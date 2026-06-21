@@ -1,9 +1,10 @@
 import { prisma } from '../src/lib/prisma'
 import { syncPaymentProvisioning } from '../src/lib/payment-sync'
 
-const intervalMs = readPositiveInt('PAYMENT_RECONCILE_INTERVAL_SECONDS', 180) * 1000
+const intervalMs = readPositiveInt('PAYMENT_RECONCILE_INTERVAL_SECONDS', 60) * 1000
 const batchSize = readPositiveInt('PAYMENT_RECONCILE_BATCH_SIZE', 25)
-const minAgeMs = readPositiveInt('PAYMENT_RECONCILE_MIN_AGE_SECONDS', 60) * 1000
+const minAgeMs = readPositiveInt('PAYMENT_RECONCILE_MIN_AGE_SECONDS', 30) * 1000
+const cancelPendingAfterMs = readPositiveInt('PAYMENT_CANCEL_PENDING_AFTER_SECONDS', 600) * 1000
 
 let stopped = false
 let wakeSleep: (() => void) | null = null
@@ -13,7 +14,7 @@ process.on('SIGINT', stop)
 
 async function main() {
   console.log(
-    `[payment-reconciler] started interval=${intervalMs / 1000}s batch=${batchSize} minAge=${minAgeMs / 1000}s`
+    `[payment-reconciler] started interval=${intervalMs / 1000}s batch=${batchSize} minAge=${minAgeMs / 1000}s cancelPendingAfter=${cancelPendingAfterMs / 1000}s`
   )
 
   while (!stopped) {
@@ -48,7 +49,10 @@ async function runOnce() {
   for (const payment of payments) {
     if (stopped) break
     try {
-      const result = await syncPaymentProvisioning({ paymentId: payment.id })
+      const result = await syncPaymentProvisioning({
+        paymentId: payment.id,
+        cancelPendingOlderThanMs: cancelPendingAfterMs,
+      })
       console.log(
         `[payment-reconciler] payment=${payment.id} status=${result.status} provisioned=${result.provisioned}`
       )

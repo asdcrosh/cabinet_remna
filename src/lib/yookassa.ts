@@ -101,3 +101,22 @@ export async function getPayment(id: string): Promise<YooPayment> {
   }
   return (await res.json()) as YooPayment
 }
+
+export async function cancelPayment(id: string, idempotenceKey = `cancel-${id}`): Promise<YooPayment> {
+  if (!SHOP_ID || !SECRET_KEY) throw new Error('YooKassa not configured')
+  const res = await fetch(`${BASE_URL}/payments/${id}/cancel`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Idempotence-Key': idempotenceKey,
+      Authorization: authHeader(),
+    },
+    body: '{}',
+    cache: 'no-store',
+  })
+  if (!res.ok) {
+    const text = await res.text()
+    throw new Error(`YooKassa cancelPayment failed: ${res.status} ${text}`)
+  }
+  return (await res.json()) as YooPayment
+}

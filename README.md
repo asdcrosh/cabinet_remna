@@ -113,6 +113,8 @@ http://localhost:3000
 | `YOOKASSA_SHOP_ID` | ID магазина YooKassa |
 | `YOOKASSA_SECRET_KEY` | Боевой secret key YooKassa |
 | `YOOKASSA_WEBHOOK_URL` | Webhook оплаты |
+| `PAYMENT_RECONCILE_INTERVAL_SECONDS` | Как часто worker проверяет ожидающие платежи |
+| `PAYMENT_CANCEL_PENDING_AFTER_SECONDS` | Через сколько секунд отменять зависший ожидающий платёж |
 | `TELEGRAM_CLIENT_ID` | Опционально, перенос старых Telegram-подписок |
 | `TELEGRAM_CLIENT_SECRET` | Опционально, перенос старых Telegram-подписок |
 | `REMNASHOP_DATABASE_URL` | Опционально, read-only подключение к старой БД remnashop |
@@ -135,6 +137,7 @@ https://ВСТАВЬ_СЮДА_ДОМЕН_КАБИНЕТА/api/webhook/yookassa
 - `payment.waiting_for_capture`
 
 После возврата пользователя из оплаты кабинет дополнительно проверяет платеж сам, поэтому выдача доступа не зависит только от webhook.
+Отдельный worker периодически сверяет ожидающие платежи с YooKassa и отменяет те, которые слишком долго не перешли в успешный статус.
 
 ## Email
 

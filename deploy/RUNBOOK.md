@@ -55,6 +55,13 @@ https://ВСТАВЬ_СЮДА_ДОМЕН_КАБИНЕТА/dashboard/admin/plans
 docker compose -f deploy/docker-compose.server.yml logs -f worker
 ```
 
+По умолчанию worker проверяет платежи раз в 60 секунд и отменяет ожидающий платёж через 600 секунд. Эти значения можно поменять в `.env.production`:
+
+```env
+PAYMENT_RECONCILE_INTERVAL_SECONDS="60"
+PAYMENT_CANCEL_PENDING_AFTER_SECONDS="600"
+```
+
 If you want to install Docker manually instead:
 
 ```bash

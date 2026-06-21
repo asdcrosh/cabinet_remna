@@ -1,13 +1,17 @@
 import { prisma } from './prisma'
 import { provisionPaymentSubscription } from './provisioning'
-import { getPayment } from './yookassa'
+import { cancelPayment, getPayment } from './yookassa'
 
 export type PaymentSyncResult =
   | { ok: true; status: 'not_found' | 'missing_external_id' | 'pending' | 'canceled'; provisioned: false }
   | { ok: true; status: 'succeeded'; provisioned: true; alreadyProvisioned?: boolean; subscriptionId?: string }
   | { ok: false; status: 'check_failed' | 'provisioning_failed'; provisioned: false; error: string }
 
-export async function syncPaymentProvisioning(input: { paymentId: string; userId?: string }): Promise<PaymentSyncResult> {
+export async function syncPaymentProvisioning(input: {
+  paymentId: string
+  userId?: string
+  cancelPendingOlderThanMs?: number
+}): Promise<PaymentSyncResult> {
   const payment = await prisma.payment.findFirst({
     where: {
       id: input.paymentId,
@@ -89,6 +93,29 @@ export async function syncPaymentProvisioning(input: { paymentId: string; userId
   }
 
   if (yooPayment.status !== 'succeeded') {
+    if (
+      input.cancelPendingOlderThanMs &&
+      Date.now() - payment.createdAt.getTime() >= input.cancelPendingOlderThanMs
+    ) {
+      try {
+        const canceledPayment = await cancelPayment(payment.yookassaId, `cancel-${payment.id}`)
+        if (canceledPayment.status === 'canceled') {
+          await cancelLocalPayment(payment.id, 'canceled')
+          return { ok: true, status: 'canceled', provisioned: false }
+        }
+      } catch (e) {
+        const message = e instanceof Error ? e.message : 'payment cancellation failed'
+        await prisma.payment.update({
+          where: { id: payment.id },
+          data: {
+            yookassaStatus: yooPayment.status,
+            provisioningError: message.slice(0, 1000),
+          },
+        })
+        return { ok: false, status: 'check_failed', provisioned: false, error: message }
+      }
+    }
+
     await prisma.payment.update({
       where: { id: payment.id },
       data: { yookassaStatus: yooPayment.status },
@@ -150,4 +177,20 @@ export async function syncPaymentProvisioning(input: { paymentId: string; userId
     })
     return { ok: false, status: 'provisioning_failed', provisioned: false, error: message }
   }
+}
+
+async function cancelLocalPayment(paymentId: string, yookassaStatus: string | null) {
+  await prisma.$transaction([
+    prisma.payment.update({
+      where: { id: paymentId },
+      data: {
+        status: 'CANCELED',
+        yookassaStatus,
+      },
+    }),
+    prisma.promoCodeRedemption.updateMany({
+      where: { paymentId, status: 'PENDING' },
+      data: { status: 'CANCELED' },
+    }),
+  ])
 }
