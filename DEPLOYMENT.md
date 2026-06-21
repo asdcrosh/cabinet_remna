@@ -43,7 +43,25 @@ YOOKASSA_WEBHOOK_URL="https://ВСТАВЬ_СЮДА_ДОМЕН_КАБИНЕТА/
 
 `EMAIL_VERIFICATION_WEBHOOK_URL` must send real email, otherwise new users cannot verify accounts.
 
+Built-in Resend option:
+
+```env
+EMAIL_VERIFICATION_WEBHOOK_URL="https://ВСТАВЬ_СЮДА_ДОМЕН_КАБИНЕТА/api/email/resend"
+EMAIL_VERIFICATION_WEBHOOK_SECRET="ВСТАВЬ_СЮДА_SECRET_ДЛЯ_EMAIL_WEBHOOK"
+RESEND_API_KEY="ВСТАВЬ_СЮДА_RESEND_API_KEY"
+EMAIL_FROM="VPN Cabinet <noreply@ВСТАВЬ_СЮДА_ДОМЕН_ПОЧТЫ>"
+```
+
 If remnashop sync is enabled, use a read-only DB user.
+
+Remote remnashop database:
+
+```env
+REMNASHOP_DATABASE_URL="postgresql://ВСТАВЬ_СЮДА_READONLY_USER:ВСТАВЬ_СЮДА_READONLY_PASSWORD@ВСТАВЬ_СЮДА_HOST_REMNASHOP:5432/remnashop?schema=public"
+REMNASHOP_DATABASE_SSL="true"
+```
+
+Open PostgreSQL port `5432` only from the cabinet server IP.
 
 ## 3. Telegram
 

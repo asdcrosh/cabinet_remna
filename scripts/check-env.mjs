@@ -21,6 +21,7 @@ const requiredProduction = [
 const optionalPairs = [
   ['TELEGRAM_CLIENT_ID', 'TELEGRAM_CLIENT_SECRET'],
   ['EMAIL_VERIFICATION_WEBHOOK_URL', 'EMAIL_VERIFICATION_WEBHOOK_SECRET'],
+  ['RESEND_API_KEY', 'EMAIL_FROM'],
 ]
 
 const errors = []
@@ -46,6 +47,14 @@ checkPublicUrl('YOOKASSA_WEBHOOK_URL', { pathPrefix: '/api/webhook/yookassa' })
 
 if (isProduction && /^test_/i.test(value('YOOKASSA_SECRET_KEY'))) {
   errors.push('YOOKASSA_SECRET_KEY looks like a test key')
+}
+
+if (isProduction && value('EMAIL_VERIFICATION_WEBHOOK_URL').includes('/api/email/resend')) {
+  if (!value('EMAIL_VERIFICATION_WEBHOOK_SECRET')) {
+    errors.push('EMAIL_VERIFICATION_WEBHOOK_SECRET is required for built-in Resend webhook')
+  }
+  if (!value('RESEND_API_KEY')) errors.push('RESEND_API_KEY is required for built-in Resend webhook')
+  if (!value('EMAIL_FROM')) errors.push('EMAIL_FROM is required for built-in Resend webhook')
 }
 
 if (isProduction && value('REMNASHOP_DATABASE_SSL') === 'no-verify') {

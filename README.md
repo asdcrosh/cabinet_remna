@@ -29,6 +29,9 @@ nano /opt/remnawave-cabinet/.env.production
 
 - `CABINET_DOMAIN`
 - `EMAIL_VERIFICATION_WEBHOOK_URL`
+- `EMAIL_VERIFICATION_WEBHOOK_SECRET`
+- `RESEND_API_KEY`
+- `EMAIL_FROM`
 - `REMNAWAVE_BASE_URL`
 - `REMNAWAVE_TOKEN`
 - `REMNAWAVE_INTERNAL_SQUAD_UUIDS`
@@ -90,6 +93,9 @@ http://localhost:3000
 | `ALLOWED_ORIGINS` | Разрешенные origins для защиты запросов |
 | `HEALTHCHECK_TOKEN` | Токен проверки `/api/health` |
 | `EMAIL_VERIFICATION_WEBHOOK_URL` | Отправка писем подтверждения email |
+| `EMAIL_VERIFICATION_WEBHOOK_SECRET` | Bearer secret для email webhook |
+| `RESEND_API_KEY` | API key Resend для встроенной отправки email |
+| `EMAIL_FROM` | От кого отправлять письма, например `VPN <noreply@domain.ru>` |
 | `REMNAWAVE_BASE_URL` | URL Remnawave Panel |
 | `REMNAWAVE_TOKEN` | API token Remnawave |
 | `REMNAWAVE_INTERNAL_SQUAD_UUIDS` | UUID squads для новых подписок |
@@ -98,6 +104,8 @@ http://localhost:3000
 | `YOOKASSA_WEBHOOK_URL` | Webhook оплаты |
 | `TELEGRAM_CLIENT_ID` | Опционально, перенос старых Telegram-подписок |
 | `TELEGRAM_CLIENT_SECRET` | Опционально, перенос старых Telegram-подписок |
+| `REMNASHOP_DATABASE_URL` | Опционально, read-only подключение к старой БД remnashop |
+| `REMNASHOP_DATABASE_SSL` | SSL для удалённой БД remnashop: `true`, `false`, `no-verify` |
 
 Полный шаблон для сервера: [deploy/env.production.example](./deploy/env.production.example).
 
@@ -119,14 +127,70 @@ https://ВСТАВЬ_СЮДА_ДОМЕН_КАБИНЕТА/api/webhook/yookassa
 
 ## Email
 
-В production нужен реальный отправщик писем. Кабинет отправляет `POST` на `EMAIL_VERIFICATION_WEBHOOK_URL` с полями:
+В production нужен реальный отправщик писем, иначе пользователи не смогут подтвердить email.
+
+Самый простой вариант уже встроен: отправка через Resend.
+
+В `.env.production` укажи:
+
+```env
+EMAIL_VERIFICATION_WEBHOOK_URL="https://ВСТАВЬ_СЮДА_ДОМЕН_КАБИНЕТА/api/email/resend"
+EMAIL_VERIFICATION_WEBHOOK_SECRET="ВСТАВЬ_СЮДА_ЛЮБОЙ_СЛУЧАЙНЫЙ_SECRET"
+RESEND_API_KEY="ВСТАВЬ_СЮДА_RESEND_API_KEY"
+EMAIL_FROM="VPN Cabinet <noreply@ВСТАВЬ_СЮДА_ТВОЙ_ДОМЕН_ПОЧТЫ>"
+```
+
+`EMAIL_VERIFICATION_WEBHOOK_SECRET` можно сгенерировать так:
+
+```bash
+openssl rand -hex 32
+```
+
+Если хочешь использовать свой отправщик, кабинет отправляет `POST` на `EMAIL_VERIFICATION_WEBHOOK_URL` с полями:
 
 - `to`
 - `subject`
 - `text`
 - `html`
 
+И заголовком:
+
+```text
+Authorization: Bearer EMAIL_VERIFICATION_WEBHOOK_SECRET
+```
+
 В dev-режиме, если webhook не задан, ссылка подтверждения выводится в консоль сервера.
+
+## Remnashop На Другом Сервере
+
+Если старая база `remnashop` находится на другом сервере, подключай её только read-only пользователем.
+
+На сервере с remnashop/PostgreSQL создай пользователя:
+
+```sql
+CREATE USER remnashop_readonly WITH PASSWORD 'ВСТАВЬ_СЮДА_СИЛЬНЫЙ_ПАРОЛЬ';
+GRANT CONNECT ON DATABASE remnashop TO remnashop_readonly;
+GRANT USAGE ON SCHEMA public TO remnashop_readonly;
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO remnashop_readonly;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO remnashop_readonly;
+```
+
+Открой доступ к PostgreSQL только с IP сервера кабинета: firewall/security group на порт `5432`.
+
+В `.env.production` кабинета:
+
+```env
+REMNASHOP_DATABASE_URL="postgresql://remnashop_readonly:ВСТАВЬ_СЮДА_ПАРОЛЬ@ВСТАВЬ_СЮДА_IP_ИЛИ_HOST_REMNASHOP:5432/remnashop?schema=public"
+REMNASHOP_DATABASE_SSL="true"
+```
+
+Если у PostgreSQL нет SSL, временно можно поставить:
+
+```env
+REMNASHOP_DATABASE_SSL="false"
+```
+
+Но для сервера в интернете лучше включить SSL или держать соединение внутри приватной сети/VPN.
 
 ## Деплой И Обновления
 

@@ -76,6 +76,9 @@ Fill real production values:
 - the password inside `DATABASE_URL`
 - `DATABASE_URL`
 - `EMAIL_VERIFICATION_WEBHOOK_URL`
+- `EMAIL_VERIFICATION_WEBHOOK_SECRET`
+- `RESEND_API_KEY`
+- `EMAIL_FROM`
 - `REMNAWAVE_BASE_URL`
 - `REMNAWAVE_TOKEN`
 - `REMNAWAVE_INTERNAL_SQUAD_UUIDS`
@@ -86,7 +89,47 @@ Rotate any tokens that were used locally before going live.
 
 Important: `POSTGRES_PASSWORD` and the password inside `DATABASE_URL` must be the same.
 
-## 4. Deploy
+## 4. Email Verification
+
+Recommended built-in setup uses Resend:
+
+```env
+EMAIL_VERIFICATION_WEBHOOK_URL="https://ВСТАВЬ_СЮДА_ДОМЕН_КАБИНЕТА/api/email/resend"
+EMAIL_VERIFICATION_WEBHOOK_SECRET="ВСТАВЬ_СЮДА_SECRET_ДЛЯ_EMAIL_WEBHOOK"
+RESEND_API_KEY="ВСТАВЬ_СЮДА_RESEND_API_KEY"
+EMAIL_FROM="VPN Cabinet <noreply@ВСТАВЬ_СЮДА_ДОМЕН_ПОЧТЫ>"
+```
+
+Generate webhook secret:
+
+```bash
+openssl rand -hex 32
+```
+
+## 5. Remote Remnashop Database
+
+If remnashop database is on another server, create a read-only PostgreSQL user there:
+
+```sql
+CREATE USER remnashop_readonly WITH PASSWORD 'ВСТАВЬ_СЮДА_СИЛЬНЫЙ_ПАРОЛЬ';
+GRANT CONNECT ON DATABASE remnashop TO remnashop_readonly;
+GRANT USAGE ON SCHEMA public TO remnashop_readonly;
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO remnashop_readonly;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO remnashop_readonly;
+```
+
+Allow PostgreSQL port `5432` only from the cabinet server IP.
+
+Then set in cabinet `.env.production`:
+
+```env
+REMNASHOP_DATABASE_URL="postgresql://remnashop_readonly:ВСТАВЬ_СЮДА_ПАРОЛЬ@ВСТАВЬ_СЮДА_IP_ИЛИ_HOST_REMNASHOP:5432/remnashop?schema=public"
+REMNASHOP_DATABASE_SSL="true"
+```
+
+Use `REMNASHOP_DATABASE_SSL="false"` only if PostgreSQL has no SSL and the network is private/trusted.
+
+## 6. Deploy
 
 Run one command:
 
@@ -103,7 +146,7 @@ This command will:
 - start the app
 - start Caddy with HTTPS
 
-## 5. Logs
+## 7. Logs
 
 App logs:
 
@@ -131,7 +174,7 @@ docker compose -f deploy/docker-compose.server.yml down
 
 Do not remove Docker volumes unless you intentionally want to delete the database.
 
-## 6. YooKassa
+## 8. YooKassa
 
 Set webhook URL in YooKassa:
 
@@ -147,7 +190,7 @@ payment.canceled
 payment.waiting_for_capture
 ```
 
-## 7. Smoke Check
+## 9. Smoke Check
 
 ```bash
 export APP_URL="https://ВСТАВЬ_СЮДА_ДОМЕН_КАБИНЕТА"
@@ -164,7 +207,7 @@ Then check manually:
 - open `/dashboard/subscription`
 - confirm QR/link is visible
 
-## 8. Backups
+## 10. Backups
 
 Create a database backup:
 
