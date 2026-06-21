@@ -3,7 +3,7 @@
 This runbook assumes the public cabinet domain is:
 
 ```text
-https://cabinet.alekseevvp.site
+https://ВСТАВЬ_СЮДА_ДОМЕН_КАБИНЕТА
 ```
 
 ## 1. DNS
@@ -11,13 +11,13 @@ https://cabinet.alekseevvp.site
 Create an `A` record:
 
 ```text
-cabinet.alekseevvp.site -> YOUR_SERVER_IP
+ВСТАВЬ_СЮДА_ДОМЕН_КАБИНЕТА -> YOUR_SERVER_IP
 ```
 
 Wait until it resolves:
 
 ```bash
-dig +short cabinet.alekseevvp.site
+dig +short ВСТАВЬ_СЮДА_ДОМЕН_КАБИНЕТА
 ```
 
 ## 2. Server packages
@@ -57,7 +57,7 @@ Then reconnect to SSH.
 On the server:
 
 ```bash
-cp deploy/env.production.alekseevvp.example .env.production
+cp deploy/env.production.example .env.production
 openssl rand -hex 32
 openssl rand -hex 32
 ```
@@ -71,11 +71,15 @@ HEALTHCHECK_TOKEN="..."
 
 Fill real production values:
 
+- `CABINET_DOMAIN`
 - `POSTGRES_PASSWORD`
 - the password inside `DATABASE_URL`
 - `DATABASE_URL`
 - `EMAIL_VERIFICATION_WEBHOOK_URL`
+- `REMNAWAVE_BASE_URL`
 - `REMNAWAVE_TOKEN`
+- `REMNAWAVE_INTERNAL_SQUAD_UUIDS`
+- `YOOKASSA_SHOP_ID`
 - `YOOKASSA_SECRET_KEY`
 
 Rotate any tokens that were used locally before going live.
@@ -132,7 +136,7 @@ Do not remove Docker volumes unless you intentionally want to delete the databas
 Set webhook URL in YooKassa:
 
 ```text
-https://cabinet.alekseevvp.site/api/webhook/yookassa
+https://ВСТАВЬ_СЮДА_ДОМЕН_КАБИНЕТА/api/webhook/yookassa
 ```
 
 Events:
@@ -146,7 +150,7 @@ payment.waiting_for_capture
 ## 7. Smoke Check
 
 ```bash
-export APP_URL="https://cabinet.alekseevvp.site"
+export APP_URL="https://ВСТАВЬ_СЮДА_ДОМЕН_КАБИНЕТА"
 export HEALTHCHECK_TOKEN="..."
 bash deploy/smoke-check.sh
 ```

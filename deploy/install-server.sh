@@ -3,7 +3,7 @@ set -euo pipefail
 
 REPO_URL="${REPO_URL:-https://github.com/asdcrosh/cabinet_remna.git}"
 INSTALL_DIR="${INSTALL_DIR:-/opt/remnawave-cabinet}"
-CABINET_DOMAIN="${CABINET_DOMAIN:-cabinet.alekseevvp.site}"
+CABINET_DOMAIN="${CABINET_DOMAIN:-cabinet.example.com}"
 BRANCH="${BRANCH:-main}"
 
 if [[ "$(id -u)" -ne 0 ]]; then
@@ -44,7 +44,7 @@ fi
 cd "${INSTALL_DIR}"
 
 if [[ ! -f .env.production ]]; then
-  cp deploy/env.production.alekseevvp.example .env.production
+  cp deploy/env.production.example .env.production
 fi
 
 DB_PASSWORD="${POSTGRES_PASSWORD:-$(openssl rand -hex 24)}"
@@ -100,7 +100,7 @@ do
   fi
 done
 
-if grep -Eq 'CHANGE_ME|test_' .env.production; then
+if grep -Eq 'CHANGE_ME|ВСТАВЬ_СЮДА|test_|example\.com' .env.production; then
   cat <<EOF
 
 Project is installed in:
@@ -111,8 +111,12 @@ Fill the remaining production values:
   nano ${INSTALL_DIR}/.env.production
 
 Required values:
+  CABINET_DOMAIN
   EMAIL_VERIFICATION_WEBHOOK_URL
+  REMNAWAVE_BASE_URL
   REMNAWAVE_TOKEN
+  REMNAWAVE_INTERNAL_SQUAD_UUIDS
+  YOOKASSA_SHOP_ID
   YOOKASSA_SECRET_KEY
 
 Then run:

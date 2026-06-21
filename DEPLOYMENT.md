@@ -1,8 +1,8 @@
 # Production deployment
 
-Ready-to-use one-command deployment files for `cabinet.alekseevvp.site` are in `deploy/`:
+Ready-to-use one-command deployment files are in `deploy/`:
 
-- `deploy/env.production.alekseevvp.example`
+- `deploy/env.production.example`
 - `deploy/Caddyfile`
 - `deploy/docker-compose.server.yml`
 - `deploy/deploy.sh`
@@ -11,7 +11,7 @@ Ready-to-use one-command deployment files for `cabinet.alekseevvp.site` are in `
 
 ## 1. Secrets
 
-Create `.env.production` on the server from `deploy/env.production.alekseevvp.example`.
+Create `.env.production` on the server from `deploy/env.production.example`.
 
 Generate fresh values:
 
@@ -36,9 +36,9 @@ Rotate any tokens that were used during local development before going live:
 `APP_URL` and `ALLOWED_ORIGINS` must be the public HTTPS cabinet origin:
 
 ```env
-APP_URL="https://cabinet.alekseevvp.site"
-ALLOWED_ORIGINS="https://cabinet.alekseevvp.site"
-YOOKASSA_WEBHOOK_URL="https://cabinet.alekseevvp.site/api/webhook/yookassa"
+APP_URL="https://ВСТАВЬ_СЮДА_ДОМЕН_КАБИНЕТА"
+ALLOWED_ORIGINS="https://ВСТАВЬ_СЮДА_ДОМЕН_КАБИНЕТА"
+YOOKASSA_WEBHOOK_URL="https://ВСТАВЬ_СЮДА_ДОМЕН_КАБИНЕТА/api/webhook/yookassa"
 ```
 
 `EMAIL_VERIFICATION_WEBHOOK_URL` must send real email, otherwise new users cannot verify accounts.
@@ -50,8 +50,8 @@ If remnashop sync is enabled, use a read-only DB user.
 In BotFather Web Login settings add:
 
 ```text
-https://cabinet.alekseevvp.site
-https://cabinet.alekseevvp.site/api/me/telegram/oidc/callback
+https://ВСТАВЬ_СЮДА_ДОМЕН_КАБИНЕТА
+https://ВСТАВЬ_СЮДА_ДОМЕН_КАБИНЕТА/api/me/telegram/oidc/callback
 ```
 
 Then set:
@@ -66,7 +66,7 @@ TELEGRAM_CLIENT_SECRET="..."
 In YooKassa dashboard add webhook:
 
 ```text
-POST https://cabinet.alekseevvp.site/api/webhook/yookassa
+POST https://ВСТАВЬ_СЮДА_ДОМЕН_КАБИНЕТА/api/webhook/yookassa
 ```
 
 Events:
@@ -88,7 +88,7 @@ curl -fsSL https://raw.githubusercontent.com/asdcrosh/cabinet_remna/main/deploy/
 ```
 
 The installer creates `/opt/remnawave-cabinet/.env.production` and generates local secrets.
-Fill the remaining production values, then run:
+Fill every `ВСТАВЬ_СЮДА_...` value in `.env.production`, then run:
 
 ```bash
 cd /opt/remnawave-cabinet
@@ -98,7 +98,7 @@ cd /opt/remnawave-cabinet
 Manual equivalent:
 
 ```bash
-cp deploy/env.production.alekseevvp.example .env.production
+cp deploy/env.production.example .env.production
 # edit .env.production
 ./deploy/deploy.sh
 ```
@@ -160,13 +160,13 @@ Use `deploy/Caddyfile` or `deploy/nginx.conf` only if you manage the reverse pro
 ## 8. Smoke checks
 
 ```bash
-curl -H "x-healthcheck-token: $HEALTHCHECK_TOKEN" https://cabinet.alekseevvp.site/api/health
+curl -H "x-healthcheck-token: $HEALTHCHECK_TOKEN" https://ВСТАВЬ_СЮДА_ДОМЕН_КАБИНЕТА/api/health
 ```
 
 Or:
 
 ```bash
-APP_URL="https://cabinet.alekseevvp.site" HEALTHCHECK_TOKEN="$HEALTHCHECK_TOKEN" bash deploy/smoke-check.sh
+APP_URL="https://ВСТАВЬ_СЮДА_ДОМЕН_КАБИНЕТА" HEALTHCHECK_TOKEN="$HEALTHCHECK_TOKEN" bash deploy/smoke-check.sh
 ```
 
 Then verify:

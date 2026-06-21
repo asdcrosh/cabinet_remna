@@ -1,10 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-APP_URL="${APP_URL:-https://cabinet.alekseevvp.site}"
+APP_URL="${APP_URL:-}"
 
 if [[ -z "${HEALTHCHECK_TOKEN:-}" ]]; then
   echo "HEALTHCHECK_TOKEN is required"
+  exit 1
+fi
+
+if [[ -z "${APP_URL}" ]]; then
+  echo "APP_URL is required, for example: https://your-cabinet-domain.example"
   exit 1
 fi
 

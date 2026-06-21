@@ -8,14 +8,14 @@ ENV_FILE="${ROOT_DIR}/.env.production"
 cd "${ROOT_DIR}"
 
 if [[ ! -f "${ENV_FILE}" ]]; then
-  cp deploy/env.production.alekseevvp.example .env.production
+  cp deploy/env.production.example .env.production
   echo "Created .env.production from template."
   echo "Fill .env.production first, then run: ./deploy/deploy.sh"
   exit 1
 fi
 
-if grep -Eq 'CHANGE_ME|test_' "${ENV_FILE}"; then
-  echo ".env.production still contains CHANGE_ME or test_ values."
+if grep -Eq 'CHANGE_ME|ВСТАВЬ_СЮДА|test_|example\.com' "${ENV_FILE}"; then
+  echo ".env.production still contains placeholder, example.com, or test_ values."
   echo "Fill real production secrets before deploy."
   exit 1
 fi

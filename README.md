@@ -27,8 +27,12 @@ nano /opt/remnawave-cabinet/.env.production
 
 Минимально нужно указать:
 
+- `CABINET_DOMAIN`
 - `EMAIL_VERIFICATION_WEBHOOK_URL`
+- `REMNAWAVE_BASE_URL`
 - `REMNAWAVE_TOKEN`
+- `REMNAWAVE_INTERNAL_SQUAD_UUIDS`
+- `YOOKASSA_SHOP_ID`
 - `YOOKASSA_SECRET_KEY`
 
 Затем запусти боевой экземпляр:
@@ -95,14 +99,14 @@ http://localhost:3000
 | `TELEGRAM_CLIENT_ID` | Опционально, перенос старых Telegram-подписок |
 | `TELEGRAM_CLIENT_SECRET` | Опционально, перенос старых Telegram-подписок |
 
-Полный шаблон для сервера: [deploy/env.production.alekseevvp.example](./deploy/env.production.alekseevvp.example).
+Полный шаблон для сервера: [deploy/env.production.example](./deploy/env.production.example).
 
 ## YooKassa
 
 В кабинете YooKassa добавь webhook:
 
 ```text
-https://cabinet.alekseevvp.site/api/webhook/yookassa
+https://ВСТАВЬ_СЮДА_ДОМЕН_КАБИНЕТА/api/webhook/yookassa
 ```
 
 События:
@@ -149,7 +153,7 @@ docker compose -f deploy/docker-compose.server.yml logs -f app
 Проверка после запуска:
 
 ```bash
-export APP_URL="https://cabinet.alekseevvp.site"
+export APP_URL="https://ВСТАВЬ_СЮДА_ДОМЕН_КАБИНЕТА"
 export HEALTHCHECK_TOKEN="значение_из_env"
 ./deploy/smoke-check.sh
 ```
@@ -182,5 +186,5 @@ deploy               production deploy scripts и compose
 - используй только боевые ключи YooKassa;
 - перевыпусти токены, которые использовались локально;
 - проверь, что `.env.production` не попадает в Git;
-- направь `cabinet.alekseevvp.site` на IP сервера;
+- направь свой домен кабинета на IP сервера;
 - проверь регистрацию, email, оплату и выдачу подписки тестовой покупкой.
