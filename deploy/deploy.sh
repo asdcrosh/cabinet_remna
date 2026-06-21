@@ -31,7 +31,12 @@ if ! docker compose version >/dev/null 2>&1; then
 fi
 
 echo "Checking production environment..."
-NODE_ENV=production npm run check:env
+if command -v npm >/dev/null 2>&1; then
+  NODE_ENV=production npm run check:env
+else
+  echo "npm is not installed on host, skipping host env check."
+  echo "Docker build and app startup will validate runtime configuration."
+fi
 
 echo "Building images..."
 CABINET_ENV_FILE="${ENV_FILE}" docker compose -f "${COMPOSE_FILE}" build

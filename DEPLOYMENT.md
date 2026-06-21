@@ -84,6 +84,20 @@ If you know YooKassa source IP/CIDR ranges for your account, set `YOOKASSA_WEBHO
 For a clean server with built-in PostgreSQL and HTTPS via Caddy:
 
 ```bash
+curl -fsSL https://raw.githubusercontent.com/asdcrosh/cabinet_remna/main/deploy/install-server.sh | sudo bash
+```
+
+The installer creates `/opt/remnawave-cabinet/.env.production` and generates local secrets.
+Fill the remaining production values, then run:
+
+```bash
+cd /opt/remnawave-cabinet
+./deploy/deploy.sh
+```
+
+Manual equivalent:
+
+```bash
 cp deploy/env.production.alekseevvp.example .env.production
 # edit .env.production
 ./deploy/deploy.sh

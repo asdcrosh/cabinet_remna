@@ -22,9 +22,28 @@ dig +short cabinet.alekseevvp.site
 
 ## 2. Server packages
 
-Install Docker and Docker Compose plugin.
+Fast path on a clean Ubuntu/Debian server:
 
-On Ubuntu/Debian the shortest practical path is:
+```bash
+curl -fsSL https://raw.githubusercontent.com/asdcrosh/cabinet_remna/main/deploy/install-server.sh | sudo bash
+```
+
+The installer will:
+
+- install Docker, Docker Compose plugin and Git
+- clone the project to `/opt/remnawave-cabinet`
+- create `.env.production`
+- generate database password, `JWT_SECRET` and `HEALTHCHECK_TOKEN`
+- tell you which production values still need to be filled
+
+After editing `.env.production`, run:
+
+```bash
+cd /opt/remnawave-cabinet
+./deploy/deploy.sh
+```
+
+If you want to install Docker manually instead:
 
 ```bash
 curl -fsSL https://get.docker.com | sh
