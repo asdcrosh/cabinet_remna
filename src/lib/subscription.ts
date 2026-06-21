@@ -9,6 +9,7 @@
 import { prisma } from './prisma'
 import { remnawave, RemnawaveError, type UserResponse } from './remnawave'
 import { gbToBytes } from './format'
+import { toRemnawaveTelegramId } from './telegram-remnawave'
 
 export interface EnsureSubscriptionInput {
   userId: string                  // локальный ID в нашей БД
@@ -68,6 +69,7 @@ export async function ensureRemnawaveSubscription(input: EnsureSubscriptionInput
         trafficLimitBytes:
           input.plan.trafficLimitGb == null ? 0 : Number(gbToBytes(input.plan.trafficLimitGb)),
         hwidDeviceLimit: input.plan.deviceLimit,
+        telegramId: toRemnawaveTelegramId(user.telegramId),
         ...(activeInternalSquads.length > 0 ? { activeInternalSquads } : {}),
       })
       remnawaveUser = updated.response
@@ -83,6 +85,7 @@ export async function ensureRemnawaveSubscription(input: EnsureSubscriptionInput
         expireAt: newExpire,
         plan: input.plan,
         activeInternalSquads,
+        telegramId: user.telegramId,
       })
       remnawaveUser = created.response
 
@@ -105,6 +108,7 @@ export async function ensureRemnawaveSubscription(input: EnsureSubscriptionInput
       expireAt,
       plan: input.plan,
       activeInternalSquads,
+      telegramId: user.telegramId,
     })
     remnawaveUser = created.response
 
@@ -213,12 +217,14 @@ function createRemnawaveUser(input: {
   expireAt: Date
   plan: EnsureSubscriptionInput['plan']
   activeInternalSquads: string[]
+  telegramId?: bigint | null
 }) {
   return remnawave.createUser({
     username: sanitizeUsername(input.email),
     expireAt: input.expireAt.toISOString(),
     status: 'ACTIVE',
     email: input.email,
+    telegramId: toRemnawaveTelegramId(input.telegramId),
     trafficLimitBytes:
       input.plan.trafficLimitGb == null ? 0 : Number(gbToBytes(input.plan.trafficLimitGb)),
     hwidDeviceLimit: input.plan.deviceLimit,

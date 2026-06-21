@@ -1,9 +1,10 @@
 'use client'
 
-import { useEffect } from 'react'
-import { useSearchParams } from 'next/navigation'
-import { ExternalLink, Send } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { ExternalLink, RefreshCw, Send } from 'lucide-react'
 import { toast } from '@/components/ui/toaster'
+import { apiFetch } from '@/lib/api-client'
 
 interface TelegramLinkCardProps {
   telegramClientId: string | null
@@ -22,8 +23,23 @@ export function TelegramLinkCard({
   remnashopUserId,
   remnawaveUsername,
 }: TelegramLinkCardProps) {
+  const router = useRouter()
   const searchParams = useSearchParams()
+  const [syncing, setSyncing] = useState(false)
   const telegramStartUrl = appUrl ? `${appUrl.replace(/\/+$/, '')}/api/me/telegram/oidc/start` : '/api/me/telegram/oidc/start'
+
+  async function syncTelegram() {
+    setSyncing(true)
+    try {
+      await apiFetch('/api/me/telegram/sync', { method: 'POST' })
+      toast('Telegram ID отправлен в Remnawave', 'success')
+      router.refresh()
+    } catch {
+      // apiFetch уже покажет toast
+    } finally {
+      setSyncing(false)
+    }
+  }
 
   useEffect(() => {
     const error = searchParams.get('telegram_error')
@@ -60,8 +76,14 @@ export function TelegramLinkCard({
       </div>
 
       {telegramId ? (
-        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-100">
-          Telegram привязан. Если старая подписка найдена, она появится в кабинете.
+        <div className="space-y-3">
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-100">
+            Telegram привязан. Если старая подписка найдена, она появится в кабинете.
+          </div>
+          <button type="button" className="btn-secondary" onClick={syncTelegram} disabled={syncing}>
+            <RefreshCw className="h-4 w-4" />
+            {syncing ? 'Синхронизируем...' : 'Синхронизировать'}
+          </button>
         </div>
       ) : !telegramClientId ? (
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">

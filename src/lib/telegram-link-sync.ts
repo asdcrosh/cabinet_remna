@@ -1,6 +1,7 @@
 import { prisma } from './prisma'
 import { remnawave, type UserResponse } from './remnawave'
 import { remnashopQuery } from './remnashop-db'
+import { toRemnawaveTelegramId } from './telegram-remnawave'
 
 interface RemnashopTelegramUserRow {
   id: number
@@ -36,11 +37,16 @@ export async function syncLinkedTelegramUser(input: {
   localUserId: string
   telegramId: bigint
 }) {
+  const localUser = await prisma.user.findUnique({
+    where: { id: input.localUserId },
+    select: { remnawaveUuid: true },
+  })
+  const localRemnawaveSynced = await syncRemnawaveTelegramId(localUser?.remnawaveUuid, input.telegramId)
   const remnashopUser = await findRemnashopUserByTelegramId(input.telegramId)
   if (!remnashopUser) {
     return {
       foundRemnashopUser: false as const,
-      syncedRemnawave: false as const,
+      syncedRemnawave: localRemnawaveSynced,
     }
   }
 
@@ -54,12 +60,19 @@ export async function syncLinkedTelegramUser(input: {
     })
     return {
       foundRemnashopUser: true as const,
-      syncedRemnawave: false as const,
+      syncedRemnawave: localRemnawaveSynced,
       remnashopUserId: remnashopUser.id,
     }
   }
 
-  const remnawaveUser = (await remnawave.getUserByUuid(remnashopUser.user_remna_id)).response
+  let remnawaveUser = (await remnawave.getUserByUuid(remnashopUser.user_remna_id)).response
+  const telegramId = toRemnawaveTelegramId(input.telegramId)
+  if (telegramId) {
+    remnawaveUser = (await remnawave.updateUser({
+      uuid: remnawaveUser.uuid,
+      telegramId,
+    })).response
+  }
   const subscription = await upsertLocalSubscriptionFromRemnawave({
     localUserId: input.localUserId,
     remnashopUserId: remnashopUser.id,
@@ -73,6 +86,19 @@ export async function syncLinkedTelegramUser(input: {
     remnawaveUuid: remnawaveUser.uuid,
     subscriptionId: subscription.id,
   }
+}
+
+async function syncRemnawaveTelegramId(remnawaveUuid: string | null | undefined, telegramIdValue: bigint) {
+  if (!remnawaveUuid) return false as const
+  const telegramId = toRemnawaveTelegramId(telegramIdValue)
+  if (!telegramId) return false as const
+
+  await remnawave.updateUser({
+    uuid: remnawaveUuid,
+    telegramId,
+  })
+
+  return true as const
 }
 
 async function upsertLocalSubscriptionFromRemnawave(input: {
