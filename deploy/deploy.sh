@@ -47,6 +47,9 @@ CABINET_ENV_FILE="${ENV_FILE}" docker compose -f "${COMPOSE_FILE}" up -d db
 echo "Running migrations..."
 CABINET_ENV_FILE="${ENV_FILE}" docker compose -f "${COMPOSE_FILE}" run --rm migrate
 
+echo "Seeding default plans if database is empty..."
+CABINET_ENV_FILE="${ENV_FILE}" docker compose -f "${COMPOSE_FILE}" run --rm migrate npm run db:seed
+
 echo "Starting app and HTTPS proxy..."
 CABINET_ENV_FILE="${ENV_FILE}" docker compose -f "${COMPOSE_FILE}" up -d app caddy
 

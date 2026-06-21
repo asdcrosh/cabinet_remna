@@ -11,6 +11,8 @@ import {
   Menu,
   Settings,
   ShieldCheck,
+  SlidersHorizontal,
+  UserCog,
   X,
 } from 'lucide-react'
 import { cn } from '@/lib/cn'
@@ -25,8 +27,15 @@ const nav = [
   { href: '/dashboard/settings', label: 'Настройки', icon: Settings },
 ]
 
-export function DashboardNav({ role: _role }: { role: 'USER' | 'ADMIN' }) {
-  return <NavList className="space-y-1" />
+const adminNav = [
+  { href: '/dashboard/admin', label: 'Админка', icon: UserCog, exact: true },
+  { href: '/dashboard/admin/plans', label: 'Управление тарифами', icon: SlidersHorizontal },
+]
+
+type NavItem = (typeof nav)[number] | (typeof adminNav)[number]
+
+export function DashboardNav({ role }: { role: 'USER' | 'ADMIN' }) {
+  return <NavList role={role} className="space-y-1" />
 }
 
 export function MobileDashboardNav({ role, email }: { role: 'USER' | 'ADMIN'; email: string }) {
@@ -60,7 +69,7 @@ export function MobileDashboardNav({ role, email }: { role: 'USER' | 'ADMIN'; em
               </button>
             </div>
             <div className="flex-1 overflow-y-auto p-3">
-              <NavList onNavigate={() => setOpen(false)} className="space-y-1" />
+              <NavList role={role} onNavigate={() => setOpen(false)} className="space-y-1" />
             </div>
             <div className="border-t border-white/70 p-3 dark:border-white/10">
               <div className="mb-2 rounded-lg border border-slate-100 bg-slate-50/80 px-3 py-2 text-xs text-slate-500 dark:border-slate-800 dark:bg-surface-900/80">
@@ -93,9 +102,11 @@ export function Brand({ compact = false }: { compact?: boolean }) {
 }
 
 function NavList({
+  role,
   className,
   onNavigate,
 }: {
+  role: 'USER' | 'ADMIN'
   className?: string
   onNavigate?: () => void
 }) {
@@ -104,6 +115,14 @@ function NavList({
   return (
     <nav className={className}>
       <NavGroup items={nav} pathname={pathname} onNavigate={onNavigate} />
+      {role === 'ADMIN' && (
+        <div className="pt-4">
+          <div className="px-3 pb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+            Администрирование
+          </div>
+          <NavGroup items={adminNav} pathname={pathname} onNavigate={onNavigate} />
+        </div>
+      )}
     </nav>
   )
 }
@@ -113,7 +132,7 @@ function NavGroup({
   pathname,
   onNavigate,
 }: {
-  items: typeof nav
+  items: NavItem[]
   pathname: string
   onNavigate?: () => void
 }) {

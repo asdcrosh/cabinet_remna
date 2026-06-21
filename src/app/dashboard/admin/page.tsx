@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { AlertTriangle, CreditCard, Database, Tag, Users } from 'lucide-react'
+import { AlertTriangle, CreditCard, Database, ShieldCheck, Tag, Users } from 'lucide-react'
 import { prisma } from '@/lib/prisma'
 import { requireAdminPage } from '@/lib/auth/admin-page'
 import { formatPrice } from '@/lib/format'
@@ -15,7 +15,7 @@ export default async function AdminDashboardPage() {
   const now = new Date()
   const soon = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
 
-  const [usersTotal, activeSubscriptions, recoveryCount, paymentsAggregate, activePromoCodes] = await Promise.all([
+  const [usersTotal, activeSubscriptions, recoveryCount, paymentsAggregate, activePromoCodes, activePlans] = await Promise.all([
     prisma.user.count(),
     prisma.subscription.count({ where: { status: { in: ['ACTIVE', 'LIMITED'] } } }),
     prisma.payment.count({ where: { status: 'SUCCEEDED', subscriptionProvisionedAt: null } }),
@@ -25,6 +25,7 @@ export default async function AdminDashboardPage() {
       _count: true,
     }),
     prisma.promoCode.count({ where: { isActive: true } }),
+    prisma.plan.count({ where: { isActive: true } }),
   ])
 
   const expiringSoon = await prisma.subscription.count({
@@ -39,8 +40,14 @@ export default async function AdminDashboardPage() {
         action={<Link href="/dashboard/admin/recovery" className="btn-primary">Recovery</Link>}
       />
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 2xl:grid-cols-5">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 2xl:grid-cols-6">
         <StatCard label="Пользователи" value={usersTotal} hint="всего аккаунтов" icon={<Users className="h-5 w-5" />} />
+        <StatCard
+          label="Тарифы"
+          value={activePlans}
+          hint="опубликованы"
+          icon={<ShieldCheck className="h-5 w-5" />}
+        />
         <StatCard
           label="Активные подписки"
           value={activeSubscriptions}
@@ -68,8 +75,9 @@ export default async function AdminDashboardPage() {
         />
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         <AdminQuickLink href="/dashboard/admin/users" title="Пользователи" description="Поиск, роли, Remnawave-профили" />
+        <AdminQuickLink href="/dashboard/admin/plans" title="Тарифы" description="Цены, сроки, лимиты и публикация" />
         <AdminQuickLink href="/dashboard/admin/payments" title="Платежи" description="История оплат и выдачи подписок" />
         <AdminQuickLink href="/dashboard/admin/promo-codes" title="Промокоды" description="Скидки, лимиты и тарифы" />
         <AdminQuickLink href="/dashboard/admin/subscriptions" title="Подписки" description="Статусы, сроки и локальная синхронизация" />

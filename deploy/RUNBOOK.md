@@ -43,6 +43,12 @@ cd /opt/remnawave-cabinet
 ./deploy/deploy.sh
 ```
 
+`deploy.sh` применит миграции и создаст стартовые тарифы, если база пустая. После первого входа админ может менять тарифы на:
+
+```text
+https://ВСТАВЬ_СЮДА_ДОМЕН_КАБИНЕТА/dashboard/admin/plans
+```
+
 If you want to install Docker manually instead:
 
 ```bash

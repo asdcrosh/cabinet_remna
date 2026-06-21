@@ -1,5 +1,5 @@
-// Сид тарифов — выполняется один раз при деплое: `npm run seed`
-// Создаёт базовую линейку тарифов, которые пользователь видит на /plans.
+// Сид тарифов для пустой базы: создаёт стартовую линейку, но не трогает
+// тарифы, которые администратор уже настроил в кабинете.
 
 import { PrismaClient } from '@prisma/client'
 
@@ -36,11 +36,15 @@ const PLANS = [
 ] as const
 
 async function main() {
+  const existingPlans = await prisma.plan.count()
+  if (existingPlans > 0) {
+    console.log(`Plans already exist (${existingPlans}), seed skipped`)
+    return
+  }
+
   for (const plan of PLANS) {
-    await prisma.plan.upsert({
-      where: { id: `plan-${plan.sortOrder}` }, // стабильные ID для дев-среды
-      update: { ...plan, isActive: true },
-      create: { id: `plan-${plan.sortOrder}`, ...plan, isActive: true },
+    await prisma.plan.create({
+      data: { id: `plan-${plan.sortOrder}`, ...plan, isActive: true },
     })
   }
   console.log(`✅ Seeded ${PLANS.length} plans`)

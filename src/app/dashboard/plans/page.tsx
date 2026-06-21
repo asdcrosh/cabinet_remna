@@ -1,6 +1,7 @@
 // /dashboard/plans — выбор тарифа. Серверный компонент: планы
 // подтянем напрямую из Prisma (не из /api/plans, чтобы не ходить самому к себе).
 
+import Link from 'next/link'
 import { prisma } from '@/lib/prisma'
 import { PlanCard } from '@/components/dashboard/plan-card'
 import { formatPrice } from '@/lib/format'
@@ -28,6 +29,11 @@ export default async function PlansPage() {
       <PageHeader
         title="Купить VPN"
         description="Выберите тариф и оплатите онлайн"
+        action={session?.role === 'ADMIN' ? (
+          <Link href="/dashboard/admin/plans" className="btn-secondary">
+            Управлять тарифами
+          </Link>
+        ) : undefined}
       />
 
       <section className="card relative overflow-hidden p-5 sm:p-6">
@@ -48,6 +54,19 @@ export default async function PlansPage() {
       </section>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {plans.length === 0 && (
+          <div className="card col-span-full py-12 text-center">
+            <h3 className="text-lg font-semibold">Тарифы скоро появятся</h3>
+            <p className="mx-auto mt-2 max-w-md text-sm text-slate-500 dark:text-slate-400">
+              Сейчас нет опубликованных тарифов.
+            </p>
+            {session?.role === 'ADMIN' && (
+              <Link href="/dashboard/admin/plans" className="btn-primary mt-5 inline-flex">
+                Создать тариф
+              </Link>
+            )}
+          </div>
+        )}
         {plans.map((p, index) => (
           <PlanCard
             key={p.id}
