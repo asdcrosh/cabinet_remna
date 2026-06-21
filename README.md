@@ -1,17 +1,66 @@
 # Remnawave Cabinet
 
-Личный кабинет для VPN-сервиса на базе Remnawave Panel: регистрация, покупка тарифа через ЮKassa, выдача/продление подписки, ключи подключения, трафик, платежи и устройства.
+Красивый личный кабинет для продажи VPN без обязательного Telegram: пользователь регистрируется по email, выбирает тариф, оплачивает онлайн и получает ссылку доступа, QR-код, историю платежей и управление устройствами.
 
-## Стек
+Проект рассчитан на связку:
 
-- Next.js 14 App Router
-- PostgreSQL + Prisma
-- JWT в httpOnly cookie
-- YooKassa payments/webhooks
-- Remnawave Panel API
-- Tailwind CSS
+- Remnawave Panel для VPN-профилей
+- YooKassa для онлайн-оплаты
+- PostgreSQL для данных кабинета
+- Next.js 14 App Router для интерфейса и API
 
-## Быстрый старт
+## Быстрый Старт На Сервере
+
+Для чистого Ubuntu/Debian сервера достаточно одной команды:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/asdcrosh/cabinet_remna/main/deploy/install-server.sh | sudo bash
+```
+
+Скрипт сам установит Docker, скачает проект, создаст `.env.production`, сгенерирует пароль базы, `JWT_SECRET` и `HEALTHCHECK_TOKEN`.
+
+После этого заполни реальные данные:
+
+```bash
+nano /opt/remnawave-cabinet/.env.production
+```
+
+Минимально нужно указать:
+
+- `EMAIL_VERIFICATION_WEBHOOK_URL`
+- `REMNAWAVE_TOKEN`
+- `YOOKASSA_SECRET_KEY`
+
+Затем запусти боевой экземпляр:
+
+```bash
+cd /opt/remnawave-cabinet
+./deploy/deploy.sh
+```
+
+Будет поднято:
+
+- PostgreSQL
+- Prisma migrations
+- Next.js приложение
+- Caddy с автоматическим HTTPS
+
+Подробный серверный чеклист: [deploy/RUNBOOK.md](./deploy/RUNBOOK.md).
+
+## Что Умеет
+
+- Регистрация и вход по email/паролю
+- Подтверждение email перед покупкой
+- Покупка и продление VPN через YooKassa
+- Автоматическая выдача доступа после оплаты
+- QR-код и ссылка доступа в кабинете
+- История платежей и состояние выдачи
+- Промокоды и скидки
+- Управление устройствами
+- Опциональный перенос старых Telegram-подписок
+- Recovery для платежей, если внешний сервис временно не ответил
+
+## Локальный Запуск
 
 ```bash
 npm install
@@ -21,129 +70,117 @@ npm run db:seed
 npm run dev
 ```
 
-Открой `http://localhost:3000`.
-
-## Переменные окружения
-
-| Переменная | Назначение |
-| --- | --- |
-| `DATABASE_URL` | PostgreSQL connection string |
-| `JWT_SECRET` | Секрет JWT, минимум 32 случайных байта |
-| `APP_URL` | Публичный URL кабинета, например `https://cabinet.example.com` |
-| `ALLOWED_ORIGINS` | Дополнительные origins для CSRF-check, через запятую |
-| `HEALTHCHECK_TOKEN` | Токен для `/api/health`; в production обязателен |
-| `EMAIL_VERIFICATION_WEBHOOK_URL` | Webhook для отправки письма подтверждения email; в production обязателен |
-| `EMAIL_VERIFICATION_WEBHOOK_SECRET` | Опциональный Bearer token для email webhook |
-| `REMNAWAVE_BASE_URL` | URL Remnawave Panel без trailing slash |
-| `REMNAWAVE_TOKEN` | API token Remnawave |
-| `REMNAWAVE_INTERNAL_SQUAD_UUIDS` | UUID внутренних squads Remnawave для новых/продлеваемых подписок, через запятую |
-| `REMNASHOP_DATABASE_URL` | Read-only PostgreSQL connection string к базе remnashop для dry-run sync |
-| `REMNASHOP_DATABASE_SSL` | SSL режим для remnashop: `false`, `true` или `no-verify` |
-| `TELEGRAM_CLIENT_ID` | Client ID из BotFather Web Login для привязки Telegram |
-| `TELEGRAM_CLIENT_SECRET` | Client Secret из BotFather Web Login для обмена OAuth code |
-| `TELEGRAM_BOT_USERNAME` | Username бота без `@` для legacy Telegram Login Widget fallback |
-| `TELEGRAM_BOT_TOKEN` | Bot token для проверки подписи legacy Telegram Login payload |
-| `YOOKASSA_SHOP_ID` | ID магазина ЮKassa |
-| `YOOKASSA_SECRET_KEY` | Secret key ЮKassa |
-| `YOOKASSA_WEBHOOK_URL` | URL webhook для настройки в ЮKassa |
-| `YOOKASSA_WEBHOOK_ALLOWED_IPS` | Опциональный allowlist IP/CIDR ЮKassa через запятую |
-
-## ЮKassa webhook
-
-В кабинете ЮKassa добавь webhook:
+Открой:
 
 ```text
-POST {APP_URL}/api/webhook/yookassa
+http://localhost:3000
 ```
 
-Включи события:
+## Основные Переменные
+
+| Переменная | Для чего нужна |
+| --- | --- |
+| `DATABASE_URL` | PostgreSQL connection string |
+| `JWT_SECRET` | Секрет сессий, минимум 32 случайных символа |
+| `APP_URL` | Публичный URL кабинета |
+| `ALLOWED_ORIGINS` | Разрешенные origins для защиты запросов |
+| `HEALTHCHECK_TOKEN` | Токен проверки `/api/health` |
+| `EMAIL_VERIFICATION_WEBHOOK_URL` | Отправка писем подтверждения email |
+| `REMNAWAVE_BASE_URL` | URL Remnawave Panel |
+| `REMNAWAVE_TOKEN` | API token Remnawave |
+| `REMNAWAVE_INTERNAL_SQUAD_UUIDS` | UUID squads для новых подписок |
+| `YOOKASSA_SHOP_ID` | ID магазина YooKassa |
+| `YOOKASSA_SECRET_KEY` | Боевой secret key YooKassa |
+| `YOOKASSA_WEBHOOK_URL` | Webhook оплаты |
+| `TELEGRAM_CLIENT_ID` | Опционально, перенос старых Telegram-подписок |
+| `TELEGRAM_CLIENT_SECRET` | Опционально, перенос старых Telegram-подписок |
+
+Полный шаблон для сервера: [deploy/env.production.alekseevvp.example](./deploy/env.production.alekseevvp.example).
+
+## YooKassa
+
+В кабинете YooKassa добавь webhook:
+
+```text
+https://cabinet.alekseevvp.site/api/webhook/yookassa
+```
+
+События:
 
 - `payment.succeeded`
 - `payment.canceled`
 - `payment.waiting_for_capture`
 
-Для локальной разработки используй публичный tunnel, например ngrok, и укажи полученный URL в `YOOKASSA_WEBHOOK_URL`.
+После возврата пользователя из оплаты кабинет дополнительно проверяет платеж сам, поэтому выдача доступа не зависит только от webhook.
 
-## Подтверждение email
+## Email
 
-После регистрации пользователь получает ссылку подтверждения и сможет войти только после перехода по ней.
+В production нужен реальный отправщик писем. Кабинет отправляет `POST` на `EMAIL_VERIFICATION_WEBHOOK_URL` с полями:
 
-Если `EMAIL_VERIFICATION_WEBHOOK_URL` задан, кабинет отправит на него `POST` с JSON-полями `to`, `subject`, `text`, `html`. Если переменная пустая, в dev-режиме ссылка подтверждения выводится в консоль сервера.
+- `to`
+- `subject`
+- `text`
+- `html`
 
-## Деплой
+В dev-режиме, если webhook не задан, ссылка подтверждения выводится в консоль сервера.
 
-Подробный чеклист: [DEPLOYMENT.md](./DEPLOYMENT.md).
+## Деплой И Обновления
 
-### Чистый сервер одной командой
-
-Для Ubuntu/Debian сервера:
+Первый деплой:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/asdcrosh/cabinet_remna/main/deploy/install-server.sh | sudo bash
 ```
 
-После установки заполни реальные значения:
-
-```bash
-nano /opt/remnawave-cabinet/.env.production
-```
-
-Затем запусти:
+Обновление уже установленного сервера:
 
 ```bash
 cd /opt/remnawave-cabinet
+git pull
 ./deploy/deploy.sh
 ```
 
-Минимальный порядок:
+Логи:
 
 ```bash
-npm ci
-NODE_ENV=production npm run check:env
-npm run prisma:deploy
-npm run build
-NODE_ENV=production npm run start
+docker compose -f deploy/docker-compose.server.yml logs -f app
 ```
 
-Перед продакшеном проверь:
-
-- `NODE_ENV=production`
-- `JWT_SECRET` сгенерирован случайно
-- `APP_URL` совпадает с публичным доменом
-- Remnawave API token имеет нужные права
-- webhook ЮKassa доступен из интернета
-- email webhook реально отправляет письма
-- `YOOKASSA_WEBHOOK_ALLOWED_IPS` заполнен, если нужен строгий allowlist
-
-## Проверки
+Проверка после запуска:
 
 ```bash
-npm run validate
+export APP_URL="https://cabinet.alekseevvp.site"
+export HEALTHCHECK_TOKEN="значение_из_env"
+./deploy/smoke-check.sh
+```
+
+Подробности: [DEPLOYMENT.md](./DEPLOYMENT.md).
+
+## Проверки Для Разработки
+
+```bash
+npm run lint
+npm run typecheck
 npm run test
 npm run build
 ```
 
-## Recovery
-
-Если платёж стал успешным, но Remnawave временно не ответил, webhook можно повторить, а администратор может довыдать подписку через recovery endpoint. В истории платежей сохраняется `provisioningError`, чтобы видеть причину сбоя.
-
-## Remnashop sync
-
-Для первичной проверки миграции из remnashop задай `REMNASHOP_DATABASE_URL` и вызови админский endpoint:
+## Структура
 
 ```text
-GET /api/admin/remnashop-sync
+src/app              Next.js pages и API routes
+src/components       UI-компоненты кабинета
+src/lib              интеграции, auth, платежи, выдача подписок
+prisma               схема, миграции, seed
+deploy               production deploy scripts и compose
 ```
 
-Сейчас endpoint работает только в `dryRun` режиме: читает remnashop, сопоставляет данные с cabinet и возвращает отчёт без записи в БД.
+## Безопасность Перед Продом
 
-## Telegram привязка
+Перед реальным запуском:
 
-Пользователь регистрируется по email, подтверждает email, затем в `/dashboard/settings` может привязать Telegram. После привязки кабинет:
-
-- проверяет подпись Telegram через `TELEGRAM_BOT_TOKEN`;
-- ищет пользователя в remnashop по `telegram_id`;
-- если найден `current_subscription_id`, берёт `user_remna_id`;
-- подтягивает Remnawave-профиль по UUID и обновляет локальную подписку.
-
-Если пользователь в remnashop не найден, Telegram всё равно привязывается к текущему email-аккаунту, а Remnawave-профиль будет создан обычным платёжным сценарием при покупке.
+- используй только боевые ключи YooKassa;
+- перевыпусти токены, которые использовались локально;
+- проверь, что `.env.production` не попадает в Git;
+- направь `cabinet.alekseevvp.site` на IP сервера;
+- проверь регистрацию, email, оплату и выдачу подписки тестовой покупкой.
