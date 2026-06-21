@@ -17,6 +17,7 @@ export interface PlanAdminRow {
   durationDays: number
   trafficLimitGb: number | null
   deviceLimit: number
+  isPromo: boolean
   isActive: boolean
   sortOrder: number
   paymentsCount: number
@@ -32,6 +33,7 @@ interface PlanFormState {
   unlimitedTraffic: boolean
   deviceLimit: string
   sortOrder: string
+  isPromo: boolean
   isActive: boolean
 }
 
@@ -44,6 +46,7 @@ const emptyForm: PlanFormState = {
   unlimitedTraffic: false,
   deviceLimit: '5',
   sortOrder: '10',
+  isPromo: false,
   isActive: true,
 }
 
@@ -99,6 +102,7 @@ export function PlansAdmin({ plans }: { plans: PlanAdminRow[] }) {
       unlimitedTraffic: plan.trafficLimitGb == null,
       deviceLimit: String(plan.deviceLimit),
       sortOrder: String(plan.sortOrder),
+      isPromo: plan.isPromo,
       isActive: plan.isActive,
     })
   }
@@ -196,6 +200,14 @@ export function PlansAdmin({ plans }: { plans: PlanAdminRow[] }) {
           <label className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-3 text-sm dark:border-white/10">
             <input
               type="checkbox"
+              checked={form.isPromo}
+              onChange={(event) => setForm((current) => ({ ...current, isPromo: event.target.checked }))}
+            />
+            Промо-тариф
+          </label>
+          <label className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-3 text-sm dark:border-white/10">
+            <input
+              type="checkbox"
               checked={form.isActive}
               onChange={(event) => setForm((current) => ({ ...current, isActive: event.target.checked }))}
             />
@@ -231,6 +243,7 @@ export function PlansAdmin({ plans }: { plans: PlanAdminRow[] }) {
                   <span className={plan.isActive ? 'badge-active' : 'badge-disabled'}>
                     {plan.isActive ? 'Опубликован' : 'Скрыт'}
                   </span>
+                  {plan.isPromo && <span className="badge-limited">Промо</span>}
                   <span className="badge-limited">{formatPrice(plan.priceKopecks)}</span>
                 </div>
                 {plan.description && (
@@ -291,6 +304,7 @@ function toPayload(form: PlanFormState) {
     trafficLimitGb: form.unlimitedTraffic || !form.trafficLimitGb ? null : Number(form.trafficLimitGb),
     deviceLimit: Number(form.deviceLimit),
     sortOrder: Number(form.sortOrder),
+    isPromo: form.isPromo,
     isActive: form.isActive,
   }
 }

@@ -29,6 +29,7 @@ export default async function AdminPlansPage() {
     durationDays: plan.durationDays,
     trafficLimitGb: plan.trafficLimitGb,
     deviceLimit: plan.deviceLimit,
+    isPromo: plan.isPromo,
     isActive: plan.isActive,
     sortOrder: plan.sortOrder,
     paymentsCount: plan._count.payments,

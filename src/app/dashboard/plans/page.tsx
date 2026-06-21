@@ -17,6 +17,17 @@ export default async function PlansPage() {
     where: { isActive: true },
     orderBy: { sortOrder: 'asc' },
   })
+  const usedTrialPlanIds = session
+    ? new Set(
+        (
+          await prisma.trialPlanRedemption.findMany({
+            where: { userId: session.uid },
+            select: { planId: true },
+          })
+        ).map((redemption) => redemption.planId)
+      )
+    : new Set<string>()
+  const visiblePlans = plans.filter((plan) => !plan.isPromo || !usedTrialPlanIds.has(plan.id))
   const currentSubscription = session
     ? await prisma.subscription.findFirst({
         where: { userId: session.uid, status: { in: ['ACTIVE', 'LIMITED'] } },
@@ -54,7 +65,7 @@ export default async function PlansPage() {
       </section>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {plans.length === 0 && (
+        {visiblePlans.length === 0 && (
           <div className="card col-span-full py-12 text-center">
             <h3 className="text-lg font-semibold">Тарифы скоро появятся</h3>
             <p className="mx-auto mt-2 max-w-md text-sm text-slate-500 dark:text-slate-400">
@@ -67,7 +78,7 @@ export default async function PlansPage() {
             )}
           </div>
         )}
-        {plans.map((p, index) => (
+        {visiblePlans.map((p, index) => (
           <PlanCard
             key={p.id}
             id={p.id}
@@ -77,6 +88,7 @@ export default async function PlansPage() {
             durationDays={p.durationDays}
             trafficLimitGb={p.trafficLimitGb}
             deviceLimit={p.deviceLimit}
+            isPromo={p.isPromo}
             popular={index === 1}
             current={currentSubscription?.planId === p.id}
           />

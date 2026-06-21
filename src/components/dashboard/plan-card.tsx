@@ -15,6 +15,7 @@ interface PlanCardProps {
   durationDays: number
   trafficLimitGb: number | null
   deviceLimit: number
+  isPromo?: boolean
   popular?: boolean
   current?: boolean
 }
@@ -27,6 +28,7 @@ export function PlanCard({
   durationDays,
   trafficLimitGb,
   deviceLimit,
+  isPromo = false,
   popular,
   current,
 }: PlanCardProps) {
@@ -45,6 +47,25 @@ export function PlanCard({
   const effectivePrice = appliedPromo ? formatPrice(appliedPromo.finalAmountKopecks) : price
 
   async function buy() {
+    if (isPromo) {
+      setLoading(true)
+      try {
+        const { redirectUrl } = await apiFetch<{ redirectUrl?: string }>(
+          '/api/payment/create',
+          {
+            method: 'POST',
+            body: JSON.stringify({ planId: id }),
+          }
+        )
+        window.location.href = redirectUrl || '/dashboard/subscription'
+      } catch {
+        // apiFetch показал toast
+      } finally {
+        setLoading(false)
+      }
+      return
+    }
+
     if (trimmedPromo && !appliedPromo) {
       toast('Сначала примените промокод или очистите поле')
       return
@@ -52,7 +73,7 @@ export function PlanCard({
 
     setLoading(true)
     try {
-      const { confirmationUrl } = await apiFetch<{ confirmationUrl: string }>(
+      const { confirmationUrl, redirectUrl } = await apiFetch<{ confirmationUrl?: string; redirectUrl?: string }>(
         '/api/payment/create',
         {
           method: 'POST',
@@ -64,6 +85,8 @@ export function PlanCard({
       )
       if (confirmationUrl) {
         window.location.href = confirmationUrl
+      } else if (redirectUrl) {
+        window.location.href = redirectUrl
       } else {
         toast('Не получили ссылку на оплату')
       }
@@ -120,7 +143,12 @@ export function PlanCard({
           <h3 className="text-xl font-semibold tracking-tight">{name}</h3>
           <div className="mt-1 text-sm text-slate-500 dark:text-slate-400">{durationDays} дней доступа</div>
         </div>
-        {popular && (
+        {isPromo ? (
+          <span className="badge bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
+            <Sparkles className="mr-1 h-3 w-3" />
+            Пробный
+          </span>
+        ) : popular && (
           <span className="badge bg-slate-950 text-white dark:bg-white dark:text-slate-950">
             <Sparkles className="mr-1 h-3 w-3" />
             Популярный
@@ -136,7 +164,7 @@ export function PlanCard({
             <div className="text-sm text-slate-400 line-through">{price}</div>
           )}
         </div>
-        <div className="text-sm text-slate-500">оплата онлайн</div>
+        <div className="text-sm text-slate-500">{isPromo ? 'один раз на аккаунт' : 'оплата онлайн'}</div>
       </div>
       <ul className="mt-5 flex-1 space-y-2 text-sm text-slate-600 dark:text-slate-300">
         <Feature strong>{trafficLimitGb == null ? 'Безлимитный трафик' : `${trafficLimitGb} ГБ трафика`}</Feature>
@@ -144,7 +172,7 @@ export function PlanCard({
         <Feature>QR и ссылка подписки</Feature>
         <Feature>До {deviceLimit} устройств</Feature>
       </ul>
-      {promoOpen || appliedPromo ? (
+      {!isPromo && (promoOpen || appliedPromo) ? (
         <div className="mt-5 space-y-2">
           <div className="flex min-w-0 items-center gap-2 rounded-lg border border-slate-200 bg-white px-2 py-2 dark:border-slate-800 dark:bg-surface-900">
             <Tag className="h-4 w-4 shrink-0 text-slate-400" />
@@ -185,7 +213,7 @@ export function PlanCard({
             </div>
           )}
         </div>
-      ) : (
+      ) : !isPromo ? (
         <button
           type="button"
           className="mt-5 inline-flex w-fit items-center gap-2 text-sm font-medium text-slate-500 transition hover:text-slate-950 dark:text-slate-400 dark:hover:text-white"
@@ -194,14 +222,14 @@ export function PlanCard({
           <Tag className="h-4 w-4" />
           Есть промокод?
         </button>
-      )}
+      ) : null}
       <button
         onClick={buy}
         disabled={loading}
         className="btn-primary mt-6"
       >
         <CreditCard className="h-4 w-4" />
-        {loading ? 'Создаём платёж...' : current ? 'Продлить текущий' : 'Купить VPN'}
+        {loading ? (isPromo ? 'Активируем...' : 'Создаём платёж...') : isPromo ? 'Активировать' : current ? 'Продлить текущий' : 'Купить VPN'}
       </button>
     </div>
   )

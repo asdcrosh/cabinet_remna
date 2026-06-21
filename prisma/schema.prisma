@@ -27,6 +27,7 @@ model Plan {
   durationDays    Int      @default(30)
   trafficLimitGb  Int?                              // null = безлимит
   deviceLimit      Int      @default(5)
+  isPromo         Boolean  @default(false)          // бесплатный одноразовый ознакомительный тариф
   isActive        Boolean  @default(true)
   sortOrder       Int      @default(0)
   createdAt       DateTime @default(now())
@@ -35,6 +36,7 @@ model Plan {
   payments        Payment[]
   subscriptions   Subscription[]
   promoCodePlans  PromoCodePlan[]
+  trialRedemptions TrialPlanRedemption[]
 
   @@index([isActive, sortOrder])
 }
@@ -78,6 +80,7 @@ model User {
   payments              Payment[]
   devices               Device[]
   promoCodeRedemptions  PromoCodeRedemption[]
+  trialPlanRedemptions  TrialPlanRedemption[]
   emailVerificationTokens EmailVerificationToken[]
 
   @@index([email])
@@ -183,6 +186,7 @@ model Payment {
   plan            Plan     @relation(fields: [planId], references: [id], onDelete: Restrict)
   promoCode       PromoCode? @relation(fields: [promoCodeId], references: [id], onDelete: SetNull)
   promoCodeRedemption PromoCodeRedemption?
+  trialPlanRedemption TrialPlanRedemption?
   provisioningJob ProvisioningJob?
 
   @@index([userId, createdAt])
@@ -195,6 +199,21 @@ enum PaymentStatus {
   SUCCEEDED
   CANCELED
   REFUNDED
+}
+
+model TrialPlanRedemption {
+  id        String   @id @default(cuid())
+  userId    String
+  planId    String
+  paymentId String   @unique
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan      Plan     @relation(fields: [planId], references: [id], onDelete: Cascade)
+  payment   Payment  @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, planId])
+  @@index([planId])
 }
 
 model ProvisioningJob {

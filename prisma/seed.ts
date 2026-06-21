@@ -13,6 +13,7 @@ const PLANS = [
     durationDays: 3,
     trafficLimitGb: 50,
     deviceLimit: 2,
+    isPromo: true,
     sortOrder: 1,
   },
   {
@@ -22,6 +23,7 @@ const PLANS = [
     durationDays: 30,
     trafficLimitGb: 200,
     deviceLimit: 5,
+    isPromo: false,
     sortOrder: 2,
   },
   {
@@ -31,6 +33,7 @@ const PLANS = [
     durationDays: 30,
     trafficLimitGb: 500,
     deviceLimit: 10,
+    isPromo: false,
     sortOrder: 3,
   },
 ] as const

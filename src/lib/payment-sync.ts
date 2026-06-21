@@ -17,7 +17,49 @@ export async function syncPaymentProvisioning(input: { paymentId: string; userId
   })
 
   if (!payment) return { ok: true, status: 'not_found', provisioned: false }
-  if (!payment.yookassaId) return { ok: true, status: 'missing_external_id', provisioned: false }
+  if (!payment.yookassaId) {
+    if (payment.status !== 'SUCCEEDED') {
+      return { ok: true, status: 'missing_external_id', provisioned: false }
+    }
+    if (payment.subscriptionProvisionedAt && payment.subscription) {
+      return {
+        ok: true,
+        status: 'succeeded',
+        provisioned: true,
+        alreadyProvisioned: true,
+        subscriptionId: payment.subscription.id,
+      }
+    }
+
+    try {
+      const result = await provisionPaymentSubscription({
+        userId: payment.user.id,
+        email: payment.user.email,
+        paymentId: payment.id,
+        plan: {
+          id: payment.plan.id,
+          name: payment.plan.name,
+          durationDays: payment.plan.durationDays,
+          trafficLimitGb: payment.plan.trafficLimitGb,
+          deviceLimit: payment.plan.deviceLimit,
+        },
+      })
+
+      return {
+        ok: true,
+        status: 'succeeded',
+        provisioned: true,
+        subscriptionId: result.subscription.id,
+      }
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'subscription provisioning failed'
+      await prisma.payment.update({
+        where: { id: payment.id },
+        data: { provisioningError: message.slice(0, 1000) },
+      })
+      return { ok: false, status: 'provisioning_failed', provisioned: false, error: message }
+    }
+  }
 
   let yooPayment
   try {

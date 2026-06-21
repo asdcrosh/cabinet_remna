@@ -10,6 +10,7 @@ import { createPayment } from '@/lib/yookassa'
 import { PromoCodeError, validatePromoCodeForPlan } from '@/lib/promo-codes'
 import { getAppUrl } from '@/lib/app-url'
 import { rateLimit } from '@/lib/rate-limit'
+import { provisionPaymentSubscription } from '@/lib/provisioning'
 
 export const runtime = 'nodejs'
 
@@ -44,6 +45,80 @@ export const POST = withAuth(async (req: Request) => {
   }
   const user = await prisma.user.findUnique({ where: { id: session.uid } })
   if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+
+  if (plan.isPromo) {
+    if (promoCode) {
+      return NextResponse.json({ error: 'Промокод не нужен для этого тарифа' }, { status: 400 })
+    }
+
+    let promoPayment: Payment
+    try {
+      promoPayment = await prisma.$transaction(
+        async (tx) => {
+          const payment = await tx.payment.create({
+            data: {
+              userId: user.id,
+              planId: plan.id,
+              amountKopecks: 0,
+              originalAmountKopecks: plan.priceKopecks,
+              discountKopecks: plan.priceKopecks,
+              status: 'SUCCEEDED',
+              paidAt: new Date(),
+            },
+          })
+
+          await tx.trialPlanRedemption.create({
+            data: {
+              userId: user.id,
+              planId: plan.id,
+              paymentId: payment.id,
+            },
+          })
+
+          return payment
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
+      )
+    } catch (e) {
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+        return NextResponse.json({ error: 'Вы уже использовали этот ознакомительный тариф' }, { status: 409 })
+      }
+      throw e
+    }
+
+    try {
+      await provisionPaymentSubscription({
+        userId: user.id,
+        email: user.email,
+        paymentId: promoPayment.id,
+        plan: {
+          id: plan.id,
+          name: plan.name,
+          durationDays: plan.durationDays,
+          trafficLimitGb: plan.trafficLimitGb,
+          deviceLimit: plan.deviceLimit,
+        },
+      })
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'subscription provisioning failed'
+      await prisma.payment.update({
+        where: { id: promoPayment.id },
+        data: { provisioningError: message.slice(0, 1000) },
+      })
+      console.error('[payment/create] promo provisioning failed', e)
+      return NextResponse.json({
+        redirectUrl: `/dashboard/billing?paid=1&payment=${promoPayment.id}`,
+        localPaymentId: promoPayment.id,
+        provisioned: false,
+      }, { status: 202 })
+    }
+
+    return NextResponse.json({
+      redirectUrl: `/dashboard/subscription?activated=1`,
+      localPaymentId: promoPayment.id,
+      provisioned: true,
+    })
+  }
 
   let localPayment: Payment
   let appliedPromo: Awaited<ReturnType<typeof validatePromoCodeForPlan>> | null = null
