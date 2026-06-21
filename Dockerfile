@@ -10,6 +10,13 @@ WORKDIR /app
 COPY prisma ./prisma
 CMD ["npx", "prisma", "migrate", "deploy"]
 
+FROM deps AS worker
+WORKDIR /app
+COPY tsconfig.json ./
+COPY scripts ./scripts
+COPY src ./src
+CMD ["npm", "run", "worker:payments"]
+
 FROM node:20-alpine AS builder
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1

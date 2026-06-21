@@ -51,6 +51,19 @@ services:
       retries: 5
       start_period: 30s
 
+  worker:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      target: worker
+    container_name: remnawave-cabinet-worker
+    restart: unless-stopped
+    env_file:
+      - ${CABINET_ENV_FILE:-../.env.production}
+    depends_on:
+      db:
+        condition: service_healthy
+
   caddy:
     image: caddy:2-alpine
     container_name: remnawave-cabinet-caddy

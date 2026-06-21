@@ -43,10 +43,16 @@ cd /opt/remnawave-cabinet
 ./deploy/deploy.sh
 ```
 
-`deploy.sh` применит миграции и создаст стартовые тарифы, если база пустая. После первого входа админ может менять тарифы на:
+`deploy.sh` применит миграции, создаст стартовые тарифы, если база пустая, и запустит payment worker для периодической проверки ожидающих платежей. После первого входа админ может менять тарифы на:
 
 ```text
 https://ВСТАВЬ_СЮДА_ДОМЕН_КАБИНЕТА/dashboard/admin/plans
+```
+
+Логи worker:
+
+```bash
+docker compose -f deploy/docker-compose.server.yml logs -f worker
 ```
 
 If you want to install Docker manually instead:
