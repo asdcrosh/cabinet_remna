@@ -1,0 +1,325 @@
+// Prisma schema для личного кабинета Remnawave
+// Datasource: PostgreSQL
+// БД хранит локальный профиль пользователя (email/пароль/тариф)
+// и ссылку на его профиль в Remnawave Panel (remnawaveUuid / remnawaveShortUuid).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ----------------------------------------------------------------------
+// 1. Тарифы
+// ----------------------------------------------------------------------
+// Это то, что пользователь видит на /plans. Цена в копейках (int)
+// во избежание float-ошибок. durationDays = срок подписки при покупке.
+// trafficLimitGb — лимит трафика в ГБ; null = безлимит.
+// ----------------------------------------------------------------------
+model Plan {
+  id              String   @id @default(cuid())
+  name            String                            // "Базовый", "PRO", "Безлимит"
+  description     String?
+  priceKopecks    Int                               // 19900 = 199 ₽
+  durationDays    Int      @default(30)
+  trafficLimitGb  Int?                              // null = безлимит
+  deviceLimit      Int      @default(5)
+  isActive        Boolean  @default(true)
+  sortOrder       Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  payments        Payment[]
+  subscriptions   Subscription[]
+  promoCodePlans  PromoCodePlan[]
+
+  @@index([isActive, sortOrder])
+}
+
+// ----------------------------------------------------------------------
+// 2. Пользователь ЛК
+// ----------------------------------------------------------------------
+// Это ЛОКАЛЬНЫЙ аккаунт для входа в ЛК. Внешний профиль в Remnawave
+// создаётся при первой покупке подписки (lazy), UUID'ы храним здесь,
+// чтобы не дёргать Remnawave при каждом логине.
+// ----------------------------------------------------------------------
+model User {
+  id                    String   @id @default(cuid())
+  email                 String   @unique
+  passwordHash          String
+  name                  String?
+  role                  UserRole @default(USER)
+
+  // Telegram привязывается после email-регистрации. Используем для поиска
+  // пользователя в remnashop и привязки старой Remnawave-подписки.
+  telegramId            BigInt?  @unique
+  telegramUsername      String?
+  telegramLinkedAt      DateTime?
+  remnashopUserId       Int?     @unique
+  remnashopSyncedAt     DateTime?
+
+  // Ссылка на пользователя в Remnawave Panel. Заполняется при первой покупке.
+  remnawaveUuid         String?  @unique
+  remnawaveShortUuid    String?  @unique
+  remnawaveUsername     String?  @unique
+
+  // Согласия
+  agreedToTermsAt       DateTime?
+  emailVerifiedAt       DateTime?
+
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  lastLoginAt           DateTime?
+
+  subscriptions         Subscription[]
+  payments              Payment[]
+  devices               Device[]
+  promoCodeRedemptions  PromoCodeRedemption[]
+  emailVerificationTokens EmailVerificationToken[]
+
+  @@index([email])
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+model EmailVerificationToken {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, usedAt])
+  @@index([expiresAt])
+}
+
+// ----------------------------------------------------------------------
+// 3. Подписка (локальная сущность — дублирует важные поля из Remnawave,
+// чтобы ЛК работал быстро, не дёргая Panel при каждом запросе)
+// ----------------------------------------------------------------------
+model Subscription {
+  id            String   @id @default(cuid())
+  userId        String
+  planId        String?
+
+  startAt       DateTime
+  expireAt      DateTime
+  status        SubscriptionStatus @default(ACTIVE)
+
+  // Лимит трафика на текущий период (в байтах). null = безлимит.
+  trafficLimitBytes BigInt?
+  // Сколько использовано за текущий период (мы денормализуем из Remnawave).
+  trafficUsedBytes  BigInt @default(0)
+  // Lifetime-использование (как в Remnawave).
+  lifetimeUsedBytes BigInt @default(0)
+  // Когда последний раз дёргали /api/subscription на нашей стороне.
+  lastSyncedAt  DateTime @default(now())
+
+  // Тех. флаг: в момент продления ещё раз зашли в Remnawave, чтобы получить новые ключи.
+  // Чтобы не зафлэдить — используем флаг.
+  pendingSync   Boolean  @default(false)
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan          Plan?    @relation(fields: [planId], references: [id], onDelete: SetNull)
+  payments      Payment[]
+
+  @@index([userId, status])
+  @@index([expireAt])
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  EXPIRED
+  DISABLED
+  LIMITED
+}
+
+// ----------------------------------------------------------------------
+// 4. Платёж
+// ----------------------------------------------------------------------
+// Платёж проходит через ЮKassa. Idempotency-key здесь — наш internal ID
+// платежа, чтобы при ретрае webhook'а не создать две подписки.
+// ----------------------------------------------------------------------
+model Payment {
+  id              String   @id @default(cuid())
+  userId          String
+  subscriptionId  String?
+  planId          String
+  promoCodeId     String?
+
+  // Наши суммы (в копейках)
+  amountKopecks   Int
+  originalAmountKopecks Int?
+  discountPercent Int?
+  discountKopecks Int      @default(0)
+  promoCodeSnapshot Json?
+
+  // Данные ЮKassa
+  yookassaId      String?  @unique
+  yookassaStatus  String?                       // pending / waiting_for_capture / succeeded / canceled
+  confirmationUrl String?                       // URL для редиректа пользователя
+
+  status          PaymentStatus @default(PENDING)
+  paidAt          DateTime?
+  subscriptionProvisionedAt DateTime?
+  provisioningError String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subscription    Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+  plan            Plan     @relation(fields: [planId], references: [id], onDelete: Restrict)
+  promoCode       PromoCode? @relation(fields: [promoCodeId], references: [id], onDelete: SetNull)
+  promoCodeRedemption PromoCodeRedemption?
+  provisioningJob ProvisioningJob?
+
+  @@index([userId, createdAt])
+  @@index([status])
+  @@index([promoCodeId])
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCEEDED
+  CANCELED
+  REFUNDED
+}
+
+model ProvisioningJob {
+  id          String   @id @default(cuid())
+  paymentId   String   @unique
+  status      ProvisioningJobStatus @default(PENDING)
+  attempts    Int      @default(0)
+  nextRetryAt DateTime?
+  lockedAt    DateTime?
+  lastError   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  payment     Payment  @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+
+  @@index([status, nextRetryAt])
+  @@index([lockedAt])
+}
+
+enum ProvisioningJobStatus {
+  PENDING
+  RUNNING
+  SUCCEEDED
+  FAILED
+}
+
+// ----------------------------------------------------------------------
+// 5. Промокоды
+// ----------------------------------------------------------------------
+// Промокод хранит правила скидки, а Payment сохраняет снимок скидки,
+// чтобы история оплат не зависела от будущих изменений кода.
+// ----------------------------------------------------------------------
+model PromoCode {
+  id                 String   @id @default(cuid())
+  code               String   @unique
+  discountPercent    Int
+  isActive           Boolean  @default(true)
+  startsAt           DateTime?
+  expiresAt          DateTime?
+  maxUses            Int?
+  maxUsesPerUser     Int      @default(1)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  payments           Payment[]
+  redemptions        PromoCodeRedemption[]
+  plans              PromoCodePlan[]
+
+  @@index([isActive, startsAt, expiresAt])
+}
+
+model PromoCodePlan {
+  promoCodeId String
+  planId      String
+
+  promoCode   PromoCode @relation(fields: [promoCodeId], references: [id], onDelete: Cascade)
+  plan        Plan      @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@id([promoCodeId, planId])
+  @@index([planId])
+}
+
+model PromoCodeRedemption {
+  id                 String   @id @default(cuid())
+  promoCodeId        String
+  userId             String
+  paymentId          String   @unique
+  status             PromoCodeRedemptionStatus @default(PENDING)
+  codeSnapshot       String
+  discountPercent    Int
+  discountKopecks    Int
+  originalAmountKopecks Int
+  finalAmountKopecks Int
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  promoCode          PromoCode @relation(fields: [promoCodeId], references: [id], onDelete: Cascade)
+  user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  payment            Payment   @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+
+  @@index([promoCodeId, status])
+  @@index([userId, promoCodeId, status])
+}
+
+enum PromoCodeRedemptionStatus {
+  PENDING
+  SUCCEEDED
+  CANCELED
+}
+
+// ----------------------------------------------------------------------
+// 6. Устройства (проксируем HWID из Remnawave)
+// ----------------------------------------------------------------------
+// Если Remnawave выдаёт лимит устройств (hwidDeviceLimit), мы показываем
+// список и позволяем отвязать. Храним локально для быстрого рендера.
+// ----------------------------------------------------------------------
+model Device {
+  id           String   @id @default(cuid())
+  userId       String
+  hwid         String                       // device hardware id
+  platform     String?                      // android, ios, windows...
+  userAgent    String?
+  ip           String?
+  firstSeenAt  DateTime @default(now())
+  lastSeenAt   DateTime @default(now())
+
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, hwid])
+  @@index([userId])
+}
+
+// ----------------------------------------------------------------------
+// 7. Rate limit buckets
+// ----------------------------------------------------------------------
+// Небольшие скользящие бакеты для login/register/payment-sensitive API.
+// Храним в БД, чтобы лимиты переживали рестарты и работали на нескольких
+// инстансах приложения.
+// ----------------------------------------------------------------------
+model RateLimitBucket {
+  key       String   @id
+  count     Int      @default(1)
+  resetAt   DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([resetAt])
+}

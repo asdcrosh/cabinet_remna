@@ -1,0 +1,75 @@
+import { NextResponse } from 'next/server'
+import { Prisma } from '@prisma/client'
+import { prisma } from '@/lib/prisma'
+import { requireAdmin, withAuth } from '@/lib/auth/guard'
+import { updateAdminPromoCodeSchema } from '@/lib/auth/validation'
+import { normalizePromoCode } from '@/lib/promo-codes'
+
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
+
+export const PATCH = withAuth(async (req: Request, { params }: { params: { id: string } }) => {
+  await requireAdmin()
+
+  let body: unknown
+  try {
+    body = await req.json()
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+  }
+
+  const parsed = updateAdminPromoCodeSchema.safeParse(body)
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: 'Validation error', details: parsed.error.flatten() },
+      { status: 400 }
+    )
+  }
+
+  const data = parsed.data
+  const normalizedCode = data.code === undefined ? undefined : normalizePromoCode(data.code)
+  if (data.code !== undefined && !normalizedCode) {
+    return NextResponse.json({ error: 'Введите промокод' }, { status: 400 })
+  }
+
+  try {
+    const promoCode = await prisma.$transaction(async (tx) => {
+      const updateData: Prisma.PromoCodeUpdateInput = {}
+      if (normalizedCode) updateData.code = normalizedCode
+      if (data.discountPercent !== undefined) updateData.discountPercent = data.discountPercent
+      if (data.isActive !== undefined) updateData.isActive = data.isActive
+      if (data.startsAt !== undefined) updateData.startsAt = data.startsAt ? new Date(data.startsAt) : null
+      if (data.expiresAt !== undefined) updateData.expiresAt = data.expiresAt ? new Date(data.expiresAt) : null
+      if (data.maxUses !== undefined) updateData.maxUses = data.maxUses ?? null
+      if (data.maxUsesPerUser !== undefined) updateData.maxUsesPerUser = data.maxUsesPerUser
+
+      const updated = await tx.promoCode.update({
+        where: { id: params.id },
+        data: updateData,
+      })
+
+      if (data.planIds !== undefined) {
+        await tx.promoCodePlan.deleteMany({ where: { promoCodeId: params.id } })
+        if (data.planIds.length > 0) {
+          await tx.promoCodePlan.createMany({
+            data: data.planIds.map((planId) => ({ promoCodeId: params.id, planId })),
+          })
+        }
+      }
+
+      return updated
+    })
+
+    return NextResponse.json({ promoCode })
+  } catch (e) {
+    if (e instanceof Prisma.PrismaClientKnownRequestError) {
+      if (e.code === 'P2002') {
+        return NextResponse.json({ error: 'Промокод с таким кодом уже существует' }, { status: 409 })
+      }
+      if (e.code === 'P2025') {
+        return NextResponse.json({ error: 'Промокод не найден' }, { status: 404 })
+      }
+    }
+    throw e
+  }
+})

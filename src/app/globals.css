@@ -1,0 +1,103 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --bg: 248 250 252;
+    --fg: 15 23 42;
+    --muted: 100 116 139;
+  }
+  html, body { @apply h-full; }
+  body {
+    @apply bg-slate-50 text-slate-900 antialiased dark:bg-surface-950 dark:text-slate-100;
+    background:
+      linear-gradient(135deg, rgba(14, 165, 233, 0.08), transparent 34%),
+      linear-gradient(225deg, rgba(16, 185, 129, 0.08), transparent 30%),
+      rgb(248 250 252);
+    font-feature-settings: 'cv11', 'ss01';
+  }
+  .dark body {
+    background:
+      linear-gradient(135deg, rgba(14, 165, 233, 0.13), transparent 36%),
+      linear-gradient(225deg, rgba(16, 185, 129, 0.10), transparent 30%),
+      rgb(2 6 23);
+  }
+  * {
+    @apply border-slate-200 dark:border-slate-800;
+  }
+  :focus-visible {
+    @apply outline-none ring-2 ring-brand-500 ring-offset-2 ring-offset-white dark:ring-offset-surface-950;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex min-h-10 max-w-full items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium
+           leading-tight transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply btn bg-slate-950 text-white shadow-lg shadow-slate-950/15 hover:-translate-y-0.5 hover:bg-slate-800
+           dark:bg-white dark:text-slate-950 dark:shadow-black/20 dark:hover:bg-slate-100;
+  }
+  .btn-secondary {
+    @apply btn border bg-white/80 text-slate-900 shadow-sm shadow-slate-200/70 backdrop-blur hover:-translate-y-0.5 hover:bg-white
+           dark:bg-surface-900/80 dark:text-slate-100 dark:border-slate-800 dark:shadow-black/20 dark:hover:bg-surface-800;
+  }
+  .btn-danger {
+    @apply btn bg-red-600 text-white hover:bg-red-700;
+  }
+  .input {
+    @apply w-full rounded-lg border bg-white/90 px-3 py-2.5 text-sm shadow-sm shadow-slate-200/50
+           text-slate-900 placeholder:text-slate-400
+           focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20
+           dark:border-slate-800 dark:bg-surface-900/90 dark:text-slate-100 dark:placeholder:text-slate-500 dark:shadow-black/10;
+  }
+  .label {
+    @apply block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1;
+  }
+  .card {
+    @apply rounded-lg border border-white/70 bg-white/80 p-4 shadow-xl shadow-slate-200/50 backdrop-blur
+           dark:border-white/10 dark:bg-surface-900/80 dark:shadow-black/25;
+  }
+  .stat {
+    @apply text-2xl font-semibold tracking-tight;
+  }
+  .stat-label {
+    @apply text-sm text-slate-500 dark:text-slate-400;
+  }
+  .badge {
+    @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium;
+  }
+  .badge-active { @apply badge bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300; }
+  .badge-expired { @apply badge bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300; }
+  .badge-disabled { @apply badge bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300; }
+  .badge-limited { @apply badge bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300; }
+  .table-shell {
+    @apply overflow-x-auto rounded-lg border border-white/70 bg-white/80 shadow-xl shadow-slate-200/50 backdrop-blur
+           dark:border-white/10 dark:bg-surface-900/80 dark:shadow-black/25;
+  }
+  .data-table {
+    @apply w-full min-w-max text-sm;
+  }
+  .data-table th {
+    @apply whitespace-nowrap px-4 py-3 font-medium;
+  }
+  .data-table td {
+    @apply px-4 py-3 align-top;
+  }
+  .info-cell {
+    @apply min-w-0 rounded-lg border border-slate-100 bg-slate-50/80 px-3 py-2 dark:border-slate-800 dark:bg-surface-800/80;
+  }
+  .action-row {
+    @apply flex flex-wrap items-center justify-end gap-2;
+  }
+  .sticky-actions-head {
+    @apply sticky right-0 z-20 border-l bg-slate-50 text-right shadow-[-12px_0_18px_-18px_rgba(15,23,42,0.55)]
+           dark:bg-surface-800;
+  }
+  .sticky-actions-cell {
+    @apply sticky right-0 z-10 border-l bg-white shadow-[-12px_0_18px_-18px_rgba(15,23,42,0.55)]
+           dark:bg-surface-900;
+  }
+}

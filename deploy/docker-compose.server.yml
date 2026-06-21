@@ -1,0 +1,74 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: remnawave-cabinet-db
+    restart: unless-stopped
+    env_file:
+      - ${CABINET_ENV_FILE:-../.env.production}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  migrate:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      target: migrator
+    container_name: remnawave-cabinet-migrate
+    env_file:
+      - ${CABINET_ENV_FILE:-../.env.production}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  app:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      target: runner
+    container_name: remnawave-cabinet-app
+    restart: unless-stopped
+    env_file:
+      - ${CABINET_ENV_FILE:-../.env.production}
+    depends_on:
+      db:
+        condition: service_healthy
+    expose:
+      - "3000"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget -qO- --header=\"x-healthcheck-token: $$HEALTHCHECK_TOKEN\" http://127.0.0.1:3000/api/health >/dev/null || exit 1",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: remnawave-cabinet-caddy
+    restart: unless-stopped
+    env_file:
+      - ${CABINET_ENV_FILE:-../.env.production}
+    depends_on:
+      app:
+        condition: service_started
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  postgres_data:
+  caddy_data:
+  caddy_config:

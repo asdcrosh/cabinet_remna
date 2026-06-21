@@ -1,0 +1,16 @@
+node_modules
+.next
+out
+dist
+.env
+.env.*
+.env.local
+.env.*.local
+!.env.example
+!.env.production.example
+*.log
+.DS_Store
+prisma/migrations/migration_lock.toml.bak
+next-env.d.ts
+tsconfig.tsbuildinfo
+.vercel

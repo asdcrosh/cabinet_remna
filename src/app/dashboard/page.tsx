@@ -1,0 +1,234 @@
+// Главная страница кабинета: тянем данные подписки, показываем крупные
+// карточки со статусом, остатком трафика и кнопкой продления.
+
+import Link from 'next/link'
+import { prisma } from '@/lib/prisma'
+import { getCurrentUser } from '@/lib/auth/cookies'
+import { remnawave, RemnawaveError } from '@/lib/remnawave'
+import { formatBytes, formatPrice } from '@/lib/format'
+import { StatusBadge } from '@/components/dashboard/status-badge'
+import { ProgressBar } from '@/components/dashboard/progress-bar'
+import { TrafficChart } from '@/components/dashboard/traffic-chart'
+import { redirect } from 'next/navigation'
+import { Activity, CheckCircle2, CreditCard, Gauge, KeyRound, ShieldCheck } from 'lucide-react'
+import { PageHeader } from '@/components/dashboard/page-header'
+import { StatCard } from '@/components/dashboard/stat-card'
+
+export const dynamic = 'force-dynamic'
+
+export default async function DashboardHome() {
+  const session = await getCurrentUser()
+  if (!session) redirect('/login')
+  const user = await prisma.user.findUnique({
+    where: { id: session.uid },
+    include: {
+      subscriptions: { orderBy: { createdAt: 'desc' }, take: 1, include: { plan: true } },
+    },
+  })
+  if (!user) redirect('/login')
+
+  // Если есть Remnawave-профиль — попробуем освежить карточку
+  let remnawaveCard: Awaited<ReturnType<typeof remnawave.getSubscriptionByUsername>> | null = null
+  if (user.remnawaveUsername) {
+    try {
+      remnawaveCard = await remnawave.getSubscriptionByUsername(user.remnawaveUsername)
+    } catch (e) {
+      if (!(e instanceof RemnawaveError)) throw e
+    }
+  }
+
+  const sub = remnawaveCard?.response.user
+  const subRow = user.subscriptions[0] ?? null
+
+  if (!user.remnawaveUsername) {
+    return <OnboardingState emailVerified={Boolean(user.emailVerifiedAt)} />
+  }
+
+  const used = sub ? BigInt(sub.trafficUsedBytes || '0') : 0n
+  const limit = sub ? BigInt(sub.trafficLimitBytes || '0') : 0n
+  const isUnlimited = limit === 0n
+  const percent = isUnlimited ? 0 : Math.min(100, Math.round((Number(used) / Number(limit || 1n)) * 100))
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title="VPN готов"
+        description="Ваша подписка активна: здесь ключи, трафик и быстрые действия"
+        action={<Link href="/dashboard/subscription" className="btn-primary">Открыть ключи</Link>}
+      />
+
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <StatCard
+          label="Статус"
+          value={<StatusBadge status={sub?.userStatus ?? 'DISABLED'} />}
+          hint={sub ? `${sub.daysLeft} дн. осталось` : 'Подписка не найдена'}
+          icon={<ShieldCheck className="h-5 w-5" />}
+        />
+
+        <StatCard
+          label="Трафик"
+          value={formatBytes(used)}
+          hint={`из ${isUnlimited ? 'безлимита' : formatBytes(limit)}`}
+          icon={<Gauge className="h-5 w-5" />}
+        />
+
+        <div className="card">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+          <p className="stat-label">Тариф</p>
+              <div className="mt-2 stat">{subRow?.plan?.name ?? '—'}</div>
+              <p className="stat-label">
+                {subRow?.plan ? formatPrice(subRow.plan.priceKopecks) : '—'} / {subRow?.plan?.durationDays ?? '—'} дн.
+              </p>
+            </div>
+            <div className="rounded-2xl bg-brand-50 p-3 text-brand-600 dark:bg-brand-500/10 dark:text-brand-300">
+              <KeyRound className="h-5 w-5" />
+            </div>
+          </div>
+          <div className="mt-3">
+            <ProgressBar value={percent} />
+          </div>
+          <div className="mt-4 flex gap-2">
+            <Link href="/dashboard/subscription" className="btn-primary">Ключи</Link>
+            <Link href="/dashboard/plans" className="btn-secondary">Продлить</Link>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-3">
+        <QuickAction
+          icon={<KeyRound className="h-5 w-5" />}
+          title="Подключить устройство"
+          description="Откройте QR и ссылку подписки для приложения."
+          href="/dashboard/subscription"
+          action="Перейти к ключам"
+        />
+        <QuickAction
+          icon={<CreditCard className="h-5 w-5" />}
+          title="Продлить VPN"
+          description="Выберите тариф и оплатите онлайн."
+          href="/dashboard/plans"
+          action="Смотреть тарифы"
+        />
+        <QuickAction
+          icon={<Activity className="h-5 w-5" />}
+          title="Проверить устройства"
+          description="Посмотрите активные устройства и отвяжите лишние."
+          href="/dashboard/devices"
+          action="Устройства"
+        />
+      </div>
+
+      <div className="card">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="flex items-center gap-2 text-lg font-semibold">
+            <Activity className="h-5 w-5 text-brand-500" />
+            Потребление трафика
+          </h2>
+          <span className="text-sm text-slate-500">за 30 дней</span>
+        </div>
+        <TrafficChart userId={user.id} />
+      </div>
+    </div>
+  )
+}
+
+function OnboardingState({ emailVerified }: { emailVerified: boolean }) {
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title="Купить VPN"
+        description="Выберите тариф и получите доступ в личном кабинете"
+        action={<Link href="/dashboard/plans" className="btn-primary">Выбрать тариф</Link>}
+      />
+
+      <div className="card relative overflow-hidden p-6 sm:p-8">
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-cyan-400 via-emerald-400 to-brand-500" />
+        <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
+          <div>
+            <div className="mb-5 grid h-14 w-14 place-items-center rounded-lg bg-slate-950 text-cyan-200 shadow-lg shadow-slate-950/15 dark:bg-white dark:text-slate-950">
+              <ShieldCheck className="h-7 w-7" />
+            </div>
+            <h2 className="text-2xl font-semibold tracking-tight">VPN без лишних шагов</h2>
+            <p className="mt-2 max-w-xl text-slate-500 dark:text-slate-400">
+              Оплатите тариф в кабинете. После оплаты здесь появятся QR-код, ссылка подписки и данные подключения.
+            </p>
+            <div className="mt-6 flex flex-col gap-2 sm:flex-row">
+              <Link href="/dashboard/plans" className="btn-primary">Выбрать тариф</Link>
+              <Link href="/dashboard/settings" className="btn-secondary">Профиль</Link>
+            </div>
+          </div>
+          <div className="grid gap-3">
+            <Step done={emailVerified} title="Email подтверждён" description="Аккаунт готов к покупке" />
+            <Step done={false} title="Выберите тариф" description="Срок, трафик и лимит устройств" />
+            <Step done={false} title="Оплатите онлайн" description="После оплаты вернём вас в кабинет" />
+            <Step done={false} title="Получите доступ" description="Ключи появятся на странице подписки" />
+          </div>
+        </div>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-3">
+        <QuickAction
+          icon={<CreditCard className="h-5 w-5" />}
+          title="Тарифы"
+          description="Сравните планы и оплатите подходящий."
+          href="/dashboard/plans"
+          action="К тарифам"
+        />
+        <QuickAction
+          icon={<KeyRound className="h-5 w-5" />}
+          title="Ключи появятся здесь"
+          description="После оплаты откроется QR и ссылка подписки."
+          href="/dashboard/subscription"
+          action="Страница ключей"
+        />
+        <QuickAction
+          icon={<ShieldCheck className="h-5 w-5" />}
+          title="Перенос подписки"
+          description="Если уже покупали раньше, проверьте профиль."
+          href="/dashboard/settings"
+          action="Настройки"
+        />
+      </div>
+    </div>
+  )
+}
+
+function Step({ done, title, description }: { done: boolean; title: string; description: string }) {
+  return (
+    <div className="flex gap-3 rounded-lg border border-slate-100 bg-slate-50/80 p-3 dark:border-slate-800 dark:bg-surface-800/70">
+      <div className={done ? 'text-emerald-500' : 'text-slate-300 dark:text-slate-600'}>
+        <CheckCircle2 className="h-5 w-5" />
+      </div>
+      <div>
+        <div className="text-sm font-medium">{title}</div>
+        <div className="text-xs text-slate-500 dark:text-slate-400">{description}</div>
+      </div>
+    </div>
+  )
+}
+
+function QuickAction({
+  icon,
+  title,
+  description,
+  href,
+  action,
+}: {
+  icon: React.ReactNode
+  title: string
+  description: string
+  href: string
+  action: string
+}) {
+  return (
+    <Link href={href} className="card block transition-transform duration-200 hover:-translate-y-0.5">
+      <div className="mb-4 grid h-10 w-10 place-items-center rounded-lg border border-slate-100 bg-slate-50 text-slate-700 dark:border-slate-800 dark:bg-surface-800 dark:text-cyan-200">
+        {icon}
+      </div>
+      <div className="font-semibold">{title}</div>
+      <p className="mt-1 min-h-10 text-sm text-slate-500 dark:text-slate-400">{description}</p>
+      <div className="mt-4 text-sm font-medium text-brand-600 dark:text-cyan-200">{action}</div>
+    </Link>
+  )
+}

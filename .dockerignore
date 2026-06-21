@@ -1,0 +1,13 @@
+node_modules
+.next
+out
+dist
+.env
+.env.*
+!.env.example
+!.env.production.example
+*.log
+.DS_Store
+.git
+.vercel
+coverage

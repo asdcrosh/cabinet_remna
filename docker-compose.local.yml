@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: remnawave-cabinet-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: cabinet
+      POSTGRES_PASSWORD: cabinet
+      POSTGRES_DB: cabinet
+    ports:
+      - "5432:5432"
+    volumes:
+      - remnawave_cabinet_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cabinet -d cabinet"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  remnawave_cabinet_pgdata:
