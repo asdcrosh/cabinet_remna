@@ -36,8 +36,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
     body: body
       ? JSON.stringify(body, (_key, value) => (typeof value === 'bigint' ? value.toString() : value))
       : undefined,
-    // Remnawave API может отвечать не мгновенно — 10s достаточно.
-    // Если нужно больше — Next.js: в `route.ts` можно обернуть.
+    signal: AbortSignal.timeout(10_000),
     cache: 'no-store',
   })
   const text = await res.text()

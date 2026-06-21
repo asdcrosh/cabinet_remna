@@ -7,6 +7,7 @@ import { loginSchema } from '@/lib/auth/validation'
 import { setSessionCookieOnResponse } from '@/lib/auth/cookies'
 import { rateLimit } from '@/lib/rate-limit'
 import { assertSameOrigin } from '@/lib/security'
+import { checkRemnawaveProfileOnLogin } from '@/lib/remnawave-profile-check'
 
 export const runtime = 'nodejs'
 
@@ -64,6 +65,12 @@ export async function POST(req: Request) {
   await prisma.user.update({
     where: { id: user.id },
     data: { lastLoginAt: new Date() },
+  })
+
+  await checkRemnawaveProfileOnLogin({
+    id: user.id,
+    remnawaveUuid: user.remnawaveUuid,
+    remnawaveUsername: user.remnawaveUsername,
   })
 
   const res = NextResponse.json({

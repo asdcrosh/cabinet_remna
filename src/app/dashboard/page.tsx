@@ -10,7 +10,7 @@ import { StatusBadge } from '@/components/dashboard/status-badge'
 import { ProgressBar } from '@/components/dashboard/progress-bar'
 import { TrafficChart } from '@/components/dashboard/traffic-chart'
 import { redirect } from 'next/navigation'
-import { Activity, CheckCircle2, CreditCard, Gauge, KeyRound, ShieldCheck } from 'lucide-react'
+import { Activity, AlertTriangle, CheckCircle2, CreditCard, Gauge, KeyRound, ShieldCheck } from 'lucide-react'
 import { PageHeader } from '@/components/dashboard/page-header'
 import { StatCard } from '@/components/dashboard/stat-card'
 
@@ -56,6 +56,18 @@ export default async function DashboardHome() {
         description="Ваша подписка активна: здесь ключи, трафик и быстрые действия"
         action={<Link href="/dashboard/subscription" className="btn-primary">Открыть ключи</Link>}
       />
+
+      {subRow?.pendingSync && !remnawaveCard && (
+        <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
+          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
+          <div>
+            <div className="font-medium">Профиль доступа не найден в Remnawave</div>
+            <div className="mt-1 opacity-80">
+              Подписка сохранена в кабинете, но профиль нужно восстановить или перевыдать.
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
         <StatCard
