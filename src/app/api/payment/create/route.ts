@@ -51,6 +51,19 @@ export const POST = withAuth(async (req: Request) => {
       return NextResponse.json({ error: 'Промокод не нужен для этого тарифа' }, { status: 400 })
     }
 
+    const existingTrial = await prisma.trialPlanRedemption.findUnique({
+      where: { userId_planId: { userId: user.id, planId: plan.id } },
+      include: { payment: true },
+    })
+
+    if (existingTrial?.payment.subscriptionProvisionedAt) {
+      return NextResponse.json({ error: 'Вы уже использовали этот ознакомительный тариф' }, { status: 409 })
+    }
+
+    if (existingTrial?.payment.status === 'SUCCEEDED') {
+      return provisionPromoPayment(existingTrial.payment, user, plan)
+    }
+
     let promoPayment: Payment
     try {
       promoPayment = await prisma.$transaction(
@@ -86,38 +99,7 @@ export const POST = withAuth(async (req: Request) => {
       throw e
     }
 
-    try {
-      await provisionPaymentSubscription({
-        userId: user.id,
-        email: user.email,
-        paymentId: promoPayment.id,
-        plan: {
-          id: plan.id,
-          name: plan.name,
-          durationDays: plan.durationDays,
-          trafficLimitGb: plan.trafficLimitGb,
-          deviceLimit: plan.deviceLimit,
-        },
-      })
-    } catch (e) {
-      const message = e instanceof Error ? e.message : 'subscription provisioning failed'
-      await prisma.payment.update({
-        where: { id: promoPayment.id },
-        data: { provisioningError: message.slice(0, 1000) },
-      })
-      console.error('[payment/create] promo provisioning failed', e)
-      return NextResponse.json({
-        redirectUrl: `/dashboard/billing?paid=1&payment=${promoPayment.id}`,
-        localPaymentId: promoPayment.id,
-        provisioned: false,
-      }, { status: 202 })
-    }
-
-    return NextResponse.json({
-      redirectUrl: `/dashboard/subscription?activated=1`,
-      localPaymentId: promoPayment.id,
-      provisioned: true,
-    })
+    return provisionPromoPayment(promoPayment, user, plan)
   }
 
   let localPayment: Payment
@@ -248,3 +230,48 @@ export const POST = withAuth(async (req: Request) => {
     localPaymentId: localPayment.id,
   })
 })
+
+async function provisionPromoPayment(
+  payment: Payment,
+  user: { id: string; email: string },
+  plan: {
+    id: string
+    name: string
+    durationDays: number
+    trafficLimitGb: number | null
+    deviceLimit: number
+  }
+) {
+  try {
+    await provisionPaymentSubscription({
+      userId: user.id,
+      email: user.email,
+      paymentId: payment.id,
+      plan: {
+        id: plan.id,
+        name: plan.name,
+        durationDays: plan.durationDays,
+        trafficLimitGb: plan.trafficLimitGb,
+        deviceLimit: plan.deviceLimit,
+      },
+    })
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'subscription provisioning failed'
+    await prisma.payment.update({
+      where: { id: payment.id },
+      data: { provisioningError: message.slice(0, 1000) },
+    })
+    console.error('[payment/create] promo provisioning failed', e)
+    return NextResponse.json({
+      redirectUrl: `/dashboard/billing?paid=1&payment=${payment.id}`,
+      localPaymentId: payment.id,
+      provisioned: false,
+    }, { status: 202 })
+  }
+
+  return NextResponse.json({
+    redirectUrl: `/dashboard/subscription?activated=1`,
+    localPaymentId: payment.id,
+    provisioned: true,
+  })
+}

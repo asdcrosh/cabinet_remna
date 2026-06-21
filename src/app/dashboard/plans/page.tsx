@@ -21,7 +21,10 @@ export default async function PlansPage() {
     ? new Set(
         (
           await prisma.trialPlanRedemption.findMany({
-            where: { userId: session.uid },
+            where: {
+              userId: session.uid,
+              payment: { subscriptionProvisionedAt: { not: null } },
+            },
             select: { planId: true },
           })
         ).map((redemption) => redemption.planId)
