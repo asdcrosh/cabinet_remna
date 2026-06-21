@@ -74,6 +74,27 @@ POST {APP_URL}/api/webhook/yookassa
 
 Подробный чеклист: [DEPLOYMENT.md](./DEPLOYMENT.md).
 
+### Чистый сервер одной командой
+
+Для Ubuntu/Debian сервера:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/asdcrosh/cabinet_remna/main/deploy/install-server.sh | sudo bash
+```
+
+После установки заполни реальные значения:
+
+```bash
+nano /opt/remnawave-cabinet/.env.production
+```
+
+Затем запусти:
+
+```bash
+cd /opt/remnawave-cabinet
+./deploy/deploy.sh
+```
+
 Минимальный порядок:
 
 ```bash
