@@ -51,6 +51,14 @@ export const POST = withAuth(async (req: Request) => {
       return NextResponse.json({ error: 'Промокод не нужен для этого тарифа' }, { status: 400 })
     }
 
+    const hasAnySubscription = await prisma.subscription.count({
+      where: { userId: user.id },
+    })
+
+    if (user.remnashopUserId || user.remnawaveUuid || hasAnySubscription > 0) {
+      return NextResponse.json({ error: 'Ознакомительный тариф доступен только новым пользователям' }, { status: 409 })
+    }
+
     const existingTrial = await prisma.trialPlanRedemption.findUnique({
       where: { userId_planId: { userId: user.id, planId: plan.id } },
       include: { payment: true },

@@ -17,6 +17,15 @@ export default async function PlansPage() {
     where: { isActive: true },
     orderBy: { sortOrder: 'asc' },
   })
+  const user = session
+    ? await prisma.user.findUnique({
+        where: { id: session.uid },
+        select: {
+          remnashopUserId: true,
+          remnawaveUuid: true,
+        },
+      })
+    : null
   const usedTrialPlanIds = session
     ? new Set(
         (
@@ -30,13 +39,21 @@ export default async function PlansPage() {
         ).map((redemption) => redemption.planId)
       )
     : new Set<string>()
-  const visiblePlans = plans.filter((plan) => !plan.isPromo || !usedTrialPlanIds.has(plan.id))
   const currentSubscription = session
     ? await prisma.subscription.findFirst({
         where: { userId: session.uid, status: { in: ['ACTIVE', 'LIMITED'] } },
         orderBy: { expireAt: 'desc' },
       })
     : null
+  const hasAnySubscription = session
+    ? (await prisma.subscription.count({ where: { userId: session.uid } })) > 0
+    : false
+  const canUsePromo =
+    !usedTrialPlanIds.size &&
+    !hasAnySubscription &&
+    !user?.remnashopUserId &&
+    !user?.remnawaveUuid
+  const visiblePlans = plans.filter((plan) => !plan.isPromo || canUsePromo)
 
   return (
     <div className="space-y-6">
