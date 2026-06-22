@@ -251,8 +251,6 @@ docker compose -f deploy/docker-compose.server.yml logs -f app
 Проверка после запуска:
 
 ```bash
-export APP_URL="https://ВСТАВЬ_СЮДА_ДОМЕН_КАБИНЕТА"
-export HEALTHCHECK_TOKEN="значение_из_env"
 ./deploy/smoke-check.sh
 ```
 

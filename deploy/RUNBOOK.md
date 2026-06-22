@@ -231,8 +231,6 @@ payment.waiting_for_capture
 ## 9. Smoke Check
 
 ```bash
-export APP_URL="https://ВСТАВЬ_СЮДА_ДОМЕН_КАБИНЕТА"
-export HEALTHCHECK_TOKEN="..."
 bash deploy/smoke-check.sh
 ```
 
