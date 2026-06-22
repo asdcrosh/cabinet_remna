@@ -1,9 +1,9 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
-import { Edit3, Power, Trash2, X } from 'lucide-react'
+import { Edit3, Power, RefreshCw, Trash2, X } from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
 import { formatPrice } from '@/lib/format'
 import { toast } from '@/components/ui/toaster'
@@ -39,6 +39,12 @@ interface PlanFormState {
   isActive: boolean
 }
 
+interface RemnawaveSquad {
+  uuid: string
+  name: string
+  isActive: boolean
+}
+
 const emptyForm: PlanFormState = {
   name: '',
   description: '',
@@ -58,11 +64,31 @@ export function PlansAdmin({ plans }: { plans: PlanAdminRow[] }) {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState<PlanFormState>(emptyForm)
   const [loading, setLoading] = useState(false)
+  const [squads, setSquads] = useState<RemnawaveSquad[]>([])
+  const [squadsLoading, setSquadsLoading] = useState(false)
+  const [squadsError, setSquadsError] = useState<string | null>(null)
 
   const editingPlan = useMemo(
     () => plans.find((plan) => plan.id === editingId) ?? null,
     [editingId, plans]
   )
+
+  useEffect(() => {
+    void loadSquads()
+  }, [])
+
+  async function loadSquads() {
+    setSquadsLoading(true)
+    setSquadsError(null)
+    try {
+      const result = await apiFetch<{ squads: RemnawaveSquad[] }>('/api/admin/remnawave/squads')
+      setSquads(result.squads)
+    } catch (error) {
+      setSquadsError(error instanceof Error ? error.message : 'Не удалось загрузить squads')
+    } finally {
+      setSquadsLoading(false)
+    }
+  }
 
   async function submit() {
     setLoading(true)
@@ -132,6 +158,19 @@ export function PlansAdmin({ plans }: { plans: PlanAdminRow[] }) {
     setEditingId(null)
     setForm(emptyForm)
   }
+
+  function setSquadSelection(uuid: string, checked: boolean) {
+    setForm((current) => {
+      const selected = parseSquads(current.activeInternalSquads)
+      const next = checked
+        ? Array.from(new Set([...selected, uuid]))
+        : selected.filter((item) => item !== uuid)
+
+      return { ...current, activeInternalSquads: next.join('\n') }
+    })
+  }
+
+  const selectedSquads = useMemo(() => new Set(parseSquads(form.activeInternalSquads)), [form.activeInternalSquads])
 
   return (
     <div className="space-y-6">
@@ -242,14 +281,57 @@ export function PlansAdmin({ plans }: { plans: PlanAdminRow[] }) {
               placeholder="Коротко для карточки тарифа"
             />
           </Field>
-          <Field label="Squad UUIDs" className="md:col-span-2 xl:col-span-4">
-            <textarea
-              value={form.activeInternalSquads}
-              onChange={(event) => setForm((current) => ({ ...current, activeInternalSquads: event.target.value }))}
-              className="input min-h-[92px] resize-y font-mono text-xs"
-              placeholder="UUID squads через запятую или с новой строки"
-            />
-          </Field>
+          <div className="md:col-span-2 xl:col-span-4">
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <div className="text-sm font-medium">Squads Remnawave</div>
+              <button
+                type="button"
+                className="btn-secondary px-3 py-2 text-xs"
+                onClick={() => void loadSquads()}
+                disabled={squadsLoading}
+              >
+                <RefreshCw className={cn('h-3.5 w-3.5', squadsLoading && 'animate-spin')} />
+                Обновить
+              </button>
+            </div>
+            {squads.length > 0 ? (
+              <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+                {squads.map((squad) => (
+                  <label
+                    key={squad.uuid}
+                    className="flex min-w-0 cursor-pointer items-start gap-3 rounded-lg border border-slate-200 bg-white px-3 py-3 text-sm transition-colors hover:border-brand-300 hover:bg-brand-50/40 dark:border-white/10 dark:bg-surface-900 dark:hover:border-cyan-400/40 dark:hover:bg-cyan-400/5"
+                  >
+                    <input
+                      type="checkbox"
+                      className="mt-1"
+                      checked={selectedSquads.has(squad.uuid)}
+                      onChange={(event) => setSquadSelection(squad.uuid, event.target.checked)}
+                    />
+                    <span className="min-w-0">
+                      <span className="flex items-center gap-2">
+                        <span className="truncate font-medium">{squad.name}</span>
+                        {!squad.isActive && <span className="badge-disabled">off</span>}
+                      </span>
+                      <span className="mt-1 block truncate font-mono text-xs text-slate-500">{squad.uuid}</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-500 dark:border-white/10 dark:bg-surface-900">
+                {squadsLoading ? 'Загружаем squads...' : squadsError || 'Squads не найдены.'}
+              </div>
+            )}
+            <details className="mt-3">
+              <summary className="cursor-pointer text-sm text-slate-500">Ручной ввод UUID</summary>
+              <textarea
+                value={form.activeInternalSquads}
+                onChange={(event) => setForm((current) => ({ ...current, activeInternalSquads: event.target.value }))}
+                className="input mt-2 min-h-[92px] resize-y font-mono text-xs"
+                placeholder="UUID squads через запятую или с новой строки"
+              />
+            </details>
+          </div>
         </div>
 
         <button type="button" className="btn-primary" onClick={submit} disabled={loading}>

@@ -34,7 +34,6 @@ nano /opt/remnawave-cabinet/.env.production
 - `EMAIL_FROM`
 - `REMNAWAVE_BASE_URL`
 - `REMNAWAVE_TOKEN`
-- `REMNAWAVE_INTERNAL_SQUAD_UUIDS`
 - `YOOKASSA_SHOP_ID`
 - `YOOKASSA_SECRET_KEY`
 
@@ -68,6 +67,7 @@ https://ВСТАВЬ_СЮДА_ДОМЕН_КАБИНЕТА/dashboard/admin/plans
 - Подтверждение email перед покупкой
 - Покупка и продление VPN через YooKassa
 - Одноразовые промо-тарифы без YooKassa
+- Выбор Remnawave squads прямо в настройках тарифа
 - Автоматическая выдача доступа после оплаты
 - Периодическая проверка ожидающих платежей
 - QR-код и ссылка доступа в кабинете
@@ -112,7 +112,7 @@ http://localhost:3000
 | `EMAIL_FROM` | От кого отправлять письма, например `VPN <noreply@domain.ru>` |
 | `REMNAWAVE_BASE_URL` | URL Remnawave Panel |
 | `REMNAWAVE_TOKEN` | API token Remnawave |
-| `REMNAWAVE_INTERNAL_SQUAD_UUIDS` | UUID squads для новых подписок |
+| `REMNAWAVE_INTERNAL_SQUAD_UUIDS` | Fallback UUID squads, если у тарифа не выбран свой список |
 | `YOOKASSA_SHOP_ID` | ID магазина YooKassa |
 | `YOOKASSA_SECRET_KEY` | Боевой secret key YooKassa |
 | `YOOKASSA_WEBHOOK_URL` | Webhook оплаты |

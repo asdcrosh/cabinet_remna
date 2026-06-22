@@ -182,6 +182,17 @@ export interface HwidUserDevice {
   updatedAt?: string
 }
 
+export interface InternalSquadResponse {
+  uuid?: string
+  id?: string
+  name?: string
+  title?: string
+  isActive?: boolean
+  isDisabled?: boolean
+  enabled?: boolean
+  active?: boolean
+}
+
 // ----------------------------------------------------------------------
 // Методы
 // ----------------------------------------------------------------------
@@ -206,6 +217,17 @@ export const remnawave = {
 
   async updateUser(input: UpdateUserRequest) {
     return request<{ response: UserResponse }>('PATCH', '/api/users', input)
+  },
+
+  async getInternalSquads() {
+    for (const path of ['/api/internal-squads', '/api/internal-squads/list', '/api/squads']) {
+      try {
+        return await request<unknown>('GET', path)
+      } catch (error) {
+        if (!(error instanceof RemnawaveError) || error.status !== 404) throw error
+      }
+    }
+    throw new RemnawaveError(404, null, 'Remnawave internal squads endpoint not found')
   },
 
   async deleteUser(uuid: string) {
