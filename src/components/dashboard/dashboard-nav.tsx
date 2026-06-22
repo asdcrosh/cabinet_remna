@@ -13,6 +13,7 @@ import {
   ShieldCheck,
   SlidersHorizontal,
   UserCog,
+  UsersRound,
   X,
 } from 'lucide-react'
 import { cn } from '@/lib/cn'
@@ -23,6 +24,7 @@ const nav = [
   { href: '/dashboard/subscription', label: 'Подписка', icon: KeyRound },
   { href: '/dashboard/plans', label: 'Тарифы', icon: ShieldCheck },
   { href: '/dashboard/billing', label: 'Платежи', icon: CreditCard },
+  { href: '/dashboard/referrals', label: 'Рефералы', icon: UsersRound },
   { href: '/dashboard/devices', label: 'Устройства', icon: Laptop },
   { href: '/dashboard/settings', label: 'Настройки', icon: Settings },
 ]

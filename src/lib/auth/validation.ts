@@ -12,6 +12,14 @@ export const registerSchema = z.object({
     .regex(/[A-Za-z]/, 'Должна быть хотя бы одна латинская буква')
     .regex(/[0-9]/, 'Должна быть хотя бы одна цифра'),
   name: z.string().max(64).trim().optional(),
+  referralCode: z
+    .string()
+    .trim()
+    .min(3)
+    .max(32)
+    .regex(/^[A-Za-z0-9_-]+$/)
+    .optional()
+    .or(z.literal('')),
   agreeToTerms: z.literal(true, {
     errorMap: () => ({ message: 'Нужно согласиться с условиями' }),
   }),

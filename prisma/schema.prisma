@@ -56,6 +56,12 @@ model User {
   name                  String?
   role                  UserRole @default(USER)
 
+  // Реферальная система: код пользователя и кто его пригласил.
+  referralCode          String?  @unique
+  referredById          String?
+  referredBy            User?    @relation("UserReferrals", fields: [referredById], references: [id], onDelete: SetNull)
+  referrals             User[]   @relation("UserReferrals")
+
   // Telegram привязывается после email-регистрации. Используем для поиска
   // пользователя в remnashop и привязки старой Remnawave-подписки.
   telegramId            BigInt?  @unique
@@ -86,6 +92,7 @@ model User {
   passwordResetTokens   PasswordResetToken[]
 
   @@index([email])
+  @@index([referredById])
 }
 
 enum UserRole {

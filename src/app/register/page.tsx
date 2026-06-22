@@ -8,7 +8,7 @@ import Link from 'next/link'
 
 export const metadata = { title: 'Регистрация — Личный кабинет' }
 
-export default async function RegisterPage() {
+export default async function RegisterPage({ searchParams }: { searchParams: { ref?: string } }) {
   const session = await getCurrentUser()
   if (session) redirect('/dashboard')
 
@@ -18,7 +18,7 @@ export default async function RegisterPage() {
       description="Регистрация занимает меньше минуты"
       footer={<>Уже есть аккаунт? <Link href="/login" className="text-brand-600 hover:underline">Войти</Link></>}
     >
-      <RegisterForm />
+      <RegisterForm initialReferralCode={searchParams.ref ?? ''} />
     </AuthLayout>
   )
 }

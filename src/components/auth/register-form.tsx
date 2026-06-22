@@ -11,14 +11,15 @@ interface RegisterInput {
   email: string
   password: string
   name?: string
+  referralCode?: string
   agreeToTerms: boolean
 }
 
-export function RegisterForm() {
+export function RegisterForm({ initialReferralCode = '' }: { initialReferralCode?: string }) {
   const router = useRouter()
   const { register, handleSubmit, watch, formState: { errors, isSubmitting } } =
     useForm<RegisterInput>({
-      defaultValues: { email: '', password: '', name: '', agreeToTerms: false as any },
+      defaultValues: { email: '', password: '', name: '', referralCode: initialReferralCode, agreeToTerms: false as any },
     })
   const [serverError, setServerError] = useState<string | null>(null)
   const [showPassword, setShowPassword] = useState(false)
@@ -92,6 +93,16 @@ export function RegisterForm() {
       <div>
         <label className="label" htmlFor="name">Имя <span className="text-slate-400">(необязательно)</span></label>
         <input id="name" type="text" className="input" {...register('name')} />
+      </div>
+      <div>
+        <label className="label" htmlFor="referralCode">Реферальный код <span className="text-slate-400">(необязательно)</span></label>
+        <input
+          id="referralCode"
+          type="text"
+          className="input uppercase"
+          autoComplete="off"
+          {...register('referralCode')}
+        />
       </div>
       <div>
         <label className="label" htmlFor="password">Пароль</label>

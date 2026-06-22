@@ -9,6 +9,7 @@ import { registerSchema } from '@/lib/auth/validation'
 import { rateLimit } from '@/lib/rate-limit'
 import { assertSameOrigin } from '@/lib/security'
 import { createEmailVerificationToken, sendEmailVerificationLink } from '@/lib/email-verification'
+import { generateUniqueReferralCode, normalizeReferralCode } from '@/lib/referrals'
 
 export const runtime = 'nodejs'
 
@@ -43,6 +44,7 @@ export async function POST(req: Request) {
   }
 
   const { email, password, name, agreeToTerms } = parsed.data
+  const referralCode = normalizeReferralCode(parsed.data.referralCode)
 
   // Проверяем, что email не занят
   const existing = await prisma.user.findUnique({ where: { email } })
@@ -54,6 +56,16 @@ export async function POST(req: Request) {
   }
 
   const passwordHash = await hash(password, 12) // 12 — баланс CPU/безопасности
+  const referrer = referralCode
+    ? await prisma.user.findUnique({
+        where: { referralCode },
+        select: { id: true },
+      })
+    : null
+
+  if (referralCode && !referrer) {
+    return NextResponse.json({ error: 'Реферальный код не найден' }, { status: 404 })
+  }
 
   const user = await prisma.user.create({
     data: {
@@ -61,6 +73,8 @@ export async function POST(req: Request) {
       passwordHash,
       name: name || null,
       role: 'USER',
+      referralCode: await generateUniqueReferralCode(),
+      referredById: referrer?.id,
       agreedToTermsAt: agreeToTerms ? new Date() : null,
     },
     select: { id: true, email: true, role: true, name: true },
