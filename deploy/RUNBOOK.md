@@ -55,6 +55,20 @@ https://ВСТАВЬ_СЮДА_ДОМЕН_КАБИНЕТА/dashboard/admin/plans
 docker compose -f deploy/docker-compose.server.yml logs -f worker
 ```
 
+If this server already has a reverse proxy on ports 80/443, disable bundled Caddy in `.env.production`:
+
+```env
+CABINET_ENABLE_CADDY="false"
+CABINET_APP_BIND="127.0.0.1"
+CABINET_APP_PORT="3000"
+```
+
+Then proxy the cabinet domain from the existing Caddy/Nginx to:
+
+```text
+http://127.0.0.1:3000
+```
+
 По умолчанию worker проверяет платежи раз в 60 секунд и отменяет ожидающий платёж через 600 секунд. Эти значения можно поменять в `.env.production`:
 
 ```env

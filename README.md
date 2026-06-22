@@ -99,6 +99,8 @@ http://localhost:3000
 | Переменная | Для чего нужна |
 | --- | --- |
 | `DATABASE_URL` | PostgreSQL connection string |
+| `CABINET_ENABLE_CADDY` | `true` для встроенного HTTPS, `false` если HTTPS уже делает внешний proxy |
+| `CABINET_APP_PORT` | Локальный порт приложения при внешнем proxy, по умолчанию `3000` |
 | `JWT_SECRET` | Секрет сессий, минимум 32 случайных символа |
 | `APP_URL` | Публичный URL кабинета |
 | `ALLOWED_ORIGINS` | Разрешенные origins для защиты запросов |
@@ -121,6 +123,16 @@ http://localhost:3000
 | `REMNASHOP_DATABASE_SSL` | SSL для удалённой БД remnashop: `true`, `false`, `no-verify` |
 
 Полный шаблон для сервера: [deploy/env.production.example](./deploy/env.production.example).
+
+Если кабинет ставится на сервер, где уже есть Caddy/Nginx на 80/443, укажи:
+
+```env
+CABINET_ENABLE_CADDY="false"
+CABINET_APP_BIND="127.0.0.1"
+CABINET_APP_PORT="3000"
+```
+
+И настрой существующий reverse proxy на `http://127.0.0.1:3000`.
 
 ## YooKassa
 

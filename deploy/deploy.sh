@@ -50,11 +50,18 @@ CABINET_ENV_FILE="${ENV_FILE}" docker compose -f "${COMPOSE_FILE}" run --rm migr
 echo "Seeding default plans if database is empty..."
 CABINET_ENV_FILE="${ENV_FILE}" docker compose -f "${COMPOSE_FILE}" run --rm migrate npm run db:seed
 
-echo "Starting app, payment worker and HTTPS proxy..."
-CABINET_ENV_FILE="${ENV_FILE}" docker compose -f "${COMPOSE_FILE}" up -d app worker caddy
+ENABLE_CADDY="$(grep -E '^CABINET_ENABLE_CADDY=' "${ENV_FILE}" | tail -n1 | cut -d= -f2- | tr -d '"' | tr -d "'" || true)"
+if [[ "${ENABLE_CADDY:-true}" == "false" ]]; then
+  echo "Starting app and payment worker without bundled Caddy..."
+  CABINET_ENV_FILE="${ENV_FILE}" docker compose -f "${COMPOSE_FILE}" up -d app worker
+else
+  echo "Starting app, payment worker and HTTPS proxy..."
+  CABINET_ENV_FILE="${ENV_FILE}" docker compose -f "${COMPOSE_FILE}" up -d app worker caddy
+fi
 
 echo "Deploy complete."
 echo "Useful commands:"
 echo "  docker compose -f deploy/docker-compose.server.yml logs -f app"
 echo "  docker compose -f deploy/docker-compose.server.yml logs -f worker"
+echo "  docker compose -f deploy/docker-compose.server.yml logs -f caddy"
 echo "  docker compose -f deploy/docker-compose.server.yml ps"
