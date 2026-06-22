@@ -1,10 +1,12 @@
+name: remnawave-cabinet
+
 services:
   db:
     image: postgres:16-alpine
     container_name: remnawave-cabinet-db
     restart: unless-stopped
     env_file:
-      - ${CABINET_ENV_FILE:-../.env.production}
+      - ${CABINET_ENV_FILE:-.env}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -15,15 +17,27 @@ services:
     networks:
       - cabinet
 
-  migrate:
-    build:
-      context: ..
-      dockerfile: Dockerfile
-      target: migrator
-    container_name: remnawave-cabinet-migrate
+  check-env:
+    image: ${CABINET_IMAGE:-ghcr.io/asdcrosh/cabinet_remna:latest}
+    pull_policy: ${CABINET_PULL_POLICY:-always}
+    container_name: remnawave-cabinet-check-env
+    command: ["node", "scripts/check-env.mjs"]
     env_file:
-      - ${CABINET_ENV_FILE:-../.env.production}
+      - ${CABINET_ENV_FILE:-.env}
+    restart: "no"
+    networks:
+      - cabinet
+
+  migrate:
+    image: ${CABINET_IMAGE:-ghcr.io/asdcrosh/cabinet_remna:latest}
+    pull_policy: ${CABINET_PULL_POLICY:-always}
+    container_name: remnawave-cabinet-migrate
+    command: ["./node_modules/.bin/prisma", "migrate", "deploy"]
+    env_file:
+      - ${CABINET_ENV_FILE:-.env}
     depends_on:
+      check-env:
+        condition: service_completed_successfully
       db:
         condition: service_healthy
     extra_hosts:
@@ -33,18 +47,33 @@ services:
       - cabinet
       - remnawave_external
 
+  seed:
+    image: ${CABINET_IMAGE:-ghcr.io/asdcrosh/cabinet_remna:latest}
+    pull_policy: ${CABINET_PULL_POLICY:-always}
+    container_name: remnawave-cabinet-seed
+    command: ["./node_modules/.bin/tsx", "prisma/seed.ts"]
+    env_file:
+      - ${CABINET_ENV_FILE:-.env}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: "no"
+    networks:
+      - cabinet
+      - remnawave_external
+
   app:
-    build:
-      context: ..
-      dockerfile: Dockerfile
-      target: runner
+    image: ${CABINET_IMAGE:-ghcr.io/asdcrosh/cabinet_remna:latest}
+    pull_policy: ${CABINET_PULL_POLICY:-always}
     container_name: remnawave-cabinet-app
     restart: unless-stopped
     env_file:
-      - ${CABINET_ENV_FILE:-../.env.production}
+      - ${CABINET_ENV_FILE:-.env}
     depends_on:
-      db:
-        condition: service_healthy
+      seed:
+        condition: service_completed_successfully
     extra_hosts:
       - "host.docker.internal:host-gateway"
     expose:
@@ -68,17 +97,16 @@ services:
           - remnawave-cabinet-app
 
   worker:
-    build:
-      context: ..
-      dockerfile: Dockerfile
-      target: worker
+    image: ${CABINET_IMAGE:-ghcr.io/asdcrosh/cabinet_remna:latest}
+    pull_policy: ${CABINET_PULL_POLICY:-always}
     container_name: remnawave-cabinet-worker
+    command: ["./node_modules/.bin/tsx", "scripts/payment-reconciler.ts"]
     restart: unless-stopped
     env_file:
-      - ${CABINET_ENV_FILE:-../.env.production}
+      - ${CABINET_ENV_FILE:-.env}
     depends_on:
-      db:
-        condition: service_healthy
+      seed:
+        condition: service_completed_successfully
     extra_hosts:
       - "host.docker.internal:host-gateway"
     networks:
@@ -89,8 +117,17 @@ services:
     image: caddy:2-alpine
     container_name: remnawave-cabinet-caddy
     restart: unless-stopped
+    profiles:
+      - caddy
     env_file:
-      - ${CABINET_ENV_FILE:-../.env.production}
+      - ${CABINET_ENV_FILE:-.env}
+    command:
+      - caddy
+      - reverse-proxy
+      - --from
+      - ${APP_URL}
+      - --to
+      - app:3000
     depends_on:
       app:
         condition: service_started
@@ -98,7 +135,6 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
     networks:

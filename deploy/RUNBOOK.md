@@ -20,7 +20,7 @@ Wait until it resolves:
 dig +short ВСТАВЬ_СЮДА_ДОМЕН_КАБИНЕТА
 ```
 
-## 2. Server packages
+## 2. Install
 
 Fast path on a clean Ubuntu/Debian server:
 
@@ -30,82 +30,31 @@ curl -fsSL https://raw.githubusercontent.com/asdcrosh/cabinet_remna/main/deploy/
 
 The installer will:
 
-- install Docker, Docker Compose plugin and Git
-- clone the project to `/opt/remnawave-cabinet`
-- create `.env.production`
-- generate database password, `JWT_SECRET` and `HEALTHCHECK_TOKEN`
-- tell you which production values still need to be filled
+- install Docker and Docker Compose plugin
+- download `/opt/remnawave-cabinet/docker-compose.yml`
+- create `/opt/remnawave-cabinet/.env`
+- generate database password, `JWT_SECRET`, and `HEALTHCHECK_TOKEN`
+- create `CABINET_EXTERNAL_NETWORK` if it is missing
+- deploy automatically when all required production values are present
 
-After editing `.env.production`, run:
+If the installer stops because placeholders remain, edit:
+
+```bash
+nano /opt/remnawave-cabinet/.env
+```
+
+Then run:
 
 ```bash
 cd /opt/remnawave-cabinet
-./deploy/deploy.sh
+docker compose --env-file .env -f docker-compose.yml up -d
 ```
 
-`deploy.sh` применит миграции, создаст стартовые тарифы, если база пустая, и запустит payment worker для периодической проверки ожидающих платежей. После первого входа админ может менять тарифы на:
+This pulls the published image, starts PostgreSQL, validates `.env`, runs Prisma
+migrations, creates starter plans if the database is empty, starts the app, and
+starts the payment worker.
 
-```text
-https://ВСТАВЬ_СЮДА_ДОМЕН_КАБИНЕТА/dashboard/admin/plans
-```
-
-Логи worker:
-
-```bash
-docker compose -f deploy/docker-compose.server.yml logs -f worker
-```
-
-If this server already has a reverse proxy on ports 80/443, disable bundled Caddy in `.env.production`:
-
-```env
-CABINET_ENABLE_CADDY="false"
-CABINET_APP_BIND="127.0.0.1"
-CABINET_APP_PORT="3000"
-CABINET_EXTERNAL_NETWORK="remnawave-network"
-```
-
-Then proxy the cabinet domain from the existing Caddy/Nginx to:
-
-```text
-http://remnawave-cabinet-app:3000
-```
-
-`deploy/deploy.sh` creates `CABINET_EXTERNAL_NETWORK` if it is missing, and
-the app/worker containers join it automatically. This is needed when Remnawave,
-remnashop, and the existing Nginx live in a shared Docker network.
-
-По умолчанию worker проверяет платежи раз в 60 секунд и отменяет ожидающий платёж через 600 секунд. Эти значения можно поменять в `.env.production`:
-
-```env
-PAYMENT_RECONCILE_INTERVAL_SECONDS="60"
-PAYMENT_CANCEL_PENDING_AFTER_SECONDS="600"
-```
-
-If you want to install Docker manually instead:
-
-```bash
-curl -fsSL https://get.docker.com | sh
-usermod -aG docker "$USER"
-```
-
-Then reconnect to SSH.
-
-## 3. Environment
-
-On the server:
-
-```bash
-cp deploy/env.production.example .env.production
-openssl rand -hex 32
-openssl rand -hex 32
-```
-
-Put the generated values into:
-
-```env
-JWT_SECRET="..."
-HEALTHCHECK_TOKEN="..."
-```
+## 3. Required environment
 
 Fill real production values:
 
@@ -123,11 +72,40 @@ Fill real production values:
 - `YOOKASSA_SHOP_ID`
 - `YOOKASSA_SECRET_KEY`
 
-Rotate any tokens that were used locally before going live.
+Important: `POSTGRES_PASSWORD` and the password inside `DATABASE_URL` must be
+the same. The installer keeps them in sync when it creates `.env`.
 
-Important: `POSTGRES_PASSWORD` and the password inside `DATABASE_URL` must be the same.
+## 4. Reverse proxy
 
-## 4. Email Verification
+Bundled Caddy is enabled by default:
+
+```env
+COMPOSE_PROFILES="caddy"
+```
+
+If this server already has a reverse proxy on ports `80` and `443`, disable
+bundled Caddy:
+
+```env
+COMPOSE_PROFILES=""
+CABINET_APP_BIND="127.0.0.1"
+CABINET_APP_PORT="3000"
+CABINET_EXTERNAL_NETWORK="remnawave-network"
+```
+
+Then proxy the cabinet domain to:
+
+```text
+http://127.0.0.1:3000
+```
+
+If the proxy runs inside the shared Docker network, use:
+
+```text
+http://remnawave-cabinet-app:3000
+```
+
+## 5. Email Verification
 
 Recommended built-in setup uses Resend:
 
@@ -144,9 +122,10 @@ Generate webhook secret:
 openssl rand -hex 32
 ```
 
-## 5. Remote Remnashop Database
+## 6. Remote Remnashop Database
 
-If remnashop database is on another server, create a read-only PostgreSQL user there:
+If remnashop database is on another server, create a read-only PostgreSQL user
+there:
 
 ```sql
 CREATE USER remnashop_readonly WITH PASSWORD 'ВСТАВЬ_СЮДА_СИЛЬНЫЙ_ПАРОЛЬ';
@@ -158,59 +137,52 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO remnashop_re
 
 Allow PostgreSQL port `5432` only from the cabinet server IP.
 
-Then set in cabinet `.env.production`:
+Then set in cabinet `.env`:
 
 ```env
 REMNASHOP_DATABASE_URL="postgresql://remnashop_readonly:ВСТАВЬ_СЮДА_ПАРОЛЬ@ВСТАВЬ_СЮДА_IP_ИЛИ_HOST_REMNASHOP:5432/remnashop?schema=public"
 REMNASHOP_DATABASE_SSL="true"
 ```
 
-Use `REMNASHOP_DATABASE_SSL="false"` only if PostgreSQL has no SSL and the network is private/trusted.
+Use `REMNASHOP_DATABASE_SSL="false"` only if PostgreSQL has no SSL and the
+network is private/trusted.
 
-## 6. Deploy
+## 7. Updates and logs
 
-Run one command:
+Update:
 
 ```bash
-./deploy/deploy.sh
+cd /opt/remnawave-cabinet
+docker compose --env-file .env -f docker-compose.yml up -d
 ```
 
-This command will:
-
-- validate `.env.production`
-- build Docker images
-- start PostgreSQL
-- run Prisma migrations
-- start the app
-- start Caddy with HTTPS
-
-## 7. Logs
-
-App logs:
+Logs:
 
 ```bash
-docker compose -f deploy/docker-compose.server.yml logs -f app
+docker compose --env-file .env -f docker-compose.yml logs -f app
+docker compose --env-file .env -f docker-compose.yml logs -f worker
 ```
 
-All services:
+Status:
 
 ```bash
-docker compose -f deploy/docker-compose.server.yml ps
+docker compose --env-file .env -f docker-compose.yml ps
 ```
 
-Restart:
+Restart app:
 
 ```bash
-docker compose -f deploy/docker-compose.server.yml restart app
+docker compose --env-file .env -f docker-compose.yml restart app
 ```
 
 Stop:
 
 ```bash
-docker compose -f deploy/docker-compose.server.yml down
+docker compose --env-file .env -f docker-compose.yml down
 ```
 
-Do not remove Docker volumes unless you intentionally want to delete the database.
+Do not remove Docker volumes unless you intentionally want to delete the
+database.
 
 ## 8. YooKassa
 
@@ -231,36 +203,14 @@ payment.waiting_for_capture
 ## 9. Smoke Check
 
 ```bash
-bash deploy/smoke-check.sh
+cd /opt/remnawave-cabinet
+source .env
+curl -H "x-healthcheck-token: $HEALTHCHECK_TOKEN" "$APP_URL/api/health"
 ```
 
 Then check manually:
 
 - register a new user
 - verify email
-- buy a small tariff
-- return from YooKassa
-- open `/dashboard/subscription`
-- confirm QR/link is visible
-
-## 10. Backups
-
-Create a database backup:
-
-```bash
-./deploy/backup-db.sh
-```
-
-Backups are written to:
-
-```text
-./backups/cabinet-YYYYMMDDTHHMMSSZ.dump
-./backups/cabinet-latest.dump
-```
-
-Restore only when you understand that it overwrites data:
-
-```bash
-RESTORE_CONFIRM=I_UNDERSTAND_DATA_WILL_BE_OVERWRITTEN ./deploy/restore-db.sh backups/cabinet-latest.dump
-./deploy/smoke-check.sh
-```
+- create a payment
+- confirm subscription provisioning

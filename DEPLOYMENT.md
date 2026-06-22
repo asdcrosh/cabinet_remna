@@ -1,197 +1,154 @@
 # Production deployment
 
-Ready-to-use one-command deployment files are in `deploy/`:
+Production deployment is image-based. The server does not need the source tree,
+`Dockerfile`, `package.json`, migrations checkout, or deploy scripts.
 
-- `deploy/env.production.example`
-- `deploy/Caddyfile`
-- `deploy/docker-compose.server.yml`
-- `deploy/deploy.sh`
-- `deploy/smoke-check.sh`
-- `deploy/RUNBOOK.md`
+Only two files are required on the server:
 
-## 1. Secrets
+- `/opt/remnawave-cabinet/docker-compose.yml`
+- `/opt/remnawave-cabinet/.env`
 
-Create `.env.production` on the server from `deploy/env.production.example`.
+The application image is configured with:
 
-Generate fresh values:
+```env
+CABINET_IMAGE="ghcr.io/asdcrosh/cabinet_remna:latest"
+```
+
+## Build and publish
+
+`.github/workflows/docker-image.yml` publishes the `release` Docker target to
+GitHub Container Registry on every push to `main`, on version tags, and on
+manual workflow dispatch.
+
+Make sure the GHCR package is public, or run `docker login ghcr.io` on the
+server before deploying.
+
+Manual publish equivalent:
 
 ```bash
-openssl rand -hex 32 # JWT_SECRET
-openssl rand -hex 32 # HEALTHCHECK_TOKEN
+docker buildx build --target release \
+  -t ghcr.io/asdcrosh/cabinet_remna:latest \
+  --push .
 ```
 
-Use only production YooKassa keys. Do not deploy `test_...` keys.
+## One-command install
 
-Rotate any tokens that were used during local development before going live:
-
-- `JWT_SECRET`
-- `REMNAWAVE_TOKEN`
-- `YOOKASSA_SECRET_KEY`
-- `TELEGRAM_CLIENT_SECRET`
-- `TELEGRAM_BOT_TOKEN`
-- `EMAIL_VERIFICATION_WEBHOOK_SECRET`
-
-## 2. Required server settings
-
-`APP_URL` and `ALLOWED_ORIGINS` must be the public HTTPS cabinet origin:
-
-```env
-APP_URL="https://ВСТАВЬ_СЮДА_ДОМЕН_КАБИНЕТА"
-ALLOWED_ORIGINS="https://ВСТАВЬ_СЮДА_ДОМЕН_КАБИНЕТА"
-YOOKASSA_WEBHOOK_URL="https://ВСТАВЬ_СЮДА_ДОМЕН_КАБИНЕТА/api/webhook/yookassa"
-```
-
-`EMAIL_VERIFICATION_WEBHOOK_URL` must send real email, otherwise new users cannot verify accounts.
-
-Built-in Resend option:
-
-```env
-EMAIL_VERIFICATION_WEBHOOK_URL="https://ВСТАВЬ_СЮДА_ДОМЕН_КАБИНЕТА/api/email/resend"
-EMAIL_VERIFICATION_WEBHOOK_SECRET="ВСТАВЬ_СЮДА_SECRET_ДЛЯ_EMAIL_WEBHOOK"
-RESEND_API_KEY="ВСТАВЬ_СЮДА_RESEND_API_KEY"
-EMAIL_FROM="VPN Cabinet <noreply@ВСТАВЬ_СЮДА_ДОМЕН_ПОЧТЫ>"
-```
-
-If remnashop sync is enabled, use a read-only DB user.
-
-Remote remnashop database:
-
-```env
-REMNASHOP_DATABASE_URL="postgresql://ВСТАВЬ_СЮДА_READONLY_USER:ВСТАВЬ_СЮДА_READONLY_PASSWORD@ВСТАВЬ_СЮДА_HOST_REMNASHOP:5432/remnashop?schema=public"
-REMNASHOP_DATABASE_SSL="true"
-```
-
-Open PostgreSQL port `5432` only from the cabinet server IP.
-
-## 3. Telegram
-
-In BotFather Web Login settings add:
-
-```text
-https://ВСТАВЬ_СЮДА_ДОМЕН_КАБИНЕТА
-https://ВСТАВЬ_СЮДА_ДОМЕН_КАБИНЕТА/api/me/telegram/oidc/callback
-```
-
-Then set:
-
-```env
-TELEGRAM_CLIENT_ID="..."
-TELEGRAM_CLIENT_SECRET="..."
-```
-
-## 4. YooKassa
-
-In YooKassa dashboard add webhook:
-
-```text
-POST https://ВСТАВЬ_СЮДА_ДОМЕН_КАБИНЕТА/api/webhook/yookassa
-```
-
-Events:
-
-```text
-payment.succeeded
-payment.canceled
-payment.waiting_for_capture
-```
-
-If you know YooKassa source IP/CIDR ranges for your account, set `YOOKASSA_WEBHOOK_ALLOWED_IPS`.
-
-## 5. One-command deploy
-
-For a clean server with built-in PostgreSQL and HTTPS via Caddy:
+For a clean Ubuntu/Debian server:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/asdcrosh/cabinet_remna/main/deploy/install-server.sh | sudo bash
 ```
 
-The installer creates `/opt/remnawave-cabinet/.env.production` and generates local secrets.
-Fill every `ВСТАВЬ_СЮДА_...` value in `.env.production`, then run:
+The installer will:
+
+- install Docker and the Docker Compose plugin
+- download `docker-compose.yml`
+- create `.env`
+- generate `POSTGRES_PASSWORD`, `JWT_SECRET`, and `HEALTHCHECK_TOKEN`
+- create `CABINET_EXTERNAL_NETWORK` if it is missing
+- deploy automatically when all required values are present
+
+If placeholders remain, edit:
+
+```bash
+nano /opt/remnawave-cabinet/.env
+```
+
+Then run either the installer again or:
 
 ```bash
 cd /opt/remnawave-cabinet
-./deploy/deploy.sh
+docker compose --env-file .env -f docker-compose.yml up -d
 ```
 
-Manual equivalent:
+`pull_policy=always` makes this command pull the newest image before recreating
+containers. The compose dependency graph validates `.env`, runs Prisma
+migrations, and runs the idempotent seed before starting the app and payment
+worker.
 
-```bash
-cp deploy/env.production.example .env.production
-# edit .env.production
-./deploy/deploy.sh
+## Required environment
+
+Fill real production values:
+
+- `CABINET_DOMAIN`
+- `EMAIL_VERIFICATION_WEBHOOK_URL`
+- `EMAIL_VERIFICATION_WEBHOOK_SECRET`
+- `RESEND_API_KEY`
+- `EMAIL_FROM`
+- `REMNAWAVE_BASE_URL`
+- `REMNAWAVE_TOKEN`
+- `REMNAWAVE_INTERNAL_SQUAD_UUIDS`
+- `YOOKASSA_SHOP_ID`
+- `YOOKASSA_SECRET_KEY`
+
+Use only production YooKassa keys. Do not deploy `test_...` keys.
+
+`APP_URL`, `ALLOWED_ORIGINS`, and `YOOKASSA_WEBHOOK_URL` must point to the
+public HTTPS cabinet origin:
+
+```env
+APP_URL="https://cabinet.example.com"
+ALLOWED_ORIGINS="https://cabinet.example.com"
+YOOKASSA_WEBHOOK_URL="https://cabinet.example.com/api/webhook/yookassa"
 ```
 
-This starts:
+## Reverse proxy
 
-- PostgreSQL
-- Prisma migrations
-- Next.js app
-- Caddy HTTPS reverse proxy
+Bundled Caddy is enabled by default:
 
-## 6. Manual build and migrate
-
-Run before start:
-
-```bash
-npm ci
-NODE_ENV=production npm run check:env
-npm run prisma:deploy
-npm run build
+```env
+COMPOSE_PROFILES="caddy"
 ```
 
-Start:
+If the server already has Caddy/Nginx/Traefik on ports `80` and `443`, disable
+the bundled proxy:
 
-```bash
-NODE_ENV=production npm run start
+```env
+COMPOSE_PROFILES=""
+CABINET_APP_BIND="127.0.0.1"
+CABINET_APP_PORT="3000"
 ```
 
-Or with the app-only Docker Compose file:
-
-```bash
-docker compose -f docker-compose.prod.yml build
-docker compose -f docker-compose.prod.yml up -d
-```
-
-Run Prisma migrations outside the runtime container before replacing the app.
-
-## 7. Reverse proxy
-
-Terminate HTTPS at nginx/Caddy/Traefik and proxy to:
+Then proxy to:
 
 ```text
 http://127.0.0.1:3000
 ```
 
-Pass these headers:
+If the external reverse proxy runs in Docker on `CABINET_EXTERNAL_NETWORK`, it
+can proxy to:
 
 ```text
-Host
-X-Forwarded-Host
-X-Forwarded-Proto
-X-Forwarded-For
-X-Real-IP
+http://remnawave-cabinet-app:3000
 ```
 
-For one-command deployment this is already handled by `deploy/docker-compose.server.yml`.
-Use `deploy/Caddyfile` or `deploy/nginx.conf` only if you manage the reverse proxy yourself.
+## Operations
 
-## 8. Smoke checks
+Update to the newest published image:
 
 ```bash
-curl -H "x-healthcheck-token: $HEALTHCHECK_TOKEN" https://ВСТАВЬ_СЮДА_ДОМЕН_КАБИНЕТА/api/health
+cd /opt/remnawave-cabinet
+docker compose --env-file .env -f docker-compose.yml up -d
 ```
 
-Or:
+Logs:
 
 ```bash
-APP_URL="https://ВСТАВЬ_СЮДА_ДОМЕН_КАБИНЕТА" HEALTHCHECK_TOKEN="$HEALTHCHECK_TOKEN" bash deploy/smoke-check.sh
+docker compose --env-file .env -f docker-compose.yml logs -f app
+docker compose --env-file .env -f docker-compose.yml logs -f worker
 ```
 
-Then verify:
+Smoke check:
 
-- registration sends a real email
-- email verification redirects to `/login?verified=1`
-- login sets `cabinet_session` with `HttpOnly`, `Secure`, `SameSite=Lax`
-- Telegram link returns to `/dashboard/settings`
-- YooKassa creates payment and webhook provisions subscription
-- admin pages are unavailable to regular users
+```bash
+source .env
+curl -H "x-healthcheck-token: $HEALTHCHECK_TOKEN" "$APP_URL/api/health"
+```
+
+Database backup:
+
+```bash
+docker compose --env-file .env -f docker-compose.yml exec -T db \
+  sh -lc 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" --format=custom --no-owner --no-privileges' \
+  > cabinet.dump
+```

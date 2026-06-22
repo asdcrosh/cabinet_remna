@@ -2,12 +2,20 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-ENV_FILE="${ENV_FILE:-${ROOT_DIR}/.env.production}"
-COMPOSE_FILE="${ROOT_DIR}/deploy/docker-compose.server.yml"
+DEFAULT_ENV_FILE="${ROOT_DIR}/.env"
+if [[ ! -f "${DEFAULT_ENV_FILE}" ]]; then
+  DEFAULT_ENV_FILE="${ROOT_DIR}/.env.production"
+fi
+DEFAULT_COMPOSE_FILE="${ROOT_DIR}/docker-compose.yml"
+if [[ ! -f "${DEFAULT_COMPOSE_FILE}" ]]; then
+  DEFAULT_COMPOSE_FILE="${ROOT_DIR}/deploy/docker-compose.server.yml"
+fi
+ENV_FILE="${ENV_FILE:-${DEFAULT_ENV_FILE}}"
+COMPOSE_FILE="${COMPOSE_FILE:-${DEFAULT_COMPOSE_FILE}}"
 BACKUP_FILE="${1:-}"
 
 if [[ ! -f "${ENV_FILE}" ]]; then
-  echo ".env.production not found. Set ENV_FILE or run from the project server checkout."
+  echo "Env file not found. Set ENV_FILE or run from the deployment directory."
   exit 1
 fi
 
@@ -29,14 +37,14 @@ if [[ "${RESTORE_CONFIRM:-}" != "I_UNDERSTAND_DATA_WILL_BE_OVERWRITTEN" ]]; then
 fi
 
 echo "Stopping app and worker before restore..."
-docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" stop app worker >/dev/null || true
+CABINET_ENV_FILE="${ENV_FILE}" docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" stop app worker >/dev/null || true
 
 echo "Restoring database from: ${BACKUP_FILE}"
-cat "${BACKUP_FILE}" | docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" exec -T db \
+cat "${BACKUP_FILE}" | CABINET_ENV_FILE="${ENV_FILE}" docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" exec -T db \
   sh -lc 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists --no-owner --no-privileges'
 
 echo "Starting app and worker..."
-docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" up -d app worker >/dev/null
+CABINET_ENV_FILE="${ENV_FILE}" docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" up -d app worker >/dev/null
 
 echo "Restore complete. Run smoke-check next:"
 echo "  ./deploy/smoke-check.sh"
