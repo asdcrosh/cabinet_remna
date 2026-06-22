@@ -4,6 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 COMPOSE_FILE="${ROOT_DIR}/deploy/docker-compose.server.yml"
 ENV_FILE="${ROOT_DIR}/.env.production"
+COMPOSE=(docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}")
 
 cd "${ROOT_DIR}"
 
@@ -39,24 +40,24 @@ else
 fi
 
 echo "Building images..."
-CABINET_ENV_FILE="${ENV_FILE}" docker compose -f "${COMPOSE_FILE}" build
+CABINET_ENV_FILE="${ENV_FILE}" "${COMPOSE[@]}" build
 
 echo "Starting database..."
-CABINET_ENV_FILE="${ENV_FILE}" docker compose -f "${COMPOSE_FILE}" up -d db
+CABINET_ENV_FILE="${ENV_FILE}" "${COMPOSE[@]}" up -d db
 
 echo "Running migrations..."
-CABINET_ENV_FILE="${ENV_FILE}" docker compose -f "${COMPOSE_FILE}" run --rm migrate
+CABINET_ENV_FILE="${ENV_FILE}" "${COMPOSE[@]}" run --rm migrate
 
 echo "Seeding default plans if database is empty..."
-CABINET_ENV_FILE="${ENV_FILE}" docker compose -f "${COMPOSE_FILE}" run --rm migrate npm run db:seed
+CABINET_ENV_FILE="${ENV_FILE}" "${COMPOSE[@]}" run --rm migrate npm run db:seed
 
 ENABLE_CADDY="$(grep -E '^CABINET_ENABLE_CADDY=' "${ENV_FILE}" | tail -n1 | cut -d= -f2- | tr -d '"' | tr -d "'" || true)"
 if [[ "${ENABLE_CADDY:-true}" == "false" ]]; then
   echo "Starting app and payment worker without bundled Caddy..."
-  CABINET_ENV_FILE="${ENV_FILE}" docker compose -f "${COMPOSE_FILE}" up -d app worker
+  CABINET_ENV_FILE="${ENV_FILE}" "${COMPOSE[@]}" up -d app worker
 else
   echo "Starting app, payment worker and HTTPS proxy..."
-  CABINET_ENV_FILE="${ENV_FILE}" docker compose -f "${COMPOSE_FILE}" up -d app worker caddy
+  CABINET_ENV_FILE="${ENV_FILE}" "${COMPOSE[@]}" up -d app worker caddy
 fi
 
 echo "Deploy complete."
