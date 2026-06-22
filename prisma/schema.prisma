@@ -61,6 +61,8 @@ model User {
   referredById          String?
   referredBy            User?    @relation("UserReferrals", fields: [referredById], references: [id], onDelete: SetNull)
   referrals             User[]   @relation("UserReferrals")
+  referralRewardsEarned ReferralReward[] @relation("ReferralRewardsEarned")
+  referralRewardAsReferred ReferralReward? @relation("ReferralRewardReferred")
 
   // Telegram привязывается после email-регистрации. Используем для поиска
   // пользователя в remnashop и привязки старой Remnawave-подписки.
@@ -211,6 +213,7 @@ model Payment {
   promoCodeRedemption PromoCodeRedemption?
   trialPlanRedemption TrialPlanRedemption?
   provisioningJob ProvisioningJob?
+  referralRewardTriggered ReferralReward?
 
   @@index([userId, createdAt])
   @@index([status])
@@ -222,6 +225,33 @@ enum PaymentStatus {
   SUCCEEDED
   CANCELED
   REFUNDED
+}
+
+model ReferralReward {
+  id                  String   @id @default(cuid())
+  referrerId          String
+  referredUserId      String   @unique
+  triggeringPaymentId String   @unique
+  bonusDays           Int
+  status              ReferralRewardStatus @default(PENDING)
+  appliedSubscriptionId String?
+  appliedAt           DateTime?
+  lastError           String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  referrer            User     @relation("ReferralRewardsEarned", fields: [referrerId], references: [id], onDelete: Cascade)
+  referredUser        User     @relation("ReferralRewardReferred", fields: [referredUserId], references: [id], onDelete: Cascade)
+  triggeringPayment   Payment  @relation(fields: [triggeringPaymentId], references: [id], onDelete: Cascade)
+
+  @@index([referrerId, status])
+  @@index([status, createdAt])
+}
+
+enum ReferralRewardStatus {
+  PENDING
+  PROCESSING
+  APPLIED
 }
 
 model TrialPlanRedemption {

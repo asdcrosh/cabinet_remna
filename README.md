@@ -122,6 +122,7 @@ http://localhost:3000
 | `TELEGRAM_CLIENT_SECRET` | Опционально, перенос старых Telegram-подписок |
 | `REMNASHOP_DATABASE_URL` | Опционально, read-only подключение к старой БД remnashop |
 | `REMNASHOP_DATABASE_SSL` | SSL для удалённой БД remnashop: `true`, `false`, `no-verify` |
+| `REFERRAL_BONUS_DAYS` | Сколько дней добавить за первую платную покупку приглашенного |
 
 Полный шаблон для сервера: [deploy/env.production.example](./deploy/env.production.example).
 

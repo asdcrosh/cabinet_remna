@@ -13,13 +13,19 @@ const mocks = vi.hoisted(() => {
   }
 
   const ensureRemnawaveSubscription = vi.fn()
+  const grantReferralRewardForPayment = vi.fn()
+  const applyPendingReferralRewardsForUser = vi.fn()
 
-  return { prisma, ensureRemnawaveSubscription, subscription }
+  return { prisma, ensureRemnawaveSubscription, grantReferralRewardForPayment, applyPendingReferralRewardsForUser, subscription }
 })
 
 vi.mock('./prisma', () => ({ prisma: mocks.prisma }))
 vi.mock('./subscription', () => ({
   ensureRemnawaveSubscription: mocks.ensureRemnawaveSubscription,
+}))
+vi.mock('./referral-rewards', () => ({
+  grantReferralRewardForPayment: mocks.grantReferralRewardForPayment,
+  applyPendingReferralRewardsForUser: mocks.applyPendingReferralRewardsForUser,
 }))
 
 import { provisionPaymentSubscription } from './provisioning'
@@ -69,6 +75,8 @@ describe('provisionPaymentSubscription', () => {
       })
     )
     expect(mocks.ensureRemnawaveSubscription).not.toHaveBeenCalled()
+    expect(mocks.grantReferralRewardForPayment).toHaveBeenCalledWith('pay-1')
+    expect(mocks.applyPendingReferralRewardsForUser).toHaveBeenCalledWith('user-1')
   })
 
   it('creates a running job and marks it succeeded after provisioning', async () => {
@@ -99,6 +107,8 @@ describe('provisionPaymentSubscription', () => {
       where: { id: 'job-1' },
       data: expect.objectContaining({ status: 'SUCCEEDED', lastError: null }),
     })
+    expect(mocks.grantReferralRewardForPayment).toHaveBeenCalledWith('pay-1')
+    expect(mocks.applyPendingReferralRewardsForUser).toHaveBeenCalledWith('user-1')
   })
 
   it('marks job failed and schedules retry when provisioning throws', async () => {
@@ -121,5 +131,6 @@ describe('provisionPaymentSubscription', () => {
         nextRetryAt: new Date('2026-01-01T00:04:00.000Z'),
       }),
     })
+    expect(mocks.grantReferralRewardForPayment).not.toHaveBeenCalled()
   })
 })

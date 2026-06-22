@@ -93,6 +93,7 @@ export async function POST(req: Request) {
           durationDays: payment.plan.durationDays,
           trafficLimitGb: payment.plan.trafficLimitGb,
           deviceLimit: payment.plan.deviceLimit,
+          activeInternalSquads: payment.plan.activeInternalSquads,
         },
       })
     } catch (e) {

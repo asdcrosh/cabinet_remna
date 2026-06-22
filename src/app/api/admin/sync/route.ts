@@ -47,6 +47,7 @@ export const POST = withAuth(async (req: Request) => {
       durationDays: payment.plan.durationDays,
       trafficLimitGb: payment.plan.trafficLimitGb,
       deviceLimit: payment.plan.deviceLimit,
+      activeInternalSquads: payment.plan.activeInternalSquads,
     },
   })
 

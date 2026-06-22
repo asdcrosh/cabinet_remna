@@ -19,7 +19,7 @@ export default async function ReferralsPage() {
   const appUrl = getAppUrl()
   const referralUrl = `${appUrl}/register?ref=${encodeURIComponent(referralCode)}`
 
-  const [invitedCount, paidCount, referrals] = await Promise.all([
+  const [invitedCount, paidCount, appliedReward, pendingReward, referrals] = await Promise.all([
     prisma.user.count({ where: { referredById: session.uid } }),
     prisma.user.count({
       where: {
@@ -31,6 +31,14 @@ export default async function ReferralsPage() {
           },
         },
       },
+    }),
+    prisma.referralReward.aggregate({
+      where: { referrerId: session.uid, status: 'APPLIED' },
+      _sum: { bonusDays: true },
+    }),
+    prisma.referralReward.aggregate({
+      where: { referrerId: session.uid, status: { in: ['PENDING', 'PROCESSING'] } },
+      _sum: { bonusDays: true },
     }),
     prisma.user.findMany({
       where: { referredById: session.uid },
@@ -48,18 +56,33 @@ export default async function ReferralsPage() {
           select: { id: true },
           take: 1,
         },
+        referralRewardAsReferred: {
+          select: {
+            status: true,
+            bonusDays: true,
+          },
+        },
       },
     }),
   ])
+
+  const appliedDays = appliedReward._sum.bonusDays ?? 0
+  const pendingDays = pendingReward._sum.bonusDays ?? 0
 
   return (
     <div className="space-y-6">
       <PageHeader title="Рефералы" description="Приглашайте пользователей и отслеживайте регистрации" />
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Код" value={referralCode} hint="Используется в ссылке" icon={<UserPlus className="h-5 w-5" />} />
         <StatCard label="Приглашено" value={invitedCount} hint="Регистрации по ссылке" icon={<UsersRound className="h-5 w-5" />} />
         <StatCard label="Оплатили" value={paidCount} hint="Есть выданная подписка" icon={<CreditCard className="h-5 w-5" />} />
+        <StatCard
+          label="Бонус"
+          value={`+${appliedDays} дн.`}
+          hint={pendingDays > 0 ? `Ожидает +${pendingDays} дн.` : 'Начислено за оплаты'}
+          icon={<CreditCard className="h-5 w-5" />}
+        />
       </div>
 
       <ReferralLinkCard code={referralCode} url={referralUrl} />
@@ -76,8 +99,8 @@ export default async function ReferralsPage() {
                 <div className="truncate font-medium">{maskEmail(user.email)}</div>
                 <div className="text-xs text-slate-500">{user.createdAt.toLocaleDateString('ru-RU')}</div>
               </div>
-              <span className={user.payments.length > 0 ? 'badge-active' : 'badge-disabled'}>
-                {user.payments.length > 0 ? 'Оплатил' : 'Регистрация'}
+              <span className={getReferralBadgeClass(user.referralRewardAsReferred?.status, user.payments.length > 0)}>
+                {getReferralBadgeText(user.referralRewardAsReferred, user.payments.length > 0)}
               </span>
             </div>
           ))}
@@ -85,6 +108,21 @@ export default async function ReferralsPage() {
       </div>
     </div>
   )
+}
+
+function getReferralBadgeText(
+  reward: { status: 'PENDING' | 'PROCESSING' | 'APPLIED'; bonusDays: number } | null,
+  hasPaid: boolean
+) {
+  if (reward?.status === 'APPLIED') return `+${reward.bonusDays} дн.`
+  if (reward?.status === 'PENDING' || reward?.status === 'PROCESSING') return `Ждет +${reward.bonusDays} дн.`
+  return hasPaid ? 'Оплатил' : 'Регистрация'
+}
+
+function getReferralBadgeClass(status: 'PENDING' | 'PROCESSING' | 'APPLIED' | undefined, hasPaid: boolean) {
+  if (status === 'APPLIED') return 'badge-active'
+  if (status === 'PENDING' || status === 'PROCESSING') return 'badge-limited'
+  return hasPaid ? 'badge-active' : 'badge-disabled'
 }
 
 function maskEmail(email: string) {
