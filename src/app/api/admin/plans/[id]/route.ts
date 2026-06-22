@@ -42,6 +42,51 @@ export const PATCH = withAuth(async (req: Request, { params }: { params: { id: s
   }
 })
 
+export const DELETE = withAuth(async (_req: Request, { params }: { params: { id: string } }) => {
+  await requireAdmin()
+
+  const plan = await prisma.plan.findUnique({
+    where: { id: params.id },
+    include: {
+      _count: {
+        select: {
+          payments: true,
+          subscriptions: true,
+          trialRedemptions: true,
+        },
+      },
+    },
+  })
+
+  if (!plan) {
+    return NextResponse.json({ error: 'Тариф не найден' }, { status: 404 })
+  }
+
+  const linkedCount = plan._count.payments + plan._count.subscriptions + plan._count.trialRedemptions
+  if (linkedCount > 0) {
+    return NextResponse.json(
+      { error: 'Нельзя удалить тариф с платежами или подписками. Скрывайте его вместо удаления.' },
+      { status: 409 }
+    )
+  }
+
+  try {
+    await prisma.plan.delete({ where: { id: params.id } })
+    return NextResponse.json({ ok: true })
+  } catch (e) {
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2025') {
+      return NextResponse.json({ error: 'Тариф не найден' }, { status: 404 })
+    }
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2003') {
+      return NextResponse.json(
+        { error: 'Нельзя удалить тариф, который используется в данных кабинета.' },
+        { status: 409 }
+      )
+    }
+    throw e
+  }
+})
+
 function normalizePlanInput<T extends { description?: string | null }>(data: T) {
   return {
     ...data,

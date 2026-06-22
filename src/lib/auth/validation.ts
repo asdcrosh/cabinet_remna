@@ -22,6 +22,20 @@ export const loginSchema = z.object({
   password: z.string().min(1).max(128),
 })
 
+export const forgotPasswordSchema = z.object({
+  email: z.string().email('Некорректный email').toLowerCase().trim(),
+})
+
+export const resetPasswordSchema = z.object({
+  token: z.string().min(16).max(256),
+  password: z
+    .string()
+    .min(8, 'Минимум 8 символов')
+    .max(128, 'Максимум 128 символов')
+    .regex(/[A-Za-z]/, 'Должна быть хотя бы одна латинская буква')
+    .regex(/[0-9]/, 'Должна быть хотя бы одна цифра'),
+})
+
 export const changePasswordSchema = z
   .object({
     oldPassword: z.string().min(1).max(128),
@@ -98,6 +112,8 @@ export const updateProfileSchema = z.object({
 
 export type RegisterInput = z.infer<typeof registerSchema>
 export type LoginInput = z.infer<typeof loginSchema>
+export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>
+export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>
 export type ChangePasswordInput = z.infer<typeof changePasswordSchema>
 export type CreatePaymentInput = z.infer<typeof createPaymentSchema>
 export type ValidatePromoCodeInput = z.infer<typeof validatePromoCodeSchema>

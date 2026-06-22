@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { apiFetch } from '@/lib/api-client'
@@ -90,7 +91,12 @@ export function LoginForm() {
         {errors.email && <p className="text-xs text-red-600 mt-1">{errors.email.message}</p>}
       </div>
       <div>
-        <label className="label" htmlFor="password">Пароль</label>
+        <div className="mb-1 flex items-center justify-between gap-3">
+          <label className="label mb-0" htmlFor="password">Пароль</label>
+          <Link href="/forgot-password" className="text-xs font-medium text-brand-600 hover:underline">
+            Забыли пароль?
+          </Link>
+        </div>
         <div className="relative">
           <input
             id="password"

@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
-import { Edit3, Power, X } from 'lucide-react'
+import { Edit3, Power, Trash2, X } from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
 import { formatPrice } from '@/lib/format'
 import { toast } from '@/components/ui/toaster'
@@ -88,6 +88,23 @@ export function PlansAdmin({ plans }: { plans: PlanAdminRow[] }) {
         body: JSON.stringify({ isActive: !plan.isActive }),
       })
       toast(plan.isActive ? 'Тариф скрыт' : 'Тариф опубликован', 'success')
+      router.refresh()
+    } catch {
+      // apiFetch уже покажет toast
+    }
+  }
+
+  async function deletePlan(plan: PlanAdminRow) {
+    if (plan.paymentsCount > 0 || plan.subscriptionsCount > 0) {
+      toast('Этот тариф уже используется. Его можно только скрыть.')
+      return
+    }
+    if (!window.confirm(`Удалить тариф "${plan.name}"?`)) return
+
+    try {
+      await apiFetch(`/api/admin/plans/${plan.id}`, { method: 'DELETE' })
+      toast('Тариф удалён', 'success')
+      if (editingId === plan.id) resetForm()
       router.refresh()
     } catch {
       // apiFetch уже покажет toast
@@ -272,7 +289,7 @@ export function PlansAdmin({ plans }: { plans: PlanAdminRow[] }) {
                 <Metric label="Связи" value={`${plan.subscriptionsCount} / ${plan.paymentsCount}`} />
               </div>
 
-              <div className="action-row xl:w-[240px]">
+              <div className="action-row xl:w-[360px]">
                 <button type="button" className="btn-secondary min-w-[112px] px-3 text-xs" onClick={() => startEdit(plan)}>
                   <Edit3 className="h-3.5 w-3.5" />
                   Изменить
@@ -280,6 +297,10 @@ export function PlansAdmin({ plans }: { plans: PlanAdminRow[] }) {
                 <button type="button" className="btn-secondary min-w-[112px] px-3 text-xs" onClick={() => toggleActive(plan)}>
                   <Power className="h-3.5 w-3.5" />
                   {plan.isActive ? 'Скрыть' : 'Показать'}
+                </button>
+                <button type="button" className="btn-secondary min-w-[112px] px-3 text-xs" onClick={() => deletePlan(plan)}>
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Удалить
                 </button>
               </div>
             </div>
