@@ -2,8 +2,16 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-ENV_FILE="${ENV_FILE:-${ROOT_DIR}/.env.production}"
-COMPOSE_FILE="${ROOT_DIR}/deploy/docker-compose.server.yml"
+DEFAULT_ENV_FILE="${ROOT_DIR}/.env"
+if [[ ! -f "${DEFAULT_ENV_FILE}" ]]; then
+  DEFAULT_ENV_FILE="${ROOT_DIR}/.env.production"
+fi
+DEFAULT_COMPOSE_FILE="${ROOT_DIR}/docker-compose.yml"
+if [[ ! -f "${DEFAULT_COMPOSE_FILE}" ]]; then
+  DEFAULT_COMPOSE_FILE="${ROOT_DIR}/deploy/docker-compose.server.yml"
+fi
+ENV_FILE="${ENV_FILE:-${DEFAULT_ENV_FILE}}"
+COMPOSE_FILE="${COMPOSE_FILE:-${DEFAULT_COMPOSE_FILE}}"
 
 if [[ -f "${ENV_FILE}" ]]; then
   set -a
@@ -43,7 +51,7 @@ if [[ -z "${APP_URL}" ]]; then
 fi
 
 echo "Checking Docker services..."
-docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" ps
+CABINET_ENV_FILE="${ENV_FILE}" docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" ps
 
 echo "Checking local app on ${CABINET_APP_BIND}:${CABINET_APP_PORT}..."
 wait_for_url "http://${CABINET_APP_BIND}:${CABINET_APP_PORT}/login" 60

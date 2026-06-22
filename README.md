@@ -17,12 +17,12 @@
 curl -fsSL https://raw.githubusercontent.com/asdcrosh/cabinet_remna/main/deploy/install-server.sh | sudo bash
 ```
 
-Скрипт сам установит Docker, скачает проект, создаст `.env.production`, сгенерирует пароль базы, `JWT_SECRET` и `HEALTHCHECK_TOKEN`.
+Скрипт сам установит Docker, скачает только `docker-compose.yml`, создаст `.env`, сгенерирует пароль базы, `JWT_SECRET` и `HEALTHCHECK_TOKEN`.
 
 После этого заполни реальные данные:
 
 ```bash
-nano /opt/remnawave-cabinet/.env.production
+nano /opt/remnawave-cabinet/.env
 ```
 
 Минимально нужно указать:
@@ -34,6 +34,7 @@ nano /opt/remnawave-cabinet/.env.production
 - `EMAIL_FROM`
 - `REMNAWAVE_BASE_URL`
 - `REMNAWAVE_TOKEN`
+- `REMNAWAVE_INTERNAL_SQUAD_UUIDS`
 - `YOOKASSA_SHOP_ID`
 - `YOOKASSA_SECRET_KEY`
 
@@ -41,7 +42,7 @@ nano /opt/remnawave-cabinet/.env.production
 
 ```bash
 cd /opt/remnawave-cabinet
-./deploy/deploy.sh
+docker compose --env-file .env -f docker-compose.yml up -d
 ```
 
 Будет поднято:
@@ -98,8 +99,9 @@ http://localhost:3000
 
 | Переменная | Для чего нужна |
 | --- | --- |
+| `CABINET_IMAGE` | Готовый Docker image кабинета, по умолчанию `ghcr.io/asdcrosh/cabinet_remna:latest` |
+| `COMPOSE_PROFILES` | `caddy` для встроенного HTTPS, пусто если HTTPS уже делает внешний proxy |
 | `DATABASE_URL` | PostgreSQL connection string |
-| `CABINET_ENABLE_CADDY` | `true` для встроенного HTTPS, `false` если HTTPS уже делает внешний proxy |
 | `CABINET_APP_PORT` | Локальный порт приложения при внешнем proxy, по умолчанию `3000` |
 | `CABINET_EXTERNAL_NETWORK` | Docker-сеть Remnawave/Nginx/remnashop, обычно `remnawave-network` |
 | `JWT_SECRET` | Секрет сессий, минимум 32 случайных символа |
@@ -124,12 +126,12 @@ http://localhost:3000
 | `REMNASHOP_DATABASE_SSL` | SSL для удалённой БД remnashop: `true`, `false`, `no-verify` |
 | `REFERRAL_BONUS_DAYS` | Сколько дней добавить за первую платную покупку приглашенного |
 
-Полный шаблон для сервера: [deploy/env.production.example](./deploy/env.production.example).
+Полный шаблон, который installer кладёт на сервер как `.env`: [deploy/env.production.example](./deploy/env.production.example).
 
 Если кабинет ставится на сервер, где уже есть Caddy/Nginx на 80/443, укажи:
 
 ```env
-CABINET_ENABLE_CADDY="false"
+COMPOSE_PROFILES=""
 CABINET_APP_BIND="127.0.0.1"
 CABINET_APP_PORT="3000"
 CABINET_EXTERNAL_NETWORK="remnawave-network"
@@ -166,7 +168,7 @@ https://ВСТАВЬ_СЮДА_ДОМЕН_КАБИНЕТА/api/webhook/yookassa
 
 Самый простой вариант уже встроен: отправка через Resend.
 
-В `.env.production` укажи:
+В `.env` укажи:
 
 ```env
 EMAIL_VERIFICATION_WEBHOOK_URL="https://ВСТАВЬ_СЮДА_ДОМЕН_КАБИНЕТА/api/email/resend"
@@ -212,7 +214,7 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO remnashop_re
 
 Открой доступ к PostgreSQL только с IP сервера кабинета: firewall/security group на порт `5432`.
 
-В `.env.production` кабинета:
+В `.env` кабинета:
 
 ```env
 REMNASHOP_DATABASE_URL="postgresql://remnashop_readonly:ВСТАВЬ_СЮДА_ПАРОЛЬ@ВСТАВЬ_СЮДА_IP_ИЛИ_HOST_REMNASHOP:5432/remnashop?schema=public"
@@ -239,32 +241,37 @@ curl -fsSL https://raw.githubusercontent.com/asdcrosh/cabinet_remna/main/deploy/
 
 ```bash
 cd /opt/remnawave-cabinet
-git pull
-./deploy/deploy.sh
+docker compose --env-file .env -f docker-compose.yml up -d
 ```
 
 Логи:
 
 ```bash
-docker compose -f deploy/docker-compose.server.yml logs -f app
+docker compose --env-file .env -f docker-compose.yml logs -f app
 ```
 
 Проверка после запуска:
 
 ```bash
-./deploy/smoke-check.sh
+source .env
+curl -H "x-healthcheck-token: $HEALTHCHECK_TOKEN" "$APP_URL/api/health"
 ```
 
 Бэкап БД кабинета:
 
 ```bash
-./deploy/backup-db.sh
+docker compose --env-file .env -f docker-compose.yml exec -T db \
+  sh -lc 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" --format=custom --no-owner --no-privileges' \
+  > cabinet.dump
 ```
 
 Восстановление из бэкапа:
 
 ```bash
-RESTORE_CONFIRM=I_UNDERSTAND_DATA_WILL_BE_OVERWRITTEN ./deploy/restore-db.sh backups/cabinet-latest.dump
+docker compose --env-file .env -f docker-compose.yml stop app worker
+cat cabinet.dump | docker compose --env-file .env -f docker-compose.yml exec -T db \
+  sh -lc 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists --no-owner --no-privileges'
+docker compose --env-file .env -f docker-compose.yml up -d
 ```
 
 Подробности: [DEPLOYMENT.md](./DEPLOYMENT.md).
@@ -294,6 +301,6 @@ deploy               production deploy scripts и compose
 
 - используй только боевые ключи YooKassa;
 - перевыпусти токены, которые использовались локально;
-- проверь, что `.env.production` не попадает в Git;
+- проверь, что `.env` не попадает в Git;
 - направь свой домен кабинета на IP сервера;
 - проверь регистрацию, email, оплату и выдачу подписки тестовой покупкой.
