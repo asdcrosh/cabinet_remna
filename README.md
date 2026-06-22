@@ -254,6 +254,18 @@ docker compose -f deploy/docker-compose.server.yml logs -f app
 ./deploy/smoke-check.sh
 ```
 
+Бэкап БД кабинета:
+
+```bash
+./deploy/backup-db.sh
+```
+
+Восстановление из бэкапа:
+
+```bash
+RESTORE_CONFIRM=I_UNDERSTAND_DATA_WILL_BE_OVERWRITTEN ./deploy/restore-db.sh backups/cabinet-latest.dump
+```
+
 Подробности: [DEPLOYMENT.md](./DEPLOYMENT.md).
 
 ## Проверки Для Разработки

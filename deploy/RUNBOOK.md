@@ -248,7 +248,19 @@ Then check manually:
 Create a database backup:
 
 ```bash
-docker compose -f deploy/docker-compose.server.yml exec db pg_dump -U cabinet cabinet > cabinet_backup.sql
+./deploy/backup-db.sh
 ```
 
-Restore only when you understand that it overwrites data.
+Backups are written to:
+
+```text
+./backups/cabinet-YYYYMMDDTHHMMSSZ.dump
+./backups/cabinet-latest.dump
+```
+
+Restore only when you understand that it overwrites data:
+
+```bash
+RESTORE_CONFIRM=I_UNDERSTAND_DATA_WILL_BE_OVERWRITTEN ./deploy/restore-db.sh backups/cabinet-latest.dump
+./deploy/smoke-check.sh
+```
