@@ -47,6 +47,7 @@ The installer will:
 - generate `POSTGRES_PASSWORD`, `JWT_SECRET`, and `HEALTHCHECK_TOKEN`
 - create `CABINET_EXTERNAL_NETWORK` if it is missing
 - deploy automatically when all required values are present
+- ask for the first administrator email and password after services start
 
 If placeholders remain, edit:
 
@@ -54,17 +55,13 @@ If placeholders remain, edit:
 nano /opt/remnawave-cabinet/.env
 ```
 
-Then run either the installer again or:
+Then run the installer again so it can create the first administrator:
 
 ```bash
-cd /opt/remnawave-cabinet
-docker compose --env-file .env -f docker-compose.yml up -d
+curl -fsSL https://raw.githubusercontent.com/asdcrosh/cabinet_remna/main/deploy/install-server.sh | sudo bash
 ```
 
-`pull_policy=always` makes this command pull the newest image before recreating
-containers. The compose dependency graph validates `.env`, runs Prisma
-migrations, and runs the idempotent seed before starting the app and payment
-worker.
+For non-interactive install, pass `SUPERUSER_EMAIL` and `SUPERUSER_PASSWORD` to the installer.
 
 ## Required environment
 

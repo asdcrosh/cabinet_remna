@@ -10,6 +10,7 @@ COMPOSE_FILE="${INSTALL_DIR}/docker-compose.yml"
 ENV_FILE="${INSTALL_DIR}/.env"
 LEGACY_ENV_FILE="${INSTALL_DIR}/.env.production"
 DEFAULT_CABINET_IMAGE="ghcr.io/asdcrosh/cabinet_remna:latest"
+TTY_DEVICE="${TTY_DEVICE:-/dev/tty}"
 
 if [[ "$(id -u)" -ne 0 ]]; then
   echo "Run as root or with sudo:"
@@ -117,6 +118,203 @@ existing_or_random_hex() {
   fi
 }
 
+prompt_text() {
+  local prompt="$1"
+  local default_value="${2:-}"
+  local value=""
+
+  if [[ ! -r "${TTY_DEVICE}" ]]; then
+    echo "${default_value}"
+    return
+  fi
+
+  if [[ -n "${default_value}" ]]; then
+    printf "%s [%s]: " "${prompt}" "${default_value}" >"${TTY_DEVICE}"
+  else
+    printf "%s: " "${prompt}" >"${TTY_DEVICE}"
+  fi
+  IFS= read -r value <"${TTY_DEVICE}" || value=""
+  echo "${value:-${default_value}}"
+}
+
+prompt_secret() {
+  local prompt="$1"
+  local first=""
+  local second=""
+
+  if [[ ! -r "${TTY_DEVICE}" ]]; then
+    echo ""
+    return
+  fi
+
+  while true; do
+    printf "%s: " "${prompt}" >"${TTY_DEVICE}"
+    stty -echo <"${TTY_DEVICE}" 2>/dev/null || true
+    IFS= read -r first <"${TTY_DEVICE}" || first=""
+    stty echo <"${TTY_DEVICE}" 2>/dev/null || true
+    printf "\nRepeat %s: " "${prompt}" >"${TTY_DEVICE}"
+    stty -echo <"${TTY_DEVICE}" 2>/dev/null || true
+    IFS= read -r second <"${TTY_DEVICE}" || second=""
+    stty echo <"${TTY_DEVICE}" 2>/dev/null || true
+    printf "\n" >"${TTY_DEVICE}"
+
+    if [[ -z "${first}" ]]; then
+      echo "Password cannot be empty." >"${TTY_DEVICE}"
+      continue
+    fi
+    if [[ "${first}" != "${second}" ]]; then
+      echo "Passwords do not match." >"${TTY_DEVICE}"
+      continue
+    fi
+    if [[ "${#first}" -lt 8 ]]; then
+      echo "Password must be at least 8 characters." >"${TTY_DEVICE}"
+      continue
+    fi
+    if [[ ! "${first}" =~ [A-Za-z] || ! "${first}" =~ [0-9] ]]; then
+      echo "Password must contain at least one latin letter and one digit." >"${TTY_DEVICE}"
+      continue
+    fi
+
+    echo "${first}"
+    return
+  done
+}
+
+wait_for_app_container() {
+  local attempts=60
+  local status=""
+
+  echo "Waiting for application container..."
+  for _ in $(seq 1 "${attempts}"); do
+    status="$("${COMPOSE[@]}" ps --status running --format '{{.Service}}' 2>/dev/null | grep -x app || true)"
+    if [[ "${status}" == "app" ]]; then
+      return 0
+    fi
+    sleep 2
+  done
+
+  echo "Application container did not start in time."
+  return 1
+}
+
+bootstrap_superuser() {
+  local email="${SUPERUSER_EMAIL:-}"
+  local password="${SUPERUSER_PASSWORD:-}"
+
+  if [[ -z "${email}" && -r "${TTY_DEVICE}" ]]; then
+    echo "" >"${TTY_DEVICE}"
+    echo "Create first administrator account." >"${TTY_DEVICE}"
+    email="$(prompt_text "Admin email")"
+  fi
+
+  if [[ -z "${email}" ]]; then
+    cat <<EOF
+
+Admin account was not created because this install is non-interactive.
+Create it later with:
+  curl -fsSL ${RAW_BASE_URL}/deploy/install-server.sh | sudo env SUPERUSER_EMAIL="admin@example.com" SUPERUSER_PASSWORD="strong-password" bash
+
+EOF
+    return 0
+  fi
+
+  if [[ -z "${password}" && -r "${TTY_DEVICE}" ]]; then
+    password="$(prompt_secret "Admin password")"
+  fi
+
+  if [[ -z "${password}" ]]; then
+    echo "Admin password is empty; skipping admin bootstrap."
+    return 0
+  fi
+
+  echo "Creating/updating administrator account..."
+  "${COMPOSE[@]}" exec -T \
+    -e SUPERUSER_EMAIL="${email}" \
+    -e SUPERUSER_PASSWORD="${password}" \
+    app node <<'NODE'
+const { PrismaClient } = require('@prisma/client')
+const bcrypt = require('bcryptjs')
+const crypto = require('node:crypto')
+
+const email = process.env.SUPERUSER_EMAIL?.trim().toLowerCase()
+const password = process.env.SUPERUSER_PASSWORD
+
+if (!email || !password) {
+  console.error('SUPERUSER_EMAIL and SUPERUSER_PASSWORD are required')
+  process.exit(1)
+}
+if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+  console.error('Invalid admin email')
+  process.exit(1)
+}
+if (password.length < 8) {
+  console.error('Admin password must be at least 8 characters')
+  process.exit(1)
+}
+if (!/[A-Za-z]/.test(password) || !/[0-9]/.test(password)) {
+  console.error('Admin password must contain at least one latin letter and one digit')
+  process.exit(1)
+}
+
+const prisma = new PrismaClient()
+
+function referralCode() {
+  return crypto.randomBytes(5).toString('base64url').replace(/[^A-Za-z0-9]/g, '').slice(0, 8).toUpperCase()
+}
+
+async function uniqueReferralCode() {
+  for (let attempt = 0; attempt < 20; attempt++) {
+    const code = referralCode()
+    const existing = await prisma.user.findUnique({ where: { referralCode: code }, select: { id: true } })
+    if (!existing) return code
+  }
+  throw new Error('Failed to generate referral code')
+}
+
+async function main() {
+  const passwordHash = await bcrypt.hash(password, 12)
+  const existing = await prisma.user.findUnique({ where: { email }, select: { id: true, referralCode: true } })
+  const now = new Date()
+
+  if (existing) {
+    await prisma.user.update({
+      where: { id: existing.id },
+      data: {
+        passwordHash,
+        role: 'ADMIN',
+        emailVerifiedAt: now,
+        referralCode: existing.referralCode ?? await uniqueReferralCode(),
+      },
+    })
+    console.log(`Admin user updated: ${email}`)
+    return
+  }
+
+  await prisma.user.create({
+    data: {
+      email,
+      passwordHash,
+      role: 'ADMIN',
+      name: 'Administrator',
+      emailVerifiedAt: now,
+      agreedToTermsAt: now,
+      referralCode: await uniqueReferralCode(),
+    },
+  })
+  console.log(`Admin user created: ${email}`)
+}
+
+main()
+  .catch((error) => {
+    console.error(error)
+    process.exit(1)
+  })
+  .finally(async () => {
+    await prisma.$disconnect()
+  })
+NODE
+}
+
 CURRENT_CABINET_DOMAIN="$(read_env_value CABINET_DOMAIN || true)"
 if ! usable_env_value "${CURRENT_CABINET_DOMAIN}"; then
   CURRENT_CABINET_DOMAIN="cabinet.example.com"
@@ -217,12 +415,11 @@ Required values:
   EMAIL_FROM
   REMNAWAVE_BASE_URL
   REMNAWAVE_TOKEN
-  REMNAWAVE_INTERNAL_SQUAD_UUIDS
   YOOKASSA_SHOP_ID
   YOOKASSA_SECRET_KEY
 
-Then run this installer command again, or run:
-  cd ${INSTALL_DIR} && docker compose --env-file .env -f docker-compose.yml up -d
+Then run this installer command again.
+After services start, it will ask for the first admin email and password.
 
 EOF
   exit 0
@@ -235,6 +432,9 @@ CABINET_ENV_FILE="${ENV_FILE}" "${COMPOSE[@]}" pull
 
 echo "Starting services..."
 CABINET_ENV_FILE="${ENV_FILE}" "${COMPOSE[@]}" up -d --remove-orphans
+
+wait_for_app_container
+bootstrap_superuser
 
 echo "Deploy complete."
 echo "Useful commands:"

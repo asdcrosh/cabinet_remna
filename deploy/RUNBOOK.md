@@ -36,6 +36,7 @@ The installer will:
 - generate database password, `JWT_SECRET`, and `HEALTHCHECK_TOKEN`
 - create `CABINET_EXTERNAL_NETWORK` if it is missing
 - deploy automatically when all required production values are present
+- ask for the first administrator email and password after services start
 
 If the installer stops because placeholders remain, edit:
 
@@ -46,13 +47,12 @@ nano /opt/remnawave-cabinet/.env
 Then run:
 
 ```bash
-cd /opt/remnawave-cabinet
-docker compose --env-file .env -f docker-compose.yml up -d
+curl -fsSL https://raw.githubusercontent.com/asdcrosh/cabinet_remna/main/deploy/install-server.sh | sudo bash
 ```
 
 This pulls the published image, starts PostgreSQL, validates `.env`, runs Prisma
 migrations, creates starter plans if the database is empty, starts the app, and
-starts the payment worker.
+starts the payment worker. After that it creates or updates the first admin user.
 
 ## 3. Required environment
 

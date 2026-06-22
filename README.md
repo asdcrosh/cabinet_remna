@@ -34,15 +34,20 @@ nano /opt/remnawave-cabinet/.env
 - `EMAIL_FROM`
 - `REMNAWAVE_BASE_URL`
 - `REMNAWAVE_TOKEN`
-- `REMNAWAVE_INTERNAL_SQUAD_UUIDS`
 - `YOOKASSA_SHOP_ID`
 - `YOOKASSA_SECRET_KEY`
 
-Затем запусти боевой экземпляр:
+Затем повторно запусти установщик. Он поднимет сервисы и спросит email/пароль первого администратора:
 
 ```bash
-cd /opt/remnawave-cabinet
-docker compose --env-file .env -f docker-compose.yml up -d
+curl -fsSL https://raw.githubusercontent.com/asdcrosh/cabinet_remna/main/deploy/install-server.sh | sudo bash
+```
+
+Для автоматического запуска без ручного ввода:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/asdcrosh/cabinet_remna/main/deploy/install-server.sh | \
+  sudo env SUPERUSER_EMAIL="admin@example.com" SUPERUSER_PASSWORD="strong-password" bash
 ```
 
 Будет поднято:
@@ -236,6 +241,8 @@ REMNASHOP_DATABASE_SSL="false"
 ```bash
 curl -fsSL https://raw.githubusercontent.com/asdcrosh/cabinet_remna/main/deploy/install-server.sh | sudo bash
 ```
+
+После заполнения `.env` запусти эту же команду еще раз: установщик поднимет контейнеры и создаст первого администратора.
 
 Обновление уже установленного сервера:
 
