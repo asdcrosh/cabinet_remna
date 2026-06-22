@@ -27,6 +27,7 @@ model Plan {
   durationDays    Int      @default(30)
   trafficLimitGb  Int?                              // null = безлимит
   deviceLimit      Int      @default(5)
+  activeInternalSquads String[] @default([])        // UUID squads Remnawave для этого тарифа
   isPromo         Boolean  @default(false)          // бесплатный одноразовый ознакомительный тариф
   isActive        Boolean  @default(true)
   sortOrder       Int      @default(0)

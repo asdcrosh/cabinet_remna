@@ -17,6 +17,7 @@ export interface PlanAdminRow {
   durationDays: number
   trafficLimitGb: number | null
   deviceLimit: number
+  activeInternalSquads: string[]
   isPromo: boolean
   isActive: boolean
   sortOrder: number
@@ -32,6 +33,7 @@ interface PlanFormState {
   trafficLimitGb: string
   unlimitedTraffic: boolean
   deviceLimit: string
+  activeInternalSquads: string
   sortOrder: string
   isPromo: boolean
   isActive: boolean
@@ -45,6 +47,7 @@ const emptyForm: PlanFormState = {
   trafficLimitGb: '200',
   unlimitedTraffic: false,
   deviceLimit: '5',
+  activeInternalSquads: '',
   sortOrder: '10',
   isPromo: false,
   isActive: true,
@@ -101,6 +104,7 @@ export function PlansAdmin({ plans }: { plans: PlanAdminRow[] }) {
       trafficLimitGb: plan.trafficLimitGb == null ? '' : String(plan.trafficLimitGb),
       unlimitedTraffic: plan.trafficLimitGb == null,
       deviceLimit: String(plan.deviceLimit),
+      activeInternalSquads: plan.activeInternalSquads.join('\n'),
       sortOrder: String(plan.sortOrder),
       isPromo: plan.isPromo,
       isActive: plan.isActive,
@@ -221,6 +225,14 @@ export function PlansAdmin({ plans }: { plans: PlanAdminRow[] }) {
               placeholder="Коротко для карточки тарифа"
             />
           </Field>
+          <Field label="Squad UUIDs" className="md:col-span-2 xl:col-span-4">
+            <textarea
+              value={form.activeInternalSquads}
+              onChange={(event) => setForm((current) => ({ ...current, activeInternalSquads: event.target.value }))}
+              className="input min-h-[92px] resize-y font-mono text-xs"
+              placeholder="UUID squads через запятую или с новой строки"
+            />
+          </Field>
         </div>
 
         <button type="button" className="btn-primary" onClick={submit} disabled={loading}>
@@ -255,6 +267,7 @@ export function PlansAdmin({ plans }: { plans: PlanAdminRow[] }) {
                 <Metric label="Срок" value={`${plan.durationDays} дн.`} />
                 <Metric label="Трафик" value={plan.trafficLimitGb == null ? 'Безлимит' : `${plan.trafficLimitGb} ГБ`} />
                 <Metric label="Устройства" value={plan.deviceLimit} />
+                <Metric label="Squads" value={plan.activeInternalSquads.length || 'env'} />
                 <Metric label="Порядок" value={plan.sortOrder} />
                 <Metric label="Связи" value={`${plan.subscriptionsCount} / ${plan.paymentsCount}`} />
               </div>
@@ -303,8 +316,16 @@ function toPayload(form: PlanFormState) {
     durationDays: Number(form.durationDays),
     trafficLimitGb: form.unlimitedTraffic || !form.trafficLimitGb ? null : Number(form.trafficLimitGb),
     deviceLimit: Number(form.deviceLimit),
+    activeInternalSquads: parseSquads(form.activeInternalSquads),
     sortOrder: Number(form.sortOrder),
     isPromo: form.isPromo,
     isActive: form.isActive,
   }
+}
+
+function parseSquads(value: string) {
+  return value
+    .split(/[\s,;]+/)
+    .map((item) => item.trim())
+    .filter(Boolean)
 }

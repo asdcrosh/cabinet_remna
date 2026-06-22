@@ -82,6 +82,7 @@ const adminPlanBaseSchema = z.object({
   durationDays: z.coerce.number().int().min(1).max(3650),
   trafficLimitGb: z.coerce.number().int().min(1).max(1_000_000).optional().nullable(),
   deviceLimit: z.coerce.number().int().min(1).max(1000),
+  activeInternalSquads: z.array(z.string().trim().uuid()).default([]),
   isPromo: z.boolean(),
   isActive: z.boolean(),
   sortOrder: z.coerce.number().int().min(0).max(100_000),

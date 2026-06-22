@@ -240,6 +240,7 @@ async function provisionPromoPayment(
     durationDays: number
     trafficLimitGb: number | null
     deviceLimit: number
+    activeInternalSquads: string[]
   }
 ) {
   try {
@@ -253,6 +254,7 @@ async function provisionPromoPayment(
         durationDays: plan.durationDays,
         trafficLimitGb: plan.trafficLimitGb,
         deviceLimit: plan.deviceLimit,
+        activeInternalSquads: plan.activeInternalSquads,
       },
     })
   } catch (e) {

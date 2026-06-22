@@ -46,6 +46,7 @@ export async function syncPaymentProvisioning(input: {
           durationDays: payment.plan.durationDays,
           trafficLimitGb: payment.plan.trafficLimitGb,
           deviceLimit: payment.plan.deviceLimit,
+          activeInternalSquads: payment.plan.activeInternalSquads,
         },
       })
 
@@ -160,6 +161,7 @@ export async function syncPaymentProvisioning(input: {
         durationDays: payment.plan.durationDays,
         trafficLimitGb: payment.plan.trafficLimitGb,
         deviceLimit: payment.plan.deviceLimit,
+        activeInternalSquads: payment.plan.activeInternalSquads,
       },
     })
 

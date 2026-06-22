@@ -21,6 +21,7 @@ export interface EnsureSubscriptionInput {
     durationDays: number
     trafficLimitGb: number | null
     deviceLimit: number
+    activeInternalSquads?: string[]
   }
 }
 
@@ -29,7 +30,7 @@ export interface EnsureSubscriptionInput {
  * Локальную запись Subscription создаёт/обновляет по результату.
  */
 export async function ensureRemnawaveSubscription(input: EnsureSubscriptionInput) {
-  const activeInternalSquads = getActiveInternalSquads()
+  const activeInternalSquads = getPlanActiveInternalSquads(input.plan.activeInternalSquads)
 
   if (input.paymentId) {
     const payment = await prisma.payment.findUnique({
@@ -247,7 +248,12 @@ function isRemnawaveUserNotFound(error: RemnawaveError) {
   )
 }
 
-function getActiveInternalSquads() {
+function getPlanActiveInternalSquads(planSquads: string[] | undefined) {
+  if (planSquads && planSquads.length > 0) return planSquads
+  return getDefaultActiveInternalSquads()
+}
+
+function getDefaultActiveInternalSquads() {
   return (process.env.REMNAWAVE_INTERNAL_SQUAD_UUIDS || process.env.REMNAWAVE_INTERNAL_SQUAD_UUID || '')
     .split(',')
     .map((uuid) => uuid.trim())
