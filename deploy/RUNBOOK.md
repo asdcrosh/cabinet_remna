@@ -61,13 +61,18 @@ If this server already has a reverse proxy on ports 80/443, disable bundled Cadd
 CABINET_ENABLE_CADDY="false"
 CABINET_APP_BIND="127.0.0.1"
 CABINET_APP_PORT="3000"
+CABINET_EXTERNAL_NETWORK="remnawave-network"
 ```
 
 Then proxy the cabinet domain from the existing Caddy/Nginx to:
 
 ```text
-http://127.0.0.1:3000
+http://remnawave-cabinet-app:3000
 ```
+
+`deploy/deploy.sh` creates `CABINET_EXTERNAL_NETWORK` if it is missing, and
+the app/worker containers join it automatically. This is needed when Remnawave,
+remnashop, and the existing Nginx live in a shared Docker network.
 
 По умолчанию worker проверяет платежи раз в 60 секунд и отменяет ожидающий платёж через 600 секунд. Эти значения можно поменять в `.env.production`:
 

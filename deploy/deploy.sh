@@ -31,6 +31,13 @@ if ! docker compose version >/dev/null 2>&1; then
   exit 1
 fi
 
+EXTERNAL_NETWORK="$(grep -E '^CABINET_EXTERNAL_NETWORK=' "${ENV_FILE}" | tail -n1 | cut -d= -f2- | tr -d '"' | tr -d "'" || true)"
+EXTERNAL_NETWORK="${EXTERNAL_NETWORK:-remnawave-network}"
+if ! docker network inspect "${EXTERNAL_NETWORK}" >/dev/null 2>&1; then
+  echo "Creating external Docker network: ${EXTERNAL_NETWORK}"
+  docker network create "${EXTERNAL_NETWORK}" >/dev/null
+fi
+
 echo "Checking production environment..."
 if command -v npm >/dev/null 2>&1; then
   NODE_ENV=production npm run check:env

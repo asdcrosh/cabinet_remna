@@ -9,6 +9,9 @@ const inter = Inter({ subsets: ['latin', 'cyrillic'], variable: '--font-inter' }
 export const metadata: Metadata = {
   title: 'Личный кабинет',
   description: 'Подписка, ключи доступа и оплата',
+  icons: {
+    icon: '/icon.svg',
+  },
 }
 
 export const viewport: Viewport = {
