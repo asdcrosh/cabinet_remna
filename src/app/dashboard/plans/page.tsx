@@ -84,7 +84,7 @@ export default async function PlansPage() {
         </div>
       </section>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid auto-rows-fr grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
         {visiblePlans.length === 0 && (
           <div className="card col-span-full py-12 text-center">
             <h3 className="text-lg font-semibold">Тарифы скоро появятся</h3>
