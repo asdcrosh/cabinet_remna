@@ -17,15 +17,9 @@
 curl -fsSL https://raw.githubusercontent.com/asdcrosh/cabinet_remna/main/deploy/install-server.sh | sudo bash
 ```
 
-Скрипт сам установит Docker, скачает только `docker-compose.yml`, создаст `.env`, сгенерирует пароль базы, `JWT_SECRET` и `HEALTHCHECK_TOKEN`.
+Скрипт сам установит Docker, скачает `docker-compose.yml`, создаст `.env`, сгенерирует пароль базы, `JWT_SECRET` и `HEALTHCHECK_TOKEN`, спросит недостающие боевые значения и после запуска попросит email/пароль первого администратора.
 
-После этого заполни реальные данные:
-
-```bash
-nano /opt/remnawave-cabinet/.env
-```
-
-Минимально нужно указать:
+В мастере нужно указать:
 
 - `CABINET_DOMAIN`
 - `EMAIL_VERIFICATION_WEBHOOK_URL`
@@ -36,12 +30,6 @@ nano /opt/remnawave-cabinet/.env
 - `REMNAWAVE_TOKEN`
 - `YOOKASSA_SHOP_ID`
 - `YOOKASSA_SECRET_KEY`
-
-Затем повторно запусти установщик. Он поднимет сервисы и спросит email/пароль первого администратора:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/asdcrosh/cabinet_remna/main/deploy/install-server.sh | sudo bash
-```
 
 Для автоматического запуска без ручного ввода:
 

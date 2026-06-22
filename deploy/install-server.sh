@@ -106,6 +106,32 @@ usable_env_value() {
   [[ -n "${value}" && "${value}" != *"ВСТАВЬ_СЮДА"* && "${value}" != *"CHANGE_ME"* && "${value}" != *"example.com"* ]]
 }
 
+env_needs_value() {
+  local key="$1"
+  local value
+  value="$(read_env_value "${key}" || true)"
+  ! usable_env_value "${value}"
+}
+
+env_file_has_placeholders() {
+  ENV_FILE_PATH="${ENV_FILE}" python3 <<'PY'
+from pathlib import Path
+import os
+import sys
+
+path = Path(os.environ["ENV_FILE_PATH"])
+markers = ("CHANGE_ME", "ВСТАВЬ_СЮДА", "test_", "example.com")
+for line in path.read_text().splitlines():
+    stripped = line.strip()
+    if not stripped or stripped.startswith("#") or "=" not in stripped:
+        continue
+    _key, value = stripped.split("=", 1)
+    if any(marker in value for marker in markers):
+        sys.exit(0)
+sys.exit(1)
+PY
+}
+
 existing_or_random_hex() {
   local key="$1"
   local bytes="$2"
@@ -135,6 +161,58 @@ prompt_text() {
   fi
   IFS= read -r value <"${TTY_DEVICE}" || value=""
   echo "${value:-${default_value}}"
+}
+
+prompt_env_text() {
+  local key="$1"
+  local label="$2"
+  local default_value="${3:-}"
+  local current
+  local value
+
+  current="$(read_env_value "${key}" || true)"
+  if usable_env_value "${current}"; then
+    return
+  fi
+
+  value="$(prompt_text "${label}" "${default_value}")"
+  if [[ -n "${value}" ]]; then
+    replace_env_value "${key}" "${value}"
+  fi
+}
+
+prompt_env_secret() {
+  local key="$1"
+  local label="$2"
+  local current
+  local value
+
+  current="$(read_env_value "${key}" || true)"
+  if usable_env_value "${current}"; then
+    return
+  fi
+
+  value="$(prompt_hidden "${label}")"
+  if [[ -n "${value}" ]]; then
+    replace_env_value "${key}" "${value}"
+  fi
+}
+
+prompt_hidden() {
+  local prompt="$1"
+  local value=""
+
+  if [[ ! -r "${TTY_DEVICE}" ]]; then
+    echo ""
+    return
+  fi
+
+  printf "%s: " "${prompt}" >"${TTY_DEVICE}"
+  stty -echo <"${TTY_DEVICE}" 2>/dev/null || true
+  IFS= read -r value <"${TTY_DEVICE}" || value=""
+  stty echo <"${TTY_DEVICE}" 2>/dev/null || true
+  printf "\n" >"${TTY_DEVICE}"
+  echo "${value}"
 }
 
 prompt_secret() {
@@ -178,6 +256,48 @@ prompt_secret() {
     echo "${first}"
     return
   done
+}
+
+prompt_required_config() {
+  if [[ ! -r "${TTY_DEVICE}" ]]; then
+    return 0
+  fi
+
+  if ! env_file_has_placeholders; then
+    return 0
+  fi
+
+  echo "" >"${TTY_DEVICE}"
+  echo "================ Remnawave Cabinet setup ================" >"${TTY_DEVICE}"
+  echo "Fill required production values. Press Enter to keep existing values." >"${TTY_DEVICE}"
+  echo "" >"${TTY_DEVICE}"
+
+  if env_needs_value "CABINET_DOMAIN"; then
+    CABINET_DOMAIN="$(prompt_text "Cabinet domain" "${CABINET_DOMAIN}")"
+    replace_env_value "CABINET_DOMAIN" "${CABINET_DOMAIN}"
+    replace_env_value "APP_URL" "https://${CABINET_DOMAIN}"
+    replace_env_value "ALLOWED_ORIGINS" "https://${CABINET_DOMAIN}"
+    replace_env_value "YOOKASSA_WEBHOOK_URL" "https://${CABINET_DOMAIN}/api/webhook/yookassa"
+  fi
+
+  echo "" >"${TTY_DEVICE}"
+  echo "Email verification / Resend" >"${TTY_DEVICE}"
+  prompt_env_text "EMAIL_VERIFICATION_WEBHOOK_URL" "Email webhook URL" "https://${CABINET_DOMAIN}/api/email/resend"
+  prompt_env_secret "EMAIL_VERIFICATION_WEBHOOK_SECRET" "Email webhook secret"
+  prompt_env_secret "RESEND_API_KEY" "Resend API key"
+  prompt_env_text "EMAIL_FROM" "Email from" "VPN Cabinet <noreply@${CABINET_DOMAIN}>"
+
+  echo "" >"${TTY_DEVICE}"
+  echo "Remnawave Panel" >"${TTY_DEVICE}"
+  prompt_env_text "REMNAWAVE_BASE_URL" "Remnawave panel URL"
+  prompt_env_secret "REMNAWAVE_TOKEN" "Remnawave API token"
+
+  echo "" >"${TTY_DEVICE}"
+  echo "YooKassa" >"${TTY_DEVICE}"
+  prompt_env_text "YOOKASSA_SHOP_ID" "YooKassa shop ID"
+  prompt_env_secret "YOOKASSA_SECRET_KEY" "YooKassa secret key"
+
+  echo "" >"${TTY_DEVICE}"
 }
 
 wait_for_app_container() {
@@ -339,6 +459,11 @@ if [[ "${CURRENT_REMNASHOP_DATABASE_URL}" == *"ВСТАВЬ_СЮДА"* || "${CUR
   replace_env_value "REMNASHOP_DATABASE_URL" ""
 fi
 
+CURRENT_SQUADS="$(read_env_value REMNAWAVE_INTERNAL_SQUAD_UUIDS || true)"
+if [[ "${CURRENT_SQUADS}" == *"ВСТАВЬ_СЮДА"* || "${CURRENT_SQUADS}" == *"CHANGE_ME"* ]]; then
+  replace_env_value "REMNAWAVE_INTERNAL_SQUAD_UUIDS" ""
+fi
+
 if [[ -n "${CABINET_IMAGE:-}" ]]; then
   replace_env_value "CABINET_IMAGE" "${CABINET_IMAGE}"
 elif ! env_key_exists "CABINET_IMAGE"; then
@@ -386,6 +511,12 @@ do
   fi
 done
 
+CABINET_DOMAIN="$(read_env_value CABINET_DOMAIN || true)"
+if ! usable_env_value "${CABINET_DOMAIN}"; then
+  CABINET_DOMAIN="cabinet.example.com"
+fi
+prompt_required_config
+
 EXTERNAL_NETWORK="$(read_env_value CABINET_EXTERNAL_NETWORK || true)"
 EXTERNAL_NETWORK="${EXTERNAL_NETWORK:-remnawave-network}"
 if ! docker network inspect "${EXTERNAL_NETWORK}" >/dev/null 2>&1; then
@@ -393,7 +524,7 @@ if ! docker network inspect "${EXTERNAL_NETWORK}" >/dev/null 2>&1; then
   docker network create "${EXTERNAL_NETWORK}" >/dev/null
 fi
 
-if grep -Eq 'CHANGE_ME|ВСТАВЬ_СЮДА|test_|example\.com' "${ENV_FILE}"; then
+if env_file_has_placeholders; then
   cat <<EOF
 
 Deployment files are ready in:

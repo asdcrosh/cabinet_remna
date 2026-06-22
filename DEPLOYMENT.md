@@ -45,21 +45,10 @@ The installer will:
 - download `docker-compose.yml`
 - create `.env`
 - generate `POSTGRES_PASSWORD`, `JWT_SECRET`, and `HEALTHCHECK_TOKEN`
+- ask for missing production values
 - create `CABINET_EXTERNAL_NETWORK` if it is missing
-- deploy automatically when all required values are present
+- deploy automatically after required values are filled
 - ask for the first administrator email and password after services start
-
-If placeholders remain, edit:
-
-```bash
-nano /opt/remnawave-cabinet/.env
-```
-
-Then run the installer again so it can create the first administrator:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/asdcrosh/cabinet_remna/main/deploy/install-server.sh | sudo bash
-```
 
 For non-interactive install, pass `SUPERUSER_EMAIL` and `SUPERUSER_PASSWORD` to the installer.
 
