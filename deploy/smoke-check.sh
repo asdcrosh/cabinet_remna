@@ -16,6 +16,22 @@ APP_URL="${APP_URL:-}"
 CABINET_APP_BIND="${CABINET_APP_BIND:-127.0.0.1}"
 CABINET_APP_PORT="${CABINET_APP_PORT:-3000}"
 
+wait_for_url() {
+  local url="$1"
+  local timeout_seconds="$2"
+  shift 2
+  local start
+  start="$(date +%s)"
+
+  until curl -fsS "$@" "${url}" >/dev/null; do
+    if (( $(date +%s) - start >= timeout_seconds )); then
+      echo "Timed out waiting for ${url}"
+      return 1
+    fi
+    sleep 2
+  done
+}
+
 if [[ -z "${HEALTHCHECK_TOKEN:-}" ]]; then
   echo "HEALTHCHECK_TOKEN is required"
   exit 1
@@ -30,10 +46,10 @@ echo "Checking Docker services..."
 docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" ps
 
 echo "Checking local app on ${CABINET_APP_BIND}:${CABINET_APP_PORT}..."
-curl -fsSI "http://${CABINET_APP_BIND}:${CABINET_APP_PORT}/login" >/dev/null
+wait_for_url "http://${CABINET_APP_BIND}:${CABINET_APP_PORT}/login" 60
 
 echo "Checking health..."
-curl -fsS -H "x-healthcheck-token: ${HEALTHCHECK_TOKEN}" "${APP_URL%/}/api/health" >/dev/null
+wait_for_url "${APP_URL%/}/api/health" 60 -H "x-healthcheck-token: ${HEALTHCHECK_TOKEN}"
 
 echo "Checking public pages..."
 curl -fsSIL "${APP_URL%/}" >/dev/null
