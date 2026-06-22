@@ -25,10 +25,24 @@ export const POST = withAuth(async () => {
     return NextResponse.json({ error: 'Telegram не привязан' }, { status: 409 })
   }
 
-  const sync = await syncLinkedTelegramUser({
-    localUserId: user.id,
-    telegramId: user.telegramId,
-  })
+  try {
+    const sync = await syncLinkedTelegramUser({
+      localUserId: user.id,
+      telegramId: user.telegramId,
+    })
 
-  return NextResponse.json({ ok: true, sync })
+    return NextResponse.json({ ok: true, sync })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'unknown error'
+    console.error('[telegram/sync] failed', {
+      userId: user.id,
+      telegramId: user.telegramId.toString(),
+      message,
+    })
+
+    return NextResponse.json(
+      { error: 'Синхронизация временно недоступна. Проверьте логи приложения.' },
+      { status: 502 }
+    )
+  }
 })
