@@ -58,8 +58,8 @@ export async function ensureRemnawaveSubscription(input: EnsureSubscriptionInput
   let isNew = false
 
   if (user.remnawaveUuid) {
-    // Уже есть профиль — продлеваем
-    const newExpire = computeNewExpireAt(user, input.plan.durationDays)
+    const activeSubscription = getLatestActiveSubscription(user.subscriptions)
+    const newExpire = computeNewExpireAt(activeSubscription, input.plan)
     try {
       const updated = await remnawave.updateUser({
         uuid: user.remnawaveUuid,
@@ -126,12 +126,14 @@ export async function ensureRemnawaveSubscription(input: EnsureSubscriptionInput
   // Денормализуем в нашу БД
   const trafficLimit = BigInt(remnawaveUser.trafficLimitBytes || '0')
   const latestSubscription = user.subscriptions[0]
+  const isPlanSwitch = Boolean(latestSubscription && latestSubscription.planId !== input.plan.id)
   const subscription = await prisma.$transaction(async (tx) => {
     const row = latestSubscription
       ? await tx.subscription.update({
           where: { id: latestSubscription.id },
           data: {
             planId: input.plan.id,
+            startAt: isPlanSwitch ? new Date() : undefined,
             expireAt: new Date(remnawaveUser.expireAt),
             status: mapStatus(remnawaveUser.status),
             trafficLimitBytes: trafficLimit === 0n ? null : trafficLimit,
@@ -174,17 +176,22 @@ export async function ensureRemnawaveSubscription(input: EnsureSubscriptionInput
 }
 
 /**
- * При продлении: если у пользователя уже есть активная подписка,
- * новая дата — expireAt + durationDays. Если нет — now + durationDays.
+ * При покупке того же тарифа продлеваем от текущей даты окончания.
+ * При смене тарифа запускаем новый период от текущего момента.
  */
-function computeNewExpireAt(user: { subscriptions: { expireAt: Date; status: string }[] }, durationDays: number) {
-  // Берём самую свежую активную подписку
-  const active = user.subscriptions
+function computeNewExpireAt(
+  active: { expireAt: Date; planId?: string | null } | undefined,
+  plan: EnsureSubscriptionInput['plan']
+) {
+  const isSamePlan = active?.planId === plan.id
+  const base = isSamePlan && active.expireAt.getTime() > Date.now() ? active.expireAt : new Date()
+  return new Date(base.getTime() + plan.durationDays * 24 * 60 * 60 * 1000)
+}
+
+function getLatestActiveSubscription(subscriptions: { expireAt: Date; status: string; planId?: string | null }[]) {
+  return subscriptions
     .filter((s) => s.status === 'ACTIVE' || s.status === 'LIMITED')
     .sort((a, b) => b.expireAt.getTime() - a.expireAt.getTime())[0]
-
-  const base = active && active.expireAt.getTime() > Date.now() ? active.expireAt : new Date()
-  return new Date(base.getTime() + durationDays * 24 * 60 * 60 * 1000)
 }
 
 function mapStatus(s: UserResponse['status']) {

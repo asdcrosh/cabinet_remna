@@ -119,7 +119,7 @@ describe('ensureRemnawaveSubscription', () => {
       id: 'user-1',
       email: 'user@example.com',
       remnawaveUuid: 'rw-1',
-      subscriptions: [{ id: 'sub-1', expireAt: currentExpireAt, status: 'ACTIVE' }],
+      subscriptions: [{ id: 'sub-1', planId: 'plan-1', expireAt: currentExpireAt, status: 'ACTIVE' }],
     })
     mocks.remnawave.updateUser.mockResolvedValue({ response: remnawaveUser })
     mocks.prisma.subscription.update.mockResolvedValue({ id: 'sub-1' })
@@ -146,6 +146,41 @@ describe('ensureRemnawaveSubscription', () => {
     )
   })
 
+  it('starts a fresh period when switching to another plan', async () => {
+    const currentExpireAt = new Date('2026-03-01T00:00:00.000Z')
+    mocks.prisma.payment.findUnique.mockResolvedValue(null)
+    mocks.prisma.user.findUnique.mockResolvedValue({
+      id: 'user-1',
+      email: 'user@example.com',
+      remnawaveUuid: 'rw-1',
+      subscriptions: [{ id: 'sub-1', planId: 'old-plan', expireAt: currentExpireAt, status: 'ACTIVE' }],
+    })
+    mocks.remnawave.updateUser.mockResolvedValue({ response: remnawaveUser })
+    mocks.prisma.subscription.update.mockResolvedValue({ id: 'sub-1' })
+
+    await ensureRemnawaveSubscription({
+      userId: 'user-1',
+      email: 'user@example.com',
+      plan,
+    })
+
+    expect(mocks.remnawave.updateUser).toHaveBeenCalledWith(
+      expect.objectContaining({
+        uuid: 'rw-1',
+        expireAt: new Date('2026-01-31T00:00:00.000Z').toISOString(),
+      })
+    )
+    expect(mocks.prisma.subscription.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'sub-1' },
+        data: expect.objectContaining({
+          planId: 'plan-1',
+          startAt: new Date('2026-01-01T00:00:00.000Z'),
+        }),
+      })
+    )
+  })
+
   it('uses plan squads before env fallback', async () => {
     const currentExpireAt = new Date('2026-01-15T00:00:00.000Z')
     mocks.prisma.payment.findUnique.mockResolvedValue(null)
@@ -153,7 +188,7 @@ describe('ensureRemnawaveSubscription', () => {
       id: 'user-1',
       email: 'user@example.com',
       remnawaveUuid: 'rw-1',
-      subscriptions: [{ id: 'sub-1', expireAt: currentExpireAt, status: 'ACTIVE' }],
+      subscriptions: [{ id: 'sub-1', planId: 'plan-1', expireAt: currentExpireAt, status: 'ACTIVE' }],
     })
     mocks.remnawave.updateUser.mockResolvedValue({ response: remnawaveUser })
     mocks.prisma.subscription.update.mockResolvedValue({ id: 'sub-1' })
@@ -181,7 +216,7 @@ describe('ensureRemnawaveSubscription', () => {
       id: 'user-1',
       email: 'user@example.com',
       remnawaveUuid: 'deleted-rw-1',
-      subscriptions: [{ id: 'sub-1', expireAt: currentExpireAt, status: 'ACTIVE' }],
+      subscriptions: [{ id: 'sub-1', planId: 'plan-1', expireAt: currentExpireAt, status: 'ACTIVE' }],
     })
     mocks.remnawave.updateUser.mockRejectedValue(new RemnawaveError(404, { errorCode: 'A025' }, 'User not found'))
     mocks.remnawave.createUser.mockResolvedValue({ response: remnawaveUser })
