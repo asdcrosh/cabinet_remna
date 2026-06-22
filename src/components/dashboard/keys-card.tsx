@@ -97,10 +97,18 @@ export function KeysCard({ subscriptionUrl }: KeysCardProps) {
           Как подключиться?
         </summary>
         <ol className="list-decimal pl-5 mt-3 space-y-1 text-slate-600 dark:text-slate-300">
-          <li>Скачайте клиент: <b>Hiddify</b>, <b>v2rayNG</b>, <b>Streisand</b>, <b>Shadowrocket</b>.</li>
+          <li>Скачайте клиент: <b>Happ</b>, <b>v2ray</b>,<b>Shadowrocket</b>.</li>
           <li>Скопируйте ссылку подписки или отсканируйте QR-код.</li>
           <li>Вставьте в клиент через «Add subscription from clipboard».</li>
           <li>Подключайтесь и проверьте статус на главной странице.</li>
+        </ol>
+        <ol className="list-decimal pl-5 mt-3 space-y-1 text-slate-600 dark:text-slate-300">
+          <li>Отсканируйте QR-код камерой телефона и перейдите по ссылке.</li>
+          <li>Следуйте инструкциям по шагам:</li>
+          <li>1. Выберите устройство (Android/iOS/Windows/Linux).</li>
+          <li>2. Нажмите скачать приложение - вас перекинет на страницу скачивания приложения</li>
+          <li>3. Вернитесь на страницу на которую перекинуло при сканировании QR-кода</li>
+          <li>4. Нажмите "Добавить подписку"</li>
         </ol>
       </details>
       <ConfirmDialog
