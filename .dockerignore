@@ -11,3 +11,13 @@ dist
 .git
 .vercel
 coverage
+.gitignore
+tsconfig.tsbuildinfo
+README.md
+DEPLOYMENT.md
+backups
+*.dump
+*.tar
+*.tar.gz
+*.zip
+codex-clipboard-*
