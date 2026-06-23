@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { Search } from 'lucide-react'
 import { prisma } from '@/lib/prisma'
-import { requireAdminPage } from '@/lib/auth/admin-page'
+import { requireStaffPage } from '@/lib/auth/admin-page'
 import { serializeSupportMessage, serializeSupportTicket, supportStatusLabel } from '@/lib/support'
 import { PageHeader } from '@/components/dashboard/page-header'
 import { SupportPanel } from '@/components/support/support-panel'
@@ -22,7 +22,7 @@ export default async function AdminSupportPage({
 }: {
   searchParams?: { status?: string; q?: string }
 }) {
-  await requireAdminPage()
+  await requireStaffPage()
 
   const status = searchParams?.status || 'ALL'
   const q = searchParams?.q?.trim() ?? ''

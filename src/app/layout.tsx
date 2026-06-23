@@ -8,7 +8,7 @@ export const metadata: Metadata = {
     default: getBrandName(),
     template: `%s — ${getBrandName()}`,
   },
-  description: `${getBrandName()}: подписка, ключи доступа и оплата`,
+  description: `${getBrandName()}: VPN-подписка, подключение и оплата`,
   icons: {
     icon: '/icon.svg',
   },

@@ -10,9 +10,13 @@ export const GET = withAuth(async (req: Request) => {
 
   const url = new URL(req.url)
   const apply = url.searchParams.get('apply') === '1' || url.searchParams.get('apply') === 'true'
+  const planScope = url.searchParams.get('scope') === 'active' ? 'active' : 'all'
+  const includePromoCodes = url.searchParams.get('promoCodes') !== '0'
 
   try {
-    const report = apply ? await syncRemnashopCatalog() : await getRemnashopSyncDryRun()
+    const report = apply
+      ? await syncRemnashopCatalog({ planScope, includePromoCodes })
+      : await getRemnashopSyncDryRun()
     return NextResponse.json(report)
   } catch (e) {
     const message = e instanceof Error ? e.message : 'remnashop sync failed'

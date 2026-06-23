@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { requireAdmin, withAuth } from '@/lib/auth/guard'
+import { requireStaff, withAuth } from '@/lib/auth/guard'
 import { serializeSupportMessage, serializeSupportTicket } from '@/lib/support'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 export const GET = withAuth(async (req: Request) => {
-  await requireAdmin()
+  await requireStaff()
 
   const url = new URL(req.url)
   const status = url.searchParams.get('status')

@@ -22,6 +22,8 @@ export function RemnashopSyncPanel() {
   const [loading, setLoading] = useState(false)
   const [report, setReport] = useState<RemnashopSyncReport | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [scope, setScope] = useState<'all' | 'active'>('active')
+  const [includePromoCodes, setIncludePromoCodes] = useState(true)
 
   async function runDryRun() {
     setLoading(true)
@@ -42,7 +44,9 @@ export function RemnashopSyncPanel() {
     setLoading(true)
     setError(null)
     try {
-      const result = await apiFetch<RemnashopSyncReport>('/api/admin/remnashop-sync?apply=1')
+      const result = await apiFetch<RemnashopSyncReport>(
+        `/api/admin/remnashop-sync?apply=1&scope=${scope}&promoCodes=${includePromoCodes ? '1' : '0'}`
+      )
       setReport(result)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Не удалось выполнить синхронизацию')
@@ -53,11 +57,12 @@ export function RemnashopSyncPanel() {
 
   return (
     <div className="space-y-4">
-      <div className="card flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+      <div className="card space-y-5">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="min-w-0">
-          <h2 className="text-lg font-semibold">Remnashop</h2>
+          <h2 className="text-lg font-semibold">Каталог Remnashop</h2>
           <p className="mt-1 text-sm text-slate-500">
-            Каталог обновляется автоматически при входе в кабинет. Здесь можно проверить или запустить вручную.
+            Выберите состав каталога и запустите обновление вручную.
           </p>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row">
@@ -69,6 +74,20 @@ export function RemnashopSyncPanel() {
             <RefreshCw className={loading ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />
             Синхронизировать
           </button>
+        </div>
+        </div>
+        <div className="grid gap-3 rounded-lg bg-slate-50 p-3 dark:bg-white/5 md:grid-cols-2">
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium text-slate-500">Какие тарифы переносить</span>
+            <select value={scope} onChange={(event) => setScope(event.target.value as 'all' | 'active')} className="input">
+              <option value="active">Только разрешённые и активные</option>
+              <option value="all">Все, включая отключённые</option>
+            </select>
+          </label>
+          <label className="flex min-h-11 items-center gap-3 self-end rounded-lg border border-slate-200 bg-white px-3 text-sm dark:border-white/10 dark:bg-surface-900">
+            <input type="checkbox" checked={includePromoCodes} onChange={(event) => setIncludePromoCodes(event.target.checked)} />
+            Синхронизировать промокоды
+          </label>
         </div>
       </div>
 

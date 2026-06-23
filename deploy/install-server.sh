@@ -625,7 +625,7 @@ async function main() {
       where: { id: existing.id },
       data: {
         passwordHash,
-        role: 'ADMIN',
+        role: 'SUPER_ADMIN',
         emailVerifiedAt: now,
         referralCode: existing.referralCode ?? await uniqueReferralCode(),
       },
@@ -638,7 +638,7 @@ async function main() {
     data: {
       email,
       passwordHash,
-      role: 'ADMIN',
+      role: 'SUPER_ADMIN',
       name: 'Administrator',
       emailVerifiedAt: now,
       agreedToTermsAt: now,

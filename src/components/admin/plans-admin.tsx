@@ -3,7 +3,17 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
-import { Edit3, Power, RefreshCw, Trash2, X } from 'lucide-react'
+import {
+  ChevronDown,
+  Edit3,
+  Globe2,
+  Plus,
+  Power,
+  RefreshCw,
+  Server,
+  Trash2,
+  X,
+} from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
 import { formatPrice } from '@/lib/format'
 import { toast } from '@/components/ui/toaster'
@@ -61,17 +71,14 @@ const emptyForm: PlanFormState = {
 
 export function PlansAdmin({ plans }: { plans: PlanAdminRow[] }) {
   const router = useRouter()
+  const [createOpen, setCreateOpen] = useState(plans.length === 0)
+  const [createForm, setCreateForm] = useState<PlanFormState>(emptyForm)
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [form, setForm] = useState<PlanFormState>(emptyForm)
-  const [loading, setLoading] = useState(false)
+  const [editForm, setEditForm] = useState<PlanFormState | null>(null)
+  const [loadingId, setLoadingId] = useState<string | null>(null)
   const [squads, setSquads] = useState<RemnawaveSquad[]>([])
   const [squadsLoading, setSquadsLoading] = useState(false)
   const [squadsError, setSquadsError] = useState<string | null>(null)
-
-  const editingPlan = useMemo(
-    () => plans.find((plan) => plan.id === editingId) ?? null,
-    [editingId, plans]
-  )
 
   useEffect(() => {
     void loadSquads()
@@ -84,30 +91,36 @@ export function PlansAdmin({ plans }: { plans: PlanAdminRow[] }) {
       const result = await apiFetch<{ squads: RemnawaveSquad[] }>('/api/admin/remnawave/squads')
       setSquads(result.squads)
     } catch (error) {
-      setSquadsError(error instanceof Error ? error.message : 'Не удалось загрузить squads')
+      setSquadsError(error instanceof Error ? error.message : 'Не удалось загрузить группы')
     } finally {
       setSquadsLoading(false)
     }
   }
 
-  async function submit() {
-    setLoading(true)
+  async function submit(form: PlanFormState, planId?: string) {
+    const loadingKey = planId ?? 'create'
+    setLoadingId(loadingKey)
     try {
-      await apiFetch(editingId ? `/api/admin/plans/${editingId}` : '/api/admin/plans', {
-        method: editingId ? 'PATCH' : 'POST',
+      await apiFetch(planId ? `/api/admin/plans/${planId}` : '/api/admin/plans', {
+        method: planId ? 'PATCH' : 'POST',
         body: JSON.stringify(toPayload(form)),
       })
-      toast(editingId ? 'Тариф обновлён' : 'Тариф создан', 'success')
-      resetForm()
+      toast(planId ? 'Тариф обновлён' : 'Тариф создан', 'success')
+      if (planId) {
+        setEditingId(null)
+        setEditForm(null)
+      } else {
+        setCreateForm(emptyForm)
+        setCreateOpen(false)
+      }
       router.refresh()
-    } catch {
-      // apiFetch уже покажет toast
     } finally {
-      setLoading(false)
+      setLoadingId(null)
     }
   }
 
   async function toggleActive(plan: PlanAdminRow) {
+    setLoadingId(plan.id)
     try {
       await apiFetch(`/api/admin/plans/${plan.id}`, {
         method: 'PATCH',
@@ -115,300 +128,324 @@ export function PlansAdmin({ plans }: { plans: PlanAdminRow[] }) {
       })
       toast(plan.isActive ? 'Тариф скрыт' : 'Тариф опубликован', 'success')
       router.refresh()
-    } catch {
-      // apiFetch уже покажет toast
+    } finally {
+      setLoadingId(null)
     }
   }
 
   async function deletePlan(plan: PlanAdminRow) {
     if (plan.paymentsCount > 0 || plan.subscriptionsCount > 0) {
-      toast('Этот тариф уже используется. Его можно только скрыть.')
+      toast('Используемый тариф можно только скрыть')
       return
     }
-    if (!window.confirm(`Удалить тариф "${plan.name}"?`)) return
-
+    if (!window.confirm(`Удалить тариф «${plan.name}»?`)) return
+    setLoadingId(plan.id)
     try {
       await apiFetch(`/api/admin/plans/${plan.id}`, { method: 'DELETE' })
       toast('Тариф удалён', 'success')
-      if (editingId === plan.id) resetForm()
       router.refresh()
-    } catch {
-      // apiFetch уже покажет toast
+    } finally {
+      setLoadingId(null)
     }
   }
 
   function startEdit(plan: PlanAdminRow) {
     setEditingId(plan.id)
-    setForm({
-      name: plan.name,
-      description: plan.description ?? '',
-      priceRub: String(plan.priceKopecks / 100),
-      durationDays: String(plan.durationDays),
-      trafficLimitGb: plan.trafficLimitGb == null ? '' : String(plan.trafficLimitGb),
-      unlimitedTraffic: plan.trafficLimitGb == null,
-      deviceLimit: String(plan.deviceLimit),
-      activeInternalSquads: plan.activeInternalSquads.join('\n'),
-      sortOrder: String(plan.sortOrder),
-      isPromo: plan.isPromo,
-      isActive: plan.isActive,
-    })
+    setEditForm(formFromPlan(plan))
   }
 
-  function resetForm() {
-    setEditingId(null)
-    setForm(emptyForm)
-  }
-
-  function setSquadSelection(uuid: string, checked: boolean) {
-    setForm((current) => {
-      const selected = parseSquads(current.activeInternalSquads)
-      const next = checked
-        ? Array.from(new Set([...selected, uuid]))
-        : selected.filter((item) => item !== uuid)
-
-      return { ...current, activeInternalSquads: next.join('\n') }
-    })
-  }
-
-  const selectedSquads = useMemo(() => new Set(parseSquads(form.activeInternalSquads)), [form.activeInternalSquads])
+  const squadById = useMemo(() => new Map(squads.map((squad) => [squad.uuid, squad])), [squads])
 
   return (
-    <div className="space-y-6">
-      <div className="card space-y-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <h2 className="text-lg font-semibold">
-              {editingPlan ? `Редактировать ${editingPlan.name}` : 'Новый тариф'}
-            </h2>
-            <p className="mt-1 text-sm text-slate-500">
-              Активные тарифы показываются пользователям на странице покупки.
-            </p>
-          </div>
-          {editingId && (
-            <button type="button" className="btn-secondary text-xs" onClick={resetForm}>
-              <X className="h-4 w-4" />
-              Отмена
-            </button>
-          )}
+    <div className="space-y-4">
+      <div className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-surface-900 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="font-semibold">Каталог тарифов</h2>
+          <p className="mt-1 text-sm text-slate-500">Изменения открываются прямо в нужной карточке.</p>
         </div>
-
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <Field label="Название">
-            <input
-              value={form.name}
-              onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
-              className="input"
-              placeholder="Базовый"
-            />
-          </Field>
-          <Field label="Цена, ₽">
-            <input
-              value={form.priceRub}
-              onChange={(event) => setForm((current) => ({ ...current, priceRub: event.target.value }))}
-              className="input"
-              type="number"
-              min={0}
-              step="0.01"
-            />
-          </Field>
-          <Field label="Срок, дней">
-            <input
-              value={form.durationDays}
-              onChange={(event) => setForm((current) => ({ ...current, durationDays: event.target.value }))}
-              className="input"
-              type="number"
-              min={1}
-            />
-          </Field>
-          <Field label="Устройств">
-            <input
-              value={form.deviceLimit}
-              onChange={(event) => setForm((current) => ({ ...current, deviceLimit: event.target.value }))}
-              className="input"
-              type="number"
-              min={1}
-            />
-          </Field>
-          <Field label="Трафик, ГБ">
-            <input
-              value={form.trafficLimitGb}
-              onChange={(event) => setForm((current) => ({ ...current, trafficLimitGb: event.target.value }))}
-              className="input"
-              type="number"
-              min={1}
-              disabled={form.unlimitedTraffic}
-              placeholder="Безлимит"
-            />
-          </Field>
-          <Field label="Порядок">
-            <input
-              value={form.sortOrder}
-              onChange={(event) => setForm((current) => ({ ...current, sortOrder: event.target.value }))}
-              className="input"
-              type="number"
-              min={0}
-            />
-          </Field>
-          <label className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-3 text-sm dark:border-white/10">
-            <input
-              type="checkbox"
-              checked={form.unlimitedTraffic}
-              onChange={(event) => setForm((current) => ({ ...current, unlimitedTraffic: event.target.checked }))}
-            />
-            Безлимитный трафик
-          </label>
-          <label className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-3 text-sm dark:border-white/10">
-            <input
-              type="checkbox"
-              checked={form.isPromo}
-              onChange={(event) => setForm((current) => ({ ...current, isPromo: event.target.checked }))}
-            />
-            Промо-тариф
-          </label>
-          <label className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-3 text-sm dark:border-white/10">
-            <input
-              type="checkbox"
-              checked={form.isActive}
-              onChange={(event) => setForm((current) => ({ ...current, isActive: event.target.checked }))}
-            />
-            Опубликован
-          </label>
-          <Field label="Описание" className="md:col-span-2 xl:col-span-4">
-            <textarea
-              value={form.description}
-              onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))}
-              className="input min-h-[92px] resize-y"
-              placeholder="Коротко для карточки тарифа"
-            />
-          </Field>
-          <div className="md:col-span-2 xl:col-span-4">
-            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-              <div className="text-sm font-medium">Squads Remnawave</div>
-              <button
-                type="button"
-                className="btn-secondary px-3 py-2 text-xs"
-                onClick={() => void loadSquads()}
-                disabled={squadsLoading}
-              >
-                <RefreshCw className={cn('h-3.5 w-3.5', squadsLoading && 'animate-spin')} />
-                Обновить
-              </button>
-            </div>
-            {squads.length > 0 ? (
-              <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-                {squads.map((squad) => (
-                  <label
-                    key={squad.uuid}
-                    className="flex min-w-0 cursor-pointer items-start gap-3 rounded-lg border border-slate-200 bg-white px-3 py-3 text-sm transition-colors hover:border-brand-300 hover:bg-brand-50/40 dark:border-white/10 dark:bg-surface-900 dark:hover:border-cyan-400/40 dark:hover:bg-cyan-400/5"
-                  >
-                    <input
-                      type="checkbox"
-                      className="mt-1"
-                      checked={selectedSquads.has(squad.uuid)}
-                      onChange={(event) => setSquadSelection(squad.uuid, event.target.checked)}
-                    />
-                    <span className="min-w-0">
-                      <span className="flex items-center gap-2">
-                        <span className="truncate font-medium">{squad.name}</span>
-                        {!squad.isActive && <span className="badge-disabled">off</span>}
-                      </span>
-                      <span className="mt-1 block truncate font-mono text-xs text-slate-500">{squad.uuid}</span>
-                    </span>
-                  </label>
-                ))}
-              </div>
-            ) : (
-              <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-500 dark:border-white/10 dark:bg-surface-900">
-                {squadsLoading ? 'Загружаем squads...' : squadsError || 'Squads не найдены.'}
-              </div>
-            )}
-            <details className="mt-3">
-              <summary className="cursor-pointer text-sm text-slate-500">Ручной ввод UUID</summary>
-              <textarea
-                value={form.activeInternalSquads}
-                onChange={(event) => setForm((current) => ({ ...current, activeInternalSquads: event.target.value }))}
-                className="input mt-2 min-h-[92px] resize-y font-mono text-xs"
-                placeholder="UUID squads через запятую или с новой строки"
-              />
-            </details>
-          </div>
+        <div className="flex gap-2">
+          <button type="button" className="btn-secondary" onClick={() => void loadSquads()} disabled={squadsLoading}>
+            <RefreshCw className={cn('h-4 w-4', squadsLoading && 'animate-spin')} />
+            Группы
+          </button>
+          <button type="button" className="btn-primary" onClick={() => setCreateOpen((value) => !value)}>
+            {createOpen ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+            {createOpen ? 'Закрыть' : 'Новый тариф'}
+          </button>
         </div>
-
-        <button type="button" className="btn-primary" onClick={submit} disabled={loading}>
-          {loading ? 'Сохраняем...' : editingId ? 'Сохранить изменения' : 'Создать тариф'}
-        </button>
       </div>
 
-      <div className="grid gap-3">
-        {plans.length === 0 && (
-          <div className="card py-10 text-center text-sm text-slate-500">
-            Тарифов пока нет. Создайте первый тариф выше.
+      {createOpen && (
+        <div className="card border-cyan-200/80 dark:border-cyan-400/20">
+          <div className="mb-5">
+            <h2 className="text-lg font-semibold">Новый тариф</h2>
+            <p className="mt-1 text-sm text-slate-500">Основные параметры, доступные группы и публикация.</p>
+          </div>
+          <PlanEditor
+            form={createForm}
+            setForm={setCreateForm}
+            squads={squads}
+            squadsLoading={squadsLoading}
+            squadsError={squadsError}
+            submitLabel="Создать тариф"
+            loading={loadingId === 'create'}
+            onSubmit={() => void submit(createForm)}
+          />
+        </div>
+      )}
+
+      {plans.length === 0 && !createOpen && (
+        <button type="button" onClick={() => setCreateOpen(true)} className="card w-full py-12 text-center text-sm text-slate-500">
+          Тарифов пока нет. Создать первый тариф
+        </button>
+      )}
+
+      <div className="grid gap-4">
+        {plans.map((plan) => {
+          const editing = editingId === plan.id && editForm
+          const selectedSquads = plan.activeInternalSquads.map((id) => squadById.get(id)).filter(Boolean) as RemnawaveSquad[]
+          const unknownSquads = plan.activeInternalSquads.filter((id) => !squadById.has(id))
+          return (
+            <article key={plan.id} className={cn('card overflow-hidden p-0', editing && 'border-brand-300 ring-2 ring-brand-100 dark:ring-brand-500/10')}>
+              <div className="p-5">
+                <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
+                  <div className="min-w-0 xl:w-[30%]">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="break-words text-lg font-semibold">{plan.name}</h3>
+                      <span className={plan.isActive ? 'badge-active' : 'badge-disabled'}>
+                        {plan.isActive ? 'Опубликован' : 'Скрыт'}
+                      </span>
+                      {plan.isPromo && <span className="badge-limited">Пробный</span>}
+                    </div>
+                    <div className="mt-2 text-2xl font-semibold tracking-tight">{formatPrice(plan.priceKopecks)}</div>
+                    {plan.description && <p className="mt-2 text-sm leading-5 text-slate-500">{plan.description}</p>}
+                  </div>
+
+                  <div className="grid flex-1 grid-cols-2 gap-2 sm:grid-cols-4">
+                    <Metric label="Срок" value={`${plan.durationDays} дней`} />
+                    <Metric label="Трафик" value={plan.trafficLimitGb == null ? 'Безлимит' : `${plan.trafficLimitGb} ГБ`} />
+                    <Metric label="Устройства" value={plan.deviceLimit} />
+                    <Metric label="Продажи" value={plan.paymentsCount} />
+                  </div>
+
+                  <div className="flex flex-wrap gap-2 xl:max-w-[19rem] xl:justify-end">
+                    <button type="button" className="btn-secondary px-3 text-xs" onClick={() => editing ? (setEditingId(null), setEditForm(null)) : startEdit(plan)}>
+                      {editing ? <X className="h-3.5 w-3.5" /> : <Edit3 className="h-3.5 w-3.5" />}
+                      {editing ? 'Закрыть' : 'Изменить'}
+                    </button>
+                    <button type="button" className="btn-secondary px-3 text-xs" onClick={() => void toggleActive(plan)} disabled={loadingId === plan.id}>
+                      <Power className="h-3.5 w-3.5" />
+                      {plan.isActive ? 'Скрыть' : 'Показать'}
+                    </button>
+                    <button type="button" className="btn-secondary px-3 text-xs text-red-600" onClick={() => void deletePlan(plan)} disabled={loadingId === plan.id}>
+                      <Trash2 className="h-3.5 w-3.5" />
+                      Удалить
+                    </button>
+                  </div>
+                </div>
+
+                <div className="mt-4 border-t border-slate-100 pt-4 dark:border-white/10">
+                  <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase text-slate-400">
+                    <Server className="h-3.5 w-3.5" />
+                    Группы доступа
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {plan.activeInternalSquads.length === 0 && (
+                      <span className="inline-flex items-center gap-1.5 rounded-md bg-slate-100 px-2.5 py-1 text-xs text-slate-600 dark:bg-white/10 dark:text-slate-300">
+                        <Globe2 className="h-3.5 w-3.5" />
+                        Группы по умолчанию
+                      </span>
+                    )}
+                    {selectedSquads.map((squad) => (
+                      <span key={squad.uuid} className="inline-flex items-center gap-1.5 rounded-md bg-cyan-50 px-2.5 py-1 text-xs text-cyan-800 dark:bg-cyan-400/10 dark:text-cyan-200">
+                        <span className={cn('h-1.5 w-1.5 rounded-full', squad.isActive ? 'bg-emerald-500' : 'bg-slate-400')} />
+                        {squad.name}
+                      </span>
+                    ))}
+                    {unknownSquads.map((id) => (
+                      <span key={id} title={id} className="max-w-[14rem] truncate rounded-md bg-amber-50 px-2.5 py-1 font-mono text-xs text-amber-800 dark:bg-amber-400/10 dark:text-amber-200">
+                        Неизвестная группа
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {editing && (
+                <div className="border-t border-slate-200 bg-slate-50/70 p-5 dark:border-white/10 dark:bg-white/[0.025]">
+                  <PlanEditor
+                    form={editForm}
+                    setForm={(value) => {
+                      setEditForm((current) => {
+                        const base = current ?? editForm
+                        return typeof value === 'function' ? value(base) : value
+                      })
+                    }}
+                    squads={squads}
+                    squadsLoading={squadsLoading}
+                    squadsError={squadsError}
+                    submitLabel="Сохранить изменения"
+                    loading={loadingId === plan.id}
+                    onSubmit={() => void submit(editForm, plan.id)}
+                  />
+                </div>
+              )}
+            </article>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function PlanEditor({
+  form,
+  setForm,
+  squads,
+  squadsLoading,
+  squadsError,
+  submitLabel,
+  loading,
+  onSubmit,
+}: {
+  form: PlanFormState
+  setForm: (value: PlanFormState | ((current: PlanFormState) => PlanFormState)) => void
+  squads: RemnawaveSquad[]
+  squadsLoading: boolean
+  squadsError: string | null
+  submitLabel: string
+  loading: boolean
+  onSubmit: () => void
+}) {
+  const selected = useMemo(() => new Set(parseSquads(form.activeInternalSquads)), [form.activeInternalSquads])
+  const set = <K extends keyof PlanFormState>(key: K, value: PlanFormState[K]) =>
+    setForm((current) => ({ ...current, [key]: value }))
+  const selectAllActive = () =>
+    set('activeInternalSquads', squads.filter((squad) => squad.isActive).map((squad) => squad.uuid).join('\n'))
+  const toggleSquad = (uuid: string) => {
+    const next = selected.has(uuid) ? [...selected].filter((id) => id !== uuid) : [...selected, uuid]
+    set('activeInternalSquads', next.join('\n'))
+  }
+
+  return (
+    <div className="space-y-5">
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <Field label="Название">
+          <input value={form.name} onChange={(event) => set('name', event.target.value)} className="input" placeholder="Стандарт 30 дней" />
+        </Field>
+        <Field label="Цена, ₽">
+          <input value={form.priceRub} onChange={(event) => set('priceRub', event.target.value)} className="input" type="number" min={0} step="0.01" />
+        </Field>
+        <Field label="Срок, дней">
+          <input value={form.durationDays} onChange={(event) => set('durationDays', event.target.value)} className="input" type="number" min={1} />
+        </Field>
+        <Field label="Устройств">
+          <input value={form.deviceLimit} onChange={(event) => set('deviceLimit', event.target.value)} className="input" type="number" min={1} />
+        </Field>
+        <Field label="Трафик, ГБ">
+          <input value={form.trafficLimitGb} onChange={(event) => set('trafficLimitGb', event.target.value)} className="input" type="number" min={1} disabled={form.unlimitedTraffic} placeholder="Безлимит" />
+        </Field>
+        <Field label="Порядок">
+          <input value={form.sortOrder} onChange={(event) => set('sortOrder', event.target.value)} className="input" type="number" min={0} />
+        </Field>
+        <Toggle checked={form.unlimitedTraffic} onChange={(value) => set('unlimitedTraffic', value)} label="Безлимитный трафик" />
+        <Toggle checked={form.isPromo} onChange={(value) => set('isPromo', value)} label="Пробный тариф" />
+        <Toggle checked={form.isActive} onChange={(value) => set('isActive', value)} label="Опубликован" />
+        <Field label="Описание" className="md:col-span-2 xl:col-span-3">
+          <input value={form.description} onChange={(event) => set('description', event.target.value)} className="input" placeholder="Короткое описание для карточки" />
+        </Field>
+      </div>
+
+      <div className="rounded-lg border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-surface-900">
+        <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <div className="font-medium">Группы Remnawave</div>
+            <div className="text-xs text-slate-500">Выберите серверные группы, доступные по тарифу.</div>
+          </div>
+          <div className="flex gap-2">
+            <button type="button" className="btn-secondary px-3 py-2 text-xs" onClick={selectAllActive}>Все активные</button>
+            <button type="button" className="btn-secondary px-3 py-2 text-xs" onClick={() => set('activeInternalSquads', '')}>Очистить</button>
+          </div>
+        </div>
+        {squads.length > 0 ? (
+          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+            {squads.map((squad) => (
+              <button
+                key={squad.uuid}
+                type="button"
+                onClick={() => toggleSquad(squad.uuid)}
+                className={cn(
+                  'flex min-w-0 items-center gap-3 rounded-lg border px-3 py-3 text-left transition-colors',
+                  selected.has(squad.uuid)
+                    ? 'border-cyan-300 bg-cyan-50 text-cyan-950 dark:border-cyan-400/40 dark:bg-cyan-400/10 dark:text-cyan-100'
+                    : 'border-slate-200 bg-white hover:border-slate-300 dark:border-white/10 dark:bg-surface-900 dark:hover:border-white/20'
+                )}
+              >
+                <span className={cn('grid h-5 w-5 shrink-0 place-items-center rounded border text-xs', selected.has(squad.uuid) ? 'border-cyan-500 bg-cyan-500 text-white' : 'border-slate-300')}>
+                  {selected.has(squad.uuid) ? '✓' : ''}
+                </span>
+                <span className="min-w-0">
+                  <span className="flex items-center gap-2">
+                    <span className="truncate text-sm font-medium">{squad.name}</span>
+                    {!squad.isActive && <span className="badge-disabled">off</span>}
+                  </span>
+                  <span className="block truncate font-mono text-[10px] text-slate-400">{squad.uuid}</span>
+                </span>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-lg bg-slate-50 px-3 py-4 text-sm text-slate-500 dark:bg-white/5">
+            {squadsLoading ? 'Загружаем группы...' : squadsError || 'Группы не найдены'}
           </div>
         )}
-        {plans.map((plan) => (
-          <article key={plan.id} className="card">
-            <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-              <div className="min-w-0 xl:max-w-sm">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="break-words text-lg font-semibold">{plan.name}</span>
-                  <span className={plan.isActive ? 'badge-active' : 'badge-disabled'}>
-                    {plan.isActive ? 'Опубликован' : 'Скрыт'}
-                  </span>
-                  {plan.isPromo && <span className="badge-limited">Промо</span>}
-                  <span className="badge-limited">{formatPrice(plan.priceKopecks)}</span>
-                </div>
-                {plan.description && (
-                  <div className="mt-2 break-words text-sm text-slate-500">{plan.description}</div>
-                )}
-              </div>
-
-              <div className="grid min-w-0 gap-3 text-sm sm:grid-cols-2 xl:flex-1 2xl:grid-cols-5">
-                <Metric label="Срок" value={`${plan.durationDays} дн.`} />
-                <Metric label="Трафик" value={plan.trafficLimitGb == null ? 'Безлимит' : `${plan.trafficLimitGb} ГБ`} />
-                <Metric label="Устройства" value={plan.deviceLimit} />
-                <Metric label="Squads" value={plan.activeInternalSquads.length || 'env'} />
-                <Metric label="Порядок" value={plan.sortOrder} />
-                <Metric label="Связи" value={`${plan.subscriptionsCount} / ${plan.paymentsCount}`} />
-              </div>
-
-              <div className="action-row xl:w-[360px]">
-                <button type="button" className="btn-secondary min-w-[112px] px-3 text-xs" onClick={() => startEdit(plan)}>
-                  <Edit3 className="h-3.5 w-3.5" />
-                  Изменить
-                </button>
-                <button type="button" className="btn-secondary min-w-[112px] px-3 text-xs" onClick={() => toggleActive(plan)}>
-                  <Power className="h-3.5 w-3.5" />
-                  {plan.isActive ? 'Скрыть' : 'Показать'}
-                </button>
-                <button type="button" className="btn-secondary min-w-[112px] px-3 text-xs" onClick={() => deletePlan(plan)}>
-                  <Trash2 className="h-3.5 w-3.5" />
-                  Удалить
-                </button>
-              </div>
-            </div>
-          </article>
-        ))}
+        <details className="mt-3">
+          <summary className="flex cursor-pointer items-center gap-1 text-xs text-slate-500">
+            <ChevronDown className="h-3.5 w-3.5" />
+            Ручной ввод UUID
+          </summary>
+          <textarea value={form.activeInternalSquads} onChange={(event) => set('activeInternalSquads', event.target.value)} className="input mt-2 min-h-[76px] resize-y font-mono text-xs" />
+        </details>
       </div>
+
+      <button type="button" className="btn-primary" onClick={onSubmit} disabled={loading}>
+        {loading ? 'Сохраняем...' : submitLabel}
+      </button>
     </div>
   )
 }
 
 function Field({ label, children, className }: { label: string; children: ReactNode; className?: string }) {
+  return <label className={cn('block', className)}><span className="mb-1 block text-sm font-medium">{label}</span>{children}</label>
+}
+
+function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (value: boolean) => void; label: string }) {
   return (
-    <label className={cn('block', className)}>
-      <span className="mb-1 block text-sm font-medium">{label}</span>
-      {children}
+    <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-lg border border-slate-200 px-3 text-sm dark:border-white/10">
+      <input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} />
+      {label}
     </label>
   )
 }
 
 function Metric({ label, value }: { label: string; value: ReactNode }) {
-  return (
-    <div className="info-cell">
-      <div className="text-xs text-slate-500">{label}</div>
-      <div className="mt-1 truncate font-medium">{value}</div>
-    </div>
-  )
+  return <div className="rounded-lg bg-slate-50 px-3 py-2.5 dark:bg-white/5"><div className="text-[11px] uppercase text-slate-400">{label}</div><div className="mt-1 font-medium">{value}</div></div>
+}
+
+function formFromPlan(plan: PlanAdminRow): PlanFormState {
+  return {
+    name: plan.name,
+    description: plan.description ?? '',
+    priceRub: String(plan.priceKopecks / 100),
+    durationDays: String(plan.durationDays),
+    trafficLimitGb: plan.trafficLimitGb == null ? '' : String(plan.trafficLimitGb),
+    unlimitedTraffic: plan.trafficLimitGb == null,
+    deviceLimit: String(plan.deviceLimit),
+    activeInternalSquads: plan.activeInternalSquads.join('\n'),
+    sortOrder: String(plan.sortOrder),
+    isPromo: plan.isPromo,
+    isActive: plan.isActive,
+  }
 }
 
 function toPayload(form: PlanFormState) {
@@ -427,8 +464,5 @@ function toPayload(form: PlanFormState) {
 }
 
 function parseSquads(value: string) {
-  return value
-    .split(/[\s,;]+/)
-    .map((item) => item.trim())
-    .filter(Boolean)
+  return value.split(/[\s,;]+/).map((item) => item.trim()).filter(Boolean)
 }

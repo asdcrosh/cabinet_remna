@@ -74,7 +74,7 @@ export default async function PlansPage() {
       <PageHeader
         title="Купить VPN"
         description="Выберите тариф и оплатите онлайн"
-        action={session?.role === 'ADMIN' ? (
+        action={session && ['ADMIN', 'SUPER_ADMIN'].includes(session.role) ? (
           <Link href="/dashboard/admin/plans" className="btn-secondary">
             Управлять тарифами
           </Link>
@@ -93,7 +93,7 @@ export default async function PlansPage() {
           <div className="grid gap-3 sm:grid-cols-3">
             <BuyStep icon={<ShieldCheck className="h-5 w-5" />} title="1. Тариф" text="Выберите срок и лимиты" />
             <BuyStep icon={<CreditCard className="h-5 w-5" />} title="2. Оплата" text="Оплатите картой онлайн" />
-            <BuyStep icon={<KeyRound className="h-5 w-5" />} title="3. Доступ" text="Откройте ключи в кабинете" />
+            <BuyStep icon={<KeyRound className="h-5 w-5" />} title="3. Подключение" text="Добавьте подписку по QR-коду" />
           </div>
         </div>
       </section>
@@ -114,7 +114,7 @@ export default async function PlansPage() {
             <p className="mx-auto mt-2 max-w-md text-sm text-slate-500 dark:text-slate-400">
               Сейчас нет опубликованных тарифов.
             </p>
-            {session?.role === 'ADMIN' && (
+            {session && ['ADMIN', 'SUPER_ADMIN'].includes(session.role) && (
               <Link href="/dashboard/admin/plans" className="btn-primary mt-5 inline-flex">
                 Создать тариф
               </Link>
@@ -140,7 +140,7 @@ export default async function PlansPage() {
 
       <section className="grid gap-4 lg:grid-cols-3">
         <TrustItem title="Email-аккаунт" text="Покупка и продление доступны в личном кабинете." />
-        <TrustItem title="Быстрый доступ" text="Ключи и QR-код появятся в личном кабинете." />
+        <TrustItem title="Быстрый доступ" text="Ссылка подписки и QR-код появятся в кабинете." />
         <TrustItem title="Устройства" text="Смотрите подключения и отвязывайте лишнее." />
       </section>
     </div>

@@ -79,6 +79,6 @@ export async function POST(req: Request) {
   return setSessionCookieOnResponse(res, {
     uid: user.id,
     email: user.email,
-    role: user.role as 'USER' | 'ADMIN',
+    role: user.role,
   })
 }

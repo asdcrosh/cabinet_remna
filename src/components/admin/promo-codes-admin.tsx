@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
-import { Edit3, Power, X } from 'lucide-react'
+import { CheckCheck, Edit3, Power, X } from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
 import { toast } from '@/components/ui/toaster'
 import { cn } from '@/lib/cn'
@@ -219,7 +219,31 @@ export function PromoCodesAdmin({
         </div>
 
         <div>
-          <div className="mb-2 text-sm font-medium">Тарифы</div>
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <div className="text-sm font-medium">Тарифы</div>
+              <div className="text-xs text-slate-500">
+                {form.planIds.length === 0 ? 'Действует на все тарифы' : `Выбрано: ${form.planIds.length} из ${plans.length}`}
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                className="btn-secondary px-3 py-2 text-xs"
+                onClick={() => setForm((current) => ({ ...current, planIds: plans.map((plan) => plan.id) }))}
+              >
+                <CheckCheck className="h-3.5 w-3.5" />
+                Выбрать все
+              </button>
+              <button
+                type="button"
+                className="btn-secondary px-3 py-2 text-xs"
+                onClick={() => setForm((current) => ({ ...current, planIds: [] }))}
+              >
+                Сбросить
+              </button>
+            </div>
+          </div>
           <div className="flex flex-wrap gap-2">
             {plans.map((plan) => (
               <button

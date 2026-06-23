@@ -16,7 +16,7 @@ const ACCESS_TTL = '7d'
 export interface SessionPayload extends JWTPayload {
   uid: string
   email: string
-  role: 'USER' | 'ADMIN'
+  role: 'USER' | 'MODERATOR' | 'ADMIN' | 'SUPER_ADMIN'
 }
 
 export const COOKIE_NAME = 'cabinet_session'

@@ -29,19 +29,19 @@ export function AuthLayout({ title, description, footer, children }: AuthLayoutP
         </Link>
         <div className="relative max-w-lg">
           <div className="mb-6 inline-flex rounded-full border border-white/10 bg-white/10 px-3 py-1 text-sm text-white/80 backdrop-blur">
-            Быстрый доступ, платежи и ключи в одном месте
+            Подписка, платежи и подключение в одном месте
           </div>
           <h1 className="text-4xl font-semibold tracking-tight">Личный кабинет, который не мешает пользоваться VPN.</h1>
           <p className="mt-4 text-white/70">
-            Следите за подпиской, продлевайте тариф, копируйте ключи и управляйте устройствами без обращения в поддержку.
+            Следите за подпиской, продлевайте тариф и подключайте устройства без лишних действий.
           </p>
           <div className="mt-8 grid gap-3">
-            <AuthSignal icon={<KeyRound className="h-4 w-4" />} label="Ключи" value="VLESS, Clash, QR" />
+            <AuthSignal icon={<KeyRound className="h-4 w-4" />} label="Подключение" value="Ссылка и QR-код" />
             <AuthSignal icon={<Activity className="h-4 w-4" />} label="Статус" value="Трафик и срок подписки" />
             <AuthSignal icon={<CreditCard className="h-4 w-4" />} label="Оплата" value="Онлайн и без ожидания" />
           </div>
         </div>
-        <div className="relative text-sm text-white/50">Защищённый вход, оплата и ключи в одном месте.</div>
+        <div className="relative text-sm text-white/50">Защищённый вход, оплата и подписка в одном месте.</div>
       </div>
 
       <div className="flex items-center justify-center p-4 sm:p-8">

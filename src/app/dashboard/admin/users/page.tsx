@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { requireAdminPage } from '@/lib/auth/admin-page'
 import { PageHeader } from '@/components/dashboard/page-header'
 import { SubscriptionBadge } from '@/components/admin/admin-badges'
+import { UserRoleSelect } from '@/components/admin/user-role-select'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Пользователи — Админка' }
@@ -13,7 +14,7 @@ export default async function AdminUsersPage({
 }: {
   searchParams?: { q?: string; page?: string }
 }) {
-  await requireAdminPage()
+  const { session, user: actor } = await requireAdminPage()
 
   const q = searchParams?.q?.trim() ?? ''
   const page = Math.max(1, Number(searchParams?.page || '1') || 1)
@@ -100,7 +101,12 @@ export default async function AdminUsersPage({
                     <div className="text-xs text-slate-500">{user.name || 'Без имени'}</div>
                   </td>
                   <td>
-                    <span className={user.role === 'ADMIN' ? 'badge-active' : 'badge-limited'}>{user.role}</span>
+                    <UserRoleSelect
+                      userId={user.id}
+                      role={user.role}
+                      actorId={session.uid}
+                      actorRole={actor.role}
+                    />
                   </td>
                   <td>
                     <div className="flex items-center gap-2">
@@ -146,7 +152,12 @@ export default async function AdminUsersPage({
                   <div className="break-words font-semibold">{user.email}</div>
                   <div className="text-sm text-slate-500">{user.name || 'Без имени'}</div>
                 </div>
-                <span className={user.role === 'ADMIN' ? 'badge-active' : 'badge-limited'}>{user.role}</span>
+                <UserRoleSelect
+                  userId={user.id}
+                  role={user.role}
+                  actorId={session.uid}
+                  actorRole={actor.role}
+                />
               </div>
 
               <div className="grid gap-3 sm:grid-cols-2">

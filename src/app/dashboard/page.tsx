@@ -53,8 +53,8 @@ export default async function DashboardHome() {
     <div className="space-y-6">
       <PageHeader
         title="VPN готов"
-        description="Ваша подписка активна: здесь ключи, трафик и быстрые действия"
-        action={<Link href="/dashboard/subscription" className="btn-primary">Открыть ключи</Link>}
+        description="Управляйте подпиской, устройствами и продлением"
+        action={<Link href="/dashboard/subscription" className="btn-primary">Открыть подписку</Link>}
       />
 
       {subRow?.pendingSync && !remnawaveCard && (
@@ -101,7 +101,7 @@ export default async function DashboardHome() {
             <ProgressBar value={percent} />
           </div>
           <div className="mt-4 flex gap-2">
-            <Link href="/dashboard/subscription" className="btn-primary">Ключи</Link>
+            <Link href="/dashboard/subscription" className="btn-primary">Подключение</Link>
             <Link href="/dashboard/plans" className="btn-secondary">Продлить</Link>
           </div>
         </div>
@@ -111,9 +111,9 @@ export default async function DashboardHome() {
         <QuickAction
           icon={<KeyRound className="h-5 w-5" />}
           title="Подключить устройство"
-          description="Откройте QR и ссылку подписки для приложения."
+          description="Откройте QR-код и добавьте подписку в приложение."
           href="/dashboard/subscription"
-          action="Перейти к ключам"
+          action="Подключить"
         />
         <QuickAction
           icon={<CreditCard className="h-5 w-5" />}
@@ -163,7 +163,7 @@ function OnboardingState({ emailVerified }: { emailVerified: boolean }) {
             </div>
             <h2 className="text-2xl font-semibold tracking-tight">VPN без лишних шагов</h2>
             <p className="mt-2 max-w-xl text-slate-500 dark:text-slate-400">
-              Оплатите тариф в кабинете. После оплаты здесь появятся QR-код, ссылка подписки и данные подключения.
+              Выберите тариф и оплатите его в кабинете. После активации останется добавить подписку в VPN-приложение.
             </p>
             <div className="mt-6 flex flex-col gap-2 sm:flex-row">
               <Link href="/dashboard/plans" className="btn-primary">Выбрать тариф</Link>
@@ -174,7 +174,7 @@ function OnboardingState({ emailVerified }: { emailVerified: boolean }) {
             <Step done={emailVerified} title="Email подтверждён" description="Аккаунт готов к покупке" />
             <Step done={false} title="Выберите тариф" description="Срок, трафик и лимит устройств" />
             <Step done={false} title="Оплатите онлайн" description="После оплаты вернём вас в кабинет" />
-            <Step done={false} title="Получите доступ" description="Ключи появятся на странице подписки" />
+            <Step done={false} title="Подключитесь" description="Добавьте подписку по QR-коду" />
           </div>
         </div>
       </div>
@@ -189,10 +189,10 @@ function OnboardingState({ emailVerified }: { emailVerified: boolean }) {
         />
         <QuickAction
           icon={<KeyRound className="h-5 w-5" />}
-          title="Ключи появятся здесь"
-          description="После оплаты откроется QR и ссылка подписки."
+          title="Подключение"
+          description="После оплаты откроется QR-код и ссылка подписки."
           href="/dashboard/subscription"
-          action="Страница ключей"
+          action="Открыть подписку"
         />
         <QuickAction
           icon={<ShieldCheck className="h-5 w-5" />}

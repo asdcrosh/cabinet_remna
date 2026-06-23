@@ -28,7 +28,31 @@ export async function requireAdmin(): Promise<SessionPayload> {
     where: { id: session.uid },
     select: { role: true },
   })
-  if (user?.role !== 'ADMIN') {
+  if (!user || !['ADMIN', 'SUPER_ADMIN'].includes(user.role)) {
+    throw new AuthError(403, 'Forbidden')
+  }
+  return session
+}
+
+export async function requireStaff(): Promise<SessionPayload> {
+  const session = await requireAuth()
+  const user = await prisma.user.findUnique({
+    where: { id: session.uid },
+    select: { role: true },
+  })
+  if (!user || !['MODERATOR', 'ADMIN', 'SUPER_ADMIN'].includes(user.role)) {
+    throw new AuthError(403, 'Forbidden')
+  }
+  return session
+}
+
+export async function requireSuperAdmin(): Promise<SessionPayload> {
+  const session = await requireAuth()
+  const user = await prisma.user.findUnique({
+    where: { id: session.uid },
+    select: { role: true },
+  })
+  if (user?.role !== 'SUPER_ADMIN') {
     throw new AuthError(403, 'Forbidden')
   }
   return session

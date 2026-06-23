@@ -170,7 +170,7 @@ export function PlanCard({
       </div>
       <ul className="mt-5 min-h-[136px] space-y-3 text-sm text-slate-600 dark:text-slate-300">
         <Feature strong>{trafficLimitGb == null ? 'Безлимитный трафик' : `${trafficLimitGb} ГБ трафика`}</Feature>
-        <Feature>Ключи сразу после оплаты</Feature>
+        <Feature>Доступ сразу после оплаты</Feature>
         <Feature>QR и ссылка подписки</Feature>
         <Feature>До {deviceLimit} устройств</Feature>
       </ul>

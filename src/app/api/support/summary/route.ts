@@ -21,7 +21,7 @@ export const GET = withAuth(async () => {
       where: { userId: session.uid },
       _sum: { userUnreadCount: true },
     }),
-    user.role === 'ADMIN'
+    ['MODERATOR', 'ADMIN', 'SUPER_ADMIN'].includes(user.role)
       ? prisma.supportTicket.aggregate({
           where: { status: 'WAITING_ADMIN' },
           _sum: { adminUnreadCount: true },

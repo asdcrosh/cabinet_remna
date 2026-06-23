@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { requireAdmin, withAuth } from '@/lib/auth/guard'
+import { requireStaff, withAuth } from '@/lib/auth/guard'
 import {
   createSupportMessageSchema,
   serializeSupportMessage,
@@ -12,7 +12,7 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 export const GET = withAuth(async (_req: Request, { params }: { params: { id: string } }) => {
-  await requireAdmin()
+  await requireStaff()
 
   const ticket = await prisma.supportTicket.findUnique({
     where: { id: params.id },
@@ -52,7 +52,7 @@ export const GET = withAuth(async (_req: Request, { params }: { params: { id: st
 })
 
 export const POST = withAuth(async (req: Request, { params }: { params: { id: string } }) => {
-  const session = await requireAdmin()
+  const session = await requireStaff()
 
   let body: unknown
   try {
@@ -109,7 +109,7 @@ export const POST = withAuth(async (req: Request, { params }: { params: { id: st
 })
 
 export const PATCH = withAuth(async (req: Request, { params }: { params: { id: string } }) => {
-  await requireAdmin()
+  await requireStaff()
 
   let body: unknown
   try {

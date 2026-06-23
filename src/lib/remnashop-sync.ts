@@ -222,11 +222,18 @@ export async function getRemnashopSyncDryRun() {
   }
 }
 
-export async function syncRemnashopCatalog() {
-  const [plans, promoCodes] = await Promise.all([
+export async function syncRemnashopCatalog(options: {
+  planScope?: 'all' | 'active'
+  includePromoCodes?: boolean
+} = {}) {
+  const [sourcePlans, sourcePromoCodes] = await Promise.all([
     fetchRemnashopPlans(),
     fetchRemnashopPromoCodes(),
   ])
+  const plans = options.planScope === 'active'
+    ? sourcePlans.filter((plan) => plan.is_active)
+    : sourcePlans
+  const promoCodes = options.includePromoCodes === false ? [] : sourcePromoCodes
 
   const warnings: string[] = []
   const planResults: Array<{
@@ -340,7 +347,7 @@ export async function syncRemnashopCatalog() {
     }
   })
 
-  if (promoCodes.length === 0) {
+  if (options.includePromoCodes !== false && promoCodes.length === 0) {
     warnings.push('Промокоды remnashop не найдены или схема промокодов не распознана.')
   }
 

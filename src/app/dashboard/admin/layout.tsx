@@ -1,6 +1,6 @@
-import { requireAdminPage } from '@/lib/auth/admin-page'
+import { requireStaffPage } from '@/lib/auth/admin-page'
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  await requireAdminPage()
+  await requireStaffPage()
   return children
 }

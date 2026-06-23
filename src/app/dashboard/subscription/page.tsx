@@ -1,4 +1,4 @@
-// /dashboard/subscription — ключи, QR-код, кнопка перевыпуска.
+// /dashboard/subscription — единая ссылка подписки, QR-код и управление доступом.
 
 import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
@@ -23,7 +23,7 @@ export default async function SubscriptionPage() {
           <ShieldAlert className="h-7 w-7" />
         </div>
         <h1 className="text-xl font-semibold">Нет активной подписки</h1>
-        <p className="text-slate-500 mt-2">Чтобы получить ключи, выберите тариф.</p>
+        <p className="text-slate-500 mt-2">Выберите тариф, чтобы активировать VPN.</p>
         <Link href="/dashboard/plans" className="btn-primary mt-6 inline-flex">
           Выбрать тариф
         </Link>
@@ -56,7 +56,7 @@ export default async function SubscriptionPage() {
     <div className="space-y-6">
       <PageHeader
         title="Подписка"
-        description="Ключи доступа, QR-код и параметры текущей подписки"
+        description="Статус, трафик и подключение устройств"
         action={<Link href="/dashboard/plans" className="btn-primary">Продлить</Link>}
       />
 

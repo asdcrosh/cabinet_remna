@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   CreditCard,
+  Database,
   Home,
   KeyRound,
   Laptop,
@@ -13,6 +14,7 @@ import {
   Settings,
   ShieldCheck,
   SlidersHorizontal,
+  Tag,
   UserCog,
   UsersRound,
   X,
@@ -32,15 +34,21 @@ const nav = [
 ]
 
 const adminNav = [
-  { href: '/dashboard/admin', label: 'Админка', icon: UserCog, exact: true },
+  { href: '/dashboard/admin', label: 'Обзор', icon: UserCog, exact: true },
   { href: '/dashboard/admin/support', label: 'Поддержка', icon: MessageCircleQuestion },
-  { href: '/dashboard/admin/plans', label: 'Управление тарифами', icon: SlidersHorizontal },
+  { href: '/dashboard/admin/users', label: 'Пользователи', icon: UsersRound },
+  { href: '/dashboard/admin/plans', label: 'Тарифы', icon: SlidersHorizontal },
+  { href: '/dashboard/admin/promo-codes', label: 'Промокоды', icon: Tag },
+  { href: '/dashboard/admin/payments', label: 'Платежи', icon: CreditCard },
+  { href: '/dashboard/admin/subscriptions', label: 'Подписки', icon: ShieldCheck },
+  { href: '/dashboard/admin/remnashop-sync', label: 'Синхронизация', icon: Database },
 ]
 
 type NavItem = (typeof nav)[number] | (typeof adminNav)[number]
 type NavBadges = Record<string, number>
+type UserRole = 'USER' | 'MODERATOR' | 'ADMIN' | 'SUPER_ADMIN'
 
-export function DashboardNav({ role, badges = {} }: { role: 'USER' | 'ADMIN'; badges?: NavBadges }) {
+export function DashboardNav({ role, badges = {} }: { role: UserRole; badges?: NavBadges }) {
   return <NavList role={role} badges={badges} className="space-y-1" />
 }
 
@@ -50,7 +58,7 @@ export function MobileDashboardNav({
   brandName,
   badges = {},
 }: {
-  role: 'USER' | 'ADMIN'
+  role: UserRole
   email: string
   brandName: string
   badges?: NavBadges
@@ -90,7 +98,7 @@ export function MobileDashboardNav({
             <div className="border-t border-white/70 p-3 dark:border-white/10">
               <div className="mb-2 rounded-lg border border-slate-100 bg-slate-50/80 px-3 py-2 text-xs text-slate-500 dark:border-slate-800 dark:bg-surface-900/80">
                 <div className="truncate font-medium text-slate-700 dark:text-slate-200">{email}</div>
-                <div>{role === 'ADMIN' ? 'Аккаунт администратора' : 'Аккаунт пользователя'}</div>
+                <div>{roleLabel(role)}</div>
               </div>
               <LogoutButton />
             </div>
@@ -123,7 +131,7 @@ function NavList({
   className,
   onNavigate,
 }: {
-  role: 'USER' | 'ADMIN'
+  role: UserRole
   badges?: NavBadges
   className?: string
   onNavigate?: () => void
@@ -134,16 +142,28 @@ function NavList({
   return (
     <nav className={className}>
       <NavGroup items={nav} pathname={pathname} badges={liveBadges} onNavigate={onNavigate} />
-      {role === 'ADMIN' && (
+      {role !== 'USER' && (
         <div className="pt-4">
           <div className="px-3 pb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
             Администрирование
           </div>
-          <NavGroup items={adminNav} pathname={pathname} badges={liveBadges} onNavigate={onNavigate} />
+          <NavGroup
+            items={role === 'MODERATOR' ? adminNav.filter((item) => item.href === '/dashboard/admin/support') : adminNav}
+            pathname={pathname}
+            badges={liveBadges}
+            onNavigate={onNavigate}
+          />
         </div>
       )}
     </nav>
   )
+}
+
+function roleLabel(role: UserRole) {
+  if (role === 'SUPER_ADMIN') return 'Главный администратор'
+  if (role === 'ADMIN') return 'Администратор'
+  if (role === 'MODERATOR') return 'Модератор поддержки'
+  return 'Аккаунт пользователя'
 }
 
 function useLiveBadges(initialBadges: NavBadges) {

@@ -31,7 +31,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
       where: { userId: session.uid },
       _sum: { userUnreadCount: true },
     }),
-    role === 'ADMIN'
+    ['MODERATOR', 'ADMIN', 'SUPER_ADMIN'].includes(role)
       ? prisma.supportTicket.aggregate({
           where: { status: 'WAITING_ADMIN' },
           _sum: { adminUnreadCount: true },
@@ -55,7 +55,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         <div className="border-t border-white/70 p-3 dark:border-white/10">
           <div className="mb-2 rounded-lg border border-slate-100 bg-slate-50/80 px-3 py-2 text-xs text-slate-500 dark:border-slate-800 dark:bg-surface-900/80">
             <div className="truncate font-medium text-slate-700 dark:text-slate-200">{email}</div>
-            <div>{role === 'ADMIN' ? 'Аккаунт администратора' : 'Аккаунт пользователя'}</div>
+            <div>{roleLabel(role)}</div>
           </div>
           <LogoutButton />
         </div>
@@ -69,4 +69,11 @@ export default async function DashboardLayout({ children }: { children: React.Re
       </main>
     </div>
   )
+}
+
+function roleLabel(role: 'USER' | 'MODERATOR' | 'ADMIN' | 'SUPER_ADMIN') {
+  if (role === 'SUPER_ADMIN') return 'Главный администратор'
+  if (role === 'ADMIN') return 'Администратор'
+  if (role === 'MODERATOR') return 'Модератор поддержки'
+  return 'Аккаунт пользователя'
 }
