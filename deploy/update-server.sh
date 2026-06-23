@@ -94,6 +94,78 @@ for line in path.read_text().splitlines():
 PY
 }
 
+is_truthy() {
+  case "${1:-}" in
+    1|true|TRUE|yes|YES|y|Y) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+image_is_used() {
+  local image="$1"
+  docker ps -a --filter "ancestor=${image}" --format '{{.ID}}' 2>/dev/null | grep -q .
+}
+
+remove_image_if_unused() {
+  local image="$1"
+
+  if [[ -z "${image}" ]]; then
+    return
+  fi
+
+  if ! docker image inspect "${image}" >/dev/null 2>&1; then
+    return
+  fi
+
+  if image_is_used "${image}"; then
+    echo "Keeping image in use: ${image}"
+    return
+  fi
+
+  if docker image rm -f "${image}" >/dev/null 2>&1; then
+    echo "Removed unused image: ${image}"
+  fi
+}
+
+cleanup_docker_artifacts() {
+  if is_truthy "${UPDATE_SKIP_DOCKER_CLEANUP:-false}"; then
+    echo "Docker cleanup skipped by UPDATE_SKIP_DOCKER_CLEANUP."
+    return
+  fi
+
+  echo "Removing completed one-shot containers..."
+  CABINET_ENV_FILE="${ENV_FILE}" "${COMPOSE[@]}" rm -fsv check-env migrate seed >/dev/null 2>&1 || true
+
+  echo "Removing unused legacy project images..."
+  for image in \
+    remnawave-cabinet-app \
+    remnawave-cabinet-worker \
+    remnawave-cabinet-migrate \
+    remnawave-cabinet-check-env \
+    remnawave-cabinet-seed \
+    cabinet_remna-app \
+    cabinet_remna-worker \
+    cabinet_remna-migrate
+  do
+    remove_image_if_unused "${image}"
+  done
+
+  docker image ls --quiet --filter "label=com.docker.compose.project=remnawave-cabinet" \
+    | sort -u \
+    | while read -r image_id; do
+        remove_image_if_unused "${image_id}"
+      done || true
+
+  echo "Pruning dangling Docker images..."
+  docker image prune -f >/dev/null || true
+
+  if is_truthy "${UPDATE_PRUNE_BUILD_CACHE:-false}"; then
+    local max_age="${UPDATE_BUILD_CACHE_MAX_AGE:-168h}"
+    echo "Pruning Docker build cache older than ${max_age}..."
+    docker builder prune -f --filter "until=${max_age}" >/dev/null || true
+  fi
+}
+
 wait_for_url() {
   local url="$1"
   local timeout_seconds="$2"
@@ -127,6 +199,8 @@ if [[ -n "${APP_URL}" && -n "${HEALTHCHECK_TOKEN}" ]]; then
   echo "Checking public health..."
   wait_for_url "${APP_URL%/}/api/health" 60 -H "x-healthcheck-token: ${HEALTHCHECK_TOKEN}"
 fi
+
+cleanup_docker_artifacts
 
 echo "Update complete."
 echo "Useful commands:"

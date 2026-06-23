@@ -197,7 +197,16 @@ curl -fsSL https://raw.githubusercontent.com/asdcrosh/cabinet_remna/main/deploy/
 
 The update script downloads the latest compose file, pulls the published image,
 reruns env checks, applies Prisma migrations, restarts the app and worker, and
-checks local/public health.
+checks local/public health. After a successful health check it removes completed
+one-shot containers, unused legacy compose-build images for this project, and
+dangling Docker images. It never prunes Docker volumes.
+
+To additionally prune old Docker build cache, run:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/asdcrosh/cabinet_remna/main/deploy/update-server.sh | \
+  sudo env UPDATE_PRUNE_BUILD_CACHE=true bash
+```
 
 If GitHub Actions has not finished publishing the Docker image yet, wait a
 minute and run the same command again.

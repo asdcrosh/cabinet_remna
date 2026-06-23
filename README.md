@@ -231,11 +231,13 @@ REMNASHOP_DATABASE_SSL="true"
 ## Обновление
 
 ```bash
-cd /opt/remnawave-cabinet
-git pull
-docker compose --env-file .env -f docker-compose.yml pull
-docker compose --env-file .env -f docker-compose.yml up -d
+curl -fsSL https://raw.githubusercontent.com/asdcrosh/cabinet_remna/main/deploy/update-server.sh | sudo bash
 ```
+
+Скрипт скачает свежий compose, подтянет опубликованный image, применит миграции,
+проверит healthcheck и после успешного запуска удалит завершённые one-shot
+контейнеры, старые локальные compose-build images этого проекта и dangling
+Docker images. Volumes с базой не удаляются.
 
 Логи:
 

@@ -113,8 +113,7 @@ http://remnawave-cabinet-app:3000
 Update to the newest published image:
 
 ```bash
-cd /opt/remnawave-cabinet
-docker compose --env-file .env -f docker-compose.yml up -d
+curl -fsSL https://raw.githubusercontent.com/asdcrosh/cabinet_remna/main/deploy/update-server.sh | sudo bash
 ```
 
 Logs:
