@@ -228,51 +228,60 @@ export function SupportPanel({ mode, initialTickets }: SupportPanelProps) {
   }
 
   return (
-    <div className="grid gap-5 xl:grid-cols-[22rem_minmax(0,1fr)]">
+    <div className="grid gap-5 xl:grid-cols-[24rem_minmax(0,1fr)]">
       <section className="space-y-4">
         {mode === 'user' && (
-          <form onSubmit={createTicket} className="card space-y-3">
+          <form onSubmit={createTicket} className="rounded-lg border border-white/70 bg-white/80 p-4 shadow-sm shadow-slate-200/60 backdrop-blur dark:border-white/10 dark:bg-surface-900/80 dark:shadow-black/20">
             <div className="flex items-center gap-3">
-              <div className="grid h-10 w-10 place-items-center rounded-lg bg-brand-50 text-brand-600">
+              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-slate-950 text-cyan-200 shadow-sm dark:bg-white dark:text-slate-950">
                 <MessageSquarePlus className="h-5 w-5" />
               </div>
               <div>
                 <h2 className="font-semibold">Новое обращение</h2>
-                <p className="text-sm text-slate-500">Напишите вопрос, ответ появится здесь.</p>
+                <p className="text-sm text-slate-500">Ответ появится в этом разделе.</p>
               </div>
             </div>
-            <input
-              className="input"
-              value={subject}
-              onChange={(event) => setSubject(event.target.value)}
-              placeholder="Тема"
-              maxLength={120}
-              required
-            />
-            <select className="input" value={category} onChange={(event) => setCategory(event.target.value)}>
-              {supportCategories.map((item) => (
-                <option key={item.value} value={item.value}>{item.label}</option>
-              ))}
-            </select>
-            <textarea
-              className="input min-h-28 resize-y"
-              value={newMessage}
-              onChange={(event) => setNewMessage(event.target.value)}
-              placeholder="Сообщение"
-              maxLength={3000}
-              required
-            />
-            <button className="btn-primary w-full" disabled={isPending}>
-              <Send className="h-4 w-4" />
-              Отправить
-            </button>
+            <div className="mt-4 space-y-3">
+              <input
+                className="input"
+                value={subject}
+                onChange={(event) => setSubject(event.target.value)}
+                placeholder="Тема"
+                maxLength={120}
+                required
+              />
+              <select className="input" value={category} onChange={(event) => setCategory(event.target.value)}>
+                {supportCategories.map((item) => (
+                  <option key={item.value} value={item.value}>{item.label}</option>
+                ))}
+              </select>
+              <textarea
+                className="input min-h-28 resize-y"
+                value={newMessage}
+                onChange={(event) => setNewMessage(event.target.value)}
+                placeholder="Сообщение"
+                maxLength={3000}
+                required
+              />
+              <button className="btn-primary w-full" disabled={isPending}>
+                <Send className="h-4 w-4" />
+                Отправить
+              </button>
+            </div>
           </form>
         )}
 
-        <div className="card p-0">
+        <div className="overflow-hidden rounded-lg border border-white/70 bg-white/80 shadow-sm shadow-slate-200/60 backdrop-blur dark:border-white/10 dark:bg-surface-900/80 dark:shadow-black/20">
           <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 dark:border-slate-800">
-            <div className="font-semibold">{mode === 'admin' ? 'Очередь' : 'Мои обращения'}</div>
-            {unreadTotal > 0 && <span className="badge-limited">{unreadTotal} новых</span>}
+            <div>
+              <div className="font-semibold">{mode === 'admin' ? 'Очередь' : 'Мои обращения'}</div>
+              <div className="text-xs text-slate-500">{tickets.length ? `${tickets.length} в списке` : 'Пока пусто'}</div>
+            </div>
+            {unreadTotal > 0 && (
+              <span className="rounded-full bg-red-600 px-2.5 py-1 text-xs font-semibold text-white">
+                {unreadTotal}
+              </span>
+            )}
           </div>
           <div className="max-h-[38rem] overflow-y-auto p-2">
             {tickets.length === 0 ? (
@@ -286,15 +295,20 @@ export function SupportPanel({ mode, initialTickets }: SupportPanelProps) {
                   type="button"
                   onClick={() => void loadTicket(ticket.id)}
                   className={cn(
-                    'w-full rounded-lg px-3 py-3 text-left transition-colors',
+                    'group w-full rounded-lg border px-3 py-3 text-left transition-all',
                     selectedId === ticket.id
-                      ? 'bg-slate-950 text-white shadow-lg shadow-slate-950/10'
-                      : 'hover:bg-slate-50 dark:hover:bg-surface-800'
+                      ? 'border-slate-950 bg-slate-950 text-white shadow-lg shadow-slate-950/10 dark:border-white dark:bg-white dark:text-slate-950'
+                      : 'border-transparent hover:border-slate-200 hover:bg-slate-50 dark:hover:border-slate-800 dark:hover:bg-surface-800'
                   )}
                 >
                   <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="truncate font-medium">{ticket.subject}</div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex min-w-0 items-center gap-2">
+                        {(mode === 'admin' ? ticket.adminUnreadCount : ticket.userUnreadCount) > 0 && (
+                          <span className={cn('h-2 w-2 shrink-0 rounded-full', selectedId === ticket.id ? 'bg-cyan-200 dark:bg-cyan-700' : 'bg-red-500')} />
+                        )}
+                        <div className="truncate font-medium">{ticket.subject}</div>
+                      </div>
                       <div className={cn('mt-1 truncate text-xs', selectedId === ticket.id ? 'text-white/65' : 'text-slate-500')}>
                         {mode === 'admin' && ticket.user ? `${ticket.user.email} · ` : ''}
                         {supportCategoryLabel(ticket.category)}
@@ -305,8 +319,15 @@ export function SupportPanel({ mode, initialTickets }: SupportPanelProps) {
                   <div className={cn('mt-2 line-clamp-2 text-sm', selectedId === ticket.id ? 'text-white/70' : 'text-slate-500')}>
                     {ticket.messages[0]?.body || 'Без сообщений'}
                   </div>
-                  <div className={cn('mt-2 text-xs', selectedId === ticket.id ? 'text-white/50' : 'text-slate-400')}>
-                    {formatDate(ticket.lastMessageAt)}
+                  <div className="mt-3 flex items-center justify-between gap-3">
+                    <div className={cn('text-xs', selectedId === ticket.id ? 'text-white/50' : 'text-slate-400')}>
+                      {formatDate(ticket.lastMessageAt)}
+                    </div>
+                    {(mode === 'admin' ? ticket.adminUnreadCount : ticket.userUnreadCount) > 0 && (
+                      <span className={cn('rounded-full px-2 py-0.5 text-[11px] font-semibold', selectedId === ticket.id ? 'bg-white/15 text-white dark:bg-slate-950/10 dark:text-slate-950' : 'bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-200')}>
+                        новое
+                      </span>
+                    )}
                   </div>
                 </button>
               ))
@@ -315,10 +336,10 @@ export function SupportPanel({ mode, initialTickets }: SupportPanelProps) {
         </div>
       </section>
 
-      <section className="card min-h-[36rem] p-0">
+      <section className="min-h-[36rem] overflow-hidden rounded-lg border border-white/70 bg-white/80 shadow-sm shadow-slate-200/60 backdrop-blur dark:border-white/10 dark:bg-surface-900/80 dark:shadow-black/20">
         {selected ? (
           <div className="flex min-h-[36rem] flex-col">
-            <div className="border-b border-slate-100 px-5 py-4 dark:border-slate-800">
+            <div className="border-b border-slate-100 bg-white/70 px-5 py-4 dark:border-slate-800 dark:bg-surface-900/70">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
@@ -353,17 +374,17 @@ export function SupportPanel({ mode, initialTickets }: SupportPanelProps) {
               </div>
             )}
 
-            <div className="flex-1 space-y-4 overflow-y-auto px-5 py-5">
+            <div className="flex-1 space-y-4 overflow-y-auto bg-slate-50/70 px-5 py-5 dark:bg-surface-950/30">
               {selected.messages.map((item) => {
                 const own = mode === 'admin' ? item.senderRole === 'ADMIN' : item.senderRole === 'USER'
                 return (
                   <div key={item.id} className={cn('flex', own ? 'justify-end' : 'justify-start')}>
                     <div
                       className={cn(
-                        'max-w-[min(42rem,86%)] rounded-lg px-4 py-3 shadow-sm',
+                        'max-w-[min(42rem,86%)] rounded-lg px-4 py-3 shadow-sm ring-1',
                         own
-                          ? 'bg-slate-950 text-white shadow-slate-950/10'
-                          : 'border border-slate-100 bg-slate-50 text-slate-900 dark:border-slate-800 dark:bg-surface-800 dark:text-white'
+                          ? 'bg-slate-950 text-white shadow-slate-950/10 ring-slate-950/10 dark:bg-white dark:text-slate-950 dark:ring-white/20'
+                          : 'bg-white text-slate-900 ring-slate-200 dark:bg-surface-800 dark:text-white dark:ring-slate-700'
                       )}
                     >
                       <div className={cn('mb-1 text-xs', own ? 'text-white/55' : 'text-slate-500')}>
@@ -376,7 +397,7 @@ export function SupportPanel({ mode, initialTickets }: SupportPanelProps) {
               })}
             </div>
 
-            <form onSubmit={sendMessage} className="border-t border-slate-100 p-4 dark:border-slate-800">
+            <form onSubmit={sendMessage} className="border-t border-slate-100 bg-white/80 p-4 dark:border-slate-800 dark:bg-surface-900/80">
               {selected.status === 'CLOSED' ? (
                 <div className="flex items-center gap-2 rounded-lg bg-slate-50 px-4 py-3 text-sm text-slate-500 dark:bg-surface-800">
                   <Lock className="h-4 w-4" />
@@ -385,7 +406,7 @@ export function SupportPanel({ mode, initialTickets }: SupportPanelProps) {
               ) : (
                 <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto]">
                   <textarea
-                    className="input min-h-24 resize-y"
+                    className="input min-h-20 resize-y"
                     value={message}
                     onChange={(event) => setMessage(event.target.value)}
                     placeholder={mode === 'admin' ? 'Ответ пользователю' : 'Ваше сообщение'}
@@ -403,7 +424,7 @@ export function SupportPanel({ mode, initialTickets }: SupportPanelProps) {
         ) : (
           <div className="grid min-h-[36rem] place-items-center p-8 text-center">
             <div>
-              <div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-brand-50 text-brand-600">
+              <div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-lg bg-brand-50 text-brand-600">
                 <LifeBuoy className="h-7 w-7" />
               </div>
               <h2 className="text-xl font-semibold">Выберите обращение</h2>

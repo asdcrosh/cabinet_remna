@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
@@ -129,20 +129,53 @@ function NavList({
   onNavigate?: () => void
 }) {
   const pathname = usePathname()
+  const liveBadges = useLiveBadges(badges)
 
   return (
     <nav className={className}>
-      <NavGroup items={nav} pathname={pathname} badges={badges} onNavigate={onNavigate} />
+      <NavGroup items={nav} pathname={pathname} badges={liveBadges} onNavigate={onNavigate} />
       {role === 'ADMIN' && (
         <div className="pt-4">
           <div className="px-3 pb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
             Администрирование
           </div>
-          <NavGroup items={adminNav} pathname={pathname} badges={badges} onNavigate={onNavigate} />
+          <NavGroup items={adminNav} pathname={pathname} badges={liveBadges} onNavigate={onNavigate} />
         </div>
       )}
     </nav>
   )
+}
+
+function useLiveBadges(initialBadges: NavBadges) {
+  const [badges, setBadges] = useState(initialBadges)
+
+  useEffect(() => {
+    let active = true
+
+    async function refreshBadges() {
+      try {
+        const res = await fetch('/api/support/summary', { cache: 'no-store' })
+        const data = await res.json().catch(() => null)
+        if (active && res.ok && data?.badges) {
+          setBadges(data.badges)
+        }
+      } catch {
+        // Quiet polling: menu keeps the last known counters.
+      }
+    }
+
+    void refreshBadges()
+    const interval = window.setInterval(() => {
+      void refreshBadges()
+    }, 5000)
+
+    return () => {
+      active = false
+      window.clearInterval(interval)
+    }
+  }, [])
+
+  return badges
 }
 
 function NavGroup({
