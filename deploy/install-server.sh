@@ -184,6 +184,76 @@ first_container_network() {
     | head -n 1
 }
 
+host_port_available() {
+  local bind_address="$1"
+  local port="$2"
+
+  python3 - "$bind_address" "$port" <<'PY'
+import socket
+import sys
+
+host = sys.argv[1]
+port = int(sys.argv[2])
+
+sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+try:
+    sock.bind((host, port))
+except OSError:
+    sys.exit(1)
+finally:
+    sock.close()
+PY
+}
+
+first_available_port() {
+  local bind_address="$1"
+  local preferred_port="$2"
+  local port
+
+  for port in "${preferred_port}" 3030 3031 3032 3033 3034 3035; do
+    if host_port_available "${bind_address}" "${port}"; then
+      echo "${port}"
+      return 0
+    fi
+  done
+
+  echo ""
+  return 1
+}
+
+configure_app_port() {
+  local bind_address
+  local current_port
+  local selected_port
+
+  bind_address="$(read_env_value CABINET_APP_BIND || true)"
+  bind_address="${bind_address:-127.0.0.1}"
+  current_port="$(read_env_value CABINET_APP_PORT || true)"
+  current_port="${current_port:-3000}"
+
+  replace_env_value "CABINET_APP_BIND" "${bind_address}"
+
+  if [[ -n "${CABINET_APP_PORT:-}" ]]; then
+    replace_env_value "CABINET_APP_PORT" "${CABINET_APP_PORT}"
+    return
+  fi
+
+  if host_port_available "${bind_address}" "${current_port}"; then
+    replace_env_value "CABINET_APP_PORT" "${current_port}"
+    return
+  fi
+
+  selected_port="$(first_available_port "${bind_address}" "3030")"
+  if [[ -z "${selected_port}" ]]; then
+    echo "No free local port found for cabinet app. Set CABINET_APP_PORT manually in ${ENV_FILE}."
+    exit 1
+  fi
+
+  replace_env_value "CABINET_APP_PORT" "${selected_port}"
+  echo "Local port ${bind_address}:${current_port} is busy. Cabinet app will use ${bind_address}:${selected_port}."
+}
+
 configure_local_remnashop_database() {
   local current_url
   local container="${REMNASHOP_DB_CONTAINER:-remnashop-db}"
@@ -588,6 +658,12 @@ elif ! env_key_exists "COMPOSE_PROFILES"; then
     replace_env_value "COMPOSE_PROFILES" "caddy"
   fi
 fi
+
+if [[ -n "${CABINET_APP_BIND:-}" ]]; then
+  replace_env_value "CABINET_APP_BIND" "${CABINET_APP_BIND}"
+fi
+
+configure_app_port
 
 for key in \
   CABINET_APP_BIND \

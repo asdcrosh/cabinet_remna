@@ -111,13 +111,13 @@ COMPOSE_PROFILES="caddy"
 ```env
 COMPOSE_PROFILES=""
 CABINET_APP_BIND="127.0.0.1"
-CABINET_APP_PORT="3000"
+CABINET_APP_PORT="3030"
 ```
 
 Проксируй домен кабинета на:
 
 ```text
-http://127.0.0.1:3000
+http://127.0.0.1:3030
 ```
 
 Если reverse proxy работает в Docker-сети Remnawave, можно проксировать на:
@@ -125,6 +125,9 @@ http://127.0.0.1:3000
 ```text
 http://remnawave-cabinet-app:3000
 ```
+
+Установщик сам оставит `3000` на чистом сервере или переключит кабинет на
+`3030`, если `3000` уже занят Remnawave.
 
 ## YooKassa
 

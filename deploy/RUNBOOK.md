@@ -78,14 +78,14 @@ bundled Caddy:
 ```env
 COMPOSE_PROFILES=""
 CABINET_APP_BIND="127.0.0.1"
-CABINET_APP_PORT="3000"
+CABINET_APP_PORT="3030"
 CABINET_EXTERNAL_NETWORK="remnawave-network"
 ```
 
 Then proxy the cabinet domain to:
 
 ```text
-http://127.0.0.1:3000
+http://127.0.0.1:3030
 ```
 
 If the proxy runs inside the shared Docker network, use:
@@ -93,6 +93,9 @@ If the proxy runs inside the shared Docker network, use:
 ```text
 http://remnawave-cabinet-app:3000
 ```
+
+The installer keeps `3000` on a clean server and automatically switches to
+`3030` when `3000` is already used by Remnawave.
 
 ## 5. Email Verification
 
