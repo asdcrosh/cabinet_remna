@@ -298,7 +298,7 @@ can_compose_nginx() {
 
 validate_nginx_config_before_recreate() {
   if can_compose_nginx; then
-    docker compose -f "${NGINX_COMPOSE_FILE}" run --rm --no-deps --entrypoint nginx "${NGINX_SERVICE}" -t
+    docker compose -f "${NGINX_COMPOSE_FILE}" run --rm -T --no-deps --entrypoint nginx "${NGINX_SERVICE}" -t
     return
   fi
 
