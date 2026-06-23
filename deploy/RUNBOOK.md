@@ -100,7 +100,43 @@ http://remnawave-cabinet-app:3000
 The installer keeps `3000` on a clean server and automatically switches to
 `3030` when `3000` is already used by Remnawave.
 
-## 5. Email Verification
+## 5. Existing Remnawave Nginx
+
+If cabinet is installed on the same server as Remnawave and Remnawave already
+owns ports `80/443`, configure the existing nginx automatically:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/asdcrosh/cabinet_remna/main/deploy/setup-nginx-proxy.sh | sudo bash
+```
+
+The script:
+
+- reads `/opt/remnawave-cabinet/.env`
+- uses `CABINET_DOMAIN`
+- backs up `/opt/remnawave/nginx/nginx.conf`
+- issues a certificate with `acme.sh`
+- adds `cabinet_fullchain.pem` and `cabinet_privkey.key` mounts to Remnawave nginx compose
+- adds a marked cabinet server block
+- connects `remnawave-nginx` to `CABINET_EXTERNAL_NETWORK`
+- runs `nginx -t`
+- rolls back nginx changes if validation fails
+
+Defaults can be overridden:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/asdcrosh/cabinet_remna/main/deploy/setup-nginx-proxy.sh | sudo env \
+  CABINET_DOMAIN="cabinet.example.com" \
+  NGINX_DIR="/opt/remnawave/nginx" \
+  NGINX_CONTAINER="remnawave-nginx" \
+  NGINX_SERVICE="remnawave-nginx" \
+  CABINET_EXTERNAL_NETWORK="remnawave-network" \
+  bash
+```
+
+DNS for `CABINET_DOMAIN` must already point to the server before running the
+script.
+
+## 6. Email Verification
 
 Recommended built-in setup uses Resend:
 
@@ -117,7 +153,7 @@ Generate webhook secret:
 openssl rand -hex 32
 ```
 
-## 6. Remnashop Database
+## 7. Remnashop Database
 
 If `remnashop-db` runs on the same server, `install-server.sh` detects it
 automatically, creates/updates the `remnashop_readonly` role, grants read-only
@@ -148,7 +184,7 @@ REMNASHOP_DATABASE_SSL="true"
 Use `REMNASHOP_DATABASE_SSL="false"` only if PostgreSQL has no SSL and the
 network is private/trusted.
 
-## 7. Update
+## 8. Update
 
 Update an existing installation without recreating `.env`, the database, or the
 admin account:
@@ -164,7 +200,7 @@ checks local/public health.
 If GitHub Actions has not finished publishing the Docker image yet, wait a
 minute and run the same command again.
 
-## 8. Logs
+## 9. Logs
 
 Logs:
 
@@ -195,7 +231,7 @@ docker compose --env-file .env -f docker-compose.yml down
 Do not remove Docker volumes unless you intentionally want to delete the
 database.
 
-## 9. YooKassa
+## 10. YooKassa
 
 Set webhook URL in YooKassa:
 
@@ -211,7 +247,7 @@ payment.canceled
 payment.waiting_for_capture
 ```
 
-## 10. Smoke Check
+## 11. Smoke Check
 
 ```bash
 cd /opt/remnawave-cabinet

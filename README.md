@@ -138,6 +138,17 @@ http://remnawave-cabinet-app:3000
 Установщик сам оставит `3000` на чистом сервере или переключит кабинет на
 `3030`, если `3000` уже занят Remnawave.
 
+Если кабинет ставится на сервер, где уже работает Remnawave nginx, можно
+автоматически добавить proxy-конфиг и сертификат:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/asdcrosh/cabinet_remna/main/deploy/setup-nginx-proxy.sh | sudo bash
+```
+
+Скрипт делает backup nginx-конфига, выпускает сертификат для `CABINET_DOMAIN`,
+добавляет server block кабинета, проверяет `nginx -t` и откатывает изменения,
+если проверка не прошла.
+
 ## YooKassa
 
 В YooKassa добавь webhook:
