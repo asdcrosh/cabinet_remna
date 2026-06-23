@@ -49,7 +49,7 @@ type NavBadges = Record<string, number>
 type UserRole = 'USER' | 'MODERATOR' | 'ADMIN' | 'SUPER_ADMIN'
 
 export function DashboardNav({ role, badges = {} }: { role: UserRole; badges?: NavBadges }) {
-  return <NavList role={role} badges={badges} className="space-y-1" />
+  return <NavList role={role} badges={badges} className="space-y-1 py-1" />
 }
 
 export function MobileDashboardNav({
@@ -143,7 +143,7 @@ function NavList({
     <nav className={className}>
       <NavGroup items={nav} pathname={pathname} badges={liveBadges} onNavigate={onNavigate} />
       {role !== 'USER' && (
-        <div className="pt-4">
+        <div className="pt-3">
           <div className="px-3 pb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
             Администрирование
           </div>
@@ -222,7 +222,7 @@ function NavGroup({
             onClick={onNavigate}
             aria-current={active ? 'page' : undefined}
             className={cn(
-              'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200',
+              'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200',
               active
                 ? 'bg-slate-950 text-white shadow-lg shadow-slate-950/10 dark:bg-white dark:text-slate-950 dark:shadow-black/20'
                 : 'text-slate-600 hover:translate-x-0.5 hover:bg-white/80 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white'

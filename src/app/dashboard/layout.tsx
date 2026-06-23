@@ -46,13 +46,13 @@ export default async function DashboardLayout({ children }: { children: React.Re
   return (
     <div className="min-h-screen lg:flex">
       <aside className="sticky top-0 hidden h-screen w-72 shrink-0 flex-col border-r border-white/70 bg-white/80 shadow-2xl shadow-slate-200/40 backdrop-blur-xl dark:border-white/10 dark:bg-surface-950/70 dark:shadow-black/25 lg:flex">
-        <div className="px-6 py-5">
+        <div className="shrink-0 px-6 py-5">
           <Brand brandName={brandName} />
         </div>
-        <div className="flex-1 px-3">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-3 [scrollbar-gutter:stable]">
           <DashboardNav role={role} badges={navBadges} />
         </div>
-        <div className="border-t border-white/70 p-3 dark:border-white/10">
+        <div className="shrink-0 border-t border-white/70 bg-white/70 p-3 backdrop-blur dark:border-white/10 dark:bg-surface-950/70">
           <div className="mb-2 rounded-lg border border-slate-100 bg-slate-50/80 px-3 py-2 text-xs text-slate-500 dark:border-slate-800 dark:bg-surface-900/80">
             <div className="truncate font-medium text-slate-700 dark:text-slate-200">{email}</div>
             <div>{roleLabel(role)}</div>

@@ -27,6 +27,7 @@ export default async function PlansPage({
     ? await prisma.user.findUnique({
         where: { id: session.uid },
         select: {
+          role: true,
           telegramId: true,
           remnashopUserId: true,
           remnashopSyncedAt: true,
@@ -34,6 +35,7 @@ export default async function PlansPage({
         },
       })
     : null
+  const canManagePlans = user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN'
   const audienceContext = session ? await getPlanAudienceContext(session.uid) : null
   const usedTrialPlanIds = session
     ? new Set(
@@ -88,7 +90,7 @@ export default async function PlansPage({
       <PageHeader
         title="Купить VPN"
         description="Выберите тариф и оплатите онлайн"
-        action={session && ['ADMIN', 'SUPER_ADMIN'].includes(session.role) ? (
+        action={canManagePlans ? (
           <Link href="/dashboard/admin/plans" className="btn-secondary">
             Управлять тарифами
           </Link>
@@ -128,7 +130,7 @@ export default async function PlansPage({
             <p className="mx-auto mt-2 max-w-md text-sm text-slate-500 dark:text-slate-400">
               Сейчас нет опубликованных тарифов.
             </p>
-            {session && ['ADMIN', 'SUPER_ADMIN'].includes(session.role) && (
+            {canManagePlans && (
               <Link href="/dashboard/admin/plans" className="btn-primary mt-5 inline-flex">
                 Создать тариф
               </Link>
