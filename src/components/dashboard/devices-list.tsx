@@ -1,9 +1,11 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { Loader2, Unlink2 } from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
 import { EmptyState, InlineAlert } from './empty-state'
 import { ConfirmDialog } from './confirm-dialog'
+import { cn } from '@/lib/cn'
 
 interface Device {
   hwid: string
@@ -62,7 +64,7 @@ export function DevicesList() {
             <th className="w-[320px]">Устройство</th>
             <th className="w-[220px]">ID устройства</th>
             <th className="w-[200px]">Последняя активность</th>
-            <th className="sticky-actions-head w-[130px] min-w-[130px]">Действие</th>
+            <th className="sticky-actions-head w-[112px] min-w-[112px] text-center">Действие</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -74,14 +76,11 @@ export function DevicesList() {
               </td>
               <td className="font-mono text-xs">{d.hwid.slice(0, 16)}…</td>
               <td className="text-sm text-slate-500">{formatDeviceDate(d.updatedAt || d.createdAt)}</td>
-              <td className="sticky-actions-cell w-[130px] min-w-[130px]">
-                <button
-                  className="btn-danger px-3 text-xs disabled:cursor-not-allowed disabled:opacity-50"
-                  disabled={removingHwid === d.hwid}
+              <td className="sticky-actions-cell w-[112px] min-w-[112px] text-center">
+                <DeviceActionButton
+                  loading={removingHwid === d.hwid}
                   onClick={() => setSelectedDevice(d)}
-                >
-                  {removingHwid === d.hwid ? 'Отвязываем...' : 'Отвязать'}
-                </button>
+                />
               </td>
             </tr>
           ))}
@@ -101,13 +100,12 @@ export function DevicesList() {
               </div>
             </div>
           </div>
-          <button
-            className="btn-danger w-full text-sm"
-            disabled={removingHwid === d.hwid}
+          <DeviceActionButton
+            loading={removingHwid === d.hwid}
+            fullWidth
+            label="Отвязать устройство"
             onClick={() => setSelectedDevice(d)}
-          >
-            {removingHwid === d.hwid ? 'Отвязываем...' : 'Отвязать устройство'}
-          </button>
+          />
         </div>
       ))}
     </div>
@@ -121,6 +119,38 @@ export function DevicesList() {
       onConfirm={() => selectedDevice && removeDevice(selectedDevice)}
     />
     </>
+  )
+}
+
+function DeviceActionButton({
+  loading,
+  fullWidth = false,
+  label = 'Отвязать',
+  onClick,
+}: {
+  loading: boolean
+  fullWidth?: boolean
+  label?: string
+  onClick: () => void
+}) {
+  const Icon = loading ? Loader2 : Unlink2
+
+  return (
+    <button
+      type="button"
+      className={cn(
+        'inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 text-sm font-medium text-red-700 shadow-sm shadow-red-950/5 transition-all',
+        'hover:-translate-y-0.5 hover:border-red-300 hover:bg-red-100 hover:text-red-800',
+        'disabled:cursor-not-allowed disabled:translate-y-0 disabled:opacity-60',
+        'dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200 dark:hover:bg-red-500/15',
+        fullWidth ? 'w-full' : 'w-[104px]'
+      )}
+      disabled={loading}
+      onClick={onClick}
+    >
+      <Icon className={cn('h-4 w-4 shrink-0', loading && 'animate-spin')} />
+      <span className="truncate">{loading ? 'Ждем...' : label}</span>
+    </button>
   )
 }
 
