@@ -153,6 +153,19 @@ print(quote(sys.argv[1], safe=""))
 PY
 }
 
+normalize_url_env() {
+  local key="$1"
+  local scheme="${2:-https}"
+  local current
+
+  current="$(read_env_value "${key}" || true)"
+  if [[ -z "${current}" || "${current}" == *"://"* || "${current}" == *"ВСТАВЬ_СЮДА"* || "${current}" == *"CHANGE_ME"* ]]; then
+    return
+  fi
+
+  replace_env_value "${key}" "${scheme}://${current}"
+}
+
 sql_literal() {
   python3 - "$1" <<'PY'
 import sys
@@ -728,6 +741,7 @@ if ! usable_env_value "${CABINET_DOMAIN}"; then
   CABINET_DOMAIN="cabinet.example.com"
 fi
 prompt_required_config
+normalize_url_env "REMNAWAVE_BASE_URL" "https"
 configure_local_remnashop_database
 
 EXTERNAL_NETWORK="$(read_env_value CABINET_EXTERNAL_NETWORK || true)"

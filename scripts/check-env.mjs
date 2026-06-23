@@ -42,6 +42,7 @@ if (value('JWT_SECRET') && value('JWT_SECRET').length < 32) {
 
 checkPublicUrl('APP_URL')
 checkPublicUrl('NEXTAUTH_URL', { optional: true })
+checkPublicUrl('REMNAWAVE_BASE_URL')
 checkPublicUrl('YOOKASSA_WEBHOOK_URL', { pathPrefix: '/api/webhook/yookassa' })
 
 if (isProduction && /^test_/i.test(value('YOOKASSA_SECRET_KEY'))) {
