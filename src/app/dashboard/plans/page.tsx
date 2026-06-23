@@ -58,7 +58,16 @@ export default async function PlansPage() {
     !user?.remnashopUserId &&
     !user?.remnawaveUuid
   const visiblePlans = plans.filter((plan) => !plan.isPromo || canUsePromo)
-  const hasHiddenPromo = plans.some((plan) => plan.isPromo) && !canUsePromo
+  const hasPromoPlan = plans.some((plan) => plan.isPromo)
+  const isOtherwiseEligibleForPromo =
+    !usedTrialPlanIds.size &&
+    !hasAnySubscription &&
+    !user?.remnashopUserId &&
+    !user?.remnawaveUuid
+  const needsTelegramCheckForPromo =
+    hasPromoPlan &&
+    isOtherwiseEligibleForPromo &&
+    (!user?.telegramId || !user?.remnashopSyncedAt)
 
   return (
     <div className="space-y-6">
@@ -89,7 +98,7 @@ export default async function PlansPage() {
         </div>
       </section>
 
-      {hasHiddenPromo && (
+      {needsTelegramCheckForPromo && (
         <div className="flex flex-col gap-3 rounded-lg border border-amber-200 bg-amber-50/80 px-4 py-3 text-sm text-amber-900 shadow-sm dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100 sm:flex-row sm:items-center sm:justify-between">
           <span>Пробный тариф откроется после проверки Telegram.</span>
           <Link href="/dashboard/settings" className="btn-secondary h-10 shrink-0 px-4 text-sm">
