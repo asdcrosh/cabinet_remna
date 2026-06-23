@@ -49,7 +49,7 @@ type NavBadges = Record<string, number>
 type UserRole = 'USER' | 'MODERATOR' | 'ADMIN' | 'SUPER_ADMIN'
 
 export function DashboardNav({ role, badges = {} }: { role: UserRole; badges?: NavBadges }) {
-  return <NavList role={role} badges={badges} className="space-y-1 py-1" />
+  return <NavList role={role} badges={badges} compactAdmin className="space-y-1 py-1" />
 }
 
 export function MobileDashboardNav({
@@ -130,11 +130,13 @@ function NavList({
   badges = {},
   className,
   onNavigate,
+  compactAdmin = false,
 }: {
   role: UserRole
   badges?: NavBadges
   className?: string
   onNavigate?: () => void
+  compactAdmin?: boolean
 }) {
   const pathname = usePathname()
   const liveBadges = useLiveBadges(badges)
@@ -152,6 +154,7 @@ function NavList({
             pathname={pathname}
             badges={liveBadges}
             onNavigate={onNavigate}
+            compact={compactAdmin && role !== 'MODERATOR'}
           />
         </div>
       )}
@@ -203,14 +206,16 @@ function NavGroup({
   pathname,
   badges,
   onNavigate,
+  compact = false,
 }: {
   items: NavItem[]
   pathname: string
   badges: NavBadges
   onNavigate?: () => void
+  compact?: boolean
 }) {
   return (
-    <div className="space-y-1">
+    <div className={compact ? 'grid grid-cols-2 gap-1.5' : 'space-y-1'}>
       {items.map((item) => {
         const Icon = item.icon
         const active = item.exact ? pathname === item.href : pathname.startsWith(item.href)
@@ -222,18 +227,22 @@ function NavGroup({
             onClick={onNavigate}
             aria-current={active ? 'page' : undefined}
             className={cn(
-              'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200',
+              compact
+                ? 'relative flex min-h-12 min-w-0 items-center gap-2 rounded-lg px-2 py-2 text-[11px] font-medium leading-tight transition-all duration-200'
+                : 'flex items-center gap-3 rounded-lg px-3 py-1.5 text-sm font-medium transition-all duration-200',
               active
                 ? 'bg-slate-950 text-white shadow-lg shadow-slate-950/10 dark:bg-white dark:text-slate-950 dark:shadow-black/20'
-                : 'text-slate-600 hover:translate-x-0.5 hover:bg-white/80 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white'
+                : 'text-slate-600 hover:bg-white/80 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white'
             )}
           >
-            <Icon className={cn('h-4 w-4', active && 'text-cyan-200 dark:text-cyan-700')} />
-            <span className="min-w-0 flex-1 truncate">{item.label}</span>
+            <Icon className={cn('h-4 w-4 shrink-0', active && 'text-cyan-200 dark:text-cyan-700')} />
+            <span className={cn('min-w-0 flex-1', compact ? 'line-clamp-2' : 'truncate')}>{item.label}</span>
             {badge > 0 && (
               <span
                 className={cn(
-                  'ml-auto grid h-5 min-w-5 place-items-center rounded-full px-1.5 text-[11px] font-semibold',
+                  compact
+                    ? 'absolute right-1 top-1 grid h-4 min-w-4 place-items-center rounded-full px-1 text-[9px] font-semibold'
+                    : 'ml-auto grid h-5 min-w-5 place-items-center rounded-full px-1.5 text-[11px] font-semibold',
                   active ? 'bg-white text-slate-950 dark:bg-slate-950 dark:text-white' : 'bg-red-600 text-white'
                 )}
               >

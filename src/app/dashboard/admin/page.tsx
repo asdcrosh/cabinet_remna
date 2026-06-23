@@ -1,7 +1,6 @@
 import Link from 'next/link'
 import {
   AlertTriangle,
-  ArrowRight,
   CreditCard,
   Database,
   LifeBuoy,
@@ -14,8 +13,7 @@ import {
 import { prisma } from '@/lib/prisma'
 import { requireAdminPage } from '@/lib/auth/admin-page'
 import { formatPrice } from '@/lib/format'
-import { PageHeader } from '@/components/dashboard/page-header'
-import { StatCard } from '@/components/dashboard/stat-card'
+import { cn } from '@/lib/cn'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Админка' }
@@ -25,8 +23,16 @@ export default async function AdminDashboardPage() {
 
   const now = new Date()
   const soon = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
-
-  const [usersTotal, activeSubscriptions, recoveryCount, paymentsAggregate, activePromoCodes, activePlans, supportWaiting] = await Promise.all([
+  const [
+    usersTotal,
+    activeSubscriptions,
+    recoveryCount,
+    paymentsAggregate,
+    activePromoCodes,
+    activePlans,
+    supportWaiting,
+    expiringSoon,
+  ] = await Promise.all([
     prisma.user.count(),
     prisma.subscription.count({ where: { status: { in: ['ACTIVE', 'LIMITED'] } } }),
     prisma.payment.count({ where: { status: 'SUCCEEDED', subscriptionProvisionedAt: null } }),
@@ -38,101 +44,114 @@ export default async function AdminDashboardPage() {
     prisma.promoCode.count({ where: { isActive: true } }),
     prisma.plan.count({ where: { isActive: true } }),
     prisma.supportTicket.count({ where: { status: 'WAITING_ADMIN' } }),
+    prisma.subscription.count({
+      where: { status: { in: ['ACTIVE', 'LIMITED'] }, expireAt: { gte: now, lte: soon } },
+    }),
   ])
 
-  const expiringSoon = await prisma.subscription.count({
-    where: { status: { in: ['ACTIVE', 'LIMITED'] }, expireAt: { gte: now, lte: soon } },
-  })
-
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Админка"
-        description="Операционная сводка по пользователям, оплатам и подпискам"
-        action={recoveryCount > 0 ? <Link href="/dashboard/admin/recovery" className="btn-primary">Проверить довыдачу</Link> : undefined}
-      />
+    <div className="space-y-4">
+      <header>
+        <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Обзор</h1>
+        <p className="mt-1 text-sm text-slate-500">Краткая сводка и быстрые переходы</p>
+      </header>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 2xl:grid-cols-6">
-        <StatCard label="Пользователи" value={usersTotal} hint="всего аккаунтов" icon={<Users className="h-5 w-5" />} />
-        <StatCard
-          label="Тарифы"
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6">
+        <AdminTile
+          href="/dashboard/admin/users"
+          icon={<Users className="h-5 w-5" />}
+          title="Пользователи"
+          value={usersTotal}
+        />
+        <AdminTile
+          href="/dashboard/admin/plans"
+          icon={<SlidersHorizontal className="h-5 w-5" />}
+          title="Тарифы"
           value={activePlans}
-          hint="опубликованы"
+        />
+        <AdminTile
+          href="/dashboard/admin/subscriptions"
           icon={<ShieldCheck className="h-5 w-5" />}
-        />
-        <StatCard
-          label="Активные подписки"
+          title="Подписки"
           value={activeSubscriptions}
-          hint={`${expiringSoon} истекают за 7 дней`}
-          icon={<Database className="h-5 w-5" />}
+          note={expiringSoon > 0 ? `${expiringSoon} скоро истекут` : undefined}
         />
-        <StatCard
-          label="Успешные оплаты"
-          value={paymentsAggregate._count}
-          hint={formatPrice(paymentsAggregate._sum.amountKopecks ?? 0)}
+        <AdminTile
+          href="/dashboard/admin/payments"
           icon={<CreditCard className="h-5 w-5" />}
+          title="Платежи"
+          value={paymentsAggregate._count}
+          note={formatPrice(paymentsAggregate._sum.amountKopecks ?? 0)}
         />
-        <StatCard
-          label="Довыдача"
-          value={recoveryCount}
-          hint={recoveryCount > 0 ? 'нужна довыдача' : 'очередь пуста'}
-          icon={<AlertTriangle className="h-5 w-5" />}
-          className={recoveryCount > 0 ? 'border-amber-300 bg-amber-50/50 dark:bg-amber-500/10' : undefined}
-        />
-        <StatCard
-          label="Промокоды"
-          value={activePromoCodes}
-          hint="активных кодов"
+        <AdminTile
+          href="/dashboard/admin/promo-codes"
           icon={<Tag className="h-5 w-5" />}
+          title="Промокоды"
+          value={activePromoCodes}
         />
-      </div>
-
-      <div>
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <div>
-            <h2 className="text-lg font-semibold">Управление</h2>
-            <p className="text-sm text-slate-500">Основные рабочие разделы кабинета</p>
-          </div>
-          {supportWaiting > 0 && <span className="badge-limited">{supportWaiting} обращений ждут ответа</span>}
-        </div>
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          <AdminQuickLink icon={<Users className="h-5 w-5" />} href="/dashboard/admin/users" title="Пользователи" description="Роли, профили и подписки" />
-          <AdminQuickLink icon={<SlidersHorizontal className="h-5 w-5" />} href="/dashboard/admin/plans" title="Тарифы" description="Цены, лимиты и группы" />
-          <AdminQuickLink icon={<CreditCard className="h-5 w-5" />} href="/dashboard/admin/payments" title="Платежи" description="Оплаты, статусы и выдача" />
-          <AdminQuickLink icon={<Tag className="h-5 w-5" />} href="/dashboard/admin/promo-codes" title="Промокоды" description="Скидки и ограничения" />
-          <AdminQuickLink icon={<Database className="h-5 w-5" />} href="/dashboard/admin/subscriptions" title="Подписки" description="Сроки, трафик и синхронизация" />
-          <AdminQuickLink icon={<LifeBuoy className="h-5 w-5" />} href="/dashboard/admin/support" title="Поддержка" description={supportWaiting > 0 ? `${supportWaiting} обращений требуют ответа` : 'Очередь обращений пуста'} />
-          <AdminQuickLink icon={<RefreshCw className="h-5 w-5" />} href="/dashboard/admin/remnashop-sync" title="Синхронизация" description="Каталог Remnashop и промокоды" />
-          {recoveryCount > 0 && <AdminQuickLink icon={<AlertTriangle className="h-5 w-5" />} href="/dashboard/admin/recovery" title="Довыдача" description={`${recoveryCount} оплат требуют внимания`} warning />}
-        </div>
+        <AdminTile
+          href="/dashboard/admin/support"
+          icon={<LifeBuoy className="h-5 w-5" />}
+          title="Поддержка"
+          value={supportWaiting}
+          warning={supportWaiting > 0}
+          note={supportWaiting > 0 ? 'Ждут ответа' : 'Очередь пуста'}
+        />
+        <AdminTile
+          href="/dashboard/admin/remnashop-sync"
+          icon={<RefreshCw className="h-5 w-5" />}
+          title="Синхронизация"
+          note="Remnashop"
+        />
+        <AdminTile
+          href="/dashboard/admin/recovery"
+          icon={recoveryCount > 0 ? <AlertTriangle className="h-5 w-5" /> : <Database className="h-5 w-5" />}
+          title="Довыдача"
+          value={recoveryCount}
+          warning={recoveryCount > 0}
+          note={recoveryCount > 0 ? 'Требует внимания' : 'Очередь пуста'}
+        />
       </div>
     </div>
   )
 }
 
-function AdminQuickLink({
+function AdminTile({
   href,
-  title,
-  description,
   icon,
+  title,
+  value,
+  note,
   warning = false,
 }: {
   href: string
-  title: string
-  description: string
   icon: React.ReactNode
+  title: string
+  value?: React.ReactNode
+  note?: string
   warning?: boolean
 }) {
   return (
-    <Link href={href} className={warning ? 'card group flex items-center gap-4 border-amber-300 bg-amber-50/60 transition-all hover:-translate-y-0.5 dark:bg-amber-500/10' : 'card group flex items-center gap-4 transition-all hover:-translate-y-0.5 hover:shadow-md'}>
-      <div className={warning ? 'grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-200' : 'grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-700 dark:bg-white/10 dark:text-cyan-200'}>
-        {icon}
+    <Link
+      href={href}
+      className={cn(
+        'group flex min-h-32 min-w-0 flex-col justify-between rounded-lg border bg-white/80 p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md dark:bg-surface-900/80 dark:hover:border-white/20',
+        warning && 'border-amber-300 bg-amber-50/70 dark:border-amber-500/30 dark:bg-amber-500/10'
+      )}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className={cn(
+          'grid h-9 w-9 place-items-center rounded-lg bg-slate-100 text-slate-700 dark:bg-white/10 dark:text-cyan-200',
+          warning && 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-200'
+        )}>
+          {icon}
+        </div>
+        {value !== undefined && <div className="text-2xl font-semibold tracking-tight">{value}</div>}
       </div>
-      <div className="min-w-0 flex-1">
-        <div className="font-semibold">{title}</div>
-        <p className="mt-0.5 truncate text-sm text-slate-500">{description}</p>
+      <div className="min-w-0">
+        <div className="truncate text-sm font-semibold">{title}</div>
+        {note && <div className="mt-0.5 truncate text-xs text-slate-500">{note}</div>}
       </div>
-      <ArrowRight className="h-4 w-4 shrink-0 text-slate-300 transition-transform group-hover:translate-x-0.5 group-hover:text-slate-600" />
     </Link>
   )
 }
