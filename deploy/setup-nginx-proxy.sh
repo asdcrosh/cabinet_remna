@@ -287,8 +287,36 @@ recreate_nginx() {
   fi
 }
 
+wait_for_nginx_container() {
+  local attempts="${1:-60}"
+  local running=""
+
+  for _ in $(seq 1 "${attempts}"); do
+    running="$(docker inspect -f '{{.State.Running}}' "${NGINX_CONTAINER}" 2>/dev/null || echo false)"
+    if [[ "${running}" == "true" ]]; then
+      return 0
+    fi
+    sleep 2
+  done
+
+  echo "Nginx container ${NGINX_CONTAINER} did not become running in time."
+  return 1
+}
+
 test_nginx() {
-  docker exec "${NGINX_CONTAINER}" nginx -t
+  local attempts="${1:-20}"
+  local output=""
+
+  for _ in $(seq 1 "${attempts}"); do
+    if output="$(docker exec "${NGINX_CONTAINER}" nginx -t 2>&1)"; then
+      printf "%s\n" "${output}"
+      return 0
+    fi
+    printf "%s\n" "${output}"
+    sleep 2
+  done
+
+  return 1
 }
 
 ensure_certificate
@@ -313,12 +341,14 @@ trap 'rollback' ERR
 patch_nginx_compose_volumes
 patch_nginx_conf
 recreate_nginx
+wait_for_nginx_container
 
 docker network inspect "${CABINET_EXTERNAL_NETWORK}" >/dev/null
 docker network connect "${CABINET_EXTERNAL_NETWORK}" "${NGINX_CONTAINER}" >/dev/null 2>&1 || true
 
 test_nginx
 docker restart "${NGINX_CONTAINER}" >/dev/null
+wait_for_nginx_container
 
 trap - ERR
 
