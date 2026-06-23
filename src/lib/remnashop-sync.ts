@@ -365,6 +365,35 @@ export async function syncRemnashopCatalog() {
   }
 }
 
+export async function maybeSyncRemnashopCatalog() {
+  if (!process.env.REMNASHOP_DATABASE_URL) {
+    return { skipped: true, reason: 'not_configured' as const }
+  }
+
+  const intervalSeconds = Number(process.env.REMNASHOP_CATALOG_SYNC_INTERVAL_SECONDS ?? 300)
+  const intervalMs = Math.max(60, Number.isFinite(intervalSeconds) ? intervalSeconds : 300) * 1000
+  const key = 'remnashop:catalog-sync'
+  const now = new Date()
+  const current = await prisma.rateLimitBucket.findUnique({
+    where: { key },
+    select: { resetAt: true },
+  })
+
+  if (current && current.resetAt > now) {
+    return { skipped: true, reason: 'throttled' as const, nextSyncAt: current.resetAt }
+  }
+
+  const nextSyncAt = new Date(now.getTime() + intervalMs)
+  await prisma.rateLimitBucket.upsert({
+    where: { key },
+    create: { key, count: 1, resetAt: nextSyncAt },
+    update: { count: { increment: 1 }, resetAt: nextSyncAt },
+  })
+
+  const report = await syncRemnashopCatalog()
+  return { skipped: false, nextSyncAt, report }
+}
+
 async function fetchRemnashopPlans() {
   const result = await remnashopQuery<RemnashopPlanRow>(`
     SELECT

@@ -3,6 +3,7 @@
 import { redirect } from 'next/navigation'
 import { getCurrentUser } from '@/lib/auth/cookies'
 import { prisma } from '@/lib/prisma'
+import { maybeSyncRemnashopCatalog } from '@/lib/remnashop-sync'
 import { LogoutButton } from '@/components/dashboard/logout-button'
 import { Brand, DashboardNav, MobileDashboardNav } from '@/components/dashboard/dashboard-nav'
 
@@ -14,6 +15,12 @@ export default async function DashboardLayout({ children }: { children: React.Re
     select: { email: true, role: true },
   })
   if (!freshUser) redirect('/login?next=/dashboard')
+
+  try {
+    await maybeSyncRemnashopCatalog()
+  } catch (error) {
+    console.warn('[remnashop-sync] auto catalog sync skipped', error)
+  }
 
   const role = freshUser.role
   const email = freshUser.email

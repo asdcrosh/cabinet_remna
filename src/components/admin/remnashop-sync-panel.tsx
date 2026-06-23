@@ -55,9 +55,9 @@ export function RemnashopSyncPanel() {
     <div className="space-y-4">
       <div className="card flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="min-w-0">
-          <h2 className="text-lg font-semibold">Dry-run синхронизации</h2>
+          <h2 className="text-lg font-semibold">Remnashop</h2>
           <p className="mt-1 text-sm text-slate-500">
-            Проверяет remnashop и показывает, что можно импортировать. Данные cabinet не изменяются.
+            Каталог обновляется автоматически при входе в кабинет. Здесь можно проверить или запустить вручную.
           </p>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row">
