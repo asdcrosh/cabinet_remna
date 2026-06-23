@@ -28,11 +28,21 @@ export const userUpdateSupportTicketSchema = z.object({
 export function supportStatusLabel(status: string) {
   const labels: Record<string, string> = {
     OPEN: 'Открыто',
-    WAITING_ADMIN: 'Ждет поддержки',
-    WAITING_USER: 'Ждет пользователя',
+    WAITING_ADMIN: 'Ожидает ответа',
+    WAITING_USER: 'Ответ отправлен',
     CLOSED: 'Закрыто',
   }
   return labels[status] ?? status
+}
+
+export function supportStatusLabelForRole(status: string, role: 'user' | 'admin') {
+  if (status === 'WAITING_ADMIN') {
+    return role === 'admin' ? 'Нужно ответить' : 'Ожидает ответа'
+  }
+  if (status === 'WAITING_USER') {
+    return role === 'admin' ? 'Ответили' : 'Ответ получен'
+  }
+  return supportStatusLabel(status)
 }
 
 export function supportCategoryLabel(category: string) {

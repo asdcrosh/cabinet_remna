@@ -38,19 +38,22 @@ const adminNav = [
 ]
 
 type NavItem = (typeof nav)[number] | (typeof adminNav)[number]
+type NavBadges = Record<string, number>
 
-export function DashboardNav({ role }: { role: 'USER' | 'ADMIN' }) {
-  return <NavList role={role} className="space-y-1" />
+export function DashboardNav({ role, badges = {} }: { role: 'USER' | 'ADMIN'; badges?: NavBadges }) {
+  return <NavList role={role} badges={badges} className="space-y-1" />
 }
 
 export function MobileDashboardNav({
   role,
   email,
   brandName,
+  badges = {},
 }: {
   role: 'USER' | 'ADMIN'
   email: string
   brandName: string
+  badges?: NavBadges
 }) {
   const [open, setOpen] = useState(false)
 
@@ -82,7 +85,7 @@ export function MobileDashboardNav({
               </button>
             </div>
             <div className="flex-1 overflow-y-auto p-3">
-              <NavList role={role} onNavigate={() => setOpen(false)} className="space-y-1" />
+              <NavList role={role} badges={badges} onNavigate={() => setOpen(false)} className="space-y-1" />
             </div>
             <div className="border-t border-white/70 p-3 dark:border-white/10">
               <div className="mb-2 rounded-lg border border-slate-100 bg-slate-50/80 px-3 py-2 text-xs text-slate-500 dark:border-slate-800 dark:bg-surface-900/80">
@@ -116,10 +119,12 @@ export function Brand({ compact = false, brandName }: { compact?: boolean; brand
 
 function NavList({
   role,
+  badges = {},
   className,
   onNavigate,
 }: {
   role: 'USER' | 'ADMIN'
+  badges?: NavBadges
   className?: string
   onNavigate?: () => void
 }) {
@@ -127,13 +132,13 @@ function NavList({
 
   return (
     <nav className={className}>
-      <NavGroup items={nav} pathname={pathname} onNavigate={onNavigate} />
+      <NavGroup items={nav} pathname={pathname} badges={badges} onNavigate={onNavigate} />
       {role === 'ADMIN' && (
         <div className="pt-4">
           <div className="px-3 pb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
             Администрирование
           </div>
-          <NavGroup items={adminNav} pathname={pathname} onNavigate={onNavigate} />
+          <NavGroup items={adminNav} pathname={pathname} badges={badges} onNavigate={onNavigate} />
         </div>
       )}
     </nav>
@@ -143,10 +148,12 @@ function NavList({
 function NavGroup({
   items,
   pathname,
+  badges,
   onNavigate,
 }: {
   items: NavItem[]
   pathname: string
+  badges: NavBadges
   onNavigate?: () => void
 }) {
   return (
@@ -154,6 +161,7 @@ function NavGroup({
       {items.map((item) => {
         const Icon = item.icon
         const active = item.exact ? pathname === item.href : pathname.startsWith(item.href)
+        const badge = badges[item.href] ?? 0
         return (
           <Link
             key={item.href}
@@ -168,7 +176,17 @@ function NavGroup({
             )}
           >
             <Icon className={cn('h-4 w-4', active && 'text-cyan-200 dark:text-cyan-700')} />
-            {item.label}
+            <span className="min-w-0 flex-1 truncate">{item.label}</span>
+            {badge > 0 && (
+              <span
+                className={cn(
+                  'ml-auto grid h-5 min-w-5 place-items-center rounded-full px-1.5 text-[11px] font-semibold',
+                  active ? 'bg-white text-slate-950 dark:bg-slate-950 dark:text-white' : 'bg-red-600 text-white'
+                )}
+              >
+                {badge > 99 ? '99+' : badge}
+              </span>
+            )}
           </Link>
         )
       })}

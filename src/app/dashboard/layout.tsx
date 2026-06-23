@@ -26,6 +26,22 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const role = freshUser.role
   const email = freshUser.email
   const brandName = getBrandName()
+  const [supportUnreadCount, adminSupportUnreadCount] = await Promise.all([
+    prisma.supportTicket.aggregate({
+      where: { userId: session.uid },
+      _sum: { userUnreadCount: true },
+    }),
+    role === 'ADMIN'
+      ? prisma.supportTicket.aggregate({
+          where: { status: 'WAITING_ADMIN' },
+          _sum: { adminUnreadCount: true },
+        })
+      : Promise.resolve({ _sum: { adminUnreadCount: 0 } }),
+  ])
+  const navBadges = {
+    '/dashboard/support': supportUnreadCount._sum.userUnreadCount ?? 0,
+    '/dashboard/admin/support': adminSupportUnreadCount._sum.adminUnreadCount ?? 0,
+  }
 
   return (
     <div className="min-h-screen lg:flex">
@@ -34,7 +50,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           <Brand brandName={brandName} />
         </div>
         <div className="flex-1 px-3">
-          <DashboardNav role={role} />
+          <DashboardNav role={role} badges={navBadges} />
         </div>
         <div className="border-t border-white/70 p-3 dark:border-white/10">
           <div className="mb-2 rounded-lg border border-slate-100 bg-slate-50/80 px-3 py-2 text-xs text-slate-500 dark:border-slate-800 dark:bg-surface-900/80">
@@ -47,7 +63,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
       <main className="min-w-0 flex-1">
         <div className="sticky top-0 z-30 flex items-center justify-between border-b border-white/70 bg-white/80 px-4 py-3 shadow-sm shadow-slate-200/60 backdrop-blur-xl dark:border-white/10 dark:bg-surface-950/80 dark:shadow-black/20 lg:hidden">
           <Brand compact brandName={brandName} />
-          <MobileDashboardNav role={role} email={email} brandName={brandName} />
+          <MobileDashboardNav role={role} email={email} brandName={brandName} badges={navBadges} />
         </div>
         <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">{children}</div>
       </main>

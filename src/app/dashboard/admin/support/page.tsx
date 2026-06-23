@@ -11,8 +11,8 @@ export const metadata = { title: 'Поддержка — Админка' }
 
 const statuses = [
   { value: 'ALL', label: 'Все' },
-  { value: 'WAITING_ADMIN', label: 'Ждут ответа' },
-  { value: 'WAITING_USER', label: 'Ждут пользователя' },
+  { value: 'WAITING_ADMIN', label: 'Нужно ответить' },
+  { value: 'WAITING_USER', label: 'Ответили' },
   { value: 'OPEN', label: 'Открытые' },
   { value: 'CLOSED', label: 'Закрытые' },
 ]

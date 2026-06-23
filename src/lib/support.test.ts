@@ -4,6 +4,7 @@ import {
   createSupportTicketSchema,
   supportCategoryLabel,
   supportStatusLabel,
+  supportStatusLabelForRole,
   userUpdateSupportTicketSchema,
 } from './support'
 
@@ -26,6 +27,8 @@ describe('support helpers', () => {
 
   it('returns labels for known support values', () => {
     expect(supportCategoryLabel('payment')).toBe('Оплата')
-    expect(supportStatusLabel('WAITING_ADMIN')).toBe('Ждет поддержки')
+    expect(supportStatusLabel('WAITING_ADMIN')).toBe('Ожидает ответа')
+    expect(supportStatusLabelForRole('WAITING_ADMIN', 'admin')).toBe('Нужно ответить')
+    expect(supportStatusLabelForRole('WAITING_USER', 'user')).toBe('Ответ получен')
   })
 })

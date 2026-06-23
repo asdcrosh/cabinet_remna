@@ -1,10 +1,10 @@
 'use client'
 
-import { FormEvent, useMemo, useState, useTransition } from 'react'
+import { FormEvent, useCallback, useEffect, useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { CheckCircle2, LifeBuoy, Lock, MessageSquarePlus, Send, XCircle } from 'lucide-react'
 import { cn } from '@/lib/cn'
-import { supportCategoryLabel, supportCategories, supportStatusLabel } from '@/lib/support'
+import { supportCategoryLabel, supportCategories, supportStatusLabelForRole } from '@/lib/support'
 
 type TicketStatus = 'OPEN' | 'WAITING_ADMIN' | 'WAITING_USER' | 'CLOSED'
 type SenderRole = 'USER' | 'ADMIN'
@@ -64,26 +64,81 @@ export function SupportPanel({ mode, initialTickets }: SupportPanelProps) {
     return tickets.reduce((sum, ticket) => sum + (mode === 'admin' ? ticket.adminUnreadCount : ticket.userUnreadCount), 0)
   }, [mode, tickets])
 
-  async function loadTicket(id: string) {
-    setSelectedId(id)
-    setError('')
+  const fetchTicket = useCallback(async (id: string) => {
     const endpoint = mode === 'admin' ? `/api/admin/support/tickets/${id}` : `/api/support/tickets/${id}`
     const res = await fetch(endpoint, { cache: 'no-store' })
     const data = await res.json().catch(() => null)
     if (!res.ok) {
-      setError(data?.error || 'Не удалось открыть обращение')
+      throw new Error(data?.error || 'Не удалось открыть обращение')
+    }
+    return data.ticket as SupportTicket
+  }, [mode])
+
+  useEffect(() => {
+    let active = true
+
+    async function refreshSupport() {
+      const listEndpoint = mode === 'admin'
+        ? `/api/admin/support/tickets${window.location.search}`
+        : '/api/support/tickets'
+
+      try {
+        const listRes = await fetch(listEndpoint, { cache: 'no-store' })
+        const listData = await listRes.json().catch(() => null)
+        if (active && listRes.ok && Array.isArray(listData?.tickets)) {
+          setTickets((current) =>
+            listData.tickets.map((ticket: SupportTicket) => {
+              const previous = current.find((item) => item.id === ticket.id)
+              return previous && previous.messages.length > ticket.messages.length
+                ? { ...ticket, messages: previous.messages }
+                : ticket
+            })
+          )
+        }
+
+        if (selectedId) {
+          const ticket = await fetchTicket(selectedId)
+          if (active && ticket) {
+            setSelectedTicket(ticket)
+            setTickets((current) => current.map((item) => item.id === ticket.id ? { ...item, ...ticket } : item))
+          }
+        }
+      } catch {
+        // Polling is intentionally quiet: manual actions still show errors.
+      }
+    }
+
+    const interval = window.setInterval(() => {
+      void refreshSupport()
+    }, 6000)
+    void refreshSupport()
+
+    return () => {
+      active = false
+      window.clearInterval(interval)
+    }
+  }, [fetchTicket, mode, selectedId])
+
+  async function loadTicket(id: string) {
+    setSelectedId(id)
+    setError('')
+    let ticket: SupportTicket
+    try {
+      ticket = await fetchTicket(id)
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Не удалось открыть обращение')
       return
     }
-    setSelectedTicket(data.ticket)
+    setSelectedTicket(ticket)
     setTickets((current) =>
-      current.map((ticket) =>
-        ticket.id === id
+      current.map((item) =>
+        item.id === id
           ? {
+              ...item,
               ...ticket,
-              ...data.ticket,
-              messages: data.ticket.messages.length ? data.ticket.messages : ticket.messages,
+              messages: ticket.messages.length ? ticket.messages : item.messages,
             }
-          : ticket
+          : item
       )
     )
   }
@@ -245,7 +300,7 @@ export function SupportPanel({ mode, initialTickets }: SupportPanelProps) {
                         {supportCategoryLabel(ticket.category)}
                       </div>
                     </div>
-                    <TicketStatusBadge status={ticket.status} active={selectedId === ticket.id} />
+                    <TicketStatusBadge status={ticket.status} mode={mode} active={selectedId === ticket.id} />
                   </div>
                   <div className={cn('mt-2 line-clamp-2 text-sm', selectedId === ticket.id ? 'text-white/70' : 'text-slate-500')}>
                     {ticket.messages[0]?.body || 'Без сообщений'}
@@ -268,7 +323,7 @@ export function SupportPanel({ mode, initialTickets }: SupportPanelProps) {
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <h2 className="text-xl font-semibold tracking-tight">{selected.subject}</h2>
-                    <TicketStatusBadge status={selected.status} />
+                    <TicketStatusBadge status={selected.status} mode={mode} />
                   </div>
                   <div className="mt-1 text-sm text-slate-500">
                     {supportCategoryLabel(selected.category)}
@@ -363,7 +418,15 @@ export function SupportPanel({ mode, initialTickets }: SupportPanelProps) {
   )
 }
 
-function TicketStatusBadge({ status, active = false }: { status: TicketStatus; active?: boolean }) {
+function TicketStatusBadge({
+  status,
+  mode,
+  active = false,
+}: {
+  status: TicketStatus
+  mode: 'user' | 'admin'
+  active?: boolean
+}) {
   const className =
     status === 'CLOSED'
       ? 'badge-disabled'
@@ -375,7 +438,7 @@ function TicketStatusBadge({ status, active = false }: { status: TicketStatus; a
 
   return (
     <span className={cn(className, active && 'bg-white/15 text-white ring-1 ring-white/20')}>
-      {supportStatusLabel(status)}
+      {supportStatusLabelForRole(status, mode)}
     </span>
   )
 }
