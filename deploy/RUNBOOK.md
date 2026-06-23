@@ -148,18 +148,28 @@ REMNASHOP_DATABASE_SSL="true"
 Use `REMNASHOP_DATABASE_SSL="false"` only if PostgreSQL has no SSL and the
 network is private/trusted.
 
-## 7. Updates and logs
+## 7. Update
 
-Update:
+Update an existing installation without recreating `.env`, the database, or the
+admin account:
 
 ```bash
-cd /opt/remnawave-cabinet
-docker compose --env-file .env -f docker-compose.yml up -d
+curl -fsSL https://raw.githubusercontent.com/asdcrosh/cabinet_remna/main/deploy/update-server.sh | sudo bash
 ```
+
+The update script downloads the latest compose file, pulls the published image,
+reruns env checks, applies Prisma migrations, restarts the app and worker, and
+checks local/public health.
+
+If GitHub Actions has not finished publishing the Docker image yet, wait a
+minute and run the same command again.
+
+## 8. Logs
 
 Logs:
 
 ```bash
+cd /opt/remnawave-cabinet
 docker compose --env-file .env -f docker-compose.yml logs -f app
 docker compose --env-file .env -f docker-compose.yml logs -f worker
 ```
@@ -185,7 +195,7 @@ docker compose --env-file .env -f docker-compose.yml down
 Do not remove Docker volumes unless you intentionally want to delete the
 database.
 
-## 8. YooKassa
+## 9. YooKassa
 
 Set webhook URL in YooKassa:
 
@@ -201,7 +211,7 @@ payment.canceled
 payment.waiting_for_capture
 ```
 
-## 9. Smoke Check
+## 10. Smoke Check
 
 ```bash
 cd /opt/remnawave-cabinet

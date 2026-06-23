@@ -59,6 +59,14 @@ curl -fsSL https://raw.githubusercontent.com/asdcrosh/cabinet_remna/main/deploy/
 https://ВСТАВЬ_СЮДА_ДОМЕН_КАБИНЕТА
 ```
 
+Обновление уже установленного кабинета:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/asdcrosh/cabinet_remna/main/deploy/update-server.sh | sudo bash
+```
+
+Обновление не пересоздает `.env`, не удаляет базу и не создает администратора заново.
+
 Подробный серверный чеклист: [deploy/RUNBOOK.md](./deploy/RUNBOOK.md).
 
 ## Что Нужно Подготовить
