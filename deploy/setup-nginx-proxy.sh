@@ -156,11 +156,7 @@ patch_nginx_compose_volumes() {
     return
   fi
 
-  if grep -q "cabinet_fullchain.pem" "${NGINX_COMPOSE_FILE}" && grep -q "cabinet_privkey.key" "${NGINX_COMPOSE_FILE}"; then
-    return
-  fi
-
-  echo "Adding cabinet certificate mounts to ${NGINX_COMPOSE_FILE}"
+  echo "Ensuring cabinet certificate mounts in ${NGINX_COMPOSE_FILE}"
   NGINX_COMPOSE_FILE_PATH="${NGINX_COMPOSE_FILE}" NGINX_SERVICE_NAME="${NGINX_SERVICE}" python3 <<'PY'
 from pathlib import Path
 import os
@@ -168,7 +164,10 @@ import sys
 
 path = Path(os.environ["NGINX_COMPOSE_FILE_PATH"])
 service_name = os.environ["NGINX_SERVICE_NAME"]
-lines = path.read_text().splitlines()
+lines = [
+    line for line in path.read_text().splitlines()
+    if "cabinet_fullchain.pem" not in line and "cabinet_privkey.key" not in line
+]
 service_index = None
 for index, line in enumerate(lines):
     if line.strip() == f"{service_name}:":
@@ -190,22 +189,28 @@ if volumes_index is None:
     print(f"volumes section not found for {service_name}.", file=sys.stderr)
     sys.exit(1)
 
+volumes_indent = lines[volumes_index][:len(lines[volumes_index]) - len(lines[volumes_index].lstrip())]
+item_indent = volumes_indent + "  "
 insert_at = volumes_index + 1
 while insert_at < len(lines):
     line = lines[insert_at]
-    if line.startswith("      - ") or line.strip() == "":
+    stripped = line.strip()
+    if not stripped:
+        insert_at += 1
+        continue
+    current_indent = line[:len(line) - len(line.lstrip())]
+    if stripped.startswith("- ") and len(current_indent) > len(volumes_indent):
+        item_indent = current_indent
         insert_at += 1
         continue
     break
 
 items = [
-    "      - ./cabinet_fullchain.pem:/etc/nginx/ssl/cabinet_fullchain.pem:ro",
-    "      - ./cabinet_privkey.key:/etc/nginx/ssl/cabinet_privkey.key:ro",
+    f"{item_indent}- ./cabinet_fullchain.pem:/etc/nginx/ssl/cabinet_fullchain.pem:ro",
+    f"{item_indent}- ./cabinet_privkey.key:/etc/nginx/ssl/cabinet_privkey.key:ro",
 ]
-existing = "\n".join(lines)
 for item in reversed(items):
-    if item not in existing:
-        lines.insert(insert_at, item)
+    lines.insert(insert_at, item)
 path.write_text("\n".join(lines) + "\n")
 PY
 }
@@ -287,13 +292,38 @@ recreate_nginx() {
   fi
 }
 
+can_compose_nginx() {
+  [[ -f "${NGINX_COMPOSE_FILE}" ]] && docker compose -f "${NGINX_COMPOSE_FILE}" config --services 2>/dev/null | grep -qx "${NGINX_SERVICE}"
+}
+
+validate_nginx_config_before_recreate() {
+  if can_compose_nginx; then
+    docker compose -f "${NGINX_COMPOSE_FILE}" run --rm --no-deps --entrypoint nginx "${NGINX_SERVICE}" -t
+    return
+  fi
+
+  if docker inspect "${NGINX_CONTAINER}" >/dev/null 2>&1; then
+    docker run --rm \
+      --volumes-from "${NGINX_CONTAINER}" \
+      nginx:1.28 nginx -t
+    return
+  fi
+
+  echo "Cannot validate nginx config: compose service and container were not found."
+  return 1
+}
+
 wait_for_nginx_container() {
   local attempts="${1:-60}"
   local running=""
+  local restarting=""
+  local status=""
 
   for _ in $(seq 1 "${attempts}"); do
+    status="$(docker inspect -f '{{.State.Status}}' "${NGINX_CONTAINER}" 2>/dev/null || echo missing)"
     running="$(docker inspect -f '{{.State.Running}}' "${NGINX_CONTAINER}" 2>/dev/null || echo false)"
-    if [[ "${running}" == "true" ]]; then
+    restarting="$(docker inspect -f '{{.State.Restarting}}' "${NGINX_CONTAINER}" 2>/dev/null || echo false)"
+    if [[ "${status}" == "running" && "${running}" == "true" && "${restarting}" != "true" ]]; then
       return 0
     fi
     sleep 2
@@ -340,6 +370,7 @@ trap 'rollback' ERR
 
 patch_nginx_compose_volumes
 patch_nginx_conf
+validate_nginx_config_before_recreate
 recreate_nginx
 wait_for_nginx_container
 
