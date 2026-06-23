@@ -44,8 +44,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
   }
 
   return (
-    <div className="min-h-screen lg:flex">
-      <aside className="sticky top-0 hidden h-screen w-72 shrink-0 flex-col border-r border-white/70 bg-white/80 shadow-2xl shadow-slate-200/40 backdrop-blur-xl dark:border-white/10 dark:bg-surface-950/70 dark:shadow-black/25 lg:flex">
+    <div className="min-h-screen">
+      <aside className="fixed inset-y-0 left-0 z-40 hidden h-dvh w-72 flex-col overflow-hidden border-r border-white/70 bg-white/90 shadow-2xl shadow-slate-200/40 backdrop-blur-xl dark:border-white/10 dark:bg-surface-950/90 dark:shadow-black/25 lg:flex">
         <div className="shrink-0 px-5 py-4">
           <Brand brandName={brandName} />
         </div>
@@ -60,7 +60,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           <LogoutButton />
         </div>
       </aside>
-      <main className="min-w-0 flex-1">
+      <main className="min-w-0 lg:ml-72">
         <div className="sticky top-0 z-30 flex items-center justify-between border-b border-white/70 bg-white/80 px-4 py-3 shadow-sm shadow-slate-200/60 backdrop-blur-xl dark:border-white/10 dark:bg-surface-950/80 dark:shadow-black/20 lg:hidden">
           <Brand compact brandName={brandName} />
           <MobileDashboardNav role={role} email={email} brandName={brandName} badges={navBadges} />
