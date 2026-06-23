@@ -7,7 +7,7 @@ import { PageHeader } from '@/components/dashboard/page-header'
 import { StatCard } from '@/components/dashboard/stat-card'
 
 export const dynamic = 'force-dynamic'
-export const metadata = { title: 'Админка — Remnawave Cabinet' }
+export const metadata = { title: 'Админка' }
 
 export default async function AdminDashboardPage() {
   await requireAdminPage()

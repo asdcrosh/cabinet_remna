@@ -1,9 +1,12 @@
 import Link from 'next/link'
+import { getBrandName } from '@/lib/branding'
 
-export const metadata = { title: 'Условия использования — Личный кабинет' }
+export const metadata = { title: 'Условия использования' }
+export const dynamic = 'force-dynamic'
 
 export default function TermsPage() {
   const updatedAt = '21 июня 2026'
+  const brandName = getBrandName()
 
   return (
     <main className="mx-auto max-w-4xl px-4 py-12 sm:px-6">
@@ -14,13 +17,13 @@ export default function TermsPage() {
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">Условия использования</h1>
           <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-            Сервис AlekseevVP. Редакция от {updatedAt}.
+            Сервис {brandName}. Редакция от {updatedAt}.
           </p>
         </div>
 
         <TermsSection title="1. Общие положения">
           <p>
-            Настоящие условия регулируют использование личного кабинета AlekseevVP, покупку тарифов,
+            Настоящие условия регулируют использование личного кабинета {brandName}, покупку тарифов,
             получение ключей доступа и управление подпиской. Создавая аккаунт или оплачивая тариф,
             пользователь подтверждает согласие с этими условиями.
           </p>

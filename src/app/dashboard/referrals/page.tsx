@@ -9,7 +9,7 @@ import { StatCard } from '@/components/dashboard/stat-card'
 import { ReferralLinkCard } from '@/components/dashboard/referral-card'
 
 export const dynamic = 'force-dynamic'
-export const metadata = { title: 'Рефералы — Личный кабинет' }
+export const metadata = { title: 'Рефералы' }
 
 export default async function ReferralsPage() {
   const session = await getCurrentUser()

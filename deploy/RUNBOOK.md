@@ -48,6 +48,7 @@ starts the payment worker. After that it creates or updates the first admin user
 Fill real production values:
 
 - `CABINET_DOMAIN`
+- `CABINET_BRAND_NAME`
 - `POSTGRES_PASSWORD`
 - the password inside `DATABASE_URL`
 - `DATABASE_URL`
@@ -116,7 +117,8 @@ The script:
 - backs up `/opt/remnawave/nginx/nginx.conf`
 - issues a certificate with `acme.sh`
 - adds `cabinet_fullchain.pem` and `cabinet_privkey.key` mounts to Remnawave nginx compose
-- adds a marked cabinet server block
+- adds marked cabinet HTTPS and HTTP-to-HTTPS server blocks
+- publishes port `80` in Remnawave nginx compose if it is missing
 - connects `remnawave-nginx` to `CABINET_EXTERNAL_NETWORK`
 - runs `nginx -t`
 - rolls back nginx changes if validation fails
@@ -144,7 +146,7 @@ Recommended built-in setup uses Resend:
 EMAIL_VERIFICATION_WEBHOOK_URL="https://ВСТАВЬ_СЮДА_ДОМЕН_КАБИНЕТА/api/email/resend"
 EMAIL_VERIFICATION_WEBHOOK_SECRET="ВСТАВЬ_СЮДА_SECRET_ДЛЯ_EMAIL_WEBHOOK"
 RESEND_API_KEY="ВСТАВЬ_СЮДА_RESEND_API_KEY"
-EMAIL_FROM="VPN Cabinet <noreply@ВСТАВЬ_СЮДА_ДОМЕН_ПОЧТЫ>"
+EMAIL_FROM="ВСТАВЬ_СЮДА_НАЗВАНИЕ_СЕРВИСА <noreply@ВСТАВЬ_СЮДА_ДОМЕН_ПОЧТЫ>"
 ```
 
 Generate webhook secret:

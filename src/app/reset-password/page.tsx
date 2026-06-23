@@ -4,7 +4,7 @@ import { AuthLayout } from '@/components/auth/auth-layout'
 import { ResetPasswordForm } from '@/components/auth/reset-password-form'
 import { getCurrentUser } from '@/lib/auth/cookies'
 
-export const metadata = { title: 'Новый пароль — Личный кабинет' }
+export const metadata = { title: 'Новый пароль' }
 
 export default async function ResetPasswordPage({ searchParams }: { searchParams: { token?: string } }) {
   const session = await getCurrentUser()

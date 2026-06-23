@@ -215,9 +215,102 @@ path.write_text("\n".join(lines) + "\n")
 PY
 }
 
+patch_nginx_compose_ports() {
+  if [[ ! -f "${NGINX_COMPOSE_FILE}" ]]; then
+    echo "${NGINX_COMPOSE_FILE} not found, skipping compose ports patch."
+    return
+  fi
+
+  echo "Ensuring HTTP/HTTPS ports in ${NGINX_COMPOSE_FILE}"
+  NGINX_COMPOSE_FILE_PATH="${NGINX_COMPOSE_FILE}" NGINX_SERVICE_NAME="${NGINX_SERVICE}" python3 <<'PY'
+from pathlib import Path
+import os
+import re
+import sys
+
+path = Path(os.environ["NGINX_COMPOSE_FILE_PATH"])
+service_name = os.environ["NGINX_SERVICE_NAME"]
+lines = path.read_text().splitlines()
+
+service_index = None
+for index, line in enumerate(lines):
+    if line.strip() == f"{service_name}:":
+        service_index = index
+        break
+if service_index is None:
+    print(f"Service {service_name} not found in nginx compose file.", file=sys.stderr)
+    sys.exit(1)
+
+service_end = len(lines)
+for index in range(service_index + 1, len(lines)):
+    line = lines[index]
+    if line and not line.startswith(" ") and not line.startswith("\t"):
+        service_end = index
+        break
+
+ports_index = None
+for index in range(service_index + 1, service_end):
+    if lines[index].strip() == "ports:":
+        ports_index = index
+        break
+
+def has_port(port: str) -> bool:
+    pattern = re.compile(rf"(^|[^0-9]){re.escape(port)}:{re.escape(port)}([^0-9]|$)")
+    return any(pattern.search(line) or line.strip() in {f"- {port}", f"- '{port}'", f'- "{port}"'} for line in lines[service_index:service_end])
+
+if ports_index is None:
+    service_indent = lines[service_index][:len(lines[service_index]) - len(lines[service_index].lstrip())]
+    section_indent = service_indent + "  "
+    insert_at = service_end
+    for index in range(service_index + 1, service_end):
+        if lines[index].strip() == "networks:":
+            insert_at = index
+            break
+    lines[insert_at:insert_at] = [
+        f"{section_indent}ports:",
+        f"{section_indent}  - '0.0.0.0:80:80'",
+        f"{section_indent}  - '0.0.0.0:443:443'",
+    ]
+else:
+    ports_indent = lines[ports_index][:len(lines[ports_index]) - len(lines[ports_index].lstrip())]
+    item_indent = ports_indent + "  "
+    insert_at = ports_index + 1
+    while insert_at < service_end:
+        line = lines[insert_at]
+        stripped = line.strip()
+        if not stripped:
+            insert_at += 1
+            continue
+        current_indent = line[:len(line) - len(line.lstrip())]
+        if stripped.startswith("- ") and len(current_indent) > len(ports_indent):
+            item_indent = current_indent
+            insert_at += 1
+            continue
+        break
+
+    additions = []
+    if not has_port("80"):
+        additions.append(f"{item_indent}- '0.0.0.0:80:80'")
+    if not has_port("443"):
+        additions.append(f"{item_indent}- '0.0.0.0:443:443'")
+    lines[insert_at:insert_at] = additions
+
+path.write_text("\n".join(lines) + "\n")
+PY
+}
+
 render_cabinet_block() {
   cat <<EOF
 ${MARKER_BEGIN}
+server {
+    server_name ${CABINET_DOMAIN};
+
+    listen 80;
+    listen [::]:80;
+
+    return 301 https://\$host\$request_uri;
+}
+
 server {
     server_name ${CABINET_DOMAIN};
 
@@ -369,6 +462,7 @@ rollback() {
 trap 'rollback' ERR
 
 patch_nginx_compose_volumes
+patch_nginx_compose_ports
 patch_nginx_conf
 validate_nginx_config_before_recreate
 recreate_nginx

@@ -4,7 +4,7 @@ import { AuthLayout } from '@/components/auth/auth-layout'
 import { ForgotPasswordForm } from '@/components/auth/forgot-password-form'
 import { getCurrentUser } from '@/lib/auth/cookies'
 
-export const metadata = { title: 'Восстановление пароля — Личный кабинет' }
+export const metadata = { title: 'Восстановление пароля' }
 
 export default async function ForgotPasswordPage() {
   const session = await getCurrentUser()

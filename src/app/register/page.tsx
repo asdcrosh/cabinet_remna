@@ -6,7 +6,7 @@ import { getCurrentUser } from '@/lib/auth/cookies'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 
-export const metadata = { title: 'Регистрация — Личный кабинет' }
+export const metadata = { title: 'Регистрация' }
 
 export default async function RegisterPage({ searchParams }: { searchParams: { ref?: string } }) {
   const session = await getCurrentUser()

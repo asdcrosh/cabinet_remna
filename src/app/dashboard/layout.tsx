@@ -3,6 +3,7 @@
 import { redirect } from 'next/navigation'
 import { getCurrentUser } from '@/lib/auth/cookies'
 import { prisma } from '@/lib/prisma'
+import { getBrandName } from '@/lib/branding'
 import { maybeSyncRemnashopCatalog } from '@/lib/remnashop-sync'
 import { LogoutButton } from '@/components/dashboard/logout-button'
 import { Brand, DashboardNav, MobileDashboardNav } from '@/components/dashboard/dashboard-nav'
@@ -24,12 +25,13 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   const role = freshUser.role
   const email = freshUser.email
+  const brandName = getBrandName()
 
   return (
     <div className="min-h-screen lg:flex">
       <aside className="sticky top-0 hidden h-screen w-72 shrink-0 flex-col border-r border-white/70 bg-white/80 shadow-2xl shadow-slate-200/40 backdrop-blur-xl dark:border-white/10 dark:bg-surface-950/70 dark:shadow-black/25 lg:flex">
         <div className="px-6 py-5">
-          <Brand />
+          <Brand brandName={brandName} />
         </div>
         <div className="flex-1 px-3">
           <DashboardNav role={role} />
@@ -44,8 +46,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
       </aside>
       <main className="min-w-0 flex-1">
         <div className="sticky top-0 z-30 flex items-center justify-between border-b border-white/70 bg-white/80 px-4 py-3 shadow-sm shadow-slate-200/60 backdrop-blur-xl dark:border-white/10 dark:bg-surface-950/80 dark:shadow-black/20 lg:hidden">
-          <Brand compact />
-          <MobileDashboardNav role={role} email={email} />
+          <Brand compact brandName={brandName} />
+          <MobileDashboardNav role={role} email={email} brandName={brandName} />
         </div>
         <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">{children}</div>
       </main>

@@ -88,6 +88,7 @@ curl -fsSL https://raw.githubusercontent.com/asdcrosh/cabinet_remna/main/deploy/
 | Переменная | Назначение |
 | --- | --- |
 | `CABINET_DOMAIN` | Домен кабинета без `https://` |
+| `CABINET_BRAND_NAME` | Название сервиса в интерфейсе, письмах и заголовках |
 | `APP_URL` | Публичный URL кабинета |
 | `DATABASE_URL` | PostgreSQL кабинета |
 | `JWT_SECRET` | Секрет сессий |
@@ -146,7 +147,8 @@ curl -fsSL https://raw.githubusercontent.com/asdcrosh/cabinet_remna/main/deploy/
 ```
 
 Скрипт делает backup nginx-конфига, выпускает сертификат для `CABINET_DOMAIN`,
-добавляет server block кабинета, проверяет `nginx -t` и откатывает изменения,
+добавляет HTTPS server block кабинета, HTTP→HTTPS редирект, публикацию порта
+`80` в compose Remnawave nginx, проверяет `nginx -t` и откатывает изменения,
 если проверка не прошла.
 
 ## YooKassa
@@ -173,7 +175,7 @@ https://ВСТАВЬ_СЮДА_ДОМЕН_КАБИНЕТА/api/webhook/yookassa
 EMAIL_VERIFICATION_WEBHOOK_URL="https://ВСТАВЬ_СЮДА_ДОМЕН_КАБИНЕТА/api/email/resend"
 EMAIL_VERIFICATION_WEBHOOK_SECRET="ВСТАВЬ_СЮДА_СЛУЧАЙНЫЙ_SECRET"
 RESEND_API_KEY="ВСТАВЬ_СЮДА_RESEND_API_KEY"
-EMAIL_FROM="VPN Cabinet <noreply@ВСТАВЬ_СЮДА_ДОМЕН_ПОЧТЫ>"
+EMAIL_FROM="ВСТАВЬ_СЮДА_НАЗВАНИЕ_СЕРВИСА <noreply@ВСТАВЬ_СЮДА_ДОМЕН_ПОЧТЫ>"
 ```
 
 Секрет можно сгенерировать:

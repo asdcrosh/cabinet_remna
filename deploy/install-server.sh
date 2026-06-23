@@ -497,12 +497,19 @@ prompt_required_config() {
     replace_env_value "YOOKASSA_WEBHOOK_URL" "https://${CABINET_DOMAIN}/api/webhook/yookassa"
   fi
 
+  if env_needs_value "CABINET_BRAND_NAME"; then
+    CABINET_BRAND_NAME="$(prompt_text "Cabinet brand name" "${CABINET_BRAND_NAME:-VPN Cabinet}")"
+    replace_env_value "CABINET_BRAND_NAME" "${CABINET_BRAND_NAME}"
+  else
+    CABINET_BRAND_NAME="$(read_env_value CABINET_BRAND_NAME || echo "VPN Cabinet")"
+  fi
+
   echo "" >"${TTY_DEVICE}"
   echo "Email verification / Resend" >"${TTY_DEVICE}"
   prompt_env_text "EMAIL_VERIFICATION_WEBHOOK_URL" "Email webhook URL" "https://${CABINET_DOMAIN}/api/email/resend"
   prompt_env_secret "EMAIL_VERIFICATION_WEBHOOK_SECRET" "Email webhook secret"
   prompt_env_secret "RESEND_API_KEY" "Resend API key"
-  prompt_env_text "EMAIL_FROM" "Email from" "VPN Cabinet <noreply@${CABINET_DOMAIN}>"
+  prompt_env_text "EMAIL_FROM" "Email from" "${CABINET_BRAND_NAME} <noreply@${CABINET_DOMAIN}>"
 
   echo "" >"${TTY_DEVICE}"
   echo "Remnawave Panel" >"${TTY_DEVICE}"
@@ -663,6 +670,11 @@ JWT_SECRET_VALUE="${JWT_SECRET:-$(existing_or_random_hex JWT_SECRET 32)}"
 HEALTHCHECK_TOKEN_VALUE="${HEALTHCHECK_TOKEN:-$(existing_or_random_hex HEALTHCHECK_TOKEN 32)}"
 
 replace_env_value "CABINET_DOMAIN" "${CABINET_DOMAIN}"
+if [[ -n "${CABINET_BRAND_NAME:-}" ]]; then
+  replace_env_value "CABINET_BRAND_NAME" "${CABINET_BRAND_NAME}"
+elif ! env_key_exists "CABINET_BRAND_NAME"; then
+  replace_env_value "CABINET_BRAND_NAME" "VPN Cabinet"
+fi
 replace_env_value "APP_URL" "https://${CABINET_DOMAIN}"
 replace_env_value "ALLOWED_ORIGINS" "https://${CABINET_DOMAIN}"
 replace_env_value "YOOKASSA_WEBHOOK_URL" "https://${CABINET_DOMAIN}/api/webhook/yookassa"
@@ -714,6 +726,7 @@ for key in \
   CABINET_APP_BIND \
   CABINET_APP_PORT \
   CABINET_EXTERNAL_NETWORK \
+  CABINET_BRAND_NAME \
   EMAIL_VERIFICATION_WEBHOOK_URL \
   EMAIL_VERIFICATION_WEBHOOK_SECRET \
   RESEND_API_KEY \

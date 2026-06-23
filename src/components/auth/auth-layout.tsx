@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import type { ReactNode } from 'react'
 import { Activity, CreditCard, KeyRound, ShieldCheck } from 'lucide-react'
+import { getBrandName } from '@/lib/branding'
 
 interface AuthLayoutProps {
   title: string
@@ -10,6 +11,8 @@ interface AuthLayoutProps {
 }
 
 export function AuthLayout({ title, description, footer, children }: AuthLayoutProps) {
+  const brandName = getBrandName()
+
   return (
     <div className="grid min-h-screen lg:grid-cols-[1.05fr_0.95fr]">
       <div className="relative hidden overflow-hidden bg-slate-950 p-10 text-white lg:flex lg:flex-col lg:justify-between">
@@ -20,7 +23,7 @@ export function AuthLayout({ title, description, footer, children }: AuthLayoutP
             <ShieldCheck className="h-6 w-6" />
           </div>
           <div className="relative">
-            <div className="font-semibold">AlekseevVP</div>
+            <div className="font-semibold">{brandName}</div>
             <div className="text-sm text-white/65">VPN без лишней сложности</div>
           </div>
         </Link>

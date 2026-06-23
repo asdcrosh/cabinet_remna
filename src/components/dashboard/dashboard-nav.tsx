@@ -40,7 +40,15 @@ export function DashboardNav({ role }: { role: 'USER' | 'ADMIN' }) {
   return <NavList role={role} className="space-y-1" />
 }
 
-export function MobileDashboardNav({ role, email }: { role: 'USER' | 'ADMIN'; email: string }) {
+export function MobileDashboardNav({
+  role,
+  email,
+  brandName,
+}: {
+  role: 'USER' | 'ADMIN'
+  email: string
+  brandName: string
+}) {
   const [open, setOpen] = useState(false)
 
   return (
@@ -61,7 +69,7 @@ export function MobileDashboardNav({ role, email }: { role: 'USER' | 'ADMIN'; em
           />
           <aside className="absolute right-0 top-0 z-10 flex h-dvh w-[min(22rem,88vw)] flex-col border-l border-white/70 bg-white/90 shadow-2xl backdrop-blur-xl dark:border-white/10 dark:bg-surface-950/90">
             <div className="flex items-center justify-between border-b border-white/70 px-4 py-4 dark:border-white/10">
-              <Brand />
+              <Brand brandName={brandName} />
               <button
                 className="grid h-9 w-9 place-items-center rounded-lg border bg-white text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-900 dark:bg-surface-900 dark:hover:bg-surface-800 dark:hover:text-white"
                 onClick={() => setOpen(false)}
@@ -87,14 +95,14 @@ export function MobileDashboardNav({ role, email }: { role: 'USER' | 'ADMIN'; em
   )
 }
 
-export function Brand({ compact = false }: { compact?: boolean }) {
+export function Brand({ compact = false, brandName }: { compact?: boolean; brandName: string }) {
   return (
     <Link href="/dashboard" className="flex min-w-0 items-center gap-3">
       <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-slate-950 text-cyan-200 shadow-lg shadow-slate-950/15 ring-1 ring-white/10 dark:bg-white dark:text-slate-950 dark:shadow-black/20">
         <ShieldCheck className="h-5 w-5" />
       </div>
       <div className="min-w-0">
-        <div className="truncate font-semibold tracking-tight">AlekseevVP</div>
+        <div className="truncate font-semibold tracking-tight">{brandName}</div>
         <div className={cn('truncate text-xs text-slate-500', compact && 'hidden')}>
           Личный кабинет
         </div>

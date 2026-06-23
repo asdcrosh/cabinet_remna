@@ -1,10 +1,14 @@
 import './globals.css'
 import type { Metadata, Viewport } from 'next'
 import { Toaster } from '@/components/ui/toaster'
+import { getBrandName } from '@/lib/branding'
 
 export const metadata: Metadata = {
-  title: 'Личный кабинет',
-  description: 'Подписка, ключи доступа и оплата',
+  title: {
+    default: getBrandName(),
+    template: `%s — ${getBrandName()}`,
+  },
+  description: `${getBrandName()}: подписка, ключи доступа и оплата`,
   icons: {
     icon: '/icon.svg',
   },
