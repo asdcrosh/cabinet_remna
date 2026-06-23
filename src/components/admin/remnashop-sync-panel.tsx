@@ -5,15 +5,16 @@ import { AlertTriangle, CheckCircle2, RefreshCw } from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
 
 interface RemnashopSyncReport {
-  mode: 'dryRun'
+  mode: 'dryRun' | 'apply'
   generatedAt: string
   counts: Record<string, number>
   warnings: string[]
-  summary: Record<string, number>
+  summary?: Record<string, number>
   samples: {
     plans: unknown[]
-    activeSubscriptions: unknown[]
-    transactions: unknown[]
+    promoCodes?: unknown[]
+    activeSubscriptions?: unknown[]
+    transactions?: unknown[]
   }
 }
 
@@ -35,6 +36,21 @@ export function RemnashopSyncPanel() {
     }
   }
 
+  async function applyCatalogSync() {
+    if (!window.confirm('Синхронизировать тарифы и промокоды из remnashop?')) return
+
+    setLoading(true)
+    setError(null)
+    try {
+      const result = await apiFetch<RemnashopSyncReport>('/api/admin/remnashop-sync?apply=1')
+      setReport(result)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Не удалось выполнить синхронизацию')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   return (
     <div className="space-y-4">
       <div className="card flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -44,10 +60,16 @@ export function RemnashopSyncPanel() {
             Проверяет remnashop и показывает, что можно импортировать. Данные cabinet не изменяются.
           </p>
         </div>
-        <button type="button" className="btn-primary shrink-0" onClick={runDryRun} disabled={loading}>
-          <RefreshCw className={loading ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />
-          {loading ? 'Проверяем...' : 'Запустить dry-run'}
-        </button>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <button type="button" className="btn-secondary shrink-0" onClick={runDryRun} disabled={loading}>
+            <RefreshCw className={loading ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />
+            Проверить
+          </button>
+          <button type="button" className="btn-primary shrink-0" onClick={applyCatalogSync} disabled={loading}>
+            <RefreshCw className={loading ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />
+            Синхронизировать
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -59,7 +81,7 @@ export function RemnashopSyncPanel() {
       {report && (
         <>
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            {Object.entries(report.summary).map(([key, value]) => (
+            {Object.entries(report.summary ?? report.counts).map(([key, value]) => (
               <Metric key={key} label={labelize(key)} value={value} />
             ))}
           </div>

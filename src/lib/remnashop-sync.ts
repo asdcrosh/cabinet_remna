@@ -3,6 +3,7 @@ import { remnashopQuery } from './remnashop-db'
 
 type RemnashopSubscriptionStatus = 'ACTIVE' | 'DISABLED' | 'EXPIRED' | 'DELETED'
 type RemnashopTransactionStatus = 'COMPLETED' | 'CANCELED' | 'FAILED'
+type CatalogSyncAction = 'created' | 'updated' | 'skipped'
 
 interface RemnashopPlanRow {
   id: number
@@ -14,6 +15,18 @@ interface RemnashopPlanRow {
   duration_days: number
   price_rub: string | null
   internal_squads: string[] | string
+}
+
+interface RemnashopPromoCodeRow {
+  id: number
+  code: string
+  discount_percent: number
+  is_active: boolean
+  starts_at: Date | null
+  expires_at: Date | null
+  max_uses: number | null
+  max_uses_per_user: number
+  plan_ids: number[]
 }
 
 interface RemnashopUserStatsRow {
@@ -60,8 +73,9 @@ interface CabinetUserRow {
 }
 
 export async function getRemnashopSyncDryRun() {
-  const [plans, userStats, subscriptions, transactions] = await Promise.all([
+  const [plans, promoCodes, userStats, subscriptions, transactions] = await Promise.all([
     fetchRemnashopPlans(),
+    fetchRemnashopPromoCodes(),
     fetchRemnashopUserStats(),
     fetchRemnashopSubscriptions(),
     fetchRemnashopTransactions(),
@@ -69,7 +83,7 @@ export async function getRemnashopSyncDryRun() {
 
   const remnaUuids = Array.from(new Set(subscriptions.map((item) => item.user_remna_id)))
   const paymentIds = Array.from(new Set(transactions.map((item) => item.payment_id)))
-  const planNames = Array.from(new Set(plans.map((item) => item.name)))
+  const planNames = Array.from(new Set(plans.map((item) => normalizeRemnashopPlan(item).name)))
 
   const [cabinetUsers, cabinetSubscriptions, cabinetPayments, cabinetPlans] = await Promise.all([
     prisma.user.findMany({
@@ -115,20 +129,29 @@ export async function getRemnashopSyncDryRun() {
   )
 
   const planActions = plans.map((plan) => {
-    const priceKopecks = rubToKopecks(plan.price_rub)
-    const key = makePlanKey(plan.name, plan.duration_days, priceKopecks)
+    const normalized = normalizeRemnashopPlan(plan)
+    const key = makePlanKey(normalized.name, normalized.durationDays, normalized.priceKopecks)
     return {
       sourceId: plan.id,
-      name: plan.name,
-      durationDays: plan.duration_days,
-      priceKopecks,
-      trafficLimitGb: plan.traffic_limit === 0 ? null : plan.traffic_limit,
-      deviceLimit: plan.device_limit,
-      isTrial: plan.is_trial,
+      name: normalized.name,
+      durationDays: normalized.durationDays,
+      priceKopecks: normalized.priceKopecks,
+      trafficLimitGb: normalized.trafficLimitGb,
+      deviceLimit: normalized.deviceLimit,
+      isTrial: normalized.isPromo,
       existsInCabinet: cabinetPlanKeys.has(key),
       action: cabinetPlanKeys.has(key) ? 'keep' : 'wouldCreate',
     }
   })
+
+  const promoActions = promoCodes.map((promoCode) => ({
+    sourceId: promoCode.id,
+    code: promoCode.code,
+    discountPercent: promoCode.discount_percent,
+    isActive: promoCode.is_active,
+    planIds: promoCode.plan_ids,
+    action: 'wouldUpsert' as const,
+  }))
 
   const transactionActions = transactions.map((transaction) => {
     const cabinetUser = transaction.user_remna_id
@@ -161,6 +184,7 @@ export async function getRemnashopSyncDryRun() {
       remnashopTelegramOnlyUsers: numberFromPg(userStats.telegram_only),
       remnashopUsersWithCurrentSubscription: numberFromPg(userStats.with_current_subscription),
       remnashopPlans: plans.length,
+      remnashopPromoCodes: promoCodes.length,
       remnashopSubscriptions: subscriptions.length,
       remnashopActiveSubscriptions: activeSubscriptions.length,
       remnashopTransactions: transactions.length,
@@ -171,6 +195,7 @@ export async function getRemnashopSyncDryRun() {
     warnings: buildWarnings(userStats, cabinetUsersByRemnaUuid.size, remnaUuids.length),
     summary: {
       plansWouldCreate: planActions.filter((item) => item.action === 'wouldCreate').length,
+      promoCodesWouldUpsert: promoActions.length,
       usersWouldNeedIdentityDecision: Math.max(0, remnaUuids.length - cabinetUsersByRemnaUuid.size),
       subscriptionsWouldCreateOrUpdate: linkableActiveSubscriptions.filter(
         (item) => !cabinetSubscriptionRemnaUuids.has(item.user_remna_id)
@@ -180,6 +205,7 @@ export async function getRemnashopSyncDryRun() {
     },
     samples: {
       plans: planActions.slice(0, 10),
+      promoCodes: promoActions.slice(0, 10),
       activeSubscriptions: activeSubscriptions.slice(0, 10).map((item) => ({
         sourceId: item.id,
         userId: item.user_id,
@@ -192,6 +218,149 @@ export async function getRemnashopSyncDryRun() {
         hasCabinetSubscription: cabinetSubscriptionRemnaUuids.has(item.user_remna_id),
       })),
       transactions: transactionActions.slice(0, 10),
+    },
+  }
+}
+
+export async function syncRemnashopCatalog() {
+  const [plans, promoCodes] = await Promise.all([
+    fetchRemnashopPlans(),
+    fetchRemnashopPromoCodes(),
+  ])
+
+  const warnings: string[] = []
+  const planResults: Array<{
+    sourceId: number
+    name: string
+    durationDays: number
+    action: CatalogSyncAction
+    cabinetPlanId: string | null
+  }> = []
+  const promoResults: Array<{
+    sourceId: number
+    code: string
+    action: CatalogSyncAction
+    linkedPlans: number
+    skippedPlans: number
+  }> = []
+  const planIdMap = new Map<string, string>()
+
+  await prisma.$transaction(async (tx) => {
+    for (const plan of plans) {
+      const normalized = normalizeRemnashopPlan(plan)
+      const existing = await tx.plan.findFirst({
+        where: {
+          name: normalized.name,
+          durationDays: normalized.durationDays,
+        },
+        orderBy: [{ createdAt: 'asc' }],
+      })
+      const data = {
+        name: normalized.name,
+        description: normalized.description,
+        priceKopecks: normalized.priceKopecks,
+        durationDays: normalized.durationDays,
+        trafficLimitGb: normalized.trafficLimitGb,
+        deviceLimit: normalized.deviceLimit,
+        activeInternalSquads: normalized.activeInternalSquads,
+        isPromo: normalized.isPromo,
+        isActive: normalized.isActive,
+        sortOrder: normalized.sortOrder,
+      }
+
+      const cabinetPlan = existing
+        ? await tx.plan.update({ where: { id: existing.id }, data })
+        : await tx.plan.create({ data })
+
+      const key = makeSourcePlanKey(plan.id, plan.duration_days)
+      planIdMap.set(key, cabinetPlan.id)
+      planResults.push({
+        sourceId: plan.id,
+        name: cabinetPlan.name,
+        durationDays: cabinetPlan.durationDays,
+        action: existing ? 'updated' : 'created',
+        cabinetPlanId: cabinetPlan.id,
+      })
+    }
+
+    for (const promoCode of promoCodes) {
+      const code = normalizeCode(promoCode.code)
+      if (!code) {
+        promoResults.push({
+          sourceId: promoCode.id,
+          code: promoCode.code,
+          action: 'skipped',
+          linkedPlans: 0,
+          skippedPlans: promoCode.plan_ids.length,
+        })
+        continue
+      }
+
+      const existing = await tx.promoCode.findUnique({ where: { code } })
+      const data = {
+        code,
+        discountPercent: clampDiscountPercent(promoCode.discount_percent),
+        isActive: promoCode.is_active,
+        startsAt: promoCode.starts_at,
+        expiresAt: promoCode.expires_at,
+        maxUses: promoCode.max_uses,
+        maxUsesPerUser: Math.max(1, promoCode.max_uses_per_user || 1),
+      }
+      const cabinetPromoCode = existing
+        ? await tx.promoCode.update({ where: { id: existing.id }, data })
+        : await tx.promoCode.create({ data })
+
+      await tx.promoCodePlan.deleteMany({ where: { promoCodeId: cabinetPromoCode.id } })
+
+      const linkedPlanIds = new Set<string>()
+      for (const sourcePlanId of promoCode.plan_ids) {
+        for (const plan of plans.filter((item) => item.id === sourcePlanId)) {
+          const cabinetPlanId = planIdMap.get(makeSourcePlanKey(plan.id, plan.duration_days))
+          if (cabinetPlanId) linkedPlanIds.add(cabinetPlanId)
+        }
+      }
+
+      if (linkedPlanIds.size > 0) {
+        await tx.promoCodePlan.createMany({
+          data: Array.from(linkedPlanIds).map((planId) => ({
+            promoCodeId: cabinetPromoCode.id,
+            planId,
+          })),
+          skipDuplicates: true,
+        })
+      }
+
+      promoResults.push({
+        sourceId: promoCode.id,
+        code,
+        action: existing ? 'updated' : 'created',
+        linkedPlans: linkedPlanIds.size,
+        skippedPlans: Math.max(0, promoCode.plan_ids.length - linkedPlanIds.size),
+      })
+    }
+  })
+
+  if (promoCodes.length === 0) {
+    warnings.push('Промокоды remnashop не найдены или схема промокодов не распознана.')
+  }
+
+  return {
+    mode: 'apply' as const,
+    source: 'remnashop',
+    generatedAt: new Date().toISOString(),
+    counts: {
+      remnashopPlans: plans.length,
+      remnashopPromoCodes: promoCodes.length,
+      plansCreated: planResults.filter((item) => item.action === 'created').length,
+      plansUpdated: planResults.filter((item) => item.action === 'updated').length,
+      promoCodesCreated: promoResults.filter((item) => item.action === 'created').length,
+      promoCodesUpdated: promoResults.filter((item) => item.action === 'updated').length,
+      promoCodesSkipped: promoResults.filter((item) => item.action === 'skipped').length,
+    },
+    warnings,
+    samples: {
+      plans: planResults.slice(0, 10),
+      promoCodes: promoResults.slice(0, 10),
     },
   }
 }
@@ -215,6 +384,90 @@ async function fetchRemnashopPlans() {
     ORDER BY p.order_index, d.days
   `)
   return result.rows
+}
+
+async function fetchRemnashopPromoCodes() {
+  const table = await firstExistingTable(['promo_codes', 'promocodes', 'coupons', 'discount_codes'])
+  if (!table) return []
+
+  const columns = await tableColumns(table)
+  const codeColumn = firstExistingColumn(columns, ['code', 'name'])
+  const discountColumn = firstExistingColumn(columns, ['discount_percent', 'discount', 'percent'])
+  if (!codeColumn || !discountColumn) return []
+
+  const idColumn = firstExistingColumn(columns, ['id'])
+  if (!idColumn) return []
+
+  const isActiveColumn = firstExistingColumn(columns, ['is_active', 'active'])
+  const startsAtColumn = firstExistingColumn(columns, ['starts_at', 'start_at', 'active_from'])
+  const expiresAtColumn = firstExistingColumn(columns, ['expires_at', 'expire_at', 'active_until'])
+  const maxUsesColumn = firstExistingColumn(columns, ['max_uses', 'usage_limit', 'uses_limit'])
+  const maxUsesPerUserColumn = firstExistingColumn(columns, ['max_uses_per_user', 'uses_per_user', 'user_limit'])
+
+  const planLinkTable = await firstExistingTable([
+    'promo_code_plans',
+    'promo_codes_plans',
+    'promo_code_plan',
+    'coupon_plans',
+    'discount_code_plans',
+  ])
+  const planLinkColumns = planLinkTable ? await tableColumns(planLinkTable) : new Set<string>()
+  const promoFkColumn = firstExistingColumn(planLinkColumns, [
+    'promo_code_id',
+    'promocode_id',
+    'coupon_id',
+    'discount_code_id',
+  ])
+  const planFkColumn = firstExistingColumn(planLinkColumns, ['plan_id'])
+
+  const planIdsSelect =
+    planLinkTable && promoFkColumn && planFkColumn
+      ? `(SELECT COALESCE(array_agg(link.${quoteIdent(planFkColumn)}::int), ARRAY[]::int[]) FROM ${quoteIdent(planLinkTable)} link WHERE link.${quoteIdent(promoFkColumn)} = pc.${quoteIdent(idColumn)})`
+      : 'ARRAY[]::int[]'
+
+  const result = await remnashopQuery<RemnashopPromoCodeRow>(`
+    SELECT
+      pc.${quoteIdent(idColumn)}::int AS id,
+      pc.${quoteIdent(codeColumn)}::text AS code,
+      pc.${quoteIdent(discountColumn)}::int AS discount_percent,
+      ${isActiveColumn ? `COALESCE(pc.${quoteIdent(isActiveColumn)}, true)` : 'true'} AS is_active,
+      ${startsAtColumn ? `pc.${quoteIdent(startsAtColumn)}` : 'NULL::timestamp'} AS starts_at,
+      ${expiresAtColumn ? `pc.${quoteIdent(expiresAtColumn)}` : 'NULL::timestamp'} AS expires_at,
+      ${maxUsesColumn ? `pc.${quoteIdent(maxUsesColumn)}::int` : 'NULL::int'} AS max_uses,
+      ${maxUsesPerUserColumn ? `COALESCE(pc.${quoteIdent(maxUsesPerUserColumn)}::int, 1)` : '1'} AS max_uses_per_user,
+      ${planIdsSelect} AS plan_ids
+    FROM ${quoteIdent(table)} pc
+    ORDER BY pc.${quoteIdent(idColumn)}
+  `)
+  return result.rows
+}
+
+async function firstExistingTable(candidates: string[]) {
+  const result = await remnashopQuery<{ table_name: string }>(
+    `
+      SELECT table_name
+      FROM information_schema.tables
+      WHERE table_schema = 'public'
+        AND table_name = ANY($1::text[])
+      ORDER BY array_position($1::text[], table_name)
+      LIMIT 1
+    `,
+    [candidates]
+  )
+  return result.rows[0]?.table_name ?? null
+}
+
+async function tableColumns(table: string) {
+  const result = await remnashopQuery<{ column_name: string }>(
+    `
+      SELECT column_name
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = $1
+    `,
+    [table]
+  )
+  return new Set(result.rows.map((row) => row.column_name))
 }
 
 async function fetchRemnashopUserStats() {
@@ -297,12 +550,64 @@ function rubToKopecks(value: string | null) {
   return Math.round(Number(value) * 100)
 }
 
+function normalizeRemnashopPlan(plan: RemnashopPlanRow) {
+  const durationLabel = plan.duration_days > 0 ? `${plan.duration_days} дн.` : ''
+  const baseName = plan.name.trim()
+  return {
+    name: durationLabel && !baseName.includes(durationLabel) ? `${baseName} ${durationLabel}` : baseName,
+    description: plan.is_trial ? 'Ознакомительный тариф' : null,
+    priceKopecks: plan.is_trial ? 0 : rubToKopecks(plan.price_rub),
+    durationDays: Math.max(1, plan.duration_days),
+    trafficLimitGb: plan.traffic_limit === 0 ? null : plan.traffic_limit,
+    deviceLimit: Math.max(1, plan.device_limit || 1),
+    activeInternalSquads: parseInternalSquads(plan.internal_squads),
+    isPromo: plan.is_trial,
+    isActive: plan.is_active,
+    sortOrder: plan.id * 100 + plan.duration_days,
+  }
+}
+
+function parseInternalSquads(value: string[] | string) {
+  if (Array.isArray(value)) return value.filter(Boolean)
+  if (!value) return []
+  try {
+    const parsed = JSON.parse(value)
+    if (Array.isArray(parsed)) return parsed.filter((item): item is string => typeof item === 'string' && Boolean(item))
+  } catch {
+    // fall through to comma/newline parsing
+  }
+  return value
+    .split(/[,\n]/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+}
+
+function normalizeCode(code: string) {
+  return code.trim().toUpperCase()
+}
+
+function clampDiscountPercent(value: number) {
+  return Math.min(99, Math.max(1, Math.trunc(value)))
+}
+
 function numberFromPg(value: string | number | bigint) {
   return Number(value)
 }
 
 function makePlanKey(name: string, durationDays: number, priceKopecks: number) {
   return `${name}:${durationDays}:${priceKopecks}`
+}
+
+function makeSourcePlanKey(planId: number, durationDays: number) {
+  return `${planId}:${durationDays}`
+}
+
+function firstExistingColumn(columns: Set<string>, candidates: string[]) {
+  return candidates.find((candidate) => columns.has(candidate)) ?? null
+}
+
+function quoteIdent(value: string) {
+  return `"${value.replace(/"/g, '""')}"`
 }
 
 function mapTransactionStatus(status: RemnashopTransactionStatus) {
