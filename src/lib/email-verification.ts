@@ -1,6 +1,8 @@
 import { createHash, randomBytes } from 'node:crypto'
 import { prisma } from './prisma'
 import { getAppUrl } from './app-url'
+import { getBrandName } from './branding'
+import { renderActionEmail } from './email-template'
 
 const TOKEN_BYTES = 32
 const TOKEN_TTL_MS = 24 * 60 * 60 * 1000
@@ -76,14 +78,17 @@ export async function sendEmailVerificationLink(input: {
     return { sent: false, reason: 'not_configured' }
   }
 
-  const subject = 'Подтвердите email'
+  const subject = `Подтвердите email в ${getBrandName()}`
   const text = [
     `Здравствуйте${input.name ? `, ${input.name}` : ''}.`,
     '',
-    'Чтобы завершить регистрацию, откройте ссылку:',
+    'Остался один шаг: подтвердите почту, чтобы завершить регистрацию и войти в кабинет.',
+    '',
+    'Нажмите кнопку в письме или откройте ссылку:',
     verifyUrl,
     '',
     'Ссылка действует 24 часа.',
+    'Если вы не регистрировались, просто проигнорируйте это письмо.',
   ].join('\n')
 
   const res = await fetch(webhookUrl, {
@@ -98,7 +103,17 @@ export async function sendEmailVerificationLink(input: {
       to: input.email,
       subject,
       text,
-      html: renderVerificationHtml({ name: input.name, verifyUrl }),
+      html: renderActionEmail({
+        eyebrow: 'Подтверждение аккаунта',
+        title: 'Подтвердите почту',
+        lead: 'Один клик, и аккаунт будет готов к покупке тарифа и получению VPN-доступа.',
+        greetingName: input.name,
+        body: 'Мы получили запрос на регистрацию. Подтвердите этот email, чтобы защитить аккаунт и продолжить работу в кабинете.',
+        ctaLabel: 'Подтвердить email',
+        ctaUrl: verifyUrl,
+        expiry: 'Ссылка действует 24 часа.',
+        securityNote: 'Если вы не создавали аккаунт, письмо можно спокойно проигнорировать.',
+      }),
     }),
   })
 
@@ -108,39 +123,4 @@ export async function sendEmailVerificationLink(input: {
   }
 
   return { sent: true }
-}
-
-function renderVerificationHtml(input: { name?: string | null; verifyUrl: string }) {
-  const greeting = input.name ? `Здравствуйте, ${escapeHtml(input.name)}.` : 'Здравствуйте.'
-  return `
-    <div style="font-family: Arial, sans-serif; line-height: 1.5; color: #0f172a;">
-      <p>${greeting}</p>
-      <p>Чтобы завершить регистрацию, подтвердите email.</p>
-      <p>
-        <a href="${input.verifyUrl}" style="display:inline-block;background:#2563eb;color:#fff;padding:10px 14px;border-radius:8px;text-decoration:none;">
-          Подтвердить email
-        </a>
-      </p>
-      <p style="color:#64748b;font-size:13px;">Ссылка действует 24 часа.</p>
-    </div>
-  `.trim()
-}
-
-function escapeHtml(value: string) {
-  return value.replace(/[&<>"']/g, (char) => {
-    switch (char) {
-      case '&':
-        return '&amp;'
-      case '<':
-        return '&lt;'
-      case '>':
-        return '&gt;'
-      case '"':
-        return '&quot;'
-      case "'":
-        return '&#039;'
-      default:
-        return char
-    }
-  })
 }

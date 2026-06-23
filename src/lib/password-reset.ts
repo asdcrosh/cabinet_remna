@@ -2,6 +2,8 @@ import { createHash, randomBytes } from 'node:crypto'
 import bcrypt from 'bcryptjs'
 import { prisma } from './prisma'
 import { getAppUrl } from './app-url'
+import { getBrandName } from './branding'
+import { renderActionEmail } from './email-template'
 
 const TOKEN_BYTES = 32
 const TOKEN_TTL_MS = 60 * 60 * 1000
@@ -57,16 +59,29 @@ export async function sendPasswordResetLink(input: {
     },
     body: JSON.stringify({
       to: input.email,
-      subject: 'Восстановление пароля',
+      subject: `Восстановление пароля в ${getBrandName()}`,
       text: [
         `Здравствуйте${input.name ? `, ${input.name}` : ''}.`,
         '',
-        'Чтобы задать новый пароль, откройте ссылку:',
+        'Мы получили запрос на восстановление пароля.',
+        '',
+        'Чтобы задать новый пароль, нажмите кнопку в письме или откройте ссылку:',
         resetUrl,
         '',
         'Ссылка действует 1 час.',
+        'Если вы не запрашивали восстановление, просто проигнорируйте это письмо.',
       ].join('\n'),
-      html: renderPasswordResetHtml({ name: input.name, resetUrl }),
+      html: renderActionEmail({
+        eyebrow: 'Восстановление доступа',
+        title: 'Задайте новый пароль',
+        lead: 'Ссылка одноразовая и поможет быстро вернуть доступ к личному кабинету.',
+        greetingName: input.name,
+        body: 'Мы получили запрос на смену пароля. Перейдите по защищённой ссылке ниже и задайте новый пароль для аккаунта.',
+        ctaLabel: 'Задать новый пароль',
+        ctaUrl: resetUrl,
+        expiry: 'Ссылка действует 1 час.',
+        securityNote: 'Если вы не запрашивали восстановление пароля, письмо можно спокойно проигнорировать.',
+      }),
     }),
   })
 
@@ -99,39 +114,4 @@ export async function resetPasswordByToken(input: { token: string; password: str
   ])
 
   return { ok: true as const }
-}
-
-function renderPasswordResetHtml(input: { name?: string | null; resetUrl: string }) {
-  const greeting = input.name ? `Здравствуйте, ${escapeHtml(input.name)}.` : 'Здравствуйте.'
-  return `
-    <div style="font-family: Arial, sans-serif; line-height: 1.5; color: #0f172a;">
-      <p>${greeting}</p>
-      <p>Чтобы задать новый пароль, откройте ссылку ниже.</p>
-      <p>
-        <a href="${input.resetUrl}" style="display:inline-block;background:#2563eb;color:#fff;padding:10px 14px;border-radius:8px;text-decoration:none;">
-          Задать новый пароль
-        </a>
-      </p>
-      <p style="color:#64748b;font-size:13px;">Ссылка действует 1 час.</p>
-    </div>
-  `.trim()
-}
-
-function escapeHtml(value: string) {
-  return value.replace(/[&<>"']/g, (char) => {
-    switch (char) {
-      case '&':
-        return '&amp;'
-      case '<':
-        return '&lt;'
-      case '>':
-        return '&gt;'
-      case '"':
-        return '&quot;'
-      case "'":
-        return '&#039;'
-      default:
-        return char
-    }
-  })
 }
