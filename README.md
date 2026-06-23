@@ -105,6 +105,7 @@ COMPOSE_PROFILES="caddy"
 ```
 
 Встроенный Caddy сам выпустит HTTPS-сертификат.
+Если `80/443` уже заняты Remnawave, установщик отключит встроенный Caddy сам.
 
 Если HTTPS уже делает внешний Nginx/Caddy:
 

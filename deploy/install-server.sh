@@ -254,6 +254,31 @@ configure_app_port() {
   echo "Local port ${bind_address}:${current_port} is busy. Cabinet app will use ${bind_address}:${selected_port}."
 }
 
+configure_caddy_profile() {
+  local current_profiles
+
+  if [[ "${CABINET_ENABLE_CADDY:-}" == "false" ]]; then
+    replace_env_value "COMPOSE_PROFILES" ""
+    return
+  fi
+
+  current_profiles="$(read_env_value COMPOSE_PROFILES || true)"
+  if [[ -z "${current_profiles}" ]]; then
+    return
+  fi
+
+  if [[ "${current_profiles}" != *"caddy"* ]]; then
+    return
+  fi
+
+  if host_port_available "0.0.0.0" "80" && host_port_available "0.0.0.0" "443"; then
+    return
+  fi
+
+  replace_env_value "COMPOSE_PROFILES" ""
+  echo "Ports 80/443 are busy. Bundled Caddy is disabled; use your existing reverse proxy for the cabinet domain."
+}
+
 configure_local_remnashop_database() {
   local current_url
   local container="${REMNASHOP_DB_CONTAINER:-remnashop-db}"
@@ -664,6 +689,7 @@ if [[ -n "${CABINET_APP_BIND:-}" ]]; then
 fi
 
 configure_app_port
+configure_caddy_profile
 
 for key in \
   CABINET_APP_BIND \
