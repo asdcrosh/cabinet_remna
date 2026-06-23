@@ -188,6 +188,12 @@ host_port_available() {
   local bind_address="$1"
   local port="$2"
 
+  if command -v ss >/dev/null 2>&1; then
+    if ss -H -ltn "sport = :${port}" 2>/dev/null | grep -q .; then
+      return 1
+    fi
+  fi
+
   python3 - "$bind_address" "$port" <<'PY'
 import socket
 import sys
