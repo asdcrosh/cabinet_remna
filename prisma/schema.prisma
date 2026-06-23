@@ -88,6 +88,8 @@ model User {
   subscriptions         Subscription[]
   payments              Payment[]
   devices               Device[]
+  supportTickets        SupportTicket[]
+  supportMessages       SupportMessage[]
   promoCodeRedemptions  PromoCodeRedemption[]
   trialPlanRedemptions  TrialPlanRedemption[]
   emailVerificationTokens EmailVerificationToken[]
@@ -394,4 +396,58 @@ model RateLimitBucket {
   updatedAt DateTime @updatedAt
 
   @@index([resetAt])
+}
+
+// ----------------------------------------------------------------------
+// 8. Поддержка
+// ----------------------------------------------------------------------
+// Встроенные обращения: пользователь пишет из кабинета, админ отвечает из
+// админки. Храним счетчики непрочитанных, чтобы не требовать WebSocket.
+// ----------------------------------------------------------------------
+model SupportTicket {
+  id               String              @id @default(cuid())
+  userId           String
+  subject          String
+  category         String              @default("general")
+  status           SupportTicketStatus @default(OPEN)
+  userUnreadCount  Int                 @default(0)
+  adminUnreadCount Int                 @default(1)
+  lastMessageAt    DateTime            @default(now())
+  closedAt         DateTime?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+
+  user             User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages         SupportMessage[]
+
+  @@index([userId, status, lastMessageAt])
+  @@index([status, lastMessageAt])
+  @@index([adminUnreadCount])
+}
+
+model SupportMessage {
+  id          String               @id @default(cuid())
+  ticketId    String
+  senderId    String?
+  senderRole  SupportMessageSender
+  body        String
+  createdAt   DateTime             @default(now())
+
+  ticket      SupportTicket        @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  sender      User?                @relation(fields: [senderId], references: [id], onDelete: SetNull)
+
+  @@index([ticketId, createdAt])
+  @@index([senderId])
+}
+
+enum SupportTicketStatus {
+  OPEN
+  WAITING_ADMIN
+  WAITING_USER
+  CLOSED
+}
+
+enum SupportMessageSender {
+  USER
+  ADMIN
 }

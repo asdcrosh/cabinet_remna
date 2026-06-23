@@ -9,6 +9,7 @@ import {
   KeyRound,
   Laptop,
   Menu,
+  MessageCircleQuestion,
   Settings,
   ShieldCheck,
   SlidersHorizontal,
@@ -26,11 +27,13 @@ const nav = [
   { href: '/dashboard/billing', label: 'Платежи', icon: CreditCard },
   { href: '/dashboard/referrals', label: 'Рефералы', icon: UsersRound },
   { href: '/dashboard/devices', label: 'Устройства', icon: Laptop },
+  { href: '/dashboard/support', label: 'Поддержка', icon: MessageCircleQuestion },
   { href: '/dashboard/settings', label: 'Настройки', icon: Settings },
 ]
 
 const adminNav = [
   { href: '/dashboard/admin', label: 'Админка', icon: UserCog, exact: true },
+  { href: '/dashboard/admin/support', label: 'Поддержка', icon: MessageCircleQuestion },
   { href: '/dashboard/admin/plans', label: 'Управление тарифами', icon: SlidersHorizontal },
 ]
 
