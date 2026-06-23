@@ -55,6 +55,20 @@ export const POST = withAuth(async (req: Request) => {
       where: { userId: user.id },
     })
 
+    if (!user.telegramId) {
+      return NextResponse.json(
+        { error: 'Ознакомительный тариф доступен после привязки Telegram' },
+        { status: 403 }
+      )
+    }
+
+    if (!user.remnashopSyncedAt) {
+      return NextResponse.json(
+        { error: 'Сначала проверьте старую подписку через Telegram' },
+        { status: 403 }
+      )
+    }
+
     if (user.remnashopUserId || user.remnawaveUuid || hasAnySubscription > 0) {
       return NextResponse.json({ error: 'Ознакомительный тариф доступен только новым пользователям' }, { status: 409 })
     }

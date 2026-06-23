@@ -77,10 +77,6 @@ export const GET = withAuth(async (req: Request) => {
       })
       settingsUrl.searchParams.set('telegram_linked', '1')
     } catch {
-      await prisma.user.update({
-        where: { id: session.uid },
-        data: { remnashopSyncedAt: new Date() },
-      })
       settingsUrl.searchParams.set('telegram_linked', '1')
       settingsUrl.searchParams.set('telegram_sync', 'failed')
     }

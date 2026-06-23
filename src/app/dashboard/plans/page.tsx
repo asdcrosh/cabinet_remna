@@ -21,7 +21,9 @@ export default async function PlansPage() {
     ? await prisma.user.findUnique({
         where: { id: session.uid },
         select: {
+          telegramId: true,
           remnashopUserId: true,
+          remnashopSyncedAt: true,
           remnawaveUuid: true,
         },
       })
@@ -49,11 +51,14 @@ export default async function PlansPage() {
     ? (await prisma.subscription.count({ where: { userId: session.uid } })) > 0
     : false
   const canUsePromo =
+    Boolean(user?.telegramId) &&
+    Boolean(user?.remnashopSyncedAt) &&
     !usedTrialPlanIds.size &&
     !hasAnySubscription &&
     !user?.remnashopUserId &&
     !user?.remnawaveUuid
   const visiblePlans = plans.filter((plan) => !plan.isPromo || canUsePromo)
+  const hasHiddenPromo = plans.some((plan) => plan.isPromo) && !canUsePromo
 
   return (
     <div className="space-y-6">
@@ -85,6 +90,14 @@ export default async function PlansPage() {
       </section>
 
       <div className="grid auto-rows-fr grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {hasHiddenPromo && (
+          <div className="card col-span-full flex flex-col gap-3 border-amber-200 bg-amber-50/70 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100 sm:flex-row sm:items-center sm:justify-between">
+            <span>Пробный тариф откроется после проверки Telegram.</span>
+            <Link href="/dashboard/settings" className="btn-secondary shrink-0">
+              Проверить Telegram
+            </Link>
+          </div>
+        )}
         {visiblePlans.length === 0 && (
           <div className="card col-span-full py-12 text-center">
             <h3 className="text-lg font-semibold">Тарифы скоро появятся</h3>

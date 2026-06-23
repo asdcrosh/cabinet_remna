@@ -69,10 +69,6 @@ export const POST = withAuth(async (req: Request) => {
     })
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Telegram linked, sync failed'
-    await prisma.user.update({
-      where: { id: session.uid },
-      data: { remnashopSyncedAt: new Date() },
-    })
     return NextResponse.json(
       {
         ok: true,

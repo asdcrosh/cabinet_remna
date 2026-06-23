@@ -12,7 +12,9 @@ interface RemnashopTelegramUserRow {
 }
 
 export async function findRemnashopUserByTelegramId(telegramId: bigint) {
-  if (!process.env.REMNASHOP_DATABASE_URL) return null
+  if (!process.env.REMNASHOP_DATABASE_URL) {
+    throw new Error('REMNASHOP_DATABASE_URL is not configured')
+  }
 
   const result = await remnashopQuery<RemnashopTelegramUserRow>(
     `
@@ -44,6 +46,10 @@ export async function syncLinkedTelegramUser(input: {
   const localRemnawaveSynced = await syncRemnawaveTelegramId(localUser?.remnawaveUuid, input.telegramId)
   const remnashopUser = await findRemnashopUserByTelegramId(input.telegramId)
   if (!remnashopUser) {
+    await prisma.user.update({
+      where: { id: input.localUserId },
+      data: { remnashopSyncedAt: new Date() },
+    })
     return {
       foundRemnashopUser: false as const,
       syncedRemnawave: localRemnawaveSynced,
