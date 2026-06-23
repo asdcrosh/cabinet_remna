@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { Search } from 'lucide-react'
 import { prisma } from '@/lib/prisma'
 import { requireAdminPage } from '@/lib/auth/admin-page'
 import { formatPrice } from '@/lib/format'
@@ -9,10 +10,37 @@ import { PaymentSyncButton, RecoveryActionButton } from '@/components/admin/reco
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Платежи — Админка' }
 
-export default async function AdminPaymentsPage() {
+export default async function AdminPaymentsPage({
+  searchParams,
+}: {
+  searchParams?: { q?: string; status?: string; delivery?: string }
+}) {
   await requireAdminPage()
 
+  const q = searchParams?.q?.trim() ?? ''
+  const status = searchParams?.status ?? 'ALL'
+  const delivery = searchParams?.delivery ?? 'ALL'
+  const where = {
+    ...(status !== 'ALL' ? { status: status as any } : {}),
+    ...(delivery === 'DELIVERED'
+      ? { subscriptionProvisionedAt: { not: null } }
+      : delivery === 'RETRY'
+        ? { status: 'SUCCEEDED' as const, subscriptionProvisionedAt: null }
+        : {}),
+    ...(q
+      ? {
+          OR: [
+            { user: { email: { contains: q, mode: 'insensitive' as const } } },
+            { user: { name: { contains: q, mode: 'insensitive' as const } } },
+            { plan: { name: { contains: q, mode: 'insensitive' as const } } },
+            { yookassaId: { contains: q, mode: 'insensitive' as const } },
+          ],
+        }
+      : {}),
+  }
+
   const payments = await prisma.payment.findMany({
+    where,
     orderBy: { createdAt: 'desc' },
     take: 100,
     include: {
@@ -26,7 +54,35 @@ export default async function AdminPaymentsPage() {
     <div className="space-y-6">
       <PageHeader title="Платежи" description="Все платежи, их статус и результат выдачи подписки" />
 
-      <div className="table-shell hidden xl:block">
+      <form className="grid gap-2 rounded-lg border border-slate-200 bg-white p-3 dark:border-white/10 dark:bg-surface-900 md:grid-cols-[minmax(14rem,1fr)_12rem_12rem_auto_auto]" action="/dashboard/admin/payments">
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <input name="q" defaultValue={q} className="input pl-9" placeholder="Email, имя, тариф или ID" />
+        </div>
+        <select name="status" defaultValue={status} className="input">
+          <option value="ALL">Все статусы</option>
+          <option value="PENDING">Ожидают оплаты</option>
+          <option value="SUCCEEDED">Оплачены</option>
+          <option value="CANCELED">Отменены</option>
+          <option value="REFUNDED">Возвраты</option>
+        </select>
+        <select name="delivery" defaultValue={delivery} className="input">
+          <option value="ALL">Любая выдача</option>
+          <option value="DELIVERED">Подписка выдана</option>
+          <option value="RETRY">Нужна довыдача</option>
+        </select>
+        <button type="submit" className="btn-primary">Показать</button>
+        {(q || status !== 'ALL' || delivery !== 'ALL') && <Link href="/dashboard/admin/payments" className="btn-secondary">Сбросить</Link>}
+      </form>
+
+      {payments.length === 0 && (
+        <div className="card py-12 text-center">
+          <h2 className="font-semibold">Платежи не найдены</h2>
+          <p className="mt-1 text-sm text-slate-500">Измените фильтры или сбросьте поиск.</p>
+        </div>
+      )}
+
+      <div className={payments.length > 0 ? 'table-shell hidden xl:block' : 'hidden'}>
         <table className="data-table min-w-[1180px]">
           <thead className="bg-slate-50 text-left text-slate-500 dark:bg-surface-800">
             <tr>
@@ -87,7 +143,7 @@ export default async function AdminPaymentsPage() {
         </table>
       </div>
 
-      <div className="space-y-3 xl:hidden">
+      <div className={payments.length > 0 ? 'space-y-3 xl:hidden' : 'hidden'}>
         {payments.map((payment) => {
           const needsRetry = payment.status === 'SUCCEEDED' && !payment.subscriptionProvisionedAt
           return (

@@ -12,23 +12,31 @@ export const metadata = { title: 'Пользователи — Админка' }
 export default async function AdminUsersPage({
   searchParams,
 }: {
-  searchParams?: { q?: string; page?: string }
+  searchParams?: { q?: string; page?: string; role?: string; account?: string }
 }) {
   const { session, user: actor } = await requireAdminPage()
 
   const q = searchParams?.q?.trim() ?? ''
   const page = Math.max(1, Number(searchParams?.page || '1') || 1)
+  const role = searchParams?.role ?? 'ALL'
+  const account = searchParams?.account ?? 'ALL'
   const pageSize = 25
   const skip = (page - 1) * pageSize
-  const where = q
-    ? {
+  const where = {
+    ...(role !== 'ALL' ? { role: role as any } : {}),
+    ...(account === 'LINKED'
+      ? { remnawaveUuid: { not: null } }
+      : account === 'UNLINKED'
+        ? { remnawaveUuid: null }
+        : {}),
+    ...(q ? {
         OR: [
           { email: { contains: q, mode: 'insensitive' as const } },
           { name: { contains: q, mode: 'insensitive' as const } },
           { remnawaveUsername: { contains: q, mode: 'insensitive' as const } },
         ],
-      }
-    : undefined
+      } : {}),
+  }
 
   const [total, users] = await prisma.$transaction([
     prisma.user.count({ where }),
@@ -62,7 +70,7 @@ export default async function AdminUsersPage({
       <PageHeader title="Пользователи" description="Аккаунты, роли, профили Remnawave и последние подписки" />
 
       <div className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-surface-900 lg:flex-row lg:items-center lg:justify-between">
-        <form className="grid min-w-0 flex-1 gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto]" action="/dashboard/admin/users">
+        <form className="grid min-w-0 flex-1 gap-2 md:grid-cols-[minmax(14rem,1fr)_11rem_12rem_auto_auto]" action="/dashboard/admin/users">
           <div className="relative min-w-0 flex-1">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
@@ -72,15 +80,34 @@ export default async function AdminUsersPage({
               className="input pl-9"
             />
           </div>
+          <select name="role" defaultValue={role} className="input">
+            <option value="ALL">Все роли</option>
+            <option value="USER">Пользователи</option>
+            <option value="MODERATOR">Модераторы</option>
+            <option value="ADMIN">Администраторы</option>
+            <option value="SUPER_ADMIN">Главные админы</option>
+          </select>
+          <select name="account" defaultValue={account} className="input">
+            <option value="ALL">Любой VPN-профиль</option>
+            <option value="LINKED">Профиль создан</option>
+            <option value="UNLINKED">Без профиля</option>
+          </select>
           <button className="btn-primary" type="submit">Найти</button>
-          {q && <Link href="/dashboard/admin/users" className="btn-secondary">Сбросить</Link>}
+          {(q || role !== 'ALL' || account !== 'ALL') && <Link href="/dashboard/admin/users" className="btn-secondary">Сбросить</Link>}
         </form>
         <div className="text-sm text-slate-500">
           {total} всего, страница {page} из {pageCount}
         </div>
       </div>
 
-      <div className="table-shell hidden xl:block">
+      {users.length === 0 && (
+        <div className="card py-12 text-center">
+          <h2 className="font-semibold">Пользователи не найдены</h2>
+          <p className="mt-1 text-sm text-slate-500">Измените фильтры или очистите строку поиска.</p>
+        </div>
+      )}
+
+      <div className={users.length > 0 ? 'table-shell hidden xl:block' : 'hidden'}>
         <table className="data-table min-w-[960px]">
           <thead className="bg-slate-50 text-left text-slate-500 dark:bg-surface-800">
             <tr>
@@ -142,7 +169,7 @@ export default async function AdminUsersPage({
         </table>
       </div>
 
-      <div className="space-y-3 xl:hidden">
+      <div className={users.length > 0 ? 'space-y-3 xl:hidden' : 'hidden'}>
         {users.map((user) => {
           const subscription = user.subscriptions[0]
           return (
@@ -179,15 +206,17 @@ export default async function AdminUsersPage({
         })}
       </div>
 
-      <Pagination page={page} pageCount={pageCount} q={q} />
+      <Pagination page={page} pageCount={pageCount} q={q} role={role} account={account} />
     </div>
   )
 }
 
-function Pagination({ page, pageCount, q }: { page: number; pageCount: number; q: string }) {
+function Pagination({ page, pageCount, q, role, account }: { page: number; pageCount: number; q: string; role: string; account: string }) {
   const makeHref = (nextPage: number) => {
     const params = new URLSearchParams()
     if (q) params.set('q', q)
+    if (role !== 'ALL') params.set('role', role)
+    if (account !== 'ALL') params.set('account', account)
     if (nextPage > 1) params.set('page', String(nextPage))
     const qs = params.toString()
     return qs ? `/dashboard/admin/users?${qs}` : '/dashboard/admin/users'
