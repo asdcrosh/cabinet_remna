@@ -3,6 +3,18 @@
 
 import { z } from 'zod'
 
+const nameSchema = z
+  .string()
+  .trim()
+  .transform((value) => value.replace(/\s+/g, ' '))
+  .refine((value) => value.length === 0 || value.length >= 2, 'Минимум 2 символа')
+  .refine((value) => value.length <= 40, 'Максимум 40 символов')
+  .refine(
+    (value) => value.length === 0 || /^[\p{L}][\p{L}\s.'-]*[\p{L}]$/u.test(value),
+    'Только буквы, пробел, дефис, точка и апостроф'
+  )
+  .refine((value) => !/[-.'\s]{2,}/.test(value), 'Уберите повторяющиеся разделители')
+
 export const registerSchema = z.object({
   email: z.string().email('Некорректный email').max(255).toLowerCase().trim(),
   password: z
@@ -11,7 +23,7 @@ export const registerSchema = z.object({
     .max(128, 'Максимум 128 символов')
     .regex(/[A-Za-z]/, 'Должна быть хотя бы одна латинская буква')
     .regex(/[0-9]/, 'Должна быть хотя бы одна цифра'),
-  name: z.string().max(64).trim().optional(),
+  name: nameSchema.optional(),
   referralCode: z
     .string()
     .trim()
@@ -115,7 +127,7 @@ export const adminPlanSchema = adminPlanBaseSchema
 export const updateAdminPlanSchema = adminPlanBaseSchema.partial()
 
 export const updateProfileSchema = z.object({
-  name: z.string().max(64).trim().optional().nullable(),
+  name: nameSchema.optional().nullable(),
 })
 
 export type RegisterInput = z.infer<typeof registerSchema>

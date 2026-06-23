@@ -92,7 +92,25 @@ export function RegisterForm({ initialReferralCode = '' }: { initialReferralCode
       </div>
       <div>
         <label className="label" htmlFor="name">Имя <span className="text-slate-400">(необязательно)</span></label>
-        <input id="name" type="text" className="input" {...register('name')} />
+        <input
+          id="name"
+          type="text"
+          className="input"
+          autoComplete="name"
+          maxLength={40}
+          placeholder="Артем"
+          {...register('name', {
+            setValueAs: (value) => String(value ?? '').trim().replace(/\s+/g, ' '),
+            validate: {
+              minLength: (value) => !value || value.length >= 2 || 'Минимум 2 символа',
+              maxLength: (value) => !value || value.length <= 40 || 'Максимум 40 символов',
+              chars: (value) =>
+                !value || /^[\p{L}][\p{L}\s.'-]*[\p{L}]$/u.test(value) || 'Только буквы, пробел, дефис, точка и апостроф',
+              separators: (value) => !value || !/[-.'\s]{2,}/.test(value) || 'Уберите повторяющиеся разделители',
+            },
+          })}
+        />
+        {errors.name && <p className="text-xs text-red-600 mt-1">{errors.name.message}</p>}
       </div>
       <div>
         <label className="label" htmlFor="referralCode">Реферальный код <span className="text-slate-400">(необязательно)</span></label>

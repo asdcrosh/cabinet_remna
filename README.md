@@ -1,78 +1,245 @@
 # Remnawave Cabinet
 
-Красивый личный кабинет для продажи VPN без обязательного Telegram: пользователь регистрируется по email, выбирает тариф, оплачивает онлайн и получает ссылку доступа, QR-код, историю платежей и управление устройствами.
+Личный кабинет для продажи VPN без обязательного Telegram. Пользователь регистрируется по email, подтверждает почту, выбирает тариф, оплачивает онлайн и получает QR-код, ссылку подписки, историю платежей и управление устройствами.
 
-Проект рассчитан на связку:
+## Возможности
 
-- Remnawave Panel для VPN-профилей
-- YooKassa для онлайн-оплаты
-- PostgreSQL для данных кабинета
-- Next.js 14 App Router для интерфейса и API
+- Email-регистрация, подтверждение почты и восстановление пароля.
+- Покупка и продление VPN через YooKassa.
+- Одноразовые промо-тарифы без оплаты.
+- Промокоды, лимиты и привязка скидок к тарифам.
+- Автоматическая выдача доступа в Remnawave после оплаты.
+- Выбор Remnawave squads в настройках тарифа.
+- QR-код, ссылка подписки, трафик и устройства в кабинете.
+- Worker для проверки ожидающих платежей и отмены зависших оплат.
+- Реферальные бонусы за первую платную покупку приглашенного пользователя.
+- Синхронизация тарифов, промокодов и старых Telegram-подписок из remnashop.
+- Админские страницы для тарифов, промокодов, пользователей, платежей и восстановления выдачи.
 
-## Быстрый Старт На Сервере
+## Архитектура
 
-Для чистого Ubuntu/Debian сервера достаточно одной команды:
+Проект использует:
+
+- `Next.js 14 App Router` для интерфейса и API.
+- `PostgreSQL` для данных кабинета.
+- `Prisma` для миграций и доступа к БД.
+- `Remnawave Panel API` для VPN-профилей.
+- `YooKassa` для платежей.
+- `Resend` или внешний webhook для email.
+- `Docker Compose` для production-деплоя.
+
+## Быстрый Старт
+
+На чистом Ubuntu/Debian сервере:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/asdcrosh/cabinet_remna/main/deploy/install-server.sh | sudo bash
 ```
 
-Скрипт сам установит Docker, скачает `docker-compose.yml`, создаст `.env`, сгенерирует пароль базы, `JWT_SECRET` и `HEALTHCHECK_TOKEN`, спросит недостающие боевые значения и после запуска попросит email/пароль первого администратора.
+Установщик:
 
-В мастере нужно указать:
+- установит Docker, если его нет;
+- создаст `/opt/remnawave-cabinet`;
+- скачает `docker-compose.yml` и `.env`;
+- сгенерирует локальные секреты;
+- спросит недостающие production-значения;
+- поднимет БД, миграции, seed, приложение и worker;
+- попросит email и пароль первого администратора.
 
-- `CABINET_DOMAIN`
-- `EMAIL_VERIFICATION_WEBHOOK_URL`
-- `EMAIL_VERIFICATION_WEBHOOK_SECRET`
-- `RESEND_API_KEY`
-- `EMAIL_FROM`
-- `REMNAWAVE_BASE_URL`
-- `REMNAWAVE_TOKEN`
-- `YOOKASSA_SHOP_ID`
-- `YOOKASSA_SECRET_KEY`
-
-Для автоматического запуска без ручного ввода:
+Без интерактивного ввода администратора:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/asdcrosh/cabinet_remna/main/deploy/install-server.sh | \
-  sudo env SUPERUSER_EMAIL="admin@example.com" SUPERUSER_PASSWORD="strong-password" bash
+  sudo env SUPERUSER_EMAIL="admin@example.com" SUPERUSER_PASSWORD="strong-password1" bash
 ```
 
-Будет поднято:
-
-- PostgreSQL
-- Prisma migrations
-- стартовые тарифы, если база пустая
-- Next.js приложение
-- worker для периодической проверки платежей
-- Caddy с автоматическим HTTPS
-
-После первого входа админ может менять тарифы в кабинете:
+После запуска открой:
 
 ```text
-https://ВСТАВЬ_СЮДА_ДОМЕН_КАБИНЕТА/dashboard/admin/plans
+https://ВСТАВЬ_СЮДА_ДОМЕН_КАБИНЕТА
 ```
 
 Подробный серверный чеклист: [deploy/RUNBOOK.md](./deploy/RUNBOOK.md).
 
-## Что Умеет
+## Что Нужно Подготовить
 
-- Регистрация и вход по email/паролю
-- Подтверждение email перед покупкой
-- Покупка и продление VPN через YooKassa
-- Одноразовые промо-тарифы без YooKassa
-- Выбор Remnawave squads прямо в настройках тарифа
-- Автоматическая выдача доступа после оплаты
-- Периодическая проверка ожидающих платежей
-- QR-код и ссылка доступа в кабинете
-- История платежей и состояние выдачи
-- Промокоды и скидки
-- Админское управление тарифами
-- Управление устройствами
-- Опциональный перенос старых Telegram-подписок
-- Recovery для платежей, если внешний сервис временно не ответил
+Перед установкой нужны:
 
-## Локальный Запуск
+- домен или поддомен для кабинета;
+- API token Remnawave;
+- YooKassa `shopId` и `secretKey`;
+- Resend API key или свой email webhook;
+- доступ к серверу с Docker.
+
+Если кабинет ставится на тот же сервер, где уже есть `remnashop-db`, установщик сам найдет контейнер, создаст read-only пользователя и заполнит подключение к remnashop.
+
+## Основные ENV
+
+Полный шаблон лежит в [deploy/env.production.example](./deploy/env.production.example). В обычной установке мастер заполняет главное сам.
+
+| Переменная | Назначение |
+| --- | --- |
+| `CABINET_DOMAIN` | Домен кабинета без `https://` |
+| `APP_URL` | Публичный URL кабинета |
+| `DATABASE_URL` | PostgreSQL кабинета |
+| `JWT_SECRET` | Секрет сессий |
+| `HEALTHCHECK_TOKEN` | Токен `/api/health` |
+| `REMNAWAVE_BASE_URL` | URL Remnawave Panel |
+| `REMNAWAVE_TOKEN` | API token Remnawave |
+| `YOOKASSA_SHOP_ID` | ID магазина YooKassa |
+| `YOOKASSA_SECRET_KEY` | Secret key YooKassa |
+| `EMAIL_VERIFICATION_WEBHOOK_URL` | Endpoint отправки email |
+| `EMAIL_VERIFICATION_WEBHOOK_SECRET` | Bearer secret email webhook |
+| `RESEND_API_KEY` | API key Resend |
+| `EMAIL_FROM` | Отправитель писем |
+| `REMNASHOP_DATABASE_URL` | Read-only подключение к remnashop |
+| `REMNASHOP_CATALOG_SYNC_INTERVAL_SECONDS` | Интервал авто-синхронизации каталога |
+| `REFERRAL_BONUS_DAYS` | Бонус за реферала |
+
+## Reverse Proxy
+
+Если на сервере нет своего Nginx/Caddy, оставь:
+
+```env
+COMPOSE_PROFILES="caddy"
+```
+
+Встроенный Caddy сам выпустит HTTPS-сертификат.
+
+Если HTTPS уже делает внешний Nginx/Caddy:
+
+```env
+COMPOSE_PROFILES=""
+CABINET_APP_BIND="127.0.0.1"
+CABINET_APP_PORT="3000"
+```
+
+Проксируй домен кабинета на:
+
+```text
+http://127.0.0.1:3000
+```
+
+Если reverse proxy работает в Docker-сети Remnawave, можно проксировать на:
+
+```text
+http://remnawave-cabinet-app:3000
+```
+
+## YooKassa
+
+В YooKassa добавь webhook:
+
+```text
+https://ВСТАВЬ_СЮДА_ДОМЕН_КАБИНЕТА/api/webhook/yookassa
+```
+
+События:
+
+- `payment.succeeded`
+- `payment.canceled`
+- `payment.waiting_for_capture`
+
+Кабинет также сам проверяет платеж после возврата пользователя, а worker периодически сверяет ожидающие платежи с YooKassa.
+
+## Email
+
+Для встроенной отправки через Resend:
+
+```env
+EMAIL_VERIFICATION_WEBHOOK_URL="https://ВСТАВЬ_СЮДА_ДОМЕН_КАБИНЕТА/api/email/resend"
+EMAIL_VERIFICATION_WEBHOOK_SECRET="ВСТАВЬ_СЮДА_СЛУЧАЙНЫЙ_SECRET"
+RESEND_API_KEY="ВСТАВЬ_СЮДА_RESEND_API_KEY"
+EMAIL_FROM="VPN Cabinet <noreply@ВСТАВЬ_СЮДА_ДОМЕН_ПОЧТЫ>"
+```
+
+Секрет можно сгенерировать:
+
+```bash
+openssl rand -hex 32
+```
+
+Если используется свой отправщик, кабинет отправляет `POST` на `EMAIL_VERIFICATION_WEBHOOK_URL` с полями `to`, `subject`, `text`, `html` и заголовком:
+
+```text
+Authorization: Bearer EMAIL_VERIFICATION_WEBHOOK_SECRET
+```
+
+## Remnashop
+
+Если `remnashop-db` на том же сервере, ничего вручную настраивать не нужно. Установщик:
+
+- найдет контейнер `remnashop-db`;
+- создаст/обновит роль `remnashop_readonly`;
+- выдаст только `SELECT`;
+- подключит кабинет к нужной Docker-сети;
+- заполнит `REMNASHOP_DATABASE_URL`;
+- отключит SSL для внутреннего Docker-соединения.
+
+Каталог remnashop автоматически синхронизируется при входе в кабинет с интервалом `REMNASHOP_CATALOG_SYNC_INTERVAL_SECONDS`.
+
+Для remnashop на другом сервере создай read-only пользователя:
+
+```sql
+CREATE USER remnashop_readonly WITH PASSWORD 'ВСТАВЬ_СЮДА_СИЛЬНЫЙ_ПАРОЛЬ';
+GRANT CONNECT ON DATABASE remnashop TO remnashop_readonly;
+GRANT USAGE ON SCHEMA public TO remnashop_readonly;
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO remnashop_readonly;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO remnashop_readonly;
+```
+
+И укажи:
+
+```env
+REMNASHOP_DATABASE_URL="postgresql://remnashop_readonly:ВСТАВЬ_СЮДА_ПАРОЛЬ@ВСТАВЬ_СЮДА_HOST:5432/remnashop?schema=public"
+REMNASHOP_DATABASE_SSL="true"
+```
+
+## Обновление
+
+```bash
+cd /opt/remnawave-cabinet
+git pull
+docker compose --env-file .env -f docker-compose.yml pull
+docker compose --env-file .env -f docker-compose.yml up -d
+```
+
+Логи:
+
+```bash
+docker compose --env-file .env -f docker-compose.yml logs -f app
+docker compose --env-file .env -f docker-compose.yml logs -f worker
+```
+
+Проверка:
+
+```bash
+source .env
+curl -H "x-healthcheck-token: $HEALTHCHECK_TOKEN" "$APP_URL/api/health"
+```
+
+## Бэкап
+
+Создать бэкап:
+
+```bash
+cd /opt/remnawave-cabinet
+docker compose --env-file .env -f docker-compose.yml exec -T db \
+  sh -lc 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" --format=custom --no-owner --no-privileges' \
+  > cabinet.dump
+```
+
+Восстановить:
+
+```bash
+cd /opt/remnawave-cabinet
+docker compose --env-file .env -f docker-compose.yml stop app worker
+cat cabinet.dump | docker compose --env-file .env -f docker-compose.yml exec -T db \
+  sh -lc 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists --no-owner --no-privileges'
+docker compose --env-file .env -f docker-compose.yml up -d
+```
+
+## Локальная Разработка
 
 ```bash
 npm install
@@ -88,200 +255,7 @@ npm run dev
 http://localhost:3000
 ```
 
-## Основные Переменные
-
-| Переменная | Для чего нужна |
-| --- | --- |
-| `CABINET_IMAGE` | Готовый Docker image кабинета, по умолчанию `ghcr.io/asdcrosh/cabinet_remna:latest` |
-| `COMPOSE_PROFILES` | `caddy` для встроенного HTTPS, пусто если HTTPS уже делает внешний proxy |
-| `DATABASE_URL` | PostgreSQL connection string |
-| `CABINET_APP_PORT` | Локальный порт приложения при внешнем proxy, по умолчанию `3000` |
-| `CABINET_EXTERNAL_NETWORK` | Docker-сеть Remnawave/Nginx/remnashop, обычно `remnawave-network` |
-| `JWT_SECRET` | Секрет сессий, минимум 32 случайных символа |
-| `APP_URL` | Публичный URL кабинета |
-| `ALLOWED_ORIGINS` | Разрешенные origins для защиты запросов |
-| `HEALTHCHECK_TOKEN` | Токен проверки `/api/health` |
-| `EMAIL_VERIFICATION_WEBHOOK_URL` | Отправка писем подтверждения email |
-| `EMAIL_VERIFICATION_WEBHOOK_SECRET` | Bearer secret для email webhook |
-| `RESEND_API_KEY` | API key Resend для встроенной отправки email |
-| `EMAIL_FROM` | От кого отправлять письма, например `VPN <noreply@domain.ru>` |
-| `REMNAWAVE_BASE_URL` | URL Remnawave Panel |
-| `REMNAWAVE_TOKEN` | API token Remnawave |
-| `REMNAWAVE_INTERNAL_SQUAD_UUIDS` | Fallback UUID squads, если у тарифа не выбран свой список |
-| `YOOKASSA_SHOP_ID` | ID магазина YooKassa |
-| `YOOKASSA_SECRET_KEY` | Боевой secret key YooKassa |
-| `YOOKASSA_WEBHOOK_URL` | Webhook оплаты |
-| `PAYMENT_RECONCILE_INTERVAL_SECONDS` | Как часто worker проверяет ожидающие платежи |
-| `PAYMENT_CANCEL_PENDING_AFTER_SECONDS` | Через сколько секунд отменять зависший ожидающий платёж |
-| `TELEGRAM_CLIENT_ID` | Опционально, перенос старых Telegram-подписок |
-| `TELEGRAM_CLIENT_SECRET` | Опционально, перенос старых Telegram-подписок |
-| `REMNASHOP_DB_CONTAINER` | Имя локального контейнера remnashop PostgreSQL, по умолчанию `remnashop-db` |
-| `REMNASHOP_DATABASE_URL` | Опционально, read-only подключение к старой БД remnashop |
-| `REMNASHOP_DATABASE_SSL` | SSL для удалённой БД remnashop: `true`, `false`, `no-verify` |
-| `REFERRAL_BONUS_DAYS` | Сколько дней добавить за первую платную покупку приглашенного |
-
-Полный шаблон, который installer кладёт на сервер как `.env`: [deploy/env.production.example](./deploy/env.production.example).
-
-Если кабинет ставится на сервер, где уже есть Caddy/Nginx на 80/443, укажи:
-
-```env
-COMPOSE_PROFILES=""
-CABINET_APP_BIND="127.0.0.1"
-CABINET_APP_PORT="3000"
-CABINET_EXTERNAL_NETWORK="remnawave-network"
-```
-
-И настрой существующий reverse proxy на `http://127.0.0.1:3000`.
-
-Если reverse proxy работает в Docker-сети Remnawave, проксируй на контейнер кабинета:
-
-```text
-http://remnawave-cabinet-app:3000
-```
-
-## YooKassa
-
-В кабинете YooKassa добавь webhook:
-
-```text
-https://ВСТАВЬ_СЮДА_ДОМЕН_КАБИНЕТА/api/webhook/yookassa
-```
-
-События:
-
-- `payment.succeeded`
-- `payment.canceled`
-- `payment.waiting_for_capture`
-
-После возврата пользователя из оплаты кабинет дополнительно проверяет платеж сам, поэтому выдача доступа не зависит только от webhook.
-Отдельный worker периодически сверяет ожидающие платежи с YooKassa и отменяет те, которые слишком долго не перешли в успешный статус.
-
-## Email
-
-В production нужен реальный отправщик писем, иначе пользователи не смогут подтвердить email.
-
-Самый простой вариант уже встроен: отправка через Resend.
-
-В `.env` укажи:
-
-```env
-EMAIL_VERIFICATION_WEBHOOK_URL="https://ВСТАВЬ_СЮДА_ДОМЕН_КАБИНЕТА/api/email/resend"
-EMAIL_VERIFICATION_WEBHOOK_SECRET="ВСТАВЬ_СЮДА_ЛЮБОЙ_СЛУЧАЙНЫЙ_SECRET"
-RESEND_API_KEY="ВСТАВЬ_СЮДА_RESEND_API_KEY"
-EMAIL_FROM="VPN Cabinet <noreply@ВСТАВЬ_СЮДА_ТВОЙ_ДОМЕН_ПОЧТЫ>"
-```
-
-`EMAIL_VERIFICATION_WEBHOOK_SECRET` можно сгенерировать так:
-
-```bash
-openssl rand -hex 32
-```
-
-Если хочешь использовать свой отправщик, кабинет отправляет `POST` на `EMAIL_VERIFICATION_WEBHOOK_URL` с полями:
-
-- `to`
-- `subject`
-- `text`
-- `html`
-
-И заголовком:
-
-```text
-Authorization: Bearer EMAIL_VERIFICATION_WEBHOOK_SECRET
-```
-
-В dev-режиме, если webhook не задан, ссылка подтверждения выводится в консоль сервера.
-
-## Remnashop Sync
-
-Если `remnashop-db` уже запущен на этом же сервере, установщик сам найдет
-контейнер, создаст read-only пользователя `remnashop_readonly`, подключит
-кабинет к той же Docker-сети и заполнит `REMNASHOP_DATABASE_URL`.
-
-Ручная настройка ниже нужна только если старая база `remnashop` находится на
-другом сервере.
-
-## Remnashop На Другом Сервере
-
-Подключай удаленную БД только read-only пользователем.
-
-На сервере с remnashop/PostgreSQL создай пользователя:
-
-```sql
-CREATE USER remnashop_readonly WITH PASSWORD 'ВСТАВЬ_СЮДА_СИЛЬНЫЙ_ПАРОЛЬ';
-GRANT CONNECT ON DATABASE remnashop TO remnashop_readonly;
-GRANT USAGE ON SCHEMA public TO remnashop_readonly;
-GRANT SELECT ON ALL TABLES IN SCHEMA public TO remnashop_readonly;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO remnashop_readonly;
-```
-
-Открой доступ к PostgreSQL только с IP сервера кабинета: firewall/security group на порт `5432`.
-
-В `.env` кабинета:
-
-```env
-REMNASHOP_DATABASE_URL="postgresql://remnashop_readonly:ВСТАВЬ_СЮДА_ПАРОЛЬ@ВСТАВЬ_СЮДА_IP_ИЛИ_HOST_REMNASHOP:5432/remnashop?schema=public"
-REMNASHOP_DATABASE_SSL="true"
-```
-
-Если у PostgreSQL нет SSL, временно можно поставить:
-
-```env
-REMNASHOP_DATABASE_SSL="false"
-```
-
-Но для сервера в интернете лучше включить SSL или держать соединение внутри приватной сети/VPN.
-
-## Деплой И Обновления
-
-Первый деплой:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/asdcrosh/cabinet_remna/main/deploy/install-server.sh | sudo bash
-```
-
-После заполнения `.env` запусти эту же команду еще раз: установщик поднимет контейнеры и создаст первого администратора.
-
-Обновление уже установленного сервера:
-
-```bash
-cd /opt/remnawave-cabinet
-docker compose --env-file .env -f docker-compose.yml up -d
-```
-
-Логи:
-
-```bash
-docker compose --env-file .env -f docker-compose.yml logs -f app
-```
-
-Проверка после запуска:
-
-```bash
-source .env
-curl -H "x-healthcheck-token: $HEALTHCHECK_TOKEN" "$APP_URL/api/health"
-```
-
-Бэкап БД кабинета:
-
-```bash
-docker compose --env-file .env -f docker-compose.yml exec -T db \
-  sh -lc 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" --format=custom --no-owner --no-privileges' \
-  > cabinet.dump
-```
-
-Восстановление из бэкапа:
-
-```bash
-docker compose --env-file .env -f docker-compose.yml stop app worker
-cat cabinet.dump | docker compose --env-file .env -f docker-compose.yml exec -T db \
-  sh -lc 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists --no-owner --no-privileges'
-docker compose --env-file .env -f docker-compose.yml up -d
-```
-
-Подробности: [DEPLOYMENT.md](./DEPLOYMENT.md).
-
-## Проверки Для Разработки
+Проверки:
 
 ```bash
 npm run lint
@@ -293,19 +267,19 @@ npm run build
 ## Структура
 
 ```text
-src/app              Next.js pages и API routes
-src/components       UI-компоненты кабинета
-src/lib              интеграции, auth, платежи, выдача подписок
+src/app              страницы и API routes
+src/components       UI кабинета
+src/lib              auth, платежи, Remnawave, remnashop, безопасность
 prisma               схема, миграции, seed
-deploy               production deploy scripts и compose
+deploy               production compose, installer, runbook
 ```
 
-## Безопасность Перед Продом
+## Перед Продом
 
-Перед реальным запуском:
-
-- используй только боевые ключи YooKassa;
-- перевыпусти токены, которые использовались локально;
-- проверь, что `.env` не попадает в Git;
-- направь свой домен кабинета на IP сервера;
-- проверь регистрацию, email, оплату и выдачу подписки тестовой покупкой.
+- Проверь DNS домена кабинета.
+- Используй только боевые ключи YooKassa.
+- Проверь отправку email и подтверждение почты.
+- Проверь тестовую покупку и выдачу Remnawave-подписки.
+- Проверь webhook YooKassa.
+- Убедись, что `.env` не попадает в Git.
+- Сделай первый бэкап после успешной настройки.
