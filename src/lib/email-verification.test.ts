@@ -36,6 +36,7 @@ describe('email verification helpers', () => {
   afterEach(() => {
     vi.useRealTimers()
     delete process.env.APP_URL
+    delete process.env.CABINET_BRAND_NAME
     delete process.env.EMAIL_VERIFICATION_WEBHOOK_URL
     delete process.env.EMAIL_VERIFICATION_WEBHOOK_SECRET
     vi.unstubAllGlobals()
@@ -109,6 +110,7 @@ describe('email verification helpers', () => {
 
   it('posts verification email to configured webhook', async () => {
     process.env.APP_URL = 'http://localhost:3000'
+    process.env.CABINET_BRAND_NAME = 'Remna VPN'
     process.env.EMAIL_VERIFICATION_WEBHOOK_URL = 'https://mail.example.test/send'
     process.env.EMAIL_VERIFICATION_WEBHOOK_SECRET = 'secret-1'
     const fetchMock = vi.fn().mockResolvedValue({ ok: true })
@@ -130,5 +132,15 @@ describe('email verification helpers', () => {
         body: expect.stringContaining('http://localhost:3000/api/auth/verify-email?token=token-1'),
       })
     )
+
+    const request = fetchMock.mock.calls[0][1] as { body: string }
+    const body = JSON.parse(request.body)
+    expect(body.subject).toBe('Подтвердите email в Remna VPN')
+    expect(body.text).toContain('Остался один шаг')
+    expect(body.html).toContain('Remna VPN')
+    expect(body.html).toContain('Подтвердите почту')
+    expect(body.html).toContain('Подтвердить email')
+    expect(body.html).toContain('Ссылка действует 24 часа.')
+    expect(body.html).toContain('Если кнопка не открывается')
   })
 })
