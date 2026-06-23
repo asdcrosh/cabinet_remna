@@ -8,11 +8,17 @@ import { formatPrice } from '@/lib/format'
 import { PageHeader } from '@/components/dashboard/page-header'
 import { getCurrentUser } from '@/lib/auth/cookies'
 import { CheckCircle2, CreditCard, KeyRound, ShieldCheck } from 'lucide-react'
+import { getPlanAudienceContext, isPlanAvailableForUser } from '@/lib/plan-access'
 
 export const revalidate = 300 // кэш на 5 минут
 
-export default async function PlansPage() {
+export default async function PlansPage({
+  searchParams,
+}: {
+  searchParams?: { plan?: string }
+}) {
   const session = await getCurrentUser()
+  const linkedPlanId = searchParams?.plan?.trim()
   const plans = await prisma.plan.findMany({
     where: { isActive: true },
     orderBy: { sortOrder: 'asc' },
@@ -28,6 +34,7 @@ export default async function PlansPage() {
         },
       })
     : null
+  const audienceContext = session ? await getPlanAudienceContext(session.uid) : null
   const usedTrialPlanIds = session
     ? new Set(
         (
@@ -57,8 +64,15 @@ export default async function PlansPage() {
     !hasAnySubscription &&
     !user?.remnashopUserId &&
     !user?.remnawaveUuid
-  const visiblePlans = plans.filter((plan) => !plan.isPromo || canUsePromo)
-  const hasPromoPlan = plans.some((plan) => plan.isPromo)
+  const audiencePlans = audienceContext
+    ? plans.filter((plan) =>
+        isPlanAvailableForUser(plan, audienceContext, {
+          allowLink: plan.availability === 'LINK' && plan.id === linkedPlanId,
+        })
+      )
+    : plans.filter((plan) => plan.availability === 'ALL')
+  const visiblePlans = audiencePlans.filter((plan) => !plan.isPromo || canUsePromo)
+  const hasPromoPlan = audiencePlans.some((plan) => plan.isPromo)
   const isOtherwiseEligibleForPromo =
     !usedTrialPlanIds.size &&
     !hasAnySubscription &&

@@ -15,6 +15,9 @@ interface RemnashopPlanRow {
   duration_days: number
   price_rub: string | null
   internal_squads: string[] | string
+  availability: 'ALL' | 'NEW' | 'EXISTING' | 'INVITED' | 'ALLOWED' | 'LINK'
+  allowed_telegram_ids: Array<string | number | bigint>
+  allowed_emails: string[]
 }
 
 interface RemnashopPromoCodeRow {
@@ -223,16 +226,12 @@ export async function getRemnashopSyncDryRun() {
 }
 
 export async function syncRemnashopCatalog(options: {
-  planScope?: 'all' | 'active'
   includePromoCodes?: boolean
 } = {}) {
-  const [sourcePlans, sourcePromoCodes] = await Promise.all([
+  const [plans, sourcePromoCodes] = await Promise.all([
     fetchRemnashopPlans(),
     fetchRemnashopPromoCodes(),
   ])
-  const plans = options.planScope === 'active'
-    ? sourcePlans.filter((plan) => plan.is_active)
-    : sourcePlans
   const promoCodes = options.includePromoCodes === false ? [] : sourcePromoCodes
 
   const warnings: string[] = []
@@ -262,7 +261,7 @@ export async function syncRemnashopCatalog(options: {
         },
         orderBy: [{ createdAt: 'asc' }],
       })
-      const data = {
+      const catalogData = {
         name: normalized.name,
         description: normalized.description,
         priceKopecks: normalized.priceKopecks,
@@ -274,10 +273,15 @@ export async function syncRemnashopCatalog(options: {
         isActive: normalized.isActive,
         sortOrder: normalized.sortOrder,
       }
+      const accessData = {
+        availability: normalized.availability,
+        allowedEmails: normalized.allowedEmails,
+        allowedTelegramIds: normalized.allowedTelegramIds,
+      }
 
       const cabinetPlan = existing
-        ? await tx.plan.update({ where: { id: existing.id }, data })
-        : await tx.plan.create({ data })
+        ? await tx.plan.update({ where: { id: existing.id }, data: catalogData })
+        : await tx.plan.create({ data: { ...catalogData, ...accessData } })
 
       const key = makeSourcePlanKey(plan.id, plan.duration_days)
       planIdMap.set(key, cabinetPlan.id)
@@ -411,6 +415,12 @@ async function fetchRemnashopPlans() {
       p.traffic_limit,
       p.device_limit,
       p.internal_squads,
+      p.availability::text AS availability,
+      COALESCE(
+        ARRAY(SELECT allowed_id::text FROM unnest(p.allowed_telegram_ids) AS allowed_id),
+        ARRAY[]::text[]
+      ) AS allowed_telegram_ids,
+      COALESCE(p.allowed_emails, ARRAY[]::text[]) AS allowed_emails,
       d.days AS duration_days,
       MAX(CASE WHEN pp.currency = 'RUB' THEN pp.price::text END) AS price_rub
     FROM plans p
@@ -597,6 +607,9 @@ function normalizeRemnashopPlan(plan: RemnashopPlanRow) {
     trafficLimitGb: plan.traffic_limit === 0 ? null : plan.traffic_limit,
     deviceLimit: Math.max(1, plan.device_limit || 1),
     activeInternalSquads: parseInternalSquads(plan.internal_squads),
+    availability: plan.availability,
+    allowedEmails: plan.allowed_emails.map((email) => email.trim().toLowerCase()).filter(Boolean),
+    allowedTelegramIds: plan.allowed_telegram_ids.map(String).filter(Boolean),
     isPromo: plan.is_trial,
     isActive: plan.is_active,
     sortOrder: plan.id * 100 + plan.duration_days,

@@ -7,6 +7,7 @@ import {
   ChevronDown,
   Edit3,
   Globe2,
+  Link2,
   Plus,
   Power,
   RefreshCw,
@@ -18,6 +19,7 @@ import { apiFetch } from '@/lib/api-client'
 import { formatPrice } from '@/lib/format'
 import { toast } from '@/components/ui/toaster'
 import { cn } from '@/lib/cn'
+import { planAvailabilityLabels, type PlanAvailabilityValue } from '@/lib/plan-availability'
 
 export interface PlanAdminRow {
   id: string
@@ -28,6 +30,9 @@ export interface PlanAdminRow {
   trafficLimitGb: number | null
   deviceLimit: number
   activeInternalSquads: string[]
+  availability: PlanAvailabilityValue
+  allowedEmails: string[]
+  allowedTelegramIds: string[]
   isPromo: boolean
   isActive: boolean
   sortOrder: number
@@ -44,6 +49,8 @@ interface PlanFormState {
   unlimitedTraffic: boolean
   deviceLimit: string
   activeInternalSquads: string
+  availability: PlanAvailabilityValue
+  allowedUsers: string
   sortOrder: string
   isPromo: boolean
   isActive: boolean
@@ -64,6 +71,8 @@ const emptyForm: PlanFormState = {
   unlimitedTraffic: false,
   deviceLimit: '5',
   activeInternalSquads: '',
+  availability: 'ALL',
+  allowedUsers: '',
   sortOrder: '10',
   isPromo: false,
   isActive: true,
@@ -149,6 +158,16 @@ export function PlansAdmin({ plans }: { plans: PlanAdminRow[] }) {
     }
   }
 
+  async function copyPlanLink(plan: PlanAdminRow) {
+    const url = `${window.location.origin}/dashboard/plans?plan=${encodeURIComponent(plan.id)}`
+    try {
+      await navigator.clipboard.writeText(url)
+      toast('Ссылка на тариф скопирована', 'success')
+    } catch {
+      toast('Не удалось скопировать ссылку')
+    }
+  }
+
   function startEdit(plan: PlanAdminRow) {
     setEditingId(plan.id)
     setEditForm(formFromPlan(plan))
@@ -225,7 +244,7 @@ export function PlansAdmin({ plans }: { plans: PlanAdminRow[] }) {
                     <Metric label="Срок" value={`${plan.durationDays} дней`} />
                     <Metric label="Трафик" value={plan.trafficLimitGb == null ? 'Безлимит' : `${plan.trafficLimitGb} ГБ`} />
                     <Metric label="Устройства" value={plan.deviceLimit} />
-                    <Metric label="Продажи" value={plan.paymentsCount} />
+                    <Metric label="Аудитория" value={planAvailabilityLabels[plan.availability]} />
                   </div>
 
                   <div className="flex flex-wrap gap-2 xl:max-w-[19rem] xl:justify-end">
@@ -237,6 +256,12 @@ export function PlansAdmin({ plans }: { plans: PlanAdminRow[] }) {
                       <Power className="h-3.5 w-3.5" />
                       {plan.isActive ? 'Скрыть' : 'Показать'}
                     </button>
+                    {plan.availability === 'LINK' && (
+                      <button type="button" className="btn-secondary px-3 text-xs" onClick={() => void copyPlanLink(plan)}>
+                        <Link2 className="h-3.5 w-3.5" />
+                        Ссылка
+                      </button>
+                    )}
                     <button type="button" className="btn-secondary px-3 text-xs text-red-600" onClick={() => void deletePlan(plan)} disabled={loadingId === plan.id}>
                       <Trash2 className="h-3.5 w-3.5" />
                       Удалить
@@ -268,6 +293,11 @@ export function PlansAdmin({ plans }: { plans: PlanAdminRow[] }) {
                       </span>
                     ))}
                   </div>
+                  {plan.availability === 'ALLOWED' && (
+                    <div className="mt-3 text-xs text-slate-500">
+                      Разрешено пользователей: {new Set([...plan.allowedEmails, ...plan.allowedTelegramIds]).size}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -351,10 +381,32 @@ function PlanEditor({
         <Toggle checked={form.unlimitedTraffic} onChange={(value) => set('unlimitedTraffic', value)} label="Безлимитный трафик" />
         <Toggle checked={form.isPromo} onChange={(value) => set('isPromo', value)} label="Пробный тариф" />
         <Toggle checked={form.isActive} onChange={(value) => set('isActive', value)} label="Опубликован" />
+        <Field label="Кому доступен тариф" className="md:col-span-2">
+          <select value={form.availability} onChange={(event) => set('availability', event.target.value as PlanAvailabilityValue)} className="input">
+            {Object.entries(planAvailabilityLabels).map(([value, label]) => (
+              <option key={value} value={value}>{label}</option>
+            ))}
+          </select>
+        </Field>
         <Field label="Описание" className="md:col-span-2 xl:col-span-3">
           <input value={form.description} onChange={(event) => set('description', event.target.value)} className="input" placeholder="Короткое описание для карточки" />
         </Field>
       </div>
+
+      {form.availability === 'ALLOWED' && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-4 dark:border-amber-500/20 dark:bg-amber-500/5">
+          <div className="font-medium">Разрешённые пользователи</div>
+          <p className="mt-1 text-xs text-slate-500">
+            По одному email или Telegram ID на строку. При синхронизации этот список переносится из Remnashop.
+          </p>
+          <textarea
+            value={form.allowedUsers}
+            onChange={(event) => set('allowedUsers', event.target.value)}
+            className="input mt-3 min-h-[110px] resize-y font-mono text-xs"
+            placeholder={'user@example.com\n123456789'}
+          />
+        </div>
+      )}
 
       <div className="rounded-lg border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-surface-900">
         <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -442,6 +494,8 @@ function formFromPlan(plan: PlanAdminRow): PlanFormState {
     unlimitedTraffic: plan.trafficLimitGb == null,
     deviceLimit: String(plan.deviceLimit),
     activeInternalSquads: plan.activeInternalSquads.join('\n'),
+    availability: plan.availability,
+    allowedUsers: [...plan.allowedEmails, ...plan.allowedTelegramIds].join('\n'),
     sortOrder: String(plan.sortOrder),
     isPromo: plan.isPromo,
     isActive: plan.isActive,
@@ -457,6 +511,9 @@ function toPayload(form: PlanFormState) {
     trafficLimitGb: form.unlimitedTraffic || !form.trafficLimitGb ? null : Number(form.trafficLimitGb),
     deviceLimit: Number(form.deviceLimit),
     activeInternalSquads: parseSquads(form.activeInternalSquads),
+    availability: form.availability,
+    allowedEmails: parseAllowedUsers(form.allowedUsers).emails,
+    allowedTelegramIds: parseAllowedUsers(form.allowedUsers).telegramIds,
     sortOrder: Number(form.sortOrder),
     isPromo: form.isPromo,
     isActive: form.isActive,
@@ -465,4 +522,12 @@ function toPayload(form: PlanFormState) {
 
 function parseSquads(value: string) {
   return value.split(/[\s,;]+/).map((item) => item.trim()).filter(Boolean)
+}
+
+function parseAllowedUsers(value: string) {
+  const items = value.split(/[\n,;]+/).map((item) => item.trim()).filter(Boolean)
+  return {
+    emails: Array.from(new Set(items.filter((item) => item.includes('@')).map((item) => item.toLowerCase()))),
+    telegramIds: Array.from(new Set(items.filter((item) => /^\d+$/.test(item)))),
+  }
 }

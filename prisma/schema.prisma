@@ -28,6 +28,9 @@ model Plan {
   trafficLimitGb  Int?                              // null = безлимит
   deviceLimit      Int      @default(5)
   activeInternalSquads String[] @default([])        // UUID squads Remnawave для этого тарифа
+  availability    PlanAvailability @default(ALL)    // аудитория тарифа как в Remnashop
+  allowedEmails   String[] @default([])             // явный доступ для availability=ALLOWED
+  allowedTelegramIds String[] @default([])           // Telegram ID строками, чтобы безопасно отдавать JSON
   isPromo         Boolean  @default(false)          // бесплатный одноразовый ознакомительный тариф
   isActive        Boolean  @default(true)
   sortOrder       Int      @default(0)
@@ -40,6 +43,15 @@ model Plan {
   trialRedemptions TrialPlanRedemption[]
 
   @@index([isActive, sortOrder])
+}
+
+enum PlanAvailability {
+  ALL
+  NEW
+  EXISTING
+  INVITED
+  ALLOWED
+  LINK
 }
 
 // ----------------------------------------------------------------------

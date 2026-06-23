@@ -30,6 +30,9 @@ export default async function AdminPlansPage() {
     trafficLimitGb: plan.trafficLimitGb,
     deviceLimit: plan.deviceLimit,
     activeInternalSquads: plan.activeInternalSquads,
+    availability: plan.availability,
+    allowedEmails: plan.allowedEmails,
+    allowedTelegramIds: plan.allowedTelegramIds,
     isPromo: plan.isPromo,
     isActive: plan.isActive,
     sortOrder: plan.sortOrder,
@@ -41,7 +44,7 @@ export default async function AdminPlansPage() {
     <div className="space-y-6">
       <PageHeader
         title="Тарифы"
-        description="Создание, цены, лимиты и публикация тарифов для пользователей"
+        description="Цены, лимиты, серверные группы и аудитория каждого тарифа"
       />
       <PlansAdmin plans={rows} />
     </div>

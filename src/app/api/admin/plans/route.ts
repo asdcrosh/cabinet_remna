@@ -44,5 +44,11 @@ function normalizePlanInput<T extends { description?: string | null }>(data: T) 
   return {
     ...data,
     description: data.description?.trim() || null,
+    allowedEmails: 'allowedEmails' in data && Array.isArray(data.allowedEmails)
+      ? Array.from(new Set(data.allowedEmails.map((email) => email.trim().toLowerCase())))
+      : undefined,
+    allowedTelegramIds: 'allowedTelegramIds' in data && Array.isArray(data.allowedTelegramIds)
+      ? Array.from(new Set(data.allowedTelegramIds))
+      : undefined,
   }
 }
