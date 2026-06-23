@@ -115,6 +115,7 @@ http://localhost:3000
 | `PAYMENT_CANCEL_PENDING_AFTER_SECONDS` | Через сколько секунд отменять зависший ожидающий платёж |
 | `TELEGRAM_CLIENT_ID` | Опционально, перенос старых Telegram-подписок |
 | `TELEGRAM_CLIENT_SECRET` | Опционально, перенос старых Telegram-подписок |
+| `REMNASHOP_DB_CONTAINER` | Имя локального контейнера remnashop PostgreSQL, по умолчанию `remnashop-db` |
 | `REMNASHOP_DATABASE_URL` | Опционально, read-only подключение к старой БД remnashop |
 | `REMNASHOP_DATABASE_SSL` | SSL для удалённой БД remnashop: `true`, `false`, `no-verify` |
 | `REFERRAL_BONUS_DAYS` | Сколько дней добавить за первую платную покупку приглашенного |
@@ -191,9 +192,18 @@ Authorization: Bearer EMAIL_VERIFICATION_WEBHOOK_SECRET
 
 В dev-режиме, если webhook не задан, ссылка подтверждения выводится в консоль сервера.
 
+## Remnashop Sync
+
+Если `remnashop-db` уже запущен на этом же сервере, установщик сам найдет
+контейнер, создаст read-only пользователя `remnashop_readonly`, подключит
+кабинет к той же Docker-сети и заполнит `REMNASHOP_DATABASE_URL`.
+
+Ручная настройка ниже нужна только если старая база `remnashop` находится на
+другом сервере.
+
 ## Remnashop На Другом Сервере
 
-Если старая база `remnashop` находится на другом сервере, подключай её только read-only пользователем.
+Подключай удаленную БД только read-only пользователем.
 
 На сервере с remnashop/PostgreSQL создай пользователя:
 

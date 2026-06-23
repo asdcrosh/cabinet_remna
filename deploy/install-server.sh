@@ -144,6 +144,109 @@ existing_or_random_hex() {
   fi
 }
 
+urlencode() {
+  python3 - "$1" <<'PY'
+from urllib.parse import quote
+import sys
+
+print(quote(sys.argv[1], safe=""))
+PY
+}
+
+sql_literal() {
+  python3 - "$1" <<'PY'
+import sys
+
+print("'" + sys.argv[1].replace("'", "''") + "'")
+PY
+}
+
+sql_identifier() {
+  python3 - "$1" <<'PY'
+import sys
+
+print('"' + sys.argv[1].replace('"', '""') + '"')
+PY
+}
+
+docker_env_value() {
+  local container="$1"
+  local key="$2"
+
+  docker inspect "${container}" --format '{{range .Config.Env}}{{println .}}{{end}}' 2>/dev/null \
+    | awk -F= -v key="${key}" '$1 == key { sub(/^[^=]*=/, ""); print; exit }'
+}
+
+first_container_network() {
+  local container="$1"
+
+  docker inspect "${container}" --format '{{range $name, $_ := .NetworkSettings.Networks}}{{println $name}}{{end}}' 2>/dev/null \
+    | head -n 1
+}
+
+configure_local_remnashop_database() {
+  local current_url
+  local container="${REMNASHOP_DB_CONTAINER:-remnashop-db}"
+  local db_user
+  local db_name
+  local network
+  local readonly_password
+  local readonly_password_literal
+  local db_name_identifier
+  local encoded_password
+  local database_url
+  local role_exists
+
+  current_url="$(read_env_value REMNASHOP_DATABASE_URL || true)"
+  if usable_env_value "${current_url}"; then
+    return
+  fi
+
+  if ! docker inspect "${container}" >/dev/null 2>&1; then
+    return
+  fi
+
+  db_user="$(docker_env_value "${container}" POSTGRES_USER)"
+  db_name="$(docker_env_value "${container}" POSTGRES_DB)"
+  network="$(first_container_network "${container}")"
+
+  if [[ -z "${db_user}" || -z "${db_name}" || -z "${network}" ]]; then
+    echo "Local ${container} detected, but database env/network could not be read. Skipping remnashop auto-link."
+    return
+  fi
+
+  readonly_password="$(existing_or_random_hex REMNASHOP_READONLY_PASSWORD 24)"
+  readonly_password_literal="$(sql_literal "${readonly_password}")"
+  db_name_identifier="$(sql_identifier "${db_name}")"
+
+  echo "Local ${container} detected. Configuring read-only remnashop sync..."
+
+  role_exists="$(docker exec "${container}" psql -U "${db_user}" -d "${db_name}" -tAc "SELECT 1 FROM pg_roles WHERE rolname = 'remnashop_readonly';" 2>/dev/null | tr -d '[:space:]' || true)"
+  if [[ "${role_exists}" == "1" ]]; then
+    docker exec "${container}" psql -v ON_ERROR_STOP=1 -U "${db_user}" -d "${db_name}" \
+      -c "ALTER ROLE remnashop_readonly WITH LOGIN PASSWORD ${readonly_password_literal};" >/dev/null
+  else
+    docker exec "${container}" psql -v ON_ERROR_STOP=1 -U "${db_user}" -d "${db_name}" \
+      -c "CREATE ROLE remnashop_readonly WITH LOGIN PASSWORD ${readonly_password_literal};" >/dev/null
+  fi
+
+  docker exec "${container}" psql -v ON_ERROR_STOP=1 -U "${db_user}" -d "${db_name}" \
+    -c "GRANT CONNECT ON DATABASE ${db_name_identifier} TO remnashop_readonly;" \
+    -c "GRANT USAGE ON SCHEMA public TO remnashop_readonly;" \
+    -c "GRANT SELECT ON ALL TABLES IN SCHEMA public TO remnashop_readonly;" \
+    -c "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO remnashop_readonly;" >/dev/null
+
+  encoded_password="$(urlencode "${readonly_password}")"
+  database_url="postgresql://remnashop_readonly:${encoded_password}@${container}:5432/${db_name}?schema=public"
+
+  replace_env_value "REMNASHOP_READONLY_PASSWORD" "${readonly_password}"
+  replace_env_value "REMNASHOP_DATABASE_URL" "${database_url}"
+  replace_env_value "REMNASHOP_DATABASE_SSL" "false"
+  replace_env_value "CABINET_EXTERNAL_NETWORK" "${network}"
+
+  echo "Remnashop sync auto-linked through Docker network: ${network}"
+}
+
 prompt_text() {
   local prompt="$1"
   local default_value="${2:-}"
@@ -497,6 +600,7 @@ for key in \
   REMNAWAVE_BASE_URL \
   REMNAWAVE_TOKEN \
   REMNAWAVE_INTERNAL_SQUAD_UUIDS \
+  REMNASHOP_DB_CONTAINER \
   YOOKASSA_SHOP_ID \
   YOOKASSA_SECRET_KEY \
   YOOKASSA_WEBHOOK_ALLOWED_IPS \
@@ -516,6 +620,7 @@ if ! usable_env_value "${CABINET_DOMAIN}"; then
   CABINET_DOMAIN="cabinet.example.com"
 fi
 prompt_required_config
+configure_local_remnashop_database
 
 EXTERNAL_NETWORK="$(read_env_value CABINET_EXTERNAL_NETWORK || true)"
 EXTERNAL_NETWORK="${EXTERNAL_NETWORK:-remnawave-network}"

@@ -111,10 +111,16 @@ Generate webhook secret:
 openssl rand -hex 32
 ```
 
-## 6. Remote Remnashop Database
+## 6. Remnashop Database
 
-If remnashop database is on another server, create a read-only PostgreSQL user
-there:
+If `remnashop-db` runs on the same server, `install-server.sh` detects it
+automatically, creates/updates the `remnashop_readonly` role, grants read-only
+access, joins the cabinet to the same Docker network, and writes
+`REMNASHOP_DATABASE_URL` to `.env`.
+
+Manual setup is only needed when remnashop database is on another server.
+
+On the remote remnashop PostgreSQL server, create a read-only user:
 
 ```sql
 CREATE USER remnashop_readonly WITH PASSWORD 'ВСТАВЬ_СЮДА_СИЛЬНЫЙ_ПАРОЛЬ';
