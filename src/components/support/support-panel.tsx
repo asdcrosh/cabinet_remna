@@ -68,7 +68,7 @@ interface SupportPanelProps {
 
 export function SupportPanel({ mode, initialTickets }: SupportPanelProps) {
   const router = useRouter()
-  const messagesEndRef = useRef<HTMLDivElement | null>(null)
+  const messagesScrollRef = useRef<HTMLDivElement | null>(null)
   const [tickets, setTickets] = useState(initialTickets)
   const [selectedId, setSelectedId] = useState(initialTickets.find((ticket) => ticket.status !== 'CLOSED')?.id ?? initialTickets[0]?.id ?? '')
   const [selectedTicket, setSelectedTicket] = useState<SupportTicket | null>(
@@ -165,7 +165,12 @@ export function SupportPanel({ mode, initialTickets }: SupportPanelProps) {
   }, [fetchTicket, mode, selectedId])
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ block: 'end' })
+    const container = messagesScrollRef.current
+    if (!container) return
+
+    requestAnimationFrame(() => {
+      container.scrollTop = container.scrollHeight
+    })
   }, [selected?.id, selected?.messages.length])
 
   async function loadTicket(id: string) {
@@ -295,8 +300,8 @@ export function SupportPanel({ mode, initialTickets }: SupportPanelProps) {
   }
 
   return (
-    <div className="grid gap-5 xl:grid-cols-[24rem_minmax(0,1fr)]">
-      <section className={cn('space-y-4', mobileChatOpen && 'hidden xl:block')}>
+    <div className="grid h-[calc(100dvh-8rem)] min-h-[34rem] gap-4 overflow-hidden xl:h-[calc(100dvh-11rem)] xl:min-h-[42rem] xl:grid-cols-[24rem_minmax(0,1fr)]">
+      <section className={cn('min-h-0 space-y-4 overflow-y-auto pr-0.5 xl:flex xl:flex-col xl:overflow-hidden', mobileChatOpen && 'hidden xl:flex')}>
         {mode === 'user' && (
           <NewTicketForm
             subject={subject}
@@ -310,8 +315,8 @@ export function SupportPanel({ mode, initialTickets }: SupportPanelProps) {
           />
         )}
 
-        <div className="overflow-hidden rounded-lg border border-white/70 bg-white/80 shadow-sm shadow-slate-200/60 backdrop-blur dark:border-white/10 dark:bg-surface-900/80 dark:shadow-black/20">
-          <div className="border-b border-slate-100 px-4 py-3 dark:border-slate-800">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-white/70 bg-white/80 shadow-sm shadow-slate-200/60 backdrop-blur dark:border-white/10 dark:bg-surface-900/80 dark:shadow-black/20">
+          <div className="border-b border-slate-100 bg-white/70 px-4 py-3 dark:border-slate-800 dark:bg-surface-900/60">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <div className="font-semibold">{mode === 'admin' ? 'Обращения' : 'Мои обращения'}</div>
@@ -322,7 +327,7 @@ export function SupportPanel({ mode, initialTickets }: SupportPanelProps) {
             <FolderTabs folder={folder} counts={folderCounts} mode={mode} onChange={setFolder} />
           </div>
 
-          <div className="max-h-[calc(100dvh-20rem)] overflow-y-auto p-2 xl:max-h-[38rem]">
+          <div className="min-h-0 flex-1 overflow-y-auto p-2">
             {filteredTickets.length === 0 ? (
               <EmptyFolder folder={folder} />
             ) : (
@@ -341,25 +346,25 @@ export function SupportPanel({ mode, initialTickets }: SupportPanelProps) {
       </section>
 
       <section className={cn(
-        'min-h-[calc(100dvh-8rem)] overflow-hidden rounded-lg border border-white/70 bg-white/80 shadow-sm shadow-slate-200/60 backdrop-blur dark:border-white/10 dark:bg-surface-900/80 dark:shadow-black/20 xl:min-h-[42rem]',
+        'min-h-0 overflow-hidden rounded-lg border border-white/70 bg-white/90 shadow-xl shadow-slate-200/60 backdrop-blur dark:border-white/10 dark:bg-surface-900/90 dark:shadow-black/20',
         !mobileChatOpen && 'hidden xl:block'
       )}>
         {selected ? (
-          <div className="flex h-[calc(100dvh-8rem)] min-h-[36rem] flex-col xl:h-[42rem]">
-            <div className="border-b border-slate-100 bg-white/80 px-4 py-3 dark:border-slate-800 dark:bg-surface-900/80 sm:px-5">
+          <div className="flex h-full min-h-0 flex-col">
+            <div className="border-b border-slate-100 bg-white/95 px-4 py-3 dark:border-slate-800 dark:bg-surface-900/95 sm:px-5">
               <div className="flex items-start justify-between gap-3">
-                <div className="flex min-w-0 gap-3">
+                <div className="flex min-w-0 flex-1 gap-3">
                   <button
                     type="button"
                     onClick={() => setMobileChatOpen(false)}
-                    className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-sm xl:hidden"
+                    className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-sm transition-colors hover:bg-slate-50 xl:hidden"
                     aria-label="Назад к обращениям"
                   >
                     <ArrowLeft className="h-4 w-4" />
                   </button>
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h2 className="truncate text-lg font-semibold tracking-tight sm:text-xl">{selected.subject}</h2>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex min-w-0 flex-wrap items-center gap-2">
+                      <h2 className="min-w-0 truncate text-base font-semibold tracking-tight sm:text-lg">{selected.subject}</h2>
                       <TicketStatusBadge status={selected.status} mode={mode} />
                     </div>
                     <div className="mt-1 truncate text-sm text-slate-500">
@@ -378,26 +383,25 @@ export function SupportPanel({ mode, initialTickets }: SupportPanelProps) {
               </div>
             )}
 
-            <div className="flex-1 overflow-y-auto bg-slate-50/70 px-3 py-4 dark:bg-surface-950/30 sm:px-5">
-              <div className="space-y-4">
+            <div ref={messagesScrollRef} className="min-h-0 flex-1 overflow-y-auto bg-slate-50/70 px-3 py-4 dark:bg-surface-950/30 sm:px-5">
+              <div className="mx-auto max-w-3xl space-y-3">
                 {selected.messages.map((item) => {
                   const own = mode === 'admin' ? item.senderRole === 'ADMIN' : item.senderRole === 'USER'
                   return <MessageBubble key={item.id} message={item} own={own} />
                 })}
-                <div ref={messagesEndRef} />
               </div>
             </div>
 
-            <form onSubmit={sendMessage} className="border-t border-slate-100 bg-white/90 p-3 dark:border-slate-800 dark:bg-surface-900/90 sm:p-4">
+            <form onSubmit={sendMessage} className="border-t border-slate-100 bg-white/95 p-3 dark:border-slate-800 dark:bg-surface-900/95 sm:p-4">
               {selected.status === 'CLOSED' ? (
                 <div className="flex items-center gap-2 rounded-lg bg-slate-50 px-4 py-3 text-sm text-slate-500 dark:bg-surface-800">
                   <Lock className="h-4 w-4" />
                   Обращение закрыто и хранится в архиве
                 </div>
               ) : (
-                <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
+                <div className="flex items-end gap-2 rounded-lg border border-slate-200 bg-white p-2 shadow-sm dark:border-slate-800 dark:bg-surface-950">
                   <textarea
-                    className="input min-h-14 resize-none"
+                    className="min-h-11 flex-1 resize-none rounded-md border-0 bg-transparent px-2 py-2 text-sm outline-none placeholder:text-slate-400 focus:ring-0"
                     value={message}
                     onChange={(event) => setMessage(event.target.value)}
                     onKeyDown={handleMessageKeyDown}
@@ -405,9 +409,8 @@ export function SupportPanel({ mode, initialTickets }: SupportPanelProps) {
                     maxLength={3000}
                     required
                   />
-                  <button className="btn-primary self-end" disabled={isPending || !message.trim()}>
+                  <button className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-slate-950 text-white shadow-sm transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-45 dark:bg-white dark:text-slate-950" disabled={isPending || !message.trim()} aria-label="Отправить сообщение">
                     <Send className="h-4 w-4" />
-                    Отправить
                   </button>
                 </div>
               )}
@@ -506,7 +509,7 @@ function FolderTabs({
               'flex min-w-0 items-center justify-between gap-2 rounded-lg border px-2.5 py-2 text-xs font-medium transition-colors',
               active
                 ? 'border-slate-950 bg-slate-950 text-white dark:border-white dark:bg-white dark:text-slate-950'
-                : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-950 dark:border-slate-800 dark:bg-surface-900 dark:text-slate-300 dark:hover:text-white'
+                : 'border-slate-200 bg-white/70 text-slate-600 hover:border-slate-300 hover:bg-white hover:text-slate-950 dark:border-slate-800 dark:bg-surface-900 dark:text-slate-300 dark:hover:text-white'
             )}
           >
             <span className="flex min-w-0 items-center gap-1.5">
@@ -543,32 +546,32 @@ function TicketListItem({
       className={cn(
         'group w-full rounded-lg border px-3 py-3 text-left transition-all',
         active
-          ? 'border-slate-950 bg-slate-950 text-white shadow-lg shadow-slate-950/10 dark:border-white dark:bg-white dark:text-slate-950'
+          ? 'border-slate-300 bg-slate-50 shadow-sm shadow-slate-200/60 ring-1 ring-slate-200 dark:border-slate-700 dark:bg-surface-800 dark:ring-slate-700'
           : 'border-transparent hover:border-slate-200 hover:bg-slate-50 dark:hover:border-slate-800 dark:hover:bg-surface-800'
       )}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex min-w-0 items-center gap-2">
-            {unread > 0 && <span className={cn('h-2 w-2 shrink-0 rounded-full', active ? 'bg-cyan-200 dark:bg-cyan-700' : 'bg-red-500')} />}
+            {unread > 0 && <span className="h-2 w-2 shrink-0 rounded-full bg-red-500" />}
             <div className="truncate font-medium">{ticket.subject}</div>
           </div>
-          <div className={cn('mt-1 truncate text-xs', active ? 'text-white/65 dark:text-slate-950/60' : 'text-slate-500')}>
+          <div className="mt-1 truncate text-xs text-slate-500 dark:text-slate-400">
             {mode === 'admin' && ticket.user ? `${ticket.user.email} · ` : ''}
             {supportCategoryLabel(ticket.category)}
           </div>
         </div>
         <TicketStatusBadge status={ticket.status} mode={mode} active={active} />
       </div>
-      <div className={cn('mt-2 line-clamp-2 text-sm', active ? 'text-white/70 dark:text-slate-950/70' : 'text-slate-500')}>
+      <div className="mt-2 line-clamp-2 text-sm text-slate-500 dark:text-slate-400">
         {ticket.messages.at(-1)?.body || ticket.messages[0]?.body || 'Без сообщений'}
       </div>
       <div className="mt-3 flex items-center justify-between gap-3">
-        <div className={cn('text-xs', active ? 'text-white/50 dark:text-slate-950/50' : 'text-slate-400')}>
+        <div className="text-xs text-slate-400">
           {formatDate(ticket.lastMessageAt)}
         </div>
         {unread > 0 && (
-          <span className={cn('rounded-full px-2 py-0.5 text-[11px] font-semibold', active ? 'bg-white/15 text-white dark:bg-slate-950/10 dark:text-slate-950' : 'bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-200')}>
+          <span className="rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-semibold text-red-700 dark:bg-red-500/10 dark:text-red-200">
             {unread}
           </span>
         )}
