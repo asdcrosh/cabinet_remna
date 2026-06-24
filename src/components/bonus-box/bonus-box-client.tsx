@@ -1,8 +1,8 @@
 'use client'
 
-import { useMemo, useRef, useState } from 'react'
+import { type ReactNode, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { CalendarPlus, Gift, LockKeyhole, Sparkles, TicketPercent, Zap } from 'lucide-react'
+import { CalendarClock, CalendarPlus, CreditCard, Gift, LockKeyhole, Sparkles, TicketPercent, Users, Zap } from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
 import { toast } from '@/components/ui/toaster'
 import { cn } from '@/lib/cn'
@@ -26,9 +26,24 @@ type BonusBoxOpeningView = {
   createdAt: string
   prize: BonusBoxPrizeView
   promoCode: string | null
+  promoCodeExpiresAt: string | null
+}
+
+type BonusBoxConfigView = {
+  rubPerAttempt: number
+  minAttemptsPerPayment: number
+  maxAttemptsPerPayment: number
+  attemptTtlDays: number
+  weeklyEnabled: boolean
+  weeklyDay: number
+  weeklyAttempts: number
+  weeklyMaxBalance: number
+  referrerAttempts: number
+  referredAttempts: number
 }
 
 type BonusBoxOverview = {
+  config: BonusBoxConfigView
   hasActiveSubscription: boolean
   attemptsCount: number
   prizes: BonusBoxPrizeView[]
@@ -42,6 +57,7 @@ type OpenBoxResponse = {
   winningIndex: number
   stopOffsetRatio: number
   promoCode: string | null
+  promoCodeExpiresAt: string | null
   remainingAttempts: number
   remoteSynced: boolean
 }
@@ -204,9 +220,14 @@ export function BonusBoxClient({ initialData }: { initialData: BonusBoxOverview 
                 <div className="mt-1 text-sm text-slate-500 dark:text-slate-400">{result.prize.description}</div>
               )}
               {result.promoCode && (
-                <div className="mt-3 inline-flex max-w-full items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-100">
+                <div className="mt-3 inline-flex max-w-full flex-wrap items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-100">
                   <TicketPercent className="h-4 w-4 shrink-0" />
                   <span className="break-all">{result.promoCode}</span>
+                  {result.promoCodeExpiresAt && (
+                    <span className="text-xs font-medium text-emerald-700/80 dark:text-emerald-100/75">
+                      до {formatDateOnly(result.promoCodeExpiresAt)}
+                    </span>
+                  )}
                 </div>
               )}
             </div>
@@ -220,6 +241,8 @@ export function BonusBoxClient({ initialData }: { initialData: BonusBoxOverview 
           </div>
         )}
       </section>
+
+      <BonusBoxRules config={data.config} hasActiveSubscription={data.hasActiveSubscription} />
 
       <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
         <section className="space-y-3">
@@ -256,6 +279,11 @@ export function BonusBoxClient({ initialData }: { initialData: BonusBoxOverview 
                 {opening.promoCode && (
                   <div className="mt-2 break-all rounded-md bg-white px-2 py-1 font-mono text-xs text-slate-700 dark:bg-surface-950 dark:text-slate-200">
                     {opening.promoCode}
+                    {opening.promoCodeExpiresAt && (
+                      <span className="ml-2 font-sans text-slate-500">
+                        до {formatDateOnly(opening.promoCodeExpiresAt)}
+                      </span>
+                    )}
                   </div>
                 )}
               </div>
@@ -267,6 +295,82 @@ export function BonusBoxClient({ initialData }: { initialData: BonusBoxOverview 
             )}
           </div>
         </section>
+      </div>
+    </div>
+  )
+}
+
+function BonusBoxRules({
+  config,
+  hasActiveSubscription,
+}: {
+  config: BonusBoxConfigView
+  hasActiveSubscription: boolean
+}) {
+  const paymentRange =
+    config.minAttemptsPerPayment > 0
+      ? `${config.minAttemptsPerPayment}-${config.maxAttemptsPerPayment}`
+      : `до ${config.maxAttemptsPerPayment}`
+  const referralText =
+    config.referrerAttempts > 0 || config.referredAttempts > 0
+      ? `За приглашение после первой оплаты: вам +${config.referrerAttempts}, другу +${config.referredAttempts}.`
+      : 'Реферальные открытия сейчас не начисляются.'
+  const weeklyText =
+    config.weeklyEnabled && config.weeklyAttempts > 0
+      ? `${weekdayLabel(config.weeklyDay)}: +${config.weeklyAttempts}, если VPN-подписка активна.`
+      : 'Еженедельный бонус сейчас выключен.'
+  const ttlText = config.attemptTtlDays > 0
+    ? `Открытия хранятся ${config.attemptTtlDays} дн.`
+    : 'Открытия не сгорают.'
+
+  return (
+    <section className="grid gap-3 md:grid-cols-3">
+      <RuleCard
+        icon={<CreditCard className="h-5 w-5" />}
+        title="За оплату"
+        text={`1 открытие за каждые ${config.rubPerAttempt} ₽. За платеж можно получить ${paymentRange}.`}
+      />
+      <RuleCard
+        icon={<Users className="h-5 w-5" />}
+        title="За приглашения"
+        text={referralText}
+      />
+      <RuleCard
+        icon={<CalendarClock className="h-5 w-5" />}
+        title="Еженедельно"
+        text={`${weeklyText} ${ttlText}`}
+        muted={!hasActiveSubscription}
+      />
+    </section>
+  )
+}
+
+function RuleCard({
+  icon,
+  title,
+  text,
+  muted = false,
+}: {
+  icon: ReactNode
+  title: string
+  text: string
+  muted?: boolean
+}) {
+  return (
+    <div
+      className={cn(
+        'rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-surface-900',
+        muted && 'bg-slate-50 text-slate-500 dark:bg-surface-900/70 dark:text-slate-400'
+      )}
+    >
+      <div className="flex items-start gap-3">
+        <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-700 dark:bg-white/10 dark:text-slate-200">
+          {icon}
+        </div>
+        <div className="min-w-0">
+          <div className="font-semibold">{title}</div>
+          <div className="mt-1 text-sm leading-5 text-slate-500 dark:text-slate-400">{text}</div>
+        </div>
       </div>
     </div>
   )
@@ -387,4 +491,17 @@ function formatDate(value: string) {
     hour: '2-digit',
     minute: '2-digit',
   })
+}
+
+function formatDateOnly(value: string) {
+  return new Date(value).toLocaleDateString('ru-RU', {
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
+  })
+}
+
+function weekdayLabel(day: number) {
+  const labels = ['Воскресенье', 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота']
+  return labels[day] ?? 'Пятница'
 }

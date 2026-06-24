@@ -138,6 +138,9 @@ https://ВСТАВЬ_СЮДА_ДОМЕН_КАБИНЕТА
 | `BONUS_BOX_WEEKLY_DAY` / `BONUS_BOX_WEEKLY_ATTEMPTS` | День недели и количество еженедельных открытий |
 | `BONUS_BOX_REFERRER_ATTEMPTS` / `BONUS_BOX_REFERRED_ATTEMPTS` | Открытия за реферальную покупку |
 | `BONUS_BOX_PROMO_EXPIRES_IN_DAYS` | Срок жизни промокодов, выпавших из бокса |
+| `BONUS_BOX_ECONOMY_GUARD_ENABLED` | Защита от подряд идущих дорогих подарков |
+| `BONUS_BOX_RARE_COOLDOWN_OPENINGS` / `BONUS_BOX_EPIC_COOLDOWN_OPENINGS` / `BONUS_BOX_LEGENDARY_COOLDOWN_OPENINGS` | Сколько открытий должно пройти перед следующими дорогими подарками |
+| `BONUS_BOX_EPIC_MIN_OPENINGS` / `BONUS_BOX_LEGENDARY_MIN_OPENINGS` | Минимальная история открытий перед эпиком и легендой |
 
 ## Reverse Proxy
 

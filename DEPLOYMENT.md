@@ -82,6 +82,8 @@ Optional Подарочный бокс settings are kept in `.env`. The most imp
 `BONUS_BOX_RUB_PER_ATTEMPT`: it controls how many paid rubles give one opening.
 Weekly and referral openings are controlled by `BONUS_BOX_WEEKLY_*` and
 `BONUS_BOX_REFERRER_ATTEMPTS` / `BONUS_BOX_REFERRED_ATTEMPTS`.
+`BONUS_BOX_ECONOMY_GUARD_ENABLED` and the `BONUS_BOX_*_COOLDOWN_OPENINGS`
+settings protect the product economy from several expensive gifts in a row.
 
 ## Reverse proxy
 
