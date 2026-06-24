@@ -82,6 +82,7 @@ BONUS_BOX_LEGENDARY_COOLDOWN_OPENINGS="30"
 `BONUS_BOX_RUB_PER_ATTEMPT` controls paid rubles per opening. `5` in
 `BONUS_BOX_WEEKLY_DAY` means Friday. Economy guard cooldowns control how many
 openings must pass before expensive prizes can return to the available pool.
+Rare and epic gifts do not reset legendary availability.
 
 ## 4. Reverse proxy
 

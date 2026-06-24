@@ -135,7 +135,7 @@ export async function getBonusBoxOverview(userId: string) {
       },
     }),
   ])
-  const availablePrizes = applyEconomyGuard(prizeRows, openings, config)
+  const availablePrizes = applyBonusBoxEconomyGuard(prizeRows, openings, config)
   const prizes = publicPrizesWithChances(prizeRows, availablePrizes)
 
   return {
@@ -405,7 +405,7 @@ export async function openBonusBox(userId: string): Promise<BonusBoxOpeningResul
         take: ECONOMY_HISTORY_LIMIT,
         select: { prize: { select: { rarity: true } } },
       })
-      const prize = pickWeightedPrize(applyEconomyGuard(eligiblePrizes, recentOpenings, config))
+      const prize = pickWeightedPrize(applyBonusBoxEconomyGuard(eligiblePrizes, recentOpenings, config))
       const claimedPrize = await tx.bonusBoxPrize.updateMany({
         where: {
           id: prize.id,
@@ -501,7 +501,7 @@ async function getPublicPrizesForUser(userId: string) {
       select: { prize: { select: { rarity: true } } },
     }),
   ])
-  return publicPrizesWithChances(prizes, applyEconomyGuard(prizes, recentOpenings, config))
+  return publicPrizesWithChances(prizes, applyBonusBoxEconomyGuard(prizes, recentOpenings, config))
 }
 
 async function getPrizeRows(tx: Pick<BonusBoxTx, 'bonusBoxPrize'>) {
@@ -683,7 +683,7 @@ function publicPrizesWithChances(prizes: BonusBoxPrize[], availablePrizes: Bonus
   )
 }
 
-function applyEconomyGuard(
+export function applyBonusBoxEconomyGuard(
   prizes: BonusBoxPrize[],
   recentOpenings: Array<{ prize: { rarity: BonusBoxRarity } }>,
   config: ReturnType<typeof getBonusBoxConfig>
@@ -712,16 +712,15 @@ function canWinPrizeNow(
     return sinceRareOrBetter >= config.rareCooldownOpenings
   }
 
+  const sinceEpicOrBetter = openingsSinceRarityAtLeast(recentOpenings, 2)
   if (rank === 2) {
     return recentOpenings.length >= config.epicMinOpenings
-      && sinceRareOrBetter >= config.epicCooldownOpenings
+      && sinceRareOrBetter >= config.rareCooldownOpenings
+      && sinceEpicOrBetter >= config.epicCooldownOpenings
   }
 
-  const sinceEpicOrBetter = openingsSinceRarityAtLeast(recentOpenings, 2)
   const sinceLegendary = openingsSinceRarityAtLeast(recentOpenings, 3)
   return recentOpenings.length >= config.legendaryMinOpenings
-    && sinceRareOrBetter >= config.epicCooldownOpenings
-    && sinceEpicOrBetter >= config.legendaryCooldownOpenings
     && sinceLegendary >= config.legendaryCooldownOpenings
 }
 
