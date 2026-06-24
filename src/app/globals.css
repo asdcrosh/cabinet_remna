@@ -2,22 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-@keyframes traffic-bar-shine {
-  from { background-position: 180% 0; }
-  to { background-position: -80% 0; }
-}
-
-@keyframes traffic-dot-pulse {
-  0%, 100% {
-    box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.2), 0 0 12px rgba(14, 165, 233, 0.5);
-    transform: translate(50%, -50%) scale(0.9);
-  }
-  50% {
-    box-shadow: 0 0 0 7px rgba(34, 211, 238, 0.08), 0 0 18px rgba(14, 165, 233, 0.7);
-    transform: translate(50%, -50%) scale(1.08);
-  }
-}
-
 @layer base {
   :root {
     --bg: 248 250 252;
@@ -116,21 +100,10 @@
     @apply sticky right-0 z-10 border-l bg-white shadow-[-12px_0_18px_-18px_rgba(15,23,42,0.55)]
            dark:bg-surface-900;
   }
-  .traffic-balance-fill {
-    background-size: 220% 100%;
-    animation: traffic-bar-shine 3.4s linear infinite;
-    box-shadow: 0 0 16px rgba(14, 165, 233, 0.28);
-  }
-  .traffic-balance-dot {
-    @apply absolute right-0 top-1/2 h-3 w-3 rounded-full border-2 border-white bg-cyan-500;
-    animation: traffic-dot-pulse 1.8s ease-in-out infinite;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .traffic-chart-moving-dot,
-  .traffic-balance-fill,
-  .traffic-balance-dot {
+  .traffic-chart-moving-dot {
     animation: none !important;
   }
   .traffic-chart-moving-dot {

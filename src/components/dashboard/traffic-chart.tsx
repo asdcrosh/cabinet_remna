@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { Activity, Infinity, Radio, TriangleAlert } from 'lucide-react'
+import { Activity, Radio, TriangleAlert } from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
 import { formatBytes } from '@/lib/format'
 
@@ -94,7 +94,7 @@ export function TrafficChart({
         {data.historyAvailable && data.series.length > 1 ? (
           <NeonAreaChart series={data.series} />
         ) : (
-          <TrafficBalance used={used} limit={limit} percent={percent} />
+          <TrafficProgressCurve used={used} limit={limit} percent={percent} />
         )}
 
         <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
@@ -129,11 +129,6 @@ function NeonAreaChart({ series }: { series: SeriesPoint[] }) {
         aria-label="График использования трафика за 30 дней"
       >
         <defs>
-          <linearGradient id="traffic-area" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.28" />
-            <stop offset="65%" stopColor="#34d399" stopOpacity="0.08" />
-            <stop offset="100%" stopColor="#10b981" stopOpacity="0" />
-          </linearGradient>
           <linearGradient id="traffic-line" x1="0" y1="0" x2="1" y2="0">
             <stop offset="0%" stopColor="#22d3ee" />
             <stop offset="55%" stopColor="#67e8f9" />
@@ -147,7 +142,6 @@ function NeonAreaChart({ series }: { series: SeriesPoint[] }) {
             </feMerge>
           </filter>
         </defs>
-        <path d={chart.areaPath} fill="url(#traffic-area)" />
         <path
           d={chart.linePath}
           fill="none"
@@ -194,7 +188,7 @@ function NeonAreaChart({ series }: { series: SeriesPoint[] }) {
   )
 }
 
-function TrafficBalance({
+function TrafficProgressCurve({
   used,
   limit,
   percent,
@@ -203,25 +197,61 @@ function TrafficBalance({
   limit: bigint | null
   percent: number | null
 }) {
+  const progress = percent === null ? (used > 0n ? 64 : 0) : percent
+  const path = makeProgressPath(progress)
+
   return (
-    <div className="rounded-lg border border-cyan-100 bg-cyan-50/45 p-4">
-      <div className="flex items-center justify-between gap-3">
-        <div className="text-sm text-slate-600">Использование периода</div>
-        <div className="flex items-center gap-1.5 font-medium text-cyan-700">
-          {percent === null ? <Infinity className="h-4 w-4" /> : `${percent}%`}
-        </div>
-      </div>
-      <div className="relative mt-4 h-4 rounded-full border border-cyan-200 bg-white shadow-inner">
-        <div
-          className="traffic-balance-fill relative h-full rounded-full bg-gradient-to-r from-cyan-400 via-sky-400 to-emerald-400 transition-all duration-700"
-          style={{ width: `${percent === null ? (used > 0n ? 100 : 0) : Math.max(percent, used > 0n ? 2 : 0)}%` }}
-        >
-          {used > 0n && <span className="traffic-balance-dot" />}
-        </div>
-      </div>
-      <div className="mt-2 flex justify-between text-[11px] text-slate-500">
-        <span>0 B</span>
-        <span>{limit ? formatBytes(limit) : 'Безлимит'}</span>
+    <div className="relative h-36 overflow-hidden rounded-lg border border-cyan-100 bg-cyan-50/45 sm:h-44">
+      <div className="absolute inset-0 bg-[linear-gradient(rgba(14,165,233,0.09)_1px,transparent_1px),linear-gradient(90deg,rgba(14,165,233,0.07)_1px,transparent_1px)] bg-[size:100%_25%,12.5%_100%]" />
+      <svg
+        viewBox="0 0 800 220"
+        preserveAspectRatio="none"
+        className="absolute inset-0 h-full w-full"
+        role="img"
+        aria-label="Текущий баланс использования трафика"
+      >
+        <defs>
+          <linearGradient id="traffic-progress-line" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stopColor="#22d3ee" />
+            <stop offset="58%" stopColor="#38bdf8" />
+            <stop offset="100%" stopColor="#34d399" />
+          </linearGradient>
+          <filter id="traffic-progress-glow" x="-20%" y="-50%" width="140%" height="200%">
+            <feGaussianBlur stdDeviation="3" result="blur" />
+            <feMerge>
+              <feMergeNode in="blur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+        </defs>
+        <path
+          d={path}
+          fill="none"
+          stroke="url(#traffic-progress-line)"
+          strokeWidth="2.25"
+          strokeLinecap="round"
+          vectorEffect="non-scaling-stroke"
+        />
+        {used > 0n && (
+          <g className="traffic-chart-moving-dot">
+            <circle r="11" fill="none" stroke="#22d3ee" strokeWidth="2" opacity="0.45">
+              <animate attributeName="r" values="7;14;7" dur="1.8s" repeatCount="indefinite" />
+              <animate attributeName="opacity" values="0.55;0;0.55" dur="1.8s" repeatCount="indefinite" />
+            </circle>
+            <circle
+              r="5.5"
+              fill="#ffffff"
+              stroke="#0284c7"
+              strokeWidth="3"
+              filter="url(#traffic-progress-glow)"
+            />
+            <animateMotion path={path} dur="4.8s" repeatCount="indefinite" />
+          </g>
+        )}
+      </svg>
+      <div className="absolute bottom-2 left-3 text-[11px] text-cyan-800/55">0 B</div>
+      <div className="absolute bottom-2 right-3 text-[11px] text-emerald-800/55">
+        {limit ? formatBytes(limit) : 'Безлимит'}
       </div>
     </div>
   )
@@ -250,8 +280,19 @@ function makeChart(series: SeriesPoint[]) {
     return { x, y, date: point.date, bytes: safeBigInt(point.bytes) }
   })
   const linePath = makeSmoothPath(points)
-  const areaPath = `${linePath} L ${points[points.length - 1]?.x ?? width} ${height} L ${points[0]?.x ?? 0} ${height} Z`
-  return { points, linePath, areaPath, lastPoint: points[points.length - 1] ?? null }
+  return { points, linePath, lastPoint: points[points.length - 1] ?? null }
+}
+
+function makeProgressPath(progress: number | null) {
+  const normalized = Math.max(0, Math.min(100, progress ?? 0))
+  const finishY = 180 - normalized * 1.35
+  return [
+    'M 0 184',
+    'C 86 178, 112 145, 192 153',
+    'S 310 184, 382 126',
+    'S 505 78, 574 112',
+    `S 714 ${Math.max(28, finishY + 18)}, 800 ${finishY}`,
+  ].join(' ')
 }
 
 function makeSmoothPath(points: Array<{ x: number; y: number }>) {
