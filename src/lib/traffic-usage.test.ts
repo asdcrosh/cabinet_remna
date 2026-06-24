@@ -20,4 +20,20 @@ describe('normalizeUsageSeries', () => {
       { timestamp: '2026-06-24T11:00:00Z', upload_bytes: 50, download_bytes: 50 },
     ])).toEqual([{ date: '2026-06-24', bytes: '500' }])
   })
+
+  it('unwraps the Remnawave response and fills missing days with zero usage', () => {
+    expect(normalizeUsageSeries({
+      response: [
+        { date: '2026-06-22', bytes: '1024' },
+        { date: '2026-06-24', bytes: '2048' },
+      ],
+    }, {
+      start: new Date('2026-06-22T12:00:00Z'),
+      end: new Date('2026-06-24T12:00:00Z'),
+    })).toEqual([
+      { date: '2026-06-22', bytes: '1024' },
+      { date: '2026-06-23', bytes: '0' },
+      { date: '2026-06-24', bytes: '2048' },
+    ])
+  })
 })

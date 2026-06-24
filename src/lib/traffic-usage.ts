@@ -3,7 +3,10 @@ export interface TrafficSeriesPoint {
   bytes: string
 }
 
-export function normalizeUsageSeries(value: unknown): TrafficSeriesPoint[] {
+export function normalizeUsageSeries(
+  value: unknown,
+  range?: { start: Date; end: Date }
+): TrafficSeriesPoint[] {
   const rows = findUsageRows(value)
   const totals = new Map<string, bigint>()
 
@@ -23,6 +26,12 @@ export function normalizeUsageSeries(value: unknown): TrafficSeriesPoint[] {
     totals.set(date, (totals.get(date) ?? 0n) + bytes)
   }
 
+  if (range) {
+    for (const date of enumerateUtcDays(range.start, range.end)) {
+      if (!totals.has(date)) totals.set(date, 0n)
+    }
+  }
+
   return Array.from(totals.entries())
     .sort(([left], [right]) => left.localeCompare(right))
     .map(([date, bytes]) => ({ date, bytes: bytes.toString() }))
@@ -33,10 +42,36 @@ function findUsageRows(value: unknown): unknown[] {
   if (!value || typeof value !== 'object') return []
 
   const record = value as Record<string, unknown>
+  if (Array.isArray(record.response)) return record.response
+  if (record.response && typeof record.response === 'object') {
+    const nested = findUsageRows(record.response)
+    if (nested.length > 0) return nested
+  }
   for (const key of ['records', 'series', 'data', 'items', 'usage']) {
     if (Array.isArray(record[key])) return record[key] as unknown[]
   }
   return []
+}
+
+function enumerateUtcDays(start: Date, end: Date) {
+  const dates: string[] = []
+  const cursor = new Date(Date.UTC(
+    start.getUTCFullYear(),
+    start.getUTCMonth(),
+    start.getUTCDate()
+  ))
+  const last = new Date(Date.UTC(
+    end.getUTCFullYear(),
+    end.getUTCMonth(),
+    end.getUTCDate()
+  ))
+
+  while (cursor <= last) {
+    dates.push(cursor.toISOString().slice(0, 10))
+    cursor.setUTCDate(cursor.getUTCDate() + 1)
+  }
+
+  return dates
 }
 
 function readBytes(record: Record<string, unknown>) {

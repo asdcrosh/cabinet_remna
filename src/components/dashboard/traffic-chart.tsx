@@ -117,6 +117,7 @@ export function TrafficChart({
 
 function NeonAreaChart({ series }: { series: SeriesPoint[] }) {
   const chart = useMemo(() => makeChart(series), [series])
+  const labels = useMemo(() => makeDateLabels(series), [series])
 
   return (
     <div className="relative h-36 overflow-hidden rounded-lg border border-cyan-100 bg-cyan-50/45 sm:h-44">
@@ -152,6 +153,20 @@ function NeonAreaChart({ series }: { series: SeriesPoint[] }) {
           opacity="0.85"
           vectorEffect="non-scaling-stroke"
         />
+        {chart.points.map((point, index) => (
+          <circle
+            key={point.date}
+            cx={point.x}
+            cy={point.y}
+            r={index % 5 === 0 || index === chart.points.length - 1 ? 2.5 : 1.5}
+            fill="#ffffff"
+            stroke="#0ea5e9"
+            strokeWidth="1.25"
+            opacity={index % 5 === 0 || index === chart.points.length - 1 ? 0.9 : 0.4}
+          >
+            <title>{`${formatChartDate(point.date)}: ${formatBytes(point.bytes)}`}</title>
+          </circle>
+        ))}
         {chart.lastPoint && (
           <>
             <circle
@@ -180,9 +195,10 @@ function NeonAreaChart({ series }: { series: SeriesPoint[] }) {
           />
         </g>
       </svg>
-      <div className="absolute bottom-2 left-3 text-[11px] text-cyan-800/55">{formatChartDate(series[0]?.date)}</div>
-      <div className="absolute bottom-2 right-3 text-[11px] text-emerald-800/55">
-        {formatChartDate(series[series.length - 1]?.date)}
+      <div className="absolute inset-x-3 bottom-2 flex justify-between text-[10px] text-slate-500">
+        {labels.map((label) => (
+          <span key={label.date}>{formatChartDate(label.date)}</span>
+        ))}
       </div>
     </div>
   )
@@ -313,6 +329,20 @@ function makeSmoothPath(points: Array<{ x: number; y: number }>) {
     path += ` C ${controlOneX} ${controlOneY}, ${controlTwoX} ${controlTwoY}, ${next.x} ${next.y}`
   }
   return path
+}
+
+function makeDateLabels(series: SeriesPoint[]) {
+  if (series.length <= 1) return series
+  const desiredLabels = 6
+  const indexes = new Set<number>()
+
+  for (let index = 0; index < desiredLabels; index += 1) {
+    indexes.add(Math.round((index / (desiredLabels - 1)) * (series.length - 1)))
+  }
+
+  return Array.from(indexes)
+    .sort((left, right) => left - right)
+    .map((index) => series[index])
 }
 
 function safeBigInt(value: string | undefined) {

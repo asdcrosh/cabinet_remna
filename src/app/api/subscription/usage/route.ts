@@ -36,7 +36,8 @@ export const GET = withAuth(async (req: Request) => {
   const url = new URL(req.url)
   const days = Math.min(Math.max(parseInt(url.searchParams.get('days') || '30', 10) || 30, 1), 90)
   const end = new Date()
-  const start = new Date(end.getTime() - days * 24 * 60 * 60 * 1000)
+  const start = new Date(end)
+  start.setUTCDate(start.getUTCDate() - (days - 1))
   const localSubscription = user.subscriptions[0]
 
   let usedBytes = localSubscription?.trafficUsedBytes ?? 0n
@@ -69,8 +70,8 @@ export const GET = withAuth(async (req: Request) => {
   }
 
   if (usageResult.status === 'fulfilled') {
-    series = normalizeUsageSeries(usageResult.value.response)
-    historyAvailable = series.length > 0
+    series = normalizeUsageSeries(usageResult.value, { start, end })
+    historyAvailable = series.length > 1
   } else if (!warning && usageResult.reason instanceof RemnawaveError) {
     warning = `Remnawave ${usageResult.reason.status}`
   }
