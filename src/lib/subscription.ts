@@ -10,6 +10,7 @@ import { prisma } from './prisma'
 import { remnawave, RemnawaveError, type UserResponse } from './remnawave'
 import { gbToBytes } from './format'
 import { toRemnawaveTelegramId } from './telegram-remnawave'
+import { readRemnawaveBigInt } from './remnawave-usage'
 
 export interface EnsureSubscriptionInput {
   userId: string                  // локальный ID в нашей БД
@@ -125,7 +126,12 @@ export async function ensureRemnawaveSubscription(input: EnsureSubscriptionInput
   }
 
   // Денормализуем в нашу БД
-  const trafficLimit = BigInt(remnawaveUser.trafficLimitBytes || '0')
+  const trafficLimit = readRemnawaveBigInt(remnawaveUser, ['trafficLimitBytes', 'trafficLimit'])
+  const trafficUsed = readRemnawaveBigInt(remnawaveUser, ['usedTrafficBytes', 'trafficUsedBytes'])
+  const lifetimeUsed = readRemnawaveBigInt(remnawaveUser, [
+    'lifetimeUsedTrafficBytes',
+    'lifetimeTrafficUsedBytes',
+  ])
   const latestSubscription = user.subscriptions[0]
   const isPlanSwitch = Boolean(latestSubscription && latestSubscription.planId !== input.plan.id)
   const subscription = await prisma.$transaction(async (tx) => {
@@ -138,8 +144,8 @@ export async function ensureRemnawaveSubscription(input: EnsureSubscriptionInput
             expireAt: new Date(remnawaveUser.expireAt),
             status: mapStatus(remnawaveUser.status),
             trafficLimitBytes: trafficLimit === 0n ? null : trafficLimit,
-            trafficUsedBytes: BigInt(remnawaveUser.usedTrafficBytes || '0'),
-            lifetimeUsedBytes: BigInt(remnawaveUser.lifetimeUsedTrafficBytes || '0'),
+            trafficUsedBytes: trafficUsed,
+            lifetimeUsedBytes: lifetimeUsed,
             lastSyncedAt: new Date(),
             pendingSync: false,
           },
@@ -152,8 +158,8 @@ export async function ensureRemnawaveSubscription(input: EnsureSubscriptionInput
             expireAt: new Date(remnawaveUser.expireAt),
             status: mapStatus(remnawaveUser.status),
             trafficLimitBytes: trafficLimit === 0n ? null : trafficLimit,
-            trafficUsedBytes: BigInt(remnawaveUser.usedTrafficBytes || '0'),
-            lifetimeUsedBytes: BigInt(remnawaveUser.lifetimeUsedTrafficBytes || '0'),
+            trafficUsedBytes: trafficUsed,
+            lifetimeUsedBytes: lifetimeUsed,
             lastSyncedAt: new Date(),
             pendingSync: false,
           },

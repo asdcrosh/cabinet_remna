@@ -9,6 +9,7 @@ import { prisma } from '@/lib/prisma'
 import { requireAuth, withAuth } from '@/lib/auth/guard'
 import { remnawave, RemnawaveError } from '@/lib/remnawave'
 import { serializeSubscription } from '@/lib/api-serializers'
+import { readRemnawaveBigInt } from '@/lib/remnawave-usage'
 
 export const runtime = 'nodejs'
 
@@ -44,14 +45,14 @@ export const GET = withAuth(async () => {
     try {
       const data = await remnawave.getSubscriptionByUsername(user.remnawaveUsername)
       const u = data.response.user
-      const limit = BigInt(u.trafficLimitBytes || '0')
+      const limit = readRemnawaveBigInt(u, ['trafficLimitBytes', 'trafficLimit'])
 
       const dataToSave = {
         expireAt: new Date(u.expiresAt),
         status: mapRemnawaveStatus(u.userStatus),
         trafficLimitBytes: limit === 0n ? null : limit,
-        trafficUsedBytes: BigInt(u.trafficUsedBytes || '0'),
-        lifetimeUsedBytes: BigInt(u.lifetimeTrafficUsedBytes || '0'),
+        trafficUsedBytes: readRemnawaveBigInt(u, ['trafficUsedBytes', 'usedTrafficBytes']),
+        lifetimeUsedBytes: readRemnawaveBigInt(u, ['lifetimeTrafficUsedBytes', 'lifetimeUsedTrafficBytes']),
         lastSyncedAt: new Date(),
         pendingSync: false,
       }
