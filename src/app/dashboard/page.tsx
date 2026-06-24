@@ -1,5 +1,4 @@
-// Главная страница кабинета: тянем данные подписки, показываем крупные
-// карточки со статусом, остатком трафика и кнопкой продления.
+// Главная страница кабинета: компактный обзор подписки и быстрые действия.
 
 import Link from 'next/link'
 import { prisma } from '@/lib/prisma'
@@ -10,9 +9,18 @@ import { StatusBadge } from '@/components/dashboard/status-badge'
 import { ProgressBar } from '@/components/dashboard/progress-bar'
 import { TrafficChart } from '@/components/dashboard/traffic-chart'
 import { redirect } from 'next/navigation'
-import { Activity, AlertTriangle, CheckCircle2, CreditCard, Gauge, KeyRound, ShieldCheck } from 'lucide-react'
-import { PageHeader } from '@/components/dashboard/page-header'
-import { StatCard } from '@/components/dashboard/stat-card'
+import {
+  Activity,
+  AlertTriangle,
+  ArrowRight,
+  CheckCircle2,
+  CreditCard,
+  Gift,
+  KeyRound,
+  Laptop,
+  ShieldCheck,
+  UsersRound,
+} from 'lucide-react'
 import { logWarn } from '@/lib/logger'
 import { readRemnawaveBigInt } from '@/lib/remnawave-usage'
 
@@ -53,13 +61,15 @@ export default async function DashboardHome() {
   const limit = sub ? readRemnawaveBigInt(sub, ['trafficLimitBytes', 'trafficLimit']) : 0n
   const isUnlimited = limit === 0n
   const percent = isUnlimited ? 0 : Math.min(100, Math.round((Number(used) / Number(limit || 1n)) * 100))
+  const daysLeft = sub?.daysLeft ?? 0
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="VPN готов"
-        description="Управляйте подпиской, устройствами и продлением"
-        action={<Link href="/dashboard/subscription" className="btn-primary">Открыть подписку</Link>}
+    <div className="space-y-4">
+      <CompactHeader
+        title="Главная"
+        description="Подписка и использование VPN"
+        actionHref="/dashboard/subscription"
+        actionLabel="Подключение"
       />
 
       {subRow?.pendingSync && !remnawaveCard && (
@@ -74,150 +84,114 @@ export default async function DashboardHome() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-        <StatCard
-          label="Статус"
-          value={<StatusBadge status={sub?.userStatus ?? 'DISABLED'} />}
-          hint={sub ? `${sub.daysLeft} дн. осталось` : 'Подписка не найдена'}
-          icon={<ShieldCheck className="h-5 w-5" />}
-        />
-
-        <StatCard
-          label="Трафик"
-          value={formatBytes(used)}
-          hint={`из ${isUnlimited ? 'безлимита' : formatBytes(limit)}`}
-          icon={<Gauge className="h-5 w-5" />}
-        />
-
-        <div className="card">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-          <p className="stat-label">Тариф</p>
-              <div className="mt-2 stat">{subRow?.plan?.name ?? '—'}</div>
-              <p className="stat-label">
-                {subRow?.plan ? formatPrice(subRow.plan.priceKopecks) : '—'} / {subRow?.plan?.durationDays ?? '—'} дн.
-              </p>
+      <section className="card overflow-hidden p-0">
+        <div className="grid lg:grid-cols-[1.25fr_0.75fr]">
+          <div className="p-4 sm:p-5">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h2 className="truncate text-xl font-semibold sm:text-2xl">
+                    {subRow?.plan?.name ?? 'VPN-подписка'}
+                  </h2>
+                  <StatusBadge status={sub?.userStatus ?? 'DISABLED'} />
+                </div>
+                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                  {subRow?.plan
+                    ? `${formatPrice(subRow.plan.priceKopecks)} · ${subRow.plan.durationDays} дн.`
+                    : 'Тариф синхронизируется'}
+                </p>
+              </div>
+              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-slate-950 text-cyan-200 dark:bg-white dark:text-slate-950">
+                <ShieldCheck className="h-5 w-5" />
+              </div>
             </div>
-            <div className="rounded-2xl bg-brand-50 p-3 text-brand-600 dark:bg-brand-500/10 dark:text-brand-300">
-              <KeyRound className="h-5 w-5" />
+
+            <div className="mt-5 grid grid-cols-2 gap-x-4 gap-y-4 sm:grid-cols-3">
+              <OverviewMetric label="Осталось" value={sub ? `${daysLeft} дн.` : '—'} />
+              <OverviewMetric label="Использовано" value={formatBytes(used)} />
+              <OverviewMetric
+                className="col-span-2 sm:col-span-1"
+                label="Лимит"
+                value={isUnlimited ? 'Безлимит' : formatBytes(limit)}
+              />
             </div>
+
+            {!isUnlimited && (
+              <div className="mt-4">
+                <div className="mb-1.5 flex justify-between text-xs text-slate-500">
+                  <span>Трафик</span>
+                  <span>{percent}%</span>
+                </div>
+                <ProgressBar value={percent} />
+              </div>
+            )}
           </div>
-          <div className="mt-3">
-            <ProgressBar value={percent} />
-          </div>
-          <div className="mt-4 flex gap-2">
-            <Link href="/dashboard/subscription" className="btn-primary">Подключение</Link>
-            <Link href="/dashboard/plans" className="btn-secondary">Продлить</Link>
+
+          <div className="grid grid-cols-3 border-t border-slate-100 bg-slate-50/70 dark:border-white/10 dark:bg-white/[0.025] lg:grid-cols-1 lg:border-l lg:border-t-0">
+            <CompactAction href="/dashboard/subscription" icon={<KeyRound />} label="Подключить" />
+            <CompactAction href="/dashboard/plans" icon={<CreditCard />} label="Продлить" />
+            <CompactAction href="/dashboard/devices" icon={<Laptop />} label="Устройства" />
           </div>
         </div>
-      </div>
+      </section>
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        <QuickAction
-          icon={<KeyRound className="h-5 w-5" />}
-          title="Подключить устройство"
-          description="Откройте QR-код и добавьте подписку в приложение."
-          href="/dashboard/subscription"
-          action="Подключить"
-        />
-        <QuickAction
-          icon={<CreditCard className="h-5 w-5" />}
-          title="Продлить VPN"
-          description="Выберите тариф и оплатите онлайн."
-          href="/dashboard/plans"
-          action="Смотреть тарифы"
-        />
-        <QuickAction
-          icon={<Activity className="h-5 w-5" />}
-          title="Проверить устройства"
-          description="Посмотрите активные устройства и отвяжите лишние."
-          href="/dashboard/devices"
-          action="Устройства"
-        />
-      </div>
-
-      <div className="card">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="flex items-center gap-2 text-lg font-semibold">
-            <Activity className="h-5 w-5 text-brand-500" />
-            Потребление трафика
+      <section className="card p-4 sm:p-5">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <h2 className="flex items-center gap-2 font-semibold">
+            <Activity className="h-4 w-4 text-brand-500" />
+            Трафик
           </h2>
-          <span className="text-sm text-slate-500">за 30 дней</span>
+          <span className="text-xs text-slate-500">30 дней</span>
         </div>
-        <TrafficChart userId={user.id} />
-      </div>
+        <TrafficChart userId={user.id} compact />
+      </section>
+
+      <PromoGrid />
     </div>
   )
 }
 
 function OnboardingState({ emailVerified }: { emailVerified: boolean }) {
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Купить VPN"
-        description="Выберите тариф и получите доступ в личном кабинете"
-        action={<Link href="/dashboard/plans" className="btn-primary">Выбрать тариф</Link>}
-      />
+    <div className="space-y-4">
+      <CompactHeader title="Главная" description="Начните пользоваться VPN" />
 
-      <div className="card relative overflow-hidden p-6 sm:p-8">
+      <div className="card relative overflow-hidden p-4 sm:p-5">
         <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-cyan-400 via-emerald-400 to-brand-500" />
-        <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
+        <div className="grid gap-5 lg:grid-cols-[1fr_0.9fr] lg:items-center">
           <div>
-            <div className="mb-5 grid h-14 w-14 place-items-center rounded-lg bg-slate-950 text-cyan-200 shadow-lg shadow-slate-950/15 dark:bg-white dark:text-slate-950">
-              <ShieldCheck className="h-7 w-7" />
+            <div className="mb-3 grid h-11 w-11 place-items-center rounded-lg bg-slate-950 text-cyan-200 shadow-lg shadow-slate-950/15 dark:bg-white dark:text-slate-950">
+              <ShieldCheck className="h-6 w-6" />
             </div>
-            <h2 className="text-2xl font-semibold tracking-tight">VPN без лишних шагов</h2>
-            <p className="mt-2 max-w-xl text-slate-500 dark:text-slate-400">
-              Выберите тариф и оплатите его в кабинете. После активации останется добавить подписку в VPN-приложение.
+            <h2 className="text-xl font-semibold">Подключите VPN</h2>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+              Выберите тариф, оплатите и добавьте подписку в приложение.
             </p>
-            <div className="mt-6 flex flex-col gap-2 sm:flex-row">
+            <div className="mt-4 flex flex-wrap gap-2">
               <Link href="/dashboard/plans" className="btn-primary">Выбрать тариф</Link>
               <Link href="/dashboard/settings" className="btn-secondary">Профиль</Link>
             </div>
           </div>
-          <div className="grid gap-3">
+          <div className="grid gap-2">
             <Step
               done={emailVerified}
-              title={emailVerified ? 'Email добавлен' : 'Вход через Telegram'}
-              description={emailVerified ? 'Доступен вход через сайт' : 'Email можно добавить позже в настройках'}
+              title={emailVerified ? 'Email подтверждён' : 'Добавьте email'}
+              description={emailVerified ? 'Аккаунт готов' : 'Можно сделать позже'}
             />
-            <Step done={false} title="Выберите тариф" description="Срок, трафик и лимит устройств" />
-            <Step done={false} title="Оплатите онлайн" description="После оплаты вернём вас в кабинет" />
-            <Step done={false} title="Подключитесь" description="Добавьте подписку по QR-коду" />
+            <Step done={false} title="Выберите тариф" description="Подходящий срок и лимиты" />
+            <Step done={false} title="Подключитесь" description="По ссылке или QR-коду" />
           </div>
         </div>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        <QuickAction
-          icon={<CreditCard className="h-5 w-5" />}
-          title="Тарифы"
-          description="Сравните планы и оплатите подходящий."
-          href="/dashboard/plans"
-          action="К тарифам"
-        />
-        <QuickAction
-          icon={<KeyRound className="h-5 w-5" />}
-          title="Подключение"
-          description="После оплаты откроется QR-код и ссылка подписки."
-          href="/dashboard/subscription"
-          action="Открыть подписку"
-        />
-        <QuickAction
-          icon={<ShieldCheck className="h-5 w-5" />}
-          title="Перенос подписки"
-          description="Если уже покупали раньше, проверьте профиль."
-          href="/dashboard/settings"
-          action="Настройки"
-        />
-      </div>
+      <PromoGrid />
     </div>
   )
 }
 
 function Step({ done, title, description }: { done: boolean; title: string; description: string }) {
   return (
-    <div className="flex gap-3 rounded-lg border border-slate-100 bg-slate-50/80 p-3 dark:border-slate-800 dark:bg-surface-800/70">
+    <div className="flex gap-3 rounded-lg border border-slate-100 bg-slate-50/80 px-3 py-2.5 dark:border-slate-800 dark:bg-surface-800/70">
       <div className={done ? 'text-emerald-500' : 'text-slate-300 dark:text-slate-600'}>
         <CheckCircle2 className="h-5 w-5" />
       </div>
@@ -229,27 +203,113 @@ function Step({ done, title, description }: { done: boolean; title: string; desc
   )
 }
 
-function QuickAction({
+function CompactHeader({
+  title,
+  description,
+  actionHref,
+  actionLabel,
+}: {
+  title: string
+  description: string
+  actionHref?: string
+  actionLabel?: string
+}) {
+  return (
+    <header className="flex items-center justify-between gap-3">
+      <div className="min-w-0">
+        <h1 className="text-xl font-semibold text-slate-950 dark:text-white sm:text-2xl">{title}</h1>
+        <p className="truncate text-sm text-slate-500 dark:text-slate-400">{description}</p>
+      </div>
+      {actionHref && actionLabel && (
+        <Link href={actionHref} className="btn-secondary min-h-9 shrink-0 px-3 py-1.5">
+          {actionLabel}
+        </Link>
+      )}
+    </header>
+  )
+}
+
+function OverviewMetric({
+  label,
+  value,
+  className = '',
+}: {
+  label: string
+  value: string
+  className?: string
+}) {
+  return (
+    <div className={className}>
+      <div className="text-xs text-slate-500 dark:text-slate-400">{label}</div>
+      <div className="mt-0.5 truncate text-lg font-semibold">{value}</div>
+    </div>
+  )
+}
+
+function CompactAction({ href, icon, label }: { href: string; icon: React.ReactElement; label: string }) {
+  return (
+    <Link
+      href={href}
+      className="flex min-h-20 flex-col items-center justify-center gap-1.5 border-r border-slate-100 px-2 py-3 text-center text-xs font-medium transition-colors last:border-r-0 hover:bg-white dark:border-white/10 dark:hover:bg-white/5 lg:min-h-0 lg:flex-row lg:justify-start lg:border-b lg:border-r-0 lg:px-4 lg:py-4 lg:text-sm lg:last:border-b-0"
+    >
+      <span className="[&>svg]:h-4 [&>svg]:w-4">{icon}</span>
+      {label}
+      <ArrowRight className="ml-auto hidden h-4 w-4 text-slate-400 lg:block" />
+    </Link>
+  )
+}
+
+function PromoGrid() {
+  return (
+    <section className="grid gap-3 sm:grid-cols-2">
+      <PromoBlock
+        href="/dashboard/referrals"
+        icon={<UsersRound className="h-5 w-5" />}
+        title="Пригласите друга"
+        description="Получайте бонусные дни"
+        tone="cyan"
+      />
+      <PromoBlock
+        href="/dashboard/bonus-box"
+        icon={<Gift className="h-5 w-5" />}
+        title="Откройте подарок"
+        description="Бонусы за активность"
+        tone="emerald"
+      />
+    </section>
+  )
+}
+
+function PromoBlock({
+  href,
   icon,
   title,
   description,
-  href,
-  action,
+  tone,
 }: {
+  href: string
   icon: React.ReactNode
   title: string
   description: string
-  href: string
-  action: string
+  tone: 'cyan' | 'emerald'
 }) {
+  const toneClass = tone === 'cyan'
+    ? 'border-cyan-200/70 bg-cyan-50/80 text-cyan-700 dark:border-cyan-500/20 dark:bg-cyan-500/10 dark:text-cyan-200'
+    : 'border-emerald-200/70 bg-emerald-50/80 text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200'
+
   return (
-    <Link href={href} className="card block transition-transform duration-200 hover:-translate-y-0.5">
-      <div className="mb-4 grid h-10 w-10 place-items-center rounded-lg border border-slate-100 bg-slate-50 text-slate-700 dark:border-slate-800 dark:bg-surface-800 dark:text-cyan-200">
+    <Link
+      href={href}
+      className={`group flex min-h-24 items-center gap-3 rounded-lg border p-4 transition-transform hover:-translate-y-0.5 ${toneClass}`}
+    >
+      <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-white/75 shadow-sm dark:bg-white/10">
         {icon}
       </div>
-      <div className="font-semibold">{title}</div>
-      <p className="mt-1 min-h-10 text-sm text-slate-500 dark:text-slate-400">{description}</p>
-      <div className="mt-4 text-sm font-medium text-brand-600 dark:text-cyan-200">{action}</div>
+      <div className="min-w-0 flex-1">
+        <div className="font-semibold text-slate-950 dark:text-white">{title}</div>
+        <div className="text-sm opacity-80">{description}</div>
+      </div>
+      <ArrowRight className="h-5 w-5 shrink-0 transition-transform group-hover:translate-x-0.5" />
     </Link>
   )
 }

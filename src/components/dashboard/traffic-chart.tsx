@@ -10,7 +10,7 @@ import { InlineAlert } from './empty-state'
 
 interface Series { date: string; bytes: string }
 
-export function TrafficChart({ userId }: { userId: string }) {
+export function TrafficChart({ userId, compact = false }: { userId: string; compact?: boolean }) {
   const [series, setSeries] = useState<Series[] | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -21,9 +21,13 @@ export function TrafficChart({ userId }: { userId: string }) {
   }, [userId])
 
   if (error) return <InlineAlert tone="danger" title="Не удалось загрузить график" description={error} />
-  if (!series) return <TrafficSkeleton />
+  if (!series) return <TrafficSkeleton compact={compact} />
   if (series.length === 0) {
-    return <p className="rounded-xl border px-4 py-8 text-center text-sm text-slate-400">Нет данных за выбранный период.</p>
+    return (
+      <p className={`rounded-lg border px-4 text-center text-sm text-slate-400 ${compact ? 'py-5' : 'py-8'}`}>
+        Нет данных за выбранный период.
+      </p>
+    )
   }
 
   const max = Math.max(...series.map((s) => Number(BigInt(s.bytes || '0'))))
@@ -34,7 +38,7 @@ export function TrafficChart({ userId }: { userId: string }) {
       <div className="text-sm text-slate-500 mb-3">
         Всего за 30 дней: <span className="font-medium text-slate-900 dark:text-slate-100">{formatBytes(total)}</span>
       </div>
-      <div className="flex items-end gap-1 h-32">
+      <div className={`flex items-end gap-1 ${compact ? 'h-20 sm:h-24' : 'h-32'}`}>
         {series.map((s, i) => {
           const v = Number(BigInt(s.bytes || '0'))
           const h = max > 0 ? Math.max(2, Math.round((v / max) * 100)) : 0
@@ -56,11 +60,11 @@ export function TrafficChart({ userId }: { userId: string }) {
   )
 }
 
-function TrafficSkeleton() {
+function TrafficSkeleton({ compact = false }: { compact?: boolean }) {
   return (
     <div className="space-y-3">
       <div className="h-4 w-48 animate-pulse rounded bg-slate-200 dark:bg-surface-800" />
-      <div className="flex h-32 items-end gap-1">
+      <div className={`flex items-end gap-1 ${compact ? 'h-20 sm:h-24' : 'h-32'}`}>
         {Array.from({ length: 24 }).map((_, index) => (
           <div
             key={index}
