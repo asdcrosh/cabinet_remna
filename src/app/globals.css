@@ -2,6 +2,49 @@
 @tailwind components;
 @tailwind utilities;
 
+@keyframes traffic-line-run {
+  0% {
+    stroke-dasharray: 0.08 0.92;
+    stroke-dashoffset: 0;
+    opacity: 0;
+  }
+  12% {
+    opacity: 1;
+  }
+  100% {
+    stroke-dasharray: 0.08 0.92;
+    stroke-dashoffset: -1;
+    opacity: 0.9;
+  }
+}
+
+@keyframes traffic-end-pulse {
+  0%, 100% {
+    opacity: 0.65;
+    transform: scale(0.7);
+  }
+  50% {
+    opacity: 0;
+    transform: scale(1.55);
+  }
+}
+
+@keyframes traffic-bar-shine {
+  from { background-position: 180% 0; }
+  to { background-position: -80% 0; }
+}
+
+@keyframes traffic-dot-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.2), 0 0 12px rgba(14, 165, 233, 0.5);
+    transform: translate(50%, -50%) scale(0.9);
+  }
+  50% {
+    box-shadow: 0 0 0 7px rgba(34, 211, 238, 0.08), 0 0 18px rgba(14, 165, 233, 0.7);
+    transform: translate(50%, -50%) scale(1.08);
+  }
+}
+
 @layer base {
   :root {
     --bg: 248 250 252;
@@ -99,5 +142,32 @@
   .sticky-actions-cell {
     @apply sticky right-0 z-10 border-l bg-white shadow-[-12px_0_18px_-18px_rgba(15,23,42,0.55)]
            dark:bg-surface-900;
+  }
+  .traffic-chart-runner {
+    stroke-dasharray: 0.08 0.92;
+    animation: traffic-line-run 3.2s linear infinite;
+  }
+  .traffic-chart-end-pulse {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: traffic-end-pulse 2.2s ease-out infinite;
+  }
+  .traffic-balance-fill {
+    background-size: 220% 100%;
+    animation: traffic-bar-shine 3.4s linear infinite;
+    box-shadow: 0 0 16px rgba(14, 165, 233, 0.28);
+  }
+  .traffic-balance-dot {
+    @apply absolute right-0 top-1/2 h-3 w-3 rounded-full border-2 border-white bg-cyan-500;
+    animation: traffic-dot-pulse 1.8s ease-in-out infinite;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .traffic-chart-runner,
+  .traffic-chart-end-pulse,
+  .traffic-balance-fill,
+  .traffic-balance-dot {
+    animation: none !important;
   }
 }

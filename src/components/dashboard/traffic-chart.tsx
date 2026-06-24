@@ -63,20 +63,18 @@ export function TrafficChart({
   const seriesTotal = data.series.reduce((total, point) => total + safeBigInt(point.bytes), 0n)
 
   return (
-    <div className="relative overflow-hidden rounded-lg border border-cyan-300/25 bg-slate-950 p-4 text-white shadow-[0_18px_50px_rgba(8,145,178,0.15)] sm:p-5">
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-cyan-300 to-transparent" />
-      <div className="pointer-events-none absolute -right-16 -top-20 h-48 w-48 rounded-full bg-cyan-400/10 blur-3xl" />
-      <div className="pointer-events-none absolute -bottom-24 left-1/3 h-44 w-44 rounded-full bg-emerald-400/10 blur-3xl" />
+    <div className="relative overflow-hidden rounded-lg border border-cyan-200/80 bg-white/90 p-4 text-slate-950 shadow-[0_18px_45px_rgba(14,165,233,0.10)] backdrop-blur dark:border-cyan-200/80 dark:bg-white/90 dark:text-slate-950 sm:p-5">
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-cyan-300 via-sky-400 to-emerald-300" />
 
       <div className="relative flex flex-col gap-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <div className="flex items-center gap-2 text-xs font-medium uppercase text-cyan-200/70">
+            <div className="flex items-center gap-2 text-xs font-medium uppercase text-cyan-700">
               <Radio className={`h-3.5 w-3.5 ${loading ? 'animate-pulse' : ''}`} />
               Трафик сейчас
             </div>
             <div className="mt-1 text-2xl font-semibold sm:text-3xl">{formatBytes(used)}</div>
-            <div className="mt-1 text-xs text-slate-400">
+            <div className="mt-1 text-xs text-slate-500">
               {limit ? `из ${formatBytes(limit)}` : 'без ограничения'}
             </div>
           </div>
@@ -99,14 +97,14 @@ export function TrafficChart({
           <TrafficBalance used={used} limit={limit} percent={percent} />
         )}
 
-        <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-400">
+        <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
           <span>
             {data.historyAvailable
               ? 'Динамика использования за последние 30 дней'
               : 'Дневная история пока недоступна, показан текущий баланс'}
           </span>
           {data.warning && (
-            <span className="inline-flex items-center gap-1 text-amber-300">
+            <span className="inline-flex items-center gap-1 text-amber-600">
               <TriangleAlert className="h-3.5 w-3.5" />
               Данные истории временно недоступны
             </span>
@@ -121,8 +119,8 @@ function NeonAreaChart({ series }: { series: SeriesPoint[] }) {
   const chart = useMemo(() => makeChart(series), [series])
 
   return (
-    <div className="relative h-36 overflow-hidden rounded-lg border border-white/10 bg-white/[0.035] sm:h-44">
-      <div className="absolute inset-0 bg-[linear-gradient(rgba(34,211,238,0.07)_1px,transparent_1px),linear-gradient(90deg,rgba(34,211,238,0.06)_1px,transparent_1px)] bg-[size:100%_25%,12.5%_100%]" />
+    <div className="relative h-36 overflow-hidden rounded-lg border border-cyan-100 bg-cyan-50/45 sm:h-44">
+      <div className="absolute inset-0 bg-[linear-gradient(rgba(14,165,233,0.09)_1px,transparent_1px),linear-gradient(90deg,rgba(14,165,233,0.07)_1px,transparent_1px)] bg-[size:100%_25%,12.5%_100%]" />
       <svg
         viewBox="0 0 800 220"
         preserveAspectRatio="none"
@@ -132,8 +130,8 @@ function NeonAreaChart({ series }: { series: SeriesPoint[] }) {
       >
         <defs>
           <linearGradient id="traffic-area" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#22d3ee" stopOpacity="0.5" />
-            <stop offset="65%" stopColor="#10b981" stopOpacity="0.12" />
+            <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.28" />
+            <stop offset="65%" stopColor="#34d399" stopOpacity="0.08" />
             <stop offset="100%" stopColor="#10b981" stopOpacity="0" />
           </linearGradient>
           <linearGradient id="traffic-line" x1="0" y1="0" x2="1" y2="0">
@@ -142,7 +140,7 @@ function NeonAreaChart({ series }: { series: SeriesPoint[] }) {
             <stop offset="100%" stopColor="#34d399" />
           </linearGradient>
           <filter id="traffic-glow" x="-20%" y="-50%" width="140%" height="200%">
-            <feGaussianBlur stdDeviation="5" result="blur" />
+            <feGaussianBlur stdDeviation="3" result="blur" />
             <feMerge>
               <feMergeNode in="blur" />
               <feMergeNode in="SourceGraphic" />
@@ -154,19 +152,61 @@ function NeonAreaChart({ series }: { series: SeriesPoint[] }) {
           d={chart.linePath}
           fill="none"
           stroke="url(#traffic-line)"
-          strokeWidth="4"
+          strokeWidth="3.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          opacity="0.9"
+        />
+        <path
+          d={chart.linePath}
+          pathLength="1"
+          fill="none"
+          stroke="#ffffff"
+          strokeWidth="2.25"
           strokeLinecap="round"
           strokeLinejoin="round"
           filter="url(#traffic-glow)"
+          className="traffic-chart-runner"
         />
-        {chart.points.map((point) => (
-          <circle key={point.date} cx={point.x} cy={point.y} r="4" fill="#ecfeff" opacity="0.9">
+        {chart.points.map((point, index) => (
+          <circle
+            key={point.date}
+            cx={point.x}
+            cy={point.y}
+            r={index === chart.points.length - 1 ? 3.5 : 2.5}
+            fill={index === chart.points.length - 1 ? '#0ea5e9' : '#ffffff'}
+            stroke="#0ea5e9"
+            strokeWidth="1.5"
+            opacity={index === chart.points.length - 1 ? 1 : 0.65}
+          >
             <title>{`${formatChartDate(point.date)}: ${formatBytes(point.bytes)}`}</title>
           </circle>
         ))}
+        {chart.lastPoint && (
+          <>
+            <circle
+              cx={chart.lastPoint.x}
+              cy={chart.lastPoint.y}
+              r="10"
+              fill="none"
+              stroke="#22d3ee"
+              strokeWidth="2"
+              className="traffic-chart-end-pulse"
+            />
+            <circle
+              cx={chart.lastPoint.x}
+              cy={chart.lastPoint.y}
+              r="5"
+              fill="#ffffff"
+              stroke="#0284c7"
+              strokeWidth="3"
+              filter="url(#traffic-glow)"
+            />
+          </>
+        )}
       </svg>
-      <div className="absolute bottom-2 left-3 text-[11px] text-cyan-100/55">{formatChartDate(series[0]?.date)}</div>
-      <div className="absolute bottom-2 right-3 text-[11px] text-emerald-100/55">
+      <div className="absolute bottom-2 left-3 text-[11px] text-cyan-800/55">{formatChartDate(series[0]?.date)}</div>
+      <div className="absolute bottom-2 right-3 text-[11px] text-emerald-800/55">
         {formatChartDate(series[series.length - 1]?.date)}
       </div>
     </div>
@@ -183,19 +223,20 @@ function TrafficBalance({
   percent: number | null
 }) {
   return (
-    <div className="rounded-lg border border-white/10 bg-white/[0.035] p-4">
+    <div className="rounded-lg border border-cyan-100 bg-cyan-50/45 p-4">
       <div className="flex items-center justify-between gap-3">
-        <div className="text-sm text-slate-300">Использование периода</div>
-        <div className="flex items-center gap-1.5 font-medium text-cyan-200">
+        <div className="text-sm text-slate-600">Использование периода</div>
+        <div className="flex items-center gap-1.5 font-medium text-cyan-700">
           {percent === null ? <Infinity className="h-4 w-4" /> : `${percent}%`}
         </div>
       </div>
-      <div className="relative mt-4 h-4 overflow-hidden rounded-full border border-cyan-300/20 bg-slate-900">
-        <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(34,211,238,0.08)_1px,transparent_1px)] bg-[size:12px_100%]" />
+      <div className="relative mt-4 h-4 rounded-full border border-cyan-200 bg-white shadow-inner">
         <div
-          className="relative h-full rounded-full bg-gradient-to-r from-cyan-400 via-sky-300 to-emerald-400 shadow-[0_0_18px_rgba(34,211,238,0.75)] transition-all duration-700"
+          className="traffic-balance-fill relative h-full rounded-full bg-gradient-to-r from-cyan-400 via-sky-400 to-emerald-400 transition-all duration-700"
           style={{ width: `${percent === null ? (used > 0n ? 100 : 0) : Math.max(percent, used > 0n ? 2 : 0)}%` }}
-        />
+        >
+          {used > 0n && <span className="traffic-balance-dot" />}
+        </div>
       </div>
       <div className="mt-2 flex justify-between text-[11px] text-slate-500">
         <span>0 B</span>
@@ -207,9 +248,9 @@ function TrafficBalance({
 
 function NeonMetric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="min-w-24 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2">
+    <div className="min-w-24 rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-2 shadow-sm">
       <div className="text-[10px] uppercase text-slate-500">{label}</div>
-      <div className="mt-0.5 truncate text-xs font-semibold text-slate-100 sm:text-sm">{value}</div>
+      <div className="mt-0.5 truncate text-xs font-semibold text-slate-800 sm:text-sm">{value}</div>
     </div>
   )
 }
@@ -229,7 +270,7 @@ function makeChart(series: SeriesPoint[]) {
   })
   const linePath = points.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`).join(' ')
   const areaPath = `${linePath} L ${points[points.length - 1]?.x ?? width} ${height} L ${points[0]?.x ?? 0} ${height} Z`
-  return { points, linePath, areaPath }
+  return { points, linePath, areaPath, lastPoint: points[points.length - 1] ?? null }
 }
 
 function safeBigInt(value: string | undefined) {
