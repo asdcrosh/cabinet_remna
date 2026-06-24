@@ -152,58 +152,39 @@ function NeonAreaChart({ series }: { series: SeriesPoint[] }) {
           d={chart.linePath}
           fill="none"
           stroke="url(#traffic-line)"
-          strokeWidth="3.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          opacity="0.9"
-        />
-        <path
-          d={chart.linePath}
-          pathLength="1"
-          fill="none"
-          stroke="#ffffff"
           strokeWidth="2.25"
           strokeLinecap="round"
           strokeLinejoin="round"
-          filter="url(#traffic-glow)"
-          className="traffic-chart-runner"
+          opacity="0.85"
+          vectorEffect="non-scaling-stroke"
         />
-        {chart.points.map((point, index) => (
-          <circle
-            key={point.date}
-            cx={point.x}
-            cy={point.y}
-            r={index === chart.points.length - 1 ? 3.5 : 2.5}
-            fill={index === chart.points.length - 1 ? '#0ea5e9' : '#ffffff'}
-            stroke="#0ea5e9"
-            strokeWidth="1.5"
-            opacity={index === chart.points.length - 1 ? 1 : 0.65}
-          >
-            <title>{`${formatChartDate(point.date)}: ${formatBytes(point.bytes)}`}</title>
-          </circle>
-        ))}
         {chart.lastPoint && (
           <>
             <circle
               cx={chart.lastPoint.x}
               cy={chart.lastPoint.y}
-              r="10"
-              fill="none"
-              stroke="#22d3ee"
-              strokeWidth="2"
-              className="traffic-chart-end-pulse"
-            />
-            <circle
-              cx={chart.lastPoint.x}
-              cy={chart.lastPoint.y}
-              r="5"
+              r="3"
               fill="#ffffff"
               stroke="#0284c7"
-              strokeWidth="3"
-              filter="url(#traffic-glow)"
+              strokeWidth="2"
             />
           </>
         )}
+        <g className="traffic-chart-moving-dot">
+          <circle r="11" fill="none" stroke="#22d3ee" strokeWidth="2" opacity="0.45">
+            <animate attributeName="r" values="7;14;7" dur="1.8s" repeatCount="indefinite" />
+            <animate attributeName="opacity" values="0.55;0;0.55" dur="1.8s" repeatCount="indefinite" />
+          </circle>
+          <circle r="5.5" fill="#ffffff" stroke="#0284c7" strokeWidth="3" filter="url(#traffic-glow)" />
+          <animateMotion
+            path={chart.linePath}
+            dur="4.8s"
+            repeatCount="indefinite"
+            calcMode="spline"
+            keyTimes="0;1"
+            keySplines="0.4 0 0.2 1"
+          />
+        </g>
       </svg>
       <div className="absolute bottom-2 left-3 text-[11px] text-cyan-800/55">{formatChartDate(series[0]?.date)}</div>
       <div className="absolute bottom-2 right-3 text-[11px] text-emerald-800/55">
@@ -268,9 +249,29 @@ function makeChart(series: SeriesPoint[]) {
     const y = bottom - (value / max) * (bottom - top)
     return { x, y, date: point.date, bytes: safeBigInt(point.bytes) }
   })
-  const linePath = points.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`).join(' ')
+  const linePath = makeSmoothPath(points)
   const areaPath = `${linePath} L ${points[points.length - 1]?.x ?? width} ${height} L ${points[0]?.x ?? 0} ${height} Z`
   return { points, linePath, areaPath, lastPoint: points[points.length - 1] ?? null }
+}
+
+function makeSmoothPath(points: Array<{ x: number; y: number }>) {
+  if (points.length === 0) return ''
+  if (points.length === 1) return `M ${points[0].x} ${points[0].y}`
+
+  let path = `M ${points[0].x} ${points[0].y}`
+  for (let index = 0; index < points.length - 1; index += 1) {
+    const previous = points[index - 1] ?? points[index]
+    const current = points[index]
+    const next = points[index + 1]
+    const afterNext = points[index + 2] ?? next
+    const controlOneX = current.x + (next.x - previous.x) / 6
+    const controlOneY = current.y + (next.y - previous.y) / 6
+    const controlTwoX = next.x - (afterNext.x - current.x) / 6
+    const controlTwoY = next.y - (afterNext.y - current.y) / 6
+
+    path += ` C ${controlOneX} ${controlOneY}, ${controlTwoX} ${controlTwoY}, ${next.x} ${next.y}`
+  }
+  return path
 }
 
 function safeBigInt(value: string | undefined) {
