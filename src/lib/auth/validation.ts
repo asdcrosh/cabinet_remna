@@ -117,8 +117,8 @@ export const updateAdminPromoCodeSchema = adminPromoCodeBaseSchema.partial().ref
 const adminBonusBoxPrizeBaseSchema = z.object({
   title: z.string().trim().min(2, 'Минимум 2 символа').max(80, 'Максимум 80 символов'),
   description: z.string().trim().max(180, 'Максимум 180 символов').optional().nullable(),
-  type: z.enum(['SUBSCRIPTION_DAYS', 'TRAFFIC_GB', 'PROMO_CODE_PERCENT', 'BONUS_ATTEMPTS']),
-  value: z.coerce.number().int().min(1).max(10_000),
+  type: z.enum(['SUBSCRIPTION_DAYS', 'TRAFFIC_GB', 'PROMO_CODE_PERCENT', 'BONUS_ATTEMPTS', 'NO_PRIZE']),
+  value: z.coerce.number().int().min(0).max(10_000),
   weight: z.coerce.number().int().min(1).max(100_000),
   rarity: z.enum(['COMMON', 'RARE', 'EPIC', 'LEGENDARY']).default('COMMON'),
   isActive: z.boolean().default(true),
@@ -127,6 +127,24 @@ const adminBonusBoxPrizeBaseSchema = z.object({
 })
 
 export const adminBonusBoxPrizeSchema = adminBonusBoxPrizeBaseSchema.refine(
+  (value) => value.type === 'NO_PRIZE' || value.value >= 1,
+  {
+    path: ['value'],
+    message: 'Значение подарка должно быть больше 0',
+  }
+).refine(
+  (value) => value.type !== 'NO_PRIZE' || value.value === 0,
+  {
+    path: ['value'],
+    message: 'Для исхода без подарка значение должно быть 0',
+  }
+).refine(
+  (value) => value.type !== 'NO_PRIZE' || value.rarity === 'COMMON',
+  {
+    path: ['rarity'],
+    message: 'Исход без подарка должен быть базовым',
+  }
+).refine(
   (value) => value.type !== 'PROMO_CODE_PERCENT' || value.value <= 99,
   {
     path: ['value'],
@@ -141,6 +159,24 @@ export const adminBonusBoxPrizeSchema = adminBonusBoxPrizeBaseSchema.refine(
 )
 
 export const updateAdminBonusBoxPrizeSchema = adminBonusBoxPrizeBaseSchema.partial().refine(
+  (value) => value.type === 'NO_PRIZE' || value.value == null || value.value >= 1,
+  {
+    path: ['value'],
+    message: 'Значение подарка должно быть больше 0',
+  }
+).refine(
+  (value) => value.type !== 'NO_PRIZE' || value.value == null || value.value === 0,
+  {
+    path: ['value'],
+    message: 'Для исхода без подарка значение должно быть 0',
+  }
+).refine(
+  (value) => value.type !== 'NO_PRIZE' || value.rarity == null || value.rarity === 'COMMON',
+  {
+    path: ['rarity'],
+    message: 'Исход без подарка должен быть базовым',
+  }
+).refine(
   (value) => value.type !== 'PROMO_CODE_PERCENT' || value.value == null || value.value <= 99,
   {
     path: ['value'],

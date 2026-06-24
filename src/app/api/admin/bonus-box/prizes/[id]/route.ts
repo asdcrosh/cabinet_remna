@@ -27,7 +27,7 @@ export const PATCH = withAuth(async (req: Request, { params }: { params: { id: s
 
   const existing = await prisma.bonusBoxPrize.findUnique({
     where: { id: params.id },
-    select: { type: true, value: true },
+    select: { type: true, value: true, rarity: true },
   })
   if (!existing) {
     return NextResponse.json({ error: 'Подарок не найден' }, { status: 404 })
@@ -35,6 +35,16 @@ export const PATCH = withAuth(async (req: Request, { params }: { params: { id: s
 
   const effectiveType = parsed.data.type ?? existing.type
   const effectiveValue = parsed.data.value ?? existing.value
+  const effectiveRarity = parsed.data.rarity ?? existing.rarity
+  if (effectiveType !== 'NO_PRIZE' && effectiveValue < 1) {
+    return NextResponse.json({ error: 'Значение подарка должно быть больше 0' }, { status: 400 })
+  }
+  if (effectiveType === 'NO_PRIZE' && effectiveValue !== 0) {
+    return NextResponse.json({ error: 'Для исхода без подарка значение должно быть 0' }, { status: 400 })
+  }
+  if (effectiveType === 'NO_PRIZE' && effectiveRarity !== 'COMMON') {
+    return NextResponse.json({ error: 'Исход без подарка должен быть базовым' }, { status: 400 })
+  }
   if (effectiveType === 'PROMO_CODE_PERCENT' && effectiveValue > 99) {
     return NextResponse.json({ error: 'Скидка должна быть от 1% до 99%' }, { status: 400 })
   }

@@ -2,12 +2,12 @@
 
 import { type ReactNode, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { CalendarClock, CalendarPlus, CreditCard, Gift, LockKeyhole, Sparkles, TicketPercent, Users, Zap } from 'lucide-react'
+import { CalendarClock, CalendarPlus, CircleSlash, CreditCard, Gift, LockKeyhole, Sparkles, TicketPercent, Users, Zap } from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
 import { toast } from '@/components/ui/toaster'
 import { cn } from '@/lib/cn'
 
-type PrizeType = 'SUBSCRIPTION_DAYS' | 'TRAFFIC_GB' | 'PROMO_CODE_PERCENT' | 'BONUS_ATTEMPTS'
+type PrizeType = 'SUBSCRIPTION_DAYS' | 'TRAFFIC_GB' | 'PROMO_CODE_PERCENT' | 'BONUS_ATTEMPTS' | 'NO_PRIZE'
 type Rarity = 'COMMON' | 'RARE' | 'EPIC' | 'LEGENDARY'
 
 export type BonusBoxPrizeView = {
@@ -117,7 +117,9 @@ export function BonusBoxClient({ initialData }: { initialData: BonusBoxOverview 
       window.setTimeout(async () => {
         setResult(response)
         setData((current) => ({ ...current, attemptsCount: response.remainingAttempts }))
-        if (!response.remoteSynced) {
+        if (response.prize.type === 'NO_PRIZE') {
+          toast('Открытие завершено: без подарка', 'success')
+        } else if (!response.remoteSynced) {
           toast('Подарок сохранён, синхронизация с VPN будет повторена', 'success')
         } else {
           toast('Подарок начислен', 'success')
@@ -158,7 +160,7 @@ export function BonusBoxClient({ initialData }: { initialData: BonusBoxOverview 
             <div>
               <h2 className="text-3xl font-semibold tracking-tight">Откройте бокс</h2>
               <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-500 dark:text-slate-400">
-                Внутри дни подписки, трафик и персональные скидки. Открытия начисляются за оплаты, рефералов и еженедельный бонус.
+                Внутри дни подписки, трафик, персональные скидки, дополнительные открытия и пустые исходы. Открытия начисляются за оплаты, рефералов и еженедельный бонус.
               </p>
             </div>
           </div>
@@ -211,13 +213,22 @@ export function BonusBoxClient({ initialData }: { initialData: BonusBoxOverview 
         {result && (
           <div className="grid gap-4 p-5 sm:p-6 md:grid-cols-[1fr_auto] md:items-center">
             <div className="min-w-0">
-              <div className="flex items-center gap-2 text-sm font-semibold text-emerald-600 dark:text-emerald-300">
-                <Sparkles className="h-4 w-4" />
-                Ваш подарок
+              <div
+                className={cn(
+                  'flex items-center gap-2 text-sm font-semibold',
+                  result.prize.type === 'NO_PRIZE'
+                    ? 'text-slate-500 dark:text-slate-400'
+                    : 'text-emerald-600 dark:text-emerald-300'
+                )}
+              >
+                {result.prize.type === 'NO_PRIZE' ? <CircleSlash className="h-4 w-4" /> : <Sparkles className="h-4 w-4" />}
+                {result.prize.type === 'NO_PRIZE' ? 'Результат открытия' : 'Ваш подарок'}
               </div>
               <div className="mt-1 text-2xl font-semibold tracking-tight text-slate-950 dark:text-white">{result.prize.title}</div>
-              {result.prize.description && (
-                <div className="mt-1 text-sm text-slate-500 dark:text-slate-400">{result.prize.description}</div>
+              {(result.prize.description || result.prize.type === 'NO_PRIZE') && (
+                <div className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                  {result.prize.description || 'В этот раз без начисления.'}
+                </div>
               )}
               {result.promoCode && (
                 <div className="mt-3 inline-flex max-w-full flex-wrap items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-100">
@@ -247,7 +258,7 @@ export function BonusBoxClient({ initialData }: { initialData: BonusBoxOverview 
       <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
         <section className="space-y-3">
           <div className="flex items-center justify-between gap-3">
-            <h2 className="text-lg font-semibold">Подарки внутри</h2>
+            <h2 className="text-lg font-semibold">Возможные исходы</h2>
             <div className="text-sm text-slate-500">{Math.round(totalChance * 100)}%</div>
           </div>
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -263,7 +274,7 @@ export function BonusBoxClient({ initialData }: { initialData: BonusBoxOverview 
         </section>
 
         <section className="rounded-lg border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-surface-900">
-          <h2 className="text-lg font-semibold">Ваши подарки</h2>
+          <h2 className="text-lg font-semibold">Ваши результаты</h2>
           <div className="mt-4 space-y-3">
             {data.openings.map((opening) => (
               <div key={opening.id} className="rounded-lg border border-slate-100 bg-slate-50 p-3 dark:border-white/10 dark:bg-surface-800">
@@ -378,7 +389,9 @@ function RuleCard({
 
 function PrizeCard({ prize, compact = false }: { prize: BonusBoxPrizeView; compact?: boolean }) {
   const Icon =
-    prize.type === 'SUBSCRIPTION_DAYS'
+    prize.type === 'NO_PRIZE'
+      ? CircleSlash
+      : prize.type === 'SUBSCRIPTION_DAYS'
       ? CalendarPlus
       : prize.type === 'TRAFFIC_GB'
         ? Zap
@@ -444,6 +457,7 @@ function makeIdleReel(prizes: BonusBoxPrizeView[]) {
 }
 
 function prizeLabel(prize: BonusBoxPrizeView) {
+  if (prize.type === 'NO_PRIZE') return 'Без начисления'
   if (prize.type === 'SUBSCRIPTION_DAYS') return `+${prize.value} дн.`
   if (prize.type === 'TRAFFIC_GB') return `+${prize.value} ГБ`
   if (prize.type === 'BONUS_ATTEMPTS') return `+${prize.value} открытий`

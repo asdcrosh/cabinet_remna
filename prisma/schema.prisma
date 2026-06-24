@@ -541,6 +541,7 @@ enum BonusBoxPrizeType {
   TRAFFIC_GB
   PROMO_CODE_PERCENT
   BONUS_ATTEMPTS
+  NO_PRIZE
 }
 
 enum BonusBoxRarity {

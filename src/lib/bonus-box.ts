@@ -513,6 +513,10 @@ async function applyPrizeInTransaction(
     config: ReturnType<typeof getBonusBoxConfig>
   }
 ) {
+  if (input.prize.type === 'NO_PRIZE') {
+    return { promoCodeId: null, subscriptionId: null, remoteUpdate: null }
+  }
+
   if (input.prize.type === 'PROMO_CODE_PERCENT') {
     const promoCode = await createPrizePromoCode(tx, input.userId, input.prize, input.config)
     return { promoCodeId: promoCode.id, subscriptionId: null, remoteUpdate: null }

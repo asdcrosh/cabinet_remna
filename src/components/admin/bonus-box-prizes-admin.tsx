@@ -8,7 +8,7 @@ import { apiFetch } from '@/lib/api-client'
 import { toast } from '@/components/ui/toaster'
 import { cn } from '@/lib/cn'
 
-type PrizeType = 'SUBSCRIPTION_DAYS' | 'TRAFFIC_GB' | 'PROMO_CODE_PERCENT' | 'BONUS_ATTEMPTS'
+type PrizeType = 'SUBSCRIPTION_DAYS' | 'TRAFFIC_GB' | 'PROMO_CODE_PERCENT' | 'BONUS_ATTEMPTS' | 'NO_PRIZE'
 type Rarity = 'COMMON' | 'RARE' | 'EPIC' | 'LEGENDARY'
 
 export type BonusBoxPrizeAdminRow = {
@@ -128,6 +128,16 @@ export function BonusBoxPrizesAdmin({
     setForm(emptyForm)
   }
 
+  function changePrizeType(type: PrizeType) {
+    setForm((current) => ({
+      ...current,
+      type,
+      value: type === 'NO_PRIZE' ? '0' : current.value === '0' ? '1' : current.value,
+      rarity: type === 'NO_PRIZE' ? 'COMMON' : current.rarity,
+      promoExpiresInDays: type === 'PROMO_CODE_PERCENT' ? current.promoExpiresInDays : '',
+    }))
+  }
+
   return (
     <div className="space-y-6">
       <div className="card space-y-4">
@@ -160,13 +170,14 @@ export function BonusBoxPrizesAdmin({
           <Field label="Тип">
             <select
               value={form.type}
-              onChange={(event) => setForm((current) => ({ ...current, type: event.target.value as PrizeType }))}
+              onChange={(event) => changePrizeType(event.target.value as PrizeType)}
               className="input"
             >
               <option value="SUBSCRIPTION_DAYS">Дни подписки</option>
               <option value="TRAFFIC_GB">Трафик, ГБ</option>
               <option value="PROMO_CODE_PERCENT">Промокод, %</option>
               <option value="BONUS_ATTEMPTS">Открытия бокса</option>
+              <option value="NO_PRIZE">Без подарка</option>
             </select>
           </Field>
           <Field label={valueLabel(form.type)}>
@@ -175,8 +186,9 @@ export function BonusBoxPrizesAdmin({
               onChange={(event) => setForm((current) => ({ ...current, value: event.target.value }))}
               className="input"
               type="number"
-              min={1}
-              max={form.type === 'PROMO_CODE_PERCENT' ? 99 : form.type === 'BONUS_ATTEMPTS' ? 100 : 10000}
+              min={form.type === 'NO_PRIZE' ? 0 : 1}
+              max={form.type === 'NO_PRIZE' ? 0 : form.type === 'PROMO_CODE_PERCENT' ? 99 : form.type === 'BONUS_ATTEMPTS' ? 100 : 10000}
+              disabled={form.type === 'NO_PRIZE'}
             />
           </Field>
           <Field label="Вес">
@@ -193,6 +205,7 @@ export function BonusBoxPrizesAdmin({
               value={form.rarity}
               onChange={(event) => setForm((current) => ({ ...current, rarity: event.target.value as Rarity }))}
               className="input"
+              disabled={form.type === 'NO_PRIZE'}
             >
               <option value="COMMON">База</option>
               <option value="RARE">Редкий</option>
@@ -304,7 +317,7 @@ function BonusBoxOpeningHistory({ openings }: { openings: BonusBoxOpeningAdminRo
         <div>
           <h2 className="text-lg font-semibold">История открытий</h2>
           <p className="mt-1 text-sm text-slate-500">
-            Последние подарки, пользователи и промокоды для контроля начислений.
+            Последние исходы, пользователи и промокоды для контроля начислений.
           </p>
         </div>
         <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 dark:bg-white/10 dark:text-slate-300">
@@ -386,9 +399,9 @@ function toPayload(form: FormState) {
     title: form.title,
     description: form.description || null,
     type: form.type,
-    value: Number(form.value),
+    value: form.type === 'NO_PRIZE' ? 0 : Number(form.value),
     weight: Number(form.weight),
-    rarity: form.rarity,
+    rarity: form.type === 'NO_PRIZE' ? 'COMMON' : form.rarity,
     isActive: form.isActive,
     maxWins: form.maxWins ? Number(form.maxWins) : null,
     promoExpiresInDays:
@@ -417,6 +430,7 @@ function Metric({ label, value }: { label: string; value: ReactNode }) {
 }
 
 function valueLabel(type: PrizeType) {
+  if (type === 'NO_PRIZE') return 'Значение'
   if (type === 'SUBSCRIPTION_DAYS') return 'Дни'
   if (type === 'TRAFFIC_GB') return 'ГБ'
   if (type === 'BONUS_ATTEMPTS') return 'Открытия'
@@ -424,6 +438,7 @@ function valueLabel(type: PrizeType) {
 }
 
 function prizeTypeLabel(type: PrizeType) {
+  if (type === 'NO_PRIZE') return 'Открытие без начисления'
   if (type === 'SUBSCRIPTION_DAYS') return 'Дни подписки'
   if (type === 'TRAFFIC_GB') return 'Дополнительный трафик'
   if (type === 'BONUS_ATTEMPTS') return 'Дополнительные открытия'
@@ -431,6 +446,7 @@ function prizeTypeLabel(type: PrizeType) {
 }
 
 function prizeValue(prize: BonusBoxPrizeAdminRow) {
+  if (prize.type === 'NO_PRIZE') return 'Без подарка'
   if (prize.type === 'SUBSCRIPTION_DAYS') return `+${prize.value} дн.`
   if (prize.type === 'TRAFFIC_GB') return `+${prize.value} ГБ`
   if (prize.type === 'BONUS_ATTEMPTS') return `+${prize.value} откр.`
@@ -438,6 +454,7 @@ function prizeValue(prize: BonusBoxPrizeAdminRow) {
 }
 
 function prizeValueFromParts(type: PrizeType, value: number) {
+  if (type === 'NO_PRIZE') return 'Без начислений'
   if (type === 'SUBSCRIPTION_DAYS') return `+${value} дн.`
   if (type === 'TRAFFIC_GB') return `+${value} ГБ`
   if (type === 'BONUS_ATTEMPTS') return `+${value} откр.`
