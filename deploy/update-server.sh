@@ -66,6 +66,7 @@ lines = path.read_text().splitlines()
 defaults = {
     "APP_LOG_LEVEL": "info",
     "APP_REQUEST_LOGS": "true",
+    "REMNASHOP_USER_SUBSCRIPTION_SYNC_STALE_SECONDS": "300",
 }
 existing = {
     line.split("=", 1)[0].strip()

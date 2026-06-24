@@ -95,6 +95,14 @@ APP_REQUEST_LOGS="true"
 Use `docker compose --env-file .env -f docker-compose.yml logs -f app` to watch
 application logs. Caddy logs show proxy access only.
 
+Remnashop user sync also restores cabinet subscriptions from Remnawave when a
+Remnashop user has `current_subscription_id -> user_remna_id`. The default
+refresh window is:
+
+```env
+REMNASHOP_USER_SUBSCRIPTION_SYNC_STALE_SECONDS="300"
+```
+
 ## 4. Reverse proxy
 
 Bundled Caddy is enabled by default:

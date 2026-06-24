@@ -90,6 +90,10 @@ Application logs are emitted to Docker stdout/stderr as JSON. Use
 `APP_LOG_LEVEL=info` and `APP_REQUEST_LOGS=true` while diagnosing production
 issues, then read them with `docker compose logs -f app`.
 
+When Remnashop sync imports users, the cabinet also resolves their current
+Remnawave UUID and upserts the local subscription from Remnawave. The refresh
+window is controlled by `REMNASHOP_USER_SUBSCRIPTION_SYNC_STALE_SECONDS`.
+
 ## Reverse proxy
 
 Bundled Caddy is enabled by default:

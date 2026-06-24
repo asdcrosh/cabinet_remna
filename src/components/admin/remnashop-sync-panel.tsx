@@ -61,7 +61,7 @@ export function RemnashopSyncPanel() {
         <div className="min-w-0">
           <h2 className="text-lg font-semibold">Remnashop</h2>
           <p className="mt-1 text-sm text-slate-500">
-            Пользователи связываются по Telegram или email. Новые тарифы переносятся вместе с аудиторией.
+            Пользователи связываются по Telegram или email. Подписки восстанавливаются из Remnawave по UUID.
           </p>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row">

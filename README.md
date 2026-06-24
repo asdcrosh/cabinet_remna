@@ -153,6 +153,7 @@ https://ВСТАВЬ_СЮДА_ДОМЕН_КАБИНЕТА
 | `BONUS_BOX_EPIC_MIN_OPENINGS` / `BONUS_BOX_LEGENDARY_MIN_OPENINGS` | Минимальная история открытий перед эпиком и легендой |
 | `APP_LOG_LEVEL` | Уровень JSON-логов приложения: `debug`, `info`, `warn`, `error` |
 | `APP_REQUEST_LOGS` | `true` включает request-log приложения в Docker stdout без cookie и секретов |
+| `REMNASHOP_USER_SUBSCRIPTION_SYNC_STALE_SECONDS` | Как часто обновлять локальные подписки пользователей из Remnawave при Remnashop sync |
 
 ## Reverse Proxy
 

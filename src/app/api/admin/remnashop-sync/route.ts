@@ -27,6 +27,9 @@ export const GET = withAuth(async (req: Request) => {
               usersCreated: users.created,
               usersUpdated: users.updated,
               usersSkipped: users.skipped,
+              subscriptionsSynced: users.subscriptionsSynced,
+              subscriptionsSkipped: users.subscriptionsSkipped,
+              subscriptionsFailed: users.subscriptionsFailed,
             },
           }
         })()
