@@ -73,10 +73,15 @@ BONUS_BOX_WEEKLY_DAY="5"
 BONUS_BOX_WEEKLY_ATTEMPTS="1"
 BONUS_BOX_REFERRER_ATTEMPTS="2"
 BONUS_BOX_REFERRED_ATTEMPTS="1"
+BONUS_BOX_ECONOMY_GUARD_ENABLED="true"
+BONUS_BOX_RARE_COOLDOWN_OPENINGS="2"
+BONUS_BOX_EPIC_COOLDOWN_OPENINGS="8"
+BONUS_BOX_LEGENDARY_COOLDOWN_OPENINGS="30"
 ```
 
 `BONUS_BOX_RUB_PER_ATTEMPT` controls paid rubles per opening. `5` in
-`BONUS_BOX_WEEKLY_DAY` means Friday.
+`BONUS_BOX_WEEKLY_DAY` means Friday. Economy guard cooldowns control how many
+openings must pass before expensive prizes can return to the available pool.
 
 ## 4. Reverse proxy
 

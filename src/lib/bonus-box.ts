@@ -1,5 +1,5 @@
 import { randomBytes, randomInt } from 'node:crypto'
-import { Prisma, type BonusBoxPrize, type BonusBoxPrizeType } from '@prisma/client'
+import { Prisma, type BonusBoxPrize, type BonusBoxPrizeType, type BonusBoxRarity } from '@prisma/client'
 import { prisma } from './prisma'
 import { remnawave } from './remnawave'
 import { gbToBytes } from './format'
@@ -8,6 +8,12 @@ const DEFAULT_RUB_PER_ATTEMPT = 300
 const DEFAULT_ATTEMPT_TTL_DAYS = 30
 const DEFAULT_WEEKLY_DAY = 5
 const DEFAULT_PROMO_EXPIRES_IN_DAYS = 7
+const DEFAULT_RARE_COOLDOWN_OPENINGS = 2
+const DEFAULT_EPIC_COOLDOWN_OPENINGS = 8
+const DEFAULT_LEGENDARY_COOLDOWN_OPENINGS = 30
+const DEFAULT_EPIC_MIN_OPENINGS = 4
+const DEFAULT_LEGENDARY_MIN_OPENINGS = 12
+const ECONOMY_HISTORY_LIMIT = 80
 const REEL_ITEM_COUNT = 88
 const REEL_WINNING_BASE_INDEX = 72
 const REEL_WINNING_SPREAD = 4
@@ -53,6 +59,7 @@ export type BonusBoxOpeningResult = {
   winningIndex: number
   stopOffsetRatio: number
   promoCode: string | null
+  promoCodeExpiresAt: string | null
   remainingAttempts: number
   remoteSynced: boolean
 }
@@ -82,6 +89,12 @@ export function getBonusBoxConfig() {
     referrerAttempts: envInt('BONUS_BOX_REFERRER_ATTEMPTS', 2, 0, 100),
     referredAttempts: envInt('BONUS_BOX_REFERRED_ATTEMPTS', 1, 0, 100),
     promoExpiresInDays: envInt('BONUS_BOX_PROMO_EXPIRES_IN_DAYS', DEFAULT_PROMO_EXPIRES_IN_DAYS, 1, 365),
+    economyGuardEnabled: envBool('BONUS_BOX_ECONOMY_GUARD_ENABLED', true),
+    rareCooldownOpenings: envInt('BONUS_BOX_RARE_COOLDOWN_OPENINGS', DEFAULT_RARE_COOLDOWN_OPENINGS, 0, 1000),
+    epicCooldownOpenings: envInt('BONUS_BOX_EPIC_COOLDOWN_OPENINGS', DEFAULT_EPIC_COOLDOWN_OPENINGS, 0, 1000),
+    legendaryCooldownOpenings: envInt('BONUS_BOX_LEGENDARY_COOLDOWN_OPENINGS', DEFAULT_LEGENDARY_COOLDOWN_OPENINGS, 0, 1000),
+    epicMinOpenings: envInt('BONUS_BOX_EPIC_MIN_OPENINGS', DEFAULT_EPIC_MIN_OPENINGS, 0, 1000),
+    legendaryMinOpenings: envInt('BONUS_BOX_LEGENDARY_MIN_OPENINGS', DEFAULT_LEGENDARY_MIN_OPENINGS, 0, 1000),
   }
 }
 
@@ -89,7 +102,8 @@ export async function getBonusBoxOverview(userId: string) {
   await grantWeeklyBonusBoxAttempts(userId)
 
   const now = new Date()
-  const [attempts, prizes, openings, vpnAccess] = await Promise.all([
+  const config = getBonusBoxConfig()
+  const [attempts, prizeRows, openings, vpnAccess] = await Promise.all([
     prisma.bonusBoxAttempt.findMany({
       where: {
         userId,
@@ -99,11 +113,11 @@ export async function getBonusBoxOverview(userId: string) {
       orderBy: { createdAt: 'asc' },
       select: { id: true, source: true, expiresAt: true, createdAt: true },
     }),
-    getPublicPrizes(),
+    getPrizeRows(prisma),
     prisma.bonusBoxOpening.findMany({
       where: { userId },
       orderBy: { createdAt: 'desc' },
-      take: 12,
+      take: ECONOMY_HISTORY_LIMIT,
       include: { prize: true, promoCode: true },
     }),
     prisma.user.findUnique({
@@ -121,9 +135,11 @@ export async function getBonusBoxOverview(userId: string) {
       },
     }),
   ])
+  const availablePrizes = applyEconomyGuard(prizeRows, openings, config)
+  const prizes = publicPrizesWithChances(prizeRows, availablePrizes)
 
   return {
-    config: getBonusBoxConfig(),
+    config,
     hasActiveSubscription: Boolean(vpnAccess?.remnawaveUuid && vpnAccess.subscriptions.length > 0),
     attempts: attempts.map((attempt) => ({
       ...attempt,
@@ -132,11 +148,12 @@ export async function getBonusBoxOverview(userId: string) {
     })),
     attemptsCount: attempts.length,
     prizes,
-    openings: openings.map((opening) => ({
+    openings: openings.slice(0, 12).map((opening) => ({
       id: opening.id,
       createdAt: opening.createdAt.toISOString(),
       prize: publicPrizeFromPrize(opening.prize, 0),
       promoCode: opening.promoCode?.code ?? null,
+      promoCodeExpiresAt: opening.promoCode?.expiresAt?.toISOString() ?? null,
     })),
   }
 }
@@ -382,7 +399,13 @@ export async function openBonusBox(userId: string): Promise<BonusBoxOpeningResul
         throw new BonusBoxError('Администратор ещё не настроил подарки', 409, 'NO_PRIZES')
       }
 
-      const prize = pickWeightedPrize(eligiblePrizes)
+      const recentOpenings = await tx.bonusBoxOpening.findMany({
+        where: { userId },
+        orderBy: { createdAt: 'desc' },
+        take: ECONOMY_HISTORY_LIMIT,
+        select: { prize: { select: { rarity: true } } },
+      })
+      const prize = pickWeightedPrize(applyEconomyGuard(eligiblePrizes, recentOpenings, config))
       const claimedPrize = await tx.bonusBoxPrize.updateMany({
         where: {
           id: prize.id,
@@ -424,6 +447,7 @@ export async function openBonusBox(userId: string): Promise<BonusBoxOpeningResul
         openingId: opening.id,
         prize,
         promoCode: opening.promoCode?.code ?? null,
+        promoCodeExpiresAt: opening.promoCode?.expiresAt?.toISOString() ?? null,
         remoteUpdate:
           application.remoteUpdate
             ? { ...application.remoteUpdate, remnawaveUuid: user.remnawaveUuid }
@@ -440,7 +464,7 @@ export async function openBonusBox(userId: string): Promise<BonusBoxOpeningResul
 
   const [remainingAttempts, prizes] = await Promise.all([
     countAvailableAttempts(userId),
-    getPublicPrizes(),
+    getPublicPrizesForUser(userId),
   ])
   const publicPrize = publicPrizeFromPrize(
     txResult.prize,
@@ -455,12 +479,32 @@ export async function openBonusBox(userId: string): Promise<BonusBoxOpeningResul
     winningIndex: reel.winningIndex,
     stopOffsetRatio: reel.stopOffsetRatio,
     promoCode: txResult.promoCode,
+    promoCodeExpiresAt: txResult.promoCodeExpiresAt,
     remainingAttempts,
     remoteSynced,
   }
 }
 
 export async function getPublicPrizes(tx: Pick<BonusBoxTx, 'bonusBoxPrize'> = prisma) {
+  const prizes = await getPrizeRows(tx)
+  return publicPrizesWithChances(prizes, prizes)
+}
+
+async function getPublicPrizesForUser(userId: string) {
+  const config = getBonusBoxConfig()
+  const [prizes, recentOpenings] = await Promise.all([
+    getPrizeRows(prisma),
+    prisma.bonusBoxOpening.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+      take: ECONOMY_HISTORY_LIMIT,
+      select: { prize: { select: { rarity: true } } },
+    }),
+  ])
+  return publicPrizesWithChances(prizes, applyEconomyGuard(prizes, recentOpenings, config))
+}
+
+async function getPrizeRows(tx: Pick<BonusBoxTx, 'bonusBoxPrize'>) {
   const prizes = await tx.bonusBoxPrize.findMany({
     where: {
       isActive: true,
@@ -468,9 +512,7 @@ export async function getPublicPrizes(tx: Pick<BonusBoxTx, 'bonusBoxPrize'> = pr
     },
     orderBy: [{ rarity: 'asc' }, { createdAt: 'asc' }],
   })
-  const eligible = prizes.filter((prize) => prize.maxWins == null || prize.winsCount < prize.maxWins)
-  const totalWeight = eligible.reduce((sum, prize) => sum + prize.weight, 0)
-  return eligible.map((prize) => publicPrizeFromPrize(prize, totalWeight > 0 ? prize.weight / totalWeight : 0))
+  return prizes.filter((prize) => prize.maxWins == null || prize.winsCount < prize.maxWins)
 }
 
 async function applyPrizeInTransaction(
@@ -627,6 +669,68 @@ async function countAvailableAttempts(userId: string) {
       OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
     },
   })
+}
+
+function publicPrizesWithChances(prizes: BonusBoxPrize[], availablePrizes: BonusBoxPrize[]) {
+  const availableIds = new Set(availablePrizes.map((prize) => prize.id))
+  const totalWeight = availablePrizes.reduce((sum, prize) => sum + prize.weight, 0)
+
+  return prizes.map((prize) =>
+    publicPrizeFromPrize(
+      prize,
+      availableIds.has(prize.id) && totalWeight > 0 ? prize.weight / totalWeight : 0
+    )
+  )
+}
+
+function applyEconomyGuard(
+  prizes: BonusBoxPrize[],
+  recentOpenings: Array<{ prize: { rarity: BonusBoxRarity } }>,
+  config: ReturnType<typeof getBonusBoxConfig>
+) {
+  if (!config.economyGuardEnabled || prizes.length <= 1) return prizes
+
+  const guarded = prizes.filter((prize) => canWinPrizeNow(prize, recentOpenings, config))
+  if (guarded.length > 0) return guarded
+
+  const common = prizes.filter((prize) => rarityRank(prize.rarity) === 0)
+  if (common.length > 0) return common
+
+  return [prizes.slice().sort((left, right) => rarityRank(left.rarity) - rarityRank(right.rarity))[0]]
+}
+
+function canWinPrizeNow(
+  prize: BonusBoxPrize,
+  recentOpenings: Array<{ prize: { rarity: BonusBoxRarity } }>,
+  config: ReturnType<typeof getBonusBoxConfig>
+) {
+  const rank = rarityRank(prize.rarity)
+  if (rank === 0) return true
+
+  const sinceRareOrBetter = openingsSinceRarityAtLeast(recentOpenings, 1)
+  if (rank === 1) {
+    return sinceRareOrBetter >= config.rareCooldownOpenings
+  }
+
+  if (rank === 2) {
+    return recentOpenings.length >= config.epicMinOpenings
+      && sinceRareOrBetter >= config.epicCooldownOpenings
+  }
+
+  const sinceEpicOrBetter = openingsSinceRarityAtLeast(recentOpenings, 2)
+  const sinceLegendary = openingsSinceRarityAtLeast(recentOpenings, 3)
+  return recentOpenings.length >= config.legendaryMinOpenings
+    && sinceRareOrBetter >= config.epicCooldownOpenings
+    && sinceEpicOrBetter >= config.legendaryCooldownOpenings
+    && sinceLegendary >= config.legendaryCooldownOpenings
+}
+
+function openingsSinceRarityAtLeast(
+  recentOpenings: Array<{ prize: { rarity: BonusBoxRarity } }>,
+  minRank: number
+) {
+  const index = recentOpenings.findIndex((opening) => rarityRank(opening.prize.rarity) >= minRank)
+  return index === -1 ? Number.POSITIVE_INFINITY : index
 }
 
 function pickWeightedPrize(prizes: BonusBoxPrize[]) {
