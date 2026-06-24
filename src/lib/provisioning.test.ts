@@ -15,8 +15,18 @@ const mocks = vi.hoisted(() => {
   const ensureRemnawaveSubscription = vi.fn()
   const grantReferralRewardForPayment = vi.fn()
   const applyPendingReferralRewardsForUser = vi.fn()
+  const grantPaymentBonusBoxAttempts = vi.fn()
+  const grantReferralBonusBoxAttemptsForPayment = vi.fn()
 
-  return { prisma, ensureRemnawaveSubscription, grantReferralRewardForPayment, applyPendingReferralRewardsForUser, subscription }
+  return {
+    prisma,
+    ensureRemnawaveSubscription,
+    grantReferralRewardForPayment,
+    applyPendingReferralRewardsForUser,
+    grantPaymentBonusBoxAttempts,
+    grantReferralBonusBoxAttemptsForPayment,
+    subscription,
+  }
 })
 
 vi.mock('./prisma', () => ({ prisma: mocks.prisma }))
@@ -26,6 +36,10 @@ vi.mock('./subscription', () => ({
 vi.mock('./referral-rewards', () => ({
   grantReferralRewardForPayment: mocks.grantReferralRewardForPayment,
   applyPendingReferralRewardsForUser: mocks.applyPendingReferralRewardsForUser,
+}))
+vi.mock('./bonus-box', () => ({
+  grantPaymentBonusBoxAttempts: mocks.grantPaymentBonusBoxAttempts,
+  grantReferralBonusBoxAttemptsForPayment: mocks.grantReferralBonusBoxAttemptsForPayment,
 }))
 
 import { provisionPaymentSubscription } from './provisioning'
@@ -75,7 +89,9 @@ describe('provisionPaymentSubscription', () => {
       })
     )
     expect(mocks.ensureRemnawaveSubscription).not.toHaveBeenCalled()
+    expect(mocks.grantPaymentBonusBoxAttempts).toHaveBeenCalledWith('pay-1')
     expect(mocks.grantReferralRewardForPayment).toHaveBeenCalledWith('pay-1')
+    expect(mocks.grantReferralBonusBoxAttemptsForPayment).toHaveBeenCalledWith('pay-1')
     expect(mocks.applyPendingReferralRewardsForUser).toHaveBeenCalledWith('user-1')
   })
 
@@ -107,7 +123,9 @@ describe('provisionPaymentSubscription', () => {
       where: { id: 'job-1' },
       data: expect.objectContaining({ status: 'SUCCEEDED', lastError: null }),
     })
+    expect(mocks.grantPaymentBonusBoxAttempts).toHaveBeenCalledWith('pay-1')
     expect(mocks.grantReferralRewardForPayment).toHaveBeenCalledWith('pay-1')
+    expect(mocks.grantReferralBonusBoxAttemptsForPayment).toHaveBeenCalledWith('pay-1')
     expect(mocks.applyPendingReferralRewardsForUser).toHaveBeenCalledWith('user-1')
   })
 
@@ -132,5 +150,7 @@ describe('provisionPaymentSubscription', () => {
       }),
     })
     expect(mocks.grantReferralRewardForPayment).not.toHaveBeenCalled()
+    expect(mocks.grantPaymentBonusBoxAttempts).not.toHaveBeenCalled()
+    expect(mocks.grantReferralBonusBoxAttemptsForPayment).not.toHaveBeenCalled()
   })
 })

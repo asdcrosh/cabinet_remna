@@ -65,6 +65,19 @@ Fill real production values:
 Important: `POSTGRES_PASSWORD` and the password inside `DATABASE_URL` must be
 the same. The installer keeps them in sync when it creates `.env`.
 
+Optional Подарочный бокс settings:
+
+```env
+BONUS_BOX_RUB_PER_ATTEMPT="300"
+BONUS_BOX_WEEKLY_DAY="5"
+BONUS_BOX_WEEKLY_ATTEMPTS="1"
+BONUS_BOX_REFERRER_ATTEMPTS="2"
+BONUS_BOX_REFERRED_ATTEMPTS="1"
+```
+
+`BONUS_BOX_RUB_PER_ATTEMPT` controls paid rubles per opening. `5` in
+`BONUS_BOX_WEEKLY_DAY` means Friday.
+
 ## 4. Reverse proxy
 
 Bundled Caddy is enabled by default:

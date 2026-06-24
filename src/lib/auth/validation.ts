@@ -114,6 +114,34 @@ export const updateAdminPromoCodeSchema = adminPromoCodeBaseSchema.partial().ref
   message: 'Дата окончания должна быть позже даты начала',
 })
 
+const adminBonusBoxPrizeBaseSchema = z.object({
+  title: z.string().trim().min(2, 'Минимум 2 символа').max(80, 'Максимум 80 символов'),
+  description: z.string().trim().max(180, 'Максимум 180 символов').optional().nullable(),
+  type: z.enum(['SUBSCRIPTION_DAYS', 'TRAFFIC_GB', 'PROMO_CODE_PERCENT']),
+  value: z.coerce.number().int().min(1).max(10_000),
+  weight: z.coerce.number().int().min(1).max(100_000),
+  rarity: z.enum(['COMMON', 'RARE', 'EPIC', 'LEGENDARY']).default('COMMON'),
+  isActive: z.boolean().default(true),
+  maxWins: z.coerce.number().int().min(1).optional().nullable(),
+  promoExpiresInDays: z.coerce.number().int().min(1).max(365).optional().nullable(),
+})
+
+export const adminBonusBoxPrizeSchema = adminBonusBoxPrizeBaseSchema.refine(
+  (value) => value.type !== 'PROMO_CODE_PERCENT' || value.value <= 99,
+  {
+    path: ['value'],
+    message: 'Скидка должна быть от 1% до 99%',
+  }
+)
+
+export const updateAdminBonusBoxPrizeSchema = adminBonusBoxPrizeBaseSchema.partial().refine(
+  (value) => value.type !== 'PROMO_CODE_PERCENT' || value.value == null || value.value <= 99,
+  {
+    path: ['value'],
+    message: 'Скидка должна быть от 1% до 99%',
+  }
+)
+
 const adminPlanBaseSchema = z.object({
   name: z.string().trim().min(2, 'Минимум 2 символа').max(80, 'Максимум 80 символов'),
   description: z.string().trim().max(240, 'Максимум 240 символов').optional().nullable(),
@@ -147,6 +175,8 @@ export type CreatePaymentInput = z.infer<typeof createPaymentSchema>
 export type ValidatePromoCodeInput = z.infer<typeof validatePromoCodeSchema>
 export type AdminPromoCodeInput = z.infer<typeof adminPromoCodeSchema>
 export type UpdateAdminPromoCodeInput = z.infer<typeof updateAdminPromoCodeSchema>
+export type AdminBonusBoxPrizeInput = z.infer<typeof adminBonusBoxPrizeSchema>
+export type UpdateAdminBonusBoxPrizeInput = z.infer<typeof updateAdminBonusBoxPrizeSchema>
 export type AdminPlanInput = z.infer<typeof adminPlanSchema>
 export type UpdateAdminPlanInput = z.infer<typeof updateAdminPlanSchema>
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>

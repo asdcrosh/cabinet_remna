@@ -1,6 +1,7 @@
 import { prisma } from './prisma'
 import { ensureRemnawaveSubscription, type EnsureSubscriptionInput } from './subscription'
 import { applyPendingReferralRewardsForUser, grantReferralRewardForPayment } from './referral-rewards'
+import { grantPaymentBonusBoxAttempts, grantReferralBonusBoxAttemptsForPayment } from './bonus-box'
 
 export interface ProvisionPaymentSubscriptionInput extends EnsureSubscriptionInput {
   paymentId: string
@@ -90,10 +91,12 @@ export async function provisionPaymentSubscription(input: ProvisionPaymentSubscr
 
 async function settleReferralRewards(paymentId: string, userId: string) {
   try {
+    await grantPaymentBonusBoxAttempts(paymentId)
     await grantReferralRewardForPayment(paymentId)
+    await grantReferralBonusBoxAttemptsForPayment(paymentId)
     await applyPendingReferralRewardsForUser(userId)
   } catch (error) {
-    console.error('[referral-rewards] settlement failed', {
+    console.error('[payment-benefits] settlement failed', {
       paymentId,
       userId,
       message: error instanceof Error ? error.message : 'unknown error',

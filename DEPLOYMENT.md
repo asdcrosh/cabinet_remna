@@ -78,6 +78,11 @@ ALLOWED_ORIGINS="https://cabinet.example.com"
 YOOKASSA_WEBHOOK_URL="https://cabinet.example.com/api/webhook/yookassa"
 ```
 
+Optional Подарочный бокс settings are kept in `.env`. The most important one is
+`BONUS_BOX_RUB_PER_ATTEMPT`: it controls how many paid rubles give one opening.
+Weekly and referral openings are controlled by `BONUS_BOX_WEEKLY_*` and
+`BONUS_BOX_REFERRER_ATTEMPTS` / `BONUS_BOX_REFERRED_ATTEMPTS`.
+
 ## Reverse proxy
 
 Bundled Caddy is enabled by default:

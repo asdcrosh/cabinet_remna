@@ -5,6 +5,7 @@ import { requireAdminPage } from '@/lib/auth/admin-page'
 import { PageHeader } from '@/components/dashboard/page-header'
 import { SubscriptionBadge } from '@/components/admin/admin-badges'
 import { UserRoleSelect } from '@/components/admin/user-role-select'
+import { BonusBoxAttemptsButton } from '@/components/admin/bonus-box-attempts-button'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Пользователи — Админка' }
@@ -63,6 +64,20 @@ export default async function AdminUsersPage({
       },
     }),
   ])
+  const now = new Date()
+  const userIds = users.map((user) => user.id)
+  const attemptsRows = userIds.length > 0
+    ? await prisma.bonusBoxAttempt.groupBy({
+        by: ['userId'],
+        where: {
+          userId: { in: userIds },
+          usedAt: null,
+          OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+        },
+        _count: { _all: true },
+      })
+    : []
+  const attemptsByUser = new Map(attemptsRows.map((row) => [row.userId, row._count._all]))
   const pageCount = Math.max(1, Math.ceil(total / pageSize))
 
   return (
@@ -121,6 +136,7 @@ export default async function AdminUsersPage({
           <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
             {users.map((user) => {
               const subscription = user.subscriptions[0]
+              const attemptsCount = attemptsByUser.get(user.id) ?? 0
               return (
                 <tr key={user.id}>
                   <td>
@@ -161,6 +177,16 @@ export default async function AdminUsersPage({
                     <div>Платежи: {user._count.payments}</div>
                     <div>Подписки: {user._count.subscriptions}</div>
                     <div>Устройства: {user._count.devices}</div>
+                    <div className="mt-2 flex items-center gap-2">
+                      <span>Открытия: {attemptsCount}</span>
+                      {actor.role === 'SUPER_ADMIN' && (
+                        <BonusBoxAttemptsButton
+                          userId={user.id}
+                          email={user.email}
+                          attemptsCount={attemptsCount}
+                        />
+                      )}
+                    </div>
                   </td>
                 </tr>
               )
@@ -172,6 +198,7 @@ export default async function AdminUsersPage({
       <div className={users.length > 0 ? 'space-y-3 xl:hidden' : 'hidden'}>
         {users.map((user) => {
           const subscription = user.subscriptions[0]
+          const attemptsCount = attemptsByUser.get(user.id) ?? 0
           return (
             <article key={user.id} className="card space-y-4">
               <div className="flex items-start justify-between gap-3">
@@ -200,7 +227,17 @@ export default async function AdminUsersPage({
                 />
                 <InfoCell label="Платежи" value={user._count.payments} />
                 <InfoCell label="Устройства" value={user._count.devices} />
+                <InfoCell label="Открытия" value={attemptsCount} />
               </div>
+              {actor.role === 'SUPER_ADMIN' && (
+                <div className="flex justify-end">
+                  <BonusBoxAttemptsButton
+                    userId={user.id}
+                    email={user.email}
+                    attemptsCount={attemptsCount}
+                  />
+                </div>
+              )}
             </article>
           )
         })}

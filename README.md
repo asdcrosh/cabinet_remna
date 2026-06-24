@@ -8,6 +8,7 @@
 - Покупка и продление VPN через YooKassa.
 - Одноразовые промо-тарифы без оплаты.
 - Промокоды, лимиты и привязка скидок к тарифам.
+- Подарочный бокс с днями подписки, трафиком и скидочными промокодами.
 - Автоматическая выдача доступа в Remnawave после оплаты.
 - Выбор Remnawave squads в настройках тарифа.
 - QR-код, ссылка подписки, трафик и устройства в кабинете.
@@ -132,6 +133,11 @@ https://ВСТАВЬ_СЮДА_ДОМЕН_КАБИНЕТА
 | `REMNASHOP_DATABASE_URL` | Read-only подключение к remnashop |
 | `REMNASHOP_CATALOG_SYNC_INTERVAL_SECONDS` | Интервал авто-синхронизации каталога |
 | `REFERRAL_BONUS_DAYS` | Бонус за реферала |
+| `BONUS_BOX_RUB_PER_ATTEMPT` | Сколько рублей оплаты дают одно открытие бокса |
+| `BONUS_BOX_MIN_ATTEMPTS_PER_PAYMENT` / `BONUS_BOX_MAX_ATTEMPTS_PER_PAYMENT` | Минимум и максимум открытий за одну оплату |
+| `BONUS_BOX_WEEKLY_DAY` / `BONUS_BOX_WEEKLY_ATTEMPTS` | День недели и количество еженедельных открытий |
+| `BONUS_BOX_REFERRER_ATTEMPTS` / `BONUS_BOX_REFERRED_ATTEMPTS` | Открытия за реферальную покупку |
+| `BONUS_BOX_PROMO_EXPIRES_IN_DAYS` | Срок жизни промокодов, выпавших из бокса |
 
 ## Reverse Proxy
 

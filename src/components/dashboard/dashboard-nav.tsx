@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation'
 import {
   CreditCard,
   Database,
+  Gift,
   Home,
   KeyRound,
   Laptop,
@@ -27,6 +28,7 @@ const nav = [
   { href: '/dashboard/subscription', label: 'Подписка', icon: KeyRound },
   { href: '/dashboard/plans', label: 'Тарифы', icon: ShieldCheck },
   { href: '/dashboard/billing', label: 'Платежи', icon: CreditCard },
+  { href: '/dashboard/bonus-box', label: 'Бонусы', icon: Gift },
   { href: '/dashboard/referrals', label: 'Рефералы', icon: UsersRound },
   { href: '/dashboard/devices', label: 'Устройства', icon: Laptop },
   { href: '/dashboard/support', label: 'Поддержка', icon: MessageCircleQuestion },
@@ -39,6 +41,7 @@ const adminNav = [
   { href: '/dashboard/admin/users', label: 'Пользователи', icon: UsersRound },
   { href: '/dashboard/admin/plans', label: 'Тарифы', icon: SlidersHorizontal },
   { href: '/dashboard/admin/promo-codes', label: 'Промокоды', icon: Tag },
+  { href: '/dashboard/admin/bonus-box', label: 'Подарки', icon: Gift },
   { href: '/dashboard/admin/payments', label: 'Платежи', icon: CreditCard },
   { href: '/dashboard/admin/subscriptions', label: 'Подписки', icon: ShieldCheck },
   { href: '/dashboard/admin/remnashop-sync', label: 'Синхронизация', icon: Database },

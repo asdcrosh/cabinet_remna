@@ -106,6 +106,8 @@ model User {
   trialPlanRedemptions  TrialPlanRedemption[]
   emailVerificationTokens EmailVerificationToken[]
   passwordResetTokens   PasswordResetToken[]
+  bonusBoxAttempts      BonusBoxAttempt[]
+  bonusBoxOpenings      BonusBoxOpening[]
 
   @@index([email])
   @@index([referredById])
@@ -330,6 +332,7 @@ model PromoCode {
   payments           Payment[]
   redemptions        PromoCodeRedemption[]
   plans              PromoCodePlan[]
+  bonusBoxOpenings   BonusBoxOpening[]
 
   @@index([isActive, startsAt, expiresAt])
 }
@@ -464,4 +467,89 @@ enum SupportTicketStatus {
 enum SupportMessageSender {
   USER
   ADMIN
+}
+
+// ----------------------------------------------------------------------
+// 9. Подарочный бокс
+// ----------------------------------------------------------------------
+// Пользователь получает открытия за оплату, рефералов и weekly-бонус.
+// Результат выбирается сервером по весам подарков, а фронт только красиво
+// анимирует горизонтальную ленту.
+// ----------------------------------------------------------------------
+model BonusBoxPrize {
+  id                 String            @id @default(cuid())
+  title              String
+  description        String?
+  type               BonusBoxPrizeType
+  value              Int
+  weight             Int               @default(1)
+  rarity             BonusBoxRarity    @default(COMMON)
+  isActive           Boolean           @default(true)
+  maxWins            Int?
+  winsCount          Int               @default(0)
+  promoExpiresInDays Int?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  openings           BonusBoxOpening[]
+
+  @@index([isActive, weight])
+  @@index([rarity])
+}
+
+model BonusBoxAttempt {
+  id        String                @id @default(cuid())
+  userId    String
+  source    BonusBoxAttemptSource
+  sourceKey String
+  expiresAt DateTime?
+  usedAt    DateTime?
+  createdAt DateTime              @default(now())
+
+  user      User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  opening   BonusBoxOpening?
+
+  @@unique([userId, source, sourceKey])
+  @@index([userId, usedAt, expiresAt])
+  @@index([source, sourceKey])
+}
+
+model BonusBoxOpening {
+  id                    String        @id @default(cuid())
+  userId                String
+  attemptId             String        @unique
+  prizeId               String
+  prizeSnapshot         Json
+  awardedSubscriptionId String?
+  promoCodeId           String?
+  createdAt             DateTime      @default(now())
+
+  user                  User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  attempt               BonusBoxAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  prize                 BonusBoxPrize @relation(fields: [prizeId], references: [id], onDelete: Restrict)
+  promoCode             PromoCode?    @relation(fields: [promoCodeId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([prizeId, createdAt])
+  @@index([promoCodeId])
+}
+
+enum BonusBoxPrizeType {
+  SUBSCRIPTION_DAYS
+  TRAFFIC_GB
+  PROMO_CODE_PERCENT
+}
+
+enum BonusBoxRarity {
+  COMMON
+  RARE
+  EPIC
+  LEGENDARY
+}
+
+enum BonusBoxAttemptSource {
+  PAYMENT
+  WEEKLY
+  REFERRAL
+  MANUAL
 }
