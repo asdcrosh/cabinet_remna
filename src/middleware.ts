@@ -25,7 +25,7 @@ export function middleware(req: NextRequest) {
         "img-src 'self' data: https:",
         "font-src 'self' data:",
         "style-src 'self' 'unsafe-inline'",
-        "script-src 'self' 'unsafe-inline'",
+        "script-src 'self' 'unsafe-inline' https://telegram.org",
         "connect-src 'self' https://oauth.telegram.org",
         'upgrade-insecure-requests',
       ].join('; ')

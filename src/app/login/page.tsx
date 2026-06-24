@@ -10,6 +10,7 @@ export const metadata = { title: 'Вход' }
 
 export default async function LoginPage() {
   const session = await getCurrentUser()
+  if (session?.stage === 'EMAIL_PENDING') redirect('/telegram-email')
   if (session) redirect('/dashboard')
 
   return (

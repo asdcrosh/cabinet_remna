@@ -11,6 +11,7 @@ import { Brand, DashboardNav, MobileDashboardNav } from '@/components/dashboard/
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const session = await getCurrentUser()
   if (!session) redirect('/login?next=/dashboard')
+  if (session.stage === 'EMAIL_PENDING') redirect('/telegram-email')
   const freshUser = await prisma.user.findUnique({
     where: { id: session.uid },
     select: { email: true, role: true },

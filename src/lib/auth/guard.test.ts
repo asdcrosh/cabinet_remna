@@ -34,6 +34,17 @@ describe('requireAdmin', () => {
     await expect(requireAdmin()).rejects.toMatchObject(new AuthError(403, 'Forbidden'))
   })
 
+  it('blocks a Telegram Mini App session until email verification', async () => {
+    mocks.getSession.mockResolvedValue({
+      uid: 'telegram-user',
+      email: 'telegram-user@pending.invalid',
+      role: 'USER',
+      stage: 'EMAIL_PENDING',
+    })
+
+    await expect(requireAdmin()).rejects.toMatchObject(new AuthError(403, 'Email verification required'))
+  })
+
   it('allows super admin in admin routes', async () => {
     const session = { uid: 'owner-1', email: 'owner@example.com', role: 'SUPER_ADMIN' as const }
     mocks.getSession.mockResolvedValue(session)

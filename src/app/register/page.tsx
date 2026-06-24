@@ -10,6 +10,7 @@ export const metadata = { title: 'Регистрация' }
 
 export default async function RegisterPage({ searchParams }: { searchParams: { ref?: string } }) {
   const session = await getCurrentUser()
+  if (session?.stage === 'EMAIL_PENDING') redirect('/telegram-email')
   if (session) redirect('/dashboard')
 
   return (

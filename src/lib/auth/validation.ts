@@ -42,6 +42,13 @@ export const loginSchema = z.object({
   password: z.string().min(1).max(128),
 })
 
+export const telegramMiniAppEmailSchema = z.object({
+  email: z.string().email('Некорректный email').max(255).toLowerCase().trim(),
+  agreeToTerms: z.literal(true, {
+    errorMap: () => ({ message: 'Нужно согласиться с условиями' }),
+  }),
+})
+
 export const forgotPasswordSchema = z.object({
   email: z.string().email('Некорректный email').toLowerCase().trim(),
 })

@@ -17,6 +17,7 @@ export interface SessionPayload extends JWTPayload {
   uid: string
   email: string
   role: 'USER' | 'MODERATOR' | 'ADMIN' | 'SUPER_ADMIN'
+  stage?: 'FULL' | 'EMAIL_PENDING'
 }
 
 export const COOKIE_NAME = 'cabinet_session'
