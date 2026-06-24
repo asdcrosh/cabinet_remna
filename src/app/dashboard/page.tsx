@@ -10,7 +10,6 @@ import { ProgressBar } from '@/components/dashboard/progress-bar'
 import { TrafficChart } from '@/components/dashboard/traffic-chart'
 import { redirect } from 'next/navigation'
 import {
-  Activity,
   AlertTriangle,
   ArrowRight,
   CheckCircle2,
@@ -135,16 +134,11 @@ export default async function DashboardHome() {
         </div>
       </section>
 
-      <section className="card p-4 sm:p-5">
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <h2 className="flex items-center gap-2 font-semibold">
-            <Activity className="h-4 w-4 text-brand-500" />
-            Трафик
-          </h2>
-          <span className="text-xs text-slate-500">30 дней</span>
-        </div>
-        <TrafficChart userId={user.id} compact />
-      </section>
+      <TrafficChart
+        userId={user.id}
+        initialUsedBytes={used.toString()}
+        initialLimitBytes={isUnlimited ? null : limit.toString()}
+      />
 
       <PromoGrid />
     </div>
