@@ -135,6 +135,7 @@ describe('ensureRemnawaveSubscription', () => {
         uuid: 'rw-1',
         expireAt: new Date('2026-02-14T00:00:00.000Z').toISOString(),
         hwidDeviceLimit: 5,
+        tag: 'IMPORTED',
         activeInternalSquads: ['squad-1', 'squad-2'],
       })
     )
@@ -232,6 +233,7 @@ describe('ensureRemnawaveSubscription', () => {
     expect(mocks.remnawave.createUser).toHaveBeenCalledWith(
       expect.objectContaining({
         expireAt: new Date('2026-02-14T00:00:00.000Z').toISOString(),
+        tag: 'IMPORTED',
         activeInternalSquads: ['squad-1', 'squad-2'],
       })
     )

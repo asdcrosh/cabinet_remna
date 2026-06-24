@@ -7,6 +7,10 @@ import {
   type TelegramAuthPayload,
 } from '@/lib/telegram-auth'
 import { syncLinkedTelegramUser } from '@/lib/telegram-link-sync'
+import {
+  mergeTechnicalTelegramAccount,
+  TelegramAccountMergeError,
+} from '@/lib/telegram-account-merge'
 
 export const runtime = 'nodejs'
 
@@ -35,12 +39,26 @@ export const POST = withAuth(async (req: Request) => {
     return NextResponse.json({ error: 'Сначала подтвердите email' }, { status: 403 })
   }
 
-  const existingTelegramOwner = await prisma.user.findUnique({
-    where: { telegramId },
-    select: { id: true },
-  })
-  if (existingTelegramOwner && existingTelegramOwner.id !== session.uid) {
-    return NextResponse.json({ error: 'Этот Telegram уже привязан к другому аккаунту' }, { status: 409 })
+  try {
+    await mergeTechnicalTelegramAccount({
+      targetUserId: session.uid,
+      telegramId,
+      telegramUsername: payload.username ?? null,
+      telegramName: getTelegramDisplayName(payload),
+    })
+  } catch (error) {
+    if (error instanceof TelegramAccountMergeError) {
+      return NextResponse.json(
+        {
+          error:
+            error.code === 'TELEGRAM_ALREADY_LINKED'
+              ? 'Этот Telegram принадлежит другому полноценному аккаунту'
+              : 'Не удалось безопасно объединить профили',
+        },
+        { status: 409 }
+      )
+    }
+    throw error
   }
 
   await prisma.user.update({

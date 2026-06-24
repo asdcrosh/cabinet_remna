@@ -10,6 +10,10 @@ import {
   TELEGRAM_OIDC_STATE_COOKIE,
   TELEGRAM_OIDC_VERIFIER_COOKIE,
 } from '@/lib/telegram-oidc'
+import {
+  mergeTechnicalTelegramAccount,
+  TelegramAccountMergeError,
+} from '@/lib/telegram-account-merge'
 
 export const runtime = 'nodejs'
 
@@ -51,13 +55,24 @@ export const GET = withAuth(async (req: Request) => {
       return clearOidcCookies(NextResponse.redirect(settingsUrl))
     }
 
-    const existingTelegramOwner = await prisma.user.findUnique({
-      where: { telegramId: telegramUser.id },
-      select: { id: true },
-    })
-    if (existingTelegramOwner && existingTelegramOwner.id !== session.uid) {
-      settingsUrl.searchParams.set('telegram_error', 'telegram_already_linked')
-      return clearOidcCookies(NextResponse.redirect(settingsUrl))
+    try {
+      await mergeTechnicalTelegramAccount({
+        targetUserId: session.uid,
+        telegramId: telegramUser.id,
+        telegramUsername: telegramUser.username,
+        telegramName: telegramUser.name,
+      })
+    } catch (error) {
+      if (error instanceof TelegramAccountMergeError) {
+        settingsUrl.searchParams.set(
+          'telegram_error',
+          error.code === 'TELEGRAM_ALREADY_LINKED'
+            ? 'telegram_already_linked'
+            : 'telegram_identity_conflict'
+        )
+        return clearOidcCookies(NextResponse.redirect(settingsUrl))
+      }
+      throw error
     }
 
     await prisma.user.update({

@@ -77,6 +77,7 @@ export async function syncLinkedTelegramUser(input: {
     remnawaveUser = (await remnawave.updateUser({
       uuid: remnawaveUser.uuid,
       telegramId,
+      tag: 'IMPORTED',
     })).response
   }
   const subscription = await upsertLocalSubscriptionFromRemnawave({
@@ -102,6 +103,7 @@ async function syncRemnawaveTelegramId(remnawaveUuid: string | null | undefined,
   await remnawave.updateUser({
     uuid: remnawaveUuid,
     telegramId,
+    tag: 'IMPORTED',
   })
 
   return true as const

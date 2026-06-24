@@ -71,6 +71,7 @@ export async function ensureRemnawaveSubscription(input: EnsureSubscriptionInput
           input.plan.trafficLimitGb == null ? 0 : Number(gbToBytes(input.plan.trafficLimitGb)),
         hwidDeviceLimit: input.plan.deviceLimit,
         telegramId: toRemnawaveTelegramId(user.telegramId),
+        tag: 'IMPORTED',
         ...(activeInternalSquads.length > 0 ? { activeInternalSquads } : {}),
       })
       remnawaveUser = updated.response
@@ -233,6 +234,7 @@ function createRemnawaveUser(input: {
     status: 'ACTIVE',
     email: input.email,
     telegramId: toRemnawaveTelegramId(input.telegramId),
+    tag: 'IMPORTED',
     trafficLimitBytes:
       input.plan.trafficLimitGb == null ? 0 : Number(gbToBytes(input.plan.trafficLimitGb)),
     hwidDeviceLimit: input.plan.deviceLimit,
