@@ -47,7 +47,7 @@ const sourceUser = {
   username: 'egor',
   user_remna_id: 'rw-1',
   subscription_created_at: new Date('2026-06-01T00:00:00.000Z'),
-  subscription_plan_snapshot: { plan: { name: 'Light' }, duration: { days: 7 } },
+  subscription_plan_snapshot: { plan: { id: 77, name: 'Light' }, duration: { days: 7 } },
   subscription_traffic_limit: 0,
   subscription_device_limit: 5,
 }
@@ -114,6 +114,11 @@ describe('syncRemnashopUsersToCabinet', () => {
     expect(mocks.remnawave.getUserByUuid).toHaveBeenCalledWith('rw-1')
     expect(mocks.remnawave.updateUser).toHaveBeenCalledWith(
       expect.objectContaining({ uuid: 'rw-1', telegramId: 123, tag: 'IMPORTED' })
+    )
+    expect(mocks.prisma.plan.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { remnashopPlanId: 77, durationDays: 7 },
+      })
     )
     expect(mocks.upsertLocalSubscriptionFromRemnawave).toHaveBeenCalledWith({
       localUserId: 'user-1',

@@ -255,7 +255,14 @@ export async function syncRemnashopCatalog(options: {
   await prisma.$transaction(async (tx) => {
     for (const plan of plans) {
       const normalized = normalizeRemnashopPlan(plan)
-      const existing = await tx.plan.findFirst({
+      const sourcePlan = await tx.plan.findFirst({
+        where: {
+          remnashopPlanId: plan.id,
+          durationDays: normalized.durationDays,
+        },
+        orderBy: [{ createdAt: 'asc' }],
+      })
+      const existing = sourcePlan ?? await tx.plan.findFirst({
         where: {
           name: normalized.name,
           durationDays: normalized.durationDays,
@@ -267,6 +274,7 @@ export async function syncRemnashopCatalog(options: {
         description: normalized.description,
         priceKopecks: normalized.priceKopecks,
         durationDays: normalized.durationDays,
+        remnashopPlanId: plan.id,
         trafficLimitGb: normalized.trafficLimitGb,
         deviceLimit: normalized.deviceLimit,
         activeInternalSquads: normalized.activeInternalSquads,

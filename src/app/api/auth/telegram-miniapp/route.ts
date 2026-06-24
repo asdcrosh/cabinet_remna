@@ -10,6 +10,7 @@ import { generateUniqueReferralCode } from '@/lib/referrals'
 import { syncLinkedTelegramUser } from '@/lib/telegram-link-sync'
 import { ensureRemnashopTelegramUser } from '@/lib/remnashop-api'
 import { logError, logInfo, logWarn } from '@/lib/logger'
+import { findCanonicalTelegramSessionUser } from '@/lib/telegram-session'
 
 export const runtime = 'nodejs'
 
@@ -105,18 +106,34 @@ export async function POST(req: Request) {
     })
   }
 
+  const sessionUser = await findCanonicalTelegramSessionUser({
+    telegramId: telegram.id,
+    fallbackUserId: user.id,
+  })
+  if (!sessionUser) {
+    logError('auth.telegram_miniapp.session_user_missing', new Error('Telegram user disappeared during sync'), {
+      userId: user.id,
+      telegramId: telegram.id,
+    })
+    return NextResponse.json(
+      { error: 'Не удалось завершить вход. Откройте кабинет заново.' },
+      { status: 409 }
+    )
+  }
+
   const response = NextResponse.json({
     ok: true,
-    emailConfigured: Boolean(user.emailVerifiedAt),
+    emailConfigured: Boolean(sessionUser.emailVerifiedAt),
   })
   logInfo('auth.telegram_miniapp.session_set', {
-    userId: user.id,
-    emailConfigured: Boolean(user.emailVerifiedAt),
+    userId: sessionUser.id,
+    initialUserId: user.id,
+    emailConfigured: Boolean(sessionUser.emailVerifiedAt),
   })
   return setSessionCookieOnResponse(response, {
-    uid: user.id,
-    email: user.email,
-    role: user.role,
+    uid: sessionUser.id,
+    email: sessionUser.email,
+    role: sessionUser.role,
     stage: 'FULL',
   })
 }

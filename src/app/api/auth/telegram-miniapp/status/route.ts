@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getSession, setSessionCookieOnResponse } from '@/lib/auth/cookies'
 import { prisma } from '@/lib/prisma'
 import { syncLinkedTelegramUser } from '@/lib/telegram-link-sync'
+import { findCanonicalTelegramSessionUser } from '@/lib/telegram-session'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -25,19 +26,27 @@ export async function GET() {
     return NextResponse.json({ authenticated: false, waitingForEmail: true })
   }
 
-  if (user.telegramId) {
-    try {
-      await syncLinkedTelegramUser({ localUserId: user.id, telegramId: user.telegramId })
-    } catch {
-      // Login must not be blocked by an optional legacy subscription sync.
-    }
+  const telegramId = user.telegramId
+  if (!telegramId) return NextResponse.json({ authenticated: false }, { status: 401 })
+  try {
+    await syncLinkedTelegramUser({ localUserId: user.id, telegramId })
+  } catch {
+    // Login must not be blocked by an optional legacy subscription sync.
+  }
+
+  const sessionUser = await findCanonicalTelegramSessionUser({
+    telegramId,
+    fallbackUserId: user.id,
+  })
+  if (!sessionUser?.emailVerifiedAt) {
+    return NextResponse.json({ authenticated: false }, { status: 401 })
   }
 
   const response = NextResponse.json({ authenticated: true })
   return setSessionCookieOnResponse(response, {
-    uid: user.id,
-    email: user.email,
-    role: user.role,
+    uid: sessionUser.id,
+    email: sessionUser.email,
+    role: sessionUser.role,
     stage: 'FULL',
   })
 }

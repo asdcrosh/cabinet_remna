@@ -8,6 +8,11 @@ import { newPasswordSchema, telegramMiniAppEmailSchema } from '@/lib/auth/valida
 import { createEmailVerificationToken, sendEmailVerificationLink } from '@/lib/email-verification'
 import { syncLinkedTelegramUser } from '@/lib/telegram-link-sync'
 import { logInfo, logWarn } from '@/lib/logger'
+import {
+  mergeTechnicalTelegramAccount,
+  TelegramAccountMergeError,
+} from '@/lib/telegram-account-merge'
+import { findCanonicalTelegramSessionUser } from '@/lib/telegram-session'
 
 export const runtime = 'nodejs'
 
@@ -92,27 +97,47 @@ export async function POST(req: Request) {
       )
     }
 
-    const mergedUser = await prisma.$transaction(async (tx) => {
-      const user = await tx.user.update({
-        where: { id: emailOwner.id },
-        data: {
-          telegramId: current.telegramId,
-          telegramUsername: current.telegramUsername,
-          telegramLinkedAt: current.telegramLinkedAt ?? new Date(),
-          agreedToTermsAt: new Date(),
-          lastLoginAt: emailOwner.emailVerifiedAt ? new Date() : undefined,
-        },
-        select: {
-          id: true,
-          email: true,
-          name: true,
-          role: true,
-          emailVerifiedAt: true,
-          telegramId: true,
-        },
+    try {
+      await mergeTechnicalTelegramAccount({
+        targetUserId: emailOwner.id,
+        telegramId: current.telegramId,
+        telegramUsername: current.telegramUsername,
+        telegramName: current.name,
       })
-      await tx.user.delete({ where: { id: current.id } })
-      return user
+    } catch (error) {
+      if (error instanceof TelegramAccountMergeError) {
+        logWarn('auth.telegram_email.merge_rejected', {
+          currentUserId: current.id,
+          targetUserId: emailOwner.id,
+          code: error.code,
+        })
+        return NextResponse.json(
+          {
+            error:
+              error.code === 'IDENTITY_CONFLICT'
+                ? 'У аккаунтов разные VPN-профили. Обратитесь в поддержку для объединения.'
+                : 'Telegram-профиль содержит данные, которые нельзя объединить автоматически.',
+          },
+          { status: 409 }
+        )
+      }
+      throw error
+    }
+
+    const mergedUser = await prisma.user.update({
+      where: { id: emailOwner.id },
+      data: {
+        agreedToTermsAt: new Date(),
+        lastLoginAt: emailOwner.emailVerifiedAt ? new Date() : undefined,
+      },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        emailVerifiedAt: true,
+        telegramId: true,
+      },
     })
     logInfo('auth.telegram_email.accounts_merged', {
       sourceUserId: current.id,
@@ -132,16 +157,23 @@ export async function POST(req: Request) {
         })
       }
 
+      const sessionUser = await findCanonicalTelegramSessionUser({
+        telegramId: mergedUser.telegramId!,
+        fallbackUserId: mergedUser.id,
+      })
+      if (!sessionUser) {
+        return NextResponse.json({ error: 'Не удалось завершить объединение аккаунтов' }, { status: 409 })
+      }
       const response = NextResponse.json({
         ok: true,
-        email: mergedUser.email,
+        email: sessionUser.email,
         authenticated: true,
         merged: true,
       })
       return setSessionCookieOnResponse(response, {
-        uid: mergedUser.id,
-        email: mergedUser.email,
-        role: mergedUser.role,
+        uid: sessionUser.id,
+        email: sessionUser.email,
+        role: sessionUser.role,
         stage: 'FULL',
       })
     }

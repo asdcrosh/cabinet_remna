@@ -25,6 +25,7 @@ model Plan {
   description     String?
   priceKopecks    Int                               // 19900 = 199 ₽
   durationDays    Int      @default(30)
+  remnashopPlanId Int?                              // исходный ID плана Remnashop для точной синхронизации
   trafficLimitGb  Int?                              // null = безлимит
   deviceLimit      Int      @default(5)
   activeInternalSquads String[] @default([])        // UUID squads Remnawave для этого тарифа
@@ -43,6 +44,7 @@ model Plan {
   trialRedemptions TrialPlanRedemption[]
 
   @@index([isActive, sortOrder])
+  @@unique([remnashopPlanId, durationDays])
 }
 
 enum PlanAvailability {

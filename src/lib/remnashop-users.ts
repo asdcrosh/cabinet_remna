@@ -256,6 +256,18 @@ async function syncSubscriptionFromRemnawave(input: {
 async function resolveCabinetPlanIdFromRemnashopSubscription(source: RemnashopUserRow) {
   const candidates = getPlanCandidates(source)
   for (const candidate of candidates) {
+    if (candidate.sourcePlanId) {
+      const sourcePlan = await prisma.plan.findFirst({
+        where: {
+          remnashopPlanId: candidate.sourcePlanId,
+          ...(candidate.durationDays ? { durationDays: candidate.durationDays } : {}),
+        },
+        select: { id: true },
+        orderBy: { createdAt: 'asc' },
+      })
+      if (sourcePlan) return sourcePlan.id
+    }
+
     const names = normalizePlanNames(candidate.name, candidate.durationDays)
     const plan = names.length > 0
       ? await prisma.plan.findFirst({
@@ -284,6 +296,7 @@ async function resolveCabinetPlanIdFromRemnashopSubscription(source: RemnashopUs
 function getPlanCandidates(source: RemnashopUserRow) {
   const snapshot = parseSnapshot(source.subscription_plan_snapshot)
   const names = snapshot ? extractPlanNames(snapshot) : []
+  const sourcePlanId = snapshot ? extractPlanId(snapshot) : null
   const durationDays = snapshot ? extractDurationDays(snapshot) : null
   const trafficLimitGb = source.subscription_traffic_limit === null
     ? undefined
@@ -294,6 +307,7 @@ function getPlanCandidates(source: RemnashopUserRow) {
 
   const candidateNames: Array<string | null> = names.length > 0 ? names : [null]
   return candidateNames.map((name) => ({
+    sourcePlanId,
     name,
     durationDays: durationDays ?? (name ? extractDurationDaysFromName(name) : null),
     trafficLimitGb,
@@ -312,6 +326,17 @@ function parseSnapshot(value: unknown): Record<string, unknown> | null {
   } catch {
     return null
   }
+}
+
+function extractPlanId(snapshot: Record<string, unknown>) {
+  return firstPositiveInt([
+    readNumber(snapshot, ['id']),
+    readNumber(snapshot, ['planId']),
+    readNumber(snapshot, ['plan_id']),
+    readNumber(snapshot, ['plan', 'id']),
+    readNumber(snapshot, ['plan', 'planId']),
+    readNumber(snapshot, ['plan', 'plan_id']),
+  ])
 }
 
 function extractPlanNames(snapshot: Record<string, unknown>) {
