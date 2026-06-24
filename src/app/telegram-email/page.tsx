@@ -28,7 +28,7 @@ export default async function TelegramEmailPage() {
             <Send className="h-6 w-6" />
           </div>
           <h1 className="mt-4 text-2xl font-semibold">{getBrandName()}</h1>
-          <p className="mt-1 text-sm text-slate-500">Укажите email для завершения регистрации</p>
+          <p className="mt-1 text-sm text-slate-500">Добавьте email и пароль для входа на сайте</p>
         </div>
         <div className="card">
           <TelegramEmailForm

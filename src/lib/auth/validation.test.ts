@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { registerSchema } from './validation'
+import { registerSchema, telegramMiniAppEmailSchema } from './validation'
 
 const baseInput = {
   email: 'user@example.com',
@@ -19,5 +19,22 @@ describe('auth validation', () => {
     expect(registerSchema.safeParse({ ...baseInput, name: 'Артем  Алексеев' }).success).toBe(true)
     expect(registerSchema.safeParse({ ...baseInput, name: 'Артем--Алексеев' }).success).toBe(false)
     expect(registerSchema.safeParse({ ...baseInput, name: 'A'.repeat(41) }).success).toBe(false)
+  })
+
+  it('requires a secure web password after Telegram Mini App login', () => {
+    expect(
+      telegramMiniAppEmailSchema.safeParse({
+        email: 'telegram@example.com',
+        password: 'Password1',
+        agreeToTerms: true,
+      }).success
+    ).toBe(true)
+    expect(
+      telegramMiniAppEmailSchema.safeParse({
+        email: 'telegram@example.com',
+        password: 'толькобуквы',
+        agreeToTerms: true,
+      }).success
+    ).toBe(false)
   })
 })

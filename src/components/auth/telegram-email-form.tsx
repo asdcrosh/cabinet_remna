@@ -2,11 +2,14 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { CheckCircle2, Loader2, Mail, Send } from 'lucide-react'
+import { CheckCircle2, Eye, EyeOff, Loader2, LockKeyhole, Mail, Send } from 'lucide-react'
 import { toast } from '@/components/ui/toaster'
 
 export function TelegramEmailForm({ telegramName, initialEmail }: { telegramName: string | null; initialEmail: string }) {
   const [email, setEmail] = useState(initialEmail.endsWith('@pending.invalid') ? '' : initialEmail)
+  const [password, setPassword] = useState('')
+  const [passwordConfirmation, setPasswordConfirmation] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [agreed, setAgreed] = useState(false)
   const [sending, setSending] = useState(false)
   const [sentTo, setSentTo] = useState<string | null>(null)
@@ -34,12 +37,16 @@ export function TelegramEmailForm({ telegramName, initialEmail }: { telegramName
 
   async function submit(event: React.FormEvent) {
     event.preventDefault()
+    if (password !== passwordConfirmation) {
+      toast('Пароли не совпадают')
+      return
+    }
     setSending(true)
     try {
       const response = await fetch('/api/auth/telegram-miniapp/email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, agreeToTerms: agreed }),
+        body: JSON.stringify({ email, password, agreeToTerms: agreed }),
       })
       const data = await response.json().catch(() => null)
       if (!response.ok) throw new Error(data?.error || 'Не удалось отправить письмо')
@@ -89,6 +96,48 @@ export function TelegramEmailForm({ telegramName, initialEmail }: { telegramName
           <input className="input pl-9" type="email" value={email} onChange={(event) => setEmail(event.target.value)} required autoComplete="email" placeholder="name@example.com" />
         </div>
       </label>
+      <label className="block">
+        <span className="label">Пароль для входа на сайте</span>
+        <div className="relative">
+          <LockKeyhole className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <input
+            className="input px-9"
+            type={showPassword ? 'text' : 'password'}
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+            required
+            minLength={8}
+            maxLength={128}
+            autoComplete="new-password"
+            placeholder="Минимум 8 символов"
+          />
+          <button
+            type="button"
+            className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-2 text-slate-400 hover:text-slate-700"
+            onClick={() => setShowPassword((value) => !value)}
+            aria-label={showPassword ? 'Скрыть пароль' : 'Показать пароль'}
+          >
+            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          </button>
+        </div>
+        <p className="mt-1 text-xs text-slate-500">Используйте латинские буквы и хотя бы одну цифру.</p>
+      </label>
+      <label className="block">
+        <span className="label">Повторите пароль</span>
+        <div className="relative">
+          <LockKeyhole className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <input
+            className="input pl-9"
+            type={showPassword ? 'text' : 'password'}
+            value={passwordConfirmation}
+            onChange={(event) => setPasswordConfirmation(event.target.value)}
+            required
+            minLength={8}
+            maxLength={128}
+            autoComplete="new-password"
+          />
+        </div>
+      </label>
       <label className="flex cursor-pointer items-start gap-3 text-sm text-slate-600 dark:text-slate-300">
         <input className="mt-1" type="checkbox" checked={agreed} onChange={(event) => setAgreed(event.target.checked)} required />
         <span>
@@ -97,7 +146,7 @@ export function TelegramEmailForm({ telegramName, initialEmail }: { telegramName
       </label>
       <button className="btn-primary w-full" type="submit" disabled={sending}>
         {sending && <Loader2 className="h-4 w-4 animate-spin" />}
-        Подтвердить email
+        Создать аккаунт
       </button>
     </form>
   )

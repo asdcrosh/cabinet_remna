@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { hash } from 'bcryptjs'
 import { getSession } from '@/lib/auth/cookies'
 import { prisma } from '@/lib/prisma'
 import { assertSameOrigin } from '@/lib/security'
@@ -55,6 +56,7 @@ export async function POST(req: Request) {
     where: { id: current.id },
     data: {
       email: parsed.data.email,
+      passwordHash: await hash(parsed.data.password, 12),
       agreedToTermsAt: new Date(),
     },
     select: { id: true, email: true, name: true },
