@@ -21,18 +21,18 @@ describe('auth validation', () => {
     expect(registerSchema.safeParse({ ...baseInput, name: 'A'.repeat(41) }).success).toBe(false)
   })
 
-  it('requires a secure web password after Telegram Mini App login', () => {
+  it('accepts an existing account password for Telegram account linking', () => {
     expect(
       telegramMiniAppEmailSchema.safeParse({
         email: 'telegram@example.com',
-        password: 'Password1',
+        password: 'old-password',
         agreeToTerms: true,
       }).success
     ).toBe(true)
     expect(
       telegramMiniAppEmailSchema.safeParse({
         email: 'telegram@example.com',
-        password: 'толькобуквы',
+        password: '',
         agreeToTerms: true,
       }).success
     ).toBe(false)

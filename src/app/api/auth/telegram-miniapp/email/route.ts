@@ -4,7 +4,7 @@ import { getSession, setSessionCookieOnResponse } from '@/lib/auth/cookies'
 import { prisma } from '@/lib/prisma'
 import { assertSameOrigin } from '@/lib/security'
 import { rateLimit } from '@/lib/rate-limit'
-import { telegramMiniAppEmailSchema } from '@/lib/auth/validation'
+import { newPasswordSchema, telegramMiniAppEmailSchema } from '@/lib/auth/validation'
 import { createEmailVerificationToken, sendEmailVerificationLink } from '@/lib/email-verification'
 import { syncLinkedTelegramUser } from '@/lib/telegram-link-sync'
 
@@ -28,7 +28,13 @@ export async function POST(req: Request) {
 
   const parsed = telegramMiniAppEmailSchema.safeParse(await req.json().catch(() => null))
   if (!parsed.success) {
-    return NextResponse.json({ error: 'Validation error', details: parsed.error.flatten() }, { status: 400 })
+    return NextResponse.json(
+      {
+        error: parsed.error.issues[0]?.message || 'Проверьте введённые данные',
+        details: parsed.error.flatten(),
+      },
+      { status: 400 }
+    )
   }
 
   const current = await prisma.user.findUnique({
@@ -145,11 +151,22 @@ export async function POST(req: Request) {
     })
   }
 
+  const newPassword = newPasswordSchema.safeParse(parsed.data.password)
+  if (!newPassword.success) {
+    return NextResponse.json(
+      {
+        error: newPassword.error.issues[0]?.message || 'Пароль не соответствует требованиям',
+        details: newPassword.error.flatten(),
+      },
+      { status: 400 }
+    )
+  }
+
   const user = await prisma.user.update({
     where: { id: current.id },
     data: {
       email: parsed.data.email,
-      passwordHash: await hash(parsed.data.password, 12),
+      passwordHash: await hash(newPassword.data, 12),
       agreedToTermsAt: new Date(),
     },
     select: { id: true, email: true, name: true },

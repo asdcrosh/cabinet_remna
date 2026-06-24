@@ -110,10 +110,9 @@ export function TelegramEmailForm({ telegramName, initialEmail }: { telegramName
             value={password}
             onChange={(event) => setPassword(event.target.value)}
             required
-            minLength={8}
             maxLength={128}
             autoComplete="new-password"
-            placeholder="Минимум 8 символов"
+            placeholder="Введите пароль"
           />
           <button
             type="button"
@@ -138,7 +137,6 @@ export function TelegramEmailForm({ telegramName, initialEmail }: { telegramName
             value={passwordConfirmation}
             onChange={(event) => setPasswordConfirmation(event.target.value)}
             required
-            minLength={8}
             maxLength={128}
             autoComplete="new-password"
           />

@@ -15,14 +15,16 @@ const nameSchema = z
   )
   .refine((value) => !/[-.'\s]{2,}/.test(value), 'Уберите повторяющиеся разделители')
 
+export const newPasswordSchema = z
+  .string()
+  .min(8, 'Минимум 8 символов')
+  .max(128, 'Максимум 128 символов')
+  .regex(/[A-Za-z]/, 'Должна быть хотя бы одна латинская буква')
+  .regex(/[0-9]/, 'Должна быть хотя бы одна цифра')
+
 export const registerSchema = z.object({
   email: z.string().email('Некорректный email').max(255).toLowerCase().trim(),
-  password: z
-    .string()
-    .min(8, 'Минимум 8 символов')
-    .max(128, 'Максимум 128 символов')
-    .regex(/[A-Za-z]/, 'Должна быть хотя бы одна латинская буква')
-    .regex(/[0-9]/, 'Должна быть хотя бы одна цифра'),
+  password: newPasswordSchema,
   name: nameSchema.optional(),
   referralCode: z
     .string()
@@ -44,12 +46,7 @@ export const loginSchema = z.object({
 
 export const telegramMiniAppEmailSchema = z.object({
   email: z.string().email('Некорректный email').max(255).toLowerCase().trim(),
-  password: z
-    .string()
-    .min(8, 'Минимум 8 символов')
-    .max(128, 'Максимум 128 символов')
-    .regex(/[A-Za-z]/, 'Должна быть хотя бы одна латинская буква')
-    .regex(/[0-9]/, 'Должна быть хотя бы одна цифра'),
+  password: z.string().min(1, 'Введите пароль').max(128, 'Максимум 128 символов'),
   agreeToTerms: z.literal(true, {
     errorMap: () => ({ message: 'Нужно согласиться с условиями' }),
   }),
@@ -61,12 +58,7 @@ export const forgotPasswordSchema = z.object({
 
 export const resetPasswordSchema = z.object({
   token: z.string().min(16).max(256),
-  password: z
-    .string()
-    .min(8, 'Минимум 8 символов')
-    .max(128, 'Максимум 128 символов')
-    .regex(/[A-Za-z]/, 'Должна быть хотя бы одна латинская буква')
-    .regex(/[0-9]/, 'Должна быть хотя бы одна цифра'),
+  password: newPasswordSchema,
 })
 
 export const changePasswordSchema = z
