@@ -6,6 +6,7 @@ import { getCurrentUser } from '@/lib/auth/cookies'
 import { prisma } from '@/lib/prisma'
 import { requireAuth, withAuth } from '@/lib/auth/guard'
 import { updateProfileSchema } from '@/lib/auth/validation'
+import { logWarn } from '@/lib/logger'
 
 export const runtime = 'nodejs'
 
@@ -20,6 +21,7 @@ export async function GET() {
     select: { id: true, email: true, name: true, role: true, createdAt: true },
   })
   if (!user) {
+    logWarn('auth.me.stale_session', { userId: session.uid })
     return NextResponse.json({ user: null })
   }
   return NextResponse.json({ user })

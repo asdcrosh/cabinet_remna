@@ -53,11 +53,22 @@ export function TelegramMiniAppAuth() {
         const response = await fetch('/api/auth/telegram-miniapp', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
           body: JSON.stringify({ initData }),
         })
         const data = await response.json().catch(() => null)
         if (!response.ok) throw new Error(data?.error || 'Telegram authentication failed')
-        window.location.replace('/dashboard')
+
+        const sessionResponse = await fetch('/api/me', {
+          cache: 'no-store',
+          credentials: 'same-origin',
+        })
+        const sessionData = await sessionResponse.json().catch(() => null)
+        if (!sessionResponse.ok || !sessionData?.user?.id) {
+          throw new Error('Сессия не сохранилась. Проверьте домен APP_URL и cookies, затем откройте кабинет заново.')
+        }
+
+        window.location.replace(getSafeNextPath())
       } catch (error) {
         console.error('[telegram-miniapp] auth failed', error)
         if (!cancelled) {
@@ -110,4 +121,10 @@ export function TelegramMiniAppAuth() {
       </div>
     </div>
   )
+}
+
+function getSafeNextPath() {
+  const next = new URLSearchParams(window.location.search).get('next')
+  if (next?.startsWith('/') && !next.startsWith('//')) return next
+  return '/dashboard'
 }

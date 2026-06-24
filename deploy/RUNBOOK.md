@@ -84,6 +84,17 @@ BONUS_BOX_LEGENDARY_COOLDOWN_OPENINGS="30"
 openings must pass before expensive prizes can return to the available pool.
 Rare and epic gifts do not reset legendary availability.
 
+Application logs go to Docker stdout/stderr as JSON. Keep these in `.env` for
+production diagnostics:
+
+```env
+APP_LOG_LEVEL="info"
+APP_REQUEST_LOGS="true"
+```
+
+Use `docker compose --env-file .env -f docker-compose.yml logs -f app` to watch
+application logs. Caddy logs show proxy access only.
+
 ## 4. Reverse proxy
 
 Bundled Caddy is enabled by default:

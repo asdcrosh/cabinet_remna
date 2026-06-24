@@ -57,6 +57,30 @@ path.write_text("\n".join(lines) + "\n")
 PY
 fi
 
+ENV_FILE_PATH="${ENV_FILE}" python3 <<'PY'
+from pathlib import Path
+import os
+
+path = Path(os.environ["ENV_FILE_PATH"])
+lines = path.read_text().splitlines()
+defaults = {
+    "APP_LOG_LEVEL": "info",
+    "APP_REQUEST_LOGS": "true",
+}
+existing = {
+    line.split("=", 1)[0].strip()
+    for line in lines
+    if line.strip() and not line.strip().startswith("#") and "=" in line
+}
+changed = False
+for key, value in defaults.items():
+    if key not in existing:
+        lines.append(f'{key}="{value}"')
+        changed = True
+if changed:
+    path.write_text("\n".join(lines) + "\n")
+PY
+
 echo "Updating compose file..."
 curl -fsSL "${COMPOSE_URL}" -o "${COMPOSE_FILE}"
 curl -fsSL "${CABINETCTL_URL}" -o "${CABINETCTL_TEMP}"

@@ -691,6 +691,16 @@ replace_env_value "POSTGRES_PASSWORD" "${DB_PASSWORD}"
 replace_env_value "DATABASE_URL" "postgresql://cabinet:${DB_PASSWORD}@db:5432/cabinet?schema=public"
 replace_env_value "JWT_SECRET" "${JWT_SECRET_VALUE}"
 replace_env_value "HEALTHCHECK_TOKEN" "${HEALTHCHECK_TOKEN_VALUE}"
+if [[ -n "${APP_LOG_LEVEL:-}" ]]; then
+  replace_env_value "APP_LOG_LEVEL" "${APP_LOG_LEVEL}"
+elif ! env_key_exists "APP_LOG_LEVEL"; then
+  replace_env_value "APP_LOG_LEVEL" "info"
+fi
+if [[ -n "${APP_REQUEST_LOGS:-}" ]]; then
+  replace_env_value "APP_REQUEST_LOGS" "${APP_REQUEST_LOGS}"
+elif ! env_key_exists "APP_REQUEST_LOGS"; then
+  replace_env_value "APP_REQUEST_LOGS" "true"
+fi
 
 CURRENT_REMNASHOP_DATABASE_URL="$(read_env_value REMNASHOP_DATABASE_URL || true)"
 if [[ "${CURRENT_REMNASHOP_DATABASE_URL}" == *"ВСТАВЬ_СЮДА"* || "${CURRENT_REMNASHOP_DATABASE_URL}" == *"CHANGE_ME"* ]]; then
@@ -747,6 +757,8 @@ for key in \
   YOOKASSA_SHOP_ID \
   YOOKASSA_SECRET_KEY \
   YOOKASSA_WEBHOOK_ALLOWED_IPS \
+  APP_LOG_LEVEL \
+  APP_REQUEST_LOGS \
   TELEGRAM_CLIENT_ID \
   TELEGRAM_CLIENT_SECRET \
   TELEGRAM_BOT_USERNAME \

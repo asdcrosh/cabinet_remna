@@ -13,6 +13,7 @@ import { redirect } from 'next/navigation'
 import { Activity, AlertTriangle, CheckCircle2, CreditCard, Gauge, KeyRound, ShieldCheck } from 'lucide-react'
 import { PageHeader } from '@/components/dashboard/page-header'
 import { StatCard } from '@/components/dashboard/stat-card'
+import { logWarn } from '@/lib/logger'
 
 export const dynamic = 'force-dynamic'
 
@@ -25,7 +26,10 @@ export default async function DashboardHome() {
       subscriptions: { orderBy: { createdAt: 'desc' }, take: 1, include: { plan: true } },
     },
   })
-  if (!user) redirect('/login')
+  if (!user) {
+    logWarn('auth.dashboard.stale_session_redirect', { userId: session.uid })
+    redirect('/login?next=/dashboard')
+  }
 
   // Если есть Remnawave-профиль — попробуем освежить карточку
   let remnawaveCard: Awaited<ReturnType<typeof remnawave.getSubscriptionByUsername>> | null = null

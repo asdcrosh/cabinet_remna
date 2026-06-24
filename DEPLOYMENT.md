@@ -86,6 +86,10 @@ Weekly and referral openings are controlled by `BONUS_BOX_WEEKLY_*` and
 settings protect the product economy from several expensive gifts in a row.
 Rare and epic gifts do not reset the path to legendary gifts.
 
+Application logs are emitted to Docker stdout/stderr as JSON. Use
+`APP_LOG_LEVEL=info` and `APP_REQUEST_LOGS=true` while diagnosing production
+issues, then read them with `docker compose logs -f app`.
+
 ## Reverse proxy
 
 Bundled Caddy is enabled by default:

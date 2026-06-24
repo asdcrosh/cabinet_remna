@@ -7,6 +7,7 @@ import { getBrandName } from '@/lib/branding'
 import { maybeSyncRemnashopCatalog } from '@/lib/remnashop-sync'
 import { LogoutButton } from '@/components/dashboard/logout-button'
 import { Brand, DashboardNav, MobileDashboardNav } from '@/components/dashboard/dashboard-nav'
+import { logWarn } from '@/lib/logger'
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const session = await getCurrentUser()
@@ -15,12 +16,17 @@ export default async function DashboardLayout({ children }: { children: React.Re
     where: { id: session.uid },
     select: { email: true, role: true, telegramUsername: true, telegramId: true },
   })
-  if (!freshUser) redirect('/login?next=/dashboard')
+  if (!freshUser) {
+    logWarn('auth.dashboard_layout.stale_session_redirect', { userId: session.uid })
+    redirect('/login?next=/dashboard')
+  }
 
   try {
     await maybeSyncRemnashopCatalog()
   } catch (error) {
-    console.warn('[remnashop-sync] auto catalog sync skipped', error)
+    logWarn('remnashop.catalog_sync.skipped', {
+      message: error instanceof Error ? error.message : 'unknown error',
+    })
   }
 
   const role = freshUser.role

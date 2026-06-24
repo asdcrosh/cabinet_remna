@@ -7,6 +7,7 @@ import { rateLimit } from '@/lib/rate-limit'
 import { newPasswordSchema, telegramMiniAppEmailSchema } from '@/lib/auth/validation'
 import { createEmailVerificationToken, sendEmailVerificationLink } from '@/lib/email-verification'
 import { syncLinkedTelegramUser } from '@/lib/telegram-link-sync'
+import { logInfo, logWarn } from '@/lib/logger'
 
 export const runtime = 'nodejs'
 
@@ -71,12 +72,20 @@ export async function POST(req: Request) {
   if (emailOwner && emailOwner.id !== current.id) {
     const passwordMatches = await compare(parsed.data.password, emailOwner.passwordHash)
     if (!passwordMatches) {
+      logWarn('auth.telegram_email.merge_password_mismatch', {
+        currentUserId: current.id,
+        targetUserId: emailOwner.id,
+      })
       return NextResponse.json(
         { error: 'Этот email уже зарегистрирован. Введите пароль от существующего аккаунта.' },
         { status: 401 }
       )
     }
     if (emailOwner.telegramId && emailOwner.telegramId !== current.telegramId) {
+      logWarn('auth.telegram_email.merge_conflict', {
+        currentUserId: current.id,
+        targetUserId: emailOwner.id,
+      })
       return NextResponse.json(
         { error: 'К этому аккаунту уже привязан другой Telegram.' },
         { status: 409 }
@@ -105,6 +114,11 @@ export async function POST(req: Request) {
       await tx.user.delete({ where: { id: current.id } })
       return user
     })
+    logInfo('auth.telegram_email.accounts_merged', {
+      sourceUserId: current.id,
+      targetUserId: mergedUser.id,
+      verified: Boolean(mergedUser.emailVerifiedAt),
+    })
 
     if (mergedUser.emailVerifiedAt) {
       try {
@@ -113,7 +127,9 @@ export async function POST(req: Request) {
           telegramId: mergedUser.telegramId!,
         })
       } catch {
-        // Legacy subscription sync must not block login.
+        logWarn('auth.telegram_email.merge_sync_failed', {
+          userId: mergedUser.id,
+        })
       }
 
       const response = NextResponse.json({
@@ -171,6 +187,7 @@ export async function POST(req: Request) {
     },
     select: { id: true, email: true, name: true },
   })
+  logInfo('auth.telegram_email.email_attached', { userId: user.id })
   const token = await createEmailVerificationToken(user.id)
   const delivery = await sendEmailVerificationLink({ email: user.email, name: user.name, token })
 

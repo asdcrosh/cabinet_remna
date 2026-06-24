@@ -9,6 +9,7 @@ import { setSessionCookieOnResponse } from '@/lib/auth/cookies'
 import { generateUniqueReferralCode } from '@/lib/referrals'
 import { syncLinkedTelegramUser } from '@/lib/telegram-link-sync'
 import { ensureRemnashopTelegramUser } from '@/lib/remnashop-api'
+import { logError, logInfo, logWarn } from '@/lib/logger'
 
 export const runtime = 'nodejs'
 
@@ -33,52 +34,72 @@ export async function POST(req: Request) {
   try {
     telegram = verifyTelegramMiniAppInitData(body.initData)
   } catch (error) {
+    logWarn('auth.telegram_miniapp.invalid_init_data', {
+      message: error instanceof Error ? error.message : 'unknown error',
+    })
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Telegram authentication failed' },
       { status: 401 }
     )
   }
+  logInfo('auth.telegram_miniapp.verified', { telegramId: telegram.id })
 
   try {
     await ensureRemnashopTelegramUser(body.initData)
   } catch (error) {
-    console.warn('[telegram-miniapp] remnashop registration deferred', {
+    logWarn('auth.telegram_miniapp.remnashop_registration_deferred', {
       telegramId: telegram.id.toString(),
       message: error instanceof Error ? error.message : 'unknown error',
     })
   }
 
-  let user = await prisma.user.findUnique({ where: { telegramId: telegram.id } })
-  if (!user) {
-    const pendingEmail = `telegram-${telegram.id.toString()}@pending.invalid`
-    user = await prisma.user.create({
-      data: {
-        email: pendingEmail,
-        passwordHash: await hash(randomBytes(48).toString('base64url'), 12),
-        name: telegram.name,
-        role: 'USER',
-        referralCode: await generateUniqueReferralCode(),
+  let user
+  try {
+    user = await prisma.user.findUnique({ where: { telegramId: telegram.id } })
+    if (!user) {
+      const pendingEmail = `telegram-${telegram.id.toString()}@pending.invalid`
+      user = await prisma.user.create({
+        data: {
+          email: pendingEmail,
+          passwordHash: await hash(randomBytes(48).toString('base64url'), 12),
+          name: telegram.name,
+          role: 'USER',
+          referralCode: await generateUniqueReferralCode(),
+          telegramId: telegram.id,
+          telegramUsername: telegram.username,
+          telegramLinkedAt: new Date(),
+        },
+      })
+      logInfo('auth.telegram_miniapp.user_created', {
+        userId: user.id,
         telegramId: telegram.id,
-        telegramUsername: telegram.username,
-        telegramLinkedAt: new Date(),
-      },
+      })
+    } else {
+      user = await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          telegramUsername: telegram.username,
+          telegramLinkedAt: user.telegramLinkedAt ?? new Date(),
+          name: user.name ?? telegram.name,
+          lastLoginAt: new Date(),
+        },
+      })
+      logInfo('auth.telegram_miniapp.user_updated', {
+        userId: user.id,
+        telegramId: telegram.id,
+      })
+    }
+  } catch (error) {
+    logError('auth.telegram_miniapp.user_upsert_failed', error, {
+      telegramId: telegram.id,
     })
-  } else {
-    user = await prisma.user.update({
-      where: { id: user.id },
-      data: {
-        telegramUsername: telegram.username,
-        telegramLinkedAt: user.telegramLinkedAt ?? new Date(),
-        name: user.name ?? telegram.name,
-        lastLoginAt: new Date(),
-      },
-    })
+    throw error
   }
 
   try {
     await syncLinkedTelegramUser({ localUserId: user.id, telegramId: telegram.id })
   } catch (error) {
-    console.warn('[telegram-miniapp] background sync failed', {
+    logWarn('auth.telegram_miniapp.background_sync_failed', {
       userId: user.id,
       message: error instanceof Error ? error.message : 'unknown error',
     })
@@ -86,6 +107,10 @@ export async function POST(req: Request) {
 
   const response = NextResponse.json({
     ok: true,
+    emailConfigured: Boolean(user.emailVerifiedAt),
+  })
+  logInfo('auth.telegram_miniapp.session_set', {
+    userId: user.id,
     emailConfigured: Boolean(user.emailVerifiedAt),
   })
   return setSessionCookieOnResponse(response, {

@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server'
+import { isRequestLoggingEnabled, logInfo } from '@/lib/logger'
 
 export function middleware(req: NextRequest) {
   const res = NextResponse.next()
@@ -32,9 +33,29 @@ export function middleware(req: NextRequest) {
     )
   }
 
+  if (isRequestLoggingEnabled()) {
+    logInfo('http.request', {
+      method: req.method,
+      path: req.nextUrl.pathname,
+      search: req.nextUrl.search || undefined,
+      ip: getClientIp(req),
+      userAgent: req.headers.get('user-agent') || undefined,
+      referer: req.headers.get('referer') || undefined,
+    })
+  }
+
   return res
 }
 
 export const config = {
   matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
+}
+
+function getClientIp(req: NextRequest) {
+  return (
+    req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+    req.headers.get('x-real-ip') ||
+    req.headers.get('cf-connecting-ip') ||
+    undefined
+  )
 }

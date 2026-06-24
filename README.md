@@ -151,6 +151,8 @@ https://ВСТАВЬ_СЮДА_ДОМЕН_КАБИНЕТА
 | `BONUS_BOX_ECONOMY_GUARD_ENABLED` | Защита от подряд идущих дорогих подарков |
 | `BONUS_BOX_RARE_COOLDOWN_OPENINGS` / `BONUS_BOX_EPIC_COOLDOWN_OPENINGS` / `BONUS_BOX_LEGENDARY_COOLDOWN_OPENINGS` | Паузы после редких, эпических и легендарных подарков; редкий и эпик не закрывают легенду |
 | `BONUS_BOX_EPIC_MIN_OPENINGS` / `BONUS_BOX_LEGENDARY_MIN_OPENINGS` | Минимальная история открытий перед эпиком и легендой |
+| `APP_LOG_LEVEL` | Уровень JSON-логов приложения: `debug`, `info`, `warn`, `error` |
+| `APP_REQUEST_LOGS` | `true` включает request-log приложения в Docker stdout без cookie и секретов |
 
 ## Reverse Proxy
 
