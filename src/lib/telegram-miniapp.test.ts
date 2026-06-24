@@ -12,6 +12,7 @@ function createInitData(botToken: string) {
   const params = new URLSearchParams({
     auth_date: String(Math.floor(Date.now() / 1000)),
     query_id: 'test-query',
+    signature: 'telegram-public-signature',
     user: JSON.stringify({
       id: 8507156675,
       first_name: 'Artem',
