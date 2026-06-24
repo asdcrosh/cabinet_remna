@@ -50,6 +50,10 @@ export function TelegramEmailForm({ telegramName, initialEmail }: { telegramName
       })
       const data = await response.json().catch(() => null)
       if (!response.ok) throw new Error(data?.error || 'Не удалось отправить письмо')
+      if (data.authenticated) {
+        window.location.replace('/dashboard')
+        return
+      }
       setSentTo(data.email)
       toast('Письмо отправлено', 'success')
     } catch (error) {
@@ -97,7 +101,7 @@ export function TelegramEmailForm({ telegramName, initialEmail }: { telegramName
         </div>
       </label>
       <label className="block">
-        <span className="label">Пароль для входа на сайте</span>
+        <span className="label">Пароль</span>
         <div className="relative">
           <LockKeyhole className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <input
@@ -120,7 +124,9 @@ export function TelegramEmailForm({ telegramName, initialEmail }: { telegramName
             {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
           </button>
         </div>
-        <p className="mt-1 text-xs text-slate-500">Используйте латинские буквы и хотя бы одну цифру.</p>
+        <p className="mt-1 text-xs text-slate-500">
+          Новый email — придумайте пароль. Уже зарегистрированный — введите текущий.
+        </p>
       </label>
       <label className="block">
         <span className="label">Повторите пароль</span>
