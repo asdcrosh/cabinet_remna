@@ -11,10 +11,9 @@ import { Brand, DashboardNav, MobileDashboardNav } from '@/components/dashboard/
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const session = await getCurrentUser()
   if (!session) redirect('/login?next=/dashboard')
-  if (session.stage === 'EMAIL_PENDING') redirect('/telegram-email')
   const freshUser = await prisma.user.findUnique({
     where: { id: session.uid },
-    select: { email: true, role: true },
+    select: { email: true, role: true, telegramUsername: true, telegramId: true },
   })
   if (!freshUser) redirect('/login?next=/dashboard')
 
@@ -25,7 +24,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
   }
 
   const role = freshUser.role
-  const email = freshUser.email
+  const accountLabel = freshUser.email.endsWith('@pending.invalid')
+    ? `@${freshUser.telegramUsername || freshUser.telegramId?.toString() || 'telegram'}`
+    : freshUser.email
   const brandName = getBrandName()
   const [supportUnreadCount, adminSupportUnreadCount] = await Promise.all([
     prisma.supportTicket.aggregate({
@@ -55,7 +56,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         </div>
         <div className="shrink-0 border-t border-white/70 bg-white/70 p-2.5 backdrop-blur dark:border-white/10 dark:bg-surface-950/70">
           <div className="mb-1.5 rounded-lg border border-slate-100 bg-slate-50/80 px-3 py-1.5 text-xs text-slate-500 dark:border-slate-800 dark:bg-surface-900/80">
-            <div className="truncate font-medium text-slate-700 dark:text-slate-200">{email}</div>
+            <div className="truncate font-medium text-slate-700 dark:text-slate-200">{accountLabel}</div>
             <div>{roleLabel(role)}</div>
           </div>
           <LogoutButton />
@@ -64,7 +65,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
       <main className="min-w-0 lg:ml-72">
         <div className="sticky top-0 z-30 flex items-center justify-between border-b border-white/70 bg-white/80 px-4 py-3 shadow-sm shadow-slate-200/60 backdrop-blur-xl dark:border-white/10 dark:bg-surface-950/80 dark:shadow-black/20 lg:hidden">
           <Brand compact brandName={brandName} />
-          <MobileDashboardNav role={role} email={email} brandName={brandName} badges={navBadges} />
+          <MobileDashboardNav role={role} email={accountLabel} brandName={brandName} badges={navBadges} />
         </div>
         <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">{children}</div>
       </main>

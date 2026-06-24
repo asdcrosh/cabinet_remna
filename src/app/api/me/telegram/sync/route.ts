@@ -13,14 +13,10 @@ export const POST = withAuth(async () => {
     select: {
       id: true,
       telegramId: true,
-      emailVerifiedAt: true,
     },
   })
 
   if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
-  if (!user.emailVerifiedAt) {
-    return NextResponse.json({ error: 'Сначала подтвердите email' }, { status: 403 })
-  }
   if (!user.telegramId) {
     return NextResponse.json({ error: 'Telegram не привязан' }, { status: 409 })
   }

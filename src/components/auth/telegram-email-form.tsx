@@ -150,7 +150,7 @@ export function TelegramEmailForm({ telegramName, initialEmail }: { telegramName
       </label>
       <button className="btn-primary w-full" type="submit" disabled={sending}>
         {sending && <Loader2 className="h-4 w-4 animate-spin" />}
-        Создать аккаунт
+        Добавить email
       </button>
     </form>
   )

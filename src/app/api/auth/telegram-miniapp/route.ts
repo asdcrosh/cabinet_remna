@@ -65,30 +65,23 @@ export async function POST(req: Request) {
     })
   }
 
-  if (user.emailVerifiedAt) {
-    try {
-      await syncLinkedTelegramUser({ localUserId: user.id, telegramId: telegram.id })
-    } catch (error) {
-      console.warn('[telegram-miniapp] background sync failed', {
-        userId: user.id,
-        message: error instanceof Error ? error.message : 'unknown error',
-      })
-    }
-
-    const response = NextResponse.json({ ok: true, requiresEmailVerification: false })
-    return setSessionCookieOnResponse(response, {
-      uid: user.id,
-      email: user.email,
-      role: user.role,
-      stage: 'FULL',
+  try {
+    await syncLinkedTelegramUser({ localUserId: user.id, telegramId: telegram.id })
+  } catch (error) {
+    console.warn('[telegram-miniapp] background sync failed', {
+      userId: user.id,
+      message: error instanceof Error ? error.message : 'unknown error',
     })
   }
 
-  const response = NextResponse.json({ ok: true, requiresEmailVerification: true })
+  const response = NextResponse.json({
+    ok: true,
+    emailConfigured: Boolean(user.emailVerifiedAt),
+  })
   return setSessionCookieOnResponse(response, {
     uid: user.id,
     email: user.email,
     role: user.role,
-    stage: 'EMAIL_PENDING',
+    stage: 'FULL',
   })
 }

@@ -171,7 +171,11 @@ function OnboardingState({ emailVerified }: { emailVerified: boolean }) {
             </div>
           </div>
           <div className="grid gap-3">
-            <Step done={emailVerified} title="Email подтверждён" description="Аккаунт готов к покупке" />
+            <Step
+              done={emailVerified}
+              title={emailVerified ? 'Email добавлен' : 'Вход через Telegram'}
+              description={emailVerified ? 'Доступен вход через сайт' : 'Email можно добавить позже в настройках'}
+            />
             <Step done={false} title="Выберите тариф" description="Срок, трафик и лимит устройств" />
             <Step done={false} title="Оплатите онлайн" description="После оплаты вернём вас в кабинет" />
             <Step done={false} title="Подключитесь" description="Добавьте подписку по QR-коду" />

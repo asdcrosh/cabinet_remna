@@ -12,7 +12,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('./cookies', () => ({ getSession: mocks.getSession }))
 vi.mock('@/lib/prisma', () => ({ prisma: mocks.prisma }))
 
-import { AuthError, requireAdmin, requireStaff, requireSuperAdmin } from './guard'
+import { AuthError, requireAdmin, requireAuth, requireStaff, requireSuperAdmin } from './guard'
 
 describe('requireAdmin', () => {
   beforeEach(() => {
@@ -34,15 +34,16 @@ describe('requireAdmin', () => {
     await expect(requireAdmin()).rejects.toMatchObject(new AuthError(403, 'Forbidden'))
   })
 
-  it('blocks a Telegram Mini App session until email verification', async () => {
-    mocks.getSession.mockResolvedValue({
+  it('allows a Telegram-only Mini App session without email verification', async () => {
+    const session = {
       uid: 'telegram-user',
       email: 'telegram-user@pending.invalid',
       role: 'USER',
       stage: 'EMAIL_PENDING',
-    })
+    }
+    mocks.getSession.mockResolvedValue(session)
 
-    await expect(requireAdmin()).rejects.toMatchObject(new AuthError(403, 'Email verification required'))
+    await expect(requireAuth()).resolves.toBe(session)
   })
 
   it('allows super admin in admin routes', async () => {

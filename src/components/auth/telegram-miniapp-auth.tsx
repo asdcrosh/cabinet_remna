@@ -57,7 +57,7 @@ export function TelegramMiniAppAuth() {
         })
         const data = await response.json().catch(() => null)
         if (!response.ok) throw new Error(data?.error || 'Telegram authentication failed')
-        window.location.replace(data.requiresEmailVerification ? '/telegram-email' : '/dashboard')
+        window.location.replace('/dashboard')
       } catch (error) {
         console.error('[telegram-miniapp] auth failed', error)
         if (!cancelled) {

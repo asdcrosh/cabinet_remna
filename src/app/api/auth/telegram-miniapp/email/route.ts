@@ -18,7 +18,7 @@ export async function POST(req: Request) {
   }
 
   const session = await getSession()
-  if (!session || session.stage !== 'EMAIL_PENDING') {
+  if (!session) {
     return NextResponse.json({ error: 'Telegram session not found' }, { status: 401 })
   }
   const limited = await rateLimit(req, `telegram-miniapp-email:${session.uid}`, 5, 60_000)
@@ -147,7 +147,7 @@ export async function POST(req: Request) {
       uid: mergedUser.id,
       email: mergedUser.email,
       role: mergedUser.role,
-      stage: 'EMAIL_PENDING',
+      stage: 'FULL',
     })
   }
 
@@ -184,6 +184,6 @@ export async function POST(req: Request) {
     uid: user.id,
     email: user.email,
     role: 'USER',
-    stage: 'EMAIL_PENDING',
+    stage: 'FULL',
   })
 }

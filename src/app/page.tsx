@@ -5,7 +5,6 @@ import { getCurrentUser } from '@/lib/auth/cookies'
 
 export default async function HomePage() {
   const session = await getCurrentUser()
-  if (session?.stage === 'EMAIL_PENDING') redirect('/telegram-email')
   if (session) redirect('/dashboard')
   redirect('/login')
 }

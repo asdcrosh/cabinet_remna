@@ -19,9 +19,6 @@ export async function requireAuth(): Promise<SessionPayload> {
   if (!session) {
     throw new AuthError(401, 'Unauthorized')
   }
-  if (session.stage === 'EMAIL_PENDING') {
-    throw new AuthError(403, 'Email verification required')
-  }
   return session
 }
 
