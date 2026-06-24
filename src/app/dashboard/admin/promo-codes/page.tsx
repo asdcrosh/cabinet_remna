@@ -2,16 +2,25 @@ import { prisma } from '@/lib/prisma'
 import { requireAdminPage } from '@/lib/auth/admin-page'
 import { PageHeader } from '@/components/dashboard/page-header'
 import { PromoCodesAdmin, type PromoCodeAdminRow } from '@/components/admin/promo-codes-admin'
+import { LazyListLoader } from '@/components/admin/lazy-list-loader'
+import { ADMIN_LIST_PAGE_SIZE, parseAdminListLimit } from '@/lib/admin-list'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Промокоды — Админка' }
 
-export default async function AdminPromoCodesPage() {
+export default async function AdminPromoCodesPage({
+  searchParams,
+}: {
+  searchParams?: { limit?: string }
+}) {
   await requireAdminPage()
+  const limit = parseAdminListLimit(searchParams?.limit)
 
-  const [promoCodes, plans] = await Promise.all([
+  const [total, promoCodes, plans] = await Promise.all([
+    prisma.promoCode.count(),
     prisma.promoCode.findMany({
       orderBy: { createdAt: 'desc' },
+      take: limit,
       include: {
         plans: { include: { plan: true }, orderBy: { plan: { sortOrder: 'asc' } } },
         redemptions: { select: { status: true } },
@@ -51,6 +60,7 @@ export default async function AdminPromoCodesPage() {
         promoCodes={rows}
         plans={plans.map((plan) => ({ id: plan.id, name: plan.name }))}
       />
+      <LazyListLoader loaded={promoCodes.length} total={total} step={ADMIN_LIST_PAGE_SIZE} />
     </div>
   )
 }

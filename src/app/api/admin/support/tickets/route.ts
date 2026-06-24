@@ -13,7 +13,7 @@ export const GET = withAuth(async (req: Request) => {
   const status = url.searchParams.get('status')
   const q = url.searchParams.get('q')?.trim()
   const page = Math.max(1, Number(url.searchParams.get('page') || '1') || 1)
-  const pageSize = Math.min(100, Math.max(1, Number(url.searchParams.get('pageSize') || '25') || 25))
+  const pageSize = Math.min(5000, Math.max(1, Number(url.searchParams.get('pageSize') || '25') || 25))
   const skip = (page - 1) * pageSize
 
   const where = {

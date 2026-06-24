@@ -6,6 +6,8 @@ import { formatPrice } from '@/lib/format'
 import { PageHeader } from '@/components/dashboard/page-header'
 import { PaymentBadge, ProvisioningBadge } from '@/components/admin/admin-badges'
 import { PaymentSyncButton, RecoveryActionButton } from '@/components/admin/recovery-actions'
+import { LazyListLoader } from '@/components/admin/lazy-list-loader'
+import { ADMIN_LIST_PAGE_SIZE, parseAdminListLimit } from '@/lib/admin-list'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Платежи — Админка' }
@@ -13,13 +15,14 @@ export const metadata = { title: 'Платежи — Админка' }
 export default async function AdminPaymentsPage({
   searchParams,
 }: {
-  searchParams?: { q?: string; status?: string; delivery?: string }
+  searchParams?: { q?: string; status?: string; delivery?: string; limit?: string }
 }) {
   await requireAdminPage()
 
   const q = searchParams?.q?.trim() ?? ''
   const status = searchParams?.status ?? 'ALL'
   const delivery = searchParams?.delivery ?? 'ALL'
+  const limit = parseAdminListLimit(searchParams?.limit)
   const where = {
     ...(status !== 'ALL' ? { status: status as any } : {}),
     ...(delivery === 'DELIVERED'
@@ -39,16 +42,19 @@ export default async function AdminPaymentsPage({
       : {}),
   }
 
-  const payments = await prisma.payment.findMany({
-    where,
-    orderBy: { createdAt: 'desc' },
-    take: 100,
-    include: {
-      user: { select: { id: true, email: true, name: true } },
-      plan: true,
-      subscription: true,
-    },
-  })
+  const [total, payments] = await prisma.$transaction([
+    prisma.payment.count({ where }),
+    prisma.payment.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+      include: {
+        user: { select: { id: true, email: true, name: true } },
+        plan: true,
+        subscription: true,
+      },
+    }),
+  ])
 
   return (
     <div className="space-y-6">
@@ -201,6 +207,8 @@ export default async function AdminPaymentsPage({
           )
         })}
       </div>
+
+      <LazyListLoader loaded={payments.length} total={total} step={ADMIN_LIST_PAGE_SIZE} />
     </div>
   )
 }

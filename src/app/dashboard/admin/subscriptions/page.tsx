@@ -5,6 +5,8 @@ import { requireAdminPage } from '@/lib/auth/admin-page'
 import { formatBytes } from '@/lib/format'
 import { PageHeader } from '@/components/dashboard/page-header'
 import { SubscriptionBadge } from '@/components/admin/admin-badges'
+import { LazyListLoader } from '@/components/admin/lazy-list-loader'
+import { ADMIN_LIST_PAGE_SIZE, parseAdminListLimit } from '@/lib/admin-list'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Подписки — Админка' }
@@ -12,15 +14,15 @@ export const metadata = { title: 'Подписки — Админка' }
 export default async function AdminSubscriptionsPage({
   searchParams,
 }: {
-  searchParams?: { q?: string; status?: string; sync?: string }
+  searchParams?: { q?: string; status?: string; sync?: string; limit?: string }
 }) {
   await requireAdminPage()
 
   const q = searchParams?.q?.trim() ?? ''
   const status = searchParams?.status ?? 'ALL'
   const sync = searchParams?.sync ?? 'ALL'
-  const subscriptions = await prisma.subscription.findMany({
-    where: {
+  const limit = parseAdminListLimit(searchParams?.limit)
+  const where = {
       ...(status !== 'ALL' ? { status: status as any } : {}),
       ...(sync === 'PENDING' ? { pendingSync: true } : sync === 'READY' ? { pendingSync: false } : {}),
       ...(q
@@ -33,14 +35,19 @@ export default async function AdminSubscriptionsPage({
             ],
           }
         : {}),
-    },
-    orderBy: { expireAt: 'desc' },
-    take: 100,
-    include: {
-      plan: true,
-      user: { select: { email: true, name: true, remnawaveUuid: true, remnawaveUsername: true } },
-    },
-  })
+    }
+  const [total, subscriptions] = await prisma.$transaction([
+    prisma.subscription.count({ where }),
+    prisma.subscription.findMany({
+      where,
+      orderBy: { expireAt: 'desc' },
+      take: limit,
+      include: {
+        plan: true,
+        user: { select: { email: true, name: true, remnawaveUuid: true, remnawaveUsername: true } },
+      },
+    }),
+  ])
 
   return (
     <div className="space-y-6">
@@ -146,6 +153,8 @@ export default async function AdminSubscriptionsPage({
           </article>
         ))}
       </div>
+
+      <LazyListLoader loaded={subscriptions.length} total={total} step={ADMIN_LIST_PAGE_SIZE} />
     </div>
   )
 }

@@ -64,12 +64,23 @@ interface SupportTicket {
 interface SupportPanelProps {
   mode: 'user' | 'admin'
   initialTickets: SupportTicket[]
+  initialTotal?: number
+  pageSize?: number
 }
 
-export function SupportPanel({ mode, initialTickets }: SupportPanelProps) {
+export function SupportPanel({
+  mode,
+  initialTickets,
+  initialTotal = initialTickets.length,
+  pageSize = 25,
+}: SupportPanelProps) {
   const router = useRouter()
   const messagesScrollRef = useRef<HTMLDivElement | null>(null)
+  const loadMoreRef = useRef<HTMLDivElement | null>(null)
   const [tickets, setTickets] = useState(initialTickets)
+  const [listLimit, setListLimit] = useState(Math.max(pageSize, initialTickets.length))
+  const [listTotal, setListTotal] = useState(initialTotal)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [selectedId, setSelectedId] = useState(initialTickets.find((ticket) => ticket.status !== 'CLOSED')?.id ?? initialTickets[0]?.id ?? '')
   const [selectedTicket, setSelectedTicket] = useState<SupportTicket | null>(
     initialTickets.find((ticket) => ticket.status !== 'CLOSED') ?? initialTickets[0] ?? null
@@ -119,26 +130,57 @@ export function SupportPanel({ mode, initialTickets }: SupportPanelProps) {
     return data.ticket as SupportTicket
   }, [mode])
 
+  const mergeTicketList = useCallback((incoming: SupportTicket[]) => {
+    setTickets((current) =>
+      incoming.map((ticket) => {
+        const previous = current.find((item) => item.id === ticket.id)
+        return previous && previous.messages.length > ticket.messages.length
+          ? { ...ticket, messages: previous.messages }
+          : ticket
+      })
+    )
+  }, [])
+
+  const fetchTicketList = useCallback(async (limit: number) => {
+    const params = new URLSearchParams(window.location.search)
+    params.set('page', '1')
+    params.set('pageSize', String(limit))
+    const listEndpoint = mode === 'admin'
+      ? `/api/admin/support/tickets?${params.toString()}`
+      : '/api/support/tickets'
+    const listRes = await fetch(listEndpoint, { cache: 'no-store' })
+    const listData = await listRes.json().catch(() => null)
+    if (!listRes.ok || !Array.isArray(listData?.tickets)) return null
+    return listData as {
+      tickets: SupportTicket[]
+      pagination?: { total?: number }
+    }
+  }, [mode])
+
+  const loadMoreTickets = useCallback(async () => {
+    if (mode !== 'admin' || loadingMore || tickets.length >= listTotal) return
+    const nextLimit = Math.min(listTotal, listLimit + pageSize)
+    setLoadingMore(true)
+    try {
+      const data = await fetchTicketList(nextLimit)
+      if (!data) return
+      mergeTicketList(data.tickets)
+      setListLimit(nextLimit)
+      if (typeof data.pagination?.total === 'number') setListTotal(data.pagination.total)
+    } finally {
+      setLoadingMore(false)
+    }
+  }, [fetchTicketList, listLimit, listTotal, loadingMore, mergeTicketList, mode, pageSize, tickets.length])
+
   useEffect(() => {
     let active = true
 
     async function refreshSupport() {
-      const listEndpoint = mode === 'admin'
-        ? `/api/admin/support/tickets${window.location.search}`
-        : '/api/support/tickets'
-
       try {
-        const listRes = await fetch(listEndpoint, { cache: 'no-store' })
-        const listData = await listRes.json().catch(() => null)
-        if (active && listRes.ok && Array.isArray(listData?.tickets)) {
-          setTickets((current) =>
-            listData.tickets.map((ticket: SupportTicket) => {
-              const previous = current.find((item) => item.id === ticket.id)
-              return previous && previous.messages.length > ticket.messages.length
-                ? { ...ticket, messages: previous.messages }
-                : ticket
-            })
-          )
+        const listData = await fetchTicketList(listLimit)
+        if (active && listData) {
+          mergeTicketList(listData.tickets)
+          if (typeof listData.pagination?.total === 'number') setListTotal(listData.pagination.total)
         }
 
         if (selectedId) {
@@ -162,7 +204,20 @@ export function SupportPanel({ mode, initialTickets }: SupportPanelProps) {
       active = false
       window.clearInterval(interval)
     }
-  }, [fetchTicket, mode, selectedId])
+  }, [fetchTicket, fetchTicketList, listLimit, mergeTicketList, selectedId])
+
+  useEffect(() => {
+    const marker = loadMoreRef.current
+    if (!marker || mode !== 'admin' || tickets.length >= listTotal) return
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) void loadMoreTickets()
+      },
+      { rootMargin: '160px 0px' }
+    )
+    observer.observe(marker)
+    return () => observer.disconnect()
+  }, [listTotal, loadMoreTickets, mode, tickets.length])
 
   useEffect(() => {
     const container = messagesScrollRef.current
@@ -340,6 +395,23 @@ export function SupportPanel({ mode, initialTickets }: SupportPanelProps) {
                   onClick={() => void loadTicket(ticket.id)}
                 />
               ))
+            )}
+            {mode === 'admin' && (
+              <div ref={loadMoreRef} className="flex flex-col items-center gap-2 px-2 py-3">
+                <div className="text-xs text-slate-500">
+                  Показано {tickets.length} из {listTotal}
+                </div>
+                {tickets.length < listTotal && (
+                  <button
+                    type="button"
+                    className="btn-secondary min-h-9 px-3 text-xs"
+                    onClick={() => void loadMoreTickets()}
+                    disabled={loadingMore}
+                  >
+                    {loadingMore ? 'Загружаем...' : 'Показать ещё'}
+                  </button>
+                )}
+              </div>
             )}
           </div>
         </div>

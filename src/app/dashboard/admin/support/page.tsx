@@ -5,6 +5,7 @@ import { requireStaffPage } from '@/lib/auth/admin-page'
 import { serializeSupportMessage, serializeSupportTicket, supportStatusLabel } from '@/lib/support'
 import { PageHeader } from '@/components/dashboard/page-header'
 import { SupportPanel } from '@/components/support/support-panel'
+import { parseAdminListLimit } from '@/lib/admin-list'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Поддержка — Админка' }
@@ -20,12 +21,13 @@ const statuses = [
 export default async function AdminSupportPage({
   searchParams,
 }: {
-  searchParams?: { status?: string; q?: string }
+  searchParams?: { status?: string; q?: string; limit?: string }
 }) {
   await requireStaffPage()
 
   const status = searchParams?.status || 'ALL'
   const q = searchParams?.q?.trim() ?? ''
+  const limit = parseAdminListLimit(searchParams?.limit)
   const where = {
     ...(status !== 'ALL' ? { status: status as any } : {}),
     ...(q
@@ -39,11 +41,12 @@ export default async function AdminSupportPage({
       : {}),
   }
 
-  const [tickets, waitingCount] = await prisma.$transaction([
+  const [total, tickets, waitingCount] = await prisma.$transaction([
+    prisma.supportTicket.count({ where }),
     prisma.supportTicket.findMany({
       where,
       orderBy: [{ adminUnreadCount: 'desc' }, { lastMessageAt: 'desc' }],
-      take: 50,
+      take: limit,
       include: {
         user: { select: { id: true, email: true, name: true, remnawaveUsername: true } },
         messages: {
@@ -90,6 +93,8 @@ export default async function AdminSupportPage({
 
       <SupportPanel
         mode="admin"
+        initialTotal={total}
+        pageSize={25}
         initialTickets={tickets.map((ticket) => ({
           ...serializeSupportTicket(ticket),
           messages: ticket.messages.map(serializeSupportMessage),

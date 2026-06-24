@@ -6,6 +6,8 @@ import { PageHeader } from '@/components/dashboard/page-header'
 import { SubscriptionBadge } from '@/components/admin/admin-badges'
 import { UserRoleSelect } from '@/components/admin/user-role-select'
 import { BonusBoxAttemptsButton } from '@/components/admin/bonus-box-attempts-button'
+import { LazyListLoader } from '@/components/admin/lazy-list-loader'
+import { ADMIN_LIST_PAGE_SIZE, parseAdminListLimit } from '@/lib/admin-list'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Пользователи — Админка' }
@@ -13,16 +15,14 @@ export const metadata = { title: 'Пользователи — Админка' }
 export default async function AdminUsersPage({
   searchParams,
 }: {
-  searchParams?: { q?: string; page?: string; role?: string; account?: string }
+  searchParams?: { q?: string; limit?: string; role?: string; account?: string }
 }) {
   const { session, user: actor } = await requireAdminPage()
 
   const q = searchParams?.q?.trim() ?? ''
-  const page = Math.max(1, Number(searchParams?.page || '1') || 1)
   const role = searchParams?.role ?? 'ALL'
   const account = searchParams?.account ?? 'ALL'
-  const pageSize = 25
-  const skip = (page - 1) * pageSize
+  const limit = parseAdminListLimit(searchParams?.limit)
   const where = {
     ...(role !== 'ALL' ? { role: role as any } : {}),
     ...(account === 'LINKED'
@@ -44,8 +44,7 @@ export default async function AdminUsersPage({
     prisma.user.findMany({
       where,
       orderBy: { createdAt: 'desc' },
-      skip,
-      take: pageSize,
+      take: limit,
       select: {
         id: true,
         email: true,
@@ -78,7 +77,6 @@ export default async function AdminUsersPage({
       })
     : []
   const attemptsByUser = new Map(attemptsRows.map((row) => [row.userId, row._count._all]))
-  const pageCount = Math.max(1, Math.ceil(total / pageSize))
 
   return (
     <div className="space-y-6">
@@ -111,7 +109,7 @@ export default async function AdminUsersPage({
           {(q || role !== 'ALL' || account !== 'ALL') && <Link href="/dashboard/admin/users" className="btn-secondary">Сбросить</Link>}
         </form>
         <div className="text-sm text-slate-500">
-          {total} всего, страница {page} из {pageCount}
+          {users.length} из {total}
         </div>
       </div>
 
@@ -243,41 +241,7 @@ export default async function AdminUsersPage({
         })}
       </div>
 
-      <Pagination page={page} pageCount={pageCount} q={q} role={role} account={account} />
-    </div>
-  )
-}
-
-function Pagination({ page, pageCount, q, role, account }: { page: number; pageCount: number; q: string; role: string; account: string }) {
-  const makeHref = (nextPage: number) => {
-    const params = new URLSearchParams()
-    if (q) params.set('q', q)
-    if (role !== 'ALL') params.set('role', role)
-    if (account !== 'ALL') params.set('account', account)
-    if (nextPage > 1) params.set('page', String(nextPage))
-    const qs = params.toString()
-    return qs ? `/dashboard/admin/users?${qs}` : '/dashboard/admin/users'
-  }
-
-  return (
-    <div className="flex items-center justify-between gap-3">
-      <Link
-        href={makeHref(Math.max(1, page - 1))}
-        aria-disabled={page <= 1}
-        className={page <= 1 ? 'btn-secondary pointer-events-none opacity-50' : 'btn-secondary'}
-      >
-        Назад
-      </Link>
-      <span className="text-sm text-slate-500">
-        {page} / {pageCount}
-      </span>
-      <Link
-        href={makeHref(Math.min(pageCount, page + 1))}
-        aria-disabled={page >= pageCount}
-        className={page >= pageCount ? 'btn-secondary pointer-events-none opacity-50' : 'btn-secondary'}
-      >
-        Вперёд
-      </Link>
+      <LazyListLoader loaded={users.length} total={total} step={ADMIN_LIST_PAGE_SIZE} />
     </div>
   )
 }

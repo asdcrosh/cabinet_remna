@@ -6,20 +6,28 @@ import {
   type BonusBoxOpeningAdminRow,
   type BonusBoxPrizeAdminRow,
 } from '@/components/admin/bonus-box-prizes-admin'
+import { LazyListLoader } from '@/components/admin/lazy-list-loader'
+import { ADMIN_LIST_PAGE_SIZE, parseAdminListLimit } from '@/lib/admin-list'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Подарочный бокс — Админка' }
 
-export default async function AdminBonusBoxPage() {
+export default async function AdminBonusBoxPage({
+  searchParams,
+}: {
+  searchParams?: { limit?: string }
+}) {
   await requireAdminPage()
+  const limit = parseAdminListLimit(searchParams?.limit)
 
-  const [prizes, openings] = await Promise.all([
+  const [prizes, totalOpenings, openings] = await Promise.all([
     prisma.bonusBoxPrize.findMany({
       orderBy: [{ isActive: 'desc' }, { createdAt: 'desc' }],
     }),
+    prisma.bonusBoxOpening.count(),
     prisma.bonusBoxOpening.findMany({
       orderBy: { createdAt: 'desc' },
-      take: 80,
+      take: limit,
       include: {
         user: { select: { email: true, name: true } },
         prize: true,
@@ -70,6 +78,7 @@ export default async function AdminBonusBoxPage() {
         description="Подарки, веса выпадения, редкость и лимиты"
       />
       <BonusBoxPrizesAdmin prizes={rows} openings={openingRows} />
+      <LazyListLoader loaded={openings.length} total={totalOpenings} step={ADMIN_LIST_PAGE_SIZE} />
     </div>
   )
 }
