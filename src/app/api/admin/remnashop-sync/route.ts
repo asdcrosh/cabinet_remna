@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { requireAdmin, withAuth } from '@/lib/auth/guard'
 import { getRemnashopSyncDryRun, syncRemnashopCatalog } from '@/lib/remnashop-sync'
+import { syncRemnashopUsersToCabinet } from '@/lib/remnashop-users'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -14,7 +15,21 @@ export const GET = withAuth(async (req: Request) => {
 
   try {
     const report = apply
-      ? await syncRemnashopCatalog({ includePromoCodes })
+      ? await (async () => {
+          const [catalog, users] = await Promise.all([
+            syncRemnashopCatalog({ includePromoCodes }),
+            syncRemnashopUsersToCabinet(),
+          ])
+          return {
+            ...catalog,
+            counts: {
+              ...catalog.counts,
+              usersCreated: users.created,
+              usersUpdated: users.updated,
+              usersSkipped: users.skipped,
+            },
+          }
+        })()
       : await getRemnashopSyncDryRun()
     return NextResponse.json(report)
   } catch (e) {

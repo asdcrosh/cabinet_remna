@@ -131,6 +131,7 @@ https://ВСТАВЬ_СЮДА_ДОМЕН_КАБИНЕТА
 | `RESEND_API_KEY` | API key Resend |
 | `EMAIL_FROM` | Отправитель писем |
 | `REMNASHOP_DATABASE_URL` | Read-only подключение к remnashop |
+| `REMNASHOP_API_URL` | Public API remnashop для двусторонней регистрации |
 | `REMNASHOP_CATALOG_SYNC_INTERVAL_SECONDS` | Интервал авто-синхронизации каталога |
 | `REFERRAL_BONUS_DAYS` | Бонус за реферала |
 | `BONUS_BOX_RUB_PER_ATTEMPT` | Сколько рублей оплаты дают одно открытие бокса |
@@ -240,6 +241,25 @@ Authorization: Bearer EMAIL_VERIFICATION_WEBHOOK_SECRET
 
 Каталог remnashop автоматически синхронизируется при входе в кабинет с интервалом `REMNASHOP_CATALOG_SYNC_INTERVAL_SECONDS`.
 
+Пользователи синхронизируются в обе стороны:
+
+- регистрация и Telegram Mini App в кабинете создают пользователя через официальный API remnashop;
+- пользователи remnashop импортируются в кабинет по `telegram_id` или email;
+- при первом email-входе кабинет проверяет пароль через remnashop и сохраняет собственный хеш;
+- прямой доступ на запись к базе remnashop не используется.
+
+Для записи из кабинета в remnashop должна быть включена его web-часть:
+
+```env
+WEB_ENABLED="true"
+APP_API_KEY="ВСТАВЬ_СЮДА_СЛУЧАЙНЫЙ_СЕКРЕТ"
+APP_JWT_SECRET="ВСТАВЬ_СЮДА_СЛУЧАЙНЫЙ_СЕКРЕТ_НЕ_КОРОЧЕ_32_СИМВОЛОВ"
+```
+
+После изменения перезапустите контейнеры remnashop. `APP_API_KEY` не передаётся
+пользователям кабинета: публичная регистрация защищается собственными правилами
+remnashop, а ключ нужен самому сервису для включения web-режима.
+
 Для remnashop на другом сервере создай read-only пользователя:
 
 ```sql
@@ -255,6 +275,7 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO remnashop_re
 ```env
 REMNASHOP_DATABASE_URL="postgresql://remnashop_readonly:ВСТАВЬ_СЮДА_ПАРОЛЬ@ВСТАВЬ_СЮДА_HOST:5432/remnashop?schema=public"
 REMNASHOP_DATABASE_SSL="true"
+REMNASHOP_API_URL="https://ВСТАВЬ_СЮДА_ДОМЕН_REMNASHOP/api/v1/public"
 ```
 
 ## Обновление

@@ -1,13 +1,16 @@
 // POST /api/auth/login
 
 import { NextResponse } from 'next/server'
-import { compare } from 'bcryptjs'
+import { compare, hash } from 'bcryptjs'
 import { prisma } from '@/lib/prisma'
 import { loginSchema } from '@/lib/auth/validation'
 import { setSessionCookieOnResponse } from '@/lib/auth/cookies'
 import { rateLimit } from '@/lib/rate-limit'
 import { assertSameOrigin } from '@/lib/security'
 import { checkRemnawaveProfileOnLogin } from '@/lib/remnawave-profile-check'
+import { authenticateRemnashopEmail } from '@/lib/remnashop-api'
+import { findRemnashopUserByEmail } from '@/lib/remnashop-users'
+import { generateUniqueReferralCode } from '@/lib/referrals'
 
 export const runtime = 'nodejs'
 
@@ -43,10 +46,57 @@ export async function POST(req: Request) {
 
   const { email, password } = parsed.data
 
-  const user = await prisma.user.findUnique({ where: { email } })
+  let user = await prisma.user.findUnique({ where: { email } })
   // Сравниваем даже при отсутствии пользователя — чтобы тайминг не указывал наличия
   const fakeHash = '$2a$12$0000000000000000000000.0000000000000000000000000000000000'
-  const isValid = await compare(password, user?.passwordHash ?? fakeHash)
+  let isValid = await compare(password, user?.passwordHash ?? fakeHash)
+
+  if (!isValid && process.env.REMNASHOP_API_URL && process.env.REMNASHOP_DATABASE_URL) {
+    try {
+      const authenticated = await authenticateRemnashopEmail(email, password)
+      if (authenticated) {
+        const source = await findRemnashopUserByEmail(email)
+        if (source) {
+          const telegramId = source.telegram_id ? BigInt(source.telegram_id) : null
+          const passwordHash = await hash(password, 12)
+          user = user
+            ? await prisma.user.update({
+                where: { id: user.id },
+                data: {
+                  passwordHash,
+                  remnashopUserId: user.remnashopUserId ?? source.id,
+                  remnashopSyncedAt: new Date(),
+                  telegramId: user.telegramId ?? telegramId,
+                  telegramUsername: user.telegramUsername ?? source.username,
+                  telegramLinkedAt: user.telegramLinkedAt ?? (telegramId ? new Date() : null),
+                  emailVerifiedAt: user.emailVerifiedAt ?? (source.is_email_verified ? new Date() : null),
+                },
+              })
+            : await prisma.user.create({
+                data: {
+                  email,
+                  passwordHash,
+                  name: source.name,
+                  role: 'USER',
+                  referralCode: await generateUniqueReferralCode(),
+                  telegramId,
+                  telegramUsername: source.username,
+                  telegramLinkedAt: telegramId ? new Date() : null,
+                  emailVerifiedAt: source.is_email_verified ? new Date() : null,
+                  remnashopUserId: source.id,
+                  remnashopSyncedAt: new Date(),
+                },
+              })
+          isValid = true
+        }
+      }
+    } catch (error) {
+      console.warn('[auth/login] remnashop fallback unavailable', {
+        email,
+        message: error instanceof Error ? error.message : 'unknown error',
+      })
+    }
+  }
 
   if (!user || !isValid) {
     return NextResponse.json(

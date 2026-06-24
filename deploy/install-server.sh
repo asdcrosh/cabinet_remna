@@ -356,6 +356,9 @@ configure_local_remnashop_database() {
   replace_env_value "REMNASHOP_READONLY_PASSWORD" "${readonly_password}"
   replace_env_value "REMNASHOP_DATABASE_URL" "${database_url}"
   replace_env_value "REMNASHOP_DATABASE_SSL" "false"
+  if docker inspect remnashop >/dev/null 2>&1; then
+    replace_env_value "REMNASHOP_API_URL" "http://remnashop:5000/api/v1/public"
+  fi
   replace_env_value "CABINET_EXTERNAL_NETWORK" "${network}"
 
   echo "Remnashop sync auto-linked through Docker network: ${network}"

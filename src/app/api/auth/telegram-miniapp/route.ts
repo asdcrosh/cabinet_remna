@@ -8,6 +8,7 @@ import { verifyTelegramMiniAppInitData } from '@/lib/telegram-auth'
 import { setSessionCookieOnResponse } from '@/lib/auth/cookies'
 import { generateUniqueReferralCode } from '@/lib/referrals'
 import { syncLinkedTelegramUser } from '@/lib/telegram-link-sync'
+import { ensureRemnashopTelegramUser } from '@/lib/remnashop-api'
 
 export const runtime = 'nodejs'
 
@@ -36,6 +37,15 @@ export async function POST(req: Request) {
       { error: error instanceof Error ? error.message : 'Telegram authentication failed' },
       { status: 401 }
     )
+  }
+
+  try {
+    await ensureRemnashopTelegramUser(body.initData)
+  } catch (error) {
+    console.warn('[telegram-miniapp] remnashop registration deferred', {
+      telegramId: telegram.id.toString(),
+      message: error instanceof Error ? error.message : 'unknown error',
+    })
   }
 
   let user = await prisma.user.findUnique({ where: { telegramId: telegram.id } })

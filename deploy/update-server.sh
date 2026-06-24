@@ -33,6 +33,27 @@ fi
 
 cd "${INSTALL_DIR}"
 
+if docker inspect remnashop >/dev/null 2>&1; then
+  ENV_FILE_PATH="${ENV_FILE}" python3 <<'PY'
+from pathlib import Path
+import os
+
+path = Path(os.environ["ENV_FILE_PATH"])
+lines = path.read_text().splitlines()
+key = "REMNASHOP_API_URL"
+value = "http://remnashop:5000/api/v1/public"
+for index, line in enumerate(lines):
+    if line.startswith(f"{key}="):
+        current = line.split("=", 1)[1].strip().strip("\"'")
+        if not current:
+            lines[index] = f'{key}="{value}"'
+        break
+else:
+    lines.append(f'{key}="{value}"')
+path.write_text("\n".join(lines) + "\n")
+PY
+fi
+
 echo "Updating compose file..."
 curl -fsSL "${COMPOSE_URL}" -o "${COMPOSE_FILE}"
 

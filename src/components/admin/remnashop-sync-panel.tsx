@@ -38,7 +38,7 @@ export function RemnashopSyncPanel() {
   }
 
   async function applyCatalogSync() {
-    if (!window.confirm('Синхронизировать тарифы и промокоды из remnashop?')) return
+    if (!window.confirm('Синхронизировать пользователей, тарифы и промокоды из remnashop?')) return
 
     setLoading(true)
     setError(null)
@@ -59,9 +59,9 @@ export function RemnashopSyncPanel() {
       <div className="card space-y-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="min-w-0">
-          <h2 className="text-lg font-semibold">Каталог Remnashop</h2>
+          <h2 className="text-lg font-semibold">Remnashop</h2>
           <p className="mt-1 text-sm text-slate-500">
-            Новые тарифы переносятся вместе с аудиторией. Для существующих тарифов выбранная в кабинете аудитория сохраняется.
+            Пользователи связываются по Telegram или email. Новые тарифы переносятся вместе с аудиторией.
           </p>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row">

@@ -1,5 +1,6 @@
 import { prisma } from '../src/lib/prisma'
 import { syncPaymentProvisioning } from '../src/lib/payment-sync'
+import { maybeSyncRemnashopCatalog } from '../src/lib/remnashop-sync'
 
 const intervalMs = readPositiveInt('PAYMENT_RECONCILE_INTERVAL_SECONDS', 60) * 1000
 const batchSize = readPositiveInt('PAYMENT_RECONCILE_BATCH_SIZE', 25)
@@ -29,6 +30,10 @@ async function main() {
 }
 
 async function runOnce() {
+  await maybeSyncRemnashopCatalog().catch((error) => {
+    console.error('[remnashop-sync] background sync failed', error)
+  })
+
   const cutoff = new Date(Date.now() - minAgeMs)
   const payments = await prisma.payment.findMany({
     where: {

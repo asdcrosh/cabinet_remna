@@ -10,6 +10,7 @@ import { rateLimit } from '@/lib/rate-limit'
 import { assertSameOrigin } from '@/lib/security'
 import { createEmailVerificationToken, sendEmailVerificationLink } from '@/lib/email-verification'
 import { generateUniqueReferralCode, normalizeReferralCode } from '@/lib/referrals'
+import { registerRemnashopEmailUser } from '@/lib/remnashop-api'
 
 export const runtime = 'nodejs'
 
@@ -87,11 +88,33 @@ export async function POST(req: Request) {
     token,
   })
 
+  let remnashopSync: 'synced' | 'already_exists' | 'not_configured' | 'failed' = 'not_configured'
+  try {
+    const result = await registerRemnashopEmailUser({
+      email,
+      password,
+      name: name || null,
+      referralCode,
+    })
+    remnashopSync = !result.configured
+      ? 'not_configured'
+      : 'alreadyExists' in result
+        ? 'already_exists'
+        : 'synced'
+  } catch (error) {
+    remnashopSync = 'failed'
+    console.warn('[auth/register] remnashop registration deferred', {
+      userId: user.id,
+      message: error instanceof Error ? error.message : 'unknown error',
+    })
+  }
+
   return NextResponse.json(
     {
       user,
       requiresEmailVerification: true,
       emailDelivery: delivery.sent ? 'sent' : delivery.reason,
+      remnashopSync,
     },
     { status: 201 }
   )

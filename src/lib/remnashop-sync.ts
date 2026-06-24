@@ -1,5 +1,6 @@
 import { prisma } from './prisma'
 import { remnashopQuery } from './remnashop-db'
+import { syncRemnashopUsersToCabinet } from './remnashop-users'
 
 type RemnashopSubscriptionStatus = 'ACTIVE' | 'DISABLED' | 'EXPIRED' | 'DELETED'
 type RemnashopTransactionStatus = 'COMPLETED' | 'CANCELED' | 'FAILED'
@@ -401,8 +402,11 @@ export async function maybeSyncRemnashopCatalog() {
     update: { count: { increment: 1 }, resetAt: nextSyncAt },
   })
 
-  const report = await syncRemnashopCatalog()
-  return { skipped: false, nextSyncAt, report }
+  const [catalog, users] = await Promise.all([
+    syncRemnashopCatalog(),
+    syncRemnashopUsersToCabinet(),
+  ])
+  return { skipped: false, nextSyncAt, report: { catalog, users } }
 }
 
 async function fetchRemnashopPlans() {
