@@ -7,6 +7,9 @@ COMPOSE_URL="${COMPOSE_URL:-${RAW_BASE_URL}/deploy/docker-compose.server.yml}"
 INSTALL_DIR="${INSTALL_DIR:-/opt/remnawave-cabinet}"
 COMPOSE_FILE="${INSTALL_DIR}/docker-compose.yml"
 ENV_FILE="${INSTALL_DIR}/.env"
+CABINETCTL_URL="${CABINETCTL_URL:-${RAW_BASE_URL}/deploy/cabinetctl.sh}"
+CABINETCTL_PATH="${CABINETCTL_PATH:-/usr/local/bin/cabinetctl}"
+CABINETCTL_TEMP="${CABINETCTL_PATH}.tmp"
 
 if [[ "$(id -u)" -ne 0 ]]; then
   echo "Run as root or with sudo:"
@@ -56,6 +59,9 @@ fi
 
 echo "Updating compose file..."
 curl -fsSL "${COMPOSE_URL}" -o "${COMPOSE_FILE}"
+curl -fsSL "${CABINETCTL_URL}" -o "${CABINETCTL_TEMP}"
+install -m 755 "${CABINETCTL_TEMP}" "${CABINETCTL_PATH}"
+rm -f "${CABINETCTL_TEMP}"
 
 COMPOSE=(docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}")
 
@@ -224,6 +230,8 @@ fi
 cleanup_docker_artifacts
 
 echo "Update complete."
+echo "Management menu:"
+echo "  cabinetctl"
 echo "Useful commands:"
 echo "  cd ${INSTALL_DIR} && docker compose --env-file .env -f docker-compose.yml ps"
 echo "  cd ${INSTALL_DIR} && docker compose --env-file .env -f docker-compose.yml logs -f app"

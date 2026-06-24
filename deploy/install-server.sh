@@ -11,6 +11,9 @@ ENV_FILE="${INSTALL_DIR}/.env"
 LEGACY_ENV_FILE="${INSTALL_DIR}/.env.production"
 DEFAULT_CABINET_IMAGE="ghcr.io/asdcrosh/cabinet_remna:latest"
 TTY_DEVICE="${TTY_DEVICE:-/dev/tty}"
+CABINETCTL_URL="${CABINETCTL_URL:-${RAW_BASE_URL}/deploy/cabinetctl.sh}"
+CABINETCTL_PATH="${CABINETCTL_PATH:-/usr/local/bin/cabinetctl}"
+CABINETCTL_TEMP="${CABINETCTL_PATH}.tmp"
 
 if [[ "$(id -u)" -ne 0 ]]; then
   echo "Run as root or with sudo:"
@@ -40,6 +43,9 @@ fi
 echo "Preparing deployment files in ${INSTALL_DIR}..."
 mkdir -p "${INSTALL_DIR}"
 curl -fsSL "${COMPOSE_URL}" -o "${COMPOSE_FILE}"
+curl -fsSL "${CABINETCTL_URL}" -o "${CABINETCTL_TEMP}"
+install -m 755 "${CABINETCTL_TEMP}" "${CABINETCTL_PATH}"
+rm -f "${CABINETCTL_TEMP}"
 
 if [[ ! -f "${ENV_FILE}" ]]; then
   if [[ -f "${LEGACY_ENV_FILE}" ]]; then
@@ -829,6 +835,8 @@ wait_for_app_container
 bootstrap_superuser
 
 echo "Deploy complete."
+echo "Management menu:"
+echo "  cabinetctl"
 echo "Useful commands:"
 echo "  cd ${INSTALL_DIR} && docker compose --env-file .env -f docker-compose.yml ps"
 echo "  cd ${INSTALL_DIR} && docker compose --env-file .env -f docker-compose.yml logs -f app"

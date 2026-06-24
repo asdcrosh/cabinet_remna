@@ -65,10 +65,19 @@ https://ВСТАВЬ_СЮДА_ДОМЕН_КАБИНЕТА
 Обновление уже установленного кабинета:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/asdcrosh/cabinet_remna/main/deploy/update-server.sh | sudo bash
+cabinetctl
 ```
 
-Обновление не пересоздает `.env`, не удаляет базу и не создает администратора заново.
+Откроется меню, где можно обновить кабинет, изменить `.env`, посмотреть логи,
+перезапустить сервисы, проверить сайт и создать резервную копию базы.
+Обновление не пересоздает `.env`, не удаляет базу и не создаёт администратора заново.
+
+Если кабинет был установлен до появления `cabinetctl`, выполните старую команду
+обновления один последний раз:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/asdcrosh/cabinet_remna/main/deploy/update-server.sh | sudo bash
+```
 
 ### Роли
 
@@ -281,13 +290,25 @@ REMNASHOP_API_URL="https://ВСТАВЬ_СЮДА_ДОМЕН_REMNASHOP/api/v1/pub
 ## Обновление
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/asdcrosh/cabinet_remna/main/deploy/update-server.sh | sudo bash
+cabinetctl
 ```
 
-Скрипт скачает свежий compose, подтянет опубликованный image, применит миграции,
+Выберите пункт `1. Обновить кабинет`. Скрипт скачает свежий compose, подтянет опубликованный image, применит миграции,
 проверит healthcheck и после успешного запуска удалит завершённые one-shot
 контейнеры, старые локальные compose-build images этого проекта и dangling
 Docker images. Volumes с базой не удаляются.
+
+Команду также можно использовать без меню:
+
+```bash
+cabinetctl update
+cabinetctl env
+cabinetctl status
+cabinetctl logs
+cabinetctl restart
+cabinetctl health
+cabinetctl backup
+```
 
 Логи:
 
