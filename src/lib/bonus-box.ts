@@ -135,8 +135,7 @@ export async function getBonusBoxOverview(userId: string) {
       },
     }),
   ])
-  const availablePrizes = applyBonusBoxEconomyGuard(prizeRows, openings, config)
-  const prizes = publicPrizesWithChances(prizeRows, availablePrizes)
+  const prizes = publicPrizesWithChances(prizeRows, prizeRows)
 
   return {
     config,
@@ -291,7 +290,7 @@ export async function grantWeeklyBonusBoxAttempts(userId: string) {
   if (!config.enabled || !config.weeklyEnabled || config.weeklyAttempts <= 0) return { granted: 0 }
 
   const now = new Date()
-  if (now.getDay() !== config.weeklyDay) return { granted: 0, reason: 'not_today' as const }
+  const weeklyBonusDate = getCurrentWeeklyBonusDate(now, config.weeklyDay)
 
   const vpnAccess = await prisma.user.findUnique({
     where: { id: userId },
@@ -327,7 +326,7 @@ export async function grantWeeklyBonusBoxAttempts(userId: string) {
     remainingWeeklySlots = config.weeklyMaxBalance - weeklyBalance
   }
 
-  const weekKey = getWeekKey(now)
+  const weekKey = getWeekKey(weeklyBonusDate)
   const attemptsCount =
     config.weeklyMaxBalance > 0
       ? Math.min(config.weeklyAttempts, remainingWeeklySlots)
@@ -464,7 +463,7 @@ export async function openBonusBox(userId: string): Promise<BonusBoxOpeningResul
 
   const [remainingAttempts, prizes] = await Promise.all([
     countAvailableAttempts(userId),
-    getPublicPrizesForUser(userId),
+    getPublicPrizes(),
   ])
   const publicPrize = publicPrizeFromPrize(
     txResult.prize,
@@ -488,20 +487,6 @@ export async function openBonusBox(userId: string): Promise<BonusBoxOpeningResul
 export async function getPublicPrizes(tx: Pick<BonusBoxTx, 'bonusBoxPrize'> = prisma) {
   const prizes = await getPrizeRows(tx)
   return publicPrizesWithChances(prizes, prizes)
-}
-
-async function getPublicPrizesForUser(userId: string) {
-  const config = getBonusBoxConfig()
-  const [prizes, recentOpenings] = await Promise.all([
-    getPrizeRows(prisma),
-    prisma.bonusBoxOpening.findMany({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
-      take: ECONOMY_HISTORY_LIMIT,
-      select: { prize: { select: { rarity: true } } },
-    }),
-  ])
-  return publicPrizesWithChances(prizes, applyBonusBoxEconomyGuard(prizes, recentOpenings, config))
 }
 
 async function getPrizeRows(tx: Pick<BonusBoxTx, 'bonusBoxPrize'>) {
@@ -531,6 +516,19 @@ async function applyPrizeInTransaction(
   if (input.prize.type === 'PROMO_CODE_PERCENT') {
     const promoCode = await createPrizePromoCode(tx, input.userId, input.prize, input.config)
     return { promoCodeId: promoCode.id, subscriptionId: null, remoteUpdate: null }
+  }
+
+  if (input.prize.type === 'BONUS_ATTEMPTS') {
+    await tx.bonusBoxAttempt.createMany({
+      data: makeAttempts({
+        userId: input.userId,
+        source: 'PRIZE',
+        sourceKeyPrefix: `prize:${input.prize.id}:${randomBytes(4).toString('hex')}`,
+        attemptsCount: clamp(input.prize.value, 1, 100),
+      }),
+      skipDuplicates: true,
+    })
+    return { promoCodeId: null, subscriptionId: null, remoteUpdate: null }
   }
 
   if (input.prize.type === 'SUBSCRIPTION_DAYS') {
@@ -642,7 +640,7 @@ async function syncPrizeToRemnawave(
 
 function makeAttempts(input: {
   userId: string
-  source: 'PAYMENT' | 'WEEKLY' | 'REFERRAL' | 'MANUAL'
+  source: 'PAYMENT' | 'WEEKLY' | 'REFERRAL' | 'MANUAL' | 'PRIZE'
   sourceKeyPrefix: string
   attemptsCount: number
 }) {
@@ -862,6 +860,14 @@ function getWeekKey(date: Date) {
   const yearStart = new Date(Date.UTC(target.getUTCFullYear(), 0, 1))
   const week = Math.ceil(((target.getTime() - yearStart.getTime()) / 86400000 + 1) / 7)
   return `${target.getUTCFullYear()}-W${String(week).padStart(2, '0')}`
+}
+
+function getCurrentWeeklyBonusDate(now: Date, weeklyDay: number) {
+  const target = new Date(now)
+  target.setHours(0, 0, 0, 0)
+  const daysSinceBonusDay = (target.getDay() - weeklyDay + 7) % 7
+  target.setDate(target.getDate() - daysSinceBonusDay)
+  return target
 }
 
 function envBool(key: string, fallback: boolean) {

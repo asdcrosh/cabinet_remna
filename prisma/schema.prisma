@@ -540,6 +540,7 @@ enum BonusBoxPrizeType {
   SUBSCRIPTION_DAYS
   TRAFFIC_GB
   PROMO_CODE_PERCENT
+  BONUS_ATTEMPTS
 }
 
 enum BonusBoxRarity {
@@ -554,4 +555,5 @@ enum BonusBoxAttemptSource {
   WEEKLY
   REFERRAL
   MANUAL
+  PRIZE
 }

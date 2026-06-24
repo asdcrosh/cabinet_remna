@@ -8,7 +8,7 @@ import { apiFetch } from '@/lib/api-client'
 import { toast } from '@/components/ui/toaster'
 import { cn } from '@/lib/cn'
 
-type PrizeType = 'SUBSCRIPTION_DAYS' | 'TRAFFIC_GB' | 'PROMO_CODE_PERCENT'
+type PrizeType = 'SUBSCRIPTION_DAYS' | 'TRAFFIC_GB' | 'PROMO_CODE_PERCENT' | 'BONUS_ATTEMPTS'
 type Rarity = 'COMMON' | 'RARE' | 'EPIC' | 'LEGENDARY'
 
 export type BonusBoxPrizeAdminRow = {
@@ -31,7 +31,7 @@ export type BonusBoxOpeningAdminRow = {
   createdAt: string
   userEmail: string
   userName: string | null
-  attemptSource: 'PAYMENT' | 'WEEKLY' | 'REFERRAL' | 'MANUAL'
+  attemptSource: 'PAYMENT' | 'WEEKLY' | 'REFERRAL' | 'MANUAL' | 'PRIZE'
   prizeTitle: string
   prizeType: PrizeType
   prizeValue: number
@@ -166,6 +166,7 @@ export function BonusBoxPrizesAdmin({
               <option value="SUBSCRIPTION_DAYS">Дни подписки</option>
               <option value="TRAFFIC_GB">Трафик, ГБ</option>
               <option value="PROMO_CODE_PERCENT">Промокод, %</option>
+              <option value="BONUS_ATTEMPTS">Открытия бокса</option>
             </select>
           </Field>
           <Field label={valueLabel(form.type)}>
@@ -175,7 +176,7 @@ export function BonusBoxPrizesAdmin({
               className="input"
               type="number"
               min={1}
-              max={form.type === 'PROMO_CODE_PERCENT' ? 99 : 10000}
+              max={form.type === 'PROMO_CODE_PERCENT' ? 99 : form.type === 'BONUS_ATTEMPTS' ? 100 : 10000}
             />
           </Field>
           <Field label="Вес">
@@ -418,24 +419,28 @@ function Metric({ label, value }: { label: string; value: ReactNode }) {
 function valueLabel(type: PrizeType) {
   if (type === 'SUBSCRIPTION_DAYS') return 'Дни'
   if (type === 'TRAFFIC_GB') return 'ГБ'
+  if (type === 'BONUS_ATTEMPTS') return 'Открытия'
   return 'Скидка, %'
 }
 
 function prizeTypeLabel(type: PrizeType) {
   if (type === 'SUBSCRIPTION_DAYS') return 'Дни подписки'
   if (type === 'TRAFFIC_GB') return 'Дополнительный трафик'
+  if (type === 'BONUS_ATTEMPTS') return 'Дополнительные открытия'
   return 'Персональный промокод'
 }
 
 function prizeValue(prize: BonusBoxPrizeAdminRow) {
   if (prize.type === 'SUBSCRIPTION_DAYS') return `+${prize.value} дн.`
   if (prize.type === 'TRAFFIC_GB') return `+${prize.value} ГБ`
+  if (prize.type === 'BONUS_ATTEMPTS') return `+${prize.value} откр.`
   return `-${prize.value}%`
 }
 
 function prizeValueFromParts(type: PrizeType, value: number) {
   if (type === 'SUBSCRIPTION_DAYS') return `+${value} дн.`
   if (type === 'TRAFFIC_GB') return `+${value} ГБ`
+  if (type === 'BONUS_ATTEMPTS') return `+${value} откр.`
   return `-${value}%`
 }
 
@@ -443,6 +448,7 @@ function sourceLabel(source: BonusBoxOpeningAdminRow['attemptSource']) {
   if (source === 'PAYMENT') return 'Оплата'
   if (source === 'WEEKLY') return 'Еженедельный бонус'
   if (source === 'REFERRAL') return 'Реферал'
+  if (source === 'PRIZE') return 'Подарок из бокса'
   return 'Админ'
 }
 

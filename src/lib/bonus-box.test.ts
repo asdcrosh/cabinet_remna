@@ -1,10 +1,48 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { BonusBoxPrize, BonusBoxRarity } from '@prisma/client'
 
-vi.mock('./prisma', () => ({ prisma: {} }))
+const mocks = vi.hoisted(() => {
+  const prisma = {
+    user: {
+      findUnique: vi.fn(),
+    },
+    bonusBoxAttempt: {
+      count: vi.fn(),
+      createMany: vi.fn(),
+      findMany: vi.fn(),
+      findFirst: vi.fn(),
+      update: vi.fn(),
+    },
+    bonusBoxPrize: {
+      findMany: vi.fn(),
+      updateMany: vi.fn(),
+    },
+    bonusBoxOpening: {
+      findMany: vi.fn(),
+      create: vi.fn(),
+    },
+    subscription: {
+      update: vi.fn(),
+    },
+    promoCode: {
+      create: vi.fn(),
+    },
+    $transaction: vi.fn(async (fn) => fn(prisma)),
+  }
+
+  return { prisma }
+})
+
+vi.mock('./prisma', () => ({ prisma: mocks.prisma }))
 vi.mock('./remnawave', () => ({ remnawave: {} }))
 
-import { applyBonusBoxEconomyGuard, getBonusBoxConfig } from './bonus-box'
+import {
+  applyBonusBoxEconomyGuard,
+  getBonusBoxConfig,
+  getBonusBoxOverview,
+  grantWeeklyBonusBoxAttempts,
+  openBonusBox,
+} from './bonus-box'
 
 type Config = ReturnType<typeof getBonusBoxConfig>
 
@@ -28,6 +66,133 @@ const config: Config = {
   epicMinOpenings: 4,
   legendaryMinOpenings: 12,
 }
+
+describe('grantWeeklyBonusBoxAttempts', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.useFakeTimers()
+    process.env.BONUS_BOX_WEEKLY_DAY = '5'
+    process.env.BONUS_BOX_WEEKLY_ATTEMPTS = '1'
+    process.env.BONUS_BOX_WEEKLY_MAX_BALANCE = '3'
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+    delete process.env.BONUS_BOX_WEEKLY_DAY
+    delete process.env.BONUS_BOX_WEEKLY_ATTEMPTS
+    delete process.env.BONUS_BOX_WEEKLY_MAX_BALANCE
+  })
+
+  it('grants the Friday weekly attempt when the user visits on Saturday', async () => {
+    vi.setSystemTime(new Date('2026-06-27T12:00:00.000Z'))
+    mocks.prisma.user.findUnique.mockResolvedValue({
+      remnawaveUuid: 'rw-1',
+      subscriptions: [{ id: 'sub-1' }],
+    })
+    mocks.prisma.bonusBoxAttempt.count.mockResolvedValue(0)
+    mocks.prisma.bonusBoxAttempt.createMany.mockImplementation(({ data }) => Promise.resolve({ count: data.length }))
+
+    const result = await grantWeeklyBonusBoxAttempts('user-1')
+
+    expect(result.granted).toBe(1)
+    expect(mocks.prisma.bonusBoxAttempt.createMany).toHaveBeenCalledWith({
+      data: [
+        expect.objectContaining({
+          userId: 'user-1',
+          source: 'WEEKLY',
+          sourceKey: '2026-W26:1',
+        }),
+      ],
+      skipDuplicates: true,
+    })
+  })
+})
+
+describe('openBonusBox', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-06-24T12:00:00.000Z'))
+    mocks.prisma.$transaction.mockImplementation(async (fn) => fn(mocks.prisma))
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('grants extra box attempts when the prize type is BONUS_ATTEMPTS', async () => {
+    const attemptPrize = prize('attempts-prize', 'COMMON', 'BONUS_ATTEMPTS', 2)
+    mocks.prisma.bonusBoxAttempt.findFirst.mockResolvedValue({ id: 'attempt-1' })
+    mocks.prisma.user.findUnique.mockResolvedValue({
+      id: 'user-1',
+      remnawaveUuid: 'rw-1',
+      subscriptions: [
+        {
+          id: 'sub-1',
+          expireAt: new Date('2026-07-24T00:00:00.000Z'),
+          trafficLimitBytes: null,
+        },
+      ],
+    })
+    mocks.prisma.bonusBoxPrize.findMany.mockResolvedValue([attemptPrize])
+    mocks.prisma.bonusBoxPrize.updateMany.mockResolvedValue({ count: 1 })
+    mocks.prisma.bonusBoxAttempt.update.mockResolvedValue({})
+    mocks.prisma.bonusBoxAttempt.createMany.mockImplementation(({ data }) => Promise.resolve({ count: data.length }))
+    mocks.prisma.bonusBoxOpening.create.mockResolvedValue({ id: 'opening-1', promoCode: null })
+    mocks.prisma.bonusBoxOpening.findMany.mockResolvedValue([])
+    mocks.prisma.bonusBoxAttempt.count.mockResolvedValue(2)
+
+    const result = await openBonusBox('user-1')
+
+    expect(result.remainingAttempts).toBe(2)
+    expect(mocks.prisma.bonusBoxAttempt.createMany).toHaveBeenCalledWith({
+      data: expect.arrayContaining([
+        expect.objectContaining({ userId: 'user-1', source: 'PRIZE' }),
+        expect.objectContaining({ userId: 'user-1', source: 'PRIZE' }),
+      ]),
+      skipDuplicates: true,
+    })
+  })
+})
+
+describe('getBonusBoxOverview', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-06-24T12:00:00.000Z'))
+    process.env.BONUS_BOX_WEEKLY_ENABLED = 'false'
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+    delete process.env.BONUS_BOX_WEEKLY_ENABLED
+  })
+
+  it('shows base chances to the user even when the economy guard closes a prize', async () => {
+    mocks.prisma.bonusBoxAttempt.findMany.mockResolvedValue([])
+    mocks.prisma.bonusBoxPrize.findMany.mockResolvedValue([
+      prize('common', 'COMMON', 'SUBSCRIPTION_DAYS', 1, 40),
+      prize('rare', 'RARE', 'BONUS_ATTEMPTS', 2, 60),
+    ])
+    mocks.prisma.bonusBoxOpening.findMany.mockResolvedValue([
+      {
+        id: 'opening-1',
+        createdAt: new Date('2026-06-24T11:00:00.000Z'),
+        prize: prize('recent-rare', 'RARE'),
+        promoCode: null,
+      },
+    ])
+    mocks.prisma.user.findUnique.mockResolvedValue({
+      remnawaveUuid: 'rw-1',
+      subscriptions: [{ id: 'sub-1' }],
+    })
+
+    const overview = await getBonusBoxOverview('user-1')
+
+    expect(overview.prizes.find((item) => item.id === 'common')?.chance).toBe(0.4)
+    expect(overview.prizes.find((item) => item.id === 'rare')?.chance).toBe(0.6)
+  })
+})
 
 describe('applyBonusBoxEconomyGuard', () => {
   it('does not let frequent rare prizes reset the legendary path', () => {
@@ -123,14 +288,20 @@ function prizes() {
   ]
 }
 
-function prize(id: string, rarity: BonusBoxRarity): BonusBoxPrize {
+function prize(
+  id: string,
+  rarity: BonusBoxRarity,
+  type: BonusBoxPrize['type'] = 'SUBSCRIPTION_DAYS',
+  value = 1,
+  weight = 10
+): BonusBoxPrize {
   return {
     id,
     title: id,
     description: null,
-    type: 'SUBSCRIPTION_DAYS',
-    value: 1,
-    weight: 10,
+    type,
+    value,
+    weight,
     rarity,
     isActive: true,
     maxWins: null,

@@ -7,7 +7,7 @@ import { apiFetch } from '@/lib/api-client'
 import { toast } from '@/components/ui/toaster'
 import { cn } from '@/lib/cn'
 
-type PrizeType = 'SUBSCRIPTION_DAYS' | 'TRAFFIC_GB' | 'PROMO_CODE_PERCENT'
+type PrizeType = 'SUBSCRIPTION_DAYS' | 'TRAFFIC_GB' | 'PROMO_CODE_PERCENT' | 'BONUS_ATTEMPTS'
 type Rarity = 'COMMON' | 'RARE' | 'EPIC' | 'LEGENDARY'
 
 export type BonusBoxPrizeView = {
@@ -317,7 +317,7 @@ function BonusBoxRules({
       : 'Реферальные открытия сейчас не начисляются.'
   const weeklyText =
     config.weeklyEnabled && config.weeklyAttempts > 0
-      ? `${weekdayLabel(config.weeklyDay)}: +${config.weeklyAttempts}, если VPN-подписка активна.`
+      ? `Раз в неделю с дня "${weekdayLabel(config.weeklyDay)}": +${config.weeklyAttempts}, если VPN-подписка активна.`
       : 'Еженедельный бонус сейчас выключен.'
   const ttlText = config.attemptTtlDays > 0
     ? `Открытия хранятся ${config.attemptTtlDays} дн.`
@@ -377,7 +377,14 @@ function RuleCard({
 }
 
 function PrizeCard({ prize, compact = false }: { prize: BonusBoxPrizeView; compact?: boolean }) {
-  const Icon = prize.type === 'SUBSCRIPTION_DAYS' ? CalendarPlus : prize.type === 'TRAFFIC_GB' ? Zap : TicketPercent
+  const Icon =
+    prize.type === 'SUBSCRIPTION_DAYS'
+      ? CalendarPlus
+      : prize.type === 'TRAFFIC_GB'
+        ? Zap
+        : prize.type === 'BONUS_ATTEMPTS'
+          ? Gift
+          : TicketPercent
 
   return (
     <div
@@ -439,6 +446,7 @@ function makeIdleReel(prizes: BonusBoxPrizeView[]) {
 function prizeLabel(prize: BonusBoxPrizeView) {
   if (prize.type === 'SUBSCRIPTION_DAYS') return `+${prize.value} дн.`
   if (prize.type === 'TRAFFIC_GB') return `+${prize.value} ГБ`
+  if (prize.type === 'BONUS_ATTEMPTS') return `+${prize.value} открытий`
   return `-${prize.value}%`
 }
 

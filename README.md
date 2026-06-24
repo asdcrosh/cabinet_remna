@@ -145,7 +145,7 @@ https://ВСТАВЬ_СЮДА_ДОМЕН_КАБИНЕТА
 | `REFERRAL_BONUS_DAYS` | Бонус за реферала |
 | `BONUS_BOX_RUB_PER_ATTEMPT` | Сколько рублей оплаты дают одно открытие бокса |
 | `BONUS_BOX_MIN_ATTEMPTS_PER_PAYMENT` / `BONUS_BOX_MAX_ATTEMPTS_PER_PAYMENT` | Минимум и максимум открытий за одну оплату |
-| `BONUS_BOX_WEEKLY_DAY` / `BONUS_BOX_WEEKLY_ATTEMPTS` | День недели и количество еженедельных открытий |
+| `BONUS_BOX_WEEKLY_DAY` / `BONUS_BOX_WEEKLY_ATTEMPTS` | День старта недельного бонуса и количество еженедельных открытий. Если пользователь пропустил этот день, попытка выдаётся при следующем входе в этот недельный период |
 | `BONUS_BOX_REFERRER_ATTEMPTS` / `BONUS_BOX_REFERRED_ATTEMPTS` | Открытия за реферальную покупку |
 | `BONUS_BOX_PROMO_EXPIRES_IN_DAYS` | Срок жизни промокодов, выпавших из бокса |
 | `BONUS_BOX_ECONOMY_GUARD_ENABLED` | Защита от подряд идущих дорогих подарков |

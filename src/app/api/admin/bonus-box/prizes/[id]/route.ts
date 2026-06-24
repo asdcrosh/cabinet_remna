@@ -38,6 +38,9 @@ export const PATCH = withAuth(async (req: Request, { params }: { params: { id: s
   if (effectiveType === 'PROMO_CODE_PERCENT' && effectiveValue > 99) {
     return NextResponse.json({ error: 'Скидка должна быть от 1% до 99%' }, { status: 400 })
   }
+  if (effectiveType === 'BONUS_ATTEMPTS' && effectiveValue > 100) {
+    return NextResponse.json({ error: 'Количество открытий должно быть от 1 до 100' }, { status: 400 })
+  }
 
   try {
     const prize = await prisma.bonusBoxPrize.update({

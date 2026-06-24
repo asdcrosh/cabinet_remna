@@ -117,7 +117,7 @@ export const updateAdminPromoCodeSchema = adminPromoCodeBaseSchema.partial().ref
 const adminBonusBoxPrizeBaseSchema = z.object({
   title: z.string().trim().min(2, 'Минимум 2 символа').max(80, 'Максимум 80 символов'),
   description: z.string().trim().max(180, 'Максимум 180 символов').optional().nullable(),
-  type: z.enum(['SUBSCRIPTION_DAYS', 'TRAFFIC_GB', 'PROMO_CODE_PERCENT']),
+  type: z.enum(['SUBSCRIPTION_DAYS', 'TRAFFIC_GB', 'PROMO_CODE_PERCENT', 'BONUS_ATTEMPTS']),
   value: z.coerce.number().int().min(1).max(10_000),
   weight: z.coerce.number().int().min(1).max(100_000),
   rarity: z.enum(['COMMON', 'RARE', 'EPIC', 'LEGENDARY']).default('COMMON'),
@@ -132,6 +132,12 @@ export const adminBonusBoxPrizeSchema = adminBonusBoxPrizeBaseSchema.refine(
     path: ['value'],
     message: 'Скидка должна быть от 1% до 99%',
   }
+).refine(
+  (value) => value.type !== 'BONUS_ATTEMPTS' || value.value <= 100,
+  {
+    path: ['value'],
+    message: 'Количество открытий должно быть от 1 до 100',
+  }
 )
 
 export const updateAdminBonusBoxPrizeSchema = adminBonusBoxPrizeBaseSchema.partial().refine(
@@ -139,6 +145,12 @@ export const updateAdminBonusBoxPrizeSchema = adminBonusBoxPrizeBaseSchema.parti
   {
     path: ['value'],
     message: 'Скидка должна быть от 1% до 99%',
+  }
+).refine(
+  (value) => value.type !== 'BONUS_ATTEMPTS' || value.value == null || value.value <= 100,
+  {
+    path: ['value'],
+    message: 'Количество открытий должно быть от 1 до 100',
   }
 )
 
