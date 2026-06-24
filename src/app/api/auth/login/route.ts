@@ -8,7 +8,7 @@ import { setSessionCookieOnResponse } from '@/lib/auth/cookies'
 import { rateLimit } from '@/lib/rate-limit'
 import { assertSameOrigin } from '@/lib/security'
 import { checkRemnawaveProfileOnLogin } from '@/lib/remnawave-profile-check'
-import { authenticateRemnashopEmail } from '@/lib/remnashop-api'
+import { authenticateRemnashopEmail, registerRemnashopEmailUser } from '@/lib/remnashop-api'
 import { findRemnashopUserByEmail } from '@/lib/remnashop-users'
 import { generateUniqueReferralCode } from '@/lib/referrals'
 
@@ -103,6 +103,33 @@ export async function POST(req: Request) {
       { error: 'Неверный email или пароль' },
       { status: 401 }
     )
+  }
+
+  if (process.env.REMNASHOP_API_URL && !user.remnashopUserId) {
+    try {
+      await registerRemnashopEmailUser({
+        email: user.email,
+        password,
+        name: user.name,
+      })
+      const source = process.env.REMNASHOP_DATABASE_URL
+        ? await findRemnashopUserByEmail(user.email)
+        : null
+      if (source) {
+        user = await prisma.user.update({
+          where: { id: user.id },
+          data: {
+            remnashopUserId: source.id,
+            remnashopSyncedAt: new Date(),
+          },
+        })
+      }
+    } catch (error) {
+      console.warn('[auth/login] remnashop registration retry deferred', {
+        userId: user.id,
+        message: error instanceof Error ? error.message : 'unknown error',
+      })
+    }
   }
 
   if (!user.emailVerifiedAt) {
