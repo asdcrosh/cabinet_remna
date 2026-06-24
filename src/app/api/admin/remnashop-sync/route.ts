@@ -16,10 +16,8 @@ export const GET = withAuth(async (req: Request) => {
   try {
     const report = apply
       ? await (async () => {
-          const [catalog, users] = await Promise.all([
-            syncRemnashopCatalog({ includePromoCodes }),
-            syncRemnashopUsersToCabinet(),
-          ])
+          const catalog = await syncRemnashopCatalog({ includePromoCodes })
+          const users = await syncRemnashopUsersToCabinet({ forceRemnawaveSubscriptions: true })
           return {
             ...catalog,
             counts: {

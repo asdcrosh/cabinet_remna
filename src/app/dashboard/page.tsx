@@ -14,6 +14,7 @@ import { Activity, AlertTriangle, CheckCircle2, CreditCard, Gauge, KeyRound, Shi
 import { PageHeader } from '@/components/dashboard/page-header'
 import { StatCard } from '@/components/dashboard/stat-card'
 import { logWarn } from '@/lib/logger'
+import { readRemnawaveBigInt } from '@/lib/remnawave-usage'
 
 export const dynamic = 'force-dynamic'
 
@@ -48,8 +49,8 @@ export default async function DashboardHome() {
     return <OnboardingState emailVerified={Boolean(user.emailVerifiedAt)} />
   }
 
-  const used = sub ? BigInt(sub.trafficUsedBytes || '0') : 0n
-  const limit = sub ? BigInt(sub.trafficLimitBytes || '0') : 0n
+  const used = sub ? readRemnawaveBigInt(sub, ['trafficUsedBytes', 'usedTrafficBytes']) : 0n
+  const limit = sub ? readRemnawaveBigInt(sub, ['trafficLimitBytes', 'trafficLimit']) : 0n
   const isUnlimited = limit === 0n
   const percent = isUnlimited ? 0 : Math.min(100, Math.round((Number(used) / Number(limit || 1n)) * 100))
 

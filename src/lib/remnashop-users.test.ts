@@ -7,6 +7,9 @@ const mocks = vi.hoisted(() => {
       update: vi.fn(),
       create: vi.fn(),
     },
+    plan: {
+      findFirst: vi.fn(),
+    },
   }
   const remnashopQuery = vi.fn()
   const remnawave = {
@@ -43,6 +46,10 @@ const sourceUser = {
   name: 'Егор',
   username: 'egor',
   user_remna_id: 'rw-1',
+  subscription_created_at: new Date('2026-06-01T00:00:00.000Z'),
+  subscription_plan_snapshot: { plan: { name: 'Light' }, duration: { days: 7 } },
+  subscription_traffic_limit: 0,
+  subscription_device_limit: 5,
 }
 
 const remnawaveUser = {
@@ -68,6 +75,7 @@ describe('syncRemnashopUsersToCabinet', () => {
     vi.setSystemTime(new Date('2026-06-24T12:00:00.000Z'))
     process.env.REMNASHOP_USER_SUBSCRIPTION_SYNC_STALE_SECONDS = '300'
     mocks.generateUniqueReferralCode.mockResolvedValue('REF123')
+    mocks.prisma.plan.findFirst.mockResolvedValue(null)
   })
 
   afterEach(() => {
@@ -83,6 +91,7 @@ describe('syncRemnashopUsersToCabinet', () => {
       name: null,
       remnashopUserId: 10,
       remnawaveUuid: null,
+      remnawaveUsername: null,
       telegramId: 123n,
       telegramUsername: null,
       telegramLinkedAt: null,
@@ -92,11 +101,13 @@ describe('syncRemnashopUsersToCabinet', () => {
     mocks.prisma.user.update.mockResolvedValue({
       id: 'user-1',
       remnawaveUuid: null,
+      remnawaveUsername: null,
       subscriptions: [],
     })
     mocks.remnawave.getUserByUuid.mockResolvedValue({ response: remnawaveUser })
     mocks.remnawave.updateUser.mockResolvedValue({ response: { ...remnawaveUser, telegramId: 123 } })
     mocks.upsertLocalSubscriptionFromRemnawave.mockResolvedValue({ id: 'sub-1' })
+    mocks.prisma.plan.findFirst.mockResolvedValue({ id: 'plan-light-7' })
 
     const result = await syncRemnashopUsersToCabinet()
 
@@ -107,6 +118,8 @@ describe('syncRemnashopUsersToCabinet', () => {
     expect(mocks.upsertLocalSubscriptionFromRemnawave).toHaveBeenCalledWith({
       localUserId: 'user-1',
       remnashopUserId: 10,
+      planId: 'plan-light-7',
+      startAt: new Date('2026-06-01T00:00:00.000Z'),
       remnawaveUser: expect.objectContaining({ uuid: 'rw-1', username: 'rw_user' }),
     })
     expect(result.subscriptionsSynced).toBe(1)
@@ -122,6 +135,7 @@ describe('syncRemnashopUsersToCabinet', () => {
       name: 'Егор',
       remnashopUserId: 10,
       remnawaveUuid: 'rw-1',
+      remnawaveUsername: 'rw_user',
       telegramId: 123n,
       telegramUsername: 'egor',
       telegramLinkedAt: new Date('2026-06-20T00:00:00.000Z'),
@@ -131,7 +145,8 @@ describe('syncRemnashopUsersToCabinet', () => {
     mocks.prisma.user.update.mockResolvedValue({
       id: 'user-1',
       remnawaveUuid: 'rw-1',
-      subscriptions: [{ lastSyncedAt }],
+      remnawaveUsername: 'rw_user',
+      subscriptions: [{ id: 'sub-1', lastSyncedAt }],
     })
 
     const result = await syncRemnashopUsersToCabinet()
@@ -139,5 +154,39 @@ describe('syncRemnashopUsersToCabinet', () => {
     expect(mocks.remnawave.getUserByUuid).not.toHaveBeenCalled()
     expect(mocks.upsertLocalSubscriptionFromRemnawave).not.toHaveBeenCalled()
     expect(result.subscriptionsSkipped).toBe(1)
+  })
+
+  it('forces a Remnawave subscription refresh during manual sync', async () => {
+    const lastSyncedAt = new Date('2026-06-24T11:59:00.000Z')
+    mocks.remnashopQuery.mockResolvedValue({ rows: [sourceUser] })
+    mocks.prisma.user.findFirst.mockResolvedValue({
+      id: 'user-1',
+      email: 'telegram-123@pending.invalid',
+      name: 'Егор',
+      remnashopUserId: 10,
+      remnawaveUuid: 'rw-1',
+      remnawaveUsername: 'rw_user',
+      telegramId: 123n,
+      telegramUsername: 'egor',
+      telegramLinkedAt: new Date('2026-06-20T00:00:00.000Z'),
+      emailVerifiedAt: null,
+      subscriptions: [{ id: 'sub-1', lastSyncedAt }],
+    })
+    mocks.prisma.user.update.mockResolvedValue({
+      id: 'user-1',
+      remnawaveUuid: 'rw-1',
+      remnawaveUsername: 'rw_user',
+      subscriptions: [{ id: 'sub-1', lastSyncedAt }],
+    })
+    mocks.remnawave.getUserByUuid.mockResolvedValue({ response: remnawaveUser })
+    mocks.remnawave.updateUser.mockResolvedValue({ response: { ...remnawaveUser, telegramId: 123 } })
+    mocks.upsertLocalSubscriptionFromRemnawave.mockResolvedValue({ id: 'sub-1' })
+
+    const result = await syncRemnashopUsersToCabinet({ forceRemnawaveSubscriptions: true })
+
+    expect(mocks.remnawave.getUserByUuid).toHaveBeenCalledWith('rw-1')
+    expect(mocks.upsertLocalSubscriptionFromRemnawave).toHaveBeenCalled()
+    expect(result.subscriptionsSynced).toBe(1)
+    expect(result.subscriptionsSkipped).toBe(0)
   })
 })

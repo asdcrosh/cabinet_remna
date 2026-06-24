@@ -1,14 +1,27 @@
 import type { UserResponse } from './remnawave'
 import { prisma } from './prisma'
+import { readRemnawaveBigInt } from './remnawave-usage'
 
 export async function upsertLocalSubscriptionFromRemnawave(input: {
   localUserId: string
   remnashopUserId?: number | null
+  planId?: string | null
+  startAt?: Date | null
   remnawaveUser: UserResponse
 }) {
-  const trafficLimit = BigInt(input.remnawaveUser.trafficLimitBytes || '0')
+  const trafficLimit = readRemnawaveBigInt(input.remnawaveUser, ['trafficLimitBytes', 'trafficLimit'])
+  const trafficUsed = readRemnawaveBigInt(input.remnawaveUser, ['usedTrafficBytes', 'trafficUsedBytes'])
+  const lifetimeUsed = readRemnawaveBigInt(input.remnawaveUser, [
+    'lifetimeUsedTrafficBytes',
+    'lifetimeTrafficUsedBytes',
+  ])
   const remnawaveCreatedAt = new Date(input.remnawaveUser.createdAt)
-  const startAt = Number.isNaN(remnawaveCreatedAt.getTime()) ? new Date() : remnawaveCreatedAt
+  const startAt =
+    input.startAt && !Number.isNaN(input.startAt.getTime())
+      ? input.startAt
+      : Number.isNaN(remnawaveCreatedAt.getTime())
+        ? new Date()
+        : remnawaveCreatedAt
 
   await prisma.user.update({
     where: { id: input.localUserId },
@@ -27,11 +40,12 @@ export async function upsertLocalSubscriptionFromRemnawave(input: {
   })
 
   const data = {
+    ...(input.planId ? { planId: input.planId } : {}),
     expireAt: new Date(input.remnawaveUser.expireAt),
     status: mapRemnawaveStatus(input.remnawaveUser.status),
     trafficLimitBytes: trafficLimit === 0n ? null : trafficLimit,
-    trafficUsedBytes: BigInt(input.remnawaveUser.usedTrafficBytes || '0'),
-    lifetimeUsedBytes: BigInt(input.remnawaveUser.lifetimeUsedTrafficBytes || '0'),
+    trafficUsedBytes: trafficUsed,
+    lifetimeUsedBytes: lifetimeUsed,
     lastSyncedAt: new Date(),
     pendingSync: false,
   }

@@ -402,10 +402,8 @@ export async function maybeSyncRemnashopCatalog() {
     update: { count: { increment: 1 }, resetAt: nextSyncAt },
   })
 
-  const [catalog, users] = await Promise.all([
-    syncRemnashopCatalog(),
-    syncRemnashopUsersToCabinet(),
-  ])
+  const catalog = await syncRemnashopCatalog()
+  const users = await syncRemnashopUsersToCabinet()
   return { skipped: false, nextSyncAt, report: { catalog, users } }
 }
 
