@@ -7,6 +7,9 @@ export function normalizeUsageSeries(
   value: unknown,
   range?: { start: Date; end: Date }
 ): TrafficSeriesPoint[] {
+  const currentSeries = readCurrentUsageSeries(value)
+  if (currentSeries.length > 0) return currentSeries
+
   const rows = findUsageRows(value)
   const totals = new Map<string, bigint>()
 
@@ -35,6 +38,25 @@ export function normalizeUsageSeries(
   return Array.from(totals.entries())
     .sort(([left], [right]) => left.localeCompare(right))
     .map(([date, bytes]) => ({ date, bytes: bytes.toString() }))
+}
+
+function readCurrentUsageSeries(value: unknown) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return []
+  const root = value as Record<string, unknown>
+  const payload = root.response && typeof root.response === 'object' && !Array.isArray(root.response)
+    ? root.response as Record<string, unknown>
+    : root
+  const categories = payload.categories
+  const sparklineData = payload.sparklineData
+
+  if (!Array.isArray(categories) || !Array.isArray(sparklineData)) return []
+
+  return categories.flatMap((rawDate, index) => {
+    const date = normalizeDate(rawDate)
+    const rawBytes = sparklineData[index]
+    if (!date || typeof rawBytes !== 'number' || !Number.isFinite(rawBytes) || rawBytes < 0) return []
+    return [{ date, bytes: BigInt(Math.trunc(rawBytes)).toString() }]
+  })
 }
 
 function findUsageRows(value: unknown): unknown[] {

@@ -154,13 +154,19 @@ export interface GetSubscriptionInfoResponse {
   }
 }
 
-export interface DailyUsageRow {
-  date: string         // "2026-06-12"
-  bytes: string        // bigint в строке
-}
-
 export interface DailyUsageResponse {
-  response: DailyUsageRow[]
+  response: {
+    categories: string[]
+    sparklineData: number[]
+    series: Array<{
+      uuid: string
+      name: string
+      color: string
+      countryCode: string
+      total: number
+      data: number[]
+    }>
+  }
 }
 
 export interface SubscriptionRequestRecord {
@@ -286,10 +292,14 @@ export const remnawave = {
   // Статистика -------------------------------------------------------------
 
   async getUsageRange(uuid: string, start: Date, end: Date) {
-    const qs = `start=${encodeURIComponent(start.toISOString())}&end=${encodeURIComponent(end.toISOString())}`
+    const qs = new URLSearchParams({
+      start: start.toISOString().slice(0, 10),
+      end: end.toISOString().slice(0, 10),
+      topNodesLimit: '20',
+    })
     return request<DailyUsageResponse>(
       'GET',
-      `/api/users/stats/usage/${encodeURIComponent(uuid)}/range?${qs}`
+      `/api/bandwidth-stats/users/${encodeURIComponent(uuid)}?${qs.toString()}`
     )
   },
 

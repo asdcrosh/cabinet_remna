@@ -36,4 +36,18 @@ describe('normalizeUsageSeries', () => {
       { date: '2026-06-24', bytes: '2048' },
     ])
   })
+
+  it('normalizes the current Remnawave bandwidth stats response', () => {
+    expect(normalizeUsageSeries({
+      response: {
+        categories: ['2026-06-22', '2026-06-23', '2026-06-24'],
+        sparklineData: [1024, 0, 2048],
+        series: [],
+      },
+    })).toEqual([
+      { date: '2026-06-22', bytes: '1024' },
+      { date: '2026-06-23', bytes: '0' },
+      { date: '2026-06-24', bytes: '2048' },
+    ])
+  })
 })

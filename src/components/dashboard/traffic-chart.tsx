@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { Activity, Radio, TriangleAlert } from 'lucide-react'
+import { Activity, Radio } from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
 import { formatBytes } from '@/lib/format'
 
@@ -57,9 +57,6 @@ export function TrafficChart({
   const used = safeBigInt(data.usedBytes)
   const limit = data.limitBytes ? safeBigInt(data.limitBytes) : null
   const lifetime = safeBigInt(data.lifetimeBytes)
-  const percent = limit && limit > 0n
-    ? Math.min(100, Math.round((Number(used) / Number(limit)) * 100))
-    : null
   const seriesTotal = data.series.reduce((total, point) => total + safeBigInt(point.bytes), 0n)
 
   return (
@@ -92,38 +89,31 @@ export function TrafficChart({
         </div>
 
         {data.historyAvailable && data.series.length > 1 ? (
-          <NeonAreaChart series={data.series} />
+          <TrafficHistoryChart series={data.series} />
         ) : (
-          <TrafficProgressCurve used={used} limit={limit} percent={percent} />
+          <TrafficHistoryEmpty loading={loading} />
         )}
 
-        <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
-          <span>
-            {data.historyAvailable
-              ? 'Динамика использования за последние 30 дней'
-              : 'Дневная история пока недоступна, показан текущий баланс'}
-          </span>
-          {data.warning && (
-            <span className="inline-flex items-center gap-1 text-amber-600">
-              <TriangleAlert className="h-3.5 w-3.5" />
-              Данные истории временно недоступны
-            </span>
-          )}
+        <div className="text-xs text-slate-500">
+          {data.historyAvailable
+            ? 'Использование трафика по дням за последние 30 дней'
+            : data.warning
+              ? 'История трафика обновится автоматически'
+              : 'История трафика пока пуста'}
         </div>
       </div>
     </div>
   )
 }
 
-function NeonAreaChart({ series }: { series: SeriesPoint[] }) {
+function TrafficHistoryChart({ series }: { series: SeriesPoint[] }) {
   const chart = useMemo(() => makeChart(series), [series])
   const labels = useMemo(() => makeDateLabels(series), [series])
 
   return (
-    <div className="relative h-36 overflow-hidden rounded-lg border border-cyan-100 bg-cyan-50/45 sm:h-44">
-      <div className="absolute inset-0 bg-[linear-gradient(rgba(14,165,233,0.09)_1px,transparent_1px),linear-gradient(90deg,rgba(14,165,233,0.07)_1px,transparent_1px)] bg-[size:100%_25%,12.5%_100%]" />
+    <div className="relative h-48 overflow-hidden rounded-lg border border-slate-200 bg-white sm:h-56">
       <svg
-        viewBox="0 0 800 220"
+        viewBox="0 0 900 260"
         preserveAspectRatio="none"
         className="absolute inset-0 h-full w-full"
         role="img"
@@ -131,26 +121,53 @@ function NeonAreaChart({ series }: { series: SeriesPoint[] }) {
       >
         <defs>
           <linearGradient id="traffic-line" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%" stopColor="#22d3ee" />
-            <stop offset="55%" stopColor="#67e8f9" />
-            <stop offset="100%" stopColor="#34d399" />
+            <stop offset="0%" stopColor="#06b6d4" />
+            <stop offset="52%" stopColor="#0ea5e9" />
+            <stop offset="100%" stopColor="#10b981" />
+          </linearGradient>
+          <linearGradient id="traffic-area" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.16" />
+            <stop offset="80%" stopColor="#38bdf8" stopOpacity="0.015" />
+            <stop offset="100%" stopColor="#38bdf8" stopOpacity="0" />
           </linearGradient>
           <filter id="traffic-glow" x="-20%" y="-50%" width="140%" height="200%">
-            <feGaussianBlur stdDeviation="3" result="blur" />
+            <feGaussianBlur stdDeviation="2.5" result="blur" />
             <feMerge>
               <feMergeNode in="blur" />
               <feMergeNode in="SourceGraphic" />
             </feMerge>
           </filter>
         </defs>
+        {chart.yTicks.map((tick) => (
+          <g key={tick.y}>
+            <line
+              x1={chart.left}
+              x2={chart.right}
+              y1={tick.y}
+              y2={tick.y}
+              stroke="#e2e8f0"
+              strokeWidth="1"
+              vectorEffect="non-scaling-stroke"
+            />
+            <text
+              x="12"
+              y={tick.y + 4}
+              fill="#94a3b8"
+              fontSize="11"
+              fontFamily="sans-serif"
+            >
+              {formatBytes(tick.value)}
+            </text>
+          </g>
+        ))}
+        <path d={chart.areaPath} fill="url(#traffic-area)" />
         <path
           d={chart.linePath}
           fill="none"
           stroke="url(#traffic-line)"
-          strokeWidth="2.25"
+          strokeWidth="2.5"
           strokeLinecap="round"
           strokeLinejoin="round"
-          opacity="0.85"
           vectorEffect="non-scaling-stroke"
         />
         {chart.points.map((point, index) => (
@@ -158,44 +175,29 @@ function NeonAreaChart({ series }: { series: SeriesPoint[] }) {
             key={point.date}
             cx={point.x}
             cy={point.y}
-            r={index % 5 === 0 || index === chart.points.length - 1 ? 2.5 : 1.5}
+            r={index % 5 === 0 || index === chart.points.length - 1 ? 2.75 : 1.5}
             fill="#ffffff"
             stroke="#0ea5e9"
             strokeWidth="1.25"
-            opacity={index % 5 === 0 || index === chart.points.length - 1 ? 0.9 : 0.4}
+            opacity={index % 5 === 0 || index === chart.points.length - 1 ? 1 : 0.38}
           >
             <title>{`${formatChartDate(point.date)}: ${formatBytes(point.bytes)}`}</title>
           </circle>
         ))}
-        {chart.lastPoint && (
-          <>
-            <circle
-              cx={chart.lastPoint.x}
-              cy={chart.lastPoint.y}
-              r="3"
-              fill="#ffffff"
-              stroke="#0284c7"
-              strokeWidth="2"
-            />
-          </>
-        )}
         <g className="traffic-chart-moving-dot">
-          <circle r="11" fill="none" stroke="#22d3ee" strokeWidth="2" opacity="0.45">
-            <animate attributeName="r" values="7;14;7" dur="1.8s" repeatCount="indefinite" />
-            <animate attributeName="opacity" values="0.55;0;0.55" dur="1.8s" repeatCount="indefinite" />
+          <circle r="9" fill="#0ea5e9" opacity="0.14">
+            <animate attributeName="r" values="7;11;7" dur="1.8s" repeatCount="indefinite" />
+            <animate attributeName="opacity" values="0.2;0.04;0.2" dur="1.8s" repeatCount="indefinite" />
           </circle>
-          <circle r="5.5" fill="#ffffff" stroke="#0284c7" strokeWidth="3" filter="url(#traffic-glow)" />
+          <circle r="4.5" fill="#ffffff" stroke="#0284c7" strokeWidth="2.5" filter="url(#traffic-glow)" />
           <animateMotion
             path={chart.linePath}
-            dur="4.8s"
+            dur="8s"
             repeatCount="indefinite"
-            calcMode="spline"
-            keyTimes="0;1"
-            keySplines="0.4 0 0.2 1"
           />
         </g>
       </svg>
-      <div className="absolute inset-x-3 bottom-2 flex justify-between text-[10px] text-slate-500">
+      <div className="absolute bottom-2 left-[7%] right-3 flex justify-between text-[10px] text-slate-500">
         {labels.map((label) => (
           <span key={label.date}>{formatChartDate(label.date)}</span>
         ))}
@@ -204,70 +206,17 @@ function NeonAreaChart({ series }: { series: SeriesPoint[] }) {
   )
 }
 
-function TrafficProgressCurve({
-  used,
-  limit,
-  percent,
-}: {
-  used: bigint
-  limit: bigint | null
-  percent: number | null
-}) {
-  const progress = percent === null ? (used > 0n ? 64 : 0) : percent
-  const path = makeProgressPath(progress)
-
+function TrafficHistoryEmpty({ loading }: { loading: boolean }) {
   return (
-    <div className="relative h-36 overflow-hidden rounded-lg border border-cyan-100 bg-cyan-50/45 sm:h-44">
-      <div className="absolute inset-0 bg-[linear-gradient(rgba(14,165,233,0.09)_1px,transparent_1px),linear-gradient(90deg,rgba(14,165,233,0.07)_1px,transparent_1px)] bg-[size:100%_25%,12.5%_100%]" />
-      <svg
-        viewBox="0 0 800 220"
-        preserveAspectRatio="none"
-        className="absolute inset-0 h-full w-full"
-        role="img"
-        aria-label="Текущий баланс использования трафика"
-      >
-        <defs>
-          <linearGradient id="traffic-progress-line" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%" stopColor="#22d3ee" />
-            <stop offset="58%" stopColor="#38bdf8" />
-            <stop offset="100%" stopColor="#34d399" />
-          </linearGradient>
-          <filter id="traffic-progress-glow" x="-20%" y="-50%" width="140%" height="200%">
-            <feGaussianBlur stdDeviation="3" result="blur" />
-            <feMerge>
-              <feMergeNode in="blur" />
-              <feMergeNode in="SourceGraphic" />
-            </feMerge>
-          </filter>
-        </defs>
-        <path
-          d={path}
-          fill="none"
-          stroke="url(#traffic-progress-line)"
-          strokeWidth="2.25"
-          strokeLinecap="round"
-          vectorEffect="non-scaling-stroke"
-        />
-        {used > 0n && (
-          <g className="traffic-chart-moving-dot">
-            <circle r="11" fill="none" stroke="#22d3ee" strokeWidth="2" opacity="0.45">
-              <animate attributeName="r" values="7;14;7" dur="1.8s" repeatCount="indefinite" />
-              <animate attributeName="opacity" values="0.55;0;0.55" dur="1.8s" repeatCount="indefinite" />
-            </circle>
-            <circle
-              r="5.5"
-              fill="#ffffff"
-              stroke="#0284c7"
-              strokeWidth="3"
-              filter="url(#traffic-progress-glow)"
-            />
-            <animateMotion path={path} dur="4.8s" repeatCount="indefinite" />
-          </g>
-        )}
-      </svg>
-      <div className="absolute bottom-2 left-3 text-[11px] text-cyan-800/55">0 B</div>
-      <div className="absolute bottom-2 right-3 text-[11px] text-emerald-800/55">
-        {limit ? formatBytes(limit) : 'Безлимит'}
+    <div className="flex h-36 items-center justify-center rounded-lg border border-dashed border-slate-200 bg-slate-50/70 sm:h-44">
+      <div className="text-center">
+        <span className="mx-auto flex h-9 w-9 items-center justify-center rounded-lg bg-white text-sky-500 shadow-sm">
+          <Activity className={`h-5 w-5 ${loading ? 'animate-pulse' : ''}`} />
+        </span>
+        <div className="mt-3 text-sm font-medium text-slate-700">
+          {loading ? 'Загружаем статистику' : 'История трафика пока не получена'}
+        </div>
+        <div className="mt-1 text-xs text-slate-500">Данные появятся здесь автоматически</div>
       </div>
     </div>
   )
@@ -283,32 +232,29 @@ function NeonMetric({ label, value }: { label: string; value: string }) {
 }
 
 function makeChart(series: SeriesPoint[]) {
-  const width = 800
-  const height = 220
+  const width = 900
+  const height = 260
+  const left = 66
+  const right = 884
   const top = 22
-  const bottom = 190
+  const bottom = 214
   const values = series.map((point) => Number(safeBigInt(point.bytes)))
   const max = Math.max(...values, 1)
   const points = series.map((point, index) => {
-    const x = series.length === 1 ? width / 2 : (index / (series.length - 1)) * width
+    const x = series.length === 1
+      ? (left + right) / 2
+      : left + (index / (series.length - 1)) * (right - left)
     const value = Number(safeBigInt(point.bytes))
     const y = bottom - (value / max) * (bottom - top)
     return { x, y, date: point.date, bytes: safeBigInt(point.bytes) }
   })
   const linePath = makeSmoothPath(points)
-  return { points, linePath, lastPoint: points[points.length - 1] ?? null }
-}
-
-function makeProgressPath(progress: number | null) {
-  const normalized = Math.max(0, Math.min(100, progress ?? 0))
-  const finishY = 180 - normalized * 1.35
-  return [
-    'M 0 184',
-    'C 86 178, 112 145, 192 153',
-    'S 310 184, 382 126',
-    'S 505 78, 574 112',
-    `S 714 ${Math.max(28, finishY + 18)}, 800 ${finishY}`,
-  ].join(' ')
+  const areaPath = `${linePath} L ${right} ${bottom} L ${left} ${bottom} Z`
+  const yTicks = [max, max / 2, 0].map((value) => ({
+    value: BigInt(Math.max(0, Math.round(value))),
+    y: bottom - (value / max) * (bottom - top),
+  }))
+  return { width, height, left, right, points, linePath, areaPath, yTicks }
 }
 
 function makeSmoothPath(points: Array<{ x: number; y: number }>) {

@@ -72,8 +72,15 @@ export const GET = withAuth(async (req: Request) => {
   if (usageResult.status === 'fulfilled') {
     series = normalizeUsageSeries(usageResult.value, { start, end })
     historyAvailable = series.length > 1
-  } else if (!warning && usageResult.reason instanceof RemnawaveError) {
-    warning = `Remnawave ${usageResult.reason.status}`
+  } else {
+    console.warn('[subscription/usage] history unavailable', {
+      userId: user.id,
+      remnawaveUuid: user.remnawaveUuid,
+      message: usageResult.reason instanceof Error ? usageResult.reason.message : String(usageResult.reason),
+      status: usageResult.reason instanceof RemnawaveError ? usageResult.reason.status : undefined,
+      body: usageResult.reason instanceof RemnawaveError ? usageResult.reason.body : undefined,
+    })
+    if (!warning) warning = 'history_unavailable'
   }
 
   return NextResponse.json({
