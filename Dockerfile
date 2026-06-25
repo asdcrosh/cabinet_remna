@@ -1,9 +1,15 @@
 FROM node:20-alpine AS deps
 WORKDIR /app
+ARG TARGETARCH
 RUN apk add --no-cache openssl
 COPY package.json package-lock.json ./
 COPY prisma ./prisma
-RUN npm ci
+RUN npm ci \
+  && case "${TARGETARCH:-amd64}" in \
+    amd64) npm install --no-save --package-lock=false @next/swc-linux-x64-musl@14.2.33 ;; \
+    arm64) npm install --no-save --package-lock=false @next/swc-linux-arm64-musl@14.2.33 ;; \
+    *) echo "Unsupported Docker architecture: ${TARGETARCH}" >&2; exit 1 ;; \
+  esac
 
 FROM deps AS migrator
 WORKDIR /app
