@@ -50,9 +50,13 @@ require_root() {
 
 require_commands() {
   local command
-  for command in docker tar gzip sha256sum awk sed grep find; do
+  for command in tar gzip sha256sum awk sed grep find; do
     command -v "${command}" >/dev/null 2>&1 || fail "Не найдена команда: ${command}"
   done
+}
+
+require_docker() {
+  command -v docker >/dev/null 2>&1 || fail "Не найден Docker."
   docker compose version >/dev/null 2>&1 || fail "Требуется Docker Compose plugin."
 }
 
@@ -173,6 +177,7 @@ EOF
 create_backup() {
   require_root
   require_commands
+  require_docker
   acquire_lock
   assert_safe_directory "${REMNAWAVE_DIR}"
   assert_safe_directory "${REMNASHOP_DIR}"
@@ -324,6 +329,7 @@ start_optional_nginx() {
 restore_backup() {
   require_root
   require_commands
+  require_docker
   acquire_lock
   assert_safe_directory "${REMNAWAVE_DIR}"
   assert_safe_directory "${REMNASHOP_DIR}"
