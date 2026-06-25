@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { createPortal } from 'react-dom'
 import {
   CreditCard,
   Database,
@@ -68,7 +69,44 @@ export function MobileDashboardNav({
   badges?: NavBadges
 }) {
   const [open, setOpen] = useState(false)
+  const [mounted, setMounted] = useState(false)
   useBodyScrollLock(open)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  const menu = (
+    <div className="fixed inset-0 z-[100] h-dvh w-dvw lg:hidden">
+      <button
+        className="absolute inset-0 bg-slate-950/40"
+        onClick={() => setOpen(false)}
+        aria-label="Закрыть меню"
+      />
+      <aside className="absolute right-0 top-0 z-10 flex h-dvh w-[min(22rem,88vw)] flex-col border-l border-white/70 bg-white/90 shadow-2xl backdrop-blur-xl dark:border-white/10 dark:bg-surface-950/90">
+        <div className="flex items-center justify-between border-b border-white/70 px-4 py-4 dark:border-white/10">
+          <Brand brandName={brandName} />
+          <button
+            className="grid h-9 w-9 place-items-center rounded-lg border bg-white text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-900 dark:bg-surface-900 dark:hover:bg-surface-800 dark:hover:text-white"
+            onClick={() => setOpen(false)}
+            aria-label="Закрыть меню"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto p-3">
+          <NavList role={role} badges={badges} onNavigate={() => setOpen(false)} className="space-y-1" />
+        </div>
+        <div className="border-t border-white/70 p-3 dark:border-white/10">
+          <div className="mb-2 rounded-lg border border-slate-100 bg-slate-50/80 px-3 py-2 text-xs text-slate-500 dark:border-slate-800 dark:bg-surface-900/80">
+            <div className="truncate font-medium text-slate-700 dark:text-slate-200">{email}</div>
+            <div>{roleLabel(role)}</div>
+          </div>
+          <LogoutButton />
+        </div>
+      </aside>
+    </div>
+  )
 
   return (
     <>
@@ -79,37 +117,7 @@ export function MobileDashboardNav({
       >
         <Menu className="h-5 w-5" />
       </button>
-      {open && (
-        <div className="fixed inset-0 z-50 h-dvh w-dvw lg:hidden">
-          <button
-            className="absolute inset-0 bg-slate-950/40"
-            onClick={() => setOpen(false)}
-            aria-label="Закрыть меню"
-          />
-          <aside className="absolute right-0 top-0 z-10 flex h-dvh w-[min(22rem,88vw)] flex-col border-l border-white/70 bg-white/90 shadow-2xl backdrop-blur-xl dark:border-white/10 dark:bg-surface-950/90">
-            <div className="flex items-center justify-between border-b border-white/70 px-4 py-4 dark:border-white/10">
-              <Brand brandName={brandName} />
-              <button
-                className="grid h-9 w-9 place-items-center rounded-lg border bg-white text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-900 dark:bg-surface-900 dark:hover:bg-surface-800 dark:hover:text-white"
-                onClick={() => setOpen(false)}
-                aria-label="Закрыть меню"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-            <div className="flex-1 overflow-y-auto p-3">
-              <NavList role={role} badges={badges} onNavigate={() => setOpen(false)} className="space-y-1" />
-            </div>
-            <div className="border-t border-white/70 p-3 dark:border-white/10">
-              <div className="mb-2 rounded-lg border border-slate-100 bg-slate-50/80 px-3 py-2 text-xs text-slate-500 dark:border-slate-800 dark:bg-surface-900/80">
-                <div className="truncate font-medium text-slate-700 dark:text-slate-200">{email}</div>
-                <div>{roleLabel(role)}</div>
-              </div>
-              <LogoutButton />
-            </div>
-          </aside>
-        </div>
-      )}
+      {mounted && open ? createPortal(menu, document.body) : null}
     </>
   )
 }
