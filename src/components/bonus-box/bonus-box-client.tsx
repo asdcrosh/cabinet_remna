@@ -1,134 +1,167 @@
-'use client'
+"use client";
 
-import { type ReactNode, useMemo, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { CalendarClock, CalendarPlus, CircleSlash, CreditCard, Gift, LockKeyhole, Sparkles, TicketPercent, Users, Zap } from 'lucide-react'
-import { apiFetch } from '@/lib/api-client'
-import { toast } from '@/components/ui/toaster'
-import { cn } from '@/lib/cn'
+import { type ReactNode, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import {
+  CalendarClock,
+  CalendarPlus,
+  CircleSlash,
+  CreditCard,
+  Gift,
+  LockKeyhole,
+  Sparkles,
+  TicketPercent,
+  Users,
+  Zap,
+} from "lucide-react";
+import { apiFetch } from "@/lib/api-client";
+import { toast } from "@/components/ui/toaster";
+import { cn } from "@/lib/cn";
 
-type PrizeType = 'SUBSCRIPTION_DAYS' | 'TRAFFIC_GB' | 'PROMO_CODE_PERCENT' | 'BONUS_ATTEMPTS' | 'NO_PRIZE'
-type Rarity = 'COMMON' | 'RARE' | 'EPIC' | 'LEGENDARY'
+type PrizeType =
+  | "SUBSCRIPTION_DAYS"
+  | "TRAFFIC_GB"
+  | "PROMO_CODE_PERCENT"
+  | "BONUS_ATTEMPTS"
+  | "NO_PRIZE";
+type Rarity = "COMMON" | "RARE" | "EPIC" | "LEGENDARY";
 
 export type BonusBoxPrizeView = {
-  id: string
-  title: string
-  description: string | null
-  type: PrizeType
-  value: number
-  weight: number
-  rarity: Rarity
-  chance: number
-}
+  id: string;
+  title: string;
+  description: string | null;
+  type: PrizeType;
+  value: number;
+  weight: number;
+  rarity: Rarity;
+  chance: number;
+};
 
 type BonusBoxOpeningView = {
-  id: string
-  createdAt: string
-  prize: BonusBoxPrizeView
-  promoCode: string | null
-  promoCodeExpiresAt: string | null
-}
+  id: string;
+  createdAt: string;
+  prize: BonusBoxPrizeView;
+  promoCode: string | null;
+  promoCodeExpiresAt: string | null;
+};
 
 type BonusBoxConfigView = {
-  rubPerAttempt: number
-  minAttemptsPerPayment: number
-  maxAttemptsPerPayment: number
-  attemptTtlDays: number
-  weeklyEnabled: boolean
-  weeklyDay: number
-  weeklyAttempts: number
-  weeklyMaxBalance: number
-  referrerAttempts: number
-  referredAttempts: number
-}
+  rubPerAttempt: number;
+  minAttemptsPerPayment: number;
+  maxAttemptsPerPayment: number;
+  attemptTtlDays: number;
+  weeklyEnabled: boolean;
+  weeklyDay: number;
+  weeklyAttempts: number;
+  weeklyMaxBalance: number;
+  referrerAttempts: number;
+  referredAttempts: number;
+};
 
 type BonusBoxOverview = {
-  config: BonusBoxConfigView
-  hasActiveSubscription: boolean
-  attemptsCount: number
-  prizes: BonusBoxPrizeView[]
-  openings: BonusBoxOpeningView[]
-}
+  config: BonusBoxConfigView;
+  hasActiveSubscription: boolean;
+  attemptsCount: number;
+  prizes: BonusBoxPrizeView[];
+  openings: BonusBoxOpeningView[];
+};
 
 type OpenBoxResponse = {
-  id: string
-  prize: BonusBoxPrizeView
-  reel: BonusBoxPrizeView[]
-  winningIndex: number
-  stopOffsetRatio: number
-  promoCode: string | null
-  promoCodeExpiresAt: string | null
-  remainingAttempts: number
-  remoteSynced: boolean
-}
+  id: string;
+  prize: BonusBoxPrizeView;
+  reel: BonusBoxPrizeView[];
+  winningIndex: number;
+  stopOffsetRatio: number;
+  promoCode: string | null;
+  promoCodeExpiresAt: string | null;
+  remainingAttempts: number;
+  remoteSynced: boolean;
+};
 
-const CARD_WIDTH = 176
-const CARD_GAP = 14
-const STEP = CARD_WIDTH + CARD_GAP
+const CARD_WIDTH = 176;
+const CARD_GAP = 14;
+const STEP = CARD_WIDTH + CARD_GAP;
 
-export function BonusBoxClient({ initialData }: { initialData: BonusBoxOverview }) {
-  const router = useRouter()
-  const viewportRef = useRef<HTMLDivElement | null>(null)
-  const [data, setData] = useState(initialData)
-  const [reel, setReel] = useState(() => makeIdleReel(initialData.prizes))
-  const [offset, setOffset] = useState(0)
-  const [opening, setOpening] = useState(false)
-  const [result, setResult] = useState<OpenBoxResponse | null>(null)
+export function BonusBoxClient({
+  initialData,
+}: {
+  initialData: BonusBoxOverview;
+}) {
+  const router = useRouter();
+  const viewportRef = useRef<HTMLDivElement | null>(null);
+  const [data, setData] = useState(initialData);
+  const [reel, setReel] = useState(() => makeIdleReel(initialData.prizes));
+  const [offset, setOffset] = useState(0);
+  const [opening, setOpening] = useState(false);
+  const [result, setResult] = useState<OpenBoxResponse | null>(null);
 
   const canOpen =
-    data.hasActiveSubscription && data.attemptsCount > 0 && data.prizes.length > 0 && !opening
+    data.hasActiveSubscription &&
+    data.attemptsCount > 0 &&
+    data.prizes.length > 0 &&
+    !opening;
   const openButtonLabel = opening
-    ? 'Открываем...'
+    ? "Открываем..."
     : data.attemptsCount <= 0
-        ? 'Нет открытий'
-        : !data.hasActiveSubscription
-          ? 'Нужна подписка'
-          : data.prizes.length === 0
-            ? 'Подарки не настроены'
-            : 'Открыть бокс'
+      ? "Нет открытий"
+      : !data.hasActiveSubscription
+        ? "Нужна подписка"
+        : data.prizes.length === 0
+          ? "Подарки не настроены"
+          : "Открыть бокс";
   const totalChance = useMemo(
     () => data.prizes.reduce((sum, prize) => sum + prize.chance, 0),
-    [data.prizes]
-  )
+    [data.prizes],
+  );
 
   async function refreshOverview() {
-    const overview = await apiFetch<BonusBoxOverview>('/api/bonus-box')
-    setData(overview)
-    router.refresh()
+    const overview = await apiFetch<BonusBoxOverview>("/api/bonus-box");
+    setData(overview);
+    router.refresh();
   }
 
   async function openBox() {
-    if (!canOpen) return
-    setOpening(true)
-    setResult(null)
-    setOffset(0)
+    if (!canOpen) return;
+    setOpening(true);
+    setResult(null);
+    setOffset(0);
 
     try {
-      const response = await apiFetch<OpenBoxResponse>('/api/bonus-box', { method: 'POST' })
-      setReel(response.reel)
+      const response = await apiFetch<OpenBoxResponse>("/api/bonus-box", {
+        method: "POST",
+      });
+      setReel(response.reel);
 
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
-          const target = response.winningIndex * STEP + CARD_WIDTH * response.stopOffsetRatio
-          setOffset(-target)
-        })
-      })
+          const target =
+            response.winningIndex * STEP +
+            CARD_WIDTH * response.stopOffsetRatio;
+          setOffset(-target);
+        });
+      });
 
       window.setTimeout(async () => {
-        setResult(response)
-        setData((current) => ({ ...current, attemptsCount: response.remainingAttempts }))
-        if (response.prize.type === 'NO_PRIZE') {
-          toast('Открытие завершено: без подарка', 'success')
+        setResult(response);
+        setData((current) => ({
+          ...current,
+          attemptsCount: response.remainingAttempts,
+        }));
+        if (response.prize.type === "NO_PRIZE") {
+          toast("Открытие завершено: без подарка", "success");
         } else if (!response.remoteSynced) {
-          toast('Подарок сохранён, синхронизация с VPN будет повторена', 'success')
+          toast(
+            "Подарок сохранён, синхронизация с VPN будет повторена",
+            "success",
+          );
         } else {
-          toast('Подарок начислен', 'success')
+          toast("Подарок начислен", "success");
         }
-        await refreshOverview().catch(() => undefined)
-        setOpening(false)
-      }, 5400)
+        await refreshOverview().catch(() => undefined);
+        setOpening(false);
+      }, 5400);
     } catch {
-      setOpening(false)
+      setOpening(false);
     }
   }
 
@@ -147,20 +180,28 @@ export function BonusBoxClient({ initialData }: { initialData: BonusBoxOverview 
               </span>
               <span
                 className={cn(
-                  'inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold',
+                  "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold",
                   data.hasActiveSubscription
-                    ? 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300'
-                    : 'bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-slate-300'
+                    ? "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300"
+                    : "bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-slate-300",
                 )}
               >
-                {!data.hasActiveSubscription && <LockKeyhole className="h-3.5 w-3.5" />}
-                {data.hasActiveSubscription ? 'Подписка активна' : 'Нужна подписка'}
+                {!data.hasActiveSubscription && (
+                  <LockKeyhole className="h-3.5 w-3.5" />
+                )}
+                {data.hasActiveSubscription
+                  ? "Подписка активна"
+                  : "Нужна подписка"}
               </span>
             </div>
             <div>
-              <h2 className="text-3xl font-semibold tracking-tight">Откройте бокс</h2>
+              <h2 className="text-3xl font-semibold tracking-tight">
+                Откройте бокс
+              </h2>
               <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-500 dark:text-slate-400">
-                Внутри дни подписки, трафик, персональные скидки, дополнительные открытия и пустые исходы. Открытия начисляются за оплаты, рефералов и еженедельный бонус.
+                Внутри дни подписки, трафик, персональные скидки, дополнительные
+                открытия и пустые исходы. Открытия начисляются за оплаты,
+                рефералов и еженедельный бонус.
               </p>
             </div>
           </div>
@@ -179,7 +220,8 @@ export function BonusBoxClient({ initialData }: { initialData: BonusBoxOverview 
             </button>
             {!data.hasActiveSubscription && data.attemptsCount > 0 && (
               <div className="mt-2 text-center text-xs text-slate-400">
-                Открытия сохраняются, активируйте подписку для получения подарка.
+                Открытия сохраняются, активируйте подписку для получения
+                подарка.
               </div>
             )}
           </div>
@@ -198,9 +240,11 @@ export function BonusBoxClient({ initialData }: { initialData: BonusBoxOverview 
               style={{
                 gap: `${CARD_GAP}px`,
                 transform: `translate3d(${offset}px,0,0)`,
-                transition: opening ? 'transform 5.2s cubic-bezier(.12,.78,.1,1)' : 'none',
-                paddingLeft: '50%',
-                paddingRight: '50%',
+                transition: opening
+                  ? "transform 5.2s cubic-bezier(.12,.78,.1,1)"
+                  : "none",
+                paddingLeft: "50%",
+                paddingRight: "50%",
               }}
             >
               {reel.map((prize, index) => (
@@ -215,19 +259,28 @@ export function BonusBoxClient({ initialData }: { initialData: BonusBoxOverview 
             <div className="min-w-0">
               <div
                 className={cn(
-                  'flex items-center gap-2 text-sm font-semibold',
-                  result.prize.type === 'NO_PRIZE'
-                    ? 'text-slate-500 dark:text-slate-400'
-                    : 'text-emerald-600 dark:text-emerald-300'
+                  "flex items-center gap-2 text-sm font-semibold",
+                  result.prize.type === "NO_PRIZE"
+                    ? "text-slate-500 dark:text-slate-400"
+                    : "text-emerald-600 dark:text-emerald-300",
                 )}
               >
-                {result.prize.type === 'NO_PRIZE' ? <CircleSlash className="h-4 w-4" /> : <Sparkles className="h-4 w-4" />}
-                {result.prize.type === 'NO_PRIZE' ? 'Результат открытия' : 'Ваш подарок'}
+                {result.prize.type === "NO_PRIZE" ? (
+                  <CircleSlash className="h-4 w-4" />
+                ) : (
+                  <Sparkles className="h-4 w-4" />
+                )}
+                {result.prize.type === "NO_PRIZE"
+                  ? "Результат открытия"
+                  : "Ваш подарок"}
               </div>
-              <div className="mt-1 text-2xl font-semibold tracking-tight text-slate-950 dark:text-white">{result.prize.title}</div>
-              {(result.prize.description || result.prize.type === 'NO_PRIZE') && (
+              <div className="mt-1 text-2xl font-semibold tracking-tight text-slate-950 dark:text-white">
+                {result.prize.title}
+              </div>
+              {(result.prize.description ||
+                result.prize.type === "NO_PRIZE") && (
                 <div className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                  {result.prize.description || 'В этот раз без начисления.'}
+                  {result.prize.description || "В этот раз без начисления."}
                 </div>
               )}
               {result.promoCode && (
@@ -253,13 +306,18 @@ export function BonusBoxClient({ initialData }: { initialData: BonusBoxOverview 
         )}
       </section>
 
-      <BonusBoxRules config={data.config} hasActiveSubscription={data.hasActiveSubscription} />
+      <BonusBoxRules
+        config={data.config}
+        hasActiveSubscription={data.hasActiveSubscription}
+      />
 
       <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
         <section className="space-y-3">
           <div className="flex items-center justify-between gap-3">
             <h2 className="text-lg font-semibold">Возможные исходы</h2>
-            <div className="text-sm text-slate-500">{Math.round(totalChance * 100)}%</div>
+            <div className="text-sm text-slate-500">
+              {Math.round(totalChance * 100)}%
+            </div>
           </div>
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {data.prizes.map((prize) => (
@@ -277,13 +335,25 @@ export function BonusBoxClient({ initialData }: { initialData: BonusBoxOverview 
           <h2 className="text-lg font-semibold">Ваши результаты</h2>
           <div className="mt-4 space-y-3">
             {data.openings.map((opening) => (
-              <div key={opening.id} className="rounded-lg border border-slate-100 bg-slate-50 p-3 dark:border-white/10 dark:bg-surface-800">
+              <div
+                key={opening.id}
+                className="rounded-lg border border-slate-100 bg-slate-50 p-3 dark:border-white/10 dark:bg-surface-800"
+              >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <div className="truncate font-medium">{opening.prize.title}</div>
-                    <div className="mt-1 text-xs text-slate-500">{formatDate(opening.createdAt)}</div>
+                    <div className="truncate font-medium">
+                      {opening.prize.title}
+                    </div>
+                    <div className="mt-1 text-xs text-slate-500">
+                      {formatDate(opening.createdAt)}
+                    </div>
                   </div>
-                  <span className={cn('shrink-0 rounded-full px-2 py-1 text-[11px] font-semibold', rarityClass(opening.prize.rarity))}>
+                  <span
+                    className={cn(
+                      "shrink-0 rounded-full px-2 py-1 text-[11px] font-semibold",
+                      rarityClass(opening.prize.rarity),
+                    )}
+                  >
                     {rarityLabel(opening.prize.rarity)}
                   </span>
                 </div>
@@ -308,31 +378,32 @@ export function BonusBoxClient({ initialData }: { initialData: BonusBoxOverview 
         </section>
       </div>
     </div>
-  )
+  );
 }
 
 function BonusBoxRules({
   config,
   hasActiveSubscription,
 }: {
-  config: BonusBoxConfigView
-  hasActiveSubscription: boolean
+  config: BonusBoxConfigView;
+  hasActiveSubscription: boolean;
 }) {
   const paymentRange =
     config.minAttemptsPerPayment > 0
       ? `${config.minAttemptsPerPayment}-${config.maxAttemptsPerPayment}`
-      : `до ${config.maxAttemptsPerPayment}`
+      : `до ${config.maxAttemptsPerPayment}`;
   const referralText =
     config.referrerAttempts > 0 || config.referredAttempts > 0
       ? `За приглашение после первой оплаты: вам +${config.referrerAttempts}, другу +${config.referredAttempts}.`
-      : 'Реферальные открытия сейчас не начисляются.'
+      : "Реферальные открытия сейчас не начисляются.";
   const weeklyText =
     config.weeklyEnabled && config.weeklyAttempts > 0
       ? `Раз в неделю с дня "${weekdayLabel(config.weeklyDay)}": +${config.weeklyAttempts}, если VPN-подписка активна.`
-      : 'Еженедельный бонус сейчас выключен.'
-  const ttlText = config.attemptTtlDays > 0
-    ? `Открытия хранятся ${config.attemptTtlDays} дн.`
-    : 'Открытия не сгорают.'
+      : "Еженедельный бонус сейчас выключен.";
+  const ttlText =
+    config.attemptTtlDays > 0
+      ? `Открытия хранятся ${config.attemptTtlDays} дн.`
+      : "Открытия не сгорают.";
 
   return (
     <section className="grid gap-3 md:grid-cols-3">
@@ -353,7 +424,7 @@ function BonusBoxRules({
         muted={!hasActiveSubscription}
       />
     </section>
-  )
+  );
 }
 
 function RuleCard({
@@ -362,16 +433,17 @@ function RuleCard({
   text,
   muted = false,
 }: {
-  icon: ReactNode
-  title: string
-  text: string
-  muted?: boolean
+  icon: ReactNode;
+  title: string;
+  text: string;
+  muted?: boolean;
 }) {
   return (
     <div
       className={cn(
-        'rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-surface-900',
-        muted && 'bg-slate-50 text-slate-500 dark:bg-surface-900/70 dark:text-slate-400'
+        "rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-surface-900",
+        muted &&
+          "bg-slate-50 text-slate-500 dark:bg-surface-900/70 dark:text-slate-400",
       )}
     >
       <div className="flex items-start gap-3">
@@ -380,52 +452,84 @@ function RuleCard({
         </div>
         <div className="min-w-0">
           <div className="font-semibold">{title}</div>
-          <div className="mt-1 text-sm leading-5 text-slate-500 dark:text-slate-400">{text}</div>
+          <div className="mt-1 text-sm leading-5 text-slate-500 dark:text-slate-400">
+            {text}
+          </div>
         </div>
       </div>
     </div>
-  )
+  );
 }
 
-function PrizeCard({ prize, compact = false }: { prize: BonusBoxPrizeView; compact?: boolean }) {
+function PrizeCard({
+  prize,
+  compact = false,
+}: {
+  prize: BonusBoxPrizeView;
+  compact?: boolean;
+}) {
   const Icon =
-    prize.type === 'NO_PRIZE'
+    prize.type === "NO_PRIZE"
       ? CircleSlash
-      : prize.type === 'SUBSCRIPTION_DAYS'
-      ? CalendarPlus
-      : prize.type === 'TRAFFIC_GB'
-        ? Zap
-        : prize.type === 'BONUS_ATTEMPTS'
-          ? Gift
-          : TicketPercent
+      : prize.type === "SUBSCRIPTION_DAYS"
+        ? CalendarPlus
+        : prize.type === "TRAFFIC_GB"
+          ? Zap
+          : prize.type === "BONUS_ATTEMPTS"
+            ? Gift
+            : TicketPercent;
 
   return (
     <div
       className={cn(
-        'relative shrink-0 overflow-hidden rounded-lg border p-3 transition-transform duration-200',
+        "relative shrink-0 overflow-hidden rounded-lg border p-3 transition-transform duration-200",
         compact
-          ? 'h-36 text-white shadow-[0_18px_42px_rgba(0,0,0,.28)]'
-          : 'min-h-[132px] bg-white shadow-sm hover:-translate-y-0.5 dark:bg-surface-900',
-        compact ? rarityReelClass(prize.rarity) : rarityBorderClass(prize.rarity)
+          ? "h-36 text-white shadow-[0_18px_42px_rgba(0,0,0,.28)]"
+          : "min-h-[132px] bg-white shadow-sm hover:-translate-y-0.5 dark:bg-surface-900",
+        compact ? prizeReelClass(prize) : prizeBorderClass(prize),
       )}
       style={compact ? { width: CARD_WIDTH } : undefined}
     >
-      <div className={cn('absolute inset-x-0 top-0 h-1', rarityTopClass(prize.rarity))} />
+      <div
+        className={cn("absolute inset-x-0 top-0 h-1", prizeTopClass(prize))}
+      />
       {compact && (
         <>
-          <div className={cn('absolute -right-10 -top-10 h-24 w-24 rounded-full blur-2xl', rarityGlowClass(prize.rarity))} />
+          <div
+            className={cn(
+              "absolute -right-10 -top-10 h-24 w-24 rounded-full blur-2xl",
+              prizeGlowClass(prize),
+            )}
+          />
           <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,.14),transparent_38%),radial-gradient(circle_at_50%_115%,rgba(255,255,255,.12),transparent_48%)]" />
         </>
       )}
 
       <div className="relative flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <div className={cn('truncate font-semibold', compact && 'text-lg text-white')}>{prize.title}</div>
-          <div className={cn('mt-1 text-xs', compact ? 'text-slate-300' : 'text-slate-500')}>
+          <div
+            className={cn(
+              "truncate font-semibold",
+              compact && "text-lg text-white",
+            )}
+          >
+            {prize.title}
+          </div>
+          <div
+            className={cn(
+              "mt-1 text-xs",
+              compact ? "text-slate-300" : "text-slate-500",
+            )}
+          >
             {prizeLabel(prize)}
           </div>
         </div>
-        <span className={cn('shrink-0 rounded-full px-2 py-1 text-[11px] font-semibold', rarityClass(prize.rarity))}>
+        <span
+          className={cn(
+            "shrink-0 rounded-full px-2 py-1 text-[11px] font-semibold",
+            rarityClass(prize.rarity),
+          )}
+        >
           {rarityLabel(prize.rarity)}
         </span>
       </div>
@@ -435,95 +539,144 @@ function PrizeCard({ prize, compact = false }: { prize: BonusBoxPrizeView; compa
             <Icon className="h-6 w-6" />
           </div>
           <div className="flex items-end gap-1">
-            <span className={cn('h-5 w-1 rounded-full', rarityTopClass(prize.rarity))} />
-            <span className={cn('h-8 w-1 rounded-full', rarityTopClass(prize.rarity))} />
-            <span className={cn('h-3 w-1 rounded-full', rarityTopClass(prize.rarity))} />
+            <span
+              className={cn("h-5 w-1 rounded-full", prizeTopClass(prize))}
+            />
+            <span
+              className={cn("h-8 w-1 rounded-full", prizeTopClass(prize))}
+            />
+            <span
+              className={cn("h-3 w-1 rounded-full", prizeTopClass(prize))}
+            />
           </div>
         </div>
       )}
       {!compact && prize.description && (
-        <p className="mt-3 line-clamp-2 text-sm text-slate-500 dark:text-slate-400">{prize.description}</p>
+        <p className="mt-3 line-clamp-2 text-sm text-slate-500 dark:text-slate-400">
+          {prize.description}
+        </p>
       )}
       {!compact && (
-        <div className="mt-4 text-xs text-slate-400">Шанс {(prize.chance * 100).toFixed(1)}%</div>
+        <div className="mt-4 text-xs text-slate-400">
+          Шанс {(prize.chance * 100).toFixed(1)}%
+        </div>
       )}
     </div>
-  )
+  );
 }
 
 function makeIdleReel(prizes: BonusBoxPrizeView[]) {
-  if (prizes.length === 0) return []
-  return Array.from({ length: 40 }, (_, index) => prizes[index % prizes.length])
+  if (prizes.length === 0) return [];
+  return Array.from(
+    { length: 40 },
+    (_, index) => prizes[index % prizes.length],
+  );
 }
 
 function prizeLabel(prize: BonusBoxPrizeView) {
-  if (prize.type === 'NO_PRIZE') return 'Без начисления'
-  if (prize.type === 'SUBSCRIPTION_DAYS') return `+${prize.value} дн.`
-  if (prize.type === 'TRAFFIC_GB') return `+${prize.value} ГБ`
-  if (prize.type === 'BONUS_ATTEMPTS') return `+${prize.value} открытий`
-  return `-${prize.value}%`
+  if (prize.type === "NO_PRIZE") return "Без начисления";
+  if (prize.type === "SUBSCRIPTION_DAYS") return `+${prize.value} дн.`;
+  if (prize.type === "TRAFFIC_GB") return `+${prize.value} ГБ`;
+  if (prize.type === "BONUS_ATTEMPTS") return `+${prize.value} открытий`;
+  return `-${prize.value}%`;
 }
 
 function rarityLabel(rarity: Rarity) {
-  if (rarity === 'LEGENDARY') return 'Легенда'
-  if (rarity === 'EPIC') return 'Эпик'
-  if (rarity === 'RARE') return 'Редкий'
-  return 'База'
+  if (rarity === "LEGENDARY") return "Легенда";
+  if (rarity === "EPIC") return "Эпик";
+  if (rarity === "RARE") return "Редкий";
+  return "База";
 }
 
 function rarityClass(rarity: Rarity) {
-  if (rarity === 'LEGENDARY') return 'bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-100'
-  if (rarity === 'EPIC') return 'bg-fuchsia-100 text-fuchsia-800 dark:bg-fuchsia-500/15 dark:text-fuchsia-100'
-  if (rarity === 'RARE') return 'bg-cyan-100 text-cyan-800 dark:bg-cyan-500/15 dark:text-cyan-100'
-  return 'bg-slate-100 text-slate-700 dark:bg-white/10 dark:text-slate-200'
+  if (rarity === "LEGENDARY")
+    return "bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-100";
+  if (rarity === "EPIC")
+    return "bg-fuchsia-100 text-fuchsia-800 dark:bg-fuchsia-500/15 dark:text-fuchsia-100";
+  if (rarity === "RARE")
+    return "bg-cyan-100 text-cyan-800 dark:bg-cyan-500/15 dark:text-cyan-100";
+  return "bg-slate-100 text-slate-700 dark:bg-white/10 dark:text-slate-200";
+}
+
+function prizeBorderClass(prize: BonusBoxPrizeView) {
+  if (prize.type === "NO_PRIZE") return "border-red-300 dark:border-red-500/60";
+  return rarityBorderClass(prize.rarity);
 }
 
 function rarityBorderClass(rarity: Rarity) {
-  if (rarity === 'LEGENDARY') return 'border-amber-200 dark:border-amber-500/40'
-  if (rarity === 'EPIC') return 'border-fuchsia-200 dark:border-fuchsia-500/40'
-  if (rarity === 'RARE') return 'border-cyan-200 dark:border-cyan-500/40'
-  return 'border-slate-200 dark:border-white/10'
+  if (rarity === "LEGENDARY")
+    return "border-amber-200 dark:border-amber-500/40";
+  if (rarity === "EPIC") return "border-fuchsia-200 dark:border-fuchsia-500/40";
+  if (rarity === "RARE") return "border-cyan-200 dark:border-cyan-500/40";
+  return "border-slate-200 dark:border-white/10";
+}
+
+function prizeReelClass(prize: BonusBoxPrizeView) {
+  if (prize.type === "NO_PRIZE")
+    return "border-red-400 bg-[linear-gradient(135deg,#450a0a,#7f1d1d_58%,#111827)] shadow-red-950/30";
+  return rarityReelClass(prize.rarity);
 }
 
 function rarityReelClass(rarity: Rarity) {
-  if (rarity === 'LEGENDARY') return 'border-amber-300 bg-[linear-gradient(135deg,#451a03,#78350f_58%,#111827)] shadow-amber-950/30'
-  if (rarity === 'EPIC') return 'border-fuchsia-300 bg-[linear-gradient(135deg,#3b0764,#701a75_58%,#111827)] shadow-fuchsia-950/30'
-  if (rarity === 'RARE') return 'border-cyan-300 bg-[linear-gradient(135deg,#083344,#164e63_58%,#111827)] shadow-cyan-950/30'
-  return 'border-slate-700 bg-[linear-gradient(135deg,#0f172a,#111827_58%,#020617)]'
+  if (rarity === "LEGENDARY")
+    return "border-amber-300 bg-[linear-gradient(135deg,#451a03,#78350f_58%,#111827)] shadow-amber-950/30";
+  if (rarity === "EPIC")
+    return "border-fuchsia-300 bg-[linear-gradient(135deg,#3b0764,#701a75_58%,#111827)] shadow-fuchsia-950/30";
+  if (rarity === "RARE")
+    return "border-cyan-300 bg-[linear-gradient(135deg,#083344,#164e63_58%,#111827)] shadow-cyan-950/30";
+  return "border-slate-700 bg-[linear-gradient(135deg,#0f172a,#111827_58%,#020617)]";
+}
+
+function prizeGlowClass(prize: BonusBoxPrizeView) {
+  if (prize.type === "NO_PRIZE") return "bg-red-400/35";
+  return rarityGlowClass(prize.rarity);
 }
 
 function rarityGlowClass(rarity: Rarity) {
-  if (rarity === 'LEGENDARY') return 'bg-amber-300/45'
-  if (rarity === 'EPIC') return 'bg-fuchsia-300/40'
-  if (rarity === 'RARE') return 'bg-cyan-300/40'
-  return 'bg-slate-300/25'
+  if (rarity === "LEGENDARY") return "bg-amber-300/45";
+  if (rarity === "EPIC") return "bg-fuchsia-300/40";
+  if (rarity === "RARE") return "bg-cyan-300/40";
+  return "bg-slate-300/25";
+}
+
+function prizeTopClass(prize: BonusBoxPrizeView) {
+  if (prize.type === "NO_PRIZE") return "bg-red-500";
+  return rarityTopClass(prize.rarity);
 }
 
 function rarityTopClass(rarity: Rarity) {
-  if (rarity === 'LEGENDARY') return 'bg-amber-400'
-  if (rarity === 'EPIC') return 'bg-fuchsia-400'
-  if (rarity === 'RARE') return 'bg-cyan-400'
-  return 'bg-slate-400'
+  if (rarity === "LEGENDARY") return "bg-amber-400";
+  if (rarity === "EPIC") return "bg-fuchsia-400";
+  if (rarity === "RARE") return "bg-cyan-400";
+  return "bg-slate-400";
 }
 
 function formatDate(value: string) {
-  return new Date(value).toLocaleDateString('ru-RU', {
-    day: '2-digit',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
+  return new Date(value).toLocaleDateString("ru-RU", {
+    day: "2-digit",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 function formatDateOnly(value: string) {
-  return new Date(value).toLocaleDateString('ru-RU', {
-    day: '2-digit',
-    month: 'long',
-    year: 'numeric',
-  })
+  return new Date(value).toLocaleDateString("ru-RU", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  });
 }
 
 function weekdayLabel(day: number) {
-  const labels = ['Воскресенье', 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота']
-  return labels[day] ?? 'Пятница'
+  const labels = [
+    "Воскресенье",
+    "Понедельник",
+    "Вторник",
+    "Среда",
+    "Четверг",
+    "Пятница",
+    "Суббота",
+  ];
+  return labels[day] ?? "Пятница";
 }
