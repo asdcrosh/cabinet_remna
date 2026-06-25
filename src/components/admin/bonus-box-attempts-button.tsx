@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createPortal } from 'react-dom'
-import { Gift, Plus, X } from 'lucide-react'
+import { Gift, X } from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
 import { toast } from '@/components/ui/toaster'
 import { useBodyScrollLock } from '@/lib/use-body-scroll-lock'
@@ -123,13 +123,12 @@ export function BonusBoxAttemptsButton({
     <>
       <button
         type="button"
-        className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-700 shadow-sm shadow-slate-200/50 transition-colors hover:bg-slate-50 dark:border-white/10 dark:bg-surface-900 dark:text-slate-200 dark:shadow-black/10 dark:hover:bg-surface-800"
+        className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-sm transition-colors hover:border-cyan-200 hover:bg-cyan-50 hover:text-cyan-700 dark:border-white/10 dark:bg-surface-900 dark:text-slate-200 dark:hover:bg-cyan-500/10 dark:hover:text-cyan-200"
         onClick={() => setOpen(true)}
-        title="Начислить открытия"
+        title="Начислить подарок"
+        aria-label="Начислить подарок"
       >
-        <Gift className="h-3.5 w-3.5" />
-        <span className="hidden 2xl:inline">Начислить</span>
-        <Plus className="h-3.5 w-3.5" />
+        <Gift className="h-4 w-4" />
       </button>
 
       {mounted && open ? createPortal(dialog, document.body) : null}

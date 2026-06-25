@@ -3,10 +3,11 @@
 import { useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
-import { CheckCheck, Edit3, Power, X } from 'lucide-react'
+import { Archive, CheckCheck, Edit3, Plus, Power, TicketCheck } from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
 import { toast } from '@/components/ui/toaster'
 import { cn } from '@/lib/cn'
+import { AdminModal } from '@/components/admin/admin-modal'
 
 export interface PromoCodeAdminRow {
   id: string
@@ -61,6 +62,8 @@ export function PromoCodesAdmin({
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState<PromoCodeFormState>(emptyForm)
   const [loading, setLoading] = useState(false)
+  const [editorOpen, setEditorOpen] = useState(false)
+  const [tab, setTab] = useState<'AVAILABLE' | 'USED' | 'ARCHIVE'>('AVAILABLE')
 
   const editingPromo = useMemo(
     () => promoCodes.find((promoCode) => promoCode.id === editingId) ?? null,
@@ -118,11 +121,19 @@ export function PromoCodesAdmin({
       maxUsesPerUser: String(promoCode.maxUsesPerUser),
       planIds: promoCode.planIds,
     })
+    setEditorOpen(true)
   }
 
   function resetForm() {
     setEditingId(null)
     setForm(emptyForm)
+    setEditorOpen(false)
+  }
+
+  function startCreate() {
+    setEditingId(null)
+    setForm(emptyForm)
+    setEditorOpen(true)
   }
 
   function togglePlan(planId: string) {
@@ -134,180 +145,218 @@ export function PromoCodesAdmin({
     }))
   }
 
-  return (
-    <div className="space-y-6">
-      <div className="card space-y-4">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <h2 className="text-lg font-semibold">
-              {editingPromo ? `Редактировать ${editingPromo.code}` : 'Новый промокод'}
-            </h2>
-            <p className="mt-1 text-sm text-slate-500">
-              Пустой список тарифов означает, что промокод действует на все активные тарифы.
-            </p>
-          </div>
-          {editingId && (
-            <button type="button" className="btn-secondary text-xs" onClick={resetForm}>
-              <X className="h-4 w-4" />
-              Отмена
-            </button>
-          )}
-        </div>
+  const filteredPromoCodes = promoCodes.filter((promoCode) => promoStatus(promoCode) === tab)
+  const counts = promoCodes.reduce((result, promoCode) => {
+    result[promoStatus(promoCode)] += 1
+    return result
+  }, { AVAILABLE: 0, USED: 0, ARCHIVE: 0 })
 
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <Field label="Код">
-            <input
-              value={form.code}
-              onChange={(event) => setForm((current) => ({ ...current, code: event.target.value }))}
-              className="input"
-              placeholder="SUMMER20"
-            />
-          </Field>
-          <Field label="Скидка, %">
-            <input
-              value={form.discountPercent}
-              onChange={(event) => setForm((current) => ({ ...current, discountPercent: event.target.value }))}
-              className="input"
-              type="number"
-              min={1}
-              max={99}
-            />
-          </Field>
-          <Field label="Общий лимит">
-            <input
-              value={form.maxUses}
-              onChange={(event) => setForm((current) => ({ ...current, maxUses: event.target.value }))}
-              className="input"
-              type="number"
-              min={1}
-              placeholder="Без лимита"
-            />
-          </Field>
-          <Field label="На пользователя">
-            <input
-              value={form.maxUsesPerUser}
-              onChange={(event) => setForm((current) => ({ ...current, maxUsesPerUser: event.target.value }))}
-              className="input"
-              type="number"
-              min={1}
-            />
-          </Field>
-          <Field label="Начало">
-            <input
-              value={form.startsAt}
-              onChange={(event) => setForm((current) => ({ ...current, startsAt: event.target.value }))}
-              className="input"
-              type="datetime-local"
-            />
-          </Field>
-          <Field label="Окончание">
-            <input
-              value={form.expiresAt}
-              onChange={(event) => setForm((current) => ({ ...current, expiresAt: event.target.value }))}
-              className="input"
-              type="datetime-local"
-            />
-          </Field>
-          <label className="flex items-center gap-2 rounded-lg border px-3 py-3 text-sm xl:col-span-2">
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-col gap-3 rounded-lg border bg-white p-4 dark:bg-surface-900 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="font-semibold">Промокоды</h2>
+          <p className="mt-1 text-sm text-slate-500">Скидки, ограничения и доступные тарифы</p>
+        </div>
+        <button type="button" className="btn-primary" onClick={startCreate}>
+          <Plus className="h-4 w-4" />
+          Новый промокод
+        </button>
+      </div>
+
+      <div className="flex gap-1 overflow-x-auto rounded-lg border bg-white p-1 dark:bg-surface-900">
+        {([
+          ['AVAILABLE', 'Не использованы', TicketCheck],
+          ['USED', 'Использованы', CheckCheck],
+          ['ARCHIVE', 'Архив', Archive],
+        ] as const).map(([value, label, Icon]) => (
+          <button
+            key={value}
+            type="button"
+            onClick={() => setTab(value)}
+            className={cn(
+              'inline-flex min-h-10 shrink-0 items-center gap-2 rounded-md px-3 text-sm font-medium transition-colors',
+              tab === value ? 'bg-slate-950 text-white dark:bg-white dark:text-slate-950' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-white/5'
+            )}
+          >
+            <Icon className="h-4 w-4" />
+            {label}
+            <span className={cn('rounded-full px-1.5 text-xs', tab === value ? 'bg-white/15' : 'bg-slate-100 dark:bg-white/10')}>
+              {counts[value]}
+            </span>
+          </button>
+        ))}
+      </div>
+
+      <AdminModal
+        open={editorOpen}
+        title={editingPromo ? `Промокод ${editingPromo.code}` : 'Новый промокод'}
+        description="Скидка, лимиты использования и доступные тарифы"
+        onClose={resetForm}
+        size="lg"
+      >
+        <div className="space-y-5">
+          <div className="grid gap-3 md:grid-cols-2">
+            <Field label="Код">
+              <input
+                value={form.code}
+                onChange={(event) => setForm((current) => ({ ...current, code: event.target.value }))}
+                className="input"
+                placeholder="SUMMER20"
+              />
+            </Field>
+            <Field label="Скидка, %">
+              <input
+                value={form.discountPercent}
+                onChange={(event) => setForm((current) => ({ ...current, discountPercent: event.target.value }))}
+                className="input"
+                type="number"
+                min={1}
+                max={99}
+              />
+            </Field>
+            <Field label="Общий лимит">
+              <input
+                value={form.maxUses}
+                onChange={(event) => setForm((current) => ({ ...current, maxUses: event.target.value }))}
+                className="input"
+                type="number"
+                min={1}
+                placeholder="Без лимита"
+              />
+            </Field>
+            <Field label="На пользователя">
+              <input
+                value={form.maxUsesPerUser}
+                onChange={(event) => setForm((current) => ({ ...current, maxUsesPerUser: event.target.value }))}
+                className="input"
+                type="number"
+                min={1}
+              />
+            </Field>
+            <Field label="Начало">
+              <input
+                value={form.startsAt}
+                onChange={(event) => setForm((current) => ({ ...current, startsAt: event.target.value }))}
+                className="input"
+                type="datetime-local"
+              />
+            </Field>
+            <Field label="Окончание">
+              <input
+                value={form.expiresAt}
+                onChange={(event) => setForm((current) => ({ ...current, expiresAt: event.target.value }))}
+                className="input"
+                type="datetime-local"
+              />
+            </Field>
+          </div>
+
+          <label className="flex min-h-11 items-center gap-3 rounded-lg border px-3 text-sm">
             <input
               type="checkbox"
               checked={form.isActive}
               onChange={(event) => setForm((current) => ({ ...current, isActive: event.target.checked }))}
             />
-            Активен
+            Промокод активен
           </label>
-        </div>
 
-        <div>
-          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <div className="text-sm font-medium">Тарифы</div>
-              <div className="text-xs text-slate-500">
-                {form.planIds.length === 0 ? 'Действует на все тарифы' : `Выбрано: ${form.planIds.length} из ${plans.length}`}
+          <div>
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <div className="text-sm font-medium">Тарифы</div>
+                <div className="text-xs text-slate-500">
+                  {form.planIds.length === 0 ? 'Действует на все тарифы' : `Выбрано ${form.planIds.length} из ${plans.length}`}
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <button type="button" className="btn-secondary px-3 py-2 text-xs" onClick={() => setForm((current) => ({ ...current, planIds: plans.map((plan) => plan.id) }))}>
+                  <CheckCheck className="h-3.5 w-3.5" />
+                  Все
+                </button>
+                <button type="button" className="btn-secondary px-3 py-2 text-xs" onClick={() => setForm((current) => ({ ...current, planIds: [] }))}>
+                  Очистить
+                </button>
               </div>
             </div>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                className="btn-secondary px-3 py-2 text-xs"
-                onClick={() => setForm((current) => ({ ...current, planIds: plans.map((plan) => plan.id) }))}
-              >
-                <CheckCheck className="h-3.5 w-3.5" />
-                Выбрать все
-              </button>
-              <button
-                type="button"
-                className="btn-secondary px-3 py-2 text-xs"
-                onClick={() => setForm((current) => ({ ...current, planIds: [] }))}
-              >
-                Сбросить
-              </button>
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {plans.map((plan) => (
-              <button
-                key={plan.id}
-                type="button"
-                onClick={() => togglePlan(plan.id)}
-                className={cn(
-                  'rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
-                  form.planIds.includes(plan.id)
-                    ? 'border-brand-300 bg-brand-50 text-brand-700 dark:border-brand-500/60 dark:bg-brand-500/10 dark:text-brand-200'
-                    : 'bg-white text-slate-600 hover:bg-slate-50 dark:bg-surface-900 dark:text-slate-300 dark:hover:bg-surface-800'
-                )}
-              >
-                {plan.name}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <button type="button" className="btn-primary" onClick={submit} disabled={loading}>
-          {loading ? 'Сохраняем...' : editingId ? 'Сохранить изменения' : 'Создать промокод'}
-        </button>
-      </div>
-
-      <div className="grid gap-3">
-        {promoCodes.map((promoCode) => (
-          <article key={promoCode.id} className="card">
-            <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-              <div className="min-w-0 xl:max-w-xs">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="break-all font-mono text-lg font-semibold">{promoCode.code}</span>
-                  <span className={promoCode.isActive ? 'badge-active' : 'badge-disabled'}>
-                    {promoCode.isActive ? 'Активен' : 'Отключён'}
+            <div className="grid gap-2 sm:grid-cols-2">
+              {plans.map((plan) => (
+                <button
+                  key={plan.id}
+                  type="button"
+                  onClick={() => togglePlan(plan.id)}
+                  className={cn(
+                    'flex items-center gap-3 rounded-lg border px-3 py-2.5 text-left text-sm transition-colors',
+                    form.planIds.includes(plan.id)
+                      ? 'border-brand-300 bg-brand-50 text-brand-700 dark:border-brand-500/60 dark:bg-brand-500/10 dark:text-brand-200'
+                      : 'bg-white text-slate-600 hover:bg-slate-50 dark:bg-surface-900 dark:text-slate-300'
+                  )}
+                >
+                  <span className={cn('grid h-5 w-5 shrink-0 place-items-center rounded border text-xs', form.planIds.includes(plan.id) && 'border-brand-500 bg-brand-500 text-white')}>
+                    {form.planIds.includes(plan.id) ? '✓' : ''}
                   </span>
-                  <span className="badge-limited">-{promoCode.discountPercent}%</span>
-                </div>
-                <div className="mt-2 break-words text-sm text-slate-500">
-                  {promoCode.planNames.length > 0 ? promoCode.planNames.join(', ') : 'Все тарифы'}
-                </div>
-              </div>
-
-              <div className="grid min-w-0 gap-3 text-sm sm:grid-cols-2 xl:flex-1 2xl:grid-cols-4">
-                <Metric label="Использовано" value={`${promoCode.usedCount}/${promoCode.maxUses ?? '∞'}`} />
-                <Metric label="Зарезервировано" value={promoCode.reservedCount} />
-                <Metric label="На пользователя" value={promoCode.maxUsesPerUser} />
-                <Metric label="Срок" value={formatRange(promoCode.startsAt, promoCode.expiresAt)} />
-              </div>
-
-              <div className="action-row xl:w-[240px]">
-                <button type="button" className="btn-secondary min-w-[112px] px-3 text-xs" onClick={() => startEdit(promoCode)}>
-                  <Edit3 className="h-3.5 w-3.5" />
-                  Изменить
+                  {plan.name}
                 </button>
-                <button type="button" className="btn-secondary min-w-[112px] px-3 text-xs" onClick={() => toggleActive(promoCode)}>
-                  <Power className="h-3.5 w-3.5" />
-                  {promoCode.isActive ? 'Отключить' : 'Включить'}
-                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2 border-t pt-4">
+            <button type="button" className="btn-secondary" onClick={resetForm}>Отмена</button>
+            <button type="button" className="btn-primary" onClick={submit} disabled={loading}>
+              {loading ? 'Сохраняем...' : editingId ? 'Сохранить' : 'Создать'}
+            </button>
+          </div>
+        </div>
+      </AdminModal>
+
+      <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
+        {filteredPromoCodes.map((promoCode) => (
+          <article key={promoCode.id} className="card flex min-h-52 flex-col p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="break-all font-mono text-lg font-semibold">{promoCode.code}</div>
+                <div className="mt-1 text-2xl font-semibold text-emerald-600">-{promoCode.discountPercent}%</div>
               </div>
+              <span className={tab === 'AVAILABLE' ? 'badge-active' : tab === 'USED' ? 'badge-disabled' : 'badge-limited'}>
+                {tab === 'AVAILABLE' ? 'Не использован' : tab === 'USED' ? 'Использован' : 'Архив'}
+              </span>
+            </div>
+            <div className="mt-3 line-clamp-2 min-h-10 text-sm text-slate-500">
+              {promoCode.planNames.length > 0 ? promoCode.planNames.join(', ') : 'Все тарифы'}
+            </div>
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              <Metric label="Использовано" value={`${promoCode.usedCount}/${promoCode.maxUses ?? '∞'}`} />
+              <Metric label="На пользователя" value={promoCode.maxUsesPerUser} />
+              <div className="col-span-2"><Metric label="Срок" value={formatRange(promoCode.startsAt, promoCode.expiresAt)} /></div>
+            </div>
+            <div className="mt-auto flex gap-2 border-t pt-3">
+              <button type="button" className="btn-secondary flex-1 px-3 text-xs" onClick={() => startEdit(promoCode)}>
+                <Edit3 className="h-3.5 w-3.5" />
+                Изменить
+              </button>
+              <button type="button" className="btn-secondary h-10 min-h-10 px-3" onClick={() => toggleActive(promoCode)} title={promoCode.isActive ? 'Отключить' : 'Включить'}>
+                <Power className="h-4 w-4" />
+              </button>
             </div>
           </article>
         ))}
       </div>
+
+      {filteredPromoCodes.length === 0 && (
+        <div className="card py-10 text-center text-sm text-slate-500">В этом разделе пока нет промокодов</div>
+      )}
     </div>
   )
+}
+
+function promoStatus(promoCode: PromoCodeAdminRow): 'AVAILABLE' | 'USED' | 'ARCHIVE' {
+  const now = Date.now()
+  const expired = promoCode.expiresAt ? new Date(promoCode.expiresAt).getTime() < now : false
+  const exhausted = promoCode.maxUses != null && promoCode.usedCount >= promoCode.maxUses
+  if (!promoCode.isActive || expired || exhausted) return 'ARCHIVE'
+  if (promoCode.usedCount > 0) return 'USED'
+  return 'AVAILABLE'
 }
 
 function Field({ label, children }: { label: string; children: ReactNode }) {

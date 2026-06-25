@@ -31,7 +31,7 @@ export function RemnashopSyncPanel() {
       const result = await apiFetch<RemnashopSyncReport>('/api/admin/remnashop-sync')
       setReport(result)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Не удалось выполнить dry-run')
+      setError(e instanceof Error ? translateError(e.message) : 'Не удалось проверить данные')
     } finally {
       setLoading(false)
     }
@@ -61,7 +61,7 @@ export function RemnashopSyncPanel() {
         <div className="min-w-0">
           <h2 className="text-lg font-semibold">Remnashop</h2>
           <p className="mt-1 text-sm text-slate-500">
-            Пользователи связываются по Telegram или email. Подписки восстанавливаются из Remnawave по UUID.
+            Проверка и перенос пользователей, подписок, тарифов и промокодов.
           </p>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row">
@@ -118,10 +118,12 @@ export function RemnashopSyncPanel() {
             </div>
           )}
 
-          <div className="grid gap-4 xl:grid-cols-2">
-            <JsonPanel title="Counts" value={report.counts} />
-            <JsonPanel title="Samples" value={report.samples} />
-          </div>
+          <details className="card">
+            <summary className="cursor-pointer font-medium">Технические детали</summary>
+            <pre className="mt-3 max-h-[28rem] overflow-auto rounded-lg bg-slate-950 p-3 text-xs text-slate-100">
+              {JSON.stringify(report.samples, null, 2)}
+            </pre>
+          </details>
         </>
       )}
     </div>
@@ -137,17 +139,46 @@ function Metric({ label, value }: { label: string; value: number }) {
   )
 }
 
-function JsonPanel({ title, value }: { title: string; value: unknown }) {
-  return (
-    <div className="card min-w-0">
-      <h3 className="mb-3 font-semibold">{title}</h3>
-      <pre className="max-h-[32rem] overflow-auto rounded-lg bg-slate-950 p-3 text-xs text-slate-100">
-        {JSON.stringify(value, null, 2)}
-      </pre>
-    </div>
-  )
+function labelize(value: string) {
+  return syncLabels[value] ?? value.replace(/([A-Z])/g, ' $1').replace(/^./, (char) => char.toUpperCase())
 }
 
-function labelize(value: string) {
-  return value.replace(/([A-Z])/g, ' $1').replace(/^./, (char) => char.toUpperCase())
+function translateError(value: string) {
+  if (value.includes('not configured')) return 'Подключение к базе Remnashop не настроено'
+  if (value.includes('timeout')) return 'Remnashop не ответил вовремя'
+  if (value.includes('password authentication')) return 'Не удалось войти в базу Remnashop'
+  return value
+}
+
+const syncLabels: Record<string, string> = {
+  remnashopUsers: 'Пользователей в Remnashop',
+  remnashopUsersWithEmail: 'Пользователей с email',
+  remnashopVerifiedEmails: 'Подтверждённых email',
+  remnashopTelegramOnlyUsers: 'Только с Telegram',
+  remnashopUsersWithCurrentSubscription: 'С активной подпиской',
+  remnashopPlans: 'Тарифов в Remnashop',
+  remnashopPromoCodes: 'Промокодов в Remnashop',
+  remnashopSubscriptions: 'Подписок в Remnashop',
+  remnashopActiveSubscriptions: 'Активных подписок',
+  remnashopTransactions: 'Платежей в Remnashop',
+  cabinetMatchedUsers: 'Связано пользователей',
+  cabinetMatchedSubscriptions: 'Связано подписок',
+  cabinetMatchedPayments: 'Связано платежей',
+  plansWouldCreate: 'Будет создано тарифов',
+  promoCodesWouldUpsert: 'Будет обновлено промокодов',
+  usersWouldNeedIdentityDecision: 'Требуют проверки',
+  subscriptionsWouldCreateOrUpdate: 'Будет обновлено подписок',
+  paymentsWouldCreate: 'Будет добавлено платежей',
+  paymentsBlockedNoCabinetUser: 'Платежей без пользователя',
+  plansCreated: 'Создано тарифов',
+  plansUpdated: 'Обновлено тарифов',
+  promoCodesCreated: 'Создано промокодов',
+  promoCodesUpdated: 'Обновлено промокодов',
+  promoCodesSkipped: 'Пропущено промокодов',
+  usersCreated: 'Создано пользователей',
+  usersUpdated: 'Обновлено пользователей',
+  usersSkipped: 'Пропущено пользователей',
+  subscriptionsSynced: 'Синхронизировано подписок',
+  subscriptionsSkipped: 'Пропущено подписок',
+  subscriptionsFailed: 'Ошибок подписок',
 }

@@ -4,7 +4,12 @@ const mocks = vi.hoisted(() => ({
   findUnique: vi.fn(),
   userUpdate: vi.fn(),
   userDelete: vi.fn(),
+  userUpdateMany: vi.fn(),
   subscriptionUpdateMany: vi.fn(),
+  relationFindMany: vi.fn().mockResolvedValue([]),
+  relationUpdateMany: vi.fn(),
+  relationDeleteMany: vi.fn(),
+  referralRewardUpdate: vi.fn(),
   transaction: vi.fn(),
   remnashopQuery: vi.fn(),
 }))
@@ -19,10 +24,7 @@ vi.mock('./remnashop-db', () => ({
   remnashopQuery: mocks.remnashopQuery,
 }))
 
-import {
-  mergeTechnicalTelegramAccount,
-  TelegramAccountMergeError,
-} from './telegram-account-merge'
+import { mergeTechnicalTelegramAccount } from './telegram-account-merge'
 
 const originalRemnashopDatabaseUrl = process.env.REMNASHOP_DATABASE_URL
 
@@ -39,6 +41,8 @@ const target = {
   remnawaveUuid: null,
   remnawaveShortUuid: null,
   remnawaveUsername: null,
+  referredById: null,
+  referralRewardAsReferred: null,
 }
 
 function technicalSource(overrides: Record<string, unknown> = {}) {
@@ -58,18 +62,6 @@ function technicalSource(overrides: Record<string, unknown> = {}) {
     remnawaveUuid: 'remna-uuid',
     remnawaveShortUuid: 'short',
     remnawaveUsername: 'remna-user',
-    _count: {
-      payments: 0,
-      devices: 0,
-      supportTickets: 0,
-      supportMessages: 0,
-      promoCodeRedemptions: 0,
-      trialPlanRedemptions: 0,
-      referrals: 0,
-      referralRewardsEarned: 0,
-      bonusBoxAttempts: 0,
-      bonusBoxOpenings: 0,
-    },
     ...overrides,
   }
 }
@@ -80,8 +72,38 @@ describe('technical Telegram account merge', () => {
     delete process.env.REMNASHOP_DATABASE_URL
     mocks.transaction.mockImplementation(async (callback) =>
       callback({
-        user: { update: mocks.userUpdate, delete: mocks.userDelete },
+        user: {
+          update: mocks.userUpdate,
+          updateMany: mocks.userUpdateMany,
+          delete: mocks.userDelete,
+        },
         subscription: { updateMany: mocks.subscriptionUpdateMany },
+        payment: { updateMany: mocks.relationUpdateMany },
+        device: {
+          findMany: mocks.relationFindMany,
+          updateMany: mocks.relationUpdateMany,
+          deleteMany: mocks.relationDeleteMany,
+        },
+        supportTicket: { updateMany: mocks.relationUpdateMany },
+        supportMessage: { updateMany: mocks.relationUpdateMany },
+        promoCodeRedemption: { updateMany: mocks.relationUpdateMany },
+        trialPlanRedemption: {
+          findMany: mocks.relationFindMany,
+          updateMany: mocks.relationUpdateMany,
+          deleteMany: mocks.relationDeleteMany,
+        },
+        referralReward: {
+          update: mocks.referralRewardUpdate,
+          updateMany: mocks.relationUpdateMany,
+        },
+        bonusBoxAttempt: {
+          findMany: mocks.relationFindMany,
+          updateMany: mocks.relationUpdateMany,
+          deleteMany: mocks.relationDeleteMany,
+        },
+        bonusBoxOpening: { updateMany: mocks.relationUpdateMany },
+        emailVerificationToken: { deleteMany: mocks.relationDeleteMany },
+        passwordResetToken: { deleteMany: mocks.relationDeleteMany },
       })
     )
   })
@@ -111,17 +133,10 @@ describe('technical Telegram account merge', () => {
     expect(mocks.userDelete).toHaveBeenCalledWith({ where: { id: 'telegram-user' } })
   })
 
-  it('does not merge a second account that owns payments', async () => {
+  it('moves activity owned by a technical Telegram account', async () => {
     mocks.findUnique
       .mockResolvedValueOnce(target)
-      .mockResolvedValueOnce(
-        technicalSource({
-          _count: {
-            ...technicalSource()._count,
-            payments: 1,
-          },
-        })
-      )
+      .mockResolvedValueOnce(technicalSource())
 
     await expect(
       mergeTechnicalTelegramAccount({
@@ -130,10 +145,11 @@ describe('technical Telegram account merge', () => {
         telegramUsername: 'telegram_user',
         telegramName: 'Telegram User',
       })
-    ).rejects.toMatchObject(
-      new TelegramAccountMergeError('TELEGRAM_ALREADY_LINKED')
-    )
-    expect(mocks.transaction).not.toHaveBeenCalled()
+    ).resolves.toMatchObject({ merged: true })
+    expect(mocks.relationUpdateMany).toHaveBeenCalledWith({
+      where: { userId: 'telegram-user' },
+      data: { userId: 'email-user' },
+    })
   })
 
   it('prefers the existing Telegram Remnashop identity over an empty email duplicate', async () => {
@@ -159,6 +175,33 @@ describe('technical Telegram account merge', () => {
       expect.objectContaining({
         where: { id: 'email-user' },
         data: expect.objectContaining({ remnashopUserId: 42 }),
+      })
+    )
+  })
+
+  it('keeps the email Remnashop identity when it owns the active subscription', async () => {
+    process.env.REMNASHOP_DATABASE_URL = 'postgresql://readonly@example/remnashop'
+    mocks.findUnique
+      .mockResolvedValueOnce({ ...target, remnashopUserId: 99 })
+      .mockResolvedValueOnce(technicalSource())
+    mocks.remnashopQuery.mockResolvedValue({
+      rows: [
+        { id: 99, current_subscription_id: 8 },
+        { id: 42, current_subscription_id: null },
+      ],
+    })
+
+    await mergeTechnicalTelegramAccount({
+      targetUserId: target.id,
+      telegramId: 123n,
+      telegramUsername: 'telegram_user',
+      telegramName: 'Telegram User',
+    })
+
+    expect(mocks.userUpdate).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        where: { id: 'email-user' },
+        data: expect.objectContaining({ remnashopUserId: 99 }),
       })
     )
   })

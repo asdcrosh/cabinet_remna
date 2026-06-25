@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { CheckCircle2, Search, XCircle } from 'lucide-react'
+import { CalendarDays, CheckCircle2, ChevronDown, Search, Send, XCircle } from 'lucide-react'
 import { prisma } from '@/lib/prisma'
 import { requireAdminPage } from '@/lib/auth/admin-page'
 import { PageHeader } from '@/components/dashboard/page-header'
@@ -50,7 +50,12 @@ export default async function AdminUsersPage({
         email: true,
         name: true,
         role: true,
+        telegramId: true,
+        telegramUsername: true,
+        emailVerifiedAt: true,
+        remnashopUserId: true,
         remnawaveUuid: true,
+        remnawaveShortUuid: true,
         remnawaveUsername: true,
         createdAt: true,
         lastLoginAt: true,
@@ -120,128 +125,101 @@ export default async function AdminUsersPage({
         </div>
       )}
 
-      <div className={users.length > 0 ? 'table-shell hidden xl:block' : 'hidden'}>
-        <table className="data-table min-w-[960px]">
-          <thead className="bg-slate-50 text-left text-slate-500 dark:bg-surface-800">
-            <tr>
-              <th className="w-[280px]">Пользователь</th>
-              <th className="w-[100px]">Роль</th>
-              <th className="w-[220px]">Remnawave</th>
-              <th className="w-[220px]">Последняя подписка</th>
-              <th className="w-[140px]">Активность</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-            {users.map((user) => {
-              const subscription = user.subscriptions[0]
-              const attemptsCount = attemptsByUser.get(user.id) ?? 0
-              return (
-                <tr key={user.id}>
-                  <td>
-                    <div className="max-w-[250px] truncate font-medium">{user.email}</div>
-                    <div className="text-xs text-slate-500">{user.name || 'Без имени'}</div>
-                  </td>
-                  <td>
-                    <UserRoleSelect
-                      userId={user.id}
-                      role={user.role}
-                      actorId={session.uid}
-                      actorRole={actor.role}
-                    />
-                  </td>
-                  <td>
-                    <div className="flex items-center gap-2">
-                      {user.remnawaveUuid ? (
-                        <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-                      ) : (
-                        <XCircle className="h-4 w-4 text-slate-400" />
-                      )}
-                      <span className="max-w-[170px] truncate font-mono text-xs">{user.remnawaveUsername || 'не создан'}</span>
-                    </div>
-                  </td>
-                  <td>
-                    {subscription ? (
-                      <div className="space-y-1">
-                        <SubscriptionBadge status={subscription.status} />
-                        <div className="text-xs text-slate-500">
-                          {subscription.plan?.name || 'Без тарифа'} до {subscription.expireAt.toLocaleDateString('ru-RU')}
-                        </div>
-                      </div>
-                    ) : (
-                      <span className="text-slate-400">Нет</span>
-                    )}
-                  </td>
-                  <td className="text-xs text-slate-500">
-                    <div>Платежи: {user._count.payments}</div>
-                    <div>Подписки: {user._count.subscriptions}</div>
-                    <div>Устройства: {user._count.devices}</div>
-                    <div className="mt-2 flex items-center gap-2">
-                      <span>Открытия: {attemptsCount}</span>
-                      {actor.role === 'SUPER_ADMIN' && (
-                        <BonusBoxAttemptsButton
-                          userId={user.id}
-                          email={user.email}
-                          attemptsCount={attemptsCount}
-                        />
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
-      </div>
-
-      <div className={users.length > 0 ? 'space-y-3 xl:hidden' : 'hidden'}>
+      <div className={users.length > 0 ? 'space-y-3' : 'hidden'}>
         {users.map((user) => {
           const subscription = user.subscriptions[0]
           const attemptsCount = attemptsByUser.get(user.id) ?? 0
           return (
-            <article key={user.id} className="card space-y-4">
-              <div className="flex items-start justify-between gap-3">
+            <article key={user.id} className="overflow-hidden rounded-lg border bg-white shadow-sm dark:bg-surface-900">
+              <div className="grid gap-4 p-4 lg:grid-cols-[minmax(15rem,1.4fr)_minmax(11rem,.8fr)_minmax(13rem,1fr)_auto] lg:items-center">
                 <div className="min-w-0">
-                  <div className="break-words font-semibold">{user.email}</div>
-                  <div className="text-sm text-slate-500">{user.name || 'Без имени'}</div>
+                  <div className="flex min-w-0 items-center gap-2">
+                    <span className={`h-2 w-2 shrink-0 rounded-full ${user.lastLoginAt ? 'bg-emerald-500' : 'bg-slate-300'}`} />
+                    <div className="truncate font-semibold">{user.email}</div>
+                  </div>
+                  <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+                    <span>{user.name || 'Без имени'}</span>
+                    <span className="inline-flex items-center gap-1">
+                      <CalendarDays className="h-3.5 w-3.5" />
+                      {user.createdAt.toLocaleDateString('ru-RU')}
+                    </span>
+                    {user.telegramId && (
+                      <span className="inline-flex items-center gap-1 text-sky-600">
+                        <Send className="h-3.5 w-3.5" />
+                        @{user.telegramUsername || user.telegramId.toString()}
+                      </span>
+                    )}
+                  </div>
                 </div>
+
                 <UserRoleSelect
                   userId={user.id}
                   role={user.role}
                   actorId={session.uid}
                   actorRole={actor.role}
                 />
+
+                <div className="min-w-0">
+                  {subscription ? (
+                    <div className="flex items-center gap-3">
+                      <SubscriptionBadge status={subscription.status} />
+                      <div className="min-w-0 text-xs text-slate-500">
+                        <div className="truncate font-medium text-slate-700 dark:text-slate-200">{subscription.plan?.name || 'Без тарифа'}</div>
+                        <div>до {subscription.expireAt.toLocaleDateString('ru-RU')}</div>
+                      </div>
+                    </div>
+                  ) : (
+                    <span className="text-sm text-slate-400">Подписки нет</span>
+                  )}
+                </div>
+
+                <div className="flex items-center justify-between gap-2 lg:justify-end">
+                  <div className="grid grid-cols-3 gap-1 text-center text-xs">
+                    <Counter value={user._count.payments} label="оплат" />
+                    <Counter value={user._count.devices} label="устр." />
+                    <Counter value={attemptsCount} label="подар." />
+                  </div>
+                  {actor.role === 'SUPER_ADMIN' && (
+                    <BonusBoxAttemptsButton
+                      userId={user.id}
+                      email={user.email}
+                      attemptsCount={attemptsCount}
+                    />
+                  )}
+                </div>
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-2">
-                <InfoCell
-                  label="Remnawave"
-                  value={user.remnawaveUsername || 'не создан'}
-                  ok={Boolean(user.remnawaveUuid)}
-                  mono
-                />
-                <InfoCell
-                  label="Последняя подписка"
-                  value={subscription ? `${subscription.plan?.name || 'Без тарифа'} до ${subscription.expireAt.toLocaleDateString('ru-RU')}` : 'Нет'}
-                />
-                <InfoCell label="Платежи" value={user._count.payments} />
-                <InfoCell label="Устройства" value={user._count.devices} />
-                <InfoCell label="Открытия" value={attemptsCount} />
-              </div>
-              {actor.role === 'SUPER_ADMIN' && (
-                <div className="flex justify-end">
-                  <BonusBoxAttemptsButton
-                    userId={user.id}
-                    email={user.email}
-                    attemptsCount={attemptsCount}
-                  />
+              <details className="group border-t">
+                <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-3 text-sm font-medium text-slate-600 hover:bg-slate-50 dark:hover:bg-white/[0.03]">
+                  Подробный профиль
+                  <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" />
+                </summary>
+                <div className="grid gap-3 border-t bg-slate-50/60 p-4 sm:grid-cols-2 xl:grid-cols-4 dark:bg-white/[0.02]">
+                  <InfoCell label="Email подтверждён" value={user.emailVerifiedAt ? user.emailVerifiedAt.toLocaleDateString('ru-RU') : 'Нет'} ok={Boolean(user.emailVerifiedAt)} />
+                  <InfoCell label="Telegram" value={user.telegramId ? `${user.telegramId}` : 'Не привязан'} ok={Boolean(user.telegramId)} mono />
+                  <InfoCell label="Remnawave" value={user.remnawaveUsername || 'Не создан'} ok={Boolean(user.remnawaveUuid)} mono />
+                  <InfoCell label="Remnashop ID" value={user.remnashopUserId ?? 'Не связан'} ok={Boolean(user.remnashopUserId)} />
+                  <InfoCell label="UUID Remnawave" value={user.remnawaveUuid || '—'} mono />
+                  <InfoCell label="Short UUID" value={user.remnawaveShortUuid || '—'} mono />
+                  <InfoCell label="Последний вход" value={user.lastLoginAt ? user.lastLoginAt.toLocaleString('ru-RU') : 'Не входил'} />
+                  <InfoCell label="Подписок всего" value={user._count.subscriptions} />
                 </div>
-              )}
+              </details>
             </article>
           )
         })}
       </div>
 
       <LazyListLoader loaded={users.length} total={total} step={ADMIN_LIST_PAGE_SIZE} />
+    </div>
+  )
+}
+
+function Counter({ value, label }: { value: number; label: string }) {
+  return (
+    <div className="min-w-12 rounded-md bg-slate-50 px-2 py-1.5 dark:bg-white/5">
+      <div className="font-semibold text-slate-800 dark:text-slate-100">{value}</div>
+      <div className="text-[10px] text-slate-400">{label}</div>
     </div>
   )
 }

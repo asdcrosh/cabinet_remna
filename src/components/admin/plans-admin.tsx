@@ -13,13 +13,13 @@ import {
   RefreshCw,
   Server,
   Trash2,
-  X,
 } from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
 import { formatPrice } from '@/lib/format'
 import { toast } from '@/components/ui/toaster'
 import { cn } from '@/lib/cn'
 import { planAvailabilityLabels, type PlanAvailabilityValue } from '@/lib/plan-availability'
+import { AdminModal } from '@/components/admin/admin-modal'
 
 export interface PlanAdminRow {
   id: string
@@ -80,7 +80,7 @@ const emptyForm: PlanFormState = {
 
 export function PlansAdmin({ plans }: { plans: PlanAdminRow[] }) {
   const router = useRouter()
-  const [createOpen, setCreateOpen] = useState(plans.length === 0)
+  const [createOpen, setCreateOpen] = useState(false)
   const [createForm, setCreateForm] = useState<PlanFormState>(emptyForm)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editForm, setEditForm] = useState<PlanFormState | null>(null)
@@ -173,6 +173,12 @@ export function PlansAdmin({ plans }: { plans: PlanAdminRow[] }) {
     setEditForm(formFromPlan(plan))
   }
 
+  function closeEditor() {
+    setCreateOpen(false)
+    setEditingId(null)
+    setEditForm(null)
+  }
+
   const squadById = useMemo(() => new Map(squads.map((squad) => [squad.uuid, squad])), [squads])
 
   return (
@@ -180,26 +186,27 @@ export function PlansAdmin({ plans }: { plans: PlanAdminRow[] }) {
       <div className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-surface-900 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="font-semibold">Каталог тарифов</h2>
-          <p className="mt-1 text-sm text-slate-500">Изменения открываются прямо в нужной карточке.</p>
+          <p className="mt-1 text-sm text-slate-500">{plans.length} тарифов · настройки открываются в отдельном окне</p>
         </div>
         <div className="flex gap-2">
           <button type="button" className="btn-secondary" onClick={() => void loadSquads()} disabled={squadsLoading}>
             <RefreshCw className={cn('h-4 w-4', squadsLoading && 'animate-spin')} />
             Группы
           </button>
-          <button type="button" className="btn-primary" onClick={() => setCreateOpen((value) => !value)}>
-            {createOpen ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
-            {createOpen ? 'Закрыть' : 'Новый тариф'}
+          <button type="button" className="btn-primary" onClick={() => setCreateOpen(true)}>
+            <Plus className="h-4 w-4" />
+            Новый тариф
           </button>
         </div>
       </div>
 
-      {createOpen && (
-        <div className="card border-cyan-200/80 dark:border-cyan-400/20">
-          <div className="mb-5">
-            <h2 className="text-lg font-semibold">Новый тариф</h2>
-            <p className="mt-1 text-sm text-slate-500">Основные параметры, доступные группы и публикация.</p>
-          </div>
+      <AdminModal
+        open={createOpen}
+        title="Новый тариф"
+        description="Цена, срок, аудитория и группы Remnawave"
+        onClose={closeEditor}
+        size="xl"
+      >
           <PlanEditor
             form={createForm}
             setForm={setCreateForm}
@@ -210,71 +217,76 @@ export function PlansAdmin({ plans }: { plans: PlanAdminRow[] }) {
             loading={loadingId === 'create'}
             onSubmit={() => void submit(createForm)}
           />
-        </div>
-      )}
+      </AdminModal>
 
-      {plans.length === 0 && !createOpen && (
+      <AdminModal
+        open={Boolean(editingId && editForm)}
+        title={editForm ? `Редактировать «${editForm.name}»` : 'Редактировать тариф'}
+        description="Изменения применятся к карточке тарифа после сохранения"
+        onClose={closeEditor}
+        size="xl"
+      >
+        {editingId && editForm && (
+          <PlanEditor
+            form={editForm}
+            setForm={(value) => {
+              setEditForm((current) => {
+                const base = current ?? editForm
+                return typeof value === 'function' ? value(base) : value
+              })
+            }}
+            squads={squads}
+            squadsLoading={squadsLoading}
+            squadsError={squadsError}
+            submitLabel="Сохранить изменения"
+            loading={loadingId === editingId}
+            onSubmit={() => void submit(editForm, editingId)}
+          />
+        )}
+      </AdminModal>
+
+      {plans.length === 0 && (
         <button type="button" onClick={() => setCreateOpen(true)} className="card w-full py-12 text-center text-sm text-slate-500">
           Тарифов пока нет. Создать первый тариф
         </button>
       )}
 
-      <div className="grid gap-4">
+      <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
         {plans.map((plan) => {
-          const editing = editingId === plan.id && editForm
           const selectedSquads = plan.activeInternalSquads.map((id) => squadById.get(id)).filter(Boolean) as RemnawaveSquad[]
           const unknownSquads = plan.activeInternalSquads.filter((id) => !squadById.has(id))
           return (
-            <article key={plan.id} className={cn('card overflow-hidden p-0', editing && 'border-brand-300 ring-2 ring-brand-100 dark:ring-brand-500/10')}>
-              <div className="p-5">
-                <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
-                  <div className="min-w-0 xl:w-[30%]">
+            <article key={plan.id} className="card flex min-h-[18rem] flex-col p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="break-words text-lg font-semibold">{plan.name}</h3>
+                      <h3 className="break-words font-semibold">{plan.name}</h3>
                       <span className={plan.isActive ? 'badge-active' : 'badge-disabled'}>
                         {plan.isActive ? 'Опубликован' : 'Скрыт'}
                       </span>
                       {plan.isPromo && <span className="badge-limited">Пробный</span>}
                     </div>
-                    <div className="mt-2 text-2xl font-semibold tracking-tight">{formatPrice(plan.priceKopecks)}</div>
-                    {plan.description && <p className="mt-2 text-sm leading-5 text-slate-500">{plan.description}</p>}
+                    <div className="mt-2 text-2xl font-semibold">{formatPrice(plan.priceKopecks)}</div>
                   </div>
+                  <button type="button" className="btn-secondary h-9 min-h-9 px-2.5" onClick={() => startEdit(plan)} title="Изменить тариф">
+                    <Edit3 className="h-4 w-4" />
+                  </button>
+                </div>
+                {plan.description && <p className="mt-2 line-clamp-2 min-h-10 text-sm leading-5 text-slate-500">{plan.description}</p>}
 
-                  <div className="grid flex-1 grid-cols-2 gap-2 sm:grid-cols-4">
+                  <div className="mt-4 grid grid-cols-2 gap-2">
                     <Metric label="Срок" value={`${plan.durationDays} дней`} />
                     <Metric label="Трафик" value={plan.trafficLimitGb == null ? 'Безлимит' : `${plan.trafficLimitGb} ГБ`} />
                     <Metric label="Устройства" value={plan.deviceLimit} />
                     <Metric label="Аудитория" value={planAvailabilityLabels[plan.availability]} />
                   </div>
 
-                  <div className="flex flex-wrap gap-2 xl:max-w-[19rem] xl:justify-end">
-                    <button type="button" className="btn-secondary px-3 text-xs" onClick={() => editing ? (setEditingId(null), setEditForm(null)) : startEdit(plan)}>
-                      {editing ? <X className="h-3.5 w-3.5" /> : <Edit3 className="h-3.5 w-3.5" />}
-                      {editing ? 'Закрыть' : 'Изменить'}
-                    </button>
-                    <button type="button" className="btn-secondary px-3 text-xs" onClick={() => void toggleActive(plan)} disabled={loadingId === plan.id}>
-                      <Power className="h-3.5 w-3.5" />
-                      {plan.isActive ? 'Скрыть' : 'Показать'}
-                    </button>
-                    {plan.availability === 'LINK' && (
-                      <button type="button" className="btn-secondary px-3 text-xs" onClick={() => void copyPlanLink(plan)}>
-                        <Link2 className="h-3.5 w-3.5" />
-                        Ссылка
-                      </button>
-                    )}
-                    <button type="button" className="btn-secondary px-3 text-xs text-red-600" onClick={() => void deletePlan(plan)} disabled={loadingId === plan.id}>
-                      <Trash2 className="h-3.5 w-3.5" />
-                      Удалить
-                    </button>
-                  </div>
-                </div>
-
-                <div className="mt-4 border-t border-slate-100 pt-4 dark:border-white/10">
+                <div className="mt-4 flex-1 border-t border-slate-100 pt-3 dark:border-white/10">
                   <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase text-slate-400">
                     <Server className="h-3.5 w-3.5" />
-                    Группы доступа
+                    Группы · {plan.activeInternalSquads.length || 'по умолчанию'}
                   </div>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex max-h-16 flex-wrap gap-1.5 overflow-hidden">
                     {plan.activeInternalSquads.length === 0 && (
                       <span className="inline-flex items-center gap-1.5 rounded-md bg-slate-100 px-2.5 py-1 text-xs text-slate-600 dark:bg-white/10 dark:text-slate-300">
                         <Globe2 className="h-3.5 w-3.5" />
@@ -299,27 +311,20 @@ export function PlansAdmin({ plans }: { plans: PlanAdminRow[] }) {
                     </div>
                   )}
                 </div>
-              </div>
-
-              {editing && (
-                <div className="border-t border-slate-200 bg-slate-50/70 p-5 dark:border-white/10 dark:bg-white/[0.025]">
-                  <PlanEditor
-                    form={editForm}
-                    setForm={(value) => {
-                      setEditForm((current) => {
-                        const base = current ?? editForm
-                        return typeof value === 'function' ? value(base) : value
-                      })
-                    }}
-                    squads={squads}
-                    squadsLoading={squadsLoading}
-                    squadsError={squadsError}
-                    submitLabel="Сохранить изменения"
-                    loading={loadingId === plan.id}
-                    onSubmit={() => void submit(editForm, plan.id)}
-                  />
+                <div className="mt-4 flex items-center gap-2 border-t border-slate-100 pt-3 dark:border-white/10">
+                  <button type="button" className="btn-secondary flex-1 px-3 text-xs" onClick={() => void toggleActive(plan)} disabled={loadingId === plan.id}>
+                    <Power className="h-3.5 w-3.5" />
+                    {plan.isActive ? 'Скрыть' : 'Показать'}
+                  </button>
+                  {plan.availability === 'LINK' && (
+                    <button type="button" className="btn-secondary h-10 min-h-10 px-3" onClick={() => void copyPlanLink(plan)} title="Скопировать ссылку">
+                      <Link2 className="h-4 w-4" />
+                    </button>
+                  )}
+                  <button type="button" className="btn-secondary h-10 min-h-10 px-3 text-red-600" onClick={() => void deletePlan(plan)} disabled={loadingId === plan.id} title="Удалить">
+                    <Trash2 className="h-4 w-4" />
+                  </button>
                 </div>
-              )}
             </article>
           )
         })}

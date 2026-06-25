@@ -15,25 +15,16 @@ export async function mergeTechnicalTelegramAccount(input: {
   telegramName: string | null
 }) {
   const [target, source] = await Promise.all([
-    prisma.user.findUnique({ where: { id: input.targetUserId } }),
+    prisma.user.findUnique({
+      where: { id: input.targetUserId },
+      include: {
+        referralRewardAsReferred: { select: { id: true } },
+      },
+    }),
     prisma.user.findUnique({
       where: { telegramId: input.telegramId },
       include: {
         referralRewardAsReferred: { select: { id: true } },
-        _count: {
-          select: {
-            payments: true,
-            devices: true,
-            supportTickets: true,
-            supportMessages: true,
-            promoCodeRedemptions: true,
-            trialPlanRedemptions: true,
-            referrals: true,
-            referralRewardsEarned: true,
-            bonusBoxAttempts: true,
-            bonusBoxOpenings: true,
-          },
-        },
       },
     }),
   ])
@@ -41,15 +32,12 @@ export async function mergeTechnicalTelegramAccount(input: {
   if (!target) throw new TelegramAccountMergeError('IDENTITY_CONFLICT')
   if (!source || source.id === target.id) return { merged: false as const }
 
-  const hasOwnedActivity = Object.values(source._count).some((count) => count > 0)
   const isTechnical =
     source.role === 'USER' &&
     source.email.endsWith('@pending.invalid') &&
-    !source.emailVerifiedAt &&
-    !source.referredById &&
-    !source.referralRewardAsReferred
+    !source.emailVerifiedAt
 
-  if (!isTechnical || hasOwnedActivity) {
+  if (!isTechnical) {
     throw new TelegramAccountMergeError('TELEGRAM_ALREADY_LINKED')
   }
 
@@ -65,6 +53,9 @@ export async function mergeTechnicalTelegramAccount(input: {
     target.remnashopUserId,
     source.remnashopUserId
   )
+  if (target.referralRewardAsReferred && source.referralRewardAsReferred) {
+    throw new TelegramAccountMergeError('IDENTITY_CONFLICT')
+  }
 
   await prisma.$transaction(async (tx) => {
     await tx.user.update({
@@ -81,6 +72,88 @@ export async function mergeTechnicalTelegramAccount(input: {
       where: { userId: source.id },
       data: { userId: target.id },
     })
+    await tx.payment.updateMany({
+      where: { userId: source.id },
+      data: { userId: target.id },
+    })
+    await tx.device.deleteMany({
+      where: {
+        userId: source.id,
+        hwid: {
+          in: (await tx.device.findMany({
+            where: { userId: target.id },
+            select: { hwid: true },
+          })).map((device) => device.hwid),
+        },
+      },
+    })
+    await tx.device.updateMany({
+      where: { userId: source.id },
+      data: { userId: target.id },
+    })
+    await tx.supportTicket.updateMany({
+      where: { userId: source.id },
+      data: { userId: target.id },
+    })
+    await tx.supportMessage.updateMany({
+      where: { senderId: source.id },
+      data: { senderId: target.id },
+    })
+    await tx.promoCodeRedemption.updateMany({
+      where: { userId: source.id },
+      data: { userId: target.id },
+    })
+    const targetTrialPlans = await tx.trialPlanRedemption.findMany({
+      where: { userId: target.id },
+      select: { planId: true },
+    })
+    await tx.trialPlanRedemption.deleteMany({
+      where: {
+        userId: source.id,
+        planId: { in: targetTrialPlans.map((redemption) => redemption.planId) },
+      },
+    })
+    await tx.trialPlanRedemption.updateMany({
+      where: { userId: source.id },
+      data: { userId: target.id },
+    })
+    await tx.user.updateMany({
+      where: { referredById: source.id },
+      data: { referredById: target.id },
+    })
+    await tx.referralReward.updateMany({
+      where: { referrerId: source.id },
+      data: { referrerId: target.id },
+    })
+    if (source.referralRewardAsReferred) {
+      await tx.referralReward.update({
+        where: { id: source.referralRewardAsReferred.id },
+        data: { referredUserId: target.id },
+      })
+    }
+    const targetAttempts = await tx.bonusBoxAttempt.findMany({
+      where: { userId: target.id },
+      select: { source: true, sourceKey: true },
+    })
+    for (const attempt of targetAttempts) {
+      await tx.bonusBoxAttempt.deleteMany({
+        where: {
+          userId: source.id,
+          source: attempt.source,
+          sourceKey: attempt.sourceKey,
+        },
+      })
+    }
+    await tx.bonusBoxAttempt.updateMany({
+      where: { userId: source.id },
+      data: { userId: target.id },
+    })
+    await tx.bonusBoxOpening.updateMany({
+      where: { userId: source.id },
+      data: { userId: target.id },
+    })
+    await tx.emailVerificationToken.deleteMany({ where: { userId: source.id } })
+    await tx.passwordResetToken.deleteMany({ where: { userId: source.id } })
     await tx.user.update({
       where: { id: target.id },
       data: {
@@ -93,6 +166,7 @@ export async function mergeTechnicalTelegramAccount(input: {
         remnawaveUuid: target.remnawaveUuid ?? source.remnawaveUuid,
         remnawaveShortUuid: target.remnawaveShortUuid ?? source.remnawaveShortUuid,
         remnawaveUsername: target.remnawaveUsername ?? source.remnawaveUsername,
+        referredById: target.referredById ?? source.referredById,
       },
     })
     await tx.user.delete({ where: { id: source.id } })
@@ -122,7 +196,9 @@ async function resolveRemnashopIdentity(targetId: number | null, sourceId: numbe
     throw new TelegramAccountMergeError('IDENTITY_CONFLICT')
   }
 
-  // The Telegram identity remains canonical in Remnashop. A duplicate empty
-  // email-only Remnashop row can stay orphaned without losing subscriptions.
+  if (target?.current_subscription_id) return targetId
+  if (source?.current_subscription_id) return sourceId
+
+  // Без подписок Telegram-профиль остаётся каноническим для будущей синхронизации.
   return sourceId
 }
