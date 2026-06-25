@@ -356,6 +356,9 @@ configure_local_remnashop_database() {
     -c "GRANT SELECT ON ALL TABLES IN SCHEMA public TO remnashop_readonly;" \
     -c "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO remnashop_readonly;" >/dev/null
 
+  curl -fsSL "${RAW_BASE_URL}/deploy/remnashop-cabinet-link.sql" \
+    | docker exec -i "${container}" psql -v ON_ERROR_STOP=1 -U "${db_user}" -d "${db_name}" >/dev/null
+
   encoded_password="$(urlencode "${readonly_password}")"
   database_url="postgresql://remnashop_readonly:${encoded_password}@${container}:5432/${db_name}?schema=public"
 

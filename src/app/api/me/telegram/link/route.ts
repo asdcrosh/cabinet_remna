@@ -6,7 +6,7 @@ import {
   verifyTelegramAuthPayload,
   type TelegramAuthPayload,
 } from '@/lib/telegram-auth'
-import { syncLinkedTelegramUser } from '@/lib/telegram-link-sync'
+import { attachRemnashopIdentityToCabinetUser } from '@/lib/telegram-link-sync'
 import {
   mergeTechnicalTelegramAccount,
   TelegramAccountMergeError,
@@ -72,7 +72,7 @@ export const POST = withAuth(async (req: Request) => {
   })
 
   try {
-    const sync = await syncLinkedTelegramUser({
+    const remnashopUser = await attachRemnashopIdentityToCabinetUser({
       localUserId: session.uid,
       telegramId,
     })
@@ -83,7 +83,11 @@ export const POST = withAuth(async (req: Request) => {
         id: telegramId.toString(),
         username: payload.username ?? null,
       },
-      sync,
+      sync: {
+        foundRemnashopUser: Boolean(remnashopUser),
+        remnashopUserId: remnashopUser?.id ?? null,
+        pending: Boolean(remnashopUser?.user_remna_id),
+      },
     })
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Telegram linked, sync failed'

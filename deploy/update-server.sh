@@ -57,6 +57,22 @@ path.write_text("\n".join(lines) + "\n")
 PY
 fi
 
+configure_remnashop_link_function() {
+  local container="${REMNASHOP_DB_CONTAINER:-remnashop-db}"
+  local db_user db_name
+  if ! docker inspect "${container}" >/dev/null 2>&1; then
+    return
+  fi
+  db_user="$(docker inspect "${container}" --format '{{range .Config.Env}}{{println .}}{{end}}' | sed -n 's/^POSTGRES_USER=//p' | head -n1)"
+  db_name="$(docker inspect "${container}" --format '{{range .Config.Env}}{{println .}}{{end}}' | sed -n 's/^POSTGRES_DB=//p' | head -n1)"
+  if [[ -z "${db_user}" || -z "${db_name}" ]]; then
+    return
+  fi
+  echo "Updating secure Remnashop account-link function..."
+  curl -fsSL "${RAW_BASE_URL}/deploy/remnashop-cabinet-link.sql" \
+    | docker exec -i "${container}" psql -v ON_ERROR_STOP=1 -U "${db_user}" -d "${db_name}" >/dev/null
+}
+
 ENV_FILE_PATH="${ENV_FILE}" python3 <<'PY'
 from pathlib import Path
 import os
@@ -87,6 +103,7 @@ curl -fsSL "${COMPOSE_URL}" -o "${COMPOSE_FILE}"
 curl -fsSL "${CABINETCTL_URL}" -o "${CABINETCTL_TEMP}"
 install -m 755 "${CABINETCTL_TEMP}" "${CABINETCTL_PATH}"
 rm -f "${CABINETCTL_TEMP}"
+configure_remnashop_link_function
 
 COMPOSE=(docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}")
 

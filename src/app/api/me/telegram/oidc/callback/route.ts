@@ -3,7 +3,7 @@ import { cookies } from 'next/headers'
 import { prisma } from '@/lib/prisma'
 import { requireAuth, withAuth } from '@/lib/auth/guard'
 import { verifyTelegramIdToken } from '@/lib/telegram-auth'
-import { syncLinkedTelegramUser } from '@/lib/telegram-link-sync'
+import { attachRemnashopIdentityToCabinetUser } from '@/lib/telegram-link-sync'
 import { getAppUrlOrRequestOrigin } from '@/lib/app-url'
 import {
   getTelegramRedirectUri,
@@ -86,11 +86,12 @@ export const GET = withAuth(async (req: Request) => {
     })
 
     try {
-      await syncLinkedTelegramUser({
+      const remnashopUser = await attachRemnashopIdentityToCabinetUser({
         localUserId: session.uid,
         telegramId: telegramUser.id,
       })
       settingsUrl.searchParams.set('telegram_linked', '1')
+      if (remnashopUser?.user_remna_id) settingsUrl.searchParams.set('telegram_sync', 'pending')
     } catch {
       settingsUrl.searchParams.set('telegram_linked', '1')
       settingsUrl.searchParams.set('telegram_sync', 'failed')

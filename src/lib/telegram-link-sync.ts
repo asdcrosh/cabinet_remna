@@ -36,6 +36,52 @@ export async function findRemnashopUserByTelegramId(telegramId: bigint) {
   return result.rows[0] ?? null
 }
 
+export async function attachRemnashopIdentityToCabinetUser(input: {
+  localUserId: string
+  telegramId: bigint
+}) {
+  const localUser = await prisma.user.findUnique({
+    where: { id: input.localUserId },
+    select: {
+      email: true,
+      emailVerifiedAt: true,
+    },
+  })
+  if (!localUser) throw new Error('Cabinet user not found')
+
+  if (localUser.emailVerifiedAt && !localUser.email.endsWith('@pending.invalid')) {
+    try {
+      await remnashopQuery(
+        'SELECT * FROM public.cabinet_link_email_to_telegram($1::bigint, $2::text, $3::boolean)',
+        [input.telegramId.toString(), localUser.email, true]
+      )
+    } catch (error) {
+      const code = typeof error === 'object' && error && 'code' in error ? String(error.code) : ''
+      if (code !== '42883') throw error
+    }
+  }
+
+  const remnashopUser = await findRemnashopUserByTelegramId(input.telegramId)
+  if (!remnashopUser) {
+    await prisma.user.update({
+      where: { id: input.localUserId },
+      data: { remnashopSyncedAt: new Date() },
+    })
+    return null
+  }
+
+  await prisma.user.update({
+    where: { id: input.localUserId },
+    data: {
+      remnashopUserId: remnashopUser.id,
+      remnashopSyncedAt: new Date(),
+      ...(remnashopUser.user_remna_id ? { remnawaveUuid: remnashopUser.user_remna_id } : {}),
+    },
+  })
+
+  return remnashopUser
+}
+
 export async function syncLinkedTelegramUser(input: {
   localUserId: string
   telegramId: bigint
@@ -45,7 +91,7 @@ export async function syncLinkedTelegramUser(input: {
     select: { remnawaveUuid: true },
   })
   const localRemnawaveSynced = await syncRemnawaveTelegramId(localUser?.remnawaveUuid, input.telegramId)
-  const remnashopUser = await findRemnashopUserByTelegramId(input.telegramId)
+  const remnashopUser = await attachRemnashopIdentityToCabinetUser(input)
   if (!remnashopUser) {
     await prisma.user.update({
       where: { id: input.localUserId },

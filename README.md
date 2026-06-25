@@ -139,7 +139,7 @@ https://ВСТАВЬ_СЮДА_ДОМЕН_КАБИНЕТА
 | `EMAIL_VERIFICATION_WEBHOOK_SECRET` | Bearer secret email webhook |
 | `RESEND_API_KEY` | API key Resend |
 | `EMAIL_FROM` | Отправитель писем |
-| `REMNASHOP_DATABASE_URL` | Read-only подключение к remnashop |
+| `REMNASHOP_DATABASE_URL` | Подключение к Remnashop для чтения и вызова ограниченной функции объединения аккаунтов |
 | `REMNASHOP_API_URL` | Public API remnashop для двусторонней регистрации |
 | `REMNASHOP_CATALOG_SYNC_INTERVAL_SECONDS` | Интервал авто-синхронизации каталога |
 | `REFERRAL_BONUS_DAYS` | Бонус за реферала |
@@ -246,6 +246,7 @@ Authorization: Bearer EMAIL_VERIFICATION_WEBHOOK_SECRET
 
 - найдет контейнер `remnashop-db`;
 - создаст/обновит роль `remnashop_readonly`;
+- установит ограниченную SQL-функцию для связи существующего Telegram-пользователя с подтверждённым email;
 - выдаст только `SELECT`;
 - подключит кабинет к нужной Docker-сети;
 - заполнит `REMNASHOP_DATABASE_URL`;
@@ -281,6 +282,15 @@ GRANT USAGE ON SCHEMA public TO remnashop_readonly;
 GRANT SELECT ON ALL TABLES IN SCHEMA public TO remnashop_readonly;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO remnashop_readonly;
 ```
+
+Для объединения email и Telegram установите функцию:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/asdcrosh/cabinet_remna/main/deploy/remnashop-cabinet-link.sql \
+  | docker compose exec -T remnashop-db sh -lc 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
+```
+
+Она не выдаёт кабинету общих прав записи: разрешён только вызов операции объединения аккаунтов.
 
 И укажи:
 

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ExternalLink, RefreshCw, Send } from 'lucide-react'
 import { toast } from '@/components/ui/toaster'
@@ -28,22 +28,30 @@ export function TelegramLinkCard({
   const [syncing, setSyncing] = useState(false)
   const telegramStartUrl = appUrl ? `${appUrl.replace(/\/+$/, '')}/api/me/telegram/oidc/start` : '/api/me/telegram/oidc/start'
 
-  async function syncTelegram() {
+  const syncTelegram = useCallback(async (clearCallbackState = false) => {
     setSyncing(true)
     try {
       await apiFetch('/api/me/telegram/sync', { method: 'POST' })
       toast('Telegram ID отправлен в Remnawave', 'success')
-      router.refresh()
+      if (clearCallbackState) {
+        router.replace('/dashboard/settings')
+      } else {
+        router.refresh()
+      }
     } catch {
       // apiFetch уже покажет toast
     } finally {
       setSyncing(false)
     }
-  }
+  }, [router])
 
   useEffect(() => {
     const error = searchParams.get('telegram_error')
     if (searchParams.get('telegram_linked') === '1') {
+      if (searchParams.get('telegram_sync') === 'pending') {
+        void syncTelegram(true)
+        return
+      }
       toast(
         searchParams.get('telegram_sync') === 'failed'
           ? 'Telegram привязан, но синхронизация не удалась'
@@ -53,7 +61,7 @@ export function TelegramLinkCard({
     } else if (error) {
       toast(`Telegram не привязан: ${error}`)
     }
-  }, [searchParams])
+  }, [searchParams, syncTelegram])
 
   return (
     <div className="card">
@@ -80,7 +88,7 @@ export function TelegramLinkCard({
           <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-100">
             Telegram привязан. Если старая подписка найдена, она появится в кабинете.
           </div>
-          <button type="button" className="btn-secondary" onClick={syncTelegram} disabled={syncing}>
+          <button type="button" className="btn-secondary" onClick={() => void syncTelegram()} disabled={syncing}>
             <RefreshCw className="h-4 w-4" />
             {syncing ? 'Синхронизируем...' : 'Синхронизировать'}
           </button>
