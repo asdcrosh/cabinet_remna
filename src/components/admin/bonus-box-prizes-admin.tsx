@@ -1,15 +1,19 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import type { ReactNode } from 'react'
+import type { Dispatch, ReactNode, SetStateAction } from 'react'
 import { useRouter } from 'next/navigation'
-import { Clock3, Edit3, Power, TicketPercent, UserRound, X } from 'lucide-react'
+import { createPortal } from 'react-dom'
+import { BarChart3, Clock3, Edit3, Gift, History, Plus, Power, TicketPercent, UserRound, X } from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
 import { toast } from '@/components/ui/toaster'
 import { cn } from '@/lib/cn'
+import { LazyListLoader } from '@/components/admin/lazy-list-loader'
+import { useBodyScrollLock } from '@/lib/use-body-scroll-lock'
 
 type PrizeType = 'SUBSCRIPTION_DAYS' | 'TRAFFIC_GB' | 'PROMO_CODE_PERCENT' | 'BONUS_ATTEMPTS' | 'NO_PRIZE'
 type Rarity = 'COMMON' | 'RARE' | 'EPIC' | 'LEGENDARY'
+type AdminBonusTab = 'prizes' | 'history'
 
 export type BonusBoxPrizeAdminRow = {
   id: string
@@ -67,16 +71,21 @@ const emptyForm: FormState = {
 export function BonusBoxPrizesAdmin({
   prizes,
   openings,
+  totalOpenings,
 }: {
   prizes: BonusBoxPrizeAdminRow[]
   openings: BonusBoxOpeningAdminRow[]
+  totalOpenings: number
 }) {
   const router = useRouter()
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState<FormState>(emptyForm)
   const [loading, setLoading] = useState(false)
+  const [activeTab, setActiveTab] = useState<AdminBonusTab>('prizes')
+  const [drawerOpen, setDrawerOpen] = useState(false)
 
   const editingPrize = useMemo(() => prizes.find((prize) => prize.id === editingId) ?? null, [editingId, prizes])
+  const stats = useMemo(() => getPrizeStats(prizes), [prizes])
 
   async function submit() {
     setLoading(true)
@@ -110,6 +119,7 @@ export function BonusBoxPrizesAdmin({
 
   function startEdit(prize: BonusBoxPrizeAdminRow) {
     setEditingId(prize.id)
+    setDrawerOpen(true)
     setForm({
       title: prize.title,
       description: prize.description ?? '',
@@ -123,9 +133,16 @@ export function BonusBoxPrizesAdmin({
     })
   }
 
+  function startCreate() {
+    setEditingId(null)
+    setForm(emptyForm)
+    setDrawerOpen(true)
+  }
+
   function resetForm() {
     setEditingId(null)
     setForm(emptyForm)
+    setDrawerOpen(false)
   }
 
   function changePrizeType(type: PrizeType) {
@@ -139,174 +156,391 @@ export function BonusBoxPrizesAdmin({
   }
 
   return (
-    <div className="space-y-6">
-      <div className="card space-y-4">
+    <div className="space-y-5">
+      <section className="rounded-lg border border-white/70 bg-white/80 p-4 shadow-xl shadow-slate-200/50 backdrop-blur dark:border-white/10 dark:bg-surface-900/80 dark:shadow-black/25">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 text-sm font-semibold text-slate-500">
+              <BarChart3 className="h-4 w-4" />
+              Экономика бокса
+            </div>
+            <h2 className="mt-1 text-xl font-semibold tracking-tight">Состав и шансы</h2>
+            <p className="mt-1 max-w-2xl text-sm text-slate-500">
+              На первом экране только баланс весов и состояние. Детали редактируются в панели справа.
+            </p>
+          </div>
+          <button type="button" className="btn-primary shrink-0" onClick={startCreate}>
+            <Plus className="h-4 w-4" />
+            Создать подарок
+          </button>
+        </div>
+
+        <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <SummaryCell label="Активных" value={`${stats.active}/${prizes.length}`} />
+          <SummaryCell label="Шанс награды" value={formatChance(stats.rewardChance)} />
+          <SummaryCell label="Без подарка" value={formatChance(stats.noPrizeChance)} tone="danger" />
+          <SummaryCell label="Открытий" value={totalOpenings} />
+        </div>
+
+        <div className="mt-5 space-y-2">
+          <EconomyLine label="Награды" value={stats.rewardChance} className="bg-emerald-500" />
+          <EconomyLine label="Без подарка" value={stats.noPrizeChance} className="bg-red-500" />
+          <EconomyLine label="Промокоды" value={stats.promoChance} className="bg-violet-500" />
+          <EconomyLine label="Доп. открытия" value={stats.attemptChance} className="bg-cyan-500" />
+        </div>
+      </section>
+
+      <div className="flex flex-wrap gap-2 rounded-lg border border-slate-200 bg-white p-1 shadow-sm dark:border-white/10 dark:bg-surface-900">
+        <AdminTabButton
+          active={activeTab === 'prizes'}
+          icon={<Gift className="h-4 w-4" />}
+          label="Состав"
+          meta={`${prizes.length}`}
+          onClick={() => setActiveTab('prizes')}
+        />
+        <AdminTabButton
+          active={activeTab === 'history'}
+          icon={<History className="h-4 w-4" />}
+          label="История"
+          meta={`${totalOpenings}`}
+          onClick={() => setActiveTab('history')}
+        />
+      </div>
+
+      {activeTab === 'prizes' && (
+        <section className="grid gap-3">
+          {prizes.map((prize) => (
+            <PrizeAdminRow
+              key={prize.id}
+              prize={prize}
+              onEdit={() => startEdit(prize)}
+              onToggle={() => toggleActive(prize)}
+            />
+          ))}
+          {prizes.length === 0 && (
+            <div className="rounded-lg border border-dashed border-slate-300 bg-white p-5 text-sm text-slate-500 dark:border-white/10 dark:bg-surface-900">
+              Добавьте первый подарок для Подарочного бокса.
+            </div>
+          )}
+        </section>
+      )}
+
+      {activeTab === 'history' && (
+        <>
+          <BonusBoxOpeningHistory openings={openings} />
+          <LazyListLoader loaded={openings.length} total={totalOpenings} />
+        </>
+      )}
+
+      <PrizeEditorDrawer
+        open={drawerOpen}
+        editingPrize={editingPrize}
+        form={form}
+        loading={loading}
+        onClose={resetForm}
+        onSubmit={submit}
+        onChange={setForm}
+        onTypeChange={changePrizeType}
+      />
+    </div>
+  )
+}
+
+function AdminTabButton({
+  active,
+  icon,
+  label,
+  meta,
+  onClick,
+}: {
+  active: boolean
+  icon: ReactNode
+  label: string
+  meta: string
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      className={cn(
+        'flex min-h-10 flex-1 items-center justify-between gap-3 rounded-md px-3 py-2 text-left text-sm transition-colors sm:flex-none sm:min-w-40',
+        active
+          ? 'bg-slate-950 text-white shadow-sm dark:bg-white dark:text-slate-950'
+          : 'text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-white/5'
+      )}
+      onClick={onClick}
+    >
+      <span className="inline-flex items-center gap-2 font-semibold">
+        {icon}
+        {label}
+      </span>
+      <span
+        className={cn(
+          'rounded-full px-2 py-0.5 text-[11px] font-semibold',
+          active
+            ? 'bg-white/15 text-white dark:bg-slate-950/10 dark:text-slate-700'
+            : 'bg-slate-100 text-slate-500 dark:bg-white/10 dark:text-slate-400'
+        )}
+      >
+        {meta}
+      </span>
+    </button>
+  )
+}
+
+function SummaryCell({
+  label,
+  value,
+  tone = 'default',
+}: {
+  label: string
+  value: ReactNode
+  tone?: 'default' | 'danger'
+}) {
+  return (
+    <div className="rounded-lg border border-slate-100 bg-slate-50/80 px-3 py-3 dark:border-white/10 dark:bg-surface-800/70">
+      <div className="text-xs text-slate-500">{label}</div>
+      <div className={cn('mt-1 text-2xl font-semibold tracking-tight', tone === 'danger' && 'text-red-600 dark:text-red-300')}>
+        {value}
+      </div>
+    </div>
+  )
+}
+
+function EconomyLine({
+  label,
+  value,
+  className,
+}: {
+  label: string
+  value: number
+  className: string
+}) {
+  const percent = value * 100
+
+  return (
+    <div className="grid gap-2 sm:grid-cols-[130px_1fr_64px] sm:items-center">
+      <div className="text-sm font-medium text-slate-600 dark:text-slate-300">{label}</div>
+      <div className="h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-white/10">
+        <div
+          className={cn('h-full rounded-full', className)}
+          style={{ width: percent <= 0 ? '0%' : `${Math.max(2, Math.min(100, percent))}%` }}
+        />
+      </div>
+      <div className="text-sm text-slate-500 sm:text-right">{formatChance(value)}</div>
+    </div>
+  )
+}
+
+function PrizeAdminRow({
+  prize,
+  onEdit,
+  onToggle,
+}: {
+  prize: BonusBoxPrizeAdminRow
+  onEdit: () => void
+  onToggle: () => void
+}) {
+  return (
+    <article className={cn('overflow-hidden rounded-lg border bg-white shadow-sm dark:bg-surface-900', prizeAdminBorderClass(prize))}>
+      <div className={cn('h-1', prizeAdminTopClass(prize))} />
+      <div className="grid gap-4 p-4 xl:grid-cols-[minmax(220px,1.1fr)_minmax(320px,1.6fr)_auto] xl:items-center">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="truncate font-semibold">{prize.title}</span>
+            <span className={prize.isActive ? 'badge-active' : 'badge-disabled'}>
+              {prize.isActive ? 'Активен' : 'Отключён'}
+            </span>
+            <span className={cn('rounded-full px-2 py-1 text-xs font-semibold', rarityClass(prize.rarity))}>
+              {rarityLabel(prize.rarity)}
+            </span>
+          </div>
+          <div className="mt-1 line-clamp-2 text-sm text-slate-500">
+            {prize.description || prizeTypeLabel(prize.type)}
+          </div>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-4">
+          <CompactMetric label="Подарок" value={prizeValue(prize)} />
+          <CompactMetric label="Шанс" value={formatChance(prize.chance)} />
+          <CompactMetric label="Вес" value={prize.weight} />
+          <CompactMetric label="Выпало" value={`${prize.winsCount}/${prize.maxWins ?? '∞'}`} />
+        </div>
+
+        <div className="action-row xl:w-[240px]">
+          <button type="button" className="btn-secondary min-w-[112px] px-3 text-xs" onClick={onEdit}>
+            <Edit3 className="h-3.5 w-3.5" />
+            Изменить
+          </button>
+          <button type="button" className="btn-secondary min-w-[112px] px-3 text-xs" onClick={onToggle}>
+            <Power className="h-3.5 w-3.5" />
+            {prize.isActive ? 'Отключить' : 'Включить'}
+          </button>
+        </div>
+      </div>
+    </article>
+  )
+}
+
+function PrizeEditorDrawer({
+  open,
+  editingPrize,
+  form,
+  loading,
+  onClose,
+  onSubmit,
+  onChange,
+  onTypeChange,
+}: {
+  open: boolean
+  editingPrize: BonusBoxPrizeAdminRow | null
+  form: FormState
+  loading: boolean
+  onClose: () => void
+  onSubmit: () => void
+  onChange: Dispatch<SetStateAction<FormState>>
+  onTypeChange: (type: PrizeType) => void
+}) {
+  useBodyScrollLock(open)
+
+  if (!open) return null
+
+  return createPortal(
+    <div className="fixed inset-0 z-[100] h-dvh w-dvw">
+      <button
+        type="button"
+        className="absolute inset-0 bg-slate-950/45 backdrop-blur-sm"
+        aria-label="Закрыть"
+        onClick={onClose}
+      />
+      <aside
+        role="dialog"
+        aria-modal="true"
+        className="absolute right-0 top-0 h-dvh w-full max-w-xl overflow-y-auto border-l border-slate-200 bg-white p-5 shadow-2xl dark:border-white/10 dark:bg-surface-950 sm:p-6"
+      >
         <div className="flex items-start justify-between gap-3">
           <div>
-            <h2 className="text-lg font-semibold">
+            <h2 className="text-xl font-semibold">
               {editingPrize ? `Редактировать ${editingPrize.title}` : 'Новый подарок'}
             </h2>
             <p className="mt-1 text-sm text-slate-500">
-              Шансы считаются по весам активных подарков. Чем больше вес, тем чаще выпадает подарок.
+              Вес управляет шансом выпадения среди активных исходов.
             </p>
           </div>
-          {editingId && (
-            <button type="button" className="btn-secondary text-xs" onClick={resetForm}>
-              <X className="h-4 w-4" />
-              Отмена
-            </button>
-          )}
+          <button type="button" className="btn-secondary h-10 w-10 px-0" onClick={onClose}>
+            <X className="h-4 w-4" />
+          </button>
         </div>
 
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <div className="mt-6 grid gap-4">
           <Field label="Название">
             <input
               value={form.title}
-              onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))}
+              onChange={(event) => onChange((current) => ({ ...current, title: event.target.value }))}
               className="input"
               placeholder="+3 дня"
             />
           </Field>
-          <Field label="Тип">
-            <select
-              value={form.type}
-              onChange={(event) => changePrizeType(event.target.value as PrizeType)}
-              className="input"
-            >
-              <option value="SUBSCRIPTION_DAYS">Дни подписки</option>
-              <option value="TRAFFIC_GB">Трафик, ГБ</option>
-              <option value="PROMO_CODE_PERCENT">Промокод, %</option>
-              <option value="BONUS_ATTEMPTS">Открытия бокса</option>
-              <option value="NO_PRIZE">Без подарка</option>
-            </select>
-          </Field>
-          <Field label={valueLabel(form.type)}>
-            <input
-              value={form.value}
-              onChange={(event) => setForm((current) => ({ ...current, value: event.target.value }))}
-              className="input"
-              type="number"
-              min={form.type === 'NO_PRIZE' ? 0 : 1}
-              max={form.type === 'NO_PRIZE' ? 0 : form.type === 'PROMO_CODE_PERCENT' ? 99 : form.type === 'BONUS_ATTEMPTS' ? 100 : 10000}
-              disabled={form.type === 'NO_PRIZE'}
-            />
-          </Field>
-          <Field label="Вес">
-            <input
-              value={form.weight}
-              onChange={(event) => setForm((current) => ({ ...current, weight: event.target.value }))}
-              className="input"
-              type="number"
-              min={1}
-            />
-          </Field>
-          <Field label="Редкость">
-            <select
-              value={form.rarity}
-              onChange={(event) => setForm((current) => ({ ...current, rarity: event.target.value as Rarity }))}
-              className="input"
-              disabled={form.type === 'NO_PRIZE'}
-            >
-              <option value="COMMON">База</option>
-              <option value="RARE">Редкий</option>
-              <option value="EPIC">Эпик</option>
-              <option value="LEGENDARY">Легенда</option>
-            </select>
-          </Field>
-          <Field label="Лимит выпадений">
-            <input
-              value={form.maxWins}
-              onChange={(event) => setForm((current) => ({ ...current, maxWins: event.target.value }))}
-              className="input"
-              type="number"
-              min={1}
-              placeholder="Без лимита"
-            />
-          </Field>
-          <Field label="Промокод, дней">
-            <input
-              value={form.promoExpiresInDays}
-              onChange={(event) => setForm((current) => ({ ...current, promoExpiresInDays: event.target.value }))}
-              className="input"
-              type="number"
-              min={1}
-              placeholder="Из .env"
-              disabled={form.type !== 'PROMO_CODE_PERCENT'}
-            />
-          </Field>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Тип">
+              <select
+                value={form.type}
+                onChange={(event) => onTypeChange(event.target.value as PrizeType)}
+                className="input"
+              >
+                <option value="SUBSCRIPTION_DAYS">Дни подписки</option>
+                <option value="TRAFFIC_GB">Трафик, ГБ</option>
+                <option value="PROMO_CODE_PERCENT">Промокод, %</option>
+                <option value="BONUS_ATTEMPTS">Открытия бокса</option>
+                <option value="NO_PRIZE">Без подарка</option>
+              </select>
+            </Field>
+            <Field label={valueLabel(form.type)}>
+              <input
+                value={form.value}
+                onChange={(event) => onChange((current) => ({ ...current, value: event.target.value }))}
+                className="input"
+                type="number"
+                min={form.type === 'NO_PRIZE' ? 0 : 1}
+                max={form.type === 'NO_PRIZE' ? 0 : form.type === 'PROMO_CODE_PERCENT' ? 99 : form.type === 'BONUS_ATTEMPTS' ? 100 : 10000}
+                disabled={form.type === 'NO_PRIZE'}
+              />
+            </Field>
+            <Field label="Вес">
+              <input
+                value={form.weight}
+                onChange={(event) => onChange((current) => ({ ...current, weight: event.target.value }))}
+                className="input"
+                type="number"
+                min={1}
+              />
+            </Field>
+            <Field label="Редкость">
+              <select
+                value={form.rarity}
+                onChange={(event) => onChange((current) => ({ ...current, rarity: event.target.value as Rarity }))}
+                className="input"
+                disabled={form.type === 'NO_PRIZE'}
+              >
+                <option value="COMMON">База</option>
+                <option value="RARE">Редкий</option>
+                <option value="EPIC">Эпик</option>
+                <option value="LEGENDARY">Легенда</option>
+              </select>
+            </Field>
+            <Field label="Лимит выпадений">
+              <input
+                value={form.maxWins}
+                onChange={(event) => onChange((current) => ({ ...current, maxWins: event.target.value }))}
+                className="input"
+                type="number"
+                min={1}
+                placeholder="Без лимита"
+              />
+            </Field>
+            <Field label="Промокод, дней">
+              <input
+                value={form.promoExpiresInDays}
+                onChange={(event) => onChange((current) => ({ ...current, promoExpiresInDays: event.target.value }))}
+                className="input"
+                type="number"
+                min={1}
+                placeholder="Из .env"
+                disabled={form.type !== 'PROMO_CODE_PERCENT'}
+              />
+            </Field>
+          </div>
+
           <label className="flex items-center gap-2 rounded-lg border px-3 py-3 text-sm">
             <input
               type="checkbox"
               checked={form.isActive}
-              onChange={(event) => setForm((current) => ({ ...current, isActive: event.target.checked }))}
+              onChange={(event) => onChange((current) => ({ ...current, isActive: event.target.checked }))}
             />
             Активен
           </label>
-        </div>
 
-        <Field label="Описание">
-          <textarea
-            value={form.description}
-            onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))}
-            className="input min-h-24"
-            placeholder="Коротко для пользователя"
-          />
-        </Field>
+          <Field label="Описание">
+            <textarea
+              value={form.description}
+              onChange={(event) => onChange((current) => ({ ...current, description: event.target.value }))}
+              className="input min-h-24"
+              placeholder="Коротко для пользователя"
+            />
+          </Field>
 
-        <button type="button" className="btn-primary" onClick={submit} disabled={loading}>
-          {loading ? 'Сохраняем...' : editingId ? 'Сохранить изменения' : 'Создать подарок'}
-        </button>
-      </div>
-
-      <div className="grid gap-3">
-        {prizes.map((prize) => (
-          <article key={prize.id} className="card">
-            <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-              <div className="min-w-0 xl:max-w-sm">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-semibold">{prize.title}</span>
-                  <span className={prize.isActive ? 'badge-active' : 'badge-disabled'}>
-                    {prize.isActive ? 'Активен' : 'Отключён'}
-                  </span>
-                  <span className={cn('rounded-full px-2 py-1 text-xs font-semibold', rarityClass(prize.rarity))}>
-                    {rarityLabel(prize.rarity)}
-                  </span>
-                </div>
-                <div className="mt-2 text-sm text-slate-500">
-                  {prize.description || prizeTypeLabel(prize.type)}
-                </div>
-              </div>
-
-              <div className="grid min-w-0 gap-3 text-sm sm:grid-cols-2 xl:flex-1 2xl:grid-cols-5">
-                <Metric label="Подарок" value={prizeValue(prize)} />
-                <Metric label="Вес" value={prize.weight} />
-                <Metric label="Шанс" value={`${(prize.chance * 100).toFixed(1)}%`} />
-                <Metric label="Выпало" value={`${prize.winsCount}/${prize.maxWins ?? '∞'}`} />
-                <Metric label="Промокод" value={prize.type === 'PROMO_CODE_PERCENT' ? `${prize.promoExpiresInDays ?? 'env'} дн.` : '—'} />
-              </div>
-
-              <div className="action-row xl:w-[240px]">
-                <button type="button" className="btn-secondary min-w-[112px] px-3 text-xs" onClick={() => startEdit(prize)}>
-                  <Edit3 className="h-3.5 w-3.5" />
-                  Изменить
-                </button>
-                <button type="button" className="btn-secondary min-w-[112px] px-3 text-xs" onClick={() => toggleActive(prize)}>
-                  <Power className="h-3.5 w-3.5" />
-                  {prize.isActive ? 'Отключить' : 'Включить'}
-                </button>
-              </div>
-            </div>
-          </article>
-        ))}
-        {prizes.length === 0 && (
-          <div className="rounded-lg border border-dashed border-slate-300 bg-white p-5 text-sm text-slate-500 dark:border-white/10 dark:bg-surface-900">
-            Добавьте первый подарок для Подарочного бокса.
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <button type="button" className="btn-secondary" onClick={onClose}>
+              Отмена
+            </button>
+            <button type="button" className="btn-primary" onClick={onSubmit} disabled={loading}>
+              {loading ? 'Сохраняем...' : editingPrize ? 'Сохранить' : 'Создать'}
+            </button>
           </div>
-        )}
-      </div>
-
-      <BonusBoxOpeningHistory openings={openings} />
-    </div>
+        </div>
+      </aside>
+    </div>,
+    document.body
   )
 }
 
@@ -420,13 +654,39 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
   )
 }
 
-function Metric({ label, value }: { label: string; value: ReactNode }) {
+function CompactMetric({ label, value }: { label: string; value: ReactNode }) {
   return (
-    <div className="info-cell">
+    <div className="min-w-0">
       <div className="text-xs text-slate-500">{label}</div>
       <div className="mt-1 truncate font-medium">{value}</div>
     </div>
   )
+}
+
+function getPrizeStats(prizes: BonusBoxPrizeAdminRow[]) {
+  const activePrizes = prizes.filter((prize) => prize.isActive && prize.weight > 0 && (prize.maxWins == null || prize.winsCount < prize.maxWins))
+  const active = activePrizes.length
+  const noPrizeChance = activePrizes
+    .filter((prize) => prize.type === 'NO_PRIZE')
+    .reduce((sum, prize) => sum + prize.chance, 0)
+  const promoChance = activePrizes
+    .filter((prize) => prize.type === 'PROMO_CODE_PERCENT')
+    .reduce((sum, prize) => sum + prize.chance, 0)
+  const attemptChance = activePrizes
+    .filter((prize) => prize.type === 'BONUS_ATTEMPTS')
+    .reduce((sum, prize) => sum + prize.chance, 0)
+
+  return {
+    active,
+    noPrizeChance,
+    promoChance,
+    attemptChance,
+    rewardChance: Math.max(0, 1 - noPrizeChance),
+  }
+}
+
+function formatChance(value: number) {
+  return `${(value * 100).toFixed(1)}%`
 }
 
 function valueLabel(type: PrizeType) {
@@ -498,4 +758,20 @@ function rarityClass(rarity: Rarity) {
   if (rarity === 'EPIC') return 'bg-fuchsia-100 text-fuchsia-800 dark:bg-fuchsia-500/15 dark:text-fuchsia-100'
   if (rarity === 'RARE') return 'bg-cyan-100 text-cyan-800 dark:bg-cyan-500/15 dark:text-cyan-100'
   return 'bg-slate-100 text-slate-700 dark:bg-white/10 dark:text-slate-200'
+}
+
+function prizeAdminBorderClass(prize: BonusBoxPrizeAdminRow) {
+  if (prize.type === 'NO_PRIZE') return 'border-red-300 dark:border-red-500/60'
+  if (prize.rarity === 'LEGENDARY') return 'border-amber-200 dark:border-amber-500/40'
+  if (prize.rarity === 'EPIC') return 'border-fuchsia-200 dark:border-fuchsia-500/40'
+  if (prize.rarity === 'RARE') return 'border-cyan-200 dark:border-cyan-500/40'
+  return 'border-slate-200 dark:border-white/10'
+}
+
+function prizeAdminTopClass(prize: BonusBoxPrizeAdminRow) {
+  if (prize.type === 'NO_PRIZE') return 'bg-red-500'
+  if (prize.rarity === 'LEGENDARY') return 'bg-amber-400'
+  if (prize.rarity === 'EPIC') return 'bg-fuchsia-400'
+  if (prize.rarity === 'RARE') return 'bg-cyan-400'
+  return 'bg-slate-400'
 }

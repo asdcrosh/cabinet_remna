@@ -21,6 +21,7 @@ import {
   X,
 } from 'lucide-react'
 import { cn } from '@/lib/cn'
+import { useBodyScrollLock } from '@/lib/use-body-scroll-lock'
 import { LogoutButton } from './logout-button'
 
 const nav = [
@@ -67,6 +68,7 @@ export function MobileDashboardNav({
   badges?: NavBadges
 }) {
   const [open, setOpen] = useState(false)
+  useBodyScrollLock(open)
 
   return (
     <>

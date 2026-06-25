@@ -6,8 +6,7 @@ import {
   type BonusBoxOpeningAdminRow,
   type BonusBoxPrizeAdminRow,
 } from '@/components/admin/bonus-box-prizes-admin'
-import { LazyListLoader } from '@/components/admin/lazy-list-loader'
-import { ADMIN_LIST_PAGE_SIZE, parseAdminListLimit } from '@/lib/admin-list'
+import { parseAdminListLimit } from '@/lib/admin-list'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Подарочный бокс — Админка' }
@@ -77,8 +76,7 @@ export default async function AdminBonusBoxPage({
         title="Подарочный бокс"
         description="Подарки, веса выпадения, редкость и лимиты"
       />
-      <BonusBoxPrizesAdmin prizes={rows} openings={openingRows} />
-      <LazyListLoader loaded={openings.length} total={totalOpenings} step={ADMIN_LIST_PAGE_SIZE} />
+      <BonusBoxPrizesAdmin prizes={rows} openings={openingRows} totalOpenings={totalOpenings} />
     </div>
   )
 }

@@ -78,6 +78,8 @@ type OpenBoxResponse = {
   remoteSynced: boolean;
 };
 
+type BonusBoxTab = "outcomes" | "history" | "rules";
+
 const CARD_WIDTH = 176;
 const CARD_GAP = 14;
 const STEP = CARD_WIDTH + CARD_GAP;
@@ -94,6 +96,7 @@ export function BonusBoxClient({
   const [offset, setOffset] = useState(0);
   const [opening, setOpening] = useState(false);
   const [result, setResult] = useState<OpenBoxResponse | null>(null);
+  const [activeTab, setActiveTab] = useState<BonusBoxTab>("outcomes");
 
   const canOpen =
     data.hasActiveSubscription &&
@@ -306,78 +309,203 @@ export function BonusBoxClient({
         )}
       </section>
 
-      <BonusBoxRules
-        config={data.config}
-        hasActiveSubscription={data.hasActiveSubscription}
-      />
+      <section className="space-y-4">
+        <div className="flex flex-wrap gap-2 rounded-lg border border-slate-200 bg-white p-1 shadow-sm dark:border-white/10 dark:bg-surface-900">
+          <BonusTabButton
+            active={activeTab === "outcomes"}
+            onClick={() => setActiveTab("outcomes")}
+            label="Исходы"
+            meta={`${data.prizes.length}`}
+          />
+          <BonusTabButton
+            active={activeTab === "history"}
+            onClick={() => setActiveTab("history")}
+            label="История"
+            meta={`${data.openings.length}`}
+          />
+          <BonusTabButton
+            active={activeTab === "rules"}
+            onClick={() => setActiveTab("rules")}
+            label="Как получить"
+            meta={data.hasActiveSubscription ? "активно" : "подписка"}
+          />
+        </div>
 
-      <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
-        <section className="space-y-3">
-          <div className="flex items-center justify-between gap-3">
-            <h2 className="text-lg font-semibold">Возможные исходы</h2>
-            <div className="text-sm text-slate-500">
-              {Math.round(totalChance * 100)}%
+        {activeTab === "outcomes" && (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-lg font-semibold">Возможные исходы</h2>
+              <div className="text-sm text-slate-500">
+                {Math.round(totalChance * 100)}%
+              </div>
+            </div>
+            <div className="grid gap-3 lg:grid-cols-2">
+              {data.prizes.map((prize) => (
+                <OutcomeRow key={prize.id} prize={prize} />
+              ))}
+              {data.prizes.length === 0 && (
+                <div className="rounded-lg border border-dashed border-slate-300 bg-white p-5 text-sm text-slate-500 dark:border-white/10 dark:bg-surface-900">
+                  Подарки скоро появятся.
+                </div>
+              )}
             </div>
           </div>
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {data.prizes.map((prize) => (
-              <PrizeCard key={prize.id} prize={prize} />
-            ))}
-            {data.prizes.length === 0 && (
-              <div className="rounded-lg border border-dashed border-slate-300 bg-white p-5 text-sm text-slate-500 dark:border-white/10 dark:bg-surface-900">
-                Подарки скоро появятся.
-              </div>
-            )}
-          </div>
-        </section>
+        )}
 
-        <section className="rounded-lg border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-surface-900">
-          <h2 className="text-lg font-semibold">Ваши результаты</h2>
-          <div className="mt-4 space-y-3">
-            {data.openings.map((opening) => (
-              <div
-                key={opening.id}
-                className="rounded-lg border border-slate-100 bg-slate-50 p-3 dark:border-white/10 dark:bg-surface-800"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="truncate font-medium">
-                      {opening.prize.title}
-                    </div>
-                    <div className="mt-1 text-xs text-slate-500">
-                      {formatDate(opening.createdAt)}
-                    </div>
-                  </div>
-                  <span
-                    className={cn(
-                      "shrink-0 rounded-full px-2 py-1 text-[11px] font-semibold",
-                      rarityClass(opening.prize.rarity),
-                    )}
-                  >
-                    {rarityLabel(opening.prize.rarity)}
-                  </span>
+        {activeTab === "history" && (
+          <section className="space-y-3">
+            <h2 className="text-lg font-semibold">Ваши результаты</h2>
+            <div className="grid gap-3 lg:grid-cols-2">
+              {data.openings.map((opening) => (
+                <OpeningRow key={opening.id} opening={opening} />
+              ))}
+              {data.openings.length === 0 && (
+                <div className="rounded-lg border border-dashed border-slate-300 bg-white p-5 text-sm text-slate-500 dark:border-white/10 dark:bg-surface-900">
+                  История пока пустая.
                 </div>
-                {opening.promoCode && (
-                  <div className="mt-2 break-all rounded-md bg-white px-2 py-1 font-mono text-xs text-slate-700 dark:bg-surface-950 dark:text-slate-200">
-                    {opening.promoCode}
-                    {opening.promoCodeExpiresAt && (
-                      <span className="ml-2 font-sans text-slate-500">
-                        до {formatDateOnly(opening.promoCodeExpiresAt)}
-                      </span>
-                    )}
-                  </div>
-                )}
-              </div>
-            ))}
-            {data.openings.length === 0 && (
-              <div className="rounded-lg border border-dashed border-slate-300 p-4 text-sm text-slate-500 dark:border-white/10">
-                История пока пустая.
-              </div>
-            )}
-          </div>
-        </section>
-      </div>
+              )}
+            </div>
+          </section>
+        )}
+
+        {activeTab === "rules" && (
+          <BonusBoxRules
+            config={data.config}
+            hasActiveSubscription={data.hasActiveSubscription}
+          />
+        )}
+      </section>
     </div>
+  );
+}
+
+function BonusTabButton({
+  active,
+  label,
+  meta,
+  onClick,
+}: {
+  active: boolean;
+  label: string;
+  meta: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className={cn(
+        "flex min-h-10 flex-1 items-center justify-between gap-3 rounded-md px-3 py-2 text-left text-sm transition-colors sm:flex-none sm:min-w-40",
+        active
+          ? "bg-slate-950 text-white shadow-sm dark:bg-white dark:text-slate-950"
+          : "text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-white/5",
+      )}
+      onClick={onClick}
+    >
+      <span className="font-semibold">{label}</span>
+      <span
+        className={cn(
+          "rounded-full px-2 py-0.5 text-[11px] font-semibold",
+          active
+            ? "bg-white/15 text-white dark:bg-slate-950/10 dark:text-slate-700"
+            : "bg-slate-100 text-slate-500 dark:bg-white/10 dark:text-slate-400",
+        )}
+      >
+        {meta}
+      </span>
+    </button>
+  );
+}
+
+function OutcomeRow({ prize }: { prize: BonusBoxPrizeView }) {
+  const chancePercent = prize.chance * 100;
+
+  return (
+    <article
+      className={cn(
+        "relative overflow-hidden rounded-lg border bg-white p-4 shadow-sm dark:bg-surface-900",
+        prizeBorderClass(prize),
+      )}
+    >
+      <div
+        className={cn("absolute inset-x-0 top-0 h-1", prizeTopClass(prize))}
+      />
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="truncate font-semibold">{prize.title}</h3>
+            <span
+              className={cn(
+                "rounded-full px-2 py-1 text-[11px] font-semibold",
+                rarityClass(prize.rarity),
+              )}
+            >
+              {rarityLabel(prize.rarity)}
+            </span>
+          </div>
+          <div className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+            {prize.description || prizeLabel(prize)}
+          </div>
+        </div>
+        <div className="shrink-0 text-right">
+          <div className="text-lg font-semibold">
+            {chancePercent.toFixed(1)}%
+          </div>
+          <div className="text-xs text-slate-400">шанс</div>
+        </div>
+      </div>
+      <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-white/10">
+        <div
+          className={cn("h-full rounded-full", prizeTopClass(prize))}
+          style={{
+            width:
+              chancePercent <= 0
+                ? "0%"
+                : `${Math.max(2, Math.min(100, chancePercent))}%`,
+          }}
+        />
+      </div>
+    </article>
+  );
+}
+
+function OpeningRow({ opening }: { opening: BonusBoxOpeningView }) {
+  return (
+    <article
+      className={cn(
+        "rounded-lg border bg-white p-4 shadow-sm dark:bg-surface-900",
+        prizeBorderClass(opening.prize),
+      )}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="truncate font-semibold">{opening.prize.title}</div>
+          <div className="mt-1 text-sm text-slate-500">
+            {formatDate(opening.createdAt)}
+          </div>
+          <div className="mt-1 text-xs text-slate-400">
+            {prizeLabel(opening.prize)}
+          </div>
+        </div>
+        <span
+          className={cn(
+            "shrink-0 rounded-full px-2 py-1 text-[11px] font-semibold",
+            rarityClass(opening.prize.rarity),
+          )}
+        >
+          {rarityLabel(opening.prize.rarity)}
+        </span>
+      </div>
+      {opening.promoCode && (
+        <div className="mt-3 break-all rounded-md bg-slate-50 px-2.5 py-2 font-mono text-xs text-slate-700 dark:bg-surface-950 dark:text-slate-200">
+          {opening.promoCode}
+          {opening.promoCodeExpiresAt && (
+            <span className="ml-2 font-sans text-slate-500">
+              до {formatDateOnly(opening.promoCodeExpiresAt)}
+            </span>
+          )}
+        </div>
+      )}
+    </article>
   );
 }
 

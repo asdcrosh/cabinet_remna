@@ -1,6 +1,9 @@
 'use client'
 
+import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { AlertTriangle } from 'lucide-react'
+import { useBodyScrollLock } from '@/lib/use-body-scroll-lock'
 
 interface ConfirmDialogProps {
   open: boolean
@@ -21,10 +24,18 @@ export function ConfirmDialog({
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
-  if (!open) return null
+  const [mounted, setMounted] = useState(false)
 
-  return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/50 p-4">
+  useBodyScrollLock(open)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  if (!open || !mounted) return null
+
+  return createPortal(
+    <div className="fixed inset-0 z-50 grid h-dvh w-dvw place-items-center bg-slate-950/50 p-4">
       <div className="w-full max-w-md rounded-2xl border bg-white p-5 shadow-2xl dark:bg-surface-900">
         <div className="mb-4 flex gap-3">
           <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-amber-50 text-amber-600 dark:bg-amber-500/10">
@@ -42,6 +53,7 @@ export function ConfirmDialog({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }

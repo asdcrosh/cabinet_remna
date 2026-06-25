@@ -6,6 +6,7 @@ import { createPortal } from 'react-dom'
 import { Gift, Plus, X } from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
 import { toast } from '@/components/ui/toaster'
+import { useBodyScrollLock } from '@/lib/use-body-scroll-lock'
 
 export function BonusBoxAttemptsButton({
   userId,
@@ -25,6 +26,8 @@ export function BonusBoxAttemptsButton({
   useEffect(() => {
     setMounted(true)
   }, [])
+
+  useBodyScrollLock(open)
 
   async function submit() {
     const attemptsToAdd = Number(value)
@@ -51,7 +54,7 @@ export function BonusBoxAttemptsButton({
   }
 
   const dialog = (
-    <div className="fixed inset-0 z-50 grid place-items-center p-4">
+    <div className="fixed inset-0 z-50 grid h-dvh w-dvw place-items-center p-4">
       <button
         type="button"
         className="absolute inset-0 bg-slate-950/50"
