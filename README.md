@@ -321,6 +321,8 @@ cabinetctl logs
 cabinetctl restart
 cabinetctl health
 cabinetctl backup
+cabinetctl backup-full
+cabinetctl transfer
 ```
 
 Логи:
@@ -337,7 +339,89 @@ source .env
 curl -H "x-healthcheck-token: $HEALTHCHECK_TOKEN" "$APP_URL/api/health"
 ```
 
-## Бэкап
+## Полный бэкап и перенос сервера
+
+После установки или обновления доступна команда:
+
+```bash
+remna-backup
+```
+
+Она работает с тремя системами на одном сервере:
+
+- `/opt/remnawave` и база `remnawave-db`;
+- `/opt/remnashop` и база `remnashop-db`;
+- `/opt/remnawave-cabinet` и база `remnawave-cabinet-db`.
+
+Архив содержит конфигурацию, `.env`, compose-файлы, сертификаты внутри каталогов,
+три согласованных PostgreSQL-дампа, манифест и SHA-256 для каждого файла.
+Redis не переносится: его данные являются временным кэшем.
+
+Создать полный бэкап:
+
+```bash
+sudo remna-backup backup
+```
+
+По умолчанию архив появится в:
+
+```text
+/opt/remnawave-backups/remna-full-backup-ДАТА-ВРЕМЯ.tar.gz
+```
+
+Проверить архив перед копированием:
+
+```bash
+sudo remna-backup verify /opt/remnawave-backups/remna-full-backup-ДАТА-ВРЕМЯ.tar.gz
+```
+
+Передать на новый сервер можно через `scp`, SFTP или объектное хранилище. Пример:
+
+```bash
+scp /opt/remnawave-backups/remna-full-backup-ДАТА-ВРЕМЯ.tar.gz root@НОВЫЙ_IP:/root/
+```
+
+На новом сервере установите Docker, скачайте скрипт и запустите восстановление:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/asdcrosh/cabinet_remna/main/deploy/full-stack-backup.sh \
+  -o /usr/local/bin/remna-backup
+chmod +x /usr/local/bin/remna-backup
+
+RESTORE_CONFIRM=RESTORE_REMNAWAVE_REMNASHOP_CABINET \
+  remna-backup restore /root/remna-full-backup-ДАТА-ВРЕМЯ.tar.gz
+```
+
+Скрипт:
+
+1. проверит контрольные суммы;
+2. остановит существующие контейнеры, если они есть;
+3. сохранит прежние каталоги в `/opt/remna-pre-restore-ДАТА-ВРЕМЯ`;
+4. восстановит файлы и базы;
+5. запустит Remnawave, Remnashop, кабинет и nginx.
+
+После переноса измените DNS на IP нового сервера и проверьте:
+
+```bash
+docker ps
+curl -I https://ДОМЕН_КАБИНЕТА
+```
+
+Если IP сервера изменился, обновите разрешённый IP панели на внешних узлах
+Remnawave и проверьте firewall. Старый сервер выключайте только после проверки
+авторизации, подписок, оплаты и Telegram.
+
+Настройки хранения:
+
+```bash
+FULL_BACKUP_DIR=/mnt/backups FULL_BACKUP_KEEP_DAYS=30 remna-backup backup
+```
+
+Сценарий создан по той же идее, что и
+[distillium/remnawave-backup-restore](https://github.com/distillium/remnawave-backup-restore),
+но отдельно адаптирован под совместный перенос Remnawave, Remnashop и кабинета.
+
+## Бэкап только базы кабинета
 
 Создать бэкап:
 

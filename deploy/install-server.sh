@@ -14,6 +14,9 @@ TTY_DEVICE="${TTY_DEVICE:-/dev/tty}"
 CABINETCTL_URL="${CABINETCTL_URL:-${RAW_BASE_URL}/deploy/cabinetctl.sh}"
 CABINETCTL_PATH="${CABINETCTL_PATH:-/usr/local/bin/cabinetctl}"
 CABINETCTL_TEMP="${CABINETCTL_PATH}.tmp"
+FULL_BACKUP_URL="${FULL_BACKUP_URL:-${RAW_BASE_URL}/deploy/full-stack-backup.sh}"
+FULL_BACKUP_PATH="${FULL_BACKUP_PATH:-/usr/local/bin/remna-backup}"
+FULL_BACKUP_TEMP="${FULL_BACKUP_PATH}.tmp"
 
 if [[ "$(id -u)" -ne 0 ]]; then
   echo "Run as root or with sudo:"
@@ -46,6 +49,9 @@ curl -fsSL "${COMPOSE_URL}" -o "${COMPOSE_FILE}"
 curl -fsSL "${CABINETCTL_URL}" -o "${CABINETCTL_TEMP}"
 install -m 755 "${CABINETCTL_TEMP}" "${CABINETCTL_PATH}"
 rm -f "${CABINETCTL_TEMP}"
+curl -fsSL "${FULL_BACKUP_URL}" -o "${FULL_BACKUP_TEMP}"
+install -m 755 "${FULL_BACKUP_TEMP}" "${FULL_BACKUP_PATH}"
+rm -f "${FULL_BACKUP_TEMP}"
 
 if [[ ! -f "${ENV_FILE}" ]]; then
   if [[ -f "${LEGACY_ENV_FILE}" ]]; then

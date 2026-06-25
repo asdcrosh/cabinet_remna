@@ -141,6 +141,22 @@ backup_database() {
   echo "${GREEN}Резервная копия создана:${RESET} ${output}"
 }
 
+full_backup() {
+  if ! command -v remna-backup >/dev/null 2>&1; then
+    echo "${RED}Команда remna-backup не установлена. Сначала обновите кабинет.${RESET}"
+    return 1
+  fi
+  remna-backup backup
+}
+
+full_backup_menu() {
+  if ! command -v remna-backup >/dev/null 2>&1; then
+    echo "${RED}Команда remna-backup не установлена. Сначала обновите кабинет.${RESET}"
+    return 1
+  fi
+  remna-backup
+}
+
 show_menu() {
   clear 2>/dev/null || true
   title
@@ -155,6 +171,8 @@ show_menu() {
     "  6. Перезапустить сервисы" \
     "  7. Проверить доступность" \
     "  8. Создать резервную копию БД" \
+    "  9. Полный бэкап сервера" \
+    " 10. Меню переноса и восстановления" \
     "  0. Выход"
   printf '\nВыберите действие: ' >/dev/tty
 }
@@ -177,6 +195,8 @@ run_menu() {
       6) restart_services; pause ;;
       7) health_check || true; pause ;;
       8) backup_database; pause ;;
+      9) full_backup; pause ;;
+      10) full_backup_menu; pause ;;
       0) exit 0 ;;
       *) echo "${RED}Неизвестный пункт.${RESET}"; pause ;;
     esac
@@ -195,6 +215,8 @@ show_help() {
   cabinetctl restart     перезапустить сервисы
   cabinetctl health      проверить доступность
   cabinetctl backup      создать резервную копию БД
+  cabinetctl backup-full полный бэкап Remnawave, Remnashop и кабинета
+  cabinetctl transfer    меню бэкапа и восстановления
 EOF
 }
 
@@ -208,6 +230,8 @@ case "${1:-menu}" in
   restart) restart_services ;;
   health) health_check ;;
   backup) backup_database ;;
+  backup-full) full_backup ;;
+  transfer) full_backup_menu ;;
   help|-h|--help) show_help ;;
   *) show_help; exit 1 ;;
 esac
