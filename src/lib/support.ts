@@ -8,10 +8,15 @@ export const supportCategories = [
 ] as const
 
 export const createSupportTicketSchema = z.object({
-  subject: z.string().trim().min(3).max(120),
+  subject: z.string().trim().min(3).max(120).optional(),
   category: z.enum(['payment', 'connection', 'subscription', 'general']).default('general'),
   message: z.string().trim().min(5).max(3000),
 })
+
+export function supportSubjectFromMessage(message: string) {
+  const firstLine = message.trim().split(/\r?\n/, 1)[0]?.replace(/\s+/g, ' ') || 'Вопрос в поддержку'
+  return firstLine.length > 64 ? `${firstLine.slice(0, 61).trimEnd()}...` : firstLine
+}
 
 export const createSupportMessageSchema = z.object({
   message: z.string().trim().min(1).max(3000),

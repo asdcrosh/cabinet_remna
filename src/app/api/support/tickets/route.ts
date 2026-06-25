@@ -2,7 +2,12 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAuth, withAuth } from '@/lib/auth/guard'
 import { rateLimit } from '@/lib/rate-limit'
-import { createSupportTicketSchema, serializeSupportMessage, serializeSupportTicket } from '@/lib/support'
+import {
+  createSupportTicketSchema,
+  serializeSupportMessage,
+  serializeSupportTicket,
+  supportSubjectFromMessage,
+} from '@/lib/support'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -53,7 +58,7 @@ export const POST = withAuth(async (req: Request) => {
     const created = await tx.supportTicket.create({
       data: {
         userId: session.uid,
-        subject: parsed.data.subject,
+        subject: parsed.data.subject || supportSubjectFromMessage(parsed.data.message),
         category: parsed.data.category,
         status: 'WAITING_ADMIN',
         adminUnreadCount: 1,

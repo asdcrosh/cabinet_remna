@@ -199,12 +199,17 @@ function useLiveBadges(initialBadges: NavBadges) {
 
     void refreshBadges()
     const interval = window.setInterval(() => {
-      void refreshBadges()
-    }, 5000)
+      if (document.visibilityState === 'visible') void refreshBadges()
+    }, 3000)
+    const refreshOnFocus = () => void refreshBadges()
+    window.addEventListener('focus', refreshOnFocus)
+    document.addEventListener('visibilitychange', refreshOnFocus)
 
     return () => {
       active = false
       window.clearInterval(interval)
+      window.removeEventListener('focus', refreshOnFocus)
+      document.removeEventListener('visibilitychange', refreshOnFocus)
     }
   }, [])
 

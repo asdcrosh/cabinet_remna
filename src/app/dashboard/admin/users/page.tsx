@@ -6,6 +6,7 @@ import { PageHeader } from '@/components/dashboard/page-header'
 import { SubscriptionBadge } from '@/components/admin/admin-badges'
 import { UserRoleSelect } from '@/components/admin/user-role-select'
 import { BonusBoxAttemptsButton } from '@/components/admin/bonus-box-attempts-button'
+import { UserProfileEditButton } from '@/components/admin/user-profile-edit-button'
 import { LazyListLoader } from '@/components/admin/lazy-list-loader'
 import { ADMIN_LIST_PAGE_SIZE, parseAdminListLimit } from '@/lib/admin-list'
 
@@ -184,6 +185,14 @@ export default async function AdminUsersPage({
                       userId={user.id}
                       email={user.email}
                       attemptsCount={attemptsCount}
+                    />
+                  )}
+                  {(actor.role === 'SUPER_ADMIN' || user.role !== 'SUPER_ADMIN') && (
+                    <UserProfileEditButton
+                      userId={user.id}
+                      email={user.email}
+                      name={user.name}
+                      emailVerified={Boolean(user.emailVerifiedAt)}
                     />
                   )}
                 </div>

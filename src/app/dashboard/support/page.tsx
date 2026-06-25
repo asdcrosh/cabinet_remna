@@ -32,7 +32,7 @@ export default async function SupportPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Поддержка" description="Вопросы по оплате, подключению и подписке" />
+      <PageHeader title="Поддержка" description="Напишите нам — ответ появится прямо в чате" />
       <SupportPanel
         mode="user"
         initialTickets={tickets.map((ticket) => ({

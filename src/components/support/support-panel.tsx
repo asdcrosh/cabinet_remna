@@ -25,7 +25,7 @@ import {
   XCircle,
 } from 'lucide-react'
 import { cn } from '@/lib/cn'
-import { supportCategoryLabel, supportCategories, supportStatusLabelForRole } from '@/lib/support'
+import { supportCategoryLabel, supportStatusLabelForRole } from '@/lib/support'
 
 type TicketStatus = 'OPEN' | 'WAITING_ADMIN' | 'WAITING_USER' | 'CLOSED'
 type SenderRole = 'USER' | 'ADMIN'
@@ -77,6 +77,7 @@ export function SupportPanel({
   const router = useRouter()
   const messagesScrollRef = useRef<HTMLDivElement | null>(null)
   const loadMoreRef = useRef<HTMLDivElement | null>(null)
+  const stickToBottomRef = useRef(true)
   const [tickets, setTickets] = useState(initialTickets)
   const [listLimit, setListLimit] = useState(Math.max(pageSize, initialTickets.length))
   const [listTotal, setListTotal] = useState(initialTotal)
@@ -88,9 +89,8 @@ export function SupportPanel({
   const [folder, setFolder] = useState<TicketFolder>('active')
   const [mobileChatOpen, setMobileChatOpen] = useState(false)
   const [message, setMessage] = useState('')
-  const [subject, setSubject] = useState('')
-  const [category, setCategory] = useState('general')
   const [newMessage, setNewMessage] = useState('')
+  const [newTicketOpen, setNewTicketOpen] = useState(mode === 'user' && initialTickets.length === 0)
   const [error, setError] = useState('')
   const [isPending, startTransition] = useTransition()
 
@@ -176,6 +176,7 @@ export function SupportPanel({
     let active = true
 
     async function refreshSupport() {
+      if (document.visibilityState === 'hidden') return
       try {
         const listData = await fetchTicketList(listLimit)
         if (active && listData) {
@@ -198,11 +199,17 @@ export function SupportPanel({
     void refreshSupport()
     const interval = window.setInterval(() => {
       void refreshSupport()
-    }, 6000)
+    }, 2500)
+
+    const refreshOnVisible = () => {
+      if (document.visibilityState === 'visible') void refreshSupport()
+    }
+    document.addEventListener('visibilitychange', refreshOnVisible)
 
     return () => {
       active = false
       window.clearInterval(interval)
+      document.removeEventListener('visibilitychange', refreshOnVisible)
     }
   }, [fetchTicket, fetchTicketList, listLimit, mergeTicketList, selectedId])
 
@@ -223,14 +230,17 @@ export function SupportPanel({
     const container = messagesScrollRef.current
     if (!container) return
 
-    requestAnimationFrame(() => {
-      container.scrollTop = container.scrollHeight
-    })
+    if (stickToBottomRef.current) {
+      requestAnimationFrame(() => {
+        container.scrollTop = container.scrollHeight
+      })
+    }
   }, [selected?.id, selected?.messages.length])
 
   async function loadTicket(id: string) {
     setSelectedId(id)
     setMobileChatOpen(true)
+    stickToBottomRef.current = true
     setError('')
 
     let ticket: SupportTicket
@@ -263,7 +273,7 @@ export function SupportPanel({
       const res = await fetch('/api/support/tickets', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ subject, category, message: newMessage }),
+        body: JSON.stringify({ message: newMessage }),
       })
       const data = await res.json().catch(() => null)
       if (!res.ok) {
@@ -275,9 +285,9 @@ export function SupportPanel({
       setSelectedTicket(data.ticket)
       setFolder('active')
       setMobileChatOpen(true)
-      setSubject('')
-      setCategory('general')
       setNewMessage('')
+      setNewTicketOpen(false)
+      stickToBottomRef.current = true
       router.refresh()
     })
   }
@@ -289,6 +299,7 @@ export function SupportPanel({
 
     const messageToSend = message.trim()
     setMessage('')
+    stickToBottomRef.current = true
 
     startTransition(async () => {
       const endpoint = mode === 'admin' ? `/api/admin/support/tickets/${selected.id}` : `/api/support/tickets/${selected.id}`
@@ -357,33 +368,42 @@ export function SupportPanel({
   return (
     <div className="grid h-[calc(100dvh-8rem)] min-h-[34rem] gap-4 overflow-hidden xl:h-[calc(100dvh-11rem)] xl:min-h-[42rem] xl:grid-cols-[24rem_minmax(0,1fr)]">
       <section className={cn('min-h-0 space-y-4 overflow-y-auto pr-0.5 xl:flex xl:flex-col xl:overflow-hidden', mobileChatOpen && 'hidden xl:flex')}>
-        {mode === 'user' && (
-          <NewTicketForm
-            subject={subject}
-            category={category}
-            message={newMessage}
-            isPending={isPending}
-            onSubjectChange={setSubject}
-            onCategoryChange={setCategory}
-            onMessageChange={setNewMessage}
-            onSubmit={createTicket}
-          />
-        )}
-
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-white/70 bg-white/80 shadow-sm shadow-slate-200/60 backdrop-blur dark:border-white/10 dark:bg-surface-900/80 dark:shadow-black/20">
           <div className="border-b border-slate-100 bg-white/70 px-4 py-3 dark:border-slate-800 dark:bg-surface-900/60">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <div className="font-semibold">{mode === 'admin' ? 'Обращения' : 'Мои обращения'}</div>
+                <div className="font-semibold">{mode === 'admin' ? 'Обращения' : 'Диалоги'}</div>
                 <div className="text-xs text-slate-500">{unreadTotal > 0 ? `${unreadTotal} новых сообщений` : 'Новых сообщений нет'}</div>
               </div>
-              {unreadTotal > 0 && <span className="rounded-full bg-red-600 px-2.5 py-1 text-xs font-semibold text-white">{unreadTotal}</span>}
+              <div className="flex items-center gap-2">
+                {unreadTotal > 0 && <span className="rounded-full bg-red-600 px-2.5 py-1 text-xs font-semibold text-white">{unreadTotal}</span>}
+                {mode === 'user' && (
+                  <button
+                    type="button"
+                    className="grid h-9 w-9 place-items-center rounded-lg bg-slate-950 text-white shadow-sm transition-colors hover:bg-slate-800 dark:bg-white dark:text-slate-950"
+                    onClick={() => setNewTicketOpen((current) => !current)}
+                    title="Новый диалог"
+                    aria-label="Новый диалог"
+                  >
+                    <MessageSquarePlus className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
             </div>
             <FolderTabs folder={folder} counts={folderCounts} mode={mode} onChange={setFolder} />
           </div>
 
           <div className="min-h-0 flex-1 overflow-y-auto p-2">
-            {filteredTickets.length === 0 ? (
+            {mode === 'user' && newTicketOpen && (
+              <NewTicketForm
+                message={newMessage}
+                isPending={isPending}
+                onMessageChange={setNewMessage}
+                onCancel={tickets.length > 0 ? () => setNewTicketOpen(false) : undefined}
+                onSubmit={createTicket}
+              />
+            )}
+            {filteredTickets.length === 0 && !newTicketOpen ? (
               <EmptyFolder folder={folder} />
             ) : (
               filteredTickets.map((ticket) => (
@@ -440,8 +460,9 @@ export function SupportPanel({
                       <TicketStatusBadge status={selected.status} mode={mode} />
                     </div>
                     <div className="mt-1 truncate text-sm text-slate-500">
-                      {supportCategoryLabel(selected.category)}
-                      {mode === 'admin' && selected.user ? ` · ${selected.user.email}` : ''}
+                      {mode === 'admin'
+                        ? `${supportCategoryLabel(selected.category)}${selected.user ? ` · ${selected.user.email}` : ''}`
+                        : 'Чат с поддержкой'}
                     </div>
                   </div>
                 </div>
@@ -455,7 +476,14 @@ export function SupportPanel({
               </div>
             )}
 
-            <div ref={messagesScrollRef} className="min-h-0 flex-1 overflow-y-auto bg-slate-50/70 px-3 py-4 dark:bg-surface-950/30 sm:px-5">
+            <div
+              ref={messagesScrollRef}
+              onScroll={(event) => {
+                const element = event.currentTarget
+                stickToBottomRef.current = element.scrollHeight - element.scrollTop - element.clientHeight < 120
+              }}
+              className="min-h-0 flex-1 overflow-y-auto bg-slate-50/70 px-3 py-4 dark:bg-surface-950/30 sm:px-5"
+            >
               <div className="mx-auto max-w-3xl space-y-3">
                 {selected.messages.map((item) => {
                   const own = mode === 'admin' ? item.senderRole === 'ADMIN' : item.senderRole === 'USER'
@@ -505,44 +533,52 @@ export function SupportPanel({
 }
 
 function NewTicketForm({
-  subject,
-  category,
   message,
   isPending,
-  onSubjectChange,
-  onCategoryChange,
   onMessageChange,
+  onCancel,
   onSubmit,
 }: {
-  subject: string
-  category: string
   message: string
   isPending: boolean
-  onSubjectChange: (value: string) => void
-  onCategoryChange: (value: string) => void
   onMessageChange: (value: string) => void
+  onCancel?: () => void
   onSubmit: (event: FormEvent<HTMLFormElement>) => void
 }) {
   return (
-    <form onSubmit={onSubmit} className="rounded-lg border border-white/70 bg-white/80 p-4 shadow-sm shadow-slate-200/60 backdrop-blur dark:border-white/10 dark:bg-surface-900/80 dark:shadow-black/20">
+    <form onSubmit={onSubmit} className="mb-2 rounded-lg border border-cyan-200 bg-cyan-50/60 p-3 shadow-sm dark:border-cyan-500/20 dark:bg-cyan-500/[0.06]">
       <div className="flex items-center gap-3">
-        <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-slate-950 text-cyan-200 shadow-sm dark:bg-white dark:text-slate-950">
+        <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-slate-950 text-cyan-200 shadow-sm dark:bg-white dark:text-slate-950">
           <MessageSquarePlus className="h-5 w-5" />
         </div>
         <div>
-          <h2 className="font-semibold">Новое обращение</h2>
-          <p className="text-sm text-slate-500">Ответ появится в этом разделе.</p>
+          <h2 className="text-sm font-semibold">Новый диалог</h2>
+          <p className="text-xs text-slate-500">Опишите вопрос одним сообщением.</p>
         </div>
       </div>
-      <div className="mt-4 space-y-3">
-        <input className="input" value={subject} onChange={(event) => onSubjectChange(event.target.value)} placeholder="Тема" maxLength={120} required />
-        <select className="input" value={category} onChange={(event) => onCategoryChange(event.target.value)}>
-          {supportCategories.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
-        </select>
-        <textarea className="input min-h-24 resize-y" value={message} onChange={(event) => onMessageChange(event.target.value)} placeholder="Сообщение" maxLength={3000} required />
-        <button className="btn-primary w-full" disabled={isPending}>
+      <textarea
+        className="input mt-3 min-h-28 resize-none"
+        value={message}
+        onChange={(event) => onMessageChange(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key !== 'Enter' || event.shiftKey) return
+          event.preventDefault()
+          event.currentTarget.form?.requestSubmit()
+        }}
+        placeholder="Напишите, что случилось"
+        maxLength={3000}
+        required
+        autoFocus
+      />
+      <div className="mt-3 flex justify-end gap-2">
+        {onCancel && (
+          <button type="button" className="btn-secondary" onClick={onCancel} disabled={isPending}>
+            Отмена
+          </button>
+        )}
+        <button className="btn-primary" disabled={isPending || message.trim().length < 5}>
           <Send className="h-4 w-4" />
-          Отправить
+          {isPending ? 'Отправляем...' : 'Отправить'}
         </button>
       </div>
     </form>
@@ -560,7 +596,10 @@ function FolderTabs({
   mode: 'user' | 'admin'
   onChange: (folder: TicketFolder) => void
 }) {
-  const items = [
+  const items = mode === 'user' ? [
+    { value: 'active' as const, label: 'Диалоги', icon: Inbox },
+    { value: 'closed' as const, label: 'Архив', icon: Archive },
+  ] : [
     { value: 'active' as const, label: 'Активные', icon: Inbox },
     { value: 'need-answer' as const, label: mode === 'admin' ? 'Новые' : 'Ответы', icon: Timer },
     { value: 'answered' as const, label: 'Отвеченные', icon: CheckCircle2 },
@@ -568,7 +607,7 @@ function FolderTabs({
   ]
 
   return (
-    <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-2">
+    <div className={cn('mt-3 grid grid-cols-2 gap-2', mode === 'admin' && 'sm:grid-cols-4 xl:grid-cols-2')}>
       {items.map((item) => {
         const Icon = item.icon
         const active = folder === item.value
@@ -629,8 +668,9 @@ function TicketListItem({
             <div className="truncate font-medium">{ticket.subject}</div>
           </div>
           <div className="mt-1 truncate text-xs text-slate-500 dark:text-slate-400">
-            {mode === 'admin' && ticket.user ? `${ticket.user.email} · ` : ''}
-            {supportCategoryLabel(ticket.category)}
+            {mode === 'admin'
+              ? `${ticket.user ? `${ticket.user.email} · ` : ''}${supportCategoryLabel(ticket.category)}`
+              : formatDate(ticket.lastMessageAt)}
           </div>
         </div>
         <TicketStatusBadge status={ticket.status} mode={mode} active={active} />

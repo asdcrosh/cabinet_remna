@@ -3,6 +3,7 @@ import {
   createSupportMessageSchema,
   createSupportTicketSchema,
   supportCategoryLabel,
+  supportSubjectFromMessage,
   supportStatusLabel,
   supportStatusLabelForRole,
   userUpdateSupportTicketSchema,
@@ -17,6 +18,14 @@ describe('support helpers', () => {
     })
 
     expect(parsed.success).toBe(true)
+    expect(createSupportTicketSchema.safeParse({
+      message: 'Не получается подключиться на iPhone.',
+    }).success).toBe(true)
+  })
+
+  it('creates a compact subject from the first message line', () => {
+    expect(supportSubjectFromMessage('Не работает подключение\nДополнительные детали')).toBe('Не работает подключение')
+    expect(supportSubjectFromMessage('А'.repeat(80))).toBe(`${'А'.repeat(61)}...`)
   })
 
   it('rejects empty messages and user status changes except close', () => {
