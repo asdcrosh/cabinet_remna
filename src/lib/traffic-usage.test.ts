@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { normalizeUsageSeries } from './traffic-usage'
+import { hasTrafficUsage, normalizeUsageSeries } from './traffic-usage'
 
 describe('normalizeUsageSeries', () => {
   it('normalizes direct byte rows and nested response formats', () => {
@@ -49,5 +49,16 @@ describe('normalizeUsageSeries', () => {
       { date: '2026-06-23', bytes: '0' },
       { date: '2026-06-24', bytes: '2048' },
     ])
+  })
+
+  it('does not treat an all-zero range as used traffic', () => {
+    expect(hasTrafficUsage([
+      { date: '2026-06-23', bytes: '0' },
+      { date: '2026-06-24', bytes: '0' },
+    ])).toBe(false)
+    expect(hasTrafficUsage([
+      { date: '2026-06-23', bytes: '0' },
+      { date: '2026-06-24', bytes: '1' },
+    ])).toBe(true)
   })
 })

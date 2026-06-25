@@ -9,6 +9,7 @@ import { BonusBoxAttemptsButton } from '@/components/admin/bonus-box-attempts-bu
 import { UserProfileEditButton } from '@/components/admin/user-profile-edit-button'
 import { LazyListLoader } from '@/components/admin/lazy-list-loader'
 import { ADMIN_LIST_PAGE_SIZE, parseAdminListLimit } from '@/lib/admin-list'
+import { UserPlanButton } from '@/components/admin/user-plan-button'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Пользователи — Админка' }
@@ -40,7 +41,7 @@ export default async function AdminUsersPage({
       } : {}),
   }
 
-  const [total, users] = await prisma.$transaction([
+  const [total, users, plans] = await prisma.$transaction([
     prisma.user.count({ where }),
     prisma.user.findMany({
       where,
@@ -67,6 +68,10 @@ export default async function AdminUsersPage({
         },
         _count: { select: { payments: true, subscriptions: true, devices: true } },
       },
+    }),
+    prisma.plan.findMany({
+      orderBy: [{ isActive: 'desc' }, { sortOrder: 'asc' }],
+      select: { id: true, name: true, priceKopecks: true, durationDays: true, isActive: true },
     }),
   ])
   const now = new Date()
@@ -174,7 +179,7 @@ export default async function AdminUsersPage({
                   )}
                 </div>
 
-                <div className="flex items-center justify-between gap-2 lg:justify-end">
+                <div className="flex flex-wrap items-center justify-between gap-2 lg:justify-end">
                   <div className="grid grid-cols-3 gap-1 text-center text-xs">
                     <Counter value={user._count.payments} label="оплат" />
                     <Counter value={user._count.devices} label="устр." />
@@ -185,6 +190,14 @@ export default async function AdminUsersPage({
                       userId={user.id}
                       email={user.email}
                       attemptsCount={attemptsCount}
+                    />
+                  )}
+                  {(actor.role === 'SUPER_ADMIN' || user.role !== 'SUPER_ADMIN') && (
+                    <UserPlanButton
+                      userId={user.id}
+                      email={user.email}
+                      currentPlanId={subscription?.planId ?? null}
+                      plans={plans}
                     />
                   )}
                   {(actor.role === 'SUPER_ADMIN' || user.role !== 'SUPER_ADMIN') && (

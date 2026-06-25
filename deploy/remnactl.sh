@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="1.0.0"
+VERSION="1.1.0"
 BRANCH="${BRANCH:-main}"
 RAW_BASE_URL="${RAW_BASE_URL:-https://raw.githubusercontent.com/asdcrosh/cabinet_remna/${BRANCH}}"
 INSTALL_URL="${INSTALL_URL:-${RAW_BASE_URL}/deploy/install-server.sh}"
@@ -246,17 +246,15 @@ show_menu() {
       "  5. Логи worker" \
       "  6. Проверить кабинет" \
       "  7. Настроить nginx и HTTPS" \
-      "  8. Создать полный бэкап" \
-      "  9. Бэкапы и восстановление" \
-      " 10. Обновить консоль" \
+      "  8. Резервные копии и S3" \
+      "  9. Обновить консоль" \
       "  0. Выход"
   else
     printf '%s\n' \
       "  1. Установить кабинет" \
-      "  2. Восстановить сервер из бэкапа" \
-      "  3. Проверить архив бэкапа" \
-      "  4. Показать состояние сервера" \
-      "  5. Обновить консоль" \
+      "  2. Резервные копии и восстановление" \
+      "  3. Показать состояние сервера" \
+      "  4. Обновить консоль" \
       "  0. Выход"
   fi
   printf '\nВыберите действие: ' >/dev/tty
@@ -282,35 +280,17 @@ run_menu() {
         5) show_logs worker; pause ;;
         6) health_check || true; pause ;;
         7) setup_nginx || true; pause ;;
-        8) backup_full || true; pause ;;
-        9) backup_menu || true; pause ;;
-        10) update_console || true; pause ;;
+        8) backup_menu || true; pause ;;
+        9) update_console || true; pause ;;
         0) exit 0 ;;
         *) warn "Неизвестный пункт."; pause ;;
       esac
     else
       case "${choice}" in
         1) install_cabinet || true; pause ;;
-        2)
-          printf 'Путь к архиву: ' >/dev/tty
-          IFS= read -r archive </dev/tty
-          printf 'Введите RESTORE для продолжения: ' >/dev/tty
-          IFS= read -r choice </dev/tty
-          if [[ "${choice}" == "RESTORE" ]]; then
-            RESTORE_CONFIRM=RESTORE_REMNAWAVE_REMNASHOP_CABINET restore_backup "${archive}" || true
-          else
-            warn "Восстановление отменено."
-          fi
-          pause
-          ;;
-        3)
-          printf 'Путь к архиву: ' >/dev/tty
-          IFS= read -r archive </dev/tty
-          verify_backup "${archive}" || true
-          pause
-          ;;
-        4) show_status; pause ;;
-        5) update_console || true; pause ;;
+        2) backup_menu || true; pause ;;
+        3) show_status; pause ;;
+        4) update_console || true; pause ;;
         0) exit 0 ;;
         *) warn "Неизвестный пункт."; pause ;;
       esac

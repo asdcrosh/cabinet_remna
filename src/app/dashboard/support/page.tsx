@@ -2,7 +2,6 @@ import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth/cookies'
 import { serializeSupportMessage, serializeSupportTicket } from '@/lib/support'
-import { PageHeader } from '@/components/dashboard/page-header'
 import { SupportPanel } from '@/components/support/support-panel'
 
 export const dynamic = 'force-dynamic'
@@ -31,8 +30,7 @@ export default async function SupportPage() {
   })
 
   return (
-    <div className="space-y-6">
-      <PageHeader title="Поддержка" description="Напишите нам — ответ появится прямо в чате" />
+    <div>
       <SupportPanel
         mode="user"
         initialTickets={tickets.map((ticket) => ({

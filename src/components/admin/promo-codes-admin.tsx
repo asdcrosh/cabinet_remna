@@ -310,30 +310,30 @@ export function PromoCodesAdmin({
         </div>
       </AdminModal>
 
-      <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
+      <div className="overflow-hidden rounded-lg border bg-white dark:bg-surface-900">
         {filteredPromoCodes.map((promoCode) => (
-          <article key={promoCode.id} className="card flex min-h-52 flex-col p-4">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <div className="break-all font-mono text-lg font-semibold">{promoCode.code}</div>
-                <div className="mt-1 text-2xl font-semibold text-emerald-600">-{promoCode.discountPercent}%</div>
+          <article key={promoCode.id} className="grid gap-4 border-b p-4 last:border-b-0 lg:grid-cols-[minmax(12rem,.8fr)_minmax(16rem,1fr)_minmax(16rem,1fr)_auto] lg:items-center">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <div className="truncate font-mono text-base font-semibold">{promoCode.code}</div>
+                <span className={tab === 'AVAILABLE' ? 'badge-active' : tab === 'USED' ? 'badge-disabled' : 'badge-limited'}>
+                  {tab === 'AVAILABLE' ? 'Активен' : tab === 'USED' ? 'Использован' : 'Архив'}
+                </span>
               </div>
-              <span className={tab === 'AVAILABLE' ? 'badge-active' : tab === 'USED' ? 'badge-disabled' : 'badge-limited'}>
-                {tab === 'AVAILABLE' ? 'Не использован' : tab === 'USED' ? 'Использован' : 'Архив'}
-              </span>
+              <div className="mt-1 text-xl font-semibold text-emerald-600">-{promoCode.discountPercent}%</div>
             </div>
-            <div className="mt-3 line-clamp-2 min-h-10 text-sm text-slate-500">
-              {promoCode.planNames.length > 0 ? promoCode.planNames.join(', ') : 'Все тарифы'}
+            <div className="min-w-0">
+              <div className="text-[11px] font-semibold uppercase text-slate-400">Тарифы</div>
+              <div className="mt-1 truncate text-sm text-slate-600 dark:text-slate-300">{promoCode.planNames.length > 0 ? promoCode.planNames.join(', ') : 'Все тарифы'}</div>
             </div>
-            <div className="mt-4 grid grid-cols-2 gap-2">
-              <Metric label="Использовано" value={`${promoCode.usedCount}/${promoCode.maxUses ?? '∞'}`} />
-              <Metric label="На пользователя" value={promoCode.maxUsesPerUser} />
-              <div className="col-span-2"><Metric label="Срок" value={formatRange(promoCode.startsAt, promoCode.expiresAt)} /></div>
+            <div className="grid grid-cols-3 gap-3 text-sm">
+              <div><div className="text-[11px] uppercase text-slate-400">Использовано</div><div className="mt-1 font-medium">{promoCode.usedCount}/{promoCode.maxUses ?? '∞'}</div></div>
+              <div><div className="text-[11px] uppercase text-slate-400">На одного</div><div className="mt-1 font-medium">{promoCode.maxUsesPerUser}</div></div>
+              <div className="min-w-0"><div className="text-[11px] uppercase text-slate-400">Срок</div><div className="mt-1 truncate font-medium" title={formatRange(promoCode.startsAt, promoCode.expiresAt)}>{formatRange(promoCode.startsAt, promoCode.expiresAt)}</div></div>
             </div>
-            <div className="mt-auto flex gap-2 border-t pt-3">
-              <button type="button" className="btn-secondary flex-1 px-3 text-xs" onClick={() => startEdit(promoCode)}>
-                <Edit3 className="h-3.5 w-3.5" />
-                Изменить
+            <div className="flex gap-2 lg:justify-end">
+              <button type="button" className="btn-secondary h-10 min-h-10 px-3" onClick={() => startEdit(promoCode)} title="Изменить">
+                <Edit3 className="h-4 w-4" />
               </button>
               <button type="button" className="btn-secondary h-10 min-h-10 px-3" onClick={() => toggleActive(promoCode)} title={promoCode.isActive ? 'Отключить' : 'Включить'}>
                 <Power className="h-4 w-4" />
@@ -365,15 +365,6 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
       <span className="mb-1 block text-sm font-medium">{label}</span>
       {children}
     </label>
-  )
-}
-
-function Metric({ label, value }: { label: string; value: ReactNode }) {
-  return (
-    <div className="info-cell">
-      <div className="text-xs text-slate-500">{label}</div>
-      <div className="mt-1 truncate font-medium">{value}</div>
-    </div>
   )
 }
 

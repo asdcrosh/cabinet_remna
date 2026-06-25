@@ -434,8 +434,9 @@ curl -fsSL https://raw.githubusercontent.com/asdcrosh/cabinet_remna/main/deploy/
 remnactl
 ```
 
-Выберите `Восстановить сервер из бэкапа`, укажите путь к архиву и подтвердите
-операцию словом `RESTORE`. Консоль при необходимости установит Docker.
+Откройте `Резервные копии и восстановление`, выберите локальный архив или S3
+по номеру и подтвердите операцию словом `RESTORE`. Вручную вводить путь к
+архиву не требуется. Консоль при необходимости установит Docker и AWS CLI.
 
 Восстановление:
 
@@ -461,6 +462,31 @@ Remnawave и проверьте firewall. Старый сервер выключ
 ```bash
 FULL_BACKUP_DIR=/mnt/backups FULL_BACKUP_KEEP_DAYS=30 remnactl backup
 ```
+
+Для S3 откройте:
+
+```bash
+remnactl
+```
+
+Затем выберите `Резервные копии и S3` → `Настроить S3`. Поддерживаются AWS S3
+и S3-совместимые хранилища с собственным endpoint. Доступы сохраняются только
+на сервере в `/etc/remna-backup-s3.conf` с правами `600`. Можно включить
+автоматическую загрузку каждого нового полного бэкапа.
+
+### Доступ к PostgreSQL кабинета
+
+Порт базы задаётся в `/opt/remnawave-cabinet/.env` и не перезаписывается при
+обновлении:
+
+```env
+CABINET_DB_BIND="127.0.0.1"
+CABINET_DB_PORT="5433"
+```
+
+База остаётся доступной только локально. Для TablePlus подключайтесь через SSH:
+host `127.0.0.1`, порт из `CABINET_DB_PORT`, пользователь и база из
+`POSTGRES_USER`/`POSTGRES_DB`.
 
 Сценарий создан по той же идее, что и
 [distillium/remnawave-backup-restore](https://github.com/distillium/remnawave-backup-restore),

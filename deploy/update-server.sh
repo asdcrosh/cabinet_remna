@@ -79,6 +79,15 @@ configure_remnashop_link_function() {
     | docker exec -i "${container}" psql -v ON_ERROR_STOP=1 -U "${db_user}" -d "${db_name}" >/dev/null
 }
 
+if ! grep -q '^CABINET_DB_PORT=' "${ENV_FILE}"; then
+  current_db_port="$(docker inspect remnawave-cabinet-db --format '{{with index .HostConfig.PortBindings "5432/tcp"}}{{(index . 0).HostPort}}{{end}}' 2>/dev/null || true)"
+  current_db_bind="$(docker inspect remnawave-cabinet-db --format '{{with index .HostConfig.PortBindings "5432/tcp"}}{{(index . 0).HostIp}}{{end}}' 2>/dev/null || true)"
+  if [[ -n "${current_db_port}" ]]; then
+    printf '\nCABINET_DB_BIND="%s"\nCABINET_DB_PORT="%s"\n' "${current_db_bind:-127.0.0.1}" "${current_db_port}" >>"${ENV_FILE}"
+    echo "Preserved current database port ${current_db_bind:-127.0.0.1}:${current_db_port} in .env."
+  fi
+fi
+
 ENV_FILE_PATH="${ENV_FILE}" python3 <<'PY'
 from pathlib import Path
 import os
@@ -88,6 +97,8 @@ lines = path.read_text().splitlines()
 defaults = {
     "APP_LOG_LEVEL": "info",
     "APP_REQUEST_LOGS": "true",
+    "CABINET_DB_BIND": "127.0.0.1",
+    "CABINET_DB_PORT": "5433",
     "REMNASHOP_USER_SUBSCRIPTION_SYNC_STALE_SECONDS": "300",
 }
 existing = {

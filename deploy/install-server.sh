@@ -752,12 +752,24 @@ fi
 if [[ -n "${CABINET_APP_BIND:-}" ]]; then
   replace_env_value "CABINET_APP_BIND" "${CABINET_APP_BIND}"
 fi
+if [[ -n "${CABINET_DB_BIND:-}" ]]; then
+  replace_env_value "CABINET_DB_BIND" "${CABINET_DB_BIND}"
+elif ! env_key_exists "CABINET_DB_BIND"; then
+  replace_env_value "CABINET_DB_BIND" "127.0.0.1"
+fi
+if [[ -n "${CABINET_DB_PORT:-}" ]]; then
+  replace_env_value "CABINET_DB_PORT" "${CABINET_DB_PORT}"
+elif ! env_key_exists "CABINET_DB_PORT"; then
+  replace_env_value "CABINET_DB_PORT" "5433"
+fi
 
 configure_app_port
 configure_caddy_profile
 
 for key in \
   CABINET_APP_BIND \
+  CABINET_DB_BIND \
+  CABINET_DB_PORT \
   CABINET_APP_PORT \
   CABINET_EXTERNAL_NETWORK \
   CABINET_BRAND_NAME \

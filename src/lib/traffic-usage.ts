@@ -3,6 +3,13 @@ export interface TrafficSeriesPoint {
   bytes: string
 }
 
+export function hasTrafficUsage(series: TrafficSeriesPoint[]) {
+  return series.some((point) => {
+    const value = point.bytes.trim()
+    return /^\d+$/.test(value) && BigInt(value) > 0n
+  })
+}
+
 export function normalizeUsageSeries(
   value: unknown,
   range?: { start: Date; end: Date }

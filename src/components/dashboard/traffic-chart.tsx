@@ -58,6 +58,7 @@ export function TrafficChart({
   const limit = data.limitBytes ? safeBigInt(data.limitBytes) : null
   const lifetime = safeBigInt(data.lifetimeBytes)
   const seriesTotal = data.series.reduce((total, point) => total + safeBigInt(point.bytes), 0n)
+  const hasUsage = used > 0n || lifetime > 0n || seriesTotal > 0n
 
   return (
     <div className="relative overflow-hidden rounded-lg border border-cyan-200/80 bg-white/90 p-4 text-slate-950 shadow-[0_18px_45px_rgba(14,165,233,0.10)] backdrop-blur dark:border-cyan-200/80 dark:bg-white/90 dark:text-slate-950 sm:p-5">
@@ -88,14 +89,16 @@ export function TrafficChart({
           </div>
         </div>
 
-        {data.historyAvailable && data.series.length > 1 ? (
+        {hasUsage && data.historyAvailable && data.series.length > 1 ? (
           <TrafficHistoryChart series={data.series} />
         ) : (
-          <TrafficHistoryEmpty loading={loading} />
+          <TrafficHistoryEmpty loading={loading} hasUsage={hasUsage} />
         )}
 
         <div className="text-xs text-slate-500">
-          {data.historyAvailable
+          {!hasUsage && !loading
+            ? 'После первого подключения здесь появится статистика'
+            : data.historyAvailable
             ? 'Использование трафика по дням за последние 30 дней'
             : data.warning
               ? 'История трафика обновится автоматически'
@@ -206,7 +209,7 @@ function TrafficHistoryChart({ series }: { series: SeriesPoint[] }) {
   )
 }
 
-function TrafficHistoryEmpty({ loading }: { loading: boolean }) {
+function TrafficHistoryEmpty({ loading, hasUsage }: { loading: boolean; hasUsage: boolean }) {
   return (
     <div className="flex h-36 items-center justify-center rounded-lg border border-dashed border-slate-200 bg-slate-50/70 sm:h-44">
       <div className="text-center">
@@ -214,9 +217,11 @@ function TrafficHistoryEmpty({ loading }: { loading: boolean }) {
           <Activity className={`h-5 w-5 ${loading ? 'animate-pulse' : ''}`} />
         </span>
         <div className="mt-3 text-sm font-medium text-slate-700">
-          {loading ? 'Загружаем статистику' : 'История трафика пока не получена'}
+          {loading ? 'Загружаем статистику' : hasUsage ? 'История трафика пока не получена' : 'Трафик пока не использовался'}
         </div>
-        <div className="mt-1 text-xs text-slate-500">Данные появятся здесь автоматически</div>
+        <div className="mt-1 text-xs text-slate-500">
+          {hasUsage ? 'Данные появятся здесь автоматически' : 'График появится после начала использования VPN'}
+        </div>
       </div>
     </div>
   )

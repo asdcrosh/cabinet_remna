@@ -20,6 +20,7 @@ const mocks = vi.hoisted(() => {
   const remnawave = {
     createUser: vi.fn(),
     updateUser: vi.fn(),
+    resetTraffic: vi.fn(),
   }
 
   return { prisma, remnawave }
@@ -180,6 +181,33 @@ describe('ensureRemnawaveSubscription', () => {
         }),
       })
     )
+  })
+
+  it('replaces the current period and resets traffic when requested by admin', async () => {
+    mocks.prisma.payment.findUnique.mockResolvedValue(null)
+    mocks.prisma.user.findUnique.mockResolvedValue({
+      id: 'user-1',
+      email: 'user@example.com',
+      remnawaveUuid: 'rw-1',
+      subscriptions: [{ id: 'sub-1', planId: 'plan-1', expireAt: new Date('2026-03-01T00:00:00.000Z'), status: 'ACTIVE' }],
+    })
+    mocks.remnawave.updateUser.mockResolvedValue({ response: remnawaveUser })
+    mocks.remnawave.resetTraffic.mockResolvedValue({ response: remnawaveUser })
+    mocks.prisma.subscription.update.mockResolvedValue({ id: 'sub-1' })
+
+    await ensureRemnawaveSubscription({
+      userId: 'user-1',
+      email: 'user@example.com',
+      plan,
+      periodMode: 'REPLACE',
+    })
+
+    expect(mocks.remnawave.updateUser).toHaveBeenCalledWith(
+      expect.objectContaining({
+        expireAt: new Date('2026-01-31T00:00:00.000Z').toISOString(),
+      })
+    )
+    expect(mocks.remnawave.resetTraffic).toHaveBeenCalledWith('rw-1')
   })
 
   it('uses plan squads before env fallback', async () => {

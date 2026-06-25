@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="1.0.0"
+VERSION="1.1.0"
 INSTALL_PATH="${FULL_BACKUP_INSTALL_PATH:-/usr/local/bin/remna-backup}"
 BACKUP_DIR="${FULL_BACKUP_DIR:-/opt/remnawave-backups}"
+S3_CONFIG_FILE="${FULL_BACKUP_S3_CONFIG:-/etc/remna-backup-s3.conf}"
 REMNAWAVE_DIR="${REMNAWAVE_DIR:-/opt/remnawave}"
 REMNASHOP_DIR="${REMNASHOP_DIR:-/opt/remnashop}"
 CABINET_DIR="${CABINET_DIR:-/opt/remnawave-cabinet}"
@@ -16,6 +17,20 @@ CABINET_DB_SERVICE="${CABINET_DB_SERVICE:-db}"
 LOCK_FILE="${FULL_BACKUP_LOCK_FILE:-/var/lock/remna-full-backup.lock}"
 KEEP_DAYS="${FULL_BACKUP_KEEP_DAYS:-14}"
 CLEANUP_PATHS=("")
+
+S3_ENDPOINT=""
+S3_REGION="us-east-1"
+S3_BUCKET=""
+S3_PREFIX="remnawave"
+S3_ACCESS_KEY=""
+S3_SECRET_KEY=""
+S3_AUTO_UPLOAD="false"
+
+if [[ -f "${S3_CONFIG_FILE}" ]]; then
+  # The file is created root-only by this script and contains shell-escaped values.
+  # shellcheck disable=SC1090
+  source "${S3_CONFIG_FILE}"
+fi
 
 cleanup_paths() {
   local path
@@ -53,6 +68,138 @@ require_commands() {
   for command in tar gzip sha256sum awk sed grep find; do
     command -v "${command}" >/dev/null 2>&1 || fail "Не найдена команда: ${command}"
   done
+}
+
+require_tty() {
+  [[ -r /dev/tty ]] || fail "Для этого действия нужен интерактивный терминал."
+}
+
+is_truthy() {
+  case "${1:-}" in
+    1|true|TRUE|yes|YES|y|Y) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+ensure_aws_cli() {
+  if command -v aws >/dev/null 2>&1; then
+    return
+  fi
+  info "Устанавливаем AWS CLI для работы с S3..."
+  if command -v apt-get >/dev/null 2>&1; then
+    apt-get update >/dev/null
+    DEBIAN_FRONTEND=noninteractive apt-get install -y awscli >/dev/null 2>&1 || true
+  fi
+  if command -v aws >/dev/null 2>&1; then
+    return
+  fi
+
+  command -v curl >/dev/null 2>&1 || fail "Для установки AWS CLI требуется curl."
+  command -v unzip >/dev/null 2>&1 || {
+    command -v apt-get >/dev/null 2>&1 || fail "Для установки AWS CLI требуется unzip."
+    DEBIAN_FRONTEND=noninteractive apt-get install -y unzip >/dev/null
+  }
+  local architecture package temporary
+  architecture="$(uname -m)"
+  case "${architecture}" in
+    x86_64|amd64) package="awscli-exe-linux-x86_64.zip" ;;
+    aarch64|arm64) package="awscli-exe-linux-aarch64.zip" ;;
+    *) fail "AWS CLI не поддерживает архитектуру ${architecture} в автоматическом установщике." ;;
+  esac
+  temporary="$(mktemp -d /tmp/awscli.XXXXXX)"
+  CLEANUP_PATHS+=("${temporary}")
+  curl -fsSL "https://awscli.amazonaws.com/${package}" -o "${temporary}/awscliv2.zip"
+  unzip -q "${temporary}/awscliv2.zip" -d "${temporary}"
+  "${temporary}/aws/install" --update >/dev/null
+  command -v aws >/dev/null 2>&1 || fail "Не удалось установить AWS CLI."
+}
+
+s3_configured() {
+  [[ -n "${S3_BUCKET}" && -n "${S3_ACCESS_KEY}" && -n "${S3_SECRET_KEY}" ]]
+}
+
+s3_uri() {
+  local suffix="${1:-}"
+  local prefix="${S3_PREFIX#/}"
+  prefix="${prefix%/}"
+  if [[ -n "${prefix}" ]]; then
+    printf 's3://%s/%s%s\n' "${S3_BUCKET}" "${prefix}" "${suffix}"
+  else
+    printf 's3://%s%s\n' "${S3_BUCKET}" "${suffix}"
+  fi
+}
+
+aws_s3() {
+  ensure_aws_cli
+  s3_configured || fail "S3 ещё не настроен."
+  local -a command=(aws)
+  if [[ -n "${S3_ENDPOINT}" ]]; then
+    command+=(--endpoint-url "${S3_ENDPOINT}")
+  fi
+  AWS_ACCESS_KEY_ID="${S3_ACCESS_KEY}" \
+  AWS_SECRET_ACCESS_KEY="${S3_SECRET_KEY}" \
+  AWS_DEFAULT_REGION="${S3_REGION}" \
+    "${command[@]}" "$@"
+}
+
+write_s3_config() {
+  require_root
+  mkdir -p "$(dirname "${S3_CONFIG_FILE}")"
+  umask 077
+  {
+    printf 'S3_ENDPOINT=%q\n' "${S3_ENDPOINT}"
+    printf 'S3_REGION=%q\n' "${S3_REGION}"
+    printf 'S3_BUCKET=%q\n' "${S3_BUCKET}"
+    printf 'S3_PREFIX=%q\n' "${S3_PREFIX}"
+    printf 'S3_ACCESS_KEY=%q\n' "${S3_ACCESS_KEY}"
+    printf 'S3_SECRET_KEY=%q\n' "${S3_SECRET_KEY}"
+    printf 'S3_AUTO_UPLOAD=%q\n' "${S3_AUTO_UPLOAD}"
+  } >"${S3_CONFIG_FILE}"
+  chmod 600 "${S3_CONFIG_FILE}"
+}
+
+configure_s3() {
+  require_tty
+  local value
+  printf 'S3 endpoint (пусто для AWS): ' >/dev/tty
+  IFS= read -r value </dev/tty
+  S3_ENDPOINT="${value:-${S3_ENDPOINT}}"
+  printf 'Регион [%s]: ' "${S3_REGION}" >/dev/tty
+  IFS= read -r value </dev/tty
+  S3_REGION="${value:-${S3_REGION}}"
+  printf 'Bucket [%s]: ' "${S3_BUCKET}" >/dev/tty
+  IFS= read -r value </dev/tty
+  S3_BUCKET="${value:-${S3_BUCKET}}"
+  printf 'Папка в bucket [%s]: ' "${S3_PREFIX}" >/dev/tty
+  IFS= read -r value </dev/tty
+  S3_PREFIX="${value:-${S3_PREFIX}}"
+  printf 'Access key%s: ' "$([[ -n "${S3_ACCESS_KEY}" ]] && printf ' (Enter — оставить текущий)')" >/dev/tty
+  IFS= read -r value </dev/tty
+  S3_ACCESS_KEY="${value:-${S3_ACCESS_KEY}}"
+  printf 'Secret key%s: ' "$([[ -n "${S3_SECRET_KEY}" ]] && printf ' (Enter — оставить текущий)')" >/dev/tty
+  IFS= read -r -s value </dev/tty
+  printf '\n' >/dev/tty
+  S3_SECRET_KEY="${value:-${S3_SECRET_KEY}}"
+  printf 'Автоматически загружать новые бэкапы? [y/N]: ' >/dev/tty
+  IFS= read -r value </dev/tty
+  if [[ "${value}" =~ ^[yYдД]$ ]]; then S3_AUTO_UPLOAD="true"; else S3_AUTO_UPLOAD="false"; fi
+  s3_configured || fail "Bucket, access key и secret key обязательны."
+  write_s3_config
+  aws_s3 s3 ls "$(s3_uri)/" >/dev/null
+  ok "S3 настроен и доступ проверен."
+}
+
+upload_backup_to_s3() {
+  local archive="$1"
+  s3_configured || fail "Сначала настройте S3."
+  local destination
+  destination="$(s3_uri "/$(basename "${archive}")")"
+  info "Загружаем $(basename "${archive}") в S3..."
+  aws_s3 s3 cp "${archive}" "${destination}" --only-show-errors
+  if [[ -f "${archive}.sha256" ]]; then
+    aws_s3 s3 cp "${archive}.sha256" "${destination}.sha256" --only-show-errors
+  fi
+  ok "Бэкап сохранён в ${destination}"
 }
 
 require_docker() {
@@ -227,6 +374,9 @@ create_backup() {
   ok "Полный бэкап создан: ${final}"
   printf 'Размер: %s\n' "$(du -h "${final}" | awk '{print $1}')"
   printf 'SHA-256: %s\n' "$(awk '{print $1}' "${final}.sha256")"
+  if s3_configured && is_truthy "${S3_AUTO_UPLOAD}"; then
+    upload_backup_to_s3 "${final}"
+  fi
 }
 
 verify_backup() {
@@ -407,8 +557,127 @@ install_script() {
 
 list_backups() {
   mkdir -p "${BACKUP_DIR}"
+  local archive
+  while IFS= read -r archive; do
+    [[ -n "${archive}" ]] || continue
+    printf '%-36s %8s  %s\n' "$(basename "${archive}")" "$(du -h "${archive}" | awk '{print $1}')" "${archive}"
+  done < <(local_backup_paths)
+  return 0
+}
+
+local_backup_paths() {
   find "${BACKUP_DIR}" -maxdepth 1 -type f -name 'remna-full-backup-*.tar.gz' \
-    -printf '%TY-%Tm-%Td %TH:%TM  %10s  %p\n' 2>/dev/null | sort -r
+    -print 2>/dev/null | sort -r
+  return 0
+}
+
+choose_local_backup() {
+  require_tty
+  local -a archives=()
+  local archive index choice
+  while IFS= read -r archive; do
+    [[ -n "${archive}" ]] && archives+=("${archive}")
+  done < <(local_backup_paths)
+  ((${#archives[@]} > 0)) || fail "Локальных бэкапов пока нет."
+  printf '\nЛокальные бэкапы:\n' >/dev/tty
+  for index in "${!archives[@]}"; do
+    printf '  %d. %-28s %8s\n' "$((index + 1))" "$(basename "${archives[index]}")" "$(du -h "${archives[index]}" | awk '{print $1}')" >/dev/tty
+  done
+  printf 'Выберите архив: ' >/dev/tty
+  IFS= read -r choice </dev/tty
+  [[ "${choice}" =~ ^[0-9]+$ ]] || fail "Неверный номер архива."
+  ((choice >= 1 && choice <= ${#archives[@]})) || fail "Архив с таким номером не найден."
+  printf '%s\n' "${archives[choice - 1]}"
+}
+
+remote_backup_keys() {
+  local prefix="${S3_PREFIX#/}"
+  prefix="${prefix%/}"
+  local -a arguments=(
+    s3api list-objects-v2
+    --bucket "${S3_BUCKET}"
+    --query 'Contents[?ends_with(Key, `.tar.gz`)].Key'
+    --output text
+  )
+  if [[ -n "${prefix}" ]]; then
+    arguments+=(--prefix "${prefix}/")
+  fi
+  aws_s3 "${arguments[@]}" | tr '\t' '\n' | sort -r
+}
+
+choose_remote_backup() {
+  require_tty
+  local -a keys=()
+  local key index choice destination
+  while IFS= read -r key; do
+    [[ -n "${key}" && "${key}" != "None" ]] && keys+=("${key}")
+  done < <(remote_backup_keys)
+  ((${#keys[@]} > 0)) || fail "В S3 нет полных бэкапов."
+  printf '\nБэкапы в S3:\n' >/dev/tty
+  for index in "${!keys[@]}"; do
+    printf '  %d. %s\n' "$((index + 1))" "$(basename "${keys[index]}")" >/dev/tty
+  done
+  printf 'Выберите архив: ' >/dev/tty
+  IFS= read -r choice </dev/tty
+  [[ "${choice}" =~ ^[0-9]+$ ]] || fail "Неверный номер архива."
+  ((choice >= 1 && choice <= ${#keys[@]})) || fail "Архив с таким номером не найден."
+  key="${keys[choice - 1]}"
+  mkdir -p "${BACKUP_DIR}"
+  destination="${BACKUP_DIR}/$(basename "${key}")"
+  info "Скачиваем архив из S3..." >/dev/tty
+  aws_s3 s3 cp "s3://${S3_BUCKET}/${key}" "${destination}" --only-show-errors
+  aws_s3 s3 cp "s3://${S3_BUCKET}/${key}.sha256" "${destination}.sha256" --only-show-errors 2>/dev/null || true
+  chmod 600 "${destination}" "${destination}.sha256" 2>/dev/null || true
+  printf '%s\n' "${destination}"
+}
+
+confirm_and_restore() {
+  local archive="$1"
+  local confirmation
+  verify_backup "${archive}"
+  printf '\nВосстановление перезапишет Remnawave, Remnashop и кабинет.\nВведите RESTORE: ' >/dev/tty
+  IFS= read -r confirmation </dev/tty
+  if [[ "${confirmation}" != "RESTORE" ]]; then
+    warn "Восстановление отменено."
+    return
+  fi
+  RESTORE_CONFIRM=RESTORE_REMNAWAVE_REMNASHOP_CABINET restore_backup "${archive}"
+}
+
+restore_menu() {
+  require_tty
+  local choice archive
+  printf '%s\n' \
+    "  1. Восстановить локальный бэкап" \
+    "  2. Скачать и восстановить из S3" \
+    "  0. Назад" >/dev/tty
+  printf 'Выберите источник: ' >/dev/tty
+  IFS= read -r choice </dev/tty
+  case "${choice}" in
+    1) archive="$(choose_local_backup)"; confirm_and_restore "${archive}" ;;
+    2) archive="$(choose_remote_backup)"; confirm_and_restore "${archive}" ;;
+    0) return ;;
+    *) warn "Неизвестный пункт." ;;
+  esac
+}
+
+s3_menu() {
+  require_tty
+  local choice archive
+  printf '%s\n' \
+    "  1. Настроить S3" \
+    "  2. Загрузить локальный бэкап" \
+    "  3. Показать файлы в S3" \
+    "  0. Назад" >/dev/tty
+  printf 'Выберите действие: ' >/dev/tty
+  IFS= read -r choice </dev/tty
+  case "${choice}" in
+    1) configure_s3 ;;
+    2) archive="$(choose_local_backup)"; upload_backup_to_s3 "${archive}" ;;
+    3) remote_backup_keys ;;
+    0) return ;;
+    *) warn "Неизвестный пункт." ;;
+  esac
 }
 
 show_menu() {
@@ -421,32 +690,17 @@ show_menu() {
     printf '%s\n\n' "${BOLD}${CYAN}Remnawave Full Backup${RESET}"
     printf '%s\n' \
       "  1. Создать полный бэкап" \
-      "  2. Показать бэкапы" \
-      "  3. Проверить архив" \
-      "  4. Восстановить архив" \
+      "  2. Восстановить бэкап" \
+      "  3. Настроить S3" \
       "  0. Выход"
-    printf '\nВыберите действие: ' >/dev/tty
-    local choice archive
+    printf '\nЛокальных архивов: %s · S3: %s\n' "$(local_backup_paths | wc -l | tr -d ' ')" "$(s3_configured && printf 'настроен' || printf 'не настроен')" >/dev/tty
+    printf 'Выберите действие: ' >/dev/tty
+    local choice
     IFS= read -r choice </dev/tty
     case "${choice}" in
       1) create_backup ;;
-      2) list_backups ;;
-      3)
-        printf 'Путь к архиву: ' >/dev/tty
-        IFS= read -r archive </dev/tty
-        verify_backup "${archive}"
-        ;;
-      4)
-        printf 'Путь к архиву: ' >/dev/tty
-        IFS= read -r archive </dev/tty
-        printf 'Введите RESTORE для продолжения: ' >/dev/tty
-        IFS= read -r choice </dev/tty
-        if [[ "${choice}" == "RESTORE" ]]; then
-          RESTORE_CONFIRM=RESTORE_REMNAWAVE_REMNASHOP_CABINET restore_backup "${archive}"
-        else
-          warn "Восстановление отменено."
-        fi
-        ;;
+      2) restore_menu ;;
+      3) s3_menu ;;
       0) exit 0 ;;
       *) warn "Неизвестный пункт." ;;
     esac
@@ -462,6 +716,9 @@ Remnawave Full Backup ${VERSION}
 Использование:
   remna-backup                       интерактивное меню
   remna-backup backup                полный бэкап трёх систем
+  remna-backup s3-upload ARCHIVE     загрузить архив в S3
+  remna-backup s3-list               список архивов в S3
+  remna-backup s3-config             настроить S3
   remna-backup list                  список архивов
   remna-backup verify ARCHIVE        проверка архива
   RESTORE_CONFIRM=RESTORE_REMNAWAVE_REMNASHOP_CABINET \\
@@ -471,6 +728,7 @@ Remnawave Full Backup ${VERSION}
 Переменные:
   FULL_BACKUP_DIR=${BACKUP_DIR}
   FULL_BACKUP_KEEP_DAYS=${KEEP_DAYS}
+  FULL_BACKUP_S3_CONFIG=${S3_CONFIG_FILE}
   REMNAWAVE_DIR=${REMNAWAVE_DIR}
   REMNASHOP_DIR=${REMNASHOP_DIR}
   CABINET_DIR=${CABINET_DIR}
@@ -483,6 +741,9 @@ case "${1:-menu}" in
   list) list_backups ;;
   verify) verify_backup "${2:-}" ;;
   restore) restore_backup "${2:-}" ;;
+  s3-config) configure_s3 ;;
+  s3-upload) upload_backup_to_s3 "${2:-}" ;;
+  s3-list) remote_backup_keys ;;
   install) install_script ;;
   help|-h|--help) show_help ;;
   *) show_help; exit 1 ;;

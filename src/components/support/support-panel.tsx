@@ -10,7 +10,6 @@ import {
   useState,
   useTransition,
 } from 'react'
-import { useRouter } from 'next/navigation'
 import {
   Archive,
   ArrowLeft,
@@ -74,7 +73,6 @@ export function SupportPanel({
   initialTotal = initialTickets.length,
   pageSize = 25,
 }: SupportPanelProps) {
-  const router = useRouter()
   const messagesScrollRef = useRef<HTMLDivElement | null>(null)
   const loadMoreRef = useRef<HTMLDivElement | null>(null)
   const stickToBottomRef = useRef(true)
@@ -288,7 +286,6 @@ export function SupportPanel({
       setNewMessage('')
       setNewTicketOpen(false)
       stickToBottomRef.current = true
-      router.refresh()
     })
   }
 
@@ -298,8 +295,24 @@ export function SupportPanel({
     setError('')
 
     const messageToSend = message.trim()
+    const temporaryId = `pending-${Date.now()}`
+    const optimisticMessage: SupportMessage = {
+      id: temporaryId,
+      body: messageToSend,
+      senderRole: mode === 'admin' ? 'ADMIN' : 'USER',
+      createdAt: new Date().toISOString(),
+    }
+    const optimisticTicket: SupportTicket = {
+      ...selected,
+      status: mode === 'admin' ? 'WAITING_USER' : 'WAITING_ADMIN',
+      closedAt: null,
+      lastMessageAt: optimisticMessage.createdAt,
+      messages: [...selected.messages, optimisticMessage],
+    }
     setMessage('')
     stickToBottomRef.current = true
+    setSelectedTicket(optimisticTicket)
+    setTickets((current) => current.map((ticket) => ticket.id === selected.id ? { ...ticket, ...optimisticTicket } : ticket))
 
     startTransition(async () => {
       const endpoint = mode === 'admin' ? `/api/admin/support/tickets/${selected.id}` : `/api/support/tickets/${selected.id}`
@@ -311,6 +324,8 @@ export function SupportPanel({
       const data = await res.json().catch(() => null)
       if (!res.ok) {
         setMessage(messageToSend)
+        setSelectedTicket(selected)
+        setTickets((current) => current.map((ticket) => ticket.id === selected.id ? { ...ticket, ...selected } : ticket))
         setError(data?.error || 'Не удалось отправить сообщение')
         return
       }
@@ -320,11 +335,10 @@ export function SupportPanel({
         status: nextStatus,
         closedAt: null,
         lastMessageAt: data.message.createdAt,
-        messages: [...selected.messages, data.message],
+        messages: optimisticTicket.messages.map((item) => item.id === temporaryId ? data.message : item),
       }
       setSelectedTicket(updated)
       setTickets((current) => current.map((ticket) => ticket.id === updated.id ? { ...ticket, ...updated } : ticket))
-      router.refresh()
     })
   }
 
@@ -355,7 +369,6 @@ export function SupportPanel({
       if (status === 'CLOSED') {
         setFolder('closed')
       }
-      router.refresh()
     })
   }
 
@@ -366,10 +379,10 @@ export function SupportPanel({
   }
 
   return (
-    <div className="grid h-[calc(100dvh-8rem)] min-h-[34rem] gap-4 overflow-hidden xl:h-[calc(100dvh-11rem)] xl:min-h-[42rem] xl:grid-cols-[24rem_minmax(0,1fr)]">
+    <div className="grid h-[calc(100dvh-6.5rem)] min-h-[34rem] gap-3 overflow-hidden xl:h-[calc(100dvh-9rem)] xl:min-h-[38rem] xl:grid-cols-[20rem_minmax(0,1fr)]">
       <section className={cn('min-h-0 space-y-4 overflow-y-auto pr-0.5 xl:flex xl:flex-col xl:overflow-hidden', mobileChatOpen && 'hidden xl:flex')}>
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-white/70 bg-white/80 shadow-sm shadow-slate-200/60 backdrop-blur dark:border-white/10 dark:bg-surface-900/80 dark:shadow-black/20">
-          <div className="border-b border-slate-100 bg-white/70 px-4 py-3 dark:border-slate-800 dark:bg-surface-900/60">
+          <div className="border-b border-slate-100 bg-white/70 px-3 py-3 dark:border-slate-800 dark:bg-surface-900/60">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <div className="font-semibold">{mode === 'admin' ? 'Обращения' : 'Диалоги'}</div>
@@ -393,7 +406,7 @@ export function SupportPanel({
             <FolderTabs folder={folder} counts={folderCounts} mode={mode} onChange={setFolder} />
           </div>
 
-          <div className="min-h-0 flex-1 overflow-y-auto p-2">
+          <div className="min-h-0 flex-1 overflow-y-auto p-1.5">
             {mode === 'user' && newTicketOpen && (
               <NewTicketForm
                 message={newMessage}
@@ -443,7 +456,7 @@ export function SupportPanel({
       )}>
         {selected ? (
           <div className="flex h-full min-h-0 flex-col">
-            <div className="border-b border-slate-100 bg-white/95 px-4 py-3 dark:border-slate-800 dark:bg-surface-900/95 sm:px-5">
+            <div className="border-b border-slate-100 bg-white/95 px-3 py-3 dark:border-slate-800 dark:bg-surface-900/95 sm:px-5">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex min-w-0 flex-1 gap-3">
                   <button
@@ -482,7 +495,7 @@ export function SupportPanel({
                 const element = event.currentTarget
                 stickToBottomRef.current = element.scrollHeight - element.scrollTop - element.clientHeight < 120
               }}
-              className="min-h-0 flex-1 overflow-y-auto bg-slate-50/70 px-3 py-4 dark:bg-surface-950/30 sm:px-5"
+              className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-slate-50/70 px-3 py-4 dark:bg-surface-950/30 sm:px-5"
             >
               <div className="mx-auto max-w-3xl space-y-3">
                 {selected.messages.map((item) => {
@@ -492,7 +505,7 @@ export function SupportPanel({
               </div>
             </div>
 
-            <form onSubmit={sendMessage} className="border-t border-slate-100 bg-white/95 p-3 dark:border-slate-800 dark:bg-surface-900/95 sm:p-4">
+            <form onSubmit={sendMessage} className="border-t border-slate-100 bg-white/95 p-2.5 dark:border-slate-800 dark:bg-surface-900/95 sm:p-3">
               {selected.status === 'CLOSED' ? (
                 <div className="flex items-center gap-2 rounded-lg bg-slate-50 px-4 py-3 text-sm text-slate-500 dark:bg-surface-800">
                   <Lock className="h-4 w-4" />
@@ -501,7 +514,7 @@ export function SupportPanel({
               ) : (
                 <div className="flex items-end gap-2 rounded-lg border border-slate-200 bg-white p-2 shadow-sm dark:border-slate-800 dark:bg-surface-950">
                   <textarea
-                    className="min-h-11 flex-1 resize-none rounded-md border-0 bg-transparent px-2 py-2 text-sm outline-none placeholder:text-slate-400 focus:ring-0"
+                    className="max-h-32 min-h-10 flex-1 resize-none rounded-md border-0 bg-transparent px-2 py-2 text-sm outline-none placeholder:text-slate-400 focus:ring-0"
                     value={message}
                     onChange={(event) => setMessage(event.target.value)}
                     onKeyDown={handleMessageKeyDown}
@@ -607,7 +620,7 @@ function FolderTabs({
   ]
 
   return (
-    <div className={cn('mt-3 grid grid-cols-2 gap-2', mode === 'admin' && 'sm:grid-cols-4 xl:grid-cols-2')}>
+    <div className={cn('mt-3 flex gap-1 overflow-x-auto rounded-lg bg-slate-100 p-1 dark:bg-white/5')}>
       {items.map((item) => {
         const Icon = item.icon
         const active = folder === item.value
@@ -617,10 +630,10 @@ function FolderTabs({
             type="button"
             onClick={() => onChange(item.value)}
             className={cn(
-              'flex min-w-0 items-center justify-between gap-2 rounded-lg border px-2.5 py-2 text-xs font-medium transition-colors',
+              'flex min-w-fit flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium transition-colors',
               active
-                ? 'border-slate-950 bg-slate-950 text-white dark:border-white dark:bg-white dark:text-slate-950'
-                : 'border-slate-200 bg-white/70 text-slate-600 hover:border-slate-300 hover:bg-white hover:text-slate-950 dark:border-slate-800 dark:bg-surface-900 dark:text-slate-300 dark:hover:text-white'
+                ? 'bg-white text-slate-950 shadow-sm dark:bg-surface-800 dark:text-white'
+                : 'text-slate-500 hover:text-slate-950 dark:text-slate-400 dark:hover:text-white'
             )}
           >
             <span className="flex min-w-0 items-center gap-1.5">
@@ -655,7 +668,7 @@ function TicketListItem({
       type="button"
       onClick={onClick}
       className={cn(
-        'group w-full rounded-lg border px-3 py-3 text-left transition-all',
+        'group w-full rounded-md border px-3 py-2.5 text-left transition-all',
         active
           ? 'border-slate-300 bg-slate-50 shadow-sm shadow-slate-200/60 ring-1 ring-slate-200 dark:border-slate-700 dark:bg-surface-800 dark:ring-slate-700'
           : 'border-transparent hover:border-slate-200 hover:bg-slate-50 dark:hover:border-slate-800 dark:hover:bg-surface-800'
@@ -675,10 +688,10 @@ function TicketListItem({
         </div>
         <TicketStatusBadge status={ticket.status} mode={mode} active={active} />
       </div>
-      <div className="mt-2 line-clamp-2 text-sm text-slate-500 dark:text-slate-400">
+      <div className="mt-1 line-clamp-1 text-sm text-slate-500 dark:text-slate-400">
         {ticket.messages.at(-1)?.body || ticket.messages[0]?.body || 'Без сообщений'}
       </div>
-      <div className="mt-3 flex items-center justify-between gap-3">
+      <div className="mt-2 flex items-center justify-between gap-3">
         <div className="text-xs text-slate-400">
           {formatDate(ticket.lastMessageAt)}
         </div>

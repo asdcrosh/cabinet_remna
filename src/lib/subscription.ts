@@ -16,6 +16,7 @@ export interface EnsureSubscriptionInput {
   userId: string                  // локальный ID в нашей БД
   email: string                   // для Remnawave username
   paymentId?: string              // локальный Payment.id, если выдача идёт из webhook
+  periodMode?: 'AUTO' | 'REPLACE' | 'EXTEND'
   plan: {
     id: string
     name: string
@@ -60,7 +61,7 @@ export async function ensureRemnawaveSubscription(input: EnsureSubscriptionInput
 
   if (user.remnawaveUuid) {
     const activeSubscription = getLatestActiveSubscription(user.subscriptions)
-    const newExpire = computeNewExpireAt(activeSubscription, input.plan)
+    const newExpire = computeNewExpireAt(activeSubscription, input.plan, input.periodMode)
     try {
       const updated = await remnawave.updateUser({
         uuid: user.remnawaveUuid,
@@ -76,6 +77,10 @@ export async function ensureRemnawaveSubscription(input: EnsureSubscriptionInput
         ...(activeInternalSquads.length > 0 ? { activeInternalSquads } : {}),
       })
       remnawaveUser = updated.response
+      if (input.periodMode === 'REPLACE') {
+        const reset = await remnawave.resetTraffic(user.remnawaveUuid)
+        remnawaveUser = reset.response
+      }
     } catch (e) {
       if (!(e instanceof RemnawaveError) || !isRemnawaveUserNotFound(e)) throw e
 
@@ -188,8 +193,16 @@ export async function ensureRemnawaveSubscription(input: EnsureSubscriptionInput
  */
 function computeNewExpireAt(
   active: { expireAt: Date; planId?: string | null } | undefined,
-  plan: EnsureSubscriptionInput['plan']
+  plan: EnsureSubscriptionInput['plan'],
+  periodMode: EnsureSubscriptionInput['periodMode'] = 'AUTO'
 ) {
+  if (periodMode === 'REPLACE') {
+    return new Date(Date.now() + plan.durationDays * 24 * 60 * 60 * 1000)
+  }
+  if (periodMode === 'EXTEND') {
+    const base = active && active.expireAt.getTime() > Date.now() ? active.expireAt : new Date()
+    return new Date(base.getTime() + plan.durationDays * 24 * 60 * 60 * 1000)
+  }
   const isSamePlan = active?.planId === plan.id
   const base = isSamePlan && active.expireAt.getTime() > Date.now() ? active.expireAt : new Date()
   return new Date(base.getTime() + plan.durationDays * 24 * 60 * 60 * 1000)

@@ -7,7 +7,7 @@ import { prisma } from '@/lib/prisma'
 import { requireAuth, withAuth } from '@/lib/auth/guard'
 import { remnawave, RemnawaveError } from '@/lib/remnawave'
 import { readRemnawaveBigInt } from '@/lib/remnawave-usage'
-import { normalizeUsageSeries } from '@/lib/traffic-usage'
+import { hasTrafficUsage, normalizeUsageSeries } from '@/lib/traffic-usage'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -71,7 +71,7 @@ export const GET = withAuth(async (req: Request) => {
 
   if (usageResult.status === 'fulfilled') {
     series = normalizeUsageSeries(usageResult.value, { start, end })
-    historyAvailable = series.length > 1
+    historyAvailable = series.length > 1 && hasTrafficUsage(series)
   } else {
     console.warn('[subscription/usage] history unavailable', {
       userId: user.id,
