@@ -8,10 +8,6 @@ export interface TelegramLaunchData {
   initData: string
 }
 
-function readParams(value: string) {
-  return new URLSearchParams(value.replace(/^[?#]/, ''))
-}
-
 function readRawParam(value: string, key: string) {
   const source = value.replace(/^[?#]/, '')
   const prefix = `${key}=`
@@ -35,22 +31,12 @@ export function getTelegramLaunchData(
   location: TelegramLaunchLocation,
   sdkInitData = ''
 ): TelegramLaunchData {
-  const hashParams = readParams(location.hash)
-  const searchParams = readParams(location.search)
-  const launchParams = [hashParams, searchParams]
   const urlInitData =
     readRawParam(location.hash, 'tgWebAppData') || readRawParam(location.search, 'tgWebAppData')
-  const isTelegram =
-    Boolean(sdkInitData || urlInitData) ||
-    launchParams.some(
-      (params) =>
-        params.has('tgWebAppVersion') ||
-        params.has('tgWebAppPlatform') ||
-        params.has('tgWebAppThemeParams')
-    )
+  const initData = sdkInitData || urlInitData
 
   return {
-    isTelegram,
-    initData: sdkInitData || urlInitData,
+    isTelegram: Boolean(initData),
+    initData,
   }
 }

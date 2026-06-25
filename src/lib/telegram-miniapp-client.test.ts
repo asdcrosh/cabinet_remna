@@ -35,13 +35,22 @@ describe('Telegram Mini App launch data', () => {
     expect(result).toEqual({ isTelegram: true, initData: 'sdk-data' })
   })
 
-  it('recognizes Telegram context while init data is still loading', () => {
+  it('does not enable Telegram auth from service parameters without signed init data', () => {
     const result = getTelegramLaunchData({
       hash: '#tgWebAppVersion=8.0&tgWebAppPlatform=macos',
       search: '',
     })
 
-    expect(result).toEqual({ isTelegram: true, initData: '' })
+    expect(result).toEqual({ isTelegram: false, initData: '' })
+  })
+
+  it('keeps web registration available when Telegram parameters leak into a browser URL', () => {
+    const result = getTelegramLaunchData({
+      hash: '#tgWebAppThemeParams=%7B%22bg_color%22%3A%22%23ffffff%22%7D',
+      search: '?next=%2Fdashboard&tgWebAppVersion=8.0',
+    })
+
+    expect(result).toEqual({ isTelegram: false, initData: '' })
   })
 
   it('keeps standard authentication outside Telegram', () => {

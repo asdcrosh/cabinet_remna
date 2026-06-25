@@ -17,13 +17,11 @@ declare global {
 }
 
 export function TelegramMiniAppAuth() {
-  const [state, setState] = useState<'checking' | 'browser' | 'authenticating' | 'error'>('checking')
+  const [state, setState] = useState<'browser' | 'authenticating' | 'error'>('browser')
   const [error, setError] = useState('')
 
   useEffect(() => {
     let cancelled = false
-    let attempts = 0
-    let retryTimer: number | undefined
 
     async function start() {
       const webApp = window.Telegram?.WebApp
@@ -36,16 +34,6 @@ export function TelegramMiniAppAuth() {
 
       setState('authenticating')
       const initData = launch.initData
-      if (!initData) {
-        attempts += 1
-        if (attempts < 100 && !cancelled) {
-          retryTimer = window.setTimeout(start, 150)
-          return
-        }
-        setError('Telegram не передал данные для входа. Закройте это окно и откройте кабинет заново из меню бота.')
-        setState('error')
-        return
-      }
 
       webApp?.ready?.()
       webApp?.expand?.()
@@ -85,7 +73,6 @@ export function TelegramMiniAppAuth() {
     void start()
     return () => {
       cancelled = true
-      if (retryTimer) window.clearTimeout(retryTimer)
     }
   }, [])
 

@@ -9,14 +9,21 @@ interface AuthLayoutProps {
   description: string
   footer: ReactNode
   children: ReactNode
+  enableTelegramMiniApp?: boolean
 }
 
-export function AuthLayout({ title, description, footer, children }: AuthLayoutProps) {
+export function AuthLayout({
+  title,
+  description,
+  footer,
+  children,
+  enableTelegramMiniApp = false,
+}: AuthLayoutProps) {
   const brandName = getBrandName()
 
   return (
     <div className="grid min-h-screen lg:grid-cols-[1.05fr_0.95fr]">
-      <TelegramMiniAppAuth />
+      {enableTelegramMiniApp && <TelegramMiniAppAuth />}
       <div className="relative hidden overflow-hidden bg-slate-950 p-10 text-white lg:flex lg:flex-col lg:justify-between">
         <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(14,165,233,0.22),transparent_42%),linear-gradient(225deg,rgba(16,185,129,0.18),transparent_36%)]" />
         <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-cyan-300/50 to-transparent" />

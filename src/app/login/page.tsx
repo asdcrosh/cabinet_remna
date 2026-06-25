@@ -29,6 +29,7 @@ export default async function LoginPage() {
       title="Вход в кабинет"
       description="Войдите, чтобы управлять подпиской"
       footer={<>Нет аккаунта? <Link href="/register" className="text-brand-600 hover:underline">Зарегистрироваться</Link></>}
+      enableTelegramMiniApp
     >
       <LoginForm />
     </AuthLayout>

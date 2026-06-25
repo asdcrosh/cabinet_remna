@@ -17,6 +17,7 @@ export default async function RegisterPage({ searchParams }: { searchParams: { r
       title="Создать аккаунт"
       description="Регистрация занимает меньше минуты"
       footer={<>Уже есть аккаунт? <Link href="/login" className="text-brand-600 hover:underline">Войти</Link></>}
+      enableTelegramMiniApp
     >
       <RegisterForm initialReferralCode={searchParams.ref ?? ''} />
     </AuthLayout>
