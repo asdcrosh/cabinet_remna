@@ -34,13 +34,19 @@ BEGIN
   FOR UPDATE;
 
   IF email_user.id IS NOT NULL THEN
-    UPDATE subscriptions SET user_id = telegram_user.id WHERE user_id = email_user.id;
-    UPDATE transactions SET user_id = telegram_user.id WHERE user_id = email_user.id;
-    UPDATE referral_rewards SET user_id = telegram_user.id WHERE user_id = email_user.id;
-    UPDATE broadcast_messages
+    UPDATE subscriptions AS subscription
+      SET user_id = telegram_user.id
+      WHERE subscription.user_id = email_user.id;
+    UPDATE transactions AS transaction_row
+      SET user_id = telegram_user.id
+      WHERE transaction_row.user_id = email_user.id;
+    UPDATE referral_rewards AS reward
+      SET user_id = telegram_user.id
+      WHERE reward.user_id = email_user.id;
+    UPDATE broadcast_messages AS broadcast
       SET user_id = telegram_user.id,
-          user_telegram_id = COALESCE(user_telegram_id, p_telegram_id)
-      WHERE user_id = email_user.id;
+          user_telegram_id = COALESCE(broadcast.user_telegram_id, p_telegram_id)
+      WHERE broadcast.user_id = email_user.id;
 
     DELETE FROM promocode_activations source
     WHERE source.user_id = email_user.id
@@ -50,7 +56,9 @@ BEGIN
         WHERE target.user_id = telegram_user.id
           AND target.promocode_id = source.promocode_id
       );
-    UPDATE promocode_activations SET user_id = telegram_user.id WHERE user_id = email_user.id;
+    UPDATE promocode_activations AS activation
+      SET user_id = telegram_user.id
+      WHERE activation.user_id = email_user.id;
 
     DELETE FROM user_oauth_providers source
     WHERE source.user_id = email_user.id
@@ -60,7 +68,9 @@ BEGIN
         WHERE target.user_id = telegram_user.id
           AND target.provider = source.provider
       );
-    UPDATE user_oauth_providers SET user_id = telegram_user.id WHERE user_id = email_user.id;
+    UPDATE user_oauth_providers AS oauth
+      SET user_id = telegram_user.id
+      WHERE oauth.user_id = email_user.id;
 
     DELETE FROM referrals
     WHERE referred_id = email_user.id
