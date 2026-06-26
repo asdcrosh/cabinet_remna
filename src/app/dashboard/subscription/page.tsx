@@ -6,7 +6,7 @@ import { getCurrentUser } from '@/lib/auth/cookies'
 import { remnawave, RemnawaveError } from '@/lib/remnawave'
 import { KeysCard } from '@/components/dashboard/keys-card'
 import Link from 'next/link'
-import { CalendarClock, Database, Infinity, ShieldAlert } from 'lucide-react'
+import { Activity, CalendarClock, Database, Infinity, ShieldAlert } from 'lucide-react'
 import { PageHeader } from '@/components/dashboard/page-header'
 import { StatCard } from '@/components/dashboard/stat-card'
 
@@ -51,16 +51,43 @@ export default async function SubscriptionPage() {
 
   const u = data.response.user
   const isUnlimited = u.trafficLimitBytes === '0'
+  const statusText = u.isActive ? 'Подписка активна' : 'Подписка не активна'
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="Подписка"
-        description="Статус, трафик и подключение устройств"
-        action={<Link href="/dashboard/plans" className="btn-primary">Продлить</Link>}
-      />
+      <section className="relative overflow-hidden rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-surface-900 sm:p-6">
+        <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-cyan-400 via-emerald-300 to-blue-500" />
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className={u.isActive ? 'badge-active' : 'badge-disabled'}>{statusText}</span>
+              <span className="badge bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-slate-300">
+                {u.username}
+              </span>
+            </div>
+            <h1 className="mt-3 text-2xl font-semibold tracking-tight sm:text-3xl">Подключение VPN</h1>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
+              Добавьте подписку в приложение по кнопке, QR-коду или ссылке. Одна подписка работает на всех ваших устройствах.
+            </p>
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row lg:shrink-0">
+            <Link href="/dashboard/plans" className="btn-primary min-h-10 justify-center">
+              Продлить
+            </Link>
+            <Link href="/dashboard/devices" className="btn-secondary min-h-10 justify-center">
+              Устройства
+            </Link>
+          </div>
+        </div>
+      </section>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <StatCard
+          label="Статус"
+          value={u.isActive ? 'Активна' : 'Отключена'}
+          hint={u.userStatus}
+          icon={<Activity className="h-5 w-5" />}
+        />
         <StatCard
           label="Действует до"
           value={new Date(u.expiresAt).toLocaleDateString('ru-RU')}
