@@ -26,18 +26,21 @@ import {
 } from 'lucide-react'
 import { logWarn } from '@/lib/logger'
 import { readRemnawaveBigInt } from '@/lib/remnawave-usage'
+import { getFreshPendingPaymentCutoff, reconcileStalePendingPaymentsForUser } from '@/lib/payment-sync'
 
 export const dynamic = 'force-dynamic'
 
 export default async function DashboardHome() {
   const session = await getCurrentUser()
   if (!session) redirect('/login')
+  await reconcileStalePendingPaymentsForUser(session.uid)
+  const freshPendingCutoff = getFreshPendingPaymentCutoff()
   const user = await prisma.user.findUnique({
     where: { id: session.uid },
     include: {
       subscriptions: { orderBy: { createdAt: 'desc' }, take: 1, include: { plan: true } },
       payments: {
-        where: { status: 'PENDING' },
+        where: { status: 'PENDING', createdAt: { gt: freshPendingCutoff } },
         orderBy: { createdAt: 'desc' },
         take: 1,
         select: { id: true, confirmationUrl: true, createdAt: true },

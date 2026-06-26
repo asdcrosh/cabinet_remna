@@ -3,6 +3,8 @@ import { notifyPaymentCanceled, notifyPaymentStuck } from './notifications'
 import { provisionPaymentSubscription } from './provisioning'
 import { cancelPayment, getPayment } from './yookassa'
 
+const DEFAULT_PENDING_TTL_SECONDS = 600
+
 export type PaymentSyncResult =
   | { ok: true; status: 'not_found' | 'missing_external_id' | 'pending' | 'canceled'; provisioned: false }
   | { ok: true; status: 'succeeded'; provisioned: true; alreadyProvisioned?: boolean; subscriptionId?: string }
@@ -22,8 +24,19 @@ export async function syncPaymentProvisioning(input: {
   })
 
   if (!payment) return { ok: true, status: 'not_found', provisioned: false }
+  if (payment.status === 'CANCELED') {
+    return { ok: true, status: 'canceled', provisioned: false }
+  }
   if (!payment.yookassaId) {
     if (payment.status !== 'SUCCEEDED') {
+      if (
+        input.cancelPendingOlderThanMs &&
+        Date.now() - payment.createdAt.getTime() >= input.cancelPendingOlderThanMs
+      ) {
+        await cancelLocalPayment(payment.id, null)
+        await notifyPaymentCanceled(payment.id, 'Платёж отменён, потому что ссылка на оплату устарела.')
+        return { ok: true, status: 'canceled', provisioned: false }
+      }
       return { ok: true, status: 'missing_external_id', provisioned: false }
     }
     if (payment.subscriptionProvisionedAt && payment.subscription) {
@@ -201,4 +214,51 @@ async function cancelLocalPayment(paymentId: string, yookassaStatus: string | nu
       data: { status: 'CANCELED' },
     }),
   ])
+}
+
+export function getPendingPaymentTtlMs() {
+  const uiTtl = readPositiveInt('PAYMENT_PENDING_UI_TTL_SECONDS')
+  const cancelTtl = readPositiveInt('PAYMENT_CANCEL_PENDING_AFTER_SECONDS')
+  return (uiTtl ?? cancelTtl ?? DEFAULT_PENDING_TTL_SECONDS) * 1000
+}
+
+export function getFreshPendingPaymentCutoff(now = Date.now()) {
+  return new Date(now - getPendingPaymentTtlMs())
+}
+
+export async function reconcileStalePendingPaymentsForUser(userId: string, limit = 5) {
+  const cutoff = getFreshPendingPaymentCutoff()
+  const stalePayments = await prisma.payment.findMany({
+    where: {
+      userId,
+      status: 'PENDING',
+      createdAt: { lte: cutoff },
+    },
+    orderBy: { createdAt: 'asc' },
+    take: limit,
+    select: { id: true },
+  })
+
+  for (const payment of stalePayments) {
+    await syncPaymentProvisioning({
+      paymentId: payment.id,
+      userId,
+      cancelPendingOlderThanMs: getPendingPaymentTtlMs(),
+    }).catch((error) => {
+      console.error('[payment-sync] stale pending reconciliation failed', {
+        paymentId: payment.id,
+        userId,
+        message: error instanceof Error ? error.message : 'unknown error',
+      })
+    })
+  }
+
+  return { checked: stalePayments.length }
+}
+
+function readPositiveInt(name: string) {
+  const raw = process.env[name]
+  if (!raw) return null
+  const value = Number(raw)
+  return Number.isInteger(value) && value > 0 ? value : null
 }

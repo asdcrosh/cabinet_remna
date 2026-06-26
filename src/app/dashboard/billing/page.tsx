@@ -7,7 +7,12 @@ import { formatPrice } from '@/lib/format'
 import { PageHeader } from '@/components/dashboard/page-header'
 import { PaymentSuccessBanner } from '@/components/dashboard/payment-success-banner'
 import { EmptyState } from '@/components/dashboard/empty-state'
-import { syncPaymentProvisioning, type PaymentSyncResult } from '@/lib/payment-sync'
+import {
+  getPendingPaymentTtlMs,
+  reconcileStalePendingPaymentsForUser,
+  syncPaymentProvisioning,
+  type PaymentSyncResult,
+} from '@/lib/payment-sync'
 import { ExternalLink } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
@@ -16,9 +21,14 @@ export default async function BillingPage({ searchParams }: { searchParams: { pa
   const session = await getCurrentUser()
   if (!session) redirect('/login')
   const returnPaymentId = typeof searchParams.payment === 'string' ? searchParams.payment : null
+  await reconcileStalePendingPaymentsForUser(session.uid)
   const syncResult =
     searchParams.paid === '1' && returnPaymentId
-      ? await syncPaymentProvisioning({ paymentId: returnPaymentId, userId: session.uid })
+      ? await syncPaymentProvisioning({
+          paymentId: returnPaymentId,
+          userId: session.uid,
+          cancelPendingOlderThanMs: getPendingPaymentTtlMs(),
+        })
       : null
   const payments = await prisma.payment.findMany({
     where: { userId: session.uid },
@@ -68,13 +78,13 @@ export default async function BillingPage({ searchParams }: { searchParams: { pa
                 </td>
                 <td className="text-slate-500">{getPromoCodeLabel(p.promoCodeSnapshot)}</td>
                 <td>
-                  <PaymentStatusBadge status={p.status} />
+                  <PaymentStatusBadge status={p.status} createdAt={p.createdAt} />
                 </td>
                 <td>
                   <ProvisioningBadge provisioned={Boolean(p.subscriptionProvisionedAt)} status={p.status} />
                 </td>
                 <td>
-                  <PaymentAction confirmationUrl={p.confirmationUrl} status={p.status} />
+                  <PaymentAction confirmationUrl={p.confirmationUrl} status={p.status} createdAt={p.createdAt} />
                 </td>
               </tr>
             ))}
@@ -97,7 +107,7 @@ export default async function BillingPage({ searchParams }: { searchParams: { pa
                   <div className="truncate text-sm font-semibold">{p.plan.name}</div>
                   <div className="mt-0.5 text-xs text-slate-500">{formatPaymentDate(p.createdAt)}</div>
                 </div>
-                <PaymentStatusBadge status={p.status} />
+                <PaymentStatusBadge status={p.status} createdAt={p.createdAt} />
               </div>
             </div>
             <div className="space-y-3 px-4 py-4">
@@ -115,7 +125,7 @@ export default async function BillingPage({ searchParams }: { searchParams: { pa
                 <InfoCell label="Промокод" value={getPromoCodeLabel(p.promoCodeSnapshot)} />
                 <InfoCell label="ID оплаты" value={p.yookassaId ? shortId(p.yookassaId) : shortId(p.id)} mono />
               </div>
-              <PaymentAction confirmationUrl={p.confirmationUrl} status={p.status} fullWidth />
+              <PaymentAction confirmationUrl={p.confirmationUrl} status={p.status} createdAt={p.createdAt} fullWidth />
             </div>
           </article>
         ))}
@@ -198,12 +208,17 @@ function ProvisioningBadge({ provisioned, status }: { provisioned: boolean; stat
 function PaymentAction({
   confirmationUrl,
   status,
+  createdAt,
   fullWidth = false,
 }: {
   confirmationUrl: string | null
   status: string
+  createdAt: Date
   fullWidth?: boolean
 }) {
+  if (status === 'PENDING' && !isFreshPendingPayment(createdAt)) {
+    return <span className="text-sm text-slate-400">Ссылка устарела</span>
+  }
   if (status !== 'PENDING' || !confirmationUrl) return <span className="text-sm text-slate-400">—</span>
   return (
     <a
@@ -222,7 +237,10 @@ function shortId(id: string) {
   return id.length > 12 ? `${id.slice(0, 8)}…${id.slice(-4)}` : id
 }
 
-function PaymentStatusBadge({ status }: { status: string }) {
+function PaymentStatusBadge({ status, createdAt }: { status: string; createdAt: Date }) {
+  if (status === 'PENDING' && !isFreshPendingPayment(createdAt)) {
+    return <span className="badge-disabled">Истёк</span>
+  }
   const map: Record<string, string> = {
     SUCCEEDED: 'badge-active',
     PENDING: 'badge-limited',
@@ -236,4 +254,8 @@ function PaymentStatusBadge({ status }: { status: string }) {
     REFUNDED: 'Возврат',
   }
   return <span className={map[status] ?? 'badge-disabled'}>{labels[status] ?? status}</span>
+}
+
+function isFreshPendingPayment(createdAt: Date) {
+  return createdAt.getTime() > Date.now() - getPendingPaymentTtlMs()
 }
