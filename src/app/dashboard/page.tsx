@@ -1,6 +1,7 @@
 // Главная страница кабинета: компактный обзор подписки и быстрые действия.
 
 import Link from 'next/link'
+import type { ReactElement, ReactNode } from 'react'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth/cookies'
 import { remnawave, RemnawaveError } from '@/lib/remnawave'
@@ -8,11 +9,11 @@ import { formatBytes, formatPrice } from '@/lib/format'
 import { StatusBadge } from '@/components/dashboard/status-badge'
 import { ProgressBar } from '@/components/dashboard/progress-bar'
 import { TrafficChart } from '@/components/dashboard/traffic-chart'
+import { DashboardOnboardingCard, type DashboardOnboardingState } from '@/components/dashboard/onboarding-card'
 import { redirect } from 'next/navigation'
 import {
   AlertTriangle,
   ArrowRight,
-  CheckCircle2,
   CreditCard,
   Gift,
   KeyRound,
@@ -32,6 +33,7 @@ export default async function DashboardHome() {
     where: { id: session.uid },
     include: {
       subscriptions: { orderBy: { createdAt: 'desc' }, take: 1, include: { plan: true } },
+      _count: { select: { devices: true } },
     },
   })
   if (!user) {
@@ -51,9 +53,24 @@ export default async function DashboardHome() {
 
   const sub = remnawaveCard?.response.user
   const subRow = user.subscriptions[0] ?? null
+  const onboardingState: DashboardOnboardingState = {
+    emailVerified: Boolean(user.emailVerifiedAt && !user.email.endsWith('@pending.invalid')),
+    telegramLinked: Boolean(user.telegramId),
+    remnashopSynced: Boolean(user.remnashopSyncedAt),
+    hasLocalSubscription: Boolean(subRow),
+    hasRemnawaveProfile: Boolean(user.remnawaveUsername),
+    pendingSync: Boolean(subRow?.pendingSync),
+    deviceCount: user._count.devices,
+  }
 
   if (!user.remnawaveUsername) {
-    return <OnboardingState emailVerified={Boolean(user.emailVerifiedAt)} />
+    return (
+      <div className="space-y-4">
+        <CompactHeader title="Главная" description="Начните пользоваться VPN" />
+        <DashboardOnboardingCard state={onboardingState} mode="full" />
+        <PromoGrid />
+      </div>
+    )
   }
 
   const used = sub ? readRemnawaveBigInt(sub, ['trafficUsedBytes', 'usedTrafficBytes']) : 0n
@@ -70,6 +87,8 @@ export default async function DashboardHome() {
         actionHref="/dashboard/subscription"
         actionLabel="Подключение"
       />
+
+      <DashboardOnboardingCard state={onboardingState} />
 
       {subRow?.pendingSync && !remnawaveCard && (
         <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
@@ -145,58 +164,6 @@ export default async function DashboardHome() {
   )
 }
 
-function OnboardingState({ emailVerified }: { emailVerified: boolean }) {
-  return (
-    <div className="space-y-4">
-      <CompactHeader title="Главная" description="Начните пользоваться VPN" />
-
-      <div className="card relative overflow-hidden p-4 sm:p-5">
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-cyan-400 via-emerald-400 to-brand-500" />
-        <div className="grid gap-5 lg:grid-cols-[1fr_0.9fr] lg:items-center">
-          <div>
-            <div className="mb-3 grid h-11 w-11 place-items-center rounded-lg bg-slate-950 text-cyan-200 shadow-lg shadow-slate-950/15 dark:bg-white dark:text-slate-950">
-              <ShieldCheck className="h-6 w-6" />
-            </div>
-            <h2 className="text-xl font-semibold">Подключите VPN</h2>
-            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-              Выберите тариф, оплатите и добавьте подписку в приложение.
-            </p>
-            <div className="mt-4 flex flex-wrap gap-2">
-              <Link href="/dashboard/plans" className="btn-primary">Выбрать тариф</Link>
-              <Link href="/dashboard/settings" className="btn-secondary">Профиль</Link>
-            </div>
-          </div>
-          <div className="grid gap-2">
-            <Step
-              done={emailVerified}
-              title={emailVerified ? 'Email подтверждён' : 'Добавьте email'}
-              description={emailVerified ? 'Аккаунт готов' : 'Можно сделать позже'}
-            />
-            <Step done={false} title="Выберите тариф" description="Подходящий срок и лимиты" />
-            <Step done={false} title="Подключитесь" description="По ссылке или QR-коду" />
-          </div>
-        </div>
-      </div>
-
-      <PromoGrid />
-    </div>
-  )
-}
-
-function Step({ done, title, description }: { done: boolean; title: string; description: string }) {
-  return (
-    <div className="flex gap-3 rounded-lg border border-slate-100 bg-slate-50/80 px-3 py-2.5 dark:border-slate-800 dark:bg-surface-800/70">
-      <div className={done ? 'text-emerald-500' : 'text-slate-300 dark:text-slate-600'}>
-        <CheckCircle2 className="h-5 w-5" />
-      </div>
-      <div>
-        <div className="text-sm font-medium">{title}</div>
-        <div className="text-xs text-slate-500 dark:text-slate-400">{description}</div>
-      </div>
-    </div>
-  )
-}
-
 function CompactHeader({
   title,
   description,
@@ -240,7 +207,7 @@ function OverviewMetric({
   )
 }
 
-function CompactAction({ href, icon, label }: { href: string; icon: React.ReactElement; label: string }) {
+function CompactAction({ href, icon, label }: { href: string; icon: ReactElement; label: string }) {
   return (
     <Link
       href={href}
@@ -282,7 +249,7 @@ function PromoBlock({
   tone,
 }: {
   href: string
-  icon: React.ReactNode
+  icon: ReactNode
   title: string
   description: string
   tone: 'cyan' | 'emerald'
