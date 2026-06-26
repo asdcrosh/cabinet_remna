@@ -6,6 +6,7 @@ import {
   FileClock,
   LifeBuoy,
   RefreshCw,
+  ServerCog,
   ShieldCheck,
   SlidersHorizontal,
   Tag,
@@ -125,6 +126,12 @@ export default async function AdminDashboardPage() {
           icon={<RefreshCw className="h-5 w-5" />}
           title="Синхронизация"
           note="Remnashop"
+        />
+        <AdminTile
+          href="/dashboard/admin/system"
+          icon={<ServerCog className="h-5 w-5" />}
+          title="Система"
+          note="Health и бэкапы"
         />
         <AdminTile
           href="/dashboard/admin/recovery"

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="1.1.1"
+VERSION="1.2.0"
 BRANCH="${BRANCH:-main}"
 RAW_BASE_URL="${RAW_BASE_URL:-https://raw.githubusercontent.com/asdcrosh/cabinet_remna/${BRANCH}}"
 INSTALL_URL="${INSTALL_URL:-${RAW_BASE_URL}/deploy/install-server.sh}"
@@ -43,6 +43,13 @@ pause() {
   fi
 }
 
+require_tty() {
+  [[ -r /dev/tty ]] || {
+    fail "Для этого действия нужен интерактивный терминал."
+    return 1
+  }
+}
+
 cabinet_installed() {
   [[ -f "${CABINET_ENV}" && -f "${CABINET_COMPOSE}" ]]
 }
@@ -76,6 +83,20 @@ container_state() {
   local state
   state="$(docker inspect -f '{{.State.Status}}' "${container}" 2>/dev/null || true)"
   [[ -n "${state}" ]] && printf '%s\n' "${state}" || printf '%s\n' "не найден"
+}
+
+env_value() {
+  local key="$1"
+  [[ -f "${CABINET_ENV}" ]] || return 0
+  awk -F= -v key="${key}" '
+    $1 == key {
+      sub(/^[^=]*=/, "")
+      gsub(/^"/, "")
+      gsub(/"$/, "")
+      print
+      exit
+    }
+  ' "${CABINET_ENV}" 2>/dev/null || true
 }
 
 download_executable() {
@@ -174,6 +195,29 @@ show_logs() {
   cabinet_compose logs -f --tail=200 "${service}" || true
 }
 
+logs_menu() {
+  cabinet_installed || {
+    fail "Кабинет ещё не установлен."
+    return 1
+  }
+  require_tty
+  printf '%s\n' \
+    "  1. Приложение" \
+    "  2. Worker платежей" \
+    "  3. Все сервисы кабинета" \
+    "  0. Назад" >/dev/tty
+  printf 'Выберите логи: ' >/dev/tty
+  local choice
+  IFS= read -r choice </dev/tty
+  case "${choice}" in
+    1) show_logs app ;;
+    2) show_logs worker ;;
+    3) warn "Для выхода из логов нажмите Ctrl+C."; cabinet_compose logs -f --tail=200 || true ;;
+    0) return ;;
+    *) warn "Неизвестный пункт." ;;
+  esac
+}
+
 restart_cabinet() {
   cabinet_compose up -d --remove-orphans
   ok "Сервисы кабинета перезапущены."
@@ -181,15 +225,34 @@ restart_cabinet() {
 }
 
 health_check() {
-  cabinet_installed || {
-    fail "Кабинет ещё не установлен."
-    return 1
-  }
+  show_status
+  printf '\n'
+
   if command -v cabinetctl >/dev/null 2>&1; then
     cabinetctl health
-    return
+  elif cabinet_installed; then
+    local app_port health_token
+    app_port="$(env_value CABINET_APP_PORT)"
+    health_token="$(env_value HEALTHCHECK_TOKEN)"
+    [[ -n "${app_port}" ]] || app_port="3000"
+    printf '%s\n' "${BOLD}Проверка кабинета${RESET}"
+    if [[ -n "${health_token}" ]] && command -v curl >/dev/null 2>&1; then
+      if curl -fsS -H "x-healthcheck-token: ${health_token}" "http://127.0.0.1:${app_port}/api/health" >/dev/null; then
+        ok "HTTP health и база кабинета отвечают"
+      else
+        warn "HTTP health кабинета не прошёл"
+      fi
+    else
+      warn "Нет curl или HEALTHCHECK_TOKEN, глубокая HTTP-проверка пропущена"
+    fi
+    cabinet_compose ps
+  else
+    warn "Кабинет ещё не установлен."
   fi
-  cabinet_compose ps
+
+  printf '\n'
+  ensure_backup_command
+  "${BACKUP_SCRIPT_PATH}" status || true
 }
 
 setup_nginx() {
@@ -245,22 +308,17 @@ show_menu() {
   show_header
   if cabinet_installed; then
     printf '%s\n' \
-      "  1. Обновить кабинет" \
+      "  1. Обновить систему" \
       "  2. Настроить .env" \
-      "  3. Перезапустить кабинет" \
-      "  4. Логи приложения" \
-      "  5. Логи worker" \
-      "  6. Проверить кабинет" \
-      "  7. Настроить nginx и HTTPS" \
-      "  8. Резервные копии и S3" \
-      "  9. Обновить консоль" \
+      "  3. Здоровье системы" \
+      "  4. Логи" \
+      "  5. Бэкапы" \
       "  0. Выход"
   else
     printf '%s\n' \
       "  1. Установить кабинет" \
-      "  2. Резервные копии и восстановление" \
-      "  3. Показать состояние сервера" \
-      "  4. Обновить консоль" \
+      "  2. Здоровье системы" \
+      "  3. Бэкапы" \
       "  0. Выход"
   fi
   printf '\nВыберите действие: ' >/dev/tty
@@ -281,22 +339,17 @@ run_menu() {
       case "${choice}" in
         1) update_cabinet || true; pause ;;
         2) edit_env || true; pause ;;
-        3) restart_cabinet || true; pause ;;
-        4) show_logs app; pause ;;
-        5) show_logs worker; pause ;;
-        6) health_check || true; pause ;;
-        7) setup_nginx || true; pause ;;
-        8) backup_menu || true; pause ;;
-        9) update_console || true; pause ;;
+        3) health_check || true; pause ;;
+        4) logs_menu || true; pause ;;
+        5) backup_menu || true; pause ;;
         0) exit 0 ;;
         *) warn "Неизвестный пункт."; pause ;;
       esac
     else
       case "${choice}" in
         1) install_cabinet || true; pause ;;
-        2) backup_menu || true; pause ;;
-        3) show_status; pause ;;
-        4) update_console || true; pause ;;
+        2) health_check || true; pause ;;
+        3) backup_menu || true; pause ;;
         0) exit 0 ;;
         *) warn "Неизвестный пункт."; pause ;;
       esac
@@ -311,18 +364,16 @@ Remna Control ${VERSION}
 Использование:
   remnactl                    интерактивная консоль
   remnactl install            установить кабинет
-  remnactl update             обновить кабинет
+  remnactl update             обновить систему
   remnactl env                открыть .env
-  remnactl status             состояние всех сервисов
-  remnactl restart            перезапустить кабинет
-  remnactl logs               логи приложения
-  remnactl worker             логи worker
-  remnactl health             проверить кабинет
+  remnactl health             здоровье системы
+  remnactl logs               меню логов
+  remnactl backups            бэкапы, восстановление и S3
+  remnactl status             краткое состояние сервисов
+  remnactl restart            перезапустить кабинет без обновления
   remnactl nginx              настроить nginx и HTTPS
-  remnactl backup             создать полный бэкап
-  remnactl backups            меню бэкапов
-  remnactl verify ARCHIVE     проверить архив
-  remnactl restore            выбрать архив и восстановить через меню
+  remnactl backup             создать бэкап без меню
+  remnactl restore            восстановить через меню
   RESTORE_CONFIRM=RESTORE_REMNAWAVE_REMNASHOP_CABINET \\
     remnactl restore ARCHIVE  восстановить сервер
   remnactl self-update        обновить консоль
@@ -336,7 +387,7 @@ case "${1:-menu}" in
   env) edit_env ;;
   status) show_status ;;
   restart) restart_cabinet ;;
-  logs) show_logs app ;;
+  logs) logs_menu ;;
   worker) show_logs worker ;;
   health) health_check ;;
   nginx) setup_nginx ;;

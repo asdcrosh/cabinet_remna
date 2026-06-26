@@ -14,6 +14,7 @@ import {
   Laptop,
   Menu,
   MessageCircleQuestion,
+  ServerCog,
   Settings,
   ShieldCheck,
   SlidersHorizontal,
@@ -48,6 +49,7 @@ const adminNav = [
   { href: '/dashboard/admin/payments', label: 'Платежи', icon: CreditCard },
   { href: '/dashboard/admin/subscriptions', label: 'Подписки', icon: ShieldCheck },
   { href: '/dashboard/admin/remnashop-sync', label: 'Синхронизация', icon: Database },
+  { href: '/dashboard/admin/system', label: 'Система', icon: ServerCog },
   { href: '/dashboard/admin/audit', label: 'История', icon: FileClock },
 ]
 

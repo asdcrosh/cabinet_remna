@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="1.1.0"
+VERSION="1.2.0"
 INSTALL_PATH="${FULL_BACKUP_INSTALL_PATH:-/usr/local/bin/remna-backup}"
 BACKUP_DIR="${FULL_BACKUP_DIR:-/opt/remnawave-backups}"
 S3_CONFIG_FILE="${FULL_BACKUP_S3_CONFIG:-/etc/remna-backup-s3.conf}"
@@ -16,6 +16,7 @@ REMNASHOP_DB_SERVICE="${REMNASHOP_DB_SERVICE:-remnashop-db}"
 CABINET_DB_SERVICE="${CABINET_DB_SERVICE:-db}"
 LOCK_FILE="${FULL_BACKUP_LOCK_FILE:-/var/lock/remna-full-backup.lock}"
 KEEP_DAYS="${FULL_BACKUP_KEEP_DAYS:-14}"
+MAX_AGE_HOURS="${FULL_BACKUP_MAX_AGE_HOURS:-48}"
 CLEANUP_PATHS=("")
 
 S3_ENDPOINT=""
@@ -571,6 +572,64 @@ local_backup_paths() {
   return 0
 }
 
+latest_local_backup() {
+  local_backup_paths | head -n 1
+}
+
+backup_age_hours() {
+  local archive="$1"
+  local modified now
+  modified="$(stat -c '%Y' "${archive}" 2>/dev/null || printf '0')"
+  now="$(date +%s)"
+  printf '%s\n' $(((now - modified) / 3600))
+}
+
+backup_status() {
+  require_root
+  require_commands
+  printf '%s\n' "${BOLD}${CYAN}Бэкапы${RESET}"
+  mkdir -p "${BACKUP_DIR}"
+
+  local latest count
+  count="$(local_backup_paths | wc -l | tr -d ' ')"
+  latest="$(latest_local_backup)"
+  printf '  Каталог:        %s\n' "${BACKUP_DIR}"
+  printf '  Локальных:      %s\n' "${count}"
+  if [[ -n "${latest}" ]]; then
+    local age
+    age="$(backup_age_hours "${latest}")"
+    printf '  Последний:      %s (%s, %s ч назад)\n' \
+      "$(basename "${latest}")" "$(du -h "${latest}" | awk '{print $1}')" "${age}"
+    if ((age <= MAX_AGE_HOURS)); then
+      ok "Локальный бэкап свежий"
+    else
+      warn "Последний локальный бэкап старше ${MAX_AGE_HOURS} часов"
+    fi
+  else
+    warn "Локальных бэкапов пока нет"
+  fi
+
+  printf '\n%s\n' "${BOLD}${CYAN}S3${RESET}"
+  if s3_configured; then
+    printf '  Bucket:         %s\n' "${S3_BUCKET}"
+    printf '  Prefix:         %s\n' "${S3_PREFIX:-/}"
+    printf '  Auto upload:    %s\n' "${S3_AUTO_UPLOAD}"
+    if ! command -v aws >/dev/null 2>&1; then
+      warn "AWS CLI не установлен, S3-доступ не проверен"
+    elif remote_backup_keys >/tmp/remna-s3-health.$$ 2>/tmp/remna-s3-health.err.$$; then
+      local remote_count
+      remote_count="$(grep -cv '^$' /tmp/remna-s3-health.$$ 2>/dev/null || true)"
+      ok "S3 доступен, архивов: ${remote_count}"
+    else
+      warn "S3 настроен, но доступ не прошёл"
+      sed -n '1,3p' /tmp/remna-s3-health.err.$$ 2>/dev/null || true
+    fi
+    rm -f /tmp/remna-s3-health.$$ /tmp/remna-s3-health.err.$$
+  else
+    warn "S3 не настроен"
+  fi
+}
+
 choose_local_backup() {
   require_tty
   local -a archives=()
@@ -687,11 +746,12 @@ show_menu() {
   fi
   while true; do
     clear 2>/dev/null || true
-    printf '%s\n\n' "${BOLD}${CYAN}Remnawave Full Backup${RESET}"
+    printf '%s\n\n' "${BOLD}${CYAN}Бэкапы и восстановление${RESET}"
     printf '%s\n' \
-      "  1. Создать полный бэкап" \
-      "  2. Восстановить бэкап" \
-      "  3. Настроить S3" \
+      "  1. Создать бэкап" \
+      "  2. Восстановить" \
+      "  3. S3" \
+      "  4. Статус" \
       "  0. Выход"
     printf '\nЛокальных архивов: %s · S3: %s\n' "$(local_backup_paths | wc -l | tr -d ' ')" "$(s3_configured && printf 'настроен' || printf 'не настроен')" >/dev/tty
     printf 'Выберите действие: ' >/dev/tty
@@ -701,6 +761,7 @@ show_menu() {
       1) create_backup ;;
       2) restore_menu ;;
       3) s3_menu ;;
+      4) backup_status ;;
       0) exit 0 ;;
       *) warn "Неизвестный пункт." ;;
     esac
@@ -716,10 +777,11 @@ Remnawave Full Backup ${VERSION}
 Использование:
   remna-backup                       интерактивное меню
   remna-backup backup                полный бэкап трёх систем
+  remna-backup status                свежесть локального бэкапа и S3
+  remna-backup list                  список архивов
+  remna-backup s3-config             настроить S3
   remna-backup s3-upload ARCHIVE     загрузить архив в S3
   remna-backup s3-list               список архивов в S3
-  remna-backup s3-config             настроить S3
-  remna-backup list                  список архивов
   remna-backup verify ARCHIVE        проверка архива
   RESTORE_CONFIRM=RESTORE_REMNAWAVE_REMNASHOP_CABINET \\
     remna-backup restore ARCHIVE     полное восстановление
@@ -738,6 +800,7 @@ EOF
 case "${1:-menu}" in
   menu) show_menu ;;
   backup) create_backup ;;
+  status) backup_status ;;
   list) list_backups ;;
   verify) verify_backup "${2:-}" ;;
   restore) restore_backup "${2:-}" ;;
