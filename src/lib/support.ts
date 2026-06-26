@@ -1,22 +1,39 @@
 import { z } from 'zod'
 
 export const supportCategories = [
-  { value: 'payment', label: 'Оплата' },
-  { value: 'connection', label: 'Подключение' },
-  { value: 'subscription', label: 'Подписка' },
-  { value: 'general', label: 'Другое' },
+  {
+    value: 'connection',
+    label: 'Подключение',
+    subject: 'Проблема с подключением',
+    description: 'VPN не подключается, нет интернета или ошибка на устройстве.',
+  },
+  {
+    value: 'payment',
+    label: 'Оплата',
+    subject: 'Вопрос по оплате',
+    description: 'Платёж, чек, продление или ошибка при покупке.',
+  },
+  {
+    value: 'subscription',
+    label: 'Подписка',
+    subject: 'Вопрос по подписке',
+    description: 'Срок, тариф, перенос или доступ к подписке.',
+  },
+  {
+    value: 'general',
+    label: 'Другое',
+    subject: 'Другой вопрос',
+    description: 'Если вопрос не подходит под остальные пункты.',
+  },
 ] as const
 
+export type SupportCategoryValue = typeof supportCategories[number]['value']
+
 export const createSupportTicketSchema = z.object({
-  subject: z.string().trim().min(3).max(120).optional(),
-  category: z.enum(['payment', 'connection', 'subscription', 'general']).default('general'),
+  subject: z.never().optional(),
+  category: z.enum(['payment', 'connection', 'subscription', 'general']).default('connection'),
   message: z.string().trim().min(5).max(3000),
 })
-
-export function supportSubjectFromMessage(message: string) {
-  const firstLine = message.trim().split(/\r?\n/, 1)[0]?.replace(/\s+/g, ' ') || 'Вопрос в поддержку'
-  return firstLine.length > 64 ? `${firstLine.slice(0, 61).trimEnd()}...` : firstLine
-}
 
 export const createSupportMessageSchema = z.object({
   message: z.string().trim().min(1).max(3000),
@@ -52,6 +69,14 @@ export function supportStatusLabelForRole(status: string, role: 'user' | 'admin'
 
 export function supportCategoryLabel(category: string) {
   return supportCategories.find((item) => item.value === category)?.label ?? 'Другое'
+}
+
+export function supportCategoryDescription(category: string) {
+  return supportCategories.find((item) => item.value === category)?.description ?? supportCategories.at(-1)?.description ?? ''
+}
+
+export function supportCategorySubject(category: string) {
+  return supportCategories.find((item) => item.value === category)?.subject ?? 'Другой вопрос'
 }
 
 export function serializeSupportTicket<T extends {

@@ -20,11 +20,18 @@ import {
   MessageCircle,
   MessageSquarePlus,
   Send,
+  Tag,
   Timer,
   XCircle,
 } from 'lucide-react'
 import { cn } from '@/lib/cn'
-import { supportCategoryLabel, supportStatusLabelForRole } from '@/lib/support'
+import {
+  supportCategories,
+  supportCategoryDescription,
+  supportCategoryLabel,
+  supportStatusLabelForRole,
+  type SupportCategoryValue,
+} from '@/lib/support'
 
 type TicketStatus = 'OPEN' | 'WAITING_ADMIN' | 'WAITING_USER' | 'CLOSED'
 type SenderRole = 'USER' | 'ADMIN'
@@ -88,6 +95,7 @@ export function SupportPanel({
   const [mobileChatOpen, setMobileChatOpen] = useState(false)
   const [message, setMessage] = useState('')
   const [newMessage, setNewMessage] = useState('')
+  const [newCategory, setNewCategory] = useState<SupportCategoryValue>('connection')
   const [newTicketOpen, setNewTicketOpen] = useState(mode === 'user' && initialTickets.length === 0)
   const [error, setError] = useState('')
   const [isPending, startTransition] = useTransition()
@@ -271,7 +279,7 @@ export function SupportPanel({
       const res = await fetch('/api/support/tickets', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ message: newMessage }),
+        body: JSON.stringify({ category: newCategory, message: newMessage }),
       })
       const data = await res.json().catch(() => null)
       if (!res.ok) {
@@ -284,6 +292,7 @@ export function SupportPanel({
       setFolder('active')
       setMobileChatOpen(true)
       setNewMessage('')
+      setNewCategory('connection')
       setNewTicketOpen(false)
       stickToBottomRef.current = true
     })
@@ -409,8 +418,10 @@ export function SupportPanel({
           <div className="min-h-0 flex-1 overflow-y-auto p-1.5">
             {mode === 'user' && newTicketOpen && (
               <NewTicketForm
+                category={newCategory}
                 message={newMessage}
                 isPending={isPending}
+                onCategoryChange={setNewCategory}
                 onMessageChange={setNewMessage}
                 onCancel={tickets.length > 0 ? () => setNewTicketOpen(false) : undefined}
                 onSubmit={createTicket}
@@ -475,7 +486,7 @@ export function SupportPanel({
                     <div className="mt-1 truncate text-sm text-slate-500">
                       {mode === 'admin'
                         ? `${supportCategoryLabel(selected.category)}${selected.user ? ` · ${selected.user.email}` : ''}`
-                        : 'Чат с поддержкой'}
+                        : supportCategoryDescription(selected.category)}
                     </div>
                   </div>
                 </div>
@@ -546,53 +557,96 @@ export function SupportPanel({
 }
 
 function NewTicketForm({
+  category,
   message,
   isPending,
+  onCategoryChange,
   onMessageChange,
   onCancel,
   onSubmit,
 }: {
+  category: SupportCategoryValue
   message: string
   isPending: boolean
+  onCategoryChange: (value: SupportCategoryValue) => void
   onMessageChange: (value: string) => void
   onCancel?: () => void
   onSubmit: (event: FormEvent<HTMLFormElement>) => void
 }) {
   return (
-    <form onSubmit={onSubmit} className="mb-2 rounded-lg border border-cyan-200 bg-cyan-50/60 p-3 shadow-sm dark:border-cyan-500/20 dark:bg-cyan-500/[0.06]">
-      <div className="flex items-center gap-3">
-        <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-slate-950 text-cyan-200 shadow-sm dark:bg-white dark:text-slate-950">
-          <MessageSquarePlus className="h-5 w-5" />
-        </div>
-        <div>
-          <h2 className="text-sm font-semibold">Новый диалог</h2>
-          <p className="text-xs text-slate-500">Опишите вопрос одним сообщением.</p>
+    <form onSubmit={onSubmit} className="mb-2 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-surface-900">
+      <div className="border-b border-slate-100 bg-slate-50/80 p-3 dark:border-slate-800 dark:bg-surface-950/50">
+        <div className="flex items-center gap-3">
+          <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-slate-950 text-cyan-200 shadow-sm dark:bg-white dark:text-slate-950">
+            <MessageSquarePlus className="h-5 w-5" />
+          </div>
+          <div>
+            <h2 className="text-sm font-semibold">Новое обращение</h2>
+            <p className="text-xs text-slate-500">Выберите проблему и напишите детали.</p>
+          </div>
         </div>
       </div>
-      <textarea
-        className="input mt-3 min-h-28 resize-none"
-        value={message}
-        onChange={(event) => onMessageChange(event.target.value)}
-        onKeyDown={(event) => {
-          if (event.key !== 'Enter' || event.shiftKey) return
-          event.preventDefault()
-          event.currentTarget.form?.requestSubmit()
-        }}
-        placeholder="Напишите, что случилось"
-        maxLength={3000}
-        required
-        autoFocus
-      />
-      <div className="mt-3 flex justify-end gap-2">
-        {onCancel && (
-          <button type="button" className="btn-secondary" onClick={onCancel} disabled={isPending}>
-            Отмена
-          </button>
-        )}
-        <button className="btn-primary" disabled={isPending || message.trim().length < 5}>
-          <Send className="h-4 w-4" />
-          {isPending ? 'Отправляем...' : 'Отправить'}
-        </button>
+
+      <div className="space-y-3 p-3">
+        <div>
+          <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+            <Tag className="h-3.5 w-3.5" />
+            Тема
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {supportCategories.map((item) => {
+              const active = category === item.value
+              return (
+                <button
+                  key={item.value}
+                  type="button"
+                  onClick={() => onCategoryChange(item.value)}
+                  className={cn(
+                    'rounded-lg border p-3 text-left transition-all',
+                    active
+                      ? 'border-slate-950 bg-slate-950 text-white shadow-md shadow-slate-950/10 dark:border-white dark:bg-white dark:text-slate-950'
+                      : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50 dark:border-slate-800 dark:bg-surface-950 dark:text-slate-200 dark:hover:border-slate-700'
+                  )}
+                >
+                  <span className="block text-sm font-semibold">{item.label}</span>
+                  <span className={cn('mt-1 line-clamp-2 block text-xs leading-relaxed', active ? 'text-white/70 dark:text-slate-600' : 'text-slate-500')}>
+                    {item.description}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
+        <textarea
+          className="input min-h-28 resize-none"
+          value={message}
+          onChange={(event) => onMessageChange(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key !== 'Enter' || event.shiftKey) return
+            event.preventDefault()
+            event.currentTarget.form?.requestSubmit()
+          }}
+          placeholder="Коротко опишите, что происходит"
+          maxLength={3000}
+          required
+          autoFocus
+        />
+
+        <div className="flex items-center justify-between gap-3">
+          <div className="text-xs text-slate-400">{message.trim().length}/3000</div>
+          <div className="flex justify-end gap-2">
+            {onCancel && (
+              <button type="button" className="btn-secondary" onClick={onCancel} disabled={isPending}>
+                Отмена
+              </button>
+            )}
+            <button className="btn-primary" disabled={isPending || message.trim().length < 5}>
+              <Send className="h-4 w-4" />
+              {isPending ? 'Отправляем...' : 'Отправить'}
+            </button>
+          </div>
+        </div>
       </div>
     </form>
   )

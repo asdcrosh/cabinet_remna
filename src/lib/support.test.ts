@@ -2,17 +2,16 @@ import { describe, expect, it } from 'vitest'
 import {
   createSupportMessageSchema,
   createSupportTicketSchema,
+  supportCategorySubject,
   supportCategoryLabel,
-  supportSubjectFromMessage,
   supportStatusLabel,
   supportStatusLabelForRole,
   userUpdateSupportTicketSchema,
 } from './support'
 
 describe('support helpers', () => {
-  it('validates ticket subject and message', () => {
+  it('validates ticket category and message', () => {
     const parsed = createSupportTicketSchema.safeParse({
-      subject: 'Не работает подключение',
       category: 'connection',
       message: 'Не получается подключиться на iPhone.',
     })
@@ -21,11 +20,11 @@ describe('support helpers', () => {
     expect(createSupportTicketSchema.safeParse({
       message: 'Не получается подключиться на iPhone.',
     }).success).toBe(true)
-  })
-
-  it('creates a compact subject from the first message line', () => {
-    expect(supportSubjectFromMessage('Не работает подключение\nДополнительные детали')).toBe('Не работает подключение')
-    expect(supportSubjectFromMessage('А'.repeat(80))).toBe(`${'А'.repeat(61)}...`)
+    expect(createSupportTicketSchema.safeParse({
+      subject: 'Очень длинная свободная тема',
+      category: 'connection',
+      message: 'Не получается подключиться на iPhone.',
+    }).success).toBe(false)
   })
 
   it('rejects empty messages and user status changes except close', () => {
@@ -36,6 +35,7 @@ describe('support helpers', () => {
 
   it('returns labels for known support values', () => {
     expect(supportCategoryLabel('payment')).toBe('Оплата')
+    expect(supportCategorySubject('connection')).toBe('Проблема с подключением')
     expect(supportStatusLabel('WAITING_ADMIN')).toBe('Ожидает ответа')
     expect(supportStatusLabelForRole('WAITING_ADMIN', 'admin')).toBe('Нужно ответить')
     expect(supportStatusLabelForRole('WAITING_USER', 'user')).toBe('Ответ получен')

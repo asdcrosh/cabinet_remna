@@ -6,7 +6,7 @@ import {
   createSupportTicketSchema,
   serializeSupportMessage,
   serializeSupportTicket,
-  supportSubjectFromMessage,
+  supportCategorySubject,
 } from '@/lib/support'
 
 export const runtime = 'nodejs'
@@ -58,7 +58,7 @@ export const POST = withAuth(async (req: Request) => {
     const created = await tx.supportTicket.create({
       data: {
         userId: session.uid,
-        subject: parsed.data.subject || supportSubjectFromMessage(parsed.data.message),
+        subject: supportCategorySubject(parsed.data.category),
         category: parsed.data.category,
         status: 'WAITING_ADMIN',
         adminUnreadCount: 1,
