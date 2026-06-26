@@ -7,17 +7,19 @@ import { useForm } from 'react-hook-form'
 import { apiFetch } from '@/lib/api-client'
 import { toast } from '@/components/ui/toaster'
 import { CheckCircle2, Eye, EyeOff, RefreshCw } from 'lucide-react'
+import { GoogleAuthButton } from './google-auth-button'
 
 interface LoginInput {
   email: string
   password: string
 }
 
-export function LoginForm() {
+export function LoginForm({ googleEnabled = false }: { googleEnabled?: boolean }) {
   const router = useRouter()
   const search = useSearchParams()
   const next = search.get('next') || '/dashboard'
   const verified = search.get('verified')
+  const googleError = search.get('google_error')
   const { register, handleSubmit, watch, formState: { errors, isSubmitting } } = useForm<LoginInput>({
     defaultValues: { email: '', password: '' },
   })
@@ -68,6 +70,16 @@ export function LoginForm() {
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
+      {googleEnabled && (
+        <>
+          <GoogleAuthButton next={next} />
+          <div className="flex items-center gap-3 text-xs text-slate-400">
+            <span className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
+            или email
+            <span className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
+          </div>
+        </>
+      )}
       {verified === '1' && (
         <div className="flex items-start gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-100">
           <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
@@ -77,6 +89,11 @@ export function LoginForm() {
       {(verified === 'invalid' || verified === 'missing') && (
         <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
           Ссылка подтверждения недействительна или истекла. Запросите новую ссылку.
+        </div>
+      )}
+      {googleError && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
+          {googleErrorMessage(googleError)}
         </div>
       )}
       <div>
@@ -137,4 +154,14 @@ export function LoginForm() {
       </button>
     </form>
   )
+}
+
+function googleErrorMessage(code: string) {
+  const messages: Record<string, string> = {
+    not_configured: 'Вход через Google пока не настроен.',
+    invalid_state: 'Сессия входа через Google истекла. Попробуйте ещё раз.',
+    email_not_verified: 'Google не подтвердил email этого аккаунта.',
+    access_denied: 'Вход через Google отменён.',
+  }
+  return messages[code] ?? 'Не удалось войти через Google. Попробуйте ещё раз.'
 }

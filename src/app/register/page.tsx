@@ -8,6 +8,8 @@ import Link from 'next/link'
 
 export const metadata = { title: 'Регистрация' }
 
+const googleEnabled = Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET)
+
 export default async function RegisterPage({ searchParams }: { searchParams: { ref?: string } }) {
   const session = await getCurrentUser()
   if (session) redirect('/dashboard')
@@ -19,7 +21,7 @@ export default async function RegisterPage({ searchParams }: { searchParams: { r
       footer={<>Уже есть аккаунт? <Link href="/login" className="text-brand-600 hover:underline">Войти</Link></>}
       enableTelegramMiniApp
     >
-      <RegisterForm initialReferralCode={searchParams.ref ?? ''} />
+      <RegisterForm initialReferralCode={searchParams.ref ?? ''} googleEnabled={googleEnabled} />
     </AuthLayout>
   )
 }
