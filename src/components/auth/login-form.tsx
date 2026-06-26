@@ -7,19 +7,19 @@ import { useForm } from 'react-hook-form'
 import { apiFetch } from '@/lib/api-client'
 import { toast } from '@/components/ui/toaster'
 import { CheckCircle2, Eye, EyeOff, RefreshCw } from 'lucide-react'
-import { GoogleAuthButton } from './google-auth-button'
+import { YandexAuthButton } from './yandex-auth-button'
 
 interface LoginInput {
   email: string
   password: string
 }
 
-export function LoginForm({ googleEnabled = false }: { googleEnabled?: boolean }) {
+export function LoginForm({ yandexEnabled = false }: { yandexEnabled?: boolean }) {
   const router = useRouter()
   const search = useSearchParams()
   const next = search.get('next') || '/dashboard'
   const verified = search.get('verified')
-  const googleError = search.get('google_error')
+  const yandexError = search.get('yandex_error')
   const { register, handleSubmit, watch, formState: { errors, isSubmitting } } = useForm<LoginInput>({
     defaultValues: { email: '', password: '' },
   })
@@ -70,9 +70,9 @@ export function LoginForm({ googleEnabled = false }: { googleEnabled?: boolean }
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
-      {googleEnabled && (
+      {yandexEnabled && (
         <>
-          <GoogleAuthButton next={next} />
+          <YandexAuthButton next={next} />
           <div className="flex items-center gap-3 text-xs text-slate-400">
             <span className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
             или email
@@ -91,9 +91,9 @@ export function LoginForm({ googleEnabled = false }: { googleEnabled?: boolean }
           Ссылка подтверждения недействительна или истекла. Запросите новую ссылку.
         </div>
       )}
-      {googleError && (
+      {yandexError && (
         <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
-          {googleErrorMessage(googleError)}
+          {yandexErrorMessage(yandexError)}
         </div>
       )}
       <div>
@@ -156,12 +156,11 @@ export function LoginForm({ googleEnabled = false }: { googleEnabled?: boolean }
   )
 }
 
-function googleErrorMessage(code: string) {
+function yandexErrorMessage(code: string) {
   const messages: Record<string, string> = {
-    not_configured: 'Вход через Google пока не настроен.',
-    invalid_state: 'Сессия входа через Google истекла. Попробуйте ещё раз.',
-    email_not_verified: 'Google не подтвердил email этого аккаунта.',
-    access_denied: 'Вход через Google отменён.',
+    not_configured: 'Вход через Яндекс пока не настроен.',
+    invalid_state: 'Сессия входа через Яндекс истекла. Попробуйте ещё раз.',
+    access_denied: 'Вход через Яндекс отменён.',
   }
-  return messages[code] ?? 'Не удалось войти через Google. Попробуйте ещё раз.'
+  return messages[code] ?? 'Не удалось войти через Яндекс. Попробуйте ещё раз.'
 }

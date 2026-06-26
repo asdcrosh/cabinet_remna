@@ -6,7 +6,7 @@ import { useForm } from 'react-hook-form'
 import { apiFetch } from '@/lib/api-client'
 import { toast } from '@/components/ui/toaster'
 import { CheckCircle2, Eye, EyeOff, Mail } from 'lucide-react'
-import { GoogleAuthButton } from './google-auth-button'
+import { YandexAuthButton } from './yandex-auth-button'
 
 interface RegisterInput {
   email: string
@@ -18,10 +18,10 @@ interface RegisterInput {
 
 export function RegisterForm({
   initialReferralCode = '',
-  googleEnabled = false,
+  yandexEnabled = false,
 }: {
   initialReferralCode?: string
-  googleEnabled?: boolean
+  yandexEnabled?: boolean
 }) {
   const router = useRouter()
   const { register, handleSubmit, watch, formState: { errors, isSubmitting } } =
@@ -83,11 +83,11 @@ export function RegisterForm({
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
-      {googleEnabled && (
+      {yandexEnabled && (
         <>
-          <GoogleAuthButton
+          <YandexAuthButton
             referralCode={initialReferralCode}
-            label="Зарегистрироваться через Google"
+            label="Зарегистрироваться через Яндекс"
           />
           <div className="flex items-center gap-3 text-xs text-slate-400">
             <span className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />

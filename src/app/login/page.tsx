@@ -10,7 +10,7 @@ import Link from 'next/link'
 
 export const metadata = { title: 'Вход' }
 
-const googleEnabled = Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET)
+const yandexEnabled = Boolean(process.env.YANDEX_CLIENT_ID && process.env.YANDEX_CLIENT_SECRET)
 
 export default async function LoginPage() {
   const session = await getCurrentUser()
@@ -33,7 +33,7 @@ export default async function LoginPage() {
       footer={<>Нет аккаунта? <Link href="/register" className="text-brand-600 hover:underline">Зарегистрироваться</Link></>}
       enableTelegramMiniApp
     >
-      <LoginForm googleEnabled={googleEnabled} />
+      <LoginForm yandexEnabled={yandexEnabled} />
     </AuthLayout>
   )
 }

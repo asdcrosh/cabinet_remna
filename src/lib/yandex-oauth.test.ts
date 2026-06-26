@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { sanitizeOAuthNext, sanitizeOAuthReferral } from './google-oauth'
+import { sanitizeOAuthNext, sanitizeOAuthReferral } from './yandex-oauth'
 
-describe('google oauth helpers', () => {
+describe('yandex oauth helpers', () => {
   it('keeps redirects inside the cabinet', () => {
     expect(sanitizeOAuthNext('/dashboard/plans')).toBe('/dashboard/plans')
     expect(sanitizeOAuthNext('https://example.com')).toBe('/dashboard')

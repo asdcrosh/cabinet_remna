@@ -187,7 +187,7 @@ remnactl env
 | `REMNASHOP_DATABASE_URL` | Подключение к Remnashop для чтения и вызова ограниченной функции объединения аккаунтов |
 | `REMNASHOP_API_URL` | Public API remnashop для двусторонней регистрации |
 | `REMNASHOP_CATALOG_SYNC_INTERVAL_SECONDS` | Интервал авто-синхронизации каталога |
-| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Опциональный вход и регистрация через Google |
+| `YANDEX_CLIENT_ID` / `YANDEX_CLIENT_SECRET` | Опциональный вход и регистрация через Яндекс ID |
 | `REFERRAL_BONUS_DAYS` | Бонус за реферала |
 | `BONUS_BOX_RUB_PER_ATTEMPT` | Сколько рублей оплаты дают одно открытие бокса |
 | `BONUS_BOX_MIN_ATTEMPTS_PER_PAYMENT` / `BONUS_BOX_MAX_ATTEMPTS_PER_PAYMENT` | Минимум и максимум открытий за одну оплату |
@@ -201,24 +201,24 @@ remnactl env
 | `APP_REQUEST_LOGS` | `true` включает request-log приложения в Docker stdout без cookie и секретов |
 | `REMNASHOP_USER_SUBSCRIPTION_SYNC_STALE_SECONDS` | Как часто обновлять локальные подписки пользователей из Remnawave при Remnashop sync |
 
-### Google OAuth
+### Яндекс ID
 
-Google-вход опционален. Если ключи пустые, кнопка в интерфейсе не показывается.
+Вход через Яндекс ID опционален. Если ключи пустые, кнопка в интерфейсе не показывается.
 
-В Google Cloud Console создай OAuth Client типа `Web application` и добавь redirect URI:
+В кабинете разработчика Яндекса создай OAuth-приложение и добавь redirect URI:
 
 ```text
-https://ТВОЙ_ДОМЕН_КАБИНЕТА/api/auth/google/callback
+https://ТВОЙ_ДОМЕН_КАБИНЕТА/api/auth/yandex/callback
 ```
 
 После этого внеси в `.env`:
 
 ```env
-GOOGLE_CLIENT_ID="ВСТАВЬ_СЮДА_GOOGLE_CLIENT_ID"
-GOOGLE_CLIENT_SECRET="ВСТАВЬ_СЮДА_GOOGLE_CLIENT_SECRET"
+YANDEX_CLIENT_ID="ВСТАВЬ_СЮДА_YANDEX_CLIENT_ID"
+YANDEX_CLIENT_SECRET="ВСТАВЬ_СЮДА_YANDEX_CLIENT_SECRET"
 ```
 
-Если пользователь уже зарегистрирован по email, вход через Google привяжется к этому же аккаунту при совпадении подтверждённого email.
+Если пользователь уже зарегистрирован по email, вход через Яндекс привяжется к этому же аккаунту при совпадении email.
 
 ### Reverse Proxy
 
