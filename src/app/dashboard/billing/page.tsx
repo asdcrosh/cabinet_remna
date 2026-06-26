@@ -8,6 +8,7 @@ import { PageHeader } from '@/components/dashboard/page-header'
 import { PaymentSuccessBanner } from '@/components/dashboard/payment-success-banner'
 import { EmptyState } from '@/components/dashboard/empty-state'
 import { syncPaymentProvisioning, type PaymentSyncResult } from '@/lib/payment-sync'
+import { ExternalLink } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
 
@@ -41,12 +42,13 @@ export default async function BillingPage({ searchParams }: { searchParams: { pa
               <th>Промокод</th>
               <th>Статус</th>
               <th>Подписка</th>
+              <th>Действие</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
             {payments.length === 0 && (
               <tr>
-                <td colSpan={6} className="py-8 text-center text-slate-400">
+                <td colSpan={7} className="py-8 text-center text-slate-400">
                   Платежей пока нет
                 </td>
               </tr>
@@ -68,8 +70,11 @@ export default async function BillingPage({ searchParams }: { searchParams: { pa
                 <td>
                   <PaymentStatusBadge status={p.status} />
                 </td>
-                <td className="text-slate-500">
-                  {p.subscriptionProvisionedAt ? 'Выдана' : p.status === 'SUCCEEDED' ? 'В обработке' : '—'}
+                <td>
+                  <ProvisioningBadge provisioned={Boolean(p.subscriptionProvisionedAt)} status={p.status} />
+                </td>
+                <td>
+                  <PaymentAction confirmationUrl={p.confirmationUrl} status={p.status} />
                 </td>
               </tr>
             ))}
@@ -110,6 +115,7 @@ export default async function BillingPage({ searchParams }: { searchParams: { pa
                 <InfoCell label="Промокод" value={getPromoCodeLabel(p.promoCodeSnapshot)} />
                 <InfoCell label="ID оплаты" value={p.yookassaId ? shortId(p.yookassaId) : shortId(p.id)} mono />
               </div>
+              <PaymentAction confirmationUrl={p.confirmationUrl} status={p.status} fullWidth />
             </div>
           </article>
         ))}
@@ -177,8 +183,39 @@ function formatPaymentDate(date: Date) {
 
 function getProvisioningLabel(provisioned: boolean, status: string) {
   if (provisioned) return 'Выдана'
-  if (status === 'SUCCEEDED') return 'В обработке'
+  if (status === 'SUCCEEDED') return 'Выдача идет'
+  if (status === 'PENDING') return 'После оплаты'
   return '—'
+}
+
+function ProvisioningBadge({ provisioned, status }: { provisioned: boolean; status: string }) {
+  if (provisioned) return <span className="badge-active">Выдана</span>
+  if (status === 'SUCCEEDED') return <span className="badge-limited">Выдача идет</span>
+  if (status === 'PENDING') return <span className="badge-disabled">После оплаты</span>
+  return <span className="text-slate-400">—</span>
+}
+
+function PaymentAction({
+  confirmationUrl,
+  status,
+  fullWidth = false,
+}: {
+  confirmationUrl: string | null
+  status: string
+  fullWidth?: boolean
+}) {
+  if (status !== 'PENDING' || !confirmationUrl) return <span className="text-sm text-slate-400">—</span>
+  return (
+    <a
+      href={confirmationUrl}
+      className={`btn-secondary min-h-9 px-3 py-1.5 text-xs ${fullWidth ? 'w-full' : ''}`}
+      target="_blank"
+      rel="noreferrer"
+    >
+      <ExternalLink className="h-4 w-4" />
+      Оплатить
+    </a>
+  )
 }
 
 function shortId(id: string) {

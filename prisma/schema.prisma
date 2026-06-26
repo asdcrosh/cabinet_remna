@@ -111,6 +111,8 @@ model User {
   oauthAccounts         OAuthAccount[]
   bonusBoxAttempts      BonusBoxAttempt[]
   bonusBoxOpenings      BonusBoxOpening[]
+  auditLogsAuthored     AuditLog[] @relation("AuditLogActor")
+  auditLogsTargeted     AuditLog[] @relation("AuditLogTarget")
 
   @@index([email])
   @@index([referredById])
@@ -577,4 +579,40 @@ enum BonusBoxAttemptSource {
   REFERRAL
   MANUAL
   PRIZE
+}
+
+// ----------------------------------------------------------------------
+// 10. Журнал действий
+// ----------------------------------------------------------------------
+// Легкий аудит админских и системных операций: кто, что и над чем сделал.
+// Используем Json metadata, чтобы не плодить таблицы под каждую операцию.
+// ----------------------------------------------------------------------
+model AuditLog {
+  id        String      @id @default(cuid())
+  actorId   String?
+  targetId  String?
+  action    AuditAction
+  message   String
+  metadata  Json?
+  ip        String?
+  userAgent String?
+  createdAt DateTime    @default(now())
+
+  actor     User?       @relation("AuditLogActor", fields: [actorId], references: [id], onDelete: SetNull)
+  target    User?       @relation("AuditLogTarget", fields: [targetId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([actorId, createdAt])
+  @@index([targetId, createdAt])
+  @@index([action, createdAt])
+}
+
+enum AuditAction {
+  ADMIN_PLAN_ASSIGNED
+  ADMIN_ROLE_CHANGED
+  ADMIN_PROFILE_UPDATED
+  PROMO_CODE_CREATED
+  PROMO_CODE_UPDATED
+  PAYMENT_SYNCED
+  SYSTEM_BACKUP_CREATED
 }

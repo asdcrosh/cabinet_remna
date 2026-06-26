@@ -1,0 +1,111 @@
+import { redirect } from 'next/navigation'
+import { Activity, CalendarClock, Search } from 'lucide-react'
+import { AuditAction } from '@prisma/client'
+import { prisma } from '@/lib/prisma'
+import { requireAdminPage } from '@/lib/auth/admin-page'
+import { PageHeader } from '@/components/dashboard/page-header'
+
+export const dynamic = 'force-dynamic'
+export const metadata = { title: 'История действий — Админка' }
+
+const ACTION_LABELS: Record<AuditAction, string> = {
+  ADMIN_PLAN_ASSIGNED: 'Тариф',
+  ADMIN_ROLE_CHANGED: 'Роль',
+  ADMIN_PROFILE_UPDATED: 'Профиль',
+  PROMO_CODE_CREATED: 'Промокод создан',
+  PROMO_CODE_UPDATED: 'Промокод изменен',
+  PAYMENT_SYNCED: 'Платеж',
+  SYSTEM_BACKUP_CREATED: 'Бэкап',
+}
+
+export default async function AdminAuditPage({
+  searchParams,
+}: {
+  searchParams?: { q?: string; action?: string }
+}) {
+  const { user } = await requireAdminPage()
+  if (user.role !== 'SUPER_ADMIN') redirect('/dashboard/admin')
+
+  const q = searchParams?.q?.trim() ?? ''
+  const action = searchParams?.action ?? 'ALL'
+  const where = {
+    ...(action !== 'ALL' && action in AuditAction ? { action: action as AuditAction } : {}),
+    ...(q
+      ? {
+          OR: [
+            { message: { contains: q, mode: 'insensitive' as const } },
+            { actor: { email: { contains: q, mode: 'insensitive' as const } } },
+            { target: { email: { contains: q, mode: 'insensitive' as const } } },
+          ],
+        }
+      : {}),
+  }
+
+  const logs = await prisma.auditLog.findMany({
+    where,
+    orderBy: { createdAt: 'desc' },
+    take: 100,
+    include: {
+      actor: { select: { email: true, name: true } },
+      target: { select: { email: true, name: true } },
+    },
+  })
+
+  return (
+    <div className="space-y-6">
+      <PageHeader title="История действий" description="Админские операции, выдачи тарифов и важные изменения" />
+
+      <form className="grid gap-2 rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-surface-900 md:grid-cols-[minmax(14rem,1fr)_14rem_auto]" action="/dashboard/admin/audit">
+        <div className="relative min-w-0">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <input name="q" defaultValue={q} placeholder="Поиск по email или действию" className="input pl-9" />
+        </div>
+        <select name="action" defaultValue={action} className="input">
+          <option value="ALL">Все действия</option>
+          {Object.entries(ACTION_LABELS).map(([value, label]) => (
+            <option key={value} value={value}>{label}</option>
+          ))}
+        </select>
+        <button className="btn-primary" type="submit">Показать</button>
+      </form>
+
+      <div className="space-y-3">
+        {logs.length === 0 && (
+          <div className="card py-12 text-center text-sm text-slate-500">Записей пока нет.</div>
+        )}
+        {logs.map((log) => (
+          <article key={log.id} className="card p-0">
+            <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-start sm:justify-between">
+              <div className="flex min-w-0 gap-3">
+                <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-slate-950 text-cyan-200 dark:bg-white dark:text-slate-950">
+                  <Activity className="h-5 w-5" />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="badge-active">{ACTION_LABELS[log.action]}</span>
+                    <h2 className="font-semibold">{log.message}</h2>
+                  </div>
+                  <div className="mt-1 text-sm text-slate-500">
+                    {log.actor ? `Автор: ${log.actor.email}` : 'Системное действие'}
+                    {log.target ? ` · Пользователь: ${log.target.email}` : ''}
+                  </div>
+                </div>
+              </div>
+              <div className="flex shrink-0 items-center gap-1 text-xs text-slate-500">
+                <CalendarClock className="h-3.5 w-3.5" />
+                {log.createdAt.toLocaleString('ru-RU')}
+              </div>
+            </div>
+            {log.metadata && (
+              <div className="border-t bg-slate-50/70 px-4 py-3 text-xs text-slate-500 dark:bg-white/[0.02]">
+                <pre className="max-h-28 overflow-auto whitespace-pre-wrap break-words font-mono">
+                  {JSON.stringify(log.metadata, null, 2)}
+                </pre>
+              </div>
+            )}
+          </article>
+        ))}
+      </div>
+    </div>
+  )
+}

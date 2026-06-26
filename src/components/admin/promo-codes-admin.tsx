@@ -279,7 +279,7 @@ export function PromoCodesAdmin({
                 </button>
               </div>
             </div>
-            <div className="grid gap-2 sm:grid-cols-2">
+            <div className="grid max-h-56 gap-2 overflow-y-auto pr-1 sm:grid-cols-2">
               {plans.map((plan) => (
                 <button
                   key={plan.id}

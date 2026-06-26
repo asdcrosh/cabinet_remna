@@ -4,12 +4,13 @@ import { prisma } from '@/lib/prisma'
 import { requireAdmin, withAuth } from '@/lib/auth/guard'
 import { updateAdminPromoCodeSchema } from '@/lib/auth/validation'
 import { normalizePromoCode } from '@/lib/promo-codes'
+import { writeAuditLog } from '@/lib/audit-log'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 export const PATCH = withAuth(async (req: Request, { params }: { params: { id: string } }) => {
-  await requireAdmin()
+  const session = await requireAdmin()
 
   let body: unknown
   try {
@@ -58,6 +59,18 @@ export const PATCH = withAuth(async (req: Request, { params }: { params: { id: s
       }
 
       return updated
+    })
+
+    await writeAuditLog({
+      actorId: session.uid,
+      action: 'PROMO_CODE_UPDATED',
+      message: 'Администратор обновил промокод',
+      metadata: {
+        promoCodeId: promoCode.id,
+        code: promoCode.code,
+        changedPlanIds: data.planIds,
+      },
+      request: req,
     })
 
     return NextResponse.json({ promoCode })

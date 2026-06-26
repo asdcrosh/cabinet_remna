@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { requireAdmin, withAuth } from '@/lib/auth/guard'
+import { writeAuditLog } from '@/lib/audit-log'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -40,6 +41,15 @@ export const PATCH = withAuth(async (req: Request, { params }: { params: { id: s
     where: { id: target.id },
     data: { role: parsed.data.role },
     select: { id: true, role: true },
+  })
+
+  await writeAuditLog({
+    actorId: session.uid,
+    targetId: target.id,
+    action: 'ADMIN_ROLE_CHANGED',
+    message: 'Администратор изменил роль пользователя',
+    metadata: { from: target.role, to: parsed.data.role },
+    request: req,
   })
 
   return NextResponse.json({ user })

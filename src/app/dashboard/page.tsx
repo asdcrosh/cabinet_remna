@@ -14,10 +14,13 @@ import { redirect } from 'next/navigation'
 import {
   AlertTriangle,
   ArrowRight,
+  Bell,
+  Clock3,
   CreditCard,
   Gift,
   KeyRound,
   Laptop,
+  MessageCircleQuestion,
   ShieldCheck,
   UsersRound,
 } from 'lucide-react'
@@ -33,6 +36,12 @@ export default async function DashboardHome() {
     where: { id: session.uid },
     include: {
       subscriptions: { orderBy: { createdAt: 'desc' }, take: 1, include: { plan: true } },
+      payments: {
+        where: { status: 'PENDING' },
+        orderBy: { createdAt: 'desc' },
+        take: 1,
+        select: { id: true, confirmationUrl: true, createdAt: true },
+      },
       _count: { select: { devices: true } },
     },
   })
@@ -68,6 +77,13 @@ export default async function DashboardHome() {
       <div className="space-y-4">
         <CompactHeader title="Главная" description="Начните пользоваться VPN" />
         <DashboardOnboardingCard state={onboardingState} mode="full" />
+        <SmartInsights
+          emailVerified={onboardingState.emailVerified}
+          telegramLinked={onboardingState.telegramLinked}
+          deviceCount={onboardingState.deviceCount}
+          subscriptionExpireAt={subRow?.expireAt ?? null}
+          pendingPayment={user.payments[0] ?? null}
+        />
         <PromoGrid />
       </div>
     )
@@ -89,6 +105,13 @@ export default async function DashboardHome() {
       />
 
       <DashboardOnboardingCard state={onboardingState} />
+      <SmartInsights
+        emailVerified={onboardingState.emailVerified}
+        telegramLinked={onboardingState.telegramLinked}
+        deviceCount={onboardingState.deviceCount}
+        subscriptionExpireAt={subRow?.expireAt ?? null}
+        pendingPayment={user.payments[0] ?? null}
+      />
 
       {subRow?.pendingSync && !remnawaveCard && (
         <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
@@ -162,6 +185,111 @@ export default async function DashboardHome() {
       <PromoGrid />
     </div>
   )
+}
+
+function SmartInsights({
+  emailVerified,
+  telegramLinked,
+  deviceCount,
+  subscriptionExpireAt,
+  pendingPayment,
+}: {
+  emailVerified: boolean
+  telegramLinked: boolean
+  deviceCount: number
+  subscriptionExpireAt: Date | null
+  pendingPayment: { id: string; confirmationUrl: string | null; createdAt: Date } | null
+}) {
+  const now = Date.now()
+  const daysLeft = subscriptionExpireAt
+    ? Math.ceil((subscriptionExpireAt.getTime() - now) / (24 * 60 * 60 * 1000))
+    : null
+  const items = [
+    pendingPayment
+      ? {
+          title: 'Есть незавершенная оплата',
+          text: 'Можно продолжить оплату или выбрать другой тариф.',
+          href: pendingPayment.confirmationUrl || '/dashboard/billing',
+          external: Boolean(pendingPayment.confirmationUrl),
+          icon: <CreditCard className="h-4 w-4" />,
+          tone: 'amber' as const,
+        }
+      : null,
+    daysLeft != null && daysLeft <= 7 && daysLeft >= 0
+      ? {
+          title: `Подписка закончится через ${daysLeft} дн.`,
+          text: 'Продлите заранее, чтобы доступ не прерывался.',
+          href: '/dashboard/plans',
+          icon: <Clock3 className="h-4 w-4" />,
+          tone: 'amber' as const,
+        }
+      : null,
+    deviceCount === 0 && subscriptionExpireAt
+      ? {
+          title: 'Устройство еще не подключено',
+          text: 'Откройте подписку и добавьте ее в приложение.',
+          href: '/dashboard/subscription',
+          icon: <Laptop className="h-4 w-4" />,
+          tone: 'cyan' as const,
+        }
+      : null,
+    !emailVerified
+      ? {
+          title: 'Email не подтвержден',
+          text: 'Подтверждение помогает восстановить доступ.',
+          href: '/dashboard/settings',
+          icon: <Bell className="h-4 w-4" />,
+          tone: 'slate' as const,
+        }
+      : null,
+    !telegramLinked
+      ? {
+          title: 'Telegram не привязан',
+          text: 'Это поможет найти старые покупки и подписки.',
+          href: '/dashboard/settings',
+          icon: <MessageCircleQuestion className="h-4 w-4" />,
+          tone: 'slate' as const,
+        }
+      : null,
+  ].filter(Boolean).slice(0, 3) as Array<{
+    title: string
+    text: string
+    href: string
+    external?: boolean
+    icon: ReactElement
+    tone: 'amber' | 'cyan' | 'slate'
+  }>
+
+  if (items.length === 0) return null
+
+  return (
+    <section className="grid gap-3 md:grid-cols-3">
+      {items.map((item) => (
+        <Link
+          key={item.title}
+          href={item.href}
+          target={item.external ? '_blank' : undefined}
+          rel={item.external ? 'noreferrer' : undefined}
+          className={`group flex min-h-24 items-start gap-3 rounded-lg border p-4 shadow-sm transition-all hover:-translate-y-0.5 ${insightTone(item.tone)}`}
+        >
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-white/80 shadow-sm dark:bg-white/10">
+            {item.icon}
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-semibold text-slate-950 dark:text-white">{item.title}</span>
+            <span className="mt-1 block text-xs leading-5 opacity-80">{item.text}</span>
+          </span>
+          <ArrowRight className="mt-1 h-4 w-4 shrink-0 transition-transform group-hover:translate-x-0.5" />
+        </Link>
+      ))}
+    </section>
+  )
+}
+
+function insightTone(tone: 'amber' | 'cyan' | 'slate') {
+  if (tone === 'amber') return 'border-amber-200 bg-amber-50/80 text-amber-800 dark:border-amber-500/25 dark:bg-amber-500/10 dark:text-amber-100'
+  if (tone === 'cyan') return 'border-cyan-200 bg-cyan-50/80 text-cyan-800 dark:border-cyan-500/25 dark:bg-cyan-500/10 dark:text-cyan-100'
+  return 'border-slate-200 bg-white/80 text-slate-600 dark:border-white/10 dark:bg-surface-900/80 dark:text-slate-300'
 }
 
 function CompactHeader({

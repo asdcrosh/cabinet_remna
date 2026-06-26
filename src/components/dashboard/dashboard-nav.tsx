@@ -7,6 +7,7 @@ import { createPortal } from 'react-dom'
 import {
   CreditCard,
   Database,
+  FileClock,
   Gift,
   Home,
   KeyRound,
@@ -47,6 +48,7 @@ const adminNav = [
   { href: '/dashboard/admin/payments', label: 'Платежи', icon: CreditCard },
   { href: '/dashboard/admin/subscriptions', label: 'Подписки', icon: ShieldCheck },
   { href: '/dashboard/admin/remnashop-sync', label: 'Синхронизация', icon: Database },
+  { href: '/dashboard/admin/audit', label: 'История', icon: FileClock },
 ]
 
 type NavItem = (typeof nav)[number] | (typeof adminNav)[number]
@@ -161,7 +163,7 @@ function NavList({
             Администрирование
           </div>
           <NavGroup
-            items={role === 'MODERATOR' ? adminNav.filter((item) => item.href === '/dashboard/admin/support') : adminNav}
+            items={getAdminItems(role)}
             pathname={pathname}
             badges={liveBadges}
             onNavigate={onNavigate}
@@ -170,6 +172,12 @@ function NavList({
       )}
     </nav>
   )
+}
+
+function getAdminItems(role: UserRole) {
+  if (role === 'MODERATOR') return adminNav.filter((item) => item.href === '/dashboard/admin/support')
+  if (role === 'ADMIN') return adminNav.filter((item) => item.href !== '/dashboard/admin/audit')
+  return adminNav
 }
 
 function roleLabel(role: UserRole) {

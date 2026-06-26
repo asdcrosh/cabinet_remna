@@ -3,10 +3,11 @@
 'use client'
 
 import { useState } from 'react'
+import type { ReactNode } from 'react'
 import Image from 'next/image'
 import { apiFetch } from '@/lib/api-client'
 import { toast } from '@/components/ui/toaster'
-import { Copy, Download, Link2, QrCode, RefreshCw, Smartphone } from 'lucide-react'
+import { Apple, Copy, Download, Link2, MonitorSmartphone, QrCode, RefreshCw, Smartphone } from 'lucide-react'
 import { ConfirmDialog } from './confirm-dialog'
 
 interface KeysCardProps {
@@ -70,7 +71,7 @@ export function KeysCard({ subscriptionUrl }: KeysCardProps) {
         <div className="min-w-0">
           <h3 className="text-xl font-semibold">Одна подписка для всех устройств</h3>
           <p className="mt-2 text-sm leading-6 text-slate-500">
-            Отсканируйте QR-код в VPN-приложении или скопируйте ссылку. Все доступные серверы обновятся автоматически.
+            Откройте приложение, добавьте подписку по QR-коду или ссылке, затем выберите подходящий сервер.
           </p>
           <div className="mt-5 flex flex-col gap-2 sm:flex-row">
             <button onClick={() => copy(subscriptionUrl, 'Ссылка')} disabled={!subscriptionUrl} className="btn-primary text-sm">
@@ -84,13 +85,18 @@ export function KeysCard({ subscriptionUrl }: KeysCardProps) {
               </a>
             )}
           </div>
+          <div className="mt-4 grid gap-2 sm:grid-cols-3">
+            <AppHint icon={<Smartphone className="h-4 w-4" />} title="Android" text="Hiddify или v2rayNG" />
+            <AppHint icon={<Apple className="h-4 w-4" />} title="iPhone" text="Hiddify или Happ" />
+            <AppHint icon={<MonitorSmartphone className="h-4 w-4" />} title="ПК" text="Hiddify Desktop" />
+          </div>
         </div>
       </div>
 
       <div className="grid gap-3 border-t border-slate-100 bg-slate-50/70 p-5 dark:border-white/10 dark:bg-white/[0.025] md:grid-cols-3">
-        <Instruction icon={<Smartphone className="h-5 w-5" />} number="1" title="Установите приложение" text="Hiddify, Happ, v2rayNG или Shadowrocket." />
-        <Instruction icon={<QrCode className="h-5 w-5" />} number="2" title="Добавьте подписку" text="Отсканируйте QR-код или вставьте скопированную ссылку." />
-        <Instruction icon={<Link2 className="h-5 w-5" />} number="3" title="Подключитесь" text="Выберите сервер и включите VPN." />
+        <Instruction icon={<Smartphone className="h-5 w-5" />} number="1" title="Откройте приложение" text="Подойдет любое приложение с подписками Xray/VLESS." />
+        <Instruction icon={<QrCode className="h-5 w-5" />} number="2" title="Добавьте подписку" text="Сканируйте QR или вставьте ссылку вручную." />
+        <Instruction icon={<Link2 className="h-5 w-5" />} number="3" title="Обновляйте список" text="Если серверы не появились, обновите подписку в приложении." />
       </div>
       <ConfirmDialog
         open={confirmOpen}
@@ -108,7 +114,19 @@ export function KeysCard({ subscriptionUrl }: KeysCardProps) {
   )
 }
 
-function Instruction({ icon, number, title, text }: { icon: React.ReactNode; number: string; title: string; text: string }) {
+function AppHint({ icon, title, text }: { icon: ReactNode; title: string; text: string }) {
+  return (
+    <div className="rounded-lg border border-slate-100 bg-slate-50/80 px-3 py-2 text-sm dark:border-white/10 dark:bg-white/[0.03]">
+      <div className="flex items-center gap-2 font-medium">
+        <span className="text-brand-600 dark:text-cyan-200">{icon}</span>
+        {title}
+      </div>
+      <div className="mt-0.5 truncate text-xs text-slate-500">{text}</div>
+    </div>
+  )
+}
+
+function Instruction({ icon, number, title, text }: { icon: ReactNode; number: string; title: string; text: string }) {
   return (
     <div className="flex gap-3">
       <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-white text-brand-600 shadow-sm dark:bg-white/10 dark:text-cyan-200">{icon}</div>

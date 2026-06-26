@@ -157,6 +157,22 @@ full_backup_menu() {
   remna-backup
 }
 
+s3_backup_config() {
+  if ! command -v remna-backup >/dev/null 2>&1; then
+    echo "${RED}Команда remna-backup не установлена. Сначала обновите кабинет.${RESET}"
+    return 1
+  fi
+  remna-backup s3-config
+}
+
+s3_backup_list() {
+  if ! command -v remna-backup >/dev/null 2>&1; then
+    echo "${RED}Команда remna-backup не установлена. Сначала обновите кабинет.${RESET}"
+    return 1
+  fi
+  remna-backup s3-list
+}
+
 show_menu() {
   clear 2>/dev/null || true
   title
@@ -172,7 +188,9 @@ show_menu() {
     "  7. Проверить доступность" \
     "  8. Создать резервную копию БД" \
     "  9. Полный бэкап сервера" \
-    " 10. Меню переноса и восстановления" \
+    " 10. S3: настроить хранилище" \
+    " 11. S3: показать архивы" \
+    " 12. Меню переноса и восстановления" \
     "  0. Выход"
   printf '\nВыберите действие: ' >/dev/tty
 }
@@ -196,7 +214,9 @@ run_menu() {
       7) health_check || true; pause ;;
       8) backup_database; pause ;;
       9) full_backup; pause ;;
-      10) full_backup_menu; pause ;;
+      10) s3_backup_config; pause ;;
+      11) s3_backup_list; pause ;;
+      12) full_backup_menu; pause ;;
       0) exit 0 ;;
       *) echo "${RED}Неизвестный пункт.${RESET}"; pause ;;
     esac
@@ -216,6 +236,8 @@ show_help() {
   cabinetctl health      проверить доступность
   cabinetctl backup      создать резервную копию БД
   cabinetctl backup-full полный бэкап Remnawave, Remnashop и кабинета
+  cabinetctl s3-config   настроить S3 для полных бэкапов
+  cabinetctl s3-list     показать архивы в S3
   cabinetctl transfer    меню бэкапа и восстановления
 EOF
 }
@@ -231,6 +253,8 @@ case "${1:-menu}" in
   health) health_check ;;
   backup) backup_database ;;
   backup-full) full_backup ;;
+  s3-config) s3_backup_config ;;
+  s3-list) s3_backup_list ;;
   transfer) full_backup_menu ;;
   help|-h|--help) show_help ;;
   *) show_help; exit 1 ;;

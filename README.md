@@ -402,8 +402,13 @@ cabinetctl restart
 cabinetctl health
 cabinetctl backup
 cabinetctl backup-full
+cabinetctl s3-config
+cabinetctl s3-list
 cabinetctl transfer
 ```
+
+В админке главный администратор видит раздел `История`: там отображаются
+выдачи тарифов, смена ролей, правки профилей и изменения промокодов.
 
 ## Полный бэкап и перенос сервера
 

@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { requireAdmin, withAuth } from '@/lib/auth/guard'
 import { attachRemnashopIdentityToCabinetUser } from '@/lib/telegram-link-sync'
+import { writeAuditLog } from '@/lib/audit-log'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -94,6 +95,20 @@ export const PATCH = withAuth(async (req: Request, { params }: { params: { id: s
         })
       }
     }
+
+    await writeAuditLog({
+      actorId: session.uid,
+      targetId: user.id,
+      action: 'ADMIN_PROFILE_UPDATED',
+      message: 'Администратор обновил профиль пользователя',
+      metadata: {
+        emailChanged,
+        email: user.email,
+        emailVerified: Boolean(user.emailVerifiedAt),
+        syncDeferred,
+      },
+      request: req,
+    })
 
     return NextResponse.json({
       user: {

@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { requireAdmin, withAuth } from '@/lib/auth/guard'
 import { adminPromoCodeSchema } from '@/lib/auth/validation'
 import { normalizePromoCode } from '@/lib/promo-codes'
+import { writeAuditLog } from '@/lib/audit-log'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -23,7 +24,7 @@ export const GET = withAuth(async () => {
 })
 
 export const POST = withAuth(async (req: Request) => {
-  await requireAdmin()
+  const session = await requireAdmin()
 
   let body: unknown
   try {
@@ -58,6 +59,19 @@ export const POST = withAuth(async (req: Request) => {
           create: data.planIds.map((planId) => ({ planId })),
         },
       },
+    })
+
+    await writeAuditLog({
+      actorId: session.uid,
+      action: 'PROMO_CODE_CREATED',
+      message: 'Администратор создал промокод',
+      metadata: {
+        promoCodeId: promoCode.id,
+        code: promoCode.code,
+        discountPercent: promoCode.discountPercent,
+        planIds: data.planIds,
+      },
+      request: req,
     })
 
     return NextResponse.json({ promoCode })

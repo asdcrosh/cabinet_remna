@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { requireAdmin, withAuth } from '@/lib/auth/guard'
 import { ensureRemnawaveSubscription } from '@/lib/subscription'
+import { writeAuditLog } from '@/lib/audit-log'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -51,6 +52,21 @@ export const POST = withAuth(async (req: Request, { params }: { params: { id: st
       deviceLimit: plan.deviceLimit,
       activeInternalSquads: plan.activeInternalSquads,
     },
+  })
+
+  await writeAuditLog({
+    actorId: session.uid,
+    targetId: user.id,
+    action: 'ADMIN_PLAN_ASSIGNED',
+    message: parsed.data.mode === 'REPLACE' ? 'Администратор назначил тариф' : 'Администратор продлил тариф',
+    metadata: {
+      planId: plan.id,
+      planName: plan.name,
+      mode: parsed.data.mode,
+      subscriptionId: result.subscription.id,
+      expireAt: result.subscription.expireAt.toISOString(),
+    },
+    request: req,
   })
 
   return NextResponse.json({

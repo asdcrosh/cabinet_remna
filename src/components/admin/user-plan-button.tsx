@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { CalendarPlus, Save } from 'lucide-react'
+import { CalendarPlus, Search, Save } from 'lucide-react'
 import { AdminModal } from '@/components/admin/admin-modal'
 import { apiFetch } from '@/lib/api-client'
 import { toast } from '@/components/ui/toaster'
@@ -32,6 +32,12 @@ export function UserPlanButton({
   const [planId, setPlanId] = useState(currentPlanId ?? plans[0]?.id ?? '')
   const [mode, setMode] = useState<'REPLACE' | 'EXTEND'>('REPLACE')
   const [loading, setLoading] = useState(false)
+  const [query, setQuery] = useState('')
+  const filteredPlans = plans.filter((plan) =>
+    `${plan.name} ${plan.durationDays} ${formatPrice(plan.priceKopecks)}`
+      .toLowerCase()
+      .includes(query.trim().toLowerCase())
+  )
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -70,16 +76,38 @@ export function UserPlanButton({
         size="md"
       >
         <form onSubmit={submit} className="space-y-5">
-          <div className="space-y-2">
-            {plans.map((plan) => (
-              <label key={plan.id} className="flex cursor-pointer items-center gap-3 rounded-lg border p-3 hover:bg-slate-50 dark:hover:bg-white/5">
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <input
+              className="input pl-9"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Найти тариф"
+            />
+          </div>
+
+          <div className="grid max-h-[18rem] gap-2 overflow-y-auto pr-1 sm:grid-cols-2">
+            {filteredPlans.map((plan) => (
+              <label
+                key={plan.id}
+                className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors hover:bg-slate-50 dark:hover:bg-white/5 ${
+                  planId === plan.id ? 'border-slate-950 bg-slate-50 dark:border-white dark:bg-white/5' : ''
+                }`}
+              >
                 <input type="radio" name="plan" checked={planId === plan.id} onChange={() => setPlanId(plan.id)} />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate font-medium">{plan.name}</span>
-                  <span className="text-xs text-slate-500">{plan.durationDays} дней · {formatPrice(plan.priceKopecks)}{!plan.isActive ? ' · скрыт' : ''}</span>
+                  <span className="text-xs text-slate-500">
+                    {plan.durationDays} дней · {formatPrice(plan.priceKopecks)}{!plan.isActive ? ' · скрыт' : ''}
+                  </span>
                 </span>
               </label>
             ))}
+            {filteredPlans.length === 0 && (
+              <div className="rounded-lg border border-dashed px-3 py-8 text-center text-sm text-slate-500 sm:col-span-2">
+                Тарифы не найдены
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-2 rounded-lg bg-slate-50 p-1 dark:bg-white/5">

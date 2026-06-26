@@ -3,6 +3,7 @@ import {
   AlertTriangle,
   CreditCard,
   Database,
+  FileClock,
   LifeBuoy,
   RefreshCw,
   ShieldCheck,
@@ -19,25 +20,36 @@ export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Админка' }
 
 export default async function AdminDashboardPage() {
-  await requireAdminPage()
+  const { user } = await requireAdminPage()
 
   const now = new Date()
   const soon = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
+  const dayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000)
+  const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
   const [
     usersTotal,
+    usersWeek,
     activeSubscriptions,
     recoveryCount,
     paymentsAggregate,
+    paymentsDay,
     activePromoCodes,
     activePlans,
     supportWaiting,
     expiringSoon,
+    auditEvents,
   ] = await Promise.all([
     prisma.user.count(),
+    prisma.user.count({ where: { createdAt: { gte: weekAgo } } }),
     prisma.subscription.count({ where: { status: { in: ['ACTIVE', 'LIMITED'] } } }),
     prisma.payment.count({ where: { status: 'SUCCEEDED', subscriptionProvisionedAt: null } }),
     prisma.payment.aggregate({
       where: { status: 'SUCCEEDED' },
+      _sum: { amountKopecks: true },
+      _count: true,
+    }),
+    prisma.payment.aggregate({
+      where: { status: 'SUCCEEDED', createdAt: { gte: dayAgo } },
       _sum: { amountKopecks: true },
       _count: true,
     }),
@@ -47,6 +59,9 @@ export default async function AdminDashboardPage() {
     prisma.subscription.count({
       where: { status: { in: ['ACTIVE', 'LIMITED'] }, expireAt: { gte: now, lte: soon } },
     }),
+    user.role === 'SUPER_ADMIN'
+      ? prisma.auditLog.count({ where: { createdAt: { gte: dayAgo } } })
+      : Promise.resolve(0),
   ])
 
   return (
@@ -62,6 +77,7 @@ export default async function AdminDashboardPage() {
           icon={<Users className="h-5 w-5" />}
           title="Пользователи"
           value={usersTotal}
+          note={usersWeek > 0 ? `+${usersWeek} за неделю` : undefined}
         />
         <AdminTile
           href="/dashboard/admin/plans"
@@ -81,7 +97,14 @@ export default async function AdminDashboardPage() {
           icon={<CreditCard className="h-5 w-5" />}
           title="Платежи"
           value={paymentsAggregate._count}
-          note={formatPrice(paymentsAggregate._sum.amountKopecks ?? 0)}
+          note={`${formatPrice(paymentsAggregate._sum.amountKopecks ?? 0)} всего`}
+        />
+        <AdminTile
+          href="/dashboard/admin/payments"
+          icon={<CreditCard className="h-5 w-5" />}
+          title="За 24 часа"
+          value={paymentsDay._count}
+          note={formatPrice(paymentsDay._sum.amountKopecks ?? 0)}
         />
         <AdminTile
           href="/dashboard/admin/promo-codes"
@@ -111,6 +134,15 @@ export default async function AdminDashboardPage() {
           warning={recoveryCount > 0}
           note={recoveryCount > 0 ? 'Требует внимания' : 'Очередь пуста'}
         />
+        {user.role === 'SUPER_ADMIN' && (
+          <AdminTile
+            href="/dashboard/admin/audit"
+            icon={<FileClock className="h-5 w-5" />}
+            title="История"
+            value={auditEvents}
+            note="За 24 часа"
+          />
+        )}
       </div>
     </div>
   )
