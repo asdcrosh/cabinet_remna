@@ -123,12 +123,13 @@ export function BonusBoxAttemptsButton({
     <>
       <button
         type="button"
-        className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-sm transition-colors hover:border-cyan-200 hover:bg-cyan-50 hover:text-cyan-700 dark:border-white/10 dark:bg-surface-900 dark:text-slate-200 dark:hover:bg-cyan-500/10 dark:hover:text-cyan-200"
+        className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-600 shadow-sm transition-colors hover:border-cyan-200 hover:bg-cyan-50 hover:text-cyan-700 dark:border-white/10 dark:bg-surface-900 dark:text-slate-200 dark:hover:bg-cyan-500/10 dark:hover:text-cyan-200"
         onClick={() => setOpen(true)}
         title="Начислить подарок"
         aria-label="Начислить подарок"
       >
         <Gift className="h-4 w-4" />
+        <span className="hidden sm:inline">Подарок</span>
       </button>
 
       {mounted && open ? createPortal(dialog, document.body) : null}

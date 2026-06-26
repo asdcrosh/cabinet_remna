@@ -388,9 +388,9 @@ export function SupportPanel({
   }
 
   return (
-    <div className="grid h-[calc(100dvh-6.5rem)] min-h-[34rem] gap-3 overflow-hidden xl:h-[calc(100dvh-9rem)] xl:min-h-[38rem] xl:grid-cols-[20rem_minmax(0,1fr)]">
+    <div className="grid h-[calc(100dvh-5.75rem)] min-h-[32rem] gap-3 overflow-hidden xl:h-[calc(100dvh-8rem)] xl:min-h-[36rem] xl:grid-cols-[21rem_minmax(0,1fr)]">
       <section className={cn('min-h-0 space-y-4 overflow-y-auto pr-0.5 xl:flex xl:flex-col xl:overflow-hidden', mobileChatOpen && 'hidden xl:flex')}>
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-white/70 bg-white/80 shadow-sm shadow-slate-200/60 backdrop-blur dark:border-white/10 dark:bg-surface-900/80 dark:shadow-black/20">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-white/70 bg-white/90 shadow-sm shadow-slate-200/60 backdrop-blur dark:border-white/10 dark:bg-surface-900/80 dark:shadow-black/20">
           <div className="border-b border-slate-100 bg-white/70 px-3 py-3 dark:border-slate-800 dark:bg-surface-900/60">
             <div className="flex items-center justify-between gap-3">
               <div>
@@ -462,7 +462,7 @@ export function SupportPanel({
       </section>
 
       <section className={cn(
-        'min-h-0 overflow-hidden rounded-lg border border-white/70 bg-white/90 shadow-xl shadow-slate-200/60 backdrop-blur dark:border-white/10 dark:bg-surface-900/90 dark:shadow-black/20',
+        'min-h-0 overflow-hidden rounded-lg border border-white/70 bg-white/95 shadow-xl shadow-slate-200/60 backdrop-blur dark:border-white/10 dark:bg-surface-900/90 dark:shadow-black/20',
         !mobileChatOpen && 'hidden xl:block'
       )}>
         {selected ? (
@@ -506,7 +506,7 @@ export function SupportPanel({
                 const element = event.currentTarget
                 stickToBottomRef.current = element.scrollHeight - element.scrollTop - element.clientHeight < 120
               }}
-              className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-slate-50/70 px-3 py-4 dark:bg-surface-950/30 sm:px-5"
+              className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-slate-50/60 px-3 py-4 dark:bg-surface-950/30 sm:px-5"
             >
               <div className="mx-auto max-w-3xl space-y-3">
                 {selected.messages.map((item) => {

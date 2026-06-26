@@ -59,10 +59,10 @@ export function supportStatusLabel(status: string) {
 
 export function supportStatusLabelForRole(status: string, role: 'user' | 'admin') {
   if (status === 'WAITING_ADMIN') {
-    return role === 'admin' ? 'Нужно ответить' : 'Ожидает ответа'
+    return role === 'admin' ? 'Нужно ответить' : 'Ждём поддержку'
   }
   if (status === 'WAITING_USER') {
-    return role === 'admin' ? 'Ответили' : 'Ответ получен'
+    return role === 'admin' ? 'Ждёт пользователя' : 'Есть ответ'
   }
   return supportStatusLabel(status)
 }

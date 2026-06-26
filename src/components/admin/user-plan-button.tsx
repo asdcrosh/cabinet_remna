@@ -60,12 +60,13 @@ export function UserPlanButton({
     <>
       <button
         type="button"
-        className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-sm transition-colors hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700 dark:border-white/10 dark:bg-surface-900"
+        className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-600 shadow-sm transition-colors hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700 dark:border-white/10 dark:bg-surface-900"
         onClick={() => setOpen(true)}
         title="Назначить тариф"
         aria-label="Назначить тариф"
       >
         <CalendarPlus className="h-4 w-4" />
+        <span className="hidden sm:inline">Тариф</span>
       </button>
 
       <AdminModal
@@ -110,18 +111,18 @@ export function UserPlanButton({
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-2 rounded-lg bg-slate-50 p-1 dark:bg-white/5">
+          <div className="grid gap-2 rounded-lg bg-slate-50 p-1 dark:bg-white/5 sm:grid-cols-2">
             <button type="button" className={mode === 'REPLACE' ? 'btn-primary' : 'btn-secondary'} onClick={() => setMode('REPLACE')}>
-              Новый период
+              Выдать заново
             </button>
             <button type="button" className={mode === 'EXTEND' ? 'btn-primary' : 'btn-secondary'} onClick={() => setMode('EXTEND')}>
-              Продлить
+              Добавить дни
             </button>
           </div>
           <p className="text-sm text-slate-500">
             {mode === 'REPLACE'
-              ? 'Срок начнётся сегодня, настройки тарифа применятся сразу, текущий трафик будет сброшен.'
-              : 'Дни выбранного тарифа добавятся к действующей подписке.'}
+              ? 'Текущая подписка заменится выбранным тарифом с сегодняшней даты.'
+              : 'Срок выбранного тарифа добавится к текущей подписке.'}
           </p>
 
           <div className="flex justify-end gap-2 border-t pt-4">

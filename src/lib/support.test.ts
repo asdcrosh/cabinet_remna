@@ -38,6 +38,6 @@ describe('support helpers', () => {
     expect(supportCategorySubject('connection')).toBe('Проблема с подключением')
     expect(supportStatusLabel('WAITING_ADMIN')).toBe('Ожидает ответа')
     expect(supportStatusLabelForRole('WAITING_ADMIN', 'admin')).toBe('Нужно ответить')
-    expect(supportStatusLabelForRole('WAITING_USER', 'user')).toBe('Ответ получен')
+    expect(supportStatusLabelForRole('WAITING_USER', 'user')).toBe('Есть ответ')
   })
 })

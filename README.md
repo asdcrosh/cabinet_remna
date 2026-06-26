@@ -384,6 +384,7 @@ remnactl health
 remnactl nginx
 remnactl backup
 remnactl backups
+remnactl restore
 remnactl self-update
 ```
 

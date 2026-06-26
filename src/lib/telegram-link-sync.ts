@@ -7,6 +7,8 @@ import { upsertLocalSubscriptionFromRemnawave } from './remnawave-local-sync'
 interface RemnashopTelegramUserRow {
   id: number
   telegram_id: string
+  email: string | null
+  is_email_verified: boolean
   name: string
   current_subscription_id: number | null
   user_remna_id: string | null
@@ -22,6 +24,8 @@ export async function findRemnashopUserByTelegramId(telegramId: bigint) {
       SELECT
         u.id,
         u.telegram_id::text AS telegram_id,
+        u.email,
+        u.is_email_verified,
         u.name,
         u.current_subscription_id,
         s.user_remna_id::text AS user_remna_id

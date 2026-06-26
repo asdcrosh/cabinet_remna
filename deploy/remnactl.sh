@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="1.1.0"
+VERSION="1.1.1"
 BRANCH="${BRANCH:-main}"
 RAW_BASE_URL="${RAW_BASE_URL:-https://raw.githubusercontent.com/asdcrosh/cabinet_remna/${BRANCH}}"
 INSTALL_URL="${INSTALL_URL:-${RAW_BASE_URL}/deploy/install-server.sh}"
@@ -218,6 +218,12 @@ verify_backup() {
 }
 
 restore_backup() {
+  if [[ -z "${1:-}" && -r /dev/tty ]]; then
+    ensure_backup_command
+    "${BACKUP_SCRIPT_PATH}" menu
+    return
+  fi
+
   if [[ "${RESTORE_CONFIRM:-}" != "RESTORE_REMNAWAVE_REMNASHOP_CABINET" ]]; then
     fail "Для CLI-восстановления задайте RESTORE_CONFIRM=RESTORE_REMNAWAVE_REMNASHOP_CABINET"
     return 1
@@ -316,6 +322,7 @@ Remna Control ${VERSION}
   remnactl backup             создать полный бэкап
   remnactl backups            меню бэкапов
   remnactl verify ARCHIVE     проверить архив
+  remnactl restore            выбрать архив и восстановить через меню
   RESTORE_CONFIRM=RESTORE_REMNAWAVE_REMNASHOP_CABINET \\
     remnactl restore ARCHIVE  восстановить сервер
   remnactl self-update        обновить консоль

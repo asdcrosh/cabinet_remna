@@ -185,29 +185,31 @@ export default async function AdminUsersPage({
                     <Counter value={user._count.devices} label="устр." />
                     <Counter value={attemptsCount} label="подар." />
                   </div>
-                  {actor.role === 'SUPER_ADMIN' && (
-                    <BonusBoxAttemptsButton
-                      userId={user.id}
-                      email={user.email}
-                      attemptsCount={attemptsCount}
-                    />
-                  )}
-                  {(actor.role === 'SUPER_ADMIN' || user.role !== 'SUPER_ADMIN') && (
-                    <UserPlanButton
-                      userId={user.id}
-                      email={user.email}
-                      currentPlanId={subscription?.planId ?? null}
-                      plans={plans}
-                    />
-                  )}
-                  {(actor.role === 'SUPER_ADMIN' || user.role !== 'SUPER_ADMIN') && (
-                    <UserProfileEditButton
-                      userId={user.id}
-                      email={user.email}
-                      name={user.name}
-                      emailVerified={Boolean(user.emailVerifiedAt)}
-                    />
-                  )}
+                  <div className="flex flex-wrap justify-end gap-2">
+                    {actor.role === 'SUPER_ADMIN' && (
+                      <BonusBoxAttemptsButton
+                        userId={user.id}
+                        email={user.email}
+                        attemptsCount={attemptsCount}
+                      />
+                    )}
+                    {(actor.role === 'SUPER_ADMIN' || user.role !== 'SUPER_ADMIN') && (
+                      <UserPlanButton
+                        userId={user.id}
+                        email={user.email}
+                        currentPlanId={subscription?.planId ?? null}
+                        plans={plans}
+                      />
+                    )}
+                    {(actor.role === 'SUPER_ADMIN' || user.role !== 'SUPER_ADMIN') && (
+                      <UserProfileEditButton
+                        userId={user.id}
+                        email={user.email}
+                        name={user.name}
+                        emailVerified={Boolean(user.emailVerifiedAt)}
+                      />
+                    )}
+                  </div>
                 </div>
               </div>
 
