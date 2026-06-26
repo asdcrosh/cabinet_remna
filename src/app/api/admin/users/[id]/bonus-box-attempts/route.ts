@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { BonusBoxError, grantManualBonusBoxAttempts } from '@/lib/bonus-box'
 import { requireSuperAdmin, withAuth } from '@/lib/auth/guard'
+import { notifyBonusGranted } from '@/lib/notifications'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -31,6 +32,7 @@ export const POST = withAuth(async (req: Request, { params }: { params: { id: st
       adminId: session.uid,
       attemptsCount: parsed.data.attemptsCount,
     })
+    await notifyBonusGranted({ userId: params.id, attemptsCount: parsed.data.attemptsCount })
     return NextResponse.json(result)
   } catch (error) {
     if (error instanceof BonusBoxError) {

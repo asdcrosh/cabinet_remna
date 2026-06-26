@@ -17,6 +17,7 @@ const mocks = vi.hoisted(() => {
   const applyPendingReferralRewardsForUser = vi.fn()
   const grantPaymentBonusBoxAttempts = vi.fn()
   const grantReferralBonusBoxAttemptsForPayment = vi.fn()
+  const notifyPaymentSucceeded = vi.fn()
 
   return {
     prisma,
@@ -25,6 +26,7 @@ const mocks = vi.hoisted(() => {
     applyPendingReferralRewardsForUser,
     grantPaymentBonusBoxAttempts,
     grantReferralBonusBoxAttemptsForPayment,
+    notifyPaymentSucceeded,
     subscription,
   }
 })
@@ -40,6 +42,9 @@ vi.mock('./referral-rewards', () => ({
 vi.mock('./bonus-box', () => ({
   grantPaymentBonusBoxAttempts: mocks.grantPaymentBonusBoxAttempts,
   grantReferralBonusBoxAttemptsForPayment: mocks.grantReferralBonusBoxAttemptsForPayment,
+}))
+vi.mock('./notifications', () => ({
+  notifyPaymentSucceeded: mocks.notifyPaymentSucceeded,
 }))
 
 import { provisionPaymentSubscription } from './provisioning'

@@ -5,6 +5,7 @@
 
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { notifyPaymentCanceled, notifyPaymentStuck } from '@/lib/notifications'
 import { provisionPaymentSubscription } from '@/lib/provisioning'
 import { getPayment } from '@/lib/yookassa'
 import { assertYookassaWebhookSource } from '@/lib/yookassa-webhook'
@@ -104,6 +105,7 @@ export async function POST(req: Request) {
           provisioningError: e instanceof Error ? e.message.slice(0, 1000) : 'subscription provisioning failed',
         },
       })
+      await notifyPaymentStuck(payment.id, 'Платёж прошёл, но подписка пока не выдана автоматически.')
       return NextResponse.json({ error: 'subscription-failed' }, { status: 500 })
     }
 
@@ -119,6 +121,7 @@ export async function POST(req: Request) {
       where: { paymentId: payment.id, status: 'PENDING' },
       data: { status: 'CANCELED' },
     })
+    await notifyPaymentCanceled(payment.id)
     return NextResponse.json({ ok: true })
   }
 

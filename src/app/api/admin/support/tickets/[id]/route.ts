@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireStaff, withAuth } from '@/lib/auth/guard'
+import { notifySupportReply } from '@/lib/notifications'
 import {
   createSupportMessageSchema,
   serializeSupportMessage,
@@ -104,6 +105,8 @@ export const POST = withAuth(async (req: Request, { params }: { params: { id: st
     })
     return created
   })
+
+  await notifySupportReply({ ticketId: ticket.id, messageId: message.id })
 
   return NextResponse.json({ message: serializeSupportMessage(message) }, { status: 201 })
 })

@@ -1,4 +1,5 @@
 import { prisma } from './prisma'
+import { notifyPaymentCanceled, notifyPaymentStuck } from './notifications'
 import { provisionPaymentSubscription } from './provisioning'
 import { cancelPayment, getPayment } from './yookassa'
 
@@ -62,6 +63,7 @@ export async function syncPaymentProvisioning(input: {
         where: { id: payment.id },
         data: { provisioningError: message.slice(0, 1000) },
       })
+      await notifyPaymentStuck(payment.id, 'Платёж прошёл, но подписка пока не выдана автоматически.')
       return { ok: false, status: 'provisioning_failed', provisioned: false, error: message }
     }
   }
@@ -89,6 +91,7 @@ export async function syncPaymentProvisioning(input: {
         data: { status: 'CANCELED' },
       }),
     ])
+    await notifyPaymentCanceled(payment.id)
 
     return { ok: true, status: 'canceled', provisioned: false }
   }
@@ -102,6 +105,7 @@ export async function syncPaymentProvisioning(input: {
         const canceledPayment = await cancelPayment(payment.yookassaId, `cancel-${payment.id}`)
         if (canceledPayment.status === 'canceled') {
           await cancelLocalPayment(payment.id, 'canceled')
+          await notifyPaymentCanceled(payment.id, 'Платёж отменён, потому что слишком долго ожидал подтверждения.')
           return { ok: true, status: 'canceled', provisioned: false }
         }
       } catch (e) {
@@ -113,6 +117,7 @@ export async function syncPaymentProvisioning(input: {
             provisioningError: message.slice(0, 1000),
           },
         })
+        await notifyPaymentStuck(payment.id, 'Не удалось автоматически отменить зависший платёж.')
         return { ok: false, status: 'check_failed', provisioned: false, error: message }
       }
     }
@@ -177,6 +182,7 @@ export async function syncPaymentProvisioning(input: {
       where: { id: payment.id },
       data: { provisioningError: message.slice(0, 1000) },
     })
+    await notifyPaymentStuck(payment.id, 'Платёж прошёл, но подписка пока не выдана автоматически.')
     return { ok: false, status: 'provisioning_failed', provisioned: false, error: message }
   }
 }

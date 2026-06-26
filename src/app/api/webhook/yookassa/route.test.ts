@@ -33,6 +33,8 @@ const mocks = vi.hoisted(() => {
     getPayment: vi.fn(),
     provisionPaymentSubscription: vi.fn(),
     assertYookassaWebhookSource: vi.fn(),
+    notifyPaymentCanceled: vi.fn(),
+    notifyPaymentStuck: vi.fn(),
   }
 })
 
@@ -43,6 +45,10 @@ vi.mock('@/lib/provisioning', () => ({
 }))
 vi.mock('@/lib/yookassa-webhook', () => ({
   assertYookassaWebhookSource: mocks.assertYookassaWebhookSource,
+}))
+vi.mock('@/lib/notifications', () => ({
+  notifyPaymentCanceled: mocks.notifyPaymentCanceled,
+  notifyPaymentStuck: mocks.notifyPaymentStuck,
 }))
 
 import { POST } from './route'

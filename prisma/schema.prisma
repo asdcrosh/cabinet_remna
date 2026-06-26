@@ -113,6 +113,7 @@ model User {
   bonusBoxOpenings      BonusBoxOpening[]
   auditLogsAuthored     AuditLog[] @relation("AuditLogActor")
   auditLogsTargeted     AuditLog[] @relation("AuditLogTarget")
+  notificationLogs      NotificationLog[]
 
   @@index([email])
   @@index([referredById])
@@ -123,6 +124,37 @@ enum UserRole {
   MODERATOR
   ADMIN
   SUPER_ADMIN
+}
+
+model NotificationLog {
+  id        String              @id @default(cuid())
+  userId    String
+  type      NotificationType
+  channel   NotificationChannel
+  dedupeKey String
+  sentAt    DateTime            @default(now())
+  error     String?
+  createdAt DateTime            @default(now())
+
+  user      User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([channel, dedupeKey])
+  @@index([userId, type, sentAt])
+}
+
+enum NotificationType {
+  PAYMENT_SUCCESS
+  PAYMENT_FAILED
+  PAYMENT_STUCK
+  SUBSCRIPTION_EXPIRING
+  TRAFFIC_LIMIT
+  SUPPORT_REPLY
+  BONUS_GRANTED
+}
+
+enum NotificationChannel {
+  TELEGRAM
+  EMAIL
 }
 
 model OAuthAccount {
