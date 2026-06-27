@@ -103,7 +103,7 @@ export function AdminNotificationBell() {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-12 z-50 w-[min(25rem,calc(100vw-2rem))] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl shadow-slate-950/10 dark:border-white/10 dark:bg-surface-950 dark:shadow-black/30">
+        <div className="fixed inset-x-3 top-16 z-50 max-h-[calc(100dvh-5rem)] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl shadow-slate-950/10 dark:border-white/10 dark:bg-surface-950 dark:shadow-black/30 sm:absolute sm:inset-x-auto sm:right-0 sm:top-12 sm:w-[min(25rem,calc(100vw-2rem))]">
           <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 dark:border-white/10">
             <div>
               <div className="text-sm font-semibold text-slate-950 dark:text-white">Админские уведомления</div>
@@ -122,7 +122,7 @@ export function AdminNotificationBell() {
             </button>
           </div>
 
-          <div className="max-h-96 overflow-y-auto p-2">
+          <div className="max-h-[calc(100dvh-13rem)] overflow-y-auto p-2 sm:max-h-96">
             {summary.notifications.length > 0 ? (
               summary.notifications.map((item) => (
                 <AdminNotificationRow

@@ -3,6 +3,7 @@
 import {
   FormEvent,
   KeyboardEvent,
+  type ReactNode,
   useCallback,
   useEffect,
   useMemo,
@@ -388,8 +389,8 @@ export function SupportPanel({
   }
 
   return (
-    <div className="grid h-[calc(100dvh-5.75rem)] min-h-[32rem] gap-3 overflow-hidden xl:h-[calc(100dvh-8rem)] xl:min-h-[36rem] xl:grid-cols-[21rem_minmax(0,1fr)]">
-      <section className={cn('min-h-0 space-y-4 overflow-y-auto pr-0.5 xl:flex xl:flex-col xl:overflow-hidden', mobileChatOpen && 'hidden xl:flex')}>
+    <div className="grid h-[calc(100dvh-5.5rem)] min-h-[32rem] gap-3 overflow-hidden xl:h-[calc(100dvh-7rem)] xl:min-h-[36rem] xl:grid-cols-[19rem_minmax(0,1fr)_15rem]">
+      <section className={cn('min-h-0 overflow-y-auto pr-0.5 xl:flex xl:flex-col xl:overflow-hidden', mobileChatOpen && 'hidden xl:flex')}>
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-white/70 bg-white/90 shadow-sm shadow-slate-200/60 backdrop-blur dark:border-white/10 dark:bg-surface-900/80 dark:shadow-black/20">
           <div className="border-b border-slate-100 bg-white/70 px-3 py-3 dark:border-slate-800 dark:bg-surface-900/60">
             <div className="flex items-center justify-between gap-3">
@@ -490,7 +491,9 @@ export function SupportPanel({
                     </div>
                   </div>
                 </div>
-                <TicketActions selected={selected} mode={mode} isPending={isPending} onUpdateStatus={updateStatus} />
+                <div className="xl:hidden">
+                  <TicketActions selected={selected} mode={mode} isPending={isPending} onUpdateStatus={updateStatus} />
+                </div>
               </div>
             </div>
 
@@ -552,6 +555,10 @@ export function SupportPanel({
           </div>
         )}
       </section>
+
+      <aside className="hidden min-h-0 overflow-hidden rounded-lg border border-white/70 bg-white/90 shadow-sm shadow-slate-200/60 backdrop-blur dark:border-white/10 dark:bg-surface-900/80 dark:shadow-black/20 xl:block">
+        <TicketSideMenu selected={selected} mode={mode} isPending={isPending} onUpdateStatus={updateStatus} />
+      </aside>
     </div>
   )
 }
@@ -784,6 +791,77 @@ function TicketActions({
           В архив
         </button>
       )}
+    </div>
+  )
+}
+
+function TicketSideMenu({
+  selected,
+  mode,
+  isPending,
+  onUpdateStatus,
+}: {
+  selected: SupportTicket | null
+  mode: 'user' | 'admin'
+  isPending: boolean
+  onUpdateStatus: (status: TicketStatus) => void
+}) {
+  if (!selected) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center p-5 text-center text-sm text-slate-500">
+        <MessageCircle className="mb-3 h-6 w-6 text-slate-300" />
+        Выберите обращение
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="border-b border-slate-100 px-4 py-4 dark:border-slate-800">
+        <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Меню</div>
+        <div className="mt-2 text-sm font-semibold text-slate-950 dark:text-white">Обращение</div>
+      </div>
+      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
+        <InfoBlock label="Статус">
+          <TicketStatusBadge status={selected.status} mode={mode} />
+        </InfoBlock>
+        <InfoBlock label="Тема">
+          <span className="break-words">{selected.subject}</span>
+        </InfoBlock>
+        <InfoBlock label="Категория">
+          <span>{supportCategoryLabel(selected.category)}</span>
+        </InfoBlock>
+        {mode === 'admin' && selected.user && (
+          <>
+            <InfoBlock label="Пользователь">
+              <span className="break-all">{selected.user.email}</span>
+            </InfoBlock>
+            {selected.user.remnawaveUsername && (
+              <InfoBlock label="Remnawave">
+                <span className="break-all">{selected.user.remnawaveUsername}</span>
+              </InfoBlock>
+            )}
+          </>
+        )}
+        <InfoBlock label="Создано">
+          <span>{formatDate(selected.createdAt)}</span>
+        </InfoBlock>
+        <InfoBlock label="Сообщений">
+          <span>{selected.messages.length}</span>
+        </InfoBlock>
+      </div>
+      <div className="border-t border-slate-100 p-4 dark:border-slate-800">
+        <TicketActions selected={selected} mode={mode} isPending={isPending} onUpdateStatus={onUpdateStatus} />
+      </div>
+    </div>
+  )
+}
+
+function InfoBlock({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div>
+      <div className="mb-1 text-xs font-medium text-slate-400">{label}</div>
+      <div className="text-sm text-slate-700 dark:text-slate-200">{children}</div>
     </div>
   )
 }
