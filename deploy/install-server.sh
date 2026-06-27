@@ -17,9 +17,6 @@ CABINETCTL_TEMP="${CABINETCTL_PATH}.tmp"
 FULL_BACKUP_URL="${FULL_BACKUP_URL:-${RAW_BASE_URL}/deploy/full-stack-backup.sh}"
 FULL_BACKUP_PATH="${FULL_BACKUP_PATH:-/usr/local/bin/remna-backup}"
 FULL_BACKUP_TEMP="${FULL_BACKUP_PATH}.tmp"
-REMNACTL_URL="${REMNACTL_URL:-${RAW_BASE_URL}/deploy/remnactl.sh}"
-REMNACTL_PATH="${REMNACTL_PATH:-/usr/local/bin/remnactl}"
-REMNACTL_TEMP="${REMNACTL_PATH}.tmp"
 
 if [[ "$(id -u)" -ne 0 ]]; then
   echo "Run as root or with sudo:"
@@ -55,9 +52,7 @@ rm -f "${CABINETCTL_TEMP}"
 curl -fsSL "${FULL_BACKUP_URL}" -o "${FULL_BACKUP_TEMP}"
 install -m 755 "${FULL_BACKUP_TEMP}" "${FULL_BACKUP_PATH}"
 rm -f "${FULL_BACKUP_TEMP}"
-curl -fsSL "${REMNACTL_URL}" -o "${REMNACTL_TEMP}"
-install -m 755 "${REMNACTL_TEMP}" "${REMNACTL_PATH}"
-rm -f "${REMNACTL_TEMP}"
+rm -f /usr/local/bin/remnactl
 
 if [[ ! -f "${ENV_FILE}" ]]; then
   if [[ -f "${LEGACY_ENV_FILE}" ]]; then

@@ -203,7 +203,7 @@ async function checkS3() {
   const secretKey = env('SYSTEM_HEALTH_S3_SECRET_KEY') || env('S3_SECRET_KEY')
 
   if (!bucket || !accessKey || !secretKey) {
-    return check('s3', 'S3', 'warn', 'S3 проверяется в консоли remnactl', 'Для проверки из веба можно заполнить SYSTEM_HEALTH_S3_*')
+    return check('s3', 'S3', 'warn', 'S3 проверяется в консоли cabinetctl', 'Для проверки из веба можно заполнить SYSTEM_HEALTH_S3_*')
   }
 
   return check('s3', 'S3', 'ok', `S3 настроен для bucket ${bucket}`)

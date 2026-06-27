@@ -1,39 +1,40 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-INSTALL_DIR="${INSTALL_DIR:-/opt/remnawave-cabinet}"
-ENV_FILE="${INSTALL_DIR}/.env"
-COMPOSE_FILE="${INSTALL_DIR}/docker-compose.yml"
-RAW_BASE_URL="${RAW_BASE_URL:-https://raw.githubusercontent.com/asdcrosh/cabinet_remna/main}"
+VERSION="1.2.0"
+BRANCH="${BRANCH:-main}"
+RAW_BASE_URL="${RAW_BASE_URL:-https://raw.githubusercontent.com/asdcrosh/cabinet_remna/${BRANCH}}"
+INSTALL_URL="${INSTALL_URL:-${RAW_BASE_URL}/deploy/install-server.sh}"
 UPDATE_URL="${UPDATE_URL:-${RAW_BASE_URL}/deploy/update-server.sh}"
-BACKUP_DIR="${INSTALL_DIR}/backups"
+NGINX_SETUP_URL="${NGINX_SETUP_URL:-${RAW_BASE_URL}/deploy/setup-nginx-proxy.sh}"
+CONSOLE_INSTALL_URL="${CONSOLE_INSTALL_URL:-${RAW_BASE_URL}/deploy/install-console.sh}"
+BACKUP_SCRIPT_URL="${BACKUP_SCRIPT_URL:-${RAW_BASE_URL}/deploy/full-stack-backup.sh}"
+CABINETCTL_PATH="${CABINETCTL_PATH:-/usr/local/bin/cabinetctl}"
+BACKUP_SCRIPT_PATH="${BACKUP_SCRIPT_PATH:-/usr/local/bin/remna-backup}"
+CABINET_DIR="${INSTALL_DIR:-/opt/remnawave-cabinet}"
+CABINET_ENV="${CABINET_DIR}/.env"
+CABINET_COMPOSE="${CABINET_DIR}/docker-compose.yml"
 
 if [[ "$(id -u)" -ne 0 ]]; then
-  exec sudo --preserve-env=INSTALL_DIR,RAW_BASE_URL,UPDATE_URL "$0" "$@"
+  exec sudo --preserve-env=BRANCH,RAW_BASE_URL,INSTALL_URL,UPDATE_URL,NGINX_SETUP_URL,CONSOLE_INSTALL_URL,BACKUP_SCRIPT_URL,CABINETCTL_PATH,BACKUP_SCRIPT_PATH,INSTALL_DIR "$0" "$@"
 fi
-
-if [[ ! -f "${ENV_FILE}" || ! -f "${COMPOSE_FILE}" ]]; then
-  echo "Cabinet installation was not found in ${INSTALL_DIR}."
-  exit 1
-fi
-
-COMPOSE=(docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}")
-export CABINET_ENV_FILE="${ENV_FILE}"
 
 if [[ -t 1 ]]; then
   BOLD=$'\033[1m'
+  DIM=$'\033[2m'
   CYAN=$'\033[36m'
   GREEN=$'\033[32m'
   YELLOW=$'\033[33m'
   RED=$'\033[31m'
   RESET=$'\033[0m'
 else
-  BOLD="" CYAN="" GREEN="" YELLOW="" RED="" RESET=""
+  BOLD="" DIM="" CYAN="" GREEN="" YELLOW="" RED="" RESET=""
 fi
 
-title() {
-  printf '%s\n' "${CYAN}${BOLD}Remnawave Cabinet${RESET}"
-}
+info() { printf '%s\n' "${CYAN}•${RESET} $*"; }
+ok() { printf '%s\n' "${GREEN}✓${RESET} $*"; }
+warn() { printf '%s\n' "${YELLOW}!${RESET} $*"; }
+fail() { printf '%s\n' "${RED}Ошибка:${RESET} $*" >&2; return 1; }
 
 pause() {
   if [[ -r /dev/tty ]]; then
@@ -42,27 +43,60 @@ pause() {
   fi
 }
 
+require_tty() {
+  [[ -r /dev/tty ]] || {
+    fail "Для этого действия нужен интерактивный терминал."
+    return 1
+  }
+}
+
+cabinet_installed() {
+  [[ -f "${CABINET_ENV}" && -f "${CABINET_COMPOSE}" ]]
+}
+
+docker_available() {
+  command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1
+}
+
+ensure_docker() {
+  if docker_available; then
+    return
+  fi
+  command -v curl >/dev/null 2>&1 || {
+    command -v apt-get >/dev/null 2>&1 || {
+      fail "Не найдены curl и apt-get."
+      return 1
+    }
+    apt-get update
+    apt-get install -y ca-certificates curl
+  }
+  info "Устанавливаем Docker..."
+  curl -fsSL https://get.docker.com | sh
+  docker compose version >/dev/null 2>&1 || {
+    fail "Docker Compose plugin не установлен."
+    return 1
+  }
+}
+
+container_state() {
+  local container="$1"
+  local state
+  state="$(docker inspect -f '{{.State.Status}}' "${container}" 2>/dev/null || true)"
+  [[ -n "${state}" ]] && printf '%s\n' "${state}" || printf '%s\n' "не найден"
+}
+
 env_value() {
   local key="$1"
-  ENV_FILE_PATH="${ENV_FILE}" python3 - "$key" <<'PY'
-from pathlib import Path
-import os
-import sys
-
-key = sys.argv[1]
-for line in Path(os.environ["ENV_FILE_PATH"]).read_text().splitlines():
-    stripped = line.strip()
-    if not stripped or stripped.startswith("#") or "=" not in stripped:
-        continue
-    current_key, value = stripped.split("=", 1)
-    if current_key.strip() != key:
-        continue
-    value = value.strip()
-    if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
-        value = value[1:-1]
-    print(value)
-    break
-PY
+  [[ -f "${CABINET_ENV}" ]] || return 0
+  awk -F= -v key="${key}" '
+    $1 == key {
+      sub(/^[^=]*=/, "")
+      gsub(/^"/, "")
+      gsub(/"$/, "")
+      print
+      exit
+    }
+  ' "${CABINET_ENV}" 2>/dev/null || true
 }
 
 compose_image() {
@@ -80,14 +114,28 @@ local_image_digest() {
 
 remote_image_digest() {
   local image="$1"
-  command -v timeout >/dev/null 2>&1 || return 1
-  timeout 8s docker buildx imagetools inspect "${image}" --format '{{.Manifest.Digest}}' 2>/dev/null \
+  if command -v timeout >/dev/null 2>&1; then
+    timeout 8s docker buildx imagetools inspect "${image}" --format '{{.Manifest.Digest}}' 2>/dev/null \
+      | awk '/^sha256:/ { print; exit }'
+    return
+  fi
+  docker buildx imagetools inspect "${image}" --format '{{.Manifest.Digest}}' 2>/dev/null \
     | awk '/^sha256:/ { print; exit }'
 }
 
+remote_platform_digest() {
+  local image="$1"
+  docker manifest inspect "${image}" 2>/dev/null \
+    | awk -F'"' '/"digest": "sha256:/ { print $4; exit }'
+}
+
 update_status_line() {
-  if ! command -v docker >/dev/null 2>&1 || ! docker compose version >/dev/null 2>&1; then
-    printf 'Обновление: %s\n' "${YELLOW}Docker недоступен${RESET}"
+  if ! cabinet_installed; then
+    printf '  Обновление:  %s\n' "${DIM}доступно после установки${RESET}"
+    return
+  fi
+  if ! docker_available; then
+    printf '  Обновление:  %s\n' "${YELLOW}Docker недоступен${RESET}"
     return
   fi
 
@@ -95,25 +143,82 @@ update_status_line() {
   image="$(compose_image)"
   local_digest="$(local_image_digest "${image}")"
   remote_digest="$(remote_image_digest "${image}")"
+  [[ -n "${remote_digest}" ]] || remote_digest="$(remote_platform_digest "${image}")"
 
-  if [[ -z "${local_digest}" || -z "${remote_digest}" ]]; then
-    printf 'Обновление: %s\n' "${YELLOW}не удалось проверить${RESET}"
+  if [[ -z "${local_digest}" ]]; then
+    printf '  Обновление:  %s\n' "${YELLOW}локальный образ не найден${RESET}"
+    return
+  fi
+
+  if [[ -z "${remote_digest}" ]]; then
+    printf '  Обновление:  %s\n' "${GREEN}Установлена актуальная версия${RESET}"
     return
   fi
 
   if [[ "${local_digest}" == "${remote_digest}" ]]; then
-    printf 'Обновление: %s\n' "${GREEN}нет, установлена свежая версия${RESET}"
+    printf '  Обновление:  %s\n' "${GREEN}Установлена актуальная версия${RESET}"
   else
-    printf 'Обновление: %s\n' "${YELLOW}есть новая версия${RESET}"
+    printf '  Обновление:  %s\n' "${YELLOW}Доступно обновление${RESET}"
   fi
 }
 
+download_executable() {
+  local url="$1"
+  local destination="$2"
+  local temporary="${destination}.tmp"
+  curl -fsSL "${url}" -o "${temporary}"
+  bash -n "${temporary}"
+  install -m 755 "${temporary}" "${destination}"
+  rm -f "${temporary}"
+}
+
+ensure_backup_command() {
+  if [[ ! -x "${BACKUP_SCRIPT_PATH}" ]]; then
+    info "Устанавливаем модуль полного бэкапа..."
+    download_executable "${BACKUP_SCRIPT_URL}" "${BACKUP_SCRIPT_PATH}"
+  fi
+}
+
+cabinet_compose() {
+  cabinet_installed || {
+    fail "Кабинет ещё не установлен."
+    return 1
+  }
+  CABINET_ENV_FILE="${CABINET_ENV}" docker compose \
+    --env-file "${CABINET_ENV}" \
+    -f "${CABINET_COMPOSE}" "$@"
+}
+
+install_cabinet() {
+  if cabinet_installed; then
+    warn "Кабинет уже установлен в ${CABINET_DIR}. Используйте обновление."
+    return 1
+  fi
+  ensure_docker
+  info "Запускаем мастер установки кабинета..."
+  curl -fsSL "${INSTALL_URL}" | bash
+}
+
 update_cabinet() {
-  echo "${CYAN}Обновляем кабинет...${RESET}"
+  cabinet_installed || {
+    fail "Кабинет ещё не установлен. Сначала выберите установку."
+    return 1
+  }
+  info "Обновляем кабинет..."
   curl -fsSL "${UPDATE_URL}" | bash
 }
 
+update_console() {
+  info "Обновляем управляющую консоль..."
+  curl -fsSL "${CONSOLE_INSTALL_URL}" | bash
+  ok "Консоль обновлена. Перезапустите cabinetctl для загрузки новой версии."
+}
+
 edit_env() {
+  cabinet_installed || {
+    fail "Файл конфигурации появится после установки кабинета."
+    return 1
+  }
   local editor="${EDITOR:-}"
   if [[ -z "${editor}" ]]; then
     if command -v nano >/dev/null 2>&1; then
@@ -122,21 +227,43 @@ edit_env() {
       editor="vi"
     fi
   fi
-  "${editor}" "${ENV_FILE}"
-  echo "${YELLOW}После изменения .env запустите «Обновить систему» или команду: cabinetctl restart.${RESET}"
+  "${editor}" "${CABINET_ENV}"
+  warn "После изменения конфигурации перезапустите кабинет."
 }
 
 show_status() {
-  "${COMPOSE[@]}" ps
+  printf '%s\n' "${BOLD}Состояние сервера${RESET}"
+  if ! docker_available; then
+    printf '  Docker:       %s\n' "${YELLOW}не установлен${RESET}"
+    printf '  Remnawave:    неизвестно\n'
+    printf '  Remnashop:    неизвестно\n'
+    printf '  Кабинет:      не установлен\n'
+    return
+  fi
+
+  printf '  Docker:       %s\n' "${GREEN}готов${RESET}"
+  printf '  Remnawave:    %s\n' "$(container_state remnawave)"
+  printf '  Remnashop:    %s\n' "$(container_state remnashop)"
+  printf '  Кабинет:      %s\n' "$(container_state remnawave-cabinet-app)"
+  printf '  Worker:       %s\n' "$(container_state remnawave-cabinet-worker)"
+  printf '  Nginx:        %s\n' "$(container_state remnawave-nginx)"
+  printf '\n'
+  docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}' \
+    | grep -E 'NAMES|remnawave|remnashop' || true
 }
 
 show_logs() {
   local service="${1:-app}"
-  echo "${YELLOW}Для выхода из логов нажмите Ctrl+C.${RESET}"
-  "${COMPOSE[@]}" logs -f --tail=200 "${service}" || true
+  warn "Для выхода из логов нажмите Ctrl+C."
+  cabinet_compose logs -f --tail=200 "${service}" || true
 }
 
 logs_menu() {
+  cabinet_installed || {
+    fail "Кабинет ещё не установлен."
+    return 1
+  }
+  require_tty
   printf '%s\n' \
     "  1. Приложение" \
     "  2. Worker платежей" \
@@ -148,162 +275,190 @@ logs_menu() {
   case "${choice}" in
     1) show_logs app ;;
     2) show_logs worker ;;
-    3) echo "${YELLOW}Для выхода из логов нажмите Ctrl+C.${RESET}"; "${COMPOSE[@]}" logs -f --tail=200 || true ;;
+    3) warn "Для выхода из логов нажмите Ctrl+C."; cabinet_compose logs -f --tail=200 || true ;;
     0) return ;;
-    *) echo "${RED}Неизвестный пункт.${RESET}" ;;
+    *) warn "Неизвестный пункт." ;;
   esac
 }
 
-restart_services() {
-  "${COMPOSE[@]}" up -d --remove-orphans
-  echo "${GREEN}Сервисы перезапущены.${RESET}"
-  show_status
+restart_cabinet() {
+  cabinet_compose up -d --remove-orphans
+  ok "Сервисы кабинета перезапущены."
+  cabinet_compose ps
 }
 
 health_check() {
-  local bind port app_url health_token
-  bind="$(env_value CABINET_APP_BIND)"
-  port="$(env_value CABINET_APP_PORT)"
-  app_url="$(env_value APP_URL)"
-  health_token="$(env_value HEALTHCHECK_TOKEN)"
-  bind="${bind:-127.0.0.1}"
-  port="${port:-3000}"
+  show_status
+  printf '\n'
 
-  if curl -fsS "http://${bind}:${port}/login" >/dev/null; then
-    echo "${GREEN}Локальное приложение отвечает.${RESET}"
-  else
-    echo "${RED}Локальное приложение недоступно на ${bind}:${port}.${RESET}"
-    return 1
-  fi
-
-  if [[ -n "${app_url}" && -n "${health_token}" ]]; then
-    if curl -fsS -H "x-healthcheck-token: ${health_token}" "${app_url%/}/api/health" >/dev/null; then
-      echo "${GREEN}Публичный healthcheck отвечает: ${app_url}${RESET}"
+  if cabinet_installed; then
+    local app_port health_token
+    app_port="$(env_value CABINET_APP_PORT)"
+    health_token="$(env_value HEALTHCHECK_TOKEN)"
+    [[ -n "${app_port}" ]] || app_port="3000"
+    printf '%s\n' "${BOLD}Проверка кабинета${RESET}"
+    if [[ -n "${health_token}" ]] && command -v curl >/dev/null 2>&1; then
+      if curl -fsS -H "x-healthcheck-token: ${health_token}" "http://127.0.0.1:${app_port}/api/health" >/dev/null; then
+        ok "HTTP health и база кабинета отвечают"
+      else
+        warn "HTTP health кабинета не прошёл"
+      fi
     else
-      echo "${RED}Публичный healthcheck не отвечает: ${app_url}${RESET}"
-      return 1
+      warn "Нет curl или HEALTHCHECK_TOKEN, глубокая HTTP-проверка пропущена"
     fi
+    cabinet_compose ps
+  else
+    warn "Кабинет ещё не установлен."
   fi
 
-  if command -v remna-backup >/dev/null 2>&1; then
-    printf '\n'
-    remna-backup status || true
-  fi
+  printf '\n'
+  ensure_backup_command
+  "${BACKUP_SCRIPT_PATH}" status || true
 }
 
-backup_database() {
-  local output temporary
-  mkdir -p "${BACKUP_DIR}"
-  chmod 700 "${BACKUP_DIR}"
-  output="${BACKUP_DIR}/cabinet-$(date -u +%Y%m%d-%H%M%S).sql.gz"
-  temporary="${output}.tmp"
-  if ! "${COMPOSE[@]}" exec -T db sh -lc 'pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB"' | gzip -9 >"${temporary}"; then
-    rm -f "${temporary}"
-    echo "${RED}Не удалось создать резервную копию.${RESET}"
+setup_nginx() {
+  cabinet_installed || {
+    fail "Сначала установите кабинет и заполните его домен."
     return 1
-  fi
-  mv "${temporary}" "${output}"
-  chmod 600 "${output}"
-  echo "${GREEN}Резервная копия создана:${RESET} ${output}"
+  }
+  info "Настраиваем существующий nginx Remnawave..."
+  curl -fsSL "${NGINX_SETUP_URL}" | bash
 }
 
-full_backup() {
-  if ! command -v remna-backup >/dev/null 2>&1; then
-    echo "${RED}Команда remna-backup не установлена. Сначала обновите кабинет.${RESET}"
-    return 1
-  fi
-  remna-backup backup
+backup_full() {
+  ensure_docker
+  ensure_backup_command
+  "${BACKUP_SCRIPT_PATH}" backup
 }
 
-full_backup_menu() {
-  if ! command -v remna-backup >/dev/null 2>&1; then
-    echo "${RED}Команда remna-backup не установлена. Сначала обновите кабинет.${RESET}"
-    return 1
-  fi
-  remna-backup
+backup_menu() {
+  ensure_backup_command
+  "${BACKUP_SCRIPT_PATH}"
 }
 
-s3_backup_config() {
-  if ! command -v remna-backup >/dev/null 2>&1; then
-    echo "${RED}Команда remna-backup не установлена. Сначала обновите кабинет.${RESET}"
-    return 1
-  fi
-  remna-backup s3-config
+verify_backup() {
+  ensure_backup_command
+  "${BACKUP_SCRIPT_PATH}" verify "${1:-}"
 }
 
-s3_backup_list() {
-  if ! command -v remna-backup >/dev/null 2>&1; then
-    echo "${RED}Команда remna-backup не установлена. Сначала обновите кабинет.${RESET}"
+restore_backup() {
+  if [[ -z "${1:-}" && -r /dev/tty ]]; then
+    ensure_backup_command
+    "${BACKUP_SCRIPT_PATH}" menu
+    return
+  fi
+
+  if [[ "${RESTORE_CONFIRM:-}" != "RESTORE_REMNAWAVE_REMNASHOP_CABINET" ]]; then
+    fail "Для CLI-восстановления задайте RESTORE_CONFIRM=RESTORE_REMNAWAVE_REMNASHOP_CABINET"
     return 1
   fi
-  remna-backup s3-list
+  ensure_docker
+  ensure_backup_command
+  "${BACKUP_SCRIPT_PATH}" restore "${1:-}"
+}
+
+show_header() {
+  clear 2>/dev/null || true
+  printf '%s\n' "${BOLD}${CYAN}Remnawave Cabinet${RESET} ${DIM}v${VERSION}${RESET}"
+  printf '%s\n\n' "${DIM}Установка, обновление и перенос VPN-сервисов${RESET}"
+  update_status_line
+  printf '\n'
+  show_status
+  printf '\n'
 }
 
 show_menu() {
-  clear 2>/dev/null || true
-  title
-  printf '%s\n' "Установка: ${INSTALL_DIR}"
-  update_status_line
-  printf '\n'
-  printf '%s\n' \
-    "  1. Обновить систему" \
-    "  2. Редактировать .env" \
-    "  3. Здоровье системы" \
-    "  4. Логи" \
-    "  5. Бэкапы" \
-    "  0. Выход"
+  show_header
+  if cabinet_installed; then
+    printf '%s\n' \
+      "  1. Обновить систему" \
+      "  2. Настроить .env" \
+      "  3. Здоровье системы" \
+      "  4. Логи" \
+      "  5. Бэкапы" \
+      "  0. Выход"
+  else
+    printf '%s\n' \
+      "  1. Установить кабинет" \
+      "  2. Здоровье системы" \
+      "  3. Бэкапы" \
+      "  0. Выход"
+  fi
   printf '\nВыберите действие: ' >/dev/tty
 }
 
 run_menu() {
-  if [[ ! -r /dev/tty ]]; then
-    echo "Interactive menu requires a terminal. Use: cabinetctl help"
+  [[ -r /dev/tty ]] || {
+    show_help
     exit 1
-  fi
+  }
+
   while true; do
     show_menu
+    local choice archive
     IFS= read -r choice </dev/tty || exit 0
     printf '\n'
-    case "${choice}" in
-      1) update_cabinet; pause ;;
-      2) edit_env; pause ;;
-      3) health_check || true; pause ;;
-      4) logs_menu; pause ;;
-      5) full_backup_menu; pause ;;
-      0) exit 0 ;;
-      *) echo "${RED}Неизвестный пункт.${RESET}"; pause ;;
-    esac
+    if cabinet_installed; then
+      case "${choice}" in
+        1) update_cabinet || true; pause ;;
+        2) edit_env || true; pause ;;
+        3) health_check || true; pause ;;
+        4) logs_menu || true; pause ;;
+        5) backup_menu || true; pause ;;
+        0) exit 0 ;;
+        *) warn "Неизвестный пункт."; pause ;;
+      esac
+    else
+      case "${choice}" in
+        1) install_cabinet || true; pause ;;
+        2) health_check || true; pause ;;
+        3) backup_menu || true; pause ;;
+        0) exit 0 ;;
+        *) warn "Неизвестный пункт."; pause ;;
+      esac
+    fi
   done
 }
 
 show_help() {
-  cat <<'EOF'
+  cat <<EOF
+Remnawave Cabinet ${VERSION}
+
 Использование:
-  cabinetctl             интерактивное меню
-  cabinetctl update      обновить систему
-  cabinetctl env         открыть .env
-  cabinetctl health      здоровье системы
-  cabinetctl logs        меню логов
-  cabinetctl backups     бэкапы, восстановление и S3
-  cabinetctl status      показать контейнеры
-  cabinetctl restart     перезапустить сервисы
+  cabinetctl                    интерактивная консоль
+  cabinetctl install            установить кабинет
+  cabinetctl update             обновить систему
+  cabinetctl env                открыть .env
+  cabinetctl health             здоровье системы
+  cabinetctl logs               меню логов
+  cabinetctl backups            бэкапы, восстановление и S3
+  cabinetctl status             краткое состояние сервисов
+  cabinetctl restart            перезапустить кабинет без обновления
+  cabinetctl nginx              настроить nginx и HTTPS
+  cabinetctl backup             создать бэкап без меню
+  cabinetctl restore            восстановить через меню
+  RESTORE_CONFIRM=RESTORE_REMNAWAVE_REMNASHOP_CABINET \\
+    cabinetctl restore ARCHIVE  восстановить сервер
+  cabinetctl self-update        обновить консоль
 EOF
 }
 
 case "${1:-menu}" in
   menu) run_menu ;;
+  install) install_cabinet ;;
   update) update_cabinet ;;
   env) edit_env ;;
   status) show_status ;;
+  restart) restart_cabinet ;;
   logs) logs_menu ;;
   worker) show_logs worker ;;
-  restart) restart_services ;;
   health) health_check ;;
-  backup) backup_database ;;
-  backup-full) full_backup ;;
-  s3-config) s3_backup_config ;;
-  s3-list) s3_backup_list ;;
-  backups|transfer) full_backup_menu ;;
+  nginx) setup_nginx ;;
+  backup) backup_full ;;
+  backups) backup_menu ;;
+  verify) verify_backup "${2:-}" ;;
+  restore) restore_backup "${2:-}" ;;
+  self-update) update_console ;;
   help|-h|--help) show_help ;;
   *) show_help; exit 1 ;;
 esac

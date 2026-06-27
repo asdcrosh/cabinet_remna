@@ -3,9 +3,9 @@ set -euo pipefail
 
 BRANCH="${BRANCH:-main}"
 RAW_BASE_URL="${RAW_BASE_URL:-https://raw.githubusercontent.com/asdcrosh/cabinet_remna/${BRANCH}}"
-REMNACTL_URL="${REMNACTL_URL:-${RAW_BASE_URL}/deploy/remnactl.sh}"
+CABINETCTL_URL="${CABINETCTL_URL:-${RAW_BASE_URL}/deploy/cabinetctl.sh}"
 BACKUP_SCRIPT_URL="${BACKUP_SCRIPT_URL:-${RAW_BASE_URL}/deploy/full-stack-backup.sh}"
-REMNACTL_PATH="${REMNACTL_PATH:-/usr/local/bin/remnactl}"
+CABINETCTL_PATH="${CABINETCTL_PATH:-/usr/local/bin/cabinetctl}"
 BACKUP_SCRIPT_PATH="${BACKUP_SCRIPT_PATH:-/usr/local/bin/remna-backup}"
 
 if [[ "$(id -u)" -ne 0 ]]; then
@@ -41,10 +41,11 @@ install_remote_script() {
   rm -f "${temporary}"
 }
 
-echo "Устанавливаем Remna Control..."
-install_remote_script "${REMNACTL_URL}" "${REMNACTL_PATH}"
+echo "Устанавливаем Cabinet Control..."
+install_remote_script "${CABINETCTL_URL}" "${CABINETCTL_PATH}"
 install_remote_script "${BACKUP_SCRIPT_URL}" "${BACKUP_SCRIPT_PATH}"
+rm -f /usr/local/bin/remnactl
 
 echo
 echo "Готово. Запустите:"
-echo "  remnactl"
+echo "  cabinetctl"
