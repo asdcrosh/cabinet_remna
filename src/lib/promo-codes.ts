@@ -7,7 +7,8 @@ type PromoCodeWithPlans = Prisma.PromoCodeGetPayload<{
   include: { plans: { select: { planId: true } } }
 }>
 
-type PromoPrisma = Pick<Prisma.TransactionClient, 'promoCode' | 'promoCodeRedemption'>
+type PromoPrisma = Pick<Prisma.TransactionClient, 'promoCode' | 'promoCodeRedemption' | 'user' | 'subscription'>
+type PromoAudiencePrisma = Pick<Prisma.TransactionClient, 'user' | 'subscription'>
 
 export class PromoCodeError extends Error {
   constructor(
@@ -78,6 +79,12 @@ export async function validatePromoCodeForPlan({
     throw new PromoCodeError('Промокод не найден', 404, 'PROMO_NOT_FOUND')
   }
   assertPromoCodeCanBeUsed(promoCode, plan.id, now)
+  await assertPromoCodeAudienceCanBeUsed({
+    prisma,
+    promoCode,
+    userId,
+    now,
+  })
 
   const [totalReserved, userReserved] = await Promise.all([
     promoCode.maxUses == null
@@ -116,6 +123,63 @@ export async function validatePromoCodeForPlan({
     discountPercent: promoCode.discountPercent,
     discountKopecks,
     finalAmountKopecks,
+  }
+}
+
+async function assertPromoCodeAudienceCanBeUsed({
+  prisma,
+  promoCode,
+  userId,
+  now,
+}: {
+  prisma: PromoAudiencePrisma
+  promoCode: Pick<PromoCodeWithPlans, 'audience' | 'allowedEmails'>
+  userId: string
+  now: Date
+}) {
+  if (promoCode.audience === 'ALL') return
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      email: true,
+      remnashopUserId: true,
+      remnawaveUuid: true,
+    },
+  })
+
+  if (!user) {
+    throw new PromoCodeError('Пользователь не найден', 404, 'PROMO_USER_NOT_FOUND')
+  }
+
+  if (promoCode.audience === 'PERSONAL') {
+    const allowedEmails = new Set(promoCode.allowedEmails.map((email) => email.trim().toLowerCase()))
+    if (!allowedEmails.has(user.email.toLowerCase())) {
+      throw new PromoCodeError('Промокод доступен только выбранным пользователям', 403, 'PROMO_USER_NOT_ALLOWED')
+    }
+    return
+  }
+
+  const subscriptionsCount = await prisma.subscription.count({
+    where:
+      promoCode.audience === 'NO_ACTIVE_SUBSCRIPTION'
+        ? {
+            userId,
+            status: { in: ['ACTIVE', 'LIMITED'] },
+            expireAt: { gt: now },
+          }
+        : { userId },
+  })
+
+  if (promoCode.audience === 'NEW_USERS') {
+    if (user.remnashopUserId || user.remnawaveUuid || subscriptionsCount > 0) {
+      throw new PromoCodeError('Промокод доступен только новым пользователям', 403, 'PROMO_NEW_USERS_ONLY')
+    }
+    return
+  }
+
+  if (promoCode.audience === 'NO_ACTIVE_SUBSCRIPTION' && subscriptionsCount > 0) {
+    throw new PromoCodeError('Промокод доступен только пользователям без активной подписки', 403, 'PROMO_NO_ACTIVE_SUBSCRIPTION_ONLY')
   }
 }
 

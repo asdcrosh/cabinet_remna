@@ -33,11 +33,34 @@ export const PATCH = withAuth(async (req: Request, { params }: { params: { id: s
     return NextResponse.json({ error: 'Введите промокод' }, { status: 400 })
   }
 
+  const existing = await prisma.promoCode.findUnique({
+    where: { id: params.id },
+    select: { audience: true, allowedEmails: true },
+  })
+  if (!existing) {
+    return NextResponse.json({ error: 'Промокод не найден' }, { status: 404 })
+  }
+
+  const effectiveAudience = data.audience ?? existing.audience
+  const effectiveAllowedEmails =
+    effectiveAudience === 'PERSONAL'
+      ? normalizeAllowedEmails(data.allowedEmails ?? existing.allowedEmails)
+      : []
+
+  if (effectiveAudience === 'PERSONAL' && effectiveAllowedEmails.length === 0) {
+    return NextResponse.json(
+      { error: 'Для персонального промокода укажите хотя бы одного пользователя' },
+      { status: 400 }
+    )
+  }
+
   try {
     const promoCode = await prisma.$transaction(async (tx) => {
       const updateData: Prisma.PromoCodeUpdateInput = {}
       if (normalizedCode) updateData.code = normalizedCode
       if (data.discountPercent !== undefined) updateData.discountPercent = data.discountPercent
+      updateData.audience = effectiveAudience
+      updateData.allowedEmails = effectiveAllowedEmails
       if (data.isActive !== undefined) updateData.isActive = data.isActive
       if (data.startsAt !== undefined) updateData.startsAt = data.startsAt ? new Date(data.startsAt) : null
       if (data.expiresAt !== undefined) updateData.expiresAt = data.expiresAt ? new Date(data.expiresAt) : null
@@ -68,6 +91,8 @@ export const PATCH = withAuth(async (req: Request, { params }: { params: { id: s
       metadata: {
         promoCodeId: promoCode.id,
         code: promoCode.code,
+        audience: promoCode.audience,
+        allowedEmails: effectiveAllowedEmails,
         changedPlanIds: data.planIds,
       },
       request: req,
@@ -86,3 +111,7 @@ export const PATCH = withAuth(async (req: Request, { params }: { params: { id: s
     throw e
   }
 })
+
+function normalizeAllowedEmails(emails: string[]) {
+  return Array.from(new Set(emails.map((email) => email.trim().toLowerCase()).filter(Boolean)))
+}

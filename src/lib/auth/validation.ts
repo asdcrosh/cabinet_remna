@@ -91,6 +91,8 @@ const adminPromoCodeBaseSchema = z.object({
     .max(32, 'Максимум 32 символа')
     .regex(/^[A-Za-z0-9_-]+$/, 'Только латиница, цифры, дефис и подчёркивание'),
   discountPercent: z.coerce.number().int().min(1).max(99),
+  audience: z.enum(['ALL', 'NEW_USERS', 'NO_ACTIVE_SUBSCRIPTION', 'PERSONAL']).default('ALL'),
+  allowedEmails: z.array(z.string().trim().email()).max(10_000).default([]),
   isActive: z.boolean().default(true),
   startsAt: z.string().datetime().optional().nullable(),
   expiresAt: z.string().datetime().optional().nullable(),
@@ -107,11 +109,17 @@ function startsBeforeExpires(value: { startsAt?: string | null; expiresAt?: stri
 export const adminPromoCodeSchema = adminPromoCodeBaseSchema.refine(startsBeforeExpires, {
   path: ['expiresAt'],
   message: 'Дата окончания должна быть позже даты начала',
+}).refine((value) => value.audience !== 'PERSONAL' || value.allowedEmails.length > 0, {
+  path: ['allowedEmails'],
+  message: 'Для персонального промокода укажите хотя бы одного пользователя',
 })
 
 export const updateAdminPromoCodeSchema = adminPromoCodeBaseSchema.partial().refine(startsBeforeExpires, {
   path: ['expiresAt'],
   message: 'Дата окончания должна быть позже даты начала',
+}).refine((value) => value.audience !== 'PERSONAL' || value.allowedEmails == null || value.allowedEmails.length > 0, {
+  path: ['allowedEmails'],
+  message: 'Для персонального промокода укажите хотя бы одного пользователя',
 })
 
 const adminBonusBoxPrizeBaseSchema = z.object({

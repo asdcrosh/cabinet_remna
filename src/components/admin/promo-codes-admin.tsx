@@ -9,10 +9,14 @@ import { toast } from '@/components/ui/toaster'
 import { cn } from '@/lib/cn'
 import { AdminModal } from '@/components/admin/admin-modal'
 
+type PromoAudience = 'ALL' | 'NEW_USERS' | 'NO_ACTIVE_SUBSCRIPTION' | 'PERSONAL'
+
 export interface PromoCodeAdminRow {
   id: string
   code: string
   discountPercent: number
+  audience: PromoAudience
+  allowedEmails: string[]
   isActive: boolean
   startsAt: string | null
   expiresAt: string | null
@@ -32,6 +36,8 @@ export interface PromoPlanOption {
 interface PromoCodeFormState {
   code: string
   discountPercent: string
+  audience: PromoAudience
+  allowedEmails: string
   isActive: boolean
   startsAt: string
   expiresAt: string
@@ -43,6 +49,8 @@ interface PromoCodeFormState {
 const emptyForm: PromoCodeFormState = {
   code: '',
   discountPercent: '10',
+  audience: 'ALL',
+  allowedEmails: '',
   isActive: true,
   startsAt: '',
   expiresAt: '',
@@ -78,6 +86,8 @@ export function PromoCodesAdmin({
         body: JSON.stringify({
           code: form.code,
           discountPercent: Number(form.discountPercent),
+          audience: form.audience,
+          allowedEmails: form.audience === 'PERSONAL' ? parseAllowedEmails(form.allowedEmails) : [],
           isActive: form.isActive,
           startsAt: form.startsAt ? new Date(form.startsAt).toISOString() : null,
           expiresAt: form.expiresAt ? new Date(form.expiresAt).toISOString() : null,
@@ -114,6 +124,8 @@ export function PromoCodesAdmin({
     setForm({
       code: promoCode.code,
       discountPercent: String(promoCode.discountPercent),
+      audience: promoCode.audience,
+      allowedEmails: promoCode.allowedEmails.join('\n'),
       isActive: promoCode.isActive,
       startsAt: toLocalDateTime(promoCode.startsAt),
       expiresAt: toLocalDateTime(promoCode.expiresAt),
@@ -250,6 +262,31 @@ export function PromoCodesAdmin({
                 type="datetime-local"
               />
             </Field>
+            <Field label="Кому доступен">
+              <select
+                value={form.audience}
+                onChange={(event) => setForm((current) => ({
+                  ...current,
+                  audience: event.target.value as PromoAudience,
+                  allowedEmails: event.target.value === 'PERSONAL' ? current.allowedEmails : '',
+                }))}
+                className="input min-h-11"
+              >
+                <option value="ALL">Всем пользователям</option>
+                <option value="NEW_USERS">Новым пользователям</option>
+                <option value="NO_ACTIVE_SUBSCRIPTION">Без активной подписки</option>
+                <option value="PERSONAL">Персональный список</option>
+              </select>
+            </Field>
+            <Field label="Пользователи">
+              <textarea
+                value={form.allowedEmails}
+                onChange={(event) => setForm((current) => ({ ...current, allowedEmails: event.target.value }))}
+                className="input min-h-11 resize-y"
+                placeholder="email@example.com"
+                disabled={form.audience !== 'PERSONAL'}
+              />
+            </Field>
           </div>
 
           <label className="flex min-h-11 items-center gap-3 rounded-lg border px-3 text-sm">
@@ -325,6 +362,10 @@ export function PromoCodesAdmin({
             <div className="min-w-0">
               <div className="text-[11px] font-semibold uppercase text-slate-400">Тарифы</div>
               <div className="mt-1 truncate text-sm text-slate-600 dark:text-slate-300">{promoCode.planNames.length > 0 ? promoCode.planNames.join(', ') : 'Все тарифы'}</div>
+              <div className="mt-2 text-[11px] font-semibold uppercase text-slate-400">Доступ</div>
+              <div className="mt-1 truncate text-sm text-slate-600 dark:text-slate-300" title={audienceTitle(promoCode)}>
+                {audienceTitle(promoCode)}
+              </div>
             </div>
             <div className="grid grid-cols-3 gap-3 text-sm">
               <div><div className="text-[11px] uppercase text-slate-400">Использовано</div><div className="mt-1 font-medium">{promoCode.usedCount}/{promoCode.maxUses ?? '∞'}</div></div>
@@ -357,6 +398,28 @@ function promoStatus(promoCode: PromoCodeAdminRow): 'AVAILABLE' | 'USED' | 'ARCH
   if (!promoCode.isActive || expired || exhausted) return 'ARCHIVE'
   if (promoCode.usedCount > 0) return 'USED'
   return 'AVAILABLE'
+}
+
+function audienceTitle(promoCode: PromoCodeAdminRow) {
+  if (promoCode.audience === 'NEW_USERS') return 'Новые пользователи'
+  if (promoCode.audience === 'NO_ACTIVE_SUBSCRIPTION') return 'Без активной подписки'
+  if (promoCode.audience === 'PERSONAL') {
+    return promoCode.allowedEmails.length > 0
+      ? `Персональный: ${promoCode.allowedEmails.join(', ')}`
+      : 'Персональный список'
+  }
+  return 'Все пользователи'
+}
+
+function parseAllowedEmails(value: string) {
+  return Array.from(
+    new Set(
+      value
+        .split(/[\s,;]+/)
+        .map((email) => email.trim().toLowerCase())
+        .filter(Boolean)
+    )
+  )
 }
 
 function Field({ label, children }: { label: string; children: ReactNode }) {

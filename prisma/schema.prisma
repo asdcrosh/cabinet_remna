@@ -377,6 +377,8 @@ model PromoCode {
   id                 String   @id @default(cuid())
   code               String   @unique
   discountPercent    Int
+  audience           PromoCodeAudience @default(ALL)
+  allowedEmails      String[] @default([])
   isActive           Boolean  @default(true)
   startsAt           DateTime?
   expiresAt          DateTime?
@@ -391,6 +393,14 @@ model PromoCode {
   bonusBoxOpenings   BonusBoxOpening[]
 
   @@index([isActive, startsAt, expiresAt])
+  @@index([audience])
+}
+
+enum PromoCodeAudience {
+  ALL
+  NEW_USERS
+  NO_ACTIVE_SUBSCRIPTION
+  PERSONAL
 }
 
 model PromoCodePlan {

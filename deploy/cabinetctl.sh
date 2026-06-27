@@ -106,27 +106,37 @@ compose_image() {
   printf '%s\n' "${image}"
 }
 
-local_image_digest() {
+local_image_digests() {
   local image="$1"
   docker image inspect "${image}" --format '{{range .RepoDigests}}{{println .}}{{end}}' 2>/dev/null \
-    | awk -F@ '/sha256:/ { print $2; exit }'
+    | awk -F@ '/sha256:/ { print $2 }' \
+    | sort -u
 }
 
-remote_image_digest() {
+remote_image_digests() {
   local image="$1"
-  if command -v timeout >/dev/null 2>&1; then
-    timeout 8s docker buildx imagetools inspect "${image}" --format '{{.Manifest.Digest}}' 2>/dev/null \
-      | awk '/^sha256:/ { print; exit }'
-    return
-  fi
-  docker buildx imagetools inspect "${image}" --format '{{.Manifest.Digest}}' 2>/dev/null \
-    | awk '/^sha256:/ { print; exit }'
+  {
+    if command -v timeout >/dev/null 2>&1; then
+      timeout 8s docker buildx imagetools inspect "${image}" --format '{{.Manifest.Digest}}' 2>/dev/null || true
+    else
+      docker buildx imagetools inspect "${image}" --format '{{.Manifest.Digest}}' 2>/dev/null || true
+    fi
+    docker manifest inspect "${image}" 2>/dev/null \
+      | awk -F'"' '/"digest": "sha256:/ { print $4 }' || true
+  } | awk '/^sha256:/ { print }' | sort -u
 }
 
-remote_platform_digest() {
-  local image="$1"
-  docker manifest inspect "${image}" 2>/dev/null \
-    | awk -F'"' '/"digest": "sha256:/ { print $4; exit }'
+digests_have_match() {
+  local local_digests="$1"
+  local remote_digests="$2"
+  local digest
+  while IFS= read -r digest; do
+    [[ -n "${digest}" ]] || continue
+    if printf '%s\n' "${remote_digests}" | grep -Fxq "${digest}"; then
+      return 0
+    fi
+  done <<< "${local_digests}"
+  return 1
 }
 
 update_status_line() {
@@ -139,23 +149,22 @@ update_status_line() {
     return
   fi
 
-  local image local_digest remote_digest
+  local image local_digests remote_digests
   image="$(compose_image)"
-  local_digest="$(local_image_digest "${image}")"
-  remote_digest="$(remote_image_digest "${image}")"
-  [[ -n "${remote_digest}" ]] || remote_digest="$(remote_platform_digest "${image}")"
+  local_digests="$(local_image_digests "${image}")"
+  remote_digests="$(remote_image_digests "${image}")"
 
-  if [[ -z "${local_digest}" ]]; then
+  if [[ -z "${local_digests}" ]]; then
     printf '  Обновление:  %s\n' "${YELLOW}локальный образ не найден${RESET}"
     return
   fi
 
-  if [[ -z "${remote_digest}" ]]; then
+  if [[ -z "${remote_digests}" ]]; then
     printf '  Обновление:  %s\n' "${GREEN}Установлена актуальная версия${RESET}"
     return
   fi
 
-  if [[ "${local_digest}" == "${remote_digest}" ]]; then
+  if digests_have_match "${local_digests}" "${remote_digests}"; then
     printf '  Обновление:  %s\n' "${GREEN}Установлена актуальная версия${RESET}"
   else
     printf '  Обновление:  %s\n' "${YELLOW}Доступно обновление${RESET}"

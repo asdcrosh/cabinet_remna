@@ -38,6 +38,8 @@ export default async function AdminPromoCodesPage({
       id: promoCode.id,
       code: promoCode.code,
       discountPercent: promoCode.discountPercent,
+      audience: promoCode.audience,
+      allowedEmails: promoCode.allowedEmails,
       isActive: promoCode.isActive,
       startsAt: promoCode.startsAt?.toISOString() ?? null,
       expiresAt: promoCode.expiresAt?.toISOString() ?? null,

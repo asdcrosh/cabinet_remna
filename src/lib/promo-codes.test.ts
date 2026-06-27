@@ -12,6 +12,12 @@ const prisma = {
   promoCodeRedemption: {
     count: vi.fn(),
   },
+  user: {
+    findUnique: vi.fn(),
+  },
+  subscription: {
+    count: vi.fn(),
+  },
 } as any
 
 const plan = {
@@ -24,6 +30,8 @@ function promoCode(overrides: Record<string, unknown> = {}) {
     id: 'promo-1',
     code: 'SALE20',
     discountPercent: 20,
+    audience: 'ALL',
+    allowedEmails: [],
     isActive: true,
     startsAt: null,
     expiresAt: null,
@@ -129,5 +137,63 @@ describe('promo code helpers', () => {
         plan,
       })
     ).rejects.toMatchObject({ code: 'PROMO_USER_LIMIT_REACHED' })
+  })
+
+  it('rejects a personal promo code for another user', async () => {
+    prisma.promoCode.findUnique.mockResolvedValue(
+      promoCode({ audience: 'PERSONAL', allowedEmails: ['vip@example.com'] })
+    )
+    prisma.user.findUnique.mockResolvedValue({
+      email: 'user@example.com',
+      remnashopUserId: null,
+      remnawaveUuid: null,
+    })
+
+    await expect(
+      validatePromoCodeForPlan({
+        prisma,
+        code: 'SALE20',
+        userId: 'user-1',
+        plan,
+      })
+    ).rejects.toMatchObject({ code: 'PROMO_USER_NOT_ALLOWED' })
+  })
+
+  it('rejects a new-user promo code for an existing user', async () => {
+    prisma.promoCode.findUnique.mockResolvedValue(promoCode({ audience: 'NEW_USERS' }))
+    prisma.user.findUnique.mockResolvedValue({
+      email: 'user@example.com',
+      remnashopUserId: null,
+      remnawaveUuid: 'rw-1',
+    })
+    prisma.subscription.count.mockResolvedValue(0)
+
+    await expect(
+      validatePromoCodeForPlan({
+        prisma,
+        code: 'SALE20',
+        userId: 'user-1',
+        plan,
+      })
+    ).rejects.toMatchObject({ code: 'PROMO_NEW_USERS_ONLY' })
+  })
+
+  it('rejects a no-active-subscription promo code for active subscribers', async () => {
+    prisma.promoCode.findUnique.mockResolvedValue(promoCode({ audience: 'NO_ACTIVE_SUBSCRIPTION' }))
+    prisma.user.findUnique.mockResolvedValue({
+      email: 'user@example.com',
+      remnashopUserId: null,
+      remnawaveUuid: null,
+    })
+    prisma.subscription.count.mockResolvedValue(1)
+
+    await expect(
+      validatePromoCodeForPlan({
+        prisma,
+        code: 'SALE20',
+        userId: 'user-1',
+        plan,
+      })
+    ).rejects.toMatchObject({ code: 'PROMO_NO_ACTIVE_SUBSCRIPTION_ONLY' })
   })
 })

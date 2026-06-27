@@ -44,12 +44,15 @@ export const POST = withAuth(async (req: Request) => {
   const data = parsed.data
   const code = normalizePromoCode(data.code)
   if (!code) return NextResponse.json({ error: 'Введите промокод' }, { status: 400 })
+  const allowedEmails = data.audience === 'PERSONAL' ? normalizeAllowedEmails(data.allowedEmails) : []
 
   try {
     const promoCode = await prisma.promoCode.create({
       data: {
         code,
         discountPercent: data.discountPercent,
+        audience: data.audience,
+        allowedEmails,
         isActive: data.isActive,
         startsAt: data.startsAt ? new Date(data.startsAt) : null,
         expiresAt: data.expiresAt ? new Date(data.expiresAt) : null,
@@ -69,6 +72,8 @@ export const POST = withAuth(async (req: Request) => {
         promoCodeId: promoCode.id,
         code: promoCode.code,
         discountPercent: promoCode.discountPercent,
+        audience: promoCode.audience,
+        allowedEmails,
         planIds: data.planIds,
       },
       request: req,
@@ -82,3 +87,7 @@ export const POST = withAuth(async (req: Request) => {
     throw e
   }
 })
+
+function normalizeAllowedEmails(emails: string[]) {
+  return Array.from(new Set(emails.map((email) => email.trim().toLowerCase()).filter(Boolean)))
+}
