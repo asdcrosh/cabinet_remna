@@ -1,95 +1,133 @@
-// Карточка подключения: единая ссылка подписки, QR-код и инструкции по устройствам.
+// Компактное подключение подписки: автоопределение устройства, deeplink, QR и инструкции в модалке.
 
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
 import Image from 'next/image'
-import { apiFetch } from '@/lib/api-client'
-import { toast } from '@/components/ui/toaster'
 import {
   Apple,
-  Check,
-  ChevronRight,
+  CheckCircle2,
   Copy,
-  Download,
   ExternalLink,
+  HelpCircle,
   Laptop,
-  Link2,
   Monitor,
   QrCode,
   RefreshCw,
+  ShieldCheck,
   Smartphone,
+  X,
 } from 'lucide-react'
+import { apiFetch } from '@/lib/api-client'
+import { cn } from '@/lib/cn'
+import { useBodyScrollLock } from '@/lib/use-body-scroll-lock'
+import { toast } from '@/components/ui/toaster'
 import { ConfirmDialog } from './confirm-dialog'
 
-type Platform = 'ios' | 'android' | 'macos' | 'windows'
+type Device = 'ios' | 'android' | 'macos' | 'windows' | 'desktop'
+type AppId = 'happ' | 'v2ray' | 'rabbit-hole'
 
 interface KeysCardProps {
   subscriptionUrl: string
 }
 
-const platformCards: Array<{
-  id: Platform
-  title: string
-  label: string
-  app: string
+interface AppOption {
+  id: AppId
+  name: string
+  subtitle: string
+  devices: Device[]
+  primaryDevices: Device[]
   icon: typeof Smartphone
+  deepLinks: (subscriptionUrl: string) => string[]
+  installUrl: string
   steps: string[]
-}> = [
+}
+
+const appOptions: AppOption[] = [
   {
-    id: 'ios',
-    title: 'iPhone / iPad',
-    label: 'iOS',
-    app: 'Happ',
-    icon: Apple,
-    steps: ['Установите Happ', 'Нажмите “Подключить” или отсканируйте QR', 'Разрешите добавление подписки'],
+    id: 'happ',
+    name: 'HAPP',
+    subtitle: 'Рекомендуемый вариант',
+    devices: ['ios', 'android', 'macos', 'windows', 'desktop'],
+    primaryDevices: ['ios', 'android', 'desktop'],
+    icon: ShieldCheck,
+    deepLinks: (url) => [
+      `happ://install-sub?url=${encodeURIComponent(url)}`,
+      `happ://add/${encodeURIComponent(url)}`,
+    ],
+    installUrl: 'https://happ.su',
+    steps: [
+      'Установите HAPP на устройство.',
+      'Нажмите “Подключить” или отсканируйте QR-код.',
+      'Подтвердите добавление подписки в приложении.',
+    ],
   },
   {
-    id: 'android',
-    title: 'Android',
-    label: 'Android',
-    app: 'Hiddify или v2rayNG',
+    id: 'v2ray',
+    name: 'V2Ray',
+    subtitle: 'Android / Windows',
+    devices: ['android', 'windows', 'desktop'],
+    primaryDevices: ['android', 'windows'],
     icon: Smartphone,
-    steps: ['Установите приложение', 'Нажмите “Подключить” или вставьте ссылку', 'Обновите список серверов'],
+    deepLinks: (url) => [
+      `v2rayng://install-sub?url=${encodeURIComponent(url)}`,
+      `v2rayn://install-sub?url=${encodeURIComponent(url)}`,
+      `v2rayng://install-config?url=${encodeURIComponent(url)}`,
+    ],
+    installUrl: 'https://github.com/2dust/v2rayNG/releases',
+    steps: [
+      'Установите V2Ray-клиент для вашей системы.',
+      'Нажмите “Подключить” или скопируйте ссылку подписки.',
+      'Если приложение попросит тип импорта, выберите подписку по URL.',
+    ],
   },
   {
-    id: 'windows',
-    title: 'Windows',
-    label: 'Windows',
-    app: 'Hiddify Desktop',
-    icon: Monitor,
-    steps: ['Откройте Hiddify Desktop', 'Скопируйте ссылку подписки', 'Добавьте профиль через Import from URL'],
-  },
-  {
-    id: 'macos',
-    title: 'macOS',
-    label: 'macOS',
-    app: 'Hiddify Desktop',
-    icon: Laptop,
-    steps: ['Откройте Hiddify Desktop', 'Нажмите “Подключить” или вставьте ссылку', 'Выберите сервер и включите VPN'],
+    id: 'rabbit-hole',
+    name: 'Rabbit Hole',
+    subtitle: 'Apple-устройства',
+    devices: ['ios', 'macos'],
+    primaryDevices: ['macos'],
+    icon: Apple,
+    deepLinks: (url) => [
+      `rabbithole://import?url=${encodeURIComponent(url)}`,
+      `rabbit-hole://import?url=${encodeURIComponent(url)}`,
+    ],
+    installUrl: 'https://apps.apple.com/search?term=Rabbit%20Hole%20VPN',
+    steps: [
+      'Установите Rabbit Hole из App Store.',
+      'Нажмите “Подключить” или отсканируйте QR-код.',
+      'После импорта выберите профиль и включите VPN.',
+    ],
   },
 ]
 
 export function KeysCard({ subscriptionUrl }: KeysCardProps) {
-  const [revoking, setRevoking] = useState(false)
+  const [device, setDevice] = useState<Device>('desktop')
+  const [selectedAppId, setSelectedAppId] = useState<AppId>('happ')
+  const [instructionsOpen, setInstructionsOpen] = useState(false)
+  const [qrOpen, setQrOpen] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
-  const [detectedPlatform, setDetectedPlatform] = useState<Platform>('ios')
-  const [selectedPlatform, setSelectedPlatform] = useState<Platform>('ios')
+  const [revoking, setRevoking] = useState(false)
 
   useEffect(() => {
-    const platform = detectPlatform(navigator.userAgent)
-    setDetectedPlatform(platform)
-    setSelectedPlatform(platform)
+    const detected = detectDevice(navigator.userAgent)
+    setDevice(detected)
+    setSelectedAppId(recommendedAppForDevice(detected).id)
   }, [])
 
-  const selected = platformCards.find((item) => item.id === selectedPlatform) ?? platformCards[0]
-  const appLinks = useMemo(() => buildAppLinks(subscriptionUrl), [subscriptionUrl])
-  const canOpenDirectly = Boolean(subscriptionUrl)
+  const availableApps = useMemo(() => {
+    const filtered = appOptions.filter((option) => option.devices.includes(device))
+    return filtered.length > 0 ? filtered : appOptions
+  }, [device])
 
-  async function copy(text: string, label: string) {
+  const selectedApp = appOptions.find((option) => option.id === selectedAppId) ?? appOptions[0]
+  const primaryLink = selectedApp.deepLinks(subscriptionUrl)[0] || subscriptionUrl
+
+  async function copy(text: string, label = 'Ссылка') {
+    if (!text) return
     try {
       await navigator.clipboard.writeText(text)
-      toast(`${label} скопировано`, 'success')
+      toast(`${label} скопирована`, 'success')
     } catch {
       toast('Не удалось скопировать')
     }
@@ -97,8 +135,9 @@ export function KeysCard({ subscriptionUrl }: KeysCardProps) {
 
   function openInApp() {
     if (!subscriptionUrl) return
-    toast('Открываем приложение. Если оно не открылось, скопируйте ссылку.', 'success')
-    window.location.href = selectedPlatform === 'ios' ? appLinks.happ : appLinks.hiddify
+    void copy(subscriptionUrl, 'Ссылка подписки')
+    toast(`Открываем ${selectedApp.name}. Ссылка уже скопирована на случай ручного импорта.`, 'success')
+    window.location.href = primaryLink
   }
 
   async function revoke() {
@@ -108,203 +147,155 @@ export function KeysCard({ subscriptionUrl }: KeysCardProps) {
       toast('Ссылка обновлена', 'success')
       setTimeout(() => window.location.reload(), 800)
     } catch {
-      // toaster покажет ошибку
+      // apiFetch already shows a toast.
     } finally {
       setRevoking(false)
     }
   }
 
   return (
-    <section className="card overflow-hidden p-0">
-      <div className="border-b border-slate-100 bg-white dark:border-white/10 dark:bg-surface-900">
-        <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
-          <div>
-            <h2 className="flex items-center gap-2 text-lg font-semibold">
-              <span className="grid h-9 w-9 place-items-center rounded-lg bg-cyan-50 text-cyan-700 dark:bg-cyan-500/10 dark:text-cyan-200">
-                <Link2 className="h-5 w-5" />
-              </span>
-              Подключение устройства
-            </h2>
-            <p className="mt-1 text-sm text-slate-500">Выберите устройство, откройте приложение или отсканируйте QR.</p>
+    <section className="rounded-lg border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-surface-900">
+      <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_18rem]">
+        <div className="min-w-0 p-4 sm:p-5">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0">
+              <div className="inline-flex items-center gap-2 rounded-full bg-cyan-50 px-3 py-1 text-xs font-semibold text-cyan-700 dark:bg-cyan-500/10 dark:text-cyan-200">
+                <DeviceIcon device={device} />
+                {deviceLabel(device)} определено автоматически
+              </div>
+              <h2 className="mt-3 text-xl font-semibold tracking-tight">Подключение</h2>
+              <p className="mt-1 max-w-xl text-sm leading-6 text-slate-500">
+                Выберите приложение, нажмите подключить или используйте QR-код.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setConfirmOpen(true)}
+              disabled={revoking}
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-60 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-200 dark:hover:bg-white/[0.06] sm:shrink-0"
+            >
+              <RefreshCw className="h-4 w-4" />
+              {revoking ? 'Обновляем' : 'Обновить ссылку'}
+            </button>
           </div>
-          <button
-            onClick={() => setConfirmOpen(true)}
-            disabled={revoking}
-            className="btn-secondary min-h-10 text-sm text-red-600 sm:shrink-0"
-          >
-            <RefreshCw className="h-4 w-4" />
-            {revoking ? 'Обновляем...' : 'Обновить ссылку'}
-          </button>
-        </div>
-      </div>
 
-      <div className="grid gap-0 xl:grid-cols-[minmax(0,1fr)_21rem]">
-        <div className="space-y-5 p-4 sm:p-5">
-          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-            {platformCards.map((platform) => {
-              const Icon = platform.icon
-              const active = platform.id === selectedPlatform
-              const detected = platform.id === detectedPlatform
+          <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
+            {availableApps.map((option) => {
+              const active = option.id === selectedApp.id
+              const Icon = option.icon
               return (
                 <button
-                  key={platform.id}
+                  key={option.id}
                   type="button"
-                  onClick={() => setSelectedPlatform(platform.id)}
-                  className={`rounded-lg border p-3 text-left transition ${
+                  onClick={() => setSelectedAppId(option.id)}
+                  className={cn(
+                    'flex min-h-20 items-center gap-3 rounded-lg border p-3 text-left transition',
                     active
-                      ? 'border-slate-950 bg-slate-950 text-white shadow-lg shadow-slate-950/15 dark:border-cyan-300 dark:bg-cyan-300 dark:text-slate-950'
-                      : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50 dark:border-white/10 dark:bg-white/[0.03] dark:hover:bg-white/[0.06]'
-                  }`}
+                      ? 'border-slate-950 bg-slate-950 text-white shadow-sm dark:border-cyan-300 dark:bg-cyan-300 dark:text-slate-950'
+                      : 'border-slate-200 bg-slate-50/70 hover:border-slate-300 hover:bg-white dark:border-white/10 dark:bg-white/[0.03] dark:hover:bg-white/[0.06]'
+                  )}
                 >
-                  <div className="flex items-center justify-between gap-3">
-                    <Icon className="h-5 w-5" />
-                    {detected && (
-                      <span
-                        className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
-                          active
-                            ? 'bg-white/15 text-current dark:bg-slate-950/10'
-                            : 'bg-cyan-50 text-cyan-700 dark:bg-cyan-500/10 dark:text-cyan-200'
-                        }`}
-                      >
-                        ваше
-                      </span>
+                  <span
+                    className={cn(
+                      'grid h-10 w-10 shrink-0 place-items-center rounded-lg',
+                      active ? 'bg-white/15' : 'bg-white text-cyan-700 shadow-sm dark:bg-white/10 dark:text-cyan-200'
                     )}
-                  </div>
-                  <div className="mt-3 font-semibold">{platform.label}</div>
-                  <div className={`mt-1 text-xs ${active ? 'text-current/70' : 'text-slate-500'}`}>{platform.app}</div>
+                  >
+                    <Icon className="h-5 w-5" />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-semibold">{option.name}</span>
+                    <span className={cn('mt-0.5 block truncate text-xs', active ? 'text-white/70 dark:text-slate-950/65' : 'text-slate-500')}>
+                      {option.subtitle}
+                    </span>
+                  </span>
                 </button>
               )
             })}
           </div>
 
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
-            <div className="rounded-lg border border-slate-200 bg-slate-50/80 p-4 dark:border-white/10 dark:bg-white/[0.03]">
-              <div className="text-xs font-semibold uppercase text-slate-400">Рекомендуемый способ</div>
-              <h3 className="mt-2 text-2xl font-semibold">{selected.title}</h3>
-              <p className="mt-2 text-sm leading-6 text-slate-500">
-                Для этого устройства лучше использовать {selected.app}. Если кнопка не откроет приложение, используйте QR или ссылку.
-              </p>
-
-              <div className="mt-5 grid gap-2">
-                <button
-                  type="button"
-                  onClick={openInApp}
-                  disabled={!canOpenDirectly}
-                  className="btn-primary min-h-11 w-full justify-center"
-                >
-                  <ExternalLink className="h-4 w-4" />
-                  Подключить
-                </button>
-                <button
-                  type="button"
-                  onClick={() => copy(subscriptionUrl, 'Ссылка подписки')}
-                  disabled={!subscriptionUrl}
-                  className="btn-secondary min-h-11 w-full justify-center"
-                >
-                  <Copy className="h-4 w-4" />
-                  Скопировать ссылку подписки
-                </button>
-              </div>
-
-              <div className="mt-4 overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-white/10 dark:bg-surface-950">
-                <div className="flex items-center gap-2 border-b border-slate-100 px-3 py-2 text-xs font-semibold text-slate-500 dark:border-white/10">
-                  <Link2 className="h-4 w-4" />
-                  Ссылка подписки
-                </div>
-                <div className="truncate px-3 py-2 font-mono text-xs text-slate-500">{subscriptionUrl || 'Ссылка пока недоступна'}</div>
-              </div>
-            </div>
-
-            <div className="rounded-lg border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-surface-900">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <div className="text-xs font-semibold uppercase text-slate-400">Инструкция</div>
-                  <h3 className="mt-1 text-lg font-semibold">{selected.title}</h3>
-                </div>
-                <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-200">
-                  3 шага
-                </span>
-              </div>
-
-              <div className="mt-4 space-y-3">
-                {selected.steps.map((step, index) => (
-                  <div key={step} className="flex gap-3 rounded-lg bg-slate-50 p-3 dark:bg-white/[0.03]">
-                    <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-white text-sm font-bold text-cyan-700 shadow-sm dark:bg-white/10 dark:text-cyan-200">
-                      {index + 1}
-                    </div>
-                    <div className="min-w-0">
-                      <div className="text-sm font-medium">{step}</div>
-                      {index === 1 && (
-                        <div className="mt-1 text-xs leading-5 text-slate-500">
-                          На телефоне удобнее QR, на компьютере быстрее скопировать ссылку.
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="mt-4 rounded-lg border border-cyan-100 bg-cyan-50/70 p-3 text-sm text-cyan-950 dark:border-cyan-400/20 dark:bg-cyan-400/10 dark:text-cyan-100">
-                <div className="flex gap-2">
-                  <Check className="mt-0.5 h-4 w-4 shrink-0" />
-                  <span>После добавления подписки выберите любой доступный сервер и включите VPN.</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <aside className="border-t border-slate-100 bg-slate-50/70 p-4 dark:border-white/10 dark:bg-white/[0.025] sm:p-5 xl:border-l xl:border-t-0">
-          <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm dark:border-white/10 dark:bg-surface-900">
-            {subscriptionUrl ? (
-              <Image
-                src={`/api/qr?text=${encodeURIComponent(subscriptionUrl)}`}
-                alt="QR-код подписки"
-                width={300}
-                height={300}
-                className="mx-auto h-auto w-full max-w-[260px]"
-                unoptimized
-              />
-            ) : (
-              <div className="grid aspect-square place-items-center rounded-lg border border-dashed text-center text-sm text-slate-400">
-                QR появится после выдачи подписки
-              </div>
-            )}
-          </div>
-
-          <div className="mt-3 grid grid-cols-2 gap-2">
+          <div className="mt-4 grid gap-2 sm:grid-cols-[1fr_auto_auto]">
+            <button
+              type="button"
+              onClick={openInApp}
+              disabled={!subscriptionUrl}
+              className="inline-flex h-12 items-center justify-center gap-2 rounded-lg bg-slate-950 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200"
+            >
+              <ExternalLink className="h-4 w-4" />
+              Подключить в {selectedApp.name}
+            </button>
             <button
               type="button"
               onClick={() => copy(subscriptionUrl, 'Ссылка подписки')}
               disabled={!subscriptionUrl}
-              className="btn-secondary min-h-10 justify-center px-3 text-xs"
+              className="inline-flex h-12 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-200 dark:hover:bg-white/[0.06]"
             >
               <Copy className="h-4 w-4" />
-              Ссылка
+              Скопировать
             </button>
-            {subscriptionUrl && (
-              <a
-                href={`/api/qr?text=${encodeURIComponent(subscriptionUrl)}`}
-                download="vpn-subscription.png"
-                className="btn-secondary min-h-10 justify-center px-3 text-xs"
-              >
-                <Download className="h-4 w-4" />
-                QR
-              </a>
+            <button
+              type="button"
+              onClick={() => setInstructionsOpen(true)}
+              className="inline-flex h-12 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-200 dark:hover:bg-white/[0.06]"
+            >
+              <HelpCircle className="h-4 w-4" />
+              Инструкция
+            </button>
+          </div>
+
+          <div className="mt-3 flex flex-col gap-2 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between">
+            <span className="min-w-0 truncate rounded-lg bg-slate-50 px-3 py-2 font-mono dark:bg-white/[0.03]">
+              {subscriptionUrl || 'Ссылка подписки пока недоступна'}
+            </span>
+            <a
+              href={selectedApp.installUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex h-9 items-center justify-center gap-2 rounded-lg text-sm font-semibold text-cyan-700 hover:text-cyan-900 dark:text-cyan-200"
+            >
+              Скачать {selectedApp.name}
+              <ExternalLink className="h-3.5 w-3.5" />
+            </a>
+          </div>
+        </div>
+
+        <aside className="border-t border-slate-100 bg-slate-50/70 p-4 dark:border-white/10 dark:bg-white/[0.025] lg:border-l lg:border-t-0">
+          <button
+            type="button"
+            onClick={() => setQrOpen(true)}
+            className="group w-full rounded-lg border border-slate-200 bg-white p-3 text-left shadow-sm transition hover:border-cyan-200 hover:shadow-md dark:border-white/10 dark:bg-surface-900"
+          >
+            {subscriptionUrl ? (
+              <Image
+                src={`/api/qr?text=${encodeURIComponent(subscriptionUrl)}`}
+                alt="QR-код подписки"
+                width={220}
+                height={220}
+                className="mx-auto h-auto w-full max-w-[180px] rounded-md"
+                unoptimized
+              />
+            ) : (
+              <div className="grid aspect-square place-items-center rounded-md border border-dashed text-center text-sm text-slate-400">
+                QR появится после выдачи подписки
+              </div>
             )}
-          </div>
-
-          <div className="mt-4 space-y-2">
-            <QuickLink title="Happ" href={appLinks.happ} />
-            <QuickLink title="Hiddify" href={appLinks.hiddify} />
-            <QuickLink title="v2rayNG" href={appLinks.v2rayng} />
-          </div>
-
-          <div className="mt-4 rounded-lg bg-white p-3 text-xs leading-5 text-slate-500 shadow-sm dark:bg-white/[0.03]">
-            QR и ссылка ведут к одной подписке. Если вы обновите ссылку, её нужно добавить заново на всех устройствах.
-          </div>
+            <div className="mt-3 flex items-center justify-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-200">
+              <QrCode className="h-4 w-4 text-cyan-600" />
+              Открыть QR
+            </div>
+          </button>
         </aside>
       </div>
+
+      <InstructionModal
+        open={instructionsOpen}
+        app={selectedApp}
+        subscriptionUrl={subscriptionUrl}
+        onClose={() => setInstructionsOpen(false)}
+        onCopy={() => copy(subscriptionUrl, 'Ссылка подписки')}
+        onOpen={openInApp}
+      />
+      <QrModal open={qrOpen} subscriptionUrl={subscriptionUrl} onClose={() => setQrOpen(false)} />
 
       <ConfirmDialog
         open={confirmOpen}
@@ -322,32 +313,148 @@ export function KeysCard({ subscriptionUrl }: KeysCardProps) {
   )
 }
 
-function QuickLink({ title, href }: { title: string; href: string }) {
+function InstructionModal({
+  open,
+  app,
+  subscriptionUrl,
+  onClose,
+  onCopy,
+  onOpen,
+}: {
+  open: boolean
+  app: AppOption
+  subscriptionUrl: string
+  onClose: () => void
+  onCopy: () => void
+  onOpen: () => void
+}) {
+  useBodyScrollLock(open)
+  if (!open) return null
+
   return (
-    <a
-      href={href}
-      className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium transition hover:border-slate-300 hover:bg-slate-50 dark:border-white/10 dark:bg-white/[0.03] dark:hover:bg-white/[0.06]"
-    >
-      <span>{title}</span>
-      <ChevronRight className="h-4 w-4 text-slate-400" />
-    </a>
+    <div className="fixed inset-0 z-[120] grid place-items-end bg-slate-950/45 p-0 sm:place-items-center sm:p-4">
+      <div className="max-h-[92dvh] w-full overflow-hidden rounded-t-2xl bg-white shadow-2xl dark:bg-surface-950 sm:max-w-lg sm:rounded-lg">
+        <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 dark:border-white/10">
+          <div>
+            <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Инструкция</div>
+            <h3 className="text-lg font-semibold">{app.name}</h3>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="grid h-9 w-9 place-items-center rounded-lg border border-slate-200 text-slate-500 transition hover:bg-slate-50 dark:border-white/10 dark:hover:bg-white/[0.06]"
+            aria-label="Закрыть"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="max-h-[calc(92dvh-4rem)] overflow-y-auto p-4">
+          <div className="space-y-3">
+            {app.steps.map((step, index) => (
+              <div key={step} className="flex gap-3 rounded-lg bg-slate-50 p-3 dark:bg-white/[0.04]">
+                <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-white text-sm font-bold text-cyan-700 shadow-sm dark:bg-white/10 dark:text-cyan-200">
+                  {index + 1}
+                </div>
+                <div className="text-sm font-medium leading-6">{step}</div>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-4 rounded-lg border border-cyan-100 bg-cyan-50/70 p-3 text-sm leading-6 text-cyan-950 dark:border-cyan-400/20 dark:bg-cyan-400/10 dark:text-cyan-100">
+            <div className="flex gap-2">
+              <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>Если приложение не открылось автоматически, ссылка уже может быть скопирована. Добавьте её вручную как URL подписки.</span>
+            </div>
+          </div>
+
+          <div className="mt-4 grid gap-2 sm:grid-cols-2">
+            <button
+              type="button"
+              onClick={onOpen}
+              disabled={!subscriptionUrl}
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-slate-950 px-4 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-60 dark:bg-white dark:text-slate-950"
+            >
+              <ExternalLink className="h-4 w-4" />
+              Открыть {app.name}
+            </button>
+            <button
+              type="button"
+              onClick={onCopy}
+              disabled={!subscriptionUrl}
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-slate-200 px-4 text-sm font-semibold transition hover:bg-slate-50 disabled:opacity-60 dark:border-white/10 dark:hover:bg-white/[0.06]"
+            >
+              <Copy className="h-4 w-4" />
+              Скопировать
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   )
 }
 
-function detectPlatform(userAgent: string): Platform {
+function QrModal({ open, subscriptionUrl, onClose }: { open: boolean; subscriptionUrl: string; onClose: () => void }) {
+  useBodyScrollLock(open)
+  if (!open) return null
+
+  return (
+    <div className="fixed inset-0 z-[120] grid place-items-center bg-slate-950/45 p-4">
+      <div className="w-full max-w-sm rounded-lg bg-white p-4 shadow-2xl dark:bg-surface-950">
+        <div className="mb-3 flex items-center justify-between">
+          <h3 className="text-lg font-semibold">QR-код подписки</h3>
+          <button
+            type="button"
+            onClick={onClose}
+            className="grid h-9 w-9 place-items-center rounded-lg border border-slate-200 text-slate-500 transition hover:bg-slate-50 dark:border-white/10 dark:hover:bg-white/[0.06]"
+            aria-label="Закрыть"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        {subscriptionUrl ? (
+          <Image
+            src={`/api/qr?text=${encodeURIComponent(subscriptionUrl)}`}
+            alt="QR-код подписки"
+            width={320}
+            height={320}
+            className="mx-auto h-auto w-full rounded-md"
+            unoptimized
+          />
+        ) : (
+          <div className="grid aspect-square place-items-center rounded-lg border border-dashed text-center text-sm text-slate-400">
+            QR появится после выдачи подписки
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function DeviceIcon({ device }: { device: Device }) {
+  if (device === 'ios' || device === 'android') return <Smartphone className="h-3.5 w-3.5" />
+  if (device === 'macos') return <Laptop className="h-3.5 w-3.5" />
+  return <Monitor className="h-3.5 w-3.5" />
+}
+
+function detectDevice(userAgent: string): Device {
   const ua = userAgent.toLowerCase()
   if (ua.includes('android')) return 'android'
   if (ua.includes('iphone') || ua.includes('ipad') || ua.includes('ipod')) return 'ios'
   if (ua.includes('windows')) return 'windows'
   if (ua.includes('mac os') || ua.includes('macintosh')) return 'macos'
-  return 'ios'
+  return 'desktop'
 }
 
-function buildAppLinks(subscriptionUrl: string) {
-  const encoded = encodeURIComponent(subscriptionUrl)
-  return {
-    happ: `happ://install-sub?url=${encoded}`,
-    hiddify: `hiddify://install-sub?url=${encoded}`,
-    v2rayng: `v2rayng://install-config?url=${encoded}`,
-  }
+function recommendedAppForDevice(device: Device) {
+  if (device === 'android' || device === 'windows') return appOptions[1]
+  if (device === 'macos') return appOptions[2]
+  return appOptions[0]
+}
+
+function deviceLabel(device: Device) {
+  if (device === 'ios') return 'iPhone/iPad'
+  if (device === 'android') return 'Android'
+  if (device === 'macos') return 'macOS'
+  if (device === 'windows') return 'Windows'
+  return 'Устройство'
 }

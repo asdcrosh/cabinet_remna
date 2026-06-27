@@ -6,9 +6,7 @@ import { getCurrentUser } from '@/lib/auth/cookies'
 import { remnawave, RemnawaveError } from '@/lib/remnawave'
 import { KeysCard } from '@/components/dashboard/keys-card'
 import Link from 'next/link'
-import { Activity, CalendarClock, Database, Infinity, ShieldAlert } from 'lucide-react'
-import { PageHeader } from '@/components/dashboard/page-header'
-import { StatCard } from '@/components/dashboard/stat-card'
+import { CalendarClock, Database, ShieldAlert } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
 
@@ -54,10 +52,10 @@ export default async function SubscriptionPage() {
   const statusText = u.isActive ? 'Подписка активна' : 'Подписка не активна'
 
   return (
-    <div className="space-y-6">
-      <section className="relative overflow-hidden rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-surface-900 sm:p-6">
+    <div className="space-y-4">
+      <section className="relative overflow-hidden rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-surface-900 sm:p-5">
         <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-cyan-400 via-emerald-300 to-blue-500" />
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <span className={u.isActive ? 'badge-active' : 'badge-disabled'}>{statusText}</span>
@@ -65,50 +63,52 @@ export default async function SubscriptionPage() {
                 {u.username}
               </span>
             </div>
-            <h1 className="mt-3 text-2xl font-semibold tracking-tight sm:text-3xl">Подключение VPN</h1>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
-              Добавьте подписку в приложение по кнопке, QR-коду или ссылке. Одна подписка работает на всех ваших устройствах.
-            </p>
+            <h1 className="mt-3 text-2xl font-semibold tracking-tight sm:text-3xl">Подписка</h1>
           </div>
-          <div className="flex flex-col gap-2 sm:flex-row lg:shrink-0">
+          <div className="grid gap-2 sm:grid-cols-3 xl:min-w-[32rem]">
+            <CompactMetric
+              icon={<CalendarClock className="h-4 w-4" />}
+              label="До"
+              value={new Date(u.expiresAt).toLocaleDateString('ru-RU')}
+              hint={`${u.daysLeft} дн.`}
+            />
+            <CompactMetric
+              icon={<Database className="h-4 w-4" />}
+              label="Трафик"
+              value={u.trafficUsed}
+              hint={isUnlimited ? 'безлимит' : `из ${u.trafficLimit}`}
+            />
             <Link href="/dashboard/plans" className="btn-primary min-h-10 justify-center">
               Продлить
-            </Link>
-            <Link href="/dashboard/devices" className="btn-secondary min-h-10 justify-center">
-              Устройства
             </Link>
           </div>
         </div>
       </section>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <StatCard
-          label="Статус"
-          value={u.isActive ? 'Активна' : 'Отключена'}
-          hint={u.userStatus}
-          icon={<Activity className="h-5 w-5" />}
-        />
-        <StatCard
-          label="Действует до"
-          value={new Date(u.expiresAt).toLocaleDateString('ru-RU')}
-          hint={`${u.daysLeft} дн. осталось`}
-          icon={<CalendarClock className="h-5 w-5" />}
-        />
-        <StatCard
-          label="Использовано"
-          value={u.trafficUsed}
-          hint={`из ${isUnlimited ? 'безлимита' : u.trafficLimit}`}
-          icon={<Database className="h-5 w-5" />}
-        />
-        <StatCard
-          label="За всё время"
-          value={u.lifetimeTrafficUsed}
-          hint="общий трафик"
-          icon={<Infinity className="h-5 w-5" />}
-        />
-      </div>
-
       <KeysCard subscriptionUrl={data.response.subscriptionUrl} />
+    </div>
+  )
+}
+
+function CompactMetric({
+  icon,
+  label,
+  value,
+  hint,
+}: {
+  icon: React.ReactNode
+  label: string
+  value: string
+  hint: string
+}) {
+  return (
+    <div className="min-w-0 rounded-lg bg-slate-50 px-3 py-2 dark:bg-white/[0.04]">
+      <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">
+        {icon}
+        {label}
+      </div>
+      <div className="mt-1 truncate text-sm font-semibold">{value}</div>
+      <div className="truncate text-xs text-slate-500">{hint}</div>
     </div>
   )
 }
