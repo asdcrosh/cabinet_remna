@@ -3,6 +3,7 @@ import { getAppUrl } from './app-url'
 import { getBrandName } from './branding'
 import { renderActionEmail } from './email-template'
 import { prisma } from './prisma'
+import { createAdminNotification } from './admin-notifications'
 
 type NotifyUserInput = {
   userId: string
@@ -123,6 +124,18 @@ export async function notifyPaymentSucceeded(paymentId: string) {
       greetingName: payment.user.name,
     }),
   })
+
+  await createAdminNotification({
+    type: 'payment',
+    severity: 'SUCCESS',
+    dedupeKey: `admin:payment-success:${payment.id}`,
+    title: 'Оплата прошла',
+    body: `${payment.user.name || 'Пользователь'} оплатил ${amount} за ${planName}.`,
+    entityType: 'payment',
+    entityId: payment.id,
+    actionHref: '/dashboard/admin/payments',
+    actionLabel: 'Открыть платежи',
+  })
 }
 
 export async function notifyPaymentCanceled(paymentId: string, reason = 'Платёж отменён или не был завершён вовремя.') {
@@ -156,6 +169,18 @@ export async function notifyPaymentCanceled(paymentId: string, reason = 'Пла�
       greetingName: payment.user.name,
     }),
   })
+
+  await createAdminNotification({
+    type: 'payment',
+    severity: 'WARNING',
+    dedupeKey: `admin:payment-canceled:${payment.id}`,
+    title: 'Платёж не завершён',
+    body: `${payment.user.name || 'Пользователь'} не завершил оплату тарифа ${payment.plan?.name ?? 'без названия'}.`,
+    entityType: 'payment',
+    entityId: payment.id,
+    actionHref: '/dashboard/admin/payments',
+    actionLabel: 'Открыть платежи',
+  })
 }
 
 export async function notifyPaymentStuck(paymentId: string, reason = 'Платёж требует проверки.') {
@@ -185,6 +210,18 @@ export async function notifyPaymentStuck(paymentId: string, reason = 'Платё
       ctaUrl: `${getAppUrl()}/dashboard/support`,
       greetingName: payment.user.name,
     }),
+  })
+
+  await createAdminNotification({
+    type: 'payment',
+    severity: 'ERROR',
+    dedupeKey: `admin:payment-stuck:${payment.id}`,
+    title: 'Платёж требует проверки',
+    body: `${payment.plan?.name ?? 'Тариф'}: ${reason}`,
+    entityType: 'payment',
+    entityId: payment.id,
+    actionHref: '/dashboard/admin/payments',
+    actionLabel: 'Проверить',
   })
 }
 

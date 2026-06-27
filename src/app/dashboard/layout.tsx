@@ -8,6 +8,7 @@ import { maybeSyncRemnashopCatalog } from '@/lib/remnashop-sync'
 import { LogoutButton } from '@/components/dashboard/logout-button'
 import { Brand, DashboardNav, MobileDashboardNav } from '@/components/dashboard/dashboard-nav'
 import { NotificationBell } from '@/components/dashboard/notification-bell'
+import { AdminNotificationBell } from '@/components/admin/admin-notification-bell'
 import { logWarn } from '@/lib/logger'
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -51,6 +52,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
     '/dashboard/support': supportUnreadCount._sum.userUnreadCount ?? 0,
     '/dashboard/admin/support': adminSupportUnreadCount._sum.adminUnreadCount ?? 0,
   }
+  const isStaff = ['MODERATOR', 'ADMIN', 'SUPER_ADMIN'].includes(role)
 
   return (
     <div className="min-h-screen">
@@ -71,11 +73,15 @@ export default async function DashboardLayout({ children }: { children: React.Re
       </aside>
       <main className="min-w-0 lg:ml-72">
         <div className="sticky top-0 z-30 hidden items-center justify-end border-b border-white/70 bg-white/80 px-6 py-3 shadow-sm shadow-slate-200/60 backdrop-blur-xl dark:border-white/10 dark:bg-surface-950/80 dark:shadow-black/20 lg:flex">
-          <NotificationBell />
+          <div className="flex items-center gap-2">
+            {isStaff && <AdminNotificationBell />}
+            <NotificationBell />
+          </div>
         </div>
         <div className="sticky top-0 z-30 flex items-center justify-between border-b border-white/70 bg-white/80 px-4 py-3 shadow-sm shadow-slate-200/60 backdrop-blur-xl dark:border-white/10 dark:bg-surface-950/80 dark:shadow-black/20 lg:hidden">
           <Brand compact brandName={brandName} />
           <div className="flex items-center gap-2">
+            {isStaff && <AdminNotificationBell />}
             <NotificationBell />
             <MobileDashboardNav role={role} email={accountLabel} brandName={brandName} badges={navBadges} />
           </div>

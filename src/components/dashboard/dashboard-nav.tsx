@@ -43,6 +43,7 @@ const nav = [
 
 const adminNav = [
   { href: '/dashboard/admin', label: 'Обзор', icon: UserCog, exact: true },
+  { href: '/dashboard/admin/notifications', label: 'Уведомления', icon: Bell },
   { href: '/dashboard/admin/support', label: 'Поддержка', icon: MessageCircleQuestion },
   { href: '/dashboard/admin/users', label: 'Пользователи', icon: UsersRound },
   { href: '/dashboard/admin/plans', label: 'Тарифы', icon: SlidersHorizontal },

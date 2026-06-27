@@ -8,6 +8,7 @@ import {
   serializeSupportTicket,
   supportCategorySubject,
 } from '@/lib/support'
+import { createAdminNotification } from '@/lib/admin-notifications'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -78,6 +79,18 @@ export const POST = withAuth(async (req: Request) => {
       },
     })
     return created
+  })
+
+  await createAdminNotification({
+    type: 'support',
+    severity: 'INFO',
+    dedupeKey: `admin:support-ticket:${ticket.id}`,
+    title: 'Новое обращение в поддержку',
+    body: `${ticket.subject}: ${parsed.data.message.slice(0, 180)}`,
+    entityType: 'supportTicket',
+    entityId: ticket.id,
+    actionHref: '/dashboard/admin/support',
+    actionLabel: 'Открыть поддержку',
   })
 
   return NextResponse.json({

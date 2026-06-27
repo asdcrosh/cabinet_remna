@@ -11,6 +11,7 @@ import { assertSameOrigin } from '@/lib/security'
 import { createEmailVerificationToken, sendEmailVerificationLink } from '@/lib/email-verification'
 import { generateUniqueReferralCode, normalizeReferralCode } from '@/lib/referrals'
 import { registerRemnashopEmailUser } from '@/lib/remnashop-api'
+import { createAdminNotification } from '@/lib/admin-notifications'
 
 export const runtime = 'nodejs'
 
@@ -108,6 +109,18 @@ export async function POST(req: Request) {
       message: error instanceof Error ? error.message : 'unknown error',
     })
   }
+
+  await createAdminNotification({
+    type: 'registration',
+    severity: 'INFO',
+    dedupeKey: `admin:registration:${user.id}`,
+    title: 'Новая регистрация',
+    body: `${user.email}${user.name ? `, ${user.name}` : ''}`,
+    entityType: 'user',
+    entityId: user.id,
+    actionHref: '/dashboard/admin/users',
+    actionLabel: 'Открыть пользователей',
+  })
 
   return NextResponse.json(
     {

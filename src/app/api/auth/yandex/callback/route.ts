@@ -16,6 +16,7 @@ import {
   YANDEX_OAUTH_STATE_COOKIE,
   type YandexProfile,
 } from '@/lib/yandex-oauth'
+import { createAdminNotification } from '@/lib/admin-notifications'
 
 export const runtime = 'nodejs'
 
@@ -126,7 +127,7 @@ async function findOrCreateYandexUser(profile: YandexProfile) {
     ? await prisma.user.findUnique({ where: { referralCode }, select: { id: true } })
     : null
 
-  return prisma.user.create({
+  const user = await prisma.user.create({
     data: {
       email: profile.email,
       passwordHash: await hash(randomBytes(48).toString('base64url'), 12),
@@ -148,6 +149,18 @@ async function findOrCreateYandexUser(profile: YandexProfile) {
       },
     },
   })
+  await createAdminNotification({
+    type: 'registration',
+    severity: 'INFO',
+    dedupeKey: `admin:registration:${user.id}`,
+    title: 'Новая регистрация через Яндекс',
+    body: `${user.email}${user.name ? `, ${user.name}` : ''}`,
+    entityType: 'user',
+    entityId: user.id,
+    actionHref: '/dashboard/admin/users',
+    actionLabel: 'Открыть пользователей',
+  })
+  return user
 }
 
 function clearYandexCookies(response: NextResponse) {

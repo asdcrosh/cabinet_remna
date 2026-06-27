@@ -12,6 +12,7 @@ import { ensureRemnashopTelegramUser } from '@/lib/remnashop-api'
 import { logError, logInfo, logWarn } from '@/lib/logger'
 import { findCanonicalTelegramSessionUser } from '@/lib/telegram-session'
 import { mergeTechnicalTelegramAccount, TelegramAccountMergeError } from '@/lib/telegram-account-merge'
+import { createAdminNotification } from '@/lib/admin-notifications'
 
 export const runtime = 'nodejs'
 
@@ -113,6 +114,17 @@ export async function POST(req: Request) {
       logInfo('auth.telegram_miniapp.user_created', {
         userId: user.id,
         telegramId: telegram.id,
+      })
+      await createAdminNotification({
+        type: 'registration',
+        severity: 'INFO',
+        dedupeKey: `admin:registration:${user.id}`,
+        title: 'Новая Telegram-регистрация',
+        body: `${telegram.name || 'Пользователь'} вошёл через Telegram${telegram.username ? ` (@${telegram.username})` : ''}.`,
+        entityType: 'user',
+        entityId: user.id,
+        actionHref: '/dashboard/admin/users',
+        actionLabel: 'Открыть пользователей',
       })
     } else {
       user = await prisma.user.update({

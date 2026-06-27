@@ -11,6 +11,7 @@ import { checkRemnawaveProfileOnLogin } from '@/lib/remnawave-profile-check'
 import { authenticateRemnashopEmail, registerRemnashopEmailUser } from '@/lib/remnashop-api'
 import { findRemnashopUserByEmail } from '@/lib/remnashop-users'
 import { generateUniqueReferralCode } from '@/lib/referrals'
+import { createAdminNotification } from '@/lib/admin-notifications'
 
 export const runtime = 'nodejs'
 
@@ -59,6 +60,7 @@ export async function POST(req: Request) {
         if (source) {
           const telegramId = source.telegram_id ? BigInt(source.telegram_id) : null
           const passwordHash = await hash(password, 12)
+          const createdFromRemnashop = !user
           user = user
             ? await prisma.user.update({
                 where: { id: user.id },
@@ -87,6 +89,19 @@ export async function POST(req: Request) {
                   remnashopSyncedAt: new Date(),
                 },
               })
+          if (createdFromRemnashop) {
+            await createAdminNotification({
+              type: 'registration',
+              severity: 'INFO',
+              dedupeKey: `admin:registration:${user.id}`,
+              title: 'Пользователь импортирован из Remnashop',
+              body: `${user.email}${user.name ? `, ${user.name}` : ''}`,
+              entityType: 'user',
+              entityId: user.id,
+              actionHref: '/dashboard/admin/users',
+              actionLabel: 'Открыть пользователей',
+            })
+          }
           isValid = true
         }
       }
