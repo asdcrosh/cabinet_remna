@@ -202,7 +202,7 @@ update_status_line() {
   if read_update_status_cache; then
     return
   fi
-  printf '  Обновление:  %s\n' "${DIM}не проверялось · cabinetctl check-update${RESET}"
+  printf '  Обновление:  %s\n' "${DIM}не проверялось${RESET}"
 }
 
 show_update_check_result() {
@@ -222,17 +222,6 @@ show_update_check_result() {
 
 check_update_command() {
   show_update_check_result || true
-}
-
-confirm_update_when_current() {
-  require_tty || return 1
-  printf 'Обновлений образа нет. Всё равно перезапустить и обновить служебные файлы? [y/N]: ' >/dev/tty
-  local answer
-  IFS= read -r answer </dev/tty
-  case "${answer}" in
-    y|Y|yes|YES|д|Д|да|ДА) return 0 ;;
-    *) return 1 ;;
-  esac
 }
 
 download_executable() {
@@ -278,15 +267,6 @@ update_cabinet() {
     fail "Кабинет ещё не установлен. Сначала выберите установку."
     return 1
   }
-  set +e
-  show_update_check_result
-  local update_result=$?
-  set -e
-
-  if [[ "${update_result}" == "1" ]] && ! confirm_update_when_current; then
-    return 0
-  fi
-
   info "Обновляем кабинет..."
   curl -fsSL "${UPDATE_URL}" | bash
   write_update_status_cache latest
@@ -452,10 +432,11 @@ show_menu() {
   if cabinet_installed; then
     printf '%s\n' \
       "  1. Обновить систему" \
-      "  2. Настроить .env" \
-      "  3. Здоровье системы" \
-      "  4. Логи" \
-      "  5. Бэкапы" \
+      "  2. Проверить обновление" \
+      "  3. Настроить .env" \
+      "  4. Здоровье системы" \
+      "  5. Логи" \
+      "  6. Бэкапы" \
       "  0. Выход"
   else
     printf '%s\n' \
@@ -481,10 +462,11 @@ run_menu() {
     if cabinet_installed; then
       case "${choice}" in
         1) update_cabinet || true; pause ;;
-        2) edit_env || true; pause ;;
-        3) health_check || true; pause ;;
-        4) logs_menu || true; pause ;;
-        5) backup_menu || true; pause ;;
+        2) check_update_command || true; pause ;;
+        3) edit_env || true; pause ;;
+        4) health_check || true; pause ;;
+        5) logs_menu || true; pause ;;
+        6) backup_menu || true; pause ;;
         0) exit 0 ;;
         *) warn "Неизвестный пункт."; pause ;;
       esac
