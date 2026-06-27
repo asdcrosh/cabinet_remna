@@ -51,11 +51,11 @@ const appOptions: AppOption[] = [
     devices: ['ios', 'android', 'macos', 'windows', 'desktop'],
     primaryDevices: ['ios', 'android', 'desktop'],
     icon: ShieldCheck,
-    deepLinks: () => ['happ://'],
+    deepLinks: () => [],
     installUrl: 'https://happ.su',
     steps: [
       'Установите HAPP на устройство.',
-      'Нажмите “Открыть HAPP”: ссылка подписки скопируется автоматически.',
+      'Нажмите “Скопировать для HAPP”: ссылка подписки скопируется автоматически.',
       'В HAPP нажмите “Буфер обмена” и подтвердите добавление подписки.',
     ],
   },
@@ -135,6 +135,8 @@ export function KeysCard({ subscriptionUrl }: KeysCardProps) {
     void copy(subscriptionUrl, 'Ссылка подписки')
     if (selectedApp.id === 'happ') {
       toast('Ссылка скопирована. В HAPP нажмите “Буфер обмена”.', 'success')
+      setInstructionsOpen(true)
+      return
     } else {
       toast(`Открываем ${selectedApp.name}. Ссылка уже скопирована на случай ручного импорта.`, 'success')
     }
@@ -223,7 +225,7 @@ export function KeysCard({ subscriptionUrl }: KeysCardProps) {
               className="inline-flex h-12 items-center justify-center gap-2 rounded-lg bg-slate-950 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200"
             >
               <ExternalLink className="h-4 w-4" />
-              {selectedApp.id === 'happ' ? 'Открыть HAPP' : `Подключить в ${selectedApp.name}`}
+              {selectedApp.id === 'happ' ? 'Скопировать для HAPP' : `Подключить в ${selectedApp.name}`}
             </button>
             <button
               type="button"
@@ -376,7 +378,7 @@ function InstructionModal({
               className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-slate-950 px-4 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-60 dark:bg-white dark:text-slate-950"
             >
               <ExternalLink className="h-4 w-4" />
-              {app.id === 'happ' ? 'Открыть HAPP' : `Открыть ${app.name}`}
+              {app.id === 'happ' ? 'Скопировать для HAPP' : `Открыть ${app.name}`}
             </button>
             <button
               type="button"
