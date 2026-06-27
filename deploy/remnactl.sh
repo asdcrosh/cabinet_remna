@@ -99,6 +99,53 @@ env_value() {
   ' "${CABINET_ENV}" 2>/dev/null || true
 }
 
+compose_image() {
+  local image
+  image="$(env_value CABINET_IMAGE)"
+  [[ -n "${image}" ]] || image="ghcr.io/asdcrosh/cabinet_remna:latest"
+  printf '%s\n' "${image}"
+}
+
+local_image_digest() {
+  local image="$1"
+  docker image inspect "${image}" --format '{{range .RepoDigests}}{{println .}}{{end}}' 2>/dev/null \
+    | awk -F@ '/sha256:/ { print $2; exit }'
+}
+
+remote_image_digest() {
+  local image="$1"
+  command -v timeout >/dev/null 2>&1 || return 1
+  timeout 8s docker buildx imagetools inspect "${image}" --format '{{.Manifest.Digest}}' 2>/dev/null \
+    | awk '/^sha256:/ { print; exit }'
+}
+
+update_status_line() {
+  if ! cabinet_installed; then
+    printf '  Обновление:  %s\n' "${DIM}доступно после установки${RESET}"
+    return
+  fi
+  if ! docker_available; then
+    printf '  Обновление:  %s\n' "${YELLOW}Docker недоступен${RESET}"
+    return
+  fi
+
+  local image local_digest remote_digest
+  image="$(compose_image)"
+  local_digest="$(local_image_digest "${image}")"
+  remote_digest="$(remote_image_digest "${image}")"
+
+  if [[ -z "${local_digest}" || -z "${remote_digest}" ]]; then
+    printf '  Обновление:  %s\n' "${YELLOW}не удалось проверить${RESET}"
+    return
+  fi
+
+  if [[ "${local_digest}" == "${remote_digest}" ]]; then
+    printf '  Обновление:  %s\n' "${GREEN}нет, установлена свежая версия${RESET}"
+  else
+    printf '  Обновление:  %s\n' "${YELLOW}есть новая версия${RESET}"
+  fi
+}
+
 download_executable() {
   local url="$1"
   local destination="$2"
@@ -300,6 +347,8 @@ show_header() {
   clear 2>/dev/null || true
   printf '%s\n' "${BOLD}${CYAN}Remna Control${RESET} ${DIM}v${VERSION}${RESET}"
   printf '%s\n\n' "${DIM}Установка, обновление и перенос VPN-сервисов${RESET}"
+  update_status_line
+  printf '\n'
   show_status
   printf '\n'
 }

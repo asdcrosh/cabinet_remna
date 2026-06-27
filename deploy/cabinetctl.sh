@@ -65,6 +65,49 @@ for line in Path(os.environ["ENV_FILE_PATH"]).read_text().splitlines():
 PY
 }
 
+compose_image() {
+  local image
+  image="$(env_value CABINET_IMAGE)"
+  [[ -n "${image}" ]] || image="ghcr.io/asdcrosh/cabinet_remna:latest"
+  printf '%s\n' "${image}"
+}
+
+local_image_digest() {
+  local image="$1"
+  docker image inspect "${image}" --format '{{range .RepoDigests}}{{println .}}{{end}}' 2>/dev/null \
+    | awk -F@ '/sha256:/ { print $2; exit }'
+}
+
+remote_image_digest() {
+  local image="$1"
+  command -v timeout >/dev/null 2>&1 || return 1
+  timeout 8s docker buildx imagetools inspect "${image}" --format '{{.Manifest.Digest}}' 2>/dev/null \
+    | awk '/^sha256:/ { print; exit }'
+}
+
+update_status_line() {
+  if ! command -v docker >/dev/null 2>&1 || ! docker compose version >/dev/null 2>&1; then
+    printf 'Обновление: %s\n' "${YELLOW}Docker недоступен${RESET}"
+    return
+  fi
+
+  local image local_digest remote_digest
+  image="$(compose_image)"
+  local_digest="$(local_image_digest "${image}")"
+  remote_digest="$(remote_image_digest "${image}")"
+
+  if [[ -z "${local_digest}" || -z "${remote_digest}" ]]; then
+    printf 'Обновление: %s\n' "${YELLOW}не удалось проверить${RESET}"
+    return
+  fi
+
+  if [[ "${local_digest}" == "${remote_digest}" ]]; then
+    printf 'Обновление: %s\n' "${GREEN}нет, установлена свежая версия${RESET}"
+  else
+    printf 'Обновление: %s\n' "${YELLOW}есть новая версия${RESET}"
+  fi
+}
+
 update_cabinet() {
   echo "${CYAN}Обновляем кабинет...${RESET}"
   curl -fsSL "${UPDATE_URL}" | bash
@@ -200,6 +243,7 @@ show_menu() {
   clear 2>/dev/null || true
   title
   printf '%s\n' "Установка: ${INSTALL_DIR}"
+  update_status_line
   printf '\n'
   printf '%s\n' \
     "  1. Обновить систему" \
