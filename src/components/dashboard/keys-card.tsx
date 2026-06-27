@@ -55,7 +55,7 @@ interface AppOption {
   deepLinks: (subscriptionUrl: string) => string[]
   installUrl: string
   steps: string[]
-  copyOnly?: boolean
+  getOpenLinks?: (input: { subscriptionUrl: string; happLink?: string | null }) => string[]
 }
 
 const appOptions: AppOption[] = [
@@ -67,13 +67,13 @@ const appOptions: AppOption[] = [
     primaryDevices: ['ios', 'android', 'desktop'],
     icon: ShieldCheck,
     deepLinks: () => [],
+    getOpenLinks: ({ subscriptionUrl, happLink }) => buildHappLinks(subscriptionUrl, happLink),
     installUrl: 'https://happ.su',
     steps: [
       'Установите HAPP на устройство.',
       'Нажмите “Подключить в HAPP”. Если приложение не открылось, используйте кнопку копирования.',
       'При ручном добавлении в HAPP нажмите “Буфер обмена” и подтвердите подписку.',
     ],
-    copyOnly: true,
   },
   {
     id: 'v2ray',
@@ -128,13 +128,12 @@ export function KeysCard({ subscriptionUrl, happLink }: KeysCardProps) {
     setSelectedAppId(recommendedAppForDevice(detected).id)
   }, [])
 
-  const availableApps = useMemo(() => {
-    const filtered = appOptions.filter((option) => option.devices.includes(device))
-    return filtered.length > 0 ? filtered : appOptions
-  }, [device])
+  const availableApps = useMemo(() => orderAppsForDevice(device), [device])
 
   const selectedApp = appOptions.find((option) => option.id === selectedAppId) ?? appOptions[0]
-  const selectedDeepLinks = selectedApp.id === 'happ' && happLink ? [happLink] : selectedApp.deepLinks(subscriptionUrl)
+  const selectedDeepLinks = selectedApp.getOpenLinks
+    ? selectedApp.getOpenLinks({ subscriptionUrl, happLink })
+    : selectedApp.deepLinks(subscriptionUrl)
   const primaryLink = selectedDeepLinks[0]
 
   async function copy(text: string, label = 'Ссылка') {
@@ -150,14 +149,14 @@ export function KeysCard({ subscriptionUrl, happLink }: KeysCardProps) {
   function openInApp() {
     if (!subscriptionUrl) return
 
-    if (!primaryLink || (selectedApp.id === 'happ' && selectedApp.copyOnly && !happLink)) {
+    if (!primaryLink) {
       void copy(subscriptionUrl, 'Ссылка подписки')
-      toast('Ссылка скопирована. В HAPP нажмите “Буфер обмена”.', 'success')
+      toast('Ссылка скопирована. Добавьте её в приложение вручную.', 'success')
       setInstructionsOpen(true)
       return
     }
 
-    openExternal(primaryLink)
+    openExternal(primaryLink, selectedDeepLinks.slice(1))
     toast(`Открываем ${selectedApp.name}. Если приложение не открылось, скопируйте ссылку вручную.`, 'success')
     window.setTimeout(() => {
       void navigator.clipboard?.writeText(subscriptionUrl).catch(() => undefined)
@@ -246,7 +245,7 @@ export function KeysCard({ subscriptionUrl, happLink }: KeysCardProps) {
               className="inline-flex h-12 items-center justify-center gap-2 rounded-lg bg-slate-950 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200"
             >
               <ExternalLink className="h-4 w-4" />
-              {selectedApp.id === 'happ' && !happLink ? 'Скопировать для HAPP' : `Подключить в ${selectedApp.name}`}
+              {`Подключить в ${selectedApp.name}`}
             </button>
             <button
               type="button"
@@ -315,7 +314,6 @@ export function KeysCard({ subscriptionUrl, happLink }: KeysCardProps) {
         open={instructionsOpen}
         app={selectedApp}
         subscriptionUrl={subscriptionUrl}
-        happLink={happLink}
         onClose={() => setInstructionsOpen(false)}
         onCopy={() => copy(subscriptionUrl, 'Ссылка подписки')}
         onOpen={openInApp}
@@ -342,7 +340,6 @@ function InstructionModal({
   open,
   app,
   subscriptionUrl,
-  happLink,
   onClose,
   onCopy,
   onOpen,
@@ -350,7 +347,6 @@ function InstructionModal({
   open: boolean
   app: AppOption
   subscriptionUrl: string
-  happLink?: string | null
   onClose: () => void
   onCopy: () => void
   onOpen: () => void
@@ -402,7 +398,7 @@ function InstructionModal({
               className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-slate-950 px-4 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-60 dark:bg-white dark:text-slate-950"
             >
               <ExternalLink className="h-4 w-4" />
-              {app.id === 'happ' && !happLink ? 'Скопировать для HAPP' : `Открыть ${app.name}`}
+              {`Открыть ${app.name}`}
             </button>
             <button
               type="button"
@@ -472,11 +468,24 @@ function detectDevice(userAgent: string): Device {
   return 'desktop'
 }
 
-function openExternal(url: string) {
+function buildHappLinks(subscriptionUrl: string, happLink?: string | null) {
+  const links = [
+    `happ://add/${subscriptionUrl}`,
+    happLink,
+  ].filter((link): link is string => Boolean(link))
+
+  return Array.from(new Set(links))
+}
+
+function openExternal(url: string, fallbackUrls: string[] = []) {
   const webApp = window.Telegram?.WebApp
   if (webApp?.openLink && /^https?:\/\//i.test(url)) {
     webApp.openLink(url, { try_instant_view: false })
     return
+  }
+
+  if (!/^https?:\/\//i.test(url)) {
+    window.location.assign(url)
   }
 
   const anchor = document.createElement('a')
@@ -486,12 +495,43 @@ function openExternal(url: string) {
   document.body.appendChild(anchor)
   anchor.click()
   anchor.remove()
+
+  fallbackUrls.forEach((fallbackUrl, index) => {
+    window.setTimeout(() => {
+      if (!/^https?:\/\//i.test(fallbackUrl)) {
+        window.location.assign(fallbackUrl)
+        return
+      }
+      const fallbackAnchor = document.createElement('a')
+      fallbackAnchor.href = fallbackUrl
+      fallbackAnchor.rel = 'noreferrer'
+      fallbackAnchor.style.display = 'none'
+      document.body.appendChild(fallbackAnchor)
+      fallbackAnchor.click()
+      fallbackAnchor.remove()
+    }, 700 + index * 700)
+  })
 }
 
 function recommendedAppForDevice(device: Device) {
   if (device === 'android' || device === 'windows') return appOptions[1]
   if (device === 'macos') return appOptions[2]
   return appOptions[0]
+}
+
+function orderAppsForDevice(device: Device) {
+  return [...appOptions].sort((a, b) => {
+    const aScore = appScore(a, device)
+    const bScore = appScore(b, device)
+    if (aScore !== bScore) return bScore - aScore
+    return appOptions.indexOf(a) - appOptions.indexOf(b)
+  })
+}
+
+function appScore(app: AppOption, device: Device) {
+  if (app.primaryDevices.includes(device)) return 2
+  if (app.devices.includes(device)) return 1
+  return 0
 }
 
 function deviceLabel(device: Device) {

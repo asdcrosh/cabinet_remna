@@ -47,6 +47,16 @@ export default async function SubscriptionPage() {
     throw e
   }
 
+  let happLink = data.response.happ?.cryptoLink
+  if (!happLink && data.response.user.shortUuid) {
+    try {
+      const publicData = await remnawave.getSubscriptionByShortUuid(data.response.user.shortUuid)
+      happLink = publicData.response.happ?.cryptoLink
+    } catch {
+      happLink = undefined
+    }
+  }
+
   const u = data.response.user
   const isUnlimited = u.trafficLimitBytes === '0'
   const statusText = u.isActive ? 'Подписка активна' : 'Подписка не активна'
@@ -85,7 +95,7 @@ export default async function SubscriptionPage() {
         </div>
       </section>
 
-      <KeysCard subscriptionUrl={data.response.subscriptionUrl} happLink={data.response.happ?.cryptoLink} />
+      <KeysCard subscriptionUrl={data.response.subscriptionUrl} happLink={happLink} />
     </div>
   )
 }
