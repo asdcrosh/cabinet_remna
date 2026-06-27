@@ -156,7 +156,7 @@ export function KeysCard({ subscriptionUrl, happLink }: KeysCardProps) {
       return
     }
 
-    openExternal(primaryLink, selectedDeepLinks.slice(1))
+    openExternal(primaryLink, selectedDeepLinks.slice(1), selectedApp.name)
     toast(`Открываем ${selectedApp.name}. Если приложение не открылось, скопируйте ссылку вручную.`, 'success')
     window.setTimeout(() => {
       void navigator.clipboard?.writeText(subscriptionUrl).catch(() => undefined)
@@ -477,10 +477,15 @@ function buildHappLinks(subscriptionUrl: string, happLink?: string | null) {
   return Array.from(new Set(links))
 }
 
-function openExternal(url: string, fallbackUrls: string[] = []) {
+function openExternal(url: string, fallbackUrls: string[] = [], appName = 'приложение') {
   const webApp = window.Telegram?.WebApp
   if (webApp?.openLink && /^https?:\/\//i.test(url)) {
     webApp.openLink(url, { try_instant_view: false })
+    return
+  }
+
+  if (webApp?.openLink && !/^https?:\/\//i.test(url)) {
+    webApp.openLink(buildOpenAppBridgeUrl(url, fallbackUrls[0], appName), { try_instant_view: false })
     return
   }
 
@@ -511,6 +516,14 @@ function openExternal(url: string, fallbackUrls: string[] = []) {
       fallbackAnchor.remove()
     }, 700 + index * 700)
   })
+}
+
+function buildOpenAppBridgeUrl(url: string, fallbackUrl: string | undefined, appName: string) {
+  const bridgeUrl = new URL('/open-app', window.location.origin)
+  bridgeUrl.searchParams.set('url', url)
+  bridgeUrl.searchParams.set('app', appName)
+  if (fallbackUrl) bridgeUrl.searchParams.set('fallback', fallbackUrl)
+  return bridgeUrl.toString()
 }
 
 function recommendedAppForDevice(device: Device) {
