@@ -288,6 +288,8 @@ if [[ -n "${APP_URL}" && -n "${HEALTHCHECK_TOKEN}" ]]; then
 fi
 
 cleanup_docker_artifacts
+mkdir -p /var/cache/remnawave-cabinet 2>/dev/null || true
+printf '%s|%s\n' "$(date +%s)" latest >/var/cache/remnawave-cabinet/update-status 2>/dev/null || true
 
 echo "Update complete."
 echo "Management menu:"

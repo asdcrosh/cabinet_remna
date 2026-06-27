@@ -870,6 +870,8 @@ CABINET_ENV_FILE="${ENV_FILE}" "${COMPOSE[@]}" up -d --remove-orphans
 
 wait_for_app_container
 bootstrap_superuser
+mkdir -p /var/cache/remnawave-cabinet 2>/dev/null || true
+printf '%s|%s\n' "$(date +%s)" latest >/var/cache/remnawave-cabinet/update-status 2>/dev/null || true
 
 echo "Deploy complete."
 echo "Management menu:"

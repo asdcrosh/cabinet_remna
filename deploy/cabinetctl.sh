@@ -14,7 +14,7 @@ BACKUP_SCRIPT_PATH="${BACKUP_SCRIPT_PATH:-/usr/local/bin/remna-backup}"
 CABINET_DIR="${INSTALL_DIR:-/opt/remnawave-cabinet}"
 CABINET_ENV="${CABINET_DIR}/.env"
 CABINET_COMPOSE="${CABINET_DIR}/docker-compose.yml"
-UPDATE_STATUS_CACHE="${CABINETCTL_UPDATE_CACHE:-/tmp/remnawave-cabinet-update-status}"
+UPDATE_STATUS_CACHE="${CABINETCTL_UPDATE_CACHE:-/var/cache/remnawave-cabinet/update-status}"
 UPDATE_STATUS_CACHE_TTL="${CABINETCTL_UPDATE_CACHE_TTL:-3600}"
 
 if [[ "$(id -u)" -ne 0 ]]; then
@@ -108,45 +108,67 @@ compose_image() {
   printf '%s\n' "${image}"
 }
 
-local_image_digests() {
+local_image_id() {
   local image="$1"
-  docker image inspect "${image}" --format '{{range .RepoDigests}}{{println .}}{{end}}' 2>/dev/null \
-    | awk -F@ '/sha256:/ { print $2 }' \
-    | sort -u
+  docker image inspect "${image}" --format '{{.Id}}' 2>/dev/null || true
 }
 
-remote_image_digests() {
-  local image="$1"
-  {
-    if command -v timeout >/dev/null 2>&1; then
-      timeout 8s docker buildx imagetools inspect "${image}" --format '{{.Manifest.Digest}}' 2>/dev/null || true
-    else
-      docker buildx imagetools inspect "${image}" --format '{{.Manifest.Digest}}' 2>/dev/null || true
-    fi
-    docker manifest inspect "${image}" 2>/dev/null \
-      | awk -F'"' '/"digest": "sha256:/ { print $4 }' || true
-  } | awk '/^sha256:/ { print }' | sort -u
+container_image_id() {
+  local container="$1"
+  docker inspect "${container}" --format '{{.Image}}' 2>/dev/null || true
 }
 
-digests_have_match() {
-  local local_digests="$1"
-  local remote_digests="$2"
-  local digest
-  while IFS= read -r digest; do
-    [[ -n "${digest}" ]] || continue
-    if printf '%s\n' "${remote_digests}" | grep -Fxq "${digest}"; then
-      return 0
-    fi
-  done <<< "${local_digests}"
-  return 1
+pull_latest_image() {
+  local image="$1"
+  if command -v timeout >/dev/null 2>&1; then
+    timeout 20s docker pull -q "${image}" >/dev/null 2>&1
+    return
+  fi
+  docker pull -q "${image}" >/dev/null 2>&1
+}
+
+check_update_status() {
+  if ! cabinet_installed; then
+    write_update_status_cache "not-installed"
+    return 2
+  fi
+  if ! docker_available; then
+    write_update_status_cache "docker-unavailable"
+    return 2
+  fi
+
+  local image running_image latest_image
+  image="$(compose_image)"
+  running_image="$(container_image_id remnawave-cabinet-app)"
+
+  if [[ -z "${running_image}" ]]; then
+    write_update_status_cache "app-not-running"
+    return 2
+  fi
+
+  if ! pull_latest_image "${image}"; then
+    write_update_status_cache "check-failed"
+    return 2
+  fi
+
+  latest_image="$(local_image_id "${image}")"
+  if [[ -n "${latest_image}" && "${running_image}" == "${latest_image}" ]]; then
+    write_update_status_cache "latest"
+    return 1
+  else
+    write_update_status_cache "available"
+    return 0
+  fi
 }
 
 print_update_status_key() {
   case "${1:-unknown}" in
-    latest) printf '  Обновление:  %s\n' "${GREEN}Установлена актуальная версия${RESET}" ;;
+    latest|current) printf '  Обновление:  %s\n' "${GREEN}Установлена актуальная версия${RESET}" ;;
     available) printf '  Обновление:  %s\n' "${YELLOW}Доступно обновление${RESET}" ;;
-    local-missing) printf '  Обновление:  %s\n' "${YELLOW}локальный образ не найден${RESET}" ;;
-    unknown) printf '  Обновление:  %s\n' "${DIM}не удалось проверить${RESET}" ;;
+    check-failed|check_failed|unknown) printf '  Обновление:  %s\n' "${YELLOW}не удалось проверить${RESET}" ;;
+    docker-unavailable|docker_unavailable) printf '  Обновление:  %s\n' "${YELLOW}Docker недоступен${RESET}" ;;
+    app-not-running|app_not_running) printf '  Обновление:  %s\n' "${YELLOW}кабинет не запущен${RESET}" ;;
+    not-installed|not_installed) printf '  Обновление:  %s\n' "${DIM}доступно после установки${RESET}" ;;
     *) return 1 ;;
   esac
 }
@@ -173,48 +195,44 @@ read_update_status_cache() {
 }
 
 update_status_line() {
-  local mode="${1:-quick}"
   if ! cabinet_installed; then
     printf '  Обновление:  %s\n' "${DIM}доступно после установки${RESET}"
     return
   fi
-  if ! docker_available; then
-    printf '  Обновление:  %s\n' "${YELLOW}Docker недоступен${RESET}"
+  if read_update_status_cache; then
     return
   fi
+  printf '  Обновление:  %s\n' "${DIM}не проверялось · cabinetctl check-update${RESET}"
+}
 
-  if [[ "${mode}" != "check" && "${CABINETCTL_CHECK_UPDATES_IN_MENU:-0}" != "1" ]]; then
-    if read_update_status_cache; then
-      return
-    fi
-    printf '  Обновление:  %s\n' "${DIM}не проверялось · cabinetctl update-check${RESET}"
-    return
-  fi
+show_update_check_result() {
+  info "Проверяем обновление..."
+  set +e
+  check_update_status
+  local result=$?
+  set -e
 
-  local image local_digests remote_digests
-  image="$(compose_image)"
-  local_digests="$(local_image_digests "${image}")"
-  remote_digests="$(remote_image_digests "${image}")"
+  case "${result}" in
+    0) warn "Доступно обновление." ;;
+    1) ok "Установлена актуальная версия." ;;
+    *) warn "Не удалось проверить обновление." ;;
+  esac
+  return "${result}"
+}
 
-  if [[ -z "${local_digests}" ]]; then
-    print_update_status_key local-missing
-    write_update_status_cache local-missing
-    return
-  fi
+check_update_command() {
+  show_update_check_result || true
+}
 
-  if [[ -z "${remote_digests}" ]]; then
-    print_update_status_key unknown
-    write_update_status_cache unknown
-    return
-  fi
-
-  if digests_have_match "${local_digests}" "${remote_digests}"; then
-    print_update_status_key latest
-    write_update_status_cache latest
-  else
-    print_update_status_key available
-    write_update_status_cache available
-  fi
+confirm_update_when_current() {
+  require_tty || return 1
+  printf 'Обновлений образа нет. Всё равно перезапустить и обновить служебные файлы? [y/N]: ' >/dev/tty
+  local answer
+  IFS= read -r answer </dev/tty
+  case "${answer}" in
+    y|Y|yes|YES|д|Д|да|ДА) return 0 ;;
+    *) return 1 ;;
+  esac
 }
 
 download_executable() {
@@ -252,6 +270,7 @@ install_cabinet() {
   ensure_docker
   info "Запускаем мастер установки кабинета..."
   curl -fsSL "${INSTALL_URL}" | bash
+  write_update_status_cache "latest"
 }
 
 update_cabinet() {
@@ -259,6 +278,15 @@ update_cabinet() {
     fail "Кабинет ещё не установлен. Сначала выберите установку."
     return 1
   }
+  set +e
+  show_update_check_result
+  local update_result=$?
+  set -e
+
+  if [[ "${update_result}" == "1" ]] && ! confirm_update_when_current; then
+    return 0
+  fi
+
   info "Обновляем кабинет..."
   curl -fsSL "${UPDATE_URL}" | bash
   write_update_status_cache latest
@@ -288,24 +316,20 @@ edit_env() {
 }
 
 show_status() {
-  printf '%s\n' "${BOLD}Состояние сервера${RESET}"
   if ! docker_available; then
-    printf '  Docker:       %s\n' "${YELLOW}не установлен${RESET}"
-    printf '  Remnawave:    неизвестно\n'
-    printf '  Remnashop:    неизвестно\n'
-    printf '  Кабинет:      не установлен\n'
+    printf '  Docker:  %s\n' "${YELLOW}не установлен${RESET}"
     return
   fi
 
-  printf '  Docker:       %s\n' "${GREEN}готов${RESET}"
-  printf '  Remnawave:    %s\n' "$(container_state remnawave)"
-  printf '  Remnashop:    %s\n' "$(container_state remnashop)"
-  printf '  Кабинет:      %s\n' "$(container_state remnawave-cabinet-app)"
-  printf '  Worker:       %s\n' "$(container_state remnawave-cabinet-worker)"
-  printf '  Nginx:        %s\n' "$(container_state remnawave-nginx)"
-  printf '\n'
-  docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}' \
-    | grep -E 'NAMES|remnawave|remnashop' || true
+  printf '  Docker:    %s\n' "${GREEN}готов${RESET}"
+  printf '  Кабинет:   app %s, worker %s, db %s\n' \
+    "$(container_state remnawave-cabinet-app)" \
+    "$(container_state remnawave-cabinet-worker)" \
+    "$(container_state remnawave-cabinet-db)"
+  printf '  Сервисы:   Remnawave %s, Remnashop %s, nginx %s\n' \
+    "$(container_state remnawave)" \
+    "$(container_state remnashop)" \
+    "$(container_state remnawave-nginx)"
 }
 
 show_logs() {
@@ -416,7 +440,7 @@ restore_backup() {
 show_header() {
   clear 2>/dev/null || true
   printf '%s\n' "${BOLD}${CYAN}Remnawave Cabinet${RESET} ${DIM}v${VERSION}${RESET}"
-  printf '%s\n\n' "${DIM}Установка, обновление и перенос VPN-сервисов${RESET}"
+  printf '%s\n\n' "${DIM}Установка и управление кабинетом${RESET}"
   update_status_line
   printf '\n'
   show_status
@@ -484,7 +508,7 @@ Remnawave Cabinet ${VERSION}
   cabinetctl                    интерактивная консоль
   cabinetctl install            установить кабинет
   cabinetctl update             обновить систему
-  cabinetctl update-check       проверить наличие обновления
+  cabinetctl check-update       проверить наличие обновления
   cabinetctl env                открыть .env
   cabinetctl health             здоровье системы
   cabinetctl logs               меню логов
@@ -504,7 +528,7 @@ case "${1:-menu}" in
   menu) run_menu ;;
   install) install_cabinet ;;
   update) update_cabinet ;;
-  update-check|check-update) update_status_line check ;;
+  update-check|check-update) check_update_command ;;
   env) edit_env ;;
   status) show_status ;;
   restart) restart_cabinet ;;
