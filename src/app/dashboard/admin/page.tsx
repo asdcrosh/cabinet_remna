@@ -1,16 +1,21 @@
 import Link from 'next/link'
 import {
   AlertTriangle,
+  BarChart3,
   CreditCard,
   Database,
   FileClock,
   LifeBuoy,
+  Percent,
   RefreshCw,
   ServerCog,
   ShieldCheck,
   SlidersHorizontal,
   Tag,
+  TrendingUp,
   Users,
+  UserPlus,
+  Wallet,
 } from 'lucide-react'
 import { prisma } from '@/lib/prisma'
 import { requireAdminPage } from '@/lib/auth/admin-page'
@@ -25,24 +30,31 @@ export default async function AdminDashboardPage() {
 
   const now = new Date()
   const soon = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
+  const todayStart = new Date(now)
+  todayStart.setHours(0, 0, 0, 0)
   const dayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000)
   const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
   const [
     usersTotal,
+    usersToday,
     usersWeek,
     activeSubscriptions,
     recoveryCount,
     paymentsAggregate,
-    paymentsDay,
+    paymentsToday,
+    paymentsWeek,
     activePromoCodes,
     activePlans,
     supportWaiting,
     expiringSoon,
     auditEvents,
+    payingUsersResult,
+    sourceRows,
   ] = await Promise.all([
     prisma.user.count(),
+    prisma.user.count({ where: { createdAt: { gte: todayStart } } }),
     prisma.user.count({ where: { createdAt: { gte: weekAgo } } }),
-    prisma.subscription.count({ where: { status: { in: ['ACTIVE', 'LIMITED'] } } }),
+    prisma.subscription.count({ where: { status: { in: ['ACTIVE', 'LIMITED'] }, expireAt: { gt: now } } }),
     prisma.payment.count({ where: { status: 'SUCCEEDED', subscriptionProvisionedAt: null } }),
     prisma.payment.aggregate({
       where: { status: 'SUCCEEDED' },
@@ -50,7 +62,24 @@ export default async function AdminDashboardPage() {
       _count: true,
     }),
     prisma.payment.aggregate({
-      where: { status: 'SUCCEEDED', createdAt: { gte: dayAgo } },
+      where: {
+        status: 'SUCCEEDED',
+        OR: [
+          { paidAt: { gte: todayStart } },
+          { paidAt: null, createdAt: { gte: todayStart } },
+        ],
+      },
+      _sum: { amountKopecks: true },
+      _count: true,
+    }),
+    prisma.payment.aggregate({
+      where: {
+        status: 'SUCCEEDED',
+        OR: [
+          { paidAt: { gte: weekAgo } },
+          { paidAt: null, createdAt: { gte: weekAgo } },
+        ],
+      },
       _sum: { amountKopecks: true },
       _count: true,
     }),
@@ -63,14 +92,148 @@ export default async function AdminDashboardPage() {
     user.role === 'SUPER_ADMIN'
       ? prisma.auditLog.count({ where: { createdAt: { gte: dayAgo } } })
       : Promise.resolve(0),
+    prisma.$queryRaw<Array<{ count: bigint }>>`
+      SELECT COUNT(DISTINCT p."userId")::bigint AS count
+      FROM "Payment" p
+      INNER JOIN "User" u ON u.id = p."userId"
+      WHERE p.status = 'SUCCEEDED' AND u.role = 'USER'
+    `,
+    prisma.$queryRaw<Array<{ source: string; count: bigint }>>`
+      WITH categorized AS (
+        SELECT
+          u.id,
+          CASE
+            WHEN u."telegramId" IS NOT NULL OR u.email LIKE 'telegram-%@pending.invalid%' THEN 'telegram'
+            WHEN EXISTS (
+              SELECT 1 FROM "OAuthAccount" oa
+              WHERE oa."userId" = u.id AND lower(oa.provider) = 'google'
+            ) THEN 'google'
+            WHEN EXISTS (
+              SELECT 1 FROM "OAuthAccount" oa
+              WHERE oa."userId" = u.id AND lower(oa.provider) = 'yandex'
+            ) THEN 'yandex'
+            ELSE 'email'
+          END AS source
+        FROM "User" u
+        WHERE u.role = 'USER'
+      )
+      SELECT source, COUNT(*)::bigint AS count
+      FROM categorized
+      GROUP BY source
+    `,
   ])
+  const customersTotal = sourceRows.reduce((sum, row) => sum + Number(row.count), 0)
+  const payingUsers = Number(payingUsersResult[0]?.count ?? 0)
+  const conversion = customersTotal > 0 ? (payingUsers / customersTotal) * 100 : 0
+  const sourceCounts = {
+    telegram: sourceCount(sourceRows, 'telegram'),
+    google: sourceCount(sourceRows, 'google'),
+    yandex: sourceCount(sourceRows, 'yandex'),
+    email: sourceCount(sourceRows, 'email'),
+  }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <header>
         <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Обзор</h1>
         <p className="mt-1 text-sm text-slate-500">Краткая сводка и быстрые переходы</p>
       </header>
+
+      <section className="space-y-3">
+        <div className="flex flex-wrap items-end justify-between gap-2">
+          <div>
+            <h2 className="text-lg font-semibold tracking-tight">Мини-аналитика</h2>
+            <p className="text-sm text-slate-500">Регистрации, платежи и источники пользователей</p>
+          </div>
+          <div className="text-xs text-slate-400">
+            Обновлено {now.toLocaleString('ru-RU', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+          </div>
+        </div>
+
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <AnalyticsCard
+            icon={<UserPlus className="h-5 w-5" />}
+            title="Регистрации"
+            value={usersToday}
+            hint="сегодня"
+            details={[
+              { label: 'За неделю', value: usersWeek },
+              { label: 'Всего', value: usersTotal },
+            ]}
+          />
+          <AnalyticsCard
+            icon={<CreditCard className="h-5 w-5" />}
+            title="Оплаты"
+            value={paymentsToday._count}
+            hint="сегодня"
+            details={[
+              { label: 'За неделю', value: paymentsWeek._count },
+              { label: 'Всего', value: paymentsAggregate._count },
+            ]}
+          />
+          <AnalyticsCard
+            icon={<Wallet className="h-5 w-5" />}
+            title="Выручка"
+            value={formatPrice(paymentsToday._sum.amountKopecks ?? 0)}
+            hint="сегодня"
+            details={[
+              { label: 'За неделю', value: formatPrice(paymentsWeek._sum.amountKopecks ?? 0) },
+              { label: 'Всего', value: formatPrice(paymentsAggregate._sum.amountKopecks ?? 0) },
+            ]}
+          />
+          <AnalyticsCard
+            icon={<Percent className="h-5 w-5" />}
+            title="Конверсия"
+            value={`${conversion.toFixed(1)}%`}
+            hint="регистрация → покупка"
+            details={[
+              { label: 'Покупателей', value: payingUsers },
+              { label: 'Клиентов', value: customersTotal },
+            ]}
+          />
+        </div>
+
+        <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,0.65fr)]">
+          <div className="rounded-lg border bg-white/80 p-4 shadow-sm dark:border-white/10 dark:bg-surface-900/80">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-sm font-semibold">Источники пользователей</div>
+                <div className="mt-0.5 text-xs text-slate-500">По текущим признакам аккаунта</div>
+              </div>
+              <BarChart3 className="h-5 w-5 text-slate-400" />
+            </div>
+            <div className="mt-4 space-y-3">
+              <SourceLine label="Telegram" value={sourceCounts.telegram} total={customersTotal} className="bg-cyan-500" />
+              <SourceLine label="Google" value={sourceCounts.google} total={customersTotal} className="bg-emerald-500" />
+              <SourceLine label="Email" value={sourceCounts.email} total={customersTotal} className="bg-slate-500" />
+              {sourceCounts.yandex > 0 && (
+                <SourceLine label="Яндекс" value={sourceCounts.yandex} total={customersTotal} className="bg-amber-500" />
+              )}
+            </div>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
+            <CompactMetric
+              icon={<ShieldCheck className="h-5 w-5" />}
+              label="Активные подписки"
+              value={activeSubscriptions}
+              hint={expiringSoon > 0 ? `${expiringSoon} истекают за 7 дней` : 'Без срочных окончаний'}
+            />
+            <CompactMetric
+              icon={<TrendingUp className="h-5 w-5" />}
+              label="Средний чек"
+              value={formatPrice(paymentsAggregate._count > 0 ? Math.round((paymentsAggregate._sum.amountKopecks ?? 0) / paymentsAggregate._count) : 0)}
+              hint="по успешным оплатам"
+            />
+          </div>
+        </div>
+      </section>
+
+      <section className="space-y-3">
+        <div>
+          <h2 className="text-lg font-semibold tracking-tight">Быстрые разделы</h2>
+          <p className="text-sm text-slate-500">Основные админские действия</p>
+        </div>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6">
         <AdminTile
@@ -103,9 +266,9 @@ export default async function AdminDashboardPage() {
         <AdminTile
           href="/dashboard/admin/payments"
           icon={<CreditCard className="h-5 w-5" />}
-          title="За 24 часа"
-          value={paymentsDay._count}
-          note={formatPrice(paymentsDay._sum.amountKopecks ?? 0)}
+          title="Сегодня"
+          value={paymentsToday._count}
+          note={formatPrice(paymentsToday._sum.amountKopecks ?? 0)}
         />
         <AdminTile
           href="/dashboard/admin/promo-codes"
@@ -151,8 +314,100 @@ export default async function AdminDashboardPage() {
           />
         )}
       </div>
+      </section>
     </div>
   )
+}
+
+function AnalyticsCard({
+  icon,
+  title,
+  value,
+  hint,
+  details,
+}: {
+  icon: React.ReactNode
+  title: string
+  value: React.ReactNode
+  hint: string
+  details: Array<{ label: string; value: React.ReactNode }>
+}) {
+  return (
+    <div className="min-w-0 rounded-lg border bg-white/80 p-4 shadow-sm dark:border-white/10 dark:bg-surface-900/80">
+      <div className="flex items-start justify-between gap-3">
+        <div className="grid h-10 w-10 place-items-center rounded-lg bg-slate-100 text-slate-700 dark:bg-white/10 dark:text-cyan-200">
+          {icon}
+        </div>
+        <div className="min-w-0 text-right">
+          <div className="truncate text-sm font-medium text-slate-500">{title}</div>
+          <div className="mt-1 text-2xl font-semibold tracking-tight">{value}</div>
+          <div className="mt-0.5 text-xs text-slate-400">{hint}</div>
+        </div>
+      </div>
+      <div className="mt-4 grid grid-cols-2 gap-2">
+        {details.map((detail) => (
+          <div key={detail.label} className="rounded-lg bg-slate-50 px-3 py-2 dark:bg-white/5">
+            <div className="truncate text-[11px] uppercase text-slate-400">{detail.label}</div>
+            <div className="mt-1 truncate text-sm font-semibold">{detail.value}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function CompactMetric({
+  icon,
+  label,
+  value,
+  hint,
+}: {
+  icon: React.ReactNode
+  label: string
+  value: React.ReactNode
+  hint: string
+}) {
+  return (
+    <div className="flex min-w-0 items-center gap-3 rounded-lg border bg-white/80 p-4 shadow-sm dark:border-white/10 dark:bg-surface-900/80">
+      <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-700 dark:bg-white/10 dark:text-cyan-200">
+        {icon}
+      </div>
+      <div className="min-w-0">
+        <div className="truncate text-sm font-medium text-slate-500">{label}</div>
+        <div className="mt-1 text-2xl font-semibold tracking-tight">{value}</div>
+        <div className="mt-0.5 truncate text-xs text-slate-400">{hint}</div>
+      </div>
+    </div>
+  )
+}
+
+function SourceLine({
+  label,
+  value,
+  total,
+  className,
+}: {
+  label: string
+  value: number
+  total: number
+  className: string
+}) {
+  const percent = total > 0 ? (value / total) * 100 : 0
+  return (
+    <div>
+      <div className="mb-1.5 flex items-center justify-between gap-3 text-sm">
+        <span className="font-medium">{label}</span>
+        <span className="text-slate-500">{value} · {percent.toFixed(1)}%</span>
+      </div>
+      <div className="h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-white/10">
+        <div className={cn('h-full rounded-full', className)} style={{ width: `${Math.max(percent, value > 0 ? 2 : 0)}%` }} />
+      </div>
+    </div>
+  )
+}
+
+function sourceCount(rows: Array<{ source: string; count: bigint }>, source: string) {
+  return Number(rows.find((row) => row.source === source)?.count ?? 0)
 }
 
 function AdminTile({

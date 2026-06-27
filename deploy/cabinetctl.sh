@@ -14,9 +14,11 @@ BACKUP_SCRIPT_PATH="${BACKUP_SCRIPT_PATH:-/usr/local/bin/remna-backup}"
 CABINET_DIR="${INSTALL_DIR:-/opt/remnawave-cabinet}"
 CABINET_ENV="${CABINET_DIR}/.env"
 CABINET_COMPOSE="${CABINET_DIR}/docker-compose.yml"
+UPDATE_STATUS_CACHE="${CABINETCTL_UPDATE_CACHE:-/tmp/remnawave-cabinet-update-status}"
+UPDATE_STATUS_CACHE_TTL="${CABINETCTL_UPDATE_CACHE_TTL:-3600}"
 
 if [[ "$(id -u)" -ne 0 ]]; then
-  exec sudo --preserve-env=BRANCH,RAW_BASE_URL,INSTALL_URL,UPDATE_URL,NGINX_SETUP_URL,CONSOLE_INSTALL_URL,BACKUP_SCRIPT_URL,CABINETCTL_PATH,BACKUP_SCRIPT_PATH,INSTALL_DIR "$0" "$@"
+  exec sudo --preserve-env=BRANCH,RAW_BASE_URL,INSTALL_URL,UPDATE_URL,NGINX_SETUP_URL,CONSOLE_INSTALL_URL,BACKUP_SCRIPT_URL,CABINETCTL_PATH,BACKUP_SCRIPT_PATH,INSTALL_DIR,CABINETCTL_UPDATE_CACHE,CABINETCTL_UPDATE_CACHE_TTL,CABINETCTL_CHECK_UPDATES_IN_MENU "$0" "$@"
 fi
 
 if [[ -t 1 ]]; then
@@ -139,7 +141,39 @@ digests_have_match() {
   return 1
 }
 
+print_update_status_key() {
+  case "${1:-unknown}" in
+    latest) printf '  Обновление:  %s\n' "${GREEN}Установлена актуальная версия${RESET}" ;;
+    available) printf '  Обновление:  %s\n' "${YELLOW}Доступно обновление${RESET}" ;;
+    local-missing) printf '  Обновление:  %s\n' "${YELLOW}локальный образ не найден${RESET}" ;;
+    unknown) printf '  Обновление:  %s\n' "${DIM}не удалось проверить${RESET}" ;;
+    *) return 1 ;;
+  esac
+}
+
+write_update_status_cache() {
+  local status="$1"
+  local cache_dir
+  cache_dir="$(dirname "${UPDATE_STATUS_CACHE}")"
+  mkdir -p "${cache_dir}" 2>/dev/null || true
+  printf '%s|%s\n' "$(date +%s)" "${status}" >"${UPDATE_STATUS_CACHE}" 2>/dev/null || true
+}
+
+read_update_status_cache() {
+  [[ -f "${UPDATE_STATUS_CACHE}" ]] || return 1
+  local created_at status now
+  IFS='|' read -r created_at status <"${UPDATE_STATUS_CACHE}" || return 1
+  [[ "${created_at}" =~ ^[0-9]+$ ]] || return 1
+  [[ "${UPDATE_STATUS_CACHE_TTL}" =~ ^[0-9]+$ ]] || return 1
+  now="$(date +%s)"
+  if (( now - created_at > UPDATE_STATUS_CACHE_TTL )); then
+    return 1
+  fi
+  print_update_status_key "${status}"
+}
+
 update_status_line() {
+  local mode="${1:-quick}"
   if ! cabinet_installed; then
     printf '  Обновление:  %s\n' "${DIM}доступно после установки${RESET}"
     return
@@ -149,25 +183,37 @@ update_status_line() {
     return
   fi
 
+  if [[ "${mode}" != "check" && "${CABINETCTL_CHECK_UPDATES_IN_MENU:-0}" != "1" ]]; then
+    if read_update_status_cache; then
+      return
+    fi
+    printf '  Обновление:  %s\n' "${DIM}не проверялось · cabinetctl update-check${RESET}"
+    return
+  fi
+
   local image local_digests remote_digests
   image="$(compose_image)"
   local_digests="$(local_image_digests "${image}")"
   remote_digests="$(remote_image_digests "${image}")"
 
   if [[ -z "${local_digests}" ]]; then
-    printf '  Обновление:  %s\n' "${YELLOW}локальный образ не найден${RESET}"
+    print_update_status_key local-missing
+    write_update_status_cache local-missing
     return
   fi
 
   if [[ -z "${remote_digests}" ]]; then
-    printf '  Обновление:  %s\n' "${GREEN}Установлена актуальная версия${RESET}"
+    print_update_status_key unknown
+    write_update_status_cache unknown
     return
   fi
 
   if digests_have_match "${local_digests}" "${remote_digests}"; then
-    printf '  Обновление:  %s\n' "${GREEN}Установлена актуальная версия${RESET}"
+    print_update_status_key latest
+    write_update_status_cache latest
   else
-    printf '  Обновление:  %s\n' "${YELLOW}Доступно обновление${RESET}"
+    print_update_status_key available
+    write_update_status_cache available
   fi
 }
 
@@ -215,6 +261,7 @@ update_cabinet() {
   }
   info "Обновляем кабинет..."
   curl -fsSL "${UPDATE_URL}" | bash
+  write_update_status_cache latest
 }
 
 update_console() {
@@ -437,6 +484,7 @@ Remnawave Cabinet ${VERSION}
   cabinetctl                    интерактивная консоль
   cabinetctl install            установить кабинет
   cabinetctl update             обновить систему
+  cabinetctl update-check       проверить наличие обновления
   cabinetctl env                открыть .env
   cabinetctl health             здоровье системы
   cabinetctl logs               меню логов
@@ -456,6 +504,7 @@ case "${1:-menu}" in
   menu) run_menu ;;
   install) install_cabinet ;;
   update) update_cabinet ;;
+  update-check|check-update) update_status_line check ;;
   env) edit_env ;;
   status) show_status ;;
   restart) restart_cabinet ;;
