@@ -165,6 +165,7 @@ async function checkEmail(sendEmail: boolean) {
 async function latestBackup() {
   const backupDir = env('SYSTEM_HEALTH_BACKUP_DIR') || env('FULL_BACKUP_DIR') || '/backups'
   const maxAgeHours = Number(env('SYSTEM_HEALTH_BACKUP_MAX_AGE_HOURS') || '48')
+  const required = env('SYSTEM_HEALTH_BACKUP_REQUIRED') === 'true'
 
   try {
     const entries = await readdir(backupDir)
@@ -193,7 +194,13 @@ async function latestBackup() {
       `${latest.entry}, ${(latest.size / 1024 / 1024).toFixed(1)} MB`
     )
   } catch (error) {
-    return check('backup', 'Бэкапы', 'warn', 'Каталог бэкапов недоступен из контейнера', errorMessage(error))
+    return check(
+      'backup',
+      'Бэкапы',
+      required ? 'warn' : 'ok',
+      'Проверяются в консоли cabinetctl',
+      required ? errorMessage(error) : 'Веб-контейнер не читает каталог бэкапов напрямую'
+    )
   }
 }
 
@@ -203,7 +210,7 @@ async function checkS3() {
   const secretKey = env('SYSTEM_HEALTH_S3_SECRET_KEY') || env('S3_SECRET_KEY')
 
   if (!bucket || !accessKey || !secretKey) {
-    return check('s3', 'S3', 'warn', 'S3 проверяется в консоли cabinetctl', 'Для проверки из веба можно заполнить SYSTEM_HEALTH_S3_*')
+    return check('s3', 'S3', 'ok', 'Проверяется в консоли cabinetctl', 'Для проверки из веба можно заполнить SYSTEM_HEALTH_S3_*')
   }
 
   return check('s3', 'S3', 'ok', `S3 настроен для bucket ${bucket}`)
