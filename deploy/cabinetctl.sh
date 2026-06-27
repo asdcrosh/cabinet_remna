@@ -80,7 +80,7 @@ edit_env() {
     fi
   fi
   "${editor}" "${ENV_FILE}"
-  echo "${YELLOW}После изменения .env выберите «Перезапустить сервисы».${RESET}"
+  echo "${YELLOW}После изменения .env запустите «Обновить систему» или команду: cabinetctl restart.${RESET}"
 }
 
 show_status() {
@@ -91,6 +91,24 @@ show_logs() {
   local service="${1:-app}"
   echo "${YELLOW}Для выхода из логов нажмите Ctrl+C.${RESET}"
   "${COMPOSE[@]}" logs -f --tail=200 "${service}" || true
+}
+
+logs_menu() {
+  printf '%s\n' \
+    "  1. Приложение" \
+    "  2. Worker платежей" \
+    "  3. Все сервисы кабинета" \
+    "  0. Назад" >/dev/tty
+  printf 'Выберите логи: ' >/dev/tty
+  local choice
+  IFS= read -r choice </dev/tty
+  case "${choice}" in
+    1) show_logs app ;;
+    2) show_logs worker ;;
+    3) echo "${YELLOW}Для выхода из логов нажмите Ctrl+C.${RESET}"; "${COMPOSE[@]}" logs -f --tail=200 || true ;;
+    0) return ;;
+    *) echo "${RED}Неизвестный пункт.${RESET}" ;;
+  esac
 }
 
 restart_services() {
@@ -122,6 +140,11 @@ health_check() {
       echo "${RED}Публичный healthcheck не отвечает: ${app_url}${RESET}"
       return 1
     fi
+  fi
+
+  if command -v remna-backup >/dev/null 2>&1; then
+    printf '\n'
+    remna-backup status || true
   fi
 }
 
@@ -179,18 +202,11 @@ show_menu() {
   printf '%s\n' "Установка: ${INSTALL_DIR}"
   printf '\n'
   printf '%s\n' \
-    "  1. Обновить кабинет" \
+    "  1. Обновить систему" \
     "  2. Редактировать .env" \
-    "  3. Статус сервисов" \
-    "  4. Логи приложения" \
-    "  5. Логи worker" \
-    "  6. Перезапустить сервисы" \
-    "  7. Проверить доступность" \
-    "  8. Создать резервную копию БД" \
-    "  9. Полный бэкап сервера" \
-    " 10. S3: настроить хранилище" \
-    " 11. S3: показать архивы" \
-    " 12. Меню переноса и восстановления" \
+    "  3. Здоровье системы" \
+    "  4. Логи" \
+    "  5. Бэкапы" \
     "  0. Выход"
   printf '\nВыберите действие: ' >/dev/tty
 }
@@ -207,16 +223,9 @@ run_menu() {
     case "${choice}" in
       1) update_cabinet; pause ;;
       2) edit_env; pause ;;
-      3) show_status; pause ;;
-      4) show_logs app; pause ;;
-      5) show_logs worker; pause ;;
-      6) restart_services; pause ;;
-      7) health_check || true; pause ;;
-      8) backup_database; pause ;;
-      9) full_backup; pause ;;
-      10) s3_backup_config; pause ;;
-      11) s3_backup_list; pause ;;
-      12) full_backup_menu; pause ;;
+      3) health_check || true; pause ;;
+      4) logs_menu; pause ;;
+      5) full_backup_menu; pause ;;
       0) exit 0 ;;
       *) echo "${RED}Неизвестный пункт.${RESET}"; pause ;;
     esac
@@ -227,18 +236,13 @@ show_help() {
   cat <<'EOF'
 Использование:
   cabinetctl             интерактивное меню
-  cabinetctl update      обновить кабинет
+  cabinetctl update      обновить систему
   cabinetctl env         открыть .env
+  cabinetctl health      здоровье системы
+  cabinetctl logs        меню логов
+  cabinetctl backups     бэкапы, восстановление и S3
   cabinetctl status      показать контейнеры
-  cabinetctl logs        логи приложения
-  cabinetctl worker      логи worker
   cabinetctl restart     перезапустить сервисы
-  cabinetctl health      проверить доступность
-  cabinetctl backup      создать резервную копию БД
-  cabinetctl backup-full полный бэкап Remnawave, Remnashop и кабинета
-  cabinetctl s3-config   настроить S3 для полных бэкапов
-  cabinetctl s3-list     показать архивы в S3
-  cabinetctl transfer    меню бэкапа и восстановления
 EOF
 }
 
@@ -247,7 +251,7 @@ case "${1:-menu}" in
   update) update_cabinet ;;
   env) edit_env ;;
   status) show_status ;;
-  logs) show_logs app ;;
+  logs) logs_menu ;;
   worker) show_logs worker ;;
   restart) restart_services ;;
   health) health_check ;;
@@ -255,7 +259,7 @@ case "${1:-menu}" in
   backup-full) full_backup ;;
   s3-config) s3_backup_config ;;
   s3-list) s3_backup_list ;;
-  transfer) full_backup_menu ;;
+  backups|transfer) full_backup_menu ;;
   help|-h|--help) show_help ;;
   *) show_help; exit 1 ;;
 esac
