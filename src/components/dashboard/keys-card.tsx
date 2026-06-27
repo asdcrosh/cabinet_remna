@@ -479,12 +479,13 @@ function buildHappLinks(subscriptionUrl: string, happLink?: string | null) {
 
 function openExternal(url: string, fallbackUrls: string[] = [], appName = 'приложение') {
   const webApp = window.Telegram?.WebApp
-  if (webApp?.openLink && /^https?:\/\//i.test(url)) {
+  const isMiniApp = isTelegramMiniAppContext()
+  if (isMiniApp && webApp?.openLink && /^https?:\/\//i.test(url)) {
     webApp.openLink(url, { try_instant_view: false })
     return
   }
 
-  if (webApp?.openLink && !/^https?:\/\//i.test(url)) {
+  if (isMiniApp && webApp?.openLink && !/^https?:\/\//i.test(url)) {
     webApp.openLink(buildOpenAppBridgeUrl(url, fallbackUrls[0], appName), { try_instant_view: false })
     return
   }
@@ -516,6 +517,14 @@ function openExternal(url: string, fallbackUrls: string[] = [], appName = 'пр�
       fallbackAnchor.remove()
     }, 700 + index * 700)
   })
+}
+
+function isTelegramMiniAppContext() {
+  const initData = window.Telegram?.WebApp?.initData
+  if (initData) return true
+  const hash = window.location.hash || ''
+  const search = window.location.search || ''
+  return hash.includes('tgWebAppData=') || search.includes('tgWebAppData=')
 }
 
 function buildOpenAppBridgeUrl(url: string, fallbackUrl: string | undefined, appName: string) {
