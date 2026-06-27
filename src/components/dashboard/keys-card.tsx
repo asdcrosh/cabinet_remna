@@ -55,7 +55,7 @@ interface AppOption {
   deepLinks: (subscriptionUrl: string) => string[]
   installUrl: string
   steps: string[]
-  getOpenLinks?: (input: { subscriptionUrl: string; happLink?: string | null }) => string[]
+  getOpenLinks?: (input: { subscriptionUrl: string; happLink?: string | null; device: Device }) => string[]
 }
 
 const appOptions: AppOption[] = [
@@ -82,11 +82,8 @@ const appOptions: AppOption[] = [
     devices: ['android', 'windows', 'desktop'],
     primaryDevices: ['android', 'windows'],
     icon: Smartphone,
-    deepLinks: (url) => [
-      `v2rayng://install-sub?url=${encodeURIComponent(url)}`,
-      `v2rayn://install-sub?url=${encodeURIComponent(url)}`,
-      `v2rayng://install-config?url=${encodeURIComponent(url)}`,
-    ],
+    deepLinks: () => [],
+    getOpenLinks: ({ subscriptionUrl, device }) => buildV2RayLinks(subscriptionUrl, device),
     installUrl: 'https://github.com/2dust/v2rayNG/releases',
     steps: [
       'Установите V2Ray-клиент для вашей системы.',
@@ -132,7 +129,7 @@ export function KeysCard({ subscriptionUrl, happLink }: KeysCardProps) {
 
   const selectedApp = appOptions.find((option) => option.id === selectedAppId) ?? appOptions[0]
   const selectedDeepLinks = selectedApp.getOpenLinks
-    ? selectedApp.getOpenLinks({ subscriptionUrl, happLink })
+    ? selectedApp.getOpenLinks({ subscriptionUrl, happLink, device })
     : selectedApp.deepLinks(subscriptionUrl)
   const primaryLink = selectedDeepLinks[0]
 
@@ -475,6 +472,20 @@ function buildHappLinks(subscriptionUrl: string, happLink?: string | null) {
   ].filter((link): link is string => Boolean(link))
 
   return Array.from(new Set(links))
+}
+
+function buildV2RayLinks(subscriptionUrl: string, device: Device) {
+  const encodedUrl = encodeURIComponent(subscriptionUrl)
+  if (device === 'android') {
+    return [
+      `v2rayng://install-sub?url=${encodedUrl}`,
+      `v2rayng://install-config?url=${encodedUrl}`,
+    ]
+  }
+  if (device === 'windows') {
+    return [`v2rayn://install-sub?url=${encodedUrl}`]
+  }
+  return []
 }
 
 function openExternal(url: string, fallbackUrls: string[] = [], appName = 'приложение') {
