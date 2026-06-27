@@ -11,6 +11,7 @@ declare global {
         initData?: string
         ready?: () => void
         expand?: () => void
+        openLink?: (url: string, options?: { try_instant_view?: boolean }) => void
       }
     }
   }

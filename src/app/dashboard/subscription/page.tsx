@@ -85,7 +85,7 @@ export default async function SubscriptionPage() {
         </div>
       </section>
 
-      <KeysCard subscriptionUrl={data.response.subscriptionUrl} />
+      <KeysCard subscriptionUrl={data.response.subscriptionUrl} happLink={data.response.happ?.cryptoLink} />
     </div>
   )
 }

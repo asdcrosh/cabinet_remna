@@ -24,11 +24,25 @@ import { useBodyScrollLock } from '@/lib/use-body-scroll-lock'
 import { toast } from '@/components/ui/toaster'
 import { ConfirmDialog } from './confirm-dialog'
 
+declare global {
+  interface Window {
+    Telegram?: {
+      WebApp?: {
+        initData?: string
+        ready?: () => void
+        expand?: () => void
+        openLink?: (url: string, options?: { try_instant_view?: boolean }) => void
+      }
+    }
+  }
+}
+
 type Device = 'ios' | 'android' | 'macos' | 'windows' | 'desktop'
 type AppId = 'happ' | 'v2ray' | 'rabbit-hole'
 
 interface KeysCardProps {
   subscriptionUrl: string
+  happLink?: string | null
 }
 
 interface AppOption {
@@ -41,6 +55,7 @@ interface AppOption {
   deepLinks: (subscriptionUrl: string) => string[]
   installUrl: string
   steps: string[]
+  copyOnly?: boolean
 }
 
 const appOptions: AppOption[] = [
@@ -55,9 +70,10 @@ const appOptions: AppOption[] = [
     installUrl: 'https://happ.su',
     steps: [
       'Установите HAPP на устройство.',
-      'Нажмите “Скопировать для HAPP”: ссылка подписки скопируется автоматически.',
-      'В HAPP нажмите “Буфер обмена” и подтвердите добавление подписки.',
+      'Нажмите “Подключить в HAPP”. Если приложение не открылось, используйте кнопку копирования.',
+      'При ручном добавлении в HAPP нажмите “Буфер обмена” и подтвердите подписку.',
     ],
+    copyOnly: true,
   },
   {
     id: 'v2ray',
@@ -98,7 +114,7 @@ const appOptions: AppOption[] = [
   },
 ]
 
-export function KeysCard({ subscriptionUrl }: KeysCardProps) {
+export function KeysCard({ subscriptionUrl, happLink }: KeysCardProps) {
   const [device, setDevice] = useState<Device>('desktop')
   const [selectedAppId, setSelectedAppId] = useState<AppId>('happ')
   const [instructionsOpen, setInstructionsOpen] = useState(false)
@@ -118,7 +134,8 @@ export function KeysCard({ subscriptionUrl }: KeysCardProps) {
   }, [device])
 
   const selectedApp = appOptions.find((option) => option.id === selectedAppId) ?? appOptions[0]
-  const primaryLink = selectedApp.deepLinks(subscriptionUrl)[0] || subscriptionUrl
+  const selectedDeepLinks = selectedApp.id === 'happ' && happLink ? [happLink] : selectedApp.deepLinks(subscriptionUrl)
+  const primaryLink = selectedDeepLinks[0]
 
   async function copy(text: string, label = 'Ссылка') {
     if (!text) return
@@ -132,15 +149,19 @@ export function KeysCard({ subscriptionUrl }: KeysCardProps) {
 
   function openInApp() {
     if (!subscriptionUrl) return
-    void copy(subscriptionUrl, 'Ссылка подписки')
-    if (selectedApp.id === 'happ') {
+
+    if (!primaryLink || (selectedApp.id === 'happ' && selectedApp.copyOnly && !happLink)) {
+      void copy(subscriptionUrl, 'Ссылка подписки')
       toast('Ссылка скопирована. В HAPP нажмите “Буфер обмена”.', 'success')
       setInstructionsOpen(true)
       return
-    } else {
-      toast(`Открываем ${selectedApp.name}. Ссылка уже скопирована на случай ручного импорта.`, 'success')
     }
-    window.location.href = primaryLink
+
+    openExternal(primaryLink)
+    toast(`Открываем ${selectedApp.name}. Если приложение не открылось, скопируйте ссылку вручную.`, 'success')
+    window.setTimeout(() => {
+      void navigator.clipboard?.writeText(subscriptionUrl).catch(() => undefined)
+    }, 500)
   }
 
   async function revoke() {
@@ -225,7 +246,7 @@ export function KeysCard({ subscriptionUrl }: KeysCardProps) {
               className="inline-flex h-12 items-center justify-center gap-2 rounded-lg bg-slate-950 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200"
             >
               <ExternalLink className="h-4 w-4" />
-              {selectedApp.id === 'happ' ? 'Скопировать для HAPP' : `Подключить в ${selectedApp.name}`}
+              {selectedApp.id === 'happ' && !happLink ? 'Скопировать для HAPP' : `Подключить в ${selectedApp.name}`}
             </button>
             <button
               type="button"
@@ -294,6 +315,7 @@ export function KeysCard({ subscriptionUrl }: KeysCardProps) {
         open={instructionsOpen}
         app={selectedApp}
         subscriptionUrl={subscriptionUrl}
+        happLink={happLink}
         onClose={() => setInstructionsOpen(false)}
         onCopy={() => copy(subscriptionUrl, 'Ссылка подписки')}
         onOpen={openInApp}
@@ -320,6 +342,7 @@ function InstructionModal({
   open,
   app,
   subscriptionUrl,
+  happLink,
   onClose,
   onCopy,
   onOpen,
@@ -327,6 +350,7 @@ function InstructionModal({
   open: boolean
   app: AppOption
   subscriptionUrl: string
+  happLink?: string | null
   onClose: () => void
   onCopy: () => void
   onOpen: () => void
@@ -378,7 +402,7 @@ function InstructionModal({
               className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-slate-950 px-4 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-60 dark:bg-white dark:text-slate-950"
             >
               <ExternalLink className="h-4 w-4" />
-              {app.id === 'happ' ? 'Скопировать для HAPP' : `Открыть ${app.name}`}
+              {app.id === 'happ' && !happLink ? 'Скопировать для HAPP' : `Открыть ${app.name}`}
             </button>
             <button
               type="button"
@@ -446,6 +470,22 @@ function detectDevice(userAgent: string): Device {
   if (ua.includes('windows')) return 'windows'
   if (ua.includes('mac os') || ua.includes('macintosh')) return 'macos'
   return 'desktop'
+}
+
+function openExternal(url: string) {
+  const webApp = window.Telegram?.WebApp
+  if (webApp?.openLink && /^https?:\/\//i.test(url)) {
+    webApp.openLink(url, { try_instant_view: false })
+    return
+  }
+
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.rel = 'noreferrer'
+  anchor.style.display = 'none'
+  document.body.appendChild(anchor)
+  anchor.click()
+  anchor.remove()
 }
 
 function recommendedAppForDevice(device: Device) {
