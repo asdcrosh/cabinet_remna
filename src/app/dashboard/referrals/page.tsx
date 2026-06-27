@@ -3,9 +3,6 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import {
   ArrowRight,
-  Award,
-  Clock3,
-  CreditCard,
   Gift,
   Link2,
   Sparkles,
@@ -17,7 +14,6 @@ import { getCurrentUser } from '@/lib/auth/cookies'
 import { getAppUrl } from '@/lib/app-url'
 import { ensureUserReferralCode } from '@/lib/referrals'
 import { getReferralBonusDays } from '@/lib/referral-rewards'
-import { cn } from '@/lib/cn'
 import { ReferralLinkCard } from '@/components/dashboard/referral-card'
 
 export const dynamic = 'force-dynamic'
@@ -100,65 +96,35 @@ export default async function ReferralsPage() {
 
   return (
     <div className="space-y-6">
-      <section className="overflow-hidden rounded-lg border border-slate-900 bg-slate-950 text-white shadow-xl shadow-slate-200/60 dark:border-white/10 dark:shadow-black/30">
-        <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_24rem]">
-          <div className="relative min-w-0 p-5 sm:p-7">
-            <div className="absolute inset-x-0 top-0 h-1 bg-cyan-400" />
-            <div className="flex flex-wrap gap-2">
-              <span className="inline-flex items-center gap-2 rounded-full border border-cyan-300/30 bg-cyan-300/10 px-3 py-1 text-sm font-medium text-cyan-100">
-                <Sparkles className="h-4 w-4" />
-                Реферальная программа
-              </span>
-              <span className="inline-flex rounded-full border border-emerald-300/30 bg-emerald-300/10 px-3 py-1 text-sm font-medium text-emerald-100">
-                +{bonusDays} дн. за оплату друга
-              </span>
-            </div>
-
-            <div className="mt-7 max-w-3xl">
-              <h1 className="text-3xl font-semibold sm:text-5xl">Пригласи друга и получи +{bonusDays} дней</h1>
-              <p className="mt-4 max-w-2xl text-base leading-7 text-slate-300 sm:text-lg">
-                Отправьте ссылку. Друг регистрируется, покупает любой платный тариф, а бонусные дни добавляются к вашей активной подписке.
-              </p>
-            </div>
-
-            <div className="mt-6 flex flex-wrap gap-3">
-              <Link href="#referral-link" className="btn-primary bg-white text-slate-950 hover:bg-slate-100">
+      <section className="rounded-lg border border-slate-200 bg-white/85 p-5 shadow-sm dark:border-white/10 dark:bg-surface-900/80 sm:p-6">
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-center">
+          <div className="min-w-0">
+            <span className="inline-flex items-center gap-2 rounded-full bg-cyan-50 px-3 py-1 text-sm font-medium text-cyan-700 dark:bg-cyan-400/10 dark:text-cyan-200">
+              <Sparkles className="h-4 w-4" />
+              Реферальная программа
+            </span>
+            <h1 className="mt-5 max-w-3xl text-3xl font-semibold tracking-tight text-slate-950 dark:text-white sm:text-4xl">
+              Пригласи друга и получи +{bonusDays} дней
+            </h1>
+            <p className="mt-3 max-w-2xl text-base leading-7 text-slate-600 dark:text-slate-300">
+              Друг регистрируется по вашей ссылке, покупает платный тариф, а бонус добавляется к вашей активной подписке.
+            </p>
+            <div className="mt-5 flex flex-wrap gap-3">
+              <Link href="#referral-link" className="btn-primary">
                 Поделиться ссылкой
                 <ArrowRight className="h-4 w-4" />
               </Link>
-              <Link href="#referral-history" className="btn-secondary border-white/15 bg-white/10 text-white shadow-none hover:bg-white/15">
-                История приглашений
+              <Link href="#referral-history" className="btn-secondary">
+                История
               </Link>
             </div>
           </div>
-
-          <div className="border-t border-white/10 bg-white/[0.04] p-5 sm:p-7 lg:border-l lg:border-t-0">
-            <div className="grid gap-3">
-              <HeroMetric icon={<UsersRound className="h-5 w-5" />} label="Приглашено" value={invitedCount} />
-              <HeroMetric icon={<CreditCard className="h-5 w-5" />} label="Оплатили" value={paidCount} />
-              <HeroMetric icon={<Award className="h-5 w-5" />} label="Начислено" value={`+${appliedDays} дн.`} />
-              <HeroMetric icon={<Clock3 className="h-5 w-5" />} label="В ожидании" value={`+${pendingDays} дн.`} muted={pendingDays === 0} />
-            </div>
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-400/20 dark:bg-emerald-400/10">
+            <div className="text-sm font-medium text-emerald-700 dark:text-emerald-200">Ваш бонус</div>
+            <div className="mt-2 text-3xl font-semibold text-emerald-900 dark:text-emerald-100">+{bonusDays} дн.</div>
+            <div className="mt-1 text-sm text-emerald-700/80 dark:text-emerald-200/80">за первую оплату друга</div>
           </div>
         </div>
-      </section>
-
-      <section className="grid gap-3 md:grid-cols-3">
-        <StepCard
-          icon={<Link2 className="h-5 w-5" />}
-          title="1. Поделиться"
-          text="Отправьте личную ссылку другу в Telegram, чат или письмо."
-        />
-        <StepCard
-          icon={<UserPlus className="h-5 w-5" />}
-          title="2. Регистрация"
-          text="Друг создаёт аккаунт по вашей ссылке, и появится в истории."
-        />
-        <StepCard
-          icon={<Gift className="h-5 w-5" />}
-          title="3. Бонус"
-          text={`После первой платной покупки вы получаете +${bonusDays} дн. подписки.`}
-        />
       </section>
 
       <section id="referral-link" className="space-y-3 scroll-mt-24">
@@ -192,7 +158,7 @@ export default async function ReferralsPage() {
           <div className="text-sm text-slate-500">Последние {referrals.length} из {invitedCount}</div>
         </div>
 
-        <div className="overflow-hidden rounded-lg border border-white/70 bg-white/80 shadow-xl shadow-slate-200/50 backdrop-blur dark:border-white/10 dark:bg-surface-900/80 dark:shadow-black/25">
+        <div className="overflow-hidden rounded-lg border bg-white/80 shadow-sm dark:border-white/10 dark:bg-surface-900/80">
           {referrals.length === 0 ? (
             <div className="px-4 py-12 text-center">
               <div className="mx-auto grid h-12 w-12 place-items-center rounded-lg bg-slate-100 text-slate-500 dark:bg-white/10 dark:text-slate-300">
@@ -234,28 +200,30 @@ export default async function ReferralsPage() {
           )}
         </div>
       </section>
-    </div>
-  )
-}
 
-function HeroMetric({
-  icon,
-  label,
-  value,
-  muted,
-}: {
-  icon: ReactNode
-  label: string
-  value: ReactNode
-  muted?: boolean
-}) {
-  return (
-    <div className={cn('flex items-center justify-between gap-3 rounded-lg border border-white/10 bg-white/10 px-4 py-3', muted && 'opacity-70')}>
-      <div className="flex items-center gap-3">
-        <div className="grid h-9 w-9 place-items-center rounded-lg bg-white/10 text-cyan-100">{icon}</div>
-        <div className="text-sm text-slate-300">{label}</div>
-      </div>
-      <div className="text-xl font-semibold">{value}</div>
+      <section className="space-y-3">
+        <div>
+          <h2 className="text-xl font-semibold">Как это работает</h2>
+          <p className="mt-1 text-sm text-slate-500">Коротко по шагам, без лишних условий.</p>
+        </div>
+        <div className="grid gap-3 md:grid-cols-3">
+          <StepCard
+            icon={<Link2 className="h-5 w-5" />}
+            title="1. Поделиться"
+            text="Отправьте личную ссылку другу в Telegram, чат или письмо."
+          />
+          <StepCard
+            icon={<UserPlus className="h-5 w-5" />}
+            title="2. Регистрация"
+            text="Друг создаёт аккаунт по вашей ссылке, и появится в истории."
+          />
+          <StepCard
+            icon={<Gift className="h-5 w-5" />}
+            title="3. Бонус"
+            text={`После первой платной покупки вы получаете +${bonusDays} дн. подписки.`}
+          />
+        </div>
+      </section>
     </div>
   )
 }
