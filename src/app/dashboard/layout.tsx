@@ -7,6 +7,7 @@ import { getBrandName } from '@/lib/branding'
 import { maybeSyncRemnashopCatalog } from '@/lib/remnashop-sync'
 import { LogoutButton } from '@/components/dashboard/logout-button'
 import { Brand, DashboardNav, MobileDashboardNav } from '@/components/dashboard/dashboard-nav'
+import { NotificationBell } from '@/components/dashboard/notification-bell'
 import { logWarn } from '@/lib/logger'
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -69,9 +70,15 @@ export default async function DashboardLayout({ children }: { children: React.Re
         </div>
       </aside>
       <main className="min-w-0 lg:ml-72">
+        <div className="sticky top-0 z-30 hidden items-center justify-end border-b border-white/70 bg-white/80 px-6 py-3 shadow-sm shadow-slate-200/60 backdrop-blur-xl dark:border-white/10 dark:bg-surface-950/80 dark:shadow-black/20 lg:flex">
+          <NotificationBell />
+        </div>
         <div className="sticky top-0 z-30 flex items-center justify-between border-b border-white/70 bg-white/80 px-4 py-3 shadow-sm shadow-slate-200/60 backdrop-blur-xl dark:border-white/10 dark:bg-surface-950/80 dark:shadow-black/20 lg:hidden">
           <Brand compact brandName={brandName} />
-          <MobileDashboardNav role={role} email={accountLabel} brandName={brandName} badges={navBadges} />
+          <div className="flex items-center gap-2">
+            <NotificationBell />
+            <MobileDashboardNav role={role} email={accountLabel} brandName={brandName} badges={navBadges} />
+          </div>
         </div>
         <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">{children}</div>
       </main>

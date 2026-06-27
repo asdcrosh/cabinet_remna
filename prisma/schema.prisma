@@ -114,6 +114,7 @@ model User {
   auditLogsAuthored     AuditLog[] @relation("AuditLogActor")
   auditLogsTargeted     AuditLog[] @relation("AuditLogTarget")
   notificationLogs      NotificationLog[]
+  notifications         UserNotification[]
 
   @@index([email])
   @@index([referredById])
@@ -140,6 +141,25 @@ model NotificationLog {
 
   @@unique([channel, dedupeKey])
   @@index([userId, type, sentAt])
+}
+
+model UserNotification {
+  id          String           @id @default(cuid())
+  userId      String
+  type        NotificationType
+  dedupeKey   String
+  title       String
+  body        String
+  actionHref  String?
+  actionLabel String?
+  readAt      DateTime?
+  createdAt   DateTime         @default(now())
+
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, dedupeKey])
+  @@index([userId, readAt, createdAt])
+  @@index([userId, type, createdAt])
 }
 
 enum NotificationType {

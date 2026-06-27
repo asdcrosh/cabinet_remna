@@ -9,6 +9,9 @@ const mocks = vi.hoisted(() => {
       create: vi.fn(),
       updateMany: vi.fn(),
     },
+    userNotification: {
+      create: vi.fn(),
+    },
   }
 
   return { prisma }
@@ -39,11 +42,14 @@ describe('notifyUser', () => {
       telegramId: 123n,
     })
     mocks.prisma.notificationLog.create.mockResolvedValue({})
+    mocks.prisma.userNotification.create.mockResolvedValue({})
 
     const result = await notifyUser({
       userId: 'user-1',
       type: 'PAYMENT_SUCCESS',
       dedupeKey: 'payment-1',
+      title: 'Оплата прошла',
+      body: 'Оплата прошла',
       telegramText: '<b>Оплата прошла</b>',
       emailSubject: 'Оплата прошла',
       emailText: 'Оплата прошла',
@@ -51,6 +57,15 @@ describe('notifyUser', () => {
     })
 
     expect(result).toEqual({ telegram: 'sent', email: 'sent' })
+    expect(mocks.prisma.userNotification.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          userId: 'user-1',
+          type: 'PAYMENT_SUCCESS',
+          title: 'Оплата прошла',
+        }),
+      })
+    )
     expect(mocks.prisma.notificationLog.create).toHaveBeenCalledTimes(2)
     expect(fetch).toHaveBeenCalledWith(
       'https://api.telegram.org/bottelegram-token/sendMessage',
@@ -74,11 +89,14 @@ describe('notifyUser', () => {
       telegramId: 123n,
     })
     mocks.prisma.notificationLog.create.mockResolvedValue({})
+    mocks.prisma.userNotification.create.mockResolvedValue({})
 
     const result = await notifyUser({
       userId: 'user-1',
       type: 'SUPPORT_REPLY',
       dedupeKey: 'message-1',
+      title: 'Ответ поддержки',
+      body: 'Ответ поддержки',
       telegramText: 'Ответ поддержки',
       emailSubject: 'Ответ поддержки',
       emailText: 'Ответ поддержки',
@@ -100,12 +118,15 @@ describe('notifyUser', () => {
     })
     mocks.prisma.notificationLog.create.mockResolvedValue({})
     mocks.prisma.notificationLog.updateMany.mockResolvedValue({ count: 1 })
+    mocks.prisma.userNotification.create.mockResolvedValue({})
     global.fetch = vi.fn(async () => new Response('bad token', { status: 401 })) as typeof fetch
 
     const result = await notifyUser({
       userId: 'user-1',
       type: 'PAYMENT_FAILED',
       dedupeKey: 'payment-1',
+      title: 'Платёж отменён',
+      body: 'Платёж отменён',
       telegramText: 'Платёж отменён',
     })
 

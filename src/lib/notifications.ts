@@ -8,6 +8,10 @@ type NotifyUserInput = {
   userId: string
   type: NotificationType
   dedupeKey: string
+  title: string
+  body: string
+  actionHref?: string
+  actionLabel?: string
   telegramText?: string
   emailSubject?: string
   emailText?: string
@@ -31,6 +35,16 @@ export async function notifyUser(input: NotifyUserInput) {
   if (!user) {
     return { telegram: 'skipped' as NotifyResult, email: 'skipped' as NotifyResult }
   }
+
+  await createInAppNotification({
+    userId: user.id,
+    type: input.type,
+    dedupeKey: input.dedupeKey,
+    title: input.title,
+    body: input.body,
+    actionHref: input.actionHref,
+    actionLabel: input.actionLabel,
+  })
 
   const [telegram, email] = await Promise.all([
     user.telegramId && input.telegramText
@@ -88,6 +102,10 @@ export async function notifyPaymentSucceeded(paymentId: string) {
     userId: payment.user.id,
     type: 'PAYMENT_SUCCESS',
     dedupeKey: `payment-success:${payment.id}`,
+    title,
+    body,
+    actionHref: '/dashboard/subscription',
+    actionLabel: 'Открыть подписку',
     telegramText: [
       `<b>${escapeTelegram(title)}</b>`,
       escapeTelegram(body),
@@ -122,6 +140,10 @@ export async function notifyPaymentCanceled(paymentId: string, reason = 'Пла�
     userId: payment.user.id,
     type: 'PAYMENT_FAILED',
     dedupeKey: `payment-canceled:${payment.id}`,
+    title: 'Платёж не завершён',
+    body,
+    actionHref: '/dashboard/plans',
+    actionLabel: 'Открыть тарифы',
     telegramText: [`<b>Платёж не завершён</b>`, escapeTelegram(body)].join('\n'),
     emailSubject: `Платёж не завершён — ${getBrandName()}`,
     emailText: `${body}\n\nОткрыть тарифы: ${getAppUrl()}/dashboard/plans`,
@@ -148,6 +170,10 @@ export async function notifyPaymentStuck(paymentId: string, reason = 'Платё
     userId: payment.userId,
     type: 'PAYMENT_STUCK',
     dedupeKey: `payment-stuck:${payment.id}`,
+    title: 'Платёж в проверке',
+    body,
+    actionHref: '/dashboard/support',
+    actionLabel: 'Написать в поддержку',
     telegramText: [`<b>Платёж в проверке</b>`, escapeTelegram(body)].join('\n'),
     emailSubject: `Платёж в проверке — ${getBrandName()}`,
     emailText: `${body}\n\nПоддержка: ${getAppUrl()}/dashboard/support`,
@@ -179,6 +205,10 @@ export async function notifySupportReply(input: { ticketId: string; messageId: s
     userId: ticket.userId,
     type: 'SUPPORT_REPLY',
     dedupeKey: `support-reply:${input.messageId}`,
+    title: 'Ответ поддержки',
+    body,
+    actionHref: '/dashboard/support',
+    actionLabel: 'Открыть чат',
     telegramText: [`<b>Ответ поддержки</b>`, escapeTelegram(body)].join('\n'),
     emailSubject: `Ответ поддержки — ${getBrandName()}`,
     emailText: `${body}\n\nОткрыть поддержку: ${getAppUrl()}/dashboard/support`,
@@ -203,6 +233,10 @@ export async function notifyBonusGranted(input: { userId: string; attemptsCount:
     userId: input.userId,
     type: 'BONUS_GRANTED',
     dedupeKey: `bonus-granted:${input.userId}:${Date.now()}`,
+    title: 'Бонус начислен',
+    body,
+    actionHref: '/dashboard/bonus-box',
+    actionLabel: 'Открыть бонусы',
     telegramText: [`<b>Бонус начислен</b>`, escapeTelegram(body)].join('\n'),
     emailSubject: `Бонус начислен — ${getBrandName()}`,
     emailText: `${body}\n\nОткрыть бонусы: ${getAppUrl()}/dashboard`,
@@ -230,6 +264,10 @@ export async function notifySubscriptionExpiring(input: {
     userId: input.userId,
     type: 'SUBSCRIPTION_EXPIRING',
     dedupeKey: `subscription-expiring:${input.subscriptionId}:${input.stage}`,
+    title: 'Подписка скоро закончится',
+    body,
+    actionHref: '/dashboard/plans',
+    actionLabel: 'Продлить',
     telegramText: [`<b>Подписка скоро закончится</b>`, escapeTelegram(body)].join('\n'),
     emailSubject: `Подписка скоро закончится — ${getBrandName()}`,
     emailText: `${body}\n\nПродлить: ${getAppUrl()}/dashboard/plans`,
@@ -259,6 +297,10 @@ export async function notifyTrafficLimit(input: {
     userId: input.userId,
     type: 'TRAFFIC_LIMIT',
     dedupeKey: `traffic-limit:${input.subscriptionId}:${input.stage}`,
+    title: 'Трафик подходит к лимиту',
+    body,
+    actionHref: '/dashboard/subscription',
+    actionLabel: 'Открыть подписку',
     telegramText: [`<b>Трафик подходит к лимиту</b>`, escapeTelegram(body)].join('\n'),
     emailSubject: `Трафик подходит к лимиту — ${getBrandName()}`,
     emailText: `${body}\n\nОткрыть подписку: ${getAppUrl()}/dashboard/subscription`,
@@ -270,6 +312,32 @@ export async function notifyTrafficLimit(input: {
       ctaUrl: `${getAppUrl()}/dashboard/subscription`,
     }),
   })
+}
+
+async function createInAppNotification(input: {
+  userId: string
+  type: NotificationType
+  dedupeKey: string
+  title: string
+  body: string
+  actionHref?: string
+  actionLabel?: string
+}) {
+  try {
+    await prisma.userNotification.create({
+      data: {
+        userId: input.userId,
+        type: input.type,
+        dedupeKey: `${input.type}:${input.dedupeKey}`,
+        title: input.title,
+        body: input.body,
+        actionHref: input.actionHref,
+        actionLabel: input.actionLabel,
+      },
+    })
+  } catch (error) {
+    if (!isUniqueError(error)) throw error
+  }
 }
 
 async function sendWithDedupe(input: {

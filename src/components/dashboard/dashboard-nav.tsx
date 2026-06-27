@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { createPortal } from 'react-dom'
 import {
+  Bell,
   CreditCard,
   Database,
   FileClock,
@@ -32,6 +33,7 @@ const nav = [
   { href: '/dashboard/subscription', label: 'Подписка', icon: KeyRound },
   { href: '/dashboard/plans', label: 'Тарифы', icon: ShieldCheck },
   { href: '/dashboard/billing', label: 'Платежи', icon: CreditCard },
+  { href: '/dashboard/notifications', label: 'Уведомления', icon: Bell },
   { href: '/dashboard/bonus-box', label: 'Бонусы', icon: Gift },
   { href: '/dashboard/referrals', label: 'Рефералы', icon: UsersRound },
   { href: '/dashboard/devices', label: 'Устройства', icon: Laptop },
