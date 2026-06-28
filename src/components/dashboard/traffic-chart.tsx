@@ -116,11 +116,11 @@ function TrafficPulsePanel({ series }: { series: SeriesPoint[] }) {
   const pulse = useMemo(() => makeTrafficPulse(series), [series])
 
   return (
-    <div className="grid gap-3 lg:grid-cols-[1fr_260px]">
-      <div className="rounded-lg border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-3 shadow-inner">
-        <div className="mb-3 flex items-center justify-between gap-3">
+    <div className="grid gap-3 lg:grid-cols-[1fr_220px]">
+      <div className="rounded-lg border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-cyan-50/30 p-3 shadow-inner">
+        <div className="mb-4 flex items-center justify-between gap-3">
           <div>
-            <div className="text-xs font-medium uppercase text-slate-500">Активность по дням</div>
+            <div className="text-xs font-medium uppercase tracking-wide text-slate-500">Активность по дням</div>
             <div className="mt-0.5 text-sm font-semibold text-slate-900">{pulse.activeDays} активных дней из {series.length}</div>
           </div>
           <div className="rounded-full border border-cyan-100 bg-cyan-50 px-3 py-1 text-xs font-medium text-cyan-700">
@@ -128,21 +128,34 @@ function TrafficPulsePanel({ series }: { series: SeriesPoint[] }) {
           </div>
         </div>
 
-        <div className="grid grid-cols-[repeat(30,minmax(0,1fr))] items-end gap-1.5 sm:gap-2">
-          {pulse.days.map((day) => (
-            <div key={day.date} className="group flex min-w-0 flex-col items-center gap-1">
-              <div className="relative flex h-24 w-full items-end justify-center rounded-full bg-slate-100 px-0.5 py-1">
+        <div className="relative rounded-lg border border-slate-200/80 bg-white/80 px-3 pb-7 pt-4">
+          <div className="pointer-events-none absolute left-3 right-3 top-1/2 border-t border-dashed border-slate-200" />
+          <div className="pointer-events-none absolute bottom-7 left-3 right-3 border-t border-slate-200" />
+
+          <div className="grid h-28 grid-cols-[repeat(30,minmax(0,1fr))] items-end gap-1.5 sm:gap-2">
+            {pulse.days.map((day) => (
+              <div key={day.date} className="group relative flex h-full min-w-0 items-end justify-center">
                 <div
-                  className={`w-full max-w-[12px] rounded-full bg-gradient-to-t ${day.isPeak ? 'from-emerald-500 to-cyan-400 shadow-[0_0_18px_rgba(6,182,212,0.45)]' : 'from-sky-500 to-cyan-300'} transition-all duration-300 group-hover:scale-105`}
-                  style={{ height: `${Math.max(day.height, day.bytes > 0n ? 12 : 4)}%`, opacity: day.bytes > 0n ? 1 : 0.28 }}
+                  className={`w-full max-w-[18px] rounded-t-md rounded-b-sm bg-gradient-to-t transition-all duration-300 group-hover:-translate-y-0.5 ${
+                    day.isPeak
+                      ? 'from-emerald-500 via-teal-400 to-cyan-300 shadow-[0_0_18px_rgba(20,184,166,0.32)]'
+                      : 'from-sky-600 via-cyan-400 to-cyan-200 shadow-[0_8px_18px_rgba(14,165,233,0.16)]'
+                  }`}
+                  style={{
+                    height: `${day.visualHeight}%`,
+                    opacity: day.bytes > 0n ? 1 : 0.2,
+                  }}
+                  title={`${formatChartDate(day.date)}: ${formatBytes(day.bytes)}`}
                 />
+                {day.showLabel && (
+                  <span className="absolute top-[calc(100%+0.35rem)] text-[10px] text-slate-400">
+                    {formatDayNumber(day.date)}
+                  </span>
+                )}
+                <span className="sr-only">{formatChartDate(day.date)}: {formatBytes(day.bytes)}</span>
               </div>
-              <span className="hidden text-[10px] text-slate-400 sm:block">
-                {day.showLabel ? formatDayNumber(day.date) : ''}
-              </span>
-              <span className="sr-only">{formatChartDate(day.date)}: {formatBytes(day.bytes)}</span>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       </div>
 
@@ -223,7 +236,9 @@ function makeTrafficPulse(series: SeriesPoint[]) {
     average,
     days: days.map((day, index) => ({
       ...day,
-      height: max > 0n ? Number((day.bytes * 100n) / max) : 0,
+      visualHeight: max > 0n && day.bytes > 0n
+        ? Math.min(100, Math.max(10, Number((day.bytes * 100n) / max)))
+        : 4,
       isPeak: day.date === peak.date && day.bytes > 0n,
       showLabel: index === 0 || index === days.length - 1 || index % labelStep === 0,
     })),
