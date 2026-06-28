@@ -14,6 +14,8 @@ const ACTION_LABELS: Record<AuditAction, string> = {
   ADMIN_PROFILE_UPDATED: 'Профиль',
   PROMO_CODE_CREATED: 'Промокод создан',
   PROMO_CODE_UPDATED: 'Промокод изменен',
+  GIFT_CERTIFICATE_CREATED: 'Сертификат создан',
+  GIFT_CERTIFICATE_UPDATED: 'Сертификат изменен',
   PAYMENT_SYNCED: 'Платеж',
   SYSTEM_BACKUP_CREATED: 'Бэкап',
 }

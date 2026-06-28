@@ -42,6 +42,7 @@ model Plan {
   subscriptions   Subscription[]
   promoCodePlans  PromoCodePlan[]
   trialRedemptions TrialPlanRedemption[]
+  giftCertificates GiftCertificate[]
 
   @@index([isActive, sortOrder])
   @@unique([remnashopPlanId, durationDays])
@@ -105,6 +106,7 @@ model User {
   supportTickets        SupportTicket[]
   supportMessages       SupportMessage[]
   promoCodeRedemptions  PromoCodeRedemption[]
+  giftCertificateRedemptions GiftCertificateRedemption[]
   trialPlanRedemptions  TrialPlanRedemption[]
   emailVerificationTokens EmailVerificationToken[]
   passwordResetTokens   PasswordResetToken[]
@@ -341,6 +343,7 @@ model Payment {
   promoCode       PromoCode? @relation(fields: [promoCodeId], references: [id], onDelete: SetNull)
   promoCodeRedemption PromoCodeRedemption?
   trialPlanRedemption TrialPlanRedemption?
+  giftCertificateRedemption GiftCertificateRedemption?
   provisioningJob ProvisioningJob?
   referralRewardTriggered ReferralReward?
 
@@ -493,6 +496,50 @@ model PromoCodeRedemption {
 
 enum PromoCodeRedemptionStatus {
   PENDING
+  SUCCEEDED
+  CANCELED
+}
+
+model GiftCertificate {
+  id             String   @id @default(cuid())
+  code           String   @unique
+  planId         String
+  durationDays   Int
+  maxUses        Int      @default(1)
+  maxUsesPerUser Int      @default(1)
+  isActive       Boolean  @default(true)
+  startsAt       DateTime?
+  expiresAt      DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  plan           Plan     @relation(fields: [planId], references: [id], onDelete: Restrict)
+  redemptions    GiftCertificateRedemption[]
+
+  @@index([isActive, startsAt, expiresAt])
+  @@index([planId])
+}
+
+model GiftCertificateRedemption {
+  id                String   @id @default(cuid())
+  giftCertificateId String
+  userId            String
+  paymentId         String   @unique
+  status            GiftCertificateRedemptionStatus @default(SUCCEEDED)
+  codeSnapshot      String
+  durationDays      Int
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  giftCertificate   GiftCertificate @relation(fields: [giftCertificateId], references: [id], onDelete: Cascade)
+  user              User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  payment           Payment         @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+
+  @@index([giftCertificateId, status])
+  @@index([userId, giftCertificateId, status])
+}
+
+enum GiftCertificateRedemptionStatus {
   SUCCEEDED
   CANCELED
 }
@@ -710,6 +757,8 @@ enum AuditAction {
   ADMIN_PROFILE_UPDATED
   PROMO_CODE_CREATED
   PROMO_CODE_UPDATED
+  GIFT_CERTIFICATE_CREATED
+  GIFT_CERTIFICATE_UPDATED
   PAYMENT_SYNCED
   SYSTEM_BACKUP_CREATED
 }

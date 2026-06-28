@@ -9,6 +9,7 @@ import { PageHeader } from '@/components/dashboard/page-header'
 import { getCurrentUser } from '@/lib/auth/cookies'
 import { CheckCircle2, CreditCard, KeyRound, ShieldCheck } from 'lucide-react'
 import { getPlanAudienceContext, isPlanAvailableForUser } from '@/lib/plan-access'
+import { GiftCertificateRedeem } from '@/components/dashboard/gift-certificate-redeem'
 
 export const revalidate = 300 // кэш на 5 минут
 
@@ -122,6 +123,8 @@ export default async function PlansPage({
           </Link>
         </div>
       )}
+
+      {session && <GiftCertificateRedeem />}
 
       <div className="grid auto-rows-fr grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
         {visiblePlans.length === 0 && (
