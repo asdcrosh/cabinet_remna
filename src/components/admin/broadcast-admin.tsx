@@ -184,6 +184,9 @@ const previewVariables: Record<string, string> = {
   ref_link: 'https://cabinet.example/ref/ABCD',
 }
 
+const MAX_UPLOAD_IMAGE_SIZE = 10 * 1024 * 1024
+const ALLOWED_UPLOAD_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif'])
+
 export function BroadcastAdmin({ initialHistory = [] }: { initialHistory?: BroadcastHistoryItem[] }) {
   const bodyInputRef = useRef<HTMLTextAreaElement | null>(null)
   const [segment, setSegment] = useState<BroadcastSegment>('ALL')
@@ -263,6 +266,19 @@ export function BroadcastAdmin({ initialHistory = [] }: { initialHistory?: Broad
 
   async function uploadImage(file: File | null) {
     if (!file) return
+    if (!ALLOWED_UPLOAD_IMAGE_TYPES.has(file.type)) {
+      toast('Неподдерживаемый формат. Загрузите JPG, PNG, WEBP или GIF.')
+      return
+    }
+    if (file.size <= 0) {
+      toast('Файл пустой. Выберите другое изображение.')
+      return
+    }
+    if (file.size > MAX_UPLOAD_IMAGE_SIZE) {
+      toast(`Картинка слишком большая: ${formatFileSize(file.size)}. Максимум 10 МБ.`)
+      return
+    }
+
     setUploadingImage(true)
     try {
       const form = new FormData()
@@ -272,7 +288,7 @@ export function BroadcastAdmin({ initialHistory = [] }: { initialHistory?: Broad
         body: form,
       })
       const data = await response.json().catch(() => null)
-      if (!response.ok) throw new Error(data?.error || `Ошибка ${response.status}`)
+      if (!response.ok) throw new Error(getUploadErrorMessage(response.status, data))
       setImageUrl(data.url)
       setImageLoadFailed(false)
       toast('Картинка загружена', 'success')
@@ -486,7 +502,7 @@ export function BroadcastAdmin({ initialHistory = [] }: { initialHistory?: Broad
                   </button>
                 ) : null}
               </div>
-              <span className="mt-1 block text-xs text-slate-400">До 5 МБ: JPG, PNG, WEBP или GIF. Можно оставить пустым.</span>
+              <span className="mt-1 block text-xs text-slate-400">До 10 МБ: JPG, PNG, WEBP или GIF. Можно оставить пустым.</span>
             </label>
 
             <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50 shadow-sm dark:border-white/10 dark:bg-white/5">
@@ -660,4 +676,19 @@ function getPreviewImageUrl(value: string) {
   } catch {
     return href
   }
+}
+
+function getUploadErrorMessage(status: number, data: any) {
+  if (data && typeof data.error === 'string' && data.error.trim()) return data.error
+  if (status === 413) return 'Картинка слишком большая. Максимум 10 МБ, а nginx/Next должны быть обновлены до нового лимита.'
+  if (status === 401) return 'Сессия истекла. Войдите заново и повторите загрузку.'
+  if (status === 403) return 'Загружать картинки может только администратор.'
+  if (status === 415) return 'Неподдерживаемый формат. Загрузите JPG, PNG, WEBP или GIF.'
+  return `Не удалось загрузить картинку. Код ошибки: ${status}.`
+}
+
+function formatFileSize(bytes: number) {
+  if (bytes >= 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} МБ`
+  if (bytes >= 1024) return `${Math.ceil(bytes / 1024)} КБ`
+  return `${bytes} Б`
 }

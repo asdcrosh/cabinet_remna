@@ -8,7 +8,7 @@ import { getAppUrl } from '@/lib/app-url'
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-const MAX_IMAGE_SIZE = 5 * 1024 * 1024
+const MAX_IMAGE_SIZE = 10 * 1024 * 1024
 const ALLOWED_TYPES = new Map([
   ['image/jpeg', 'jpg'],
   ['image/png', 'png'],
@@ -31,7 +31,7 @@ export const POST = withAuth(async (req: Request) => {
   }
 
   if (file.size <= 0 || file.size > MAX_IMAGE_SIZE) {
-    return NextResponse.json({ error: 'Картинка должна быть до 5 МБ' }, { status: 400 })
+    return NextResponse.json({ error: 'Картинка должна быть до 10 МБ' }, { status: 400 })
   }
 
   const bytes = Buffer.from(await file.arrayBuffer())
