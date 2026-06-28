@@ -10,6 +10,7 @@ import { UserProfileEditButton } from '@/components/admin/user-profile-edit-butt
 import { LazyListLoader } from '@/components/admin/lazy-list-loader'
 import { ADMIN_LIST_PAGE_SIZE, parseAdminListLimit } from '@/lib/admin-list'
 import { UserPlanButton } from '@/components/admin/user-plan-button'
+import { formatPrice } from '@/lib/format'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Пользователи — Админка' }
@@ -65,6 +66,16 @@ export default async function AdminUsersPage({
           orderBy: { expireAt: 'desc' },
           take: 1,
           include: { plan: true },
+        },
+        payments: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          select: {
+            status: true,
+            amountKopecks: true,
+            createdAt: true,
+            plan: { select: { name: true } },
+          },
         },
         _count: { select: { payments: true, subscriptions: true, devices: true } },
       },
@@ -134,6 +145,7 @@ export default async function AdminUsersPage({
       <div className={users.length > 0 ? 'space-y-3' : 'hidden'}>
         {users.map((user) => {
           const subscription = user.subscriptions[0]
+          const lastPayment = user.payments[0]
           const attemptsCount = attemptsByUser.get(user.id) ?? 0
           return (
             <article key={user.id} className="overflow-hidden rounded-lg border bg-white shadow-sm dark:bg-surface-900">
@@ -227,6 +239,15 @@ export default async function AdminUsersPage({
                   <InfoCell label="Short UUID" value={user.remnawaveShortUuid || '—'} mono />
                   <InfoCell label="Последний вход" value={user.lastLoginAt ? user.lastLoginAt.toLocaleString('ru-RU') : 'Не входил'} />
                   <InfoCell label="Подписок всего" value={user._count.subscriptions} />
+                  <InfoCell
+                    label="Последняя оплата"
+                    value={lastPayment ? `${paymentStatusLabel(lastPayment.status)} · ${formatPrice(lastPayment.amountKopecks)}` : 'Нет оплат'}
+                    ok={lastPayment?.status === 'SUCCEEDED'}
+                  />
+                  <InfoCell
+                    label="Тариф оплаты"
+                    value={lastPayment ? `${lastPayment.plan.name} · ${lastPayment.createdAt.toLocaleDateString('ru-RU')}` : '—'}
+                  />
                 </div>
               </details>
             </article>
@@ -237,6 +258,16 @@ export default async function AdminUsersPage({
       <LazyListLoader loaded={users.length} total={total} step={ADMIN_LIST_PAGE_SIZE} />
     </div>
   )
+}
+
+function paymentStatusLabel(status: string) {
+  const labels: Record<string, string> = {
+    PENDING: 'Ожидает',
+    SUCCEEDED: 'Оплачен',
+    CANCELED: 'Отменён',
+    REFUNDED: 'Возврат',
+  }
+  return labels[status] ?? status
 }
 
 function Counter({ value, label }: { value: number; label: string }) {

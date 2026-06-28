@@ -12,18 +12,30 @@ export default async function BroadcastsPage() {
     select: {
       id: true,
       title: true,
+      body: true,
       segment: true,
       channels: true,
+      actionHref: true,
+      actionLabel: true,
+      imageUrl: true,
       recipients: true,
       inAppCount: true,
       telegramSent: true,
+      telegramSkipped: true,
+      telegramDuplicate: true,
       telegramFailed: true,
       emailSent: true,
+      emailSkipped: true,
+      emailDuplicate: true,
       emailFailed: true,
       limited: true,
       createdAt: true,
       createdBy: { select: { email: true, name: true } },
     },
+  })
+  const templates = await prisma.broadcastTemplate.findMany({
+    orderBy: { createdAt: 'desc' },
+    take: 50,
   })
 
   return (
@@ -41,6 +53,11 @@ export default async function BroadcastsPage() {
           ...item,
           createdAt: item.createdAt.toISOString(),
           createdBy: item.createdBy ? item.createdBy.name || item.createdBy.email : null,
+        }))}
+        initialTemplates={templates.map((template) => ({
+          ...template,
+          createdAt: template.createdAt.toISOString(),
+          updatedAt: template.updatedAt.toISOString(),
         }))}
       />
     </div>

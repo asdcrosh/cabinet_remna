@@ -41,7 +41,7 @@ async function runOnce() {
     where: {
       createdAt: { lte: cutoff },
       OR: [
-        { status: 'PENDING', yookassaId: { not: null } },
+        { status: 'PENDING' },
         { status: 'SUCCEEDED', subscriptionProvisionedAt: null },
       ],
     },

@@ -34,6 +34,8 @@ export default async function AdminDashboardPage() {
   todayStart.setHours(0, 0, 0, 0)
   const dayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000)
   const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+  const twoWeeksAgo = new Date(now.getTime() - 13 * 24 * 60 * 60 * 1000)
+  twoWeeksAgo.setHours(0, 0, 0, 0)
   const [
     usersTotal,
     usersToday,
@@ -50,6 +52,8 @@ export default async function AdminDashboardPage() {
     auditEvents,
     payingUsersResult,
     sourceRows,
+    dailyPaymentRows,
+    dailyUserRows,
   ] = await Promise.all([
     prisma.user.count(),
     prisma.user.count({ where: { createdAt: { gte: todayStart } } }),
@@ -121,6 +125,24 @@ export default async function AdminDashboardPage() {
       FROM categorized
       GROUP BY source
     `,
+    prisma.$queryRaw<Array<{ day: Date; payments: bigint; amount: bigint }>>`
+      SELECT
+        date_trunc('day', COALESCE(p."paidAt", p."createdAt"))::date AS day,
+        COUNT(*)::bigint AS payments,
+        COALESCE(SUM(p."amountKopecks"), 0)::bigint AS amount
+      FROM "Payment" p
+      WHERE p.status = 'SUCCEEDED'
+        AND COALESCE(p."paidAt", p."createdAt") >= ${twoWeeksAgo}
+      GROUP BY 1
+      ORDER BY 1 ASC
+    `,
+    prisma.$queryRaw<Array<{ day: Date; users: bigint }>>`
+      SELECT date_trunc('day', u."createdAt")::date AS day, COUNT(*)::bigint AS users
+      FROM "User" u
+      WHERE u."createdAt" >= ${twoWeeksAgo}
+      GROUP BY 1
+      ORDER BY 1 ASC
+    `,
   ])
   const customersTotal = sourceRows.reduce((sum, row) => sum + Number(row.count), 0)
   const payingUsers = Number(payingUsersResult[0]?.count ?? 0)
@@ -131,6 +153,7 @@ export default async function AdminDashboardPage() {
     yandex: sourceCount(sourceRows, 'yandex'),
     email: sourceCount(sourceRows, 'email'),
   }
+  const trendDays = buildTrendDays(twoWeeksAgo, now, dailyPaymentRows, dailyUserRows)
 
   return (
     <div className="space-y-6">
@@ -227,6 +250,8 @@ export default async function AdminDashboardPage() {
             />
           </div>
         </div>
+
+        <TrendPanel days={trendDays} />
       </section>
 
       <section className="space-y-3">
@@ -319,6 +344,74 @@ export default async function AdminDashboardPage() {
   )
 }
 
+function TrendPanel({
+  days,
+}: {
+  days: Array<{ label: string; users: number; payments: number; amountKopecks: number }>
+}) {
+  const maxAmount = Math.max(1, ...days.map((day) => day.amountKopecks))
+  const maxUsers = Math.max(1, ...days.map((day) => day.users))
+  const totals = days.reduce(
+    (acc, day) => {
+      acc.users += day.users
+      acc.payments += day.payments
+      acc.amount += day.amountKopecks
+      return acc
+    },
+    { users: 0, payments: 0, amount: 0 }
+  )
+
+  return (
+    <div className="rounded-lg border bg-white/80 p-4 shadow-sm dark:border-white/10 dark:bg-surface-900/80">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <div className="text-sm font-semibold">Динамика за 14 дней</div>
+          <div className="mt-0.5 text-xs text-slate-500">
+            {totals.users} регистраций · {totals.payments} оплат · {formatPrice(totals.amount)}
+          </div>
+        </div>
+        <BarChart3 className="h-5 w-5 text-slate-400" />
+      </div>
+      <div className="mt-4 grid items-end gap-1.5 overflow-x-auto pb-1" style={{ gridTemplateColumns: 'repeat(14, minmax(2rem, 1fr))' }}>
+        {days.map((day) => {
+          const amountHeight = Math.max(8, Math.round((day.amountKopecks / maxAmount) * 84))
+          const userHeight = Math.max(6, Math.round((day.users / maxUsers) * 42))
+          return (
+            <div key={day.label} className="flex min-w-8 flex-col items-center gap-1">
+              <div className="flex h-24 items-end gap-0.5">
+                <div
+                  className="w-2 rounded-full bg-cyan-400"
+                  style={{ height: day.amountKopecks > 0 ? amountHeight : 4 }}
+                  title={`${day.label}: ${formatPrice(day.amountKopecks)}`}
+                />
+                <div
+                  className="w-2 rounded-full bg-emerald-400"
+                  style={{ height: day.users > 0 ? userHeight : 4 }}
+                  title={`${day.label}: ${day.users} регистраций`}
+                />
+              </div>
+              <div className="text-[10px] text-slate-400">{day.label}</div>
+            </div>
+          )
+        })}
+      </div>
+      <div className="mt-3 flex flex-wrap gap-3 text-xs text-slate-500">
+        <LegendDot className="bg-cyan-400" label="выручка" />
+        <LegendDot className="bg-emerald-400" label="регистрации" />
+      </div>
+    </div>
+  )
+}
+
+function LegendDot({ className, label }: { className: string; label: string }) {
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span className={cn('h-2 w-2 rounded-full', className)} />
+      {label}
+    </span>
+  )
+}
+
 function AnalyticsCard({
   icon,
   title,
@@ -408,6 +501,41 @@ function SourceLine({
 
 function sourceCount(rows: Array<{ source: string; count: bigint }>, source: string) {
   return Number(rows.find((row) => row.source === source)?.count ?? 0)
+}
+
+function buildTrendDays(
+  start: Date,
+  end: Date,
+  payments: Array<{ day: Date; payments: bigint; amount: bigint }>,
+  users: Array<{ day: Date; users: bigint }>
+) {
+  const paymentMap = new Map(
+    payments.map((row) => [
+      dayKey(row.day),
+      { payments: Number(row.payments), amountKopecks: Number(row.amount) },
+    ])
+  )
+  const userMap = new Map(users.map((row) => [dayKey(row.day), Number(row.users)]))
+  const result: Array<{ label: string; users: number; payments: number; amountKopecks: number }> = []
+  const cursor = new Date(start)
+
+  while (cursor <= end && result.length < 14) {
+    const key = dayKey(cursor)
+    const payment = paymentMap.get(key)
+    result.push({
+      label: cursor.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' }),
+      users: userMap.get(key) ?? 0,
+      payments: payment?.payments ?? 0,
+      amountKopecks: payment?.amountKopecks ?? 0,
+    })
+    cursor.setDate(cursor.getDate() + 1)
+  }
+
+  return result
+}
+
+function dayKey(date: Date) {
+  return date.toISOString().slice(0, 10)
 }
 
 function AdminTile({

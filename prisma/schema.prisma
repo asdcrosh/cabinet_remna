@@ -116,6 +116,7 @@ model User {
   auditLogsAuthored          AuditLog[]                  @relation("AuditLogActor")
   auditLogsTargeted          AuditLog[]                  @relation("AuditLogTarget")
   broadcastCampaigns         BroadcastCampaign[]         @relation("BroadcastCampaignAuthor")
+  broadcastTemplates         BroadcastTemplate[]         @relation("BroadcastTemplateAuthor")
   notificationLogs           NotificationLog[]
   notifications              UserNotification[]
   adminNotificationReads     AdminNotificationRead[]
@@ -239,6 +240,26 @@ model BroadcastCampaign {
   createdAt         DateTime @default(now())
 
   createdBy User? @relation("BroadcastCampaignAuthor", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([createdById, createdAt])
+}
+
+model BroadcastTemplate {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  segment     String
+  channels    String[] @default([])
+  actionHref  String?
+  actionLabel String?
+  imageUrl    String?
+  body        String
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  createdBy User? @relation("BroadcastTemplateAuthor", fields: [createdById], references: [id], onDelete: SetNull)
 
   @@index([createdAt])
   @@index([createdById, createdAt])

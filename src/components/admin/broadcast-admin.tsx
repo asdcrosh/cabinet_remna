@@ -1,7 +1,7 @@
 'use client'
 
-import { useRef, useState } from 'react'
-import { Clock3, ImageIcon, Mail, MessageCircle, Send, Smartphone, UsersRound, X } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { Clock3, Eye, ImageIcon, Mail, MessageCircle, RotateCcw, Send, Smartphone, UsersRound, X } from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
 import { toast } from '@/components/ui/toaster'
 import { cn } from '@/lib/cn'
@@ -28,17 +28,39 @@ type BroadcastStats = {
 type BroadcastHistoryItem = {
   id: string
   title: string
+  body: string
   segment: string
   channels: string[]
+  actionHref: string | null
+  actionLabel: string | null
+  imageUrl: string | null
   recipients: number
   inAppCount: number
   telegramSent: number
+  telegramSkipped: number
+  telegramDuplicate: number
   telegramFailed: number
   emailSent: number
+  emailSkipped: number
+  emailDuplicate: number
   emailFailed: number
   limited: boolean
   createdAt: string
   createdBy: string | null
+}
+
+type BroadcastTemplateItem = {
+  id?: string
+  title: string
+  description?: string | null
+  segment: BroadcastSegment | string
+  channels: string[]
+  actionHref?: string | null
+  actionLabel?: string | null
+  imageUrl?: string | null
+  body: string
+  createdAt?: string
+  updatedAt?: string
 }
 
 const segments: Array<{ value: BroadcastSegment; label: string; description: string }> = [
@@ -186,8 +208,15 @@ const previewVariables: Record<string, string> = {
 
 const MAX_UPLOAD_IMAGE_SIZE = 15 * 1024 * 1024
 const ALLOWED_UPLOAD_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif'])
+const BROADCAST_DRAFT_KEY = 'remnawave-cabinet:broadcast-draft'
 
-export function BroadcastAdmin({ initialHistory = [] }: { initialHistory?: BroadcastHistoryItem[] }) {
+export function BroadcastAdmin({
+  initialHistory = [],
+  initialTemplates = [],
+}: {
+  initialHistory?: BroadcastHistoryItem[]
+  initialTemplates?: BroadcastTemplateItem[]
+}) {
   const bodyInputRef = useRef<HTMLTextAreaElement | null>(null)
   const [segment, setSegment] = useState<BroadcastSegment>('ALL')
   const [selectedChannels, setSelectedChannels] = useState<BroadcastChannel[]>(['IN_APP'])
@@ -201,12 +230,44 @@ export function BroadcastAdmin({ initialHistory = [] }: { initialHistory?: Broad
   const [loading, setLoading] = useState(false)
   const [stats, setStats] = useState<BroadcastStats | null>(null)
   const [history, setHistory] = useState<BroadcastHistoryItem[]>(initialHistory)
+  const [customTemplates, setCustomTemplates] = useState<BroadcastTemplateItem[]>(initialTemplates)
+  const [selectedHistoryItem, setSelectedHistoryItem] = useState<BroadcastHistoryItem | null>(null)
 
-  async function submit() {
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(BROADCAST_DRAFT_KEY)
+      if (!raw) return
+      const draft = JSON.parse(raw) as Partial<{
+        title: string
+        body: string
+        segment: BroadcastSegment
+        selectedChannels: BroadcastChannel[]
+        actionHref: string
+        actionLabel: string
+        imageUrl: string
+      }>
+      if (draft.title) setTitle(draft.title)
+      if (draft.body) setBody(draft.body)
+      if (draft.segment) setSegment(draft.segment)
+      if (draft.selectedChannels?.length) setSelectedChannels(draft.selectedChannels)
+      if (typeof draft.actionHref === 'string') setActionHref(draft.actionHref)
+      if (typeof draft.actionLabel === 'string') setActionLabel(draft.actionLabel)
+      if (typeof draft.imageUrl === 'string') setImageUrl(draft.imageUrl)
+    } catch {
+      window.localStorage.removeItem(BROADCAST_DRAFT_KEY)
+    }
+  }, [])
+
+  useEffect(() => {
+    const draft = { title, body, segment, selectedChannels, actionHref, actionLabel, imageUrl }
+    window.localStorage.setItem(BROADCAST_DRAFT_KEY, JSON.stringify(draft))
+  }, [actionHref, actionLabel, body, imageUrl, segment, selectedChannels, title])
+
+  async function submit(testMode = false) {
     setLoading(true)
     setStats(null)
     try {
-      const result = await apiFetch<{ stats: BroadcastStats; limited?: boolean; campaign?: BroadcastHistoryItem }>('/api/admin/broadcasts', {
+      const result = await apiFetch<{ stats: BroadcastStats; limited?: boolean; campaign?: BroadcastHistoryItem; testMode?: boolean }>('/api/admin/broadcasts', {
         method: 'POST',
         body: JSON.stringify({
           title,
@@ -216,13 +277,15 @@ export function BroadcastAdmin({ initialHistory = [] }: { initialHistory?: Broad
           actionHref,
           actionLabel,
           imageUrl: imageUrl.trim() || null,
+          testMode,
         }),
       })
       setStats(result.stats)
       if (result.campaign) {
         setHistory((current) => [result.campaign!, ...current].slice(0, 12))
       }
-      toast(result.limited ? 'Рассылка отправлена первым 5000 получателей' : 'Рассылка отправлена', 'success')
+      if (!testMode) window.localStorage.removeItem(BROADCAST_DRAFT_KEY)
+      toast(testMode ? 'Тестовая рассылка отправлена вам' : result.limited ? 'Рассылка отправлена первым 5000 получателей' : 'Рассылка отправлена', 'success')
     } catch {
       // apiFetch покажет ошибку.
     } finally {
@@ -254,14 +317,60 @@ export function BroadcastAdmin({ initialHistory = [] }: { initialHistory?: Broad
     })
   }
 
-  function applyTemplate(template: (typeof templates)[number]) {
+  function applyTemplate(template: BroadcastTemplateItem) {
     setTitle(template.title)
     setBody(template.body)
-    setSegment(template.segment)
-    setSelectedChannels(template.channels)
-    setActionHref(template.actionHref)
-    setActionLabel(template.actionLabel)
+    setSegment(template.segment as BroadcastSegment)
+    setSelectedChannels(template.channels.filter((channel): channel is BroadcastChannel => ['IN_APP', 'EMAIL', 'TELEGRAM'].includes(channel)))
+    setActionHref(template.actionHref || '')
+    setActionLabel(template.actionLabel || '')
+    setImageUrl(template.imageUrl || '')
     setStats(null)
+  }
+
+  async function saveTemplate() {
+    try {
+      const result = await apiFetch<{ template: BroadcastTemplateItem }>('/api/admin/broadcast-templates', {
+        method: 'POST',
+        body: JSON.stringify({
+          title,
+          description: `Сохранено ${new Intl.DateTimeFormat('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date())}`,
+          body,
+          segment,
+          channels: selectedChannels,
+          actionHref,
+          actionLabel,
+          imageUrl: imageUrl.trim() || null,
+        }),
+      })
+      setCustomTemplates((current) => [result.template, ...current].slice(0, 50))
+      toast('Шаблон сохранён', 'success')
+    } catch {
+      // apiFetch покажет ошибку.
+    }
+  }
+
+  async function deleteTemplate(templateId: string) {
+    try {
+      await apiFetch(`/api/admin/broadcast-templates/${encodeURIComponent(templateId)}`, { method: 'DELETE' })
+      setCustomTemplates((current) => current.filter((template) => template.id !== templateId))
+      toast('Шаблон удалён', 'success')
+    } catch {
+      // apiFetch покажет ошибку.
+    }
+  }
+
+  function applyHistoryItem(item: BroadcastHistoryItem) {
+    setTitle(item.title)
+    setBody(item.body)
+    setSegment(item.segment as BroadcastSegment)
+    setSelectedChannels(item.channels.filter((channel): channel is BroadcastChannel => ['IN_APP', 'EMAIL', 'TELEGRAM'].includes(channel)))
+    setActionHref(item.actionHref || '')
+    setActionLabel(item.actionLabel || '')
+    setImageUrl(item.imageUrl || '')
+    setImageLoadFailed(false)
+    setStats(null)
+    toast('Рассылка загружена в редактор', 'success')
   }
 
   async function uploadImage(file: File | null) {
@@ -305,6 +414,7 @@ export function BroadcastAdmin({ initialHistory = [] }: { initialHistory?: Broad
   const previewBody = renderPreview(body || 'Текст сообщения будет показан здесь.')
   const previewActionLabel = renderPreview(actionLabel || 'Открыть')
   const previewImageUrl = getPreviewImageUrl(imageUrl)
+  const visibleTemplates: BroadcastTemplateItem[] = [...customTemplates, ...templates]
 
   return (
     <section className="grid gap-4">
@@ -362,18 +472,28 @@ export function BroadcastAdmin({ initialHistory = [] }: { initialHistory?: Broad
           </div>
 
           <div className="mt-5">
-            <div className="text-sm font-semibold">Шаблоны</div>
+            <div className="flex items-center justify-between gap-2">
+              <div className="text-sm font-semibold">Шаблоны</div>
+              <button type="button" className="btn-secondary min-h-9 px-3 text-xs" onClick={saveTemplate} disabled={!canSend}>
+                Сохранить
+              </button>
+            </div>
             <div className="mt-2 grid gap-2">
-              {templates.map((template) => (
-                <button
-                  key={template.title}
-                  type="button"
-                  onClick={() => applyTemplate(template)}
-                  className="rounded-lg border border-slate-200 bg-white p-3 text-left transition-colors hover:bg-slate-50 dark:border-white/10 dark:bg-surface-900 dark:hover:bg-white/5"
+              {visibleTemplates.map((template) => (
+                <div
+                  key={template.id || template.title}
+                  className="rounded-lg border border-slate-200 bg-white p-3 transition-colors hover:bg-slate-50 dark:border-white/10 dark:bg-surface-900 dark:hover:bg-white/5"
                 >
-                  <div className="text-sm font-semibold">{template.title}</div>
-                  <div className="mt-0.5 text-xs text-slate-500">{template.description}</div>
-                </button>
+                  <button type="button" onClick={() => applyTemplate(template)} className="w-full text-left">
+                    <div className="text-sm font-semibold">{template.title}</div>
+                    <div className="mt-0.5 text-xs text-slate-500">{template.description || 'Пользовательский шаблон'}</div>
+                  </button>
+                  {template.id ? (
+                    <button type="button" className="mt-2 text-xs font-semibold text-red-600 hover:text-red-700" onClick={() => deleteTemplate(template.id!)}>
+                      Удалить шаблон
+                    </button>
+                  ) : null}
+                </div>
               ))}
             </div>
           </div>
@@ -563,21 +683,36 @@ export function BroadcastAdmin({ initialHistory = [] }: { initialHistory?: Broad
 
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               {stats ? <BroadcastStats stats={stats} /> : <div className="text-sm text-slate-500">Результат появится после отправки.</div>}
-              <button type="button" className="btn-primary min-h-11 px-5" onClick={submit} disabled={!canSend}>
-                <Send className="h-4 w-4" />
-                {loading ? 'Отправляем...' : 'Отправить'}
-              </button>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <button type="button" className="btn-secondary min-h-11 px-5" onClick={() => submit(true)} disabled={!canSend}>
+                  <Send className="h-4 w-4" />
+                  Тест себе
+                </button>
+                <button type="button" className="btn-primary min-h-11 px-5" onClick={() => submit(false)} disabled={!canSend}>
+                  <Send className="h-4 w-4" />
+                  {loading ? 'Отправляем...' : 'Отправить'}
+                </button>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      <BroadcastHistory history={history} />
+      <BroadcastHistory history={history} onRepeat={applyHistoryItem} onView={setSelectedHistoryItem} />
+      {selectedHistoryItem ? <BroadcastHistoryModal item={selectedHistoryItem} onClose={() => setSelectedHistoryItem(null)} /> : null}
     </section>
   )
 }
 
-function BroadcastHistory({ history }: { history: BroadcastHistoryItem[] }) {
+function BroadcastHistory({
+  history,
+  onRepeat,
+  onView,
+}: {
+  history: BroadcastHistoryItem[]
+  onRepeat: (item: BroadcastHistoryItem) => void
+  onView: (item: BroadcastHistoryItem) => void
+}) {
   return (
     <div className="card p-4">
       <div className="flex items-center gap-2">
@@ -599,7 +734,19 @@ function BroadcastHistory({ history }: { history: BroadcastHistoryItem[] }) {
                     {formatDateTime(item.createdAt)} · {segmentLabel(item.segment)} · {item.createdBy || 'Система'}
                   </div>
                 </div>
-                <div className="text-sm font-semibold text-slate-950 dark:text-white">{item.recipients} получ.</div>
+                <div className="flex flex-wrap gap-2">
+                  <button type="button" className="btn-secondary min-h-9 px-3 text-sm" onClick={() => onView(item)}>
+                    <Eye className="h-4 w-4" />
+                    Детали
+                  </button>
+                  <button type="button" className="btn-secondary min-h-9 px-3 text-sm" onClick={() => onRepeat(item)}>
+                    <RotateCcw className="h-4 w-4" />
+                    Повторить
+                  </button>
+                  <div className="grid min-h-9 place-items-center rounded-lg bg-slate-50 px-3 text-sm font-semibold text-slate-950 dark:bg-white/5 dark:text-white">
+                    {item.recipients} получ.
+                  </div>
+                </div>
               </div>
               <div className="mt-3 grid gap-2 text-xs text-slate-500 sm:grid-cols-3">
                 <HistoryMetric label="Кабинет" value={item.inAppCount} />
@@ -611,6 +758,49 @@ function BroadcastHistory({ history }: { history: BroadcastHistoryItem[] }) {
           ))}
         </div>
       )}
+    </div>
+  )
+}
+
+function BroadcastHistoryModal({ item, onClose }: { item: BroadcastHistoryItem; onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/45 p-4" role="dialog" aria-modal="true">
+      <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl dark:bg-surface-950">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Рассылка</div>
+            <h3 className="mt-1 text-xl font-semibold">{item.title}</h3>
+            <div className="mt-1 text-sm text-slate-500">
+              {formatDateTime(item.createdAt)} · {segmentLabel(item.segment)} · {item.createdBy || 'Система'}
+            </div>
+          </div>
+          <button type="button" className="btn-secondary min-h-10 px-3" onClick={onClose} aria-label="Закрыть">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        {item.imageUrl ? (
+          <div className="mt-4 overflow-hidden rounded-xl border border-slate-200 dark:border-white/10">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={getPreviewImageUrl(item.imageUrl)} alt="" className="max-h-80 w-full object-cover" />
+          </div>
+        ) : null}
+
+        <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-white/5">
+          <p className="whitespace-pre-wrap text-sm leading-6 text-slate-700 dark:text-slate-200">{item.body}</p>
+          {item.actionHref ? (
+            <div className="mt-3 rounded-lg bg-cyan-50 px-3 py-2 text-sm font-semibold text-cyan-800 dark:bg-cyan-500/10 dark:text-cyan-100">
+              {item.actionLabel || 'Открыть'} · {item.actionHref}
+            </div>
+          ) : null}
+        </div>
+
+        <div className="mt-4 grid gap-2 text-sm sm:grid-cols-3">
+          <HistoryMetric label="Кабинет" value={item.inAppCount} />
+          <HistoryMetric label="Telegram" value={item.telegramSent} failed={item.telegramFailed + item.telegramSkipped + item.telegramDuplicate} />
+          <HistoryMetric label="Email" value={item.emailSent} failed={item.emailFailed + item.emailSkipped + item.emailDuplicate} />
+        </div>
+      </div>
     </div>
   )
 }

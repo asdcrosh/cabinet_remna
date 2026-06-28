@@ -9,6 +9,7 @@ import { getAppUrl } from '@/lib/app-url'
 import { getBrandName } from '@/lib/branding'
 import { createAdminNotification } from '@/lib/admin-notifications'
 import { escapeTelegramHtml, renderTelegramCustomEmoji, stripTelegramCustomEmojiMarkup } from '@/lib/telegram-format'
+import { rateLimit } from '@/lib/rate-limit'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -24,6 +25,7 @@ const schema = z.object({
   actionHref: z.string().trim().max(180).optional().nullable(),
   actionLabel: z.string().trim().max(32).optional().nullable(),
   imageUrl: z.string().trim().url().max(600).optional().nullable().or(z.literal('')),
+  testMode: z.boolean().optional(),
 })
 
 export const POST = withAuth(async (req: Request) => {
@@ -34,26 +36,31 @@ export const POST = withAuth(async (req: Request) => {
   }
 
   const input = parsed.data
-  const users = await prisma.user.findMany({
-    where: buildSegmentWhere(input.segment),
-    select: {
-      id: true,
-      email: true,
-      name: true,
-      referralCode: true,
-      subscriptions: {
-        where: { status: { in: ACTIVE_SUBSCRIPTION_STATUSES }, expireAt: { gt: new Date() } },
-        orderBy: { expireAt: 'desc' },
+  const limit = await rateLimit(
+    req,
+    input.testMode ? `broadcast-test:${session.uid}` : `broadcast:${session.uid}`,
+    input.testMode ? 20 : 3,
+    input.testMode ? 60_000 : 5 * 60_000
+  )
+  if (!limit.ok) {
+    return NextResponse.json(
+      { error: 'Слишком много отправок. Подождите и попробуйте снова.' },
+      { status: 429, headers: { 'Retry-After': String(limit.retryAfter) } }
+    )
+  }
+
+  const users = input.testMode
+    ? await prisma.user.findMany({
+        where: { id: session.uid },
+        select: broadcastUserSelect,
         take: 1,
-        select: {
-          expireAt: true,
-          plan: { select: { name: true } },
-        },
-      },
-    },
-    orderBy: { createdAt: 'desc' },
-    take: MAX_RECIPIENTS,
-  })
+      })
+    : await prisma.user.findMany({
+        where: buildSegmentWhere(input.segment),
+        select: broadcastUserSelect,
+        orderBy: { createdAt: 'desc' },
+        take: MAX_RECIPIENTS,
+      })
 
   const actionHref = normalizeActionHref(input.actionHref)
   const actionUrl = actionHref ? `${getAppUrl()}${actionHref}` : getAppUrl()
@@ -114,6 +121,15 @@ export const POST = withAuth(async (req: Request) => {
     stats.email[result.email] += 1
   }
 
+  if (input.testMode) {
+    return NextResponse.json({
+      ok: true,
+      stats,
+      limited: false,
+      testMode: true,
+    })
+  }
+
   const campaign = await prisma.broadcastCampaign.create({
     data: {
       title: input.title,
@@ -139,13 +155,21 @@ export const POST = withAuth(async (req: Request) => {
     select: {
       id: true,
       title: true,
+      body: true,
       segment: true,
       channels: true,
+      actionHref: true,
+      actionLabel: true,
+      imageUrl: true,
       recipients: true,
       inAppCount: true,
       telegramSent: true,
+      telegramSkipped: true,
+      telegramDuplicate: true,
       telegramFailed: true,
       emailSent: true,
+      emailSkipped: true,
+      emailDuplicate: true,
       emailFailed: true,
       limited: true,
       createdAt: true,
@@ -174,6 +198,22 @@ export const POST = withAuth(async (req: Request) => {
     },
   })
 })
+
+const broadcastUserSelect = {
+  id: true,
+  email: true,
+  name: true,
+  referralCode: true,
+  subscriptions: {
+    where: { status: { in: ACTIVE_SUBSCRIPTION_STATUSES }, expireAt: { gt: new Date() } },
+    orderBy: { expireAt: 'desc' },
+    take: 1,
+    select: {
+      expireAt: true,
+      plan: { select: { name: true } },
+    },
+  },
+} satisfies Prisma.UserSelect
 
 function buildSegmentWhere(segment: z.infer<typeof schema>['segment']): Prisma.UserWhereInput {
   const now = new Date()

@@ -12,6 +12,7 @@ import { getAppUrl } from '@/lib/app-url'
 import { rateLimit } from '@/lib/rate-limit'
 import { provisionPaymentSubscription } from '@/lib/provisioning'
 import { getPlanAudienceContext, isPlanAvailableForUser } from '@/lib/plan-access'
+import { reconcileStalePendingPaymentsForUser } from '@/lib/payment-sync'
 
 export const runtime = 'nodejs'
 
@@ -46,6 +47,7 @@ export const POST = withAuth(async (req: Request) => {
   }
   const user = await prisma.user.findUnique({ where: { id: session.uid } })
   if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+  await reconcileStalePendingPaymentsForUser(user.id)
   const audienceContext = await getPlanAudienceContext(user.id)
   if (!audienceContext || !isPlanAvailableForUser(plan, audienceContext, { allowLink: plan.availability === 'LINK' })) {
     return NextResponse.json({ error: 'Этот тариф недоступен для вашего аккаунта' }, { status: 403 })
