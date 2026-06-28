@@ -184,7 +184,7 @@ const previewVariables: Record<string, string> = {
   ref_link: 'https://cabinet.example/ref/ABCD',
 }
 
-const MAX_UPLOAD_IMAGE_SIZE = 10 * 1024 * 1024
+const MAX_UPLOAD_IMAGE_SIZE = 15 * 1024 * 1024
 const ALLOWED_UPLOAD_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif'])
 
 export function BroadcastAdmin({ initialHistory = [] }: { initialHistory?: BroadcastHistoryItem[] }) {
@@ -275,7 +275,7 @@ export function BroadcastAdmin({ initialHistory = [] }: { initialHistory?: Broad
       return
     }
     if (file.size > MAX_UPLOAD_IMAGE_SIZE) {
-      toast(`Картинка слишком большая: ${formatFileSize(file.size)}. Максимум 10 МБ.`)
+      toast(`Картинка слишком большая: ${formatFileSize(file.size)}. Максимум 15 МБ.`)
       return
     }
 
@@ -502,7 +502,7 @@ export function BroadcastAdmin({ initialHistory = [] }: { initialHistory?: Broad
                   </button>
                 ) : null}
               </div>
-              <span className="mt-1 block text-xs text-slate-400">До 10 МБ: JPG, PNG, WEBP или GIF. Можно оставить пустым.</span>
+              <span className="mt-1 block text-xs text-slate-400">До 15 МБ: JPG, PNG, WEBP или GIF. Можно оставить пустым.</span>
             </label>
 
             <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50 shadow-sm dark:border-white/10 dark:bg-white/5">
@@ -680,7 +680,7 @@ function getPreviewImageUrl(value: string) {
 
 function getUploadErrorMessage(status: number, data: any) {
   if (data && typeof data.error === 'string' && data.error.trim()) return data.error
-  if (status === 413) return 'Картинка слишком большая. Максимум 10 МБ, а nginx/Next должны быть обновлены до нового лимита.'
+  if (status === 413) return 'Картинка слишком большая для загрузки. Сожмите изображение или выберите файл до 15 МБ.'
   if (status === 401) return 'Сессия истекла. Войдите заново и повторите загрузку.'
   if (status === 403) return 'Загружать картинки может только администратор.'
   if (status === 415) return 'Неподдерживаемый формат. Загрузите JPG, PNG, WEBP или GIF.'

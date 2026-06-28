@@ -323,7 +323,7 @@ server {
     ssl_certificate_key "${CERT_PRIVKEY_CONTAINER}";
     ssl_trusted_certificate "${CERT_FULLCHAIN_CONTAINER}";
 
-    client_max_body_size 12m;
+    client_max_body_size 25m;
 
     add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
     add_header X-Content-Type-Options "nosniff" always;
