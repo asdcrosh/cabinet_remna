@@ -94,6 +94,45 @@ export const POST = withAuth(async (req: Request) => {
     stats.email[result.email] += 1
   }
 
+  const campaign = await prisma.broadcastCampaign.create({
+    data: {
+      title: input.title,
+      body: plainBody,
+      segment: input.segment,
+      channels: input.channels,
+      actionHref,
+      actionLabel,
+      imageUrl,
+      recipients: stats.recipients,
+      inAppCount: stats.inApp,
+      telegramSent: stats.telegram.sent,
+      telegramSkipped: stats.telegram.skipped,
+      telegramDuplicate: stats.telegram.duplicate,
+      telegramFailed: stats.telegram.failed,
+      emailSent: stats.email.sent,
+      emailSkipped: stats.email.skipped,
+      emailDuplicate: stats.email.duplicate,
+      emailFailed: stats.email.failed,
+      limited: users.length === MAX_RECIPIENTS,
+      createdById: session.uid,
+    },
+    select: {
+      id: true,
+      title: true,
+      segment: true,
+      channels: true,
+      recipients: true,
+      inAppCount: true,
+      telegramSent: true,
+      telegramFailed: true,
+      emailSent: true,
+      emailFailed: true,
+      limited: true,
+      createdAt: true,
+      createdBy: { select: { email: true, name: true } },
+    },
+  })
+
   await createAdminNotification({
     type: 'broadcast',
     severity: 'INFO',
@@ -104,7 +143,16 @@ export const POST = withAuth(async (req: Request) => {
     actionLabel: 'Открыть рассылки',
   })
 
-  return NextResponse.json({ ok: true, stats, limited: users.length === MAX_RECIPIENTS })
+  return NextResponse.json({
+    ok: true,
+    stats,
+    limited: users.length === MAX_RECIPIENTS,
+    campaign: {
+      ...campaign,
+      createdAt: campaign.createdAt.toISOString(),
+      createdBy: campaign.createdBy ? campaign.createdBy.name || campaign.createdBy.email : null,
+    },
+  })
 })
 
 function buildSegmentWhere(segment: z.infer<typeof schema>['segment']): Prisma.UserWhereInput {

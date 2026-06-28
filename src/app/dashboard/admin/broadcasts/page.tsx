@@ -1,10 +1,30 @@
 import { requireAdminPage } from '@/lib/auth/admin-page'
 import { BroadcastAdmin } from '@/components/admin/broadcast-admin'
+import { prisma } from '@/lib/prisma'
 
 export const metadata = { title: 'Рассылки — Админка' }
 
 export default async function BroadcastsPage() {
   await requireAdminPage()
+  const history = await prisma.broadcastCampaign.findMany({
+    orderBy: { createdAt: 'desc' },
+    take: 12,
+    select: {
+      id: true,
+      title: true,
+      segment: true,
+      channels: true,
+      recipients: true,
+      inAppCount: true,
+      telegramSent: true,
+      telegramFailed: true,
+      emailSent: true,
+      emailFailed: true,
+      limited: true,
+      createdAt: true,
+      createdBy: { select: { email: true, name: true } },
+    },
+  })
 
   return (
     <div className="space-y-5">
@@ -16,7 +36,13 @@ export default async function BroadcastsPage() {
         </p>
       </header>
 
-      <BroadcastAdmin />
+      <BroadcastAdmin
+        initialHistory={history.map((item) => ({
+          ...item,
+          createdAt: item.createdAt.toISOString(),
+          createdBy: item.createdBy ? item.createdBy.name || item.createdBy.email : null,
+        }))}
+      />
     </div>
   )
 }

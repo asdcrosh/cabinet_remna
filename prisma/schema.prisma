@@ -20,32 +20,32 @@ datasource db {
 // trafficLimitGb — лимит трафика в ГБ; null = безлимит.
 // ----------------------------------------------------------------------
 model Plan {
-  id              String   @id @default(cuid())
-  name            String                            // "Базовый", "PRO", "Безлимит"
-  description     String?
-  priceKopecks    Int                               // 19900 = 199 ₽
-  durationDays    Int      @default(30)
-  remnashopPlanId Int?                              // исходный ID плана Remnashop для точной синхронизации
-  trafficLimitGb  Int?                              // null = безлимит
-  deviceLimit      Int      @default(5)
-  activeInternalSquads String[] @default([])        // UUID squads Remnawave для этого тарифа
-  availability    PlanAvailability @default(ALL)    // аудитория тарифа как в Remnashop
-  allowedEmails   String[] @default([])             // явный доступ для availability=ALLOWED
-  allowedTelegramIds String[] @default([])           // Telegram ID строками, чтобы безопасно отдавать JSON
-  isPromo         Boolean  @default(false)          // бесплатный одноразовый ознакомительный тариф
-  isActive        Boolean  @default(true)
-  sortOrder       Int      @default(0)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id                   String           @id @default(cuid())
+  name                 String // "Базовый", "PRO", "Безлимит"
+  description          String?
+  priceKopecks         Int // 19900 = 199 ₽
+  durationDays         Int              @default(30)
+  remnashopPlanId      Int? // исходный ID плана Remnashop для точной синхронизации
+  trafficLimitGb       Int? // null = безлимит
+  deviceLimit          Int              @default(5)
+  activeInternalSquads String[]         @default([]) // UUID squads Remnawave для этого тарифа
+  availability         PlanAvailability @default(ALL) // аудитория тарифа как в Remnashop
+  allowedEmails        String[]         @default([]) // явный доступ для availability=ALLOWED
+  allowedTelegramIds   String[]         @default([]) // Telegram ID строками, чтобы безопасно отдавать JSON
+  isPromo              Boolean          @default(false) // бесплатный одноразовый ознакомительный тариф
+  isActive             Boolean          @default(true)
+  sortOrder            Int              @default(0)
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
 
-  payments        Payment[]
-  subscriptions   Subscription[]
-  promoCodePlans  PromoCodePlan[]
+  payments         Payment[]
+  subscriptions    Subscription[]
+  promoCodePlans   PromoCodePlan[]
   trialRedemptions TrialPlanRedemption[]
   giftCertificates GiftCertificate[]
 
-  @@index([isActive, sortOrder])
   @@unique([remnashopPlanId, durationDays])
+  @@index([isActive, sortOrder])
 }
 
 enum PlanAvailability {
@@ -65,59 +65,60 @@ enum PlanAvailability {
 // чтобы не дёргать Remnawave при каждом логине.
 // ----------------------------------------------------------------------
 model User {
-  id                    String   @id @default(cuid())
-  email                 String   @unique
-  passwordHash          String
-  name                  String?
-  role                  UserRole @default(USER)
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String?
+  role         UserRole @default(USER)
 
   // Реферальная система: код пользователя и кто его пригласил.
-  referralCode          String?  @unique
-  referredById          String?
-  referredBy            User?    @relation("UserReferrals", fields: [referredById], references: [id], onDelete: SetNull)
-  referrals             User[]   @relation("UserReferrals")
-  referralRewardsEarned ReferralReward[] @relation("ReferralRewardsEarned")
-  referralRewardAsReferred ReferralReward? @relation("ReferralRewardReferred")
+  referralCode             String?          @unique
+  referredById             String?
+  referredBy               User?            @relation("UserReferrals", fields: [referredById], references: [id], onDelete: SetNull)
+  referrals                User[]           @relation("UserReferrals")
+  referralRewardsEarned    ReferralReward[] @relation("ReferralRewardsEarned")
+  referralRewardAsReferred ReferralReward?  @relation("ReferralRewardReferred")
 
   // Telegram привязывается после email-регистрации. Используем для поиска
   // пользователя в remnashop и привязки старой Remnawave-подписки.
-  telegramId            BigInt?  @unique
-  telegramUsername      String?
-  telegramLinkedAt      DateTime?
-  remnashopUserId       Int?     @unique
-  remnashopSyncedAt     DateTime?
+  telegramId        BigInt?   @unique
+  telegramUsername  String?
+  telegramLinkedAt  DateTime?
+  remnashopUserId   Int?      @unique
+  remnashopSyncedAt DateTime?
 
   // Ссылка на пользователя в Remnawave Panel. Заполняется при первой покупке.
-  remnawaveUuid         String?  @unique
-  remnawaveShortUuid    String?  @unique
-  remnawaveUsername     String?  @unique
+  remnawaveUuid      String? @unique
+  remnawaveShortUuid String? @unique
+  remnawaveUsername  String? @unique
 
   // Согласия
-  agreedToTermsAt       DateTime?
-  emailVerifiedAt       DateTime?
+  agreedToTermsAt DateTime?
+  emailVerifiedAt DateTime?
 
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
-  lastLoginAt           DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  lastLoginAt DateTime?
 
-  subscriptions         Subscription[]
-  payments              Payment[]
-  devices               Device[]
-  supportTickets        SupportTicket[]
-  supportMessages       SupportMessage[]
-  promoCodeRedemptions  PromoCodeRedemption[]
+  subscriptions              Subscription[]
+  payments                   Payment[]
+  devices                    Device[]
+  supportTickets             SupportTicket[]
+  supportMessages            SupportMessage[]
+  promoCodeRedemptions       PromoCodeRedemption[]
   giftCertificateRedemptions GiftCertificateRedemption[]
-  trialPlanRedemptions  TrialPlanRedemption[]
-  emailVerificationTokens EmailVerificationToken[]
-  passwordResetTokens   PasswordResetToken[]
-  oauthAccounts         OAuthAccount[]
-  bonusBoxAttempts      BonusBoxAttempt[]
-  bonusBoxOpenings      BonusBoxOpening[]
-  auditLogsAuthored     AuditLog[] @relation("AuditLogActor")
-  auditLogsTargeted     AuditLog[] @relation("AuditLogTarget")
-  notificationLogs      NotificationLog[]
-  notifications         UserNotification[]
-  adminNotificationReads AdminNotificationRead[]
+  trialPlanRedemptions       TrialPlanRedemption[]
+  emailVerificationTokens    EmailVerificationToken[]
+  passwordResetTokens        PasswordResetToken[]
+  oauthAccounts              OAuthAccount[]
+  bonusBoxAttempts           BonusBoxAttempt[]
+  bonusBoxOpenings           BonusBoxOpening[]
+  auditLogsAuthored          AuditLog[]                  @relation("AuditLogActor")
+  auditLogsTargeted          AuditLog[]                  @relation("AuditLogTarget")
+  broadcastCampaigns         BroadcastCampaign[]         @relation("BroadcastCampaignAuthor")
+  notificationLogs           NotificationLog[]
+  notifications              UserNotification[]
+  adminNotificationReads     AdminNotificationRead[]
 
   @@index([email])
   @@index([referredById])
@@ -140,7 +141,7 @@ model NotificationLog {
   error     String?
   createdAt DateTime            @default(now())
 
-  user      User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([channel, dedupeKey])
   @@index([userId, type, sentAt])
@@ -158,7 +159,7 @@ model UserNotification {
   readAt      DateTime?
   createdAt   DateTime         @default(now())
 
-  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, dedupeKey])
   @@index([userId, readAt, createdAt])
@@ -178,7 +179,7 @@ model AdminNotification {
   actionLabel String?
   createdAt   DateTime @default(now())
 
-  reads       AdminNotificationRead[]
+  reads AdminNotificationRead[]
 
   @@index([type, createdAt])
   @@index([severity, createdAt])
@@ -191,8 +192,8 @@ model AdminNotificationRead {
   userId         String
   readAt         DateTime @default(now())
 
-  notification   AdminNotification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
-  user           User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  notification AdminNotification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  user         User              @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([notificationId, userId])
   @@index([userId, readAt])
@@ -214,6 +215,35 @@ enum NotificationChannel {
   EMAIL
 }
 
+model BroadcastCampaign {
+  id                String   @id @default(cuid())
+  title             String
+  body              String
+  segment           String
+  channels          String[] @default([])
+  actionHref        String?
+  actionLabel       String?
+  imageUrl          String?
+  recipients        Int      @default(0)
+  inAppCount        Int      @default(0)
+  telegramSent      Int      @default(0)
+  telegramSkipped   Int      @default(0)
+  telegramDuplicate Int      @default(0)
+  telegramFailed    Int      @default(0)
+  emailSent         Int      @default(0)
+  emailSkipped      Int      @default(0)
+  emailDuplicate    Int      @default(0)
+  emailFailed       Int      @default(0)
+  limited           Boolean  @default(false)
+  createdById       String?
+  createdAt         DateTime @default(now())
+
+  createdBy User? @relation("BroadcastCampaignAuthor", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([createdById, createdAt])
+}
+
 model OAuthAccount {
   id             String   @id @default(cuid())
   userId         String
@@ -226,7 +256,7 @@ model OAuthAccount {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerUserId])
   @@index([userId])
@@ -234,28 +264,28 @@ model OAuthAccount {
 }
 
 model EmailVerificationToken {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   userId    String
-  tokenHash String   @unique
+  tokenHash String    @unique
   expiresAt DateTime
   usedAt    DateTime?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
 
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, usedAt])
   @@index([expiresAt])
 }
 
 model PasswordResetToken {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   userId    String
-  tokenHash String   @unique
+  tokenHash String    @unique
   expiresAt DateTime
   usedAt    DateTime?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
 
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, usedAt])
   @@index([expiresAt])
@@ -266,33 +296,33 @@ model PasswordResetToken {
 // чтобы ЛК работал быстро, не дёргая Panel при каждом запросе)
 // ----------------------------------------------------------------------
 model Subscription {
-  id            String   @id @default(cuid())
-  userId        String
-  planId        String?
+  id     String  @id @default(cuid())
+  userId String
+  planId String?
 
-  startAt       DateTime
-  expireAt      DateTime
-  status        SubscriptionStatus @default(ACTIVE)
+  startAt  DateTime
+  expireAt DateTime
+  status   SubscriptionStatus @default(ACTIVE)
 
   // Лимит трафика на текущий период (в байтах). null = безлимит.
   trafficLimitBytes BigInt?
   // Сколько использовано за текущий период (мы денормализуем из Remnawave).
-  trafficUsedBytes  BigInt @default(0)
+  trafficUsedBytes  BigInt   @default(0)
   // Lifetime-использование (как в Remnawave).
-  lifetimeUsedBytes BigInt @default(0)
+  lifetimeUsedBytes BigInt   @default(0)
   // Когда последний раз дёргали /api/subscription на нашей стороне.
-  lastSyncedAt  DateTime @default(now())
+  lastSyncedAt      DateTime @default(now())
 
   // Тех. флаг: в момент продления ещё раз зашли в Remnawave, чтобы получить новые ключи.
   // Чтобы не зафлэдить — используем флаг.
-  pendingSync   Boolean  @default(false)
+  pendingSync Boolean @default(false)
 
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  plan          Plan?    @relation(fields: [planId], references: [id], onDelete: SetNull)
-  payments      Payment[]
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan     Plan?     @relation(fields: [planId], references: [id], onDelete: SetNull)
+  payments Payment[]
 
   @@index([userId, status])
   @@index([expireAt])
@@ -312,40 +342,40 @@ enum SubscriptionStatus {
 // платежа, чтобы при ретрае webhook'а не создать две подписки.
 // ----------------------------------------------------------------------
 model Payment {
-  id              String   @id @default(cuid())
-  userId          String
-  subscriptionId  String?
-  planId          String
-  promoCodeId     String?
+  id             String  @id @default(cuid())
+  userId         String
+  subscriptionId String?
+  planId         String
+  promoCodeId    String?
 
   // Наши суммы (в копейках)
-  amountKopecks   Int
+  amountKopecks         Int
   originalAmountKopecks Int?
-  discountPercent Int?
-  discountKopecks Int      @default(0)
-  promoCodeSnapshot Json?
+  discountPercent       Int?
+  discountKopecks       Int   @default(0)
+  promoCodeSnapshot     Json?
 
   // Данные ЮKassa
-  yookassaId      String?  @unique
-  yookassaStatus  String?                       // pending / waiting_for_capture / succeeded / canceled
-  confirmationUrl String?                       // URL для редиректа пользователя
+  yookassaId      String? @unique
+  yookassaStatus  String? // pending / waiting_for_capture / succeeded / canceled
+  confirmationUrl String? // URL для редиректа пользователя
 
-  status          PaymentStatus @default(PENDING)
-  paidAt          DateTime?
+  status                    PaymentStatus @default(PENDING)
+  paidAt                    DateTime?
   subscriptionProvisionedAt DateTime?
-  provisioningError String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  provisioningError         String?
+  createdAt                 DateTime      @default(now())
+  updatedAt                 DateTime      @updatedAt
 
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  subscription    Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
-  plan            Plan     @relation(fields: [planId], references: [id], onDelete: Restrict)
-  promoCode       PromoCode? @relation(fields: [promoCodeId], references: [id], onDelete: SetNull)
-  promoCodeRedemption PromoCodeRedemption?
-  trialPlanRedemption TrialPlanRedemption?
+  user                      User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subscription              Subscription?              @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+  plan                      Plan                       @relation(fields: [planId], references: [id], onDelete: Restrict)
+  promoCode                 PromoCode?                 @relation(fields: [promoCodeId], references: [id], onDelete: SetNull)
+  promoCodeRedemption       PromoCodeRedemption?
+  trialPlanRedemption       TrialPlanRedemption?
   giftCertificateRedemption GiftCertificateRedemption?
-  provisioningJob ProvisioningJob?
-  referralRewardTriggered ReferralReward?
+  provisioningJob           ProvisioningJob?
+  referralRewardTriggered   ReferralReward?
 
   @@index([userId, createdAt])
   @@index([status])
@@ -360,21 +390,21 @@ enum PaymentStatus {
 }
 
 model ReferralReward {
-  id                  String   @id @default(cuid())
-  referrerId          String
-  referredUserId      String   @unique
-  triggeringPaymentId String   @unique
-  bonusDays           Int
-  status              ReferralRewardStatus @default(PENDING)
+  id                    String               @id @default(cuid())
+  referrerId            String
+  referredUserId        String               @unique
+  triggeringPaymentId   String               @unique
+  bonusDays             Int
+  status                ReferralRewardStatus @default(PENDING)
   appliedSubscriptionId String?
-  appliedAt           DateTime?
-  lastError           String?
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  appliedAt             DateTime?
+  lastError             String?
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
 
-  referrer            User     @relation("ReferralRewardsEarned", fields: [referrerId], references: [id], onDelete: Cascade)
-  referredUser        User     @relation("ReferralRewardReferred", fields: [referredUserId], references: [id], onDelete: Cascade)
-  triggeringPayment   Payment  @relation(fields: [triggeringPaymentId], references: [id], onDelete: Cascade)
+  referrer          User    @relation("ReferralRewardsEarned", fields: [referrerId], references: [id], onDelete: Cascade)
+  referredUser      User    @relation("ReferralRewardReferred", fields: [referredUserId], references: [id], onDelete: Cascade)
+  triggeringPayment Payment @relation(fields: [triggeringPaymentId], references: [id], onDelete: Cascade)
 
   @@index([referrerId, status])
   @@index([status, createdAt])
@@ -393,26 +423,26 @@ model TrialPlanRedemption {
   paymentId String   @unique
   createdAt DateTime @default(now())
 
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  plan      Plan     @relation(fields: [planId], references: [id], onDelete: Cascade)
-  payment   Payment  @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan    Plan    @relation(fields: [planId], references: [id], onDelete: Cascade)
+  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
 
   @@unique([userId, planId])
   @@index([planId])
 }
 
 model ProvisioningJob {
-  id          String   @id @default(cuid())
-  paymentId   String   @unique
+  id          String                @id @default(cuid())
+  paymentId   String                @unique
   status      ProvisioningJobStatus @default(PENDING)
-  attempts    Int      @default(0)
+  attempts    Int                   @default(0)
   nextRetryAt DateTime?
   lockedAt    DateTime?
   lastError   String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
 
-  payment     Payment  @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
 
   @@index([status, nextRetryAt])
   @@index([lockedAt])
@@ -432,23 +462,23 @@ enum ProvisioningJobStatus {
 // чтобы история оплат не зависела от будущих изменений кода.
 // ----------------------------------------------------------------------
 model PromoCode {
-  id                 String   @id @default(cuid())
-  code               String   @unique
-  discountPercent    Int
-  audience           PromoCodeAudience @default(ALL)
-  allowedEmails      String[] @default([])
-  isActive           Boolean  @default(true)
-  startsAt           DateTime?
-  expiresAt          DateTime?
-  maxUses            Int?
-  maxUsesPerUser     Int      @default(1)
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  id              String            @id @default(cuid())
+  code            String            @unique
+  discountPercent Int
+  audience        PromoCodeAudience @default(ALL)
+  allowedEmails   String[]          @default([])
+  isActive        Boolean           @default(true)
+  startsAt        DateTime?
+  expiresAt       DateTime?
+  maxUses         Int?
+  maxUsesPerUser  Int               @default(1)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
 
-  payments           Payment[]
-  redemptions        PromoCodeRedemption[]
-  plans              PromoCodePlan[]
-  bonusBoxOpenings   BonusBoxOpening[]
+  payments         Payment[]
+  redemptions      PromoCodeRedemption[]
+  plans            PromoCodePlan[]
+  bonusBoxOpenings BonusBoxOpening[]
 
   @@index([isActive, startsAt, expiresAt])
   @@index([audience])
@@ -465,30 +495,30 @@ model PromoCodePlan {
   promoCodeId String
   planId      String
 
-  promoCode   PromoCode @relation(fields: [promoCodeId], references: [id], onDelete: Cascade)
-  plan        Plan      @relation(fields: [planId], references: [id], onDelete: Cascade)
+  promoCode PromoCode @relation(fields: [promoCodeId], references: [id], onDelete: Cascade)
+  plan      Plan      @relation(fields: [planId], references: [id], onDelete: Cascade)
 
   @@id([promoCodeId, planId])
   @@index([planId])
 }
 
 model PromoCodeRedemption {
-  id                 String   @id @default(cuid())
-  promoCodeId        String
-  userId             String
-  paymentId          String   @unique
-  status             PromoCodeRedemptionStatus @default(PENDING)
-  codeSnapshot       String
-  discountPercent    Int
-  discountKopecks    Int
+  id                    String                    @id @default(cuid())
+  promoCodeId           String
+  userId                String
+  paymentId             String                    @unique
+  status                PromoCodeRedemptionStatus @default(PENDING)
+  codeSnapshot          String
+  discountPercent       Int
+  discountKopecks       Int
   originalAmountKopecks Int
-  finalAmountKopecks Int
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  finalAmountKopecks    Int
+  createdAt             DateTime                  @default(now())
+  updatedAt             DateTime                  @updatedAt
 
-  promoCode          PromoCode @relation(fields: [promoCodeId], references: [id], onDelete: Cascade)
-  user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  payment            Payment   @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  promoCode PromoCode @relation(fields: [promoCodeId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  payment   Payment   @relation(fields: [paymentId], references: [id], onDelete: Cascade)
 
   @@index([promoCodeId, status])
   @@index([userId, promoCodeId, status])
@@ -501,39 +531,39 @@ enum PromoCodeRedemptionStatus {
 }
 
 model GiftCertificate {
-  id             String   @id @default(cuid())
-  code           String   @unique
+  id             String    @id @default(cuid())
+  code           String    @unique
   planId         String
   durationDays   Int
-  maxUses        Int      @default(1)
-  maxUsesPerUser Int      @default(1)
-  isActive       Boolean  @default(true)
+  maxUses        Int       @default(1)
+  maxUsesPerUser Int       @default(1)
+  isActive       Boolean   @default(true)
   startsAt       DateTime?
   expiresAt      DateTime?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
-  plan           Plan     @relation(fields: [planId], references: [id], onDelete: Restrict)
-  redemptions    GiftCertificateRedemption[]
+  plan        Plan                        @relation(fields: [planId], references: [id], onDelete: Restrict)
+  redemptions GiftCertificateRedemption[]
 
   @@index([isActive, startsAt, expiresAt])
   @@index([planId])
 }
 
 model GiftCertificateRedemption {
-  id                String   @id @default(cuid())
+  id                String                          @id @default(cuid())
   giftCertificateId String
   userId            String
-  paymentId         String   @unique
+  paymentId         String                          @unique
   status            GiftCertificateRedemptionStatus @default(SUCCEEDED)
   codeSnapshot      String
   durationDays      Int
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  createdAt         DateTime                        @default(now())
+  updatedAt         DateTime                        @updatedAt
 
-  giftCertificate   GiftCertificate @relation(fields: [giftCertificateId], references: [id], onDelete: Cascade)
-  user              User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  payment           Payment         @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  giftCertificate GiftCertificate @relation(fields: [giftCertificateId], references: [id], onDelete: Cascade)
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  payment         Payment         @relation(fields: [paymentId], references: [id], onDelete: Cascade)
 
   @@index([giftCertificateId, status])
   @@index([userId, giftCertificateId, status])
@@ -551,16 +581,16 @@ enum GiftCertificateRedemptionStatus {
 // список и позволяем отвязать. Храним локально для быстрого рендера.
 // ----------------------------------------------------------------------
 model Device {
-  id           String   @id @default(cuid())
-  userId       String
-  hwid         String                       // device hardware id
-  platform     String?                      // android, ios, windows...
-  userAgent    String?
-  ip           String?
-  firstSeenAt  DateTime @default(now())
-  lastSeenAt   DateTime @default(now())
+  id          String   @id @default(cuid())
+  userId      String
+  hwid        String // device hardware id
+  platform    String? // android, ios, windows...
+  userAgent   String?
+  ip          String?
+  firstSeenAt DateTime @default(now())
+  lastSeenAt  DateTime @default(now())
 
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, hwid])
   @@index([userId])
@@ -602,8 +632,8 @@ model SupportTicket {
   createdAt        DateTime            @default(now())
   updatedAt        DateTime            @updatedAt
 
-  user             User                @relation(fields: [userId], references: [id], onDelete: Cascade)
-  messages         SupportMessage[]
+  user     User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages SupportMessage[]
 
   @@index([userId, status, lastMessageAt])
   @@index([status, lastMessageAt])
@@ -611,15 +641,15 @@ model SupportTicket {
 }
 
 model SupportMessage {
-  id          String               @id @default(cuid())
-  ticketId    String
-  senderId    String?
-  senderRole  SupportMessageSender
-  body        String
-  createdAt   DateTime             @default(now())
+  id         String               @id @default(cuid())
+  ticketId   String
+  senderId   String?
+  senderRole SupportMessageSender
+  body       String
+  createdAt  DateTime             @default(now())
 
-  ticket      SupportTicket        @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-  sender      User?                @relation(fields: [senderId], references: [id], onDelete: SetNull)
+  ticket SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  sender User?         @relation(fields: [senderId], references: [id], onDelete: SetNull)
 
   @@index([ticketId, createdAt])
   @@index([senderId])
@@ -659,7 +689,7 @@ model BonusBoxPrize {
   createdAt          DateTime          @default(now())
   updatedAt          DateTime          @updatedAt
 
-  openings           BonusBoxOpening[]
+  openings BonusBoxOpening[]
 
   @@index([isActive, weight])
   @@index([rarity])
@@ -674,8 +704,8 @@ model BonusBoxAttempt {
   usedAt    DateTime?
   createdAt DateTime              @default(now())
 
-  user      User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  opening   BonusBoxOpening?
+  user    User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  opening BonusBoxOpening?
 
   @@unique([userId, source, sourceKey])
   @@index([userId, usedAt, expiresAt])
@@ -683,19 +713,19 @@ model BonusBoxAttempt {
 }
 
 model BonusBoxOpening {
-  id                    String        @id @default(cuid())
+  id                    String   @id @default(cuid())
   userId                String
-  attemptId             String        @unique
+  attemptId             String   @unique
   prizeId               String
   prizeSnapshot         Json
   awardedSubscriptionId String?
   promoCodeId           String?
-  createdAt             DateTime      @default(now())
+  createdAt             DateTime @default(now())
 
-  user                  User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  attempt               BonusBoxAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
-  prize                 BonusBoxPrize @relation(fields: [prizeId], references: [id], onDelete: Restrict)
-  promoCode             PromoCode?    @relation(fields: [promoCodeId], references: [id], onDelete: SetNull)
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  attempt   BonusBoxAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  prize     BonusBoxPrize   @relation(fields: [prizeId], references: [id], onDelete: Restrict)
+  promoCode PromoCode?      @relation(fields: [promoCodeId], references: [id], onDelete: SetNull)
 
   @@index([userId, createdAt])
   @@index([prizeId, createdAt])
@@ -742,8 +772,8 @@ model AuditLog {
   userAgent String?
   createdAt DateTime    @default(now())
 
-  actor     User?       @relation("AuditLogActor", fields: [actorId], references: [id], onDelete: SetNull)
-  target    User?       @relation("AuditLogTarget", fields: [targetId], references: [id], onDelete: SetNull)
+  actor  User? @relation("AuditLogActor", fields: [actorId], references: [id], onDelete: SetNull)
+  target User? @relation("AuditLogTarget", fields: [targetId], references: [id], onDelete: SetNull)
 
   @@index([createdAt])
   @@index([actorId, createdAt])
