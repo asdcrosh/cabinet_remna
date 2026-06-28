@@ -157,13 +157,16 @@ export default async function DashboardHome() {
         </div>
       )}
 
-      <section className="card overflow-hidden p-0">
-        <div className="grid lg:grid-cols-[1.25fr_0.75fr]">
-          <div className="p-4 sm:p-5">
-            <div className="flex items-start justify-between gap-3">
+      <section className="relative overflow-hidden rounded-lg border border-slate-200 bg-white p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] dark:border-white/10 dark:bg-surface-900 sm:p-5">
+        <div className="pointer-events-none absolute -right-16 -top-16 h-40 w-40 rounded-full bg-cyan-100/70 blur-3xl dark:bg-cyan-500/10" />
+        <div className="pointer-events-none absolute -bottom-20 left-1/3 h-44 w-44 rounded-full bg-emerald-100/60 blur-3xl dark:bg-emerald-500/10" />
+
+        <div className="relative grid gap-5 xl:grid-cols-[1fr_auto]">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
-                  <h2 className="truncate text-xl font-semibold sm:text-2xl">
+                  <h2 className="truncate text-2xl font-semibold leading-tight text-slate-950 dark:text-white">
                     {subRow?.plan?.name ?? 'VPN-подписка'}
                   </h2>
                   <StatusBadge status={sub?.userStatus ?? 'DISABLED'} />
@@ -174,24 +177,20 @@ export default async function DashboardHome() {
                     : 'Тариф синхронизируется'}
                 </p>
               </div>
-              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-slate-950 text-cyan-200 dark:bg-white dark:text-slate-950">
+              <div className="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-slate-950 text-cyan-200 shadow-lg shadow-slate-950/10 dark:bg-white dark:text-slate-950">
                 <ShieldCheck className="h-5 w-5" />
               </div>
             </div>
 
-            <div className="mt-5 grid grid-cols-2 gap-x-4 gap-y-4 sm:grid-cols-3">
+            <div className="mt-5 grid gap-3 sm:grid-cols-3">
               <OverviewMetric label="Осталось" value={sub ? `${daysLeft} дн.` : '—'} />
               <OverviewMetric label="Использовано" value={formatBytes(used)} />
-              <OverviewMetric
-                className="col-span-2 sm:col-span-1"
-                label="Лимит"
-                value={isUnlimited ? 'Безлимит' : formatBytes(limit)}
-              />
+              <OverviewMetric label="Лимит" value={isUnlimited ? 'Безлимит' : formatBytes(limit)} />
             </div>
 
             {!isUnlimited && (
-              <div className="mt-4">
-                <div className="mb-1.5 flex justify-between text-xs text-slate-500">
+              <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50/80 p-3 dark:border-white/10 dark:bg-white/[0.03]">
+                <div className="mb-2 flex justify-between text-xs text-slate-500 dark:text-slate-400">
                   <span>Трафик</span>
                   <span>{percent}%</span>
                 </div>
@@ -200,7 +199,7 @@ export default async function DashboardHome() {
             )}
           </div>
 
-          <div className="grid grid-cols-3 border-t border-slate-100 bg-slate-50/70 dark:border-white/10 dark:bg-white/[0.025] lg:grid-cols-1 lg:border-l lg:border-t-0">
+          <div className="grid gap-2 sm:grid-cols-3 xl:w-56 xl:grid-cols-1">
             <CompactAction href="/dashboard/subscription" icon={<KeyRound />} label="Подключить" />
             <CompactAction href="/dashboard/plans" icon={<CreditCard />} label="Продлить" />
             <CompactAction href="/dashboard/devices" icon={<Laptop />} label="Устройства" />
@@ -581,16 +580,14 @@ function CompactHeader({
 function OverviewMetric({
   label,
   value,
-  className = '',
 }: {
   label: string
   value: string
-  className?: string
 }) {
   return (
-    <div className={className}>
+    <div className="rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-3 dark:border-white/10 dark:bg-white/[0.03]">
       <div className="text-xs text-slate-500 dark:text-slate-400">{label}</div>
-      <div className="mt-0.5 truncate text-lg font-semibold">{value}</div>
+      <div className="mt-1 truncate text-lg font-semibold text-slate-950 dark:text-white">{value}</div>
     </div>
   )
 }
@@ -599,11 +596,11 @@ function CompactAction({ href, icon, label }: { href: string; icon: ReactElement
   return (
     <Link
       href={href}
-      className="flex min-h-20 flex-col items-center justify-center gap-1.5 border-r border-slate-100 px-2 py-3 text-center text-xs font-medium transition-colors last:border-r-0 hover:bg-white dark:border-white/10 dark:hover:bg-white/5 lg:min-h-0 lg:flex-row lg:justify-start lg:border-b lg:border-r-0 lg:px-4 lg:py-4 lg:text-sm lg:last:border-b-0"
+      className="group flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-900 shadow-sm transition hover:-translate-y-0.5 hover:border-cyan-200 hover:bg-cyan-50/70 hover:text-cyan-800 dark:border-white/10 dark:bg-white/[0.03] dark:text-white dark:hover:border-cyan-500/30 dark:hover:bg-cyan-500/10"
     >
-      <span className="[&>svg]:h-4 [&>svg]:w-4">{icon}</span>
+      <span className="text-slate-500 transition group-hover:text-cyan-700 dark:text-slate-400 [&>svg]:h-4 [&>svg]:w-4">{icon}</span>
       {label}
-      <ArrowRight className="ml-auto hidden h-4 w-4 text-slate-400 lg:block" />
+      <ArrowRight className="ml-auto hidden h-4 w-4 text-slate-400 transition group-hover:translate-x-0.5 sm:block" />
     </Link>
   )
 }
