@@ -135,4 +135,45 @@ describe('notifyUser', () => {
       expect.objectContaining({ data: expect.objectContaining({ error: expect.stringContaining('Telegram failed') }) })
     )
   })
+
+  it('sends Telegram photo notifications with inline action button', async () => {
+    mocks.prisma.user.findUnique.mockResolvedValue({
+      id: 'user-1',
+      email: 'user@example.test',
+      emailVerifiedAt: null,
+      name: 'User',
+      telegramId: 123n,
+    })
+    mocks.prisma.notificationLog.create.mockResolvedValue({})
+    mocks.prisma.userNotification.create.mockResolvedValue({})
+
+    const result = await notifyUser({
+      userId: 'user-1',
+      type: 'BROADCAST',
+      dedupeKey: 'broadcast-1',
+      title: 'Новость',
+      body: 'Новость',
+      telegramText: '<b>Новость</b>',
+      telegramImageUrl: 'https://cdn.example.test/image.jpg',
+      telegramActionUrl: 'https://cabinet.example.test/dashboard/plans',
+      telegramActionLabel: 'Выбрать тариф',
+    })
+
+    expect(result).toEqual({ telegram: 'sent', email: 'skipped' })
+    expect(fetch).toHaveBeenCalledWith(
+      'https://api.telegram.org/bottelegram-token/sendPhoto',
+      expect.objectContaining({
+        method: 'POST',
+        body: expect.stringContaining('"photo":"https://cdn.example.test/image.jpg"'),
+      })
+    )
+    const payload = JSON.parse((fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body as string)
+    expect(payload).toEqual(
+      expect.objectContaining({
+        chat_id: '123',
+        caption: '<b>Новость</b>',
+        reply_markup: { inline_keyboard: [[{ text: 'Выбрать тариф', url: 'https://cabinet.example.test/dashboard/plans' }]] },
+      })
+    )
+  })
 })

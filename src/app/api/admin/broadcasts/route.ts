@@ -23,6 +23,7 @@ const schema = z.object({
   channels: z.array(z.enum(['IN_APP', 'EMAIL', 'TELEGRAM'])).min(1).max(3),
   actionHref: z.string().trim().max(180).optional().nullable(),
   actionLabel: z.string().trim().max(32).optional().nullable(),
+  imageUrl: z.string().trim().url().max(600).optional().nullable().or(z.literal('')),
 })
 
 export const POST = withAuth(async (req: Request) => {
@@ -43,6 +44,7 @@ export const POST = withAuth(async (req: Request) => {
   const actionHref = normalizeActionHref(input.actionHref)
   const actionUrl = actionHref ? `${getAppUrl()}${actionHref}` : getAppUrl()
   const actionLabel = input.actionLabel || (actionHref ? 'Открыть кабинет' : undefined)
+  const imageUrl = normalizeImageUrl(input.imageUrl)
   const plainBody = stripTelegramCustomEmojiMarkup(input.body)
   const batchKey = `broadcast:${Date.now()}:${session.uid}`
   const channels = new Set(input.channels)
@@ -64,10 +66,13 @@ export const POST = withAuth(async (req: Request) => {
       actionLabel,
       inApp: channels.has('IN_APP'),
       telegramText: channels.has('TELEGRAM')
-        ? [`<b>${escapeTelegramHtml(input.title)}</b>`, renderTelegramCustomEmoji(input.body), actionHref ? `\n${escapeTelegramHtml(actionUrl)}` : '']
+        ? [`<b>${escapeTelegramHtml(input.title)}</b>`, renderTelegramCustomEmoji(input.body)]
             .filter(Boolean)
             .join('\n')
         : undefined,
+      telegramImageUrl: channels.has('TELEGRAM') ? imageUrl ?? undefined : undefined,
+      telegramActionUrl: channels.has('TELEGRAM') && actionHref ? actionUrl : undefined,
+      telegramActionLabel: channels.has('TELEGRAM') && actionHref ? actionLabel || 'Открыть' : undefined,
       emailSubject: channels.has('EMAIL') ? `${input.title} — ${getBrandName()}` : undefined,
       emailText: channels.has('EMAIL') ? `${plainBody}${actionHref ? `\n\n${actionUrl}` : ''}` : undefined,
       emailHtml: channels.has('EMAIL')
@@ -78,6 +83,7 @@ export const POST = withAuth(async (req: Request) => {
             body: plainBody,
             ctaLabel: actionLabel || 'Открыть кабинет',
             ctaUrl: actionUrl,
+            imageUrl,
             expiry: 'Это сообщение отправлено администратором сервиса.',
             securityNote: 'Если сообщение неактуально, просто игнорируйте его.',
           })
@@ -141,4 +147,17 @@ function normalizeActionHref(value: string | null | undefined) {
   if (!href) return null
   if (!href.startsWith('/dashboard')) return null
   return href
+}
+
+function normalizeImageUrl(value: string | null | undefined) {
+  const href = value?.trim()
+  if (!href) return null
+
+  try {
+    const url = new URL(href)
+    if (url.protocol !== 'https:') return null
+    return url.toString()
+  } catch {
+    return null
+  }
 }

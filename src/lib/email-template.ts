@@ -8,6 +8,7 @@ type ActionEmailInput = {
   body: string
   ctaLabel: string
   ctaUrl: string
+  imageUrl?: string | null
   expiry: string
   securityNote: string
 }
@@ -63,6 +64,11 @@ export function renderActionEmail(input: ActionEmailInput) {
                   </tr>
                   <tr>
                     <td style="padding:32px 34px 34px;font-family:Arial,Helvetica,sans-serif;">
+                      ${
+                        input.imageUrl
+                          ? `<img src="${escapeAttribute(input.imageUrl)}" alt="" width="572" style="display:block;width:100%;max-width:572px;max-height:320px;object-fit:cover;border-radius:18px;margin:0 0 24px;border:1px solid #e2e8f0;">`
+                          : ''
+                      }
                       <p style="margin:0;font-size:16px;line-height:1.7;color:#0f172a;">${greeting}</p>
                       <p style="margin:12px 0 0;font-size:16px;line-height:1.7;color:#334155;">
                         ${escapeHtml(input.body)}

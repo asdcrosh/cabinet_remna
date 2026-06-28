@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import { Mail, MessageCircle, Send, Smartphone, UsersRound } from 'lucide-react'
+import { ImageIcon, Mail, MessageCircle, Send, Smartphone, UsersRound, X } from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
 import { toast } from '@/components/ui/toaster'
 import { cn } from '@/lib/cn'
@@ -41,6 +41,15 @@ const channels: Array<{ value: BroadcastChannel; label: string; icon: typeof Mai
   { value: 'EMAIL', label: 'Email', icon: Mail },
 ]
 
+const actionPresets = [
+  { href: '', label: '', title: 'Без кнопки', description: 'Только сообщение' },
+  { href: '/dashboard', label: 'Открыть кабинет', title: 'Главная', description: 'Общий экран кабинета' },
+  { href: '/dashboard/subscription', label: 'Открыть подписку', title: 'Подписка', description: 'Доступ, QR и подключение' },
+  { href: '/dashboard/plans', label: 'Выбрать тариф', title: 'Тарифы', description: 'Покупка и продление' },
+  { href: '/dashboard/referrals', label: 'Пригласить друга', title: 'Рефералы', description: 'Бонусы за приглашения' },
+  { href: '/dashboard/support', label: 'Написать в поддержку', title: 'Поддержка', description: 'Чат с оператором' },
+]
+
 export function BroadcastAdmin() {
   const bodyInputRef = useRef<HTMLTextAreaElement | null>(null)
   const [segment, setSegment] = useState<BroadcastSegment>('ALL')
@@ -48,7 +57,8 @@ export function BroadcastAdmin() {
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
   const [actionHref, setActionHref] = useState('/dashboard')
-  const [actionLabel, setActionLabel] = useState('Открыть')
+  const [actionLabel, setActionLabel] = useState('Открыть кабинет')
+  const [imageUrl, setImageUrl] = useState('')
   const [loading, setLoading] = useState(false)
   const [stats, setStats] = useState<BroadcastStats | null>(null)
 
@@ -65,6 +75,7 @@ export function BroadcastAdmin() {
           channels: selectedChannels,
           actionHref,
           actionLabel,
+          imageUrl: imageUrl.trim() || null,
         }),
       })
       setStats(result.stats)
@@ -101,6 +112,7 @@ export function BroadcastAdmin() {
   }
 
   const canSend = title.trim().length >= 3 && body.trim().length >= 5 && selectedChannels.length > 0 && !loading
+  const selectedPreset = actionPresets.find((preset) => preset.href === actionHref) ?? actionPresets[0]
 
   return (
     <section className="grid gap-4 xl:grid-cols-[0.85fr_1.15fr]">
@@ -190,34 +202,91 @@ export function BroadcastAdmin() {
             <span className="mt-1 block text-xs text-slate-400">{body.length}/1200</span>
           </label>
 
-          <div className="grid gap-3 sm:grid-cols-[1fr_13rem]">
+          <div className="grid gap-3 lg:grid-cols-[1fr_13rem]">
             <label className="block">
-              <span className="text-sm font-medium">Ссылка действия</span>
-              <input
+              <span className="text-sm font-medium">Куда ведет кнопка</span>
+              <select
                 className="input mt-1"
                 value={actionHref}
-                onChange={(event) => setActionHref(event.target.value)}
-                placeholder="/dashboard/plans"
-              />
+                onChange={(event) => {
+                  const preset = actionPresets.find((item) => item.href === event.target.value) ?? actionPresets[0]
+                  setActionHref(preset.href)
+                  setActionLabel(preset.label)
+                }}
+              >
+                {actionPresets.map((preset) => (
+                  <option key={preset.title} value={preset.href}>
+                    {preset.title}
+                  </option>
+                ))}
+              </select>
+              <span className="mt-1 block text-xs text-slate-400">{selectedPreset.description}</span>
             </label>
             <label className="block">
-              <span className="text-sm font-medium">Кнопка</span>
+              <span className="text-sm font-medium">Текст кнопки</span>
               <input
                 className="input mt-1"
                 value={actionLabel}
                 onChange={(event) => setActionLabel(event.target.value)}
                 maxLength={32}
-                placeholder="Открыть"
+                placeholder={actionHref ? 'Открыть' : 'Без кнопки'}
+                disabled={!actionHref}
               />
             </label>
           </div>
 
-          <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-white/5">
-            <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Предпросмотр</div>
-            <div className="mt-2 text-lg font-semibold">{title || 'Заголовок рассылки'}</div>
-            <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-300">
-              {body || 'Текст сообщения будет показан здесь.'}
-            </p>
+          <label className="block">
+            <span className="text-sm font-medium">Картинка</span>
+            <div className="mt-1 grid gap-2 sm:grid-cols-[1fr_auto]">
+              <input
+                className="input"
+                value={imageUrl}
+                onChange={(event) => setImageUrl(event.target.value)}
+                maxLength={600}
+                placeholder="https://site.ru/image.jpg"
+              />
+              {imageUrl ? (
+                <button type="button" className="btn-secondary min-h-11 px-4" onClick={() => setImageUrl('')}>
+                  <X className="h-4 w-4" />
+                  Убрать
+                </button>
+              ) : null}
+            </div>
+            <span className="mt-1 block text-xs text-slate-400">Для Telegram и email нужна публичная HTTPS-ссылка.</span>
+          </label>
+
+          <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50 dark:border-white/10 dark:bg-white/5">
+            <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3 dark:border-white/10">
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Предпросмотр Telegram</div>
+                <div className="mt-1 text-sm text-slate-500">Фото, текст и inline-кнопка</div>
+              </div>
+              <MessageCircle className="h-5 w-5 text-cyan-600" />
+            </div>
+            <div className="grid gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_15rem]">
+              <div className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200 dark:bg-surface-950 dark:ring-white/10">
+                <div className="text-lg font-semibold">{title || 'Заголовок рассылки'}</div>
+                <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-600 dark:text-slate-300">
+                  {body || 'Текст сообщения будет показан здесь.'}
+                </p>
+                {actionHref ? (
+                  <div className="mt-4 rounded-lg border border-cyan-200 bg-cyan-50 px-3 py-2 text-center text-sm font-semibold text-cyan-800 dark:border-cyan-500/25 dark:bg-cyan-500/10 dark:text-cyan-100">
+                    {actionLabel || 'Открыть'}
+                  </div>
+                ) : null}
+              </div>
+              <div className="flex min-h-40 items-center justify-center overflow-hidden rounded-xl border border-dashed border-slate-300 bg-white dark:border-white/10 dark:bg-surface-950">
+                {imageUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={imageUrl} alt="" className="h-full max-h-52 w-full object-cover" />
+                ) : (
+                  <div className="grid justify-items-center gap-2 px-4 text-center text-sm text-slate-400">
+                    <ImageIcon className="h-6 w-6" />
+                    Картинка не выбрана
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
 
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

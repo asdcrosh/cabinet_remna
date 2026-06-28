@@ -14,6 +14,9 @@ type NotifyUserInput = {
   actionHref?: string
   actionLabel?: string
   telegramText?: string
+  telegramImageUrl?: string
+  telegramActionUrl?: string
+  telegramActionLabel?: string
   emailSubject?: string
   emailText?: string
   emailHtml?: string
@@ -57,7 +60,14 @@ export async function notifyUser(input: NotifyUserInput) {
           type: input.type,
           channel: 'TELEGRAM',
           dedupeKey: input.dedupeKey,
-          send: () => sendTelegramMessage(user.telegramId!, input.telegramText!),
+          send: () =>
+            sendTelegramMessage({
+              chatId: user.telegramId!,
+              text: input.telegramText!,
+              imageUrl: input.telegramImageUrl,
+              actionUrl: input.telegramActionUrl,
+              actionLabel: input.telegramActionLabel,
+            }),
         })
       : Promise.resolve('skipped' as NotifyResult),
     user.emailVerifiedAt && isRealEmail(user.email) && input.emailSubject && input.emailText && input.emailHtml
@@ -421,19 +431,41 @@ async function sendWithDedupe(input: {
   }
 }
 
-async function sendTelegramMessage(chatId: bigint, text: string) {
+async function sendTelegramMessage(input: {
+  chatId: bigint
+  text: string
+  imageUrl?: string
+  actionUrl?: string
+  actionLabel?: string
+}) {
   const token = process.env.TELEGRAM_BOT_TOKEN?.trim()
   if (!token) return
 
-  const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+  const replyMarkup = input.actionUrl && input.actionLabel
+    ? { inline_keyboard: [[{ text: input.actionLabel, url: input.actionUrl }]] }
+    : undefined
+  const method = input.imageUrl ? 'sendPhoto' : 'sendMessage'
+  const payload = input.imageUrl
+    ? {
+        chat_id: input.chatId.toString(),
+        photo: input.imageUrl,
+        caption: input.text.slice(0, 1000),
+        parse_mode: 'HTML',
+        show_caption_above_media: true,
+        ...(replyMarkup ? { reply_markup: replyMarkup } : {}),
+      }
+    : {
+        chat_id: input.chatId.toString(),
+        text: input.text,
+        parse_mode: 'HTML',
+        disable_web_page_preview: true,
+        ...(replyMarkup ? { reply_markup: replyMarkup } : {}),
+      }
+
+  const response = await fetch(`https://api.telegram.org/bot${token}/${method}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      chat_id: chatId.toString(),
-      text,
-      parse_mode: 'HTML',
-      disable_web_page_preview: true,
-    }),
+    body: JSON.stringify(payload),
   })
 
   if (!response.ok) {
