@@ -77,7 +77,7 @@ const templates: Array<{
 }> = [
   {
     title: 'VPN почти на паузе',
-    description: 'Продление для активных',
+    description: 'Мягкое продление активным',
     segment: 'ACTIVE',
     channels: ['IN_APP', 'TELEGRAM', 'EMAIL'],
     actionHref: '/dashboard/plans',
@@ -86,12 +86,30 @@ const templates: Array<{
   },
   {
     title: 'Персональный бонус',
-    description: 'Возврат неактивных',
+    description: 'Возврат тех, кто давно не платил',
     segment: 'INACTIVE_45D',
     channels: ['IN_APP', 'TELEGRAM'],
     actionHref: '/dashboard/plans',
     actionLabel: 'Забрать бонус',
     body: '🎁 {name}, для вас открыт персональный бонус на VPN.\n\nВыберите тариф в кабинете, а промокод примените при оплате.',
+  },
+  {
+    title: 'VPN без ожидания',
+    description: 'Для пользователей без подписки',
+    segment: 'NO_ACTIVE',
+    channels: ['IN_APP', 'EMAIL'],
+    actionHref: '/dashboard/plans',
+    actionLabel: 'Выбрать тариф',
+    body: '⚡ {name}, VPN можно подключить за пару минут.\n\nВыберите срок, оплатите тариф и сразу откройте подписку в кабинете.',
+  },
+  {
+    title: 'Доступ закончился',
+    description: 'Возврат после окончания подписки',
+    segment: 'EXPIRED',
+    channels: ['IN_APP', 'TELEGRAM', 'EMAIL'],
+    actionHref: '/dashboard/plans',
+    actionLabel: 'Вернуть доступ',
+    body: '⏳ {name}, ваша подписка «{plan}» больше не активна.\n\nПродлите доступ, чтобы снова подключаться без настройки с нуля.',
   },
   {
     title: 'Новое устройство',
@@ -103,6 +121,15 @@ const templates: Array<{
     body: '📲 {name}, подключите VPN на телефоне или компьютере.\n\nВ кабинете есть QR, ссылка подписки и быстрые кнопки для приложений.',
   },
   {
+    title: 'Проверьте email',
+    description: 'Для подтвержденных email',
+    segment: 'EMAIL_VERIFIED',
+    channels: ['EMAIL', 'IN_APP'],
+    actionHref: '/dashboard/settings',
+    actionLabel: 'Открыть настройки',
+    body: '✅ {name}, email {email} подтвержден и готов для важных уведомлений.\n\nПроверьте Telegram в настройках, чтобы получать быстрые сообщения по подписке.',
+  },
+  {
     title: 'Пригласи друга',
     description: 'Реферальный оффер',
     segment: 'ACTIVE',
@@ -110,6 +137,33 @@ const templates: Array<{
     actionHref: '/dashboard/referrals',
     actionLabel: 'Открыть рефералку',
     body: '🤝 {name}, поделитесь VPN с другом и получите бонус.\n\nВаша ссылка: {ref_link}',
+  },
+  {
+    title: 'Бонус за активность',
+    description: 'Для лояльных пользователей',
+    segment: 'ACTIVE',
+    channels: ['IN_APP', 'TELEGRAM'],
+    actionHref: '/dashboard/referrals',
+    actionLabel: 'Получить бонус',
+    body: '🌟 {name}, вы уже используете «{plan}».\n\nПригласите друга по ссылке {ref_link} и получите дополнительный бонус к подписке.',
+  },
+  {
+    title: 'Нужна помощь?',
+    description: 'Направление в поддержку',
+    segment: 'ALL',
+    channels: ['IN_APP', 'TELEGRAM'],
+    actionHref: '/dashboard/support',
+    actionLabel: 'Написать в поддержку',
+    body: '💬 {name}, если VPN не подключается или нужна помощь с устройством, напишите нам в поддержку.\n\nОтвет появится прямо в кабинете.',
+  },
+  {
+    title: 'Подарочный доступ',
+    description: 'Для рекламы и ручных бонусов',
+    segment: 'ALL',
+    channels: ['IN_APP', 'TELEGRAM', 'EMAIL'],
+    actionHref: '/dashboard/plans',
+    actionLabel: 'Активировать подарок',
+    body: '🎟️ {name}, для вас подготовлен подарочный доступ.\n\nОткройте кабинет, выберите тариф или введите сертификат, если код уже у вас.',
   },
   {
     title: 'Что нового',
@@ -140,6 +194,7 @@ export function BroadcastAdmin({ initialHistory = [] }: { initialHistory?: Broad
   const [actionLabel, setActionLabel] = useState('Открыть кабинет')
   const [imageUrl, setImageUrl] = useState('')
   const [uploadingImage, setUploadingImage] = useState(false)
+  const [imageLoadFailed, setImageLoadFailed] = useState(false)
   const [loading, setLoading] = useState(false)
   const [stats, setStats] = useState<BroadcastStats | null>(null)
   const [history, setHistory] = useState<BroadcastHistoryItem[]>(initialHistory)
@@ -219,6 +274,7 @@ export function BroadcastAdmin({ initialHistory = [] }: { initialHistory?: Broad
       const data = await response.json().catch(() => null)
       if (!response.ok) throw new Error(data?.error || `Ошибка ${response.status}`)
       setImageUrl(data.url)
+      setImageLoadFailed(false)
       toast('Картинка загружена', 'success')
     } catch (error) {
       toast(error instanceof Error ? error.message : 'Не удалось загрузить картинку')
@@ -232,6 +288,7 @@ export function BroadcastAdmin({ initialHistory = [] }: { initialHistory?: Broad
   const previewTitle = renderPreview(title || 'Заголовок рассылки')
   const previewBody = renderPreview(body || 'Текст сообщения будет показан здесь.')
   const previewActionLabel = renderPreview(actionLabel || 'Открыть')
+  const previewImageUrl = getPreviewImageUrl(imageUrl)
 
   return (
     <section className="grid gap-4">
@@ -394,7 +451,10 @@ export function BroadcastAdmin({ initialHistory = [] }: { initialHistory?: Broad
                 <input
                   className="input"
                   value={imageUrl}
-                  onChange={(event) => setImageUrl(event.target.value)}
+                  onChange={(event) => {
+                    setImageUrl(event.target.value)
+                    setImageLoadFailed(false)
+                  }}
                   maxLength={600}
                   placeholder="Ссылка появится после загрузки"
                 />
@@ -413,7 +473,14 @@ export function BroadcastAdmin({ initialHistory = [] }: { initialHistory?: Broad
                   />
                 </label>
                 {imageUrl ? (
-                  <button type="button" className="btn-secondary min-h-11 px-4" onClick={() => setImageUrl('')}>
+                  <button
+                    type="button"
+                    className="btn-secondary min-h-11 px-4"
+                    onClick={() => {
+                      setImageUrl('')
+                      setImageLoadFailed(false)
+                    }}
+                  >
                     <X className="h-4 w-4" />
                     Убрать
                   </button>
@@ -441,14 +508,23 @@ export function BroadcastAdmin({ initialHistory = [] }: { initialHistory?: Broad
                   </div>
 
                   <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 dark:bg-surface-900 dark:ring-white/10">
-                    {imageUrl ? (
-                      <div className="max-h-56 overflow-hidden bg-slate-100 dark:bg-white/5">
+                    {previewImageUrl && !imageLoadFailed ? (
+                      <div className="overflow-hidden bg-slate-100 dark:bg-white/5">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={imageUrl} alt="" className="h-full max-h-56 w-full object-cover" />
+                        <img
+                          src={previewImageUrl}
+                          alt=""
+                          className="max-h-72 w-full object-cover"
+                          onLoad={() => setImageLoadFailed(false)}
+                          onError={() => setImageLoadFailed(true)}
+                        />
                       </div>
                     ) : (
-                      <div className="grid min-h-28 place-items-center bg-slate-100 text-slate-400 dark:bg-white/5">
-                        <ImageIcon className="h-7 w-7" />
+                      <div className="grid min-h-32 place-items-center bg-slate-100 px-4 text-center text-slate-400 dark:bg-white/5">
+                        <div className="grid justify-items-center gap-2">
+                          <ImageIcon className="h-7 w-7" />
+                          <div className="text-sm">{imageLoadFailed ? 'Картинку не удалось открыть' : 'Картинка не выбрана'}</div>
+                        </div>
                       </div>
                     )}
 
@@ -570,4 +646,18 @@ function insertAtSelection(value: string, insert: string, start: number, end: nu
 
 function renderPreview(value: string) {
   return value.replace(/\{(name|email|days_left|plan|ref_link)\}/g, (_, key: string) => previewVariables[key] ?? `{${key}}`)
+}
+
+function getPreviewImageUrl(value: string) {
+  const href = value.trim()
+  if (!href) return ''
+  if (typeof window === 'undefined') return href
+
+  try {
+    const url = new URL(href, window.location.origin)
+    if (url.origin === window.location.origin) return `${url.pathname}${url.search}`
+    return url.toString()
+  } catch {
+    return href
+  }
 }
