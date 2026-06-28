@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { Activity, Radio } from 'lucide-react'
+import { Activity, CalendarDays, Radio, TrendingUp, Zap } from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
 import { formatBytes } from '@/lib/format'
 
@@ -57,12 +57,15 @@ export function TrafficChart({
   const used = safeBigInt(data.usedBytes)
   const limit = data.limitBytes ? safeBigInt(data.limitBytes) : null
   const lifetime = safeBigInt(data.lifetimeBytes)
-  const seriesTotal = data.series.reduce((total, point) => total + safeBigInt(point.bytes), 0n)
+  const seriesTotal = sumSeries(data.series)
   const hasUsage = used > 0n || lifetime > 0n || seriesTotal > 0n
+  const canShowHistory = hasUsage && data.historyAvailable && data.series.length > 1 && seriesTotal > 0n
 
   return (
-    <div className="relative overflow-hidden rounded-lg border border-cyan-200/80 bg-white/90 p-4 text-slate-950 shadow-[0_18px_45px_rgba(14,165,233,0.10)] backdrop-blur dark:border-cyan-200/80 dark:bg-white/90 dark:text-slate-950 sm:p-5">
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-cyan-300 via-sky-400 to-emerald-300" />
+    <div className="relative overflow-hidden rounded-lg border border-slate-200 bg-white/95 p-4 text-slate-950 shadow-[0_18px_45px_rgba(15,23,42,0.08)] backdrop-blur dark:border-slate-200 dark:bg-white/95 dark:text-slate-950 sm:p-5">
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-cyan-300 via-sky-300 to-emerald-300" />
+      <div className="pointer-events-none absolute -right-16 -top-20 h-44 w-44 rounded-full bg-cyan-100/60 blur-3xl" />
+      <div className="pointer-events-none absolute -bottom-24 left-1/3 h-48 w-48 rounded-full bg-emerald-100/60 blur-3xl" />
 
       <div className="relative flex flex-col gap-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
@@ -78,19 +81,19 @@ export function TrafficChart({
           </div>
 
           <div className="grid grid-cols-2 gap-2 text-right">
-            <NeonMetric
+            <TrafficMetric
               label="За 30 дней"
-              value={data.historyAvailable ? formatBytes(seriesTotal) : '—'}
+              value={canShowHistory ? formatBytes(seriesTotal) : '—'}
             />
-            <NeonMetric
+            <TrafficMetric
               label="За всё время"
               value={formatBytes(lifetime)}
             />
           </div>
         </div>
 
-        {hasUsage && data.historyAvailable && data.series.length > 1 ? (
-          <TrafficHistoryChart series={data.series} />
+        {canShowHistory ? (
+          <TrafficPulsePanel series={data.series} />
         ) : (
           <TrafficHistoryEmpty loading={loading} hasUsage={hasUsage} />
         )}
@@ -98,8 +101,8 @@ export function TrafficChart({
         <div className="text-xs text-slate-500">
           {!hasUsage && !loading
             ? 'После первого подключения здесь появится статистика'
-            : data.historyAvailable
-            ? 'Использование трафика по дням за последние 30 дней'
+            : canShowHistory
+            ? 'Пульс активности за последние 30 дней'
             : data.warning
               ? 'История трафика обновится автоматически'
               : 'История трафика пока пуста'}
@@ -109,101 +112,44 @@ export function TrafficChart({
   )
 }
 
-function TrafficHistoryChart({ series }: { series: SeriesPoint[] }) {
-  const chart = useMemo(() => makeChart(series), [series])
-  const labels = useMemo(() => makeDateLabels(series), [series])
+function TrafficPulsePanel({ series }: { series: SeriesPoint[] }) {
+  const pulse = useMemo(() => makeTrafficPulse(series), [series])
 
   return (
-    <div className="relative h-48 overflow-hidden rounded-lg border border-slate-200 bg-white sm:h-56">
-      <svg
-        viewBox="0 0 900 260"
-        preserveAspectRatio="none"
-        className="absolute inset-0 h-full w-full"
-        role="img"
-        aria-label="График использования трафика за 30 дней"
-      >
-        <defs>
-          <linearGradient id="traffic-line" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%" stopColor="#06b6d4" />
-            <stop offset="52%" stopColor="#0ea5e9" />
-            <stop offset="100%" stopColor="#10b981" />
-          </linearGradient>
-          <linearGradient id="traffic-area" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.16" />
-            <stop offset="80%" stopColor="#38bdf8" stopOpacity="0.015" />
-            <stop offset="100%" stopColor="#38bdf8" stopOpacity="0" />
-          </linearGradient>
-          <filter id="traffic-glow" x="-20%" y="-50%" width="140%" height="200%">
-            <feGaussianBlur stdDeviation="2.5" result="blur" />
-            <feMerge>
-              <feMergeNode in="blur" />
-              <feMergeNode in="SourceGraphic" />
-            </feMerge>
-          </filter>
-        </defs>
-        {chart.yTicks.map((tick) => (
-          <g key={tick.y}>
-            <line
-              x1={chart.left}
-              x2={chart.right}
-              y1={tick.y}
-              y2={tick.y}
-              stroke="#e2e8f0"
-              strokeWidth="1"
-              vectorEffect="non-scaling-stroke"
-            />
-            <text
-              x="12"
-              y={tick.y + 4}
-              fill="#94a3b8"
-              fontSize="11"
-              fontFamily="sans-serif"
-            >
-              {formatBytes(tick.value)}
-            </text>
-          </g>
-        ))}
-        <path d={chart.areaPath} fill="url(#traffic-area)" />
-        <path
-          d={chart.linePath}
-          fill="none"
-          stroke="url(#traffic-line)"
-          strokeWidth="2.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          vectorEffect="non-scaling-stroke"
-        />
-        {chart.points.map((point, index) => (
-          <circle
-            key={point.date}
-            cx={point.x}
-            cy={point.y}
-            r={index % 5 === 0 || index === chart.points.length - 1 ? 2.75 : 1.5}
-            fill="#ffffff"
-            stroke="#0ea5e9"
-            strokeWidth="1.25"
-            opacity={index % 5 === 0 || index === chart.points.length - 1 ? 1 : 0.38}
-          >
-            <title>{`${formatChartDate(point.date)}: ${formatBytes(point.bytes)}`}</title>
-          </circle>
-        ))}
-        <g className="traffic-chart-moving-dot">
-          <circle r="9" fill="#0ea5e9" opacity="0.14">
-            <animate attributeName="r" values="7;11;7" dur="1.8s" repeatCount="indefinite" />
-            <animate attributeName="opacity" values="0.2;0.04;0.2" dur="1.8s" repeatCount="indefinite" />
-          </circle>
-          <circle r="4.5" fill="#ffffff" stroke="#0284c7" strokeWidth="2.5" filter="url(#traffic-glow)" />
-          <animateMotion
-            path={chart.linePath}
-            dur="8s"
-            repeatCount="indefinite"
-          />
-        </g>
-      </svg>
-      <div className="absolute bottom-2 left-[7%] right-3 flex justify-between text-[10px] text-slate-500">
-        {labels.map((label) => (
-          <span key={label.date}>{formatChartDate(label.date)}</span>
-        ))}
+    <div className="grid gap-3 lg:grid-cols-[1fr_260px]">
+      <div className="rounded-lg border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-3 shadow-inner">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <div>
+            <div className="text-xs font-medium uppercase text-slate-500">Активность по дням</div>
+            <div className="mt-0.5 text-sm font-semibold text-slate-900">{pulse.activeDays} активных дней из {series.length}</div>
+          </div>
+          <div className="rounded-full border border-cyan-100 bg-cyan-50 px-3 py-1 text-xs font-medium text-cyan-700">
+            пик {formatBytes(pulse.peak.bytes)}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-[repeat(30,minmax(0,1fr))] items-end gap-1.5 sm:gap-2">
+          {pulse.days.map((day) => (
+            <div key={day.date} className="group flex min-w-0 flex-col items-center gap-1">
+              <div className="relative flex h-24 w-full items-end justify-center rounded-full bg-slate-100 px-0.5 py-1">
+                <div
+                  className={`w-full max-w-[12px] rounded-full bg-gradient-to-t ${day.isPeak ? 'from-emerald-500 to-cyan-400 shadow-[0_0_18px_rgba(6,182,212,0.45)]' : 'from-sky-500 to-cyan-300'} transition-all duration-300 group-hover:scale-105`}
+                  style={{ height: `${Math.max(day.height, day.bytes > 0n ? 12 : 4)}%`, opacity: day.bytes > 0n ? 1 : 0.28 }}
+                />
+              </div>
+              <span className="hidden text-[10px] text-slate-400 sm:block">
+                {day.showLabel ? formatDayNumber(day.date) : ''}
+              </span>
+              <span className="sr-only">{formatChartDate(day.date)}: {formatBytes(day.bytes)}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-1">
+        <TrafficSideStat icon={<Zap className="h-4 w-4" />} label="Пик" value={formatBytes(pulse.peak.bytes)} hint={formatChartDate(pulse.peak.date)} />
+        <TrafficSideStat icon={<TrendingUp className="h-4 w-4" />} label="В среднем" value={formatBytes(pulse.average)} hint="за активный день" />
+        <TrafficSideStat icon={<CalendarDays className="h-4 w-4" />} label="Активность" value={`${pulse.activeDays} дн.`} hint="за период" />
       </div>
     </div>
   )
@@ -227,7 +173,7 @@ function TrafficHistoryEmpty({ loading, hasUsage }: { loading: boolean; hasUsage
   )
 }
 
-function NeonMetric({ label, value }: { label: string; value: string }) {
+function TrafficMetric({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-24 rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-2 shadow-sm">
       <div className="text-[10px] uppercase text-slate-500">{label}</div>
@@ -236,64 +182,56 @@ function NeonMetric({ label, value }: { label: string; value: string }) {
   )
 }
 
-function makeChart(series: SeriesPoint[]) {
-  const width = 900
-  const height = 260
-  const left = 66
-  const right = 884
-  const top = 22
-  const bottom = 214
-  const values = series.map((point) => Number(safeBigInt(point.bytes)))
-  const max = Math.max(...values, 1)
-  const points = series.map((point, index) => {
-    const x = series.length === 1
-      ? (left + right) / 2
-      : left + (index / (series.length - 1)) * (right - left)
-    const value = Number(safeBigInt(point.bytes))
-    const y = bottom - (value / max) * (bottom - top)
-    return { x, y, date: point.date, bytes: safeBigInt(point.bytes) }
-  })
-  const linePath = makeSmoothPath(points)
-  const areaPath = `${linePath} L ${right} ${bottom} L ${left} ${bottom} Z`
-  const yTicks = [max, max / 2, 0].map((value) => ({
-    value: BigInt(Math.max(0, Math.round(value))),
-    y: bottom - (value / max) * (bottom - top),
+function TrafficSideStat({
+  icon,
+  label,
+  value,
+  hint,
+}: {
+  icon: React.ReactNode
+  label: string
+  value: string
+  hint: string
+}) {
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+      <div className="flex items-center gap-2 text-xs font-medium uppercase text-slate-500">
+        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-cyan-50 text-cyan-700">{icon}</span>
+        {label}
+      </div>
+      <div className="mt-2 text-lg font-semibold text-slate-950">{value}</div>
+      <div className="text-xs text-slate-500">{hint}</div>
+    </div>
+  )
+}
+
+function makeTrafficPulse(series: SeriesPoint[]) {
+  const days = series.map((point) => ({
+    date: point.date,
+    bytes: safeBigInt(point.bytes),
   }))
-  return { width, height, left, right, points, linePath, areaPath, yTicks }
+  const max = days.reduce((current, day) => day.bytes > current ? day.bytes : current, 0n)
+  const peak = days.reduce((current, day) => day.bytes > current.bytes ? day : current, days[0])
+  const activeDays = days.filter((day) => day.bytes > 0n).length
+  const total = days.reduce((sum, day) => sum + day.bytes, 0n)
+  const average = activeDays > 0 ? total / BigInt(activeDays) : 0n
+  const labelStep = Math.max(1, Math.ceil(days.length / 6))
+
+  return {
+    peak,
+    activeDays,
+    average,
+    days: days.map((day, index) => ({
+      ...day,
+      height: max > 0n ? Number((day.bytes * 100n) / max) : 0,
+      isPeak: day.date === peak.date && day.bytes > 0n,
+      showLabel: index === 0 || index === days.length - 1 || index % labelStep === 0,
+    })),
+  }
 }
 
-function makeSmoothPath(points: Array<{ x: number; y: number }>) {
-  if (points.length === 0) return ''
-  if (points.length === 1) return `M ${points[0].x} ${points[0].y}`
-
-  let path = `M ${points[0].x} ${points[0].y}`
-  for (let index = 0; index < points.length - 1; index += 1) {
-    const previous = points[index - 1] ?? points[index]
-    const current = points[index]
-    const next = points[index + 1]
-    const afterNext = points[index + 2] ?? next
-    const controlOneX = current.x + (next.x - previous.x) / 6
-    const controlOneY = current.y + (next.y - previous.y) / 6
-    const controlTwoX = next.x - (afterNext.x - current.x) / 6
-    const controlTwoY = next.y - (afterNext.y - current.y) / 6
-
-    path += ` C ${controlOneX} ${controlOneY}, ${controlTwoX} ${controlTwoY}, ${next.x} ${next.y}`
-  }
-  return path
-}
-
-function makeDateLabels(series: SeriesPoint[]) {
-  if (series.length <= 1) return series
-  const desiredLabels = 6
-  const indexes = new Set<number>()
-
-  for (let index = 0; index < desiredLabels; index += 1) {
-    indexes.add(Math.round((index / (desiredLabels - 1)) * (series.length - 1)))
-  }
-
-  return Array.from(indexes)
-    .sort((left, right) => left - right)
-    .map((index) => series[index])
+function sumSeries(series: SeriesPoint[]) {
+  return series.reduce((total, point) => total + safeBigInt(point.bytes), 0n)
 }
 
 function safeBigInt(value: string | undefined) {
@@ -306,4 +244,12 @@ function formatChartDate(value: string | undefined) {
   return Number.isNaN(date.getTime())
     ? value
     : new Intl.DateTimeFormat('ru-RU', { day: '2-digit', month: 'short' }).format(date)
+}
+
+function formatDayNumber(value: string | undefined) {
+  if (!value) return ''
+  const date = new Date(`${value}T00:00:00Z`)
+  return Number.isNaN(date.getTime())
+    ? value
+    : new Intl.DateTimeFormat('ru-RU', { day: '2-digit' }).format(date)
 }
