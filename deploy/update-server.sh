@@ -59,6 +59,18 @@ write_installed_version() {
   } >"${VERSION_FILE}" 2>/dev/null || true
 }
 
+running_app_revision() {
+  local image_id revision
+  image_id="$(docker inspect remnawave-cabinet-app --format '{{.Image}}' 2>/dev/null || true)"
+  [[ -n "${image_id}" ]] || return 1
+  revision="$(docker image inspect "${image_id}" --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' 2>/dev/null || true)"
+  if [[ "${revision}" =~ ^[0-9a-f]{40}$ ]]; then
+    printf '%s\n' "${revision}"
+    return 0
+  fi
+  return 1
+}
+
 cd "${INSTALL_DIR}"
 
 if docker inspect remnashop >/dev/null 2>&1; then
@@ -310,7 +322,7 @@ if [[ -n "${APP_URL}" && -n "${HEALTHCHECK_TOKEN}" ]]; then
 fi
 
 cleanup_docker_artifacts
-write_installed_version "$(remote_commit_sha || true)"
+write_installed_version "$(running_app_revision || remote_commit_sha || true)"
 mkdir -p /var/cache/remnawave-cabinet 2>/dev/null || true
 printf '%s|%s\n' "$(date +%s)" latest >/var/cache/remnawave-cabinet/update-status 2>/dev/null || true
 

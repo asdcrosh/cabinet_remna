@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="1.2.1"
+VERSION="1.2.2"
 BRANCH="${BRANCH:-main}"
 RAW_BASE_URL="${RAW_BASE_URL:-https://raw.githubusercontent.com/asdcrosh/cabinet_remna/${BRANCH}}"
 GITHUB_API_URL="${GITHUB_API_URL:-https://api.github.com/repos/asdcrosh/cabinet_remna/commits/${BRANCH}}"
@@ -139,6 +139,19 @@ remote_commit_sha() {
 }
 
 installed_commit_sha() {
+  local image_id image_revision
+  image_id=""
+  if command -v docker >/dev/null 2>&1; then
+    image_id="$(container_image_id remnawave-cabinet-app)"
+  fi
+  if [[ -n "${image_id}" ]] && docker image inspect "${image_id}" >/dev/null 2>&1; then
+    image_revision="$(docker image inspect "${image_id}" --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' 2>/dev/null || true)"
+    if [[ "${image_revision}" =~ ^[0-9a-f]{40}$ ]]; then
+      printf '%s\n' "${image_revision}"
+      return 0
+    fi
+  fi
+
   [[ -f "${CABINET_VERSION_FILE}" ]] || return 1
   sed -n 's/^commit=//p' "${CABINET_VERSION_FILE}" 2>/dev/null | head -n 1
 }
@@ -169,9 +182,8 @@ check_update_status() {
 
   installed_sha="$(installed_commit_sha || true)"
   if [[ -z "${installed_sha}" ]]; then
-    write_installed_version "${remote_sha}"
-    write_update_status_cache "latest"
-    return 1
+    write_update_status_cache "version-unknown"
+    return 2
   fi
 
   if [[ "${installed_sha}" == "${remote_sha}" ]]; then
@@ -188,6 +200,7 @@ print_update_status_key() {
     latest|current) printf '  Обновление:  %s\n' "${GREEN}Установлена актуальная версия${RESET}" ;;
     available) printf '  Обновление:  %s\n' "${YELLOW}Доступно обновление${RESET}" ;;
     check-failed|check_failed|unknown) printf '  Обновление:  %s\n' "${YELLOW}не удалось проверить${RESET}" ;;
+    version-unknown|version_unknown) printf '  Обновление:  %s\n' "${YELLOW}версия не зафиксирована${RESET}" ;;
     docker-unavailable|docker_unavailable) printf '  Обновление:  %s\n' "${YELLOW}Docker недоступен${RESET}" ;;
     app-not-running|app_not_running) printf '  Обновление:  %s\n' "${YELLOW}кабинет не запущен${RESET}" ;;
     not-installed|not_installed) printf '  Обновление:  %s\n' "${DIM}доступно после установки${RESET}" ;;
@@ -221,9 +234,6 @@ update_status_line() {
     printf '  Обновление:  %s\n' "${DIM}доступно после установки${RESET}"
     return
   fi
-  if read_update_status_cache; then
-    return
-  fi
 
   set +e
   check_update_status >/dev/null 2>&1
@@ -245,7 +255,13 @@ show_update_check_result() {
   case "${result}" in
     0) warn "Доступно обновление." ;;
     1) ok "Установлена актуальная версия." ;;
-    *) warn "Не удалось проверить обновление." ;;
+    *)
+      if [[ -f "${UPDATE_STATUS_CACHE}" ]] && grep -q '|version-unknown$' "${UPDATE_STATUS_CACHE}" 2>/dev/null; then
+        warn "Версия не зафиксирована. Запустите обновление системы."
+      else
+        warn "Не удалось проверить обновление."
+      fi
+      ;;
   esac
   return "${result}"
 }
@@ -289,7 +305,6 @@ install_cabinet() {
   ensure_docker
   info "Запускаем мастер установки кабинета..."
   curl -fsSL "${INSTALL_URL}" | bash
-  write_installed_version "$(remote_commit_sha || true)"
   write_update_status_cache "latest"
 }
 
@@ -300,7 +315,6 @@ update_cabinet() {
   }
   info "Обновляем кабинет..."
   curl -fsSL "${UPDATE_URL}" | bash
-  write_installed_version "$(remote_commit_sha || true)"
   write_update_status_cache latest
 }
 
