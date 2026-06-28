@@ -22,11 +22,13 @@ import {
   Laptop,
   MessageCircleQuestion,
   ShieldCheck,
+  Sparkles,
   UsersRound,
 } from 'lucide-react'
 import { logWarn } from '@/lib/logger'
 import { readRemnawaveBigInt } from '@/lib/remnawave-usage'
 import { getFreshPendingPaymentCutoff, reconcileStalePendingPaymentsForUser } from '@/lib/payment-sync'
+import { getPlanAudienceContext, isPlanAvailableForUser } from '@/lib/plan-access'
 
 export const dynamic = 'force-dynamic'
 
@@ -65,6 +67,31 @@ export default async function DashboardHome() {
 
   const sub = remnawaveCard?.response.user
   const subRow = user.subscriptions[0] ?? null
+  const [audienceContext, availablePlans, lastSucceededPayment, promoOfferCode] = await Promise.all([
+    getPlanAudienceContext(user.id),
+    prisma.plan.findMany({
+      where: { isActive: true, isPromo: false },
+      orderBy: [{ sortOrder: 'asc' }, { priceKopecks: 'asc' }],
+    }),
+    prisma.payment.findFirst({
+      where: { userId: user.id, status: 'SUCCEEDED' },
+      orderBy: { paidAt: 'desc' },
+      select: { paidAt: true, createdAt: true },
+    }),
+    findDashboardPromoCode(user.id, user.email),
+  ])
+  const visiblePaidPlans = audienceContext
+    ? availablePlans.filter((plan) => isPlanAvailableForUser(plan, audienceContext))
+    : availablePlans.filter((plan) => plan.availability === 'ALL')
+  const personalOffer = buildPersonalOffer({
+    activeSubscription: subRow && ['ACTIVE', 'LIMITED'].includes(subRow.status) && subRow.expireAt > new Date()
+      ? subRow
+      : null,
+    bestPlan: visiblePaidPlans[0] ?? null,
+    deviceCount: user._count.devices,
+    lastSucceededPaymentAt: lastSucceededPayment?.paidAt ?? lastSucceededPayment?.createdAt ?? null,
+    promoCode: promoOfferCode,
+  })
   const onboardingState: DashboardOnboardingState = {
     emailVerified: Boolean(user.emailVerifiedAt && !user.email.endsWith('@pending.invalid')),
     telegramLinked: Boolean(user.telegramId),
@@ -80,6 +107,7 @@ export default async function DashboardHome() {
       <div className="space-y-4">
         <CompactHeader title="Главная" description="Начните пользоваться VPN" />
         <DashboardOnboardingCard state={onboardingState} mode="full" />
+        {personalOffer && <PersonalOffer offer={personalOffer} />}
         <SmartInsights
           emailVerified={onboardingState.emailVerified}
           telegramLinked={onboardingState.telegramLinked}
@@ -108,6 +136,7 @@ export default async function DashboardHome() {
       />
 
       <DashboardOnboardingCard state={onboardingState} />
+      {personalOffer && <PersonalOffer offer={personalOffer} />}
       <SmartInsights
         emailVerified={onboardingState.emailVerified}
         telegramLinked={onboardingState.telegramLinked}
@@ -188,6 +217,234 @@ export default async function DashboardHome() {
       <PromoGrid />
     </div>
   )
+}
+
+type DashboardSubscription = {
+  plan: { id: string; name: string; priceKopecks: number; durationDays: number } | null
+  expireAt: Date
+}
+
+type DashboardPlan = {
+  id: string
+  name: string
+  priceKopecks: number
+  durationDays: number
+}
+
+type DashboardPromoCode = {
+  code: string
+  discountPercent: number
+}
+
+type PersonalOfferView = {
+  eyebrow: string
+  title: string
+  description: string
+  href: string
+  cta: string
+  meta: string
+  icon: ReactElement
+  tone: 'cyan' | 'emerald' | 'amber' | 'violet'
+}
+
+async function findDashboardPromoCode(userId: string, email: string): Promise<DashboardPromoCode | null> {
+  const now = new Date()
+  const hasActiveSubscription = await prisma.subscription.count({
+    where: {
+      userId,
+      status: { in: ['ACTIVE', 'LIMITED'] },
+      expireAt: { gt: now },
+    },
+  })
+  const userHasActiveSubscription = hasActiveSubscription > 0
+  const normalizedEmail = email.trim().toLowerCase()
+
+  const candidates = await prisma.promoCode.findMany({
+    where: {
+      isActive: true,
+      AND: [
+        { OR: [{ startsAt: null }, { startsAt: { lte: now } }] },
+        { OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] },
+      ],
+      audience: { in: userHasActiveSubscription ? ['ALL', 'PERSONAL'] : ['ALL', 'NO_ACTIVE_SUBSCRIPTION', 'PERSONAL'] },
+    },
+    include: {
+      redemptions: {
+        where: { status: { in: ['PENDING', 'SUCCEEDED'] } },
+        select: { userId: true, status: true },
+      },
+    },
+    orderBy: [{ discountPercent: 'desc' }, { createdAt: 'desc' }],
+    take: 12,
+  })
+
+  const promo = candidates.find((code) => {
+    if (code.audience === 'PERSONAL') {
+      const allowedEmails = new Set(code.allowedEmails.map((item) => item.trim().toLowerCase()))
+      if (!allowedEmails.has(normalizedEmail)) return false
+    }
+    if (code.maxUses != null && code.redemptions.length >= code.maxUses) return false
+    const userUses = code.redemptions.filter((item) => item.userId === userId).length
+    return userUses < code.maxUsesPerUser
+  })
+
+  return promo ? { code: promo.code, discountPercent: promo.discountPercent } : null
+}
+
+function buildPersonalOffer({
+  activeSubscription,
+  bestPlan,
+  deviceCount,
+  lastSucceededPaymentAt,
+  promoCode,
+}: {
+  activeSubscription: DashboardSubscription | null
+  bestPlan: DashboardPlan | null
+  deviceCount: number
+  lastSucceededPaymentAt: Date | null
+  promoCode: DashboardPromoCode | null
+}): PersonalOfferView | null {
+  const now = Date.now()
+  const inactiveDays = lastSucceededPaymentAt
+    ? Math.floor((now - lastSucceededPaymentAt.getTime()) / (24 * 60 * 60 * 1000))
+    : null
+
+  if (!activeSubscription) {
+    if (promoCode && (inactiveDays == null || inactiveDays >= 45)) {
+      return {
+        eyebrow: 'Личный оффер',
+        title: `Промокод ${promoCode.code}`,
+        description: `Скидка ${promoCode.discountPercent}% на оплату VPN. Код уже можно применить в тарифах.`,
+        href: '/dashboard/plans',
+        cta: 'Выбрать тариф',
+        meta: 'для возвращения',
+        icon: <Gift className="h-5 w-5" />,
+        tone: 'violet',
+      }
+    }
+
+    if (!bestPlan) return null
+    return {
+      eyebrow: 'Рекомендация',
+      title: bestPlan.name,
+      description: `${bestPlan.durationDays} дн. доступа за ${formatPrice(bestPlan.priceKopecks)}.`,
+      href: `/dashboard/plans?plan=${bestPlan.id}`,
+      cta: 'Купить VPN',
+      meta: 'лучший старт',
+      icon: <CreditCard className="h-5 w-5" />,
+      tone: 'cyan',
+    }
+  }
+
+  const daysLeft = Math.ceil((activeSubscription.expireAt.getTime() - now) / (24 * 60 * 60 * 1000))
+  if (daysLeft <= 7) {
+    return {
+      eyebrow: 'Продление',
+      title: `Осталось ${Math.max(daysLeft, 0)} дн.`,
+      description: activeSubscription.plan
+        ? `Продлите ${activeSubscription.plan.name}, чтобы доступ не прерывался.`
+        : 'Продлите подписку заранее, чтобы доступ не прерывался.',
+      href: '/dashboard/plans',
+      cta: 'Продлить',
+      meta: 'важно',
+      icon: <Clock3 className="h-5 w-5" />,
+      tone: 'amber',
+    }
+  }
+
+  if (deviceCount === 0) {
+    return {
+      eyebrow: 'Следующий шаг',
+      title: 'Подключите устройство',
+      description: 'Откройте подписку, выберите приложение и добавьте VPN в один переход.',
+      href: '/dashboard/subscription',
+      cta: 'Подключить',
+      meta: 'быстрый доступ',
+      icon: <Laptop className="h-5 w-5" />,
+      tone: 'emerald',
+    }
+  }
+
+  return {
+    eyebrow: 'Бонус',
+    title: 'Пригласите друга',
+    description: 'Отправьте реферальную ссылку и получите дополнительные дни после оплаты друга.',
+    href: '/dashboard/referrals',
+    cta: 'Открыть рефералку',
+    meta: 'активная подписка',
+    icon: <UsersRound className="h-5 w-5" />,
+    tone: 'emerald',
+  }
+}
+
+function PersonalOffer({ offer }: { offer: PersonalOfferView }) {
+  const tone = personalOfferTone(offer.tone)
+
+  return (
+    <section className={`relative overflow-hidden rounded-xl border p-4 shadow-sm sm:p-5 ${tone.shell}`}>
+      <div className={`pointer-events-none absolute inset-x-0 top-0 h-1 ${tone.line}`} />
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 gap-3">
+          <div className={`grid h-11 w-11 shrink-0 place-items-center rounded-lg ${tone.icon}`}>
+            {offer.icon}
+          </div>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className={`text-xs font-semibold uppercase tracking-wide ${tone.eyebrow}`}>
+                {offer.eyebrow}
+              </span>
+              <span className="rounded-full border border-white/60 bg-white/70 px-2 py-0.5 text-xs text-slate-600 shadow-sm dark:border-white/10 dark:bg-white/10 dark:text-slate-300">
+                {offer.meta}
+              </span>
+            </div>
+            <h2 className="mt-1 text-xl font-semibold tracking-tight text-slate-950 dark:text-white">
+              {offer.title}
+            </h2>
+            <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">
+              {offer.description}
+            </p>
+          </div>
+        </div>
+        <Link href={offer.href} className="btn-primary min-h-11 shrink-0 justify-center px-4">
+          <Sparkles className="h-4 w-4" />
+          {offer.cta}
+        </Link>
+      </div>
+    </section>
+  )
+}
+
+function personalOfferTone(tone: PersonalOfferView['tone']) {
+  if (tone === 'amber') {
+    return {
+      shell: 'border-amber-200 bg-amber-50/80 dark:border-amber-500/25 dark:bg-amber-500/10',
+      line: 'bg-gradient-to-r from-amber-400 to-orange-400',
+      icon: 'bg-amber-100 text-amber-700 dark:bg-amber-400/15 dark:text-amber-100',
+      eyebrow: 'text-amber-700 dark:text-amber-200',
+    }
+  }
+  if (tone === 'emerald') {
+    return {
+      shell: 'border-emerald-200 bg-emerald-50/80 dark:border-emerald-500/25 dark:bg-emerald-500/10',
+      line: 'bg-gradient-to-r from-emerald-400 to-cyan-400',
+      icon: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-400/15 dark:text-emerald-100',
+      eyebrow: 'text-emerald-700 dark:text-emerald-200',
+    }
+  }
+  if (tone === 'violet') {
+    return {
+      shell: 'border-violet-200 bg-violet-50/80 dark:border-violet-500/25 dark:bg-violet-500/10',
+      line: 'bg-gradient-to-r from-violet-400 to-cyan-400',
+      icon: 'bg-violet-100 text-violet-700 dark:bg-violet-400/15 dark:text-violet-100',
+      eyebrow: 'text-violet-700 dark:text-violet-200',
+    }
+  }
+  return {
+    shell: 'border-cyan-200 bg-cyan-50/80 dark:border-cyan-500/25 dark:bg-cyan-500/10',
+    line: 'bg-gradient-to-r from-cyan-400 to-blue-400',
+    icon: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-400/15 dark:text-cyan-100',
+    eyebrow: 'text-cyan-700 dark:text-cyan-200',
+  }
 }
 
 function SmartInsights({
