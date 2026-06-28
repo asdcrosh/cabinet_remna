@@ -122,6 +122,7 @@ export function BroadcastAdmin({ initialHistory = [] }: { initialHistory?: Broad
   const [actionHref, setActionHref] = useState('/dashboard')
   const [actionLabel, setActionLabel] = useState('Открыть кабинет')
   const [imageUrl, setImageUrl] = useState('')
+  const [uploadingImage, setUploadingImage] = useState(false)
   const [loading, setLoading] = useState(false)
   const [stats, setStats] = useState<BroadcastStats | null>(null)
   const [history, setHistory] = useState<BroadcastHistoryItem[]>(initialHistory)
@@ -186,6 +187,27 @@ export function BroadcastAdmin({ initialHistory = [] }: { initialHistory?: Broad
     setActionHref(template.actionHref)
     setActionLabel(template.actionLabel)
     setStats(null)
+  }
+
+  async function uploadImage(file: File | null) {
+    if (!file) return
+    setUploadingImage(true)
+    try {
+      const form = new FormData()
+      form.set('file', file)
+      const response = await fetch('/api/admin/broadcasts/upload', {
+        method: 'POST',
+        body: form,
+      })
+      const data = await response.json().catch(() => null)
+      if (!response.ok) throw new Error(data?.error || `Ошибка ${response.status}`)
+      setImageUrl(data.url)
+      toast('Картинка загружена', 'success')
+    } catch (error) {
+      toast(error instanceof Error ? error.message : 'Не удалось загрузить картинку')
+    } finally {
+      setUploadingImage(false)
+    }
   }
 
   const canSend = title.trim().length >= 3 && body.trim().length >= 5 && selectedChannels.length > 0 && !loading
@@ -277,6 +299,22 @@ export function BroadcastAdmin({ initialHistory = [] }: { initialHistory?: Broad
               />
             </label>
 
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-white/10 dark:bg-white/5">
+              <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Подстановки</div>
+              <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                {['{name}', '{email}', '{days_left}', '{plan}', '{ref_link}'].map((token) => (
+                  <button
+                    key={token}
+                    type="button"
+                    className="rounded-full border border-slate-200 bg-white px-2.5 py-1 font-mono text-slate-600 hover:bg-slate-100 dark:border-white/10 dark:bg-surface-900 dark:text-slate-300"
+                    onClick={() => insertBodyEmoji(token)}
+                  >
+                    {token}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <label className="block">
               <span className="text-sm font-medium">Текст</span>
               <div className="relative mt-1">
@@ -332,14 +370,28 @@ export function BroadcastAdmin({ initialHistory = [] }: { initialHistory?: Broad
 
             <label className="block">
               <span className="text-sm font-medium">Картинка</span>
-              <div className="mt-1 grid gap-2 sm:grid-cols-[1fr_auto]">
+              <div className="mt-1 grid gap-2 sm:grid-cols-[1fr_auto_auto]">
                 <input
                   className="input"
                   value={imageUrl}
                   onChange={(event) => setImageUrl(event.target.value)}
                   maxLength={600}
-                  placeholder="https://site.ru/image.jpg"
+                  placeholder="Ссылка появится после загрузки"
                 />
+                <label className={cn('btn-secondary min-h-11 cursor-pointer px-4', uploadingImage && 'pointer-events-none opacity-60')}>
+                  <ImageIcon className="h-4 w-4" />
+                  {uploadingImage ? 'Загрузка...' : 'Загрузить'}
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp,image/gif"
+                    className="sr-only"
+                    onChange={(event) => {
+                      const file = event.target.files?.[0] ?? null
+                      void uploadImage(file)
+                      event.currentTarget.value = ''
+                    }}
+                  />
+                </label>
                 {imageUrl ? (
                   <button type="button" className="btn-secondary min-h-11 px-4" onClick={() => setImageUrl('')}>
                     <X className="h-4 w-4" />
@@ -347,7 +399,7 @@ export function BroadcastAdmin({ initialHistory = [] }: { initialHistory?: Broad
                   </button>
                 ) : null}
               </div>
-              <span className="mt-1 block text-xs text-slate-400">Для Telegram и email нужна публичная HTTPS-ссылка.</span>
+              <span className="mt-1 block text-xs text-slate-400">До 5 МБ: JPG, PNG, WEBP или GIF. Можно оставить пустым.</span>
             </label>
 
             <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50 dark:border-white/10 dark:bg-white/5">

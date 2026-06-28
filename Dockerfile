@@ -44,6 +44,7 @@ ENV NEXT_TELEMETRY_DISABLED=1
 
 RUN apk add --no-cache openssl
 RUN addgroup -S nextjs && adduser -S nextjs -G nextjs
+RUN mkdir -p /app/public/uploads && chown -R nextjs:nextjs /app/public/uploads
 
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
@@ -64,6 +65,7 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN apk add --no-cache openssl wget && addgroup -S nextjs && adduser -S nextjs -G nextjs
 
 COPY --chown=nextjs:nextjs --from=builder /app/public ./public
+RUN mkdir -p /app/public/uploads && chown -R nextjs:nextjs /app/public/uploads
 COPY --chown=nextjs:nextjs --from=builder /app/.next/standalone ./
 COPY --chown=nextjs:nextjs --from=builder /app/.next/static ./.next/static
 COPY --chown=nextjs:nextjs --from=prod-deps /app/node_modules ./node_modules

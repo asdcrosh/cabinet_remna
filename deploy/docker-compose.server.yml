@@ -84,6 +84,7 @@ services:
       - "${CABINET_APP_BIND:-127.0.0.1}:${CABINET_APP_PORT:-3000}:3000"
     volumes:
       - "${FULL_BACKUP_DIR:-/opt/remnawave-backups}:/backups:ro"
+      - broadcast_uploads:/app/public/uploads
     healthcheck:
       test:
         [
@@ -148,6 +149,7 @@ volumes:
   postgres_data:
   caddy_data:
   caddy_config:
+  broadcast_uploads:
 
 networks:
   cabinet:

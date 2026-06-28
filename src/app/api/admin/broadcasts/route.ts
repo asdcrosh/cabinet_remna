@@ -36,7 +36,21 @@ export const POST = withAuth(async (req: Request) => {
   const input = parsed.data
   const users = await prisma.user.findMany({
     where: buildSegmentWhere(input.segment),
-    select: { id: true },
+    select: {
+      id: true,
+      email: true,
+      name: true,
+      referralCode: true,
+      subscriptions: {
+        where: { status: { in: ACTIVE_SUBSCRIPTION_STATUSES }, expireAt: { gt: new Date() } },
+        orderBy: { expireAt: 'desc' },
+        take: 1,
+        select: {
+          expireAt: true,
+          plan: { select: { name: true } },
+        },
+      },
+    },
     orderBy: { createdAt: 'desc' },
     take: MAX_RECIPIENTS,
   })
@@ -56,32 +70,38 @@ export const POST = withAuth(async (req: Request) => {
   }
 
   for (const user of users) {
+    const variables = buildTemplateVariables(user)
+    const personalizedTitle = applyTemplateVariables(input.title, variables)
+    const personalizedBody = applyTemplateVariables(input.body, variables)
+    const personalizedPlainBody = stripTelegramCustomEmojiMarkup(personalizedBody)
+    const personalizedActionLabel = actionLabel ? applyTemplateVariables(actionLabel, variables) : undefined
+
     const result = await notifyUser({
       userId: user.id,
       type: 'BROADCAST',
       dedupeKey: `${batchKey}:${user.id}`,
-      title: input.title,
-      body: plainBody,
+      title: personalizedTitle,
+      body: personalizedPlainBody,
       actionHref: actionHref ?? undefined,
-      actionLabel,
+      actionLabel: personalizedActionLabel,
       inApp: channels.has('IN_APP'),
       telegramText: channels.has('TELEGRAM')
-        ? [`<b>${escapeTelegramHtml(input.title)}</b>`, renderTelegramCustomEmoji(input.body)]
+        ? [`<b>${escapeTelegramHtml(personalizedTitle)}</b>`, renderTelegramCustomEmoji(personalizedBody)]
             .filter(Boolean)
             .join('\n')
         : undefined,
       telegramImageUrl: channels.has('TELEGRAM') ? imageUrl ?? undefined : undefined,
       telegramActionUrl: channels.has('TELEGRAM') && actionHref ? actionUrl : undefined,
-      telegramActionLabel: channels.has('TELEGRAM') && actionHref ? actionLabel || 'Открыть' : undefined,
-      emailSubject: channels.has('EMAIL') ? `${input.title} — ${getBrandName()}` : undefined,
-      emailText: channels.has('EMAIL') ? `${plainBody}${actionHref ? `\n\n${actionUrl}` : ''}` : undefined,
+      telegramActionLabel: channels.has('TELEGRAM') && actionHref ? personalizedActionLabel || 'Открыть' : undefined,
+      emailSubject: channels.has('EMAIL') ? `${personalizedTitle} — ${getBrandName()}` : undefined,
+      emailText: channels.has('EMAIL') ? `${personalizedPlainBody}${actionHref ? `\n\n${actionUrl}` : ''}` : undefined,
       emailHtml: channels.has('EMAIL')
         ? renderActionEmail({
             eyebrow: 'Сообщение',
-            title: input.title,
-            lead: plainBody,
-            body: plainBody,
-            ctaLabel: actionLabel || 'Открыть кабинет',
+            title: personalizedTitle,
+            lead: personalizedPlainBody,
+            body: personalizedPlainBody,
+            ctaLabel: personalizedActionLabel || 'Открыть кабинет',
             ctaUrl: actionUrl,
             imageUrl,
             expiry: 'Это сообщение отправлено администратором сервиса.',
@@ -208,4 +228,26 @@ function normalizeImageUrl(value: string | null | undefined) {
   } catch {
     return null
   }
+}
+
+function buildTemplateVariables(user: {
+  email: string
+  name: string | null
+  referralCode: string | null
+  subscriptions: Array<{ expireAt: Date; plan: { name: string } | null }>
+}) {
+  const subscription = user.subscriptions[0]
+  const daysLeft = subscription ? Math.max(0, Math.ceil((subscription.expireAt.getTime() - Date.now()) / 86_400_000)) : 0
+  const referralCode = user.referralCode
+  return {
+    name: user.name?.trim() || user.email,
+    email: user.email,
+    days_left: String(daysLeft),
+    plan: subscription?.plan?.name || 'без активного тарифа',
+    ref_link: referralCode ? `${getAppUrl()}/register?ref=${encodeURIComponent(referralCode)}` : `${getAppUrl()}/dashboard/referrals`,
+  }
+}
+
+function applyTemplateVariables(value: string, variables: Record<string, string>) {
+  return value.replace(/\{(name|email|days_left|plan|ref_link)\}/g, (_, key: string) => variables[key] ?? '')
 }

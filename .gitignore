@@ -10,6 +10,7 @@ dist
 !.env.production.example
 *.log
 backups/
+public/uploads/
 .DS_Store
 prisma/migrations/migration_lock.toml.bak
 next-env.d.ts
