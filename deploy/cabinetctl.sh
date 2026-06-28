@@ -224,7 +224,15 @@ update_status_line() {
   if read_update_status_cache; then
     return
   fi
-  printf '  Обновление:  %s\n' "${DIM}не проверялось${RESET}"
+
+  set +e
+  check_update_status >/dev/null 2>&1
+  set -e
+
+  if read_update_status_cache; then
+    return
+  fi
+  print_update_status_key "check-failed"
 }
 
 show_update_check_result() {
@@ -456,11 +464,10 @@ show_menu() {
   if cabinet_installed; then
     printf '%s\n' \
       "  1. Обновить систему" \
-      "  2. Проверить обновление" \
-      "  3. Настроить .env" \
-      "  4. Здоровье системы" \
-      "  5. Логи" \
-      "  6. Бэкапы" \
+      "  2. Настроить .env" \
+      "  3. Здоровье системы" \
+      "  4. Логи" \
+      "  5. Бэкапы" \
       "  0. Выход"
   else
     printf '%s\n' \
@@ -486,11 +493,10 @@ run_menu() {
     if cabinet_installed; then
       case "${choice}" in
         1) update_cabinet || true; pause ;;
-        2) check_update_command || true; pause ;;
-        3) edit_env || true; pause ;;
-        4) health_check || true; pause ;;
-        5) logs_menu || true; pause ;;
-        6) backup_menu || true; pause ;;
+        2) edit_env || true; pause ;;
+        3) health_check || true; pause ;;
+        4) logs_menu || true; pause ;;
+        5) backup_menu || true; pause ;;
         0) exit 0 ;;
         *) warn "Неизвестный пункт."; pause ;;
       esac
