@@ -21,6 +21,8 @@ import {
   MessageCircle,
   MessageSquarePlus,
   Send,
+  Search,
+  Smile,
   Tag,
   Timer,
   XCircle,
@@ -37,6 +39,72 @@ import {
 type TicketStatus = 'OPEN' | 'WAITING_ADMIN' | 'WAITING_USER' | 'CLOSED'
 type SenderRole = 'USER' | 'ADMIN'
 type TicketFolder = 'active' | 'need-answer' | 'answered' | 'closed'
+type EmojiCategory = 'recent' | 'people' | 'signals' | 'objects'
+
+const emojiCategories: Array<{ value: EmojiCategory; label: string; items: string[] }> = [
+  { value: 'recent', label: 'Недавние', items: ['👍', '🙏', '🔥', '🎁', '✅', '⚡', '🚀', '💬', '👀', '👇'] },
+  { value: 'people', label: 'Смайлы', items: ['😀', '😁', '😄', '🙂', '😊', '😉', '😎', '🤔', '😕', '😔', '😅', '😂', '😍', '🤝', '🙌', '👌', '👋', '💪'] },
+  { value: 'signals', label: 'Статусы', items: ['✅', '❌', '⚠️', '🔔', '⏳', '🕒', '📌', '📍', '🔒', '🔓', '🔄', '🧾', '💳', '🛠️', '📡', '🧩'] },
+  { value: 'objects', label: 'Разное', items: ['🎁', '🎉', '⭐', '🔥', '⚡', '🚀', '🌐', '🔗', '📦', '💎', '🏆', '🎯', '🧠', '📱', '💻', '🖥️'] },
+]
+
+const emojiKeywords: Record<string, string> = {
+  '👍': 'ок лайк хорошо согласен',
+  '🙏': 'спасибо пожалуйста',
+  '🔥': 'огонь срочно акция горячо',
+  '🎁': 'подарок бонус промо',
+  '✅': 'готово успешно да',
+  '⚡': 'быстро молния срочно',
+  '🚀': 'старт запуск быстро',
+  '💬': 'чат сообщение поддержка',
+  '👀': 'смотрю проверка',
+  '👇': 'ниже сюда',
+  '😀': 'улыбка смайл',
+  '😁': 'улыбка радость',
+  '😄': 'радость',
+  '🙂': 'улыбка нормально',
+  '😊': 'приятно спасибо',
+  '😉': 'ок подмигивание',
+  '😎': 'круто',
+  '🤔': 'думаю вопрос',
+  '😕': 'непонятно проблема',
+  '😔': 'грусть',
+  '😅': 'неловко',
+  '😂': 'смех',
+  '😍': 'супер',
+  '🤝': 'договорились помощь',
+  '🙌': 'ура готово',
+  '👌': 'ок',
+  '👋': 'привет',
+  '💪': 'сила',
+  '❌': 'нет ошибка отмена',
+  '⚠️': 'внимание ошибка проблема',
+  '🔔': 'уведомление колокол',
+  '⏳': 'ожидание время',
+  '🕒': 'время',
+  '📌': 'важно закрепить',
+  '📍': 'место точка',
+  '🔒': 'закрыто пароль безопасность',
+  '🔓': 'открыто доступ',
+  '🔄': 'обновить синхронизация',
+  '🧾': 'чек платеж квитанция',
+  '💳': 'карта оплата платеж',
+  '🛠️': 'ремонт настройка',
+  '📡': 'сеть vpn подключение',
+  '🧩': 'модуль часть',
+  '🎉': 'праздник готово',
+  '⭐': 'звезда важно',
+  '🌐': 'интернет сайт',
+  '🔗': 'ссылка',
+  '📦': 'пакет архив',
+  '💎': 'премиум',
+  '🏆': 'победа',
+  '🎯': 'цель',
+  '🧠': 'идея',
+  '📱': 'телефон мобильный',
+  '💻': 'ноутбук компьютер',
+  '🖥️': 'компьютер экран',
+}
 
 interface SupportMessage {
   id: string
@@ -83,6 +151,7 @@ export function SupportPanel({
 }: SupportPanelProps) {
   const messagesScrollRef = useRef<HTMLDivElement | null>(null)
   const loadMoreRef = useRef<HTMLDivElement | null>(null)
+  const messageInputRef = useRef<HTMLTextAreaElement | null>(null)
   const stickToBottomRef = useRef(true)
   const [tickets, setTickets] = useState(initialTickets)
   const [listLimit, setListLimit] = useState(Math.max(pageSize, initialTickets.length))
@@ -388,6 +457,21 @@ export function SupportPanel({
     void sendMessage()
   }
 
+  function insertMessageEmoji(emoji: string) {
+    const input = messageInputRef.current
+    if (!input) {
+      setMessage((current) => `${current}${emoji}`.slice(0, 3000))
+      return
+    }
+
+    const next = insertAtSelection(message, emoji, input.selectionStart, input.selectionEnd, 3000)
+    setMessage(next.value)
+    requestAnimationFrame(() => {
+      input.focus()
+      input.setSelectionRange(next.cursor, next.cursor)
+    })
+  }
+
   return (
     <div className="grid h-[calc(100dvh-5.5rem)] min-h-[32rem] gap-3 overflow-hidden xl:h-[calc(100dvh-7rem)] xl:min-h-[36rem] xl:grid-cols-[19rem_minmax(0,1fr)_15rem]">
       <section className={cn('min-h-0 overflow-y-auto pr-0.5 xl:flex xl:flex-col xl:overflow-hidden', mobileChatOpen && 'hidden xl:flex')}>
@@ -526,8 +610,10 @@ export function SupportPanel({
                   Обращение закрыто и хранится в архиве
                 </div>
               ) : (
-                <div className="flex items-end gap-2 rounded-lg border border-slate-200 bg-white p-2 shadow-sm dark:border-slate-800 dark:bg-surface-950">
+                <div className="relative flex items-end gap-2 rounded-lg border border-slate-200 bg-white p-2 shadow-sm dark:border-slate-800 dark:bg-surface-950">
+                  <EmojiPicker onPick={insertMessageEmoji} />
                   <textarea
+                    ref={messageInputRef}
                     className="max-h-32 min-h-10 flex-1 resize-none rounded-md border-0 bg-transparent px-2 py-2 text-sm outline-none placeholder:text-slate-400 focus:ring-0"
                     value={message}
                     onChange={(event) => setMessage(event.target.value)}
@@ -580,6 +666,23 @@ function NewTicketForm({
   onCancel?: () => void
   onSubmit: (event: FormEvent<HTMLFormElement>) => void
 }) {
+  const messageInputRef = useRef<HTMLTextAreaElement | null>(null)
+
+  function insertEmoji(emoji: string) {
+    const input = messageInputRef.current
+    if (!input) {
+      onMessageChange(`${message}${emoji}`.slice(0, 3000))
+      return
+    }
+
+    const next = insertAtSelection(message, emoji, input.selectionStart, input.selectionEnd, 3000)
+    onMessageChange(next.value)
+    requestAnimationFrame(() => {
+      input.focus()
+      input.setSelectionRange(next.cursor, next.cursor)
+    })
+  }
+
   return (
     <form onSubmit={onSubmit} className="mb-2 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-surface-900">
       <div className="border-b border-slate-100 bg-slate-50/80 p-3 dark:border-slate-800 dark:bg-surface-950/50">
@@ -625,20 +728,24 @@ function NewTicketForm({
           </div>
         </div>
 
-        <textarea
-          className="input min-h-28 resize-none"
-          value={message}
-          onChange={(event) => onMessageChange(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key !== 'Enter' || event.shiftKey) return
-            event.preventDefault()
-            event.currentTarget.form?.requestSubmit()
-          }}
-          placeholder="Коротко опишите, что происходит"
-          maxLength={3000}
-          required
-          autoFocus
-        />
+        <div className="relative flex items-start gap-2 rounded-lg border border-slate-200 bg-white p-2 shadow-sm dark:border-slate-800 dark:bg-surface-950">
+          <EmojiPicker onPick={insertEmoji} />
+          <textarea
+            ref={messageInputRef}
+            className="min-h-28 flex-1 resize-none rounded-md border-0 bg-transparent px-2 py-2 text-sm outline-none placeholder:text-slate-400 focus:ring-0"
+            value={message}
+            onChange={(event) => onMessageChange(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key !== 'Enter' || event.shiftKey) return
+              event.preventDefault()
+              event.currentTarget.form?.requestSubmit()
+            }}
+            placeholder="Коротко опишите, что происходит"
+            maxLength={3000}
+            required
+            autoFocus
+          />
+        </div>
 
         <div className="flex items-center justify-between gap-3">
           <div className="text-xs text-slate-400">{message.trim().length}/3000</div>
@@ -656,6 +763,94 @@ function NewTicketForm({
         </div>
       </div>
     </form>
+  )
+}
+
+function EmojiPicker({ onPick }: { onPick: (emoji: string) => void }) {
+  const [open, setOpen] = useState(false)
+  const [category, setCategory] = useState<EmojiCategory>('recent')
+  const [query, setQuery] = useState('')
+
+  const items = useMemo(() => {
+    const allItems = emojiCategories.flatMap((item) => item.items)
+    const normalizedQuery = query.trim().toLowerCase()
+    const source = normalizedQuery
+      ? allItems.filter((emoji) => `${emoji} ${emojiKeywords[emoji] ?? ''}`.toLowerCase().includes(normalizedQuery))
+      : emojiCategories.find((item) => item.value === category)?.items ?? []
+    return Array.from(new Set(source))
+  }, [category, query])
+
+  return (
+    <div className="relative shrink-0">
+      <button
+        type="button"
+        onClick={() => setOpen((current) => !current)}
+        className={cn(
+          'grid h-10 w-10 place-items-center rounded-lg border text-slate-500 transition-colors',
+          open
+            ? 'border-slate-300 bg-slate-100 text-slate-950 dark:border-slate-700 dark:bg-surface-800 dark:text-white'
+            : 'border-transparent hover:bg-slate-100 hover:text-slate-950 dark:hover:bg-surface-800 dark:hover:text-white'
+        )}
+        aria-label="Открыть emoji"
+      >
+        <Smile className="h-5 w-5" />
+      </button>
+
+      {open && (
+        <div className="absolute bottom-12 left-0 z-30 w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-lg border border-slate-200 bg-white shadow-2xl shadow-slate-950/15 dark:border-slate-800 dark:bg-surface-900">
+          <div className="border-b border-slate-100 p-2 dark:border-slate-800">
+            <div className="flex items-center gap-2 rounded-lg bg-slate-100 px-3 py-2 dark:bg-surface-950">
+              <Search className="h-4 w-4 shrink-0 text-slate-400" />
+              <input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400"
+                placeholder="Поиск"
+              />
+            </div>
+            <div className="mt-2 flex gap-1 overflow-x-auto">
+              {emojiCategories.map((item) => (
+                <button
+                  key={item.value}
+                  type="button"
+                  onClick={() => {
+                    setCategory(item.value)
+                    setQuery('')
+                  }}
+                  className={cn(
+                    'min-w-fit rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors',
+                    category === item.value && !query.trim()
+                      ? 'bg-slate-950 text-white dark:bg-white dark:text-slate-950'
+                      : 'text-slate-500 hover:bg-slate-100 hover:text-slate-950 dark:hover:bg-surface-800 dark:hover:text-white'
+                  )}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="max-h-60 overflow-y-auto p-2">
+            <div className="grid grid-cols-8 gap-1">
+              {items.map((emoji, index) => (
+                <button
+                  key={`${emoji}-${index}`}
+                  type="button"
+                  onClick={() => {
+                    onPick(emoji)
+                    setOpen(false)
+                  }}
+                  className="grid h-9 w-9 place-items-center rounded-lg text-xl transition-colors hover:bg-slate-100 dark:hover:bg-surface-800"
+                  aria-label={`Вставить ${emoji}`}
+                >
+                  {emoji}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -939,6 +1134,16 @@ function getUnreadCount(ticket: SupportTicket, mode: 'user' | 'admin') {
 function needsCurrentActor(ticket: SupportTicket, mode: 'user' | 'admin') {
   if (mode === 'admin') return ticket.status === 'WAITING_ADMIN'
   return ticket.userUnreadCount > 0 || ticket.status === 'WAITING_USER'
+}
+
+function insertAtSelection(value: string, insert: string, start: number, end: number, maxLength: number) {
+  const safeStart = Math.max(0, Math.min(start, value.length))
+  const safeEnd = Math.max(safeStart, Math.min(end, value.length))
+  const nextValue = `${value.slice(0, safeStart)}${insert}${value.slice(safeEnd)}`.slice(0, maxLength)
+  return {
+    value: nextValue,
+    cursor: Math.min(safeStart + insert.length, nextValue.length),
+  }
 }
 
 function formatDate(value: string) {
