@@ -1,10 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Mail, MessageCircle, Send, Smartphone, UsersRound } from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
 import { toast } from '@/components/ui/toaster'
 import { cn } from '@/lib/cn'
+import { EmojiPicker } from '@/components/ui/emoji-picker'
 
 type BroadcastSegment =
   | 'ALL'
@@ -40,17 +41,14 @@ const channels: Array<{ value: BroadcastChannel; label: string; icon: typeof Mai
   { value: 'EMAIL', label: 'Email', icon: Mail },
 ]
 
-const quickEmojis = ['🔥', '🎁', '⚡', '✅', '💬', '🚀', '⭐', '🔔']
-
 export function BroadcastAdmin() {
+  const bodyInputRef = useRef<HTMLTextAreaElement | null>(null)
   const [segment, setSegment] = useState<BroadcastSegment>('ALL')
   const [selectedChannels, setSelectedChannels] = useState<BroadcastChannel[]>(['IN_APP'])
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
   const [actionHref, setActionHref] = useState('/dashboard')
   const [actionLabel, setActionLabel] = useState('Открыть')
-  const [customEmojiId, setCustomEmojiId] = useState('')
-  const [customEmojiFallback, setCustomEmojiFallback] = useState('🔥')
   const [loading, setLoading] = useState(false)
   const [stats, setStats] = useState<BroadcastStats | null>(null)
 
@@ -87,18 +85,19 @@ export function BroadcastAdmin() {
     })
   }
 
-  function appendToBody(value: string) {
-    setBody((current) => `${current}${current && !current.endsWith(' ') ? ' ' : ''}${value}`.slice(0, 1200))
-  }
-
-  function appendCustomEmoji() {
-    const emojiId = customEmojiId.trim()
-    const fallback = customEmojiFallback.trim() || '🙂'
-    if (!/^[0-9]{5,32}$/.test(emojiId)) {
-      toast('Укажите числовой emoji-id из Telegram', 'error')
+  function insertBodyEmoji(emoji: string) {
+    const input = bodyInputRef.current
+    if (!input) {
+      setBody((current) => `${current}${emoji}`.slice(0, 1200))
       return
     }
-    appendToBody(`{tg:${emojiId}:${fallback.slice(0, 16)}}`)
+
+    const next = insertAtSelection(body, emoji, input.selectionStart, input.selectionEnd, 1200)
+    setBody(next.value)
+    requestAnimationFrame(() => {
+      input.focus()
+      input.setSelectionRange(next.cursor, next.cursor)
+    })
   }
 
   const canSend = title.trim().length >= 3 && body.trim().length >= 5 && selectedChannels.length > 0 && !loading
@@ -173,60 +172,23 @@ export function BroadcastAdmin() {
 
           <label className="block">
             <span className="text-sm font-medium">Текст</span>
-            <textarea
-              className="input mt-1 min-h-40 resize-y py-3"
-              value={body}
-              onChange={(event) => setBody(event.target.value)}
-              maxLength={1200}
-              placeholder="Короткое сообщение для пользователя"
-            />
+            <div className="relative mt-1">
+              <textarea
+                ref={bodyInputRef}
+                className="input min-h-40 resize-y py-3 pr-14"
+                value={body}
+                onChange={(event) => setBody(event.target.value)}
+                maxLength={1200}
+                placeholder="Короткое сообщение для пользователя"
+              />
+              <EmojiPicker
+                onPick={insertBodyEmoji}
+                className="absolute bottom-3 right-3"
+                buttonClassName="bg-white shadow-sm dark:bg-surface-900"
+              />
+            </div>
             <span className="mt-1 block text-xs text-slate-400">{body.length}/1200</span>
           </label>
-
-          <div className="grid gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-white/10 dark:bg-white/5">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="mr-1 text-xs font-semibold uppercase tracking-wide text-slate-400">Emoji</span>
-              {quickEmojis.map((emoji) => (
-                <button
-                  key={emoji}
-                  type="button"
-                  onClick={() => appendToBody(emoji)}
-                  className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-lg transition-colors hover:bg-cyan-50 dark:border-white/10 dark:bg-surface-900 dark:hover:bg-white/10"
-                  aria-label={`Добавить ${emoji}`}
-                >
-                  {emoji}
-                </button>
-              ))}
-            </div>
-            <div className="grid gap-2 sm:grid-cols-[1fr_5rem_auto] sm:items-end">
-              <label className="block">
-                <span className="text-xs font-medium text-slate-500">Telegram animated emoji-id</span>
-                <input
-                  className="input mt-1 h-10 min-h-10"
-                  value={customEmojiId}
-                  onChange={(event) => setCustomEmojiId(event.target.value)}
-                  inputMode="numeric"
-                  placeholder="5368324170671202286"
-                />
-              </label>
-              <label className="block">
-                <span className="text-xs font-medium text-slate-500">Символ</span>
-                <input
-                  className="input mt-1 h-10 min-h-10 text-center text-lg"
-                  value={customEmojiFallback}
-                  onChange={(event) => setCustomEmojiFallback(event.target.value)}
-                  maxLength={8}
-                  placeholder="🔥"
-                />
-              </label>
-              <button type="button" className="btn-secondary h-10 min-h-10 px-3" onClick={appendCustomEmoji}>
-                Добавить
-              </button>
-            </div>
-            <p className="text-xs leading-5 text-slate-500">
-              Обычные emoji работают во всех каналах. Animated emoji применяется только в Telegram, в кабинете и email будет обычный символ.
-            </p>
-          </div>
 
           <div className="grid gap-3 sm:grid-cols-[1fr_13rem]">
             <label className="block">
@@ -280,4 +242,14 @@ function BroadcastStats({ stats }: { stats: BroadcastStats }) {
       <div>Email: {stats.email.sent} отправлено, {stats.email.failed} ошибок</div>
     </div>
   )
+}
+
+function insertAtSelection(value: string, insert: string, start: number, end: number, maxLength: number) {
+  const safeStart = Math.max(0, Math.min(start, value.length))
+  const safeEnd = Math.max(safeStart, Math.min(end, value.length))
+  const nextValue = `${value.slice(0, safeStart)}${insert}${value.slice(safeEnd)}`.slice(0, maxLength)
+  return {
+    value: nextValue,
+    cursor: Math.min(safeStart + insert.length, nextValue.length),
+  }
 }
