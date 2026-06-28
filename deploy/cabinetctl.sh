@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="1.2.0"
+VERSION="1.2.1"
 BRANCH="${BRANCH:-main}"
 RAW_BASE_URL="${RAW_BASE_URL:-https://raw.githubusercontent.com/asdcrosh/cabinet_remna/${BRANCH}}"
+GITHUB_API_URL="${GITHUB_API_URL:-https://api.github.com/repos/asdcrosh/cabinet_remna/commits/${BRANCH}}"
 INSTALL_URL="${INSTALL_URL:-${RAW_BASE_URL}/deploy/install-server.sh}"
 UPDATE_URL="${UPDATE_URL:-${RAW_BASE_URL}/deploy/update-server.sh}"
 NGINX_SETUP_URL="${NGINX_SETUP_URL:-${RAW_BASE_URL}/deploy/setup-nginx-proxy.sh}"
@@ -14,11 +15,12 @@ BACKUP_SCRIPT_PATH="${BACKUP_SCRIPT_PATH:-/usr/local/bin/remna-backup}"
 CABINET_DIR="${INSTALL_DIR:-/opt/remnawave-cabinet}"
 CABINET_ENV="${CABINET_DIR}/.env"
 CABINET_COMPOSE="${CABINET_DIR}/docker-compose.yml"
+CABINET_VERSION_FILE="${CABINET_VERSION_FILE:-${CABINET_DIR}/.cabinet-version}"
 UPDATE_STATUS_CACHE="${CABINETCTL_UPDATE_CACHE:-/var/cache/remnawave-cabinet/update-status}"
 UPDATE_STATUS_CACHE_TTL="${CABINETCTL_UPDATE_CACHE_TTL:-3600}"
 
 if [[ "$(id -u)" -ne 0 ]]; then
-  exec sudo --preserve-env=BRANCH,RAW_BASE_URL,INSTALL_URL,UPDATE_URL,NGINX_SETUP_URL,CONSOLE_INSTALL_URL,BACKUP_SCRIPT_URL,CABINETCTL_PATH,BACKUP_SCRIPT_PATH,INSTALL_DIR,CABINETCTL_UPDATE_CACHE,CABINETCTL_UPDATE_CACHE_TTL,CABINETCTL_CHECK_UPDATES_IN_MENU "$0" "$@"
+  exec sudo --preserve-env=BRANCH,RAW_BASE_URL,GITHUB_API_URL,INSTALL_URL,UPDATE_URL,NGINX_SETUP_URL,CONSOLE_INSTALL_URL,BACKUP_SCRIPT_URL,CABINETCTL_PATH,BACKUP_SCRIPT_PATH,INSTALL_DIR,CABINET_VERSION_FILE,CABINETCTL_UPDATE_CACHE,CABINETCTL_UPDATE_CACHE_TTL,CABINETCTL_CHECK_UPDATES_IN_MENU "$0" "$@"
 fi
 
 if [[ -t 1 ]]; then
@@ -127,38 +129,58 @@ pull_latest_image() {
   docker pull -q "${image}" >/dev/null 2>&1
 }
 
+remote_commit_sha() {
+  local response
+  command -v curl >/dev/null 2>&1 || return 1
+  response="$(curl -fsSL -H 'Accept: application/vnd.github+json' "${GITHUB_API_URL}" 2>/dev/null || true)"
+  printf '%s\n' "${response}" \
+    | sed -n 's/.*"sha"[[:space:]]*:[[:space:]]*"\([0-9a-f]\{40\}\)".*/\1/p' \
+    | head -n 1
+}
+
+installed_commit_sha() {
+  [[ -f "${CABINET_VERSION_FILE}" ]] || return 1
+  sed -n 's/^commit=//p' "${CABINET_VERSION_FILE}" 2>/dev/null | head -n 1
+}
+
+write_installed_version() {
+  local sha="$1"
+  [[ -n "${sha}" ]] || return 0
+  mkdir -p "$(dirname "${CABINET_VERSION_FILE}")" 2>/dev/null || true
+  {
+    printf 'commit=%s\n' "${sha}"
+    printf 'branch=%s\n' "${BRANCH}"
+    printf 'updated_at=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  } >"${CABINET_VERSION_FILE}" 2>/dev/null || true
+}
+
 check_update_status() {
   if ! cabinet_installed; then
     write_update_status_cache "not-installed"
     return 2
   fi
-  if ! docker_available; then
-    write_update_status_cache "docker-unavailable"
-    return 2
-  fi
 
-  local image running_image latest_image
-  image="$(compose_image)"
-  running_image="$(container_image_id remnawave-cabinet-app)"
-
-  if [[ -z "${running_image}" ]]; then
-    write_update_status_cache "app-not-running"
-    return 2
-  fi
-
-  if ! pull_latest_image "${image}"; then
+  local remote_sha installed_sha
+  remote_sha="$(remote_commit_sha)"
+  if [[ -z "${remote_sha}" ]]; then
     write_update_status_cache "check-failed"
     return 2
   fi
 
-  latest_image="$(local_image_id "${image}")"
-  if [[ -n "${latest_image}" && "${running_image}" == "${latest_image}" ]]; then
+  installed_sha="$(installed_commit_sha || true)"
+  if [[ -z "${installed_sha}" ]]; then
+    write_installed_version "${remote_sha}"
     write_update_status_cache "latest"
     return 1
-  else
-    write_update_status_cache "available"
-    return 0
   fi
+
+  if [[ "${installed_sha}" == "${remote_sha}" ]]; then
+    write_update_status_cache "latest"
+    return 1
+  fi
+
+  write_update_status_cache "available"
+  return 0
 }
 
 print_update_status_key() {
@@ -259,6 +281,7 @@ install_cabinet() {
   ensure_docker
   info "Запускаем мастер установки кабинета..."
   curl -fsSL "${INSTALL_URL}" | bash
+  write_installed_version "$(remote_commit_sha || true)"
   write_update_status_cache "latest"
 }
 
@@ -269,6 +292,7 @@ update_cabinet() {
   }
   info "Обновляем кабинет..."
   curl -fsSL "${UPDATE_URL}" | bash
+  write_installed_version "$(remote_commit_sha || true)"
   write_update_status_cache latest
 }
 

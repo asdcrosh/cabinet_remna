@@ -3,10 +3,12 @@ set -euo pipefail
 
 BRANCH="${BRANCH:-main}"
 RAW_BASE_URL="${RAW_BASE_URL:-https://raw.githubusercontent.com/asdcrosh/cabinet_remna/${BRANCH}}"
+GITHUB_API_URL="${GITHUB_API_URL:-https://api.github.com/repos/asdcrosh/cabinet_remna/commits/${BRANCH}}"
 COMPOSE_URL="${COMPOSE_URL:-${RAW_BASE_URL}/deploy/docker-compose.server.yml}"
 INSTALL_DIR="${INSTALL_DIR:-/opt/remnawave-cabinet}"
 COMPOSE_FILE="${INSTALL_DIR}/docker-compose.yml"
 ENV_FILE="${INSTALL_DIR}/.env"
+VERSION_FILE="${INSTALL_DIR}/.cabinet-version"
 CABINETCTL_URL="${CABINETCTL_URL:-${RAW_BASE_URL}/deploy/cabinetctl.sh}"
 CABINETCTL_PATH="${CABINETCTL_PATH:-/usr/local/bin/cabinetctl}"
 CABINETCTL_TEMP="${CABINETCTL_PATH}.tmp"
@@ -36,6 +38,26 @@ if ! command -v docker >/dev/null 2>&1 || ! docker compose version >/dev/null 2>
   echo "Docker and Docker Compose plugin are required. Run install-server.sh first."
   exit 1
 fi
+
+remote_commit_sha() {
+  local response
+  command -v curl >/dev/null 2>&1 || return 1
+  response="$(curl -fsSL -H 'Accept: application/vnd.github+json' "${GITHUB_API_URL}" 2>/dev/null || true)"
+  printf '%s\n' "${response}" \
+    | sed -n 's/.*"sha"[[:space:]]*:[[:space:]]*"\([0-9a-f]\{40\}\)".*/\1/p' \
+    | head -n 1
+}
+
+write_installed_version() {
+  local sha="$1"
+  [[ -n "${sha}" ]] || return 0
+  mkdir -p "$(dirname "${VERSION_FILE}")" 2>/dev/null || true
+  {
+    printf 'commit=%s\n' "${sha}"
+    printf 'branch=%s\n' "${BRANCH}"
+    printf 'updated_at=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  } >"${VERSION_FILE}" 2>/dev/null || true
+}
 
 cd "${INSTALL_DIR}"
 
@@ -288,6 +310,7 @@ if [[ -n "${APP_URL}" && -n "${HEALTHCHECK_TOKEN}" ]]; then
 fi
 
 cleanup_docker_artifacts
+write_installed_version "$(remote_commit_sha || true)"
 mkdir -p /var/cache/remnawave-cabinet 2>/dev/null || true
 printf '%s|%s\n' "$(date +%s)" latest >/var/cache/remnawave-cabinet/update-status 2>/dev/null || true
 
