@@ -17,6 +17,7 @@ type NotifyUserInput = {
   emailSubject?: string
   emailText?: string
   emailHtml?: string
+  inApp?: boolean
 }
 
 type NotifyResult = 'sent' | 'duplicate' | 'skipped' | 'failed'
@@ -37,15 +38,17 @@ export async function notifyUser(input: NotifyUserInput) {
     return { telegram: 'skipped' as NotifyResult, email: 'skipped' as NotifyResult }
   }
 
-  await createInAppNotification({
-    userId: user.id,
-    type: input.type,
-    dedupeKey: input.dedupeKey,
-    title: input.title,
-    body: input.body,
-    actionHref: input.actionHref,
-    actionLabel: input.actionLabel,
-  })
+  if (input.inApp !== false) {
+    await createInAppNotification({
+      userId: user.id,
+      type: input.type,
+      dedupeKey: input.dedupeKey,
+      title: input.title,
+      body: input.body,
+      actionHref: input.actionHref,
+      actionLabel: input.actionLabel,
+    })
+  }
 
   const [telegram, email] = await Promise.all([
     user.telegramId && input.telegramText

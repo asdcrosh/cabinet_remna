@@ -204,6 +204,7 @@ enum NotificationType {
   TRAFFIC_LIMIT
   SUPPORT_REPLY
   BONUS_GRANTED
+  BROADCAST
 }
 
 enum NotificationChannel {
