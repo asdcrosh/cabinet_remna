@@ -76,42 +76,59 @@ const templates: Array<{
   body: string
 }> = [
   {
-    title: 'Продление подписки',
-    description: 'Для активных пользователей',
+    title: 'VPN почти на паузе',
+    description: 'Продление для активных',
     segment: 'ACTIVE',
     channels: ['IN_APP', 'TELEGRAM', 'EMAIL'],
     actionHref: '/dashboard/plans',
-    actionLabel: 'Продлить подписку',
-    body: 'Подписка скоро закончится. Продлите доступ заранее, чтобы подключение не прерывалось.',
+    actionLabel: 'Продлить {plan}',
+    body: '🔥 {name}, тариф «{plan}» заканчивается через {days_left} дн.\n\nПродлите доступ заранее, чтобы VPN работал без пауз.',
   },
   {
-    title: 'Промокод для возврата',
-    description: 'Для тех, кто давно не покупал',
+    title: 'Персональный бонус',
+    description: 'Возврат неактивных',
     segment: 'INACTIVE_45D',
     channels: ['IN_APP', 'TELEGRAM'],
     actionHref: '/dashboard/plans',
-    actionLabel: 'Выбрать тариф',
-    body: 'Для вас доступно персональное предложение на VPN. Откройте тарифы и выберите подходящий срок.',
+    actionLabel: 'Забрать бонус',
+    body: '🎁 {name}, для вас открыт персональный бонус на VPN.\n\nВыберите тариф в кабинете, а промокод примените при оплате.',
   },
   {
-    title: 'Подключение устройства',
-    description: 'Для пользователей с Telegram',
+    title: 'Новое устройство',
+    description: 'Подключение без лишнего',
     segment: 'TELEGRAM_LINKED',
     channels: ['IN_APP', 'TELEGRAM'],
     actionHref: '/dashboard/subscription',
-    actionLabel: 'Открыть подписку',
-    body: 'Подключите VPN на новом устройстве: ссылка подписки, QR-код и инструкции уже доступны в кабинете.',
+    actionLabel: 'Подключить VPN',
+    body: '📲 {name}, подключите VPN на телефоне или компьютере.\n\nВ кабинете есть QR, ссылка подписки и быстрые кнопки для приложений.',
   },
   {
-    title: 'Новость сервиса',
+    title: 'Пригласи друга',
+    description: 'Реферальный оффер',
+    segment: 'ACTIVE',
+    channels: ['IN_APP', 'TELEGRAM', 'EMAIL'],
+    actionHref: '/dashboard/referrals',
+    actionLabel: 'Открыть рефералку',
+    body: '🤝 {name}, поделитесь VPN с другом и получите бонус.\n\nВаша ссылка: {ref_link}',
+  },
+  {
+    title: 'Что нового',
     description: 'Для всей базы',
     segment: 'ALL',
     channels: ['IN_APP'],
     actionHref: '/dashboard',
     actionLabel: 'Открыть кабинет',
-    body: 'В кабинете появились обновления. Откройте главную страницу, чтобы посмотреть актуальную информацию.',
+    body: '✨ {name}, в кабинете появились обновления.\n\nПроверьте подписку, устройства и новые возможности на главной странице.',
   },
 ]
+
+const previewVariables: Record<string, string> = {
+  name: 'Артем',
+  email: 'user@example.com',
+  days_left: '5',
+  plan: 'Стандарт 30 дн.',
+  ref_link: 'https://cabinet.example/ref/ABCD',
+}
 
 export function BroadcastAdmin({ initialHistory = [] }: { initialHistory?: BroadcastHistoryItem[] }) {
   const bodyInputRef = useRef<HTMLTextAreaElement | null>(null)
@@ -212,6 +229,9 @@ export function BroadcastAdmin({ initialHistory = [] }: { initialHistory?: Broad
 
   const canSend = title.trim().length >= 3 && body.trim().length >= 5 && selectedChannels.length > 0 && !loading
   const selectedPreset = actionPresets.find((preset) => preset.href === actionHref) ?? actionPresets[0]
+  const previewTitle = renderPreview(title || 'Заголовок рассылки')
+  const previewBody = renderPreview(body || 'Текст сообщения будет показан здесь.')
+  const previewActionLabel = renderPreview(actionLabel || 'Открыть')
 
   return (
     <section className="grid gap-4">
@@ -402,36 +422,49 @@ export function BroadcastAdmin({ initialHistory = [] }: { initialHistory?: Broad
               <span className="mt-1 block text-xs text-slate-400">До 5 МБ: JPG, PNG, WEBP или GIF. Можно оставить пустым.</span>
             </label>
 
-            <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50 dark:border-white/10 dark:bg-white/5">
+            <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50 shadow-sm dark:border-white/10 dark:bg-white/5">
               <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3 dark:border-white/10">
                 <div>
-                  <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Предпросмотр Telegram</div>
-                  <div className="mt-1 text-sm text-slate-500">Фото, текст и inline-кнопка</div>
+                  <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Предпросмотр</div>
+                  <div className="mt-1 text-sm text-slate-500">Как увидит пользователь</div>
                 </div>
                 <MessageCircle className="h-5 w-5 text-cyan-600" />
               </div>
-              <div className="grid gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_15rem]">
-                <div className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200 dark:bg-surface-950 dark:ring-white/10">
-                  <div className="text-lg font-semibold">{title || 'Заголовок рассылки'}</div>
-                  <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-600 dark:text-slate-300">
-                    {body || 'Текст сообщения будет показан здесь.'}
-                  </p>
-                  {actionHref ? (
-                    <div className="mt-4 rounded-lg border border-cyan-200 bg-cyan-50 px-3 py-2 text-center text-sm font-semibold text-cyan-800 dark:border-cyan-500/25 dark:bg-cyan-500/10 dark:text-cyan-100">
-                      {actionLabel || 'Открыть'}
+              <div className="bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.18),transparent_34%),linear-gradient(135deg,#f8fafc,#eef8ff)] p-4 dark:bg-none dark:bg-surface-950">
+                <div className="mx-auto max-w-xl rounded-[1.35rem] border border-white/80 bg-white/80 p-3 shadow-sm backdrop-blur dark:border-white/10 dark:bg-white/5">
+                  <div className="mb-3 flex items-center gap-2 px-1">
+                    <div className="grid h-8 w-8 place-items-center rounded-full bg-cyan-500 text-sm font-bold text-white">T</div>
+                    <div>
+                      <div className="text-sm font-semibold text-slate-950 dark:text-white">Telegram</div>
+                      <div className="text-xs text-slate-400">рассылка кабинета</div>
                     </div>
-                  ) : null}
-                </div>
-                <div className="flex min-h-40 items-center justify-center overflow-hidden rounded-xl border border-dashed border-slate-300 bg-white dark:border-white/10 dark:bg-surface-950">
-                  {imageUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={imageUrl} alt="" className="h-full max-h-52 w-full object-cover" />
-                  ) : (
-                    <div className="grid justify-items-center gap-2 px-4 text-center text-sm text-slate-400">
-                      <ImageIcon className="h-6 w-6" />
-                      Картинка не выбрана
+                  </div>
+
+                  <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 dark:bg-surface-900 dark:ring-white/10">
+                    {imageUrl ? (
+                      <div className="max-h-56 overflow-hidden bg-slate-100 dark:bg-white/5">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={imageUrl} alt="" className="h-full max-h-56 w-full object-cover" />
+                      </div>
+                    ) : (
+                      <div className="grid min-h-28 place-items-center bg-slate-100 text-slate-400 dark:bg-white/5">
+                        <ImageIcon className="h-7 w-7" />
+                      </div>
+                    )}
+
+                    <div className="p-4">
+                      <div className="text-base font-semibold leading-tight">{previewTitle}</div>
+                      <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-600 dark:text-slate-300">{previewBody}</p>
                     </div>
-                  )}
+
+                    {actionHref ? (
+                      <div className="border-t border-slate-100 p-2 dark:border-white/10">
+                        <div className="rounded-xl bg-cyan-50 px-3 py-2.5 text-center text-sm font-semibold text-cyan-800 dark:bg-cyan-500/10 dark:text-cyan-100">
+                          {previewActionLabel}
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
               </div>
             </div>
@@ -533,4 +566,8 @@ function insertAtSelection(value: string, insert: string, start: number, end: nu
     value: nextValue,
     cursor: Math.min(safeStart + insert.length, nextValue.length),
   }
+}
+
+function renderPreview(value: string) {
+  return value.replace(/\{(name|email|days_left|plan|ref_link)\}/g, (_, key: string) => previewVariables[key] ?? `{${key}}`)
 }
