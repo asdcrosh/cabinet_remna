@@ -8,6 +8,7 @@ import { renderActionEmail } from '@/lib/email-template'
 import { getAppUrl } from '@/lib/app-url'
 import { getBrandName } from '@/lib/branding'
 import { createAdminNotification } from '@/lib/admin-notifications'
+import { escapeTelegramHtml, renderTelegramCustomEmoji, stripTelegramCustomEmojiMarkup } from '@/lib/telegram-format'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -42,6 +43,7 @@ export const POST = withAuth(async (req: Request) => {
   const actionHref = normalizeActionHref(input.actionHref)
   const actionUrl = actionHref ? `${getAppUrl()}${actionHref}` : getAppUrl()
   const actionLabel = input.actionLabel || (actionHref ? 'Открыть кабинет' : undefined)
+  const plainBody = stripTelegramCustomEmojiMarkup(input.body)
   const batchKey = `broadcast:${Date.now()}:${session.uid}`
   const channels = new Set(input.channels)
   const stats = {
@@ -57,21 +59,23 @@ export const POST = withAuth(async (req: Request) => {
       type: 'BROADCAST',
       dedupeKey: `${batchKey}:${user.id}`,
       title: input.title,
-      body: input.body,
+      body: plainBody,
       actionHref: actionHref ?? undefined,
       actionLabel,
       inApp: channels.has('IN_APP'),
       telegramText: channels.has('TELEGRAM')
-        ? [`<b>${escapeTelegram(input.title)}</b>`, escapeTelegram(input.body), actionHref ? `\n${escapeTelegram(actionUrl)}` : ''].filter(Boolean).join('\n')
+        ? [`<b>${escapeTelegramHtml(input.title)}</b>`, renderTelegramCustomEmoji(input.body), actionHref ? `\n${escapeTelegramHtml(actionUrl)}` : '']
+            .filter(Boolean)
+            .join('\n')
         : undefined,
       emailSubject: channels.has('EMAIL') ? `${input.title} — ${getBrandName()}` : undefined,
-      emailText: channels.has('EMAIL') ? `${input.body}${actionHref ? `\n\n${actionUrl}` : ''}` : undefined,
+      emailText: channels.has('EMAIL') ? `${plainBody}${actionHref ? `\n\n${actionUrl}` : ''}` : undefined,
       emailHtml: channels.has('EMAIL')
         ? renderActionEmail({
             eyebrow: 'Сообщение',
             title: input.title,
-            lead: input.body,
-            body: input.body,
+            lead: plainBody,
+            body: plainBody,
             ctaLabel: actionLabel || 'Открыть кабинет',
             ctaUrl: actionUrl,
             expiry: 'Это сообщение отправлено администратором сервиса.',
@@ -137,21 +141,4 @@ function normalizeActionHref(value: string | null | undefined) {
   if (!href) return null
   if (!href.startsWith('/dashboard')) return null
   return href
-}
-
-function escapeTelegram(value: string) {
-  return value.replace(/[&<>"]/g, (char) => {
-    switch (char) {
-      case '&':
-        return '&amp;'
-      case '<':
-        return '&lt;'
-      case '>':
-        return '&gt;'
-      case '"':
-        return '&quot;'
-      default:
-        return char
-    }
-  })
 }

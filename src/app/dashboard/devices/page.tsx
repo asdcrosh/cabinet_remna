@@ -14,21 +14,21 @@ export default function DevicesPage() {
         title="Устройства"
         description="Список подключенных устройств и управление доступом"
       />
-      <section className="grid gap-3 md:grid-cols-3">
+      <section className="grid gap-2 md:grid-cols-3">
         <DeviceHint
           icon={<ShieldCheck className="h-5 w-5" />}
           title="Привязка автоматическая"
-          text="Устройство появляется после первого подключения к VPN."
+          text="Появляется после подключения"
         />
         <DeviceHint
           icon={<RefreshCw className="h-5 w-5" />}
           title="Можно отвязать"
-          text="Освободите место, если сменили телефон или компьютер."
+          text="Если сменили устройство"
         />
         <DeviceHint
           icon={<Clock3 className="h-5 w-5" />}
           title="Активность"
-          text="Последнее подключение помогает понять, что реально используется."
+          text="Видно последнее подключение"
         />
       </section>
       <DevicesList />
@@ -38,13 +38,15 @@ export default function DevicesPage() {
 
 function DeviceHint({ icon, title, text }: { icon: ReactNode; title: string; text: string }) {
   return (
-    <div className="card flex items-start gap-3 p-4">
-      <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-slate-950 text-cyan-200 dark:bg-white dark:text-slate-950">
-        {icon}
-      </div>
-      <div>
-        <h2 className="text-sm font-semibold">{title}</h2>
-        <p className="mt-1 text-xs leading-5 text-slate-500">{text}</p>
+    <div className="rounded-lg border border-slate-200 bg-white/80 p-3 shadow-sm dark:border-white/10 dark:bg-white/[0.03]">
+      <div className="flex items-center gap-2">
+        <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-slate-950 text-cyan-200 dark:bg-white dark:text-slate-950">
+          {icon}
+        </div>
+        <div className="min-w-0">
+          <h2 className="text-sm font-semibold">{title}</h2>
+          <p className="truncate text-xs text-slate-500">{text}</p>
+        </div>
       </div>
     </div>
   )
