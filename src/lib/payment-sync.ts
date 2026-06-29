@@ -10,6 +10,12 @@ export type PaymentSyncResult =
   | { ok: true; status: 'succeeded'; provisioned: true; alreadyProvisioned?: boolean; subscriptionId?: string }
   | { ok: false; status: 'check_failed' | 'provisioning_failed'; provisioned: false; error: string }
 
+type PendingPaymentForCancel = {
+  id: string
+  userId: string
+  yookassaId: string | null
+}
+
 export async function syncPaymentProvisioning(input: {
   paymentId: string
   userId?: string
@@ -114,25 +120,11 @@ export async function syncPaymentProvisioning(input: {
       input.cancelPendingOlderThanMs &&
       Date.now() - payment.createdAt.getTime() >= input.cancelPendingOlderThanMs
     ) {
-      try {
-        const canceledPayment = await cancelPayment(payment.yookassaId, `cancel-${payment.id}`)
-        if (canceledPayment.status === 'canceled') {
-          await cancelLocalPayment(payment.id, 'canceled')
-          await notifyPaymentCanceled(payment.id, 'Платёж отменён, потому что слишком долго ожидал подтверждения.')
-          return { ok: true, status: 'canceled', provisioned: false }
-        }
-      } catch (e) {
-        const message = e instanceof Error ? e.message : 'payment cancellation failed'
-        await prisma.payment.update({
-          where: { id: payment.id },
-          data: {
-            yookassaStatus: yooPayment.status,
-            provisioningError: message.slice(0, 1000),
-          },
-        })
-        await notifyPaymentStuck(payment.id, 'Не удалось автоматически отменить зависший платёж.')
-        return { ok: false, status: 'check_failed', provisioned: false, error: message }
-      }
+      const canceled = await cancelPendingPayment(
+        payment,
+        'Платёж отменён, потому что слишком долго ожидал подтверждения.'
+      )
+      if (canceled === 'canceled') return { ok: true, status: 'canceled', provisioned: false }
     }
 
     await prisma.payment.update({
@@ -157,6 +149,7 @@ export async function syncPaymentProvisioning(input: {
       data: { status: 'SUCCEEDED' },
     }),
   ])
+  await cancelOtherPendingPaymentsForUser(payment.userId, payment.id)
 
   if (payment.subscriptionProvisionedAt && payment.subscription) {
     return {
@@ -198,6 +191,73 @@ export async function syncPaymentProvisioning(input: {
     await notifyPaymentStuck(payment.id, 'Платёж прошёл, но подписка пока не выдана автоматически.')
     return { ok: false, status: 'provisioning_failed', provisioned: false, error: message }
   }
+}
+
+export async function cancelOtherPendingPaymentsForUser(userId: string, paidPaymentId: string, limit = 25) {
+  const payments = await prisma.payment.findMany({
+    where: {
+      userId,
+      status: 'PENDING',
+      id: { not: paidPaymentId },
+    },
+    orderBy: { createdAt: 'asc' },
+    take: limit,
+    select: { id: true, userId: true, yookassaId: true },
+  })
+
+  for (const payment of payments) {
+    await cancelPendingPayment(payment, 'Платёж отменён, потому что другая оплата уже завершена.').catch((error) => {
+      console.error('[payment-sync] sibling pending cancellation failed', {
+        paymentId: payment.id,
+        userId,
+        message: error instanceof Error ? error.message : 'unknown error',
+      })
+    })
+  }
+
+  return { canceled: payments.length }
+}
+
+async function cancelPendingPayment(payment: PendingPaymentForCancel, reason: string) {
+  if (!payment.yookassaId) {
+    await cancelLocalPayment(payment.id, null)
+    await notifyPaymentCanceled(payment.id, reason)
+    return 'canceled' as const
+  }
+
+  let remoteStatus: string | null = null
+  try {
+    const remotePayment = await getPayment(payment.yookassaId)
+    remoteStatus = remotePayment.status
+    if (remotePayment.status === 'succeeded') return 'paid' as const
+    if (remotePayment.status === 'canceled') {
+      await cancelLocalPayment(payment.id, 'canceled')
+      await notifyPaymentCanceled(payment.id, reason)
+      return 'canceled' as const
+    }
+
+    const canceledPayment = await cancelPayment(payment.yookassaId, `cancel-${payment.id}`)
+    remoteStatus = canceledPayment.status
+    if (canceledPayment.status === 'succeeded') return 'paid' as const
+  } catch (error) {
+    try {
+      const remotePayment = await getPayment(payment.yookassaId)
+      remoteStatus = remotePayment.status
+      if (remotePayment.status === 'succeeded') return 'paid' as const
+      if (remotePayment.status === 'canceled') {
+        await cancelLocalPayment(payment.id, 'canceled')
+        await notifyPaymentCanceled(payment.id, reason)
+        return 'canceled' as const
+      }
+    } catch {
+      const message = error instanceof Error ? error.message : 'payment cancellation failed'
+      remoteStatus = remoteStatus ?? `cancel_failed: ${message.slice(0, 240)}`
+    }
+  }
+
+  await cancelLocalPayment(payment.id, remoteStatus)
+  await notifyPaymentCanceled(payment.id, reason)
+  return 'canceled' as const
 }
 
 async function cancelLocalPayment(paymentId: string, yookassaStatus: string | null) {

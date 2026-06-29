@@ -32,6 +32,9 @@ import { getPlanAudienceContext, isPlanAvailableForUser } from '@/lib/plan-acces
 
 export const dynamic = 'force-dynamic'
 
+const OFFER_RENEWAL_DAYS_LEFT = 7
+const OFFER_RETURN_PROMO_DAYS = 45
+
 export default async function DashboardHome() {
   const session = await getCurrentUser()
   if (!session) redirect('/login')
@@ -40,7 +43,7 @@ export default async function DashboardHome() {
   const user = await prisma.user.findUnique({
     where: { id: session.uid },
     include: {
-      subscriptions: { orderBy: { createdAt: 'desc' }, take: 1, include: { plan: true } },
+      subscriptions: { orderBy: { expireAt: 'desc' }, take: 5, include: { plan: true } },
       payments: {
         where: { status: 'PENDING', createdAt: { gt: freshPendingCutoff } },
         orderBy: { createdAt: 'desc' },
@@ -67,6 +70,9 @@ export default async function DashboardHome() {
 
   const sub = remnawaveCard?.response.user
   const subRow = user.subscriptions[0] ?? null
+  const activeSubRow = user.subscriptions.find((subscription) =>
+    ['ACTIVE', 'LIMITED'].includes(subscription.status) && subscription.expireAt > new Date()
+  ) ?? null
   const [audienceContext, availablePlans, lastSucceededPayment, promoOfferCode] = await Promise.all([
     getPlanAudienceContext(user.id),
     prisma.plan.findMany({
@@ -84,9 +90,7 @@ export default async function DashboardHome() {
     ? availablePlans.filter((plan) => isPlanAvailableForUser(plan, audienceContext))
     : availablePlans.filter((plan) => plan.availability === 'ALL')
   const personalOffer = buildPersonalOffer({
-    activeSubscription: subRow && ['ACTIVE', 'LIMITED'].includes(subRow.status) && subRow.expireAt > new Date()
-      ? subRow
-      : null,
+    activeSubscription: activeSubRow,
     bestPlan: visiblePaidPlans[0] ?? null,
     deviceCount: user._count.devices,
     lastSucceededPaymentAt: lastSucceededPayment?.paidAt ?? lastSucceededPayment?.createdAt ?? null,
@@ -308,15 +312,21 @@ function buildPersonalOffer({
     ? Math.floor((now - lastSucceededPaymentAt.getTime()) / (24 * 60 * 60 * 1000))
     : null
 
+  // Приоритет офферов:
+  // 1. Нет активной подписки и пользователь давно не покупал: промокод на возврат.
+  // 2. Нет активной подписки: лучший доступный тариф.
+  // 3. Подписка скоро закончится: продление.
+  // 4. Подписка активна, но устройств нет: подключение.
+  // 5. Подписка активна и все базовое готово: реферальный бонус.
   if (!activeSubscription) {
-    if (promoCode && (inactiveDays == null || inactiveDays >= 45)) {
+    if (promoCode && inactiveDays != null && inactiveDays >= OFFER_RETURN_PROMO_DAYS) {
       return {
         eyebrow: 'Личный оффер',
         title: `Промокод ${promoCode.code}`,
         description: `Скидка ${promoCode.discountPercent}% на оплату VPN. Код уже можно применить в тарифах.`,
         href: '/dashboard/plans',
         cta: 'Выбрать тариф',
-        meta: 'для возвращения',
+        meta: `не покупали ${inactiveDays} дн.`,
         icon: <Gift className="h-5 w-5" />,
         tone: 'violet',
       }
@@ -326,7 +336,7 @@ function buildPersonalOffer({
     return {
       eyebrow: 'Рекомендация',
       title: bestPlan.name,
-      description: `${bestPlan.durationDays} дн. доступа за ${formatPrice(bestPlan.priceKopecks)}.`,
+      description: `${bestPlan.durationDays} дн. доступа за ${formatPrice(bestPlan.priceKopecks)}. Подходит для первого подключения.`,
       href: `/dashboard/plans?plan=${bestPlan.id}`,
       cta: 'Купить VPN',
       meta: 'лучший старт',
@@ -336,7 +346,7 @@ function buildPersonalOffer({
   }
 
   const daysLeft = Math.ceil((activeSubscription.expireAt.getTime() - now) / (24 * 60 * 60 * 1000))
-  if (daysLeft <= 7) {
+  if (daysLeft <= OFFER_RENEWAL_DAYS_LEFT) {
     return {
       eyebrow: 'Продление',
       title: `Осталось ${Math.max(daysLeft, 0)} дн.`,

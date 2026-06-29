@@ -135,4 +135,90 @@ describe('payment sync pending expiration', () => {
     )
     expect(mocks.cancelPayment).toHaveBeenCalledWith('yoo-1', 'cancel-old-pay')
   })
+
+  it('locally cancels stale pending payment when YooKassa cancel fails and payment is not paid', async () => {
+    mocks.prisma.payment.findFirst.mockResolvedValue({
+      id: 'old-pay',
+      userId: 'user-1',
+      yookassaId: 'yoo-1',
+      status: 'PENDING',
+      createdAt: new Date('2026-06-26T11:40:00.000Z'),
+      user: { id: 'user-1', email: 'user@example.test' },
+      plan: {
+        id: 'plan-1',
+        name: 'Стандарт',
+        durationDays: 30,
+        trafficLimitGb: null,
+        deviceLimit: 5,
+        activeInternalSquads: [],
+      },
+      subscription: null,
+    })
+    mocks.getPayment.mockResolvedValue({ status: 'pending' })
+    mocks.cancelPayment.mockRejectedValue(new Error('YooKassa cancelPayment failed: 400 invalid_request'))
+
+    const result = await syncPaymentProvisioning({
+      paymentId: 'old-pay',
+      userId: 'user-1',
+      cancelPendingOlderThanMs: 600_000,
+    })
+
+    expect(result).toEqual({ ok: true, status: 'canceled', provisioned: false })
+    expect(mocks.prisma.payment.update).toHaveBeenCalledWith({
+      where: { id: 'old-pay' },
+      data: { status: 'CANCELED', yookassaStatus: 'pending' },
+    })
+  })
+
+  it('cancels other pending user payments after one payment succeeds', async () => {
+    mocks.prisma.payment.findFirst.mockResolvedValue({
+      id: 'paid-pay',
+      userId: 'user-1',
+      yookassaId: 'yoo-paid',
+      status: 'PENDING',
+      paidAt: null,
+      subscriptionProvisionedAt: new Date('2026-06-26T11:59:00.000Z'),
+      createdAt: new Date('2026-06-26T11:58:00.000Z'),
+      user: { id: 'user-1', email: 'user@example.test' },
+      plan: {
+        id: 'plan-1',
+        name: 'Стандарт',
+        durationDays: 30,
+        trafficLimitGb: null,
+        deviceLimit: 5,
+        activeInternalSquads: [],
+      },
+      subscription: { id: 'sub-1' },
+    })
+    mocks.prisma.payment.findMany.mockResolvedValue([
+      { id: 'old-pay-1', userId: 'user-1', yookassaId: 'yoo-old-1' },
+      { id: 'old-pay-2', userId: 'user-1', yookassaId: null },
+    ])
+    mocks.getPayment.mockResolvedValueOnce({ status: 'succeeded' }).mockResolvedValueOnce({ status: 'pending' })
+    mocks.cancelPayment.mockResolvedValue({ status: 'canceled' })
+
+    const result = await syncPaymentProvisioning({ paymentId: 'paid-pay', userId: 'user-1' })
+
+    expect(result).toEqual({
+      ok: true,
+      status: 'succeeded',
+      provisioned: true,
+      alreadyProvisioned: true,
+      subscriptionId: 'sub-1',
+    })
+    expect(mocks.prisma.payment.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          userId: 'user-1',
+          status: 'PENDING',
+          id: { not: 'paid-pay' },
+        }),
+      })
+    )
+    expect(mocks.cancelPayment).toHaveBeenCalledWith('yoo-old-1', 'cancel-old-pay-1')
+    expect(mocks.prisma.payment.update).toHaveBeenCalledWith({
+      where: { id: 'old-pay-2' },
+      data: { status: 'CANCELED', yookassaStatus: null },
+    })
+  })
 })
