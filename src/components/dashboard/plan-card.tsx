@@ -18,6 +18,13 @@ interface PlanCardProps {
   isPromo?: boolean;
   popular?: boolean;
   current?: boolean;
+  availablePromoCodes?: Array<{
+    code: string;
+    discountPercent: number;
+    discountKopecks: number;
+    finalAmountKopecks: number;
+    source: "BONUS_BOX" | "WELCOME";
+  }>;
 }
 
 export function PlanCard({
@@ -31,6 +38,7 @@ export function PlanCard({
   isPromo = false,
   popular,
   current,
+  availablePromoCodes = [],
 }: PlanCardProps) {
   const [loading, setLoading] = useState(false);
   const [validatingPromo, setValidatingPromo] = useState(false);
@@ -126,6 +134,18 @@ export function PlanCard({
     }
   }
 
+  function selectAwardedPromo(promo: NonNullable<PlanCardProps["availablePromoCodes"]>[number]) {
+    setPromoOpen(true);
+    setPromoInput(promo.code);
+    setAppliedPromo({
+      code: promo.code,
+      discountPercent: promo.discountPercent,
+      discountKopecks: promo.discountKopecks,
+      finalAmountKopecks: promo.finalAmountKopecks,
+    });
+    toast("Промокод выбран", "success");
+  }
+
   function resetPromo() {
     setPromoInput("");
     setAppliedPromo(null);
@@ -201,6 +221,41 @@ export function PlanCard({
       </ul>
       {!isPromo && (promoOpen || appliedPromo) ? (
         <div className="mt-auto min-h-[74px] space-y-2 pt-3">
+          {availablePromoCodes.length > 0 ? (
+            <div className="grid gap-2">
+              {availablePromoCodes.map((promo) => (
+                <button
+                  key={promo.code}
+                  type="button"
+                  className={cn(
+                    "flex items-center justify-between gap-3 rounded-lg border px-3 py-2 text-left text-sm transition",
+                    appliedPromo?.code === promo.code
+                      ? "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-100"
+                      : "border-slate-200 bg-white hover:bg-slate-50 dark:border-slate-800 dark:bg-surface-900 dark:hover:bg-surface-800"
+                  )}
+                  onClick={() => selectAwardedPromo(promo)}
+                >
+                  <span className="min-w-0">
+                    <span className="block font-semibold">{promo.code}</span>
+                    <span className="block text-xs text-slate-500 dark:text-slate-400">
+                      Скидка {promo.discountPercent}% · {promo.source === "BONUS_BOX" ? "из бонусов" : "приветственный"}
+                    </span>
+                  </span>
+                  <span className="shrink-0 text-xs font-semibold text-emerald-600 dark:text-emerald-300">
+                    -{formatPrice(promo.discountKopecks)}
+                  </span>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <a
+              href="/dashboard/bonus-box"
+              className="flex items-center justify-between gap-3 rounded-lg border border-cyan-100 bg-cyan-50/70 px-3 py-2 text-sm font-medium text-cyan-800 transition hover:bg-cyan-50 dark:border-cyan-500/20 dark:bg-cyan-500/10 dark:text-cyan-100"
+            >
+              <span>Промокод можно выбить в разделе “Бонусы”</span>
+              <Sparkles className="h-4 w-4 shrink-0" />
+            </a>
+          )}
           <div className="flex min-w-0 items-center gap-2 rounded-lg border border-slate-200 bg-white px-2 py-2 dark:border-slate-800 dark:bg-surface-900">
             <Tag className="h-4 w-4 shrink-0 text-slate-400" />
             <input
@@ -248,7 +303,7 @@ export function PlanCard({
           onClick={() => setPromoOpen(true)}
         >
           <Tag className="h-4 w-4" />
-          Есть промокод?
+          {availablePromoCodes.length > 0 ? "Выбрать промокод" : "Есть промокод?"}
         </button>
       ) : (
         <div className="mt-auto min-h-[74px]" />

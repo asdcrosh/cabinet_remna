@@ -10,6 +10,7 @@ import { getCurrentUser } from '@/lib/auth/cookies'
 import { CreditCard, KeyRound, ShieldCheck } from 'lucide-react'
 import { getPlanAudienceContext, isPlanAvailableForUser } from '@/lib/plan-access'
 import { GiftCertificateRedeem } from '@/components/dashboard/gift-certificate-redeem'
+import { getAvailableUserPromoCodesByPlan } from '@/lib/user-promo-codes'
 
 export const revalidate = 300 // кэш на 5 минут
 
@@ -75,6 +76,9 @@ export default async function PlansPage({
       )
     : plans.filter((plan) => plan.availability === 'ALL')
   const visiblePlans = audiencePlans.filter((plan) => !plan.isPromo || canUsePromo)
+  const availablePromoCodesByPlan = session
+    ? await getAvailableUserPromoCodesByPlan({ userId: session.uid, plans: visiblePlans })
+    : new Map()
   const hasPromoPlan = audiencePlans.some((plan) => plan.isPromo)
   const isOtherwiseEligibleForPromo =
     !usedTrialPlanIds.size &&
@@ -154,6 +158,7 @@ export default async function PlansPage({
             isPromo={p.isPromo}
             popular={index === 1}
             current={currentSubscription?.planId === p.id}
+            availablePromoCodes={availablePromoCodesByPlan.get(p.id) ?? []}
           />
         ))}
       </div>
