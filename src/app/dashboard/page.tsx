@@ -100,15 +100,6 @@ export default async function DashboardHome() {
   const visiblePaidPlans = audienceContext
     ? availablePlans.filter((plan) => isPlanAvailableForUser(plan, audienceContext))
     : availablePlans.filter((plan) => plan.availability === 'ALL')
-  const personalOffer = buildPersonalOffer({
-    activeSubscription: activeSubRow,
-    bestPlan: visiblePaidPlans[0] ?? null,
-    deviceCount: user._count.devices,
-    lastSucceededPaymentAt: lastSucceededPayment?.paidAt ?? lastSucceededPayment?.createdAt ?? null,
-    promoCode: promoOfferCode,
-    offerSettings,
-    user: { name: user.name, email: user.email },
-  })
   const onboardingState: DashboardOnboardingState = {
     emailVerified: Boolean(user.emailVerifiedAt && !user.email.endsWith('@pending.invalid')),
     telegramLinked: Boolean(user.telegramId),
@@ -118,6 +109,15 @@ export default async function DashboardHome() {
     pendingSync: Boolean(subRow?.pendingSync),
     deviceCount: user._count.devices,
   }
+  const personalOffer = filterDuplicateHomeOffer(buildPersonalOffer({
+    activeSubscription: activeSubRow,
+    bestPlan: visiblePaidPlans[0] ?? null,
+    deviceCount: user._count.devices,
+    lastSucceededPaymentAt: lastSucceededPayment?.paidAt ?? lastSucceededPayment?.createdAt ?? null,
+    promoCode: promoOfferCode,
+    offerSettings,
+    user: { name: user.name, email: user.email },
+  }), onboardingState)
 
   if (!user.remnawaveUsername) {
     return (
@@ -258,6 +258,7 @@ type DashboardOfferSetting = PersonalOfferSetting & {
 }
 
 type PersonalOfferView = {
+  scenario: PersonalOfferScenario
   eyebrow: string
   title: string
   description: string
@@ -474,13 +475,14 @@ function renderConfiguredOffer({
   scenario: PersonalOfferScenario
   settings: DashboardOfferSetting[]
   values: Record<string, string>
-  fallback: Omit<PersonalOfferView, 'icon'>
+  fallback: Omit<PersonalOfferView, 'icon' | 'scenario'>
   icon: ReactElement
   action?: PersonalOfferView['action']
 }): PersonalOfferView {
   const setting = settings.find((item) => item.scenario === scenario)
-  if (!setting) return { ...fallback, icon, action }
+  if (!setting) return { ...fallback, scenario, icon, action }
   return {
+    scenario,
     eyebrow: renderPersonalOfferTemplate(setting.eyebrow, values) || fallback.eyebrow,
     title: renderPersonalOfferTemplate(setting.title, values) || fallback.title,
     description: renderPersonalOfferTemplate(setting.description, values) || fallback.description,
@@ -491,6 +493,12 @@ function renderConfiguredOffer({
     icon,
     action,
   }
+}
+
+function filterDuplicateHomeOffer(offer: PersonalOfferView | null, state: DashboardOnboardingState) {
+  if (!offer) return null
+  if (offer.scenario === 'CONNECT_DEVICE' && state.hasRemnawaveProfile && state.deviceCount === 0) return null
+  return offer
 }
 
 function PersonalOffer({ offer }: { offer: PersonalOfferView }) {

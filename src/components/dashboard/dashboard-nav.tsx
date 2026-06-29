@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation'
 import { createPortal } from 'react-dom'
 import {
   Bell,
+  ChevronDown,
   CreditCard,
   Database,
   FileClock,
@@ -70,6 +71,39 @@ const adminNav = [
   { href: '/dashboard/admin/system', label: 'Система', icon: ServerCog },
   { href: '/dashboard/admin/audit', label: 'История', icon: FileClock },
 ]
+
+const adminNavGroups = [
+  {
+    label: 'Работа',
+    items: [
+      { href: '/dashboard/admin/notifications', label: 'Уведомления', icon: Bell },
+      { href: '/dashboard/admin/broadcasts', label: 'Рассылки', icon: Send },
+      { href: '/dashboard/admin/support', label: 'Поддержка', icon: MessageCircleQuestion },
+      { href: '/dashboard/admin/users', label: 'Пользователи', icon: UsersRound },
+      { href: '/dashboard/admin/duplicates', label: 'Дубли', icon: SearchCheck },
+    ],
+  },
+  {
+    label: 'Продажи',
+    items: [
+      { href: '/dashboard/admin/offers', label: 'Офферы', icon: Sparkles },
+      { href: '/dashboard/admin/plans', label: 'Тарифы', icon: SlidersHorizontal },
+      { href: '/dashboard/admin/promo-codes', label: 'Промокоды', icon: Tag },
+      { href: '/dashboard/admin/gift-certificates', label: 'Сертификаты', icon: TicketCheck },
+      { href: '/dashboard/admin/bonus-box', label: 'Подарки', icon: Gift },
+      { href: '/dashboard/admin/payments', label: 'Платежи', icon: CreditCard },
+      { href: '/dashboard/admin/subscriptions', label: 'Подписки', icon: ShieldCheck },
+    ],
+  },
+  {
+    label: 'Система',
+    items: [
+      { href: '/dashboard/admin/remnashop-sync', label: 'Синхронизация', icon: Database },
+      { href: '/dashboard/admin/system', label: 'Система', icon: ServerCog },
+      { href: '/dashboard/admin/audit', label: 'История', icon: FileClock },
+    ],
+  },
+] satisfies Array<{ label: string; items: typeof adminNav }>
 
 type NavItem = (typeof nav)[number] | (typeof adminNav)[number]
 type NavBadges = Record<string, number>
@@ -236,12 +270,7 @@ function NavList({
           <div className="px-3 pb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
             Администрирование
           </div>
-          <NavGroup
-            items={getAdminItems(role, features)}
-            pathname={pathname}
-            badges={liveBadges}
-            onNavigate={onNavigate}
-          />
+          <AdminNavGroups role={role} features={features} pathname={pathname} badges={liveBadges} onNavigate={onNavigate} />
         </div>
       )}
     </nav>
@@ -359,6 +388,97 @@ function NavGroup({
           </Link>
         )
       })}
+    </div>
+  )
+}
+
+function AdminNavGroups({
+  role,
+  features,
+  pathname,
+  badges,
+  onNavigate,
+}: {
+  role: UserRole
+  features: FeatureFlags
+  pathname: string
+  badges: NavBadges
+  onNavigate?: () => void
+}) {
+  const overview = getAdminItems(role, features).filter((item) => item.href === '/dashboard/admin')
+  const groups = adminNavGroups
+    .map((group) => ({
+      ...group,
+      items: getAdminItems(role, features).filter((item) =>
+        group.items.some((groupItem) => groupItem.href === item.href)
+      ),
+    }))
+    .filter((group) => group.items.length > 0)
+
+  return (
+    <div className="space-y-1">
+      <NavGroup items={overview} pathname={pathname} badges={badges} onNavigate={onNavigate} />
+      {groups.map((group) => (
+        <AdminNavGroup
+          key={group.label}
+          label={group.label}
+          items={group.items}
+          pathname={pathname}
+          badges={badges}
+          onNavigate={onNavigate}
+        />
+      ))}
+    </div>
+  )
+}
+
+function AdminNavGroup({
+  label,
+  items,
+  pathname,
+  badges,
+  onNavigate,
+}: {
+  label: string
+  items: NavItem[]
+  pathname: string
+  badges: NavBadges
+  onNavigate?: () => void
+}) {
+  const hasActive = items.some((item) => (item.exact ? pathname === item.href : pathname.startsWith(item.href)))
+  const [open, setOpen] = useState(hasActive)
+  const totalBadge = items.reduce((sum, item) => sum + (badges[item.href] ?? 0), 0)
+
+  useEffect(() => {
+    if (hasActive) setOpen(true)
+  }, [hasActive])
+
+  return (
+    <div className="rounded-lg border border-slate-100 bg-white/45 dark:border-white/10 dark:bg-white/[0.03]">
+      <button
+        type="button"
+        className={cn(
+          'flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition-colors',
+          hasActive
+            ? 'text-slate-950 dark:text-white'
+            : 'text-slate-500 hover:text-slate-950 dark:text-slate-400 dark:hover:text-white'
+        )}
+        onClick={() => setOpen((value) => !value)}
+        aria-expanded={open}
+      >
+        <span className="min-w-0 flex-1 truncate text-left">{label}</span>
+        {totalBadge > 0 && (
+          <span className="grid h-5 min-w-5 place-items-center rounded-full bg-red-600 px-1.5 text-[11px] text-white">
+            {totalBadge > 99 ? '99+' : totalBadge}
+          </span>
+        )}
+        <ChevronDown className={cn('h-4 w-4 shrink-0 transition-transform', open && 'rotate-180')} />
+      </button>
+      {open && (
+        <div className="border-t border-slate-100 px-1 py-1 dark:border-white/10">
+          <NavGroup items={items} pathname={pathname} badges={badges} onNavigate={onNavigate} />
+        </div>
+      )}
     </div>
   )
 }

@@ -95,16 +95,10 @@ export function PersonalOffersAdmin({
                   <span className="rounded-full bg-slate-100 px-2 py-1">{offer.eyebrow}</span>
                   <span className="rounded-full bg-slate-100 px-2 py-1">{personalOfferToneLabels[offer.tone]}</span>
                   <span className="rounded-full bg-slate-100 px-2 py-1">{offer.cta}</span>
-                  {offer.promoCode && (
-                    <span className="rounded-full bg-violet-50 px-2 py-1 text-violet-700">
-                      {offer.promoCode.code} · {offer.promoCode.discountPercent}%
-                    </span>
-                  )}
-                  {offer.welcomeBonusEnabled && (
-                    <span className="rounded-full bg-emerald-50 px-2 py-1 text-emerald-700">
-                      {personalOfferWelcomeBonusLabels[offer.welcomeBonusType]}
-                    </span>
-                  )}
+                </div>
+                <div className="mt-3 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-sm text-slate-600">
+                  <span className="font-medium text-slate-950">Выдача: </span>
+                  {rewardSummary(offer)}
                 </div>
               </div>
               <button type="button" className="btn-secondary min-h-10 shrink-0 px-3" onClick={() => openEdit(offer)}>
@@ -184,7 +178,13 @@ export function PersonalOffersAdmin({
             </Field>
           </div>
 
-          <div className="grid gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 sm:grid-cols-2">
+          <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <div>
+              <div className="text-sm font-semibold text-slate-950">Что выдавать пользователю</div>
+              <div className="text-sm text-slate-500">
+                Здесь задается промокод для возврата или приветственный бонус для новых пользователей.
+              </div>
+            </div>
             <Field label="Промокод для оффера">
               <select
                 className="input"
@@ -319,4 +319,28 @@ function toForm(offer?: Offer): OfferForm {
     welcomeTrialPlanId: offer?.welcomeTrialPlanId ?? '',
     welcomeBonusAttempts: offer?.welcomeBonusAttempts ?? 1,
   }
+}
+
+function rewardSummary(offer: Offer) {
+  const parts: string[] = []
+
+  if (offer.scenario === 'RETURN_PROMO') {
+    parts.push(
+      offer.promoCode
+        ? `промокод ${offer.promoCode.code} на ${offer.promoCode.discountPercent}%`
+        : 'лучший доступный промокод автоматически'
+    )
+  }
+
+  if (offer.scenario === 'NO_SUBSCRIPTION') {
+    if (!offer.welcomeBonusEnabled || offer.welcomeBonusType === 'NONE') {
+      parts.push('приветственный бонус выключен')
+    } else if (offer.welcomeBonusType === 'TRIAL_PLAN') {
+      parts.push(offer.welcomeTrialPlan ? `пробный тариф ${offer.welcomeTrialPlan.name}` : 'пробный тариф не выбран')
+    } else {
+      parts.push(`${offer.welcomeBonusAttempts || 1} открытий бонус-бокса`)
+    }
+  }
+
+  return parts.length > 0 ? parts.join(' · ') : 'только переход по кнопке'
 }

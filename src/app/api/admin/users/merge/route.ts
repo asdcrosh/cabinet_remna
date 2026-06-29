@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { Prisma } from '@prisma/client'
 import { requireAdmin, withAuth } from '@/lib/auth/guard'
 import { AdminMergeUsersError, mergeTechnicalTelegramUserIntoEmailUser } from '@/lib/admin-user-merge'
 
@@ -23,6 +24,12 @@ export const POST = withAuth(async (req: Request) => {
   } catch (error) {
     if (error instanceof AdminMergeUsersError) {
       return NextResponse.json({ error: error.message }, { status: error.status })
+    }
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      return NextResponse.json(
+        { error: 'Не удалось объединить: часть Telegram или Remnawave данных уже занята другим аккаунтом.' },
+        { status: 409 }
+      )
     }
     throw error
   }

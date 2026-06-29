@@ -75,20 +75,26 @@ export async function mergeTechnicalTelegramUserIntoEmailUser(input: AdminMergeU
     transferred.notifications = await transferUserNotifications(tx, source.id, target.id)
     transferred.adminReads = await transferAdminNotificationReads(tx, source.id, target.id)
 
+    await tx.user.update({
+      where: { id: source.id },
+      data: {
+        telegramId: null,
+        remnashopUserId: null,
+        remnawaveUuid: null,
+        remnawaveShortUuid: null,
+        remnawaveUsername: null,
+      },
+    })
+
     await tx.user.update({ where: { id: target.id }, data: targetData })
     await tx.user.update({
       where: { id: source.id },
       data: {
         email: `merged-${source.id}@pending.invalid`,
         name: `Объединён с ${target.email}`,
-        telegramId: null,
         telegramUsername: null,
         telegramLinkedAt: null,
-        remnashopUserId: null,
         remnashopSyncedAt: null,
-        remnawaveUuid: null,
-        remnawaveShortUuid: null,
-        remnawaveUsername: null,
         referredById: null,
       },
     })
