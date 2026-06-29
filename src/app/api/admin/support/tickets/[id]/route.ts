@@ -33,7 +33,7 @@ export const GET = withAuth(async (_req: Request, { params }: { params: { id: st
   })
 
   if (!ticket) {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    return NextResponse.json({ error: 'Обращение не найдено.' }, { status: 404 })
   }
 
   if (ticket.adminUnreadCount > 0) {
@@ -59,12 +59,12 @@ export const POST = withAuth(async (req: Request, { params }: { params: { id: st
   try {
     body = await req.json()
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+    return NextResponse.json({ error: 'Некорректный запрос.' }, { status: 400 })
   }
 
   const parsed = createSupportMessageSchema.safeParse(body)
   if (!parsed.success) {
-    return NextResponse.json({ error: 'Validation error', details: parsed.error.flatten() }, { status: 400 })
+    return NextResponse.json({ error: 'Напишите сообщение перед отправкой.', details: parsed.error.flatten() }, { status: 400 })
   }
 
   const ticket = await prisma.supportTicket.findUnique({
@@ -72,10 +72,10 @@ export const POST = withAuth(async (req: Request, { params }: { params: { id: st
     select: { id: true, status: true },
   })
   if (!ticket) {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    return NextResponse.json({ error: 'Обращение не найдено.' }, { status: 404 })
   }
   if (ticket.status === 'CLOSED') {
-    return NextResponse.json({ error: 'Ticket is closed' }, { status: 400 })
+    return NextResponse.json({ error: 'Обращение уже закрыто.' }, { status: 400 })
   }
 
   const message = await prisma.$transaction(async (tx) => {
@@ -118,12 +118,12 @@ export const PATCH = withAuth(async (req: Request, { params }: { params: { id: s
   try {
     body = await req.json()
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+    return NextResponse.json({ error: 'Некорректный запрос.' }, { status: 400 })
   }
 
   const parsed = updateSupportTicketSchema.safeParse(body)
   if (!parsed.success) {
-    return NextResponse.json({ error: 'Validation error', details: parsed.error.flatten() }, { status: 400 })
+    return NextResponse.json({ error: 'Некорректный статус обращения.', details: parsed.error.flatten() }, { status: 400 })
   }
 
   const ticket = await prisma.supportTicket.update({

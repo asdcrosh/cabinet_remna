@@ -40,19 +40,19 @@ export const POST = withAuth(async (req: Request) => {
   const session = await requireAuth()
   const limited = await rateLimit(req, `support:create:${session.uid}`, 5, 10 * 60 * 1000)
   if (!limited.ok) {
-    return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
+    return NextResponse.json({ error: 'Слишком много обращений. Попробуйте позже.' }, { status: 429 })
   }
 
   let body: unknown
   try {
     body = await req.json()
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+    return NextResponse.json({ error: 'Некорректный запрос.' }, { status: 400 })
   }
 
   const parsed = createSupportTicketSchema.safeParse(body)
   if (!parsed.success) {
-    return NextResponse.json({ error: 'Validation error', details: parsed.error.flatten() }, { status: 400 })
+    return NextResponse.json({ error: 'Выберите тему и напишите сообщение от 5 символов.', details: parsed.error.flatten() }, { status: 400 })
   }
 
   const ticket = await prisma.$transaction(async (tx) => {

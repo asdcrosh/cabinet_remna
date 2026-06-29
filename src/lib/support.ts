@@ -20,6 +20,18 @@ export const supportCategories = [
     description: 'Срок, тариф, перенос или доступ к подписке.',
   },
   {
+    value: 'devices',
+    label: 'Устройства',
+    subject: 'Вопрос по устройствам',
+    description: 'QR-код, приложение, новое устройство или отвязка старого.',
+  },
+  {
+    value: 'speed',
+    label: 'Скорость',
+    subject: 'Проблема со скоростью',
+    description: 'Медленная работа, высокий пинг или нестабильное соединение.',
+  },
+  {
     value: 'general',
     label: 'Другое',
     subject: 'Другой вопрос',
@@ -31,7 +43,7 @@ export type SupportCategoryValue = typeof supportCategories[number]['value']
 
 export const createSupportTicketSchema = z.object({
   subject: z.never().optional(),
-  category: z.enum(['payment', 'connection', 'subscription', 'general']).default('connection'),
+  category: z.enum(['payment', 'connection', 'subscription', 'devices', 'speed', 'general']).default('connection'),
   message: z.string().trim().min(5).max(3000),
 })
 
