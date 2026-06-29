@@ -43,6 +43,7 @@ model Plan {
   promoCodePlans   PromoCodePlan[]
   trialRedemptions TrialPlanRedemption[]
   giftCertificates GiftCertificate[]
+  welcomeOfferSettings PersonalOfferSetting[] @relation("WelcomeTrialPlan")
 
   @@unique([remnashopPlanId, durationDays])
   @@index([isActive, sortOrder])
@@ -179,10 +180,20 @@ model PersonalOfferSetting {
   href        String?
   meta        String?
   tone        PersonalOfferTone     @default(CYAN)
+  promoCodeId String?
+  welcomeBonusEnabled  Boolean                       @default(false)
+  welcomeBonusType     PersonalOfferWelcomeBonusType @default(NONE)
+  welcomeTrialPlanId   String?
+  welcomeBonusAttempts Int                           @default(0)
   createdAt   DateTime              @default(now())
   updatedAt   DateTime              @updatedAt
 
+  promoCode PromoCode? @relation(fields: [promoCodeId], references: [id], onDelete: SetNull)
+  welcomeTrialPlan Plan? @relation("WelcomeTrialPlan", fields: [welcomeTrialPlanId], references: [id], onDelete: SetNull)
+
   @@index([enabled, priority])
+  @@index([promoCodeId])
+  @@index([welcomeTrialPlanId])
 }
 
 enum PersonalOfferScenario {
@@ -198,6 +209,12 @@ enum PersonalOfferTone {
   EMERALD
   AMBER
   VIOLET
+}
+
+enum PersonalOfferWelcomeBonusType {
+  NONE
+  TRIAL_PLAN
+  BONUS_BOX_ATTEMPTS
 }
 
 model AdminNotification {
@@ -533,6 +550,7 @@ model PromoCode {
   redemptions      PromoCodeRedemption[]
   plans            PromoCodePlan[]
   bonusBoxOpenings BonusBoxOpening[]
+  personalOfferSettings PersonalOfferSetting[]
 
   @@index([isActive, startsAt, expiresAt])
   @@index([audience])

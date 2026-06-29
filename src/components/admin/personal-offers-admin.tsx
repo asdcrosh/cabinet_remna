@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import type { PersonalOfferSetting, PersonalOfferTone } from '@prisma/client'
+import type { PersonalOfferSetting, PersonalOfferTone, PersonalOfferWelcomeBonusType } from '@prisma/client'
 import { Edit3, Sparkles } from 'lucide-react'
 import { AdminModal } from '@/components/admin/admin-modal'
 import { apiFetch } from '@/lib/api-client'
@@ -11,7 +11,13 @@ import {
   personalOfferPlaceholders,
   personalOfferScenarioLabels,
   personalOfferToneLabels,
+  personalOfferWelcomeBonusLabels,
 } from '@/lib/personal-offers'
+
+type Offer = PersonalOfferSetting & {
+  promoCode?: { id: string; code: string; discountPercent: number; isActive: boolean } | null
+  welcomeTrialPlan?: { id: string; name: string; durationDays: number; isActive: boolean } | null
+}
 
 type OfferForm = {
   enabled: boolean
@@ -23,17 +29,30 @@ type OfferForm = {
   href: string
   meta: string
   tone: PersonalOfferTone
+  promoCodeId: string
+  welcomeBonusEnabled: boolean
+  welcomeBonusType: PersonalOfferWelcomeBonusType
+  welcomeTrialPlanId: string
+  welcomeBonusAttempts: number
 }
 
-export function PersonalOffersAdmin({ offers }: { offers: PersonalOfferSetting[] }) {
+export function PersonalOffersAdmin({
+  offers,
+  promoCodes,
+  trialPlans,
+}: {
+  offers: Offer[]
+  promoCodes: Array<{ id: string; code: string; discountPercent: number }>
+  trialPlans: Array<{ id: string; name: string; durationDays: number }>
+}) {
   const router = useRouter()
-  const [editing, setEditing] = useState<PersonalOfferSetting | null>(null)
+  const [editing, setEditing] = useState<Offer | null>(null)
   const [loading, setLoading] = useState(false)
   const [form, setForm] = useState<OfferForm>(() => toForm(offers[0]))
 
   const activeOffer = useMemo(() => editing, [editing])
 
-  function openEdit(offer: PersonalOfferSetting) {
+  function openEdit(offer: Offer) {
     setEditing(offer)
     setForm(toForm(offer))
   }
@@ -76,6 +95,16 @@ export function PersonalOffersAdmin({ offers }: { offers: PersonalOfferSetting[]
                   <span className="rounded-full bg-slate-100 px-2 py-1">{offer.eyebrow}</span>
                   <span className="rounded-full bg-slate-100 px-2 py-1">{personalOfferToneLabels[offer.tone]}</span>
                   <span className="rounded-full bg-slate-100 px-2 py-1">{offer.cta}</span>
+                  {offer.promoCode && (
+                    <span className="rounded-full bg-violet-50 px-2 py-1 text-violet-700">
+                      {offer.promoCode.code} · {offer.promoCode.discountPercent}%
+                    </span>
+                  )}
+                  {offer.welcomeBonusEnabled && (
+                    <span className="rounded-full bg-emerald-50 px-2 py-1 text-emerald-700">
+                      {personalOfferWelcomeBonusLabels[offer.welcomeBonusType]}
+                    </span>
+                  )}
                 </div>
               </div>
               <button type="button" className="btn-secondary min-h-10 shrink-0 px-3" onClick={() => openEdit(offer)}>
@@ -155,6 +184,78 @@ export function PersonalOffersAdmin({ offers }: { offers: PersonalOfferSetting[]
             </Field>
           </div>
 
+          <div className="grid gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 sm:grid-cols-2">
+            <Field label="Промокод для оффера">
+              <select
+                className="input"
+                value={form.promoCodeId}
+                onChange={(event) => setFormValue('promoCodeId', event.target.value)}
+              >
+                <option value="">Автоматически</option>
+                {promoCodes.map((promoCode) => (
+                  <option key={promoCode.id} value={promoCode.id}>
+                    {promoCode.code} · {promoCode.discountPercent}%
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <div className="text-sm leading-6 text-slate-500">
+              Работает для оффера “Давно не покупал”. Если не выбрать, кабинет покажет лучший доступный промокод.
+            </div>
+          </div>
+
+          {activeOffer?.scenario === 'NO_SUBSCRIPTION' && (
+            <div className="space-y-3 rounded-lg border border-emerald-200 bg-emerald-50/80 p-3">
+              <label className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  checked={form.welcomeBonusEnabled}
+                  onChange={(event) => setForm((prev) => ({ ...prev, welcomeBonusEnabled: event.target.checked }))}
+                />
+                <span className="text-sm font-semibold text-emerald-950">Включить приветственный бонус новым пользователям</span>
+              </label>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <Field label="Тип бонуса">
+                  <select
+                    className="input"
+                    value={form.welcomeBonusType}
+                    onChange={(event) => setForm((prev) => ({ ...prev, welcomeBonusType: event.target.value as PersonalOfferWelcomeBonusType }))}
+                  >
+                    {Object.entries(personalOfferWelcomeBonusLabels).map(([value, label]) => (
+                      <option key={value} value={value}>{label}</option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="Пробный тариф">
+                  <select
+                    className="input"
+                    value={form.welcomeTrialPlanId}
+                    onChange={(event) => setFormValue('welcomeTrialPlanId', event.target.value)}
+                    disabled={form.welcomeBonusType !== 'TRIAL_PLAN'}
+                  >
+                    <option value="">Выберите тариф</option>
+                    {trialPlans.map((plan) => (
+                      <option key={plan.id} value={plan.id}>
+                        {plan.name} · {plan.durationDays} дн.
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="Открытий">
+                  <input
+                    className="input"
+                    type="number"
+                    min={1}
+                    max={20}
+                    value={form.welcomeBonusAttempts}
+                    disabled={form.welcomeBonusType !== 'BONUS_BOX_ATTEMPTS'}
+                    onChange={(event) => setForm((prev) => ({ ...prev, welcomeBonusAttempts: Number(event.target.value) }))}
+                  />
+                </Field>
+              </div>
+            </div>
+          )}
+
           <div className="rounded-lg border border-cyan-100 bg-cyan-50/80 p-3 text-sm text-cyan-900">
             <div className="mb-2 flex items-center gap-2 font-semibold">
               <Sparkles className="h-4 w-4" />
@@ -201,7 +302,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   )
 }
 
-function toForm(offer?: PersonalOfferSetting): OfferForm {
+function toForm(offer?: Offer): OfferForm {
   return {
     enabled: offer?.enabled ?? true,
     priority: offer?.priority ?? 0,
@@ -212,5 +313,10 @@ function toForm(offer?: PersonalOfferSetting): OfferForm {
     href: offer?.href ?? '',
     meta: offer?.meta ?? '',
     tone: offer?.tone ?? 'CYAN',
+    promoCodeId: offer?.promoCodeId ?? '',
+    welcomeBonusEnabled: offer?.welcomeBonusEnabled ?? false,
+    welcomeBonusType: offer?.welcomeBonusType ?? 'NONE',
+    welcomeTrialPlanId: offer?.welcomeTrialPlanId ?? '',
+    welcomeBonusAttempts: offer?.welcomeBonusAttempts ?? 1,
   }
 }

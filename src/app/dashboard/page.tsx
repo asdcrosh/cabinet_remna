@@ -11,6 +11,7 @@ import { StatusBadge } from '@/components/dashboard/status-badge'
 import { ProgressBar } from '@/components/dashboard/progress-bar'
 import { TrafficChart } from '@/components/dashboard/traffic-chart'
 import { DashboardOnboardingCard, type DashboardOnboardingState } from '@/components/dashboard/onboarding-card'
+import { WelcomeOfferButton } from '@/components/dashboard/welcome-offer-button'
 import { redirect } from 'next/navigation'
 import {
   AlertTriangle,
@@ -90,6 +91,10 @@ export default async function DashboardHome() {
     prisma.personalOfferSetting.findMany({
       where: { enabled: true },
       orderBy: [{ priority: 'asc' }, { scenario: 'asc' }],
+      include: {
+        promoCode: { select: { id: true, code: true, discountPercent: true, isActive: true } },
+        welcomeTrialPlan: { select: { id: true, name: true, durationDays: true, isActive: true } },
+      },
     }),
   ])
   const visiblePaidPlans = audienceContext
@@ -247,6 +252,11 @@ type DashboardPromoCode = {
   discountPercent: number
 }
 
+type DashboardOfferSetting = PersonalOfferSetting & {
+  promoCode?: { id: string; code: string; discountPercent: number; isActive: boolean } | null
+  welcomeTrialPlan?: { id: string; name: string; durationDays: number; isActive: boolean } | null
+}
+
 type PersonalOfferView = {
   eyebrow: string
   title: string
@@ -256,6 +266,7 @@ type PersonalOfferView = {
   meta: string
   icon: ReactElement
   tone: 'cyan' | 'emerald' | 'amber' | 'violet'
+  action?: 'WELCOME_BONUS'
 }
 
 async function findDashboardPromoCode(userId: string, email: string): Promise<DashboardPromoCode | null> {
@@ -316,7 +327,7 @@ function buildPersonalOffer({
   deviceCount: number
   lastSucceededPaymentAt: Date | null
   promoCode: DashboardPromoCode | null
-  offerSettings: PersonalOfferSetting[]
+  offerSettings: DashboardOfferSetting[]
   user: { name: string | null; email: string }
 }): PersonalOfferView | null {
   const now = Date.now()
@@ -331,21 +342,26 @@ function buildPersonalOffer({
   // 4. Подписка активна, но устройств нет: подключение.
   // 5. Подписка активна и все базовое готово: реферальный бонус.
   if (!activeSubscription) {
-    if (promoCode && inactiveDays != null && inactiveDays >= OFFER_RETURN_PROMO_DAYS) {
+    const returnSetting = offerSettings.find((item) => item.scenario === 'RETURN_PROMO')
+    const selectedReturnPromo = returnSetting?.promoCode?.isActive
+      ? { code: returnSetting.promoCode.code, discountPercent: returnSetting.promoCode.discountPercent }
+      : null
+    const returnPromo = selectedReturnPromo ?? promoCode
+    if (returnPromo && inactiveDays != null && inactiveDays >= OFFER_RETURN_PROMO_DAYS) {
       return renderConfiguredOffer({
         scenario: 'RETURN_PROMO',
         settings: offerSettings,
         values: {
           name: user.name || 'друг',
           email: user.email,
-          promo: promoCode.code,
-          discount: String(promoCode.discountPercent),
+          promo: returnPromo.code,
+          discount: String(returnPromo.discountPercent),
           inactive_days: String(inactiveDays),
         },
         fallback: {
           eyebrow: 'Личный оффер',
-          title: `Промокод ${promoCode.code}`,
-          description: `Скидка ${promoCode.discountPercent}% на оплату VPN. Код уже можно применить в тарифах.`,
+          title: `Промокод ${returnPromo.code}`,
+          description: `Скидка ${returnPromo.discountPercent}% на оплату VPN. Код уже можно применить в тарифах.`,
           href: '/dashboard/plans',
           cta: 'Выбрать тариф',
           meta: `не покупали ${inactiveDays} дн.`,
@@ -377,6 +393,13 @@ function buildPersonalOffer({
         tone: 'cyan',
       },
       icon: <CreditCard className="h-5 w-5" />,
+      action: offerSettings.some((item) =>
+        item.scenario === 'NO_SUBSCRIPTION' &&
+        item.welcomeBonusEnabled &&
+        item.welcomeBonusType !== 'NONE'
+      )
+        ? 'WELCOME_BONUS'
+        : undefined,
     })
   }
 
@@ -446,15 +469,17 @@ function renderConfiguredOffer({
   values,
   fallback,
   icon,
+  action,
 }: {
   scenario: PersonalOfferScenario
-  settings: PersonalOfferSetting[]
+  settings: DashboardOfferSetting[]
   values: Record<string, string>
   fallback: Omit<PersonalOfferView, 'icon'>
   icon: ReactElement
+  action?: PersonalOfferView['action']
 }): PersonalOfferView {
   const setting = settings.find((item) => item.scenario === scenario)
-  if (!setting) return { ...fallback, icon }
+  if (!setting) return { ...fallback, icon, action }
   return {
     eyebrow: renderPersonalOfferTemplate(setting.eyebrow, values) || fallback.eyebrow,
     title: renderPersonalOfferTemplate(setting.title, values) || fallback.title,
@@ -464,6 +489,7 @@ function renderConfiguredOffer({
     meta: renderPersonalOfferTemplate(setting.meta, values) || fallback.meta,
     tone: normalizeOfferTone(setting.tone),
     icon,
+    action,
   }
 }
 
@@ -495,10 +521,14 @@ function PersonalOffer({ offer }: { offer: PersonalOfferView }) {
             </p>
           </div>
         </div>
-        <Link href={offer.href} className="btn-primary min-h-11 shrink-0 justify-center px-4">
-          <Sparkles className="h-4 w-4" />
-          {offer.cta}
-        </Link>
+        {offer.action === 'WELCOME_BONUS' ? (
+          <WelcomeOfferButton label={offer.cta} />
+        ) : (
+          <Link href={offer.href} className="btn-primary min-h-11 shrink-0 justify-center px-4">
+            <Sparkles className="h-4 w-4" />
+            {offer.cta}
+          </Link>
+        )}
       </div>
     </section>
   )

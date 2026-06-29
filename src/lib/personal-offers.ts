@@ -1,8 +1,20 @@
-import type { PersonalOfferScenario, PersonalOfferSetting, PersonalOfferTone } from '@prisma/client'
+import type { PersonalOfferScenario, PersonalOfferSetting, PersonalOfferTone, PersonalOfferWelcomeBonusType } from '@prisma/client'
 
 export type PersonalOfferSettingSeed = Pick<
   PersonalOfferSetting,
-  'scenario' | 'enabled' | 'priority' | 'eyebrow' | 'title' | 'description' | 'cta' | 'href' | 'meta' | 'tone'
+  | 'scenario'
+  | 'enabled'
+  | 'priority'
+  | 'eyebrow'
+  | 'title'
+  | 'description'
+  | 'cta'
+  | 'href'
+  | 'meta'
+  | 'tone'
+  | 'welcomeBonusEnabled'
+  | 'welcomeBonusType'
+  | 'welcomeBonusAttempts'
 >
 
 export const defaultPersonalOfferSettings: PersonalOfferSettingSeed[] = [
@@ -17,6 +29,9 @@ export const defaultPersonalOfferSettings: PersonalOfferSettingSeed[] = [
     href: '/dashboard/plans',
     meta: 'не покупали {inactive_days} дн.',
     tone: 'VIOLET',
+    welcomeBonusEnabled: false,
+    welcomeBonusType: 'NONE',
+    welcomeBonusAttempts: 0,
   },
   {
     scenario: 'NO_SUBSCRIPTION',
@@ -29,6 +44,9 @@ export const defaultPersonalOfferSettings: PersonalOfferSettingSeed[] = [
     href: '/dashboard/plans?plan={plan_id}',
     meta: 'лучший старт',
     tone: 'CYAN',
+    welcomeBonusEnabled: false,
+    welcomeBonusType: 'NONE',
+    welcomeBonusAttempts: 0,
   },
   {
     scenario: 'RENEWAL_SOON',
@@ -41,6 +59,9 @@ export const defaultPersonalOfferSettings: PersonalOfferSettingSeed[] = [
     href: '/dashboard/plans',
     meta: 'важно',
     tone: 'AMBER',
+    welcomeBonusEnabled: false,
+    welcomeBonusType: 'NONE',
+    welcomeBonusAttempts: 0,
   },
   {
     scenario: 'CONNECT_DEVICE',
@@ -53,6 +74,9 @@ export const defaultPersonalOfferSettings: PersonalOfferSettingSeed[] = [
     href: '/dashboard/subscription',
     meta: 'быстрый доступ',
     tone: 'EMERALD',
+    welcomeBonusEnabled: false,
+    welcomeBonusType: 'NONE',
+    welcomeBonusAttempts: 0,
   },
   {
     scenario: 'REFERRAL',
@@ -65,6 +89,9 @@ export const defaultPersonalOfferSettings: PersonalOfferSettingSeed[] = [
     href: '/dashboard/referrals',
     meta: 'активная подписка',
     tone: 'EMERALD',
+    welcomeBonusEnabled: false,
+    welcomeBonusType: 'NONE',
+    welcomeBonusAttempts: 0,
   },
 ]
 
@@ -81,6 +108,12 @@ export const personalOfferToneLabels: Record<PersonalOfferTone, string> = {
   EMERALD: 'Зелёный',
   AMBER: 'Жёлтый',
   VIOLET: 'Фиолетовый',
+}
+
+export const personalOfferWelcomeBonusLabels: Record<PersonalOfferWelcomeBonusType, string> = {
+  NONE: 'Без бонуса',
+  TRIAL_PLAN: 'Пробный период',
+  BONUS_BOX_ATTEMPTS: 'Открытия подарков',
 }
 
 export const personalOfferPlaceholders = [
