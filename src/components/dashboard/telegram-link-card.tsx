@@ -13,6 +13,7 @@ interface TelegramLinkCardProps {
   telegramUsername: string | null
   remnashopUserId: number | null
   remnawaveUsername: string | null
+  embedded?: boolean
 }
 
 export function TelegramLinkCard({
@@ -22,6 +23,7 @@ export function TelegramLinkCard({
   telegramUsername,
   remnashopUserId,
   remnawaveUsername,
+  embedded = false,
 }: TelegramLinkCardProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -64,7 +66,7 @@ export function TelegramLinkCard({
   }, [searchParams, syncTelegram])
 
   return (
-    <div className="card">
+    <div className={embedded ? '' : 'card'}>
       <div className="mb-4 flex items-start gap-3">
         <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-sky-50 text-sky-600 dark:bg-sky-500/10 dark:text-sky-300">
           <Send className="h-5 w-5" />

@@ -80,10 +80,13 @@ export async function syncCabinetPaymentToRemnashop(paymentId: string) {
 async function resolveRemnashopUserId(user: {
   id: string
   email: string
+  emailVerifiedAt: Date | null
   telegramId: bigint | null
   remnashopUserId: number | null
 }) {
   if (user.remnashopUserId) return user.remnashopUserId
+
+  await linkRemnashopEmailToTelegramIfPossible(user)
 
   const byTelegram = user.telegramId
     ? await remnashopQuery<RemnashopUserRow>(
@@ -110,6 +113,24 @@ async function resolveRemnashopUserId(user: {
   }
 
   return null
+}
+
+async function linkRemnashopEmailToTelegramIfPossible(user: {
+  email: string
+  emailVerifiedAt: Date | null
+  telegramId: bigint | null
+}) {
+  if (!user.telegramId || !user.emailVerifiedAt || user.email.endsWith('@pending.invalid')) return
+
+  try {
+    await remnashopQuery(
+      'SELECT * FROM public.cabinet_link_email_to_telegram($1::bigint, $2::text, $3::boolean)',
+      [user.telegramId.toString(), user.email, true]
+    )
+  } catch (error) {
+    const code = typeof error === 'object' && error && 'code' in error ? String(error.code) : ''
+    if (code !== '42883') throw error
+  }
 }
 
 async function markLocalUserSynced(userId: string, remnashopUserId: number) {

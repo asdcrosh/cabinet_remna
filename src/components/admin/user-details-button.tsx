@@ -49,13 +49,12 @@ export function UserDetailsButton({ details }: { details: AdminUserDetails }) {
     <>
       <button
         type="button"
-        className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-600 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50 hover:text-slate-950 dark:border-white/10 dark:bg-surface-900"
+        className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-600 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50 hover:text-slate-950 dark:border-white/10 dark:bg-surface-900"
         onClick={() => setOpen(true)}
         title="Открыть пользователя"
         aria-label="Открыть пользователя"
       >
         <Eye className="h-4 w-4" />
-        <span className="hidden sm:inline">Открыть</span>
       </button>
 
       <AdminModal

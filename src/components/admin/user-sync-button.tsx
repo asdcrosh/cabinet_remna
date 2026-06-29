@@ -37,14 +37,13 @@ export function UserSyncButton({ userId }: { userId: string }) {
   return (
     <button
       type="button"
-      className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-600 shadow-sm transition-colors hover:border-sky-200 hover:bg-sky-50 hover:text-sky-700 disabled:opacity-60 dark:border-white/10 dark:bg-surface-900"
+      className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-600 shadow-sm transition-colors hover:border-sky-200 hover:bg-sky-50 hover:text-sky-700 disabled:opacity-60 dark:border-white/10 dark:bg-surface-900"
       onClick={() => void sync()}
       disabled={loading}
       title="Синхронизировать пользователя"
       aria-label="Синхронизировать пользователя"
     >
       <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-      <span className="hidden sm:inline">{loading ? 'Sync...' : 'Sync'}</span>
     </button>
   )
 }
