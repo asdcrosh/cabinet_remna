@@ -2,16 +2,16 @@
 
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import type { PersonalOfferSetting, PersonalOfferTone, WelcomeBonusSetting, WelcomeBonusType } from '@prisma/client'
-import { Edit3, Gift, Sparkles } from 'lucide-react'
+import type { PersonalOfferSetting, PersonalOfferTone, WelcomeBonusSetting } from '@prisma/client'
+import { Edit3, Gift, Sparkles, Ticket, WandSparkles } from 'lucide-react'
 import { AdminModal } from '@/components/admin/admin-modal'
 import { apiFetch } from '@/lib/api-client'
+import { cn } from '@/lib/cn'
 import { toast } from '@/components/ui/toaster'
 import {
   personalOfferPlaceholders,
   personalOfferScenarioLabels,
   personalOfferToneLabels,
-  welcomeBonusTypeLabels,
 } from '@/lib/personal-offers'
 
 type Offer = PersonalOfferSetting & {
@@ -38,9 +38,11 @@ type OfferForm = {
 
 type WelcomeBonusForm = {
   enabled: boolean
-  type: WelcomeBonusType
+  trialEnabled: boolean
   trialPlanId: string
+  bonusAttemptsEnabled: boolean
   bonusAttempts: number
+  promoCodeEnabled: boolean
   promoCodeId: string
 }
 
@@ -121,28 +123,24 @@ export function PersonalOffersAdmin({
             </div>
           </div>
 
-          <div className="grid w-full gap-3 lg:max-w-3xl lg:grid-cols-[9rem_1fr_1fr_auto]">
-            <label className="flex items-center gap-2 rounded-lg border border-emerald-100 bg-white px-3 py-2 text-sm font-medium">
+          <div className="grid w-full gap-3 lg:max-w-4xl">
+            <label className="flex min-h-12 items-center gap-2 rounded-lg border border-emerald-100 bg-white px-3 py-2 text-sm font-medium shadow-sm dark:border-emerald-500/20 dark:bg-surface-900">
               <input
                 type="checkbox"
                 checked={welcomeForm.enabled}
                 onChange={(event) => setWelcomeForm((prev) => ({ ...prev, enabled: event.target.checked }))}
               />
-              Включён
+              Включить приветственный бонус
             </label>
-            <Field label="Что выдавать">
-              <select
-                className="input"
-                value={welcomeForm.type}
-                onChange={(event) => setWelcomeForm((prev) => ({ ...prev, type: event.target.value as WelcomeBonusType }))}
+
+            <div className="grid gap-3 xl:grid-cols-3">
+              <WelcomeBonusOption
+                title="Пробный период"
+                description="Новый пользователь сможет выбрать бесплатный тариф."
+                icon={<Sparkles className="h-5 w-5" />}
+                checked={welcomeForm.trialEnabled}
+                onToggle={(checked) => setWelcomeForm((prev) => ({ ...prev, trialEnabled: checked }))}
               >
-                {Object.entries(welcomeBonusTypeLabels).map(([value, label]) => (
-                  <option key={value} value={value}>{label}</option>
-                ))}
-              </select>
-            </Field>
-            {welcomeForm.type === 'TRIAL_PLAN' ? (
-              <Field label="Пробный тариф">
                 <select
                   className="input"
                   value={welcomeForm.trialPlanId}
@@ -153,9 +151,15 @@ export function PersonalOffersAdmin({
                     <option key={plan.id} value={plan.id}>{plan.name} · {plan.durationDays} дн.</option>
                   ))}
                 </select>
-              </Field>
-            ) : welcomeForm.type === 'PROMO_CODE' ? (
-              <Field label="Промокод">
+              </WelcomeBonusOption>
+
+              <WelcomeBonusOption
+                title="Промокод"
+                description="Пользователь получит код на первую оплату."
+                icon={<Ticket className="h-5 w-5" />}
+                checked={welcomeForm.promoCodeEnabled}
+                onToggle={(checked) => setWelcomeForm((prev) => ({ ...prev, promoCodeEnabled: checked }))}
+              >
                 <select
                   className="input"
                   value={welcomeForm.promoCodeId}
@@ -168,21 +172,27 @@ export function PersonalOffersAdmin({
                     </option>
                   ))}
                 </select>
-              </Field>
-            ) : (
-              <Field label="Прокруток">
+              </WelcomeBonusOption>
+
+              <WelcomeBonusOption
+                title="Рулетка"
+                description="Начислить попытки в подарочном боксе."
+                icon={<WandSparkles className="h-5 w-5" />}
+                checked={welcomeForm.bonusAttemptsEnabled}
+                onToggle={(checked) => setWelcomeForm((prev) => ({ ...prev, bonusAttemptsEnabled: checked }))}
+              >
                 <input
                   className="input"
                   type="number"
                   min={1}
                   max={50}
                   value={welcomeForm.bonusAttempts}
-                  disabled={welcomeForm.type !== 'BONUS_BOX_ATTEMPTS'}
                   onChange={(event) => setWelcomeForm((prev) => ({ ...prev, bonusAttempts: Number(event.target.value) }))}
                 />
-              </Field>
-            )}
-            <button type="button" className="btn-primary self-end" onClick={() => void saveWelcomeBonus()} disabled={welcomeLoading}>
+              </WelcomeBonusOption>
+            </div>
+
+            <button type="button" className="btn-primary min-h-12 justify-center" onClick={() => void saveWelcomeBonus()} disabled={welcomeLoading}>
               {welcomeLoading ? 'Сохраняем...' : 'Сохранить'}
             </button>
           </div>
@@ -362,6 +372,48 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   )
 }
 
+function WelcomeBonusOption({
+  title,
+  description,
+  icon,
+  checked,
+  onToggle,
+  children,
+}: {
+  title: string
+  description: string
+  icon: React.ReactNode
+  checked: boolean
+  onToggle: (checked: boolean) => void
+  children: React.ReactNode
+}) {
+  return (
+    <div className={cn(
+      'flex min-h-52 flex-col rounded-xl border bg-white p-4 shadow-sm transition-colors dark:bg-surface-900',
+      checked ? 'border-emerald-300 ring-2 ring-emerald-100 dark:border-emerald-500/40 dark:ring-emerald-500/10' : 'border-slate-200 dark:border-white/10'
+    )}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 gap-3">
+          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-200">
+            {icon}
+          </div>
+          <div className="min-w-0">
+            <div className="font-semibold text-slate-950 dark:text-white">{title}</div>
+            <p className="mt-1 text-sm leading-5 text-slate-500 dark:text-slate-400">{description}</p>
+          </div>
+        </div>
+        <input
+          type="checkbox"
+          className="mt-1 h-5 w-5"
+          checked={checked}
+          onChange={(event) => onToggle(event.target.checked)}
+        />
+      </div>
+      <div className={cn('mt-auto pt-4', !checked && 'opacity-50')}>{children}</div>
+    </div>
+  )
+}
+
 function toForm(offer?: Offer): OfferForm {
   return {
     enabled: offer?.enabled ?? true,
@@ -380,9 +432,11 @@ function toForm(offer?: Offer): OfferForm {
 function toWelcomeForm(setting: WelcomeBonus): WelcomeBonusForm {
   return {
     enabled: setting?.enabled ?? false,
-    type: setting?.type ?? 'NONE',
+    trialEnabled: setting?.trialEnabled ?? setting?.type === 'TRIAL_PLAN',
     trialPlanId: setting?.trialPlanId ?? '',
+    bonusAttemptsEnabled: setting?.bonusAttemptsEnabled ?? setting?.type === 'BONUS_BOX_ATTEMPTS',
     bonusAttempts: setting?.bonusAttempts || 10,
+    promoCodeEnabled: setting?.promoCodeEnabled ?? setting?.type === 'PROMO_CODE',
     promoCodeId: setting?.promoCodeId ?? '',
   }
 }
@@ -406,14 +460,16 @@ function welcomeSummary(
   trialPlans: Array<{ id: string; name: string; durationDays: number }>,
   promoCodes: Array<{ id: string; code: string; discountPercent: number }>
 ) {
-  if (!form.enabled || form.type === 'NONE') return 'выключен'
-  if (form.type === 'TRIAL_PLAN') {
+  if (!form.enabled) return 'выключен'
+  const parts: string[] = []
+  if (form.trialEnabled) {
     const plan = trialPlans.find((item) => item.id === form.trialPlanId)
-    return plan ? `пробный тариф ${plan.name} на ${plan.durationDays} дн.` : 'пробный тариф не выбран'
+    parts.push(plan ? `пробный тариф ${plan.name} на ${plan.durationDays} дн.` : 'пробный тариф не выбран')
   }
-  if (form.type === 'PROMO_CODE') {
+  if (form.promoCodeEnabled) {
     const promoCode = promoCodes.find((item) => item.id === form.promoCodeId)
-    return promoCode ? `промокод ${promoCode.code} на ${promoCode.discountPercent}%` : 'промокод не выбран'
+    parts.push(promoCode ? `промокод ${promoCode.code} на ${promoCode.discountPercent}%` : 'промокод не выбран')
   }
-  return `${form.bonusAttempts || 1} прокруток рулетки`
+  if (form.bonusAttemptsEnabled) parts.push(`${form.bonusAttempts || 1} прокруток рулетки`)
+  return parts.length ? parts.join(' · ') : 'варианты не выбраны'
 }

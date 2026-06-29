@@ -17,6 +17,7 @@ type BroadcastSegment =
   | 'INACTIVE_45D'
 
 type BroadcastChannel = 'IN_APP' | 'EMAIL' | 'TELEGRAM'
+type BroadcastStep = 'message' | 'audience' | 'delivery'
 
 type BroadcastStats = {
   recipients: number
@@ -232,6 +233,7 @@ export function BroadcastAdmin({
   const [history, setHistory] = useState<BroadcastHistoryItem[]>(initialHistory)
   const [customTemplates, setCustomTemplates] = useState<BroadcastTemplateItem[]>(initialTemplates)
   const [selectedHistoryItem, setSelectedHistoryItem] = useState<BroadcastHistoryItem | null>(null)
+  const [step, setStep] = useState<BroadcastStep>('message')
 
   useEffect(() => {
     try {
@@ -415,11 +417,42 @@ export function BroadcastAdmin({
   const previewActionLabel = renderPreview(actionLabel || 'Открыть')
   const previewImageUrl = getPreviewImageUrl(imageUrl)
   const visibleTemplates: BroadcastTemplateItem[] = [...customTemplates, ...templates]
+  const stepSummary = {
+    message: title.trim() ? title.trim() : 'Сообщение не заполнено',
+    audience: `${segmentLabel(segment)} · ${selectedChannels.map(channelLabel).join(', ')}`,
+    delivery: canSend ? 'Готово к отправке' : 'Заполните сообщение и канал',
+  }
 
   return (
     <section className="grid gap-4">
-      <div className="grid gap-4 xl:grid-cols-[0.85fr_1.15fr]">
-        <div className="card p-4">
+      <div className="card p-3">
+        <div className="grid gap-2 md:grid-cols-3">
+          <BroadcastStepButton
+            active={step === 'message'}
+            number="1"
+            title="Сообщение"
+            description={stepSummary.message}
+            onClick={() => setStep('message')}
+          />
+          <BroadcastStepButton
+            active={step === 'audience'}
+            number="2"
+            title="Кому и куда"
+            description={stepSummary.audience}
+            onClick={() => setStep('audience')}
+          />
+          <BroadcastStepButton
+            active={step === 'delivery'}
+            number="3"
+            title="Проверка"
+            description={stepSummary.delivery}
+            onClick={() => setStep('delivery')}
+          />
+        </div>
+      </div>
+
+      <div className="grid gap-4">
+        <div className={cn('card p-4', step !== 'audience' && 'hidden')}>
           <div className="flex items-center gap-2">
             <UsersRound className="h-5 w-5 text-cyan-600" />
             <h2 className="font-semibold">Кому отправить</h2>
@@ -499,7 +532,7 @@ export function BroadcastAdmin({
           </div>
         </div>
 
-        <div className="card p-4">
+        <div className={cn('card p-4', step === 'audience' && 'hidden')}>
           <div className="grid gap-4">
             <label className="block">
               <span className="text-sm font-medium">Заголовок</span>
@@ -684,6 +717,11 @@ export function BroadcastAdmin({
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               {stats ? <BroadcastStats stats={stats} /> : <div className="text-sm text-slate-500">Результат появится после отправки.</div>}
               <div className="flex flex-col gap-2 sm:flex-row">
+                {step === 'message' ? (
+                  <button type="button" className="btn-secondary min-h-11 px-5" onClick={() => setStep('audience')}>
+                    Далее
+                  </button>
+                ) : null}
                 <button type="button" className="btn-secondary min-h-11 px-5" onClick={() => submit(true)} disabled={!canSend}>
                   <Send className="h-4 w-4" />
                   Тест себе
@@ -701,6 +739,46 @@ export function BroadcastAdmin({
       <BroadcastHistory history={history} onRepeat={applyHistoryItem} onView={setSelectedHistoryItem} />
       {selectedHistoryItem ? <BroadcastHistoryModal item={selectedHistoryItem} onClose={() => setSelectedHistoryItem(null)} /> : null}
     </section>
+  )
+}
+
+function BroadcastStepButton({
+  active,
+  number,
+  title,
+  description,
+  onClick,
+}: {
+  active: boolean
+  number: string
+  title: string
+  description: string
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      className={cn(
+        'flex min-h-20 items-center gap-3 rounded-xl border p-3 text-left transition-colors',
+        active
+          ? 'border-slate-950 bg-slate-950 text-white shadow-sm dark:border-white dark:bg-white dark:text-slate-950'
+          : 'border-slate-200 bg-white hover:bg-slate-50 dark:border-white/10 dark:bg-white/[0.03] dark:hover:bg-white/[0.06]'
+      )}
+      onClick={onClick}
+    >
+      <span className={cn(
+        'grid h-9 w-9 shrink-0 place-items-center rounded-lg text-sm font-semibold',
+        active ? 'bg-white text-slate-950 dark:bg-slate-950 dark:text-white' : 'bg-cyan-50 text-cyan-700 dark:bg-cyan-500/10 dark:text-cyan-200'
+      )}>
+        {number}
+      </span>
+      <span className="min-w-0">
+        <span className="block font-semibold">{title}</span>
+        <span className={cn('mt-0.5 block truncate text-sm', active ? 'text-white/70 dark:text-slate-500' : 'text-slate-500 dark:text-slate-400')}>
+          {description}
+        </span>
+      </span>
+    </button>
   )
 }
 
@@ -829,6 +907,10 @@ function HistoryMetric({ label, value, failed = 0 }: { label: string; value: num
 
 function segmentLabel(value: string) {
   return segments.find((item) => item.value === value)?.label ?? value
+}
+
+function channelLabel(value: string) {
+  return channels.find((item) => item.value === value)?.label ?? value
 }
 
 function formatDateTime(value: string) {

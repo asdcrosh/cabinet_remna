@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import type { ReactElement, ReactNode } from 'react'
-import type { PersonalOfferScenario, PersonalOfferSetting } from '@prisma/client'
+import { Prisma, type PersonalOfferScenario, type PersonalOfferSetting, type WelcomeBonusType } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth/cookies'
 import { remnawave, RemnawaveError } from '@/lib/remnawave'
@@ -53,6 +53,7 @@ export default async function DashboardHome() {
         take: 1,
         select: { id: true, confirmationUrl: true, createdAt: true },
       },
+      trialPlanRedemptions: { select: { id: true }, take: 1 },
       _count: { select: { devices: true } },
     },
   })
@@ -97,9 +98,15 @@ export default async function DashboardHome() {
     }),
     prisma.welcomeBonusSetting.findUnique({
       where: { id: 'default' },
-      select: { enabled: true, type: true },
+      include: {
+        trialPlan: { select: { id: true, name: true, durationDays: true, isActive: true, isPromo: true } },
+        promoCode: { select: { id: true, code: true, discountPercent: true, isActive: true } },
+      },
     }),
   ])
+  const welcomeBonusOptions = buildWelcomeBonusOptions(welcomeBonusSetting, {
+    trialUsed: user.trialPlanRedemptions.length > 0,
+  })
   const visiblePaidPlans = audienceContext
     ? availablePlans.filter((plan) => isPlanAvailableForUser(plan, audienceContext))
     : availablePlans.filter((plan) => plan.availability === 'ALL')
@@ -119,7 +126,7 @@ export default async function DashboardHome() {
     lastSucceededPaymentAt: lastSucceededPayment?.paidAt ?? lastSucceededPayment?.createdAt ?? null,
     promoCode: promoOfferCode,
     offerSettings,
-    welcomeBonusAvailable: Boolean(welcomeBonusSetting?.enabled && welcomeBonusSetting.type !== 'NONE'),
+    welcomeBonusAvailable: welcomeBonusOptions.length > 0,
     user: { name: user.name, email: user.email },
   }), onboardingState)
 
@@ -128,7 +135,7 @@ export default async function DashboardHome() {
       <div className="space-y-4">
         <CompactHeader title="Главная" description="Начните пользоваться VPN" />
         <DashboardOnboardingCard state={onboardingState} mode="full" />
-        {personalOffer && <PersonalOffer offer={personalOffer} />}
+        {personalOffer && <PersonalOffer offer={personalOffer} welcomeBonusOptions={welcomeBonusOptions} />}
         <SmartInsights
           emailVerified={onboardingState.emailVerified}
           telegramLinked={onboardingState.telegramLinked}
@@ -157,7 +164,7 @@ export default async function DashboardHome() {
       />
 
       <DashboardOnboardingCard state={onboardingState} />
-      {personalOffer && <PersonalOffer offer={personalOffer} />}
+      {personalOffer && <PersonalOffer offer={personalOffer} welcomeBonusOptions={welcomeBonusOptions} />}
       <SmartInsights
         emailVerified={onboardingState.emailVerified}
         telegramLinked={onboardingState.telegramLinked}
@@ -271,6 +278,12 @@ type PersonalOfferView = {
   icon: ReactElement
   tone: 'cyan' | 'emerald' | 'amber' | 'violet'
   action?: 'WELCOME_BONUS'
+}
+
+export type WelcomeBonusChoice = {
+  type: Exclude<WelcomeBonusType, 'NONE'>
+  title: string
+  description: string
 }
 
 async function findDashboardPromoCode(userId: string, email: string): Promise<DashboardPromoCode | null> {
@@ -502,7 +515,13 @@ function filterDuplicateHomeOffer(offer: PersonalOfferView | null, state: Dashbo
   return offer
 }
 
-function PersonalOffer({ offer }: { offer: PersonalOfferView }) {
+function PersonalOffer({
+  offer,
+  welcomeBonusOptions,
+}: {
+  offer: PersonalOfferView
+  welcomeBonusOptions: WelcomeBonusChoice[]
+}) {
   const tone = personalOfferTone(offer.tone)
 
   return (
@@ -531,7 +550,7 @@ function PersonalOffer({ offer }: { offer: PersonalOfferView }) {
           </div>
         </div>
         {offer.action === 'WELCOME_BONUS' ? (
-          <WelcomeOfferButton label={offer.cta} />
+          <WelcomeOfferButton label={offer.cta} options={welcomeBonusOptions} />
         ) : (
           <Link href={offer.href} className="btn-primary min-h-11 shrink-0 justify-center px-4">
             <Sparkles className="h-4 w-4" />
@@ -541,6 +560,49 @@ function PersonalOffer({ offer }: { offer: PersonalOfferView }) {
       </div>
     </section>
   )
+}
+
+type WelcomeBonusSettingForDashboard = Prisma.WelcomeBonusSettingGetPayload<{
+  include: {
+    trialPlan: { select: { id: true; name: true; durationDays: true; isActive: true; isPromo: true } }
+    promoCode: { select: { id: true; code: true; discountPercent: true; isActive: true } }
+  }
+}>
+
+function buildWelcomeBonusOptions(
+  setting: WelcomeBonusSettingForDashboard | null,
+  state: { trialUsed: boolean }
+): WelcomeBonusChoice[] {
+  if (!setting?.enabled) return []
+  const hasExplicitChoices = setting.trialEnabled || setting.promoCodeEnabled || setting.bonusAttemptsEnabled
+  const trialEnabled = hasExplicitChoices ? setting.trialEnabled : setting.type === 'TRIAL_PLAN'
+  const promoEnabled = hasExplicitChoices ? setting.promoCodeEnabled : setting.type === 'PROMO_CODE'
+  const bonusEnabled = hasExplicitChoices ? setting.bonusAttemptsEnabled : setting.type === 'BONUS_BOX_ATTEMPTS'
+  const options: WelcomeBonusChoice[] = []
+
+  if (trialEnabled && setting.trialPlan?.isActive && setting.trialPlan.isPromo && !state.trialUsed) {
+    options.push({
+      type: 'TRIAL_PLAN',
+      title: 'Пробный период',
+      description: `${setting.trialPlan.name} на ${setting.trialPlan.durationDays} дн.`,
+    })
+  }
+  if (promoEnabled && setting.promoCode?.isActive) {
+    options.push({
+      type: 'PROMO_CODE',
+      title: 'Промокод',
+      description: `${setting.promoCode.code} на ${setting.promoCode.discountPercent}%`,
+    })
+  }
+  if (bonusEnabled && setting.bonusAttempts > 0) {
+    options.push({
+      type: 'BONUS_BOX_ATTEMPTS',
+      title: 'Рулетка',
+      description: `${setting.bonusAttempts} прокруток`,
+    })
+  }
+
+  return options
 }
 
 function personalOfferTone(tone: PersonalOfferView['tone']) {

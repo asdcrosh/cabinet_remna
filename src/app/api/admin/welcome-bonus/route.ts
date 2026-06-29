@@ -33,23 +33,39 @@ async function parseWelcomeBonusInput(body: any):
         data: {
           enabled: boolean
           type: WelcomeBonusType
+          trialEnabled: boolean
           trialPlanId: string | null
+          bonusAttemptsEnabled: boolean
           bonusAttempts: number
+          promoCodeEnabled: boolean
           promoCodeId: string | null
         }
       }
     | { error: string }
   > {
   const enabled = Boolean(body?.enabled)
-  const type = body?.type
+  const trialEnabled = Boolean(body?.trialEnabled)
+  const bonusAttemptsEnabled = Boolean(body?.bonusAttemptsEnabled)
+  const promoCodeEnabled = Boolean(body?.promoCodeEnabled)
   const trialPlanId = normalizeNullableText(body?.trialPlanId, 80)
   const promoCodeId = normalizeNullableText(body?.promoCodeId, 80)
   const bonusAttempts = Number(body?.bonusAttempts)
+  const type: WelcomeBonusType = !enabled
+    ? 'NONE'
+    : trialEnabled
+      ? 'TRIAL_PLAN'
+      : promoCodeEnabled
+        ? 'PROMO_CODE'
+        : bonusAttemptsEnabled
+          ? 'BONUS_BOX_ATTEMPTS'
+          : 'NONE'
 
-  if (!Object.values(WelcomeBonusType).includes(type)) return { error: 'Некорректный тип приветственного бонуса' }
-  if (enabled && type === 'TRIAL_PLAN' && !trialPlanId) return { error: 'Выберите пробный тариф' }
-  if (enabled && type === 'PROMO_CODE' && !promoCodeId) return { error: 'Выберите промокод' }
-  if (enabled && type === 'BONUS_BOX_ATTEMPTS' && (!Number.isFinite(bonusAttempts) || bonusAttempts < 1)) {
+  if (enabled && !trialEnabled && !bonusAttemptsEnabled && !promoCodeEnabled) {
+    return { error: 'Включите хотя бы один вариант приветственного бонуса' }
+  }
+  if (enabled && trialEnabled && !trialPlanId) return { error: 'Выберите пробный тариф' }
+  if (enabled && promoCodeEnabled && !promoCodeId) return { error: 'Выберите промокод' }
+  if (enabled && bonusAttemptsEnabled && (!Number.isFinite(bonusAttempts) || bonusAttempts < 1)) {
     return { error: 'Укажите количество прокруток' }
   }
 
@@ -72,12 +88,15 @@ async function parseWelcomeBonusInput(body: any):
   return {
     data: {
       enabled,
-      type: enabled ? type : 'NONE',
-      trialPlanId: enabled && type === 'TRIAL_PLAN' ? trialPlanId : null,
-      bonusAttempts: enabled && type === 'BONUS_BOX_ATTEMPTS'
+      type,
+      trialEnabled: enabled && trialEnabled,
+      trialPlanId: enabled && trialEnabled ? trialPlanId : null,
+      bonusAttemptsEnabled: enabled && bonusAttemptsEnabled,
+      bonusAttempts: enabled && bonusAttemptsEnabled
         ? Math.max(1, Math.min(50, Math.floor(bonusAttempts)))
         : 0,
-      promoCodeId: enabled && type === 'PROMO_CODE' ? promoCodeId : null,
+      promoCodeEnabled: enabled && promoCodeEnabled,
+      promoCodeId: enabled && promoCodeEnabled ? promoCodeId : null,
     },
   }
 }

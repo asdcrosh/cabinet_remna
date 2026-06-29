@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { Prisma, type Plan, type PromoCode, type WelcomeBonusSetting } from '@prisma/client'
+import { Prisma, WelcomeBonusType, type Plan, type PromoCode, type WelcomeBonusSetting } from '@prisma/client'
 import { requireAuth, withAuth } from '@/lib/auth/guard'
 import { prisma } from '@/lib/prisma'
 import { rateLimit } from '@/lib/rate-limit'
@@ -11,6 +11,8 @@ export const dynamic = 'force-dynamic'
 
 export const POST = withAuth(async (req: Request) => {
   const session = await requireAuth()
+  const body = await req.json().catch(() => null)
+  const requestedType = normalizeWelcomeBonusType(body?.type)
   const limited = await rateLimit(req, `welcome-offer:${session.uid}`, 5, 60_000)
   if (!limited.ok) {
     return NextResponse.json(
@@ -23,7 +25,7 @@ export const POST = withAuth(async (req: Request) => {
     where: { id: 'default' },
     include: { trialPlan: true, promoCode: true },
   })
-  if (!setting?.enabled || setting.type === 'NONE') {
+  if (!setting?.enabled) {
     return NextResponse.json({ error: 'Приветственный бонус сейчас недоступен' }, { status: 404 })
   }
 
@@ -56,16 +58,53 @@ export const POST = withAuth(async (req: Request) => {
     return NextResponse.json({ error: 'Приветственный бонус доступен только новым пользователям' }, { status: 409 })
   }
 
-  if (setting.type === 'TRIAL_PLAN') {
+  const availableTypes = getAvailableWelcomeBonusTypes(setting, {
+    trialUsed: user.trialPlanRedemptions.length > 0,
+  })
+  const selectedType = requestedType && availableTypes.includes(requestedType)
+    ? requestedType
+    : availableTypes.length === 1
+      ? availableTypes[0]
+      : null
+
+  if (!selectedType) {
+    return NextResponse.json({ error: 'Выберите доступный приветственный бонус' }, { status: 422 })
+  }
+
+  if (selectedType === 'TRIAL_PLAN') {
     return claimTrialPlan({ userId: user.id, email: user.email, setting })
   }
 
-  if (setting.type === 'PROMO_CODE') {
+  if (selectedType === 'PROMO_CODE') {
     return claimPromoCode({ userId: user.id, setting })
   }
 
   return claimBonusAttempts({ userId: user.id, setting })
 })
+
+function normalizeWelcomeBonusType(value: unknown): WelcomeBonusType | null {
+  return typeof value === 'string' && Object.values(WelcomeBonusType).includes(value as WelcomeBonusType)
+    ? value as WelcomeBonusType
+    : null
+}
+
+function getAvailableWelcomeBonusTypes(
+  setting: WelcomeBonusSetting,
+  state: { trialUsed: boolean }
+): WelcomeBonusType[] {
+  const types: WelcomeBonusType[] = []
+  const hasExplicitChoices = setting.trialEnabled || setting.promoCodeEnabled || setting.bonusAttemptsEnabled
+  if (hasExplicitChoices) {
+    if (setting.trialEnabled && setting.trialPlanId && !state.trialUsed) types.push('TRIAL_PLAN')
+    if (setting.promoCodeEnabled && setting.promoCodeId) types.push('PROMO_CODE')
+    if (setting.bonusAttemptsEnabled && setting.bonusAttempts > 0) types.push('BONUS_BOX_ATTEMPTS')
+    return types
+  }
+  if (setting.type === 'TRIAL_PLAN' && setting.trialPlanId && !state.trialUsed) types.push('TRIAL_PLAN')
+  if (setting.type === 'PROMO_CODE' && setting.promoCodeId) types.push('PROMO_CODE')
+  if (setting.type === 'BONUS_BOX_ATTEMPTS' && setting.bonusAttempts > 0) types.push('BONUS_BOX_ATTEMPTS')
+  return types
+}
 
 async function claimTrialPlan({
   userId,

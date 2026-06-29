@@ -207,14 +207,17 @@ enum PersonalOfferTone {
 }
 
 model WelcomeBonusSetting {
-  id            String           @id @default("default")
-  enabled       Boolean          @default(false)
-  type          WelcomeBonusType @default(NONE)
-  trialPlanId   String?
-  bonusAttempts Int              @default(0)
-  promoCodeId   String?
-  createdAt     DateTime         @default(now())
-  updatedAt     DateTime         @updatedAt
+  id                   String           @id @default("default")
+  enabled              Boolean          @default(false)
+  type                 WelcomeBonusType @default(NONE)
+  trialEnabled         Boolean          @default(false)
+  trialPlanId          String?
+  bonusAttemptsEnabled Boolean          @default(false)
+  bonusAttempts        Int              @default(0)
+  promoCodeEnabled     Boolean          @default(false)
+  promoCodeId          String?
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
 
   trialPlan Plan?      @relation("WelcomeTrialPlan", fields: [trialPlanId], references: [id], onDelete: SetNull)
   promoCode PromoCode? @relation(fields: [promoCodeId], references: [id], onDelete: SetNull)

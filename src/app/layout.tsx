@@ -25,6 +25,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="ru" suppressHydrationWarning>
       <body className="font-sans">
+        <Script id="theme-init" strategy="beforeInteractive">
+          {`(() => {
+            try {
+              const media = window.matchMedia('(prefers-color-scheme: dark)')
+              const apply = () => document.documentElement.classList.toggle('dark', media.matches)
+              apply()
+              media.addEventListener?.('change', apply)
+            } catch {}
+          })()`}
+        </Script>
         <Script src="https://telegram.org/js/telegram-web-app.js?62" strategy="beforeInteractive" />
         {children}
         <Toaster />

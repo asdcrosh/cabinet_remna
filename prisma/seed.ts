@@ -64,7 +64,14 @@ async function main() {
   await prisma.welcomeBonusSetting.upsert({
     where: { id: 'default' },
     update: {},
-    create: { id: 'default', enabled: false, type: 'NONE' },
+    create: {
+      id: 'default',
+      enabled: false,
+      type: 'NONE',
+      trialEnabled: false,
+      bonusAttemptsEnabled: false,
+      promoCodeEnabled: false,
+    },
   })
   console.log('✅ Seeded welcome bonus setting')
 }
