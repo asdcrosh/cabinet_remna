@@ -76,7 +76,7 @@ export default async function DashboardHome() {
   const activeSubRow = user.subscriptions.find((subscription) =>
     ['ACTIVE', 'LIMITED'].includes(subscription.status) && subscription.expireAt > new Date()
   ) ?? null
-  const [audienceContext, availablePlans, lastSucceededPayment, promoOfferCode, offerSettings] = await Promise.all([
+  const [audienceContext, availablePlans, lastSucceededPayment, promoOfferCode, offerSettings, welcomeBonusSetting] = await Promise.all([
     getPlanAudienceContext(user.id),
     prisma.plan.findMany({
       where: { isActive: true, isPromo: false },
@@ -93,8 +93,11 @@ export default async function DashboardHome() {
       orderBy: [{ priority: 'asc' }, { scenario: 'asc' }],
       include: {
         promoCode: { select: { id: true, code: true, discountPercent: true, isActive: true } },
-        welcomeTrialPlan: { select: { id: true, name: true, durationDays: true, isActive: true } },
       },
+    }),
+    prisma.welcomeBonusSetting.findUnique({
+      where: { id: 'default' },
+      select: { enabled: true, type: true },
     }),
   ])
   const visiblePaidPlans = audienceContext
@@ -116,6 +119,7 @@ export default async function DashboardHome() {
     lastSucceededPaymentAt: lastSucceededPayment?.paidAt ?? lastSucceededPayment?.createdAt ?? null,
     promoCode: promoOfferCode,
     offerSettings,
+    welcomeBonusAvailable: Boolean(welcomeBonusSetting?.enabled && welcomeBonusSetting.type !== 'NONE'),
     user: { name: user.name, email: user.email },
   }), onboardingState)
 
@@ -254,7 +258,6 @@ type DashboardPromoCode = {
 
 type DashboardOfferSetting = PersonalOfferSetting & {
   promoCode?: { id: string; code: string; discountPercent: number; isActive: boolean } | null
-  welcomeTrialPlan?: { id: string; name: string; durationDays: number; isActive: boolean } | null
 }
 
 type PersonalOfferView = {
@@ -321,6 +324,7 @@ function buildPersonalOffer({
   lastSucceededPaymentAt,
   promoCode,
   offerSettings,
+  welcomeBonusAvailable,
   user,
 }: {
   activeSubscription: DashboardSubscription | null
@@ -329,6 +333,7 @@ function buildPersonalOffer({
   lastSucceededPaymentAt: Date | null
   promoCode: DashboardPromoCode | null
   offerSettings: DashboardOfferSetting[]
+  welcomeBonusAvailable: boolean
   user: { name: string | null; email: string }
 }): PersonalOfferView | null {
   const now = Date.now()
@@ -394,11 +399,7 @@ function buildPersonalOffer({
         tone: 'cyan',
       },
       icon: <CreditCard className="h-5 w-5" />,
-      action: offerSettings.some((item) =>
-        item.scenario === 'NO_SUBSCRIPTION' &&
-        item.welcomeBonusEnabled &&
-        item.welcomeBonusType !== 'NONE'
-      )
+      action: welcomeBonusAvailable
         ? 'WELCOME_BONUS'
         : undefined,
     })

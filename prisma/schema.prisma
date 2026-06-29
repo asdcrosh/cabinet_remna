@@ -43,7 +43,7 @@ model Plan {
   promoCodePlans   PromoCodePlan[]
   trialRedemptions TrialPlanRedemption[]
   giftCertificates GiftCertificate[]
-  welcomeOfferSettings PersonalOfferSetting[] @relation("WelcomeTrialPlan")
+  welcomeBonusSettings WelcomeBonusSetting[] @relation("WelcomeTrialPlan")
 
   @@unique([remnashopPlanId, durationDays])
   @@index([isActive, sortOrder])
@@ -114,6 +114,7 @@ model User {
   oauthAccounts              OAuthAccount[]
   bonusBoxAttempts           BonusBoxAttempt[]
   bonusBoxOpenings           BonusBoxOpening[]
+  welcomeBonusRedemptions    WelcomeBonusRedemption[]
   auditLogsAuthored          AuditLog[]                  @relation("AuditLogActor")
   auditLogsTargeted          AuditLog[]                  @relation("AuditLogTarget")
   broadcastCampaigns         BroadcastCampaign[]         @relation("BroadcastCampaignAuthor")
@@ -181,19 +182,13 @@ model PersonalOfferSetting {
   meta        String?
   tone        PersonalOfferTone     @default(CYAN)
   promoCodeId String?
-  welcomeBonusEnabled  Boolean                       @default(false)
-  welcomeBonusType     PersonalOfferWelcomeBonusType @default(NONE)
-  welcomeTrialPlanId   String?
-  welcomeBonusAttempts Int                           @default(0)
   createdAt   DateTime              @default(now())
   updatedAt   DateTime              @updatedAt
 
   promoCode PromoCode? @relation(fields: [promoCodeId], references: [id], onDelete: SetNull)
-  welcomeTrialPlan Plan? @relation("WelcomeTrialPlan", fields: [welcomeTrialPlanId], references: [id], onDelete: SetNull)
 
   @@index([enabled, priority])
   @@index([promoCodeId])
-  @@index([welcomeTrialPlanId])
 }
 
 enum PersonalOfferScenario {
@@ -211,10 +206,46 @@ enum PersonalOfferTone {
   VIOLET
 }
 
-enum PersonalOfferWelcomeBonusType {
+model WelcomeBonusSetting {
+  id            String           @id @default("default")
+  enabled       Boolean          @default(false)
+  type          WelcomeBonusType @default(NONE)
+  trialPlanId   String?
+  bonusAttempts Int              @default(0)
+  promoCodeId   String?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  trialPlan Plan?      @relation("WelcomeTrialPlan", fields: [trialPlanId], references: [id], onDelete: SetNull)
+  promoCode PromoCode? @relation(fields: [promoCodeId], references: [id], onDelete: SetNull)
+
+  @@index([trialPlanId])
+  @@index([promoCodeId])
+}
+
+model WelcomeBonusRedemption {
+  id          String           @id @default(cuid())
+  userId      String
+  type        WelcomeBonusType
+  settingId   String
+  paymentId   String?
+  promoCodeId String?
+  metadata    Json?
+  createdAt   DateTime         @default(now())
+
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  promoCode PromoCode? @relation(fields: [promoCodeId], references: [id], onDelete: SetNull)
+
+  @@unique([userId])
+  @@index([type, createdAt])
+  @@index([promoCodeId])
+}
+
+enum WelcomeBonusType {
   NONE
   TRIAL_PLAN
   BONUS_BOX_ATTEMPTS
+  PROMO_CODE
 }
 
 model AdminNotification {
@@ -551,6 +582,8 @@ model PromoCode {
   plans            PromoCodePlan[]
   bonusBoxOpenings BonusBoxOpening[]
   personalOfferSettings PersonalOfferSetting[]
+  welcomeBonusSettings WelcomeBonusSetting[]
+  welcomeBonusRedemptions WelcomeBonusRedemption[]
 
   @@index([isActive, startsAt, expiresAt])
   @@index([audience])

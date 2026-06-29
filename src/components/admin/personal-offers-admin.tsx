@@ -2,8 +2,8 @@
 
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import type { PersonalOfferSetting, PersonalOfferTone, PersonalOfferWelcomeBonusType } from '@prisma/client'
-import { Edit3, Sparkles } from 'lucide-react'
+import type { PersonalOfferSetting, PersonalOfferTone, WelcomeBonusSetting, WelcomeBonusType } from '@prisma/client'
+import { Edit3, Gift, Sparkles } from 'lucide-react'
 import { AdminModal } from '@/components/admin/admin-modal'
 import { apiFetch } from '@/lib/api-client'
 import { toast } from '@/components/ui/toaster'
@@ -11,13 +11,17 @@ import {
   personalOfferPlaceholders,
   personalOfferScenarioLabels,
   personalOfferToneLabels,
-  personalOfferWelcomeBonusLabels,
+  welcomeBonusTypeLabels,
 } from '@/lib/personal-offers'
 
 type Offer = PersonalOfferSetting & {
   promoCode?: { id: string; code: string; discountPercent: number; isActive: boolean } | null
-  welcomeTrialPlan?: { id: string; name: string; durationDays: number; isActive: boolean } | null
 }
+
+type WelcomeBonus = (WelcomeBonusSetting & {
+  trialPlan?: { id: string; name: string; durationDays: number; isActive: boolean } | null
+  promoCode?: { id: string; code: string; discountPercent: number; isActive: boolean } | null
+}) | null
 
 type OfferForm = {
   enabled: boolean
@@ -30,25 +34,33 @@ type OfferForm = {
   meta: string
   tone: PersonalOfferTone
   promoCodeId: string
-  welcomeBonusEnabled: boolean
-  welcomeBonusType: PersonalOfferWelcomeBonusType
-  welcomeTrialPlanId: string
-  welcomeBonusAttempts: number
+}
+
+type WelcomeBonusForm = {
+  enabled: boolean
+  type: WelcomeBonusType
+  trialPlanId: string
+  bonusAttempts: number
+  promoCodeId: string
 }
 
 export function PersonalOffersAdmin({
   offers,
   promoCodes,
   trialPlans,
+  welcomeBonusSetting,
 }: {
   offers: Offer[]
   promoCodes: Array<{ id: string; code: string; discountPercent: number }>
   trialPlans: Array<{ id: string; name: string; durationDays: number }>
+  welcomeBonusSetting: WelcomeBonus
 }) {
   const router = useRouter()
   const [editing, setEditing] = useState<Offer | null>(null)
   const [loading, setLoading] = useState(false)
+  const [welcomeLoading, setWelcomeLoading] = useState(false)
   const [form, setForm] = useState<OfferForm>(() => toForm(offers[0]))
+  const [welcomeForm, setWelcomeForm] = useState<WelcomeBonusForm>(() => toWelcomeForm(welcomeBonusSetting))
 
   const activeOffer = useMemo(() => editing, [editing])
 
@@ -73,8 +85,110 @@ export function PersonalOffersAdmin({
     }
   }
 
+  async function saveWelcomeBonus() {
+    setWelcomeLoading(true)
+    try {
+      await apiFetch('/api/admin/welcome-bonus', {
+        method: 'PATCH',
+        body: JSON.stringify(welcomeForm),
+      })
+      toast('Приветственный бонус обновлён', 'success')
+      router.refresh()
+    } finally {
+      setWelcomeLoading(false)
+    }
+  }
+
   return (
     <>
+      <section className="surface-card border-emerald-100 bg-emerald-50/50">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="min-w-0">
+            <div className="flex items-center gap-3">
+              <div className="grid h-11 w-11 place-items-center rounded-lg bg-emerald-100 text-emerald-700">
+                <Gift className="h-5 w-5" />
+              </div>
+              <div>
+                <h2 className="text-xl font-semibold text-slate-950">Приветственный бонус</h2>
+                <p className="text-sm text-slate-500">
+                  Отдельная выдача для новых пользователей: пробный период, рулетка или промокод.
+                </p>
+              </div>
+            </div>
+            <div className="mt-3 rounded-lg border border-emerald-100 bg-white/80 px-3 py-2 text-sm text-slate-600">
+              <span className="font-medium text-slate-950">Сейчас: </span>
+              {welcomeSummary(welcomeForm, trialPlans, promoCodes)}
+            </div>
+          </div>
+
+          <div className="grid w-full gap-3 lg:max-w-3xl lg:grid-cols-[9rem_1fr_1fr_auto]">
+            <label className="flex items-center gap-2 rounded-lg border border-emerald-100 bg-white px-3 py-2 text-sm font-medium">
+              <input
+                type="checkbox"
+                checked={welcomeForm.enabled}
+                onChange={(event) => setWelcomeForm((prev) => ({ ...prev, enabled: event.target.checked }))}
+              />
+              Включён
+            </label>
+            <Field label="Что выдавать">
+              <select
+                className="input"
+                value={welcomeForm.type}
+                onChange={(event) => setWelcomeForm((prev) => ({ ...prev, type: event.target.value as WelcomeBonusType }))}
+              >
+                {Object.entries(welcomeBonusTypeLabels).map(([value, label]) => (
+                  <option key={value} value={value}>{label}</option>
+                ))}
+              </select>
+            </Field>
+            {welcomeForm.type === 'TRIAL_PLAN' ? (
+              <Field label="Пробный тариф">
+                <select
+                  className="input"
+                  value={welcomeForm.trialPlanId}
+                  onChange={(event) => setWelcomeForm((prev) => ({ ...prev, trialPlanId: event.target.value }))}
+                >
+                  <option value="">Выберите тариф</option>
+                  {trialPlans.map((plan) => (
+                    <option key={plan.id} value={plan.id}>{plan.name} · {plan.durationDays} дн.</option>
+                  ))}
+                </select>
+              </Field>
+            ) : welcomeForm.type === 'PROMO_CODE' ? (
+              <Field label="Промокод">
+                <select
+                  className="input"
+                  value={welcomeForm.promoCodeId}
+                  onChange={(event) => setWelcomeForm((prev) => ({ ...prev, promoCodeId: event.target.value }))}
+                >
+                  <option value="">Выберите промокод</option>
+                  {promoCodes.map((promoCode) => (
+                    <option key={promoCode.id} value={promoCode.id}>
+                      {promoCode.code} · {promoCode.discountPercent}%
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            ) : (
+              <Field label="Прокруток">
+                <input
+                  className="input"
+                  type="number"
+                  min={1}
+                  max={50}
+                  value={welcomeForm.bonusAttempts}
+                  disabled={welcomeForm.type !== 'BONUS_BOX_ATTEMPTS'}
+                  onChange={(event) => setWelcomeForm((prev) => ({ ...prev, bonusAttempts: Number(event.target.value) }))}
+                />
+              </Field>
+            )}
+            <button type="button" className="btn-primary self-end" onClick={() => void saveWelcomeBonus()} disabled={welcomeLoading}>
+              {welcomeLoading ? 'Сохраняем...' : 'Сохранить'}
+            </button>
+          </div>
+        </div>
+      </section>
+
       <section className="grid gap-3 xl:grid-cols-2">
         {offers.map((offer) => (
           <article key={offer.id} className="surface-card">
@@ -97,7 +211,7 @@ export function PersonalOffersAdmin({
                   <span className="rounded-full bg-slate-100 px-2 py-1">{offer.cta}</span>
                 </div>
                 <div className="mt-3 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-sm text-slate-600">
-                  <span className="font-medium text-slate-950">Выдача: </span>
+                  <span className="font-medium text-slate-950">Действие: </span>
                   {rewardSummary(offer)}
                 </div>
               </div>
@@ -181,9 +295,7 @@ export function PersonalOffersAdmin({
           <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
             <div>
               <div className="text-sm font-semibold text-slate-950">Что выдавать пользователю</div>
-              <div className="text-sm text-slate-500">
-                Здесь задается промокод для возврата или приветственный бонус для новых пользователей.
-              </div>
+              <div className="text-sm text-slate-500">Оффер отвечает за текст и кнопку. Бонус новым пользователям настраивается отдельно выше.</div>
             </div>
             <Field label="Промокод для оффера">
               <select
@@ -203,58 +315,6 @@ export function PersonalOffersAdmin({
               Работает для оффера “Давно не покупал”. Если не выбрать, кабинет покажет лучший доступный промокод.
             </div>
           </div>
-
-          {activeOffer?.scenario === 'NO_SUBSCRIPTION' && (
-            <div className="space-y-3 rounded-lg border border-emerald-200 bg-emerald-50/80 p-3">
-              <label className="flex items-center gap-3">
-                <input
-                  type="checkbox"
-                  checked={form.welcomeBonusEnabled}
-                  onChange={(event) => setForm((prev) => ({ ...prev, welcomeBonusEnabled: event.target.checked }))}
-                />
-                <span className="text-sm font-semibold text-emerald-950">Включить приветственный бонус новым пользователям</span>
-              </label>
-              <div className="grid gap-3 sm:grid-cols-3">
-                <Field label="Тип бонуса">
-                  <select
-                    className="input"
-                    value={form.welcomeBonusType}
-                    onChange={(event) => setForm((prev) => ({ ...prev, welcomeBonusType: event.target.value as PersonalOfferWelcomeBonusType }))}
-                  >
-                    {Object.entries(personalOfferWelcomeBonusLabels).map(([value, label]) => (
-                      <option key={value} value={value}>{label}</option>
-                    ))}
-                  </select>
-                </Field>
-                <Field label="Пробный тариф">
-                  <select
-                    className="input"
-                    value={form.welcomeTrialPlanId}
-                    onChange={(event) => setFormValue('welcomeTrialPlanId', event.target.value)}
-                    disabled={form.welcomeBonusType !== 'TRIAL_PLAN'}
-                  >
-                    <option value="">Выберите тариф</option>
-                    {trialPlans.map((plan) => (
-                      <option key={plan.id} value={plan.id}>
-                        {plan.name} · {plan.durationDays} дн.
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-                <Field label="Открытий">
-                  <input
-                    className="input"
-                    type="number"
-                    min={1}
-                    max={20}
-                    value={form.welcomeBonusAttempts}
-                    disabled={form.welcomeBonusType !== 'BONUS_BOX_ATTEMPTS'}
-                    onChange={(event) => setForm((prev) => ({ ...prev, welcomeBonusAttempts: Number(event.target.value) }))}
-                  />
-                </Field>
-              </div>
-            </div>
-          )}
 
           <div className="rounded-lg border border-cyan-100 bg-cyan-50/80 p-3 text-sm text-cyan-900">
             <div className="mb-2 flex items-center gap-2 font-semibold">
@@ -314,10 +374,16 @@ function toForm(offer?: Offer): OfferForm {
     meta: offer?.meta ?? '',
     tone: offer?.tone ?? 'CYAN',
     promoCodeId: offer?.promoCodeId ?? '',
-    welcomeBonusEnabled: offer?.welcomeBonusEnabled ?? false,
-    welcomeBonusType: offer?.welcomeBonusType ?? 'NONE',
-    welcomeTrialPlanId: offer?.welcomeTrialPlanId ?? '',
-    welcomeBonusAttempts: offer?.welcomeBonusAttempts ?? 1,
+  }
+}
+
+function toWelcomeForm(setting: WelcomeBonus): WelcomeBonusForm {
+  return {
+    enabled: setting?.enabled ?? false,
+    type: setting?.type ?? 'NONE',
+    trialPlanId: setting?.trialPlanId ?? '',
+    bonusAttempts: setting?.bonusAttempts || 10,
+    promoCodeId: setting?.promoCodeId ?? '',
   }
 }
 
@@ -332,15 +398,22 @@ function rewardSummary(offer: Offer) {
     )
   }
 
-  if (offer.scenario === 'NO_SUBSCRIPTION') {
-    if (!offer.welcomeBonusEnabled || offer.welcomeBonusType === 'NONE') {
-      parts.push('приветственный бонус выключен')
-    } else if (offer.welcomeBonusType === 'TRIAL_PLAN') {
-      parts.push(offer.welcomeTrialPlan ? `пробный тариф ${offer.welcomeTrialPlan.name}` : 'пробный тариф не выбран')
-    } else {
-      parts.push(`${offer.welcomeBonusAttempts || 1} открытий бонус-бокса`)
-    }
-  }
-
   return parts.length > 0 ? parts.join(' · ') : 'только переход по кнопке'
+}
+
+function welcomeSummary(
+  form: WelcomeBonusForm,
+  trialPlans: Array<{ id: string; name: string; durationDays: number }>,
+  promoCodes: Array<{ id: string; code: string; discountPercent: number }>
+) {
+  if (!form.enabled || form.type === 'NONE') return 'выключен'
+  if (form.type === 'TRIAL_PLAN') {
+    const plan = trialPlans.find((item) => item.id === form.trialPlanId)
+    return plan ? `пробный тариф ${plan.name} на ${plan.durationDays} дн.` : 'пробный тариф не выбран'
+  }
+  if (form.type === 'PROMO_CODE') {
+    const promoCode = promoCodes.find((item) => item.id === form.promoCodeId)
+    return promoCode ? `промокод ${promoCode.code} на ${promoCode.discountPercent}%` : 'промокод не выбран'
+  }
+  return `${form.bonusAttempts || 1} прокруток рулетки`
 }

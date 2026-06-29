@@ -12,10 +12,9 @@ export default async function AdminOffersPage() {
     orderBy: [{ priority: 'asc' }, { scenario: 'asc' }],
     include: {
       promoCode: { select: { id: true, code: true, discountPercent: true, isActive: true } },
-      welcomeTrialPlan: { select: { id: true, name: true, durationDays: true, isActive: true } },
     },
   })
-  const [promoCodes, trialPlans] = await Promise.all([
+  const [promoCodes, trialPlans, welcomeBonusSetting] = await Promise.all([
     prisma.promoCode.findMany({
       where: { isActive: true },
       orderBy: [{ discountPercent: 'desc' }, { code: 'asc' }],
@@ -26,6 +25,13 @@ export default async function AdminOffersPage() {
       orderBy: [{ sortOrder: 'asc' }, { durationDays: 'asc' }],
       select: { id: true, name: true, durationDays: true },
     }),
+    prisma.welcomeBonusSetting.findUnique({
+      where: { id: 'default' },
+      include: {
+        trialPlan: { select: { id: true, name: true, durationDays: true, isActive: true } },
+        promoCode: { select: { id: true, code: true, discountPercent: true, isActive: true } },
+      },
+    }),
   ])
 
   return (
@@ -34,7 +40,12 @@ export default async function AdminOffersPage() {
         title="Персональные офферы"
         description="Настройте блок на главной под разные сценарии пользователя"
       />
-      <PersonalOffersAdmin offers={offers} promoCodes={promoCodes} trialPlans={trialPlans} />
+      <PersonalOffersAdmin
+        offers={offers}
+        promoCodes={promoCodes}
+        trialPlans={trialPlans}
+        welcomeBonusSetting={welcomeBonusSetting}
+      />
     </div>
   )
 }

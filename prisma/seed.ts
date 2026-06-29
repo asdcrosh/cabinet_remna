@@ -60,6 +60,13 @@ async function main() {
     })
   }
   console.log(`✅ Seeded ${defaultPersonalOfferSettings.length} personal offer settings`)
+
+  await prisma.welcomeBonusSetting.upsert({
+    where: { id: 'default' },
+    update: {},
+    create: { id: 'default', enabled: false, type: 'NONE' },
+  })
+  console.log('✅ Seeded welcome bonus setting')
 }
 
 main()

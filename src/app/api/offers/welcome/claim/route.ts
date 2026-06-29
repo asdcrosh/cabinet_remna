@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { Prisma, type PersonalOfferSetting, type Plan } from '@prisma/client'
+import { Prisma, type Plan, type PromoCode, type WelcomeBonusSetting } from '@prisma/client'
 import { requireAuth, withAuth } from '@/lib/auth/guard'
 import { prisma } from '@/lib/prisma'
 import { rateLimit } from '@/lib/rate-limit'
@@ -19,11 +19,11 @@ export const POST = withAuth(async (req: Request) => {
     )
   }
 
-  const setting = await prisma.personalOfferSetting.findUnique({
-    where: { scenario: 'NO_SUBSCRIPTION' },
-    include: { welcomeTrialPlan: true },
+  const setting = await prisma.welcomeBonusSetting.findUnique({
+    where: { id: 'default' },
+    include: { trialPlan: true, promoCode: true },
   })
-  if (!setting?.enabled || !setting.welcomeBonusEnabled || setting.welcomeBonusType === 'NONE') {
+  if (!setting?.enabled || setting.type === 'NONE') {
     return NextResponse.json({ error: 'Приветственный бонус сейчас недоступен' }, { status: 404 })
   }
 
@@ -38,25 +38,30 @@ export const POST = withAuth(async (req: Request) => {
       subscriptions: { select: { id: true }, take: 1 },
       payments: { where: { status: 'SUCCEEDED' }, select: { id: true }, take: 1 },
       trialPlanRedemptions: { select: { id: true }, take: 1 },
+      welcomeBonusRedemptions: { select: { id: true }, take: 1 },
     },
   })
   if (!user) return NextResponse.json({ error: 'Пользователь не найден' }, { status: 404 })
   if (!user.emailVerifiedAt || user.email.endsWith('@pending.invalid')) {
     return NextResponse.json({ error: 'Подтвердите email, чтобы получить приветственный бонус' }, { status: 403 })
   }
-  if (user.remnashopUserId || user.remnawaveUuid || user.subscriptions.length > 0 || user.payments.length > 0 || user.trialPlanRedemptions.length > 0) {
+  if (
+    user.remnashopUserId ||
+    user.remnawaveUuid ||
+    user.subscriptions.length > 0 ||
+    user.payments.length > 0 ||
+    user.trialPlanRedemptions.length > 0 ||
+    user.welcomeBonusRedemptions.length > 0
+  ) {
     return NextResponse.json({ error: 'Приветственный бонус доступен только новым пользователям' }, { status: 409 })
   }
 
-  const usedWelcome = await prisma.bonusBoxAttempt.count({
-    where: { userId: user.id, source: 'MANUAL', sourceKey: { startsWith: `welcome:${setting.id}:` } },
-  })
-  if (usedWelcome > 0) {
-    return NextResponse.json({ error: 'Вы уже получили приветственный бонус' }, { status: 409 })
+  if (setting.type === 'TRIAL_PLAN') {
+    return claimTrialPlan({ userId: user.id, email: user.email, setting })
   }
 
-  if (setting.welcomeBonusType === 'TRIAL_PLAN') {
-    return claimTrialPlan({ userId: user.id, email: user.email, setting })
+  if (setting.type === 'PROMO_CODE') {
+    return claimPromoCode({ userId: user.id, setting })
   }
 
   return claimBonusAttempts({ userId: user.id, setting })
@@ -69,9 +74,9 @@ async function claimTrialPlan({
 }: {
   userId: string
   email: string
-  setting: PersonalOfferSetting & { welcomeTrialPlan: Plan | null }
+  setting: WelcomeBonusSetting & { trialPlan: Plan | null }
 }) {
-  const plan = setting.welcomeTrialPlan
+  const plan = setting.trialPlan
   if (!plan || !plan.isActive || !plan.isPromo) {
     return NextResponse.json({ error: 'Пробный тариф для бонуса не настроен' }, { status: 409 })
   }
@@ -102,6 +107,16 @@ async function claimTrialPlan({
             userId,
             planId: plan.id,
             paymentId: createdPayment.id,
+          },
+        })
+
+        await tx.welcomeBonusRedemption.create({
+          data: {
+            userId,
+            type: 'TRIAL_PLAN',
+            settingId: setting.id,
+            paymentId: createdPayment.id,
+            metadata: { planId: plan.id },
           },
         })
 
@@ -159,35 +174,90 @@ async function claimBonusAttempts({
   setting,
 }: {
   userId: string
-  setting: { id: string; welcomeBonusAttempts: number }
+  setting: { id: string; bonusAttempts: number }
 }) {
   const config = getBonusBoxConfig()
   if (!config.enabled) {
     return NextResponse.json({ error: 'Подарочный бокс сейчас недоступен' }, { status: 403 })
   }
 
-  const attemptsCount = Math.max(1, Math.min(20, setting.welcomeBonusAttempts))
+  const attemptsCount = Math.max(1, Math.min(50, setting.bonusAttempts))
   const expiresAt =
     config.attemptTtlDays > 0
       ? new Date(Date.now() + config.attemptTtlDays * 24 * 60 * 60 * 1000)
       : null
-  const result = await prisma.bonusBoxAttempt.createMany({
-    data: Array.from({ length: attemptsCount }, (_, index) => ({
-      userId,
-      source: 'MANUAL',
-      sourceKey: `welcome:${setting.id}:${index + 1}`,
-      expiresAt,
-    })),
-    skipDuplicates: true,
-  })
+  let count = 0
+  try {
+    const result = await prisma.$transaction(async (tx) => {
+      await tx.welcomeBonusRedemption.create({
+        data: {
+          userId,
+          type: 'BONUS_BOX_ATTEMPTS',
+          settingId: setting.id,
+          metadata: { attemptsCount },
+        },
+      })
+      return tx.bonusBoxAttempt.createMany({
+        data: Array.from({ length: attemptsCount }, (_, index) => ({
+          userId,
+          source: 'MANUAL',
+          sourceKey: `welcome:${setting.id}:${index + 1}`,
+          expiresAt,
+        })),
+        skipDuplicates: true,
+      })
+    })
+    count = result.count
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      return NextResponse.json({ error: 'Вы уже получили приветственный бонус' }, { status: 409 })
+    }
+    throw error
+  }
 
-  if (result.count === 0) {
+  if (count === 0) {
     return NextResponse.json({ error: 'Вы уже получили приветственный бонус' }, { status: 409 })
   }
 
   return NextResponse.json({
     type: 'BONUS_BOX_ATTEMPTS',
     redirectUrl: '/dashboard/bonus-box',
-    message: `Начислено открытий: ${result.count}`,
+    message: `Начислено открытий: ${count}`,
+  })
+}
+
+async function claimPromoCode({
+  userId,
+  setting,
+}: {
+  userId: string
+  setting: WelcomeBonusSetting & { promoCode: PromoCode | null }
+}) {
+  const promoCode = setting.promoCode
+  if (!promoCode || !promoCode.isActive) {
+    return NextResponse.json({ error: 'Промокод для бонуса не настроен' }, { status: 409 })
+  }
+
+  try {
+    await prisma.welcomeBonusRedemption.create({
+      data: {
+        userId,
+        type: 'PROMO_CODE',
+        settingId: setting.id,
+        promoCodeId: promoCode.id,
+        metadata: { code: promoCode.code, discountPercent: promoCode.discountPercent },
+      },
+    })
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      return NextResponse.json({ error: 'Вы уже получили приветственный бонус' }, { status: 409 })
+    }
+    throw error
+  }
+
+  return NextResponse.json({
+    type: 'PROMO_CODE',
+    redirectUrl: `/dashboard/plans?promo=${encodeURIComponent(promoCode.code)}`,
+    message: `Промокод ${promoCode.code} готов`,
   })
 }
