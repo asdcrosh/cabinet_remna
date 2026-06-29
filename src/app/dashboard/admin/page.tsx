@@ -11,6 +11,7 @@ import {
   ServerCog,
   ShieldCheck,
   SlidersHorizontal,
+  SearchCheck,
   Tag,
   TrendingUp,
   Users,
@@ -21,6 +22,8 @@ import { prisma } from '@/lib/prisma'
 import { requireAdminPage } from '@/lib/auth/admin-page'
 import { formatPrice } from '@/lib/format'
 import { cn } from '@/lib/cn'
+import { getPendingPaymentTtlMs } from '@/lib/payment-sync'
+import { findIdentityDuplicateCandidates } from '@/lib/identity-duplicates'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Админка' }
@@ -34,6 +37,7 @@ export default async function AdminDashboardPage() {
   todayStart.setHours(0, 0, 0, 0)
   const dayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000)
   const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+  const stalePaymentDate = new Date(now.getTime() - getPendingPaymentTtlMs())
   const twoWeeksAgo = new Date(now.getTime() - 13 * 24 * 60 * 60 * 1000)
   twoWeeksAgo.setHours(0, 0, 0, 0)
   const [
@@ -54,6 +58,8 @@ export default async function AdminDashboardPage() {
     sourceRows,
     dailyPaymentRows,
     dailyUserRows,
+    stalePendingPayments,
+    duplicateCandidates,
   ] = await Promise.all([
     prisma.user.count(),
     prisma.user.count({ where: { createdAt: { gte: todayStart } } }),
@@ -143,6 +149,8 @@ export default async function AdminDashboardPage() {
       GROUP BY 1
       ORDER BY 1 ASC
     `,
+    prisma.payment.count({ where: { status: 'PENDING', createdAt: { lt: stalePaymentDate } } }),
+    findIdentityDuplicateCandidates(20),
   ])
   const customersTotal = sourceRows.reduce((sum, row) => sum + Number(row.count), 0)
   const payingUsers = Number(payingUsersResult[0]?.count ?? 0)
@@ -248,6 +256,18 @@ export default async function AdminDashboardPage() {
               value={formatPrice(paymentsAggregate._count > 0 ? Math.round((paymentsAggregate._sum.amountKopecks ?? 0) / paymentsAggregate._count) : 0)}
               hint="по успешным оплатам"
             />
+            <CompactMetric
+              icon={<AlertTriangle className="h-5 w-5" />}
+              label="Зависшие оплаты"
+              value={stalePendingPayments}
+              hint={stalePendingPayments > 0 ? 'нужна сверка' : 'очередь чистая'}
+            />
+            <CompactMetric
+              icon={<SearchCheck className="h-5 w-5" />}
+              label="Возможные дубли"
+              value={duplicateCandidates.length}
+              hint={duplicateCandidates.length > 0 ? 'проверьте связи' : 'не найдено'}
+            />
           </div>
         </div>
 
@@ -328,6 +348,14 @@ export default async function AdminDashboardPage() {
           value={recoveryCount}
           warning={recoveryCount > 0}
           note={recoveryCount > 0 ? 'Требует внимания' : 'Очередь пуста'}
+        />
+        <AdminTile
+          href="/dashboard/admin/duplicates"
+          icon={<SearchCheck className="h-5 w-5" />}
+          title="Дубли"
+          value={duplicateCandidates.length}
+          warning={duplicateCandidates.length > 0}
+          note={duplicateCandidates.length > 0 ? 'Проверить связи' : 'Чисто'}
         />
         {user.role === 'SUPER_ADMIN' && (
           <AdminTile

@@ -18,6 +18,7 @@ import {
   Send,
   ServerCog,
   Settings,
+  SearchCheck,
   ShieldCheck,
   SlidersHorizontal,
   Tag,
@@ -28,6 +29,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { useBodyScrollLock } from '@/lib/use-body-scroll-lock'
+import type { FeatureFlags } from '@/lib/feature-flags'
 import { LogoutButton } from './logout-button'
 
 const nav = [
@@ -41,12 +43,21 @@ const nav = [
   { href: '/dashboard/settings', label: 'Настройки', icon: Settings },
 ]
 
+const bottomNav = [
+  { href: '/dashboard', label: 'Главная', icon: Home, exact: true },
+  { href: '/dashboard/subscription', label: 'Подписка', icon: KeyRound },
+  { href: '/dashboard/plans', label: 'Тарифы', icon: ShieldCheck },
+  { href: '/dashboard/support', label: 'Поддержка', icon: MessageCircleQuestion },
+  { href: '/dashboard/settings', label: 'Ещё', icon: Menu },
+]
+
 const adminNav = [
   { href: '/dashboard/admin', label: 'Обзор', icon: UserCog, exact: true },
   { href: '/dashboard/admin/notifications', label: 'Уведомления', icon: Bell },
   { href: '/dashboard/admin/broadcasts', label: 'Рассылки', icon: Send },
   { href: '/dashboard/admin/support', label: 'Поддержка', icon: MessageCircleQuestion },
   { href: '/dashboard/admin/users', label: 'Пользователи', icon: UsersRound },
+  { href: '/dashboard/admin/duplicates', label: 'Дубли', icon: SearchCheck },
   { href: '/dashboard/admin/plans', label: 'Тарифы', icon: SlidersHorizontal },
   { href: '/dashboard/admin/promo-codes', label: 'Промокоды', icon: Tag },
   { href: '/dashboard/admin/gift-certificates', label: 'Сертификаты', icon: TicketCheck },
@@ -62,8 +73,16 @@ type NavItem = (typeof nav)[number] | (typeof adminNav)[number]
 type NavBadges = Record<string, number>
 type UserRole = 'USER' | 'MODERATOR' | 'ADMIN' | 'SUPER_ADMIN'
 
-export function DashboardNav({ role, badges = {} }: { role: UserRole; badges?: NavBadges }) {
-  return <NavList role={role} badges={badges} className="space-y-1 py-1" />
+export function DashboardNav({
+  role,
+  badges = {},
+  features,
+}: {
+  role: UserRole
+  badges?: NavBadges
+  features: FeatureFlags
+}) {
+  return <NavList role={role} badges={badges} features={features} className="space-y-1 py-1" />
 }
 
 export function MobileDashboardNav({
@@ -71,11 +90,13 @@ export function MobileDashboardNav({
   email,
   brandName,
   badges = {},
+  features,
 }: {
   role: UserRole
   email: string
   brandName: string
   badges?: NavBadges
+  features: FeatureFlags
 }) {
   const [open, setOpen] = useState(false)
   const [mounted, setMounted] = useState(false)
@@ -104,7 +125,7 @@ export function MobileDashboardNav({
           </button>
         </div>
         <div className="flex-1 overflow-y-auto p-3">
-          <NavList role={role} badges={badges} onNavigate={() => setOpen(false)} className="space-y-1" />
+          <NavList role={role} badges={badges} features={features} onNavigate={() => setOpen(false)} className="space-y-1" />
         </div>
         <div className="border-t border-white/70 p-3 dark:border-white/10">
           <div className="mb-2 rounded-lg border border-slate-100 bg-slate-50/80 px-3 py-2 text-xs text-slate-500 dark:border-slate-800 dark:bg-surface-900/80">
@@ -131,6 +152,48 @@ export function MobileDashboardNav({
   )
 }
 
+export function MobileBottomNav({ badges = {}, features }: { badges?: NavBadges; features: FeatureFlags }) {
+  const pathname = usePathname()
+  const liveBadges = useLiveBadges(badges)
+  const items = filterUserNav(bottomNav, features)
+
+  return (
+    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-white/70 bg-white/90 px-2 pb-[calc(env(safe-area-inset-bottom)+0.4rem)] pt-1.5 shadow-[0_-16px_40px_rgba(15,23,42,0.10)] backdrop-blur-xl dark:border-white/10 dark:bg-surface-950/90 lg:hidden">
+      <div className="mx-auto grid max-w-md grid-cols-5 gap-1">
+        {items.map((item) => {
+          const Icon = item.icon
+          const active = item.exact ? pathname === item.href : pathname.startsWith(item.href)
+          const badge = liveBadges[item.href] ?? 0
+
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              aria-current={active ? 'page' : undefined}
+              className={cn(
+                'relative flex min-w-0 flex-col items-center justify-center gap-0.5 rounded-lg px-1 py-1.5 text-[11px] font-medium transition',
+                active
+                  ? 'bg-slate-950 text-white shadow-lg shadow-slate-950/10 dark:bg-white dark:text-slate-950'
+                  : 'text-slate-500 hover:bg-slate-100 hover:text-slate-950 dark:text-slate-400 dark:hover:bg-white/10 dark:hover:text-white'
+              )}
+            >
+              <span className="relative">
+                <Icon className="h-[18px] w-[18px]" />
+                {badge > 0 && (
+                  <span className="absolute -right-2 -top-2 grid min-w-4 place-items-center rounded-full bg-cyan-500 px-1 text-[10px] leading-4 text-white">
+                    {badge > 9 ? '9+' : badge}
+                  </span>
+                )}
+              </span>
+              <span className="max-w-full truncate">{item.label}</span>
+            </Link>
+          )
+        })}
+      </div>
+    </nav>
+  )
+}
+
 export function Brand({ compact = false, brandName }: { compact?: boolean; brandName: string }) {
   return (
     <Link href="/dashboard" className="flex min-w-0 items-center gap-3">
@@ -152,25 +215,27 @@ function NavList({
   badges = {},
   className,
   onNavigate,
+  features,
 }: {
   role: UserRole
   badges?: NavBadges
   className?: string
   onNavigate?: () => void
+  features: FeatureFlags
 }) {
   const pathname = usePathname()
   const liveBadges = useLiveBadges(badges)
 
   return (
     <nav className={className}>
-      <NavGroup items={nav} pathname={pathname} badges={liveBadges} onNavigate={onNavigate} />
+      <NavGroup items={filterUserNav(nav, features)} pathname={pathname} badges={liveBadges} onNavigate={onNavigate} />
       {role !== 'USER' && (
         <div className="pt-3">
           <div className="px-3 pb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
             Администрирование
           </div>
           <NavGroup
-            items={getAdminItems(role)}
+            items={getAdminItems(role, features)}
             pathname={pathname}
             badges={liveBadges}
             onNavigate={onNavigate}
@@ -181,10 +246,26 @@ function NavList({
   )
 }
 
-function getAdminItems(role: UserRole) {
-  if (role === 'MODERATOR') return adminNav.filter((item) => item.href === '/dashboard/admin/support')
-  if (role === 'ADMIN') return adminNav.filter((item) => item.href !== '/dashboard/admin/audit')
-  return adminNav
+function filterUserNav<T extends NavItem>(items: T[], features: FeatureFlags) {
+  return items.filter((item) => {
+    if (item.href === '/dashboard/referrals') return features.referrals
+    if (item.href === '/dashboard/bonus-box') return features.bonusBox
+    if (item.href === '/dashboard/support') return features.support
+    return true
+  })
+}
+
+function getAdminItems(role: UserRole, features: FeatureFlags) {
+  const available = adminNav.filter((item) => {
+    if (item.href === '/dashboard/admin/support') return features.support
+    if (item.href === '/dashboard/admin/broadcasts') return features.broadcasts
+    if (item.href === '/dashboard/admin/gift-certificates') return features.giftCertificates
+    if (item.href === '/dashboard/admin/bonus-box') return features.bonusBox
+    return true
+  })
+  if (role === 'MODERATOR') return available.filter((item) => item.href === '/dashboard/admin/support')
+  if (role === 'ADMIN') return available.filter((item) => item.href !== '/dashboard/admin/audit')
+  return available
 }
 
 function roleLabel(role: UserRole) {

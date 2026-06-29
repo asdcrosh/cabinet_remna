@@ -2,6 +2,7 @@ import { readdir, stat } from 'fs/promises'
 import path from 'path'
 import { prisma } from '@/lib/prisma'
 import { remnawave } from '@/lib/remnawave'
+import { getProvisioningQueueHealth } from '@/lib/job-health'
 
 export type SystemHealthStatus = 'ok' | 'warn' | 'error'
 
@@ -216,6 +217,29 @@ async function checkS3() {
   return check('s3', 'S3', 'ok', `S3 настроен для bucket ${bucket}`)
 }
 
+async function checkProvisioningQueue() {
+  try {
+    const queue = await getProvisioningQueueHealth()
+    if (!queue.ok) {
+      return check(
+        'provisioning-queue',
+        'Очередь выдачи',
+        'warn',
+        'Есть задачи, требующие внимания',
+        `Ожидают: ${queue.pending}, ошибок: ${queue.failed}, зависли: ${queue.staleRunning}`
+      )
+    }
+    return check(
+      'provisioning-queue',
+      'Очередь выдачи',
+      'ok',
+      queue.pending > 0 ? `Ожидают обработки: ${queue.pending}` : 'Очередь чистая'
+    )
+  } catch (error) {
+    return check('provisioning-queue', 'Очередь выдачи', 'warn', 'Не удалось проверить очередь', errorMessage(error))
+  }
+}
+
 export async function getSystemHealth(options: { sendEmail?: boolean } = {}): Promise<SystemHealthReport> {
   const checkedAt = nowIso()
   const checks = await Promise.all([
@@ -226,6 +250,7 @@ export async function getSystemHealth(options: { sendEmail?: boolean } = {}): Pr
     checkTelegram(),
     latestBackup(),
     checkS3(),
+    checkProvisioningQueue(),
   ])
 
   return {

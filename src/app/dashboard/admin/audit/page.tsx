@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation'
+import Link from 'next/link'
 import { Activity, CalendarClock, Search } from 'lucide-react'
 import { AuditAction } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
@@ -23,13 +24,14 @@ const ACTION_LABELS: Record<AuditAction, string> = {
 export default async function AdminAuditPage({
   searchParams,
 }: {
-  searchParams?: { q?: string; action?: string }
+  searchParams?: { q?: string; action?: string; limit?: string }
 }) {
   const { user } = await requireAdminPage()
   if (user.role !== 'SUPER_ADMIN') redirect('/dashboard/admin')
 
   const q = searchParams?.q?.trim() ?? ''
   const action = searchParams?.action ?? 'ALL'
+  const limit = normalizeLimit(searchParams?.limit)
   const where = {
     ...(action !== 'ALL' && action in AuditAction ? { action: action as AuditAction } : {}),
     ...(q
@@ -46,12 +48,14 @@ export default async function AdminAuditPage({
   const logs = await prisma.auditLog.findMany({
     where,
     orderBy: { createdAt: 'desc' },
-    take: 100,
+    take: limit + 1,
     include: {
       actor: { select: { email: true, name: true } },
       target: { select: { email: true, name: true } },
     },
   })
+  const hasMore = logs.length > limit
+  const visibleLogs = hasMore ? logs.slice(0, limit) : logs
 
   return (
     <div className="space-y-6">
@@ -72,10 +76,10 @@ export default async function AdminAuditPage({
       </form>
 
       <div className="space-y-3">
-        {logs.length === 0 && (
+        {visibleLogs.length === 0 && (
           <div className="card py-12 text-center text-sm text-slate-500">Записей пока нет.</div>
         )}
-        {logs.map((log) => (
+        {visibleLogs.map((log) => (
           <article key={log.id} className="card p-0">
             <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-start sm:justify-between">
               <div className="flex min-w-0 gap-3">
@@ -107,7 +111,28 @@ export default async function AdminAuditPage({
             )}
           </article>
         ))}
+        {hasMore && (
+          <div className="text-center">
+            <Link href={buildMoreHref(q, action, limit + 50)} className="btn-secondary inline-flex">
+              Показать еще
+            </Link>
+          </div>
+        )}
       </div>
     </div>
   )
+}
+
+function normalizeLimit(value: string | undefined) {
+  const limit = Number(value)
+  if (!Number.isFinite(limit)) return 50
+  return Math.min(200, Math.max(20, Math.floor(limit)))
+}
+
+function buildMoreHref(q: string, action: string, limit: number) {
+  const params = new URLSearchParams()
+  if (q) params.set('q', q)
+  if (action !== 'ALL') params.set('action', action)
+  params.set('limit', String(limit))
+  return `/dashboard/admin/audit?${params.toString()}`
 }

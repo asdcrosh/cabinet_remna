@@ -6,11 +6,12 @@ import {
   verifyTelegramAuthPayload,
   type TelegramAuthPayload,
 } from '@/lib/telegram-auth'
-import { attachRemnashopIdentityToCabinetUser } from '@/lib/telegram-link-sync'
+import { syncLinkedTelegramUser } from '@/lib/telegram-link-sync'
 import {
   mergeTechnicalTelegramAccount,
   TelegramAccountMergeError,
 } from '@/lib/telegram-account-merge'
+import { writeAuditLog } from '@/lib/audit-log'
 
 export const runtime = 'nodejs'
 
@@ -71,8 +72,20 @@ export const POST = withAuth(async (req: Request) => {
     },
   })
 
+  await writeAuditLog({
+    actorId: session.uid,
+    targetId: session.uid,
+    action: 'ADMIN_PROFILE_UPDATED',
+    message: 'Пользователь привязал Telegram',
+    metadata: {
+      telegramId: telegramId.toString(),
+      username: payload.username ?? null,
+    },
+    request: req,
+  })
+
   try {
-    const remnashopUser = await attachRemnashopIdentityToCabinetUser({
+    const sync = await syncLinkedTelegramUser({
       localUserId: session.uid,
       telegramId,
     })
@@ -84,9 +97,10 @@ export const POST = withAuth(async (req: Request) => {
         username: payload.username ?? null,
       },
       sync: {
-        foundRemnashopUser: Boolean(remnashopUser),
-        remnashopUserId: remnashopUser?.id ?? null,
-        pending: Boolean(remnashopUser?.user_remna_id),
+        ...sync,
+        remnashopUserId: 'remnashopUserId' in sync ? sync.remnashopUserId ?? null : null,
+        remnawaveUuid: 'remnawaveUuid' in sync ? sync.remnawaveUuid ?? null : null,
+        subscriptionId: 'subscriptionId' in sync ? sync.subscriptionId ?? null : null,
       },
     })
   } catch (e) {

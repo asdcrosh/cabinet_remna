@@ -5,8 +5,9 @@ import { getCurrentUser } from '@/lib/auth/cookies'
 import { prisma } from '@/lib/prisma'
 import { getBrandName } from '@/lib/branding'
 import { maybeSyncRemnashopCatalog } from '@/lib/remnashop-sync'
+import { getFeatureFlags } from '@/lib/feature-flags'
 import { LogoutButton } from '@/components/dashboard/logout-button'
-import { Brand, DashboardNav, MobileDashboardNav } from '@/components/dashboard/dashboard-nav'
+import { Brand, DashboardNav, MobileBottomNav, MobileDashboardNav } from '@/components/dashboard/dashboard-nav'
 import { NotificationBell } from '@/components/dashboard/notification-bell'
 import { logWarn } from '@/lib/logger'
 
@@ -31,6 +32,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   }
 
   const role = freshUser.role
+  const features = getFeatureFlags()
   const accountLabel = freshUser.email.endsWith('@pending.invalid')
     ? `@${freshUser.telegramUsername || freshUser.telegramId?.toString() || 'telegram'}`
     : freshUser.email
@@ -60,7 +62,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           <Brand brandName={brandName} />
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-3 [scrollbar-gutter:stable]">
-          <DashboardNav role={role} badges={navBadges} />
+          <DashboardNav role={role} badges={navBadges} features={features} />
         </div>
         <div className="shrink-0 border-t border-white/70 bg-white/70 p-2.5 backdrop-blur dark:border-white/10 dark:bg-surface-950/70">
           <div className="mb-1.5 rounded-lg border border-slate-100 bg-slate-50/80 px-3 py-1.5 text-xs text-slate-500 dark:border-slate-800 dark:bg-surface-900/80">
@@ -80,11 +82,12 @@ export default async function DashboardLayout({ children }: { children: React.Re
           <Brand compact brandName={brandName} />
           <div className="flex items-center gap-2">
             <NotificationBell showAdmin={isStaff} />
-            <MobileDashboardNav role={role} email={accountLabel} brandName={brandName} badges={navBadges} />
+            <MobileDashboardNav role={role} email={accountLabel} brandName={brandName} badges={navBadges} features={features} />
           </div>
         </div>
-        <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">{children}</div>
+        <div className="mx-auto max-w-6xl px-4 pb-24 pt-6 sm:px-6 lg:px-8 lg:py-8">{children}</div>
       </main>
+      <MobileBottomNav badges={navBadges} features={features} />
     </div>
   )
 }

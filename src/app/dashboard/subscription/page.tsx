@@ -7,6 +7,7 @@ import { remnawave, RemnawaveError } from '@/lib/remnawave'
 import { KeysCard } from '@/components/dashboard/keys-card'
 import Link from 'next/link'
 import { CalendarClock, Database, ShieldAlert } from 'lucide-react'
+import { EmptyState } from '@/components/dashboard/empty-state'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,16 +17,12 @@ export default async function SubscriptionPage() {
   const user = await prisma.user.findUnique({ where: { id: session.uid } })
   if (!user?.remnawaveUsername) {
     return (
-      <div className="card text-center py-16">
-        <div className="mx-auto mb-5 grid h-14 w-14 place-items-center rounded-2xl bg-brand-50 text-brand-600 dark:bg-brand-500/10">
-          <ShieldAlert className="h-7 w-7" />
-        </div>
-        <h1 className="text-xl font-semibold">Нет активной подписки</h1>
-        <p className="text-slate-500 mt-2">Выберите тариф, чтобы активировать VPN.</p>
-        <Link href="/dashboard/plans" className="btn-primary mt-6 inline-flex">
-          Выбрать тариф
-        </Link>
-      </div>
+      <EmptyState
+        title="Нет активной подписки"
+        description="Выберите тариф, после оплаты здесь появятся QR-код, ссылка и быстрые кнопки подключения."
+        icon={<ShieldAlert className="h-7 w-7" />}
+        action={<Link href="/dashboard/plans" className="btn-primary">Выбрать тариф</Link>}
+      />
     )
   }
 
@@ -35,13 +32,11 @@ export default async function SubscriptionPage() {
   } catch (e) {
     if (e instanceof RemnawaveError) {
       return (
-        <div className="card text-center py-16">
-          <div className="mx-auto mb-5 grid h-14 w-14 place-items-center rounded-2xl bg-red-50 text-red-600 dark:bg-red-500/10">
-            <ShieldAlert className="h-7 w-7" />
-          </div>
-          <h1 className="text-xl font-semibold text-red-600">Не удалось загрузить подписку</h1>
-          <p className="text-slate-500 mt-2">Сервис временно недоступен. Попробуйте обновить страницу чуть позже.</p>
-        </div>
+        <EmptyState
+          title="Не удалось загрузить подписку"
+          description="Сервис временно недоступен. Попробуйте обновить страницу чуть позже."
+          icon={<ShieldAlert className="h-7 w-7" />}
+        />
       )
     }
     throw e

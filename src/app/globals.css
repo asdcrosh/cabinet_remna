@@ -60,6 +60,24 @@
     @apply rounded-lg border border-white/70 bg-white/80 p-4 shadow-xl shadow-slate-200/50 backdrop-blur
            dark:border-white/10 dark:bg-surface-900/80 dark:shadow-black/25;
   }
+  .panel {
+    @apply rounded-lg border border-white/70 bg-white/85 shadow-xl shadow-slate-200/45 backdrop-blur
+           dark:border-white/10 dark:bg-surface-900/85 dark:shadow-black/25;
+  }
+  .panel-pad {
+    @apply p-4 sm:p-5;
+  }
+  .surface-card {
+    @apply rounded-lg border border-slate-200 bg-white/80 p-4 shadow-sm shadow-slate-200/60 transition
+           dark:border-white/10 dark:bg-white/[0.03] dark:shadow-black/10;
+  }
+  .surface-card-hover {
+    @apply hover:-translate-y-0.5 hover:border-cyan-200 hover:bg-white hover:shadow-lg hover:shadow-slate-950/5
+           dark:hover:border-cyan-500/30 dark:hover:bg-white/[0.06];
+  }
+  .skeleton {
+    @apply animate-pulse rounded-lg bg-slate-200/80 dark:bg-surface-800;
+  }
   .stat {
     @apply text-2xl font-semibold tracking-tight;
   }

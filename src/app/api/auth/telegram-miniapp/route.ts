@@ -13,6 +13,8 @@ import { logError, logInfo, logWarn } from '@/lib/logger'
 import { findCanonicalTelegramSessionUser } from '@/lib/telegram-session'
 import { mergeTechnicalTelegramAccount, TelegramAccountMergeError } from '@/lib/telegram-account-merge'
 import { createAdminNotification } from '@/lib/admin-notifications'
+import { resolveTelegramIdentity } from '@/lib/identity-resolver'
+import { writeAuditLog } from '@/lib/audit-log'
 
 export const runtime = 'nodejs'
 
@@ -56,42 +58,52 @@ export async function POST(req: Request) {
     })
   }
 
-  const remnashopUser = await findTelegramRemnashopUser(telegram.id)
+  let remnashopUser = await findTelegramRemnashopUser(telegram.id)
   const remnashopEmail = remnashopUser?.email?.trim().toLowerCase() || null
   let user
   try {
-    user = await prisma.user.findUnique({ where: { telegramId: telegram.id } })
-    if (user && remnashopEmail && isPendingTelegramEmail(user.email)) {
-      const emailUser = await prisma.user.findUnique({ where: { email: remnashopEmail } })
-      if (emailUser && emailUser.id !== user.id) {
-        const sourceUserId = user.id
-        try {
-          await mergeTechnicalTelegramAccount({
-            targetUserId: emailUser.id,
-            telegramId: telegram.id,
-            telegramUsername: telegram.username,
-            telegramName: telegram.name,
-          })
-          user = await prisma.user.findUnique({ where: { id: emailUser.id } })
-        } catch (error) {
-          if (!(error instanceof TelegramAccountMergeError)) throw error
-          logWarn('auth.telegram_miniapp.merge_deferred', {
-            targetUserId: emailUser.id,
-            sourceUserId,
-            code: error.code,
-          })
+    const identity = await resolveTelegramIdentity({
+      telegramId: telegram.id,
+      remnashopUserId: remnashopUser?.id ?? null,
+      remnashopEmail,
+    })
+
+    if (identity.action === 'merge_technical_into_email' || identity.action === 'merge_technical_into_remnashop_owner') {
+      try {
+        await mergeTechnicalTelegramAccount({
+          targetUserId: identity.target.id,
+          telegramId: telegram.id,
+          telegramUsername: telegram.username,
+          telegramName: telegram.name,
+        })
+        await writeAuditLog({
+          targetId: identity.target.id,
+          action: 'ADMIN_PROFILE_UPDATED',
+          message: 'Telegram Mini App объединил технический профиль с основным аккаунтом',
+          metadata: {
+            sourceUserId: identity.source.id,
+            telegramId: telegram.id.toString(),
+            remnashopUserId: remnashopUser?.id ?? null,
+            reason: identity.action,
+          },
+          request: req,
+        })
+        user = await prisma.user.findUnique({ where: { id: identity.target.id } })
+      } catch (error) {
+        if (!(error instanceof TelegramAccountMergeError)) throw error
+        logWarn('auth.telegram_miniapp.merge_deferred', {
+          targetUserId: identity.target.id,
+          sourceUserId: identity.source.id,
+          remnashopUserId: remnashopUser?.id ?? null,
+          code: error.code,
+        })
+        if (identity.action === 'merge_technical_into_remnashop_owner') {
+          remnashopUser = null
         }
       }
     }
-    if (!user && remnashopUser) {
-      user = await prisma.user.findFirst({
-        where: {
-          OR: [
-            { remnashopUserId: remnashopUser.id },
-            ...(remnashopEmail ? [{ email: remnashopEmail }] : []),
-          ],
-        },
-      })
+    if (!user && identity.action === 'use_existing') {
+      user = await prisma.user.findUnique({ where: { id: identity.user.id } })
     }
     if (!user) {
       const pendingEmail = `telegram-${telegram.id.toString()}@pending.invalid`
@@ -125,6 +137,17 @@ export async function POST(req: Request) {
         entityId: user.id,
         actionHref: '/dashboard/admin/users',
         actionLabel: 'Открыть пользователей',
+      })
+      await writeAuditLog({
+        targetId: user.id,
+        action: 'ADMIN_PROFILE_UPDATED',
+        message: 'Создан пользователь через Telegram Mini App',
+        metadata: {
+          telegramId: telegram.id.toString(),
+          remnashopUserId: remnashopUser?.id ?? null,
+          email: user.email,
+        },
+        request: req,
       })
     } else {
       user = await prisma.user.update({
@@ -206,8 +229,4 @@ async function findTelegramRemnashopUser(telegramId: bigint) {
     })
     return null
   }
-}
-
-function isPendingTelegramEmail(email: string) {
-  return email.startsWith('telegram-') && email.endsWith('@pending.invalid')
 }

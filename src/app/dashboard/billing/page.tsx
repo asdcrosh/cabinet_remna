@@ -3,6 +3,7 @@
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth/cookies'
 import { redirect } from 'next/navigation'
+import Link from 'next/link'
 import { formatPrice } from '@/lib/format'
 import { PageHeader } from '@/components/dashboard/page-header'
 import { PaymentSuccessBanner } from '@/components/dashboard/payment-success-banner'
@@ -58,8 +59,16 @@ export default async function BillingPage({ searchParams }: { searchParams: { pa
           <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
             {payments.length === 0 && (
               <tr>
-                <td colSpan={7} className="py-8 text-center text-slate-400">
-                  Платежей пока нет
+                <td colSpan={7} className="py-10">
+                  <div className="mx-auto max-w-md text-center">
+                    <div className="text-base font-semibold text-slate-900 dark:text-white">Платежей пока нет</div>
+                    <p className="mt-1 text-sm text-slate-500">
+                      После покупки здесь появятся сумма, статус и выданная подписка.
+                    </p>
+                    <Link href="/dashboard/plans" className="btn-primary mt-4 inline-flex">
+                      Выбрать тариф
+                    </Link>
+                  </div>
                 </td>
               </tr>
             )}
@@ -97,6 +106,7 @@ export default async function BillingPage({ searchParams }: { searchParams: { pa
           <EmptyState
             title="Платежей пока нет"
             description="После первой покупки здесь появится история оплат и состояние выдачи подписки."
+            action={<Link href="/dashboard/plans" className="btn-primary">Выбрать тариф</Link>}
           />
         )}
         {payments.map((p) => (
