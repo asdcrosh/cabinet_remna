@@ -105,6 +105,7 @@ export default async function AdminPaymentsPage({
           <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
             {payments.map((payment) => {
               const needsRetry = payment.status === 'SUCCEEDED' && !payment.subscriptionProvisionedAt
+              const canCheckPayment = Boolean(payment.yookassaId) && payment.status !== 'SUCCEEDED'
               return (
                 <tr key={payment.id}>
                   <td className="text-slate-500">{new Date(payment.createdAt).toLocaleString('ru-RU')}</td>
@@ -132,7 +133,7 @@ export default async function AdminPaymentsPage({
                   </td>
                   <td className="sticky-actions-cell w-[176px] min-w-[176px]">
                     <div className="action-row">
-                      {payment.yookassaId && <PaymentSyncButton paymentId={payment.id} />}
+                      {canCheckPayment && <PaymentSyncButton paymentId={payment.id} />}
                       {needsRetry ? (
                         <RecoveryActionButton paymentId={payment.id} />
                       ) : payment.subscriptionId ? (
@@ -152,6 +153,7 @@ export default async function AdminPaymentsPage({
       <div className={payments.length > 0 ? 'space-y-3 xl:hidden' : 'hidden'}>
         {payments.map((payment) => {
           const needsRetry = payment.status === 'SUCCEEDED' && !payment.subscriptionProvisionedAt
+          const canCheckPayment = Boolean(payment.yookassaId) && payment.status !== 'SUCCEEDED'
           return (
             <article key={payment.id} className="overflow-hidden rounded-lg border bg-white shadow-sm dark:bg-surface-900">
               <div className="border-b bg-slate-50 px-4 py-3 dark:bg-surface-800">
@@ -193,7 +195,7 @@ export default async function AdminPaymentsPage({
                   </div>
                 )}
                 <div className="action-row">
-                  {payment.yookassaId && <PaymentSyncButton paymentId={payment.id} />}
+                  {canCheckPayment && <PaymentSyncButton paymentId={payment.id} />}
                   {needsRetry ? (
                     <RecoveryActionButton paymentId={payment.id} />
                   ) : payment.subscriptionId ? (

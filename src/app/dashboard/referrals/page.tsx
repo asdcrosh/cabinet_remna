@@ -1,12 +1,6 @@
-import type { ReactNode } from 'react'
-import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import {
-  ArrowRight,
   Gift,
-  Link2,
-  Sparkles,
-  UserPlus,
   UsersRound,
 } from 'lucide-react'
 import { prisma } from '@/lib/prisma'
@@ -15,6 +9,7 @@ import { getAppUrl } from '@/lib/app-url'
 import { ensureUserReferralCode } from '@/lib/referrals'
 import { getReferralBonusDays } from '@/lib/referral-rewards'
 import { ReferralLinkCard } from '@/components/dashboard/referral-card'
+import { PageHeader } from '@/components/dashboard/page-header'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Рефералы' }
@@ -96,66 +91,40 @@ export default async function ReferralsPage() {
 
   return (
     <div className="space-y-6">
-      <section className="rounded-lg border border-slate-200 bg-white/85 p-5 shadow-sm dark:border-white/10 dark:bg-surface-900/80 sm:p-6">
-        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-center">
-          <div className="min-w-0">
-            <span className="inline-flex items-center gap-2 rounded-full bg-cyan-50 px-3 py-1 text-sm font-medium text-cyan-700 dark:bg-cyan-400/10 dark:text-cyan-200">
-              <Sparkles className="h-4 w-4" />
-              Реферальная программа
-            </span>
-            <h1 className="mt-5 max-w-3xl text-3xl font-semibold tracking-tight text-slate-950 dark:text-white sm:text-4xl">
-              Пригласи друга и получи +{bonusDays} дней
-            </h1>
-            <p className="mt-3 max-w-2xl text-base leading-7 text-slate-600 dark:text-slate-300">
-              Друг регистрируется по вашей ссылке, покупает платный тариф, а бонус добавляется к вашей активной подписке.
-            </p>
-            <div className="mt-5 flex flex-wrap gap-3">
-              <Link href="#referral-link" className="btn-primary">
-                Поделиться ссылкой
-                <ArrowRight className="h-4 w-4" />
-              </Link>
-              <Link href="#referral-history" className="btn-secondary">
-                История
-              </Link>
-            </div>
-          </div>
-          <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-400/20 dark:bg-emerald-400/10">
-            <div className="text-sm font-medium text-emerald-700 dark:text-emerald-200">Ваш бонус</div>
-            <div className="mt-2 text-3xl font-semibold text-emerald-900 dark:text-emerald-100">+{bonusDays} дн.</div>
-            <div className="mt-1 text-sm text-emerald-700/80 dark:text-emerald-200/80">за первую оплату друга</div>
-          </div>
-        </div>
-      </section>
+      <PageHeader title="Рефералы" description={`Пригласите друга и получите +${bonusDays} дней после его первой оплаты`} />
 
       <section id="referral-link" className="space-y-3 scroll-mt-24">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <h2 className="text-xl font-semibold">Ссылка для приглашения</h2>
-            <p className="mt-1 text-sm text-slate-500">Одна ссылка для всех приглашений, бонусы считаются автоматически.</p>
+        <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_15rem]">
+          <ReferralLinkCard code={referralCode} url={referralUrl} bonusDays={bonusDays} />
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-400/20 dark:bg-emerald-400/10">
+            <div className="flex items-center gap-2 text-sm font-medium text-emerald-700 dark:text-emerald-200">
+              <Gift className="h-4 w-4" />
+              Бонус за друга
+            </div>
+            <div className="mt-3 text-3xl font-semibold text-emerald-900 dark:text-emerald-100">+{bonusDays} дн.</div>
+            <p className="mt-1 text-sm text-emerald-700/80 dark:text-emerald-200/80">начисляется после первой оплаты</p>
           </div>
-          <div className="badge-active">Бонус +{bonusDays} дн.</div>
         </div>
-        <ReferralLinkCard code={referralCode} url={referralUrl} bonusDays={bonusDays} />
       </section>
 
-      <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <SummaryCard label="Всего приглашений" value={invitedCount} hint="Регистрации по ссылке" />
-        <SummaryCard label="Оплатили" value={paidCount} hint="Платная покупка с выдачей" />
-        <SummaryCard label="Конверсия" value={`${conversion}%`} hint="Из регистрации в покупку" />
+      <section className="grid gap-3 md:grid-cols-4">
+        <SummaryCard label="Приглашено" value={invitedCount} />
+        <SummaryCard label="Оплатили" value={paidCount} />
+        <SummaryCard label="Конверсия" value={`${conversion}%`} />
         <SummaryCard
-          label="Бонусные дни"
+          label="Начислено"
           value={`+${appliedDays}`}
-          hint={pendingDays > 0 ? `Ещё +${pendingDays} дн. ожидают` : 'Все доступные начислены'}
+          hint={pendingDays > 0 ? `+${pendingDays} дн. ожидают` : undefined}
         />
       </section>
 
       <section id="referral-history" className="scroll-mt-24">
         <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h2 className="text-xl font-semibold">История приглашённых</h2>
-            <p className="mt-1 text-sm text-slate-500">Статус показывает, что происходит с бонусом за каждого друга.</p>
+            <h2 className="text-xl font-semibold">Приглашённые</h2>
+            <p className="mt-1 text-sm text-slate-500">Кто зарегистрировался и когда начислится бонус.</p>
           </div>
-          <div className="text-sm text-slate-500">Последние {referrals.length} из {invitedCount}</div>
+          {invitedCount > 0 && <div className="text-sm text-slate-500">{referrals.length} из {invitedCount}</div>}
         </div>
 
         <div className="overflow-hidden rounded-lg border bg-white/80 shadow-sm dark:border-white/10 dark:bg-surface-900/80">
@@ -200,52 +169,16 @@ export default async function ReferralsPage() {
           )}
         </div>
       </section>
-
-      <section className="space-y-3">
-        <div>
-          <h2 className="text-xl font-semibold">Как это работает</h2>
-          <p className="mt-1 text-sm text-slate-500">Коротко по шагам, без лишних условий.</p>
-        </div>
-        <div className="grid gap-3 md:grid-cols-3">
-          <StepCard
-            icon={<Link2 className="h-5 w-5" />}
-            title="1. Поделиться"
-            text="Отправьте личную ссылку другу в Telegram, чат или письмо."
-          />
-          <StepCard
-            icon={<UserPlus className="h-5 w-5" />}
-            title="2. Регистрация"
-            text="Друг создаёт аккаунт по вашей ссылке, и появится в истории."
-          />
-          <StepCard
-            icon={<Gift className="h-5 w-5" />}
-            title="3. Бонус"
-            text={`После первой платной покупки вы получаете +${bonusDays} дн. подписки.`}
-          />
-        </div>
-      </section>
     </div>
   )
 }
 
-function StepCard({ icon, title, text }: { icon: ReactNode; title: string; text: string }) {
-  return (
-    <div className="rounded-lg border bg-white/80 p-4 shadow-sm dark:border-white/10 dark:bg-surface-900/80">
-      <div className="grid h-10 w-10 place-items-center rounded-lg bg-slate-100 text-slate-700 dark:bg-white/10 dark:text-cyan-200">
-        {icon}
-      </div>
-      <div className="mt-4 font-semibold">{title}</div>
-      <p className="mt-1 text-sm leading-6 text-slate-500">{text}</p>
-    </div>
-  )
-}
-
-function SummaryCard({ label, value, hint }: { label: string; value: ReactNode; hint: string }) {
+function SummaryCard({ label, value, hint }: { label: string; value: string | number; hint?: string }) {
   return (
     <div className="rounded-lg border bg-white/80 p-4 shadow-sm dark:border-white/10 dark:bg-surface-900/80">
       <div className="text-sm text-slate-500">{label}</div>
       <div className="mt-2 text-2xl font-semibold">{value}</div>
-      <div className="mt-1 text-xs text-slate-400">{hint}</div>
+      {hint && <div className="mt-1 text-xs text-slate-400">{hint}</div>}
     </div>
   )
 }

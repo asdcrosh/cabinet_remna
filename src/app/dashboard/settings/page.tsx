@@ -8,7 +8,7 @@ import { PageHeader } from '@/components/dashboard/page-header'
 import { ProfileForm } from '@/components/dashboard/profile-form'
 import { TelegramLinkCard } from '@/components/dashboard/telegram-link-card'
 import Link from 'next/link'
-import { MailPlus } from 'lucide-react'
+import { CreditCard, MailPlus } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
 
@@ -25,6 +25,22 @@ export default async function SettingsPage() {
   return (
     <div className="max-w-2xl space-y-6">
       <PageHeader title="Настройки" description="Профиль и безопасность аккаунта" />
+
+      <Link
+        href="/dashboard/billing"
+        className="card flex items-center justify-between gap-4 transition-colors hover:border-cyan-200 hover:bg-cyan-50/40 dark:hover:bg-cyan-500/5"
+      >
+        <div className="flex items-center gap-3">
+          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-slate-950 text-cyan-200 dark:bg-white dark:text-slate-950">
+            <CreditCard className="h-5 w-5" />
+          </div>
+          <div>
+            <h2 className="font-semibold">История платежей</h2>
+            <p className="mt-1 text-sm text-slate-500">Оплаты, статусы и выдача подписки.</p>
+          </div>
+        </div>
+        <span className="text-sm font-medium text-slate-500">Открыть</span>
+      </Link>
 
       <div className="card">
         <h2 className="text-lg font-semibold mb-4">Профиль</h2>
