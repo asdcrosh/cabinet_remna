@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import Link from 'next/link'
 import { CalendarDays, CheckCircle2, ChevronDown, Search, Send, XCircle } from 'lucide-react'
 import { prisma } from '@/lib/prisma'
@@ -247,29 +248,42 @@ export default async function AdminUsersPage({
                 </div>
               </div>
 
-              <details className="group border-t">
-                <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-3 text-sm font-medium text-slate-600 hover:bg-slate-50 dark:hover:bg-white/[0.03]">
-                  Подробный профиль
+              <details className="group border-t border-slate-100 dark:border-white/10">
+                <summary className="flex cursor-pointer list-none items-center justify-between bg-slate-50/50 px-4 py-3 text-sm font-medium text-slate-600 transition hover:bg-slate-50 dark:bg-white/[0.02] dark:hover:bg-white/[0.04]">
+                  <span className="flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-cyan-600" />
+                    Детали аккаунта
+                  </span>
                   <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" />
                 </summary>
-                <div className="grid gap-3 border-t bg-slate-50/60 p-4 sm:grid-cols-2 xl:grid-cols-4 dark:bg-white/[0.02]">
-                  <InfoCell label="Email подтверждён" value={user.emailVerifiedAt ? user.emailVerifiedAt.toLocaleDateString('ru-RU') : 'Нет'} ok={Boolean(user.emailVerifiedAt)} />
-                  <InfoCell label="Telegram" value={user.telegramId ? `${user.telegramId}` : 'Не привязан'} ok={Boolean(user.telegramId)} mono />
-                  <InfoCell label="Remnawave" value={user.remnawaveUsername || 'Не создан'} ok={Boolean(user.remnawaveUuid)} mono />
-                  <InfoCell label="Remnashop ID" value={user.remnashopUserId ?? 'Не связан'} ok={Boolean(user.remnashopUserId)} />
-                  <InfoCell label="UUID Remnawave" value={user.remnawaveUuid || '—'} mono />
-                  <InfoCell label="Short UUID" value={user.remnawaveShortUuid || '—'} mono />
-                  <InfoCell label="Последний вход" value={user.lastLoginAt ? user.lastLoginAt.toLocaleString('ru-RU') : 'Не входил'} />
-                  <InfoCell label="Подписок всего" value={user._count.subscriptions} />
-                  <InfoCell
-                    label="Последняя оплата"
-                    value={lastPayment ? `${paymentStatusLabel(lastPayment.status)} · ${formatPrice(lastPayment.amountKopecks)}` : 'Нет оплат'}
-                    ok={lastPayment?.status === 'SUCCEEDED'}
-                  />
-                  <InfoCell
-                    label="Тариф оплаты"
-                    value={lastPayment ? `${lastPayment.plan.name} · ${lastPayment.createdAt.toLocaleDateString('ru-RU')}` : '—'}
-                  />
+                <div className="border-t border-slate-100 bg-slate-50/30 p-4 dark:border-white/10 dark:bg-white/[0.02]">
+                  <div className="grid gap-4 lg:grid-cols-3">
+                    <DetailPanel title="Связи">
+                      <DetailRow label="Email" value={user.emailVerifiedAt ? user.emailVerifiedAt.toLocaleDateString('ru-RU') : 'Не подтверждён'} ok={Boolean(user.emailVerifiedAt)} />
+                      <DetailRow label="Telegram" value={user.telegramId ? `${user.telegramId}` : 'Не привязан'} ok={Boolean(user.telegramId)} mono />
+                      <DetailRow label="Remnashop" value={user.remnashopUserId ?? 'Не связан'} ok={Boolean(user.remnashopUserId)} mono />
+                    </DetailPanel>
+
+                    <DetailPanel title="VPN профиль">
+                      <DetailRow label="Username" value={user.remnawaveUsername || 'Не создан'} ok={Boolean(user.remnawaveUuid)} mono />
+                      <DetailRow label="UUID" value={user.remnawaveUuid || '—'} mono />
+                      <DetailRow label="Short UUID" value={user.remnawaveShortUuid || '—'} mono />
+                    </DetailPanel>
+
+                    <DetailPanel title="Активность">
+                      <DetailRow label="Последний вход" value={user.lastLoginAt ? user.lastLoginAt.toLocaleString('ru-RU') : 'Не входил'} />
+                      <DetailRow label="Подписок" value={user._count.subscriptions} />
+                      <DetailRow
+                        label="Последняя оплата"
+                        value={lastPayment ? `${paymentStatusLabel(lastPayment.status)} · ${formatPrice(lastPayment.amountKopecks)}` : 'Нет оплат'}
+                        ok={lastPayment?.status === 'SUCCEEDED'}
+                      />
+                      <DetailRow
+                        label="Тариф оплаты"
+                        value={lastPayment ? `${lastPayment.plan.name} · ${lastPayment.createdAt.toLocaleDateString('ru-RU')}` : '—'}
+                      />
+                    </DetailPanel>
+                  </div>
                 </div>
               </details>
             </article>
@@ -420,23 +434,32 @@ function Counter({ value, label }: { value: number; label: string }) {
   )
 }
 
-function InfoCell({
+function DetailPanel({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section className="min-w-0 rounded-lg border border-slate-200 bg-white p-3 shadow-sm dark:border-white/10 dark:bg-surface-950">
+      <h3 className="mb-2 text-xs font-semibold uppercase text-slate-400">{title}</h3>
+      <div className="space-y-2">{children}</div>
+    </section>
+  )
+}
+
+function DetailRow({
   label,
   value,
   ok,
   mono,
 }: {
   label: string
-  value: string | number
+  value: string | number | null
   ok?: boolean
   mono?: boolean
 }) {
   return (
-    <div className="info-cell">
+    <div className="grid min-w-0 gap-1 rounded-md bg-slate-50 px-3 py-2 text-sm dark:bg-white/[0.03] sm:grid-cols-[8rem_minmax(0,1fr)] sm:items-center">
       <div className="text-xs text-slate-500">{label}</div>
-      <div className={mono ? 'mt-1 flex min-w-0 items-center gap-2 font-mono text-xs' : 'mt-1 font-medium'}>
+      <div className={`flex min-w-0 items-center gap-2 font-medium text-slate-800 dark:text-slate-100 ${mono ? 'font-mono text-xs' : ''}`}>
         {ok !== undefined && (ok ? <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" /> : <XCircle className="h-4 w-4 shrink-0 text-slate-400" />)}
-        <span className="truncate">{value}</span>
+        <span className={mono ? 'min-w-0 break-all' : 'min-w-0 truncate'}>{value ?? '—'}</span>
       </div>
     </div>
   )

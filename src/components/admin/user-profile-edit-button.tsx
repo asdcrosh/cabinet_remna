@@ -40,9 +40,6 @@ export function UserProfileEditButton({
     telegramId: telegramId ?? '',
     telegramUsername: telegramUsername ?? '',
     remnashopUserId: remnashopUserId ? String(remnashopUserId) : '',
-    remnawaveUuid: remnawaveUuid ?? '',
-    remnawaveShortUuid: remnawaveShortUuid ?? '',
-    remnawaveUsername: remnawaveUsername ?? '',
   })
 
   function close() {
@@ -55,7 +52,14 @@ export function UserProfileEditButton({
     try {
       const result = await apiFetch<{ syncDeferred?: boolean }>(`/api/admin/users/${userId}/profile`, {
         method: 'PATCH',
-        body: JSON.stringify(form),
+        body: JSON.stringify({
+          email: form.email,
+          name: form.name,
+          emailVerified: form.emailVerified,
+          telegramId: form.telegramId,
+          telegramUsername: form.telegramUsername,
+          remnashopUserId: form.remnashopUserId,
+        }),
       })
       toast(
         result.syncDeferred
@@ -175,36 +179,12 @@ export function UserProfileEditButton({
           <section className="space-y-3 rounded-lg border border-slate-200 p-4 dark:border-white/10">
             <div>
               <h3 className="font-semibold">Remnawave</h3>
-              <p className="mt-1 text-sm text-slate-500">UUID и username используются для ручной синхронизации подписки и устройств.</p>
+              <p className="mt-1 text-sm text-slate-500">Эти данные выдаются автоматически и не редактируются вручную.</p>
             </div>
             <div className="grid gap-4 md:grid-cols-3">
-              <label className="block">
-                <span className="label">UUID</span>
-                <input
-                  className="input font-mono text-sm"
-                  value={form.remnawaveUuid}
-                  onChange={(event) => setForm((current) => ({ ...current, remnawaveUuid: event.target.value.trim() }))}
-                  placeholder="uuid"
-                />
-              </label>
-              <label className="block">
-                <span className="label">Short UUID</span>
-                <input
-                  className="input font-mono text-sm"
-                  value={form.remnawaveShortUuid}
-                  onChange={(event) => setForm((current) => ({ ...current, remnawaveShortUuid: event.target.value.trim() }))}
-                  placeholder="shortUuid"
-                />
-              </label>
-              <label className="block">
-                <span className="label">Username</span>
-                <input
-                  className="input font-mono text-sm"
-                  value={form.remnawaveUsername}
-                  onChange={(event) => setForm((current) => ({ ...current, remnawaveUsername: event.target.value.trim() }))}
-                  placeholder="remnawave username"
-                />
-              </label>
+              <ReadonlyIdentity label="Username" value={remnawaveUsername} />
+              <ReadonlyIdentity label="UUID" value={remnawaveUuid} />
+              <ReadonlyIdentity label="Short UUID" value={remnawaveShortUuid} />
             </div>
           </section>
 
@@ -220,5 +200,14 @@ export function UserProfileEditButton({
         </form>
       </AdminModal>
     </>
+  )
+}
+
+function ReadonlyIdentity({ label, value }: { label: string; value?: string | null }) {
+  return (
+    <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 dark:border-white/10 dark:bg-white/[0.03]">
+      <div className="text-xs font-medium uppercase text-slate-400">{label}</div>
+      <div className="mt-1 break-all font-mono text-sm text-slate-700 dark:text-slate-200">{value || '—'}</div>
+    </div>
   )
 }

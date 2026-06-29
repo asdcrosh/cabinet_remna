@@ -25,9 +25,6 @@ const schema = z.object({
   telegramId: z.string().trim().regex(/^\d*$/, 'Telegram ID должен содержать только цифры').max(32).optional(),
   telegramUsername: z.string().trim().max(64).optional(),
   remnashopUserId: z.string().trim().regex(/^\d*$/, 'Remnashop ID должен содержать только цифры').max(16).optional(),
-  remnawaveUuid: z.string().trim().max(80).optional(),
-  remnawaveShortUuid: z.string().trim().max(80).optional(),
-  remnawaveUsername: z.string().trim().max(120).optional(),
 })
 
 export const PATCH = withAuth(async (req: Request, { params }: { params: { id: string } }) => {
@@ -69,9 +66,6 @@ export const PATCH = withAuth(async (req: Request, { params }: { params: { id: s
           telegramId: parsed.data.telegramId ? BigInt(parsed.data.telegramId) : null,
           telegramUsername: parsed.data.telegramUsername || null,
           remnashopUserId: parsed.data.remnashopUserId ? Number(parsed.data.remnashopUserId) : null,
-          remnawaveUuid: parsed.data.remnawaveUuid || null,
-          remnawaveShortUuid: parsed.data.remnawaveShortUuid || null,
-          remnawaveUsername: parsed.data.remnawaveUsername || null,
         },
         select: {
           id: true,
@@ -81,9 +75,6 @@ export const PATCH = withAuth(async (req: Request, { params }: { params: { id: s
           telegramId: true,
           telegramUsername: true,
           remnashopUserId: true,
-          remnawaveUuid: true,
-          remnawaveShortUuid: true,
-          remnawaveUsername: true,
         },
       })
 
@@ -125,9 +116,6 @@ export const PATCH = withAuth(async (req: Request, { params }: { params: { id: s
         telegramId: user.telegramId?.toString() ?? null,
         telegramUsername: user.telegramUsername,
         remnashopUserId: user.remnashopUserId,
-        remnawaveUuid: user.remnawaveUuid,
-        remnawaveShortUuid: user.remnawaveShortUuid,
-        remnawaveUsername: user.remnawaveUsername,
         syncDeferred,
       },
       request: req,
