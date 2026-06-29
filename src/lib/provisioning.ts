@@ -3,6 +3,7 @@ import { ensureRemnawaveSubscription, type EnsureSubscriptionInput } from './sub
 import { applyPendingReferralRewardsForUser, grantReferralRewardForPayment } from './referral-rewards'
 import { grantPaymentBonusBoxAttempts, grantReferralBonusBoxAttemptsForPayment } from './bonus-box'
 import { notifyPaymentSucceeded } from './notifications'
+import { syncCabinetPaymentToRemnashopBestEffort } from './remnashop-reverse-sync'
 
 export interface ProvisionPaymentSubscriptionInput extends EnsureSubscriptionInput {
   paymentId: string
@@ -34,6 +35,7 @@ export async function provisionPaymentSubscription(input: ProvisionPaymentSubscr
     })
 
     await settleReferralRewards(input.paymentId, input.userId)
+    await syncCabinetPaymentToRemnashopBestEffort(input.paymentId)
     await notifyPaymentSucceeded(input.paymentId)
 
     return {
@@ -74,6 +76,7 @@ export async function provisionPaymentSubscription(input: ProvisionPaymentSubscr
       },
     })
     await settleReferralRewards(input.paymentId, input.userId)
+    await syncCabinetPaymentToRemnashopBestEffort(input.paymentId)
     await notifyPaymentSucceeded(input.paymentId)
     return { ...result, jobStatus: 'SUCCEEDED' as const }
   } catch (e) {

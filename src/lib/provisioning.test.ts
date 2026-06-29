@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => {
   const grantPaymentBonusBoxAttempts = vi.fn()
   const grantReferralBonusBoxAttemptsForPayment = vi.fn()
   const notifyPaymentSucceeded = vi.fn()
+  const syncCabinetPaymentToRemnashopBestEffort = vi.fn()
 
   return {
     prisma,
@@ -27,6 +28,7 @@ const mocks = vi.hoisted(() => {
     grantPaymentBonusBoxAttempts,
     grantReferralBonusBoxAttemptsForPayment,
     notifyPaymentSucceeded,
+    syncCabinetPaymentToRemnashopBestEffort,
     subscription,
   }
 })
@@ -45,6 +47,9 @@ vi.mock('./bonus-box', () => ({
 }))
 vi.mock('./notifications', () => ({
   notifyPaymentSucceeded: mocks.notifyPaymentSucceeded,
+}))
+vi.mock('./remnashop-reverse-sync', () => ({
+  syncCabinetPaymentToRemnashopBestEffort: mocks.syncCabinetPaymentToRemnashopBestEffort,
 }))
 
 import { provisionPaymentSubscription } from './provisioning'
@@ -98,6 +103,7 @@ describe('provisionPaymentSubscription', () => {
     expect(mocks.grantReferralRewardForPayment).toHaveBeenCalledWith('pay-1')
     expect(mocks.grantReferralBonusBoxAttemptsForPayment).toHaveBeenCalledWith('pay-1')
     expect(mocks.applyPendingReferralRewardsForUser).toHaveBeenCalledWith('user-1')
+    expect(mocks.syncCabinetPaymentToRemnashopBestEffort).toHaveBeenCalledWith('pay-1')
   })
 
   it('creates a running job and marks it succeeded after provisioning', async () => {
@@ -132,6 +138,7 @@ describe('provisionPaymentSubscription', () => {
     expect(mocks.grantReferralRewardForPayment).toHaveBeenCalledWith('pay-1')
     expect(mocks.grantReferralBonusBoxAttemptsForPayment).toHaveBeenCalledWith('pay-1')
     expect(mocks.applyPendingReferralRewardsForUser).toHaveBeenCalledWith('user-1')
+    expect(mocks.syncCabinetPaymentToRemnashopBestEffort).toHaveBeenCalledWith('pay-1')
   })
 
   it('marks job failed and schedules retry when provisioning throws', async () => {
@@ -157,5 +164,6 @@ describe('provisionPaymentSubscription', () => {
     expect(mocks.grantReferralRewardForPayment).not.toHaveBeenCalled()
     expect(mocks.grantPaymentBonusBoxAttempts).not.toHaveBeenCalled()
     expect(mocks.grantReferralBonusBoxAttemptsForPayment).not.toHaveBeenCalled()
+    expect(mocks.syncCabinetPaymentToRemnashopBestEffort).not.toHaveBeenCalled()
   })
 })
