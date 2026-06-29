@@ -3,6 +3,7 @@ import { AlertTriangle, GitMerge, SearchCheck } from 'lucide-react'
 import { requireAdminPage } from '@/lib/auth/admin-page'
 import { findIdentityDuplicateCandidates } from '@/lib/identity-duplicates'
 import { PageHeader } from '@/components/dashboard/page-header'
+import { DuplicateMergeButton } from '@/components/admin/duplicate-merge-button'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Возможные дубли — Админка' }
@@ -75,6 +76,12 @@ export default async function AdminDuplicatesPage() {
                   <Link href={`/dashboard/admin/users?q=${encodeURIComponent(candidate.email)}`} className="btn-secondary h-9 px-3">
                     Открыть
                   </Link>
+                  <DuplicateMergeButton
+                    sourceUserId={candidate.technicalUserId}
+                    targetUserId={candidate.emailUserId}
+                    sourceEmail={candidate.technicalEmail}
+                    targetEmail={candidate.email}
+                  />
                 </div>
               </div>
             </article>

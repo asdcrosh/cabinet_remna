@@ -13,6 +13,8 @@ const ACTION_LABELS: Record<AuditAction, string> = {
   ADMIN_PLAN_ASSIGNED: 'Тариф',
   ADMIN_ROLE_CHANGED: 'Роль',
   ADMIN_PROFILE_UPDATED: 'Профиль',
+  ADMIN_USERS_MERGED: 'Объединение',
+  PERSONAL_OFFER_UPDATED: 'Оффер',
   PROMO_CODE_CREATED: 'Промокод создан',
   PROMO_CODE_UPDATED: 'Промокод изменен',
   GIFT_CERTIFICATE_CREATED: 'Сертификат создан',

@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import type { ReactElement, ReactNode } from 'react'
+import type { PersonalOfferScenario, PersonalOfferSetting } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth/cookies'
 import { remnawave, RemnawaveError } from '@/lib/remnawave'
@@ -29,6 +30,7 @@ import { logWarn } from '@/lib/logger'
 import { readRemnawaveBigInt } from '@/lib/remnawave-usage'
 import { getFreshPendingPaymentCutoff, reconcileStalePendingPaymentsForUser } from '@/lib/payment-sync'
 import { getPlanAudienceContext, isPlanAvailableForUser } from '@/lib/plan-access'
+import { normalizeOfferTone, renderPersonalOfferTemplate } from '@/lib/personal-offers'
 
 export const dynamic = 'force-dynamic'
 
@@ -73,7 +75,7 @@ export default async function DashboardHome() {
   const activeSubRow = user.subscriptions.find((subscription) =>
     ['ACTIVE', 'LIMITED'].includes(subscription.status) && subscription.expireAt > new Date()
   ) ?? null
-  const [audienceContext, availablePlans, lastSucceededPayment, promoOfferCode] = await Promise.all([
+  const [audienceContext, availablePlans, lastSucceededPayment, promoOfferCode, offerSettings] = await Promise.all([
     getPlanAudienceContext(user.id),
     prisma.plan.findMany({
       where: { isActive: true, isPromo: false },
@@ -85,6 +87,10 @@ export default async function DashboardHome() {
       select: { paidAt: true, createdAt: true },
     }),
     findDashboardPromoCode(user.id, user.email),
+    prisma.personalOfferSetting.findMany({
+      where: { enabled: true },
+      orderBy: [{ priority: 'asc' }, { scenario: 'asc' }],
+    }),
   ])
   const visiblePaidPlans = audienceContext
     ? availablePlans.filter((plan) => isPlanAvailableForUser(plan, audienceContext))
@@ -95,6 +101,8 @@ export default async function DashboardHome() {
     deviceCount: user._count.devices,
     lastSucceededPaymentAt: lastSucceededPayment?.paidAt ?? lastSucceededPayment?.createdAt ?? null,
     promoCode: promoOfferCode,
+    offerSettings,
+    user: { name: user.name, email: user.email },
   })
   const onboardingState: DashboardOnboardingState = {
     emailVerified: Boolean(user.emailVerifiedAt && !user.email.endsWith('@pending.invalid')),
@@ -300,12 +308,16 @@ function buildPersonalOffer({
   deviceCount,
   lastSucceededPaymentAt,
   promoCode,
+  offerSettings,
+  user,
 }: {
   activeSubscription: DashboardSubscription | null
   bestPlan: DashboardPlan | null
   deviceCount: number
   lastSucceededPaymentAt: Date | null
   promoCode: DashboardPromoCode | null
+  offerSettings: PersonalOfferSetting[]
+  user: { name: string | null; email: string }
 }): PersonalOfferView | null {
   const now = Date.now()
   const inactiveDays = lastSucceededPaymentAt
@@ -320,69 +332,138 @@ function buildPersonalOffer({
   // 5. Подписка активна и все базовое готово: реферальный бонус.
   if (!activeSubscription) {
     if (promoCode && inactiveDays != null && inactiveDays >= OFFER_RETURN_PROMO_DAYS) {
-      return {
-        eyebrow: 'Личный оффер',
-        title: `Промокод ${promoCode.code}`,
-        description: `Скидка ${promoCode.discountPercent}% на оплату VPN. Код уже можно применить в тарифах.`,
-        href: '/dashboard/plans',
-        cta: 'Выбрать тариф',
-        meta: `не покупали ${inactiveDays} дн.`,
+      return renderConfiguredOffer({
+        scenario: 'RETURN_PROMO',
+        settings: offerSettings,
+        values: {
+          name: user.name || 'друг',
+          email: user.email,
+          promo: promoCode.code,
+          discount: String(promoCode.discountPercent),
+          inactive_days: String(inactiveDays),
+        },
+        fallback: {
+          eyebrow: 'Личный оффер',
+          title: `Промокод ${promoCode.code}`,
+          description: `Скидка ${promoCode.discountPercent}% на оплату VPN. Код уже можно применить в тарифах.`,
+          href: '/dashboard/plans',
+          cta: 'Выбрать тариф',
+          meta: `не покупали ${inactiveDays} дн.`,
+          tone: 'violet',
+        },
         icon: <Gift className="h-5 w-5" />,
-        tone: 'violet',
-      }
+      })
     }
 
     if (!bestPlan) return null
-    return {
-      eyebrow: 'Рекомендация',
-      title: bestPlan.name,
-      description: `${bestPlan.durationDays} дн. доступа за ${formatPrice(bestPlan.priceKopecks)}. Подходит для первого подключения.`,
-      href: `/dashboard/plans?plan=${bestPlan.id}`,
-      cta: 'Купить VPN',
-      meta: 'лучший старт',
+    return renderConfiguredOffer({
+      scenario: 'NO_SUBSCRIPTION',
+      settings: offerSettings,
+      values: {
+        name: user.name || 'друг',
+        email: user.email,
+        plan: bestPlan.name,
+        plan_id: bestPlan.id,
+        price: formatPrice(bestPlan.priceKopecks),
+        duration: String(bestPlan.durationDays),
+      },
+      fallback: {
+        eyebrow: 'Рекомендация',
+        title: bestPlan.name,
+        description: `${bestPlan.durationDays} дн. доступа за ${formatPrice(bestPlan.priceKopecks)}. Подходит для первого подключения.`,
+        href: `/dashboard/plans?plan=${bestPlan.id}`,
+        cta: 'Купить VPN',
+        meta: 'лучший старт',
+        tone: 'cyan',
+      },
       icon: <CreditCard className="h-5 w-5" />,
-      tone: 'cyan',
-    }
+    })
   }
 
   const daysLeft = Math.ceil((activeSubscription.expireAt.getTime() - now) / (24 * 60 * 60 * 1000))
   if (daysLeft <= OFFER_RENEWAL_DAYS_LEFT) {
-    return {
-      eyebrow: 'Продление',
-      title: `Осталось ${Math.max(daysLeft, 0)} дн.`,
-      description: activeSubscription.plan
-        ? `Продлите ${activeSubscription.plan.name}, чтобы доступ не прерывался.`
-        : 'Продлите подписку заранее, чтобы доступ не прерывался.',
-      href: '/dashboard/plans',
-      cta: 'Продлить',
-      meta: 'важно',
+    const planName = activeSubscription.plan?.name ?? 'подписку'
+    return renderConfiguredOffer({
+      scenario: 'RENEWAL_SOON',
+      settings: offerSettings,
+      values: {
+        name: user.name || 'друг',
+        email: user.email,
+        plan: planName,
+        days_left: String(Math.max(daysLeft, 0)),
+      },
+      fallback: {
+        eyebrow: 'Продление',
+        title: `Осталось ${Math.max(daysLeft, 0)} дн.`,
+        description: `Продлите ${planName}, чтобы доступ не прерывался.`,
+        href: '/dashboard/plans',
+        cta: 'Продлить',
+        meta: 'важно',
+        tone: 'amber',
+      },
       icon: <Clock3 className="h-5 w-5" />,
-      tone: 'amber',
-    }
+    })
   }
 
   if (deviceCount === 0) {
-    return {
-      eyebrow: 'Следующий шаг',
-      title: 'Подключите устройство',
-      description: 'Откройте подписку, выберите приложение и добавьте VPN в один переход.',
-      href: '/dashboard/subscription',
-      cta: 'Подключить',
-      meta: 'быстрый доступ',
+    return renderConfiguredOffer({
+      scenario: 'CONNECT_DEVICE',
+      settings: offerSettings,
+      values: { name: user.name || 'друг', email: user.email },
+      fallback: {
+        eyebrow: 'Следующий шаг',
+        title: 'Подключите устройство',
+        description: 'Откройте подписку, выберите приложение и добавьте VPN в один переход.',
+        href: '/dashboard/subscription',
+        cta: 'Подключить',
+        meta: 'быстрый доступ',
+        tone: 'emerald',
+      },
       icon: <Laptop className="h-5 w-5" />,
-      tone: 'emerald',
-    }
+    })
   }
 
-  return {
-    eyebrow: 'Бонус',
-    title: 'Пригласите друга',
-    description: 'Отправьте реферальную ссылку и получите дополнительные дни после оплаты друга.',
-    href: '/dashboard/referrals',
-    cta: 'Открыть рефералку',
-    meta: 'активная подписка',
+  return renderConfiguredOffer({
+    scenario: 'REFERRAL',
+    settings: offerSettings,
+    values: { name: user.name || 'друг', email: user.email },
+    fallback: {
+      eyebrow: 'Бонус',
+      title: 'Пригласите друга',
+      description: 'Отправьте реферальную ссылку и получите дополнительные дни после оплаты друга.',
+      href: '/dashboard/referrals',
+      cta: 'Открыть рефералку',
+      meta: 'активная подписка',
+      tone: 'emerald',
+    },
     icon: <UsersRound className="h-5 w-5" />,
-    tone: 'emerald',
+  })
+}
+
+function renderConfiguredOffer({
+  scenario,
+  settings,
+  values,
+  fallback,
+  icon,
+}: {
+  scenario: PersonalOfferScenario
+  settings: PersonalOfferSetting[]
+  values: Record<string, string>
+  fallback: Omit<PersonalOfferView, 'icon'>
+  icon: ReactElement
+}): PersonalOfferView {
+  const setting = settings.find((item) => item.scenario === scenario)
+  if (!setting) return { ...fallback, icon }
+  return {
+    eyebrow: renderPersonalOfferTemplate(setting.eyebrow, values) || fallback.eyebrow,
+    title: renderPersonalOfferTemplate(setting.title, values) || fallback.title,
+    description: renderPersonalOfferTemplate(setting.description, values) || fallback.description,
+    href: renderPersonalOfferTemplate(setting.href, values) || fallback.href,
+    cta: renderPersonalOfferTemplate(setting.cta, values) || fallback.cta,
+    meta: renderPersonalOfferTemplate(setting.meta, values) || fallback.meta,
+    tone: normalizeOfferTone(setting.tone),
+    icon,
   }
 }
 

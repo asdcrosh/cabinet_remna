@@ -2,6 +2,7 @@
 // тарифы, которые администратор уже настроил в кабинете.
 
 import { PrismaClient } from '@prisma/client'
+import { defaultPersonalOfferSettings } from '../src/lib/personal-offers'
 
 const prisma = new PrismaClient()
 
@@ -42,15 +43,23 @@ async function main() {
   const existingPlans = await prisma.plan.count()
   if (existingPlans > 0) {
     console.log(`Plans already exist (${existingPlans}), seed skipped`)
-    return
+  } else {
+    for (const plan of PLANS) {
+      await prisma.plan.create({
+        data: { id: `plan-${plan.sortOrder}`, ...plan, isActive: true },
+      })
+    }
+    console.log(`✅ Seeded ${PLANS.length} plans`)
   }
 
-  for (const plan of PLANS) {
-    await prisma.plan.create({
-      data: { id: `plan-${plan.sortOrder}`, ...plan, isActive: true },
+  for (const offer of defaultPersonalOfferSettings) {
+    await prisma.personalOfferSetting.upsert({
+      where: { scenario: offer.scenario },
+      update: {},
+      create: offer,
     })
   }
-  console.log(`✅ Seeded ${PLANS.length} plans`)
+  console.log(`✅ Seeded ${defaultPersonalOfferSettings.length} personal offer settings`)
 }
 
 main()

@@ -167,6 +167,39 @@ model UserNotification {
   @@index([userId, type, createdAt])
 }
 
+model PersonalOfferSetting {
+  id          String                @id @default(cuid())
+  scenario    PersonalOfferScenario @unique
+  enabled     Boolean               @default(true)
+  priority    Int                   @default(0)
+  eyebrow     String
+  title       String
+  description String
+  cta         String
+  href        String?
+  meta        String?
+  tone        PersonalOfferTone     @default(CYAN)
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+
+  @@index([enabled, priority])
+}
+
+enum PersonalOfferScenario {
+  NO_SUBSCRIPTION
+  RETURN_PROMO
+  RENEWAL_SOON
+  CONNECT_DEVICE
+  REFERRAL
+}
+
+enum PersonalOfferTone {
+  CYAN
+  EMERALD
+  AMBER
+  VIOLET
+}
+
 model AdminNotification {
   id          String   @id @default(cuid())
   type        String
@@ -806,6 +839,8 @@ enum AuditAction {
   ADMIN_PLAN_ASSIGNED
   ADMIN_ROLE_CHANGED
   ADMIN_PROFILE_UPDATED
+  ADMIN_USERS_MERGED
+  PERSONAL_OFFER_UPDATED
   PROMO_CODE_CREATED
   PROMO_CODE_UPDATED
   GIFT_CERTIFICATE_CREATED
