@@ -10,6 +10,8 @@ import { UserProfileEditButton } from '@/components/admin/user-profile-edit-butt
 import { LazyListLoader } from '@/components/admin/lazy-list-loader'
 import { ADMIN_LIST_PAGE_SIZE, parseAdminListLimit } from '@/lib/admin-list'
 import { UserPlanButton } from '@/components/admin/user-plan-button'
+import { UserDetailsButton, type AdminUserDetails } from '@/components/admin/user-details-button'
+import { UserSyncButton } from '@/components/admin/user-sync-button'
 import { formatPrice } from '@/lib/format'
 
 export const dynamic = 'force-dynamic'
@@ -64,17 +66,29 @@ export default async function AdminUsersPage({
         lastLoginAt: true,
         subscriptions: {
           orderBy: { expireAt: 'desc' },
-          take: 1,
+          take: 5,
           include: { plan: true },
         },
         payments: {
           orderBy: { createdAt: 'desc' },
-          take: 1,
+          take: 5,
           select: {
+            id: true,
             status: true,
             amountKopecks: true,
+            paidAt: true,
             createdAt: true,
             plan: { select: { name: true } },
+          },
+        },
+        devices: {
+          orderBy: { lastSeenAt: 'desc' },
+          take: 5,
+          select: {
+            hwid: true,
+            platform: true,
+            ip: true,
+            lastSeenAt: true,
           },
         },
         _count: { select: { payments: true, subscriptions: true, devices: true } },
@@ -198,6 +212,8 @@ export default async function AdminUsersPage({
                     <Counter value={attemptsCount} label="подар." />
                   </div>
                   <div className="flex flex-wrap justify-end gap-2">
+                    <UserDetailsButton details={buildUserDetails(user)} />
+                    <UserSyncButton userId={user.id} />
                     {actor.role === 'SUPER_ADMIN' && (
                       <BonusBoxAttemptsButton
                         userId={user.id}
@@ -219,6 +235,12 @@ export default async function AdminUsersPage({
                         email={user.email}
                         name={user.name}
                         emailVerified={Boolean(user.emailVerifiedAt)}
+                        telegramId={user.telegramId?.toString() ?? null}
+                        telegramUsername={user.telegramUsername}
+                        remnashopUserId={user.remnashopUserId}
+                        remnawaveUuid={user.remnawaveUuid}
+                        remnawaveShortUuid={user.remnawaveShortUuid}
+                        remnawaveUsername={user.remnawaveUsername}
                       />
                     )}
                   </div>
@@ -268,6 +290,125 @@ function paymentStatusLabel(status: string) {
     REFUNDED: 'Возврат',
   }
   return labels[status] ?? status
+}
+
+function subscriptionStatusLabel(status: string) {
+  const labels: Record<string, string> = {
+    ACTIVE: 'Активна',
+    EXPIRED: 'Истекла',
+    DISABLED: 'Отключена',
+    LIMITED: 'Лимит',
+  }
+  return labels[status] ?? status
+}
+
+function buildUserDetails(user: {
+  email: string
+  name: string | null
+  role: string
+  createdAt: Date
+  lastLoginAt: Date | null
+  emailVerifiedAt: Date | null
+  telegramId: bigint | null
+  telegramUsername: string | null
+  remnashopUserId: number | null
+  remnawaveUuid: string | null
+  remnawaveShortUuid: string | null
+  remnawaveUsername: string | null
+  subscriptions: Array<{
+    id: string
+    startAt: Date
+    expireAt: Date
+    status: string
+    trafficLimitBytes: bigint | null
+    trafficUsedBytes: bigint
+    lastSyncedAt: Date
+    plan: { name: string } | null
+  }>
+  payments: Array<{
+    id: string
+    status: string
+    amountKopecks: number
+    paidAt: Date | null
+    createdAt: Date
+    plan: { name: string }
+  }>
+  devices: Array<{
+    hwid: string
+    platform: string | null
+    ip: string | null
+    lastSeenAt: Date
+  }>
+}): AdminUserDetails {
+  return {
+    email: user.email,
+    name: user.name || 'Без имени',
+    role: roleLabel(user.role),
+    createdAt: formatDateTime(user.createdAt),
+    lastLoginAt: user.lastLoginAt ? formatDateTime(user.lastLoginAt) : 'Не входил',
+    emailVerifiedAt: user.emailVerifiedAt ? formatDateTime(user.emailVerifiedAt) : 'Не подтверждён',
+    telegram: user.telegramId
+      ? `@${user.telegramUsername || user.telegramId.toString()} · ${user.telegramId.toString()}`
+      : 'Не привязан',
+    remnashop: user.remnashopUserId ? String(user.remnashopUserId) : 'Не связан',
+    remnawaveUsername: user.remnawaveUsername || 'Не создан',
+    remnawaveUuid: user.remnawaveUuid || '—',
+    remnawaveShortUuid: user.remnawaveShortUuid || '—',
+    subscriptions: user.subscriptions.map((subscription) => ({
+      id: subscription.id,
+      plan: subscription.plan?.name || 'Без тарифа',
+      status: subscriptionStatusLabel(subscription.status),
+      startAt: formatDate(subscription.startAt),
+      expireAt: formatDate(subscription.expireAt),
+      traffic: formatTraffic(subscription.trafficUsedBytes, subscription.trafficLimitBytes),
+      syncedAt: formatDateTime(subscription.lastSyncedAt),
+    })),
+    payments: user.payments.map((payment) => ({
+      id: payment.id,
+      plan: payment.plan.name,
+      status: paymentStatusLabel(payment.status),
+      amount: formatPrice(payment.amountKopecks),
+      paidAt: payment.paidAt ? formatDateTime(payment.paidAt) : '—',
+      createdAt: formatDateTime(payment.createdAt),
+    })),
+    devices: user.devices.map((device) => ({
+      hwid: device.hwid,
+      platform: device.platform || 'Неизвестное устройство',
+      ip: device.ip || 'IP не записан',
+      lastSeenAt: formatDateTime(device.lastSeenAt),
+    })),
+  }
+}
+
+function roleLabel(role: string) {
+  const labels: Record<string, string> = {
+    USER: 'Пользователь',
+    MODERATOR: 'Модератор',
+    ADMIN: 'Администратор',
+    SUPER_ADMIN: 'Главный администратор',
+  }
+  return labels[role] ?? role
+}
+
+function formatTraffic(used: bigint, limit: bigint | null) {
+  const usedLabel = formatBytes(used)
+  return limit ? `${usedLabel} из ${formatBytes(limit)}` : `${usedLabel} · безлимит`
+}
+
+function formatBytes(value: bigint) {
+  const gb = Number(value) / 1024 ** 3
+  if (gb >= 1) return `${gb.toFixed(2)} GB`
+  const mb = Number(value) / 1024 ** 2
+  if (mb >= 1) return `${mb.toFixed(2)} MB`
+  return `${value.toString()} B`
+}
+
+function formatDate(value: Date) {
+  return value.toLocaleDateString('ru-RU')
+}
+
+function formatDateTime(value: Date) {
+  return value.toLocaleString('ru-RU')
 }
 
 function Counter({ value, label }: { value: number; label: string }) {

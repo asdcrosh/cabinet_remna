@@ -22,6 +22,12 @@ const schema = z.object({
       'В имени допустимы буквы, пробел, дефис, точка и апостроф'
     ),
   emailVerified: z.boolean(),
+  telegramId: z.string().trim().regex(/^\d*$/, 'Telegram ID должен содержать только цифры').max(32).optional(),
+  telegramUsername: z.string().trim().max(64).optional(),
+  remnashopUserId: z.string().trim().regex(/^\d*$/, 'Remnashop ID должен содержать только цифры').max(16).optional(),
+  remnawaveUuid: z.string().trim().max(80).optional(),
+  remnawaveShortUuid: z.string().trim().max(80).optional(),
+  remnawaveUsername: z.string().trim().max(120).optional(),
 })
 
 export const PATCH = withAuth(async (req: Request, { params }: { params: { id: string } }) => {
@@ -60,6 +66,12 @@ export const PATCH = withAuth(async (req: Request, { params }: { params: { id: s
           email: parsed.data.email,
           name: parsed.data.name || null,
           emailVerifiedAt: parsed.data.emailVerified ? new Date() : null,
+          telegramId: parsed.data.telegramId ? BigInt(parsed.data.telegramId) : null,
+          telegramUsername: parsed.data.telegramUsername || null,
+          remnashopUserId: parsed.data.remnashopUserId ? Number(parsed.data.remnashopUserId) : null,
+          remnawaveUuid: parsed.data.remnawaveUuid || null,
+          remnawaveShortUuid: parsed.data.remnawaveShortUuid || null,
+          remnawaveUsername: parsed.data.remnawaveUsername || null,
         },
         select: {
           id: true,
@@ -67,6 +79,11 @@ export const PATCH = withAuth(async (req: Request, { params }: { params: { id: s
           name: true,
           emailVerifiedAt: true,
           telegramId: true,
+          telegramUsername: true,
+          remnashopUserId: true,
+          remnawaveUuid: true,
+          remnawaveShortUuid: true,
+          remnawaveUsername: true,
         },
       })
 
@@ -105,6 +122,12 @@ export const PATCH = withAuth(async (req: Request, { params }: { params: { id: s
         emailChanged,
         email: user.email,
         emailVerified: Boolean(user.emailVerifiedAt),
+        telegramId: user.telegramId?.toString() ?? null,
+        telegramUsername: user.telegramUsername,
+        remnashopUserId: user.remnashopUserId,
+        remnawaveUuid: user.remnawaveUuid,
+        remnawaveShortUuid: user.remnawaveShortUuid,
+        remnawaveUsername: user.remnawaveUsername,
         syncDeferred,
       },
       request: req,

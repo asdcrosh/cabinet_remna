@@ -8,7 +8,6 @@ import { maybeSyncRemnashopCatalog } from '@/lib/remnashop-sync'
 import { LogoutButton } from '@/components/dashboard/logout-button'
 import { Brand, DashboardNav, MobileDashboardNav } from '@/components/dashboard/dashboard-nav'
 import { NotificationBell } from '@/components/dashboard/notification-bell'
-import { AdminNotificationBell } from '@/components/admin/admin-notification-bell'
 import { logWarn } from '@/lib/logger'
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -74,15 +73,13 @@ export default async function DashboardLayout({ children }: { children: React.Re
       <main className="min-w-0 lg:ml-72">
         <div className="sticky top-0 z-30 hidden h-14 items-center justify-end border-b border-white/70 bg-white/80 px-6 shadow-sm shadow-slate-200/60 backdrop-blur-xl dark:border-white/10 dark:bg-surface-950/80 dark:shadow-black/20 lg:flex">
           <div className="flex items-center gap-2">
-            {isStaff && <AdminNotificationBell />}
-            <NotificationBell />
+            <NotificationBell showAdmin={isStaff} />
           </div>
         </div>
         <div className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-white/70 bg-white/80 px-4 shadow-sm shadow-slate-200/60 backdrop-blur-xl dark:border-white/10 dark:bg-surface-950/80 dark:shadow-black/20 lg:hidden">
           <Brand compact brandName={brandName} />
           <div className="flex items-center gap-2">
-            {isStaff && <AdminNotificationBell />}
-            <NotificationBell />
+            <NotificationBell showAdmin={isStaff} />
             <MobileDashboardNav role={role} email={accountLabel} brandName={brandName} badges={navBadges} />
           </div>
         </div>

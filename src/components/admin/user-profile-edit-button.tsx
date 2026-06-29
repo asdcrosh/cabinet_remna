@@ -12,11 +12,23 @@ export function UserProfileEditButton({
   email,
   name,
   emailVerified,
+  telegramId,
+  telegramUsername,
+  remnashopUserId,
+  remnawaveUuid,
+  remnawaveShortUuid,
+  remnawaveUsername,
 }: {
   userId: string
   email: string
   name: string | null
   emailVerified: boolean
+  telegramId?: string | null
+  telegramUsername?: string | null
+  remnashopUserId?: number | null
+  remnawaveUuid?: string | null
+  remnawaveShortUuid?: string | null
+  remnawaveUsername?: string | null
 }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
@@ -25,6 +37,12 @@ export function UserProfileEditButton({
     email,
     name: name ?? '',
     emailVerified,
+    telegramId: telegramId ?? '',
+    telegramUsername: telegramUsername ?? '',
+    remnashopUserId: remnashopUserId ? String(remnashopUserId) : '',
+    remnawaveUuid: remnawaveUuid ?? '',
+    remnawaveShortUuid: remnawaveShortUuid ?? '',
+    remnawaveUsername: remnawaveUsername ?? '',
   })
 
   function close() {
@@ -72,32 +90,34 @@ export function UserProfileEditButton({
         onClose={close}
         title="Профиль пользователя"
         description="Эти данные используются при поиске и синхронизации аккаунта."
-        size="md"
+        size="xl"
       >
         <form onSubmit={submit} className="space-y-5">
-          <label className="block">
-            <span className="label">Email</span>
-            <input
-              className="input"
-              type="email"
-              value={form.email}
-              onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))}
-              maxLength={255}
-              required
-              autoFocus
-            />
-          </label>
+          <div className="grid gap-4 md:grid-cols-2">
+            <label className="block">
+              <span className="label">Email</span>
+              <input
+                className="input"
+                type="email"
+                value={form.email}
+                onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))}
+                maxLength={255}
+                required
+                autoFocus
+              />
+            </label>
 
-          <label className="block">
-            <span className="label">Имя</span>
-            <input
-              className="input"
-              value={form.name}
-              onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
-              maxLength={40}
-              placeholder="Имя пользователя"
-            />
-          </label>
+            <label className="block">
+              <span className="label">Имя</span>
+              <input
+                className="input"
+                value={form.name}
+                onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
+                maxLength={40}
+                placeholder="Имя пользователя"
+              />
+            </label>
+          </div>
 
           <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-white/10 dark:bg-white/[0.03]">
             <input
@@ -113,6 +133,80 @@ export function UserProfileEditButton({
               </span>
             </span>
           </label>
+
+          <section className="space-y-3 rounded-lg border border-slate-200 p-4 dark:border-white/10">
+            <div>
+              <h3 className="font-semibold">Связанные аккаунты</h3>
+              <p className="mt-1 text-sm text-slate-500">Заполняйте вручную, если нужно связать профиль после импорта или ошибки синхронизации.</p>
+            </div>
+            <div className="grid gap-4 md:grid-cols-3">
+              <label className="block">
+                <span className="label">Telegram ID</span>
+                <input
+                  className="input"
+                  inputMode="numeric"
+                  value={form.telegramId}
+                  onChange={(event) => setForm((current) => ({ ...current, telegramId: event.target.value.replace(/\D/g, '') }))}
+                  placeholder="8507156675"
+                />
+              </label>
+              <label className="block">
+                <span className="label">Telegram username</span>
+                <input
+                  className="input"
+                  value={form.telegramUsername}
+                  onChange={(event) => setForm((current) => ({ ...current, telegramUsername: event.target.value.replace(/^@/, '') }))}
+                  placeholder="username"
+                />
+              </label>
+              <label className="block">
+                <span className="label">Remnashop ID</span>
+                <input
+                  className="input"
+                  inputMode="numeric"
+                  value={form.remnashopUserId}
+                  onChange={(event) => setForm((current) => ({ ...current, remnashopUserId: event.target.value.replace(/\D/g, '') }))}
+                  placeholder="42"
+                />
+              </label>
+            </div>
+          </section>
+
+          <section className="space-y-3 rounded-lg border border-slate-200 p-4 dark:border-white/10">
+            <div>
+              <h3 className="font-semibold">Remnawave</h3>
+              <p className="mt-1 text-sm text-slate-500">UUID и username используются для ручной синхронизации подписки и устройств.</p>
+            </div>
+            <div className="grid gap-4 md:grid-cols-3">
+              <label className="block">
+                <span className="label">UUID</span>
+                <input
+                  className="input font-mono text-sm"
+                  value={form.remnawaveUuid}
+                  onChange={(event) => setForm((current) => ({ ...current, remnawaveUuid: event.target.value.trim() }))}
+                  placeholder="uuid"
+                />
+              </label>
+              <label className="block">
+                <span className="label">Short UUID</span>
+                <input
+                  className="input font-mono text-sm"
+                  value={form.remnawaveShortUuid}
+                  onChange={(event) => setForm((current) => ({ ...current, remnawaveShortUuid: event.target.value.trim() }))}
+                  placeholder="shortUuid"
+                />
+              </label>
+              <label className="block">
+                <span className="label">Username</span>
+                <input
+                  className="input font-mono text-sm"
+                  value={form.remnawaveUsername}
+                  onChange={(event) => setForm((current) => ({ ...current, remnawaveUsername: event.target.value.trim() }))}
+                  placeholder="remnawave username"
+                />
+              </label>
+            </div>
+          </section>
 
           <div className="flex justify-end gap-2 border-t pt-4">
             <button type="button" className="btn-secondary" onClick={close} disabled={loading}>
