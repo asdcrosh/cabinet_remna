@@ -134,7 +134,7 @@ export function PlanCard({
   return (
     <div
       className={cn(
-        "card group relative flex h-full min-h-[430px] flex-col overflow-hidden p-5 transition-all duration-200 hover:-translate-y-1 hover:shadow-2xl",
+        "card group relative flex h-full min-h-[380px] flex-col overflow-hidden p-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl sm:p-5",
         popular &&
           "border-slate-950 ring-2 ring-slate-950/10 dark:border-white dark:ring-white/15",
         current && "bg-cyan-50/70 dark:bg-cyan-500/10",
@@ -145,10 +145,10 @@ export function PlanCard({
       )}
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 pr-2">
-          <h3 className="break-words text-xl font-semibold leading-tight tracking-tight">
+          <h3 className="break-words text-lg font-semibold leading-tight tracking-tight sm:text-xl">
             {name}
           </h3>
-          <div className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+          <div className="mt-1.5 text-sm text-slate-500 dark:text-slate-400">
             {durationDays} дней доступа
           </div>
           {current && (
@@ -172,13 +172,13 @@ export function PlanCard({
         )}
       </div>
       {description && (
-        <p className="mt-4 line-clamp-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
+        <p className="mt-3 line-clamp-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
           {description}
         </p>
       )}
-      <div className="mt-5">
+      <div className="mt-4">
         <div className="flex flex-wrap items-baseline gap-2">
-          <div className="whitespace-nowrap text-3xl font-semibold tracking-tight">
+          <div className="whitespace-nowrap text-2xl font-semibold tracking-tight sm:text-3xl">
             {effectivePrice}
           </div>
           {appliedPromo && (
@@ -189,7 +189,7 @@ export function PlanCard({
           {isPromo ? "один раз на аккаунт" : "оплата онлайн"}
         </div>
       </div>
-      <ul className="mt-5 min-h-[112px] space-y-2.5 text-sm text-slate-600 dark:text-slate-300">
+      <ul className="mt-4 min-h-[104px] space-y-2 text-sm text-slate-600 dark:text-slate-300">
         <Feature strong>
           {trafficLimitGb == null
             ? "Безлимитный трафик"
@@ -200,7 +200,7 @@ export function PlanCard({
         <Feature>До {deviceLimit} устройств</Feature>
       </ul>
       {!isPromo && (promoOpen || appliedPromo) ? (
-        <div className="mt-auto min-h-[82px] space-y-2 pt-4">
+        <div className="mt-auto min-h-[74px] space-y-2 pt-3">
           <div className="flex min-w-0 items-center gap-2 rounded-lg border border-slate-200 bg-white px-2 py-2 dark:border-slate-800 dark:bg-surface-900">
             <Tag className="h-4 w-4 shrink-0 text-slate-400" />
             <input
@@ -251,7 +251,7 @@ export function PlanCard({
           Есть промокод?
         </button>
       ) : (
-        <div className="mt-auto min-h-[82px]" />
+        <div className="mt-auto min-h-[74px]" />
       )}
       <button
         onClick={buy}

@@ -131,6 +131,13 @@ export const PATCH = withAuth(async (req: Request, { params }: { params: { id: s
     })
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      const fields = Array.isArray(error.meta?.target) ? error.meta.target.map(String) : []
+      if (fields.includes('telegramId')) {
+        return NextResponse.json({ error: 'Этот Telegram уже привязан к другому аккаунту' }, { status: 409 })
+      }
+      if (fields.includes('remnashopUserId')) {
+        return NextResponse.json({ error: 'Этот Remnashop ID уже привязан к другому аккаунту' }, { status: 409 })
+      }
       return NextResponse.json({ error: 'Этот email уже используется другим аккаунтом' }, { status: 409 })
     }
     throw error

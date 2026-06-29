@@ -80,8 +80,10 @@ export async function syncCabinetPaymentToRemnashop(paymentId: string) {
 async function resolveRemnashopUserId(user: {
   id: string
   email: string
+  name: string | null
   emailVerifiedAt: Date | null
   telegramId: bigint | null
+  telegramUsername: string | null
   remnashopUserId: number | null
 }) {
   if (user.remnashopUserId) return user.remnashopUserId
@@ -110,6 +112,12 @@ async function resolveRemnashopUserId(user: {
       await markLocalUserSynced(user.id, emailUserId)
       return emailUserId
     }
+  }
+
+  const createdUserId = await createRemnashopUserForCabinet(user)
+  if (createdUserId) {
+    await markLocalUserSynced(user.id, createdUserId)
+    return createdUserId
   }
 
   return null
@@ -141,6 +149,50 @@ async function markLocalUserSynced(userId: string, remnashopUserId: number) {
       remnashopSyncedAt: new Date(),
     },
   })
+}
+
+async function createRemnashopUserForCabinet(user: {
+  id: string
+  email: string
+  name: string | null
+  emailVerifiedAt: Date | null
+  telegramId: bigint | null
+  telegramUsername: string | null
+}) {
+  const hasRealEmail = !user.email.endsWith('@pending.invalid')
+  if (!hasRealEmail && !user.telegramId) return null
+
+  const columns = await tableColumns('users')
+  const now = new Date()
+  const data = pickExistingColumns(columns, {
+    email: hasRealEmail ? user.email : null,
+    is_email_verified: Boolean(hasRealEmail && user.emailVerifiedAt),
+    name: user.name || (user.telegramUsername ? `@${user.telegramUsername}` : 'Cabinet user'),
+    username: user.telegramUsername,
+    telegram_id: user.telegramId?.toString() ?? null,
+    role: 'USER',
+    language_code: 'ru',
+    source: SOURCE,
+    created_at: now,
+    updated_at: now,
+  })
+
+  try {
+    const id = await insertRow('users', columns, data)
+    logInfo('remnashop.reverse_sync.user_created', {
+      cabinetUserId: user.id,
+      remnashopUserId: id,
+      hasTelegram: Boolean(user.telegramId),
+      hasEmail: hasRealEmail,
+    })
+    return Number(id)
+  } catch (error) {
+    logWarn('remnashop.reverse_sync.user_create_failed', {
+      cabinetUserId: user.id,
+      message: error instanceof Error ? error.message : 'unknown error',
+    })
+    return null
+  }
 }
 
 async function upsertRemnashopSubscription(input: {
