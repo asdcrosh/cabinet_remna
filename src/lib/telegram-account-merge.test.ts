@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   relationFindUnique: vi.fn().mockResolvedValue(null),
   relationUpdateMany: vi.fn(),
   relationDeleteMany: vi.fn(),
+  oauthUpdateMany: vi.fn(),
   referralRewardUpdate: vi.fn(),
   referralRewardDelete: vi.fn(),
   transaction: vi.fn(),
@@ -101,7 +102,7 @@ describe('technical Telegram account merge', () => {
         },
         giftCertificateRedemption: { updateMany: mocks.relationUpdateMany },
         notificationLog: { updateMany: mocks.relationUpdateMany },
-        oAuthAccount: { updateMany: mocks.relationUpdateMany },
+        oAuthAccount: { updateMany: mocks.oauthUpdateMany },
         bonusBoxAttempt: {
           findMany: mocks.relationFindMany,
           updateMany: mocks.relationUpdateMany,
@@ -203,12 +204,21 @@ describe('technical Telegram account merge', () => {
         remnawaveUuid: null,
       }),
     })
-    expect(mocks.userUpdate).toHaveBeenLastCalledWith({
+    expect(mocks.userUpdate).toHaveBeenCalledWith({
       where: { id: 'old-email-user' },
       data: expect.objectContaining({
-        email: 'merged-old-email-user@pending.invalid',
+        telegramUsername: null,
+        telegramLinkedAt: null,
       }),
     })
+    expect(mocks.userUpdate).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'old-email-user' },
+        data: expect.objectContaining({
+          email: 'merged-old-email-user@pending.invalid',
+        }),
+      })
+    )
     expect(mocks.userDelete).not.toHaveBeenCalled()
     expect(mocks.userUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -219,6 +229,7 @@ describe('technical Telegram account merge', () => {
         }),
       })
     )
+    expect(mocks.oauthUpdateMany).not.toHaveBeenCalled()
   })
 
   it('moves a Telegram identity away from a privileged account without archiving that account', async () => {

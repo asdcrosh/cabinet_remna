@@ -96,10 +96,6 @@ export async function mergeTechnicalTelegramAccount(input: {
       where: { userId: source.id },
       data: { userId: target.id },
     })
-    await tx.oAuthAccount.updateMany({
-      where: { userId: source.id },
-      data: { userId: target.id },
-    })
     const targetTrialPlans = await tx.trialPlanRedemption.findMany({
       where: { userId: target.id },
       select: { planId: true },
@@ -228,13 +224,10 @@ export async function mergeTechnicalTelegramAccount(input: {
       await tx.user.update({
         where: { id: source.id },
         data: {
-          email: `merged-${source.id}@pending.invalid`,
-          name: `Объединён с ${target.email}`,
           telegramUsername: null,
           telegramLinkedAt: null,
           remnashopSyncedAt: null,
           referredById: null,
-          emailVerifiedAt: null,
         },
       })
     }

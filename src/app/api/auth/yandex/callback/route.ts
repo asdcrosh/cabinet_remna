@@ -88,16 +88,38 @@ async function findOrCreateYandexUser(profile: YandexProfile) {
   })
 
   if (existingAccount) {
+    let emailOwner =
+      existingAccount.user.email.toLowerCase() === profile.email.toLowerCase()
+        ? existingAccount.user
+        : await prisma.user.findUnique({ where: { email: profile.email } })
+    if (!emailOwner && existingAccount.user.email.toLowerCase() !== profile.email.toLowerCase()) {
+      emailOwner = await createYandexUser(profile, { createOAuthAccount: false })
+    }
+    const user = emailOwner ?? existingAccount.user
+
     await prisma.oAuthAccount.update({
       where: { id: existingAccount.id },
       data: {
+        userId: user.id,
         email: profile.email,
         emailVerified: profile.emailVerified,
         name: profile.name,
         picture: profile.picture,
       },
     })
-    return existingAccount.user
+
+    if (user.email.toLowerCase() === profile.email.toLowerCase()) {
+      return prisma.user.update({
+        where: { id: user.id },
+        data: {
+          emailVerifiedAt: user.emailVerifiedAt ?? new Date(),
+          agreedToTermsAt: user.agreedToTermsAt ?? new Date(),
+          name: user.name ?? profile.name,
+        },
+      })
+    }
+
+    return user
   }
 
   const existingUser = await prisma.user.findUnique({ where: { email: profile.email } })
@@ -122,6 +144,13 @@ async function findOrCreateYandexUser(profile: YandexProfile) {
     })
   }
 
+  return createYandexUser(profile, { createOAuthAccount: true })
+}
+
+async function createYandexUser(
+  profile: YandexProfile,
+  options: { createOAuthAccount: boolean }
+) {
   const referralCode = normalizeReferralCode(cookies().get(YANDEX_OAUTH_REF_COOKIE)?.value)
   const referrer = referralCode
     ? await prisma.user.findUnique({ where: { referralCode }, select: { id: true } })
@@ -137,16 +166,18 @@ async function findOrCreateYandexUser(profile: YandexProfile) {
       referredById: referrer?.id,
       agreedToTermsAt: new Date(),
       emailVerifiedAt: new Date(),
-      oauthAccounts: {
-        create: {
-          provider: YANDEX_PROVIDER,
-          providerUserId: profile.providerUserId,
-          email: profile.email,
-          emailVerified: profile.emailVerified,
-          name: profile.name,
-          picture: profile.picture,
-        },
-      },
+      oauthAccounts: options.createOAuthAccount
+        ? {
+            create: {
+              provider: YANDEX_PROVIDER,
+              providerUserId: profile.providerUserId,
+              email: profile.email,
+              emailVerified: profile.emailVerified,
+              name: profile.name,
+              picture: profile.picture,
+            },
+          }
+        : undefined,
     },
   })
   await createAdminNotification({
