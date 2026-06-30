@@ -33,8 +33,17 @@ export function TelegramLinkCard({
   const syncTelegram = useCallback(async (clearCallbackState = false) => {
     setSyncing(true)
     try {
-      await apiFetch('/api/me/telegram/sync', { method: 'POST' })
-      toast('Telegram ID отправлен в Remnawave', 'success')
+      const response = await apiFetch<{
+        warnings?: string[]
+        sync?: { devicesSynced?: number }
+      }>('/api/me/telegram/sync', { method: 'POST' })
+      const warnings = response.warnings?.filter(Boolean) ?? []
+      toast(
+        warnings.length
+          ? `Синхронизация завершена с предупреждением: ${warnings.join('; ')}`
+          : `Telegram синхронизирован. Устройств: ${response.sync?.devicesSynced ?? 0}`,
+        warnings.length ? undefined : 'success'
+      )
       if (clearCallbackState) {
         router.replace('/dashboard/settings')
       } else {

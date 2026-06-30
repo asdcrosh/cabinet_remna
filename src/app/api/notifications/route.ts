@@ -32,3 +32,9 @@ export const PATCH = withAuth(async () => {
   })
   return NextResponse.json({ ok: true })
 })
+
+export const DELETE = withAuth(async () => {
+  const session = await requireAuth()
+  await prisma.userNotification.deleteMany({ where: { userId: session.uid } })
+  return NextResponse.json({ ok: true })
+})

@@ -145,7 +145,7 @@
   }
   .bonus-box-reel-shell {
     isolation: isolate;
-    min-height: 14.5rem;
+    min-height: 13.25rem;
   }
   .bonus-box-reel-shell::before {
     content: '';
@@ -163,7 +163,7 @@
     animation: bonus-box-luxury-sweep 1600ms ease-in-out infinite;
   }
   .bonus-box-stage--opening .bonus-box-reel-card {
-    animation: bonus-box-card-lift 1050ms ease-in-out infinite;
+    animation: bonus-box-card-lift 1350ms ease-in-out infinite;
   }
   .bonus-box-stage--opening .bonus-box-reel-track {
     filter: drop-shadow(0 0 24px rgba(103, 232, 249, 0.24));
@@ -171,59 +171,65 @@
   .bonus-box-portal {
     pointer-events: none;
     position: absolute;
-    inset-block: 1.15rem;
+    inset-block: 1.45rem;
     left: 50%;
     z-index: 32;
-    width: min(13.5rem, 42vw);
+    width: min(10.5rem, 36vw);
     transform: translateX(-50%);
   }
   .bonus-box-portal::before {
     content: '';
     position: absolute;
-    inset: 0;
-    border-radius: 1.1rem;
+    inset: 0.45rem 1.15rem;
+    border-radius: 999px;
     border: 1px solid rgba(165, 243, 252, 0.42);
     background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.12), transparent 38%, rgba(34, 211, 238, 0.10)),
-      radial-gradient(circle at 50% 50%, rgba(103, 232, 249, 0.15), transparent 70%);
+      linear-gradient(180deg, rgba(255, 255, 255, 0.18), transparent 42%, rgba(34, 211, 238, 0.14)),
+      radial-gradient(circle at 50% 50%, rgba(103, 232, 249, 0.26), transparent 72%);
     box-shadow:
       0 0 0 1px rgba(255, 255, 255, 0.06) inset,
-      0 0 38px rgba(103, 232, 249, 0.24),
-      0 18px 56px rgba(2, 6, 23, 0.36);
-    opacity: 0.95;
+      0 0 30px rgba(103, 232, 249, 0.22),
+      0 14px 42px rgba(2, 6, 23, 0.28);
+    opacity: 0.86;
   }
   .bonus-box-portal::after {
     content: '';
     position: absolute;
-    inset: -0.35rem;
-    border-radius: 1.35rem;
-    border: 1px solid rgba(16, 185, 129, 0.18);
-    opacity: 0;
+    left: 50%;
+    top: 0.1rem;
+    width: 1.2rem;
+    height: 1.2rem;
+    transform: translateX(-50%) rotate(45deg);
+    border-radius: 0.2rem;
+    border-bottom: 1px solid rgba(207, 250, 254, 0.82);
+    border-right: 1px solid rgba(207, 250, 254, 0.82);
+    opacity: 0.9;
+    filter: drop-shadow(0 0 14px rgba(103, 232, 249, 0.65));
   }
   .bonus-box-stage--opening .bonus-box-portal::after {
-    animation: bonus-box-portal-ping 1250ms ease-out infinite;
+    animation: bonus-box-portal-caret 920ms ease-in-out infinite;
   }
   .bonus-box-portal-core {
     position: absolute;
-    inset: 0.7rem;
-    border-radius: 0.9rem;
+    inset: 0;
+    border-radius: 999px;
     background:
-      radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.20), transparent 34%),
-      linear-gradient(90deg, transparent, rgba(103, 232, 249, 0.18), transparent);
+      radial-gradient(ellipse at 50% 50%, rgba(255, 255, 255, 0.18), transparent 34%),
+      linear-gradient(90deg, transparent, rgba(103, 232, 249, 0.20), transparent);
     mix-blend-mode: screen;
-    opacity: 0.58;
+    opacity: 0.46;
   }
   .bonus-box-stage--opening .bonus-box-portal-core {
     animation: bonus-box-portal-core 980ms ease-in-out infinite;
   }
   .bonus-box-portal-line {
     position: absolute;
-    inset-block: 0.75rem;
+    inset-block: 0.85rem;
     left: 50%;
-    width: 2px;
+    width: 3px;
     transform: translateX(-50%);
     border-radius: 999px;
-    background: linear-gradient(180deg, transparent, rgba(207, 250, 254, 0.96), transparent);
+    background: linear-gradient(180deg, transparent, rgba(236, 253, 245, 0.9) 18%, rgba(34, 211, 238, 0.98) 50%, rgba(236, 253, 245, 0.9) 82%, transparent);
     box-shadow:
       0 0 18px rgba(165, 243, 252, 0.88),
       0 0 42px rgba(34, 211, 238, 0.36);
@@ -363,14 +369,18 @@
   }
 }
 
-@keyframes bonus-box-portal-ping {
+@keyframes bonus-box-portal-caret {
   0% {
-    opacity: 0.9;
-    transform: scale(0.96);
+    opacity: 0.55;
+    transform: translateX(-50%) translateY(-0.15rem) rotate(45deg);
+  }
+  50% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0.18rem) rotate(45deg);
   }
   100% {
-    opacity: 0;
-    transform: scale(1.15);
+    opacity: 0.55;
+    transform: translateX(-50%) translateY(-0.15rem) rotate(45deg);
   }
 }
 
@@ -380,8 +390,8 @@
     transform: scaleX(0.82);
   }
   50% {
-    opacity: 0.9;
-    transform: scaleX(1.04);
+    opacity: 0.72;
+    transform: scaleX(0.96);
   }
 }
 
@@ -397,8 +407,8 @@
     transform: translateX(-50%) scaleX(0.84);
   }
   50% {
-    opacity: 0.96;
-    transform: translateX(-50%) scaleX(1.08);
+    opacity: 0.72;
+    transform: translateX(-50%) scaleX(0.98);
   }
 }
 

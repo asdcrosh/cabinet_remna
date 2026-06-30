@@ -112,6 +112,35 @@ export const PATCH = withAuth(async (req: Request, { params }: { params: { id: s
   }
 })
 
+export const DELETE = withAuth(async (req: Request, { params }: { params: { id: string } }) => {
+  const session = await requireAdmin()
+
+  try {
+    const deleted = await prisma.promoCode.delete({
+      where: { id: params.id },
+      select: { id: true, code: true },
+    })
+
+    await writeAuditLog({
+      actorId: session.uid,
+      action: 'PROMO_CODE_UPDATED',
+      message: 'Администратор удалил промокод',
+      metadata: {
+        promoCodeId: deleted.id,
+        code: deleted.code,
+      },
+      request: req,
+    })
+
+    return NextResponse.json({ ok: true })
+  } catch (e) {
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2025') {
+      return NextResponse.json({ error: 'Промокод не найден' }, { status: 404 })
+    }
+    throw e
+  }
+})
+
 function normalizeAllowedEmails(emails: string[]) {
   return Array.from(new Set(emails.map((email) => email.trim().toLowerCase()).filter(Boolean)))
 }

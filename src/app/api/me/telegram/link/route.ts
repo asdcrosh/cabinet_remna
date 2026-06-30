@@ -12,6 +12,7 @@ import {
   TelegramAccountMergeError,
 } from '@/lib/telegram-account-merge'
 import { writeAuditLog } from '@/lib/audit-log'
+import { describeSyncError } from '@/lib/sync-error'
 
 export const runtime = 'nodejs'
 
@@ -105,7 +106,7 @@ export const POST = withAuth(async (req: Request) => {
       },
     })
   } catch (e) {
-    const message = e instanceof Error ? e.message : 'Telegram linked, sync failed'
+    const message = describeSyncError(e)
     return NextResponse.json(
       {
         ok: true,

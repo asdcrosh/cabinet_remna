@@ -498,18 +498,21 @@ export function SupportPanel({
       className={cn(
         'grid h-[calc(100dvh-5.5rem)] min-h-[32rem] gap-3 overflow-hidden xl:h-[calc(100dvh-7rem)] xl:min-h-[36rem]',
         mode === 'admin'
-          ? 'xl:grid-cols-[19rem_minmax(0,1fr)_15rem]'
+          ? 'xl:h-[calc(100dvh-5.75rem)] xl:grid-cols-[21rem_minmax(0,1fr)_18rem]'
           : 'xl:grid-cols-[19rem_minmax(0,1fr)]'
       )}
     >
       <section className={cn('min-h-0 overflow-y-auto pr-0.5 xl:flex xl:flex-col xl:overflow-hidden', mobileChatOpen && 'hidden xl:flex')}>
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-white/70 bg-white/90 shadow-sm shadow-slate-200/60 backdrop-blur dark:border-white/10 dark:bg-surface-900/80 dark:shadow-black/20">
-          <div className="border-b border-slate-100 bg-white/80 px-3 py-3 dark:border-slate-800 dark:bg-surface-900/60">
+          <div className={cn(
+            'border-b border-slate-100 bg-white/80 px-3 py-3 dark:border-slate-800 dark:bg-surface-900/60',
+            mode === 'admin' && 'bg-slate-50/85 dark:bg-surface-950/70'
+          )}>
             <div className="flex items-center justify-between gap-3">
               <div>
-                <div className="font-semibold">{mode === 'admin' ? 'Очередь' : 'Поддержка'}</div>
+                <div className="font-semibold">{mode === 'admin' ? 'Обращения' : 'Поддержка'}</div>
                 <div className="text-xs text-slate-500">
-                  {unreadTotal > 0 ? `${unreadTotal} новых сообщений` : mode === 'admin' ? 'Все обращения под рукой' : 'Выберите диалог или создайте новый'}
+                  {unreadTotal > 0 ? `${unreadTotal} новых сообщений` : mode === 'admin' ? `${listTotal} всего в очереди` : 'Выберите диалог или создайте новый'}
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -604,6 +607,7 @@ export function SupportPanel({
 
       <section className={cn(
         'min-h-0 overflow-hidden rounded-lg border border-white/70 bg-white/95 shadow-xl shadow-slate-200/60 backdrop-blur dark:border-white/10 dark:bg-surface-900/90 dark:shadow-black/20',
+        mode === 'admin' && 'shadow-sm',
         !mobileChatOpen && 'hidden xl:block'
       )}>
         {mode === 'user' && newTicketOpen ? (
@@ -644,7 +648,7 @@ export function SupportPanel({
                     </div>
                   </div>
                 </div>
-                <div className="xl:hidden">
+                <div className={cn(mode === 'admin' ? 'hidden 2xl:block' : 'xl:hidden')}>
                   <TicketActions selected={selected} mode={mode} isPending={isPending} onUpdateStatus={updateStatus} />
                 </div>
               </div>
@@ -1011,6 +1015,7 @@ function TicketListItem({
       onClick={onClick}
       className={cn(
         'group w-full rounded-md border px-3 py-2.5 text-left transition-all',
+        mode === 'admin' && 'rounded-lg py-3',
         active
           ? 'border-slate-300 bg-slate-50 shadow-sm shadow-slate-200/60 ring-1 ring-slate-200 dark:border-slate-700 dark:bg-surface-800 dark:ring-slate-700'
           : 'border-transparent hover:border-slate-200 hover:bg-slate-50 dark:hover:border-slate-800 dark:hover:bg-surface-800'
@@ -1020,11 +1025,11 @@ function TicketListItem({
         <div className="min-w-0 flex-1">
           <div className="flex min-w-0 items-center gap-2">
             {unread > 0 && <span className="h-2 w-2 shrink-0 rounded-full bg-red-500" />}
-            <div className="truncate font-medium">{ticket.subject}</div>
+            <div className="truncate font-medium">{mode === 'admin' && ticket.user ? ticket.user.email : ticket.subject}</div>
           </div>
           <div className="mt-1 truncate text-xs text-slate-500 dark:text-slate-400">
             {mode === 'admin'
-              ? `${ticket.user ? `${ticket.user.email} · ` : ''}${supportCategoryLabel(ticket.category)}`
+              ? `${supportCategoryLabel(ticket.category)} · ${ticket.subject}`
               : formatDate(ticket.lastMessageAt)}
           </div>
         </div>
@@ -1066,6 +1071,18 @@ function TicketActions({
           Открыть
         </button>
       )}
+      {mode === 'admin' && selected.status !== 'CLOSED' && selected.status !== 'WAITING_ADMIN' && (
+        <button className="btn-secondary" onClick={() => onUpdateStatus('WAITING_ADMIN')} disabled={isPending}>
+          <Timer className="h-4 w-4" />
+          В работу
+        </button>
+      )}
+      {mode === 'admin' && selected.status !== 'CLOSED' && selected.status !== 'WAITING_USER' && (
+        <button className="btn-secondary" onClick={() => onUpdateStatus('WAITING_USER')} disabled={isPending}>
+          <CheckCircle2 className="h-4 w-4" />
+          Ждет пользователя
+        </button>
+      )}
       {selected.status !== 'CLOSED' && (
         <button className="btn-secondary" onClick={() => onUpdateStatus('CLOSED')} disabled={isPending}>
           <XCircle className="h-4 w-4" />
@@ -1099,16 +1116,16 @@ function TicketSideMenu({
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="border-b border-slate-100 px-4 py-4 dark:border-slate-800">
-        <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Карточка</div>
+        <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Карточка обращения</div>
         <div className="mt-2 line-clamp-2 text-sm font-semibold text-slate-950 dark:text-white">{selected.subject}</div>
+        <div className="mt-2">
+          <TicketStatusBadge status={selected.status} mode={mode} />
+        </div>
       </div>
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
         <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-surface-950">
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-xs font-medium text-slate-400">Статус</span>
-            <TicketStatusBadge status={selected.status} mode={mode} />
-          </div>
-          <div className="mt-3 text-sm text-slate-600 dark:text-slate-300">{supportCategoryLabel(selected.category)}</div>
+          <div className="text-xs font-medium text-slate-400">Тема</div>
+          <div className="mt-2 text-sm font-medium text-slate-700 dark:text-slate-200">{supportCategoryLabel(selected.category)}</div>
         </div>
         {mode === 'admin' && selected.user && (
           <>

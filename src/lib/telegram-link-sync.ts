@@ -3,6 +3,8 @@ import { remnawave } from './remnawave'
 import { remnashopQuery } from './remnashop-db'
 import { toRemnawaveTelegramId } from './telegram-remnawave'
 import { upsertLocalSubscriptionFromRemnawave } from './remnawave-local-sync'
+import { syncLocalDevicesFromRemnawave } from './remnawave-device-sync'
+import { describeSyncError } from './sync-error'
 
 interface RemnashopTelegramUserRow {
   id: number
@@ -90,11 +92,23 @@ export async function syncLinkedTelegramUser(input: {
   localUserId: string
   telegramId: bigint
 }) {
+  const warnings: string[] = []
   const localUser = await prisma.user.findUnique({
     where: { id: input.localUserId },
     select: { remnawaveUuid: true },
   })
   const localRemnawaveSynced = await syncRemnawaveTelegramId(localUser?.remnawaveUuid, input.telegramId)
+  let localDevicesSynced = 0
+  if (localUser?.remnawaveUuid) {
+    try {
+      localDevicesSynced = (await syncLocalDevicesFromRemnawave({
+        localUserId: input.localUserId,
+        remnawaveUuid: localUser.remnawaveUuid,
+      })).total
+    } catch (error) {
+      warnings.push(`Устройства не обновлены: ${describeSyncError(error)}`)
+    }
+  }
   const remnashopUser = await attachRemnashopIdentityToCabinetUser(input)
   if (!remnashopUser) {
     await prisma.user.update({
@@ -104,10 +118,13 @@ export async function syncLinkedTelegramUser(input: {
     return {
       foundRemnashopUser: false as const,
       syncedRemnawave: localRemnawaveSynced,
+      devicesSynced: localDevicesSynced,
+      warnings,
     }
   }
 
   if (!remnashopUser.user_remna_id) {
+    warnings.push('Пользователь найден в Remnashop, но у него нет связанного профиля Remnawave.')
     await prisma.user.update({
       where: { id: input.localUserId },
       data: {
@@ -119,6 +136,8 @@ export async function syncLinkedTelegramUser(input: {
       foundRemnashopUser: true as const,
       syncedRemnawave: localRemnawaveSynced,
       remnashopUserId: remnashopUser.id,
+      devicesSynced: localDevicesSynced,
+      warnings,
     }
   }
 
@@ -136,6 +155,15 @@ export async function syncLinkedTelegramUser(input: {
     remnashopUserId: remnashopUser.id,
     remnawaveUser,
   })
+  let devicesSynced = localDevicesSynced
+  try {
+    devicesSynced = (await syncLocalDevicesFromRemnawave({
+      localUserId: input.localUserId,
+      remnawaveUuid: remnawaveUser.uuid,
+    })).total
+  } catch (error) {
+    warnings.push(`Устройства не обновлены: ${describeSyncError(error)}`)
+  }
 
   return {
     foundRemnashopUser: true as const,
@@ -143,6 +171,8 @@ export async function syncLinkedTelegramUser(input: {
     remnashopUserId: remnashopUser.id,
     remnawaveUuid: remnawaveUser.uuid,
     subscriptionId: subscription.id,
+    devicesSynced,
+    warnings,
   }
 }
 

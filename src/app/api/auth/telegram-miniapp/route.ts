@@ -117,6 +117,7 @@ export async function POST(req: Request) {
           telegramId: telegram.id,
           telegramUsername: telegram.username,
           telegramLinkedAt: new Date(),
+          lastLoginAt: new Date(),
           remnashopUserId: remnashopUser?.id,
           remnashopSyncedAt: remnashopUser ? new Date() : null,
           emailVerifiedAt: remnashopUser?.is_email_verified ? new Date() : null,

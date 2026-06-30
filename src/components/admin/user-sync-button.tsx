@@ -17,16 +17,22 @@ export function UserSyncButton({ userId }: { userId: string }) {
         result: {
           telegram: boolean
           remnawave: boolean
+          devices: number
           remnashopPayments: number
           warnings: string[]
         }
       }>(`/api/admin/users/${userId}/sync`, { method: 'POST' })
-      const warnings = response.result.warnings.length
+      const warnings = response.result.warnings.filter(Boolean)
+      const parts = [
+        response.result.telegram ? 'Telegram' : null,
+        response.result.remnawave ? 'Remnawave' : null,
+        `${response.result.devices} устр.`,
+      ].filter(Boolean)
       toast(
-        warnings
-          ? `Синхронизация выполнена с предупреждениями: ${warnings}`
-          : 'Пользователь синхронизирован',
-        warnings ? undefined : 'success'
+        warnings.length
+          ? `Синхронизация завершена. ${parts.join(', ')}. Предупреждение: ${warnings.join('; ')}`
+          : `Пользователь синхронизирован. ${parts.join(', ')}`,
+        warnings.length ? undefined : 'success'
       )
       router.refresh()
     } finally {

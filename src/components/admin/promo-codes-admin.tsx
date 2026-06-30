@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
-import { Archive, CheckCheck, Edit3, Plus, Power, TicketCheck } from 'lucide-react'
+import { Archive, CheckCheck, Edit3, Plus, Power, TicketCheck, Trash2 } from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
 import { toast } from '@/components/ui/toaster'
 import { cn } from '@/lib/cn'
@@ -113,6 +113,18 @@ export function PromoCodesAdmin({
         body: JSON.stringify({ isActive: !promoCode.isActive }),
       })
       toast(promoCode.isActive ? 'Промокод отключён' : 'Промокод включён', 'success')
+      router.refresh()
+    } catch {
+      // apiFetch уже покажет toast
+    }
+  }
+
+  async function deletePromoCode(promoCode: PromoCodeAdminRow) {
+    if (!window.confirm(`Удалить промокод ${promoCode.code}? История оплат сохранится без привязки к этому коду.`)) return
+
+    try {
+      await apiFetch(`/api/admin/promo-codes/${promoCode.id}`, { method: 'DELETE' })
+      toast('Промокод удалён', 'success')
       router.refresh()
     } catch {
       // apiFetch уже покажет toast
@@ -378,6 +390,14 @@ export function PromoCodesAdmin({
               </button>
               <button type="button" className="btn-secondary h-10 min-h-10 px-3" onClick={() => toggleActive(promoCode)} title={promoCode.isActive ? 'Отключить' : 'Включить'}>
                 <Power className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                className="btn-secondary h-10 min-h-10 px-3 text-red-600 hover:border-red-200 hover:bg-red-50 hover:text-red-700 dark:text-red-300 dark:hover:border-red-500/30 dark:hover:bg-red-500/10"
+                onClick={() => void deletePromoCode(promoCode)}
+                title="Удалить"
+              >
+                <Trash2 className="h-4 w-4" />
               </button>
             </div>
           </article>

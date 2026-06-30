@@ -45,3 +45,9 @@ export const PATCH = withAuth(async () => {
 
   return NextResponse.json({ ok: true })
 })
+
+export const DELETE = withAuth(async () => {
+  await requireStaff()
+  await prisma.adminNotification.deleteMany({})
+  return NextResponse.json({ ok: true })
+})

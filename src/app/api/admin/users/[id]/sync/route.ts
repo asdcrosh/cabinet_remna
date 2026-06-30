@@ -6,6 +6,8 @@ import { upsertLocalSubscriptionFromRemnawave } from '@/lib/remnawave-local-sync
 import { syncLinkedTelegramUser } from '@/lib/telegram-link-sync'
 import { syncCabinetPaymentToRemnashopBestEffort } from '@/lib/remnashop-reverse-sync'
 import { writeAuditLog } from '@/lib/audit-log'
+import { syncLocalDevicesFromRemnawave } from '@/lib/remnawave-device-sync'
+import { describeSyncError } from '@/lib/sync-error'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -37,16 +39,19 @@ export const POST = withAuth(async (req: Request, { params }: { params: { id: st
   const result = {
     telegram: false,
     remnawave: false,
+    devices: 0,
     remnashopPayments: 0,
     warnings: [] as string[],
   }
 
   if (user.telegramId) {
     try {
-      await syncLinkedTelegramUser({ localUserId: user.id, telegramId: user.telegramId })
+      const sync = await syncLinkedTelegramUser({ localUserId: user.id, telegramId: user.telegramId })
       result.telegram = true
+      result.devices = Math.max(result.devices, sync.devicesSynced ?? 0)
+      result.warnings.push(...(sync.warnings ?? []))
     } catch (error) {
-      result.warnings.push(`Telegram/Remnashop: ${error instanceof Error ? error.message : 'ошибка синхронизации'}`)
+      result.warnings.push(`Telegram/Remnashop: ${describeSyncError(error)}`)
     }
   }
 
@@ -62,10 +67,18 @@ export const POST = withAuth(async (req: Request, { params }: { params: { id: st
         localUserId: user.id,
         remnawaveUser,
       })
+      try {
+        result.devices = Math.max(result.devices, (await syncLocalDevicesFromRemnawave({
+          localUserId: user.id,
+          remnawaveUuid: remnawaveUser.uuid,
+        })).total)
+      } catch (error) {
+        result.warnings.push(`Устройства: ${describeSyncError(error)}`)
+      }
       result.remnawave = true
     }
   } catch (error) {
-    result.warnings.push(`Remnawave: ${error instanceof Error ? error.message : 'ошибка синхронизации'}`)
+    result.warnings.push(`Remnawave: ${describeSyncError(error)}`)
   }
 
   const payments = await prisma.payment.findMany({

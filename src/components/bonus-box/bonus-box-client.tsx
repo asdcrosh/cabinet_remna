@@ -270,10 +270,10 @@ export function BonusBoxClient({
               </div>
             )}
           </div>
-          <div className="min-w-0">
+          <div className="min-w-0 md:flex md:justify-end">
             <button
               type="button"
-              className="group relative min-h-14 w-full overflow-hidden rounded-lg border border-cyan-300/30 bg-[linear-gradient(135deg,#020617,#0e7490_62%,#10b981)] px-4 text-sm font-semibold text-white shadow-xl shadow-cyan-950/20 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-cyan-950/30 disabled:translate-y-0 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-none disabled:bg-slate-200 disabled:text-slate-500 disabled:shadow-none dark:border-cyan-300/35 dark:shadow-black/25 dark:disabled:border-white/10 dark:disabled:bg-white/10 dark:disabled:text-slate-400"
+              className="group relative min-h-16 w-full overflow-hidden rounded-lg border border-cyan-300/30 bg-[linear-gradient(135deg,#020617,#0e7490_58%,#10b981)] px-4 text-sm font-semibold text-white shadow-xl shadow-cyan-950/20 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-cyan-950/30 disabled:translate-y-0 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-none disabled:bg-slate-200 disabled:text-slate-500 disabled:shadow-none dark:border-cyan-300/35 dark:shadow-black/25 dark:disabled:border-white/10 dark:disabled:bg-white/10 dark:disabled:text-slate-400 md:max-w-md"
               onClick={openBox}
               disabled={!canOpen}
             >
@@ -318,17 +318,9 @@ export function BonusBoxClient({
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <span className="rounded-full border border-white/10 bg-white/10 px-2.5 py-1 text-xs font-medium text-slate-200">
+            <span className="rounded-full border border-white/10 bg-white/10 px-3 py-1.5 text-xs font-medium text-slate-200">
               {opening ? "Открывается" : `${data.attemptsCount} доступно`}
             </span>
-            <button
-              type="button"
-              className="hidden rounded-lg border border-cyan-300/25 bg-cyan-300/10 px-3 py-1.5 text-xs font-semibold text-cyan-100 transition hover:bg-cyan-300/15 disabled:cursor-not-allowed disabled:opacity-50 sm:inline-flex"
-              onClick={openBox}
-              disabled={!canOpen}
-            >
-              {opening ? "Крутим" : "Открыть"}
-            </button>
           </div>
         </div>
 

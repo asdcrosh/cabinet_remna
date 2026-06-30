@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { BellRing, CheckCheck, ExternalLink } from 'lucide-react'
+import { BellRing, CheckCheck, ExternalLink, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import type { AdminNotificationView } from '@/lib/admin-notifications'
 
@@ -59,6 +59,19 @@ export function AdminNotificationBell() {
     }
   }
 
+  async function clearNotifications() {
+    if (summary.notifications.length === 0) return
+    if (!window.confirm('Очистить админские уведомления?')) return
+    const previous = summary
+    setSummary({ unreadCount: 0, notifications: [] })
+    try {
+      const res = await fetch('/api/admin/notifications', { method: 'DELETE' })
+      if (!res.ok) setSummary(previous)
+    } catch {
+      setSummary(previous)
+    }
+  }
+
   useEffect(() => {
     void refresh()
     const interval = window.setInterval(() => {
@@ -111,15 +124,27 @@ export function AdminNotificationBell() {
                 {summary.unreadCount > 0 ? `Новых: ${summary.unreadCount}` : 'Новых нет'}
               </div>
             </div>
-            <button
-              type="button"
-              onClick={markAllRead}
-              disabled={summary.unreadCount === 0}
-              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 text-xs font-medium text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/10 dark:text-slate-300 dark:hover:bg-white/10"
-            >
-              <CheckCheck className="h-3.5 w-3.5" />
-              Прочитано
-            </button>
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={markAllRead}
+                disabled={summary.unreadCount === 0}
+                className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 text-xs font-medium text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/10 dark:text-slate-300 dark:hover:bg-white/10"
+              >
+                <CheckCheck className="h-3.5 w-3.5" />
+                Прочитано
+              </button>
+              <button
+                type="button"
+                onClick={clearNotifications}
+                disabled={summary.notifications.length === 0}
+                className="grid h-8 w-8 place-items-center rounded-lg border border-slate-200 text-slate-500 transition hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/10 dark:text-slate-300 dark:hover:bg-red-500/10 dark:hover:text-red-200"
+                title="Очистить"
+                aria-label="Очистить уведомления"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </div>
           </div>
 
           <div className="max-h-[calc(100dvh-13rem)] overflow-y-auto p-2 sm:max-h-96">

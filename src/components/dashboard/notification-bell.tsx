@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { Bell, CheckCheck, ExternalLink } from 'lucide-react'
+import { Bell, CheckCheck, ExternalLink, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import type { UserNotificationView } from '@/lib/user-notifications'
 import type { AdminNotificationView } from '@/lib/admin-notifications'
@@ -102,6 +102,31 @@ export function NotificationBell({ showAdmin = false }: { showAdmin?: boolean })
     }
   }
 
+  async function clearNotifications() {
+    if (activeSummary.notifications.length === 0) return
+    const confirmed = window.confirm(tab === 'admin' ? 'Очистить админские уведомления?' : 'Очистить ваши уведомления?')
+    if (!confirmed) return
+
+    const previousUser = summary
+    const previousAdmin = adminSummary
+    if (tab === 'admin') {
+      setAdminSummary({ unreadCount: 0, notifications: [] })
+    } else {
+      setSummary({ unreadCount: 0, notifications: [] })
+    }
+
+    try {
+      const res = await fetch(tab === 'admin' ? '/api/admin/notifications' : '/api/notifications', { method: 'DELETE' })
+      if (!res.ok) {
+        setSummary(previousUser)
+        setAdminSummary(previousAdmin)
+      }
+    } catch {
+      setSummary(previousUser)
+      setAdminSummary(previousAdmin)
+    }
+  }
+
   useEffect(() => {
     void refresh()
     const interval = window.setInterval(() => {
@@ -154,15 +179,27 @@ export function NotificationBell({ showAdmin = false }: { showAdmin?: boolean })
                 {activeSummary.unreadCount > 0 ? `Новых: ${activeSummary.unreadCount}` : 'Новых нет'}
               </div>
             </div>
-            <button
-              type="button"
-              onClick={markAllRead}
-              disabled={activeSummary.unreadCount === 0}
-              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 text-xs font-medium text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/10 dark:text-slate-300 dark:hover:bg-white/10"
-            >
-              <CheckCheck className="h-3.5 w-3.5" />
-              Прочитано
-            </button>
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={markAllRead}
+                disabled={activeSummary.unreadCount === 0}
+                className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 text-xs font-medium text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/10 dark:text-slate-300 dark:hover:bg-white/10"
+              >
+                <CheckCheck className="h-3.5 w-3.5" />
+                Прочитано
+              </button>
+              <button
+                type="button"
+                onClick={clearNotifications}
+                disabled={activeSummary.notifications.length === 0}
+                className="grid h-8 w-8 place-items-center rounded-lg border border-slate-200 text-slate-500 transition hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/10 dark:text-slate-300 dark:hover:bg-red-500/10 dark:hover:text-red-200"
+                title="Очистить"
+                aria-label="Очистить уведомления"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </div>
           </div>
 
           {showAdmin && (
