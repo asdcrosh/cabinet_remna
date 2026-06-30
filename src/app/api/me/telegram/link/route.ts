@@ -52,9 +52,10 @@ export const POST = withAuth(async (req: Request) => {
       return NextResponse.json(
         {
           error:
-            error.code === 'TELEGRAM_ALREADY_LINKED'
-              ? 'Этот Telegram принадлежит другому полноценному аккаунту'
+            error.code === 'PRIVILEGED_SOURCE'
+              ? 'Этот Telegram привязан к аккаунту администратора или модератора. Объединение доступно только вручную.'
               : 'Не удалось безопасно объединить профили',
+          code: error.code,
         },
         { status: 409 }
       )

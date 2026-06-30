@@ -30,14 +30,11 @@ export async function mergeTechnicalTelegramUserIntoEmailUser(input: AdminMergeU
     if (!source || !target) {
       throw new AdminMergeUsersError(404, 'Пользователь не найден')
     }
-    if (!isTechnicalTelegramUser(source.email)) {
-      throw new AdminMergeUsersError(400, 'Источник должен быть техническим Telegram-аккаунтом')
-    }
     if (isTechnicalTelegramUser(target.email)) {
       throw new AdminMergeUsersError(400, 'Целевой аккаунт должен быть email-аккаунтом')
     }
     if (source.role !== 'USER') {
-      throw new AdminMergeUsersError(400, 'Нельзя объединять технический аккаунт с ролью выше пользователя')
+      throw new AdminMergeUsersError(400, 'Нельзя объединять аккаунт с ролью выше пользователя')
     }
 
     const conflicts: string[] = []

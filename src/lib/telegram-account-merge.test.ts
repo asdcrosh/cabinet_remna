@@ -7,9 +7,11 @@ const mocks = vi.hoisted(() => ({
   userUpdateMany: vi.fn(),
   subscriptionUpdateMany: vi.fn(),
   relationFindMany: vi.fn().mockResolvedValue([]),
+  relationFindUnique: vi.fn().mockResolvedValue(null),
   relationUpdateMany: vi.fn(),
   relationDeleteMany: vi.fn(),
   referralRewardUpdate: vi.fn(),
+  referralRewardDelete: vi.fn(),
   transaction: vi.fn(),
   remnashopQuery: vi.fn(),
 }))
@@ -95,13 +97,32 @@ describe('technical Telegram account merge', () => {
         referralReward: {
           update: mocks.referralRewardUpdate,
           updateMany: mocks.relationUpdateMany,
+          delete: mocks.referralRewardDelete,
         },
+        giftCertificateRedemption: { updateMany: mocks.relationUpdateMany },
+        notificationLog: { updateMany: mocks.relationUpdateMany },
+        oAuthAccount: { updateMany: mocks.relationUpdateMany },
         bonusBoxAttempt: {
           findMany: mocks.relationFindMany,
           updateMany: mocks.relationUpdateMany,
           deleteMany: mocks.relationDeleteMany,
         },
         bonusBoxOpening: { updateMany: mocks.relationUpdateMany },
+        welcomeBonusRedemption: {
+          findUnique: mocks.relationFindUnique,
+          update: mocks.relationUpdateMany,
+          delete: mocks.relationDeleteMany,
+        },
+        userNotification: {
+          findMany: mocks.relationFindMany,
+          updateMany: mocks.relationUpdateMany,
+          deleteMany: mocks.relationDeleteMany,
+        },
+        adminNotificationRead: {
+          findMany: mocks.relationFindMany,
+          updateMany: mocks.relationUpdateMany,
+          deleteMany: mocks.relationDeleteMany,
+        },
         emailVerificationToken: { deleteMany: mocks.relationDeleteMany },
         passwordResetToken: { deleteMany: mocks.relationDeleteMany },
       })
@@ -150,6 +171,54 @@ describe('technical Telegram account merge', () => {
       where: { userId: 'telegram-user' },
       data: { userId: 'email-user' },
     })
+  })
+
+  it('moves a Telegram identity away from another regular user into the selected email account', async () => {
+    mocks.findUnique
+      .mockResolvedValueOnce({ ...target, remnawaveUuid: null })
+      .mockResolvedValueOnce(technicalSource({
+        id: 'old-email-user',
+        email: 'old@example.com',
+        emailVerifiedAt: new Date(),
+        remnawaveUuid: 'active-remna-uuid',
+      }))
+
+    await expect(
+      mergeTechnicalTelegramAccount({
+        targetUserId: target.id,
+        telegramId: 123n,
+        telegramUsername: 'telegram_user',
+        telegramName: 'Telegram User',
+      })
+    ).resolves.toMatchObject({
+      merged: true,
+      sourceUserId: 'old-email-user',
+      sourceWasTechnical: false,
+    })
+
+    expect(mocks.userUpdate).toHaveBeenCalledWith({
+      where: { id: 'old-email-user' },
+      data: expect.objectContaining({
+        telegramId: null,
+        remnawaveUuid: null,
+      }),
+    })
+    expect(mocks.userUpdate).toHaveBeenLastCalledWith({
+      where: { id: 'old-email-user' },
+      data: expect.objectContaining({
+        email: 'merged-old-email-user@pending.invalid',
+      }),
+    })
+    expect(mocks.userDelete).not.toHaveBeenCalled()
+    expect(mocks.userUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'email-user' },
+        data: expect.objectContaining({
+          telegramId: 123n,
+          remnawaveUuid: 'active-remna-uuid',
+        }),
+      })
+    )
   })
 
   it('prefers the existing Telegram Remnashop identity over an empty email duplicate', async () => {

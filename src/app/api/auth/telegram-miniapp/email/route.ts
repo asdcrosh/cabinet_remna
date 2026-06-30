@@ -86,17 +86,6 @@ export async function POST(req: Request) {
         { status: 401 }
       )
     }
-    if (emailOwner.telegramId && emailOwner.telegramId !== current.telegramId) {
-      logWarn('auth.telegram_email.merge_conflict', {
-        currentUserId: current.id,
-        targetUserId: emailOwner.id,
-      })
-      return NextResponse.json(
-        { error: 'К этому аккаунту уже привязан другой Telegram.' },
-        { status: 409 }
-      )
-    }
-
     try {
       await mergeTechnicalTelegramAccount({
         targetUserId: emailOwner.id,
@@ -114,9 +103,10 @@ export async function POST(req: Request) {
         return NextResponse.json(
           {
             error:
-              error.code === 'IDENTITY_CONFLICT'
-                ? 'У аккаунтов разные VPN-профили. Обратитесь в поддержку для объединения.'
+              error.code === 'PRIVILEGED_SOURCE'
+                ? 'Этот Telegram привязан к аккаунту администратора или модератора. Обратитесь в поддержку.'
                 : 'Telegram-профиль содержит данные, которые нельзя объединить автоматически.',
+            code: error.code,
           },
           { status: 409 }
         )

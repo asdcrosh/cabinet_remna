@@ -66,8 +66,8 @@ export const GET = withAuth(async (req: Request) => {
       if (error instanceof TelegramAccountMergeError) {
         settingsUrl.searchParams.set(
           'telegram_error',
-          error.code === 'TELEGRAM_ALREADY_LINKED'
-            ? 'telegram_already_linked'
+          error.code === 'PRIVILEGED_SOURCE'
+            ? 'telegram_privileged_source'
             : 'telegram_identity_conflict'
         )
         return clearOidcCookies(NextResponse.redirect(settingsUrl))

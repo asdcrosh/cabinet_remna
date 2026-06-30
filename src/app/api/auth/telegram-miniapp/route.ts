@@ -153,9 +153,9 @@ export async function POST(req: Request) {
       user = await prisma.user.update({
         where: { id: user.id },
         data: {
-          telegramId: user.telegramId ?? telegram.id,
+          telegramId: telegram.id,
           telegramUsername: telegram.username,
-          telegramLinkedAt: user.telegramLinkedAt ?? new Date(),
+          telegramLinkedAt: user.telegramId === telegram.id ? user.telegramLinkedAt ?? new Date() : new Date(),
           name: user.name ?? telegram.name,
           lastLoginAt: new Date(),
           remnashopUserId: user.remnashopUserId ?? remnashopUser?.id,

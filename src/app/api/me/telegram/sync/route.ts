@@ -37,7 +37,10 @@ export const POST = withAuth(async () => {
     })
 
     return NextResponse.json(
-      { error: 'Синхронизация временно недоступна. Проверьте логи приложения.' },
+      {
+        error: 'Синхронизация временно недоступна',
+        details: message,
+      },
       { status: 502 }
     )
   }
