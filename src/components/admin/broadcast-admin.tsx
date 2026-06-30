@@ -432,9 +432,9 @@ export function BroadcastAdmin({
   }
 
   return (
-    <section className="grid gap-4">
-      <div className="card p-3">
-        <div className="grid gap-2 md:grid-cols-3">
+    <section className="grid min-w-0 max-w-full gap-4 overflow-hidden">
+      <div className="card min-w-0 overflow-hidden p-3">
+        <div className="grid min-w-0 gap-2 xl:grid-cols-3">
           <BroadcastStepButton
             active={step === 'message'}
             number="1"
@@ -459,8 +459,8 @@ export function BroadcastAdmin({
         </div>
       </div>
 
-      <div className="grid gap-4">
-        <div className={cn('card p-4', step !== 'audience' && 'hidden')}>
+      <div className="grid min-w-0 gap-4">
+        <div className={cn('card min-w-0 overflow-hidden p-4', step !== 'audience' && 'hidden')}>
           <div className="flex items-center gap-2">
             <UsersRound className="h-5 w-5 text-cyan-600" />
             <h2 className="font-semibold">Кому отправить</h2>
@@ -523,9 +523,9 @@ export function BroadcastAdmin({
 
         </div>
 
-        <div className={cn('card p-4', step === 'audience' && 'hidden')}>
-          <div className="grid gap-4">
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-white/10 dark:bg-white/5">
+        <div className={cn('card min-w-0 overflow-hidden p-4', step === 'audience' && 'hidden')}>
+          <div className="grid min-w-0 gap-4">
+            <div className="min-w-0 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-white/10 dark:bg-white/5">
               <div className="flex items-center justify-between gap-2">
                 <div>
                   <div className="text-sm font-semibold text-slate-950 dark:text-white">Шаблон сообщения</div>
@@ -535,11 +535,11 @@ export function BroadcastAdmin({
                   Сохранить
                 </button>
               </div>
-              <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
+              <div className="mt-3 grid min-w-0 gap-2 sm:grid-cols-2 2xl:grid-cols-3">
                 {visibleTemplates.map((template) => (
                   <div
                     key={template.id || template.title}
-                    className="min-w-56 rounded-lg border border-slate-200 bg-white p-3 transition-colors hover:bg-slate-50 dark:border-white/10 dark:bg-surface-900 dark:hover:bg-white/5"
+                    className="min-w-0 rounded-lg border border-slate-200 bg-white p-3 transition-colors hover:bg-slate-50 dark:border-white/10 dark:bg-surface-900 dark:hover:bg-white/5"
                   >
                     <button type="button" onClick={() => applyTemplate(template)} className="w-full text-left">
                       <div className="truncate text-sm font-semibold text-slate-950 dark:text-white">{template.title}</div>
@@ -555,7 +555,7 @@ export function BroadcastAdmin({
               </div>
             </div>
 
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-white/10 dark:bg-white/5">
+            <div className="min-w-0 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-white/10 dark:bg-white/5">
               <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Подстановки</div>
               <div className="mt-2 flex flex-wrap gap-2 text-xs">
                 {['{name}', '{email}', '{days_left}', '{plan}', '{ref_link}'].map((token) => (
@@ -591,7 +591,7 @@ export function BroadcastAdmin({
               <span className="mt-1 block text-xs text-slate-400">{body.length}/1200</span>
             </label>
 
-            <div className="grid gap-3 lg:grid-cols-[1fr_13rem]">
+            <div className="grid min-w-0 gap-3 lg:grid-cols-[minmax(0,1fr)_13rem]">
               <label className="block">
                 <span className="text-sm font-medium">Куда ведет кнопка</span>
                 <select
@@ -626,7 +626,7 @@ export function BroadcastAdmin({
 
             <label className="block">
               <span className="text-sm font-medium">Картинка</span>
-              <div className="mt-1 grid gap-2 sm:grid-cols-[1fr_auto_auto]">
+              <div className="mt-1 grid min-w-0 gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
                 <input
                   className="input"
                   value={imageUrl}
@@ -668,7 +668,7 @@ export function BroadcastAdmin({
               <span className="mt-1 block text-xs text-slate-400">До 15 МБ: JPG, PNG, WEBP или GIF. Можно оставить пустым.</span>
             </label>
 
-            <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50 shadow-sm dark:border-white/10 dark:bg-white/5">
+            <div className="min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-slate-50 shadow-sm dark:border-white/10 dark:bg-white/5">
               <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3 dark:border-white/10">
                 <div>
                   <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Предпросмотр</div>
@@ -746,7 +746,9 @@ export function BroadcastAdmin({
         </div>
       </div>
 
-      <BroadcastHistory history={history} onRepeat={applyHistoryItem} onView={setSelectedHistoryItem} />
+      <div className="min-w-0 overflow-hidden">
+        <BroadcastHistory history={history} onRepeat={applyHistoryItem} onView={setSelectedHistoryItem} />
+      </div>
       {selectedHistoryItem ? <BroadcastHistoryModal item={selectedHistoryItem} onClose={() => setSelectedHistoryItem(null)} /> : null}
     </section>
   )
@@ -769,7 +771,7 @@ function BroadcastStepButton({
     <button
       type="button"
       className={cn(
-        'flex min-h-20 items-center gap-3 rounded-xl border p-3 text-left transition-colors',
+        'flex min-h-20 min-w-0 items-center gap-3 rounded-xl border p-3 text-left transition-colors',
         active
           ? 'border-slate-950 bg-slate-950 text-white shadow-sm dark:border-white dark:bg-white dark:text-slate-950'
           : 'border-slate-200 bg-white hover:bg-slate-50 dark:border-white/10 dark:bg-white/[0.03] dark:hover:bg-white/[0.06]'
@@ -783,7 +785,7 @@ function BroadcastStepButton({
         {number}
       </span>
       <span className="min-w-0">
-        <span className="block font-semibold">{title}</span>
+        <span className="block truncate font-semibold">{title}</span>
         <span className={cn('mt-0.5 block truncate text-sm', active ? 'text-white/70 dark:text-slate-500' : 'text-slate-500 dark:text-slate-400')}>
           {description}
         </span>
@@ -802,7 +804,7 @@ function BroadcastHistory({
   onView: (item: BroadcastHistoryItem) => void
 }) {
   return (
-    <div className="card p-4">
+    <div className="card min-w-0 overflow-hidden p-4">
       <div className="flex items-center gap-2">
         <Clock3 className="h-5 w-5 text-cyan-600" />
         <h2 className="font-semibold">Последние рассылки</h2>
@@ -814,10 +816,10 @@ function BroadcastHistory({
       ) : (
         <div className="mt-4 grid gap-2">
           {history.map((item) => (
-            <div key={item.id} className="rounded-xl border border-slate-200 bg-white p-3 dark:border-white/10 dark:bg-surface-900">
+            <div key={item.id} className="min-w-0 rounded-xl border border-slate-200 bg-white p-3 dark:border-white/10 dark:bg-surface-900">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                <div>
-                  <div className="font-semibold">{item.title}</div>
+                <div className="min-w-0">
+                  <div className="truncate font-semibold">{item.title}</div>
                   <div className="mt-1 text-xs text-slate-500">
                     {formatDateTime(item.createdAt)} · {segmentLabel(item.segment)} · {item.createdBy || 'Система'}
                   </div>

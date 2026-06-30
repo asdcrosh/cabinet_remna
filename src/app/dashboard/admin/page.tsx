@@ -295,13 +295,6 @@ export default async function AdminDashboardPage() {
           value={activePlans}
         />
         <AdminTile
-          href="/dashboard/admin/subscriptions"
-          icon={<ShieldCheck className="h-5 w-5" />}
-          title="Подписки"
-          value={activeSubscriptions}
-          note={expiringSoon > 0 ? `${expiringSoon} скоро истекут` : undefined}
-        />
-        <AdminTile
           href="/dashboard/admin/payments"
           icon={<CreditCard className="h-5 w-5" />}
           title="Платежи"

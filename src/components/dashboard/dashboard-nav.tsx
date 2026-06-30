@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation'
 import { createPortal } from 'react-dom'
 import {
   Bell,
+  ChevronDown,
   CreditCard,
   Database,
   FileClock,
@@ -66,6 +67,43 @@ const adminNav = [
   { href: '/dashboard/admin/remnashop-sync', label: 'Синхронизация', icon: Database },
   { href: '/dashboard/admin/system', label: 'Система', icon: ServerCog },
   { href: '/dashboard/admin/audit', label: 'История', icon: FileClock },
+]
+
+const adminNavGroups = [
+  {
+    title: 'Аккаунты',
+    items: [
+      '/dashboard/admin',
+      '/dashboard/admin/users',
+      '/dashboard/admin/duplicates',
+    ],
+  },
+  {
+    title: 'Коммуникации',
+    items: [
+      '/dashboard/admin/notifications',
+      '/dashboard/admin/broadcasts',
+      '/dashboard/admin/support',
+    ],
+  },
+  {
+    title: 'Продажи',
+    items: [
+      '/dashboard/admin/offers',
+      '/dashboard/admin/plans',
+      '/dashboard/admin/promo-codes',
+      '/dashboard/admin/bonus-box',
+      '/dashboard/admin/payments',
+    ],
+  },
+  {
+    title: 'Система',
+    items: [
+      '/dashboard/admin/remnashop-sync',
+      '/dashboard/admin/system',
+      '/dashboard/admin/audit',
+    ],
+  },
 ]
 
 type NavItem = (typeof nav)[number] | (typeof adminNav)[number]
@@ -367,5 +405,73 @@ function AdminNavGroups({
   badges: NavBadges
   onNavigate?: () => void
 }) {
-  return <NavGroup items={getAdminItems(role, features)} pathname={pathname} badges={badges} onNavigate={onNavigate} />
+  const availableItems = getAdminItems(role, features)
+  const availableByHref = new Map(availableItems.map((item) => [item.href, item]))
+  const groups = adminNavGroups
+    .map((group) => ({
+      ...group,
+      items: group.items
+        .map((href) => availableByHref.get(href))
+        .filter((item): item is NavItem => Boolean(item)),
+    }))
+    .filter((group) => group.items.length > 0)
+
+  if (role === 'MODERATOR') {
+    return <NavGroup items={availableItems} pathname={pathname} badges={badges} onNavigate={onNavigate} />
+  }
+
+  return (
+    <div className="space-y-1.5">
+      {groups.map((group) => (
+        <AdminNavGroup
+          key={group.title}
+          title={group.title}
+          items={group.items}
+          pathname={pathname}
+          badges={badges}
+          onNavigate={onNavigate}
+        />
+      ))}
+    </div>
+  )
+}
+
+function AdminNavGroup({
+  title,
+  items,
+  pathname,
+  badges,
+  onNavigate,
+}: {
+  title: string
+  items: NavItem[]
+  pathname: string
+  badges: NavBadges
+  onNavigate?: () => void
+}) {
+  const hasActiveItem = items.some((item) => item.exact ? pathname === item.href : pathname.startsWith(item.href))
+  const [open, setOpen] = useState(hasActiveItem)
+
+  useEffect(() => {
+    if (hasActiveItem) setOpen(true)
+  }, [hasActiveItem])
+
+  return (
+    <div className="rounded-lg border border-slate-100 bg-white/45 p-1 dark:border-white/10 dark:bg-white/[0.03]">
+      <button
+        type="button"
+        className="flex w-full items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-400 transition-colors hover:bg-white/70 hover:text-slate-600 dark:hover:bg-white/5 dark:hover:text-slate-200"
+        onClick={() => setOpen((value) => !value)}
+        aria-expanded={open}
+      >
+        <span>{title}</span>
+        <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', open && 'rotate-180')} />
+      </button>
+      {open && (
+        <div className="mt-1 space-y-1">
+          <NavGroup items={items} pathname={pathname} badges={badges} onNavigate={onNavigate} />
+        </div>
+      )}
+    </div>
+  )
 }

@@ -3,7 +3,6 @@ export type FeatureFlags = {
   bonusBox: boolean
   support: boolean
   broadcasts: boolean
-  giftCertificates: boolean
 }
 
 export function getFeatureFlags(): FeatureFlags {
@@ -12,7 +11,6 @@ export function getFeatureFlags(): FeatureFlags {
     bonusBox: envFlag('FEATURE_BONUS_BOX', true),
     support: envFlag('FEATURE_SUPPORT', true),
     broadcasts: envFlag('FEATURE_BROADCASTS', true),
-    giftCertificates: envFlag('FEATURE_GIFT_CERTIFICATES', true),
   }
 }
 
