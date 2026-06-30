@@ -122,7 +122,7 @@ describe('openBonusBox', () => {
 
   it('grants extra box attempts when the prize type is BONUS_ATTEMPTS', async () => {
     const attemptPrize = prize('attempts-prize', 'COMMON', 'BONUS_ATTEMPTS', 2)
-    mocks.prisma.bonusBoxAttempt.findFirst.mockResolvedValue({ id: 'attempt-1' })
+    mocks.prisma.bonusBoxAttempt.findFirst.mockResolvedValue({ id: 'attempt-1', source: 'PAYMENT', sourceKey: 'payment-1:1' })
     mocks.prisma.user.findUnique.mockResolvedValue({
       id: 'user-1',
       remnawaveUuid: 'rw-1',
@@ -156,7 +156,7 @@ describe('openBonusBox', () => {
 
   it('records a no-prize opening without granting any reward', async () => {
     const emptyPrize = prize('empty-prize', 'COMMON', 'NO_PRIZE', 0)
-    mocks.prisma.bonusBoxAttempt.findFirst.mockResolvedValue({ id: 'attempt-1' })
+    mocks.prisma.bonusBoxAttempt.findFirst.mockResolvedValue({ id: 'attempt-1', source: 'PAYMENT', sourceKey: 'payment-1:1' })
     mocks.prisma.user.findUnique.mockResolvedValue({
       id: 'user-1',
       remnawaveUuid: 'rw-1',
@@ -183,6 +183,44 @@ describe('openBonusBox', () => {
     expect(mocks.prisma.subscription.update).not.toHaveBeenCalled()
     expect(mocks.prisma.promoCode.create).not.toHaveBeenCalled()
     expect(mocks.prisma.bonusBoxAttempt.createMany).not.toHaveBeenCalled()
+  })
+
+  it('allows a welcome attempt before the first subscription', async () => {
+    const promoPrize = prize('promo-prize', 'COMMON', 'PROMO_CODE_PERCENT', 20)
+    const subscriptionPrize = prize('days-prize', 'COMMON', 'SUBSCRIPTION_DAYS', 3)
+    mocks.prisma.bonusBoxAttempt.findFirst.mockResolvedValue({
+      id: 'attempt-1',
+      source: 'MANUAL',
+      sourceKey: 'welcome:setting-1:1',
+    })
+    mocks.prisma.user.findUnique.mockResolvedValue({
+      id: 'user-1',
+      remnawaveUuid: null,
+      subscriptions: [],
+    })
+    mocks.prisma.bonusBoxPrize.findMany.mockResolvedValue([subscriptionPrize, promoPrize])
+    mocks.prisma.bonusBoxPrize.updateMany.mockResolvedValue({ count: 1 })
+    mocks.prisma.bonusBoxAttempt.update.mockResolvedValue({})
+    mocks.prisma.promoCode.create.mockResolvedValue({
+      id: 'promo-1',
+      code: 'BOX-WELCOME',
+      expiresAt: new Date('2026-07-01T00:00:00.000Z'),
+    })
+    mocks.prisma.bonusBoxOpening.create.mockResolvedValue({
+      id: 'opening-1',
+      promoCode: { code: 'BOX-WELCOME', expiresAt: new Date('2026-07-01T00:00:00.000Z') },
+    })
+    mocks.prisma.bonusBoxOpening.findMany.mockResolvedValue([])
+    mocks.prisma.bonusBoxAttempt.count.mockResolvedValue(0)
+
+    const result = await openBonusBox('user-1')
+
+    expect(result.prize.type).toBe('PROMO_CODE_PERCENT')
+    expect(result.promoCode).toBe('BOX-WELCOME')
+    expect(mocks.prisma.subscription.update).not.toHaveBeenCalled()
+    expect(mocks.prisma.bonusBoxPrize.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ id: 'promo-prize' }) })
+    )
   })
 })
 

@@ -238,6 +238,33 @@ describe('ensureRemnawaveSubscription', () => {
     )
   })
 
+  it('sends Telegram ID when creating a new Remnawave user', async () => {
+    mocks.prisma.payment.findUnique.mockResolvedValue(null)
+    mocks.prisma.user.findUnique.mockResolvedValue({
+      id: 'user-1',
+      email: 'user@example.com',
+      telegramId: 8507156675n,
+      remnawaveUuid: null,
+      subscriptions: [],
+    })
+    mocks.remnawave.createUser.mockResolvedValue({ response: remnawaveUser })
+    mocks.prisma.user.update.mockResolvedValue({})
+    mocks.prisma.subscription.create.mockResolvedValue({ id: 'sub-1' })
+
+    await ensureRemnawaveSubscription({
+      userId: 'user-1',
+      email: 'user@example.com',
+      plan,
+    })
+
+    expect(mocks.remnawave.createUser).toHaveBeenCalledWith(
+      expect.objectContaining({
+        email: 'user@example.com',
+        telegramId: '8507156675',
+      })
+    )
+  })
+
   it('recreates Remnawave user when local profile was deleted remotely', async () => {
     const currentExpireAt = new Date('2026-01-15T00:00:00.000Z')
     mocks.prisma.payment.findUnique.mockResolvedValue(null)

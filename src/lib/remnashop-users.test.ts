@@ -105,7 +105,7 @@ describe('syncRemnashopUsersToCabinet', () => {
       subscriptions: [],
     })
     mocks.remnawave.getUserByUuid.mockResolvedValue({ response: remnawaveUser })
-    mocks.remnawave.updateUser.mockResolvedValue({ response: { ...remnawaveUser, telegramId: 123 } })
+    mocks.remnawave.updateUser.mockResolvedValue({ response: { ...remnawaveUser, telegramId: '123' } })
     mocks.upsertLocalSubscriptionFromRemnawave.mockResolvedValue({ id: 'sub-1' })
     mocks.prisma.plan.findFirst.mockResolvedValue({ id: 'plan-light-7' })
 
@@ -113,7 +113,7 @@ describe('syncRemnashopUsersToCabinet', () => {
 
     expect(mocks.remnawave.getUserByUuid).toHaveBeenCalledWith('rw-1')
     expect(mocks.remnawave.updateUser).toHaveBeenCalledWith(
-      expect.objectContaining({ uuid: 'rw-1', telegramId: 123, tag: 'IMPORTED' })
+      expect.objectContaining({ uuid: 'rw-1', telegramId: '123', tag: 'IMPORTED' })
     )
     expect(mocks.prisma.plan.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -184,7 +184,7 @@ describe('syncRemnashopUsersToCabinet', () => {
       subscriptions: [{ id: 'sub-1', lastSyncedAt }],
     })
     mocks.remnawave.getUserByUuid.mockResolvedValue({ response: remnawaveUser })
-    mocks.remnawave.updateUser.mockResolvedValue({ response: { ...remnawaveUser, telegramId: 123 } })
+    mocks.remnawave.updateUser.mockResolvedValue({ response: { ...remnawaveUser, telegramId: '123' } })
     mocks.upsertLocalSubscriptionFromRemnawave.mockResolvedValue({ id: 'sub-1' })
 
     const result = await syncRemnashopUsersToCabinet({ forceRemnawaveSubscriptions: true })

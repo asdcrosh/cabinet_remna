@@ -1,5 +1,5 @@
 export function toRemnawaveTelegramId(value: bigint | number | null | undefined) {
   if (value == null) return undefined
-  const id = typeof value === 'bigint' ? Number(value) : value
-  return Number.isSafeInteger(id) && id > 0 ? id : undefined
+  if (typeof value === 'bigint') return value > 0n ? value.toString() : undefined
+  return Number.isSafeInteger(value) && value > 0 ? String(value) : undefined
 }

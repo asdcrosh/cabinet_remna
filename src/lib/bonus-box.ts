@@ -17,6 +17,7 @@ const ECONOMY_HISTORY_LIMIT = 80
 const REEL_ITEM_COUNT = 88
 const REEL_WINNING_BASE_INDEX = 72
 const REEL_WINNING_SPREAD = 4
+const WELCOME_ATTEMPT_PREFIX = 'welcome:'
 
 const RARITY_VISUAL_WEIGHT: Record<BonusBoxPublicPrize['rarity'], number> = {
   COMMON: 1,
@@ -111,7 +112,7 @@ export async function getBonusBoxOverview(userId: string) {
         OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
       },
       orderBy: { createdAt: 'asc' },
-      select: { id: true, source: true, expiresAt: true, createdAt: true },
+      select: { id: true, source: true, sourceKey: true, expiresAt: true, createdAt: true },
     }),
     getPrizeRows(prisma),
     prisma.bonusBoxOpening.findMany({
@@ -146,6 +147,7 @@ export async function getBonusBoxOverview(userId: string) {
       createdAt: attempt.createdAt.toISOString(),
     })),
     attemptsCount: attempts.length,
+    welcomeAttemptsCount: attempts.filter(isWelcomeBonusAttempt).length,
     prizes,
     openings: openings.slice(0, 12).map((opening) => ({
       id: opening.id,
@@ -354,18 +356,6 @@ export async function openBonusBox(userId: string): Promise<BonusBoxOpeningResul
   const now = new Date()
   const txResult = await prisma.$transaction(
     async (tx) => {
-      const attempt = await tx.bonusBoxAttempt.findFirst({
-        where: {
-          userId,
-          usedAt: null,
-          OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
-        },
-        orderBy: { createdAt: 'asc' },
-      })
-      if (!attempt) {
-        throw new BonusBoxError('Нет доступных открытий', 409, 'NO_ATTEMPTS')
-      }
-
       const user = await tx.user.findUnique({
         where: { id: userId },
         select: {
@@ -382,7 +372,31 @@ export async function openBonusBox(userId: string): Promise<BonusBoxOpeningResul
         },
       })
       const subscription = user?.subscriptions[0]
-      if (!user || !subscription || !user.remnawaveUuid) {
+      const hasActiveSubscription = Boolean(user && subscription && user.remnawaveUuid)
+      if (!user) {
+        throw new BonusBoxError('Пользователь не найден', 404, 'USER_NOT_FOUND')
+      }
+
+      const attempt = await tx.bonusBoxAttempt.findFirst({
+        where: {
+          userId,
+          usedAt: null,
+          OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+          ...(hasActiveSubscription
+            ? {}
+            : { source: 'MANUAL' as const, sourceKey: { startsWith: WELCOME_ATTEMPT_PREFIX } }),
+        },
+        orderBy: { createdAt: 'asc' },
+      })
+      if (!attempt) {
+        throw new BonusBoxError(
+          hasActiveSubscription ? 'Нет доступных открытий' : 'Нет приветственных открытий без подписки',
+          409,
+          'NO_ATTEMPTS'
+        )
+      }
+      const isWelcomeAttempt = isWelcomeBonusAttempt(attempt)
+      if (!hasActiveSubscription && !isWelcomeAttempt) {
         throw new BonusBoxError('Нужна активная VPN-подписка', 403, 'NO_ACTIVE_SUBSCRIPTION')
       }
 
@@ -393,9 +407,17 @@ export async function openBonusBox(userId: string): Promise<BonusBoxOpeningResul
         },
         orderBy: { createdAt: 'asc' },
       })
-      const eligiblePrizes = prizes.filter((prize) => prize.maxWins == null || prize.winsCount < prize.maxWins)
+      const eligiblePrizes = prizes
+        .filter((prize) => prize.maxWins == null || prize.winsCount < prize.maxWins)
+        .filter((prize) => hasActiveSubscription || !prizeNeedsActiveSubscription(prize))
       if (eligiblePrizes.length === 0) {
-        throw new BonusBoxError('Администратор ещё не настроил подарки', 409, 'NO_PRIZES')
+        throw new BonusBoxError(
+          hasActiveSubscription
+            ? 'Администратор ещё не настроил подарки'
+            : 'Для приветственной крутки нужны подарки без активной подписки',
+          409,
+          'NO_PRIZES'
+        )
       }
 
       const recentOpenings = await tx.bonusBoxOpening.findMany({
@@ -449,7 +471,7 @@ export async function openBonusBox(userId: string): Promise<BonusBoxOpeningResul
         promoCodeExpiresAt: opening.promoCode?.expiresAt?.toISOString() ?? null,
         remoteUpdate:
           application.remoteUpdate
-            ? { ...application.remoteUpdate, remnawaveUuid: user.remnawaveUuid }
+            ? { ...application.remoteUpdate, remnawaveUuid: user.remnawaveUuid! }
             : null,
       }
     },
@@ -484,6 +506,14 @@ export async function openBonusBox(userId: string): Promise<BonusBoxOpeningResul
   }
 }
 
+function isWelcomeBonusAttempt(attempt: { source: string; sourceKey: string }) {
+  return attempt.source === 'MANUAL' && attempt.sourceKey.startsWith(WELCOME_ATTEMPT_PREFIX)
+}
+
+function prizeNeedsActiveSubscription(prize: Pick<BonusBoxPrize, 'type'>) {
+  return prize.type === 'SUBSCRIPTION_DAYS' || prize.type === 'TRAFFIC_GB'
+}
+
 export async function getPublicPrizes(tx: Pick<BonusBoxTx, 'bonusBoxPrize'> = prisma) {
   const prizes = await getPrizeRows(tx)
   return publicPrizesWithChances(prizes, prizes)
@@ -504,7 +534,7 @@ async function applyPrizeInTransaction(
   tx: BonusBoxTx,
   input: {
     userId: string
-    subscription: {
+    subscription?: {
       id: string
       expireAt: Date
       trafficLimitBytes: bigint | null
@@ -536,6 +566,9 @@ async function applyPrizeInTransaction(
   }
 
   if (input.prize.type === 'SUBSCRIPTION_DAYS') {
+    if (!input.subscription) {
+      throw new BonusBoxError('Нужна активная VPN-подписка', 403, 'NO_ACTIVE_SUBSCRIPTION')
+    }
     const base = input.subscription.expireAt.getTime() > Date.now() ? input.subscription.expireAt : new Date()
     const expireAt = new Date(base.getTime() + input.prize.value * 24 * 60 * 60 * 1000)
     await tx.subscription.update({
@@ -554,6 +587,9 @@ async function applyPrizeInTransaction(
     }
   }
 
+  if (!input.subscription) {
+    throw new BonusBoxError('Нужна активная VPN-подписка', 403, 'NO_ACTIVE_SUBSCRIPTION')
+  }
   const currentLimit = input.subscription.trafficLimitBytes
   const trafficLimitBytes = currentLimit == null ? null : currentLimit + gbToBytes(input.prize.value)
   await tx.subscription.update({

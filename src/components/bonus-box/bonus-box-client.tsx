@@ -62,6 +62,7 @@ type BonusBoxOverview = {
   config: BonusBoxConfigView;
   hasActiveSubscription: boolean;
   attemptsCount: number;
+  welcomeAttemptsCount: number;
   prizes: BonusBoxPrizeView[];
   openings: BonusBoxOpeningView[];
 };
@@ -115,9 +116,11 @@ export function BonusBoxClient({
   const [revealEffect, setRevealEffect] = useState(false);
   const [result, setResult] = useState<OpenBoxResponse | null>(null);
   const [activeTab, setActiveTab] = useState<BonusBoxTab>("outcomes");
+  const canUseWelcomeAttempts =
+    !data.hasActiveSubscription && data.welcomeAttemptsCount > 0;
 
   const canOpen =
-    data.hasActiveSubscription &&
+    (data.hasActiveSubscription || canUseWelcomeAttempts) &&
     data.attemptsCount > 0 &&
     data.prizes.length > 0 &&
     !opening;
@@ -125,7 +128,9 @@ export function BonusBoxClient({
     ? "Открываем..."
     : data.attemptsCount <= 0
       ? "Нет открытий"
-      : !data.hasActiveSubscription
+      : canUseWelcomeAttempts
+        ? "Открыть приветственный бонус"
+        : !data.hasActiveSubscription
         ? "Нужна подписка"
         : data.prizes.length === 0
           ? "Подарки не настроены"
@@ -218,6 +223,8 @@ export function BonusBoxClient({
                 )}
                 {data.hasActiveSubscription
                   ? "Подписка активна"
+                  : canUseWelcomeAttempts
+                    ? "Приветственный бонус"
                   : "Нужна подписка"}
               </span>
             </div>
@@ -249,10 +256,16 @@ export function BonusBoxClient({
                 hint="результатов"
               />
             </div>
-            {!data.hasActiveSubscription && data.attemptsCount > 0 && (
+            {!data.hasActiveSubscription && data.attemptsCount > 0 && !canUseWelcomeAttempts && (
               <div className="mt-4 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
                 <LockKeyhole className="mt-0.5 h-4 w-4 shrink-0" />
                 <span>Открытия сохраняются на балансе. Активируйте подписку, чтобы забрать подарок.</span>
+              </div>
+            )}
+            {canUseWelcomeAttempts && (
+              <div className="mt-4 flex items-start gap-2 rounded-lg border border-cyan-200 bg-cyan-50 px-3 py-2 text-sm text-cyan-900 dark:border-cyan-400/30 dark:bg-cyan-400/10 dark:text-cyan-100">
+                <Gift className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>Приветственные открытия доступны без подписки. Следующие бонусы откроются после покупки VPN.</span>
               </div>
             )}
           </div>

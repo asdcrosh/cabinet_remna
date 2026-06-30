@@ -72,7 +72,7 @@ export interface CreateUserRequest {
   description?: string
   tag?: string
   email?: string
-  telegramId?: number
+  telegramId?: number | string
   hwidDeviceLimit?: number
   activeInternalSquads?: string[]
   externalSquadUuid?: string
@@ -87,7 +87,7 @@ export interface UpdateUserRequest {
   trafficLimitStrategy?: TrafficLimitStrategy
   description?: string | null
   tag?: string
-  telegramId?: number
+  telegramId?: number | string
   email?: string
   hwidDeviceLimit?: number
   activeInternalSquads?: string[]
@@ -111,7 +111,7 @@ export interface UserResponse {
   tag?: string
   hwidDeviceLimit?: number
   email?: string
-  telegramId?: number
+  telegramId?: number | string
   description?: string
 }
 
