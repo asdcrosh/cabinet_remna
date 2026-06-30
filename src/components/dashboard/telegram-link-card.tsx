@@ -67,19 +67,19 @@ export function TelegramLinkCard({
 
   return (
     <div className={embedded ? '' : 'card'}>
-      <div className="mb-4 flex items-start gap-3">
+      <div className="mb-4 flex items-center gap-3">
         <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-sky-50 text-sky-600 dark:bg-sky-500/10 dark:text-sky-300">
           <Send className="h-5 w-5" />
         </div>
         <div className="min-w-0">
-          <h2 className="text-lg font-semibold">Перенос из Telegram</h2>
-          <p className="mt-1 text-sm text-slate-500">
+          <h2 className="font-semibold">Перенос из Telegram</h2>
+          <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
             Нужен только тем, кто покупал VPN раньше через Telegram.
           </p>
         </div>
       </div>
 
-      <div className="mb-4 grid gap-3 rounded-lg bg-slate-50 p-4 text-sm dark:bg-surface-800 sm:grid-cols-2">
+      <div className="mb-4 grid gap-2 text-sm sm:grid-cols-3">
         <Info label="Telegram" value={telegramId ? `@${telegramUsername || telegramId}` : 'не привязан'} />
         <Info label="Старая подписка" value={remnashopUserId ? 'найдена' : 'не найдена'} />
         <Info label="VPN-профиль" value={remnawaveUsername ? 'готов' : 'пока нет'} />
@@ -127,9 +127,9 @@ function TelegramOidcHint() {
 
 function Info({ label, value }: { label: string; value: string }) {
   return (
-    <div className="min-w-0">
-      <div className="text-slate-500">{label}</div>
-      <div className="truncate font-medium">{value}</div>
+    <div className="min-w-0 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 dark:border-white/10 dark:bg-white/[0.03]">
+      <div className="text-xs text-slate-500 dark:text-slate-400">{label}</div>
+      <div className="mt-1 truncate font-medium text-slate-950 dark:text-white">{value}</div>
     </div>
   )
 }
