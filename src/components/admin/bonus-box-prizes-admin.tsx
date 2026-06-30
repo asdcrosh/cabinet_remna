@@ -159,7 +159,7 @@ export function BonusBoxPrizesAdmin({
     <div className="space-y-5">
       <section className="relative overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm shadow-slate-200/60 dark:border-white/10 dark:bg-surface-900 dark:shadow-black/20">
         <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-cyan-400 via-emerald-300 to-blue-500" />
-        <div className="p-4 pt-5 sm:p-5">
+        <div className="p-4 pt-5">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div className="min-w-0">
               <div className="inline-flex items-center gap-2 rounded-full bg-cyan-50 px-3 py-1 text-xs font-semibold text-cyan-700 dark:bg-cyan-500/10 dark:text-cyan-200">
@@ -177,14 +177,14 @@ export function BonusBoxPrizesAdmin({
             </button>
           </div>
 
-          <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
             <SummaryCell label="Активных" value={`${stats.active}/${prizes.length}`} />
             <SummaryCell label="Шанс награды" value={formatChance(stats.rewardChance)} />
             <SummaryCell label="Без подарка" value={formatChance(stats.noPrizeChance)} tone="danger" />
             <SummaryCell label="Открытий" value={totalOpenings} />
           </div>
 
-          <div className="mt-5 space-y-2">
+          <div className="mt-4 space-y-2">
             <EconomyLine label="Награды" value={stats.rewardChance} className="bg-emerald-500" />
             <EconomyLine label="Без подарка" value={stats.noPrizeChance} className="bg-red-500" />
             <EconomyLine label="Промокоды" value={stats.promoChance} className="bg-violet-500" />
@@ -211,7 +211,7 @@ export function BonusBoxPrizesAdmin({
       </div>
 
       {activeTab === 'prizes' && (
-        <section className="grid gap-3 lg:grid-cols-2">
+        <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {prizes.map((prize) => (
             <PrizeAdminRow
               key={prize.id}
@@ -301,9 +301,9 @@ function SummaryCell({
   tone?: 'default' | 'danger'
 }) {
   return (
-    <div className="rounded-lg border border-slate-100 bg-slate-50/80 px-3 py-3 dark:border-white/10 dark:bg-white/[0.04]">
+    <div className="rounded-lg border border-slate-100 bg-slate-50/80 px-3 py-2.5 dark:border-white/10 dark:bg-white/[0.04]">
       <div className="text-xs text-slate-500">{label}</div>
-      <div className={cn('mt-1 text-2xl font-semibold tracking-tight', tone === 'danger' && 'text-red-600 dark:text-red-300')}>
+      <div className={cn('mt-1 text-xl font-semibold tracking-tight', tone === 'danger' && 'text-red-600 dark:text-red-300')}>
         {value}
       </div>
     </div>
@@ -347,7 +347,7 @@ function PrizeAdminRow({
   return (
     <article className={cn('group relative overflow-hidden rounded-lg border bg-white shadow-sm shadow-slate-200/60 transition hover:-translate-y-0.5 hover:border-cyan-200 hover:shadow-lg hover:shadow-slate-950/5 dark:bg-surface-900 dark:shadow-black/20 dark:hover:border-cyan-500/30', prizeAdminBorderClass(prize))}>
       <div className={cn('h-1', prizeAdminTopClass(prize))} />
-      <div className="space-y-4 p-4">
+      <div className="space-y-3 p-3">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
@@ -358,24 +358,24 @@ function PrizeAdminRow({
                 {rarityLabel(prize.rarity)}
               </span>
             </div>
-            <h3 className="mt-2 truncate text-lg font-semibold text-slate-950 dark:text-white">{prize.title}</h3>
-            <div className="mt-1 line-clamp-2 text-sm leading-5 text-slate-500 dark:text-slate-400">
+            <h3 className="mt-2 truncate text-base font-semibold text-slate-950 dark:text-white">{prize.title}</h3>
+            <div className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500 dark:text-slate-400">
               {prize.description || prizeTypeLabel(prize.type)}
             </div>
           </div>
-          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-slate-950 text-cyan-200 shadow-sm dark:bg-white dark:text-slate-950">
-            <Gift className="h-5 w-5" />
+          <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-slate-950 text-cyan-200 shadow-sm dark:bg-white dark:text-slate-950">
+            <Gift className="h-4 w-4" />
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <div className="grid grid-cols-4 gap-1.5">
           <CompactMetric label="Подарок" value={prizeValue(prize)} />
           <CompactMetric label="Шанс" value={formatChance(prize.chance)} />
           <CompactMetric label="Вес" value={prize.weight} />
           <CompactMetric label="Выпало" value={`${prize.winsCount}/${prize.maxWins ?? '∞'}`} />
         </div>
 
-        <div className="grid gap-2 sm:grid-cols-2">
+        <div className="grid grid-cols-2 gap-2">
           <button type="button" className="btn-secondary min-h-10 justify-center px-3 text-xs" onClick={onEdit}>
             <Edit3 className="h-3.5 w-3.5" />
             Изменить
@@ -700,9 +700,9 @@ function PrizeFormPreview({ form }: { form: FormState }) {
 
 function CompactMetric({ label, value }: { label: string; value: ReactNode }) {
   return (
-    <div className="min-w-0 rounded-lg border border-slate-100 bg-slate-50/80 px-3 py-2 dark:border-white/10 dark:bg-white/[0.04]">
-      <div className="text-xs text-slate-500">{label}</div>
-      <div className="mt-1 truncate font-medium">{value}</div>
+    <div className="min-w-0 rounded-lg border border-slate-100 bg-slate-50/80 px-2 py-1.5 dark:border-white/10 dark:bg-white/[0.04]">
+      <div className="truncate text-[11px] text-slate-500">{label}</div>
+      <div className="mt-0.5 truncate text-sm font-semibold">{value}</div>
     </div>
   )
 }

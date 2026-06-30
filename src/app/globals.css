@@ -118,6 +118,247 @@
     @apply sticky right-0 z-10 border-l bg-white shadow-[-12px_0_18px_-18px_rgba(15,23,42,0.55)]
            dark:bg-surface-900;
   }
+
+  .bonus-box-stage {
+    position: relative;
+    isolation: isolate;
+  }
+  .bonus-box-stage::before {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    z-index: -1;
+    border-radius: inherit;
+    background:
+      radial-gradient(circle at 50% 40%, rgba(103, 232, 249, 0.35), transparent 32%),
+      linear-gradient(90deg, rgba(34, 211, 238, 0.45), rgba(16, 185, 129, 0.32), rgba(59, 130, 246, 0.45));
+    opacity: 0;
+    filter: blur(20px);
+    transition: opacity 260ms ease;
+  }
+  .bonus-box-stage--opening::before,
+  .bonus-box-stage--reveal::before {
+    opacity: 1;
+  }
+  .bonus-box-stage--opening {
+    animation: bonus-box-stage-breathe 1400ms ease-in-out infinite;
+  }
+  .bonus-box-reel-shell {
+    isolation: isolate;
+  }
+  .bonus-box-reel-shell::before {
+    content: '';
+    pointer-events: none;
+    position: absolute;
+    inset: 0;
+    z-index: 18;
+    background:
+      linear-gradient(115deg, transparent 12%, rgba(255, 255, 255, 0.12) 28%, transparent 44%),
+      radial-gradient(circle at 50% 50%, rgba(103, 232, 249, 0.14), transparent 42%);
+    opacity: 0;
+    transform: translateX(-22%);
+  }
+  .bonus-box-stage--opening .bonus-box-reel-shell::before {
+    animation: bonus-box-luxury-sweep 1600ms ease-in-out infinite;
+  }
+  .bonus-box-stage--opening .bonus-box-reel-card {
+    animation: bonus-box-card-lift 1050ms ease-in-out infinite;
+  }
+  .bonus-box-stage--opening .bonus-box-reel-track {
+    filter: drop-shadow(0 0 22px rgba(103, 232, 249, 0.2));
+  }
+  .bonus-box-fx-layer {
+    pointer-events: none;
+    position: absolute;
+    inset: 0;
+    z-index: 24;
+    overflow: hidden;
+    opacity: 0;
+    transition: opacity 220ms ease;
+  }
+  .bonus-box-stage--opening .bonus-box-fx-layer,
+  .bonus-box-stage--reveal .bonus-box-fx-layer {
+    opacity: 1;
+  }
+  .bonus-box-fx-aurora {
+    position: absolute;
+    inset: -45%;
+    background:
+      conic-gradient(from 210deg at 50% 50%, transparent, rgba(34, 211, 238, 0.28), rgba(245, 158, 11, 0.22), rgba(16, 185, 129, 0.22), transparent),
+      radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.14), transparent 28%);
+    filter: blur(26px) saturate(1.25);
+    mix-blend-mode: screen;
+    opacity: 0.85;
+    animation: bonus-box-aurora-spin 4200ms linear infinite;
+  }
+  .bonus-box-fx-scanner {
+    position: absolute;
+    inset-y: 0;
+    left: 50%;
+    width: min(26rem, 82%);
+    transform: translateX(-50%);
+    background:
+      linear-gradient(90deg, transparent, rgba(103, 232, 249, 0.18), rgba(255, 255, 255, 0.32), rgba(103, 232, 249, 0.18), transparent);
+    mix-blend-mode: screen;
+    opacity: 0.88;
+    animation: bonus-box-scanner-pulse 860ms ease-in-out infinite;
+  }
+  .bonus-box-fx-ring {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 8rem;
+    height: 8rem;
+    border-radius: 999px;
+    border: 1px solid rgba(165, 243, 252, 0.62);
+    box-shadow:
+      0 0 32px rgba(103, 232, 249, 0.34),
+      inset 0 0 24px rgba(255, 255, 255, 0.14);
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.62);
+  }
+  .bonus-box-stage--opening .bonus-box-fx-ring {
+    animation: bonus-box-ring-expand 1450ms ease-out infinite;
+  }
+  .bonus-box-fx-ring-two {
+    animation-delay: 420ms !important;
+  }
+  .bonus-box-fx-flash {
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.85), rgba(103, 232, 249, 0.34) 18%, transparent 46%);
+    opacity: 0;
+    mix-blend-mode: screen;
+  }
+  .bonus-box-stage--win .bonus-box-fx-flash {
+    background:
+      radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.95), rgba(251, 191, 36, 0.48) 18%, rgba(34, 211, 238, 0.22) 38%, transparent 58%);
+  }
+  .bonus-box-stage--empty .bonus-box-fx-flash {
+    background:
+      radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.62), rgba(248, 113, 113, 0.28) 18%, transparent 54%);
+  }
+  .bonus-box-stage--reveal .bonus-box-fx-flash {
+    animation: bonus-box-final-flash 980ms ease-out both;
+  }
+  .bonus-box-fx-particles {
+    position: absolute;
+    inset: 0;
+  }
+  .bonus-box-fx-particles span {
+    position: absolute;
+    bottom: -0.75rem;
+    left: var(--bonus-particle-x);
+    width: var(--bonus-particle-size);
+    height: var(--bonus-particle-size);
+    border-radius: 999px;
+    background: rgba(236, 253, 245, 0.92);
+    box-shadow:
+      0 0 10px rgba(103, 232, 249, 0.9),
+      0 0 22px rgba(251, 191, 36, 0.28);
+    opacity: 0;
+  }
+  .bonus-box-stage--opening .bonus-box-fx-particles span,
+  .bonus-box-stage--reveal .bonus-box-fx-particles span {
+    animation: bonus-box-particle-rise var(--bonus-particle-duration) ease-out infinite;
+    animation-delay: var(--bonus-particle-delay);
+  }
+}
+
+@keyframes bonus-box-stage-breathe {
+  0%, 100% {
+    box-shadow:
+      0 18px 40px rgba(2, 6, 23, 0.22),
+      0 0 0 rgba(103, 232, 249, 0);
+  }
+  50% {
+    box-shadow:
+      0 22px 58px rgba(2, 6, 23, 0.34),
+      0 0 46px rgba(103, 232, 249, 0.18);
+  }
+}
+
+@keyframes bonus-box-luxury-sweep {
+  0% {
+    opacity: 0;
+    transform: translateX(-36%);
+  }
+  38% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(36%);
+  }
+}
+
+@keyframes bonus-box-card-lift {
+  0%, 100% {
+    filter: brightness(1) saturate(1);
+  }
+  50% {
+    filter: brightness(1.18) saturate(1.18);
+  }
+}
+
+@keyframes bonus-box-aurora-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes bonus-box-scanner-pulse {
+  0%, 100% {
+    opacity: 0.42;
+    transform: translateX(-50%) scaleX(0.84);
+  }
+  50% {
+    opacity: 0.96;
+    transform: translateX(-50%) scaleX(1.08);
+  }
+}
+
+@keyframes bonus-box-ring-expand {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.58);
+  }
+  22% {
+    opacity: 0.85;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1.85);
+  }
+}
+
+@keyframes bonus-box-final-flash {
+  0% {
+    opacity: 0;
+    transform: scale(0.86);
+  }
+  18% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.24);
+  }
+}
+
+@keyframes bonus-box-particle-rise {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 0, 0) scale(0.65);
+  }
+  14% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(var(--bonus-particle-drift), -9.25rem, 0) scale(1.18);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -125,6 +366,21 @@
     animation: none !important;
   }
   .traffic-chart-moving-dot {
+    display: none;
+  }
+  .bonus-box-stage,
+  .bonus-box-stage::before,
+  .bonus-box-reel-shell::before,
+  .bonus-box-reel-card,
+  .bonus-box-fx-aurora,
+  .bonus-box-fx-scanner,
+  .bonus-box-fx-ring,
+  .bonus-box-fx-flash,
+  .bonus-box-fx-particles span {
+    animation: none !important;
+    transition: none !important;
+  }
+  .bonus-box-fx-layer {
     display: none;
   }
 }
