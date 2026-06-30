@@ -37,10 +37,6 @@ export async function mergeTechnicalTelegramAccount(input: {
     source.email.endsWith('@pending.invalid') &&
     !source.emailVerifiedAt
 
-  if (source.role !== 'USER') {
-    throw new TelegramAccountMergeError('PRIVILEGED_SOURCE')
-  }
-
   const remnashopUserId = await resolveRemnashopIdentity(
     target.remnashopUserId,
     source.remnashopUserId
@@ -228,7 +224,7 @@ export async function mergeTechnicalTelegramAccount(input: {
     })
     if (isTechnicalSource) {
       await tx.user.delete({ where: { id: source.id } })
-    } else {
+    } else if (source.role === 'USER') {
       await tx.user.update({
         where: { id: source.id },
         data: {
@@ -244,7 +240,12 @@ export async function mergeTechnicalTelegramAccount(input: {
     }
   })
 
-  return { merged: true as const, sourceUserId: source.id, sourceWasTechnical: isTechnicalSource }
+  return {
+    merged: true as const,
+    sourceUserId: source.id,
+    sourceWasTechnical: isTechnicalSource,
+    sourceWasPrivileged: source.role !== 'USER',
+  }
 }
 
 async function resolveRemnashopIdentity(targetId: number | null, sourceId: number | null) {

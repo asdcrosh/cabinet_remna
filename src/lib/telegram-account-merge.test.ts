@@ -221,6 +221,55 @@ describe('technical Telegram account merge', () => {
     )
   })
 
+  it('moves a Telegram identity away from a privileged account without archiving that account', async () => {
+    mocks.findUnique
+      .mockResolvedValueOnce({ ...target, remnawaveUuid: null })
+      .mockResolvedValueOnce(technicalSource({
+        id: 'admin-user',
+        email: 'admin@example.com',
+        role: 'ADMIN',
+        emailVerifiedAt: new Date(),
+        remnawaveUuid: 'admin-remna-uuid',
+      }))
+
+    await expect(
+      mergeTechnicalTelegramAccount({
+        targetUserId: target.id,
+        telegramId: 123n,
+        telegramUsername: 'telegram_user',
+        telegramName: 'Telegram User',
+      })
+    ).resolves.toMatchObject({
+      merged: true,
+      sourceUserId: 'admin-user',
+      sourceWasPrivileged: true,
+    })
+
+    expect(mocks.userUpdate).toHaveBeenCalledWith({
+      where: { id: 'admin-user' },
+      data: expect.objectContaining({
+        telegramId: null,
+        remnawaveUuid: null,
+      }),
+    })
+    expect(mocks.userUpdate).not.toHaveBeenCalledWith({
+      where: { id: 'admin-user' },
+      data: expect.objectContaining({
+        email: 'merged-admin-user@pending.invalid',
+      }),
+    })
+    expect(mocks.userDelete).not.toHaveBeenCalled()
+    expect(mocks.userUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'email-user' },
+        data: expect.objectContaining({
+          telegramId: 123n,
+          remnawaveUuid: 'admin-remna-uuid',
+        }),
+      })
+    )
+  })
+
   it('prefers the existing Telegram Remnashop identity over an empty email duplicate', async () => {
     process.env.REMNASHOP_DATABASE_URL = 'postgresql://readonly@example/remnashop'
     mocks.findUnique
