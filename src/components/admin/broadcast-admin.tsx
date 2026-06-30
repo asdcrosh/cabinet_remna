@@ -521,9 +521,17 @@ export function BroadcastAdmin({
             </div>
           </div>
 
+          <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:justify-between">
+            <button type="button" className="btn-secondary min-h-11 px-5" onClick={() => setStep('message')}>
+              Назад
+            </button>
+            <button type="button" className="btn-primary min-h-11 px-5" onClick={() => setStep('delivery')} disabled={!canSend}>
+              К проверке
+            </button>
+          </div>
         </div>
 
-        <div className={cn('card min-w-0 overflow-hidden p-4', step === 'audience' && 'hidden')}>
+        <div className={cn('card min-w-0 overflow-hidden p-4', step !== 'message' && 'hidden')}>
           <div className="grid min-w-0 gap-4">
             <div className="min-w-0 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-white/10 dark:bg-white/5">
               <div className="flex items-center justify-between gap-2">
@@ -668,6 +676,25 @@ export function BroadcastAdmin({
               <span className="mt-1 block text-xs text-slate-400">До 15 МБ: JPG, PNG, WEBP или GIF. Можно оставить пустым.</span>
             </label>
 
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="text-sm text-slate-500">Шаблон и текст готовы, дальше выберите аудиторию и канал.</div>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <button type="button" className="btn-primary min-h-11 px-5" onClick={() => setStep('audience')} disabled={!body.trim()}>
+                  Далее
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className={cn('card min-w-0 overflow-hidden p-4', step !== 'delivery' && 'hidden')}>
+          <div className="grid min-w-0 gap-4">
+            <div className="grid gap-2 md:grid-cols-3">
+              <InfoPill label="Сегмент" value={segmentLabel(segment)} />
+              <InfoPill label="Каналы" value={selectedChannels.map(channelLabel).join(', ')} />
+              <InfoPill label="Кнопка" value={actionHref ? previewActionLabel : 'Без кнопки'} />
+            </div>
+
             <div className="min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-slate-50 shadow-sm dark:border-white/10 dark:bg-white/5">
               <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3 dark:border-white/10">
                 <div>
@@ -727,11 +754,9 @@ export function BroadcastAdmin({
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               {stats ? <BroadcastStats stats={stats} /> : <div className="text-sm text-slate-500">Результат появится после отправки.</div>}
               <div className="flex flex-col gap-2 sm:flex-row">
-                {step === 'message' ? (
-                  <button type="button" className="btn-secondary min-h-11 px-5" onClick={() => setStep('audience')}>
-                    Далее
-                  </button>
-                ) : null}
+                <button type="button" className="btn-secondary min-h-11 px-5" onClick={() => setStep('audience')}>
+                  Назад
+                </button>
                 <button type="button" className="btn-secondary min-h-11 px-5" onClick={() => submit(true)} disabled={!canSend}>
                   <Send className="h-4 w-4" />
                   Тест себе
@@ -791,6 +816,15 @@ function BroadcastStepButton({
         </span>
       </span>
     </button>
+  )
+}
+
+function InfoPill({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-white/10 dark:bg-white/5">
+      <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">{label}</div>
+      <div className="mt-1 truncate text-sm font-semibold text-slate-950 dark:text-white">{value || 'Не выбрано'}</div>
+    </div>
   )
 }
 
