@@ -70,9 +70,9 @@ export function renderActionEmail(input: ActionEmailInput) {
                           : ''
                       }
                       <p style="margin:0;font-size:16px;line-height:1.7;color:#0f172a;">${greeting}</p>
-                      <p style="margin:12px 0 0;font-size:16px;line-height:1.7;color:#334155;">
-                        ${escapeHtml(input.body)}
-                      </p>
+                      <div style="margin:12px 0 0;font-size:16px;line-height:1.7;color:#334155;">
+                        ${formatMultilineHtml(input.body)}
+                      </div>
 
                       <table role="presentation" cellspacing="0" cellpadding="0" style="margin:28px 0 24px;">
                         <tr>
@@ -147,4 +147,11 @@ function escapeHtml(value: string) {
 
 function escapeAttribute(value: string) {
   return escapeHtml(value)
+}
+
+function formatMultilineHtml(value: string) {
+  return escapeHtml(value)
+    .split('\n')
+    .map((line) => line || '&nbsp;')
+    .join('<br>')
 }

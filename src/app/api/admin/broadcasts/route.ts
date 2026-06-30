@@ -106,7 +106,7 @@ export const POST = withAuth(async (req: Request) => {
         ? renderActionEmail({
             eyebrow: 'Сообщение',
             title: personalizedTitle,
-            lead: personalizedPlainBody,
+            lead: 'Новое сообщение от администратора сервиса.',
             body: personalizedPlainBody,
             ctaLabel: personalizedActionLabel || 'Открыть кабинет',
             ctaUrl: actionUrl,
