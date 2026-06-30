@@ -167,6 +167,7 @@ export function SupportPanel({
   const [newMessage, setNewMessage] = useState('')
   const [newCategory, setNewCategory] = useState<SupportCategoryValue>('connection')
   const [newTicketOpen, setNewTicketOpen] = useState(mode === 'user' && initialTickets.length === 0)
+  const [query, setQuery] = useState('')
   const [error, setError] = useState('')
   const [isPending, startTransition] = useTransition()
 
@@ -184,13 +185,32 @@ export function SupportPanel({
   }, [mode, tickets])
 
   const filteredTickets = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase()
     return tickets.filter((ticket) => {
-      if (folder === 'closed') return ticket.status === 'CLOSED'
-      if (folder === 'need-answer') return needsCurrentActor(ticket, mode)
-      if (folder === 'answered') return ticket.status === 'WAITING_USER'
-      return ticket.status !== 'CLOSED'
+      const matchesFolder =
+        folder === 'closed'
+          ? ticket.status === 'CLOSED'
+          : folder === 'need-answer'
+            ? needsCurrentActor(ticket, mode)
+            : folder === 'answered'
+              ? ticket.status === 'WAITING_USER'
+              : ticket.status !== 'CLOSED'
+
+      if (!matchesFolder) return false
+      if (!normalizedQuery) return true
+
+      const haystack = [
+        ticket.subject,
+        supportCategoryLabel(ticket.category),
+        ticket.user?.email,
+        ticket.user?.name,
+        ticket.user?.remnawaveUsername,
+        ticket.messages.at(-1)?.body,
+      ].filter(Boolean).join(' ').toLowerCase()
+
+      return haystack.includes(normalizedQuery)
     })
-  }, [folder, mode, tickets])
+  }, [folder, mode, query, tickets])
 
   const unreadTotal = useMemo(() => {
     return tickets.reduce((sum, ticket) => sum + getUnreadCount(ticket, mode), 0)
@@ -478,8 +498,8 @@ export function SupportPanel({
       className={cn(
         'grid h-[calc(100dvh-5.5rem)] min-h-[32rem] gap-3 overflow-hidden xl:h-[calc(100dvh-7rem)] xl:min-h-[36rem]',
         mode === 'admin'
-          ? 'xl:grid-cols-[20rem_minmax(0,1fr)_14rem]'
-          : 'xl:grid-cols-[20rem_minmax(0,1fr)]'
+          ? 'xl:grid-cols-[19rem_minmax(0,1fr)_15rem]'
+          : 'xl:grid-cols-[19rem_minmax(0,1fr)]'
       )}
     >
       <section className={cn('min-h-0 overflow-y-auto pr-0.5 xl:flex xl:flex-col xl:overflow-hidden', mobileChatOpen && 'hidden xl:flex')}>
@@ -512,6 +532,15 @@ export function SupportPanel({
               </div>
             </div>
             <FolderTabs folder={folder} counts={folderCounts} mode={mode} onChange={setFolder} />
+            <div className="mt-2 flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 dark:border-slate-800 dark:bg-surface-950">
+              <Search className="h-4 w-4 shrink-0 text-slate-400" />
+              <input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400"
+                placeholder={mode === 'admin' ? 'Поиск по email, теме или тексту' : 'Найти диалог'}
+              />
+            </div>
           </div>
 
           <div className="min-h-0 flex-1 overflow-y-auto p-1.5">
@@ -650,21 +679,24 @@ export function SupportPanel({
                   Обращение закрыто и хранится в архиве
                 </div>
               ) : (
-                <div className="relative flex items-end gap-2 rounded-lg border border-slate-200 bg-white p-2 shadow-sm dark:border-slate-800 dark:bg-surface-950">
-                  <EmojiPicker onPick={insertMessageEmoji} />
-                  <textarea
-                    ref={messageInputRef}
-                    className="max-h-32 min-h-10 flex-1 resize-none rounded-md border-0 bg-transparent px-2 py-2 text-sm outline-none placeholder:text-slate-400 focus:ring-0"
-                    value={message}
-                    onChange={(event) => setMessage(event.target.value)}
-                    onKeyDown={handleMessageKeyDown}
-                    placeholder={mode === 'admin' ? 'Ответ пользователю' : 'Ваше сообщение'}
-                    maxLength={3000}
-                    required
-                  />
-                  <button className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-slate-950 text-white shadow-sm transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-45 dark:bg-white dark:text-slate-950" disabled={isPending || !message.trim()} aria-label="Отправить сообщение">
-                    <Send className="h-4 w-4" />
-                  </button>
+                <div className="space-y-2">
+                  <QuickReplies mode={mode} onPick={(value) => setMessage(value)} />
+                  <div className="relative flex items-end gap-2 rounded-lg border border-slate-200 bg-white p-2 shadow-sm dark:border-slate-800 dark:bg-surface-950">
+                    <EmojiPicker onPick={insertMessageEmoji} />
+                    <textarea
+                      ref={messageInputRef}
+                      className="max-h-32 min-h-10 flex-1 resize-none rounded-md border-0 bg-transparent px-2 py-2 text-sm outline-none placeholder:text-slate-400 focus:ring-0"
+                      value={message}
+                      onChange={(event) => setMessage(event.target.value)}
+                      onKeyDown={handleMessageKeyDown}
+                      placeholder={mode === 'admin' ? 'Ответ пользователю' : 'Ваше сообщение'}
+                      maxLength={3000}
+                      required
+                    />
+                    <button className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-slate-950 text-white shadow-sm transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-45 dark:bg-white dark:text-slate-950" disabled={isPending || !message.trim()} aria-label="Отправить сообщение">
+                      <Send className="h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
               )}
             </form>
@@ -1067,19 +1099,17 @@ function TicketSideMenu({
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="border-b border-slate-100 px-4 py-4 dark:border-slate-800">
-        <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Меню</div>
-        <div className="mt-2 text-sm font-semibold text-slate-950 dark:text-white">Обращение</div>
+        <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Карточка</div>
+        <div className="mt-2 line-clamp-2 text-sm font-semibold text-slate-950 dark:text-white">{selected.subject}</div>
       </div>
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
-        <InfoBlock label="Статус">
-          <TicketStatusBadge status={selected.status} mode={mode} />
-        </InfoBlock>
-        <InfoBlock label="Тема">
-          <span className="break-words">{selected.subject}</span>
-        </InfoBlock>
-        <InfoBlock label="Категория">
-          <span>{supportCategoryLabel(selected.category)}</span>
-        </InfoBlock>
+        <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-surface-950">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-xs font-medium text-slate-400">Статус</span>
+            <TicketStatusBadge status={selected.status} mode={mode} />
+          </div>
+          <div className="mt-3 text-sm text-slate-600 dark:text-slate-300">{supportCategoryLabel(selected.category)}</div>
+        </div>
         {mode === 'admin' && selected.user && (
           <>
             <InfoBlock label="Пользователь">
@@ -1102,6 +1132,35 @@ function TicketSideMenu({
       <div className="border-t border-slate-100 p-4 dark:border-slate-800">
         <TicketActions selected={selected} mode={mode} isPending={isPending} onUpdateStatus={onUpdateStatus} />
       </div>
+    </div>
+  )
+}
+
+function QuickReplies({ mode, onPick }: { mode: 'user' | 'admin'; onPick: (value: string) => void }) {
+  const replies = mode === 'admin'
+    ? [
+        'Проверяю и скоро вернусь с ответом.',
+        'Готово, попробуйте подключиться еще раз.',
+        'Пришлите, пожалуйста, скрин ошибки и модель устройства.',
+      ]
+    : [
+        'Не подключается VPN',
+        'Оплата прошла, доступа нет',
+        'Нужна помощь с приложением',
+      ]
+
+  return (
+    <div className="flex gap-1.5 overflow-x-auto pb-0.5">
+      {replies.map((reply) => (
+        <button
+          key={reply}
+          type="button"
+          onClick={() => onPick(reply)}
+          className="min-w-fit rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:border-cyan-200 hover:bg-cyan-50 hover:text-cyan-800 dark:border-slate-800 dark:bg-white/5 dark:text-slate-300 dark:hover:border-cyan-400/30 dark:hover:bg-cyan-400/10 dark:hover:text-cyan-100"
+        >
+          {reply}
+        </button>
+      ))}
     </div>
   )
 }

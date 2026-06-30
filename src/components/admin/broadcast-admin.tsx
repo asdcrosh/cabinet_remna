@@ -186,7 +186,7 @@ const templates: Array<{
     channels: ['IN_APP', 'TELEGRAM', 'EMAIL'],
     actionHref: '/dashboard/plans',
     actionLabel: 'Активировать подарок',
-    body: '🎟️ {name}, для вас подготовлен подарочный доступ.\n\nОткройте кабинет, выберите тариф или введите сертификат, если код уже у вас.',
+    body: '🎟️ {name}, для вас подготовлен подарочный доступ.\n\nОткройте тарифы и примените промокод при оплате. Если код уже есть, просто вставьте его в поле промокода.',
   },
   {
     title: 'Что нового',
@@ -432,9 +432,9 @@ export function BroadcastAdmin({
   }
 
   return (
-    <section className="grid min-w-0 max-w-full gap-4 overflow-hidden">
-      <div className="card min-w-0 overflow-hidden p-3">
-        <div className="grid min-w-0 gap-2 xl:grid-cols-3">
+    <section className="grid w-full min-w-0 max-w-full gap-4 overflow-hidden">
+      <div className="card w-full min-w-0 overflow-hidden p-3">
+        <div className="grid w-full min-w-0 gap-2 lg:grid-cols-3">
           <BroadcastStepButton
             active={step === 'message'}
             number="1"
@@ -459,7 +459,7 @@ export function BroadcastAdmin({
         </div>
       </div>
 
-      <div className="grid min-w-0 gap-4">
+      <div className="grid w-full min-w-0 gap-4">
         <div className={cn('card min-w-0 overflow-hidden p-4', step !== 'audience' && 'hidden')}>
           <div className="flex items-center gap-2">
             <UsersRound className="h-5 w-5 text-cyan-600" />
@@ -543,11 +543,11 @@ export function BroadcastAdmin({
                   Сохранить
                 </button>
               </div>
-              <div className="mt-3 grid min-w-0 gap-2 sm:grid-cols-2 2xl:grid-cols-3">
+              <div className="-mx-1 mt-3 flex min-w-0 gap-2 overflow-x-auto px-1 pb-1">
                 {visibleTemplates.map((template) => (
                   <div
                     key={template.id || template.title}
-                    className="min-w-0 rounded-lg border border-slate-200 bg-white p-3 transition-colors hover:bg-slate-50 dark:border-white/10 dark:bg-surface-900 dark:hover:bg-white/5"
+                    className="min-w-[13.5rem] max-w-[15rem] rounded-lg border border-slate-200 bg-white p-3 transition-colors hover:bg-slate-50 dark:border-white/10 dark:bg-surface-900 dark:hover:bg-white/5"
                   >
                     <button type="button" onClick={() => applyTemplate(template)} className="w-full text-left">
                       <div className="truncate text-sm font-semibold text-slate-950 dark:text-white">{template.title}</div>
