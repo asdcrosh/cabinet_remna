@@ -54,6 +54,7 @@ export default async function DashboardHome() {
         select: { id: true, confirmationUrl: true, createdAt: true },
       },
       trialPlanRedemptions: { select: { id: true }, take: 1 },
+      welcomeBonusRedemptions: { select: { id: true }, take: 1 },
       _count: { select: { devices: true } },
     },
   })
@@ -107,6 +108,18 @@ export default async function DashboardHome() {
   const welcomeBonusOptions = buildWelcomeBonusOptions(welcomeBonusSetting, {
     trialUsed: user.trialPlanRedemptions.length > 0,
   })
+  const welcomeBonusEligible = isWelcomeBonusEligible({
+    activeSubscription: activeSubRow,
+    user: {
+      email: user.email,
+      emailVerifiedAt: user.emailVerifiedAt,
+      telegramId: user.telegramId,
+      remnawaveUuid: user.remnawaveUuid,
+      successfulPayments: Boolean(lastSucceededPayment),
+      trialUsed: user.trialPlanRedemptions.length > 0,
+      welcomeUsed: user.welcomeBonusRedemptions.length > 0,
+    },
+  })
   const visiblePaidPlans = audienceContext
     ? availablePlans.filter((plan) => isPlanAvailableForUser(plan, audienceContext))
     : availablePlans.filter((plan) => plan.availability === 'ALL')
@@ -126,7 +139,7 @@ export default async function DashboardHome() {
     lastSucceededPaymentAt: lastSucceededPayment?.paidAt ?? lastSucceededPayment?.createdAt ?? null,
     promoCode: promoOfferCode,
     offerSettings,
-    welcomeBonusAvailable: welcomeBonusOptions.length > 0,
+    welcomeBonusAvailable: welcomeBonusEligible && welcomeBonusOptions.length > 0,
     user: { name: user.name, email: user.email },
   }), onboardingState)
 
@@ -361,6 +374,21 @@ function buildPersonalOffer({
   // 4. Подписка активна, но устройств нет: подключение.
   // 5. Подписка активна и все базовое готово: реферальный бонус.
   if (!activeSubscription) {
+    if (welcomeBonusAvailable) {
+      return {
+        scenario: 'NO_SUBSCRIPTION',
+        eyebrow: 'Приветственный бонус',
+        title: 'Выберите подарок на старт',
+        description: 'Доступен один бонус: пробный период, промокод или прокрутки рулетки. Выберите то, что полезнее сейчас.',
+        href: '/dashboard/bonus-box',
+        cta: 'Выбрать бонус',
+        meta: 'для нового аккаунта',
+        tone: 'emerald',
+        icon: <Sparkles className="h-5 w-5" />,
+        action: 'WELCOME_BONUS',
+      }
+    }
+
     const returnSetting = offerSettings.find((item) => item.scenario === 'RETURN_PROMO')
     const selectedReturnPromo = returnSetting?.promoCode?.isActive
       ? { code: returnSetting.promoCode.code, discountPercent: returnSetting.promoCode.discountPercent }
@@ -603,6 +631,32 @@ function buildWelcomeBonusOptions(
   }
 
   return options
+}
+
+function isWelcomeBonusEligible({
+  activeSubscription,
+  user,
+}: {
+  activeSubscription: DashboardSubscription | null
+  user: {
+    email: string
+    emailVerifiedAt: Date | null
+    telegramId: bigint | null
+    remnawaveUuid: string | null
+    successfulPayments: boolean
+    trialUsed: boolean
+    welcomeUsed: boolean
+  }
+}) {
+  const hasTrustedIdentity = Boolean(user.telegramId || (user.emailVerifiedAt && !user.email.endsWith('@pending.invalid')))
+  if (!hasTrustedIdentity) return false
+  return !(
+    activeSubscription ||
+    user.remnawaveUuid ||
+    user.successfulPayments ||
+    user.trialUsed ||
+    user.welcomeUsed
+  )
 }
 
 function personalOfferTone(tone: PersonalOfferView['tone']) {

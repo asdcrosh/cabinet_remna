@@ -35,7 +35,7 @@ export const POST = withAuth(async (req: Request) => {
       id: true,
       email: true,
       emailVerifiedAt: true,
-      remnashopUserId: true,
+      telegramId: true,
       remnawaveUuid: true,
       subscriptions: { select: { id: true }, take: 1 },
       payments: { where: { status: 'SUCCEEDED' }, select: { id: true }, take: 1 },
@@ -44,11 +44,11 @@ export const POST = withAuth(async (req: Request) => {
     },
   })
   if (!user) return NextResponse.json({ error: 'Пользователь не найден' }, { status: 404 })
-  if (!user.emailVerifiedAt || user.email.endsWith('@pending.invalid')) {
-    return NextResponse.json({ error: 'Подтвердите email, чтобы получить приветственный бонус' }, { status: 403 })
+  const hasTrustedIdentity = Boolean(user.telegramId || (user.emailVerifiedAt && !user.email.endsWith('@pending.invalid')))
+  if (!hasTrustedIdentity) {
+    return NextResponse.json({ error: 'Подтвердите email или войдите через Telegram, чтобы получить приветственный бонус' }, { status: 403 })
   }
   if (
-    user.remnashopUserId ||
     user.remnawaveUuid ||
     user.subscriptions.length > 0 ||
     user.payments.length > 0 ||
