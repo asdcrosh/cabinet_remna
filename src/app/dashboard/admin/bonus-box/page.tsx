@@ -9,7 +9,7 @@ import {
 import { parseAdminListLimit } from '@/lib/admin-list'
 
 export const dynamic = 'force-dynamic'
-export const metadata = { title: 'Подарочный бокс — Админка' }
+export const metadata = { title: 'Подарки — Админка' }
 
 export default async function AdminBonusBoxPage({
   searchParams,
@@ -73,8 +73,8 @@ export default async function AdminBonusBoxPage({
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Подарочный бокс"
-        description="Подарки, веса выпадения, редкость и лимиты"
+        title="Подарки"
+        description="Настройка подарочного бокса, шансов, лимитов и истории открытий"
       />
       <BonusBoxPrizesAdmin prizes={rows} openings={openingRows} totalOpenings={totalOpenings} />
     </div>

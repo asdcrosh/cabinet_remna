@@ -6,7 +6,7 @@ import { PageHeader } from '@/components/dashboard/page-header'
 import { BonusBoxClient } from '@/components/bonus-box/bonus-box-client'
 
 export const dynamic = 'force-dynamic'
-export const metadata = { title: 'Подарочный бокс' }
+export const metadata = { title: 'Бонусы' }
 
 export default async function BonusBoxPage() {
   const session = await getCurrentUser()
@@ -17,7 +17,7 @@ export default async function BonusBoxPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Подарочный бокс"
+        title="Бонусы"
         description="Открывайте подарки за покупки, приглашения и еженедельный бонус"
         action={<Gift className="h-5 w-5 text-brand-500" />}
       />

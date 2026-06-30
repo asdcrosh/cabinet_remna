@@ -157,40 +157,43 @@ export function BonusBoxPrizesAdmin({
 
   return (
     <div className="space-y-5">
-      <section className="rounded-lg border border-white/70 bg-white/80 p-4 shadow-xl shadow-slate-200/50 backdrop-blur dark:border-white/10 dark:bg-surface-900/80 dark:shadow-black/25">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2 text-sm font-semibold text-slate-500">
-              <BarChart3 className="h-4 w-4" />
-              Экономика бокса
+      <section className="surface-card p-0">
+        <div className="h-1 bg-gradient-to-r from-cyan-400 via-emerald-300 to-blue-500" />
+        <div className="p-4 sm:p-5">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 text-sm font-semibold text-cyan-700 dark:text-cyan-200">
+                <BarChart3 className="h-4 w-4" />
+                Управление подарками
+              </div>
+              <h2 className="mt-1 text-xl font-semibold tracking-tight text-slate-950 dark:text-white">Состав и шансы</h2>
+              <p className="mt-1 max-w-2xl text-sm text-slate-500">
+                Держите баланс наград, пустых исходов и редких подарков под контролем. Вес управляет шансом выпадения.
+              </p>
             </div>
-            <h2 className="mt-1 text-xl font-semibold tracking-tight">Состав и шансы</h2>
-            <p className="mt-1 max-w-2xl text-sm text-slate-500">
-              На первом экране только баланс весов и состояние. Детали редактируются в панели справа.
-            </p>
+            <button type="button" className="btn-primary shrink-0" onClick={startCreate}>
+              <Plus className="h-4 w-4" />
+              Создать подарок
+            </button>
           </div>
-          <button type="button" className="btn-primary shrink-0" onClick={startCreate}>
-            <Plus className="h-4 w-4" />
-            Создать подарок
-          </button>
-        </div>
 
-        <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <SummaryCell label="Активных" value={`${stats.active}/${prizes.length}`} />
-          <SummaryCell label="Шанс награды" value={formatChance(stats.rewardChance)} />
-          <SummaryCell label="Без подарка" value={formatChance(stats.noPrizeChance)} tone="danger" />
-          <SummaryCell label="Открытий" value={totalOpenings} />
-        </div>
+          <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <SummaryCell label="Активных" value={`${stats.active}/${prizes.length}`} />
+            <SummaryCell label="Шанс награды" value={formatChance(stats.rewardChance)} />
+            <SummaryCell label="Без подарка" value={formatChance(stats.noPrizeChance)} tone="danger" />
+            <SummaryCell label="Открытий" value={totalOpenings} />
+          </div>
 
-        <div className="mt-5 space-y-2">
-          <EconomyLine label="Награды" value={stats.rewardChance} className="bg-emerald-500" />
-          <EconomyLine label="Без подарка" value={stats.noPrizeChance} className="bg-red-500" />
-          <EconomyLine label="Промокоды" value={stats.promoChance} className="bg-violet-500" />
-          <EconomyLine label="Доп. открытия" value={stats.attemptChance} className="bg-cyan-500" />
+          <div className="mt-5 space-y-2">
+            <EconomyLine label="Награды" value={stats.rewardChance} className="bg-emerald-500" />
+            <EconomyLine label="Без подарка" value={stats.noPrizeChance} className="bg-red-500" />
+            <EconomyLine label="Промокоды" value={stats.promoChance} className="bg-violet-500" />
+            <EconomyLine label="Доп. открытия" value={stats.attemptChance} className="bg-cyan-500" />
+          </div>
         </div>
       </section>
 
-      <div className="flex flex-wrap gap-2 rounded-lg border border-slate-200 bg-white p-1 shadow-sm dark:border-white/10 dark:bg-surface-900">
+      <div className="surface-card flex flex-wrap gap-2 p-1">
         <AdminTabButton
           active={activeTab === 'prizes'}
           icon={<Gift className="h-4 w-4" />}
@@ -298,7 +301,7 @@ function SummaryCell({
   tone?: 'default' | 'danger'
 }) {
   return (
-    <div className="rounded-lg border border-slate-100 bg-slate-50/80 px-3 py-3 dark:border-white/10 dark:bg-surface-800/70">
+    <div className="rounded-lg border border-slate-100 bg-slate-50/80 px-3 py-3 dark:border-white/10 dark:bg-white/[0.04]">
       <div className="text-xs text-slate-500">{label}</div>
       <div className={cn('mt-1 text-2xl font-semibold tracking-tight', tone === 'danger' && 'text-red-600 dark:text-red-300')}>
         {value}
@@ -342,7 +345,7 @@ function PrizeAdminRow({
   onToggle: () => void
 }) {
   return (
-    <article className={cn('overflow-hidden rounded-lg border bg-white shadow-sm dark:bg-surface-900', prizeAdminBorderClass(prize))}>
+    <article className={cn('surface-card surface-card-hover overflow-hidden p-0', prizeAdminBorderClass(prize))}>
       <div className={cn('h-1', prizeAdminTopClass(prize))} />
       <div className="grid gap-4 p-4 xl:grid-cols-[minmax(220px,1.1fr)_minmax(320px,1.6fr)_auto] xl:items-center">
         <div className="min-w-0">
@@ -416,23 +419,25 @@ function PrizeEditorDrawer({
       <aside
         role="dialog"
         aria-modal="true"
-        className="absolute right-0 top-0 h-dvh w-full max-w-xl overflow-y-auto border-l border-slate-200 bg-white p-5 shadow-2xl dark:border-white/10 dark:bg-surface-950 sm:p-6"
+        className="absolute right-0 top-0 h-dvh w-full max-w-xl overflow-y-auto border-l border-slate-200 bg-white shadow-2xl dark:border-white/10 dark:bg-surface-950"
       >
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <h2 className="text-xl font-semibold">
-              {editingPrize ? `Редактировать ${editingPrize.title}` : 'Новый подарок'}
-            </h2>
-            <p className="mt-1 text-sm text-slate-500">
-              Вес управляет шансом выпадения среди активных исходов.
-            </p>
+        <div className="sticky top-0 z-10 border-b border-slate-100 bg-white/95 p-5 backdrop-blur dark:border-white/10 dark:bg-surface-950/95 sm:p-6">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h2 className="text-xl font-semibold">
+                {editingPrize ? `Редактировать ${editingPrize.title}` : 'Новый подарок'}
+              </h2>
+              <p className="mt-1 text-sm text-slate-500">
+                Вес управляет шансом выпадения среди активных исходов.
+              </p>
+            </div>
+            <button type="button" className="btn-secondary h-10 w-10 px-0" onClick={onClose}>
+              <X className="h-4 w-4" />
+            </button>
           </div>
-          <button type="button" className="btn-secondary h-10 w-10 px-0" onClick={onClose}>
-            <X className="h-4 w-4" />
-          </button>
         </div>
 
-        <div className="mt-6 grid gap-4">
+        <div className="grid gap-4 p-5 sm:p-6">
           <Field label="Название">
             <input
               value={form.title}
@@ -511,7 +516,9 @@ function PrizeEditorDrawer({
             </Field>
           </div>
 
-          <label className="flex items-center gap-2 rounded-lg border px-3 py-3 text-sm">
+          <PrizeFormPreview form={form} />
+
+          <label className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-sm dark:border-white/10 dark:bg-white/[0.04]">
             <input
               type="checkbox"
               checked={form.isActive}
@@ -529,7 +536,7 @@ function PrizeEditorDrawer({
             />
           </Field>
 
-          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <div className="flex flex-col-reverse gap-2 border-t border-slate-100 pt-4 dark:border-white/10 sm:flex-row sm:justify-end">
             <button type="button" className="btn-secondary" onClick={onClose}>
               Отмена
             </button>
@@ -546,7 +553,7 @@ function PrizeEditorDrawer({
 
 function BonusBoxOpeningHistory({ openings }: { openings: BonusBoxOpeningAdminRow[] }) {
   return (
-    <section className="card space-y-4">
+    <section className="surface-card space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold">История открытий</h2>
@@ -654,6 +661,38 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
   )
 }
 
+function PrizeFormPreview({ form }: { form: FormState }) {
+  const title = form.title.trim() || 'Новый подарок'
+  const value = previewPrizeValue(form.type, Number(form.value || 0))
+
+  return (
+    <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-white/10 dark:bg-white/[0.04]">
+      <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+        Превью
+      </div>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="truncate font-semibold text-slate-950 dark:text-white">{title}</div>
+          <div className="mt-1 text-sm text-slate-500">{value}</div>
+        </div>
+        <span className={cn('shrink-0 rounded-full px-2 py-1 text-[11px] font-semibold', rarityClass(form.rarity))}>
+          {form.type === 'NO_PRIZE' ? 'Без подарка' : rarityLabel(form.rarity)}
+        </span>
+      </div>
+      <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
+        <div className="rounded-md bg-white px-2.5 py-2 dark:bg-surface-900">
+          <div className="text-xs text-slate-400">Тип</div>
+          <div className="mt-0.5 truncate font-medium">{prizeTypeLabel(form.type)}</div>
+        </div>
+        <div className="rounded-md bg-white px-2.5 py-2 dark:bg-surface-900">
+          <div className="text-xs text-slate-400">Вес</div>
+          <div className="mt-0.5 truncate font-medium">{form.weight || '0'}</div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function CompactMetric({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="min-w-0">
@@ -719,6 +758,12 @@ function prizeValueFromParts(type: PrizeType, value: number) {
   if (type === 'TRAFFIC_GB') return `+${value} ГБ`
   if (type === 'BONUS_ATTEMPTS') return `+${value} откр.`
   return `-${value}%`
+}
+
+function previewPrizeValue(type: PrizeType, value: number) {
+  if (type === 'NO_PRIZE') return 'Открытие без начисления'
+  if (!Number.isFinite(value) || value <= 0) return 'Укажите значение подарка'
+  return prizeValueFromParts(type, value)
 }
 
 function sourceLabel(source: BonusBoxOpeningAdminRow['attemptSource']) {
