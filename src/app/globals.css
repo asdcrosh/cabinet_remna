@@ -145,6 +145,7 @@
   }
   .bonus-box-reel-shell {
     isolation: isolate;
+    min-height: 14.5rem;
   }
   .bonus-box-reel-shell::before {
     content: '';
@@ -165,7 +166,67 @@
     animation: bonus-box-card-lift 1050ms ease-in-out infinite;
   }
   .bonus-box-stage--opening .bonus-box-reel-track {
-    filter: drop-shadow(0 0 22px rgba(103, 232, 249, 0.2));
+    filter: drop-shadow(0 0 24px rgba(103, 232, 249, 0.24));
+  }
+  .bonus-box-portal {
+    pointer-events: none;
+    position: absolute;
+    inset-block: 1.15rem;
+    left: 50%;
+    z-index: 32;
+    width: min(13.5rem, 42vw);
+    transform: translateX(-50%);
+  }
+  .bonus-box-portal::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 1.1rem;
+    border: 1px solid rgba(165, 243, 252, 0.42);
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.12), transparent 38%, rgba(34, 211, 238, 0.10)),
+      radial-gradient(circle at 50% 50%, rgba(103, 232, 249, 0.15), transparent 70%);
+    box-shadow:
+      0 0 0 1px rgba(255, 255, 255, 0.06) inset,
+      0 0 38px rgba(103, 232, 249, 0.24),
+      0 18px 56px rgba(2, 6, 23, 0.36);
+    opacity: 0.95;
+  }
+  .bonus-box-portal::after {
+    content: '';
+    position: absolute;
+    inset: -0.35rem;
+    border-radius: 1.35rem;
+    border: 1px solid rgba(16, 185, 129, 0.18);
+    opacity: 0;
+  }
+  .bonus-box-stage--opening .bonus-box-portal::after {
+    animation: bonus-box-portal-ping 1250ms ease-out infinite;
+  }
+  .bonus-box-portal-core {
+    position: absolute;
+    inset: 0.7rem;
+    border-radius: 0.9rem;
+    background:
+      radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.20), transparent 34%),
+      linear-gradient(90deg, transparent, rgba(103, 232, 249, 0.18), transparent);
+    mix-blend-mode: screen;
+    opacity: 0.58;
+  }
+  .bonus-box-stage--opening .bonus-box-portal-core {
+    animation: bonus-box-portal-core 980ms ease-in-out infinite;
+  }
+  .bonus-box-portal-line {
+    position: absolute;
+    inset-block: 0.75rem;
+    left: 50%;
+    width: 2px;
+    transform: translateX(-50%);
+    border-radius: 999px;
+    background: linear-gradient(180deg, transparent, rgba(207, 250, 254, 0.96), transparent);
+    box-shadow:
+      0 0 18px rgba(165, 243, 252, 0.88),
+      0 0 42px rgba(34, 211, 238, 0.36);
   }
   .bonus-box-fx-layer {
     pointer-events: none;
@@ -195,7 +256,7 @@
     position: absolute;
     inset-y: 0;
     left: 50%;
-    width: min(26rem, 82%);
+    width: min(22rem, 76%);
     transform: translateX(-50%);
     background:
       linear-gradient(90deg, transparent, rgba(103, 232, 249, 0.18), rgba(255, 255, 255, 0.32), rgba(103, 232, 249, 0.18), transparent);
@@ -207,8 +268,8 @@
     position: absolute;
     left: 50%;
     top: 50%;
-    width: 8rem;
-    height: 8rem;
+    width: 7rem;
+    height: 7rem;
     border-radius: 999px;
     border: 1px solid rgba(165, 243, 252, 0.62);
     box-shadow:
@@ -302,6 +363,28 @@
   }
 }
 
+@keyframes bonus-box-portal-ping {
+  0% {
+    opacity: 0.9;
+    transform: scale(0.96);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.15);
+  }
+}
+
+@keyframes bonus-box-portal-core {
+  0%, 100% {
+    opacity: 0.45;
+    transform: scaleX(0.82);
+  }
+  50% {
+    opacity: 0.9;
+    transform: scaleX(1.04);
+  }
+}
+
 @keyframes bonus-box-aurora-spin {
   to {
     transform: rotate(360deg);
@@ -371,6 +454,8 @@
   .bonus-box-stage,
   .bonus-box-stage::before,
   .bonus-box-reel-shell::before,
+  .bonus-box-portal::after,
+  .bonus-box-portal-core,
   .bonus-box-reel-card,
   .bonus-box-fx-aurora,
   .bonus-box-fx-scanner,
