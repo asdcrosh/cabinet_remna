@@ -103,27 +103,27 @@ export function PersonalOffersAdmin({
 
   return (
     <>
-      <section className="surface-card border-emerald-100 bg-emerald-50/50">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+      <section className="surface-card border-emerald-100 bg-emerald-50/50 p-4 dark:border-emerald-500/20 dark:bg-emerald-500/10">
+        <div className="flex flex-col gap-4">
           <div className="min-w-0">
             <div className="flex items-center gap-3">
-              <div className="grid h-11 w-11 place-items-center rounded-lg bg-emerald-100 text-emerald-700">
+              <div className="grid h-10 w-10 place-items-center rounded-lg bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-100">
                 <Gift className="h-5 w-5" />
               </div>
               <div>
-                <h2 className="text-xl font-semibold text-slate-950">Приветственный бонус</h2>
-                <p className="text-sm text-slate-500">
+                <h2 className="text-lg font-semibold text-slate-950 dark:text-white">Приветственный бонус</h2>
+                <p className="text-sm text-slate-500 dark:text-slate-400">
                   Отдельная выдача для новых пользователей: пробный период, рулетка или промокод.
                 </p>
               </div>
             </div>
-            <div className="mt-3 rounded-lg border border-emerald-100 bg-white/80 px-3 py-2 text-sm text-slate-600">
-              <span className="font-medium text-slate-950">Сейчас: </span>
+            <div className="mt-3 rounded-lg border border-emerald-100 bg-white/80 px-3 py-2 text-sm text-slate-600 dark:border-emerald-500/20 dark:bg-white/[0.04] dark:text-slate-300">
+              <span className="font-medium text-slate-950 dark:text-white">Сейчас: </span>
               {welcomeSummary(welcomeForm, trialPlans, promoCodes)}
             </div>
           </div>
 
-          <div className="grid w-full gap-3 lg:max-w-4xl">
+          <div className="grid w-full gap-3">
             <label className="flex min-h-12 items-center gap-2 rounded-lg border border-emerald-100 bg-white px-3 py-2 text-sm font-medium shadow-sm dark:border-emerald-500/20 dark:bg-surface-900">
               <input
                 type="checkbox"
@@ -192,40 +192,40 @@ export function PersonalOffersAdmin({
               </WelcomeBonusOption>
             </div>
 
-            <button type="button" className="btn-primary min-h-12 justify-center" onClick={() => void saveWelcomeBonus()} disabled={welcomeLoading}>
+            <button type="button" className="btn-primary min-h-11 justify-center sm:w-fit sm:px-5" onClick={() => void saveWelcomeBonus()} disabled={welcomeLoading}>
               {welcomeLoading ? 'Сохраняем...' : 'Сохранить'}
             </button>
           </div>
         </div>
       </section>
 
-      <section className="grid gap-3 xl:grid-cols-2">
+      <section className="grid gap-3 xl:grid-cols-3">
         {offers.map((offer) => (
-          <article key={offer.id} className="surface-card">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <article key={offer.id} className="surface-card p-4">
+            <div className="flex flex-col gap-3">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className={offer.enabled ? 'badge-active' : 'badge-muted'}>
                     {offer.enabled ? 'Включён' : 'Выключен'}
                   </span>
-                  <span className="badge bg-slate-100 text-slate-600">#{offer.priority}</span>
-                  <span className="text-sm font-medium text-slate-500">
+                  <span className="badge bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-slate-300">#{offer.priority}</span>
+                  <span className="text-sm font-medium text-slate-500 dark:text-slate-400">
                     {personalOfferScenarioLabels[offer.scenario]}
                   </span>
                 </div>
-                <h2 className="mt-3 text-lg font-semibold text-slate-950 dark:text-white">{offer.title}</h2>
-                <p className="mt-1 line-clamp-2 text-sm leading-6 text-slate-500">{offer.description}</p>
+                <h2 className="mt-3 line-clamp-1 text-base font-semibold text-slate-950 dark:text-white">{offer.title}</h2>
+                <p className="mt-1 line-clamp-2 text-sm leading-5 text-slate-500 dark:text-slate-400">{offer.description}</p>
                 <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-500">
-                  <span className="rounded-full bg-slate-100 px-2 py-1">{offer.eyebrow}</span>
-                  <span className="rounded-full bg-slate-100 px-2 py-1">{personalOfferToneLabels[offer.tone]}</span>
-                  <span className="rounded-full bg-slate-100 px-2 py-1">{offer.cta}</span>
+                  <span className="rounded-full bg-slate-100 px-2 py-1 dark:bg-white/10 dark:text-slate-300">{offer.eyebrow}</span>
+                  <span className="rounded-full bg-slate-100 px-2 py-1 dark:bg-white/10 dark:text-slate-300">{personalOfferToneLabels[offer.tone]}</span>
+                  <span className="rounded-full bg-slate-100 px-2 py-1 dark:bg-white/10 dark:text-slate-300">{offer.cta}</span>
                 </div>
-                <div className="mt-3 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-sm text-slate-600">
-                  <span className="font-medium text-slate-950">Действие: </span>
+                <div className="mt-3 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-sm text-slate-600 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-300">
+                  <span className="font-medium text-slate-950 dark:text-white">Действие: </span>
                   {rewardSummary(offer)}
                 </div>
               </div>
-              <button type="button" className="btn-secondary min-h-10 shrink-0 px-3" onClick={() => openEdit(offer)}>
+              <button type="button" className="btn-secondary min-h-10 w-full justify-center px-3" onClick={() => openEdit(offer)}>
                 <Edit3 className="h-4 w-4" />
                 Изменить
               </button>
@@ -243,7 +243,7 @@ export function PersonalOffersAdmin({
       >
         <div className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-[1fr_8rem_12rem]">
-            <label className="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+            <label className="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 dark:border-white/10 dark:bg-white/[0.04]">
               <input
                 type="checkbox"
                 checked={form.enabled}
@@ -302,10 +302,10 @@ export function PersonalOffersAdmin({
             </Field>
           </div>
 
-          <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
+          <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-white/10 dark:bg-white/[0.04]">
             <div>
-              <div className="text-sm font-semibold text-slate-950">Что выдавать пользователю</div>
-              <div className="text-sm text-slate-500">Оффер отвечает за текст и кнопку. Бонус новым пользователям настраивается отдельно выше.</div>
+              <div className="text-sm font-semibold text-slate-950 dark:text-white">Что выдавать пользователю</div>
+              <div className="text-sm text-slate-500 dark:text-slate-400">Оффер отвечает за текст и кнопку. Бонус новым пользователям настраивается отдельно выше.</div>
             </div>
             <Field label="Промокод для оффера">
               <select
@@ -321,12 +321,12 @@ export function PersonalOffersAdmin({
                 ))}
               </select>
             </Field>
-            <div className="text-sm leading-6 text-slate-500">
+            <div className="text-sm leading-6 text-slate-500 dark:text-slate-400">
               Работает для оффера “Давно не покупал”. Если не выбрать, кабинет покажет лучший доступный промокод.
             </div>
           </div>
 
-          <div className="rounded-lg border border-cyan-100 bg-cyan-50/80 p-3 text-sm text-cyan-900">
+          <div className="rounded-lg border border-cyan-100 bg-cyan-50/80 p-3 text-sm text-cyan-900 dark:border-cyan-500/20 dark:bg-cyan-500/10 dark:text-cyan-100">
             <div className="mb-2 flex items-center gap-2 font-semibold">
               <Sparkles className="h-4 w-4" />
               Подстановки
@@ -336,7 +336,7 @@ export function PersonalOffersAdmin({
                 <button
                   key={item}
                   type="button"
-                  className="rounded-md border border-cyan-200 bg-white px-2 py-1 font-mono text-xs text-cyan-800"
+                  className="rounded-md border border-cyan-200 bg-white px-2 py-1 font-mono text-xs text-cyan-800 dark:border-cyan-500/20 dark:bg-white/10 dark:text-cyan-100"
                   onClick={() => setFormValue('description', `${form.description} ${item}`.trim())}
                 >
                   {item}
@@ -366,7 +366,7 @@ export function PersonalOffersAdmin({
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block">
-      <span className="mb-1 block text-sm font-medium text-slate-600">{label}</span>
+      <span className="mb-1 block text-sm font-medium text-slate-600 dark:text-slate-300">{label}</span>
       {children}
     </label>
   )
@@ -389,7 +389,7 @@ function WelcomeBonusOption({
 }) {
   return (
     <div className={cn(
-      'flex min-h-52 flex-col rounded-xl border bg-white p-4 shadow-sm transition-colors dark:bg-surface-900',
+      'flex min-h-36 flex-col rounded-xl border bg-white p-3 shadow-sm transition-colors dark:bg-surface-900',
       checked ? 'border-emerald-300 ring-2 ring-emerald-100 dark:border-emerald-500/40 dark:ring-emerald-500/10' : 'border-slate-200 dark:border-white/10'
     )}>
       <div className="flex items-start justify-between gap-3">
@@ -409,7 +409,7 @@ function WelcomeBonusOption({
           onChange={(event) => onToggle(event.target.checked)}
         />
       </div>
-      <div className={cn('mt-auto pt-4', !checked && 'opacity-50')}>{children}</div>
+      <div className={cn('mt-3', !checked && 'opacity-50')}>{children}</div>
     </div>
   )
 }

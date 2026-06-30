@@ -55,6 +55,12 @@ export function PlanCard({
   const effectivePrice = appliedPromo
     ? formatPrice(appliedPromo.finalAmountKopecks)
     : price;
+  const suggestedPromoCodes = [...availablePromoCodes]
+    .sort((a, b) => {
+      if (b.discountKopecks !== a.discountKopecks) return b.discountKopecks - a.discountKopecks;
+      return b.discountPercent - a.discountPercent;
+    })
+    .slice(0, 3);
 
   async function buy() {
     if (isPromo) {
@@ -221,9 +227,9 @@ export function PlanCard({
       </ul>
       {!isPromo && (promoOpen || appliedPromo) ? (
         <div className="mt-auto min-h-[74px] space-y-2 pt-3">
-          {availablePromoCodes.length > 0 ? (
+          {suggestedPromoCodes.length > 0 ? (
             <div className="grid gap-2">
-              {availablePromoCodes.map((promo) => (
+              {suggestedPromoCodes.map((promo) => (
                 <button
                   key={promo.code}
                   type="button"
@@ -303,7 +309,7 @@ export function PlanCard({
           onClick={() => setPromoOpen(true)}
         >
           <Tag className="h-4 w-4" />
-          {availablePromoCodes.length > 0 ? "Выбрать промокод" : "Есть промокод?"}
+          {suggestedPromoCodes.length > 0 ? "Выбрать промокод" : "Есть промокод?"}
         </button>
       ) : (
         <div className="mt-auto min-h-[74px]" />

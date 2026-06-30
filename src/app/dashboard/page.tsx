@@ -696,7 +696,7 @@ function SmartInsights({
     !telegramLinked
       ? {
           title: 'Telegram не привязан',
-          text: 'Это поможет найти старые покупки и подписки.',
+          text: 'Привяжите Telegram, чтобы получить бонус и найти старые покупки.',
           href: '/dashboard/settings',
           icon: <MessageCircleQuestion className="h-4 w-4" />,
           tone: 'slate' as const,

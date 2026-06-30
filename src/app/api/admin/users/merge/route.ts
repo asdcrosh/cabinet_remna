@@ -31,6 +31,9 @@ export const POST = withAuth(async (req: Request) => {
         { status: 409 }
       )
     }
-    throw error
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Не удалось объединить аккаунты' },
+      { status: 500 }
+    )
   }
 })

@@ -27,7 +27,7 @@ export default async function AdminDuplicatesPage() {
             </div>
             <div className="min-w-0">
               <h2 className="font-semibold text-slate-950 dark:text-white">Проверка дублей</h2>
-              <p className="mt-1 text-sm text-slate-500">
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
                 Автоматическое объединение выполняется только в безопасных сценариях. Здесь список для ручной проверки.
               </p>
             </div>
@@ -44,7 +44,7 @@ export default async function AdminDuplicatesPage() {
             <SearchCheck className="h-6 w-6" />
           </div>
           <h2 className="mt-4 text-lg font-semibold">Подозрительных дублей нет</h2>
-          <p className="mt-1 text-sm text-slate-500">Если пользователь жалуется на разные кабинеты, используйте поиск в пользователях.</p>
+          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Если пользователь жалуется на разные кабинеты, используйте поиск в пользователях.</p>
         </section>
       ) : (
         <div className="grid gap-3">
@@ -69,9 +69,9 @@ export default async function AdminDuplicatesPage() {
                   />
                 </div>
                 <div className="flex shrink-0 flex-wrap items-center gap-2">
-                  <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">
+                  <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
                     <AlertTriangle className="h-3.5 w-3.5" />
-                    {candidate.reason === 'same_name' ? 'одинаковое имя' : 'рядом по времени'}
+                    одинаковое имя
                   </span>
                   <Link href={`/dashboard/admin/users?q=${encodeURIComponent(candidate.email)}`} className="btn-secondary h-9 px-3">
                     Открыть
@@ -105,9 +105,9 @@ function IdentityBox({
 }) {
   return (
     <div className="min-w-0 rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-2 dark:border-white/10 dark:bg-white/[0.03]">
-      <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">{title}</div>
+      <div className="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">{title}</div>
       <div className="mt-1 truncate font-semibold text-slate-950 dark:text-white">{email}</div>
-      <div className="mt-0.5 truncate text-sm text-slate-500">{name || 'имя не указано'} · {meta}</div>
+      <div className="mt-0.5 truncate text-sm text-slate-500 dark:text-slate-400">{name || 'имя не указано'} · {meta}</div>
     </div>
   )
 }

@@ -71,6 +71,7 @@ export async function mergeTechnicalTelegramUserIntoEmailUser(input: AdminMergeU
 
     transferred.devices = await transferDevices(tx, source.id, target.id)
     transferred.trialRedemptions = await transferTrialRedemptions(tx, source.id, target.id)
+    transferred.welcomeBonusRedemptions = await transferWelcomeBonusRedemptions(tx, source.id, target.id)
     transferred.bonusAttempts = await transferBonusAttempts(tx, source.id, target.id)
     transferred.notifications = await transferUserNotifications(tx, source.id, target.id)
     transferred.adminReads = await transferAdminNotificationReads(tx, source.id, target.id)
@@ -162,6 +163,20 @@ async function transferTrialRedemptions(tx: Prisma.TransactionClient, sourceUser
     }
   }
   return count
+}
+
+async function transferWelcomeBonusRedemptions(tx: Prisma.TransactionClient, sourceUserId: string, targetUserId: string) {
+  const sourceItem = await tx.welcomeBonusRedemption.findUnique({ where: { userId: sourceUserId }, select: { id: true } })
+  if (!sourceItem) return 0
+
+  const targetItem = await tx.welcomeBonusRedemption.findUnique({ where: { userId: targetUserId }, select: { id: true } })
+  if (targetItem) {
+    await tx.welcomeBonusRedemption.delete({ where: { id: sourceItem.id } })
+    return 0
+  }
+
+  await tx.welcomeBonusRedemption.update({ where: { id: sourceItem.id }, data: { userId: targetUserId } })
+  return 1
 }
 
 async function transferBonusAttempts(tx: Prisma.TransactionClient, sourceUserId: string, targetUserId: string) {

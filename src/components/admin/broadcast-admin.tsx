@@ -266,13 +266,14 @@ export function BroadcastAdmin({
   }, [actionHref, actionLabel, body, imageUrl, segment, selectedChannels, title])
 
   async function submit(testMode = false) {
+    const campaignTitle = getBroadcastTitle()
     setLoading(true)
     setStats(null)
     try {
       const result = await apiFetch<{ stats: BroadcastStats; limited?: boolean; campaign?: BroadcastHistoryItem; testMode?: boolean }>('/api/admin/broadcasts', {
         method: 'POST',
         body: JSON.stringify({
-          title,
+          title: campaignTitle,
           body,
           segment,
           channels: selectedChannels,
@@ -328,14 +329,16 @@ export function BroadcastAdmin({
     setActionLabel(template.actionLabel || '')
     setImageUrl(template.imageUrl || '')
     setStats(null)
+    setStep('message')
   }
 
   async function saveTemplate() {
+    const campaignTitle = getBroadcastTitle()
     try {
       const result = await apiFetch<{ template: BroadcastTemplateItem }>('/api/admin/broadcast-templates', {
         method: 'POST',
         body: JSON.stringify({
-          title,
+          title: campaignTitle,
           description: `Сохранено ${new Intl.DateTimeFormat('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date())}`,
           body,
           segment,
@@ -410,15 +413,20 @@ export function BroadcastAdmin({
     }
   }
 
-  const canSend = title.trim().length >= 3 && body.trim().length >= 5 && selectedChannels.length > 0 && !loading
+  function getBroadcastTitle() {
+    const firstLine = body.trim().split('\n').find(Boolean)?.trim() ?? ''
+    return (title.trim() || firstLine.slice(0, 80) || 'Сообщение').trim()
+  }
+
+  const canSend = body.trim().length >= 5 && selectedChannels.length > 0 && !loading
   const selectedPreset = actionPresets.find((preset) => preset.href === actionHref) ?? actionPresets[0]
-  const previewTitle = renderPreview(title || 'Заголовок рассылки')
+  const previewTitle = renderPreview(getBroadcastTitle())
   const previewBody = renderPreview(body || 'Текст сообщения будет показан здесь.')
   const previewActionLabel = renderPreview(actionLabel || 'Открыть')
   const previewImageUrl = getPreviewImageUrl(imageUrl)
   const visibleTemplates: BroadcastTemplateItem[] = [...customTemplates, ...templates]
   const stepSummary = {
-    message: title.trim() ? title.trim() : 'Сообщение не заполнено',
+    message: body.trim() ? body.trim().split('\n').find(Boolean)?.slice(0, 42) ?? 'Сообщение' : 'Выберите шаблон или напишите текст',
     audience: `${segmentLabel(segment)} · ${selectedChannels.map(channelLabel).join(', ')}`,
     delivery: canSend ? 'Готово к отправке' : 'Заполните сообщение и канал',
   }
@@ -479,7 +487,16 @@ export function BroadcastAdmin({
           </div>
 
           <div className="mt-5">
-            <div className="text-sm font-semibold">Каналы</div>
+            <div className="flex items-center justify-between gap-2">
+              <div className="text-sm font-semibold">Каналы</div>
+              <button
+                type="button"
+                className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-slate-300"
+                onClick={() => setSelectedChannels(['IN_APP', 'TELEGRAM', 'EMAIL'])}
+              >
+                Все каналы
+              </button>
+            </div>
             <div className="mt-2 grid grid-cols-3 gap-2">
               {channels.map((item) => {
                 const Icon = item.icon
@@ -504,46 +521,39 @@ export function BroadcastAdmin({
             </div>
           </div>
 
-          <div className="mt-5">
-            <div className="flex items-center justify-between gap-2">
-              <div className="text-sm font-semibold">Шаблоны</div>
-              <button type="button" className="btn-secondary min-h-9 px-3 text-xs" onClick={saveTemplate} disabled={!canSend}>
-                Сохранить
-              </button>
-            </div>
-            <div className="mt-2 grid gap-2">
-              {visibleTemplates.map((template) => (
-                <div
-                  key={template.id || template.title}
-                  className="rounded-lg border border-slate-200 bg-white p-3 transition-colors hover:bg-slate-50 dark:border-white/10 dark:bg-surface-900 dark:hover:bg-white/5"
-                >
-                  <button type="button" onClick={() => applyTemplate(template)} className="w-full text-left">
-                    <div className="text-sm font-semibold">{template.title}</div>
-                    <div className="mt-0.5 text-xs text-slate-500">{template.description || 'Пользовательский шаблон'}</div>
-                  </button>
-                  {template.id ? (
-                    <button type="button" className="mt-2 text-xs font-semibold text-red-600 hover:text-red-700" onClick={() => deleteTemplate(template.id!)}>
-                      Удалить шаблон
-                    </button>
-                  ) : null}
-                </div>
-              ))}
-            </div>
-          </div>
         </div>
 
         <div className={cn('card p-4', step === 'audience' && 'hidden')}>
           <div className="grid gap-4">
-            <label className="block">
-              <span className="text-sm font-medium">Заголовок</span>
-              <input
-                className="input mt-1"
-                value={title}
-                onChange={(event) => setTitle(event.target.value)}
-                maxLength={80}
-                placeholder="Например: скидка до конца недели"
-              />
-            </label>
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-white/10 dark:bg-white/5">
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <div className="text-sm font-semibold text-slate-950 dark:text-white">Шаблон сообщения</div>
+                  <div className="text-xs text-slate-500 dark:text-slate-400">Выберите готовый сценарий, текст заполнится ниже.</div>
+                </div>
+                <button type="button" className="btn-secondary min-h-9 px-3 text-xs" onClick={saveTemplate} disabled={!canSend}>
+                  Сохранить
+                </button>
+              </div>
+              <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
+                {visibleTemplates.map((template) => (
+                  <div
+                    key={template.id || template.title}
+                    className="min-w-56 rounded-lg border border-slate-200 bg-white p-3 transition-colors hover:bg-slate-50 dark:border-white/10 dark:bg-surface-900 dark:hover:bg-white/5"
+                  >
+                    <button type="button" onClick={() => applyTemplate(template)} className="w-full text-left">
+                      <div className="truncate text-sm font-semibold text-slate-950 dark:text-white">{template.title}</div>
+                      <div className="mt-0.5 line-clamp-2 text-xs text-slate-500 dark:text-slate-400">{template.description || 'Пользовательский шаблон'}</div>
+                    </button>
+                    {template.id ? (
+                      <button type="button" className="mt-2 text-xs font-semibold text-red-600 hover:text-red-700 dark:text-red-300" onClick={() => deleteTemplate(template.id!)}>
+                        Удалить
+                      </button>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            </div>
 
             <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-white/10 dark:bg-white/5">
               <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Подстановки</div>

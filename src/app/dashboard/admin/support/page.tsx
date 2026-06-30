@@ -53,16 +53,14 @@ export default async function AdminSupportPage({
   ])
 
   return (
-    <div>
-      <SupportPanel
-        mode="admin"
-        initialTotal={total}
-        pageSize={25}
-        initialTickets={tickets.map((ticket) => ({
-          ...serializeSupportTicket(ticket),
-          messages: ticket.messages.map(serializeSupportMessage),
-        }))}
-      />
-    </div>
+    <SupportPanel
+      mode="admin"
+      initialTotal={total}
+      pageSize={25}
+      initialTickets={tickets.map((ticket) => ({
+        ...serializeSupportTicket(ticket),
+        messages: ticket.messages.map(serializeSupportMessage),
+      }))}
+    />
   )
 }

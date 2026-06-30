@@ -42,7 +42,7 @@ export default async function AdminPaymentsPage({
       : {}),
   }
 
-  const [total, payments] = await prisma.$transaction([
+  const [total, payments, pendingCount, retryCount, succeededCount] = await prisma.$transaction([
     prisma.payment.count({ where }),
     prisma.payment.findMany({
       where,
@@ -54,11 +54,20 @@ export default async function AdminPaymentsPage({
         subscription: true,
       },
     }),
+    prisma.payment.count({ where: { status: 'PENDING' } }),
+    prisma.payment.count({ where: { status: 'SUCCEEDED', subscriptionProvisionedAt: null } }),
+    prisma.payment.count({ where: { status: 'SUCCEEDED' } }),
   ])
 
   return (
     <div className="space-y-6">
       <PageHeader title="Платежи" description="Все платежи, их статус и результат выдачи подписки" />
+
+      <section className="grid gap-3 md:grid-cols-3">
+        <PaymentStat title="Ожидают оплаты" value={pendingCount} tone="amber" />
+        <PaymentStat title="Нужна довыдача" value={retryCount} tone={retryCount > 0 ? 'red' : 'slate'} />
+        <PaymentStat title="Оплачено всего" value={succeededCount} tone="emerald" />
+      </section>
 
       <form className="grid gap-2 rounded-lg border border-slate-200 bg-white p-3 dark:border-white/10 dark:bg-surface-900 md:grid-cols-[minmax(14rem,1fr)_12rem_12rem_auto_auto]" action="/dashboard/admin/payments">
         <div className="relative">
@@ -137,8 +146,8 @@ export default async function AdminPaymentsPage({
                       {needsRetry ? (
                         <RecoveryActionButton paymentId={payment.id} />
                       ) : payment.subscriptionId ? (
-                        <Link href="/dashboard/admin/subscriptions" className="btn-secondary min-w-[112px] px-3 text-xs">
-                          Подписка
+                        <Link href={`/dashboard/admin/users?q=${encodeURIComponent(payment.user.email)}`} className="btn-secondary min-w-[112px] px-3 text-xs">
+                          Пользователь
                         </Link>
                       ) : null}
                     </div>
@@ -199,8 +208,8 @@ export default async function AdminPaymentsPage({
                   {needsRetry ? (
                     <RecoveryActionButton paymentId={payment.id} />
                   ) : payment.subscriptionId ? (
-                    <Link href="/dashboard/admin/subscriptions" className="btn-secondary min-w-[112px] px-3 text-xs">
-                      Открыть подписки
+                    <Link href={`/dashboard/admin/users?q=${encodeURIComponent(payment.user.email)}`} className="btn-secondary min-w-[112px] px-3 text-xs">
+                      Пользователь
                     </Link>
                   ) : null}
                 </div>
@@ -211,6 +220,22 @@ export default async function AdminPaymentsPage({
       </div>
 
       <LazyListLoader loaded={payments.length} total={total} step={ADMIN_LIST_PAGE_SIZE} />
+    </div>
+  )
+}
+
+function PaymentStat({ title, value, tone }: { title: string; value: number; tone: 'amber' | 'emerald' | 'red' | 'slate' }) {
+  const toneClass = {
+    amber: 'border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-500/25 dark:bg-amber-500/10 dark:text-amber-100',
+    emerald: 'border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-500/25 dark:bg-emerald-500/10 dark:text-emerald-100',
+    red: 'border-red-200 bg-red-50 text-red-900 dark:border-red-500/25 dark:bg-red-500/10 dark:text-red-100',
+    slate: 'border-slate-200 bg-white text-slate-900 dark:border-white/10 dark:bg-surface-900 dark:text-white',
+  }[tone]
+
+  return (
+    <div className={`rounded-lg border px-4 py-3 shadow-sm ${toneClass}`}>
+      <div className="text-sm opacity-75">{title}</div>
+      <div className="mt-1 text-2xl font-semibold">{value}</div>
     </div>
   )
 }

@@ -22,19 +22,14 @@ export async function findIdentityDuplicateCandidates(limit = 30) {
       email_user.id AS "emailUserId",
       email_user.email AS "email",
       email_user.name AS "emailName",
-      CASE
-        WHEN lower(coalesce(technical.name, '')) = lower(coalesce(email_user.name, '')) THEN 'same_name'
-        ELSE 'same_recent_registration'
-      END AS "reason",
+      'same_name' AS "reason",
       abs(extract(epoch FROM (technical."createdAt" - email_user."createdAt")) / 60)::int AS "createdDistanceMinutes"
     FROM "User" technical
     JOIN "User" email_user
       ON email_user.id <> technical.id
      AND email_user.email NOT LIKE 'telegram-%@pending.invalid'
-     AND (
-       lower(coalesce(technical.name, '')) = lower(coalesce(email_user.name, ''))
-       OR abs(extract(epoch FROM (technical."createdAt" - email_user."createdAt")) / 60) <= 30
-     )
+     AND length(trim(coalesce(technical.name, ''))) >= 3
+     AND lower(trim(coalesce(technical.name, ''))) = lower(trim(coalesce(email_user.name, '')))
     WHERE technical.email LIKE 'telegram-%@pending.invalid'
       AND technical."telegramId" IS NOT NULL
     ORDER BY technical."createdAt" DESC
