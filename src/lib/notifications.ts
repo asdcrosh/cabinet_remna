@@ -1,4 +1,4 @@
-import { Prisma, type NotificationChannel, type NotificationType } from '@prisma/client'
+import type { NotificationChannel, NotificationType } from '@prisma/client'
 import { getAppUrl } from './app-url'
 import { getBrandName } from './branding'
 import { renderActionEmail } from './email-template'
@@ -373,21 +373,18 @@ async function createInAppNotification(input: {
   actionHref?: string
   actionLabel?: string
 }) {
-  try {
-    await prisma.userNotification.create({
-      data: {
-        userId: input.userId,
-        type: input.type,
-        dedupeKey: `${input.type}:${input.dedupeKey}`,
-        title: input.title,
-        body: input.body,
-        actionHref: input.actionHref,
-        actionLabel: input.actionLabel,
-      },
-    })
-  } catch (error) {
-    if (!isUniqueError(error)) throw error
-  }
+  await prisma.userNotification.createMany({
+    data: {
+      userId: input.userId,
+      type: input.type,
+      dedupeKey: `${input.type}:${input.dedupeKey}`,
+      title: input.title,
+      body: input.body,
+      actionHref: input.actionHref,
+      actionLabel: input.actionLabel,
+    },
+    skipDuplicates: true,
+  })
 }
 
 async function sendWithDedupe(input: {
@@ -398,19 +395,17 @@ async function sendWithDedupe(input: {
   send: () => Promise<void>
 }): Promise<NotifyResult> {
   const dedupeKey = `${input.type}:${input.dedupeKey}`
-  try {
-    await prisma.notificationLog.create({
-      data: {
-        userId: input.userId,
-        type: input.type,
-        channel: input.channel,
-        dedupeKey,
-      },
-    })
-  } catch (error) {
-    if (isUniqueError(error)) return 'duplicate'
-    throw error
-  }
+  const created = await prisma.notificationLog.createMany({
+    data: {
+      userId: input.userId,
+      type: input.type,
+      channel: input.channel,
+      dedupeKey,
+    },
+    skipDuplicates: true,
+  })
+
+  if (created.count === 0) return 'duplicate'
 
   try {
     await input.send()
@@ -514,10 +509,6 @@ function renderNotificationEmail(input: {
     expiry: 'Уведомление отправлено автоматически.',
     securityNote: 'Если вопрос уже решён, дополнительных действий не требуется.',
   })
-}
-
-function isUniqueError(error: unknown) {
-  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002'
 }
 
 function isRealEmail(email: string) {

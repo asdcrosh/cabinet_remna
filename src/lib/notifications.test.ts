@@ -6,11 +6,11 @@ const mocks = vi.hoisted(() => {
       findUnique: vi.fn(),
     },
     notificationLog: {
-      create: vi.fn(),
+      createMany: vi.fn(),
       updateMany: vi.fn(),
     },
     userNotification: {
-      create: vi.fn(),
+      createMany: vi.fn(),
     },
   }
 
@@ -41,8 +41,8 @@ describe('notifyUser', () => {
       name: 'User',
       telegramId: 123n,
     })
-    mocks.prisma.notificationLog.create.mockResolvedValue({})
-    mocks.prisma.userNotification.create.mockResolvedValue({})
+    mocks.prisma.notificationLog.createMany.mockResolvedValue({ count: 1 })
+    mocks.prisma.userNotification.createMany.mockResolvedValue({ count: 1 })
 
     const result = await notifyUser({
       userId: 'user-1',
@@ -57,7 +57,7 @@ describe('notifyUser', () => {
     })
 
     expect(result).toEqual({ telegram: 'sent', email: 'sent' })
-    expect(mocks.prisma.userNotification.create).toHaveBeenCalledWith(
+    expect(mocks.prisma.userNotification.createMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
           userId: 'user-1',
@@ -66,7 +66,7 @@ describe('notifyUser', () => {
         }),
       })
     )
-    expect(mocks.prisma.notificationLog.create).toHaveBeenCalledTimes(2)
+    expect(mocks.prisma.notificationLog.createMany).toHaveBeenCalledTimes(2)
     expect(fetch).toHaveBeenCalledWith(
       'https://api.telegram.org/bottelegram-token/sendMessage',
       expect.objectContaining({ method: 'POST' })
@@ -88,8 +88,8 @@ describe('notifyUser', () => {
       name: 'User',
       telegramId: 123n,
     })
-    mocks.prisma.notificationLog.create.mockResolvedValue({})
-    mocks.prisma.userNotification.create.mockResolvedValue({})
+    mocks.prisma.notificationLog.createMany.mockResolvedValue({ count: 1 })
+    mocks.prisma.userNotification.createMany.mockResolvedValue({ count: 1 })
 
     const result = await notifyUser({
       userId: 'user-1',
@@ -104,7 +104,7 @@ describe('notifyUser', () => {
     })
 
     expect(result).toEqual({ telegram: 'sent', email: 'skipped' })
-    expect(mocks.prisma.notificationLog.create).toHaveBeenCalledTimes(1)
+    expect(mocks.prisma.notificationLog.createMany).toHaveBeenCalledTimes(1)
     expect(fetch).toHaveBeenCalledTimes(1)
   })
 
@@ -116,9 +116,9 @@ describe('notifyUser', () => {
       name: 'User',
       telegramId: 123n,
     })
-    mocks.prisma.notificationLog.create.mockResolvedValue({})
+    mocks.prisma.notificationLog.createMany.mockResolvedValue({ count: 1 })
     mocks.prisma.notificationLog.updateMany.mockResolvedValue({ count: 1 })
-    mocks.prisma.userNotification.create.mockResolvedValue({})
+    mocks.prisma.userNotification.createMany.mockResolvedValue({ count: 1 })
     global.fetch = vi.fn(async () => new Response('bad token', { status: 401 })) as typeof fetch
 
     const result = await notifyUser({
@@ -144,8 +144,8 @@ describe('notifyUser', () => {
       name: 'User',
       telegramId: 123n,
     })
-    mocks.prisma.notificationLog.create.mockResolvedValue({})
-    mocks.prisma.userNotification.create.mockResolvedValue({})
+    mocks.prisma.notificationLog.createMany.mockResolvedValue({ count: 1 })
+    mocks.prisma.userNotification.createMany.mockResolvedValue({ count: 1 })
 
     const result = await notifyUser({
       userId: 'user-1',
@@ -175,5 +175,33 @@ describe('notifyUser', () => {
         reply_markup: { inline_keyboard: [[{ text: 'Выбрать тариф', url: 'https://cabinet.example.test/dashboard/plans' }]] },
       })
     )
+  })
+
+  it('quietly skips duplicate channel notifications', async () => {
+    mocks.prisma.user.findUnique.mockResolvedValue({
+      id: 'user-1',
+      email: 'user@example.test',
+      emailVerifiedAt: new Date(),
+      name: 'User',
+      telegramId: 123n,
+    })
+    mocks.prisma.notificationLog.createMany.mockResolvedValue({ count: 0 })
+    mocks.prisma.userNotification.createMany.mockResolvedValue({ count: 0 })
+
+    const result = await notifyUser({
+      userId: 'user-1',
+      type: 'SUBSCRIPTION_EXPIRING',
+      dedupeKey: 'subscription-expiring:subscription-1:3d',
+      title: 'Подписка скоро закончится',
+      body: 'Подписка скоро закончится',
+      telegramText: 'Подписка скоро закончится',
+      emailSubject: 'Подписка скоро закончится',
+      emailText: 'Подписка скоро закончится',
+      emailHtml: '<p>Подписка скоро закончится</p>',
+    })
+
+    expect(result).toEqual({ telegram: 'duplicate', email: 'duplicate' })
+    expect(mocks.prisma.notificationLog.createMany).toHaveBeenCalledTimes(2)
+    expect(fetch).not.toHaveBeenCalled()
   })
 })
