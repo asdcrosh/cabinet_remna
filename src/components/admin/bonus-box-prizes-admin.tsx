@@ -157,16 +157,16 @@ export function BonusBoxPrizesAdmin({
 
   return (
     <div className="space-y-5">
-      <section className="surface-card p-0">
-        <div className="h-1 bg-gradient-to-r from-cyan-400 via-emerald-300 to-blue-500" />
-        <div className="p-4 sm:p-5">
+      <section className="relative overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm shadow-slate-200/60 dark:border-white/10 dark:bg-surface-900 dark:shadow-black/20">
+        <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-cyan-400 via-emerald-300 to-blue-500" />
+        <div className="p-4 pt-5 sm:p-5">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div className="min-w-0">
-              <div className="flex items-center gap-2 text-sm font-semibold text-cyan-700 dark:text-cyan-200">
-                <BarChart3 className="h-4 w-4" />
+              <div className="inline-flex items-center gap-2 rounded-full bg-cyan-50 px-3 py-1 text-xs font-semibold text-cyan-700 dark:bg-cyan-500/10 dark:text-cyan-200">
+                <BarChart3 className="h-3.5 w-3.5" />
                 Управление подарками
               </div>
-              <h2 className="mt-1 text-xl font-semibold tracking-tight text-slate-950 dark:text-white">Состав и шансы</h2>
+              <h2 className="mt-3 text-xl font-semibold tracking-tight text-slate-950 dark:text-white">Состав и шансы</h2>
               <p className="mt-1 max-w-2xl text-sm text-slate-500">
                 Держите баланс наград, пустых исходов и редких подарков под контролем. Вес управляет шансом выпадения.
               </p>
@@ -193,7 +193,7 @@ export function BonusBoxPrizesAdmin({
         </div>
       </section>
 
-      <div className="surface-card flex flex-wrap gap-2 p-1">
+      <div className="flex flex-wrap gap-2 rounded-lg border border-slate-200 bg-white p-1 shadow-sm shadow-slate-200/60 dark:border-white/10 dark:bg-surface-900 dark:shadow-black/20">
         <AdminTabButton
           active={activeTab === 'prizes'}
           icon={<Gift className="h-4 w-4" />}
@@ -211,7 +211,7 @@ export function BonusBoxPrizesAdmin({
       </div>
 
       {activeTab === 'prizes' && (
-        <section className="grid gap-3">
+        <section className="grid gap-3 lg:grid-cols-2">
           {prizes.map((prize) => (
             <PrizeAdminRow
               key={prize.id}
@@ -345,37 +345,42 @@ function PrizeAdminRow({
   onToggle: () => void
 }) {
   return (
-    <article className={cn('surface-card surface-card-hover overflow-hidden p-0', prizeAdminBorderClass(prize))}>
+    <article className={cn('group relative overflow-hidden rounded-lg border bg-white shadow-sm shadow-slate-200/60 transition hover:-translate-y-0.5 hover:border-cyan-200 hover:shadow-lg hover:shadow-slate-950/5 dark:bg-surface-900 dark:shadow-black/20 dark:hover:border-cyan-500/30', prizeAdminBorderClass(prize))}>
       <div className={cn('h-1', prizeAdminTopClass(prize))} />
-      <div className="grid gap-4 p-4 xl:grid-cols-[minmax(220px,1.1fr)_minmax(320px,1.6fr)_auto] xl:items-center">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="truncate font-semibold">{prize.title}</span>
-            <span className={prize.isActive ? 'badge-active' : 'badge-disabled'}>
-              {prize.isActive ? 'Активен' : 'Отключён'}
-            </span>
-            <span className={cn('rounded-full px-2 py-1 text-xs font-semibold', rarityClass(prize.rarity))}>
-              {rarityLabel(prize.rarity)}
-            </span>
+      <div className="space-y-4 p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className={prize.isActive ? 'badge-active' : 'badge-disabled'}>
+                {prize.isActive ? 'Активен' : 'Отключён'}
+              </span>
+              <span className={cn('rounded-full px-2 py-1 text-xs font-semibold', rarityClass(prize.rarity))}>
+                {rarityLabel(prize.rarity)}
+              </span>
+            </div>
+            <h3 className="mt-2 truncate text-lg font-semibold text-slate-950 dark:text-white">{prize.title}</h3>
+            <div className="mt-1 line-clamp-2 text-sm leading-5 text-slate-500 dark:text-slate-400">
+              {prize.description || prizeTypeLabel(prize.type)}
+            </div>
           </div>
-          <div className="mt-1 line-clamp-2 text-sm text-slate-500">
-            {prize.description || prizeTypeLabel(prize.type)}
+          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-slate-950 text-cyan-200 shadow-sm dark:bg-white dark:text-slate-950">
+            <Gift className="h-5 w-5" />
           </div>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           <CompactMetric label="Подарок" value={prizeValue(prize)} />
           <CompactMetric label="Шанс" value={formatChance(prize.chance)} />
           <CompactMetric label="Вес" value={prize.weight} />
           <CompactMetric label="Выпало" value={`${prize.winsCount}/${prize.maxWins ?? '∞'}`} />
         </div>
 
-        <div className="action-row xl:w-[240px]">
-          <button type="button" className="btn-secondary min-w-[112px] px-3 text-xs" onClick={onEdit}>
+        <div className="grid gap-2 sm:grid-cols-2">
+          <button type="button" className="btn-secondary min-h-10 justify-center px-3 text-xs" onClick={onEdit}>
             <Edit3 className="h-3.5 w-3.5" />
             Изменить
           </button>
-          <button type="button" className="btn-secondary min-w-[112px] px-3 text-xs" onClick={onToggle}>
+          <button type="button" className="btn-secondary min-h-10 justify-center px-3 text-xs" onClick={onToggle}>
             <Power className="h-3.5 w-3.5" />
             {prize.isActive ? 'Отключить' : 'Включить'}
           </button>
@@ -553,7 +558,7 @@ function PrizeEditorDrawer({
 
 function BonusBoxOpeningHistory({ openings }: { openings: BonusBoxOpeningAdminRow[] }) {
   return (
-    <section className="surface-card space-y-4">
+    <section className="space-y-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60 dark:border-white/10 dark:bg-surface-900 dark:shadow-black/20">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold">История открытий</h2>
@@ -695,7 +700,7 @@ function PrizeFormPreview({ form }: { form: FormState }) {
 
 function CompactMetric({ label, value }: { label: string; value: ReactNode }) {
   return (
-    <div className="min-w-0">
+    <div className="min-w-0 rounded-lg border border-slate-100 bg-slate-50/80 px-3 py-2 dark:border-white/10 dark:bg-white/[0.04]">
       <div className="text-xs text-slate-500">{label}</div>
       <div className="mt-1 truncate font-medium">{value}</div>
     </div>

@@ -116,6 +116,10 @@ export function BonusBoxClient({
     () => data.prizes.reduce((sum, prize) => sum + prize.chance, 0),
     [data.prizes],
   );
+  const rewardPrizesCount = useMemo(
+    () => data.prizes.filter((prize) => prize.type !== "NO_PRIZE").length,
+    [data.prizes],
+  );
 
   async function refreshOverview() {
     const overview = await apiFetch<BonusBoxOverview>("/api/bonus-box");
@@ -170,14 +174,14 @@ export function BonusBoxClient({
 
   return (
     <div className="space-y-5">
-      <section className="surface-card overflow-hidden p-0">
-        <div className="h-1 bg-gradient-to-r from-cyan-400 via-emerald-300 to-blue-500" />
-        <div className="grid gap-5 p-4 sm:p-5 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-center">
+      <section className="relative overflow-hidden rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60 dark:border-white/10 dark:bg-surface-900 dark:shadow-black/20 sm:p-5">
+        <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-cyan-400 via-emerald-300 to-blue-500" />
+        <div className="relative grid gap-5 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-center">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <span className="inline-flex items-center gap-1.5 rounded-full bg-cyan-50 px-3 py-1 text-xs font-semibold text-cyan-700 dark:bg-cyan-500/10 dark:text-cyan-200">
                 <Sparkles className="h-3.5 w-3.5" />
-                Подарки
+                Подарочный бокс
               </span>
               <span
                 className={cn(
@@ -196,18 +200,39 @@ export function BonusBoxClient({
               </span>
             </div>
             <h2 className="mt-4 text-2xl font-semibold tracking-tight text-slate-950 dark:text-white sm:text-3xl">
-              Откройте подарок
+              Бонусы за активность
             </h2>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500 dark:text-slate-400">
               Внутри дни подписки, трафик, персональные скидки и дополнительные
               открытия. Попытки начисляются за оплаты, рефералов и еженедельный
               бонус.
             </p>
-            <div className="mt-4 grid gap-2 sm:grid-cols-3">
-              <TopMetric label="Доступно" value={data.attemptsCount} hint="открытий" />
-              <TopMetric label="Подарков" value={data.prizes.length} hint="в боксе" />
-              <TopMetric label="Шансы" value={`${Math.round(totalChance * 100)}%`} hint="активны" />
+            <div className="mt-4 grid grid-cols-3 gap-2">
+              <TopMetric
+                icon={<Gift className="h-4 w-4" />}
+                label="Открытий"
+                value={data.attemptsCount}
+                hint="доступно"
+              />
+              <TopMetric
+                icon={<Sparkles className="h-4 w-4" />}
+                label="Наград"
+                value={rewardPrizesCount}
+                hint="вариантов"
+              />
+              <TopMetric
+                icon={<CalendarClock className="h-4 w-4" />}
+                label="История"
+                value={data.openings.length}
+                hint="результатов"
+              />
             </div>
+            {!data.hasActiveSubscription && data.attemptsCount > 0 && (
+              <div className="mt-4 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
+                <LockKeyhole className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>Открытия сохраняются на балансе. Активируйте подписку, чтобы забрать подарок.</span>
+              </div>
+            )}
           </div>
           <div className="min-w-0">
             <button
@@ -222,22 +247,30 @@ export function BonusBoxClient({
                 {openButtonLabel}
               </span>
             </button>
-            {!data.hasActiveSubscription && data.attemptsCount > 0 && (
-              <div className="mt-2 text-center text-xs text-slate-400">
-                Открытия сохраняются, активируйте подписку для получения
-                подарка.
-              </div>
-            )}
           </div>
         </div>
+      </section>
 
-        <div className="border-t border-slate-100 bg-slate-50/70 p-3 dark:border-white/10 dark:bg-white/[0.025] sm:p-4">
-          <div className="relative overflow-hidden rounded-lg border border-slate-900/10 bg-slate-950 py-5 shadow-sm dark:border-white/10 sm:py-6">
-            <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-16 bg-gradient-to-r from-slate-950 via-slate-950/80 to-transparent sm:w-32" />
-            <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-16 bg-gradient-to-l from-slate-950 via-slate-950/80 to-transparent sm:w-32" />
-            <div className="pointer-events-none absolute inset-y-4 left-1/2 z-30 w-px -translate-x-1/2 bg-cyan-100/90 shadow-[0_0_18px_rgba(165,243,252,.72)]" />
-            <div className="pointer-events-none absolute left-1/2 top-2 z-30 h-0 w-0 -translate-x-1/2 border-x-[10px] border-t-[14px] border-x-transparent border-t-cyan-100/90" />
-            <div className="pointer-events-none absolute bottom-2 left-1/2 z-30 h-0 w-0 -translate-x-1/2 border-x-[10px] border-b-[14px] border-x-transparent border-b-cyan-100/90" />
+      <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm shadow-slate-200/60 dark:border-white/10 dark:bg-surface-900 dark:shadow-black/20">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-4 py-3 dark:border-white/10 sm:px-5">
+          <div>
+            <h2 className="font-semibold text-slate-950 dark:text-white">Лента открытия</h2>
+            <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
+              Каждое открытие расходует одну попытку, результат сохраняется в истории.
+            </p>
+          </div>
+          <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-500 dark:bg-white/10 dark:text-slate-300">
+            {opening ? "Открывается" : `${data.attemptsCount} доступно`}
+          </span>
+        </div>
+
+        <div className="bg-slate-50/70 p-3 dark:bg-surface-950/35 sm:p-4">
+          <div className="relative overflow-hidden rounded-lg border border-slate-200 bg-white py-4 shadow-sm dark:border-white/10 dark:bg-surface-900 sm:py-5">
+            <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-12 bg-gradient-to-r from-white via-white/85 to-transparent dark:from-surface-900 dark:via-surface-900/85 sm:w-24" />
+            <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-12 bg-gradient-to-l from-white via-white/85 to-transparent dark:from-surface-900 dark:via-surface-900/85 sm:w-24" />
+            <div className="pointer-events-none absolute inset-y-3 left-1/2 z-30 w-px -translate-x-1/2 bg-slate-950/50 dark:bg-white/70" />
+            <div className="pointer-events-none absolute left-1/2 top-2 z-30 h-0 w-0 -translate-x-1/2 border-x-[8px] border-t-[11px] border-x-transparent border-t-slate-950/70 dark:border-t-white/80" />
+            <div className="pointer-events-none absolute bottom-2 left-1/2 z-30 h-0 w-0 -translate-x-1/2 border-x-[8px] border-b-[11px] border-x-transparent border-b-slate-950/70 dark:border-b-white/80" />
 
             <div ref={viewportRef} className="overflow-hidden">
               <div
@@ -259,61 +292,68 @@ export function BonusBoxClient({
             </div>
           </div>
         </div>
-
-        {result && (
-          <div className="grid gap-4 border-t border-slate-100 bg-white p-4 dark:border-white/10 dark:bg-surface-900 sm:p-5 md:grid-cols-[1fr_auto] md:items-center">
-            <div className="min-w-0">
-              <div
-                className={cn(
-                  "flex items-center gap-2 text-sm font-semibold",
-                  result.prize.type === "NO_PRIZE"
-                    ? "text-slate-500 dark:text-slate-400"
-                    : "text-emerald-600 dark:text-emerald-300",
-                )}
-              >
-                {result.prize.type === "NO_PRIZE" ? (
-                  <CircleSlash className="h-4 w-4" />
-                ) : (
-                  <Sparkles className="h-4 w-4" />
-                )}
-                {result.prize.type === "NO_PRIZE"
-                  ? "Результат открытия"
-                  : "Ваш подарок"}
-              </div>
-              <div className="mt-1 text-2xl font-semibold tracking-tight text-slate-950 dark:text-white">
-                {result.prize.title}
-              </div>
-              {(result.prize.description ||
-                result.prize.type === "NO_PRIZE") && (
-                <div className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                  {result.prize.description || "В этот раз без начисления."}
-                </div>
-              )}
-              {result.promoCode && (
-                <div className="mt-3 inline-flex max-w-full flex-wrap items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-100">
-                  <TicketPercent className="h-4 w-4 shrink-0" />
-                  <span className="break-all">{result.promoCode}</span>
-                  {result.promoCodeExpiresAt && (
-                    <span className="text-xs font-medium text-emerald-700/80 dark:text-emerald-100/75">
-                      до {formatDateOnly(result.promoCodeExpiresAt)}
-                    </span>
-                  )}
-                </div>
-              )}
-            </div>
-            <button
-              type="button"
-              className="btn-secondary"
-              onClick={() => setResult(null)}
-            >
-              Закрыть
-            </button>
-          </div>
-        )}
       </section>
 
+      {result && (
+        <section
+          className={cn(
+            "grid gap-4 rounded-lg border bg-white p-4 shadow-sm shadow-slate-200/60 dark:bg-surface-900 dark:shadow-black/20 sm:p-5 md:grid-cols-[1fr_auto] md:items-center",
+            result.prize.type === "NO_PRIZE"
+              ? "border-red-200 dark:border-red-500/40"
+              : "border-emerald-200 dark:border-emerald-500/30",
+          )}
+        >
+          <div className="min-w-0">
+            <div
+              className={cn(
+                "flex items-center gap-2 text-sm font-semibold",
+                result.prize.type === "NO_PRIZE"
+                  ? "text-slate-500 dark:text-slate-400"
+                  : "text-emerald-600 dark:text-emerald-300",
+              )}
+            >
+              {result.prize.type === "NO_PRIZE" ? (
+                <CircleSlash className="h-4 w-4" />
+              ) : (
+                <Sparkles className="h-4 w-4" />
+              )}
+              {result.prize.type === "NO_PRIZE"
+                ? "Результат открытия"
+                : "Ваш подарок"}
+            </div>
+            <div className="mt-1 text-2xl font-semibold tracking-tight text-slate-950 dark:text-white">
+              {result.prize.title}
+            </div>
+            {(result.prize.description ||
+              result.prize.type === "NO_PRIZE") && (
+              <div className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                {result.prize.description || "В этот раз без начисления."}
+              </div>
+            )}
+            {result.promoCode && (
+              <div className="mt-3 inline-flex max-w-full flex-wrap items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-100">
+                <TicketPercent className="h-4 w-4 shrink-0" />
+                <span className="break-all">{result.promoCode}</span>
+                {result.promoCodeExpiresAt && (
+                  <span className="text-xs font-medium text-emerald-700/80 dark:text-emerald-100/75">
+                    до {formatDateOnly(result.promoCodeExpiresAt)}
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={() => setResult(null)}
+          >
+            Закрыть
+          </button>
+        </section>
+      )}
+
       <section className="space-y-4">
-        <div className="surface-card flex flex-wrap gap-2 p-1">
+        <div className="flex flex-wrap gap-2 rounded-lg border border-slate-200 bg-white p-1 shadow-sm shadow-slate-200/60 dark:border-white/10 dark:bg-surface-900 dark:shadow-black/20">
           <BonusTabButton
             active={activeTab === "outcomes"}
             onClick={() => setActiveTab("outcomes")}
@@ -420,23 +460,26 @@ function BonusTabButton({
 }
 
 function TopMetric({
+  icon,
   label,
   value,
   hint,
 }: {
+  icon: ReactNode;
   label: string;
   value: ReactNode;
   hint: string;
 }) {
   return (
-    <div className="min-w-0 rounded-lg bg-slate-50 px-3 py-2 dark:bg-white/[0.04]">
-      <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+    <div className="min-w-0 rounded-lg border border-slate-100 bg-slate-50/80 px-2.5 py-2 dark:border-white/10 dark:bg-white/[0.04] sm:px-3">
+      <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400 sm:text-xs">
+        {icon}
         {label}
       </div>
-      <div className="mt-1 truncate text-lg font-semibold text-slate-950 dark:text-white">
+      <div className="mt-1 truncate text-base font-semibold text-slate-950 dark:text-white sm:text-lg">
         {value}
       </div>
-      <div className="truncate text-xs text-slate-500">{hint}</div>
+      <div className="truncate text-[11px] text-slate-500 sm:text-xs">{hint}</div>
     </div>
   );
 }
@@ -447,7 +490,7 @@ function OutcomeRow({ prize }: { prize: BonusBoxPrizeView }) {
   return (
     <article
       className={cn(
-        "surface-card relative overflow-hidden p-4",
+        "relative overflow-hidden rounded-lg border bg-white p-4 shadow-sm shadow-slate-200/60 dark:bg-surface-900 dark:shadow-black/20",
         prizeBorderClass(prize),
       )}
     >
@@ -497,7 +540,7 @@ function OpeningRow({ opening }: { opening: BonusBoxOpeningView }) {
   return (
     <article
       className={cn(
-        "surface-card p-4",
+        "rounded-lg border bg-white p-4 shadow-sm shadow-slate-200/60 dark:bg-surface-900 dark:shadow-black/20",
         prizeBorderClass(opening.prize),
       )}
     >
@@ -594,9 +637,9 @@ function RuleCard({
   return (
     <div
       className={cn(
-        "surface-card p-4",
+        "rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60 dark:border-white/10 dark:bg-surface-900 dark:shadow-black/20",
         muted &&
-          "bg-slate-50 text-slate-500 dark:bg-white/[0.025] dark:text-slate-400",
+          "bg-slate-50/80 text-slate-500 dark:bg-surface-900/80 dark:text-slate-400",
       )}
     >
       <div className="flex items-start gap-3">
@@ -637,7 +680,7 @@ function PrizeCard({
       className={cn(
         "relative shrink-0 overflow-hidden rounded-lg border p-3 transition-transform duration-200",
         compact
-          ? "h-36 text-white shadow-[0_18px_42px_rgba(0,0,0,.28)]"
+          ? "h-32 bg-white text-slate-950 shadow-sm dark:bg-surface-800 dark:text-white"
           : "min-h-[132px] bg-white shadow-sm hover:-translate-y-0.5 dark:bg-surface-900",
         compact ? prizeReelClass(prize) : prizeBorderClass(prize),
       )}
@@ -646,24 +689,12 @@ function PrizeCard({
       <div
         className={cn("absolute inset-x-0 top-0 h-1", prizeTopClass(prize))}
       />
-      {compact && (
-        <>
-          <div
-            className={cn(
-              "absolute -right-10 -top-10 h-24 w-24 rounded-full blur-2xl",
-              prizeGlowClass(prize),
-            )}
-          />
-          <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,.14),transparent_38%),radial-gradient(circle_at_50%_115%,rgba(255,255,255,.12),transparent_48%)]" />
-        </>
-      )}
-
       <div className="relative flex items-start justify-between gap-2">
         <div className="min-w-0">
           <div
             className={cn(
               "truncate font-semibold",
-              compact && "text-lg text-white",
+              compact && "text-base text-slate-950 dark:text-white",
             )}
           >
             {prize.title}
@@ -671,7 +702,7 @@ function PrizeCard({
           <div
             className={cn(
               "mt-1 text-xs",
-              compact ? "text-slate-300" : "text-slate-500",
+              compact ? "text-slate-500 dark:text-slate-400" : "text-slate-500",
             )}
           >
             {prizeLabel(prize)}
@@ -688,8 +719,8 @@ function PrizeCard({
       </div>
       {compact && (
         <div className="relative mt-6 flex items-end justify-between">
-          <div className="grid h-12 w-12 place-items-center rounded-lg border border-white/10 bg-white/10 text-white shadow-inner shadow-white/5">
-            <Icon className="h-6 w-6" />
+          <div className={cn("grid h-10 w-10 place-items-center rounded-lg border shadow-sm", prizeIconClass(prize))}>
+            <Icon className="h-5 w-5" />
           </div>
           <div className="flex items-end gap-1">
             <span
@@ -766,30 +797,30 @@ function rarityBorderClass(rarity: Rarity) {
 
 function prizeReelClass(prize: BonusBoxPrizeView) {
   if (prize.type === "NO_PRIZE")
-    return "border-red-400 bg-[linear-gradient(135deg,#450a0a,#7f1d1d_58%,#111827)] shadow-red-950/30";
+    return "border-red-200 bg-red-50/80 dark:border-red-500/35 dark:bg-red-500/10";
   return rarityReelClass(prize.rarity);
 }
 
 function rarityReelClass(rarity: Rarity) {
   if (rarity === "LEGENDARY")
-    return "border-amber-300 bg-[linear-gradient(135deg,#451a03,#78350f_58%,#111827)] shadow-amber-950/30";
+    return "border-amber-200 bg-amber-50/90 dark:border-amber-500/35 dark:bg-amber-500/10";
   if (rarity === "EPIC")
-    return "border-fuchsia-300 bg-[linear-gradient(135deg,#3b0764,#701a75_58%,#111827)] shadow-fuchsia-950/30";
+    return "border-fuchsia-200 bg-fuchsia-50/80 dark:border-fuchsia-500/35 dark:bg-fuchsia-500/10";
   if (rarity === "RARE")
-    return "border-cyan-300 bg-[linear-gradient(135deg,#083344,#164e63_58%,#111827)] shadow-cyan-950/30";
-  return "border-slate-700 bg-[linear-gradient(135deg,#0f172a,#111827_58%,#020617)]";
+    return "border-cyan-200 bg-cyan-50/80 dark:border-cyan-500/35 dark:bg-cyan-500/10";
+  return "border-slate-200 bg-slate-50/90 dark:border-white/10 dark:bg-white/[0.04]";
 }
 
-function prizeGlowClass(prize: BonusBoxPrizeView) {
-  if (prize.type === "NO_PRIZE") return "bg-red-400/35";
-  return rarityGlowClass(prize.rarity);
-}
-
-function rarityGlowClass(rarity: Rarity) {
-  if (rarity === "LEGENDARY") return "bg-amber-300/45";
-  if (rarity === "EPIC") return "bg-fuchsia-300/40";
-  if (rarity === "RARE") return "bg-cyan-300/40";
-  return "bg-slate-300/25";
+function prizeIconClass(prize: BonusBoxPrizeView) {
+  if (prize.type === "NO_PRIZE")
+    return "border-red-200 bg-white text-red-600 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200";
+  if (prize.rarity === "LEGENDARY")
+    return "border-amber-200 bg-white text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100";
+  if (prize.rarity === "EPIC")
+    return "border-fuchsia-200 bg-white text-fuchsia-700 dark:border-fuchsia-500/30 dark:bg-fuchsia-500/10 dark:text-fuchsia-100";
+  if (prize.rarity === "RARE")
+    return "border-cyan-200 bg-white text-cyan-700 dark:border-cyan-500/30 dark:bg-cyan-500/10 dark:text-cyan-100";
+  return "border-slate-200 bg-white text-slate-700 dark:border-white/10 dark:bg-white/10 dark:text-slate-200";
 }
 
 function prizeTopClass(prize: BonusBoxPrizeView) {
