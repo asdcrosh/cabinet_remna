@@ -119,6 +119,12 @@
            dark:bg-surface-900;
   }
 
+  @property --bonus-border-angle {
+    syntax: '<angle>';
+    inherits: false;
+    initial-value: 0deg;
+  }
+
   .bonus-box-hero {
     background:
       radial-gradient(circle at 78% 28%, rgba(34, 211, 238, 0.16), transparent 30%),
@@ -214,18 +220,20 @@
   }
   .bonus-box-stage--reveal-epic .bonus-box-reel-shell::before {
     background:
-      radial-gradient(circle at 50% 50%, rgba(250, 232, 255, 0.86), rgba(217, 70, 239, 0.40) 22%, rgba(34, 211, 238, 0.20) 46%, transparent 62%);
+      radial-gradient(circle at 50% 50%, rgba(250, 232, 255, 0.92), rgba(217, 70, 239, 0.54) 20%, rgba(34, 211, 238, 0.30) 44%, transparent 68%);
+    animation-duration: 1180ms;
   }
   .bonus-box-stage--reveal-legendary .bonus-box-reel-shell::before {
     background:
-      radial-gradient(circle at 50% 50%, rgba(255, 251, 235, 0.95), rgba(251, 191, 36, 0.52) 20%, rgba(245, 158, 11, 0.24) 46%, transparent 66%);
+      radial-gradient(circle at 50% 50%, rgba(255, 251, 235, 1), rgba(251, 191, 36, 0.68) 18%, rgba(245, 158, 11, 0.36) 44%, transparent 72%);
+    animation-duration: 1380ms;
   }
   .bonus-box-stage--opening .bonus-box-reel-shell::after {
     animation: bonus-box-center-scan 1180ms ease-in-out infinite;
     opacity: 0.86;
   }
   .bonus-box-stage--opening .bonus-box-reel-card {
-    animation: bonus-box-card-lift 1120ms ease-in-out infinite;
+    animation: bonus-box-card-speed 900ms ease-in-out infinite;
   }
   .bonus-box-stage--opening .bonus-box-reel-track {
     filter: drop-shadow(0 0 24px rgba(103, 232, 249, 0.28)) saturate(1.08);
@@ -308,6 +316,18 @@
   }
   .bonus-box-stage--reveal .bonus-box-portal-line {
     animation: bonus-box-line-lock 740ms ease-out both;
+  }
+  .bonus-box-stage--reveal-epic .bonus-box-portal::before,
+  .bonus-box-stage--reveal-legendary .bonus-box-portal::before {
+    background:
+      linear-gradient(90deg, rgba(255, 255, 255, 0.18), transparent 18%, transparent 82%, rgba(255, 255, 255, 0.18)),
+      conic-gradient(from var(--bonus-border-angle, 0deg), transparent 0deg, transparent 42deg, rgba(255, 255, 255, 0.96) 54deg, transparent 68deg, transparent 360deg);
+    animation: bonus-box-border-run 1050ms linear 2, bonus-box-border-pulse 1500ms ease-out both;
+  }
+  .bonus-box-stage--reveal-legendary .bonus-box-portal::before {
+    background:
+      linear-gradient(90deg, rgba(254, 243, 199, 0.18), transparent 18%, transparent 82%, rgba(254, 243, 199, 0.18)),
+      conic-gradient(from var(--bonus-border-angle, 0deg), transparent 0deg, transparent 36deg, rgba(254, 243, 199, 1) 50deg, rgba(251, 191, 36, 0.9) 58deg, transparent 74deg, transparent 360deg);
   }
   .bonus-box-fx-layer {
     pointer-events: none;
@@ -555,14 +575,12 @@
   }
 }
 
-@keyframes bonus-box-card-lift {
+@keyframes bonus-box-card-speed {
   0%, 100% {
-    filter: brightness(0.96) saturate(1.02);
-    transform: translateY(0) scale(0.985);
+    filter: brightness(0.98) saturate(1.04);
   }
   50% {
-    filter: brightness(1.22) saturate(1.2);
-    transform: translateY(-0.18rem) scale(1.015);
+    filter: brightness(1.16) saturate(1.16);
   }
 }
 
@@ -610,6 +628,23 @@
   100% {
     opacity: 0.95;
     transform: translateX(-50%) scaleY(1);
+  }
+}
+
+@keyframes bonus-box-border-run {
+  to {
+    --bonus-border-angle: 360deg;
+  }
+}
+
+@keyframes bonus-box-border-pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1.02);
+  }
+  32% {
+    opacity: 1;
+    transform: scale(1.055);
   }
 }
 
