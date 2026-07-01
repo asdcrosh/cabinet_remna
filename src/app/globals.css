@@ -221,11 +221,12 @@
   .bonus-box-portal {
     pointer-events: none;
     position: absolute;
-    inset-block: 3.5rem;
+    top: 50%;
     left: 50%;
     z-index: 32;
     width: 184px;
-    transform: translateX(-50%);
+    height: 160px;
+    transform: translate(-50%, -50%);
   }
   .bonus-box-portal::before {
     content: '';
@@ -233,9 +234,7 @@
     inset: 0;
     border-radius: 0.35rem;
     border: 2px solid rgba(165, 243, 252, 0.82);
-    background:
-      linear-gradient(90deg, rgba(103, 232, 249, 0.12), transparent 16%, transparent 84%, rgba(103, 232, 249, 0.12)),
-      linear-gradient(180deg, rgba(255, 255, 255, 0.10), transparent 22%, transparent 78%, rgba(255, 255, 255, 0.10));
+    background: transparent;
     box-shadow:
       0 0 0 1px rgba(255, 255, 255, 0.14) inset,
       0 0 28px rgba(103, 232, 249, 0.52),
@@ -267,11 +266,9 @@
     position: absolute;
     inset: 0;
     border-radius: 0.2rem;
-    background:
-      linear-gradient(90deg, transparent 0 43%, rgba(103, 232, 249, 0.18) 50%, transparent 57%),
-      linear-gradient(180deg, rgba(255, 255, 255, 0.08), transparent 20%, transparent 80%, rgba(255, 255, 255, 0.08));
+    background: linear-gradient(90deg, transparent 0 48%, rgba(103, 232, 249, 0.20) 50%, transparent 52%);
     mix-blend-mode: screen;
-    opacity: 0.36;
+    opacity: 0.28;
   }
   .bonus-box-stage--opening .bonus-box-portal-core {
     animation: bonus-box-portal-core 980ms ease-in-out infinite;
@@ -319,27 +316,27 @@
     position: absolute;
     inset-y: 0;
     left: 50%;
-    width: min(22rem, 76%);
+    width: 184px;
     transform: translateX(-50%);
     background:
       linear-gradient(90deg, transparent, rgba(103, 232, 249, 0.18), rgba(255, 255, 255, 0.32), rgba(103, 232, 249, 0.18), transparent);
     mix-blend-mode: screen;
-    opacity: 0.88;
+    opacity: 0.34;
     animation: bonus-box-scanner-pulse 860ms ease-in-out infinite;
   }
   .bonus-box-fx-ring {
     position: absolute;
     left: 50%;
     top: 50%;
-    width: 7rem;
-    height: 7rem;
+    width: 8.75rem;
+    height: 8.75rem;
     border-radius: 999px;
     border: 1px solid rgba(165, 243, 252, 0.62);
     box-shadow:
       0 0 32px rgba(103, 232, 249, 0.34),
       inset 0 0 24px rgba(255, 255, 255, 0.14);
     opacity: 0;
-    transform: translate(-50%, -50%) scale(0.62);
+    transform: translate(-50%, -50%) scale(0.74);
   }
   .bonus-box-stage--opening .bonus-box-fx-ring {
     animation: bonus-box-ring-expand 1450ms ease-out infinite;
@@ -605,14 +602,14 @@
 @keyframes bonus-box-ring-expand {
   0% {
     opacity: 0;
-    transform: translate(-50%, -50%) scale(0.58);
+    transform: translate(-50%, -50%) scale(0.72);
   }
   22% {
-    opacity: 0.85;
+    opacity: 0.58;
   }
   100% {
     opacity: 0;
-    transform: translate(-50%, -50%) scale(1.85);
+    transform: translate(-50%, -50%) scale(1.18);
   }
 }
 
