@@ -4,6 +4,7 @@ import { applyPendingReferralRewardsForUser, grantReferralRewardForPayment } fro
 import { grantPaymentBonusBoxAttempts, grantReferralBonusBoxAttemptsForPayment } from './bonus-box'
 import { notifyPaymentSucceeded } from './notifications'
 import { syncCabinetPaymentToRemnashopBestEffort } from './remnashop-reverse-sync'
+import { logError } from './logger'
 
 export interface ProvisionPaymentSubscriptionInput extends EnsureSubscriptionInput {
   paymentId: string
@@ -102,7 +103,7 @@ async function settleReferralRewards(paymentId: string, userId: string) {
     await grantReferralBonusBoxAttemptsForPayment(paymentId)
     await applyPendingReferralRewardsForUser(userId)
   } catch (error) {
-    console.error('[payment-benefits] settlement failed', {
+    logError('provisioning.settlement_failed', error, {
       paymentId,
       userId,
       message: error instanceof Error ? error.message : 'unknown error',

@@ -4,6 +4,7 @@ import { getBrandName } from './branding'
 import { renderActionEmail } from './email-template'
 import { prisma } from './prisma'
 import { createAdminNotification } from './admin-notifications'
+import { logError } from './logger'
 
 type NotifyUserInput = {
   userId: string
@@ -416,7 +417,7 @@ async function sendWithDedupe(input: {
       where: { channel: input.channel, dedupeKey },
       data: { error: message.slice(0, 1000) },
     })
-    console.error('[notifications] delivery failed', {
+    logError('notifications.delivery_failed', undefined, {
       userId: input.userId,
       type: input.type,
       channel: input.channel,

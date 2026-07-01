@@ -30,10 +30,17 @@ export function logWarn(event: string, details?: Record<string, unknown>) {
 }
 
 export function logError(event: string, error: unknown, details?: Record<string, unknown>) {
-  writeLog('error', event, {
-    ...details,
-    error: serializeError(error),
-  })
+  const safeDetails = details ? (sanitize(details) as Record<string, unknown>) : {}
+  const payload = {
+    time: new Date().toISOString(),
+    level: 'error' as const,
+    event,
+    ...safeDetails,
+    ...(error !== undefined ? { error: serializeError(error) } : {}),
+  }
+  if (LEVELS.error < LEVELS[currentLevel()]) return
+  const line = JSON.stringify(payload)
+  console.error(line)
 }
 
 function writeLog(level: LogLevel, event: string, details?: Record<string, unknown>) {

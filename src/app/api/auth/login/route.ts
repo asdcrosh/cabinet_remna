@@ -8,6 +8,7 @@ import { setSessionCookieOnResponse } from '@/lib/auth/cookies'
 import { rateLimit } from '@/lib/rate-limit'
 import { assertSameOrigin } from '@/lib/security'
 import { checkRemnawaveProfileOnLogin } from '@/lib/remnawave-profile-check'
+import { logWarn } from '@/lib/logger'
 import { authenticateRemnashopEmail, registerRemnashopEmailUser } from '@/lib/remnashop-api'
 import { findRemnashopUserByEmail } from '@/lib/remnashop-users'
 import { generateUniqueReferralCode } from '@/lib/referrals'
@@ -106,7 +107,7 @@ export async function POST(req: Request) {
         }
       }
     } catch (error) {
-      console.warn('[auth/login] remnashop fallback unavailable', {
+      logWarn('auth.login.remnashop_fallback_unavailable', {
         email,
         message: error instanceof Error ? error.message : 'unknown error',
       })
@@ -140,7 +141,7 @@ export async function POST(req: Request) {
         })
       }
     } catch (error) {
-      console.warn('[auth/login] remnashop registration retry deferred', {
+      logWarn('auth.login.remnashop_retry_deferred', {
         userId: user.id,
         message: error instanceof Error ? error.message : 'unknown error',
       })

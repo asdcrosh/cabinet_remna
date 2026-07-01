@@ -12,6 +12,7 @@ import { createEmailVerificationToken, sendEmailVerificationLink } from '@/lib/e
 import { generateUniqueReferralCode, normalizeReferralCode } from '@/lib/referrals'
 import { registerRemnashopEmailUser } from '@/lib/remnashop-api'
 import { createAdminNotification } from '@/lib/admin-notifications'
+import { logWarn } from '@/lib/logger'
 
 export const runtime = 'nodejs'
 
@@ -104,7 +105,7 @@ export async function POST(req: Request) {
         : 'synced'
   } catch (error) {
     remnashopSync = 'failed'
-    console.warn('[auth/register] remnashop registration deferred', {
+    logWarn('auth.register.remnashop_deferred', {
       userId: user.id,
       message: error instanceof Error ? error.message : 'unknown error',
     })

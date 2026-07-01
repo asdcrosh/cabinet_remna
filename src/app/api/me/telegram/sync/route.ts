@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { requireAuth, withAuth } from '@/lib/auth/guard'
 import { syncLinkedTelegramUser } from '@/lib/telegram-link-sync'
 import { describeSyncError } from '@/lib/sync-error'
+import { logError } from '@/lib/logger'
 
 export const runtime = 'nodejs'
 
@@ -31,7 +32,7 @@ export const POST = withAuth(async () => {
     return NextResponse.json({ ok: true, sync, warnings: sync.warnings ?? [] })
   } catch (error) {
     const message = describeSyncError(error)
-    console.error('[telegram/sync] failed', {
+    logError('telegram.sync.failed', error, {
       userId: user.id,
       telegramId: user.telegramId.toString(),
       message: error instanceof Error ? error.message : message,

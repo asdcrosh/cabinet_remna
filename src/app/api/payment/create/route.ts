@@ -13,6 +13,7 @@ import { rateLimit } from '@/lib/rate-limit'
 import { provisionPaymentSubscription } from '@/lib/provisioning'
 import { getPlanAudienceContext, isPlanAvailableForUser } from '@/lib/plan-access'
 import { reconcileStalePendingPaymentsForUser } from '@/lib/payment-sync'
+import { logError } from '@/lib/logger'
 
 export const runtime = 'nodejs'
 
@@ -233,7 +234,7 @@ export const POST = withAuth(async (req: Request) => {
       where: { paymentId: localPayment.id },
       data: { status: 'CANCELED' },
     })
-    console.error('[payment/create] YooKassa createPayment failed', e)
+    logError('payment.create.yookassa_failed', e, { localPaymentId: localPayment.id })
     return NextResponse.json(
       {
         error:
@@ -292,7 +293,7 @@ async function provisionPromoPayment(
       where: { id: payment.id },
       data: { provisioningError: message.slice(0, 1000) },
     })
-    console.error('[payment/create] promo provisioning failed', e)
+    logError('payment.create.promo_provisioning_failed', e, { paymentId: payment.id })
     return NextResponse.json({
       redirectUrl: `/dashboard/billing?paid=1&payment=${payment.id}`,
       localPaymentId: payment.id,

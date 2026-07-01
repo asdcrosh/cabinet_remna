@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { logError } from '@/lib/logger'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -60,7 +61,7 @@ export async function POST(req: Request) {
 
   if (!response.ok) {
     const details = await response.text().catch(() => '')
-    console.error(`[email/resend] failed: ${response.status} ${details}`)
+    logError('email.resend.failed', undefined, { status: response.status, details })
     return NextResponse.json({ error: 'Email provider failed' }, { status: 502 })
   }
 

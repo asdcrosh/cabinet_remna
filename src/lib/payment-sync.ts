@@ -1,4 +1,5 @@
 import { prisma } from './prisma'
+import { logError } from './logger'
 import { notifyPaymentCanceled, notifyPaymentStuck } from './notifications'
 import { provisionPaymentSubscription } from './provisioning'
 import { cancelPayment, getPayment } from './yookassa'
@@ -211,7 +212,7 @@ export async function cancelOtherPendingPaymentsForUser(userId: string, paidPaym
   for (const payment of payments) {
     const result = await cancelPendingPayment(payment, 'Платёж отменён, потому что другая оплата уже завершена.').catch(
       (error) => {
-        console.error('[payment-sync] sibling pending cancellation failed', {
+        logError('payment_sync.sibling_cancellation_failed', error, {
           paymentId: payment.id,
           userId,
           message: error instanceof Error ? error.message : 'unknown error',
@@ -223,7 +224,7 @@ export async function cancelOtherPendingPaymentsForUser(userId: string, paidPaym
     if (result === 'paid') {
       paid += 1
       await syncPaymentProvisioning({ paymentId: payment.id, userId }).catch((error) => {
-        console.error('[payment-sync] sibling paid payment provisioning failed', {
+        logError('payment_sync.sibling_paid_provisioning_failed', error, {
           paymentId: payment.id,
           userId,
           message: error instanceof Error ? error.message : 'unknown error',
@@ -324,7 +325,7 @@ export async function reconcileStalePendingPaymentsForUser(userId: string, limit
       userId,
       cancelPendingOlderThanMs: getPendingPaymentTtlMs(),
     }).catch((error) => {
-      console.error('[payment-sync] stale pending reconciliation failed', {
+      logError('payment_sync.stale_pending_reconciliation_failed', error, {
         paymentId: payment.id,
         userId,
         message: error instanceof Error ? error.message : 'unknown error',

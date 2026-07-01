@@ -1,4 +1,5 @@
 import { prisma } from './prisma'
+import { logWarn } from './logger'
 import { remnawave, RemnawaveError } from './remnawave'
 
 export async function checkRemnawaveProfileOnLogin(user: {
@@ -28,7 +29,10 @@ export async function checkRemnawaveProfileOnLogin(user: {
       return
     }
 
-    console.warn('[auth/login] Remnawave profile check skipped', e)
+    logWarn('remnawave_profile_check.skipped', {
+      userId: user.id,
+      message: e instanceof Error ? e.message : String(e),
+    })
   }
 }
 

@@ -8,6 +8,7 @@ import { requireAuth, withAuth } from '@/lib/auth/guard'
 import { remnawave, RemnawaveError } from '@/lib/remnawave'
 import { readRemnawaveBigInt } from '@/lib/remnawave-usage'
 import { hasTrafficUsage, normalizeUsageSeries } from '@/lib/traffic-usage'
+import { logWarn } from '@/lib/logger'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -73,7 +74,7 @@ export const GET = withAuth(async (req: Request) => {
     series = normalizeUsageSeries(usageResult.value, { start, end })
     historyAvailable = series.length > 1 && hasTrafficUsage(series)
   } else {
-    console.warn('[subscription/usage] history unavailable', {
+    logWarn('subscription.usage.history_unavailable', {
       userId: user.id,
       remnawaveUuid: user.remnawaveUuid,
       message: usageResult.reason instanceof Error ? usageResult.reason.message : String(usageResult.reason),

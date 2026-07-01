@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { Loader2, RefreshCw, Send, TriangleAlert } from 'lucide-react'
 import { getTelegramLaunchData } from '@/lib/telegram-miniapp-client'
+import { logError } from '@/lib/logger'
 
 declare global {
   interface Window {
@@ -59,7 +60,7 @@ export function TelegramMiniAppAuth() {
 
         window.location.replace(getSafeNextPath())
       } catch (error) {
-        console.error('[telegram-miniapp] auth failed', error)
+        logError('telegram_miniapp.auth_failed', error)
         if (!cancelled) {
           setError(
             error instanceof Error && error.message

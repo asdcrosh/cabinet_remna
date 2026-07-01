@@ -10,6 +10,7 @@ import { requireAuth, withAuth } from '@/lib/auth/guard'
 import { remnawave, RemnawaveError } from '@/lib/remnawave'
 import { serializeSubscription } from '@/lib/api-serializers'
 import { readRemnawaveBigInt } from '@/lib/remnawave-usage'
+import { logError } from '@/lib/logger'
 
 export const runtime = 'nodejs'
 
@@ -73,7 +74,7 @@ export const GET = withAuth(async () => {
           })
     } catch (e) {
       // Не валим UI из-за временных проблем Remnawave
-      console.error('[subscription] remnawave sync failed:', e)
+      logError('subscription.remnawave_sync_failed', e)
       if (e instanceof RemnawaveError) {
         return NextResponse.json(
           { subscription: serializeSubscription(subscription), warning: `Remnawave API ${e.status}` },

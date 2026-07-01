@@ -3,11 +3,12 @@
 // что закрывает XSS-кражу. CSRF закрываем тем, что cookie SameSite=Lax
 // и mutation-роуты проверяют Origin через assertSameOrigin.
 import { SignJWT, jwtVerify, type JWTPayload } from 'jose'
+import { logWarn } from '../logger'
 
 const SECRET = process.env.JWT_SECRET
 if (!SECRET || SECRET.length < 32) {
   // Не throw-аем: пусть билд пройдёт, но в проде упадёт на первом запросе.
-  console.warn('[auth] JWT_SECRET is missing or too short — auth will fail')
+  logWarn('auth.jwt_secret_missing', { length: SECRET?.length ?? 0 })
 }
 
 const ALG = 'HS256'

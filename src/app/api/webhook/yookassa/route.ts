@@ -4,6 +4,7 @@
 // но обязан довыдать подписку, если прежний provisioning упал.
 
 import { NextResponse } from 'next/server'
+import { logError, logWarn } from '@/lib/logger'
 import { prisma } from '@/lib/prisma'
 import { notifyPaymentCanceled, notifyPaymentStuck } from '@/lib/notifications'
 import { provisionPaymentSubscription } from '@/lib/provisioning'
@@ -45,7 +46,7 @@ export async function POST(req: Request) {
     include: { plan: true, user: true },
   })
   if (!payment) {
-    console.warn(`[webhook] Payment ${yookassaId} not found in local DB`)
+    logWarn('webhook.payment_not_found', { yookassaId })
     return NextResponse.json({ ok: true, notFound: true })
   }
 
@@ -62,7 +63,7 @@ export async function POST(req: Request) {
     const fresh = await getPayment(yookassaId)
     status = fresh.status
   } catch (e) {
-    console.error('[webhook] getPayment failed', e)
+    logError('webhook.get_payment_failed', e, { yookassaId })
   }
 
   if (status === 'succeeded') {
@@ -98,7 +99,7 @@ export async function POST(req: Request) {
         },
       })
     } catch (e) {
-      console.error('[webhook] provisionPaymentSubscription failed', e)
+      logError('webhook.provision_failed', e, { paymentId: payment.id, yookassaId })
       await prisma.payment.update({
         where: { id: payment.id },
         data: {

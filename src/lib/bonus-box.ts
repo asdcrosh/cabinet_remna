@@ -1,6 +1,7 @@
 import { randomBytes, randomInt } from 'node:crypto'
 import { Prisma, type BonusBoxPrize, type BonusBoxPrizeType, type BonusBoxRarity } from '@prisma/client'
 import { prisma } from './prisma'
+import { logError } from './logger'
 import { remnawave } from './remnawave'
 import { gbToBytes } from './format'
 import { cleanupExpiredBonusBoxPromoCodes } from './promo-code-cleanup'
@@ -673,7 +674,7 @@ async function syncPrizeToRemnawave(
     })
     return true
   } catch (error) {
-    console.error('[bonus-box] remnawave sync failed', error)
+    logError('bonus_box.remnawave_sync_failed', error, { subscriptionId: input.subscriptionId })
     await prisma.subscription.update({
       where: { id: input.subscriptionId },
       data: { pendingSync: true },

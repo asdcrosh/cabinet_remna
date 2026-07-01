@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma'
 import { setSessionCookieOnResponse } from '@/lib/auth/cookies'
 import { getAppUrlOrRequestOrigin } from '@/lib/app-url'
 import { checkRemnawaveProfileOnLogin } from '@/lib/remnawave-profile-check'
+import { logWarn } from '@/lib/logger'
 import { generateUniqueReferralCode, normalizeReferralCode } from '@/lib/referrals'
 import {
   exchangeYandexCode,
@@ -68,7 +69,7 @@ export async function GET(req: Request) {
     })
     return clearYandexCookies(response)
   } catch (error) {
-    console.warn('[auth/yandex] callback failed', {
+    logWarn('auth.yandex.callback_failed', {
       message: error instanceof Error ? error.message : 'unknown error',
     })
     errorUrl.searchParams.set('yandex_error', 'yandex_auth_failed')

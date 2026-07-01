@@ -4,6 +4,7 @@ import { prisma } from './prisma'
 import { getAppUrl } from './app-url'
 import { getBrandName } from './branding'
 import { renderActionEmail } from './email-template'
+import { logError, logInfo } from './logger'
 
 const TOKEN_BYTES = 32
 const TOKEN_TTL_MS = 60 * 60 * 1000
@@ -44,7 +45,7 @@ export async function sendPasswordResetLink(input: {
 
   if (!webhookUrl) {
     if (process.env.NODE_ENV !== 'production') {
-      console.info(`[password-reset] ${input.email}: ${resetUrl}`)
+      logInfo('password_reset.dev_link', { email: input.email, resetUrl })
     }
     return { sent: false as const, reason: 'not_configured' as const }
   }
@@ -86,7 +87,7 @@ export async function sendPasswordResetLink(input: {
   })
 
   if (!res.ok) {
-    console.error(`[password-reset] delivery failed: ${res.status}`)
+    logError('password_reset.delivery_failed', undefined, { status: res.status })
     return { sent: false as const, reason: 'failed' as const }
   }
 

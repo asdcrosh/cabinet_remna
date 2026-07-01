@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma'
 import { requireAdmin, withAuth } from '@/lib/auth/guard'
 import { attachRemnashopIdentityToCabinetUser } from '@/lib/telegram-link-sync'
 import { writeAuditLog } from '@/lib/audit-log'
+import { logError } from '@/lib/logger'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -97,7 +98,7 @@ export const PATCH = withAuth(async (req: Request, { params }: { params: { id: s
         })
       } catch (error) {
         syncDeferred = true
-        console.error('[admin/users/profile] remnashop sync deferred', {
+        logError('admin.users.profile.remnashop_sync_deferred', error, {
           userId: user.id,
           message: error instanceof Error ? error.message : String(error),
         })

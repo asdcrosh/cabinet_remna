@@ -5,13 +5,15 @@
 // Используется ТОЛЬКО с сервера (Next.js API routes / Server Components),
 // токен лежит в env и не должен попасть в браузер.
 
+import { logWarn } from './logger'
+
 const BASE_URL = process.env.REMNAWAVE_BASE_URL?.replace(/\/$/, '')
 const TOKEN = process.env.REMNAWAVE_TOKEN
 
 if (!BASE_URL || !TOKEN) {
   // Не throw-аем на импорте: иначе `next build` падает, если env ещё не заполнен.
   // Бросим только в момент первого реального вызова.
-  console.warn('[remnawave] REMNAWAVE_BASE_URL / REMNAWAVE_TOKEN не заданы — API вызовы упадут')
+  logWarn('remnawave.missing_credentials', { hasBaseUrl: Boolean(BASE_URL), hasToken: Boolean(TOKEN) })
 }
 
 class RemnawaveError extends Error {

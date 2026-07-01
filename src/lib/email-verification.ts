@@ -3,6 +3,7 @@ import { prisma } from './prisma'
 import { getAppUrl } from './app-url'
 import { getBrandName } from './branding'
 import { renderActionEmail } from './email-template'
+import { logError, logInfo } from './logger'
 
 const TOKEN_BYTES = 32
 const TOKEN_TTL_MS = 24 * 60 * 60 * 1000
@@ -73,7 +74,7 @@ export async function sendEmailVerificationLink(input: {
 
   if (!webhookUrl) {
     if (process.env.NODE_ENV !== 'production') {
-      console.info(`[email-verification] ${input.email}: ${verifyUrl}`)
+      logInfo('email_verification.dev_link', { email: input.email, verifyUrl })
     }
     return { sent: false, reason: 'not_configured' }
   }
@@ -118,7 +119,7 @@ export async function sendEmailVerificationLink(input: {
   })
 
   if (!res.ok) {
-    console.error(`[email-verification] delivery failed: ${res.status}`)
+    logError('email_verification.delivery_failed', undefined, { status: res.status })
     return { sent: false, reason: 'failed' }
   }
 

@@ -1,3 +1,4 @@
+import { logWarn } from './logger'
 import { getClientIp, isIpAllowed } from './security'
 
 export function assertYookassaWebhookSource(req: Request): { ok: true } | { ok: false; error: string } {
@@ -10,7 +11,7 @@ export function assertYookassaWebhookSource(req: Request): { ok: true } | { ok: 
 
   const ip = getClientIp(req)
   if (!isIpAllowed(ip, allowlist)) {
-    console.warn(`[webhook] rejected YooKassa webhook from IP: ${ip || 'unknown'}`)
+    logWarn('webhook.yookassa.rejected_ip', { ip: ip || 'unknown' })
     return { ok: false, error: 'Webhook source is not allowed' }
   }
 

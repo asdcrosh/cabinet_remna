@@ -2,11 +2,13 @@
 // API: https://yookassa.ru/developers/api
 // Авторизация: Basic auth (shop_id:secret_key в base64).
 
+import { logWarn } from './logger'
+
 const SHOP_ID = process.env.YOOKASSA_SHOP_ID
 const SECRET_KEY = process.env.YOOKASSA_SECRET_KEY
 
 if (!SHOP_ID || !SECRET_KEY) {
-  console.warn('[yookassa] YOOKASSA_SHOP_ID / YOOKASSA_SECRET_KEY not set')
+  logWarn('yookassa.missing_credentials', { hasShopId: Boolean(SHOP_ID), hasSecretKey: Boolean(SECRET_KEY) })
 }
 
 const BASE_URL = 'https://api.yookassa.ru/v3'
