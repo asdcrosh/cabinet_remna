@@ -332,7 +332,7 @@ export function BonusBoxClient({
           </div>
         </div>
 
-        <div className="bonus-box-reel-shell relative overflow-hidden py-5 sm:py-7">
+        <div className="bonus-box-reel-shell relative overflow-hidden py-4 sm:py-5">
           <BonusBoxOpeningEffects />
           <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-12 bg-gradient-to-r from-slate-950 via-slate-950/80 to-transparent sm:w-32" />
           <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-12 bg-gradient-to-l from-slate-950 via-slate-950/80 to-transparent sm:w-32" />

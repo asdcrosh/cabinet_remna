@@ -173,7 +173,7 @@
   }
   .bonus-box-reel-shell {
     isolation: isolate;
-    min-height: 17rem;
+    min-height: 12.75rem;
     background:
       linear-gradient(180deg, rgba(15, 23, 42, 0.82), rgba(2, 6, 23, 0.98)),
       radial-gradient(circle at 50% 50%, rgba(34, 211, 238, 0.12), transparent 34%);
@@ -205,6 +205,21 @@
   .bonus-box-stage--opening .bonus-box-reel-shell::before {
     animation: bonus-box-luxury-sweep 1320ms ease-in-out infinite;
   }
+  .bonus-box-stage--reveal .bonus-box-reel-shell::before {
+    animation: bonus-box-prize-burst 980ms ease-out both;
+  }
+  .bonus-box-stage--reveal-rare .bonus-box-reel-shell::before {
+    background:
+      radial-gradient(circle at 50% 50%, rgba(207, 250, 254, 0.78), rgba(34, 211, 238, 0.34) 24%, transparent 58%);
+  }
+  .bonus-box-stage--reveal-epic .bonus-box-reel-shell::before {
+    background:
+      radial-gradient(circle at 50% 50%, rgba(250, 232, 255, 0.86), rgba(217, 70, 239, 0.40) 22%, rgba(34, 211, 238, 0.20) 46%, transparent 62%);
+  }
+  .bonus-box-stage--reveal-legendary .bonus-box-reel-shell::before {
+    background:
+      radial-gradient(circle at 50% 50%, rgba(255, 251, 235, 0.95), rgba(251, 191, 36, 0.52) 20%, rgba(245, 158, 11, 0.24) 46%, transparent 66%);
+  }
   .bonus-box-stage--opening .bonus-box-reel-shell::after {
     animation: bonus-box-center-scan 1180ms ease-in-out infinite;
     opacity: 0.86;
@@ -221,7 +236,7 @@
   .bonus-box-portal {
     pointer-events: none;
     position: absolute;
-    top: 1.75rem;
+    top: 1.25rem;
     left: 50%;
     z-index: 32;
     width: 184px;
@@ -287,6 +302,12 @@
   }
   .bonus-box-stage--opening .bonus-box-portal-line {
     animation: bonus-box-portal-line 640ms ease-in-out infinite;
+  }
+  .bonus-box-stage--reveal .bonus-box-portal {
+    animation: bonus-box-prize-lock 820ms cubic-bezier(.2,.9,.2,1) both;
+  }
+  .bonus-box-stage--reveal .bonus-box-portal-line {
+    animation: bonus-box-line-lock 740ms ease-out both;
   }
   .bonus-box-fx-layer {
     pointer-events: none;
@@ -411,7 +432,7 @@
       0 0 22px rgba(34, 211, 238, 0.20);
   }
   .bonus-box-stage--reveal-rare {
-    animation: bonus-box-rare-pop 920ms ease-out both;
+    animation: bonus-box-rare-pop 920ms ease-out both, bonus-box-rare-glow 1600ms ease-out both;
     box-shadow: 0 22px 64px rgba(8, 145, 178, 0.32);
   }
   .bonus-box-stage--reveal-rare .bonus-box-portal::before {
@@ -428,7 +449,7 @@
       0 0 28px rgba(59, 130, 246, 0.36);
   }
   .bonus-box-stage--reveal-epic {
-    animation: bonus-box-epic-pop 1100ms ease-out both;
+    animation: bonus-box-epic-pop 1100ms ease-out both, bonus-box-epic-glow 1800ms ease-out both;
     box-shadow: 0 24px 74px rgba(192, 38, 211, 0.34);
   }
   .bonus-box-stage--reveal-epic .bonus-box-portal::before {
@@ -445,7 +466,7 @@
       0 0 30px rgba(34, 211, 238, 0.46);
   }
   .bonus-box-stage--reveal-legendary {
-    animation: bonus-box-legendary-pop 1280ms ease-out both;
+    animation: bonus-box-legendary-pop 1280ms ease-out both, bonus-box-legendary-glow 2200ms ease-out both;
     box-shadow: 0 26px 86px rgba(245, 158, 11, 0.38);
   }
   .bonus-box-stage--reveal-legendary .bonus-box-portal::before {
@@ -545,6 +566,53 @@
   }
 }
 
+@keyframes bonus-box-prize-burst {
+  0% {
+    opacity: 0;
+    transform: scaleX(0.62) scaleY(0.74);
+  }
+  18% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: scaleX(1.25) scaleY(1.18);
+  }
+}
+
+@keyframes bonus-box-prize-lock {
+  0% {
+    filter: brightness(1);
+    transform: translateX(-50%) scale(1);
+  }
+  24% {
+    filter: brightness(1.35);
+    transform: translateX(-50%) scale(1.045);
+  }
+  54% {
+    transform: translateX(-50%) scale(0.992);
+  }
+  100% {
+    filter: brightness(1);
+    transform: translateX(-50%) scale(1);
+  }
+}
+
+@keyframes bonus-box-line-lock {
+  0% {
+    opacity: 0.7;
+    transform: translateX(-50%) scaleY(0.78);
+  }
+  28% {
+    opacity: 1;
+    transform: translateX(-50%) scaleY(1.12);
+  }
+  100% {
+    opacity: 0.95;
+    transform: translateX(-50%) scaleY(1);
+  }
+}
+
 @keyframes bonus-box-portal-caret {
   0% {
     opacity: 0.7;
@@ -557,6 +625,39 @@
   100% {
     opacity: 0.7;
     transform: translateX(-50%) scaleX(0.82);
+  }
+}
+
+@keyframes bonus-box-rare-glow {
+  0%, 100% {
+    box-shadow: 0 22px 64px rgba(8, 145, 178, 0.32);
+  }
+  28% {
+    box-shadow:
+      0 24px 74px rgba(8, 145, 178, 0.42),
+      0 0 38px rgba(34, 211, 238, 0.24);
+  }
+}
+
+@keyframes bonus-box-epic-glow {
+  0%, 100% {
+    box-shadow: 0 24px 74px rgba(192, 38, 211, 0.34);
+  }
+  30% {
+    box-shadow:
+      0 26px 84px rgba(192, 38, 211, 0.46),
+      0 0 46px rgba(34, 211, 238, 0.26);
+  }
+}
+
+@keyframes bonus-box-legendary-glow {
+  0%, 100% {
+    box-shadow: 0 26px 86px rgba(245, 158, 11, 0.38);
+  }
+  24% {
+    box-shadow:
+      0 30px 98px rgba(245, 158, 11, 0.52),
+      0 0 56px rgba(251, 191, 36, 0.34);
   }
 }
 
