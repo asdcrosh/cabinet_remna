@@ -41,6 +41,10 @@ function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : 'Неизвестная ошибка'
 }
 
+function errorCode(error: unknown) {
+  return typeof error === 'object' && error !== null && 'code' in error ? String(error.code) : ''
+}
+
 function env(name: string) {
   return process.env[name]?.trim() || ''
 }
@@ -195,12 +199,17 @@ async function latestBackup() {
       `${latest.entry}, ${(latest.size / 1024 / 1024).toFixed(1)} MB`
     )
   } catch (error) {
+    const accessDenied = errorCode(error) === 'EACCES'
     return check(
       'backup',
       'Бэкапы',
       required ? 'warn' : 'ok',
-      'Проверяются в консоли cabinetctl',
-      required ? errorMessage(error) : 'Веб-контейнер не читает каталог бэкапов напрямую'
+      accessDenied ? 'Каталог бэкапов недоступен из веб-контейнера' : 'Проверяются в консоли cabinetctl',
+      required
+        ? errorMessage(error)
+        : accessDenied
+          ? 'Это нормально, если бэкапы настроены через cabinetctl или S3.'
+          : 'Веб-контейнер не читает каталог бэкапов напрямую'
     )
   }
 }

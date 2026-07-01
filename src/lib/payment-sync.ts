@@ -205,17 +205,36 @@ export async function cancelOtherPendingPaymentsForUser(userId: string, paidPaym
     select: { id: true, userId: true, yookassaId: true },
   })
 
+  let canceled = 0
+  let paid = 0
+
   for (const payment of payments) {
-    await cancelPendingPayment(payment, 'Платёж отменён, потому что другая оплата уже завершена.').catch((error) => {
-      console.error('[payment-sync] sibling pending cancellation failed', {
-        paymentId: payment.id,
-        userId,
-        message: error instanceof Error ? error.message : 'unknown error',
+    const result = await cancelPendingPayment(payment, 'Платёж отменён, потому что другая оплата уже завершена.').catch(
+      (error) => {
+        console.error('[payment-sync] sibling pending cancellation failed', {
+          paymentId: payment.id,
+          userId,
+          message: error instanceof Error ? error.message : 'unknown error',
+        })
+        return null
+      }
+    )
+
+    if (result === 'paid') {
+      paid += 1
+      await syncPaymentProvisioning({ paymentId: payment.id, userId }).catch((error) => {
+        console.error('[payment-sync] sibling paid payment provisioning failed', {
+          paymentId: payment.id,
+          userId,
+          message: error instanceof Error ? error.message : 'unknown error',
+        })
       })
-    })
+    } else if (result === 'canceled') {
+      canceled += 1
+    }
   }
 
-  return { canceled: payments.length }
+  return { canceled, paid }
 }
 
 async function cancelPendingPayment(payment: PendingPaymentForCancel, reason: string) {

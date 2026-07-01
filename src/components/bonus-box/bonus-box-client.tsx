@@ -310,7 +310,7 @@ export function BonusBoxClient({
               <span className="absolute inset-y-0 -left-1/3 w-1/3 skew-x-[-18deg] bg-white/24 blur-sm transition-transform duration-700 group-hover:translate-x-[430%]" />
               <span className="relative flex items-center justify-center gap-2">
                 <Gift className="h-4 w-4" />
-                <span>{opening ? "Крутим..." : "Открыть кейс"}</span>
+                <span>{opening ? "Крутим..." : openButtonLabel}</span>
               </span>
             </button>
           </div>
@@ -349,62 +349,73 @@ export function BonusBoxClient({
       {result && (
         <section
           className={cn(
-            "bonus-box-result order-2 grid gap-4 rounded-lg border bg-white p-4 shadow-sm shadow-slate-200/60 dark:bg-surface-900 dark:shadow-black/20 sm:p-5 md:grid-cols-[1fr_auto] md:items-center",
+            "bonus-box-result relative order-2 overflow-hidden rounded-lg border bg-white shadow-sm shadow-slate-200/60 dark:bg-surface-900 dark:shadow-black/20",
             result.prize.type === "NO_PRIZE"
               ? "border-red-200 dark:border-red-500/40"
               : "border-emerald-200 dark:border-emerald-500/30",
             bonusBoxResultClass(result.prize),
           )}
         >
-          <div className="min-w-0">
+          <div className="relative grid gap-4 p-4 sm:p-5 md:grid-cols-[auto_1fr_auto] md:items-center">
             <div
               className={cn(
-                "flex items-center gap-2 text-sm font-semibold",
+                "grid h-14 w-14 place-items-center rounded-lg border shadow-inner",
                 result.prize.type === "NO_PRIZE"
-                  ? "text-slate-500 dark:text-slate-400"
-                  : "text-emerald-600 dark:text-emerald-300",
+                  ? "border-red-200 bg-red-50 text-red-500 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200"
+                  : "border-emerald-200 bg-emerald-50 text-emerald-600 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200",
               )}
             >
               {result.prize.type === "NO_PRIZE" ? (
-                <CircleSlash className="h-4 w-4" />
+                <CircleSlash className="h-7 w-7" />
               ) : (
-                <Sparkles className="h-4 w-4" />
+                <Sparkles className="h-7 w-7" />
               )}
-              {result.prize.type === "NO_PRIZE"
-                ? "Результат открытия"
-                : "Ваш подарок"}
             </div>
-            <div className="mt-1 text-2xl font-semibold tracking-tight text-slate-950 dark:text-white">
-              {result.prize.title}
-            </div>
-            {(result.prize.description ||
-              result.prize.type === "NO_PRIZE") && (
-              <div className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                {result.prize.description || "В этот раз без начисления."}
-              </div>
-            )}
-            {result.promoCode && (
-              <div className="mt-3 inline-flex max-w-full flex-wrap items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-100">
-                <TicketPercent className="h-4 w-4 shrink-0" />
-                <span className="break-all">{result.promoCode}</span>
-                {result.promoCodeExpiresAt && (
-                  <span className="text-xs font-medium text-emerald-700/80 dark:text-emerald-100/75">
-                    до {formatDateOnly(result.promoCodeExpiresAt)}
-                  </span>
+
+            <div className="min-w-0">
+              <div
+                className={cn(
+                  "text-sm font-semibold uppercase tracking-wide",
+                  result.prize.type === "NO_PRIZE"
+                    ? "text-slate-500 dark:text-slate-400"
+                    : "text-emerald-600 dark:text-emerald-300",
                 )}
+              >
+                {result.prize.type === "NO_PRIZE" ? "Открытие завершено" : "Подарок начислен"}
               </div>
-            )}
+              <div className="mt-1 text-2xl font-semibold tracking-tight text-slate-950 dark:text-white">
+                {result.prize.title}
+              </div>
+              {(result.prize.description ||
+                result.prize.type === "NO_PRIZE") && (
+                <div className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                  {result.prize.description || "В этот раз без начисления. Следующее открытие может быть удачнее."}
+                </div>
+              )}
+              {result.promoCode && (
+                <div className="mt-3 inline-flex max-w-full flex-wrap items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-100">
+                  <TicketPercent className="h-4 w-4 shrink-0" />
+                  <span className="break-all">{result.promoCode}</span>
+                  {result.promoCodeExpiresAt && (
+                    <span className="text-xs font-medium text-emerald-700/80 dark:text-emerald-100/75">
+                      до {formatDateOnly(result.promoCodeExpiresAt)}
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <button
+              type="button"
+              className="btn-secondary md:justify-self-end"
+              onClick={() => {
+                setRevealEffect(false);
+                setResult(null);
+              }}
+            >
+              Закрыть
+            </button>
           </div>
-          <button
-            type="button"
-            className="btn-secondary"
-            onClick={() => {
-              setRevealEffect(false);
-              setResult(null);
-            }}
-          >
-            Закрыть
-          </button>
         </section>
       )}
 
@@ -621,39 +632,56 @@ function OutcomeRow({ prize }: { prize: BonusBoxPrizeView }) {
 }
 
 function OpeningRow({ opening }: { opening: BonusBoxOpeningView }) {
+  const Icon =
+    opening.prize.type === "NO_PRIZE"
+      ? CircleSlash
+      : opening.prize.type === "SUBSCRIPTION_DAYS"
+        ? CalendarPlus
+        : opening.prize.type === "TRAFFIC_GB"
+          ? Zap
+          : opening.prize.type === "BONUS_ATTEMPTS"
+            ? Gift
+            : TicketPercent;
+
   return (
     <article
       className={cn(
-        "rounded-lg border bg-white p-3 shadow-sm shadow-slate-200/60 dark:bg-surface-900 dark:shadow-black/20",
+        "rounded-lg border bg-white p-3 shadow-sm shadow-slate-200/60 transition-colors hover:bg-slate-50 dark:bg-surface-900 dark:shadow-black/20 dark:hover:bg-white/[0.04]",
         prizeBorderClass(opening.prize),
       )}
     >
       <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="truncate font-semibold">{opening.prize.title}</div>
-          <div className="mt-1 text-sm text-slate-500">
-            {formatDate(opening.createdAt)}
+        <div className="flex min-w-0 gap-3">
+          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-700 dark:bg-white/10 dark:text-slate-200">
+            <Icon className="h-5 w-5" />
           </div>
-          <div className="mt-1 text-xs text-slate-400">
-            {prizeLabel(opening.prize)}
+          <div className="min-w-0">
+            <div className="truncate font-semibold text-slate-950 dark:text-white">{opening.prize.title}</div>
+            <div className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+              {prizeLabel(opening.prize)}
+            </div>
           </div>
         </div>
-        <span
-          className={cn(
-            "shrink-0 rounded-full px-2 py-1 text-[11px] font-semibold",
-            rarityClass(opening.prize.rarity),
-          )}
-        >
-          {rarityLabel(opening.prize.rarity)}
-        </span>
+        <div className="shrink-0 text-right">
+          <div className="text-xs text-slate-400 dark:text-slate-500">
+            {formatDate(opening.createdAt)}
+          </div>
+          <span
+            className={cn(
+              "mt-2 inline-flex rounded-full px-2 py-1 text-[11px] font-semibold",
+              rarityClass(opening.prize.rarity),
+            )}
+          >
+            {rarityLabel(opening.prize.rarity)}
+          </span>
+        </div>
       </div>
       {opening.promoCode && (
-        <div className="mt-3 break-all rounded-md bg-slate-50 px-2.5 py-2 font-mono text-xs text-slate-700 dark:bg-surface-950 dark:text-slate-200">
-          {opening.promoCode}
+        <div className="mt-3 flex flex-wrap items-center gap-2 rounded-md bg-slate-50 px-2.5 py-2 text-xs text-slate-700 dark:bg-surface-950 dark:text-slate-200">
+          <TicketPercent className="h-3.5 w-3.5 shrink-0 text-emerald-500" />
+          <span className="break-all font-mono">{opening.promoCode}</span>
           {opening.promoCodeExpiresAt && (
-            <span className="ml-2 font-sans text-slate-500">
-              до {formatDateOnly(opening.promoCodeExpiresAt)}
-            </span>
+            <span className="text-slate-500 dark:text-slate-400">до {formatDateOnly(opening.promoCodeExpiresAt)}</span>
           )}
         </div>
       )}

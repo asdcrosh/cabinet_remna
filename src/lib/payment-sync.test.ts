@@ -221,4 +221,61 @@ describe('payment sync pending expiration', () => {
       data: { status: 'CANCELED', yookassaStatus: null },
     })
   })
+
+  it('syncs another pending user payment if YooKassa already marked it paid', async () => {
+    const mainPayment = {
+      id: 'paid-pay',
+      userId: 'user-1',
+      yookassaId: 'yoo-paid',
+      status: 'PENDING',
+      paidAt: null,
+      subscriptionProvisionedAt: new Date('2026-06-26T11:59:00.000Z'),
+      createdAt: new Date('2026-06-26T11:58:00.000Z'),
+      user: { id: 'user-1', email: 'user@example.test' },
+      plan: {
+        id: 'plan-1',
+        name: 'Стандарт',
+        durationDays: 30,
+        trafficLimitGb: null,
+        deviceLimit: 5,
+        activeInternalSquads: [],
+      },
+      subscription: { id: 'sub-main' },
+    }
+    const siblingPayment = {
+      ...mainPayment,
+      id: 'old-paid',
+      yookassaId: 'yoo-old-paid',
+      subscription: { id: 'sub-old' },
+    }
+
+    mocks.prisma.payment.findFirst
+      .mockResolvedValueOnce(mainPayment)
+      .mockResolvedValueOnce(siblingPayment)
+    mocks.prisma.payment.findMany
+      .mockResolvedValueOnce([{ id: 'old-paid', userId: 'user-1', yookassaId: 'yoo-old-paid' }])
+      .mockResolvedValueOnce([])
+    mocks.getPayment
+      .mockResolvedValueOnce({ status: 'succeeded' })
+      .mockResolvedValueOnce({ status: 'succeeded' })
+      .mockResolvedValueOnce({ status: 'succeeded' })
+
+    const result = await syncPaymentProvisioning({ paymentId: 'paid-pay', userId: 'user-1' })
+
+    expect(result).toEqual({
+      ok: true,
+      status: 'succeeded',
+      provisioned: true,
+      alreadyProvisioned: true,
+      subscriptionId: 'sub-main',
+    })
+    expect(mocks.cancelPayment).not.toHaveBeenCalled()
+    expect(mocks.prisma.payment.update).toHaveBeenCalledWith({
+      where: { id: 'old-paid' },
+      data: expect.objectContaining({
+        status: 'SUCCEEDED',
+        yookassaStatus: 'succeeded',
+      }),
+    })
+  })
 })

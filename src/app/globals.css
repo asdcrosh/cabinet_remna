@@ -262,20 +262,22 @@
   .bonus-box-portal {
     pointer-events: none;
     position: absolute;
-    top: 1.25rem;
+    top: 1.55rem;
     left: 50%;
     z-index: 32;
-    width: 184px;
-    height: 160px;
+    width: 164px;
+    height: 148px;
     transform: translateX(-50%);
   }
   .bonus-box-portal::before {
     content: '';
     position: absolute;
     inset: 0;
-    border-radius: 0.35rem;
+    border-radius: 1rem;
     border: 2px solid rgba(165, 243, 252, 0.82);
-    background: transparent;
+    background:
+      radial-gradient(circle at 50% 50%, rgba(103, 232, 249, 0.10), transparent 54%),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.06), transparent);
     box-shadow:
       0 0 0 1px rgba(255, 255, 255, 0.14) inset,
       0 0 28px rgba(103, 232, 249, 0.52),
@@ -288,7 +290,7 @@
     position: absolute;
     left: 50%;
     inset-block: -0.35rem;
-    width: 3.5rem;
+    width: 4.25rem;
     transform: translateX(-50%);
     border-top: 3px solid rgba(236, 253, 245, 0.95);
     border-bottom: 3px solid rgba(236, 253, 245, 0.95);
@@ -305,11 +307,13 @@
   }
   .bonus-box-portal-core {
     position: absolute;
-    inset: 0;
-    border-radius: 0.2rem;
-    background: linear-gradient(90deg, transparent 0 48%, rgba(103, 232, 249, 0.20) 50%, transparent 52%);
+    inset: 0.55rem;
+    border-radius: 0.8rem;
+    background:
+      radial-gradient(circle at 50% 50%, rgba(236, 253, 245, 0.18), transparent 48%),
+      linear-gradient(90deg, transparent 0 48%, rgba(103, 232, 249, 0.20) 50%, transparent 52%);
     mix-blend-mode: screen;
-    opacity: 0.28;
+    opacity: 0.46;
   }
   .bonus-box-stage--opening .bonus-box-portal-core {
     animation: bonus-box-portal-core 980ms ease-in-out infinite;
@@ -318,13 +322,26 @@
     position: absolute;
     inset-block: -0.2rem;
     left: 50%;
-    width: 4px;
+    width: 3px;
     transform: translateX(-50%);
     border-radius: 999px;
     background: linear-gradient(180deg, transparent, rgba(236, 253, 245, 0.9) 18%, rgba(34, 211, 238, 0.98) 50%, rgba(236, 253, 245, 0.9) 82%, transparent);
     box-shadow:
       0 0 20px rgba(165, 243, 252, 0.95),
       0 0 48px rgba(34, 211, 238, 0.5);
+  }
+  .bonus-box-result {
+    animation: bonus-box-result-enter 420ms cubic-bezier(.16,1,.3,1) both;
+  }
+  .bonus-box-result::before {
+    content: '';
+    pointer-events: none;
+    position: absolute;
+    inset: -30% -10%;
+    background:
+      radial-gradient(circle at 18% 50%, rgba(34, 211, 238, 0.12), transparent 30%),
+      radial-gradient(circle at 86% 40%, rgba(16, 185, 129, 0.10), transparent 34%);
+    opacity: 0.8;
   }
   .bonus-box-stage--opening .bonus-box-portal-line {
     animation: bonus-box-portal-line 640ms ease-in-out infinite;
@@ -678,6 +695,17 @@
   }
   100% {
     transform: translateX(-50%) scale(1);
+  }
+}
+
+@keyframes bonus-box-result-enter {
+  0% {
+    opacity: 0;
+    transform: translateY(-0.5rem) scale(0.985);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
   }
 }
 
