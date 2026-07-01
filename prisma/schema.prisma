@@ -810,6 +810,16 @@ model BonusBoxPrize {
   @@index([rarity])
 }
 
+model BonusBoxSetting {
+  id                       String   @id @default("default")
+  pityEnabled              Boolean  @default(true)
+  pityOpenings             Int      @default(10)
+  showBestRecentOpening    Boolean  @default(true)
+  activePromoRewardsLimit  Int      @default(3)
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+}
+
 model BonusBoxAttempt {
   id        String                @id @default(cuid())
   userId    String

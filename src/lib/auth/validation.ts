@@ -198,6 +198,13 @@ export const updateAdminBonusBoxPrizeSchema = adminBonusBoxPrizeBaseSchema.parti
   }
 )
 
+export const adminBonusBoxSettingsSchema = z.object({
+  pityEnabled: z.boolean().default(true),
+  pityOpenings: z.coerce.number().int().min(2, 'Минимум 2 открытия').max(100, 'Максимум 100 открытий'),
+  showBestRecentOpening: z.boolean().default(true),
+  activePromoRewardsLimit: z.coerce.number().int().min(0).max(12, 'Максимум 12 промокодов'),
+})
+
 const adminPlanBaseSchema = z.object({
   name: z.string().trim().min(2, 'Минимум 2 символа').max(80, 'Максимум 80 символов'),
   description: z.string().trim().max(240, 'Максимум 240 символов').optional().nullable(),

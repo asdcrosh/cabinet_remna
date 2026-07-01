@@ -15,6 +15,9 @@ const DEFAULT_EPIC_COOLDOWN_OPENINGS = 8
 const DEFAULT_LEGENDARY_COOLDOWN_OPENINGS = 30
 const DEFAULT_EPIC_MIN_OPENINGS = 4
 const DEFAULT_LEGENDARY_MIN_OPENINGS = 12
+const DEFAULT_PITY_OPENINGS = 10
+const DEFAULT_ACTIVE_PROMO_REWARDS_LIMIT = 3
+const BONUS_BOX_SETTINGS_ID = 'default'
 const ECONOMY_HISTORY_LIMIT = 80
 const REEL_ITEM_COUNT = 88
 const REEL_WINNING_BASE_INDEX = 72
@@ -67,6 +70,13 @@ export type BonusBoxOpeningResult = {
   remoteSynced: boolean
 }
 
+export type BonusBoxSettings = {
+  pityEnabled: boolean
+  pityOpenings: number
+  showBestRecentOpening: boolean
+  activePromoRewardsLimit: number
+}
+
 export class BonusBoxError extends Error {
   constructor(
     message: string,
@@ -98,7 +108,56 @@ export function getBonusBoxConfig() {
     legendaryCooldownOpenings: envInt('BONUS_BOX_LEGENDARY_COOLDOWN_OPENINGS', DEFAULT_LEGENDARY_COOLDOWN_OPENINGS, 0, 1000),
     epicMinOpenings: envInt('BONUS_BOX_EPIC_MIN_OPENINGS', DEFAULT_EPIC_MIN_OPENINGS, 0, 1000),
     legendaryMinOpenings: envInt('BONUS_BOX_LEGENDARY_MIN_OPENINGS', DEFAULT_LEGENDARY_MIN_OPENINGS, 0, 1000),
+    pityEnabled: envBool('BONUS_BOX_PITY_ENABLED', true),
+    pityOpenings: envInt('BONUS_BOX_PITY_OPENINGS', DEFAULT_PITY_OPENINGS, 2, 100),
+    showBestRecentOpening: envBool('BONUS_BOX_SHOW_BEST_RECENT_OPENING', true),
+    activePromoRewardsLimit: envInt('BONUS_BOX_ACTIVE_PROMO_REWARDS_LIMIT', DEFAULT_ACTIVE_PROMO_REWARDS_LIMIT, 0, 12),
   }
+}
+
+export async function getBonusBoxSettings(
+  tx: Pick<BonusBoxTx, 'bonusBoxSetting'> = prisma
+): Promise<BonusBoxSettings> {
+  const config = getBonusBoxConfig()
+  const settings = await tx.bonusBoxSetting.findUnique({
+    where: { id: BONUS_BOX_SETTINGS_ID },
+  })
+
+  return {
+    pityEnabled: settings?.pityEnabled ?? config.pityEnabled,
+    pityOpenings: clamp(settings?.pityOpenings ?? config.pityOpenings, 2, 100),
+    showBestRecentOpening: settings?.showBestRecentOpening ?? config.showBestRecentOpening,
+    activePromoRewardsLimit: clamp(
+      settings?.activePromoRewardsLimit ?? config.activePromoRewardsLimit,
+      0,
+      12
+    ),
+  }
+}
+
+export async function updateBonusBoxSettings(input: BonusBoxSettings) {
+  return prisma.bonusBoxSetting.upsert({
+    where: { id: BONUS_BOX_SETTINGS_ID },
+    create: {
+      id: BONUS_BOX_SETTINGS_ID,
+      pityEnabled: input.pityEnabled,
+      pityOpenings: clamp(input.pityOpenings, 2, 100),
+      showBestRecentOpening: input.showBestRecentOpening,
+      activePromoRewardsLimit: clamp(input.activePromoRewardsLimit, 0, 12),
+    },
+    update: {
+      pityEnabled: input.pityEnabled,
+      pityOpenings: clamp(input.pityOpenings, 2, 100),
+      showBestRecentOpening: input.showBestRecentOpening,
+      activePromoRewardsLimit: clamp(input.activePromoRewardsLimit, 0, 12),
+    },
+  })
+}
+
+async function getBonusBoxRuntimeConfig() {
+  const config = getBonusBoxConfig()
+  const settings = await getBonusBoxSettings()
+  return { ...config, ...settings }
 }
 
 export async function getBonusBoxOverview(userId: string) {
@@ -108,8 +167,8 @@ export async function getBonusBoxOverview(userId: string) {
   ])
 
   const now = new Date()
-  const config = getBonusBoxConfig()
-  const [attempts, prizeRows, openings, vpnAccess] = await Promise.all([
+  const config = await getBonusBoxRuntimeConfig()
+  const [attempts, prizeRows, openings, activePromoRewards, bestRecentOpening, vpnAccess] = await Promise.all([
     prisma.bonusBoxAttempt.findMany({
       where: {
         userId,
@@ -126,6 +185,8 @@ export async function getBonusBoxOverview(userId: string) {
       take: ECONOMY_HISTORY_LIMIT,
       include: { prize: true, promoCode: true },
     }),
+    getActivePromoRewards(userId, config.activePromoRewardsLimit, now),
+    config.showBestRecentOpening ? getBestRecentOpening(now) : Promise.resolve(null),
     prisma.user.findUnique({
       where: { id: userId },
       select: {
@@ -142,17 +203,30 @@ export async function getBonusBoxOverview(userId: string) {
     }),
   ])
   const prizes = publicPrizesWithChances(prizeRows, prizeRows)
+  const hasActiveSubscription = Boolean(vpnAccess?.remnawaveUuid && vpnAccess.subscriptions.length > 0)
+  const welcomeAttemptsCount = attempts.filter(isWelcomeBonusAttempt).length
 
   return {
     config,
-    hasActiveSubscription: Boolean(vpnAccess?.remnawaveUuid && vpnAccess.subscriptions.length > 0),
+    hasActiveSubscription,
     attempts: attempts.map((attempt) => ({
       ...attempt,
       expiresAt: attempt.expiresAt?.toISOString() ?? null,
       createdAt: attempt.createdAt.toISOString(),
     })),
     attemptsCount: attempts.length,
-    welcomeAttemptsCount: attempts.filter(isWelcomeBonusAttempt).length,
+    welcomeAttemptsCount,
+    canOpenReason: getCanOpenReason({
+      enabled: config.enabled,
+      attemptsCount: attempts.length,
+      prizesCount: prizeRows.length,
+      hasActiveSubscription,
+      welcomeAttemptsCount,
+    }),
+    pityProgress: buildPityProgress(openings, config),
+    openingStreak: buildOpeningStreak(openings.length),
+    bestRecentOpening,
+    activePromoRewards,
     prizes,
     openings: openings.slice(0, 12).map((opening) => ({
       id: opening.id,
@@ -353,7 +427,7 @@ export async function grantWeeklyBonusBoxAttempts(userId: string) {
 }
 
 export async function openBonusBox(userId: string): Promise<BonusBoxOpeningResult> {
-  const config = getBonusBoxConfig()
+  const config = await getBonusBoxRuntimeConfig()
   if (!config.enabled) {
     throw new BonusBoxError('Подарочный бокс сейчас недоступен', 403, 'BONUS_BOX_DISABLED')
   }
@@ -414,12 +488,9 @@ export async function openBonusBox(userId: string): Promise<BonusBoxOpeningResul
       })
       const eligiblePrizes = prizes
         .filter((prize) => prize.maxWins == null || prize.winsCount < prize.maxWins)
-        .filter((prize) => hasActiveSubscription || !prizeNeedsActiveSubscription(prize))
       if (eligiblePrizes.length === 0) {
         throw new BonusBoxError(
-          hasActiveSubscription
-            ? 'Администратор ещё не настроил подарки'
-            : 'Для приветственной крутки нужны подарки без активной подписки',
+          'Администратор ещё не настроил подарки',
           409,
           'NO_PRIZES'
         )
@@ -431,7 +502,13 @@ export async function openBonusBox(userId: string): Promise<BonusBoxOpeningResul
         take: ECONOMY_HISTORY_LIMIT,
         select: { prize: { select: { rarity: true } } },
       })
-      const prize = pickWeightedPrize(applyBonusBoxEconomyGuard(eligiblePrizes, recentOpenings, config))
+      const guardedPrizes = applyBonusBoxEconomyGuard(eligiblePrizes, recentOpenings, config)
+      const pityProgress = buildPityProgress(recentOpenings, config)
+      const guaranteedPrizes =
+        pityProgress.guaranteedNext
+          ? eligiblePrizes.filter((item) => rarityRank(item.rarity) >= 1)
+          : []
+      const prize = pickWeightedPrize(guaranteedPrizes.length > 0 ? guaranteedPrizes : guardedPrizes)
       const claimedPrize = await tx.bonusBoxPrize.updateMany({
         where: {
           id: prize.id,
@@ -515,10 +592,6 @@ function isWelcomeBonusAttempt(attempt: { source: string; sourceKey: string }) {
   return attempt.source === 'MANUAL' && attempt.sourceKey.startsWith(WELCOME_ATTEMPT_PREFIX)
 }
 
-function prizeNeedsActiveSubscription(prize: Pick<BonusBoxPrize, 'type'>) {
-  return prize.type === 'SUBSCRIPTION_DAYS' || prize.type === 'TRAFFIC_GB'
-}
-
 export async function getPublicPrizes(tx: Pick<BonusBoxTx, 'bonusBoxPrize'> = prisma) {
   const prizes = await getPrizeRows(tx)
   return publicPrizesWithChances(prizes, prizes)
@@ -572,7 +645,7 @@ async function applyPrizeInTransaction(
 
   if (input.prize.type === 'SUBSCRIPTION_DAYS') {
     if (!input.subscription) {
-      throw new BonusBoxError('Нужна активная VPN-подписка', 403, 'NO_ACTIVE_SUBSCRIPTION')
+      return { promoCodeId: null, subscriptionId: null, remoteUpdate: null }
     }
     const base = input.subscription.expireAt.getTime() > Date.now() ? input.subscription.expireAt : new Date()
     const expireAt = new Date(base.getTime() + input.prize.value * 24 * 60 * 60 * 1000)
@@ -593,7 +666,7 @@ async function applyPrizeInTransaction(
   }
 
   if (!input.subscription) {
-    throw new BonusBoxError('Нужна активная VPN-подписка', 403, 'NO_ACTIVE_SUBSCRIPTION')
+    return { promoCodeId: null, subscriptionId: null, remoteUpdate: null }
   }
   const currentLimit = input.subscription.trafficLimitBytes
   const trafficLimitBytes = currentLimit == null ? null : currentLimit + gbToBytes(input.prize.value)
@@ -896,6 +969,146 @@ function makePrizeSnapshot(prize: BonusBoxPrize) {
     value: prize.value,
     rarity: prize.rarity,
   }
+}
+
+async function getActivePromoRewards(userId: string, limit: number, now: Date) {
+  if (limit <= 0) return []
+
+  const openings = await prisma.bonusBoxOpening.findMany({
+    where: {
+      userId,
+      promoCode: {
+        is: {
+          isActive: true,
+          OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+        },
+      },
+    },
+    orderBy: { createdAt: 'desc' },
+    take: Math.max(limit * 2, limit),
+    include: { prize: true, promoCode: true },
+  })
+  const seenCodes = new Set<string>()
+
+  return openings.flatMap((opening) => {
+    const promoCode = opening.promoCode
+    if (!promoCode || seenCodes.has(promoCode.code)) return []
+    seenCodes.add(promoCode.code)
+
+    return [{
+      id: promoCode.id,
+      code: promoCode.code,
+      discountPercent: promoCode.discountPercent,
+      expiresAt: promoCode.expiresAt?.toISOString() ?? null,
+      prizeTitle: opening.prize.title,
+      createdAt: opening.createdAt.toISOString(),
+    }]
+  }).slice(0, limit)
+}
+
+async function getBestRecentOpening(now: Date) {
+  const since = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+  const openings = await prisma.bonusBoxOpening.findMany({
+    where: {
+      createdAt: { gte: since },
+      prize: { type: { not: 'NO_PRIZE' } },
+    },
+    orderBy: { createdAt: 'desc' },
+    take: 80,
+    include: {
+      prize: true,
+      user: { select: { name: true, email: true } },
+    },
+  })
+  const best = openings
+    .slice()
+    .sort((left, right) => scoreOpening(right.prize) - scoreOpening(left.prize))[0]
+
+  if (!best) return null
+
+  return {
+    id: best.id,
+    title: best.prize.title,
+    label: prizeValueLabel(best.prize),
+    rarity: best.prize.rarity,
+    userLabel: best.user?.name?.trim() || maskEmail(best.user?.email) || 'Пользователь',
+    createdAt: best.createdAt.toISOString(),
+  }
+}
+
+function getCanOpenReason(input: {
+  enabled: boolean
+  attemptsCount: number
+  prizesCount: number
+  hasActiveSubscription: boolean
+  welcomeAttemptsCount: number
+}) {
+  if (!input.enabled) return 'Подарочный бокс временно выключен'
+  if (input.prizesCount <= 0) return 'Подарки ещё не настроены'
+  if (input.attemptsCount <= 0) {
+    return 'Нет доступных открытий. Их можно получить за покупку, приглашение или еженедельный бонус.'
+  }
+  if (!input.hasActiveSubscription && input.welcomeAttemptsCount <= 0) {
+    return 'Нужна активная подписка. Приветственные открытия можно использовать без покупки.'
+  }
+  return null
+}
+
+function buildPityProgress(
+  recentOpenings: Array<{ prize: { rarity: BonusBoxRarity } }>,
+  config: { pityEnabled: boolean; pityOpenings: number }
+) {
+  const threshold = clamp(config.pityOpenings, 2, 100)
+  const current = config.pityEnabled
+    ? Math.min(openingsSinceRarityAtLeastFinite(recentOpenings, 1), threshold)
+    : 0
+
+  return {
+    enabled: config.pityEnabled,
+    threshold,
+    current,
+    remaining: config.pityEnabled ? Math.max(0, threshold - current) : null,
+    guaranteedNext: config.pityEnabled && current >= threshold,
+  }
+}
+
+function buildOpeningStreak(openingsCount: number) {
+  const targets = [3, 5, 10]
+  const nextTarget = targets.find((target) => openingsCount < target) ?? null
+
+  return {
+    current: nextTarget ? openingsCount : Math.min(openingsCount, targets[targets.length - 1]),
+    nextTarget,
+    targets,
+    completed: targets.filter((target) => openingsCount >= target),
+  }
+}
+
+function openingsSinceRarityAtLeastFinite(
+  recentOpenings: Array<{ prize: { rarity: BonusBoxRarity } }>,
+  minRank: number
+) {
+  const index = recentOpenings.findIndex((opening) => rarityRank(opening.prize.rarity) >= minRank)
+  return index === -1 ? recentOpenings.length : index
+}
+
+function scoreOpening(prize: Pick<BonusBoxPrize, 'rarity' | 'type' | 'value'>) {
+  return rarityRank(prize.rarity) * 10_000 + Math.max(0, prize.value)
+}
+
+function prizeValueLabel(prize: Pick<BonusBoxPrize, 'type' | 'value'>) {
+  if (prize.type === 'SUBSCRIPTION_DAYS') return `+${prize.value} дн.`
+  if (prize.type === 'TRAFFIC_GB') return `+${prize.value} ГБ`
+  if (prize.type === 'BONUS_ATTEMPTS') return `+${prize.value} открытий`
+  if (prize.type === 'PROMO_CODE_PERCENT') return `-${prize.value}%`
+  return 'Без начисления'
+}
+
+function maskEmail(email?: string | null) {
+  if (!email) return null
+  const [name, domain] = email.split('@')
+  if (!domain) return name
+  return `${name.slice(0, 2)}***@${domain}`
 }
 
 function getWeekKey(date: Date) {

@@ -7,6 +7,7 @@ import {
   type BonusBoxPrizeAdminRow,
 } from '@/components/admin/bonus-box-prizes-admin'
 import { parseAdminListLimit } from '@/lib/admin-list'
+import { getBonusBoxSettings } from '@/lib/bonus-box'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Подарки — Админка' }
@@ -19,7 +20,7 @@ export default async function AdminBonusBoxPage({
   await requireAdminPage()
   const limit = parseAdminListLimit(searchParams?.limit)
 
-  const [prizes, totalOpenings, openings] = await Promise.all([
+  const [prizes, totalOpenings, openings, settings] = await Promise.all([
     prisma.bonusBoxPrize.findMany({
       orderBy: [{ isActive: 'desc' }, { createdAt: 'desc' }],
     }),
@@ -34,6 +35,7 @@ export default async function AdminBonusBoxPage({
         promoCode: { select: { code: true, expiresAt: true } },
       },
     }),
+    getBonusBoxSettings(),
   ])
   const totalActiveWeight = prizes
     .filter((prize) => prize.isActive && prize.weight > 0 && (prize.maxWins == null || prize.winsCount < prize.maxWins))
@@ -76,7 +78,12 @@ export default async function AdminBonusBoxPage({
         title="Подарки"
         description="Настройка подарочного бокса, шансов, лимитов и истории открытий"
       />
-      <BonusBoxPrizesAdmin prizes={rows} openings={openingRows} totalOpenings={totalOpenings} />
+      <BonusBoxPrizesAdmin
+        prizes={rows}
+        openings={openingRows}
+        settings={settings}
+        totalOpenings={totalOpenings}
+      />
     </div>
   )
 }

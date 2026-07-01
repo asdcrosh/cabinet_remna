@@ -17,6 +17,10 @@ const mocks = vi.hoisted(() => {
       findMany: vi.fn(),
       updateMany: vi.fn(),
     },
+    bonusBoxSetting: {
+      findUnique: vi.fn(),
+      upsert: vi.fn(),
+    },
     bonusBoxOpening: {
       findMany: vi.fn(),
       create: vi.fn(),
@@ -65,6 +69,10 @@ const config: Config = {
   legendaryCooldownOpenings: 30,
   epicMinOpenings: 4,
   legendaryMinOpenings: 12,
+  pityEnabled: true,
+  pityOpenings: 10,
+  showBestRecentOpening: true,
+  activePromoRewardsLimit: 3,
 }
 
 describe('grantWeeklyBonusBoxAttempts', () => {
@@ -114,6 +122,7 @@ describe('openBonusBox', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-06-24T12:00:00.000Z'))
     mocks.prisma.$transaction.mockImplementation(async (fn) => fn(mocks.prisma))
+    mocks.prisma.bonusBoxSetting.findUnique.mockResolvedValue(null)
   })
 
   afterEach(() => {
@@ -187,7 +196,6 @@ describe('openBonusBox', () => {
 
   it('allows a welcome attempt before the first subscription', async () => {
     const promoPrize = prize('promo-prize', 'COMMON', 'PROMO_CODE_PERCENT', 20)
-    const subscriptionPrize = prize('days-prize', 'COMMON', 'SUBSCRIPTION_DAYS', 3)
     mocks.prisma.bonusBoxAttempt.findFirst.mockResolvedValue({
       id: 'attempt-1',
       source: 'MANUAL',
@@ -198,7 +206,7 @@ describe('openBonusBox', () => {
       remnawaveUuid: null,
       subscriptions: [],
     })
-    mocks.prisma.bonusBoxPrize.findMany.mockResolvedValue([subscriptionPrize, promoPrize])
+    mocks.prisma.bonusBoxPrize.findMany.mockResolvedValue([promoPrize])
     mocks.prisma.bonusBoxPrize.updateMany.mockResolvedValue({ count: 1 })
     mocks.prisma.bonusBoxAttempt.update.mockResolvedValue({})
     mocks.prisma.promoCode.create.mockResolvedValue({
@@ -222,6 +230,77 @@ describe('openBonusBox', () => {
       expect.objectContaining({ where: expect.objectContaining({ id: 'promo-prize' }) })
     )
   })
+
+  it('records a subscription-days prize from a welcome attempt without an active subscription', async () => {
+    const daysPrize = prize('days-prize', 'RARE', 'SUBSCRIPTION_DAYS', 7)
+    mocks.prisma.bonusBoxAttempt.findFirst.mockResolvedValue({
+      id: 'attempt-1',
+      source: 'MANUAL',
+      sourceKey: 'welcome:setting-1:1',
+    })
+    mocks.prisma.user.findUnique.mockResolvedValue({
+      id: 'user-1',
+      remnawaveUuid: null,
+      subscriptions: [],
+    })
+    mocks.prisma.bonusBoxPrize.findMany.mockResolvedValue([daysPrize])
+    mocks.prisma.bonusBoxPrize.updateMany.mockResolvedValue({ count: 1 })
+    mocks.prisma.bonusBoxAttempt.update.mockResolvedValue({})
+    mocks.prisma.bonusBoxOpening.create.mockResolvedValue({ id: 'opening-1', promoCode: null })
+    mocks.prisma.bonusBoxOpening.findMany.mockResolvedValue([])
+    mocks.prisma.bonusBoxAttempt.count.mockResolvedValue(0)
+
+    const result = await openBonusBox('user-1')
+
+    expect(result.prize.type).toBe('SUBSCRIPTION_DAYS')
+    expect(result.remoteSynced).toBe(true)
+    expect(mocks.prisma.subscription.update).not.toHaveBeenCalled()
+    expect(mocks.prisma.bonusBoxOpening.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          awardedSubscriptionId: null,
+          promoCodeId: null,
+        }),
+      })
+    )
+  })
+
+  it('guarantees a rare prize when pity progress reaches the threshold', async () => {
+    const commonPrize = prize('common-prize', 'COMMON', 'BONUS_ATTEMPTS', 1, 10_000)
+    const rarePrize = prize('rare-prize', 'RARE', 'BONUS_ATTEMPTS', 2, 1)
+    mocks.prisma.bonusBoxSetting.findUnique.mockResolvedValue({
+      pityEnabled: true,
+      pityOpenings: 2,
+      showBestRecentOpening: true,
+      activePromoRewardsLimit: 3,
+    })
+    mocks.prisma.bonusBoxAttempt.findFirst.mockResolvedValue({ id: 'attempt-1', source: 'PAYMENT', sourceKey: 'payment-1:1' })
+    mocks.prisma.user.findUnique.mockResolvedValue({
+      id: 'user-1',
+      remnawaveUuid: 'rw-1',
+      subscriptions: [
+        {
+          id: 'sub-1',
+          expireAt: new Date('2026-07-24T00:00:00.000Z'),
+          trafficLimitBytes: null,
+        },
+      ],
+    })
+    mocks.prisma.bonusBoxPrize.findMany.mockResolvedValue([commonPrize, rarePrize])
+    mocks.prisma.bonusBoxOpening.findMany.mockResolvedValue(history(['COMMON', 'COMMON']))
+    mocks.prisma.bonusBoxPrize.updateMany.mockResolvedValue({ count: 1 })
+    mocks.prisma.bonusBoxAttempt.update.mockResolvedValue({})
+    mocks.prisma.bonusBoxAttempt.createMany.mockResolvedValue({ count: 2 })
+    mocks.prisma.bonusBoxOpening.create.mockResolvedValue({ id: 'opening-1', promoCode: null })
+    mocks.prisma.bonusBoxAttempt.count.mockResolvedValue(0)
+
+    const result = await openBonusBox('user-1')
+
+    expect(result.prize.id).toBe('rare-prize')
+    expect(mocks.prisma.bonusBoxPrize.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ id: 'rare-prize' }) })
+    )
+  })
 })
 
 describe('getBonusBoxOverview', () => {
@@ -230,6 +309,12 @@ describe('getBonusBoxOverview', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-06-24T12:00:00.000Z'))
     process.env.BONUS_BOX_WEEKLY_ENABLED = 'false'
+    mocks.prisma.bonusBoxSetting.findUnique.mockResolvedValue({
+      pityEnabled: true,
+      pityOpenings: 3,
+      showBestRecentOpening: false,
+      activePromoRewardsLimit: 0,
+    })
   })
 
   afterEach(() => {
@@ -260,6 +345,13 @@ describe('getBonusBoxOverview', () => {
 
     expect(overview.prizes.find((item) => item.id === 'common')?.chance).toBe(0.4)
     expect(overview.prizes.find((item) => item.id === 'rare')?.chance).toBe(0.6)
+    expect(overview.pityProgress).toMatchObject({
+      enabled: true,
+      threshold: 3,
+      current: 0,
+      remaining: 3,
+      guaranteedNext: false,
+    })
   })
 })
 
