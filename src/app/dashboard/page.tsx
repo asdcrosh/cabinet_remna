@@ -63,22 +63,26 @@ export default async function DashboardHome() {
     redirect('/login?next=/dashboard')
   }
 
-  // Если есть Remnawave-профиль — попробуем освежить карточку
-  let remnawaveCard: Awaited<ReturnType<typeof remnawave.getSubscriptionByUsername>> | null = null
-  if (user.remnawaveUsername) {
-    try {
-      remnawaveCard = await remnawave.getSubscriptionByUsername(user.remnawaveUsername)
-    } catch (e) {
-      if (!(e instanceof RemnawaveError)) throw e
-    }
-  }
-
-  const sub = remnawaveCard?.response.user
   const subRow = user.subscriptions[0] ?? null
   const activeSubRow = user.subscriptions.find((subscription) =>
     ['ACTIVE', 'LIMITED'].includes(subscription.status) && subscription.expireAt > new Date()
   ) ?? null
-  const [audienceContext, availablePlans, lastSucceededPayment, promoOfferCode, offerSettings, welcomeBonusSetting] = await Promise.all([
+  const remnawaveCardPromise = user.remnawaveUsername
+    ? remnawave.getSubscriptionByUsername(user.remnawaveUsername).catch((error) => {
+        if (error instanceof RemnawaveError) return null
+        throw error
+      })
+    : Promise.resolve(null)
+  const [
+    remnawaveCard,
+    audienceContext,
+    availablePlans,
+    lastSucceededPayment,
+    promoOfferCode,
+    offerSettings,
+    welcomeBonusSetting,
+  ] = await Promise.all([
+    remnawaveCardPromise,
     getPlanAudienceContext(user.id),
     prisma.plan.findMany({
       where: { isActive: true, isPromo: false },
@@ -105,6 +109,7 @@ export default async function DashboardHome() {
       },
     }),
   ])
+  const sub = remnawaveCard?.response.user
   const welcomeBonusOptions = buildWelcomeBonusOptions(welcomeBonusSetting, {
     trialUsed: user.trialPlanRedemptions.length > 0,
   })

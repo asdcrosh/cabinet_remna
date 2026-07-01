@@ -41,6 +41,9 @@ type SenderRole = 'USER' | 'ADMIN'
 type TicketFolder = 'active' | 'need-answer' | 'answered' | 'closed'
 type EmojiCategory = 'recent' | 'people' | 'signals' | 'objects'
 
+const SUPPORT_LIST_REFRESH_MS = 20_000
+const SUPPORT_ACTIVE_TICKET_REFRESH_MS = 5_000
+
 const emojiCategories: Array<{ value: EmojiCategory; label: string; items: string[] }> = [
   { value: 'recent', label: 'Недавние', items: ['👍', '🙏', '🔥', '🎁', '✅', '⚡', '🚀', '💬', '👀', '👇'] },
   { value: 'people', label: 'Смайлы', items: ['😀', '😁', '😄', '🙂', '😊', '😉', '😎', '🤔', '😕', '😔', '😅', '😂', '😍', '🤝', '🙌', '👌', '👋', '💪'] },
@@ -227,14 +230,15 @@ export function SupportPanel({
   }, [mode])
 
   const mergeTicketList = useCallback((incoming: SupportTicket[]) => {
-    setTickets((current) =>
-      incoming.map((ticket) => {
-        const previous = current.find((item) => item.id === ticket.id)
+    setTickets((current) => {
+      const currentById = new Map(current.map((ticket) => [ticket.id, ticket]))
+      return incoming.map((ticket) => {
+        const previous = currentById.get(ticket.id)
         return previous && previous.messages.length > ticket.messages.length
           ? { ...ticket, messages: previous.messages }
           : ticket
       })
-    )
+    })
   }, [])
 
   const fetchTicketList = useCallback(async (limit: number) => {
@@ -295,7 +299,7 @@ export function SupportPanel({
     void refreshSupport()
     const interval = window.setInterval(() => {
       void refreshSupport()
-    }, 2500)
+    }, selectedId ? SUPPORT_ACTIVE_TICKET_REFRESH_MS : SUPPORT_LIST_REFRESH_MS)
 
     const refreshOnVisible = () => {
       if (document.visibilityState === 'visible') void refreshSupport()

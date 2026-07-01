@@ -17,7 +17,8 @@ export default async function SupportPage() {
     take: 50,
     include: {
       messages: {
-        orderBy: { createdAt: 'asc' },
+        orderBy: { createdAt: 'desc' },
+        take: 1,
         select: {
           id: true,
           body: true,

@@ -39,7 +39,8 @@ export default async function AdminSupportPage({
       include: {
         user: { select: { id: true, email: true, name: true, remnawaveUsername: true } },
         messages: {
-          orderBy: { createdAt: 'asc' },
+          orderBy: { createdAt: 'desc' },
+          take: 1,
           select: {
             id: true,
             body: true,

@@ -1,7 +1,6 @@
 "use client";
 
 import { type CSSProperties, type ReactNode, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import {
   CalendarClock,
   CalendarPlus,
@@ -107,7 +106,6 @@ export function BonusBoxClient({
 }: {
   initialData: BonusBoxOverview;
 }) {
-  const router = useRouter();
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const [data, setData] = useState(initialData);
   const [reel, setReel] = useState(() => makeIdleReel(initialData.prizes));
@@ -145,12 +143,6 @@ export function BonusBoxClient({
   );
   const revealClass = result ? bonusBoxRevealClass(result.prize) : null;
 
-  async function refreshOverview() {
-    const overview = await apiFetch<BonusBoxOverview>("/api/bonus-box");
-    setData(overview);
-    router.refresh();
-  }
-
   async function openBox() {
     if (!canOpen) return;
     setOpening(true);
@@ -178,6 +170,16 @@ export function BonusBoxClient({
         setData((current) => ({
           ...current,
           attemptsCount: response.remainingAttempts,
+          openings: [
+            {
+              id: response.id,
+              createdAt: new Date().toISOString(),
+              prize: response.prize,
+              promoCode: response.promoCode,
+              promoCodeExpiresAt: response.promoCodeExpiresAt,
+            },
+            ...current.openings,
+          ].slice(0, 12),
         }));
         if (response.prize.type === "NO_PRIZE") {
           toast("Открытие завершено: без подарка", "success");
@@ -189,7 +191,6 @@ export function BonusBoxClient({
         } else {
           toast("Подарок начислен", "success");
         }
-        await refreshOverview().catch(() => undefined);
         setOpening(false);
         window.setTimeout(() => setRevealEffect(false), 1600);
       }, 5900);

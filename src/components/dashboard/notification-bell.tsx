@@ -7,6 +7,8 @@ import { cn } from '@/lib/cn'
 import type { UserNotificationView } from '@/lib/user-notifications'
 import type { AdminNotificationView } from '@/lib/admin-notifications'
 
+const NOTIFICATION_REFRESH_MS = 15_000
+
 type NotificationSummary = {
   unreadCount: number
   notifications: UserNotificationView[]
@@ -131,7 +133,7 @@ export function NotificationBell({ showAdmin = false }: { showAdmin?: boolean })
     void refresh()
     const interval = window.setInterval(() => {
       if (document.visibilityState === 'visible') void refresh()
-    }, 5000)
+    }, NOTIFICATION_REFRESH_MS)
     const onFocus = () => void refresh()
     const onVisibility = () => {
       if (document.visibilityState === 'visible') void refresh()

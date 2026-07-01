@@ -6,6 +6,8 @@ import { BellRing, CheckCheck, ExternalLink, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import type { AdminNotificationView } from '@/lib/admin-notifications'
 
+const ADMIN_NOTIFICATION_REFRESH_MS = 15_000
+
 type AdminNotificationSummary = {
   unreadCount: number
   notifications: AdminNotificationView[]
@@ -76,7 +78,7 @@ export function AdminNotificationBell() {
     void refresh()
     const interval = window.setInterval(() => {
       if (document.visibilityState === 'visible') void refresh()
-    }, 5000)
+    }, ADMIN_NOTIFICATION_REFRESH_MS)
     const onFocus = () => void refresh()
     const onVisibility = () => {
       if (document.visibilityState === 'visible') void refresh()

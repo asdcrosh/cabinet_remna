@@ -52,6 +52,8 @@ const bottomNav = [
   { href: '/dashboard/settings', label: 'Ещё', icon: Menu },
 ]
 
+const NAV_BADGES_REFRESH_MS = 15_000
+
 const adminNav = [
   { href: '/dashboard/admin', label: 'Обзор', icon: UserCog, exact: true },
   { href: '/dashboard/admin/notifications', label: 'Уведомления', icon: Bell },
@@ -327,16 +329,19 @@ function useLiveBadges(initialBadges: NavBadges) {
     void refreshBadges()
     const interval = window.setInterval(() => {
       if (document.visibilityState === 'visible') void refreshBadges()
-    }, 3000)
+    }, NAV_BADGES_REFRESH_MS)
     const refreshOnFocus = () => void refreshBadges()
+    const refreshOnVisible = () => {
+      if (document.visibilityState === 'visible') void refreshBadges()
+    }
     window.addEventListener('focus', refreshOnFocus)
-    document.addEventListener('visibilitychange', refreshOnFocus)
+    document.addEventListener('visibilitychange', refreshOnVisible)
 
     return () => {
       active = false
       window.clearInterval(interval)
       window.removeEventListener('focus', refreshOnFocus)
-      document.removeEventListener('visibilitychange', refreshOnFocus)
+      document.removeEventListener('visibilitychange', refreshOnVisible)
     }
   }, [])
 
