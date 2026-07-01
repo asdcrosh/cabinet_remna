@@ -202,7 +202,7 @@ export function BonusBoxClient({
 
   return (
     <div className="flex flex-col gap-4 sm:gap-5">
-      <section className="bonus-box-hero order-2 relative overflow-hidden rounded-lg border border-cyan-200/70 bg-white/85 p-3 shadow-sm shadow-cyan-950/5 backdrop-blur dark:border-cyan-300/15 dark:text-white dark:shadow-black/20 sm:p-4">
+      <section className="bonus-box-hero order-3 relative overflow-hidden rounded-lg border border-cyan-200/70 bg-white/85 p-3 shadow-sm shadow-cyan-950/5 backdrop-blur dark:border-cyan-300/15 dark:text-white dark:shadow-black/20 sm:p-4">
         <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-cyan-300 via-emerald-300 to-transparent" />
         <div className="pointer-events-none absolute -right-28 -top-28 h-64 w-64 rounded-full bg-cyan-300/20 blur-3xl dark:bg-cyan-300/10" />
         <div className="pointer-events-none absolute -bottom-36 left-1/3 h-64 w-64 rounded-full bg-emerald-300/20 blur-3xl dark:bg-emerald-300/10" />
@@ -278,7 +278,7 @@ export function BonusBoxClient({
 
       <section
         className={cn(
-          "bonus-box-stage order-1 overflow-hidden rounded-lg border border-slate-900 bg-slate-950 shadow-xl shadow-slate-950/20 dark:border-white/10",
+          "bonus-box-stage order-first overflow-hidden rounded-lg border border-slate-900 bg-slate-950 shadow-xl shadow-slate-950/20 dark:border-white/10",
           opening && "bonus-box-stage--opening",
           revealEffect && "bonus-box-stage--reveal",
           revealEffect && result?.prize.type !== "NO_PRIZE" && "bonus-box-stage--win",
@@ -349,7 +349,7 @@ export function BonusBoxClient({
       {result && (
         <section
           className={cn(
-            "bonus-box-result grid gap-4 rounded-lg border bg-white p-4 shadow-sm shadow-slate-200/60 dark:bg-surface-900 dark:shadow-black/20 sm:p-5 md:grid-cols-[1fr_auto] md:items-center",
+            "bonus-box-result order-2 grid gap-4 rounded-lg border bg-white p-4 shadow-sm shadow-slate-200/60 dark:bg-surface-900 dark:shadow-black/20 sm:p-5 md:grid-cols-[1fr_auto] md:items-center",
             result.prize.type === "NO_PRIZE"
               ? "border-red-200 dark:border-red-500/40"
               : "border-emerald-200 dark:border-emerald-500/30",
@@ -408,7 +408,7 @@ export function BonusBoxClient({
         </section>
       )}
 
-      <section className="space-y-4">
+      <section className="order-4 space-y-4">
         <div className="flex flex-wrap gap-2 rounded-lg border border-slate-200 bg-white p-1 shadow-sm shadow-slate-200/60 dark:border-white/10 dark:bg-surface-900 dark:shadow-black/20">
           <BonusTabButton
             active={activeTab === "outcomes"}
