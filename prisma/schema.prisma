@@ -430,7 +430,9 @@ model Subscription {
   payments Payment[]
 
   @@index([userId, status])
+  @@index([userId, status, expireAt])
   @@index([expireAt])
+  @@index([pendingSync, updatedAt])
 }
 
 enum SubscriptionStatus {
@@ -483,7 +485,10 @@ model Payment {
   referralRewardTriggered   ReferralReward?
 
   @@index([userId, createdAt])
+  @@index([userId, status, createdAt])
   @@index([status])
+  @@index([status, createdAt])
+  @@index([status, subscriptionProvisionedAt, createdAt])
   @@index([promoCodeId])
 }
 
@@ -744,8 +749,10 @@ model SupportTicket {
   messages SupportMessage[]
 
   @@index([userId, status, lastMessageAt])
+  @@index([userId, lastMessageAt])
   @@index([status, lastMessageAt])
   @@index([adminUnreadCount])
+  @@index([adminUnreadCount, lastMessageAt])
 }
 
 model SupportMessage {

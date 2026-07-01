@@ -24,6 +24,7 @@ import { formatPrice } from '@/lib/format'
 import { cn } from '@/lib/cn'
 import { getPendingPaymentTtlMs } from '@/lib/payment-sync'
 import { findIdentityDuplicateCandidates } from '@/lib/identity-duplicates'
+import { PageHeader } from '@/components/dashboard/page-header'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Админка' }
@@ -164,11 +165,38 @@ export default async function AdminDashboardPage() {
   const trendDays = buildTrendDays(twoWeeksAgo, now, dailyPaymentRows, dailyUserRows)
 
   return (
-    <div className="space-y-6">
-      <header>
-        <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Обзор</h1>
-        <p className="mt-1 text-sm text-slate-500">Краткая сводка и быстрые переходы</p>
-      </header>
+    <div className="page-stack">
+      <PageHeader
+        title="Обзор"
+        description="Операционная сводка, риски и быстрые переходы по админке."
+      />
+
+      <section className="grid gap-3 md:grid-cols-3">
+        <PriorityCard
+          href="/dashboard/admin/support"
+          icon={<LifeBuoy className="h-5 w-5" />}
+          title="Поддержка"
+          value={supportWaiting}
+          text={supportWaiting > 0 ? 'Есть обращения без ответа' : 'Очередь чистая'}
+          urgent={supportWaiting > 0}
+        />
+        <PriorityCard
+          href="/dashboard/admin/recovery"
+          icon={<Database className="h-5 w-5" />}
+          title="Довыдача"
+          value={recoveryCount}
+          text={recoveryCount > 0 ? 'Нужно восстановить доступ' : 'Ошибок выдачи нет'}
+          urgent={recoveryCount > 0}
+        />
+        <PriorityCard
+          href="/dashboard/admin/duplicates"
+          icon={<SearchCheck className="h-5 w-5" />}
+          title="Дубли"
+          value={duplicateCandidates.length}
+          text={duplicateCandidates.length > 0 ? 'Проверьте связанные аккаунты' : 'Подозрительных дублей нет'}
+          urgent={duplicateCandidates.length > 0}
+        />
+      </section>
 
       <section className="space-y-3">
         <div className="flex flex-wrap items-end justify-between gap-2">
@@ -595,6 +623,46 @@ function AdminTile({
         <div className="truncate text-sm font-semibold">{title}</div>
         {note && <div className="mt-0.5 truncate text-xs text-slate-500">{note}</div>}
       </div>
+    </Link>
+  )
+}
+
+function PriorityCard({
+  href,
+  icon,
+  title,
+  value,
+  text,
+  urgent,
+}: {
+  href: string
+  icon: React.ReactNode
+  title: string
+  value: number
+  text: string
+  urgent: boolean
+}) {
+  return (
+    <Link
+      href={href}
+      className={cn(
+        'metric-card group flex items-center justify-between gap-4 transition-all hover:-translate-y-0.5 hover:shadow-md',
+        urgent && 'border-amber-300 bg-amber-50/80 dark:border-amber-500/30 dark:bg-amber-500/10'
+      )}
+    >
+      <div className="flex min-w-0 items-center gap-3">
+        <div className={cn(
+          'grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-700 dark:bg-white/10 dark:text-cyan-200',
+          urgent && 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-200'
+        )}>
+          {icon}
+        </div>
+        <div className="min-w-0">
+          <div className="font-semibold text-slate-950 dark:text-white">{title}</div>
+          <div className="mt-1 truncate text-sm text-slate-500 dark:text-slate-400">{text}</div>
+        </div>
+      </div>
+      <div className="text-2xl font-semibold tracking-tight">{value}</div>
     </Link>
   )
 }

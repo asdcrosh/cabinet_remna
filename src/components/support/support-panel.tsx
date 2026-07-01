@@ -688,7 +688,7 @@ export function SupportPanel({
                 </div>
               ) : (
                 <div className="space-y-2">
-                  <QuickReplies mode={mode} onPick={(value) => setMessage(value)} />
+                  <QuickReplies mode={mode} onPick={(value) => setMessage((current) => current.trim() ? `${current.trim()}\n\n${value}` : value)} />
                   <div className="relative flex items-end gap-2 rounded-lg border border-slate-200 bg-white p-2 shadow-sm dark:border-slate-800 dark:bg-surface-950">
                     <EmojiPicker onPick={insertMessageEmoji} />
                     <textarea
@@ -1163,15 +1163,22 @@ function QuickReplies({ mode, onPick }: { mode: 'user' | 'admin'; onPick: (value
         'Проверяю и скоро вернусь с ответом.',
         'Готово, попробуйте подключиться еще раз.',
         'Пришлите, пожалуйста, скрин ошибки и модель устройства.',
+        'Проверил оплату. Если доступ не появился, нажмите синхронизацию в кабинете.',
+        'Закрою обращение после вашего подтверждения, что все работает.',
       ]
     : [
         'Не подключается VPN',
         'Оплата прошла, доступа нет',
         'Нужна помощь с приложением',
+        'Хочу сменить устройство',
       ]
 
   return (
-    <div className="flex gap-1.5 overflow-x-auto pb-0.5">
+    <div className="rounded-lg border border-slate-100 bg-slate-50/70 p-2 dark:border-white/10 dark:bg-white/[0.035]">
+      <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">
+        {mode === 'admin' ? 'Шаблоны ответа' : 'Быстрый старт'}
+      </div>
+      <div className="flex gap-1.5 overflow-x-auto pb-0.5">
       {replies.map((reply) => (
         <button
           key={reply}
@@ -1182,6 +1189,7 @@ function QuickReplies({ mode, onPick }: { mode: 'user' | 'admin'; onPick: (value
           {reply}
         </button>
       ))}
+      </div>
     </div>
   )
 }

@@ -6,7 +6,7 @@ import { getCurrentUser } from '@/lib/auth/cookies'
 import { remnawave, RemnawaveError } from '@/lib/remnawave'
 import { KeysCard } from '@/components/dashboard/keys-card'
 import Link from 'next/link'
-import { CalendarClock, Database, ShieldAlert } from 'lucide-react'
+import { CalendarClock, CreditCard, Database, LifeBuoy, ShieldAlert } from 'lucide-react'
 import { EmptyState } from '@/components/dashboard/empty-state'
 
 export const dynamic = 'force-dynamic'
@@ -57,9 +57,9 @@ export default async function SubscriptionPage() {
   const statusText = u.isActive ? 'Подписка активна' : 'Подписка не активна'
 
   return (
-    <div className="space-y-4">
+    <div className="page-stack">
       <section className="relative overflow-hidden rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-surface-900 sm:p-5">
-        <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-cyan-400 via-emerald-300 to-blue-500" />
+        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-cyan-400 via-emerald-300 to-transparent" />
         <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
@@ -88,6 +88,21 @@ export default async function SubscriptionPage() {
             </Link>
           </div>
         </div>
+      </section>
+
+      <section className="grid gap-3 sm:grid-cols-3">
+        <Link href="/dashboard/plans" className="quick-action">
+          <CreditCard className="h-4 w-4 text-cyan-600 dark:text-cyan-300" />
+          Продлить подписку
+        </Link>
+        <Link href="/dashboard/devices" className="quick-action">
+          <Database className="h-4 w-4 text-cyan-600 dark:text-cyan-300" />
+          Мои устройства
+        </Link>
+        <Link href="/dashboard/support" className="quick-action">
+          <LifeBuoy className="h-4 w-4 text-cyan-600 dark:text-cyan-300" />
+          Помощь с подключением
+        </Link>
       </section>
 
       <KeysCard subscriptionUrl={data.response.subscriptionUrl} happLink={happLink} />

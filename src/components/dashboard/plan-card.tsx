@@ -160,7 +160,7 @@ export function PlanCard({
   return (
     <div
       className={cn(
-        "card group relative flex h-full min-h-[380px] flex-col overflow-hidden p-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl sm:p-5",
+        "card group relative flex h-full min-h-[390px] flex-col overflow-hidden p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-cyan-200/80 hover:shadow-xl sm:p-5",
         popular &&
           "border-slate-950 ring-2 ring-slate-950/10 dark:border-white dark:ring-white/15",
         current && "bg-cyan-50/70 dark:bg-cyan-500/10",
@@ -202,7 +202,7 @@ export function PlanCard({
           {description}
         </p>
       )}
-      <div className="mt-4">
+      <div className="mt-4 rounded-lg border border-slate-100 bg-slate-50/70 p-3 dark:border-white/10 dark:bg-white/[0.035]">
         <div className="flex flex-wrap items-baseline gap-2">
           <div className="whitespace-nowrap text-2xl font-semibold tracking-tight sm:text-3xl">
             {effectivePrice}
@@ -211,7 +211,7 @@ export function PlanCard({
             <div className="text-sm text-slate-400 line-through">{price}</div>
           )}
         </div>
-        <div className="text-sm text-slate-500">
+        <div className="text-sm text-slate-500 dark:text-slate-400">
           {isPromo ? "один раз на аккаунт" : "оплата онлайн"}
         </div>
       </div>
@@ -317,7 +317,7 @@ export function PlanCard({
       <button
         onClick={buy}
         disabled={loading}
-        className="btn-primary mt-5 w-full"
+        className="btn-primary mt-5 w-full min-h-11"
       >
         <CreditCard className="h-4 w-4" />
         {loading

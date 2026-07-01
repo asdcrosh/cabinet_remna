@@ -7,7 +7,7 @@ import { PlanCard } from '@/components/dashboard/plan-card'
 import { formatPrice } from '@/lib/format'
 import { PageHeader } from '@/components/dashboard/page-header'
 import { getCurrentUser } from '@/lib/auth/cookies'
-import { CreditCard, KeyRound, ShieldCheck } from 'lucide-react'
+import { CreditCard, KeyRound, ShieldCheck, Tag } from 'lucide-react'
 import { getPlanAudienceContext, isPlanAvailableForUser } from '@/lib/plan-access'
 import { getAvailableUserPromoCodesByPlan } from '@/lib/user-promo-codes'
 
@@ -90,7 +90,7 @@ export default async function PlansPage({
     (!user?.telegramId || !user?.remnashopSyncedAt)
 
   return (
-    <div className="space-y-6">
+    <div className="page-stack">
       <PageHeader
         title="Купить VPN"
         description="Выберите тариф и оплатите онлайн"
@@ -106,7 +106,7 @@ export default async function PlansPage({
       />
 
       <section className="card relative overflow-hidden p-4 sm:p-5">
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-cyan-400 via-emerald-400 to-brand-500" />
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-cyan-400 via-emerald-400 to-transparent" />
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
           <div>
             <h2 className="text-xl font-semibold tracking-tight sm:text-2xl">Выберите срок доступа</h2>
@@ -118,6 +118,12 @@ export default async function PlansPage({
             <BuyStep icon={<KeyRound className="h-4 w-4" />} title="Подключение" />
           </div>
         </div>
+      </section>
+
+      <section className="grid gap-3 md:grid-cols-3">
+        <TrustPoint icon={<ShieldCheck className="h-4 w-4" />} title="Моментальная выдача" text="QR и ссылка появятся после успешной оплаты." />
+        <TrustPoint icon={<Tag className="h-4 w-4" />} title="Промокоды" text="Скидки из бонусов подставляются прямо в карточке тарифа." />
+        <TrustPoint icon={<KeyRound className="h-4 w-4" />} title="Без лишних шагов" text="Оплатили, открыли подписку, подключили устройство." />
       </section>
 
       {needsTelegramCheckForPromo && (
@@ -171,6 +177,20 @@ function BuyStep({ icon, title }: { icon: React.ReactNode; title: string }) {
         {icon}
       </div>
       <span>{title}</span>
+    </div>
+  )
+}
+
+function TrustPoint({ icon, title, text }: { icon: React.ReactNode; title: string; text: string }) {
+  return (
+    <div className="metric-card flex items-start gap-3">
+      <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-cyan-50 text-cyan-700 dark:bg-cyan-500/10 dark:text-cyan-200">
+        {icon}
+      </div>
+      <div className="min-w-0">
+        <div className="font-semibold text-slate-950 dark:text-white">{title}</div>
+        <div className="mt-1 text-sm leading-5 text-slate-500 dark:text-slate-400">{text}</div>
+      </div>
     </div>
   )
 }

@@ -150,7 +150,7 @@ export default async function DashboardHome() {
 
   if (!user.remnawaveUsername) {
     return (
-      <div className="space-y-4">
+      <div className="page-stack">
         <CompactHeader title="Главная" description="Начните пользоваться VPN" />
         <DashboardOnboardingCard state={onboardingState} mode="full" />
         {personalOffer && <PersonalOffer offer={personalOffer} welcomeBonusOptions={welcomeBonusOptions} />}
@@ -161,7 +161,7 @@ export default async function DashboardHome() {
           subscriptionExpireAt={subRow?.expireAt ?? null}
           pendingPayment={user.payments[0] ?? null}
         />
-        <PromoGrid />
+        <ActionCenter />
       </div>
     )
   }
@@ -173,7 +173,7 @@ export default async function DashboardHome() {
   const daysLeft = sub?.daysLeft ?? 0
 
   return (
-    <div className="space-y-4">
+    <div className="page-stack">
       <CompactHeader
         title="Главная"
         description="Подписка и использование VPN"
@@ -259,7 +259,7 @@ export default async function DashboardHome() {
         initialLimitBytes={isUnlimited ? null : limit.toString()}
       />
 
-      <PromoGrid />
+      <ActionCenter />
     </div>
   )
 }
@@ -856,9 +856,16 @@ function CompactAction({ href, icon, label }: { href: string; icon: ReactElement
   )
 }
 
-function PromoGrid() {
+function ActionCenter() {
   return (
-    <section className="grid gap-3 sm:grid-cols-2">
+    <section className="space-y-3">
+      <div className="section-heading">
+        <div>
+          <h2 className="section-title">Быстрые действия</h2>
+          <p className="section-description">Самые частые задачи без лишних переходов.</p>
+        </div>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
       <PromoBlock
         href="/dashboard/referrals"
         icon={<UsersRound className="h-5 w-5" />}
@@ -873,6 +880,21 @@ function PromoGrid() {
         description="Бонусы за активность"
         tone="emerald"
       />
+      <PromoBlock
+        href="/dashboard/notifications"
+        icon={<Bell className="h-5 w-5" />}
+        title="События"
+        description="Платежи и важные статусы"
+        tone="slate"
+      />
+      <PromoBlock
+        href="/dashboard/support"
+        icon={<MessageCircleQuestion className="h-5 w-5" />}
+        title="Поддержка"
+        description="Вопросы и обращения"
+        tone="cyan"
+      />
+      </div>
     </section>
   )
 }
@@ -888,16 +910,18 @@ function PromoBlock({
   icon: ReactNode
   title: string
   description: string
-  tone: 'cyan' | 'emerald'
+  tone: 'cyan' | 'emerald' | 'slate'
 }) {
   const toneClass = tone === 'cyan'
     ? 'border-cyan-200/70 bg-cyan-50/80 text-cyan-700 dark:border-cyan-500/20 dark:bg-cyan-500/10 dark:text-cyan-200'
-    : 'border-emerald-200/70 bg-emerald-50/80 text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200'
+    : tone === 'emerald'
+      ? 'border-emerald-200/70 bg-emerald-50/80 text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200'
+      : 'border-slate-200 bg-white/80 text-slate-600 dark:border-white/10 dark:bg-white/[0.035] dark:text-slate-300'
 
   return (
     <Link
       href={href}
-      className={`group flex min-h-24 items-center gap-3 rounded-lg border p-4 transition-transform hover:-translate-y-0.5 ${toneClass}`}
+      className={`group flex min-h-24 items-center gap-3 rounded-lg border p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${toneClass}`}
     >
       <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-white/75 shadow-sm dark:bg-white/10">
         {icon}

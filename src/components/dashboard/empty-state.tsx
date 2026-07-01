@@ -12,12 +12,13 @@ interface EmptyStateProps {
 
 export function EmptyState({ title, description, icon, action, className }: EmptyStateProps) {
   return (
-    <div className={cn('card py-12 text-center', className)}>
-      <div className="mx-auto mb-5 grid h-14 w-14 place-items-center rounded-2xl bg-brand-50 text-brand-600 dark:bg-brand-500/10">
+    <div className={cn('card relative overflow-hidden py-12 text-center', className)}>
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-cyan-300/80 to-transparent" />
+      <div className="mx-auto mb-5 grid h-14 w-14 place-items-center rounded-lg border border-cyan-100 bg-cyan-50 text-cyan-700 shadow-sm dark:border-cyan-500/20 dark:bg-cyan-500/10 dark:text-cyan-200">
         {icon ?? <Info className="h-7 w-7" />}
       </div>
       <h2 className="text-xl font-semibold tracking-tight">{title}</h2>
-      {description && <p className="mx-auto mt-2 max-w-md text-sm text-slate-500">{description}</p>}
+      {description && <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500 dark:text-slate-400">{description}</p>}
       {action && <div className="mt-6">{action}</div>}
     </div>
   )
