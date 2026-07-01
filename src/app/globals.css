@@ -221,12 +221,12 @@
   .bonus-box-portal {
     pointer-events: none;
     position: absolute;
-    top: 50%;
+    top: 1.75rem;
     left: 50%;
     z-index: 32;
     width: 184px;
     height: 160px;
-    transform: translate(-50%, -50%);
+    transform: translateX(-50%);
   }
   .bonus-box-portal::before {
     content: '';
