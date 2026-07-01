@@ -159,14 +159,30 @@
     opacity: 0;
     transform: translateX(-22%);
   }
+  .bonus-box-reel-shell::after {
+    content: '';
+    pointer-events: none;
+    position: absolute;
+    inset: 0;
+    z-index: 17;
+    background:
+      repeating-linear-gradient(90deg, transparent 0 4.65rem, rgba(148, 163, 184, 0.08) 4.65rem 4.72rem, transparent 4.72rem 5.5rem),
+      radial-gradient(ellipse at 50% 50%, rgba(14, 165, 233, 0.18), transparent 34%);
+    opacity: 0.25;
+    mask-image: linear-gradient(90deg, transparent, #000 24%, #000 76%, transparent);
+  }
   .bonus-box-stage--opening .bonus-box-reel-shell::before {
-    animation: bonus-box-luxury-sweep 1600ms ease-in-out infinite;
+    animation: bonus-box-luxury-sweep 1320ms ease-in-out infinite;
+  }
+  .bonus-box-stage--opening .bonus-box-reel-shell::after {
+    animation: bonus-box-rail-speed 720ms linear infinite;
+    opacity: 0.72;
   }
   .bonus-box-stage--opening .bonus-box-reel-card {
-    animation: bonus-box-card-lift 1350ms ease-in-out infinite;
+    animation: bonus-box-card-lift 1120ms ease-in-out infinite;
   }
   .bonus-box-stage--opening .bonus-box-reel-track {
-    filter: drop-shadow(0 0 24px rgba(103, 232, 249, 0.24));
+    filter: drop-shadow(0 0 24px rgba(103, 232, 249, 0.28)) saturate(1.08);
   }
   .bonus-box-portal {
     pointer-events: none;
@@ -190,7 +206,8 @@
       0 0 0 1px rgba(255, 255, 255, 0.06) inset,
       0 0 30px rgba(103, 232, 249, 0.22),
       0 14px 42px rgba(2, 6, 23, 0.28);
-    opacity: 0.86;
+    opacity: 0.74;
+    transition: opacity 220ms ease, transform 220ms ease;
   }
   .bonus-box-portal::after {
     content: '';
@@ -208,6 +225,11 @@
   }
   .bonus-box-stage--opening .bonus-box-portal::after {
     animation: bonus-box-portal-caret 920ms ease-in-out infinite;
+  }
+  .bonus-box-stage--opening .bonus-box-portal::before,
+  .bonus-box-stage--reveal .bonus-box-portal::before {
+    opacity: 0.95;
+    transform: scaleY(1.04);
   }
   .bonus-box-portal-core {
     position: absolute;
@@ -233,6 +255,9 @@
     box-shadow:
       0 0 18px rgba(165, 243, 252, 0.88),
       0 0 42px rgba(34, 211, 238, 0.36);
+  }
+  .bonus-box-stage--opening .bonus-box-portal-line {
+    animation: bonus-box-portal-line 640ms ease-in-out infinite;
   }
   .bonus-box-fx-layer {
     pointer-events: none;
@@ -360,12 +385,23 @@
   }
 }
 
+@keyframes bonus-box-rail-speed {
+  from {
+    background-position: 0 0, 0 0;
+  }
+  to {
+    background-position: -5.5rem 0, 0 0;
+  }
+}
+
 @keyframes bonus-box-card-lift {
   0%, 100% {
-    filter: brightness(1) saturate(1);
+    filter: brightness(0.96) saturate(1.02);
+    transform: translateY(0) scale(0.985);
   }
   50% {
-    filter: brightness(1.18) saturate(1.18);
+    filter: brightness(1.22) saturate(1.2);
+    transform: translateY(-0.18rem) scale(1.015);
   }
 }
 
@@ -392,6 +428,17 @@
   50% {
     opacity: 0.72;
     transform: scaleX(0.96);
+  }
+}
+
+@keyframes bonus-box-portal-line {
+  0%, 100% {
+    opacity: 0.82;
+    transform: translateX(-50%) scaleY(0.92);
+  }
+  50% {
+    opacity: 1;
+    transform: translateX(-50%) scaleY(1.06);
   }
 }
 
@@ -464,8 +511,10 @@
   .bonus-box-stage,
   .bonus-box-stage::before,
   .bonus-box-reel-shell::before,
+  .bonus-box-reel-shell::after,
   .bonus-box-portal::after,
   .bonus-box-portal-core,
+  .bonus-box-portal-line,
   .bonus-box-reel-card,
   .bonus-box-fx-aurora,
   .bonus-box-fx-scanner,

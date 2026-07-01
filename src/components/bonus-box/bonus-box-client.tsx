@@ -192,7 +192,7 @@ export function BonusBoxClient({
         await refreshOverview().catch(() => undefined);
         setOpening(false);
         window.setTimeout(() => setRevealEffect(false), 1600);
-      }, 5400);
+      }, 5900);
     } catch {
       setOpening(false);
       setRevealEffect(false);
@@ -205,7 +205,7 @@ export function BonusBoxClient({
         <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-cyan-300 via-emerald-300 to-blue-400" />
         <div className="pointer-events-none absolute -right-28 -top-28 h-64 w-64 rounded-full bg-cyan-300/20 blur-3xl dark:bg-cyan-300/10" />
         <div className="pointer-events-none absolute -bottom-36 left-1/3 h-64 w-64 rounded-full bg-emerald-300/20 blur-3xl dark:bg-emerald-300/10" />
-        <div className="relative grid gap-4 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-center">
+        <div className="relative grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,25rem)] lg:items-center">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <span className="inline-flex items-center gap-1.5 rounded-full border border-cyan-300/50 bg-cyan-300/15 px-3 py-1 text-xs font-semibold text-cyan-700 dark:border-cyan-300/30 dark:text-cyan-100">
@@ -273,18 +273,18 @@ export function BonusBoxClient({
           <div className="min-w-0 md:flex md:justify-end">
             <button
               type="button"
-              className="group relative min-h-16 w-full overflow-hidden rounded-lg border border-cyan-300/30 bg-[linear-gradient(135deg,#020617,#0e7490_58%,#10b981)] px-4 text-sm font-semibold text-white shadow-xl shadow-cyan-950/20 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-cyan-950/30 disabled:translate-y-0 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-none disabled:bg-slate-200 disabled:text-slate-500 disabled:shadow-none dark:border-cyan-300/35 dark:shadow-black/25 dark:disabled:border-white/10 dark:disabled:bg-white/10 dark:disabled:text-slate-400 md:max-w-md"
+              className="group relative min-h-[4.75rem] w-full overflow-hidden rounded-lg border border-cyan-300/35 bg-[linear-gradient(135deg,#020617,#0e7490_55%,#10b981)] px-4 text-sm font-semibold text-white shadow-xl shadow-cyan-950/20 transition-all duration-200 hover:-translate-y-0.5 hover:border-cyan-200/70 hover:shadow-cyan-950/30 disabled:translate-y-0 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-none disabled:bg-slate-200 disabled:text-slate-500 disabled:shadow-none dark:border-cyan-300/35 dark:shadow-black/25 dark:disabled:border-white/10 dark:disabled:bg-white/10 dark:disabled:text-slate-400 sm:px-5 md:max-w-[26rem]"
               onClick={openBox}
               disabled={!canOpen}
             >
               <span className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(255,255,255,.22),transparent_34%),linear-gradient(90deg,transparent,rgba(255,255,255,.18),transparent)] opacity-80" />
               <span className="absolute inset-y-0 -left-1/3 w-1/3 skew-x-[-18deg] bg-white/24 blur-sm transition-transform duration-700 group-hover:translate-x-[430%]" />
-              <span className="relative flex items-center justify-center gap-3">
+              <span className="relative flex h-full items-center justify-center gap-3">
                 <span className="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-white/14 shadow-inner shadow-white/10">
                   <Gift className="h-5 w-5" />
                 </span>
-                <span className="min-w-0 text-left">
-                  <span className="block truncate">{openButtonLabel}</span>
+                <span className="min-w-0 text-center sm:text-left">
+                  <span className="block whitespace-normal leading-tight">{openButtonLabel}</span>
                   <span className="block text-xs font-medium text-cyan-50/80">
                     {opening
                       ? "Идёт прокрутка"
@@ -340,7 +340,7 @@ export function BonusBoxClient({
                 gap: `${CARD_GAP}px`,
                 transform: `translate3d(${offset}px,0,0)`,
                 transition: opening
-                  ? "transform 5.2s cubic-bezier(.12,.78,.1,1)"
+                  ? "transform 5.7s cubic-bezier(.08,.82,.07,1)"
                   : "none",
                 paddingLeft: "50%",
                 paddingRight: "50%",
