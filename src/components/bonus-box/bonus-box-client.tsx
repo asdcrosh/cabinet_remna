@@ -201,9 +201,9 @@ export function BonusBoxClient({
   }
 
   return (
-    <div className="space-y-5">
-      <section className="bonus-box-hero relative overflow-hidden rounded-lg border border-cyan-200/70 bg-white/85 p-4 shadow-xl shadow-cyan-950/5 backdrop-blur dark:border-cyan-300/15 dark:text-white dark:shadow-black/25 sm:p-5">
-        <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-cyan-300 via-emerald-300 to-blue-400" />
+    <div className="flex flex-col gap-4 sm:gap-5">
+      <section className="bonus-box-hero order-2 relative overflow-hidden rounded-lg border border-cyan-200/70 bg-white/85 p-3 shadow-sm shadow-cyan-950/5 backdrop-blur dark:border-cyan-300/15 dark:text-white dark:shadow-black/20 sm:p-4">
+        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-cyan-300 via-emerald-300 to-transparent" />
         <div className="pointer-events-none absolute -right-28 -top-28 h-64 w-64 rounded-full bg-cyan-300/20 blur-3xl dark:bg-cyan-300/10" />
         <div className="pointer-events-none absolute -bottom-36 left-1/3 h-64 w-64 rounded-full bg-emerald-300/20 blur-3xl dark:bg-emerald-300/10" />
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_78%_44%,rgba(34,211,238,.16),transparent_28%),linear-gradient(90deg,transparent,rgba(16,185,129,.08))]" />
@@ -240,13 +240,7 @@ export function BonusBoxClient({
                 {data.attemptsCount} открытий
               </span>
             </div>
-            <h2 className="mt-5 max-w-3xl text-3xl font-semibold tracking-tight text-slate-950 dark:text-white sm:text-4xl">
-              Откройте кейс с бонусами
-            </h2>
-            <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-300 sm:text-base">
-              Рулетка выбирает дни подписки, трафик, промокоды и дополнительные открытия. Чем выше редкость подарка, тем заметнее финальный эффект.
-            </p>
-            <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="mt-3 grid gap-2 sm:grid-cols-3">
               <TopMetric
                 icon={<Gift className="h-4 w-4" />}
                 label="Открытий"
@@ -265,30 +259,6 @@ export function BonusBoxClient({
                 value={data.openings.length}
                 hint="результатов"
               />
-              <button
-                type="button"
-                className="bonus-box-open-button group relative min-h-[94px] w-full overflow-hidden rounded-lg border border-cyan-300/35 px-4 text-sm font-semibold text-white shadow-xl shadow-cyan-950/20 transition-all duration-200 hover:-translate-y-0.5 hover:border-cyan-200/70 hover:shadow-cyan-950/30 disabled:translate-y-0 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-500 disabled:shadow-none dark:border-cyan-300/35 dark:shadow-black/25 dark:disabled:border-white/10 dark:disabled:bg-white/10 dark:disabled:text-slate-400"
-                onClick={openBox}
-                disabled={!canOpen}
-              >
-                <span className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(255,255,255,.22),transparent_34%),linear-gradient(90deg,transparent,rgba(255,255,255,.18),transparent)] opacity-80" />
-                <span className="absolute inset-y-0 -left-1/3 w-1/3 skew-x-[-18deg] bg-white/24 blur-sm transition-transform duration-700 group-hover:translate-x-[430%]" />
-                <span className="relative flex h-full items-center gap-3 text-left">
-                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-md bg-white/14 shadow-inner shadow-white/10">
-                    <Gift className="h-5 w-5" />
-                  </span>
-                  <span className="min-w-0">
-                    <span className="block leading-tight">{openButtonLabel}</span>
-                    <span className="mt-1 block text-xs font-medium text-cyan-50/80">
-                      {opening
-                        ? "Идёт прокрутка"
-                        : data.attemptsCount > 0
-                          ? `${data.attemptsCount} попыток доступно`
-                          : "Попыток пока нет"}
-                    </span>
-                  </span>
-                </span>
-              </button>
             </div>
             {!data.hasActiveSubscription && data.attemptsCount > 0 && !canUseWelcomeAttempts && (
               <div className="mt-4 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
@@ -308,7 +278,7 @@ export function BonusBoxClient({
 
       <section
         className={cn(
-          "bonus-box-stage overflow-hidden rounded-lg border border-slate-900 bg-slate-950 shadow-xl shadow-slate-950/20 dark:border-white/10",
+          "bonus-box-stage order-1 overflow-hidden rounded-lg border border-slate-900 bg-slate-950 shadow-xl shadow-slate-950/20 dark:border-white/10",
           opening && "bonus-box-stage--opening",
           revealEffect && "bonus-box-stage--reveal",
           revealEffect && result?.prize.type !== "NO_PRIZE" && "bonus-box-stage--win",
@@ -316,7 +286,7 @@ export function BonusBoxClient({
           revealEffect && revealClass,
         )}
       >
-        <div className="bonus-box-stage-header flex flex-wrap items-center justify-between gap-3 border-b border-white/10 px-4 py-3 sm:px-5">
+        <div className="bonus-box-stage-header flex flex-col gap-3 border-b border-white/10 px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
           <div>
             <h2 className="font-semibold text-white">Рулетка подарков</h2>
             <p className="mt-0.5 text-sm text-slate-400">
@@ -327,14 +297,26 @@ export function BonusBoxClient({
                   : "Запустите кейс, подарок остановится в подсвеченной зоне."}
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:min-w-64 sm:flex-row sm:items-center sm:justify-end">
             <span className="rounded-full border border-white/10 bg-white/10 px-3 py-1.5 text-xs font-medium text-slate-200">
               {opening ? "Открывается" : `${data.attemptsCount} доступно`}
             </span>
+            <button
+              type="button"
+              className="bonus-box-open-button group relative min-h-11 overflow-hidden rounded-lg border border-cyan-300/35 px-4 text-sm font-semibold text-white shadow-lg shadow-cyan-950/20 transition-all duration-200 hover:-translate-y-0.5 hover:border-cyan-200/70 disabled:translate-y-0 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/10 disabled:text-slate-400 disabled:shadow-none sm:min-w-44"
+              onClick={openBox}
+              disabled={!canOpen}
+            >
+              <span className="absolute inset-y-0 -left-1/3 w-1/3 skew-x-[-18deg] bg-white/24 blur-sm transition-transform duration-700 group-hover:translate-x-[430%]" />
+              <span className="relative flex items-center justify-center gap-2">
+                <Gift className="h-4 w-4" />
+                <span>{opening ? "Крутим..." : "Открыть кейс"}</span>
+              </span>
+            </button>
           </div>
         </div>
 
-        <div className="bonus-box-reel-shell relative overflow-hidden py-4 sm:py-5">
+        <div className="bonus-box-reel-shell relative overflow-hidden py-3 sm:py-5">
           <BonusBoxOpeningEffects />
           <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-12 bg-gradient-to-r from-slate-950 via-slate-950/80 to-transparent sm:w-32" />
           <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-12 bg-gradient-to-l from-slate-950 via-slate-950/80 to-transparent sm:w-32" />

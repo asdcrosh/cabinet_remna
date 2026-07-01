@@ -160,7 +160,7 @@ export function PlanCard({
   return (
     <div
       className={cn(
-        "card group relative flex h-full min-h-[390px] flex-col overflow-hidden p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-cyan-200/80 hover:shadow-xl sm:p-5",
+        "card group relative flex h-full min-h-0 flex-col overflow-hidden p-3 transition-all duration-200 hover:-translate-y-0.5 hover:border-cyan-200/80 hover:shadow-xl sm:min-h-[390px] sm:p-5",
         popular &&
           "border-slate-950 ring-2 ring-slate-950/10 dark:border-white dark:ring-white/15",
         current && "bg-cyan-50/70 dark:bg-cyan-500/10",
@@ -171,10 +171,10 @@ export function PlanCard({
       )}
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 pr-2">
-          <h3 className="break-words text-lg font-semibold leading-tight tracking-tight sm:text-xl">
+          <h3 className="break-words text-base font-semibold leading-tight tracking-tight sm:text-xl">
             {name}
           </h3>
-          <div className="mt-1.5 text-sm text-slate-500 dark:text-slate-400">
+          <div className="mt-1 text-xs text-slate-500 dark:text-slate-400 sm:mt-1.5 sm:text-sm">
             {durationDays} дней доступа
           </div>
           {current && (
@@ -198,31 +198,31 @@ export function PlanCard({
         )}
       </div>
       {description && (
-        <p className="mt-3 line-clamp-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
+        <p className="mt-2 line-clamp-1 text-xs leading-5 text-slate-500 dark:text-slate-400 sm:mt-3 sm:line-clamp-2 sm:text-sm sm:leading-6">
           {description}
         </p>
       )}
-      <div className="mt-4 rounded-lg border border-slate-100 bg-slate-50/70 p-3 dark:border-white/10 dark:bg-white/[0.035]">
+      <div className="mt-3 rounded-lg border border-slate-100 bg-slate-50/70 p-2.5 dark:border-white/10 dark:bg-white/[0.035] sm:mt-4 sm:p-3">
         <div className="flex flex-wrap items-baseline gap-2">
-          <div className="whitespace-nowrap text-2xl font-semibold tracking-tight sm:text-3xl">
+          <div className="whitespace-nowrap text-xl font-semibold tracking-tight sm:text-3xl">
             {effectivePrice}
           </div>
           {appliedPromo && (
             <div className="text-sm text-slate-400 line-through">{price}</div>
           )}
         </div>
-        <div className="text-sm text-slate-500 dark:text-slate-400">
+        <div className="text-xs text-slate-500 dark:text-slate-400 sm:text-sm">
           {isPromo ? "один раз на аккаунт" : "оплата онлайн"}
         </div>
       </div>
-      <ul className="mt-4 min-h-[104px] space-y-2 text-sm text-slate-600 dark:text-slate-300">
+      <ul className="mt-3 space-y-1.5 text-xs text-slate-600 dark:text-slate-300 sm:mt-4 sm:min-h-[104px] sm:space-y-2 sm:text-sm">
         <Feature strong>
           {trafficLimitGb == null
             ? "Безлимитный трафик"
             : `${trafficLimitGb} ГБ трафика`}
         </Feature>
-        <Feature>Доступ сразу после оплаты</Feature>
-        <Feature>QR и ссылка подписки</Feature>
+        <Feature className="hidden sm:flex">Доступ сразу после оплаты</Feature>
+        <Feature className="hidden sm:flex">QR и ссылка подписки</Feature>
         <Feature>До {deviceLimit} устройств</Feature>
       </ul>
       {!isPromo && (promoOpen || appliedPromo) ? (
@@ -317,7 +317,7 @@ export function PlanCard({
       <button
         onClick={buy}
         disabled={loading}
-        className="btn-primary mt-5 w-full min-h-11"
+        className="btn-primary mt-4 w-full min-h-10 sm:mt-5 sm:min-h-11"
       >
         <CreditCard className="h-4 w-4" />
         {loading
@@ -337,12 +337,14 @@ export function PlanCard({
 function Feature({
   children,
   strong = false,
+  className,
 }: {
   children: React.ReactNode;
   strong?: boolean;
+  className?: string;
 }) {
   return (
-    <li className="flex items-start gap-3">
+    <li className={cn("flex items-start gap-2 sm:gap-3", className)}>
       <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />
       <span
         className={

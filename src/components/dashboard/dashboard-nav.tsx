@@ -48,8 +48,8 @@ const bottomNav = [
   { href: '/dashboard', label: 'Главная', icon: Home, exact: true },
   { href: '/dashboard/subscription', label: 'Подписка', icon: KeyRound },
   { href: '/dashboard/plans', label: 'Тарифы', icon: ShieldCheck },
+  { href: '/dashboard/bonus-box', label: 'Бонусы', icon: Gift },
   { href: '/dashboard/support', label: 'Поддержка', icon: MessageCircleQuestion },
-  { href: '/dashboard/settings', label: 'Ещё', icon: Menu },
 ]
 
 const NAV_BADGES_REFRESH_MS = 15_000

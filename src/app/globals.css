@@ -78,6 +78,9 @@
   .page-stack {
     @apply space-y-5 sm:space-y-6;
   }
+  .page-transition {
+    animation: page-soft-enter 180ms ease-out both;
+  }
   .section-heading {
     @apply flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between;
   }
@@ -900,6 +903,19 @@
   }
 }
 
+@keyframes page-soft-enter {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+    filter: saturate(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: saturate(1);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .traffic-chart-moving-dot {
     animation: none !important;
@@ -925,5 +941,8 @@
   }
   .bonus-box-fx-layer {
     display: none;
+  }
+  .page-transition {
+    animation: none !important;
   }
 }
