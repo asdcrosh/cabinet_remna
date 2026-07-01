@@ -221,10 +221,10 @@
   .bonus-box-portal {
     pointer-events: none;
     position: absolute;
-    inset-block: 1.75rem;
+    inset-block: 3.5rem;
     left: 50%;
     z-index: 32;
-    width: min(12rem, 42vw);
+    width: 184px;
     transform: translateX(-50%);
   }
   .bonus-box-portal::before {
@@ -234,8 +234,8 @@
     border-radius: 0.35rem;
     border: 2px solid rgba(165, 243, 252, 0.82);
     background:
-      linear-gradient(90deg, rgba(103, 232, 249, 0.18), transparent 18%, transparent 82%, rgba(103, 232, 249, 0.18)),
-      linear-gradient(180deg, rgba(255, 255, 255, 0.16), transparent 24%, transparent 76%, rgba(255, 255, 255, 0.16));
+      linear-gradient(90deg, rgba(103, 232, 249, 0.12), transparent 16%, transparent 84%, rgba(103, 232, 249, 0.12)),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.10), transparent 22%, transparent 78%, rgba(255, 255, 255, 0.10));
     box-shadow:
       0 0 0 1px rgba(255, 255, 255, 0.14) inset,
       0 0 28px rgba(103, 232, 249, 0.52),
@@ -265,13 +265,13 @@
   }
   .bonus-box-portal-core {
     position: absolute;
-    inset: 0.45rem;
+    inset: 0;
     border-radius: 0.2rem;
     background:
-      linear-gradient(90deg, transparent, rgba(103, 232, 249, 0.30), transparent),
-      linear-gradient(180deg, rgba(255, 255, 255, 0.14), transparent 35%, transparent 65%, rgba(255, 255, 255, 0.14));
+      linear-gradient(90deg, transparent 0 43%, rgba(103, 232, 249, 0.18) 50%, transparent 57%),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.08), transparent 20%, transparent 80%, rgba(255, 255, 255, 0.08));
     mix-blend-mode: screen;
-    opacity: 0.72;
+    opacity: 0.36;
   }
   .bonus-box-stage--opening .bonus-box-portal-core {
     animation: bonus-box-portal-core 980ms ease-in-out infinite;
