@@ -166,7 +166,8 @@ export function BonusBoxClient({
 
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
-          const target = response.winningIndex * STEP + CARD_WIDTH / 2;
+          const stopRatio = Math.min(0.72, Math.max(0.28, response.stopOffsetRatio));
+          const target = response.winningIndex * STEP + CARD_WIDTH * stopRatio;
           setOffset(-target);
         });
       });
