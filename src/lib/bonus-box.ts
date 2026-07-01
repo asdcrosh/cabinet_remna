@@ -3,6 +3,7 @@ import { Prisma, type BonusBoxPrize, type BonusBoxPrizeType, type BonusBoxRarity
 import { prisma } from './prisma'
 import { remnawave } from './remnawave'
 import { gbToBytes } from './format'
+import { cleanupExpiredBonusBoxPromoCodes } from './promo-code-cleanup'
 
 const DEFAULT_RUB_PER_ATTEMPT = 300
 const DEFAULT_ATTEMPT_TTL_DAYS = 30
@@ -100,7 +101,10 @@ export function getBonusBoxConfig() {
 }
 
 export async function getBonusBoxOverview(userId: string) {
-  await grantWeeklyBonusBoxAttempts(userId)
+  await Promise.all([
+    grantWeeklyBonusBoxAttempts(userId),
+    cleanupExpiredBonusBoxPromoCodes(),
+  ])
 
   const now = new Date()
   const config = getBonusBoxConfig()

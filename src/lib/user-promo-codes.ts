@@ -1,6 +1,7 @@
 import type { Plan } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { validatePromoCodeForPlan } from '@/lib/promo-codes'
+import { cleanupExpiredBonusBoxPromoCodes } from '@/lib/promo-code-cleanup'
 
 export type AvailableUserPromoCode = {
   code: string
@@ -17,6 +18,7 @@ export async function getAvailableUserPromoCodesByPlan({
   userId: string
   plans: Array<Pick<Plan, 'id' | 'priceKopecks' | 'isPromo'>>
 }) {
+  await cleanupExpiredBonusBoxPromoCodes()
   const awardedCodes = await getAwardedPromoCodes(userId)
   const result = new Map<string, AvailableUserPromoCode[]>()
 

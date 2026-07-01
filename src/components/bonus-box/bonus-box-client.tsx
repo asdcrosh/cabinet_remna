@@ -438,7 +438,7 @@ export function BonusBoxClient({
                 {Math.round(totalChance * 100)}%
               </div>
             </div>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            <div className="grid grid-cols-[repeat(auto-fit,minmax(15rem,1fr))] gap-2.5">
               {data.prizes.map((prize) => (
                 <OutcomeRow key={prize.id} prize={prize} />
               ))}
@@ -574,47 +574,47 @@ function OutcomeRow({ prize }: { prize: BonusBoxPrizeView }) {
   return (
     <article
       className={cn(
-        "relative overflow-hidden rounded-lg border bg-white p-3 shadow-sm shadow-slate-200/60 dark:bg-surface-900 dark:shadow-black/20",
+        "relative min-h-[5.5rem] overflow-hidden rounded-lg border bg-white/80 p-2.5 shadow-sm shadow-slate-200/50 transition-colors hover:bg-white dark:bg-white/[0.035] dark:shadow-black/10 dark:hover:bg-white/[0.055]",
         prizeBorderClass(prize),
       )}
     >
       <div
-        className={cn("absolute inset-x-0 top-0 h-1", prizeTopClass(prize))}
+        className={cn("absolute inset-y-0 left-0 w-1", prizeTopClass(prize))}
       />
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <h3 className="truncate font-semibold">{prize.title}</h3>
+      <div className="flex h-full items-start justify-between gap-3 pl-1.5">
+        <div className="min-w-0 flex-1">
+          <div className="flex min-w-0 items-center gap-2">
+            <h3 className="truncate text-sm font-semibold leading-tight text-slate-950 dark:text-white">{prize.title}</h3>
             <span
               className={cn(
-                "rounded-full px-2 py-1 text-[11px] font-semibold",
+                "shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold",
                 rarityClass(prize.rarity),
               )}
             >
               {rarityLabel(prize.rarity)}
             </span>
           </div>
-          <div className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+          <div className="mt-1 truncate text-xs text-slate-500 dark:text-slate-400">
             {prize.description || prizeLabel(prize)}
           </div>
+          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-white/10">
+            <div
+              className={cn("h-full rounded-full", prizeTopClass(prize))}
+              style={{
+                width:
+                  chancePercent <= 0
+                    ? "0%"
+                    : `${Math.max(2, Math.min(100, chancePercent))}%`,
+              }}
+            />
+          </div>
         </div>
-        <div className="shrink-0 text-right">
-          <div className="text-base font-semibold">
+        <div className="shrink-0 rounded-lg bg-slate-50 px-2 py-1.5 text-right dark:bg-white/5">
+          <div className="text-sm font-semibold leading-none text-slate-950 dark:text-white">
             {chancePercent.toFixed(1)}%
           </div>
-          <div className="text-xs text-slate-400">шанс</div>
+          <div className="mt-0.5 text-[10px] text-slate-400">шанс</div>
         </div>
-      </div>
-      <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-white/10">
-        <div
-          className={cn("h-full rounded-full", prizeTopClass(prize))}
-          style={{
-            width:
-              chancePercent <= 0
-                ? "0%"
-                : `${Math.max(2, Math.min(100, chancePercent))}%`,
-          }}
-        />
       </div>
     </article>
   );

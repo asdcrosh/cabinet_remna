@@ -72,6 +72,7 @@ export function PromoCodesAdmin({
   const [loading, setLoading] = useState(false)
   const [editorOpen, setEditorOpen] = useState(false)
   const [tab, setTab] = useState<'AVAILABLE' | 'USED' | 'ARCHIVE'>('AVAILABLE')
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
 
   const editingPromo = useMemo(
     () => promoCodes.find((promoCode) => promoCode.id === editingId) ?? null,
@@ -131,6 +132,27 @@ export function PromoCodesAdmin({
     }
   }
 
+  async function deleteSelectedPromoCodes() {
+    const selectedCodes = promoCodes.filter((promoCode) => selectedIds.includes(promoCode.id))
+    if (selectedCodes.length === 0) return
+    if (!window.confirm(`Удалить выбранные промокоды (${selectedCodes.length})? История оплат сохранится без привязки к этим кодам.`)) return
+
+    setLoading(true)
+    try {
+      const result = await apiFetch<{ deleted: number }>('/api/admin/promo-codes', {
+        method: 'DELETE',
+        body: JSON.stringify({ ids: selectedIds }),
+      })
+      toast(`Удалено промокодов: ${result.deleted}`, 'success')
+      setSelectedIds([])
+      router.refresh()
+    } catch {
+      // apiFetch уже покажет toast
+    } finally {
+      setLoading(false)
+    }
+  }
+
   function startEdit(promoCode: PromoCodeAdminRow) {
     setEditingId(promoCode.id)
     setForm({
@@ -170,10 +192,33 @@ export function PromoCodesAdmin({
   }
 
   const filteredPromoCodes = promoCodes.filter((promoCode) => promoStatus(promoCode) === tab)
+  const filteredIds = filteredPromoCodes.map((promoCode) => promoCode.id)
+  const selectedInTab = filteredIds.filter((id) => selectedIds.includes(id))
+  const allInTabSelected = filteredIds.length > 0 && selectedInTab.length === filteredIds.length
   const counts = promoCodes.reduce((result, promoCode) => {
     result[promoStatus(promoCode)] += 1
     return result
   }, { AVAILABLE: 0, USED: 0, ARCHIVE: 0 })
+
+  function toggleSelected(id: string) {
+    setSelectedIds((current) =>
+      current.includes(id)
+        ? current.filter((item) => item !== id)
+        : [...current, id]
+    )
+  }
+
+  function toggleSelectedInTab() {
+    setSelectedIds((current) => {
+      const currentSet = new Set(current)
+      if (allInTabSelected) {
+        filteredIds.forEach((id) => currentSet.delete(id))
+      } else {
+        filteredIds.forEach((id) => currentSet.add(id))
+      }
+      return Array.from(currentSet)
+    })
+  }
 
   return (
     <div className="space-y-4">
@@ -210,6 +255,32 @@ export function PromoCodesAdmin({
             </span>
           </button>
         ))}
+      </div>
+
+      <div className="flex flex-col gap-3 rounded-lg border bg-white p-3 dark:bg-surface-900 sm:flex-row sm:items-center sm:justify-between">
+        <label className="flex min-h-10 items-center gap-3 text-sm font-medium text-slate-600 dark:text-slate-300">
+          <input
+            type="checkbox"
+            checked={allInTabSelected}
+            onChange={toggleSelectedInTab}
+            disabled={filteredIds.length === 0}
+          />
+          Выбрать в текущем разделе
+          {selectedIds.length > 0 && (
+            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500 dark:bg-white/10">
+              выбрано {selectedIds.length}
+            </span>
+          )}
+        </label>
+        <button
+          type="button"
+          className="btn-secondary text-red-600 hover:border-red-200 hover:bg-red-50 hover:text-red-700 dark:text-red-300 dark:hover:border-red-500/30 dark:hover:bg-red-500/10"
+          onClick={() => void deleteSelectedPromoCodes()}
+          disabled={selectedIds.length === 0 || loading}
+        >
+          <Trash2 className="h-4 w-4" />
+          Удалить выбранные
+        </button>
       </div>
 
       <AdminModal
@@ -361,7 +432,15 @@ export function PromoCodesAdmin({
 
       <div className="overflow-hidden rounded-lg border bg-white dark:bg-surface-900">
         {filteredPromoCodes.map((promoCode) => (
-          <article key={promoCode.id} className="grid gap-4 border-b p-4 last:border-b-0 lg:grid-cols-[minmax(12rem,.8fr)_minmax(16rem,1fr)_minmax(16rem,1fr)_auto] lg:items-center">
+          <article key={promoCode.id} className="grid gap-4 border-b p-4 last:border-b-0 lg:grid-cols-[auto_minmax(12rem,.8fr)_minmax(16rem,1fr)_minmax(16rem,1fr)_auto] lg:items-center">
+            <label className="flex items-center gap-2 text-sm text-slate-500">
+              <input
+                type="checkbox"
+                checked={selectedIds.includes(promoCode.id)}
+                onChange={() => toggleSelected(promoCode.id)}
+                aria-label={`Выбрать промокод ${promoCode.code}`}
+              />
+            </label>
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <div className="truncate font-mono text-base font-semibold">{promoCode.code}</div>

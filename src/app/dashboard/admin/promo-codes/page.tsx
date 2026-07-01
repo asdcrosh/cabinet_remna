@@ -4,6 +4,7 @@ import { PageHeader } from '@/components/dashboard/page-header'
 import { PromoCodesAdmin, type PromoCodeAdminRow } from '@/components/admin/promo-codes-admin'
 import { LazyListLoader } from '@/components/admin/lazy-list-loader'
 import { ADMIN_LIST_PAGE_SIZE, parseAdminListLimit } from '@/lib/admin-list'
+import { cleanupExpiredBonusBoxPromoCodes } from '@/lib/promo-code-cleanup'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Промокоды — Админка' }
@@ -14,6 +15,7 @@ export default async function AdminPromoCodesPage({
   searchParams?: { limit?: string }
 }) {
   await requireAdminPage()
+  await cleanupExpiredBonusBoxPromoCodes()
   const limit = parseAdminListLimit(searchParams?.limit)
 
   const [total, promoCodes, plans] = await Promise.all([
