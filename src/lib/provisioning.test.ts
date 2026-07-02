@@ -17,6 +17,8 @@ const mocks = vi.hoisted(() => {
   const applyPendingReferralRewardsForUser = vi.fn()
   const grantPaymentBonusBoxAttempts = vi.fn()
   const grantReferralBonusBoxAttemptsForPayment = vi.fn()
+  const recordEarlyRenewalMissionForPayment = vi.fn()
+  const grantBundleRewardForPayment = vi.fn()
   const notifyPaymentSucceeded = vi.fn()
   const syncCabinetPaymentToRemnashopBestEffort = vi.fn()
 
@@ -27,6 +29,8 @@ const mocks = vi.hoisted(() => {
     applyPendingReferralRewardsForUser,
     grantPaymentBonusBoxAttempts,
     grantReferralBonusBoxAttemptsForPayment,
+    recordEarlyRenewalMissionForPayment,
+    grantBundleRewardForPayment,
     notifyPaymentSucceeded,
     syncCabinetPaymentToRemnashopBestEffort,
     subscription,
@@ -44,6 +48,12 @@ vi.mock('./referral-rewards', () => ({
 vi.mock('./bonus-box', () => ({
   grantPaymentBonusBoxAttempts: mocks.grantPaymentBonusBoxAttempts,
   grantReferralBonusBoxAttemptsForPayment: mocks.grantReferralBonusBoxAttemptsForPayment,
+}))
+vi.mock('./missions', () => ({
+  recordEarlyRenewalMissionForPayment: mocks.recordEarlyRenewalMissionForPayment,
+}))
+vi.mock('./engagement-bundles', () => ({
+  grantBundleRewardForPayment: mocks.grantBundleRewardForPayment,
 }))
 vi.mock('./notifications', () => ({
   notifyPaymentSucceeded: mocks.notifyPaymentSucceeded,
@@ -100,6 +110,15 @@ describe('provisionPaymentSubscription', () => {
     )
     expect(mocks.ensureRemnawaveSubscription).not.toHaveBeenCalled()
     expect(mocks.grantPaymentBonusBoxAttempts).toHaveBeenCalledWith('pay-1')
+    expect(mocks.recordEarlyRenewalMissionForPayment).toHaveBeenCalledWith({
+      paymentId: 'pay-1',
+      userId: 'user-1',
+      hadActiveSubscriptionBefore: false,
+    })
+    expect(mocks.grantBundleRewardForPayment).toHaveBeenCalledWith({
+      paymentId: 'pay-1',
+      hadActiveSubscriptionBefore: false,
+    })
     expect(mocks.grantReferralRewardForPayment).toHaveBeenCalledWith('pay-1')
     expect(mocks.grantReferralBonusBoxAttemptsForPayment).toHaveBeenCalledWith('pay-1')
     expect(mocks.applyPendingReferralRewardsForUser).toHaveBeenCalledWith('user-1')
@@ -119,6 +138,7 @@ describe('provisionPaymentSubscription', () => {
       remnawaveUser: null,
       isNew: true,
       idempotent: false,
+      hadActiveSubscriptionBefore: true,
     })
 
     const result = await provisionPaymentSubscription(input)
@@ -135,6 +155,15 @@ describe('provisionPaymentSubscription', () => {
       data: expect.objectContaining({ status: 'SUCCEEDED', lastError: null }),
     })
     expect(mocks.grantPaymentBonusBoxAttempts).toHaveBeenCalledWith('pay-1')
+    expect(mocks.recordEarlyRenewalMissionForPayment).toHaveBeenCalledWith({
+      paymentId: 'pay-1',
+      userId: 'user-1',
+      hadActiveSubscriptionBefore: true,
+    })
+    expect(mocks.grantBundleRewardForPayment).toHaveBeenCalledWith({
+      paymentId: 'pay-1',
+      hadActiveSubscriptionBefore: true,
+    })
     expect(mocks.grantReferralRewardForPayment).toHaveBeenCalledWith('pay-1')
     expect(mocks.grantReferralBonusBoxAttemptsForPayment).toHaveBeenCalledWith('pay-1')
     expect(mocks.applyPendingReferralRewardsForUser).toHaveBeenCalledWith('user-1')

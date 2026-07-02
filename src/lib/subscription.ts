@@ -138,6 +138,11 @@ export async function ensureRemnawaveSubscription(input: EnsureSubscriptionInput
     'lifetimeTrafficUsedBytes',
   ])
   const latestSubscription = user.subscriptions[0]
+  const hadActiveSubscriptionBefore = Boolean(
+    latestSubscription &&
+    (latestSubscription.status === 'ACTIVE' || latestSubscription.status === 'LIMITED') &&
+    latestSubscription.expireAt.getTime() > Date.now()
+  )
   const isPlanSwitch = Boolean(latestSubscription && latestSubscription.planId !== input.plan.id)
   const subscription = await prisma.$transaction(async (tx) => {
     const row = latestSubscription
@@ -184,7 +189,7 @@ export async function ensureRemnawaveSubscription(input: EnsureSubscriptionInput
     return row
   })
 
-  return { remnawaveUser, subscription, isNew, idempotent: false }
+  return { remnawaveUser, subscription, isNew, idempotent: false, hadActiveSubscriptionBefore }
 }
 
 /**

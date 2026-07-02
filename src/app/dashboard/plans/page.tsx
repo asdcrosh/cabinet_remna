@@ -10,17 +10,19 @@ import { getCurrentUser } from '@/lib/auth/cookies'
 import { CreditCard, KeyRound, ShieldCheck } from 'lucide-react'
 import { getPlanAudienceContext, isPlanAvailableForUser } from '@/lib/plan-access'
 import { getAvailableUserPromoCodesByPlan } from '@/lib/user-promo-codes'
+import { getVisibleEngagementBundles } from '@/lib/engagement-bundles'
 
 export const revalidate = 300 // кэш на 5 минут
 
 export default async function PlansPage({
   searchParams,
 }: {
-  searchParams?: { plan?: string; promo?: string }
+  searchParams?: { plan?: string; promo?: string; bundle?: string }
 }) {
   const session = await getCurrentUser()
   const linkedPlanId = searchParams?.plan?.trim()
   const initialPromoCode = searchParams?.promo?.trim()
+  const selectedBundleKey = searchParams?.bundle?.trim()
   const plans = await prisma.plan.findMany({
     where: { isActive: true },
     orderBy: { sortOrder: 'asc' },
@@ -79,6 +81,13 @@ export default async function PlansPage({
   const availablePromoCodesByPlan = session
     ? await getAvailableUserPromoCodesByPlan({ userId: session.uid, plans: visiblePlans, linkPromoCode: initialPromoCode })
     : new Map()
+  const bundles = session
+    ? await getVisibleEngagementBundles({ userId: session.uid, placement: 'PLANS' })
+    : []
+  const selectedBundle = selectedBundleKey
+    ? bundles.find((bundle) => bundle.key === selectedBundleKey) ?? null
+    : bundles[0] ?? null
+  const bundlePromoCode = selectedBundle?.promoCode?.code
   const hasPromoPlan = audiencePlans.some((plan) => plan.isPromo)
   const isOtherwiseEligibleForPromo =
     !usedTrialPlanIds.size &&
@@ -132,6 +141,33 @@ export default async function PlansPage({
         </div>
       )}
 
+      {bundles.length > 0 && (
+        <section className="rounded-lg border border-cyan-200 bg-cyan-50/80 p-3 dark:border-cyan-400/20 dark:bg-cyan-400/10 sm:p-4">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="min-w-0">
+              <div className="text-xs font-semibold uppercase tracking-[0.14em] text-cyan-700 dark:text-cyan-200">Персональные bundles</div>
+              <h2 className="mt-1 text-lg font-semibold text-slate-950 dark:text-white">
+                {selectedBundle?.title ?? 'Доступны бонусы к оплате'}
+              </h2>
+              <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+                {selectedBundle?.description ?? 'Выберите bundle и оплатите подходящий тариф.'}
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {bundles.map((bundle) => (
+                <Link
+                  key={bundle.key}
+                  href={`/dashboard/plans?bundle=${bundle.key}${bundle.promoCode ? `&promo=${bundle.promoCode.code}` : ''}`}
+                  className={bundle.key === selectedBundle?.key ? 'btn-primary min-h-10 px-3 text-sm' : 'btn-secondary min-h-10 px-3 text-sm'}
+                >
+                  {bundle.cta}
+                </Link>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
       <div className="grid auto-rows-fr grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:gap-4">
         {visiblePlans.length === 0 && (
           <div className="card col-span-full py-12 text-center">
@@ -160,7 +196,8 @@ export default async function PlansPage({
             isPromo={p.isPromo}
             popular={index === 1}
             current={currentSubscription?.planId === p.id}
-            initialPromoCode={initialPromoCode}
+            initialPromoCode={initialPromoCode || bundlePromoCode}
+            bundleKey={selectedBundle?.key}
             availablePromoCodes={availablePromoCodesByPlan.get(p.id) ?? []}
           />
         ))}

@@ -42,7 +42,7 @@ export type BonusBoxOpeningAdminRow = {
   createdAt: string
   userEmail: string
   userName: string | null
-  attemptSource: 'PAYMENT' | 'WEEKLY' | 'REFERRAL' | 'MANUAL' | 'PRIZE'
+  attemptSource: 'PAYMENT' | 'WEEKLY' | 'REFERRAL' | 'MANUAL' | 'PRIZE' | 'MISSION' | 'BUNDLE' | 'SEASONAL_EVENT' | 'AUTOFUNNEL'
   prizeTitle: string
   prizeType: PrizeType
   prizeValue: number
@@ -881,6 +881,10 @@ function sourceLabel(source: BonusBoxOpeningAdminRow['attemptSource']) {
   if (source === 'WEEKLY') return 'Еженедельный бонус'
   if (source === 'REFERRAL') return 'Реферал'
   if (source === 'PRIZE') return 'Подарок из бокса'
+  if (source === 'MISSION') return 'Миссия'
+  if (source === 'BUNDLE') return 'Bundle'
+  if (source === 'SEASONAL_EVENT') return 'Сезонное событие'
+  if (source === 'AUTOFUNNEL') return 'Автоворонка'
   return 'Админ'
 }
 

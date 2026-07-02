@@ -20,6 +20,7 @@ interface PlanCardProps {
   popular?: boolean;
   current?: boolean;
   initialPromoCode?: string;
+  bundleKey?: string | null;
   availablePromoCodes?: Array<{
     code: string;
     discountPercent: number;
@@ -42,6 +43,7 @@ export function PlanCard({
   popular,
   current,
   initialPromoCode,
+  bundleKey,
   availablePromoCodes = [],
 }: PlanCardProps) {
   const [loading, setLoading] = useState(false);
@@ -140,6 +142,7 @@ export function PlanCard({
         body: JSON.stringify({
           planId: id,
           ...(appliedPromo ? { promoCode: appliedPromo.code } : {}),
+          ...(bundleKey ? { bundleKey } : {}),
         }),
       });
       if (confirmationUrl) {

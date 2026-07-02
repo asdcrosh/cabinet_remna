@@ -14,6 +14,7 @@ import { provisionPaymentSubscription } from '@/lib/provisioning'
 import { getPlanAudienceContext, isPlanAvailableForUser } from '@/lib/plan-access'
 import { reconcileStalePendingPaymentsForUser } from '@/lib/payment-sync'
 import { logError } from '@/lib/logger'
+import { EngagementBundleError, getPaymentBundleForPlan, toBundleSnapshot } from '@/lib/engagement-bundles'
 
 export const runtime = 'nodejs'
 
@@ -40,7 +41,7 @@ export const POST = withAuth(async (req: Request) => {
       { status: 400 }
     )
   }
-  const { planId, promoCode } = parsed.data
+  const { planId, promoCode, bundleKey } = parsed.data
 
   const plan = await prisma.plan.findUnique({ where: { id: planId } })
   if (!plan || !plan.isActive) {
@@ -58,6 +59,16 @@ export const POST = withAuth(async (req: Request) => {
       { error: 'Бесплатный тариф должен быть настроен как ознакомительный.' },
       { status: 400 }
     )
+  }
+
+  let engagementBundle: Awaited<ReturnType<typeof getPaymentBundleForPlan>> = null
+  try {
+    engagementBundle = await getPaymentBundleForPlan({ userId: user.id, bundleKey, plan })
+  } catch (error) {
+    if (error instanceof EngagementBundleError) {
+      return NextResponse.json({ error: error.message, code: error.code }, { status: error.status })
+    }
+    throw error
   }
 
   if (plan.isPromo) {
@@ -143,10 +154,11 @@ export const POST = withAuth(async (req: Request) => {
   try {
     const result = await prisma.$transaction(
       async (tx) => {
-        const discount = promoCode
+        const effectivePromoCode = promoCode || engagementBundle?.promoCode?.code
+        const discount = effectivePromoCode
           ? await validatePromoCodeForPlan({
               prisma: tx,
-              code: promoCode,
+              code: effectivePromoCode,
               userId: user.id,
               plan,
             })
@@ -157,6 +169,7 @@ export const POST = withAuth(async (req: Request) => {
             userId: user.id,
             planId: plan.id,
             promoCodeId: discount?.promoCode.id,
+            engagementBundleId: engagementBundle?.id,
             amountKopecks: discount?.finalAmountKopecks ?? plan.priceKopecks,
             originalAmountKopecks: plan.priceKopecks,
             discountPercent: discount?.discountPercent,
@@ -170,6 +183,7 @@ export const POST = withAuth(async (req: Request) => {
                   finalAmountKopecks: discount.finalAmountKopecks,
                 }
               : undefined,
+            engagementBundleSnapshot: engagementBundle ? toBundleSnapshot(engagementBundle) : undefined,
             status: 'PENDING',
           },
         })
@@ -218,6 +232,7 @@ export const POST = withAuth(async (req: Request) => {
         userId: user.id,
         planId: plan.id,
         localPaymentId: localPayment.id,
+        ...(engagementBundle ? { bundleKey: engagementBundle.key } : {}),
         ...(appliedPromo
           ? {
               promoCode: appliedPromo.normalizedCode,

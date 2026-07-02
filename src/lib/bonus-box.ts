@@ -758,7 +758,7 @@ async function syncPrizeToRemnawave(
 
 function makeAttempts(input: {
   userId: string
-  source: 'PAYMENT' | 'WEEKLY' | 'REFERRAL' | 'MANUAL' | 'PRIZE'
+  source: 'PAYMENT' | 'WEEKLY' | 'REFERRAL' | 'MANUAL' | 'PRIZE' | 'MISSION' | 'BUNDLE' | 'SEASONAL_EVENT' | 'AUTOFUNNEL'
   sourceKeyPrefix: string
   attemptsCount: number
 }) {

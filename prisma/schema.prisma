@@ -114,6 +114,10 @@ model User {
   oauthAccounts              OAuthAccount[]
   bonusBoxAttempts           BonusBoxAttempt[]
   bonusBoxOpenings           BonusBoxOpening[]
+  missionProgresses          UserMissionProgress[]
+  engagementEvents           UserEngagementEvent[]
+  autoFunnelDeliveries       AutoFunnelDelivery[]
+  seasonalBonusDeliveries    SeasonalBonusEventDelivery[]
   welcomeBonusRedemptions    WelcomeBonusRedemption[]
   auditLogsAuthored          AuditLog[]                  @relation("AuditLogActor")
   auditLogsTargeted          AuditLog[]                  @relation("AuditLogTarget")
@@ -292,6 +296,9 @@ enum NotificationType {
   TRAFFIC_LIMIT
   SUPPORT_REPLY
   BONUS_GRANTED
+  MISSION_COMPLETED
+  SEASONAL_EVENT
+  AUTOFUNNEL
   BROADCAST
 }
 
@@ -351,6 +358,130 @@ model BroadcastTemplate {
 
   @@index([createdAt])
   @@index([createdById, createdAt])
+}
+
+model EngagementBundleSetting {
+  id                  String                   @id @default(cuid())
+  key                 String                   @unique
+  scenario            EngagementBundleScenario
+  enabled             Boolean                  @default(true)
+  priority            Int                      @default(0)
+  title               String
+  description         String
+  cta                 String                   @default("Открыть")
+  href                String?
+  minPlanDurationDays Int?
+  bonusAttempts       Int                      @default(0)
+  bonusMultiplier     Int                      @default(1)
+  promoCodeId         String?
+  showOnHome          Boolean                  @default(true)
+  showOnPlans         Boolean                  @default(true)
+  showInBroadcasts    Boolean                  @default(true)
+  showAsPersonalOffer Boolean                  @default(true)
+  createdAt           DateTime                 @default(now())
+  updatedAt           DateTime                 @updatedAt
+
+  promoCode PromoCode? @relation(fields: [promoCodeId], references: [id], onDelete: SetNull)
+  payments  Payment[]
+
+  @@index([enabled, priority])
+  @@index([promoCodeId])
+}
+
+enum EngagementBundleScenario {
+  EXTEND_90_BONUS
+  COMEBACK_TODAY
+  ACTIVE_DOUBLE_REWARD
+}
+
+model SeasonalBonusEvent {
+  id                        String    @id @default(cuid())
+  key                       String    @unique
+  enabled                   Boolean   @default(true)
+  title                     String
+  description               String
+  audience                  String    @default("ALL")
+  startsAt                  DateTime?
+  endsAt                    DateTime?
+  recurringWeekday          Int?
+  notifyInApp               Boolean   @default(true)
+  notifyTelegram            Boolean   @default(true)
+  actionHref                String    @default("/dashboard/bonus-box")
+  actionLabel               String    @default("Открыть bonus box")
+  bonusAttempts             Int       @default(0)
+  promoCodeId               String?
+  notificationCooldownHours Int       @default(24)
+  createdAt                 DateTime  @default(now())
+  updatedAt                 DateTime  @updatedAt
+
+  promoCode PromoCode? @relation(fields: [promoCodeId], references: [id], onDelete: SetNull)
+  deliveries SeasonalBonusEventDelivery[]
+
+  @@index([enabled, startsAt, endsAt])
+  @@index([promoCodeId])
+}
+
+model SeasonalBonusEventDelivery {
+  id              String    @id @default(cuid())
+  eventId         String
+  userId          String
+  notifiedAt      DateTime?
+  claimedAt       DateTime?
+  attemptsGranted Int       @default(0)
+  promoCodeId     String?
+  metadata        Json?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  event     SeasonalBonusEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user      User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  promoCode PromoCode?         @relation(fields: [promoCodeId], references: [id], onDelete: SetNull)
+
+  @@unique([eventId, userId])
+  @@index([userId, notifiedAt])
+  @@index([eventId, claimedAt])
+  @@index([promoCodeId])
+}
+
+model AutoFunnelSetting {
+  id                   String   @id @default(cuid())
+  key                  String   @unique
+  enabled              Boolean  @default(false)
+  title                String
+  segment              String
+  triggerDays          Int      @default(7)
+  cooldownDays         Int      @default(14)
+  channels             String[] @default(["IN_APP", "TELEGRAM"])
+  messageTitle         String
+  messageBody          String
+  actionHref           String   @default("/dashboard")
+  actionLabel          String   @default("Открыть")
+  actionOpenInTelegram Boolean  @default(true)
+  bonusAttempts        Int      @default(0)
+  promoCodeId          String?
+  maxRecipientsPerRun  Int      @default(500)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  promoCode  PromoCode? @relation(fields: [promoCodeId], references: [id], onDelete: SetNull)
+  deliveries AutoFunnelDelivery[]
+
+  @@index([enabled, segment])
+  @@index([promoCodeId])
+}
+
+model AutoFunnelDelivery {
+  id          String   @id @default(cuid())
+  funnelId    String
+  userId      String
+  sentAt      DateTime @default(now())
+  giftGranted Boolean  @default(false)
+
+  funnel AutoFunnelSetting @relation(fields: [funnelId], references: [id], onDelete: Cascade)
+  user   User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([funnelId, sentAt])
+  @@index([userId, sentAt])
 }
 
 model OAuthAccount {
@@ -458,6 +589,7 @@ model Payment {
   subscriptionId String?
   planId         String
   promoCodeId    String?
+  engagementBundleId String?
 
   // Наши суммы (в копейках)
   amountKopecks         Int
@@ -465,6 +597,7 @@ model Payment {
   discountPercent       Int?
   discountKopecks       Int   @default(0)
   promoCodeSnapshot     Json?
+  engagementBundleSnapshot Json?
 
   // Данные ЮKassa
   yookassaId      String? @unique
@@ -482,6 +615,7 @@ model Payment {
   subscription              Subscription?              @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
   plan                      Plan                       @relation(fields: [planId], references: [id], onDelete: Restrict)
   promoCode                 PromoCode?                 @relation(fields: [promoCodeId], references: [id], onDelete: SetNull)
+  engagementBundle          EngagementBundleSetting?    @relation(fields: [engagementBundleId], references: [id], onDelete: SetNull)
   promoCodeRedemption       PromoCodeRedemption?
   trialPlanRedemption       TrialPlanRedemption?
   giftCertificateRedemption GiftCertificateRedemption?
@@ -494,6 +628,7 @@ model Payment {
   @@index([status, createdAt])
   @@index([status, subscriptionProvisionedAt, createdAt])
   @@index([promoCodeId])
+  @@index([engagementBundleId])
 }
 
 enum PaymentStatus {
@@ -594,6 +729,10 @@ model PromoCode {
   plans            PromoCodePlan[]
   bonusBoxOpenings BonusBoxOpening[]
   personalOfferSettings PersonalOfferSetting[]
+  engagementBundleSettings EngagementBundleSetting[]
+  seasonalBonusEvents SeasonalBonusEvent[]
+  seasonalBonusDeliveries SeasonalBonusEventDelivery[]
+  autoFunnelSettings AutoFunnelSetting[]
   welcomeBonusSettings WelcomeBonusSetting[]
   welcomeBonusRedemptions WelcomeBonusRedemption[]
 
@@ -861,6 +1000,63 @@ model BonusBoxOpening {
   @@index([promoCodeId])
 }
 
+model MissionDefinition {
+  id           String            @id @default(cuid())
+  key          String            @unique
+  title        String
+  description  String
+  goal         Int               @default(1)
+  rewardType   MissionRewardType
+  rewardValue  Int               @default(1)
+  rewardConfig Json?
+  isActive     Boolean           @default(true)
+  sortOrder    Int               @default(0)
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  progresses UserMissionProgress[]
+
+  @@index([isActive, sortOrder])
+}
+
+model UserMissionProgress {
+  id             String    @id @default(cuid())
+  userId         String
+  missionId      String
+  progress       Int       @default(0)
+  goal           Int       @default(1)
+  completedAt    DateTime?
+  claimedAt      DateTime?
+  rewardMetadata Json?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  user    User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mission MissionDefinition @relation(fields: [missionId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, missionId])
+  @@index([userId, claimedAt])
+}
+
+model UserEngagementEvent {
+  id         String   @id @default(cuid())
+  userId     String
+  type       String
+  eventKey   String
+  occurredAt DateTime @default(now())
+  metadata   Json?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, type, eventKey])
+  @@index([userId, type, occurredAt])
+}
+
+enum MissionRewardType {
+  BONUS_BOX_ATTEMPTS
+  PROMO_CODE_PERCENT
+}
+
 enum BonusBoxPrizeType {
   SUBSCRIPTION_DAYS
   TRAFFIC_GB
@@ -882,6 +1078,10 @@ enum BonusBoxAttemptSource {
   REFERRAL
   MANUAL
   PRIZE
+  MISSION
+  BUNDLE
+  SEASONAL_EVENT
+  AUTOFUNNEL
 }
 
 // ----------------------------------------------------------------------

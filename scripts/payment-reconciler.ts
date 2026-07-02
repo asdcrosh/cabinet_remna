@@ -2,6 +2,8 @@ import { prisma } from '../src/lib/prisma'
 import { notifySubscriptionExpiring, notifyTrafficLimit } from '../src/lib/notifications'
 import { syncPaymentProvisioning } from '../src/lib/payment-sync'
 import { maybeSyncRemnashopCatalog } from '../src/lib/remnashop-sync'
+import { runAutoFunnels } from '../src/lib/autofunnels'
+import { runSeasonalEventNotifications } from '../src/lib/seasonal-events'
 
 const intervalMs = readPositiveInt('PAYMENT_RECONCILE_INTERVAL_SECONDS', 60) * 1000
 const batchSize = readPositiveInt('PAYMENT_RECONCILE_BATCH_SIZE', 25)
@@ -70,6 +72,25 @@ async function runOnce() {
 
   await notifyExpiringSubscriptions()
   await notifyTrafficThresholds()
+  await runEngagementAutomation()
+}
+
+async function runEngagementAutomation() {
+  if (envFlag('FEATURE_SEASONAL_EVENTS_RUNNER', false)) {
+    const result = await runSeasonalEventNotifications().catch((error) => {
+      console.error('[seasonal-events] runner failed', error)
+      return null
+    })
+    if (result) console.log(`[seasonal-events] sent=${result.sent} skipped=${result.skipped}`)
+  }
+
+  if (envFlag('FEATURE_AUTOFUNNELS', false)) {
+    const result = await runAutoFunnels().catch((error) => {
+      console.error('[autofunnels] runner failed', error)
+      return null
+    })
+    if (result) console.log(`[autofunnels] funnels=${result.funnels} sent=${result.sent} gifts=${result.giftsGranted}`)
+  }
 }
 
 async function notifyExpiringSubscriptions() {
@@ -166,6 +187,12 @@ function readPositiveInt(name: string, fallback: number) {
   if (!raw) return fallback
   const value = Number(raw)
   return Number.isInteger(value) && value > 0 ? value : fallback
+}
+
+function envFlag(name: string, fallback: boolean) {
+  const raw = process.env[name]
+  if (raw == null) return fallback
+  return ['1', 'true', 'yes', 'on'].includes(raw.trim().toLowerCase())
 }
 
 main().catch(async (error) => {

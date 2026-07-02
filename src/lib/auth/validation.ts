@@ -76,6 +76,7 @@ export const changePasswordSchema = z
 export const createPaymentSchema = z.object({
   planId: z.string().min(1).max(64),
   promoCode: z.string().trim().min(1).max(64).optional(),
+  bundleKey: z.string().trim().min(1).max(64).optional(),
 })
 
 export const validatePromoCodeSchema = z.object({

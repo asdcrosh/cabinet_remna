@@ -99,6 +99,7 @@ const templates: Array<{
   channels: BroadcastChannel[]
   actionHref: string
   actionLabel: string
+  actionOpenInTelegram?: boolean
   body: string
 }> = [
   {
@@ -119,6 +120,37 @@ const templates: Array<{
     actionHref: '/dashboard/plans',
     actionLabel: 'Забрать бонус',
     body: '🎁 {name}, для вас открыт персональный бонус на VPN.\n\nВыберите тариф в кабинете, а промокод примените при оплате.',
+  },
+  {
+    title: 'Comeback bundle',
+    description: 'Вернись сегодня: скидка + открытия',
+    segment: 'INACTIVE_N_DAYS',
+    inactiveDays: 45,
+    channels: ['IN_APP', 'TELEGRAM'],
+    actionHref: '/dashboard/plans?bundle=COMEBACK_TODAY',
+    actionLabel: 'Вернуться выгоднее',
+    actionOpenInTelegram: true,
+    body: '🎁 {name}, для вас открыт comeback bundle: скидка и дополнительные открытия bonus box.\n\nОткройте тарифы в Telegram и заберите оффер сегодня.',
+  },
+  {
+    title: '90 дней + bonus box',
+    description: 'Bundle для раннего продления',
+    segment: 'ACTIVE',
+    channels: ['IN_APP', 'TELEGRAM'],
+    actionHref: '/dashboard/plans?bundle=EXTEND_90_BONUS',
+    actionLabel: 'Продлить на 90 дней',
+    actionOpenInTelegram: true,
+    body: '🔥 {name}, продлите подписку на 90 дней и получите дополнительные открытия bonus box.\n\nПодписка «{plan}» активна, поэтому продление добавится заранее.',
+  },
+  {
+    title: 'x2 за раннее продление',
+    description: 'Для активных пользователей',
+    segment: 'ACTIVE',
+    channels: ['IN_APP', 'TELEGRAM'],
+    actionHref: '/dashboard/plans?bundle=ACTIVE_DOUBLE_REWARD',
+    actionLabel: 'Забрать x2',
+    actionOpenInTelegram: true,
+    body: '⚡ {name}, для активных пользователей открыт x2 bundle.\n\nПродлите заранее и получите удвоенные награды bonus box.',
   },
   {
     title: 'VPN без ожидания',

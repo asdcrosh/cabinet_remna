@@ -15,6 +15,7 @@ import { mergeTechnicalTelegramAccount, TelegramAccountMergeError } from '@/lib/
 import { createAdminNotification } from '@/lib/admin-notifications'
 import { resolveTelegramIdentity } from '@/lib/identity-resolver'
 import { writeAuditLog } from '@/lib/audit-log'
+import { recordTelegramWebAppOpen } from '@/lib/missions'
 
 export const runtime = 'nodejs'
 
@@ -183,6 +184,15 @@ export async function POST(req: Request) {
     await syncLinkedTelegramUser({ localUserId: user.id, telegramId: telegram.id })
   } catch (error) {
     logWarn('auth.telegram_miniapp.background_sync_failed', {
+      userId: user.id,
+      message: error instanceof Error ? error.message : 'unknown error',
+    })
+  }
+
+  try {
+    await recordTelegramWebAppOpen(user.id)
+  } catch (error) {
+    logWarn('auth.telegram_miniapp.mission_event_failed', {
       userId: user.id,
       message: error instanceof Error ? error.message : 'unknown error',
     })

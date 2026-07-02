@@ -131,7 +131,8 @@ function notificationGroup(type: UserNotificationView['type']): NotificationFilt
   if (type === 'PAYMENT_SUCCESS' || type === 'PAYMENT_FAILED' || type === 'PAYMENT_STUCK') return 'payments'
   if (type === 'SUBSCRIPTION_EXPIRING' || type === 'TRAFFIC_LIMIT') return 'subscription'
   if (type === 'SUPPORT_REPLY') return 'support'
-  if (type === 'BONUS_GRANTED') return 'bonus'
+  if (type === 'BONUS_GRANTED' || type === 'MISSION_COMPLETED' || type === 'SEASONAL_EVENT') return 'bonus'
+  if (type === 'AUTOFUNNEL') return 'broadcast'
   return 'broadcast'
 }
 

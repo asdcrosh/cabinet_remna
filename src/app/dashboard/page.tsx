@@ -11,6 +11,7 @@ import { StatusBadge } from '@/components/dashboard/status-badge'
 import { ProgressBar } from '@/components/dashboard/progress-bar'
 import { TrafficChart } from '@/components/dashboard/traffic-chart'
 import { DashboardOnboardingCard, type DashboardOnboardingState } from '@/components/dashboard/onboarding-card'
+import { MissionsCard } from '@/components/dashboard/missions-card'
 import { WelcomeOfferButton } from '@/components/dashboard/welcome-offer-button'
 import { redirect } from 'next/navigation'
 import {
@@ -32,6 +33,8 @@ import { readRemnawaveBigInt } from '@/lib/remnawave-usage'
 import { getFreshPendingPaymentCutoff, reconcileStalePendingPaymentsForUser } from '@/lib/payment-sync'
 import { getPlanAudienceContext, isPlanAvailableForUser } from '@/lib/plan-access'
 import { normalizeOfferTone, renderPersonalOfferTemplate } from '@/lib/personal-offers'
+import { getUserMissions } from '@/lib/missions'
+import { getVisibleEngagementBundles, type EngagementBundleView } from '@/lib/engagement-bundles'
 
 export const dynamic = 'force-dynamic'
 
@@ -81,6 +84,9 @@ export default async function DashboardHome() {
     promoOfferCode,
     offerSettings,
     welcomeBonusSetting,
+    missions,
+    homeBundles,
+    personalBundles,
   ] = await Promise.all([
     remnawaveCardPromise,
     getPlanAudienceContext(user.id),
@@ -108,6 +114,9 @@ export default async function DashboardHome() {
         promoCode: { select: { id: true, code: true, discountPercent: true, isActive: true } },
       },
     }),
+    getUserMissions(user.id),
+    getVisibleEngagementBundles({ userId: user.id, placement: 'HOME' }),
+    getVisibleEngagementBundles({ userId: user.id, placement: 'PERSONAL_OFFER' }),
   ])
   const sub = remnawaveCard?.response.user
   const welcomeBonusOptions = buildWelcomeBonusOptions(welcomeBonusSetting, {
@@ -146,6 +155,7 @@ export default async function DashboardHome() {
     promoCode: promoOfferCode,
     offerSettings,
     welcomeBonusAvailable: welcomeBonusEligible && welcomeBonusOptions.length > 0,
+    bundleOffer: personalBundles[0] ?? null,
     user: { name: user.name, email: user.email },
   }), onboardingState)
 
@@ -155,6 +165,8 @@ export default async function DashboardHome() {
         <CompactHeader title="Главная" description="Начните пользоваться VPN" />
         <DashboardOnboardingCard state={onboardingState} mode="full" />
         {personalOffer && <PersonalOffer offer={personalOffer} welcomeBonusOptions={welcomeBonusOptions} />}
+        <EngagementBundlesStrip bundles={homeBundles} />
+        <MissionsCard initialMissions={missions} />
         <SmartInsights
           emailVerified={onboardingState.emailVerified}
           telegramLinked={onboardingState.telegramLinked}
@@ -185,6 +197,8 @@ export default async function DashboardHome() {
 
       <DashboardOnboardingCard state={onboardingState} />
       {personalOffer && <PersonalOffer offer={personalOffer} welcomeBonusOptions={welcomeBonusOptions} />}
+      <EngagementBundlesStrip bundles={homeBundles} />
+      <MissionsCard initialMissions={missions} />
       <SmartInsights
         emailVerified={onboardingState.emailVerified}
         telegramLinked={onboardingState.telegramLinked}
@@ -359,6 +373,7 @@ function buildPersonalOffer({
   promoCode,
   offerSettings,
   welcomeBonusAvailable,
+  bundleOffer,
   user,
 }: {
   activeSubscription: DashboardSubscription | null
@@ -368,12 +383,31 @@ function buildPersonalOffer({
   promoCode: DashboardPromoCode | null
   offerSettings: DashboardOfferSetting[]
   welcomeBonusAvailable: boolean
+  bundleOffer: EngagementBundleView | null
   user: { name: string | null; email: string }
 }): PersonalOfferView | null {
   const now = Date.now()
   const inactiveDays = lastSucceededPaymentAt
     ? Math.floor((now - lastSucceededPaymentAt.getTime()) / (24 * 60 * 60 * 1000))
     : null
+
+  if (bundleOffer && !welcomeBonusAvailable) {
+    return {
+      scenario: bundleOffer.scenario === 'COMEBACK_TODAY' ? 'RETURN_PROMO' : 'RENEWAL_SOON',
+      eyebrow: 'Персональный bundle',
+      title: bundleOffer.title,
+      description: bundleOffer.description,
+      href: bundleOffer.href,
+      cta: bundleOffer.cta,
+      meta: bundleOffer.promoCode
+        ? `-${bundleOffer.promoCode.discountPercent}% + бонус`
+        : bundleOffer.bonusMultiplier > 1
+          ? `x${bundleOffer.bonusMultiplier} награды`
+          : `${bundleOffer.bonusAttempts} открытий`,
+      tone: bundleOffer.scenario === 'COMEBACK_TODAY' ? 'violet' : 'cyan',
+      icon: <Gift className="h-5 w-5" />,
+    }
+  }
 
   // Приоритет офферов:
   // 1. Нет активной подписки и пользователь давно не покупал: промокод на возврат.
@@ -606,6 +640,49 @@ function PersonalOffer({
           </Link>
         )}
       </div>
+    </section>
+  )
+}
+
+function EngagementBundlesStrip({ bundles }: { bundles: EngagementBundleView[] }) {
+  if (bundles.length === 0) return null
+
+  return (
+    <section className="grid gap-3 lg:grid-cols-3">
+      {bundles.slice(0, 3).map((bundle) => (
+        <Link
+          key={bundle.key}
+          href={bundle.href}
+          className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm transition hover:border-cyan-200 hover:shadow-md dark:border-white/10 dark:bg-surface-900"
+        >
+          <div className="text-xs font-semibold uppercase tracking-[0.14em] text-cyan-600 dark:text-cyan-300">
+            Bundle
+          </div>
+          <h3 className="mt-1 line-clamp-1 text-base font-semibold text-slate-950 dark:text-white">
+            {bundle.title}
+          </h3>
+          <p className="mt-1 line-clamp-2 text-sm leading-5 text-slate-500 dark:text-slate-400">
+            {bundle.description}
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold">
+            {bundle.promoCode && (
+              <span className="rounded-full bg-violet-50 px-2 py-1 text-violet-700 dark:bg-violet-400/10 dark:text-violet-200">
+                -{bundle.promoCode.discountPercent}%
+              </span>
+            )}
+            {bundle.bonusAttempts > 0 && (
+              <span className="rounded-full bg-emerald-50 px-2 py-1 text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-200">
+                +{bundle.bonusAttempts} открытий
+              </span>
+            )}
+            {bundle.bonusMultiplier > 1 && (
+              <span className="rounded-full bg-cyan-50 px-2 py-1 text-cyan-700 dark:bg-cyan-400/10 dark:text-cyan-200">
+                x{bundle.bonusMultiplier} награды
+              </span>
+            )}
+          </div>
+        </Link>
+      ))}
     </section>
   )
 }

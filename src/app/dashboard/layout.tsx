@@ -9,6 +9,7 @@ import { getFeatureFlags } from '@/lib/feature-flags'
 import { LogoutButton } from '@/components/dashboard/logout-button'
 import { Brand, DashboardNav, MobileBottomNav, MobileDashboardNav } from '@/components/dashboard/dashboard-nav'
 import { NotificationBell } from '@/components/dashboard/notification-bell'
+import { TelegramWebAppOpenTracker } from '@/components/dashboard/telegram-webapp-open-tracker'
 import { logWarn } from '@/lib/logger'
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -57,6 +58,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   return (
     <div className="min-h-screen">
+      <TelegramWebAppOpenTracker />
       <aside className="fixed inset-y-0 left-0 z-40 hidden h-dvh w-72 flex-col overflow-hidden border-r border-white/70 bg-white/90 shadow-2xl shadow-slate-200/40 backdrop-blur-xl dark:border-white/10 dark:bg-surface-950/90 dark:shadow-black/25 lg:flex">
         <div className="shrink-0 px-5 py-4">
           <Brand brandName={brandName} />

@@ -2,6 +2,8 @@ import { prisma } from './prisma'
 import { ensureRemnawaveSubscription, type EnsureSubscriptionInput } from './subscription'
 import { applyPendingReferralRewardsForUser, grantReferralRewardForPayment } from './referral-rewards'
 import { grantPaymentBonusBoxAttempts, grantReferralBonusBoxAttemptsForPayment } from './bonus-box'
+import { recordEarlyRenewalMissionForPayment } from './missions'
+import { grantBundleRewardForPayment } from './engagement-bundles'
 import { notifyPaymentSucceeded } from './notifications'
 import { syncCabinetPaymentToRemnashopBestEffort } from './remnashop-reverse-sync'
 import { logError } from './logger'
@@ -76,7 +78,7 @@ export async function provisionPaymentSubscription(input: ProvisionPaymentSubscr
         lastError: null,
       },
     })
-    await settleReferralRewards(input.paymentId, input.userId)
+    await settleReferralRewards(input.paymentId, input.userId, Boolean(result.hadActiveSubscriptionBefore))
     await syncCabinetPaymentToRemnashopBestEffort(input.paymentId)
     await notifyPaymentSucceeded(input.paymentId)
     return { ...result, jobStatus: 'SUCCEEDED' as const }
@@ -96,9 +98,11 @@ export async function provisionPaymentSubscription(input: ProvisionPaymentSubscr
   }
 }
 
-async function settleReferralRewards(paymentId: string, userId: string) {
+async function settleReferralRewards(paymentId: string, userId: string, hadActiveSubscriptionBefore = false) {
   try {
     await grantPaymentBonusBoxAttempts(paymentId)
+    await recordEarlyRenewalMissionForPayment({ paymentId, userId, hadActiveSubscriptionBefore })
+    await grantBundleRewardForPayment({ paymentId, hadActiveSubscriptionBefore })
     await grantReferralRewardForPayment(paymentId)
     await grantReferralBonusBoxAttemptsForPayment(paymentId)
     await applyPendingReferralRewardsForUser(userId)
