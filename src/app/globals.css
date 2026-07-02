@@ -143,18 +143,6 @@
            dark:bg-surface-900;
   }
 
-  .bonus-box-hero {
-    background:
-      radial-gradient(circle at 78% 28%, rgba(34, 211, 238, 0.16), transparent 30%),
-      radial-gradient(circle at 70% 92%, rgba(16, 185, 129, 0.16), transparent 34%),
-      linear-gradient(135deg, rgba(15, 23, 42, 0.02), rgba(14, 116, 144, 0.12));
-  }
-  .dark .bonus-box-hero {
-    background:
-      radial-gradient(circle at 78% 28%, rgba(34, 211, 238, 0.18), transparent 30%),
-      radial-gradient(circle at 70% 92%, rgba(16, 185, 129, 0.16), transparent 34%),
-      linear-gradient(135deg, #101827, #0b1220 54%, #062f3a);
-  }
   .bonus-box-open-button {
     background:
       radial-gradient(circle at 82% 24%, rgba(255, 255, 255, 0.28), transparent 28%),
