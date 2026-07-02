@@ -120,7 +120,7 @@ function PasswordField({
       />
       <button
         type="button"
-        className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-2 text-slate-400 hover:text-slate-700"
+        className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-white/5 dark:hover:text-slate-100"
         onClick={toggle}
         aria-label={visible ? 'Скрыть пароль' : 'Показать пароль'}
       >
