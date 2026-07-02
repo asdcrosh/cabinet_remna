@@ -10,19 +10,24 @@ import { getBrandName } from '@/lib/branding'
 import { createAdminNotification } from '@/lib/admin-notifications'
 import { renderTelegramCustomEmoji, stripTelegramCustomEmojiMarkup } from '@/lib/telegram-format'
 import { rateLimit } from '@/lib/rate-limit'
+import { remnashopQuery } from '@/lib/remnashop-db'
+import { logWarn } from '@/lib/logger'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 const MAX_RECIPIENTS = 5000
+const MAX_ACTION_HREF_LENGTH = 600
 const ACTIVE_SUBSCRIPTION_STATUSES = ['ACTIVE', 'LIMITED'] satisfies SubscriptionStatus[]
+const DEFAULT_INACTIVE_DAYS = 45
 
 const schema = z.object({
   title: z.string().trim().min(3).max(80),
   body: z.string().trim().min(5).max(1200),
-  segment: z.enum(['ALL', 'ACTIVE', 'NO_ACTIVE', 'EXPIRED', 'EMAIL_VERIFIED', 'TELEGRAM_LINKED', 'INACTIVE_45D']),
+  segment: z.enum(['ALL', 'ACTIVE', 'NO_ACTIVE', 'EXPIRED', 'NEVER_PURCHASED', 'INACTIVE_N_DAYS', 'INACTIVE_45D']),
+  inactiveDays: z.coerce.number().int().min(1).max(3650).optional().nullable(),
   channels: z.array(z.enum(['IN_APP', 'EMAIL', 'TELEGRAM'])).min(1).max(3),
-  actionHref: z.string().trim().max(180).optional().nullable(),
+  actionHref: z.string().trim().max(MAX_ACTION_HREF_LENGTH).optional().nullable(),
   actionLabel: z.string().trim().max(32).optional().nullable(),
   actionOpenInTelegram: z.boolean().optional(),
   imageUrl: z.string().trim().url().max(600).optional().nullable().or(z.literal('')),
@@ -37,6 +42,9 @@ export const POST = withAuth(async (req: Request) => {
   }
 
   const input = parsed.data
+  const segment = normalizeSegment(input.segment)
+  const inactiveDays = segment === 'INACTIVE_N_DAYS' ? input.inactiveDays ?? DEFAULT_INACTIVE_DAYS : null
+  const channels = new Set(input.channels)
   const limit = await rateLimit(
     req,
     input.testMode ? `broadcast-test:${session.uid}` : `broadcast:${session.uid}`,
@@ -56,12 +64,7 @@ export const POST = withAuth(async (req: Request) => {
         select: broadcastUserSelect,
         take: 1,
       })
-    : await prisma.user.findMany({
-        where: buildSegmentWhere(input.segment),
-        select: broadcastUserSelect,
-        orderBy: { createdAt: 'desc' },
-        take: MAX_RECIPIENTS,
-      })
+    : await findBroadcastUsers(segment, inactiveDays ?? DEFAULT_INACTIVE_DAYS, input.channels)
 
   const actionHref = normalizeActionHref(input.actionHref)
   const actionUrl = actionHref ? `${getAppUrl()}${actionHref}` : getAppUrl()
@@ -70,10 +73,9 @@ export const POST = withAuth(async (req: Request) => {
   const imageUrl = normalizeImageUrl(input.imageUrl)
   const plainBody = stripTelegramCustomEmojiMarkup(input.body)
   const batchKey = `broadcast:${Date.now()}:${session.uid}`
-  const channels = new Set(input.channels)
   const stats = {
-    recipients: users.length,
-    inApp: channels.has('IN_APP') ? users.length : 0,
+    recipients: 0,
+    inApp: 0,
     telegram: { sent: 0, skipped: 0, duplicate: 0, failed: 0 },
     email: { sent: 0, skipped: 0, duplicate: 0, failed: 0 },
   }
@@ -120,6 +122,10 @@ export const POST = withAuth(async (req: Request) => {
 
     stats.telegram[result.telegram] += 1
     stats.email[result.email] += 1
+    if (channels.has('IN_APP')) stats.inApp += 1
+    if (channels.has('IN_APP') || result.telegram === 'sent' || result.email === 'sent') {
+      stats.recipients += 1
+    }
   }
 
   if (input.testMode) {
@@ -135,7 +141,8 @@ export const POST = withAuth(async (req: Request) => {
     data: {
       title: input.title,
       body: plainBody,
-      segment: input.segment,
+      segment,
+      inactiveDays,
       channels: input.channels,
       actionHref,
       actionLabel,
@@ -159,6 +166,7 @@ export const POST = withAuth(async (req: Request) => {
       title: true,
       body: true,
       segment: true,
+      inactiveDays: true,
       channels: true,
       actionHref: true,
       actionLabel: true,
@@ -218,39 +226,403 @@ const broadcastUserSelect = {
   },
 } satisfies Prisma.UserSelect
 
-function buildSegmentWhere(segment: z.infer<typeof schema>['segment']): Prisma.UserWhereInput {
+type BroadcastSegment = 'ALL' | 'ACTIVE' | 'NO_ACTIVE' | 'EXPIRED' | 'NEVER_PURCHASED' | 'INACTIVE_N_DAYS'
+type BroadcastChannel = 'IN_APP' | 'EMAIL' | 'TELEGRAM'
+
+interface RemnashopAudienceRow {
+  id: number
+  telegram_id: string | null
+  email: string | null
+}
+
+async function findBroadcastUsers(segment: BroadcastSegment, inactiveDays: number, channels: BroadcastChannel[]) {
+  const where = combineWhere(
+    await buildSegmentWhere(segment, inactiveDays),
+    buildDeliveryWhere(channels)
+  )
+  return prisma.user.findMany({
+    where,
+    select: broadcastUserSelect,
+    orderBy: { createdAt: 'desc' },
+    take: MAX_RECIPIENTS,
+  })
+}
+
+async function buildSegmentWhere(segment: BroadcastSegment, inactiveDays: number): Promise<Prisma.UserWhereInput> {
   const now = new Date()
-  const inactiveCutoff = new Date(now.getTime() - 45 * 24 * 60 * 60 * 1000)
+  const inactiveCutoff = new Date(now.getTime() - inactiveDays * 24 * 60 * 60 * 1000)
 
   switch (segment) {
     case 'ACTIVE':
-      return { subscriptions: { some: { status: { in: ACTIVE_SUBSCRIPTION_STATUSES }, expireAt: { gt: now } } } }
+      return buildActiveWhere(now)
     case 'NO_ACTIVE':
-      return { subscriptions: { none: { status: { in: ACTIVE_SUBSCRIPTION_STATUSES }, expireAt: { gt: now } } } }
+      return buildNoActiveWhere(now)
     case 'EXPIRED':
-      return {
-        subscriptions: {
-          some: { expireAt: { lte: now } },
-          none: { status: { in: ACTIVE_SUBSCRIPTION_STATUSES }, expireAt: { gt: now } },
-        },
-      }
-    case 'EMAIL_VERIFIED':
-      return { emailVerifiedAt: { not: null }, NOT: [{ email: { endsWith: '@pending.invalid' } }, { email: { endsWith: '@pending.invalid.local' } }] }
-    case 'TELEGRAM_LINKED':
-      return { telegramId: { not: null } }
-    case 'INACTIVE_45D':
-      return {
-        payments: {
-          none: {
-            status: 'SUCCEEDED',
-            OR: [{ paidAt: { gte: inactiveCutoff } }, { createdAt: { gte: inactiveCutoff } }],
-          },
-        },
-      }
+      return buildExpiredWhere(now)
+    case 'NEVER_PURCHASED':
+      return buildNeverPurchasedWhere()
+    case 'INACTIVE_N_DAYS':
+      return buildInactiveBuyersWhere(inactiveCutoff, inactiveDays, now)
     case 'ALL':
     default:
       return {}
   }
+}
+
+function normalizeSegment(value: z.infer<typeof schema>['segment']): BroadcastSegment {
+  if (value === 'INACTIVE_45D') return 'INACTIVE_N_DAYS'
+  return value
+}
+
+async function buildActiveWhere(now: Date): Promise<Prisma.UserWhereInput> {
+  const localWhere = localActiveWhere(now)
+  const remnashopRows = await fetchRemnashopActiveUsers()
+  if (!remnashopRows) return localWhere
+
+  return {
+    OR: [
+      remnashopRowsToUserWhere(remnashopRows),
+      {
+        AND: [
+          { remnashopUserId: null },
+          localWhere,
+        ],
+      },
+    ],
+  }
+}
+
+async function buildNoActiveWhere(now: Date): Promise<Prisma.UserWhereInput> {
+  const localWhere = localNoActiveWhere(now)
+  const remnashopRows = await fetchRemnashopNoActiveUsers()
+  if (!remnashopRows) return localWhere
+
+  return {
+    AND: [
+      localWhere,
+      {
+        OR: [
+          remnashopRowsToUserWhere(remnashopRows),
+          { remnashopUserId: null },
+        ],
+      },
+    ],
+  }
+}
+
+async function buildExpiredWhere(now: Date): Promise<Prisma.UserWhereInput> {
+  const localWhere = localExpiredWhere(now)
+  const remnashopRows = await fetchRemnashopExpiredUsers()
+  if (!remnashopRows) return localWhere
+
+  return {
+    AND: [
+      localNoActiveWhere(now),
+      {
+        OR: [
+          remnashopRowsToUserWhere(remnashopRows),
+          {
+            AND: [
+              { remnashopUserId: null },
+              localWhere,
+            ],
+          },
+        ],
+      },
+    ],
+  }
+}
+
+async function buildInactiveBuyersWhere(cutoff: Date, inactiveDays: number, now: Date): Promise<Prisma.UserWhereInput> {
+  const localWhere = localInactiveBuyersWhere(cutoff, now)
+  const remnashopRows = await fetchRemnashopInactiveBuyers(inactiveDays)
+  if (!remnashopRows) return localWhere
+
+  return {
+    AND: [
+      localNoActiveWhere(now),
+      {
+        OR: [
+          remnashopRowsToUserWhere(remnashopRows),
+          {
+            AND: [
+              { remnashopUserId: null },
+              localWhere,
+            ],
+          },
+        ],
+      },
+    ],
+  }
+}
+
+async function buildNeverPurchasedWhere(): Promise<Prisma.UserWhereInput> {
+  const localWhere = localNeverPurchasedWhere()
+  const remnashopRows = await fetchRemnashopNeverPurchased()
+  if (!remnashopRows) return localWhere
+
+  return {
+    AND: [
+      localWhere,
+      {
+        OR: [
+          remnashopRowsToUserWhere(remnashopRows),
+          { remnashopUserId: null },
+        ],
+      },
+    ],
+  }
+}
+
+function localActiveWhere(now: Date): Prisma.UserWhereInput {
+  return { subscriptions: { some: { status: { in: ACTIVE_SUBSCRIPTION_STATUSES }, expireAt: { gt: now } } } }
+}
+
+function localNoActiveWhere(now: Date): Prisma.UserWhereInput {
+  return { subscriptions: { none: { status: { in: ACTIVE_SUBSCRIPTION_STATUSES }, expireAt: { gt: now } } } }
+}
+
+function localExpiredWhere(now: Date): Prisma.UserWhereInput {
+  return {
+    subscriptions: {
+      some: { expireAt: { lte: now } },
+      none: { status: { in: ACTIVE_SUBSCRIPTION_STATUSES }, expireAt: { gt: now } },
+    },
+  }
+}
+
+function localInactiveBuyersWhere(cutoff: Date, now: Date): Prisma.UserWhereInput {
+  return {
+    AND: [
+      {
+        subscriptions: {
+          some: { expireAt: { lt: cutoff } },
+        },
+      },
+      {
+        subscriptions: {
+          none: { expireAt: { gte: cutoff } },
+        },
+      },
+      localNoActiveWhere(now),
+    ],
+  }
+}
+
+function localNeverPurchasedWhere(): Prisma.UserWhereInput {
+  return {
+    payments: { none: { status: 'SUCCEEDED' } },
+    subscriptions: { none: {} },
+  }
+}
+
+async function fetchRemnashopInactiveBuyers(inactiveDays: number) {
+  if (!process.env.REMNASHOP_DATABASE_URL) return null
+
+  try {
+    const result = await remnashopQuery<RemnashopAudienceRow>(
+      `
+        WITH last_subscription AS (
+          SELECT user_id, max(expire_at) AS last_expire_at
+          FROM subscriptions
+          WHERE expire_at IS NOT NULL
+          GROUP BY user_id
+        )
+        SELECT u.id, u.telegram_id::text AS telegram_id, lower(u.email) AS email
+        FROM users u
+        JOIN last_subscription ls ON ls.user_id = u.id
+        WHERE ls.last_expire_at < now() - ($1::int * interval '1 day')
+          AND NOT EXISTS (
+            SELECT 1
+            FROM subscriptions active_s
+            WHERE active_s.user_id = u.id
+              AND active_s.expire_at > now()
+              AND upper(active_s.status::text) = 'ACTIVE'
+          )
+        ORDER BY ls.last_expire_at DESC
+        LIMIT ${MAX_RECIPIENTS * 2}
+      `,
+      [inactiveDays]
+    )
+    return result.rows
+  } catch (error) {
+    logWarn('broadcast.remnashop_inactive_segment_failed', {
+      inactiveDays,
+      message: error instanceof Error ? error.message : 'unknown error',
+    })
+    return null
+  }
+}
+
+async function fetchRemnashopActiveUsers() {
+  if (!process.env.REMNASHOP_DATABASE_URL) return null
+
+  try {
+    const result = await remnashopQuery<RemnashopAudienceRow>(
+      `
+        SELECT DISTINCT u.id, u.telegram_id::text AS telegram_id, lower(u.email) AS email
+        FROM users u
+        JOIN subscriptions s ON s.user_id = u.id
+        WHERE s.expire_at > now()
+          AND upper(s.status::text) = 'ACTIVE'
+        ORDER BY u.id DESC
+        LIMIT ${MAX_RECIPIENTS * 2}
+      `
+    )
+    return result.rows
+  } catch (error) {
+    logWarn('broadcast.remnashop_active_segment_failed', {
+      message: error instanceof Error ? error.message : 'unknown error',
+    })
+    return null
+  }
+}
+
+async function fetchRemnashopNoActiveUsers() {
+  if (!process.env.REMNASHOP_DATABASE_URL) return null
+
+  try {
+    const result = await remnashopQuery<RemnashopAudienceRow>(
+      `
+        SELECT u.id, u.telegram_id::text AS telegram_id, lower(u.email) AS email
+        FROM users u
+        WHERE NOT EXISTS (
+          SELECT 1
+          FROM subscriptions active_s
+          WHERE active_s.user_id = u.id
+            AND active_s.expire_at > now()
+            AND upper(active_s.status::text) = 'ACTIVE'
+        )
+        ORDER BY u.id DESC
+        LIMIT ${MAX_RECIPIENTS * 2}
+      `
+    )
+    return result.rows
+  } catch (error) {
+    logWarn('broadcast.remnashop_no_active_segment_failed', {
+      message: error instanceof Error ? error.message : 'unknown error',
+    })
+    return null
+  }
+}
+
+async function fetchRemnashopExpiredUsers() {
+  if (!process.env.REMNASHOP_DATABASE_URL) return null
+
+  try {
+    const result = await remnashopQuery<RemnashopAudienceRow>(
+      `
+        SELECT u.id, u.telegram_id::text AS telegram_id, lower(u.email) AS email
+        FROM users u
+        WHERE EXISTS (
+          SELECT 1
+          FROM subscriptions expired_s
+          WHERE expired_s.user_id = u.id
+            AND expired_s.expire_at <= now()
+        )
+          AND NOT EXISTS (
+            SELECT 1
+            FROM subscriptions active_s
+            WHERE active_s.user_id = u.id
+              AND active_s.expire_at > now()
+              AND upper(active_s.status::text) = 'ACTIVE'
+          )
+        ORDER BY u.id DESC
+        LIMIT ${MAX_RECIPIENTS * 2}
+      `
+    )
+    return result.rows
+  } catch (error) {
+    logWarn('broadcast.remnashop_expired_segment_failed', {
+      message: error instanceof Error ? error.message : 'unknown error',
+    })
+    return null
+  }
+}
+
+async function fetchRemnashopNeverPurchased() {
+  if (!process.env.REMNASHOP_DATABASE_URL) return null
+
+  try {
+    const result = await remnashopQuery<RemnashopAudienceRow>(
+      `
+        SELECT u.id, u.telegram_id::text AS telegram_id, lower(u.email) AS email
+        FROM users u
+        WHERE NOT EXISTS (
+          SELECT 1 FROM subscriptions s WHERE s.user_id = u.id
+        )
+          AND NOT EXISTS (
+            SELECT 1
+            FROM transactions t
+            WHERE t.user_id = u.id
+              AND upper(t.status::text) IN ('COMPLETED', 'SUCCEEDED', 'SUCCESS', 'PAID')
+          )
+        ORDER BY u.id DESC
+        LIMIT ${MAX_RECIPIENTS * 2}
+      `
+    )
+    return result.rows
+  } catch (error) {
+    logWarn('broadcast.remnashop_never_purchased_segment_failed', {
+      message: error instanceof Error ? error.message : 'unknown error',
+    })
+    return null
+  }
+}
+
+function remnashopRowsToUserWhere(rows: RemnashopAudienceRow[]): Prisma.UserWhereInput {
+  const or: Prisma.UserWhereInput[] = []
+  const seen = new Set<string>()
+
+  for (const row of rows) {
+    addUniqueWhere(or, seen, `remnashop:${row.id}`, { remnashopUserId: row.id })
+    if (row.telegram_id && /^\d+$/.test(row.telegram_id)) {
+      addUniqueWhere(or, seen, `telegram:${row.telegram_id}`, { telegramId: BigInt(row.telegram_id) })
+    }
+    if (row.email && !row.email.endsWith('@pending.invalid') && !row.email.endsWith('@pending.invalid.local')) {
+      addUniqueWhere(or, seen, `email:${row.email}`, { email: { equals: row.email, mode: 'insensitive' } })
+    }
+  }
+
+  return or.length > 0 ? { OR: or } : { id: '__no_remnashop_matches__' }
+}
+
+function addUniqueWhere(
+  items: Prisma.UserWhereInput[],
+  seen: Set<string>,
+  key: string,
+  where: Prisma.UserWhereInput
+) {
+  if (seen.has(key)) return
+  seen.add(key)
+  items.push(where)
+}
+
+function buildDeliveryWhere(channels: BroadcastChannel[]): Prisma.UserWhereInput {
+  if (channels.includes('IN_APP')) return {}
+
+  const or: Prisma.UserWhereInput[] = []
+  if (channels.includes('TELEGRAM')) {
+    or.push({ telegramId: { not: null } })
+  }
+  if (channels.includes('EMAIL')) {
+    or.push({
+      emailVerifiedAt: { not: null },
+      NOT: [
+        { email: { endsWith: '@pending.invalid' } },
+        { email: { endsWith: '@pending.invalid.local' } },
+      ],
+    })
+  }
+
+  return or.length > 0 ? { OR: or } : {}
+}
+
+function combineWhere(...items: Prisma.UserWhereInput[]): Prisma.UserWhereInput {
+  const activeItems = items.filter((item) => Object.keys(item).length > 0)
+  if (activeItems.length === 0) return {}
+  if (activeItems.length === 1) return activeItems[0]
+  return { AND: activeItems }
 }
 
 function normalizeActionHref(value: string | null | undefined) {

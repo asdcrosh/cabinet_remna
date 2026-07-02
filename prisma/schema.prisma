@@ -305,6 +305,7 @@ model BroadcastCampaign {
   title             String
   body              String
   segment           String
+  inactiveDays      Int?
   channels          String[] @default([])
   actionHref        String?
   actionLabel       String?
@@ -335,6 +336,7 @@ model BroadcastTemplate {
   title       String
   description String?
   segment     String
+  inactiveDays Int?
   channels    String[] @default([])
   actionHref  String?
   actionLabel String?

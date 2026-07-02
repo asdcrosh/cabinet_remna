@@ -12,9 +12,8 @@ type BroadcastSegment =
   | 'ACTIVE'
   | 'NO_ACTIVE'
   | 'EXPIRED'
-  | 'EMAIL_VERIFIED'
-  | 'TELEGRAM_LINKED'
-  | 'INACTIVE_45D'
+  | 'NEVER_PURCHASED'
+  | 'INACTIVE_N_DAYS'
 
 type BroadcastChannel = 'IN_APP' | 'EMAIL' | 'TELEGRAM'
 type BroadcastStep = 'message' | 'audience' | 'delivery'
@@ -31,6 +30,7 @@ type BroadcastHistoryItem = {
   title: string
   body: string
   segment: string
+  inactiveDays: number | null
   channels: string[]
   actionHref: string | null
   actionLabel: string | null
@@ -56,6 +56,7 @@ type BroadcastTemplateItem = {
   title: string
   description?: string | null
   segment: BroadcastSegment | string
+  inactiveDays?: number | null
   channels: string[]
   actionHref?: string | null
   actionLabel?: string | null
@@ -71,9 +72,8 @@ const segments: Array<{ value: BroadcastSegment; label: string; description: str
   { value: 'ACTIVE', label: 'Активная подписка', description: 'Есть текущий доступ' },
   { value: 'NO_ACTIVE', label: 'Без подписки', description: 'Нет активного доступа' },
   { value: 'EXPIRED', label: 'Истекла подписка', description: 'Был доступ, сейчас нет' },
-  { value: 'EMAIL_VERIFIED', label: 'Email подтвержден', description: 'Можно отправить email' },
-  { value: 'TELEGRAM_LINKED', label: 'Telegram привязан', description: 'Можно отправить в бот' },
-  { value: 'INACTIVE_45D', label: 'Не покупали 45 дней', description: 'Для возврата' },
+  { value: 'NEVER_PURCHASED', label: 'Ни разу не покупали', description: 'Зарегистрированы без покупок' },
+  { value: 'INACTIVE_N_DAYS', label: 'Не покупали N дней', description: 'Нет активной подписки, раньше покупали' },
 ]
 
 const channels: Array<{ value: BroadcastChannel; label: string; icon: typeof Mail }> = [
@@ -95,6 +95,7 @@ const templates: Array<{
   title: string
   description: string
   segment: BroadcastSegment
+  inactiveDays?: number
   channels: BroadcastChannel[]
   actionHref: string
   actionLabel: string
@@ -112,7 +113,8 @@ const templates: Array<{
   {
     title: 'Персональный бонус',
     description: 'Возврат тех, кто давно не платил',
-    segment: 'INACTIVE_45D',
+    segment: 'INACTIVE_N_DAYS',
+    inactiveDays: 45,
     channels: ['IN_APP', 'TELEGRAM'],
     actionHref: '/dashboard/plans',
     actionLabel: 'Забрать бонус',
@@ -120,8 +122,8 @@ const templates: Array<{
   },
   {
     title: 'VPN без ожидания',
-    description: 'Для пользователей без подписки',
-    segment: 'NO_ACTIVE',
+    description: 'Для новых пользователей без покупок',
+    segment: 'NEVER_PURCHASED',
     channels: ['IN_APP', 'EMAIL'],
     actionHref: '/dashboard/plans',
     actionLabel: 'Выбрать тариф',
@@ -135,24 +137,6 @@ const templates: Array<{
     actionHref: '/dashboard/plans',
     actionLabel: 'Вернуть доступ',
     body: '⏳ {name}, ваша подписка «{plan}» больше не активна.\n\nПродлите доступ, чтобы снова подключаться без настройки с нуля.',
-  },
-  {
-    title: 'Новое устройство',
-    description: 'Подключение без лишнего',
-    segment: 'TELEGRAM_LINKED',
-    channels: ['IN_APP', 'TELEGRAM'],
-    actionHref: '/dashboard/subscription',
-    actionLabel: 'Подключить VPN',
-    body: '📲 {name}, подключите VPN на телефоне или компьютере.\n\nВ кабинете есть QR, ссылка подписки и быстрые кнопки для приложений.',
-  },
-  {
-    title: 'Проверьте email',
-    description: 'Для подтвержденных email',
-    segment: 'EMAIL_VERIFIED',
-    channels: ['EMAIL', 'IN_APP'],
-    actionHref: '/dashboard/settings',
-    actionLabel: 'Открыть настройки',
-    body: '✅ {name}, email {email} подтвержден и готов для важных уведомлений.\n\nПроверьте Telegram в настройках, чтобы получать быстрые сообщения по подписке.',
   },
   {
     title: 'Пригласи друга',
@@ -222,6 +206,7 @@ export function BroadcastAdmin({
 }) {
   const bodyInputRef = useRef<HTMLTextAreaElement | null>(null)
   const [segment, setSegment] = useState<BroadcastSegment>('ALL')
+  const [inactiveDays, setInactiveDays] = useState(45)
   const [selectedChannels, setSelectedChannels] = useState<BroadcastChannel[]>(['IN_APP'])
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
@@ -246,6 +231,7 @@ export function BroadcastAdmin({
         title: string
         body: string
         segment: BroadcastSegment
+        inactiveDays: number
         selectedChannels: BroadcastChannel[]
         actionHref: string
         actionLabel: string
@@ -254,7 +240,8 @@ export function BroadcastAdmin({
       }>
       if (draft.title) setTitle(draft.title)
       if (draft.body) setBody(draft.body)
-      if (draft.segment) setSegment(draft.segment)
+      if (draft.segment) setSegment(normalizeSegment(draft.segment))
+      if (typeof draft.inactiveDays === 'number') setInactiveDays(normalizeInactiveDays(draft.inactiveDays))
       if (draft.selectedChannels?.length) setSelectedChannels(draft.selectedChannels)
       if (typeof draft.actionHref === 'string') setActionHref(draft.actionHref)
       if (typeof draft.actionLabel === 'string') setActionLabel(draft.actionLabel)
@@ -266,9 +253,9 @@ export function BroadcastAdmin({
   }, [])
 
   useEffect(() => {
-    const draft = { title, body, segment, selectedChannels, actionHref, actionLabel, actionOpenInTelegram, imageUrl }
+    const draft = { title, body, segment, inactiveDays, selectedChannels, actionHref, actionLabel, actionOpenInTelegram, imageUrl }
     window.localStorage.setItem(BROADCAST_DRAFT_KEY, JSON.stringify(draft))
-  }, [actionHref, actionLabel, actionOpenInTelegram, body, imageUrl, segment, selectedChannels, title])
+  }, [actionHref, actionLabel, actionOpenInTelegram, body, imageUrl, inactiveDays, segment, selectedChannels, title])
 
   async function submit(testMode = false) {
     const campaignTitle = getBroadcastTitle()
@@ -281,6 +268,7 @@ export function BroadcastAdmin({
           title: campaignTitle,
           body,
           segment,
+          inactiveDays: segment === 'INACTIVE_N_DAYS' ? inactiveDays : null,
           channels: selectedChannels,
           actionHref,
           actionLabel,
@@ -329,7 +317,9 @@ export function BroadcastAdmin({
   function applyTemplate(template: BroadcastTemplateItem) {
     setTitle(template.title)
     setBody(template.body)
-    setSegment(template.segment as BroadcastSegment)
+    const nextSegment = normalizeSegment(template.segment)
+    setSegment(nextSegment)
+    setInactiveDays(normalizeInactiveDays(template.inactiveDays ?? (template.segment === 'INACTIVE_45D' ? 45 : inactiveDays)))
     setSelectedChannels(template.channels.filter((channel): channel is BroadcastChannel => ['IN_APP', 'EMAIL', 'TELEGRAM'].includes(channel)))
     setActionHref(template.actionHref || '')
     setActionLabel(template.actionLabel || '')
@@ -349,6 +339,7 @@ export function BroadcastAdmin({
           description: `Сохранено ${new Intl.DateTimeFormat('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date())}`,
           body,
           segment,
+          inactiveDays: segment === 'INACTIVE_N_DAYS' ? inactiveDays : null,
           channels: selectedChannels,
           actionHref,
           actionLabel,
@@ -376,7 +367,9 @@ export function BroadcastAdmin({
   function applyHistoryItem(item: BroadcastHistoryItem) {
     setTitle(item.title)
     setBody(item.body)
-    setSegment(item.segment as BroadcastSegment)
+    const nextSegment = normalizeSegment(item.segment)
+    setSegment(nextSegment)
+    setInactiveDays(normalizeInactiveDays(item.inactiveDays ?? (item.segment === 'INACTIVE_45D' ? 45 : inactiveDays)))
     setSelectedChannels(item.channels.filter((channel): channel is BroadcastChannel => ['IN_APP', 'EMAIL', 'TELEGRAM'].includes(channel)))
     setActionHref(item.actionHref || '')
     setActionLabel(item.actionLabel || '')
@@ -434,7 +427,7 @@ export function BroadcastAdmin({
   const visibleTemplates: BroadcastTemplateItem[] = [...customTemplates, ...templates]
   const stepSummary = {
     message: body.trim() ? body.trim().split('\n').find(Boolean)?.slice(0, 42) ?? 'Сообщение' : 'Выберите шаблон или напишите текст',
-    audience: `${segmentLabel(segment)} · ${selectedChannels.map(channelLabel).join(', ')}`,
+    audience: `${segmentLabel(segment, inactiveDays)} · ${selectedChannels.map(channelLabel).join(', ')}`,
     delivery: canSend ? 'Готово к отправке' : 'Заполните сообщение и канал',
   }
 
@@ -492,6 +485,20 @@ export function BroadcastAdmin({
               </button>
             ))}
           </div>
+
+          {segment === 'INACTIVE_N_DAYS' && (
+            <label className="mt-4 block rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-white/10 dark:bg-white/5">
+              <span className="text-sm font-medium">Не покупали, дней</span>
+              <input
+                className="input mt-2"
+                type="number"
+                min={1}
+                max={3650}
+                value={inactiveDays}
+                onChange={(event) => setInactiveDays(normalizeInactiveDays(event.target.value))}
+              />
+            </label>
+          )}
 
           <div className="mt-5">
             <div className="flex items-center justify-between gap-2">
@@ -656,7 +663,7 @@ export function BroadcastAdmin({
                   setActionHref(href)
                   if (!href) setActionOpenInTelegram(false)
                 }}
-                maxLength={180}
+                maxLength={600}
                 placeholder="/dashboard/plans?promo=COMEBACK"
               />
             </label>
@@ -734,7 +741,7 @@ export function BroadcastAdmin({
         <div className={cn('card min-w-0 overflow-hidden p-4', step !== 'delivery' && 'hidden')}>
           <div className="grid min-w-0 gap-4">
             <div className="grid gap-2 md:grid-cols-3">
-              <InfoPill label="Сегмент" value={segmentLabel(segment)} />
+              <InfoPill label="Сегмент" value={segmentLabel(segment, inactiveDays)} />
               <InfoPill label="Каналы" value={selectedChannels.map(channelLabel).join(', ')} />
               <InfoPill label="Кнопка" value={actionHref ? `${previewActionLabel}${actionOpenInTelegram ? ' · Telegram Web App' : ''}` : 'Без кнопки'} />
             </div>
@@ -898,7 +905,7 @@ function BroadcastHistory({
                 <div className="min-w-0">
                   <div className="truncate font-semibold">{item.title}</div>
                   <div className="mt-1 text-xs text-slate-500">
-                    {formatDateTime(item.createdAt)} · {segmentLabel(item.segment)} · {item.createdBy || 'Система'}
+                    {formatDateTime(item.createdAt)} · {segmentLabel(item.segment, item.inactiveDays ?? undefined)} · {item.createdBy || 'Система'}
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -938,7 +945,7 @@ function BroadcastHistoryModal({ item, onClose }: { item: BroadcastHistoryItem; 
             <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Рассылка</div>
             <h3 className="mt-1 text-xl font-semibold">{item.title}</h3>
             <div className="mt-1 text-sm text-slate-500">
-              {formatDateTime(item.createdAt)} · {segmentLabel(item.segment)} · {item.createdBy || 'Система'}
+              {formatDateTime(item.createdAt)} · {segmentLabel(item.segment, item.inactiveDays ?? undefined)} · {item.createdBy || 'Система'}
             </div>
           </div>
           <button type="button" className="btn-secondary min-h-10 px-3" onClick={onClose} aria-label="Закрыть">
@@ -994,12 +1001,27 @@ function HistoryMetric({ label, value, failed = 0 }: { label: string; value: num
   )
 }
 
-function segmentLabel(value: string) {
-  return segments.find((item) => item.value === value)?.label ?? value
+function segmentLabel(value: string, days?: number) {
+  const normalized = normalizeSegment(value)
+  if (normalized === 'INACTIVE_N_DAYS') return `Не покупали ${normalizeInactiveDays(days ?? 45)} дней`
+  return segments.find((item) => item.value === normalized)?.label ?? value
 }
 
 function channelLabel(value: string) {
   return channels.find((item) => item.value === value)?.label ?? value
+}
+
+function normalizeSegment(value: string): BroadcastSegment {
+  if (value === 'INACTIVE_45D') return 'INACTIVE_N_DAYS'
+  if (value === 'EMAIL_VERIFIED' || value === 'TELEGRAM_LINKED') return 'ALL'
+  if (segments.some((item) => item.value === value)) return value as BroadcastSegment
+  return 'ALL'
+}
+
+function normalizeInactiveDays(value: string | number) {
+  const parsed = typeof value === 'number' ? value : Number(value)
+  if (!Number.isFinite(parsed)) return 45
+  return Math.min(3650, Math.max(1, Math.round(parsed)))
 }
 
 function formatDateTime(value: string) {

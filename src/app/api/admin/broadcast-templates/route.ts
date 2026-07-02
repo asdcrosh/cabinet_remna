@@ -7,13 +7,16 @@ import { getAppUrl } from '@/lib/app-url'
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
+const MAX_ACTION_HREF_LENGTH = 600
+
 const schema = z.object({
   title: z.string().trim().min(3).max(80),
   description: z.string().trim().max(140).optional().nullable(),
   body: z.string().trim().min(5).max(1200),
-  segment: z.enum(['ALL', 'ACTIVE', 'NO_ACTIVE', 'EXPIRED', 'EMAIL_VERIFIED', 'TELEGRAM_LINKED', 'INACTIVE_45D']),
+  segment: z.enum(['ALL', 'ACTIVE', 'NO_ACTIVE', 'EXPIRED', 'NEVER_PURCHASED', 'INACTIVE_N_DAYS', 'INACTIVE_45D']),
+  inactiveDays: z.coerce.number().int().min(1).max(3650).optional().nullable(),
   channels: z.array(z.enum(['IN_APP', 'EMAIL', 'TELEGRAM'])).min(1).max(3),
-  actionHref: z.string().trim().max(180).optional().nullable(),
+  actionHref: z.string().trim().max(MAX_ACTION_HREF_LENGTH).optional().nullable(),
   actionLabel: z.string().trim().max(32).optional().nullable(),
   actionOpenInTelegram: z.boolean().optional(),
   imageUrl: z.string().trim().url().max(600).optional().nullable().or(z.literal('')),
@@ -47,7 +50,8 @@ export const POST = withAuth(async (req: Request) => {
       title: input.title,
       description: input.description || null,
       body: input.body,
-      segment: input.segment,
+      segment: input.segment === 'INACTIVE_45D' ? 'INACTIVE_N_DAYS' : input.segment,
+      inactiveDays: input.segment === 'INACTIVE_45D' || input.segment === 'INACTIVE_N_DAYS' ? input.inactiveDays ?? 45 : null,
       channels: input.channels,
       actionHref: normalizeActionHref(input.actionHref),
       actionLabel: input.actionLabel || null,

@@ -14,6 +14,7 @@ export default async function BroadcastsPage() {
       title: true,
       body: true,
       segment: true,
+      inactiveDays: true,
       channels: true,
       actionHref: true,
       actionLabel: true,
