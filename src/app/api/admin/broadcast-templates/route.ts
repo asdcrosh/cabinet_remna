@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { requireAdmin, withAuth } from '@/lib/auth/guard'
 import { prisma } from '@/lib/prisma'
+import { getAppUrl } from '@/lib/app-url'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -66,8 +67,17 @@ export const POST = withAuth(async (req: Request) => {
 })
 
 function normalizeActionHref(value: string | null | undefined) {
-  const href = value?.trim()
+  let href = value?.trim()
   if (!href) return null
+  if (href.startsWith('http://') || href.startsWith('https://')) {
+    try {
+      const url = new URL(href)
+      if (url.origin !== getAppUrl()) return null
+      href = `${url.pathname}${url.search}${url.hash}`
+    } catch {
+      return null
+    }
+  }
   if (!href.startsWith('/dashboard')) return null
   return href
 }

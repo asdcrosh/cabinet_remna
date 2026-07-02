@@ -427,7 +427,7 @@ export function BroadcastAdmin({
   }
 
   const canSend = body.trim().length >= 5 && selectedChannels.length > 0 && !loading
-  const selectedPreset = actionPresets.find((preset) => preset.href === actionHref) ?? actionPresets[0]
+  const selectedPreset = actionPresets.find((preset) => preset.href === actionHref)
   const previewBody = renderPreview(body || 'Текст сообщения будет показан здесь.')
   const previewActionLabel = renderPreview(actionLabel || 'Открыть')
   const previewImageUrl = getPreviewImageUrl(imageUrl)
@@ -611,9 +611,14 @@ export function BroadcastAdmin({
                 <span className="text-sm font-medium">Куда ведет кнопка</span>
                 <select
                   className="input mt-1"
-                  value={actionHref}
+                  value={selectedPreset ? selectedPreset.href : 'CUSTOM'}
                   onChange={(event) => {
                     const preset = actionPresets.find((item) => item.href === event.target.value) ?? actionPresets[0]
+                    if (event.target.value === 'CUSTOM') {
+                      setActionHref(actionHref || '/dashboard')
+                      setActionLabel((current) => current || 'Открыть')
+                      return
+                    }
                     setActionHref(preset.href)
                     setActionLabel(preset.label)
                     if (!preset.href) setActionOpenInTelegram(false)
@@ -624,8 +629,9 @@ export function BroadcastAdmin({
                       {preset.title}
                     </option>
                   ))}
+                  <option value="CUSTOM">Своя ссылка</option>
                 </select>
-                <span className="mt-1 block text-xs text-slate-400">{selectedPreset.description}</span>
+                <span className="mt-1 block text-xs text-slate-400">{selectedPreset?.description ?? 'Путь внутри кабинета, можно с параметрами'}</span>
               </label>
               <label className="block">
                 <span className="text-sm font-medium">Текст кнопки</span>
@@ -639,6 +645,21 @@ export function BroadcastAdmin({
                 />
               </label>
             </div>
+
+            <label className="block">
+              <span className="text-sm font-medium">Адрес кнопки</span>
+              <input
+                className="input mt-1 font-mono text-sm"
+                value={actionHref}
+                onChange={(event) => {
+                  const href = event.target.value
+                  setActionHref(href)
+                  if (!href) setActionOpenInTelegram(false)
+                }}
+                maxLength={180}
+                placeholder="/dashboard/plans?promo=COMEBACK"
+              />
+            </label>
 
             {actionHref ? (
               <label className="flex min-h-12 items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-white/10 dark:bg-white/5">

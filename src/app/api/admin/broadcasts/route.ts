@@ -254,8 +254,17 @@ function buildSegmentWhere(segment: z.infer<typeof schema>['segment']): Prisma.U
 }
 
 function normalizeActionHref(value: string | null | undefined) {
-  const href = value?.trim()
+  let href = value?.trim()
   if (!href) return null
+  if (href.startsWith('http://') || href.startsWith('https://')) {
+    try {
+      const url = new URL(href)
+      if (url.origin !== getAppUrl()) return null
+      href = `${url.pathname}${url.search}${url.hash}`
+    } catch {
+      return null
+    }
+  }
   if (!href.startsWith('/dashboard')) return null
   return href
 }

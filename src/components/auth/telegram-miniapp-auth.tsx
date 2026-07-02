@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { Loader2, RefreshCw, Send, TriangleAlert } from 'lucide-react'
 import { getTelegramLaunchData } from '@/lib/telegram-miniapp-client'
 import { logError } from '@/lib/logger'
+import { sanitizeInternalNext } from '@/lib/auth/next-path'
 
 declare global {
   interface Window {
@@ -58,7 +59,7 @@ export function TelegramMiniAppAuth() {
           throw new Error('Сессия не сохранилась. Проверьте домен APP_URL и cookies, затем откройте кабинет заново.')
         }
 
-        window.location.replace(getSafeNextPath())
+        window.location.replace(getSafeNextPath(window.location))
       } catch (error) {
         logError('telegram_miniapp.auth_failed', error)
         if (!cancelled) {
@@ -112,8 +113,21 @@ export function TelegramMiniAppAuth() {
   )
 }
 
-function getSafeNextPath() {
-  const next = new URLSearchParams(window.location.search).get('next')
-  if (next?.startsWith('/') && !next.startsWith('//')) return next
-  return '/dashboard'
+function getSafeNextPath(location: Location) {
+  const params = new URLSearchParams(location.search)
+  const next = sanitizeInternalNext(params.get('next'), '')
+  if (next) return stripTelegramSearchParams(next)
+
+  if (!location.pathname.startsWith('/dashboard')) return '/dashboard'
+
+  return stripTelegramSearchParams(`${location.pathname}${location.search}`)
+}
+
+function stripTelegramSearchParams(path: string) {
+  const url = new URL(path, window.location.origin)
+  for (const key of Array.from(url.searchParams.keys())) {
+    if (key.startsWith('tgWebApp')) url.searchParams.delete(key)
+  }
+
+  return `${url.pathname}${url.search}`
 }

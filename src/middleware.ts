@@ -2,8 +2,37 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { isRequestLoggingEnabled, logInfo } from '@/lib/logger'
 
 export function middleware(req: NextRequest) {
-  const res = NextResponse.next()
+  const res = getMiddlewareResponse(req)
 
+  applySecurityHeaders(res, req)
+
+  if (isRequestLoggingEnabled()) {
+    logInfo('http.request', {
+      method: req.method,
+      path: req.nextUrl.pathname,
+      search: req.nextUrl.search || undefined,
+      ip: getClientIp(req),
+      userAgent: req.headers.get('user-agent') || undefined,
+      referer: req.headers.get('referer') || undefined,
+    })
+  }
+
+  return res
+}
+
+function getMiddlewareResponse(req: NextRequest) {
+  if (req.nextUrl.pathname.startsWith('/dashboard') && !req.cookies.get('cabinet_session')?.value) {
+    const url = req.nextUrl.clone()
+    url.pathname = '/login'
+    url.search = ''
+    url.searchParams.set('next', `${req.nextUrl.pathname}${req.nextUrl.search}`)
+    return NextResponse.redirect(url)
+  }
+
+  return NextResponse.next()
+}
+
+function applySecurityHeaders(res: NextResponse, req: NextRequest) {
   res.headers.set('X-Content-Type-Options', 'nosniff')
   res.headers.set('X-Frame-Options', 'DENY')
   res.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin')
@@ -32,19 +61,6 @@ export function middleware(req: NextRequest) {
       ].join('; ')
     )
   }
-
-  if (isRequestLoggingEnabled()) {
-    logInfo('http.request', {
-      method: req.method,
-      path: req.nextUrl.pathname,
-      search: req.nextUrl.search || undefined,
-      ip: getClientIp(req),
-      userAgent: req.headers.get('user-agent') || undefined,
-      referer: req.headers.get('referer') || undefined,
-    })
-  }
-
-  return res
 }
 
 export const config = {

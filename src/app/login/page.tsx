@@ -5,6 +5,7 @@ import { AuthLayout } from '@/components/auth/auth-layout'
 import { getCurrentUser } from '@/lib/auth/cookies'
 import { prisma } from '@/lib/prisma'
 import { logInfo, logWarn } from '@/lib/logger'
+import { sanitizeInternalNext } from '@/lib/auth/next-path'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 
@@ -12,7 +13,11 @@ export const metadata = { title: 'Вход' }
 
 const yandexEnabled = Boolean(process.env.YANDEX_CLIENT_ID && process.env.YANDEX_CLIENT_SECRET)
 
-export default async function LoginPage() {
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams?: { next?: string }
+}) {
   const session = await getCurrentUser()
   if (session) {
     const user = await prisma.user.findUnique({
@@ -21,7 +26,7 @@ export default async function LoginPage() {
     })
     if (user) {
       logInfo('auth.login.redirect_authenticated', { userId: session.uid })
-      redirect('/dashboard')
+      redirect(sanitizeInternalNext(searchParams?.next))
     }
     logWarn('auth.login.stale_session_ignored', { userId: session.uid })
   }
