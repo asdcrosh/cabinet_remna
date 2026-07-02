@@ -15,6 +15,7 @@ const requiredProduction = [
   "YOOKASSA_SHOP_ID",
   "YOOKASSA_SECRET_KEY",
   "YOOKASSA_WEBHOOK_URL",
+  "YOOKASSA_WEBHOOK_ALLOWED_IPS",
 ];
 
 const optionalPairs = [

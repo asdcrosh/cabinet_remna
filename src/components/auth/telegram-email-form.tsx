@@ -124,7 +124,7 @@ export function TelegramEmailForm({ telegramName, initialEmail }: { telegramName
           </button>
         </div>
         <p className="mt-1 text-xs text-slate-500">
-          Новый email — придумайте пароль. Уже зарегистрированный — введите текущий.
+          Введите пароль для подтверждения email.
         </p>
       </label>
       <label className="block">

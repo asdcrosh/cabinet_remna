@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { Prisma } from '@prisma/client'
 import { compare, hash } from 'bcryptjs'
 import { getSession, setSessionCookieOnResponse } from '@/lib/auth/cookies'
 import { prisma } from '@/lib/prisma'
@@ -82,7 +83,7 @@ export async function POST(req: Request) {
         targetUserId: emailOwner.id,
       })
       return NextResponse.json(
-        { error: 'Этот email уже зарегистрирован. Введите пароль от существующего аккаунта.' },
+        { error: 'Не удалось подтвердить email или пароль.' },
         { status: 401 }
       )
     }
@@ -200,15 +201,26 @@ export async function POST(req: Request) {
     )
   }
 
-  const user = await prisma.user.update({
-    where: { id: current.id },
-    data: {
-      email: parsed.data.email,
-      passwordHash: await hash(newPassword.data, 12),
-      agreedToTermsAt: new Date(),
-    },
-    select: { id: true, email: true, name: true },
-  })
+  let user: { id: string; email: string; name: string | null }
+  try {
+    user = await prisma.user.update({
+      where: { id: current.id },
+      data: {
+        email: parsed.data.email,
+        passwordHash: await hash(newPassword.data, 12),
+        agreedToTermsAt: new Date(),
+      },
+      select: { id: true, email: true, name: true },
+    })
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      return NextResponse.json(
+        { error: 'Не удалось подтвердить email или пароль.' },
+        { status: 401 }
+      )
+    }
+    throw error
+  }
   logInfo('auth.telegram_email.email_attached', { userId: user.id })
   const token = await createEmailVerificationToken(user.id)
   const delivery = await sendEmailVerificationLink({ email: user.email, name: user.name, token })

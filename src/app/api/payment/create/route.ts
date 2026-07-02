@@ -53,6 +53,12 @@ export const POST = withAuth(async (req: Request) => {
   if (!audienceContext || !isPlanAvailableForUser(plan, audienceContext, { allowLink: plan.availability === 'LINK' })) {
     return NextResponse.json({ error: 'Этот тариф недоступен для вашего аккаунта' }, { status: 403 })
   }
+  if (plan.priceKopecks <= 0 && !plan.isPromo) {
+    return NextResponse.json(
+      { error: 'Бесплатный тариф должен быть настроен как ознакомительный.' },
+      { status: 400 }
+    )
+  }
 
   if (plan.isPromo) {
     if (promoCode) {

@@ -7,7 +7,13 @@ export function assertYookassaWebhookSource(req: Request): { ok: true } | { ok: 
     .map((item) => item.trim())
     .filter(Boolean)
 
-  if (allowlist.length === 0) return { ok: true }
+  if (allowlist.length === 0) {
+    if (process.env.NODE_ENV === 'production') {
+      logWarn('webhook.yookassa.allowlist_missing')
+      return { ok: false, error: 'Webhook source allowlist is not configured' }
+    }
+    return { ok: true }
+  }
 
   const ip = getClientIp(req)
   if (!isIpAllowed(ip, allowlist)) {
