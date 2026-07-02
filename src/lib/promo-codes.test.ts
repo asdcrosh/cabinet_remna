@@ -18,6 +18,9 @@ const prisma = {
   subscription: {
     count: vi.fn(),
   },
+  payment: {
+    count: vi.fn(),
+  },
 } as any
 
 const plan = {
@@ -164,9 +167,9 @@ describe('promo code helpers', () => {
     prisma.user.findUnique.mockResolvedValue({
       email: 'user@example.com',
       remnashopUserId: null,
-      remnawaveUuid: 'rw-1',
     })
     prisma.subscription.count.mockResolvedValue(0)
+    prisma.payment.count.mockResolvedValue(1)
 
     await expect(
       validatePromoCodeForPlan({
@@ -178,12 +181,31 @@ describe('promo code helpers', () => {
     ).rejects.toMatchObject({ code: 'PROMO_NEW_USERS_ONLY' })
   })
 
+  it('allows a new-user promo code for a remnashop account without purchases', async () => {
+    prisma.promoCode.findUnique.mockResolvedValue(promoCode({ audience: 'NEW_USERS' }))
+    prisma.user.findUnique.mockResolvedValue({
+      email: 'user@example.com',
+      remnashopUserId: 42,
+    })
+    prisma.subscription.count.mockResolvedValue(0)
+    prisma.payment.count.mockResolvedValue(0)
+    prisma.promoCodeRedemption.count.mockResolvedValue(0)
+
+    const result = await validatePromoCodeForPlan({
+      prisma,
+      code: 'SALE20',
+      userId: 'user-1',
+      plan,
+    })
+
+    expect(result.normalizedCode).toBe('SALE20')
+  })
+
   it('rejects a no-active-subscription promo code for active subscribers', async () => {
     prisma.promoCode.findUnique.mockResolvedValue(promoCode({ audience: 'NO_ACTIVE_SUBSCRIPTION' }))
     prisma.user.findUnique.mockResolvedValue({
       email: 'user@example.com',
       remnashopUserId: null,
-      remnawaveUuid: null,
     })
     prisma.subscription.count.mockResolvedValue(1)
 

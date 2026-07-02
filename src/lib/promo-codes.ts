@@ -1,4 +1,6 @@
 import type { Plan, Prisma } from '@prisma/client'
+import { logWarn } from './logger'
+import { remnashopQuery } from './remnashop-db'
 
 const MIN_PAYMENT_KOPECKS = 100
 const ACTIVE_REDEMPTION_STATUSES = ['PENDING', 'SUCCEEDED'] as const
@@ -7,8 +9,8 @@ type PromoCodeWithPlans = Prisma.PromoCodeGetPayload<{
   include: { plans: { select: { planId: true } } }
 }>
 
-type PromoPrisma = Pick<Prisma.TransactionClient, 'promoCode' | 'promoCodeRedemption' | 'user' | 'subscription'>
-type PromoAudiencePrisma = Pick<Prisma.TransactionClient, 'user' | 'subscription'>
+type PromoPrisma = Pick<Prisma.TransactionClient, 'promoCode' | 'promoCodeRedemption' | 'user' | 'subscription' | 'payment'>
+type PromoAudiencePrisma = Pick<Prisma.TransactionClient, 'user' | 'subscription' | 'payment'>
 
 export class PromoCodeError extends Error {
   constructor(
@@ -144,7 +146,6 @@ async function assertPromoCodeAudienceCanBeUsed({
     select: {
       email: true,
       remnashopUserId: true,
-      remnawaveUuid: true,
     },
   })
 
@@ -160,26 +161,61 @@ async function assertPromoCodeAudienceCanBeUsed({
     return
   }
 
-  const subscriptionsCount = await prisma.subscription.count({
-    where:
-      promoCode.audience === 'NO_ACTIVE_SUBSCRIPTION'
-        ? {
-            userId,
-            status: { in: ['ACTIVE', 'LIMITED'] },
-            expireAt: { gt: now },
-          }
-        : { userId },
-  })
-
   if (promoCode.audience === 'NEW_USERS') {
-    if (user.remnashopUserId || user.remnawaveUuid || subscriptionsCount > 0) {
+    const [subscriptionsCount, succeededPaymentsCount, hasRemnashopHistory] = await Promise.all([
+      prisma.subscription.count({ where: { userId } }),
+      prisma.payment.count({ where: { userId, status: 'SUCCEEDED' } }),
+      hasRemnashopPurchaseHistory(user.remnashopUserId),
+    ])
+
+    if (subscriptionsCount > 0 || succeededPaymentsCount > 0 || hasRemnashopHistory) {
       throw new PromoCodeError('Промокод доступен только новым пользователям', 403, 'PROMO_NEW_USERS_ONLY')
     }
     return
   }
 
+  const subscriptionsCount = await prisma.subscription.count({
+    where: {
+      userId,
+      status: { in: ['ACTIVE', 'LIMITED'] },
+      expireAt: { gt: now },
+    },
+  })
+
   if (promoCode.audience === 'NO_ACTIVE_SUBSCRIPTION' && subscriptionsCount > 0) {
     throw new PromoCodeError('Промокод доступен только пользователям без активной подписки', 403, 'PROMO_NO_ACTIVE_SUBSCRIPTION_ONLY')
+  }
+}
+
+async function hasRemnashopPurchaseHistory(remnashopUserId: number | null) {
+  if (!remnashopUserId || !process.env.REMNASHOP_DATABASE_URL) return false
+
+  try {
+    const result = await remnashopQuery<{ has_history: boolean }>(
+      `
+        SELECT (
+          EXISTS (
+            SELECT 1
+            FROM subscriptions s
+            WHERE s.user_id = $1
+          )
+          OR EXISTS (
+            SELECT 1
+            FROM transactions t
+            WHERE t.user_id = $1
+              AND upper(t.status::text) IN ('COMPLETED', 'SUCCEEDED', 'SUCCESS', 'PAID')
+          )
+        ) AS has_history
+      `,
+      [remnashopUserId]
+    )
+    return Boolean(result.rows[0]?.has_history)
+  } catch (error) {
+    logWarn('promo_codes.remnashop_new_user_check_failed', {
+      remnashopUserId,
+      message: error instanceof Error ? error.message : 'unknown error',
+    })
+    return false
   }
 }
 
