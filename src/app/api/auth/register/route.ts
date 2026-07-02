@@ -3,6 +3,7 @@
 // он понадобится только при первой покупке подписки.
 
 import { NextResponse } from 'next/server'
+import { Prisma } from '@prisma/client'
 import { hash } from 'bcryptjs'
 import { prisma } from '@/lib/prisma'
 import { registerSchema } from '@/lib/auth/validation'
@@ -15,6 +16,16 @@ import { createAdminNotification } from '@/lib/admin-notifications'
 import { logWarn } from '@/lib/logger'
 
 export const runtime = 'nodejs'
+
+function neutralRegisterResponse() {
+  return NextResponse.json(
+    {
+      requiresEmailVerification: true,
+      emailDelivery: 'sent',
+    },
+    { status: 202 }
+  )
+}
 
 export async function POST(req: Request) {
   try {
@@ -49,13 +60,9 @@ export async function POST(req: Request) {
   const { email, password, name, agreeToTerms } = parsed.data
   const referralCode = normalizeReferralCode(parsed.data.referralCode)
 
-  // Проверяем, что email не занят
   const existing = await prisma.user.findUnique({ where: { email } })
   if (existing) {
-    return NextResponse.json(
-      { error: 'Пользователь с таким email уже существует' },
-      { status: 409 }
-    )
+    return neutralRegisterResponse()
   }
 
   const passwordHash = await hash(password, 12) // 12 — баланс CPU/безопасности
@@ -70,18 +77,26 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Реферальный код не найден' }, { status: 404 })
   }
 
-  const user = await prisma.user.create({
-    data: {
-      email,
-      passwordHash,
-      name: name || null,
-      role: 'USER',
-      referralCode: await generateUniqueReferralCode(),
-      referredById: referrer?.id,
-      agreedToTermsAt: agreeToTerms ? new Date() : null,
-    },
-    select: { id: true, email: true, role: true, name: true },
-  })
+  let user: { id: string; email: string; role: string; name: string | null }
+  try {
+    user = await prisma.user.create({
+      data: {
+        email,
+        passwordHash,
+        name: name || null,
+        role: 'USER',
+        referralCode: await generateUniqueReferralCode(),
+        referredById: referrer?.id,
+        agreedToTermsAt: agreeToTerms ? new Date() : null,
+      },
+      select: { id: true, email: true, role: true, name: true },
+    })
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      return neutralRegisterResponse()
+    }
+    throw error
+  }
 
   const token = await createEmailVerificationToken(user.id)
   const delivery = await sendEmailVerificationLink({

@@ -43,7 +43,7 @@ export function RegisterForm({
       })
       setRegisteredEmail(values.email)
       setEmailDelivery(result.emailDelivery ?? null)
-      toast('Проверьте почту для подтверждения email', 'success')
+      toast('Проверьте почту для продолжения', 'success')
     } catch (e: any) {
       setServerError(e.message)
     }
@@ -58,7 +58,8 @@ export function RegisterForm({
         <div>
           <h2 className="text-lg font-semibold">Подтвердите email</h2>
           <p className="mt-1 text-sm text-slate-500">
-            Мы отправили ссылку подтверждения на {registeredEmail}. После подтверждения можно войти в кабинет.
+            Если регистрация доступна, мы отправили ссылку подтверждения на {registeredEmail}.
+            После подтверждения можно войти в кабинет.
           </p>
         </div>
         {emailDelivery && emailDelivery !== 'sent' && (
@@ -75,7 +76,7 @@ export function RegisterForm({
         </button>
         <div className="flex items-center justify-center gap-2 text-sm text-emerald-600">
           <CheckCircle2 className="h-4 w-4" />
-          Аккаунт создан
+          Проверьте почту
         </div>
       </div>
     )
