@@ -90,7 +90,7 @@ export default async function SubscriptionPage() {
         </div>
       </section>
 
-      <section className="grid gap-3 sm:grid-cols-3">
+      <section className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:grid sm:grid-cols-3 sm:overflow-visible sm:px-0 sm:pb-0">
         <Link href="/dashboard/plans" className="quick-action">
           <CreditCard className="h-4 w-4 text-cyan-600 dark:text-cyan-300" />
           Продлить подписку

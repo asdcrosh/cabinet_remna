@@ -95,9 +95,9 @@
            dark:border-white/10 dark:bg-white/[0.035] dark:shadow-black/10;
   }
   .quick-action {
-    @apply flex min-h-12 items-center gap-3 rounded-lg border border-slate-200 bg-white/80 px-3 py-2.5 text-sm font-semibold
+    @apply flex min-h-12 min-w-[13rem] items-center gap-3 rounded-lg border border-slate-200 bg-white/80 px-3 py-2.5 text-sm font-semibold
            text-slate-800 shadow-sm transition-all hover:-translate-y-0.5 hover:border-cyan-200 hover:bg-cyan-50/70
-           dark:border-white/10 dark:bg-white/[0.035] dark:text-slate-100 dark:hover:border-cyan-500/30 dark:hover:bg-cyan-500/10;
+           dark:border-white/10 dark:bg-white/[0.035] dark:text-slate-100 dark:hover:border-cyan-500/30 dark:hover:bg-cyan-500/10 sm:min-w-0;
   }
   .skeleton {
     @apply animate-pulse rounded-lg bg-slate-200/80 dark:bg-surface-800;

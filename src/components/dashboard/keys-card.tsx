@@ -174,17 +174,17 @@ export function KeysCard({ subscriptionUrl, happLink }: KeysCardProps) {
   }
 
   return (
-    <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-surface-900">
-      <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_18rem]">
+    <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-surface-900">
+      <div className="grid gap-0 sm:grid-cols-[minmax(0,1fr)_14rem] lg:grid-cols-[minmax(0,1fr)_18rem]">
         <div className="min-w-0 p-4 sm:p-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0">
-              <div className="inline-flex items-center gap-2 rounded-full bg-cyan-50 px-3 py-1 text-xs font-semibold text-cyan-700 dark:bg-cyan-500/10 dark:text-cyan-200">
+              <div className="inline-flex max-w-full items-center gap-2 rounded-full bg-cyan-50 px-3 py-1 text-xs font-semibold text-cyan-700 dark:bg-cyan-500/10 dark:text-cyan-200">
                 <DeviceIcon device={device} />
-                {deviceLabel(device)} определено автоматически
+                <span className="truncate">{deviceLabel(device)} определено</span>
               </div>
               <h2 className="mt-3 text-xl font-semibold tracking-tight text-slate-950 dark:text-white">Подключение</h2>
-              <p className="mt-1 max-w-xl text-sm leading-6 text-slate-500 dark:text-slate-400">
+              <p className="mt-1 hidden max-w-xl text-sm leading-6 text-slate-500 dark:text-slate-400 sm:block">
                 Выберите приложение и добавьте подписку в один переход.
               </p>
             </div>
@@ -195,7 +195,7 @@ export function KeysCard({ subscriptionUrl, happLink }: KeysCardProps) {
               className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-60 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-200 dark:hover:bg-white/[0.06] sm:shrink-0"
             >
               <RefreshCw className="h-4 w-4" />
-              {revoking ? 'Обновляем' : 'Обновить ссылку'}
+              <span>{revoking ? 'Обновляем' : 'Обновить ссылку'}</span>
             </button>
           </div>
 
@@ -209,7 +209,7 @@ export function KeysCard({ subscriptionUrl, happLink }: KeysCardProps) {
                   type="button"
                   onClick={() => setSelectedAppId(option.id)}
                   className={cn(
-                    'flex min-h-16 min-w-[11rem] items-center gap-3 rounded-lg border p-3 text-left transition sm:min-w-0',
+                    'flex min-h-14 min-w-[9.5rem] items-center gap-2.5 rounded-lg border p-2.5 text-left transition sm:min-h-16 sm:min-w-0 sm:gap-3 sm:p-3',
                     active
                       ? 'border-slate-950 bg-slate-950 text-white shadow-sm dark:border-cyan-300 dark:bg-cyan-300 dark:text-slate-950'
                       : 'border-slate-200 bg-slate-50/70 hover:border-slate-300 hover:bg-white dark:border-white/10 dark:bg-white/[0.03] dark:hover:bg-white/[0.06]'
@@ -217,7 +217,7 @@ export function KeysCard({ subscriptionUrl, happLink }: KeysCardProps) {
                 >
                   <span
                     className={cn(
-                      'grid h-10 w-10 shrink-0 place-items-center rounded-lg',
+                      'grid h-9 w-9 shrink-0 place-items-center rounded-lg sm:h-10 sm:w-10',
                       active ? 'bg-white/15' : 'bg-white text-cyan-700 shadow-sm dark:bg-white/10 dark:text-cyan-200'
                     )}
                   >
@@ -225,7 +225,7 @@ export function KeysCard({ subscriptionUrl, happLink }: KeysCardProps) {
                   </span>
                   <span className="min-w-0">
                     <span className="block truncate text-sm font-semibold">{option.name}</span>
-                    <span className={cn('mt-0.5 block truncate text-xs', active ? 'text-white/70 dark:text-slate-950/65' : 'text-slate-500')}>
+                    <span className={cn('mt-0.5 block truncate text-[11px] sm:text-xs', active ? 'text-white/70 dark:text-slate-950/65' : 'text-slate-500')}>
                       {option.subtitle}
                     </span>
                   </span>
@@ -234,12 +234,12 @@ export function KeysCard({ subscriptionUrl, happLink }: KeysCardProps) {
             })}
           </div>
 
-          <div className="mt-4 grid gap-2 sm:grid-cols-[1fr_auto_auto]">
+          <div className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-[1fr_auto_auto]">
             <button
               type="button"
               onClick={openInApp}
               disabled={!subscriptionUrl}
-              className="inline-flex h-12 items-center justify-center gap-2 rounded-lg bg-slate-950 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200"
+              className="col-span-3 inline-flex h-12 items-center justify-center gap-2 rounded-lg bg-slate-950 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200 sm:col-span-1"
             >
               <ExternalLink className="h-4 w-4" />
               {`Подключить в ${selectedApp.name}`}
@@ -248,23 +248,36 @@ export function KeysCard({ subscriptionUrl, happLink }: KeysCardProps) {
               type="button"
               onClick={() => copy(subscriptionUrl, 'Ссылка подписки')}
               disabled={!subscriptionUrl}
-              className="inline-flex h-12 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-200 dark:hover:bg-white/[0.06]"
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-200 dark:hover:bg-white/[0.06] sm:h-12 sm:px-4"
             >
               <Copy className="h-4 w-4" />
-              Скопировать
+              <span className="hidden sm:inline">Скопировать</span>
+              <span className="sm:hidden">Ссылка</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setQrOpen(true)}
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-200 dark:hover:bg-white/[0.06] sm:hidden"
+            >
+              <QrCode className="h-4 w-4" />
+              QR
             </button>
             <button
               type="button"
               onClick={() => setInstructionsOpen(true)}
-              className="inline-flex h-12 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-200 dark:hover:bg-white/[0.06]"
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-200 dark:hover:bg-white/[0.06] sm:h-12 sm:px-4"
             >
               <HelpCircle className="h-4 w-4" />
-              Инструкция
+              <span className="hidden sm:inline">Инструкция</span>
+              <span className="sm:hidden">Помощь</span>
             </button>
           </div>
 
           <div className="mt-3 flex flex-col gap-2 text-xs text-slate-500 dark:text-slate-400 sm:flex-row sm:items-center sm:justify-between">
-            <span className="min-w-0 truncate rounded-lg bg-slate-50 px-3 py-2 font-mono dark:bg-white/[0.03]">
+            <span className="min-w-0 rounded-lg bg-slate-50 px-3 py-2 dark:bg-white/[0.03] sm:hidden">
+              {subscriptionUrl ? 'Ссылка подписки готова' : 'Ссылка подписки пока недоступна'}
+            </span>
+            <span className="hidden min-w-0 truncate rounded-lg bg-slate-50 px-3 py-2 font-mono dark:bg-white/[0.03] sm:block">
               {subscriptionUrl || 'Ссылка подписки пока недоступна'}
             </span>
             <a
@@ -279,7 +292,7 @@ export function KeysCard({ subscriptionUrl, happLink }: KeysCardProps) {
           </div>
         </div>
 
-        <aside className="border-t border-slate-100 bg-slate-50/70 p-4 dark:border-white/10 dark:bg-white/[0.025] lg:border-l lg:border-t-0">
+        <aside className="hidden border-t border-slate-100 bg-slate-50/70 p-4 dark:border-white/10 dark:bg-white/[0.025] sm:block sm:border-l sm:border-t-0">
           <button
             type="button"
             onClick={() => setQrOpen(true)}

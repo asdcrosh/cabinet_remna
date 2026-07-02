@@ -110,9 +110,11 @@ export default async function PlansPage({
         <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
           <div>
             <h2 className="text-lg font-semibold tracking-tight sm:text-2xl">Выберите срок доступа</h2>
-            <p className="mt-1 max-w-2xl text-sm text-slate-500 dark:text-slate-400">Оплата картой, подписка появится в кабинете.</p>
+            <p className="mt-1 max-w-2xl text-sm text-slate-500 dark:text-slate-400">
+              Оплата онлайн, подключение сразу в кабинете.
+            </p>
           </div>
-          <div className="grid grid-cols-3 gap-1.5 sm:gap-2 lg:w-[34rem]">
+          <div className="hidden grid-cols-3 gap-1.5 sm:grid sm:gap-2 lg:w-[34rem]">
             <BuyStep icon={<ShieldCheck className="h-4 w-4" />} title="Тариф" />
             <BuyStep icon={<CreditCard className="h-4 w-4" />} title="Оплата" />
             <BuyStep icon={<KeyRound className="h-4 w-4" />} title="Подключение" />
