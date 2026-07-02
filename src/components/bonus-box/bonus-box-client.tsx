@@ -1,6 +1,6 @@
 "use client";
 
-import { type CSSProperties, type ReactNode, useMemo, useRef, useState } from "react";
+import { type CSSProperties, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import {
   CalendarClock,
   CalendarPlus,
@@ -124,9 +124,10 @@ type OpenBoxResponse = {
 
 type BonusBoxTab = "outcomes" | "history" | "rules";
 
-const CARD_WIDTH = 184;
-const CARD_GAP = 14;
-const STEP = CARD_WIDTH + CARD_GAP;
+const DESKTOP_CARD_WIDTH = 184;
+const MOBILE_CARD_WIDTH = 138;
+const DESKTOP_CARD_GAP = 14;
+const MOBILE_CARD_GAP = 12;
 const OPENING_EFFECT_PARTICLES = [
   { x: 7, delay: 0, size: 3, drift: -22, duration: 1700 },
   { x: 13, delay: 180, size: 5, drift: 30, duration: 1900 },
@@ -158,8 +159,12 @@ export function BonusBoxClient({
   const [revealEffect, setRevealEffect] = useState(false);
   const [result, setResult] = useState<OpenBoxResponse | null>(null);
   const [activeTab, setActiveTab] = useState<BonusBoxTab>("outcomes");
+  const [mobileReel, setMobileReel] = useState(false);
   const canUseWelcomeAttempts =
     !data.hasActiveSubscription && data.welcomeAttemptsCount > 0;
+  const cardWidth = mobileReel ? MOBILE_CARD_WIDTH : DESKTOP_CARD_WIDTH;
+  const cardGap = mobileReel ? MOBILE_CARD_GAP : DESKTOP_CARD_GAP;
+  const reelStep = cardWidth + cardGap;
 
   const canOpen = !data.canOpenReason && !opening;
   const subscribeCta = Boolean(data.canOpenReason?.includes("подписк"));
@@ -178,6 +183,15 @@ export function BonusBoxClient({
     "bonus-box-open-button group relative inline-flex min-h-11 items-center justify-center overflow-hidden rounded-lg border border-cyan-300/35 px-4 text-sm font-semibold text-white shadow-lg shadow-cyan-950/20 transition-all duration-200 hover:-translate-y-0.5 hover:border-cyan-200/70 disabled:translate-y-0 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/10 disabled:text-slate-400 disabled:shadow-none sm:min-w-44";
   const revealClass = result ? bonusBoxRevealClass(result.prize) : null;
 
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 639px)");
+    const sync = () => setMobileReel(media.matches);
+
+    sync();
+    media.addEventListener("change", sync);
+    return () => media.removeEventListener("change", sync);
+  }, []);
+
   async function openBox() {
     if (!canOpen) return;
     setOpening(true);
@@ -194,7 +208,7 @@ export function BonusBoxClient({
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           const stopRatio = Math.min(0.72, Math.max(0.28, response.stopOffsetRatio));
-          const target = response.winningIndex * STEP + CARD_WIDTH * stopRatio;
+          const target = response.winningIndex * reelStep + cardWidth * stopRatio;
           setOffset(-target);
         });
       });
@@ -221,16 +235,6 @@ export function BonusBoxClient({
             ].slice(0, 12),
           }));
         }
-        if (response.prize.type === "NO_PRIZE") {
-          toast("Открытие завершено: без подарка", "success");
-        } else if (!response.remoteSynced) {
-          toast(
-            "Подарок сохранён, синхронизация с VPN будет повторена",
-            "success",
-          );
-        } else {
-          toast("Подарок начислен", "success");
-        }
         setOpening(false);
         window.setTimeout(() => setRevealEffect(false), 1600);
       }, 5900);
@@ -250,13 +254,18 @@ export function BonusBoxClient({
   }
 
   const openCaseCta = subscribeCta && !opening ? (
-    <a href="/dashboard/tariffs" className={cn(openButtonClass, "w-full")}>
+    <a href="/dashboard/plans" className={cn(openButtonClass, "w-full")}>
       <span className="absolute inset-y-0 -left-1/3 w-1/3 skew-x-[-18deg] bg-white/24 blur-sm transition-transform duration-700 group-hover:translate-x-[430%]" />
       <span className="relative flex items-center justify-center gap-2">
         <ShoppingCart className="h-4 w-4" />
         <span>{openButtonLabel}</span>
       </span>
     </a>
+  ) : data.canOpenReason && !opening ? (
+    <div className="flex min-h-10 items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/[0.06] px-3 text-sm font-semibold text-slate-300">
+      <Gift className="h-4 w-4 text-cyan-200" />
+      <span>{openButtonLabel}</span>
+    </div>
   ) : (
     <button
       type="button"
@@ -284,15 +293,15 @@ export function BonusBoxClient({
           revealEffect && revealClass,
         )}
       >
-        <div className="bonus-box-stage-header grid gap-3 border-b border-white/10 px-3 py-3 sm:grid-cols-[minmax(0,1fr)_minmax(12rem,18rem)] sm:items-center sm:px-5">
+        <div className="bonus-box-stage-header grid gap-2.5 border-b border-white/10 px-3 py-2.5 sm:grid-cols-[minmax(0,1fr)_minmax(12rem,18rem)] sm:items-center sm:gap-3 sm:px-5 sm:py-3">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <h2 className="text-lg font-semibold text-white">Рулетка бонусов</h2>
+              <h2 className="text-base font-semibold text-white sm:text-lg">Рулетка бонусов</h2>
               <span className="rounded-full border border-cyan-300/25 bg-cyan-300/10 px-2.5 py-1 text-xs font-semibold text-cyan-100">
                 {data.attemptsCount} доступно
               </span>
             </div>
-            <p className="mt-1 text-sm text-slate-400">
+            <p className="mt-1 text-xs leading-5 text-slate-400 sm:text-sm">
               {opening
                 ? "Крутим и фиксируем подарок в центре."
                 : result
@@ -310,18 +319,18 @@ export function BonusBoxClient({
 
         <div className="bonus-box-reel-shell relative overflow-hidden py-3 sm:py-5">
           <BonusBoxOpeningEffects />
-          <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-12 bg-gradient-to-r from-slate-950 via-slate-950/80 to-transparent sm:w-32" />
-          <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-12 bg-gradient-to-l from-slate-950 via-slate-950/80 to-transparent sm:w-32" />
+          <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-5 bg-gradient-to-r from-slate-950 via-slate-950/65 to-transparent sm:w-32 sm:via-slate-950/80" />
+          <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-5 bg-gradient-to-l from-slate-950 via-slate-950/65 to-transparent sm:w-32 sm:via-slate-950/80" />
           <div className="bonus-box-portal" aria-hidden="true">
             <div className="bonus-box-portal-core" />
             <div className="bonus-box-portal-line" />
           </div>
 
-          <div ref={viewportRef} className="overflow-hidden">
+          <div ref={viewportRef} className="bonus-box-reel-viewport overflow-hidden">
             <div
               className="bonus-box-reel-track flex will-change-transform"
               style={{
-                gap: `${CARD_GAP}px`,
+                gap: `${cardGap}px`,
                 transform: `translate3d(${offset}px,0,0)`,
                 transition: opening
                   ? "transform 5.7s cubic-bezier(.08,.82,.07,1)"
@@ -335,6 +344,7 @@ export function BonusBoxClient({
                   key={`${prize.id}-${index}`}
                   prize={prize}
                   compact
+                  cardWidth={cardWidth}
                   highlighted={Boolean(revealEffect && result?.winningIndex === index)}
                 />
               ))}
@@ -421,14 +431,14 @@ export function BonusBoxClient({
                     <Copy className="h-4 w-4" />
                     Скопировать
                   </button>
-                  <a className="btn-secondary" href={`/dashboard/tariffs?promo=${encodeURIComponent(result.promoCode)}`}>
+                  <a className="btn-secondary" href={`/dashboard/plans?promo=${encodeURIComponent(result.promoCode)}`}>
                     <TicketPercent className="h-4 w-4" />
                     Применить к тарифу
                   </a>
                 </>
               )}
               {!data.hasActiveSubscription && prizeRequiresSubscription(result.prize) && (
-                <a className="btn-primary" href="/dashboard/tariffs">
+                <a className="btn-primary" href="/dashboard/plans">
                   <ShoppingCart className="h-4 w-4" />
                   Оформить подписку
                 </a>
@@ -561,11 +571,11 @@ function ActivePromoRewards({
   onCopy: (code: string) => void;
 }) {
   return (
-    <section className="order-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60 dark:border-white/10 dark:bg-surface-900 dark:shadow-black/20">
+    <section className="order-3 rounded-lg border border-slate-200 bg-white p-3 shadow-sm shadow-slate-200/60 dark:border-white/10 dark:bg-surface-900 dark:shadow-black/20 sm:p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold text-slate-950 dark:text-white">Ваши активные промокоды</h2>
-          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+          <h2 className="text-base font-semibold text-slate-950 dark:text-white sm:text-lg">Ваши активные промокоды</h2>
+          <p className="mt-1 text-sm leading-5 text-slate-500 dark:text-slate-400">
             Можно скопировать или сразу применить к тарифу.
           </p>
         </div>
@@ -595,7 +605,7 @@ function ActivePromoRewards({
                 <Copy className="h-3.5 w-3.5" />
                 Копировать
               </button>
-              <a className="btn-primary min-h-10 justify-center text-xs" href={`/dashboard/tariffs?promo=${encodeURIComponent(reward.code)}`}>
+              <a className="btn-primary min-h-10 justify-center text-xs" href={`/dashboard/plans?promo=${encodeURIComponent(reward.code)}`}>
                 Применить
               </a>
             </div>
@@ -837,10 +847,12 @@ function PrizeCard({
   prize,
   compact = false,
   highlighted = false,
+  cardWidth,
 }: {
   prize: BonusBoxPrizeView;
   compact?: boolean;
   highlighted?: boolean;
+  cardWidth?: number;
 }) {
   const Icon =
     prize.type === "NO_PRIZE"
@@ -858,12 +870,12 @@ function PrizeCard({
       className={cn(
         "relative shrink-0 overflow-hidden rounded-lg border p-3 transition-transform duration-200",
         compact
-          ? "bonus-box-reel-card h-40 text-white shadow-[0_18px_42px_rgba(0,0,0,.28)]"
+          ? "bonus-box-reel-card h-32 text-white shadow-[0_14px_32px_rgba(0,0,0,.24)] sm:h-40 sm:shadow-[0_18px_42px_rgba(0,0,0,.28)]"
           : "min-h-[132px] bg-white shadow-sm hover:-translate-y-0.5 dark:bg-surface-900",
         compact ? prizeReelClass(prize) : prizeBorderClass(prize),
         highlighted && "bonus-box-reel-card--winner",
       )}
-      style={compact ? { width: CARD_WIDTH } : undefined}
+      style={compact ? { width: cardWidth ?? DESKTOP_CARD_WIDTH } : undefined}
     >
       <div
         className={cn("absolute inset-x-0 top-0 h-1", prizeTopClass(prize))}
@@ -884,7 +896,7 @@ function PrizeCard({
           <div
             className={cn(
               "truncate font-semibold",
-              compact && "text-lg text-white",
+              compact && "text-base text-white sm:text-lg",
             )}
           >
             {prize.title}
@@ -908,9 +920,9 @@ function PrizeCard({
         </span>
       </div>
       {compact && (
-        <div className="relative mt-8 flex items-end justify-between">
-          <div className="grid h-12 w-12 place-items-center rounded-lg border border-white/10 bg-white/10 text-white shadow-inner shadow-white/5">
-            <Icon className="h-6 w-6" />
+        <div className="relative mt-5 flex items-end justify-between sm:mt-8">
+          <div className="grid h-10 w-10 place-items-center rounded-lg border border-white/10 bg-white/10 text-white shadow-inner shadow-white/5 sm:h-12 sm:w-12">
+            <Icon className="h-5 w-5 sm:h-6 sm:w-6" />
           </div>
           <div className="flex items-end gap-1">
             <span
@@ -961,7 +973,7 @@ function prizeRequiresSubscription(prize: BonusBoxPrizeView) {
 
 function getDisabledCtaLabel(reason: string) {
   if (reason.includes("подписк")) return "Оформить подписку";
-  if (reason.includes("Нет доступных")) return "Как получить открытия";
+  if (reason.includes("Нет доступных")) return "Нет открытий";
   if (reason.includes("настро")) return "Подарки скоро";
   return "Недоступно";
 }

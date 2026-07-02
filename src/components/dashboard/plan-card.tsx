@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { apiFetch } from "@/lib/api-client";
 import { toast } from "@/components/ui/toaster";
 import { cn } from "@/lib/cn";
@@ -12,12 +12,14 @@ interface PlanCardProps {
   name: string;
   description: string | null;
   price: string;
+  priceKopecks: number;
   durationDays: number;
   trafficLimitGb: number | null;
   deviceLimit: number;
   isPromo?: boolean;
   popular?: boolean;
   current?: boolean;
+  initialPromoCode?: string;
   availablePromoCodes?: Array<{
     code: string;
     discountPercent: number;
@@ -32,17 +34,20 @@ export function PlanCard({
   name,
   description,
   price,
+  priceKopecks,
   durationDays,
   trafficLimitGb,
   deviceLimit,
   isPromo = false,
   popular,
   current,
+  initialPromoCode,
   availablePromoCodes = [],
 }: PlanCardProps) {
   const [loading, setLoading] = useState(false);
   const [validatingPromo, setValidatingPromo] = useState(false);
   const [promoOpen, setPromoOpen] = useState(false);
+  const [manualPromoOpen, setManualPromoOpen] = useState(false);
   const [promoInput, setPromoInput] = useState("");
   const [appliedPromo, setAppliedPromo] = useState<{
     code: string;
@@ -51,19 +56,50 @@ export function PlanCard({
     finalAmountKopecks: number;
   } | null>(null);
 
+  const isPromoPlan = isPromo || priceKopecks <= 0;
   const trimmedPromo = promoInput.trim();
   const effectivePrice = appliedPromo
     ? formatPrice(appliedPromo.finalAmountKopecks)
     : price;
-  const suggestedPromoCodes = [...availablePromoCodes]
-    .sort((a, b) => {
+  const suggestedPromoCodes = useMemo(
+    () => [...availablePromoCodes].sort((a, b) => {
       if (b.discountKopecks !== a.discountKopecks) return b.discountKopecks - a.discountKopecks;
       return b.discountPercent - a.discountPercent;
-    })
-    .slice(0, 3);
+    }).slice(0, 3),
+    [availablePromoCodes],
+  );
+  const bestPromo = suggestedPromoCodes[0] ?? null;
+  const showManualPromoInput =
+    promoOpen && (manualPromoOpen || suggestedPromoCodes.length === 0);
+
+  useEffect(() => {
+    if (!initialPromoCode || isPromoPlan) return;
+    const awardedPromo = suggestedPromoCodes.find((promo) => promo.code === initialPromoCode);
+
+    setPromoOpen(true);
+    if (awardedPromo) {
+      setManualPromoOpen(false);
+      setPromoInput(awardedPromo.code);
+      setAppliedPromo({
+        code: awardedPromo.code,
+        discountPercent: awardedPromo.discountPercent,
+        discountKopecks: awardedPromo.discountKopecks,
+        finalAmountKopecks: awardedPromo.finalAmountKopecks,
+      });
+      return;
+    }
+
+    if (suggestedPromoCodes.length > 0) {
+      setManualPromoOpen(false);
+      return;
+    }
+
+    setManualPromoOpen(true);
+    setPromoInput(initialPromoCode);
+  }, [initialPromoCode, isPromoPlan, suggestedPromoCodes]);
 
   async function buy() {
-    if (isPromo) {
+    if (isPromoPlan) {
       setLoading(true);
       try {
         const { redirectUrl } = await apiFetch<{ redirectUrl?: string }>(
@@ -132,6 +168,9 @@ export function PlanCard({
       });
       setAppliedPromo(discount);
       setPromoInput(discount.code);
+      if (suggestedPromoCodes.length > 0) {
+        setManualPromoOpen(false);
+      }
       toast("Промокод применён", "success");
     } catch {
       setAppliedPromo(null);
@@ -142,6 +181,7 @@ export function PlanCard({
 
   function selectAwardedPromo(promo: NonNullable<PlanCardProps["availablePromoCodes"]>[number]) {
     setPromoOpen(true);
+    setManualPromoOpen(false);
     setPromoInput(promo.code);
     setAppliedPromo({
       code: promo.code,
@@ -155,6 +195,16 @@ export function PlanCard({
   function resetPromo() {
     setPromoInput("");
     setAppliedPromo(null);
+    setManualPromoOpen(true);
+  }
+
+  function openPromoBlock() {
+    if (bestPromo) {
+      selectAwardedPromo(bestPromo);
+      return;
+    }
+    setManualPromoOpen(true);
+    setPromoOpen(true);
   }
 
   return (
@@ -225,68 +275,91 @@ export function PlanCard({
         <Feature className="hidden sm:flex">QR и ссылка подписки</Feature>
         <Feature>До {deviceLimit} устройств</Feature>
       </ul>
-      {!isPromo && (promoOpen || appliedPromo) ? (
+      {!isPromoPlan && (promoOpen || appliedPromo) ? (
         <div className="mt-auto space-y-2 pt-3">
           {suggestedPromoCodes.length > 0 ? (
-            <div className="flex gap-1.5 overflow-x-auto pb-0.5">
-              {suggestedPromoCodes.map((promo) => (
+            <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-2.5 shadow-inner shadow-white/5">
+              <div className="mb-2 flex items-center justify-between gap-2 text-xs">
+                <span className="inline-flex min-w-0 items-center gap-1.5 font-semibold text-slate-700 dark:text-slate-200">
+                  <Tag className="h-3.5 w-3.5 shrink-0 text-cyan-500 dark:text-cyan-300" />
+                  <span className="truncate">Доступные промокоды</span>
+                </span>
+                {bestPromo && (
+                  <span className="shrink-0 rounded-full border border-cyan-300/30 bg-cyan-300/10 px-2 py-0.5 font-semibold text-cyan-800 dark:text-cyan-100">
+                    лучший -{bestPromo.discountPercent}%
+                  </span>
+                )}
+              </div>
+              <div className="grid gap-1.5 sm:grid-cols-3">
+                {suggestedPromoCodes.map((promo) => (
+                  <button
+                    key={promo.code}
+                    type="button"
+                    className={cn(
+                      "min-w-0 rounded-xl border px-2.5 py-2 text-left transition",
+                      appliedPromo?.code === promo.code
+                        ? "border-emerald-300/60 bg-emerald-400/12 text-emerald-900 shadow-sm shadow-emerald-950/10 dark:text-emerald-100"
+                        : "border-white/10 bg-slate-950/[0.03] text-slate-600 hover:border-cyan-300/35 hover:bg-cyan-300/10 dark:bg-slate-950/35 dark:text-slate-300"
+                    )}
+                    onClick={() => selectAwardedPromo(promo)}
+                  >
+                    <span className="block truncate text-xs font-semibold">{promo.code}</span>
+                    <span className="mt-1 block text-xs text-slate-500 dark:text-slate-400">
+                      -{promo.discountPercent}%
+                    </span>
+                  </button>
+                ))}
+              </div>
+              {!manualPromoOpen && (
                 <button
-                  key={promo.code}
                   type="button"
-                  className={cn(
-                    "min-w-fit rounded-full border px-2.5 py-1.5 text-left text-xs font-medium transition",
-                    appliedPromo?.code === promo.code
-                      ? "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-100"
-                      : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-800 dark:bg-surface-900 dark:text-slate-300 dark:hover:bg-surface-800"
-                  )}
-                  onClick={() => selectAwardedPromo(promo)}
+                  className="mt-2 text-xs font-medium text-cyan-800 transition hover:text-slate-950 dark:text-cyan-100/75 dark:hover:text-white"
+                  onClick={() => setManualPromoOpen(true)}
                 >
-                  {promo.code} · -{promo.discountPercent}%
+                  Ввести другой
                 </button>
-              ))}
+              )}
             </div>
           ) : (
-            <a
-              href="/dashboard/bonus-box"
-              className="flex items-center justify-between gap-3 rounded-lg border border-cyan-100 bg-cyan-50/70 px-3 py-2 text-sm font-medium text-cyan-800 transition hover:bg-cyan-50 dark:border-cyan-500/20 dark:bg-cyan-500/10 dark:text-cyan-100"
-            >
-              <span>Промокод можно выбить в разделе “Бонусы”</span>
-              <Sparkles className="h-4 w-4 shrink-0" />
-            </a>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-3 py-2 text-sm font-medium text-slate-700 dark:border-white/10 dark:bg-white/[0.05] dark:text-slate-200">
+              Введите свой промокод вручную
+            </div>
           )}
-          <div className="flex min-w-0 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2 py-1.5 dark:border-slate-800 dark:bg-surface-900">
-            <Tag className="h-4 w-4 shrink-0 text-slate-400" />
-            <input
-              value={promoInput}
-              onChange={(event) => {
-                setPromoInput(event.target.value);
-                setAppliedPromo(null);
-              }}
-              placeholder="Промокод"
-              className="min-w-0 flex-1 bg-transparent text-sm font-medium uppercase outline-none placeholder:normal-case placeholder:text-slate-400"
-              autoComplete="off"
-              spellCheck={false}
-            />
-            <button
-              type="button"
-              className="grid h-8 w-8 shrink-0 place-items-center rounded-md bg-slate-950 text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-slate-950"
-              onClick={applyPromo}
-              disabled={validatingPromo}
-              aria-label="Применить промокод"
-            >
-              <Check className="h-4 w-4" />
-            </button>
-            {promoInput ? (
+          {showManualPromoInput && (
+            <div className="flex min-w-0 items-center gap-1.5 rounded-2xl border border-slate-200 bg-white px-2 py-1.5 dark:border-slate-800 dark:bg-surface-900">
+              <Tag className="h-4 w-4 shrink-0 text-slate-400" />
+              <input
+                value={promoInput}
+                onChange={(event) => {
+                  setPromoInput(event.target.value);
+                  setAppliedPromo(null);
+                }}
+                placeholder="Промокод"
+                className="min-w-0 flex-1 bg-transparent text-sm font-medium uppercase outline-none placeholder:normal-case placeholder:text-slate-400"
+                autoComplete="off"
+                spellCheck={false}
+              />
               <button
                 type="button"
-                className="grid h-8 w-8 shrink-0 place-items-center rounded-md text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-surface-800 dark:hover:text-slate-200"
-                onClick={resetPromo}
-                aria-label="Очистить промокод"
+                className="grid h-8 w-8 shrink-0 place-items-center rounded-md bg-slate-950 text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-slate-950"
+                onClick={applyPromo}
+                disabled={validatingPromo}
+                aria-label="Применить промокод"
               >
-                <X className="h-4 w-4" />
+                <Check className="h-4 w-4" />
               </button>
-            ) : null}
-          </div>
+              {promoInput ? (
+                <button
+                  type="button"
+                  className="grid h-8 w-8 shrink-0 place-items-center rounded-md text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-surface-800 dark:hover:text-slate-200"
+                  onClick={resetPromo}
+                  aria-label="Очистить промокод"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              ) : null}
+            </div>
+          )}
           {appliedPromo && (
             <div className="text-xs font-medium text-emerald-600 dark:text-emerald-300">
               Скидка {appliedPromo.discountPercent}%: -
@@ -294,15 +367,33 @@ export function PlanCard({
             </div>
           )}
         </div>
-      ) : !isPromo ? (
-        <button
-          type="button"
-          className="mt-auto inline-flex w-fit items-center gap-2 pt-3 text-sm font-medium text-slate-500 transition hover:text-slate-950 dark:text-slate-400 dark:hover:text-white"
-          onClick={() => setPromoOpen(true)}
-        >
-          <Tag className="h-4 w-4" />
-          {suggestedPromoCodes.length > 0 ? "Выбрать промокод" : "Есть промокод?"}
-        </button>
+      ) : !isPromoPlan ? (
+        <div className="mt-auto pt-4">
+          <button
+            type="button"
+            className="flex w-full items-center gap-2 rounded-xl border border-cyan-300/20 bg-cyan-300/[0.08] px-3 py-2 text-left text-sm font-semibold text-cyan-950 shadow-sm shadow-cyan-950/5 transition hover:border-cyan-300/40 hover:bg-cyan-300/[0.12] dark:text-cyan-100"
+            onClick={openPromoBlock}
+          >
+            <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-cyan-200/80 text-cyan-950 dark:bg-cyan-300/15 dark:text-cyan-100">
+              <Tag className="h-3.5 w-3.5" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate">
+                {bestPromo ? "Выбрать промокод" : "У меня есть промокод"}
+              </span>
+              {bestPromo && (
+                <span className="block truncate text-xs font-medium text-cyan-800/75 dark:text-cyan-100/70">
+                  Доступна скидка до {bestPromo.discountPercent}%
+                </span>
+              )}
+            </span>
+            {bestPromo && (
+              <span className="shrink-0 rounded-full bg-white/95 px-2 py-0.5 text-xs font-bold text-slate-950 shadow-sm dark:bg-white">
+                -{bestPromo.discountPercent}%
+              </span>
+            )}
+          </button>
+        </div>
       ) : (
         <div className="mt-auto" />
       )}
@@ -313,10 +404,10 @@ export function PlanCard({
       >
         <CreditCard className="h-4 w-4" />
         {loading
-          ? isPromo
+          ? isPromoPlan
             ? "Активируем..."
             : "Создаём платёж..."
-          : isPromo
+          : isPromoPlan
             ? "Активировать"
             : current
               ? "Продлить текущий"

@@ -16,10 +16,11 @@ export const revalidate = 300 // кэш на 5 минут
 export default async function PlansPage({
   searchParams,
 }: {
-  searchParams?: { plan?: string }
+  searchParams?: { plan?: string; promo?: string }
 }) {
   const session = await getCurrentUser()
   const linkedPlanId = searchParams?.plan?.trim()
+  const initialPromoCode = searchParams?.promo?.trim()
   const plans = await prisma.plan.findMany({
     where: { isActive: true },
     orderBy: { sortOrder: 'asc' },
@@ -152,12 +153,14 @@ export default async function PlansPage({
             name={p.name}
             description={p.description}
             price={formatPrice(p.priceKopecks)}
+            priceKopecks={p.priceKopecks}
             durationDays={p.durationDays}
             trafficLimitGb={p.trafficLimitGb}
             deviceLimit={p.deviceLimit}
             isPromo={p.isPromo}
             popular={index === 1}
             current={currentSubscription?.planId === p.id}
+            initialPromoCode={initialPromoCode}
             availablePromoCodes={availablePromoCodesByPlan.get(p.id) ?? []}
           />
         ))}
