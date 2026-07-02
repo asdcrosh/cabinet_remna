@@ -25,7 +25,29 @@ export default async function AdminPromoCodesPage({
       take: limit,
       include: {
         plans: { include: { plan: true }, orderBy: { plan: { sortOrder: 'asc' } } },
-        redemptions: { select: { status: true } },
+        redemptions: {
+          select: {
+            status: true,
+            createdAt: true,
+            user: { select: { id: true, email: true, name: true } },
+          },
+          orderBy: { createdAt: 'desc' },
+        },
+        bonusBoxOpenings: {
+          select: {
+            createdAt: true,
+            prize: { select: { title: true } },
+            user: { select: { id: true, email: true, name: true } },
+          },
+          orderBy: { createdAt: 'desc' },
+        },
+        welcomeBonusRedemptions: {
+          select: {
+            createdAt: true,
+            user: { select: { id: true, email: true, name: true } },
+          },
+          orderBy: { createdAt: 'desc' },
+        },
       },
     }),
     prisma.plan.findMany({ orderBy: { sortOrder: 'asc' }, select: { id: true, name: true } }),
@@ -51,6 +73,7 @@ export default async function AdminPromoCodesPage({
       reservedCount,
       planIds: promoCode.plans.map((promoPlan) => promoPlan.planId),
       planNames: promoCode.plans.map((promoPlan) => promoPlan.plan.name),
+      assignees: buildPromoCodeAssignees(promoCode),
     }
   })
 
@@ -67,4 +90,90 @@ export default async function AdminPromoCodesPage({
       <LazyListLoader loaded={promoCodes.length} total={total} step={ADMIN_LIST_PAGE_SIZE} />
     </div>
   )
+}
+
+type PromoCodeForAssignees = Awaited<ReturnType<typeof prisma.promoCode.findMany>>[number] & {
+  allowedEmails: string[]
+  redemptions: Array<{
+    status: string
+    createdAt: Date
+    user: { id: string; email: string; name: string | null }
+  }>
+  bonusBoxOpenings: Array<{
+    createdAt: Date
+    prize: { title: string }
+    user: { id: string; email: string; name: string | null }
+  }>
+  welcomeBonusRedemptions: Array<{
+    createdAt: Date
+    user: { id: string; email: string; name: string | null }
+  }>
+}
+
+function buildPromoCodeAssignees(promoCode: PromoCodeForAssignees): PromoCodeAdminRow['assignees'] {
+  const assignees: PromoCodeAdminRow['assignees'] = []
+  const seen = new Set<string>()
+
+  for (const email of promoCode.allowedEmails) {
+    const normalizedEmail = email.trim().toLowerCase()
+    if (!normalizedEmail || seen.has(`personal:${normalizedEmail}`)) continue
+    seen.add(`personal:${normalizedEmail}`)
+    assignees.push({
+      id: `personal:${normalizedEmail}`,
+      userId: null,
+      email: normalizedEmail,
+      name: null,
+      source: 'PERSONAL',
+      sourceLabel: 'Персональный доступ',
+      createdAt: null,
+    })
+  }
+
+  for (const opening of promoCode.bonusBoxOpenings) {
+    const key = `bonus:${opening.user.id}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    assignees.push({
+      id: key,
+      userId: opening.user.id,
+      email: opening.user.email,
+      name: opening.user.name,
+      source: 'BONUS_BOX',
+      sourceLabel: opening.prize.title ? `Подарок: ${opening.prize.title}` : 'Подарок',
+      createdAt: opening.createdAt.toISOString(),
+    })
+  }
+
+  for (const redemption of promoCode.welcomeBonusRedemptions) {
+    const key = `welcome:${redemption.user.id}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    assignees.push({
+      id: key,
+      userId: redemption.user.id,
+      email: redemption.user.email,
+      name: redemption.user.name,
+      source: 'WELCOME_BONUS',
+      sourceLabel: 'Welcome-бонус',
+      createdAt: redemption.createdAt.toISOString(),
+    })
+  }
+
+  for (const redemption of promoCode.redemptions) {
+    if (!['PENDING', 'SUCCEEDED'].includes(redemption.status)) continue
+    const key = `redemption:${redemption.user.id}:${redemption.status}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    assignees.push({
+      id: key,
+      userId: redemption.user.id,
+      email: redemption.user.email,
+      name: redemption.user.name,
+      source: 'REDEMPTION',
+      sourceLabel: redemption.status === 'SUCCEEDED' ? 'Использовал' : 'Зарезервировал',
+      createdAt: redemption.createdAt.toISOString(),
+    })
+  }
+
+  return assignees
 }

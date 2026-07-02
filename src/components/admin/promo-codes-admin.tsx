@@ -2,14 +2,26 @@
 
 import { useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Archive, CheckCheck, Edit3, Plus, Power, TicketCheck, Trash2 } from 'lucide-react'
+import { Archive, CheckCheck, Edit3, Plus, Power, TicketCheck, Trash2, UserRound } from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
 import { toast } from '@/components/ui/toaster'
 import { cn } from '@/lib/cn'
 import { AdminModal } from '@/components/admin/admin-modal'
 
 type PromoAudience = 'ALL' | 'NEW_USERS' | 'NO_ACTIVE_SUBSCRIPTION' | 'PERSONAL'
+type PromoAssigneeSource = 'PERSONAL' | 'BONUS_BOX' | 'WELCOME_BONUS' | 'REDEMPTION'
+
+export interface PromoCodeAssignee {
+  id: string
+  userId: string | null
+  email: string
+  name: string | null
+  source: PromoAssigneeSource
+  sourceLabel: string
+  createdAt: string | null
+}
 
 export interface PromoCodeAdminRow {
   id: string
@@ -26,6 +38,7 @@ export interface PromoCodeAdminRow {
   reservedCount: number
   planIds: string[]
   planNames: string[]
+  assignees: PromoCodeAssignee[]
 }
 
 export interface PromoPlanOption {
@@ -432,7 +445,7 @@ export function PromoCodesAdmin({
 
       <div className="overflow-hidden rounded-lg border bg-white dark:bg-surface-900">
         {filteredPromoCodes.map((promoCode) => (
-          <article key={promoCode.id} className="grid gap-4 border-b p-4 last:border-b-0 lg:grid-cols-[auto_minmax(12rem,.8fr)_minmax(16rem,1fr)_minmax(16rem,1fr)_auto] lg:items-center">
+          <article key={promoCode.id} className="grid gap-4 border-b p-4 last:border-b-0 xl:grid-cols-[auto_minmax(12rem,.75fr)_minmax(14rem,.9fr)_minmax(16rem,1fr)_minmax(16rem,.9fr)_auto] xl:items-center">
             <label className="flex items-center gap-2 text-sm text-slate-500">
               <input
                 type="checkbox"
@@ -458,6 +471,7 @@ export function PromoCodesAdmin({
                 {audienceTitle(promoCode)}
               </div>
             </div>
+            <AssigneesBlock assignees={promoCode.assignees} />
             <div className="grid grid-cols-3 gap-3 text-sm">
               <div><div className="text-[11px] uppercase text-slate-400">Использовано</div><div className="mt-1 font-medium">{promoCode.usedCount}/{promoCode.maxUses ?? '∞'}</div></div>
               <div><div className="text-[11px] uppercase text-slate-400">На одного</div><div className="mt-1 font-medium">{promoCode.maxUsesPerUser}</div></div>
@@ -485,6 +499,54 @@ export function PromoCodesAdmin({
 
       {filteredPromoCodes.length === 0 && (
         <div className="card py-10 text-center text-sm text-slate-500">В этом разделе пока нет промокодов</div>
+      )}
+    </div>
+  )
+}
+
+function AssigneesBlock({ assignees }: { assignees: PromoCodeAssignee[] }) {
+  const visibleAssignees = assignees.slice(0, 3)
+  const hiddenCount = assignees.length - visibleAssignees.length
+
+  return (
+    <div className="min-w-0">
+      <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase text-slate-400">
+        <UserRound className="h-3.5 w-3.5" />
+        За кем числится
+      </div>
+      {visibleAssignees.length > 0 ? (
+        <div className="mt-2 space-y-1.5">
+          {visibleAssignees.map((assignee) => (
+            <div key={assignee.id} className="min-w-0 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-2 dark:border-white/10 dark:bg-white/5">
+              <div className="flex min-w-0 items-center justify-between gap-2">
+                <Link
+                  href={`/dashboard/admin/users?q=${encodeURIComponent(assignee.email)}`}
+                  className="truncate text-sm font-medium text-slate-800 hover:text-brand-600 dark:text-slate-100 dark:hover:text-brand-200"
+                  title={assignee.email}
+                >
+                  {assignee.name || assignee.email}
+                </Link>
+                <span
+                  className={cn('max-w-[9rem] shrink-0 truncate rounded-full px-2 py-0.5 text-[10px] font-semibold', assigneeBadgeClass(assignee.source))}
+                  title={assignee.sourceLabel}
+                >
+                  {assignee.sourceLabel}
+                </span>
+              </div>
+              {assignee.name ? (
+                <div className="mt-0.5 truncate text-xs text-slate-500 dark:text-slate-400">{assignee.email}</div>
+              ) : null}
+              {assignee.createdAt ? (
+                <div className="mt-0.5 text-xs text-slate-400">{formatDate(assignee.createdAt)}</div>
+              ) : null}
+            </div>
+          ))}
+          {hiddenCount > 0 ? (
+            <div className="text-xs font-medium text-slate-500 dark:text-slate-400">Ещё {hiddenCount}</div>
+          ) : null}
+        </div>
+      ) : (
+        <div className="mt-1 text-sm text-slate-500 dark:text-slate-400">Не закреплён за пользователем</div>
       )}
     </div>
   )
@@ -542,4 +604,15 @@ function formatRange(startsAt: string | null, expiresAt: string | null) {
   const start = startsAt ? new Date(startsAt).toLocaleDateString('ru-RU') : 'сейчас'
   const end = expiresAt ? new Date(expiresAt).toLocaleDateString('ru-RU') : 'без конца'
   return `${start} - ${end}`
+}
+
+function formatDate(value: string) {
+  return new Date(value).toLocaleDateString('ru-RU')
+}
+
+function assigneeBadgeClass(source: PromoAssigneeSource) {
+  if (source === 'BONUS_BOX') return 'bg-amber-100 text-amber-700 dark:bg-amber-400/15 dark:text-amber-200'
+  if (source === 'WELCOME_BONUS') return 'bg-cyan-100 text-cyan-700 dark:bg-cyan-400/15 dark:text-cyan-200'
+  if (source === 'REDEMPTION') return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-400/15 dark:text-emerald-200'
+  return 'bg-violet-100 text-violet-700 dark:bg-violet-400/15 dark:text-violet-200'
 }
