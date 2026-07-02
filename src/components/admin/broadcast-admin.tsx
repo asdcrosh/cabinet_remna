@@ -34,6 +34,7 @@ type BroadcastHistoryItem = {
   channels: string[]
   actionHref: string | null
   actionLabel: string | null
+  actionOpenInTelegram: boolean
   imageUrl: string | null
   recipients: number
   inAppCount: number
@@ -58,6 +59,7 @@ type BroadcastTemplateItem = {
   channels: string[]
   actionHref?: string | null
   actionLabel?: string | null
+  actionOpenInTelegram?: boolean
   imageUrl?: string | null
   body: string
   createdAt?: string
@@ -225,6 +227,7 @@ export function BroadcastAdmin({
   const [body, setBody] = useState('')
   const [actionHref, setActionHref] = useState('/dashboard')
   const [actionLabel, setActionLabel] = useState('Открыть кабинет')
+  const [actionOpenInTelegram, setActionOpenInTelegram] = useState(false)
   const [imageUrl, setImageUrl] = useState('')
   const [uploadingImage, setUploadingImage] = useState(false)
   const [imageLoadFailed, setImageLoadFailed] = useState(false)
@@ -246,6 +249,7 @@ export function BroadcastAdmin({
         selectedChannels: BroadcastChannel[]
         actionHref: string
         actionLabel: string
+        actionOpenInTelegram: boolean
         imageUrl: string
       }>
       if (draft.title) setTitle(draft.title)
@@ -254,6 +258,7 @@ export function BroadcastAdmin({
       if (draft.selectedChannels?.length) setSelectedChannels(draft.selectedChannels)
       if (typeof draft.actionHref === 'string') setActionHref(draft.actionHref)
       if (typeof draft.actionLabel === 'string') setActionLabel(draft.actionLabel)
+      if (typeof draft.actionOpenInTelegram === 'boolean') setActionOpenInTelegram(draft.actionOpenInTelegram)
       if (typeof draft.imageUrl === 'string') setImageUrl(draft.imageUrl)
     } catch {
       window.localStorage.removeItem(BROADCAST_DRAFT_KEY)
@@ -261,9 +266,9 @@ export function BroadcastAdmin({
   }, [])
 
   useEffect(() => {
-    const draft = { title, body, segment, selectedChannels, actionHref, actionLabel, imageUrl }
+    const draft = { title, body, segment, selectedChannels, actionHref, actionLabel, actionOpenInTelegram, imageUrl }
     window.localStorage.setItem(BROADCAST_DRAFT_KEY, JSON.stringify(draft))
-  }, [actionHref, actionLabel, body, imageUrl, segment, selectedChannels, title])
+  }, [actionHref, actionLabel, actionOpenInTelegram, body, imageUrl, segment, selectedChannels, title])
 
   async function submit(testMode = false) {
     const campaignTitle = getBroadcastTitle()
@@ -279,6 +284,7 @@ export function BroadcastAdmin({
           channels: selectedChannels,
           actionHref,
           actionLabel,
+          actionOpenInTelegram,
           imageUrl: imageUrl.trim() || null,
           testMode,
         }),
@@ -327,6 +333,7 @@ export function BroadcastAdmin({
     setSelectedChannels(template.channels.filter((channel): channel is BroadcastChannel => ['IN_APP', 'EMAIL', 'TELEGRAM'].includes(channel)))
     setActionHref(template.actionHref || '')
     setActionLabel(template.actionLabel || '')
+    setActionOpenInTelegram(Boolean(template.actionOpenInTelegram))
     setImageUrl(template.imageUrl || '')
     setStats(null)
     setStep('message')
@@ -345,6 +352,7 @@ export function BroadcastAdmin({
           channels: selectedChannels,
           actionHref,
           actionLabel,
+          actionOpenInTelegram,
           imageUrl: imageUrl.trim() || null,
         }),
       })
@@ -372,6 +380,7 @@ export function BroadcastAdmin({
     setSelectedChannels(item.channels.filter((channel): channel is BroadcastChannel => ['IN_APP', 'EMAIL', 'TELEGRAM'].includes(channel)))
     setActionHref(item.actionHref || '')
     setActionLabel(item.actionLabel || '')
+    setActionOpenInTelegram(item.actionOpenInTelegram)
     setImageUrl(item.imageUrl || '')
     setImageLoadFailed(false)
     setStats(null)
@@ -414,13 +423,11 @@ export function BroadcastAdmin({
   }
 
   function getBroadcastTitle() {
-    const firstLine = body.trim().split('\n').find(Boolean)?.trim() ?? ''
-    return (title.trim() || firstLine.slice(0, 80) || 'Сообщение').trim()
+    return (title.trim() || 'Рассылка').trim()
   }
 
   const canSend = body.trim().length >= 5 && selectedChannels.length > 0 && !loading
   const selectedPreset = actionPresets.find((preset) => preset.href === actionHref) ?? actionPresets[0]
-  const previewTitle = renderPreview(getBroadcastTitle())
   const previewBody = renderPreview(body || 'Текст сообщения будет показан здесь.')
   const previewActionLabel = renderPreview(actionLabel || 'Открыть')
   const previewImageUrl = getPreviewImageUrl(imageUrl)
@@ -609,6 +616,7 @@ export function BroadcastAdmin({
                     const preset = actionPresets.find((item) => item.href === event.target.value) ?? actionPresets[0]
                     setActionHref(preset.href)
                     setActionLabel(preset.label)
+                    if (!preset.href) setActionOpenInTelegram(false)
                   }}
                 >
                   {actionPresets.map((preset) => (
@@ -631,6 +639,21 @@ export function BroadcastAdmin({
                 />
               </label>
             </div>
+
+            {actionHref ? (
+              <label className="flex min-h-12 items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-white/10 dark:bg-white/5">
+                <span className="min-w-0">
+                  <span className="block text-sm font-medium text-slate-950 dark:text-white">Открывать в Telegram</span>
+                  <span className="mt-0.5 block text-xs text-slate-500 dark:text-slate-400">Web App для Telegram-кнопки</span>
+                </span>
+                <input
+                  type="checkbox"
+                  className="h-5 w-5 shrink-0"
+                  checked={actionOpenInTelegram}
+                  onChange={(event) => setActionOpenInTelegram(event.target.checked)}
+                />
+              </label>
+            ) : null}
 
             <label className="block">
               <span className="text-sm font-medium">Картинка</span>
@@ -692,7 +715,7 @@ export function BroadcastAdmin({
             <div className="grid gap-2 md:grid-cols-3">
               <InfoPill label="Сегмент" value={segmentLabel(segment)} />
               <InfoPill label="Каналы" value={selectedChannels.map(channelLabel).join(', ')} />
-              <InfoPill label="Кнопка" value={actionHref ? previewActionLabel : 'Без кнопки'} />
+              <InfoPill label="Кнопка" value={actionHref ? `${previewActionLabel}${actionOpenInTelegram ? ' · Telegram Web App' : ''}` : 'Без кнопки'} />
             </div>
 
             <div className="min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-slate-50 shadow-sm dark:border-white/10 dark:bg-white/5">
@@ -735,8 +758,7 @@ export function BroadcastAdmin({
                     )}
 
                     <div className="p-4">
-                      <div className="text-base font-semibold leading-tight">{previewTitle}</div>
-                      <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-600 dark:text-slate-300">{previewBody}</p>
+                      <p className="whitespace-pre-wrap text-sm leading-6 text-slate-600 dark:text-slate-300">{previewBody}</p>
                     </div>
 
                     {actionHref ? (

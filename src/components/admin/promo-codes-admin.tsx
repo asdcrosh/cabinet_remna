@@ -445,23 +445,24 @@ export function PromoCodesAdmin({
 
       <div className="overflow-hidden rounded-lg border bg-white dark:bg-surface-900">
         {filteredPromoCodes.map((promoCode) => (
-          <article key={promoCode.id} className="grid gap-4 border-b p-4 last:border-b-0 xl:grid-cols-[auto_minmax(12rem,.75fr)_minmax(14rem,.9fr)_minmax(16rem,1fr)_minmax(16rem,.9fr)_auto] xl:items-center">
-            <label className="flex items-center gap-2 text-sm text-slate-500">
+          <article key={promoCode.id} className="grid gap-4 border-b p-4 last:border-b-0 lg:grid-cols-[minmax(13rem,1fr)_minmax(12rem,.9fr)_minmax(13rem,1fr)_minmax(12rem,.8fr)_auto] lg:items-center">
+            <div className="flex min-w-0 items-start gap-3">
               <input
+                className="mt-1.5 shrink-0"
                 type="checkbox"
                 checked={selectedIds.includes(promoCode.id)}
                 onChange={() => toggleSelected(promoCode.id)}
                 aria-label={`Выбрать промокод ${promoCode.code}`}
               />
-            </label>
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <div className="truncate font-mono text-base font-semibold">{promoCode.code}</div>
-                <span className={tab === 'AVAILABLE' ? 'badge-active' : tab === 'USED' ? 'badge-disabled' : 'badge-limited'}>
-                  {tab === 'AVAILABLE' ? 'Активен' : tab === 'USED' ? 'Использован' : 'Архив'}
-                </span>
+              <div className="min-w-0">
+                <div className="flex min-w-0 items-center gap-2">
+                  <div className="truncate font-mono text-base font-semibold" title={promoCode.code}>{promoCode.code}</div>
+                  <span className={cn('shrink-0', tab === 'AVAILABLE' ? 'badge-active' : tab === 'USED' ? 'badge-disabled' : 'badge-limited')}>
+                    {tab === 'AVAILABLE' ? 'Активен' : tab === 'USED' ? 'Использован' : 'Архив'}
+                  </span>
+                </div>
+                <div className="mt-1 text-xl font-semibold text-emerald-600">-{promoCode.discountPercent}%</div>
               </div>
-              <div className="mt-1 text-xl font-semibold text-emerald-600">-{promoCode.discountPercent}%</div>
             </div>
             <div className="min-w-0">
               <div className="text-[11px] font-semibold uppercase text-slate-400">Тарифы</div>
@@ -472,12 +473,12 @@ export function PromoCodesAdmin({
               </div>
             </div>
             <AssigneesBlock assignees={promoCode.assignees} />
-            <div className="grid grid-cols-3 gap-3 text-sm">
-              <div><div className="text-[11px] uppercase text-slate-400">Использовано</div><div className="mt-1 font-medium">{promoCode.usedCount}/{promoCode.maxUses ?? '∞'}</div></div>
-              <div><div className="text-[11px] uppercase text-slate-400">На одного</div><div className="mt-1 font-medium">{promoCode.maxUsesPerUser}</div></div>
-              <div className="min-w-0"><div className="text-[11px] uppercase text-slate-400">Срок</div><div className="mt-1 truncate font-medium" title={formatRange(promoCode.startsAt, promoCode.expiresAt)}>{formatRange(promoCode.startsAt, promoCode.expiresAt)}</div></div>
+            <div className="grid min-w-0 grid-cols-3 gap-2 text-sm lg:grid-cols-1 xl:grid-cols-3">
+              <CompactFact label="Исп." value={`${promoCode.usedCount}/${promoCode.maxUses ?? '∞'}`} />
+              <CompactFact label="На одного" value={String(promoCode.maxUsesPerUser)} />
+              <CompactFact label="Срок" value={formatRange(promoCode.startsAt, promoCode.expiresAt)} />
             </div>
-            <div className="flex gap-2 lg:justify-end">
+            <div className="flex shrink-0 gap-2 lg:justify-end">
               <button type="button" className="btn-secondary h-10 min-h-10 px-3" onClick={() => startEdit(promoCode)} title="Изменить">
                 <Edit3 className="h-4 w-4" />
               </button>
@@ -505,8 +506,8 @@ export function PromoCodesAdmin({
 }
 
 function AssigneesBlock({ assignees }: { assignees: PromoCodeAssignee[] }) {
-  const visibleAssignees = assignees.slice(0, 3)
-  const hiddenCount = assignees.length - visibleAssignees.length
+  const firstAssignee = assignees[0]
+  const hiddenCount = Math.max(0, assignees.length - 1)
 
   return (
     <div className="min-w-0">
@@ -514,40 +515,46 @@ function AssigneesBlock({ assignees }: { assignees: PromoCodeAssignee[] }) {
         <UserRound className="h-3.5 w-3.5" />
         За кем числится
       </div>
-      {visibleAssignees.length > 0 ? (
-        <div className="mt-2 space-y-1.5">
-          {visibleAssignees.map((assignee) => (
-            <div key={assignee.id} className="min-w-0 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-2 dark:border-white/10 dark:bg-white/5">
-              <div className="flex min-w-0 items-center justify-between gap-2">
-                <Link
-                  href={`/dashboard/admin/users?q=${encodeURIComponent(assignee.email)}`}
-                  className="truncate text-sm font-medium text-slate-800 hover:text-brand-600 dark:text-slate-100 dark:hover:text-brand-200"
-                  title={assignee.email}
-                >
-                  {assignee.name || assignee.email}
-                </Link>
-                <span
-                  className={cn('max-w-[9rem] shrink-0 truncate rounded-full px-2 py-0.5 text-[10px] font-semibold', assigneeBadgeClass(assignee.source))}
-                  title={assignee.sourceLabel}
-                >
-                  {assignee.sourceLabel}
-                </span>
-              </div>
-              {assignee.name ? (
-                <div className="mt-0.5 truncate text-xs text-slate-500 dark:text-slate-400">{assignee.email}</div>
-              ) : null}
-              {assignee.createdAt ? (
-                <div className="mt-0.5 text-xs text-slate-400">{formatDate(assignee.createdAt)}</div>
-              ) : null}
-            </div>
-          ))}
+      {firstAssignee ? (
+        <div className="mt-1 min-w-0">
+          <div className="flex min-w-0 items-center gap-2">
+            <Link
+              href={`/dashboard/admin/users?q=${encodeURIComponent(firstAssignee.email)}`}
+              className="truncate text-sm font-medium text-slate-800 hover:text-brand-600 dark:text-slate-100 dark:hover:text-brand-200"
+              title={firstAssignee.email}
+            >
+              {firstAssignee.name || firstAssignee.email}
+            </Link>
+            {hiddenCount > 0 ? (
+              <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500 dark:bg-white/10 dark:text-slate-300">
+                +{hiddenCount}
+              </span>
+            ) : null}
+          </div>
+          <div className="mt-0.5 truncate text-xs text-slate-500 dark:text-slate-400">
+            {firstAssignee.name ? firstAssignee.email : firstAssignee.createdAt ? formatDate(firstAssignee.createdAt) : 'Пользователь'}
+          </div>
+          {firstAssignee.name && firstAssignee.createdAt ? (
+            <div className="mt-0.5 text-xs text-slate-400">{formatDate(firstAssignee.createdAt)}</div>
+          ) : null}
           {hiddenCount > 0 ? (
-            <div className="text-xs font-medium text-slate-500 dark:text-slate-400">Ещё {hiddenCount}</div>
+            <div className="mt-0.5 truncate text-xs text-slate-400" title={assignees.slice(1).map((assignee) => assignee.email).join(', ')}>
+              {assignees.slice(1).map((assignee) => assignee.email).join(', ')}
+            </div>
           ) : null}
         </div>
       ) : (
         <div className="mt-1 text-sm text-slate-500 dark:text-slate-400">Не закреплён за пользователем</div>
       )}
+    </div>
+  )
+}
+
+function CompactFact({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0">
+      <div className="text-[11px] uppercase text-slate-400">{label}</div>
+      <div className="mt-1 truncate font-medium" title={value}>{value}</div>
     </div>
   )
 }
@@ -608,11 +615,4 @@ function formatRange(startsAt: string | null, expiresAt: string | null) {
 
 function formatDate(value: string) {
   return new Date(value).toLocaleDateString('ru-RU')
-}
-
-function assigneeBadgeClass(source: PromoAssigneeSource) {
-  if (source === 'BONUS_BOX') return 'bg-amber-100 text-amber-700 dark:bg-amber-400/15 dark:text-amber-200'
-  if (source === 'WELCOME_BONUS') return 'bg-cyan-100 text-cyan-700 dark:bg-cyan-400/15 dark:text-cyan-200'
-  if (source === 'REDEMPTION') return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-400/15 dark:text-emerald-200'
-  return 'bg-violet-100 text-violet-700 dark:bg-violet-400/15 dark:text-violet-200'
 }

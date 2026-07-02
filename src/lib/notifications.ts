@@ -18,6 +18,7 @@ type NotifyUserInput = {
   telegramImageUrl?: string
   telegramActionUrl?: string
   telegramActionLabel?: string
+  telegramActionOpenInTelegram?: boolean
   emailSubject?: string
   emailText?: string
   emailHtml?: string
@@ -68,6 +69,7 @@ export async function notifyUser(input: NotifyUserInput) {
               imageUrl: input.telegramImageUrl,
               actionUrl: input.telegramActionUrl,
               actionLabel: input.telegramActionLabel,
+              actionOpenInTelegram: input.telegramActionOpenInTelegram,
             }),
         })
       : Promise.resolve('skipped' as NotifyResult),
@@ -433,12 +435,19 @@ async function sendTelegramMessage(input: {
   imageUrl?: string
   actionUrl?: string
   actionLabel?: string
+  actionOpenInTelegram?: boolean
 }) {
   const token = process.env.TELEGRAM_BOT_TOKEN?.trim()
   if (!token) return
 
   const replyMarkup = input.actionUrl && input.actionLabel
-    ? { inline_keyboard: [[{ text: input.actionLabel, url: input.actionUrl }]] }
+    ? {
+        inline_keyboard: [[
+          input.actionOpenInTelegram
+            ? { text: input.actionLabel, web_app: { url: input.actionUrl } }
+            : { text: input.actionLabel, url: input.actionUrl },
+        ]],
+      }
     : undefined
   const method = input.imageUrl ? 'sendPhoto' : 'sendMessage'
   const payload = input.imageUrl

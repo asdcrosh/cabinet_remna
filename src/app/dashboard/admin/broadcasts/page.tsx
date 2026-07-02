@@ -17,6 +17,7 @@ export default async function BroadcastsPage() {
       channels: true,
       actionHref: true,
       actionLabel: true,
+      actionOpenInTelegram: true,
       imageUrl: true,
       recipients: true,
       inAppCount: true,

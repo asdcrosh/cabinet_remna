@@ -14,6 +14,7 @@ const schema = z.object({
   channels: z.array(z.enum(['IN_APP', 'EMAIL', 'TELEGRAM'])).min(1).max(3),
   actionHref: z.string().trim().max(180).optional().nullable(),
   actionLabel: z.string().trim().max(32).optional().nullable(),
+  actionOpenInTelegram: z.boolean().optional(),
   imageUrl: z.string().trim().url().max(600).optional().nullable().or(z.literal('')),
 })
 
@@ -49,6 +50,7 @@ export const POST = withAuth(async (req: Request) => {
       channels: input.channels,
       actionHref: normalizeActionHref(input.actionHref),
       actionLabel: input.actionLabel || null,
+      actionOpenInTelegram: Boolean(input.actionOpenInTelegram && normalizeActionHref(input.actionHref)),
       imageUrl: input.imageUrl || null,
       createdById: session.uid,
     },

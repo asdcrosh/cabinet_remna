@@ -8,7 +8,7 @@ import { renderActionEmail } from '@/lib/email-template'
 import { getAppUrl } from '@/lib/app-url'
 import { getBrandName } from '@/lib/branding'
 import { createAdminNotification } from '@/lib/admin-notifications'
-import { escapeTelegramHtml, renderTelegramCustomEmoji, stripTelegramCustomEmojiMarkup } from '@/lib/telegram-format'
+import { renderTelegramCustomEmoji, stripTelegramCustomEmojiMarkup } from '@/lib/telegram-format'
 import { rateLimit } from '@/lib/rate-limit'
 
 export const runtime = 'nodejs'
@@ -24,6 +24,7 @@ const schema = z.object({
   channels: z.array(z.enum(['IN_APP', 'EMAIL', 'TELEGRAM'])).min(1).max(3),
   actionHref: z.string().trim().max(180).optional().nullable(),
   actionLabel: z.string().trim().max(32).optional().nullable(),
+  actionOpenInTelegram: z.boolean().optional(),
   imageUrl: z.string().trim().url().max(600).optional().nullable().or(z.literal('')),
   testMode: z.boolean().optional(),
 })
@@ -65,6 +66,7 @@ export const POST = withAuth(async (req: Request) => {
   const actionHref = normalizeActionHref(input.actionHref)
   const actionUrl = actionHref ? `${getAppUrl()}${actionHref}` : getAppUrl()
   const actionLabel = input.actionLabel || (actionHref ? 'Открыть кабинет' : undefined)
+  const actionOpenInTelegram = Boolean(input.actionOpenInTelegram && actionHref)
   const imageUrl = normalizeImageUrl(input.imageUrl)
   const plainBody = stripTelegramCustomEmojiMarkup(input.body)
   const batchKey = `broadcast:${Date.now()}:${session.uid}`
@@ -93,13 +95,12 @@ export const POST = withAuth(async (req: Request) => {
       actionLabel: personalizedActionLabel,
       inApp: channels.has('IN_APP'),
       telegramText: channels.has('TELEGRAM')
-        ? [`<b>${escapeTelegramHtml(personalizedTitle)}</b>`, renderTelegramCustomEmoji(personalizedBody)]
-            .filter(Boolean)
-            .join('\n')
+        ? renderTelegramCustomEmoji(personalizedBody)
         : undefined,
       telegramImageUrl: channels.has('TELEGRAM') ? imageUrl ?? undefined : undefined,
       telegramActionUrl: channels.has('TELEGRAM') && actionHref ? actionUrl : undefined,
       telegramActionLabel: channels.has('TELEGRAM') && actionHref ? personalizedActionLabel || 'Открыть' : undefined,
+      telegramActionOpenInTelegram: channels.has('TELEGRAM') ? actionOpenInTelegram : undefined,
       emailSubject: channels.has('EMAIL') ? `${personalizedTitle} — ${getBrandName()}` : undefined,
       emailText: channels.has('EMAIL') ? `${personalizedPlainBody}${actionHref ? `\n\n${actionUrl}` : ''}` : undefined,
       emailHtml: channels.has('EMAIL')
@@ -138,6 +139,7 @@ export const POST = withAuth(async (req: Request) => {
       channels: input.channels,
       actionHref,
       actionLabel,
+      actionOpenInTelegram,
       imageUrl,
       recipients: stats.recipients,
       inAppCount: stats.inApp,
@@ -160,6 +162,7 @@ export const POST = withAuth(async (req: Request) => {
       channels: true,
       actionHref: true,
       actionLabel: true,
+      actionOpenInTelegram: true,
       imageUrl: true,
       recipients: true,
       inAppCount: true,

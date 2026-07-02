@@ -204,4 +204,43 @@ describe('notifyUser', () => {
     expect(mocks.prisma.notificationLog.createMany).toHaveBeenCalledTimes(2)
     expect(fetch).not.toHaveBeenCalled()
   })
+
+  it('sends Telegram action button as Web App when requested', async () => {
+    mocks.prisma.user.findUnique.mockResolvedValue({
+      id: 'user-1',
+      email: 'user@example.test',
+      emailVerifiedAt: null,
+      name: 'User',
+      telegramId: 123n,
+    })
+    mocks.prisma.notificationLog.createMany.mockResolvedValue({ count: 1 })
+    mocks.prisma.userNotification.createMany.mockResolvedValue({ count: 1 })
+
+    const result = await notifyUser({
+      userId: 'user-1',
+      type: 'BROADCAST',
+      dedupeKey: 'broadcast-1',
+      title: 'Рассылка',
+      body: 'Сообщение',
+      telegramText: 'Сообщение',
+      telegramActionUrl: 'https://cabinet.example.test/dashboard/plans',
+      telegramActionLabel: 'Выбрать тариф',
+      telegramActionOpenInTelegram: true,
+      inApp: false,
+    })
+
+    expect(result.telegram).toBe('sent')
+    expect(fetch).toHaveBeenCalledWith(
+      'https://api.telegram.org/bottelegram-token/sendMessage',
+      expect.objectContaining({
+        body: expect.stringContaining('"web_app":{"url":"https://cabinet.example.test/dashboard/plans"}'),
+      })
+    )
+    const payload = JSON.parse((fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body as string)
+    expect(payload.reply_markup.inline_keyboard[0][0]).toEqual({
+      text: 'Выбрать тариф',
+      web_app: { url: 'https://cabinet.example.test/dashboard/plans' },
+    })
+    expect(payload.reply_markup.inline_keyboard[0][0].url).toBeUndefined()
+  })
 })

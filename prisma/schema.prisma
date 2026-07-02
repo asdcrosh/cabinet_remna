@@ -308,6 +308,7 @@ model BroadcastCampaign {
   channels          String[] @default([])
   actionHref        String?
   actionLabel       String?
+  actionOpenInTelegram Boolean @default(false)
   imageUrl          String?
   recipients        Int      @default(0)
   inAppCount        Int      @default(0)
@@ -337,6 +338,7 @@ model BroadcastTemplate {
   channels    String[] @default([])
   actionHref  String?
   actionLabel String?
+  actionOpenInTelegram Boolean @default(false)
   imageUrl    String?
   body        String
   createdById String?
