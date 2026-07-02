@@ -500,16 +500,16 @@ export function SupportPanel({
   return (
     <div
       className={cn(
-        'grid h-[calc(100dvh-5.5rem)] min-h-[32rem] gap-3 overflow-hidden xl:h-[calc(100dvh-7rem)] xl:min-h-[36rem]',
+        'grid h-[calc(100dvh-4.75rem)] min-h-[30rem] gap-2.5 overflow-hidden xl:h-[calc(100dvh-6.25rem)] xl:min-h-[35rem]',
         mode === 'admin'
-          ? 'xl:h-[calc(100dvh-5.75rem)] xl:grid-cols-[21rem_minmax(0,1fr)_18rem]'
-          : 'xl:grid-cols-[19rem_minmax(0,1fr)]'
+          ? 'xl:h-[calc(100dvh-5.5rem)] xl:grid-cols-[19rem_minmax(0,1fr)_16rem]'
+          : 'xl:grid-cols-[18rem_minmax(0,1fr)]'
       )}
     >
       <section className={cn('min-h-0 overflow-y-auto pr-0.5 xl:flex xl:flex-col xl:overflow-hidden', mobileChatOpen && 'hidden xl:flex')}>
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-white/70 bg-white/90 shadow-sm shadow-slate-200/60 backdrop-blur dark:border-white/10 dark:bg-surface-900/80 dark:shadow-black/20">
           <div className={cn(
-            'border-b border-slate-100 bg-white/80 px-3 py-3 dark:border-slate-800 dark:bg-surface-900/60',
+            'border-b border-slate-100 bg-white/80 px-3 py-2.5 dark:border-slate-800 dark:bg-surface-900/60',
             mode === 'admin' && 'bg-slate-50/85 dark:bg-surface-950/70'
           )}>
             <div className="flex items-center justify-between gap-3">
@@ -560,13 +560,13 @@ export function SupportPanel({
                   setError('')
                 }}
                 className={cn(
-                  'mb-1.5 flex w-full items-center gap-3 rounded-lg border px-3 py-3 text-left transition-all',
+                  'mb-1.5 flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition-all',
                   newTicketOpen
                     ? 'border-cyan-200 bg-cyan-50 text-slate-950 shadow-sm dark:border-cyan-400/30 dark:bg-cyan-400/10 dark:text-white'
                     : 'border-slate-200 bg-white text-slate-700 hover:border-cyan-200 hover:bg-cyan-50/60 dark:border-slate-800 dark:bg-surface-950 dark:text-slate-200'
                 )}
               >
-                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-slate-950 text-cyan-200 dark:bg-white dark:text-slate-950">
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-slate-950 text-cyan-200 dark:bg-white dark:text-slate-950">
                   <MessageSquarePlus className="h-5 w-5" />
                 </span>
                 <span className="min-w-0">
@@ -629,7 +629,7 @@ export function SupportPanel({
           />
         ) : selected ? (
           <div className="flex h-full min-h-0 flex-col">
-            <div className="border-b border-slate-100 bg-white/95 px-3 py-3 dark:border-slate-800 dark:bg-surface-900/95 sm:px-5">
+            <div className="border-b border-slate-100 bg-white/95 px-3 py-2.5 dark:border-slate-800 dark:bg-surface-900/95 sm:px-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex min-w-0 flex-1 gap-3">
                   <button
@@ -670,7 +670,7 @@ export function SupportPanel({
                 const element = event.currentTarget
                 stickToBottomRef.current = element.scrollHeight - element.scrollTop - element.clientHeight < 120
               }}
-              className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-slate-50/60 px-3 py-4 dark:bg-surface-950/30 sm:px-5"
+              className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-slate-50/60 px-3 py-3 dark:bg-surface-950/30 sm:px-4"
             >
               <div className="mx-auto max-w-3xl space-y-3">
                 {selected.messages.map((item) => {
@@ -680,7 +680,7 @@ export function SupportPanel({
               </div>
             </div>
 
-            <form onSubmit={sendMessage} className="border-t border-slate-100 bg-white/95 p-2.5 dark:border-slate-800 dark:bg-surface-900/95 sm:p-3">
+            <form onSubmit={sendMessage} className="border-t border-slate-100 bg-white/95 p-2.5 pb-[calc(0.625rem+env(safe-area-inset-bottom))] dark:border-slate-800 dark:bg-surface-900/95">
               {selected.status === 'CLOSED' ? (
                 <div className="flex items-center gap-2 rounded-lg bg-slate-50 px-4 py-3 text-sm text-slate-500 dark:bg-surface-800">
                   <Lock className="h-4 w-4" />
@@ -689,11 +689,11 @@ export function SupportPanel({
               ) : (
                 <div className="space-y-2">
                   <QuickReplies mode={mode} onPick={(value) => setMessage((current) => current.trim() ? `${current.trim()}\n\n${value}` : value)} />
-                  <div className="relative flex items-end gap-2 rounded-lg border border-slate-200 bg-white p-2 shadow-sm dark:border-slate-800 dark:bg-surface-950">
+                  <div className="relative flex items-end gap-2 rounded-lg border border-slate-200 bg-white p-1.5 shadow-sm dark:border-slate-800 dark:bg-surface-950">
                     <EmojiPicker onPick={insertMessageEmoji} />
                     <textarea
                       ref={messageInputRef}
-                      className="max-h-32 min-h-10 flex-1 resize-none rounded-md border-0 bg-transparent px-2 py-2 text-sm outline-none placeholder:text-slate-400 focus:ring-0"
+                      className="max-h-28 min-h-10 flex-1 resize-none rounded-md border-0 bg-transparent px-2 py-2 text-sm outline-none placeholder:text-slate-400 focus:ring-0"
                       value={message}
                       onChange={(event) => setMessage(event.target.value)}
                       onKeyDown={handleMessageKeyDown}
@@ -768,15 +768,15 @@ function NewTicketForm({
 
   return (
     <form onSubmit={onSubmit} className="flex h-full min-h-0 flex-col overflow-hidden">
-      <div className="border-b border-slate-100 bg-white/95 px-4 py-4 dark:border-slate-800 dark:bg-surface-900/95 sm:px-6">
+      <div className="border-b border-slate-100 bg-white/95 px-3 py-3 dark:border-slate-800 dark:bg-surface-900/95 sm:px-5">
         <div className="flex items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-cyan-50 text-cyan-700 ring-1 ring-cyan-100 dark:bg-cyan-400/10 dark:text-cyan-200 dark:ring-cyan-400/20">
+            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-cyan-50 text-cyan-700 ring-1 ring-cyan-100 dark:bg-cyan-400/10 dark:text-cyan-200 dark:ring-cyan-400/20">
               <MessageSquarePlus className="h-5 w-5" />
             </div>
             <div className="min-w-0">
-              <h2 className="truncate text-lg font-semibold tracking-tight">Новое обращение</h2>
-              <p className="text-sm text-slate-500">Выберите тему и напишите, что случилось.</p>
+              <h2 className="truncate text-base font-semibold tracking-tight sm:text-lg">Новое обращение</h2>
+              <p className="text-xs text-slate-500 sm:text-sm">Выберите тему и опишите проблему.</p>
             </div>
           </div>
           {onCancel && (
@@ -787,13 +787,13 @@ function NewTicketForm({
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-4 sm:p-6">
+      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3 sm:space-y-5 sm:p-5">
         <div>
           <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
             <Tag className="h-3.5 w-3.5" />
             В чем проблема
           </div>
-          <div className="grid gap-2 sm:grid-cols-2">
+          <div className="-mx-3 flex gap-2 overflow-x-auto px-3 pb-1 sm:mx-0 sm:grid sm:grid-cols-2 sm:overflow-visible sm:px-0 sm:pb-0">
             {supportCategories.map((item) => {
               const active = category === item.value
               return (
@@ -802,13 +802,13 @@ function NewTicketForm({
                   type="button"
                   onClick={() => onCategoryChange(item.value)}
                   className={cn(
-                    'rounded-lg border p-4 text-left transition-all',
+                    'min-w-[13rem] rounded-lg border p-3 text-left transition-all sm:min-w-0',
                     active
                       ? 'border-slate-950 bg-slate-950 text-white shadow-md shadow-slate-950/10 dark:border-white dark:bg-white dark:text-slate-950'
                       : 'border-slate-200 bg-white text-slate-700 hover:border-cyan-200 hover:bg-cyan-50/40 dark:border-slate-800 dark:bg-surface-950 dark:text-slate-200 dark:hover:border-cyan-400/30'
                   )}
                 >
-                  <span className="block text-base font-semibold">{item.label}</span>
+                  <span className="block text-sm font-semibold sm:text-base">{item.label}</span>
                   <span className={cn('mt-1 line-clamp-2 block text-xs leading-relaxed', active ? 'text-white/70 dark:text-slate-600' : 'text-slate-500')}>
                     {item.description}
                   </span>
@@ -820,11 +820,11 @@ function NewTicketForm({
 
         <div>
           <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Сообщение</div>
-          <div className="relative flex items-start gap-2 rounded-lg border border-slate-200 bg-white p-2 shadow-sm dark:border-slate-800 dark:bg-surface-950">
+          <div className="relative flex items-start gap-1.5 rounded-lg border border-slate-200 bg-white p-1.5 shadow-sm dark:border-slate-800 dark:bg-surface-950 sm:gap-2 sm:p-2">
             <EmojiPicker onPick={insertEmoji} />
             <textarea
               ref={messageInputRef}
-              className="min-h-44 flex-1 resize-none rounded-md border-0 bg-transparent px-2 py-2 text-base outline-none placeholder:text-slate-400 focus:ring-0 sm:text-sm"
+              className="min-h-32 flex-1 resize-none rounded-md border-0 bg-transparent px-2 py-2 text-base outline-none placeholder:text-slate-400 focus:ring-0 sm:min-h-44 sm:text-sm"
               value={message}
               onChange={(event) => onMessageChange(event.target.value)}
               onKeyDown={(event) => {
@@ -842,7 +842,7 @@ function NewTicketForm({
         </div>
       </div>
 
-      <div className="flex items-center justify-between gap-3 border-t border-slate-100 bg-white/95 p-3 dark:border-slate-800 dark:bg-surface-900/95 sm:p-4">
+      <div className="flex items-center justify-between gap-3 border-t border-slate-100 bg-white/95 p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] dark:border-slate-800 dark:bg-surface-900/95 sm:p-4">
         <div className="text-xs text-slate-400">{message.trim().length}/3000</div>
         <div className="flex justify-end gap-2">
           {onCancel && (
@@ -891,7 +891,7 @@ function EmojiPicker({ onPick }: { onPick: (emoji: string) => void }) {
       </button>
 
       {open && (
-        <div className="absolute bottom-12 left-0 z-30 w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-lg border border-slate-200 bg-white shadow-2xl shadow-slate-950/15 dark:border-slate-800 dark:bg-surface-900">
+        <div className="fixed inset-x-3 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-30 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-2xl shadow-slate-950/15 dark:border-slate-800 dark:bg-surface-900 sm:absolute sm:bottom-12 sm:left-0 sm:right-auto sm:w-[min(22rem,calc(100vw-2rem))]">
           <div className="border-b border-slate-100 p-2 dark:border-slate-800">
             <div className="flex items-center gap-2 rounded-lg bg-slate-100 px-3 py-2 dark:bg-surface-950">
               <Search className="h-4 w-4 shrink-0 text-slate-400" />
@@ -924,7 +924,7 @@ function EmojiPicker({ onPick }: { onPick: (emoji: string) => void }) {
             </div>
           </div>
 
-          <div className="max-h-60 overflow-y-auto p-2">
+          <div className="max-h-[40dvh] overflow-y-auto p-2 sm:max-h-60">
             <div className="grid grid-cols-8 gap-1">
               {items.map((emoji, index) => (
                 <button
@@ -934,7 +934,7 @@ function EmojiPicker({ onPick }: { onPick: (emoji: string) => void }) {
                     onPick(emoji)
                     setOpen(false)
                   }}
-                  className="grid h-9 w-9 place-items-center rounded-lg text-xl transition-colors hover:bg-slate-100 dark:hover:bg-surface-800"
+                  className="grid h-9 w-full place-items-center rounded-lg text-xl transition-colors hover:bg-slate-100 dark:hover:bg-surface-800"
                   aria-label={`Вставить ${emoji}`}
                 >
                   {emoji}
@@ -1174,8 +1174,8 @@ function QuickReplies({ mode, onPick }: { mode: 'user' | 'admin'; onPick: (value
       ]
 
   return (
-    <div className="rounded-lg border border-slate-100 bg-slate-50/70 p-2 dark:border-white/10 dark:bg-white/[0.035]">
-      <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">
+    <div className="rounded-lg border border-slate-100 bg-slate-50/70 p-1.5 dark:border-white/10 dark:bg-white/[0.035] sm:p-2">
+      <div className="mb-1.5 px-0.5 text-xs font-semibold uppercase tracking-wide text-slate-400">
         {mode === 'admin' ? 'Шаблоны ответа' : 'Быстрый старт'}
       </div>
       <div className="flex gap-1.5 overflow-x-auto pb-0.5">
@@ -1184,7 +1184,7 @@ function QuickReplies({ mode, onPick }: { mode: 'user' | 'admin'; onPick: (value
           key={reply}
           type="button"
           onClick={() => onPick(reply)}
-          className="min-w-fit rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:border-cyan-200 hover:bg-cyan-50 hover:text-cyan-800 dark:border-slate-800 dark:bg-white/5 dark:text-slate-300 dark:hover:border-cyan-400/30 dark:hover:bg-cyan-400/10 dark:hover:text-cyan-100"
+          className="min-w-fit rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:border-cyan-200 hover:bg-cyan-50 hover:text-cyan-800 dark:border-slate-800 dark:bg-white/5 dark:text-slate-300 dark:hover:border-cyan-400/30 dark:hover:bg-cyan-400/10 dark:hover:text-cyan-100 sm:px-3"
         >
           {reply}
         </button>

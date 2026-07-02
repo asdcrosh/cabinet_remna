@@ -174,7 +174,7 @@ export function KeysCard({ subscriptionUrl, happLink }: KeysCardProps) {
   }
 
   return (
-    <section className="rounded-lg border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-surface-900">
+    <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-surface-900">
       <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_18rem]">
         <div className="min-w-0 p-4 sm:p-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -183,9 +183,9 @@ export function KeysCard({ subscriptionUrl, happLink }: KeysCardProps) {
                 <DeviceIcon device={device} />
                 {deviceLabel(device)} определено автоматически
               </div>
-              <h2 className="mt-3 text-xl font-semibold tracking-tight">Подключение</h2>
-              <p className="mt-1 max-w-xl text-sm leading-6 text-slate-500">
-                Выберите приложение, нажмите подключить или используйте QR-код.
+              <h2 className="mt-3 text-xl font-semibold tracking-tight text-slate-950 dark:text-white">Подключение</h2>
+              <p className="mt-1 max-w-xl text-sm leading-6 text-slate-500 dark:text-slate-400">
+                Выберите приложение и добавьте подписку в один переход.
               </p>
             </div>
             <button
@@ -199,7 +199,7 @@ export function KeysCard({ subscriptionUrl, happLink }: KeysCardProps) {
             </button>
           </div>
 
-          <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
+          <div className="-mx-4 mt-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:grid sm:grid-cols-3 sm:overflow-visible sm:px-0 sm:pb-0">
             {availableApps.map((option) => {
               const active = option.id === selectedApp.id
               const Icon = option.icon
@@ -209,7 +209,7 @@ export function KeysCard({ subscriptionUrl, happLink }: KeysCardProps) {
                   type="button"
                   onClick={() => setSelectedAppId(option.id)}
                   className={cn(
-                    'flex min-h-20 items-center gap-3 rounded-lg border p-3 text-left transition',
+                    'flex min-h-16 min-w-[11rem] items-center gap-3 rounded-lg border p-3 text-left transition sm:min-w-0',
                     active
                       ? 'border-slate-950 bg-slate-950 text-white shadow-sm dark:border-cyan-300 dark:bg-cyan-300 dark:text-slate-950'
                       : 'border-slate-200 bg-slate-50/70 hover:border-slate-300 hover:bg-white dark:border-white/10 dark:bg-white/[0.03] dark:hover:bg-white/[0.06]'
@@ -263,7 +263,7 @@ export function KeysCard({ subscriptionUrl, happLink }: KeysCardProps) {
             </button>
           </div>
 
-          <div className="mt-3 flex flex-col gap-2 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between">
+          <div className="mt-3 flex flex-col gap-2 text-xs text-slate-500 dark:text-slate-400 sm:flex-row sm:items-center sm:justify-between">
             <span className="min-w-0 truncate rounded-lg bg-slate-50 px-3 py-2 font-mono dark:bg-white/[0.03]">
               {subscriptionUrl || 'Ссылка подписки пока недоступна'}
             </span>

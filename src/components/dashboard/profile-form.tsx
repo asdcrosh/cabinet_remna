@@ -30,17 +30,17 @@ export function ProfileForm({ name }: { name: string | null }) {
   })
 
   return (
-    <form onSubmit={onSubmit} className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+    <form onSubmit={onSubmit} className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
       <div className="min-w-0">
         <label className="label" htmlFor="profile-name">Имя</label>
         <input id="profile-name" className="input" placeholder="Как к вам обращаться" {...register('name')} />
       </div>
       {serverError && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-100 md:col-span-2">
+        <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-100 sm:col-span-2">
           {serverError}
         </div>
       )}
-      <button className="btn-primary md:min-w-52" disabled={isSubmitting}>
+      <button className="btn-primary w-full sm:min-w-48" disabled={isSubmitting}>
         <Save className="h-4 w-4" />
         {isSubmitting ? 'Сохраняем...' : 'Сохранить профиль'}
       </button>

@@ -26,14 +26,15 @@ export function Toaster() {
     }
   }, [])
   return (
-    <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2">
+    <div className="fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+4.65rem)] z-50 flex flex-col gap-2 sm:inset-x-auto sm:bottom-4 sm:right-4 sm:w-96">
       {items.map((t) => (
         <div
           key={t.id}
-          className={`rounded-lg px-4 py-3 text-sm shadow-lg ${
+          role="status"
+          className={`w-full rounded-lg px-4 py-3 text-sm leading-5 shadow-2xl shadow-slate-950/15 backdrop-blur sm:w-auto ${
             t.type === 'error'
-              ? 'bg-red-600 text-white'
-              : 'bg-emerald-600 text-white'
+              ? 'border border-red-400/30 bg-red-600/95 text-white'
+              : 'border border-emerald-300/30 bg-emerald-600/95 text-white'
           }`}
         >
           {t.message}

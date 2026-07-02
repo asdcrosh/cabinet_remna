@@ -197,7 +197,7 @@
   }
   .bonus-box-reel-shell {
     isolation: isolate;
-    min-height: 12.75rem;
+    min-height: 11rem;
     background:
       linear-gradient(180deg, rgba(15, 23, 42, 0.82), rgba(2, 6, 23, 0.98)),
       radial-gradient(circle at 50% 50%, rgba(34, 211, 238, 0.12), transparent 34%);
@@ -270,11 +270,11 @@
   .bonus-box-portal {
     pointer-events: none;
     position: absolute;
-    top: 1.55rem;
+    top: 1.25rem;
     left: 50%;
     z-index: 32;
-    width: 164px;
-    height: 148px;
+    width: 138px;
+    height: 126px;
     transform: translateX(-50%);
   }
   .bonus-box-portal::before {
@@ -591,6 +591,17 @@
   }
   .bonus-box-result--empty::before {
     background: linear-gradient(90deg, rgba(248, 113, 113, 0.12), transparent 54%);
+  }
+
+  @media (min-width: 640px) {
+    .bonus-box-reel-shell {
+      min-height: 12.75rem;
+    }
+    .bonus-box-portal {
+      top: 1.55rem;
+      width: 164px;
+      height: 148px;
+    }
   }
 }
 

@@ -137,6 +137,7 @@ export default async function DashboardHome() {
     pendingSync: Boolean(subRow?.pendingSync),
     deviceCount: user._count.devices,
   }
+  const primaryHomeNudge = getPrimaryHomeNudge(onboardingState)
   const personalOffer = filterDuplicateHomeOffer(buildPersonalOffer({
     activeSubscription: activeSubRow,
     bestPlan: visiblePaidPlans[0] ?? null,
@@ -160,6 +161,7 @@ export default async function DashboardHome() {
           deviceCount={onboardingState.deviceCount}
           subscriptionExpireAt={subRow?.expireAt ?? null}
           pendingPayment={user.payments[0] ?? null}
+          suppress={primaryHomeNudge}
         />
         <ActionCenter />
       </div>
@@ -189,6 +191,7 @@ export default async function DashboardHome() {
         deviceCount={onboardingState.deviceCount}
         subscriptionExpireAt={subRow?.expireAt ?? null}
         pendingPayment={user.payments[0] ?? null}
+        suppress={primaryHomeNudge}
       />
 
       {subRow?.pendingSync && !remnawaveCard && (
@@ -548,6 +551,18 @@ function filterDuplicateHomeOffer(offer: PersonalOfferView | null, state: Dashbo
   return offer
 }
 
+type HomeNudgeKey = 'subscription' | 'device' | 'email' | 'telegram' | 'sync' | null
+
+function getPrimaryHomeNudge(state: DashboardOnboardingState): HomeNudgeKey {
+  if (state.pendingSync && !state.hasRemnawaveProfile) return 'sync'
+  if (!state.hasLocalSubscription && !state.hasRemnawaveProfile) return 'subscription'
+  if (state.hasRemnawaveProfile && state.deviceCount === 0) return 'device'
+  if (!state.emailVerified) return 'email'
+  if (!state.telegramLinked) return 'telegram'
+  if (state.telegramLinked && !state.remnashopSynced) return 'sync'
+  return null
+}
+
 function PersonalOffer({
   offer,
   welcomeBonusOptions,
@@ -703,12 +718,14 @@ function SmartInsights({
   deviceCount,
   subscriptionExpireAt,
   pendingPayment,
+  suppress = null,
 }: {
   emailVerified: boolean
   telegramLinked: boolean
   deviceCount: number
   subscriptionExpireAt: Date | null
   pendingPayment: { id: string; confirmationUrl: string | null; createdAt: Date } | null
+  suppress?: HomeNudgeKey
 }) {
   const now = Date.now()
   const daysLeft = subscriptionExpireAt
@@ -734,7 +751,7 @@ function SmartInsights({
           tone: 'amber' as const,
         }
       : null,
-    deviceCount === 0 && subscriptionExpireAt
+    suppress !== 'device' && deviceCount === 0 && subscriptionExpireAt
       ? {
           title: 'Устройство еще не подключено',
           text: 'Откройте подписку и добавьте ее в приложение.',
@@ -743,7 +760,7 @@ function SmartInsights({
           tone: 'cyan' as const,
         }
       : null,
-    !emailVerified
+    suppress !== 'email' && !emailVerified
       ? {
           title: 'Email не подтвержден',
           text: 'Подтверждение помогает восстановить доступ.',
@@ -752,7 +769,7 @@ function SmartInsights({
           tone: 'slate' as const,
         }
       : null,
-    !telegramLinked
+    suppress !== 'telegram' && !telegramLinked
       ? {
           title: 'Telegram не привязан',
           text: 'Привяжите Telegram, чтобы получить бонус и найти старые покупки.',
@@ -773,14 +790,14 @@ function SmartInsights({
   if (items.length === 0) return null
 
   return (
-    <section className="grid gap-3 md:grid-cols-3">
+    <section className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
       {items.map((item) => (
         <Link
           key={item.title}
           href={item.href}
           target={item.external ? '_blank' : undefined}
           rel={item.external ? 'noreferrer' : undefined}
-          className={`group flex min-h-24 items-start gap-3 rounded-lg border p-4 shadow-sm transition-all hover:-translate-y-0.5 ${insightTone(item.tone)}`}
+          className={`group flex min-h-20 items-start gap-3 rounded-lg border p-3 shadow-sm transition-all hover:-translate-y-0.5 ${insightTone(item.tone)}`}
         >
           <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-white/80 shadow-sm dark:bg-white/10">
             {item.icon}

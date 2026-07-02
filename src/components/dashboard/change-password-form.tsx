@@ -36,7 +36,7 @@ export function ChangePasswordForm() {
   })
 
   return (
-    <form onSubmit={onSubmit} className="space-y-4">
+    <form onSubmit={onSubmit} className="space-y-3">
       <div>
         <label className="label" htmlFor="oldPassword">Текущий пароль</label>
         <PasswordField
@@ -47,7 +47,7 @@ export function ChangePasswordForm() {
           register={register('oldPassword', { required: 'Введите текущий пароль' })}
         />
         {errors.oldPassword && (
-          <p className="text-xs text-red-600 mt-1">{errors.oldPassword.message}</p>
+          <p className="mt-1 text-xs text-red-600 dark:text-red-300">{errors.oldPassword.message}</p>
         )}
       </div>
       <div>
@@ -65,7 +65,7 @@ export function ChangePasswordForm() {
           })}
         />
         {errors.newPassword && (
-          <p className="text-xs text-red-600 mt-1">{errors.newPassword.message}</p>
+          <p className="mt-1 text-xs text-red-600 dark:text-red-300">{errors.newPassword.message}</p>
         )}
       </div>
       <div>
@@ -81,7 +81,7 @@ export function ChangePasswordForm() {
           })}
         />
         {errors.confirm && (
-          <p className="text-xs text-red-600 mt-1">{errors.confirm.message}</p>
+          <p className="mt-1 text-xs text-red-600 dark:text-red-300">{errors.confirm.message}</p>
         )}
       </div>
       {serverError && (
@@ -89,7 +89,7 @@ export function ChangePasswordForm() {
           {serverError}
         </div>
       )}
-      <button type="submit" disabled={isSubmitting} className="btn-primary">
+      <button type="submit" disabled={isSubmitting} className="btn-primary w-full">
         {isSubmitting ? 'Сохраняем...' : 'Сменить пароль'}
       </button>
     </form>

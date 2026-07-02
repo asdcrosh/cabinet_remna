@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import {
   Gift,
+  TrendingUp,
   UsersRound,
 } from 'lucide-react'
 import { prisma } from '@/lib/prisma'
@@ -90,24 +91,31 @@ export default async function ReferralsPage() {
   const conversion = invitedCount > 0 ? Math.round((paidCount / invitedCount) * 100) : 0
 
   return (
-    <div className="space-y-6">
-      <PageHeader title="Рефералы" description={`Пригласите друга и получите +${bonusDays} дней после его первой оплаты`} />
+    <div className="space-y-4 sm:space-y-6">
+      <PageHeader title="Рефералы" description={`+${bonusDays} дней за первую оплату друга`} />
 
-      <section id="referral-link" className="space-y-3 scroll-mt-24">
-        <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_15rem]">
+      <section id="referral-link" className="scroll-mt-24">
+        <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_14rem]">
           <ReferralLinkCard code={referralCode} url={referralUrl} bonusDays={bonusDays} />
-          <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-400/20 dark:bg-emerald-400/10">
-            <div className="flex items-center gap-2 text-sm font-medium text-emerald-700 dark:text-emerald-200">
-              <Gift className="h-4 w-4" />
-              Бонус за друга
+          <div className="rounded-lg border border-emerald-200/80 bg-gradient-to-br from-emerald-50 to-cyan-50 p-3 shadow-sm shadow-emerald-100/50 dark:border-emerald-400/20 dark:from-emerald-400/10 dark:to-cyan-400/10 dark:shadow-none sm:p-4">
+            <div className="flex items-center justify-between gap-3 lg:block">
+              <div>
+                <div className="flex items-center gap-2 text-sm font-medium text-emerald-700 dark:text-emerald-200">
+                  <Gift className="h-4 w-4" />
+                  Бонус
+                </div>
+                <div className="mt-2 text-2xl font-semibold text-emerald-950 dark:text-emerald-100 sm:text-3xl">+{bonusDays} дн.</div>
+              </div>
+              <div className="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-white/75 text-emerald-700 shadow-sm dark:bg-white/10 dark:text-emerald-200 lg:mt-5">
+                <TrendingUp className="h-5 w-5" />
+              </div>
             </div>
-            <div className="mt-3 text-3xl font-semibold text-emerald-900 dark:text-emerald-100">+{bonusDays} дн.</div>
-            <p className="mt-1 text-sm text-emerald-700/80 dark:text-emerald-200/80">начисляется после первой оплаты</p>
+            <p className="mt-2 text-sm text-emerald-700/80 dark:text-emerald-200/80">начислим после первой оплаты приглашенного</p>
           </div>
         </div>
       </section>
 
-      <section className="grid gap-3 md:grid-cols-4">
+      <section className="grid grid-cols-2 gap-2 sm:gap-3 xl:grid-cols-4">
         <SummaryCard label="Приглашено" value={invitedCount} />
         <SummaryCard label="Оплатили" value={paidCount} />
         <SummaryCard label="Конверсия" value={`${conversion}%`} />
@@ -121,15 +129,15 @@ export default async function ReferralsPage() {
       <section id="referral-history" className="scroll-mt-24">
         <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h2 className="text-xl font-semibold">Приглашённые</h2>
-            <p className="mt-1 text-sm text-slate-500">Кто зарегистрировался и когда начислится бонус.</p>
+            <h2 className="text-lg font-semibold sm:text-xl">Приглашённые</h2>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Кто зарегистрировался и когда начислится бонус.</p>
           </div>
-          {invitedCount > 0 && <div className="text-sm text-slate-500">{referrals.length} из {invitedCount}</div>}
+          {invitedCount > 0 && <div className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-500 dark:bg-white/10 dark:text-slate-300">{referrals.length} из {invitedCount}</div>}
         </div>
 
         <div className="overflow-hidden rounded-lg border bg-white/80 shadow-sm dark:border-white/10 dark:bg-surface-900/80">
           {referrals.length === 0 ? (
-            <div className="px-4 py-12 text-center">
+            <div className="px-4 py-10 text-center">
               <div className="mx-auto grid h-12 w-12 place-items-center rounded-lg bg-slate-100 text-slate-500 dark:bg-white/10 dark:text-slate-300">
                 <UsersRound className="h-6 w-6" />
               </div>
@@ -144,7 +152,7 @@ export default async function ReferralsPage() {
                 const paidAt = user.payments[0]?.paidAt ?? user.payments[0]?.createdAt ?? null
                 const reward = getReferralStatus(user.referralRewardAsReferred, Boolean(paidAt))
                 return (
-                  <article key={user.id} className="grid gap-3 px-4 py-4 md:grid-cols-[minmax(0,1fr)_10rem_11rem_12rem] md:items-center">
+                  <article key={user.id} className="grid gap-3 px-3 py-3 sm:px-4 md:grid-cols-[minmax(0,1fr)_8rem_8rem_10rem] md:items-center">
                     <div className="min-w-0">
                       <div className="flex min-w-0 items-center gap-2">
                         <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-500 dark:bg-white/10 dark:text-slate-300">
@@ -156,9 +164,11 @@ export default async function ReferralsPage() {
                         </div>
                       </div>
                     </div>
-                    <HistoryCell label="Регистрация" value={formatReferralDate(user.createdAt)} />
-                    <HistoryCell label="Оплата" value={paidAt ? formatReferralDate(paidAt) : 'Ожидаем'} />
-                    <div className="min-w-0 md:text-right">
+                    <div className="grid grid-cols-2 gap-2 md:contents">
+                      <HistoryCell label="Регистрация" value={formatReferralDate(user.createdAt)} />
+                      <HistoryCell label="Оплата" value={paidAt ? formatReferralDate(paidAt) : 'Ожидаем'} />
+                    </div>
+                    <div className="min-w-0 rounded-lg bg-slate-50 p-2 dark:bg-white/5 md:bg-transparent md:p-0 md:text-right md:dark:bg-transparent">
                       <span className={reward.className}>{reward.label}</span>
                       <div className="mt-1 truncate text-xs text-slate-500">{reward.description}</div>
                     </div>
@@ -175,9 +185,9 @@ export default async function ReferralsPage() {
 
 function SummaryCard({ label, value, hint }: { label: string; value: string | number; hint?: string }) {
   return (
-    <div className="rounded-lg border bg-white/80 p-4 shadow-sm dark:border-white/10 dark:bg-surface-900/80">
-      <div className="text-sm text-slate-500">{label}</div>
-      <div className="mt-2 text-2xl font-semibold">{value}</div>
+    <div className="rounded-lg border bg-white/85 p-3 shadow-sm dark:border-white/10 dark:bg-white/[0.04] sm:p-4">
+      <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{label}</div>
+      <div className="mt-2 text-xl font-semibold text-slate-950 dark:text-white sm:text-2xl">{value}</div>
       {hint && <div className="mt-1 text-xs text-slate-400">{hint}</div>}
     </div>
   )
@@ -185,7 +195,7 @@ function SummaryCard({ label, value, hint }: { label: string; value: string | nu
 
 function HistoryCell({ label, value }: { label: string; value: string }) {
   return (
-    <div className="min-w-0">
+    <div className="min-w-0 rounded-lg bg-slate-50 p-2 dark:bg-white/5 md:bg-transparent md:p-0 md:dark:bg-transparent">
       <div className="text-xs uppercase text-slate-400">{label}</div>
       <div className="mt-1 truncate text-sm font-medium">{value}</div>
     </div>

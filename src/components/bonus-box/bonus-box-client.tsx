@@ -256,9 +256,32 @@ export function BonusBoxClient({
     }
   }
 
+  const openCaseCta = subscribeCta && !opening ? (
+    <a href="/dashboard/tariffs" className={cn(openButtonClass, "w-full")}>
+      <span className="absolute inset-y-0 -left-1/3 w-1/3 skew-x-[-18deg] bg-white/24 blur-sm transition-transform duration-700 group-hover:translate-x-[430%]" />
+      <span className="relative flex items-center justify-center gap-2">
+        <ShoppingCart className="h-4 w-4" />
+        <span>{openButtonLabel}</span>
+      </span>
+    </a>
+  ) : (
+    <button
+      type="button"
+      className={cn(openButtonClass, "w-full")}
+      onClick={openBox}
+      disabled={!canOpen}
+    >
+      <span className="absolute inset-y-0 -left-1/3 w-1/3 skew-x-[-18deg] bg-white/24 blur-sm transition-transform duration-700 group-hover:translate-x-[430%]" />
+      <span className="relative flex items-center justify-center gap-2">
+        <Gift className="h-4 w-4" />
+        <span>{opening ? "Открываем..." : openButtonLabel}</span>
+      </span>
+    </button>
+  );
+
   return (
     <div className="flex flex-col gap-4 sm:gap-5">
-      <section className="bonus-box-hero order-3 relative overflow-hidden rounded-lg border border-cyan-200/70 bg-white/85 p-3 shadow-sm shadow-cyan-950/5 backdrop-blur dark:border-cyan-300/15 dark:text-white dark:shadow-black/20 sm:p-4">
+      <section className="bonus-box-hero order-first relative overflow-hidden rounded-lg border border-cyan-200/70 bg-white/85 p-3 shadow-sm shadow-cyan-950/5 backdrop-blur dark:border-cyan-300/15 dark:text-white dark:shadow-black/20 sm:p-4">
         <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-cyan-300 via-emerald-300 to-transparent" />
         <div className="pointer-events-none absolute -right-28 -top-28 h-64 w-64 rounded-full bg-cyan-300/20 blur-3xl dark:bg-cyan-300/10" />
         <div className="pointer-events-none absolute -bottom-36 left-1/3 h-64 w-64 rounded-full bg-emerald-300/20 blur-3xl dark:bg-emerald-300/10" />
@@ -296,7 +319,40 @@ export function BonusBoxClient({
                 {data.attemptsCount} открытий
               </span>
             </div>
-            <div className="mt-3 grid gap-2 sm:grid-cols-3">
+
+            <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(15rem,22rem)] lg:items-end">
+              <div className="min-w-0">
+                <h2 className="text-2xl font-semibold tracking-tight text-slate-950 dark:text-white sm:text-3xl">
+                  Открывайте бонусы
+                </h2>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">
+                  Дни подписки, промокоды и дополнительные открытия. Один запуск, один результат, всё сохраняется в истории.
+                </p>
+              </div>
+              <div className="rounded-lg border border-cyan-200/70 bg-white/70 p-3 shadow-sm shadow-cyan-950/5 dark:border-cyan-300/15 dark:bg-white/10">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">
+                      Доступно
+                    </div>
+                    <div className="mt-0.5 text-2xl font-semibold text-slate-950 dark:text-white">
+                      {data.attemptsCount}
+                    </div>
+                  </div>
+                  <div className="grid h-11 w-11 place-items-center rounded-lg bg-cyan-50 text-cyan-700 dark:bg-cyan-400/10 dark:text-cyan-100">
+                    <Gift className="h-5 w-5" />
+                  </div>
+                </div>
+                <div className="mt-3">{openCaseCta}</div>
+                {data.canOpenReason && !subscribeCta && (
+                  <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                    {data.canOpenReason}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="mt-4 grid gap-2 sm:grid-cols-3">
               <TopMetric
                 icon={<Gift className="h-4 w-4" />}
                 label="Открытий"
@@ -334,7 +390,7 @@ export function BonusBoxClient({
 
       <section
         className={cn(
-          "bonus-box-stage order-first overflow-hidden rounded-lg border border-slate-900 bg-slate-950 shadow-xl shadow-slate-950/20 dark:border-white/10",
+          "bonus-box-stage order-2 overflow-hidden rounded-lg border border-slate-900 bg-slate-950 shadow-xl shadow-slate-950/20 dark:border-white/10",
           opening && "bonus-box-stage--opening",
           revealEffect && "bonus-box-stage--reveal",
           revealEffect && result?.prize.type !== "NO_PRIZE" && "bonus-box-stage--win",
@@ -353,32 +409,10 @@ export function BonusBoxClient({
                   : data.canOpenReason || "Запустите кейс, подарок остановится в подсвеченной зоне."}
             </p>
           </div>
-          <div className="flex w-full flex-col gap-2 sm:w-auto sm:min-w-64 sm:flex-row sm:items-center sm:justify-end">
+          <div className="flex w-full items-center justify-start gap-2 sm:w-auto sm:justify-end">
             <span className="rounded-full border border-white/10 bg-white/10 px-3 py-1.5 text-xs font-medium text-slate-200">
-              {opening ? "Открывается" : `${data.attemptsCount} доступно`}
+              {opening ? "Открывается" : result ? "Результат сохранён" : `${data.attemptsCount} доступно`}
             </span>
-            {subscribeCta && !opening ? (
-              <a href="/dashboard/tariffs" className={openButtonClass}>
-                <span className="absolute inset-y-0 -left-1/3 w-1/3 skew-x-[-18deg] bg-white/24 blur-sm transition-transform duration-700 group-hover:translate-x-[430%]" />
-                <span className="relative flex items-center justify-center gap-2">
-                  <ShoppingCart className="h-4 w-4" />
-                  <span>{openButtonLabel}</span>
-                </span>
-              </a>
-            ) : (
-              <button
-                type="button"
-                className={openButtonClass}
-                onClick={openBox}
-                disabled={!canOpen}
-              >
-                <span className="absolute inset-y-0 -left-1/3 w-1/3 skew-x-[-18deg] bg-white/24 blur-sm transition-transform duration-700 group-hover:translate-x-[430%]" />
-                <span className="relative flex items-center justify-center gap-2">
-                  <Gift className="h-4 w-4" />
-                  <span>{opening ? "Крутим..." : openButtonLabel}</span>
-                </span>
-              </button>
-            )}
           </div>
         </div>
 
@@ -819,7 +853,7 @@ function TopMetric({
   hint: string;
 }) {
   return (
-    <div className="min-h-[94px] min-w-0 rounded-lg border border-slate-200/70 bg-white/60 px-3 py-3 shadow-sm shadow-slate-950/5 dark:border-white/10 dark:bg-white/10">
+    <div className="min-h-[76px] min-w-0 rounded-lg border border-slate-200/70 bg-white/60 px-3 py-2.5 shadow-sm shadow-slate-950/5 dark:border-white/10 dark:bg-white/10">
       <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300 sm:text-xs">
         {icon}
         {label}

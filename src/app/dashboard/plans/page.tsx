@@ -105,14 +105,14 @@ export default async function PlansPage({
         )}
       />
 
-      <section className="card relative overflow-hidden p-4 sm:p-5">
+      <section className="card relative overflow-hidden p-3 sm:p-5">
         <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-cyan-400 via-emerald-400 to-transparent" />
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+        <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
           <div>
-            <h2 className="text-xl font-semibold tracking-tight sm:text-2xl">Выберите срок доступа</h2>
-            <p className="mt-1 max-w-2xl text-sm text-slate-500 dark:text-slate-400">После оплаты подписка появится в кабинете.</p>
+            <h2 className="text-lg font-semibold tracking-tight sm:text-2xl">Выберите срок доступа</h2>
+            <p className="mt-1 max-w-2xl text-sm text-slate-500 dark:text-slate-400">Оплата картой, подписка появится в кабинете.</p>
           </div>
-          <div className="grid gap-2 sm:grid-cols-3 lg:w-[34rem]">
+          <div className="grid grid-cols-3 gap-1.5 sm:gap-2 lg:w-[34rem]">
             <BuyStep icon={<ShieldCheck className="h-4 w-4" />} title="Тариф" />
             <BuyStep icon={<CreditCard className="h-4 w-4" />} title="Оплата" />
             <BuyStep icon={<KeyRound className="h-4 w-4" />} title="Подключение" />
@@ -129,7 +129,7 @@ export default async function PlansPage({
         </div>
       )}
 
-      <div className="grid auto-rows-fr grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <div className="grid auto-rows-fr grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:gap-4">
         {visiblePlans.length === 0 && (
           <div className="card col-span-full py-12 text-center">
             <h3 className="text-lg font-semibold">Тарифы скоро появятся</h3>
@@ -166,11 +166,11 @@ export default async function PlansPage({
 
 function BuyStep({ icon, title }: { icon: React.ReactNode; title: string }) {
   return (
-    <div className="flex items-center gap-2 rounded-lg border border-slate-100 bg-slate-50/80 p-2.5 text-sm font-medium dark:border-slate-800 dark:bg-surface-800/70">
+    <div className="flex min-w-0 flex-col items-center justify-center gap-1 rounded-lg border border-slate-100 bg-slate-50/80 p-2 text-center text-xs font-medium dark:border-slate-800 dark:bg-surface-800/70 sm:flex-row sm:justify-start sm:gap-2 sm:p-2.5 sm:text-sm sm:text-left">
       <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-slate-950 text-cyan-200 dark:bg-white dark:text-slate-950">
         {icon}
       </div>
-      <span>{title}</span>
+      <span className="truncate">{title}</span>
     </div>
   )
 }

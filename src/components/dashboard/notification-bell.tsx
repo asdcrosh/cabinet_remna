@@ -173,7 +173,7 @@ export function NotificationBell({ showAdmin = false }: { showAdmin?: boolean })
       </button>
 
       {open && (
-        <div className="fixed inset-x-3 top-16 z-50 max-h-[calc(100dvh-5rem)] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl shadow-slate-950/10 dark:border-white/10 dark:bg-surface-950 dark:shadow-black/30 sm:absolute sm:inset-x-auto sm:right-0 sm:top-12 sm:w-[min(24rem,calc(100vw-2rem))]">
+        <div className="fixed inset-x-2 bottom-[calc(env(safe-area-inset-bottom)+4.8rem)] z-50 max-h-[min(78dvh,34rem)] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-slate-950/15 dark:border-white/10 dark:bg-surface-950 dark:shadow-black/35 sm:absolute sm:bottom-auto sm:inset-x-auto sm:right-0 sm:top-12 sm:w-[min(24rem,calc(100vw-2rem))] sm:rounded-xl">
           <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 dark:border-white/10">
             <div>
               <div className="text-sm font-semibold text-slate-950 dark:text-white">Уведомления</div>
@@ -223,7 +223,7 @@ export function NotificationBell({ showAdmin = false }: { showAdmin?: boolean })
             </div>
           )}
 
-          <div className="max-h-[calc(100dvh-13rem)] overflow-y-auto p-2 sm:max-h-96">
+          <div className="max-h-[calc(78dvh-10rem)] overflow-y-auto p-2 sm:max-h-96">
             {activeSummary.notifications.length > 0 ? (
               activeSummary.notifications.map((item) => (
                 tab === 'admin' ? (

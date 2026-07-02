@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { Clock3, Hash, Laptop, Loader2, Monitor, Smartphone, Tablet, Unlink2 } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
+import { Clock3, Hash, Laptop, Loader2, Monitor, RefreshCw, Smartphone, Tablet, Unlink2 } from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
 import { EmptyState, InlineAlert } from './empty-state'
 import { ConfirmDialog } from './confirm-dialog'
@@ -21,14 +21,26 @@ interface Device {
 export function DevicesList() {
   const [devices, setDevices] = useState<Device[] | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [refreshing, setRefreshing] = useState(false)
   const [removingHwid, setRemovingHwid] = useState<string | null>(null)
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null)
 
-  useEffect(() => {
-    apiFetch<{ devices: Device[] }>('/api/devices')
-      .then((d) => setDevices(d.devices))
-      .catch((e) => setError(e.message))
+  const loadDevices = useCallback(async () => {
+    setError(null)
+    setRefreshing(true)
+    try {
+      const data = await apiFetch<{ devices: Device[] }>('/api/devices')
+      setDevices(data.devices)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Не удалось загрузить устройства')
+    } finally {
+      setRefreshing(false)
+    }
   }, [])
+
+  useEffect(() => {
+    void loadDevices()
+  }, [loadDevices])
 
   async function removeDevice(device: Device) {
     setRemovingHwid(device.hwid)
@@ -57,37 +69,53 @@ export function DevicesList() {
 
   return (
     <>
-    <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-[0_18px_45px_rgba(15,23,42,0.06)] dark:border-white/10 dark:bg-surface-900">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <div className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Подключенные устройства</div>
-          <div className="mt-1 text-2xl font-semibold text-slate-950 dark:text-white">{devices.length}</div>
+      <section className="overflow-hidden rounded-lg border border-slate-200/80 bg-white/90 shadow-sm shadow-slate-200/50 backdrop-blur dark:border-white/10 dark:bg-white/[0.035] dark:shadow-black/20">
+        <div className="border-b border-slate-100 bg-slate-50/60 p-3 dark:border-white/10 dark:bg-white/[0.02] sm:p-5">
+          <div className="space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <div className="text-xs font-semibold uppercase tracking-wide text-cyan-700 dark:text-cyan-300">Подключенные устройства</div>
+                <h2 className="mt-0.5 text-2xl font-semibold tracking-tight text-slate-950 dark:text-white">{devices.length}</h2>
+              </div>
+              <button
+                type="button"
+                className="btn-secondary min-h-10 shrink-0 px-3"
+                onClick={() => void loadDevices()}
+                disabled={refreshing}
+                aria-label="Обновить устройства"
+              >
+                <RefreshCw className={cn('h-4 w-4', refreshing && 'animate-spin')} />
+                <span className="hidden sm:inline">Обновить</span>
+              </button>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              <DeviceMetric label="За сутки" value={countRecentDevices(devices).toString()} />
+              <DeviceMetric label="За неделю" value={countWeekDevices(devices).toString()} />
+              <DeviceMetric label="Всего" value={devices.length.toString()} />
+            </div>
+          </div>
         </div>
-        <div className="rounded-full border border-cyan-100 bg-cyan-50 px-3 py-1 text-xs font-medium text-cyan-700 dark:border-cyan-500/20 dark:bg-cyan-500/10 dark:text-cyan-200">
-          {countRecentDevices(devices)} активных за сутки
-        </div>
-      </div>
 
-      <div className="grid gap-3 lg:grid-cols-2 2xl:grid-cols-3">
-      {devices.map((d) => (
-        <DeviceCard
-          key={d.hwid}
-          device={d}
-          loading={removingHwid === d.hwid}
-          onRemove={() => setSelectedDevice(d)}
-        />
-      ))}
-      </div>
-    </section>
-    <ConfirmDialog
-      open={Boolean(selectedDevice)}
-      title="Отвязать устройство?"
-      description="Устройство исчезнет из списка привязок. При следующем подключении может потребоваться повторная авторизация."
-      confirmLabel="Отвязать"
-      loading={Boolean(removingHwid)}
-      onCancel={() => setSelectedDevice(null)}
-      onConfirm={() => selectedDevice && removeDevice(selectedDevice)}
-    />
+        <div className="grid gap-2.5 p-3 sm:gap-3 sm:p-5 lg:grid-cols-2 2xl:grid-cols-3">
+          {devices.map((d) => (
+            <DeviceCard
+              key={d.hwid}
+              device={d}
+              loading={removingHwid === d.hwid}
+              onRemove={() => setSelectedDevice(d)}
+            />
+          ))}
+        </div>
+      </section>
+      <ConfirmDialog
+        open={Boolean(selectedDevice)}
+        title="Отвязать устройство?"
+        description="Устройство исчезнет из списка привязок. При следующем подключении может потребоваться повторная авторизация."
+        confirmLabel="Отвязать"
+        loading={Boolean(removingHwid)}
+        onCancel={() => setSelectedDevice(null)}
+        onConfirm={() => selectedDevice && removeDevice(selectedDevice)}
+      />
     </>
   )
 }
@@ -105,30 +133,30 @@ function DeviceCard({
   const Icon = getDeviceIcon(device)
 
   return (
-    <article className="group relative overflow-hidden rounded-lg border border-slate-200 bg-slate-50/70 p-4 transition hover:-translate-y-0.5 hover:border-cyan-200 hover:bg-white hover:shadow-lg hover:shadow-slate-950/5 dark:border-white/10 dark:bg-white/[0.03] dark:hover:border-cyan-500/30 dark:hover:bg-white/[0.05]">
+    <article className="group relative overflow-hidden rounded-lg border border-slate-200/80 bg-slate-50/80 p-3 transition hover:-translate-y-0.5 hover:border-cyan-200 hover:bg-white hover:shadow-lg hover:shadow-slate-950/5 dark:border-white/10 dark:bg-surface-950/35 dark:hover:border-cyan-500/30 dark:hover:bg-white/[0.055] sm:p-4">
       <div className="pointer-events-none absolute -right-10 -top-10 h-24 w-24 rounded-full bg-cyan-100/70 blur-2xl opacity-0 transition group-hover:opacity-100 dark:bg-cyan-500/10" />
-      <div className="relative space-y-4">
+      <div className="relative space-y-3 sm:space-y-4">
         <div className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 items-start gap-3">
-            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-slate-950 text-cyan-200 shadow-sm dark:bg-white dark:text-slate-950">
+            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-slate-950 text-cyan-200 shadow-sm dark:bg-cyan-300/10 dark:text-cyan-200">
               <Icon className="h-5 w-5" />
             </div>
             <div className="min-w-0">
-              <h2 className="truncate text-base font-semibold text-slate-950 dark:text-white">{getDeviceTitle(device)}</h2>
+              <h2 className="truncate text-sm font-semibold text-slate-950 dark:text-white sm:text-base">{getDeviceTitle(device)}</h2>
               <p className="mt-1 line-clamp-2 text-sm leading-5 text-slate-500 dark:text-slate-400">{getDeviceSubtitle(device)}</p>
             </div>
           </div>
         </div>
 
         <div className="grid gap-2 text-xs text-slate-500 dark:text-slate-400 sm:grid-cols-2">
-          <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 dark:border-white/10 dark:bg-surface-900/70">
+          <div className="rounded-lg border border-slate-200/80 bg-white/90 px-3 py-2 dark:border-white/10 dark:bg-white/[0.03]">
             <div className="flex items-center gap-1.5 font-medium text-slate-700 dark:text-slate-200">
               <Clock3 className="h-3.5 w-3.5" />
               Активность
             </div>
             <div className="mt-1">{formatDeviceDate(device.updatedAt || device.createdAt)}</div>
           </div>
-          <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 dark:border-white/10 dark:bg-surface-900/70">
+          <div className="rounded-lg border border-slate-200/80 bg-white/90 px-3 py-2 dark:border-white/10 dark:bg-white/[0.03]">
             <div className="flex items-center gap-1.5 font-medium text-slate-700 dark:text-slate-200">
               <Hash className="h-3.5 w-3.5" />
               ID
@@ -149,6 +177,15 @@ function DeviceCard({
         </div>
       </div>
     </article>
+  )
+}
+
+function DeviceMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-slate-200/80 bg-white/80 px-2.5 py-2 text-sm shadow-sm shadow-slate-200/40 dark:border-white/10 dark:bg-surface-950/35 dark:shadow-black/10 sm:px-3">
+      <div className="truncate text-[11px] text-slate-500 dark:text-slate-400 sm:text-xs">{label}</div>
+      <div className="mt-0.5 font-semibold text-slate-950 dark:text-white">{value}</div>
+    </div>
   )
 }
 
@@ -247,6 +284,14 @@ function countRecentDevices(devices: Device[]) {
   return devices.filter((device) => {
     const date = device.updatedAt || device.createdAt
     return date ? Date.now() - new Date(date).getTime() <= dayMs : false
+  }).length
+}
+
+function countWeekDevices(devices: Device[]) {
+  const weekMs = 7 * 24 * 60 * 60 * 1000
+  return devices.filter((device) => {
+    const date = device.updatedAt || device.createdAt
+    return date ? Date.now() - new Date(date).getTime() <= weekMs : false
   }).length
 }
 
