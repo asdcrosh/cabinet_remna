@@ -25,7 +25,7 @@ interface PlanCardProps {
     discountPercent: number;
     discountKopecks: number;
     finalAmountKopecks: number;
-    source: "BONUS_BOX" | "WELCOME";
+    source: "BONUS_BOX" | "WELCOME" | "LINK";
   }>;
 }
 
@@ -61,20 +61,27 @@ export function PlanCard({
   const effectivePrice = appliedPromo
     ? formatPrice(appliedPromo.finalAmountKopecks)
     : price;
-  const suggestedPromoCodes = useMemo(
-    () => [...availablePromoCodes].sort((a, b) => {
+  const normalizedInitialPromoCode = initialPromoCode?.trim().toUpperCase() || "";
+  const suggestedPromoCodes = useMemo(() => {
+    const sorted = [...availablePromoCodes].sort((a, b) => {
       if (b.discountKopecks !== a.discountKopecks) return b.discountKopecks - a.discountKopecks;
       return b.discountPercent - a.discountPercent;
-    }).slice(0, 3),
-    [availablePromoCodes],
-  );
+    });
+    const linkedPromo = normalizedInitialPromoCode
+      ? sorted.find((promo) => promo.code.toUpperCase() === normalizedInitialPromoCode)
+      : null;
+    const visible = linkedPromo
+      ? [linkedPromo, ...sorted.filter((promo) => promo.code !== linkedPromo.code)]
+      : sorted;
+    return visible.slice(0, 3);
+  }, [availablePromoCodes, normalizedInitialPromoCode]);
   const bestPromo = suggestedPromoCodes[0] ?? null;
   const showManualPromoInput =
     promoOpen && (manualPromoOpen || suggestedPromoCodes.length === 0);
 
   useEffect(() => {
     if (!initialPromoCode || isPromoPlan) return;
-    const awardedPromo = suggestedPromoCodes.find((promo) => promo.code === initialPromoCode);
+    const awardedPromo = suggestedPromoCodes.find((promo) => promo.code.toUpperCase() === normalizedInitialPromoCode);
 
     setPromoOpen(true);
     if (awardedPromo) {
@@ -96,7 +103,7 @@ export function PlanCard({
 
     setManualPromoOpen(true);
     setPromoInput(initialPromoCode);
-  }, [initialPromoCode, isPromoPlan, suggestedPromoCodes]);
+  }, [initialPromoCode, isPromoPlan, normalizedInitialPromoCode, suggestedPromoCodes]);
 
   async function buy() {
     if (isPromoPlan) {

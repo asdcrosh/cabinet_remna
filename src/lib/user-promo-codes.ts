@@ -8,18 +8,20 @@ export type AvailableUserPromoCode = {
   discountPercent: number
   discountKopecks: number
   finalAmountKopecks: number
-  source: 'BONUS_BOX' | 'WELCOME'
+  source: 'BONUS_BOX' | 'WELCOME' | 'LINK'
 }
 
 export async function getAvailableUserPromoCodesByPlan({
   userId,
   plans,
+  linkPromoCode,
 }: {
   userId: string
   plans: Array<Pick<Plan, 'id' | 'priceKopecks' | 'isPromo'>>
+  linkPromoCode?: string | null
 }) {
   await cleanupExpiredBonusBoxPromoCodes()
-  const awardedCodes = await getAwardedPromoCodes(userId)
+  const awardedCodes = await getAwardedPromoCodes(userId, linkPromoCode)
   const result = new Map<string, AvailableUserPromoCode[]>()
 
   await Promise.all(plans.map(async (plan) => {
@@ -54,7 +56,7 @@ export async function getAvailableUserPromoCodesByPlan({
   return result
 }
 
-async function getAwardedPromoCodes(userId: string) {
+async function getAwardedPromoCodes(userId: string, linkPromoCode?: string | null) {
   const [bonusOpenings, welcomeRedemptions] = await Promise.all([
     prisma.bonusBoxOpening.findMany({
       where: { userId, promoCodeId: { not: null } },
@@ -70,17 +72,25 @@ async function getAwardedPromoCodes(userId: string) {
 
   const seen = new Set<string>()
   const items: Array<{ code: string; source: AvailableUserPromoCode['source'] }> = []
+  const normalizedLinkCode = linkPromoCode?.trim()
+
+  if (normalizedLinkCode) {
+    seen.add(normalizedLinkCode.toUpperCase())
+    items.push({ code: normalizedLinkCode, source: 'LINK' })
+  }
 
   for (const opening of bonusOpenings) {
     const code = opening.promoCode?.code
-    if (!code || seen.has(code)) continue
-    seen.add(code)
+    const normalizedCode = code?.toUpperCase()
+    if (!code || !normalizedCode || seen.has(normalizedCode)) continue
+    seen.add(normalizedCode)
     items.push({ code, source: 'BONUS_BOX' })
   }
   for (const redemption of welcomeRedemptions) {
     const code = redemption.promoCode?.code
-    if (!code || seen.has(code)) continue
-    seen.add(code)
+    const normalizedCode = code?.toUpperCase()
+    if (!code || !normalizedCode || seen.has(normalizedCode)) continue
+    seen.add(normalizedCode)
     items.push({ code, source: 'WELCOME' })
   }
 

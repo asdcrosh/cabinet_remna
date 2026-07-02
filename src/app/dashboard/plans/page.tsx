@@ -77,7 +77,7 @@ export default async function PlansPage({
     : plans.filter((plan) => plan.availability === 'ALL')
   const visiblePlans = audiencePlans.filter((plan) => !plan.isPromo || canUsePromo)
   const availablePromoCodesByPlan = session
-    ? await getAvailableUserPromoCodesByPlan({ userId: session.uid, plans: visiblePlans })
+    ? await getAvailableUserPromoCodesByPlan({ userId: session.uid, plans: visiblePlans, linkPromoCode: initialPromoCode })
     : new Map()
   const hasPromoPlan = audiencePlans.some((plan) => plan.isPromo)
   const isOtherwiseEligibleForPromo =
