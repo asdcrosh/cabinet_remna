@@ -113,7 +113,7 @@ describe('syncRemnashopUsersToCabinet', () => {
 
     expect(mocks.remnawave.getUserByUuid).toHaveBeenCalledWith('rw-1')
     expect(mocks.remnawave.updateUser).toHaveBeenCalledWith(
-      expect.objectContaining({ uuid: 'rw-1', telegramId: '123', tag: 'IMPORTED' })
+      expect.objectContaining({ uuid: 'rw-1', telegramId: 123, tag: 'IMPORTED' })
     )
     expect(mocks.prisma.plan.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({

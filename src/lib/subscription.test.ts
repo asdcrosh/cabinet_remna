@@ -260,7 +260,7 @@ describe('ensureRemnawaveSubscription', () => {
     expect(mocks.remnawave.createUser).toHaveBeenCalledWith(
       expect.objectContaining({
         email: 'user@example.com',
-        telegramId: '8507156675',
+        telegramId: 8507156675,
       })
     )
   })

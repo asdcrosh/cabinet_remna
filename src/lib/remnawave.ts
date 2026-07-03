@@ -16,7 +16,7 @@ if (!BASE_URL || !TOKEN) {
   logWarn('remnawave.missing_credentials', { hasBaseUrl: Boolean(BASE_URL), hasToken: Boolean(TOKEN) })
 }
 
-class RemnawaveError extends Error {
+export class RemnawaveError extends Error {
   constructor(public status: number, public body: unknown, message: string) {
     super(message)
     this.name = 'RemnawaveError'
@@ -44,7 +44,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   const text = await res.text()
   const data = text ? safeJson(text) : null
   if (!res.ok) {
-    throw new RemnawaveError(res.status, data, `Remnawave ${method} ${path} → ${res.status}`)
+    throw new RemnawaveError(res.status, data, `Remnawave ${method} ${path} → ${res.status}: ${formatErrorBody(data)}`)
   }
   return data as T
 }
@@ -54,6 +54,16 @@ function safeJson(text: string): unknown {
     return JSON.parse(text)
   } catch {
     return text
+  }
+}
+
+function formatErrorBody(data: unknown) {
+  if (!data) return 'empty response'
+  if (typeof data === 'string') return data.slice(0, 500)
+  try {
+    return JSON.stringify(data).slice(0, 500)
+  } catch {
+    return 'unserializable response'
   }
 }
 
@@ -328,5 +338,3 @@ export const remnawave = {
     )
   },
 }
-
-export { RemnawaveError }
