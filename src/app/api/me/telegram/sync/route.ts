@@ -40,8 +40,8 @@ export const POST = withAuth(async () => {
 
     return NextResponse.json(
       {
-        error: 'Синхронизация временно недоступна',
-        details: message,
+        error: message,
+        details: 'telegram_sync_failed',
       },
       { status: 502 }
     )

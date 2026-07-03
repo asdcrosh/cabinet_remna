@@ -12,6 +12,7 @@ export function describeSyncError(error: unknown) {
   const message = error instanceof Error ? error.message : String(error)
   if (/REMNASHOP_DATABASE_URL/i.test(message)) return 'Подключение к базе Remnashop не настроено.'
   if (/password authentication failed/i.test(message)) return 'База Remnashop отклонила логин или пароль.'
+  if (/permission denied/i.test(message)) return 'У пользователя базы Remnashop не хватает прав на чтение или запись.'
   if (/connection timeout|timeout/i.test(message)) return 'Не удалось дождаться ответа базы или API.'
   if (/getaddrinfo|ENOTFOUND/i.test(message)) return 'Не удалось найти хост базы или API.'
   if (/fetch failed/i.test(message)) return 'Не удалось подключиться к внешнему сервису.'

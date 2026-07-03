@@ -104,6 +104,7 @@ model User {
   subscriptions              Subscription[]
   payments                   Payment[]
   devices                    Device[]
+  blockedDevices             BlockedDevice[]
   supportTickets             SupportTicket[]
   supportMessages            SupportMessage[]
   promoCodeRedemptions       PromoCodeRedemption[]
@@ -714,6 +715,21 @@ model Device {
 
   @@unique([userId, hwid])
   @@index([userId])
+}
+
+model BlockedDevice {
+  id          String    @id @default(cuid())
+  userId      String
+  hwid        String
+  reason      String?
+  blockedAt   DateTime  @default(now())
+  unblockedAt DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, hwid])
+  @@index([userId])
+  @@index([userId, unblockedAt])
 }
 
 // ----------------------------------------------------------------------
