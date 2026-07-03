@@ -1,16 +1,22 @@
 import { prisma } from '../src/lib/prisma'
 import { notifySubscriptionExpiring, notifyTrafficLimit } from '../src/lib/notifications'
 import { syncPaymentProvisioning } from '../src/lib/payment-sync'
+import { syncCabinetPaymentToRemnashopBestEffort } from '../src/lib/remnashop-reverse-sync'
 import { maybeSyncRemnashopCatalog } from '../src/lib/remnashop-sync'
+import { syncRemnashopUsersToCabinet } from '../src/lib/remnashop-users'
 
 const intervalMs = readPositiveInt('PAYMENT_RECONCILE_INTERVAL_SECONDS', 60) * 1000
 const batchSize = readPositiveInt('PAYMENT_RECONCILE_BATCH_SIZE', 25)
 const minAgeMs = readPositiveInt('PAYMENT_RECONCILE_MIN_AGE_SECONDS', 30) * 1000
 const cancelPendingAfterMs = readPositiveInt('PAYMENT_CANCEL_PENDING_AFTER_SECONDS', 600) * 1000
 const notificationBatchSize = readPositiveInt('NOTIFICATION_RECONCILE_BATCH_SIZE', 100)
+const remnashopUsersSyncIntervalMs = readNonNegativeInt('REMNASHOP_USERS_SYNC_INTERVAL_SECONDS', 300) * 1000
+const remnashopReverseSyncBatchSize = readPositiveInt('REMNASHOP_REVERSE_SYNC_BATCH_SIZE', 25)
+const remnashopReverseSyncLookbackDays = readPositiveInt('REMNASHOP_REVERSE_SYNC_LOOKBACK_DAYS', 14)
 
 let stopped = false
 let wakeSleep: (() => void) | null = null
+let lastRemnashopUsersSyncAt = 0
 
 process.on('SIGTERM', stop)
 process.on('SIGINT', stop)
@@ -35,6 +41,7 @@ async function runOnce() {
   await maybeSyncRemnashopCatalog().catch((error) => {
     console.error('[remnashop-sync] background sync failed', error)
   })
+  await syncRemnashopUsersIfDue()
 
   const cutoff = new Date(Date.now() - minAgeMs)
   const payments = await prisma.payment.findMany({
@@ -68,8 +75,52 @@ async function runOnce() {
     }
   }
 
+  await retryRemnashopReverseSync()
   await notifyExpiringSubscriptions()
   await notifyTrafficThresholds()
+}
+
+async function syncRemnashopUsersIfDue() {
+  if (!process.env.REMNASHOP_DATABASE_URL) return
+  if (remnashopUsersSyncIntervalMs <= 0) return
+
+  const now = Date.now()
+  if (now - lastRemnashopUsersSyncAt < remnashopUsersSyncIntervalMs) return
+  lastRemnashopUsersSyncAt = now
+
+  try {
+    const result = await syncRemnashopUsersToCabinet()
+    console.log(
+      `[remnashop-users-sync] total=${result.total} created=${result.created} updated=${result.updated} skipped=${result.skipped} subscriptionsSynced=${result.subscriptionsSynced} subscriptionsFailed=${result.subscriptionsFailed}`
+    )
+  } catch (error) {
+    console.error('[remnashop-users-sync] failed', error)
+  }
+}
+
+async function retryRemnashopReverseSync() {
+  if (!process.env.REMNASHOP_DATABASE_URL) return
+
+  const payments = await prisma.payment.findMany({
+    where: {
+      status: 'SUCCEEDED',
+      subscriptionProvisionedAt: { not: null },
+      updatedAt: {
+        gte: new Date(Date.now() - remnashopReverseSyncLookbackDays * 24 * 60 * 60 * 1000),
+      },
+    },
+    orderBy: { updatedAt: 'desc' },
+    take: remnashopReverseSyncBatchSize,
+    select: { id: true },
+  })
+
+  for (const payment of payments) {
+    if (stopped) break
+    const result = await syncCabinetPaymentToRemnashopBestEffort(payment.id)
+    if (!result.ok) {
+      console.error(`[remnashop-reverse-sync] payment=${payment.id} failed`)
+    }
+  }
 }
 
 async function notifyExpiringSubscriptions() {
@@ -166,6 +217,13 @@ function readPositiveInt(name: string, fallback: number) {
   if (!raw) return fallback
   const value = Number(raw)
   return Number.isInteger(value) && value > 0 ? value : fallback
+}
+
+function readNonNegativeInt(name: string, fallback: number) {
+  const raw = process.env[name]
+  if (!raw) return fallback
+  const value = Number(raw)
+  return Number.isInteger(value) && value >= 0 ? value : fallback
 }
 
 main().catch(async (error) => {

@@ -183,9 +183,12 @@ cabinetctl env
 | `EMAIL_VERIFICATION_WEBHOOK_SECRET` | Bearer secret email webhook |
 | `RESEND_API_KEY` | API key Resend |
 | `EMAIL_FROM` | Отправитель писем |
-| `REMNASHOP_DATABASE_URL` | Подключение к Remnashop для чтения и вызова ограниченной функции объединения аккаунтов |
+| `REMNASHOP_DATABASE_URL` | Подключение к Remnashop. Для обратной записи платежей нужен ограниченный read/write-доступ к `users`, `subscriptions`, `transactions` |
 | `REMNASHOP_API_URL` | Public API remnashop для двусторонней регистрации |
 | `REMNASHOP_CATALOG_SYNC_INTERVAL_SECONDS` | Интервал авто-синхронизации каталога |
+| `REMNASHOP_USERS_SYNC_INTERVAL_SECONDS` | Как часто payment worker тянет пользователей Remnashop в кабинет; `0` отключает |
+| `REMNASHOP_REVERSE_SYNC_BATCH_SIZE` | Сколько выданных платежей за проход ретраить в Remnashop |
+| `REMNASHOP_REVERSE_SYNC_LOOKBACK_DAYS` | За сколько последних дней ретраить обратную запись платежей в Remnashop |
 | `YANDEX_CLIENT_ID` / `YANDEX_CLIENT_SECRET` | Опциональный вход и регистрация через Яндекс ID |
 | `REFERRAL_BONUS_DAYS` | Бонус за реферала |
 | `BONUS_BOX_RUB_PER_ATTEMPT` | Сколько рублей оплаты дают одно открытие бокса |

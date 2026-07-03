@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react'
 import type { Dispatch, ReactNode, SetStateAction } from 'react'
 import { useRouter } from 'next/navigation'
 import { createPortal } from 'react-dom'
+import type { BonusBoxAttemptSource } from '@prisma/client'
 import { BarChart3, Clock3, Edit3, Gift, History, Plus, Power, ShieldCheck, SlidersHorizontal, TicketPercent, UserRound, X } from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
 import { toast } from '@/components/ui/toaster'
@@ -42,7 +43,7 @@ export type BonusBoxOpeningAdminRow = {
   createdAt: string
   userEmail: string
   userName: string | null
-  attemptSource: 'PAYMENT' | 'WEEKLY' | 'REFERRAL' | 'MANUAL' | 'PRIZE'
+  attemptSource: BonusBoxAttemptSource
   prizeTitle: string
   prizeType: PrizeType
   prizeValue: number
@@ -881,6 +882,8 @@ function sourceLabel(source: BonusBoxOpeningAdminRow['attemptSource']) {
   if (source === 'WEEKLY') return 'Еженедельный бонус'
   if (source === 'REFERRAL') return 'Реферал'
   if (source === 'PRIZE') return 'Подарок из бокса'
+  if (source === 'SEASONAL_EVENT') return 'Событие'
+  if (source === 'MISSION') return 'Миссия'
   return 'Админ'
 }
 
