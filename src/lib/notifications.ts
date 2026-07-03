@@ -98,22 +98,48 @@ export async function notifyPaymentSucceeded(paymentId: string) {
     where: { id: paymentId },
     include: {
       user: { select: { id: true, name: true } },
-      plan: { select: { name: true, durationDays: true } },
-      subscription: { select: { expireAt: true } },
+      plan: { select: { name: true, durationDays: true, trafficLimitGb: true, deviceLimit: true } },
+      subscription: { select: { startAt: true, expireAt: true } },
     },
   })
   if (!payment) return
 
+  const previousSucceededPayments = await prisma.payment.count({
+    where: {
+      userId: payment.userId,
+      id: { not: payment.id },
+      status: 'SUCCEEDED',
+      subscriptionProvisionedAt: { not: null },
+      createdAt: { lt: payment.createdAt },
+    },
+  })
+
+  const appUrl = getAppUrl()
   const amount = formatRubles(payment.amountKopecks)
   const planName = payment.plan?.name ?? 'тариф'
+  const isPaid = payment.amountKopecks > 0
+  const isRenewal = isPaid && previousSucceededPayments > 0
   const expireText = payment.subscription?.expireAt ? `до ${formatDate(payment.subscription.expireAt)}` : null
-  const title = payment.amountKopecks > 0 ? 'Оплата прошла' : 'Пробный тариф активирован'
+  const title = isPaid ? (isRenewal ? 'Подписка продлена' : 'Подписка оплачена') : 'Пробный тариф активирован'
   const body = [
-    payment.amountKopecks > 0
-      ? `Оплата ${amount} за ${planName} прошла успешно.`
+    isPaid
+      ? `${isRenewal ? 'Продление' : 'Оплата'} ${amount} за ${planName} прошло успешно.`
       : `Тариф ${planName} активирован.`,
     expireText ? `Подписка действует ${expireText}.` : 'Подписка уже доступна в кабинете.',
   ].join(' ')
+  const telegramText = buildPaymentSuccessTelegramText({
+    title,
+    userName: payment.user.name,
+    planName,
+    amount,
+    durationDays: payment.plan?.durationDays ?? null,
+    trafficLimitGb: payment.plan?.trafficLimitGb ?? null,
+    deviceLimit: payment.plan?.deviceLimit ?? null,
+    expireAt: payment.subscription?.expireAt ?? null,
+    paidAt: payment.paidAt ?? payment.subscriptionProvisionedAt ?? payment.updatedAt,
+    isPaid,
+    isRenewal,
+  })
 
   await notifyUser({
     userId: payment.user.id,
@@ -123,20 +149,18 @@ export async function notifyPaymentSucceeded(paymentId: string) {
     body,
     actionHref: '/dashboard/subscription',
     actionLabel: 'Открыть подписку',
-    telegramText: [
-      `<b>${escapeTelegram(title)}</b>`,
-      escapeTelegram(body),
-      '',
-      `<a href="${escapeTelegram(getAppUrl())}/dashboard/subscription">Открыть подписку</a>`,
-    ].join('\n'),
+    telegramText,
+    telegramActionUrl: `${appUrl}/dashboard/subscription`,
+    telegramActionLabel: 'Открыть подписку',
+    telegramActionOpenInTelegram: true,
     emailSubject: `${title} в ${getBrandName()}`,
-    emailText: `${body}\n\nОткрыть кабинет: ${getAppUrl()}/dashboard/subscription`,
+    emailText: `${body}\n\nОткрыть кабинет: ${appUrl}/dashboard/subscription`,
     emailHtml: renderNotificationEmail({
       eyebrow: 'Подписка',
       title,
       lead: body,
       ctaLabel: 'Открыть подписку',
-      ctaUrl: `${getAppUrl()}/dashboard/subscription`,
+      ctaUrl: `${appUrl}/dashboard/subscription`,
       greetingName: payment.user.name,
     }),
   })
@@ -530,6 +554,63 @@ function formatRubles(kopecks: number) {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })} ₽`
+}
+
+function buildPaymentSuccessTelegramText(input: {
+  title: string
+  userName?: string | null
+  planName: string
+  amount: string
+  durationDays: number | null
+  trafficLimitGb: number | null
+  deviceLimit: number | null
+  expireAt: Date | null
+  paidAt: Date
+  isPaid: boolean
+  isRenewal: boolean
+}) {
+  const greeting = input.userName?.trim()
+    ? `${input.userName.trim()}, всё готово.`
+    : 'Всё готово.'
+  const action = input.isPaid
+    ? input.isRenewal
+      ? 'Продление подписки успешно применено.'
+      : 'Оплата прошла успешно, подписка активна.'
+    : 'Пробный тариф активирован, подписка уже доступна.'
+  const rawDetails: Array<[string, string | null]> = [
+    ['Тариф', input.planName],
+    ['Срок', input.durationDays ? formatDurationDays(input.durationDays) : null],
+    ['Трафик', input.trafficLimitGb ? `${input.trafficLimitGb} ГБ` : 'без лимита'],
+    ['Устройства', input.deviceLimit ? `до ${input.deviceLimit}` : null],
+    [input.isPaid ? 'Оплачено' : 'Стоимость', input.isPaid ? input.amount : 'бесплатно'],
+    ['Действует до', input.expireAt ? formatDate(input.expireAt) : null],
+    ['Дата операции', formatDate(input.paidAt)],
+  ]
+  const details = rawDetails.flatMap(([label, value]) =>
+    value ? [`<b>${escapeTelegram(label)}:</b> ${escapeTelegram(value)}`] : []
+  )
+
+  return [
+    `<b>${escapeTelegram(input.title)}</b>`,
+    '',
+    escapeTelegram(greeting),
+    escapeTelegram(action),
+    '',
+    ...details,
+    '',
+    'Ключи и QR-код доступны в кабинете.',
+  ].join('\n')
+}
+
+function formatDurationDays(days: number) {
+  const mod10 = days % 10
+  const mod100 = days % 100
+  const suffix = mod10 === 1 && mod100 !== 11
+    ? 'день'
+    : mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)
+      ? 'дня'
+      : 'дней'
+  return `${days} ${suffix}`
 }
 
 function formatDate(date: Date) {

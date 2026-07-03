@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { Ban, Clock3, Hash, Laptop, Loader2, Monitor, RefreshCw, Smartphone, Tablet, Unlink2, Unlock } from 'lucide-react'
+import { Clock3, Hash, Laptop, Loader2, Monitor, RefreshCw, Smartphone, Tablet, Unlink2 } from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
 import { EmptyState, InlineAlert } from './empty-state'
 import { ConfirmDialog } from './confirm-dialog'
@@ -18,32 +18,19 @@ interface Device {
   updatedAt?: string | null
 }
 
-interface BlockedDevice {
-  hwid: string
-  reason?: string | null
-  blockedAt: string
-}
-
-type DeviceAction =
-  | { type: 'detach'; device: Device }
-  | { type: 'block'; device: Device }
-  | { type: 'unblock'; device: BlockedDevice }
-
 export function DevicesList() {
   const [devices, setDevices] = useState<Device[] | null>(null)
-  const [blockedDevices, setBlockedDevices] = useState<BlockedDevice[]>([])
   const [error, setError] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
-  const [pendingAction, setPendingAction] = useState<DeviceAction | null>(null)
-  const [activeActionKey, setActiveActionKey] = useState<string | null>(null)
+  const [removingHwid, setRemovingHwid] = useState<string | null>(null)
+  const [selectedDevice, setSelectedDevice] = useState<Device | null>(null)
 
   const loadDevices = useCallback(async () => {
     setError(null)
     setRefreshing(true)
     try {
-      const data = await apiFetch<{ devices: Device[]; blockedDevices?: BlockedDevice[] }>('/api/devices')
+      const data = await apiFetch<{ devices: Device[] }>('/api/devices')
       setDevices(data.devices)
-      setBlockedDevices(data.blockedDevices ?? [])
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Не удалось загрузить устройства')
     } finally {
@@ -56,61 +43,22 @@ export function DevicesList() {
   }, [loadDevices])
 
   async function removeDevice(device: Device) {
-    setActiveActionKey(actionKey('detach', device.hwid))
+    setRemovingHwid(device.hwid)
     setError(null)
     try {
       await apiFetch(`/api/devices/${encodeURIComponent(device.hwid)}`, { method: 'DELETE' })
       setDevices((current) => current?.filter((item) => item.hwid !== device.hwid) ?? [])
-      setPendingAction(null)
+      setSelectedDevice(null)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Не удалось отвязать устройство')
     } finally {
-      setActiveActionKey(null)
+      setRemovingHwid(null)
     }
-  }
-
-  async function blockDevice(device: Device) {
-    setActiveActionKey(actionKey('block', device.hwid))
-    setError(null)
-    try {
-      const response = await apiFetch<{ blockedDevice: BlockedDevice }>(
-        `/api/devices/${encodeURIComponent(device.hwid)}/block`,
-        { method: 'POST' }
-      )
-      setDevices((current) => current?.filter((item) => item.hwid !== device.hwid) ?? [])
-      setBlockedDevices((current) => [response.blockedDevice, ...current.filter((item) => item.hwid !== device.hwid)])
-      setPendingAction(null)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Не удалось заблокировать устройство')
-    } finally {
-      setActiveActionKey(null)
-    }
-  }
-
-  async function unblockDevice(device: BlockedDevice) {
-    setActiveActionKey(actionKey('unblock', device.hwid))
-    setError(null)
-    try {
-      await apiFetch(`/api/devices/${encodeURIComponent(device.hwid)}/block`, { method: 'DELETE' })
-      setBlockedDevices((current) => current.filter((item) => item.hwid !== device.hwid))
-      setPendingAction(null)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Не удалось разблокировать устройство')
-    } finally {
-      setActiveActionKey(null)
-    }
-  }
-
-  async function confirmAction() {
-    if (!pendingAction) return
-    if (pendingAction.type === 'detach') await removeDevice(pendingAction.device)
-    if (pendingAction.type === 'block') await blockDevice(pendingAction.device)
-    if (pendingAction.type === 'unblock') await unblockDevice(pendingAction.device)
   }
 
   if (error) return <InlineAlert tone="danger" title="Не удалось загрузить устройства" description={error} />
   if (!devices) return <DevicesSkeleton />
-  if (devices.length === 0 && blockedDevices.length === 0) {
+  if (devices.length === 0) {
     return (
       <EmptyState
         title="Устройств пока нет"
@@ -153,51 +101,20 @@ export function DevicesList() {
             <DeviceCard
               key={d.hwid}
               device={d}
-              detaching={activeActionKey === actionKey('detach', d.hwid)}
-              blocking={activeActionKey === actionKey('block', d.hwid)}
-              onDetach={() => setPendingAction({ type: 'detach', device: d })}
-              onBlock={() => setPendingAction({ type: 'block', device: d })}
+              loading={removingHwid === d.hwid}
+              onRemove={() => setSelectedDevice(d)}
             />
           ))}
-          {devices.length === 0 && (
-            <div className="rounded-lg border border-dashed border-slate-300 bg-white p-5 text-sm text-slate-500 dark:border-white/10 dark:bg-surface-900">
-              Активных устройств нет.
-            </div>
-          )}
         </div>
       </section>
-
-      {blockedDevices.length > 0 && (
-        <section className="mt-4 overflow-hidden rounded-lg border border-red-200/80 bg-white/90 shadow-sm shadow-red-950/5 backdrop-blur dark:border-red-500/20 dark:bg-white/[0.035] dark:shadow-black/20">
-          <div className="border-b border-red-100 bg-red-50/70 p-3 dark:border-red-500/20 dark:bg-red-500/10 sm:p-5">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <div className="text-xs font-semibold uppercase tracking-wide text-red-700 dark:text-red-200">Заблокированные устройства</div>
-                <h2 className="mt-0.5 text-2xl font-semibold tracking-tight text-slate-950 dark:text-white">{blockedDevices.length}</h2>
-              </div>
-              <Ban className="h-5 w-5 text-red-500" />
-            </div>
-          </div>
-          <div className="grid gap-2.5 p-3 sm:gap-3 sm:p-5 lg:grid-cols-2 2xl:grid-cols-3">
-            {blockedDevices.map((device) => (
-              <BlockedDeviceCard
-                key={device.hwid}
-                device={device}
-                loading={activeActionKey === actionKey('unblock', device.hwid)}
-                onUnblock={() => setPendingAction({ type: 'unblock', device })}
-              />
-            ))}
-          </div>
-        </section>
-      )}
       <ConfirmDialog
-        open={Boolean(pendingAction)}
-        title={getConfirmTitle(pendingAction)}
-        description={getConfirmDescription(pendingAction)}
-        confirmLabel={getConfirmLabel(pendingAction)}
-        loading={Boolean(activeActionKey)}
-        onCancel={() => setPendingAction(null)}
-        onConfirm={() => void confirmAction()}
+        open={Boolean(selectedDevice)}
+        title="Отвязать устройство?"
+        description="Устройство исчезнет из списка привязок. При следующем подключении может потребоваться повторная авторизация."
+        confirmLabel="Отвязать"
+        loading={Boolean(removingHwid)}
+        onCancel={() => setSelectedDevice(null)}
+        onConfirm={() => selectedDevice && removeDevice(selectedDevice)}
       />
     </>
   )
@@ -205,16 +122,12 @@ export function DevicesList() {
 
 function DeviceCard({
   device,
-  detaching,
-  blocking,
-  onDetach,
-  onBlock,
+  loading,
+  onRemove,
 }: {
   device: Device
-  detaching: boolean
-  blocking: boolean
-  onDetach: () => void
-  onBlock: () => void
+  loading: boolean
+  onRemove: () => void
 }) {
   const activity = getActivityState(device.updatedAt || device.createdAt)
   const Icon = getDeviceIcon(device)
@@ -256,64 +169,12 @@ function DeviceCard({
           <span className={cn('rounded-full border px-2.5 py-1 text-xs font-medium', activity.className)}>
             {activity.label}
           </span>
-          <div className="flex flex-wrap gap-2">
-            <DeviceActionButton
-              loading={detaching}
-              label="Отвязать"
-              icon="unlink"
-              tone="neutral"
-              onClick={onDetach}
-            />
-            <DeviceActionButton
-              loading={blocking}
-              label="Блок"
-              icon="ban"
-              tone="danger"
-              onClick={onBlock}
-            />
-          </div>
+          <DeviceActionButton
+            loading={loading}
+            label="Отвязать"
+            onClick={onRemove}
+          />
         </div>
-      </div>
-    </article>
-  )
-}
-
-function BlockedDeviceCard({
-  device,
-  loading,
-  onUnblock,
-}: {
-  device: BlockedDevice
-  loading: boolean
-  onUnblock: () => void
-}) {
-  return (
-    <article className="rounded-lg border border-red-200/80 bg-red-50/60 p-3 dark:border-red-500/20 dark:bg-red-500/10 sm:p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h2 className="truncate text-sm font-semibold text-slate-950 dark:text-white sm:text-base">
-            {shortDeviceId(device.hwid)}
-          </h2>
-          <p className="mt-1 text-sm text-red-700/80 dark:text-red-100/80">
-            Заблокировано {formatDeviceDate(device.blockedAt)}
-          </p>
-          {device.reason && (
-            <p className="mt-1 line-clamp-2 text-xs text-slate-500 dark:text-slate-400">{device.reason}</p>
-          )}
-        </div>
-        <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-red-100 text-red-600 dark:bg-red-400/10 dark:text-red-200">
-          <Ban className="h-5 w-5" />
-        </div>
-      </div>
-      <div className="mt-3">
-        <DeviceActionButton
-          loading={loading}
-          label="Разблокировать"
-          icon="unlock"
-          tone="neutral"
-          fullWidth
-          onClick={onUnblock}
-        />
       </div>
     </article>
   )
@@ -332,29 +193,23 @@ function DeviceActionButton({
   loading,
   fullWidth = false,
   label = 'Отвязать',
-  icon = 'unlink',
-  tone = 'danger',
   onClick,
 }: {
   loading: boolean
   fullWidth?: boolean
   label?: string
-  icon?: 'unlink' | 'ban' | 'unlock'
-  tone?: 'neutral' | 'danger'
   onClick: () => void
 }) {
-  const Icon = loading ? Loader2 : icon === 'ban' ? Ban : icon === 'unlock' ? Unlock : Unlink2
+  const Icon = loading ? Loader2 : Unlink2
 
   return (
     <button
       type="button"
       className={cn(
-        'inline-flex h-10 items-center justify-center gap-2 rounded-lg border px-3 text-sm font-medium shadow-sm transition-all',
-        'hover:-translate-y-0.5',
+        'inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 text-sm font-medium text-red-700 shadow-sm shadow-red-950/5 transition-all',
+        'hover:-translate-y-0.5 hover:border-red-300 hover:bg-red-100 hover:text-red-800',
         'disabled:cursor-not-allowed disabled:translate-y-0 disabled:opacity-60',
-        tone === 'danger'
-          ? 'border-red-200 bg-red-50 text-red-700 shadow-red-950/5 hover:border-red-300 hover:bg-red-100 hover:text-red-800 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200 dark:hover:bg-red-500/15'
-          : 'border-slate-200 bg-white text-slate-700 shadow-slate-950/5 hover:border-cyan-200 hover:bg-cyan-50 hover:text-slate-950 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-200 dark:hover:bg-white/[0.08]',
+        'dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200 dark:hover:bg-red-500/15',
         fullWidth ? 'w-full' : 'w-[104px]'
       )}
       disabled={loading}
@@ -364,32 +219,6 @@ function DeviceActionButton({
       <span className="truncate">{loading ? 'Ждем...' : label}</span>
     </button>
   )
-}
-
-function actionKey(type: DeviceAction['type'], hwid: string) {
-  return `${type}:${hwid}`
-}
-
-function getConfirmTitle(action: DeviceAction | null) {
-  if (action?.type === 'block') return 'Заблокировать устройство?'
-  if (action?.type === 'unblock') return 'Разблокировать устройство?'
-  return 'Отвязать устройство?'
-}
-
-function getConfirmDescription(action: DeviceAction | null) {
-  if (action?.type === 'block') {
-    return 'Устройство будет удалено из Remnawave и добавлено в блок-лист. При повторном появлении кабинет снова удалит его.'
-  }
-  if (action?.type === 'unblock') {
-    return 'Устройство можно будет подключить заново. В списке оно появится после следующего подключения.'
-  }
-  return 'Устройство исчезнет из списка привязок. При следующем подключении может потребоваться повторная авторизация.'
-}
-
-function getConfirmLabel(action: DeviceAction | null) {
-  if (action?.type === 'block') return 'Заблокировать'
-  if (action?.type === 'unblock') return 'Разблокировать'
-  return 'Отвязать'
 }
 
 function DevicesSkeleton() {
