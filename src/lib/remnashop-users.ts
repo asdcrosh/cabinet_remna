@@ -26,6 +26,8 @@ interface RemnashopUserRow extends RemnashopIdentityRow {
   subscription_device_limit: number | null
 }
 
+type LocalUserForRemnashopSync = NonNullable<Awaited<ReturnType<typeof getLocalUserForRemnashopSync>>>
+
 export async function findRemnashopUserByEmail(email: string) {
   const result = await remnashopQuery<RemnashopIdentityRow>(
     `
@@ -39,10 +41,266 @@ export async function findRemnashopUserByEmail(email: string) {
   return result.rows[0] ?? null
 }
 
+export async function syncRemnashopUserToCabinet(localUserId: string, options: {
+  forceRemnawaveSubscriptions?: boolean
+} = {}) {
+  if (!process.env.REMNASHOP_DATABASE_URL) {
+    return { found: false as const, reason: 'REMNASHOP_DATABASE_URL is not configured' as const }
+  }
+
+  const existing = await getLocalUserForRemnashopSync(localUserId)
+  if (!existing) return { found: false as const, reason: 'local_user_not_found' as const }
+
+  const source = await findRemnashopSourceForLocalUser(existing)
+  if (!source) return { found: false as const, reason: 'remnashop_user_not_found' as const }
+
+  const result = await syncRemnashopSourceToCabinet(source, {
+    ...options,
+    existingUserId: existing.id,
+  })
+
+  return {
+    found: true as const,
+    remnashopUserId: source.id,
+    ...result,
+  }
+}
+
 export async function syncRemnashopUsersToCabinet(options: {
   forceRemnawaveSubscriptions?: boolean
 } = {}) {
-  const result = await remnashopQuery<RemnashopUserRow>(`
+  const result = await fetchRemnashopSources()
+  let created = 0
+  let updated = 0
+  let skipped = 0
+  let subscriptionsSynced = 0
+  let subscriptionsSkipped = 0
+  let subscriptionsFailed = 0
+
+  for (const source of result.rows) {
+    try {
+      const row = await syncRemnashopSourceToCabinet(source, options)
+      if (row.userAction === 'created') created += 1
+      if (row.userAction === 'updated') updated += 1
+      if (row.userAction === 'skipped') skipped += 1
+      if (row.subscriptionAction === 'synced') subscriptionsSynced += 1
+      if (row.subscriptionAction === 'skipped') subscriptionsSkipped += 1
+      if (row.subscriptionAction === 'failed') subscriptionsFailed += 1
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        skipped += 1
+        continue
+      }
+      throw error
+    }
+  }
+
+  return {
+    total: result.rows.length,
+    created,
+    updated,
+    skipped,
+    subscriptionsSynced,
+    subscriptionsSkipped,
+    subscriptionsFailed,
+  }
+}
+
+async function syncRemnashopSourceToCabinet(source: RemnashopUserRow, options: {
+  forceRemnawaveSubscriptions?: boolean
+  existingUserId?: string
+}) {
+  const telegramId = parseTelegramId(source.telegram_id)
+  const email = source.email?.trim().toLowerCase() || null
+  const existing = options.existingUserId
+    ? await getLocalUserForRemnashopSync(options.existingUserId)
+    : await findLocalUserForRemnashopSource({ sourceId: source.id, telegramId, email })
+
+  let localUserId: string | null = null
+  let localRemnawaveUuid: string | null = existing?.remnawaveUuid ?? null
+  let localRemnawaveUsername: string | null = existing?.remnawaveUsername ?? null
+  let localSubscriptionId: string | null = existing?.subscriptions[0]?.id ?? null
+  let lastSubscriptionSyncedAt = existing?.subscriptions[0]?.lastSyncedAt ?? null
+  let userAction: 'created' | 'updated' | 'skipped' = 'skipped'
+  let subscriptionAction: 'synced' | 'skipped' | 'failed' | 'none' = 'none'
+
+  if (existing) {
+    const user = await prisma.user.update({
+      where: { id: existing.id },
+      data: {
+        remnashopUserId: existing.remnashopUserId ?? source.id,
+        remnashopSyncedAt: new Date(),
+        telegramId: existing.telegramId ?? telegramId,
+        telegramUsername: existing.telegramUsername ?? source.username,
+        telegramLinkedAt: existing.telegramLinkedAt ?? (telegramId ? new Date() : null),
+        name: existing.name ?? source.name,
+        emailVerifiedAt:
+          existing.emailVerifiedAt ?? (email === existing.email && source.is_email_verified ? new Date() : null),
+      },
+      select: {
+        id: true,
+        remnawaveUuid: true,
+        remnawaveUsername: true,
+        subscriptions: {
+          orderBy: { expireAt: 'desc' },
+          take: 1,
+          select: { id: true, lastSyncedAt: true },
+        },
+      },
+    })
+    localUserId = user.id
+    localRemnawaveUuid = user.remnawaveUuid
+    localRemnawaveUsername = user.remnawaveUsername
+    localSubscriptionId = user.subscriptions[0]?.id ?? localSubscriptionId
+    lastSubscriptionSyncedAt = user.subscriptions[0]?.lastSyncedAt ?? lastSubscriptionSyncedAt
+    userAction = 'updated'
+  } else {
+    if (!telegramId && !email) {
+      return { userAction, subscriptionAction }
+    }
+
+    const user = await prisma.user.create({
+      data: {
+        email: email ?? `telegram-${telegramId!.toString()}@pending.invalid`,
+        passwordHash: await hash(randomBytes(48).toString('base64url'), 12),
+        name: source.name,
+        role: 'USER',
+        referralCode: await generateUniqueReferralCode(),
+        telegramId,
+        telegramUsername: source.username,
+        telegramLinkedAt: telegramId ? new Date() : null,
+        emailVerifiedAt: email && source.is_email_verified ? new Date() : null,
+        remnashopUserId: source.id,
+        remnashopSyncedAt: new Date(),
+      },
+      select: { id: true },
+    })
+    localUserId = user.id
+    userAction = 'created'
+  }
+
+  if (!source.user_remna_id || !localUserId) return { userAction, subscriptionAction }
+  if (!options.forceRemnawaveSubscriptions && !shouldSyncRemnawaveSubscription({
+    sourceRemnawaveUuid: source.user_remna_id,
+    localRemnawaveUuid,
+    localRemnawaveUsername,
+    localSubscriptionId,
+    lastSubscriptionSyncedAt,
+  })) {
+    return { userAction, subscriptionAction: 'skipped' as const }
+  }
+
+  try {
+    const planId = await resolveCabinetPlanIdFromRemnashopSubscription(source)
+    if (!planId && source.subscription_plan_snapshot) {
+      logWarn('remnashop.users.plan_match_failed', {
+        remnashopUserId: source.id,
+        remnawaveUuid: source.user_remna_id,
+      })
+    }
+    await syncSubscriptionFromRemnawave({
+      localUserId,
+      remnashopUserId: source.id,
+      remnawaveUuid: source.user_remna_id,
+      telegramId,
+      planId,
+      startAt: source.subscription_created_at,
+    })
+    subscriptionAction = 'synced'
+  } catch (error) {
+    subscriptionAction = 'failed'
+    logWarn('remnashop.users.subscription_sync_failed', {
+      remnashopUserId: source.id,
+      localUserId,
+      remnawaveUuid: source.user_remna_id,
+      message: error instanceof Error ? error.message : 'unknown error',
+    })
+  }
+
+  return { userAction, subscriptionAction }
+}
+
+async function getLocalUserForRemnashopSync(localUserId: string) {
+  return prisma.user.findUnique({
+    where: { id: localUserId },
+    select: localUserSelect,
+  })
+}
+
+async function findLocalUserForRemnashopSource(input: {
+  sourceId: number
+  telegramId: bigint | null
+  email: string | null
+}) {
+  return prisma.user.findFirst({
+    where: {
+      OR: [
+        { remnashopUserId: input.sourceId },
+        ...(input.telegramId ? [{ telegramId: input.telegramId }] : []),
+        ...(input.email ? [{ email: input.email }] : []),
+      ],
+    },
+    select: localUserSelect,
+  })
+}
+
+const localUserSelect = {
+  id: true,
+  email: true,
+  name: true,
+  remnashopUserId: true,
+  remnawaveUuid: true,
+  remnawaveUsername: true,
+  telegramId: true,
+  telegramUsername: true,
+  telegramLinkedAt: true,
+  emailVerifiedAt: true,
+  subscriptions: {
+    orderBy: { expireAt: 'desc' as const },
+    take: 1,
+    select: { id: true, lastSyncedAt: true },
+  },
+}
+
+async function findRemnashopSourceForLocalUser(user: LocalUserForRemnashopSync) {
+  if (user.remnashopUserId) {
+    const byId = await fetchRemnashopSources({
+      whereSql: 'u.id = $1',
+      values: [user.remnashopUserId],
+      limit: 1,
+    })
+    if (byId.rows[0]) return byId.rows[0]
+  }
+
+  if (user.telegramId) {
+    const byTelegram = await fetchRemnashopSources({
+      whereSql: 'u.telegram_id::text = $1',
+      values: [user.telegramId.toString()],
+      limit: 1,
+    })
+    if (byTelegram.rows[0]) return byTelegram.rows[0]
+  }
+
+  if (!user.email.endsWith('@pending.invalid')) {
+    const byEmail = await fetchRemnashopSources({
+      whereSql: 'lower(u.email) = lower($1)',
+      values: [user.email],
+      limit: 1,
+    })
+    if (byEmail.rows[0]) return byEmail.rows[0]
+  }
+
+  return null
+}
+
+function fetchRemnashopSources(options: {
+  whereSql?: string
+  values?: unknown[]
+  limit?: number
+} = {}) {
+  const whereSql = options.whereSql ?? 'TRUE'
+  const limitSql = options.limit ? `LIMIT ${Math.max(1, Math.trunc(options.limit))}` : ''
+  return remnashopQuery<RemnashopUserRow>(`
     SELECT
       u.id,
       u.telegram_id::text AS telegram_id,
@@ -66,163 +324,19 @@ export async function syncRemnashopUsersToCabinet(options: {
       ORDER BY s.expire_at DESC NULLS LAST, s.updated_at DESC
       LIMIT 1
     ) latest_s ON true
+    WHERE ${whereSql}
     ORDER BY u.id
-  `)
-  let created = 0
-  let updated = 0
-  let skipped = 0
-  let subscriptionsSynced = 0
-  let subscriptionsSkipped = 0
-  let subscriptionsFailed = 0
+    ${limitSql}
+  `, options.values ?? [])
+}
 
-  for (const source of result.rows) {
-    const telegramId = source.telegram_id ? BigInt(source.telegram_id) : null
-    const email = source.email?.trim().toLowerCase() || null
-    const existing = await prisma.user.findFirst({
-      where: {
-        OR: [
-          { remnashopUserId: source.id },
-          ...(telegramId ? [{ telegramId }] : []),
-          ...(email ? [{ email }] : []),
-        ],
-      },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        remnashopUserId: true,
-        remnawaveUuid: true,
-        remnawaveUsername: true,
-        telegramId: true,
-        telegramUsername: true,
-        telegramLinkedAt: true,
-        emailVerifiedAt: true,
-        subscriptions: {
-          orderBy: { expireAt: 'desc' },
-          take: 1,
-          select: { id: true, lastSyncedAt: true },
-        },
-      },
-    })
-
-    try {
-      let localUserId: string | null = null
-      let localRemnawaveUuid: string | null = existing?.remnawaveUuid ?? null
-      let localRemnawaveUsername: string | null = existing?.remnawaveUsername ?? null
-      let localSubscriptionId: string | null = existing?.subscriptions[0]?.id ?? null
-      let lastSubscriptionSyncedAt = existing?.subscriptions[0]?.lastSyncedAt ?? null
-
-      if (existing) {
-        const user = await prisma.user.update({
-          where: { id: existing.id },
-          data: {
-            remnashopUserId: existing.remnashopUserId ?? source.id,
-            remnashopSyncedAt: new Date(),
-            telegramId: existing.telegramId ?? telegramId,
-            telegramUsername: existing.telegramUsername ?? source.username,
-            telegramLinkedAt: existing.telegramLinkedAt ?? (telegramId ? new Date() : null),
-            name: existing.name ?? source.name,
-            emailVerifiedAt:
-              existing.emailVerifiedAt ?? (email === existing.email && source.is_email_verified ? new Date() : null),
-          },
-          select: {
-            id: true,
-            remnawaveUuid: true,
-            remnawaveUsername: true,
-            subscriptions: {
-              orderBy: { expireAt: 'desc' },
-              take: 1,
-              select: { id: true, lastSyncedAt: true },
-            },
-          },
-        })
-        localUserId = user.id
-        localRemnawaveUuid = user.remnawaveUuid
-        localRemnawaveUsername = user.remnawaveUsername
-        localSubscriptionId = user.subscriptions[0]?.id ?? localSubscriptionId
-        lastSubscriptionSyncedAt = user.subscriptions[0]?.lastSyncedAt ?? lastSubscriptionSyncedAt
-        updated += 1
-      } else {
-        if (!telegramId && !email) {
-          skipped += 1
-          continue
-        }
-
-        const user = await prisma.user.create({
-          data: {
-            email: email ?? `telegram-${telegramId!.toString()}@pending.invalid`,
-            passwordHash: await hash(randomBytes(48).toString('base64url'), 12),
-            name: source.name,
-            role: 'USER',
-            referralCode: await generateUniqueReferralCode(),
-            telegramId,
-            telegramUsername: source.username,
-            telegramLinkedAt: telegramId ? new Date() : null,
-            emailVerifiedAt: email && source.is_email_verified ? new Date() : null,
-            remnashopUserId: source.id,
-            remnashopSyncedAt: new Date(),
-          },
-          select: { id: true },
-        })
-        localUserId = user.id
-        created += 1
-      }
-
-      if (!source.user_remna_id || !localUserId) continue
-      if (!options.forceRemnawaveSubscriptions && !shouldSyncRemnawaveSubscription({
-        sourceRemnawaveUuid: source.user_remna_id,
-        localRemnawaveUuid,
-        localRemnawaveUsername,
-        localSubscriptionId,
-        lastSubscriptionSyncedAt,
-      })) {
-        subscriptionsSkipped += 1
-        continue
-      }
-
-      try {
-        const planId = await resolveCabinetPlanIdFromRemnashopSubscription(source)
-        if (!planId && source.subscription_plan_snapshot) {
-          logWarn('remnashop.users.plan_match_failed', {
-            remnashopUserId: source.id,
-            remnawaveUuid: source.user_remna_id,
-          })
-        }
-        await syncSubscriptionFromRemnawave({
-          localUserId,
-          remnashopUserId: source.id,
-          remnawaveUuid: source.user_remna_id,
-          telegramId,
-          planId,
-          startAt: source.subscription_created_at,
-        })
-        subscriptionsSynced += 1
-      } catch (error) {
-        subscriptionsFailed += 1
-        logWarn('remnashop.users.subscription_sync_failed', {
-          remnashopUserId: source.id,
-          localUserId,
-          remnawaveUuid: source.user_remna_id,
-          message: error instanceof Error ? error.message : 'unknown error',
-        })
-      }
-    } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-        skipped += 1
-        continue
-      }
-      throw error
-    }
-  }
-
-  return {
-    total: result.rows.length,
-    created,
-    updated,
-    skipped,
-    subscriptionsSynced,
-    subscriptionsSkipped,
-    subscriptionsFailed,
+function parseTelegramId(value: string | null) {
+  if (!value) return null
+  try {
+    const parsed = BigInt(value)
+    return parsed > 0n ? parsed : null
+  } catch {
+    return null
   }
 }
 

@@ -29,6 +29,7 @@ type PaymentForRemnashopSync = PaymentWithRelations & {
 
 export async function syncCabinetPaymentToRemnashop(paymentId: string) {
   if (!process.env.REMNASHOP_DATABASE_URL) {
+    await markPaymentRemnashopSyncFailed(paymentId, 'REMNASHOP_DATABASE_URL is not configured')
     return { ok: false as const, skipped: 'REMNASHOP_DATABASE_URL is not configured' }
   }
 
@@ -43,11 +44,18 @@ export async function syncCabinetPaymentToRemnashop(paymentId: string) {
 
   if (!payment) return { ok: false as const, skipped: 'payment not found' }
   if (payment.status !== 'SUCCEEDED') return { ok: false as const, skipped: 'payment is not succeeded' }
-  if (!payment.subscription) return { ok: false as const, skipped: 'subscription is missing' }
-  if (!payment.user.remnawaveUuid) return { ok: false as const, skipped: 'remnawave user is missing' }
+  if (!payment.subscription) {
+    await markPaymentRemnashopSyncFailed(payment.id, 'subscription is missing')
+    return { ok: false as const, skipped: 'subscription is missing' }
+  }
+  if (!payment.user.remnawaveUuid) {
+    await markPaymentRemnashopSyncFailed(payment.id, 'remnawave user is missing')
+    return { ok: false as const, skipped: 'remnawave user is missing' }
+  }
 
   const remnashopUserId = await resolveRemnashopUserId(payment.user)
   if (!remnashopUserId) {
+    await markPaymentRemnashopSyncFailed(payment.id, 'remnashop user not found')
     return { ok: false as const, skipped: 'remnashop user not found' }
   }
 
@@ -61,6 +69,7 @@ export async function syncCabinetPaymentToRemnashop(paymentId: string) {
     payment: syncPayment,
   })
   await setCurrentRemnashopSubscription(remnashopUserId, remnashopSubscriptionId)
+  await markPaymentRemnashopSyncSucceeded(payment.id)
 
   logInfo('remnashop.reverse_sync.completed', {
     paymentId,
@@ -75,6 +84,25 @@ export async function syncCabinetPaymentToRemnashop(paymentId: string) {
     remnashopSubscriptionId,
     remnashopTransactionId,
   }
+}
+
+async function markPaymentRemnashopSyncSucceeded(paymentId: string) {
+  await prisma.payment.update({
+    where: { id: paymentId },
+    data: {
+      remnashopSyncedAt: new Date(),
+      remnashopSyncError: null,
+    },
+  })
+}
+
+async function markPaymentRemnashopSyncFailed(paymentId: string, message: string) {
+  await prisma.payment.update({
+    where: { id: paymentId },
+    data: {
+      remnashopSyncError: message.slice(0, 1000),
+    },
+  }).catch(() => null)
 }
 
 async function resolveRemnashopUserId(user: {
@@ -391,8 +419,19 @@ function quoteIdent(value: string) {
 
 export async function syncCabinetPaymentToRemnashopBestEffort(paymentId: string) {
   try {
-    return await syncCabinetPaymentToRemnashop(paymentId)
+    const result = await syncCabinetPaymentToRemnashop(paymentId)
+    if (!result.ok && 'skipped' in result) {
+      logWarn('remnashop.reverse_sync.skipped', {
+        paymentId,
+        reason: result.skipped,
+      })
+    }
+    return result
   } catch (error) {
+    await markPaymentRemnashopSyncFailed(
+      paymentId,
+      error instanceof Error ? error.message : 'unknown remnashop reverse sync error'
+    )
     logWarn('remnashop.reverse_sync.failed', {
       paymentId,
       message: error instanceof Error ? error.message : 'unknown error',

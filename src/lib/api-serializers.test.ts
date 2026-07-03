@@ -44,6 +44,8 @@ describe('api serializers', () => {
       paidAt: new Date('2026-01-01T00:00:00.000Z'),
       subscriptionProvisionedAt: null,
       provisioningError: null,
+      remnashopSyncedAt: null,
+      remnashopSyncError: null,
       createdAt: new Date('2026-01-01T00:00:00.000Z'),
       updatedAt: new Date('2026-01-01T00:00:00.000Z'),
       plan: null,

@@ -105,6 +105,10 @@ async function retryRemnashopReverseSync() {
     where: {
       status: 'SUCCEEDED',
       subscriptionProvisionedAt: { not: null },
+      OR: [
+        { remnashopSyncedAt: null },
+        { remnashopSyncError: { not: null } },
+      ],
       updatedAt: {
         gte: new Date(Date.now() - remnashopReverseSyncLookbackDays * 24 * 60 * 60 * 1000),
       },

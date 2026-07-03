@@ -138,6 +138,11 @@ export default async function AdminPaymentsPage({
                       {payment.provisioningError && (
                         <div className="max-w-[180px] truncate text-xs text-slate-500">{payment.provisioningError}</div>
                       )}
+                      {payment.subscriptionProvisionedAt && (
+                        <div className={payment.remnashopSyncedAt ? 'text-xs text-emerald-600 dark:text-emerald-300' : 'max-w-[180px] truncate text-xs text-amber-600 dark:text-amber-300'}>
+                          {payment.remnashopSyncedAt ? 'Remnashop синхр.' : payment.remnashopSyncError || 'Remnashop ждёт sync'}
+                        </div>
+                      )}
                     </div>
                   </td>
                   <td className="sticky-actions-cell w-[176px] min-w-[176px]">
@@ -201,6 +206,11 @@ export default async function AdminPaymentsPage({
                 {payment.provisioningError && (
                   <div className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:bg-amber-500/10 dark:text-amber-100">
                     {payment.provisioningError}
+                  </div>
+                )}
+                {payment.subscriptionProvisionedAt && !payment.remnashopSyncedAt && (
+                  <div className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:bg-amber-500/10 dark:text-amber-100">
+                    Remnashop: {payment.remnashopSyncError || 'ожидает фоновой синхронизации'}
                   </div>
                 )}
                 <div className="action-row">
