@@ -1,8 +1,43 @@
 'use client'
 
+import type { ReactNode } from 'react'
 import { useState } from 'react'
 import { AlertTriangle, CheckCircle2, RefreshCw } from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
+
+interface RemnashopPlanDiff {
+  sourceId: number
+  name: string
+  durationDays: number
+  priceKopecks: number
+  trafficLimitGb: number | null
+  deviceLimit: number
+  existsInCabinet: boolean
+  action: string
+}
+
+interface RemnashopSubscriptionDiff {
+  sourceId: number
+  userId: number
+  userRemnaId: string
+  status: string
+  expireAt: string
+  deviceLimit: number
+  trafficLimitGb: number | null
+  hasCabinetUser: boolean
+  hasCabinetSubscription: boolean
+}
+
+interface RemnashopTransactionDiff {
+  sourceId: number
+  paymentId: string
+  status: string
+  mappedStatus: string
+  userRemnaId: string | null
+  hasCabinetUser: boolean
+  existsInCabinet: boolean
+  action: string
+}
 
 interface RemnashopSyncReport {
   mode: 'dryRun' | 'apply'
@@ -11,10 +46,10 @@ interface RemnashopSyncReport {
   warnings: string[]
   summary?: Record<string, number>
   samples: {
-    plans: unknown[]
+    plans: RemnashopPlanDiff[]
     promoCodes?: unknown[]
-    activeSubscriptions?: unknown[]
-    transactions?: unknown[]
+    activeSubscriptions?: RemnashopSubscriptionDiff[]
+    transactions?: RemnashopTransactionDiff[]
   }
 }
 
@@ -118,6 +153,8 @@ export function RemnashopSyncPanel() {
             </div>
           )}
 
+          <DiffView report={report} />
+
           <details className="card">
             <summary className="cursor-pointer font-medium">Технические детали</summary>
             <pre className="mt-3 max-h-[28rem] overflow-auto rounded-lg bg-slate-950 p-3 text-xs text-slate-100">
@@ -139,8 +176,149 @@ function Metric({ label, value }: { label: string; value: number }) {
   )
 }
 
+function DiffView({ report }: { report: RemnashopSyncReport }) {
+  const plansToCreate = report.samples.plans.filter((item) => item.action === 'wouldCreate')
+  const subscriptionsToSync = (report.samples.activeSubscriptions ?? []).filter(
+    (item) => item.hasCabinetUser && !item.hasCabinetSubscription
+  )
+  const blockedPayments = (report.samples.transactions ?? []).filter((item) => item.action === 'blockedNoCabinetUser')
+  const paymentsToCreate = (report.samples.transactions ?? []).filter((item) => item.action === 'wouldCreate')
+
+  if (report.mode !== 'dryRun') {
+    return (
+      <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-100">
+        Синхронизация выполнена. Для свежего diff нажмите “Проверить”.
+      </div>
+    )
+  }
+
+  return (
+    <div className="grid gap-4 xl:grid-cols-2">
+      <DiffSection
+        title="Тарифы к созданию"
+        empty="Новых тарифов нет"
+        items={plansToCreate}
+        render={(item) => (
+          <DiffLine
+            key={`${item.sourceId}:${item.durationDays}`}
+            title={item.name}
+            meta={`${item.durationDays} дн. · ${formatRub(item.priceKopecks)} · ${item.deviceLimit} устр.`}
+            tone="cyan"
+          />
+        )}
+      />
+      <DiffSection
+        title="Подписки к обновлению"
+        empty="Расхождений по подпискам нет"
+        items={subscriptionsToSync}
+        render={(item) => (
+          <DiffLine
+            key={item.sourceId}
+            title={`Remnawave ${item.userRemnaId}`}
+            meta={`до ${formatDate(item.expireAt)} · Remnashop user ${item.userId}`}
+            tone="emerald"
+          />
+        )}
+      />
+      <DiffSection
+        title="Новые платежи"
+        empty="Новых платежей нет"
+        items={paymentsToCreate}
+        render={(item) => (
+          <DiffLine
+            key={item.sourceId}
+            title={item.paymentId}
+            meta={`${item.status} → ${item.mappedStatus}`}
+            tone="emerald"
+          />
+        )}
+      />
+      <DiffSection
+        title="Платежи без пользователя"
+        empty="Блокировок нет"
+        items={blockedPayments}
+        render={(item) => (
+          <DiffLine
+            key={item.sourceId}
+            title={item.paymentId}
+            meta={item.userRemnaId ? `Remnawave ${item.userRemnaId}` : 'Нет Remnawave ID'}
+            tone="amber"
+          />
+        )}
+      />
+    </div>
+  )
+}
+
+function DiffSection<T>({
+  title,
+  empty,
+  items,
+  render,
+}: {
+  title: string
+  empty: string
+  items: T[]
+  render: (item: T) => ReactNode
+}) {
+  return (
+    <section className="card space-y-3">
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="text-sm font-semibold text-slate-950 dark:text-white">{title}</h3>
+        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600 dark:bg-white/10 dark:text-slate-300">
+          {items.length}
+        </span>
+      </div>
+      {items.length > 0 ? (
+        <div className="space-y-2">
+          {items.slice(0, 8).map(render)}
+          {items.length > 8 && (
+            <div className="text-xs text-slate-500">Еще {items.length - 8} записей в технических деталях</div>
+          )}
+        </div>
+      ) : (
+        <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500 dark:border-white/10 dark:bg-white/[0.04]">
+          {empty}
+        </div>
+      )}
+    </section>
+  )
+}
+
+function DiffLine({ title, meta, tone }: { title: string; meta: string; tone: 'cyan' | 'emerald' | 'amber' }) {
+  const toneClass =
+    tone === 'emerald'
+      ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/25 dark:bg-emerald-500/10 dark:text-emerald-100'
+      : tone === 'amber'
+        ? 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-500/25 dark:bg-amber-500/10 dark:text-amber-100'
+        : 'border-cyan-200 bg-cyan-50 text-cyan-800 dark:border-cyan-500/25 dark:bg-cyan-500/10 dark:text-cyan-100'
+
+  return (
+    <div className={`rounded-lg border px-3 py-2 ${toneClass}`}>
+      <div className="truncate text-sm font-semibold">{title}</div>
+      <div className="mt-0.5 truncate text-xs opacity-75">{meta}</div>
+    </div>
+  )
+}
+
 function labelize(value: string) {
   return syncLabels[value] ?? value.replace(/([A-Z])/g, ' $1').replace(/^./, (char) => char.toUpperCase())
+}
+
+function formatRub(value: number) {
+  return new Intl.NumberFormat('ru-RU', {
+    style: 'currency',
+    currency: 'RUB',
+    maximumFractionDigits: 0,
+  }).format(value / 100)
+}
+
+function formatDate(value: string) {
+  return new Intl.DateTimeFormat('ru-RU', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  }).format(new Date(value))
 }
 
 function translateError(value: string) {

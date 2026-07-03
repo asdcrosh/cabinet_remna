@@ -16,11 +16,12 @@ export const revalidate = 300 // кэш на 5 минут
 export default async function PlansPage({
   searchParams,
 }: {
-  searchParams?: { plan?: string; promo?: string }
+  searchParams?: { plan?: string; promo?: string; intent?: string }
 }) {
   const session = await getCurrentUser()
   const linkedPlanId = searchParams?.plan?.trim()
   const initialPromoCode = searchParams?.promo?.trim()
+  const isRenewIntent = searchParams?.intent === 'renew'
   const plans = await prisma.plan.findMany({
     where: { isActive: true },
     orderBy: { sortOrder: 'asc' },
@@ -122,6 +123,15 @@ export default async function PlansPage({
           </div>
         </div>
       </section>
+
+      {isRenewIntent && (
+        <section className="rounded-lg border border-cyan-200 bg-cyan-50/80 px-4 py-3 text-sm text-cyan-950 shadow-sm dark:border-cyan-400/30 dark:bg-cyan-400/10 dark:text-cyan-50">
+          <div className="font-semibold">Продление подписки</div>
+          <div className="mt-1 text-cyan-900/75 dark:text-cyan-50/75">
+            Выберите текущий или любой другой тариф. После оплаты срок доступа обновится автоматически.
+          </div>
+        </section>
+      )}
 
       {needsTelegramCheckForPromo && (
         <div className="flex flex-col gap-3 rounded-lg border border-amber-200 bg-amber-50/80 px-4 py-3 text-sm text-amber-900 shadow-sm dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100 sm:flex-row sm:items-center sm:justify-between">

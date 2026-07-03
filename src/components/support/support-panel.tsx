@@ -134,8 +134,31 @@ interface SupportTicket {
     id: string
     email: string
     name: string | null
+    telegramId?: string | null
+    remnashopUserId?: number | null
+    remnashopSyncedAt?: string | null
+    remnawaveUuid?: string | null
     remnawaveUsername?: string | null
-  }
+    subscriptions?: Array<{
+      id: string
+      status: string
+      expireAt: string
+      pendingSync: boolean
+      plan: { name: string } | null
+    }>
+    payments?: Array<{
+      id: string
+      status: string
+      amountKopecks: number
+      paidAt: string | null
+      createdAt: string
+      subscriptionProvisionedAt: string | null
+      provisioningError: string | null
+      remnashopSyncedAt: string | null
+      remnashopSyncError: string | null
+      plan: { name: string } | null
+    }>
+  } | null
   messages: SupportMessage[]
 }
 
@@ -1136,11 +1159,7 @@ function TicketSideMenu({
             <InfoBlock label="Пользователь">
               <span className="break-all">{selected.user.email}</span>
             </InfoBlock>
-            {selected.user.remnawaveUsername && (
-              <InfoBlock label="Remnawave">
-                <span className="break-all">{selected.user.remnawaveUsername}</span>
-              </InfoBlock>
-            )}
+            <SupportUserDiagnostics user={selected.user} />
           </>
         )}
         <InfoBlock label="Создано">
@@ -1153,6 +1172,103 @@ function TicketSideMenu({
       <div className="border-t border-slate-100 p-4 dark:border-slate-800">
         <TicketActions selected={selected} mode={mode} isPending={isPending} onUpdateStatus={onUpdateStatus} />
       </div>
+    </div>
+  )
+}
+
+function SupportUserDiagnostics({ user }: { user: NonNullable<SupportTicket['user']> }) {
+  const subscription = user.subscriptions?.[0] ?? null
+  const payment = user.payments?.[0] ?? null
+  const syncProblems = [
+    subscription?.pendingSync ? 'Подписка ждет синхронизацию' : '',
+    payment?.provisioningError ? `Выдача: ${payment.provisioningError}` : '',
+    payment?.remnashopSyncError ? `Remnashop: ${payment.remnashopSyncError}` : '',
+  ].filter(Boolean)
+
+  return (
+    <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-surface-950">
+      <div className="flex items-center justify-between gap-2">
+        <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Диагностика</div>
+        <a
+          href={`/dashboard/admin/users?q=${encodeURIComponent(user.email)}`}
+          className="text-xs font-semibold text-cyan-700 hover:text-slate-950 dark:text-cyan-200 dark:hover:text-white"
+        >
+          Профиль
+        </a>
+      </div>
+
+      <div className="grid gap-2 text-xs">
+        <DiagnosticRow label="Telegram" value={user.telegramId ? `TG ${user.telegramId}` : 'не привязан'} ok={Boolean(user.telegramId)} />
+        <DiagnosticRow label="Remnashop" value={user.remnashopUserId ? `ID ${user.remnashopUserId}` : 'не связан'} ok={Boolean(user.remnashopUserId)} />
+        <DiagnosticRow label="Remnawave" value={user.remnawaveUsername || user.remnawaveUuid || 'нет'} ok={Boolean(user.remnawaveUuid)} mono />
+      </div>
+
+      {subscription ? (
+        <div className="rounded-lg border border-white bg-white p-2.5 text-xs dark:border-white/10 dark:bg-white/[0.04]">
+          <div className="font-semibold text-slate-900 dark:text-white">{subscription.plan?.name ?? 'Подписка'}</div>
+          <div className="mt-1 text-slate-500">
+            {subscription.status} до {formatDate(subscription.expireAt)}
+          </div>
+        </div>
+      ) : (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-2.5 text-xs text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
+          Активная подписка не найдена
+        </div>
+      )}
+
+      {payment && (
+        <div className="rounded-lg border border-white bg-white p-2.5 text-xs dark:border-white/10 dark:bg-white/[0.04]">
+          <div className="flex items-center justify-between gap-2">
+            <span className="font-semibold text-slate-900 dark:text-white">{payment.plan?.name ?? 'Платеж'}</span>
+            <span className={cn(
+              'rounded-full px-2 py-0.5 font-semibold',
+              payment.status === 'SUCCEEDED'
+                ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-200'
+                : payment.status === 'PENDING'
+                  ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-200'
+                  : 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-200'
+            )}>
+              {payment.status}
+            </span>
+          </div>
+          <div className="mt-1 text-slate-500">
+            {formatSupportPrice(payment.amountKopecks)} · {formatDate(payment.paidAt ?? payment.createdAt)}
+          </div>
+          <div className="mt-2 grid gap-1 text-slate-500">
+            <span>Выдача: {payment.subscriptionProvisionedAt ? 'готово' : 'нет'}</span>
+            <span>Remnashop: {payment.remnashopSyncedAt ? 'записан' : 'нет записи'}</span>
+          </div>
+        </div>
+      )}
+
+      {syncProblems.length > 0 && (
+        <div className="rounded-lg border border-red-200 bg-red-50 p-2.5 text-xs text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-100">
+          <div className="mb-1 font-semibold">Проблемы</div>
+          <ul className="space-y-1">
+            {syncProblems.map((problem) => <li key={problem}>{problem}</li>)}
+          </ul>
+        </div>
+      )}
+
+      <div className="grid grid-cols-2 gap-2">
+        <a href={`/dashboard/admin/payments?q=${encodeURIComponent(user.email)}`} className="btn-secondary h-9 px-2 text-xs">
+          Платежи
+        </a>
+        <a href="/dashboard/admin/recovery" className="btn-secondary h-9 px-2 text-xs">
+          Довыдача
+        </a>
+      </div>
+    </div>
+  )
+}
+
+function DiagnosticRow({ label, value, ok, mono = false }: { label: string; value: string; ok: boolean; mono?: boolean }) {
+  return (
+    <div className="flex items-center justify-between gap-2">
+      <span className="text-slate-500">{label}</span>
+      <span className={cn('truncate font-medium', ok ? 'text-emerald-600 dark:text-emerald-300' : 'text-slate-400', mono && 'font-mono')}>
+        {value}
+      </span>
     </div>
   )
 }
@@ -1295,4 +1411,12 @@ function formatDate(value: string) {
     hour: '2-digit',
     minute: '2-digit',
   }).format(new Date(value))
+}
+
+function formatSupportPrice(value: number) {
+  return new Intl.NumberFormat('ru-RU', {
+    style: 'currency',
+    currency: 'RUB',
+    maximumFractionDigits: 0,
+  }).format(value / 100)
 }

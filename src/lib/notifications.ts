@@ -6,6 +6,9 @@ import { prisma } from './prisma'
 import { createAdminNotification } from './admin-notifications'
 import { logError } from './logger'
 
+const RENEW_PATH = '/dashboard/plans?intent=renew'
+const SUBSCRIPTION_PATH = '/dashboard/subscription'
+
 type NotifyUserInput = {
   userId: string
   type: NotificationType
@@ -147,20 +150,20 @@ export async function notifyPaymentSucceeded(paymentId: string) {
     dedupeKey: `payment-success:${payment.id}`,
     title,
     body,
-    actionHref: '/dashboard/subscription',
+    actionHref: SUBSCRIPTION_PATH,
     actionLabel: 'Открыть подписку',
     telegramText,
-    telegramActionUrl: `${appUrl}/dashboard/subscription`,
+    telegramActionUrl: `${appUrl}${SUBSCRIPTION_PATH}`,
     telegramActionLabel: 'Открыть подписку',
     telegramActionOpenInTelegram: true,
     emailSubject: `${title} в ${getBrandName()}`,
-    emailText: `${body}\n\nОткрыть кабинет: ${appUrl}/dashboard/subscription`,
+    emailText: `${body}\n\nОткрыть кабинет: ${appUrl}${SUBSCRIPTION_PATH}`,
     emailHtml: renderNotificationEmail({
       eyebrow: 'Подписка',
       title,
       lead: body,
       ctaLabel: 'Открыть подписку',
-      ctaUrl: `${appUrl}/dashboard/subscription`,
+      ctaUrl: `${appUrl}${SUBSCRIPTION_PATH}`,
       greetingName: payment.user.name,
     }),
   })
@@ -195,17 +198,20 @@ export async function notifyPaymentCanceled(paymentId: string, reason = 'Пла�
     dedupeKey: `payment-canceled:${payment.id}`,
     title: 'Платёж не завершён',
     body,
-    actionHref: '/dashboard/plans',
-    actionLabel: 'Открыть тарифы',
+    actionHref: RENEW_PATH,
+    actionLabel: 'Оплатить заново',
     telegramText: [`<b>Платёж не завершён</b>`, escapeTelegram(body)].join('\n'),
+    telegramActionUrl: `${getAppUrl()}${RENEW_PATH}`,
+    telegramActionLabel: 'Оплатить заново',
+    telegramActionOpenInTelegram: true,
     emailSubject: `Платёж не завершён — ${getBrandName()}`,
-    emailText: `${body}\n\nОткрыть тарифы: ${getAppUrl()}/dashboard/plans`,
+    emailText: `${body}\n\nОткрыть тарифы: ${getAppUrl()}${RENEW_PATH}`,
     emailHtml: renderNotificationEmail({
       eyebrow: 'Платёж',
       title: 'Платёж не завершён',
       lead: body,
-      ctaLabel: 'Открыть тарифы',
-      ctaUrl: `${getAppUrl()}/dashboard/plans`,
+      ctaLabel: 'Оплатить заново',
+      ctaUrl: `${getAppUrl()}${RENEW_PATH}`,
       greetingName: payment.user.name,
     }),
   })
@@ -343,17 +349,20 @@ export async function notifySubscriptionExpiring(input: {
     dedupeKey: `subscription-expiring:${input.subscriptionId}:${input.stage}`,
     title: 'Подписка скоро закончится',
     body,
-    actionHref: '/dashboard/plans',
+    actionHref: RENEW_PATH,
     actionLabel: 'Продлить',
     telegramText: [`<b>Подписка скоро закончится</b>`, escapeTelegram(body)].join('\n'),
+    telegramActionUrl: `${getAppUrl()}${RENEW_PATH}`,
+    telegramActionLabel: 'Продлить',
+    telegramActionOpenInTelegram: true,
     emailSubject: `Подписка скоро закончится — ${getBrandName()}`,
-    emailText: `${body}\n\nПродлить: ${getAppUrl()}/dashboard/plans`,
+    emailText: `${body}\n\nПродлить: ${getAppUrl()}${RENEW_PATH}`,
     emailHtml: renderNotificationEmail({
       eyebrow: 'Подписка',
       title: 'Подписка скоро закончится',
       lead: body,
       ctaLabel: 'Продлить подписку',
-      ctaUrl: `${getAppUrl()}/dashboard/plans`,
+      ctaUrl: `${getAppUrl()}${RENEW_PATH}`,
     }),
   })
 }

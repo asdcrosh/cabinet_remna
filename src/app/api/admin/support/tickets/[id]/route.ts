@@ -18,7 +18,39 @@ export const GET = withAuth(async (_req: Request, { params }: { params: { id: st
   const ticket = await prisma.supportTicket.findUnique({
     where: { id: params.id },
     include: {
-      user: { select: { id: true, email: true, name: true, remnawaveUsername: true } },
+      user: {
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          telegramId: true,
+          remnashopUserId: true,
+          remnashopSyncedAt: true,
+          remnawaveUuid: true,
+          remnawaveUsername: true,
+          subscriptions: {
+            orderBy: { expireAt: 'desc' },
+            take: 1,
+            select: { id: true, status: true, expireAt: true, pendingSync: true, plan: { select: { name: true } } },
+          },
+          payments: {
+            orderBy: { createdAt: 'desc' },
+            take: 1,
+            select: {
+              id: true,
+              status: true,
+              amountKopecks: true,
+              paidAt: true,
+              createdAt: true,
+              subscriptionProvisionedAt: true,
+              provisioningError: true,
+              remnashopSyncedAt: true,
+              remnashopSyncError: true,
+              plan: { select: { name: true } },
+            },
+          },
+        },
+      },
       messages: {
         orderBy: { createdAt: 'asc' },
         select: {

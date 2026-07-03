@@ -96,9 +96,21 @@ export function serializeSupportTicket<T extends {
   updatedAt: Date
   lastMessageAt: Date
   closedAt: Date | null
-}>(ticket: T) {
+  user?: {
+    telegramId?: bigint | null
+    remnashopSyncedAt?: Date | null
+    subscriptions?: Array<{ expireAt: Date }>
+    payments?: Array<{
+      paidAt: Date | null
+      createdAt: Date
+      subscriptionProvisionedAt: Date | null
+      remnashopSyncedAt: Date | null
+    }>
+  } | null
+}>(ticket: T): any {
   return {
     ...ticket,
+    user: ticket.user ? serializeSupportUser(ticket.user) : ticket.user,
     createdAt: ticket.createdAt.toISOString(),
     updatedAt: ticket.updatedAt.toISOString(),
     lastMessageAt: ticket.lastMessageAt.toISOString(),
@@ -110,5 +122,34 @@ export function serializeSupportMessage<T extends { createdAt: Date }>(message: 
   return {
     ...message,
     createdAt: message.createdAt.toISOString(),
+  }
+}
+
+function serializeSupportUser<T extends {
+  telegramId?: bigint | null
+  remnashopSyncedAt?: Date | null
+  subscriptions?: Array<{ expireAt: Date }>
+  payments?: Array<{
+    paidAt: Date | null
+    createdAt: Date
+    subscriptionProvisionedAt: Date | null
+    remnashopSyncedAt: Date | null
+  }>
+}>(user: T) {
+  return {
+    ...user,
+    telegramId: user.telegramId?.toString() ?? null,
+    remnashopSyncedAt: user.remnashopSyncedAt?.toISOString() ?? null,
+    subscriptions: user.subscriptions?.map((subscription) => ({
+      ...subscription,
+      expireAt: subscription.expireAt.toISOString(),
+    })),
+    payments: user.payments?.map((payment) => ({
+      ...payment,
+      paidAt: payment.paidAt?.toISOString() ?? null,
+      createdAt: payment.createdAt.toISOString(),
+      subscriptionProvisionedAt: payment.subscriptionProvisionedAt?.toISOString() ?? null,
+      remnashopSyncedAt: payment.remnashopSyncedAt?.toISOString() ?? null,
+    })),
   }
 }
