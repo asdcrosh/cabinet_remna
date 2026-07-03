@@ -11,6 +11,7 @@ import {
   Sparkles,
   ShoppingCart,
   TicketPercent,
+  Trophy,
   Users,
   Zap,
 } from "lucide-react";
@@ -465,6 +466,10 @@ export function BonusBoxClient({
         />
       )}
 
+      {data.config.showBestRecentOpening && data.bestRecentOpening && (
+        <BestRecentOpening opening={data.bestRecentOpening} />
+      )}
+
       <section className="order-4 space-y-4">
         <div className="flex flex-wrap gap-2 rounded-lg border border-slate-200 bg-white p-1 shadow-sm shadow-slate-200/60 dark:border-white/10 dark:bg-surface-900 dark:shadow-black/20">
           <BonusTabButton
@@ -611,6 +616,34 @@ function ActivePromoRewards({
             </div>
           </article>
         ))}
+      </div>
+    </section>
+  );
+}
+
+function BestRecentOpening({ opening }: { opening: BestRecentOpeningView }) {
+  return (
+    <section className="order-3 rounded-lg border border-amber-200 bg-white p-3 shadow-sm shadow-amber-950/5 dark:border-amber-400/20 dark:bg-surface-900 dark:shadow-black/20 sm:p-4">
+      <div className="grid gap-3 sm:grid-cols-[auto_1fr_auto] sm:items-center">
+        <div className="grid h-11 w-11 place-items-center rounded-lg bg-amber-50 text-amber-600 dark:bg-amber-400/10 dark:text-amber-200">
+          <Trophy className="h-5 w-5" />
+        </div>
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="text-base font-semibold text-slate-950 dark:text-white">Лучший выигрыш за 30 дней</h2>
+            <span className={cn("rounded-full px-2 py-1 text-[11px] font-semibold", rarityClass(opening.rarity))}>
+              {rarityLabel(opening.rarity)}
+            </span>
+          </div>
+          <div className="mt-1 min-w-0 text-sm text-slate-500 dark:text-slate-400">
+            <span className="font-semibold text-slate-700 dark:text-slate-200">{opening.title}</span>
+            <span> · {opening.label}</span>
+            <span> · {opening.userLabel}</span>
+          </div>
+        </div>
+        <div className="text-sm text-slate-500 sm:text-right">
+          {formatDate(opening.createdAt)}
+        </div>
       </div>
     </section>
   );

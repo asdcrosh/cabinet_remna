@@ -353,6 +353,50 @@ describe('getBonusBoxOverview', () => {
       guaranteedNext: false,
     })
   })
+
+  it('shows the best recent opening instead of the latest opening', async () => {
+    mocks.prisma.bonusBoxSetting.findUnique.mockResolvedValue({
+      pityEnabled: true,
+      pityOpenings: 3,
+      showBestRecentOpening: true,
+      activePromoRewardsLimit: 0,
+    })
+    mocks.prisma.bonusBoxAttempt.findMany.mockResolvedValue([])
+    mocks.prisma.bonusBoxPrize.findMany.mockResolvedValue([
+      prize('common', 'COMMON', 'SUBSCRIPTION_DAYS', 1, 40),
+      prize('legendary', 'LEGENDARY', 'SUBSCRIPTION_DAYS', 30, 1),
+    ])
+    mocks.prisma.bonusBoxOpening.findMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        {
+          id: 'latest-common',
+          createdAt: new Date('2026-06-24T11:00:00.000Z'),
+          prize: prize('latest-common', 'COMMON', 'SUBSCRIPTION_DAYS', 1),
+          user: { name: 'Анна', email: 'anna@example.com' },
+        },
+        {
+          id: 'older-legendary',
+          createdAt: new Date('2026-06-23T11:00:00.000Z'),
+          prize: prize('older-legendary', 'LEGENDARY', 'SUBSCRIPTION_DAYS', 30),
+          user: { name: 'Ольга', email: 'olga@example.com' },
+        },
+      ])
+    mocks.prisma.user.findUnique.mockResolvedValue({
+      remnawaveUuid: 'rw-1',
+      subscriptions: [{ id: 'sub-1' }],
+    })
+
+    const overview = await getBonusBoxOverview('user-1')
+
+    expect(overview.bestRecentOpening).toMatchObject({
+      id: 'older-legendary',
+      title: 'older-legendary',
+      label: '+30 дн.',
+      rarity: 'LEGENDARY',
+      userLabel: 'Ольга',
+    })
+  })
 })
 
 describe('applyBonusBoxEconomyGuard', () => {

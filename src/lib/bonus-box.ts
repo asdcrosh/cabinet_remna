@@ -1014,7 +1014,6 @@ async function getBestRecentOpening(now: Date) {
       prize: { type: { not: 'NO_PRIZE' } },
     },
     orderBy: { createdAt: 'desc' },
-    take: 80,
     include: {
       prize: true,
       user: { select: { name: true, email: true } },
@@ -1022,7 +1021,11 @@ async function getBestRecentOpening(now: Date) {
   })
   const best = openings
     .slice()
-    .sort((left, right) => scoreOpening(right.prize) - scoreOpening(left.prize))[0]
+    .sort((left, right) => {
+      const scoreDiff = scoreOpening(right.prize) - scoreOpening(left.prize)
+      if (scoreDiff !== 0) return scoreDiff
+      return right.createdAt.getTime() - left.createdAt.getTime()
+    })[0]
 
   if (!best) return null
 
@@ -1093,7 +1096,19 @@ function openingsSinceRarityAtLeastFinite(
 }
 
 function scoreOpening(prize: Pick<BonusBoxPrize, 'rarity' | 'type' | 'value'>) {
-  return rarityRank(prize.rarity) * 10_000 + Math.max(0, prize.value)
+  const value = Math.max(0, prize.value)
+  const typeScore =
+    prize.type === 'SUBSCRIPTION_DAYS'
+      ? value * 120
+      : prize.type === 'TRAFFIC_GB'
+        ? value * 70
+        : prize.type === 'PROMO_CODE_PERCENT'
+          ? value * 45
+          : prize.type === 'BONUS_ATTEMPTS'
+            ? value * 35
+            : 0
+
+  return rarityRank(prize.rarity) * 100_000 + typeScore
 }
 
 function prizeValueLabel(prize: Pick<BonusBoxPrize, 'type' | 'value'>) {
