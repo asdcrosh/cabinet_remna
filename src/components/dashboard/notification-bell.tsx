@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
+import { createPortal } from 'react-dom'
 import { Bell, CheckCheck, ExternalLink, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import type { UserNotificationView } from '@/lib/user-notifications'
@@ -24,7 +25,9 @@ export function NotificationBell({ showAdmin = false }: { showAdmin?: boolean })
   const [tab, setTab] = useState<'user' | 'admin'>('user')
   const [summary, setSummary] = useState<NotificationSummary>({ unreadCount: 0, notifications: [] })
   const [adminSummary, setAdminSummary] = useState<AdminNotificationSummary>({ unreadCount: 0, notifications: [] })
+  const [mounted, setMounted] = useState(false)
   const rootRef = useRef<HTMLDivElement | null>(null)
+  const panelRef = useRef<HTMLDivElement | null>(null)
   const activeSummary = tab === 'admin' ? adminSummary : summary
   const totalUnread = summary.unreadCount + (showAdmin ? adminSummary.unreadCount : 0)
 
@@ -130,6 +133,10 @@ export function NotificationBell({ showAdmin = false }: { showAdmin?: boolean })
   }
 
   useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  useEffect(() => {
     void refresh()
     const interval = window.setInterval(() => {
       if (document.visibilityState === 'visible') void refresh()
@@ -150,11 +157,107 @@ export function NotificationBell({ showAdmin = false }: { showAdmin?: boolean })
   useEffect(() => {
     if (!open) return
     const onPointerDown = (event: PointerEvent) => {
-      if (rootRef.current && !rootRef.current.contains(event.target as Node)) setOpen(false)
+      const target = event.target as Node
+      const insideButton = rootRef.current?.contains(target)
+      const insidePanel = panelRef.current?.contains(target)
+      if (!insideButton && !insidePanel) setOpen(false)
     }
     document.addEventListener('pointerdown', onPointerDown)
     return () => document.removeEventListener('pointerdown', onPointerDown)
   }, [open])
+
+  const panel = open ? (
+    <div
+      ref={panelRef}
+      className="fixed inset-x-2 top-[calc(env(safe-area-inset-top)+4.25rem)] z-[120] max-h-[calc(100dvh-env(safe-area-inset-top)-env(safe-area-inset-bottom)-8.75rem)] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-slate-950/15 dark:border-white/10 dark:bg-surface-950 dark:shadow-black/35 sm:absolute sm:inset-x-auto sm:right-6 sm:top-16 sm:w-[min(24rem,calc(100vw-2rem))] sm:max-h-[34rem] sm:rounded-xl lg:right-6"
+    >
+      <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 dark:border-white/10">
+        <div>
+          <div className="text-sm font-semibold text-slate-950 dark:text-white">Уведомления</div>
+          <div className="text-xs text-slate-500">
+            {activeSummary.unreadCount > 0 ? `Новых: ${activeSummary.unreadCount}` : 'Новых нет'}
+          </div>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={markAllRead}
+            disabled={activeSummary.unreadCount === 0}
+            className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 text-xs font-medium text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/10 dark:text-slate-300 dark:hover:bg-white/10"
+          >
+            <CheckCheck className="h-3.5 w-3.5" />
+            Прочитано
+          </button>
+          <button
+            type="button"
+            onClick={clearNotifications}
+            disabled={activeSummary.notifications.length === 0}
+            className="grid h-8 w-8 place-items-center rounded-lg border border-slate-200 text-slate-500 transition hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/10 dark:text-slate-300 dark:hover:bg-red-500/10 dark:hover:text-red-200"
+            title="Очистить"
+            aria-label="Очистить уведомления"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      </div>
+
+      {showAdmin && (
+        <div className="grid grid-cols-2 gap-1 border-b border-slate-100 bg-slate-50 p-1 dark:border-white/10 dark:bg-white/[0.03]">
+          <button
+            type="button"
+            className={cn('rounded-lg px-3 py-2 text-sm font-medium transition', tab === 'user' ? 'bg-white text-slate-950 shadow-sm dark:bg-surface-900 dark:text-white' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white')}
+            onClick={() => setTab('user')}
+          >
+            Мои {summary.unreadCount > 0 ? `· ${summary.unreadCount}` : ''}
+          </button>
+          <button
+            type="button"
+            className={cn('rounded-lg px-3 py-2 text-sm font-medium transition', tab === 'admin' ? 'bg-white text-slate-950 shadow-sm dark:bg-surface-900 dark:text-white' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white')}
+            onClick={() => setTab('admin')}
+          >
+            Админка {adminSummary.unreadCount > 0 ? `· ${adminSummary.unreadCount}` : ''}
+          </button>
+        </div>
+      )}
+
+      <div className="max-h-[calc(100dvh-env(safe-area-inset-top)-env(safe-area-inset-bottom)-18rem)] overflow-y-auto p-2 sm:max-h-96">
+        {activeSummary.notifications.length > 0 ? (
+          activeSummary.notifications.map((item) => (
+            tab === 'admin' ? (
+              <AdminNotificationRow
+                key={item.id}
+                notification={item as AdminNotificationView}
+                onNavigate={() => {
+                  void markOneRead(item.id)
+                  setOpen(false)
+                }}
+              />
+            ) : (
+              <NotificationRow
+                key={item.id}
+                notification={item as UserNotificationView}
+                onNavigate={() => {
+                  void markOneRead(item.id)
+                  setOpen(false)
+                }}
+              />
+            )
+          ))
+        ) : (
+          <div className="px-4 py-8 text-center text-sm text-slate-500">Уведомлений пока нет</div>
+        )}
+      </div>
+
+      <Link
+        href={tab === 'admin' ? '/dashboard/admin/notifications' : '/dashboard/notifications'}
+        onClick={() => setOpen(false)}
+        className="flex items-center justify-center gap-2 border-t border-slate-100 px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-white/10 dark:text-slate-200 dark:hover:bg-white/10"
+      >
+        {tab === 'admin' ? 'Все события' : 'Все уведомления'}
+        <ExternalLink className="h-4 w-4" />
+      </Link>
+    </div>
+  ) : null
 
   return (
     <div ref={rootRef} className="relative">
@@ -172,95 +275,7 @@ export function NotificationBell({ showAdmin = false }: { showAdmin?: boolean })
         )}
       </button>
 
-      {open && (
-        <div className="fixed inset-x-2 bottom-[calc(env(safe-area-inset-bottom)+4.8rem)] z-50 max-h-[min(78dvh,34rem)] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-slate-950/15 dark:border-white/10 dark:bg-surface-950 dark:shadow-black/35 sm:absolute sm:bottom-auto sm:inset-x-auto sm:right-0 sm:top-12 sm:w-[min(24rem,calc(100vw-2rem))] sm:rounded-xl">
-          <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 dark:border-white/10">
-            <div>
-              <div className="text-sm font-semibold text-slate-950 dark:text-white">Уведомления</div>
-              <div className="text-xs text-slate-500">
-                {activeSummary.unreadCount > 0 ? `Новых: ${activeSummary.unreadCount}` : 'Новых нет'}
-              </div>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                onClick={markAllRead}
-                disabled={activeSummary.unreadCount === 0}
-                className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 text-xs font-medium text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/10 dark:text-slate-300 dark:hover:bg-white/10"
-              >
-                <CheckCheck className="h-3.5 w-3.5" />
-                Прочитано
-              </button>
-              <button
-                type="button"
-                onClick={clearNotifications}
-                disabled={activeSummary.notifications.length === 0}
-                className="grid h-8 w-8 place-items-center rounded-lg border border-slate-200 text-slate-500 transition hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/10 dark:text-slate-300 dark:hover:bg-red-500/10 dark:hover:text-red-200"
-                title="Очистить"
-                aria-label="Очистить уведомления"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </button>
-            </div>
-          </div>
-
-          {showAdmin && (
-            <div className="grid grid-cols-2 gap-1 border-b border-slate-100 bg-slate-50 p-1 dark:border-white/10 dark:bg-white/[0.03]">
-              <button
-                type="button"
-                className={cn('rounded-lg px-3 py-2 text-sm font-medium transition', tab === 'user' ? 'bg-white text-slate-950 shadow-sm dark:bg-surface-900 dark:text-white' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white')}
-                onClick={() => setTab('user')}
-              >
-                Мои {summary.unreadCount > 0 ? `· ${summary.unreadCount}` : ''}
-              </button>
-              <button
-                type="button"
-                className={cn('rounded-lg px-3 py-2 text-sm font-medium transition', tab === 'admin' ? 'bg-white text-slate-950 shadow-sm dark:bg-surface-900 dark:text-white' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white')}
-                onClick={() => setTab('admin')}
-              >
-                Админка {adminSummary.unreadCount > 0 ? `· ${adminSummary.unreadCount}` : ''}
-              </button>
-            </div>
-          )}
-
-          <div className="max-h-[calc(78dvh-10rem)] overflow-y-auto p-2 sm:max-h-96">
-            {activeSummary.notifications.length > 0 ? (
-              activeSummary.notifications.map((item) => (
-                tab === 'admin' ? (
-                  <AdminNotificationRow
-                    key={item.id}
-                    notification={item as AdminNotificationView}
-                    onNavigate={() => {
-                      void markOneRead(item.id)
-                      setOpen(false)
-                    }}
-                  />
-                ) : (
-                  <NotificationRow
-                    key={item.id}
-                    notification={item as UserNotificationView}
-                    onNavigate={() => {
-                      void markOneRead(item.id)
-                      setOpen(false)
-                    }}
-                  />
-                )
-              ))
-            ) : (
-              <div className="px-4 py-8 text-center text-sm text-slate-500">Уведомлений пока нет</div>
-            )}
-          </div>
-
-          <Link
-            href={tab === 'admin' ? '/dashboard/admin/notifications' : '/dashboard/notifications'}
-            onClick={() => setOpen(false)}
-            className="flex items-center justify-center gap-2 border-t border-slate-100 px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-white/10 dark:text-slate-200 dark:hover:bg-white/10"
-          >
-            {tab === 'admin' ? 'Все события' : 'Все уведомления'}
-            <ExternalLink className="h-4 w-4" />
-          </Link>
-        </div>
-      )}
+      {mounted && panel ? createPortal(panel, document.body) : null}
     </div>
   )
 }
