@@ -9,13 +9,23 @@
     --muted: 100 116 139;
   }
   html, body { @apply h-full; }
+  html {
+    width: 100%;
+    overflow-x: hidden;
+  }
   body {
     @apply bg-slate-50 text-slate-900 antialiased dark:bg-surface-950 dark:text-slate-100;
+    width: 100%;
+    min-width: 0;
+    overflow-x: clip;
     background:
       linear-gradient(135deg, rgba(14, 165, 233, 0.08), transparent 34%),
       linear-gradient(225deg, rgba(16, 185, 129, 0.08), transparent 30%),
       rgb(248 250 252);
     font-feature-settings: 'cv11', 'ss01';
+  }
+  #__next {
+    min-width: 0;
   }
   .dark body {
     background:

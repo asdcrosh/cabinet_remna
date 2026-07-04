@@ -6,19 +6,6 @@ import { getTelegramLaunchData } from '@/lib/telegram-miniapp-client'
 import { logError } from '@/lib/logger'
 import { sanitizeInternalNext } from '@/lib/auth/next-path'
 
-declare global {
-  interface Window {
-    Telegram?: {
-      WebApp?: {
-        initData?: string
-        ready?: () => void
-        expand?: () => void
-        openLink?: (url: string, options?: { try_instant_view?: boolean }) => void
-      }
-    }
-  }
-}
-
 export function TelegramMiniAppAuth() {
   const [state, setState] = useState<'browser' | 'authenticating' | 'error'>('browser')
   const [error, setError] = useState('')

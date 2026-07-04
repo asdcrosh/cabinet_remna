@@ -63,7 +63,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           <LogoutButton />
         </div>
       </aside>
-      <main className="min-w-0 lg:ml-72">
+      <main className="min-w-0 w-full overflow-x-clip lg:ml-72 lg:w-auto">
         <div className="sticky top-0 z-30 hidden h-14 items-center justify-end border-b border-white/70 bg-white/80 px-6 shadow-sm shadow-slate-200/60 backdrop-blur-xl dark:border-white/10 dark:bg-surface-950/80 dark:shadow-black/20 lg:flex">
           <div className="flex items-center gap-2">
             <NotificationBell showAdmin={isStaff} />
@@ -76,7 +76,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
             <MobileDashboardNav role={role} email={accountLabel} brandName={brandName} badges={navBadges} features={features} />
           </div>
         </div>
-        <div className="page-transition mx-auto max-w-6xl px-4 pb-24 pt-4 sm:px-6 sm:pt-6 lg:px-8 lg:py-8">{children}</div>
+        <div className="page-transition mx-auto w-full max-w-6xl min-w-0 px-4 pb-24 pt-4 sm:px-6 sm:pt-6 lg:px-8 lg:py-8">{children}</div>
       </main>
       <MobileBottomNav badges={navBadges} features={features} />
     </div>

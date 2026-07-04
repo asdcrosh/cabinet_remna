@@ -3,6 +3,7 @@ import type { Metadata, Viewport } from 'next'
 import { Toaster } from '@/components/ui/toaster'
 import { getBrandName } from '@/lib/branding'
 import Script from 'next/script'
+import { TelegramMiniAppViewport } from '@/components/telegram/telegram-miniapp-viewport'
 
 export const metadata: Metadata = {
   title: {
@@ -36,6 +37,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           })()`}
         </Script>
         <Script src="https://telegram.org/js/telegram-web-app.js?62" strategy="beforeInteractive" />
+        <TelegramMiniAppViewport />
         {children}
         <Toaster />
       </body>

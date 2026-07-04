@@ -24,19 +24,6 @@ import { useBodyScrollLock } from '@/lib/use-body-scroll-lock'
 import { toast } from '@/components/ui/toaster'
 import { ConfirmDialog } from './confirm-dialog'
 
-declare global {
-  interface Window {
-    Telegram?: {
-      WebApp?: {
-        initData?: string
-        ready?: () => void
-        expand?: () => void
-        openLink?: (url: string, options?: { try_instant_view?: boolean }) => void
-      }
-    }
-  }
-}
-
 type Device = 'ios' | 'android' | 'macos' | 'windows' | 'desktop'
 type AppId = 'happ' | 'v2ray' | 'rabbit-hole'
 
