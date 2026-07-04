@@ -25,6 +25,20 @@ const optionalPairs = [
   ["RESEND_API_KEY", "EMAIL_FROM"],
 ];
 
+const optionalNonNegativeIntegers = [
+  "AUDIT_LOG_RETENTION_DAYS",
+  "NOTIFICATION_LOG_RETENTION_DAYS",
+  "SYNC_EVENT_RETENTION_DAYS",
+  "BONUS_BOX_RUB_PER_ATTEMPT",
+  "BONUS_BOX_MIN_ATTEMPTS_PER_PAYMENT",
+  "BONUS_BOX_MAX_ATTEMPTS_PER_PAYMENT",
+  "BONUS_BOX_ATTEMPT_TTL_DAYS",
+  "BONUS_BOX_WEEKLY_DAY",
+  "BONUS_BOX_WEEKLY_ATTEMPTS",
+  "BONUS_BOX_WEEKLY_MAX_BALANCE",
+  "REFERRAL_BONUS_DAYS",
+];
+
 const errors = [];
 const warnings = [];
 
@@ -70,6 +84,25 @@ for (const [left, right] of optionalPairs) {
   if (Boolean(value(left)) !== Boolean(value(right))) {
     warnings.push(`${left} and ${right} should be configured together`);
   }
+}
+
+for (const key of optionalNonNegativeIntegers) {
+  if (!value(key)) continue;
+  const numeric = Number(value(key));
+  if (!Number.isInteger(numeric) || numeric < 0) {
+    errors.push(`${key} must be a non-negative integer`);
+  }
+}
+
+if (value("BONUS_BOX_WEEKLY_DAY")) {
+  const weeklyDay = Number(value("BONUS_BOX_WEEKLY_DAY"));
+  if (!Number.isInteger(weeklyDay) || weeklyDay < 0 || weeklyDay > 6) {
+    errors.push("BONUS_BOX_WEEKLY_DAY must be between 0 and 6");
+  }
+}
+
+if (value("TELEGRAM_BOT_TOKEN") && value("TELEGRAM_BOT_TOKEN").length < 20) {
+  warnings.push("TELEGRAM_BOT_TOKEN looks too short");
 }
 
 if (errors.length > 0) {

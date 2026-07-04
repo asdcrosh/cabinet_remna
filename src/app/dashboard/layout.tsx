@@ -4,8 +4,6 @@ import { redirect } from 'next/navigation'
 import { getCurrentUser } from '@/lib/auth/cookies'
 import { prisma } from '@/lib/prisma'
 import { getBrandName } from '@/lib/branding'
-import { maybeSyncRemnashopCatalog } from '@/lib/remnashop-sync'
-import { syncRemnashopUserToCabinet } from '@/lib/remnashop-users'
 import { getFeatureFlags } from '@/lib/feature-flags'
 import { LogoutButton } from '@/components/dashboard/logout-button'
 import { Brand, DashboardNav, MobileBottomNav, MobileDashboardNav } from '@/components/dashboard/dashboard-nav'
@@ -22,22 +20,6 @@ export default async function DashboardLayout({ children }: { children: React.Re
   if (!freshUser) {
     logWarn('auth.dashboard_layout.stale_session_redirect', { userId: session.uid })
     redirect('/login?next=/dashboard')
-  }
-
-  try {
-    await maybeSyncRemnashopCatalog()
-  } catch (error) {
-    logWarn('remnashop.catalog_sync.skipped', {
-      message: error instanceof Error ? error.message : 'unknown error',
-    })
-  }
-  try {
-    await syncRemnashopUserToCabinet(session.uid)
-  } catch (error) {
-    logWarn('remnashop.user_sync.skipped', {
-      userId: session.uid,
-      message: error instanceof Error ? error.message : 'unknown error',
-    })
   }
 
   const role = freshUser.role

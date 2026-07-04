@@ -122,8 +122,11 @@ model User {
   notificationLogs           NotificationLog[]
   notifications              UserNotification[]
   adminNotificationReads     AdminNotificationRead[]
+  revokedSessions            RevokedSession[]
 
   @@index([email])
+  @@index([role])
+  @@index([remnawaveUuid])
   @@index([referredById])
 }
 
@@ -764,6 +767,19 @@ model RateLimitBucket {
   updatedAt DateTime @updatedAt
 
   @@index([resetAt])
+}
+
+model RevokedSession {
+  id        String   @id @default(cuid())
+  jti       String   @unique
+  userId    String?
+  expiresAt DateTime
+  revokedAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
+  @@index([userId, revokedAt])
 }
 
 // ----------------------------------------------------------------------
