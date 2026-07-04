@@ -2,12 +2,15 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { isRequestLoggingEnabled, logInfo } from '@/lib/logger'
 
 export function middleware(req: NextRequest) {
-  const res = getMiddlewareResponse(req)
+  const requestId = getRequestId(req)
+  const res = getMiddlewareResponse(req, requestId)
 
   applySecurityHeaders(res, req)
+  res.headers.set('x-request-id', requestId)
 
   if (isRequestLoggingEnabled()) {
     logInfo('http.request', {
+      requestId,
       method: req.method,
       path: req.nextUrl.pathname,
       search: req.nextUrl.search || undefined,
@@ -20,7 +23,7 @@ export function middleware(req: NextRequest) {
   return res
 }
 
-function getMiddlewareResponse(req: NextRequest) {
+function getMiddlewareResponse(req: NextRequest, requestId: string) {
   if (req.nextUrl.pathname.startsWith('/dashboard') && !req.cookies.get('cabinet_session')?.value) {
     const url = req.nextUrl.clone()
     url.pathname = '/login'
@@ -29,7 +32,14 @@ function getMiddlewareResponse(req: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  return NextResponse.next()
+  const requestHeaders = new Headers(req.headers)
+  requestHeaders.set('x-request-id', requestId)
+
+  return NextResponse.next({
+    request: {
+      headers: requestHeaders,
+    },
+  })
 }
 
 function applySecurityHeaders(res: NextResponse, req: NextRequest) {
@@ -74,4 +84,10 @@ function getClientIp(req: NextRequest) {
     req.headers.get('cf-connecting-ip') ||
     undefined
   )
+}
+
+function getRequestId(req: NextRequest) {
+  const existing = req.headers.get('x-request-id')?.trim()
+  if (existing && /^[a-zA-Z0-9._:-]{8,128}$/.test(existing)) return existing
+  return crypto.randomUUID()
 }

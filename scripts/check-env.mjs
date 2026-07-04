@@ -106,6 +106,21 @@ if (isProduction && value("REMNASHOP_DATABASE_SSL") === "no-verify") {
   warnings.push("REMNASHOP_DATABASE_SSL=no-verify disables TLS verification");
 }
 
+if (isProduction && value("DATABASE_URL")) {
+  try {
+    const databaseUrl = new URL(value("DATABASE_URL"));
+    const hasPoolOptions =
+      databaseUrl.searchParams.has("connection_limit") ||
+      databaseUrl.searchParams.has("pool_timeout") ||
+      databaseUrl.searchParams.get("pgbouncer") === "true";
+    if (!hasPoolOptions) {
+      warnings.push("DATABASE_URL should set connection_limit/pool_timeout or use pgbouncer=true in production");
+    }
+  } catch {
+    errors.push("DATABASE_URL must be a valid URL");
+  }
+}
+
 for (const [left, right] of optionalPairs) {
   if (Boolean(value(left)) !== Boolean(value(right))) {
     warnings.push(`${left} and ${right} should be configured together`);
