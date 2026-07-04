@@ -12,6 +12,7 @@ import { renderTelegramCustomEmoji, stripTelegramCustomEmojiMarkup } from '@/lib
 import { rateLimit } from '@/lib/rate-limit'
 import { remnashopQuery } from '@/lib/remnashop-db'
 import { logWarn } from '@/lib/logger'
+import type { BroadcastDeliveryPayload } from '@/lib/broadcast-delivery'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -73,62 +74,50 @@ export const POST = withAuth(async (req: Request) => {
   const imageUrl = normalizeImageUrl(input.imageUrl)
   const plainBody = stripTelegramCustomEmojiMarkup(input.body)
   const batchKey = `broadcast:${Date.now()}:${session.uid}`
-  const stats = {
-    recipients: 0,
-    inApp: 0,
-    telegram: { sent: 0, skipped: 0, duplicate: 0, failed: 0 },
-    email: { sent: 0, skipped: 0, duplicate: 0, failed: 0 },
-  }
-
-  for (const user of users) {
-    const variables = buildTemplateVariables(user)
-    const personalizedTitle = applyTemplateVariables(input.title, variables)
-    const personalizedBody = applyTemplateVariables(input.body, variables)
-    const personalizedPlainBody = stripTelegramCustomEmojiMarkup(personalizedBody)
-    const personalizedActionLabel = actionLabel ? applyTemplateVariables(actionLabel, variables) : undefined
-
-    const result = await notifyUser({
-      userId: user.id,
-      type: 'BROADCAST',
-      dedupeKey: `${batchKey}:${user.id}`,
-      title: personalizedTitle,
-      body: personalizedPlainBody,
-      actionHref: actionHref ?? undefined,
-      actionLabel: personalizedActionLabel,
-      inApp: channels.has('IN_APP'),
-      telegramText: channels.has('TELEGRAM')
-        ? renderTelegramCustomEmoji(personalizedBody)
-        : undefined,
-      telegramImageUrl: channels.has('TELEGRAM') ? imageUrl ?? undefined : undefined,
-      telegramActionUrl: channels.has('TELEGRAM') && actionHref ? actionUrl : undefined,
-      telegramActionLabel: channels.has('TELEGRAM') && actionHref ? personalizedActionLabel || 'Открыть' : undefined,
-      telegramActionOpenInTelegram: channels.has('TELEGRAM') ? actionOpenInTelegram : undefined,
-      emailSubject: channels.has('EMAIL') ? `${personalizedTitle} — ${getBrandName()}` : undefined,
-      emailText: channels.has('EMAIL') ? `${personalizedPlainBody}${actionHref ? `\n\n${actionUrl}` : ''}` : undefined,
-      emailHtml: channels.has('EMAIL')
-        ? renderActionEmail({
-            eyebrow: 'Сообщение',
-            title: personalizedTitle,
-            lead: 'Новое сообщение от администратора сервиса.',
-            body: personalizedPlainBody,
-            ctaLabel: personalizedActionLabel || 'Открыть кабинет',
-            ctaUrl: actionUrl,
-            imageUrl,
-            expiry: 'Это сообщение отправлено администратором сервиса.',
-            securityNote: 'Если сообщение неактуально, просто игнорируйте его.',
-          })
-        : undefined,
-    })
-
-    stats.telegram[result.telegram] += 1
-    stats.email[result.email] += 1
-    if (channels.has('IN_APP')) stats.inApp += 1
-    if (channels.has('IN_APP') || result.telegram === 'sent' || result.email === 'sent') {
-      stats.recipients += 1
-    }
-  }
+  const stats = emptyBroadcastStats()
 
   if (input.testMode) {
+    for (const user of users) {
+      const payload = buildBroadcastPayload({
+        user,
+        batchKey,
+        title: input.title,
+        body: input.body,
+        actionHref,
+        actionLabel,
+        actionOpenInTelegram,
+        imageUrl,
+        channels,
+        actionUrl,
+      })
+
+      const result = await notifyUser({
+        userId: payload.userId,
+        type: 'BROADCAST',
+        dedupeKey: payload.dedupeKey,
+        title: payload.title,
+        body: payload.body,
+        actionHref: payload.actionHref ?? undefined,
+        actionLabel: payload.actionLabel ?? undefined,
+        inApp: payload.inApp,
+        telegramText: payload.telegramText ?? undefined,
+        telegramImageUrl: payload.telegramImageUrl ?? undefined,
+        telegramActionUrl: payload.telegramActionUrl ?? undefined,
+        telegramActionLabel: payload.telegramActionLabel ?? undefined,
+        telegramActionOpenInTelegram: payload.telegramActionOpenInTelegram,
+        emailSubject: payload.emailSubject ?? undefined,
+        emailText: payload.emailText ?? undefined,
+        emailHtml: payload.emailHtml ?? undefined,
+      })
+
+      stats.telegram[result.telegram] += 1
+      stats.email[result.email] += 1
+      if (payload.inApp) stats.inApp += 1
+      if (payload.inApp || result.telegram === 'sent' || result.email === 'sent') {
+        stats.recipients += 1
+      }
+    }
+
     return NextResponse.json({
       ok: true,
       stats,
@@ -148,16 +137,7 @@ export const POST = withAuth(async (req: Request) => {
       actionLabel,
       actionOpenInTelegram,
       imageUrl,
-      recipients: stats.recipients,
-      inAppCount: stats.inApp,
-      telegramSent: stats.telegram.sent,
-      telegramSkipped: stats.telegram.skipped,
-      telegramDuplicate: stats.telegram.duplicate,
-      telegramFailed: stats.telegram.failed,
-      emailSent: stats.email.sent,
-      emailSkipped: stats.email.skipped,
-      emailDuplicate: stats.email.duplicate,
-      emailFailed: stats.email.failed,
+      recipients: users.length,
       limited: users.length === MAX_RECIPIENTS,
       createdById: session.uid,
     },
@@ -188,11 +168,39 @@ export const POST = withAuth(async (req: Request) => {
     },
   })
 
+  const deliveries = users.map((user) => {
+    const payload = buildBroadcastPayload({
+      user,
+      batchKey,
+      title: input.title,
+      body: input.body,
+      actionHref,
+      actionLabel,
+      actionOpenInTelegram,
+      imageUrl,
+      channels,
+      actionUrl,
+    })
+
+    return {
+      campaignId: campaign.id,
+      userId: user.id,
+      payload: payload as unknown as Prisma.InputJsonValue,
+    }
+  })
+
+  for (let index = 0; index < deliveries.length; index += 1000) {
+    await prisma.broadcastDelivery.createMany({
+      data: deliveries.slice(index, index + 1000),
+      skipDuplicates: true,
+    })
+  }
+
   await createAdminNotification({
     type: 'broadcast',
     severity: 'INFO',
     dedupeKey: `admin:${batchKey}`,
-    title: 'Рассылка отправлена',
+    title: 'Рассылка поставлена в очередь',
     body: `${input.title}: получателей ${users.length}.`,
     actionHref: '/dashboard/admin/broadcasts',
     actionLabel: 'Открыть рассылки',
@@ -200,8 +208,12 @@ export const POST = withAuth(async (req: Request) => {
 
   return NextResponse.json({
     ok: true,
-    stats,
+    stats: {
+      ...emptyBroadcastStats(),
+      recipients: users.length,
+    },
     limited: users.length === MAX_RECIPIENTS,
+    queued: true,
     campaign: {
       ...campaign,
       createdAt: campaign.createdAt.toISOString(),
@@ -209,6 +221,15 @@ export const POST = withAuth(async (req: Request) => {
     },
   })
 })
+
+function emptyBroadcastStats() {
+  return {
+    recipients: 0,
+    inApp: 0,
+    telegram: { sent: 0, skipped: 0, duplicate: 0, failed: 0 },
+    email: { sent: 0, skipped: 0, duplicate: 0, failed: 0 },
+  }
+}
 
 const broadcastUserSelect = {
   id: true,
@@ -654,7 +675,74 @@ function normalizeImageUrl(value: string | null | undefined) {
   }
 }
 
+function buildBroadcastPayload({
+  user,
+  batchKey,
+  title,
+  body,
+  actionHref,
+  actionLabel,
+  actionOpenInTelegram,
+  imageUrl,
+  channels,
+  actionUrl,
+}: {
+  user: {
+    id: string
+    email: string
+    name: string | null
+    referralCode: string | null
+    subscriptions: Array<{ expireAt: Date; plan: { name: string } | null }>
+  }
+  batchKey: string
+  title: string
+  body: string
+  actionHref: string | null
+  actionLabel: string | undefined
+  actionOpenInTelegram: boolean
+  imageUrl: string | null
+  channels: Set<BroadcastChannel>
+  actionUrl: string
+}): BroadcastDeliveryPayload {
+  const variables = buildTemplateVariables(user)
+  const personalizedTitle = applyTemplateVariables(title, variables)
+  const personalizedBody = applyTemplateVariables(body, variables)
+  const personalizedPlainBody = stripTelegramCustomEmojiMarkup(personalizedBody)
+  const personalizedActionLabel = actionLabel ? applyTemplateVariables(actionLabel, variables) : undefined
+
+  return {
+    userId: user.id,
+    dedupeKey: `${batchKey}:${user.id}`,
+    title: personalizedTitle,
+    body: personalizedPlainBody,
+    actionHref,
+    actionLabel: personalizedActionLabel ?? null,
+    inApp: channels.has('IN_APP'),
+    telegramText: channels.has('TELEGRAM') ? renderTelegramCustomEmoji(personalizedBody) : null,
+    telegramImageUrl: channels.has('TELEGRAM') ? imageUrl : null,
+    telegramActionUrl: channels.has('TELEGRAM') && actionHref ? actionUrl : null,
+    telegramActionLabel: channels.has('TELEGRAM') && actionHref ? personalizedActionLabel || 'Открыть' : null,
+    telegramActionOpenInTelegram: channels.has('TELEGRAM') ? actionOpenInTelegram : undefined,
+    emailSubject: channels.has('EMAIL') ? `${personalizedTitle} — ${getBrandName()}` : null,
+    emailText: channels.has('EMAIL') ? `${personalizedPlainBody}${actionHref ? `\n\n${actionUrl}` : ''}` : null,
+    emailHtml: channels.has('EMAIL')
+      ? renderActionEmail({
+          eyebrow: 'Сообщение',
+          title: personalizedTitle,
+          lead: 'Новое сообщение от администратора сервиса.',
+          body: personalizedPlainBody,
+          ctaLabel: personalizedActionLabel || 'Открыть кабинет',
+          ctaUrl: actionUrl,
+          imageUrl,
+          expiry: 'Это сообщение отправлено администратором сервиса.',
+          securityNote: 'Если сообщение неактуально, просто игнорируйте его.',
+        })
+      : null,
+  }
+}
+
 function buildTemplateVariables(user: {
+  id?: string
   email: string
   name: string | null
   referralCode: string | null

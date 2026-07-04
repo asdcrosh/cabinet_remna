@@ -37,6 +37,9 @@ const optionalNonNegativeIntegers = [
   "BONUS_BOX_WEEKLY_ATTEMPTS",
   "BONUS_BOX_WEEKLY_MAX_BALANCE",
   "REFERRAL_BONUS_DAYS",
+  "BROADCAST_WORKER_INTERVAL_SECONDS",
+  "BROADCAST_WORKER_BATCH_SIZE",
+  "BROADCAST_WORKER_MAX_ATTEMPTS",
 ];
 
 const errors = [];
@@ -103,6 +106,10 @@ if (value("BONUS_BOX_WEEKLY_DAY")) {
 
 if (value("TELEGRAM_BOT_TOKEN") && value("TELEGRAM_BOT_TOKEN").length < 20) {
   warnings.push("TELEGRAM_BOT_TOKEN looks too short");
+}
+
+if (value("BROADCAST_UPLOAD_SIGNING_SECRET") && value("BROADCAST_UPLOAD_SIGNING_SECRET").length < 32) {
+  errors.push("BROADCAST_UPLOAD_SIGNING_SECRET must be at least 32 characters");
 }
 
 if (errors.length > 0) {

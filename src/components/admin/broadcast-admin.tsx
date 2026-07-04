@@ -262,7 +262,7 @@ export function BroadcastAdmin({
     setLoading(true)
     setStats(null)
     try {
-      const result = await apiFetch<{ stats: BroadcastStats; limited?: boolean; campaign?: BroadcastHistoryItem; testMode?: boolean }>('/api/admin/broadcasts', {
+      const result = await apiFetch<{ stats: BroadcastStats; limited?: boolean; campaign?: BroadcastHistoryItem; testMode?: boolean; queued?: boolean }>('/api/admin/broadcasts', {
         method: 'POST',
         body: JSON.stringify({
           title: campaignTitle,
@@ -282,7 +282,7 @@ export function BroadcastAdmin({
         setHistory((current) => [result.campaign!, ...current].slice(0, 12))
       }
       if (!testMode) window.localStorage.removeItem(BROADCAST_DRAFT_KEY)
-      toast(testMode ? 'Тестовая рассылка отправлена вам' : result.limited ? 'Рассылка отправлена первым 5000 получателей' : 'Рассылка отправлена', 'success')
+      toast(testMode ? 'Тестовая рассылка отправлена вам' : result.queued ? 'Рассылка поставлена в очередь' : result.limited ? 'Рассылка отправлена первым 5000 получателей' : 'Рассылка отправлена', 'success')
     } catch {
       // apiFetch покажет ошибку.
     } finally {

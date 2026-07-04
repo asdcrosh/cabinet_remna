@@ -1,6 +1,7 @@
 import { readFile } from 'fs/promises'
 import path from 'path'
 import { NextResponse } from 'next/server'
+import { isBroadcastUploadSignatureValid } from '@/lib/broadcast-upload-url'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -13,9 +14,14 @@ const CONTENT_TYPES: Record<string, string> = {
   gif: 'image/gif',
 }
 
-export async function GET(_: Request, { params }: { params: { filename: string } }) {
+export async function GET(req: Request, { params }: { params: { filename: string } }) {
   const filename = params.filename
   if (!/^\d{4}-\d{2}-\d{2}-[a-f0-9-]+\.(jpg|png|webp|gif)$/i.test(filename)) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  }
+  const signature = new URL(req.url).searchParams.get('sig')
+  const allowUnsignedLegacy = process.env.BROADCAST_UPLOAD_ALLOW_UNSIGNED_LEGACY === 'true'
+  if (!isBroadcastUploadSignatureValid(filename, signature) && !allowUnsignedLegacy) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 })
   }
 

@@ -12,6 +12,7 @@
     "validate": "npm run lint && npm run typecheck && npm run check:env && npm run test",
     "test": "vitest run",
     "worker:payments": "tsx scripts/payment-reconciler.ts",
+    "worker:broadcasts": "tsx scripts/broadcast-worker.ts",
     "cleanup:retention": "tsx scripts/cleanup-retention.ts",
     "postinstall": "prisma generate",
     "prisma:generate": "prisma generate",

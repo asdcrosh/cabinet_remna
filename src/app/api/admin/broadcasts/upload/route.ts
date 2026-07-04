@@ -4,6 +4,7 @@ import path from 'path'
 import { NextResponse } from 'next/server'
 import { requireAdmin, withAuth } from '@/lib/auth/guard'
 import { getAppUrl } from '@/lib/app-url'
+import { signBroadcastUploadUrl } from '@/lib/broadcast-upload-url'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -41,6 +42,6 @@ export const POST = withAuth(async (req: Request) => {
   await writeFile(path.join(directory, filename), bytes, { flag: 'wx' })
 
   return NextResponse.json({
-    url: `${getAppUrl()}/uploads/broadcasts/${filename}`,
+    url: signBroadcastUploadUrl(`${getAppUrl()}/uploads/broadcasts/${filename}`),
   })
 })

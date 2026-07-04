@@ -123,6 +123,7 @@ model User {
   notifications              UserNotification[]
   adminNotificationReads     AdminNotificationRead[]
   revokedSessions            RevokedSession[]
+  broadcastDeliveries        BroadcastDelivery[]
 
   @@index([email])
   @@index([role])
@@ -329,9 +330,39 @@ model BroadcastCampaign {
   createdAt         DateTime @default(now())
 
   createdBy User? @relation("BroadcastCampaignAuthor", fields: [createdById], references: [id], onDelete: SetNull)
+  deliveries BroadcastDelivery[]
 
   @@index([createdAt])
   @@index([createdById, createdAt])
+}
+
+model BroadcastDelivery {
+  id         String                  @id @default(cuid())
+  campaignId String
+  userId     String
+  payload    Json
+  status     BroadcastDeliveryStatus @default(PENDING)
+  attempts   Int                     @default(0)
+  lastError  String?
+  lockedAt   DateTime?
+  sentAt     DateTime?
+  createdAt  DateTime                @default(now())
+  updatedAt  DateTime                @updatedAt
+
+  campaign BroadcastCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  user     User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([campaignId, userId])
+  @@index([status, lockedAt, createdAt])
+  @@index([campaignId, status])
+  @@index([userId, createdAt])
+}
+
+enum BroadcastDeliveryStatus {
+  PENDING
+  PROCESSING
+  SUCCEEDED
+  FAILED
 }
 
 model BroadcastTemplate {
