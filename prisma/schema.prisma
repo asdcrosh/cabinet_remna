@@ -241,10 +241,12 @@ model WelcomeBonusRedemption {
   createdAt   DateTime         @default(now())
 
   user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  payment   Payment?   @relation(fields: [paymentId], references: [id], onDelete: SetNull)
   promoCode PromoCode? @relation(fields: [promoCodeId], references: [id], onDelete: SetNull)
 
   @@unique([userId])
   @@index([type, createdAt])
+  @@index([paymentId])
   @@index([promoCodeId])
 }
 
@@ -523,6 +525,7 @@ model Payment {
   giftCertificateRedemption GiftCertificateRedemption?
   provisioningJob           ProvisioningJob?
   referralRewardTriggered   ReferralReward?
+  welcomeBonusRedemptions   WelcomeBonusRedemption[]
 
   @@index([userId, createdAt])
   @@index([userId, status, createdAt])

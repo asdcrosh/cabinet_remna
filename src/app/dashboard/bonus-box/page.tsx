@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 import { getCurrentUser } from '@/lib/auth/cookies'
 import { getBonusBoxOverview } from '@/lib/bonus-box'
-import { BonusBoxClient } from '@/components/bonus-box/bonus-box-client'
+import { BonusBoxClientDynamic } from '@/components/bonus-box/bonus-box-client-dynamic'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Бонусы' }
@@ -14,7 +14,7 @@ export default async function BonusBoxPage() {
 
   return (
     <div>
-      <BonusBoxClient initialData={data} />
+      <BonusBoxClientDynamic initialData={data} />
     </div>
   )
 }

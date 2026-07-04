@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { requireStaffPage } from '@/lib/auth/admin-page'
 import { serializeSupportMessage, serializeSupportTicket } from '@/lib/support'
-import { SupportPanel } from '@/components/support/support-panel'
+import { SupportPanelDynamic } from '@/components/support/support-panel-dynamic'
 import { parseAdminListLimit } from '@/lib/admin-list'
 
 export const dynamic = 'force-dynamic'
@@ -86,7 +86,7 @@ export default async function AdminSupportPage({
   ])
 
   return (
-    <SupportPanel
+    <SupportPanelDynamic
       mode="admin"
       initialTotal={total}
       pageSize={25}

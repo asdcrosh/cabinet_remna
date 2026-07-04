@@ -20,6 +20,7 @@ import { toast } from '@/components/ui/toaster'
 import { cn } from '@/lib/cn'
 import { planAvailabilityLabels, type PlanAvailabilityValue } from '@/lib/plan-availability'
 import { AdminModal } from '@/components/admin/admin-modal'
+import { ConfirmDialog } from '@/components/dashboard/confirm-dialog'
 
 export interface PlanAdminRow {
   id: string
@@ -88,6 +89,7 @@ export function PlansAdmin({ plans }: { plans: PlanAdminRow[] }) {
   const [squads, setSquads] = useState<RemnawaveSquad[]>([])
   const [squadsLoading, setSquadsLoading] = useState(false)
   const [squadsError, setSquadsError] = useState<string | null>(null)
+  const [deleteCandidate, setDeleteCandidate] = useState<PlanAdminRow | null>(null)
 
   useEffect(() => {
     void loadSquads()
@@ -142,16 +144,22 @@ export function PlansAdmin({ plans }: { plans: PlanAdminRow[] }) {
     }
   }
 
-  async function deletePlan(plan: PlanAdminRow) {
+  function requestDeletePlan(plan: PlanAdminRow) {
     if (plan.paymentsCount > 0 || plan.subscriptionsCount > 0) {
       toast('Используемый тариф можно только скрыть')
       return
     }
-    if (!window.confirm(`Удалить тариф «${plan.name}»?`)) return
+    setDeleteCandidate(plan)
+  }
+
+  async function deletePlan() {
+    if (!deleteCandidate) return
+    const plan = deleteCandidate
     setLoadingId(plan.id)
     try {
       await apiFetch(`/api/admin/plans/${plan.id}`, { method: 'DELETE' })
       toast('Тариф удалён', 'success')
+      setDeleteCandidate(null)
       router.refresh()
     } finally {
       setLoadingId(null)
@@ -309,7 +317,7 @@ export function PlansAdmin({ plans }: { plans: PlanAdminRow[] }) {
                       <Link2 className="h-4 w-4" />
                     </button>
                   )}
-                  <button type="button" className="btn-secondary h-10 min-h-10 px-3 text-red-600" onClick={() => void deletePlan(plan)} disabled={loadingId === plan.id} title="Удалить">
+                  <button type="button" className="btn-secondary h-10 min-h-10 px-3 text-red-600" onClick={() => requestDeletePlan(plan)} disabled={loadingId === plan.id} title="Удалить">
                     <Trash2 className="h-4 w-4" />
                   </button>
                   <button type="button" className="btn-secondary h-10 min-h-10 px-3" onClick={() => void toggleActive(plan)} disabled={loadingId === plan.id} title={plan.isActive ? 'Скрыть тариф' : 'Опубликовать тариф'}>
@@ -321,6 +329,15 @@ export function PlansAdmin({ plans }: { plans: PlanAdminRow[] }) {
           )
         })}
       </div>
+      <ConfirmDialog
+        open={Boolean(deleteCandidate)}
+        title="Удалить тариф"
+        description={deleteCandidate ? `Тариф «${deleteCandidate.name}» будет удалён из каталога. Это действие нельзя отменить.` : ''}
+        confirmLabel="Удалить"
+        loading={Boolean(deleteCandidate && loadingId === deleteCandidate.id)}
+        onConfirm={() => void deletePlan()}
+        onCancel={() => setDeleteCandidate(null)}
+      />
     </div>
   )
 }

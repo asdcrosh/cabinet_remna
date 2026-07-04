@@ -25,6 +25,16 @@ const optionalPairs = [
   ["RESEND_API_KEY", "EMAIL_FROM"],
 ];
 
+const optionalBooleans = [
+  "TRUSTED_PROXY_HEADERS",
+  "BROADCAST_UPLOAD_ALLOW_UNSIGNED_LEGACY",
+  "BONUS_BOX_ENABLED",
+  "BONUS_BOX_WEEKLY_ENABLED",
+  "BONUS_BOX_ECONOMY_GUARD_ENABLED",
+  "BONUS_BOX_PITY_ENABLED",
+  "BONUS_BOX_SHOW_BEST_RECENT_OPENING",
+];
+
 const optionalNonNegativeIntegers = [
   "AUDIT_LOG_RETENTION_DAYS",
   "NOTIFICATION_LOG_RETENTION_DAYS",
@@ -36,10 +46,23 @@ const optionalNonNegativeIntegers = [
   "BONUS_BOX_WEEKLY_DAY",
   "BONUS_BOX_WEEKLY_ATTEMPTS",
   "BONUS_BOX_WEEKLY_MAX_BALANCE",
+  "BONUS_BOX_REFERRER_ATTEMPTS",
+  "BONUS_BOX_REFERRED_ATTEMPTS",
+  "BONUS_BOX_RARE_COOLDOWN_OPENINGS",
+  "BONUS_BOX_EPIC_COOLDOWN_OPENINGS",
+  "BONUS_BOX_LEGENDARY_COOLDOWN_OPENINGS",
+  "BONUS_BOX_EPIC_MIN_OPENINGS",
+  "BONUS_BOX_LEGENDARY_MIN_OPENINGS",
+  "BONUS_BOX_ACTIVE_PROMO_REWARDS_LIMIT",
   "REFERRAL_BONUS_DAYS",
   "BROADCAST_WORKER_INTERVAL_SECONDS",
   "BROADCAST_WORKER_BATCH_SIZE",
   "BROADCAST_WORKER_MAX_ATTEMPTS",
+];
+
+const optionalPositiveIntegers = [
+  "BONUS_BOX_PROMO_EXPIRES_IN_DAYS",
+  "BONUS_BOX_PITY_OPENINGS",
 ];
 
 const errors = [];
@@ -89,11 +112,26 @@ for (const [left, right] of optionalPairs) {
   }
 }
 
+for (const key of optionalBooleans) {
+  if (!value(key)) continue;
+  if (!["1", "true", "yes", "on", "0", "false", "no", "off"].includes(value(key).toLowerCase())) {
+    errors.push(`${key} must be a boolean`);
+  }
+}
+
 for (const key of optionalNonNegativeIntegers) {
   if (!value(key)) continue;
   const numeric = Number(value(key));
   if (!Number.isInteger(numeric) || numeric < 0) {
     errors.push(`${key} must be a non-negative integer`);
+  }
+}
+
+for (const key of optionalPositiveIntegers) {
+  if (!value(key)) continue;
+  const numeric = Number(value(key));
+  if (!Number.isInteger(numeric) || numeric < 1) {
+    errors.push(`${key} must be a positive integer`);
   }
 }
 

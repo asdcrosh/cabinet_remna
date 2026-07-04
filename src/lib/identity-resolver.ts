@@ -23,12 +23,21 @@ export async function resolveTelegramIdentity(input: {
   })
   const remnashopEmail = input.remnashopEmail?.trim().toLowerCase() || null
 
-  if (telegramUser && remnashopEmail && isTechnicalTelegramEmail(telegramUser.email)) {
+  if (
+    telegramUser &&
+    remnashopEmail &&
+    input.remnashopUserId &&
+    isTechnicalTelegramEmail(telegramUser.email)
+  ) {
     const emailUser = await prisma.user.findUnique({
       where: { email: remnashopEmail },
       select: identitySelect,
     })
-    if (emailUser && emailUser.id !== telegramUser.id) {
+    if (
+      emailUser &&
+      emailUser.id !== telegramUser.id &&
+      emailUser.remnashopUserId === input.remnashopUserId
+    ) {
       return {
         action: 'merge_technical_into_email',
         source: telegramUser,
@@ -53,13 +62,10 @@ export async function resolveTelegramIdentity(input: {
 
   if (telegramUser) return { action: 'use_existing', user: telegramUser }
 
-  if (input.remnashopUserId || remnashopEmail) {
+  if (input.remnashopUserId) {
     const remnashopLinkedUser = await prisma.user.findFirst({
       where: {
-        OR: [
-          ...(input.remnashopUserId ? [{ remnashopUserId: input.remnashopUserId }] : []),
-          ...(remnashopEmail ? [{ email: remnashopEmail }] : []),
-        ],
+        remnashopUserId: input.remnashopUserId,
       },
       select: identitySelect,
     })

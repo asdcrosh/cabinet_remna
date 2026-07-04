@@ -5,6 +5,7 @@ import { useState } from 'react'
 import { AlertTriangle, CheckCircle2, RefreshCw, RotateCcw } from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
 import { toast } from '@/components/ui/toaster'
+import { ConfirmDialog } from '@/components/dashboard/confirm-dialog'
 
 interface RemnashopPlanDiff {
   sourceId: number
@@ -75,6 +76,7 @@ export function RemnashopSyncPanel() {
   const [report, setReport] = useState<RemnashopSyncReport | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [includePromoCodes, setIncludePromoCodes] = useState(true)
+  const [applyConfirmOpen, setApplyConfirmOpen] = useState(false)
 
   async function runDryRun() {
     setLoading(true)
@@ -90,8 +92,6 @@ export function RemnashopSyncPanel() {
   }
 
   async function applyCatalogSync() {
-    if (!window.confirm('Синхронизировать пользователей, тарифы и промокоды из remnashop?')) return
-
     setLoading(true)
     setError(null)
     try {
@@ -100,6 +100,7 @@ export function RemnashopSyncPanel() {
         body: JSON.stringify({ promoCodes: includePromoCodes }),
       })
       setReport(result)
+      setApplyConfirmOpen(false)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Не удалось выполнить синхронизацию')
     } finally {
@@ -139,7 +140,7 @@ export function RemnashopSyncPanel() {
             <RefreshCw className={loading ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />
             Проверить
           </button>
-          <button type="button" className="btn-primary shrink-0" onClick={applyCatalogSync} disabled={loading}>
+          <button type="button" className="btn-primary shrink-0" onClick={() => setApplyConfirmOpen(true)} disabled={loading}>
             <RefreshCw className={loading ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />
             Синхронизировать
           </button>
@@ -205,6 +206,15 @@ export function RemnashopSyncPanel() {
           </details>
         </>
       )}
+      <ConfirmDialog
+        open={applyConfirmOpen}
+        title="Запустить синхронизацию"
+        description="Пользователи, тарифы и промокоды будут синхронизированы из Remnashop в кабинет."
+        confirmLabel="Синхронизировать"
+        loading={loading}
+        onConfirm={() => void applyCatalogSync()}
+        onCancel={() => setApplyConfirmOpen(false)}
+      />
     </div>
   )
 }

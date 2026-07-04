@@ -118,6 +118,39 @@ services:
       - cabinet
       - remnawave_external
 
+  broadcast-worker:
+    image: ${CABINET_IMAGE:-ghcr.io/asdcrosh/cabinet_remna:latest}
+    pull_policy: ${CABINET_PULL_POLICY:-always}
+    container_name: remnawave-cabinet-broadcast-worker
+    command: ["./node_modules/.bin/tsx", "scripts/broadcast-worker.ts"]
+    restart: unless-stopped
+    env_file:
+      - ${CABINET_ENV_FILE:-.env}
+    depends_on:
+      seed:
+        condition: service_completed_successfully
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - cabinet
+      - remnawave_external
+
+  retention-cleanup:
+    image: ${CABINET_IMAGE:-ghcr.io/asdcrosh/cabinet_remna:latest}
+    pull_policy: ${CABINET_PULL_POLICY:-always}
+    container_name: remnawave-cabinet-retention-cleanup
+    command: ["./node_modules/.bin/tsx", "scripts/cleanup-retention.ts"]
+    restart: "no"
+    profiles:
+      - maintenance
+    env_file:
+      - ${CABINET_ENV_FILE:-.env}
+    depends_on:
+      seed:
+        condition: service_completed_successfully
+    networks:
+      - cabinet
+
   caddy:
     image: caddy:2-alpine
     container_name: remnawave-cabinet-caddy

@@ -1,5 +1,5 @@
 import { requireAdminPage } from '@/lib/auth/admin-page'
-import { BroadcastAdmin } from '@/components/admin/broadcast-admin'
+import { BroadcastAdminDynamic } from '@/components/admin/broadcast-admin-dynamic'
 import { prisma } from '@/lib/prisma'
 
 export const metadata = { title: 'Рассылки — Админка' }
@@ -50,7 +50,7 @@ export default async function BroadcastsPage() {
         </p>
       </header>
 
-      <BroadcastAdmin
+      <BroadcastAdminDynamic
         initialHistory={history.map((item) => ({
           ...item,
           createdAt: item.createdAt.toISOString(),

@@ -7,6 +7,7 @@ import { Bell, CheckCheck, ExternalLink, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import type { UserNotificationView } from '@/lib/user-notifications'
 import type { AdminNotificationView } from '@/lib/admin-notifications'
+import { ConfirmDialog } from './confirm-dialog'
 
 const NOTIFICATION_REFRESH_MS = 15_000
 
@@ -26,6 +27,7 @@ export function NotificationBell({ showAdmin = false }: { showAdmin?: boolean })
   const [summary, setSummary] = useState<NotificationSummary>({ unreadCount: 0, notifications: [] })
   const [adminSummary, setAdminSummary] = useState<AdminNotificationSummary>({ unreadCount: 0, notifications: [] })
   const [mounted, setMounted] = useState(false)
+  const [clearConfirmOpen, setClearConfirmOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement | null>(null)
   const panelRef = useRef<HTMLDivElement | null>(null)
   const activeSummary = tab === 'admin' ? adminSummary : summary
@@ -109,9 +111,10 @@ export function NotificationBell({ showAdmin = false }: { showAdmin?: boolean })
 
   async function clearNotifications() {
     if (activeSummary.notifications.length === 0) return
-    const confirmed = window.confirm(tab === 'admin' ? 'Очистить админские уведомления?' : 'Очистить ваши уведомления?')
-    if (!confirmed) return
+    setClearConfirmOpen(true)
+  }
 
+  async function confirmClearNotifications() {
     const previousUser = summary
     const previousAdmin = adminSummary
     if (tab === 'admin') {
@@ -125,6 +128,8 @@ export function NotificationBell({ showAdmin = false }: { showAdmin?: boolean })
       if (!res.ok) {
         setSummary(previousUser)
         setAdminSummary(previousAdmin)
+      } else {
+        setClearConfirmOpen(false)
       }
     } catch {
       setSummary(previousUser)
@@ -168,6 +173,7 @@ export function NotificationBell({ showAdmin = false }: { showAdmin?: boolean })
 
   const panel = open ? (
     <div
+      id="notification-panel"
       ref={panelRef}
       className="fixed inset-x-2 top-[calc(env(safe-area-inset-top)+4.25rem)] z-[120] max-h-[calc(100dvh-env(safe-area-inset-top)-env(safe-area-inset-bottom)-8.75rem)] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-slate-950/15 dark:border-white/10 dark:bg-surface-950 dark:shadow-black/35 sm:absolute sm:inset-x-auto sm:right-6 sm:top-16 sm:w-[min(24rem,calc(100vw-2rem))] sm:max-h-[34rem] sm:rounded-xl lg:right-6"
     >
@@ -264,9 +270,11 @@ export function NotificationBell({ showAdmin = false }: { showAdmin?: boolean })
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}
-        className="relative grid h-10 w-10 place-items-center rounded-lg border border-white/70 bg-white/80 text-slate-700 shadow-sm shadow-slate-200/60 transition hover:bg-white hover:text-slate-950 dark:border-white/10 dark:bg-surface-900/80 dark:text-slate-200 dark:shadow-black/20 dark:hover:bg-surface-800 dark:hover:text-white"
-        aria-label="Уведомления"
-      >
+      className="relative grid h-10 w-10 place-items-center rounded-lg border border-white/70 bg-white/80 text-slate-700 shadow-sm shadow-slate-200/60 transition hover:bg-white hover:text-slate-950 dark:border-white/10 dark:bg-surface-900/80 dark:text-slate-200 dark:shadow-black/20 dark:hover:bg-surface-800 dark:hover:text-white"
+      aria-label="Уведомления"
+      aria-expanded={open}
+      aria-controls="notification-panel"
+    >
         <Bell className="h-5 w-5" />
         {totalUnread > 0 && (
           <span className="absolute -right-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full bg-red-600 px-1 text-[10px] font-bold leading-none text-white ring-2 ring-white dark:ring-surface-950">
@@ -276,6 +284,15 @@ export function NotificationBell({ showAdmin = false }: { showAdmin?: boolean })
       </button>
 
       {mounted && panel ? createPortal(panel, document.body) : null}
+      <ConfirmDialog
+        open={clearConfirmOpen}
+        title="Очистить уведомления"
+        description={tab === 'admin' ? 'Админские уведомления будут очищены только для вашего аккаунта.' : 'Ваши уведомления будут очищены из списка.'}
+        confirmLabel="Очистить"
+        loading={false}
+        onConfirm={() => void confirmClearNotifications()}
+        onCancel={() => setClearConfirmOpen(false)}
+      />
     </div>
   )
 }

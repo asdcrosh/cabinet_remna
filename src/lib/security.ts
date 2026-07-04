@@ -8,8 +8,10 @@ export function assertSameOrigin(req: Request) {
 
   const allowedOrigins = new Set([new URL(req.url).origin])
 
-  const forwardedOrigin = getForwardedOrigin(req)
-  if (forwardedOrigin) allowedOrigins.add(forwardedOrigin)
+  if (trustProxyHeaders()) {
+    const forwardedOrigin = getForwardedOrigin(req)
+    if (forwardedOrigin) allowedOrigins.add(forwardedOrigin)
+  }
 
   for (const configuredOrigin of getConfiguredOrigins()) {
     allowedOrigins.add(configuredOrigin)
@@ -43,6 +45,8 @@ function getForwardedOrigin(req: Request) {
 }
 
 export function getClientIp(req: Request) {
+  if (!trustProxyHeaders()) return ''
+
   const forwardedFor = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
   return (
     forwardedFor ||
@@ -51,6 +55,10 @@ export function getClientIp(req: Request) {
     req.headers.get('x-vercel-forwarded-for')?.split(',')[0]?.trim() ||
     ''
   )
+}
+
+function trustProxyHeaders() {
+  return ['1', 'true', 'yes', 'on'].includes((process.env.TRUSTED_PROXY_HEADERS || '').toLowerCase())
 }
 
 export function isIpAllowed(ip: string, allowlist: string[]) {

@@ -4,6 +4,7 @@ import { syncPaymentProvisioning } from '../src/lib/payment-sync'
 import { syncCabinetPaymentToRemnashopBestEffort } from '../src/lib/remnashop-reverse-sync'
 import { maybeSyncRemnashopCatalog } from '../src/lib/remnashop-sync'
 import { syncRemnashopUsersToCabinet } from '../src/lib/remnashop-users'
+import { logError, logInfo } from '../src/lib/logger'
 
 const intervalMs = readPositiveInt('PAYMENT_RECONCILE_INTERVAL_SECONDS', 60) * 1000
 const batchSize = readPositiveInt('PAYMENT_RECONCILE_BATCH_SIZE', 25)
@@ -22,24 +23,27 @@ process.on('SIGTERM', stop)
 process.on('SIGINT', stop)
 
 async function main() {
-  console.log(
-    `[payment-reconciler] started interval=${intervalMs / 1000}s batch=${batchSize} minAge=${minAgeMs / 1000}s cancelPendingAfter=${cancelPendingAfterMs / 1000}s`
-  )
+  logInfo('payment_reconciler.started', {
+    intervalSeconds: intervalMs / 1000,
+    batchSize,
+    minAgeSeconds: minAgeMs / 1000,
+    cancelPendingAfterSeconds: cancelPendingAfterMs / 1000,
+  })
 
   while (!stopped) {
     await runOnce().catch((error) => {
-      console.error('[payment-reconciler] batch failed', error)
+      logError('payment_reconciler.batch_failed', error)
     })
     await sleep(intervalMs)
   }
 
   await prisma.$disconnect()
-  console.log('[payment-reconciler] stopped')
+  logInfo('payment_reconciler.stopped')
 }
 
 async function runOnce() {
   await maybeSyncRemnashopCatalog().catch((error) => {
-    console.error('[remnashop-sync] background sync failed', error)
+    logError('remnashop_sync.background_failed', error)
   })
   await syncRemnashopUsersIfDue()
 
@@ -58,7 +62,7 @@ async function runOnce() {
   })
 
   if (payments.length > 0) {
-    console.log(`[payment-reconciler] checking ${payments.length} payment(s)`)
+    logInfo('payment_reconciler.payments_check_started', { count: payments.length })
     for (const payment of payments) {
       if (stopped) break
       try {
@@ -66,11 +70,13 @@ async function runOnce() {
           paymentId: payment.id,
           cancelPendingOlderThanMs: cancelPendingAfterMs,
         })
-        console.log(
-          `[payment-reconciler] payment=${payment.id} status=${result.status} provisioned=${result.provisioned}`
-        )
+        logInfo('payment_reconciler.payment_checked', {
+          paymentId: payment.id,
+          status: result.status,
+          provisioned: result.provisioned,
+        })
       } catch (error) {
-        console.error(`[payment-reconciler] payment=${payment.id} failed`, error)
+        logError('payment_reconciler.payment_failed', error, { paymentId: payment.id })
       }
     }
   }
@@ -90,11 +96,9 @@ async function syncRemnashopUsersIfDue() {
 
   try {
     const result = await syncRemnashopUsersToCabinet()
-    console.log(
-      `[remnashop-users-sync] total=${result.total} created=${result.created} updated=${result.updated} skipped=${result.skipped} subscriptionsSynced=${result.subscriptionsSynced} subscriptionsFailed=${result.subscriptionsFailed}`
-    )
+    logInfo('remnashop_users_sync.completed', result)
   } catch (error) {
-    console.error('[remnashop-users-sync] failed', error)
+    logError('remnashop_users_sync.failed', error)
   }
 }
 
@@ -122,7 +126,8 @@ async function retryRemnashopReverseSync() {
     if (stopped) break
     const result = await syncCabinetPaymentToRemnashopBestEffort(payment.id)
     if (!result.ok) {
-      console.error(`[remnashop-reverse-sync] payment=${payment.id} failed`)
+      const reason = 'error' in result ? result.error : result.skipped
+      logError('remnashop_reverse_sync.payment_failed', reason, { paymentId: payment.id })
     }
   }
 }
@@ -231,7 +236,7 @@ function readNonNegativeInt(name: string, fallback: number) {
 }
 
 main().catch(async (error) => {
-  console.error('[payment-reconciler] fatal', error)
+  logError('payment_reconciler.fatal', error)
   await prisma.$disconnect()
   process.exit(1)
 })

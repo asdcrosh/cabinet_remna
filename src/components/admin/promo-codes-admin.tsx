@@ -9,6 +9,7 @@ import { apiFetch } from '@/lib/api-client'
 import { toast } from '@/components/ui/toaster'
 import { cn } from '@/lib/cn'
 import { AdminModal } from '@/components/admin/admin-modal'
+import { ConfirmDialog } from '@/components/dashboard/confirm-dialog'
 
 type PromoAudience = 'ALL' | 'NEW_USERS' | 'NO_ACTIVE_SUBSCRIPTION' | 'PERSONAL'
 type PromoAssigneeSource = 'PERSONAL' | 'BONUS_BOX' | 'WELCOME_BONUS' | 'REDEMPTION'
@@ -90,6 +91,12 @@ export function PromoCodesAdmin({
   const [origin, setOrigin] = useState<'ALL' | PromoOrigin>('ALL')
   const [query, setQuery] = useState('')
   const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [confirmAction, setConfirmAction] = useState<{
+    title: string
+    description: string
+    label: string
+    run: () => Promise<void>
+  } | null>(null)
 
   const editingPromo = useMemo(
     () => promoCodes.find((promoCode) => promoCode.id === editingId) ?? null,
@@ -138,8 +145,17 @@ export function PromoCodesAdmin({
   }
 
   async function deletePromoCode(promoCode: PromoCodeAdminRow) {
-    if (!window.confirm(`Удалить промокод ${promoCode.code}? История оплат сохранится без привязки к этому коду.`)) return
+    setConfirmAction({
+      title: 'Удалить промокод',
+      description: `Промокод ${promoCode.code} будет удалён. История оплат сохранится без привязки к этому коду.`,
+      label: 'Удалить',
+      run: async () => {
+        await performDeletePromoCode(promoCode)
+      },
+    })
+  }
 
+  async function performDeletePromoCode(promoCode: PromoCodeAdminRow) {
     try {
       await apiFetch(`/api/admin/promo-codes/${promoCode.id}`, { method: 'DELETE' })
       toast('Промокод удалён', 'success')
@@ -152,8 +168,17 @@ export function PromoCodesAdmin({
   async function deleteSelectedPromoCodes() {
     const selectedCodes = promoCodes.filter((promoCode) => selectedIds.includes(promoCode.id))
     if (selectedCodes.length === 0) return
-    if (!window.confirm(`Удалить выбранные промокоды (${selectedCodes.length})? История оплат сохранится без привязки к этим кодам.`)) return
+    setConfirmAction({
+      title: 'Удалить промокоды',
+      description: `Будет удалено промокодов: ${selectedCodes.length}. История оплат сохранится без привязки к этим кодам.`,
+      label: 'Удалить',
+      run: async () => {
+        await performDeleteSelectedPromoCodes()
+      },
+    })
+  }
 
+  async function performDeleteSelectedPromoCodes() {
     setLoading(true)
     try {
       const result = await apiFetch<{ deleted: number }>('/api/admin/promo-codes', {
@@ -173,8 +198,17 @@ export function PromoCodesAdmin({
   async function updateSelectedActive(isActive: boolean) {
     const selectedCodes = promoCodes.filter((promoCode) => selectedIds.includes(promoCode.id))
     if (selectedCodes.length === 0) return
-    if (!window.confirm(`${isActive ? 'Включить' : 'Отключить'} выбранные промокоды (${selectedCodes.length})?`)) return
+    setConfirmAction({
+      title: isActive ? 'Включить промокоды' : 'Отключить промокоды',
+      description: `${isActive ? 'Включить' : 'Отключить'} выбранные промокоды: ${selectedCodes.length}.`,
+      label: isActive ? 'Включить' : 'Отключить',
+      run: async () => {
+        await performUpdateSelectedActive(isActive)
+      },
+    })
+  }
 
+  async function performUpdateSelectedActive(isActive: boolean) {
     setLoading(true)
     try {
       const result = await apiFetch<{ updated: number }>('/api/admin/promo-codes', {
@@ -188,6 +222,17 @@ export function PromoCodesAdmin({
       // apiFetch уже покажет toast
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function runConfirmedAction() {
+    const action = confirmAction
+    if (!action) return
+    try {
+      await action.run()
+      setConfirmAction(null)
+    } catch {
+      // apiFetch уже покажет ошибку.
     }
   }
 
@@ -606,6 +651,15 @@ export function PromoCodesAdmin({
       {filteredPromoCodes.length === 0 && (
         <div className="card py-10 text-center text-sm text-slate-500">В этом разделе пока нет промокодов</div>
       )}
+      <ConfirmDialog
+        open={Boolean(confirmAction)}
+        title={confirmAction?.title ?? ''}
+        description={confirmAction?.description ?? ''}
+        confirmLabel={confirmAction?.label ?? 'Подтвердить'}
+        loading={loading}
+        onConfirm={() => void runConfirmedAction()}
+        onCancel={() => setConfirmAction(null)}
+      />
     </div>
   )
 }

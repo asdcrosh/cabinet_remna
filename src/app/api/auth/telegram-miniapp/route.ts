@@ -107,9 +107,13 @@ export async function POST(req: Request) {
     }
     if (!user) {
       const pendingEmail = `telegram-${telegram.id.toString()}@pending.invalid`
+      const remnashopEmailAvailable = remnashopEmail
+        ? !(await prisma.user.findUnique({ where: { email: remnashopEmail }, select: { id: true } }))
+        : false
+      const emailForNewUser = remnashopEmailAvailable && remnashopEmail ? remnashopEmail : pendingEmail
       user = await prisma.user.create({
         data: {
-          email: remnashopEmail ?? pendingEmail,
+          email: emailForNewUser,
           passwordHash: await hash(randomBytes(48).toString('base64url'), 12),
           name: telegram.name,
           role: 'USER',
@@ -120,7 +124,7 @@ export async function POST(req: Request) {
           lastLoginAt: new Date(),
           remnashopUserId: remnashopUser?.id,
           remnashopSyncedAt: remnashopUser ? new Date() : null,
-          emailVerifiedAt: remnashopUser?.is_email_verified ? new Date() : null,
+          emailVerifiedAt: remnashopEmailAvailable && remnashopUser?.is_email_verified ? new Date() : null,
           ...(remnashopUser?.user_remna_id ? { remnawaveUuid: remnashopUser.user_remna_id } : {}),
         },
       })

@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth/cookies'
 import { serializeSupportMessage, serializeSupportTicket } from '@/lib/support'
-import { SupportPanel } from '@/components/support/support-panel'
+import { SupportPanelDynamic } from '@/components/support/support-panel-dynamic'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Поддержка' }
@@ -32,7 +32,7 @@ export default async function SupportPage() {
 
   return (
     <div>
-      <SupportPanel
+      <SupportPanelDynamic
         mode="user"
         initialTickets={tickets.map((ticket) => ({
           ...serializeSupportTicket(ticket),
