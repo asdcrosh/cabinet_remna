@@ -626,6 +626,7 @@ export function BroadcastAdmin({
                       setActionLabel((current) => current || 'Открыть')
                       return
                     }
+                    if (!preset) return
                     setActionHref(preset.href)
                     setActionLabel(preset.label)
                     if (!preset.href) setActionOpenInTelegram(false)

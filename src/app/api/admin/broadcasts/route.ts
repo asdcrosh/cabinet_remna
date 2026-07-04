@@ -642,7 +642,7 @@ function buildDeliveryWhere(channels: BroadcastChannel[]): Prisma.UserWhereInput
 function combineWhere(...items: Prisma.UserWhereInput[]): Prisma.UserWhereInput {
   const activeItems = items.filter((item) => Object.keys(item).length > 0)
   if (activeItems.length === 0) return {}
-  if (activeItems.length === 1) return activeItems[0]
+  if (activeItems.length === 1) return activeItems[0] ?? {}
   return { AND: activeItems }
 }
 

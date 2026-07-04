@@ -252,7 +252,7 @@ function maskEmail(email: string) {
   if (isPendingTelegramEmail(email)) return 'Telegram Mini App'
   const [name, domain] = email.split('@')
   if (!domain) return email
-  return `${name.slice(0, 2)}***@${domain}`
+  return `${(name || email).slice(0, 2)}***@${domain}`
 }
 
 function isPendingTelegramEmail(email: string) {

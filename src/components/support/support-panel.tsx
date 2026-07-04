@@ -182,6 +182,9 @@ export function SupportPanel({
   const [tickets, setTickets] = useState(initialTickets)
   const [listLimit, setListLimit] = useState(Math.max(pageSize, initialTickets.length))
   const [listTotal, setListTotal] = useState(initialTotal)
+  const [listCursor, setListCursor] = useState(
+    initialTickets.length < initialTotal ? getSupportTicketCursor(initialTickets.at(-1)) : null
+  )
   const [loadingMore, setLoadingMore] = useState(false)
   const [selectedId, setSelectedId] = useState(initialTickets.find((ticket) => ticket.status !== 'CLOSED')?.id ?? initialTickets[0]?.id ?? '')
   const [selectedTicket, setSelectedTicket] = useState<SupportTicket | null>(
@@ -264,10 +267,30 @@ export function SupportPanel({
     })
   }, [])
 
-  const fetchTicketList = useCallback(async (limit: number) => {
+  const appendTicketList = useCallback((incoming: SupportTicket[]) => {
+    setTickets((current) => {
+      const currentById = new Map(current.map((ticket) => [ticket.id, ticket]))
+      const next = [...current]
+      for (const ticket of incoming) {
+        const previous = currentById.get(ticket.id)
+        if (previous) {
+          const merged = previous.messages.length > ticket.messages.length
+            ? { ...ticket, messages: previous.messages }
+            : ticket
+          next[next.findIndex((item) => item.id === ticket.id)] = merged
+          continue
+        }
+        next.push(ticket)
+      }
+      return next
+    })
+  }, [])
+
+  const fetchTicketList = useCallback(async (limit: number, cursor?: string | null) => {
     const params = new URLSearchParams(window.location.search)
-    params.set('page', '1')
     params.set('pageSize', String(limit))
+    if (cursor) params.set('cursor', cursor)
+    else params.set('page', '1')
     const listEndpoint = mode === 'admin'
       ? `/api/admin/support/tickets?${params.toString()}`
       : '/api/support/tickets'
@@ -276,24 +299,24 @@ export function SupportPanel({
     if (!listRes.ok || !Array.isArray(listData?.tickets)) return null
     return listData as {
       tickets: SupportTicket[]
-      pagination?: { total?: number }
+      pagination?: { total?: number; nextCursor?: string | null }
     }
   }, [mode])
 
   const loadMoreTickets = useCallback(async () => {
-    if (mode !== 'admin' || loadingMore || tickets.length >= listTotal) return
-    const nextLimit = Math.min(listTotal, listLimit + pageSize)
+    if (mode !== 'admin' || loadingMore || tickets.length >= listTotal || !listCursor) return
     setLoadingMore(true)
     try {
-      const data = await fetchTicketList(nextLimit)
+      const data = await fetchTicketList(pageSize, listCursor)
       if (!data) return
-      mergeTicketList(data.tickets)
-      setListLimit(nextLimit)
+      appendTicketList(data.tickets)
+      setListLimit((current) => current + data.tickets.length)
+      setListCursor(data.pagination?.nextCursor ?? null)
       if (typeof data.pagination?.total === 'number') setListTotal(data.pagination.total)
     } finally {
       setLoadingMore(false)
     }
-  }, [fetchTicketList, listLimit, listTotal, loadingMore, mergeTicketList, mode, pageSize, tickets.length])
+  }, [appendTicketList, fetchTicketList, listCursor, listTotal, loadingMore, mode, pageSize, tickets.length])
 
   useEffect(() => {
     let active = true
@@ -304,6 +327,7 @@ export function SupportPanel({
         const listData = await fetchTicketList(listLimit)
         if (active && listData) {
           mergeTicketList(listData.tickets)
+          setListCursor(listData.pagination?.nextCursor ?? null)
           if (typeof listData.pagination?.total === 'number') setListTotal(listData.pagination.total)
         }
 
@@ -1392,6 +1416,11 @@ function getUnreadCount(ticket: SupportTicket, mode: 'user' | 'admin') {
 function needsCurrentActor(ticket: SupportTicket, mode: 'user' | 'admin') {
   if (mode === 'admin') return ticket.status === 'WAITING_ADMIN'
   return ticket.userUnreadCount > 0 || ticket.status === 'WAITING_USER'
+}
+
+function getSupportTicketCursor(ticket: SupportTicket | undefined) {
+  if (!ticket) return null
+  return `${ticket.adminUnreadCount}|${ticket.lastMessageAt}|${ticket.id}`
 }
 
 function insertAtSelection(value: string, insert: string, start: number, end: number, maxLength: number) {

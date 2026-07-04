@@ -24,7 +24,8 @@ export function renderTelegramCustomEmoji(value: string) {
   for (const match of value.matchAll(CUSTOM_EMOJI_RE)) {
     const index = match.index ?? 0
     const emojiId = match[1]
-    const fallback = match[2]
+    const fallback = match[2] ?? ''
+    if (!emojiId) continue
 
     output += escapeTelegramHtml(value.slice(lastIndex, index))
     output += `<tg-emoji emoji-id="${emojiId}">${escapeTelegramHtml(fallback)}</tg-emoji>`
@@ -38,4 +39,3 @@ export function renderTelegramCustomEmoji(value: string) {
 export function stripTelegramCustomEmojiMarkup(value: string) {
   return value.replace(CUSTOM_EMOJI_RE, (_, _emojiId: string, fallback: string) => fallback)
 }
-

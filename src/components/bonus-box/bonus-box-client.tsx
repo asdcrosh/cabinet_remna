@@ -989,7 +989,7 @@ function makeIdleReel(prizes: BonusBoxPrizeView[]) {
   return Array.from(
     { length: 40 },
     (_, index) => prizes[index % prizes.length],
-  );
+  ).filter((prize): prize is BonusBoxPrizeView => Boolean(prize));
 }
 
 function prizeLabel(prize: BonusBoxPrizeView) {

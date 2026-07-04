@@ -7,7 +7,7 @@ import { prisma } from '@/lib/prisma'
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-export const GET = withAuth(async (req: Request) => {
+export const GET = withAuth(async () => {
   await requireAdmin()
 
   try {

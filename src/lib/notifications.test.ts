@@ -167,7 +167,10 @@ describe('notifyUser', () => {
         body: expect.stringContaining('"photo":"https://cdn.example.test/image.jpg"'),
       })
     )
-    const payload = JSON.parse((fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body as string)
+    const request = (fetch as ReturnType<typeof vi.fn>).mock.calls[0]?.[1] as { body: string } | undefined
+    expect(request).toBeDefined()
+    if (!request) throw new Error('Expected Telegram request')
+    const payload = JSON.parse(request.body)
     expect(payload).toEqual(
       expect.objectContaining({
         chat_id: '123',
@@ -236,7 +239,10 @@ describe('notifyUser', () => {
         body: expect.stringContaining('"web_app":{"url":"https://cabinet.example.test/dashboard/plans"}'),
       })
     )
-    const payload = JSON.parse((fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body as string)
+    const request = (fetch as ReturnType<typeof vi.fn>).mock.calls[0]?.[1] as { body: string } | undefined
+    expect(request).toBeDefined()
+    if (!request) throw new Error('Expected Telegram request')
+    const payload = JSON.parse(request.body)
     expect(payload.reply_markup.inline_keyboard[0][0]).toEqual({
       text: 'Выбрать тариф',
       web_app: { url: 'https://cabinet.example.test/dashboard/plans' },

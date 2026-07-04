@@ -232,7 +232,7 @@ function mapStatus(s: UserResponse['status']) {
  * Требование: ^[a-zA-Z0-9_-]+$, 3-36.
  */
 function sanitizeUsername(email: string): string {
-  const base = email.split('@')[0].replace(/[^a-zA-Z0-9_-]/g, '_')
+  const base = (email.split('@')[0] || 'user').replace(/[^a-zA-Z0-9_-]/g, '_')
   const short = base.slice(0, 28)
   // Добавим 6 случайных символов, чтобы username был уникален
   const rand = Math.random().toString(36).slice(2, 8)

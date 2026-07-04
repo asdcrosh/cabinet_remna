@@ -110,6 +110,7 @@ const appOptions: AppOption[] = [
     ],
   },
 ]
+const defaultApp = appOptions[0] as AppOption
 
 export function KeysCard({ subscriptionUrl, happLink }: KeysCardProps) {
   const [device, setDevice] = useState<Device>('desktop')
@@ -127,7 +128,7 @@ export function KeysCard({ subscriptionUrl, happLink }: KeysCardProps) {
 
   const availableApps = useMemo(() => orderAppsForDevice(device), [device])
 
-  const selectedApp = appOptions.find((option) => option.id === selectedAppId) ?? appOptions[0]
+  const selectedApp = appOptions.find((option) => option.id === selectedAppId) ?? defaultApp
   const selectedDeepLinks = selectedApp.getOpenLinks
     ? selectedApp.getOpenLinks({ subscriptionUrl, happLink, device })
     : selectedApp.deepLinks(subscriptionUrl)
@@ -560,9 +561,9 @@ function buildOpenAppBridgeUrl(url: string, fallbackUrl: string | undefined, app
 }
 
 function recommendedAppForDevice(device: Device) {
-  if (device === 'android' || device === 'windows') return appOptions[1]
-  if (device === 'macos') return appOptions[2]
-  return appOptions[0]
+  if (device === 'android' || device === 'windows') return appOptions[1] ?? defaultApp
+  if (device === 'macos') return appOptions[2] ?? defaultApp
+  return defaultApp
 }
 
 function orderAppsForDevice(device: Device) {

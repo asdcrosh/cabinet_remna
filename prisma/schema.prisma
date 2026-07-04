@@ -128,6 +128,7 @@ model User {
   @@index([email])
   @@index([role])
   @@index([remnawaveUuid])
+  @@index([createdAt, id])
   @@index([referredById])
 }
 
@@ -530,6 +531,7 @@ model Payment {
   @@index([userId, createdAt])
   @@index([userId, status, createdAt])
   @@index([status])
+  @@index([createdAt, id])
   @@index([status, createdAt])
   @@index([status, subscriptionProvisionedAt, createdAt])
   @@index([status, subscriptionProvisionedAt, remnashopSyncedAt, updatedAt])
@@ -843,6 +845,7 @@ model SupportTicket {
   @@index([status, lastMessageAt])
   @@index([adminUnreadCount])
   @@index([adminUnreadCount, lastMessageAt])
+  @@index([adminUnreadCount, lastMessageAt, id])
 }
 
 model SupportMessage {

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { requireStaff, withAuth } from '@/lib/auth/guard'
 import { serializeSupportMessage, serializeSupportTicket } from '@/lib/support'
@@ -13,10 +14,11 @@ export const GET = withAuth(async (req: Request) => {
   const status = url.searchParams.get('status')
   const q = url.searchParams.get('q')?.trim()
   const page = Math.max(1, Number(url.searchParams.get('page') || '1') || 1)
-  const pageSize = Math.min(5000, Math.max(1, Number(url.searchParams.get('pageSize') || '25') || 25))
-  const skip = (page - 1) * pageSize
+  const cursor = parseSupportCursor(url.searchParams.get('cursor'))
+  const pageSizeLimit = cursor ? 100 : 5000
+  const pageSize = Math.min(pageSizeLimit, Math.max(1, Number(url.searchParams.get('pageSize') || '25') || 25))
 
-  const where = {
+  const baseWhere: Prisma.SupportTicketWhereInput = {
     ...(status && status !== 'ALL' ? { status: status as any } : {}),
     ...(q
       ? {
@@ -28,14 +30,16 @@ export const GET = withAuth(async (req: Request) => {
         }
       : {}),
   }
+  const where: Prisma.SupportTicketWhereInput = cursor
+    ? { AND: [baseWhere, { OR: buildSupportCursorWhere(cursor) }] }
+    : baseWhere
 
   const [total, tickets] = await prisma.$transaction([
-    prisma.supportTicket.count({ where }),
+    prisma.supportTicket.count({ where: baseWhere }),
     prisma.supportTicket.findMany({
       where,
-      orderBy: [{ adminUnreadCount: 'desc' }, { lastMessageAt: 'desc' }],
-      skip,
-      take: pageSize,
+      orderBy: [{ adminUnreadCount: 'desc' }, { lastMessageAt: 'desc' }, { id: 'desc' }],
+      take: pageSize + 1,
       include: {
         user: {
           select: {
@@ -78,6 +82,8 @@ export const GET = withAuth(async (req: Request) => {
       },
     }),
   ])
+  const visibleTickets = tickets.slice(0, pageSize)
+  const nextTicket = tickets[pageSize]
 
   return NextResponse.json({
     pagination: {
@@ -85,10 +91,45 @@ export const GET = withAuth(async (req: Request) => {
       pageSize,
       total,
       pageCount: Math.max(1, Math.ceil(total / pageSize)),
+      nextCursor: nextTicket ? formatSupportCursor(nextTicket) : null,
     },
-    tickets: tickets.map((ticket) => ({
+    tickets: visibleTickets.map((ticket) => ({
       ...serializeSupportTicket(ticket),
       messages: ticket.messages.map(serializeSupportMessage),
     })),
   })
 })
+
+type SupportCursor = {
+  adminUnreadCount: number
+  lastMessageAt: Date
+  id: string
+}
+
+function parseSupportCursor(raw: string | null): SupportCursor | null {
+  if (!raw) return null
+  const [adminUnreadCountRaw, lastMessageAtRaw, id] = raw.split('|')
+  const adminUnreadCount = Number(adminUnreadCountRaw)
+  const lastMessageAt = new Date(lastMessageAtRaw || '')
+  if (!Number.isInteger(adminUnreadCount) || !id || Number.isNaN(lastMessageAt.getTime())) return null
+  return { adminUnreadCount, lastMessageAt, id }
+}
+
+function buildSupportCursorWhere(cursor: SupportCursor): Prisma.SupportTicketWhereInput[] {
+  return [
+    { adminUnreadCount: { lt: cursor.adminUnreadCount } },
+    {
+      adminUnreadCount: cursor.adminUnreadCount,
+      lastMessageAt: { lt: cursor.lastMessageAt },
+    },
+    {
+      adminUnreadCount: cursor.adminUnreadCount,
+      lastMessageAt: cursor.lastMessageAt,
+      id: { lt: cursor.id },
+    },
+  ]
+}
+
+function formatSupportCursor(ticket: { adminUnreadCount: number; lastMessageAt: Date; id: string }) {
+  return `${ticket.adminUnreadCount}|${ticket.lastMessageAt.toISOString()}|${ticket.id}`
+}

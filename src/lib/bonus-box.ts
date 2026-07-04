@@ -820,7 +820,8 @@ export function applyBonusBoxEconomyGuard(
   const common = prizes.filter((prize) => rarityRank(prize.rarity) === 0)
   if (common.length > 0) return common
 
-  return [prizes.slice().sort((left, right) => rarityRank(left.rarity) - rarityRank(right.rarity))[0]]
+  const fallbackPrize = prizes.slice().sort((left, right) => rarityRank(left.rarity) - rarityRank(right.rarity))[0]
+  return fallbackPrize ? [fallbackPrize] : []
 }
 
 function canWinPrizeNow(
@@ -857,13 +858,16 @@ function openingsSinceRarityAtLeast(
 }
 
 function pickWeightedPrize(prizes: BonusBoxPrize[]) {
+  if (prizes.length === 0) {
+    throw new BonusBoxError('Нет доступных подарков', 409, 'NO_PRIZES_AVAILABLE')
+  }
   const totalWeight = prizes.reduce((sum, prize) => sum + prize.weight, 0)
   let cursor = randomInt(Math.max(1, totalWeight))
   for (const prize of prizes) {
     if (cursor < prize.weight) return prize
     cursor -= prize.weight
   }
-  return prizes[prizes.length - 1]
+  return prizes[prizes.length - 1] ?? prizes[0]!
 }
 
 function buildReel(prizes: BonusBoxPublicPrize[], winner: BonusBoxPublicPrize) {
@@ -882,7 +886,7 @@ function buildReel(prizes: BonusBoxPublicPrize[], winner: BonusBoxPublicPrize) {
   }
 
   return {
-    items: items.map((item) => item ?? pickDisplayPrize(prizes, items, 0)),
+    items: items.map((item) => item ?? pickDisplayPrize(prizes, items, 0)).filter((item): item is BonusBoxPublicPrize => Boolean(item)),
     winningIndex,
     stopOffsetRatio,
   }
@@ -930,6 +934,9 @@ function canPlaceDisplayPrize(
 }
 
 function pickVisualWeightedPrize(prizes: BonusBoxPublicPrize[]) {
+  if (prizes.length === 0) {
+    throw new BonusBoxError('Нет доступных подарков', 409, 'NO_PRIZES_AVAILABLE')
+  }
   const weighted = prizes.map((prize) => ({
     prize,
     weight: Math.max(1, Math.round(prize.weight * RARITY_VISUAL_WEIGHT[prize.rarity] * 100)),
@@ -942,7 +949,7 @@ function pickVisualWeightedPrize(prizes: BonusBoxPublicPrize[]) {
     cursor -= item.weight
   }
 
-  return weighted[weighted.length - 1].prize
+  return weighted[weighted.length - 1]?.prize ?? prizes[0]!
 }
 
 function rarityRank(rarity: BonusBoxPublicPrize['rarity']) {
@@ -1088,7 +1095,7 @@ function buildOpeningStreak(openingsCount: number) {
   const nextTarget = targets.find((target) => openingsCount < target) ?? null
 
   return {
-    current: nextTarget ? openingsCount : Math.min(openingsCount, targets[targets.length - 1]),
+    current: nextTarget ? openingsCount : Math.min(openingsCount, targets[targets.length - 1] ?? openingsCount),
     nextTarget,
     targets,
     completed: targets.filter((target) => openingsCount >= target),
@@ -1131,7 +1138,7 @@ function maskEmail(email?: string | null) {
   if (!email) return null
   const [name, domain] = email.split('@')
   if (!domain) return name
-  return `${name.slice(0, 2)}***@${domain}`
+  return `${(name || email).slice(0, 2)}***@${domain}`
 }
 
 function getWeekKey(date: Date) {

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { requireAdmin, withAuth } from '@/lib/auth/guard'
 
@@ -12,9 +13,9 @@ export const GET = withAuth(async (req: Request) => {
   const q = url.searchParams.get('q')?.trim()
   const page = Math.max(1, Number(url.searchParams.get('page') || '1') || 1)
   const pageSize = Math.min(100, Math.max(1, Number(url.searchParams.get('pageSize') || '25') || 25))
-  const skip = (page - 1) * pageSize
+  const cursor = parseCreatedAtCursor(url.searchParams.get('cursor'))
 
-  const where = q
+  const baseWhere: Prisma.UserWhereInput | undefined = q
     ? {
         OR: [
           { email: { contains: q, mode: 'insensitive' as const } },
@@ -23,14 +24,16 @@ export const GET = withAuth(async (req: Request) => {
         ],
       }
     : undefined
+  const where: Prisma.UserWhereInput | undefined = cursor
+    ? { AND: [baseWhere ?? {}, { OR: buildCreatedAtCursorWhere(cursor) }] }
+    : baseWhere
 
   const [total, users] = await prisma.$transaction([
-    prisma.user.count({ where }),
+    prisma.user.count({ where: baseWhere }),
     prisma.user.findMany({
       where,
-      orderBy: { createdAt: 'desc' },
-      skip,
-      take: pageSize,
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      take: pageSize + 1,
       select: {
         id: true,
         email: true,
@@ -51,6 +54,8 @@ export const GET = withAuth(async (req: Request) => {
       },
     }),
   ])
+  const visibleUsers = users.slice(0, pageSize)
+  const nextUser = users[pageSize]
 
   return NextResponse.json({
     pagination: {
@@ -58,8 +63,9 @@ export const GET = withAuth(async (req: Request) => {
       pageSize,
       total,
       pageCount: Math.max(1, Math.ceil(total / pageSize)),
+      nextCursor: nextUser ? formatCreatedAtCursor(nextUser) : null,
     },
-    users: users.map((user) => ({
+    users: visibleUsers.map((user) => ({
       ...user,
       subscriptions: user.subscriptions.map((subscription) => ({
         ...subscription,
@@ -70,3 +76,27 @@ export const GET = withAuth(async (req: Request) => {
     })),
   })
 })
+
+type CreatedAtCursor = {
+  createdAt: Date
+  id: string
+}
+
+function parseCreatedAtCursor(raw: string | null): CreatedAtCursor | null {
+  if (!raw) return null
+  const [createdAtRaw, id] = raw.split('|')
+  const createdAt = new Date(createdAtRaw || '')
+  if (!id || Number.isNaN(createdAt.getTime())) return null
+  return { createdAt, id }
+}
+
+function buildCreatedAtCursorWhere(cursor: CreatedAtCursor): Prisma.UserWhereInput[] {
+  return [
+    { createdAt: { lt: cursor.createdAt } },
+    { createdAt: cursor.createdAt, id: { lt: cursor.id } },
+  ]
+}
+
+function formatCreatedAtCursor(item: { createdAt: Date; id: string }) {
+  return `${item.createdAt.toISOString()}|${item.id}`
+}

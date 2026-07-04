@@ -91,5 +91,6 @@ function ipv4ToInt(ip: string) {
   if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)) {
     return null
   }
-  return (((parts[0] << 24) >>> 0) + (parts[1] << 16) + (parts[2] << 8) + parts[3]) >>> 0
+  const [first = 0, second = 0, third = 0, fourth = 0] = parts
+  return (((first << 24) >>> 0) + (second << 16) + (third << 8) + fourth) >>> 0
 }

@@ -223,8 +223,9 @@ function makeTrafficPulse(series: SeriesPoint[]) {
     date: point.date,
     bytes: safeBigInt(point.bytes),
   }))
+  const firstDay = days[0] ?? { date: new Date().toISOString(), bytes: 0n }
   const max = days.reduce((current, day) => day.bytes > current ? day.bytes : current, 0n)
-  const peak = days.reduce((current, day) => day.bytes > current.bytes ? day : current, days[0])
+  const peak = days.reduce((current, day) => day.bytes > current.bytes ? day : current, firstDay)
   const activeDays = days.filter((day) => day.bytes > 0n).length
   const total = days.reduce((sum, day) => sum + day.bytes, 0n)
   const average = activeDays > 0 ? total / BigInt(activeDays) : 0n

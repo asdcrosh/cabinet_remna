@@ -38,8 +38,9 @@ export function WelcomeOfferButton({ label, options }: { label: string; options:
   }
 
   function onPrimaryClick() {
-    if (options.length === 1) {
-      void claim(options[0].type)
+    const firstOption = options[0]
+    if (options.length === 1 && firstOption) {
+      void claim(firstOption.type)
       return
     }
     setOpen(true)

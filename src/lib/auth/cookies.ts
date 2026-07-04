@@ -2,7 +2,6 @@
 // Нам нужно httpOnly + Secure (в проде) + SameSite=Lax.
 // Параметр `req` опционален — если есть, проставим Path=/Domain привязкой к текущему.
 
-import type { ResponseCookies } from 'next/dist/compiled/@edge-runtime/cookies'
 import type { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { COOKIE_NAME, signSession, verifySession, type SessionPayload } from './jwt'

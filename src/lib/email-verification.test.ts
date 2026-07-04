@@ -133,7 +133,9 @@ describe('email verification helpers', () => {
       })
     )
 
-    const request = fetchMock.mock.calls[0][1] as { body: string }
+    const request = fetchMock.mock.calls[0]?.[1] as { body: string } | undefined
+    expect(request).toBeDefined()
+    if (!request) throw new Error('Expected fetch request')
     const body = JSON.parse(request.body)
     expect(body.subject).toBe('Подтвердите email в Remna VPN')
     expect(body.text).toContain('Остался один шаг')
