@@ -66,6 +66,7 @@ export async function syncCabinetPaymentToRemnashop(paymentId: string) {
   })
   const remnashopTransactionId = await upsertRemnashopTransaction({
     remnashopUserId,
+    remnashopSubscriptionId,
     payment: syncPayment,
   })
   await setCurrentRemnashopSubscription(remnashopUserId, remnashopSubscriptionId)
@@ -234,6 +235,7 @@ async function upsertRemnashopSubscription(input: {
     : null
   const data = pickExistingColumns(columns, {
     user_id: input.remnashopUserId,
+    plan_id: input.payment.plan.remnashopPlanId,
     user_remna_id: input.payment.user.remnawaveUuid,
     status: mapSubscriptionStatus(input.payment.subscription.status),
     expire_at: input.payment.subscription.expireAt,
@@ -255,6 +257,7 @@ async function upsertRemnashopSubscription(input: {
 
 async function upsertRemnashopTransaction(input: {
   remnashopUserId: number
+  remnashopSubscriptionId: number
   payment: PaymentForRemnashopSync
 }) {
   const columns = await tableColumns('transactions')
@@ -272,11 +275,19 @@ async function upsertRemnashopTransaction(input: {
   const planSnapshot = buildPlanSnapshot(input.payment)
   const data = pickExistingColumns(columns, {
     user_id: input.remnashopUserId,
+    subscription_id: input.remnashopSubscriptionId,
+    plan_id: input.payment.plan.remnashopPlanId,
     payment_id: paymentExternalId,
     status: 'COMPLETED',
     gateway_type: 'YOOKASSA',
     purchase_type: 'SUBSCRIPTION',
     currency: 'RUB',
+    amount: input.payment.amountKopecks,
+    amount_kopecks: input.payment.amountKopecks,
+    original_amount: input.payment.originalAmountKopecks ?? input.payment.amountKopecks,
+    original_amount_kopecks: input.payment.originalAmountKopecks ?? input.payment.amountKopecks,
+    discount_amount: input.payment.discountKopecks,
+    discount_kopecks: input.payment.discountKopecks,
     pricing,
     plan_snapshot: planSnapshot,
     created_at: input.payment.paidAt ?? input.payment.createdAt,
