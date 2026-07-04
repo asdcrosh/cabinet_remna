@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Archive, CheckCheck, Edit3, Plus, Power, TicketCheck, Trash2, UserRound } from 'lucide-react'
+import { Archive, CheckCheck, Edit3, Gift, Plus, Power, TicketCheck, Trash2, UserRound, Wand2 } from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
 import { toast } from '@/components/ui/toaster'
 import { cn } from '@/lib/cn'
@@ -12,6 +12,7 @@ import { AdminModal } from '@/components/admin/admin-modal'
 
 type PromoAudience = 'ALL' | 'NEW_USERS' | 'NO_ACTIVE_SUBSCRIPTION' | 'PERSONAL'
 type PromoAssigneeSource = 'PERSONAL' | 'BONUS_BOX' | 'WELCOME_BONUS' | 'REDEMPTION'
+type PromoOrigin = 'CREATED' | 'MY_BOX' | 'OTHER_BOX'
 
 export interface PromoCodeAssignee {
   id: string
@@ -39,6 +40,7 @@ export interface PromoCodeAdminRow {
   planIds: string[]
   planNames: string[]
   assignees: PromoCodeAssignee[]
+  origin: PromoOrigin
 }
 
 export interface PromoPlanOption {
@@ -85,6 +87,7 @@ export function PromoCodesAdmin({
   const [loading, setLoading] = useState(false)
   const [editorOpen, setEditorOpen] = useState(false)
   const [tab, setTab] = useState<'AVAILABLE' | 'USED' | 'ARCHIVE'>('AVAILABLE')
+  const [origin, setOrigin] = useState<'ALL' | PromoOrigin>('ALL')
   const [selectedIds, setSelectedIds] = useState<string[]>([])
 
   const editingPromo = useMemo(
@@ -166,6 +169,27 @@ export function PromoCodesAdmin({
     }
   }
 
+  async function updateSelectedActive(isActive: boolean) {
+    const selectedCodes = promoCodes.filter((promoCode) => selectedIds.includes(promoCode.id))
+    if (selectedCodes.length === 0) return
+    if (!window.confirm(`${isActive ? 'Включить' : 'Отключить'} выбранные промокоды (${selectedCodes.length})?`)) return
+
+    setLoading(true)
+    try {
+      const result = await apiFetch<{ updated: number }>('/api/admin/promo-codes', {
+        method: 'PATCH',
+        body: JSON.stringify({ ids: selectedIds, isActive }),
+      })
+      toast(`${isActive ? 'Включено' : 'Отключено'} промокодов: ${result.updated}`, 'success')
+      setSelectedIds([])
+      router.refresh()
+    } catch {
+      // apiFetch уже покажет toast
+    } finally {
+      setLoading(false)
+    }
+  }
+
   function startEdit(promoCode: PromoCodeAdminRow) {
     setEditingId(promoCode.id)
     setForm({
@@ -204,7 +228,10 @@ export function PromoCodesAdmin({
     }))
   }
 
-  const filteredPromoCodes = promoCodes.filter((promoCode) => promoStatus(promoCode) === tab)
+  const filteredPromoCodes = promoCodes.filter((promoCode) => (
+    promoStatus(promoCode) === tab &&
+    (origin === 'ALL' || promoCode.origin === origin)
+  ))
   const filteredIds = filteredPromoCodes.map((promoCode) => promoCode.id)
   const selectedInTab = filteredIds.filter((id) => selectedIds.includes(id))
   const allInTabSelected = filteredIds.length > 0 && selectedInTab.length === filteredIds.length
@@ -212,6 +239,11 @@ export function PromoCodesAdmin({
     result[promoStatus(promoCode)] += 1
     return result
   }, { AVAILABLE: 0, USED: 0, ARCHIVE: 0 })
+  const originCounts = promoCodes.reduce((result, promoCode) => {
+    result.ALL += 1
+    result[promoCode.origin] += 1
+    return result
+  }, { ALL: 0, CREATED: 0, MY_BOX: 0, OTHER_BOX: 0 })
 
   function toggleSelected(id: string) {
     setSelectedIds((current) =>
@@ -270,6 +302,34 @@ export function PromoCodesAdmin({
         ))}
       </div>
 
+      <div className="flex gap-1 overflow-x-auto rounded-lg border bg-white p-1 dark:bg-surface-900">
+        {([
+          ['ALL', 'Все', TicketCheck],
+          ['CREATED', 'Созданные', Wand2],
+          ['MY_BOX', 'Мои из бокса', Gift],
+          ['OTHER_BOX', 'Чужие из бокса', UserRound],
+        ] as const).map(([value, label, Icon]) => (
+          <button
+            key={value}
+            type="button"
+            onClick={() => {
+              setOrigin(value)
+              setSelectedIds([])
+            }}
+            className={cn(
+              'inline-flex min-h-10 shrink-0 items-center gap-2 rounded-md px-3 text-sm font-medium transition-colors',
+              origin === value ? 'bg-slate-950 text-white dark:bg-white dark:text-slate-950' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-white/5'
+            )}
+          >
+            <Icon className="h-4 w-4" />
+            {label}
+            <span className={cn('rounded-full px-1.5 text-xs', origin === value ? 'bg-white/15' : 'bg-slate-100 dark:bg-white/10')}>
+              {originCounts[value]}
+            </span>
+          </button>
+        ))}
+      </div>
+
       <div className="flex flex-col gap-3 rounded-lg border bg-white p-3 dark:bg-surface-900 sm:flex-row sm:items-center sm:justify-between">
         <label className="flex min-h-10 items-center gap-3 text-sm font-medium text-slate-600 dark:text-slate-300">
           <input
@@ -285,15 +345,35 @@ export function PromoCodesAdmin({
             </span>
           )}
         </label>
-        <button
-          type="button"
-          className="btn-secondary text-red-600 hover:border-red-200 hover:bg-red-50 hover:text-red-700 dark:text-red-300 dark:hover:border-red-500/30 dark:hover:bg-red-500/10"
-          onClick={() => void deleteSelectedPromoCodes()}
-          disabled={selectedIds.length === 0 || loading}
-        >
-          <Trash2 className="h-4 w-4" />
-          Удалить выбранные
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={() => void updateSelectedActive(true)}
+            disabled={selectedIds.length === 0 || loading}
+          >
+            <Power className="h-4 w-4" />
+            Включить
+          </button>
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={() => void updateSelectedActive(false)}
+            disabled={selectedIds.length === 0 || loading}
+          >
+            <Archive className="h-4 w-4" />
+            Отключить
+          </button>
+          <button
+            type="button"
+            className="btn-secondary text-red-600 hover:border-red-200 hover:bg-red-50 hover:text-red-700 dark:text-red-300 dark:hover:border-red-500/30 dark:hover:bg-red-500/10"
+            onClick={() => void deleteSelectedPromoCodes()}
+            disabled={selectedIds.length === 0 || loading}
+          >
+            <Trash2 className="h-4 w-4" />
+            Удалить выбранные
+          </button>
+        </div>
       </div>
 
       <AdminModal
@@ -461,6 +541,11 @@ export function PromoCodesAdmin({
                     {tab === 'AVAILABLE' ? 'Активен' : tab === 'USED' ? 'Использован' : 'Архив'}
                   </span>
                 </div>
+                <div className="mt-1">
+                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500 dark:bg-white/10 dark:text-slate-300">
+                    {originTitle(promoCode.origin)}
+                  </span>
+                </div>
                 <div className="mt-1 text-xl font-semibold text-emerald-600">-{promoCode.discountPercent}%</div>
               </div>
             </div>
@@ -577,6 +662,12 @@ function audienceTitle(promoCode: PromoCodeAdminRow) {
       : 'Персональный список'
   }
   return 'Все пользователи'
+}
+
+function originTitle(origin: PromoOrigin) {
+  if (origin === 'MY_BOX') return 'Мой бокс'
+  if (origin === 'OTHER_BOX') return 'Чужой бокс'
+  return 'Создан вручную'
 }
 
 function parseAllowedEmails(value: string) {

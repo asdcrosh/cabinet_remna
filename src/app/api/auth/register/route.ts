@@ -12,6 +12,7 @@ import { assertSameOrigin } from '@/lib/security'
 import { createEmailVerificationToken, sendEmailVerificationLink } from '@/lib/email-verification'
 import { generateUniqueReferralCode, normalizeReferralCode } from '@/lib/referrals'
 import { registerRemnashopEmailUser } from '@/lib/remnashop-api'
+import { findRemnashopUserByEmail } from '@/lib/remnashop-users'
 import { createAdminNotification } from '@/lib/admin-notifications'
 import { logWarn } from '@/lib/logger'
 
@@ -25,6 +26,27 @@ function neutralRegisterResponse() {
     },
     { status: 202 }
   )
+}
+
+async function linkRegisteredRemnashopUser(userId: string, email: string) {
+  try {
+    if (!process.env.REMNASHOP_DATABASE_URL) return
+    const remnashopUser = await findRemnashopUserByEmail(email)
+    if (!remnashopUser) return
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        remnashopUserId: remnashopUser.id,
+        remnashopSyncedAt: new Date(),
+        emailVerifiedAt: remnashopUser.is_email_verified ? new Date() : undefined,
+      },
+    })
+  } catch (error) {
+    logWarn('auth.register.remnashop_identity_link_deferred', {
+      userId,
+      message: error instanceof Error ? error.message : 'unknown error',
+    })
+  }
 }
 
 export async function POST(req: Request) {
@@ -118,6 +140,9 @@ export async function POST(req: Request) {
       : 'alreadyExists' in result
         ? 'already_exists'
         : 'synced'
+    if (result.configured) {
+      await linkRegisteredRemnashopUser(user.id, email)
+    }
   } catch (error) {
     remnashopSync = 'failed'
     logWarn('auth.register.remnashop_deferred', {

@@ -5,6 +5,10 @@ import { requireAdmin, withAuth } from '@/lib/auth/guard'
 import { updateAdminPromoCodeSchema } from '@/lib/auth/validation'
 import { normalizePromoCode } from '@/lib/promo-codes'
 import { writeAuditLog } from '@/lib/audit-log'
+import {
+  deactivateCabinetPromoCodesInRemnashopBestEffort,
+  syncCabinetPromoCodeToRemnashopBestEffort,
+} from '@/lib/remnashop-promo-sync'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -97,6 +101,7 @@ export const PATCH = withAuth(async (req: Request, { params }: { params: { id: s
       },
       request: req,
     })
+    await syncCabinetPromoCodeToRemnashopBestEffort(promoCode.id)
 
     return NextResponse.json({ promoCode })
   } catch (e) {
@@ -116,6 +121,12 @@ export const DELETE = withAuth(async (req: Request, { params }: { params: { id: 
   const session = await requireAdmin()
 
   try {
+    const existing = await prisma.promoCode.findUnique({
+      where: { id: params.id },
+      select: { id: true, code: true },
+    })
+    if (!existing) return NextResponse.json({ error: 'Промокод не найден' }, { status: 404 })
+    await deactivateCabinetPromoCodesInRemnashopBestEffort([existing.code])
     const deleted = await prisma.promoCode.delete({
       where: { id: params.id },
       select: { id: true, code: true },

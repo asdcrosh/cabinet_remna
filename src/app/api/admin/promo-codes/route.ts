@@ -6,6 +6,10 @@ import { adminPromoCodeSchema } from '@/lib/auth/validation'
 import { normalizePromoCode } from '@/lib/promo-codes'
 import { writeAuditLog } from '@/lib/audit-log'
 import { cleanupExpiredBonusBoxPromoCodes } from '@/lib/promo-code-cleanup'
+import {
+  deactivateCabinetPromoCodesInRemnashopBestEffort,
+  syncCabinetPromoCodeToRemnashopBestEffort,
+} from '@/lib/remnashop-promo-sync'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -51,6 +55,7 @@ export const DELETE = withAuth(async (req: Request) => {
     return NextResponse.json({ error: 'Промокоды не найдены' }, { status: 404 })
   }
 
+  await deactivateCabinetPromoCodesInRemnashopBestEffort(promoCodes.map((promoCode) => promoCode.code))
   const deleted = await prisma.promoCode.deleteMany({
     where: { id: { in: promoCodes.map((promoCode) => promoCode.id) } },
   })
@@ -67,6 +72,60 @@ export const DELETE = withAuth(async (req: Request) => {
   })
 
   return NextResponse.json({ ok: true, deleted: deleted.count })
+})
+
+export const PATCH = withAuth(async (req: Request) => {
+  const session = await requireAdmin()
+
+  let body: unknown
+  try {
+    body = await req.json()
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+  }
+
+  const ids = Array.isArray((body as { ids?: unknown })?.ids)
+    ? (body as { ids: unknown[] }).ids.filter((id): id is string => typeof id === 'string' && id.length > 0)
+    : []
+  const uniqueIds = Array.from(new Set(ids)).slice(0, 100)
+  const isActive = (body as { isActive?: unknown })?.isActive
+  if (uniqueIds.length === 0) {
+    return NextResponse.json({ error: 'Выберите промокоды' }, { status: 400 })
+  }
+  if (typeof isActive !== 'boolean') {
+    return NextResponse.json({ error: 'isActive is required' }, { status: 400 })
+  }
+
+  const promoCodes = await prisma.promoCode.findMany({
+    where: { id: { in: uniqueIds } },
+    select: { id: true, code: true },
+  })
+  if (promoCodes.length === 0) {
+    return NextResponse.json({ error: 'Промокоды не найдены' }, { status: 404 })
+  }
+
+  const updated = await prisma.promoCode.updateMany({
+    where: { id: { in: promoCodes.map((promoCode) => promoCode.id) } },
+    data: { isActive },
+  })
+
+  for (const promoCode of promoCodes) {
+    await syncCabinetPromoCodeToRemnashopBestEffort(promoCode.id)
+  }
+
+  await writeAuditLog({
+    actorId: session.uid,
+    action: 'PROMO_CODE_UPDATED',
+    message: isActive ? 'Администратор включил выбранные промокоды' : 'Администратор отключил выбранные промокоды',
+    metadata: {
+      count: updated.count,
+      promoCodes,
+      isActive,
+    },
+    request: req,
+  })
+
+  return NextResponse.json({ ok: true, updated: updated.count })
 })
 
 export const POST = withAuth(async (req: Request) => {
@@ -124,6 +183,7 @@ export const POST = withAuth(async (req: Request) => {
       },
       request: req,
     })
+    await syncCabinetPromoCodeToRemnashopBestEffort(promoCode.id)
 
     return NextResponse.json({ promoCode })
   } catch (e) {

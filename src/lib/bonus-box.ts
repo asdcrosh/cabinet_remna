@@ -5,6 +5,7 @@ import { logError } from './logger'
 import { remnawave } from './remnawave'
 import { gbToBytes } from './format'
 import { cleanupExpiredBonusBoxPromoCodes } from './promo-code-cleanup'
+import { syncCabinetPromoCodeToRemnashopBestEffort } from './remnashop-promo-sync'
 
 const DEFAULT_RUB_PER_ATTEMPT = 300
 const DEFAULT_ATTEMPT_TTL_DAYS = 30
@@ -549,6 +550,7 @@ export async function openBonusBox(userId: string): Promise<BonusBoxOpeningResul
       return {
         openingId: opening.id,
         prize,
+        promoCodeId: application.promoCodeId,
         promoCode: opening.promoCode?.code ?? null,
         promoCodeExpiresAt: opening.promoCode?.expiresAt?.toISOString() ?? null,
         remoteUpdate:
@@ -563,6 +565,9 @@ export async function openBonusBox(userId: string): Promise<BonusBoxOpeningResul
   let remoteSynced = true
   if (txResult.remoteUpdate) {
     remoteSynced = await syncPrizeToRemnawave(txResult.remoteUpdate)
+  }
+  if (txResult.promoCodeId) {
+    await syncCabinetPromoCodeToRemnashopBestEffort(txResult.promoCodeId)
   }
 
   const [remainingAttempts, prizes] = await Promise.all([

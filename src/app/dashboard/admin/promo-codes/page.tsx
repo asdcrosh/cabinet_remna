@@ -14,7 +14,7 @@ export default async function AdminPromoCodesPage({
 }: {
   searchParams?: { limit?: string }
 }) {
-  await requireAdminPage()
+  const { user } = await requireAdminPage()
   await cleanupExpiredBonusBoxPromoCodes()
   const limit = parseAdminListLimit(searchParams?.limit)
 
@@ -74,6 +74,7 @@ export default async function AdminPromoCodesPage({
       planIds: promoCode.plans.map((promoPlan) => promoPlan.planId),
       planNames: promoCode.plans.map((promoPlan) => promoPlan.plan.name),
       assignees: buildPromoCodeAssignees(promoCode),
+      origin: getPromoCodeOrigin(promoCode, user.id),
     }
   })
 
@@ -176,4 +177,14 @@ function buildPromoCodeAssignees(promoCode: PromoCodeForAssignees): PromoCodeAdm
   }
 
   return assignees
+}
+
+function getPromoCodeOrigin(
+  promoCode: PromoCodeForAssignees,
+  currentUserId: string
+): PromoCodeAdminRow['origin'] {
+  if (promoCode.bonusBoxOpenings.length === 0) return 'CREATED'
+  return promoCode.bonusBoxOpenings.some((opening) => opening.user.id === currentUserId)
+    ? 'MY_BOX'
+    : 'OTHER_BOX'
 }
