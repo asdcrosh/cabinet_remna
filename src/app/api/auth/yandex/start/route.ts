@@ -13,6 +13,7 @@ import {
 } from '@/lib/yandex-oauth'
 
 export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
 
 export async function GET(req: Request) {
   const limited = await rateLimit(req, 'yandex-oauth-start', 30, 60_000)
