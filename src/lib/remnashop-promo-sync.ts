@@ -2,6 +2,7 @@ import type { Prisma } from '@prisma/client'
 import { prisma } from './prisma'
 import { remnashopQuery } from './remnashop-db'
 import { logInfo, logWarn } from './logger'
+import { markSyncFailed, markSyncSkipped, markSyncSucceeded } from './sync-events'
 
 type RemnashopColumns = Set<string>
 
@@ -71,13 +72,23 @@ export async function syncCabinetPromoCodeToRemnashop(promoCodeId: string) {
 }
 
 export async function syncCabinetPromoCodeToRemnashopBestEffort(promoCodeId: string) {
+  const event = {
+    direction: 'CABINET_TO_REMNASHOP' as const,
+    entityType: 'promoCode',
+    entityId: promoCodeId,
+    operation: 'upsert',
+  }
   try {
     const result = await syncCabinetPromoCodeToRemnashop(promoCodeId)
     if (!result.ok && 'skipped' in result) {
+      await markSyncSkipped(event, result.skipped)
       logWarn('remnashop.promo_code_sync.skipped', { promoCodeId, reason: result.skipped })
+    } else if (result.ok) {
+      await markSyncSucceeded(event)
     }
     return result
   } catch (error) {
+    await markSyncFailed(event, error)
     logWarn('remnashop.promo_code_sync.failed', {
       promoCodeId,
       message: error instanceof Error ? error.message : 'unknown error',
@@ -106,7 +117,23 @@ export async function deactivateCabinetPromoCodesInRemnashopBestEffort(codes: st
       `,
       [uniqueCodes.map((code) => code.toUpperCase())]
     )
+    for (const code of uniqueCodes) {
+      await markSyncSucceeded({
+        direction: 'CABINET_TO_REMNASHOP',
+        entityType: 'promoCode',
+        entityId: code,
+        operation: 'deactivate',
+      })
+    }
   } catch (error) {
+    for (const code of uniqueCodes) {
+      await markSyncFailed({
+        direction: 'CABINET_TO_REMNASHOP',
+        entityType: 'promoCode',
+        entityId: code,
+        operation: 'deactivate',
+      }, error)
+    }
     logWarn('remnashop.promo_code_deactivate.failed', {
       count: uniqueCodes.length,
       message: error instanceof Error ? error.message : 'unknown error',

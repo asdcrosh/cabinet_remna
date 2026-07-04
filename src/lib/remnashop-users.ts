@@ -8,6 +8,7 @@ import { generateUniqueReferralCode } from './referrals'
 import { toRemnawaveTelegramId } from './telegram-remnawave'
 import { upsertLocalSubscriptionFromRemnawave } from './remnawave-local-sync'
 import { logWarn } from './logger'
+import { markSyncFailed, markSyncSucceeded } from './sync-events'
 
 interface RemnashopIdentityRow {
   id: number
@@ -80,6 +81,16 @@ export async function syncRemnashopUsersToCabinet(options: {
   for (const source of result.rows) {
     try {
       const row = await syncRemnashopSourceToCabinet(source, options)
+      await markSyncSucceeded({
+        direction: 'REMNASHOP_TO_CABINET',
+        entityType: 'user',
+        entityId: String(source.id),
+        operation: 'upsert',
+        metadata: {
+          userAction: row.userAction,
+          subscriptionAction: row.subscriptionAction,
+        },
+      })
       if (row.userAction === 'created') created += 1
       if (row.userAction === 'updated') updated += 1
       if (row.userAction === 'skipped') skipped += 1
@@ -87,6 +98,12 @@ export async function syncRemnashopUsersToCabinet(options: {
       if (row.subscriptionAction === 'skipped') subscriptionsSkipped += 1
       if (row.subscriptionAction === 'failed') subscriptionsFailed += 1
     } catch (error) {
+      await markSyncFailed({
+        direction: 'REMNASHOP_TO_CABINET',
+        entityType: 'user',
+        entityId: String(source.id),
+        operation: 'upsert',
+      }, error)
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
         skipped += 1
         continue

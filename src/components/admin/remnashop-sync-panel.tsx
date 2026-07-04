@@ -2,8 +2,9 @@
 
 import type { ReactNode } from 'react'
 import { useState } from 'react'
-import { AlertTriangle, CheckCircle2, RefreshCw } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, RefreshCw, RotateCcw } from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
+import { toast } from '@/components/ui/toaster'
 
 interface RemnashopPlanDiff {
   sourceId: number
@@ -51,6 +52,22 @@ interface RemnashopSyncReport {
     activeSubscriptions?: RemnashopSubscriptionDiff[]
     transactions?: RemnashopTransactionDiff[]
   }
+  syncEvents?: SyncEventRow[]
+  syncStatusCounts?: Record<string, number>
+}
+
+interface SyncEventRow {
+  id: string
+  direction: 'CABINET_TO_REMNASHOP' | 'REMNASHOP_TO_CABINET'
+  entityType: string
+  entityId: string
+  operation: string
+  status: 'PENDING' | 'SUCCEEDED' | 'FAILED' | 'SKIPPED'
+  attempts: number
+  lastError: string | null
+  nextRetryAt: string | null
+  lastSyncedAt: string | null
+  updatedAt: string
 }
 
 export function RemnashopSyncPanel() {
@@ -84,6 +101,23 @@ export function RemnashopSyncPanel() {
       setReport(result)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Не удалось выполнить синхронизацию')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function retryEvent(id: string) {
+    setLoading(true)
+    setError(null)
+    try {
+      await apiFetch('/api/admin/remnashop-sync/retry', {
+        method: 'POST',
+        body: JSON.stringify({ id }),
+      })
+      toast('Повтор синхронизации выполнен', 'success')
+      await runDryRun()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Не удалось повторить синхронизацию')
     } finally {
       setLoading(false)
     }
@@ -154,6 +188,13 @@ export function RemnashopSyncPanel() {
           )}
 
           <DiffView report={report} />
+          <SyncEventsView
+            events={report.syncEvents ?? []}
+            counts={report.syncStatusCounts ?? {}}
+            loading={loading}
+            onRetry={(id) => void retryEvent(id)}
+          />
+          <LiveCheckList />
 
           <details className="card">
             <summary className="cursor-pointer font-medium">Технические детали</summary>
@@ -164,6 +205,95 @@ export function RemnashopSyncPanel() {
         </>
       )}
     </div>
+  )
+}
+
+function LiveCheckList() {
+  const checks = [
+    'Регистрация в кабинете появляется в Remnashop',
+    'Регистрация в Remnashop появляется в кабинете',
+    'Покупка в кабинете появляется в Remnashop',
+    'Покупка в Remnashop появляется в кабинете',
+    'Промокод из кабинета появляется в Remnashop',
+    'Промокод из Remnashop появляется в кабинете',
+  ]
+
+  return (
+    <section className="card">
+      <h3 className="text-sm font-semibold">Живая проверка после деплоя</h3>
+      <div className="mt-3 grid gap-2 md:grid-cols-2">
+        {checks.map((check) => (
+          <label key={check} className="flex min-h-10 items-center gap-3 rounded-lg border px-3 text-sm">
+            <input type="checkbox" />
+            {check}
+          </label>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+function SyncEventsView({
+  events,
+  counts,
+  loading,
+  onRetry,
+}: {
+  events: SyncEventRow[]
+  counts: Record<string, number>
+  loading: boolean
+  onRetry: (id: string) => void
+}) {
+  return (
+    <section className="space-y-3">
+      <div className="grid gap-3 sm:grid-cols-4">
+        {(['FAILED', 'PENDING', 'SKIPPED', 'SUCCEEDED'] as const).map((status) => (
+          <Metric key={status} label={syncStatusLabel(status)} value={counts[status] ?? 0} />
+        ))}
+      </div>
+      <div className="overflow-hidden rounded-lg border bg-white dark:bg-surface-900">
+        <div className="border-b px-4 py-3">
+          <h3 className="text-sm font-semibold">Последние события</h3>
+        </div>
+        {events.length > 0 ? (
+          <div className="divide-y">
+            {events.map((event) => (
+              <div key={event.id} className="grid gap-3 px-4 py-3 md:grid-cols-[minmax(12rem,1fr)_8rem_minmax(12rem,1fr)_auto] md:items-center">
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-semibold">
+                    {directionLabel(event.direction)} · {entityLabel(event.entityType)}
+                  </div>
+                  <div className="mt-0.5 truncate font-mono text-xs text-slate-500">{event.entityId}</div>
+                </div>
+                <div>
+                  <span className={statusClass(event.status)}>{syncStatusLabel(event.status)}</span>
+                  <div className="mt-1 text-xs text-slate-500">попыток: {event.attempts}</div>
+                </div>
+                <div className="min-w-0 text-xs text-slate-500">
+                  {event.lastError ? (
+                    <div className="truncate text-amber-600 dark:text-amber-300" title={event.lastError}>{event.lastError}</div>
+                  ) : (
+                    <div>обновлено {formatDateTime(event.updatedAt)}</div>
+                  )}
+                  {event.nextRetryAt ? <div>retry: {formatDateTime(event.nextRetryAt)}</div> : null}
+                </div>
+                <button
+                  type="button"
+                  className="btn-secondary h-10 px-3"
+                  onClick={() => onRetry(event.id)}
+                  disabled={loading}
+                >
+                  <RotateCcw className="h-4 w-4" />
+                  Retry
+                </button>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="px-4 py-8 text-center text-sm text-slate-500">Событий синхронизации пока нет</div>
+        )}
+      </div>
+    </section>
   )
 }
 
@@ -326,6 +456,36 @@ function translateError(value: string) {
   if (value.includes('timeout')) return 'Remnashop не ответил вовремя'
   if (value.includes('password authentication')) return 'Не удалось войти в базу Remnashop'
   return value
+}
+
+function directionLabel(value: SyncEventRow['direction']) {
+  return value === 'CABINET_TO_REMNASHOP' ? 'Cabinet -> Remnashop' : 'Remnashop -> Cabinet'
+}
+
+function entityLabel(value: string) {
+  if (value === 'payment') return 'Платеж'
+  if (value === 'promoCode') return 'Промокод'
+  if (value === 'user') return 'Пользователь'
+  return value
+}
+
+function syncStatusLabel(value: string) {
+  if (value === 'FAILED') return 'Ошибки'
+  if (value === 'PENDING') return 'Ожидают'
+  if (value === 'SKIPPED') return 'Пропущены'
+  if (value === 'SUCCEEDED') return 'Успешно'
+  return value
+}
+
+function statusClass(status: SyncEventRow['status']) {
+  if (status === 'SUCCEEDED') return 'badge-active'
+  if (status === 'FAILED') return 'badge-disabled'
+  if (status === 'SKIPPED') return 'badge-limited'
+  return 'badge-disabled'
+}
+
+function formatDateTime(value: string) {
+  return new Date(value).toLocaleString('ru-RU')
 }
 
 const syncLabels: Record<string, string> = {

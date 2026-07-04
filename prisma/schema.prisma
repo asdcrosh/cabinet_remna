@@ -506,6 +506,39 @@ enum PaymentStatus {
   REFUNDED
 }
 
+model SyncEvent {
+  id          String          @id @default(cuid())
+  direction   SyncDirection
+  entityType  String
+  entityId    String
+  operation   String
+  status      SyncEventStatus @default(PENDING)
+  attempts    Int             @default(0)
+  lastError   String?
+  nextRetryAt DateTime?
+  lastSyncedAt DateTime?
+  metadata    Json?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@unique([direction, entityType, entityId, operation])
+  @@index([status, nextRetryAt, updatedAt])
+  @@index([direction, entityType, status])
+  @@index([updatedAt])
+}
+
+enum SyncDirection {
+  CABINET_TO_REMNASHOP
+  REMNASHOP_TO_CABINET
+}
+
+enum SyncEventStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  SKIPPED
+}
+
 model ReferralReward {
   id                    String               @id @default(cuid())
   referrerId            String

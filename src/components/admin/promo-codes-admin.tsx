@@ -88,6 +88,7 @@ export function PromoCodesAdmin({
   const [editorOpen, setEditorOpen] = useState(false)
   const [tab, setTab] = useState<'AVAILABLE' | 'USED' | 'ARCHIVE'>('AVAILABLE')
   const [origin, setOrigin] = useState<'ALL' | PromoOrigin>('ALL')
+  const [query, setQuery] = useState('')
   const [selectedIds, setSelectedIds] = useState<string[]>([])
 
   const editingPromo = useMemo(
@@ -228,10 +229,17 @@ export function PromoCodesAdmin({
     }))
   }
 
-  const filteredPromoCodes = promoCodes.filter((promoCode) => (
-    promoStatus(promoCode) === tab &&
-    (origin === 'ALL' || promoCode.origin === origin)
-  ))
+  const normalizedQuery = query.trim().toLowerCase()
+  const filteredPromoCodes = promoCodes.filter((promoCode) => {
+    const matchesStatus = promoStatus(promoCode) === tab
+    const matchesOrigin = origin === 'ALL' || promoCode.origin === origin
+    const matchesQuery = !normalizedQuery || [
+      promoCode.code,
+      ...promoCode.allowedEmails,
+      ...promoCode.assignees.map((assignee) => `${assignee.email} ${assignee.name ?? ''}`),
+    ].some((value) => value.toLowerCase().includes(normalizedQuery))
+    return matchesStatus && matchesOrigin && matchesQuery
+  })
   const filteredIds = filteredPromoCodes.map((promoCode) => promoCode.id)
   const selectedInTab = filteredIds.filter((id) => selectedIds.includes(id))
   const allInTabSelected = filteredIds.length > 0 && selectedInTab.length === filteredIds.length
@@ -328,6 +336,18 @@ export function PromoCodesAdmin({
             </span>
           </button>
         ))}
+      </div>
+
+      <div className="rounded-lg border bg-white p-3 dark:bg-surface-900">
+        <input
+          value={query}
+          onChange={(event) => {
+            setQuery(event.target.value)
+            setSelectedIds([])
+          }}
+          className="input"
+          placeholder="Поиск по коду, email или имени"
+        />
       </div>
 
       <div className="flex flex-col gap-3 rounded-lg border bg-white p-3 dark:bg-surface-900 sm:flex-row sm:items-center sm:justify-between">

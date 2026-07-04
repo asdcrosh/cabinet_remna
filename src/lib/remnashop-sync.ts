@@ -41,6 +41,12 @@ interface RemnashopUserStatsRow {
   with_current_subscription: string
 }
 
+interface RemnashopWriteAccessRow {
+  table_name: string
+  can_insert: boolean
+  can_update: boolean
+}
+
 interface RemnashopSubscriptionRow {
   id: number
   user_id: number
@@ -77,12 +83,13 @@ interface CabinetUserRow {
 }
 
 export async function getRemnashopSyncDryRun() {
-  const [plans, promoCodes, userStats, subscriptions, transactions] = await Promise.all([
+  const [plans, promoCodes, userStats, subscriptions, transactions, writeAccess] = await Promise.all([
     fetchRemnashopPlans(),
     fetchRemnashopPromoCodes(),
     fetchRemnashopUserStats(),
     fetchRemnashopSubscriptions(),
     fetchRemnashopTransactions(),
+    fetchRemnashopWriteAccess(),
   ])
 
   const remnaUuids = Array.from(new Set(subscriptions.map((item) => item.user_remna_id)))
@@ -196,7 +203,7 @@ export async function getRemnashopSyncDryRun() {
       cabinetMatchedSubscriptions: cabinetSubscriptionRemnaUuids.size,
       cabinetMatchedPayments: cabinetPaymentIds.size,
     },
-    warnings: buildWarnings(userStats, cabinetUsersByRemnaUuid.size, remnaUuids.length),
+    warnings: buildWarnings(userStats, cabinetUsersByRemnaUuid.size, remnaUuids.length, writeAccess),
     summary: {
       plansWouldCreate: planActions.filter((item) => item.action === 'wouldCreate').length,
       promoCodesWouldUpsert: promoActions.length,
@@ -590,13 +597,36 @@ async function fetchRemnashopTransactions() {
   return result.rows
 }
 
-function buildWarnings(userStats: RemnashopUserStatsRow, matchedCabinetUsers: number, remnashopRemnaUsers: number) {
+async function fetchRemnashopWriteAccess() {
+  const result = await remnashopQuery<RemnashopWriteAccessRow>(`
+    SELECT
+      table_name,
+      has_table_privilege(current_user, format('public.%I', table_name), 'INSERT') AS can_insert,
+      has_table_privilege(current_user, format('public.%I', table_name), 'UPDATE') AS can_update
+    FROM information_schema.tables
+    WHERE table_schema = 'public'
+      AND table_name = ANY($1::text[])
+    ORDER BY table_name
+  `, [['users', 'subscriptions', 'transactions', 'promo_codes', 'promocodes', 'coupons', 'discount_codes']])
+  return result.rows
+}
+
+function buildWarnings(
+  userStats: RemnashopUserStatsRow,
+  matchedCabinetUsers: number,
+  remnashopRemnaUsers: number,
+  writeAccess: RemnashopWriteAccessRow[]
+) {
   const warnings: string[] = []
   if (numberFromPg(userStats.with_email) === 0) {
     warnings.push('В remnashop нет email у пользователей: для импорта аккаунтов нужен Telegram login или привязка email.')
   }
   if (matchedCabinetUsers < remnashopRemnaUsers) {
     warnings.push('Часть remnashop подписок ссылается на Remnawave UUID, которых пока нет среди cabinet пользователей.')
+  }
+  const missingWriteAccess = writeAccess.filter((row) => !row.can_insert || !row.can_update)
+  if (missingWriteAccess.length > 0) {
+    warnings.push(`Для двусторонней синхронизации нужен INSERT/UPDATE в Remnashop: ${missingWriteAccess.map((row) => row.table_name).join(', ')}.`)
   }
   return warnings
 }

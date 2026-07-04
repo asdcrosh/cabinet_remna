@@ -2,6 +2,7 @@ import type { Prisma } from '@prisma/client'
 import { prisma } from './prisma'
 import { remnashopQuery } from './remnashop-db'
 import { logInfo, logWarn } from './logger'
+import { markSyncFailed, markSyncSkipped, markSyncSucceeded } from './sync-events'
 
 type RemnashopColumns = Set<string>
 
@@ -429,16 +430,26 @@ function quoteIdent(value: string) {
 }
 
 export async function syncCabinetPaymentToRemnashopBestEffort(paymentId: string) {
+  const event = {
+    direction: 'CABINET_TO_REMNASHOP' as const,
+    entityType: 'payment',
+    entityId: paymentId,
+    operation: 'upsert',
+  }
   try {
     const result = await syncCabinetPaymentToRemnashop(paymentId)
     if (!result.ok && 'skipped' in result) {
+      await markSyncSkipped(event, result.skipped)
       logWarn('remnashop.reverse_sync.skipped', {
         paymentId,
         reason: result.skipped,
       })
+    } else if (result.ok) {
+      await markSyncSucceeded(event)
     }
     return result
   } catch (error) {
+    await markSyncFailed(event, error)
     await markPaymentRemnashopSyncFailed(
       paymentId,
       error instanceof Error ? error.message : 'unknown remnashop reverse sync error'
