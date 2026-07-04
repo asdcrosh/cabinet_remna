@@ -4,15 +4,12 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
 import { apiFetch } from '@/lib/api-client'
+import { loginSchema, type LoginInput } from '@/lib/auth/validation'
 import { toast } from '@/components/ui/toaster'
 import { CheckCircle2, Eye, EyeOff, RefreshCw } from 'lucide-react'
 import { YandexAuthButton } from './yandex-auth-button'
-
-interface LoginInput {
-  email: string
-  password: string
-}
 
 export function LoginForm({ yandexEnabled = false }: { yandexEnabled?: boolean }) {
   const router = useRouter()
@@ -21,6 +18,7 @@ export function LoginForm({ yandexEnabled = false }: { yandexEnabled?: boolean }
   const verified = search.get('verified')
   const yandexError = search.get('yandex_error')
   const { register, handleSubmit, watch, formState: { errors, isSubmitting } } = useForm<LoginInput>({
+    resolver: zodResolver(loginSchema),
     defaultValues: { email: '', password: '' },
   })
   const [serverError, setServerError] = useState<string | null>(null)
@@ -103,7 +101,7 @@ export function LoginForm({ yandexEnabled = false }: { yandexEnabled?: boolean }
           type="email"
           autoComplete="email"
           className="input"
-          {...register('email', { required: 'Введите email' })}
+          {...register('email')}
         />
         {errors.email && <p className="text-xs text-red-600 mt-1">{errors.email.message}</p>}
       </div>
@@ -120,7 +118,7 @@ export function LoginForm({ yandexEnabled = false }: { yandexEnabled?: boolean }
             type={showPassword ? 'text' : 'password'}
             autoComplete="current-password"
             className="input pr-11"
-            {...register('password', { required: 'Введите пароль' })}
+            {...register('password')}
           />
           <button
             type="button"

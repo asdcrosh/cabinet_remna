@@ -3,18 +3,12 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
 import { apiFetch } from '@/lib/api-client'
+import { registerSchema, type RegisterInput } from '@/lib/auth/validation'
 import { toast } from '@/components/ui/toaster'
 import { CheckCircle2, Eye, EyeOff, Mail } from 'lucide-react'
 import { YandexAuthButton } from './yandex-auth-button'
-
-interface RegisterInput {
-  email: string
-  password: string
-  name?: string
-  referralCode?: string
-  agreeToTerms: boolean
-}
 
 export function RegisterForm({
   initialReferralCode = '',
@@ -26,6 +20,7 @@ export function RegisterForm({
   const router = useRouter()
   const { register, handleSubmit, watch, formState: { errors, isSubmitting } } =
     useForm<RegisterInput>({
+      resolver: zodResolver(registerSchema),
       defaultValues: { email: '', password: '', name: '', referralCode: initialReferralCode, agreeToTerms: false as any },
     })
   const [serverError, setServerError] = useState<string | null>(null)
@@ -104,10 +99,7 @@ export function RegisterForm({
           type="email"
           autoComplete="email"
           className="input"
-          {...register('email', {
-            required: 'Введите email',
-            pattern: { value: /^[^@\s]+@[^@\s]+\.[^@\s]+$/, message: 'Некорректный email' },
-          })}
+          {...register('email')}
         />
         {errors.email && <p className="text-xs text-red-600 mt-1">{errors.email.message}</p>}
       </div>
@@ -120,16 +112,7 @@ export function RegisterForm({
           autoComplete="name"
           maxLength={40}
           placeholder="Артем"
-          {...register('name', {
-            setValueAs: (value) => String(value ?? '').trim().replace(/\s+/g, ' '),
-            validate: {
-              minLength: (value) => !value || value.length >= 2 || 'Минимум 2 символа',
-              maxLength: (value) => !value || value.length <= 40 || 'Максимум 40 символов',
-              chars: (value) =>
-                !value || /^[\p{L}][\p{L}\s.'-]*[\p{L}]$/u.test(value) || 'Только буквы, пробел, дефис, точка и апостроф',
-              separators: (value) => !value || !/[-.'\s]{2,}/.test(value) || 'Уберите повторяющиеся разделители',
-            },
-          })}
+          {...register('name')}
         />
         {errors.name && <p className="text-xs text-red-600 mt-1">{errors.name.message}</p>}
       </div>
@@ -151,12 +134,7 @@ export function RegisterForm({
             type={showPassword ? 'text' : 'password'}
             autoComplete="new-password"
             className="input pr-11"
-            {...register('password', {
-              required: 'Введите пароль',
-              minLength: { value: 8, message: 'Минимум 8 символов' },
-              validate: (v) =>
-                (/[A-Za-z]/.test(v) && /[0-9]/.test(v)) || 'Должна быть латиница и цифра',
-            })}
+            {...register('password')}
           />
           <button
             type="button"
@@ -178,7 +156,7 @@ export function RegisterForm({
         <input
           type="checkbox"
           className="mt-0.5"
-          {...register('agreeToTerms', { required: true })}
+          {...register('agreeToTerms')}
         />
         <span>
           Согласен с{' '}

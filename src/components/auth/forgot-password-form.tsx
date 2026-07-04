@@ -2,14 +2,13 @@
 
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
 import { apiFetch } from '@/lib/api-client'
-
-interface ForgotPasswordInput {
-  email: string
-}
+import { forgotPasswordSchema, type ForgotPasswordInput } from '@/lib/auth/validation'
 
 export function ForgotPasswordForm() {
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<ForgotPasswordInput>({
+    resolver: zodResolver(forgotPasswordSchema),
     defaultValues: { email: '' },
   })
   const [sent, setSent] = useState(false)
@@ -36,7 +35,7 @@ export function ForgotPasswordForm() {
           type="email"
           autoComplete="email"
           className="input"
-          {...register('email', { required: 'Введите email' })}
+          {...register('email')}
         />
         {errors.email && <p className="mt-1 text-xs text-red-600">{errors.email.message}</p>}
       </div>

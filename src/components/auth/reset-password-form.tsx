@@ -3,25 +3,24 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
 import { Eye, EyeOff } from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
+import { resetPasswordSchema, type ResetPasswordInput } from '@/lib/auth/validation'
 import { toast } from '@/components/ui/toaster'
-
-interface ResetPasswordInput {
-  password: string
-}
 
 export function ResetPasswordForm({ token }: { token: string }) {
   const router = useRouter()
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<ResetPasswordInput>({
-    defaultValues: { password: '' },
+    resolver: zodResolver(resetPasswordSchema),
+    defaultValues: { token, password: '' },
   })
   const [showPassword, setShowPassword] = useState(false)
 
   const onSubmit = handleSubmit(async (values) => {
     await apiFetch('/api/auth/reset-password', {
       method: 'POST',
-      body: JSON.stringify({ token, password: values.password }),
+      body: JSON.stringify(values),
     })
     toast('Пароль обновлён', 'success')
     router.push('/login')
@@ -37,14 +36,7 @@ export function ResetPasswordForm({ token }: { token: string }) {
             type={showPassword ? 'text' : 'password'}
             autoComplete="new-password"
             className="input pr-11"
-            {...register('password', {
-              required: 'Введите новый пароль',
-              minLength: { value: 8, message: 'Минимум 8 символов' },
-              pattern: {
-                value: /^(?=.*[A-Za-z])(?=.*\d).+$/,
-                message: 'Нужны латинская буква и цифра',
-              },
-            })}
+            {...register('password')}
           />
           <button
             type="button"

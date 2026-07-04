@@ -2,25 +2,34 @@
 
 import { useState } from 'react'
 import { useForm, type UseFormRegisterReturn } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { z } from 'zod'
 import { apiFetch } from '@/lib/api-client'
+import { newPasswordSchema } from '@/lib/auth/validation'
 import { toast } from '@/components/ui/toaster'
 import { Eye, EyeOff } from 'lucide-react'
 
-interface ChangePasswordInput {
-  oldPassword: string
-  newPassword: string
-  confirm: string
-}
+const changePasswordFormSchema = z
+  .object({
+    oldPassword: z.string().min(1, 'Введите текущий пароль').max(128, 'Максимум 128 символов'),
+    newPassword: newPasswordSchema,
+    confirm: z.string().min(1, 'Подтвердите пароль'),
+  })
+  .refine((value) => value.newPassword === value.confirm, {
+    path: ['confirm'],
+    message: 'Пароли не совпадают',
+  })
+
+type ChangePasswordFormInput = z.infer<typeof changePasswordFormSchema>
 
 export function ChangePasswordForm() {
-  const { register, handleSubmit, watch, reset, formState: { errors, isSubmitting } } =
-    useForm<ChangePasswordInput>({
+  const { register, handleSubmit, reset, formState: { errors, isSubmitting } } =
+    useForm<ChangePasswordFormInput>({
+      resolver: zodResolver(changePasswordFormSchema),
       defaultValues: { oldPassword: '', newPassword: '', confirm: '' },
     })
   const [serverError, setServerError] = useState<string | null>(null)
   const [visible, setVisible] = useState(false)
-  const newPassword = watch('newPassword')
-
   const onSubmit = handleSubmit(async (values) => {
     setServerError(null)
     try {
@@ -44,7 +53,7 @@ export function ChangePasswordForm() {
           autoComplete="current-password"
           visible={visible}
           toggle={() => setVisible((value) => !value)}
-          register={register('oldPassword', { required: 'Введите текущий пароль' })}
+          register={register('oldPassword')}
         />
         {errors.oldPassword && (
           <p className="mt-1 text-xs text-red-600 dark:text-red-300">{errors.oldPassword.message}</p>
@@ -57,12 +66,7 @@ export function ChangePasswordForm() {
           autoComplete="new-password"
           visible={visible}
           toggle={() => setVisible((value) => !value)}
-          register={register('newPassword', {
-            required: 'Введите новый пароль',
-            minLength: { value: 8, message: 'Минимум 8 символов' },
-            validate: (v) =>
-              (/[A-Za-z]/.test(v) && /[0-9]/.test(v)) || 'Должна быть латиница и цифра',
-          })}
+          register={register('newPassword')}
         />
         {errors.newPassword && (
           <p className="mt-1 text-xs text-red-600 dark:text-red-300">{errors.newPassword.message}</p>
@@ -75,10 +79,7 @@ export function ChangePasswordForm() {
           autoComplete="new-password"
           visible={visible}
           toggle={() => setVisible((value) => !value)}
-          register={register('confirm', {
-            required: 'Подтвердите пароль',
-            validate: (v) => v === newPassword || 'Пароли не совпадают',
-          })}
+          register={register('confirm')}
         />
         {errors.confirm && (
           <p className="mt-1 text-xs text-red-600 dark:text-red-300">{errors.confirm.message}</p>
