@@ -11,7 +11,7 @@ const mocks = vi.hoisted(() => {
       createMany: vi.fn(),
       findMany: vi.fn(),
       findFirst: vi.fn(),
-      update: vi.fn(),
+      updateMany: vi.fn(),
     },
     bonusBoxPrize: {
       findMany: vi.fn(),
@@ -145,7 +145,7 @@ describe('openBonusBox', () => {
     })
     mocks.prisma.bonusBoxPrize.findMany.mockResolvedValue([attemptPrize])
     mocks.prisma.bonusBoxPrize.updateMany.mockResolvedValue({ count: 1 })
-    mocks.prisma.bonusBoxAttempt.update.mockResolvedValue({})
+    mocks.prisma.bonusBoxAttempt.updateMany.mockResolvedValue({ count: 1 })
     mocks.prisma.bonusBoxAttempt.createMany.mockImplementation(({ data }) => Promise.resolve({ count: data.length }))
     mocks.prisma.bonusBoxOpening.create.mockResolvedValue({ id: 'opening-1', promoCode: null })
     mocks.prisma.bonusBoxOpening.findMany.mockResolvedValue([])
@@ -179,7 +179,7 @@ describe('openBonusBox', () => {
     })
     mocks.prisma.bonusBoxPrize.findMany.mockResolvedValue([emptyPrize])
     mocks.prisma.bonusBoxPrize.updateMany.mockResolvedValue({ count: 1 })
-    mocks.prisma.bonusBoxAttempt.update.mockResolvedValue({})
+    mocks.prisma.bonusBoxAttempt.updateMany.mockResolvedValue({ count: 1 })
     mocks.prisma.bonusBoxOpening.create.mockResolvedValue({ id: 'opening-1', promoCode: null })
     mocks.prisma.bonusBoxOpening.findMany.mockResolvedValue([])
     mocks.prisma.bonusBoxAttempt.count.mockResolvedValue(0)
@@ -208,7 +208,7 @@ describe('openBonusBox', () => {
     })
     mocks.prisma.bonusBoxPrize.findMany.mockResolvedValue([promoPrize])
     mocks.prisma.bonusBoxPrize.updateMany.mockResolvedValue({ count: 1 })
-    mocks.prisma.bonusBoxAttempt.update.mockResolvedValue({})
+    mocks.prisma.bonusBoxAttempt.updateMany.mockResolvedValue({ count: 1 })
     mocks.prisma.promoCode.create.mockResolvedValue({
       id: 'promo-1',
       code: 'BOX-WELCOME',
@@ -245,7 +245,7 @@ describe('openBonusBox', () => {
     })
     mocks.prisma.bonusBoxPrize.findMany.mockResolvedValue([daysPrize])
     mocks.prisma.bonusBoxPrize.updateMany.mockResolvedValue({ count: 1 })
-    mocks.prisma.bonusBoxAttempt.update.mockResolvedValue({})
+    mocks.prisma.bonusBoxAttempt.updateMany.mockResolvedValue({ count: 1 })
     mocks.prisma.bonusBoxOpening.create.mockResolvedValue({ id: 'opening-1', promoCode: null })
     mocks.prisma.bonusBoxOpening.findMany.mockResolvedValue([])
     mocks.prisma.bonusBoxAttempt.count.mockResolvedValue(0)
@@ -289,7 +289,7 @@ describe('openBonusBox', () => {
     mocks.prisma.bonusBoxPrize.findMany.mockResolvedValue([commonPrize, rarePrize])
     mocks.prisma.bonusBoxOpening.findMany.mockResolvedValue(history(['COMMON', 'COMMON']))
     mocks.prisma.bonusBoxPrize.updateMany.mockResolvedValue({ count: 1 })
-    mocks.prisma.bonusBoxAttempt.update.mockResolvedValue({})
+    mocks.prisma.bonusBoxAttempt.updateMany.mockResolvedValue({ count: 1 })
     mocks.prisma.bonusBoxAttempt.createMany.mockResolvedValue({ count: 2 })
     mocks.prisma.bonusBoxOpening.create.mockResolvedValue({ id: 'opening-1', promoCode: null })
     mocks.prisma.bonusBoxAttempt.count.mockResolvedValue(0)
@@ -300,6 +300,28 @@ describe('openBonusBox', () => {
     expect(mocks.prisma.bonusBoxPrize.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({ where: expect.objectContaining({ id: 'rare-prize' }) })
     )
+  })
+
+  it('rejects a box attempt that was already claimed concurrently', async () => {
+    const emptyPrize = prize('empty-prize', 'COMMON', 'NO_PRIZE', 0)
+    mocks.prisma.bonusBoxAttempt.findFirst.mockResolvedValue({ id: 'attempt-1', source: 'PAYMENT', sourceKey: 'payment-1:1' })
+    mocks.prisma.user.findUnique.mockResolvedValue({
+      id: 'user-1',
+      remnawaveUuid: 'rw-1',
+      subscriptions: [
+        {
+          id: 'sub-1',
+          expireAt: new Date('2026-07-24T00:00:00.000Z'),
+          trafficLimitBytes: null,
+        },
+      ],
+    })
+    mocks.prisma.bonusBoxAttempt.updateMany.mockResolvedValue({ count: 0 })
+    mocks.prisma.bonusBoxPrize.findMany.mockResolvedValue([emptyPrize])
+
+    await expect(openBonusBox('user-1')).rejects.toMatchObject({ code: 'ATTEMPT_ALREADY_USED' })
+    expect(mocks.prisma.bonusBoxPrize.updateMany).not.toHaveBeenCalled()
+    expect(mocks.prisma.bonusBoxOpening.create).not.toHaveBeenCalled()
   })
 })
 

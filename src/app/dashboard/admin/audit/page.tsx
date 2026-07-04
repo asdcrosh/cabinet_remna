@@ -20,6 +20,7 @@ const ACTION_LABELS: Record<AuditAction, string> = {
   GIFT_CERTIFICATE_CREATED: 'Сертификат создан',
   GIFT_CERTIFICATE_UPDATED: 'Сертификат изменен',
   PAYMENT_SYNCED: 'Платеж',
+  ADMIN_NOTIFICATIONS_UPDATED: 'Уведомления',
   SYSTEM_BACKUP_CREATED: 'Бэкап',
 }
 

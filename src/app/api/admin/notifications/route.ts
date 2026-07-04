@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server'
-import { requireStaff, withAuth } from '@/lib/auth/guard'
+import { requireAdmin, requireStaff, withAuth } from '@/lib/auth/guard'
 import { prisma } from '@/lib/prisma'
 import { serializeAdminNotification } from '@/lib/admin-notifications'
+import { writeAuditLog } from '@/lib/audit-log'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -46,8 +47,28 @@ export const PATCH = withAuth(async () => {
   return NextResponse.json({ ok: true })
 })
 
-export const DELETE = withAuth(async () => {
-  await requireStaff()
-  await prisma.adminNotification.deleteMany({})
-  return NextResponse.json({ ok: true })
+export const DELETE = withAuth(async (req: Request) => {
+  const session = await requireAdmin()
+  const notifications = await prisma.adminNotification.findMany({
+    where: { reads: { none: { userId: session.uid } } },
+    select: { id: true },
+    take: 1000,
+  })
+
+  if (notifications.length > 0) {
+    await prisma.adminNotificationRead.createMany({
+      data: notifications.map((item) => ({ notificationId: item.id, userId: session.uid })),
+      skipDuplicates: true,
+    })
+  }
+
+  await writeAuditLog({
+    actorId: session.uid,
+    action: 'ADMIN_NOTIFICATIONS_UPDATED',
+    message: 'Администратор очистил уведомления для своего аккаунта',
+    metadata: { count: notifications.length },
+    request: req,
+  })
+
+  return NextResponse.json({ ok: true, archived: notifications.length })
 })

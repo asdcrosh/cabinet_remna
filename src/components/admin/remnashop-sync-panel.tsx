@@ -95,9 +95,10 @@ export function RemnashopSyncPanel() {
     setLoading(true)
     setError(null)
     try {
-      const result = await apiFetch<RemnashopSyncReport>(
-        `/api/admin/remnashop-sync?apply=1&promoCodes=${includePromoCodes ? '1' : '0'}`
-      )
+      const result = await apiFetch<RemnashopSyncReport>('/api/admin/remnashop-sync', {
+        method: 'POST',
+        body: JSON.stringify({ promoCodes: includePromoCodes }),
+      })
       setReport(result)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Не удалось выполнить синхронизацию')

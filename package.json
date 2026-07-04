@@ -9,7 +9,7 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "check:env": "node scripts/check-env.mjs",
-    "validate": "npm run lint && npm run typecheck && npm run check:env",
+    "validate": "npm run lint && npm run typecheck && npm run check:env && npm run test",
     "test": "vitest run",
     "worker:payments": "tsx scripts/payment-reconciler.ts",
     "postinstall": "prisma generate",

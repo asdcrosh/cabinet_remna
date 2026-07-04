@@ -480,6 +480,14 @@ export async function openBonusBox(userId: string): Promise<BonusBoxOpeningResul
         throw new BonusBoxError('Нужна активная VPN-подписка', 403, 'NO_ACTIVE_SUBSCRIPTION')
       }
 
+      const claimedAttempt = await tx.bonusBoxAttempt.updateMany({
+        where: { id: attempt.id, usedAt: null },
+        data: { usedAt: now },
+      })
+      if (claimedAttempt.count !== 1) {
+        throw new BonusBoxError('Открытие уже использовано', 409, 'ATTEMPT_ALREADY_USED')
+      }
+
       const prizes = await tx.bonusBoxPrize.findMany({
         where: {
           isActive: true,
@@ -522,11 +530,6 @@ export async function openBonusBox(userId: string): Promise<BonusBoxOpeningResul
       if (claimedPrize.count === 0) {
         throw new BonusBoxError('Подарок уже разобрали, попробуйте ещё раз', 409, 'PRIZE_LIMIT_REACHED')
       }
-
-      await tx.bonusBoxAttempt.update({
-        where: { id: attempt.id },
-        data: { usedAt: now },
-      })
 
       const application = await applyPrizeInTransaction(tx, {
         userId,

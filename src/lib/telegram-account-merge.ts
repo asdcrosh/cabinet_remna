@@ -31,6 +31,7 @@ export async function mergeTechnicalTelegramAccount(input: {
 
   if (!target) throw new TelegramAccountMergeError('IDENTITY_CONFLICT')
   if (!source || source.id === target.id) return { merged: false as const }
+  if (source.role !== 'USER') throw new TelegramAccountMergeError('PRIVILEGED_SOURCE')
 
   const isTechnicalSource =
     source.role === 'USER' &&

@@ -2,10 +2,17 @@ import { NextResponse } from 'next/server'
 import { resetPasswordSchema } from '@/lib/auth/validation'
 import { rateLimit } from '@/lib/rate-limit'
 import { resetPasswordByToken } from '@/lib/password-reset'
+import { assertSameOrigin } from '@/lib/security'
 
 export const runtime = 'nodejs'
 
 export async function POST(req: Request) {
+  try {
+    assertSameOrigin(req)
+  } catch {
+    return NextResponse.json({ error: 'Invalid request origin' }, { status: 403 })
+  }
+
   const limited = await rateLimit(req, 'reset-password', 30, 60_000)
   if (!limited.ok) {
     return NextResponse.json(

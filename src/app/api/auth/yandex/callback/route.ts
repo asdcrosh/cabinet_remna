@@ -78,6 +78,10 @@ export async function GET(req: Request) {
 }
 
 async function findOrCreateYandexUser(profile: YandexProfile) {
+  if (!profile.emailVerified) {
+    throw new Error('yandex_email_not_verified')
+  }
+
   const existingAccount = await prisma.oAuthAccount.findUnique({
     where: {
       provider_providerUserId: {
@@ -96,6 +100,13 @@ async function findOrCreateYandexUser(profile: YandexProfile) {
     if (!emailOwner && existingAccount.user.email.toLowerCase() !== profile.email.toLowerCase()) {
       emailOwner = await createYandexUser(profile, { createOAuthAccount: false })
     }
+    if (
+      emailOwner &&
+      emailOwner.id !== existingAccount.user.id &&
+      !canLinkYandexToExistingEmailUser(emailOwner, profile)
+    ) {
+      throw new Error('yandex_email_owner_requires_step_up')
+    }
     const user = emailOwner ?? existingAccount.user
 
     await prisma.oAuthAccount.update({
@@ -113,7 +124,7 @@ async function findOrCreateYandexUser(profile: YandexProfile) {
       return prisma.user.update({
         where: { id: user.id },
         data: {
-          emailVerifiedAt: user.emailVerifiedAt ?? new Date(),
+          emailVerifiedAt: user.emailVerifiedAt ?? (profile.emailVerified ? new Date() : undefined),
           agreedToTermsAt: user.agreedToTermsAt ?? new Date(),
           name: user.name ?? profile.name,
         },
@@ -125,6 +136,9 @@ async function findOrCreateYandexUser(profile: YandexProfile) {
 
   const existingUser = await prisma.user.findUnique({ where: { email: profile.email } })
   if (existingUser) {
+    if (!canLinkYandexToExistingEmailUser(existingUser, profile)) {
+      throw new Error('yandex_existing_email_requires_step_up')
+    }
     return prisma.user.update({
       where: { id: existingUser.id },
       data: {
@@ -146,6 +160,13 @@ async function findOrCreateYandexUser(profile: YandexProfile) {
   }
 
   return createYandexUser(profile, { createOAuthAccount: true })
+}
+
+function canLinkYandexToExistingEmailUser(
+  user: { emailVerifiedAt: Date | null },
+  profile: YandexProfile
+) {
+  return profile.emailVerified && Boolean(user.emailVerifiedAt)
 }
 
 async function createYandexUser(

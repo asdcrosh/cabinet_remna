@@ -1,0 +1,39 @@
+name: Quality
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    env:
+      CI: true
+      DATABASE_URL: postgresql://cabinet:cabinet@localhost:5432/cabinet?schema=public
+      DIRECT_URL: postgresql://cabinet:cabinet@localhost:5432/cabinet?schema=public
+      JWT_SECRET: ci-jwt-secret-with-enough-length
+      NEXTAUTH_SECRET: ci-nextauth-secret-with-enough-length
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+      APP_URL: http://localhost:3000
+      ALLOWED_ORIGINS: http://localhost:3000
+      YOOKASSA_SHOP_ID: ci-shop
+      YOOKASSA_SECRET_KEY: ci-secret
+      YOOKASSA_WEBHOOK_ALLOWED_IPS: 127.0.0.1
+      REMNAWAVE_BASE_URL: https://remnawave.example
+      REMNAWAVE_TOKEN: ci-token
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+      - run: npx prisma validate
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run test
+      - run: npm run build
