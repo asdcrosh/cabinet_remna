@@ -5,10 +5,11 @@ import { requireAdminPage } from '@/lib/auth/admin-page'
 import { formatPrice } from '@/lib/format'
 import { PageHeader } from '@/components/dashboard/page-header'
 import { PaymentBadge, ProvisioningBadge } from '@/components/admin/admin-badges'
-import { PaymentSyncButton, RecoveryActionButton } from '@/components/admin/recovery-actions'
+import { PaymentSyncButton, RecoveryActionButton, RemnashopPaymentRetryButton } from '@/components/admin/recovery-actions'
 import { LazyListLoader } from '@/components/admin/lazy-list-loader'
 import { ADMIN_LIST_PAGE_SIZE, parseAdminListLimit } from '@/lib/admin-list'
 import { AdminFilterSubmitButton } from '@/components/admin/admin-filter-submit-button'
+import { describeSyncError } from '@/lib/sync-error'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Платежи — Админка' }
@@ -117,6 +118,7 @@ export default async function AdminPaymentsPage({
           <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
             {payments.map((payment) => {
               const needsRetry = payment.status === 'SUCCEEDED' && !payment.subscriptionProvisionedAt
+              const needsRemnashopRetry = payment.status === 'SUCCEEDED' && Boolean(payment.subscriptionProvisionedAt) && !payment.remnashopSyncedAt
               const canCheckPayment = Boolean(payment.yookassaId) && payment.status !== 'SUCCEEDED'
               return (
                 <tr key={payment.id}>
@@ -142,8 +144,11 @@ export default async function AdminPaymentsPage({
                         <div className="max-w-[180px] truncate text-xs text-slate-500">{payment.provisioningError}</div>
                       )}
                       {payment.subscriptionProvisionedAt && (
-                        <div className={payment.remnashopSyncedAt ? 'text-xs text-emerald-600 dark:text-emerald-300' : 'max-w-[180px] truncate text-xs text-amber-600 dark:text-amber-300'}>
-                          {payment.remnashopSyncedAt ? 'Remnashop синхр.' : payment.remnashopSyncError || 'Remnashop ждёт sync'}
+                        <div
+                          className={payment.remnashopSyncedAt ? 'text-xs text-emerald-600 dark:text-emerald-300' : 'max-w-[180px] truncate text-xs text-amber-600 dark:text-amber-300'}
+                          title={humanSyncError(payment.remnashopSyncError)}
+                        >
+                          {payment.remnashopSyncedAt ? 'Remnashop синхр.' : humanSyncError(payment.remnashopSyncError)}
                         </div>
                       )}
                     </div>
@@ -153,6 +158,8 @@ export default async function AdminPaymentsPage({
                       {canCheckPayment && <PaymentSyncButton paymentId={payment.id} />}
                       {needsRetry ? (
                         <RecoveryActionButton paymentId={payment.id} />
+                      ) : needsRemnashopRetry ? (
+                        <RemnashopPaymentRetryButton paymentId={payment.id} />
                       ) : payment.subscriptionId ? (
                         <Link href={`/dashboard/admin/users?q=${encodeURIComponent(payment.user.email)}`} className="btn-secondary min-w-[112px] px-3 text-xs">
                           Пользователь
@@ -170,6 +177,7 @@ export default async function AdminPaymentsPage({
       <div className={payments.length > 0 ? 'space-y-3 xl:hidden' : 'hidden'}>
         {payments.map((payment) => {
           const needsRetry = payment.status === 'SUCCEEDED' && !payment.subscriptionProvisionedAt
+          const needsRemnashopRetry = payment.status === 'SUCCEEDED' && Boolean(payment.subscriptionProvisionedAt) && !payment.remnashopSyncedAt
           const canCheckPayment = Boolean(payment.yookassaId) && payment.status !== 'SUCCEEDED'
           return (
             <article key={payment.id} className="overflow-hidden rounded-lg border bg-white shadow-sm dark:bg-surface-900">
@@ -213,13 +221,15 @@ export default async function AdminPaymentsPage({
                 )}
                 {payment.subscriptionProvisionedAt && !payment.remnashopSyncedAt && (
                   <div className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:bg-amber-500/10 dark:text-amber-100">
-                    Remnashop: {payment.remnashopSyncError || 'ожидает фоновой синхронизации'}
+                    Remnashop: {humanSyncError(payment.remnashopSyncError)}
                   </div>
                 )}
                 <div className="action-row">
                   {canCheckPayment && <PaymentSyncButton paymentId={payment.id} />}
                   {needsRetry ? (
                     <RecoveryActionButton paymentId={payment.id} />
+                  ) : needsRemnashopRetry ? (
+                    <RemnashopPaymentRetryButton paymentId={payment.id} />
                   ) : payment.subscriptionId ? (
                     <Link href={`/dashboard/admin/users?q=${encodeURIComponent(payment.user.email)}`} className="btn-secondary min-w-[112px] px-3 text-xs">
                       Пользователь
@@ -235,6 +245,11 @@ export default async function AdminPaymentsPage({
       <LazyListLoader loaded={payments.length} total={total} step={ADMIN_LIST_PAGE_SIZE} />
     </div>
   )
+}
+
+function humanSyncError(value: string | null) {
+  if (!value) return 'Remnashop ждёт sync'
+  return describeSyncError(new Error(value))
 }
 
 function PaymentStat({ title, value, tone }: { title: string; value: number; tone: 'amber' | 'emerald' | 'red' | 'slate' }) {

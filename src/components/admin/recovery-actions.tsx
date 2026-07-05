@@ -81,3 +81,33 @@ export function PaymentSyncButton({ paymentId }: { paymentId: string }) {
     </button>
   )
 }
+
+export function RemnashopPaymentRetryButton({ paymentId }: { paymentId: string }) {
+  const router = useRouter()
+  const [loading, setLoading] = useState(false)
+
+  return (
+    <button
+      className="btn-secondary min-w-[112px] px-3 text-xs"
+      disabled={loading}
+      onClick={async () => {
+        setLoading(true)
+        try {
+          await apiFetch('/api/admin/remnashop-sync/retry-payment', {
+            method: 'POST',
+            body: JSON.stringify({ paymentId }),
+          })
+          toast('Платёж отправлен в Remnashop', 'success')
+          router.refresh()
+        } catch {
+          // apiFetch уже покажет toast
+        } finally {
+          setLoading(false)
+        }
+      }}
+    >
+      <RefreshCw className="h-3.5 w-3.5" />
+      {loading ? 'Sync...' : 'Retry sync'}
+    </button>
+  )
+}
