@@ -30,20 +30,26 @@ export async function markSyncSkipped(input: SyncEventInput, reason: string) {
 export async function markSyncFailed(input: SyncEventInput, error: unknown) {
   if (!prisma.syncEvent) return
   const message = error instanceof Error ? error.message : String(error || 'unknown sync error')
+  const where = uniqueWhere(input)
+  const existing = await prisma.syncEvent.findUnique({
+    where,
+    select: { attempts: true },
+  }).catch(() => null)
+  const attempts = (existing?.attempts ?? 0) + 1
   await prisma.syncEvent.upsert({
-    where: uniqueWhere(input),
+    where,
     create: {
       ...input,
       status: 'FAILED',
-      attempts: 1,
+      attempts,
       lastError: message.slice(0, 1000),
-      nextRetryAt: computeNextRetryAt(1),
+      nextRetryAt: computeNextRetryAt(attempts),
     },
     update: {
       status: 'FAILED',
-      attempts: { increment: 1 },
+      attempts,
       lastError: message.slice(0, 1000),
-      nextRetryAt: computeNextRetryAtExpression(),
+      nextRetryAt: computeNextRetryAt(attempts),
       ...(input.metadata ? { metadata: input.metadata } : {}),
     },
   }).catch((eventError) => {
@@ -104,8 +110,4 @@ function uniqueWhere(input: SyncEventInput) {
 function computeNextRetryAt(attempts: number) {
   const delayMinutes = Math.min(120, Math.max(1, 2 ** Math.min(attempts, 6)))
   return new Date(Date.now() + delayMinutes * 60 * 1000)
-}
-
-function computeNextRetryAtExpression() {
-  return computeNextRetryAt(2)
 }

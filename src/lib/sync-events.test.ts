@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const mocks = vi.hoisted(() => ({
   prisma: {
     syncEvent: {
+      findUnique: vi.fn(),
       upsert: vi.fn(),
     },
   },
@@ -22,6 +23,7 @@ const input = {
 describe('sync events', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mocks.prisma.syncEvent.findUnique.mockResolvedValue(null)
     mocks.prisma.syncEvent.upsert.mockResolvedValue({})
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-07-04T10:00:00.000Z'))
@@ -75,8 +77,24 @@ describe('sync events', () => {
         }),
         update: expect.objectContaining({
           status: 'FAILED',
-          attempts: { increment: 1 },
+          attempts: 1,
           lastError: 'boom',
+          nextRetryAt: new Date('2026-07-04T10:02:00.000Z'),
+        }),
+      })
+    )
+  })
+
+  it('backs off from the stored attempts count', async () => {
+    mocks.prisma.syncEvent.findUnique.mockResolvedValue({ attempts: 5 })
+
+    await markSyncFailed(input, new Error('boom'))
+
+    expect(mocks.prisma.syncEvent.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: expect.objectContaining({
+          attempts: 6,
+          nextRetryAt: new Date('2026-07-04T11:04:00.000Z'),
         }),
       })
     )

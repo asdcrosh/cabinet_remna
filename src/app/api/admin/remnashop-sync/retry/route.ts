@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAdmin, withAuth } from '@/lib/auth/guard'
-import { syncCabinetPaymentToRemnashopBestEffort } from '@/lib/remnashop-reverse-sync'
-import { syncCabinetPromoCodeToRemnashopBestEffort } from '@/lib/remnashop-promo-sync'
+import { syncCabinetPaymentToRemnashop } from '@/lib/remnashop-reverse-sync'
+import { syncCabinetPromoCodeToRemnashop } from '@/lib/remnashop-promo-sync'
 import { syncRemnashopUserToCabinet, syncRemnashopUsersToCabinet } from '@/lib/remnashop-users'
 import { markSyncFailed, markSyncPending, markSyncSucceeded } from '@/lib/sync-events'
 import { writeAuditLog } from '@/lib/audit-log'
@@ -67,14 +67,14 @@ async function retryEvent(event: {
   entityId: string
 }) {
   if (event.direction === 'CABINET_TO_REMNASHOP' && event.entityType === 'payment') {
-    const result = await syncCabinetPaymentToRemnashopBestEffort(event.entityId)
-    if (!result.ok) throw new Error('Payment sync did not complete')
+    const result = await syncCabinetPaymentToRemnashop(event.entityId)
+    if (!result.ok) throw new Error('skipped' in result ? result.skipped : 'Payment sync did not complete')
     return result
   }
 
   if (event.direction === 'CABINET_TO_REMNASHOP' && event.entityType === 'promoCode') {
-    const result = await syncCabinetPromoCodeToRemnashopBestEffort(event.entityId)
-    if (!result.ok) throw new Error('Promo code sync did not complete')
+    const result = await syncCabinetPromoCodeToRemnashop(event.entityId)
+    if (!result.ok) throw new Error('skipped' in result ? result.skipped : 'Promo code sync did not complete')
     return result
   }
 

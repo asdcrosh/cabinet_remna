@@ -230,6 +230,9 @@ async function upsertRemnashopSubscription(input: {
   payment: PaymentForRemnashopSync
 }) {
   const columns = await tableColumns('subscriptions')
+  if (columns.has('plan_id') && input.payment.plan.remnashopPlanId == null) {
+    throw new Error('remnashop plan is not linked to cabinet plan')
+  }
   const snapshot = buildPlanSnapshot(input.payment)
   const existingId = columns.has('plan_snapshot')
     ? await findRowByCabinetPayment('subscriptions', input.payment.id)
@@ -239,6 +242,7 @@ async function upsertRemnashopSubscription(input: {
     plan_id: input.payment.plan.remnashopPlanId,
     user_remna_id: input.payment.user.remnawaveUuid,
     status: mapSubscriptionStatus(input.payment.subscription.status),
+    is_trial: false,
     expire_at: input.payment.subscription.expireAt,
     traffic_limit: input.payment.plan.trafficLimitGb ?? 0,
     device_limit: input.payment.plan.deviceLimit,

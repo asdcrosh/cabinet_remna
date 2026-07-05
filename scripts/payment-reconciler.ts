@@ -121,15 +121,34 @@ async function retryRemnashopReverseSync() {
     take: remnashopReverseSyncBatchSize,
     select: { id: true },
   })
+  const retryablePaymentIds = await filterRetryableRemnashopPaymentIds(payments.map((payment) => payment.id))
 
-  for (const payment of payments) {
+  for (const paymentId of retryablePaymentIds) {
     if (stopped) break
-    const result = await syncCabinetPaymentToRemnashopBestEffort(payment.id)
+    const result = await syncCabinetPaymentToRemnashopBestEffort(paymentId)
     if (!result.ok) {
       const reason = 'error' in result ? result.error : result.skipped
-      logError('remnashop_reverse_sync.payment_failed', reason, { paymentId: payment.id })
+      logError('remnashop_reverse_sync.payment_failed', reason, { paymentId })
     }
   }
+}
+
+async function filterRetryableRemnashopPaymentIds(paymentIds: string[]) {
+  if (paymentIds.length === 0) return []
+  const now = new Date()
+  const delayed = await prisma.syncEvent.findMany({
+    where: {
+      direction: 'CABINET_TO_REMNASHOP',
+      entityType: 'payment',
+      entityId: { in: paymentIds },
+      operation: 'upsert',
+      status: 'FAILED',
+      nextRetryAt: { gt: now },
+    },
+    select: { entityId: true },
+  })
+  const delayedIds = new Set(delayed.map((event) => event.entityId))
+  return paymentIds.filter((paymentId) => !delayedIds.has(paymentId))
 }
 
 async function notifyExpiringSubscriptions() {
