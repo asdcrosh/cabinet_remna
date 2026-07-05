@@ -261,7 +261,7 @@ enum WelcomeBonusType {
 model AdminNotification {
   id          String   @id @default(cuid())
   type        String
-  severity    String   @default("INFO")
+  severity    AdminNotificationSeverity @default(INFO)
   dedupeKey   String?  @unique
   title       String
   body        String
@@ -276,6 +276,13 @@ model AdminNotification {
   @@index([type, createdAt])
   @@index([severity, createdAt])
   @@index([createdAt])
+}
+
+enum AdminNotificationSeverity {
+  INFO
+  SUCCESS
+  WARNING
+  ERROR
 }
 
 model AdminNotificationRead {
@@ -311,7 +318,7 @@ model BroadcastCampaign {
   id                String   @id @default(cuid())
   title             String
   body              String
-  segment           String
+  segment           BroadcastSegment
   inactiveDays      Int?
   channels          String[] @default([])
   actionHref        String?
@@ -337,6 +344,15 @@ model BroadcastCampaign {
 
   @@index([createdAt])
   @@index([createdById, createdAt])
+}
+
+enum BroadcastSegment {
+  ALL
+  ACTIVE
+  NO_ACTIVE
+  EXPIRED
+  NEVER_PURCHASED
+  INACTIVE_N_DAYS
 }
 
 model BroadcastDelivery {
@@ -505,7 +521,7 @@ model Payment {
 
   // Данные ЮKassa
   yookassaId      String? @unique
-  yookassaStatus  String? // pending / waiting_for_capture / succeeded / canceled
+  yookassaStatus  YookassaPaymentStatus?
   confirmationUrl String? // URL для редиректа пользователя
 
   status                    PaymentStatus @default(PENDING)
@@ -534,7 +550,7 @@ model Payment {
   @@index([createdAt, id])
   @@index([status, createdAt])
   @@index([status, subscriptionProvisionedAt, createdAt])
-  @@index([status, subscriptionProvisionedAt, remnashopSyncedAt, updatedAt])
+  @@index([status, subscriptionProvisionedAt, remnashopSyncedAt, updatedAt], map: "Payment_status_subscriptionProvisionedAt_remnashopSyncedAt_upda")
   @@index([promoCodeId])
 }
 
@@ -543,6 +559,13 @@ enum PaymentStatus {
   SUCCEEDED
   CANCELED
   REFUNDED
+}
+
+enum YookassaPaymentStatus {
+  pending
+  waiting_for_capture
+  succeeded
+  canceled
 }
 
 model SyncEvent {
@@ -1011,5 +1034,8 @@ enum AuditAction {
   GIFT_CERTIFICATE_UPDATED
   PAYMENT_SYNCED
   ADMIN_NOTIFICATIONS_UPDATED
+  ADMIN_BONUS_ATTEMPTS_GRANTED
+  ADMIN_SUPPORT_UPDATED
+  REMNASHOP_SYNC_RUN
   SYSTEM_BACKUP_CREATED
 }

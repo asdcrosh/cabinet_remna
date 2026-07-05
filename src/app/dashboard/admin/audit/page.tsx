@@ -22,6 +22,9 @@ const ACTION_LABELS: Record<AuditAction, string> = {
   GIFT_CERTIFICATE_UPDATED: 'Сертификат изменен',
   PAYMENT_SYNCED: 'Платеж',
   ADMIN_NOTIFICATIONS_UPDATED: 'Уведомления',
+  ADMIN_BONUS_ATTEMPTS_GRANTED: 'Бонусы',
+  ADMIN_SUPPORT_UPDATED: 'Поддержка',
+  REMNASHOP_SYNC_RUN: 'Remnashop sync',
   SYSTEM_BACKUP_CREATED: 'Бэкап',
 }
 

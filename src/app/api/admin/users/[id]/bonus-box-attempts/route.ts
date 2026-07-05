@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { BonusBoxError, grantManualBonusBoxAttempts } from '@/lib/bonus-box'
 import { requireSuperAdmin, withAuth } from '@/lib/auth/guard'
 import { notifyBonusGranted } from '@/lib/notifications'
+import { writeAuditLog } from '@/lib/audit-log'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -34,6 +35,18 @@ export const POST = withAuth(async (req: Request, { params }: { params: Promise<
       attemptsCount: parsed.data.attemptsCount,
     })
     await notifyBonusGranted({ userId: id, attemptsCount: parsed.data.attemptsCount })
+    await writeAuditLog({
+      actorId: session.uid,
+      targetId: id,
+      action: 'ADMIN_BONUS_ATTEMPTS_GRANTED',
+      message: `Выданы попытки подарочного бокса: ${result.granted}`,
+      metadata: {
+        requested: parsed.data.attemptsCount,
+        granted: result.granted,
+        availableAttempts: result.attemptsCount,
+      },
+      request: req,
+    })
     return NextResponse.json(result)
   } catch (error) {
     if (error instanceof BonusBoxError) {

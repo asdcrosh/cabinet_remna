@@ -9,6 +9,20 @@ on:
 jobs:
   quality:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: cabinet
+          POSTGRES_PASSWORD: cabinet
+          POSTGRES_DB: cabinet
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U cabinet -d cabinet"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
     env:
       CI: true
       DATABASE_URL: postgresql://cabinet:cabinet@localhost:5432/cabinet?schema=public
@@ -33,6 +47,11 @@ jobs:
 
       - run: npm ci
       - run: npx prisma validate
+      - name: Check Prisma migration drift
+        run: npx prisma migrate diff --from-migrations prisma/migrations --to-schema-datamodel prisma/schema.prisma --shadow-database-url "$DIRECT_URL" --exit-code
+      - name: npm audit report
+        run: npm audit --audit-level=high
+        continue-on-error: true
       - run: npm run lint
       - run: npm run typecheck
       - run: npm run test

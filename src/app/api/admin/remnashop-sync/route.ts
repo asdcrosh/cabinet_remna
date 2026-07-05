@@ -3,6 +3,7 @@ import { requireAdmin, withAuth } from '@/lib/auth/guard'
 import { getRemnashopSyncDryRun, syncRemnashopCatalog } from '@/lib/remnashop-sync'
 import { syncRemnashopUsersToCabinet } from '@/lib/remnashop-users'
 import { prisma } from '@/lib/prisma'
+import { writeAuditLog } from '@/lib/audit-log'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -19,7 +20,7 @@ export const GET = withAuth(async () => {
 })
 
 export const POST = withAuth(async (req: Request) => {
-  await requireAdmin()
+  const session = await requireAdmin()
 
   const body = (await req.json().catch(() => null)) as { promoCodes?: unknown } | null
   const includePromoCodes = body?.promoCodes !== false
@@ -39,9 +40,29 @@ export const POST = withAuth(async (req: Request) => {
         subscriptionsFailed: users.subscriptionsFailed,
       },
     }
+    await writeAuditLog({
+      actorId: session.uid,
+      action: 'REMNASHOP_SYNC_RUN',
+      message: 'Запущена ручная синхронизация Remnashop',
+      metadata: {
+        includePromoCodes,
+        counts: reportBase.counts,
+      },
+      request: req,
+    })
     return NextResponse.json(await withSyncEvents(reportBase))
   } catch (e) {
     const message = e instanceof Error ? e.message : 'remnashop sync failed'
+    await writeAuditLog({
+      actorId: session.uid,
+      action: 'REMNASHOP_SYNC_RUN',
+      message: 'Ручная синхронизация Remnashop завершилась ошибкой',
+      metadata: {
+        includePromoCodes,
+        error: message.slice(0, 1000),
+      },
+      request: req,
+    })
     return NextResponse.json({ error: message }, { status: 500 })
   }
 })

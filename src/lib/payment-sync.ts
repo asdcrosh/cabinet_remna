@@ -3,6 +3,7 @@ import { logError } from './logger'
 import { notifyPaymentCanceled, notifyPaymentStuck } from './notifications'
 import { provisionPaymentSubscription } from './provisioning'
 import { cancelPayment, getPayment } from './yookassa'
+import type { PaymentStatus as YooKassaPaymentStatus } from './yookassa'
 
 const DEFAULT_PENDING_TTL_SECONDS = 600
 
@@ -245,7 +246,7 @@ async function cancelPendingPayment(payment: PendingPaymentForCancel, reason: st
     return 'canceled' as const
   }
 
-  let remoteStatus: string | null = null
+  let remoteStatus: YooKassaPaymentStatus | null = null
   try {
     const remotePayment = await getPayment(payment.yookassaId)
     remoteStatus = remotePayment.status
@@ -271,7 +272,10 @@ async function cancelPendingPayment(payment: PendingPaymentForCancel, reason: st
       }
     } catch {
       const message = error instanceof Error ? error.message : 'payment cancellation failed'
-      remoteStatus = remoteStatus ?? `cancel_failed: ${message.slice(0, 240)}`
+      logError('payment_sync.remote_status_after_cancel_failed', error, {
+        paymentId: payment.id,
+        message,
+      })
     }
   }
 
@@ -280,7 +284,7 @@ async function cancelPendingPayment(payment: PendingPaymentForCancel, reason: st
   return 'canceled' as const
 }
 
-async function cancelLocalPayment(paymentId: string, yookassaStatus: string | null) {
+async function cancelLocalPayment(paymentId: string, yookassaStatus: YooKassaPaymentStatus | null) {
   await prisma.$transaction([
     prisma.payment.update({
       where: { id: paymentId },

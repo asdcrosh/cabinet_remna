@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireStaff, withAuth } from '@/lib/auth/guard'
 import { notifySupportReply } from '@/lib/notifications'
+import { writeAuditLog } from '@/lib/audit-log'
 import {
   createSupportMessageSchema,
   serializeSupportMessage,
@@ -103,7 +104,7 @@ export const POST = withAuth(async (req: Request, { params }: { params: Promise<
 
   const ticket = await prisma.supportTicket.findUnique({
     where: { id },
-    select: { id: true, status: true },
+    select: { id: true, status: true, userId: true },
   })
   if (!ticket) {
     return NextResponse.json({ error: 'Обращение не найдено.' }, { status: 404 })
@@ -141,12 +142,25 @@ export const POST = withAuth(async (req: Request, { params }: { params: Promise<
   })
 
   await notifySupportReply({ ticketId: ticket.id, messageId: message.id })
+  await writeAuditLog({
+    actorId: session.uid,
+    targetId: ticket.userId,
+    action: 'ADMIN_SUPPORT_UPDATED',
+    message: 'Администратор ответил в обращении',
+    metadata: {
+      ticketId: ticket.id,
+      messageId: message.id,
+      fromStatus: ticket.status,
+      toStatus: 'WAITING_USER',
+    },
+    request: req,
+  })
 
   return NextResponse.json({ message: serializeSupportMessage(message) }, { status: 201 })
 })
 
 export const PATCH = withAuth(async (req: Request, { params }: { params: Promise<{ id: string }> }) => {
-  await requireStaff()
+  const session = await requireStaff()
   const { id } = await params
 
   let body: unknown
@@ -161,12 +175,32 @@ export const PATCH = withAuth(async (req: Request, { params }: { params: Promise
     return NextResponse.json({ error: 'Некорректный статус обращения.', details: parsed.error.flatten() }, { status: 400 })
   }
 
+  const before = await prisma.supportTicket.findUnique({
+    where: { id },
+    select: { id: true, status: true, userId: true },
+  })
+  if (!before) {
+    return NextResponse.json({ error: 'Обращение не найдено.' }, { status: 404 })
+  }
+
   const ticket = await prisma.supportTicket.update({
     where: { id },
     data: {
       status: parsed.data.status,
       closedAt: parsed.data.status === 'CLOSED' ? new Date() : null,
     },
+  })
+  await writeAuditLog({
+    actorId: session.uid,
+    targetId: before.userId,
+    action: 'ADMIN_SUPPORT_UPDATED',
+    message: `Статус обращения изменён: ${before.status} → ${ticket.status}`,
+    metadata: {
+      ticketId: ticket.id,
+      fromStatus: before.status,
+      toStatus: ticket.status,
+    },
+    request: req,
   })
 
   return NextResponse.json({ ticket: serializeSupportTicket(ticket) })
