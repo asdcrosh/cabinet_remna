@@ -4,6 +4,7 @@ import { getRemnashopSyncDryRun, syncRemnashopCatalog } from '@/lib/remnashop-sy
 import { syncRemnashopUsersToCabinet } from '@/lib/remnashop-users'
 import { prisma } from '@/lib/prisma'
 import { writeAuditLog } from '@/lib/audit-log'
+import { describeSyncError } from '@/lib/sync-error'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -165,8 +166,14 @@ function groupSyncIssues(events: Array<{
 function normalizeIssueReason(reason: string | null) {
   const value = reason?.trim()
   if (!value) return 'Причина не записана'
-  if (value.includes('is_trial')) return 'В Remnashop не хватает значения is_trial для subscriptions'
+  if (value.includes('internal_squads')) return 'В Remnashop обязательное поле internal_squads для подписок'
+  if (value.includes('is_trial')) return 'В Remnashop обязательное поле is_trial для подписок'
+  if (/permission denied/i.test(value)) return describeSyncError(new Error(value))
+  if (value === 'remnashop promo code schema is not recognized') {
+    return 'Не распознана таблица промокодов Remnashop'
+  }
   if (value.includes('not configured')) return 'Не настроено подключение'
+  if (value === 'remnashop user not found') return 'Пользователь ещё не связан с Remnashop'
   if (value.includes('not found')) return 'Связанная запись не найдена'
   if (value.includes('not recognized')) return 'Схема таблицы не распознана'
   return value.length > 180 ? `${value.slice(0, 180)}...` : value

@@ -4,7 +4,8 @@ import { getBrandName } from './branding'
 import { renderActionEmail } from './email-template'
 import { prisma } from './prisma'
 import { createAdminNotification } from './admin-notifications'
-import { logError } from './logger'
+import { logError, logWarn } from './logger'
+import { remnawave } from './remnawave'
 
 const RENEW_PATH = '/dashboard/plans?intent=renew'
 const SUBSCRIPTION_PATH = '/dashboard/subscription'
@@ -25,6 +26,7 @@ type NotifyUserInput = {
   emailSubject?: string
   emailText?: string
   emailHtml?: string
+  emailDeliveryMode?: 'always' | 'fallback'
   inApp?: boolean
 }
 
@@ -58,40 +60,50 @@ export async function notifyUser(input: NotifyUserInput) {
     })
   }
 
-  const [telegram, email] = await Promise.all([
-    user.telegramId && input.telegramText
-      ? sendWithDedupe({
-          userId: user.id,
-          type: input.type,
-          channel: 'TELEGRAM',
-          dedupeKey: input.dedupeKey,
-          send: () =>
-            sendTelegramMessage({
-              chatId: user.telegramId!,
-              text: input.telegramText!,
-              imageUrl: input.telegramImageUrl,
-              actionUrl: input.telegramActionUrl,
-              actionLabel: input.telegramActionLabel,
-              actionOpenInTelegram: input.telegramActionOpenInTelegram,
-            }),
-        })
-      : Promise.resolve('skipped' as NotifyResult),
-    user.emailVerifiedAt && isRealEmail(user.email) && input.emailSubject && input.emailText && input.emailHtml
-      ? sendWithDedupe({
-          userId: user.id,
-          type: input.type,
-          channel: 'EMAIL',
-          dedupeKey: input.dedupeKey,
-          send: () =>
-            sendEmail({
-              to: user.email,
-              subject: input.emailSubject!,
-              text: input.emailText!,
-              html: input.emailHtml!,
-            }),
-        })
-      : Promise.resolve('skipped' as NotifyResult),
-  ])
+  const telegram = user.telegramId && input.telegramText
+    ? await sendWithDedupe({
+        userId: user.id,
+        type: input.type,
+        channel: 'TELEGRAM',
+        dedupeKey: input.dedupeKey,
+        send: () =>
+          sendTelegramMessage({
+            chatId: user.telegramId!,
+            text: input.telegramText!,
+            imageUrl: input.telegramImageUrl,
+            actionUrl: input.telegramActionUrl,
+            actionLabel: input.telegramActionLabel,
+            actionOpenInTelegram: input.telegramActionOpenInTelegram,
+          }),
+      })
+    : 'skipped' as NotifyResult
+
+  const emailAllowed =
+    user.emailVerifiedAt &&
+    isRealEmail(user.email) &&
+    input.emailSubject &&
+    input.emailText &&
+    input.emailHtml
+  const emailMode = input.emailDeliveryMode ?? 'always'
+  const shouldSendEmail = Boolean(emailAllowed) && (
+    emailMode === 'always' || telegram === 'skipped' || telegram === 'failed'
+  )
+
+  const email = shouldSendEmail
+    ? await sendWithDedupe({
+        userId: user.id,
+        type: input.type,
+        channel: 'EMAIL',
+        dedupeKey: input.dedupeKey,
+        send: () =>
+          sendEmail({
+            to: user.email,
+            subject: input.emailSubject!,
+            text: input.emailText!,
+            html: input.emailHtml!,
+          }),
+      })
+    : 'skipped' as NotifyResult
 
   return { telegram, email }
 }
@@ -100,7 +112,7 @@ export async function notifyPaymentSucceeded(paymentId: string) {
   const payment = await prisma.payment.findUnique({
     where: { id: paymentId },
     include: {
-      user: { select: { id: true, name: true } },
+      user: { select: { id: true, name: true, remnawaveUsername: true } },
       plan: { select: { name: true, durationDays: true, trafficLimitGb: true, deviceLimit: true } },
       subscription: { select: { startAt: true, expireAt: true } },
     },
@@ -120,6 +132,9 @@ export async function notifyPaymentSucceeded(paymentId: string) {
   const appUrl = getAppUrl()
   const amount = formatRubles(payment.amountKopecks)
   const planName = payment.plan?.name ?? 'тариф'
+  const subscriptionUrl = await getSubscriptionUrl(payment.user.remnawaveUsername)
+  const dashboardSubscriptionUrl = `${appUrl}${SUBSCRIPTION_PATH}`
+  const qrUrl = subscriptionUrl ? `${appUrl}/api/qr?text=${encodeURIComponent(subscriptionUrl)}` : null
   const isPaid = payment.amountKopecks > 0
   const isRenewal = isPaid && previousSucceededPayments > 0
   const expireText = payment.subscription?.expireAt ? `до ${formatDate(payment.subscription.expireAt)}` : null
@@ -157,15 +172,36 @@ export async function notifyPaymentSucceeded(paymentId: string) {
     telegramActionLabel: 'Открыть подписку',
     telegramActionOpenInTelegram: true,
     emailSubject: `${title} в ${getBrandName()}`,
-    emailText: `${body}\n\nОткрыть кабинет: ${appUrl}${SUBSCRIPTION_PATH}`,
-    emailHtml: renderNotificationEmail({
-      eyebrow: 'Подписка',
+    emailText: buildPaymentSuccessEmailText({
+      title,
+      body,
+      planName,
+      amount,
+      durationDays: payment.plan?.durationDays ?? null,
+      trafficLimitGb: payment.plan?.trafficLimitGb ?? null,
+      deviceLimit: payment.plan?.deviceLimit ?? null,
+      expireAt: payment.subscription?.expireAt ?? null,
+      subscriptionUrl,
+      dashboardSubscriptionUrl,
+      qrUrl,
+      appUrl,
+    }),
+    emailHtml: renderPaymentSuccessEmail({
       title,
       lead: body,
-      ctaLabel: 'Открыть подписку',
-      ctaUrl: `${appUrl}${SUBSCRIPTION_PATH}`,
       greetingName: payment.user.name,
+      planName,
+      amount,
+      durationDays: payment.plan?.durationDays ?? null,
+      trafficLimitGb: payment.plan?.trafficLimitGb ?? null,
+      deviceLimit: payment.plan?.deviceLimit ?? null,
+      expireAt: payment.subscription?.expireAt ?? null,
+      subscriptionUrl,
+      dashboardSubscriptionUrl,
+      qrUrl,
+      appUrl,
     }),
+    emailDeliveryMode: 'fallback',
   })
 
   await createAdminNotification({
@@ -552,6 +588,112 @@ function renderNotificationEmail(input: {
     expiry: 'Уведомление отправлено автоматически.',
     securityNote: 'Если вопрос уже решён, дополнительных действий не требуется.',
   })
+}
+
+function renderPaymentSuccessEmail(input: {
+  title: string
+  lead: string
+  greetingName?: string | null
+  planName: string
+  amount: string
+  durationDays: number | null
+  trafficLimitGb: number | null
+  deviceLimit: number | null
+  expireAt: Date | null
+  subscriptionUrl: string | null
+  dashboardSubscriptionUrl: string
+  qrUrl: string | null
+  appUrl: string
+}) {
+  const primaryUrl = input.subscriptionUrl ?? input.dashboardSubscriptionUrl
+  const primaryLabel = input.subscriptionUrl ? 'Подключить VPN' : 'Открыть подписку'
+  const rows: Array<[string, string]> = [
+    ['Тариф', input.planName],
+    ['Срок', input.durationDays ? formatDurationDays(input.durationDays) : 'активен'],
+    ['Трафик', input.trafficLimitGb ? `${input.trafficLimitGb} ГБ` : 'без лимита'],
+    ['Устройства', input.deviceLimit ? `до ${input.deviceLimit}` : 'по тарифу'],
+    ['Оплачено', input.amount],
+    ['Действует до', input.expireAt ? formatDate(input.expireAt) : 'уже доступна в кабинете'],
+  ]
+  const links = [
+    `Подписка в кабинете: ${input.dashboardSubscriptionUrl}`,
+    input.subscriptionUrl ? `Прямая ссылка подписки: ${input.subscriptionUrl}` : null,
+    input.qrUrl ? `QR-код: ${input.qrUrl}` : null,
+    `Устройства: ${input.appUrl}/dashboard/devices`,
+    `Помощь с подключением: ${input.appUrl}/dashboard/support`,
+  ].filter((item): item is string => Boolean(item))
+
+  return renderActionEmail({
+    eyebrow: 'Оплата прошла',
+    title: input.title,
+    lead: input.lead,
+    greetingName: input.greetingName,
+    body: [
+      'Подписка активна. Ниже данные тарифа и ссылки для подключения.',
+      '',
+      ...rows.map(([label, value]) => `${label}: ${value}`),
+      '',
+      'Быстрые ссылки:',
+      ...links.map((link) => `- ${link}`),
+    ].join('\n'),
+    ctaLabel: primaryLabel,
+    ctaUrl: primaryUrl,
+    expiry: input.expireAt
+      ? `Подписка действует до ${formatDate(input.expireAt)}.`
+      : 'Подписка уже доступна в личном кабинете.',
+    securityNote: input.subscriptionUrl
+      ? 'Ссылка подписки даёт доступ к подключению. Не пересылайте это письмо посторонним.'
+      : 'Ссылка подписки появится в кабинете сразу после обновления данных Remnawave.',
+  })
+}
+
+function buildPaymentSuccessEmailText(input: {
+  title: string
+  body: string
+  planName: string
+  amount: string
+  durationDays: number | null
+  trafficLimitGb: number | null
+  deviceLimit: number | null
+  expireAt: Date | null
+  subscriptionUrl: string | null
+  dashboardSubscriptionUrl: string
+  qrUrl: string | null
+  appUrl: string
+}) {
+  return [
+    input.title,
+    '',
+    input.body,
+    '',
+    `Тариф: ${input.planName}`,
+    `Срок: ${input.durationDays ? formatDurationDays(input.durationDays) : 'активен'}`,
+    `Трафик: ${input.trafficLimitGb ? `${input.trafficLimitGb} ГБ` : 'без лимита'}`,
+    `Устройства: ${input.deviceLimit ? `до ${input.deviceLimit}` : 'по тарифу'}`,
+    `Оплачено: ${input.amount}`,
+    `Действует до: ${input.expireAt ? formatDate(input.expireAt) : 'уже доступна в кабинете'}`,
+    '',
+    `Подписка в кабинете: ${input.dashboardSubscriptionUrl}`,
+    input.subscriptionUrl ? `Прямая ссылка подписки: ${input.subscriptionUrl}` : null,
+    input.qrUrl ? `QR-код: ${input.qrUrl}` : null,
+    `Устройства: ${input.appUrl}/dashboard/devices`,
+    `Помощь с подключением: ${input.appUrl}/dashboard/support`,
+  ].filter((line): line is string => line !== null).join('\n')
+}
+
+async function getSubscriptionUrl(remnawaveUsername: string | null) {
+  if (!remnawaveUsername) return null
+
+  try {
+    const data = await remnawave.getSubscriptionByUsername(remnawaveUsername)
+    return data.response.subscriptionUrl || null
+  } catch (error) {
+    logWarn('notifications.payment_success_subscription_url_failed', {
+      remnawaveUsername,
+      message: error instanceof Error ? error.message : 'unknown error',
+    })
+    return null
+  }
 }
 
 function isRealEmail(email: string) {

@@ -243,6 +243,7 @@ async function upsertRemnashopSubscription(input: {
     user_remna_id: input.payment.user.remnawaveUuid,
     status: mapSubscriptionStatus(input.payment.subscription.status),
     is_trial: false,
+    internal_squads: input.payment.plan.activeInternalSquads ?? [],
     expire_at: input.payment.subscription.expireAt,
     traffic_limit: input.payment.plan.trafficLimitGb ?? 0,
     device_limit: input.payment.plan.deviceLimit,
@@ -423,6 +424,7 @@ function mapSubscriptionStatus(status: string) {
 }
 
 function toDbValue(value: unknown) {
+  if (Array.isArray(value)) return value
   if (value && typeof value === 'object' && !(value instanceof Date)) {
     return JSON.stringify(value)
   }

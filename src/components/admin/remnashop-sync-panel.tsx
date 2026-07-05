@@ -598,8 +598,20 @@ function formatDateTime(value: string) {
 }
 
 function humanIssueReason(value: string) {
+  if (value.includes('internal_squads')) {
+    return 'При записи платежей Remnashop требует internal_squads. Код теперь отправляет squads тарифа или пустой список, после retry эта ошибка должна уйти.'
+  }
   if (value.includes('is_trial')) {
-    return 'В старой базе Remnashop у части подписок нет обязательного поля is_trial. Такие записи надо дописать дефолтом или обновить схему Remnashop.'
+    return 'Remnashop требует is_trial для подписок. Код отправляет false; если ошибка останется, значит в старой записи/триггере Remnashop нужно поставить дефолт.'
+  }
+  if (value.includes('не хватает прав')) {
+    return 'У пользователя базы Remnashop нет прав на запись промокодов. Нужно выдать INSERT/UPDATE/DELETE/SELECT на таблицу промокодов и таблицу связей с тарифами.'
+  }
+  if (value.includes('таблица промокодов')) {
+    return 'Кабинет не понял структуру промокодов Remnashop. Нужно проверить реальные названия таблицы и колонок промокодов в базе Remnashop.'
+  }
+  if (value.includes('Пользователь ещё не связан')) {
+    return 'Платёж нельзя отправить в Remnashop, пока пользователь не найден или не создан там. После синхронизации пользователей нажмите retry по платежам.'
   }
   if (value === 'Причина не записана') return value
   return value

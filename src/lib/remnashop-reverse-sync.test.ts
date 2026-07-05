@@ -66,6 +66,7 @@ const payment = {
     durationDays: 30,
     trafficLimitGb: 0,
     deviceLimit: 3,
+    activeInternalSquads: ['squad-1'],
   },
   subscription: {
     id: 'sub-1',
@@ -92,6 +93,7 @@ describe('remnashop reverse sync', () => {
             'user_remna_id',
             'status',
             'is_trial',
+            'internal_squads',
             'expire_at',
             'traffic_limit',
             'device_limit',
@@ -153,5 +155,7 @@ describe('remnashop reverse sync', () => {
     )
     expect(subscriptionInsert?.[0]).toContain('"is_trial"')
     expect(subscriptionInsert?.[1]).toContain(false)
+    expect(subscriptionInsert?.[0]).toContain('"internal_squads"')
+    expect(subscriptionInsert?.[1]).toContainEqual(['squad-1'])
   })
 })

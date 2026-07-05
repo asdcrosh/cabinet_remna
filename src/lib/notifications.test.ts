@@ -249,4 +249,68 @@ describe('notifyUser', () => {
     })
     expect(payload.reply_markup.inline_keyboard[0][0].url).toBeUndefined()
   })
+
+  it('sends fallback email when Telegram is not linked', async () => {
+    mocks.prisma.user.findUnique.mockResolvedValue({
+      id: 'user-1',
+      email: 'user@example.test',
+      emailVerifiedAt: new Date(),
+      name: 'User',
+      telegramId: null,
+    })
+    mocks.prisma.notificationLog.createMany.mockResolvedValue({ count: 1 })
+    mocks.prisma.userNotification.createMany.mockResolvedValue({ count: 1 })
+
+    const result = await notifyUser({
+      userId: 'user-1',
+      type: 'PAYMENT_SUCCESS',
+      dedupeKey: 'payment-1',
+      title: 'Оплата прошла',
+      body: 'Оплата прошла',
+      telegramText: '<b>Оплата прошла</b>',
+      emailSubject: 'Оплата прошла',
+      emailText: 'Оплата прошла',
+      emailHtml: '<p>Оплата прошла</p>',
+      emailDeliveryMode: 'fallback',
+    })
+
+    expect(result).toEqual({ telegram: 'skipped', email: 'sent' })
+    expect(fetch).toHaveBeenCalledTimes(1)
+    expect(fetch).toHaveBeenCalledWith(
+      'https://mail.example.test/send',
+      expect.objectContaining({ method: 'POST' })
+    )
+  })
+
+  it('does not send fallback email when Telegram was delivered', async () => {
+    mocks.prisma.user.findUnique.mockResolvedValue({
+      id: 'user-1',
+      email: 'user@example.test',
+      emailVerifiedAt: new Date(),
+      name: 'User',
+      telegramId: 123n,
+    })
+    mocks.prisma.notificationLog.createMany.mockResolvedValue({ count: 1 })
+    mocks.prisma.userNotification.createMany.mockResolvedValue({ count: 1 })
+
+    const result = await notifyUser({
+      userId: 'user-1',
+      type: 'PAYMENT_SUCCESS',
+      dedupeKey: 'payment-1',
+      title: 'Оплата прошла',
+      body: 'Оплата прошла',
+      telegramText: '<b>Оплата прошла</b>',
+      emailSubject: 'Оплата прошла',
+      emailText: 'Оплата прошла',
+      emailHtml: '<p>Оплата прошла</p>',
+      emailDeliveryMode: 'fallback',
+    })
+
+    expect(result).toEqual({ telegram: 'sent', email: 'skipped' })
+    expect(fetch).toHaveBeenCalledTimes(1)
+    expect(fetch).toHaveBeenCalledWith(
+      'https://api.telegram.org/bottelegram-token/sendMessage',
+      expect.objectContaining({ method: 'POST' })
+    )
+  })
 })
