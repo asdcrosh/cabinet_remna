@@ -55,6 +55,7 @@ interface RemnashopSyncReport {
   }
   syncEvents?: SyncEventRow[]
   syncStatusCounts?: Record<string, number>
+  syncIssueGroups?: SyncIssueGroup[]
 }
 
 interface SyncEventRow {
@@ -69,6 +70,16 @@ interface SyncEventRow {
   nextRetryAt: string | null
   lastSyncedAt: string | null
   updatedAt: string
+}
+
+interface SyncIssueGroup {
+  direction: 'CABINET_TO_REMNASHOP' | 'REMNASHOP_TO_CABINET'
+  entityType: string
+  operation: string
+  status: 'FAILED' | 'SKIPPED'
+  reason: string
+  count: number
+  lastSeenAt: string
 }
 
 export function RemnashopSyncPanel() {
@@ -168,6 +179,8 @@ export function RemnashopSyncPanel() {
             ))}
           </div>
 
+          <SyncHealthSummary report={report} />
+
           {report.warnings.length > 0 ? (
             <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
               <div className="mb-2 flex items-center gap-2 font-medium">
@@ -193,6 +206,7 @@ export function RemnashopSyncPanel() {
           <SyncEventsView
             events={report.syncEvents ?? []}
             counts={report.syncStatusCounts ?? {}}
+            issueGroups={report.syncIssueGroups ?? []}
             loading={loading}
             onRetry={(id) => void retryEvent(id)}
           />
@@ -247,16 +261,46 @@ function LiveCheckList() {
 function SyncEventsView({
   events,
   counts,
+  issueGroups,
   loading,
   onRetry,
 }: {
   events: SyncEventRow[]
   counts: Record<string, number>
+  issueGroups: SyncIssueGroup[]
   loading: boolean
   onRetry: (id: string) => void
 }) {
   return (
     <section className="space-y-3">
+      {issueGroups.length > 0 ? (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
+          <div className="mb-3 flex items-center gap-2 font-semibold">
+            <AlertTriangle className="h-4 w-4" />
+            Почему есть ошибки и пропуски
+          </div>
+          <div className="space-y-2">
+            {issueGroups.map((group) => (
+              <div
+                key={`${group.direction}:${group.entityType}:${group.operation}:${group.status}:${group.reason}`}
+                className="rounded-lg border border-amber-200 bg-white/70 px-3 py-2 dark:border-amber-500/20 dark:bg-slate-950/30"
+              >
+                <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0">
+                    <div className="font-medium">
+                      {directionLabel(group.direction)} · {entityLabel(group.entityType)} · {syncStatusLabel(group.status)}
+                    </div>
+                    <div className="mt-1 break-words text-xs opacity-80">{humanIssueReason(group.reason)}</div>
+                  </div>
+                  <div className="shrink-0 text-xs opacity-70">
+                    {group.count} шт. · {formatDateTime(group.lastSeenAt)}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
       <div className="grid gap-3 sm:grid-cols-4">
         {(['FAILED', 'PENDING', 'SKIPPED', 'SUCCEEDED'] as const).map((status) => (
           <Metric key={status} label={syncStatusLabel(status)} value={counts[status] ?? 0} />
@@ -264,7 +308,10 @@ function SyncEventsView({
       </div>
       <div className="overflow-hidden rounded-lg border bg-white dark:bg-surface-900">
         <div className="border-b px-4 py-3">
-          <h3 className="text-sm font-semibold">Последние события</h3>
+          <h3 className="text-sm font-semibold">Журнал синхронизации</h3>
+          <p className="mt-1 text-xs text-slate-500">
+            Это накопленные события, а не только последний запуск. Ошибки уходят после успешного retry или новой успешной синхронизации той же записи.
+          </p>
         </div>
         {events.length > 0 ? (
           <div className="divide-y">
@@ -305,6 +352,57 @@ function SyncEventsView({
         )}
       </div>
     </section>
+  )
+}
+
+function SyncHealthSummary({ report }: { report: RemnashopSyncReport }) {
+  const counts = report.counts
+  const failedEvents = report.syncStatusCounts?.FAILED ?? 0
+  const skippedEvents = report.syncStatusCounts?.SKIPPED ?? 0
+  const subscriptionFailures = counts.subscriptionsFailed ?? 0
+  const subscriptionSkipped = counts.subscriptionsSkipped ?? 0
+  const usersSkipped = counts.usersSkipped ?? 0
+  const hasProblems = subscriptionFailures > 0 || failedEvents > 0 || skippedEvents > 0 || report.warnings.length > 0
+
+  if (!hasProblems) {
+    return (
+      <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-100">
+        Последний запуск прошёл без явных проблем, backlog событий чистый.
+      </div>
+    )
+  }
+
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm dark:border-white/10 dark:bg-surface-900 dark:text-slate-200">
+      <div className="font-semibold text-slate-950 dark:text-white">Как читать этот экран</div>
+      <div className="mt-2 grid gap-2 md:grid-cols-2">
+        <InfoLine
+          label="Последний запуск"
+          value={
+            subscriptionFailures > 0
+              ? `${subscriptionFailures} подписок не подтянулись из Remnawave`
+              : subscriptionSkipped > 0
+                ? `${subscriptionSkipped} подписок уже свежие, поэтому пропущены`
+                : usersSkipped > 0
+                  ? `${usersSkipped} пользователей пропущены без email/Telegram`
+                  : 'Каталог и пользователи обработаны'
+          }
+        />
+        <InfoLine
+          label="Backlog событий"
+          value={`${failedEvents} ошибок, ${skippedEvents} пропусков за всё время журнала`}
+        />
+      </div>
+    </div>
+  )
+}
+
+function InfoLine({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg bg-slate-50 px-3 py-2 dark:bg-white/5">
+      <div className="text-xs uppercase text-slate-400">{label}</div>
+      <div className="mt-1 font-medium">{value}</div>
+    </div>
   )
 }
 
@@ -497,6 +595,14 @@ function statusClass(status: SyncEventRow['status']) {
 
 function formatDateTime(value: string) {
   return new Date(value).toLocaleString('ru-RU')
+}
+
+function humanIssueReason(value: string) {
+  if (value.includes('is_trial')) {
+    return 'В старой базе Remnashop у части подписок нет обязательного поля is_trial. Такие записи надо дописать дефолтом или обновить схему Remnashop.'
+  }
+  if (value === 'Причина не записана') return value
+  return value
 }
 
 const syncLabels: Record<string, string> = {

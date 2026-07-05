@@ -68,7 +68,7 @@ export const POST = withAuth(async (req: Request) => {
 })
 
 async function withSyncEvents<T extends Record<string, unknown>>(reportBase: T) {
-  const [events, statusCounts] = await Promise.all([
+  const [events, statusCounts, issueEvents] = await Promise.all([
     prisma.syncEvent.findMany({
       orderBy: { updatedAt: 'desc' },
       take: 40,
@@ -90,6 +90,19 @@ async function withSyncEvents<T extends Record<string, unknown>>(reportBase: T) 
       by: ['status'],
       _count: { _all: true },
     }),
+    prisma.syncEvent.findMany({
+      where: { status: { in: ['FAILED', 'SKIPPED'] } },
+      orderBy: { updatedAt: 'desc' },
+      take: 300,
+      select: {
+        direction: true,
+        entityType: true,
+        operation: true,
+        status: true,
+        lastError: true,
+        updatedAt: true,
+      },
+    }),
   ])
 
   return {
@@ -101,5 +114,60 @@ async function withSyncEvents<T extends Record<string, unknown>>(reportBase: T) 
       updatedAt: event.updatedAt.toISOString(),
     })),
     syncStatusCounts: Object.fromEntries(statusCounts.map((item) => [item.status, item._count._all])),
+    syncIssueGroups: groupSyncIssues(issueEvents),
   }
+}
+
+function groupSyncIssues(events: Array<{
+  direction: string
+  entityType: string
+  operation: string
+  status: string
+  lastError: string | null
+  updatedAt: Date
+}>) {
+  const groups = new Map<string, {
+    direction: string
+    entityType: string
+    operation: string
+    status: string
+    reason: string
+    count: number
+    lastSeenAt: string
+  }>()
+
+  for (const event of events) {
+    const reason = normalizeIssueReason(event.lastError)
+    const key = `${event.direction}:${event.entityType}:${event.operation}:${event.status}:${reason}`
+    const existing = groups.get(key)
+    if (existing) {
+      existing.count += 1
+      if (new Date(existing.lastSeenAt) < event.updatedAt) {
+        existing.lastSeenAt = event.updatedAt.toISOString()
+      }
+      continue
+    }
+
+    groups.set(key, {
+      direction: event.direction,
+      entityType: event.entityType,
+      operation: event.operation,
+      status: event.status,
+      reason,
+      count: 1,
+      lastSeenAt: event.updatedAt.toISOString(),
+    })
+  }
+
+  return Array.from(groups.values()).sort((left, right) => right.count - left.count).slice(0, 12)
+}
+
+function normalizeIssueReason(reason: string | null) {
+  const value = reason?.trim()
+  if (!value) return 'Причина не записана'
+  if (value.includes('is_trial')) return 'В Remnashop не хватает значения is_trial для subscriptions'
+  if (value.includes('not configured')) return 'Не настроено подключение'
+  if (value.includes('not found')) return 'Связанная запись не найдена'
+  if (value.includes('not recognized')) return 'Схема таблицы не распознана'
+  return value.length > 180 ? `${value.slice(0, 180)}...` : value
 }

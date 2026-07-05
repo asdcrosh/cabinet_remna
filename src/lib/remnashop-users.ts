@@ -81,7 +81,7 @@ export async function syncRemnashopUsersToCabinet(options: {
   for (const source of result.rows) {
     try {
       const row = await syncRemnashopSourceToCabinet(source, options)
-      await markSyncSucceeded({
+      const event = {
         direction: 'REMNASHOP_TO_CABINET',
         entityType: 'user',
         entityId: String(source.id),
@@ -90,7 +90,12 @@ export async function syncRemnashopUsersToCabinet(options: {
           userAction: row.userAction,
           subscriptionAction: row.subscriptionAction,
         },
-      })
+      } as const
+      if (row.subscriptionAction === 'failed') {
+        await markSyncFailed(event, new Error(row.subscriptionError || 'subscription sync failed'))
+      } else {
+        await markSyncSucceeded(event)
+      }
       if (row.userAction === 'created') created += 1
       if (row.userAction === 'updated') updated += 1
       if (row.userAction === 'skipped') skipped += 1
@@ -140,6 +145,7 @@ async function syncRemnashopSourceToCabinet(source: RemnashopUserRow, options: {
   let lastSubscriptionSyncedAt = existing?.subscriptions[0]?.lastSyncedAt ?? null
   let userAction: 'created' | 'updated' | 'skipped' = 'skipped'
   let subscriptionAction: 'synced' | 'skipped' | 'failed' | 'none' = 'none'
+  let subscriptionError: string | undefined
 
   if (existing) {
     const user = await prisma.user.update({
@@ -226,15 +232,16 @@ async function syncRemnashopSourceToCabinet(source: RemnashopUserRow, options: {
     subscriptionAction = 'synced'
   } catch (error) {
     subscriptionAction = 'failed'
+    subscriptionError = error instanceof Error ? error.message : 'unknown error'
     logWarn('remnashop.users.subscription_sync_failed', {
       remnashopUserId: source.id,
       localUserId,
       remnawaveUuid: source.user_remna_id,
-      message: error instanceof Error ? error.message : 'unknown error',
+      message: subscriptionError,
     })
   }
 
-  return { userAction, subscriptionAction }
+  return { userAction, subscriptionAction, subscriptionError }
 }
 
 async function getLocalUserForRemnashopSync(localUserId: string) {
