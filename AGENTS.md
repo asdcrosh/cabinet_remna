@@ -12,16 +12,19 @@
 
 ## Build, Test, and Development Commands
 
+Requires Node.js >= 20.9.0. Local Postgres: `docker compose -f docker-compose.local.yml up -d`.
+
 - `npm run dev` starts the local Next.js dev server.
 - `npm run build` runs Prisma generate and builds the production app.
 - `npm run start` starts the built Next.js app.
-- `npm run lint` runs Next.js ESLint checks.
+- `npm run lint` runs ESLint 9 (`eslint.config.cjs`).
 - `npm run typecheck` runs TypeScript without emitting files.
 - `npm run test` runs Vitest tests.
-- `npm run validate` runs lint, typecheck, and environment validation.
+- `npm run validate` runs lint, typecheck, check:env, and test.
 - `npm run prisma:migrate` creates and applies local Prisma migrations.
 - `npm run prisma:deploy` applies migrations in production.
 - `npm run db:seed` seeds default database data.
+- `npm run worker:payments` / `worker:broadcasts` / `cleanup:retention` run operational scripts.
 
 ## Coding Style & Naming Conventions
 
@@ -43,7 +46,7 @@ npx vitest run src/lib/notifications.test.ts
 
 Recent commits use conventional prefixes such as `feat:` and `fix:`. Keep messages imperative and scoped, for example `feat: add broadcast templates`.
 
-Pull requests should include a summary, affected screens or APIs, migration notes if Prisma changed, and screenshots for UI work. Before opening a PR, run `npm run lint`, `npm run typecheck`, and relevant tests.
+Pull requests should include a summary, affected screens or APIs, migration notes if Prisma changed, and screenshots for UI work. Before opening a PR, run `npm run validate`.
 
 ## Security & Configuration Tips
 
