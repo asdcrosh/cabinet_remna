@@ -16,12 +16,21 @@ RUN npm prune --omit=dev \
   && rm -rf node_modules/@next/swc-*gnu \
   && npm cache clean --force
 
-FROM deps AS worker
+FROM node:24-alpine AS ops
 WORKDIR /app
-COPY tsconfig.json ./
-COPY scripts ./scripts
-COPY src ./src
-CMD ["npm", "run", "worker:payments"]
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+
+RUN apk add --no-cache openssl wget && addgroup -S nextjs && adduser -S nextjs -G nextjs
+
+COPY --chown=nextjs:nextjs --from=prod-deps /app/node_modules ./node_modules
+COPY --chown=nextjs:nextjs package.json package-lock.json tsconfig.json ./
+COPY --chown=nextjs:nextjs prisma ./prisma
+COPY --chown=nextjs:nextjs scripts ./scripts
+COPY --chown=nextjs:nextjs src ./src
+
+USER nextjs
+CMD ["node", "scripts/check-env.mjs"]
 
 FROM node:24-alpine AS builder
 WORKDIR /app
@@ -62,11 +71,6 @@ COPY --chown=nextjs:nextjs --from=builder /app/public ./public
 RUN mkdir -p /app/public/uploads && chown -R nextjs:nextjs /app/public/uploads
 COPY --chown=nextjs:nextjs --from=builder /app/.next/standalone ./
 COPY --chown=nextjs:nextjs --from=builder /app/.next/static ./.next/static
-COPY --chown=nextjs:nextjs --from=prod-deps /app/node_modules ./node_modules
-COPY --chown=nextjs:nextjs package.json package-lock.json tsconfig.json ./
-COPY --chown=nextjs:nextjs prisma ./prisma
-COPY --chown=nextjs:nextjs scripts ./scripts
-COPY --chown=nextjs:nextjs src ./src
 
 USER nextjs
 EXPOSE 3000

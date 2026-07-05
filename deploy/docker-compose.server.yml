@@ -20,7 +20,7 @@ services:
       - cabinet
 
   check-env:
-    image: ${CABINET_IMAGE:-ghcr.io/asdcrosh/cabinet_remna:latest}
+    image: ${CABINET_OPS_IMAGE:-ghcr.io/asdcrosh/cabinet_remna:ops-latest}
     pull_policy: ${CABINET_PULL_POLICY:-always}
     container_name: remnawave-cabinet-check-env
     command: ["node", "scripts/check-env.mjs"]
@@ -31,7 +31,7 @@ services:
       - cabinet
 
   migrate:
-    image: ${CABINET_IMAGE:-ghcr.io/asdcrosh/cabinet_remna:latest}
+    image: ${CABINET_OPS_IMAGE:-ghcr.io/asdcrosh/cabinet_remna:ops-latest}
     pull_policy: ${CABINET_PULL_POLICY:-always}
     container_name: remnawave-cabinet-migrate
     command: ["./node_modules/.bin/prisma", "migrate", "deploy"]
@@ -50,7 +50,7 @@ services:
       - remnawave_external
 
   seed:
-    image: ${CABINET_IMAGE:-ghcr.io/asdcrosh/cabinet_remna:latest}
+    image: ${CABINET_OPS_IMAGE:-ghcr.io/asdcrosh/cabinet_remna:ops-latest}
     pull_policy: ${CABINET_PULL_POLICY:-always}
     container_name: remnawave-cabinet-seed
     command: ["./node_modules/.bin/tsx", "prisma/seed.ts"]
@@ -102,7 +102,7 @@ services:
           - remnawave-cabinet-app
 
   worker:
-    image: ${CABINET_IMAGE:-ghcr.io/asdcrosh/cabinet_remna:latest}
+    image: ${CABINET_OPS_IMAGE:-ghcr.io/asdcrosh/cabinet_remna:ops-latest}
     pull_policy: ${CABINET_PULL_POLICY:-always}
     container_name: remnawave-cabinet-worker
     command: ["./node_modules/.bin/tsx", "scripts/payment-reconciler.ts"]
@@ -119,7 +119,7 @@ services:
       - remnawave_external
 
   broadcast-worker:
-    image: ${CABINET_IMAGE:-ghcr.io/asdcrosh/cabinet_remna:latest}
+    image: ${CABINET_OPS_IMAGE:-ghcr.io/asdcrosh/cabinet_remna:ops-latest}
     pull_policy: ${CABINET_PULL_POLICY:-always}
     container_name: remnawave-cabinet-broadcast-worker
     command: ["./node_modules/.bin/tsx", "scripts/broadcast-worker.ts"]
@@ -136,7 +136,7 @@ services:
       - remnawave_external
 
   retention-cleanup:
-    image: ${CABINET_IMAGE:-ghcr.io/asdcrosh/cabinet_remna:latest}
+    image: ${CABINET_OPS_IMAGE:-ghcr.io/asdcrosh/cabinet_remna:ops-latest}
     pull_policy: ${CABINET_PULL_POLICY:-always}
     container_name: remnawave-cabinet-retention-cleanup
     command:

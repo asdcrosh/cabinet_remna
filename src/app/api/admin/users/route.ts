@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server'
-import { Prisma } from '@prisma/client'
+import { Prisma, UserRole } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { requireAdmin, withAuth } from '@/lib/auth/guard'
+import { ADMIN_LIST_PAGE_SIZE, parseAdminListLimit } from '@/lib/admin-list'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -11,21 +12,31 @@ export const GET = withAuth(async (req: Request) => {
 
   const url = new URL(req.url)
   const q = url.searchParams.get('q')?.trim()
+  const role = url.searchParams.get('role') ?? 'ALL'
+  const account = url.searchParams.get('account') ?? 'ALL'
   const page = Math.max(1, Number(url.searchParams.get('page') || '1') || 1)
-  const pageSize = Math.min(100, Math.max(1, Number(url.searchParams.get('pageSize') || '25') || 25))
+  const pageSize = parseAdminListLimit(url.searchParams.get('pageSize') || undefined, ADMIN_LIST_PAGE_SIZE, 100)
   const cursor = parseCreatedAtCursor(url.searchParams.get('cursor'))
 
-  const baseWhere: Prisma.UserWhereInput | undefined = q
-    ? {
-        OR: [
-          { email: { contains: q, mode: 'insensitive' as const } },
-          { name: { contains: q, mode: 'insensitive' as const } },
-          { remnawaveUsername: { contains: q, mode: 'insensitive' as const } },
-        ],
-      }
-    : undefined
+  const baseWhere: Prisma.UserWhereInput = {
+    ...(isUserRoleFilter(role) ? { role } : {}),
+    ...(account === 'LINKED'
+      ? { remnawaveUuid: { not: null } }
+      : account === 'UNLINKED'
+        ? { remnawaveUuid: null }
+        : {}),
+    ...(q
+      ? {
+          OR: [
+            { email: { contains: q, mode: 'insensitive' as const } },
+            { name: { contains: q, mode: 'insensitive' as const } },
+            { remnawaveUsername: { contains: q, mode: 'insensitive' as const } },
+          ],
+        }
+      : {}),
+  }
   const where: Prisma.UserWhereInput | undefined = cursor
-    ? { AND: [baseWhere ?? {}, { OR: buildCreatedAtCursorWhere(cursor) }] }
+    ? { AND: [baseWhere, { OR: buildCreatedAtCursorWhere(cursor) }] }
     : baseWhere
 
   const [total, users] = await prisma.$transaction([
@@ -99,4 +110,8 @@ function buildCreatedAtCursorWhere(cursor: CreatedAtCursor): Prisma.UserWhereInp
 
 function formatCreatedAtCursor(item: { createdAt: Date; id: string }) {
   return `${item.createdAt.toISOString()}|${item.id}`
+}
+
+function isUserRoleFilter(value: string): value is UserRole {
+  return value === UserRole.USER || value === UserRole.MODERATOR || value === UserRole.ADMIN || value === UserRole.SUPER_ADMIN
 }

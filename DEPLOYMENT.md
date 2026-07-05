@@ -12,13 +12,17 @@ The application image is configured with:
 
 ```env
 CABINET_IMAGE="ghcr.io/asdcrosh/cabinet_remna:latest"
+CABINET_OPS_IMAGE="ghcr.io/asdcrosh/cabinet_remna:ops-latest"
 ```
 
 ## Build and publish
 
-`.github/workflows/docker-image.yml` publishes the `release` Docker target to
-GitHub Container Registry on every push to `main`, on version tags, and on
-manual workflow dispatch.
+`.github/workflows/docker-image.yml` publishes two Docker targets to GitHub
+Container Registry on every push to `main`, on version tags, and on manual
+workflow dispatch:
+
+- `release` → `CABINET_IMAGE`, web-only Next.js standalone runner.
+- `ops` → `CABINET_OPS_IMAGE`, workers, migrations, seed, check-env, cleanup.
 
 Make sure the GHCR package is public, or run `docker login ghcr.io` on the
 server before deploying.
@@ -29,14 +33,14 @@ Manual publish equivalent:
 docker buildx build --target release \
   -t ghcr.io/asdcrosh/cabinet_remna:latest \
   --push .
+docker buildx build --target ops \
+  -t ghcr.io/asdcrosh/cabinet_remna:ops-latest \
+  --push .
 ```
 
-The `release` target is intentionally a single operational image for now. The
-server compose file reuses it for the web app, payment worker, broadcast worker,
-Prisma migrations, seed, check-env, and retention cleanup. This keeps deploy and
-rollback one-image simple, at the cost of carrying `node_modules`, `scripts`,
-and `src` in the published image. If the image size becomes a real bottleneck,
-split it into separate `runner`, `worker`, and `migrator` images.
+The `release` image intentionally does not contain `src`, `scripts`, Prisma
+migrations, or the full production `node_modules`. Those live in the `ops`
+image because compose needs them for background and one-shot services.
 
 ## One-command install
 

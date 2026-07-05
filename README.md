@@ -335,6 +335,8 @@ NODE_ENV=production npm run check:env
 | `NODE_ENV` | `production` |
 | `APP_URL` | Публичный HTTPS URL кабинета |
 | `ALLOWED_ORIGINS` | Разрешённые origins (обычно = APP_URL) |
+| `CABINET_IMAGE` | Web image (`release`) |
+| `CABINET_OPS_IMAGE` | Ops image для workers/migrations/cleanup |
 | `DATABASE_URL` | PostgreSQL с `connection_limit` и `pool_timeout` |
 | `JWT_SECRET` | Секрет сессий (>= 32 символов) |
 | `HEALTHCHECK_TOKEN` | Токен для `/api/health` |
@@ -574,9 +576,12 @@ deploy/            production compose, installer, runbook
 5. `npm run build`
 
 Docker-образ публикуется в GHCR ([docker-image.yml](./.github/workflows/docker-image.yml)) при push в `main`.
-CI собирает `target: release`: это один образ для web, workers, migrations, seed и check-env.
-Он больше минимального web-runner, зато сервер обновляется и откатывается одной версией образа.
-Разделение на runner/worker/migrator стоит делать отдельным эпиком, если размер образа начнет мешать.
+CI собирает два target:
+
+- `release` → web-only Next.js standalone image (`CABINET_IMAGE`);
+- `ops` → migrations, seed, check-env, workers и cleanup (`CABINET_OPS_IMAGE`).
+
+Так основной web-образ не тащит `src`, `scripts`, Prisma migrations и полный `node_modules`.
 
 ### Технические правила
 

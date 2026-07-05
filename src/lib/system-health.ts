@@ -1,5 +1,4 @@
 import { readdir, stat } from 'fs/promises'
-import path from 'path'
 import { prisma } from '@/lib/prisma'
 import { remnawave } from '@/lib/remnawave'
 import { getProvisioningQueueHealth } from '@/lib/job-health'
@@ -47,6 +46,12 @@ function errorCode(error: unknown) {
 
 function env(name: string) {
   return process.env[name]?.trim() || ''
+}
+
+function safeBackupPath(backupDir: string, entry: string) {
+  if (!backupDir.startsWith('/')) return null
+  if (entry.includes('/') || entry.includes('\\') || entry === '..') return null
+  return `${backupDir.replace(/\/+$/, '')}/${entry}`
 }
 
 async function checkDatabase() {
@@ -178,13 +183,15 @@ async function latestBackup() {
       entries
         .filter((entry) => /^remna-full-backup-.*\.tar\.gz$/.test(entry))
         .map(async (entry) => {
-          const fullPath = path.join(/*turbopackIgnore: true*/ backupDir, entry)
+          const fullPath = safeBackupPath(backupDir, entry)
+          if (!fullPath) return null
           const stats = await stat(fullPath)
           return { entry, fullPath, mtime: stats.mtime, size: stats.size }
         })
     )
-    archives.sort((a, b) => b.mtime.getTime() - a.mtime.getTime())
-    const latest = archives[0]
+    const validArchives = archives.filter((archive) => archive !== null)
+    validArchives.sort((a, b) => b.mtime.getTime() - a.mtime.getTime())
+    const latest = validArchives[0]
     if (!latest) {
       return check('backup', 'Бэкапы', 'warn', 'Архивы не найдены', `Каталог: ${backupDir}`)
     }
