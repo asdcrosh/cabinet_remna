@@ -139,8 +139,13 @@ services:
     image: ${CABINET_IMAGE:-ghcr.io/asdcrosh/cabinet_remna:latest}
     pull_policy: ${CABINET_PULL_POLICY:-always}
     container_name: remnawave-cabinet-retention-cleanup
-    command: ["./node_modules/.bin/tsx", "scripts/cleanup-retention.ts"]
-    restart: "no"
+    command:
+      [
+        "sh",
+        "-c",
+        "while true; do ./node_modules/.bin/tsx scripts/cleanup-retention.ts; sleep $${RETENTION_CLEANUP_INTERVAL_SECONDS:-86400}; done",
+      ]
+    restart: unless-stopped
     profiles:
       - maintenance
     env_file:

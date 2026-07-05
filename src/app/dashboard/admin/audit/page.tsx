@@ -5,6 +5,7 @@ import { AuditAction } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { requireAdminPage } from '@/lib/auth/admin-page'
 import { PageHeader } from '@/components/dashboard/page-header'
+import { AdminFilterSubmitButton } from '@/components/admin/admin-filter-submit-button'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'История действий — Админка' }
@@ -76,7 +77,7 @@ export default async function AdminAuditPage({
             <option key={value} value={value}>{label}</option>
           ))}
         </select>
-        <button className="btn-primary" type="submit">Показать</button>
+        <AdminFilterSubmitButton />
       </form>
 
       <div className="space-y-3">

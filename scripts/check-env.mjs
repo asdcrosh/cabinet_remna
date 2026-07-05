@@ -64,6 +64,7 @@ const optionalNonNegativeIntegers = [
 const optionalPositiveIntegers = [
   "BONUS_BOX_PROMO_EXPIRES_IN_DAYS",
   "BONUS_BOX_PITY_OPENINGS",
+  "RETENTION_CLEANUP_INTERVAL_SECONDS",
 ];
 
 const optionalSampleRates = [

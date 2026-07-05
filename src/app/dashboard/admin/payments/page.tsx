@@ -8,6 +8,7 @@ import { PaymentBadge, ProvisioningBadge } from '@/components/admin/admin-badges
 import { PaymentSyncButton, RecoveryActionButton } from '@/components/admin/recovery-actions'
 import { LazyListLoader } from '@/components/admin/lazy-list-loader'
 import { ADMIN_LIST_PAGE_SIZE, parseAdminListLimit } from '@/lib/admin-list'
+import { AdminFilterSubmitButton } from '@/components/admin/admin-filter-submit-button'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Платежи — Админка' }
@@ -87,7 +88,7 @@ export default async function AdminPaymentsPage({
           <option value="DELIVERED">Подписка выдана</option>
           <option value="RETRY">Нужна довыдача</option>
         </select>
-        <button type="submit" className="btn-primary">Показать</button>
+        <AdminFilterSubmitButton />
         {(q || status !== 'ALL' || delivery !== 'ALL') && <Link href="/dashboard/admin/payments" className="btn-secondary">Сбросить</Link>}
       </form>
 

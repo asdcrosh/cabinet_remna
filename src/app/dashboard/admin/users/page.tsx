@@ -14,6 +14,7 @@ import { UserPlanButton } from '@/components/admin/user-plan-button'
 import { UserDetailsButton, type AdminUserDetails } from '@/components/admin/user-details-button'
 import { UserSyncButton } from '@/components/admin/user-sync-button'
 import { formatPrice } from '@/lib/format'
+import { AdminFilterSubmitButton } from '@/components/admin/admin-filter-submit-button'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Пользователи — Админка' }
@@ -143,7 +144,7 @@ export default async function AdminUsersPage({
             <option value="LINKED">Профиль создан</option>
             <option value="UNLINKED">Без профиля</option>
           </select>
-          <button className="btn-primary" type="submit">Найти</button>
+          <AdminFilterSubmitButton idleText="Найти" />
           {(q || role !== 'ALL' || account !== 'ALL') && <Link href="/dashboard/admin/users" className="btn-secondary">Сбросить</Link>}
         </form>
         <div className="text-sm text-slate-500">

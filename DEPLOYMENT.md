@@ -31,6 +31,13 @@ docker buildx build --target release \
   --push .
 ```
 
+The `release` target is intentionally a single operational image for now. The
+server compose file reuses it for the web app, payment worker, broadcast worker,
+Prisma migrations, seed, check-env, and retention cleanup. This keeps deploy and
+rollback one-image simple, at the cost of carrying `node_modules`, `scripts`,
+and `src` in the published image. If the image size becomes a real bottleneck,
+split it into separate `runner`, `worker`, and `migrator` images.
+
 ## One-command install
 
 For a clean Ubuntu/Debian server:
@@ -44,7 +51,8 @@ The installer will:
 - install Docker and the Docker Compose plugin
 - download `docker-compose.yml`
 - create `.env`
-- generate `POSTGRES_PASSWORD`, `JWT_SECRET`, and `HEALTHCHECK_TOKEN`
+- generate `POSTGRES_PASSWORD`, `JWT_SECRET`, `HEALTHCHECK_TOKEN`, and
+  `BROADCAST_UPLOAD_SIGNING_SECRET`
 - ask for missing production values
 - create `CABINET_EXTERNAL_NETWORK` if it is missing
 - deploy automatically after required values are filled
@@ -99,14 +107,14 @@ window is controlled by `REMNASHOP_USER_SUBSCRIPTION_SYNC_STALE_SECONDS`.
 Bundled Caddy is enabled by default:
 
 ```env
-COMPOSE_PROFILES="caddy"
+COMPOSE_PROFILES="caddy,maintenance"
 ```
 
 If the server already has Caddy/Nginx/Traefik on ports `80` and `443`, disable
 the bundled proxy:
 
 ```env
-COMPOSE_PROFILES=""
+COMPOSE_PROFILES="maintenance"
 CABINET_APP_BIND="127.0.0.1"
 CABINET_APP_PORT="3000"
 ```
@@ -137,7 +145,12 @@ Logs:
 ```bash
 docker compose --env-file .env -f docker-compose.yml logs -f app
 docker compose --env-file .env -f docker-compose.yml logs -f worker
+docker compose --env-file .env -f docker-compose.yml logs -f broadcast-worker
 ```
+
+The payment worker, broadcast worker, and retention cleanup run as long-lived
+services by default. Cleanup is tied to the `maintenance` profile; its loop
+interval is `RETENTION_CLEANUP_INTERVAL_SECONDS` and defaults to one day.
 
 Smoke check:
 

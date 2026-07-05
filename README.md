@@ -147,7 +147,7 @@ npm run build         # production build
 | `npm run db:seed` | Начальные тарифы и настройки |
 | `npm run worker:payments` | Локальный payment reconciler |
 | `npm run worker:broadcasts` | Локальный broadcast worker |
-| `npm run cleanup:retention` | Очистка старых audit/notification logs |
+| `npm run cleanup:retention` | Очистка старых audit/notification/sync logs |
 
 ---
 
@@ -180,7 +180,7 @@ cabinetctl
 1. установит Docker, если его нет;
 2. создаст `/opt/remnawave-cabinet`;
 3. подготовит `docker-compose.yml` и `.env`;
-4. сгенерирует локальные секреты (`JWT_SECRET`, `HEALTHCHECK_TOKEN`, пароль БД);
+4. сгенерирует локальные секреты (`JWT_SECRET`, `HEALTHCHECK_TOKEN`, `BROADCAST_UPLOAD_SIGNING_SECRET`, пароль БД);
 5. запросит production-настройки (домен, YooKassa, Remnawave, email);
 6. подключит Remnashop, если найден на сервере;
 7. запустит контейнеры (см. [порядок запуска](#порядок-запуска-контейнеров));
@@ -255,6 +255,7 @@ docker logs remnawave-cabinet-check-env
 # Обязательно в production:
 BROADCAST_UPLOAD_SIGNING_SECRET="<openssl rand -hex 32>"
 BROADCAST_UPLOAD_ALLOW_UNSIGNED_LEGACY="false"
+RETENTION_CLEANUP_INTERVAL_SECONDS="86400"
 
 # Рекомендуется в DATABASE_URL:
 # ...&connection_limit=10&pool_timeout=20
@@ -297,9 +298,12 @@ app + worker + broadcast-worker
 | `remnawave-cabinet-worker` | Payment reconciler + Remnashop sync |
 | `remnawave-cabinet-broadcast-worker` | Очередь рассылок |
 | `remnawave-cabinet-caddy` | HTTPS reverse proxy (profile `caddy`) |
-| `remnawave-cabinet-retention-cleanup` | Очистка старых логов (profile `maintenance`) |
+| `remnawave-cabinet-retention-cleanup` | Очистка старых логов циклом (profile `maintenance`) |
 
 Файл compose: [deploy/docker-compose.server.yml](./deploy/docker-compose.server.yml).
+
+Обычный деплой должен показывать `app`, `worker`, `broadcast-worker` и `retention-cleanup` в `docker compose ps`.
+Если cleanup не нужен, уберите `maintenance` из `COMPOSE_PROFILES`.
 
 ---
 
@@ -358,6 +362,7 @@ NODE_ENV=production npm run check:env
 | `REFERRAL_BONUS_DAYS` | Бонус за реферала |
 | `BONUS_BOX_*` | Настройки подарочного бокса |
 | `BROADCAST_WORKER_*` | Параметры broadcast worker |
+| `RETENTION_CLEANUP_INTERVAL_SECONDS` | Интервал cleanup-контейнера в секундах |
 | `AUDIT_LOG_RETENTION_DAYS` | Срок хранения audit log |
 | `APP_LOG_LEVEL` | `debug` / `info` / `warn` / `error` |
 | `APP_REQUEST_LOGS` | `true` — JSON request-log в stdout |
@@ -372,13 +377,13 @@ NODE_ENV=production npm run check:env
 **Встроенный Caddy** (по умолчанию при установке):
 
 ```env
-COMPOSE_PROFILES="caddy"
+COMPOSE_PROFILES="caddy,maintenance"
 ```
 
 **Внешний Nginx/Caddy** (если 80/443 заняты):
 
 ```env
-COMPOSE_PROFILES=""
+COMPOSE_PROFILES="maintenance"
 CABINET_APP_BIND="127.0.0.1"
 CABINET_APP_PORT="3030"
 ```
@@ -569,6 +574,15 @@ deploy/            production compose, installer, runbook
 5. `npm run build`
 
 Docker-образ публикуется в GHCR ([docker-image.yml](./.github/workflows/docker-image.yml)) при push в `main`.
+CI собирает `target: release`: это один образ для web, workers, migrations, seed и check-env.
+Он больше минимального web-runner, зато сервер обновляется и откатывается одной версией образа.
+Разделение на runner/worker/migrator стоит делать отдельным эпиком, если размер образа начнет мешать.
+
+### Технические правила
+
+- Админские SSR-таблицы используют `?limit=N` с базовым шагом 25; при смене фильтров `limit` не передается и список возвращается к 25 строкам.
+- JSON API для админских списков может использовать cursor, но размер страницы должен начинаться с 25 и не превращаться в выгрузку всей таблицы.
+- Перед апгрейдом Prisma 7 отдельно проверить breaking changes, pooling в `DATABASE_URL`, enum-миграции для строковых статусов и миграционный diff на staging.
 
 ### Перед production-релизом
 
@@ -578,6 +592,7 @@ Docker-образ публикуется в GHCR ([docker-image.yml](./.github/w
 - [ ] Тестовая покупка → выдача Remnawave-подписки
 - [ ] Webhook YooKassa отвечает 200
 - [ ] `BROADCAST_UPLOAD_SIGNING_SECRET` задан
+- [ ] `docker compose ps` показывает app, worker, broadcast-worker и retention-cleanup
 - [ ] `npm run validate` проходит локально
 - [ ] Первый бэкап после настройки
 

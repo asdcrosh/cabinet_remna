@@ -322,9 +322,10 @@ configure_app_port() {
 
 configure_caddy_profile() {
   local current_profiles
+  local next_profiles
 
   if [[ "${CABINET_ENABLE_CADDY:-}" == "false" ]]; then
-    replace_env_value "COMPOSE_PROFILES" ""
+    replace_env_value "COMPOSE_PROFILES" "maintenance"
     return
   fi
 
@@ -341,7 +342,11 @@ configure_caddy_profile() {
     return
   fi
 
-  replace_env_value "COMPOSE_PROFILES" ""
+  next_profiles=",${current_profiles},"
+  next_profiles="${next_profiles//,caddy,/,}"
+  next_profiles="${next_profiles#,}"
+  next_profiles="${next_profiles%,}"
+  replace_env_value "COMPOSE_PROFILES" "${next_profiles}"
   echo "Ports 80/443 are busy. Bundled Caddy is disabled; use your existing reverse proxy for the cabinet domain."
 }
 
@@ -721,6 +726,7 @@ CABINET_DOMAIN="${CABINET_DOMAIN:-${CURRENT_CABINET_DOMAIN}}"
 DB_PASSWORD="${POSTGRES_PASSWORD:-$(existing_or_random_hex POSTGRES_PASSWORD 24)}"
 JWT_SECRET_VALUE="${JWT_SECRET:-$(existing_or_random_hex JWT_SECRET 32)}"
 HEALTHCHECK_TOKEN_VALUE="${HEALTHCHECK_TOKEN:-$(existing_or_random_hex HEALTHCHECK_TOKEN 32)}"
+BROADCAST_UPLOAD_SIGNING_SECRET_VALUE="${BROADCAST_UPLOAD_SIGNING_SECRET:-$(existing_or_random_hex BROADCAST_UPLOAD_SIGNING_SECRET 32)}"
 
 replace_env_value "CABINET_DOMAIN" "${CABINET_DOMAIN}"
 if [[ -n "${CABINET_BRAND_NAME:-}" ]]; then
@@ -732,9 +738,11 @@ replace_env_value "APP_URL" "https://${CABINET_DOMAIN}"
 replace_env_value "ALLOWED_ORIGINS" "https://${CABINET_DOMAIN}"
 replace_env_value "YOOKASSA_WEBHOOK_URL" "https://${CABINET_DOMAIN}/api/webhook/yookassa"
 replace_env_value "POSTGRES_PASSWORD" "${DB_PASSWORD}"
-replace_env_value "DATABASE_URL" "postgresql://cabinet:${DB_PASSWORD}@db:5432/cabinet?schema=public"
+replace_env_value "DATABASE_URL" "postgresql://cabinet:${DB_PASSWORD}@db:5432/cabinet?schema=public&connection_limit=10&pool_timeout=20"
 replace_env_value "JWT_SECRET" "${JWT_SECRET_VALUE}"
 replace_env_value "HEALTHCHECK_TOKEN" "${HEALTHCHECK_TOKEN_VALUE}"
+replace_env_value "BROADCAST_UPLOAD_SIGNING_SECRET" "${BROADCAST_UPLOAD_SIGNING_SECRET_VALUE}"
+replace_env_value "BROADCAST_UPLOAD_ALLOW_UNSIGNED_LEGACY" "false"
 if [[ -n "${APP_LOG_LEVEL:-}" ]]; then
   replace_env_value "APP_LOG_LEVEL" "${APP_LOG_LEVEL}"
 elif ! env_key_exists "APP_LOG_LEVEL"; then
@@ -772,9 +780,9 @@ if [[ -n "${COMPOSE_PROFILES+x}" ]]; then
   replace_env_value "COMPOSE_PROFILES" "${COMPOSE_PROFILES}"
 elif ! env_key_exists "COMPOSE_PROFILES"; then
   if [[ "${CABINET_ENABLE_CADDY:-true}" == "false" ]]; then
-    replace_env_value "COMPOSE_PROFILES" ""
+    replace_env_value "COMPOSE_PROFILES" "maintenance"
   else
-    replace_env_value "COMPOSE_PROFILES" "caddy"
+    replace_env_value "COMPOSE_PROFILES" "caddy,maintenance"
   fi
 fi
 
@@ -814,6 +822,7 @@ for key in \
   REMNASHOP_USER_SUBSCRIPTION_SYNC_STALE_SECONDS \
   REMNASHOP_REVERSE_SYNC_BATCH_SIZE \
   REMNASHOP_REVERSE_SYNC_LOOKBACK_DAYS \
+  RETENTION_CLEANUP_INTERVAL_SECONDS \
   YOOKASSA_SHOP_ID \
   YOOKASSA_SECRET_KEY \
   YOOKASSA_WEBHOOK_ALLOWED_IPS \

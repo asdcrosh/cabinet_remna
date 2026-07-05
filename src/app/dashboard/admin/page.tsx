@@ -60,6 +60,7 @@ export default async function AdminDashboardPage() {
     dailyPaymentRows,
     dailyUserRows,
     stalePendingPayments,
+    pendingPayments,
     duplicateCandidates,
   ] = await Promise.all([
     prisma.user.count(),
@@ -151,6 +152,7 @@ export default async function AdminDashboardPage() {
       ORDER BY 1 ASC
     `,
     prisma.payment.count({ where: { status: 'PENDING', createdAt: { lt: stalePaymentDate } } }),
+    prisma.payment.count({ where: { status: 'PENDING' } }),
     findIdentityDuplicateCandidates(20),
   ])
   const customersTotal = sourceRows.reduce((sum, row) => sum + Number(row.count), 0)
@@ -283,6 +285,12 @@ export default async function AdminDashboardPage() {
               label="Средний чек"
               value={formatPrice(paymentsAggregate._count > 0 ? Math.round((paymentsAggregate._sum.amountKopecks ?? 0) / paymentsAggregate._count) : 0)}
               hint="по успешным оплатам"
+            />
+            <CompactMetric
+              icon={<FileClock className="h-5 w-5" />}
+              label="Pending-платежи"
+              value={pendingPayments}
+              hint={pendingPayments > 0 ? 'ожидают оплаты' : 'нет ожидания'}
             />
             <CompactMetric
               icon={<AlertTriangle className="h-5 w-5" />}
