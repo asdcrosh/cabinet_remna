@@ -201,6 +201,7 @@ async function createRemnashopUserForCabinet(user: {
     username: user.telegramUsername,
     telegram_id: user.telegramId?.toString() ?? null,
     role: 'USER',
+    language: 'ru',
     language_code: 'ru',
     source: SOURCE,
     created_at: now,
@@ -221,7 +222,7 @@ async function createRemnashopUserForCabinet(user: {
       cabinetUserId: user.id,
       message: error instanceof Error ? error.message : 'unknown error',
     })
-    return null
+    throw error
   }
 }
 

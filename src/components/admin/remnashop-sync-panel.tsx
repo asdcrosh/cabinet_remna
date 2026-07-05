@@ -607,6 +607,9 @@ function humanIssueReason(value: string) {
   if (value.includes('не хватает прав')) {
     return 'У пользователя базы Remnashop нет прав на запись промокодов. Нужно выдать INSERT/UPDATE/DELETE/SELECT на таблицу промокодов и таблицу связей с тарифами.'
   }
+  if (value.includes('нет прав на запись промокодов')) {
+    return 'У пользователя базы Remnashop нет прав на запись промокодов. Нужно выдать INSERT/UPDATE/DELETE/SELECT на таблицу промокодов и таблицу связей с тарифами.'
+  }
   if (value.includes('таблица промокодов')) {
     return 'Кабинет не понял структуру промокодов Remnashop. Нужно проверить реальные названия таблицы и колонок промокодов в базе Remnashop.'
   }

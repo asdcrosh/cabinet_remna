@@ -118,7 +118,9 @@ export async function processBroadcastDeliveryBatch(options: {
     }
   }
 
-  logInfo('broadcast.delivery_batch_completed', { processed, succeeded, failed })
+  if (processed > 0 || failed > 0) {
+    logInfo('broadcast.delivery_batch_completed', { processed, succeeded, failed })
+  }
   return { processed, succeeded, failed }
 }
 

@@ -105,6 +105,14 @@ async function withSyncEvents<T extends Record<string, unknown>>(reportBase: T) 
       },
     }),
   ])
+  const visibleIssueEvents = filterSupersededIssueEvents(issueEvents)
+  const visibleIssueStatusCounts = visibleIssueEvents.reduce<Record<string, number>>((acc, event) => {
+    acc[event.status] = (acc[event.status] ?? 0) + 1
+    return acc
+  }, {})
+  const syncStatusCounts = Object.fromEntries(statusCounts.map((item) => [item.status, item._count._all]))
+  syncStatusCounts.FAILED = visibleIssueStatusCounts.FAILED ?? 0
+  syncStatusCounts.SKIPPED = visibleIssueStatusCounts.SKIPPED ?? 0
 
   return {
     ...reportBase,
@@ -114,9 +122,36 @@ async function withSyncEvents<T extends Record<string, unknown>>(reportBase: T) 
       lastSyncedAt: event.lastSyncedAt?.toISOString() ?? null,
       updatedAt: event.updatedAt.toISOString(),
     })),
-    syncStatusCounts: Object.fromEntries(statusCounts.map((item) => [item.status, item._count._all])),
-    syncIssueGroups: groupSyncIssues(issueEvents),
+    syncStatusCounts,
+    syncIssueGroups: groupSyncIssues(visibleIssueEvents),
   }
+}
+
+function filterSupersededIssueEvents(events: Array<{
+  direction: string
+  entityType: string
+  operation: string
+  status: string
+  lastError: string | null
+  updatedAt: Date
+}>) {
+  const hasPromoConfigIssue = events.some((event) =>
+    event.direction === 'CABINET_TO_REMNASHOP' &&
+    event.entityType === 'promoCodeConfig' &&
+    ['remnashop promo code table not found', 'remnashop promo code schema is not recognized', 'remnashop promo code table is not writable'].includes(event.lastError ?? '')
+  )
+  if (!hasPromoConfigIssue) return events
+
+  return events.filter((event) => {
+    if (event.direction !== 'CABINET_TO_REMNASHOP' || event.entityType !== 'promoCode') return true
+    const reason = event.lastError ?? ''
+    return !(
+      reason === 'remnashop promo code schema is not recognized' ||
+      reason === 'remnashop promo code table not found' ||
+      reason === 'remnashop promo code table is not writable' ||
+      /permission denied/i.test(reason)
+    )
+  })
 }
 
 function groupSyncIssues(events: Array<{
@@ -169,6 +204,12 @@ function normalizeIssueReason(reason: string | null) {
   if (value.includes('internal_squads')) return 'В Remnashop обязательное поле internal_squads для подписок'
   if (value.includes('is_trial')) return 'В Remnashop обязательное поле is_trial для подписок'
   if (/permission denied/i.test(value)) return describeSyncError(new Error(value))
+  if (value === 'remnashop promo code table is not writable') {
+    return 'Нет прав на запись промокодов Remnashop'
+  }
+  if (value === 'remnashop promo code table not found') {
+    return 'Таблица промокодов Remnashop не найдена'
+  }
   if (value === 'remnashop promo code schema is not recognized') {
     return 'Не распознана таблица промокодов Remnashop'
   }

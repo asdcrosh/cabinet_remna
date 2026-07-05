@@ -123,7 +123,29 @@ describe('remnashop reverse sync', () => {
         }
       }
       if (sql.includes('information_schema.columns') && values[0] === 'users') {
-        return { rows: [{ column_name: 'current_subscription_id' }] }
+        return {
+          rows: [
+            'id',
+            'email',
+            'is_email_verified',
+            'name',
+            'username',
+            'telegram_id',
+            'role',
+            'language',
+            'language_code',
+            'source',
+            'current_subscription_id',
+            'created_at',
+            'updated_at',
+          ].map((column_name) => ({ column_name })),
+        }
+      }
+      if (sql.includes('FROM users WHERE')) {
+        return { rows: [] }
+      }
+      if (sql.includes('INSERT INTO "users"')) {
+        return { rows: [{ id: '10' }] }
       }
       if (sql.includes('FROM "subscriptions"') || sql.includes('FROM "transactions"')) {
         return { rows: [] }
@@ -157,5 +179,27 @@ describe('remnashop reverse sync', () => {
     expect(subscriptionInsert?.[1]).toContain(false)
     expect(subscriptionInsert?.[0]).toContain('"internal_squads"')
     expect(subscriptionInsert?.[1]).toContainEqual(['squad-1'])
+  })
+
+  it('fills Remnashop language columns when creating a missing user', async () => {
+    mocks.paymentFindUnique.mockResolvedValue({
+      ...payment,
+      user: {
+        ...payment.user,
+        remnashopUserId: null,
+      },
+    })
+
+    await expect(syncCabinetPaymentToRemnashop('pay-1')).resolves.toMatchObject({
+      ok: true,
+      remnashopUserId: 10,
+    })
+
+    const userInsert = mocks.remnashopQuery.mock.calls.find(([sql]) =>
+      String(sql).includes('INSERT INTO "users"')
+    )
+    expect(userInsert?.[0]).toContain('"language"')
+    expect(userInsert?.[1]).toContain('ru')
+    expect(userInsert?.[0]).toContain('"language_code"')
   })
 })

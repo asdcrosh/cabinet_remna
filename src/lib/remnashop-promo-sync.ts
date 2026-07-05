@@ -5,6 +5,21 @@ import { logInfo, logWarn } from './logger'
 import { markSyncFailed, markSyncSkipped, markSyncSucceeded } from './sync-events'
 
 type RemnashopColumns = Set<string>
+type PromoSyncCapability =
+  | {
+      ok: true
+      table: string
+      idColumn: string
+      codeColumn: string
+      discountColumn: string
+      columns: RemnashopColumns
+    }
+  | {
+      ok: false
+      skipped: string
+      table?: string
+      columns?: RemnashopColumns
+    }
 
 type PromoCodeForRemnashopSync = Prisma.PromoCodeGetPayload<{
   include: {
@@ -28,6 +43,11 @@ const PLAN_LINK_TABLES = [
   'coupon_plans',
   'discount_code_plans',
 ]
+const PROMO_SYNC_UNAVAILABLE_REASONS = new Set([
+  'remnashop promo code table not found',
+  'remnashop promo code schema is not recognized',
+  'remnashop promo code table is not writable',
+])
 
 export async function syncCabinetPromoCodeToRemnashop(promoCodeId: string) {
   if (!process.env.REMNASHOP_DATABASE_URL) {
@@ -40,16 +60,10 @@ export async function syncCabinetPromoCodeToRemnashop(promoCodeId: string) {
   })
   if (!promoCode) return { ok: false as const, skipped: 'promo code not found' }
 
-  const table = await firstExistingTable(PROMO_TABLES)
-  if (!table) return { ok: false as const, skipped: 'remnashop promo code table not found' }
+  const capability = await diagnosePromoSyncCapability()
+  if (!capability.ok) return { ok: false as const, skipped: capability.skipped }
 
-  const columns = await tableColumns(table)
-  const idColumn = firstExistingColumn(columns, ['id'])
-  const codeColumn = firstExistingColumn(columns, ['code', 'name'])
-  const discountColumn = firstExistingColumn(columns, ['discount_percent', 'discount', 'percent'])
-  if (!idColumn || !codeColumn || !discountColumn) {
-    return { ok: false as const, skipped: 'remnashop promo code schema is not recognized' }
-  }
+  const { table, columns, idColumn, codeColumn, discountColumn } = capability
 
   const existingId = await findPromoCodeId(table, idColumn, codeColumn, promoCode.code)
   const values = pickExistingColumns(columns, buildPromoCodeValues(promoCode))
@@ -81,7 +95,17 @@ export async function syncCabinetPromoCodeToRemnashopBestEffort(promoCodeId: str
   try {
     const result = await syncCabinetPromoCodeToRemnashop(promoCodeId)
     if (!result.ok && 'skipped' in result) {
-      await markSyncSkipped(event, result.skipped)
+      await markSyncSkipped(
+        PROMO_SYNC_UNAVAILABLE_REASONS.has(result.skipped)
+          ? {
+              direction: 'CABINET_TO_REMNASHOP',
+              entityType: 'promoCodeConfig',
+              entityId: 'remnashop',
+              operation: 'check',
+            }
+          : event,
+        result.skipped
+      )
       logWarn('remnashop.promo_code_sync.skipped', { promoCodeId, reason: result.skipped })
     } else if (result.ok) {
       await markSyncSucceeded(event)
@@ -102,9 +126,17 @@ export async function deactivateCabinetPromoCodesInRemnashopBestEffort(codes: st
   if (uniqueCodes.length === 0 || !process.env.REMNASHOP_DATABASE_URL) return
 
   try {
-    const table = await firstExistingTable(PROMO_TABLES)
-    if (!table) return
-    const columns = await tableColumns(table)
+    const capability = await diagnosePromoSyncCapability()
+    if (!capability.ok) {
+      await markSyncSkipped({
+        direction: 'CABINET_TO_REMNASHOP',
+        entityType: 'promoCodeConfig',
+        entityId: 'remnashop',
+        operation: 'check',
+      }, capability.skipped)
+      return
+    }
+    const { table, columns } = capability
     const codeColumn = firstExistingColumn(columns, ['code', 'name'])
     const isActiveColumn = firstExistingColumn(columns, ['is_active', 'active'])
     if (!codeColumn || !isActiveColumn) return
@@ -139,6 +171,38 @@ export async function deactivateCabinetPromoCodesInRemnashopBestEffort(codes: st
       message: error instanceof Error ? error.message : 'unknown error',
     })
   }
+}
+
+async function diagnosePromoSyncCapability(): Promise<PromoSyncCapability> {
+  const table = await firstExistingTable(PROMO_TABLES)
+  if (!table) return { ok: false, skipped: 'remnashop promo code table not found' }
+
+  const columns = await tableColumns(table)
+  const idColumn = firstExistingColumn(columns, ['id'])
+  const codeColumn = firstExistingColumn(columns, ['code', 'name'])
+  const discountColumn = firstExistingColumn(columns, ['discount_percent', 'discount', 'percent'])
+  if (!idColumn || !codeColumn || !discountColumn) {
+    return { ok: false, skipped: 'remnashop promo code schema is not recognized', table, columns }
+  }
+
+  const access = await tableWriteAccess(table)
+  if (!access.can_insert || !access.can_update) {
+    return { ok: false, skipped: 'remnashop promo code table is not writable', table, columns }
+  }
+
+  return { ok: true, table, idColumn, codeColumn, discountColumn, columns }
+}
+
+async function tableWriteAccess(table: string) {
+  const result = await remnashopQuery<{ can_insert: boolean; can_update: boolean }>(
+    `
+      SELECT
+        has_table_privilege(current_user, format('public.%I', $1::text), 'INSERT') AS can_insert,
+        has_table_privilege(current_user, format('public.%I', $1::text), 'UPDATE') AS can_update
+    `,
+    [table]
+  )
+  return result.rows[0] ?? { can_insert: false, can_update: false }
 }
 
 function buildPromoCodeValues(promoCode: PromoCodeForRemnashopSync) {

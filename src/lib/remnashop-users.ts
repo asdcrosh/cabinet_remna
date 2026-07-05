@@ -2,13 +2,13 @@ import { randomBytes } from 'node:crypto'
 import { hash } from 'bcryptjs'
 import { Prisma } from '@prisma/client'
 import { prisma } from './prisma'
-import { remnawave } from './remnawave'
+import { remnawave, RemnawaveError } from './remnawave'
 import { remnashopQuery } from './remnashop-db'
 import { generateUniqueReferralCode } from './referrals'
 import { toRemnawaveTelegramId } from './telegram-remnawave'
 import { upsertLocalSubscriptionFromRemnawave } from './remnawave-local-sync'
-import { logWarn } from './logger'
-import { markSyncFailed, markSyncSucceeded } from './sync-events'
+import { logDebug, logInfo, logWarn } from './logger'
+import { markSyncFailed, markSyncSkipped, markSyncSucceeded } from './sync-events'
 
 interface RemnashopIdentityRow {
   id: number
@@ -93,6 +93,8 @@ export async function syncRemnashopUsersToCabinet(options: {
       } as const
       if (row.subscriptionAction === 'failed') {
         await markSyncFailed(event, new Error(row.subscriptionError || 'subscription sync failed'))
+      } else if (row.subscriptionAction === 'skipped' && row.subscriptionError) {
+        await markSyncSkipped(event, row.subscriptionError)
       } else {
         await markSyncSucceeded(event)
       }
@@ -216,7 +218,7 @@ async function syncRemnashopSourceToCabinet(source: RemnashopUserRow, options: {
   try {
     const planId = await resolveCabinetPlanIdFromRemnashopSubscription(source)
     if (!planId && source.subscription_plan_snapshot) {
-      logWarn('remnashop.users.plan_match_failed', {
+      logInfo('remnashop.users.plan_match_failed', {
         remnashopUserId: source.id,
         remnawaveUuid: source.user_remna_id,
       })
@@ -231,9 +233,11 @@ async function syncRemnashopSourceToCabinet(source: RemnashopUserRow, options: {
     })
     subscriptionAction = 'synced'
   } catch (error) {
-    subscriptionAction = 'failed'
+    const missingRemnawaveProfile = isMissingRemnawaveProfile(error)
+    subscriptionAction = missingRemnawaveProfile ? 'skipped' : 'failed'
     subscriptionError = error instanceof Error ? error.message : 'unknown error'
-    logWarn('remnashop.users.subscription_sync_failed', {
+    const log = missingRemnawaveProfile ? logDebug : logWarn
+    log('remnashop.users.subscription_sync_failed', {
       remnashopUserId: source.id,
       localUserId,
       remnawaveUuid: source.user_remna_id,
@@ -242,6 +246,10 @@ async function syncRemnashopSourceToCabinet(source: RemnashopUserRow, options: {
   }
 
   return { userAction, subscriptionAction, subscriptionError }
+}
+
+function isMissingRemnawaveProfile(error: unknown) {
+  return error instanceof RemnawaveError && error.status === 404
 }
 
 async function getLocalUserForRemnashopSync(localUserId: string) {
