@@ -181,7 +181,7 @@ export function BonusBoxClient({
     [data.prizes],
   );
   const openButtonClass =
-    "bonus-box-open-button group relative inline-flex min-h-11 items-center justify-center overflow-hidden rounded-lg border border-cyan-300/35 px-4 text-sm font-semibold text-white shadow-lg shadow-cyan-950/20 transition-all duration-200 hover:-translate-y-0.5 hover:border-cyan-200/70 disabled:translate-y-0 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/10 disabled:text-slate-400 disabled:shadow-none sm:min-w-44";
+    "bonus-box-open-button group relative inline-flex min-h-11 items-center justify-center overflow-hidden rounded-lg border border-slate-950 px-4 text-sm font-semibold text-white shadow-lg shadow-slate-950/15 transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-800 disabled:translate-y-0 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 disabled:shadow-none dark:border-white dark:text-slate-950 dark:shadow-black/20 dark:hover:border-slate-200 dark:disabled:border-white/10 dark:disabled:bg-white/10 dark:disabled:text-slate-500 sm:min-w-44";
   const revealClass = result ? bonusBoxRevealClass(result.prize) : null;
 
   useEffect(() => {
@@ -256,15 +256,14 @@ export function BonusBoxClient({
 
   const openCaseCta = subscribeCta && !opening ? (
     <a href="/dashboard/plans" className={cn(openButtonClass, "w-full")}>
-      <span className="absolute inset-y-0 -left-1/3 w-1/3 skew-x-[-18deg] bg-white/24 blur-sm transition-transform duration-700 group-hover:translate-x-[430%]" />
       <span className="relative flex items-center justify-center gap-2">
         <ShoppingCart className="h-4 w-4" />
         <span>{openButtonLabel}</span>
       </span>
     </a>
   ) : data.canOpenReason && !opening ? (
-    <div className="flex min-h-10 items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/[0.06] px-3 text-sm font-semibold text-slate-300">
-      <Gift className="h-4 w-4 text-cyan-200" />
+    <div className="flex min-h-10 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-slate-600 dark:border-white/10 dark:bg-white/[0.05] dark:text-slate-300">
+      <Gift className="h-4 w-4 text-cyan-600 dark:text-cyan-300" />
       <span>{openButtonLabel}</span>
     </div>
   ) : (
@@ -274,7 +273,6 @@ export function BonusBoxClient({
       onClick={openBox}
       disabled={!canOpen}
     >
-      <span className="absolute inset-y-0 -left-1/3 w-1/3 skew-x-[-18deg] bg-white/24 blur-sm transition-transform duration-700 group-hover:translate-x-[430%]" />
       <span className="relative flex items-center justify-center gap-2">
         <Gift className="h-4 w-4" />
         <span>{opening ? "Открываем..." : openButtonLabel}</span>
@@ -286,7 +284,7 @@ export function BonusBoxClient({
     <div className="flex flex-col gap-4 sm:gap-5">
       <section
         className={cn(
-          "bonus-box-stage order-first overflow-hidden rounded-lg border border-slate-900 bg-slate-950 shadow-xl shadow-slate-950/20 dark:border-white/10",
+          "bonus-box-stage order-first overflow-hidden rounded-lg border border-slate-200 bg-white shadow-xl shadow-slate-200/50 dark:border-white/10 dark:bg-surface-900 dark:shadow-black/25",
           opening && "bonus-box-stage--opening",
           revealEffect && "bonus-box-stage--reveal",
           revealEffect && result?.prize.type !== "NO_PRIZE" && "bonus-box-stage--win",
@@ -294,15 +292,15 @@ export function BonusBoxClient({
           revealEffect && revealClass,
         )}
       >
-        <div className="bonus-box-stage-header grid gap-2.5 border-b border-white/10 px-3 py-2.5 sm:grid-cols-[minmax(0,1fr)_minmax(12rem,18rem)] sm:items-center sm:gap-3 sm:px-5 sm:py-3">
+        <div className="bonus-box-stage-header grid gap-2.5 border-b border-slate-200 px-3 py-2.5 dark:border-white/10 sm:grid-cols-[minmax(0,1fr)_minmax(12rem,18rem)] sm:items-center sm:gap-3 sm:px-5 sm:py-3">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <h2 className="text-base font-semibold text-white sm:text-lg">Рулетка бонусов</h2>
-              <span className="rounded-full border border-cyan-300/25 bg-cyan-300/10 px-2.5 py-1 text-xs font-semibold text-cyan-100">
+              <h2 className="text-base font-semibold text-slate-950 dark:text-white sm:text-lg">Рулетка бонусов</h2>
+              <span className="rounded-full border border-cyan-200 bg-cyan-50 px-2.5 py-1 text-xs font-semibold text-cyan-700 dark:border-cyan-500/25 dark:bg-cyan-500/10 dark:text-cyan-100">
                 {data.attemptsCount} доступно
               </span>
             </div>
-            <p className="mt-1 text-xs leading-5 text-slate-400 sm:text-sm">
+            <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400 sm:text-sm">
               {opening
                 ? "Крутим и фиксируем подарок в центре."
                 : result
@@ -313,15 +311,15 @@ export function BonusBoxClient({
           <div className="min-w-0">
             {openCaseCta}
             {data.canOpenReason && !subscribeCta && (
-              <p className="mt-2 text-xs text-slate-400">{data.canOpenReason}</p>
+              <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">{data.canOpenReason}</p>
             )}
           </div>
         </div>
 
         <div className="bonus-box-reel-shell relative overflow-hidden py-3 sm:py-5">
           <BonusBoxOpeningEffects />
-          <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-5 bg-gradient-to-r from-slate-950 via-slate-950/65 to-transparent sm:w-32 sm:via-slate-950/80" />
-          <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-5 bg-gradient-to-l from-slate-950 via-slate-950/65 to-transparent sm:w-32 sm:via-slate-950/80" />
+          <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-5 bg-gradient-to-r from-white via-white/75 to-transparent dark:from-surface-900 dark:via-surface-900/75 sm:w-32" />
+          <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-5 bg-gradient-to-l from-white via-white/75 to-transparent dark:from-surface-900 dark:via-surface-900/75 sm:w-32" />
           <div className="bonus-box-portal" aria-hidden="true">
             <div className="bonus-box-portal-core" />
             <div className="bonus-box-portal-line" />
@@ -354,7 +352,7 @@ export function BonusBoxClient({
         </div>
 
         {(canUseWelcomeAttempts || (!data.hasActiveSubscription && data.attemptsCount > 0)) && (
-          <div className="border-t border-white/10 bg-slate-950/80 px-3 py-2 text-sm text-slate-300 sm:px-5">
+          <div className="border-t border-slate-200 bg-slate-50/80 px-3 py-2 text-sm text-slate-600 dark:border-white/10 dark:bg-white/[0.035] dark:text-slate-300 sm:px-5">
             {canUseWelcomeAttempts
               ? "Приветственные открытия доступны без подписки."
               : "Открытия сохраняются на балансе. Активируйте подписку, чтобы забрать подарок."}
@@ -903,7 +901,7 @@ function PrizeCard({
       className={cn(
         "relative shrink-0 overflow-hidden rounded-lg border p-3 transition-transform duration-200",
         compact
-          ? "bonus-box-reel-card h-32 text-white shadow-[0_14px_32px_rgba(0,0,0,.24)] sm:h-40 sm:shadow-[0_18px_42px_rgba(0,0,0,.28)]"
+          ? "bonus-box-reel-card h-32 text-slate-950 shadow-sm shadow-slate-200/70 dark:text-white dark:shadow-black/20 sm:h-40"
           : "min-h-[132px] bg-white shadow-sm hover:-translate-y-0.5 dark:bg-surface-900",
         compact ? prizeReelClass(prize) : prizeBorderClass(prize),
         highlighted && "bonus-box-reel-card--winner",
@@ -929,7 +927,7 @@ function PrizeCard({
           <div
             className={cn(
               "truncate font-semibold",
-              compact && "text-base text-white sm:text-lg",
+              compact && "text-base text-slate-950 dark:text-white sm:text-lg",
             )}
           >
             {prize.title}
@@ -937,7 +935,7 @@ function PrizeCard({
           <div
             className={cn(
               "mt-1 text-xs",
-              compact ? "text-slate-300" : "text-slate-500",
+              compact ? "text-slate-500 dark:text-slate-400" : "text-slate-500",
             )}
           >
             {prizeLabel(prize)}
@@ -954,7 +952,7 @@ function PrizeCard({
       </div>
       {compact && (
         <div className="relative mt-5 flex items-end justify-between sm:mt-8">
-          <div className="grid h-10 w-10 place-items-center rounded-lg border border-white/10 bg-white/10 text-white shadow-inner shadow-white/5 sm:h-12 sm:w-12">
+          <div className="grid h-10 w-10 place-items-center rounded-lg border border-slate-200 bg-white/70 text-slate-700 shadow-inner shadow-slate-200/60 dark:border-white/10 dark:bg-white/10 dark:text-slate-100 dark:shadow-white/5 sm:h-12 sm:w-12">
             <Icon className="h-5 w-5 sm:h-6 sm:w-6" />
           </div>
           <div className="flex items-end gap-1">
@@ -1043,22 +1041,22 @@ function rarityBorderClass(rarity: Rarity) {
 
 function prizeReelClass(prize: BonusBoxPrizeView) {
   if (prize.type === "NO_PRIZE")
-    return "border-red-400 bg-[linear-gradient(135deg,#450a0a,#7f1d1d_58%,#111827)] shadow-red-950/30";
+    return "border-red-200 bg-red-50/80 dark:border-red-500/35 dark:bg-red-500/10";
   return rarityReelClass(prize.rarity);
 }
 
 function rarityReelClass(rarity: Rarity) {
   if (rarity === "LEGENDARY")
-    return "border-amber-300 bg-[linear-gradient(135deg,#451a03,#78350f_58%,#111827)] shadow-amber-950/30";
+    return "border-amber-200 bg-amber-50/80 dark:border-amber-500/35 dark:bg-amber-500/10";
   if (rarity === "EPIC")
-    return "border-fuchsia-300 bg-[linear-gradient(135deg,#3b0764,#701a75_58%,#111827)] shadow-fuchsia-950/30";
+    return "border-fuchsia-200 bg-fuchsia-50/80 dark:border-fuchsia-500/35 dark:bg-fuchsia-500/10";
   if (rarity === "RARE")
-    return "border-cyan-300 bg-[linear-gradient(135deg,#083344,#164e63_58%,#111827)] shadow-cyan-950/30";
-  return "border-slate-700 bg-[linear-gradient(135deg,#0f172a,#111827_58%,#020617)]";
+    return "border-cyan-200 bg-cyan-50/80 dark:border-cyan-500/35 dark:bg-cyan-500/10";
+  return "border-slate-200 bg-slate-50/90 dark:border-white/10 dark:bg-white/[0.04]";
 }
 
 function prizeGlowClass(prize: BonusBoxPrizeView) {
-  if (prize.type === "NO_PRIZE") return "bg-red-400/35";
+  if (prize.type === "NO_PRIZE") return "bg-red-200/45 dark:bg-red-400/20";
   return rarityGlowClass(prize.rarity);
 }
 
@@ -1079,10 +1077,10 @@ function bonusBoxResultClass(prize: BonusBoxPrizeView) {
 }
 
 function rarityGlowClass(rarity: Rarity) {
-  if (rarity === "LEGENDARY") return "bg-amber-300/45";
-  if (rarity === "EPIC") return "bg-fuchsia-300/40";
-  if (rarity === "RARE") return "bg-cyan-300/40";
-  return "bg-slate-300/25";
+  if (rarity === "LEGENDARY") return "bg-amber-200/55 dark:bg-amber-300/20";
+  if (rarity === "EPIC") return "bg-fuchsia-200/45 dark:bg-fuchsia-300/18";
+  if (rarity === "RARE") return "bg-cyan-200/45 dark:bg-cyan-300/18";
+  return "bg-slate-200/45 dark:bg-slate-300/10";
 }
 
 function prizeTopClass(prize: BonusBoxPrizeView) {
