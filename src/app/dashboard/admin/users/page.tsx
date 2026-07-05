@@ -1,5 +1,4 @@
 import type { ReactNode } from 'react'
-import Link from 'next/link'
 import { CalendarDays, CheckCircle2, ChevronDown, Search, Send, XCircle } from 'lucide-react'
 import { prisma } from '@/lib/prisma'
 import { requireAdminPage } from '@/lib/auth/admin-page'
@@ -15,6 +14,9 @@ import { UserDetailsButton, type AdminUserDetails } from '@/components/admin/use
 import { UserSyncButton } from '@/components/admin/user-sync-button'
 import { formatPrice } from '@/lib/format'
 import { AdminFilterSubmitButton } from '@/components/admin/admin-filter-submit-button'
+import { AdminFilterBar } from '@/components/admin/admin-filter-bar'
+import { AdminEmptyState } from '@/components/admin/admin-empty-state'
+import { AdminActionsMenu } from '@/components/admin/admin-actions-menu'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Пользователи — Админка' }
@@ -121,43 +123,40 @@ export default async function AdminUsersPage({
     <div className="space-y-6">
       <PageHeader title="Пользователи" description="Аккаунты, роли, профили Remnawave и последние подписки" />
 
-      <div className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-surface-900 lg:flex-row lg:items-center lg:justify-between">
-        <form className="grid min-w-0 flex-1 gap-2 md:grid-cols-[minmax(14rem,1fr)_11rem_12rem_auto_auto]" action="/dashboard/admin/users">
-          <input type="hidden" name="limit" value={ADMIN_LIST_PAGE_SIZE} />
-          <div className="relative min-w-0 flex-1">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            <input
-              name="q"
-              defaultValue={q}
-              placeholder="Email, имя или Remnawave username"
-              className="input pl-9"
-            />
-          </div>
-          <select name="role" defaultValue={role} className="input">
-            <option value="ALL">Все роли</option>
-            <option value="USER">Пользователи</option>
-            <option value="MODERATOR">Модераторы</option>
-            <option value="ADMIN">Администраторы</option>
-            <option value="SUPER_ADMIN">Главные админы</option>
-          </select>
-          <select name="account" defaultValue={account} className="input">
-            <option value="ALL">Любой VPN-профиль</option>
-            <option value="LINKED">Профиль создан</option>
-            <option value="UNLINKED">Без профиля</option>
-          </select>
-          <AdminFilterSubmitButton idleText="Найти" />
-          {(q || role !== 'ALL' || account !== 'ALL') && <Link href="/dashboard/admin/users" className="btn-secondary">Сбросить</Link>}
-        </form>
-        <div className="text-sm text-slate-500">
-          {users.length} из {total}
+      <AdminFilterBar
+        action="/dashboard/admin/users"
+        resetHref="/dashboard/admin/users"
+        resetVisible={Boolean(q || role !== 'ALL' || account !== 'ALL')}
+        count={{ shown: users.length, total }}
+        className="md:grid-cols-[minmax(14rem,1fr)_11rem_12rem_auto_auto]"
+      >
+        <input type="hidden" name="limit" value={ADMIN_LIST_PAGE_SIZE} />
+        <div className="relative min-w-0 flex-1">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <input
+            name="q"
+            defaultValue={q}
+            placeholder="Email, имя или Remnawave username"
+            className="input pl-9"
+          />
         </div>
-      </div>
+        <select name="role" defaultValue={role} className="input">
+          <option value="ALL">Все роли</option>
+          <option value="USER">Пользователи</option>
+          <option value="MODERATOR">Модераторы</option>
+          <option value="ADMIN">Администраторы</option>
+          <option value="SUPER_ADMIN">Главные админы</option>
+        </select>
+        <select name="account" defaultValue={account} className="input">
+          <option value="ALL">Любой VPN-профиль</option>
+          <option value="LINKED">Профиль создан</option>
+          <option value="UNLINKED">Без профиля</option>
+        </select>
+        <AdminFilterSubmitButton idleText="Найти" />
+      </AdminFilterBar>
 
       {users.length === 0 && (
-        <div className="card py-12 text-center">
-          <h2 className="font-semibold">Пользователи не найдены</h2>
-          <p className="mt-1 text-sm text-slate-500">Измените фильтры или очистите строку поиска.</p>
-        </div>
+        <AdminEmptyState title="Пользователи не найдены" description="Измените фильтры или очистите строку поиска." />
       )}
 
       <div className={users.length > 0 ? 'space-y-3' : 'hidden'}>
@@ -215,38 +214,25 @@ export default async function AdminUsersPage({
                     <Counter value={user._count.devices} label="устр." />
                     <Counter value={attemptsCount} label="подар." />
                   </div>
-                  <div className="flex flex-wrap justify-end gap-2">
-                    <UserDetailsButton details={buildUserDetails(user)} />
-                    <UserSyncButton userId={user.id} />
-                    {actor.role === 'SUPER_ADMIN' && (
-                      <BonusBoxAttemptsButton
-                        userId={user.id}
-                        email={user.email}
+                  <div className="hidden flex-wrap justify-end gap-2 xl:flex">
+                    <UserActions
+                      user={user}
+                      subscriptionPlanId={subscription?.planId ?? null}
+                      attemptsCount={attemptsCount}
+                      actorRole={actor.role}
+                      plans={plans}
+                    />
+                  </div>
+                  <div className="xl:hidden">
+                    <AdminActionsMenu>
+                      <UserActions
+                        user={user}
+                        subscriptionPlanId={subscription?.planId ?? null}
                         attemptsCount={attemptsCount}
-                      />
-                    )}
-                    {(actor.role === 'SUPER_ADMIN' || user.role !== 'SUPER_ADMIN') && (
-                      <UserPlanButton
-                        userId={user.id}
-                        email={user.email}
-                        currentPlanId={subscription?.planId ?? null}
+                        actorRole={actor.role}
                         plans={plans}
                       />
-                    )}
-                    {(actor.role === 'SUPER_ADMIN' || user.role !== 'SUPER_ADMIN') && (
-                      <UserProfileEditButton
-                        userId={user.id}
-                        email={user.email}
-                        name={user.name}
-                        emailVerified={Boolean(user.emailVerifiedAt)}
-                        telegramId={user.telegramId?.toString() ?? null}
-                        telegramUsername={user.telegramUsername}
-                        remnashopUserId={user.remnashopUserId}
-                        remnawaveUuid={user.remnawaveUuid}
-                        remnawaveShortUuid={user.remnawaveShortUuid}
-                        remnawaveUsername={user.remnawaveUsername}
-                      />
-                    )}
+                    </AdminActionsMenu>
                   </div>
                 </div>
               </div>
@@ -434,6 +420,75 @@ function Counter({ value, label }: { value: number; label: string }) {
       <div className="font-semibold text-slate-800 dark:text-slate-100">{value}</div>
       <div className="text-[10px] text-slate-400">{label}</div>
     </div>
+  )
+}
+
+function UserActions({
+  user,
+  subscriptionPlanId,
+  attemptsCount,
+  actorRole,
+  plans,
+}: {
+  user: {
+    id: string
+    email: string
+    name: string | null
+    role: string
+    emailVerifiedAt: Date | null
+    telegramId: bigint | null
+    telegramUsername: string | null
+    remnashopUserId: number | null
+    remnawaveUuid: string | null
+    remnawaveShortUuid: string | null
+    remnawaveUsername: string | null
+    createdAt: Date
+    lastLoginAt: Date | null
+    subscriptions: Parameters<typeof buildUserDetails>[0]['subscriptions']
+    payments: Parameters<typeof buildUserDetails>[0]['payments']
+    devices: Parameters<typeof buildUserDetails>[0]['devices']
+  }
+  subscriptionPlanId: string | null
+  attemptsCount: number
+  actorRole: string
+  plans: Array<{ id: string; name: string; priceKopecks: number; durationDays: number; isActive: boolean }>
+}) {
+  const canManageUser = actorRole === 'SUPER_ADMIN' || user.role !== 'SUPER_ADMIN'
+
+  return (
+    <>
+      <UserDetailsButton details={buildUserDetails(user)} />
+      <UserSyncButton userId={user.id} />
+      {actorRole === 'SUPER_ADMIN' && (
+        <BonusBoxAttemptsButton
+          userId={user.id}
+          email={user.email}
+          attemptsCount={attemptsCount}
+        />
+      )}
+      {canManageUser && (
+        <UserPlanButton
+          userId={user.id}
+          email={user.email}
+          currentPlanId={subscriptionPlanId}
+          plans={plans}
+        />
+      )}
+      {canManageUser && (
+        <UserProfileEditButton
+          userId={user.id}
+          email={user.email}
+          name={user.name}
+          emailVerified={Boolean(user.emailVerifiedAt)}
+          telegramId={user.telegramId?.toString() ?? null}
+          telegramUsername={user.telegramUsername}
+          remnashopUserId={user.remnashopUserId}
+          remnawaveUuid={user.remnawaveUuid}
+          remnawaveShortUuid={user.remnawaveShortUuid}
+          remnawaveUsername={user.remnawaveUsername}
+        />
+      )}
+    </>
   )
 }
 

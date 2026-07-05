@@ -9,6 +9,8 @@ import { PaymentSyncButton, RecoveryActionButton, RemnashopPaymentRetryButton } 
 import { LazyListLoader } from '@/components/admin/lazy-list-loader'
 import { ADMIN_LIST_PAGE_SIZE, parseAdminListLimit } from '@/lib/admin-list'
 import { AdminFilterSubmitButton } from '@/components/admin/admin-filter-submit-button'
+import { AdminFilterBar } from '@/components/admin/admin-filter-bar'
+import { AdminEmptyState } from '@/components/admin/admin-empty-state'
 import { describeSyncError } from '@/lib/sync-error'
 
 export const dynamic = 'force-dynamic'
@@ -72,7 +74,12 @@ export default async function AdminPaymentsPage({
         <PaymentStat title="Оплачено всего" value={succeededCount} tone="emerald" />
       </section>
 
-      <form className="grid gap-2 rounded-lg border border-slate-200 bg-white p-3 dark:border-white/10 dark:bg-surface-900 md:grid-cols-[minmax(14rem,1fr)_12rem_12rem_auto_auto]" action="/dashboard/admin/payments">
+      <AdminFilterBar
+        action="/dashboard/admin/payments"
+        resetHref="/dashboard/admin/payments"
+        resetVisible={Boolean(q || status !== 'ALL' || delivery !== 'ALL')}
+        count={{ shown: payments.length, total }}
+      >
         <input type="hidden" name="limit" value={ADMIN_LIST_PAGE_SIZE} />
         <div className="relative">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -91,14 +98,10 @@ export default async function AdminPaymentsPage({
           <option value="RETRY">Нужна довыдача</option>
         </select>
         <AdminFilterSubmitButton />
-        {(q || status !== 'ALL' || delivery !== 'ALL') && <Link href="/dashboard/admin/payments" className="btn-secondary">Сбросить</Link>}
-      </form>
+      </AdminFilterBar>
 
       {payments.length === 0 && (
-        <div className="card py-12 text-center">
-          <h2 className="font-semibold">Платежи не найдены</h2>
-          <p className="mt-1 text-sm text-slate-500">Измените фильтры или сбросьте поиск.</p>
-        </div>
+        <AdminEmptyState title="Платежи не найдены" description="Измените фильтры или сбросьте поиск." />
       )}
 
       <div className={payments.length > 0 ? 'table-shell hidden xl:block' : 'hidden'}>

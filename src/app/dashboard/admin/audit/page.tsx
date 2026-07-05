@@ -6,6 +6,8 @@ import { prisma } from '@/lib/prisma'
 import { requireAdminPage } from '@/lib/auth/admin-page'
 import { PageHeader } from '@/components/dashboard/page-header'
 import { AdminFilterSubmitButton } from '@/components/admin/admin-filter-submit-button'
+import { AdminFilterBar } from '@/components/admin/admin-filter-bar'
+import { AdminEmptyState } from '@/components/admin/admin-empty-state'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'История действий — Админка' }
@@ -53,15 +55,18 @@ export default async function AdminAuditPage({
       : {}),
   }
 
-  const logs = await prisma.auditLog.findMany({
-    where,
-    orderBy: { createdAt: 'desc' },
-    take: limit + 1,
-    include: {
-      actor: { select: { email: true, name: true } },
-      target: { select: { email: true, name: true } },
-    },
-  })
+  const [total, logs] = await prisma.$transaction([
+    prisma.auditLog.count({ where }),
+    prisma.auditLog.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      take: limit + 1,
+      include: {
+        actor: { select: { email: true, name: true } },
+        target: { select: { email: true, name: true } },
+      },
+    }),
+  ])
   const hasMore = logs.length > limit
   const visibleLogs = hasMore ? logs.slice(0, limit) : logs
 
@@ -69,7 +74,13 @@ export default async function AdminAuditPage({
     <div className="space-y-6">
       <PageHeader title="История действий" description="Админские операции, выдачи тарифов и важные изменения" />
 
-      <form className="grid gap-2 rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-surface-900 md:grid-cols-[minmax(14rem,1fr)_14rem_auto]" action="/dashboard/admin/audit">
+      <AdminFilterBar
+        action="/dashboard/admin/audit"
+        resetHref="/dashboard/admin/audit"
+        resetVisible={Boolean(q || action !== 'ALL')}
+        count={{ shown: visibleLogs.length, total }}
+        className="md:grid-cols-[minmax(14rem,1fr)_14rem_auto_auto]"
+      >
         <div className="relative min-w-0">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <input name="q" defaultValue={q} placeholder="Поиск по email или действию" className="input pl-9" />
@@ -81,11 +92,11 @@ export default async function AdminAuditPage({
           ))}
         </select>
         <AdminFilterSubmitButton />
-      </form>
+      </AdminFilterBar>
 
       <div className="space-y-3">
         {visibleLogs.length === 0 && (
-          <div className="card py-12 text-center text-sm text-slate-500">Записей пока нет.</div>
+          <AdminEmptyState title="Записей пока нет" description="История появится после админских действий." />
         )}
         {visibleLogs.map((log) => (
           <article key={log.id} className="card p-0">

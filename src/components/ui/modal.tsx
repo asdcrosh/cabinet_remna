@@ -3,6 +3,7 @@
 import * as React from 'react'
 import { X } from 'lucide-react'
 import { cn } from '@/lib/cn'
+import { useBodyScrollLock } from '@/lib/use-body-scroll-lock'
 import { Button } from './button'
 
 export interface ModalProps {
@@ -17,16 +18,50 @@ export interface ModalProps {
 export function Modal({ open, title, description, children, footer, onClose }: ModalProps) {
   const titleId = React.useId()
   const descriptionId = React.useId()
+  const dialogRef = React.useRef<HTMLDivElement | null>(null)
+  const previouslyFocusedRef = React.useRef<HTMLElement | null>(null)
+
+  useBodyScrollLock(open)
 
   React.useEffect(() => {
     if (!open) return
+    previouslyFocusedRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
+
+    window.setTimeout(() => {
+      const firstFocusable = getFocusableElements(dialogRef.current)[0]
+      firstFocusable?.focus()
+    }, 0)
 
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === 'Escape') onClose()
+      if (event.key !== 'Tab') return
+
+      const focusable = getFocusableElements(dialogRef.current)
+      if (focusable.length === 0) {
+        event.preventDefault()
+        dialogRef.current?.focus()
+        return
+      }
+
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      if (!first || !last) return
+
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault()
+        first.focus()
+      }
     }
 
     window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
+    return () => {
+      window.removeEventListener('keydown', onKeyDown)
+      previouslyFocusedRef.current?.focus()
+      previouslyFocusedRef.current = null
+    }
   }, [onClose, open])
 
   if (!open) return null
@@ -34,10 +69,12 @@ export function Modal({ open, title, description, children, footer, onClose }: M
   return (
     <div className="fixed inset-0 z-50 grid place-items-end bg-slate-950/45 p-0 backdrop-blur-sm sm:place-items-center sm:p-4">
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={description ? descriptionId : undefined}
+        tabIndex={-1}
         className={cn(
           'max-h-[calc(100dvh-24px)] w-full overflow-hidden rounded-t-2xl border border-slate-200 bg-white shadow-2xl dark:border-white/10 dark:bg-slate-950',
           'sm:max-w-lg sm:rounded-2xl'
@@ -63,4 +100,13 @@ export function Modal({ open, title, description, children, footer, onClose }: M
       </div>
     </div>
   )
+}
+
+function getFocusableElements(root: HTMLElement | null) {
+  if (!root) return []
+  return Array.from(
+    root.querySelectorAll<HTMLElement>(
+      'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    )
+  ).filter((element) => !element.hasAttribute('disabled') && element.getAttribute('aria-hidden') !== 'true')
 }

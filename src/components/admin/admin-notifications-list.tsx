@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { CheckCheck, ExternalLink } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import type { AdminNotificationView } from '@/lib/admin-notifications'
+import { AdminEmptyState } from './admin-empty-state'
 
 const filters = [
   { value: 'ALL', label: 'Все' },
@@ -142,7 +143,9 @@ export function AdminNotificationsList({ initialNotifications }: { initialNotifi
             </div>
           ))
         ) : (
-          <div className="px-4 py-12 text-center text-sm text-slate-500">Уведомлений нет</div>
+          <div className="p-4">
+            <AdminEmptyState title="Уведомлений нет" description="Новые системные события появятся здесь." />
+          </div>
         )}
       </div>
     </div>

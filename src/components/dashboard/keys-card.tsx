@@ -16,11 +16,10 @@ import {
   RefreshCw,
   ShieldCheck,
   Smartphone,
-  X,
 } from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
 import { cn } from '@/lib/cn'
-import { useBodyScrollLock } from '@/lib/use-body-scroll-lock'
+import { Modal } from '@/components/ui/modal'
 import { toast } from '@/components/ui/toaster'
 import { ConfirmDialog } from './confirm-dialog'
 
@@ -349,105 +348,74 @@ function InstructionModal({
   onCopy: () => void
   onOpen: () => void
 }) {
-  useBodyScrollLock(open)
-  if (!open) return null
-
   return (
-    <div className="fixed inset-0 z-[120] grid place-items-end bg-slate-950/45 p-0 sm:place-items-center sm:p-4">
-      <div className="max-h-[92dvh] w-full overflow-hidden rounded-t-2xl bg-white shadow-2xl dark:bg-surface-950 sm:max-w-lg sm:rounded-lg">
-        <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 dark:border-white/10">
-          <div>
-            <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Инструкция</div>
-            <h3 className="text-lg font-semibold">{app.name}</h3>
-          </div>
+    <Modal
+      open={open}
+      title={app.name}
+      description="Инструкция подключения"
+      onClose={onClose}
+      footer={(
+        <div className="grid gap-2 sm:grid-cols-2">
           <button
             type="button"
-            onClick={onClose}
-            className="grid h-9 w-9 place-items-center rounded-lg border border-slate-200 text-slate-500 transition hover:bg-slate-50 dark:border-white/10 dark:hover:bg-white/[0.06]"
-            aria-label="Закрыть"
+            onClick={onOpen}
+            disabled={!subscriptionUrl}
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-slate-950 px-4 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-60 dark:bg-white dark:text-slate-950"
           >
-            <X className="h-4 w-4" />
+            <ExternalLink className="h-4 w-4" />
+            {`Открыть ${app.name}`}
+          </button>
+          <button
+            type="button"
+            onClick={onCopy}
+            disabled={!subscriptionUrl}
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-slate-200 px-4 text-sm font-semibold transition hover:bg-slate-50 disabled:opacity-60 dark:border-white/10 dark:hover:bg-white/[0.06]"
+          >
+            <Copy className="h-4 w-4" />
+            Скопировать
           </button>
         </div>
-        <div className="max-h-[calc(92dvh-4rem)] overflow-y-auto p-4">
-          <div className="space-y-3">
-            {app.steps.map((step, index) => (
-              <div key={step} className="flex gap-3 rounded-lg bg-slate-50 p-3 dark:bg-white/[0.04]">
-                <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-white text-sm font-bold text-cyan-700 shadow-sm dark:bg-white/10 dark:text-cyan-200">
-                  {index + 1}
-                </div>
-                <div className="text-sm font-medium leading-6">{step}</div>
-              </div>
-            ))}
-          </div>
-
-          <div className="mt-4 rounded-lg border border-cyan-100 bg-cyan-50/70 p-3 text-sm leading-6 text-cyan-950 dark:border-cyan-400/20 dark:bg-cyan-400/10 dark:text-cyan-100">
-            <div className="flex gap-2">
-              <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
-              <span>Если приложение не открылось автоматически, ссылка уже может быть скопирована. Добавьте её вручную как URL подписки.</span>
+      )}
+    >
+      <div className="space-y-3">
+        {app.steps.map((step, index) => (
+          <div key={step} className="flex gap-3 rounded-lg bg-slate-50 p-3 dark:bg-white/[0.04]">
+            <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-white text-sm font-bold text-cyan-700 shadow-sm dark:bg-white/10 dark:text-cyan-200">
+              {index + 1}
             </div>
+            <div className="text-sm font-medium leading-6">{step}</div>
           </div>
+        ))}
+      </div>
 
-          <div className="mt-4 grid gap-2 sm:grid-cols-2">
-            <button
-              type="button"
-              onClick={onOpen}
-              disabled={!subscriptionUrl}
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-slate-950 px-4 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-60 dark:bg-white dark:text-slate-950"
-            >
-              <ExternalLink className="h-4 w-4" />
-              {`Открыть ${app.name}`}
-            </button>
-            <button
-              type="button"
-              onClick={onCopy}
-              disabled={!subscriptionUrl}
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-slate-200 px-4 text-sm font-semibold transition hover:bg-slate-50 disabled:opacity-60 dark:border-white/10 dark:hover:bg-white/[0.06]"
-            >
-              <Copy className="h-4 w-4" />
-              Скопировать
-            </button>
-          </div>
+      <div className="mt-4 rounded-lg border border-cyan-100 bg-cyan-50/70 p-3 text-sm leading-6 text-cyan-950 dark:border-cyan-400/20 dark:bg-cyan-400/10 dark:text-cyan-100">
+        <div className="flex gap-2">
+          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>Если приложение не открылось автоматически, ссылка уже может быть скопирована. Добавьте её вручную как URL подписки.</span>
         </div>
       </div>
-    </div>
+    </Modal>
   )
 }
 
 function QrModal({ open, subscriptionUrl, onClose }: { open: boolean; subscriptionUrl: string; onClose: () => void }) {
-  useBodyScrollLock(open)
-  if (!open) return null
-
   return (
-    <div className="fixed inset-0 z-[120] grid place-items-center bg-slate-950/45 p-4">
-      <div className="w-full max-w-sm rounded-lg bg-white p-4 shadow-2xl dark:bg-surface-950">
-        <div className="mb-3 flex items-center justify-between">
-          <h3 className="text-lg font-semibold">QR-код подписки</h3>
-          <button
-            type="button"
-            onClick={onClose}
-            className="grid h-9 w-9 place-items-center rounded-lg border border-slate-200 text-slate-500 transition hover:bg-slate-50 dark:border-white/10 dark:hover:bg-white/[0.06]"
-            aria-label="Закрыть"
-          >
-            <X className="h-4 w-4" />
-          </button>
+    <Modal open={open} title="QR-код подписки" onClose={onClose}>
+      {subscriptionUrl ? (
+        <Image
+          src={`/api/qr?text=${encodeURIComponent(subscriptionUrl)}`}
+          alt="QR-код подписки"
+          width={320}
+          height={320}
+          className="mx-auto h-auto w-full max-w-sm rounded-md"
+          unoptimized
+        />
+      ) : (
+        <div className="grid aspect-square place-items-center rounded-lg border border-dashed text-center text-sm text-slate-400">
+          QR появится после выдачи подписки
         </div>
-        {subscriptionUrl ? (
-          <Image
-            src={`/api/qr?text=${encodeURIComponent(subscriptionUrl)}`}
-            alt="QR-код подписки"
-            width={320}
-            height={320}
-            className="mx-auto h-auto w-full rounded-md"
-            unoptimized
-          />
-        ) : (
-          <div className="grid aspect-square place-items-center rounded-lg border border-dashed text-center text-sm text-slate-400">
-            QR появится после выдачи подписки
-          </div>
-        )}
-      </div>
-    </div>
+      )}
+    </Modal>
   )
 }
 

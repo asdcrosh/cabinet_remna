@@ -3,6 +3,7 @@ import { requireStaffPage } from '@/lib/auth/admin-page'
 import { serializeSupportMessage, serializeSupportTicket } from '@/lib/support'
 import { SupportPanelDynamic } from '@/components/support/support-panel-dynamic'
 import { parseAdminListLimit } from '@/lib/admin-list'
+import { PageHeader } from '@/components/dashboard/page-header'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Поддержка — Админка' }
@@ -87,14 +88,17 @@ export default async function AdminSupportPage({
   ])
 
   return (
-    <SupportPanelDynamic
-      mode="admin"
-      initialTotal={total}
-      pageSize={25}
-      initialTickets={tickets.map((ticket) => ({
-        ...serializeSupportTicket(ticket),
-        messages: ticket.messages.map(serializeSupportMessage),
-      }))}
-    />
+    <div className="space-y-4">
+      <PageHeader title="Поддержка" description="Админка: обращения пользователей и контекст по аккаунтам" />
+      <SupportPanelDynamic
+        mode="admin"
+        initialTotal={total}
+        pageSize={25}
+        initialTickets={tickets.map((ticket) => ({
+          ...serializeSupportTicket(ticket),
+          messages: ticket.messages.map(serializeSupportMessage),
+        }))}
+      />
+    </div>
   )
 }

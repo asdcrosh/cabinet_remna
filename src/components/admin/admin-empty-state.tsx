@@ -1,0 +1,22 @@
+import type { ReactNode } from 'react'
+import { Inbox } from 'lucide-react'
+
+type AdminEmptyStateProps = {
+  title: string
+  description?: string
+  icon?: ReactNode
+  action?: ReactNode
+}
+
+export function AdminEmptyState({ title, description, icon, action }: AdminEmptyStateProps) {
+  return (
+    <div className="card py-12 text-center">
+      <div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-lg bg-slate-50 text-slate-500 dark:bg-white/5 dark:text-slate-300">
+        {icon ?? <Inbox className="h-7 w-7" />}
+      </div>
+      <h2 className="text-lg font-semibold text-slate-950 dark:text-white">{title}</h2>
+      {description ? <p className="mx-auto mt-1 max-w-md text-sm text-slate-500 dark:text-slate-400">{description}</p> : null}
+      {action ? <div className="mt-5 flex justify-center">{action}</div> : null}
+    </div>
+  )
+}

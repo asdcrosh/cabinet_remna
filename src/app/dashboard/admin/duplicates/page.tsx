@@ -4,6 +4,7 @@ import { requireAdminPage } from '@/lib/auth/admin-page'
 import { findIdentityDuplicateCandidates } from '@/lib/identity-duplicates'
 import { PageHeader } from '@/components/dashboard/page-header'
 import { DuplicateMergeButton } from '@/components/admin/duplicate-merge-button'
+import { AdminEmptyState } from '@/components/admin/admin-empty-state'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Возможные дубли — Админка' }
@@ -39,13 +40,11 @@ export default async function AdminDuplicatesPage() {
       </section>
 
       {candidates.length === 0 ? (
-        <section className="panel panel-pad py-12 text-center">
-          <div className="mx-auto grid h-12 w-12 place-items-center rounded-lg bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-200">
-            <SearchCheck className="h-6 w-6" />
-          </div>
-          <h2 className="mt-4 text-lg font-semibold">Подозрительных дублей нет</h2>
-          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Если пользователь жалуется на разные кабинеты, используйте поиск в пользователях.</p>
-        </section>
+        <AdminEmptyState
+          title="Подозрительных дублей нет"
+          description="Если пользователь жалуется на разные кабинеты, используйте поиск в пользователях."
+          icon={<SearchCheck className="h-7 w-7 text-emerald-600" />}
+        />
       ) : (
         <div className="grid gap-3">
           {candidates.map((candidate) => (

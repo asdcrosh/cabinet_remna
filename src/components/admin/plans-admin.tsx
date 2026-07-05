@@ -20,6 +20,7 @@ import { toast } from '@/components/ui/toaster'
 import { cn } from '@/lib/cn'
 import { planAvailabilityLabels, type PlanAvailabilityValue } from '@/lib/plan-availability'
 import { AdminModal } from '@/components/admin/admin-modal'
+import { AdminEmptyState } from '@/components/admin/admin-empty-state'
 import { ConfirmDialog } from '@/components/dashboard/confirm-dialog'
 
 export interface PlanAdminRow {
@@ -254,9 +255,15 @@ export function PlansAdmin({ plans }: { plans: PlanAdminRow[] }) {
       </AdminModal>
 
       {plans.length === 0 && (
-        <button type="button" onClick={() => setCreateOpen(true)} className="card w-full py-12 text-center text-sm text-slate-500">
-          Тарифов пока нет. Создать первый тариф
-        </button>
+        <AdminEmptyState
+          title="Тарифов пока нет"
+          description="Создайте первый тариф, чтобы пользователи могли оформить подписку."
+          action={(
+            <button type="button" onClick={() => setCreateOpen(true)} className="btn-primary">
+              Создать первый тариф
+            </button>
+          )}
+        />
       )}
 
       <div className="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-white/10 dark:bg-surface-900">
