@@ -27,14 +27,15 @@ const ACTION_LABELS: Record<AuditAction, string> = {
 export default async function AdminAuditPage({
   searchParams,
 }: {
-  searchParams?: { q?: string; action?: string; limit?: string }
+  searchParams: Promise<{ q?: string; action?: string; limit?: string }>
 }) {
   const { user } = await requireAdminPage()
   if (user.role !== 'SUPER_ADMIN') redirect('/dashboard/admin')
 
-  const q = searchParams?.q?.trim() ?? ''
-  const action = searchParams?.action ?? 'ALL'
-  const limit = normalizeLimit(searchParams?.limit)
+  const params = await searchParams
+  const q = params.q?.trim() ?? ''
+  const action = params.action ?? 'ALL'
+  const limit = normalizeLimit(params.limit)
   const where = {
     ...(action !== 'ALL' && action in AuditAction ? { action: action as AuditAction } : {}),
     ...(q

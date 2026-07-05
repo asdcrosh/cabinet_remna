@@ -6,11 +6,16 @@ import { getCurrentUser } from '@/lib/auth/cookies'
 
 export const metadata = { title: 'Новый пароль' }
 
-export default async function ResetPasswordPage({ searchParams }: { searchParams: { token?: string } }) {
+export default async function ResetPasswordPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ token?: string }>
+}) {
+  const params = await searchParams
   const session = await getCurrentUser()
   if (session) redirect('/dashboard')
 
-  const token = searchParams.token?.trim()
+  const token = params.token?.trim()
 
   return (
     <AuthLayout

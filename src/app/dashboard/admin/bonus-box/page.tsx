@@ -15,10 +15,11 @@ export const metadata = { title: 'Подарки — Админка' }
 export default async function AdminBonusBoxPage({
   searchParams,
 }: {
-  searchParams?: { limit?: string }
+  searchParams: Promise<{ limit?: string }>
 }) {
   await requireAdminPage()
-  const limit = parseAdminListLimit(searchParams?.limit)
+  const params = await searchParams
+  const limit = parseAdminListLimit(params.limit)
 
   const [prizes, totalOpenings, openings, settings] = await Promise.all([
     prisma.bonusBoxPrize.findMany({

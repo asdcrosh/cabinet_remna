@@ -15,14 +15,15 @@ export const metadata = { title: 'Платежи — Админка' }
 export default async function AdminPaymentsPage({
   searchParams,
 }: {
-  searchParams?: { q?: string; status?: string; delivery?: string; limit?: string }
+  searchParams: Promise<{ q?: string; status?: string; delivery?: string; limit?: string }>
 }) {
   await requireAdminPage()
 
-  const q = searchParams?.q?.trim() ?? ''
-  const status = searchParams?.status ?? 'ALL'
-  const delivery = searchParams?.delivery ?? 'ALL'
-  const limit = parseAdminListLimit(searchParams?.limit)
+  const params = await searchParams
+  const q = params.q?.trim() ?? ''
+  const status = params.status ?? 'ALL'
+  const delivery = params.delivery ?? 'ALL'
+  const limit = parseAdminListLimit(params.limit)
   const where = {
     ...(status !== 'ALL' ? { status: status as any } : {}),
     ...(delivery === 'DELIVERED'

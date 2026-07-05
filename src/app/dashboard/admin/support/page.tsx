@@ -10,13 +10,14 @@ export const metadata = { title: 'Поддержка — Админка' }
 export default async function AdminSupportPage({
   searchParams,
 }: {
-  searchParams?: { status?: string; q?: string; limit?: string }
+  searchParams: Promise<{ status?: string; q?: string; limit?: string }>
 }) {
   await requireStaffPage()
 
-  const status = searchParams?.status || 'ALL'
-  const q = searchParams?.q?.trim() ?? ''
-  const limit = parseAdminListLimit(searchParams?.limit)
+  const params = await searchParams
+  const status = params.status || 'ALL'
+  const q = params.q?.trim() ?? ''
+  const limit = parseAdminListLimit(params.limit)
   const where = {
     ...(status !== 'ALL' ? { status: status as any } : {}),
     ...(q

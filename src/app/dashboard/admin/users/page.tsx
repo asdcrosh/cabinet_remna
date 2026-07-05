@@ -21,14 +21,15 @@ export const metadata = { title: 'Пользователи — Админка' }
 export default async function AdminUsersPage({
   searchParams,
 }: {
-  searchParams?: { q?: string; limit?: string; role?: string; account?: string }
+  searchParams: Promise<{ q?: string; limit?: string; role?: string; account?: string }>
 }) {
   const { session, user: actor } = await requireAdminPage()
 
-  const q = searchParams?.q?.trim() ?? ''
-  const role = searchParams?.role ?? 'ALL'
-  const account = searchParams?.account ?? 'ALL'
-  const limit = parseAdminListLimit(searchParams?.limit)
+  const params = await searchParams
+  const q = params.q?.trim() ?? ''
+  const role = params.role ?? 'ALL'
+  const account = params.account ?? 'ALL'
+  const limit = parseAdminListLimit(params.limit)
   const where = {
     ...(role !== 'ALL' ? { role: role as any } : {}),
     ...(account === 'LINKED'

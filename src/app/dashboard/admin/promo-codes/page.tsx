@@ -12,11 +12,12 @@ export const metadata = { title: 'Промокоды — Админка' }
 export default async function AdminPromoCodesPage({
   searchParams,
 }: {
-  searchParams?: { limit?: string }
+  searchParams: Promise<{ limit?: string }>
 }) {
   const { user } = await requireAdminPage()
   await cleanupExpiredBonusBoxPromoCodes()
-  const limit = parseAdminListLimit(searchParams?.limit)
+  const params = await searchParams
+  const limit = parseAdminListLimit(params.limit)
 
   const [total, promoCodes, plans] = await Promise.all([
     prisma.promoCode.count(),

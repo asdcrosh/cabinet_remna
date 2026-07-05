@@ -1,63 +1,71 @@
 'use client'
 
-import { useEffect, useRef, useTransition } from 'react'
-import { Loader2 } from 'lucide-react'
+import { useCallback, useEffect, useRef, useTransition } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+
+type LazyListLoaderProps = {
+  loaded: number
+  total: number
+  step?: number
+  param?: string
+}
 
 export function LazyListLoader({
   loaded,
   total,
   step = 25,
   param = 'limit',
-}: {
-  loaded: number
-  total: number
-  step?: number
-  param?: string
-}) {
+}: LazyListLoaderProps) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
-  const markerRef = useRef<HTMLDivElement | null>(null)
   const [isPending, startTransition] = useTransition()
+  const markerRef = useRef<HTMLDivElement | null>(null)
   const hasMore = loaded < total
 
-  function loadMore() {
+  const loadMore = useCallback(() => {
     if (!hasMore || isPending) return
-    const params = new URLSearchParams(searchParams.toString())
-    params.set(param, String(Math.min(total, loaded + step)))
     startTransition(() => {
-      router.replace(`${pathname}?${params.toString()}`, { scroll: false })
+      const nextLimit = Math.min(Math.max(loaded + step, step), total)
+      const next = new URLSearchParams(searchParams.toString())
+      next.set(param, String(nextLimit))
+      router.replace(`${pathname}?${next.toString()}`, { scroll: false })
     })
-  }
+  }, [hasMore, isPending, loaded, step, total, searchParams, param, pathname, router])
 
   useEffect(() => {
     const marker = markerRef.current
     if (!marker || !hasMore) return
 
     const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((entry) => entry.isIntersecting)) loadMore()
+      entries => {
+        if (entries.some(entry => entry.isIntersecting)) {
+          loadMore()
+        }
       },
-      { rootMargin: '240px 0px' }
+      { root: null, rootMargin: '240px 0px', threshold: 0 },
     )
+
     observer.observe(marker)
     return () => observer.disconnect()
-  })
+  }, [hasMore, loadMore])
 
-  if (total === 0) return null
+  if (!hasMore) return null
 
   return (
-    <div ref={markerRef} className="flex flex-col items-center gap-2 py-2">
-      <div className="text-xs text-slate-500">
+    <div className="flex flex-col items-center gap-3 py-6">
+      <div ref={markerRef} aria-hidden className="h-px w-full" />
+      <button
+        type="button"
+        onClick={loadMore}
+        disabled={isPending}
+        className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 disabled:opacity-60"
+      >
+        {isPending ? 'Загрузка…' : 'Показать ещё'}
+      </button>
+      <p className="text-xs text-slate-500">
         Показано {loaded} из {total}
-      </div>
-      {hasMore && (
-        <button type="button" className="btn-secondary min-w-40" onClick={loadMore} disabled={isPending}>
-          {isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-          {isPending ? 'Загружаем...' : 'Показать ещё'}
-        </button>
-      )}
+      </p>
     </div>
   )
 }

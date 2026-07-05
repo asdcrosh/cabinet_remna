@@ -18,13 +18,18 @@ import { ExternalLink } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
 
-export default async function BillingPage({ searchParams }: { searchParams: { paid?: string; payment?: string } }) {
+export default async function BillingPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ paid?: string; payment?: string }>
+}) {
+  const params = await searchParams
   const session = await getCurrentUser()
   if (!session) redirect('/login')
-  const returnPaymentId = typeof searchParams.payment === 'string' ? searchParams.payment : null
+  const returnPaymentId = typeof params.payment === 'string' ? params.payment : null
   await reconcileStalePendingPaymentsForUser(session.uid)
   const syncResult =
-    searchParams.paid === '1' && returnPaymentId
+    params.paid === '1' && returnPaymentId
       ? await syncPaymentProvisioning({
           paymentId: returnPaymentId,
           userId: session.uid,
@@ -41,7 +46,7 @@ export default async function BillingPage({ searchParams }: { searchParams: { pa
     <div className="space-y-6">
       <PageHeader title="Платежи" description="История оплат и состояние выдачи подписки" />
 
-      {searchParams.paid === '1' && <PaymentSuccessBanner status={getBannerStatus(syncResult)} />}
+      {params.paid === '1' && <PaymentSuccessBanner status={getBannerStatus(syncResult)} />}
 
       <div className="table-shell hidden xl:block">
         <table className="data-table min-w-[900px]">

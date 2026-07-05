@@ -10,7 +10,12 @@ export const metadata = { title: 'Регистрация' }
 
 const yandexEnabled = Boolean(process.env.YANDEX_CLIENT_ID && process.env.YANDEX_CLIENT_SECRET)
 
-export default async function RegisterPage({ searchParams }: { searchParams: { ref?: string } }) {
+export default async function RegisterPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ ref?: string }>
+}) {
+  const params = await searchParams
   const session = await getCurrentUser()
   if (session) redirect('/dashboard')
 
@@ -21,7 +26,7 @@ export default async function RegisterPage({ searchParams }: { searchParams: { r
       footer={<>Уже есть аккаунт? <Link href="/login" className="text-brand-600 hover:underline">Войти</Link></>}
       enableTelegramMiniApp
     >
-      <RegisterForm initialReferralCode={searchParams.ref ?? ''} yandexEnabled={yandexEnabled} />
+      <RegisterForm initialReferralCode={params.ref ?? ''} yandexEnabled={yandexEnabled} />
     </AuthLayout>
   )
 }
