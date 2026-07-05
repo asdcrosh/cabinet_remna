@@ -123,6 +123,7 @@ export default async function AdminUsersPage({
 
       <div className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-surface-900 lg:flex-row lg:items-center lg:justify-between">
         <form className="grid min-w-0 flex-1 gap-2 md:grid-cols-[minmax(14rem,1fr)_11rem_12rem_auto_auto]" action="/dashboard/admin/users">
+          <input type="hidden" name="limit" value={ADMIN_LIST_PAGE_SIZE} />
           <div className="relative min-w-0 flex-1">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input

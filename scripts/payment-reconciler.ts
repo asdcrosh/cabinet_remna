@@ -1,6 +1,7 @@
 import { prisma } from '../src/lib/prisma'
 import { notifySubscriptionExpiring, notifyTrafficLimit } from '../src/lib/notifications'
 import { syncPaymentProvisioning } from '../src/lib/payment-sync'
+import { provisionPaymentSubscription } from '../src/lib/provisioning'
 import { syncCabinetPaymentToRemnashopBestEffort } from '../src/lib/remnashop-reverse-sync'
 import { maybeSyncRemnashopCatalog } from '../src/lib/remnashop-sync'
 import { syncRemnashopUsersToCabinet } from '../src/lib/remnashop-users'
@@ -10,6 +11,7 @@ const intervalMs = readPositiveInt('PAYMENT_RECONCILE_INTERVAL_SECONDS', 60) * 1
 const batchSize = readPositiveInt('PAYMENT_RECONCILE_BATCH_SIZE', 25)
 const minAgeMs = readPositiveInt('PAYMENT_RECONCILE_MIN_AGE_SECONDS', 30) * 1000
 const cancelPendingAfterMs = readPositiveInt('PAYMENT_CANCEL_PENDING_AFTER_SECONDS', 600) * 1000
+const provisioningRetryBatchSize = readPositiveInt('PROVISIONING_RETRY_BATCH_SIZE', 10)
 const notificationBatchSize = readPositiveInt('NOTIFICATION_RECONCILE_BATCH_SIZE', 100)
 const remnashopUsersSyncIntervalMs = readNonNegativeInt('REMNASHOP_USERS_SYNC_INTERVAL_SECONDS', 300) * 1000
 const remnashopReverseSyncBatchSize = readPositiveInt('REMNASHOP_REVERSE_SYNC_BATCH_SIZE', 25)
@@ -81,9 +83,78 @@ async function runOnce() {
     }
   }
 
+  await retryProvisioningJobs()
   await retryRemnashopReverseSync()
   await notifyExpiringSubscriptions()
   await notifyTrafficThresholds()
+}
+
+async function retryProvisioningJobs() {
+  const jobs = await prisma.provisioningJob.findMany({
+    where: {
+      status: 'FAILED',
+      OR: [
+        { nextRetryAt: null },
+        { nextRetryAt: { lte: new Date() } },
+      ],
+    },
+    orderBy: [
+      { nextRetryAt: 'asc' },
+      { updatedAt: 'asc' },
+    ],
+    take: provisioningRetryBatchSize,
+    include: {
+      payment: {
+        include: {
+          user: { select: { id: true, email: true } },
+          plan: {
+            select: {
+              id: true,
+              name: true,
+              durationDays: true,
+              trafficLimitGb: true,
+              deviceLimit: true,
+              activeInternalSquads: true,
+            },
+          },
+        },
+      },
+    },
+  })
+
+  if (jobs.length === 0) return
+  logInfo('payment_reconciler.provisioning_retry_started', { count: jobs.length })
+
+  for (const job of jobs) {
+    if (stopped) break
+    const payment = job.payment
+
+    if (payment.status !== 'SUCCEEDED') {
+      logInfo('payment_reconciler.provisioning_retry_skipped', {
+        paymentId: payment.id,
+        status: payment.status,
+      })
+      continue
+    }
+
+    try {
+      await provisionPaymentSubscription({
+        userId: payment.user.id,
+        email: payment.user.email,
+        paymentId: payment.id,
+        plan: payment.plan,
+      })
+      logInfo('payment_reconciler.provisioning_retry_succeeded', {
+        paymentId: payment.id,
+        jobId: job.id,
+      })
+    } catch (error) {
+      logError('payment_reconciler.provisioning_retry_failed', error, {
+        paymentId: payment.id,
+        jobId: job.id,
+      })
+    }
+  }
 }
 
 async function syncRemnashopUsersIfDue() {

@@ -59,6 +59,7 @@ const optionalNonNegativeIntegers = [
   "BROADCAST_WORKER_INTERVAL_SECONDS",
   "BROADCAST_WORKER_BATCH_SIZE",
   "BROADCAST_WORKER_MAX_ATTEMPTS",
+  "PROVISIONING_RETRY_BATCH_SIZE",
 ];
 
 const optionalPositiveIntegers = [

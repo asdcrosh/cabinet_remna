@@ -72,6 +72,7 @@ export default async function AdminPaymentsPage({
       </section>
 
       <form className="grid gap-2 rounded-lg border border-slate-200 bg-white p-3 dark:border-white/10 dark:bg-surface-900 md:grid-cols-[minmax(14rem,1fr)_12rem_12rem_auto_auto]" action="/dashboard/admin/payments">
+        <input type="hidden" name="limit" value={ADMIN_LIST_PAGE_SIZE} />
         <div className="relative">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <input name="q" defaultValue={q} className="input pl-9" placeholder="Email, имя, тариф или ID" />
