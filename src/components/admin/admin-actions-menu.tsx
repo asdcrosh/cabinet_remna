@@ -29,21 +29,22 @@ export function AdminActionsMenu({ children, label = 'Действия' }: { chi
   }, [open])
 
   return (
-    <div ref={rootRef} className="relative">
+    <div ref={rootRef} className="relative z-50">
       <button
         type="button"
-        className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-200 dark:hover:bg-white/[0.08]"
+        className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-200 dark:hover:bg-white/[0.08]"
         aria-label={label}
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
       >
         <MoreHorizontal className="h-5 w-5" />
+        <span>{label}</span>
       </button>
       {open ? (
         <div
           role="menu"
-          className="absolute right-0 z-30 mt-2 w-56 rounded-lg border border-slate-200 bg-white p-2 shadow-xl shadow-slate-950/10 dark:border-white/10 dark:bg-surface-950 dark:shadow-black/30"
+          className="absolute right-0 z-[80] mt-2 w-56 rounded-lg border border-slate-200 bg-white p-2 shadow-xl shadow-slate-950/10 dark:border-white/10 dark:bg-surface-950 dark:shadow-black/30"
         >
           <div className="grid gap-1 [&_a]:w-full [&_button]:w-full [&_.btn-secondary]:justify-start [&_.btn-primary]:justify-start">
             {children}

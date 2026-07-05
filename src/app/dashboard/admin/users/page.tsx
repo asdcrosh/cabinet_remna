@@ -165,7 +165,7 @@ export default async function AdminUsersPage({
           const lastPayment = user.payments[0]
           const attemptsCount = attemptsByUser.get(user.id) ?? 0
           return (
-            <article key={user.id} className="overflow-hidden rounded-lg border bg-white shadow-sm dark:bg-surface-900">
+            <article key={user.id} className="relative overflow-visible rounded-lg border bg-white shadow-sm dark:bg-surface-900">
               <div className="grid gap-4 p-4 lg:grid-cols-[minmax(15rem,1.4fr)_minmax(11rem,.8fr)_minmax(13rem,1fr)_auto] lg:items-center">
                 <div className="min-w-0">
                   <div className="flex min-w-0 items-center gap-2">
@@ -223,7 +223,7 @@ export default async function AdminUsersPage({
                       plans={plans}
                     />
                   </div>
-                  <div className="xl:hidden">
+                  <div className="relative z-30 xl:hidden">
                     <AdminActionsMenu>
                       <UserActions
                         user={user}
