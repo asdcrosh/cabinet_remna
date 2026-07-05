@@ -69,36 +69,47 @@ export async function POST(req: Request) {
     })
 
     if (identity.action === 'merge_technical_into_email' || identity.action === 'merge_technical_into_remnashop_owner') {
-      try {
-        await mergeTechnicalTelegramAccount({
-          targetUserId: identity.target.id,
-          telegramId: telegram.id,
-          telegramUsername: telegram.username,
-          telegramName: telegram.name,
-        })
-        await writeAuditLog({
-          targetId: identity.target.id,
-          action: 'ADMIN_PROFILE_UPDATED',
-          message: 'Telegram Mini App объединил технический профиль с основным аккаунтом',
-          metadata: {
-            sourceUserId: identity.source.id,
-            telegramId: telegram.id.toString(),
-            remnashopUserId: remnashopUser?.id ?? null,
-            reason: identity.action,
-          },
-          request: req,
-        })
-        user = await prisma.user.findUnique({ where: { id: identity.target.id } })
-      } catch (error) {
-        if (!(error instanceof TelegramAccountMergeError)) throw error
-        logWarn('auth.telegram_miniapp.merge_deferred', {
+      if (!isMiniAppAutoMergeEnabled()) {
+        logWarn('auth.telegram_miniapp.merge_requires_step_up', {
           targetUserId: identity.target.id,
           sourceUserId: identity.source.id,
           remnashopUserId: remnashopUser?.id ?? null,
-          code: error.code,
+          reason: identity.action,
         })
-        if (identity.action === 'merge_technical_into_remnashop_owner') {
-          remnashopUser = null
+        remnashopUser = null
+        user = await prisma.user.findUnique({ where: { id: identity.source.id } })
+      } else {
+        try {
+          await mergeTechnicalTelegramAccount({
+            targetUserId: identity.target.id,
+            telegramId: telegram.id,
+            telegramUsername: telegram.username,
+            telegramName: telegram.name,
+          })
+          await writeAuditLog({
+            targetId: identity.target.id,
+            action: 'ADMIN_PROFILE_UPDATED',
+            message: 'Telegram Mini App объединил технический профиль с основным аккаунтом',
+            metadata: {
+              sourceUserId: identity.source.id,
+              telegramId: telegram.id.toString(),
+              remnashopUserId: remnashopUser?.id ?? null,
+              reason: identity.action,
+            },
+            request: req,
+          })
+          user = await prisma.user.findUnique({ where: { id: identity.target.id } })
+        } catch (error) {
+          if (!(error instanceof TelegramAccountMergeError)) throw error
+          logWarn('auth.telegram_miniapp.merge_deferred', {
+            targetUserId: identity.target.id,
+            sourceUserId: identity.source.id,
+            remnashopUserId: remnashopUser?.id ?? null,
+            code: error.code,
+          })
+          if (identity.action === 'merge_technical_into_remnashop_owner') {
+            remnashopUser = null
+          }
         }
       }
     }
@@ -234,4 +245,8 @@ async function findTelegramRemnashopUser(telegramId: bigint) {
     })
     return null
   }
+}
+
+function isMiniAppAutoMergeEnabled() {
+  return ['1', 'true', 'yes', 'on'].includes((process.env.TELEGRAM_MINIAPP_AUTO_MERGE_TECHNICAL || '').toLowerCase())
 }

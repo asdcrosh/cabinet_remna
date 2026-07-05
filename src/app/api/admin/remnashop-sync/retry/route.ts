@@ -5,12 +5,13 @@ import { syncCabinetPaymentToRemnashopBestEffort } from '@/lib/remnashop-reverse
 import { syncCabinetPromoCodeToRemnashopBestEffort } from '@/lib/remnashop-promo-sync'
 import { syncRemnashopUserToCabinet, syncRemnashopUsersToCabinet } from '@/lib/remnashop-users'
 import { markSyncFailed, markSyncPending, markSyncSucceeded } from '@/lib/sync-events'
+import { writeAuditLog } from '@/lib/audit-log'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 export const POST = withAuth(async (req: Request) => {
-  await requireAdmin()
+  const session = await requireAdmin()
 
   const body = (await req.json().catch(() => null)) as { id?: unknown } | null
   const id = typeof body?.id === 'string' ? body.id : null
@@ -33,6 +34,19 @@ export const POST = withAuth(async (req: Request) => {
       entityType: event.entityType,
       entityId: event.entityId,
       operation: event.operation,
+    })
+    await writeAuditLog({
+      actorId: session.uid,
+      action: 'PAYMENT_SYNCED',
+      message: 'Администратор повторил событие синхронизации',
+      metadata: {
+        syncEventId: event.id,
+        direction: event.direction,
+        entityType: event.entityType,
+        entityId: event.entityId,
+        operation: event.operation,
+      },
+      request: req,
     })
     return NextResponse.json({ ok: true, result })
   } catch (error) {

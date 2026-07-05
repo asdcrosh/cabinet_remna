@@ -13,11 +13,12 @@ import { createAdminNotification } from '@/lib/admin-notifications'
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-export const GET = withAuth(async (_req: Request, { params }: { params: { id: string } }) => {
+export const GET = withAuth(async (_req: Request, { params }: { params: Promise<{ id: string }> }) => {
   const session = await requireAuth()
+  const { id } = await params
 
   const ticket = await prisma.supportTicket.findFirst({
-    where: { id: params.id, userId: session.uid },
+    where: { id, userId: session.uid },
     include: {
       messages: {
         orderBy: { createdAt: 'asc' },
@@ -52,8 +53,9 @@ export const GET = withAuth(async (_req: Request, { params }: { params: { id: st
   })
 })
 
-export const POST = withAuth(async (req: Request, { params }: { params: { id: string } }) => {
+export const POST = withAuth(async (req: Request, { params }: { params: Promise<{ id: string }> }) => {
   const session = await requireAuth()
+  const { id } = await params
   const limited = await rateLimit(req, `support:message:${session.uid}`, 20, 10 * 60 * 1000)
   if (!limited.ok) {
     return NextResponse.json({ error: 'Слишком много сообщений. Попробуйте позже.' }, { status: 429 })
@@ -72,7 +74,7 @@ export const POST = withAuth(async (req: Request, { params }: { params: { id: st
   }
 
   const ticket = await prisma.supportTicket.findFirst({
-    where: { id: params.id, userId: session.uid },
+    where: { id, userId: session.uid },
     select: { id: true, status: true },
   })
   if (!ticket) {
@@ -124,8 +126,9 @@ export const POST = withAuth(async (req: Request, { params }: { params: { id: st
   return NextResponse.json({ message: serializeSupportMessage(message) }, { status: 201 })
 })
 
-export const PATCH = withAuth(async (req: Request, { params }: { params: { id: string } }) => {
+export const PATCH = withAuth(async (req: Request, { params }: { params: Promise<{ id: string }> }) => {
   const session = await requireAuth()
+  const { id } = await params
 
   let body: unknown
   try {
@@ -140,7 +143,7 @@ export const PATCH = withAuth(async (req: Request, { params }: { params: { id: s
   }
 
   const ticket = await prisma.supportTicket.updateMany({
-    where: { id: params.id, userId: session.uid },
+    where: { id, userId: session.uid },
     data: {
       status: parsed.data.status,
       closedAt: new Date(),

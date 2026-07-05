@@ -26,7 +26,8 @@ const YANDEX_PROVIDER = 'yandex'
 export async function GET(req: Request) {
   const requestUrl = new URL(req.url)
   const baseUrl = getAppUrlOrRequestOrigin(req)
-  const next = sanitizeOAuthNext(cookies().get(YANDEX_OAUTH_NEXT_COOKIE)?.value)
+  const cookieStore = await cookies()
+  const next = sanitizeOAuthNext(cookieStore.get(YANDEX_OAUTH_NEXT_COOKIE)?.value)
   const successUrl = new URL(next, baseUrl)
   const errorUrl = new URL('/login', baseUrl)
 
@@ -38,7 +39,7 @@ export async function GET(req: Request) {
 
   const code = requestUrl.searchParams.get('code')
   const state = requestUrl.searchParams.get('state')
-  const expectedState = cookies().get(YANDEX_OAUTH_STATE_COOKIE)?.value
+  const expectedState = cookieStore.get(YANDEX_OAUTH_STATE_COOKIE)?.value
 
   if (!code || !state || !expectedState || state !== expectedState) {
     errorUrl.searchParams.set('yandex_error', 'invalid_state')
@@ -48,7 +49,8 @@ export async function GET(req: Request) {
   try {
     const tokenResponse = await exchangeYandexCode(code)
     const profile = await fetchYandexProfile(tokenResponse.accessToken)
-    const user = await findOrCreateYandexUser(profile)
+    const referralCode = normalizeReferralCode(cookieStore.get(YANDEX_OAUTH_REF_COOKIE)?.value)
+    const user = await findOrCreateYandexUser(profile, referralCode)
 
     await prisma.user.update({
       where: { id: user.id },
@@ -77,7 +79,7 @@ export async function GET(req: Request) {
   }
 }
 
-async function findOrCreateYandexUser(profile: YandexProfile) {
+async function findOrCreateYandexUser(profile: YandexProfile, referralCode: string | null) {
   if (!profile.emailVerified) {
     throw new Error('yandex_email_not_verified')
   }
@@ -98,7 +100,7 @@ async function findOrCreateYandexUser(profile: YandexProfile) {
         ? existingAccount.user
         : await prisma.user.findUnique({ where: { email: profile.email } })
     if (!emailOwner && existingAccount.user.email.toLowerCase() !== profile.email.toLowerCase()) {
-      emailOwner = await createYandexUser(profile, { createOAuthAccount: false })
+      emailOwner = await createYandexUser(profile, { createOAuthAccount: false, referralCode })
     }
     if (
       emailOwner &&
@@ -159,7 +161,7 @@ async function findOrCreateYandexUser(profile: YandexProfile) {
     })
   }
 
-  return createYandexUser(profile, { createOAuthAccount: true })
+  return createYandexUser(profile, { createOAuthAccount: true, referralCode })
 }
 
 function canLinkYandexToExistingEmailUser(
@@ -171,11 +173,10 @@ function canLinkYandexToExistingEmailUser(
 
 async function createYandexUser(
   profile: YandexProfile,
-  options: { createOAuthAccount: boolean }
+  options: { createOAuthAccount: boolean; referralCode: string | null }
 ) {
-  const referralCode = normalizeReferralCode(cookies().get(YANDEX_OAUTH_REF_COOKIE)?.value)
-  const referrer = referralCode
-    ? await prisma.user.findUnique({ where: { referralCode }, select: { id: true } })
+  const referrer = options.referralCode
+    ? await prisma.user.findUnique({ where: { referralCode: options.referralCode }, select: { id: true } })
     : null
 
   const user = await prisma.user.create({

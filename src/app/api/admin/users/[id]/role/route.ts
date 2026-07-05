@@ -11,11 +11,12 @@ const schema = z.object({
   role: z.enum(['USER', 'MODERATOR', 'ADMIN', 'SUPER_ADMIN']),
 })
 
-export const PATCH = withAuth(async (req: Request, { params }: { params: { id: string } }) => {
+export const PATCH = withAuth(async (req: Request, { params }: { params: Promise<{ id: string }> }) => {
   const session = await requireAdmin()
+  const { id } = await params
   const [actor, target] = await Promise.all([
     prisma.user.findUnique({ where: { id: session.uid }, select: { id: true, role: true } }),
-    prisma.user.findUnique({ where: { id: params.id }, select: { id: true, role: true } }),
+    prisma.user.findUnique({ where: { id }, select: { id: true, role: true } }),
   ])
 
   if (!actor || !target) {

@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { requireAdmin, withAuth } from '@/lib/auth/guard'
 import { adminBonusBoxPrizeSchema } from '@/lib/auth/validation'
+import { writeAuditLog } from '@/lib/audit-log'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -36,6 +37,20 @@ export const POST = withAuth(async (req: Request) => {
   try {
     const prize = await prisma.bonusBoxPrize.create({
       data: parsed.data,
+    })
+    await writeAuditLog({
+      action: 'ADMIN_PROFILE_UPDATED',
+      targetId: prize.id,
+      message: 'Администратор создал подарок бонусной коробки',
+      metadata: {
+        entityType: 'bonusBoxPrize',
+        prizeId: prize.id,
+        type: prize.type,
+        value: prize.value,
+        rarity: prize.rarity,
+        isActive: prize.isActive,
+      },
+      request: req,
     })
     return NextResponse.json({ prize })
   } catch (error) {

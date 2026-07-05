@@ -3,12 +3,14 @@ import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { requireAdmin, withAuth } from '@/lib/auth/guard'
 import { updateAdminBonusBoxPrizeSchema } from '@/lib/auth/validation'
+import { writeAuditLog } from '@/lib/audit-log'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-export const PATCH = withAuth(async (req: Request, { params }: { params: { id: string } }) => {
+export const PATCH = withAuth(async (req: Request, { params }: { params: Promise<{ id: string }> }) => {
   await requireAdmin()
+  const { id } = await params
 
   let body: unknown
   try {
@@ -26,7 +28,7 @@ export const PATCH = withAuth(async (req: Request, { params }: { params: { id: s
   }
 
   const existing = await prisma.bonusBoxPrize.findUnique({
-    where: { id: params.id },
+    where: { id },
     select: { type: true, value: true, rarity: true },
   })
   if (!existing) {
@@ -54,8 +56,19 @@ export const PATCH = withAuth(async (req: Request, { params }: { params: { id: s
 
   try {
     const prize = await prisma.bonusBoxPrize.update({
-      where: { id: params.id },
+      where: { id },
       data: parsed.data,
+    })
+    await writeAuditLog({
+      action: 'ADMIN_PROFILE_UPDATED',
+      targetId: prize.id,
+      message: 'Администратор обновил подарок бонусной коробки',
+      metadata: {
+        entityType: 'bonusBoxPrize',
+        prizeId: prize.id,
+        changedFields: Object.keys(parsed.data),
+      },
+      request: req,
     })
 
     return NextResponse.json({ prize })

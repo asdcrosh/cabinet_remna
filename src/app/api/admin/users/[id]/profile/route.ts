@@ -28,8 +28,9 @@ const schema = z.object({
   remnashopUserId: z.string().trim().regex(/^\d*$/, 'Remnashop ID должен содержать только цифры').max(16).optional(),
 })
 
-export const PATCH = withAuth(async (req: Request, { params }: { params: { id: string } }) => {
+export const PATCH = withAuth(async (req: Request, { params }: { params: Promise<{ id: string }> }) => {
   const session = await requireAdmin()
+  const { id } = await params
   const body = await req.json().catch(() => null)
   const parsed = schema.safeParse(body)
 
@@ -43,7 +44,7 @@ export const PATCH = withAuth(async (req: Request, { params }: { params: { id: s
   const [actor, target] = await Promise.all([
     prisma.user.findUnique({ where: { id: session.uid }, select: { role: true } }),
     prisma.user.findUnique({
-      where: { id: params.id },
+      where: { id },
       select: { id: true, role: true, email: true, telegramId: true },
     }),
   ])

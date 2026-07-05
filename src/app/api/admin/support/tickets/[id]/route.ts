@@ -12,11 +12,12 @@ import {
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-export const GET = withAuth(async (_req: Request, { params }: { params: { id: string } }) => {
+export const GET = withAuth(async (_req: Request, { params }: { params: Promise<{ id: string }> }) => {
   await requireStaff()
+  const { id } = await params
 
   const ticket = await prisma.supportTicket.findUnique({
-    where: { id: params.id },
+    where: { id },
     include: {
       user: {
         select: {
@@ -84,8 +85,9 @@ export const GET = withAuth(async (_req: Request, { params }: { params: { id: st
   })
 })
 
-export const POST = withAuth(async (req: Request, { params }: { params: { id: string } }) => {
+export const POST = withAuth(async (req: Request, { params }: { params: Promise<{ id: string }> }) => {
   const session = await requireStaff()
+  const { id } = await params
 
   let body: unknown
   try {
@@ -100,7 +102,7 @@ export const POST = withAuth(async (req: Request, { params }: { params: { id: st
   }
 
   const ticket = await prisma.supportTicket.findUnique({
-    where: { id: params.id },
+    where: { id },
     select: { id: true, status: true },
   })
   if (!ticket) {
@@ -143,8 +145,9 @@ export const POST = withAuth(async (req: Request, { params }: { params: { id: st
   return NextResponse.json({ message: serializeSupportMessage(message) }, { status: 201 })
 })
 
-export const PATCH = withAuth(async (req: Request, { params }: { params: { id: string } }) => {
+export const PATCH = withAuth(async (req: Request, { params }: { params: Promise<{ id: string }> }) => {
   await requireStaff()
+  const { id } = await params
 
   let body: unknown
   try {
@@ -159,7 +162,7 @@ export const PATCH = withAuth(async (req: Request, { params }: { params: { id: s
   }
 
   const ticket = await prisma.supportTicket.update({
-    where: { id: params.id },
+    where: { id },
     data: {
       status: parsed.data.status,
       closedAt: parsed.data.status === 'CLOSED' ? new Date() : null,

@@ -1,10 +1,13 @@
 import { NextResponse, type NextRequest } from 'next/server'
-import { isRequestLoggingEnabled, logInfo } from '@/lib/logger'
+import { isRequestLoggingEnabled, logInfo, withRequestLogContext } from '@/lib/logger'
 
-export function middleware(req: NextRequest) {
+export function proxy(req: NextRequest) {
   const requestId = getRequestId(req)
-  const res = getMiddlewareResponse(req, requestId)
+  return withRequestLogContext({ requestId }, () => handleMiddleware(req, requestId))
+}
 
+function handleMiddleware(req: NextRequest, requestId: string) {
+  const res = getMiddlewareResponse(req, requestId)
   applySecurityHeaders(res, req)
   res.headers.set('x-request-id', requestId)
 

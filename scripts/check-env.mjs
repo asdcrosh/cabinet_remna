@@ -33,6 +33,7 @@ const optionalBooleans = [
   "BONUS_BOX_ECONOMY_GUARD_ENABLED",
   "BONUS_BOX_PITY_ENABLED",
   "BONUS_BOX_SHOW_BEST_RECENT_OPENING",
+  "TELEGRAM_MINIAPP_AUTO_MERGE_TECHNICAL",
 ];
 
 const optionalNonNegativeIntegers = [
@@ -63,6 +64,13 @@ const optionalNonNegativeIntegers = [
 const optionalPositiveIntegers = [
   "BONUS_BOX_PROMO_EXPIRES_IN_DAYS",
   "BONUS_BOX_PITY_OPENINGS",
+];
+
+const optionalSampleRates = [
+  "SENTRY_TRACES_SAMPLE_RATE",
+  "NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE",
+  "NEXT_PUBLIC_SENTRY_REPLAYS_SESSION_SAMPLE_RATE",
+  "NEXT_PUBLIC_SENTRY_REPLAYS_ON_ERROR_SAMPLE_RATE",
 ];
 
 const errors = [];
@@ -150,6 +158,14 @@ for (const key of optionalPositiveIntegers) {
   }
 }
 
+for (const key of optionalSampleRates) {
+  if (!value(key)) continue;
+  const numeric = Number(value(key));
+  if (!Number.isFinite(numeric) || numeric < 0 || numeric > 1) {
+    errors.push(`${key} must be between 0 and 1`);
+  }
+}
+
 if (value("BONUS_BOX_WEEKLY_DAY")) {
   const weeklyDay = Number(value("BONUS_BOX_WEEKLY_DAY"));
   if (!Number.isInteger(weeklyDay) || weeklyDay < 0 || weeklyDay > 6) {
@@ -163,6 +179,14 @@ if (value("TELEGRAM_BOT_TOKEN") && value("TELEGRAM_BOT_TOKEN").length < 20) {
 
 if (value("BROADCAST_UPLOAD_SIGNING_SECRET") && value("BROADCAST_UPLOAD_SIGNING_SECRET").length < 32) {
   errors.push("BROADCAST_UPLOAD_SIGNING_SECRET must be at least 32 characters");
+}
+
+if (isProduction && !value("BROADCAST_UPLOAD_SIGNING_SECRET")) {
+  errors.push("BROADCAST_UPLOAD_SIGNING_SECRET is required in production");
+}
+
+if (isProduction && value("BROADCAST_UPLOAD_ALLOW_UNSIGNED_LEGACY") !== "false") {
+  errors.push("BROADCAST_UPLOAD_ALLOW_UNSIGNED_LEGACY must be false in production");
 }
 
 if (errors.length > 0) {

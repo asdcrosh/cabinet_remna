@@ -178,7 +178,7 @@ async function latestBackup() {
       entries
         .filter((entry) => /^remna-full-backup-.*\.tar\.gz$/.test(entry))
         .map(async (entry) => {
-          const fullPath = path.join(backupDir, entry)
+          const fullPath = path.join(/*turbopackIgnore: true*/ backupDir, entry)
           const stats = await stat(fullPath)
           return { entry, fullPath, mtime: stats.mtime, size: stats.size }
         })

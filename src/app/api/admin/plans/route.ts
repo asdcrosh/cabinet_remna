@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAdmin, withAuth } from '@/lib/auth/guard'
 import { adminPlanSchema } from '@/lib/auth/validation'
+import { writeAuditLog } from '@/lib/audit-log'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -36,6 +37,20 @@ export const POST = withAuth(async (req: Request) => {
 
   const data = normalizePlanInput(parsed.data)
   const plan = await prisma.plan.create({ data })
+  await writeAuditLog({
+    action: 'ADMIN_PROFILE_UPDATED',
+    targetId: plan.id,
+    message: 'Администратор создал тариф',
+    metadata: {
+      entityType: 'plan',
+      planId: plan.id,
+      name: plan.name,
+      priceKopecks: plan.priceKopecks,
+      durationDays: plan.durationDays,
+      isActive: plan.isActive,
+    },
+    request: req,
+  })
 
   return NextResponse.json({ plan }, { status: 201 })
 })

@@ -3,12 +3,14 @@ import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { requireAdmin, withAuth } from '@/lib/auth/guard'
 import { updateAdminPlanSchema } from '@/lib/auth/validation'
+import { writeAuditLog } from '@/lib/audit-log'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-export const PATCH = withAuth(async (req: Request, { params }: { params: { id: string } }) => {
+export const PATCH = withAuth(async (req: Request, { params }: { params: Promise<{ id: string }> }) => {
   await requireAdmin()
+  const { id } = await params
 
   let body: unknown
   try {
@@ -29,8 +31,20 @@ export const PATCH = withAuth(async (req: Request, { params }: { params: { id: s
 
   try {
     const plan = await prisma.plan.update({
-      where: { id: params.id },
+      where: { id },
       data,
+    })
+    await writeAuditLog({
+      action: 'ADMIN_PROFILE_UPDATED',
+      targetId: plan.id,
+      message: 'Администратор обновил тариф',
+      metadata: {
+        entityType: 'plan',
+        planId: plan.id,
+        name: plan.name,
+        changedFields: Object.keys(data),
+      },
+      request: req,
     })
 
     return NextResponse.json({ plan })
@@ -42,11 +56,12 @@ export const PATCH = withAuth(async (req: Request, { params }: { params: { id: s
   }
 })
 
-export const DELETE = withAuth(async (_req: Request, { params }: { params: { id: string } }) => {
+export const DELETE = withAuth(async (req: Request, { params }: { params: Promise<{ id: string }> }) => {
   await requireAdmin()
+  const { id } = await params
 
   const plan = await prisma.plan.findUnique({
-    where: { id: params.id },
+    where: { id },
     include: {
       _count: {
         select: {
@@ -71,7 +86,20 @@ export const DELETE = withAuth(async (_req: Request, { params }: { params: { id:
   }
 
   try {
-    await prisma.plan.delete({ where: { id: params.id } })
+    await prisma.plan.delete({ where: { id } })
+    await writeAuditLog({
+      action: 'ADMIN_PROFILE_UPDATED',
+      targetId: plan.id,
+      message: 'Администратор удалил тариф',
+      metadata: {
+        entityType: 'plan',
+        planId: plan.id,
+        name: plan.name,
+        priceKopecks: plan.priceKopecks,
+        durationDays: plan.durationDays,
+      },
+      request: req,
+    })
     return NextResponse.json({ ok: true })
   } catch (e) {
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2025') {

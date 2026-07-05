@@ -5,14 +5,15 @@ import { remnawave, RemnawaveError } from '@/lib/remnawave'
 
 export const runtime = 'nodejs'
 
-export const DELETE = withAuth(async (_req: Request, { params }: { params: { hwid: string } }) => {
+export const DELETE = withAuth(async (_req: Request, { params }: { params: Promise<{ hwid: string }> }) => {
   const session = await requireAuth()
+  const { hwid: rawHwid } = await params
   const user = await prisma.user.findUnique({ where: { id: session.uid } })
   if (!user?.remnawaveUuid) {
     return NextResponse.json({ error: 'Нет активной подписки' }, { status: 404 })
   }
 
-  const hwid = decodeURIComponent(params.hwid)
+  const hwid = decodeURIComponent(rawHwid)
   if (!hwid) {
     return NextResponse.json({ error: 'Не выбрано устройство' }, { status: 400 })
   }

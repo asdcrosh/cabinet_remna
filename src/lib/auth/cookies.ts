@@ -8,7 +8,8 @@ import { COOKIE_NAME, signSession, verifySession, type SessionPayload } from './
 
 export async function setSessionCookie(payload: Omit<SessionPayload, 'iat' | 'exp'>) {
   const token = await signSession(payload)
-  cookies().set(COOKIE_NAME, token, {
+  const cookieStore = await cookies()
+  cookieStore.set(COOKIE_NAME, token, {
     httpOnly: true,
     sameSite: 'lax',
     secure: process.env.NODE_ENV === 'production',
@@ -17,8 +18,9 @@ export async function setSessionCookie(payload: Omit<SessionPayload, 'iat' | 'ex
   })
 }
 
-export function clearSessionCookie() {
-  cookies().delete(COOKIE_NAME)
+export async function clearSessionCookie() {
+  const cookieStore = await cookies()
+  cookieStore.delete(COOKIE_NAME)
 }
 
 // То же, но в Route Handler (нужно явно отдавать response с Set-Cookie).
@@ -44,7 +46,8 @@ export function clearSessionCookieOnResponse(res: NextResponse) {
 
 // Удобный геттер для server components
 export async function getSession(): Promise<SessionPayload | null> {
-  const token = cookies().get(COOKIE_NAME)?.value
+  const cookieStore = await cookies()
+  const token = cookieStore.get(COOKIE_NAME)?.value
   if (!token) return null
   return verifySession(token)
 }

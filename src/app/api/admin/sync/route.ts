@@ -2,11 +2,12 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAdmin, withAuth } from '@/lib/auth/guard'
 import { provisionPaymentSubscription } from '@/lib/provisioning'
+import { writeAuditLog } from '@/lib/audit-log'
 
 export const runtime = 'nodejs'
 
 export const POST = withAuth(async (req: Request) => {
-  await requireAdmin()
+  const session = await requireAdmin()
 
   let body: unknown
   try {
@@ -49,6 +50,19 @@ export const POST = withAuth(async (req: Request) => {
       deviceLimit: payment.plan.deviceLimit,
       activeInternalSquads: payment.plan.activeInternalSquads,
     },
+  })
+  await writeAuditLog({
+    actorId: session.uid,
+    targetId: payment.user.id,
+    action: 'PAYMENT_SYNCED',
+    message: 'Администратор вручную выдал подписку по платежу',
+    metadata: {
+      paymentId: payment.id,
+      subscriptionId: result.subscription.id,
+      planId: payment.plan.id,
+      planName: payment.plan.name,
+    },
+    request: req,
   })
 
   return NextResponse.json({ ok: true, subscriptionId: result.subscription.id })

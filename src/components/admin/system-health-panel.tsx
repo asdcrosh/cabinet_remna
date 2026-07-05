@@ -8,17 +8,17 @@ import type { SystemHealthReport, SystemHealthStatus } from '@/lib/system-health
 const statusView: Record<SystemHealthStatus, { label: string; className: string; icon: React.ReactNode }> = {
   ok: {
     label: 'Готово',
-    className: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+    className: 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/25 dark:bg-emerald-500/10 dark:text-emerald-200',
     icon: <CheckCircle2 className="h-4 w-4" />,
   },
   warn: {
     label: 'Внимание',
-    className: 'border-amber-200 bg-amber-50 text-amber-700',
+    className: 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/25 dark:bg-amber-500/10 dark:text-amber-200',
     icon: <AlertTriangle className="h-4 w-4" />,
   },
   error: {
     label: 'Ошибка',
-    className: 'border-red-200 bg-red-50 text-red-700',
+    className: 'border-red-200 bg-red-50 text-red-700 dark:border-red-500/25 dark:bg-red-500/10 dark:text-red-200',
     icon: <XCircle className="h-4 w-4" />,
   },
 }
@@ -75,7 +75,7 @@ export function SystemHealthPanel({ initialReport }: { initialReport: SystemHeal
           </button>
         </div>
         {error && (
-          <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-500/25 dark:bg-red-500/10 dark:text-red-200">
             {error}
           </div>
         )}

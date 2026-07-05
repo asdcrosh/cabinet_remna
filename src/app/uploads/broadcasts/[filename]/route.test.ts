@@ -31,7 +31,7 @@ describe('broadcast upload route', () => {
 
   it('rejects broadcast uploads without a valid signature', async () => {
     const response = await GET(new Request(`https://cabinet.example/uploads/broadcasts/${filename}`), {
-      params: { filename },
+      params: Promise.resolve({ filename }),
     })
 
     expect(response.status).toBe(404)
@@ -39,7 +39,7 @@ describe('broadcast upload route', () => {
 
   it('serves broadcast uploads with a valid signature', async () => {
     const signedUrl = signBroadcastUploadUrl(`https://cabinet.example/uploads/broadcasts/${filename}`)
-    const response = await GET(new Request(signedUrl), { params: { filename } })
+    const response = await GET(new Request(signedUrl), { params: Promise.resolve({ filename }) })
 
     expect(response.status).toBe(200)
     expect(response.headers.get('Content-Type')).toBe('image/jpeg')

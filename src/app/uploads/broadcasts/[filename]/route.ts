@@ -14,8 +14,8 @@ const CONTENT_TYPES: Record<string, string> = {
   gif: 'image/gif',
 }
 
-export async function GET(req: Request, { params }: { params: { filename: string } }) {
-  const filename = params.filename
+export async function GET(req: Request, { params }: { params: Promise<{ filename: string }> }) {
+  const { filename } = await params
   if (!/^\d{4}-\d{2}-\d{2}-[a-f0-9-]+\.(jpg|png|webp|gif)$/i.test(filename)) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 })
   }

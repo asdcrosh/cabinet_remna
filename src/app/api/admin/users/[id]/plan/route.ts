@@ -13,8 +13,9 @@ const schema = z.object({
   mode: z.enum(['REPLACE', 'EXTEND']).default('REPLACE'),
 })
 
-export const POST = withAuth(async (req: Request, { params }: { params: { id: string } }) => {
+export const POST = withAuth(async (req: Request, { params }: { params: Promise<{ id: string }> }) => {
   const session = await requireAdmin()
+  const { id } = await params
   const body = await req.json().catch(() => null)
   const parsed = schema.safeParse(body)
   if (!parsed.success) {
@@ -24,7 +25,7 @@ export const POST = withAuth(async (req: Request, { params }: { params: { id: st
   const [actor, user, plan] = await Promise.all([
     prisma.user.findUnique({ where: { id: session.uid }, select: { role: true } }),
     prisma.user.findUnique({
-      where: { id: params.id },
+      where: { id },
       select: { id: true, email: true, role: true },
     }),
     prisma.plan.findUnique({ where: { id: parsed.data.planId } }),

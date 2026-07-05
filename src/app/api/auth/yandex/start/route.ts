@@ -39,12 +39,13 @@ export async function GET(req: Request) {
   }
 
   const cookieOptions = getYandexOAuthCookieOptions()
-  cookies().set(YANDEX_OAUTH_STATE_COOKIE, state, cookieOptions)
-  cookies().set(YANDEX_OAUTH_NEXT_COOKIE, next, cookieOptions)
+  const cookieStore = await cookies()
+  cookieStore.set(YANDEX_OAUTH_STATE_COOKIE, state, cookieOptions)
+  cookieStore.set(YANDEX_OAUTH_NEXT_COOKIE, next, cookieOptions)
   if (referralCode) {
-    cookies().set(YANDEX_OAUTH_REF_COOKIE, referralCode, cookieOptions)
+    cookieStore.set(YANDEX_OAUTH_REF_COOKIE, referralCode, cookieOptions)
   } else {
-    cookies().delete(YANDEX_OAUTH_REF_COOKIE)
+    cookieStore.delete(YANDEX_OAUTH_REF_COOKIE)
   }
 
   return NextResponse.redirect(yandexUrl)

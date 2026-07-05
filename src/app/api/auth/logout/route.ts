@@ -15,7 +15,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Invalid request origin' }, { status: 403 })
   }
 
-  const token = cookies().get(COOKIE_NAME)?.value
+  const cookieStore = await cookies()
+  const token = cookieStore.get(COOKIE_NAME)?.value
   if (token) {
     await revokeSessionToken(token)
   }

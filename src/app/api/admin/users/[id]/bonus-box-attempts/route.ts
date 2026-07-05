@@ -11,8 +11,9 @@ const schema = z.object({
   attemptsCount: z.coerce.number().int().min(1).max(100),
 })
 
-export const POST = withAuth(async (req: Request, { params }: { params: { id: string } }) => {
+export const POST = withAuth(async (req: Request, { params }: { params: Promise<{ id: string }> }) => {
   const session = await requireSuperAdmin()
+  const { id } = await params
 
   let body: unknown
   try {
@@ -28,11 +29,11 @@ export const POST = withAuth(async (req: Request, { params }: { params: { id: st
 
   try {
     const result = await grantManualBonusBoxAttempts({
-      userId: params.id,
+      userId: id,
       adminId: session.uid,
       attemptsCount: parsed.data.attemptsCount,
     })
-    await notifyBonusGranted({ userId: params.id, attemptsCount: parsed.data.attemptsCount })
+    await notifyBonusGranted({ userId: id, attemptsCount: parsed.data.attemptsCount })
     return NextResponse.json(result)
   } catch (error) {
     if (error instanceof BonusBoxError) {

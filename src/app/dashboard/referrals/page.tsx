@@ -94,8 +94,8 @@ export default async function ReferralsPage() {
     <div className="space-y-4 sm:space-y-6">
       <PageHeader title="Рефералы" description={`+${bonusDays} дней за первую оплату друга`} />
 
-      <section id="referral-link" className="scroll-mt-24">
-        <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_14rem]">
+      <section id="referral-link" className="min-w-0 scroll-mt-24">
+        <div className="grid min-w-0 gap-3 lg:grid-cols-[minmax(0,1fr)_14rem]">
           <ReferralLinkCard code={referralCode} url={referralUrl} bonusDays={bonusDays} />
           <div className="rounded-lg border border-emerald-200/80 bg-gradient-to-br from-emerald-50 to-cyan-50 p-3 shadow-sm shadow-emerald-100/50 dark:border-emerald-400/20 dark:from-emerald-400/10 dark:to-cyan-400/10 dark:shadow-none sm:p-4">
             <div className="flex items-center justify-between gap-3 lg:block">

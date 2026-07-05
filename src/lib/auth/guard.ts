@@ -6,6 +6,7 @@ import { getSession } from './cookies'
 import type { SessionPayload } from './jwt'
 import { assertSameOrigin } from '@/lib/security'
 import { prisma } from '@/lib/prisma'
+import { withRequestLogContext } from '@/lib/logger'
 
 export class AuthError extends Error {
   constructor(public status: number, message: string) {
@@ -66,6 +67,10 @@ export function withAuth<T extends (...args: any[]) => Promise<NextResponse>>(
     try {
       if (args[0] instanceof Request) {
         assertSameOrigin(args[0])
+        return await withRequestLogContext(
+          { requestId: args[0].headers.get('x-request-id') || undefined },
+          () => handler(...args)
+        )
       }
       return await handler(...args)
     } catch (e) {

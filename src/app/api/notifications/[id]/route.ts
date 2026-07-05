@@ -5,11 +5,12 @@ import { requireAuth, withAuth } from '@/lib/auth/guard'
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-export const PATCH = withAuth(async (_req: Request, { params }: { params: { id: string } }) => {
+export const PATCH = withAuth(async (_req: Request, { params }: { params: Promise<{ id: string }> }) => {
   const session = await requireAuth()
+  const { id } = await params
 
   const result = await prisma.userNotification.updateMany({
-    where: { id: params.id, userId: session.uid, readAt: null },
+    where: { id, userId: session.uid, readAt: null },
     data: { readAt: new Date() },
   })
 

@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { requireAdmin, withAuth } from '@/lib/auth/guard'
 import { prisma } from '@/lib/prisma'
 import { getAppUrl } from '@/lib/app-url'
+import { writeAuditLog } from '@/lib/audit-log'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -59,6 +60,19 @@ export const POST = withAuth(async (req: Request) => {
       imageUrl: input.imageUrl || null,
       createdById: session.uid,
     },
+  })
+  await writeAuditLog({
+    actorId: session.uid,
+    action: 'ADMIN_NOTIFICATIONS_UPDATED',
+    message: 'Администратор создал шаблон рассылки',
+    metadata: {
+      entityType: 'broadcastTemplate',
+      templateId: template.id,
+      title: template.title,
+      segment: template.segment,
+      channels: template.channels,
+    },
+    request: req,
   })
 
   return NextResponse.json({

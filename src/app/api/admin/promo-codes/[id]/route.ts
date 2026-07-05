@@ -13,8 +13,9 @@ import {
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-export const PATCH = withAuth(async (req: Request, { params }: { params: { id: string } }) => {
+export const PATCH = withAuth(async (req: Request, { params }: { params: Promise<{ id: string }> }) => {
   const session = await requireAdmin()
+  const { id } = await params
 
   let body: unknown
   try {
@@ -38,7 +39,7 @@ export const PATCH = withAuth(async (req: Request, { params }: { params: { id: s
   }
 
   const existing = await prisma.promoCode.findUnique({
-    where: { id: params.id },
+    where: { id },
     select: { audience: true, allowedEmails: true },
   })
   if (!existing) {
@@ -72,15 +73,15 @@ export const PATCH = withAuth(async (req: Request, { params }: { params: { id: s
       if (data.maxUsesPerUser !== undefined) updateData.maxUsesPerUser = data.maxUsesPerUser
 
       const updated = await tx.promoCode.update({
-        where: { id: params.id },
+        where: { id },
         data: updateData,
       })
 
       if (data.planIds !== undefined) {
-        await tx.promoCodePlan.deleteMany({ where: { promoCodeId: params.id } })
+        await tx.promoCodePlan.deleteMany({ where: { promoCodeId: id } })
         if (data.planIds.length > 0) {
           await tx.promoCodePlan.createMany({
-            data: data.planIds.map((planId) => ({ promoCodeId: params.id, planId })),
+            data: data.planIds.map((planId) => ({ promoCodeId: id, planId })),
           })
         }
       }
@@ -117,18 +118,19 @@ export const PATCH = withAuth(async (req: Request, { params }: { params: { id: s
   }
 })
 
-export const DELETE = withAuth(async (req: Request, { params }: { params: { id: string } }) => {
+export const DELETE = withAuth(async (req: Request, { params }: { params: Promise<{ id: string }> }) => {
   const session = await requireAdmin()
+  const { id } = await params
 
   try {
     const existing = await prisma.promoCode.findUnique({
-      where: { id: params.id },
+      where: { id },
       select: { id: true, code: true },
     })
     if (!existing) return NextResponse.json({ error: 'Промокод не найден' }, { status: 404 })
     await deactivateCabinetPromoCodesInRemnashopBestEffort([existing.code])
     const deleted = await prisma.promoCode.delete({
-      where: { id: params.id },
+      where: { id },
       select: { id: true, code: true },
     })
 

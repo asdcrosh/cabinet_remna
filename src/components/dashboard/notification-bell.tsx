@@ -10,6 +10,14 @@ import type { AdminNotificationView } from '@/lib/admin-notifications'
 import { ConfirmDialog } from './confirm-dialog'
 
 const NOTIFICATION_REFRESH_MS = 15_000
+const FOCUSABLE_SELECTOR = [
+  'a[href]',
+  'button:not([disabled])',
+  'textarea:not([disabled])',
+  'input:not([disabled])',
+  'select:not([disabled])',
+  '[tabindex]:not([tabindex="-1"])',
+].join(',')
 
 type NotificationSummary = {
   unreadCount: number
@@ -30,8 +38,14 @@ export function NotificationBell({ showAdmin = false }: { showAdmin?: boolean })
   const [clearConfirmOpen, setClearConfirmOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement | null>(null)
   const panelRef = useRef<HTMLDivElement | null>(null)
+  const triggerRef = useRef<HTMLButtonElement | null>(null)
   const activeSummary = tab === 'admin' ? adminSummary : summary
   const totalUnread = summary.unreadCount + (showAdmin ? adminSummary.unreadCount : 0)
+
+  const closePanel = useCallback(() => {
+    setOpen(false)
+    window.requestAnimationFrame(() => triggerRef.current?.focus())
+  }, [])
 
   const refresh = useCallback(async () => {
     try {
@@ -165,21 +179,62 @@ export function NotificationBell({ showAdmin = false }: { showAdmin?: boolean })
       const target = event.target as Node
       const insideButton = rootRef.current?.contains(target)
       const insidePanel = panelRef.current?.contains(target)
-      if (!insideButton && !insidePanel) setOpen(false)
+      if (!insideButton && !insidePanel) closePanel()
     }
     document.addEventListener('pointerdown', onPointerDown)
     return () => document.removeEventListener('pointerdown', onPointerDown)
+  }, [closePanel, open])
+
+  useEffect(() => {
+    if (!open) return
+    window.requestAnimationFrame(() => panelRef.current?.focus())
   }, [open])
+
+  const handlePanelKeyDown = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      closePanel()
+      return
+    }
+
+    if (event.key !== 'Tab') return
+    const focusable = Array.from(panelRef.current?.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR) ?? [])
+      .filter((item) => !item.hasAttribute('disabled') && item.offsetParent !== null)
+    if (focusable.length === 0) return
+
+    const first = focusable[0]!
+    const last = focusable[focusable.length - 1]!
+    const active = document.activeElement
+
+    if (event.shiftKey && active === first) {
+      event.preventDefault()
+      last.focus()
+    } else if (!event.shiftKey && active === last) {
+      event.preventDefault()
+      first.focus()
+    }
+  }, [closePanel])
+
+  const handleTabKeyDown = useCallback((event: React.KeyboardEvent<HTMLButtonElement>) => {
+    if (!showAdmin || (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight')) return
+    event.preventDefault()
+    setTab((current) => (current === 'user' ? 'admin' : 'user'))
+  }, [showAdmin])
 
   const panel = open ? (
     <div
       id="notification-panel"
       ref={panelRef}
+      role="dialog"
+      aria-modal="false"
+      aria-labelledby="notification-panel-title"
+      tabIndex={-1}
+      onKeyDown={handlePanelKeyDown}
       className="fixed inset-x-2 top-[calc(env(safe-area-inset-top)+4.25rem)] z-[120] max-h-[calc(100dvh-env(safe-area-inset-top)-env(safe-area-inset-bottom)-8.75rem)] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-slate-950/15 dark:border-white/10 dark:bg-surface-950 dark:shadow-black/35 sm:absolute sm:inset-x-auto sm:right-6 sm:top-16 sm:w-[min(24rem,calc(100vw-2rem))] sm:max-h-[34rem] sm:rounded-xl lg:right-6"
     >
       <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 dark:border-white/10">
         <div>
-          <div className="text-sm font-semibold text-slate-950 dark:text-white">Уведомления</div>
+          <div id="notification-panel-title" className="text-sm font-semibold text-slate-950 dark:text-white">Уведомления</div>
           <div className="text-xs text-slate-500">
             {activeSummary.unreadCount > 0 ? `Новых: ${activeSummary.unreadCount}` : 'Новых нет'}
           </div>
@@ -208,25 +263,46 @@ export function NotificationBell({ showAdmin = false }: { showAdmin?: boolean })
       </div>
 
       {showAdmin && (
-        <div className="grid grid-cols-2 gap-1 border-b border-slate-100 bg-slate-50 p-1 dark:border-white/10 dark:bg-white/[0.03]">
+        <div
+          role="tablist"
+          aria-label="Тип уведомлений"
+          className="grid grid-cols-2 gap-1 border-b border-slate-100 bg-slate-50 p-1 dark:border-white/10 dark:bg-white/[0.03]"
+        >
           <button
             type="button"
+            id="notification-tab-user"
+            role="tab"
+            aria-selected={tab === 'user'}
+            aria-controls="notification-tabpanel-user"
+            tabIndex={tab === 'user' ? 0 : -1}
             className={cn('rounded-lg px-3 py-2 text-sm font-medium transition', tab === 'user' ? 'bg-white text-slate-950 shadow-sm dark:bg-surface-900 dark:text-white' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white')}
             onClick={() => setTab('user')}
+            onKeyDown={handleTabKeyDown}
           >
             Мои {summary.unreadCount > 0 ? `· ${summary.unreadCount}` : ''}
           </button>
           <button
             type="button"
+            id="notification-tab-admin"
+            role="tab"
+            aria-selected={tab === 'admin'}
+            aria-controls="notification-tabpanel-admin"
+            tabIndex={tab === 'admin' ? 0 : -1}
             className={cn('rounded-lg px-3 py-2 text-sm font-medium transition', tab === 'admin' ? 'bg-white text-slate-950 shadow-sm dark:bg-surface-900 dark:text-white' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white')}
             onClick={() => setTab('admin')}
+            onKeyDown={handleTabKeyDown}
           >
             Админка {adminSummary.unreadCount > 0 ? `· ${adminSummary.unreadCount}` : ''}
           </button>
         </div>
       )}
 
-      <div className="max-h-[calc(100dvh-env(safe-area-inset-top)-env(safe-area-inset-bottom)-18rem)] overflow-y-auto p-2 sm:max-h-96">
+      <div
+        id={tab === 'admin' ? 'notification-tabpanel-admin' : 'notification-tabpanel-user'}
+        role={showAdmin ? 'tabpanel' : undefined}
+        aria-labelledby={showAdmin ? (tab === 'admin' ? 'notification-tab-admin' : 'notification-tab-user') : undefined}
+        className="max-h-[calc(100dvh-env(safe-area-inset-top)-env(safe-area-inset-bottom)-18rem)] overflow-y-auto p-2 sm:max-h-96"
+      >
         {activeSummary.notifications.length > 0 ? (
           activeSummary.notifications.map((item) => (
             tab === 'admin' ? (
@@ -235,7 +311,7 @@ export function NotificationBell({ showAdmin = false }: { showAdmin?: boolean })
                 notification={item as AdminNotificationView}
                 onNavigate={() => {
                   void markOneRead(item.id)
-                  setOpen(false)
+                  closePanel()
                 }}
               />
             ) : (
@@ -244,7 +320,7 @@ export function NotificationBell({ showAdmin = false }: { showAdmin?: boolean })
                 notification={item as UserNotificationView}
                 onNavigate={() => {
                   void markOneRead(item.id)
-                  setOpen(false)
+                  closePanel()
                 }}
               />
             )
@@ -256,7 +332,7 @@ export function NotificationBell({ showAdmin = false }: { showAdmin?: boolean })
 
       <Link
         href={tab === 'admin' ? '/dashboard/admin/notifications' : '/dashboard/notifications'}
-        onClick={() => setOpen(false)}
+        onClick={closePanel}
         className="flex items-center justify-center gap-2 border-t border-slate-100 px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-white/10 dark:text-slate-200 dark:hover:bg-white/10"
       >
         {tab === 'admin' ? 'Все события' : 'Все уведомления'}
@@ -268,13 +344,15 @@ export function NotificationBell({ showAdmin = false }: { showAdmin?: boolean })
   return (
     <div ref={rootRef} className="relative">
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setOpen((value) => !value)}
-      className="relative grid h-10 w-10 place-items-center rounded-lg border border-white/70 bg-white/80 text-slate-700 shadow-sm shadow-slate-200/60 transition hover:bg-white hover:text-slate-950 dark:border-white/10 dark:bg-surface-900/80 dark:text-slate-200 dark:shadow-black/20 dark:hover:bg-surface-800 dark:hover:text-white"
-      aria-label="Уведомления"
-      aria-expanded={open}
-      aria-controls="notification-panel"
-    >
+        className="relative grid h-10 w-10 place-items-center rounded-lg border border-white/70 bg-white/80 text-slate-700 shadow-sm shadow-slate-200/60 transition hover:bg-white hover:text-slate-950 dark:border-white/10 dark:bg-surface-900/80 dark:text-slate-200 dark:shadow-black/20 dark:hover:bg-surface-800 dark:hover:text-white"
+        aria-label="Уведомления"
+        aria-expanded={open}
+        aria-controls="notification-panel"
+        aria-haspopup="dialog"
+      >
         <Bell className="h-5 w-5" />
         {totalUnread > 0 && (
           <span className="absolute -right-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full bg-red-600 px-1 text-[10px] font-bold leading-none text-white ring-2 ring-white dark:ring-surface-950">

@@ -1,12 +1,13 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
-import { middleware } from './middleware'
+import { proxy } from './proxy'
 import { logInfo } from '@/lib/logger'
 
 vi.mock('@/lib/logger', () => ({
   isRequestLoggingEnabled: vi.fn(() => true),
   logInfo: vi.fn(),
+  withRequestLogContext: vi.fn((_context, callback) => callback()),
 }))
 
 const logInfoMock = vi.mocked(logInfo)
@@ -30,7 +31,7 @@ describe('middleware request id', () => {
       },
     })
 
-    const res = middleware(req)
+    const res = proxy(req)
 
     expect(res.headers.get('x-request-id')).toBe('req_test-12345678')
     expect(logInfoMock).toHaveBeenCalledWith(
@@ -50,7 +51,7 @@ describe('middleware request id', () => {
       },
     })
 
-    const res = middleware(req)
+    const res = proxy(req)
     const requestId = res.headers.get('x-request-id')
 
     expect(requestId).toBe('00000000-0000-4000-8000-000000000000')

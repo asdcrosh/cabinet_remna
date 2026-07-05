@@ -12,12 +12,13 @@ import { describeSyncError } from '@/lib/sync-error'
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-export const POST = withAuth(async (req: Request, { params }: { params: { id: string } }) => {
+export const POST = withAuth(async (req: Request, { params }: { params: Promise<{ id: string }> }) => {
   const session = await requireAdmin()
+  const { id } = await params
   const [actor, user] = await Promise.all([
     prisma.user.findUnique({ where: { id: session.uid }, select: { role: true } }),
     prisma.user.findUnique({
-      where: { id: params.id },
+      where: { id },
       select: {
         id: true,
         email: true,

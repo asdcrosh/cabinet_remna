@@ -13,6 +13,7 @@ import { rateLimit } from '@/lib/rate-limit'
 import { remnashopQuery } from '@/lib/remnashop-db'
 import { logWarn } from '@/lib/logger'
 import type { BroadcastDeliveryPayload } from '@/lib/broadcast-delivery'
+import { writeAuditLog } from '@/lib/audit-log'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -204,6 +205,21 @@ export const POST = withAuth(async (req: Request) => {
     body: `${input.title}: получателей ${users.length}.`,
     actionHref: '/dashboard/admin/broadcasts',
     actionLabel: 'Открыть рассылки',
+  })
+  await writeAuditLog({
+    actorId: session.uid,
+    action: 'ADMIN_NOTIFICATIONS_UPDATED',
+    message: 'Администратор поставил рассылку в очередь',
+    metadata: {
+      entityType: 'broadcastCampaign',
+      campaignId: campaign.id,
+      title: campaign.title,
+      segment: campaign.segment,
+      channels: campaign.channels,
+      recipients: users.length,
+      limited: users.length === MAX_RECIPIENTS,
+    },
+    request: req,
   })
 
   return NextResponse.json({

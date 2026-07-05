@@ -30,8 +30,9 @@ export const GET = withAuth(async (req: Request) => {
 
   const code = url.searchParams.get('code')
   const state = url.searchParams.get('state')
-  const expectedState = cookies().get(TELEGRAM_OIDC_STATE_COOKIE)?.value
-  const verifier = cookies().get(TELEGRAM_OIDC_VERIFIER_COOKIE)?.value
+  const cookieStore = await cookies()
+  const expectedState = cookieStore.get(TELEGRAM_OIDC_STATE_COOKIE)?.value
+  const verifier = cookieStore.get(TELEGRAM_OIDC_VERIFIER_COOKIE)?.value
 
   if (!code || !state || !expectedState || !verifier || state !== expectedState) {
     settingsUrl.searchParams.set('telegram_error', 'invalid_state')

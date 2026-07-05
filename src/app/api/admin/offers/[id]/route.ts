@@ -4,8 +4,9 @@ import { requireAdmin, withAuth } from '@/lib/auth/guard'
 import { prisma } from '@/lib/prisma'
 import { writeAuditLog } from '@/lib/audit-log'
 
-export const PATCH = withAuth(async (req: Request, { params }: { params: { id: string } }) => {
+export const PATCH = withAuth(async (req: Request, { params }: { params: Promise<{ id: string }> }) => {
   const session = await requireAdmin()
+  const { id } = await params
   const body = await req.json().catch(() => null)
   const parsed = parseOfferInput(body)
   if ('error' in parsed) return NextResponse.json({ error: parsed.error }, { status: 422 })
@@ -18,7 +19,7 @@ export const PATCH = withAuth(async (req: Request, { params }: { params: { id: s
     if (!promoCode) return NextResponse.json({ error: 'Выбранный промокод не найден или отключён' }, { status: 422 })
   }
   const offer = await prisma.personalOfferSetting.update({
-    where: { id: params.id },
+    where: { id },
     data: parsed.data,
   })
 

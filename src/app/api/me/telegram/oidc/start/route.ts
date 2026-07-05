@@ -41,8 +41,9 @@ export const GET = withAuth(async (req: Request) => {
   url.searchParams.set('code_challenge_method', 'S256')
 
   const cookieOptions = getTelegramOidcCookieOptions()
-  cookies().set(TELEGRAM_OIDC_STATE_COOKIE, state, cookieOptions)
-  cookies().set(TELEGRAM_OIDC_VERIFIER_COOKIE, verifier, cookieOptions)
+  const cookieStore = await cookies()
+  cookieStore.set(TELEGRAM_OIDC_STATE_COOKIE, state, cookieOptions)
+  cookieStore.set(TELEGRAM_OIDC_VERIFIER_COOKIE, verifier, cookieOptions)
 
   return NextResponse.redirect(url)
 })
