@@ -11,6 +11,7 @@ import { ensureUserReferralCode } from '@/lib/referrals'
 import { getReferralBonusDays } from '@/lib/referral-rewards'
 import { ReferralLinkCard } from '@/components/dashboard/referral-card'
 import { PageHeader } from '@/components/dashboard/page-header'
+import { CountUp } from '@/components/dashboard/count-up'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Рефералы' }
@@ -184,13 +185,28 @@ export default async function ReferralsPage() {
 }
 
 function SummaryCard({ label, value, hint }: { label: string; value: string | number; hint?: string }) {
+  const count = parseCountValue(value)
+
   return (
     <div className="rounded-lg border bg-white/85 p-3 shadow-sm dark:border-white/10 dark:bg-white/[0.04] sm:p-4">
       <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{label}</div>
-      <div className="mt-2 text-xl font-semibold text-slate-950 dark:text-white sm:text-2xl">{value}</div>
+      <div className="mt-2 text-xl font-semibold text-slate-950 dark:text-white sm:text-2xl">
+        {count ? <CountUp value={count.value} prefix={count.prefix} suffix={count.suffix} /> : value}
+      </div>
       {hint && <div className="mt-1 text-xs text-slate-400">{hint}</div>}
     </div>
   )
+}
+
+function parseCountValue(value: string | number) {
+  if (typeof value === 'number') return { value, prefix: '', suffix: '' }
+  const match = value.match(/^([+]?)(\d+)(.*)$/)
+  if (!match) return null
+  return {
+    prefix: match[1] ?? '',
+    value: Number(match[2]),
+    suffix: match[3] ?? '',
+  }
 }
 
 function HistoryCell({ label, value }: { label: string; value: string }) {

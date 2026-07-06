@@ -1,5 +1,6 @@
 'use client'
 
+import type { CSSProperties } from 'react'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { AlertTriangle, CheckCircle2, Loader2 } from 'lucide-react'
@@ -25,6 +26,7 @@ export function PaymentSuccessBanner({ status = 'processing' }: { status?: Payme
 
   return (
     <div className={copy.className}>
+      {status === 'ready' && <PaymentConfetti />}
       {copy.icon}
       <div>
         <div className="font-medium">{copy.title}</div>
@@ -39,6 +41,20 @@ export function PaymentSuccessBanner({ status = 'processing' }: { status?: Payme
   )
 }
 
+function PaymentConfetti() {
+  return (
+    <div className="payment-confetti" aria-hidden="true">
+      {Array.from({ length: 12 }).map((_, index) => {
+        const style = {
+          '--confetti-index': index,
+          '--confetti-hue': 155 + index * 14,
+        } as CSSProperties
+        return <span key={index} style={style} />
+      })}
+    </div>
+  )
+}
+
 function getBannerCopy(status: PaymentSuccessBannerStatus, seconds: number) {
   if (status === 'ready') {
     return {
@@ -46,7 +62,7 @@ function getBannerCopy(status: PaymentSuccessBannerStatus, seconds: number) {
       description: 'Оплата прошла, подписка уже доступна в кабинете.',
       icon: <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" />,
       className:
-        'flex items-start gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-100',
+        'payment-success-pop relative overflow-hidden flex items-start gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-100',
     }
   }
 

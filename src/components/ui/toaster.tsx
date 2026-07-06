@@ -4,6 +4,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { CheckCircle2, XCircle } from 'lucide-react'
 
 type Toast = { id: number; type: 'error' | 'success'; message: string }
 
@@ -31,13 +32,14 @@ export function Toaster() {
         <div
           key={t.id}
           role="status"
-          className={`w-full max-w-sm rounded-lg px-3 py-2.5 text-sm leading-5 shadow-2xl shadow-slate-950/15 backdrop-blur sm:w-auto sm:max-w-none sm:px-4 sm:py-3 ${
+          className={`toast-enter flex w-full max-w-sm items-start gap-2 rounded-lg px-3 py-2.5 text-sm leading-5 shadow-2xl shadow-slate-950/15 backdrop-blur sm:w-auto sm:max-w-none sm:px-4 sm:py-3 ${
             t.type === 'error'
               ? 'border border-red-400/30 bg-red-600/95 text-white'
               : 'border border-emerald-300/30 bg-emerald-600/95 text-white'
           }`}
         >
-          {t.message}
+          {t.type === 'error' ? <XCircle className="mt-0.5 h-4 w-4 shrink-0" /> : <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />}
+          <span className="min-w-0">{t.message}</span>
         </div>
       ))}
     </div>

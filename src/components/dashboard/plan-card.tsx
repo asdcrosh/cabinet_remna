@@ -217,7 +217,7 @@ export function PlanCard({
   return (
     <div
       className={cn(
-        "card group relative flex h-full min-h-0 flex-col overflow-hidden p-3 transition-all duration-200 hover:-translate-y-0.5 hover:border-cyan-200/80 hover:shadow-xl sm:min-h-[360px] sm:p-4 lg:p-5",
+        "plan-card-tilt card group relative flex h-full min-h-0 flex-col overflow-hidden p-3 transition-all duration-200 hover:-translate-y-0.5 hover:border-cyan-200/80 hover:shadow-xl sm:min-h-[360px] sm:p-4 lg:p-5",
         popular &&
           "border-slate-950 ring-2 ring-slate-950/10 dark:border-white dark:ring-white/15",
         current && "bg-cyan-50/70 dark:bg-cyan-500/10",

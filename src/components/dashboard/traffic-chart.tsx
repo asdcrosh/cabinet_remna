@@ -136,7 +136,7 @@ function TrafficPulsePanel({ series }: { series: SeriesPoint[] }) {
             {pulse.days.map((day) => (
               <div key={day.date} className="group relative flex h-full min-w-0 items-end justify-center">
                 <div
-                  className={`w-full max-w-[18px] rounded-t-md rounded-b-sm bg-gradient-to-t transition-all duration-300 group-hover:-translate-y-0.5 ${
+                  className={`traffic-chart-bar w-full max-w-[18px] rounded-t-md rounded-b-sm bg-gradient-to-t transition-all duration-300 group-hover:-translate-y-0.5 ${
                     day.isPeak
                       ? 'from-emerald-500 via-teal-400 to-cyan-300 shadow-[0_0_18px_rgba(20,184,166,0.32)]'
                       : 'from-sky-600 via-cyan-400 to-cyan-200 shadow-[0_8px_18px_rgba(14,165,233,0.16)]'

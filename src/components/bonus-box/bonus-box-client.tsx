@@ -1018,7 +1018,7 @@ function rarityLabel(rarity: Rarity) {
 
 function rarityClass(rarity: Rarity) {
   if (rarity === "LEGENDARY")
-    return "bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-100";
+    return "rarity-shimmer bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-100";
   if (rarity === "EPIC")
     return "bg-fuchsia-100 text-fuchsia-800 dark:bg-fuchsia-500/15 dark:text-fuchsia-100";
   if (rarity === "RARE")
@@ -1033,7 +1033,7 @@ function prizeBorderClass(prize: BonusBoxPrizeView) {
 
 function rarityBorderClass(rarity: Rarity) {
   if (rarity === "LEGENDARY")
-    return "border-amber-200 dark:border-amber-500/40";
+    return "rarity-shimmer border-amber-200 dark:border-amber-500/40";
   if (rarity === "EPIC") return "border-fuchsia-200 dark:border-fuchsia-500/40";
   if (rarity === "RARE") return "border-cyan-200 dark:border-cyan-500/40";
   return "border-slate-200 dark:border-white/10";
@@ -1047,7 +1047,7 @@ function prizeReelClass(prize: BonusBoxPrizeView) {
 
 function rarityReelClass(rarity: Rarity) {
   if (rarity === "LEGENDARY")
-    return "border-amber-200 bg-amber-50/80 dark:border-amber-500/35 dark:bg-amber-500/10";
+    return "rarity-shimmer border-amber-200 bg-amber-50/80 dark:border-amber-500/35 dark:bg-amber-500/10";
   if (rarity === "EPIC")
     return "border-fuchsia-200 bg-fuchsia-50/80 dark:border-fuchsia-500/35 dark:bg-fuchsia-500/10";
   if (rarity === "RARE")
