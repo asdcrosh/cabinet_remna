@@ -36,6 +36,7 @@ export function TrafficChart({
     historyAvailable: false,
   })
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
 
   useEffect(() => {
     let active = true
@@ -44,6 +45,7 @@ export function TrafficChart({
         if (active) setData(response)
       })
       .catch(() => {
+        if (active) setLoadError(true)
         // Агрегаты уже переданы сервером, поэтому не заменяем их ошибкой.
       })
       .finally(() => {
@@ -99,7 +101,9 @@ export function TrafficChart({
         )}
 
         <div className="text-xs text-slate-500 dark:text-slate-400">
-          {!hasUsage && !loading
+          {loadError
+            ? 'Не удалось загрузить график. Текущие агрегаты показаны выше.'
+            : !hasUsage && !loading
             ? 'После первого подключения здесь появится статистика'
             : canShowHistory
             ? 'Пульс активности за последние 30 дней'

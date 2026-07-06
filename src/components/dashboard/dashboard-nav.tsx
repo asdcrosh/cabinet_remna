@@ -16,6 +16,7 @@ import {
   Laptop,
   Menu,
   MessageCircleQuestion,
+  MoreHorizontal,
   Send,
   ServerCog,
   Settings,
@@ -50,8 +51,15 @@ const bottomNav = [
   { href: '/dashboard/subscription', label: 'Подписка', icon: KeyRound },
   { href: '/dashboard/plans', label: 'Тарифы', icon: ShieldCheck },
   { href: '/dashboard/billing', label: 'Платежи', icon: CreditCard },
+]
+
+const bottomMoreNav = [
   { href: '/dashboard/bonus-box', label: 'Бонусы', icon: Gift },
+  { href: '/dashboard/referrals', label: 'Рефералы', icon: UsersRound },
+  { href: '/dashboard/devices', label: 'Устройства', icon: Laptop },
+  { href: '/dashboard/notifications', label: 'Уведомления', icon: Bell },
   { href: '/dashboard/support', label: 'Поддержка', icon: MessageCircleQuestion },
+  { href: '/dashboard/settings', label: 'Настройки', icon: Settings },
 ]
 
 const NAV_BADGES_REFRESH_MS = 15_000
@@ -199,10 +207,77 @@ export function MobileBottomNav({ badges = {}, features }: { badges?: NavBadges;
   const pathname = usePathname()
   const liveBadges = useLiveBadges(badges)
   const items = filterUserNav(bottomNav, features)
+  const moreItems = filterUserNav(bottomMoreNav, features)
+  const [moreOpen, setMoreOpen] = useState(false)
+  const [mounted, setMounted] = useState(false)
+  const moreActive = moreItems.some((item) => ('exact' in item && item.exact) ? pathname === item.href : pathname.startsWith(item.href))
+
+  useBodyScrollLock(moreOpen)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  const moreDrawer = (
+    <div className="fixed inset-0 z-[95] h-dvh w-dvw lg:hidden">
+      <button
+        type="button"
+        className="absolute inset-0 bg-slate-950/40"
+        onClick={() => setMoreOpen(false)}
+        aria-label="Закрыть меню"
+      />
+      <div className="absolute inset-x-0 bottom-0 rounded-t-2xl border border-white/70 bg-white/95 p-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] shadow-2xl backdrop-blur-xl dark:border-white/10 dark:bg-surface-950/95">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <div>
+            <div className="font-semibold text-slate-950 dark:text-white">Ещё</div>
+            <div className="text-sm text-slate-500 dark:text-slate-400">Разделы кабинета</div>
+          </div>
+          <button
+            type="button"
+            className="grid h-9 w-9 place-items-center rounded-lg border bg-white text-slate-500 transition hover:bg-slate-50 hover:text-slate-950 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white"
+            onClick={() => setMoreOpen(false)}
+            aria-label="Закрыть"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          {moreItems.map((item) => {
+            const Icon = item.icon
+            const active = ('exact' in item && item.exact) ? pathname === item.href : pathname.startsWith(item.href)
+            const badge = liveBadges[item.href] ?? 0
+
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={() => setMoreOpen(false)}
+                aria-current={active ? 'page' : undefined}
+                className={cn(
+                  'relative flex min-h-12 min-w-0 items-center gap-3 rounded-lg border px-3 py-2 text-sm font-semibold transition',
+                  active
+                    ? 'nav-active-glow border-slate-950 bg-slate-950 text-white dark:border-white dark:bg-white dark:text-slate-950'
+                    : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-950 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white'
+                )}
+              >
+                <Icon className="h-4 w-4 shrink-0" />
+                <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                {badge > 0 && (
+                  <span className="grid h-5 min-w-5 place-items-center rounded-full bg-red-600 px-1.5 text-[11px] text-white">
+                    {badge > 99 ? '99+' : badge}
+                  </span>
+                )}
+              </Link>
+            )
+          })}
+        </div>
+      </div>
+    </div>
+  )
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-white/70 bg-white/90 px-2 pb-[calc(env(safe-area-inset-bottom)+0.4rem)] pt-1.5 shadow-[0_-16px_40px_rgba(15,23,42,0.10)] backdrop-blur-xl dark:border-white/10 dark:bg-surface-950/90 lg:hidden">
-      <div className="mx-auto grid max-w-lg grid-cols-6 gap-1">
+      <div className="mx-auto grid max-w-md grid-cols-5 gap-1">
         {items.map((item) => {
           const Icon = item.icon
           const active = item.exact ? pathname === item.href : pathname.startsWith(item.href)
@@ -232,7 +307,23 @@ export function MobileBottomNav({ badges = {}, features }: { badges?: NavBadges;
             </Link>
           )
         })}
+        <button
+          type="button"
+          aria-expanded={moreOpen}
+          aria-label="Открыть ещё разделы"
+          onClick={() => setMoreOpen(true)}
+          className={cn(
+            'relative flex min-w-0 flex-col items-center justify-center gap-0.5 rounded-lg px-1 py-1.5 text-[11px] font-medium transition',
+            moreActive
+              ? 'bg-slate-950 text-white shadow-lg shadow-slate-950/10 dark:bg-white dark:text-slate-950'
+              : 'text-slate-500 hover:bg-slate-100 hover:text-slate-950 dark:text-slate-400 dark:hover:bg-white/10 dark:hover:text-white'
+          )}
+        >
+          <MoreHorizontal className="h-[18px] w-[18px]" />
+          <span className="max-w-full truncate">Ещё</span>
+        </button>
       </div>
+      {mounted && moreOpen ? createPortal(moreDrawer, document.body) : null}
     </nav>
   )
 }

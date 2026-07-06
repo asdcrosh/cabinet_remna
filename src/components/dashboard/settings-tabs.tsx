@@ -29,7 +29,7 @@ export function SettingsTabs({ sections }: { sections: SettingsTabSection[] }) {
     <div className="space-y-3 sm:space-y-4">
       <div className="sticky top-0 z-20 -mx-3 bg-slate-50/95 px-3 py-2 backdrop-blur dark:bg-surface-950/95 sm:static sm:mx-0 sm:bg-transparent sm:px-0 sm:py-0 sm:backdrop-blur-none">
         <div className="overflow-x-auto rounded-lg border border-slate-200/80 bg-white/90 p-1 shadow-sm shadow-slate-200/50 dark:border-white/10 dark:bg-white/[0.045] dark:shadow-black/20">
-          <div className="flex min-w-max gap-1 sm:grid sm:min-w-0 sm:grid-cols-2 xl:grid-cols-4">
+          <div role="tablist" aria-label="Разделы настроек" className="flex min-w-max gap-1 sm:grid sm:min-w-0 sm:grid-cols-2 xl:grid-cols-4">
           {sections.map((section) => {
             const active = section.id === activeId
 
@@ -37,6 +37,11 @@ export function SettingsTabs({ sections }: { sections: SettingsTabSection[] }) {
               <button
                 key={section.id}
                 type="button"
+                role="tab"
+                id={`settings-tab-${section.id}`}
+                aria-selected={active}
+                aria-controls={`settings-panel-${section.id}`}
+                tabIndex={active ? 0 : -1}
                 className={cn(
                   'flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-md px-2.5 text-sm font-medium transition sm:h-14 sm:justify-start sm:gap-3 sm:px-3 sm:text-left',
                   active
@@ -74,7 +79,13 @@ export function SettingsTabs({ sections }: { sections: SettingsTabSection[] }) {
         </div>
       </div>
 
-      <div>{activeSection?.children}</div>
+      <div
+        id={activeSection ? `settings-panel-${activeSection.id}` : undefined}
+        role="tabpanel"
+        aria-labelledby={activeSection ? `settings-tab-${activeSection.id}` : undefined}
+      >
+        {activeSection?.children}
+      </div>
     </div>
   )
 }

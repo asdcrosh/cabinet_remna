@@ -48,6 +48,12 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   return (
     <div className="min-h-screen">
+      <a
+        href="#dashboard-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[200] focus:rounded-lg focus:bg-slate-950 focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-white"
+      >
+        Перейти к содержимому
+      </a>
       <aside className="fixed inset-y-0 left-0 z-40 hidden h-dvh w-72 flex-col overflow-hidden border-r border-white/70 bg-white/90 shadow-2xl shadow-slate-200/40 backdrop-blur-xl dark:border-white/10 dark:bg-surface-950/90 dark:shadow-black/25 lg:flex">
         <div className="shrink-0 px-5 py-4">
           <Brand brandName={brandName} />
@@ -76,7 +82,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
             <MobileDashboardNav role={role} email={accountLabel} brandName={brandName} badges={navBadges} features={features} />
           </div>
         </div>
-        <div className="page-transition mx-auto w-full max-w-6xl min-w-0 px-4 pb-24 pt-4 sm:px-6 sm:pt-6 lg:px-8 lg:py-8">{children}</div>
+        <div id="dashboard-content" className="page-transition mx-auto w-full max-w-6xl min-w-0 scroll-mt-20 px-4 pb-24 pt-4 sm:px-6 sm:pt-6 lg:px-8 lg:py-8">{children}</div>
       </main>
       <MobileBottomNav badges={navBadges} features={features} />
     </div>
