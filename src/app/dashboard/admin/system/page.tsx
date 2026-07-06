@@ -1,4 +1,5 @@
 import { SystemHealthPanel } from '@/components/admin/system-health-panel'
+import { AdminPageShell } from '@/components/admin/admin-page-shell'
 import { requireAdminPage } from '@/lib/auth/admin-page'
 import { getSystemHealth } from '@/lib/system-health'
 
@@ -10,14 +11,11 @@ export default async function AdminSystemPage() {
   const report = await getSystemHealth()
 
   return (
-    <div className="space-y-4">
-      <header>
-        <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Система</h1>
-        <p className="mt-1 text-sm text-slate-500">
-          Проверка боевых интеграций, бэкапов и готовности кабинета
-        </p>
-      </header>
+    <AdminPageShell
+      title="Система"
+      description="Проверка боевых интеграций, бэкапов и готовности кабинета"
+    >
       <SystemHealthPanel initialReport={report} />
-    </div>
+    </AdminPageShell>
   )
 }
