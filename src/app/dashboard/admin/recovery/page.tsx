@@ -4,7 +4,7 @@ import { requireAdminPage } from '@/lib/auth/admin-page'
 import { formatPrice } from '@/lib/format'
 import { PageHeader } from '@/components/dashboard/page-header'
 import { PaymentBadge } from '@/components/admin/admin-badges'
-import { RecoveryActionButton } from '@/components/admin/recovery-actions'
+import { BulkRecoveryActionButton, RecoveryActionButton } from '@/components/admin/recovery-actions'
 import { AdminEmptyState } from '@/components/admin/admin-empty-state'
 
 export const dynamic = 'force-dynamic'
@@ -28,6 +28,7 @@ export default async function AdminRecoveryPage() {
       <PageHeader
         title="Довыдача"
         description="Оплаты, которые прошли, но подписка ещё не была выдана"
+        action={payments.length > 0 ? <BulkRecoveryActionButton paymentIds={payments.map((payment) => payment.id)} /> : null}
       />
 
       {payments.length === 0 ? (

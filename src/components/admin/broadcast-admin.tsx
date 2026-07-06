@@ -201,9 +201,11 @@ const BROADCAST_DRAFT_KEY = 'remnawave-cabinet:broadcast-draft'
 
 export function BroadcastAdmin({
   initialHistory = [],
+  initialHistoryTotal = initialHistory.length,
   initialTemplates = [],
 }: {
   initialHistory?: BroadcastHistoryItem[]
+  initialHistoryTotal?: number
   initialTemplates?: BroadcastTemplateItem[]
 }) {
   const bodyInputRef = useRef<HTMLTextAreaElement | null>(null)
@@ -221,6 +223,8 @@ export function BroadcastAdmin({
   const [loading, setLoading] = useState(false)
   const [stats, setStats] = useState<BroadcastStats | null>(null)
   const [history, setHistory] = useState<BroadcastHistoryItem[]>(initialHistory)
+  const [historyTotal, setHistoryTotal] = useState(initialHistoryTotal)
+  const [historyLoading, setHistoryLoading] = useState(false)
   const [customTemplates, setCustomTemplates] = useState<BroadcastTemplateItem[]>(initialTemplates)
   const [selectedHistoryItem, setSelectedHistoryItem] = useState<BroadcastHistoryItem | null>(null)
   const [step, setStep] = useState<BroadcastStep>('message')
@@ -282,6 +286,7 @@ export function BroadcastAdmin({
       setStats(result.stats)
       if (result.campaign) {
         setHistory((current) => [result.campaign!, ...current].slice(0, 12))
+        setHistoryTotal((current) => current + 1)
       }
       if (!testMode) window.localStorage.removeItem(BROADCAST_DRAFT_KEY)
       toast(testMode ? 'Тестовая рассылка отправлена вам' : result.queued ? 'Рассылка поставлена в очередь' : result.limited ? 'Рассылка отправлена первым 5000 получателей' : 'Рассылка отправлена', 'success')
@@ -380,6 +385,26 @@ export function BroadcastAdmin({
     setImageLoadFailed(false)
     setStats(null)
     toast('Рассылка загружена в редактор', 'success')
+  }
+
+  async function loadMoreHistory() {
+    if (historyLoading || history.length >= historyTotal) return
+    setHistoryLoading(true)
+    try {
+      const result = await apiFetch<{ history: BroadcastHistoryItem[]; total: number }>(
+        `/api/admin/broadcasts?skip=${history.length}&take=12`
+      )
+      setHistory((current) => {
+        const seen = new Set(current.map((item) => item.id))
+        const next = result.history.filter((item) => !seen.has(item.id))
+        return [...current, ...next]
+      })
+      setHistoryTotal(result.total)
+    } catch {
+      // apiFetch покажет ошибку.
+    } finally {
+      setHistoryLoading(false)
+    }
   }
 
   async function uploadImage(file: File | null) {
@@ -825,7 +850,14 @@ export function BroadcastAdmin({
       </div>
 
       <div className="min-w-0 overflow-hidden">
-        <BroadcastHistory history={history} onRepeat={applyHistoryItem} onView={setSelectedHistoryItem} />
+        <BroadcastHistory
+          history={history}
+          total={historyTotal}
+          loading={historyLoading}
+          onLoadMore={loadMoreHistory}
+          onRepeat={applyHistoryItem}
+          onView={setSelectedHistoryItem}
+        />
       </div>
       {selectedHistoryItem ? <BroadcastHistoryModal item={selectedHistoryItem} onClose={() => setSelectedHistoryItem(null)} /> : null}
     </section>
@@ -883,13 +915,21 @@ function InfoPill({ label, value }: { label: string; value: string }) {
 
 function BroadcastHistory({
   history,
+  total,
+  loading,
+  onLoadMore,
   onRepeat,
   onView,
 }: {
   history: BroadcastHistoryItem[]
+  total: number
+  loading: boolean
+  onLoadMore: () => void
   onRepeat: (item: BroadcastHistoryItem) => void
   onView: (item: BroadcastHistoryItem) => void
 }) {
+  const hasMore = history.length < total
+
   return (
     <div className="card min-w-0 overflow-hidden p-4">
       <div className="flex items-center gap-2">
@@ -936,6 +976,11 @@ function BroadcastHistory({
               {item.limited ? <div className="mt-2 text-xs text-amber-600">Отправлено первым 5000 получателей</div> : null}
             </div>
           ))}
+          {hasMore ? (
+            <button type="button" className="btn-secondary mt-2 justify-center" onClick={onLoadMore} disabled={loading}>
+              {loading ? 'Загрузка...' : `Показать ещё (${history.length} из ${total})`}
+            </button>
+          ) : null}
         </div>
       )}
     </div>

@@ -1,9 +1,9 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { Archive, CheckCheck, Edit3, Gift, Plus, Power, TicketCheck, Trash2, UserRound, Wand2 } from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
 import { toast } from '@/components/ui/toaster'
@@ -11,6 +11,7 @@ import { cn } from '@/lib/cn'
 import { AdminEmptyState } from '@/components/admin/admin-empty-state'
 import { AdminModal } from '@/components/admin/admin-modal'
 import { ConfirmDialog } from '@/components/dashboard/confirm-dialog'
+import { ADMIN_LIST_PAGE_SIZE } from '@/lib/admin-list'
 
 type PromoAudience = 'ALL' | 'NEW_USERS' | 'NO_ACTIVE_SUBSCRIPTION' | 'PERSONAL'
 type PromoAssigneeSource = 'PERSONAL' | 'BONUS_BOX' | 'WELCOME_BONUS' | 'REDEMPTION'
@@ -79,18 +80,22 @@ const emptyForm: PromoCodeFormState = {
 export function PromoCodesAdmin({
   promoCodes,
   plans,
+  initialQuery = '',
 }: {
   promoCodes: PromoCodeAdminRow[]
   plans: PromoPlanOption[]
+  initialQuery?: string
 }) {
   const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState<PromoCodeFormState>(emptyForm)
   const [loading, setLoading] = useState(false)
   const [editorOpen, setEditorOpen] = useState(false)
   const [tab, setTab] = useState<'AVAILABLE' | 'USED' | 'ARCHIVE'>('AVAILABLE')
   const [origin, setOrigin] = useState<'ALL' | PromoOrigin>('ALL')
-  const [query, setQuery] = useState('')
+  const [query, setQuery] = useState(initialQuery)
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [confirmAction, setConfirmAction] = useState<{
     title: string
@@ -103,6 +108,29 @@ export function PromoCodesAdmin({
     () => promoCodes.find((promoCode) => promoCode.id === editingId) ?? null,
     [editingId, promoCodes]
   )
+
+  useEffect(() => {
+    setQuery(initialQuery)
+  }, [initialQuery])
+
+  useEffect(() => {
+    const handle = window.setTimeout(() => {
+      const normalized = query.trim()
+      if (normalized === (searchParams.get('q') ?? '').trim()) return
+      const next = new URLSearchParams(searchParams.toString())
+      if (normalized) {
+        next.set('q', normalized)
+        next.set('limit', String(ADMIN_LIST_PAGE_SIZE))
+      } else {
+        next.delete('q')
+        next.delete('limit')
+      }
+      const href = next.toString() ? `${pathname}?${next.toString()}` : pathname
+      router.replace(href, { scroll: false })
+    }, 350)
+
+    return () => window.clearTimeout(handle)
+  }, [pathname, query, router, searchParams])
 
   async function submit() {
     setLoading(true)

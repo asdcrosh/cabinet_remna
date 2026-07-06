@@ -12,16 +12,31 @@ export const metadata = { title: 'Промокоды — Админка' }
 export default async function AdminPromoCodesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ limit?: string }>
+  searchParams: Promise<{ limit?: string; q?: string }>
 }) {
   const { user } = await requireAdminPage()
   await cleanupExpiredBonusBoxPromoCodes()
   const params = await searchParams
+  const q = params.q?.trim() ?? ''
   const limit = parseAdminListLimit(params.limit)
+  const where = q
+    ? {
+        OR: [
+          { code: { contains: q, mode: 'insensitive' as const } },
+          { redemptions: { some: { user: { email: { contains: q, mode: 'insensitive' as const } } } } },
+          { redemptions: { some: { user: { name: { contains: q, mode: 'insensitive' as const } } } } },
+          { bonusBoxOpenings: { some: { user: { email: { contains: q, mode: 'insensitive' as const } } } } },
+          { bonusBoxOpenings: { some: { user: { name: { contains: q, mode: 'insensitive' as const } } } } },
+          { welcomeBonusRedemptions: { some: { user: { email: { contains: q, mode: 'insensitive' as const } } } } },
+          { welcomeBonusRedemptions: { some: { user: { name: { contains: q, mode: 'insensitive' as const } } } } },
+        ],
+      }
+    : undefined
 
   const [total, promoCodes, plans] = await Promise.all([
-    prisma.promoCode.count(),
+    prisma.promoCode.count({ where }),
     prisma.promoCode.findMany({
+      where,
       orderBy: { createdAt: 'desc' },
       take: limit,
       include: {
@@ -88,6 +103,7 @@ export default async function AdminPromoCodesPage({
       <PromoCodesAdmin
         promoCodes={rows}
         plans={plans.map((plan) => ({ id: plan.id, name: plan.name }))}
+        initialQuery={q}
       />
       <LazyListLoader loaded={promoCodes.length} total={total} step={ADMIN_LIST_PAGE_SIZE} />
     </div>

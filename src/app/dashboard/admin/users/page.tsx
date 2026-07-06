@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { CalendarDays, CheckCircle2, ChevronDown, Search, Send, XCircle } from 'lucide-react'
+import { CalendarDays, CheckCircle2, ChevronDown, Download, Search, Send, XCircle } from 'lucide-react'
 import { prisma } from '@/lib/prisma'
 import { requireAdminPage } from '@/lib/auth/admin-page'
 import { PageHeader } from '@/components/dashboard/page-header'
@@ -121,7 +121,16 @@ export default async function AdminUsersPage({
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Пользователи" description="Аккаунты, роли, профили Remnawave и последние подписки" />
+      <PageHeader
+        title="Пользователи"
+        description="Аккаунты, роли, профили Remnawave и последние подписки"
+        action={
+          <a href={buildUsersExportHref(q, role, account)} className="btn-secondary w-full sm:w-auto">
+            <Download className="h-4 w-4" />
+            CSV
+          </a>
+        }
+      />
 
       <AdminFilterBar
         action="/dashboard/admin/users"
@@ -293,6 +302,14 @@ function paymentStatusLabel(status: string) {
     REFUNDED: 'Возврат',
   }
   return labels[status] ?? status
+}
+
+function buildUsersExportHref(q: string, role: string, account: string) {
+  const params = new URLSearchParams({ format: 'csv' })
+  if (q) params.set('q', q)
+  if (role !== 'ALL') params.set('role', role)
+  if (account !== 'ALL') params.set('account', account)
+  return `/api/admin/users?${params.toString()}`
 }
 
 function subscriptionStatusLabel(status: string) {

@@ -36,6 +36,45 @@ export function RecoveryActionButton({ paymentId }: { paymentId: string }) {
   )
 }
 
+export function BulkRecoveryActionButton({ paymentIds }: { paymentIds: string[] }) {
+  const router = useRouter()
+  const [loading, setLoading] = useState(false)
+  const uniquePaymentIds = Array.from(new Set(paymentIds)).slice(0, 100)
+
+  return (
+    <button
+      className="btn-primary w-full sm:w-auto"
+      disabled={loading || uniquePaymentIds.length === 0}
+      onClick={async () => {
+        setLoading(true)
+        try {
+          const result = await apiFetch<{
+            total: number
+            provisioned: number
+            alreadyProvisioned: number
+            failed: number
+          }>('/api/admin/sync', {
+            method: 'POST',
+            body: JSON.stringify({ paymentIds: uniquePaymentIds }),
+          })
+          toast(
+            `Довыдача: ${result.provisioned} выдано, ${result.alreadyProvisioned} уже было, ${result.failed} ошибок из ${result.total}`,
+            result.failed > 0 ? 'error' : 'success'
+          )
+          router.refresh()
+        } catch {
+          // apiFetch уже покажет toast
+        } finally {
+          setLoading(false)
+        }
+      }}
+    >
+      <RefreshCw className="h-4 w-4" />
+      {loading ? 'Выдаём...' : `Довыдать все (${uniquePaymentIds.length})`}
+    </button>
+  )
+}
+
 export function PaymentSyncButton({ paymentId }: { paymentId: string }) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)

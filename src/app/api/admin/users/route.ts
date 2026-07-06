@@ -3,6 +3,7 @@ import { Prisma, UserRole } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { requireAdmin, withAuth } from '@/lib/auth/guard'
 import { ADMIN_LIST_PAGE_SIZE, parseAdminListLimit } from '@/lib/admin-list'
+import { csvResponse } from '@/lib/csv'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -14,6 +15,7 @@ export const GET = withAuth(async (req: Request) => {
   const q = url.searchParams.get('q')?.trim()
   const role = url.searchParams.get('role') ?? 'ALL'
   const account = url.searchParams.get('account') ?? 'ALL'
+  const format = url.searchParams.get('format')
   const page = Math.max(1, Number(url.searchParams.get('page') || '1') || 1)
   const pageSize = parseAdminListLimit(url.searchParams.get('pageSize') || undefined, ADMIN_LIST_PAGE_SIZE, 100)
   const cursor = parseCreatedAtCursor(url.searchParams.get('cursor'))
@@ -38,6 +40,41 @@ export const GET = withAuth(async (req: Request) => {
   const where: Prisma.UserWhereInput | undefined = cursor
     ? { AND: [baseWhere, { OR: buildCreatedAtCursorWhere(cursor) }] }
     : baseWhere
+
+  if (format === 'csv') {
+    const users = await prisma.user.findMany({
+      where: baseWhere,
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      take: 5000,
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        telegramUsername: true,
+        remnashopUserId: true,
+        remnawaveUsername: true,
+        createdAt: true,
+        lastLoginAt: true,
+        _count: { select: { payments: true, subscriptions: true, devices: true } },
+      },
+    })
+
+    return csvResponse('users.csv', users.map((user) => ({
+      id: user.id,
+      email: user.email,
+      name: user.name ?? '',
+      role: user.role,
+      telegramUsername: user.telegramUsername ?? '',
+      remnashopUserId: user.remnashopUserId ?? '',
+      remnawaveUsername: user.remnawaveUsername ?? '',
+      payments: user._count.payments,
+      subscriptions: user._count.subscriptions,
+      devices: user._count.devices,
+      createdAt: user.createdAt,
+      lastLoginAt: user.lastLoginAt ?? '',
+    })))
+  }
 
   const [total, users] = await prisma.$transaction([
     prisma.user.count({ where: baseWhere }),

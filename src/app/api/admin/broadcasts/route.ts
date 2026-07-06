@@ -36,6 +36,56 @@ const schema = z.object({
   testMode: z.boolean().optional(),
 })
 
+const broadcastCampaignSelect = {
+  id: true,
+  title: true,
+  body: true,
+  segment: true,
+  inactiveDays: true,
+  channels: true,
+  actionHref: true,
+  actionLabel: true,
+  actionOpenInTelegram: true,
+  imageUrl: true,
+  recipients: true,
+  inAppCount: true,
+  telegramSent: true,
+  telegramSkipped: true,
+  telegramDuplicate: true,
+  telegramFailed: true,
+  emailSent: true,
+  emailSkipped: true,
+  emailDuplicate: true,
+  emailFailed: true,
+  limited: true,
+  createdAt: true,
+  createdBy: { select: { email: true, name: true } },
+} satisfies Prisma.BroadcastCampaignSelect
+
+type BroadcastCampaignListItem = Prisma.BroadcastCampaignGetPayload<{ select: typeof broadcastCampaignSelect }>
+
+export const GET = withAuth(async (req: Request) => {
+  await requireAdmin()
+  const url = new URL(req.url)
+  const skip = Math.max(0, Number(url.searchParams.get('skip') || '0') || 0)
+  const take = Math.min(50, Math.max(1, Number(url.searchParams.get('take') || '12') || 12))
+
+  const [total, history] = await prisma.$transaction([
+    prisma.broadcastCampaign.count(),
+    prisma.broadcastCampaign.findMany({
+      orderBy: { createdAt: 'desc' },
+      skip,
+      take,
+      select: broadcastCampaignSelect,
+    }),
+  ])
+
+  return NextResponse.json({
+    history: history.map(serializeBroadcastCampaign),
+    total,
+  })
+})
+
 export const POST = withAuth(async (req: Request) => {
   const session = await requireAdmin()
   const parsed = schema.safeParse(await req.json().catch(() => null))
@@ -142,31 +192,7 @@ export const POST = withAuth(async (req: Request) => {
       limited: users.length === MAX_RECIPIENTS,
       createdById: session.uid,
     },
-    select: {
-      id: true,
-      title: true,
-      body: true,
-      segment: true,
-      inactiveDays: true,
-      channels: true,
-      actionHref: true,
-      actionLabel: true,
-      actionOpenInTelegram: true,
-      imageUrl: true,
-      recipients: true,
-      inAppCount: true,
-      telegramSent: true,
-      telegramSkipped: true,
-      telegramDuplicate: true,
-      telegramFailed: true,
-      emailSent: true,
-      emailSkipped: true,
-      emailDuplicate: true,
-      emailFailed: true,
-      limited: true,
-      createdAt: true,
-      createdBy: { select: { email: true, name: true } },
-    },
+    select: broadcastCampaignSelect,
   })
 
   const deliveries = users.map((user) => {
@@ -230,13 +256,17 @@ export const POST = withAuth(async (req: Request) => {
     },
     limited: users.length === MAX_RECIPIENTS,
     queued: true,
-    campaign: {
-      ...campaign,
-      createdAt: campaign.createdAt.toISOString(),
-      createdBy: campaign.createdBy ? campaign.createdBy.name || campaign.createdBy.email : null,
-    },
+    campaign: serializeBroadcastCampaign(campaign),
   })
 })
+
+function serializeBroadcastCampaign(campaign: BroadcastCampaignListItem) {
+  return {
+    ...campaign,
+    createdAt: campaign.createdAt.toISOString(),
+    createdBy: campaign.createdBy ? campaign.createdBy.name || campaign.createdBy.email : null,
+  }
+}
 
 function emptyBroadcastStats() {
   return {

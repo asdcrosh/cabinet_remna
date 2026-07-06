@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { Search } from 'lucide-react'
+import { Download, Search } from 'lucide-react'
 import { prisma } from '@/lib/prisma'
 import { requireAdminPage } from '@/lib/auth/admin-page'
 import { formatPrice } from '@/lib/format'
@@ -19,7 +19,7 @@ export const metadata = { title: 'Платежи — Админка' }
 export default async function AdminPaymentsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; status?: string; delivery?: string; limit?: string }>
+  searchParams: Promise<{ q?: string; status?: string; delivery?: string; from?: string; to?: string; range?: string; limit?: string }>
 }) {
   await requireAdminPage()
 
@@ -27,6 +27,8 @@ export default async function AdminPaymentsPage({
   const q = params.q?.trim() ?? ''
   const status = params.status ?? 'ALL'
   const delivery = params.delivery ?? 'ALL'
+  const range = params.range ?? 'ALL'
+  const { from, to } = resolveDateRange(range, params.from, params.to)
   const limit = parseAdminListLimit(params.limit)
   const where = {
     ...(status !== 'ALL' ? { status: status as any } : {}),
@@ -35,6 +37,7 @@ export default async function AdminPaymentsPage({
       : delivery === 'RETRY'
         ? { status: 'SUCCEEDED' as const, subscriptionProvisionedAt: null }
         : {}),
+    ...(from || to ? { createdAt: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } } : {}),
     ...(q
       ? {
           OR: [
@@ -66,7 +69,16 @@ export default async function AdminPaymentsPage({
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Платежи" description="Все платежи, их статус и результат выдачи подписки" />
+      <PageHeader
+        title="Платежи"
+        description="Все платежи, их статус и результат выдачи подписки"
+        action={
+          <Link href={buildPaymentsExportHref(q, status, delivery, range, params.from, params.to)} className="btn-secondary w-full sm:w-auto">
+            <Download className="h-4 w-4" />
+            CSV
+          </Link>
+        }
+      />
 
       <section className="grid gap-3 md:grid-cols-3">
         <PaymentStat title="Ожидают оплаты" value={pendingCount} tone="amber" />
@@ -77,8 +89,9 @@ export default async function AdminPaymentsPage({
       <AdminFilterBar
         action="/dashboard/admin/payments"
         resetHref="/dashboard/admin/payments"
-        resetVisible={Boolean(q || status !== 'ALL' || delivery !== 'ALL')}
+        resetVisible={Boolean(q || status !== 'ALL' || delivery !== 'ALL' || range !== 'ALL' || params.from || params.to)}
         count={{ shown: payments.length, total }}
+        className="md:grid-cols-[minmax(14rem,1fr)_10rem_12rem_10rem_9rem_9rem_auto_auto]"
       >
         <input type="hidden" name="limit" value={ADMIN_LIST_PAGE_SIZE} />
         <div className="relative">
@@ -97,6 +110,14 @@ export default async function AdminPaymentsPage({
           <option value="DELIVERED">Подписка выдана</option>
           <option value="RETRY">Нужна довыдача</option>
         </select>
+        <select name="range" defaultValue={range} className="input">
+          <option value="ALL">Всё время</option>
+          <option value="TODAY">Сегодня</option>
+          <option value="WEEK">Неделя</option>
+          <option value="CUSTOM">Период</option>
+        </select>
+        <input name="from" defaultValue={params.from ?? ''} type="date" className="input" aria-label="Дата от" />
+        <input name="to" defaultValue={params.to ?? ''} type="date" className="input" aria-label="Дата до" />
         <AdminFilterSubmitButton />
       </AdminFilterBar>
 
@@ -253,6 +274,44 @@ export default async function AdminPaymentsPage({
 function humanSyncError(value: string | null) {
   if (!value) return 'Remnashop ждёт sync'
   return describeSyncError(new Error(value))
+}
+
+function resolveDateRange(range: string, fromRaw?: string, toRaw?: string) {
+  const now = new Date()
+  if (range === 'TODAY') {
+    const start = new Date(now)
+    start.setHours(0, 0, 0, 0)
+    const end = new Date(now)
+    end.setHours(23, 59, 59, 999)
+    return { from: start, to: end }
+  }
+  if (range === 'WEEK') {
+    const start = new Date(now)
+    start.setDate(start.getDate() - 7)
+    start.setHours(0, 0, 0, 0)
+    return { from: start, to: now }
+  }
+  return {
+    from: parseDateInput(fromRaw, 'start'),
+    to: parseDateInput(toRaw, 'end'),
+  }
+}
+
+function parseDateInput(value: string | undefined, edge: 'start' | 'end') {
+  if (!value) return null
+  const date = new Date(`${value}T${edge === 'start' ? '00:00:00.000' : '23:59:59.999'}`)
+  return Number.isNaN(date.getTime()) ? null : date
+}
+
+function buildPaymentsExportHref(q: string, status: string, delivery: string, range: string, from?: string, to?: string) {
+  const params = new URLSearchParams({ format: 'csv' })
+  if (q) params.set('q', q)
+  if (status !== 'ALL') params.set('status', status)
+  if (delivery !== 'ALL') params.set('delivery', delivery)
+  if (range !== 'ALL') params.set('range', range)
+  if (from) params.set('from', from)
+  if (to) params.set('to', to)
+  return `/api/admin/payments?${params.toString()}`
 }
 
 function PaymentStat({ title, value, tone }: { title: string; value: number; tone: 'amber' | 'emerald' | 'red' | 'slate' }) {
