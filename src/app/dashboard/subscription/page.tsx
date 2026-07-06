@@ -34,8 +34,18 @@ export default async function SubscriptionPage() {
       return (
         <EmptyState
           title="Не удалось загрузить подписку"
-          description="Сервис временно недоступен. Попробуйте обновить страницу чуть позже."
+          description="Сервис временно недоступен. Можно повторить загрузку или написать в поддержку."
           icon={<ShieldAlert className="h-7 w-7" />}
+          action={
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Link href="/dashboard/subscription" className="btn-primary">
+                Обновить
+              </Link>
+              <Link href="/dashboard/support" className="btn-secondary">
+                В поддержку
+              </Link>
+            </div>
+          }
         />
       )
     }

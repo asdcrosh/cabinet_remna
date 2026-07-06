@@ -37,6 +37,7 @@ const nav = [
   { href: '/dashboard', label: 'Главная', icon: Home, exact: true },
   { href: '/dashboard/subscription', label: 'Подписка', icon: KeyRound },
   { href: '/dashboard/plans', label: 'Тарифы', icon: ShieldCheck },
+  { href: '/dashboard/billing', label: 'Платежи', icon: CreditCard },
   { href: '/dashboard/bonus-box', label: 'Бонусы', icon: Gift },
   { href: '/dashboard/referrals', label: 'Рефералы', icon: UsersRound },
   { href: '/dashboard/devices', label: 'Устройства', icon: Laptop },
@@ -48,6 +49,7 @@ const bottomNav = [
   { href: '/dashboard', label: 'Главная', icon: Home, exact: true },
   { href: '/dashboard/subscription', label: 'Подписка', icon: KeyRound },
   { href: '/dashboard/plans', label: 'Тарифы', icon: ShieldCheck },
+  { href: '/dashboard/billing', label: 'Платежи', icon: CreditCard },
   { href: '/dashboard/bonus-box', label: 'Бонусы', icon: Gift },
   { href: '/dashboard/support', label: 'Поддержка', icon: MessageCircleQuestion },
 ]
@@ -66,6 +68,7 @@ const adminNav = [
   { href: '/dashboard/admin/promo-codes', label: 'Промокоды', icon: Tag },
   { href: '/dashboard/admin/bonus-box', label: 'Подарки', icon: Gift },
   { href: '/dashboard/admin/payments', label: 'Платежи', icon: CreditCard },
+  { href: '/dashboard/admin/recovery', label: 'Довыдача', icon: FileClock },
   { href: '/dashboard/admin/remnashop-sync', label: 'Синхронизация', icon: Database },
   { href: '/dashboard/admin/system', label: 'Система', icon: ServerCog },
   { href: '/dashboard/admin/audit', label: 'История', icon: FileClock },
@@ -96,6 +99,7 @@ const adminNavGroups = [
       '/dashboard/admin/promo-codes',
       '/dashboard/admin/bonus-box',
       '/dashboard/admin/payments',
+      '/dashboard/admin/recovery',
     ],
   },
   {
@@ -198,7 +202,7 @@ export function MobileBottomNav({ badges = {}, features }: { badges?: NavBadges;
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-white/70 bg-white/90 px-2 pb-[calc(env(safe-area-inset-bottom)+0.4rem)] pt-1.5 shadow-[0_-16px_40px_rgba(15,23,42,0.10)] backdrop-blur-xl dark:border-white/10 dark:bg-surface-950/90 lg:hidden">
-      <div className="mx-auto grid max-w-md grid-cols-5 gap-1">
+      <div className="mx-auto grid max-w-lg grid-cols-6 gap-1">
         {items.map((item) => {
           const Icon = item.icon
           const active = item.exact ? pathname === item.href : pathname.startsWith(item.href)

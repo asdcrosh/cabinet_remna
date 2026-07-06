@@ -34,6 +34,8 @@ export function NotificationsList({ initialNotifications }: { initialNotificatio
     { value: 'bonus', label: 'Бонусы', count: notifications.filter((item) => notificationGroup(item.type) === 'bonus').length },
     { value: 'broadcast', label: 'Новости', count: notifications.filter((item) => notificationGroup(item.type) === 'broadcast').length },
   ]
+  const activeFilter = filterItems.find((item) => item.value === filter) ?? filterItems[0]!
+  const emptyCopy = getEmptyCopy(filter, activeFilter.label, notifications.length)
 
   return (
     <section className="space-y-4">
@@ -84,14 +86,28 @@ export function NotificationsList({ initialNotifications }: { initialNotificatio
               <div className="mx-auto grid h-12 w-12 place-items-center rounded-xl bg-slate-100 text-slate-500 dark:bg-white/10 dark:text-slate-300">
                 <Bell className="h-5 w-5" />
               </div>
-              <div className="mt-3 font-medium text-slate-950 dark:text-white">Уведомлений пока нет</div>
-              <div className="mt-1 text-sm text-slate-500">Важные события появятся здесь.</div>
+              <div className="mt-3 font-medium text-slate-950 dark:text-white">{emptyCopy.title}</div>
+              <div className="mt-1 text-sm text-slate-500">{emptyCopy.description}</div>
             </div>
           </div>
         )}
       </div>
     </section>
   )
+}
+
+function getEmptyCopy(filter: NotificationFilter, label: string, total: number) {
+  if (total === 0 || filter === 'all') {
+    return {
+      title: 'Уведомлений пока нет',
+      description: 'Важные события появятся здесь.',
+    }
+  }
+
+  return {
+    title: `В категории «${label}» пока пусто`,
+    description: 'В других категориях уведомления уже есть.',
+  }
 }
 
 function NotificationItem({ notification }: { notification: UserNotificationView }) {

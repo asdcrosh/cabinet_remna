@@ -81,6 +81,7 @@ export default async function AdminAuditPage({
         count={{ shown: visibleLogs.length, total }}
         className="md:grid-cols-[minmax(14rem,1fr)_14rem_auto_auto]"
       >
+        <input type="hidden" name="limit" value="50" />
         <div className="relative min-w-0">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <input name="q" defaultValue={q} placeholder="Поиск по email или действию" className="input pl-9" />

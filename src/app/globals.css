@@ -125,6 +125,7 @@
   .badge-expired { @apply badge bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300; }
   .badge-disabled { @apply badge bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300; }
   .badge-limited { @apply badge bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300; }
+  .badge-muted { @apply badge bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-slate-300; }
   .table-shell {
     @apply overflow-x-auto rounded-lg border border-white/70 bg-white/80 shadow-xl shadow-slate-200/50 backdrop-blur
            dark:border-white/10 dark:bg-surface-900/80 dark:shadow-black/25;

@@ -8,7 +8,7 @@ import { RecoveryActionButton } from '@/components/admin/recovery-actions'
 import { AdminEmptyState } from '@/components/admin/admin-empty-state'
 
 export const dynamic = 'force-dynamic'
-export const metadata = { title: 'Recovery — Админка' }
+export const metadata = { title: 'Довыдача — Админка' }
 
 export default async function AdminRecoveryPage() {
   await requireAdminPage()
@@ -26,7 +26,7 @@ export default async function AdminRecoveryPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Recovery"
+        title="Довыдача"
         description="Оплаты, которые прошли, но подписка ещё не была выдана"
       />
 
