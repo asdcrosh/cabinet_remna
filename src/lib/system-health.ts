@@ -256,6 +256,63 @@ async function checkProvisioningQueue() {
   }
 }
 
+async function checkBroadcastBacklog() {
+  try {
+    const [pending, processing, failed] = await Promise.all([
+      prisma.broadcastDelivery.count({ where: { status: 'PENDING' } }),
+      prisma.broadcastDelivery.count({ where: { status: 'PROCESSING' } }),
+      prisma.broadcastDelivery.count({ where: { status: 'FAILED' } }),
+    ])
+    const total = pending + processing + failed
+    if (failed > 0) {
+      return check(
+        'broadcast-backlog',
+        'Очередь рассылок',
+        'warn',
+        'Есть ошибки доставки',
+        `Ожидают: ${pending}, в работе: ${processing}, ошибок: ${failed}`
+      )
+    }
+    return check(
+      'broadcast-backlog',
+      'Очередь рассылок',
+      pending > 1000 || processing > 250 ? 'warn' : 'ok',
+      total > 0 ? `В очереди: ${total}` : 'Очередь чистая',
+      total > 0 ? `Ожидают: ${pending}, в работе: ${processing}` : undefined
+    )
+  } catch (error) {
+    return check('broadcast-backlog', 'Очередь рассылок', 'warn', 'Не удалось проверить очередь', errorMessage(error))
+  }
+}
+
+async function checkSyncEventsBacklog() {
+  try {
+    const [pending, failed, skipped] = await Promise.all([
+      prisma.syncEvent.count({ where: { status: 'PENDING' } }),
+      prisma.syncEvent.count({ where: { status: 'FAILED' } }),
+      prisma.syncEvent.count({ where: { status: 'SKIPPED' } }),
+    ])
+    if (failed > 0) {
+      return check(
+        'sync-events',
+        'События синхронизации',
+        'warn',
+        'Есть события с ошибками',
+        `Ожидают: ${pending}, ошибок: ${failed}, пропущено: ${skipped}`
+      )
+    }
+    return check(
+      'sync-events',
+      'События синхронизации',
+      pending > 250 || skipped > 0 ? 'warn' : 'ok',
+      pending > 0 ? `Ожидают обработки: ${pending}` : 'Backlog чистый',
+      skipped > 0 ? `Пропущено: ${skipped}` : undefined
+    )
+  } catch (error) {
+    return check('sync-events', 'События синхронизации', 'warn', 'Не удалось проверить sync events', errorMessage(error))
+  }
+}
+
 export async function getSystemHealth(options: { sendEmail?: boolean } = {}): Promise<SystemHealthReport> {
   const checkedAt = nowIso()
   const checks = await Promise.all([
@@ -267,6 +324,8 @@ export async function getSystemHealth(options: { sendEmail?: boolean } = {}): Pr
     latestBackup(),
     checkS3(),
     checkProvisioningQueue(),
+    checkBroadcastBacklog(),
+    checkSyncEventsBacklog(),
   ])
 
   return {

@@ -8,6 +8,7 @@ async function main() {
   const auditDays = readDays('AUDIT_LOG_RETENTION_DAYS', 365)
   const notificationDays = readDays('NOTIFICATION_LOG_RETENTION_DAYS', 180)
   const syncEventDays = readDays('SYNC_EVENT_RETENTION_DAYS', 180)
+  const broadcastDeliveryDays = readDays('BROADCAST_DELIVERY_RETENTION_DAYS', 180)
 
   const [
     expiredRateLimits,
@@ -15,6 +16,7 @@ async function main() {
     oldAuditLogs,
     oldNotificationLogs,
     oldSyncEvents,
+    oldBroadcastDeliveries,
   ] = await Promise.all([
     prisma.rateLimitBucket.deleteMany({
       where: { resetAt: { lt: now } },
@@ -31,6 +33,12 @@ async function main() {
     prisma.syncEvent.deleteMany({
       where: { updatedAt: { lt: daysAgo(now, syncEventDays) } },
     }),
+    prisma.broadcastDelivery.deleteMany({
+      where: {
+        status: { in: ['SUCCEEDED', 'FAILED'] },
+        updatedAt: { lt: daysAgo(now, broadcastDeliveryDays) },
+      },
+    }),
   ])
 
   logInfo('retention.cleanup_completed', {
@@ -39,6 +47,7 @@ async function main() {
     oldAuditLogs: oldAuditLogs.count,
     oldNotificationLogs: oldNotificationLogs.count,
     oldSyncEvents: oldSyncEvents.count,
+    oldBroadcastDeliveries: oldBroadcastDeliveries.count,
   })
 }
 
