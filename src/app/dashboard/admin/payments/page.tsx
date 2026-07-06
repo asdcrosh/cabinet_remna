@@ -91,7 +91,7 @@ export default async function AdminPaymentsPage({
         resetHref="/dashboard/admin/payments"
         resetVisible={Boolean(q || status !== 'ALL' || delivery !== 'ALL' || range !== 'ALL' || params.from || params.to)}
         count={{ shown: payments.length, total }}
-        className="md:grid-cols-[minmax(14rem,1fr)_10rem_12rem_10rem_9rem_9rem_auto_auto]"
+        className="md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-[minmax(14rem,1fr)_10rem_12rem_10rem_9rem_9rem_auto]"
       >
         <input type="hidden" name="limit" value={ADMIN_LIST_PAGE_SIZE} />
         <div className="relative">

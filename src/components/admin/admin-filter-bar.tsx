@@ -22,13 +22,13 @@ export function AdminFilterBar({
   className = 'md:grid-cols-[minmax(14rem,1fr)_12rem_12rem_auto_auto]',
 }: AdminFilterBarProps) {
   return (
-    <div className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-surface-900 lg:flex-row lg:items-center lg:justify-between">
+    <div className="flex flex-col gap-3 overflow-hidden rounded-lg border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-surface-900">
       <form className={`grid min-w-0 flex-1 gap-2 ${className}`} action={action}>
         {children}
         {resetVisible && resetHref ? <Link href={resetHref} className="btn-secondary">Сбросить</Link> : null}
       </form>
       {count ? (
-        <div className="shrink-0 text-sm text-slate-500 dark:text-slate-400">
+        <div className="self-end text-sm text-slate-500 dark:text-slate-400">
           {count.shown} из {count.total}
         </div>
       ) : null}
