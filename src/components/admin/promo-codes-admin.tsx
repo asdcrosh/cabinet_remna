@@ -8,6 +8,7 @@ import { Archive, CheckCheck, Edit3, Gift, Plus, Power, TicketCheck, Trash2, Use
 import { apiFetch } from '@/lib/api-client'
 import { toast } from '@/components/ui/toaster'
 import { cn } from '@/lib/cn'
+import { AdminEmptyState } from '@/components/admin/admin-empty-state'
 import { AdminModal } from '@/components/admin/admin-modal'
 import { ConfirmDialog } from '@/components/dashboard/confirm-dialog'
 
@@ -649,7 +650,10 @@ export function PromoCodesAdmin({
       </div>
 
       {filteredPromoCodes.length === 0 && (
-        <div className="card py-10 text-center text-sm text-slate-500">В этом разделе пока нет промокодов</div>
+        <AdminEmptyState
+          title="Промокодов пока нет"
+          description="В этом разделе пока нет промокодов."
+        />
       )}
       <ConfirmDialog
         open={Boolean(confirmAction)}

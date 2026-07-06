@@ -5,6 +5,7 @@ import { useState } from 'react'
 import { AlertTriangle, CheckCircle2, RefreshCw, RotateCcw } from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
 import { toast } from '@/components/ui/toaster'
+import { AdminEmptyState } from '@/components/admin/admin-empty-state'
 import { ConfirmDialog } from '@/components/dashboard/confirm-dialog'
 
 interface RemnashopPlanDiff {
@@ -348,7 +349,12 @@ function SyncEventsView({
             ))}
           </div>
         ) : (
-          <div className="px-4 py-8 text-center text-sm text-slate-500">Событий синхронизации пока нет</div>
+          <AdminEmptyState
+            title="Событий пока нет"
+            description="События синхронизации появятся после запуска проверки или retry."
+            surface="plain"
+            className="m-4"
+          />
         )}
       </div>
     </section>

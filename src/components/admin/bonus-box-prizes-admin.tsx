@@ -8,6 +8,7 @@ import { BarChart3, Clock3, Edit3, Gift, History, Plus, Power, ShieldCheck, Slid
 import { apiFetch } from '@/lib/api-client'
 import { toast } from '@/components/ui/toaster'
 import { cn } from '@/lib/cn'
+import { AdminEmptyState } from '@/components/admin/admin-empty-state'
 import { LazyListLoader } from '@/components/admin/lazy-list-loader'
 import { useBodyScrollLock } from '@/lib/use-body-scroll-lock'
 
@@ -300,9 +301,12 @@ export function BonusBoxPrizesAdmin({
             />
           ))}
           {prizes.length === 0 && (
-            <div className="rounded-lg border border-dashed border-slate-300 bg-white p-5 text-sm text-slate-500 dark:border-white/10 dark:bg-surface-900">
-              Добавьте первый подарок для Подарочного бокса.
-            </div>
+            <AdminEmptyState
+              title="Подарков пока нет"
+              description="Добавьте первый подарок для Подарочного бокса."
+              surface="plain"
+              className="md:col-span-2 xl:col-span-3"
+            />
           )}
         </section>
       )}
@@ -754,9 +758,11 @@ function BonusBoxOpeningHistory({ openings }: { openings: BonusBoxOpeningAdminRo
         </div>
         </>
       ) : (
-        <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-5 text-sm text-slate-500 dark:border-white/10 dark:bg-surface-800/60">
-          Открытий пока не было.
-        </div>
+        <AdminEmptyState
+          title="Открытий пока не было"
+          description="История появится после первого открытия Подарочного бокса."
+          surface="plain"
+        />
       )}
     </section>
   )

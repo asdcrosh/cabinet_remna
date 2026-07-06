@@ -5,6 +5,7 @@ import { Clock3, Eye, ImageIcon, Mail, MessageCircle, RotateCcw, Send, Smartphon
 import { apiFetch } from '@/lib/api-client'
 import { toast } from '@/components/ui/toaster'
 import { cn } from '@/lib/cn'
+import { AdminEmptyState } from '@/components/admin/admin-empty-state'
 import { EmojiPicker } from '@/components/ui/emoji-picker'
 
 type BroadcastSegment =
@@ -895,9 +896,12 @@ function BroadcastHistory({
         <h2 className="font-semibold">Последние рассылки</h2>
       </div>
       {history.length === 0 ? (
-        <div className="mt-4 rounded-lg border border-dashed border-slate-200 p-6 text-sm text-slate-500 dark:border-white/10">
-          История появится после первой отправки.
-        </div>
+        <AdminEmptyState
+          title="Рассылок пока нет"
+          description="История появится после первой отправки."
+          surface="plain"
+          className="mt-4"
+        />
       ) : (
         <div className="mt-4 grid gap-2">
           {history.map((item) => (
