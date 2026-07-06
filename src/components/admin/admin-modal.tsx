@@ -1,9 +1,18 @@
 'use client'
 
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 import { useBodyScrollLock } from '@/lib/use-body-scroll-lock'
+
+const FOCUSABLE_SELECTOR = [
+  'a[href]',
+  'button:not([disabled])',
+  'textarea:not([disabled])',
+  'input:not([disabled])',
+  'select:not([disabled])',
+  '[tabindex]:not([tabindex="-1"])',
+].join(',')
 
 export function AdminModal({
   open,
@@ -21,17 +30,57 @@ export function AdminModal({
   size?: 'md' | 'lg' | 'xl'
 }) {
   const [mounted, setMounted] = useState(false)
+  const titleId = useId()
+  const descriptionId = useId()
+  const dialogRef = useRef<HTMLElement | null>(null)
+  const previouslyFocusedRef = useRef<HTMLElement | null>(null)
 
   useEffect(() => setMounted(true), [])
   useBodyScrollLock(open)
 
   useEffect(() => {
     if (!open) return
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose()
+    previouslyFocusedRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
+
+    window.setTimeout(() => {
+      const firstFocusable = getFocusableElements(dialogRef.current)[0]
+      const focusTarget = firstFocusable ?? dialogRef.current
+      focusTarget?.focus()
+    }, 0)
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        onClose()
+        return
+      }
+      if (event.key !== 'Tab') return
+
+      const focusable = getFocusableElements(dialogRef.current)
+      if (focusable.length === 0) {
+        event.preventDefault()
+        dialogRef.current?.focus()
+        return
+      }
+
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      if (!first || !last) return
+
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault()
+        first.focus()
+      }
     }
-    window.addEventListener('keydown', closeOnEscape)
-    return () => window.removeEventListener('keydown', closeOnEscape)
+
+    window.addEventListener('keydown', onKeyDown)
+    return () => {
+      window.removeEventListener('keydown', onKeyDown)
+      previouslyFocusedRef.current?.focus()
+      previouslyFocusedRef.current = null
+    }
   }, [onClose, open])
 
   if (!mounted || !open) return null
@@ -51,15 +100,18 @@ export function AdminModal({
         aria-label="Закрыть окно"
       />
       <section
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
-        aria-label={title}
+        aria-labelledby={titleId}
+        aria-describedby={description ? descriptionId : undefined}
+        tabIndex={-1}
         className={`relative z-10 flex max-h-[94dvh] w-full flex-col overflow-hidden rounded-t-lg border bg-white shadow-2xl dark:border-white/10 dark:bg-surface-900 sm:rounded-lg ${widths[size]}`}
       >
         <header className="flex shrink-0 items-start justify-between gap-4 border-b px-4 py-4 sm:px-6">
           <div className="min-w-0">
-            <h2 className="text-lg font-semibold">{title}</h2>
-            {description && <p className="mt-1 text-sm text-slate-500">{description}</p>}
+            <h2 id={titleId} className="text-lg font-semibold">{title}</h2>
+            {description && <p id={descriptionId} className="mt-1 text-sm text-slate-500">{description}</p>}
           </div>
           <button
             type="button"
@@ -77,4 +129,10 @@ export function AdminModal({
     </div>,
     document.body
   )
+}
+
+function getFocusableElements(root: HTMLElement | null) {
+  if (!root) return []
+  return Array.from(root.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR))
+    .filter((element) => !element.hasAttribute('disabled') && element.getAttribute('aria-hidden') !== 'true')
 }

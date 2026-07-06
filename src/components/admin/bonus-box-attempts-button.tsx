@@ -1,12 +1,11 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { createPortal } from 'react-dom'
-import { Gift, X } from 'lucide-react'
+import { Gift } from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
 import { toast } from '@/components/ui/toaster'
-import { useBodyScrollLock } from '@/lib/use-body-scroll-lock'
+import { AdminModal } from '@/components/admin/admin-modal'
 
 export function BonusBoxAttemptsButton({
   userId,
@@ -21,13 +20,6 @@ export function BonusBoxAttemptsButton({
   const [open, setOpen] = useState(false)
   const [value, setValue] = useState('1')
   const [loading, setLoading] = useState(false)
-  const [mounted, setMounted] = useState(false)
-
-  useEffect(() => {
-    setMounted(true)
-  }, [])
-
-  useBodyScrollLock(open)
 
   async function submit() {
     const attemptsToAdd = Number(value)
@@ -53,40 +45,28 @@ export function BonusBoxAttemptsButton({
     }
   }
 
-  const dialog = (
-    <div className="fixed inset-0 z-50 grid h-dvh w-dvw place-items-center p-4">
+  return (
+    <>
       <button
         type="button"
-        className="absolute inset-0 bg-slate-950/50"
-        onClick={() => setOpen(false)}
-        disabled={loading}
-        aria-label="Закрыть окно начисления"
-      />
-      <div className="relative z-10 w-full max-w-md rounded-lg border bg-white p-5 shadow-2xl dark:border-white/10 dark:bg-surface-900">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-cyan-50 text-cyan-700 dark:bg-cyan-500/10 dark:text-cyan-200">
-                <Gift className="h-5 w-5" />
-              </div>
-              <div className="min-w-0">
-                <h2 className="font-semibold">Начислить открытия</h2>
-                <p className="truncate text-sm text-slate-500">{email}</p>
-              </div>
-            </div>
-          </div>
-          <button
-            type="button"
-            className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-white/10 dark:hover:text-white"
-            onClick={() => setOpen(false)}
-            disabled={loading}
-            aria-label="Закрыть"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
+        className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-600 shadow-sm transition-colors hover:border-cyan-200 hover:bg-cyan-50 hover:text-cyan-700 dark:border-white/10 dark:bg-surface-900 dark:text-slate-200 dark:hover:bg-cyan-500/10 dark:hover:text-cyan-200"
+        onClick={() => setOpen(true)}
+        title="Начислить подарок"
+        aria-label="Начислить подарок"
+      >
+        <Gift className="h-4 w-4" />
+      </button>
 
-        <div className="mt-5 grid gap-4">
+      <AdminModal
+        open={open}
+        title="Начислить открытия"
+        description={email}
+        onClose={() => {
+          if (!loading) setOpen(false)
+        }}
+        size="md"
+      >
+        <div className="grid gap-4">
           <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-sm dark:border-white/10 dark:bg-surface-800">
             Сейчас доступно: <span className="font-semibold">{attemptsCount}</span>
           </div>
@@ -115,23 +95,7 @@ export function BonusBoxAttemptsButton({
             {loading ? 'Начисляем...' : 'Начислить'}
           </button>
         </div>
-      </div>
-    </div>
-  )
-
-  return (
-    <>
-      <button
-        type="button"
-        className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-600 shadow-sm transition-colors hover:border-cyan-200 hover:bg-cyan-50 hover:text-cyan-700 dark:border-white/10 dark:bg-surface-900 dark:text-slate-200 dark:hover:bg-cyan-500/10 dark:hover:text-cyan-200"
-        onClick={() => setOpen(true)}
-        title="Начислить подарок"
-        aria-label="Начислить подарок"
-      >
-        <Gift className="h-4 w-4" />
-      </button>
-
-      {mounted && open ? createPortal(dialog, document.body) : null}
+      </AdminModal>
     </>
   )
 }

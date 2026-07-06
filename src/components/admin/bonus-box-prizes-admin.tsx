@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import type { Dispatch, ReactNode, SetStateAction } from 'react'
 import { useRouter } from 'next/navigation'
 import { createPortal } from 'react-dom'
@@ -15,6 +15,15 @@ import { useBodyScrollLock } from '@/lib/use-body-scroll-lock'
 type PrizeType = 'SUBSCRIPTION_DAYS' | 'TRAFFIC_GB' | 'PROMO_CODE_PERCENT' | 'BONUS_ATTEMPTS' | 'NO_PRIZE'
 type Rarity = 'COMMON' | 'RARE' | 'EPIC' | 'LEGENDARY'
 type AdminBonusTab = 'prizes' | 'history'
+
+const FOCUSABLE_SELECTOR = [
+  'a[href]',
+  'button:not([disabled])',
+  'textarea:not([disabled])',
+  'input:not([disabled])',
+  'select:not([disabled])',
+  '[tabindex]:not([tabindex="-1"])',
+].join(',')
 
 export type BonusBoxSettingsAdminRow = {
   pityEnabled: boolean
@@ -493,6 +502,55 @@ function PrizeEditorDrawer({
   onTypeChange: (type: PrizeType) => void
 }) {
   useBodyScrollLock(open)
+  const titleId = useId()
+  const descriptionId = useId()
+  const drawerRef = useRef<HTMLElement | null>(null)
+  const previouslyFocusedRef = useRef<HTMLElement | null>(null)
+
+  useEffect(() => {
+    if (!open) return
+    previouslyFocusedRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
+
+    window.setTimeout(() => {
+      const firstFocusable = getFocusableElements(drawerRef.current)[0]
+      const focusTarget = firstFocusable ?? drawerRef.current
+      focusTarget?.focus()
+    }, 0)
+
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        onClose()
+        return
+      }
+      if (event.key !== 'Tab') return
+
+      const focusable = getFocusableElements(drawerRef.current)
+      if (focusable.length === 0) {
+        event.preventDefault()
+        drawerRef.current?.focus()
+        return
+      }
+
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      if (!first || !last) return
+
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault()
+        first.focus()
+      }
+    }
+
+    window.addEventListener('keydown', onKeyDown)
+    return () => {
+      window.removeEventListener('keydown', onKeyDown)
+      previouslyFocusedRef.current?.focus()
+      previouslyFocusedRef.current = null
+    }
+  }, [onClose, open])
 
   if (!open) return null
 
@@ -505,17 +563,21 @@ function PrizeEditorDrawer({
         onClick={onClose}
       />
       <aside
+        ref={drawerRef}
         role="dialog"
         aria-modal="true"
+        aria-labelledby={titleId}
+        aria-describedby={descriptionId}
+        tabIndex={-1}
         className="absolute right-0 top-0 h-dvh w-full max-w-xl overflow-y-auto border-l border-slate-200 bg-white shadow-2xl dark:border-white/10 dark:bg-surface-950"
       >
         <div className="sticky top-0 z-10 border-b border-slate-100 bg-white/95 p-5 backdrop-blur dark:border-white/10 dark:bg-surface-950/95 sm:p-6">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h2 className="text-xl font-semibold">
+              <h2 id={titleId} className="text-xl font-semibold">
                 {editingPrize ? `Редактировать ${editingPrize.title}` : 'Новый подарок'}
               </h2>
-              <p className="mt-1 text-sm text-slate-500">
+              <p id={descriptionId} className="mt-1 text-sm text-slate-500">
                 Вес управляет шансом выпадения среди активных исходов.
               </p>
             </div>
@@ -923,6 +985,12 @@ function getPrizeStats(prizes: BonusBoxPrizeAdminRow[]) {
     attemptChance,
     rewardChance: Math.max(0, 1 - noPrizeChance),
   }
+}
+
+function getFocusableElements(root: HTMLElement | null) {
+  if (!root) return []
+  return Array.from(root.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR))
+    .filter((element) => !element.hasAttribute('disabled') && element.getAttribute('aria-hidden') !== 'true')
 }
 
 function formatChance(value: number) {

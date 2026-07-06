@@ -6,6 +6,7 @@ import { apiFetch } from '@/lib/api-client'
 import { toast } from '@/components/ui/toaster'
 import { cn } from '@/lib/cn'
 import { AdminEmptyState } from '@/components/admin/admin-empty-state'
+import { AdminModal } from '@/components/admin/admin-modal'
 import { EmojiPicker } from '@/components/ui/emoji-picker'
 
 type BroadcastSegment =
@@ -943,29 +944,26 @@ function BroadcastHistory({
 
 function BroadcastHistoryModal({ item, onClose }: { item: BroadcastHistoryItem; onClose: () => void }) {
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/45 p-4" role="dialog" aria-modal="true">
-      <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl dark:bg-surface-950">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Рассылка</div>
-            <h3 className="mt-1 text-xl font-semibold">{item.title}</h3>
-            <div className="mt-1 text-sm text-slate-500">
-              {formatDateTime(item.createdAt)} · {segmentLabel(item.segment, item.inactiveDays ?? undefined)} · {item.createdBy || 'Система'}
-            </div>
-          </div>
-          <button type="button" className="btn-secondary min-h-10 px-3" onClick={onClose} aria-label="Закрыть">
-            <X className="h-4 w-4" />
-          </button>
+    <AdminModal
+      open
+      title={item.title}
+      description={`${formatDateTime(item.createdAt)} · ${segmentLabel(item.segment, item.inactiveDays ?? undefined)} · ${item.createdBy || 'Система'}`}
+      onClose={onClose}
+      size="lg"
+    >
+      <div className="grid gap-4">
+        <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+          Рассылка
         </div>
 
         {item.imageUrl ? (
-          <div className="mt-4 overflow-hidden rounded-xl border border-slate-200 dark:border-white/10">
+          <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-white/10">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={getPreviewImageUrl(item.imageUrl)} alt="" className="max-h-80 w-full object-cover" />
           </div>
         ) : null}
 
-        <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-white/5">
+        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-white/5">
           <p className="whitespace-pre-wrap text-sm leading-6 text-slate-700 dark:text-slate-200">{item.body}</p>
           {item.actionHref ? (
             <div className="mt-3 rounded-lg bg-cyan-50 px-3 py-2 text-sm font-semibold text-cyan-800 dark:bg-cyan-500/10 dark:text-cyan-100">
@@ -974,13 +972,13 @@ function BroadcastHistoryModal({ item, onClose }: { item: BroadcastHistoryItem; 
           ) : null}
         </div>
 
-        <div className="mt-4 grid gap-2 text-sm sm:grid-cols-3">
+        <div className="grid gap-2 text-sm sm:grid-cols-3">
           <HistoryMetric label="Кабинет" value={item.inAppCount} />
           <HistoryMetric label="Telegram" value={item.telegramSent} failed={item.telegramFailed + item.telegramSkipped + item.telegramDuplicate} />
           <HistoryMetric label="Email" value={item.emailSent} failed={item.emailFailed + item.emailSkipped + item.emailDuplicate} />
         </div>
       </div>
-    </div>
+    </AdminModal>
   )
 }
 
