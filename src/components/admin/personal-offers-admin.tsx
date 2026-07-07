@@ -199,39 +199,50 @@ export function PersonalOffersAdmin({
         </div>
       </section>
 
-      <section className="grid gap-3 xl:grid-cols-3">
-        {offers.map((offer) => (
-          <article key={offer.id} className="surface-card p-4">
-            <div className="flex flex-col gap-3">
+      <section className="surface-card overflow-hidden p-0">
+        <div className="border-b border-slate-100 px-4 py-3 dark:border-white/10">
+          <h2 className="font-semibold text-slate-950 dark:text-white">Офферы на главной</h2>
+          <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
+            Порядок, текст и кнопки для разных состояний пользователя.
+          </p>
+        </div>
+        <div className="divide-y divide-slate-100 dark:divide-white/10">
+          {offers.map((offer) => (
+            <article key={offer.id} className="grid gap-3 px-4 py-3 lg:grid-cols-[13rem_minmax(0,1fr)_13rem_auto] lg:items-center">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className={offer.enabled ? 'badge-active' : 'badge-muted'}>
-                    {offer.enabled ? 'Включён' : 'Выключен'}
+                    {offer.enabled ? 'Вкл' : 'Выкл'}
                   </span>
-                  <span className="badge bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-slate-300">#{offer.priority}</span>
-                  <span className="text-sm font-medium text-slate-500 dark:text-slate-400">
-                    {personalOfferScenarioLabels[offer.scenario]}
+                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-500 dark:bg-white/10 dark:text-slate-300">
+                    #{offer.priority}
                   </span>
                 </div>
-                <h2 className="mt-3 line-clamp-1 text-base font-semibold text-slate-950 dark:text-white">{offer.title}</h2>
-                <p className="mt-1 line-clamp-2 text-sm leading-5 text-slate-500 dark:text-slate-400">{offer.description}</p>
-                <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-500">
-                  <span className="rounded-full bg-slate-100 px-2 py-1 dark:bg-white/10 dark:text-slate-300">{offer.eyebrow}</span>
-                  <span className="rounded-full bg-slate-100 px-2 py-1 dark:bg-white/10 dark:text-slate-300">{personalOfferToneLabels[offer.tone]}</span>
-                  <span className="rounded-full bg-slate-100 px-2 py-1 dark:bg-white/10 dark:text-slate-300">{offer.cta}</span>
-                </div>
-                <div className="mt-3 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-sm text-slate-600 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-300">
-                  <span className="font-medium text-slate-950 dark:text-white">Действие: </span>
-                  {rewardSummary(offer)}
+                <div className="mt-2 truncate font-medium text-slate-950 dark:text-white">
+                  {personalOfferScenarioLabels[offer.scenario]}
                 </div>
               </div>
-              <button type="button" className="btn-secondary min-h-10 w-full justify-center px-3" onClick={() => openEdit(offer)}>
+
+              <div className="min-w-0">
+                <div className="truncate font-semibold text-slate-950 dark:text-white">{offer.title}</div>
+                <div className="mt-1 line-clamp-2 text-sm leading-5 text-slate-500 dark:text-slate-400">
+                  {offer.description}
+                </div>
+              </div>
+
+              <div className="min-w-0 text-sm text-slate-500 dark:text-slate-400">
+                <div className="truncate font-medium text-slate-700 dark:text-slate-200">{offer.cta || 'Без кнопки'}</div>
+                <div className="mt-1 truncate">{offer.href || 'Нет ссылки'}</div>
+                <div className="mt-1 truncate">{rewardSummary(offer)}</div>
+              </div>
+
+              <button type="button" className="btn-secondary min-h-10 justify-center px-3 lg:w-32" onClick={() => openEdit(offer)}>
                 <Edit3 className="h-4 w-4" />
                 Изменить
               </button>
-            </div>
-          </article>
-        ))}
+            </article>
+          ))}
+        </div>
       </section>
 
       <AdminModal
