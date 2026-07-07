@@ -16,7 +16,7 @@ export default async function AdminOffersPage() {
   })
   const [promoCodes, trialPlans, welcomeBonusSetting] = await Promise.all([
     prisma.promoCode.findMany({
-      where: { isActive: true },
+      where: { isActive: true, bonusBoxOpenings: { none: {} } },
       orderBy: [{ discountPercent: 'desc' }, { code: 'asc' }],
       select: { id: true, code: true, discountPercent: true },
     }),
@@ -29,10 +29,26 @@ export default async function AdminOffersPage() {
       where: { id: 'default' },
       include: {
         trialPlan: { select: { id: true, name: true, durationDays: true, isActive: true } },
-        promoCode: { select: { id: true, code: true, discountPercent: true, isActive: true } },
+        promoCode: {
+          select: {
+            id: true,
+            code: true,
+            discountPercent: true,
+            isActive: true,
+            bonusBoxOpenings: { select: { id: true }, take: 1 },
+          },
+        },
       },
     }),
   ])
+  const welcomeBonusForForm = welcomeBonusSetting?.promoCode?.bonusBoxOpenings.length
+    ? {
+        ...welcomeBonusSetting,
+        promoCode: null,
+        promoCodeId: null,
+        promoCodeEnabled: false,
+      }
+    : welcomeBonusSetting
 
   return (
     <div className="space-y-5">
@@ -44,7 +60,7 @@ export default async function AdminOffersPage() {
         offers={offers}
         promoCodes={promoCodes}
         trialPlans={trialPlans}
-        welcomeBonusSetting={welcomeBonusSetting}
+        welcomeBonusSetting={welcomeBonusForForm}
       />
     </div>
   )

@@ -79,10 +79,10 @@ async function parseWelcomeBonusInput(body: any):
 
   if (promoCodeId) {
     const promoCode = await prisma.promoCode.findFirst({
-      where: { id: promoCodeId, isActive: true },
+      where: { id: promoCodeId, isActive: true, bonusBoxOpenings: { none: {} } },
       select: { id: true },
     })
-    if (!promoCode) return { error: 'Промокод не найден или отключён' }
+    if (!promoCode) return { error: 'Выберите активный промокод, созданный вручную' }
   }
 
   return {
