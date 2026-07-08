@@ -33,9 +33,13 @@ export function AdminModal({
   const titleId = useId()
   const descriptionId = useId()
   const dialogRef = useRef<HTMLElement | null>(null)
+  const onCloseRef = useRef(onClose)
   const previouslyFocusedRef = useRef<HTMLElement | null>(null)
 
   useEffect(() => setMounted(true), [])
+  useEffect(() => {
+    onCloseRef.current = onClose
+  }, [onClose])
   useBodyScrollLock(open)
 
   useEffect(() => {
@@ -43,14 +47,12 @@ export function AdminModal({
     previouslyFocusedRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
 
     window.setTimeout(() => {
-      const firstFocusable = getFocusableElements(dialogRef.current)[0]
-      const focusTarget = firstFocusable ?? dialogRef.current
-      focusTarget?.focus()
+      dialogRef.current?.focus()
     }, 0)
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
-        onClose()
+        onCloseRef.current()
         return
       }
       if (event.key !== 'Tab') return
@@ -81,7 +83,7 @@ export function AdminModal({
       previouslyFocusedRef.current?.focus()
       previouslyFocusedRef.current = null
     }
-  }, [onClose, open])
+  }, [open])
 
   if (!mounted || !open) return null
 

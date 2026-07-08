@@ -107,6 +107,10 @@ export function BonusBoxPrizesAdmin({
 
   const editingPrize = useMemo(() => prizes.find((prize) => prize.id === editingId) ?? null, [editingId, prizes])
   const stats = useMemo(() => getPrizeStats(prizes), [prizes])
+  const estimatedChance = useMemo(
+    () => estimatePrizeChance(prizes, editingId, editingPrize, form),
+    [editingId, editingPrize, form, prizes]
+  )
 
   async function submit() {
     setLoading(true)
@@ -336,6 +340,7 @@ export function BonusBoxPrizesAdmin({
         onSubmit={submit}
         onChange={setForm}
         onTypeChange={changePrizeType}
+        estimatedChance={estimatedChance}
       />
     </div>
   )
@@ -491,6 +496,7 @@ function PrizeEditorDrawer({
   onSubmit,
   onChange,
   onTypeChange,
+  estimatedChance,
 }: {
   open: boolean
   editingPrize: BonusBoxPrizeAdminRow | null
@@ -500,26 +506,30 @@ function PrizeEditorDrawer({
   onSubmit: () => void
   onChange: Dispatch<SetStateAction<FormState>>
   onTypeChange: (type: PrizeType) => void
+  estimatedChance: number
 }) {
   useBodyScrollLock(open)
   const titleId = useId()
   const descriptionId = useId()
   const drawerRef = useRef<HTMLElement | null>(null)
+  const onCloseRef = useRef(onClose)
   const previouslyFocusedRef = useRef<HTMLElement | null>(null)
+
+  useEffect(() => {
+    onCloseRef.current = onClose
+  }, [onClose])
 
   useEffect(() => {
     if (!open) return
     previouslyFocusedRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
 
     window.setTimeout(() => {
-      const firstFocusable = getFocusableElements(drawerRef.current)[0]
-      const focusTarget = firstFocusable ?? drawerRef.current
-      focusTarget?.focus()
+      drawerRef.current?.focus()
     }, 0)
 
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === 'Escape') {
-        onClose()
+        onCloseRef.current()
         return
       }
       if (event.key !== 'Tab') return
@@ -550,7 +560,7 @@ function PrizeEditorDrawer({
       previouslyFocusedRef.current?.focus()
       previouslyFocusedRef.current = null
     }
-  }, [onClose, open])
+  }, [open])
 
   if (!open) return null
 
@@ -666,7 +676,7 @@ function PrizeEditorDrawer({
             </Field>
           </div>
 
-          <PrizeFormPreview form={form} />
+          <PrizeFormPreview form={form} estimatedChance={estimatedChance} />
 
           <label className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-sm dark:border-white/10 dark:bg-white/[0.04]">
             <input
@@ -924,7 +934,7 @@ function SettingsCard({
   )
 }
 
-function PrizeFormPreview({ form }: { form: FormState }) {
+function PrizeFormPreview({ form, estimatedChance }: { form: FormState; estimatedChance: number }) {
   const title = form.title.trim() || 'Новый подарок'
   const value = previewPrizeValue(form.type, Number(form.value || 0))
 
@@ -950,6 +960,10 @@ function PrizeFormPreview({ form }: { form: FormState }) {
         <div className="rounded-md bg-white px-2.5 py-2 dark:bg-surface-900">
           <div className="text-xs text-slate-400">Вес</div>
           <div className="mt-0.5 truncate font-medium">{form.weight || '0'}</div>
+        </div>
+        <div className="rounded-md bg-white px-2.5 py-2 dark:bg-surface-900">
+          <div className="text-xs text-slate-400">Шанс по весу</div>
+          <div className="mt-0.5 truncate font-medium">{formatChance(estimatedChance)}</div>
         </div>
       </div>
     </div>
@@ -985,6 +999,31 @@ function getPrizeStats(prizes: BonusBoxPrizeAdminRow[]) {
     attemptChance,
     rewardChance: Math.max(0, 1 - noPrizeChance),
   }
+}
+
+function estimatePrizeChance(
+  prizes: BonusBoxPrizeAdminRow[],
+  editingId: string | null,
+  editingPrize: BonusBoxPrizeAdminRow | null,
+  form: FormState
+) {
+  const weight = Number(form.weight)
+  const maxWins = form.maxWins ? Number(form.maxWins) : null
+  const isCurrentEligible = form.isActive
+    && Number.isFinite(weight)
+    && weight > 0
+    && (maxWins == null || !editingPrize || editingPrize.winsCount < maxWins)
+  const otherWeight = prizes
+    .filter((prize) =>
+      prize.id !== editingId
+      && prize.isActive
+      && prize.weight > 0
+      && (prize.maxWins == null || prize.winsCount < prize.maxWins)
+    )
+    .reduce((sum, prize) => sum + prize.weight, 0)
+
+  if (!isCurrentEligible) return 0
+  return weight / (otherWeight + weight)
 }
 
 function getFocusableElements(root: HTMLElement | null) {
