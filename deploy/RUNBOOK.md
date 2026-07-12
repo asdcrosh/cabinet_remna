@@ -245,9 +245,11 @@ one-shot containers, unused legacy compose-build images for this project, and
 dangling Docker images. It never prunes Docker volumes.
 
 If `TELEGRAM_BOT_TOKEN` and `TELEGRAM_NOTIFY_CHAT_ID` are set in the production
-`.env`, the script sends a Telegram message only after a different running image
-revision passes health checks. Commits and image publication do not trigger it,
-and rerunning the same deployed revision does not send a duplicate message.
+`.env`, the script sends a Telegram message only after the running image revision
+passes health checks. The last successfully notified revision is stored
+separately, so a failed or newly configured notification can be retried by
+rerunning the update. Successful messages are not duplicated. Commits and image
+publication do not trigger notifications.
 
 To additionally prune old Docker build cache, run:
 

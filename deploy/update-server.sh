@@ -9,6 +9,7 @@ INSTALL_DIR="${INSTALL_DIR:-/opt/remnawave-cabinet}"
 COMPOSE_FILE="${INSTALL_DIR}/docker-compose.yml"
 ENV_FILE="${INSTALL_DIR}/.env"
 VERSION_FILE="${INSTALL_DIR}/.cabinet-version"
+DEPLOY_NOTIFICATION_FILE="${INSTALL_DIR}/.last-deploy-notification"
 CABINETCTL_URL="${CABINETCTL_URL:-${RAW_BASE_URL}/deploy/cabinetctl.sh}"
 CABINETCTL_PATH="${CABINETCTL_PATH:-/usr/local/bin/cabinetctl}"
 CABINETCTL_TEMP="${CABINETCTL_PATH}.tmp"
@@ -75,6 +76,17 @@ installed_version_revision() {
   local revision
   [[ -f "${VERSION_FILE}" ]] || return 1
   revision="$(sed -n 's/^commit=//p' "${VERSION_FILE}" 2>/dev/null | head -n 1)"
+  if [[ "${revision}" =~ ^[0-9a-f]{40}$ ]]; then
+    printf '%s\n' "${revision}"
+    return 0
+  fi
+  return 1
+}
+
+last_notified_revision() {
+  local revision
+  [[ -f "${DEPLOY_NOTIFICATION_FILE}" ]] || return 1
+  revision="$(head -n 1 "${DEPLOY_NOTIFICATION_FILE}" 2>/dev/null || true)"
   if [[ "${revision}" =~ ^[0-9a-f]{40}$ ]]; then
     printf '%s\n' "${revision}"
     return 0
@@ -233,15 +245,25 @@ PY
 notify_telegram_deploy() {
   local previous_revision="$1"
   local deployed_revision="$2"
-  local bot_token chat_id app_url brand_name message
+  local bot_token chat_id app_url brand_name message notified_revision
 
-  [[ "${previous_revision}" =~ ^[0-9a-f]{40}$ ]] || return 0
-  [[ "${deployed_revision}" =~ ^[0-9a-f]{40}$ ]] || return 0
-  [[ "${previous_revision}" != "${deployed_revision}" ]] || return 0
+  if [[ ! "${deployed_revision}" =~ ^[0-9a-f]{40}$ ]]; then
+    echo "Warning: Telegram deploy notification skipped because the running image revision is unknown." >&2
+    return 0
+  fi
+
+  notified_revision="$(last_notified_revision || true)"
+  if [[ "${notified_revision}" == "${deployed_revision}" ]]; then
+    echo "Telegram deploy notification already sent for ${deployed_revision:0:7}."
+    return 0
+  fi
 
   bot_token="$(env_value TELEGRAM_BOT_TOKEN)"
   chat_id="$(env_value TELEGRAM_NOTIFY_CHAT_ID)"
-  [[ -n "${bot_token}" && -n "${chat_id}" ]] || return 0
+  if [[ -z "${bot_token}" || -z "${chat_id}" ]]; then
+    echo "Warning: Telegram deploy notification is not configured. Set TELEGRAM_BOT_TOKEN and TELEGRAM_NOTIFY_CHAT_ID." >&2
+    return 0
+  fi
 
   app_url="$(env_value APP_URL)"
   brand_name="$(env_value CABINET_BRAND_NAME)"
@@ -250,8 +272,11 @@ notify_telegram_deploy() {
 
 Новая версия успешно развёрнута и прошла health-check.
 Версия: ${deployed_revision:0:7}
-Предыдущая: ${previous_revision:0:7}
 Время: $(date -u '+%d.%m.%Y %H:%M UTC')"
+  if [[ "${previous_revision}" =~ ^[0-9a-f]{40}$ && "${previous_revision}" != "${deployed_revision}" ]]; then
+    message="${message}
+Предыдущая: ${previous_revision:0:7}"
+  fi
   if [[ -n "${app_url}" ]]; then
     message="${message}
 Сайт: ${app_url%/}"
@@ -262,6 +287,7 @@ notify_telegram_deploy() {
     --data-urlencode "chat_id=${chat_id}" \
     --data-urlencode "text=${message}" \
     --data "disable_web_page_preview=true" >/dev/null; then
+    printf '%s\n' "${deployed_revision}" >"${DEPLOY_NOTIFICATION_FILE}" 2>/dev/null || true
     echo "Telegram deploy notification sent."
   else
     echo "Warning: deployment succeeded, but Telegram notification failed." >&2
