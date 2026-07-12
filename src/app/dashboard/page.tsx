@@ -12,6 +12,7 @@ import { ProgressBar } from '@/components/dashboard/progress-bar'
 import { TrafficChart } from '@/components/dashboard/traffic-chart'
 import { DashboardOnboardingCard, type DashboardOnboardingState } from '@/components/dashboard/onboarding-card'
 import { WelcomeOfferButton } from '@/components/dashboard/welcome-offer-button'
+import { PageHeader } from '@/components/dashboard/page-header'
 import { redirect } from 'next/navigation'
 import {
   AlertTriangle,
@@ -152,7 +153,7 @@ export default async function DashboardHome() {
   if (!user.remnawaveUsername) {
     return (
       <div className="page-stack">
-        <CompactHeader title="Главная" description="Начните пользоваться VPN" />
+        <PageHeader title="Главная" description="Начните пользоваться VPN" />
         <DashboardOnboardingCard state={onboardingState} mode="full" />
         {personalOffer && <PersonalOffer offer={personalOffer} welcomeBonusOptions={welcomeBonusOptions} />}
         <SmartInsights
@@ -176,22 +177,15 @@ export default async function DashboardHome() {
 
   return (
     <div className="page-stack">
-      <CompactHeader
+      <PageHeader
         title="Главная"
         description="Подписка и использование VPN"
-        actionHref="/dashboard/subscription"
-        actionLabel="Подключение"
-      />
-
-      <DashboardOnboardingCard state={onboardingState} />
-      {personalOffer && <PersonalOffer offer={personalOffer} welcomeBonusOptions={welcomeBonusOptions} />}
-      <SmartInsights
-        emailVerified={onboardingState.emailVerified}
-        telegramLinked={onboardingState.telegramLinked}
-        deviceCount={onboardingState.deviceCount}
-        subscriptionExpireAt={subRow?.expireAt ?? null}
-        pendingPayment={user.payments[0] ?? null}
-        suppress={primaryHomeNudge}
+        action={(
+          <Link href="/dashboard/subscription" className="btn-secondary min-h-10 px-3">
+            <KeyRound className="h-4 w-4" />
+            Подключение
+          </Link>
+        )}
       />
 
       {subRow?.pendingSync && !remnawaveCard && (
@@ -206,11 +200,8 @@ export default async function DashboardHome() {
         </div>
       )}
 
-      <section className="relative overflow-hidden rounded-lg border border-slate-200 bg-white p-4 shadow-[0_18px_45px_rgba(15,23,42,0.07)] dark:border-white/10 dark:bg-surface-900 sm:p-5">
-        <div className="pointer-events-none absolute -right-16 -top-16 h-40 w-40 rounded-full bg-cyan-100/70 blur-3xl dark:bg-cyan-500/10" />
-        <div className="pointer-events-none absolute -bottom-20 left-1/3 h-44 w-44 rounded-full bg-emerald-100/60 blur-3xl dark:bg-emerald-500/10" />
-
-        <div className="relative grid gap-5 xl:grid-cols-[1fr_auto]">
+      <section className="overflow-hidden rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60 dark:border-white/10 dark:bg-surface-900 dark:shadow-black/20 sm:p-5">
+        <div className="grid gap-5 xl:grid-cols-[1fr_auto]">
           <div className="min-w-0">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
@@ -255,6 +246,17 @@ export default async function DashboardHome() {
           </div>
         </div>
       </section>
+
+      <DashboardOnboardingCard state={onboardingState} />
+      <SmartInsights
+        emailVerified={onboardingState.emailVerified}
+        telegramLinked={onboardingState.telegramLinked}
+        deviceCount={onboardingState.deviceCount}
+        subscriptionExpireAt={subRow?.expireAt ?? null}
+        pendingPayment={user.payments[0] ?? null}
+        suppress={primaryHomeNudge}
+      />
+      {personalOffer && <PersonalOffer offer={personalOffer} welcomeBonusOptions={welcomeBonusOptions} />}
 
       <TrafficChart
         userId={user.id}
@@ -817,32 +819,6 @@ function insightTone(tone: 'amber' | 'cyan' | 'slate') {
   if (tone === 'amber') return 'border-amber-200 bg-amber-50/80 text-amber-800 dark:border-amber-500/25 dark:bg-amber-500/10 dark:text-amber-100'
   if (tone === 'cyan') return 'border-cyan-200 bg-cyan-50/80 text-cyan-800 dark:border-cyan-500/25 dark:bg-cyan-500/10 dark:text-cyan-100'
   return 'border-slate-200 bg-white/80 text-slate-600 dark:border-white/10 dark:bg-surface-900/80 dark:text-slate-300'
-}
-
-function CompactHeader({
-  title,
-  description,
-  actionHref,
-  actionLabel,
-}: {
-  title: string
-  description: string
-  actionHref?: string
-  actionLabel?: string
-}) {
-  return (
-    <header className="flex items-center justify-between gap-3">
-      <div className="min-w-0">
-        <h1 className="text-xl font-semibold text-slate-950 dark:text-white sm:text-2xl">{title}</h1>
-        <p className="truncate text-sm text-slate-500 dark:text-slate-400">{description}</p>
-      </div>
-      {actionHref && actionLabel && (
-        <Link href={actionHref} className="btn-secondary min-h-9 shrink-0 px-3 py-1.5">
-          {actionLabel}
-        </Link>
-      )}
-    </header>
-  )
 }
 
 function OverviewMetric({

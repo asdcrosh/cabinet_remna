@@ -424,7 +424,7 @@ export function PromoCodesAdmin({
         />
       </div>
 
-      <div className="flex flex-col gap-3 rounded-lg border bg-white p-3 dark:bg-surface-900 sm:flex-row sm:items-center sm:justify-between">
+      <div className={selectedIds.length > 0 ? 'admin-bulk-bar' : 'flex flex-col gap-3 rounded-lg border bg-white p-3 dark:bg-surface-900 sm:flex-row sm:items-center sm:justify-between'}>
         <label className="flex min-h-10 items-center gap-3 text-sm font-medium text-slate-600 dark:text-slate-300">
           <input
             type="checkbox"
@@ -497,41 +497,6 @@ export function PromoCodesAdmin({
                 max={99}
               />
             </Field>
-            <Field label="Общий лимит">
-              <input
-                value={form.maxUses}
-                onChange={(event) => setForm((current) => ({ ...current, maxUses: event.target.value }))}
-                className="input"
-                type="number"
-                min={1}
-                placeholder="Без лимита"
-              />
-            </Field>
-            <Field label="На пользователя">
-              <input
-                value={form.maxUsesPerUser}
-                onChange={(event) => setForm((current) => ({ ...current, maxUsesPerUser: event.target.value }))}
-                className="input"
-                type="number"
-                min={1}
-              />
-            </Field>
-            <Field label="Начало">
-              <input
-                value={form.startsAt}
-                onChange={(event) => setForm((current) => ({ ...current, startsAt: event.target.value }))}
-                className="input"
-                type="datetime-local"
-              />
-            </Field>
-            <Field label="Окончание">
-              <input
-                value={form.expiresAt}
-                onChange={(event) => setForm((current) => ({ ...current, expiresAt: event.target.value }))}
-                className="input"
-                type="datetime-local"
-              />
-            </Field>
             <Field label="Кому доступен">
               <select
                 value={form.audience}
@@ -568,7 +533,29 @@ export function PromoCodesAdmin({
             Промокод активен
           </label>
 
-          <div>
+          <details className="rounded-lg border border-slate-200 bg-slate-50/70 p-3 dark:border-white/10 dark:bg-white/[0.03]">
+            <summary className="cursor-pointer text-sm font-semibold text-slate-950 dark:text-white">Сроки и лимиты</summary>
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              <Field label="Общий лимит">
+                <input value={form.maxUses} onChange={(event) => setForm((current) => ({ ...current, maxUses: event.target.value }))} className="input" type="number" min={1} placeholder="Без лимита" />
+              </Field>
+              <Field label="На пользователя">
+                <input value={form.maxUsesPerUser} onChange={(event) => setForm((current) => ({ ...current, maxUsesPerUser: event.target.value }))} className="input" type="number" min={1} />
+              </Field>
+              <Field label="Начало">
+                <input value={form.startsAt} onChange={(event) => setForm((current) => ({ ...current, startsAt: event.target.value }))} className="input" type="datetime-local" />
+              </Field>
+              <Field label="Окончание">
+                <input value={form.expiresAt} onChange={(event) => setForm((current) => ({ ...current, expiresAt: event.target.value }))} className="input" type="datetime-local" />
+              </Field>
+            </div>
+          </details>
+
+          <details className="rounded-lg border border-slate-200 bg-slate-50/70 p-3 dark:border-white/10 dark:bg-white/[0.03]">
+            <summary className="cursor-pointer text-sm font-semibold text-slate-950 dark:text-white">
+              Тарифы · {form.planIds.length === 0 ? 'все' : `выбрано ${form.planIds.length}`}
+            </summary>
+          <div className="mt-4">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <div>
                 <div className="text-sm font-medium">Тарифы</div>
@@ -607,6 +594,7 @@ export function PromoCodesAdmin({
               ))}
             </div>
           </div>
+          </details>
 
           <div className="flex justify-end gap-2 border-t pt-4">
             <button type="button" className="btn-secondary" onClick={resetForm}>Отмена</button>

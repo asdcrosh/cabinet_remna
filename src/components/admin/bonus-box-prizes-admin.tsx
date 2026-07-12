@@ -198,16 +198,15 @@ export function BonusBoxPrizesAdmin({
 
   return (
     <div className="space-y-5">
-      <section className="relative overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm shadow-slate-200/60 dark:border-white/10 dark:bg-surface-900 dark:shadow-black/20">
-        <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-cyan-400 via-emerald-300 to-blue-500" />
-        <div className="p-4 pt-5">
+      <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm shadow-slate-200/60 dark:border-white/10 dark:bg-surface-900 dark:shadow-black/20">
+        <div className="p-4">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div className="min-w-0">
-              <div className="inline-flex items-center gap-2 rounded-full bg-cyan-50 px-3 py-1 text-xs font-semibold text-cyan-700 dark:bg-cyan-500/10 dark:text-cyan-200">
+              <div className="inline-flex items-center gap-2 text-xs font-semibold uppercase text-slate-500 dark:text-slate-400">
                 <BarChart3 className="h-3.5 w-3.5" />
                 Управление подарками
               </div>
-              <h2 className="mt-3 text-xl font-semibold tracking-tight text-slate-950 dark:text-white">Состав и шансы</h2>
+              <h2 className="mt-2 text-xl font-semibold tracking-tight text-slate-950 dark:text-white">Состав и шансы</h2>
               <p className="mt-1 max-w-2xl text-sm text-slate-500">
                 Держите баланс наград, пустых исходов и редких подарков под контролем. Вес управляет шансом выпадения.
               </p>

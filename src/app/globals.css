@@ -190,10 +190,18 @@
     @apply w-full min-w-max text-sm;
   }
   .data-table th {
-    @apply whitespace-nowrap px-4 py-3 font-medium;
+    @apply sticky top-0 z-10 whitespace-nowrap bg-slate-50 px-4 py-3 font-medium dark:bg-surface-800;
   }
   .data-table td {
     @apply px-4 py-3 align-top;
+  }
+  .data-table tbody tr {
+    @apply transition-colors hover:bg-slate-50/80 dark:hover:bg-white/[0.025];
+  }
+  .admin-bulk-bar {
+    @apply sticky bottom-[calc(env(safe-area-inset-bottom)+5.25rem)] z-30 flex flex-col gap-3 rounded-lg border border-slate-300
+           bg-white/95 p-3 shadow-xl shadow-slate-950/10 backdrop-blur dark:border-white/15 dark:bg-surface-900/95
+           sm:bottom-4 sm:flex-row sm:items-center sm:justify-between;
   }
   .info-cell {
     @apply min-w-0 rounded-lg border border-slate-100 bg-slate-50/80 px-3 py-2 dark:border-slate-800 dark:bg-surface-800/80;

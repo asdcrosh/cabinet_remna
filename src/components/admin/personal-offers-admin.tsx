@@ -8,6 +8,7 @@ import { AdminModal } from '@/components/admin/admin-modal'
 import { apiFetch } from '@/lib/api-client'
 import { cn } from '@/lib/cn'
 import { toast } from '@/components/ui/toaster'
+import { Tabs } from '@/components/ui/tabs'
 import {
   personalOfferPlaceholders,
   personalOfferScenarioLabels,
@@ -63,12 +64,14 @@ export function PersonalOffersAdmin({
   const [welcomeLoading, setWelcomeLoading] = useState(false)
   const [form, setForm] = useState<OfferForm>(() => toForm(offers[0]))
   const [welcomeForm, setWelcomeForm] = useState<WelcomeBonusForm>(() => toWelcomeForm(welcomeBonusSetting))
+  const [editorSection, setEditorSection] = useState<'CONTENT' | 'BEHAVIOR' | 'PREVIEW'>('CONTENT')
 
   const activeOffer = useMemo(() => editing, [editing])
 
   function openEdit(offer: Offer) {
     setEditing(offer)
     setForm(toForm(offer))
+    setEditorSection('CONTENT')
   }
 
   async function save() {
@@ -252,109 +255,81 @@ export function PersonalOffersAdmin({
         size="lg"
         onClose={() => setEditing(null)}
       >
-        <div className="space-y-4">
-          <div className="grid gap-3 sm:grid-cols-[1fr_8rem_12rem]">
-            <label className="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 dark:border-white/10 dark:bg-white/[0.04]">
-              <input
-                type="checkbox"
-                checked={form.enabled}
-                onChange={(event) => setForm((prev) => ({ ...prev, enabled: event.target.checked }))}
-              />
-              <span className="text-sm font-medium">Показывать оффер</span>
-            </label>
-            <Field label="Приоритет">
-              <input
-                className="input"
-                type="number"
-                min={0}
-                max={1000}
-                value={form.priority}
-                onChange={(event) => setForm((prev) => ({ ...prev, priority: Number(event.target.value) }))}
-              />
-            </Field>
-            <Field label="Цвет">
-              <select
-                className="input"
-                value={form.tone}
-                onChange={(event) => setForm((prev) => ({ ...prev, tone: event.target.value as PersonalOfferTone }))}
-              >
-                {Object.entries(personalOfferToneLabels).map(([value, label]) => (
-                  <option key={value} value={value}>{label}</option>
-                ))}
-              </select>
-            </Field>
-          </div>
+        <div className="space-y-5">
+          <Tabs
+            value={editorSection}
+            onValueChange={setEditorSection}
+            className="w-full"
+            items={[
+              { value: 'CONTENT', label: 'Содержание' },
+              { value: 'BEHAVIOR', label: 'Условия' },
+              { value: 'PREVIEW', label: 'Предпросмотр' },
+            ]}
+          />
 
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="Метка">
-              <input className="input" value={form.eyebrow} onChange={(event) => setFormValue('eyebrow', event.target.value)} />
-            </Field>
-            <Field label="Кнопка">
-              <input className="input" value={form.cta} onChange={(event) => setFormValue('cta', event.target.value)} />
-            </Field>
-          </div>
+          {editorSection === 'CONTENT' ? (
+            <div className="space-y-4">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Field label="Метка">
+                  <input className="input" value={form.eyebrow} onChange={(event) => setFormValue('eyebrow', event.target.value)} />
+                </Field>
+                <Field label="Текст кнопки">
+                  <input className="input" value={form.cta} onChange={(event) => setFormValue('cta', event.target.value)} />
+                </Field>
+              </div>
+              <Field label="Заголовок">
+                <input className="input" value={form.title} onChange={(event) => setFormValue('title', event.target.value)} />
+              </Field>
+              <Field label="Описание">
+                <textarea className="input min-h-28 resize-y" value={form.description} onChange={(event) => setFormValue('description', event.target.value)} />
+              </Field>
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-white/10 dark:bg-white/[0.04]">
+                <div className="mb-2 text-sm font-medium text-slate-700 dark:text-slate-200">Подстановки</div>
+                <div className="flex flex-wrap gap-2">
+                  {personalOfferPlaceholders.map((item) => (
+                    <button key={item} type="button" className="rounded-md border bg-white px-2 py-1 font-mono text-xs dark:bg-white/5" onClick={() => setFormValue('description', `${form.description} ${item}`.trim())}>
+                      {item}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : null}
 
-          <Field label="Заголовок">
-            <input className="input" value={form.title} onChange={(event) => setFormValue('title', event.target.value)} />
-          </Field>
-          <Field label="Описание">
-            <textarea
-              className="input min-h-28 resize-y"
-              value={form.description}
-              onChange={(event) => setFormValue('description', event.target.value)}
-            />
-          </Field>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="Ссылка">
-              <input className="input" value={form.href} onChange={(event) => setFormValue('href', event.target.value)} />
-            </Field>
-            <Field label="Подпись">
-              <input className="input" value={form.meta} onChange={(event) => setFormValue('meta', event.target.value)} />
-            </Field>
-          </div>
+          {editorSection === 'BEHAVIOR' ? (
+            <div className="space-y-4">
+              <div className="grid gap-3 sm:grid-cols-[1fr_8rem_12rem]">
+                <label className="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 dark:border-white/10 dark:bg-white/[0.04]">
+                  <input type="checkbox" checked={form.enabled} onChange={(event) => setForm((prev) => ({ ...prev, enabled: event.target.checked }))} />
+                  <span className="text-sm font-medium">Показывать</span>
+                </label>
+                <Field label="Приоритет">
+                  <input className="input" type="number" min={0} max={1000} value={form.priority} onChange={(event) => setForm((prev) => ({ ...prev, priority: Number(event.target.value) }))} />
+                </Field>
+                <Field label="Цвет">
+                  <select className="input" value={form.tone} onChange={(event) => setForm((prev) => ({ ...prev, tone: event.target.value as PersonalOfferTone }))}>
+                    {Object.entries(personalOfferToneLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                  </select>
+                </Field>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Field label="Ссылка">
+                  <input className="input" value={form.href} onChange={(event) => setFormValue('href', event.target.value)} />
+                </Field>
+                <Field label="Короткая подпись">
+                  <input className="input" value={form.meta} onChange={(event) => setFormValue('meta', event.target.value)} />
+                </Field>
+              </div>
+              <Field label="Промокод для оффера «Давно не покупал»">
+                <select className="input" value={form.promoCodeId} onChange={(event) => setFormValue('promoCodeId', event.target.value)}>
+                  <option value="">Лучший доступный автоматически</option>
+                  {promoCodes.map((promoCode) => <option key={promoCode.id} value={promoCode.id}>{promoCode.code} · {promoCode.discountPercent}%</option>)}
+                </select>
+              </Field>
+            </div>
+          ) : null}
 
-          <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-white/10 dark:bg-white/[0.04]">
-            <div>
-              <div className="text-sm font-semibold text-slate-950 dark:text-white">Что выдавать пользователю</div>
-              <div className="text-sm text-slate-500 dark:text-slate-400">Оффер отвечает за текст и кнопку. Бонус новым пользователям настраивается отдельно выше.</div>
-            </div>
-            <Field label="Промокод для оффера">
-              <select
-                className="input"
-                value={form.promoCodeId}
-                onChange={(event) => setFormValue('promoCodeId', event.target.value)}
-              >
-                <option value="">Автоматически</option>
-                {promoCodes.map((promoCode) => (
-                  <option key={promoCode.id} value={promoCode.id}>
-                    {promoCode.code} · {promoCode.discountPercent}%
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <div className="text-sm leading-6 text-slate-500 dark:text-slate-400">
-              Работает для оффера “Давно не покупал”. Если не выбрать, кабинет покажет лучший доступный промокод.
-            </div>
-          </div>
-
-          <div className="rounded-lg border border-cyan-100 bg-cyan-50/80 p-3 text-sm text-cyan-900 dark:border-cyan-500/20 dark:bg-cyan-500/10 dark:text-cyan-100">
-            <div className="mb-2 flex items-center gap-2 font-semibold">
-              <Sparkles className="h-4 w-4" />
-              Подстановки
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {personalOfferPlaceholders.map((item) => (
-                <button
-                  key={item}
-                  type="button"
-                  className="rounded-md border border-cyan-200 bg-white px-2 py-1 font-mono text-xs text-cyan-800 dark:border-cyan-500/20 dark:bg-white/10 dark:text-cyan-100"
-                  onClick={() => setFormValue('description', `${form.description} ${item}`.trim())}
-                >
-                  {item}
-                </button>
-              ))}
-            </div>
-          </div>
+          {editorSection === 'PREVIEW' ? <OfferPreview form={form} /> : null}
 
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <button type="button" className="btn-secondary" onClick={() => setEditing(null)} disabled={loading}>
@@ -372,6 +347,32 @@ export function PersonalOffersAdmin({
   function setFormValue(key: keyof OfferForm, value: string) {
     setForm((prev) => ({ ...prev, [key]: value }))
   }
+}
+
+function OfferPreview({ form }: { form: OfferForm }) {
+  const tone = form.tone === 'AMBER'
+    ? 'border-amber-200 bg-amber-50 dark:border-amber-500/25 dark:bg-amber-500/10'
+    : form.tone === 'EMERALD'
+      ? 'border-emerald-200 bg-emerald-50 dark:border-emerald-500/25 dark:bg-emerald-500/10'
+      : form.tone === 'VIOLET'
+        ? 'border-violet-200 bg-violet-50 dark:border-violet-500/25 dark:bg-violet-500/10'
+        : 'border-cyan-200 bg-cyan-50 dark:border-cyan-500/25 dark:bg-cyan-500/10'
+
+  return (
+    <div className={cn('rounded-lg border p-4', tone)}>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase text-slate-500">
+            <span>{form.eyebrow || 'Метка оффера'}</span>
+            {form.meta ? <span className="badge-muted normal-case">{form.meta}</span> : null}
+          </div>
+          <h3 className="mt-2 text-xl font-semibold text-slate-950 dark:text-white">{form.title || 'Заголовок оффера'}</h3>
+          <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-300">{form.description || 'Описание появится здесь.'}</p>
+        </div>
+        <span className="btn-primary shrink-0">{form.cta || 'Кнопка'}</span>
+      </div>
+    </div>
+  )
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {

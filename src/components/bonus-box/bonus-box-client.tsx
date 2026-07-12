@@ -911,17 +911,6 @@ function PrizeCard({
       <div
         className={cn("absolute inset-x-0 top-0 h-1", prizeTopClass(prize))}
       />
-      {compact && (
-        <>
-          <div
-            className={cn(
-              "absolute -right-10 -top-10 h-24 w-24 rounded-full blur-2xl",
-              prizeGlowClass(prize),
-            )}
-          />
-          <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,.14),transparent_38%),radial-gradient(circle_at_50%_115%,rgba(255,255,255,.12),transparent_48%)]" />
-        </>
-      )}
       <div className="relative flex items-start justify-between gap-2">
         <div className="min-w-0">
           <div
@@ -1055,11 +1044,6 @@ function rarityReelClass(rarity: Rarity) {
   return "border-slate-200 bg-slate-50/90 dark:border-white/10 dark:bg-white/[0.04]";
 }
 
-function prizeGlowClass(prize: BonusBoxPrizeView) {
-  if (prize.type === "NO_PRIZE") return "bg-red-200/45 dark:bg-red-400/20";
-  return rarityGlowClass(prize.rarity);
-}
-
 function bonusBoxRevealClass(prize: BonusBoxPrizeView) {
   if (prize.type === "NO_PRIZE") return "bonus-box-stage--reveal-empty";
   if (prize.rarity === "LEGENDARY") return "bonus-box-stage--reveal-legendary";
@@ -1074,13 +1058,6 @@ function bonusBoxResultClass(prize: BonusBoxPrizeView) {
   if (prize.rarity === "EPIC") return "bonus-box-result--epic";
   if (prize.rarity === "RARE") return "bonus-box-result--rare";
   return "bonus-box-result--common";
-}
-
-function rarityGlowClass(rarity: Rarity) {
-  if (rarity === "LEGENDARY") return "bg-amber-200/55 dark:bg-amber-300/20";
-  if (rarity === "EPIC") return "bg-fuchsia-200/45 dark:bg-fuchsia-300/18";
-  if (rarity === "RARE") return "bg-cyan-200/45 dark:bg-cyan-300/18";
-  return "bg-slate-200/45 dark:bg-slate-300/10";
 }
 
 function prizeTopClass(prize: BonusBoxPrizeView) {

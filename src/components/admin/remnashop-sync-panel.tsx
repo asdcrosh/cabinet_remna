@@ -2,7 +2,7 @@
 
 import type { ReactNode } from 'react'
 import { useState } from 'react'
-import { AlertTriangle, CheckCircle2, RefreshCw, RotateCcw } from 'lucide-react'
+import { Activity, AlertTriangle, ArrowLeftRight, CheckCircle2, Clock3, RefreshCw, RotateCcw } from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
 import { toast } from '@/components/ui/toaster'
 import { AdminEmptyState } from '@/components/admin/admin-empty-state'
@@ -137,6 +137,28 @@ export function RemnashopSyncPanel() {
     }
   }
 
+  async function retryFailedEvents() {
+    const failed = (report?.syncEvents ?? []).filter((event) => event.status === 'FAILED')
+    if (failed.length === 0) return
+    setLoading(true)
+    setError(null)
+    try {
+      for (const event of failed) {
+        await apiFetch('/api/admin/remnashop-sync/retry', {
+          method: 'POST',
+          body: JSON.stringify({ id: event.id }),
+        })
+      }
+      toast(`Повторено событий: ${failed.length}`, 'success')
+      const result = await apiFetch<RemnashopSyncReport>('/api/admin/remnashop-sync')
+      setReport(result)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Не удалось повторить ошибки')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   return (
     <div className="space-y-4">
       <div className="card space-y-5">
@@ -174,8 +196,10 @@ export function RemnashopSyncPanel() {
 
       {report && (
         <>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            {Object.entries(report.summary ?? report.counts).map(([key, value]) => (
+          <SyncOverview report={report} />
+
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            {Object.entries(report.summary ?? report.counts).slice(0, 8).map(([key, value]) => (
               <Metric key={key} label={labelize(key)} value={value} />
             ))}
           </div>
@@ -210,6 +234,7 @@ export function RemnashopSyncPanel() {
             issueGroups={report.syncIssueGroups ?? []}
             loading={loading}
             onRetry={(id) => void retryEvent(id)}
+            onRetryFailed={() => void retryFailedEvents()}
           />
           <LiveCheckList />
 
@@ -265,35 +290,43 @@ function SyncEventsView({
   issueGroups,
   loading,
   onRetry,
+  onRetryFailed,
 }: {
   events: SyncEventRow[]
   counts: Record<string, number>
   issueGroups: SyncIssueGroup[]
   loading: boolean
   onRetry: (id: string) => void
+  onRetryFailed: () => void
 }) {
+  const [showHistory, setShowHistory] = useState(false)
+  const visibleEvents = showHistory
+    ? events
+    : events.filter((event) => event.status !== 'SUCCEEDED')
+  const failedCount = events.filter((event) => event.status === 'FAILED').length
+
   return (
     <section className="space-y-3">
       {issueGroups.length > 0 ? (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
-          <div className="mb-3 flex items-center gap-2 font-semibold">
+        <div className="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm dark:border-white/10 dark:bg-surface-900">
+          <div className="mb-3 flex items-center gap-2 font-semibold text-slate-950 dark:text-white">
             <AlertTriangle className="h-4 w-4" />
-            Почему есть ошибки и пропуски
+            Требуют внимания
           </div>
           <div className="space-y-2">
             {issueGroups.map((group) => (
               <div
                 key={`${group.direction}:${group.entityType}:${group.operation}:${group.status}:${group.reason}`}
-                className="rounded-lg border border-amber-200 bg-white/70 px-3 py-2 dark:border-amber-500/20 dark:bg-slate-950/30"
+                className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 dark:border-white/10 dark:bg-white/[0.04]"
               >
                 <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0">
                     <div className="font-medium">
                       {directionLabel(group.direction)} · {entityLabel(group.entityType)} · {syncStatusLabel(group.status)}
                     </div>
-                    <div className="mt-1 break-words text-xs opacity-80">{humanIssueReason(group.reason)}</div>
+                    <div className="mt-1 break-words text-xs text-slate-500 dark:text-slate-400">{humanIssueReason(group.reason)}</div>
                   </div>
-                  <div className="shrink-0 text-xs opacity-70">
+                  <div className="shrink-0 text-xs text-slate-400">
                     {group.count} шт. · {formatDateTime(group.lastSeenAt)}
                   </div>
                 </div>
@@ -308,15 +341,29 @@ function SyncEventsView({
         ))}
       </div>
       <div className="overflow-hidden rounded-lg border bg-white dark:bg-surface-900">
-        <div className="border-b px-4 py-3">
-          <h3 className="text-sm font-semibold">Журнал синхронизации</h3>
-          <p className="mt-1 text-xs text-slate-500">
-            Это накопленные события, а не только последний запуск. Ошибки уходят после успешного retry или новой успешной синхронизации той же записи.
-          </p>
+        <div className="flex flex-col gap-3 border-b px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h3 className="text-sm font-semibold">События синхронизации</h3>
+            <p className="mt-1 text-xs text-slate-500">
+              По умолчанию показаны только записи, которые требуют внимания.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" className="btn-secondary h-10 px-3" onClick={() => setShowHistory((value) => !value)}>
+              <Clock3 className="h-4 w-4" />
+              {showHistory ? 'Скрыть успешные' : 'Показать историю'}
+            </button>
+            {failedCount > 0 ? (
+              <button type="button" className="btn-primary h-10 px-3" onClick={onRetryFailed} disabled={loading}>
+                <RotateCcw className="h-4 w-4" />
+                Повторить ошибки ({failedCount})
+              </button>
+            ) : null}
+          </div>
         </div>
-        {events.length > 0 ? (
+        {visibleEvents.length > 0 ? (
           <div className="divide-y">
-            {events.map((event) => (
+            {visibleEvents.map((event) => (
               <div key={event.id} className="grid gap-3 px-4 py-3 md:grid-cols-[minmax(12rem,1fr)_8rem_minmax(12rem,1fr)_auto] md:items-center">
                 <div className="min-w-0">
                   <div className="truncate text-sm font-semibold">
@@ -330,7 +377,7 @@ function SyncEventsView({
                 </div>
                 <div className="min-w-0 text-xs text-slate-500">
                   {event.lastError ? (
-                    <div className="truncate text-amber-600 dark:text-amber-300" title={event.lastError}>{event.lastError}</div>
+                    <div className="line-clamp-2 text-amber-600 dark:text-amber-300" title={event.lastError}>{humanIssueReason(event.lastError)}</div>
                   ) : (
                     <div>обновлено {formatDateTime(event.updatedAt)}</div>
                   )}
@@ -343,19 +390,53 @@ function SyncEventsView({
                   disabled={loading}
                 >
                   <RotateCcw className="h-4 w-4" />
-                  Retry
+                  Повторить
                 </button>
               </div>
             ))}
           </div>
         ) : (
           <AdminEmptyState
-            title="Событий пока нет"
-            description="События синхронизации появятся после запуска проверки или retry."
+            title={events.length > 0 ? 'Активных проблем нет' : 'Событий пока нет'}
+            description={events.length > 0 ? 'Успешные записи доступны в полной истории.' : 'События появятся после запуска проверки или синхронизации.'}
             surface="plain"
             className="m-4"
           />
         )}
+      </div>
+    </section>
+  )
+}
+
+function SyncOverview({ report }: { report: RemnashopSyncReport }) {
+  const failed = report.syncStatusCounts?.FAILED ?? 0
+  const pending = report.syncStatusCounts?.PENDING ?? 0
+  const warnings = report.warnings.length
+  const healthy = failed === 0 && pending === 0 && warnings === 0
+
+  return (
+    <section className="grid gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-surface-900 lg:grid-cols-[1fr_auto_1fr] lg:items-center">
+      <div className="flex items-center gap-3">
+        <span className="grid h-10 w-10 place-items-center rounded-lg bg-slate-100 text-slate-700 dark:bg-white/10 dark:text-slate-200">
+          <Activity className="h-5 w-5" />
+        </span>
+        <div>
+          <div className="text-xs font-medium uppercase text-slate-400">Cabinet</div>
+          <div className="font-semibold text-slate-950 dark:text-white">Основные данные</div>
+        </div>
+      </div>
+      <div className="flex items-center justify-center gap-2 text-sm font-medium text-slate-500">
+        <ArrowLeftRight className="h-5 w-5" />
+        <span className={healthy ? 'badge-active' : 'badge-limited'}>{healthy ? 'Системы согласованы' : 'Нужна проверка'}</span>
+      </div>
+      <div className="flex items-center gap-3 lg:justify-end lg:text-right">
+        <div>
+          <div className="text-xs font-medium uppercase text-slate-400">Remnashop</div>
+          <div className="font-semibold text-slate-950 dark:text-white">Магазин и каталог</div>
+        </div>
+        <span className="grid h-10 w-10 place-items-center rounded-lg bg-slate-100 text-slate-700 dark:bg-white/10 dark:text-slate-200">
+          <RefreshCw className="h-5 w-5" />
+        </span>
       </div>
     </section>
   )
@@ -414,9 +495,9 @@ function InfoLine({ label, value }: { label: string; value: string }) {
 
 function Metric({ label, value }: { label: string; value: number }) {
   return (
-    <div className="card">
+    <div className="metric-card">
       <div className="text-sm text-slate-500">{label}</div>
-      <div className="mt-2 text-2xl font-semibold">{value}</div>
+      <div className="mt-1 text-2xl font-semibold">{value}</div>
     </div>
   )
 }
