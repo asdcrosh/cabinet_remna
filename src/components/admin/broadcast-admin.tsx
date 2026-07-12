@@ -104,86 +104,104 @@ const templates: Array<{
   body: string
 }> = [
   {
-    title: 'VPN почти на паузе',
-    description: 'Мягкое продление активным',
+    title: 'Подписка скоро закончится',
+    description: 'Заблаговременное продление без давления',
     segment: 'ACTIVE',
     channels: ['IN_APP', 'TELEGRAM', 'EMAIL'],
     actionHref: '/dashboard/plans',
-    actionLabel: 'Продлить {plan}',
-    body: '🔥 {name}, тариф «{plan}» заканчивается через {days_left} дн.\n\nПродлите доступ заранее, чтобы VPN работал без пауз.',
+    actionLabel: 'Продлить подписку',
+    body: '{name}, напоминаем о подписке заранее.\n\nВаш тариф: «{plan}»\nДо окончания: {days_left} дн.\n\nПосле продления доступ продолжит работать без пауз, а подключённые устройства и настройки сохранятся. Ничего добавлять заново не потребуется.\n\nВыберите удобный срок в кабинете. Новый период прибавится к текущему.',
   },
   {
-    title: 'Персональный бонус',
-    description: 'Возврат тех, кто давно не платил',
+    title: 'Персональное предложение',
+    description: 'Возвращает пользователей после долгого перерыва',
     segment: 'INACTIVE_N_DAYS',
     inactiveDays: 45,
-    channels: ['IN_APP', 'TELEGRAM'],
+    channels: ['IN_APP', 'TELEGRAM', 'EMAIL'],
     actionHref: '/dashboard/plans',
-    actionLabel: 'Забрать бонус',
-    body: '🎁 {name}, для вас открыт персональный бонус на VPN.\n\nВыберите тариф в кабинете, а промокод примените при оплате.',
+    actionLabel: 'Посмотреть предложение',
+    body: '{name}, мы сохранили ваш аккаунт и подготовили персональное предложение на возвращение.\n\nВ кабинете можно выбрать новый срок доступа, применить доступный промокод и сразу получить обновлённую подписку.\n\nЧто останется с вами:\n- привычный аккаунт;\n- история платежей;\n- поддержка и быстрые инструкции;\n- подключение по QR-коду или ссылке.\n\nОткройте тарифы и посмотрите доступные условия.',
   },
   {
-    title: 'VPN без ожидания',
-    description: 'Для новых пользователей без покупок',
+    title: 'Первое подключение за несколько минут',
+    description: 'Знакомство с сервисом для новых пользователей',
     segment: 'NEVER_PURCHASED',
-    channels: ['IN_APP', 'EMAIL'],
+    channels: ['IN_APP', 'TELEGRAM', 'EMAIL'],
     actionHref: '/dashboard/plans',
     actionLabel: 'Выбрать тариф',
-    body: '⚡ {name}, VPN можно подключить за пару минут.\n\nВыберите срок, оплатите тариф и сразу откройте подписку в кабинете.',
+    body: '{name}, ваш кабинет уже готов к первому подключению.\n\nВесь процесс занимает несколько минут:\n1. Выберите подходящий срок доступа.\n2. Оплатите тариф онлайн.\n3. Откройте выданную подписку.\n4. Добавьте VPN в приложение по QR-коду или одной кнопкой.\n\nПосле оплаты не нужно ждать ручной активации: данные для подключения появятся в кабинете автоматически.',
   },
   {
-    title: 'Доступ закончился',
-    description: 'Возврат после окончания подписки',
+    title: 'Доступ можно восстановить',
+    description: 'Возврат после завершения подписки',
     segment: 'EXPIRED',
     channels: ['IN_APP', 'TELEGRAM', 'EMAIL'],
     actionHref: '/dashboard/plans',
     actionLabel: 'Вернуть доступ',
-    body: '⏳ {name}, ваша подписка «{plan}» больше не активна.\n\nПродлите доступ, чтобы снова подключаться без настройки с нуля.',
+    body: '{name}, срок действия подписки «{plan}» завершился.\n\nАккаунт и история покупок сохранены. Чтобы снова пользоваться VPN, достаточно выбрать тариф и оплатить продление.\n\nПосле оплаты кабинет автоматически обновит доступ. Затем можно открыть раздел подписки и подключиться по прежнему удобным способом: через приложение, QR-код или ссылку.\n\nПовторная регистрация и настройка аккаунта не нужны.',
   },
   {
-    title: 'Пригласи друга',
-    description: 'Реферальный оффер',
+    title: 'Поделитесь доступом с другом',
+    description: 'Полноценное приглашение в реферальную программу',
     segment: 'ACTIVE',
     channels: ['IN_APP', 'TELEGRAM', 'EMAIL'],
     actionHref: '/dashboard/referrals',
-    actionLabel: 'Открыть рефералку',
-    body: '🤝 {name}, поделитесь VPN с другом и получите бонус.\n\nВаша ссылка: {ref_link}',
+    actionLabel: 'Пригласить друга',
+    body: '{name}, у вас есть персональная ссылка для приглашения друзей.\n\nКак это работает:\n- отправьте другу свою ссылку;\n- друг зарегистрируется и выберет тариф;\n- после его первой оплаты вам начислят бонусные дни.\n\nПерсональная ссылка:\n{ref_link}\n\nСтатус приглашений и начисленные бонусы всегда видны в кабинете.',
   },
   {
-    title: 'Бонус за активность',
-    description: 'Для лояльных пользователей',
+    title: 'Бонус для постоянных пользователей',
+    description: 'Тёплая коммуникация с активной аудиторией',
     segment: 'ACTIVE',
     channels: ['IN_APP', 'TELEGRAM'],
-    actionHref: '/dashboard/referrals',
-    actionLabel: 'Получить бонус',
-    body: '🌟 {name}, вы уже используете «{plan}».\n\nПригласите друга по ссылке {ref_link} и получите дополнительный бонус к подписке.',
+    actionHref: '/dashboard/bonus-box',
+    actionLabel: 'Открыть бонусы',
+    body: '{name}, спасибо, что продолжаете пользоваться тарифом «{plan}».\n\nВ кабинете доступны дополнительные возможности для активных пользователей:\n- подарочный бокс;\n- персональные промокоды;\n- бонусные дни за приглашённых друзей;\n- история полученных наград.\n\nЗагляните в раздел бонусов: возможно, там уже есть доступная попытка или новый подарок.',
   },
   {
-    title: 'Нужна помощь?',
-    description: 'Направление в поддержку',
+    title: 'Поможем с подключением',
+    description: 'Полезное сервисное сообщение без продажи',
     segment: 'ALL',
-    channels: ['IN_APP', 'TELEGRAM'],
+    channels: ['IN_APP', 'TELEGRAM', 'EMAIL'],
     actionHref: '/dashboard/support',
     actionLabel: 'Написать в поддержку',
-    body: '💬 {name}, если VPN не подключается или нужна помощь с устройством, напишите нам в поддержку.\n\nОтвет появится прямо в кабинете.',
+    body: '{name}, если VPN не подключается или приложение показывает ошибку, не нужно разбираться в одиночку.\n\nНапишите в поддержку и укажите:\n- модель устройства;\n- название приложения;\n- что происходит после нажатия кнопки подключения.\n\nМы проверим подписку и подскажем конкретные шаги. Ответ появится в кабинете, а при привязанном Telegram придёт уведомление.',
   },
   {
-    title: 'Подарочный доступ',
-    description: 'Для рекламы и ручных бонусов',
+    title: 'Для вас подготовлен подарок',
+    description: 'Промокод или подарочный доступ с понятной инструкцией',
     segment: 'ALL',
     channels: ['IN_APP', 'TELEGRAM', 'EMAIL'],
     actionHref: '/dashboard/plans',
-    actionLabel: 'Активировать подарок',
-    body: '🎟️ {name}, для вас подготовлен подарочный доступ.\n\nОткройте тарифы и примените промокод при оплате. Если код уже есть, просто вставьте его в поле промокода.',
+    actionLabel: 'Использовать подарок',
+    body: '{name}, для вашего аккаунта подготовлен подарок.\n\nЕсли вы получили промокод, откройте тарифы, выберите подходящий срок и укажите код перед оплатой. Итоговая стоимость пересчитается сразу.\n\nЕсли подарок уже начислен в кабинет, он будет виден в разделе бонусов или среди доступных промокодов.\n\nПодарки могут иметь ограниченный срок действия, поэтому рекомендуем проверить предложение сейчас.',
   },
   {
-    title: 'Что нового',
-    description: 'Для всей базы',
+    title: 'Кабинет стал удобнее',
+    description: 'Анонс обновления продукта для всей базы',
     segment: 'ALL',
-    channels: ['IN_APP'],
+    channels: ['IN_APP', 'TELEGRAM', 'EMAIL'],
     actionHref: '/dashboard',
     actionLabel: 'Открыть кабинет',
-    body: '✨ {name}, в кабинете появились обновления.\n\nПроверьте подписку, устройства и новые возможности на главной странице.',
+    body: '{name}, мы выпустили новую версию личного кабинета.\n\nЧто стало удобнее:\n- главная страница показывает состояние подписки и главное действие;\n- тарифы проще сравнивать на телефоне;\n- подключение собрано в понятный пошаговый сценарий;\n- статусы оплаты и выдачи подписки стали нагляднее;\n- навигация работает быстрее и занимает меньше места.\n\nОбновление уже установлено. Просто откройте кабинет и продолжайте пользоваться.',
+  },
+  {
+    title: 'Технические работы завершены',
+    description: 'Сообщение после обслуживания или восстановления сервиса',
+    segment: 'ALL',
+    channels: ['IN_APP', 'TELEGRAM', 'EMAIL'],
+    actionHref: '/dashboard/subscription',
+    actionLabel: 'Проверить подписку',
+    body: '{name}, плановые технические работы завершены. Кабинет, оплата и выдача подписок работают в обычном режиме.\n\nЕсли устройство не подключилось автоматически, откройте подписку и обновите её в приложении. Обычно повторная настройка не требуется.\n\nПри сохранении ошибки напишите в поддержку: мы проверим ваш профиль и поможем восстановить подключение.',
+  },
+  {
+    title: 'Проверьте подключение на устройстве',
+    description: 'Инструкция активным пользователям после изменений сети',
+    segment: 'ACTIVE',
+    channels: ['IN_APP', 'TELEGRAM'],
+    actionHref: '/dashboard/subscription',
+    actionLabel: 'Обновить подключение',
+    body: '{name}, для тарифа «{plan}» доступны актуальные параметры подключения.\n\nЧтобы приложение использовало последнюю конфигурацию:\n1. Откройте раздел подписки в кабинете.\n2. Выберите своё приложение.\n3. Нажмите кнопку подключения или обновите подписку внутри приложения.\n\nЕсли текущий профиль работает нормально, дополнительных действий не требуется.',
   },
 ]
 
@@ -574,31 +592,47 @@ export function BroadcastAdmin({
 
         <div className={cn('card min-w-0 overflow-hidden p-4', step !== 'message' && 'hidden')}>
           <div className="grid min-w-0 gap-4">
-            <div className="min-w-0 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-white/10 dark:bg-white/5">
+            <div className="min-w-0">
               <div className="flex items-center justify-between gap-2">
                 <div>
                   <div className="text-sm font-semibold text-slate-950 dark:text-white">Шаблон сообщения</div>
-                  <div className="text-xs text-slate-500 dark:text-slate-400">Выберите готовый сценарий, текст заполнится ниже.</div>
+                  <div className="text-xs text-slate-500 dark:text-slate-400">Готовые полноценные сценарии для продаж, сервиса и возврата пользователей.</div>
                 </div>
                 <button type="button" className="btn-secondary min-h-9 px-3 text-xs" onClick={saveTemplate} disabled={!canSend}>
                   Сохранить
                 </button>
               </div>
-              <div className="-mx-1 mt-3 flex min-w-0 gap-2 overflow-x-auto px-1 pb-1">
+              <div className="-mx-1 mt-3 flex min-w-0 snap-x gap-3 overflow-x-auto px-1 pb-2 [scrollbar-width:thin]">
                 {visibleTemplates.map((template) => (
                   <div
                     key={template.id || template.title}
-                    className="min-w-[13.5rem] max-w-[15rem] rounded-lg border border-slate-200 bg-white p-3 transition-colors hover:bg-slate-50 dark:border-white/10 dark:bg-surface-900 dark:hover:bg-white/5"
+                    className="flex min-h-[18rem] min-w-[19rem] max-w-[21rem] snap-start flex-col rounded-lg border border-slate-200 bg-white p-4 shadow-sm transition-colors hover:border-cyan-200 dark:border-white/10 dark:bg-surface-900 dark:hover:border-cyan-500/30"
                   >
-                    <button type="button" onClick={() => applyTemplate(template)} className="w-full text-left">
-                      <div className="truncate text-sm font-semibold text-slate-950 dark:text-white">{template.title}</div>
-                      <div className="mt-0.5 line-clamp-2 text-xs text-slate-500 dark:text-slate-400">{template.description || 'Пользовательский шаблон'}</div>
-                    </button>
-                    {template.id ? (
-                      <button type="button" className="mt-2 text-xs font-semibold text-red-600 hover:text-red-700 dark:text-red-300" onClick={() => deleteTemplate(template.id!)}>
-                        Удалить
+                    <div className="text-base font-semibold text-slate-950 dark:text-white">{template.title}</div>
+                    <div className="mt-1 line-clamp-2 min-h-8 text-xs leading-4 text-slate-500 dark:text-slate-400">{template.description || 'Пользовательский шаблон'}</div>
+                    <div className="mt-3 flex flex-wrap gap-1.5 text-[11px] font-medium">
+                      <span className="rounded-full bg-slate-100 px-2 py-1 text-slate-600 dark:bg-white/10 dark:text-slate-300">
+                        {segmentLabel(template.segment, template.inactiveDays ?? undefined)}
+                      </span>
+                      {template.channels.map((channel) => (
+                        <span key={channel} className="rounded-full bg-cyan-50 px-2 py-1 text-cyan-700 dark:bg-cyan-500/10 dark:text-cyan-200">
+                          {channelLabel(channel)}
+                        </span>
+                      ))}
+                    </div>
+                    <p className="mt-3 line-clamp-6 whitespace-pre-line text-xs leading-5 text-slate-600 dark:text-slate-300">
+                      {renderPreview(template.body)}
+                    </p>
+                    <div className="mt-auto flex items-center gap-2 pt-4">
+                      <button type="button" onClick={() => applyTemplate(template)} className="btn-primary min-h-10 flex-1 px-3 text-xs">
+                        Использовать
                       </button>
-                    ) : null}
+                      {template.id ? (
+                        <button type="button" className="btn-secondary min-h-10 px-3 text-xs text-red-600 dark:text-red-300" onClick={() => deleteTemplate(template.id!)}>
+                          Удалить
+                        </button>
+                      ) : null}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -625,7 +659,7 @@ export function BroadcastAdmin({
               <div className="relative mt-1">
                 <textarea
                   ref={bodyInputRef}
-                  className="input min-h-40 resize-y py-3 pr-14"
+                  className="input min-h-64 resize-y py-3 pr-14 leading-6"
                   value={body}
                   onChange={(event) => setBody(event.target.value)}
                   maxLength={1200}
