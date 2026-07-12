@@ -143,9 +143,11 @@ export default async function PlansPage({
         </div>
       )}
 
-      <div className="grid auto-rows-fr grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:gap-4">
+      {visiblePlans.length > 1 ? <PlanComparison plans={visiblePlans} /> : null}
+
+      <div className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-2 md:mx-0 md:grid md:auto-rows-fr md:grid-cols-2 md:overflow-visible md:px-0 md:pb-0 xl:grid-cols-3 2xl:gap-4">
         {visiblePlans.length === 0 && (
-          <div className="card col-span-full py-12 text-center">
+          <div className="card w-full py-12 text-center md:col-span-full">
             <h3 className="text-lg font-semibold">Тарифы скоро появятся</h3>
             <p className="mx-auto mt-2 max-w-md text-sm text-slate-500 dark:text-slate-400">
               Сейчас нет опубликованных тарифов.
@@ -158,25 +160,58 @@ export default async function PlansPage({
           </div>
         )}
         {visiblePlans.map((p, index) => (
-          <PlanCard
-            key={p.id}
-            id={p.id}
-            name={p.name}
-            description={p.description}
-            price={formatPrice(p.priceKopecks)}
-            priceKopecks={p.priceKopecks}
-            durationDays={p.durationDays}
-            trafficLimitGb={p.trafficLimitGb}
-            deviceLimit={p.deviceLimit}
-            isPromo={p.isPromo}
-            popular={index === 1}
-            current={currentSubscription?.planId === p.id}
-            initialPromoCode={initialPromoCode}
-            availablePromoCodes={availablePromoCodesByPlan.get(p.id) ?? []}
-          />
+          <div key={p.id} className="w-[min(88vw,22rem)] shrink-0 snap-center md:w-auto">
+            <PlanCard
+              id={p.id}
+              name={p.name}
+              description={p.description}
+              price={formatPrice(p.priceKopecks)}
+              priceKopecks={p.priceKopecks}
+              durationDays={p.durationDays}
+              trafficLimitGb={p.trafficLimitGb}
+              deviceLimit={p.deviceLimit}
+              isPromo={p.isPromo}
+              popular={index === 1}
+              current={currentSubscription?.planId === p.id}
+              initialPromoCode={initialPromoCode}
+              availablePromoCodes={availablePromoCodesByPlan.get(p.id) ?? []}
+            />
+          </div>
         ))}
       </div>
     </div>
+  )
+}
+
+function PlanComparison({ plans }: { plans: Array<{ id: string; name: string; priceKopecks: number; durationDays: number; trafficLimitGb: number | null; deviceLimit: number }> }) {
+  return (
+    <details className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-surface-900">
+      <summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-slate-950 dark:text-white">Сравнить тарифы</summary>
+      <div className="overflow-x-auto border-t border-slate-100 dark:border-white/10">
+        <table className="w-full min-w-[680px] text-sm">
+          <thead className="bg-slate-50 text-left text-slate-500 dark:bg-surface-800">
+            <tr>
+              <th className="px-4 py-3">Тариф</th>
+              <th className="px-4 py-3">Срок</th>
+              <th className="px-4 py-3">Трафик</th>
+              <th className="px-4 py-3">Устройства</th>
+              <th className="px-4 py-3 text-right">Цена</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100 dark:divide-white/10">
+            {plans.map((plan) => (
+              <tr key={plan.id}>
+                <td className="px-4 py-3 font-medium">{plan.name}</td>
+                <td className="px-4 py-3 text-slate-500">{plan.durationDays} дн.</td>
+                <td className="px-4 py-3 text-slate-500">{plan.trafficLimitGb == null ? 'Безлимит' : `${plan.trafficLimitGb} ГБ`}</td>
+                <td className="px-4 py-3 text-slate-500">{plan.deviceLimit}</td>
+                <td className="px-4 py-3 text-right font-semibold">{formatPrice(plan.priceKopecks)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </details>
   )
 }
 

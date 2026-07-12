@@ -2,8 +2,9 @@
 
 import type { ReactNode } from 'react'
 import { useState } from 'react'
-import { Eye, Laptop, Receipt, ShieldCheck } from 'lucide-react'
+import { Eye, Laptop, Receipt, ShieldCheck, UserRound } from 'lucide-react'
 import { AdminModal } from '@/components/admin/admin-modal'
+import { Tabs } from '@/components/ui/tabs'
 
 export interface AdminUserDetails {
   email: string
@@ -44,13 +45,17 @@ export interface AdminUserDetails {
 
 export function UserDetailsButton({ details }: { details: AdminUserDetails }) {
   const [open, setOpen] = useState(false)
+  const [tab, setTab] = useState<'PROFILE' | 'SUBSCRIPTIONS' | 'PAYMENTS' | 'DEVICES'>('PROFILE')
 
   return (
     <>
       <button
         type="button"
         className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-600 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50 hover:text-slate-950 dark:border-white/10 dark:bg-surface-900"
-        onClick={() => setOpen(true)}
+        onClick={() => {
+          setTab('PROFILE')
+          setOpen(true)
+        }}
         title="Открыть пользователя"
         aria-label="Открыть пользователя"
       >
@@ -65,18 +70,33 @@ export function UserDetailsButton({ details }: { details: AdminUserDetails }) {
         size="xl"
       >
         <div className="space-y-5">
-          <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <DetailCard label="Регистрация" value={details.createdAt} />
-            <DetailCard label="Последний вход" value={details.lastLoginAt} />
-            <DetailCard label="Email" value={details.emailVerifiedAt} />
-            <DetailCard label="Telegram" value={details.telegram} mono />
-            <DetailCard label="Remnashop" value={details.remnashop} mono />
-            <DetailCard label="Remnawave username" value={details.remnawaveUsername} mono />
-            <DetailCard label="Remnawave UUID" value={details.remnawaveUuid} mono />
-            <DetailCard label="Short UUID" value={details.remnawaveShortUuid} mono />
-          </section>
+          <UserStatusOverview details={details} />
+          <Tabs
+            value={tab}
+            onValueChange={setTab}
+            className="w-full"
+            items={[
+              { value: 'PROFILE', label: 'Профиль' },
+              { value: 'SUBSCRIPTIONS', label: `Подписки ${details.subscriptions.length}` },
+              { value: 'PAYMENTS', label: `Платежи ${details.payments.length}` },
+              { value: 'DEVICES', label: `Устройства ${details.devices.length}` },
+            ]}
+          />
 
-          <DetailSection icon={<ShieldCheck className="h-4 w-4" />} title="Подписки">
+          {tab === 'PROFILE' ? (
+            <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <DetailCard label="Регистрация" value={details.createdAt} />
+              <DetailCard label="Последний вход" value={details.lastLoginAt} />
+              <DetailCard label="Email" value={details.emailVerifiedAt} />
+              <DetailCard label="Telegram" value={details.telegram} mono />
+              <DetailCard label="Remnashop" value={details.remnashop} mono />
+              <DetailCard label="Remnawave username" value={details.remnawaveUsername} mono />
+              <DetailCard label="Remnawave UUID" value={details.remnawaveUuid} mono />
+              <DetailCard label="Short UUID" value={details.remnawaveShortUuid} mono />
+            </section>
+          ) : null}
+
+          {tab === 'SUBSCRIPTIONS' ? <DetailSection icon={<ShieldCheck className="h-4 w-4" />} title="Подписки">
             {details.subscriptions.length > 0 ? (
               <div className="grid gap-2">
                 {details.subscriptions.map((subscription) => (
@@ -99,9 +119,9 @@ export function UserDetailsButton({ details }: { details: AdminUserDetails }) {
             ) : (
               <EmptyLine text="Подписок нет" />
             )}
-          </DetailSection>
+          </DetailSection> : null}
 
-          <DetailSection icon={<Receipt className="h-4 w-4" />} title="Платежи">
+          {tab === 'PAYMENTS' ? <DetailSection icon={<Receipt className="h-4 w-4" />} title="Платежи">
             {details.payments.length > 0 ? (
               <div className="grid gap-2">
                 {details.payments.map((payment) => (
@@ -118,9 +138,9 @@ export function UserDetailsButton({ details }: { details: AdminUserDetails }) {
             ) : (
               <EmptyLine text="Платежей нет" />
             )}
-          </DetailSection>
+          </DetailSection> : null}
 
-          <DetailSection icon={<Laptop className="h-4 w-4" />} title="Устройства">
+          {tab === 'DEVICES' ? <DetailSection icon={<Laptop className="h-4 w-4" />} title="Устройства">
             {details.devices.length > 0 ? (
               <div className="grid gap-2 md:grid-cols-2">
                 {details.devices.map((device) => (
@@ -137,11 +157,44 @@ export function UserDetailsButton({ details }: { details: AdminUserDetails }) {
             ) : (
               <EmptyLine text="Устройств нет" />
             )}
-          </DetailSection>
+          </DetailSection> : null}
         </div>
       </AdminModal>
     </>
   )
+}
+
+function UserStatusOverview({ details }: { details: AdminUserDetails }) {
+  const subscription = details.subscriptions[0]
+  const hasTelegram = isConnected(details.telegram)
+  const hasRemnashop = isConnected(details.remnashop)
+  const hasRemnawave = isConnected(details.remnawaveUsername) || isConnected(details.remnawaveUuid)
+
+  return (
+    <section className="grid gap-3 rounded-lg border border-slate-200 bg-slate-50/70 p-3 dark:border-white/10 dark:bg-white/[0.03] sm:grid-cols-2 xl:grid-cols-4">
+      <StatusCell icon={<UserRound className="h-4 w-4" />} label="Аккаунт" value={details.role} active />
+      <StatusCell icon={<ShieldCheck className="h-4 w-4" />} label="Подписка" value={subscription?.status || 'Нет подписки'} active={Boolean(subscription)} />
+      <StatusCell icon={<Receipt className="h-4 w-4" />} label="Оплаты" value={String(details.payments.length)} active={details.payments.length > 0} />
+      <StatusCell icon={<Laptop className="h-4 w-4" />} label="Связи" value={`${Number(hasTelegram) + Number(hasRemnashop) + Number(hasRemnawave)}/3`} active={hasTelegram && hasRemnashop && hasRemnawave} />
+    </section>
+  )
+}
+
+function StatusCell({ icon, label, value, active }: { icon: ReactNode; label: string; value: string; active: boolean }) {
+  return (
+    <div className="flex items-center gap-3 rounded-lg bg-white px-3 py-2 dark:bg-surface-900">
+      <span className={active ? 'text-emerald-600 dark:text-emerald-300' : 'text-slate-400'}>{icon}</span>
+      <div className="min-w-0">
+        <div className="text-xs text-slate-400">{label}</div>
+        <div className="truncate text-sm font-semibold">{value}</div>
+      </div>
+    </div>
+  )
+}
+
+function isConnected(value: string) {
+  const normalized = value.trim().toLowerCase()
+  return Boolean(normalized && normalized !== '—' && normalized !== 'нет' && normalized !== 'не привязан')
 }
 
 function DetailCard({ label, value, mono }: { label: string; value: string; mono?: boolean }) {

@@ -146,7 +146,7 @@ export default async function AdminPaymentsPage({
               const canCheckPayment = Boolean(payment.yookassaId) && payment.status !== 'SUCCEEDED'
               return (
                 <tr key={payment.id}>
-                  <td className="text-slate-500">{new Date(payment.createdAt).toLocaleString('ru-RU')}</td>
+                  <td className={`border-l-4 text-slate-500 ${paymentRailClass(payment.status, needsRetry || needsRemnashopRetry)}`}>{new Date(payment.createdAt).toLocaleString('ru-RU')}</td>
                   <td>
                     <div className="max-w-[220px] truncate font-medium">{payment.user.email}</div>
                     <div className="text-xs text-slate-500">{payment.user.name || 'Без имени'}</div>
@@ -204,7 +204,7 @@ export default async function AdminPaymentsPage({
           const needsRemnashopRetry = payment.status === 'SUCCEEDED' && Boolean(payment.subscriptionProvisionedAt) && !payment.remnashopSyncedAt
           const canCheckPayment = Boolean(payment.yookassaId) && payment.status !== 'SUCCEEDED'
           return (
-            <article key={payment.id} className="overflow-hidden rounded-lg border bg-white shadow-sm dark:bg-surface-900">
+            <article key={payment.id} className={`overflow-hidden rounded-lg border border-l-4 bg-white shadow-sm dark:bg-surface-900 ${paymentRailClass(payment.status, needsRetry || needsRemnashopRetry)}`}>
               <div className="border-b bg-slate-50 px-4 py-3 dark:bg-surface-800">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
@@ -230,24 +230,24 @@ export default async function AdminPaymentsPage({
                     />
                   </div>
                 </div>
+                <PaymentFlow
+                  paid={payment.status === 'SUCCEEDED'}
+                  provisioned={Boolean(payment.subscriptionProvisionedAt)}
+                  remnashopSynced={Boolean(payment.remnashopSyncedAt)}
+                />
                 <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
-                  <AdminInfoCell
-                    label="Выдача"
-                    value={payment.subscriptionProvisionedAt ? 'Выдана' : payment.status === 'SUCCEEDED' ? 'Нужен retry' : '—'}
-                  />
                   <AdminInfoCell label="Промокод" value={getPromoCodeLabel(payment.promoCodeSnapshot)} />
                   <AdminInfoCell label="ID платежа" value={shortId(payment.yookassaId || payment.id)} mono />
                 </div>
-                {payment.provisioningError && (
-                  <div className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:bg-amber-500/10 dark:text-amber-100">
-                    {payment.provisioningError}
-                  </div>
-                )}
-                {payment.subscriptionProvisionedAt && !payment.remnashopSyncedAt && (
-                  <div className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:bg-amber-500/10 dark:text-amber-100">
-                    Remnashop: {humanSyncError(payment.remnashopSyncError)}
-                  </div>
-                )}
+                {(payment.provisioningError || (payment.subscriptionProvisionedAt && !payment.remnashopSyncedAt)) ? (
+                  <details className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
+                    <summary className="cursor-pointer font-semibold">Технические детали</summary>
+                    <div className="mt-2 space-y-1">
+                      {payment.provisioningError ? <div>{payment.provisioningError}</div> : null}
+                      {payment.subscriptionProvisionedAt && !payment.remnashopSyncedAt ? <div>Remnashop: {humanSyncError(payment.remnashopSyncError)}</div> : null}
+                    </div>
+                  </details>
+                ) : null}
                 <div className="action-row">
                   {canCheckPayment && <PaymentSyncButton paymentId={payment.id} />}
                   {needsRetry ? (
@@ -269,6 +269,32 @@ export default async function AdminPaymentsPage({
       <LazyListLoader loaded={payments.length} total={total} step={ADMIN_LIST_PAGE_SIZE} />
     </div>
   )
+}
+
+function PaymentFlow({ paid, provisioned, remnashopSynced }: { paid: boolean; provisioned: boolean; remnashopSynced: boolean }) {
+  const steps = [
+    { label: 'Оплата', done: paid },
+    { label: 'Выдача', done: provisioned },
+    { label: 'Remnashop', done: remnashopSynced },
+  ]
+
+  return (
+    <div className="grid grid-cols-3 overflow-hidden rounded-lg border border-slate-200 dark:border-white/10">
+      {steps.map((step, index) => (
+        <div key={step.label} className={`relative px-2 py-2 text-center text-xs font-medium ${step.done ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-200' : 'bg-slate-50 text-slate-400 dark:bg-white/[0.03]'}`}>
+          {index > 0 ? <span className="absolute inset-y-2 left-0 w-px bg-slate-200 dark:bg-white/10" /> : null}
+          {step.label}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function paymentRailClass(status: string, requiresAttention: boolean) {
+  if (requiresAttention) return 'border-l-red-500'
+  if (status === 'SUCCEEDED') return 'border-l-emerald-500'
+  if (status === 'PENDING') return 'border-l-amber-400'
+  return 'border-l-slate-300 dark:border-l-slate-600'
 }
 
 function humanSyncError(value: string | null) {

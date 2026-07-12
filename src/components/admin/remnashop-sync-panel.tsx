@@ -300,9 +300,16 @@ function SyncEventsView({
   onRetryFailed: () => void
 }) {
   const [showHistory, setShowHistory] = useState(false)
-  const visibleEvents = showHistory
+  const [directionFilter, setDirectionFilter] = useState<'ALL' | SyncEventRow['direction']>('ALL')
+  const [entityFilter, setEntityFilter] = useState('ALL')
+  const baseEvents = showHistory
     ? events
     : events.filter((event) => event.status !== 'SUCCEEDED')
+  const visibleEvents = baseEvents.filter((event) =>
+    (directionFilter === 'ALL' || event.direction === directionFilter) &&
+    (entityFilter === 'ALL' || event.entityType === entityFilter)
+  )
+  const entityTypes = Array.from(new Set(events.map((event) => event.entityType))).sort()
   const failedCount = events.filter((event) => event.status === 'FAILED').length
 
   return (
@@ -349,6 +356,15 @@ function SyncEventsView({
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
+            <select className="input h-10 w-auto min-w-36 py-1.5" value={directionFilter} onChange={(event) => setDirectionFilter(event.target.value as 'ALL' | SyncEventRow['direction'])} aria-label="Направление синхронизации">
+              <option value="ALL">Оба направления</option>
+              <option value="CABINET_TO_REMNASHOP">Cabinet → Remnashop</option>
+              <option value="REMNASHOP_TO_CABINET">Remnashop → Cabinet</option>
+            </select>
+            <select className="input h-10 w-auto min-w-32 py-1.5" value={entityFilter} onChange={(event) => setEntityFilter(event.target.value)} aria-label="Тип записи">
+              <option value="ALL">Все типы</option>
+              {entityTypes.map((type) => <option key={type} value={type}>{entityLabel(type)}</option>)}
+            </select>
             <button type="button" className="btn-secondary h-10 px-3" onClick={() => setShowHistory((value) => !value)}>
               <Clock3 className="h-4 w-4" />
               {showHistory ? 'Скрыть успешные' : 'Показать историю'}

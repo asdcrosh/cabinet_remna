@@ -61,6 +61,7 @@ export default async function AdminDashboardPage() {
     dailyUserRows,
     stalePendingPayments,
     pendingPayments,
+    syncFailed,
     duplicateCandidates,
   ] = await Promise.all([
     prisma.user.count(),
@@ -153,6 +154,7 @@ export default async function AdminDashboardPage() {
     `,
     prisma.payment.count({ where: { status: 'PENDING', createdAt: { lt: stalePaymentDate } } }),
     prisma.payment.count({ where: { status: 'PENDING' } }),
+    prisma.syncEvent.count({ where: { status: 'FAILED' } }),
     findIdentityDuplicateCandidates(20),
   ])
   const customersTotal = sourceRows.reduce((sum, row) => sum + Number(row.count), 0)
@@ -173,7 +175,12 @@ export default async function AdminDashboardPage() {
         description="Операционная сводка, риски и быстрые переходы по админке."
       />
 
-      <section className="grid gap-3 md:grid-cols-3">
+      <section className="space-y-3">
+        <div>
+          <h2 className="text-lg font-semibold tracking-tight">Требует внимания</h2>
+          <p className="text-sm text-slate-500">Очереди и ошибки, которые влияют на пользователей</p>
+        </div>
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         <PriorityCard
           href="/dashboard/admin/support"
           icon={<LifeBuoy className="h-5 w-5" />}
@@ -191,6 +198,14 @@ export default async function AdminDashboardPage() {
           urgent={recoveryCount > 0}
         />
         <PriorityCard
+          href="/dashboard/admin/remnashop-sync"
+          icon={<RefreshCw className="h-5 w-5" />}
+          title="Синхронизация"
+          value={syncFailed}
+          text={syncFailed > 0 ? 'Есть необработанные ошибки' : 'Ошибок синхронизации нет'}
+          urgent={syncFailed > 0}
+        />
+        <PriorityCard
           href="/dashboard/admin/duplicates"
           icon={<SearchCheck className="h-5 w-5" />}
           title="Дубли"
@@ -198,12 +213,13 @@ export default async function AdminDashboardPage() {
           text={duplicateCandidates.length > 0 ? 'Проверьте связанные аккаунты' : 'Подозрительных дублей нет'}
           urgent={duplicateCandidates.length > 0}
         />
+        </div>
       </section>
 
       <section className="space-y-3">
         <div className="flex flex-wrap items-end justify-between gap-2">
           <div>
-            <h2 className="text-lg font-semibold tracking-tight">Мини-аналитика</h2>
+            <h2 className="text-lg font-semibold tracking-tight">Рабочая сводка</h2>
             <p className="text-sm text-slate-500">Регистрации, платежи и источники пользователей</p>
           </div>
           <div className="text-xs text-slate-400">
@@ -338,25 +354,10 @@ export default async function AdminDashboardPage() {
           note={`${formatPrice(paymentsAggregate._sum.amountKopecks ?? 0)} всего`}
         />
         <AdminTile
-          href="/dashboard/admin/payments"
-          icon={<CreditCard className="h-5 w-5" />}
-          title="Сегодня"
-          value={paymentsToday._count}
-          note={formatPrice(paymentsToday._sum.amountKopecks ?? 0)}
-        />
-        <AdminTile
           href="/dashboard/admin/promo-codes"
           icon={<Tag className="h-5 w-5" />}
           title="Промокоды"
           value={activePromoCodes}
-        />
-        <AdminTile
-          href="/dashboard/admin/support"
-          icon={<LifeBuoy className="h-5 w-5" />}
-          title="Поддержка"
-          value={supportWaiting}
-          warning={supportWaiting > 0}
-          note={supportWaiting > 0 ? 'Ждут ответа' : 'Очередь пуста'}
         />
         <AdminTile
           href="/dashboard/admin/remnashop-sync"
@@ -369,22 +370,6 @@ export default async function AdminDashboardPage() {
           icon={<ServerCog className="h-5 w-5" />}
           title="Система"
           note="Health и бэкапы"
-        />
-        <AdminTile
-          href="/dashboard/admin/recovery"
-          icon={recoveryCount > 0 ? <AlertTriangle className="h-5 w-5" /> : <Database className="h-5 w-5" />}
-          title="Довыдача"
-          value={recoveryCount}
-          warning={recoveryCount > 0}
-          note={recoveryCount > 0 ? 'Требует внимания' : 'Очередь пуста'}
-        />
-        <AdminTile
-          href="/dashboard/admin/duplicates"
-          icon={<SearchCheck className="h-5 w-5" />}
-          title="Дубли"
-          value={duplicateCandidates.length}
-          warning={duplicateCandidates.length > 0}
-          note={duplicateCandidates.length > 0 ? 'Проверить связи' : 'Чисто'}
         />
         {user.role === 'SUPER_ADMIN' && (
           <AdminTile
