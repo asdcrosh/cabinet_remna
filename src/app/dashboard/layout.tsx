@@ -47,7 +47,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const isStaff = ['MODERATOR', 'ADMIN', 'SUPER_ADMIN'].includes(role)
 
   return (
-    <div className="min-h-screen">
+    <div className="dashboard-shell min-h-screen bg-transparent dark:bg-surface-950">
       <a
         href="#dashboard-content"
         className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[200] focus:rounded-lg focus:bg-slate-950 focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-white"

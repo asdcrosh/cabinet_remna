@@ -221,9 +221,9 @@ export function PlanCard({
   return (
     <div
       className={cn(
-        "plan-card-tilt card group relative flex h-full min-h-0 flex-col overflow-hidden p-3 transition-all duration-200 hover:-translate-y-0.5 hover:border-cyan-200/80 hover:shadow-xl sm:min-h-[360px] sm:p-4 lg:p-5",
+        "plan-card-tilt card group relative flex h-full min-h-0 flex-col overflow-hidden p-4 transition-all duration-200 hover:border-cyan-200/80 hover:shadow-xl sm:min-h-[380px] lg:p-5",
         popular &&
-          "border-slate-950 ring-2 ring-slate-950/10 dark:border-white dark:ring-white/15",
+          "border-cyan-300 ring-1 ring-cyan-200/70 dark:border-cyan-400/50 dark:ring-cyan-400/15",
         current && "bg-cyan-50/70 dark:bg-cyan-500/10",
       )}
     >
@@ -232,7 +232,7 @@ export function PlanCard({
       )}
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 pr-2">
-          <h3 className="break-words text-base font-semibold leading-tight tracking-tight sm:text-xl">
+          <h3 className="break-words text-lg font-semibold leading-tight tracking-tight sm:text-xl">
             {name}
           </h3>
           <div className="mt-1 text-xs text-slate-500 dark:text-slate-400 sm:mt-1.5 sm:text-sm">
@@ -263,9 +263,9 @@ export function PlanCard({
           {description}
         </p>
       )}
-      <div className="mt-3 rounded-lg border border-slate-100 bg-slate-50/70 p-2.5 dark:border-white/10 dark:bg-white/[0.035] sm:mt-4">
+      <div className="mt-3 rounded-lg border border-slate-100 bg-slate-50/80 p-3 dark:border-white/10 dark:bg-white/[0.04] sm:mt-4">
         <div className="flex flex-wrap items-baseline gap-2">
-          <div className="whitespace-nowrap text-xl font-semibold tracking-tight sm:text-3xl">
+          <div className="whitespace-nowrap text-2xl font-semibold tracking-tight sm:text-3xl">
             {effectivePrice}
           </div>
           {appliedPromo && (
@@ -281,14 +281,14 @@ export function PlanCard({
           </div>
         ) : null}
       </div>
-      <ul className="mt-3 grid gap-1.5 text-xs text-slate-600 dark:text-slate-300 sm:mt-4 sm:min-h-[86px] sm:gap-2 sm:text-sm">
+      <ul className="mt-4 grid grid-cols-2 gap-x-3 gap-y-2.5 text-xs leading-5 text-slate-600 dark:text-slate-300 sm:min-h-[86px] sm:text-sm">
         <Feature strong>
           {trafficLimitGb == null
             ? "Безлимитный трафик"
             : `${trafficLimitGb} ГБ трафика`}
         </Feature>
-        <Feature className="hidden sm:flex">Доступ сразу после оплаты</Feature>
-        <Feature className="hidden sm:flex">QR и ссылка подписки</Feature>
+        <Feature>Доступ сразу после оплаты</Feature>
+        <Feature>QR и ссылка подписки</Feature>
         <Feature>До {deviceLimit} устройств</Feature>
       </ul>
       {!isPromoPlan && (promoOpen || appliedPromo) ? (

@@ -28,10 +28,7 @@
     min-width: 0;
   }
   .dark body {
-    background:
-      linear-gradient(135deg, rgba(14, 165, 233, 0.13), transparent 36%),
-      linear-gradient(225deg, rgba(16, 185, 129, 0.10), transparent 30%),
-      rgb(2 6 23);
+    background: rgb(8 11 16);
   }
   * {
     @apply border-slate-200 dark:border-slate-800;
@@ -94,8 +91,10 @@
   .plan-card-tilt {
     transform-style: preserve-3d;
   }
-  .plan-card-tilt:hover {
-    transform: translateY(-2px) perspective(900px) rotateX(1.4deg) rotateY(-1.2deg);
+  @media (hover: hover) and (pointer: fine) {
+    .plan-card-tilt:hover {
+      transform: translateY(-2px) perspective(900px) rotateX(1.2deg) rotateY(-0.8deg);
+    }
   }
   .toast-enter {
     animation: toast-slide-in 180ms ease-out both;
@@ -1079,14 +1078,10 @@
 
 @keyframes page-soft-enter {
   from {
-    opacity: 0;
-    transform: translateY(4px);
-    filter: saturate(0.98);
+    opacity: 0.88;
   }
   to {
     opacity: 1;
-    transform: translateY(0);
-    filter: saturate(1);
   }
 }
 

@@ -114,21 +114,10 @@ export default async function PlansPage({
         )}
       />
 
-      <section className="card relative overflow-hidden p-3 sm:p-5">
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-cyan-400 via-emerald-400 to-transparent" />
-        <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
-          <div>
-            <h2 className="text-lg font-semibold tracking-tight sm:text-2xl">Выберите срок доступа</h2>
-            <p className="mt-1 max-w-2xl text-sm text-slate-500 dark:text-slate-400">
-              Оплата онлайн, подключение сразу в кабинете.
-            </p>
-          </div>
-          <div className="hidden grid-cols-3 gap-1.5 sm:grid sm:gap-2 lg:w-[34rem]">
-            <BuyStep icon={<ShieldCheck className="h-4 w-4" />} title="Тариф" />
-            <BuyStep icon={<CreditCard className="h-4 w-4" />} title="Оплата" />
-            <BuyStep icon={<KeyRound className="h-4 w-4" />} title="Подключение" />
-          </div>
-        </div>
+      <section aria-label="Как подключиться" className="grid grid-cols-3 gap-2 sm:gap-3">
+        <BuyStep icon={<ShieldCheck className="h-4 w-4" />} title="Выберите" subtitle="тариф" />
+        <BuyStep icon={<CreditCard className="h-4 w-4" />} title="Оплатите" subtitle="онлайн" />
+        <BuyStep icon={<KeyRound className="h-4 w-4" />} title="Подключите" subtitle="устройство" />
       </section>
 
       {isRenewIntent && (
@@ -149,9 +138,7 @@ export default async function PlansPage({
         </div>
       )}
 
-      {visiblePlans.length > 1 ? <PlanComparison plans={visiblePlans} /> : null}
-
-      <div className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-2 md:mx-0 md:grid md:auto-rows-fr md:grid-cols-2 md:overflow-visible md:px-0 md:pb-0 xl:grid-cols-3 2xl:gap-4">
+      <div className="grid gap-3 sm:gap-4 md:auto-rows-fr md:grid-cols-2 xl:grid-cols-3">
         {visiblePlans.length === 0 && (
           <div className="card w-full py-12 text-center md:col-span-full">
             <h3 className="text-lg font-semibold">Тарифы скоро появятся</h3>
@@ -166,7 +153,7 @@ export default async function PlansPage({
           </div>
         )}
         {visiblePlans.map((p, index) => (
-          <div key={p.id} className="w-[min(88vw,22rem)] shrink-0 snap-center md:w-auto">
+          <div key={p.id} className="min-w-0">
             <PlanCard
               id={p.id}
               name={p.name}
@@ -191,6 +178,8 @@ export default async function PlansPage({
           </div>
         ))}
       </div>
+
+      {visiblePlans.length > 1 ? <PlanComparison plans={visiblePlans} /> : null}
     </div>
   )
 }
@@ -227,13 +216,16 @@ function PlanComparison({ plans }: { plans: Array<{ id: string; name: string; pr
   )
 }
 
-function BuyStep({ icon, title }: { icon: React.ReactNode; title: string }) {
+function BuyStep({ icon, title, subtitle }: { icon: React.ReactNode; title: string; subtitle: string }) {
   return (
-    <div className="flex min-w-0 flex-col items-center justify-center gap-1 rounded-lg border border-slate-100 bg-slate-50/80 p-2 text-center text-xs font-medium dark:border-slate-800 dark:bg-surface-800/70 sm:flex-row sm:justify-start sm:gap-2 sm:p-2.5 sm:text-sm sm:text-left">
-      <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-slate-950 text-cyan-200 dark:bg-white dark:text-slate-950">
+    <div className="flex min-w-0 flex-col items-center justify-center gap-2 rounded-lg border border-slate-200/80 bg-white/75 px-2 py-3 text-center shadow-sm shadow-slate-200/40 dark:border-white/10 dark:bg-white/[0.035] dark:shadow-black/10 sm:flex-row sm:justify-start sm:px-3 sm:text-left">
+      <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-slate-950 text-cyan-200 dark:bg-white/10 dark:text-cyan-200">
         {icon}
       </div>
-      <span className="truncate">{title}</span>
+      <span className="min-w-0 leading-tight">
+        <span className="block text-xs font-semibold text-slate-900 dark:text-white sm:text-sm">{title}</span>
+        <span className="mt-0.5 block text-[11px] text-slate-500 dark:text-slate-400 sm:text-xs">{subtitle}</span>
+      </span>
     </div>
   )
 }

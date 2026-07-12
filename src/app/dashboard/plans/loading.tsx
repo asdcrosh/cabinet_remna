@@ -11,21 +11,13 @@ export default function PlansLoading() {
         </div>
       </header>
 
-      <section className="card p-3 sm:p-5">
-        <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
-          <div className="space-y-2">
-            <div className="skeleton h-8 w-56 rounded-lg" />
-            <div className="skeleton h-5 w-72 max-w-full rounded-lg" />
-          </div>
-          <div className="hidden grid-cols-3 gap-2 sm:grid lg:w-[34rem]">
-            <div className="skeleton h-14 rounded-lg" />
-            <div className="skeleton h-14 rounded-lg" />
-            <div className="skeleton h-14 rounded-lg" />
-          </div>
-        </div>
+      <section className="grid grid-cols-3 gap-2 sm:gap-3">
+        <div className="skeleton h-[5.25rem] rounded-lg sm:h-16" />
+        <div className="skeleton h-[5.25rem] rounded-lg sm:h-16" />
+        <div className="skeleton h-[5.25rem] rounded-lg sm:h-16" />
       </section>
 
-      <div className="grid auto-rows-fr grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:gap-4">
+      <div className="grid auto-rows-fr grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2 xl:grid-cols-3">
         {Array.from({ length: 6 }).map((_, index) => (
           <div key={index} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-surface-900">
             <div className="flex items-start justify-between gap-3">
