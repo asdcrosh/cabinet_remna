@@ -279,8 +279,8 @@ export function MobileBottomNav({ badges = {}, features }: { badges?: NavBadges;
   )
 
   return (
-    <nav className="fixed bottom-[calc(env(safe-area-inset-bottom)+0.5rem)] left-1/2 z-40 w-[calc(100%-1rem)] max-w-md -translate-x-1/2 rounded-lg border border-white/80 bg-white/[0.92] p-1.5 shadow-2xl shadow-slate-950/15 backdrop-blur-xl dark:border-white/10 dark:bg-surface-900/[0.94] dark:shadow-black/35 lg:hidden">
-      <div className="mx-auto grid max-w-md grid-cols-5 gap-1">
+    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-white/80 bg-white/[0.94] pb-[calc(env(safe-area-inset-bottom)+0.5rem)] pt-1.5 shadow-[0_-12px_32px_rgba(15,23,42,0.12)] backdrop-blur-xl dark:border-white/10 dark:bg-surface-900/[0.96] dark:shadow-black/35 lg:hidden">
+      <div className="mx-auto grid max-w-md grid-cols-5 gap-1 px-2">
         {items.map((item) => {
           const Icon = item.icon
           const active = item.exact ? pathname === item.href : pathname.startsWith(item.href)
