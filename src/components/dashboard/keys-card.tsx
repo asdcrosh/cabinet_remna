@@ -105,6 +105,7 @@ export function KeysCard({ subscriptionUrl, happLink }: KeysCardProps) {
   const [qrOpen, setQrOpen] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [revoking, setRevoking] = useState(false)
+  const [connectionStep, setConnectionStep] = useState<1 | 2>(1)
 
   useEffect(() => {
     const detected = detectDevice(navigator.userAgent)
@@ -132,6 +133,7 @@ export function KeysCard({ subscriptionUrl, happLink }: KeysCardProps) {
 
   function openInApp() {
     if (!subscriptionUrl) return
+    setConnectionStep(2)
 
     if (!primaryLink) {
       void copy(subscriptionUrl, 'Ссылка подписки')
@@ -186,6 +188,8 @@ export function KeysCard({ subscriptionUrl, happLink }: KeysCardProps) {
             </button>
           </div>
 
+          <ConnectionSteps step={connectionStep} />
+
           <div className="-mx-4 mt-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:grid sm:grid-cols-3 sm:overflow-visible sm:px-0 sm:pb-0">
             {availableApps.map((option) => {
               const active = option.id === selectedApp.id
@@ -194,7 +198,10 @@ export function KeysCard({ subscriptionUrl, happLink }: KeysCardProps) {
                 <button
                   key={option.id}
                   type="button"
-                  onClick={() => setSelectedAppId(option.id)}
+                  onClick={() => {
+                    setSelectedAppId(option.id)
+                    setConnectionStep(1)
+                  }}
                   className={cn(
                     'flex min-h-14 min-w-[9.5rem] items-center gap-2.5 rounded-lg border p-2.5 text-left transition sm:min-h-16 sm:min-w-0 sm:gap-3 sm:p-3',
                     active
@@ -330,6 +337,28 @@ export function KeysCard({ subscriptionUrl, happLink }: KeysCardProps) {
         }}
       />
     </section>
+  )
+}
+
+function ConnectionSteps({ step }: { step: 1 | 2 }) {
+  const items = [
+    { number: 1, label: 'Приложение', done: true },
+    { number: 2, label: 'Добавить подписку', done: step >= 2 },
+    { number: 3, label: 'Включить VPN', done: false },
+  ]
+
+  return (
+    <div className="mt-4 grid grid-cols-3 overflow-hidden rounded-lg border border-slate-200 bg-slate-50/70 dark:border-white/10 dark:bg-white/[0.03]">
+      {items.map((item, index) => (
+        <div key={item.number} className="relative flex min-w-0 items-center justify-center gap-2 px-2 py-2.5 text-center text-xs font-medium sm:text-sm">
+          {index > 0 ? <span className="absolute inset-y-2 left-0 w-px bg-slate-200 dark:bg-white/10" /> : null}
+          <span className={cn('grid h-5 w-5 shrink-0 place-items-center rounded-full text-[11px] font-bold', item.done ? 'bg-emerald-500 text-white' : 'bg-slate-200 text-slate-500 dark:bg-white/10 dark:text-slate-300')}>
+            {item.done ? '✓' : item.number}
+          </span>
+          <span className="hidden truncate sm:block">{item.label}</span>
+        </div>
+      ))}
+    </div>
   )
 }
 

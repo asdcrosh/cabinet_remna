@@ -13,6 +13,8 @@ interface PlanCardProps {
   description: string | null;
   price: string;
   priceKopecks: number;
+  monthlyPrice: string;
+  savingsPercent: number;
   durationDays: number;
   trafficLimitGb: number | null;
   deviceLimit: number;
@@ -35,6 +37,8 @@ export function PlanCard({
   description,
   price,
   priceKopecks,
+  monthlyPrice,
+  savingsPercent,
   durationDays,
   trafficLimitGb,
   deviceLimit,
@@ -269,8 +273,13 @@ export function PlanCard({
           )}
         </div>
         <div className="text-xs text-slate-500 dark:text-slate-400 sm:text-sm">
-          {isPromo ? "один раз на аккаунт" : "оплата онлайн"}
+          {isPromo ? "один раз на аккаунт" : `${monthlyPrice} за 30 дней`}
         </div>
+        {savingsPercent > 0 ? (
+          <div className="mt-2 inline-flex rounded-md bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-200">
+            Экономия {savingsPercent}%
+          </div>
+        ) : null}
       </div>
       <ul className="mt-3 grid gap-1.5 text-xs text-slate-600 dark:text-slate-300 sm:mt-4 sm:min-h-[86px] sm:gap-2 sm:text-sm">
         <Feature strong>
@@ -404,10 +413,14 @@ export function PlanCard({
       ) : (
         <div className="mt-auto" />
       )}
+      <div className="mt-4 flex items-center justify-between gap-3 border-t border-slate-100 pt-3 text-sm dark:border-white/10">
+        <span className="text-slate-500 dark:text-slate-400">К оплате</span>
+        <span className="text-lg font-semibold text-slate-950 dark:text-white">{effectivePrice}</span>
+      </div>
       <button
         onClick={buy}
         disabled={loading}
-        className="btn-primary mt-4 w-full min-h-10 sm:mt-5 sm:min-h-11"
+        className="btn-primary mt-3 w-full min-h-11"
       >
         <CreditCard className="h-4 w-4" />
         {loading

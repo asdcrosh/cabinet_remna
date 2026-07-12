@@ -154,6 +154,7 @@ export default async function DashboardHome() {
     return (
       <div className="page-stack">
         <PageHeader title="Главная" description="Начните пользоваться VPN" />
+        <ProductTrustStrip />
         <DashboardOnboardingCard state={onboardingState} mode="full" />
         {personalOffer && <PersonalOffer offer={personalOffer} welcomeBonusOptions={welcomeBonusOptions} />}
         <SmartInsights
@@ -187,6 +188,7 @@ export default async function DashboardHome() {
           </Link>
         )}
       />
+      <ProductTrustStrip />
 
       {subRow?.pendingSync && !remnawaveCard && (
         <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
@@ -833,6 +835,26 @@ function OverviewMetric({
       <div className="text-xs text-slate-500 dark:text-slate-400">{label}</div>
       <div className="mt-1 truncate text-lg font-semibold text-slate-950 dark:text-white">{value}</div>
     </div>
+  )
+}
+
+function ProductTrustStrip() {
+  const items = [
+    { icon: <ShieldCheck className="h-4 w-4" />, label: 'Выдача автоматически' },
+    { icon: <KeyRound className="h-4 w-4" />, label: 'QR и ссылка подключения' },
+    { icon: <MessageCircleQuestion className="h-4 w-4" />, label: 'Поддержка в кабинете' },
+  ]
+
+  return (
+    <section className="grid overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-surface-900 sm:grid-cols-3">
+      {items.map((item, index) => (
+        <div key={item.label} className="relative flex items-center gap-2 px-3 py-2.5 text-sm font-medium text-slate-600 dark:text-slate-300">
+          {index > 0 ? <span className="absolute inset-x-3 top-0 h-px bg-slate-100 dark:bg-white/10 sm:inset-y-2 sm:left-0 sm:h-auto sm:w-px" /> : null}
+          <span className="text-emerald-600 dark:text-emerald-300">{item.icon}</span>
+          {item.label}
+        </div>
+      ))}
+    </section>
   )
 }
 

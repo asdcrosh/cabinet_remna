@@ -91,6 +91,12 @@ export default async function PlansPage({
     hasPromoPlan &&
     isOtherwiseEligibleForPromo &&
     (!user?.telegramId || !user?.remnashopSyncedAt)
+  const referencePlan = visiblePlans
+    .filter((plan) => !plan.isPromo && plan.priceKopecks > 0)
+    .sort((a, b) => a.durationDays - b.durationDays)[0]
+  const referenceDailyPrice = referencePlan
+    ? referencePlan.priceKopecks / Math.max(1, referencePlan.durationDays)
+    : 0
 
   return (
     <div className="page-stack">
@@ -167,6 +173,12 @@ export default async function PlansPage({
               description={p.description}
               price={formatPrice(p.priceKopecks)}
               priceKopecks={p.priceKopecks}
+              monthlyPrice={formatPrice(Math.round((p.priceKopecks / Math.max(1, p.durationDays)) * 30))}
+              savingsPercent={
+                !p.isPromo && referenceDailyPrice > 0
+                  ? Math.max(0, Math.round((1 - (p.priceKopecks / Math.max(1, p.durationDays)) / referenceDailyPrice) * 100))
+                  : 0
+              }
               durationDays={p.durationDays}
               trafficLimitGb={p.trafficLimitGb}
               deviceLimit={p.deviceLimit}

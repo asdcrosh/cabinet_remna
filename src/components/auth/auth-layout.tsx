@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import type { ReactNode } from 'react'
-import { Activity, CreditCard, KeyRound, ShieldCheck } from 'lucide-react'
+import { Activity, CreditCard, Headphones, KeyRound, ShieldCheck } from 'lucide-react'
 import { getBrandName } from '@/lib/branding'
 import { TelegramMiniAppAuth } from './telegram-miniapp-auth'
 
@@ -62,10 +62,24 @@ export function AuthLayout({
             <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
             <p className="mt-1 text-sm text-slate-500">{description}</p>
           </div>
+          <div className="-mx-4 mb-4 flex snap-x gap-2 overflow-x-auto px-4 pb-1 lg:hidden">
+            <MobileValue icon={<Activity className="h-4 w-4" />} title="Быстрый доступ" />
+            <MobileValue icon={<ShieldCheck className="h-4 w-4" />} title="Простое подключение" />
+            <MobileValue icon={<Headphones className="h-4 w-4" />} title="Поддержка" />
+          </div>
           <div className="card">{children}</div>
           <div className="mt-4 text-center text-sm text-slate-500">{footer}</div>
         </div>
       </div>
+    </div>
+  )
+}
+
+function MobileValue({ icon, title }: { icon: ReactNode; title: string }) {
+  return (
+    <div className="flex min-w-[10.5rem] snap-start items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-xs font-semibold text-slate-700 shadow-sm dark:border-white/10 dark:bg-surface-900 dark:text-slate-200">
+      <span className="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-cyan-50 text-cyan-700 dark:bg-cyan-500/10 dark:text-cyan-200">{icon}</span>
+      {title}
     </div>
   )
 }
