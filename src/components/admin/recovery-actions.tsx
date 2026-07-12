@@ -12,6 +12,7 @@ export function RecoveryActionButton({ paymentId }: { paymentId: string }) {
 
   return (
     <button
+      type="button"
       className="btn-primary min-w-[112px] px-3 text-xs"
       disabled={loading}
       onClick={async () => {
@@ -43,6 +44,7 @@ export function BulkRecoveryActionButton({ paymentIds }: { paymentIds: string[] 
 
   return (
     <button
+      type="button"
       className="btn-primary w-full sm:w-auto"
       disabled={loading || uniquePaymentIds.length === 0}
       onClick={async () => {
@@ -81,6 +83,7 @@ export function PaymentSyncButton({ paymentId }: { paymentId: string }) {
 
   return (
     <button
+      type="button"
       className="btn-secondary min-w-[112px] px-3 text-xs"
       disabled={loading}
       onClick={async () => {
@@ -127,6 +130,7 @@ export function RemnashopPaymentRetryButton({ paymentId }: { paymentId: string }
 
   return (
     <button
+      type="button"
       className="btn-secondary min-w-[112px] px-3 text-xs"
       disabled={loading}
       onClick={async () => {

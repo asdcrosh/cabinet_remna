@@ -40,7 +40,7 @@ export function ProfileForm({ name }: { name: string | null }) {
           {serverError}
         </div>
       )}
-      <button className="btn-primary w-full sm:min-w-48" disabled={isSubmitting}>
+      <button type="submit" className="btn-primary w-full sm:min-w-48" disabled={isSubmitting}>
         <Save className="h-4 w-4" />
         {isSubmitting ? 'Сохраняем...' : 'Сохранить профиль'}
       </button>

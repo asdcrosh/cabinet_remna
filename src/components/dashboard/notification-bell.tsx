@@ -8,6 +8,7 @@ import { cn } from '@/lib/cn'
 import type { UserNotificationView } from '@/lib/user-notifications'
 import type { AdminNotificationView } from '@/lib/admin-notifications'
 import { ConfirmDialog } from './confirm-dialog'
+import { toast } from '@/components/ui/toaster'
 
 const NOTIFICATION_REFRESH_MS = 15_000
 const FOCUSABLE_SELECTOR = [
@@ -36,6 +37,7 @@ export function NotificationBell({ showAdmin = false }: { showAdmin?: boolean })
   const [adminSummary, setAdminSummary] = useState<AdminNotificationSummary>({ unreadCount: 0, notifications: [] })
   const [mounted, setMounted] = useState(false)
   const [clearConfirmOpen, setClearConfirmOpen] = useState(false)
+  const [clearLoading, setClearLoading] = useState(false)
   const rootRef = useRef<HTMLDivElement | null>(null)
   const panelRef = useRef<HTMLDivElement | null>(null)
   const triggerRef = useRef<HTMLButtonElement | null>(null)
@@ -129,6 +131,7 @@ export function NotificationBell({ showAdmin = false }: { showAdmin?: boolean })
   }
 
   async function confirmClearNotifications() {
+    setClearLoading(true)
     const previousUser = summary
     const previousAdmin = adminSummary
     if (tab === 'admin') {
@@ -142,12 +145,17 @@ export function NotificationBell({ showAdmin = false }: { showAdmin?: boolean })
       if (!res.ok) {
         setSummary(previousUser)
         setAdminSummary(previousAdmin)
+        toast('Не удалось очистить уведомления')
       } else {
         setClearConfirmOpen(false)
+        toast('Уведомления очищены', 'success')
       }
     } catch {
       setSummary(previousUser)
       setAdminSummary(previousAdmin)
+      toast('Не удалось очистить уведомления')
+    } finally {
+      setClearLoading(false)
     }
   }
 
@@ -230,7 +238,7 @@ export function NotificationBell({ showAdmin = false }: { showAdmin?: boolean })
       aria-labelledby="notification-panel-title"
       tabIndex={-1}
       onKeyDown={handlePanelKeyDown}
-      className="fixed inset-x-2 top-[calc(env(safe-area-inset-top)+4.25rem)] z-[120] max-h-[calc(100dvh-env(safe-area-inset-top)-env(safe-area-inset-bottom)-8.75rem)] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-slate-950/15 dark:border-white/10 dark:bg-surface-950 dark:shadow-black/35 sm:absolute sm:inset-x-auto sm:right-6 sm:top-16 sm:w-[min(24rem,calc(100vw-2rem))] sm:max-h-[34rem] sm:rounded-xl lg:right-6"
+      className="fixed inset-x-2 top-[calc(env(safe-area-inset-top)+4.25rem)] z-[120] max-h-[calc(100dvh-env(safe-area-inset-top)-env(safe-area-inset-bottom)-8.75rem)] overflow-hidden rounded-lg border border-slate-200 bg-white shadow-2xl shadow-slate-950/15 dark:border-white/10 dark:bg-surface-950 dark:shadow-black/35 sm:absolute sm:inset-x-auto sm:right-6 sm:top-16 sm:w-[min(24rem,calc(100vw-2rem))] sm:max-h-[34rem] lg:right-6"
     >
       <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 dark:border-white/10">
         <div>
@@ -367,7 +375,7 @@ export function NotificationBell({ showAdmin = false }: { showAdmin?: boolean })
         title="Очистить уведомления"
         description={tab === 'admin' ? 'Админские уведомления будут очищены только для вашего аккаунта.' : 'Ваши уведомления будут очищены из списка.'}
         confirmLabel="Очистить"
-        loading={false}
+        loading={clearLoading}
         onConfirm={() => void confirmClearNotifications()}
         onCancel={() => setClearConfirmOpen(false)}
       />

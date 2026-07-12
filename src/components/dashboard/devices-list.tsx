@@ -134,7 +134,6 @@ function DeviceCard({
 
   return (
     <article className="group relative overflow-hidden rounded-lg border border-slate-200/80 bg-slate-50/80 p-3 transition hover:-translate-y-0.5 hover:border-cyan-200 hover:bg-white hover:shadow-lg hover:shadow-slate-950/5 dark:border-white/10 dark:bg-surface-950/35 dark:hover:border-cyan-500/30 dark:hover:bg-white/[0.055] sm:p-4">
-      <div className="pointer-events-none absolute -right-10 -top-10 h-24 w-24 rounded-full bg-cyan-100/70 blur-2xl opacity-0 transition group-hover:opacity-100 dark:bg-cyan-500/10" />
       <div className="relative space-y-3 sm:space-y-4">
         <div className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 items-start gap-3">

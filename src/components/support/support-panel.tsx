@@ -748,7 +748,7 @@ export function SupportPanel({
                       maxLength={3000}
                       required
                     />
-                    <button className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-slate-950 text-white shadow-sm transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-45 dark:bg-white dark:text-slate-950" disabled={isPending || !message.trim()} aria-label="Отправить сообщение">
+                    <button type="submit" className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-slate-950 text-white shadow-sm transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-45 dark:bg-white dark:text-slate-950" disabled={isPending || !message.trim()} aria-label="Отправить сообщение">
                       <Send className="h-4 w-4" />
                     </button>
                   </div>
@@ -897,7 +897,7 @@ function NewTicketForm({
               Отмена
             </button>
           )}
-          <button className="btn-primary" disabled={isPending || message.trim().length < 5}>
+          <button type="submit" className="btn-primary" disabled={isPending || message.trim().length < 5}>
             <Send className="h-4 w-4" />
             {isPending ? 'Отправляем...' : 'Отправить'}
           </button>
@@ -1117,25 +1117,25 @@ function TicketActions({
   return (
     <div className="flex shrink-0 flex-wrap justify-end gap-2">
       {mode === 'admin' && selected.status === 'CLOSED' && (
-        <button className="btn-secondary" onClick={() => onUpdateStatus('OPEN')} disabled={isPending}>
+        <button type="button" className="btn-secondary" onClick={() => onUpdateStatus('OPEN')} disabled={isPending}>
           <CheckCircle2 className="h-4 w-4" />
           Открыть
         </button>
       )}
       {mode === 'admin' && selected.status !== 'CLOSED' && selected.status !== 'WAITING_ADMIN' && (
-        <button className="btn-secondary" onClick={() => onUpdateStatus('WAITING_ADMIN')} disabled={isPending}>
+        <button type="button" className="btn-secondary" onClick={() => onUpdateStatus('WAITING_ADMIN')} disabled={isPending}>
           <Timer className="h-4 w-4" />
           В работу
         </button>
       )}
       {mode === 'admin' && selected.status !== 'CLOSED' && selected.status !== 'WAITING_USER' && (
-        <button className="btn-secondary" onClick={() => onUpdateStatus('WAITING_USER')} disabled={isPending}>
+        <button type="button" className="btn-secondary" onClick={() => onUpdateStatus('WAITING_USER')} disabled={isPending}>
           <CheckCircle2 className="h-4 w-4" />
           Ждет пользователя
         </button>
       )}
       {selected.status !== 'CLOSED' && (
-        <button className="btn-secondary" onClick={() => onUpdateStatus('CLOSED')} disabled={isPending}>
+        <button type="button" className="btn-secondary" onClick={() => onUpdateStatus('CLOSED')} disabled={isPending}>
           <XCircle className="h-4 w-4" />
           В архив
         </button>

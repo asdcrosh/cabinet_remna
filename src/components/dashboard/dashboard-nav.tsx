@@ -160,6 +160,7 @@ export function MobileDashboardNav({
   const menu = (
     <div className="fixed inset-0 z-[100] h-dvh w-dvw lg:hidden">
       <button
+        type="button"
         className="absolute inset-0 bg-slate-950/40"
         onClick={() => setOpen(false)}
         aria-label="Закрыть меню"
@@ -168,6 +169,7 @@ export function MobileDashboardNav({
         <div className="flex items-center justify-between border-b border-white/70 px-4 py-4 dark:border-white/10">
           <Brand brandName={brandName} />
           <button
+            type="button"
             className="grid h-9 w-9 place-items-center rounded-lg border bg-white text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-900 dark:bg-surface-900 dark:hover:bg-surface-800 dark:hover:text-white"
             onClick={() => setOpen(false)}
             aria-label="Закрыть меню"
@@ -192,6 +194,7 @@ export function MobileDashboardNav({
   return (
     <>
       <button
+        type="button"
         className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-white/70 bg-white/80 text-slate-700 shadow-sm shadow-slate-200/60 backdrop-blur transition-colors hover:bg-white dark:border-white/10 dark:bg-surface-900/80 dark:text-slate-200 dark:shadow-black/20 dark:hover:bg-surface-800 lg:hidden"
         onClick={() => setOpen(true)}
         aria-label="Открыть меню"

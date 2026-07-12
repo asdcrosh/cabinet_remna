@@ -10,7 +10,7 @@ export default function DashboardError({ reset }: { error: Error; reset: () => v
       </div>
       <h1 className="text-xl font-semibold">Не удалось загрузить раздел</h1>
       <p className="mt-2 text-sm text-slate-500">Попробуйте обновить данные. Если ошибка повторяется, обратитесь в поддержку.</p>
-      <button className="btn-primary mt-6" onClick={reset}>Повторить</button>
+      <button type="button" className="btn-primary mt-6" onClick={reset}>Повторить</button>
     </div>
   )
 }

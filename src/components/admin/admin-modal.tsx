@@ -94,7 +94,7 @@ export function AdminModal({
   }
 
   return createPortal(
-    <div className="fixed inset-0 z-[70] flex h-dvh w-dvw items-end justify-center p-0 sm:items-center sm:p-5">
+    <div className="fixed inset-0 z-[160] flex h-dvh w-dvw items-end justify-center p-0 sm:items-center sm:p-5">
       <button
         type="button"
         className="absolute inset-0 bg-slate-950/55 backdrop-blur-[2px]"

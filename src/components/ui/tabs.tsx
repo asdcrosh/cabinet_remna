@@ -19,7 +19,7 @@ export function Tabs<T extends string>({ items, value, onValueChange, className 
     <div
       role="tablist"
       className={cn(
-        'inline-flex max-w-full gap-1 overflow-x-auto rounded-xl bg-slate-100 p-1 dark:bg-white/10',
+        'inline-flex max-w-full gap-1 overflow-x-auto rounded-lg bg-slate-100 p-1 dark:bg-white/10',
         className
       )}
     >

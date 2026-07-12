@@ -8,6 +8,7 @@ export function LogoutButton() {
   const router = useRouter()
   return (
     <button
+      type="button"
       onClick={async () => {
         await apiFetch('/api/auth/logout', { method: 'POST' })
         router.push('/login')

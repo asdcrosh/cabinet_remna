@@ -1,6 +1,7 @@
 'use client'
 
 import * as React from 'react'
+import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { useBodyScrollLock } from '@/lib/use-body-scroll-lock'
@@ -16,12 +17,19 @@ export interface ModalProps {
 }
 
 export function Modal({ open, title, description, children, footer, onClose }: ModalProps) {
+  const [mounted, setMounted] = React.useState(false)
   const titleId = React.useId()
   const descriptionId = React.useId()
   const dialogRef = React.useRef<HTMLDivElement | null>(null)
+  const onCloseRef = React.useRef(onClose)
   const previouslyFocusedRef = React.useRef<HTMLElement | null>(null)
 
   useBodyScrollLock(open)
+
+  React.useEffect(() => setMounted(true), [])
+  React.useEffect(() => {
+    onCloseRef.current = onClose
+  }, [onClose])
 
   React.useEffect(() => {
     if (!open) return
@@ -33,7 +41,7 @@ export function Modal({ open, title, description, children, footer, onClose }: M
     }, 0)
 
     function onKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') onClose()
+      if (event.key === 'Escape') onCloseRef.current()
       if (event.key !== 'Tab') return
 
       const focusable = getFocusableElements(dialogRef.current)
@@ -62,12 +70,17 @@ export function Modal({ open, title, description, children, footer, onClose }: M
       previouslyFocusedRef.current?.focus()
       previouslyFocusedRef.current = null
     }
-  }, [onClose, open])
+  }, [open])
 
-  if (!open) return null
+  if (!mounted || !open) return null
 
-  return (
-    <div className="fixed inset-0 z-50 grid place-items-end bg-slate-950/45 p-0 backdrop-blur-sm sm:place-items-center sm:p-4">
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[160] grid place-items-end bg-slate-950/45 p-0 backdrop-blur-sm sm:place-items-center sm:p-4"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onCloseRef.current()
+      }}
+    >
       <div
         ref={dialogRef}
         role="dialog"
@@ -76,11 +89,11 @@ export function Modal({ open, title, description, children, footer, onClose }: M
         aria-describedby={description ? descriptionId : undefined}
         tabIndex={-1}
         className={cn(
-          'max-h-[calc(100dvh-24px)] w-full overflow-hidden rounded-t-2xl border border-slate-200 bg-white shadow-2xl dark:border-white/10 dark:bg-slate-950',
-          'sm:max-w-lg sm:rounded-2xl'
+          'flex h-dvh max-h-dvh w-full flex-col overflow-hidden border-0 bg-white shadow-2xl dark:bg-slate-950',
+          'sm:h-auto sm:max-h-[calc(100dvh-24px)] sm:max-w-lg sm:rounded-lg sm:border sm:border-slate-200 dark:sm:border-white/10'
         )}
       >
-        <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4 dark:border-white/10">
+        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-slate-200 px-5 py-4 dark:border-white/10">
           <div>
             <h2 id={titleId} className="text-base font-semibold text-slate-950 dark:text-white">
               {title}
@@ -95,10 +108,11 @@ export function Modal({ open, title, description, children, footer, onClose }: M
             <X className="h-5 w-5" />
           </Button>
         </div>
-        <div className="overflow-y-auto px-5 py-4">{children}</div>
-        {footer ? <div className="border-t border-slate-200 px-5 py-4 dark:border-white/10">{footer}</div> : null}
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4">{children}</div>
+        {footer ? <div className="shrink-0 border-t border-slate-200 px-5 py-4 dark:border-white/10">{footer}</div> : null}
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 

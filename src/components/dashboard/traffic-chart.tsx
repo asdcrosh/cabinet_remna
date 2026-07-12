@@ -66,8 +66,6 @@ export function TrafficChart({
   return (
     <div className="relative overflow-hidden rounded-lg border border-slate-200 bg-white/95 p-4 text-slate-950 shadow-[0_18px_45px_rgba(15,23,42,0.08)] backdrop-blur dark:border-white/10 dark:bg-surface-900/95 dark:text-white dark:shadow-[0_18px_45px_rgba(0,0,0,0.22)] sm:p-5">
       <div className="pointer-events-none absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-cyan-300 via-sky-300 to-emerald-300 dark:from-cyan-400 dark:via-sky-500 dark:to-emerald-400" />
-      <div className="pointer-events-none absolute -right-16 -top-20 h-44 w-44 rounded-full bg-cyan-100/60 blur-3xl dark:bg-cyan-500/10" />
-      <div className="pointer-events-none absolute -bottom-24 left-1/3 h-48 w-48 rounded-full bg-emerald-100/60 blur-3xl dark:bg-emerald-500/10" />
 
       <div className="relative flex flex-col gap-4">
         <div className="flex flex-wrap items-start justify-between gap-3">

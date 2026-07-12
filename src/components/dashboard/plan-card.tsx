@@ -294,7 +294,7 @@ export function PlanCard({
       {!isPromoPlan && (promoOpen || appliedPromo) ? (
         <div className="mt-auto space-y-2 pt-3">
           {suggestedPromoCodes.length > 0 ? (
-            <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-2.5 shadow-inner shadow-white/5">
+            <div className="rounded-lg border border-white/10 bg-white/[0.04] p-2.5 shadow-inner shadow-white/5">
               <div className="mb-2 flex items-center justify-between gap-2 text-xs">
                 <span className="inline-flex min-w-0 items-center gap-1.5 font-semibold text-slate-700 dark:text-slate-200">
                   <Tag className="h-3.5 w-3.5 shrink-0 text-cyan-500 dark:text-cyan-300" />
@@ -337,12 +337,12 @@ export function PlanCard({
               )}
             </div>
           ) : (
-            <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-3 py-2 text-sm font-medium text-slate-700 dark:border-white/10 dark:bg-white/[0.05] dark:text-slate-200">
+            <div className="rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-2 text-sm font-medium text-slate-700 dark:border-white/10 dark:bg-white/[0.05] dark:text-slate-200">
               Введите свой промокод вручную
             </div>
           )}
           {showManualPromoInput && (
-            <div className="flex min-w-0 items-center gap-1.5 rounded-2xl border border-slate-200 bg-white px-2 py-1.5 dark:border-slate-800 dark:bg-surface-900">
+            <div className="flex min-w-0 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2 py-1.5 dark:border-slate-800 dark:bg-surface-900">
               <Tag className="h-4 w-4 shrink-0 text-slate-400" />
               <input
                 value={promoInput}
@@ -418,6 +418,7 @@ export function PlanCard({
         <span className="text-lg font-semibold text-slate-950 dark:text-white">{effectivePrice}</span>
       </div>
       <button
+        type="button"
         onClick={buy}
         disabled={loading}
         className="btn-primary mt-3 w-full min-h-11"

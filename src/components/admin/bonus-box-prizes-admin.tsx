@@ -564,7 +564,7 @@ function PrizeEditorDrawer({
   if (!open) return null
 
   return createPortal(
-    <div className="fixed inset-0 z-[100] h-dvh w-dvw">
+    <div className="fixed inset-0 z-[160] h-dvh w-dvw">
       <button
         type="button"
         className="absolute inset-0 bg-slate-950/45 backdrop-blur-sm"
