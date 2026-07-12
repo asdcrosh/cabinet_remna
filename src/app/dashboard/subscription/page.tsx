@@ -6,7 +6,7 @@ import { getCurrentUser } from '@/lib/auth/cookies'
 import { remnawave, RemnawaveError } from '@/lib/remnawave'
 import { KeysCard } from '@/components/dashboard/keys-card'
 import Link from 'next/link'
-import { CalendarClock, CreditCard, Database, LifeBuoy, ShieldAlert } from 'lucide-react'
+import { CalendarClock, Database, ShieldAlert } from 'lucide-react'
 import { EmptyState } from '@/components/dashboard/empty-state'
 
 export const dynamic = 'force-dynamic'
@@ -68,9 +68,9 @@ export default async function SubscriptionPage() {
 
   return (
     <div className="page-stack">
-      <section className="relative overflow-hidden rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-surface-900 sm:p-5">
-        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-cyan-400 via-emerald-300 to-transparent" />
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+      <section className="relative overflow-hidden rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-surface-900 sm:p-6">
+        <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-cyan-400 via-emerald-400 to-cyan-500" />
+        <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <span className={u.isActive ? 'badge-active' : 'badge-disabled'}>{statusText}</span>
@@ -78,7 +78,8 @@ export default async function SubscriptionPage() {
                 {u.username}
               </span>
             </div>
-            <h1 className="mt-3 text-2xl font-semibold tracking-tight sm:text-3xl">Подписка</h1>
+            <h1 className="mt-3 text-2xl font-semibold sm:text-3xl">Подключение VPN</h1>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">QR-код, ссылка подписки и приложения для вашего устройства</p>
           </div>
           <div className="grid gap-2 sm:grid-cols-3 xl:min-w-[32rem]">
             <CompactMetric
@@ -93,29 +94,19 @@ export default async function SubscriptionPage() {
               value={u.trafficUsed}
               hint={isUnlimited ? 'безлимит' : `из ${u.trafficLimit}`}
             />
-            <Link href="/dashboard/plans" className="btn-primary min-h-10 justify-center">
+            <Link href="/dashboard/plans?intent=renew" className="btn-primary min-h-11 justify-center">
               Продлить
             </Link>
           </div>
         </div>
       </section>
 
-      <section className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:grid sm:grid-cols-3 sm:overflow-visible sm:px-0 sm:pb-0">
-        <Link href="/dashboard/plans" className="quick-action">
-          <CreditCard className="h-4 w-4 text-cyan-600 dark:text-cyan-300" />
-          Продлить подписку
-        </Link>
-        <Link href="/dashboard/devices" className="quick-action">
-          <Database className="h-4 w-4 text-cyan-600 dark:text-cyan-300" />
-          Мои устройства
-        </Link>
-        <Link href="/dashboard/support" className="quick-action">
-          <LifeBuoy className="h-4 w-4 text-cyan-600 dark:text-cyan-300" />
-          Помощь с подключением
-        </Link>
-      </section>
-
       <KeysCard subscriptionUrl={data.response.subscriptionUrl} happLink={happLink} />
+
+      <div className="flex flex-wrap justify-center gap-x-5 gap-y-2 text-sm text-slate-500 dark:text-slate-400">
+        <Link href="/dashboard/devices" className="font-medium hover:text-cyan-700 dark:hover:text-cyan-200">Мои устройства</Link>
+        <Link href="/dashboard/support" className="font-medium hover:text-cyan-700 dark:hover:text-cyan-200">Помощь с подключением</Link>
+      </div>
     </div>
   )
 }

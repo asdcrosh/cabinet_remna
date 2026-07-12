@@ -40,7 +40,7 @@ export default async function BillingPage({
   })
 
   return (
-    <div className="space-y-6">
+    <div className="page-stack">
       <PageHeader title="Платежи" description="История оплат и состояние выдачи подписки" />
 
       {params.paid === '1' && <PaymentSuccessBanner status={getBannerStatus(syncResult)} />}

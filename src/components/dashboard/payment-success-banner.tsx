@@ -2,8 +2,9 @@
 
 import type { CSSProperties } from 'react'
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { AlertTriangle, CheckCircle2, CreditCard, KeyRound, Loader2 } from 'lucide-react'
+import { AlertTriangle, Check, CheckCircle2, Circle, CreditCard, KeyRound, Loader2 } from 'lucide-react'
 
 type PaymentSuccessBannerStatus = 'ready' | 'processing' | 'attention'
 
@@ -34,14 +35,20 @@ export function PaymentSuccessBanner({ status = 'processing' }: { status?: Payme
         <PaymentProgress status={status} />
         {status === 'ready' && (
           <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-            <a href="/dashboard/subscription" className="btn-primary min-h-10 px-4">
+            <Link href="/dashboard/subscription" className="btn-primary min-h-11 px-4">
               <KeyRound className="h-4 w-4" />
               Подключить устройство
-            </a>
-            <a href="/dashboard/billing" className="btn-secondary min-h-10 px-4">
+            </Link>
+            <Link href="/dashboard/billing" className="btn-secondary min-h-11 px-4">
               <CreditCard className="h-4 w-4" />
               Открыть платёж
-            </a>
+            </Link>
+          </div>
+        )}
+        {status === 'attention' && (
+          <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+            <Link href="/dashboard/billing" className="btn-primary min-h-11 px-4">Проверить платёж</Link>
+            <Link href="/dashboard/support" className="btn-secondary min-h-11 px-4">Написать в поддержку</Link>
           </div>
         )}
       </div>
@@ -57,10 +64,13 @@ function PaymentProgress({ status }: { status: PaymentSuccessBannerStatus }) {
   ]
 
   return (
-    <div className="mt-3 grid grid-cols-3 overflow-hidden rounded-lg border border-current/15 bg-white/45 dark:bg-black/10">
-      {steps.map((step, index) => (
-        <div key={step.label} className="relative px-2 py-2 text-center text-xs font-semibold">
-          {index > 0 ? <span className="absolute inset-y-2 left-0 w-px bg-current/15" /> : null}
+    <div className="relative mt-4 grid grid-cols-3 rounded-lg border border-current/15 bg-white/45 px-2 py-3 dark:bg-black/10">
+      <span className="absolute left-[17%] right-[17%] top-[1.35rem] h-px bg-current/20" />
+      {steps.map((step) => (
+        <div key={step.label} className="relative z-10 flex flex-col items-center gap-1.5 text-center text-xs font-semibold">
+          <span className="grid h-5 w-5 place-items-center rounded-full bg-white shadow-sm dark:bg-surface-900">
+            {step.done ? <Check className="h-3.5 w-3.5" /> : step.active ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Circle className="h-3.5 w-3.5 opacity-45" />}
+          </span>
           <span className={step.done ? 'opacity-100' : step.active ? 'opacity-80' : 'opacity-45'}>{step.label}</span>
         </div>
       ))}
@@ -89,7 +99,7 @@ function getBannerCopy(status: PaymentSuccessBannerStatus, seconds: number) {
       description: 'Оплата прошла, подписка уже доступна в кабинете.',
       icon: <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" />,
       className:
-        'payment-success-pop relative overflow-hidden flex items-start gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-4 text-sm text-emerald-900 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-100',
+        'payment-success-pop relative overflow-hidden flex items-start gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-5 text-sm text-emerald-900 shadow-sm dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-100 sm:px-5',
     }
   }
 
@@ -99,7 +109,7 @@ function getBannerCopy(status: PaymentSuccessBannerStatus, seconds: number) {
       description: 'Доступ пока не выдан. Обновите страницу чуть позже или проверьте платежи в кабинете.',
       icon: <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />,
       className:
-        'flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100',
+        'flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-5 text-sm text-amber-900 shadow-sm dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100 sm:px-5',
     }
   }
 
@@ -108,6 +118,6 @@ function getBannerCopy(status: PaymentSuccessBannerStatus, seconds: number) {
     description: `Готовим доступ. Страница обновится ещё несколько раз${seconds > 0 ? `, примерно ${seconds} сек.` : '.'}`,
     icon: <Loader2 className="mt-0.5 h-5 w-5 shrink-0 animate-spin" />,
     className:
-      'flex items-start gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-4 text-sm text-emerald-900 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-100',
+      'flex items-start gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-5 text-sm text-emerald-900 shadow-sm dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-100 sm:px-5',
   }
 }

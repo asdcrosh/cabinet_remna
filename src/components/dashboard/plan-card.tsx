@@ -7,7 +7,7 @@ import { cn } from "@/lib/cn";
 import { formatPrice } from "@/lib/format";
 import { Check, CreditCard, Sparkles, Tag, X } from "lucide-react";
 
-interface PlanCardProps {
+export interface PlanCardProps {
   id: string;
   name: string;
   description: string | null;

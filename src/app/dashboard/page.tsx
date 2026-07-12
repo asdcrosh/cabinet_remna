@@ -1,18 +1,16 @@
 // Главная страница кабинета: компактный обзор подписки и быстрые действия.
 
 import Link from 'next/link'
-import type { ReactElement, ReactNode } from 'react'
+import type { ReactElement } from 'react'
 import { Prisma, type PersonalOfferScenario, type PersonalOfferSetting, type WelcomeBonusType } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth/cookies'
 import { remnawave, RemnawaveError } from '@/lib/remnawave'
 import { formatBytes, formatPrice } from '@/lib/format'
 import { StatusBadge } from '@/components/dashboard/status-badge'
-import { ProgressBar } from '@/components/dashboard/progress-bar'
 import { TrafficChart } from '@/components/dashboard/traffic-chart'
 import { DashboardOnboardingCard, type DashboardOnboardingState } from '@/components/dashboard/onboarding-card'
 import { WelcomeOfferButton } from '@/components/dashboard/welcome-offer-button'
-import { PageHeader } from '@/components/dashboard/page-header'
 import { redirect } from 'next/navigation'
 import {
   AlertTriangle,
@@ -153,8 +151,6 @@ export default async function DashboardHome() {
   if (!user.remnawaveUsername) {
     return (
       <div className="page-stack">
-        <PageHeader title="Главная" description="Начните пользоваться VPN" />
-        <ProductTrustStrip />
         <DashboardOnboardingCard state={onboardingState} mode="full" />
         {personalOffer && <PersonalOffer offer={personalOffer} welcomeBonusOptions={welcomeBonusOptions} />}
         <SmartInsights
@@ -165,7 +161,6 @@ export default async function DashboardHome() {
           pendingPayment={user.payments[0] ?? null}
           suppress={primaryHomeNudge}
         />
-        <ActionCenter />
       </div>
     )
   }
@@ -175,21 +170,14 @@ export default async function DashboardHome() {
   const isUnlimited = limit === 0n
   const percent = isUnlimited ? 0 : Math.min(100, Math.round((Number(used) / Number(limit || 1n)) * 100))
   const daysLeft = sub?.daysLeft ?? 0
+  const primaryAction = daysLeft <= 7
+    ? { href: '/dashboard/plans?intent=renew', label: 'Продлить подписку', icon: <CreditCard className="h-4 w-4" /> }
+    : user._count.devices === 0
+      ? { href: '/dashboard/subscription', label: 'Подключить устройство', icon: <KeyRound className="h-4 w-4" /> }
+      : { href: '/dashboard/subscription', label: 'Открыть подписку', icon: <KeyRound className="h-4 w-4" /> }
 
   return (
     <div className="page-stack">
-      <PageHeader
-        title="Главная"
-        description="Подписка и использование VPN"
-        action={(
-          <Link href="/dashboard/subscription" className="btn-secondary min-h-10 px-3">
-            <KeyRound className="h-4 w-4" />
-            Подключение
-          </Link>
-        )}
-      />
-      <ProductTrustStrip />
-
       {subRow?.pendingSync && !remnawaveCard && (
         <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
           <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
@@ -202,15 +190,17 @@ export default async function DashboardHome() {
         </div>
       )}
 
-      <section className="overflow-hidden rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60 dark:border-white/10 dark:bg-surface-900 dark:shadow-black/20 sm:p-5">
-        <div className="grid gap-5 xl:grid-cols-[1fr_auto]">
+      <section className="relative overflow-hidden rounded-lg border border-slate-200 bg-white/90 p-4 shadow-xl shadow-slate-950/[0.06] dark:border-white/10 dark:bg-surface-900 dark:shadow-black/25 sm:p-6">
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-cyan-400 via-emerald-400 to-cyan-500" />
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_17rem] lg:items-stretch">
           <div className="min-w-0">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
+                <div className="mb-2 text-xs font-semibold uppercase text-emerald-600 dark:text-emerald-300">Ваш VPN</div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <h2 className="truncate text-2xl font-semibold leading-tight text-slate-950 dark:text-white">
+                  <h1 className="truncate text-2xl font-semibold leading-tight text-slate-950 dark:text-white sm:text-3xl">
                     {subRow?.plan?.name ?? 'VPN-подписка'}
-                  </h2>
+                  </h1>
                   <StatusBadge status={sub?.userStatus ?? 'DISABLED'} />
                 </div>
                 <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
@@ -219,37 +209,40 @@ export default async function DashboardHome() {
                     : 'Тариф синхронизируется'}
                 </p>
               </div>
-              <div className="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-slate-950 text-cyan-200 shadow-lg shadow-slate-950/10 dark:bg-white dark:text-slate-950">
+              <div className="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-emerald-100 text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-200">
                 <ShieldCheck className="h-5 w-5" />
               </div>
             </div>
 
-            <div className="mt-5 grid gap-3 sm:grid-cols-3">
+            <div className="mt-6 grid grid-cols-3 divide-x divide-slate-200 border-y border-slate-200 py-4 dark:divide-white/10 dark:border-white/10">
               <OverviewMetric label="Осталось" value={sub ? `${daysLeft} дн.` : '—'} />
               <OverviewMetric label="Использовано" value={formatBytes(used)} />
               <OverviewMetric label="Лимит" value={isUnlimited ? 'Безлимит' : formatBytes(limit)} />
             </div>
 
-            {!isUnlimited && (
-              <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50/80 p-3 dark:border-white/10 dark:bg-white/[0.03]">
-                <div className="mb-2 flex justify-between text-xs text-slate-500 dark:text-slate-400">
-                  <span>Трафик</span>
-                  <span>{percent}%</span>
-                </div>
-                <ProgressBar value={percent} />
-              </div>
-            )}
+            <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-sm">
+              <Link href="/dashboard/devices" className="font-medium text-slate-600 hover:text-cyan-700 dark:text-slate-300 dark:hover:text-cyan-200">Устройства</Link>
+              <Link href="/dashboard/billing" className="font-medium text-slate-600 hover:text-cyan-700 dark:text-slate-300 dark:hover:text-cyan-200">Платежи</Link>
+              <Link href="/dashboard/support" className="font-medium text-slate-600 hover:text-cyan-700 dark:text-slate-300 dark:hover:text-cyan-200">Поддержка</Link>
+            </div>
           </div>
 
-          <div className="grid gap-2 sm:grid-cols-3 xl:w-56 xl:grid-cols-1">
-            <CompactAction href="/dashboard/subscription" icon={<KeyRound />} label="Подключить" />
-            <CompactAction href="/dashboard/plans" icon={<CreditCard />} label="Продлить" />
-            <CompactAction href="/dashboard/devices" icon={<Laptop />} label="Устройства" />
+          <div className="flex flex-col items-center justify-center rounded-lg border border-slate-200 bg-slate-50/80 p-4 text-center dark:border-white/10 dark:bg-white/[0.035]">
+            <UsageRing percent={percent} unlimited={isUnlimited} />
+            <div className="mt-3 text-sm font-semibold text-slate-950 dark:text-white">
+              {isUnlimited ? 'Трафик без ограничений' : `${percent}% использовано`}
+            </div>
+            <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+              {daysLeft > 0 ? `Доступ ещё ${daysLeft} дн.` : 'Проверьте срок доступа'}
+            </div>
+            <Link href={primaryAction.href} className="btn-primary mt-4 w-full min-h-11">
+              {primaryAction.icon}
+              {primaryAction.label}
+            </Link>
           </div>
         </div>
       </section>
 
-      <DashboardOnboardingCard state={onboardingState} />
       <SmartInsights
         emailVerified={onboardingState.emailVerified}
         telegramLinked={onboardingState.telegramLinked}
@@ -259,6 +252,7 @@ export default async function DashboardHome() {
         suppress={primaryHomeNudge}
       />
       {personalOffer && <PersonalOffer offer={personalOffer} welcomeBonusOptions={welcomeBonusOptions} />}
+      <DashboardOnboardingCard state={onboardingState} />
 
       <TrafficChart
         userId={user.id}
@@ -266,7 +260,6 @@ export default async function DashboardHome() {
         initialLimitBytes={isUnlimited ? null : limit.toString()}
       />
 
-      <ActionCenter />
     </div>
   )
 }
@@ -831,121 +824,23 @@ function OverviewMetric({
   value: string
 }) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-3 dark:border-white/10 dark:bg-white/[0.03]">
+    <div className="min-w-0 px-2 text-center first:pl-0 last:pr-0 sm:px-4 sm:text-left">
       <div className="text-xs text-slate-500 dark:text-slate-400">{label}</div>
-      <div className="mt-1 truncate text-lg font-semibold text-slate-950 dark:text-white">{value}</div>
+      <div className="mt-1 truncate text-base font-semibold text-slate-950 dark:text-white sm:text-lg">{value}</div>
     </div>
   )
 }
 
-function ProductTrustStrip() {
-  const items = [
-    { icon: <ShieldCheck className="h-4 w-4" />, label: 'Выдача автоматически' },
-    { icon: <KeyRound className="h-4 w-4" />, label: 'QR и ссылка подключения' },
-    { icon: <MessageCircleQuestion className="h-4 w-4" />, label: 'Поддержка в кабинете' },
-  ]
-
+function UsageRing({ percent, unlimited }: { percent: number; unlimited: boolean }) {
+  const value = unlimited ? 100 : Math.max(0, Math.min(percent, 100))
   return (
-    <section className="grid overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-surface-900 sm:grid-cols-3">
-      {items.map((item, index) => (
-        <div key={item.label} className="relative flex items-center gap-2 px-3 py-2.5 text-sm font-medium text-slate-600 dark:text-slate-300">
-          {index > 0 ? <span className="absolute inset-x-3 top-0 h-px bg-slate-100 dark:bg-white/10 sm:inset-y-2 sm:left-0 sm:h-auto sm:w-px" /> : null}
-          <span className="text-emerald-600 dark:text-emerald-300">{item.icon}</span>
-          {item.label}
-        </div>
-      ))}
-    </section>
-  )
-}
-
-function CompactAction({ href, icon, label }: { href: string; icon: ReactElement; label: string }) {
-  return (
-    <Link
-      href={href}
-      className="group flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-900 shadow-sm transition hover:-translate-y-0.5 hover:border-cyan-200 hover:bg-cyan-50/70 hover:text-cyan-800 dark:border-white/10 dark:bg-white/[0.03] dark:text-white dark:hover:border-cyan-500/30 dark:hover:bg-cyan-500/10"
+    <div
+      className="grid h-24 w-24 place-items-center rounded-full p-2"
+      style={{ background: `conic-gradient(rgb(16 185 129) ${value * 3.6}deg, rgba(148,163,184,0.18) 0deg)` }}
     >
-      <span className="text-slate-500 transition group-hover:text-cyan-700 dark:text-slate-400 [&>svg]:h-4 [&>svg]:w-4">{icon}</span>
-      {label}
-      <ArrowRight className="ml-auto hidden h-4 w-4 text-slate-400 transition group-hover:translate-x-0.5 sm:block" />
-    </Link>
-  )
-}
-
-function ActionCenter() {
-  return (
-    <section className="space-y-3">
-      <div className="section-heading">
-        <div>
-          <h2 className="section-title">Быстрые действия</h2>
-          <p className="section-description">Самые частые задачи без лишних переходов.</p>
-        </div>
+      <div className="grid h-full w-full place-items-center rounded-full bg-white text-lg font-semibold text-slate-950 shadow-inner dark:bg-surface-900 dark:text-white">
+        {unlimited ? <ShieldCheck className="h-7 w-7 text-emerald-500" /> : `${value}%`}
       </div>
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-      <PromoBlock
-        href="/dashboard/referrals"
-        icon={<UsersRound className="h-5 w-5" />}
-        title="Пригласите друга"
-        description="Получайте бонусные дни"
-        tone="cyan"
-      />
-      <PromoBlock
-        href="/dashboard/bonus-box"
-        icon={<Gift className="h-5 w-5" />}
-        title="Откройте подарок"
-        description="Бонусы за активность"
-        tone="emerald"
-      />
-      <PromoBlock
-        href="/dashboard/notifications"
-        icon={<Bell className="h-5 w-5" />}
-        title="События"
-        description="Платежи и важные статусы"
-        tone="slate"
-      />
-      <PromoBlock
-        href="/dashboard/support"
-        icon={<MessageCircleQuestion className="h-5 w-5" />}
-        title="Поддержка"
-        description="Вопросы и обращения"
-        tone="cyan"
-      />
-      </div>
-    </section>
-  )
-}
-
-function PromoBlock({
-  href,
-  icon,
-  title,
-  description,
-  tone,
-}: {
-  href: string
-  icon: ReactNode
-  title: string
-  description: string
-  tone: 'cyan' | 'emerald' | 'slate'
-}) {
-  const toneClass = tone === 'cyan'
-    ? 'border-cyan-200/70 bg-cyan-50/80 text-cyan-700 dark:border-cyan-500/20 dark:bg-cyan-500/10 dark:text-cyan-200'
-    : tone === 'emerald'
-      ? 'border-emerald-200/70 bg-emerald-50/80 text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200'
-      : 'border-slate-200 bg-white/80 text-slate-600 dark:border-white/10 dark:bg-white/[0.035] dark:text-slate-300'
-
-  return (
-    <Link
-      href={href}
-      className={`group flex min-h-24 items-center gap-3 rounded-lg border p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${toneClass}`}
-    >
-      <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-white/75 shadow-sm dark:bg-white/10">
-        {icon}
-      </div>
-      <div className="min-w-0 flex-1">
-        <div className="font-semibold text-slate-950 dark:text-white">{title}</div>
-        <div className="text-sm opacity-80">{description}</div>
-      </div>
-      <ArrowRight className="h-5 w-5 shrink-0 transition-transform group-hover:translate-x-0.5" />
-    </Link>
+    </div>
   )
 }

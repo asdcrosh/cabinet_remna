@@ -4,6 +4,7 @@
 import Link from 'next/link'
 import { prisma } from '@/lib/prisma'
 import { PlanCard } from '@/components/dashboard/plan-card'
+import { MobilePlanPicker } from '@/components/dashboard/mobile-plan-picker'
 import { formatPrice } from '@/lib/format'
 import { PageHeader } from '@/components/dashboard/page-header'
 import { getCurrentUser } from '@/lib/auth/cookies'
@@ -97,6 +98,26 @@ export default async function PlansPage({
   const referenceDailyPrice = referencePlan
     ? referencePlan.priceKopecks / Math.max(1, referencePlan.durationDays)
     : 0
+  const planViews = visiblePlans.map((plan, index) => ({
+    id: plan.id,
+    name: plan.name,
+    description: plan.description,
+    price: formatPrice(plan.priceKopecks),
+    shortPrice: formatPrice(plan.priceKopecks),
+    priceKopecks: plan.priceKopecks,
+    monthlyPrice: formatPrice(Math.round((plan.priceKopecks / Math.max(1, plan.durationDays)) * 30)),
+    savingsPercent: !plan.isPromo && referenceDailyPrice > 0
+      ? Math.max(0, Math.round((1 - (plan.priceKopecks / Math.max(1, plan.durationDays)) / referenceDailyPrice) * 100))
+      : 0,
+    durationDays: plan.durationDays,
+    trafficLimitGb: plan.trafficLimitGb,
+    deviceLimit: plan.deviceLimit,
+    isPromo: plan.isPromo,
+    popular: index === 1,
+    current: currentSubscription?.planId === plan.id,
+    initialPromoCode,
+    availablePromoCodes: availablePromoCodesByPlan.get(plan.id) ?? [],
+  }))
 
   return (
     <div className="page-stack">
@@ -138,8 +159,12 @@ export default async function PlansPage({
         </div>
       )}
 
-      <div className="grid gap-3 sm:gap-4 md:auto-rows-fr md:grid-cols-2 xl:grid-cols-3">
-        {visiblePlans.length === 0 && (
+      {planViews.length > 0 ? (
+        <MobilePlanPicker plans={planViews} initialPlanId={linkedPlanId} />
+      ) : null}
+
+      <div className="hidden gap-4 md:grid md:auto-rows-fr md:grid-cols-2 xl:grid-cols-3">
+        {planViews.length === 0 && (
           <div className="card w-full py-12 text-center md:col-span-full">
             <h3 className="text-lg font-semibold">Тарифы скоро появятся</h3>
             <p className="mx-auto mt-2 max-w-md text-sm text-slate-500 dark:text-slate-400">
@@ -152,32 +177,19 @@ export default async function PlansPage({
             )}
           </div>
         )}
-        {visiblePlans.map((p, index) => (
-          <div key={p.id} className="min-w-0">
-            <PlanCard
-              id={p.id}
-              name={p.name}
-              description={p.description}
-              price={formatPrice(p.priceKopecks)}
-              priceKopecks={p.priceKopecks}
-              monthlyPrice={formatPrice(Math.round((p.priceKopecks / Math.max(1, p.durationDays)) * 30))}
-              savingsPercent={
-                !p.isPromo && referenceDailyPrice > 0
-                  ? Math.max(0, Math.round((1 - (p.priceKopecks / Math.max(1, p.durationDays)) / referenceDailyPrice) * 100))
-                  : 0
-              }
-              durationDays={p.durationDays}
-              trafficLimitGb={p.trafficLimitGb}
-              deviceLimit={p.deviceLimit}
-              isPromo={p.isPromo}
-              popular={index === 1}
-              current={currentSubscription?.planId === p.id}
-              initialPromoCode={initialPromoCode}
-              availablePromoCodes={availablePromoCodesByPlan.get(p.id) ?? []}
-            />
+        {planViews.map((plan) => (
+          <div key={plan.id} className="min-w-0">
+            <PlanCard {...plan} />
           </div>
         ))}
       </div>
+
+      {planViews.length === 0 && (
+        <div className="card py-10 text-center md:hidden">
+          <h3 className="text-lg font-semibold">Тарифы скоро появятся</h3>
+          <p className="mx-auto mt-2 max-w-md text-sm text-slate-500 dark:text-slate-400">Сейчас нет опубликованных тарифов.</p>
+        </div>
+      )}
 
       {visiblePlans.length > 1 ? <PlanComparison plans={visiblePlans} /> : null}
     </div>

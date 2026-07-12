@@ -45,7 +45,7 @@ export function DashboardOnboardingCard({ state, mode = 'compact' }: DashboardOn
   if (!action && !isFull) return null
 
   return (
-    <section className={`card relative overflow-hidden ${isFull ? 'p-4 sm:p-5' : 'p-4'}`}>
+    <section className={`card relative overflow-hidden ${isFull ? 'p-5 sm:p-6' : 'p-4'}`}>
       <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-cyan-400 via-emerald-400 to-brand-500" />
       <div className={`grid gap-4 ${isFull ? 'lg:grid-cols-[0.9fr_1.1fr] lg:items-center' : 'xl:grid-cols-[0.85fr_1.15fr] xl:items-center'}`}>
         <div className="min-w-0">
@@ -65,7 +65,7 @@ export function DashboardOnboardingCard({ state, mode = 'compact' }: DashboardOn
           <p className="max-w-xl text-sm text-slate-500 dark:text-slate-400">
             {action?.description ?? 'Можно смотреть подписку, устройства, платежи и бонусы.'}
           </p>
-          <div className="mt-4 flex flex-wrap gap-2">
+          <div className="mt-5 flex flex-wrap items-center gap-3">
             {action ? (
               <Link href={action.href} className="btn-primary min-h-9 px-3 py-1.5">
                 {action.label}
@@ -77,8 +77,8 @@ export function DashboardOnboardingCard({ state, mode = 'compact' }: DashboardOn
                 <ArrowRight className="h-4 w-4" />
               </Link>
             )}
-            <Link href="/dashboard/support" className="btn-secondary min-h-9 px-3 py-1.5">
-              Поддержка
+            <Link href="/dashboard/support" className="text-sm font-medium text-slate-500 hover:text-cyan-700 dark:text-slate-400 dark:hover:text-cyan-200">
+              Нужна помощь?
             </Link>
           </div>
         </div>

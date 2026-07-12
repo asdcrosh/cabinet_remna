@@ -1,7 +1,7 @@
 export default function PlansLoading() {
   return (
     <div className="page-stack">
-      <header className="rounded-lg border border-white/70 bg-white/72 p-4 shadow-sm shadow-slate-200/50 dark:border-white/10 dark:bg-surface-950/45 sm:p-5">
+      <header className="border-b border-slate-200/80 pb-4 dark:border-white/10 sm:pb-5">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div className="space-y-2">
             <div className="skeleton h-9 w-44 rounded-lg" />

@@ -79,7 +79,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           <Brand compact brandName={brandName} />
           <div className="flex items-center gap-2">
             <NotificationBell showAdmin={isStaff} />
-            <MobileDashboardNav role={role} email={accountLabel} brandName={brandName} badges={navBadges} features={features} />
+            {isStaff ? <MobileDashboardNav role={role} email={accountLabel} brandName={brandName} badges={navBadges} features={features} /> : null}
           </div>
         </div>
         <div id="dashboard-content" className="page-transition mx-auto w-full max-w-6xl min-w-0 scroll-mt-20 px-4 pb-24 pt-4 sm:px-6 sm:pt-6 lg:px-8 lg:py-8">{children}</div>

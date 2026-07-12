@@ -50,15 +50,15 @@ const bottomNav = [
   { href: '/dashboard', label: 'Главная', icon: Home, exact: true },
   { href: '/dashboard/subscription', label: 'Подписка', icon: KeyRound },
   { href: '/dashboard/plans', label: 'Тарифы', icon: ShieldCheck },
-  { href: '/dashboard/billing', label: 'Платежи', icon: CreditCard },
+  { href: '/dashboard/support', label: 'Поддержка', icon: MessageCircleQuestion },
 ]
 
 const bottomMoreNav = [
+  { href: '/dashboard/billing', label: 'Платежи', icon: CreditCard },
   { href: '/dashboard/bonus-box', label: 'Бонусы', icon: Gift },
   { href: '/dashboard/referrals', label: 'Рефералы', icon: UsersRound },
   { href: '/dashboard/devices', label: 'Устройства', icon: Laptop },
   { href: '/dashboard/notifications', label: 'Уведомления', icon: Bell },
-  { href: '/dashboard/support', label: 'Поддержка', icon: MessageCircleQuestion },
   { href: '/dashboard/settings', label: 'Настройки', icon: Settings },
 ]
 
@@ -279,7 +279,7 @@ export function MobileBottomNav({ badges = {}, features }: { badges?: NavBadges;
   )
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-white/70 bg-white/90 px-2 pb-[calc(env(safe-area-inset-bottom)+0.4rem)] pt-1.5 shadow-[0_-16px_40px_rgba(15,23,42,0.10)] backdrop-blur-xl dark:border-white/10 dark:bg-surface-950/90 lg:hidden">
+    <nav className="fixed bottom-[calc(env(safe-area-inset-bottom)+0.5rem)] left-1/2 z-40 w-[calc(100%-1rem)] max-w-md -translate-x-1/2 rounded-lg border border-white/80 bg-white/[0.92] p-1.5 shadow-2xl shadow-slate-950/15 backdrop-blur-xl dark:border-white/10 dark:bg-surface-900/[0.94] dark:shadow-black/35 lg:hidden">
       <div className="mx-auto grid max-w-md grid-cols-5 gap-1">
         {items.map((item) => {
           const Icon = item.icon
@@ -292,9 +292,9 @@ export function MobileBottomNav({ badges = {}, features }: { badges?: NavBadges;
               href={item.href}
               aria-current={active ? 'page' : undefined}
               className={cn(
-                'relative flex min-w-0 flex-col items-center justify-center gap-0.5 rounded-lg px-1 py-1.5 text-[11px] font-medium transition',
+                'relative flex min-h-12 min-w-0 flex-col items-center justify-center gap-0.5 rounded-lg px-1 py-1.5 text-[10px] font-semibold transition-colors',
                 active
-                  ? 'bg-slate-950 text-white shadow-lg shadow-slate-950/10 dark:bg-white dark:text-slate-950'
+                  ? 'bg-slate-950 text-white shadow-md shadow-slate-950/15 dark:bg-white dark:text-slate-950'
                   : 'text-slate-500 hover:bg-slate-100 hover:text-slate-950 dark:text-slate-400 dark:hover:bg-white/10 dark:hover:text-white'
               )}
             >
@@ -316,7 +316,7 @@ export function MobileBottomNav({ badges = {}, features }: { badges?: NavBadges;
           aria-label="Открыть ещё разделы"
           onClick={() => setMoreOpen(true)}
           className={cn(
-            'relative flex min-w-0 flex-col items-center justify-center gap-0.5 rounded-lg px-1 py-1.5 text-[11px] font-medium transition',
+            'relative flex min-h-12 min-w-0 flex-col items-center justify-center gap-0.5 rounded-lg px-1 py-1.5 text-[10px] font-semibold transition-colors',
             moreActive
               ? 'bg-slate-950 text-white shadow-lg shadow-slate-950/10 dark:bg-white dark:text-slate-950'
               : 'text-slate-500 hover:bg-slate-100 hover:text-slate-950 dark:text-slate-400 dark:hover:bg-white/10 dark:hover:text-white'
