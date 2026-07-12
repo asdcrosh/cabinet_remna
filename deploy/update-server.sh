@@ -71,7 +71,19 @@ running_app_revision() {
   return 1
 }
 
+installed_version_revision() {
+  local revision
+  [[ -f "${VERSION_FILE}" ]] || return 1
+  revision="$(sed -n 's/^commit=//p' "${VERSION_FILE}" 2>/dev/null | head -n 1)"
+  if [[ "${revision}" =~ ^[0-9a-f]{40}$ ]]; then
+    printf '%s\n' "${revision}"
+    return 0
+  fi
+  return 1
+}
+
 cd "${INSTALL_DIR}"
+PREVIOUS_DEPLOYED_REVISION="$(running_app_revision || installed_version_revision || true)"
 
 if docker inspect remnashop >/dev/null 2>&1; then
   ENV_FILE_PATH="${ENV_FILE}" python3 <<'PY'
@@ -218,6 +230,44 @@ for line in path.read_text().splitlines():
 PY
 }
 
+notify_telegram_deploy() {
+  local previous_revision="$1"
+  local deployed_revision="$2"
+  local bot_token chat_id app_url brand_name message
+
+  [[ "${previous_revision}" =~ ^[0-9a-f]{40}$ ]] || return 0
+  [[ "${deployed_revision}" =~ ^[0-9a-f]{40}$ ]] || return 0
+  [[ "${previous_revision}" != "${deployed_revision}" ]] || return 0
+
+  bot_token="$(env_value TELEGRAM_BOT_TOKEN)"
+  chat_id="$(env_value TELEGRAM_NOTIFY_CHAT_ID)"
+  [[ -n "${bot_token}" && -n "${chat_id}" ]] || return 0
+
+  app_url="$(env_value APP_URL)"
+  brand_name="$(env_value CABINET_BRAND_NAME)"
+  brand_name="${brand_name:-Кабинет}"
+  message="${brand_name} обновлён
+
+Новая версия успешно развёрнута и прошла health-check.
+Версия: ${deployed_revision:0:7}
+Предыдущая: ${previous_revision:0:7}
+Время: $(date -u '+%d.%m.%Y %H:%M UTC')"
+  if [[ -n "${app_url}" ]]; then
+    message="${message}
+Сайт: ${app_url%/}"
+  fi
+
+  if curl -fsS --max-time 10 \
+    -X POST "https://api.telegram.org/bot${bot_token}/sendMessage" \
+    --data-urlencode "chat_id=${chat_id}" \
+    --data-urlencode "text=${message}" \
+    --data "disable_web_page_preview=true" >/dev/null; then
+    echo "Telegram deploy notification sent."
+  else
+    echo "Warning: deployment succeeded, but Telegram notification failed." >&2
+  fi
+}
+
 is_truthy() {
   case "${1:-}" in
     1|true|TRUE|yes|YES|y|Y) return 0 ;;
@@ -325,9 +375,12 @@ if [[ -n "${APP_URL}" && -n "${HEALTHCHECK_TOKEN}" ]]; then
 fi
 
 cleanup_docker_artifacts
-write_installed_version "$(running_app_revision || remote_commit_sha || true)"
+DEPLOYED_REVISION="$(running_app_revision || true)"
+VERSION_TO_RECORD="${DEPLOYED_REVISION:-$(remote_commit_sha || true)}"
+write_installed_version "${VERSION_TO_RECORD}"
 mkdir -p /var/cache/remnawave-cabinet 2>/dev/null || true
 printf '%s|%s\n' "$(date +%s)" latest >/var/cache/remnawave-cabinet/update-status 2>/dev/null || true
+notify_telegram_deploy "${PREVIOUS_DEPLOYED_REVISION}" "${DEPLOYED_REVISION}"
 
 echo "Update complete."
 echo "Management menu:"

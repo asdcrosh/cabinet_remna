@@ -244,6 +244,11 @@ checks local/public health. After a successful health check it removes completed
 one-shot containers, unused legacy compose-build images for this project, and
 dangling Docker images. It never prunes Docker volumes.
 
+If `TELEGRAM_BOT_TOKEN` and `TELEGRAM_NOTIFY_CHAT_ID` are set in the production
+`.env`, the script sends a Telegram message only after a different running image
+revision passes health checks. Commits and image publication do not trigger it,
+and rerunning the same deployed revision does not send a duplicate message.
+
 To additionally prune old Docker build cache, run:
 
 ```bash

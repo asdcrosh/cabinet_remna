@@ -138,6 +138,10 @@ for (const [left, right] of optionalPairs) {
   }
 }
 
+if (value("TELEGRAM_NOTIFY_CHAT_ID") && !value("TELEGRAM_BOT_TOKEN")) {
+  warnings.push("TELEGRAM_BOT_TOKEN is required for Telegram deploy notifications");
+}
+
 for (const key of optionalBooleans) {
   if (!value(key)) continue;
   if (!["1", "true", "yes", "on", "0", "false", "no", "off"].includes(value(key).toLowerCase())) {

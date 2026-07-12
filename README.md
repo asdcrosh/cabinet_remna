@@ -499,6 +499,12 @@ cabinetctl
 | `cabinetctl logs` | Меню логов |
 | `cabinetctl backups` | Бэкапы и восстановление |
 
+Чтобы получать сообщение в Telegram после успешного обновления, заполните в
+`/opt/remnawave-cabinet/.env` переменные `TELEGRAM_BOT_TOKEN` и
+`TELEGRAM_NOTIFY_CHAT_ID`. `cabinetctl update` отправит сообщение только когда
+запущена новая ревизия и пройдены health-check. Новый коммит или публикация
+Docker-образа сами по себе уведомление не отправляют.
+
 Логи вручную:
 
 ```bash
