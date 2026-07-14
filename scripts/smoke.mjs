@@ -1,5 +1,5 @@
 const baseUrl = (process.env.SMOKE_BASE_URL || 'http://127.0.0.1:3000').replace(/\/$/, '')
-const paths = ['/', '/login', '/register', '/terms', '/privacy', '/refunds']
+const paths = ['/', '/login', '/register', '/terms', '/privacy', '/refunds', '/api/plans']
 const deadline = Date.now() + 30_000
 const healthHeaders = process.env.HEALTHCHECK_TOKEN
   ? { 'x-healthcheck-token': process.env.HEALTHCHECK_TOKEN }
