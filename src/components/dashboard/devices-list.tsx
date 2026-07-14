@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import Link from 'next/link'
 import { Clock3, Hash, Laptop, Loader2, Monitor, RefreshCw, Smartphone, Tablet, Unlink2 } from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
 import { EmptyState, InlineAlert } from './empty-state'
@@ -56,26 +57,38 @@ export function DevicesList() {
     }
   }
 
-  if (error) return <InlineAlert tone="danger" title="Не удалось загрузить устройства" description={error} />
+  if (error) {
+    return (
+      <div className="space-y-3">
+        <InlineAlert tone="danger" title="Не удалось загрузить устройства" description={error} />
+        <button type="button" className="btn-secondary w-full sm:w-auto" onClick={() => void loadDevices()}>
+          <RefreshCw className="h-4 w-4" />
+          Попробовать снова
+        </button>
+      </div>
+    )
+  }
   if (!devices) return <DevicesSkeleton />
   if (devices.length === 0) {
     return (
       <EmptyState
         title="Устройств пока нет"
-        description="Они появятся здесь после первого подключения к VPN."
+        description="Подключите VPN в приложении, и устройство автоматически появится здесь."
+        action={<Link href="/dashboard/subscription" className="btn-primary">Подключить устройство</Link>}
       />
     )
   }
 
   return (
     <>
-      <section className="overflow-hidden rounded-lg border border-slate-200/80 bg-white/90 shadow-sm shadow-slate-200/50 backdrop-blur dark:border-white/10 dark:bg-white/[0.035] dark:shadow-black/20">
-        <div className="border-b border-slate-100 bg-slate-50/60 p-3 dark:border-white/10 dark:bg-white/[0.02] sm:p-5">
-          <div className="space-y-3">
+      <section className="overflow-hidden rounded-3xl border border-slate-200/80 bg-white/90 shadow-sm shadow-slate-950/[0.04] dark:border-white/10 dark:bg-surface-900 dark:shadow-black/20">
+        <div className="border-b border-slate-100 p-4 dark:border-white/10 sm:p-5">
+          <div className="space-y-4">
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
-                <div className="text-xs font-semibold uppercase tracking-wide text-cyan-700 dark:text-cyan-300">Подключенные устройства</div>
-                <h2 className="mt-0.5 text-2xl font-semibold tracking-tight text-slate-950 dark:text-white">{devices.length}</h2>
+                <div className="text-xs font-semibold uppercase tracking-wide text-cyan-700 dark:text-cyan-300">Ваши подключения</div>
+                <h2 className="mt-1 text-xl font-semibold tracking-tight text-slate-950 dark:text-white">Подключённые устройства</h2>
+                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Всего: {devices.length}</p>
               </div>
               <button
                 type="button"
@@ -89,14 +102,14 @@ export function DevicesList() {
               </button>
             </div>
             <div className="grid grid-cols-3 gap-2">
-              <DeviceMetric label="За сутки" value={countRecentDevices(devices).toString()} />
+              <DeviceMetric label="Активны сегодня" value={countRecentDevices(devices).toString()} />
               <DeviceMetric label="За неделю" value={countWeekDevices(devices).toString()} />
-              <DeviceMetric label="Всего" value={devices.length.toString()} />
+              <DeviceMetric label="Подключено" value={devices.length.toString()} />
             </div>
           </div>
         </div>
 
-        <div className="grid gap-2.5 p-3 sm:gap-3 sm:p-5 lg:grid-cols-2 2xl:grid-cols-3">
+        <div className="grid gap-3 p-4 sm:p-5 lg:grid-cols-2 2xl:grid-cols-3">
           {devices.map((d) => (
             <DeviceCard
               key={d.hwid}
@@ -133,11 +146,11 @@ function DeviceCard({
   const Icon = getDeviceIcon(device)
 
   return (
-    <article className="group relative overflow-hidden rounded-lg border border-slate-200/80 bg-slate-50/80 p-3 transition hover:-translate-y-0.5 hover:border-cyan-200 hover:bg-white hover:shadow-lg hover:shadow-slate-950/5 dark:border-white/10 dark:bg-surface-950/35 dark:hover:border-cyan-500/30 dark:hover:bg-white/[0.055] sm:p-4">
+    <article className="group relative overflow-hidden rounded-2xl border border-slate-200/80 bg-slate-50/70 p-3.5 transition-colors hover:border-cyan-200 hover:bg-white dark:border-white/10 dark:bg-surface-950/35 dark:hover:border-cyan-500/30 dark:hover:bg-white/[0.055] sm:p-4">
       <div className="relative space-y-3 sm:space-y-4">
         <div className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 items-start gap-3">
-            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-slate-950 text-cyan-200 shadow-sm dark:bg-cyan-300/10 dark:text-cyan-200">
+            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-cyan-50 text-cyan-700 shadow-sm dark:bg-cyan-300/10 dark:text-cyan-200">
               <Icon className="h-5 w-5" />
             </div>
             <div className="min-w-0">
@@ -148,14 +161,14 @@ function DeviceCard({
         </div>
 
         <div className="grid gap-2 text-xs text-slate-500 dark:text-slate-400 sm:grid-cols-2">
-          <div className="rounded-lg border border-slate-200/80 bg-white/90 px-3 py-2 dark:border-white/10 dark:bg-white/[0.03]">
+          <div className="rounded-xl border border-slate-200/80 bg-white/90 px-3 py-2.5 dark:border-white/10 dark:bg-white/[0.03]">
             <div className="flex items-center gap-1.5 font-medium text-slate-700 dark:text-slate-200">
               <Clock3 className="h-3.5 w-3.5" />
               Активность
             </div>
             <div className="mt-1">{formatDeviceDate(device.updatedAt || device.createdAt)}</div>
           </div>
-          <div className="rounded-lg border border-slate-200/80 bg-white/90 px-3 py-2 dark:border-white/10 dark:bg-white/[0.03]">
+          <div className="rounded-xl border border-slate-200/80 bg-white/90 px-3 py-2.5 dark:border-white/10 dark:bg-white/[0.03]">
             <div className="flex items-center gap-1.5 font-medium text-slate-700 dark:text-slate-200">
               <Hash className="h-3.5 w-3.5" />
               ID
@@ -181,7 +194,7 @@ function DeviceCard({
 
 function DeviceMetric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-slate-200/80 bg-white/80 px-2.5 py-2 text-sm shadow-sm shadow-slate-200/40 dark:border-white/10 dark:bg-surface-950/35 dark:shadow-black/10 sm:px-3">
+    <div className="rounded-xl border border-slate-200/80 bg-slate-50/70 px-2.5 py-2.5 text-sm dark:border-white/10 dark:bg-surface-950/35 sm:px-3">
       <div className="truncate text-[11px] text-slate-500 dark:text-slate-400 sm:text-xs">{label}</div>
       <div className="mt-0.5 font-semibold text-slate-950 dark:text-white">{value}</div>
     </div>
@@ -205,9 +218,9 @@ function DeviceActionButton({
     <button
       type="button"
       className={cn(
-        'inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 text-sm font-medium text-red-700 shadow-sm shadow-red-950/5 transition-all',
-        'hover:-translate-y-0.5 hover:border-red-300 hover:bg-red-100 hover:text-red-800',
-        'disabled:cursor-not-allowed disabled:translate-y-0 disabled:opacity-60',
+        'inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-red-200/80 bg-white px-3 text-sm font-medium text-red-700 transition-colors',
+        'hover:border-red-300 hover:bg-red-50 hover:text-red-800',
+        'disabled:cursor-not-allowed disabled:opacity-60',
         'dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200 dark:hover:bg-red-500/15',
         fullWidth ? 'w-full' : 'w-[104px]'
       )}
@@ -222,11 +235,11 @@ function DeviceActionButton({
 
 function DevicesSkeleton() {
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-surface-900">
-      <div className="mb-4 h-10 w-48 animate-pulse rounded-lg bg-slate-200 dark:bg-surface-800" />
+    <div className="rounded-3xl border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-surface-900">
+      <div className="mb-4 h-10 w-48 animate-pulse rounded-xl bg-slate-200 dark:bg-surface-800" />
       <div className="grid gap-3 lg:grid-cols-2 2xl:grid-cols-3">
         {[0, 1, 2].map((item) => (
-          <div key={item} className="h-44 animate-pulse rounded-lg bg-slate-100 dark:bg-surface-800" />
+          <div key={item} className="h-44 animate-pulse rounded-2xl bg-slate-100 dark:bg-surface-800" />
         ))}
       </div>
     </div>

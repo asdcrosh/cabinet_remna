@@ -163,7 +163,7 @@ export function KeysCard({ subscriptionUrl, happLink }: KeysCardProps) {
   }
 
   return (
-    <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-surface-900">
+    <section className="overflow-hidden rounded-3xl border border-slate-200/80 bg-white/95 shadow-sm shadow-slate-950/[0.04] dark:border-white/10 dark:bg-surface-900 dark:shadow-black/20">
       <div className="grid gap-0 sm:grid-cols-[minmax(0,1fr)_14rem] lg:grid-cols-[minmax(0,1fr)_18rem]">
         <div className="min-w-0 p-4 sm:p-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -172,16 +172,16 @@ export function KeysCard({ subscriptionUrl, happLink }: KeysCardProps) {
                 <DeviceIcon device={device} />
                 <span className="truncate">{deviceLabel(device)} определено</span>
               </div>
-              <h2 className="mt-3 text-xl font-semibold tracking-tight text-slate-950 dark:text-white">Подключение</h2>
-              <p className="mt-1 hidden max-w-xl text-sm leading-6 text-slate-500 dark:text-slate-400 sm:block">
-                Выберите приложение и добавьте подписку в один переход.
+              <h2 className="mt-3 text-xl font-semibold tracking-tight text-slate-950 dark:text-white">Подключите устройство</h2>
+              <p className="mt-1 max-w-xl text-sm leading-6 text-slate-500 dark:text-slate-400">
+                Выберите приложение и добавьте подписку одним нажатием.
               </p>
             </div>
             <button
               type="button"
               onClick={() => setConfirmOpen(true)}
               disabled={revoking}
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-60 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-200 dark:hover:bg-white/[0.06] sm:shrink-0"
+              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl px-2 text-sm font-medium text-slate-500 transition hover:bg-slate-50 hover:text-slate-900 disabled:opacity-60 dark:text-slate-400 dark:hover:bg-white/[0.05] dark:hover:text-white sm:shrink-0"
             >
               <RefreshCw className="h-4 w-4" />
               <span>{revoking ? 'Обновляем' : 'Обновить ссылку'}</span>
@@ -203,23 +203,23 @@ export function KeysCard({ subscriptionUrl, happLink }: KeysCardProps) {
                     setConnectionStep(1)
                   }}
                   className={cn(
-                    'flex min-h-14 min-w-[9.5rem] items-center gap-2.5 rounded-lg border p-2.5 text-left transition sm:min-h-16 sm:min-w-0 sm:gap-3 sm:p-3',
+                    'flex min-h-16 min-w-[9.5rem] items-center gap-2.5 rounded-xl border p-2.5 text-left transition sm:min-w-0 sm:gap-3 sm:p-3',
                     active
-                      ? 'border-slate-950 bg-slate-950 text-white shadow-sm dark:border-cyan-300 dark:bg-cyan-300 dark:text-slate-950'
+                      ? 'border-cyan-300 bg-cyan-50 text-slate-950 shadow-sm shadow-cyan-950/5 dark:border-cyan-400/40 dark:bg-cyan-400/10 dark:text-white'
                       : 'border-slate-200 bg-slate-50/70 hover:border-slate-300 hover:bg-white dark:border-white/10 dark:bg-white/[0.03] dark:hover:bg-white/[0.06]'
                   )}
                 >
                   <span
                     className={cn(
-                      'grid h-9 w-9 shrink-0 place-items-center rounded-lg sm:h-10 sm:w-10',
-                      active ? 'bg-white/15' : 'bg-white text-cyan-700 shadow-sm dark:bg-white/10 dark:text-cyan-200'
+                      'grid h-9 w-9 shrink-0 place-items-center rounded-xl sm:h-10 sm:w-10',
+                      active ? 'bg-cyan-500 text-white dark:bg-cyan-300 dark:text-slate-950' : 'bg-white text-cyan-700 shadow-sm dark:bg-white/10 dark:text-cyan-200'
                     )}
                   >
                     <Icon className="h-5 w-5" />
                   </span>
                   <span className="min-w-0">
                     <span className="block truncate text-sm font-semibold">{option.name}</span>
-                    <span className={cn('mt-0.5 block truncate text-[11px] sm:text-xs', active ? 'text-white/70 dark:text-slate-950/65' : 'text-slate-500')}>
+                    <span className={cn('mt-0.5 block truncate text-[11px] sm:text-xs', active ? 'text-cyan-700 dark:text-cyan-200' : 'text-slate-500')}>
                       {option.subtitle}
                     </span>
                   </span>
@@ -233,7 +233,7 @@ export function KeysCard({ subscriptionUrl, happLink }: KeysCardProps) {
               type="button"
               onClick={openInApp}
               disabled={!subscriptionUrl}
-              className="col-span-3 inline-flex h-12 items-center justify-center gap-2 rounded-lg bg-slate-950 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200 sm:col-span-1"
+              className="btn-primary col-span-3 h-12 sm:col-span-1"
             >
               <ExternalLink className="h-4 w-4" />
               {`Подключить в ${selectedApp.name}`}
@@ -242,7 +242,7 @@ export function KeysCard({ subscriptionUrl, happLink }: KeysCardProps) {
               type="button"
               onClick={() => copy(subscriptionUrl, 'Ссылка подписки')}
               disabled={!subscriptionUrl}
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-200 dark:hover:bg-white/[0.06] sm:h-12 sm:px-4"
+              className="btn-secondary h-11 px-3 disabled:cursor-not-allowed sm:h-12 sm:px-4"
             >
               <Copy className="h-4 w-4" />
               <span className="hidden sm:inline">Скопировать</span>
@@ -251,7 +251,7 @@ export function KeysCard({ subscriptionUrl, happLink }: KeysCardProps) {
             <button
               type="button"
               onClick={() => setQrOpen(true)}
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-200 dark:hover:bg-white/[0.06] sm:hidden"
+              className="btn-secondary h-11 px-3 sm:hidden"
             >
               <QrCode className="h-4 w-4" />
               QR
@@ -259,7 +259,7 @@ export function KeysCard({ subscriptionUrl, happLink }: KeysCardProps) {
             <button
               type="button"
               onClick={() => setInstructionsOpen(true)}
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-200 dark:hover:bg-white/[0.06] sm:h-12 sm:px-4"
+              className="btn-secondary h-11 px-3 sm:h-12 sm:px-4"
             >
               <HelpCircle className="h-4 w-4" />
               <span className="hidden sm:inline">Инструкция</span>
@@ -268,10 +268,10 @@ export function KeysCard({ subscriptionUrl, happLink }: KeysCardProps) {
           </div>
 
           <div className="mt-3 flex flex-col gap-2 text-xs text-slate-500 dark:text-slate-400 sm:flex-row sm:items-center sm:justify-between">
-            <span className="min-w-0 rounded-lg bg-slate-50 px-3 py-2 dark:bg-white/[0.03] sm:hidden">
+            <span className="min-w-0 rounded-xl bg-slate-50 px-3 py-2 dark:bg-white/[0.03] sm:hidden">
               {subscriptionUrl ? 'Ссылка подписки готова' : 'Ссылка подписки пока недоступна'}
             </span>
-            <span className="hidden min-w-0 truncate rounded-lg bg-slate-50 px-3 py-2 font-mono dark:bg-white/[0.03] sm:block">
+            <span className="hidden min-w-0 truncate rounded-xl bg-slate-50 px-3 py-2 font-mono dark:bg-white/[0.03] sm:block">
               {subscriptionUrl || 'Ссылка подписки пока недоступна'}
             </span>
             <a
@@ -286,11 +286,11 @@ export function KeysCard({ subscriptionUrl, happLink }: KeysCardProps) {
           </div>
         </div>
 
-        <aside className="hidden border-t border-slate-100 bg-slate-50/70 p-4 dark:border-white/10 dark:bg-white/[0.025] sm:block sm:border-l sm:border-t-0">
+        <aside className="hidden border-t border-slate-100 bg-slate-50/60 p-4 dark:border-white/10 dark:bg-white/[0.025] sm:block sm:border-l sm:border-t-0">
           <button
             type="button"
             onClick={() => setQrOpen(true)}
-            className="group w-full rounded-lg border border-slate-200 bg-white p-3 text-left shadow-sm transition hover:border-cyan-200 hover:shadow-md dark:border-white/10 dark:bg-surface-900"
+            className="group w-full rounded-2xl border border-slate-200 bg-white p-3 text-left shadow-sm transition hover:border-cyan-200 dark:border-white/10 dark:bg-surface-900"
           >
             {subscriptionUrl ? (
               <Image
@@ -298,11 +298,11 @@ export function KeysCard({ subscriptionUrl, happLink }: KeysCardProps) {
                 alt="QR-код подписки"
                 width={220}
                 height={220}
-                className="mx-auto h-auto w-full max-w-[180px] rounded-md"
+                className="mx-auto h-auto w-full max-w-[180px] rounded-xl"
                 unoptimized
               />
             ) : (
-              <div className="grid aspect-square place-items-center rounded-md border border-dashed text-center text-sm text-slate-400">
+              <div className="grid aspect-square place-items-center rounded-xl border border-dashed text-center text-sm text-slate-400">
                 QR появится после выдачи подписки
               </div>
             )}
@@ -343,19 +343,19 @@ export function KeysCard({ subscriptionUrl, happLink }: KeysCardProps) {
 function ConnectionSteps({ step }: { step: 1 | 2 }) {
   const items = [
     { number: 1, label: 'Приложение', done: true },
-    { number: 2, label: 'Добавить подписку', done: step >= 2 },
+    { number: 2, label: 'Подписка', done: step >= 2 },
     { number: 3, label: 'Включить VPN', done: false },
   ]
 
   return (
-    <div className="mt-4 grid grid-cols-3 overflow-hidden rounded-lg border border-slate-200 bg-slate-50/70 dark:border-white/10 dark:bg-white/[0.03]">
+    <div className="mt-4 grid grid-cols-3 overflow-hidden rounded-2xl border border-slate-200 bg-slate-50/70 dark:border-white/10 dark:bg-white/[0.03]">
       {items.map((item, index) => (
-        <div key={item.number} className="relative flex min-w-0 items-center justify-center gap-2 px-2 py-2.5 text-center text-xs font-medium sm:text-sm">
+        <div key={item.number} className="relative flex min-w-0 flex-col items-center justify-center gap-1 px-1 py-2.5 text-center text-[10px] font-medium sm:flex-row sm:gap-2 sm:px-2 sm:text-sm">
           {index > 0 ? <span className="absolute inset-y-2 left-0 w-px bg-slate-200 dark:bg-white/10" /> : null}
           <span className={cn('grid h-5 w-5 shrink-0 place-items-center rounded-full text-[11px] font-bold', item.done ? 'bg-emerald-500 text-white' : 'bg-slate-200 text-slate-500 dark:bg-white/10 dark:text-slate-300')}>
             {item.done ? '✓' : item.number}
           </span>
-          <span className="hidden truncate sm:block">{item.label}</span>
+          <span className="max-w-full truncate">{item.label}</span>
         </div>
       ))}
     </div>
@@ -408,8 +408,8 @@ function InstructionModal({
     >
       <div className="space-y-3">
         {app.steps.map((step, index) => (
-          <div key={step} className="flex gap-3 rounded-lg bg-slate-50 p-3 dark:bg-white/[0.04]">
-            <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-white text-sm font-bold text-cyan-700 shadow-sm dark:bg-white/10 dark:text-cyan-200">
+          <div key={step} className="flex gap-3 rounded-xl bg-slate-50 p-3 dark:bg-white/[0.04]">
+            <div className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-white text-sm font-bold text-cyan-700 shadow-sm dark:bg-white/10 dark:text-cyan-200">
               {index + 1}
             </div>
             <div className="text-sm font-medium leading-6">{step}</div>
@@ -417,7 +417,7 @@ function InstructionModal({
         ))}
       </div>
 
-      <div className="mt-4 rounded-lg border border-cyan-100 bg-cyan-50/70 p-3 text-sm leading-6 text-cyan-950 dark:border-cyan-400/20 dark:bg-cyan-400/10 dark:text-cyan-100">
+      <div className="mt-4 rounded-xl border border-cyan-100 bg-cyan-50/70 p-3 text-sm leading-6 text-cyan-950 dark:border-cyan-400/20 dark:bg-cyan-400/10 dark:text-cyan-100">
         <div className="flex gap-2">
           <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
           <span>Если приложение не открылось автоматически, ссылка уже может быть скопирована. Добавьте её вручную как URL подписки.</span>
@@ -436,11 +436,11 @@ function QrModal({ open, subscriptionUrl, onClose }: { open: boolean; subscripti
           alt="QR-код подписки"
           width={320}
           height={320}
-          className="mx-auto h-auto w-full max-w-sm rounded-md"
+          className="mx-auto h-auto w-full max-w-sm rounded-xl"
           unoptimized
         />
       ) : (
-        <div className="grid aspect-square place-items-center rounded-lg border border-dashed text-center text-sm text-slate-400">
+        <div className="grid aspect-square place-items-center rounded-xl border border-dashed text-center text-sm text-slate-400">
           QR появится после выдачи подписки
         </div>
       )}
