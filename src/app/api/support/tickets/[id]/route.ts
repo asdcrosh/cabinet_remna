@@ -9,19 +9,25 @@ import {
   userUpdateSupportTicketSchema,
 } from '@/lib/support'
 import { createAdminNotification } from '@/lib/admin-notifications'
+import { isFeatureEnabled } from '@/lib/feature-flags'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
+const MESSAGE_PAGE_SIZE = 50
 
-export const GET = withAuth(async (_req: Request, { params }: { params: Promise<{ id: string }> }) => {
+export const GET = withAuth(async (req: Request, { params }: { params: Promise<{ id: string }> }) => {
+  if (!isFeatureEnabled('support')) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   const session = await requireAuth()
   const { id } = await params
+  const before = new URL(req.url).searchParams.get('before')?.trim() || null
 
   const ticket = await prisma.supportTicket.findFirst({
     where: { id, userId: session.uid },
     include: {
       messages: {
-        orderBy: { createdAt: 'asc' },
+        orderBy: { createdAt: 'desc' },
+        take: MESSAGE_PAGE_SIZE + 1,
+        ...(before ? { cursor: { id: before }, skip: 1 } : {}),
         select: {
           id: true,
           body: true,
@@ -37,6 +43,9 @@ export const GET = withAuth(async (_req: Request, { params }: { params: Promise<
     return NextResponse.json({ error: 'Обращение не найдено.' }, { status: 404 })
   }
 
+  const hasOlderMessages = ticket.messages.length > MESSAGE_PAGE_SIZE
+  const messages = ticket.messages.slice(0, MESSAGE_PAGE_SIZE).reverse()
+
   if (ticket.userUnreadCount > 0) {
     await prisma.supportTicket.update({
       where: { id: ticket.id },
@@ -48,12 +57,17 @@ export const GET = withAuth(async (_req: Request, { params }: { params: Promise<
   return NextResponse.json({
     ticket: {
       ...serializeSupportTicket(ticket),
-      messages: ticket.messages.map(serializeSupportMessage),
+      messages: messages.map(serializeSupportMessage),
+      messagePagination: {
+        hasMore: hasOlderMessages,
+        before: hasOlderMessages ? messages[0]?.id ?? null : null,
+      },
     },
   })
 })
 
 export const POST = withAuth(async (req: Request, { params }: { params: Promise<{ id: string }> }) => {
+  if (!isFeatureEnabled('support')) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   const session = await requireAuth()
   const { id } = await params
   const limited = await rateLimit(req, `support:message:${session.uid}`, 20, 10 * 60 * 1000)
@@ -127,6 +141,7 @@ export const POST = withAuth(async (req: Request, { params }: { params: Promise<
 })
 
 export const PATCH = withAuth(async (req: Request, { params }: { params: Promise<{ id: string }> }) => {
+  if (!isFeatureEnabled('support')) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   const session = await requireAuth()
   const { id } = await params
 

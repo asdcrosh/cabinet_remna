@@ -8,10 +8,14 @@ export type FeatureFlags = {
 export function getFeatureFlags(): FeatureFlags {
   return {
     referrals: envFlag('FEATURE_REFERRALS', true),
-    bonusBox: envFlag('FEATURE_BONUS_BOX', true),
+    bonusBox: envFlag('BONUS_BOX_ENABLED', true),
     support: envFlag('FEATURE_SUPPORT', true),
     broadcasts: envFlag('FEATURE_BROADCASTS', true),
   }
+}
+
+export function isFeatureEnabled(feature: keyof FeatureFlags) {
+  return getFeatureFlags()[feature]
 }
 
 function envFlag(name: string, defaultValue: boolean) {

@@ -8,10 +8,12 @@ import { KeysCard } from '@/components/dashboard/keys-card'
 import Link from 'next/link'
 import { CalendarClock, Database, ShieldAlert } from 'lucide-react'
 import { EmptyState } from '@/components/dashboard/empty-state'
+import { getFeatureFlags } from '@/lib/feature-flags'
 
 export const dynamic = 'force-dynamic'
 
 export default async function SubscriptionPage() {
+  const features = getFeatureFlags()
   const session = await getCurrentUser()
   if (!session) redirect('/login')
   const user = await prisma.user.findUnique({ where: { id: session.uid } })
@@ -34,16 +36,16 @@ export default async function SubscriptionPage() {
       return (
         <EmptyState
           title="Не удалось загрузить подписку"
-          description="Сервис временно недоступен. Можно повторить загрузку или написать в поддержку."
+          description={features.support
+            ? 'Сервис временно недоступен. Можно повторить загрузку или написать в поддержку.'
+            : 'Сервис временно недоступен. Повторите загрузку чуть позже.'}
           icon={<ShieldAlert className="h-7 w-7" />}
           action={
             <div className="flex flex-col gap-2 sm:flex-row">
               <Link href="/dashboard/subscription" className="btn-primary">
                 Обновить
               </Link>
-              <Link href="/dashboard/support" className="btn-secondary">
-                В поддержку
-              </Link>
+              {features.support && <Link href="/dashboard/support" className="btn-secondary">В поддержку</Link>}
             </div>
           }
         />
@@ -105,7 +107,7 @@ export default async function SubscriptionPage() {
 
       <div className="flex flex-wrap justify-center gap-x-5 gap-y-2 text-sm text-slate-500 dark:text-slate-400">
         <Link href="/dashboard/devices" className="font-medium hover:text-cyan-700 dark:hover:text-cyan-200">Мои устройства</Link>
-        <Link href="/dashboard/support" className="font-medium hover:text-cyan-700 dark:hover:text-cyan-200">Помощь с подключением</Link>
+        {features.support && <Link href="/dashboard/support" className="font-medium hover:text-cyan-700 dark:hover:text-cyan-200">Помощь с подключением</Link>}
       </div>
     </div>
   )

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { requireAdmin, withAuth } from '@/lib/auth/guard'
 import { adminPlanSchema } from '@/lib/auth/validation'
@@ -35,11 +36,30 @@ export const POST = withAuth(async (req: Request) => {
     )
   }
 
-  const data = normalizePlanInput(parsed.data)
-  const plan = await prisma.plan.create({ data })
+  const normalized = normalizePlanInput(parsed.data)
+  const data = {
+    ...normalized,
+    featuredSlot: normalized.isFeatured ? 1 : null,
+  }
+  let plan: Awaited<ReturnType<typeof prisma.plan.create>>
+  try {
+    plan = await prisma.$transaction(async (tx) => {
+      if (data.isFeatured) {
+        await tx.plan.updateMany({
+          where: { isFeatured: true },
+          data: { isFeatured: false, featuredSlot: null },
+        })
+      }
+      return tx.plan.create({ data })
+    })
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      return NextResponse.json({ error: 'Популярный тариф уже изменён другим администратором' }, { status: 409 })
+    }
+    throw error
+  }
   await writeAuditLog({
-    action: 'ADMIN_PROFILE_UPDATED',
-    targetId: plan.id,
+    action: 'ADMIN_PLAN_CREATED',
     message: 'Администратор создал тариф',
     metadata: {
       entityType: 'plan',
@@ -48,6 +68,7 @@ export const POST = withAuth(async (req: Request) => {
       priceKopecks: plan.priceKopecks,
       durationDays: plan.durationDays,
       isActive: plan.isActive,
+      isFeatured: plan.isFeatured,
     },
     request: req,
   })

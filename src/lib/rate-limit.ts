@@ -14,7 +14,10 @@ export async function rateLimit(
   windowMs: number
 ): Promise<RateLimitResult> {
   const now = Date.now()
-  const ip = getClientIp(req) || 'unknown'
+  const ip = getClientIp(req)
+  if (!ip && process.env.NODE_ENV === 'production') {
+    throw new Error('Client IP is unavailable. Check TRUSTED_PROXY_HEADERS and reverse proxy headers.')
+  }
   const bucketKey = `${key}:${ip}`
   const nowDate = new Date(now)
 

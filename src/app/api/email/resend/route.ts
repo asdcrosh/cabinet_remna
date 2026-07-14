@@ -3,6 +3,7 @@ import { logError } from '@/lib/logger'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
+const PROVIDER_TIMEOUT_MS = 15_000
 
 interface EmailWebhookPayload {
   to?: unknown
@@ -57,6 +58,7 @@ export async function POST(req: Request) {
       text: payload.text,
       html: payload.html,
     }),
+    signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
   })
 
   if (!response.ok) {

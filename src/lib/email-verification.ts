@@ -7,6 +7,7 @@ import { logError, logInfo } from './logger'
 
 const TOKEN_BYTES = 32
 const TOKEN_TTL_MS = 24 * 60 * 60 * 1000
+const DELIVERY_TIMEOUT_MS = 15_000
 
 export interface EmailDeliveryResult {
   sent: boolean
@@ -116,6 +117,7 @@ export async function sendEmailVerificationLink(input: {
         securityNote: 'Если вы не создавали аккаунт, письмо можно спокойно проигнорировать.',
       }),
     }),
+    signal: AbortSignal.timeout(DELIVERY_TIMEOUT_MS),
   })
 
   if (!res.ok) {

@@ -26,6 +26,7 @@ export interface DashboardOnboardingState {
 interface DashboardOnboardingCardProps {
   state: DashboardOnboardingState
   mode?: 'full' | 'compact'
+  supportEnabled?: boolean
 }
 
 interface NextAction {
@@ -37,7 +38,7 @@ interface NextAction {
   tone: 'cyan' | 'emerald' | 'amber' | 'slate'
 }
 
-export function DashboardOnboardingCard({ state, mode = 'compact' }: DashboardOnboardingCardProps) {
+export function DashboardOnboardingCard({ state, mode = 'compact', supportEnabled = true }: DashboardOnboardingCardProps) {
   const action = getNextAction(state)
   const steps = getSteps(state)
   const isFull = mode === 'full'
@@ -77,9 +78,11 @@ export function DashboardOnboardingCard({ state, mode = 'compact' }: DashboardOn
                 <ArrowRight className="h-4 w-4" />
               </Link>
             )}
-            <Link href="/dashboard/support" className="text-sm font-medium text-slate-500 hover:text-cyan-700 dark:text-slate-400 dark:hover:text-cyan-200">
-              Нужна помощь?
-            </Link>
+            {supportEnabled && (
+              <Link href="/dashboard/support" className="text-sm font-medium text-slate-500 hover:text-cyan-700 dark:text-slate-400 dark:hover:text-cyan-200">
+                Нужна помощь?
+              </Link>
+            )}
           </div>
         </div>
 

@@ -8,6 +8,8 @@ export interface ApiError {
   details?: unknown
 }
 
+const API_TIMEOUT_MS = 20_000
+
 const STATUS_MESSAGES: Record<number, string> = {
   400: 'Некорректный запрос. Проверьте введенные данные.',
   401: 'Нужно войти в кабинет заново.',
@@ -27,13 +29,26 @@ export async function apiFetch<T = unknown>(
   path: string,
   init: RequestInit = {}
 ): Promise<T> {
-  const res = await fetch(path, {
-    ...init,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(init.headers || {}),
-    },
-  })
+  const timeoutSignal = AbortSignal.timeout(API_TIMEOUT_MS)
+  const signal = init.signal ? AbortSignal.any([init.signal, timeoutSignal]) : timeoutSignal
+  let res: Response
+  try {
+    res = await fetch(path, {
+      ...init,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(init.headers || {}),
+      },
+      signal,
+    })
+  } catch (error) {
+    if (error instanceof Error && error.name === 'TimeoutError') {
+      const message = 'Сервер не ответил вовремя. Попробуйте ещё раз.'
+      if (init.method && init.method !== 'GET') toast(message)
+      throw new Error(message)
+    }
+    throw error
+  }
   let data: any = null
   try {
     data = await res.json()

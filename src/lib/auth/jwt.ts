@@ -21,12 +21,16 @@ export interface SessionPayload extends JWTPayload {
   email: string
   role: 'USER' | 'MODERATOR' | 'ADMIN' | 'SUPER_ADMIN'
   stage?: 'FULL' | 'EMAIL_PENDING'
+  sv?: number
 }
 
 export const COOKIE_NAME = 'cabinet_session'
 
-export async function signSession(payload: Omit<SessionPayload, 'iat' | 'exp'>): Promise<string> {
-  return new SignJWT(payload)
+export async function signSession(payload: Omit<SessionPayload, 'iat' | 'exp' | 'sv'>): Promise<string> {
+  if (typeof payload.uid !== 'string') throw new Error('Session user id is required')
+  const sessionVersion = await getUserSessionVersion(payload.uid)
+
+  return new SignJWT({ ...payload, sv: sessionVersion })
     .setProtectedHeader({ alg: ALG })
     .setIssuedAt()
     .setExpirationTime(ACCESS_TTL)
@@ -40,17 +44,34 @@ export async function verifySession(token: string): Promise<SessionPayload | nul
     const { payload } = await jwtVerify(token, getSecretKey(), {
       issuer: 'remnawave-cabinet',
     })
-    if (typeof payload.jti === 'string') {
-      const revoked = await prisma.revokedSession.findUnique({
-        where: { jti: payload.jti },
-        select: { id: true },
-      })
-      if (revoked) return null
-    }
+    if (typeof payload.uid !== 'string') return null
+
+    const [revoked, user] = await Promise.all([
+      typeof payload.jti === 'string'
+        ? prisma.revokedSession.findUnique({
+            where: { jti: payload.jti },
+            select: { id: true },
+          })
+        : null,
+      prisma.user.findUnique({
+        where: { id: payload.uid },
+        select: { sessionVersion: true },
+      }),
+    ])
+    if (revoked || !user || (payload.sv ?? 0) !== user.sessionVersion) return null
     return payload as SessionPayload
   } catch {
     return null
   }
+}
+
+async function getUserSessionVersion(userId: string) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { sessionVersion: true },
+  })
+  if (!user) throw new Error('Cannot create session for missing user')
+  return user.sessionVersion
 }
 
 export async function revokeSessionToken(token: string) {

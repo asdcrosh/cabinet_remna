@@ -36,7 +36,6 @@ export function PlanCard({
   name,
   description,
   price,
-  priceKopecks,
   monthlyPrice,
   savingsPercent,
   durationDays,
@@ -60,7 +59,7 @@ export function PlanCard({
     finalAmountKopecks: number;
   } | null>(null);
 
-  const isPromoPlan = isPromo || priceKopecks <= 0;
+  const isPromoPlan = isPromo;
   const trimmedPromo = promoInput.trim();
   const effectivePrice = appliedPromo
     ? formatPrice(appliedPromo.finalAmountKopecks)

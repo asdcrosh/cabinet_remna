@@ -4,6 +4,7 @@ import { BonusBoxError, grantManualBonusBoxAttempts } from '@/lib/bonus-box'
 import { requireSuperAdmin, withAuth } from '@/lib/auth/guard'
 import { notifyBonusGranted } from '@/lib/notifications'
 import { writeAuditLog } from '@/lib/audit-log'
+import { isFeatureEnabled } from '@/lib/feature-flags'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -13,6 +14,7 @@ const schema = z.object({
 })
 
 export const POST = withAuth(async (req: Request, { params }: { params: Promise<{ id: string }> }) => {
+  if (!isFeatureEnabled('bonusBox')) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   const session = await requireSuperAdmin()
   const { id } = await params
 

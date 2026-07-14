@@ -11,6 +11,18 @@ export async function GET() {
   const plans = await prisma.plan.findMany({
     where: { isActive: true, availability: 'ALL' },
     orderBy: { sortOrder: 'asc' },
+    select: {
+      id: true,
+      name: true,
+      description: true,
+      priceKopecks: true,
+      durationDays: true,
+      trafficLimitGb: true,
+      deviceLimit: true,
+      isPromo: true,
+      isFeatured: true,
+      sortOrder: true,
+    },
   })
   return NextResponse.json({ plans })
 }

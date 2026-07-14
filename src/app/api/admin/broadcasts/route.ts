@@ -14,6 +14,7 @@ import { remnashopQuery } from '@/lib/remnashop-db'
 import { logWarn } from '@/lib/logger'
 import type { BroadcastDeliveryPayload } from '@/lib/broadcast-delivery'
 import { writeAuditLog } from '@/lib/audit-log'
+import { isFeatureEnabled } from '@/lib/feature-flags'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -65,6 +66,7 @@ const broadcastCampaignSelect = {
 type BroadcastCampaignListItem = Prisma.BroadcastCampaignGetPayload<{ select: typeof broadcastCampaignSelect }>
 
 export const GET = withAuth(async (req: Request) => {
+  if (!isFeatureEnabled('broadcasts')) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   await requireAdmin()
   const url = new URL(req.url)
   const skip = Math.max(0, Number(url.searchParams.get('skip') || '0') || 0)
@@ -87,6 +89,7 @@ export const GET = withAuth(async (req: Request) => {
 })
 
 export const POST = withAuth(async (req: Request) => {
+  if (!isFeatureEnabled('broadcasts')) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   const session = await requireAdmin()
   const parsed = schema.safeParse(await req.json().catch(() => null))
   if (!parsed.success) {
@@ -234,7 +237,7 @@ export const POST = withAuth(async (req: Request) => {
   })
   await writeAuditLog({
     actorId: session.uid,
-    action: 'ADMIN_NOTIFICATIONS_UPDATED',
+    action: 'ADMIN_BROADCAST_CREATED',
     message: 'Администратор поставил рассылку в очередь',
     metadata: {
       entityType: 'broadcastCampaign',

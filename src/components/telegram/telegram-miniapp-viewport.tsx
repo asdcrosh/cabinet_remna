@@ -4,25 +4,37 @@ import { useEffect } from 'react'
 
 export function TelegramMiniAppViewport() {
   useEffect(() => {
-    const webApp = window.Telegram?.WebApp
-    if (!webApp) return
+    let cleanup: (() => void) | undefined
 
-    const syncViewport = () => {
-      if (webApp.viewportHeight) {
-        document.documentElement.style.setProperty('--tg-viewport-height', `${webApp.viewportHeight}px`)
+    const initialize = () => {
+      cleanup?.()
+      const webApp = window.Telegram?.WebApp
+      if (!webApp) return
+
+      const syncViewport = () => {
+        if (webApp.viewportHeight) {
+          document.documentElement.style.setProperty('--tg-viewport-height', `${webApp.viewportHeight}px`)
+        }
+        if (webApp.viewportStableHeight) {
+          document.documentElement.style.setProperty('--tg-viewport-stable-height', `${webApp.viewportStableHeight}px`)
+        }
       }
-      if (webApp.viewportStableHeight) {
-        document.documentElement.style.setProperty('--tg-viewport-stable-height', `${webApp.viewportStableHeight}px`)
+
+      webApp.ready?.()
+      webApp.expand?.()
+      syncViewport()
+      webApp.onEvent?.('viewportChanged', syncViewport)
+      cleanup = () => {
+        webApp.offEvent?.('viewportChanged', syncViewport)
       }
     }
 
-    webApp.ready?.()
-    webApp.expand?.()
-    syncViewport()
-    webApp.onEvent?.('viewportChanged', syncViewport)
+    initialize()
+    window.addEventListener('telegram-web-app-ready', initialize)
 
     return () => {
-      webApp.offEvent?.('viewportChanged', syncViewport)
+      window.removeEventListener('telegram-web-app-ready', initialize)
+      cleanup?.()
     }
   }, [])
 

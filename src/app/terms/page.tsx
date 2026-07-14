@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { getBrandName } from '@/lib/branding'
+import { getLegalDetails } from '@/lib/legal'
 
 export const metadata = { title: 'Условия использования' }
 export const dynamic = 'force-dynamic'
@@ -7,6 +8,7 @@ export const dynamic = 'force-dynamic'
 export default function TermsPage() {
   const updatedAt = '21 июня 2026'
   const brandName = getBrandName()
+  const legal = getLegalDetails()
 
   return (
     <main className="mx-auto max-w-4xl px-4 py-12 sm:px-6">
@@ -149,6 +151,16 @@ export default function TermsPage() {
             публикации обновлений означает согласие с новой редакцией.
           </p>
         </TermsSection>
+
+        <TermsSection title="11. Исполнитель и контакты">
+          <p>{legal.operatorName}, ИНН {legal.taxId}.</p>
+          <p>Адрес: {legal.address}. Поддержка: <a className="text-brand-600 hover:underline" href={`mailto:${legal.supportEmail}`}>{legal.supportEmail}</a>.</p>
+        </TermsSection>
+
+        <nav className="flex flex-wrap gap-4 border-t border-slate-200 pt-5 text-sm dark:border-white/10">
+          <Link href="/privacy" className="text-brand-600 hover:underline">Политика конфиденциальности</Link>
+          <Link href="/refunds" className="text-brand-600 hover:underline">Правила возврата</Link>
+        </nav>
       </div>
     </main>
   )

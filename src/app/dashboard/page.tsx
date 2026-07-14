@@ -28,9 +28,10 @@ import {
 } from 'lucide-react'
 import { logWarn } from '@/lib/logger'
 import { readRemnawaveBigInt } from '@/lib/remnawave-usage'
-import { getFreshPendingPaymentCutoff, reconcileStalePendingPaymentsForUser } from '@/lib/payment-sync'
+import { getFreshPendingPaymentCutoff } from '@/lib/payment-sync'
 import { getPlanAudienceContext, isPlanAvailableForUser } from '@/lib/plan-access'
 import { normalizeOfferTone, renderPersonalOfferTemplate } from '@/lib/personal-offers'
+import { getFeatureFlags } from '@/lib/feature-flags'
 
 export const dynamic = 'force-dynamic'
 
@@ -40,7 +41,7 @@ const OFFER_RETURN_PROMO_DAYS = 45
 export default async function DashboardHome() {
   const session = await getCurrentUser()
   if (!session) redirect('/login')
-  await reconcileStalePendingPaymentsForUser(session.uid)
+  const features = getFeatureFlags()
   const freshPendingCutoff = getFreshPendingPaymentCutoff()
   const user = await prisma.user.findUnique({
     where: { id: session.uid },
@@ -111,6 +112,7 @@ export default async function DashboardHome() {
   const sub = remnawaveCard?.response.user
   const welcomeBonusOptions = buildWelcomeBonusOptions(welcomeBonusSetting, {
     trialUsed: user.trialPlanRedemptions.length > 0,
+    bonusBoxEnabled: features.bonusBox,
   })
   const welcomeBonusEligible = isWelcomeBonusEligible({
     activeSubscription: activeSubRow,
@@ -145,13 +147,14 @@ export default async function DashboardHome() {
     promoCode: promoOfferCode,
     offerSettings,
     welcomeBonusAvailable: welcomeBonusEligible && welcomeBonusOptions.length > 0,
+    referralsEnabled: features.referrals,
     user: { name: user.name, email: user.email },
   }), onboardingState)
 
   if (!user.remnawaveUsername) {
     return (
       <div className="page-stack">
-        <DashboardOnboardingCard state={onboardingState} mode="full" />
+        <DashboardOnboardingCard state={onboardingState} mode="full" supportEnabled={features.support} />
         {personalOffer && <PersonalOffer offer={personalOffer} welcomeBonusOptions={welcomeBonusOptions} />}
         <SmartInsights
           emailVerified={onboardingState.emailVerified}
@@ -223,7 +226,7 @@ export default async function DashboardHome() {
             <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-sm">
               <Link href="/dashboard/devices" className="font-medium text-slate-600 hover:text-cyan-700 dark:text-slate-300 dark:hover:text-cyan-200">Устройства</Link>
               <Link href="/dashboard/billing" className="font-medium text-slate-600 hover:text-cyan-700 dark:text-slate-300 dark:hover:text-cyan-200">Платежи</Link>
-              <Link href="/dashboard/support" className="font-medium text-slate-600 hover:text-cyan-700 dark:text-slate-300 dark:hover:text-cyan-200">Поддержка</Link>
+              {features.support && <Link href="/dashboard/support" className="font-medium text-slate-600 hover:text-cyan-700 dark:text-slate-300 dark:hover:text-cyan-200">Поддержка</Link>}
             </div>
           </div>
 
@@ -252,7 +255,7 @@ export default async function DashboardHome() {
         suppress={primaryHomeNudge}
       />
       {personalOffer && <PersonalOffer offer={personalOffer} welcomeBonusOptions={welcomeBonusOptions} />}
-      <DashboardOnboardingCard state={onboardingState} />
+      <DashboardOnboardingCard state={onboardingState} supportEnabled={features.support} />
 
       <TrafficChart
         userId={user.id}
@@ -356,6 +359,7 @@ function buildPersonalOffer({
   promoCode,
   offerSettings,
   welcomeBonusAvailable,
+  referralsEnabled,
   user,
 }: {
   activeSubscription: DashboardSubscription | null
@@ -365,6 +369,7 @@ function buildPersonalOffer({
   promoCode: DashboardPromoCode | null
   offerSettings: DashboardOfferSetting[]
   welcomeBonusAvailable: boolean
+  referralsEnabled: boolean
   user: { name: string | null; email: string }
 }): PersonalOfferView | null {
   const now = Date.now()
@@ -494,6 +499,8 @@ function buildPersonalOffer({
     })
   }
 
+  if (!referralsEnabled) return null
+
   return renderConfiguredOffer({
     scenario: 'REFERRAL',
     settings: offerSettings,
@@ -616,7 +623,7 @@ type WelcomeBonusSettingForDashboard = Prisma.WelcomeBonusSettingGetPayload<{
 
 function buildWelcomeBonusOptions(
   setting: WelcomeBonusSettingForDashboard | null,
-  state: { trialUsed: boolean }
+  state: { trialUsed: boolean; bonusBoxEnabled: boolean }
 ): WelcomeBonusChoice[] {
   if (!setting?.enabled) return []
   const hasExplicitChoices = setting.trialEnabled || setting.promoCodeEnabled || setting.bonusAttemptsEnabled
@@ -639,7 +646,7 @@ function buildWelcomeBonusOptions(
       description: `${setting.promoCode.code} на ${setting.promoCode.discountPercent}%`,
     })
   }
-  if (bonusEnabled && setting.bonusAttempts > 0) {
+  if (state.bonusBoxEnabled && bonusEnabled && setting.bonusAttempts > 0) {
     options.push({
       type: 'BONUS_BOX_ATTEMPTS',
       title: 'Рулетка',

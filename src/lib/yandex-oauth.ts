@@ -1,6 +1,8 @@
 import { randomBytes } from 'node:crypto'
 import { getAppUrl } from './app-url'
 
+const OAUTH_TIMEOUT_MS = 10_000
+
 export const YANDEX_OAUTH_STATE_COOKIE = 'yandex_oauth_state'
 export const YANDEX_OAUTH_NEXT_COOKIE = 'yandex_oauth_next'
 export const YANDEX_OAUTH_REF_COOKIE = 'yandex_oauth_ref'
@@ -69,6 +71,7 @@ export async function exchangeYandexCode(code: string) {
       client_id: getYandexClientId(),
       client_secret: getYandexClientSecret(),
     }),
+    signal: AbortSignal.timeout(OAUTH_TIMEOUT_MS),
   })
 
   const data = (await response.json().catch(() => null)) as YandexTokenResponse | null
@@ -83,6 +86,7 @@ export async function exchangeYandexCode(code: string) {
 export async function fetchYandexProfile(accessToken: string): Promise<YandexProfile> {
   const response = await fetch('https://login.yandex.ru/info?format=json', {
     headers: { Authorization: `OAuth ${accessToken}` },
+    signal: AbortSignal.timeout(OAUTH_TIMEOUT_MS),
   })
 
   const data = (await response.json().catch(() => null)) as YandexInfoResponse | null

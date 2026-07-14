@@ -4,6 +4,7 @@ import { requireAdmin, withAuth } from '@/lib/auth/guard'
 import { prisma } from '@/lib/prisma'
 import { getAppUrl } from '@/lib/app-url'
 import { writeAuditLog } from '@/lib/audit-log'
+import { isFeatureEnabled } from '@/lib/feature-flags'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -24,6 +25,7 @@ const schema = z.object({
 })
 
 export const GET = withAuth(async () => {
+  if (!isFeatureEnabled('broadcasts')) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   await requireAdmin()
   const templates = await prisma.broadcastTemplate.findMany({
     orderBy: { createdAt: 'desc' },
@@ -39,6 +41,7 @@ export const GET = withAuth(async () => {
 })
 
 export const POST = withAuth(async (req: Request) => {
+  if (!isFeatureEnabled('broadcasts')) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   const session = await requireAdmin()
   const parsed = schema.safeParse(await req.json().catch(() => null))
   if (!parsed.success) {
@@ -63,7 +66,7 @@ export const POST = withAuth(async (req: Request) => {
   })
   await writeAuditLog({
     actorId: session.uid,
-    action: 'ADMIN_NOTIFICATIONS_UPDATED',
+    action: 'ADMIN_BROADCAST_TEMPLATE_CREATED',
     message: 'Администратор создал шаблон рассылки',
     metadata: {
       entityType: 'broadcastTemplate',

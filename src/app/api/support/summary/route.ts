@@ -1,11 +1,13 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAuth, withAuth } from '@/lib/auth/guard'
+import { isFeatureEnabled } from '@/lib/feature-flags'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 export const GET = withAuth(async () => {
+  if (!isFeatureEnabled('support')) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   const session = await requireAuth()
   const user = await prisma.user.findUnique({
     where: { id: session.uid },

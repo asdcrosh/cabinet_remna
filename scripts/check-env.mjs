@@ -16,6 +16,10 @@ const requiredProduction = [
   "YOOKASSA_SECRET_KEY",
   "YOOKASSA_WEBHOOK_URL",
   "YOOKASSA_WEBHOOK_ALLOWED_IPS",
+  "LEGAL_OPERATOR_NAME",
+  "LEGAL_OPERATOR_TAX_ID",
+  "LEGAL_OPERATOR_ADDRESS",
+  "LEGAL_SUPPORT_EMAIL",
 ];
 
 const optionalPairs = [
@@ -27,6 +31,9 @@ const optionalPairs = [
 
 const optionalBooleans = [
   "TRUSTED_PROXY_HEADERS",
+  "FEATURE_REFERRALS",
+  "FEATURE_SUPPORT",
+  "FEATURE_BROADCASTS",
   "BROADCAST_UPLOAD_ALLOW_UNSIGNED_LEGACY",
   "BONUS_BOX_ENABLED",
   "BONUS_BOX_WEEKLY_ENABLED",
@@ -194,6 +201,10 @@ if (isProduction && !value("BROADCAST_UPLOAD_SIGNING_SECRET")) {
 
 if (isProduction && value("BROADCAST_UPLOAD_ALLOW_UNSIGNED_LEGACY") !== "false") {
   errors.push("BROADCAST_UPLOAD_ALLOW_UNSIGNED_LEGACY must be false in production");
+}
+
+if (isProduction && value("TRUSTED_PROXY_HEADERS").toLowerCase() !== "true") {
+  errors.push("TRUSTED_PROXY_HEADERS must be true in production");
 }
 
 if (errors.length > 0) {

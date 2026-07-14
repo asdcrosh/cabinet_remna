@@ -2,10 +2,13 @@ import { requireAdminPage } from '@/lib/auth/admin-page'
 import { BroadcastAdminDynamic } from '@/components/admin/broadcast-admin-dynamic'
 import { AdminPageShell } from '@/components/admin/admin-page-shell'
 import { prisma } from '@/lib/prisma'
+import { notFound } from 'next/navigation'
+import { isFeatureEnabled } from '@/lib/feature-flags'
 
 export const metadata = { title: 'Рассылки — Админка' }
 
 export default async function BroadcastsPage() {
+  if (!isFeatureEnabled('broadcasts')) notFound()
   await requireAdminPage()
   const [historyTotal, history, templates] = await prisma.$transaction([
     prisma.broadcastCampaign.count(),

@@ -2,11 +2,13 @@ import { NextResponse } from 'next/server'
 import { requireAdmin, withAuth } from '@/lib/auth/guard'
 import { prisma } from '@/lib/prisma'
 import { writeAuditLog } from '@/lib/audit-log'
+import { isFeatureEnabled } from '@/lib/feature-flags'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 export const DELETE = withAuth(async (req: Request, { params }: { params: Promise<{ id: string }> }) => {
+  if (!isFeatureEnabled('broadcasts')) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   const session = await requireAdmin()
   const { id } = await params
   const template = await prisma.broadcastTemplate.findUnique({
@@ -17,7 +19,7 @@ export const DELETE = withAuth(async (req: Request, { params }: { params: Promis
   if (template) {
     await writeAuditLog({
       actorId: session.uid,
-      action: 'ADMIN_NOTIFICATIONS_UPDATED',
+      action: 'ADMIN_BROADCAST_TEMPLATE_DELETED',
       message: 'Администратор удалил шаблон рассылки',
       metadata: {
         entityType: 'broadcastTemplate',

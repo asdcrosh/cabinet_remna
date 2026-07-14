@@ -208,7 +208,7 @@ export function MobileDashboardNav({
 
 export function MobileBottomNav({ badges = {}, features }: { badges?: NavBadges; features: FeatureFlags }) {
   const pathname = usePathname()
-  const liveBadges = useLiveBadges(badges)
+  const liveBadges = useLiveBadges(badges, features.support)
   const items = filterUserNav(bottomNav, features)
   const moreItems = filterUserNav(bottomMoreNav, features)
   const [moreOpen, setMoreOpen] = useState(false)
@@ -361,7 +361,7 @@ function NavList({
   features: FeatureFlags
 }) {
   const pathname = usePathname()
-  const liveBadges = useLiveBadges(badges)
+  const liveBadges = useLiveBadges(badges, features.support)
 
   return (
     <nav className={className}>
@@ -406,10 +406,11 @@ function roleLabel(role: UserRole) {
   return 'Аккаунт пользователя'
 }
 
-function useLiveBadges(initialBadges: NavBadges) {
+function useLiveBadges(initialBadges: NavBadges, supportEnabled: boolean) {
   const [badges, setBadges] = useState(initialBadges)
 
   useEffect(() => {
+    if (!supportEnabled) return
     let active = true
 
     async function refreshBadges() {
@@ -441,7 +442,7 @@ function useLiveBadges(initialBadges: NavBadges) {
       window.removeEventListener('focus', refreshOnFocus)
       document.removeEventListener('visibilitychange', refreshOnVisible)
     }
-  }, [])
+  }, [supportEnabled])
 
   return badges
 }

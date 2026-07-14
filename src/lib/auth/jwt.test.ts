@@ -5,6 +5,7 @@ process.env.JWT_SECRET = 'test-jwt-secret-with-at-least-32-chars'
 const mocks = vi.hoisted(() => ({
   revokedFindUnique: vi.fn(),
   revokedUpsert: vi.fn(),
+  userFindUnique: vi.fn(),
 }))
 
 vi.mock('../prisma', () => ({
@@ -12,6 +13,9 @@ vi.mock('../prisma', () => ({
     revokedSession: {
       findUnique: mocks.revokedFindUnique,
       upsert: mocks.revokedUpsert,
+    },
+    user: {
+      findUnique: mocks.userFindUnique,
     },
   },
 }))
@@ -27,6 +31,7 @@ describe('auth jwt', () => {
     vi.clearAllMocks()
     mocks.revokedFindUnique.mockResolvedValue(null)
     mocks.revokedUpsert.mockResolvedValue({})
+    mocks.userFindUnique.mockResolvedValue({ sessionVersion: 0 })
   })
 
   it('signs and verifies a session with a revocable jti', async () => {
@@ -53,6 +58,17 @@ describe('auth jwt', () => {
       email: 'user@example.com',
       role: 'USER',
     })
+
+    await expect(authJwt.verifySession(token)).resolves.toBeNull()
+  })
+
+  it('rejects sessions issued before a password change', async () => {
+    const token = await authJwt.signSession({
+      uid: 'user-1',
+      email: 'user@example.com',
+      role: 'USER',
+    })
+    mocks.userFindUnique.mockResolvedValue({ sessionVersion: 1 })
 
     await expect(authJwt.verifySession(token)).resolves.toBeNull()
   })

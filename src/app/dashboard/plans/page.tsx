@@ -98,7 +98,7 @@ export default async function PlansPage({
   const referenceDailyPrice = referencePlan
     ? referencePlan.priceKopecks / Math.max(1, referencePlan.durationDays)
     : 0
-  const planViews = visiblePlans.map((plan, index) => ({
+  const planViews = visiblePlans.map((plan) => ({
     id: plan.id,
     name: plan.name,
     description: plan.description,
@@ -113,7 +113,7 @@ export default async function PlansPage({
     trafficLimitGb: plan.trafficLimitGb,
     deviceLimit: plan.deviceLimit,
     isPromo: plan.isPromo,
-    popular: index === 1,
+    popular: plan.isFeatured,
     current: currentSubscription?.planId === plan.id,
     initialPromoCode,
     availablePromoCodes: availablePromoCodesByPlan.get(plan.id) ?? [],

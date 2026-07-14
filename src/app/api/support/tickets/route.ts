@@ -9,11 +9,13 @@ import {
   supportCategorySubject,
 } from '@/lib/support'
 import { createAdminNotification } from '@/lib/admin-notifications'
+import { isFeatureEnabled } from '@/lib/feature-flags'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 export const GET = withAuth(async () => {
+  if (!isFeatureEnabled('support')) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   const session = await requireAuth()
 
   const tickets = await prisma.supportTicket.findMany({
@@ -37,6 +39,7 @@ export const GET = withAuth(async () => {
 })
 
 export const POST = withAuth(async (req: Request) => {
+  if (!isFeatureEnabled('support')) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   const session = await requireAuth()
   const limited = await rateLimit(req, `support:create:${session.uid}`, 5, 10 * 60 * 1000)
   if (!limited.ok) {

@@ -36,6 +36,7 @@ export interface PlanAdminRow {
   allowedEmails: string[]
   allowedTelegramIds: string[]
   isPromo: boolean
+  isFeatured: boolean
   isActive: boolean
   sortOrder: number
   paymentsCount: number
@@ -55,6 +56,7 @@ interface PlanFormState {
   allowedUsers: string
   sortOrder: string
   isPromo: boolean
+  isFeatured: boolean
   isActive: boolean
 }
 
@@ -77,6 +79,7 @@ const emptyForm: PlanFormState = {
   allowedUsers: '',
   sortOrder: '10',
   isPromo: false,
+  isFeatured: false,
   isActive: true,
 }
 
@@ -278,6 +281,7 @@ export function PlansAdmin({ plans }: { plans: PlanAdminRow[] }) {
                     <h3 className="truncate font-semibold">{plan.name}</h3>
                     <span className={plan.isActive ? 'badge-active' : 'badge-disabled'}>{plan.isActive ? 'Опубликован' : 'Скрыт'}</span>
                     {plan.isPromo && <span className="badge-limited">Пробный</span>}
+                    {plan.isFeatured && <span className="badge-active">Популярный</span>}
                   </div>
                   <div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
                     <span className="text-xl font-semibold">{formatPrice(plan.priceKopecks)}</span>
@@ -401,6 +405,7 @@ function PlanEditor({
         </Field>
         <Toggle checked={form.unlimitedTraffic} onChange={(value) => set('unlimitedTraffic', value)} label="Безлимитный трафик" />
         <Toggle checked={form.isPromo} onChange={(value) => set('isPromo', value)} label="Пробный тариф" />
+        <Toggle checked={form.isFeatured} onChange={(value) => set('isFeatured', value)} label="Популярный тариф" />
         <Toggle checked={form.isActive} onChange={(value) => set('isActive', value)} label="Опубликован" />
         <Field label="Кому доступен тариф" className="md:col-span-2">
           <select value={form.availability} onChange={(event) => set('availability', event.target.value as PlanAvailabilityValue)} className="input">
@@ -515,6 +520,7 @@ function formFromPlan(plan: PlanAdminRow): PlanFormState {
     allowedUsers: [...plan.allowedEmails, ...plan.allowedTelegramIds].join('\n'),
     sortOrder: String(plan.sortOrder),
     isPromo: plan.isPromo,
+    isFeatured: plan.isFeatured,
     isActive: plan.isActive,
   }
 }
@@ -533,6 +539,7 @@ function toPayload(form: PlanFormState) {
     allowedTelegramIds: parseAllowedUsers(form.allowedUsers).telegramIds,
     sortOrder: Number(form.sortOrder),
     isPromo: form.isPromo,
+    isFeatured: form.isFeatured,
     isActive: form.isActive,
   }
 }

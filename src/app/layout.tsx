@@ -4,6 +4,7 @@ import { Toaster } from '@/components/ui/toaster'
 import { getBrandName } from '@/lib/branding'
 import Script from 'next/script'
 import { TelegramMiniAppViewport } from '@/components/telegram/telegram-miniapp-viewport'
+import { TelegramMiniAppScript } from '@/components/telegram/telegram-miniapp-script'
 
 export const metadata: Metadata = {
   title: {
@@ -36,7 +37,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             } catch {}
           })()`}
         </Script>
-        <Script src="https://telegram.org/js/telegram-web-app.js?62" strategy="beforeInteractive" />
+        <TelegramMiniAppScript />
         <TelegramMiniAppViewport />
         {children}
         <Toaster />

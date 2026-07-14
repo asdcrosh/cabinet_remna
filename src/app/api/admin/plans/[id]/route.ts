@@ -27,16 +27,45 @@ export const PATCH = withAuth(async (req: Request, { params }: { params: Promise
     )
   }
 
-  const data = normalizePlanInput(parsed.data)
+  const currentPlan = await prisma.plan.findUnique({ where: { id } })
+  if (!currentPlan) {
+    return NextResponse.json({ error: 'Тариф не найден' }, { status: 404 })
+  }
+
+  const invariant = {
+    priceKopecks: parsed.data.priceKopecks ?? currentPlan.priceKopecks,
+    isPromo: parsed.data.isPromo ?? currentPlan.isPromo,
+  }
+  if (invariant.priceKopecks <= 0 && !invariant.isPromo) {
+    return NextResponse.json(
+      { error: 'Бесплатный тариф должен быть промо-тарифом' },
+      { status: 400 }
+    )
+  }
+
+  const normalized = normalizePlanInput(parsed.data)
+  const data = {
+    ...normalized,
+    ...(normalized.isFeatured === undefined
+      ? {}
+      : { featuredSlot: normalized.isFeatured ? 1 : null }),
+  }
 
   try {
-    const plan = await prisma.plan.update({
-      where: { id },
-      data,
+    const plan = await prisma.$transaction(async (tx) => {
+      if (data.isFeatured) {
+        await tx.plan.updateMany({
+          where: { isFeatured: true, id: { not: id } },
+          data: { isFeatured: false, featuredSlot: null },
+        })
+      }
+      return tx.plan.update({
+        where: { id },
+        data,
+      })
     })
     await writeAuditLog({
-      action: 'ADMIN_PROFILE_UPDATED',
-      targetId: plan.id,
+      action: 'ADMIN_PLAN_UPDATED',
       message: 'Администратор обновил тариф',
       metadata: {
         entityType: 'plan',
@@ -49,6 +78,9 @@ export const PATCH = withAuth(async (req: Request, { params }: { params: Promise
 
     return NextResponse.json({ plan })
   } catch (e) {
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+      return NextResponse.json({ error: 'Популярный тариф уже изменён другим администратором' }, { status: 409 })
+    }
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2025') {
       return NextResponse.json({ error: 'Тариф не найден' }, { status: 404 })
     }
@@ -88,8 +120,7 @@ export const DELETE = withAuth(async (req: Request, { params }: { params: Promis
   try {
     await prisma.plan.delete({ where: { id } })
     await writeAuditLog({
-      action: 'ADMIN_PROFILE_UPDATED',
-      targetId: plan.id,
+      action: 'ADMIN_PLAN_DELETED',
       message: 'Администратор удалил тариф',
       metadata: {
         entityType: 'plan',

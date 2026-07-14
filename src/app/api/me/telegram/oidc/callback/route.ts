@@ -16,6 +16,7 @@ import {
 } from '@/lib/telegram-account-merge'
 
 export const runtime = 'nodejs'
+const OAUTH_TIMEOUT_MS = 10_000
 
 export const GET = withAuth(async (req: Request) => {
   const session = await requireAuth()
@@ -128,6 +129,7 @@ async function exchangeTelegramCode(code: string, codeVerifier: string) {
       'Content-Type': 'application/x-www-form-urlencoded',
     },
     body,
+    signal: AbortSignal.timeout(OAUTH_TIMEOUT_MS),
   })
 
   const data = (await response.json().catch(() => null)) as { id_token?: string; error?: string } | null

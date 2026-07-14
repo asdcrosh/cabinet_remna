@@ -33,16 +33,18 @@ model Plan {
   allowedEmails        String[]         @default([]) // явный доступ для availability=ALLOWED
   allowedTelegramIds   String[]         @default([]) // Telegram ID строками, чтобы безопасно отдавать JSON
   isPromo              Boolean          @default(false) // бесплатный одноразовый ознакомительный тариф
+  isFeatured           Boolean          @default(false) // тариф, выделенный в витрине
+  featuredSlot         Int?             @unique // 1 только у одного выделенного тарифа
   isActive             Boolean          @default(true)
   sortOrder            Int              @default(0)
   createdAt            DateTime         @default(now())
   updatedAt            DateTime         @updatedAt
 
-  payments         Payment[]
-  subscriptions    Subscription[]
-  promoCodePlans   PromoCodePlan[]
-  trialRedemptions TrialPlanRedemption[]
-  giftCertificates GiftCertificate[]
+  payments             Payment[]
+  subscriptions        Subscription[]
+  promoCodePlans       PromoCodePlan[]
+  trialRedemptions     TrialPlanRedemption[]
+  giftCertificates     GiftCertificate[]
   welcomeBonusSettings WelcomeBonusSetting[] @relation("WelcomeTrialPlan")
 
   @@unique([remnashopPlanId, durationDays])
@@ -66,11 +68,12 @@ enum PlanAvailability {
 // чтобы не дёргать Remnawave при каждом логине.
 // ----------------------------------------------------------------------
 model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
-  passwordHash String
-  name         String?
-  role         UserRole @default(USER)
+  id             String   @id @default(cuid())
+  email          String   @unique
+  passwordHash   String
+  sessionVersion Int      @default(0)
+  name           String?
+  role           UserRole @default(USER)
 
   // Реферальная система: код пользователя и кто его пригласил.
   referralCode             String?          @unique
@@ -259,17 +262,17 @@ enum WelcomeBonusType {
 }
 
 model AdminNotification {
-  id          String   @id @default(cuid())
+  id          String                    @id @default(cuid())
   type        String
   severity    AdminNotificationSeverity @default(INFO)
-  dedupeKey   String?  @unique
+  dedupeKey   String?                   @unique
   title       String
   body        String
   entityType  String?
   entityId    String?
   actionHref  String?
   actionLabel String?
-  createdAt   DateTime @default(now())
+  createdAt   DateTime                  @default(now())
 
   reads AdminNotificationRead[]
 
@@ -315,31 +318,31 @@ enum NotificationChannel {
 }
 
 model BroadcastCampaign {
-  id                String   @id @default(cuid())
-  title             String
-  body              String
-  segment           BroadcastSegment
-  inactiveDays      Int?
-  channels          String[] @default([])
-  actionHref        String?
-  actionLabel       String?
-  actionOpenInTelegram Boolean @default(false)
-  imageUrl          String?
-  recipients        Int      @default(0)
-  inAppCount        Int      @default(0)
-  telegramSent      Int      @default(0)
-  telegramSkipped   Int      @default(0)
-  telegramDuplicate Int      @default(0)
-  telegramFailed    Int      @default(0)
-  emailSent         Int      @default(0)
-  emailSkipped      Int      @default(0)
-  emailDuplicate    Int      @default(0)
-  emailFailed       Int      @default(0)
-  limited           Boolean  @default(false)
-  createdById       String?
-  createdAt         DateTime @default(now())
+  id                   String           @id @default(cuid())
+  title                String
+  body                 String
+  segment              BroadcastSegment
+  inactiveDays         Int?
+  channels             String[]         @default([])
+  actionHref           String?
+  actionLabel          String?
+  actionOpenInTelegram Boolean          @default(false)
+  imageUrl             String?
+  recipients           Int              @default(0)
+  inAppCount           Int              @default(0)
+  telegramSent         Int              @default(0)
+  telegramSkipped      Int              @default(0)
+  telegramDuplicate    Int              @default(0)
+  telegramFailed       Int              @default(0)
+  emailSent            Int              @default(0)
+  emailSkipped         Int              @default(0)
+  emailDuplicate       Int              @default(0)
+  emailFailed          Int              @default(0)
+  limited              Boolean          @default(false)
+  createdById          String?
+  createdAt            DateTime         @default(now())
 
-  createdBy User? @relation("BroadcastCampaignAuthor", fields: [createdById], references: [id], onDelete: SetNull)
+  createdBy  User?               @relation("BroadcastCampaignAuthor", fields: [createdById], references: [id], onDelete: SetNull)
   deliveries BroadcastDelivery[]
 
   @@index([createdAt])
@@ -385,20 +388,20 @@ enum BroadcastDeliveryStatus {
 }
 
 model BroadcastTemplate {
-  id          String   @id @default(cuid())
-  title       String
-  description String?
-  segment     String
-  inactiveDays Int?
-  channels    String[] @default([])
-  actionHref  String?
-  actionLabel String?
-  actionOpenInTelegram Boolean @default(false)
-  imageUrl    String?
-  body        String
-  createdById String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id                   String   @id @default(cuid())
+  title                String
+  description          String?
+  segment              String
+  inactiveDays         Int?
+  channels             String[] @default([])
+  actionHref           String?
+  actionLabel          String?
+  actionOpenInTelegram Boolean  @default(false)
+  imageUrl             String?
+  body                 String
+  createdById          String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
 
   createdBy User? @relation("BroadcastTemplateAuthor", fields: [createdById], references: [id], onDelete: SetNull)
 
@@ -520,7 +523,7 @@ model Payment {
   promoCodeSnapshot     Json?
 
   // Данные ЮKassa
-  yookassaId      String? @unique
+  yookassaId      String?                @unique
   yookassaStatus  YookassaPaymentStatus?
   confirmationUrl String? // URL для редиректа пользователя
 
@@ -569,19 +572,19 @@ enum YookassaPaymentStatus {
 }
 
 model SyncEvent {
-  id          String          @id @default(cuid())
-  direction   SyncDirection
-  entityType  String
-  entityId    String
-  operation   String
-  status      SyncEventStatus @default(PENDING)
-  attempts    Int             @default(0)
-  lastError   String?
-  nextRetryAt DateTime?
+  id           String          @id @default(cuid())
+  direction    SyncDirection
+  entityType   String
+  entityId     String
+  operation    String
+  status       SyncEventStatus @default(PENDING)
+  attempts     Int             @default(0)
+  lastError    String?
+  nextRetryAt  DateTime?
   lastSyncedAt DateTime?
-  metadata    Json?
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
+  metadata     Json?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
 
   @@unique([direction, entityType, entityId, operation])
   @@index([status, nextRetryAt, updatedAt])
@@ -687,12 +690,12 @@ model PromoCode {
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
 
-  payments         Payment[]
-  redemptions      PromoCodeRedemption[]
-  plans            PromoCodePlan[]
-  bonusBoxOpenings BonusBoxOpening[]
-  personalOfferSettings PersonalOfferSetting[]
-  welcomeBonusSettings WelcomeBonusSetting[]
+  payments                Payment[]
+  redemptions             PromoCodeRedemption[]
+  plans                   PromoCodePlan[]
+  bonusBoxOpenings        BonusBoxOpening[]
+  personalOfferSettings   PersonalOfferSetting[]
+  welcomeBonusSettings    WelcomeBonusSetting[]
   welcomeBonusRedemptions WelcomeBonusRedemption[]
 
   @@index([isActive, startsAt, expiresAt])
@@ -927,13 +930,13 @@ model BonusBoxPrize {
 }
 
 model BonusBoxSetting {
-  id                       String   @id @default("default")
-  pityEnabled              Boolean  @default(true)
-  pityOpenings             Int      @default(10)
-  showBestRecentOpening    Boolean  @default(true)
-  activePromoRewardsLimit  Int      @default(3)
-  createdAt                DateTime @default(now())
-  updatedAt                DateTime @updatedAt
+  id                      String   @id @default("default")
+  pityEnabled             Boolean  @default(true)
+  pityOpenings            Int      @default(10)
+  showBestRecentOpening   Boolean  @default(true)
+  activePromoRewardsLimit Int      @default(3)
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
 }
 
 model BonusBoxAttempt {
@@ -1023,6 +1026,9 @@ model AuditLog {
 }
 
 enum AuditAction {
+  ADMIN_PLAN_CREATED
+  ADMIN_PLAN_UPDATED
+  ADMIN_PLAN_DELETED
   ADMIN_PLAN_ASSIGNED
   ADMIN_ROLE_CHANGED
   ADMIN_PROFILE_UPDATED
@@ -1035,7 +1041,13 @@ enum AuditAction {
   PAYMENT_SYNCED
   ADMIN_NOTIFICATIONS_UPDATED
   ADMIN_BONUS_ATTEMPTS_GRANTED
+  ADMIN_BONUS_PRIZE_CREATED
+  ADMIN_BONUS_PRIZE_UPDATED
+  ADMIN_BONUS_SETTINGS_UPDATED
   ADMIN_SUPPORT_UPDATED
+  ADMIN_BROADCAST_CREATED
+  ADMIN_BROADCAST_TEMPLATE_CREATED
+  ADMIN_BROADCAST_TEMPLATE_DELETED
   REMNASHOP_SYNC_RUN
   SYSTEM_BACKUP_CREATED
 }

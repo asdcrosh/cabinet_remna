@@ -29,11 +29,13 @@ export default async function DashboardLayout({ children }: { children: React.Re
     : freshUser.email
   const brandName = getBrandName()
   const [supportUnreadCount, adminSupportUnreadCount] = await Promise.all([
-    prisma.supportTicket.aggregate({
-      where: { userId: session.uid },
-      _sum: { userUnreadCount: true },
-    }),
-    ['MODERATOR', 'ADMIN', 'SUPER_ADMIN'].includes(role)
+    features.support
+      ? prisma.supportTicket.aggregate({
+          where: { userId: session.uid },
+          _sum: { userUnreadCount: true },
+        })
+      : Promise.resolve({ _sum: { userUnreadCount: 0 } }),
+    features.support && ['MODERATOR', 'ADMIN', 'SUPER_ADMIN'].includes(role)
       ? prisma.supportTicket.aggregate({
           where: { status: 'WAITING_ADMIN' },
           _sum: { adminUnreadCount: true },

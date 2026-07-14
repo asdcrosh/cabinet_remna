@@ -1,4 +1,4 @@
-import { redirect } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import {
   Gift,
   TrendingUp,
@@ -12,6 +12,7 @@ import { getReferralBonusDays } from '@/lib/referral-rewards'
 import { ReferralLinkCard } from '@/components/dashboard/referral-card'
 import { PageHeader } from '@/components/dashboard/page-header'
 import { CountUp } from '@/components/dashboard/count-up'
+import { isFeatureEnabled } from '@/lib/feature-flags'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Рефералы' }
@@ -19,6 +20,7 @@ export const metadata = { title: 'Рефералы' }
 type RewardStatus = 'PENDING' | 'PROCESSING' | 'APPLIED'
 
 export default async function ReferralsPage() {
+  if (!isFeatureEnabled('referrals')) notFound()
   const session = await getCurrentUser()
   if (!session) redirect('/login')
 

@@ -35,79 +35,14 @@ import {
   supportStatusLabelForRole,
   type SupportCategoryValue,
 } from '@/lib/support'
+import { emojiCategories, emojiKeywords, type EmojiCategory } from './support-emojis'
 
 type TicketStatus = 'OPEN' | 'WAITING_ADMIN' | 'WAITING_USER' | 'CLOSED'
 type SenderRole = 'USER' | 'ADMIN'
 type TicketFolder = 'active' | 'need-answer' | 'answered' | 'closed'
-type EmojiCategory = 'recent' | 'people' | 'signals' | 'objects'
 
 const SUPPORT_LIST_REFRESH_MS = 20_000
 const SUPPORT_ACTIVE_TICKET_REFRESH_MS = 5_000
-
-const emojiCategories: Array<{ value: EmojiCategory; label: string; items: string[] }> = [
-  { value: 'recent', label: 'Недавние', items: ['👍', '🙏', '🔥', '🎁', '✅', '⚡', '🚀', '💬', '👀', '👇'] },
-  { value: 'people', label: 'Смайлы', items: ['😀', '😁', '😄', '🙂', '😊', '😉', '😎', '🤔', '😕', '😔', '😅', '😂', '😍', '🤝', '🙌', '👌', '👋', '💪'] },
-  { value: 'signals', label: 'Статусы', items: ['✅', '❌', '⚠️', '🔔', '⏳', '🕒', '📌', '📍', '🔒', '🔓', '🔄', '🧾', '💳', '🛠️', '📡', '🧩'] },
-  { value: 'objects', label: 'Разное', items: ['🎁', '🎉', '⭐', '🔥', '⚡', '🚀', '🌐', '🔗', '📦', '💎', '🏆', '🎯', '🧠', '📱', '💻', '🖥️'] },
-]
-
-const emojiKeywords: Record<string, string> = {
-  '👍': 'ок лайк хорошо согласен',
-  '🙏': 'спасибо пожалуйста',
-  '🔥': 'огонь срочно акция горячо',
-  '🎁': 'подарок бонус промо',
-  '✅': 'готово успешно да',
-  '⚡': 'быстро молния срочно',
-  '🚀': 'старт запуск быстро',
-  '💬': 'чат сообщение поддержка',
-  '👀': 'смотрю проверка',
-  '👇': 'ниже сюда',
-  '😀': 'улыбка смайл',
-  '😁': 'улыбка радость',
-  '😄': 'радость',
-  '🙂': 'улыбка нормально',
-  '😊': 'приятно спасибо',
-  '😉': 'ок подмигивание',
-  '😎': 'круто',
-  '🤔': 'думаю вопрос',
-  '😕': 'непонятно проблема',
-  '😔': 'грусть',
-  '😅': 'неловко',
-  '😂': 'смех',
-  '😍': 'супер',
-  '🤝': 'договорились помощь',
-  '🙌': 'ура готово',
-  '👌': 'ок',
-  '👋': 'привет',
-  '💪': 'сила',
-  '❌': 'нет ошибка отмена',
-  '⚠️': 'внимание ошибка проблема',
-  '🔔': 'уведомление колокол',
-  '⏳': 'ожидание время',
-  '🕒': 'время',
-  '📌': 'важно закрепить',
-  '📍': 'место точка',
-  '🔒': 'закрыто пароль безопасность',
-  '🔓': 'открыто доступ',
-  '🔄': 'обновить синхронизация',
-  '🧾': 'чек платеж квитанция',
-  '💳': 'карта оплата платеж',
-  '🛠️': 'ремонт настройка',
-  '📡': 'сеть vpn подключение',
-  '🧩': 'модуль часть',
-  '🎉': 'праздник готово',
-  '⭐': 'звезда важно',
-  '🌐': 'интернет сайт',
-  '🔗': 'ссылка',
-  '📦': 'пакет архив',
-  '💎': 'премиум',
-  '🏆': 'победа',
-  '🎯': 'цель',
-  '🧠': 'идея',
-  '📱': 'телефон мобильный',
-  '💻': 'ноутбук компьютер',
-  '🖥️': 'компьютер экран',
-}
 
 interface SupportMessage {
   id: string
@@ -160,6 +95,10 @@ interface SupportTicket {
     }>
   } | null
   messages: SupportMessage[]
+  messagePagination?: {
+    hasMore: boolean
+    before: string | null
+  }
 }
 
 interface SupportPanelProps {
@@ -186,6 +125,7 @@ export function SupportPanel({
     initialTickets.length < initialTotal ? getSupportTicketCursor(initialTickets.at(-1)) : null
   )
   const [loadingMore, setLoadingMore] = useState(false)
+  const [loadingOlderMessages, setLoadingOlderMessages] = useState(false)
   const [selectedId, setSelectedId] = useState(initialTickets.find((ticket) => ticket.status !== 'CLOSED')?.id ?? initialTickets[0]?.id ?? '')
   const [selectedTicket, setSelectedTicket] = useState<SupportTicket | null>(
     initialTickets.find((ticket) => ticket.status !== 'CLOSED') ?? initialTickets[0] ?? null
@@ -245,8 +185,9 @@ export function SupportPanel({
     return tickets.reduce((sum, ticket) => sum + getUnreadCount(ticket, mode), 0)
   }, [mode, tickets])
 
-  const fetchTicket = useCallback(async (id: string) => {
-    const endpoint = mode === 'admin' ? `/api/admin/support/tickets/${id}` : `/api/support/tickets/${id}`
+  const fetchTicket = useCallback(async (id: string, before?: string | null) => {
+    const base = mode === 'admin' ? `/api/admin/support/tickets/${id}` : `/api/support/tickets/${id}`
+    const endpoint = before ? `${base}?before=${encodeURIComponent(before)}` : base
     const res = await fetch(endpoint, { cache: 'no-store' })
     const data = await res.json().catch(() => null)
     if (!res.ok) {
@@ -334,8 +275,8 @@ export function SupportPanel({
         if (selectedId) {
           const ticket = await fetchTicket(selectedId)
           if (active && ticket) {
-            setSelectedTicket(ticket)
-            setTickets((current) => current.map((item) => item.id === ticket.id ? { ...item, ...ticket } : item))
+            setSelectedTicket((current) => current?.id === ticket.id ? mergeSupportTicket(current, ticket, true) : ticket)
+            setTickets((current) => current.map((item) => item.id === ticket.id ? mergeSupportTicket(item, ticket, true) : item))
           }
         }
       } catch {
@@ -411,6 +352,28 @@ export function SupportPanel({
           : item
       )
     )
+  }
+
+  async function loadOlderMessages() {
+    const before = selected?.messagePagination?.before
+    if (!selected || !before || loadingOlderMessages) return
+    const container = messagesScrollRef.current
+    const previousHeight = container?.scrollHeight ?? 0
+    setLoadingOlderMessages(true)
+    stickToBottomRef.current = false
+    try {
+      const ticket = await fetchTicket(selected.id, before)
+      const merged = mergeSupportTicket(selected, ticket)
+      setSelectedTicket(merged)
+      setTickets((current) => current.map((item) => item.id === merged.id ? { ...item, ...merged } : item))
+      requestAnimationFrame(() => {
+        if (container) container.scrollTop += container.scrollHeight - previousHeight
+      })
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Не удалось загрузить старые сообщения')
+    } finally {
+      setLoadingOlderMessages(false)
+    }
   }
 
   async function createTicket(event: FormEvent<HTMLFormElement>) {
@@ -720,6 +683,18 @@ export function SupportPanel({
               className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-slate-50/60 px-3 py-3 dark:bg-surface-950/30 sm:px-4"
             >
               <div className="mx-auto max-w-3xl space-y-3">
+                {selected.messagePagination?.hasMore && (
+                  <div className="flex justify-center pb-1">
+                    <button
+                      type="button"
+                      className="btn-secondary min-h-9 px-3 py-1.5 text-xs"
+                      disabled={loadingOlderMessages}
+                      onClick={() => void loadOlderMessages()}
+                    >
+                      {loadingOlderMessages ? 'Загрузка...' : 'Показать старые сообщения'}
+                    </button>
+                  </div>
+                )}
                 {selected.messages.map((item) => {
                   const own = mode === 'admin' ? item.senderRole === 'ADMIN' : item.senderRole === 'USER'
                   return <MessageBubble key={item.id} message={item} own={own} />
@@ -1416,6 +1391,22 @@ function getUnreadCount(ticket: SupportTicket, mode: 'user' | 'admin') {
 function needsCurrentActor(ticket: SupportTicket, mode: 'user' | 'admin') {
   if (mode === 'admin') return ticket.status === 'WAITING_ADMIN'
   return ticket.userUnreadCount > 0 || ticket.status === 'WAITING_USER'
+}
+
+function mergeSupportTicket(current: SupportTicket, incoming: SupportTicket, preservePagination = false) {
+  const messages = new Map<string, SupportMessage>()
+  for (const message of [...current.messages, ...incoming.messages]) messages.set(message.id, message)
+  return {
+    ...current,
+    ...incoming,
+    messages: [...messages.values()].sort((left, right) => {
+      const dateOrder = new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime()
+      return dateOrder || left.id.localeCompare(right.id)
+    }),
+    messagePagination: preservePagination && current.messagePagination
+      ? current.messagePagination
+      : incoming.messagePagination,
+  }
 }
 
 function getSupportTicketCursor(ticket: SupportTicket | undefined) {

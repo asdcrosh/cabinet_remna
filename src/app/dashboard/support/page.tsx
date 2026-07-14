@@ -1,13 +1,15 @@
-import { redirect } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth/cookies'
 import { serializeSupportMessage, serializeSupportTicket } from '@/lib/support'
 import { SupportPanelDynamic } from '@/components/support/support-panel-dynamic'
+import { isFeatureEnabled } from '@/lib/feature-flags'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Поддержка' }
 
 export default async function SupportPage() {
+  if (!isFeatureEnabled('support')) notFound()
   const session = await getCurrentUser()
   if (!session) redirect('/login?next=/dashboard/support')
 

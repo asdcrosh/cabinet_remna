@@ -4,11 +4,13 @@ import { prisma } from '@/lib/prisma'
 import { requireAdmin, withAuth } from '@/lib/auth/guard'
 import { updateAdminBonusBoxPrizeSchema } from '@/lib/auth/validation'
 import { writeAuditLog } from '@/lib/audit-log'
+import { isFeatureEnabled } from '@/lib/feature-flags'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 export const PATCH = withAuth(async (req: Request, { params }: { params: Promise<{ id: string }> }) => {
+  if (!isFeatureEnabled('bonusBox')) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   await requireAdmin()
   const { id } = await params
 
@@ -60,8 +62,7 @@ export const PATCH = withAuth(async (req: Request, { params }: { params: Promise
       data: parsed.data,
     })
     await writeAuditLog({
-      action: 'ADMIN_PROFILE_UPDATED',
-      targetId: prize.id,
+      action: 'ADMIN_BONUS_PRIZE_UPDATED',
       message: 'Администратор обновил подарок бонусной коробки',
       metadata: {
         entityType: 'bonusBoxPrize',

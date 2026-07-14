@@ -4,11 +4,13 @@ import { prisma } from '@/lib/prisma'
 import { requireAdmin, withAuth } from '@/lib/auth/guard'
 import { adminBonusBoxPrizeSchema } from '@/lib/auth/validation'
 import { writeAuditLog } from '@/lib/audit-log'
+import { isFeatureEnabled } from '@/lib/feature-flags'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 export const GET = withAuth(async () => {
+  if (!isFeatureEnabled('bonusBox')) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   await requireAdmin()
   const prizes = await prisma.bonusBoxPrize.findMany({
     orderBy: [{ isActive: 'desc' }, { createdAt: 'desc' }],
@@ -17,6 +19,7 @@ export const GET = withAuth(async () => {
 })
 
 export const POST = withAuth(async (req: Request) => {
+  if (!isFeatureEnabled('bonusBox')) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   await requireAdmin()
 
   let body: unknown
@@ -39,8 +42,7 @@ export const POST = withAuth(async (req: Request) => {
       data: parsed.data,
     })
     await writeAuditLog({
-      action: 'ADMIN_PROFILE_UPDATED',
-      targetId: prize.id,
+      action: 'ADMIN_BONUS_PRIZE_CREATED',
       message: 'Администратор создал подарок бонусной коробки',
       metadata: {
         entityType: 'bonusBoxPrize',

@@ -5,6 +5,7 @@ import { NextResponse } from 'next/server'
 import { requireAdmin, withAuth } from '@/lib/auth/guard'
 import { getAppUrl } from '@/lib/app-url'
 import { signBroadcastUploadUrl } from '@/lib/broadcast-upload-url'
+import { isFeatureEnabled } from '@/lib/feature-flags'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -18,6 +19,7 @@ const ALLOWED_TYPES = new Map([
 ])
 
 export const POST = withAuth(async (req: Request) => {
+  if (!isFeatureEnabled('broadcasts')) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   await requireAdmin()
 
   const form = await req.formData().catch(() => null)

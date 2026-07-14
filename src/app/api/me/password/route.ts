@@ -38,6 +38,12 @@ export const POST = withAuth(async (req: Request) => {
     return NextResponse.json({ error: 'Неверный текущий пароль' }, { status: 400 })
   }
   const newHash = await hash(newPassword, 12)
-  await prisma.user.update({ where: { id: user.id }, data: { passwordHash: newHash } })
+  await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      passwordHash: newHash,
+      sessionVersion: { increment: 1 },
+    },
+  })
   return NextResponse.json({ ok: true })
 })

@@ -9,6 +9,7 @@ import { remnawave } from './remnawave'
 
 const RENEW_PATH = '/dashboard/plans?intent=renew'
 const SUBSCRIPTION_PATH = '/dashboard/subscription'
+const DELIVERY_TIMEOUT_MS = 15_000
 
 type NotifyUserInput = {
   userId: string
@@ -540,6 +541,7 @@ async function sendTelegramMessage(input: {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(DELIVERY_TIMEOUT_MS),
   })
 
   if (!response.ok) {
@@ -561,6 +563,7 @@ async function sendEmail(input: { to: string; subject: string; text: string; htm
         : {}),
     },
     body: JSON.stringify(input),
+    signal: AbortSignal.timeout(DELIVERY_TIMEOUT_MS),
   })
 
   if (!response.ok) {

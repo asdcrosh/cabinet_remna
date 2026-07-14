@@ -34,6 +34,7 @@ export default async function AdminPlansPage() {
     allowedEmails: plan.allowedEmails,
     allowedTelegramIds: plan.allowedTelegramIds,
     isPromo: plan.isPromo,
+    isFeatured: plan.isFeatured,
     isActive: plan.isActive,
     sortOrder: plan.sortOrder,
     paymentsCount: plan._count.payments,

@@ -8,6 +8,8 @@ import {
 } from '@/components/admin/bonus-box-prizes-admin'
 import { parseAdminListLimit } from '@/lib/admin-list'
 import { getBonusBoxSettings } from '@/lib/bonus-box'
+import { notFound } from 'next/navigation'
+import { isFeatureEnabled } from '@/lib/feature-flags'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Подарки — Админка' }
@@ -17,6 +19,7 @@ export default async function AdminBonusBoxPage({
 }: {
   searchParams: Promise<{ limit?: string }>
 }) {
+  if (!isFeatureEnabled('bonusBox')) notFound()
   await requireAdminPage()
   const params = await searchParams
   const limit = parseAdminListLimit(params.limit)

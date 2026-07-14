@@ -8,6 +8,7 @@ import { logError, logInfo } from './logger'
 
 const TOKEN_BYTES = 32
 const TOKEN_TTL_MS = 60 * 60 * 1000
+const DELIVERY_TIMEOUT_MS = 15_000
 
 export function hashPasswordResetToken(token: string) {
   return createHash('sha256').update(token).digest('hex')
@@ -84,6 +85,7 @@ export async function sendPasswordResetLink(input: {
         securityNote: 'Если вы не запрашивали восстановление пароля, письмо можно спокойно проигнорировать.',
       }),
     }),
+    signal: AbortSignal.timeout(DELIVERY_TIMEOUT_MS),
   })
 
   if (!res.ok) {
@@ -106,7 +108,10 @@ export async function resetPasswordByToken(input: { token: string; password: str
   await prisma.$transaction([
     prisma.user.update({
       where: { id: row.userId },
-      data: { passwordHash },
+      data: {
+        passwordHash,
+        sessionVersion: { increment: 1 },
+      },
     }),
     prisma.passwordResetToken.update({
       where: { id: row.id },

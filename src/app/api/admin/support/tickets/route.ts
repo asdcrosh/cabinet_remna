@@ -3,11 +3,13 @@ import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { requireStaff, withAuth } from '@/lib/auth/guard'
 import { serializeSupportMessage, serializeSupportTicket } from '@/lib/support'
+import { isFeatureEnabled } from '@/lib/feature-flags'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 export const GET = withAuth(async (req: Request) => {
+  if (!isFeatureEnabled('support')) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   await requireStaff()
 
   const url = new URL(req.url)

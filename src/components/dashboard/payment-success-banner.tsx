@@ -8,7 +8,13 @@ import { AlertTriangle, Check, CheckCircle2, Circle, CreditCard, KeyRound, Loade
 
 type PaymentSuccessBannerStatus = 'ready' | 'processing' | 'attention'
 
-export function PaymentSuccessBanner({ status = 'processing' }: { status?: PaymentSuccessBannerStatus }) {
+export function PaymentSuccessBanner({
+  status = 'processing',
+  supportEnabled = true,
+}: {
+  status?: PaymentSuccessBannerStatus
+  supportEnabled?: boolean
+}) {
   const router = useRouter()
   const [seconds, setSeconds] = useState(12)
 
@@ -48,7 +54,7 @@ export function PaymentSuccessBanner({ status = 'processing' }: { status?: Payme
         {status === 'attention' && (
           <div className="mt-4 flex flex-col gap-2 sm:flex-row">
             <Link href="/dashboard/billing" className="btn-primary min-h-11 px-4">Проверить платёж</Link>
-            <Link href="/dashboard/support" className="btn-secondary min-h-11 px-4">Написать в поддержку</Link>
+            {supportEnabled && <Link href="/dashboard/support" className="btn-secondary min-h-11 px-4">Написать в поддержку</Link>}
           </div>
         )}
       </div>

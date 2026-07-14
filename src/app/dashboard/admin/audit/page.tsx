@@ -13,6 +13,9 @@ export const dynamic = 'force-dynamic'
 export const metadata = { title: 'История действий — Админка' }
 
 const ACTION_LABELS: Record<AuditAction, string> = {
+  ADMIN_PLAN_CREATED: 'Тариф создан',
+  ADMIN_PLAN_UPDATED: 'Тариф изменён',
+  ADMIN_PLAN_DELETED: 'Тариф удалён',
   ADMIN_PLAN_ASSIGNED: 'Тариф',
   ADMIN_ROLE_CHANGED: 'Роль',
   ADMIN_PROFILE_UPDATED: 'Профиль',
@@ -25,7 +28,13 @@ const ACTION_LABELS: Record<AuditAction, string> = {
   PAYMENT_SYNCED: 'Платеж',
   ADMIN_NOTIFICATIONS_UPDATED: 'Уведомления',
   ADMIN_BONUS_ATTEMPTS_GRANTED: 'Бонусы',
+  ADMIN_BONUS_PRIZE_CREATED: 'Подарок создан',
+  ADMIN_BONUS_PRIZE_UPDATED: 'Подарок изменён',
+  ADMIN_BONUS_SETTINGS_UPDATED: 'Настройки подарков',
   ADMIN_SUPPORT_UPDATED: 'Поддержка',
+  ADMIN_BROADCAST_CREATED: 'Рассылка создана',
+  ADMIN_BROADCAST_TEMPLATE_CREATED: 'Шаблон создан',
+  ADMIN_BROADCAST_TEMPLATE_DELETED: 'Шаблон удалён',
   REMNASHOP_SYNC_RUN: 'Remnashop sync',
   SYSTEM_BACKUP_CREATED: 'Бэкап',
 }

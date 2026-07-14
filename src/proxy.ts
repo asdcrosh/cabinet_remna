@@ -58,6 +58,7 @@ function applySecurityHeaders(res: NextResponse, req: NextRequest) {
   }
 
   if (process.env.NODE_ENV === 'production') {
+    const sentryOrigin = getSentryOrigin()
     res.headers.set(
       'Content-Security-Policy',
       [
@@ -69,10 +70,20 @@ function applySecurityHeaders(res: NextResponse, req: NextRequest) {
         "font-src 'self' data:",
         "style-src 'self' 'unsafe-inline'",
         "script-src 'self' 'unsafe-inline' https://telegram.org",
-        "connect-src 'self' https://oauth.telegram.org",
+        `connect-src 'self' https://oauth.telegram.org${sentryOrigin ? ` ${sentryOrigin}` : ''}`,
         'upgrade-insecure-requests',
       ].join('; ')
     )
+  }
+}
+
+function getSentryOrigin() {
+  const dsn = process.env.NEXT_PUBLIC_SENTRY_DSN?.trim()
+  if (!dsn) return ''
+  try {
+    return new URL(dsn).origin
+  } catch {
+    return ''
   }
 }
 

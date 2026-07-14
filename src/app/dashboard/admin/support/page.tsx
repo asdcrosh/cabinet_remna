@@ -4,6 +4,8 @@ import { serializeSupportMessage, serializeSupportTicket } from '@/lib/support'
 import { SupportPanelDynamic } from '@/components/support/support-panel-dynamic'
 import { parseAdminListLimit } from '@/lib/admin-list'
 import { PageHeader } from '@/components/dashboard/page-header'
+import { notFound } from 'next/navigation'
+import { isFeatureEnabled } from '@/lib/feature-flags'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Поддержка — Админка' }
@@ -13,6 +15,7 @@ export default async function AdminSupportPage({
 }: {
   searchParams: Promise<{ status?: string; q?: string; limit?: string }>
 }) {
+  if (!isFeatureEnabled('support')) notFound()
   await requireStaffPage()
 
   const params = await searchParams

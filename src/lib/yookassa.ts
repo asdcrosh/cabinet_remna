@@ -12,6 +12,7 @@ if (!SHOP_ID || !SECRET_KEY) {
 }
 
 const BASE_URL = 'https://api.yookassa.ru/v3'
+const REQUEST_TIMEOUT_MS = 15_000
 
 const authHeader = () =>
   'Basic ' + Buffer.from(`${SHOP_ID}:${SECRET_KEY}`).toString('base64')
@@ -82,6 +83,7 @@ export async function createPayment(input: CreatePaymentInput): Promise<YooPayme
       Authorization: authHeader(),
     },
     body: JSON.stringify(body),
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   })
 
   if (!res.ok) {
@@ -96,6 +98,7 @@ export async function getPayment(id: string): Promise<YooPayment> {
   const res = await fetch(`${BASE_URL}/payments/${id}`, {
     headers: { Authorization: authHeader() },
     cache: 'no-store',
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   })
   if (!res.ok) {
     const text = await res.text()
@@ -115,6 +118,7 @@ export async function cancelPayment(id: string, idempotenceKey = `cancel-${id}`)
     },
     body: '{}',
     cache: 'no-store',
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   })
   if (!res.ok) {
     const text = await res.text()

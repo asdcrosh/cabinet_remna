@@ -51,10 +51,15 @@ jobs:
         run: npx prisma migrate diff --from-migrations prisma/migrations --to-schema-datamodel prisma/schema.prisma --shadow-database-url "$DIRECT_URL" --exit-code
       - name: npm audit report
         run: npm audit --audit-level=high
-        continue-on-error: true
       - run: npm run check:env
       - run: npm run lint
       - run: npm run typecheck
       - run: npm run test
       - run: npm run test:coverage
       - run: npm run build
+      - name: Production smoke checks
+        run: |
+          npm run start &
+          server_pid=$!
+          trap 'kill $server_pid' EXIT
+          npm run test:smoke
