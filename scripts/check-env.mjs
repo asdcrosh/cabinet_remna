@@ -104,6 +104,7 @@ checkPublicUrl("APP_URL");
 checkPublicUrl("NEXTAUTH_URL", { optional: true });
 checkPublicUrl("REMNAWAVE_BASE_URL");
 checkPublicUrl("YOOKASSA_WEBHOOK_URL", { pathPrefix: "/api/webhook/yookassa" });
+checkAllowedOrigins();
 
 if (
   isProduction &&
@@ -273,5 +274,35 @@ function checkPublicUrl(key, options = {}) {
   }
   if (options.pathPrefix && !url.pathname.startsWith(options.pathPrefix)) {
     errors.push(`${key} must point to ${options.pathPrefix}`);
+  }
+}
+
+function checkAllowedOrigins() {
+  const origins = value("ALLOWED_ORIGINS")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
+  for (const origin of origins) {
+    let url;
+    try {
+      url = new URL(origin);
+    } catch {
+      errors.push(`ALLOWED_ORIGINS contains an invalid URL: ${origin}`);
+      continue;
+    }
+
+    if (!["http:", "https:"].includes(url.protocol)) {
+      errors.push(`ALLOWED_ORIGINS must contain only http/https origins: ${origin}`);
+    }
+    if (url.username || url.password) {
+      errors.push(`ALLOWED_ORIGINS must not contain credentials: ${origin}`);
+    }
+    if (url.pathname !== "/" || url.search || url.hash) {
+      errors.push(`ALLOWED_ORIGINS must contain origins without paths: ${origin}`);
+    }
+    if (isProduction && url.protocol !== "https:") {
+      errors.push(`ALLOWED_ORIGINS must use https in production: ${origin}`);
+    }
   }
 }

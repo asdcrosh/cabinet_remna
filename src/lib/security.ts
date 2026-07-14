@@ -3,8 +3,17 @@ const MUTATION_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
 export function assertSameOrigin(req: Request) {
   if (!MUTATION_METHODS.has(req.method)) return
 
-  const origin = req.headers.get('origin')
-  if (!origin) return
+  const originHeader = req.headers.get('origin')
+  if (!originHeader) {
+    const fetchSite = req.headers.get('sec-fetch-site')?.trim().toLowerCase()
+    if (fetchSite === 'cross-site' || process.env.NODE_ENV === 'production') {
+      throw new Error('Invalid request origin')
+    }
+    return
+  }
+
+  const origin = normalizeOrigin(originHeader)
+  if (!origin) throw new Error('Invalid request origin')
 
   const allowedOrigins = new Set([new URL(req.url).origin])
 
@@ -30,18 +39,32 @@ function getConfiguredOrigins() {
   ]
     .map((value) => value?.trim())
     .filter((value): value is string => Boolean(value))
-    .map((value) => new URL(value).origin)
+    .map(normalizeOrigin)
+    .filter((value): value is string => Boolean(value))
 }
 
 function getForwardedOrigin(req: Request) {
   const forwardedHost = req.headers.get('x-forwarded-host')?.split(',')[0]?.trim()
-  if (!forwardedHost) return null
+  if (!forwardedHost || /[\\/@\s]/.test(forwardedHost)) return null
 
   const forwardedProto =
-    req.headers.get('x-forwarded-proto')?.split(',')[0]?.trim() ||
+    req.headers.get('x-forwarded-proto')?.split(',')[0]?.trim().toLowerCase() ||
     new URL(req.url).protocol.replace(':', '')
+  if (!['http', 'https'].includes(forwardedProto)) return null
 
-  return `${forwardedProto}://${forwardedHost}`
+  return normalizeOrigin(`${forwardedProto}://${forwardedHost}`)
+}
+
+function normalizeOrigin(value: string | null | undefined) {
+  if (!value || value === 'null') return null
+  try {
+    const url = new URL(value)
+    if (!['http:', 'https:'].includes(url.protocol)) return null
+    if (url.username || url.password) return null
+    return url.origin
+  } catch {
+    return null
+  }
 }
 
 export function getClientIp(req: Request) {

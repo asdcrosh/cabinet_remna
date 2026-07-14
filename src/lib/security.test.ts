@@ -1,8 +1,9 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { assertSameOrigin, getClientIp, isIpAllowed } from './security'
 
 describe('security helpers', () => {
   afterEach(() => {
+    vi.unstubAllEnvs()
     delete process.env.APP_URL
     delete process.env.NEXTAUTH_URL
     delete process.env.ALLOWED_ORIGINS
@@ -59,6 +60,62 @@ describe('security helpers', () => {
         origin: 'https://demo.ngrok-free.app',
         'x-forwarded-host': 'demo.ngrok-free.app',
         'x-forwarded-proto': 'https',
+      },
+    })
+
+    expect(() => assertSameOrigin(req)).toThrow('Invalid request origin')
+  })
+
+  it('rejects a mutation without origin in production', () => {
+    vi.stubEnv('NODE_ENV', 'production')
+
+    const req = new Request('https://cabinet.example/api/payment/create', {
+      method: 'POST',
+    })
+
+    expect(() => assertSameOrigin(req)).toThrow('Invalid request origin')
+  })
+
+  it('rejects a cross-site mutation without origin outside production', () => {
+    const req = new Request('http://localhost:3000/api/auth/login', {
+      method: 'POST',
+      headers: { 'sec-fetch-site': 'cross-site' },
+    })
+
+    expect(() => assertSameOrigin(req)).toThrow('Invalid request origin')
+  })
+
+  it('rejects malformed and null origins', () => {
+    for (const origin of ['null', 'not-a-url', 'javascript:alert(1)']) {
+      const req = new Request('http://localhost:3000/api/auth/login', {
+        method: 'POST',
+        headers: { origin },
+      })
+
+      expect(() => assertSameOrigin(req)).toThrow('Invalid request origin')
+    }
+  })
+
+  it('ignores malformed configured origins instead of failing the request', () => {
+    process.env.ALLOWED_ORIGINS = 'not-a-url,https://cabinet.example'
+
+    const req = new Request('http://localhost:3000/api/auth/login', {
+      method: 'POST',
+      headers: { origin: 'https://cabinet.example' },
+    })
+
+    expect(() => assertSameOrigin(req)).not.toThrow()
+  })
+
+  it('rejects invalid forwarded protocols', () => {
+    process.env.TRUSTED_PROXY_HEADERS = 'true'
+
+    const req = new Request('http://localhost:3000/api/auth/login', {
+      method: 'POST',
+      headers: {
+        origin: 'https://cabinet.example',
+        'x-forwarded-host': 'cabinet.example',
+        'x-forwarded-proto': 'javascript',
       },
     })
 

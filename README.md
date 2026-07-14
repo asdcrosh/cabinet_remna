@@ -334,7 +334,7 @@ NODE_ENV=production npm run check:env
 | --- | --- |
 | `NODE_ENV` | `production` |
 | `APP_URL` | Публичный HTTPS URL кабинета |
-| `ALLOWED_ORIGINS` | Разрешённые origins (обычно = APP_URL) |
+| `ALLOWED_ORIGINS` | Разрешённые origins через запятую, без путей (обычно = APP_URL; в production только HTTPS) |
 | `CABINET_IMAGE` | Web image (`release`) |
 | `CABINET_OPS_IMAGE` | Ops image для workers/migrations/cleanup |
 | `DATABASE_URL` | PostgreSQL с `connection_limit` и `pool_timeout` |
