@@ -220,9 +220,9 @@ export function PlanCard({
   return (
     <div
       className={cn(
-        "plan-card-tilt card group relative flex h-full min-h-0 flex-col overflow-hidden p-4 transition-all duration-200 hover:border-cyan-200/80 hover:shadow-xl sm:min-h-[380px] lg:p-5",
+        "plan-card-tilt card group relative flex h-full min-h-0 flex-col overflow-hidden p-4 transition-all duration-200 hover:border-cyan-200/80 hover:shadow-md sm:min-h-[390px] lg:p-5",
         popular &&
-          "border-cyan-300 ring-1 ring-cyan-200/70 dark:border-cyan-400/50 dark:ring-cyan-400/15",
+          "border-cyan-300 bg-gradient-to-b from-cyan-50/70 to-white ring-1 ring-cyan-200/60 dark:border-cyan-400/50 dark:from-cyan-400/[0.08] dark:to-surface-900 dark:ring-cyan-400/15",
         current && "bg-cyan-50/70 dark:bg-cyan-500/10",
       )}
     >
@@ -262,9 +262,9 @@ export function PlanCard({
           {description}
         </p>
       )}
-      <div className="mt-3 rounded-lg border border-slate-100 bg-slate-50/80 p-3 dark:border-white/10 dark:bg-white/[0.04] sm:mt-4">
+      <div className="mt-3 rounded-2xl border border-slate-100 bg-slate-50/80 p-3.5 dark:border-white/10 dark:bg-white/[0.04] sm:mt-4">
         <div className="flex flex-wrap items-baseline gap-2">
-          <div className="whitespace-nowrap text-2xl font-semibold tracking-tight sm:text-3xl">
+          <div className="whitespace-nowrap text-3xl font-semibold tracking-tight sm:text-4xl">
             {effectivePrice}
           </div>
           {appliedPromo && (
@@ -280,7 +280,7 @@ export function PlanCard({
           </div>
         ) : null}
       </div>
-      <ul className="mt-4 grid grid-cols-2 gap-x-3 gap-y-2.5 text-xs leading-5 text-slate-600 dark:text-slate-300 sm:min-h-[86px] sm:text-sm">
+      <ul className="mt-4 grid grid-cols-1 gap-x-3 gap-y-2.5 text-sm leading-5 text-slate-600 dark:text-slate-300 sm:min-h-[86px] sm:grid-cols-2">
         <Feature strong>
           {trafficLimitGb == null
             ? "Безлимитный трафик"
@@ -412,7 +412,7 @@ export function PlanCard({
       ) : (
         <div className="mt-auto" />
       )}
-      <div className="mt-4 flex items-center justify-between gap-3 border-t border-slate-100 pt-3 text-sm dark:border-white/10">
+      <div className="mt-5 flex items-center justify-between gap-3 border-t border-slate-100 pt-4 text-sm dark:border-white/10">
         <span className="text-slate-500 dark:text-slate-400">К оплате</span>
         <span className="text-lg font-semibold text-slate-950 dark:text-white">{effectivePrice}</span>
       </div>

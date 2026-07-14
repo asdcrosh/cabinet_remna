@@ -182,7 +182,7 @@ export default async function DashboardHome() {
   return (
     <div className="page-stack">
       {subRow?.pendingSync && !remnawaveCard && (
-        <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
+        <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
           <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
           <div>
             <div className="font-medium">Профиль доступа не найден в Remnawave</div>
@@ -193,7 +193,7 @@ export default async function DashboardHome() {
         </div>
       )}
 
-      <section className="relative overflow-hidden rounded-lg border border-slate-200 bg-white/90 p-4 shadow-xl shadow-slate-950/[0.06] dark:border-white/10 dark:bg-surface-900 dark:shadow-black/25 sm:p-6">
+      <section className="relative overflow-hidden rounded-3xl border border-slate-200/80 bg-white/95 p-4 shadow-sm shadow-slate-950/[0.05] dark:border-white/10 dark:bg-surface-900 dark:shadow-black/20 sm:p-6">
         <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-cyan-400 via-emerald-400 to-cyan-500" />
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_17rem] lg:items-stretch">
           <div className="min-w-0">
@@ -212,7 +212,7 @@ export default async function DashboardHome() {
                     : 'Тариф синхронизируется'}
                 </p>
               </div>
-              <div className="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-emerald-100 text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-200">
+              <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-emerald-100 text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-200">
                 <ShieldCheck className="h-5 w-5" />
               </div>
             </div>
@@ -230,7 +230,7 @@ export default async function DashboardHome() {
             </div>
           </div>
 
-          <div className="flex flex-col items-center justify-center rounded-lg border border-slate-200 bg-slate-50/80 p-4 text-center dark:border-white/10 dark:bg-white/[0.035]">
+          <div className="flex flex-col items-center justify-center rounded-2xl border border-slate-200 bg-slate-50/70 p-4 text-center dark:border-white/10 dark:bg-white/[0.035]">
             <UsageRing percent={percent} unlimited={isUnlimited} />
             <div className="mt-3 text-sm font-semibold text-slate-950 dark:text-white">
               {isUnlimited ? 'Трафик без ограничений' : `${percent}% использовано`}
@@ -801,7 +801,7 @@ function SmartInsights({
           href={item.href}
           target={item.external ? '_blank' : undefined}
           rel={item.external ? 'noreferrer' : undefined}
-          className={`group flex min-h-20 items-start gap-3 rounded-lg border p-3 shadow-sm transition-all hover:-translate-y-0.5 ${insightTone(item.tone)}`}
+          className={`group flex min-h-20 items-start gap-3 rounded-2xl border p-3 shadow-sm transition-colors ${insightTone(item.tone)}`}
         >
           <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-white/80 shadow-sm dark:bg-white/10">
             {item.icon}

@@ -55,8 +55,8 @@ export function PaymentHistory({ payments }: { payments: PaymentHistoryPayment[]
       <div className="space-y-3 xl:hidden">
         {payments.length === 0 && <PaymentHistoryEmpty />}
         {payments.map((payment) => (
-          <article key={payment.id} className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-surface-900">
-            <div className="border-b border-slate-100 bg-slate-50 px-4 py-3 dark:border-white/10 dark:bg-surface-800">
+          <article key={payment.id} className="overflow-hidden rounded-2xl border border-slate-200 bg-white/90 shadow-sm shadow-slate-950/[0.04] dark:border-white/10 dark:bg-surface-900">
+            <div className="border-b border-slate-100 px-4 py-4 dark:border-white/10">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="truncate text-sm font-semibold text-slate-950 dark:text-white">{payment.plan.name}</div>
@@ -65,9 +65,9 @@ export function PaymentHistory({ payments }: { payments: PaymentHistoryPayment[]
                 <PaymentStatusBadge status={payment.status} createdAt={payment.createdAt} />
               </div>
             </div>
-            <div className="space-y-3 px-4 py-4">
+            <div className="space-y-4 px-4 py-4">
               <div className="flex items-baseline justify-between gap-3">
-                <span className="text-xs uppercase tracking-wide text-slate-400">Сумма</span>
+                <span className="text-xs font-medium text-slate-500">Сумма</span>
                 <PaymentAmount
                   amountKopecks={payment.amountKopecks}
                   originalAmountKopecks={payment.originalAmountKopecks}

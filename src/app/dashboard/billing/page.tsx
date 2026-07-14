@@ -51,7 +51,11 @@ export default async function BillingPage({
 
   return (
     <div className="page-stack">
-      <PageHeader title="Платежи" description="История оплат и состояние выдачи подписки" />
+      <PageHeader
+        title="Платежи"
+        description="История оплат и состояние выдачи подписки"
+        action={<Link href="/dashboard/plans" className="btn-primary">Выбрать тариф</Link>}
+      />
 
       {params.paid === '1' && <PaymentSuccessBanner status={getBannerStatus(syncResult)} supportEnabled={features.support} />}
 

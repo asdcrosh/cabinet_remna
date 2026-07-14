@@ -257,9 +257,9 @@ export function MobileBottomNav({ badges = {}, features }: { badges?: NavBadges;
                 onClick={() => setMoreOpen(false)}
                 aria-current={active ? 'page' : undefined}
                 className={cn(
-                  'relative flex min-h-12 min-w-0 items-center gap-3 rounded-lg border px-3 py-2 text-sm font-semibold transition',
+                  'relative flex min-h-12 min-w-0 items-center gap-3 rounded-xl border px-3 py-2 text-sm font-semibold transition',
                   active
-                    ? 'nav-active-glow border-slate-950 bg-slate-950 text-white dark:border-white dark:bg-white dark:text-slate-950'
+                    ? 'nav-active-glow border-cyan-200 bg-cyan-50 text-cyan-900 dark:border-cyan-400/25 dark:bg-cyan-400/10 dark:text-cyan-100'
                     : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-950 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white'
                 )}
               >
@@ -279,7 +279,7 @@ export function MobileBottomNav({ badges = {}, features }: { badges?: NavBadges;
   )
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-white/80 bg-white/[0.94] pb-[calc(env(safe-area-inset-bottom)+0.5rem)] pt-1.5 shadow-[0_-12px_32px_rgba(15,23,42,0.12)] backdrop-blur-xl dark:border-white/10 dark:bg-surface-900/[0.96] dark:shadow-black/35 lg:hidden">
+    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200/80 bg-white/[0.94] pb-[calc(env(safe-area-inset-bottom)+0.5rem)] pt-1.5 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur-xl dark:border-white/10 dark:bg-surface-900/[0.96] dark:shadow-black/25 lg:hidden">
       <div className="mx-auto grid max-w-md grid-cols-5 gap-1 px-2">
         {items.map((item) => {
           const Icon = item.icon
@@ -292,14 +292,14 @@ export function MobileBottomNav({ badges = {}, features }: { badges?: NavBadges;
               href={item.href}
               aria-current={active ? 'page' : undefined}
               className={cn(
-                'relative flex min-h-12 min-w-0 flex-col items-center justify-center gap-0.5 rounded-lg px-1 py-1.5 text-[10px] font-semibold transition-colors',
+                'relative flex min-h-12 min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1.5 text-[10px] font-semibold transition-colors',
                 active
-                  ? 'bg-slate-950 text-white shadow-md shadow-slate-950/15 dark:bg-white dark:text-slate-950'
+                  ? 'bg-cyan-50 text-cyan-800 dark:bg-cyan-400/10 dark:text-cyan-200'
                   : 'text-slate-500 hover:bg-slate-100 hover:text-slate-950 dark:text-slate-400 dark:hover:bg-white/10 dark:hover:text-white'
               )}
             >
               <span className="relative">
-                <Icon className="h-[18px] w-[18px]" />
+                <Icon className={cn('h-[18px] w-[18px]', active && 'stroke-[2.5]')} />
                 {badge > 0 && (
                   <span className="absolute -right-2 -top-2 grid min-w-4 place-items-center rounded-full bg-cyan-500 px-1 text-[10px] leading-4 text-white">
                     {badge > 9 ? '9+' : badge}
@@ -316,9 +316,9 @@ export function MobileBottomNav({ badges = {}, features }: { badges?: NavBadges;
           aria-label="Открыть ещё разделы"
           onClick={() => setMoreOpen(true)}
           className={cn(
-            'relative flex min-h-12 min-w-0 flex-col items-center justify-center gap-0.5 rounded-lg px-1 py-1.5 text-[10px] font-semibold transition-colors',
+            'relative flex min-h-12 min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1.5 text-[10px] font-semibold transition-colors',
             moreActive
-              ? 'bg-slate-950 text-white shadow-lg shadow-slate-950/10 dark:bg-white dark:text-slate-950'
+              ? 'bg-cyan-50 text-cyan-800 dark:bg-cyan-400/10 dark:text-cyan-200'
               : 'text-slate-500 hover:bg-slate-100 hover:text-slate-950 dark:text-slate-400 dark:hover:bg-white/10 dark:hover:text-white'
           )}
         >
@@ -334,7 +334,7 @@ export function MobileBottomNav({ badges = {}, features }: { badges?: NavBadges;
 export function Brand({ compact = false, brandName }: { compact?: boolean; brandName: string }) {
   return (
     <Link href="/dashboard" className="flex min-w-0 items-center gap-3">
-      <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-slate-950 text-cyan-200 shadow-lg shadow-slate-950/15 ring-1 ring-white/10 dark:bg-white dark:text-slate-950 dark:shadow-black/20">
+      <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-slate-950 text-cyan-200 shadow-sm shadow-slate-950/15 ring-1 ring-white/10 dark:bg-white dark:text-slate-950 dark:shadow-black/20">
         <ShieldCheck className="h-5 w-5" />
       </div>
       <div className="min-w-0">
@@ -471,19 +471,19 @@ function NavGroup({
             onClick={onNavigate}
             aria-current={active ? 'page' : undefined}
             className={cn(
-              'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200',
+              'flex min-h-10 items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-all duration-200',
               active
-                ? 'nav-active-glow bg-slate-950 text-white shadow-lg shadow-slate-950/10 dark:bg-white dark:text-slate-950 dark:shadow-black/20'
+                ? 'nav-active-glow bg-cyan-50 text-cyan-900 dark:bg-cyan-400/10 dark:text-cyan-100'
                 : 'text-slate-600 hover:bg-white/80 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white'
             )}
           >
-            <Icon className={cn('h-4 w-4 shrink-0', active && 'text-cyan-200 dark:text-cyan-700')} />
+            <Icon className={cn('h-4 w-4 shrink-0', active && 'text-cyan-600 dark:text-cyan-300')} />
             <span className="min-w-0 flex-1 truncate">{item.label}</span>
             {badge > 0 && (
               <span
                 className={cn(
                   'ml-auto grid h-5 min-w-5 place-items-center rounded-full px-1.5 text-[11px] font-semibold',
-                  active ? 'bg-white text-slate-950 dark:bg-slate-950 dark:text-white' : 'bg-red-600 text-white'
+                  active ? 'bg-cyan-600 text-white dark:bg-cyan-300 dark:text-slate-950' : 'bg-red-600 text-white'
                 )}
               >
                 {badge > 99 ? '99+' : badge}
@@ -561,7 +561,7 @@ function AdminNavGroup({
   }, [hasActiveItem])
 
   return (
-    <div className="rounded-lg border border-slate-100 bg-white/45 p-1 dark:border-white/10 dark:bg-white/[0.03]">
+    <div className="rounded-xl border border-slate-100 bg-white/45 p-1 dark:border-white/10 dark:bg-white/[0.03]">
       <button
         type="button"
         className="flex w-full items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-400 transition-colors hover:bg-white/70 hover:text-slate-600 dark:hover:bg-white/5 dark:hover:text-slate-200"
