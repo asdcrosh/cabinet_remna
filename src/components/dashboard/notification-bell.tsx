@@ -238,7 +238,7 @@ export function NotificationBell({ showAdmin = false }: { showAdmin?: boolean })
       aria-labelledby="notification-panel-title"
       tabIndex={-1}
       onKeyDown={handlePanelKeyDown}
-      className="fixed inset-x-2 top-[calc(env(safe-area-inset-top)+4.25rem)] z-[120] max-h-[calc(100dvh-env(safe-area-inset-top)-env(safe-area-inset-bottom)-8.75rem)] overflow-hidden rounded-lg border border-slate-200 bg-white shadow-2xl shadow-slate-950/15 dark:border-white/10 dark:bg-surface-950 dark:shadow-black/35 sm:absolute sm:inset-x-auto sm:right-6 sm:top-16 sm:w-[min(24rem,calc(100vw-2rem))] sm:max-h-[34rem] lg:right-6"
+      className="fixed inset-x-2 bottom-[calc(env(safe-area-inset-bottom)+5.5rem)] top-auto z-[120] max-h-[72dvh] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl shadow-slate-950/10 dark:border-white/10 dark:bg-surface-950 dark:shadow-black/30 sm:absolute sm:bottom-auto sm:inset-x-auto sm:right-6 sm:top-16 sm:w-[min(24rem,calc(100vw-2rem))] sm:max-h-[34rem] lg:right-6"
     >
       <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 dark:border-white/10">
         <div>
@@ -252,7 +252,7 @@ export function NotificationBell({ showAdmin = false }: { showAdmin?: boolean })
             type="button"
             onClick={markAllRead}
             disabled={activeSummary.unreadCount === 0}
-            className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 text-xs font-medium text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/10 dark:text-slate-300 dark:hover:bg-white/10"
+            className="inline-flex h-8 items-center gap-1.5 rounded-xl border border-slate-200 px-2.5 text-xs font-medium text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/10 dark:text-slate-300 dark:hover:bg-white/10"
           >
             <CheckCheck className="h-3.5 w-3.5" />
             Прочитано
@@ -261,7 +261,7 @@ export function NotificationBell({ showAdmin = false }: { showAdmin?: boolean })
             type="button"
             onClick={clearNotifications}
             disabled={activeSummary.notifications.length === 0}
-            className="grid h-8 w-8 place-items-center rounded-lg border border-slate-200 text-slate-500 transition hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/10 dark:text-slate-300 dark:hover:bg-red-500/10 dark:hover:text-red-200"
+            className="grid h-8 w-8 place-items-center rounded-xl border border-slate-200 text-slate-500 transition hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/10 dark:text-slate-300 dark:hover:bg-red-500/10 dark:hover:text-red-200"
             title="Очистить"
             aria-label="Очистить уведомления"
           >
@@ -283,7 +283,7 @@ export function NotificationBell({ showAdmin = false }: { showAdmin?: boolean })
             aria-selected={tab === 'user'}
             aria-controls="notification-tabpanel-user"
             tabIndex={tab === 'user' ? 0 : -1}
-            className={cn('rounded-lg px-3 py-2 text-sm font-medium transition', tab === 'user' ? 'bg-white text-slate-950 shadow-sm dark:bg-surface-900 dark:text-white' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white')}
+            className={cn('rounded-xl px-3 py-2 text-sm font-medium transition', tab === 'user' ? 'bg-white text-slate-950 shadow-sm dark:bg-surface-900 dark:text-white' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white')}
             onClick={() => setTab('user')}
             onKeyDown={handleTabKeyDown}
           >
@@ -296,7 +296,7 @@ export function NotificationBell({ showAdmin = false }: { showAdmin?: boolean })
             aria-selected={tab === 'admin'}
             aria-controls="notification-tabpanel-admin"
             tabIndex={tab === 'admin' ? 0 : -1}
-            className={cn('rounded-lg px-3 py-2 text-sm font-medium transition', tab === 'admin' ? 'bg-white text-slate-950 shadow-sm dark:bg-surface-900 dark:text-white' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white')}
+            className={cn('rounded-xl px-3 py-2 text-sm font-medium transition', tab === 'admin' ? 'bg-white text-slate-950 shadow-sm dark:bg-surface-900 dark:text-white' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white')}
             onClick={() => setTab('admin')}
             onKeyDown={handleTabKeyDown}
           >
@@ -309,7 +309,7 @@ export function NotificationBell({ showAdmin = false }: { showAdmin?: boolean })
         id={tab === 'admin' ? 'notification-tabpanel-admin' : 'notification-tabpanel-user'}
         role={showAdmin ? 'tabpanel' : undefined}
         aria-labelledby={showAdmin ? (tab === 'admin' ? 'notification-tab-admin' : 'notification-tab-user') : undefined}
-        className="max-h-[calc(100dvh-env(safe-area-inset-top)-env(safe-area-inset-bottom)-18rem)] overflow-y-auto p-2 sm:max-h-96"
+        className="max-h-[calc(72dvh-10rem)] overflow-y-auto p-2 sm:max-h-96"
       >
         {activeSummary.notifications.length > 0 ? (
           activeSummary.notifications.map((item) => (
@@ -355,7 +355,7 @@ export function NotificationBell({ showAdmin = false }: { showAdmin?: boolean })
         ref={triggerRef}
         type="button"
         onClick={() => setOpen((value) => !value)}
-        className="relative grid h-10 w-10 place-items-center rounded-lg border border-white/70 bg-white/80 text-slate-700 shadow-sm shadow-slate-200/60 transition hover:bg-white hover:text-slate-950 dark:border-white/10 dark:bg-surface-900/80 dark:text-slate-200 dark:shadow-black/20 dark:hover:bg-surface-800 dark:hover:text-white"
+        className="relative grid h-10 w-10 place-items-center rounded-xl border border-white/70 bg-white/80 text-slate-700 shadow-sm shadow-slate-200/60 transition hover:bg-white hover:text-slate-950 dark:border-white/10 dark:bg-surface-900/80 dark:text-slate-200 dark:shadow-black/20 dark:hover:bg-surface-800 dark:hover:text-white"
         aria-label="Уведомления"
         aria-expanded={open}
         aria-controls="notification-panel"
@@ -393,7 +393,7 @@ function AdminNotificationRow({
   const content = (
     <div
       className={cn(
-        'rounded-lg px-3 py-2.5 transition',
+        'rounded-xl px-3 py-2.5 transition',
         notification.readAt ? 'hover:bg-slate-50 dark:hover:bg-white/10' : 'bg-orange-50/80 hover:bg-orange-50 dark:bg-orange-950/20 dark:hover:bg-orange-950/30'
       )}
     >
@@ -429,7 +429,7 @@ function NotificationRow({
   const content = (
     <div
       className={cn(
-        'rounded-lg px-3 py-2.5 transition',
+        'rounded-xl px-3 py-2.5 transition',
         notification.readAt ? 'hover:bg-slate-50 dark:hover:bg-white/10' : 'bg-cyan-50/70 hover:bg-cyan-50 dark:bg-cyan-950/20 dark:hover:bg-cyan-950/30'
       )}
     >

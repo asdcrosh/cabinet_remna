@@ -39,45 +39,49 @@ export function NotificationsList({ initialNotifications }: { initialNotificatio
 
   return (
     <section className="space-y-4">
-      <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto]">
-        <div className="metric-card">
-          <div className="text-sm text-slate-500 dark:text-slate-400">Непрочитанные</div>
-          <div className="mt-1 text-2xl font-semibold text-slate-950 dark:text-white">{unreadCount}</div>
-          <div className="mt-1 text-sm text-slate-500 dark:text-slate-400">Всего событий: {notifications.length}</div>
+      <div className="flex flex-col gap-3 rounded-2xl border border-slate-200/80 bg-white/85 p-4 shadow-sm shadow-slate-950/[0.04] dark:border-white/10 dark:bg-white/[0.035] sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3">
+          <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-cyan-50 text-cyan-700 dark:bg-cyan-500/10 dark:text-cyan-200">
+            <Bell className="h-5 w-5" />
+          </div>
+          <div>
+            <div className="font-semibold text-slate-950 dark:text-white">{unreadCount > 0 ? `${unreadCount} непрочитанных` : 'Всё прочитано'}</div>
+            <div className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">Всего событий: {notifications.length}</div>
+          </div>
         </div>
         <button
           type="button"
           onClick={markAllRead}
           disabled={unreadCount === 0}
-          className="btn-secondary h-full min-h-14"
+          className="btn-secondary w-full sm:w-auto"
         >
           <CheckCheck className="h-4 w-4" />
           Отметить все
         </button>
       </div>
 
-      <div className="flex gap-2 overflow-x-auto rounded-lg border border-white/70 bg-white/60 p-2 shadow-sm dark:border-white/10 dark:bg-surface-950/40">
+      <div className="flex gap-1.5 overflow-x-auto rounded-2xl border border-slate-200/80 bg-white/70 p-1.5 shadow-sm dark:border-white/10 dark:bg-surface-950/40">
         {filterItems.map((item) => (
           <button
             key={item.value}
             type="button"
             onClick={() => setFilter(item.value)}
             className={cn(
-              'flex min-w-fit items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold transition',
+              'flex min-w-fit items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition',
               filter === item.value
-                ? 'bg-slate-950 text-white shadow-sm dark:bg-white dark:text-slate-950'
+                ? 'bg-cyan-50 text-cyan-900 ring-1 ring-cyan-200 dark:bg-cyan-400/10 dark:text-cyan-100 dark:ring-cyan-400/20'
                 : 'text-slate-500 hover:bg-white hover:text-slate-950 dark:hover:bg-white/10 dark:hover:text-white'
             )}
           >
             {item.label}
-            <span className={cn('rounded-full px-1.5 py-0.5 text-[10px]', filter === item.value ? 'bg-white/15 dark:bg-slate-950/10' : 'bg-slate-100 dark:bg-white/10')}>
+            <span className={cn('rounded-full px-1.5 py-0.5 text-[10px]', filter === item.value ? 'bg-cyan-100 text-cyan-800 dark:bg-cyan-300/15 dark:text-cyan-100' : 'bg-slate-100 dark:bg-white/10')}>
               {item.count}
             </span>
           </button>
         ))}
       </div>
 
-      <div className="overflow-hidden rounded-lg border border-white/70 bg-white/80 shadow-sm shadow-slate-200/50 dark:border-white/10 dark:bg-surface-950/50 dark:shadow-black/20">
+      <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white/85 shadow-sm shadow-slate-950/[0.04] dark:border-white/10 dark:bg-surface-950/50 dark:shadow-black/20">
         {filteredNotifications.length > 0 ? (
           filteredNotifications.map((item) => <NotificationItem key={item.id} notification={item} />)
         ) : (
@@ -119,7 +123,7 @@ function NotificationItem({ notification }: { notification: UserNotificationView
         notification.readAt ? 'bg-white/40 dark:bg-transparent' : 'bg-cyan-50/60 dark:bg-cyan-950/20'
       )}
     >
-      <span className={cn('mt-1 grid h-9 w-9 shrink-0 place-items-center rounded-lg', notification.readAt ? 'bg-slate-100 text-slate-400 dark:bg-white/10' : 'bg-cyan-50 text-cyan-700 dark:bg-cyan-500/10 dark:text-cyan-200')}>
+      <span className={cn('mt-1 grid h-10 w-10 shrink-0 place-items-center rounded-xl', notification.readAt ? 'bg-slate-100 text-slate-400 dark:bg-white/10' : 'bg-cyan-50 text-cyan-700 dark:bg-cyan-500/10 dark:text-cyan-200')}>
         <Icon className="h-4 w-4" />
       </span>
       <div className="min-w-0 flex-1">

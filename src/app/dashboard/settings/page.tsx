@@ -17,6 +17,7 @@ import { PaymentHistory } from '@/components/dashboard/payment-history'
 import { ProfileForm } from '@/components/dashboard/profile-form'
 import { SettingsTabs } from '@/components/dashboard/settings-tabs'
 import { TelegramLinkCard } from '@/components/dashboard/telegram-link-card'
+import { PageHeader } from '@/components/dashboard/page-header'
 import { cn } from '@/lib/cn'
 
 export const dynamic = 'force-dynamic'
@@ -38,15 +39,11 @@ export default async function SettingsPage() {
   const hasVerifiedEmail = Boolean(user.emailVerifiedAt && !user.email.endsWith('@pending.invalid'))
 
   return (
-    <div className="mx-auto max-w-6xl space-y-3 sm:space-y-5">
-      <div className="px-0.5">
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-950 dark:text-white sm:text-3xl">
-          Настройки
-        </h1>
-        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-          Аккаунт, синхронизация, безопасность и платежи
-        </p>
-      </div>
+    <div className="mx-auto max-w-6xl page-stack">
+      <PageHeader
+        title="Настройки"
+        description="Аккаунт, синхронизация, безопасность и платежи"
+      />
 
       <SettingsTabs
         sections={[
@@ -102,9 +99,9 @@ export default async function SettingsPage() {
                     remnawaveUsername={user.remnawaveUsername}
                     embedded
                   />
-                  <div className="rounded-lg border border-slate-200/80 bg-slate-50/80 p-3 dark:border-white/10 dark:bg-surface-950/45">
+                  <div className="rounded-2xl border border-slate-200/80 bg-slate-50/80 p-4 dark:border-white/10 dark:bg-surface-950/45">
                     <div className="flex items-center gap-3">
-                      <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-cyan-50 text-cyan-700 dark:bg-cyan-400/10 dark:text-cyan-200">
+                      <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-cyan-50 text-cyan-700 dark:bg-cyan-400/10 dark:text-cyan-200">
                         <MailPlus className="h-5 w-5" />
                       </div>
                       <div className="min-w-0">
@@ -119,7 +116,7 @@ export default async function SettingsPage() {
                         Добавить email
                       </Link>
                     ) : (
-                      <div className="mt-4 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-500 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-400">
+                      <div className="mt-4 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-500 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-400">
                         {hasVerifiedEmail ? user.email : 'Сначала привяжите Telegram.'}
                       </div>
                     )}
@@ -143,7 +140,7 @@ export default async function SettingsPage() {
                 {hasVerifiedEmail ? (
                   <ChangePasswordForm />
                 ) : (
-                  <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
+                  <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
                     Добавьте и подтвердите email, чтобы включить вход по паролю.
                   </div>
                 )}
@@ -191,13 +188,13 @@ function SettingsSection({
     <section
       id={id}
       className={cn(
-        'scroll-mt-4 overflow-hidden rounded-lg border border-slate-200/80 bg-white/90 shadow-sm shadow-slate-200/50 backdrop-blur dark:border-white/10 dark:bg-white/[0.045] dark:shadow-black/20',
+        'scroll-mt-20 overflow-hidden rounded-3xl border border-slate-200/80 bg-white/90 shadow-sm shadow-slate-950/[0.04] backdrop-blur dark:border-white/10 dark:bg-white/[0.045] dark:shadow-black/20',
         className
       )}
     >
-      <div className="border-b border-slate-100 bg-slate-50/55 px-3 py-3 dark:border-white/10 dark:bg-white/[0.025] sm:px-4">
+      <div className="border-b border-slate-100 px-4 py-4 dark:border-white/10 sm:px-5">
         <div className="flex items-center gap-3">
-          <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-slate-950 text-cyan-200 shadow-sm dark:bg-cyan-300/10 dark:text-cyan-200">
+          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-cyan-50 text-cyan-700 dark:bg-cyan-300/10 dark:text-cyan-200">
             {icon}
           </div>
           <div className="min-w-0">
@@ -206,14 +203,14 @@ function SettingsSection({
           </div>
         </div>
       </div>
-      <div className="p-3 sm:p-4">{children}</div>
+      <div className="p-4 sm:p-5">{children}</div>
     </section>
   )
 }
 
 function AccountFact({ label, value }: { label: string; value: string }) {
   return (
-    <div className="min-w-0 rounded-lg border border-slate-200/80 bg-slate-50/80 px-3 py-2.5 dark:border-white/10 dark:bg-surface-950/45">
+    <div className="min-w-0 rounded-xl border border-slate-200/80 bg-slate-50/80 px-3 py-2.5 dark:border-white/10 dark:bg-surface-950/45">
       <div className="text-xs text-slate-500 dark:text-slate-400">{label}</div>
       <div className="mt-1 truncate font-medium text-slate-950 dark:text-white">{value}</div>
     </div>
@@ -232,9 +229,9 @@ function StatusPanel({
   const readyCount = [emailReady, telegramReady, vpnReady].filter(Boolean).length
 
   return (
-    <div className="rounded-lg border border-slate-200/80 bg-white/90 p-3 shadow-sm shadow-slate-200/50 dark:border-white/10 dark:bg-white/[0.045] dark:shadow-black/20">
+    <div className="rounded-2xl border border-slate-200/80 bg-white/90 p-4 shadow-sm shadow-slate-950/[0.04] dark:border-white/10 dark:bg-white/[0.045] dark:shadow-black/20">
       <div className="flex items-center gap-3">
-        <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-300">
+        <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-300">
           <ShieldCheck className="h-5 w-5" />
         </div>
         <div className="min-w-0">
@@ -253,7 +250,7 @@ function StatusPanel({
 
 function StatusLine({ label, value, active }: { label: string; value: string; active: boolean }) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-lg border border-slate-200/80 bg-slate-50/80 px-3 py-2 text-sm dark:border-white/10 dark:bg-surface-950/45">
+    <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-200/80 bg-slate-50/80 px-3 py-2.5 text-sm dark:border-white/10 dark:bg-surface-950/45">
       <span className="text-slate-500 dark:text-slate-400">{label}</span>
       <span className={`inline-flex items-center gap-1.5 font-medium ${active ? 'text-emerald-600 dark:text-emerald-300' : 'text-slate-400'}`}>
         {active ? <CheckCircle2 className="h-3.5 w-3.5" /> : null}

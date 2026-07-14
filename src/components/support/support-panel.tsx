@@ -510,14 +510,14 @@ export function SupportPanel({
   return (
     <div
       className={cn(
-        'grid h-[calc(100dvh-4.75rem)] min-h-[30rem] gap-2.5 overflow-hidden xl:h-[calc(100dvh-6.25rem)] xl:min-h-[35rem]',
+        'grid h-[calc(100dvh-10rem-env(safe-area-inset-bottom))] min-h-[26rem] gap-3 overflow-hidden xl:h-[calc(100dvh-6.25rem)] xl:min-h-[35rem]',
         mode === 'admin'
           ? 'xl:h-[calc(100dvh-5.5rem)] xl:grid-cols-[19rem_minmax(0,1fr)_16rem]'
           : 'xl:grid-cols-[18rem_minmax(0,1fr)]'
       )}
     >
       <section className={cn('min-h-0 overflow-y-auto pr-0.5 xl:flex xl:flex-col xl:overflow-hidden', mobileChatOpen && 'hidden xl:flex')}>
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-white/70 bg-white/90 shadow-sm shadow-slate-200/60 backdrop-blur dark:border-white/10 dark:bg-surface-900/80 dark:shadow-black/20">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-3xl border border-slate-200/80 bg-white/90 shadow-sm shadow-slate-950/[0.04] backdrop-blur dark:border-white/10 dark:bg-surface-900/80 dark:shadow-black/20">
           <div className={cn(
             'border-b border-slate-100 bg-white/80 px-3 py-2.5 dark:border-slate-800 dark:bg-surface-900/60',
             mode === 'admin' && 'bg-slate-50/85 dark:bg-surface-950/70'
@@ -534,7 +534,7 @@ export function SupportPanel({
                 {mode === 'user' && (
                   <button
                     type="button"
-                    className="grid h-9 w-9 place-items-center rounded-lg bg-slate-950 text-white shadow-sm transition-colors hover:bg-slate-800 dark:bg-white dark:text-slate-950"
+                    className="grid h-9 w-9 place-items-center rounded-xl bg-slate-950 text-white shadow-sm transition-colors hover:bg-slate-800 dark:bg-white dark:text-slate-950"
                     onClick={() => {
                       setNewTicketOpen(true)
                       setMobileChatOpen(true)
@@ -549,7 +549,7 @@ export function SupportPanel({
               </div>
             </div>
             <FolderTabs folder={folder} counts={folderCounts} mode={mode} onChange={setFolder} />
-            <div className="mt-2 flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 dark:border-slate-800 dark:bg-surface-950">
+            <div className="mt-2 flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 dark:border-slate-800 dark:bg-surface-950">
               <Search className="h-4 w-4 shrink-0 text-slate-400" />
               <input
                 value={query}
@@ -570,13 +570,13 @@ export function SupportPanel({
                   setError('')
                 }}
                 className={cn(
-                  'mb-1.5 flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition-all',
+                  'mb-1.5 flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition-all',
                   newTicketOpen
                     ? 'border-cyan-200 bg-cyan-50 text-slate-950 shadow-sm dark:border-cyan-400/30 dark:bg-cyan-400/10 dark:text-white'
                     : 'border-slate-200 bg-white text-slate-700 hover:border-cyan-200 hover:bg-cyan-50/60 dark:border-slate-800 dark:bg-surface-950 dark:text-slate-200'
                 )}
               >
-                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-slate-950 text-cyan-200 dark:bg-white dark:text-slate-950">
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-cyan-500 text-white dark:bg-cyan-300 dark:text-slate-950">
                   <MessageSquarePlus className="h-5 w-5" />
                 </span>
                 <span className="min-w-0">
@@ -620,7 +620,7 @@ export function SupportPanel({
       </section>
 
       <section className={cn(
-        'min-h-0 overflow-hidden rounded-lg border border-white/70 bg-white/95 shadow-xl shadow-slate-200/60 backdrop-blur dark:border-white/10 dark:bg-surface-900/90 dark:shadow-black/20',
+        'min-h-0 overflow-hidden rounded-3xl border border-slate-200/80 bg-white/95 shadow-sm shadow-slate-950/[0.05] backdrop-blur dark:border-white/10 dark:bg-surface-900/90 dark:shadow-black/20',
         mode === 'admin' && 'shadow-sm',
         !mobileChatOpen && 'hidden xl:block'
       )}>
@@ -645,7 +645,7 @@ export function SupportPanel({
                   <button
                     type="button"
                     onClick={() => setMobileChatOpen(false)}
-                    className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-sm transition-colors hover:bg-slate-50 xl:hidden"
+                    className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition-colors hover:bg-slate-50 xl:hidden"
                     aria-label="Назад к обращениям"
                   >
                     <ArrowLeft className="h-4 w-4" />
@@ -669,7 +669,7 @@ export function SupportPanel({
             </div>
 
             {error && (
-              <div className="mx-4 mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 sm:mx-5">
+              <div className="mx-4 mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 sm:mx-5">
                 {error}
               </div>
             )}
@@ -704,18 +704,18 @@ export function SupportPanel({
 
             <form onSubmit={sendMessage} className="border-t border-slate-100 bg-white/95 p-2.5 pb-[calc(0.625rem+env(safe-area-inset-bottom))] dark:border-slate-800 dark:bg-surface-900/95">
               {selected.status === 'CLOSED' ? (
-                <div className="flex items-center gap-2 rounded-lg bg-slate-50 px-4 py-3 text-sm text-slate-500 dark:bg-surface-800">
+                <div className="flex items-center gap-2 rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-500 dark:bg-surface-800">
                   <Lock className="h-4 w-4" />
                   Обращение закрыто и хранится в архиве
                 </div>
               ) : (
                 <div className="space-y-2">
                   <QuickReplies mode={mode} onPick={(value) => setMessage((current) => current.trim() ? `${current.trim()}\n\n${value}` : value)} />
-                  <div className="relative flex items-end gap-2 rounded-lg border border-slate-200 bg-white p-1.5 shadow-sm dark:border-slate-800 dark:bg-surface-950">
+                  <div className="relative flex items-end gap-2 rounded-2xl border border-slate-200 bg-white p-1.5 shadow-sm dark:border-slate-800 dark:bg-surface-950">
                     <EmojiPicker onPick={insertMessageEmoji} />
                     <textarea
                       ref={messageInputRef}
-                      className="max-h-28 min-h-10 flex-1 resize-none rounded-md border-0 bg-transparent px-2 py-2 text-sm outline-none placeholder:text-slate-400 focus:ring-0"
+                      className="max-h-28 min-h-10 flex-1 resize-none rounded-xl border-0 bg-transparent px-2 py-2 text-sm outline-none placeholder:text-slate-400 focus:ring-0"
                       value={message}
                       onChange={(event) => setMessage(event.target.value)}
                       onKeyDown={handleMessageKeyDown}
@@ -723,7 +723,7 @@ export function SupportPanel({
                       maxLength={3000}
                       required
                     />
-                    <button type="submit" className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-slate-950 text-white shadow-sm transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-45 dark:bg-white dark:text-slate-950" disabled={isPending || !message.trim()} aria-label="Отправить сообщение">
+                    <button type="submit" className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-slate-950 text-white shadow-sm transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-45 dark:bg-white dark:text-slate-950" disabled={isPending || !message.trim()} aria-label="Отправить сообщение">
                       <Send className="h-4 w-4" />
                     </button>
                   </div>
@@ -734,7 +734,7 @@ export function SupportPanel({
         ) : (
           <div className="grid min-h-[36rem] place-items-center p-8 text-center">
             <div>
-              <div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-lg bg-brand-50 text-brand-600">
+              <div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-brand-50 text-brand-600">
                 <LifeBuoy className="h-7 w-7" />
               </div>
               <h2 className="text-xl font-semibold">Выберите обращение</h2>
@@ -745,7 +745,7 @@ export function SupportPanel({
       </section>
 
       <aside className={cn(
-        'hidden min-h-0 overflow-hidden rounded-lg border border-white/70 bg-white/90 shadow-sm shadow-slate-200/60 backdrop-blur dark:border-white/10 dark:bg-surface-900/80 dark:shadow-black/20',
+        'hidden min-h-0 overflow-hidden rounded-3xl border border-slate-200/80 bg-white/90 shadow-sm shadow-slate-950/[0.04] backdrop-blur dark:border-white/10 dark:bg-surface-900/80 dark:shadow-black/20',
         mode === 'admin' && 'xl:block'
       )}>
         <TicketSideMenu selected={selected} mode={mode} isPending={isPending} onUpdateStatus={updateStatus} />
@@ -793,7 +793,7 @@ function NewTicketForm({
       <div className="border-b border-slate-100 bg-white/95 px-3 py-3 dark:border-slate-800 dark:bg-surface-900/95 sm:px-5">
         <div className="flex items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-cyan-50 text-cyan-700 ring-1 ring-cyan-100 dark:bg-cyan-400/10 dark:text-cyan-200 dark:ring-cyan-400/20">
+            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-cyan-50 text-cyan-700 ring-1 ring-cyan-100 dark:bg-cyan-400/10 dark:text-cyan-200 dark:ring-cyan-400/20">
               <MessageSquarePlus className="h-5 w-5" />
             </div>
             <div className="min-w-0">
@@ -824,14 +824,14 @@ function NewTicketForm({
                   type="button"
                   onClick={() => onCategoryChange(item.value)}
                   className={cn(
-                    'min-w-[13rem] rounded-lg border p-3 text-left transition-all sm:min-w-0',
+                    'min-w-[13rem] rounded-2xl border p-3 text-left transition-colors sm:min-w-0',
                     active
-                      ? 'border-slate-950 bg-slate-950 text-white shadow-md shadow-slate-950/10 dark:border-white dark:bg-white dark:text-slate-950'
+                      ? 'border-cyan-300 bg-cyan-50 text-slate-950 shadow-sm shadow-cyan-950/5 dark:border-cyan-400/40 dark:bg-cyan-400/10 dark:text-white'
                       : 'border-slate-200 bg-white text-slate-700 hover:border-cyan-200 hover:bg-cyan-50/40 dark:border-slate-800 dark:bg-surface-950 dark:text-slate-200 dark:hover:border-cyan-400/30'
                   )}
                 >
                   <span className="block text-sm font-semibold sm:text-base">{item.label}</span>
-                  <span className={cn('mt-1 line-clamp-2 block text-xs leading-relaxed', active ? 'text-white/70 dark:text-slate-600' : 'text-slate-500')}>
+                  <span className={cn('mt-1 line-clamp-2 block text-xs leading-relaxed', active ? 'text-cyan-700 dark:text-cyan-200' : 'text-slate-500')}>
                     {item.description}
                   </span>
                 </button>
@@ -842,11 +842,11 @@ function NewTicketForm({
 
         <div>
           <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Сообщение</div>
-          <div className="relative flex items-start gap-1.5 rounded-lg border border-slate-200 bg-white p-1.5 shadow-sm dark:border-slate-800 dark:bg-surface-950 sm:gap-2 sm:p-2">
+          <div className="relative flex items-start gap-1.5 rounded-2xl border border-slate-200 bg-white p-1.5 shadow-sm dark:border-slate-800 dark:bg-surface-950 sm:gap-2 sm:p-2">
             <EmojiPicker onPick={insertEmoji} />
             <textarea
               ref={messageInputRef}
-              className="min-h-32 flex-1 resize-none rounded-md border-0 bg-transparent px-2 py-2 text-base outline-none placeholder:text-slate-400 focus:ring-0 sm:min-h-44 sm:text-sm"
+              className="min-h-32 flex-1 resize-none rounded-xl border-0 bg-transparent px-2 py-2 text-base outline-none placeholder:text-slate-400 focus:ring-0 sm:min-h-44 sm:text-sm"
               value={message}
               onChange={(event) => onMessageChange(event.target.value)}
               onKeyDown={(event) => {
@@ -902,7 +902,7 @@ function EmojiPicker({ onPick }: { onPick: (emoji: string) => void }) {
         type="button"
         onClick={() => setOpen((current) => !current)}
         className={cn(
-          'grid h-10 w-10 place-items-center rounded-lg border text-slate-500 transition-colors',
+          'grid h-10 w-10 place-items-center rounded-xl border text-slate-500 transition-colors',
           open
             ? 'border-slate-300 bg-slate-100 text-slate-950 dark:border-slate-700 dark:bg-surface-800 dark:text-white'
             : 'border-transparent hover:bg-slate-100 hover:text-slate-950 dark:hover:bg-surface-800 dark:hover:text-white'
@@ -913,9 +913,9 @@ function EmojiPicker({ onPick }: { onPick: (emoji: string) => void }) {
       </button>
 
       {open && (
-        <div className="fixed inset-x-3 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-30 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-2xl shadow-slate-950/15 dark:border-slate-800 dark:bg-surface-900 sm:absolute sm:bottom-12 sm:left-0 sm:right-auto sm:w-[min(22rem,calc(100vw-2rem))]">
+        <div className="fixed inset-x-3 bottom-[calc(5.5rem+env(safe-area-inset-bottom))] z-30 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl shadow-slate-950/10 dark:border-slate-800 dark:bg-surface-900 sm:absolute sm:bottom-12 sm:left-0 sm:right-auto sm:w-[min(22rem,calc(100vw-2rem))]">
           <div className="border-b border-slate-100 p-2 dark:border-slate-800">
-            <div className="flex items-center gap-2 rounded-lg bg-slate-100 px-3 py-2 dark:bg-surface-950">
+            <div className="flex items-center gap-2 rounded-xl bg-slate-100 px-3 py-2 dark:bg-surface-950">
               <Search className="h-4 w-4 shrink-0 text-slate-400" />
               <input
                 value={query}
@@ -992,7 +992,7 @@ function FolderTabs({
   ]
 
   return (
-    <div className={cn('mt-3 flex gap-1 overflow-x-auto rounded-lg bg-slate-100 p-1 dark:bg-white/5')}>
+    <div className={cn('mt-3 flex gap-1 overflow-x-auto rounded-xl bg-slate-100 p-1 dark:bg-white/5')}>
       {items.map((item) => {
         const Icon = item.icon
         const active = folder === item.value
@@ -1002,7 +1002,7 @@ function FolderTabs({
             type="button"
             onClick={() => onChange(item.value)}
             className={cn(
-              'flex min-w-fit flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium transition-colors',
+              'flex min-w-fit flex-1 items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium transition-colors',
               active
                 ? 'bg-white text-slate-950 shadow-sm dark:bg-surface-800 dark:text-white'
                 : 'text-slate-500 hover:text-slate-950 dark:text-slate-400 dark:hover:text-white'
@@ -1040,8 +1040,8 @@ function TicketListItem({
       type="button"
       onClick={onClick}
       className={cn(
-        'group w-full rounded-md border px-3 py-2.5 text-left transition-all',
-        mode === 'admin' && 'rounded-lg py-3',
+        'group w-full rounded-xl border px-3 py-2.5 text-left transition-colors',
+        mode === 'admin' && 'py-3',
         active
           ? 'border-slate-300 bg-slate-50 shadow-sm shadow-slate-200/60 ring-1 ring-slate-200 dark:border-slate-700 dark:bg-surface-800 dark:ring-slate-700'
           : 'border-transparent hover:border-slate-200 hover:bg-slate-50 dark:hover:border-slate-800 dark:hover:bg-surface-800'
@@ -1289,7 +1289,7 @@ function QuickReplies({ mode, onPick }: { mode: 'user' | 'admin'; onPick: (value
       ]
 
   return (
-    <div className="rounded-lg border border-slate-100 bg-slate-50/70 p-1.5 dark:border-white/10 dark:bg-white/[0.035] sm:p-2">
+    <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-1.5 dark:border-white/10 dark:bg-white/[0.035] sm:p-2">
       <div className="mb-1.5 px-0.5 text-xs font-semibold uppercase tracking-wide text-slate-400">
         {mode === 'admin' ? 'Шаблоны ответа' : 'Быстрый старт'}
       </div>
@@ -1323,7 +1323,7 @@ function MessageBubble({ message, own }: { message: SupportMessage; own: boolean
     <div className={cn('flex', own ? 'justify-end' : 'justify-start')}>
       <div
         className={cn(
-          'max-w-[min(42rem,88%)] rounded-lg px-4 py-3 shadow-sm ring-1',
+          'max-w-[min(42rem,88%)] rounded-2xl px-4 py-3 shadow-sm ring-1',
           own
             ? 'bg-slate-950 text-white shadow-slate-950/10 ring-slate-950/10 dark:bg-white dark:text-slate-950 dark:ring-white/20'
             : 'bg-white text-slate-900 ring-slate-200 dark:bg-surface-800 dark:text-white dark:ring-slate-700'
@@ -1349,7 +1349,7 @@ function EmptyFolder({ folder }: { folder: TicketFolder }) {
   return (
     <div className="grid min-h-48 place-items-center px-4 py-10 text-center">
       <div>
-        <div className="mx-auto mb-3 grid h-11 w-11 place-items-center rounded-lg bg-slate-50 text-slate-400 dark:bg-surface-800">
+        <div className="mx-auto mb-3 grid h-11 w-11 place-items-center rounded-2xl bg-slate-50 text-slate-400 dark:bg-surface-800">
           <MessageCircle className="h-5 w-5" />
         </div>
         <div className="font-medium">{labels[folder]}</div>
