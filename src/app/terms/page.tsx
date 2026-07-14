@@ -154,7 +154,10 @@ export default function TermsPage() {
 
         <TermsSection title="11. Исполнитель и контакты">
           <p>{legal.operatorName}, ИНН {legal.taxId}.</p>
-          <p>Адрес: {legal.address}. Поддержка: <a className="text-brand-600 hover:underline" href={`mailto:${legal.supportEmail}`}>{legal.supportEmail}</a>.</p>
+          <p>
+            {legal.address && <>Адрес: {legal.address}. </>}
+            Поддержка: <a className="text-brand-600 hover:underline" href={`mailto:${legal.supportEmail}`}>{legal.supportEmail}</a>.
+          </p>
         </TermsSection>
 
         <nav className="flex flex-wrap gap-4 border-t border-slate-200 pt-5 text-sm dark:border-white/10">

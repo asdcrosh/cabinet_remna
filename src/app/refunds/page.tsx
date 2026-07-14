@@ -30,7 +30,10 @@ export default function RefundsPage() {
           <p>После проверки решение сообщается по email. Одобренный возврат отправляется через исходный способ оплаты. Фактический срок зачисления зависит от платёжного провайдера и банка.</p>
         </Section>
         <Section title="Исполнитель">
-          <p>{legal.operatorName}, ИНН {legal.taxId}. Адрес: {legal.address}.</p>
+          <p>
+            {legal.operatorName}, ИНН {legal.taxId}.
+            {legal.address && <> Адрес: {legal.address}.</>}
+          </p>
         </Section>
         <nav className="flex flex-wrap gap-4 border-t border-slate-200 pt-5 dark:border-white/10">
           <Link href="/terms" className="text-brand-600 hover:underline">Условия использования</Link>

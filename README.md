@@ -335,6 +335,7 @@ NODE_ENV=production npm run check:env
 | `NODE_ENV` | `production` |
 | `APP_URL` | Публичный HTTPS URL кабинета |
 | `ALLOWED_ORIGINS` | Разрешённые origins через запятую, без путей (обычно = APP_URL; в production только HTTPS) |
+| `TRUSTED_PROXY_HEADERS` | `true` за Caddy/Nginx, требуется стандартной production-конфигурацией |
 | `CABINET_IMAGE` | Web image (`release`) |
 | `CABINET_OPS_IMAGE` | Ops image для workers/migrations/cleanup |
 | `DATABASE_URL` | PostgreSQL с `connection_limit` и `pool_timeout` |
@@ -349,6 +350,9 @@ NODE_ENV=production npm run check:env
 | `EMAIL_VERIFICATION_WEBHOOK_URL` | Endpoint отправки email |
 | `BROADCAST_UPLOAD_SIGNING_SECRET` | Подпись URL картинок рассылок (>= 32 символов) |
 | `BROADCAST_UPLOAD_ALLOW_UNSIGNED_LEGACY` | Должно быть `false` |
+| `LEGAL_OPERATOR_NAME` | ФИО самозанятого, наименование ИП или ООО |
+| `LEGAL_OPERATOR_TAX_ID` | ИНН без слова «ИНН» |
+| `LEGAL_SUPPORT_EMAIL` | Публичный email поддержки и возвратов |
 
 ### Важные опциональные переменные
 
@@ -356,7 +360,7 @@ NODE_ENV=production npm run check:env
 | --- | --- |
 | `CABINET_DOMAIN` | Домен без `https://` |
 | `CABINET_BRAND_NAME` | Название сервиса в UI и письмах |
-| `TRUSTED_PROXY_HEADERS` | `true` за reverse proxy (rate limit по IP) |
+| `LEGAL_OPERATOR_ADDRESS` | Необязательный адрес исполнителя; пустое значение не показывается |
 | `REMNASHOP_DATABASE_URL` | Read-only доступ к БД Remnashop |
 | `REMNASHOP_API_URL` | Public API Remnashop |
 | `TELEGRAM_BOT_TOKEN` | Mini App и Telegram-уведомления |

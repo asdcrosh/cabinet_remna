@@ -31,7 +31,10 @@ export default function PrivacyPage() {
           <p>Пользователь может запросить сведения об обработке, уточнение или удаление данных, если их хранение больше не требуется по закону или для исполнения договора. Запрос направляется на <a className="text-brand-600 hover:underline" href={`mailto:${legal.supportEmail}`}>{legal.supportEmail}</a>.</p>
         </Section>
         <Section title="Оператор">
-          <p>{legal.operatorName}, ИНН {legal.taxId}. Адрес: {legal.address}.</p>
+          <p>
+            {legal.operatorName}, ИНН {legal.taxId}.
+            {legal.address && <> Адрес: {legal.address}.</>}
+          </p>
         </Section>
         <nav className="flex flex-wrap gap-4 border-t border-slate-200 pt-5 dark:border-white/10">
           <Link href="/terms" className="text-brand-600 hover:underline">Условия использования</Link>
