@@ -195,17 +195,17 @@ export function PlansAdmin({ plans }: { plans: PlanAdminRow[] }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-surface-900 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-4 rounded-2xl border border-slate-200/80 bg-white/90 p-4 shadow-sm shadow-slate-950/[0.04] dark:border-white/10 dark:bg-surface-900/90 dark:shadow-black/20 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="font-semibold">Каталог тарифов</h2>
           <p className="mt-1 text-sm text-slate-500">{plans.length} тарифов · настройки открываются в отдельном окне</p>
         </div>
-        <div className="flex gap-2">
-          <button type="button" className="btn-secondary" onClick={() => void loadSquads()} disabled={squadsLoading}>
+        <div className="flex w-full gap-2 sm:w-auto">
+          <button type="button" className="btn-secondary flex-1 sm:flex-none" onClick={() => void loadSquads()} disabled={squadsLoading}>
             <RefreshCw className={cn('h-4 w-4', squadsLoading && 'animate-spin')} />
             Группы
           </button>
-          <button type="button" className="btn-primary" onClick={() => setCreateOpen(true)}>
+          <button type="button" className="btn-primary flex-1 sm:flex-none" onClick={() => setCreateOpen(true)}>
             <Plus className="h-4 w-4" />
             Новый тариф
           </button>
@@ -219,16 +219,16 @@ export function PlansAdmin({ plans }: { plans: PlanAdminRow[] }) {
         onClose={closeEditor}
         size="xl"
       >
-          <PlanEditor
-            form={createForm}
-            setForm={setCreateForm}
-            squads={squads}
-            squadsLoading={squadsLoading}
-            squadsError={squadsError}
-            submitLabel="Создать тариф"
-            loading={loadingId === 'create'}
-            onSubmit={() => void submit(createForm)}
-          />
+        <PlanEditor
+          form={createForm}
+          setForm={setCreateForm}
+          squads={squads}
+          squadsLoading={squadsLoading}
+          squadsError={squadsError}
+          submitLabel="Создать тариф"
+          loading={loadingId === 'create'}
+          onSubmit={() => void submit(createForm)}
+        />
       </AdminModal>
 
       <AdminModal
@@ -269,12 +269,13 @@ export function PlansAdmin({ plans }: { plans: PlanAdminRow[] }) {
         />
       )}
 
-      <div className="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-white/10 dark:bg-surface-900">
-        {plans.map((plan) => {
+      {plans.length > 0 && (
+        <div className="grid gap-3">
+          {plans.map((plan) => {
           const selectedSquads = plan.activeInternalSquads.map((id) => squadById.get(id)).filter(Boolean) as RemnawaveSquad[]
           const unknownSquads = plan.activeInternalSquads.filter((id) => !squadById.has(id))
           return (
-            <article key={plan.id} className="border-b border-slate-100 p-4 last:border-b-0 dark:border-white/10">
+            <article key={plan.id} className="rounded-2xl border border-slate-200/80 bg-white/90 p-4 shadow-sm shadow-slate-950/[0.04] dark:border-white/10 dark:bg-surface-900/90 dark:shadow-black/20">
               <div className="grid gap-4 xl:grid-cols-[minmax(15rem,1.2fr)_minmax(12rem,.7fr)_minmax(16rem,1fr)_auto] xl:items-center">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
@@ -319,27 +320,28 @@ export function PlansAdmin({ plans }: { plans: PlanAdminRow[] }) {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 xl:justify-end">
-                  <button type="button" className="btn-secondary h-10 min-h-10 px-3" onClick={() => startEdit(plan)} title="Изменить тариф">
+                <div className="grid grid-flow-col auto-cols-fr gap-2 sm:flex sm:items-center xl:justify-end">
+                  <button type="button" className="btn-secondary h-10 min-h-10 px-3" onClick={() => startEdit(plan)} title="Изменить тариф" aria-label={`Изменить тариф ${plan.name}`}>
                     <Edit3 className="h-4 w-4" />
                   </button>
                   {plan.availability === 'LINK' && (
-                    <button type="button" className="btn-secondary h-10 min-h-10 px-3" onClick={() => void copyPlanLink(plan)} title="Скопировать ссылку">
+                    <button type="button" className="btn-secondary h-10 min-h-10 px-3" onClick={() => void copyPlanLink(plan)} title="Скопировать ссылку" aria-label={`Скопировать ссылку на тариф ${plan.name}`}>
                       <Link2 className="h-4 w-4" />
                     </button>
                   )}
-                  <button type="button" className="btn-secondary h-10 min-h-10 px-3 text-red-600" onClick={() => requestDeletePlan(plan)} disabled={loadingId === plan.id} title="Удалить">
+                  <button type="button" className="btn-secondary h-10 min-h-10 px-3 text-red-600" onClick={() => requestDeletePlan(plan)} disabled={loadingId === plan.id} title="Удалить" aria-label={`Удалить тариф ${plan.name}`}>
                     <Trash2 className="h-4 w-4" />
                   </button>
-                  <button type="button" className="btn-secondary h-10 min-h-10 px-3" onClick={() => void toggleActive(plan)} disabled={loadingId === plan.id} title={plan.isActive ? 'Скрыть тариф' : 'Опубликовать тариф'}>
+                  <button type="button" className="btn-secondary h-10 min-h-10 px-3" onClick={() => void toggleActive(plan)} disabled={loadingId === plan.id} title={plan.isActive ? 'Скрыть тариф' : 'Опубликовать тариф'} aria-label={`${plan.isActive ? 'Скрыть' : 'Опубликовать'} тариф ${plan.name}`}>
                     <Power className="h-4 w-4" />
                   </button>
                 </div>
               </div>
             </article>
           )
-        })}
-      </div>
+          })}
+        </div>
+      )}
       <ConfirmDialog
         open={Boolean(deleteCandidate)}
         title="Удалить тариф"
@@ -420,7 +422,7 @@ function PlanEditor({
       </div>
 
       {form.availability === 'ALLOWED' && (
-        <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-4 dark:border-amber-500/20 dark:bg-amber-500/5">
+        <div className="rounded-2xl border border-amber-200 bg-amber-50/60 p-4 dark:border-amber-500/20 dark:bg-amber-500/5">
           <div className="font-medium">Разрешённые пользователи</div>
           <p className="mt-1 text-xs text-slate-500">
             По одному email или Telegram ID на строку. При синхронизации этот список переносится из Remnashop.
@@ -434,7 +436,7 @@ function PlanEditor({
         </div>
       )}
 
-      <div className="rounded-lg border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-surface-900">
+      <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-surface-900">
         <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <div className="font-medium">Группы Remnawave</div>
@@ -453,7 +455,7 @@ function PlanEditor({
                 type="button"
                 onClick={() => toggleSquad(squad.uuid)}
                 className={cn(
-                  'flex min-w-0 items-center gap-3 rounded-lg border px-3 py-3 text-left transition-colors',
+                  'flex min-w-0 items-center gap-3 rounded-xl border px-3 py-3 text-left transition-colors',
                   selected.has(squad.uuid)
                     ? 'border-cyan-300 bg-cyan-50 text-cyan-950 dark:border-cyan-400/40 dark:bg-cyan-400/10 dark:text-cyan-100'
                     : 'border-slate-200 bg-white hover:border-slate-300 dark:border-white/10 dark:bg-surface-900 dark:hover:border-white/20'
@@ -473,7 +475,7 @@ function PlanEditor({
             ))}
           </div>
         ) : (
-          <div className="rounded-lg bg-slate-50 px-3 py-4 text-sm text-slate-500 dark:bg-white/5">
+          <div className="rounded-xl bg-slate-50 px-3 py-4 text-sm text-slate-500 dark:bg-white/5">
             {squadsLoading ? 'Загружаем группы...' : squadsError || 'Группы не найдены'}
           </div>
         )}
@@ -486,9 +488,11 @@ function PlanEditor({
         </details>
       </div>
 
-      <button type="button" className="btn-primary" onClick={onSubmit} disabled={loading}>
-        {loading ? 'Сохраняем...' : submitLabel}
-      </button>
+      <div className="flex justify-end border-t pt-4">
+        <button type="button" className="btn-primary w-full sm:w-auto" onClick={onSubmit} disabled={loading}>
+          {loading ? 'Сохраняем...' : submitLabel}
+        </button>
+      </div>
     </div>
   )
 }
@@ -499,7 +503,7 @@ function Field({ label, children, className }: { label: string; children: ReactN
 
 function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (value: boolean) => void; label: string }) {
   return (
-    <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-lg border border-slate-200 px-3 text-sm dark:border-white/10">
+    <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-xl border border-slate-200 px-3 text-sm dark:border-white/10">
       <input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} />
       {label}
     </label>

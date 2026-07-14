@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { Archive, CheckCheck, Edit3, Gift, Plus, Power, TicketCheck, Trash2, UserRound, Wand2 } from 'lucide-react'
+import { Archive, CheckCheck, Edit3, Gift, Plus, Power, Search, TicketCheck, Trash2, UserRound, Wand2 } from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
 import { toast } from '@/components/ui/toaster'
 import { cn } from '@/lib/cn'
@@ -349,82 +349,93 @@ export function PromoCodesAdmin({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-3 rounded-lg border bg-white p-4 dark:bg-surface-900 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="font-semibold">Промокоды</h2>
-          <p className="mt-1 text-sm text-slate-500">Скидки, ограничения и доступные тарифы</p>
-        </div>
-        <button type="button" className="btn-primary" onClick={startCreate}>
-          <Plus className="h-4 w-4" />
-          Новый промокод
-        </button>
-      </div>
-
-      <div className="flex gap-1 overflow-x-auto rounded-lg border bg-white p-1 dark:bg-surface-900">
-        {([
-          ['AVAILABLE', 'Не использованы', TicketCheck],
-          ['USED', 'Использованы', CheckCheck],
-          ['ARCHIVE', 'Архив', Archive],
-        ] as const).map(([value, label, Icon]) => (
-          <button
-            key={value}
-            type="button"
-            onClick={() => setTab(value)}
-            className={cn(
-              'inline-flex min-h-10 shrink-0 items-center gap-2 rounded-md px-3 text-sm font-medium transition-colors',
-              tab === value ? 'bg-slate-950 text-white dark:bg-white dark:text-slate-950' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-white/5'
-            )}
-          >
-            <Icon className="h-4 w-4" />
-            {label}
-            <span className={cn('rounded-full px-1.5 text-xs', tab === value ? 'bg-white/15' : 'bg-slate-100 dark:bg-white/10')}>
-              {counts[value]}
-            </span>
+      <section className="rounded-2xl border border-slate-200/80 bg-white/90 p-4 shadow-sm shadow-slate-950/[0.04] dark:border-white/10 dark:bg-surface-900/90 dark:shadow-black/20">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="font-semibold">Промокоды</h2>
+            <p className="mt-1 text-sm text-slate-500">Скидки, ограничения и доступные тарифы</p>
+          </div>
+          <button type="button" className="btn-primary w-full sm:w-auto" onClick={startCreate}>
+            <Plus className="h-4 w-4" />
+            Новый промокод
           </button>
-        ))}
-      </div>
+        </div>
 
-      <div className="flex gap-1 overflow-x-auto rounded-lg border bg-white p-1 dark:bg-surface-900">
-        {([
-          ['ALL', 'Все', TicketCheck],
-          ['CREATED', 'Созданные', Wand2],
-          ['MY_BOX', 'Мои из бокса', Gift],
-          ['OTHER_BOX', 'Чужие из бокса', UserRound],
-        ] as const).map(([value, label, Icon]) => (
-          <button
-            key={value}
-            type="button"
-            onClick={() => {
-              setOrigin(value)
+        <div className="relative mt-4">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <input
+            value={query}
+            onChange={(event) => {
+              setQuery(event.target.value)
               setSelectedIds([])
             }}
-            className={cn(
-              'inline-flex min-h-10 shrink-0 items-center gap-2 rounded-md px-3 text-sm font-medium transition-colors',
-              origin === value ? 'bg-slate-950 text-white dark:bg-white dark:text-slate-950' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-white/5'
-            )}
-          >
-            <Icon className="h-4 w-4" />
-            {label}
-            <span className={cn('rounded-full px-1.5 text-xs', origin === value ? 'bg-white/15' : 'bg-slate-100 dark:bg-white/10')}>
-              {originCounts[value]}
-            </span>
-          </button>
-        ))}
-      </div>
+            className="input pl-9"
+            placeholder="Поиск по коду, email или имени"
+          />
+        </div>
 
-      <div className="rounded-lg border bg-white p-3 dark:bg-surface-900">
-        <input
-          value={query}
-          onChange={(event) => {
-            setQuery(event.target.value)
-            setSelectedIds([])
-          }}
-          className="input"
-          placeholder="Поиск по коду, email или имени"
-        />
-      </div>
+        <div className="mt-4 grid gap-3 xl:grid-cols-2">
+          <div className="min-w-0">
+            <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">Статус</div>
+            <div className="flex gap-1 overflow-x-auto rounded-xl bg-slate-100/80 p-1 dark:bg-white/[0.05]">
+              {([
+                ['AVAILABLE', 'Не использованы', TicketCheck],
+                ['USED', 'Использованы', CheckCheck],
+                ['ARCHIVE', 'Архив', Archive],
+              ] as const).map(([value, label, Icon]) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setTab(value)}
+                  className={cn(
+                    'inline-flex min-h-10 shrink-0 items-center gap-2 rounded-lg px-3 text-sm font-medium transition-colors',
+                    tab === value ? 'bg-slate-950 text-white shadow-sm dark:bg-white dark:text-slate-950' : 'text-slate-500 hover:bg-white/70 dark:hover:bg-white/5'
+                  )}
+                >
+                  <Icon className="h-4 w-4" />
+                  {label}
+                  <span className={cn('rounded-full px-1.5 text-xs', tab === value ? 'bg-white/15' : 'bg-white dark:bg-white/10')}>
+                    {counts[value]}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
 
-      <div className={selectedIds.length > 0 ? 'admin-bulk-bar' : 'flex flex-col gap-3 rounded-lg border bg-white p-3 dark:bg-surface-900 sm:flex-row sm:items-center sm:justify-between'}>
+          <div className="min-w-0">
+            <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">Источник</div>
+            <div className="flex gap-1 overflow-x-auto rounded-xl bg-slate-100/80 p-1 dark:bg-white/[0.05]">
+              {([
+                ['ALL', 'Все', TicketCheck],
+                ['CREATED', 'Созданные', Wand2],
+                ['MY_BOX', 'Мои из бокса', Gift],
+                ['OTHER_BOX', 'Чужие из бокса', UserRound],
+              ] as const).map(([value, label, Icon]) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => {
+                    setOrigin(value)
+                    setSelectedIds([])
+                  }}
+                  className={cn(
+                    'inline-flex min-h-10 shrink-0 items-center gap-2 rounded-lg px-3 text-sm font-medium transition-colors',
+                    origin === value ? 'bg-slate-950 text-white shadow-sm dark:bg-white dark:text-slate-950' : 'text-slate-500 hover:bg-white/70 dark:hover:bg-white/5'
+                  )}
+                >
+                  <Icon className="h-4 w-4" />
+                  {label}
+                  <span className={cn('rounded-full px-1.5 text-xs', origin === value ? 'bg-white/15' : 'bg-white dark:bg-white/10')}>
+                    {originCounts[value]}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div className={selectedIds.length > 0 ? 'admin-bulk-bar' : 'flex flex-col gap-3 rounded-2xl border border-slate-200/80 bg-white/90 p-3 shadow-sm shadow-slate-950/[0.04] dark:border-white/10 dark:bg-surface-900/90 sm:flex-row sm:items-center sm:justify-between'}>
         <label className="flex min-h-10 items-center gap-3 text-sm font-medium text-slate-600 dark:text-slate-300">
           <input
             type="checkbox"
@@ -524,7 +535,7 @@ export function PromoCodesAdmin({
             </Field>
           </div>
 
-          <label className="flex min-h-11 items-center gap-3 rounded-lg border px-3 text-sm">
+          <label className="flex min-h-11 items-center gap-3 rounded-xl border px-3 text-sm">
             <input
               type="checkbox"
               checked={form.isActive}
@@ -533,7 +544,7 @@ export function PromoCodesAdmin({
             Промокод активен
           </label>
 
-          <details className="rounded-lg border border-slate-200 bg-slate-50/70 p-3 dark:border-white/10 dark:bg-white/[0.03]">
+          <details className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3 dark:border-white/10 dark:bg-white/[0.03]">
             <summary className="cursor-pointer text-sm font-semibold text-slate-950 dark:text-white">Сроки и лимиты</summary>
             <div className="mt-4 grid gap-3 md:grid-cols-2">
               <Field label="Общий лимит">
@@ -551,7 +562,7 @@ export function PromoCodesAdmin({
             </div>
           </details>
 
-          <details className="rounded-lg border border-slate-200 bg-slate-50/70 p-3 dark:border-white/10 dark:bg-white/[0.03]">
+          <details className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3 dark:border-white/10 dark:bg-white/[0.03]">
             <summary className="cursor-pointer text-sm font-semibold text-slate-950 dark:text-white">
               Тарифы · {form.planIds.length === 0 ? 'все' : `выбрано ${form.planIds.length}`}
             </summary>
@@ -580,7 +591,7 @@ export function PromoCodesAdmin({
                   type="button"
                   onClick={() => togglePlan(plan.id)}
                   className={cn(
-                    'flex items-center gap-3 rounded-lg border px-3 py-2.5 text-left text-sm transition-colors',
+                    'flex items-center gap-3 rounded-xl border px-3 py-2.5 text-left text-sm transition-colors',
                     form.planIds.includes(plan.id)
                       ? 'border-brand-300 bg-brand-50 text-brand-700 dark:border-brand-500/60 dark:bg-brand-500/10 dark:text-brand-200'
                       : 'bg-white text-slate-600 hover:bg-slate-50 dark:bg-surface-900 dark:text-slate-300'
@@ -596,7 +607,7 @@ export function PromoCodesAdmin({
           </div>
           </details>
 
-          <div className="flex justify-end gap-2 border-t pt-4">
+          <div className="grid grid-cols-2 gap-2 border-t pt-4 sm:flex sm:justify-end">
             <button type="button" className="btn-secondary" onClick={resetForm}>Отмена</button>
             <button type="button" className="btn-primary" onClick={submit} disabled={loading}>
               {loading ? 'Сохраняем...' : editingId ? 'Сохранить' : 'Создать'}
@@ -605,9 +616,10 @@ export function PromoCodesAdmin({
         </div>
       </AdminModal>
 
-      <div className="overflow-hidden rounded-lg border bg-white dark:bg-surface-900">
-        {filteredPromoCodes.map((promoCode) => (
-          <article key={promoCode.id} className="grid gap-4 border-b p-4 last:border-b-0 lg:grid-cols-[minmax(13rem,1fr)_minmax(12rem,.9fr)_minmax(13rem,1fr)_minmax(12rem,.8fr)_auto] lg:items-center">
+      {filteredPromoCodes.length > 0 && (
+        <div className="grid gap-3">
+          {filteredPromoCodes.map((promoCode) => (
+          <article key={promoCode.id} className="grid gap-4 rounded-2xl border border-slate-200/80 bg-white/90 p-4 shadow-sm shadow-slate-950/[0.04] dark:border-white/10 dark:bg-surface-900/90 dark:shadow-black/20 lg:grid-cols-[minmax(13rem,1fr)_minmax(12rem,.9fr)_minmax(13rem,1fr)_minmax(12rem,.8fr)_auto] lg:items-center">
             <div className="flex min-w-0 items-start gap-3">
               <input
                 className="mt-1.5 shrink-0"
@@ -645,11 +657,11 @@ export function PromoCodesAdmin({
               <CompactFact label="На одного" value={String(promoCode.maxUsesPerUser)} />
               <CompactFact label="Срок" value={formatRange(promoCode.startsAt, promoCode.expiresAt)} />
             </div>
-            <div className="flex shrink-0 gap-2 lg:justify-end">
-              <button type="button" className="btn-secondary h-10 min-h-10 px-3" onClick={() => startEdit(promoCode)} title="Изменить">
+            <div className="grid grid-cols-3 gap-2 sm:flex sm:shrink-0 lg:justify-end">
+              <button type="button" className="btn-secondary h-10 min-h-10 px-3" onClick={() => startEdit(promoCode)} title="Изменить" aria-label={`Изменить промокод ${promoCode.code}`}>
                 <Edit3 className="h-4 w-4" />
               </button>
-              <button type="button" className="btn-secondary h-10 min-h-10 px-3" onClick={() => toggleActive(promoCode)} title={promoCode.isActive ? 'Отключить' : 'Включить'}>
+              <button type="button" className="btn-secondary h-10 min-h-10 px-3" onClick={() => toggleActive(promoCode)} title={promoCode.isActive ? 'Отключить' : 'Включить'} aria-label={`${promoCode.isActive ? 'Отключить' : 'Включить'} промокод ${promoCode.code}`}>
                 <Power className="h-4 w-4" />
               </button>
               <button
@@ -657,13 +669,15 @@ export function PromoCodesAdmin({
                 className="btn-secondary h-10 min-h-10 px-3 text-red-600 hover:border-red-200 hover:bg-red-50 hover:text-red-700 dark:text-red-300 dark:hover:border-red-500/30 dark:hover:bg-red-500/10"
                 onClick={() => void deletePromoCode(promoCode)}
                 title="Удалить"
+                aria-label={`Удалить промокод ${promoCode.code}`}
               >
                 <Trash2 className="h-4 w-4" />
               </button>
             </div>
           </article>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
       {filteredPromoCodes.length === 0 && (
         <AdminEmptyState
@@ -731,7 +745,7 @@ function AssigneesBlock({ assignees }: { assignees: PromoCodeAssignee[] }) {
 
 function CompactFact({ label, value }: { label: string; value: string }) {
   return (
-    <div className="min-w-0">
+    <div className="min-w-0 rounded-xl bg-slate-50/80 px-2.5 py-2 dark:bg-white/[0.04]">
       <div className="text-[11px] uppercase text-slate-400">{label}</div>
       <div className="mt-1 truncate font-medium" title={value}>{value}</div>
     </div>
