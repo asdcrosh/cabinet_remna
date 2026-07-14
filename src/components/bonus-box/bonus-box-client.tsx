@@ -86,7 +86,7 @@ export function BonusBoxClient({
     [data.prizes],
   );
   const openButtonClass =
-    "bonus-box-open-button group relative inline-flex min-h-11 items-center justify-center overflow-hidden rounded-lg border border-slate-950 px-4 text-sm font-semibold text-white shadow-lg shadow-slate-950/15 transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-800 disabled:translate-y-0 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 disabled:shadow-none dark:border-white dark:text-slate-950 dark:shadow-black/20 dark:hover:border-slate-200 dark:disabled:border-white/10 dark:disabled:bg-white/10 dark:disabled:text-slate-500 sm:min-w-44";
+    "bonus-box-open-button group relative inline-flex min-h-11 items-center justify-center overflow-hidden rounded-xl border border-slate-950 px-4 text-sm font-semibold text-white shadow-sm shadow-slate-950/15 transition-colors duration-200 hover:border-slate-800 hover:bg-slate-800 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 disabled:shadow-none dark:border-white dark:text-slate-950 dark:shadow-black/20 dark:hover:border-slate-200 dark:disabled:border-white/10 dark:disabled:bg-white/10 dark:disabled:text-slate-500 sm:min-w-44";
   const revealClass = result ? bonusBoxRevealClass(result.prize) : null;
 
   useEffect(() => {
@@ -167,7 +167,7 @@ export function BonusBoxClient({
       </span>
     </a>
   ) : data.canOpenReason && !opening ? (
-    <div className="flex min-h-10 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-slate-600 dark:border-white/10 dark:bg-white/[0.05] dark:text-slate-300">
+    <div className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-slate-600 dark:border-white/10 dark:bg-white/[0.05] dark:text-slate-300">
       <Gift className="h-4 w-4 text-cyan-600 dark:text-cyan-300" />
       <span>{openButtonLabel}</span>
     </div>
@@ -189,7 +189,7 @@ export function BonusBoxClient({
     <div className="flex flex-col gap-4 sm:gap-5">
       <section
         className={cn(
-          "bonus-box-stage order-first overflow-hidden rounded-lg border border-slate-200 bg-white shadow-xl shadow-slate-200/50 dark:border-white/10 dark:bg-surface-900 dark:shadow-black/25",
+          "bonus-box-stage order-first overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-sm shadow-slate-950/[0.05] dark:border-white/10 dark:bg-surface-900 dark:shadow-black/20",
           opening && "bonus-box-stage--opening",
           revealEffect && "bonus-box-stage--reveal",
           revealEffect && result?.prize.type !== "NO_PRIZE" && "bonus-box-stage--win",
@@ -197,7 +197,7 @@ export function BonusBoxClient({
           revealEffect && revealClass,
         )}
       >
-        <div className="bonus-box-stage-header grid gap-2.5 border-b border-slate-200 px-3 py-2.5 dark:border-white/10 sm:grid-cols-[minmax(0,1fr)_minmax(12rem,18rem)] sm:items-center sm:gap-3 sm:px-5 sm:py-3">
+        <div className="bonus-box-stage-header grid gap-3 border-b border-slate-200 px-4 py-3.5 dark:border-white/10 sm:grid-cols-[minmax(0,1fr)_minmax(12rem,18rem)] sm:items-center sm:px-5 sm:py-4">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="text-base font-semibold text-slate-950 dark:text-white sm:text-lg">Рулетка бонусов</h2>
@@ -268,7 +268,7 @@ export function BonusBoxClient({
       {result && (
         <section
           className={cn(
-            "bonus-box-result relative order-2 overflow-hidden rounded-lg border bg-white shadow-sm shadow-slate-200/60 dark:bg-surface-900 dark:shadow-black/20",
+            "bonus-box-result relative order-2 overflow-hidden rounded-2xl border bg-white shadow-sm shadow-slate-950/[0.04] dark:bg-surface-900 dark:shadow-black/20",
             result.prize.type === "NO_PRIZE"
               ? "border-red-200 dark:border-red-500/40"
               : "border-emerald-200 dark:border-emerald-500/30",
@@ -278,7 +278,7 @@ export function BonusBoxClient({
           <div className="relative grid gap-4 p-4 sm:p-5 md:grid-cols-[auto_1fr_auto] md:items-center">
             <div
               className={cn(
-                "grid h-14 w-14 place-items-center rounded-lg border shadow-inner",
+                "grid h-14 w-14 place-items-center rounded-2xl border shadow-inner",
                 result.prize.type === "NO_PRIZE"
                   ? "border-red-200 bg-red-50 text-red-500 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200"
                   : "border-emerald-200 bg-emerald-50 text-emerald-600 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200",
@@ -312,7 +312,7 @@ export function BonusBoxClient({
                 </div>
               )}
               {result.promoCode && (
-                <div className="mt-3 inline-flex max-w-full flex-wrap items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-100">
+                <div className="mt-3 inline-flex max-w-full flex-wrap items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-100">
                   <TicketPercent className="h-4 w-4 shrink-0" />
                   <span className="break-all">{result.promoCode}</span>
                   {result.promoCodeExpiresAt && (
@@ -374,7 +374,7 @@ export function BonusBoxClient({
       )}
 
       <section className="order-4 space-y-4">
-        <div className="flex flex-wrap gap-2 rounded-lg border border-slate-200 bg-white p-1 shadow-sm shadow-slate-200/60 dark:border-white/10 dark:bg-surface-900 dark:shadow-black/20">
+        <div className="flex flex-wrap gap-1.5 rounded-2xl border border-slate-200/80 bg-white p-1.5 shadow-sm shadow-slate-950/[0.04] dark:border-white/10 dark:bg-surface-900 dark:shadow-black/20">
           <BonusTabButton
             active={activeTab === "outcomes"}
             onClick={() => setActiveTab("outcomes")}
@@ -408,7 +408,7 @@ export function BonusBoxClient({
                 <OutcomeRow key={prize.id} prize={prize} />
               ))}
               {data.prizes.length === 0 && (
-                <div className="rounded-lg border border-dashed border-slate-300 bg-white p-5 text-sm text-slate-500 dark:border-white/10 dark:bg-surface-900">
+                <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-5 text-sm text-slate-500 dark:border-white/10 dark:bg-surface-900">
                   Подарки скоро появятся.
                 </div>
               )}
@@ -424,7 +424,7 @@ export function BonusBoxClient({
                 <OpeningRow key={opening.id} opening={opening} />
               ))}
               {data.openings.length === 0 && (
-                <div className="rounded-lg border border-dashed border-slate-300 bg-white p-5 text-sm text-slate-500 dark:border-white/10 dark:bg-surface-900">
+                <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-5 text-sm text-slate-500 dark:border-white/10 dark:bg-surface-900">
                   История пока пустая.
                 </div>
               )}
@@ -479,7 +479,7 @@ function ActivePromoRewards({
   onCopy: (code: string) => void;
 }) {
   return (
-    <section className="order-3 rounded-lg border border-slate-200 bg-white p-3 shadow-sm shadow-slate-200/60 dark:border-white/10 dark:bg-surface-900 dark:shadow-black/20 sm:p-4">
+    <section className="order-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm shadow-slate-950/[0.03] dark:border-white/10 dark:bg-surface-900 dark:shadow-black/20 sm:p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-base font-semibold text-slate-950 dark:text-white sm:text-lg">Ваши активные промокоды</h2>
@@ -495,7 +495,7 @@ function ActivePromoRewards({
         {rewards.map((reward) => (
           <article
             key={reward.id}
-            className="rounded-lg border border-slate-200 bg-slate-50/70 p-3 dark:border-white/10 dark:bg-white/[0.04]"
+            className="rounded-xl border border-slate-200 bg-slate-50/70 p-3 dark:border-white/10 dark:bg-white/[0.04]"
           >
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
@@ -526,9 +526,9 @@ function ActivePromoRewards({
 
 function BestRecentOpening({ opening }: { opening: BestRecentOpeningView }) {
   return (
-    <section className="order-3 rounded-lg border border-amber-200 bg-white p-3 shadow-sm shadow-amber-950/5 dark:border-amber-400/20 dark:bg-surface-900 dark:shadow-black/20 sm:p-4">
+    <section className="order-3 rounded-2xl border border-amber-200 bg-white p-3 shadow-sm shadow-amber-950/5 dark:border-amber-400/20 dark:bg-surface-900 dark:shadow-black/20 sm:p-4">
       <div className="grid gap-3 sm:grid-cols-[auto_1fr_auto] sm:items-center">
-        <div className="grid h-11 w-11 place-items-center rounded-lg bg-amber-50 text-amber-600 dark:bg-amber-400/10 dark:text-amber-200">
+        <div className="grid h-11 w-11 place-items-center rounded-xl bg-amber-50 text-amber-600 dark:bg-amber-400/10 dark:text-amber-200">
           <Trophy className="h-5 w-5" />
         </div>
         <div className="min-w-0">
@@ -567,9 +567,9 @@ function BonusTabButton({
     <button
       type="button"
       className={cn(
-        "flex min-h-10 flex-1 items-center justify-between gap-3 rounded-md px-3 py-2 text-left text-sm transition-colors sm:flex-none sm:min-w-40",
+        "flex min-h-10 flex-1 items-center justify-between gap-3 rounded-xl px-3 py-2 text-left text-sm transition-colors sm:flex-none sm:min-w-40",
         active
-          ? "bg-slate-950 text-white shadow-sm dark:bg-white dark:text-slate-950"
+          ? "bg-cyan-50 text-cyan-900 ring-1 ring-cyan-200 dark:bg-cyan-400/10 dark:text-cyan-100 dark:ring-cyan-400/20"
           : "text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-white/5",
       )}
       onClick={onClick}
@@ -579,7 +579,7 @@ function BonusTabButton({
         className={cn(
           "rounded-full px-2 py-0.5 text-[11px] font-semibold",
           active
-            ? "bg-white/15 text-white dark:bg-slate-950/10 dark:text-slate-700"
+            ? "bg-cyan-100 text-cyan-800 dark:bg-cyan-300/15 dark:text-cyan-100"
             : "bg-slate-100 text-slate-500 dark:bg-white/10 dark:text-slate-400",
         )}
       >
@@ -595,7 +595,7 @@ function OutcomeRow({ prize }: { prize: BonusBoxPrizeView }) {
   return (
     <article
       className={cn(
-        "relative min-h-[5.5rem] overflow-hidden rounded-lg border bg-white/80 p-2.5 shadow-sm shadow-slate-200/50 transition-colors hover:bg-white dark:bg-white/[0.035] dark:shadow-black/10 dark:hover:bg-white/[0.055]",
+        "relative min-h-[5.5rem] overflow-hidden rounded-2xl border bg-white/80 p-3 shadow-sm shadow-slate-950/[0.03] transition-colors hover:bg-white dark:bg-white/[0.035] dark:shadow-black/10 dark:hover:bg-white/[0.055]",
         prizeBorderClass(prize),
       )}
     >
@@ -630,7 +630,7 @@ function OutcomeRow({ prize }: { prize: BonusBoxPrizeView }) {
             />
           </div>
         </div>
-        <div className="shrink-0 rounded-lg bg-slate-50 px-2 py-1.5 text-right dark:bg-white/5">
+        <div className="shrink-0 rounded-xl bg-slate-50 px-2 py-1.5 text-right dark:bg-white/5">
           <div className="text-sm font-semibold leading-none text-slate-950 dark:text-white">
             {chancePercent.toFixed(1)}%
           </div>
@@ -656,13 +656,13 @@ function OpeningRow({ opening }: { opening: BonusBoxOpeningView }) {
   return (
     <article
       className={cn(
-        "rounded-lg border bg-white p-3 shadow-sm shadow-slate-200/60 transition-colors hover:bg-slate-50 dark:bg-surface-900 dark:shadow-black/20 dark:hover:bg-white/[0.04]",
+        "rounded-2xl border bg-white p-3 shadow-sm shadow-slate-950/[0.03] transition-colors hover:bg-slate-50 dark:bg-surface-900 dark:shadow-black/20 dark:hover:bg-white/[0.04]",
         prizeBorderClass(opening.prize),
       )}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 gap-3">
-          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-700 dark:bg-white/10 dark:text-slate-200">
+          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-700 dark:bg-white/10 dark:text-slate-200">
             <Icon className="h-5 w-5" />
           </div>
           <div className="min-w-0">
@@ -687,7 +687,7 @@ function OpeningRow({ opening }: { opening: BonusBoxOpeningView }) {
         </div>
       </div>
       {opening.promoCode && (
-        <div className="mt-3 flex flex-wrap items-center gap-2 rounded-md bg-slate-50 px-2.5 py-2 text-xs text-slate-700 dark:bg-surface-950 dark:text-slate-200">
+        <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl bg-slate-50 px-2.5 py-2 text-xs text-slate-700 dark:bg-surface-950 dark:text-slate-200">
           <TicketPercent className="h-3.5 w-3.5 shrink-0 text-emerald-500" />
           <span className="break-all font-mono">{opening.promoCode}</span>
           {opening.promoCodeExpiresAt && (
@@ -759,13 +759,13 @@ function RuleCard({
   return (
     <div
       className={cn(
-        "rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60 dark:border-white/10 dark:bg-surface-900 dark:shadow-black/20",
+        "rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-950/[0.03] dark:border-white/10 dark:bg-surface-900 dark:shadow-black/20",
         muted &&
           "bg-slate-50/80 text-slate-500 dark:bg-surface-900/80 dark:text-slate-400",
       )}
     >
       <div className="flex items-start gap-3">
-        <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-700 dark:bg-white/10 dark:text-slate-200">
+        <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-700 dark:bg-white/10 dark:text-slate-200">
           {icon}
         </div>
         <div className="min-w-0">
@@ -804,10 +804,10 @@ function PrizeCard({
   return (
     <div
       className={cn(
-        "relative shrink-0 overflow-hidden rounded-lg border p-3 transition-transform duration-200",
+        "relative shrink-0 overflow-hidden rounded-2xl border p-3 transition-colors duration-200",
         compact
           ? "bonus-box-reel-card h-32 text-slate-950 shadow-sm shadow-slate-200/70 dark:text-white dark:shadow-black/20 sm:h-40"
-          : "min-h-[132px] bg-white shadow-sm hover:-translate-y-0.5 dark:bg-surface-900",
+          : "min-h-[132px] bg-white shadow-sm hover:border-cyan-200 dark:bg-surface-900",
         compact ? prizeReelClass(prize) : prizeBorderClass(prize),
         highlighted && "bonus-box-reel-card--winner",
       )}
@@ -846,7 +846,7 @@ function PrizeCard({
       </div>
       {compact && (
         <div className="relative mt-5 flex items-end justify-between sm:mt-8">
-          <div className="grid h-10 w-10 place-items-center rounded-lg border border-slate-200 bg-white/70 text-slate-700 shadow-inner shadow-slate-200/60 dark:border-white/10 dark:bg-white/10 dark:text-slate-100 dark:shadow-white/5 sm:h-12 sm:w-12">
+          <div className="grid h-10 w-10 place-items-center rounded-xl border border-slate-200 bg-white/70 text-slate-700 shadow-inner shadow-slate-200/60 dark:border-white/10 dark:bg-white/10 dark:text-slate-100 dark:shadow-white/5 sm:h-12 sm:w-12">
             <Icon className="h-5 w-5 sm:h-6 sm:w-6" />
           </div>
           <div className="flex items-end gap-1">

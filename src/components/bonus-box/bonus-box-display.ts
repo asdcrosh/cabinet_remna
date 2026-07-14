@@ -7,20 +7,12 @@ export const MOBILE_CARD_GAP = 12;
 
 export const OPENING_EFFECT_PARTICLES = [
   { x: 7, delay: 0, size: 3, drift: -22, duration: 1700 },
-  { x: 13, delay: 180, size: 5, drift: 30, duration: 1900 },
-  { x: 19, delay: 320, size: 2, drift: -16, duration: 1600 },
   { x: 26, delay: 80, size: 4, drift: 18, duration: 2100 },
-  { x: 32, delay: 430, size: 3, drift: -34, duration: 1800 },
   { x: 39, delay: 220, size: 6, drift: 26, duration: 2300 },
-  { x: 45, delay: 540, size: 3, drift: -20, duration: 1700 },
   { x: 50, delay: 120, size: 7, drift: 0, duration: 2200 },
-  { x: 56, delay: 360, size: 3, drift: 24, duration: 1650 },
   { x: 62, delay: 60, size: 5, drift: -28, duration: 2050 },
-  { x: 69, delay: 480, size: 2, drift: 18, duration: 1750 },
   { x: 75, delay: 260, size: 4, drift: -18, duration: 2000 },
-  { x: 82, delay: 640, size: 3, drift: 32, duration: 1850 },
   { x: 88, delay: 140, size: 5, drift: -26, duration: 2150 },
-  { x: 94, delay: 520, size: 2, drift: 16, duration: 1600 },
 ] as const;
 
 export function makeIdleReel(prizes: BonusBoxPrizeView[]) {
