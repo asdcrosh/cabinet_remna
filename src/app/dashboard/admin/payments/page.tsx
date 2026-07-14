@@ -68,7 +68,7 @@ export default async function AdminPaymentsPage({
   ])
 
   return (
-    <div className="space-y-6">
+    <div className="page-stack">
       <PageHeader
         title="Платежи"
         description="Все платежи, их статус и результат выдачи подписки"
@@ -204,8 +204,8 @@ export default async function AdminPaymentsPage({
           const needsRemnashopRetry = payment.status === 'SUCCEEDED' && Boolean(payment.subscriptionProvisionedAt) && !payment.remnashopSyncedAt
           const canCheckPayment = Boolean(payment.yookassaId) && payment.status !== 'SUCCEEDED'
           return (
-            <article key={payment.id} className={`overflow-hidden rounded-lg border border-l-4 bg-white shadow-sm dark:bg-surface-900 ${paymentRailClass(payment.status, needsRetry || needsRemnashopRetry)}`}>
-              <div className="border-b bg-slate-50 px-4 py-3 dark:bg-surface-800">
+            <article key={payment.id} className={`overflow-hidden rounded-2xl border border-l-4 bg-white shadow-sm shadow-slate-950/[0.04] dark:bg-surface-900 dark:shadow-black/20 ${paymentRailClass(payment.status, needsRetry || needsRemnashopRetry)}`}>
+              <div className="border-b bg-slate-50/70 px-4 py-3 dark:bg-white/[0.03]">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="break-words text-sm font-semibold">{payment.user.email}</div>
@@ -240,7 +240,7 @@ export default async function AdminPaymentsPage({
                   <AdminInfoCell label="ID платежа" value={shortId(payment.yookassaId || payment.id)} mono />
                 </div>
                 {(payment.provisioningError || (payment.subscriptionProvisionedAt && !payment.remnashopSyncedAt)) ? (
-                  <details className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
+                  <details className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
                     <summary className="cursor-pointer font-semibold">Технические детали</summary>
                     <div className="mt-2 space-y-1">
                       {payment.provisioningError ? <div>{payment.provisioningError}</div> : null}
@@ -279,7 +279,7 @@ function PaymentFlow({ paid, provisioned, remnashopSynced }: { paid: boolean; pr
   ]
 
   return (
-    <div className="grid grid-cols-3 overflow-hidden rounded-lg border border-slate-200 dark:border-white/10">
+    <div className="grid grid-cols-3 overflow-hidden rounded-xl border border-slate-200 dark:border-white/10">
       {steps.map((step, index) => (
         <div key={step.label} className={`relative px-2 py-2 text-center text-xs font-medium ${step.done ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-200' : 'bg-slate-50 text-slate-400 dark:bg-white/[0.03]'}`}>
           {index > 0 ? <span className="absolute inset-y-2 left-0 w-px bg-slate-200 dark:bg-white/10" /> : null}
@@ -349,7 +349,7 @@ function PaymentStat({ title, value, tone }: { title: string; value: number; ton
   }[tone]
 
   return (
-    <div className={`rounded-lg border px-4 py-3 shadow-sm ${toneClass}`}>
+    <div className={`rounded-2xl border px-4 py-3 shadow-sm ${toneClass}`}>
       <div className="text-sm opacity-75">{title}</div>
       <div className="mt-1 text-2xl font-semibold">{value}</div>
     </div>

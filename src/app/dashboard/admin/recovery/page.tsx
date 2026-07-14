@@ -24,7 +24,7 @@ export default async function AdminRecoveryPage() {
   })
 
   return (
-    <div className="space-y-6">
+    <div className="page-stack">
       <PageHeader
         title="Довыдача"
         description="Оплаты, которые прошли, но подписка ещё не была выдана"
@@ -88,8 +88,8 @@ export default async function AdminRecoveryPage() {
 
           <div className="space-y-3 xl:hidden">
             {payments.map((payment) => (
-              <article key={payment.id} className="overflow-hidden rounded-lg border bg-white shadow-sm dark:border-white/10 dark:bg-surface-900">
-                <div className="border-b bg-slate-50 px-4 py-3 dark:border-white/10 dark:bg-white/[0.03]">
+              <article key={payment.id} className="overflow-hidden rounded-2xl border bg-white shadow-sm shadow-slate-950/[0.04] dark:border-white/10 dark:bg-surface-900 dark:shadow-black/20">
+                <div className="border-b bg-slate-50/70 px-4 py-3 dark:border-white/10 dark:bg-white/[0.03]">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="break-words text-sm font-semibold">{payment.user.email}</div>
@@ -111,7 +111,7 @@ export default async function AdminRecoveryPage() {
                       value={payment.provisioningJob?.nextRetryAt ? payment.provisioningJob.nextRetryAt.toLocaleString('ru-RU') : '—'}
                     />
                   </div>
-                  <div className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:bg-amber-500/10 dark:text-amber-100">
+                  <div className="rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:bg-amber-500/10 dark:text-amber-100">
                     {payment.provisioningJob?.lastError || payment.provisioningError || 'Подписка не была выдана.'}
                   </div>
                   <div className="action-row">
@@ -125,7 +125,7 @@ export default async function AdminRecoveryPage() {
       )}
 
       {payments.length > 0 && (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
           <div className="flex gap-2">
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
             <div>После довыдачи пользователь получит или обновит Remnawave-профиль, а платёж будет связан с подпиской.</div>
@@ -138,7 +138,7 @@ export default async function AdminRecoveryPage() {
 
 function InfoCell({ label, value }: { label: string; value: string }) {
   return (
-    <div className="min-w-0 rounded-lg bg-slate-50 px-3 py-2 dark:bg-white/[0.04]">
+    <div className="min-w-0 rounded-xl bg-slate-50 px-3 py-2 dark:bg-white/[0.04]">
       <div className="text-xs text-slate-500">{label}</div>
       <div className="mt-1 truncate font-medium">{value}</div>
     </div>

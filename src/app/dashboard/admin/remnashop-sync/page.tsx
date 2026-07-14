@@ -6,7 +6,7 @@ export const metadata = { title: 'Синхронизация — Админка'
 
 export default function AdminRemnashopSyncPage() {
   return (
-    <div className="space-y-6">
+    <div className="page-stack">
       <PageHeader
         title="Синхронизация"
         description="Перенос и обновление данных из Remnashop"

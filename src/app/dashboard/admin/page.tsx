@@ -271,7 +271,7 @@ export default async function AdminDashboardPage() {
         </div>
 
         <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,0.65fr)]">
-          <div className="rounded-lg border bg-white/80 p-4 shadow-sm dark:border-white/10 dark:bg-surface-900/80">
+          <div className="metric-card">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <div className="text-sm font-semibold">Источники пользователей</div>
@@ -404,7 +404,7 @@ function TrendPanel({
   )
 
   return (
-    <div className="rounded-lg border bg-white/80 p-4 shadow-sm dark:border-white/10 dark:bg-surface-900/80">
+    <div className="metric-card">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="text-sm font-semibold">Динамика за 14 дней</div>
@@ -468,9 +468,9 @@ function AnalyticsCard({
   details: Array<{ label: string; value: React.ReactNode }>
 }) {
   return (
-    <div className="min-w-0 rounded-lg border bg-white/80 p-4 shadow-sm dark:border-white/10 dark:bg-surface-900/80">
+    <div className="metric-card">
       <div className="flex items-start justify-between gap-3">
-        <div className="grid h-10 w-10 place-items-center rounded-lg bg-slate-100 text-slate-700 dark:bg-white/10 dark:text-cyan-200">
+        <div className="grid h-10 w-10 place-items-center rounded-xl bg-slate-100 text-slate-700 dark:bg-white/10 dark:text-cyan-200">
           {icon}
         </div>
         <div className="min-w-0 text-right">
@@ -481,7 +481,7 @@ function AnalyticsCard({
       </div>
       <div className="mt-4 grid grid-cols-2 gap-2">
         {details.map((detail) => (
-          <div key={detail.label} className="rounded-lg bg-slate-50 px-3 py-2 dark:bg-white/5">
+          <div key={detail.label} className="rounded-xl bg-slate-50 px-3 py-2 dark:bg-white/5">
             <div className="truncate text-[11px] uppercase text-slate-400">{detail.label}</div>
             <div className="mt-1 truncate text-sm font-semibold">{detail.value}</div>
           </div>
@@ -503,8 +503,8 @@ function CompactMetric({
   hint: string
 }) {
   return (
-    <div className="flex min-w-0 items-center gap-3 rounded-lg border bg-white/80 p-4 shadow-sm dark:border-white/10 dark:bg-surface-900/80">
-      <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-700 dark:bg-white/10 dark:text-cyan-200">
+    <div className="metric-card flex items-center gap-3">
+      <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-700 dark:bg-white/10 dark:text-cyan-200">
         {icon}
       </div>
       <div className="min-w-0">
@@ -599,13 +599,13 @@ function AdminTile({
     <Link
       href={href}
       className={cn(
-        'group flex min-h-32 min-w-0 flex-col justify-between rounded-lg border bg-white/80 p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md dark:bg-surface-900/80 dark:hover:border-white/20',
+        'group flex min-h-32 min-w-0 flex-col justify-between rounded-2xl border bg-white/80 p-4 shadow-sm transition-colors hover:border-cyan-200 hover:bg-cyan-50/40 dark:bg-surface-900/80 dark:hover:border-cyan-500/30 dark:hover:bg-cyan-500/[0.06]',
         warning && 'border-amber-300 bg-amber-50/70 dark:border-amber-500/30 dark:bg-amber-500/10'
       )}
     >
       <div className="flex items-start justify-between gap-2">
         <div className={cn(
-          'grid h-9 w-9 place-items-center rounded-lg bg-slate-100 text-slate-700 dark:bg-white/10 dark:text-cyan-200',
+          'grid h-9 w-9 place-items-center rounded-xl bg-slate-100 text-slate-700 dark:bg-white/10 dark:text-cyan-200',
           warning && 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-200'
         )}>
           {icon}
@@ -639,13 +639,13 @@ function PriorityCard({
     <Link
       href={href}
       className={cn(
-        'metric-card group flex items-center justify-between gap-4 transition-all hover:-translate-y-0.5 hover:shadow-md',
+        'metric-card group flex items-center justify-between gap-4 transition-colors hover:border-cyan-200 hover:bg-cyan-50/40 dark:hover:border-cyan-500/30 dark:hover:bg-cyan-500/[0.06]',
         urgent && 'border-amber-300 bg-amber-50/80 dark:border-amber-500/30 dark:bg-amber-500/10'
       )}
     >
       <div className="flex min-w-0 items-center gap-3">
         <div className={cn(
-          'grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-700 dark:bg-white/10 dark:text-cyan-200',
+          'grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-700 dark:bg-white/10 dark:text-cyan-200',
           urgent && 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-200'
         )}>
           {icon}

@@ -42,7 +42,7 @@ export default async function AdminPlansPage() {
   }))
 
   return (
-    <div className="space-y-6">
+    <div className="page-stack">
       <PageHeader
         title="Тарифы"
         description="Цены, лимиты, серверные группы и аудитория каждого тарифа"

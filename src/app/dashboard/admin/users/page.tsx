@@ -120,7 +120,7 @@ export default async function AdminUsersPage({
   const attemptsByUser = new Map(attemptsRows.map((row) => [row.userId, row._count._all]))
 
   return (
-    <div className="space-y-6">
+    <div className="page-stack">
       <PageHeader
         title="Пользователи"
         description="Аккаунты, роли, профили Remnawave и последние подписки"
@@ -174,7 +174,7 @@ export default async function AdminUsersPage({
           const lastPayment = user.payments[0]
           const attemptsCount = attemptsByUser.get(user.id) ?? 0
           return (
-            <article key={user.id} className="relative overflow-visible rounded-lg border bg-white shadow-sm dark:bg-surface-900">
+            <article key={user.id} className="relative overflow-visible rounded-2xl border border-slate-200/80 bg-white/90 shadow-sm shadow-slate-950/[0.04] dark:border-white/10 dark:bg-surface-900/90 dark:shadow-black/20">
               <div className="grid gap-4 p-4 lg:grid-cols-[minmax(15rem,1.4fr)_minmax(11rem,.8fr)_minmax(13rem,1fr)_auto] lg:items-center">
                 <div className="min-w-0">
                   <div className="flex min-w-0 items-center gap-2">
@@ -511,7 +511,7 @@ function UserActions({
 
 function DetailPanel({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section className="min-w-0 rounded-lg border border-slate-200 bg-white p-3 shadow-sm dark:border-white/10 dark:bg-surface-950">
+    <section className="min-w-0 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm dark:border-white/10 dark:bg-surface-950">
       <h3 className="mb-2 text-xs font-semibold uppercase text-slate-400">{title}</h3>
       <div className="space-y-2">{children}</div>
     </section>

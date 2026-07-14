@@ -108,7 +108,7 @@ export function AdminModal({
         aria-labelledby={titleId}
         aria-describedby={description ? descriptionId : undefined}
         tabIndex={-1}
-        className={`relative z-10 flex h-dvh max-h-dvh w-full flex-col overflow-hidden border-0 bg-white shadow-2xl dark:bg-surface-900 sm:h-auto sm:max-h-[94dvh] sm:rounded-lg sm:border dark:sm:border-white/10 ${widths[size]}`}
+        className={`relative z-10 flex h-[calc(100dvh-0.75rem)] max-h-[calc(100dvh-0.75rem)] w-full flex-col overflow-hidden rounded-t-3xl border-0 bg-white shadow-2xl dark:bg-surface-900 sm:h-auto sm:max-h-[94dvh] sm:rounded-3xl sm:border dark:sm:border-white/10 ${widths[size]}`}
       >
         <header className="flex shrink-0 items-start justify-between gap-4 border-b px-4 py-4 sm:px-6">
           <div className="min-w-0">
@@ -117,7 +117,7 @@ export function AdminModal({
           </div>
           <button
             type="button"
-            className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-white/10 dark:hover:text-white"
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-xl text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-white/10 dark:hover:text-white"
             onClick={onClose}
             aria-label="Закрыть"
           >

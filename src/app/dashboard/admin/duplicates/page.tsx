@@ -14,7 +14,7 @@ export default async function AdminDuplicatesPage() {
   const candidates = await findIdentityDuplicateCandidates()
 
   return (
-    <div className="space-y-5">
+    <div className="page-stack">
       <PageHeader
         title="Возможные дубли"
         description="Технические Telegram-аккаунты, похожие на email-аккаунты"
@@ -23,7 +23,7 @@ export default async function AdminDuplicatesPage() {
       <section className="panel panel-pad">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex min-w-0 gap-3">
-            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-cyan-50 text-cyan-700 dark:bg-cyan-500/10 dark:text-cyan-200">
+            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-cyan-50 text-cyan-700 dark:bg-cyan-500/10 dark:text-cyan-200">
               <SearchCheck className="h-5 w-5" />
             </div>
             <div className="min-w-0">
@@ -103,7 +103,7 @@ function IdentityBox({
   meta: string
 }) {
   return (
-    <div className="min-w-0 rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-2 dark:border-white/10 dark:bg-white/[0.03]">
+    <div className="min-w-0 rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-2 dark:border-white/10 dark:bg-white/[0.03]">
       <div className="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">{title}</div>
       <div className="mt-1 truncate font-semibold text-slate-950 dark:text-white">{email}</div>
       <div className="mt-0.5 truncate text-sm text-slate-500 dark:text-slate-400">{name || 'имя не указано'} · {meta}</div>

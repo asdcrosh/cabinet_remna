@@ -80,7 +80,7 @@ export default async function AdminAuditPage({
   const visibleLogs = hasMore ? logs.slice(0, limit) : logs
 
   return (
-    <div className="space-y-6">
+    <div className="page-stack">
       <PageHeader title="История действий" description="Админские операции, выдачи тарифов и важные изменения" />
 
       <AdminFilterBar
@@ -112,7 +112,7 @@ export default async function AdminAuditPage({
           <article key={log.id} className="card p-0">
             <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-start sm:justify-between">
               <div className="flex min-w-0 gap-3">
-                <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-slate-950 text-cyan-200 dark:bg-white dark:text-slate-950">
+                <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-slate-950 text-cyan-200 dark:bg-white dark:text-slate-950">
                   <Activity className="h-5 w-5" />
                 </div>
                 <div className="min-w-0">

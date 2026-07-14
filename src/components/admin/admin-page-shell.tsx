@@ -10,7 +10,7 @@ interface AdminPageShellProps {
 
 export function AdminPageShell({ title, description, action, children }: AdminPageShellProps) {
   return (
-    <div className="space-y-5">
+    <div className="page-stack">
       <PageHeader title={title} description={description} action={action} />
       {children}
     </div>
