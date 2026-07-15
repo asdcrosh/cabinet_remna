@@ -10,15 +10,19 @@ test('пользователь обновляет профиль через на
   await page.goto('/dashboard/settings')
 
   const nameInput = page.locator('#profile-name')
+  await expect(nameInput).toBeEnabled()
   await nameInput.fill('Тест Обновлён')
   const updateResponse = page.waitForResponse((response) =>
     response.url().endsWith('/api/me') && response.request().method() === 'PATCH'
   )
   await page.getByRole('button', { name: 'Сохранить профиль' }).click()
   await expect((await updateResponse).ok()).toBe(true)
+  await expect(page.getByText('Профиль обновлён', { exact: true })).toBeVisible()
 
   await page.reload()
-  await expect(page.locator('#profile-name')).toHaveValue('Тест Обновлён')
+  const persistedNameInput = page.locator('#profile-name')
+  await expect(persistedNameInput).toHaveCount(1)
+  await expect(persistedNameInput).toHaveValue('Тест Обновлён')
   await expectNoHorizontalOverflow(page)
 })
 

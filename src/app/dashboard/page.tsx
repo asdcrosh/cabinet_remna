@@ -227,7 +227,7 @@ export default async function DashboardHome() {
         </div>
       )}
 
-      <section className="dashboard-hero">
+      <section className="dashboard-hero" data-testid="subscription-overview">
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_17rem] lg:items-stretch">
           <div className="min-w-0">
             <div className="flex flex-wrap items-start justify-between gap-3">

@@ -5,9 +5,10 @@ import { E2E_USERS } from './test-data'
 test('истёкшая подписка не показывает отрицательные дни', async ({ page }) => {
   await login(page, E2E_USERS.expired.email)
 
-  await expect(page.getByRole('heading', { name: 'E2E Стандарт' })).toBeVisible()
-  await expect(page.getByText('-2 дн.', { exact: true })).toHaveCount(0)
-  await expect(page.getByText('Срок доступа истёк', { exact: true })).toBeVisible()
+  const subscriptionOverview = page.getByTestId('subscription-overview')
+  await expect(subscriptionOverview.getByRole('heading', { name: 'E2E Стандарт' })).toBeVisible()
+  await expect(subscriptionOverview.getByText('-2 дн.', { exact: true })).toHaveCount(0)
+  await expect(subscriptionOverview.getByText('Срок доступа истёк', { exact: true })).toBeVisible()
   await expectNoHorizontalOverflow(page)
 })
 
