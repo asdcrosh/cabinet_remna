@@ -275,7 +275,7 @@ export function MobileBottomNav({ badges = {}, features }: { badges?: NavBadges;
         aria-modal="true"
         aria-labelledby="mobile-more-menu-title"
         tabIndex={-1}
-        className="absolute inset-x-0 bottom-0 rounded-t-2xl border border-white/70 bg-white/95 p-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] shadow-2xl backdrop-blur-xl dark:border-white/10 dark:bg-surface-950/95"
+        className="absolute inset-x-0 bottom-0 rounded-t-[2rem] border border-white/70 bg-white/95 p-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] shadow-2xl backdrop-blur-2xl dark:border-white/10 dark:bg-surface-950/95"
       >
         <div className="mb-3 flex items-center justify-between gap-3">
           <div>
@@ -332,9 +332,9 @@ export function MobileBottomNav({ badges = {}, features }: { badges?: NavBadges;
   return (
     <nav
       aria-label="Основная мобильная навигация"
-      className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200/80 bg-white/[0.94] pb-[calc(env(safe-area-inset-bottom)+0.5rem)] pt-1.5 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur-xl dark:border-white/10 dark:bg-surface-900/[0.96] dark:shadow-black/25 lg:hidden"
+      className="fixed inset-x-3 bottom-[max(.5rem,env(safe-area-inset-bottom))] z-40 rounded-[1.4rem] border border-white/80 bg-white/[0.9] p-1.5 shadow-[0_18px_55px_rgba(15,23,42,0.22)] backdrop-blur-2xl dark:border-white/[0.12] dark:bg-surface-900/[0.9] dark:shadow-black/45 lg:hidden"
     >
-      <div className="mx-auto grid max-w-md grid-cols-5 gap-1 px-2">
+      <div className="mx-auto grid max-w-md grid-cols-5 gap-1">
         {items.map((item) => {
           const Icon = item.icon
           const active = item.exact ? pathname === item.href : pathname.startsWith(item.href)
@@ -346,9 +346,9 @@ export function MobileBottomNav({ badges = {}, features }: { badges?: NavBadges;
               href={item.href}
               aria-current={active ? 'page' : undefined}
               className={cn(
-                'relative flex min-h-12 min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1.5 text-[10px] font-semibold transition-colors',
+                'relative flex min-h-12 min-w-0 flex-col items-center justify-center gap-0.5 rounded-[1rem] px-1 py-1.5 text-[10px] font-semibold transition-all',
                 active
-                  ? 'bg-cyan-50 text-cyan-800 dark:bg-cyan-400/10 dark:text-cyan-200'
+                  ? 'bg-slate-950 text-white shadow-lg shadow-slate-950/20 dark:bg-white dark:text-slate-950 dark:shadow-black/25'
                   : 'text-slate-500 hover:bg-slate-100 hover:text-slate-950 dark:text-slate-400 dark:hover:bg-white/10 dark:hover:text-white'
               )}
             >
@@ -373,9 +373,9 @@ export function MobileBottomNav({ badges = {}, features }: { badges?: NavBadges;
           aria-haspopup="dialog"
           onClick={() => setMoreOpen(true)}
           className={cn(
-            'relative flex min-h-12 min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1.5 text-[10px] font-semibold transition-colors',
+            'relative flex min-h-12 min-w-0 flex-col items-center justify-center gap-0.5 rounded-[1rem] px-1 py-1.5 text-[10px] font-semibold transition-all',
             moreActive
-              ? 'bg-cyan-50 text-cyan-800 dark:bg-cyan-400/10 dark:text-cyan-200'
+              ? 'bg-slate-950 text-white shadow-lg shadow-slate-950/20 dark:bg-white dark:text-slate-950 dark:shadow-black/25'
               : 'text-slate-500 hover:bg-slate-100 hover:text-slate-950 dark:text-slate-400 dark:hover:bg-white/10 dark:hover:text-white'
           )}
         >
@@ -391,11 +391,12 @@ export function MobileBottomNav({ badges = {}, features }: { badges?: NavBadges;
 export function Brand({ compact = false, brandName }: { compact?: boolean; brandName: string }) {
   return (
     <Link href="/dashboard" className="flex min-w-0 items-center gap-3">
-      <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-slate-950 text-cyan-200 shadow-sm shadow-slate-950/15 ring-1 ring-white/10 dark:bg-white dark:text-slate-950 dark:shadow-black/20">
+      <div className="relative grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-600 via-cyan-600 to-emerald-500 text-white shadow-lg shadow-cyan-900/20 ring-1 ring-white/30 dark:shadow-black/35">
+        <span className="absolute inset-0 bg-[radial-gradient(circle_at_25%_15%,rgba(255,255,255,.38),transparent_42%)]" />
         <ShieldCheck className="h-5 w-5" />
       </div>
       <div className="min-w-0">
-        <div className="truncate font-semibold tracking-tight">{brandName}</div>
+        <div className="truncate text-[15px] font-bold tracking-tight text-slate-950 dark:text-white">{brandName}</div>
         <div className={cn('truncate text-xs text-slate-500', compact && 'hidden')}>
           Личный кабинет
         </div>
@@ -534,11 +535,11 @@ function NavGroup({
             className={cn(
               'flex min-h-10 items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-all duration-200',
               active
-                ? 'nav-active-glow bg-cyan-50 text-cyan-900 dark:bg-cyan-400/10 dark:text-cyan-100'
-                : 'text-slate-600 hover:bg-white/80 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white'
+                ? 'nav-active-glow bg-slate-950 text-white dark:bg-white dark:text-slate-950'
+                : 'text-slate-600 hover:bg-white/85 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-white/[0.07] dark:hover:text-white'
             )}
           >
-            <Icon className={cn('h-4 w-4 shrink-0', active && 'text-cyan-600 dark:text-cyan-300')} />
+            <Icon className={cn('h-4 w-4 shrink-0', active && 'text-cyan-300 dark:text-cyan-700')} />
             <span className="min-w-0 flex-1 truncate">{item.label}</span>
             {badge > 0 && (
               <span
@@ -622,7 +623,7 @@ function AdminNavGroup({
   }, [hasActiveItem])
 
   return (
-    <div className="rounded-xl border border-slate-100 bg-white/45 p-1 dark:border-white/10 dark:bg-white/[0.03]">
+    <div className="rounded-2xl border border-slate-200/65 bg-white/45 p-1 dark:border-white/[0.07] dark:bg-white/[0.025]">
       <button
         type="button"
         className="flex w-full items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-400 transition-colors hover:bg-white/70 hover:text-slate-600 dark:hover:bg-white/5 dark:hover:text-slate-200"

@@ -57,23 +57,23 @@ export default async function DashboardLayout({ children }: { children: React.Re
         >
           Перейти к содержимому
         </a>
-        <aside className="fixed inset-y-0 left-0 z-40 hidden h-dvh w-72 flex-col overflow-hidden border-r border-slate-200/80 bg-white/90 shadow-sm shadow-slate-950/[0.04] backdrop-blur-xl dark:border-white/10 dark:bg-surface-950/90 dark:shadow-black/20 lg:flex">
-          <div className="shrink-0 px-5 py-4">
+        <aside className="dashboard-sidebar fixed inset-y-0 left-0 z-40 hidden h-dvh w-[17rem] flex-col overflow-hidden border-r border-white/70 bg-white/80 shadow-[18px_0_60px_-42px_rgba(15,23,42,0.35)] backdrop-blur-2xl dark:border-white/[0.08] dark:bg-surface-950/82 dark:shadow-black/40 lg:flex">
+          <div className="shrink-0 px-5 py-5">
             <Brand brandName={brandName} />
           </div>
           <div className="dashboard-sidebar-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-3">
             <DashboardNav role={role} badges={navBadges} features={features} />
           </div>
-          <div className="shrink-0 border-t border-white/70 bg-white/70 p-2.5 backdrop-blur dark:border-white/10 dark:bg-surface-950/70">
-            <div className="mb-1.5 rounded-xl border border-slate-100 bg-slate-50/80 px-3 py-2 text-xs text-slate-500 dark:border-slate-800 dark:bg-surface-900/80">
+          <div className="shrink-0 border-t border-white/70 bg-white/55 p-3 backdrop-blur dark:border-white/[0.08] dark:bg-surface-950/55">
+            <div className="mb-1.5 rounded-2xl border border-slate-200/70 bg-white/70 px-3 py-2.5 text-xs text-slate-500 shadow-sm shadow-slate-950/[0.03] dark:border-white/[0.08] dark:bg-white/[0.035]">
               <div className="truncate font-medium text-slate-700 dark:text-slate-200">{accountLabel}</div>
               <div>{roleLabel(role)}</div>
             </div>
             <LogoutButton />
           </div>
         </aside>
-        <main className="min-w-0 w-full overflow-x-clip lg:ml-72 lg:w-auto">
-          <div className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-slate-200/70 bg-white/80 px-4 backdrop-blur-xl dark:border-white/10 dark:bg-surface-950/80 lg:justify-end lg:bg-white/75 lg:px-6 dark:lg:bg-surface-950/75">
+        <main className="min-w-0 w-full overflow-x-clip lg:ml-[17rem] lg:w-auto">
+          <div className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-white/70 bg-white/60 px-4 backdrop-blur-2xl dark:border-white/[0.07] dark:bg-surface-950/60 lg:justify-end lg:px-8">
             <div className="lg:hidden">
               <Brand compact brandName={brandName} />
             </div>
@@ -82,7 +82,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
               {isStaff ? <MobileDashboardNav role={role} email={accountLabel} brandName={brandName} badges={navBadges} features={features} /> : null}
             </div>
           </div>
-          <div id="dashboard-content" className="page-transition mx-auto w-full max-w-6xl min-w-0 scroll-mt-20 px-4 pb-28 pt-5 sm:px-6 sm:pt-7 lg:px-8 lg:py-9">{children}</div>
+          <div id="dashboard-content" className="page-transition mx-auto w-full max-w-7xl min-w-0 scroll-mt-20 px-4 pb-28 pt-5 sm:px-6 sm:pt-7 lg:px-8 lg:py-10 xl:px-10">{children}</div>
         </main>
         <MobileBottomNav badges={navBadges} features={features} />
       </div>

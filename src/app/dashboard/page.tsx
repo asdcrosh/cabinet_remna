@@ -192,6 +192,20 @@ export default async function DashboardHome() {
 
   return (
     <div className="page-stack">
+      <header className="flex flex-col gap-3 pb-1 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <div className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-700 dark:text-cyan-300">Обзор</div>
+          <h1 className="mt-2 text-3xl font-bold tracking-[-0.045em] text-slate-950 dark:text-white sm:text-4xl">
+            С возвращением, {dashboardDisplayName(user.name, user.email)}
+          </h1>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500 dark:text-slate-400">
+            Подписка, трафик и быстрые действия в одном месте.
+          </p>
+        </div>
+        <div className="hidden rounded-full border border-white/80 bg-white/70 px-3 py-1.5 text-xs font-medium text-slate-500 shadow-sm backdrop-blur dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-slate-400 sm:block">
+          Защищённое соединение
+        </div>
+      </header>
       {remnawaveErrorStatus !== null && (
         <div className="flex flex-col gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-start gap-3">
@@ -213,49 +227,48 @@ export default async function DashboardHome() {
         </div>
       )}
 
-      <section className="relative overflow-hidden rounded-3xl border border-slate-200/80 bg-white/95 p-4 shadow-sm shadow-slate-950/[0.05] dark:border-white/10 dark:bg-surface-900 dark:shadow-black/20 sm:p-6">
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-cyan-400 via-emerald-400 to-cyan-500" />
+      <section className="dashboard-hero">
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_17rem] lg:items-stretch">
           <div className="min-w-0">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
-                <div className="mb-2 text-xs font-semibold uppercase text-emerald-600 dark:text-emerald-300">Ваш VPN</div>
+                <div className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-cyan-200">Ваш VPN</div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <h1 className="truncate text-2xl font-semibold leading-tight text-slate-950 dark:text-white sm:text-3xl">
+                  <h2 className="truncate text-2xl font-bold leading-tight tracking-[-0.035em] text-white sm:text-4xl">
                     {subRow?.plan?.name ?? 'VPN-подписка'}
-                  </h1>
+                  </h2>
                   <StatusBadge status={subscriptionStatus} />
                 </div>
-                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                <p className="mt-1.5 text-sm text-slate-300">
                   {subRow?.plan
                     ? `${formatPrice(subRow.plan.priceKopecks)} · ${subRow.plan.durationDays} дн.`
                     : 'Тариф синхронизируется'}
                 </p>
               </div>
-              <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-emerald-100 text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-200">
+              <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl border border-white/10 bg-white/10 text-cyan-200 shadow-inner backdrop-blur">
                 <ShieldCheck className="h-5 w-5" />
               </div>
             </div>
 
-            <div className="mt-6 grid grid-cols-3 divide-x divide-slate-200 border-y border-slate-200 py-4 dark:divide-white/10 dark:border-white/10">
+            <div className="mt-7 grid grid-cols-3 gap-2 sm:gap-3">
               <OverviewMetric label="Осталось" value={subRow || sub ? formatSubscriptionDaysLeft(daysLeft, subscriptionStatus) : '—'} />
               <OverviewMetric label="Использовано" value={hasRemoteUsage ? formatBytes(used) : '—'} />
               <OverviewMetric label="Лимит" value={hasRemoteUsage ? isUnlimited ? 'Безлимит' : formatBytes(limit) : '—'} />
             </div>
 
-            <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-sm">
-              <Link href="/dashboard/devices" className="font-medium text-slate-600 hover:text-cyan-700 dark:text-slate-300 dark:hover:text-cyan-200">Устройства</Link>
-              <Link href="/dashboard/billing" className="font-medium text-slate-600 hover:text-cyan-700 dark:text-slate-300 dark:hover:text-cyan-200">Платежи</Link>
-              {features.support && <Link href="/dashboard/support" className="font-medium text-slate-600 hover:text-cyan-700 dark:text-slate-300 dark:hover:text-cyan-200">Поддержка</Link>}
+            <div className="mt-4 flex flex-wrap gap-2 text-sm">
+              <Link href="/dashboard/devices" className="rounded-full border border-white/10 bg-white/[0.06] px-3 py-1.5 font-medium text-slate-200 transition hover:bg-white/10 hover:text-white">Устройства</Link>
+              <Link href="/dashboard/billing" className="rounded-full border border-white/10 bg-white/[0.06] px-3 py-1.5 font-medium text-slate-200 transition hover:bg-white/10 hover:text-white">Платежи</Link>
+              {features.support && <Link href="/dashboard/support" className="rounded-full border border-white/10 bg-white/[0.06] px-3 py-1.5 font-medium text-slate-200 transition hover:bg-white/10 hover:text-white">Поддержка</Link>}
             </div>
           </div>
 
-          <div className="flex flex-col items-center justify-center rounded-2xl border border-slate-200 bg-slate-50/70 p-4 text-center dark:border-white/10 dark:bg-white/[0.035]">
+          <div className="flex flex-col items-center justify-center rounded-[1.6rem] border border-white/10 bg-white/[0.075] p-5 text-center shadow-inner backdrop-blur-xl">
             <UsageRing percent={percent} unlimited={isUnlimited} unavailable={!hasRemoteUsage} />
-            <div className="mt-3 text-sm font-semibold text-slate-950 dark:text-white">
+            <div className="mt-3 text-sm font-semibold text-white">
               {!hasRemoteUsage ? 'Данные трафика недоступны' : isUnlimited ? 'Трафик без ограничений' : `${percent}% использовано`}
             </div>
-            <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+            <div className="mt-1 text-xs text-slate-300">
               {subscriptionExpired
                 ? 'Срок доступа истёк'
                 : daysLeft > 0
@@ -855,9 +868,9 @@ function OverviewMetric({
   value: string
 }) {
   return (
-    <div className="min-w-0 px-2 text-center first:pl-0 last:pr-0 sm:px-4 sm:text-left">
-      <div className="text-xs text-slate-500 dark:text-slate-400">{label}</div>
-      <div className="mt-1 truncate text-base font-semibold text-slate-950 dark:text-white sm:text-lg">{value}</div>
+    <div className="dashboard-hero-metric text-center sm:text-left">
+      <div className="text-[11px] font-medium uppercase tracking-wide text-slate-400">{label}</div>
+      <div className="mt-1 truncate text-base font-semibold text-white sm:text-lg">{value}</div>
     </div>
   )
 }
@@ -869,7 +882,7 @@ function UsageRing({ percent, unlimited, unavailable = false }: { percent: numbe
       className="grid h-24 w-24 place-items-center rounded-full p-2"
       style={{ background: `conic-gradient(rgb(16 185 129) ${value * 3.6}deg, rgba(148,163,184,0.18) 0deg)` }}
     >
-      <div className="grid h-full w-full place-items-center rounded-full bg-white text-lg font-semibold text-slate-950 shadow-inner dark:bg-surface-900 dark:text-white">
+      <div className="grid h-full w-full place-items-center rounded-full bg-slate-950/90 text-lg font-semibold text-white shadow-inner ring-1 ring-white/10">
         {unavailable
           ? <AlertTriangle className="h-7 w-7 text-amber-500" />
           : unlimited
@@ -878,4 +891,9 @@ function UsageRing({ percent, unlimited, unavailable = false }: { percent: numbe
       </div>
     </div>
   )
+}
+
+function dashboardDisplayName(name: string | null, email: string) {
+  const value = name?.trim() || email.split('@')[0] || 'друг'
+  return value.split(/\s+/)[0]
 }

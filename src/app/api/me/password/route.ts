@@ -5,6 +5,7 @@ import { compare, hash } from 'bcryptjs'
 import { prisma } from '@/lib/prisma'
 import { changePasswordSchema } from '@/lib/auth/validation'
 import { withAuth, requireAuth } from '@/lib/auth/guard'
+import { setSessionCookieOnResponse } from '@/lib/auth/cookies'
 import { rateLimit } from '@/lib/rate-limit'
 
 export const runtime = 'nodejs'
@@ -45,5 +46,12 @@ export const POST = withAuth(async (req: Request) => {
       sessionVersion: { increment: 1 },
     },
   })
-  return NextResponse.json({ ok: true })
+
+  const response = NextResponse.json({ ok: true })
+  return setSessionCookieOnResponse(response, {
+    uid: user.id,
+    email: user.email,
+    role: user.role,
+    ...(session.stage ? { stage: session.stage } : {}),
+  })
 })

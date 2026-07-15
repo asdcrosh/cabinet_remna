@@ -19,16 +19,19 @@
     min-width: 0;
     overflow-x: clip;
     background:
-      radial-gradient(circle at 8% 0%, rgba(14, 165, 233, 0.07), transparent 30rem),
-      radial-gradient(circle at 92% 4%, rgba(16, 185, 129, 0.055), transparent 26rem),
-      rgb(248 250 252);
+      radial-gradient(circle at 4% -8%, rgba(99, 102, 241, 0.12), transparent 34rem),
+      radial-gradient(circle at 96% 2%, rgba(6, 182, 212, 0.10), transparent 30rem),
+      linear-gradient(180deg, rgb(248 250 252), rgb(244 247 251));
     font-feature-settings: 'cv11', 'ss01';
   }
   #__next {
     min-width: 0;
   }
   .dark body {
-    background: rgb(8 11 16);
+    background:
+      radial-gradient(circle at 4% -8%, rgba(99, 102, 241, 0.13), transparent 34rem),
+      radial-gradient(circle at 96% 2%, rgba(6, 182, 212, 0.10), transparent 32rem),
+      rgb(8 11 16);
   }
   * {
     @apply border-slate-200 dark:border-slate-800;
@@ -44,8 +47,9 @@
            leading-tight transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-50;
   }
   .btn-primary {
-    @apply btn bg-slate-950 text-white shadow-sm shadow-slate-950/15 hover:bg-slate-800 hover:shadow-md
-           dark:bg-white dark:text-slate-950 dark:shadow-black/20 dark:hover:bg-slate-100;
+    @apply btn border border-indigo-500/20 bg-gradient-to-r from-indigo-600 to-cyan-600 text-white shadow-lg shadow-indigo-950/15
+           hover:-translate-y-0.5 hover:from-indigo-500 hover:to-cyan-500 hover:shadow-xl hover:shadow-cyan-950/20
+           dark:border-white/10 dark:shadow-black/25;
   }
   .btn-secondary {
     @apply btn border bg-white/80 text-slate-900 shadow-sm shadow-slate-200/50 backdrop-blur hover:border-slate-300 hover:bg-white
@@ -64,29 +68,29 @@
     @apply block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1;
   }
   .card {
-    @apply rounded-2xl border border-slate-200/80 bg-white/90 p-4 shadow-sm shadow-slate-950/[0.04]
-           dark:border-white/10 dark:bg-surface-900 dark:shadow-black/20;
+    @apply rounded-3xl border border-white/80 bg-white/80 p-4 shadow-[0_18px_55px_-38px_rgba(15,23,42,0.42)] backdrop-blur
+           dark:border-white/[0.08] dark:bg-white/[0.04] dark:shadow-black/35;
   }
   .panel {
-    @apply rounded-2xl border border-slate-200/80 bg-white/90 shadow-sm shadow-slate-950/[0.04]
-           dark:border-white/10 dark:bg-surface-900 dark:shadow-black/20;
+    @apply rounded-3xl border border-white/80 bg-white/80 shadow-[0_18px_55px_-38px_rgba(15,23,42,0.42)] backdrop-blur
+           dark:border-white/[0.08] dark:bg-white/[0.04] dark:shadow-black/35;
   }
   .panel-pad {
     @apply p-4 sm:p-5;
   }
   .surface-card {
-    @apply rounded-2xl border border-slate-200/80 bg-white/90 p-4 shadow-sm shadow-slate-950/[0.04] transition
-           dark:border-white/10 dark:bg-white/[0.035] dark:shadow-black/10;
+    @apply rounded-3xl border border-white/80 bg-white/80 p-4 shadow-[0_16px_46px_-36px_rgba(15,23,42,0.38)] backdrop-blur transition
+           dark:border-white/[0.08] dark:bg-white/[0.035] dark:shadow-black/25;
   }
   .surface-card-hover {
     @apply hover:border-cyan-200 hover:bg-white hover:shadow-md hover:shadow-slate-950/5
            dark:hover:border-cyan-500/30 dark:hover:bg-white/[0.06];
   }
   .nav-active-glow {
-    box-shadow: 0 8px 20px rgba(14, 165, 233, 0.08), 0 0 0 1px rgba(14, 165, 233, 0.08);
+    box-shadow: 0 12px 28px -14px rgba(15, 23, 42, 0.62), 0 0 0 1px rgba(255, 255, 255, 0.08);
   }
   .dark .nav-active-glow {
-    box-shadow: 0 8px 22px rgba(0, 0, 0, 0.18), 0 0 0 1px rgba(34, 211, 238, 0.12);
+    box-shadow: 0 12px 28px -14px rgba(0, 0, 0, 0.72), 0 0 0 1px rgba(255, 255, 255, 0.32);
   }
   .dashboard-sidebar-scroll {
     scrollbar-width: thin;
@@ -164,7 +168,35 @@
     animation-delay: calc(var(--confetti-index) * 34ms);
   }
   .page-stack {
-    @apply space-y-5 sm:space-y-6;
+    @apply space-y-5 sm:space-y-7;
+  }
+
+  .dashboard-hero {
+    @apply relative overflow-hidden rounded-[2rem] border border-white/10 p-5 text-white shadow-[0_32px_80px_-42px_rgba(8,47,73,0.75)] sm:p-7;
+    background:
+      radial-gradient(circle at 78% 18%, rgba(34, 211, 238, 0.24), transparent 20rem),
+      radial-gradient(circle at 10% 110%, rgba(99, 102, 241, 0.36), transparent 24rem),
+      linear-gradient(135deg, rgb(10 18 34), rgb(13 34 48) 58%, rgb(8 55 60));
+  }
+  .dashboard-hero::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.25;
+    background-image: linear-gradient(rgba(255,255,255,.055) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.055) 1px, transparent 1px);
+    background-size: 32px 32px;
+    mask-image: linear-gradient(to bottom right, black, transparent 72%);
+  }
+  .dashboard-hero > * {
+    position: relative;
+    z-index: 1;
+  }
+  .dashboard-hero .btn-primary {
+    @apply border-white/80 bg-none bg-white text-slate-950 shadow-xl shadow-black/20 hover:bg-slate-100;
+  }
+  .dashboard-hero-metric {
+    @apply min-w-0 rounded-2xl border border-white/10 bg-white/[0.075] px-3 py-3 backdrop-blur sm:px-4;
   }
   .page-transition {
     animation: page-soft-enter 120ms ease-out both;

@@ -19,6 +19,18 @@ const user = {
   ssPassword: 'e2e-ss-password',
 }
 
+const device = {
+  hwid: 'e2e-device-pixel-8',
+  userUuid: user.uuid,
+  platform: 'Android',
+  osVersion: '15',
+  deviceModel: 'Pixel 8',
+  userAgent: 'Happ/2.0',
+  requestIp: '192.0.2.10',
+  createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+  updatedAt: new Date().toISOString(),
+}
+
 const server = createServer((request, response) => {
   if (request.url === '/health') return json(response, 200, { ok: true })
 
@@ -28,6 +40,14 @@ const server = createServer((request, response) => {
 
   if (request.method === 'GET' && request.url === '/api/users/e2e-expired-uuid') {
     return json(response, 200, { response: user })
+  }
+
+  if (request.method === 'GET' && request.url === '/api/hwid/devices/e2e-expired-uuid') {
+    return json(response, 200, { response: { total: 1, devices: [device] } })
+  }
+
+  if (request.method === 'POST' && request.url === '/api/hwid/devices/delete') {
+    return json(response, 200, { response: [] })
   }
 
   if (request.method === 'GET' && request.url === '/api/subscriptions/by-username/e2e-expired') {
