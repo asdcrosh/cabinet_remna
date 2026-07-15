@@ -161,7 +161,7 @@ export function RemnashopSyncPanel() {
 
   return (
     <div className="space-y-4">
-      <section className="rounded-2xl border border-slate-200/80 bg-white/90 p-4 shadow-sm shadow-slate-950/[0.04] dark:border-white/10 dark:bg-surface-900/90 dark:shadow-black/20">
+      <section className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.035]">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="min-w-0">
             <h2 className="text-lg font-semibold">Remnashop</h2>
@@ -345,7 +345,7 @@ function SyncEventsView({
           <Metric key={status} label={syncStatusLabel(status)} value={counts[status] ?? 0} />
         ))}
       </div>
-      <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white/90 shadow-sm shadow-slate-950/[0.04] dark:border-white/10 dark:bg-surface-900/90 dark:shadow-black/20">
+      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.035]">
         <div className="flex flex-col gap-3 border-b px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h3 className="text-sm font-semibold">События синхронизации</h3>
@@ -429,7 +429,7 @@ function SyncOverview({ report }: { report: RemnashopSyncReport }) {
   const healthy = failed === 0 && pending === 0 && warnings === 0
 
   return (
-    <section className="grid gap-3 rounded-2xl border border-slate-200/80 bg-white/90 p-4 shadow-sm shadow-slate-950/[0.04] dark:border-white/10 dark:bg-surface-900/90 dark:shadow-black/20 lg:grid-cols-[1fr_auto_1fr] lg:items-center">
+    <section className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.035] lg:grid-cols-[1fr_auto_1fr] lg:items-center">
       <div className="flex items-center gap-3">
         <span className="grid h-10 w-10 place-items-center rounded-xl bg-slate-100 text-slate-700 dark:bg-white/10 dark:text-slate-200">
           <Activity className="h-5 w-5" />
@@ -474,7 +474,7 @@ function SyncHealthSummary({ report }: { report: RemnashopSyncReport }) {
   }
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm dark:border-white/10 dark:bg-surface-900 dark:text-slate-200">
+    <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 dark:border-white/10 dark:bg-white/[0.035] dark:text-slate-200">
       <div className="font-semibold text-slate-950 dark:text-white">Как читать этот экран</div>
       <div className="mt-2 grid gap-2 md:grid-cols-2">
         <InfoLine

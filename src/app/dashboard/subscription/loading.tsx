@@ -2,7 +2,7 @@ export default function SubscriptionLoading() {
   return (
     <div className="page-stack" role="status" aria-busy="true" aria-live="polite">
       <span className="sr-only">Загрузка подписки</span>
-      <section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-surface-900 sm:p-5">
+      <section className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.035] sm:p-5">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
           <div className="min-w-0 space-y-3">
             <div className="flex gap-2">
@@ -25,7 +25,7 @@ export default function SubscriptionLoading() {
         <div className="skeleton h-12 rounded-xl" />
       </section>
 
-      <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-surface-900">
+      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.035]">
         <div className="grid gap-0 sm:grid-cols-[minmax(0,1fr)_14rem] lg:grid-cols-[minmax(0,1fr)_18rem]">
           <div className="space-y-4 p-4 sm:p-5">
             <div className="skeleton h-7 w-36 rounded-full" />

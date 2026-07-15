@@ -385,7 +385,7 @@ function InstructionModal({
       <div className="space-y-3">
         {app.steps.map((step, index) => (
           <div key={step} className="flex gap-3 rounded-xl bg-slate-50 p-3 dark:bg-white/[0.04]">
-            <div className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-white text-sm font-bold text-cyan-700 shadow-sm dark:bg-white/10 dark:text-cyan-200">
+            <div className="grid h-8 w-8 shrink-0 place-items-center text-sm font-bold text-cyan-700 dark:text-cyan-200">
               {index + 1}
             </div>
             <div className="text-sm font-medium leading-6">{step}</div>

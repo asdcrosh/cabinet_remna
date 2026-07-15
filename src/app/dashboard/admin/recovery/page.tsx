@@ -89,7 +89,7 @@ export default async function AdminRecoveryPage() {
 
           <div className="space-y-3 2xl:hidden">
             {payments.map((payment) => (
-              <article key={payment.id} className="overflow-hidden rounded-2xl border bg-white shadow-sm shadow-slate-950/[0.04] dark:border-white/10 dark:bg-surface-900 dark:shadow-black/20">
+              <article key={payment.id} className="overflow-hidden rounded-2xl border bg-white dark:border-white/10 dark:bg-white/[0.035]">
                 <div className="border-b bg-slate-50/70 px-4 py-3 dark:border-white/10 dark:bg-white/[0.03]">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">

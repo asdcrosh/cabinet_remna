@@ -127,7 +127,7 @@ export function PersonalOffersAdmin({
           </div>
 
           <div className="grid w-full gap-3">
-            <label className="flex min-h-12 items-center gap-2 rounded-xl border border-emerald-100 bg-white px-3 py-2 text-sm font-medium shadow-sm dark:border-emerald-500/20 dark:bg-surface-900">
+            <label className="flex min-h-12 items-center gap-2 rounded-xl border border-emerald-100 bg-white px-3 py-2 text-sm font-medium dark:border-emerald-500/20 dark:bg-white/[0.035]">
               <input
                 type="checkbox"
                 checked={welcomeForm.enabled}
@@ -213,7 +213,7 @@ export function PersonalOffersAdmin({
           {offers.map((offer) => (
             <article
               key={offer.id}
-              className="grid gap-4 rounded-2xl border border-slate-200/80 bg-white/90 p-4 shadow-sm shadow-slate-950/[0.04] dark:border-white/10 dark:bg-surface-900/90 dark:shadow-black/20 lg:grid-cols-[13rem_minmax(0,1fr)_13rem_auto] lg:items-center"
+              className="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.035] lg:grid-cols-[13rem_minmax(0,1fr)_13rem_auto] lg:items-center"
             >
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
@@ -404,7 +404,7 @@ function WelcomeBonusOption({
 }) {
   return (
     <div className={cn(
-      'flex min-h-36 flex-col rounded-2xl border bg-white p-3 shadow-sm transition-colors dark:bg-surface-900',
+      'flex min-h-36 flex-col rounded-2xl border bg-white p-3 transition-colors dark:bg-white/[0.035]',
       checked ? 'border-emerald-300 ring-2 ring-emerald-100 dark:border-emerald-500/40 dark:ring-emerald-500/10' : 'border-slate-200 dark:border-white/10'
     )}>
       <div className="flex items-start justify-between gap-3">

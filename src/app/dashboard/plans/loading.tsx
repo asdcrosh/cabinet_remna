@@ -20,7 +20,7 @@ export default function PlansLoading() {
 
       <div className="grid auto-rows-fr grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2 xl:grid-cols-3">
         {Array.from({ length: 6 }).map((_, index) => (
-            <div key={index} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-surface-900">
+            <div key={index} className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.035]">
             <div className="flex items-start justify-between gap-3">
               <div className="space-y-2">
                 <div className="skeleton h-7 w-32 rounded-lg" />

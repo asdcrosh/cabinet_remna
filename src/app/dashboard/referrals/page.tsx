@@ -119,7 +119,7 @@ export default async function ReferralsPage() {
           {invitedCount > 0 && <div className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-500 dark:bg-white/10 dark:text-slate-300">{referrals.length} из {invitedCount}</div>}
         </div>
 
-        <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white/85 shadow-sm shadow-slate-950/[0.04] dark:border-white/10 dark:bg-surface-900/80">
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.035]">
           {referrals.length === 0 ? (
             <div className="px-4 py-10 text-center">
               <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-slate-100 text-slate-500 dark:bg-white/10 dark:text-slate-300">
@@ -171,7 +171,7 @@ function SummaryCard({ label, value, hint }: { label: string; value: string | nu
   const count = parseCountValue(value)
 
   return (
-    <div className="rounded-2xl border border-slate-200/80 bg-white/85 p-3 shadow-sm shadow-slate-950/[0.03] dark:border-white/10 dark:bg-white/[0.04] sm:p-4">
+    <div className="rounded-2xl border border-slate-200 bg-white p-3 dark:border-white/10 dark:bg-white/[0.035] sm:p-4">
       <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{label}</div>
       <div className="mt-2 text-xl font-semibold text-slate-950 dark:text-white sm:text-2xl">
         {count ? <CountUp value={count.value} prefix={count.prefix} suffix={count.suffix} /> : value}

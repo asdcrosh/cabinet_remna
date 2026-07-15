@@ -181,7 +181,7 @@ export default async function AdminUsersPage({
           const lastPayment = user.payments[0]
           const attemptsCount = attemptsByUser.get(user.id) ?? 0
           return (
-            <article key={user.id} className="relative overflow-visible rounded-2xl border border-slate-200/80 bg-white/90 shadow-sm shadow-slate-950/[0.04] dark:border-white/10 dark:bg-surface-900/90 dark:shadow-black/20">
+            <article key={user.id} className="relative overflow-visible rounded-2xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.035]">
               <div className="grid gap-4 p-4 lg:grid-cols-[minmax(15rem,1.4fr)_minmax(11rem,.8fr)_minmax(13rem,1fr)_auto] lg:items-center">
                 <div className="min-w-0">
                   <div className="flex min-w-0 items-center gap-2">
@@ -518,7 +518,7 @@ function UserActions({
 
 function DetailPanel({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section className="min-w-0 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm dark:border-white/10 dark:bg-surface-950">
+    <section className="min-w-0 rounded-2xl border border-slate-200 bg-white p-3 dark:border-white/10 dark:bg-white/[0.035]">
       <h3 className="mb-2 text-xs font-semibold uppercase text-slate-400">{title}</h3>
       <div className="space-y-2">{children}</div>
     </section>

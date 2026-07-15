@@ -59,7 +59,7 @@ export function LazyListLoader({
         type="button"
         onClick={loadMore}
         disabled={isPending}
-        className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 disabled:opacity-60"
+        className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
       >
         {isPending ? 'Загрузка…' : 'Показать ещё'}
       </button>

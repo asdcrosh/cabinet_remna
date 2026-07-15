@@ -217,7 +217,7 @@ export default async function AdminPaymentsPage({
           const needsRemnashopRetry = payment.status === 'SUCCEEDED' && Boolean(payment.subscriptionProvisionedAt) && !payment.remnashopSyncedAt
           const canCheckPayment = Boolean(payment.yookassaId) && payment.status !== 'SUCCEEDED'
           return (
-            <article key={payment.id} className={`overflow-hidden rounded-2xl border border-l-4 bg-white shadow-sm shadow-slate-950/[0.04] dark:bg-surface-900 dark:shadow-black/20 ${paymentRailClass(payment.status, needsRetry || needsRemnashopRetry)}`}>
+            <article key={payment.id} className={`overflow-hidden rounded-2xl border border-l-4 bg-white dark:bg-white/[0.035] ${paymentRailClass(payment.status, needsRetry || needsRemnashopRetry)}`}>
               <div className="border-b bg-slate-50/70 px-4 py-3 dark:bg-white/[0.03]">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
@@ -362,7 +362,7 @@ function PaymentStat({ title, value, tone }: { title: string; value: number; ton
   }[tone]
 
   return (
-    <div className={`rounded-2xl border px-4 py-3 shadow-sm ${toneClass}`}>
+    <div className={`rounded-2xl border px-4 py-3 ${toneClass}`}>
       <div className="text-sm opacity-75">{title}</div>
       <div className="mt-1 text-2xl font-semibold">{value}</div>
     </div>

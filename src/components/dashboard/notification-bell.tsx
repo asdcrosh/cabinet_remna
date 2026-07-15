@@ -288,7 +288,7 @@ export function NotificationBell({ showAdmin = false }: { showAdmin?: boolean })
             aria-selected={tab === 'user'}
             aria-controls="notification-tabpanel-user"
             tabIndex={tab === 'user' ? 0 : -1}
-            className={cn('rounded-xl px-3 py-2 text-sm font-medium transition', tab === 'user' ? 'bg-white text-slate-950 shadow-sm dark:bg-surface-900 dark:text-white' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white')}
+            className={cn('rounded-xl px-3 py-2 text-sm font-medium transition', tab === 'user' ? 'bg-white text-slate-950 dark:bg-surface-900 dark:text-white' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white')}
             onClick={() => setTab('user')}
             onKeyDown={handleTabKeyDown}
           >
@@ -302,7 +302,7 @@ export function NotificationBell({ showAdmin = false }: { showAdmin?: boolean })
             aria-selected={tab === 'admin'}
             aria-controls="notification-tabpanel-admin"
             tabIndex={tab === 'admin' ? 0 : -1}
-            className={cn('rounded-xl px-3 py-2 text-sm font-medium transition', tab === 'admin' ? 'bg-white text-slate-950 shadow-sm dark:bg-surface-900 dark:text-white' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white')}
+            className={cn('rounded-xl px-3 py-2 text-sm font-medium transition', tab === 'admin' ? 'bg-white text-slate-950 dark:bg-surface-900 dark:text-white' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white')}
             onClick={() => setTab('admin')}
             onKeyDown={handleTabKeyDown}
           >
@@ -361,7 +361,7 @@ export function NotificationBell({ showAdmin = false }: { showAdmin?: boolean })
         ref={triggerRef}
         type="button"
         onClick={() => setOpen((value) => !value)}
-        className="relative grid h-10 w-10 place-items-center rounded-xl border border-white/70 bg-white/80 text-slate-700 shadow-sm shadow-slate-200/60 transition hover:bg-white hover:text-slate-950 dark:border-white/10 dark:bg-surface-900/80 dark:text-slate-200 dark:shadow-black/20 dark:hover:bg-surface-800 dark:hover:text-white"
+        className="relative grid h-10 w-10 place-items-center rounded-xl border border-slate-200 bg-white text-slate-700 transition-colors hover:bg-slate-50 hover:text-slate-950 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-200 dark:hover:bg-white/[0.08] dark:hover:text-white"
         aria-label={totalUnread > 0 ? `Уведомления, новых: ${totalUnread}` : 'Уведомления, новых нет'}
         aria-expanded={open}
         aria-controls="notification-panel"

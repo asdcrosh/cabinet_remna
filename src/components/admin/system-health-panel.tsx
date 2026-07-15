@@ -53,7 +53,7 @@ export function SystemHealthPanel({ initialReport }: { initialReport: SystemHeal
 
   return (
     <div className="space-y-4">
-      <section className="rounded-2xl border border-slate-200/80 bg-white/90 p-4 shadow-sm shadow-slate-950/[0.04] dark:border-white/10 dark:bg-surface-900/90 dark:shadow-black/20" aria-busy={loading}>
+      <section className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.035]" aria-busy={loading}>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <div className="text-sm font-medium uppercase tracking-wide text-slate-400">Состояние</div>
@@ -87,7 +87,7 @@ export function SystemHealthPanel({ initialReport }: { initialReport: SystemHeal
           return (
             <article
               key={item.id}
-              className="rounded-2xl border border-slate-200/80 bg-white/90 p-4 shadow-sm shadow-slate-950/[0.04] dark:border-white/10 dark:bg-surface-900/90 dark:shadow-black/20"
+              className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.035]"
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">

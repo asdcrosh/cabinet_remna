@@ -21,7 +21,7 @@ export default function DevicesPage() {
         }
       />
       <section className="flex items-start gap-3 rounded-2xl border border-cyan-200/70 bg-cyan-50/70 px-4 py-3 text-sm text-cyan-950 dark:border-cyan-400/20 dark:bg-cyan-400/10 dark:text-cyan-100">
-        <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white/80 text-cyan-700 shadow-sm dark:bg-white/10 dark:text-cyan-200">
+        <div className="grid h-9 w-9 shrink-0 place-items-center text-cyan-700 dark:text-cyan-200">
           <ShieldCheck className="h-4 w-4" />
         </div>
         <div>

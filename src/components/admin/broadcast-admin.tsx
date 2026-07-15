@@ -329,7 +329,7 @@ export function BroadcastAdmin({
                 className={cn(
                   'rounded-xl border p-3 text-left transition-colors',
                   segment === item.value
-                    ? 'border-slate-950 bg-slate-950 text-white shadow-sm dark:border-white dark:bg-white dark:text-slate-950'
+                    ? 'border-slate-950 bg-slate-950 text-white dark:border-white dark:bg-white dark:text-slate-950'
                     : 'border-slate-200 bg-white hover:bg-slate-50 dark:border-white/10 dark:bg-surface-900 dark:hover:bg-white/5'
                 )}
               >
@@ -416,7 +416,7 @@ export function BroadcastAdmin({
                 {visibleTemplates.map((template) => (
                   <div
                     key={template.id || template.title}
-                    className="flex min-h-[16rem] min-w-[17rem] max-w-[19rem] snap-start flex-col rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition-colors hover:border-cyan-200 dark:border-white/10 dark:bg-surface-900 dark:hover:border-cyan-500/30"
+                    className="flex min-h-[16rem] min-w-[17rem] max-w-[19rem] snap-start flex-col rounded-2xl border border-slate-200 bg-white p-4 transition-colors hover:border-slate-300 dark:border-white/10 dark:bg-white/[0.035] dark:hover:border-white/20"
                   >
                     <div className="text-base font-semibold text-slate-950 dark:text-white">{template.title}</div>
                     <div className="mt-1 line-clamp-2 min-h-8 text-xs leading-4 text-slate-500 dark:text-slate-400">{template.description || 'Пользовательский шаблон'}</div>
@@ -478,7 +478,7 @@ export function BroadcastAdmin({
                 <EmojiPicker
                   onPick={insertBodyEmoji}
                   className="absolute bottom-3 right-3"
-                  buttonClassName="bg-white shadow-sm dark:bg-surface-900"
+                  buttonClassName="bg-white dark:bg-surface-900"
                 />
               </div>
               <span className="mt-1 block text-xs text-slate-400">{body.length}/1200</span>
@@ -618,7 +618,7 @@ export function BroadcastAdmin({
               <InfoPill label="Кнопка" value={actionHref ? `${previewActionLabel}${actionOpenInTelegram ? ' · Telegram Web App' : ''}` : 'Без кнопки'} />
             </div>
 
-            <div className="min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-slate-50 shadow-sm dark:border-white/10 dark:bg-white/5">
+            <div className="min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-slate-50 dark:border-white/10 dark:bg-white/5">
               <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3 dark:border-white/10">
                 <div>
                   <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Предпросмотр</div>
@@ -627,7 +627,7 @@ export function BroadcastAdmin({
                 <MessageCircle className="h-5 w-5 text-cyan-600" />
               </div>
               <div className="bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.18),transparent_34%),linear-gradient(135deg,#f8fafc,#eef8ff)] p-4 dark:bg-none dark:bg-surface-950">
-                <div className="mx-auto max-w-xl rounded-[1.35rem] border border-white/80 bg-white/80 p-3 shadow-sm backdrop-blur dark:border-white/10 dark:bg-white/5">
+                <div className="mx-auto max-w-xl rounded-2xl border border-slate-200 bg-white p-3 dark:border-white/10 dark:bg-white/5">
                   <div className="mb-3 flex items-center gap-2 px-1">
                     <div className="grid h-8 w-8 place-items-center rounded-full bg-cyan-500 text-sm font-bold text-white">T</div>
                     <div>
@@ -636,7 +636,7 @@ export function BroadcastAdmin({
                     </div>
                   </div>
 
-                  <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 dark:bg-surface-900 dark:ring-white/10">
+                  <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-white/10 dark:bg-surface-900">
                     {previewImageUrl && !imageLoadFailed ? (
                       <div className="overflow-hidden bg-slate-100 dark:bg-white/5">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -727,7 +727,7 @@ function BroadcastStepButton({
       className={cn(
         'flex min-h-[4.5rem] w-[16.5rem] shrink-0 items-center gap-3 rounded-xl border p-3 text-left transition-colors lg:min-h-20 lg:w-auto lg:min-w-0',
         active
-          ? 'border-slate-950 bg-slate-950 text-white shadow-sm dark:border-white dark:bg-white dark:text-slate-950'
+          ? 'border-slate-950 bg-slate-950 text-white dark:border-white dark:bg-white dark:text-slate-950'
           : 'border-slate-200 bg-white hover:bg-slate-50 dark:border-white/10 dark:bg-white/[0.03] dark:hover:bg-white/[0.06]'
       )}
       onClick={onClick}

@@ -599,7 +599,7 @@ function AdminTile({
     <Link
       href={href}
       className={cn(
-        'group flex min-h-32 min-w-0 flex-col justify-between rounded-2xl border bg-white/80 p-4 shadow-sm transition-colors hover:border-cyan-200 hover:bg-cyan-50/40 dark:bg-surface-900/80 dark:hover:border-cyan-500/30 dark:hover:bg-cyan-500/[0.06]',
+        'group flex min-h-32 min-w-0 flex-col justify-between rounded-2xl border bg-white p-4 transition-colors hover:border-slate-300 hover:bg-slate-50 dark:bg-white/[0.035] dark:hover:border-white/20 dark:hover:bg-white/[0.05]',
         warning && 'border-amber-300 bg-amber-50/70 dark:border-amber-500/30 dark:bg-amber-500/10'
       )}
     >

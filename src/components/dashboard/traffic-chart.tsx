@@ -136,7 +136,7 @@ function TrafficPulsePanel({ series }: { series: SeriesPoint[] }) {
             {pulse.days.map((day) => (
               <div key={day.date} className="group relative flex h-full min-w-0 items-end justify-center">
                 <div
-                  className={`traffic-chart-bar w-full max-w-[18px] rounded-t-md rounded-b-sm bg-gradient-to-t transition-all duration-300 group-hover:-translate-y-0.5 ${
+                  className={`traffic-chart-bar w-full max-w-[18px] rounded-t-md rounded-b-sm bg-gradient-to-t ${
                     day.isPeak
                       ? 'from-emerald-500 via-teal-400 to-cyan-300'
                       : 'from-sky-600 via-cyan-400 to-cyan-200'
@@ -172,7 +172,7 @@ function TrafficHistoryEmpty({ loading, hasUsage }: { loading: boolean; hasUsage
   return (
     <div className="flex h-36 items-center justify-center rounded-lg border border-dashed border-slate-200 bg-slate-50/70 dark:border-white/10 dark:bg-white/[0.03] sm:h-44">
       <div className="text-center">
-        <span className="mx-auto flex h-9 w-9 items-center justify-center rounded-lg bg-white text-sky-500 shadow-sm dark:bg-white/10 dark:text-cyan-300">
+        <span className="mx-auto flex h-9 w-9 items-center justify-center text-sky-500 dark:text-cyan-300">
           <Activity className={`h-5 w-5 ${loading ? 'animate-pulse' : ''}`} />
         </span>
         <div className="mt-3 text-sm font-medium text-slate-700 dark:text-slate-200">

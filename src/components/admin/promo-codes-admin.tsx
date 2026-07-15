@@ -389,7 +389,7 @@ export function PromoCodesAdmin({
                   onClick={() => setTab(value)}
                   className={cn(
                     'inline-flex min-h-10 min-w-0 items-center justify-center gap-1.5 rounded-lg px-2 text-xs font-medium transition-colors sm:text-sm',
-                    tab === value ? 'bg-slate-950 text-white shadow-sm dark:bg-white dark:text-slate-950' : 'text-slate-500 hover:bg-white/70 dark:hover:bg-white/5'
+                    tab === value ? 'bg-slate-950 text-white dark:bg-white dark:text-slate-950' : 'text-slate-500 hover:bg-white/70 dark:hover:bg-white/5'
                   )}
                 >
                   <Icon className="h-4 w-4" />

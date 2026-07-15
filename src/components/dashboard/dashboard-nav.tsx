@@ -422,12 +422,17 @@ function NavList({
 
   return (
     <nav className={className}>
-      <NavGroup items={filterUserNav(nav, features)} pathname={pathname} badges={liveBadges} onNavigate={onNavigate} />
-      {role !== 'USER' && (
-        <div className="pt-3">
-          <div className="px-3 pb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-            Администрирование
-          </div>
+      {role === 'USER' ? (
+        <NavGroup items={filterUserNav(nav, features)} pathname={pathname} badges={liveBadges} onNavigate={onNavigate} />
+      ) : (
+        <div className="space-y-1.5">
+          <AdminNavGroup
+            title="Личный кабинет"
+            items={filterUserNav(nav, features)}
+            pathname={pathname}
+            badges={liveBadges}
+            onNavigate={onNavigate}
+          />
           <AdminNavGroups role={role} features={features} pathname={pathname} badges={liveBadges} onNavigate={onNavigate} />
         </div>
       )}

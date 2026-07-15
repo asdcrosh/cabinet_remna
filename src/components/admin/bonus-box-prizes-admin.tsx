@@ -198,7 +198,7 @@ export function BonusBoxPrizesAdmin({
 
   return (
     <div className="page-stack">
-      <section className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white/90 shadow-sm shadow-slate-950/[0.04] dark:border-white/10 dark:bg-surface-900/90 dark:shadow-black/20">
+      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.035]">
         <div className="p-4">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div className="min-w-0">
@@ -233,7 +233,7 @@ export function BonusBoxPrizesAdmin({
         </div>
       </section>
 
-      <section className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white/90 shadow-sm shadow-slate-950/[0.04] dark:border-white/10 dark:bg-surface-900/90 dark:shadow-black/20">
+      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.035]">
         <div className="flex flex-col gap-4 border-b border-slate-100 p-4 dark:border-white/10 lg:flex-row lg:items-center lg:justify-between">
           <div className="min-w-0">
             <div className="inline-flex items-center gap-2 rounded-md bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600 dark:bg-white/10 dark:text-slate-200">
@@ -285,7 +285,7 @@ export function BonusBoxPrizesAdmin({
         </div>
       </section>
 
-      <div className="flex flex-wrap gap-2 rounded-2xl border border-slate-200/80 bg-white/90 p-1.5 shadow-sm shadow-slate-950/[0.04] dark:border-white/10 dark:bg-surface-900/90 dark:shadow-black/20">
+      <div className="flex flex-wrap gap-2 border-b border-slate-200 pb-2 dark:border-white/10">
         <AdminTabButton
           active={activeTab === 'prizes'}
           icon={<Gift className="h-4 w-4" />}
@@ -364,7 +364,7 @@ function AdminTabButton({
       className={cn(
         'flex min-h-10 flex-1 items-center justify-between gap-3 rounded-xl px-3 py-2 text-left text-sm transition-colors sm:flex-none sm:min-w-40',
         active
-          ? 'bg-slate-950 text-white shadow-sm dark:bg-white dark:text-slate-950'
+          ? 'bg-slate-950 text-white dark:bg-white dark:text-slate-950'
           : 'text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-white/5'
       )}
       onClick={onClick}
@@ -441,7 +441,7 @@ function PrizeAdminRow({
   onToggle: () => void
 }) {
   return (
-    <article className={cn('group relative overflow-hidden rounded-2xl border bg-white shadow-sm shadow-slate-950/[0.04] transition-colors hover:border-cyan-200 dark:bg-surface-900 dark:shadow-black/20 dark:hover:border-cyan-500/30', prizeAdminBorderClass(prize))}>
+    <article className={cn('group relative overflow-hidden rounded-2xl border bg-white transition-colors hover:border-slate-300 dark:bg-white/[0.035] dark:hover:border-white/20', prizeAdminBorderClass(prize))}>
       <div className={cn('h-1', prizeAdminTopClass(prize))} />
       <div className="space-y-3 p-3">
         <div className="flex items-start justify-between gap-3">
@@ -459,7 +459,7 @@ function PrizeAdminRow({
               {prize.description || prizeTypeLabel(prize.type)}
             </div>
           </div>
-          <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-slate-950 text-cyan-200 shadow-sm dark:bg-white dark:text-slate-950">
+          <div className="grid h-9 w-9 shrink-0 place-items-center text-slate-600 dark:text-slate-300">
             <Gift className="h-4 w-4" />
           </div>
         </div>
@@ -712,7 +712,7 @@ function PrizeEditorDrawer({
 
 function BonusBoxOpeningHistory({ openings }: { openings: BonusBoxOpeningAdminRow[] }) {
   return (
-    <section className="space-y-4 rounded-2xl border border-slate-200/80 bg-white/90 p-4 shadow-sm shadow-slate-950/[0.04] dark:border-white/10 dark:bg-surface-900/90 dark:shadow-black/20">
+    <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.035]">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold">История открытий</h2>
@@ -789,7 +789,7 @@ function BonusBoxOpeningHistory({ openings }: { openings: BonusBoxOpeningAdminRo
         </div>
         <div className="space-y-3 xl:hidden">
           {openings.map((opening) => (
-            <article key={opening.id} className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm dark:border-white/10 dark:bg-white/[0.03]">
+            <article key={opening.id} className="rounded-2xl border border-slate-200 bg-white p-3 dark:border-white/10 dark:bg-white/[0.03]">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex min-w-0 gap-3">
                   <span className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-500 dark:bg-white/10 dark:text-slate-300">
@@ -890,7 +890,7 @@ function SettingsCard({
   onFieldChange: (value: number) => void
 }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-950/[0.04] dark:border-white/10 dark:bg-surface-950/80 dark:shadow-black/20">
+    <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.035]">
       <label className="flex cursor-pointer items-start justify-between gap-4">
         <span className="min-w-0">
           <span className="block text-base font-semibold text-slate-950 dark:text-white">{title}</span>

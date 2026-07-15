@@ -35,7 +35,7 @@ export function SettingsTabs({ sections }: { sections: SettingsTabSection[] }) {
 
   return (
     <div className="space-y-4 sm:space-y-5">
-      <div className="sticky top-14 z-20 -mx-4 bg-slate-50/95 px-4 py-2 backdrop-blur dark:bg-surface-950/95 sm:static sm:mx-0 sm:bg-transparent sm:px-0 sm:py-0 sm:backdrop-blur-none">
+      <div className="sticky top-14 z-20 -mx-4 bg-slate-50 px-4 py-2 dark:bg-surface-950 sm:static sm:mx-0 sm:bg-transparent sm:px-0 sm:py-0">
         <div className="rounded-2xl border border-slate-200 bg-white p-1 dark:border-white/10 dark:bg-white/[0.035]">
           <div role="tablist" aria-label="Разделы настроек" className="grid grid-cols-4 gap-1 sm:grid-cols-2 xl:grid-cols-4">
           {sections.map((section, index) => {
