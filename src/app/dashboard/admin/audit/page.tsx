@@ -117,7 +117,7 @@ export default async function AdminAuditPage({
                 </div>
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="badge-active">{ACTION_LABELS[log.action]}</span>
+                    <span className={auditActionBadgeClass(log.action)}>{ACTION_LABELS[log.action]}</span>
                     <h2 className="font-semibold">{log.message}</h2>
                   </div>
                   <div className="mt-1 text-sm text-slate-500">
@@ -132,17 +132,20 @@ export default async function AdminAuditPage({
               </div>
             </div>
             {log.metadata && (
-              <div className="border-t bg-slate-50/70 px-4 py-3 text-xs text-slate-500 dark:bg-white/[0.02]">
-                <pre className="max-h-28 overflow-auto whitespace-pre-wrap break-words font-mono">
+              <details className="border-t bg-slate-50/70 px-4 py-3 text-xs text-slate-500 dark:bg-white/[0.02]">
+                <summary className="cursor-pointer font-semibold text-slate-600 dark:text-slate-300">
+                  Технические данные
+                </summary>
+                <pre className="mt-3 max-h-40 overflow-auto whitespace-pre-wrap break-words rounded-xl bg-white p-3 font-mono [scrollbar-width:thin] dark:bg-surface-950">
                   {JSON.stringify(log.metadata, null, 2)}
                 </pre>
-              </div>
+              </details>
             )}
           </article>
         ))}
         {hasMore && (
           <div className="text-center">
-            <Link href={buildMoreHref(q, action, limit + 50)} className="btn-secondary inline-flex">
+            <Link href={buildMoreHref(q, action, limit + 50)} className="btn-secondary w-full sm:w-auto">
               Показать еще
             </Link>
           </div>
@@ -150,6 +153,13 @@ export default async function AdminAuditPage({
       </div>
     </div>
   )
+}
+
+function auditActionBadgeClass(action: AuditAction) {
+  if (action.includes('DELETED')) return 'badge-expired'
+  if (action.includes('CREATED')) return 'badge-active'
+  if (action.includes('MERGED')) return 'badge-limited'
+  return 'badge-muted'
 }
 
 function normalizeLimit(value: string | undefined) {

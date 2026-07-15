@@ -10,7 +10,7 @@ export type PaymentHistoryPayment = Prisma.PaymentGetPayload<{ include: { plan: 
 export function PaymentHistory({ payments }: { payments: PaymentHistoryPayment[] }) {
   return (
     <div className="space-y-3">
-      <div className="table-shell hidden xl:block">
+      <div className="table-shell hidden 2xl:block">
         <table className="data-table min-w-[900px]">
           <thead className="bg-slate-50 text-left text-slate-500 dark:bg-surface-800">
             <tr>
@@ -52,7 +52,7 @@ export function PaymentHistory({ payments }: { payments: PaymentHistoryPayment[]
         </table>
       </div>
 
-      <div className="space-y-3 xl:hidden">
+      <div className="space-y-3 2xl:hidden">
         {payments.length === 0 && <PaymentHistoryEmpty />}
         {payments.map((payment) => (
           <article key={payment.id} className="overflow-hidden rounded-2xl border border-slate-200 bg-white/90 shadow-sm shadow-slate-950/[0.04] dark:border-white/10 dark:bg-surface-900">
@@ -90,7 +90,7 @@ export function PaymentHistory({ payments }: { payments: PaymentHistoryPayment[]
 }
 
 function PaymentHistoryEmpty({ compact = false }: { compact?: boolean }) {
-  const action = <Link href="/dashboard/plans" className="btn-primary">Выбрать тариф</Link>
+  const action = <Link href="/dashboard/plans" className="btn-primary w-full sm:w-auto">Выбрать тариф</Link>
 
   if (compact) {
     return (
@@ -162,7 +162,8 @@ function PaymentAction({
   if (status === 'PENDING' && !isFreshPendingPayment(createdAt)) {
     return <span className="text-sm text-slate-400">Ссылка устарела</span>
   }
-  if (status !== 'PENDING' || !confirmationUrl) return <span className="text-sm text-slate-400">—</span>
+  if (status !== 'PENDING') return <span className="text-sm text-slate-400">—</span>
+  if (!confirmationUrl) return <span className="text-sm text-slate-400">Ссылка недоступна</span>
   return (
     <a
       href={confirmationUrl}
@@ -197,7 +198,7 @@ function PaymentStatusBadge({ status, createdAt }: { status: string; createdAt: 
 
 function ProvisioningBadge({ provisioned, status }: { provisioned: boolean; status: string }) {
   if (provisioned) return <span className="badge-active">Выдана</span>
-  if (status === 'SUCCEEDED') return <span className="badge-limited">Выдача идет</span>
+  if (status === 'SUCCEEDED') return <span className="badge-limited">Выдача идёт</span>
   if (status === 'PENDING') return <span className="badge-disabled">После оплаты</span>
   return <span className="text-slate-400">—</span>
 }
@@ -210,7 +211,7 @@ function getPromoCodeLabel(snapshot: unknown) {
 
 function getProvisioningLabel(provisioned: boolean, status: string) {
   if (provisioned) return 'Выдана'
-  if (status === 'SUCCEEDED') return 'Выдача идет'
+  if (status === 'SUCCEEDED') return 'Выдача идёт'
   if (status === 'PENDING') return 'После оплаты'
   return '—'
 }

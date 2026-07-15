@@ -21,19 +21,21 @@ interface Device {
 
 export function DevicesList() {
   const [devices, setDevices] = useState<Device[] | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
   const [removingHwid, setRemovingHwid] = useState<string | null>(null)
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null)
 
   const loadDevices = useCallback(async () => {
-    setError(null)
+    setLoadError(null)
+    setActionError(null)
     setRefreshing(true)
     try {
       const data = await apiFetch<{ devices: Device[] }>('/api/devices')
       setDevices(data.devices)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Не удалось загрузить устройства')
+      setLoadError(e instanceof Error ? e.message : 'Не удалось загрузить устройства')
     } finally {
       setRefreshing(false)
     }
@@ -45,22 +47,22 @@ export function DevicesList() {
 
   async function removeDevice(device: Device) {
     setRemovingHwid(device.hwid)
-    setError(null)
+    setActionError(null)
     try {
       await apiFetch(`/api/devices/${encodeURIComponent(device.hwid)}`, { method: 'DELETE' })
       setDevices((current) => current?.filter((item) => item.hwid !== device.hwid) ?? [])
       setSelectedDevice(null)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Не удалось отвязать устройство')
+      setActionError(e instanceof Error ? e.message : 'Не удалось отвязать устройство')
     } finally {
       setRemovingHwid(null)
     }
   }
 
-  if (error) {
+  if (loadError && !devices) {
     return (
       <div className="space-y-3">
-        <InlineAlert tone="danger" title="Не удалось загрузить устройства" description={error} />
+        <InlineAlert tone="danger" title="Не удалось загрузить устройства" description={loadError} />
         <button type="button" className="btn-secondary w-full sm:w-auto" onClick={() => void loadDevices()}>
           <RefreshCw className="h-4 w-4" />
           Попробовать снова
@@ -74,13 +76,20 @@ export function DevicesList() {
       <EmptyState
         title="Устройств пока нет"
         description="Подключите VPN в приложении, и устройство автоматически появится здесь."
-        action={<Link href="/dashboard/subscription" className="btn-primary">Подключить устройство</Link>}
+        action={<Link href="/dashboard/subscription" className="btn-primary w-full sm:w-auto">Подключить устройство</Link>}
       />
     )
   }
 
   return (
     <>
+      {(loadError || actionError) && (
+        <InlineAlert
+          tone="danger"
+          title={actionError ? 'Не удалось отвязать устройство' : 'Не удалось обновить список'}
+          description={actionError || loadError || undefined}
+        />
+      )}
       <section className="overflow-hidden rounded-3xl border border-slate-200/80 bg-white/90 shadow-sm shadow-slate-950/[0.04] dark:border-white/10 dark:bg-surface-900 dark:shadow-black/20">
         <div className="border-b border-slate-100 p-4 dark:border-white/10 sm:p-5">
           <div className="space-y-4">
@@ -154,7 +163,7 @@ function DeviceCard({
               <Icon className="h-5 w-5" />
             </div>
             <div className="min-w-0">
-              <h2 className="truncate text-sm font-semibold text-slate-950 dark:text-white sm:text-base">{getDeviceTitle(device)}</h2>
+              <h2 className="line-clamp-2 text-sm font-semibold text-slate-950 dark:text-white sm:text-base">{getDeviceTitle(device)}</h2>
               <p className="mt-1 line-clamp-2 text-sm leading-5 text-slate-500 dark:text-slate-400">{getDeviceSubtitle(device)}</p>
             </div>
           </div>

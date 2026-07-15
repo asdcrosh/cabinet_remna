@@ -12,14 +12,14 @@ interface EmptyStateProps {
 
 export function EmptyState({ title, description, icon, action, className }: EmptyStateProps) {
   return (
-    <div className={cn('card relative overflow-hidden py-12 text-center', className)}>
+    <div className={cn('card relative overflow-hidden px-4 py-9 text-center sm:py-12', className)}>
       <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-cyan-300/80 to-transparent" />
       <div className="mx-auto mb-5 grid h-14 w-14 place-items-center rounded-2xl border border-cyan-100 bg-cyan-50 text-cyan-700 shadow-sm dark:border-cyan-500/20 dark:bg-cyan-500/10 dark:text-cyan-200">
         {icon ?? <Info className="h-7 w-7" />}
       </div>
       <h2 className="text-xl font-semibold tracking-tight">{title}</h2>
       {description && <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500 dark:text-slate-400">{description}</p>}
-      {action && <div className="mt-6">{action}</div>}
+      {action && <div className="mx-auto mt-6 flex w-full max-w-xs flex-col sm:w-auto sm:max-w-none">{action}</div>}
     </div>
   )
 }
@@ -39,10 +39,15 @@ export function InlineAlert({
     info: 'border-slate-200 bg-white text-slate-700 dark:border-slate-800 dark:bg-surface-900 dark:text-slate-200',
   }
 
+  const Icon = tone === 'info' ? Info : AlertTriangle
+
   return (
-    <div className={cn('rounded-2xl border px-4 py-3 text-sm', styles[tone])}>
+    <div
+      className={cn('rounded-2xl border px-4 py-3 text-sm', styles[tone])}
+      role={tone === 'danger' ? 'alert' : 'status'}
+    >
       <div className="flex gap-2">
-        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+        <Icon className="mt-0.5 h-4 w-4 shrink-0" />
         <div>
           <div className="font-medium">{title}</div>
           {description && <div className="mt-1 opacity-80">{description}</div>}

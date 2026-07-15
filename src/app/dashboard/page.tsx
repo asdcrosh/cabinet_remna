@@ -5,7 +5,7 @@ import type { ReactElement } from 'react'
 import { Prisma, type PersonalOfferScenario, type PersonalOfferSetting, type WelcomeBonusType } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth/cookies'
-import { remnawave, RemnawaveError } from '@/lib/remnawave'
+import { remnawave, RemnawaveError, type UserStatus } from '@/lib/remnawave'
 import { formatBytes, formatPrice } from '@/lib/format'
 import { StatusBadge } from '@/components/dashboard/status-badge'
 import { TrafficChart } from '@/components/dashboard/traffic-chart'
@@ -69,13 +69,15 @@ export default async function DashboardHome() {
     ['ACTIVE', 'LIMITED'].includes(subscription.status) && subscription.expireAt > new Date()
   ) ?? null
   const remnawaveCardPromise = user.remnawaveUsername
-    ? remnawave.getSubscriptionByUsername(user.remnawaveUsername).catch((error) => {
-        if (error instanceof RemnawaveError) return null
-        throw error
-      })
-    : Promise.resolve(null)
+    ? remnawave.getSubscriptionByUsername(user.remnawaveUsername)
+        .then((data) => ({ data, errorStatus: null as number | null }))
+        .catch((error) => {
+          if (error instanceof RemnawaveError) return { data: null, errorStatus: error.status }
+          throw error
+        })
+    : Promise.resolve({ data: null, errorStatus: null as number | null })
   const [
-    remnawaveCard,
+    remnawaveCardResult,
     audienceContext,
     availablePlans,
     lastSucceededPayment,
@@ -110,6 +112,8 @@ export default async function DashboardHome() {
       },
     }),
   ])
+  const remnawaveCard = remnawaveCardResult.data
+  const remnawaveErrorStatus = remnawaveCardResult.errorStatus
   const sub = remnawaveCard?.response.user
   const welcomeBonusOptions = buildWelcomeBonusOptions(welcomeBonusSetting, {
     trialUsed: user.trialPlanRedemptions.length > 0,
@@ -169,12 +173,17 @@ export default async function DashboardHome() {
     )
   }
 
+  const hasRemoteUsage = Boolean(sub)
   const used = sub ? readRemnawaveBigInt(sub, ['trafficUsedBytes', 'usedTrafficBytes']) : 0n
   const limit = sub ? readRemnawaveBigInt(sub, ['trafficLimitBytes', 'trafficLimit']) : 0n
-  const isUnlimited = limit === 0n
+  const isUnlimited = hasRemoteUsage && limit === 0n
   const percent = isUnlimited ? 0 : Math.min(100, Math.round((Number(used) / Number(limit || 1n)) * 100))
-  const daysLeft = sub?.daysLeft ?? 0
-  const subscriptionExpired = sub ? isSubscriptionExpired(daysLeft, sub.userStatus) : false
+  const localDaysLeft = subRow
+    ? Math.ceil((subRow.expireAt.getTime() - Date.now()) / (24 * 60 * 60 * 1000))
+    : 0
+  const daysLeft = sub?.daysLeft ?? localDaysLeft
+  const subscriptionStatus = (sub?.userStatus ?? subRow?.status ?? 'DISABLED') as UserStatus
+  const subscriptionExpired = isSubscriptionExpired(daysLeft, subscriptionStatus)
   const primaryAction = daysLeft <= 7
     ? { href: '/dashboard/plans?intent=renew', label: 'Продлить подписку', icon: <CreditCard className="h-4 w-4" /> }
     : user._count.devices === 0
@@ -183,15 +192,24 @@ export default async function DashboardHome() {
 
   return (
     <div className="page-stack">
-      {subRow?.pendingSync && !remnawaveCard && (
-        <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
-          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
-          <div>
-            <div className="font-medium">Профиль доступа не найден в Remnawave</div>
-            <div className="mt-1 opacity-80">
-              Подписка сохранена в кабинете, но профиль нужно восстановить или перевыдать.
+      {remnawaveErrorStatus !== null && (
+        <div className="flex flex-col gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
+            <div>
+              <div className="font-medium">
+                {remnawaveErrorStatus === 404 ? 'Профиль доступа не найден в Remnawave' : 'Не удалось обновить данные подписки'}
+              </div>
+              <div className="mt-1 opacity-80">
+                {remnawaveErrorStatus === 404
+                  ? 'Подписка сохранена в кабинете, но профиль нужно восстановить или перевыдать.'
+                  : 'Срок показан по данным кабинета. Трафик временно недоступен.'}
+              </div>
             </div>
           </div>
+          <Link href="/dashboard" className="btn-secondary w-full shrink-0 justify-center sm:w-auto">
+            Повторить
+          </Link>
         </div>
       )}
 
@@ -206,7 +224,7 @@ export default async function DashboardHome() {
                   <h1 className="truncate text-2xl font-semibold leading-tight text-slate-950 dark:text-white sm:text-3xl">
                     {subRow?.plan?.name ?? 'VPN-подписка'}
                   </h1>
-                  <StatusBadge status={sub?.userStatus ?? 'DISABLED'} />
+                  <StatusBadge status={subscriptionStatus} />
                 </div>
                 <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
                   {subRow?.plan
@@ -220,9 +238,9 @@ export default async function DashboardHome() {
             </div>
 
             <div className="mt-6 grid grid-cols-3 divide-x divide-slate-200 border-y border-slate-200 py-4 dark:divide-white/10 dark:border-white/10">
-              <OverviewMetric label="Осталось" value={sub ? formatSubscriptionDaysLeft(daysLeft, sub.userStatus) : '—'} />
-              <OverviewMetric label="Использовано" value={formatBytes(used)} />
-              <OverviewMetric label="Лимит" value={isUnlimited ? 'Безлимит' : formatBytes(limit)} />
+              <OverviewMetric label="Осталось" value={subRow || sub ? formatSubscriptionDaysLeft(daysLeft, subscriptionStatus) : '—'} />
+              <OverviewMetric label="Использовано" value={hasRemoteUsage ? formatBytes(used) : '—'} />
+              <OverviewMetric label="Лимит" value={hasRemoteUsage ? isUnlimited ? 'Безлимит' : formatBytes(limit) : '—'} />
             </div>
 
             <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-sm">
@@ -233,9 +251,9 @@ export default async function DashboardHome() {
           </div>
 
           <div className="flex flex-col items-center justify-center rounded-2xl border border-slate-200 bg-slate-50/70 p-4 text-center dark:border-white/10 dark:bg-white/[0.035]">
-            <UsageRing percent={percent} unlimited={isUnlimited} />
+            <UsageRing percent={percent} unlimited={isUnlimited} unavailable={!hasRemoteUsage} />
             <div className="mt-3 text-sm font-semibold text-slate-950 dark:text-white">
-              {isUnlimited ? 'Трафик без ограничений' : `${percent}% использовано`}
+              {!hasRemoteUsage ? 'Данные трафика недоступны' : isUnlimited ? 'Трафик без ограничений' : `${percent}% использовано`}
             </div>
             <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
               {subscriptionExpired
@@ -844,15 +862,19 @@ function OverviewMetric({
   )
 }
 
-function UsageRing({ percent, unlimited }: { percent: number; unlimited: boolean }) {
-  const value = unlimited ? 100 : Math.max(0, Math.min(percent, 100))
+function UsageRing({ percent, unlimited, unavailable = false }: { percent: number; unlimited: boolean; unavailable?: boolean }) {
+  const value = unavailable ? 0 : unlimited ? 100 : Math.max(0, Math.min(percent, 100))
   return (
     <div
       className="grid h-24 w-24 place-items-center rounded-full p-2"
       style={{ background: `conic-gradient(rgb(16 185 129) ${value * 3.6}deg, rgba(148,163,184,0.18) 0deg)` }}
     >
       <div className="grid h-full w-full place-items-center rounded-full bg-white text-lg font-semibold text-slate-950 shadow-inner dark:bg-surface-900 dark:text-white">
-        {unlimited ? <ShieldCheck className="h-7 w-7 text-emerald-500" /> : `${value}%`}
+        {unavailable
+          ? <AlertTriangle className="h-7 w-7 text-amber-500" />
+          : unlimited
+            ? <ShieldCheck className="h-7 w-7 text-emerald-500" />
+            : `${value}%`}
       </div>
     </div>
   )

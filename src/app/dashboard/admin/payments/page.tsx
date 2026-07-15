@@ -80,7 +80,7 @@ export default async function AdminPaymentsPage({
         }
       />
 
-      <section className="grid gap-3 md:grid-cols-3">
+      <section className="grid gap-3 sm:grid-cols-3">
         <PaymentStat title="Ожидают оплаты" value={pendingCount} tone="amber" />
         <PaymentStat title="Нужна довыдача" value={retryCount} tone={retryCount > 0 ? 'red' : 'slate'} />
         <PaymentStat title="Оплачено всего" value={succeededCount} tone="emerald" />
@@ -125,8 +125,8 @@ export default async function AdminPaymentsPage({
         <AdminEmptyState title="Платежи не найдены" description="Измените фильтры или сбросьте поиск." />
       )}
 
-      <div className={payments.length > 0 ? 'table-shell hidden xl:block' : 'hidden'}>
-        <table className="data-table min-w-[1180px]">
+      <div className={payments.length > 0 ? 'table-shell hidden 2xl:block' : 'hidden'}>
+        <table className="data-table min-w-[1120px]">
           <thead className="bg-slate-50 text-left text-slate-500 dark:bg-surface-800">
             <tr>
               <th className="w-[150px]">Дата</th>
@@ -198,7 +198,7 @@ export default async function AdminPaymentsPage({
         </table>
       </div>
 
-      <div className={payments.length > 0 ? 'space-y-3 xl:hidden' : 'hidden'}>
+      <div className={payments.length > 0 ? 'space-y-3 2xl:hidden' : 'hidden'}>
         {payments.map((payment) => {
           const needsRetry = payment.status === 'SUCCEEDED' && !payment.subscriptionProvisionedAt
           const needsRemnashopRetry = payment.status === 'SUCCEEDED' && Boolean(payment.subscriptionProvisionedAt) && !payment.remnashopSyncedAt
@@ -248,7 +248,7 @@ export default async function AdminPaymentsPage({
                     </div>
                   </details>
                 ) : null}
-                <div className="action-row">
+                <div className="grid gap-2 sm:flex sm:flex-wrap sm:justify-end">
                   {canCheckPayment && <PaymentSyncButton paymentId={payment.id} />}
                   {needsRetry ? (
                     <RecoveryActionButton paymentId={payment.id} />

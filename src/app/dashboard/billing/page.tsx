@@ -54,7 +54,7 @@ export default async function BillingPage({
       <PageHeader
         title="Платежи"
         description="История оплат и состояние выдачи подписки"
-        action={<Link href="/dashboard/plans" className="btn-primary">Выбрать тариф</Link>}
+        action={<Link href="/dashboard/plans" className="btn-primary w-full sm:w-auto">Выбрать тариф</Link>}
       />
 
       {params.paid === '1' && <PaymentSuccessBanner status={getBannerStatus(syncResult)} supportEnabled={features.support} />}
@@ -62,13 +62,13 @@ export default async function BillingPage({
       <PaymentHistory payments={payments} />
 
       {pages > 1 && (
-        <nav className="flex items-center justify-between gap-3" aria-label="Страницы платежей">
+        <nav className="grid grid-cols-[1fr_auto_1fr] items-center gap-3" aria-label="Страницы платежей">
           {page > 1
-            ? <Link href={`/dashboard/billing?page=${page - 1}`} className="btn-secondary">Назад</Link>
+            ? <Link href={`/dashboard/billing?page=${page - 1}`} className="btn-secondary justify-self-start">Назад</Link>
             : <span />}
-          <span className="text-sm text-slate-500">Страница {Math.min(page, pages)} из {pages}</span>
+          <span className="text-center text-sm text-slate-500">Страница {Math.min(page, pages)} из {pages}</span>
           {page < pages
-            ? <Link href={`/dashboard/billing?page=${page + 1}`} className="btn-secondary">Дальше</Link>
+            ? <Link href={`/dashboard/billing?page=${page + 1}`} className="btn-secondary justify-self-end">Дальше</Link>
             : <span />}
         </nav>
       )}

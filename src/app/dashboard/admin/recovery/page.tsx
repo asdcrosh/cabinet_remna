@@ -39,7 +39,7 @@ export default async function AdminRecoveryPage() {
         />
       ) : (
         <>
-          <div className="table-shell hidden xl:block">
+          <div className="table-shell hidden 2xl:block">
             <table className="data-table min-w-[900px]">
               <thead className="bg-slate-50 text-left text-slate-500 dark:bg-surface-800">
                 <tr>
@@ -86,7 +86,7 @@ export default async function AdminRecoveryPage() {
             </table>
           </div>
 
-          <div className="space-y-3 xl:hidden">
+          <div className="space-y-3 2xl:hidden">
             {payments.map((payment) => (
               <article key={payment.id} className="overflow-hidden rounded-2xl border bg-white shadow-sm shadow-slate-950/[0.04] dark:border-white/10 dark:bg-surface-900 dark:shadow-black/20">
                 <div className="border-b bg-slate-50/70 px-4 py-3 dark:border-white/10 dark:bg-white/[0.03]">
@@ -99,7 +99,7 @@ export default async function AdminRecoveryPage() {
                   </div>
                 </div>
                 <div className="space-y-3 p-4">
-                  <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div className="grid gap-3 text-sm sm:grid-cols-2">
                     <InfoCell label="Тариф" value={payment.plan.name} />
                     <InfoCell label="Сумма" value={formatPrice(payment.amountKopecks)} />
                     <InfoCell
@@ -114,7 +114,7 @@ export default async function AdminRecoveryPage() {
                   <div className="rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:bg-amber-500/10 dark:text-amber-100">
                     {payment.provisioningJob?.lastError || payment.provisioningError || 'Подписка не была выдана.'}
                   </div>
-                  <div className="action-row">
+                  <div className="grid gap-2 sm:flex sm:justify-end">
                     <RecoveryActionButton paymentId={payment.id} />
                   </div>
                 </div>

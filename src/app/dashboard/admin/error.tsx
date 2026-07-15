@@ -13,7 +13,7 @@ export default function AdminError({ reset }: { error: Error; reset: () => void 
       <p className="mt-2 text-sm text-red-800/80 dark:text-red-100/80">
         Данные не потеряны. Попробуйте повторить запрос.
       </p>
-      <Button variant="danger" className="mt-5" onClick={reset}>
+      <Button variant="danger" className="mt-5 w-full sm:w-auto" onClick={reset}>
         Повторить
       </Button>
     </div>

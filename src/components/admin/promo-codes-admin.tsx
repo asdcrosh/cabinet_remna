@@ -377,7 +377,7 @@ export function PromoCodesAdmin({
         <div className="mt-4 grid gap-3 xl:grid-cols-2">
           <div className="min-w-0">
             <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">Статус</div>
-            <div className="flex gap-1 overflow-x-auto rounded-xl bg-slate-100/80 p-1 dark:bg-white/[0.05]">
+            <div className="flex snap-x gap-1 overflow-x-auto rounded-xl bg-slate-100/80 p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden dark:bg-white/[0.05]">
               {([
                 ['AVAILABLE', 'Не использованы', TicketCheck],
                 ['USED', 'Использованы', CheckCheck],
@@ -388,7 +388,7 @@ export function PromoCodesAdmin({
                   type="button"
                   onClick={() => setTab(value)}
                   className={cn(
-                    'inline-flex min-h-10 shrink-0 items-center gap-2 rounded-lg px-3 text-sm font-medium transition-colors',
+                    'inline-flex min-h-10 shrink-0 snap-start items-center gap-2 rounded-lg px-3 text-sm font-medium transition-colors',
                     tab === value ? 'bg-slate-950 text-white shadow-sm dark:bg-white dark:text-slate-950' : 'text-slate-500 hover:bg-white/70 dark:hover:bg-white/5'
                   )}
                 >
@@ -404,7 +404,7 @@ export function PromoCodesAdmin({
 
           <div className="min-w-0">
             <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">Источник</div>
-            <div className="flex gap-1 overflow-x-auto rounded-xl bg-slate-100/80 p-1 dark:bg-white/[0.05]">
+            <div className="flex snap-x gap-1 overflow-x-auto rounded-xl bg-slate-100/80 p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden dark:bg-white/[0.05]">
               {([
                 ['ALL', 'Все', TicketCheck],
                 ['CREATED', 'Созданные', Wand2],
@@ -419,7 +419,7 @@ export function PromoCodesAdmin({
                     setSelectedIds([])
                   }}
                   className={cn(
-                    'inline-flex min-h-10 shrink-0 items-center gap-2 rounded-lg px-3 text-sm font-medium transition-colors',
+                    'inline-flex min-h-10 shrink-0 snap-start items-center gap-2 rounded-lg px-3 text-sm font-medium transition-colors',
                     origin === value ? 'bg-slate-950 text-white shadow-sm dark:bg-white dark:text-slate-950' : 'text-slate-500 hover:bg-white/70 dark:hover:bg-white/5'
                   )}
                 >
@@ -450,10 +450,10 @@ export function PromoCodesAdmin({
             </span>
           )}
         </label>
-        <div className="flex flex-wrap gap-2">
+        <div className="grid w-full grid-cols-2 gap-2 sm:w-auto sm:flex sm:flex-wrap">
           <button
             type="button"
-            className="btn-secondary"
+            className="btn-secondary justify-center"
             onClick={() => void updateSelectedActive(true)}
             disabled={selectedIds.length === 0 || loading}
           >
@@ -462,7 +462,7 @@ export function PromoCodesAdmin({
           </button>
           <button
             type="button"
-            className="btn-secondary"
+            className="btn-secondary justify-center"
             onClick={() => void updateSelectedActive(false)}
             disabled={selectedIds.length === 0 || loading}
           >
@@ -471,7 +471,7 @@ export function PromoCodesAdmin({
           </button>
           <button
             type="button"
-            className="btn-secondary text-red-600 hover:border-red-200 hover:bg-red-50 hover:text-red-700 dark:text-red-300 dark:hover:border-red-500/30 dark:hover:bg-red-500/10"
+            className="btn-secondary col-span-2 justify-center text-red-600 hover:border-red-200 hover:bg-red-50 hover:text-red-700 dark:text-red-300 dark:hover:border-red-500/30 dark:hover:bg-red-500/10 sm:col-span-1"
             onClick={() => void deleteSelectedPromoCodes()}
             disabled={selectedIds.length === 0 || loading}
           >
@@ -619,7 +619,7 @@ export function PromoCodesAdmin({
       {filteredPromoCodes.length > 0 && (
         <div className="grid gap-3">
           {filteredPromoCodes.map((promoCode) => (
-          <article key={promoCode.id} className="grid gap-4 rounded-2xl border border-slate-200/80 bg-white/90 p-4 shadow-sm shadow-slate-950/[0.04] dark:border-white/10 dark:bg-surface-900/90 dark:shadow-black/20 lg:grid-cols-[minmax(13rem,1fr)_minmax(12rem,.9fr)_minmax(13rem,1fr)_minmax(12rem,.8fr)_auto] lg:items-center">
+          <article key={promoCode.id} className="grid gap-4 rounded-2xl border border-slate-200/80 bg-white/90 p-4 shadow-sm shadow-slate-950/[0.04] dark:border-white/10 dark:bg-surface-900/90 dark:shadow-black/20 2xl:grid-cols-[minmax(13rem,1fr)_minmax(12rem,.9fr)_minmax(13rem,1fr)_minmax(12rem,.8fr)_auto] 2xl:items-center">
             <div className="flex min-w-0 items-start gap-3">
               <input
                 className="mt-1.5 shrink-0"
@@ -652,26 +652,29 @@ export function PromoCodesAdmin({
               </div>
             </div>
             <AssigneesBlock assignees={promoCode.assignees} />
-            <div className="grid min-w-0 grid-cols-3 gap-2 text-sm lg:grid-cols-1 xl:grid-cols-3">
+            <div className="grid min-w-0 grid-cols-3 gap-2 text-sm">
               <CompactFact label="Исп." value={`${promoCode.usedCount}/${promoCode.maxUses ?? '∞'}`} />
               <CompactFact label="На одного" value={String(promoCode.maxUsesPerUser)} />
               <CompactFact label="Срок" value={formatRange(promoCode.startsAt, promoCode.expiresAt)} />
             </div>
-            <div className="grid grid-cols-3 gap-2 sm:flex sm:shrink-0 lg:justify-end">
-              <button type="button" className="btn-secondary h-10 min-h-10 px-3" onClick={() => startEdit(promoCode)} title="Изменить" aria-label={`Изменить промокод ${promoCode.code}`}>
+            <div className="grid grid-cols-3 gap-2 sm:flex sm:shrink-0 2xl:justify-end">
+              <button type="button" className="btn-secondary min-h-12 flex-col gap-1 px-2 py-2 sm:h-10 sm:min-h-10 sm:flex-row sm:px-3" onClick={() => startEdit(promoCode)} title="Изменить" aria-label={`Изменить промокод ${promoCode.code}`}>
                 <Edit3 className="h-4 w-4" />
+                <span className="text-[10px] sm:sr-only">Править</span>
               </button>
-              <button type="button" className="btn-secondary h-10 min-h-10 px-3" onClick={() => toggleActive(promoCode)} title={promoCode.isActive ? 'Отключить' : 'Включить'} aria-label={`${promoCode.isActive ? 'Отключить' : 'Включить'} промокод ${promoCode.code}`}>
+              <button type="button" className="btn-secondary min-h-12 flex-col gap-1 px-2 py-2 sm:h-10 sm:min-h-10 sm:flex-row sm:px-3" onClick={() => toggleActive(promoCode)} title={promoCode.isActive ? 'Отключить' : 'Включить'} aria-label={`${promoCode.isActive ? 'Отключить' : 'Включить'} промокод ${promoCode.code}`}>
                 <Power className="h-4 w-4" />
+                <span className="text-[10px] sm:sr-only">Статус</span>
               </button>
               <button
                 type="button"
-                className="btn-secondary h-10 min-h-10 px-3 text-red-600 hover:border-red-200 hover:bg-red-50 hover:text-red-700 dark:text-red-300 dark:hover:border-red-500/30 dark:hover:bg-red-500/10"
+                className="btn-secondary min-h-12 flex-col gap-1 px-2 py-2 text-red-600 hover:border-red-200 hover:bg-red-50 hover:text-red-700 dark:text-red-300 dark:hover:border-red-500/30 dark:hover:bg-red-500/10 sm:h-10 sm:min-h-10 sm:flex-row sm:px-3"
                 onClick={() => void deletePromoCode(promoCode)}
                 title="Удалить"
                 aria-label={`Удалить промокод ${promoCode.code}`}
               >
                 <Trash2 className="h-4 w-4" />
+                <span className="text-[10px] sm:sr-only">Удалить</span>
               </button>
             </div>
           </article>

@@ -49,7 +49,7 @@ export default async function AdminDuplicatesPage() {
         <div className="grid gap-3">
           {candidates.map((candidate) => (
             <article key={`${candidate.technicalUserId}:${candidate.emailUserId}`} className="surface-card">
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex flex-col gap-4 2xl:flex-row 2xl:items-center 2xl:justify-between">
                 <div className="grid min-w-0 gap-3 md:grid-cols-[1fr_auto_1fr] md:items-center">
                   <IdentityBox
                     title="Telegram-аккаунт"
@@ -67,12 +67,12 @@ export default async function AdminDuplicatesPage() {
                     meta={candidate.createdDistanceMinutes != null ? `${candidate.createdDistanceMinutes} мин. между регистрациями` : 'похожий профиль'}
                   />
                 </div>
-                <div className="flex shrink-0 flex-wrap items-center gap-2">
-                  <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
+                <div className="grid w-full grid-cols-2 gap-2 2xl:w-auto 2xl:shrink-0">
+                  <span className="col-span-2 inline-flex items-center justify-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
                     <AlertTriangle className="h-3.5 w-3.5" />
                     одинаковое имя
                   </span>
-                  <Link href={`/dashboard/admin/users?q=${encodeURIComponent(candidate.email)}`} className="btn-secondary h-9 px-3">
+                  <Link href={`/dashboard/admin/users?q=${encodeURIComponent(candidate.email)}`} className="btn-secondary min-h-11 justify-center px-3">
                     Открыть
                   </Link>
                   <DuplicateMergeButton

@@ -45,7 +45,7 @@ export function ReferralLinkCard({
 
   return (
     <div className="w-full max-w-full overflow-hidden rounded-3xl border border-cyan-100 bg-white/95 p-4 shadow-sm shadow-cyan-950/[0.04] dark:border-cyan-400/15 dark:bg-white/[0.04] dark:shadow-none sm:p-5">
-      <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+      <div className="flex min-w-0 flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
         <div className="min-w-0 max-w-full">
           <div className="flex min-w-0 items-center gap-2 text-sm font-semibold text-slate-950 dark:text-white">
             <span className="grid h-9 w-9 place-items-center rounded-xl bg-cyan-50 text-cyan-700 dark:bg-cyan-400/10 dark:text-cyan-200">
@@ -74,7 +74,7 @@ export function ReferralLinkCard({
             <span className="min-w-0">Бонус начислится после первой оплаты друга</span>
           </div>
         </div>
-        <div className="grid min-w-0 max-w-full gap-2 sm:grid-cols-2 lg:w-[20rem]">
+        <div className="grid min-w-0 max-w-full gap-2 sm:grid-cols-2 xl:w-[20rem]">
           <button type="button" className="btn-primary" onClick={share}>
             <Send className="h-4 w-4" />
             Поделиться

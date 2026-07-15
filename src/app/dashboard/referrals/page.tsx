@@ -154,7 +154,7 @@ export default async function ReferralsPage() {
                     </div>
                     <div className="min-w-0 rounded-xl bg-slate-50 p-2.5 dark:bg-white/5 md:bg-transparent md:p-0 md:text-right md:dark:bg-transparent">
                       <span className={reward.className}>{reward.label}</span>
-                      <div className="mt-1 truncate text-xs text-slate-500">{reward.description}</div>
+                      <div className="mt-1 line-clamp-2 text-xs text-slate-500">{reward.description}</div>
                     </div>
                   </article>
                 )

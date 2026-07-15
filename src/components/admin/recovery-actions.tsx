@@ -13,7 +13,7 @@ export function RecoveryActionButton({ paymentId }: { paymentId: string }) {
   return (
     <button
       type="button"
-      className="btn-primary min-w-[112px] px-3 text-xs"
+      className="btn-primary min-w-[112px] w-full px-3 text-xs sm:w-auto"
       disabled={loading}
       onClick={async () => {
         setLoading(true)
@@ -84,7 +84,7 @@ export function PaymentSyncButton({ paymentId }: { paymentId: string }) {
   return (
     <button
       type="button"
-      className="btn-secondary min-w-[112px] px-3 text-xs"
+      className="btn-secondary min-w-[112px] w-full px-3 text-xs sm:w-auto"
       disabled={loading}
       onClick={async () => {
         setLoading(true)
@@ -131,7 +131,7 @@ export function RemnashopPaymentRetryButton({ paymentId }: { paymentId: string }
   return (
     <button
       type="button"
-      className="btn-secondary min-w-[112px] px-3 text-xs"
+      className="btn-secondary min-w-[112px] w-full px-3 text-xs sm:w-auto"
       disabled={loading}
       onClick={async () => {
         setLoading(true)
@@ -150,7 +150,7 @@ export function RemnashopPaymentRetryButton({ paymentId }: { paymentId: string }
       }}
     >
       <RefreshCw className="h-3.5 w-3.5" />
-      {loading ? 'Sync...' : 'Retry sync'}
+      {loading ? 'Синхронизация...' : 'Повторить sync'}
     </button>
   )
 }

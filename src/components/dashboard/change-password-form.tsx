@@ -29,7 +29,6 @@ export function ChangePasswordForm() {
       defaultValues: { oldPassword: '', newPassword: '', confirm: '' },
     })
   const [serverError, setServerError] = useState<string | null>(null)
-  const [visible, setVisible] = useState(false)
   const onSubmit = handleSubmit(async (values) => {
     setServerError(null)
     try {
@@ -39,8 +38,8 @@ export function ChangePasswordForm() {
       })
       toast('Пароль изменён', 'success')
       reset()
-    } catch (e: any) {
-      setServerError(e.message)
+    } catch (error) {
+      setServerError(error instanceof Error ? error.message : 'Не удалось изменить пароль')
     }
   })
 
@@ -51,8 +50,6 @@ export function ChangePasswordForm() {
         <PasswordField
           id="oldPassword"
           autoComplete="current-password"
-          visible={visible}
-          toggle={() => setVisible((value) => !value)}
           register={register('oldPassword')}
         />
         {errors.oldPassword && (
@@ -64,8 +61,6 @@ export function ChangePasswordForm() {
         <PasswordField
           id="newPassword"
           autoComplete="new-password"
-          visible={visible}
-          toggle={() => setVisible((value) => !value)}
           register={register('newPassword')}
         />
         {errors.newPassword && (
@@ -77,8 +72,6 @@ export function ChangePasswordForm() {
         <PasswordField
           id="confirm"
           autoComplete="new-password"
-          visible={visible}
-          toggle={() => setVisible((value) => !value)}
           register={register('confirm')}
         />
         {errors.confirm && (
@@ -86,7 +79,7 @@ export function ChangePasswordForm() {
         )}
       </div>
       {serverError && (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-100">
+        <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-100">
           {serverError}
         </div>
       )}
@@ -100,16 +93,14 @@ export function ChangePasswordForm() {
 function PasswordField({
   id,
   autoComplete,
-  visible,
-  toggle,
   register,
 }: {
   id: string
   autoComplete: string
-  visible: boolean
-  toggle: () => void
   register: UseFormRegisterReturn
 }) {
+  const [visible, setVisible] = useState(false)
+
   return (
     <div className="relative">
       <input
@@ -122,7 +113,7 @@ function PasswordField({
       <button
         type="button"
         className="absolute right-2 top-1/2 -translate-y-1/2 rounded-xl p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-white/5 dark:hover:text-slate-100"
-        onClick={toggle}
+        onClick={() => setVisible((value) => !value)}
         aria-label={visible ? 'Скрыть пароль' : 'Показать пароль'}
       >
         {visible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}

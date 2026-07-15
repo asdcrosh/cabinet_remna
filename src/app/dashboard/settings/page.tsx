@@ -212,7 +212,7 @@ function AccountFact({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0 rounded-xl border border-slate-200/80 bg-slate-50/80 px-3 py-2.5 dark:border-white/10 dark:bg-surface-950/45">
       <div className="text-xs text-slate-500 dark:text-slate-400">{label}</div>
-      <div className="mt-1 truncate font-medium text-slate-950 dark:text-white">{value}</div>
+      <div className="mt-1 truncate font-medium text-slate-950 dark:text-white" title={value}>{value}</div>
     </div>
   )
 }
