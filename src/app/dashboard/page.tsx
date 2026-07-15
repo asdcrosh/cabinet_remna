@@ -33,6 +33,7 @@ import { getFreshPendingPaymentCutoff } from '@/lib/payment-sync'
 import { getPlanAudienceContext, isPlanAvailableForUser } from '@/lib/plan-access'
 import { normalizeOfferTone, renderPersonalOfferTemplate } from '@/lib/personal-offers'
 import { getFeatureFlags } from '@/lib/feature-flags'
+import { cn } from '@/lib/cn'
 
 export const dynamic = 'force-dynamic'
 
@@ -250,8 +251,12 @@ export default async function DashboardHome() {
               </div>
             </div>
 
-            <div className="mt-7 grid grid-cols-3 gap-2 sm:gap-3">
-              <OverviewMetric label="Осталось" value={subRow || sub ? formatSubscriptionDaysLeft(daysLeft, subscriptionStatus) : '—'} />
+            <div className="mt-7 grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3">
+              <OverviewMetric
+                className="col-span-2 sm:col-span-1"
+                label="Осталось"
+                value={subRow || sub ? formatSubscriptionDaysLeft(daysLeft, subscriptionStatus) : '—'}
+              />
               <OverviewMetric label="Использовано" value={hasRemoteUsage ? formatBytes(used) : '—'} />
               <OverviewMetric label="Лимит" value={hasRemoteUsage ? isUnlimited ? 'Безлимит' : formatBytes(limit) : '—'} />
             </div>
@@ -861,16 +866,18 @@ function insightTone(tone: 'amber' | 'cyan' | 'slate') {
 }
 
 function OverviewMetric({
+  className,
   label,
   value,
 }: {
+  className?: string
   label: string
   value: string
 }) {
   return (
-    <div className="dashboard-hero-metric text-center sm:text-left">
+    <div className={cn('dashboard-hero-metric text-left', className)}>
       <div className="text-[11px] font-medium uppercase tracking-wide text-slate-400">{label}</div>
-      <div className="mt-1 truncate text-base font-semibold text-white sm:text-lg">{value}</div>
+      <div className="mt-1 break-words text-base font-semibold leading-tight text-white sm:text-lg">{value}</div>
     </div>
   )
 }

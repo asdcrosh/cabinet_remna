@@ -242,7 +242,7 @@ export function NotificationBell({ showAdmin = false }: { showAdmin?: boolean })
       aria-labelledby="notification-panel-title"
       tabIndex={-1}
       onKeyDown={handlePanelKeyDown}
-      className="fixed inset-x-2 bottom-[calc(env(safe-area-inset-bottom)+5.5rem)] top-auto z-[120] max-h-[72dvh] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl shadow-slate-950/10 dark:border-white/10 dark:bg-surface-950 dark:shadow-black/30 sm:absolute sm:bottom-auto sm:inset-x-auto sm:right-6 sm:top-16 sm:w-[min(24rem,calc(100vw-2rem))] sm:max-h-[34rem] lg:right-6"
+      className="fixed inset-x-2 top-[4.5rem] z-[120] max-h-[72dvh] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl shadow-slate-950/10 dark:border-white/10 dark:bg-surface-950 dark:shadow-black/30 sm:inset-x-auto sm:right-6 sm:w-[min(24rem,calc(100vw-2rem))] sm:max-h-[34rem]"
     >
       <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 dark:border-white/10">
         <div>
