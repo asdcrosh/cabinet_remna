@@ -810,8 +810,8 @@ function NewTicketForm({
       </div>
 
       <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3 sm:space-y-5 sm:p-5">
-        <div>
-          <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+        <div role="group" aria-labelledby="new-ticket-category-label">
+          <div id="new-ticket-category-label" className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
             <Tag className="h-3.5 w-3.5" />
             В чем проблема
           </div>
@@ -822,6 +822,7 @@ function NewTicketForm({
                 <button
                   key={item.value}
                   type="button"
+                  aria-pressed={active}
                   onClick={() => onCategoryChange(item.value)}
                   className={cn(
                     'min-w-[13rem] rounded-2xl border p-3 text-left transition-colors sm:min-w-0',
@@ -846,6 +847,7 @@ function NewTicketForm({
             <EmojiPicker onPick={insertEmoji} />
             <textarea
               ref={messageInputRef}
+              aria-label="Сообщение"
               className="min-h-32 flex-1 resize-none rounded-xl border-0 bg-transparent px-2 py-2 text-base outline-none placeholder:text-slate-400 focus:ring-0 sm:min-h-44 sm:text-sm"
               value={message}
               onChange={(event) => onMessageChange(event.target.value)}

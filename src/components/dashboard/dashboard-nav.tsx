@@ -322,6 +322,9 @@ export function MobileBottomNav({ badges = {}, features }: { badges?: NavBadges;
             )
           })}
         </div>
+        <div className="mt-3 border-t border-slate-200 pt-3 dark:border-white/10">
+          <LogoutButton />
+        </div>
       </div>
     </div>
   )

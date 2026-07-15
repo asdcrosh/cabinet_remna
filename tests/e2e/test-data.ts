@@ -14,6 +14,11 @@ export const E2E_USERS = {
     remnawaveShortUuid: 'e2e-expired-short',
     remnawaveUsername: 'e2e-expired',
   },
+  admin: {
+    id: 'e2e-admin-user',
+    email: 'e2e-admin@example.test',
+    name: 'E2E Администратор',
+  },
 } as const
 
 export const E2E_PLAN_ID = 'e2e-expired-plan'

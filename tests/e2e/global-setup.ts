@@ -18,6 +18,14 @@ export default async function globalSetup() {
   const expireAt = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000)
 
   try {
+    await prisma.rateLimitBucket.deleteMany({
+      where: {
+        OR: [
+          { key: { startsWith: 'auth-login:' } },
+          { key: { startsWith: 'support:create:e2e-' } },
+        ],
+      },
+    })
     await prisma.user.deleteMany({
       where: { email: { in: Object.values(E2E_USERS).map((user) => user.email) } },
     })
@@ -64,6 +72,17 @@ export default async function globalSetup() {
             trafficLimitBytes: null,
           },
         },
+      },
+    })
+
+    await prisma.user.create({
+      data: {
+        ...E2E_USERS.admin,
+        passwordHash,
+        role: 'SUPER_ADMIN',
+        emailVerifiedAt: now,
+        agreedToTermsAt: now,
+        referralCode: 'E2EADMIN',
       },
     })
   } finally {
