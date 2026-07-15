@@ -377,9 +377,9 @@ export function PromoCodesAdmin({
         <div className="mt-4 grid gap-3 xl:grid-cols-2">
           <div className="min-w-0">
             <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">Статус</div>
-            <div className="flex snap-x gap-1 overflow-x-auto rounded-xl bg-slate-100/80 p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden dark:bg-white/[0.05]">
+            <div data-testid="promo-status-filter" className="grid grid-cols-3 gap-1 rounded-xl bg-slate-100/80 p-1 dark:bg-white/[0.05]">
               {([
-                ['AVAILABLE', 'Не использованы', TicketCheck],
+                ['AVAILABLE', 'Доступны', TicketCheck],
                 ['USED', 'Использованы', CheckCheck],
                 ['ARCHIVE', 'Архив', Archive],
               ] as const).map(([value, label, Icon]) => (
@@ -388,7 +388,7 @@ export function PromoCodesAdmin({
                   type="button"
                   onClick={() => setTab(value)}
                   className={cn(
-                    'inline-flex min-h-10 shrink-0 snap-start items-center gap-2 rounded-lg px-3 text-sm font-medium transition-colors',
+                    'inline-flex min-h-10 min-w-0 items-center justify-center gap-1.5 rounded-lg px-2 text-xs font-medium transition-colors sm:text-sm',
                     tab === value ? 'bg-slate-950 text-white shadow-sm dark:bg-white dark:text-slate-950' : 'text-slate-500 hover:bg-white/70 dark:hover:bg-white/5'
                   )}
                 >
@@ -404,7 +404,7 @@ export function PromoCodesAdmin({
 
           <div className="min-w-0">
             <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">Источник</div>
-            <div className="flex snap-x gap-1 overflow-x-auto rounded-xl bg-slate-100/80 p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden dark:bg-white/[0.05]">
+            <div data-testid="promo-origin-filter" className="grid grid-cols-2 gap-1 rounded-xl bg-slate-100/80 p-1 dark:bg-white/[0.05] 2xl:grid-cols-4">
               {([
                 ['ALL', 'Все', TicketCheck],
                 ['CREATED', 'Созданные', Wand2],
@@ -419,7 +419,7 @@ export function PromoCodesAdmin({
                     setSelectedIds([])
                   }}
                   className={cn(
-                    'inline-flex min-h-10 shrink-0 snap-start items-center gap-2 rounded-lg px-3 text-sm font-medium transition-colors',
+                    'inline-flex min-h-10 min-w-0 items-center justify-center gap-1.5 rounded-lg px-2 text-xs font-medium transition-colors sm:text-sm',
                     origin === value ? 'bg-slate-950 text-white shadow-sm dark:bg-white dark:text-slate-950' : 'text-slate-500 hover:bg-white/70 dark:hover:bg-white/5'
                   )}
                 >
@@ -450,7 +450,7 @@ export function PromoCodesAdmin({
             </span>
           )}
         </label>
-        <div className="grid w-full grid-cols-2 gap-2 sm:w-auto sm:flex sm:flex-wrap">
+        {selectedIds.length > 0 && <div className="grid w-full grid-cols-2 gap-2 sm:w-auto sm:flex sm:flex-wrap">
           <button
             type="button"
             className="btn-secondary justify-center"
@@ -478,7 +478,7 @@ export function PromoCodesAdmin({
             <Trash2 className="h-4 w-4" />
             Удалить выбранные
           </button>
-        </div>
+        </div>}
       </div>
 
       <AdminModal
@@ -617,68 +617,89 @@ export function PromoCodesAdmin({
       </AdminModal>
 
       {filteredPromoCodes.length > 0 && (
-        <div className="grid gap-3">
-          {filteredPromoCodes.map((promoCode) => (
-          <article key={promoCode.id} className="grid gap-4 rounded-2xl border border-slate-200/80 bg-white/90 p-4 shadow-sm shadow-slate-950/[0.04] dark:border-white/10 dark:bg-surface-900/90 dark:shadow-black/20 2xl:grid-cols-[minmax(13rem,1fr)_minmax(12rem,.9fr)_minmax(13rem,1fr)_minmax(12rem,.8fr)_auto] 2xl:items-center">
-            <div className="flex min-w-0 items-start gap-3">
-              <input
-                className="mt-1.5 shrink-0"
-                type="checkbox"
-                checked={selectedIds.includes(promoCode.id)}
-                onChange={() => toggleSelected(promoCode.id)}
-                aria-label={`Выбрать промокод ${promoCode.code}`}
-              />
-              <div className="min-w-0">
-                <div className="flex min-w-0 items-center gap-2">
-                  <div className="truncate font-mono text-base font-semibold" title={promoCode.code}>{promoCode.code}</div>
-                  <span className={cn('shrink-0', tab === 'AVAILABLE' ? 'badge-active' : tab === 'USED' ? 'badge-disabled' : 'badge-limited')}>
-                    {tab === 'AVAILABLE' ? 'Активен' : tab === 'USED' ? 'Использован' : 'Архив'}
-                  </span>
-                </div>
-                <div className="mt-1">
-                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500 dark:bg-white/10 dark:text-slate-300">
-                    {originTitle(promoCode.origin)}
-                  </span>
-                </div>
-                <div className="mt-1 text-xl font-semibold text-emerald-600">-{promoCode.discountPercent}%</div>
-              </div>
-            </div>
-            <div className="min-w-0">
-              <div className="text-[11px] font-semibold uppercase text-slate-400">Тарифы</div>
-              <div className="mt-1 truncate text-sm text-slate-600 dark:text-slate-300">{promoCode.planNames.length > 0 ? promoCode.planNames.join(', ') : 'Все тарифы'}</div>
-              <div className="mt-2 text-[11px] font-semibold uppercase text-slate-400">Доступ</div>
-              <div className="mt-1 truncate text-sm text-slate-600 dark:text-slate-300" title={audienceTitle(promoCode)}>
-                {audienceTitle(promoCode)}
-              </div>
-            </div>
-            <AssigneesBlock assignees={promoCode.assignees} />
-            <div className="grid min-w-0 grid-cols-3 gap-2 text-sm">
-              <CompactFact label="Исп." value={`${promoCode.usedCount}/${promoCode.maxUses ?? '∞'}`} />
-              <CompactFact label="На одного" value={String(promoCode.maxUsesPerUser)} />
-              <CompactFact label="Срок" value={formatRange(promoCode.startsAt, promoCode.expiresAt)} />
-            </div>
-            <div className="grid grid-cols-3 gap-2 sm:flex sm:shrink-0 2xl:justify-end">
-              <button type="button" className="btn-secondary min-h-12 flex-col gap-1 px-2 py-2 sm:h-10 sm:min-h-10 sm:flex-row sm:px-3" onClick={() => startEdit(promoCode)} title="Изменить" aria-label={`Изменить промокод ${promoCode.code}`}>
-                <Edit3 className="h-4 w-4" />
-                <span className="text-[10px] sm:sr-only">Править</span>
-              </button>
-              <button type="button" className="btn-secondary min-h-12 flex-col gap-1 px-2 py-2 sm:h-10 sm:min-h-10 sm:flex-row sm:px-3" onClick={() => toggleActive(promoCode)} title={promoCode.isActive ? 'Отключить' : 'Включить'} aria-label={`${promoCode.isActive ? 'Отключить' : 'Включить'} промокод ${promoCode.code}`}>
-                <Power className="h-4 w-4" />
-                <span className="text-[10px] sm:sr-only">Статус</span>
-              </button>
-              <button
-                type="button"
-                className="btn-secondary min-h-12 flex-col gap-1 px-2 py-2 text-red-600 hover:border-red-200 hover:bg-red-50 hover:text-red-700 dark:text-red-300 dark:hover:border-red-500/30 dark:hover:bg-red-500/10 sm:h-10 sm:min-h-10 sm:flex-row sm:px-3"
-                onClick={() => void deletePromoCode(promoCode)}
-                title="Удалить"
-                aria-label={`Удалить промокод ${promoCode.code}`}
+        <div data-testid="admin-promo-grid" className="grid gap-4 xl:grid-cols-2">
+          {filteredPromoCodes.map((promoCode) => {
+            const status = promoStatus(promoCode)
+            return (
+              <article
+                key={promoCode.id}
+                data-testid="admin-promo-card"
+                className="flex h-full min-w-0 flex-col rounded-3xl border border-slate-200/80 bg-white/90 p-4 shadow-sm shadow-slate-950/[0.04] dark:border-white/10 dark:bg-surface-900/90 dark:shadow-black/20 sm:p-5"
               >
-                <Trash2 className="h-4 w-4" />
-                <span className="text-[10px] sm:sr-only">Удалить</span>
-              </button>
-            </div>
-          </article>
-          ))}
+                <div className="flex items-start gap-3">
+                  <input
+                    className="mt-1.5 shrink-0"
+                    type="checkbox"
+                    checked={selectedIds.includes(promoCode.id)}
+                    onChange={() => toggleSelected(promoCode.id)}
+                    aria-label={`Выбрать промокод ${promoCode.code}`}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="break-all font-mono text-base font-semibold" title={promoCode.code}>{promoCode.code}</h3>
+                      <span className={status === 'AVAILABLE' ? 'badge-active' : status === 'USED' ? 'badge-disabled' : 'badge-limited'}>
+                        {status === 'AVAILABLE' ? 'Активен' : status === 'USED' ? 'Использован' : 'Архив'}
+                      </span>
+                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500 dark:bg-white/10 dark:text-slate-300">
+                        {originTitle(promoCode.origin)}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="shrink-0 text-2xl font-semibold tracking-tight text-emerald-600 dark:text-emerald-300">-{promoCode.discountPercent}%</div>
+                </div>
+
+                <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                  <CompactFact label="Использовано" value={`${promoCode.usedCount}/${promoCode.maxUses ?? '∞'}`} />
+                  <CompactFact label="На одного" value={String(promoCode.maxUsesPerUser)} />
+                  <CompactFact className="col-span-2 sm:col-span-1" label="Срок" value={formatRange(promoCode.startsAt, promoCode.expiresAt)} />
+                </div>
+
+                <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                  <div className="rounded-2xl border border-slate-200/70 bg-slate-50/70 px-3 py-2.5 dark:border-white/[0.07] dark:bg-white/[0.025]">
+                    <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Тарифы</div>
+                    <div className="mt-1 line-clamp-2 text-sm font-medium text-slate-800 dark:text-slate-100">
+                      {promoCode.planNames.length > 0 ? promoCode.planNames.join(', ') : 'Все тарифы'}
+                    </div>
+                  </div>
+                  <div className="rounded-2xl border border-slate-200/70 bg-slate-50/70 px-3 py-2.5 dark:border-white/[0.07] dark:bg-white/[0.025]">
+                    <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Доступ</div>
+                    <div className="mt-1 line-clamp-2 text-sm font-medium text-slate-800 dark:text-slate-100" title={audienceTitle(promoCode)}>
+                      {audienceTitle(promoCode)}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-4">
+                  <AssigneesBlock assignees={promoCode.assignees} />
+                </div>
+
+                <div className="mt-auto flex flex-wrap items-center gap-2 border-t border-slate-200/70 pt-4 dark:border-white/[0.07]">
+                  <button type="button" className="btn-secondary min-h-10 px-3 py-2 text-xs" onClick={() => startEdit(promoCode)} aria-label={`Изменить промокод ${promoCode.code}`}>
+                    <Edit3 className="h-4 w-4" />
+                    Изменить
+                  </button>
+                  <button
+                    type="button"
+                    className={cn('btn-secondary min-h-10 px-3 py-2 text-xs', promoCode.isActive ? 'text-amber-700 dark:text-amber-200' : 'text-emerald-700 dark:text-emerald-200')}
+                    onClick={() => toggleActive(promoCode)}
+                    aria-label={`${promoCode.isActive ? 'Отключить' : 'Включить'} промокод ${promoCode.code}`}
+                  >
+                    <Power className="h-4 w-4" />
+                    {promoCode.isActive ? 'Отключить' : 'Включить'}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-secondary ml-auto min-h-10 px-3 py-2 text-xs text-red-600 hover:border-red-200 hover:bg-red-50 hover:text-red-700 dark:text-red-300 dark:hover:border-red-500/30 dark:hover:bg-red-500/10"
+                    onClick={() => void deletePromoCode(promoCode)}
+                    aria-label={`Удалить промокод ${promoCode.code}`}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    Удалить
+                  </button>
+                </div>
+              </article>
+            )
+          })}
         </div>
       )}
 
@@ -706,7 +727,7 @@ function AssigneesBlock({ assignees }: { assignees: PromoCodeAssignee[] }) {
   const hiddenCount = Math.max(0, assignees.length - 1)
 
   return (
-    <div className="min-w-0">
+    <div className="min-w-0 rounded-2xl border border-slate-200/70 bg-slate-50/70 px-3 py-2.5 dark:border-white/[0.07] dark:bg-white/[0.025]">
       <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase text-slate-400">
         <UserRound className="h-3.5 w-3.5" />
         За кем числится
@@ -746,11 +767,11 @@ function AssigneesBlock({ assignees }: { assignees: PromoCodeAssignee[] }) {
   )
 }
 
-function CompactFact({ label, value }: { label: string; value: string }) {
+function CompactFact({ label, value, className }: { label: string; value: string; className?: string }) {
   return (
-    <div className="min-w-0 rounded-xl bg-slate-50/80 px-2.5 py-2 dark:bg-white/[0.04]">
-      <div className="text-[11px] uppercase text-slate-400">{label}</div>
-      <div className="mt-1 truncate font-medium" title={value}>{value}</div>
+    <div className={cn('min-w-0 rounded-2xl border border-slate-200/70 bg-slate-50/70 px-3 py-2.5 dark:border-white/[0.07] dark:bg-white/[0.025]', className)}>
+      <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">{label}</div>
+      <div className="mt-1 break-words text-sm font-semibold leading-tight" title={value}>{value}</div>
     </div>
   )
 }

@@ -270,79 +270,101 @@ export function PlansAdmin({ plans }: { plans: PlanAdminRow[] }) {
       )}
 
       {plans.length > 0 && (
-        <div className="grid gap-3">
+        <div data-testid="admin-plan-grid" className="grid gap-4 xl:grid-cols-2">
           {plans.map((plan) => {
-          const selectedSquads = plan.activeInternalSquads.map((id) => squadById.get(id)).filter(Boolean) as RemnawaveSquad[]
-          const unknownSquads = plan.activeInternalSquads.filter((id) => !squadById.has(id))
-          return (
-            <article key={plan.id} className="rounded-2xl border border-slate-200/80 bg-white/90 p-4 shadow-sm shadow-slate-950/[0.04] dark:border-white/10 dark:bg-surface-900/90 dark:shadow-black/20">
-              <div className="grid gap-4 2xl:grid-cols-[minmax(15rem,1.2fr)_minmax(12rem,.7fr)_minmax(16rem,1fr)_auto] 2xl:items-center">
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="truncate font-semibold">{plan.name}</h3>
-                    <span className={plan.isActive ? 'badge-active' : 'badge-disabled'}>{plan.isActive ? 'Опубликован' : 'Скрыт'}</span>
-                    {plan.isPromo && <span className="badge-limited">Пробный</span>}
-                    {plan.isFeatured && <span className="badge-active">Популярный</span>}
+            const selectedSquads = plan.activeInternalSquads.map((id) => squadById.get(id)).filter(Boolean) as RemnawaveSquad[]
+            const unknownSquads = plan.activeInternalSquads.filter((id) => !squadById.has(id))
+            const allowedUsersCount = new Set([...plan.allowedEmails, ...plan.allowedTelegramIds]).size
+
+            return (
+              <article
+                key={plan.id}
+                data-testid="admin-plan-card"
+                className="flex h-full min-w-0 flex-col rounded-3xl border border-slate-200/80 bg-white/90 p-4 shadow-sm shadow-slate-950/[0.04] dark:border-white/10 dark:bg-surface-900/90 dark:shadow-black/20 sm:p-5"
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="break-words text-lg font-semibold tracking-tight">{plan.name}</h3>
+                      <span className={plan.isActive ? 'badge-active' : 'badge-disabled'}>{plan.isActive ? 'Опубликован' : 'Скрыт'}</span>
+                      {plan.isPromo && <span className="badge-limited">Пробный</span>}
+                      {plan.isFeatured && <span className="badge-active">Популярный</span>}
+                    </div>
+                    {plan.description && <p className="mt-1 line-clamp-2 text-sm leading-5 text-slate-500 dark:text-slate-400">{plan.description}</p>}
                   </div>
-                  <div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                    <span className="text-xl font-semibold">{formatPrice(plan.priceKopecks)}</span>
-                    <span className="text-sm leading-5 text-slate-500">{plan.durationDays} дней · {plan.trafficLimitGb == null ? 'безлимит' : `${plan.trafficLimitGb} ГБ`} · {plan.deviceLimit} устройств</span>
-                  </div>
-                  {plan.description && <p className="mt-1 line-clamp-2 text-sm text-slate-500">{plan.description}</p>}
+                  <div className="shrink-0 text-right text-xl font-semibold tracking-tight">{formatPrice(plan.priceKopecks)}</div>
                 </div>
 
-                <div className="min-w-0">
-                  <div className="text-[11px] font-semibold uppercase text-slate-400">Доступ</div>
-                  <div className="mt-1 text-sm font-medium">{planAvailabilityLabels[plan.availability]}</div>
-                  {plan.availability === 'ALLOWED' && <div className="text-xs text-slate-500">{new Set([...plan.allowedEmails, ...plan.allowedTelegramIds]).size} пользователей</div>}
+                <div className="mt-4 grid grid-cols-3 gap-2">
+                  <PlanStat label="Срок" value={`${plan.durationDays} дн.`} />
+                  <PlanStat label="Трафик" value={plan.trafficLimitGb == null ? 'Безлимит' : `${plan.trafficLimitGb} ГБ`} />
+                  <PlanStat label="Устройства" value={String(plan.deviceLimit)} />
                 </div>
 
-                <div className="min-w-0">
-                  <div className="mb-1.5 flex items-center gap-2 text-[11px] font-semibold uppercase text-slate-400">
+                <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                  <div className="rounded-2xl border border-slate-200/70 bg-slate-50/70 px-3 py-2.5 dark:border-white/[0.07] dark:bg-white/[0.025]">
+                    <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Доступ</div>
+                    <div className="mt-1 text-sm font-medium text-slate-800 dark:text-slate-100">{planAvailabilityLabels[plan.availability]}</div>
+                    {plan.availability === 'ALLOWED' && <div className="mt-0.5 text-xs text-slate-500">Пользователей: {allowedUsersCount}</div>}
+                  </div>
+                  <div className="rounded-2xl border border-slate-200/70 bg-slate-50/70 px-3 py-2.5 dark:border-white/[0.07] dark:bg-white/[0.025]">
+                    <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Использование</div>
+                    <div className="mt-1 text-sm font-medium text-slate-800 dark:text-slate-100">Подписок: {plan.subscriptionsCount}</div>
+                    <div className="mt-0.5 text-xs text-slate-500">Оплат: {plan.paymentsCount}</div>
+                  </div>
+                </div>
+
+                <div className="mt-4 min-w-0">
+                  <div className="mb-2 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
                     <Server className="h-3.5 w-3.5" />
-                    Группы
+                    Группы Remnawave
                   </div>
-                  <div className="flex flex-wrap gap-1.5">
+                  <div className="flex min-h-7 flex-wrap gap-1.5">
                     {plan.activeInternalSquads.length === 0 && (
                       <span className="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 px-2 py-1 text-xs text-slate-600 dark:bg-white/10 dark:text-slate-300">
                         <Globe2 className="h-3.5 w-3.5" />
                         По умолчанию
                       </span>
                     )}
-                    {selectedSquads.slice(0, 2).map((squad) => (
-                      <span key={squad.uuid} className="inline-flex max-w-40 items-center gap-1.5 truncate rounded-lg bg-cyan-50 px-2 py-1 text-xs text-cyan-800 dark:bg-cyan-400/10 dark:text-cyan-200">
-                        <span className={cn('h-1.5 w-1.5 rounded-full', squad.isActive ? 'bg-emerald-500' : 'bg-slate-400')} />
+                    {selectedSquads.slice(0, 3).map((squad) => (
+                      <span key={squad.uuid} className="inline-flex max-w-44 items-center gap-1.5 truncate rounded-lg bg-cyan-50 px-2 py-1 text-xs text-cyan-800 dark:bg-cyan-400/10 dark:text-cyan-200">
+                        <span className={cn('h-1.5 w-1.5 shrink-0 rounded-full', squad.isActive ? 'bg-emerald-500' : 'bg-slate-400')} />
                         {squad.name}
                       </span>
                     ))}
-                    {plan.activeInternalSquads.length > 2 && <span className="rounded-lg bg-slate-100 px-2 py-1 text-xs text-slate-500">+{plan.activeInternalSquads.length - 2}</span>}
+                    {plan.activeInternalSquads.length > 3 && <span className="rounded-lg bg-slate-100 px-2 py-1 text-xs text-slate-500">+{plan.activeInternalSquads.length - 3}</span>}
                     {unknownSquads.length > 0 && <span className="rounded-lg bg-amber-50 px-2 py-1 text-xs text-amber-700">Не найдено: {unknownSquads.length}</span>}
                   </div>
                 </div>
 
-                <div className="grid grid-flow-col auto-cols-fr gap-2 sm:flex sm:items-center 2xl:justify-end">
-                  <button type="button" className="btn-secondary min-h-12 flex-col gap-1 px-1 py-2 sm:h-10 sm:min-h-10 sm:flex-row sm:px-3" onClick={() => startEdit(plan)} title="Изменить тариф" aria-label={`Изменить тариф ${plan.name}`}>
+                <div className="mt-auto flex flex-wrap items-center gap-2 border-t border-slate-200/70 pt-4 dark:border-white/[0.07]">
+                  <button type="button" className="btn-secondary min-h-10 px-3 py-2 text-xs" onClick={() => startEdit(plan)} aria-label={`Изменить тариф ${plan.name}`}>
                     <Edit3 className="h-4 w-4" />
-                    <span className="text-[10px] sm:sr-only">Править</span>
+                    Изменить
                   </button>
                   {plan.availability === 'LINK' && (
-                    <button type="button" className="btn-secondary min-h-12 flex-col gap-1 px-1 py-2 sm:h-10 sm:min-h-10 sm:flex-row sm:px-3" onClick={() => void copyPlanLink(plan)} title="Скопировать ссылку" aria-label={`Скопировать ссылку на тариф ${plan.name}`}>
+                    <button type="button" className="btn-secondary min-h-10 px-3 py-2 text-xs" onClick={() => void copyPlanLink(plan)} aria-label={`Скопировать ссылку на тариф ${plan.name}`}>
                       <Link2 className="h-4 w-4" />
-                      <span className="text-[10px] sm:sr-only">Ссылка</span>
+                      Ссылка
                     </button>
                   )}
-                  <button type="button" className="btn-secondary min-h-12 flex-col gap-1 px-1 py-2 text-red-600 sm:h-10 sm:min-h-10 sm:flex-row sm:px-3" onClick={() => requestDeletePlan(plan)} disabled={loadingId === plan.id} title="Удалить" aria-label={`Удалить тариф ${plan.name}`}>
-                    <Trash2 className="h-4 w-4" />
-                    <span className="text-[10px] sm:sr-only">Удалить</span>
-                  </button>
-                  <button type="button" className="btn-secondary min-h-12 flex-col gap-1 px-1 py-2 sm:h-10 sm:min-h-10 sm:flex-row sm:px-3" onClick={() => void toggleActive(plan)} disabled={loadingId === plan.id} title={plan.isActive ? 'Скрыть тариф' : 'Опубликовать тариф'} aria-label={`${plan.isActive ? 'Скрыть' : 'Опубликовать'} тариф ${plan.name}`}>
+                  <button
+                    type="button"
+                    className={cn('btn-secondary min-h-10 px-3 py-2 text-xs', plan.isActive ? 'text-amber-700 dark:text-amber-200' : 'text-emerald-700 dark:text-emerald-200')}
+                    onClick={() => void toggleActive(plan)}
+                    disabled={loadingId === plan.id}
+                    aria-label={`${plan.isActive ? 'Скрыть' : 'Опубликовать'} тариф ${plan.name}`}
+                  >
                     <Power className="h-4 w-4" />
-                    <span className="text-[10px] sm:sr-only">Статус</span>
+                    {plan.isActive ? 'Скрыть' : 'Опубликовать'}
+                  </button>
+                  <button type="button" className="btn-secondary ml-auto min-h-10 px-3 py-2 text-xs text-red-600 dark:text-red-300" onClick={() => requestDeletePlan(plan)} disabled={loadingId === plan.id} aria-label={`Удалить тариф ${plan.name}`}>
+                    <Trash2 className="h-4 w-4" />
+                    Удалить
                   </button>
                 </div>
-              </div>
-            </article>
-          )
+              </article>
+            )
           })}
         </div>
       )}
@@ -355,6 +377,15 @@ export function PlansAdmin({ plans }: { plans: PlanAdminRow[] }) {
         onConfirm={() => void deletePlan()}
         onCancel={() => setDeleteCandidate(null)}
       />
+    </div>
+  )
+}
+
+function PlanStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0 rounded-2xl border border-slate-200/70 bg-slate-50/70 px-3 py-2.5 dark:border-white/[0.07] dark:bg-white/[0.025]">
+      <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">{label}</div>
+      <div className="mt-1 break-words text-sm font-semibold leading-tight text-slate-900 dark:text-white">{value}</div>
     </div>
   )
 }

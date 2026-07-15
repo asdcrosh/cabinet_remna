@@ -65,3 +65,40 @@ test('мобильные уведомления раскрываются под 
   expect(panelBox!.y).toBeGreaterThanOrEqual(triggerBox!.y + triggerBox!.height)
   expect(panelBox!.y).toBeLessThan(page.viewportSize()!.height / 3)
 })
+
+test('каталог тарифов использует компактные карточки с понятными действиями', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop-chromium', 'Проверка предназначена для desktop viewport')
+  await login(page, E2E_USERS.admin.email)
+  await page.goto('/dashboard/admin/plans')
+
+  await expect(page.getByRole('heading', { name: 'Тарифы' })).toBeVisible()
+  const grid = page.getByTestId('admin-plan-grid')
+  const card = page.getByTestId('admin-plan-card').filter({ hasText: 'E2E Стандарт' })
+  await expect(card).toHaveCount(1)
+  await expect(card.getByRole('button', { name: 'Изменить тариф E2E Стандарт' })).toBeVisible()
+  await expect(card.getByRole('button', { name: 'Скрыть тариф E2E Стандарт' })).toBeVisible()
+
+  const [gridBox, cardBox] = await Promise.all([grid.boundingBox(), card.boundingBox()])
+  expect(gridBox).not.toBeNull()
+  expect(cardBox).not.toBeNull()
+  expect(cardBox!.width).toBeLessThan(gridBox!.width * 0.7)
+  await expectNoHorizontalOverflow(page)
+})
+
+test('фильтры промокодов помещаются без скрытой прокрутки', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop-chromium', 'Проверка предназначена для desktop viewport')
+  await login(page, E2E_USERS.admin.email)
+  await page.goto('/dashboard/admin/promo-codes')
+
+  await expect(page.getByRole('heading', { level: 1, name: 'Промокоды' })).toBeVisible()
+  const statusFilter = page.getByTestId('promo-status-filter')
+  const originFilter = page.getByTestId('promo-origin-filter')
+  await expect(statusFilter).toHaveCount(1)
+  await expect(originFilter).toHaveCount(1)
+  await expect(statusFilter.getByRole('button')).toHaveCount(3)
+  await expect(originFilter.getByRole('button')).toHaveCount(4)
+  expect(await statusFilter.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true)
+  expect(await originFilter.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true)
+  await expect(page.getByRole('button', { name: 'Удалить выбранные' })).toHaveCount(0)
+  await expectNoHorizontalOverflow(page)
+})
