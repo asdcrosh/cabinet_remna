@@ -604,14 +604,14 @@ export function PromoCodesAdmin({
       </AdminModal>
 
       {filteredPromoCodes.length > 0 && (
-        <div data-testid="admin-promo-grid" className="grid gap-4 xl:grid-cols-2">
+        <div data-testid="admin-promo-grid" className="space-y-2">
           {filteredPromoCodes.map((promoCode) => {
             const status = promoStatus(promoCode)
             return (
               <article
                 key={promoCode.id}
                 data-testid="admin-promo-card"
-                className="flex h-full min-w-0 flex-col rounded-2xl border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.035] sm:p-5"
+                className="min-w-0 rounded-xl border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.035] lg:grid lg:grid-cols-[minmax(13rem,1fr)_minmax(20rem,1.6fr)_minmax(13rem,1fr)] lg:gap-x-6"
               >
                 <div className="flex items-start gap-3">
                   <input
@@ -635,7 +635,7 @@ export function PromoCodesAdmin({
                   <div className="shrink-0 text-2xl font-semibold tracking-tight text-emerald-600 dark:text-emerald-300">-{promoCode.discountPercent}%</div>
                 </div>
 
-                <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 border-y border-slate-200/70 py-3 dark:border-white/[0.07] sm:grid-cols-3">
+                <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 border-y border-slate-200/70 py-3 dark:border-white/[0.07] sm:grid-cols-3 lg:col-start-2 lg:row-start-1 lg:mt-0 lg:border-0 lg:py-1">
                   <div>
                     <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Использовано</div>
                     <div className="mt-0.5 text-sm font-medium">{promoCode.usedCount}/{promoCode.maxUses ?? '∞'}</div>
@@ -650,7 +650,7 @@ export function PromoCodesAdmin({
                   </div>
                 </div>
 
-                <div className="mt-3 space-y-1.5 text-sm">
+                <div className="mt-3 space-y-1.5 text-sm lg:col-start-2 lg:row-start-2">
                   <div className="flex min-w-0 gap-3">
                     <span className="w-16 shrink-0 text-slate-400">Тарифы</span>
                     <span className="line-clamp-2 font-medium text-slate-700 dark:text-slate-200">{promoCode.planNames.length > 0 ? promoCode.planNames.join(', ') : 'Все тарифы'}</span>
@@ -661,11 +661,11 @@ export function PromoCodesAdmin({
                   </div>
                 </div>
 
-                <div className="mt-4">
+                <div className="mt-4 lg:col-start-3 lg:row-span-2 lg:row-start-1 lg:mt-0">
                   <AssigneesBlock assignees={promoCode.assignees} />
                 </div>
 
-                <div className="mt-auto flex flex-wrap items-center gap-2 border-t border-slate-200/70 pt-4 dark:border-white/[0.07]">
+                <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-slate-200/70 pt-3 dark:border-white/[0.07] lg:col-span-3">
                   <button type="button" className="btn-secondary min-h-10 px-3 py-2 text-xs" onClick={() => startEdit(promoCode)} aria-label={`Изменить промокод ${promoCode.code}`}>
                     <Edit3 className="h-4 w-4" />
                     Изменить

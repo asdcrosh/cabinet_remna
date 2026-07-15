@@ -390,12 +390,12 @@ export function MobileBottomNav({ badges = {}, features }: { badges?: NavBadges;
 
 export function Brand({ compact = false, brandName }: { compact?: boolean; brandName: string }) {
   return (
-    <Link href="/dashboard" className="flex min-w-0 items-center gap-3">
-      <div className="relative grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-slate-950 text-white dark:bg-white dark:text-slate-950">
-        <ShieldCheck className="h-5 w-5" />
+    <Link href="/dashboard" className="flex min-w-0 items-center gap-2.5">
+      <div className="relative grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-slate-950 text-white dark:bg-white dark:text-slate-950">
+        <ShieldCheck className="h-4 w-4" />
       </div>
       <div className="min-w-0">
-        <div className="truncate text-[15px] font-bold tracking-tight text-slate-950 dark:text-white">{brandName}</div>
+        <div className="truncate text-sm font-semibold tracking-tight text-slate-950 dark:text-white">{brandName}</div>
         <div className={cn('truncate text-xs text-slate-500', compact && 'hidden')}>
           Личный кабинет
         </div>

@@ -178,7 +178,6 @@ export default async function DashboardHome() {
   const used = sub ? readRemnawaveBigInt(sub, ['trafficUsedBytes', 'usedTrafficBytes']) : 0n
   const limit = sub ? readRemnawaveBigInt(sub, ['trafficLimitBytes', 'trafficLimit']) : 0n
   const isUnlimited = hasRemoteUsage && limit === 0n
-  const percent = isUnlimited ? 0 : Math.min(100, Math.round((Number(used) / Number(limit || 1n)) * 100))
   const localDaysLeft = subRow
     ? Math.ceil((subRow.expireAt.getTime() - Date.now()) / (24 * 60 * 60 * 1000))
     : 0
@@ -264,12 +263,9 @@ export default async function DashboardHome() {
             </div>
           </div>
 
-          <div className="flex flex-col items-center justify-center border-t border-white/10 pt-5 text-center lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
-            <UsageRing percent={percent} unlimited={isUnlimited} unavailable={!hasRemoteUsage} />
-            <div className="mt-3 text-sm font-semibold text-white">
-              {!hasRemoteUsage ? 'Данные трафика недоступны' : isUnlimited ? 'Трафик без ограничений' : `${percent}% использовано`}
-            </div>
-            <div className="mt-1 text-xs text-slate-300">
+          <div className="flex flex-col justify-end border-t border-white/10 pt-5 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
+            <div className="text-xs font-medium uppercase tracking-wide text-cyan-200">Доступ</div>
+            <div className="mt-1 text-sm text-slate-300">
               {subscriptionExpired
                 ? 'Срок доступа истёк'
                 : daysLeft > 0
@@ -869,24 +865,6 @@ function OverviewMetric({
     <div className={cn('dashboard-hero-metric text-left', className)}>
       <div className="text-[11px] font-medium uppercase tracking-wide text-slate-400">{label}</div>
       <div className="mt-1 break-words text-base font-semibold leading-tight text-white sm:text-lg">{value}</div>
-    </div>
-  )
-}
-
-function UsageRing({ percent, unlimited, unavailable = false }: { percent: number; unlimited: boolean; unavailable?: boolean }) {
-  const value = unavailable ? 0 : unlimited ? 100 : Math.max(0, Math.min(percent, 100))
-  return (
-    <div
-      className="grid h-24 w-24 place-items-center rounded-full p-2"
-      style={{ background: `conic-gradient(rgb(16 185 129) ${value * 3.6}deg, rgba(148,163,184,0.18) 0deg)` }}
-    >
-      <div className="grid h-full w-full place-items-center rounded-full bg-slate-950/90 text-lg font-semibold text-white shadow-inner ring-1 ring-white/10">
-        {unavailable
-          ? <AlertTriangle className="h-7 w-7 text-amber-500" />
-          : unlimited
-            ? <ShieldCheck className="h-7 w-7 text-emerald-500" />
-            : `${value}%`}
-      </div>
     </div>
   )
 }

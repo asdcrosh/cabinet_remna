@@ -270,7 +270,7 @@ export function PlansAdmin({ plans }: { plans: PlanAdminRow[] }) {
       )}
 
       {plans.length > 0 && (
-        <div data-testid="admin-plan-grid" className="grid gap-4 xl:grid-cols-2">
+        <div data-testid="admin-plan-grid" className="space-y-2">
           {plans.map((plan) => {
             const selectedSquads = plan.activeInternalSquads.map((id) => squadById.get(id)).filter(Boolean) as RemnawaveSquad[]
             const unknownSquads = plan.activeInternalSquads.filter((id) => !squadById.has(id))
@@ -280,7 +280,7 @@ export function PlansAdmin({ plans }: { plans: PlanAdminRow[] }) {
               <article
                 key={plan.id}
                 data-testid="admin-plan-card"
-                className="flex h-full min-w-0 flex-col rounded-2xl border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.035] sm:p-5"
+                className="min-w-0 rounded-xl border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.035] lg:grid lg:grid-cols-[minmax(13rem,1.1fr)_minmax(19rem,1.5fr)_minmax(13rem,1fr)] lg:gap-x-6"
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0">
@@ -295,7 +295,7 @@ export function PlansAdmin({ plans }: { plans: PlanAdminRow[] }) {
                   <div className="shrink-0 text-right text-xl font-semibold tracking-tight">{formatPrice(plan.priceKopecks)}</div>
                 </div>
 
-                <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 border-y border-slate-200/70 py-3 dark:border-white/[0.07] sm:grid-cols-3">
+                <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 border-y border-slate-200/70 py-3 dark:border-white/[0.07] sm:grid-cols-3 lg:col-start-2 lg:row-start-1 lg:mt-0 lg:border-0 lg:py-1">
                   <div>
                     <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Срок</div>
                     <div className="mt-0.5 text-sm font-medium">{plan.durationDays} дн.</div>
@@ -310,14 +310,14 @@ export function PlansAdmin({ plans }: { plans: PlanAdminRow[] }) {
                   </div>
                 </div>
 
-                <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-sm text-slate-500 dark:text-slate-400">
+                <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-sm text-slate-500 dark:text-slate-400 lg:col-start-2 lg:row-start-2">
                   <span><span className="text-slate-400">Доступ:</span> {planAvailabilityLabels[plan.availability]}</span>
                   {plan.availability === 'ALLOWED' && <span>Пользователей: {allowedUsersCount}</span>}
                   <span>Подписок: {plan.subscriptionsCount}</span>
                   <span>Оплат: {plan.paymentsCount}</span>
                 </div>
 
-                <div className="mt-4 min-w-0">
+                <div className="mt-4 min-w-0 lg:col-start-3 lg:row-span-2 lg:row-start-1 lg:mt-0">
                   <div className="mb-2 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
                     <Server className="h-3.5 w-3.5" />
                     Группы Remnawave
@@ -340,7 +340,7 @@ export function PlansAdmin({ plans }: { plans: PlanAdminRow[] }) {
                   </div>
                 </div>
 
-                <div className="mt-auto flex flex-wrap items-center gap-2 border-t border-slate-200/70 pt-4 dark:border-white/[0.07]">
+                <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-slate-200/70 pt-3 dark:border-white/[0.07] lg:col-span-3">
                   <button type="button" className="btn-secondary min-h-10 px-3 py-2 text-xs" onClick={() => startEdit(plan)} aria-label={`Изменить тариф ${plan.name}`}>
                     <Edit3 className="h-4 w-4" />
                     Изменить

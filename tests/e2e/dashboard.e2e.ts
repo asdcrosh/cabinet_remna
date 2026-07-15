@@ -66,7 +66,7 @@ test('мобильные уведомления раскрываются под 
   expect(panelBox!.y).toBeLessThan(page.viewportSize()!.height / 3)
 })
 
-test('каталог тарифов использует компактные карточки с понятными действиями', async ({ page }, testInfo) => {
+test('каталог тарифов использует компактные строки с понятными действиями', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop-chromium', 'Проверка предназначена для desktop viewport')
   await login(page, E2E_USERS.admin.email)
   await page.goto('/dashboard/admin/plans')
@@ -81,7 +81,8 @@ test('каталог тарифов использует компактные к
   const [gridBox, cardBox] = await Promise.all([grid.boundingBox(), card.boundingBox()])
   expect(gridBox).not.toBeNull()
   expect(cardBox).not.toBeNull()
-  expect(cardBox!.width).toBeLessThan(gridBox!.width * 0.7)
+  expect(cardBox!.width).toBeGreaterThan(gridBox!.width * 0.9)
+  expect(cardBox!.height).toBeLessThan(240)
   await expectNoHorizontalOverflow(page)
 })
 
