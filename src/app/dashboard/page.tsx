@@ -27,6 +27,7 @@ import {
   UsersRound,
 } from 'lucide-react'
 import { logWarn } from '@/lib/logger'
+import { formatSubscriptionDaysLeft, isSubscriptionExpired } from '@/lib/subscription-time'
 import { readRemnawaveBigInt } from '@/lib/remnawave-usage'
 import { getFreshPendingPaymentCutoff } from '@/lib/payment-sync'
 import { getPlanAudienceContext, isPlanAvailableForUser } from '@/lib/plan-access'
@@ -173,6 +174,7 @@ export default async function DashboardHome() {
   const isUnlimited = limit === 0n
   const percent = isUnlimited ? 0 : Math.min(100, Math.round((Number(used) / Number(limit || 1n)) * 100))
   const daysLeft = sub?.daysLeft ?? 0
+  const subscriptionExpired = sub ? isSubscriptionExpired(daysLeft, sub.userStatus) : false
   const primaryAction = daysLeft <= 7
     ? { href: '/dashboard/plans?intent=renew', label: 'Продлить подписку', icon: <CreditCard className="h-4 w-4" /> }
     : user._count.devices === 0
@@ -218,7 +220,7 @@ export default async function DashboardHome() {
             </div>
 
             <div className="mt-6 grid grid-cols-3 divide-x divide-slate-200 border-y border-slate-200 py-4 dark:divide-white/10 dark:border-white/10">
-              <OverviewMetric label="Осталось" value={sub ? `${daysLeft} дн.` : '—'} />
+              <OverviewMetric label="Осталось" value={sub ? formatSubscriptionDaysLeft(daysLeft, sub.userStatus) : '—'} />
               <OverviewMetric label="Использовано" value={formatBytes(used)} />
               <OverviewMetric label="Лимит" value={isUnlimited ? 'Безлимит' : formatBytes(limit)} />
             </div>
@@ -236,7 +238,11 @@ export default async function DashboardHome() {
               {isUnlimited ? 'Трафик без ограничений' : `${percent}% использовано`}
             </div>
             <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-              {daysLeft > 0 ? `Доступ ещё ${daysLeft} дн.` : 'Проверьте срок доступа'}
+              {subscriptionExpired
+                ? 'Срок доступа истёк'
+                : daysLeft > 0
+                  ? `Доступ ещё ${daysLeft} дн.`
+                  : 'Доступ закончится сегодня'}
             </div>
             <Link href={primaryAction.href} className="btn-primary mt-4 w-full min-h-11">
               {primaryAction.icon}

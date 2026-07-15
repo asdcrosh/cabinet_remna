@@ -9,6 +9,7 @@ import Link from 'next/link'
 import { CalendarClock, Database, ShieldAlert } from 'lucide-react'
 import { EmptyState } from '@/components/dashboard/empty-state'
 import { getFeatureFlags } from '@/lib/feature-flags'
+import { formatSubscriptionDaysLeft, isSubscriptionExpired } from '@/lib/subscription-time'
 
 export const dynamic = 'force-dynamic'
 
@@ -66,7 +67,13 @@ export default async function SubscriptionPage() {
 
   const u = data.response.user
   const isUnlimited = u.trafficLimitBytes === '0'
-  const statusText = u.isActive ? 'Подписка активна' : 'Подписка не активна'
+  const subscriptionExpired = isSubscriptionExpired(u.daysLeft, u.userStatus)
+  const expiresAtLabel = new Date(u.expiresAt).toLocaleDateString('ru-RU')
+  const statusText = subscriptionExpired
+    ? 'Подписка истекла'
+    : u.isActive
+      ? 'Подписка активна'
+      : 'Подписка не активна'
 
   return (
     <div className="page-stack">
@@ -75,7 +82,7 @@ export default async function SubscriptionPage() {
         <div className="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <span className={u.isActive ? 'badge-active' : 'badge-disabled'}>{statusText}</span>
+              <span className={subscriptionExpired ? 'badge-expired' : u.isActive ? 'badge-active' : 'badge-disabled'}>{statusText}</span>
               <span className="badge bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-slate-300">
                 {u.username}
               </span>
@@ -86,9 +93,9 @@ export default async function SubscriptionPage() {
           <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto] xl:min-w-[34rem]">
             <CompactMetric
               icon={<CalendarClock className="h-4 w-4" />}
-              label="До"
-              value={new Date(u.expiresAt).toLocaleDateString('ru-RU')}
-              hint={`${u.daysLeft} дн.`}
+              label={subscriptionExpired ? 'Срок' : 'До'}
+              value={subscriptionExpired ? 'Истекла' : expiresAtLabel}
+              hint={subscriptionExpired ? `Была активна до ${expiresAtLabel}` : formatSubscriptionDaysLeft(u.daysLeft, u.userStatus)}
             />
             <CompactMetric
               icon={<Database className="h-4 w-4" />}
