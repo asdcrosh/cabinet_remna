@@ -8,7 +8,6 @@ import { MobilePlanPicker } from '@/components/dashboard/mobile-plan-picker'
 import { formatPrice } from '@/lib/format'
 import { PageHeader } from '@/components/dashboard/page-header'
 import { getCurrentUser } from '@/lib/auth/cookies'
-import { CreditCard, KeyRound, ShieldCheck } from 'lucide-react'
 import { getPlanAudienceContext, isPlanAvailableForUser } from '@/lib/plan-access'
 import { getAvailableUserPromoCodesByPlan } from '@/lib/user-promo-codes'
 
@@ -135,14 +134,8 @@ export default async function PlansPage({
         )}
       />
 
-      <section aria-label="Как подключиться" className="grid grid-cols-3 gap-1 rounded-2xl border border-slate-200/80 bg-white/75 p-1.5 shadow-sm shadow-slate-950/[0.03] dark:border-white/10 dark:bg-white/[0.025] sm:gap-2 sm:p-2">
-        <BuyStep icon={<ShieldCheck className="h-4 w-4" />} title="Выберите" subtitle="тариф" />
-        <BuyStep icon={<CreditCard className="h-4 w-4" />} title="Оплатите" subtitle="онлайн" />
-        <BuyStep icon={<KeyRound className="h-4 w-4" />} title="Подключите" subtitle="устройство" />
-      </section>
-
       {isRenewIntent && (
-        <section className="rounded-2xl border border-cyan-200 bg-cyan-50/80 px-4 py-3 text-sm text-cyan-950 shadow-sm dark:border-cyan-400/30 dark:bg-cyan-400/10 dark:text-cyan-50">
+        <section className="rounded-2xl border border-cyan-200 bg-cyan-50/80 px-4 py-3 text-sm text-cyan-950 dark:border-cyan-400/30 dark:bg-cyan-400/10 dark:text-cyan-50">
           <div className="font-semibold">Продление подписки</div>
           <div className="mt-1 text-cyan-900/75 dark:text-cyan-50/75">
             Выберите текущий или любой другой тариф. После оплаты срок доступа обновится автоматически.
@@ -151,7 +144,7 @@ export default async function PlansPage({
       )}
 
       {needsTelegramCheckForPromo && (
-        <div className="flex flex-col gap-3 rounded-2xl border border-amber-200 bg-amber-50/80 px-4 py-3 text-sm text-amber-900 shadow-sm dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-3 rounded-2xl border border-amber-200 bg-amber-50/80 px-4 py-3 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100 sm:flex-row sm:items-center sm:justify-between">
           <span>Пробный тариф откроется после проверки Telegram.</span>
           <Link href="/dashboard/settings" className="btn-secondary h-10 shrink-0 px-4 text-sm">
             Проверить Telegram
@@ -198,7 +191,7 @@ export default async function PlansPage({
 
 function PlanComparison({ plans }: { plans: Array<{ id: string; name: string; priceKopecks: number; durationDays: number; trafficLimitGb: number | null; deviceLimit: number }> }) {
   return (
-    <details className="overflow-hidden rounded-2xl border border-slate-200 bg-white/90 shadow-sm dark:border-white/10 dark:bg-surface-900">
+    <details className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.035]">
       <summary className="cursor-pointer px-4 py-4 text-sm font-semibold text-slate-950 dark:text-white">Сравнить все тарифы</summary>
       <div
         role="region"
@@ -231,19 +224,5 @@ function PlanComparison({ plans }: { plans: Array<{ id: string; name: string; pr
         </table>
       </div>
     </details>
-  )
-}
-
-function BuyStep({ icon, title, subtitle }: { icon: React.ReactNode; title: string; subtitle: string }) {
-  return (
-    <div className="flex min-w-0 flex-col items-center justify-center gap-2 rounded-xl px-2 py-2.5 text-center sm:flex-row sm:justify-start sm:px-3 sm:text-left">
-      <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-slate-100 text-cyan-700 dark:bg-white/10 dark:text-cyan-200">
-        {icon}
-      </div>
-      <span className="min-w-0 leading-tight">
-        <span className="block text-xs font-semibold text-slate-900 dark:text-white sm:text-sm">{title}</span>
-        <span className="mt-0.5 block text-[11px] text-slate-500 dark:text-slate-400 sm:text-xs">{subtitle}</span>
-      </span>
-    </div>
   )
 }

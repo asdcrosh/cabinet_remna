@@ -11,8 +11,7 @@ export function PageHeader({ title, description, action }: PageHeaderProps) {
     <header className="pb-1 sm:pb-2">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0">
-          <div className="mb-3 h-1 w-10 rounded-full bg-gradient-to-r from-indigo-500 to-cyan-500" />
-          <h1 className="text-2xl font-bold tracking-[-0.035em] text-slate-950 dark:text-white sm:text-3xl">{title}</h1>
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-950 dark:text-white sm:text-3xl">{title}</h1>
           {description && <p className="mt-1.5 max-w-2xl text-sm leading-6 text-slate-500 dark:text-slate-400">{description}</p>}
         </div>
         {action && <div className="shrink-0 sm:text-right">{action}</div>}

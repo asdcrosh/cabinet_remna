@@ -56,7 +56,7 @@ export function PaymentHistory({ payments }: { payments: PaymentHistoryPayment[]
       <div className="space-y-3 2xl:hidden">
         {payments.length === 0 && <PaymentHistoryEmpty />}
         {payments.map((payment) => (
-          <article key={payment.id} className="overflow-hidden rounded-2xl border border-slate-200 bg-white/90 shadow-sm shadow-slate-950/[0.04] dark:border-white/10 dark:bg-surface-900">
+          <article key={payment.id} className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.035]">
             <div className="border-b border-slate-100 px-4 py-4 dark:border-white/10">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
@@ -116,7 +116,7 @@ function PaymentHistoryEmpty({ compact = false }: { compact?: boolean }) {
 
 function InfoCell({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
-    <div className="info-cell">
+    <div className="min-w-0 border-l border-slate-200 pl-3 dark:border-white/10">
       <div className="text-xs text-slate-500">{label}</div>
       <div className={mono ? 'mt-1 truncate font-mono text-xs' : 'mt-1 truncate font-medium'}>{value}</div>
     </div>

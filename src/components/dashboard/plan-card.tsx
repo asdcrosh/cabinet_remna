@@ -220,15 +220,12 @@ export function PlanCard({
   return (
     <div
       className={cn(
-        "plan-card-tilt card group relative flex h-full min-h-0 flex-col overflow-hidden p-4 transition-all duration-200 hover:border-cyan-200/80 hover:shadow-md sm:min-h-[390px] lg:p-5",
+        "plan-card-tilt card relative flex h-full min-h-0 flex-col overflow-hidden p-4 sm:min-h-[390px] lg:p-5",
         popular &&
-          "border-cyan-300 bg-gradient-to-b from-cyan-50/70 to-white ring-1 ring-cyan-200/60 dark:border-cyan-400/50 dark:from-cyan-400/[0.08] dark:to-surface-900 dark:ring-cyan-400/15",
+          "border-cyan-300 dark:border-cyan-400/40",
         current && "bg-cyan-50/70 dark:bg-cyan-500/10",
       )}
     >
-      {popular && (
-        <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-cyan-400 via-emerald-400 to-brand-500" />
-      )}
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 pr-2">
           <h3 className="break-words text-lg font-semibold leading-tight tracking-tight sm:text-xl">
@@ -262,7 +259,7 @@ export function PlanCard({
           {description}
         </p>
       )}
-      <div className="mt-3 rounded-2xl border border-slate-100 bg-slate-50/80 p-3.5 dark:border-white/10 dark:bg-white/[0.04] sm:mt-4">
+      <div className="mt-3 border-y border-slate-100 py-3.5 dark:border-white/10 sm:mt-4">
         <div className="flex flex-wrap items-baseline gap-2">
           <div className="whitespace-nowrap text-3xl font-semibold tracking-tight sm:text-4xl">
             {effectivePrice}
@@ -293,7 +290,7 @@ export function PlanCard({
       {!isPromoPlan && (promoOpen || appliedPromo) ? (
         <div className="mt-auto space-y-2 pt-3">
           {suggestedPromoCodes.length > 0 ? (
-            <div className="rounded-lg border border-white/10 bg-white/[0.04] p-2.5 shadow-inner shadow-white/5">
+            <div className="border-t border-slate-100 pt-3 dark:border-white/10">
               <div className="mb-2 flex items-center justify-between gap-2 text-xs">
                 <span className="inline-flex min-w-0 items-center gap-1.5 font-semibold text-slate-700 dark:text-slate-200">
                   <Tag className="h-3.5 w-3.5 shrink-0 text-cyan-500 dark:text-cyan-300" />
@@ -313,7 +310,7 @@ export function PlanCard({
                     className={cn(
                       "min-w-0 rounded-xl border px-2.5 py-2 text-left transition",
                       appliedPromo?.code === promo.code
-                        ? "border-emerald-300/60 bg-emerald-400/12 text-emerald-900 shadow-sm shadow-emerald-950/10 dark:text-emerald-100"
+                        ? "border-emerald-300/60 bg-emerald-400/10 text-emerald-900 dark:text-emerald-100"
                         : "border-white/10 bg-slate-950/[0.03] text-slate-600 hover:border-cyan-300/35 hover:bg-cyan-300/10 dark:bg-slate-950/35 dark:text-slate-300"
                     )}
                     onClick={() => selectAwardedPromo(promo)}
@@ -386,12 +383,10 @@ export function PlanCard({
         <div className="mt-auto pt-4">
           <button
             type="button"
-            className="flex w-full items-center gap-2 rounded-xl border border-cyan-300/20 bg-cyan-300/[0.08] px-3 py-2 text-left text-sm font-semibold text-cyan-950 shadow-sm shadow-cyan-950/5 transition hover:border-cyan-300/40 hover:bg-cyan-300/[0.12] dark:text-cyan-100"
+            className="flex w-full items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-left text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 dark:border-white/10 dark:text-slate-200 dark:hover:bg-white/[0.05]"
             onClick={openPromoBlock}
           >
-            <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-cyan-200/80 text-cyan-950 dark:bg-cyan-300/15 dark:text-cyan-100">
-              <Tag className="h-3.5 w-3.5" />
-            </span>
+            <Tag className="h-4 w-4 shrink-0 text-cyan-600 dark:text-cyan-300" />
             <span className="min-w-0 flex-1">
               <span className="block truncate">
                 {bestPromo ? "Выбрать промокод" : "У меня есть промокод"}
@@ -403,7 +398,7 @@ export function PlanCard({
               )}
             </span>
             {bestPromo && (
-              <span className="shrink-0 rounded-full bg-white/95 px-2 py-0.5 text-xs font-bold text-slate-950 shadow-sm dark:bg-white">
+              <span className="shrink-0 text-xs font-bold text-emerald-600 dark:text-emerald-300">
                 -{bestPromo.discountPercent}%
               </span>
             )}

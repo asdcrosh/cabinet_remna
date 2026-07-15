@@ -193,18 +193,14 @@ export default async function DashboardHome() {
 
   return (
     <div className="page-stack">
-      <header className="flex flex-col gap-3 pb-1 sm:flex-row sm:items-end sm:justify-between">
+      <header className="pb-1">
         <div>
-          <div className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-700 dark:text-cyan-300">Обзор</div>
-          <h1 className="mt-2 text-3xl font-bold tracking-[-0.045em] text-slate-950 dark:text-white sm:text-4xl">
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-950 dark:text-white sm:text-3xl">
             С возвращением, {dashboardDisplayName(user.name, user.email)}
           </h1>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500 dark:text-slate-400">
+          <p className="mt-1.5 max-w-2xl text-sm leading-6 text-slate-500 dark:text-slate-400">
             Подписка, трафик и быстрые действия в одном месте.
           </p>
-        </div>
-        <div className="hidden rounded-full border border-white/80 bg-white/70 px-3 py-1.5 text-xs font-medium text-slate-500 shadow-sm backdrop-blur dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-slate-400 sm:block">
-          Защищённое соединение
         </div>
       </header>
       {remnawaveErrorStatus !== null && (
@@ -229,7 +225,7 @@ export default async function DashboardHome() {
       )}
 
       <section className="dashboard-hero" data-testid="subscription-overview">
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_17rem] lg:items-stretch">
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_15rem] lg:items-stretch">
           <div className="min-w-0">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
@@ -246,7 +242,7 @@ export default async function DashboardHome() {
                     : 'Тариф синхронизируется'}
                 </p>
               </div>
-              <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl border border-white/10 bg-white/10 text-cyan-200 shadow-inner backdrop-blur">
+              <div className="grid h-10 w-10 shrink-0 place-items-center text-cyan-200">
                 <ShieldCheck className="h-5 w-5" />
               </div>
             </div>
@@ -261,14 +257,14 @@ export default async function DashboardHome() {
               <OverviewMetric label="Лимит" value={hasRemoteUsage ? isUnlimited ? 'Безлимит' : formatBytes(limit) : '—'} />
             </div>
 
-            <div className="mt-4 flex flex-wrap gap-2 text-sm">
-              <Link href="/dashboard/devices" className="rounded-full border border-white/10 bg-white/[0.06] px-3 py-1.5 font-medium text-slate-200 transition hover:bg-white/10 hover:text-white">Устройства</Link>
-              <Link href="/dashboard/billing" className="rounded-full border border-white/10 bg-white/[0.06] px-3 py-1.5 font-medium text-slate-200 transition hover:bg-white/10 hover:text-white">Платежи</Link>
-              {features.support && <Link href="/dashboard/support" className="rounded-full border border-white/10 bg-white/[0.06] px-3 py-1.5 font-medium text-slate-200 transition hover:bg-white/10 hover:text-white">Поддержка</Link>}
+            <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm font-medium text-slate-300">
+              <Link href="/dashboard/devices" className="transition-colors hover:text-white">Устройства</Link>
+              <Link href="/dashboard/billing" className="transition-colors hover:text-white">Платежи</Link>
+              {features.support && <Link href="/dashboard/support" className="transition-colors hover:text-white">Поддержка</Link>}
             </div>
           </div>
 
-          <div className="flex flex-col items-center justify-center rounded-[1.6rem] border border-white/10 bg-white/[0.075] p-5 text-center shadow-inner backdrop-blur-xl">
+          <div className="flex flex-col items-center justify-center border-t border-white/10 pt-5 text-center lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
             <UsageRing percent={percent} unlimited={isUnlimited} unavailable={!hasRemoteUsage} />
             <div className="mt-3 text-sm font-semibold text-white">
               {!hasRemoteUsage ? 'Данные трафика недоступны' : isUnlimited ? 'Трафик без ограничений' : `${percent}% использовано`}
@@ -619,8 +615,7 @@ function PersonalOffer({
   const tone = personalOfferTone(offer.tone)
 
   return (
-    <section className={`relative overflow-hidden rounded-xl border p-4 shadow-sm sm:p-5 ${tone.shell}`}>
-      <div className={`pointer-events-none absolute inset-x-0 top-0 h-1 ${tone.line}`} />
+    <section className={`rounded-2xl border p-4 sm:p-5 ${tone.shell}`}>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex min-w-0 gap-3">
           <div className={`grid h-11 w-11 shrink-0 place-items-center rounded-lg ${tone.icon}`}>
@@ -631,7 +626,7 @@ function PersonalOffer({
               <span className={`text-xs font-semibold uppercase tracking-wide ${tone.eyebrow}`}>
                 {offer.eyebrow}
               </span>
-              <span className="rounded-full border border-white/60 bg-white/70 px-2 py-0.5 text-xs text-slate-600 shadow-sm dark:border-white/10 dark:bg-white/10 dark:text-slate-300">
+              <span className="text-xs text-slate-500 dark:text-slate-400">
                 {offer.meta}
               </span>
             </div>
@@ -729,7 +724,6 @@ function personalOfferTone(tone: PersonalOfferView['tone']) {
   if (tone === 'amber') {
     return {
       shell: 'border-amber-200 bg-amber-50/80 dark:border-amber-500/25 dark:bg-amber-500/10',
-      line: 'bg-gradient-to-r from-amber-400 to-orange-400',
       icon: 'bg-amber-100 text-amber-700 dark:bg-amber-400/15 dark:text-amber-100',
       eyebrow: 'text-amber-700 dark:text-amber-200',
     }
@@ -737,7 +731,6 @@ function personalOfferTone(tone: PersonalOfferView['tone']) {
   if (tone === 'emerald') {
     return {
       shell: 'border-emerald-200 bg-emerald-50/80 dark:border-emerald-500/25 dark:bg-emerald-500/10',
-      line: 'bg-gradient-to-r from-emerald-400 to-cyan-400',
       icon: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-400/15 dark:text-emerald-100',
       eyebrow: 'text-emerald-700 dark:text-emerald-200',
     }
@@ -745,14 +738,12 @@ function personalOfferTone(tone: PersonalOfferView['tone']) {
   if (tone === 'violet') {
     return {
       shell: 'border-violet-200 bg-violet-50/80 dark:border-violet-500/25 dark:bg-violet-500/10',
-      line: 'bg-gradient-to-r from-violet-400 to-cyan-400',
       icon: 'bg-violet-100 text-violet-700 dark:bg-violet-400/15 dark:text-violet-100',
       eyebrow: 'text-violet-700 dark:text-violet-200',
     }
   }
   return {
     shell: 'border-cyan-200 bg-cyan-50/80 dark:border-cyan-500/25 dark:bg-cyan-500/10',
-    line: 'bg-gradient-to-r from-cyan-400 to-blue-400',
     icon: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-400/15 dark:text-cyan-100',
     eyebrow: 'text-cyan-700 dark:text-cyan-200',
   }
@@ -824,7 +815,7 @@ function SmartInsights({
           tone: 'slate' as const,
         }
       : null,
-  ].filter(Boolean).slice(0, 3) as Array<{
+  ].filter(Boolean).slice(0, 2) as Array<{
     title: string
     text: string
     href: string
@@ -843,9 +834,9 @@ function SmartInsights({
           href={item.href}
           target={item.external ? '_blank' : undefined}
           rel={item.external ? 'noreferrer' : undefined}
-          className={`group flex min-h-20 items-start gap-3 rounded-2xl border p-3 shadow-sm transition-colors ${insightTone(item.tone)}`}
+          className={`group flex min-h-20 items-start gap-3 rounded-2xl border p-3 transition-colors ${insightTone(item.tone)}`}
         >
-          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-white/80 shadow-sm dark:bg-white/10">
+          <span className="grid h-9 w-9 shrink-0 place-items-center text-current">
             {item.icon}
           </span>
           <span className="min-w-0 flex-1">

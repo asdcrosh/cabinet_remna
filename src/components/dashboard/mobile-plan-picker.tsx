@@ -43,7 +43,7 @@ export function MobilePlanPicker({ plans, initialPlanId }: { plans: MobilePlan[]
               className={cn(
                 'relative min-w-[7.5rem] snap-start rounded-xl border px-3 py-3 text-left transition-colors',
                 selected
-                  ? 'border-cyan-300 bg-cyan-50 text-slate-950 shadow-sm shadow-cyan-950/5 dark:border-cyan-400/40 dark:bg-cyan-400/10 dark:text-white'
+                  ? 'border-slate-950 bg-slate-950 text-white dark:border-white dark:bg-white dark:text-slate-950'
                   : 'border-slate-200 bg-white/80 text-slate-700 dark:border-white/10 dark:bg-white/[0.035] dark:text-slate-200'
               )}
             >
@@ -52,7 +52,7 @@ export function MobilePlanPicker({ plans, initialPlanId }: { plans: MobilePlan[]
                 {plan.shortPrice}
               </span>
               {selected ? (
-                <span className="absolute right-2 top-2 grid h-5 w-5 place-items-center rounded-full bg-cyan-500 text-white dark:bg-cyan-300 dark:text-slate-950">
+                <span className="absolute right-2 top-2 grid h-5 w-5 place-items-center">
                   <Check className="h-3 w-3" />
                 </span>
               ) : null}

@@ -39,9 +39,9 @@ export function NotificationsList({ initialNotifications }: { initialNotificatio
 
   return (
     <section className="space-y-4">
-      <div className="flex flex-col gap-3 rounded-2xl border border-slate-200/80 bg-white/85 p-4 shadow-sm shadow-slate-950/[0.04] dark:border-white/10 dark:bg-white/[0.035] sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
-          <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-cyan-50 text-cyan-700 dark:bg-cyan-500/10 dark:text-cyan-200">
+          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-600 dark:bg-white/[0.06] dark:text-slate-300">
             <Bell className="h-5 w-5" />
           </div>
           <div>
@@ -60,7 +60,7 @@ export function NotificationsList({ initialNotifications }: { initialNotificatio
         </button>
       </div>
 
-      <div className="flex gap-1.5 overflow-x-auto rounded-2xl border border-slate-200/80 bg-white/70 p-1.5 shadow-sm dark:border-white/10 dark:bg-surface-950/40">
+      <div className="flex gap-1 overflow-x-auto border-b border-slate-200 pb-2 dark:border-white/10">
         {filterItems.map((item) => (
           <button
             key={item.value}
@@ -69,8 +69,8 @@ export function NotificationsList({ initialNotifications }: { initialNotificatio
             className={cn(
               'flex min-w-fit items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition',
               filter === item.value
-                ? 'bg-cyan-50 text-cyan-900 ring-1 ring-cyan-200 dark:bg-cyan-400/10 dark:text-cyan-100 dark:ring-cyan-400/20'
-                : 'text-slate-500 hover:bg-white hover:text-slate-950 dark:hover:bg-white/10 dark:hover:text-white'
+                ? 'bg-slate-100 text-slate-950 dark:bg-white/10 dark:text-white'
+                : 'text-slate-500 hover:bg-slate-50 hover:text-slate-950 dark:hover:bg-white/5 dark:hover:text-white'
             )}
           >
             {item.label}
@@ -81,7 +81,7 @@ export function NotificationsList({ initialNotifications }: { initialNotificatio
         ))}
       </div>
 
-      <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white/85 shadow-sm shadow-slate-950/[0.04] dark:border-white/10 dark:bg-surface-950/50 dark:shadow-black/20">
+      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.035]">
         {filteredNotifications.length > 0 ? (
           filteredNotifications.map((item) => <NotificationItem key={item.id} notification={item} />)
         ) : (

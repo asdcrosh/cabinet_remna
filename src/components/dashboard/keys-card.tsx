@@ -105,7 +105,7 @@ export function KeysCard({ subscriptionUrl, happLink }: KeysCardProps) {
   const [qrOpen, setQrOpen] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [revoking, setRevoking] = useState(false)
-  const [connectionStep, setConnectionStep] = useState<1 | 2>(1)
+  const [, setConnectionStep] = useState<1 | 2>(1)
 
   useEffect(() => {
     const detected = detectDevice(navigator.userAgent)
@@ -163,7 +163,7 @@ export function KeysCard({ subscriptionUrl, happLink }: KeysCardProps) {
   }
 
   return (
-    <section className="overflow-hidden rounded-3xl border border-slate-200/80 bg-white/95 shadow-sm shadow-slate-950/[0.04] dark:border-white/10 dark:bg-surface-900 dark:shadow-black/20">
+    <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.035]">
       <div className="grid gap-0 sm:grid-cols-[minmax(0,1fr)_14rem] lg:grid-cols-[minmax(0,1fr)_18rem]">
         <div className="min-w-0 p-4 sm:p-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -188,8 +188,6 @@ export function KeysCard({ subscriptionUrl, happLink }: KeysCardProps) {
             </button>
           </div>
 
-          <ConnectionSteps step={connectionStep} />
-
           <div className="-mx-4 mt-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:grid sm:grid-cols-3 sm:overflow-visible sm:px-0 sm:pb-0">
             {availableApps.map((option) => {
               const active = option.id === selectedApp.id
@@ -205,14 +203,14 @@ export function KeysCard({ subscriptionUrl, happLink }: KeysCardProps) {
                   className={cn(
                     'flex min-h-16 min-w-[9.5rem] items-center gap-2.5 rounded-xl border p-2.5 text-left transition sm:min-w-0 sm:gap-3 sm:p-3',
                     active
-                      ? 'border-cyan-300 bg-cyan-50 text-slate-950 shadow-sm shadow-cyan-950/5 dark:border-cyan-400/40 dark:bg-cyan-400/10 dark:text-white'
+                      ? 'border-slate-950 bg-slate-950 text-white dark:border-white dark:bg-white dark:text-slate-950'
                       : 'border-slate-200 bg-slate-50/70 hover:border-slate-300 hover:bg-white dark:border-white/10 dark:bg-white/[0.03] dark:hover:bg-white/[0.06]'
                   )}
                 >
                   <span
                     className={cn(
                       'grid h-9 w-9 shrink-0 place-items-center rounded-xl sm:h-10 sm:w-10',
-                      active ? 'bg-cyan-500 text-white dark:bg-cyan-300 dark:text-slate-950' : 'bg-white text-cyan-700 shadow-sm dark:bg-white/10 dark:text-cyan-200'
+                      active ? 'text-cyan-300 dark:text-cyan-700' : 'text-cyan-700 dark:text-cyan-200'
                     )}
                   >
                     <Icon className="h-5 w-5" />
@@ -286,11 +284,11 @@ export function KeysCard({ subscriptionUrl, happLink }: KeysCardProps) {
           </div>
         </div>
 
-        <aside className="hidden border-t border-slate-100 bg-slate-50/60 p-4 dark:border-white/10 dark:bg-white/[0.025] sm:block sm:border-l sm:border-t-0">
+        <aside className="hidden border-t border-slate-100 p-4 dark:border-white/10 sm:block sm:border-l sm:border-t-0">
           <button
             type="button"
             onClick={() => setQrOpen(true)}
-            className="group w-full rounded-2xl border border-slate-200 bg-white p-3 text-left shadow-sm transition hover:border-cyan-200 dark:border-white/10 dark:bg-surface-900"
+            className="group w-full rounded-xl p-2 text-left transition-colors hover:bg-slate-50 dark:hover:bg-white/[0.04]"
           >
             {subscriptionUrl ? (
               <Image
@@ -337,28 +335,6 @@ export function KeysCard({ subscriptionUrl, happLink }: KeysCardProps) {
         }}
       />
     </section>
-  )
-}
-
-function ConnectionSteps({ step }: { step: 1 | 2 }) {
-  const items = [
-    { number: 1, label: 'Приложение', done: true },
-    { number: 2, label: 'Подписка', done: step >= 2 },
-    { number: 3, label: 'Включить VPN', done: false },
-  ]
-
-  return (
-    <div className="mt-4 grid grid-cols-3 overflow-hidden rounded-2xl border border-slate-200 bg-slate-50/70 dark:border-white/10 dark:bg-white/[0.03]">
-      {items.map((item, index) => (
-        <div key={item.number} className="relative flex min-w-0 flex-col items-center justify-center gap-1 px-1 py-2.5 text-center text-[10px] font-medium sm:flex-row sm:gap-2 sm:px-2 sm:text-sm">
-          {index > 0 ? <span className="absolute inset-y-2 left-0 w-px bg-slate-200 dark:bg-white/10" /> : null}
-          <span className={cn('grid h-5 w-5 shrink-0 place-items-center rounded-full text-[11px] font-bold', item.done ? 'bg-emerald-500 text-white' : 'bg-slate-200 text-slate-500 dark:bg-white/10 dark:text-slate-300')}>
-            {item.done ? '✓' : item.number}
-          </span>
-          <span className="max-w-full truncate">{item.label}</span>
-        </div>
-      ))}
-    </div>
   )
 }
 

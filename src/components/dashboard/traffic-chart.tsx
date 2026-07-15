@@ -64,9 +64,7 @@ export function TrafficChart({
   const canShowHistory = hasUsage && data.historyAvailable && data.series.length > 1 && seriesTotal > 0n
 
   return (
-    <div className="relative overflow-hidden rounded-lg border border-slate-200 bg-white/95 p-4 text-slate-950 shadow-[0_18px_45px_rgba(15,23,42,0.08)] backdrop-blur dark:border-white/10 dark:bg-surface-900/95 dark:text-white dark:shadow-[0_18px_45px_rgba(0,0,0,0.22)] sm:p-5">
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-cyan-300 via-sky-300 to-emerald-300 dark:from-cyan-400 dark:via-sky-500 dark:to-emerald-400" />
-
+    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white p-4 text-slate-950 dark:border-white/10 dark:bg-white/[0.035] dark:text-white sm:p-5">
       <div className="relative flex flex-col gap-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
@@ -119,7 +117,7 @@ function TrafficPulsePanel({ series }: { series: SeriesPoint[] }) {
 
   return (
     <div className="grid gap-3 lg:grid-cols-[1fr_220px]">
-      <div className="rounded-lg border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-cyan-50/30 p-3 shadow-inner dark:border-white/10 dark:bg-none dark:bg-surface-950/70 dark:shadow-inner">
+      <div className="min-w-0">
         <div className="mb-4 flex items-center justify-between gap-3">
           <div>
             <div className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Активность по дням</div>
@@ -130,7 +128,7 @@ function TrafficPulsePanel({ series }: { series: SeriesPoint[] }) {
           </div>
         </div>
 
-        <div className="relative rounded-lg border border-slate-200/80 bg-white/80 px-3 pb-7 pt-4 dark:border-white/10 dark:bg-white/[0.03]">
+        <div className="relative border-t border-slate-200 px-1 pb-7 pt-4 dark:border-white/10">
           <div className="pointer-events-none absolute left-3 right-3 top-1/2 border-t border-dashed border-slate-200 dark:border-white/10" />
           <div className="pointer-events-none absolute bottom-7 left-3 right-3 border-t border-slate-200 dark:border-white/10" />
 
@@ -140,8 +138,8 @@ function TrafficPulsePanel({ series }: { series: SeriesPoint[] }) {
                 <div
                   className={`traffic-chart-bar w-full max-w-[18px] rounded-t-md rounded-b-sm bg-gradient-to-t transition-all duration-300 group-hover:-translate-y-0.5 ${
                     day.isPeak
-                      ? 'from-emerald-500 via-teal-400 to-cyan-300 shadow-[0_0_18px_rgba(20,184,166,0.32)]'
-                      : 'from-sky-600 via-cyan-400 to-cyan-200 shadow-[0_8px_18px_rgba(14,165,233,0.16)]'
+                      ? 'from-emerald-500 via-teal-400 to-cyan-300'
+                      : 'from-sky-600 via-cyan-400 to-cyan-200'
                   }`}
                   style={{
                     height: `${day.visualHeight}%`,
@@ -190,7 +188,7 @@ function TrafficHistoryEmpty({ loading, hasUsage }: { loading: boolean; hasUsage
 
 function TrafficMetric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="min-w-24 rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-2 shadow-sm dark:border-white/10 dark:bg-white/[0.04]">
+    <div className="min-w-24 border-l border-slate-200 px-3 py-1 dark:border-white/10">
       <div className="text-[10px] uppercase text-slate-500 dark:text-slate-400">{label}</div>
       <div className="mt-0.5 truncate text-xs font-semibold text-slate-800 dark:text-white sm:text-sm">{value}</div>
     </div>
@@ -209,9 +207,9 @@ function TrafficSideStat({
   hint: string
 }) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm dark:border-white/10 dark:bg-white/[0.04]">
+    <div className="border-l border-slate-200 px-3 py-1 dark:border-white/10">
       <div className="flex items-center gap-2 text-xs font-medium uppercase text-slate-500 dark:text-slate-400">
-        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-cyan-50 text-cyan-700 dark:bg-cyan-400/10 dark:text-cyan-200">{icon}</span>
+        <span className="flex h-7 w-7 items-center justify-center text-cyan-700 dark:text-cyan-200">{icon}</span>
         {label}
       </div>
       <div className="mt-2 text-lg font-semibold text-slate-950 dark:text-white">{value}</div>

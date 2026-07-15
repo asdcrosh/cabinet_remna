@@ -52,7 +52,7 @@ export function AdminNotificationsList({ initialNotifications }: { initialNotifi
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-3 rounded-2xl border border-slate-200/80 bg-white/90 p-3 shadow-sm shadow-slate-950/[0.04] dark:border-white/10 dark:bg-surface-950/90 dark:shadow-black/20 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 border-b border-slate-200 pb-3 dark:border-white/10 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex min-w-0 gap-1 overflow-x-auto rounded-xl bg-slate-100/80 p-1 dark:bg-white/[0.05]">
           {filters.map((item) => (
             <button
@@ -66,7 +66,7 @@ export function AdminNotificationsList({ initialNotifications }: { initialNotifi
               className={cn(
                 'h-9 shrink-0 rounded-lg px-3 text-sm font-medium transition-colors',
                 filter === item.value
-                  ? 'bg-slate-950 text-white shadow-sm dark:bg-white dark:text-slate-950'
+                  ? 'bg-slate-950 text-white dark:bg-white dark:text-slate-950'
                   : 'text-slate-600 hover:bg-white/70 dark:text-slate-300 dark:hover:bg-white/10'
               )}
             >
@@ -108,7 +108,7 @@ export function AdminNotificationsList({ initialNotifications }: { initialNotifi
         {loading && <div className="rounded-xl bg-slate-100 px-4 py-2 text-sm text-slate-500 dark:bg-white/[0.05]">Загрузка...</div>}
         {notifications.length > 0 ? (
           notifications.map((item) => (
-            <article key={item.id} className={cn('rounded-2xl border border-slate-200/80 bg-white/90 p-4 shadow-sm shadow-slate-950/[0.04] dark:border-white/10 dark:bg-surface-950/90 dark:shadow-black/20', !item.readAt && 'border-cyan-200 bg-cyan-50/50 dark:border-cyan-500/25 dark:bg-cyan-950/10')}>
+            <article key={item.id} className={cn('rounded-2xl border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.035]', !item.readAt && 'border-cyan-200 bg-cyan-50/50 dark:border-cyan-500/25 dark:bg-cyan-950/10')}>
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">

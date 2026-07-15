@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { Archive, CheckCheck, Edit3, Gift, Plus, Power, Search, TicketCheck, Trash2, UserRound, Wand2 } from 'lucide-react'
+import { Archive, CheckCheck, Edit3, Plus, Power, Search, TicketCheck, Trash2, UserRound } from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
 import { toast } from '@/components/ui/toaster'
 import { cn } from '@/lib/cn'
@@ -349,7 +349,7 @@ export function PromoCodesAdmin({
 
   return (
     <div className="space-y-4">
-      <section className="rounded-2xl border border-slate-200/80 bg-white/90 p-4 shadow-sm shadow-slate-950/[0.04] dark:border-white/10 dark:bg-surface-900/90 dark:shadow-black/20">
+      <section className="pb-2">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="font-semibold">Промокоды</h2>
@@ -374,7 +374,7 @@ export function PromoCodesAdmin({
           />
         </div>
 
-        <div className="mt-4 grid gap-3 xl:grid-cols-2">
+        <div className="mt-4 grid items-end gap-3 xl:grid-cols-[minmax(0,1fr)_16rem]">
           <div className="min-w-0">
             <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">Статус</div>
             <div data-testid="promo-status-filter" className="grid grid-cols-3 gap-1 rounded-xl bg-slate-100/80 p-1 dark:bg-white/[0.05]">
@@ -404,38 +404,25 @@ export function PromoCodesAdmin({
 
           <div className="min-w-0">
             <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">Источник</div>
-            <div data-testid="promo-origin-filter" className="grid grid-cols-2 gap-1 rounded-xl bg-slate-100/80 p-1 dark:bg-white/[0.05] 2xl:grid-cols-4">
-              {([
-                ['ALL', 'Все', TicketCheck],
-                ['CREATED', 'Созданные', Wand2],
-                ['MY_BOX', 'Мои из бокса', Gift],
-                ['OTHER_BOX', 'Чужие из бокса', UserRound],
-              ] as const).map(([value, label, Icon]) => (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => {
-                    setOrigin(value)
-                    setSelectedIds([])
-                  }}
-                  className={cn(
-                    'inline-flex min-h-10 min-w-0 items-center justify-center gap-1.5 rounded-lg px-2 text-xs font-medium transition-colors sm:text-sm',
-                    origin === value ? 'bg-slate-950 text-white shadow-sm dark:bg-white dark:text-slate-950' : 'text-slate-500 hover:bg-white/70 dark:hover:bg-white/5'
-                  )}
-                >
-                  <Icon className="h-4 w-4" />
-                  {label}
-                  <span className={cn('rounded-full px-1.5 text-xs', origin === value ? 'bg-white/15' : 'bg-white dark:bg-white/10')}>
-                    {originCounts[value]}
-                  </span>
-                </button>
-              ))}
-            </div>
+            <select
+              data-testid="promo-origin-filter"
+              className="input min-h-12"
+              value={origin}
+              onChange={(event) => {
+                setOrigin(event.target.value as 'ALL' | PromoOrigin)
+                setSelectedIds([])
+              }}
+            >
+              <option value="ALL">Все · {originCounts.ALL}</option>
+              <option value="CREATED">Созданные · {originCounts.CREATED}</option>
+              <option value="MY_BOX">Мои из бокса · {originCounts.MY_BOX}</option>
+              <option value="OTHER_BOX">Чужие из бокса · {originCounts.OTHER_BOX}</option>
+            </select>
           </div>
         </div>
       </section>
 
-      <div className={selectedIds.length > 0 ? 'admin-bulk-bar' : 'flex flex-col gap-3 rounded-2xl border border-slate-200/80 bg-white/90 p-3 shadow-sm shadow-slate-950/[0.04] dark:border-white/10 dark:bg-surface-900/90 sm:flex-row sm:items-center sm:justify-between'}>
+      <div className={selectedIds.length > 0 ? 'admin-bulk-bar' : 'flex min-h-10 items-center px-1'}>
         <label className="flex min-h-10 items-center gap-3 text-sm font-medium text-slate-600 dark:text-slate-300">
           <input
             type="checkbox"
@@ -624,7 +611,7 @@ export function PromoCodesAdmin({
               <article
                 key={promoCode.id}
                 data-testid="admin-promo-card"
-                className="flex h-full min-w-0 flex-col rounded-3xl border border-slate-200/80 bg-white/90 p-4 shadow-sm shadow-slate-950/[0.04] dark:border-white/10 dark:bg-surface-900/90 dark:shadow-black/20 sm:p-5"
+                className="flex h-full min-w-0 flex-col rounded-2xl border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.035] sm:p-5"
               >
                 <div className="flex items-start gap-3">
                   <input
@@ -648,24 +635,29 @@ export function PromoCodesAdmin({
                   <div className="shrink-0 text-2xl font-semibold tracking-tight text-emerald-600 dark:text-emerald-300">-{promoCode.discountPercent}%</div>
                 </div>
 
-                <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
-                  <CompactFact label="Использовано" value={`${promoCode.usedCount}/${promoCode.maxUses ?? '∞'}`} />
-                  <CompactFact label="На одного" value={String(promoCode.maxUsesPerUser)} />
-                  <CompactFact className="col-span-2 sm:col-span-1" label="Срок" value={formatRange(promoCode.startsAt, promoCode.expiresAt)} />
+                <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 border-y border-slate-200/70 py-3 dark:border-white/[0.07] sm:grid-cols-3">
+                  <div>
+                    <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Использовано</div>
+                    <div className="mt-0.5 text-sm font-medium">{promoCode.usedCount}/{promoCode.maxUses ?? '∞'}</div>
+                  </div>
+                  <div>
+                    <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">На одного</div>
+                    <div className="mt-0.5 text-sm font-medium">{promoCode.maxUsesPerUser}</div>
+                  </div>
+                  <div className="col-span-2 sm:col-span-1">
+                    <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Срок</div>
+                    <div className="mt-0.5 text-sm font-medium">{formatRange(promoCode.startsAt, promoCode.expiresAt)}</div>
+                  </div>
                 </div>
 
-                <div className="mt-4 grid gap-2 sm:grid-cols-2">
-                  <div className="rounded-2xl border border-slate-200/70 bg-slate-50/70 px-3 py-2.5 dark:border-white/[0.07] dark:bg-white/[0.025]">
-                    <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Тарифы</div>
-                    <div className="mt-1 line-clamp-2 text-sm font-medium text-slate-800 dark:text-slate-100">
-                      {promoCode.planNames.length > 0 ? promoCode.planNames.join(', ') : 'Все тарифы'}
-                    </div>
+                <div className="mt-3 space-y-1.5 text-sm">
+                  <div className="flex min-w-0 gap-3">
+                    <span className="w-16 shrink-0 text-slate-400">Тарифы</span>
+                    <span className="line-clamp-2 font-medium text-slate-700 dark:text-slate-200">{promoCode.planNames.length > 0 ? promoCode.planNames.join(', ') : 'Все тарифы'}</span>
                   </div>
-                  <div className="rounded-2xl border border-slate-200/70 bg-slate-50/70 px-3 py-2.5 dark:border-white/[0.07] dark:bg-white/[0.025]">
-                    <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Доступ</div>
-                    <div className="mt-1 line-clamp-2 text-sm font-medium text-slate-800 dark:text-slate-100" title={audienceTitle(promoCode)}>
-                      {audienceTitle(promoCode)}
-                    </div>
+                  <div className="flex min-w-0 gap-3">
+                    <span className="w-16 shrink-0 text-slate-400">Доступ</span>
+                    <span className="line-clamp-2 font-medium text-slate-700 dark:text-slate-200" title={audienceTitle(promoCode)}>{audienceTitle(promoCode)}</span>
                   </div>
                 </div>
 
@@ -727,7 +719,7 @@ function AssigneesBlock({ assignees }: { assignees: PromoCodeAssignee[] }) {
   const hiddenCount = Math.max(0, assignees.length - 1)
 
   return (
-    <div className="min-w-0 rounded-2xl border border-slate-200/70 bg-slate-50/70 px-3 py-2.5 dark:border-white/[0.07] dark:bg-white/[0.025]">
+    <div className="min-w-0">
       <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase text-slate-400">
         <UserRound className="h-3.5 w-3.5" />
         За кем числится
@@ -763,15 +755,6 @@ function AssigneesBlock({ assignees }: { assignees: PromoCodeAssignee[] }) {
       ) : (
         <div className="mt-1 text-sm text-slate-500 dark:text-slate-400">Не закреплён за пользователем</div>
       )}
-    </div>
-  )
-}
-
-function CompactFact({ label, value, className }: { label: string; value: string; className?: string }) {
-  return (
-    <div className={cn('min-w-0 rounded-2xl border border-slate-200/70 bg-slate-50/70 px-3 py-2.5 dark:border-white/[0.07] dark:bg-white/[0.025]', className)}>
-      <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">{label}</div>
-      <div className="mt-1 break-words text-sm font-semibold leading-tight" title={value}>{value}</div>
     </div>
   )
 }

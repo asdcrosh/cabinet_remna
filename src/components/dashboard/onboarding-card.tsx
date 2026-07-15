@@ -45,9 +45,26 @@ export function DashboardOnboardingCard({ state, mode = 'compact', supportEnable
 
   if (!action && !isFull) return null
 
+  if (!isFull && action) {
+    return (
+      <section className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.035] sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 items-start gap-3">
+          <div className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${toneClass(action.tone)}`}>{action.icon}</div>
+          <div className="min-w-0">
+            <h2 className="font-semibold text-slate-950 dark:text-white">{action.title}</h2>
+            <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">{action.description}</p>
+          </div>
+        </div>
+        <Link href={action.href} className="btn-primary shrink-0">
+          {action.label}
+          <ArrowRight className="h-4 w-4" />
+        </Link>
+      </section>
+    )
+  }
+
   return (
-    <section className={`card relative overflow-hidden ${isFull ? 'p-5 sm:p-6' : 'p-4'}`}>
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-cyan-400 via-emerald-400 to-brand-500" />
+    <section className={`card ${isFull ? 'p-5 sm:p-6' : 'p-4'}`}>
       <div className={`grid gap-4 ${isFull ? 'lg:grid-cols-[0.9fr_1.1fr] lg:items-center' : 'xl:grid-cols-[0.85fr_1.15fr] xl:items-center'}`}>
         <div className="min-w-0">
           <div className="mb-3 flex items-center gap-3">

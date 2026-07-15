@@ -99,9 +99,9 @@ export default async function SettingsPage() {
                     remnawaveUsername={user.remnawaveUsername}
                     embedded
                   />
-                  <div className="rounded-2xl border border-slate-200/80 bg-slate-50/80 p-4 dark:border-white/10 dark:bg-surface-950/45">
+                  <div className="border-l border-slate-200 p-4 dark:border-white/10">
                     <div className="flex items-center gap-3">
-                      <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-cyan-50 text-cyan-700 dark:bg-cyan-400/10 dark:text-cyan-200">
+                      <div className="grid h-10 w-10 shrink-0 place-items-center text-cyan-700 dark:text-cyan-200">
                         <MailPlus className="h-5 w-5" />
                       </div>
                       <div className="min-w-0">
@@ -116,7 +116,7 @@ export default async function SettingsPage() {
                         Добавить email
                       </Link>
                     ) : (
-                      <div className="mt-4 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-500 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-400">
+                      <div className="mt-4 text-sm text-slate-500 dark:text-slate-400">
                         {hasVerifiedEmail ? user.email : 'Сначала привяжите Telegram.'}
                       </div>
                     )}
@@ -188,13 +188,13 @@ function SettingsSection({
     <section
       id={id}
       className={cn(
-        'scroll-mt-20 overflow-hidden rounded-3xl border border-slate-200/80 bg-white/90 shadow-sm shadow-slate-950/[0.04] backdrop-blur dark:border-white/10 dark:bg-white/[0.045] dark:shadow-black/20',
+        'scroll-mt-20 overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.035]',
         className
       )}
     >
       <div className="border-b border-slate-100 px-4 py-4 dark:border-white/10 sm:px-5">
         <div className="flex items-center gap-3">
-          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-cyan-50 text-cyan-700 dark:bg-cyan-300/10 dark:text-cyan-200">
+          <div className="grid h-10 w-10 shrink-0 place-items-center text-cyan-700 dark:text-cyan-200">
             {icon}
           </div>
           <div className="min-w-0">
@@ -210,7 +210,7 @@ function SettingsSection({
 
 function AccountFact({ label, value }: { label: string; value: string }) {
   return (
-    <div className="min-w-0 rounded-xl border border-slate-200/80 bg-slate-50/80 px-3 py-2.5 dark:border-white/10 dark:bg-surface-950/45">
+    <div className="min-w-0 border-l border-slate-200 px-3 py-1 dark:border-white/10">
       <div className="text-xs text-slate-500 dark:text-slate-400">{label}</div>
       <div className="mt-1 truncate font-medium text-slate-950 dark:text-white" title={value}>{value}</div>
     </div>
@@ -229,9 +229,9 @@ function StatusPanel({
   const readyCount = [emailReady, telegramReady, vpnReady].filter(Boolean).length
 
   return (
-    <div className="rounded-2xl border border-slate-200/80 bg-white/90 p-4 shadow-sm shadow-slate-950/[0.04] dark:border-white/10 dark:bg-white/[0.045] dark:shadow-black/20">
+    <div className="border-l border-slate-200 p-4 dark:border-white/10">
       <div className="flex items-center gap-3">
-        <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-300">
+        <div className="grid h-10 w-10 shrink-0 place-items-center text-emerald-600 dark:text-emerald-300">
           <ShieldCheck className="h-5 w-5" />
         </div>
         <div className="min-w-0">
@@ -250,7 +250,7 @@ function StatusPanel({
 
 function StatusLine({ label, value, active }: { label: string; value: string; active: boolean }) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-200/80 bg-slate-50/80 px-3 py-2.5 text-sm dark:border-white/10 dark:bg-surface-950/45">
+    <div className="flex items-center justify-between gap-3 border-b border-slate-100 py-2.5 text-sm last:border-b-0 dark:border-white/10">
       <span className="text-slate-500 dark:text-slate-400">{label}</span>
       <span className={`inline-flex items-center gap-1.5 font-medium ${active ? 'text-emerald-600 dark:text-emerald-300' : 'text-slate-400'}`}>
         {active ? <CheckCircle2 className="h-3.5 w-3.5" /> : null}

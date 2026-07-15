@@ -195,7 +195,7 @@ export function PlansAdmin({ plans }: { plans: PlanAdminRow[] }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-4 rounded-2xl border border-slate-200/80 bg-white/90 p-4 shadow-sm shadow-slate-950/[0.04] dark:border-white/10 dark:bg-surface-900/90 dark:shadow-black/20 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-4 pb-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="font-semibold">Каталог тарифов</h2>
           <p className="mt-1 text-sm text-slate-500">{plans.length} тарифов · настройки открываются в отдельном окне</p>
@@ -280,7 +280,7 @@ export function PlansAdmin({ plans }: { plans: PlanAdminRow[] }) {
               <article
                 key={plan.id}
                 data-testid="admin-plan-card"
-                className="flex h-full min-w-0 flex-col rounded-3xl border border-slate-200/80 bg-white/90 p-4 shadow-sm shadow-slate-950/[0.04] dark:border-white/10 dark:bg-surface-900/90 dark:shadow-black/20 sm:p-5"
+                className="flex h-full min-w-0 flex-col rounded-2xl border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.035] sm:p-5"
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0">
@@ -295,23 +295,26 @@ export function PlansAdmin({ plans }: { plans: PlanAdminRow[] }) {
                   <div className="shrink-0 text-right text-xl font-semibold tracking-tight">{formatPrice(plan.priceKopecks)}</div>
                 </div>
 
-                <div className="mt-4 grid grid-cols-3 gap-2">
-                  <PlanStat label="Срок" value={`${plan.durationDays} дн.`} />
-                  <PlanStat label="Трафик" value={plan.trafficLimitGb == null ? 'Безлимит' : `${plan.trafficLimitGb} ГБ`} />
-                  <PlanStat label="Устройства" value={String(plan.deviceLimit)} />
+                <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 border-y border-slate-200/70 py-3 dark:border-white/[0.07] sm:grid-cols-3">
+                  <div>
+                    <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Срок</div>
+                    <div className="mt-0.5 text-sm font-medium">{plan.durationDays} дн.</div>
+                  </div>
+                  <div>
+                    <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Трафик</div>
+                    <div className="mt-0.5 text-sm font-medium">{plan.trafficLimitGb == null ? 'Безлимит' : `${plan.trafficLimitGb} ГБ`}</div>
+                  </div>
+                  <div>
+                    <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Устройства</div>
+                    <div className="mt-0.5 text-sm font-medium">{plan.deviceLimit}</div>
+                  </div>
                 </div>
 
-                <div className="mt-4 grid gap-2 sm:grid-cols-2">
-                  <div className="rounded-2xl border border-slate-200/70 bg-slate-50/70 px-3 py-2.5 dark:border-white/[0.07] dark:bg-white/[0.025]">
-                    <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Доступ</div>
-                    <div className="mt-1 text-sm font-medium text-slate-800 dark:text-slate-100">{planAvailabilityLabels[plan.availability]}</div>
-                    {plan.availability === 'ALLOWED' && <div className="mt-0.5 text-xs text-slate-500">Пользователей: {allowedUsersCount}</div>}
-                  </div>
-                  <div className="rounded-2xl border border-slate-200/70 bg-slate-50/70 px-3 py-2.5 dark:border-white/[0.07] dark:bg-white/[0.025]">
-                    <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Использование</div>
-                    <div className="mt-1 text-sm font-medium text-slate-800 dark:text-slate-100">Подписок: {plan.subscriptionsCount}</div>
-                    <div className="mt-0.5 text-xs text-slate-500">Оплат: {plan.paymentsCount}</div>
-                  </div>
+                <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-sm text-slate-500 dark:text-slate-400">
+                  <span><span className="text-slate-400">Доступ:</span> {planAvailabilityLabels[plan.availability]}</span>
+                  {plan.availability === 'ALLOWED' && <span>Пользователей: {allowedUsersCount}</span>}
+                  <span>Подписок: {plan.subscriptionsCount}</span>
+                  <span>Оплат: {plan.paymentsCount}</span>
                 </div>
 
                 <div className="mt-4 min-w-0">
@@ -377,15 +380,6 @@ export function PlansAdmin({ plans }: { plans: PlanAdminRow[] }) {
         onConfirm={() => void deletePlan()}
         onCancel={() => setDeleteCandidate(null)}
       />
-    </div>
-  )
-}
-
-function PlanStat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="min-w-0 rounded-2xl border border-slate-200/70 bg-slate-50/70 px-3 py-2.5 dark:border-white/[0.07] dark:bg-white/[0.025]">
-      <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">{label}</div>
-      <div className="mt-1 break-words text-sm font-semibold leading-tight text-slate-900 dark:text-white">{value}</div>
     </div>
   )
 }
