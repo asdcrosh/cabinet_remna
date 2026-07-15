@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="1.2.2"
+VERSION="1.3.0"
 BRANCH="${BRANCH:-main}"
 RAW_BASE_URL="${RAW_BASE_URL:-https://raw.githubusercontent.com/asdcrosh/cabinet_remna/${BRANCH}}"
 GITHUB_API_URL="${GITHUB_API_URL:-https://api.github.com/repos/asdcrosh/cabinet_remna/commits/${BRANCH}}"
@@ -18,10 +18,7 @@ CABINET_COMPOSE="${CABINET_DIR}/docker-compose.yml"
 CABINET_VERSION_FILE="${CABINET_VERSION_FILE:-${CABINET_DIR}/.cabinet-version}"
 UPDATE_STATUS_CACHE="${CABINETCTL_UPDATE_CACHE:-/var/cache/remnawave-cabinet/update-status}"
 UPDATE_STATUS_CACHE_TTL="${CABINETCTL_UPDATE_CACHE_TTL:-3600}"
-
-if [[ "$(id -u)" -ne 0 ]]; then
-  exec sudo --preserve-env=BRANCH,RAW_BASE_URL,GITHUB_API_URL,INSTALL_URL,UPDATE_URL,NGINX_SETUP_URL,CONSOLE_INSTALL_URL,BACKUP_SCRIPT_URL,CABINETCTL_PATH,BACKUP_SCRIPT_PATH,INSTALL_DIR,CABINET_VERSION_FILE,CABINETCTL_UPDATE_CACHE,CABINETCTL_UPDATE_CACHE_TTL,CABINETCTL_CHECK_UPDATES_IN_MENU "$0" "$@"
-fi
+CHECK_UPDATES_IN_MENU="${CABINETCTL_CHECK_UPDATES_IN_MENU:-0}"
 
 if [[ -t 1 ]]; then
   BOLD=$'\033[1m'
@@ -39,6 +36,10 @@ info() { printf '%s\n' "${CYAN}•${RESET} $*"; }
 ok() { printf '%s\n' "${GREEN}✓${RESET} $*"; }
 warn() { printf '%s\n' "${YELLOW}!${RESET} $*"; }
 fail() { printf '%s\n' "${RED}Ошибка:${RESET} $*" >&2; return 1; }
+
+rule() {
+  printf '%s\n' "${DIM}--------------------------------------------------------${RESET}"
+}
 
 pause() {
   if [[ -r /dev/tty ]]; then
@@ -60,6 +61,10 @@ cabinet_installed() {
 
 docker_available() {
   command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1
+}
+
+docker_running() {
+  docker_available && docker info >/dev/null 2>&1
 }
 
 ensure_docker() {
@@ -87,6 +92,23 @@ container_state() {
   local state
   state="$(docker inspect -f '{{.State.Status}}' "${container}" 2>/dev/null || true)"
   [[ -n "${state}" ]] && printf '%s\n' "${state}" || printf '%s\n' "не найден"
+}
+
+state_label() {
+  case "${1:-}" in
+    running) printf '%s' "${GREEN}работает${RESET}" ;;
+    restarting) printf '%s' "${YELLOW}перезапускается${RESET}" ;;
+    created) printf '%s' "${YELLOW}создан${RESET}" ;;
+    exited|dead|removing|paused) printf '%s' "${RED}остановлен${RESET}" ;;
+    "не найден"|"") printf '%s' "${DIM}не найден${RESET}" ;;
+    *) printf '%s%s%s' "${YELLOW}" "$1" "${RESET}" ;;
+  esac
+}
+
+print_service_state() {
+  local label="$1"
+  local container="$2"
+  printf '  %-18s %s\n' "${label}" "$(state_label "$(container_state "${container}")")"
 }
 
 env_value() {
@@ -197,13 +219,13 @@ check_update_status() {
 
 print_update_status_key() {
   case "${1:-unknown}" in
-    latest|current) printf '  Обновление:  %s\n' "${GREEN}Установлена актуальная версия${RESET}" ;;
-    available) printf '  Обновление:  %s\n' "${YELLOW}Доступно обновление${RESET}" ;;
-    check-failed|check_failed|unknown) printf '  Обновление:  %s\n' "${YELLOW}не удалось проверить${RESET}" ;;
-    version-unknown|version_unknown) printf '  Обновление:  %s\n' "${YELLOW}версия не зафиксирована${RESET}" ;;
-    docker-unavailable|docker_unavailable) printf '  Обновление:  %s\n' "${YELLOW}Docker недоступен${RESET}" ;;
-    app-not-running|app_not_running) printf '  Обновление:  %s\n' "${YELLOW}кабинет не запущен${RESET}" ;;
-    not-installed|not_installed) printf '  Обновление:  %s\n' "${DIM}доступно после установки${RESET}" ;;
+    latest|current) printf '  %-18s %s\n' "Версия кабинета" "${GREEN}актуальная${RESET}" ;;
+    available) printf '  %-18s %s\n' "Версия кабинета" "${YELLOW}доступно обновление${RESET}" ;;
+    check-failed|check_failed|unknown) printf '  %-18s %s\n' "Версия кабинета" "${YELLOW}не удалось проверить${RESET}" ;;
+    version-unknown|version_unknown) printf '  %-18s %s\n' "Версия кабинета" "${YELLOW}не зафиксирована${RESET}" ;;
+    docker-unavailable|docker_unavailable) printf '  %-18s %s\n' "Версия кабинета" "${YELLOW}Docker недоступен${RESET}" ;;
+    app-not-running|app_not_running) printf '  %-18s %s\n' "Версия кабинета" "${YELLOW}кабинет не запущен${RESET}" ;;
+    not-installed|not_installed) printf '  %-18s %s\n' "Версия кабинета" "${DIM}после установки${RESET}" ;;
     *) return 1 ;;
   esac
 }
@@ -231,18 +253,23 @@ read_update_status_cache() {
 
 update_status_line() {
   if ! cabinet_installed; then
-    printf '  Обновление:  %s\n' "${DIM}доступно после установки${RESET}"
+    printf '  %-18s %s\n' "Версия кабинета" "${DIM}после установки${RESET}"
     return
   fi
-
-  set +e
-  check_update_status >/dev/null 2>&1
-  set -e
 
   if read_update_status_cache; then
     return
   fi
-  print_update_status_key "check-failed"
+
+  if [[ "${CHECK_UPDATES_IN_MENU}" == "1" || "${CHECK_UPDATES_IN_MENU}" == "true" ]]; then
+    set +e
+    check_update_status >/dev/null 2>&1
+    set -e
+    read_update_status_cache || print_update_status_key "check-failed"
+    return
+  fi
+
+  printf '  %-18s %s\n' "Версия кабинета" "${DIM}не проверена, пункт 8${RESET}"
 }
 
 show_update_check_result() {
@@ -343,19 +370,24 @@ edit_env() {
 
 show_status() {
   if ! docker_available; then
-    printf '  Docker:  %s\n' "${YELLOW}не установлен${RESET}"
+    printf '  %-18s %s\n' "Docker" "${YELLOW}не установлен${RESET}"
+    return
+  fi
+  if ! docker_running; then
+    printf '  %-18s %s\n' "Docker" "${RED}не запущен${RESET}"
     return
   fi
 
-  printf '  Docker:    %s\n' "${GREEN}готов${RESET}"
-  printf '  Кабинет:   app %s, worker %s, db %s\n' \
-    "$(container_state remnawave-cabinet-app)" \
-    "$(container_state remnawave-cabinet-worker)" \
-    "$(container_state remnawave-cabinet-db)"
-  printf '  Сервисы:   Remnawave %s, Remnashop %s, nginx %s\n' \
-    "$(container_state remnawave)" \
-    "$(container_state remnashop)" \
-    "$(container_state remnawave-nginx)"
+  printf '  %-18s %s\n' "Docker" "${GREEN}готов${RESET}"
+  if ! cabinet_installed; then
+    printf '  %-18s %s\n' "Кабинет" "${DIM}не установлен${RESET}"
+    return
+  fi
+
+  print_service_state "Кабинет" "remnawave-cabinet-app"
+  print_service_state "Платежи" "remnawave-cabinet-worker"
+  print_service_state "Рассылки" "remnawave-cabinet-broadcast-worker"
+  print_service_state "База" "remnawave-cabinet-db"
 }
 
 show_logs() {
@@ -372,8 +404,10 @@ logs_menu() {
   require_tty
   printf '%s\n' \
     "  1. Приложение" \
-    "  2. Worker платежей" \
-    "  3. Все сервисы кабинета" \
+    "  2. Платежи" \
+    "  3. Рассылки" \
+    "  4. База данных" \
+    "  5. Все сервисы кабинета" \
     "  0. Назад" >/dev/tty
   printf 'Выберите логи: ' >/dev/tty
   local choice
@@ -381,16 +415,42 @@ logs_menu() {
   case "${choice}" in
     1) show_logs app ;;
     2) show_logs worker ;;
-    3) warn "Для выхода из логов нажмите Ctrl+C."; cabinet_compose logs -f --tail=200 || true ;;
+    3) show_logs broadcast-worker ;;
+    4) show_logs db ;;
+    5) warn "Для выхода из логов нажмите Ctrl+C."; cabinet_compose logs -f --tail=200 || true ;;
     0) return ;;
     *) warn "Неизвестный пункт." ;;
   esac
 }
 
 restart_cabinet() {
-  cabinet_compose up -d --remove-orphans
+  cabinet_compose restart app worker broadcast-worker
   ok "Сервисы кабинета перезапущены."
   cabinet_compose ps
+}
+
+show_services() {
+  cabinet_compose ps
+}
+
+check_config() {
+  info "Проверяем конфигурацию кабинета..."
+  cabinet_compose run --rm check-env
+  ok "Конфигурация прошла проверку."
+}
+
+show_url() {
+  cabinet_installed || {
+    fail "Кабинет ещё не установлен."
+    return 1
+  }
+  local app_url
+  app_url="$(env_value APP_URL)"
+  if [[ -z "${app_url}" ]]; then
+    warn "APP_URL не заполнен в ${CABINET_ENV}."
+    return 1
+  fi
+  printf '%s\n' "${app_url}"
 }
 
 health_check() {
@@ -417,9 +477,10 @@ health_check() {
     warn "Кабинет ещё не установлен."
   fi
 
-  printf '\n'
-  ensure_backup_command
-  "${BACKUP_SCRIPT_PATH}" status || true
+  if [[ -x "${BACKUP_SCRIPT_PATH}" ]]; then
+    printf '\n%s\n' "${BOLD}Бэкапы${RESET}"
+    "${BACKUP_SCRIPT_PATH}" status || true
+  fi
 }
 
 setup_nginx() {
@@ -465,30 +526,42 @@ restore_backup() {
 
 show_header() {
   clear 2>/dev/null || true
-  printf '%s\n' "${BOLD}${CYAN}Remnawave Cabinet${RESET} ${DIM}v${VERSION}${RESET}"
-  printf '%s\n\n' "${DIM}Установка и управление кабинетом${RESET}"
-  update_status_line
-  printf '\n'
+  printf '%s\n' "${BOLD}Remnawave Cabinet${RESET}  ${DIM}cabinetctl v${VERSION}${RESET}"
+  printf '%s\n' "${DIM}${CABINET_DIR}${RESET}"
+  rule
+  printf '%s\n' "${BOLD}Состояние${RESET}"
   show_status
-  printf '\n'
+  update_status_line
+  rule
 }
 
 show_menu() {
   show_header
   if cabinet_installed; then
     printf '%s\n' \
-      "  1. Обновить систему" \
-      "  2. Настроить .env" \
-      "  3. Здоровье системы" \
-      "  4. Логи" \
-      "  5. Бэкапы" \
-      "  0. Выход"
+      "${BOLD}Кабинет${RESET}" \
+      "  1  Обновить" \
+      "  2  Перезапустить" \
+      "  3  Проверить систему" \
+      "" \
+      "${BOLD}Настройка${RESET}" \
+      "  4  Открыть .env" \
+      "  5  Проверить .env" \
+      "  6  Логи" \
+      "  7  Бэкапы" \
+      "" \
+      "${BOLD}Консоль${RESET}" \
+      "  8  Проверить обновление кабинета" \
+      "  9  Обновить cabinetctl" \
+      "  0  Выход"
   else
     printf '%s\n' \
-      "  1. Установить кабинет" \
-      "  2. Здоровье системы" \
-      "  3. Бэкапы" \
-      "  0. Выход"
+      "${BOLD}Кабинет не установлен${RESET}" \
+      "  1  Установить" \
+      "  2  Проверить систему" \
+      "  3  Бэкапы" \
+      "  9  Обновить cabinetctl" \
+      "  0  Выход"
   fi
   printf '\nВыберите действие: ' >/dev/tty
 }
@@ -501,16 +574,20 @@ run_menu() {
 
   while true; do
     show_menu
-    local choice archive
+    local choice
     IFS= read -r choice </dev/tty || exit 0
     printf '\n'
     if cabinet_installed; then
       case "${choice}" in
         1) update_cabinet || true; pause ;;
-        2) edit_env || true; pause ;;
+        2) restart_cabinet || true; pause ;;
         3) health_check || true; pause ;;
-        4) logs_menu || true; pause ;;
-        5) backup_menu || true; pause ;;
+        4) edit_env || true; pause ;;
+        5) check_config || true; pause ;;
+        6) logs_menu || true; pause ;;
+        7) backup_menu || true; pause ;;
+        8) check_update_command || true; pause ;;
+        9) update_console || true; pause ;;
         0) exit 0 ;;
         *) warn "Неизвестный пункт."; pause ;;
       esac
@@ -519,6 +596,7 @@ run_menu() {
         1) install_cabinet || true; pause ;;
         2) health_check || true; pause ;;
         3) backup_menu || true; pause ;;
+        9) update_console || true; pause ;;
         0) exit 0 ;;
         *) warn "Неизвестный пункт."; pause ;;
       esac
@@ -536,10 +614,13 @@ Remnawave Cabinet ${VERSION}
   cabinetctl update             обновить систему
   cabinetctl check-update       проверить наличие обновления
   cabinetctl env                открыть .env
+  cabinetctl config-check       проверить переменные .env
   cabinetctl health             здоровье системы
-  cabinetctl logs               меню логов
+  cabinetctl logs [service]     меню или логи app, worker, broadcast-worker, db
   cabinetctl backups            бэкапы, восстановление и S3
   cabinetctl status             краткое состояние сервисов
+  cabinetctl ps                 состояние compose-сервисов
+  cabinetctl url                показать адрес кабинета
   cabinetctl restart            перезапустить кабинет без обновления
   cabinetctl nginx              настроить nginx и HTTPS
   cabinetctl backup             создать бэкап без меню
@@ -547,8 +628,18 @@ Remnawave Cabinet ${VERSION}
   RESTORE_CONFIRM=RESTORE_REMNAWAVE_REMNASHOP_CABINET \\
     cabinetctl restore ARCHIVE  восстановить сервер
   cabinetctl self-update        обновить консоль
+  cabinetctl version            показать версию консоли
 EOF
 }
+
+case "${1:-menu}" in
+  help|-h|--help) show_help; exit 0 ;;
+  version|-v|--version) printf 'cabinetctl %s\n' "${VERSION}"; exit 0 ;;
+esac
+
+if [[ "$(id -u)" -ne 0 ]]; then
+  exec sudo --preserve-env=BRANCH,RAW_BASE_URL,GITHUB_API_URL,INSTALL_URL,UPDATE_URL,NGINX_SETUP_URL,CONSOLE_INSTALL_URL,BACKUP_SCRIPT_URL,CABINETCTL_PATH,BACKUP_SCRIPT_PATH,INSTALL_DIR,CABINET_VERSION_FILE,CABINETCTL_UPDATE_CACHE,CABINETCTL_UPDATE_CACHE_TTL,CABINETCTL_CHECK_UPDATES_IN_MENU "$0" "$@"
+fi
 
 case "${1:-menu}" in
   menu) run_menu ;;
@@ -556,9 +647,18 @@ case "${1:-menu}" in
   update) update_cabinet ;;
   update-check|check-update) check_update_command ;;
   env) edit_env ;;
+  config-check|check-config) check_config ;;
   status) show_status ;;
+  ps|services) show_services ;;
+  url) show_url ;;
   restart) restart_cabinet ;;
-  logs) logs_menu ;;
+  logs)
+    if [[ -n "${2:-}" ]]; then
+      show_logs "${2}"
+    else
+      logs_menu
+    fi
+    ;;
   worker) show_logs worker ;;
   health) health_check ;;
   nginx) setup_nginx ;;
@@ -567,6 +667,5 @@ case "${1:-menu}" in
   verify) verify_backup "${2:-}" ;;
   restore) restore_backup "${2:-}" ;;
   self-update) update_console ;;
-  help|-h|--help) show_help ;;
   *) show_help; exit 1 ;;
 esac

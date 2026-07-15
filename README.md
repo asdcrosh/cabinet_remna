@@ -498,10 +498,22 @@ cabinetctl
 | Команда | Действие |
 | --- | --- |
 | `cabinetctl update` | Обновить образ, миграции, перезапуск |
+| `cabinetctl restart` | Перезапустить приложение и воркеры без обновления |
 | `cabinetctl env` | Редактировать `.env` |
+| `cabinetctl config-check` | Проверить `.env` до перезапуска |
 | `cabinetctl health` | Проверить систему |
-| `cabinetctl logs` | Меню логов |
+| `cabinetctl status` | Краткий статус основных сервисов |
+| `cabinetctl ps` | Полный статус Docker Compose |
+| `cabinetctl logs [service]` | Меню логов или логи выбранного сервиса |
 | `cabinetctl backups` | Бэкапы и восстановление |
+| `cabinetctl check-update` | Проверить обновление кабинета |
+| `cabinetctl self-update` | Обновить саму консоль |
+| `cabinetctl version` | Показать версию консоли |
+| `cabinetctl url` | Показать адрес кабинета |
+
+Интерактивное меню не обращается к GitHub при каждом открытии. Чтобы включить
+автоматическую проверку обновлений в меню, задайте
+`CABINETCTL_CHECK_UPDATES_IN_MENU=1`. Результат проверки кешируется на час.
 
 Чтобы получать сообщение в Telegram после успешного обновления, заполните в
 `/opt/remnawave-cabinet/.env` переменные `TELEGRAM_BOT_TOKEN` и

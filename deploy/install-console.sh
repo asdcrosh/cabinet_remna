@@ -41,7 +41,7 @@ install_remote_script() {
   rm -f "${temporary}"
 }
 
-echo "Устанавливаем Cabinet Control..."
+echo "Устанавливаем cabinetctl..."
 install_remote_script "${CABINETCTL_URL}" "${CABINETCTL_PATH}"
 install_remote_script "${BACKUP_SCRIPT_URL}" "${BACKUP_SCRIPT_PATH}"
 rm -f /usr/local/bin/remnactl
