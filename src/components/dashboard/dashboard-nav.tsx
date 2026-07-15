@@ -327,7 +327,10 @@ export function MobileBottomNav({ badges = {}, features }: { badges?: NavBadges;
   )
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200/80 bg-white/[0.94] pb-[calc(env(safe-area-inset-bottom)+0.5rem)] pt-1.5 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur-xl dark:border-white/10 dark:bg-surface-900/[0.96] dark:shadow-black/25 lg:hidden">
+    <nav
+      aria-label="Основная мобильная навигация"
+      className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200/80 bg-white/[0.94] pb-[calc(env(safe-area-inset-bottom)+0.5rem)] pt-1.5 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur-xl dark:border-white/10 dark:bg-surface-900/[0.96] dark:shadow-black/25 lg:hidden"
+    >
       <div className="mx-auto grid max-w-md grid-cols-5 gap-1 px-2">
         {items.map((item) => {
           const Icon = item.icon

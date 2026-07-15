@@ -1,0 +1,62 @@
+import { defineConfig, devices } from '@playwright/test'
+
+const baseURL = process.env.PLAYWRIGHT_TEST_BASE_URL || 'http://localhost:3000'
+const usesExternalServer = Boolean(process.env.PLAYWRIGHT_TEST_BASE_URL)
+
+export default defineConfig({
+  testDir: './tests/e2e',
+  testMatch: '**/*.e2e.ts',
+  globalSetup: './tests/e2e/global-setup.ts',
+  globalTeardown: './tests/e2e/global-teardown.ts',
+  fullyParallel: false,
+  workers: 1,
+  forbidOnly: Boolean(process.env.CI),
+  retries: process.env.CI ? 1 : 0,
+  reporter: process.env.CI
+    ? [['line'], ['html', { open: 'never', outputFolder: 'playwright-report' }]]
+    : [['list'], ['html', { open: 'never', outputFolder: 'playwright-report' }]],
+  outputDir: 'test-results',
+  use: {
+    baseURL,
+    locale: 'ru-RU',
+    timezoneId: 'Europe/Moscow',
+    trace: 'on-first-retry',
+    screenshot: 'only-on-failure',
+    video: 'retain-on-failure',
+  },
+  projects: [
+    {
+      name: 'desktop-chromium',
+      use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 1000 } },
+    },
+    {
+      name: 'mobile-chromium',
+      use: { ...devices['Pixel 7'] },
+    },
+  ],
+  webServer: usesExternalServer
+    ? undefined
+    : [
+        {
+          name: 'Remnawave mock',
+          command: 'node tests/e2e/mock-remnawave.mjs',
+          url: 'http://127.0.0.1:4010/health',
+          reuseExistingServer: !process.env.CI,
+          timeout: 30_000,
+        },
+        {
+          name: 'Cabinet',
+          command: 'npm run dev',
+          url: `${baseURL}/login`,
+          reuseExistingServer: !process.env.CI,
+          timeout: 120_000,
+          env: {
+            APP_URL: baseURL,
+            NEXT_PUBLIC_APP_URL: baseURL,
+            ALLOWED_ORIGINS: baseURL,
+            REMNAWAVE_BASE_URL: 'http://127.0.0.1:4010',
+            REMNAWAVE_TOKEN: 'e2e-token',
+          },
+        },
+      ],
+})

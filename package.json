@@ -13,6 +13,8 @@
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:smoke": "node scripts/smoke.mjs",
+    "test:e2e": "E2E_TEST_DATABASE=true playwright test",
+    "test:e2e:ui": "E2E_TEST_DATABASE=true playwright test --ui",
     "worker:payments": "tsx scripts/payment-reconciler.ts",
     "worker:broadcasts": "tsx scripts/broadcast-worker.ts",
     "cleanup:retention": "tsx scripts/cleanup-retention.ts",
@@ -49,6 +51,7 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^22.20.0",
     "@types/pg": "^8.20.0",
