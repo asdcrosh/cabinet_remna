@@ -57,7 +57,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         >
           Перейти к содержимому
         </a>
-        <aside className="dashboard-sidebar fixed inset-y-0 left-0 z-40 hidden h-dvh w-[17rem] flex-col overflow-hidden border-r border-white/70 bg-white/80 shadow-[18px_0_60px_-42px_rgba(15,23,42,0.35)] backdrop-blur-2xl dark:border-white/[0.08] dark:bg-surface-950/82 dark:shadow-black/40 lg:flex">
+        <aside className="dashboard-sidebar fixed inset-y-0 left-0 z-40 hidden h-dvh w-[17rem] flex-col overflow-hidden border-r border-white/70 bg-white/80 shadow-[18px_0_60px_-42px_rgba(15,23,42,0.35)] backdrop-blur-2xl dark:border-white/[0.08] dark:bg-surface-950/95 dark:shadow-black/40 lg:flex">
           <div className="shrink-0 px-5 py-5">
             <Brand brandName={brandName} />
           </div>
