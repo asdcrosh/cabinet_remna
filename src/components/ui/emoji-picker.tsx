@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { Search, Smile } from 'lucide-react'
 import { cn } from '@/lib/cn'
 
@@ -130,6 +130,37 @@ export function EmojiPicker({
   const [open, setOpen] = useState(false)
   const [category, setCategory] = useState<EmojiCategory>('recent')
   const [query, setQuery] = useState('')
+  const panelId = useId()
+  const rootRef = useRef<HTMLDivElement | null>(null)
+  const triggerRef = useRef<HTMLButtonElement | null>(null)
+  const searchRef = useRef<HTMLInputElement | null>(null)
+
+  const closePicker = useCallback(() => {
+    setOpen(false)
+    window.requestAnimationFrame(() => triggerRef.current?.focus())
+  }, [])
+
+  useEffect(() => {
+    if (!open) return
+    window.requestAnimationFrame(() => searchRef.current?.focus())
+
+    function onPointerDown(event: PointerEvent) {
+      if (!rootRef.current?.contains(event.target as Node)) closePicker()
+    }
+
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key !== 'Escape') return
+      event.preventDefault()
+      closePicker()
+    }
+
+    document.addEventListener('pointerdown', onPointerDown)
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown)
+      document.removeEventListener('keydown', onKeyDown)
+    }
+  }, [closePicker, open])
 
   const items = useMemo(() => {
     const allItems = emojiCategories.flatMap((item) => item.items)
@@ -141,8 +172,9 @@ export function EmojiPicker({
   }, [category, query])
 
   return (
-    <div className={cn('relative shrink-0', className)}>
+    <div ref={rootRef} className={cn('relative shrink-0', className)}>
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setOpen((current) => !current)}
         className={cn(
@@ -153,20 +185,30 @@ export function EmojiPicker({
           buttonClassName
         )}
         aria-label="Открыть emoji"
+        aria-expanded={open}
+        aria-controls={panelId}
+        aria-haspopup="dialog"
       >
         <Smile className="h-5 w-5" />
       </button>
 
       {open && (
-        <div className={cn('absolute bottom-12 right-0 z-40 w-[min(24rem,calc(100vw-2rem))] overflow-hidden rounded-lg border border-slate-200 bg-white shadow-2xl shadow-slate-950/15 dark:border-slate-800 dark:bg-surface-900', panelClassName)}>
+        <div
+          id={panelId}
+          role="dialog"
+          aria-label="Выбор emoji"
+          className={cn('absolute bottom-12 right-0 z-40 w-[min(24rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-slate-950/15 dark:border-slate-800 dark:bg-surface-900', panelClassName)}
+        >
           <div className="border-b border-slate-100 p-2 dark:border-slate-800">
             <div className="flex items-center gap-2 rounded-lg bg-slate-100 px-3 py-2 dark:bg-surface-950">
               <Search className="h-4 w-4 shrink-0 text-slate-400" />
               <input
+                ref={searchRef}
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400"
                 placeholder="Поиск"
+                aria-label="Поиск emoji"
               />
             </div>
             <div className="mt-2 flex gap-1 overflow-x-auto">
@@ -184,6 +226,7 @@ export function EmojiPicker({
                       ? 'bg-slate-950 text-white dark:bg-white dark:text-slate-950'
                       : 'text-slate-500 hover:bg-slate-100 hover:text-slate-950 dark:hover:bg-surface-800 dark:hover:text-white'
                   )}
+                  aria-pressed={category === item.value && !query.trim()}
                 >
                   {item.label}
                 </button>
@@ -199,7 +242,7 @@ export function EmojiPicker({
                   type="button"
                   onClick={() => {
                     onPick(emoji)
-                    setOpen(false)
+                    closePicker()
                   }}
                   className="grid h-10 w-10 place-items-center rounded-lg text-2xl transition-colors hover:bg-slate-100 dark:hover:bg-surface-800"
                   aria-label={`Вставить ${emoji}`}
@@ -214,4 +257,3 @@ export function EmojiPicker({
     </div>
   )
 }
-

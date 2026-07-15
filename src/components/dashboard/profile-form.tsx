@@ -8,6 +8,7 @@ import { Save } from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
 import { updateProfileSchema, type UpdateProfileInput } from '@/lib/auth/validation'
 import { toast } from '@/components/ui/toaster'
+import { FormAlert } from '@/components/ui/form-alert'
 
 export function ProfileForm({ name }: { name: string | null }) {
   const router = useRouter()
@@ -36,9 +37,7 @@ export function ProfileForm({ name }: { name: string | null }) {
         {errors.name && <p className="mt-1 text-xs text-red-600">{errors.name.message}</p>}
       </div>
       {serverError && (
-        <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-100 sm:col-span-2">
-          {serverError}
-        </div>
+        <FormAlert className="sm:col-span-2">{serverError}</FormAlert>
       )}
       <button type="submit" className="btn-primary w-full sm:min-w-48" disabled={isSubmitting}>
         <Save className="h-4 w-4" />

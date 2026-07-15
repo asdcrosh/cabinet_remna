@@ -90,7 +90,7 @@ export function Modal({ open, title, description, children, footer, onClose }: M
         tabIndex={-1}
         className={cn(
           'flex h-dvh max-h-dvh w-full flex-col overflow-hidden border-0 bg-white shadow-2xl dark:bg-slate-950',
-          'sm:h-auto sm:max-h-[calc(100dvh-24px)] sm:max-w-lg sm:rounded-lg sm:border sm:border-slate-200 dark:sm:border-white/10'
+          'sm:h-auto sm:max-h-[calc(100dvh-24px)] sm:max-w-lg sm:rounded-2xl sm:border sm:border-slate-200 dark:sm:border-white/10'
         )}
       >
         <div className="flex shrink-0 items-start justify-between gap-4 border-b border-slate-200 px-5 py-4 dark:border-white/10">

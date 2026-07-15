@@ -1,6 +1,7 @@
 export default function SubscriptionLoading() {
   return (
-    <div className="page-stack">
+    <div className="page-stack" role="status" aria-busy="true" aria-live="polite">
+      <span className="sr-only">Загрузка подписки</span>
       <section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-surface-900 sm:p-5">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
           <div className="min-w-0 space-y-3">

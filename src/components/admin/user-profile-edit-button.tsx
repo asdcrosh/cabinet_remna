@@ -6,6 +6,7 @@ import { Pencil, Save } from 'lucide-react'
 import { AdminModal } from '@/components/admin/admin-modal'
 import { toast } from '@/components/ui/toaster'
 import { apiFetch } from '@/lib/api-client'
+import { FormAlert } from '@/components/ui/form-alert'
 
 export function UserProfileEditButton({
   userId,
@@ -33,6 +34,7 @@ export function UserProfileEditButton({
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [serverError, setServerError] = useState<string | null>(null)
   const [form, setForm] = useState({
     email,
     name: name ?? '',
@@ -48,6 +50,7 @@ export function UserProfileEditButton({
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    setServerError(null)
     setLoading(true)
     try {
       const result = await apiFetch<{ syncDeferred?: boolean }>(`/api/admin/users/${userId}/profile`, {
@@ -69,8 +72,8 @@ export function UserProfileEditButton({
       )
       setOpen(false)
       router.refresh()
-    } catch {
-      // apiFetch показывает ошибку.
+    } catch (error) {
+      setServerError(error instanceof Error ? error.message : 'Не удалось сохранить профиль')
     } finally {
       setLoading(false)
     }
@@ -174,6 +177,10 @@ export function UserProfileEditButton({
               </label>
             </div>
           </section>
+
+          {serverError && (
+            <FormAlert>{serverError}</FormAlert>
+          )}
 
           <section className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/40 p-4 dark:border-white/10 dark:bg-white/[0.02]">
             <div>

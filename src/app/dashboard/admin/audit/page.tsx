@@ -6,7 +6,7 @@ import { prisma } from '@/lib/prisma'
 import { requireAdminPage } from '@/lib/auth/admin-page'
 import { PageHeader } from '@/components/dashboard/page-header'
 import { AdminFilterSubmitButton } from '@/components/admin/admin-filter-submit-button'
-import { AdminFilterBar } from '@/components/admin/admin-filter-bar'
+import { AdminFilterBar, AdminFilterField } from '@/components/admin/admin-filter-bar'
 import { AdminEmptyState } from '@/components/admin/admin-empty-state'
 
 export const dynamic = 'force-dynamic'
@@ -91,16 +91,20 @@ export default async function AdminAuditPage({
         className="md:grid-cols-[minmax(14rem,1fr)_14rem_auto_auto]"
       >
         <input type="hidden" name="limit" value="50" />
-        <div className="relative min-w-0">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          <input name="q" defaultValue={q} placeholder="Поиск по email или действию" className="input pl-9" />
-        </div>
-        <select name="action" defaultValue={action} className="input">
-          <option value="ALL">Все действия</option>
-          {Object.entries(ACTION_LABELS).map(([value, label]) => (
-            <option key={value} value={value}>{label}</option>
-          ))}
-        </select>
+        <AdminFilterField label="Поиск в истории">
+          <div className="relative min-w-0">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <input type="search" name="q" defaultValue={q} placeholder="Email или действие" className="input pl-9" />
+          </div>
+        </AdminFilterField>
+        <AdminFilterField label="Тип действия">
+          <select name="action" defaultValue={action} className="input">
+            <option value="ALL">Все действия</option>
+            {Object.entries(ACTION_LABELS).map(([value, label]) => (
+              <option key={value} value={value}>{label}</option>
+            ))}
+          </select>
+        </AdminFilterField>
         <AdminFilterSubmitButton />
       </AdminFilterBar>
 

@@ -72,7 +72,7 @@ export function TelegramMiniAppAuth() {
     <div className="fixed inset-0 z-[100] grid place-items-center bg-slate-50 px-5 dark:bg-surface-950">
       <div className="w-full max-w-sm text-center">
         <div
-          className={`mx-auto grid h-14 w-14 place-items-center rounded-lg ${
+          className={`mx-auto grid h-14 w-14 place-items-center rounded-2xl ${
             state === 'error'
               ? 'bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-300'
               : 'bg-sky-100 text-sky-600 dark:bg-sky-500/10 dark:text-sky-300'

@@ -24,7 +24,7 @@ export default async function TelegramEmailPage() {
     <main className="grid min-h-dvh place-items-center px-4 py-8">
       <div className="w-full max-w-md">
         <div className="mb-6 text-center">
-          <div className="mx-auto grid h-12 w-12 place-items-center rounded-lg bg-sky-100 text-sky-600 dark:bg-sky-500/10 dark:text-sky-300">
+          <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-sky-100 text-sky-600 dark:bg-sky-500/10 dark:text-sky-300">
             <Send className="h-6 w-6" />
           </div>
           <h1 className="mt-4 text-2xl font-semibold">{getBrandName()}</h1>

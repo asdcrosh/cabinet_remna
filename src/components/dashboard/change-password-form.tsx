@@ -8,6 +8,7 @@ import { apiFetch } from '@/lib/api-client'
 import { newPasswordSchema } from '@/lib/auth/validation'
 import { toast } from '@/components/ui/toaster'
 import { Eye, EyeOff } from 'lucide-react'
+import { FormAlert } from '@/components/ui/form-alert'
 
 const changePasswordFormSchema = z
   .object({
@@ -79,9 +80,7 @@ export function ChangePasswordForm() {
         )}
       </div>
       {serverError && (
-        <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-100">
-          {serverError}
-        </div>
+        <FormAlert>{serverError}</FormAlert>
       )}
       <button type="submit" disabled={isSubmitting} className="btn-primary w-full">
         {isSubmitting ? 'Сохраняем...' : 'Сменить пароль'}

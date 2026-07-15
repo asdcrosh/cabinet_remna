@@ -1,6 +1,6 @@
-import Link from 'next/link'
 import { getBrandName } from '@/lib/branding'
 import { getLegalDetails } from '@/lib/legal'
+import { LegalPage, LegalSection } from '@/components/legal/legal-page'
 
 export const metadata = { title: 'Условия использования' }
 export const dynamic = 'force-dynamic'
@@ -11,19 +11,17 @@ export default function TermsPage() {
   const legal = getLegalDetails()
 
   return (
-    <main className="mx-auto max-w-4xl px-4 py-12 sm:px-6">
-      <Link href="/register" className="text-sm text-brand-600 hover:underline">
-        Назад к регистрации
-      </Link>
-      <div className="card mt-6 space-y-7">
-        <div>
-          <h1 className="text-3xl font-semibold tracking-tight">Условия использования</h1>
-          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-            Сервис {brandName}. Редакция от {updatedAt}.
-          </p>
-        </div>
-
-        <TermsSection title="1. Общие положения">
+    <LegalPage
+      activePath="/terms"
+      backHref="/register"
+      backLabel="К регистрации"
+      brandName={brandName}
+      description="Правила использования сервиса, оплаты и управления VPN-доступом."
+      supportEmail={legal.supportEmail}
+      title="Условия использования"
+      updatedAt={updatedAt}
+    >
+        <LegalSection title="1. Общие положения">
           <p>
             Настоящие условия регулируют использование личного кабинета {brandName}, покупку тарифов,
             получение доступа и управление подпиской. Создавая аккаунт или оплачивая тариф,
@@ -34,9 +32,9 @@ export default function TermsPage() {
             нарушения законодательства, обхода законных ограничений, атак на сети, рассылки спама или
             иных действий, причиняющих вред третьим лицам.
           </p>
-        </TermsSection>
+        </LegalSection>
 
-        <TermsSection title="2. Аккаунт">
+        <LegalSection title="2. Аккаунт">
           <p>
             Для работы с кабинетом пользователь регистрируется по email и подтверждает адрес электронной
             почты. Пользователь отвечает за достоверность указанных данных, сохранность пароля и безопасность
@@ -47,9 +45,9 @@ export default function TermsPage() {
             лицам, перепродажа подписки или массовое распространение ссылки могут привести к ограничению
             или отключению доступа.
           </p>
-        </TermsSection>
+        </LegalSection>
 
-        <TermsSection title="3. Тарифы, оплата и выдача доступа">
+        <LegalSection title="3. Тарифы, оплата и выдача доступа">
           <p>
             Доступ предоставляется на срок, лимит трафика и количество устройств, указанные в выбранном тарифе.
             Платные тарифы оплачиваются онлайн через подключённого платёжного провайдера. Подписка активируется
@@ -60,9 +58,9 @@ export default function TermsPage() {
             повторена автоматически или вручную администратором. Пользователь может проверить состояние выдачи
             в разделе платежей.
           </p>
-        </TermsSection>
+        </LegalSection>
 
-        <TermsSection title="4. Промо-тарифы и промокоды">
+        <LegalSection title="4. Промо-тарифы и промокоды">
           <p>
             Промо-тарифы предназначены для ознакомления с сервисом и могут предоставляться бесплатно, без оплаты
             через платёжного провайдера. Если иное не указано в карточке тарифа, промо-тариф доступен одному
@@ -78,9 +76,9 @@ export default function TermsPage() {
             действия промокода, список тарифов, общее количество применений и количество применений одним
             пользователем.
           </p>
-        </TermsSection>
+        </LegalSection>
 
-        <TermsSection title="5. Правила использования">
+        <LegalSection title="5. Правила использования">
           <p>Пользователю запрещено использовать сервис для:</p>
           <ul className="list-disc space-y-1 pl-5">
             <li>рассылки спама, фишинга, вредоносного ПО или мошеннических материалов;</li>
@@ -90,9 +88,9 @@ export default function TermsPage() {
             <li>перепродажи доступа без отдельного согласования с администратором сервиса;</li>
             <li>действий, создающих чрезмерную нагрузку или угрозу стабильности инфраструктуры.</li>
           </ul>
-        </TermsSection>
+        </LegalSection>
 
-        <TermsSection title="6. Ограничение и прекращение доступа">
+        <LegalSection title="6. Ограничение и прекращение доступа">
           <p>
             Сервис может временно ограничить или прекратить доступ пользователя при нарушении условий,
             подозрении на злоупотребление, угрозе безопасности, неоплате тарифа, окончании срока подписки
@@ -102,9 +100,9 @@ export default function TermsPage() {
             Если ограничение связано с технической ошибкой, пользователь может обратиться за проверкой через
             доступные каналы связи сервиса.
           </p>
-        </TermsSection>
+        </LegalSection>
 
-        <TermsSection title="7. Возвраты">
+        <LegalSection title="7. Возвраты">
           <p>
             Возврат средств возможен, если доступ не был выдан по технической причине и проблема не была
             устранена в разумный срок. Возврат может быть невозможен или ограничен, если пользователь уже
@@ -114,9 +112,9 @@ export default function TermsPage() {
             Комиссии платёжных систем, сроки обработки возврата и способ возврата зависят от платёжного
             провайдера и банка пользователя.
           </p>
-        </TermsSection>
+        </LegalSection>
 
-        <TermsSection title="8. Данные пользователя">
+        <LegalSection title="8. Данные пользователя">
           <p>
             Для работы кабинета сервис обрабатывает данные аккаунта: email, имя при наличии, хэш пароля,
             сведения о подтверждении email, выбранные тарифы, платежи, подписки, технические статусы выдачи,
@@ -130,9 +128,9 @@ export default function TermsPage() {
             Технические журналы сервера могут содержать IP-адрес, user-agent, дату и время запроса. Эти данные
             используются для безопасности, диагностики ошибок, защиты от злоупотреблений и поддержки работы сервиса.
           </p>
-        </TermsSection>
+        </LegalSection>
 
-        <TermsSection title="9. Доступность и ответственность">
+        <LegalSection title="9. Доступность и ответственность">
           <p>
             Сервис стремится обеспечивать стабильную работу, но не гарантирует абсолютную бесперебойность,
             отсутствие задержек, блокировок сторонних сетей или совместимость со всеми сайтами, приложениями
@@ -142,38 +140,23 @@ export default function TermsPage() {
             VPN-доступ не является гарантией полной анонимности. Пользователь самостоятельно отвечает за свои
             действия в интернете, соблюдение законов и безопасность собственных устройств.
           </p>
-        </TermsSection>
+        </LegalSection>
 
-        <TermsSection title="10. Изменение условий">
+        <LegalSection title="10. Изменение условий">
           <p>
             Сервис может обновлять условия использования. Новая редакция применяется с момента публикации
             на этой странице, если в тексте не указан иной срок. Продолжение использования сервиса после
             публикации обновлений означает согласие с новой редакцией.
           </p>
-        </TermsSection>
+        </LegalSection>
 
-        <TermsSection title="11. Исполнитель и контакты">
+        <LegalSection title="11. Исполнитель и контакты">
           <p>{legal.operatorName}, ИНН {legal.taxId}.</p>
           <p>
             {legal.address && <>Адрес: {legal.address}. </>}
             Поддержка: <a className="text-brand-600 hover:underline" href={`mailto:${legal.supportEmail}`}>{legal.supportEmail}</a>.
           </p>
-        </TermsSection>
-
-        <nav className="flex flex-wrap gap-4 border-t border-slate-200 pt-5 text-sm dark:border-white/10">
-          <Link href="/privacy" className="text-brand-600 hover:underline">Политика конфиденциальности</Link>
-          <Link href="/refunds" className="text-brand-600 hover:underline">Правила возврата</Link>
-        </nav>
-      </div>
-    </main>
-  )
-}
-
-function TermsSection({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <section className="space-y-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
-      <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">{title}</h2>
-      {children}
-    </section>
+        </LegalSection>
+    </LegalPage>
   )
 }

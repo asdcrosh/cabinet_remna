@@ -23,7 +23,7 @@ export function YandexAuthButton({
     <Link
       href={`/api/auth/yandex/start?${params.toString()}`}
       className={cn(
-        'flex min-h-11 w-full items-center justify-center gap-3 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-800 shadow-sm transition-colors hover:bg-slate-50 dark:border-slate-800 dark:bg-surface-950 dark:text-white dark:hover:bg-surface-900',
+        'flex min-h-11 w-full items-center justify-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-800 shadow-sm transition-colors hover:bg-slate-50 dark:border-slate-800 dark:bg-surface-950 dark:text-white dark:hover:bg-surface-900',
         className
       )}
     >

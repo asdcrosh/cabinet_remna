@@ -9,7 +9,7 @@ import { PaymentSyncButton, RecoveryActionButton, RemnashopPaymentRetryButton } 
 import { LazyListLoader } from '@/components/admin/lazy-list-loader'
 import { ADMIN_LIST_PAGE_SIZE, parseAdminListLimit } from '@/lib/admin-list'
 import { AdminFilterSubmitButton } from '@/components/admin/admin-filter-submit-button'
-import { AdminFilterBar } from '@/components/admin/admin-filter-bar'
+import { AdminFilterBar, AdminFilterField } from '@/components/admin/admin-filter-bar'
 import { AdminEmptyState } from '@/components/admin/admin-empty-state'
 import { describeSyncError } from '@/lib/sync-error'
 
@@ -94,30 +94,42 @@ export default async function AdminPaymentsPage({
         className="md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-[minmax(14rem,1fr)_10rem_12rem_10rem_9rem_9rem_auto]"
       >
         <input type="hidden" name="limit" value={ADMIN_LIST_PAGE_SIZE} />
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          <input name="q" defaultValue={q} className="input pl-9" placeholder="Email, имя, тариф или ID" />
-        </div>
-        <select name="status" defaultValue={status} className="input">
-          <option value="ALL">Все статусы</option>
-          <option value="PENDING">Ожидают оплаты</option>
-          <option value="SUCCEEDED">Оплачены</option>
-          <option value="CANCELED">Отменены</option>
-          <option value="REFUNDED">Возвраты</option>
-        </select>
-        <select name="delivery" defaultValue={delivery} className="input">
-          <option value="ALL">Любая выдача</option>
-          <option value="DELIVERED">Подписка выдана</option>
-          <option value="RETRY">Нужна довыдача</option>
-        </select>
-        <select name="range" defaultValue={range} className="input">
-          <option value="ALL">Всё время</option>
-          <option value="TODAY">Сегодня</option>
-          <option value="WEEK">Неделя</option>
-          <option value="CUSTOM">Период</option>
-        </select>
-        <input name="from" defaultValue={params.from ?? ''} type="date" className="input" aria-label="Дата от" />
-        <input name="to" defaultValue={params.to ?? ''} type="date" className="input" aria-label="Дата до" />
+        <AdminFilterField label="Поиск платежей">
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <input type="search" name="q" defaultValue={q} className="input pl-9" placeholder="Email, имя, тариф или ID" />
+          </div>
+        </AdminFilterField>
+        <AdminFilterField label="Статус оплаты">
+          <select name="status" defaultValue={status} className="input">
+            <option value="ALL">Все статусы</option>
+            <option value="PENDING">Ожидают оплаты</option>
+            <option value="SUCCEEDED">Оплачены</option>
+            <option value="CANCELED">Отменены</option>
+            <option value="REFUNDED">Возвраты</option>
+          </select>
+        </AdminFilterField>
+        <AdminFilterField label="Выдача подписки">
+          <select name="delivery" defaultValue={delivery} className="input">
+            <option value="ALL">Любая выдача</option>
+            <option value="DELIVERED">Подписка выдана</option>
+            <option value="RETRY">Нужна довыдача</option>
+          </select>
+        </AdminFilterField>
+        <AdminFilterField label="Период">
+          <select name="range" defaultValue={range} className="input">
+            <option value="ALL">Всё время</option>
+            <option value="TODAY">Сегодня</option>
+            <option value="WEEK">Неделя</option>
+            <option value="CUSTOM">Свой период</option>
+          </select>
+        </AdminFilterField>
+        <AdminFilterField label="Дата от">
+          <input name="from" defaultValue={params.from ?? ''} type="date" className="input" />
+        </AdminFilterField>
+        <AdminFilterField label="Дата до">
+          <input name="to" defaultValue={params.to ?? ''} type="date" className="input" />
+        </AdminFilterField>
         <AdminFilterSubmitButton />
       </AdminFilterBar>
 
@@ -127,6 +139,7 @@ export default async function AdminPaymentsPage({
 
       <div className={payments.length > 0 ? 'table-shell hidden 2xl:block' : 'hidden'}>
         <table className="data-table min-w-[1120px]">
+          <caption className="sr-only">Платежи пользователей и состояние выдачи подписки</caption>
           <thead className="bg-slate-50 text-left text-slate-500 dark:bg-surface-800">
             <tr>
               <th className="w-[150px]">Дата</th>

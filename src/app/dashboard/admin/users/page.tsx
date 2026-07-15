@@ -14,7 +14,7 @@ import { UserDetailsButton, type AdminUserDetails } from '@/components/admin/use
 import { UserSyncButton } from '@/components/admin/user-sync-button'
 import { formatPrice } from '@/lib/format'
 import { AdminFilterSubmitButton } from '@/components/admin/admin-filter-submit-button'
-import { AdminFilterBar } from '@/components/admin/admin-filter-bar'
+import { AdminFilterBar, AdminFilterField } from '@/components/admin/admin-filter-bar'
 import { AdminEmptyState } from '@/components/admin/admin-empty-state'
 import { AdminActionsMenu } from '@/components/admin/admin-actions-menu'
 
@@ -140,27 +140,34 @@ export default async function AdminUsersPage({
         className="md:grid-cols-[minmax(14rem,1fr)_11rem_12rem_auto_auto]"
       >
         <input type="hidden" name="limit" value={ADMIN_LIST_PAGE_SIZE} />
-        <div className="relative min-w-0 flex-1">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          <input
-            name="q"
-            defaultValue={q}
-            placeholder="Email, имя или Remnawave username"
-            className="input pl-9"
-          />
-        </div>
-        <select name="role" defaultValue={role} className="input">
-          <option value="ALL">Все роли</option>
-          <option value="USER">Пользователи</option>
-          <option value="MODERATOR">Модераторы</option>
-          <option value="ADMIN">Администраторы</option>
-          <option value="SUPER_ADMIN">Главные админы</option>
-        </select>
-        <select name="account" defaultValue={account} className="input">
-          <option value="ALL">Любой VPN-профиль</option>
-          <option value="LINKED">Профиль создан</option>
-          <option value="UNLINKED">Без профиля</option>
-        </select>
+        <AdminFilterField label="Поиск пользователей">
+          <div className="relative min-w-0 flex-1">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <input
+              type="search"
+              name="q"
+              defaultValue={q}
+              placeholder="Email, имя или Remnawave username"
+              className="input pl-9"
+            />
+          </div>
+        </AdminFilterField>
+        <AdminFilterField label="Роль">
+          <select name="role" defaultValue={role} className="input">
+            <option value="ALL">Все роли</option>
+            <option value="USER">Пользователи</option>
+            <option value="MODERATOR">Модераторы</option>
+            <option value="ADMIN">Администраторы</option>
+            <option value="SUPER_ADMIN">Главные админы</option>
+          </select>
+        </AdminFilterField>
+        <AdminFilterField label="VPN-профиль">
+          <select name="account" defaultValue={account} className="input">
+            <option value="ALL">Любой VPN-профиль</option>
+            <option value="LINKED">Профиль создан</option>
+            <option value="UNLINKED">Без профиля</option>
+          </select>
+        </AdminFilterField>
         <AdminFilterSubmitButton idleText="Найти" />
       </AdminFilterBar>
 

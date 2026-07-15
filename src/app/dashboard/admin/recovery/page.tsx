@@ -41,6 +41,7 @@ export default async function AdminRecoveryPage() {
         <>
           <div className="table-shell hidden 2xl:block">
             <table className="data-table min-w-[900px]">
+              <caption className="sr-only">Платежи, для которых требуется повторная выдача подписки</caption>
               <thead className="bg-slate-50 text-left text-slate-500 dark:bg-surface-800">
                 <tr>
                   <th className="w-[260px]">Пользователь</th>

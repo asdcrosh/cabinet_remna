@@ -1,6 +1,7 @@
 export default function PlansLoading() {
   return (
-    <div className="page-stack">
+    <div className="page-stack" role="status" aria-busy="true" aria-live="polite">
+      <span className="sr-only">Загрузка тарифов</span>
       <header className="border-b border-slate-200/80 pb-4 dark:border-white/10 sm:pb-5">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div className="space-y-2">
@@ -19,7 +20,7 @@ export default function PlansLoading() {
 
       <div className="grid auto-rows-fr grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2 xl:grid-cols-3">
         {Array.from({ length: 6 }).map((_, index) => (
-          <div key={index} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-surface-900">
+            <div key={index} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-surface-900">
             <div className="flex items-start justify-between gap-3">
               <div className="space-y-2">
                 <div className="skeleton h-7 w-32 rounded-lg" />

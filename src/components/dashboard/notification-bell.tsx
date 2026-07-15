@@ -41,6 +41,8 @@ export function NotificationBell({ showAdmin = false }: { showAdmin?: boolean })
   const rootRef = useRef<HTMLDivElement | null>(null)
   const panelRef = useRef<HTMLDivElement | null>(null)
   const triggerRef = useRef<HTMLButtonElement | null>(null)
+  const userTabRef = useRef<HTMLButtonElement | null>(null)
+  const adminTabRef = useRef<HTMLButtonElement | null>(null)
   const activeSummary = tab === 'admin' ? adminSummary : summary
   const totalUnread = summary.unreadCount + (showAdmin ? adminSummary.unreadCount : 0)
 
@@ -224,10 +226,12 @@ export function NotificationBell({ showAdmin = false }: { showAdmin?: boolean })
   }, [closePanel])
 
   const handleTabKeyDown = useCallback((event: React.KeyboardEvent<HTMLButtonElement>) => {
-    if (!showAdmin || (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight')) return
+    if (!showAdmin || !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
     event.preventDefault()
-    setTab((current) => (current === 'user' ? 'admin' : 'user'))
-  }, [showAdmin])
+    const nextTab = event.key === 'Home' ? 'user' : event.key === 'End' ? 'admin' : tab === 'user' ? 'admin' : 'user'
+    setTab(nextTab)
+    window.requestAnimationFrame(() => (nextTab === 'user' ? userTabRef.current : adminTabRef.current)?.focus())
+  }, [showAdmin, tab])
 
   const panel = open ? (
     <div
@@ -252,7 +256,7 @@ export function NotificationBell({ showAdmin = false }: { showAdmin?: boolean })
             type="button"
             onClick={markAllRead}
             disabled={activeSummary.unreadCount === 0}
-            className="inline-flex h-8 items-center gap-1.5 rounded-xl border border-slate-200 px-2.5 text-xs font-medium text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/10 dark:text-slate-300 dark:hover:bg-white/10"
+            className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-slate-200 px-3 text-xs font-medium text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/10 dark:text-slate-300 dark:hover:bg-white/10"
           >
             <CheckCheck className="h-3.5 w-3.5" />
             Прочитано
@@ -261,7 +265,7 @@ export function NotificationBell({ showAdmin = false }: { showAdmin?: boolean })
             type="button"
             onClick={clearNotifications}
             disabled={activeSummary.notifications.length === 0}
-            className="grid h-8 w-8 place-items-center rounded-xl border border-slate-200 text-slate-500 transition hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/10 dark:text-slate-300 dark:hover:bg-red-500/10 dark:hover:text-red-200"
+            className="grid h-10 w-10 place-items-center rounded-xl border border-slate-200 text-slate-500 transition hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/10 dark:text-slate-300 dark:hover:bg-red-500/10 dark:hover:text-red-200"
             title="Очистить"
             aria-label="Очистить уведомления"
           >
@@ -277,6 +281,7 @@ export function NotificationBell({ showAdmin = false }: { showAdmin?: boolean })
           className="grid grid-cols-2 gap-1 border-b border-slate-100 bg-slate-50 p-1 dark:border-white/10 dark:bg-white/[0.03]"
         >
           <button
+            ref={userTabRef}
             type="button"
             id="notification-tab-user"
             role="tab"
@@ -290,6 +295,7 @@ export function NotificationBell({ showAdmin = false }: { showAdmin?: boolean })
             Мои {summary.unreadCount > 0 ? `· ${summary.unreadCount}` : ''}
           </button>
           <button
+            ref={adminTabRef}
             type="button"
             id="notification-tab-admin"
             role="tab"
@@ -356,14 +362,14 @@ export function NotificationBell({ showAdmin = false }: { showAdmin?: boolean })
         type="button"
         onClick={() => setOpen((value) => !value)}
         className="relative grid h-10 w-10 place-items-center rounded-xl border border-white/70 bg-white/80 text-slate-700 shadow-sm shadow-slate-200/60 transition hover:bg-white hover:text-slate-950 dark:border-white/10 dark:bg-surface-900/80 dark:text-slate-200 dark:shadow-black/20 dark:hover:bg-surface-800 dark:hover:text-white"
-        aria-label="Уведомления"
+        aria-label={totalUnread > 0 ? `Уведомления, новых: ${totalUnread}` : 'Уведомления, новых нет'}
         aria-expanded={open}
         aria-controls="notification-panel"
         aria-haspopup="dialog"
       >
         <Bell className="h-5 w-5" />
         {totalUnread > 0 && (
-          <span className="absolute -right-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full bg-red-600 px-1 text-[10px] font-bold leading-none text-white ring-2 ring-white dark:ring-surface-950">
+          <span aria-hidden="true" className="absolute -right-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full bg-red-600 px-1 text-[10px] font-bold leading-none text-white ring-2 ring-white dark:ring-surface-950">
             {totalUnread > 99 ? '99+' : totalUnread}
           </span>
         )}

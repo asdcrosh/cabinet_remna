@@ -23,9 +23,9 @@ export function AdminFilterBar({
 }: AdminFilterBarProps) {
   return (
     <div className="flex flex-col gap-3 rounded-2xl border border-slate-200/80 bg-white/90 p-3 shadow-sm shadow-slate-950/[0.04] dark:border-white/10 dark:bg-surface-900/90 dark:shadow-black/20 sm:p-4">
-      <form className={`grid min-w-0 flex-1 gap-2 ${className}`} action={action}>
+      <form aria-label="Фильтры списка" className={`grid min-w-0 flex-1 gap-2 ${className}`} action={action}>
         {children}
-        {resetVisible && resetHref ? <Link href={resetHref} className="btn-secondary">Сбросить</Link> : null}
+        {resetVisible && resetHref ? <Link href={resetHref} className="btn-secondary self-end">Сбросить</Link> : null}
       </form>
       {count ? (
         <div className="self-end rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium tabular-nums text-slate-500 dark:bg-white/[0.06] dark:text-slate-400">
@@ -33,5 +33,14 @@ export function AdminFilterBar({
         </div>
       ) : null}
     </div>
+  )
+}
+
+export function AdminFilterField({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <label className="block min-w-0">
+      <span className="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">{label}</span>
+      {children}
+    </label>
   )
 }

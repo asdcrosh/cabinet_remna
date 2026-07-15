@@ -12,6 +12,7 @@ export function PaymentHistory({ payments }: { payments: PaymentHistoryPayment[]
     <div className="space-y-3">
       <div className="table-shell hidden 2xl:block">
         <table className="data-table min-w-[900px]">
+          <caption className="sr-only">История платежей и состояние выданных подписок</caption>
           <thead className="bg-slate-50 text-left text-slate-500 dark:bg-surface-800">
             <tr>
               <th>Дата</th>

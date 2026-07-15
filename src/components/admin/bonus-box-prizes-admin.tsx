@@ -730,6 +730,7 @@ function BonusBoxOpeningHistory({ openings }: { openings: BonusBoxOpeningAdminRo
         <>
         <div className="hidden overflow-hidden rounded-2xl border border-slate-200 dark:border-white/10 xl:block">
           <table className="w-full min-w-[760px] text-sm">
+            <caption className="sr-only">История открытий бонусной коробки</caption>
             <thead className="text-left text-xs uppercase tracking-wide text-slate-400">
               <tr>
                 <th className="py-2 pr-4 font-medium">Когда</th>

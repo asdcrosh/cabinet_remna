@@ -2,11 +2,13 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { apiFetch } from '@/lib/api-client'
 import { registerSchema, type RegisterInput } from '@/lib/auth/validation'
 import { toast } from '@/components/ui/toaster'
+import { FormAlert } from '@/components/ui/form-alert'
 import { CheckCircle2, Eye, EyeOff, Mail } from 'lucide-react'
 import { YandexAuthButton } from './yandex-auth-button'
 
@@ -39,8 +41,8 @@ export function RegisterForm({
       setRegisteredEmail(values.email)
       setEmailDelivery(result.emailDelivery ?? null)
       toast('Проверьте почту для продолжения', 'success')
-    } catch (e: any) {
-      setServerError(e.message)
+    } catch (error) {
+      setServerError(error instanceof Error ? error.message : 'Не удалось создать аккаунт')
     }
   })
 
@@ -53,7 +55,8 @@ export function RegisterForm({
         <div>
           <h2 className="text-lg font-semibold">Подтвердите email</h2>
           <p className="mt-1 text-sm text-slate-500">
-            Если регистрация доступна, мы отправили ссылку подтверждения на {registeredEmail}.
+            Если регистрация доступна, мы отправили ссылку подтверждения на{' '}
+            <span className="break-all font-medium text-slate-700 dark:text-slate-200">{registeredEmail}</span>.
             После подтверждения можно войти в кабинет.
           </p>
         </div>
@@ -138,7 +141,7 @@ export function RegisterForm({
           />
           <button
             type="button"
-            className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-2 text-slate-400 hover:text-slate-700"
+            className="absolute right-2 top-1/2 -translate-y-1/2 rounded-xl p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-white/5 dark:hover:text-slate-100"
             onClick={() => setShowPassword((value) => !value)}
             aria-label={showPassword ? 'Скрыть пароль' : 'Показать пароль'}
           >
@@ -160,18 +163,16 @@ export function RegisterForm({
         />
         <span>
           Согласен с{' '}
-          <a href="/terms" className="text-brand-600 hover:underline">
+          <Link href="/terms" className="text-brand-600 hover:underline">
             условиями использования
-          </a>
+          </Link>
         </span>
       </label>
       {errors.agreeToTerms && (
         <p className="text-xs text-red-600">Нужно согласиться с условиями</p>
       )}
       {serverError && (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-100">
-          {serverError}
-        </div>
+        <FormAlert>{serverError}</FormAlert>
       )}
       <button type="submit" disabled={isSubmitting} className="btn-primary w-full">
         {isSubmitting ? 'Создаём аккаунт...' : 'Зарегистрироваться'}

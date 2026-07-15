@@ -20,10 +20,15 @@ export function PaymentSuccessBanner({
 
   useEffect(() => {
     if (status !== 'processing') return
+    setSeconds(12)
+    let refreshCount = 0
 
     const refresh = window.setInterval(() => {
+      if (document.visibilityState === 'hidden') return
+      refreshCount += 1
       router.refresh()
-      setSeconds((value) => Math.max(0, value - 3))
+      setSeconds(Math.max(0, 12 - refreshCount * 3))
+      if (refreshCount >= 4) window.clearInterval(refresh)
     }, 3000)
 
     return () => window.clearInterval(refresh)

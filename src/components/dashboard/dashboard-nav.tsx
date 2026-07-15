@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { createContext, type ReactNode, useContext, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { createPortal } from 'react-dom'
@@ -31,6 +31,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { useBodyScrollLock } from '@/lib/use-body-scroll-lock'
+import { useDialogFocus } from '@/lib/use-dialog-focus'
 import type { FeatureFlags } from '@/lib/feature-flags'
 import { LogoutButton } from './logout-button'
 
@@ -124,6 +125,21 @@ type NavItem = (typeof nav)[number] | (typeof adminNav)[number]
 type NavBadges = Record<string, number>
 type UserRole = 'USER' | 'MODERATOR' | 'ADMIN' | 'SUPER_ADMIN'
 
+const NavBadgesContext = createContext<NavBadges | null>(null)
+
+export function NavBadgesProvider({
+  initialBadges,
+  supportEnabled,
+  children,
+}: {
+  initialBadges: NavBadges
+  supportEnabled: boolean
+  children: ReactNode
+}) {
+  const badges = useLiveBadges(initialBadges, supportEnabled)
+  return <NavBadgesContext.Provider value={badges}>{children}</NavBadgesContext.Provider>
+}
+
 export function DashboardNav({
   role,
   badges = {},
@@ -151,7 +167,12 @@ export function MobileDashboardNav({
 }) {
   const [open, setOpen] = useState(false)
   const [mounted, setMounted] = useState(false)
+  const triggerRef = useRef<HTMLButtonElement | null>(null)
+  const dialogRef = useRef<HTMLElement | null>(null)
+  const closeButtonRef = useRef<HTMLButtonElement | null>(null)
+  const closeMenu = () => setOpen(false)
   useBodyScrollLock(open)
+  useDialogFocus({ open, onClose: closeMenu, dialogRef, initialFocusRef: closeButtonRef, returnFocusRef: triggerRef })
 
   useEffect(() => {
     setMounted(true)
@@ -162,23 +183,32 @@ export function MobileDashboardNav({
       <button
         type="button"
         className="absolute inset-0 bg-slate-950/40"
-        onClick={() => setOpen(false)}
+        onClick={closeMenu}
         aria-label="Закрыть меню"
       />
-      <aside className="absolute right-0 top-0 z-10 flex h-dvh w-[min(22rem,88vw)] flex-col border-l border-white/70 bg-white/90 shadow-2xl backdrop-blur-xl dark:border-white/10 dark:bg-surface-950/90">
+      <aside
+        id="mobile-dashboard-menu"
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Меню кабинета"
+        tabIndex={-1}
+        className="absolute right-0 top-0 z-10 flex h-dvh w-[min(22rem,88vw)] flex-col border-l border-white/70 bg-white/90 shadow-2xl backdrop-blur-xl dark:border-white/10 dark:bg-surface-950/90"
+      >
         <div className="flex items-center justify-between border-b border-white/70 px-4 py-4 dark:border-white/10">
           <Brand brandName={brandName} />
           <button
+            ref={closeButtonRef}
             type="button"
-            className="grid h-9 w-9 place-items-center rounded-lg border bg-white text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-900 dark:bg-surface-900 dark:hover:bg-surface-800 dark:hover:text-white"
-            onClick={() => setOpen(false)}
+            className="grid h-10 w-10 place-items-center rounded-xl border bg-white text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-900 dark:bg-surface-900 dark:hover:bg-surface-800 dark:hover:text-white"
+            onClick={closeMenu}
             aria-label="Закрыть меню"
           >
             <X className="h-4 w-4" />
           </button>
         </div>
         <div className="flex-1 overflow-y-auto p-3">
-          <NavList role={role} badges={badges} features={features} onNavigate={() => setOpen(false)} className="space-y-1" />
+          <NavList role={role} badges={badges} features={features} onNavigate={closeMenu} className="space-y-1" />
         </div>
         <div className="border-t border-white/70 p-3 dark:border-white/10">
           <div className="mb-2 rounded-lg border border-slate-100 bg-slate-50/80 px-3 py-2 text-xs text-slate-500 dark:border-slate-800 dark:bg-surface-900/80">
@@ -194,10 +224,14 @@ export function MobileDashboardNav({
   return (
     <>
       <button
+        ref={triggerRef}
         type="button"
-        className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-white/70 bg-white/80 text-slate-700 shadow-sm shadow-slate-200/60 backdrop-blur transition-colors hover:bg-white dark:border-white/10 dark:bg-surface-900/80 dark:text-slate-200 dark:shadow-black/20 dark:hover:bg-surface-800 lg:hidden"
+        className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-white/70 bg-white/80 text-slate-700 shadow-sm shadow-slate-200/60 backdrop-blur transition-colors hover:bg-white dark:border-white/10 dark:bg-surface-900/80 dark:text-slate-200 dark:shadow-black/20 dark:hover:bg-surface-800 lg:hidden"
         onClick={() => setOpen(true)}
         aria-label="Открыть меню"
+        aria-expanded={open}
+        aria-controls="mobile-dashboard-menu"
+        aria-haspopup="dialog"
       >
         <Menu className="h-5 w-5" />
       </button>
@@ -208,14 +242,19 @@ export function MobileDashboardNav({
 
 export function MobileBottomNav({ badges = {}, features }: { badges?: NavBadges; features: FeatureFlags }) {
   const pathname = usePathname()
-  const liveBadges = useLiveBadges(badges, features.support)
+  const liveBadges = useNavBadgeValues(badges)
   const items = filterUserNav(bottomNav, features)
   const moreItems = filterUserNav(bottomMoreNav, features)
   const [moreOpen, setMoreOpen] = useState(false)
   const [mounted, setMounted] = useState(false)
+  const moreTriggerRef = useRef<HTMLButtonElement | null>(null)
+  const moreDialogRef = useRef<HTMLDivElement | null>(null)
+  const moreCloseButtonRef = useRef<HTMLButtonElement | null>(null)
+  const closeMore = () => setMoreOpen(false)
   const moreActive = moreItems.some((item) => ('exact' in item && item.exact) ? pathname === item.href : pathname.startsWith(item.href))
 
   useBodyScrollLock(moreOpen)
+  useDialogFocus({ open: moreOpen, onClose: closeMore, dialogRef: moreDialogRef, initialFocusRef: moreCloseButtonRef, returnFocusRef: moreTriggerRef })
 
   useEffect(() => {
     setMounted(true)
@@ -226,19 +265,28 @@ export function MobileBottomNav({ badges = {}, features }: { badges?: NavBadges;
       <button
         type="button"
         className="absolute inset-0 bg-slate-950/40"
-        onClick={() => setMoreOpen(false)}
+        onClick={closeMore}
         aria-label="Закрыть меню"
       />
-      <div className="absolute inset-x-0 bottom-0 rounded-t-2xl border border-white/70 bg-white/95 p-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] shadow-2xl backdrop-blur-xl dark:border-white/10 dark:bg-surface-950/95">
+      <div
+        id="mobile-more-menu"
+        ref={moreDialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="mobile-more-menu-title"
+        tabIndex={-1}
+        className="absolute inset-x-0 bottom-0 rounded-t-2xl border border-white/70 bg-white/95 p-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] shadow-2xl backdrop-blur-xl dark:border-white/10 dark:bg-surface-950/95"
+      >
         <div className="mb-3 flex items-center justify-between gap-3">
           <div>
-            <div className="font-semibold text-slate-950 dark:text-white">Ещё</div>
+            <div id="mobile-more-menu-title" className="font-semibold text-slate-950 dark:text-white">Ещё</div>
             <div className="text-sm text-slate-500 dark:text-slate-400">Разделы кабинета</div>
           </div>
           <button
+            ref={moreCloseButtonRef}
             type="button"
-            className="grid h-9 w-9 place-items-center rounded-lg border bg-white text-slate-500 transition hover:bg-slate-50 hover:text-slate-950 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white"
-            onClick={() => setMoreOpen(false)}
+            className="grid h-10 w-10 place-items-center rounded-xl border bg-white text-slate-500 transition hover:bg-slate-50 hover:text-slate-950 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white"
+            onClick={closeMore}
             aria-label="Закрыть"
           >
             <X className="h-4 w-4" />
@@ -254,7 +302,7 @@ export function MobileBottomNav({ badges = {}, features }: { badges?: NavBadges;
               <Link
                 key={item.href}
                 href={item.href}
-                onClick={() => setMoreOpen(false)}
+                onClick={closeMore}
                 aria-current={active ? 'page' : undefined}
                 className={cn(
                   'relative flex min-h-12 min-w-0 items-center gap-3 rounded-xl border px-3 py-2 text-sm font-semibold transition',
@@ -311,9 +359,12 @@ export function MobileBottomNav({ badges = {}, features }: { badges?: NavBadges;
           )
         })}
         <button
+          ref={moreTriggerRef}
           type="button"
           aria-expanded={moreOpen}
           aria-label="Открыть ещё разделы"
+          aria-controls="mobile-more-menu"
+          aria-haspopup="dialog"
           onClick={() => setMoreOpen(true)}
           className={cn(
             'relative flex min-h-12 min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1.5 text-[10px] font-semibold transition-colors',
@@ -361,7 +412,7 @@ function NavList({
   features: FeatureFlags
 }) {
   const pathname = usePathname()
-  const liveBadges = useLiveBadges(badges, features.support)
+  const liveBadges = useNavBadgeValues(badges)
 
   return (
     <nav className={className}>
@@ -445,6 +496,10 @@ function useLiveBadges(initialBadges: NavBadges, supportEnabled: boolean) {
   }, [supportEnabled])
 
   return badges
+}
+
+function useNavBadgeValues(fallback: NavBadges) {
+  return useContext(NavBadgesContext) ?? fallback
 }
 
 function NavGroup({

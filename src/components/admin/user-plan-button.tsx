@@ -7,6 +7,7 @@ import { AdminModal } from '@/components/admin/admin-modal'
 import { apiFetch } from '@/lib/api-client'
 import { toast } from '@/components/ui/toaster'
 import { formatPrice } from '@/lib/format'
+import { FormAlert } from '@/components/ui/form-alert'
 
 export interface UserPlanOption {
   id: string
@@ -33,6 +34,7 @@ export function UserPlanButton({
   const [mode, setMode] = useState<'REPLACE' | 'EXTEND'>('REPLACE')
   const [loading, setLoading] = useState(false)
   const [query, setQuery] = useState('')
+  const [serverError, setServerError] = useState<string | null>(null)
   const filteredPlans = plans.filter((plan) =>
     `${plan.name} ${plan.durationDays} ${formatPrice(plan.priceKopecks)}`
       .toLowerCase()
@@ -41,7 +43,11 @@ export function UserPlanButton({
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (!planId) return
+    setServerError(null)
+    if (!planId) {
+      setServerError('Выберите тариф')
+      return
+    }
     setLoading(true)
     try {
       await apiFetch(`/api/admin/users/${userId}/plan`, {
@@ -51,6 +57,8 @@ export function UserPlanButton({
       toast(mode === 'REPLACE' ? 'Тариф назначен, новый период начат' : 'Тариф начислен к текущему сроку', 'success')
       setOpen(false)
       router.refresh()
+    } catch (error) {
+      setServerError(error instanceof Error ? error.message : 'Не удалось назначить тариф')
     } finally {
       setLoading(false)
     }
@@ -76,17 +84,22 @@ export function UserPlanButton({
         size="md"
       >
         <form onSubmit={submit} className="space-y-5">
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            <input
-              className="input pl-9"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Найти тариф"
-            />
-          </div>
+          <label className="block">
+            <span className="label">Поиск тарифа</span>
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input
+                type="search"
+                className="input pl-9"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Название, срок или цена"
+              />
+            </div>
+          </label>
 
-          <div className="grid max-h-[18rem] gap-2 overflow-y-auto pr-1 sm:grid-cols-2">
+          <fieldset className="grid max-h-[18rem] gap-2 overflow-y-auto pr-1 sm:grid-cols-2">
+            <legend className="sr-only">Доступные тарифы</legend>
             {filteredPlans.map((plan) => (
               <label
                 key={plan.id}
@@ -108,13 +121,13 @@ export function UserPlanButton({
                 Тарифы не найдены
               </div>
             )}
-          </div>
+          </fieldset>
 
           <div className="grid gap-2 rounded-xl bg-slate-50 p-1 dark:bg-white/5 sm:grid-cols-2">
-            <button type="button" className={mode === 'REPLACE' ? 'btn-primary' : 'btn-secondary'} onClick={() => setMode('REPLACE')}>
+            <button type="button" aria-pressed={mode === 'REPLACE'} className={mode === 'REPLACE' ? 'btn-primary' : 'btn-secondary'} onClick={() => setMode('REPLACE')}>
               Выдать заново
             </button>
-            <button type="button" className={mode === 'EXTEND' ? 'btn-primary' : 'btn-secondary'} onClick={() => setMode('EXTEND')}>
+            <button type="button" aria-pressed={mode === 'EXTEND'} className={mode === 'EXTEND' ? 'btn-primary' : 'btn-secondary'} onClick={() => setMode('EXTEND')}>
               Добавить дни
             </button>
           </div>
@@ -123,6 +136,10 @@ export function UserPlanButton({
               ? 'Текущая подписка заменится выбранным тарифом с сегодняшней даты.'
               : 'Срок выбранного тарифа добавится к текущей подписке.'}
           </p>
+
+          {serverError && (
+            <FormAlert>{serverError}</FormAlert>
+          )}
 
           <div className="grid grid-cols-2 gap-2 border-t pt-4 sm:flex sm:justify-end">
             <button type="button" className="btn-secondary" onClick={() => setOpen(false)} disabled={loading}>Отмена</button>

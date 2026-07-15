@@ -200,8 +200,14 @@ function PlanComparison({ plans }: { plans: Array<{ id: string; name: string; pr
   return (
     <details className="overflow-hidden rounded-2xl border border-slate-200 bg-white/90 shadow-sm dark:border-white/10 dark:bg-surface-900">
       <summary className="cursor-pointer px-4 py-4 text-sm font-semibold text-slate-950 dark:text-white">Сравнить все тарифы</summary>
-      <div className="overflow-x-auto border-t border-slate-100 dark:border-white/10">
+      <div
+        role="region"
+        aria-label="Сравнение тарифов с горизонтальной прокруткой"
+        tabIndex={0}
+        className="overflow-x-auto border-t border-slate-100 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-cyan-400 dark:border-white/10"
+      >
         <table className="w-full min-w-[680px] text-sm">
+          <caption className="sr-only">Сравнение срока, трафика, устройств и цены тарифов</caption>
           <thead className="bg-slate-50 text-left text-slate-500 dark:bg-surface-800">
             <tr>
               <th className="px-4 py-3">Тариф</th>

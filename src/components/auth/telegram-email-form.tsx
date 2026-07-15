@@ -4,15 +4,18 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { CheckCircle2, Eye, EyeOff, Loader2, LockKeyhole, Mail, Send } from 'lucide-react'
 import { toast } from '@/components/ui/toaster'
+import { FormAlert } from '@/components/ui/form-alert'
 
 export function TelegramEmailForm({ telegramName, initialEmail }: { telegramName: string | null; initialEmail: string }) {
   const [email, setEmail] = useState(initialEmail.endsWith('@pending.invalid') ? '' : initialEmail)
   const [password, setPassword] = useState('')
   const [passwordConfirmation, setPasswordConfirmation] = useState('')
   const [showPassword, setShowPassword] = useState(false)
+  const [showPasswordConfirmation, setShowPasswordConfirmation] = useState(false)
   const [agreed, setAgreed] = useState(false)
   const [sending, setSending] = useState(false)
   const [sentTo, setSentTo] = useState<string | null>(null)
+  const [serverError, setServerError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!sentTo) return
@@ -37,8 +40,9 @@ export function TelegramEmailForm({ telegramName, initialEmail }: { telegramName
 
   async function submit(event: React.FormEvent) {
     event.preventDefault()
+    setServerError(null)
     if (password !== passwordConfirmation) {
-      toast('Пароли не совпадают')
+      setServerError('Пароли не совпадают')
       return
     }
     setSending(true)
@@ -57,7 +61,7 @@ export function TelegramEmailForm({ telegramName, initialEmail }: { telegramName
       setSentTo(data.email)
       toast('Письмо отправлено', 'success')
     } catch (error) {
-      toast(error instanceof Error ? error.message : 'Не удалось отправить письмо')
+      setServerError(error instanceof Error ? error.message : 'Не удалось отправить письмо')
     } finally {
       setSending(false)
     }
@@ -66,18 +70,18 @@ export function TelegramEmailForm({ telegramName, initialEmail }: { telegramName
   if (sentTo) {
     return (
       <div className="text-center">
-        <div className="mx-auto grid h-14 w-14 place-items-center rounded-lg bg-emerald-100 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-300">
+        <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-emerald-100 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-300">
           <CheckCircle2 className="h-7 w-7" />
         </div>
         <h1 className="mt-4 text-xl font-semibold">Проверьте почту</h1>
         <p className="mt-2 text-sm text-slate-500">
-          Ссылка отправлена на <span className="font-medium text-slate-800 dark:text-slate-200">{sentTo}</span>
+          Ссылка отправлена на <span className="break-all font-medium text-slate-800 dark:text-slate-200">{sentTo}</span>
         </p>
         <div className="mt-5 flex items-center justify-center gap-2 text-sm text-slate-500">
           <Loader2 className="h-4 w-4 animate-spin" />
           Ожидаем подтверждение
         </div>
-        <button type="button" className="btn-secondary mt-5" onClick={() => setSentTo(null)}>
+        <button type="button" className="btn-secondary mt-5 w-full sm:w-auto" onClick={() => setSentTo(null)}>
           Изменить email
         </button>
       </div>
@@ -86,7 +90,7 @@ export function TelegramEmailForm({ telegramName, initialEmail }: { telegramName
 
   return (
     <form onSubmit={submit} className="space-y-4">
-      <div className="flex items-center gap-3 rounded-lg bg-sky-50 px-3 py-3 dark:bg-sky-500/10">
+      <div className="flex items-center gap-3 rounded-2xl bg-sky-50 px-3 py-3 dark:bg-sky-500/10">
         <Send className="h-5 w-5 text-sky-500" />
         <div className="min-w-0">
           <div className="text-xs text-slate-500">Telegram</div>
@@ -116,7 +120,7 @@ export function TelegramEmailForm({ telegramName, initialEmail }: { telegramName
           />
           <button
             type="button"
-            className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-2 text-slate-400 hover:text-slate-700"
+            className="absolute right-2 top-1/2 -translate-y-1/2 rounded-xl p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-white/5 dark:hover:text-slate-200"
             onClick={() => setShowPassword((value) => !value)}
             aria-label={showPassword ? 'Скрыть пароль' : 'Показать пароль'}
           >
@@ -132,14 +136,22 @@ export function TelegramEmailForm({ telegramName, initialEmail }: { telegramName
         <div className="relative">
           <LockKeyhole className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <input
-            className="input pl-9"
-            type={showPassword ? 'text' : 'password'}
+            className="input px-9"
+            type={showPasswordConfirmation ? 'text' : 'password'}
             value={passwordConfirmation}
             onChange={(event) => setPasswordConfirmation(event.target.value)}
             required
             maxLength={128}
             autoComplete="new-password"
           />
+          <button
+            type="button"
+            className="absolute right-2 top-1/2 -translate-y-1/2 rounded-xl p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-white/5 dark:hover:text-slate-200"
+            onClick={() => setShowPasswordConfirmation((value) => !value)}
+            aria-label={showPasswordConfirmation ? 'Скрыть подтверждение пароля' : 'Показать подтверждение пароля'}
+          >
+            {showPasswordConfirmation ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          </button>
         </div>
       </label>
       <label className="flex cursor-pointer items-start gap-3 text-sm text-slate-600 dark:text-slate-300">
@@ -148,9 +160,12 @@ export function TelegramEmailForm({ telegramName, initialEmail }: { telegramName
           Я принимаю <Link href="/terms" target="_blank" className="text-brand-600 hover:underline">условия использования</Link>
         </span>
       </label>
+      {serverError && (
+        <FormAlert>{serverError}</FormAlert>
+      )}
       <button className="btn-primary w-full" type="submit" disabled={sending}>
         {sending && <Loader2 className="h-4 w-4 animate-spin" />}
-        Добавить email
+        {sending ? 'Отправляем...' : 'Добавить email'}
       </button>
     </form>
   )

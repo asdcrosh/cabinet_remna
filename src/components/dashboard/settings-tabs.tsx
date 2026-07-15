@@ -1,6 +1,6 @@
 'use client'
 
-import { type ReactNode, useState } from 'react'
+import { type ReactNode, useRef, useState } from 'react'
 import { CreditCard, Database, LockKeyhole, UserRound } from 'lucide-react'
 import { cn } from '@/lib/cn'
 
@@ -24,18 +24,27 @@ const tabIcons: Record<SettingsTabId, ReactNode> = {
 export function SettingsTabs({ sections }: { sections: SettingsTabSection[] }) {
   const [activeId, setActiveId] = useState<SettingsTabId>(sections[0]?.id ?? 'account')
   const activeSection = sections.find((section) => section.id === activeId) ?? sections[0]
+  const tabRefs = useRef<Array<HTMLButtonElement | null>>([])
+
+  function selectTab(index: number) {
+    const section = sections[index]
+    if (!section) return
+    setActiveId(section.id)
+    window.requestAnimationFrame(() => tabRefs.current[index]?.focus())
+  }
 
   return (
     <div className="space-y-4 sm:space-y-5">
       <div className="sticky top-14 z-20 -mx-4 bg-slate-50/95 px-4 py-2 backdrop-blur dark:bg-surface-950/95 sm:static sm:mx-0 sm:bg-transparent sm:px-0 sm:py-0 sm:backdrop-blur-none">
         <div className="snap-x overflow-x-auto rounded-2xl border border-slate-200/80 bg-white/90 p-1.5 shadow-sm shadow-slate-950/[0.04] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden dark:border-white/10 dark:bg-white/[0.045] dark:shadow-black/20">
           <div role="tablist" aria-label="Разделы настроек" className="flex min-w-max gap-1 sm:grid sm:min-w-0 sm:grid-cols-2 xl:grid-cols-4">
-          {sections.map((section) => {
+          {sections.map((section, index) => {
             const active = section.id === activeId
 
             return (
               <button
                 key={section.id}
+                ref={(element) => { tabRefs.current[index] = element }}
                 type="button"
                 role="tab"
                 id={`settings-tab-${section.id}`}
@@ -49,6 +58,21 @@ export function SettingsTabs({ sections }: { sections: SettingsTabSection[] }) {
                     : 'text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-white/5'
                 )}
                 onClick={() => setActiveId(section.id)}
+                onKeyDown={(event) => {
+                  if (event.key === 'ArrowRight') {
+                    event.preventDefault()
+                    selectTab((index + 1) % sections.length)
+                  } else if (event.key === 'ArrowLeft') {
+                    event.preventDefault()
+                    selectTab((index - 1 + sections.length) % sections.length)
+                  } else if (event.key === 'Home') {
+                    event.preventDefault()
+                    selectTab(0)
+                  } else if (event.key === 'End') {
+                    event.preventDefault()
+                    selectTab(sections.length - 1)
+                  }
+                }}
               >
                 <span
                   className={cn(

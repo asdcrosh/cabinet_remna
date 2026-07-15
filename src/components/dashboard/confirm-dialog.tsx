@@ -94,10 +94,10 @@ export function ConfirmDialog({
         aria-labelledby={titleId}
         aria-describedby={descriptionId}
         tabIndex={-1}
-        className="w-full max-w-md rounded-lg border bg-white p-5 shadow-2xl dark:bg-surface-900"
+        className="w-full max-w-md rounded-2xl border bg-white p-5 shadow-2xl dark:bg-surface-900"
       >
         <div className="mb-4 flex gap-3">
-          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-amber-50 text-amber-600 dark:bg-amber-500/10">
+          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-amber-50 text-amber-600 dark:bg-amber-500/10">
             <AlertTriangle className="h-5 w-5" />
           </div>
           <div>

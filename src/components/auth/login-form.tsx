@@ -8,13 +8,15 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { apiFetch } from '@/lib/api-client'
 import { loginSchema, type LoginInput } from '@/lib/auth/validation'
 import { toast } from '@/components/ui/toaster'
+import { FormAlert } from '@/components/ui/form-alert'
 import { CheckCircle2, Eye, EyeOff, RefreshCw } from 'lucide-react'
 import { YandexAuthButton } from './yandex-auth-button'
+import { sanitizeInternalNext } from '@/lib/auth/next-path'
 
 export function LoginForm({ yandexEnabled = false }: { yandexEnabled?: boolean }) {
   const router = useRouter()
   const search = useSearchParams()
-  const next = search.get('next') || '/dashboard'
+  const next = sanitizeInternalNext(search.get('next'))
   const verified = search.get('verified')
   const yandexError = search.get('yandex_error')
   const { register, handleSubmit, watch, formState: { errors, isSubmitting } } = useForm<LoginInput>({
@@ -35,11 +37,12 @@ export function LoginForm({ yandexEnabled = false }: { yandexEnabled?: boolean }
       toast('Добро пожаловать!', 'success')
       router.push(next)
       router.refresh()
-    } catch (e: any) {
-      if (e.data?.code === 'EMAIL_NOT_VERIFIED') {
+    } catch (error) {
+      const apiError = error as Error & { data?: { code?: string } }
+      if (apiError.data?.code === 'EMAIL_NOT_VERIFIED') {
         setNeedsVerification(true)
       }
-      setServerError(e.message)
+      setServerError(apiError.message || 'Не удалось войти')
     }
   })
 
@@ -79,7 +82,7 @@ export function LoginForm({ yandexEnabled = false }: { yandexEnabled?: boolean }
         </>
       )}
       {verified === '1' && (
-        <div className="flex items-start gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-100">
+        <div role="status" className="flex items-start gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-100">
           <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
           Email подтверждён. Теперь можно войти.
         </div>
@@ -122,7 +125,7 @@ export function LoginForm({ yandexEnabled = false }: { yandexEnabled?: boolean }
           />
           <button
             type="button"
-            className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-2 text-slate-400 hover:text-slate-700"
+            className="absolute right-2 top-1/2 -translate-y-1/2 rounded-xl p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-white/5 dark:hover:text-slate-100"
             onClick={() => setShowPassword((value) => !value)}
             aria-label={showPassword ? 'Скрыть пароль' : 'Показать пароль'}
           >
@@ -132,9 +135,7 @@ export function LoginForm({ yandexEnabled = false }: { yandexEnabled?: boolean }
         {errors.password && <p className="text-xs text-red-600 mt-1">{errors.password.message}</p>}
       </div>
       {serverError && (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-100">
-          {serverError}
-        </div>
+        <FormAlert>{serverError}</FormAlert>
       )}
       {needsVerification && (
         <button
