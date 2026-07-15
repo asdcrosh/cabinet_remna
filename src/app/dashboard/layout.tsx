@@ -60,7 +60,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         <div className="shrink-0 px-5 py-4">
           <Brand brandName={brandName} />
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-3 [scrollbar-gutter:stable]">
+        <div className="dashboard-sidebar-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-3">
           <DashboardNav role={role} badges={navBadges} features={features} />
         </div>
         <div className="shrink-0 border-t border-white/70 bg-white/70 p-2.5 backdrop-blur dark:border-white/10 dark:bg-surface-950/70">

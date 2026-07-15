@@ -51,7 +51,7 @@ export function UserDetailsButton({ details }: { details: AdminUserDetails }) {
     <>
       <button
         type="button"
-        className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-600 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50 hover:text-slate-950 dark:border-white/10 dark:bg-surface-900"
+        className="btn-secondary h-9 min-h-9 w-9 shrink-0 px-0"
         onClick={() => {
           setTab('PROFILE')
           setOpen(true)
@@ -100,7 +100,7 @@ export function UserDetailsButton({ details }: { details: AdminUserDetails }) {
             {details.subscriptions.length > 0 ? (
               <div className="grid gap-2">
                 {details.subscriptions.map((subscription) => (
-                  <div key={subscription.id} className="rounded-lg border border-slate-200 p-3 dark:border-white/10">
+                  <div key={subscription.id} className="rounded-xl border border-slate-200 bg-slate-50/40 p-3 dark:border-white/10 dark:bg-white/[0.02]">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="font-medium">{subscription.plan}</div>
                       <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600 dark:bg-white/10">
@@ -125,7 +125,7 @@ export function UserDetailsButton({ details }: { details: AdminUserDetails }) {
             {details.payments.length > 0 ? (
               <div className="grid gap-2">
                 {details.payments.map((payment) => (
-                  <div key={payment.id} className="grid gap-2 rounded-lg border border-slate-200 p-3 text-sm dark:border-white/10 md:grid-cols-[1fr_auto_auto] md:items-center">
+                  <div key={payment.id} className="grid gap-2 rounded-xl border border-slate-200 bg-slate-50/40 p-3 text-sm dark:border-white/10 dark:bg-white/[0.02] md:grid-cols-[1fr_auto_auto] md:items-center">
                     <div>
                       <div className="font-medium">{payment.plan}</div>
                       <div className="font-mono text-xs text-slate-400">{payment.id}</div>
@@ -144,7 +144,7 @@ export function UserDetailsButton({ details }: { details: AdminUserDetails }) {
             {details.devices.length > 0 ? (
               <div className="grid gap-2 md:grid-cols-2">
                 {details.devices.map((device) => (
-                  <div key={device.hwid} className="rounded-lg border border-slate-200 p-3 dark:border-white/10">
+                  <div key={device.hwid} className="rounded-xl border border-slate-200 bg-slate-50/40 p-3 dark:border-white/10 dark:bg-white/[0.02]">
                     <div className="font-medium">{device.platform}</div>
                     <div className="mt-1 truncate font-mono text-xs text-slate-500">{device.hwid}</div>
                     <div className="mt-2 flex flex-wrap gap-3 text-sm text-slate-500">
@@ -171,7 +171,7 @@ function UserStatusOverview({ details }: { details: AdminUserDetails }) {
   const hasRemnawave = isConnected(details.remnawaveUsername) || isConnected(details.remnawaveUuid)
 
   return (
-    <section className="grid gap-3 rounded-lg border border-slate-200 bg-slate-50/70 p-3 dark:border-white/10 dark:bg-white/[0.03] sm:grid-cols-2 xl:grid-cols-4">
+    <section className="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-3 dark:border-white/10 dark:bg-white/[0.03] sm:grid-cols-2 xl:grid-cols-4">
       <StatusCell icon={<UserRound className="h-4 w-4" />} label="Аккаунт" value={details.role} active />
       <StatusCell icon={<ShieldCheck className="h-4 w-4" />} label="Подписка" value={subscription?.status || 'Нет подписки'} active={Boolean(subscription)} />
       <StatusCell icon={<Receipt className="h-4 w-4" />} label="Оплаты" value={String(details.payments.length)} active={details.payments.length > 0} />
@@ -182,7 +182,7 @@ function UserStatusOverview({ details }: { details: AdminUserDetails }) {
 
 function StatusCell({ icon, label, value, active }: { icon: ReactNode; label: string; value: string; active: boolean }) {
   return (
-    <div className="flex items-center gap-3 rounded-lg bg-white px-3 py-2 dark:bg-surface-900">
+    <div className="flex items-center gap-3 rounded-xl bg-white px-3 py-2 dark:bg-surface-900">
       <span className={active ? 'text-emerald-600 dark:text-emerald-300' : 'text-slate-400'}>{icon}</span>
       <div className="min-w-0">
         <div className="text-xs text-slate-400">{label}</div>
@@ -199,9 +199,9 @@ function isConnected(value: string) {
 
 function DetailCard({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-slate-50/70 p-3 dark:border-white/10 dark:bg-white/[0.03]">
+    <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3 dark:border-white/10 dark:bg-white/[0.03]">
       <div className="text-xs uppercase tracking-wide text-slate-400">{label}</div>
-      <div className={`mt-1 truncate text-sm font-semibold ${mono ? 'font-mono' : ''}`}>{value || '—'}</div>
+      <div className={`mt-1 text-sm font-semibold ${mono ? 'break-all font-mono' : 'truncate'}`}>{value || '—'}</div>
     </div>
   )
 }
@@ -219,5 +219,5 @@ function DetailSection({ icon, title, children }: { icon: ReactNode; title: stri
 }
 
 function EmptyLine({ text }: { text: string }) {
-  return <div className="rounded-lg border border-dashed px-4 py-8 text-center text-sm text-slate-500">{text}</div>
+  return <div className="rounded-xl border border-dashed px-4 py-8 text-center text-sm text-slate-500">{text}</div>
 }

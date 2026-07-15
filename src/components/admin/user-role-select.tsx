@@ -36,7 +36,7 @@ export function UserRoleSelect({
 
   return (
     <select
-      className="input h-9 min-w-[9.5rem] py-1.5 text-xs"
+      className="input h-10 min-h-10 min-w-[9.5rem] py-1.5 text-xs"
       value={value}
       disabled={!canManage || loading}
       aria-label="Роль пользователя"

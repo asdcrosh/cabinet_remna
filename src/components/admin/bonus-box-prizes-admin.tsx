@@ -197,8 +197,8 @@ export function BonusBoxPrizesAdmin({
   }
 
   return (
-    <div className="space-y-5">
-      <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm shadow-slate-200/60 dark:border-white/10 dark:bg-surface-900 dark:shadow-black/20">
+    <div className="page-stack">
+      <section className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white/90 shadow-sm shadow-slate-950/[0.04] dark:border-white/10 dark:bg-surface-900/90 dark:shadow-black/20">
         <div className="p-4">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div className="min-w-0">
@@ -211,7 +211,7 @@ export function BonusBoxPrizesAdmin({
                 Держите баланс наград, пустых исходов и редких подарков под контролем. Вес управляет шансом выпадения.
               </p>
             </div>
-            <button type="button" className="btn-primary shrink-0" onClick={startCreate}>
+            <button type="button" className="btn-primary w-full shrink-0 justify-center sm:w-auto" onClick={startCreate}>
               <Plus className="h-4 w-4" />
               Создать подарок
             </button>
@@ -233,7 +233,7 @@ export function BonusBoxPrizesAdmin({
         </div>
       </section>
 
-      <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm shadow-slate-200/60 dark:border-white/10 dark:bg-surface-900 dark:shadow-black/20">
+      <section className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white/90 shadow-sm shadow-slate-950/[0.04] dark:border-white/10 dark:bg-surface-900/90 dark:shadow-black/20">
         <div className="flex flex-col gap-4 border-b border-slate-100 p-4 dark:border-white/10 lg:flex-row lg:items-center lg:justify-between">
           <div className="min-w-0">
             <div className="inline-flex items-center gap-2 rounded-md bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600 dark:bg-white/10 dark:text-slate-200">
@@ -249,7 +249,7 @@ export function BonusBoxPrizesAdmin({
           </div>
           <button
             type="button"
-            className="btn-primary shrink-0"
+            className="btn-primary w-full shrink-0 justify-center sm:w-auto"
             onClick={saveSettings}
             disabled={settingsLoading}
           >
@@ -285,7 +285,7 @@ export function BonusBoxPrizesAdmin({
         </div>
       </section>
 
-      <div className="flex flex-wrap gap-2 rounded-lg border border-slate-200 bg-white p-1 shadow-sm shadow-slate-200/60 dark:border-white/10 dark:bg-surface-900 dark:shadow-black/20">
+      <div className="flex flex-wrap gap-2 rounded-2xl border border-slate-200/80 bg-white/90 p-1.5 shadow-sm shadow-slate-950/[0.04] dark:border-white/10 dark:bg-surface-900/90 dark:shadow-black/20">
         <AdminTabButton
           active={activeTab === 'prizes'}
           icon={<Gift className="h-4 w-4" />}
@@ -362,7 +362,7 @@ function AdminTabButton({
     <button
       type="button"
       className={cn(
-        'flex min-h-10 flex-1 items-center justify-between gap-3 rounded-md px-3 py-2 text-left text-sm transition-colors sm:flex-none sm:min-w-40',
+        'flex min-h-10 flex-1 items-center justify-between gap-3 rounded-xl px-3 py-2 text-left text-sm transition-colors sm:flex-none sm:min-w-40',
         active
           ? 'bg-slate-950 text-white shadow-sm dark:bg-white dark:text-slate-950'
           : 'text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-white/5'
@@ -397,7 +397,7 @@ function SummaryCell({
   tone?: 'default' | 'danger'
 }) {
   return (
-    <div className="rounded-lg border border-slate-100 bg-slate-50/80 px-3 py-2.5 dark:border-white/10 dark:bg-white/[0.04]">
+    <div className="rounded-xl border border-slate-100 bg-slate-50/80 px-3 py-2.5 dark:border-white/10 dark:bg-white/[0.04]">
       <div className="text-xs text-slate-500">{label}</div>
       <div className={cn('mt-1 text-xl font-semibold tracking-tight', tone === 'danger' && 'text-red-600 dark:text-red-300')}>
         {value}
@@ -441,7 +441,7 @@ function PrizeAdminRow({
   onToggle: () => void
 }) {
   return (
-    <article className={cn('group relative overflow-hidden rounded-lg border bg-white shadow-sm shadow-slate-200/60 transition hover:-translate-y-0.5 hover:border-cyan-200 hover:shadow-lg hover:shadow-slate-950/5 dark:bg-surface-900 dark:shadow-black/20 dark:hover:border-cyan-500/30', prizeAdminBorderClass(prize))}>
+    <article className={cn('group relative overflow-hidden rounded-2xl border bg-white shadow-sm shadow-slate-950/[0.04] transition-colors hover:border-cyan-200 dark:bg-surface-900 dark:shadow-black/20 dark:hover:border-cyan-500/30', prizeAdminBorderClass(prize))}>
       <div className={cn('h-1', prizeAdminTopClass(prize))} />
       <div className="space-y-3 p-3">
         <div className="flex items-start justify-between gap-3">
@@ -459,12 +459,12 @@ function PrizeAdminRow({
               {prize.description || prizeTypeLabel(prize.type)}
             </div>
           </div>
-          <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-slate-950 text-cyan-200 shadow-sm dark:bg-white dark:text-slate-950">
+          <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-slate-950 text-cyan-200 shadow-sm dark:bg-white dark:text-slate-950">
             <Gift className="h-4 w-4" />
           </div>
         </div>
 
-        <div className="grid grid-cols-4 gap-1.5">
+        <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
           <CompactMetric label="Подарок" value={prizeValue(prize)} />
           <CompactMetric label="Шанс" value={formatChance(prize.chance)} />
           <CompactMetric label="Вес" value={prize.weight} />
@@ -578,7 +578,7 @@ function PrizeEditorDrawer({
         aria-labelledby={titleId}
         aria-describedby={descriptionId}
         tabIndex={-1}
-        className="absolute right-0 top-0 h-dvh w-full max-w-xl overflow-y-auto border-l border-slate-200 bg-white shadow-2xl dark:border-white/10 dark:bg-surface-950"
+        className="absolute bottom-0 right-0 h-[calc(100dvh-0.75rem)] w-full max-w-xl overflow-y-auto rounded-t-3xl border border-b-0 border-slate-200 bg-white shadow-2xl dark:border-white/10 dark:bg-surface-950 sm:bottom-auto sm:top-0 sm:h-dvh sm:rounded-none sm:border-y-0 sm:border-r-0"
       >
         <div className="sticky top-0 z-10 border-b border-slate-100 bg-white/95 p-5 backdrop-blur dark:border-white/10 dark:bg-surface-950/95 sm:p-6">
           <div className="flex items-start justify-between gap-3">
@@ -677,7 +677,7 @@ function PrizeEditorDrawer({
 
           <PrizeFormPreview form={form} estimatedChance={estimatedChance} />
 
-          <label className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-sm dark:border-white/10 dark:bg-white/[0.04]">
+          <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm dark:border-white/10 dark:bg-white/[0.04]">
             <input
               type="checkbox"
               checked={form.isActive}
@@ -695,11 +695,11 @@ function PrizeEditorDrawer({
             />
           </Field>
 
-          <div className="flex flex-col-reverse gap-2 border-t border-slate-100 pt-4 dark:border-white/10 sm:flex-row sm:justify-end">
-            <button type="button" className="btn-secondary" onClick={onClose}>
+          <div className="grid grid-cols-2 gap-2 border-t border-slate-100 pt-4 dark:border-white/10 sm:flex sm:justify-end">
+            <button type="button" className="btn-secondary justify-center" onClick={onClose}>
               Отмена
             </button>
-            <button type="button" className="btn-primary" onClick={onSubmit} disabled={loading}>
+            <button type="button" className="btn-primary justify-center" onClick={onSubmit} disabled={loading}>
               {loading ? 'Сохраняем...' : editingPrize ? 'Сохранить' : 'Создать'}
             </button>
           </div>
@@ -712,7 +712,7 @@ function PrizeEditorDrawer({
 
 function BonusBoxOpeningHistory({ openings }: { openings: BonusBoxOpeningAdminRow[] }) {
   return (
-    <section className="space-y-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60 dark:border-white/10 dark:bg-surface-900 dark:shadow-black/20">
+    <section className="space-y-4 rounded-2xl border border-slate-200/80 bg-white/90 p-4 shadow-sm shadow-slate-950/[0.04] dark:border-white/10 dark:bg-surface-900/90 dark:shadow-black/20">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold">История открытий</h2>
@@ -728,7 +728,7 @@ function BonusBoxOpeningHistory({ openings }: { openings: BonusBoxOpeningAdminRo
 
       {openings.length > 0 ? (
         <>
-        <div className="hidden overflow-hidden rounded-lg border border-slate-200 dark:border-white/10 xl:block">
+        <div className="hidden overflow-hidden rounded-2xl border border-slate-200 dark:border-white/10 xl:block">
           <table className="w-full min-w-[760px] text-sm">
             <thead className="text-left text-xs uppercase tracking-wide text-slate-400">
               <tr>
@@ -745,7 +745,7 @@ function BonusBoxOpeningHistory({ openings }: { openings: BonusBoxOpeningAdminRo
                   <td className="py-3 pr-4 text-slate-500">{formatDateTime(opening.createdAt)}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-start gap-2">
-                      <span className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-500 dark:bg-white/10 dark:text-slate-300">
+                      <span className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-500 dark:bg-white/10 dark:text-slate-300">
                         <UserRound className="h-4 w-4" />
                       </span>
                       <div className="min-w-0">
@@ -770,7 +770,7 @@ function BonusBoxOpeningHistory({ openings }: { openings: BonusBoxOpeningAdminRo
                   </td>
                   <td className="py-3 pl-4">
                     {opening.promoCode ? (
-                      <div className="inline-flex max-w-[220px] flex-wrap items-center gap-1.5 rounded-lg bg-slate-50 px-2.5 py-1.5 text-xs dark:bg-surface-800">
+                      <div className="inline-flex max-w-[220px] flex-wrap items-center gap-1.5 rounded-xl bg-slate-50 px-2.5 py-1.5 text-xs dark:bg-surface-800">
                         <TicketPercent className="h-3.5 w-3.5 text-slate-400" />
                         <span className="break-all font-mono">{opening.promoCode}</span>
                         {opening.promoCodeExpiresAt && (
@@ -788,10 +788,10 @@ function BonusBoxOpeningHistory({ openings }: { openings: BonusBoxOpeningAdminRo
         </div>
         <div className="space-y-3 xl:hidden">
           {openings.map((opening) => (
-            <article key={opening.id} className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm dark:border-white/10 dark:bg-white/[0.03]">
+            <article key={opening.id} className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm dark:border-white/10 dark:bg-white/[0.03]">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex min-w-0 gap-3">
-                  <span className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-500 dark:bg-white/10 dark:text-slate-300">
+                  <span className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-500 dark:bg-white/10 dark:text-slate-300">
                     <UserRound className="h-4 w-4" />
                   </span>
                   <div className="min-w-0">
@@ -805,18 +805,18 @@ function BonusBoxOpeningHistory({ openings }: { openings: BonusBoxOpeningAdminRo
                 </span>
               </div>
               <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
-                <div className="rounded-lg bg-slate-50 px-3 py-2 dark:bg-white/[0.04]">
+                <div className="rounded-xl bg-slate-50 px-3 py-2 dark:bg-white/[0.04]">
                   <div className="text-xs text-slate-500">Подарок</div>
                   <div className="mt-1 font-medium">{opening.prizeTitle}</div>
                   <div className="text-xs text-slate-500">{prizeValueFromParts(opening.prizeType, opening.prizeValue)}</div>
                 </div>
-                <div className="rounded-lg bg-slate-50 px-3 py-2 dark:bg-white/[0.04]">
+                <div className="rounded-xl bg-slate-50 px-3 py-2 dark:bg-white/[0.04]">
                   <div className="text-xs text-slate-500">Источник</div>
                   <div className="mt-1 font-medium">{sourceLabel(opening.attemptSource)}</div>
                 </div>
               </div>
               {opening.promoCode ? (
-                <div className="mt-3 flex flex-wrap items-center gap-1.5 rounded-lg bg-slate-50 px-2.5 py-2 text-xs dark:bg-surface-800">
+                <div className="mt-3 flex flex-wrap items-center gap-1.5 rounded-xl bg-slate-50 px-2.5 py-2 text-xs dark:bg-surface-800">
                   <TicketPercent className="h-3.5 w-3.5 text-slate-400" />
                   <span className="break-all font-mono">{opening.promoCode}</span>
                   {opening.promoCodeExpiresAt && (
@@ -889,7 +889,7 @@ function SettingsCard({
   onFieldChange: (value: number) => void
 }) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/50 dark:border-white/10 dark:bg-surface-950/80 dark:shadow-black/20">
+    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-950/[0.04] dark:border-white/10 dark:bg-surface-950/80 dark:shadow-black/20">
       <label className="flex cursor-pointer items-start justify-between gap-4">
         <span className="min-w-0">
           <span className="block text-base font-semibold text-slate-950 dark:text-white">{title}</span>
@@ -938,7 +938,7 @@ function PrizeFormPreview({ form, estimatedChance }: { form: FormState; estimate
   const value = previewPrizeValue(form.type, Number(form.value || 0))
 
   return (
-    <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-white/10 dark:bg-white/[0.04]">
+    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-white/10 dark:bg-white/[0.04]">
       <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
         Превью
       </div>
@@ -952,15 +952,15 @@ function PrizeFormPreview({ form, estimatedChance }: { form: FormState; estimate
         </span>
       </div>
       <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
-        <div className="rounded-md bg-white px-2.5 py-2 dark:bg-surface-900">
+        <div className="rounded-xl bg-white px-2.5 py-2 dark:bg-surface-900">
           <div className="text-xs text-slate-400">Тип</div>
           <div className="mt-0.5 truncate font-medium">{prizeTypeLabel(form.type)}</div>
         </div>
-        <div className="rounded-md bg-white px-2.5 py-2 dark:bg-surface-900">
+        <div className="rounded-xl bg-white px-2.5 py-2 dark:bg-surface-900">
           <div className="text-xs text-slate-400">Вес</div>
           <div className="mt-0.5 truncate font-medium">{form.weight || '0'}</div>
         </div>
-        <div className="rounded-md bg-white px-2.5 py-2 dark:bg-surface-900">
+        <div className="rounded-xl bg-white px-2.5 py-2 dark:bg-surface-900">
           <div className="text-xs text-slate-400">Шанс по весу</div>
           <div className="mt-0.5 truncate font-medium">{formatChance(estimatedChance)}</div>
         </div>
@@ -971,7 +971,7 @@ function PrizeFormPreview({ form, estimatedChance }: { form: FormState; estimate
 
 function CompactMetric({ label, value }: { label: string; value: ReactNode }) {
   return (
-    <div className="min-w-0 rounded-lg border border-slate-100 bg-slate-50/80 px-2 py-1.5 dark:border-white/10 dark:bg-white/[0.04]">
+    <div className="min-w-0 rounded-xl border border-slate-100 bg-slate-50/80 px-2 py-1.5 dark:border-white/10 dark:bg-white/[0.04]">
       <div className="truncate text-[11px] text-slate-500">{label}</div>
       <div className="mt-0.5 truncate text-sm font-semibold">{value}</div>
     </div>

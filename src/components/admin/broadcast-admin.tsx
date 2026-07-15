@@ -288,8 +288,8 @@ export function BroadcastAdmin({
 
   return (
     <section className="grid w-full min-w-0 max-w-full gap-4 overflow-hidden">
-      <div className="card w-full min-w-0 overflow-hidden p-3">
-        <div className="grid w-full min-w-0 gap-2 lg:grid-cols-3">
+      <div className="card w-full min-w-0 overflow-hidden p-2 sm:p-3">
+        <div className="flex w-full min-w-0 gap-2 overflow-x-auto lg:grid lg:grid-cols-3 lg:overflow-visible">
           <BroadcastStepButton
             active={step === 'message'}
             number="1"
@@ -327,7 +327,7 @@ export function BroadcastAdmin({
                 type="button"
                 onClick={() => setSegment(item.value)}
                 className={cn(
-                  'rounded-lg border p-3 text-left transition-colors',
+                  'rounded-xl border p-3 text-left transition-colors',
                   segment === item.value
                     ? 'border-slate-950 bg-slate-950 text-white shadow-sm dark:border-white dark:bg-white dark:text-slate-950'
                     : 'border-slate-200 bg-white hover:bg-slate-50 dark:border-white/10 dark:bg-surface-900 dark:hover:bg-white/5'
@@ -342,7 +342,7 @@ export function BroadcastAdmin({
           </div>
 
           {segment === 'INACTIVE_N_DAYS' && (
-            <label className="mt-4 block rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-white/10 dark:bg-white/5">
+            <label className="mt-4 block rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-white/10 dark:bg-white/5">
               <span className="text-sm font-medium">Не покупали, дней</span>
               <input
                 className="input mt-2"
@@ -376,7 +376,7 @@ export function BroadcastAdmin({
                     type="button"
                     onClick={() => toggleChannel(item.value)}
                     className={cn(
-                      'flex min-h-20 flex-col items-center justify-center gap-2 rounded-lg border px-2 text-sm font-medium transition-colors',
+                      'flex min-h-20 flex-col items-center justify-center gap-2 rounded-xl border px-2 text-sm font-medium transition-colors',
                       active
                         ? 'border-cyan-200 bg-cyan-50 text-cyan-800 dark:border-cyan-500/25 dark:bg-cyan-500/10 dark:text-cyan-100'
                         : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50 dark:border-white/10 dark:bg-surface-900 dark:hover:bg-white/5'
@@ -403,7 +403,7 @@ export function BroadcastAdmin({
         <div className={cn('card min-w-0 overflow-hidden p-4', step !== 'message' && 'hidden')}>
           <div className="grid min-w-0 gap-4">
             <div className="min-w-0">
-              <div className="flex items-center justify-between gap-2">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <div className="text-sm font-semibold text-slate-950 dark:text-white">Шаблон сообщения</div>
                   <div className="text-xs text-slate-500 dark:text-slate-400">Готовые полноценные сценарии для продаж, сервиса и возврата пользователей.</div>
@@ -416,7 +416,7 @@ export function BroadcastAdmin({
                 {visibleTemplates.map((template) => (
                   <div
                     key={template.id || template.title}
-                    className="flex min-h-[18rem] min-w-[19rem] max-w-[21rem] snap-start flex-col rounded-lg border border-slate-200 bg-white p-4 shadow-sm transition-colors hover:border-cyan-200 dark:border-white/10 dark:bg-surface-900 dark:hover:border-cyan-500/30"
+                    className="flex min-h-[16rem] min-w-[17rem] max-w-[19rem] snap-start flex-col rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition-colors hover:border-cyan-200 dark:border-white/10 dark:bg-surface-900 dark:hover:border-cyan-500/30"
                   >
                     <div className="text-base font-semibold text-slate-950 dark:text-white">{template.title}</div>
                     <div className="mt-1 line-clamp-2 min-h-8 text-xs leading-4 text-slate-500 dark:text-slate-400">{template.description || 'Пользовательский шаблон'}</div>
@@ -430,7 +430,7 @@ export function BroadcastAdmin({
                         </span>
                       ))}
                     </div>
-                    <p className="mt-3 line-clamp-6 whitespace-pre-line text-xs leading-5 text-slate-600 dark:text-slate-300">
+                    <p className="mt-3 line-clamp-4 whitespace-pre-line text-xs leading-5 text-slate-600 dark:text-slate-300">
                       {renderPreview(template.body)}
                     </p>
                     <div className="mt-auto flex items-center gap-2 pt-4">
@@ -469,7 +469,7 @@ export function BroadcastAdmin({
               <div className="relative mt-1">
                 <textarea
                   ref={bodyInputRef}
-                  className="input min-h-64 resize-y py-3 pr-14 leading-6"
+                  className="input min-h-52 resize-y py-3 pr-14 leading-6 sm:min-h-64"
                   value={body}
                   onChange={(event) => setBody(event.target.value)}
                   maxLength={1200}
@@ -725,7 +725,7 @@ function BroadcastStepButton({
     <button
       type="button"
       className={cn(
-        'flex min-h-20 min-w-0 items-center gap-3 rounded-xl border p-3 text-left transition-colors',
+        'flex min-h-[4.5rem] w-[16.5rem] shrink-0 items-center gap-3 rounded-xl border p-3 text-left transition-colors lg:min-h-20 lg:w-auto lg:min-w-0',
         active
           ? 'border-slate-950 bg-slate-950 text-white shadow-sm dark:border-white dark:bg-white dark:text-slate-950'
           : 'border-slate-200 bg-white hover:bg-slate-50 dark:border-white/10 dark:bg-white/[0.03] dark:hover:bg-white/[0.06]'
@@ -733,7 +733,7 @@ function BroadcastStepButton({
       onClick={onClick}
     >
       <span className={cn(
-        'grid h-9 w-9 shrink-0 place-items-center rounded-lg text-sm font-semibold',
+        'grid h-9 w-9 shrink-0 place-items-center rounded-xl text-sm font-semibold',
         active ? 'bg-white text-slate-950 dark:bg-slate-950 dark:text-white' : 'bg-cyan-50 text-cyan-700 dark:bg-cyan-500/10 dark:text-cyan-200'
       )}>
         {number}
@@ -798,7 +798,7 @@ function BroadcastHistory({
                     {formatDateTime(item.createdAt)} · {segmentLabel(item.segment, item.inactiveDays ?? undefined)} · {item.createdBy || 'Система'}
                   </div>
                 </div>
-                <div className="flex flex-wrap gap-2">
+                <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
                   <button type="button" className="btn-secondary min-h-9 px-3 text-sm" onClick={() => onView(item)}>
                     <Eye className="h-4 w-4" />
                     Детали
@@ -807,7 +807,7 @@ function BroadcastHistory({
                     <RotateCcw className="h-4 w-4" />
                     Повторить
                   </button>
-                  <div className="grid min-h-9 place-items-center rounded-lg bg-slate-50 px-3 text-sm font-semibold text-slate-950 dark:bg-white/5 dark:text-white">
+                  <div className="col-span-2 grid min-h-9 place-items-center rounded-xl bg-slate-50 px-3 text-sm font-semibold text-slate-950 dark:bg-white/5 dark:text-white sm:col-span-1">
                     {item.recipients} получ.
                   </div>
                 </div>
@@ -855,7 +855,7 @@ function BroadcastHistoryModal({ item, onClose }: { item: BroadcastHistoryItem; 
         <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-white/5">
           <p className="whitespace-pre-wrap text-sm leading-6 text-slate-700 dark:text-slate-200">{item.body}</p>
           {item.actionHref ? (
-            <div className="mt-3 rounded-lg bg-cyan-50 px-3 py-2 text-sm font-semibold text-cyan-800 dark:bg-cyan-500/10 dark:text-cyan-100">
+            <div className="mt-3 rounded-xl bg-cyan-50 px-3 py-2 text-sm font-semibold text-cyan-800 dark:bg-cyan-500/10 dark:text-cyan-100">
               {item.actionLabel || 'Открыть'} · {item.actionHref}
             </div>
           ) : null}
@@ -884,7 +884,7 @@ function BroadcastStats({ stats }: { stats: BroadcastStats }) {
 
 function HistoryMetric({ label, value, failed = 0 }: { label: string; value: number; failed?: number }) {
   return (
-    <div className="rounded-lg bg-slate-50 px-3 py-2 dark:bg-white/5">
+    <div className="rounded-xl bg-slate-50 px-3 py-2 dark:bg-white/5">
       <div className="font-medium text-slate-700 dark:text-slate-200">{label}</div>
       <div className="mt-0.5">
         {value} отправлено{failed ? `, ${failed} ошибок` : ''}

@@ -161,35 +161,33 @@ export function RemnashopSyncPanel() {
 
   return (
     <div className="space-y-4">
-      <div className="card space-y-5">
+      <section className="rounded-2xl border border-slate-200/80 bg-white/90 p-4 shadow-sm shadow-slate-950/[0.04] dark:border-white/10 dark:bg-surface-900/90 dark:shadow-black/20">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div className="min-w-0">
-          <h2 className="text-lg font-semibold">Remnashop</h2>
-          <p className="mt-1 text-sm text-slate-500">
-            Проверка и перенос пользователей, подписок, тарифов и промокодов.
-          </p>
+          <div className="min-w-0">
+            <h2 className="text-lg font-semibold">Remnashop</h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Проверка и перенос пользователей, подписок, тарифов и промокодов.
+            </p>
+          </div>
+          <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto">
+            <button type="button" className="btn-secondary" onClick={runDryRun} disabled={loading}>
+              <RefreshCw className={loading ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />
+              Проверить
+            </button>
+            <button type="button" className="btn-primary" onClick={() => setApplyConfirmOpen(true)} disabled={loading}>
+              <RefreshCw className={loading ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />
+              Синхронизировать
+            </button>
+          </div>
         </div>
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <button type="button" className="btn-secondary shrink-0" onClick={runDryRun} disabled={loading}>
-            <RefreshCw className={loading ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />
-            Проверить
-          </button>
-          <button type="button" className="btn-primary shrink-0" onClick={() => setApplyConfirmOpen(true)} disabled={loading}>
-            <RefreshCw className={loading ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />
-            Синхронизировать
-          </button>
-        </div>
-        </div>
-        <div className="rounded-lg bg-slate-50 p-3 dark:bg-white/5">
-          <label className="flex min-h-11 items-center gap-3 rounded-lg border border-slate-200 bg-white px-3 text-sm dark:border-white/10 dark:bg-surface-900">
-            <input type="checkbox" checked={includePromoCodes} onChange={(event) => setIncludePromoCodes(event.target.checked)} />
-            Синхронизировать промокоды
-          </label>
-        </div>
-      </div>
+        <label className="mt-4 flex min-h-11 cursor-pointer items-center gap-3 rounded-xl border border-slate-200 bg-slate-50/80 px-3 text-sm dark:border-white/10 dark:bg-white/[0.04]">
+          <input type="checkbox" checked={includePromoCodes} onChange={(event) => setIncludePromoCodes(event.target.checked)} />
+          Синхронизировать промокоды
+        </label>
+      </section>
 
       {error && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-100">
+        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-100" role="alert">
           {error}
         </div>
       )}
@@ -207,7 +205,7 @@ export function RemnashopSyncPanel() {
           <SyncHealthSummary report={report} />
 
           {report.warnings.length > 0 ? (
-            <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
               <div className="mb-2 flex items-center gap-2 font-medium">
                 <AlertTriangle className="h-4 w-4" />
                 Предупреждения
@@ -219,7 +217,7 @@ export function RemnashopSyncPanel() {
               </ul>
             </div>
           ) : (
-            <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-100">
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-100">
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="h-4 w-4" />
                 Критичных предупреждений нет.
@@ -240,7 +238,7 @@ export function RemnashopSyncPanel() {
 
           <details className="card">
             <summary className="cursor-pointer font-medium">Технические детали</summary>
-            <pre className="mt-3 max-h-[28rem] overflow-auto rounded-lg bg-slate-950 p-3 text-xs text-slate-100">
+            <pre className="mt-3 max-h-[28rem] overflow-auto rounded-xl bg-slate-950 p-3 text-xs text-slate-100">
               {JSON.stringify(report.samples, null, 2)}
             </pre>
           </details>
@@ -274,7 +272,7 @@ function LiveCheckList() {
       <h3 className="text-sm font-semibold">Живая проверка после деплоя</h3>
       <div className="mt-3 grid gap-2 md:grid-cols-2">
         {checks.map((check) => (
-          <label key={check} className="flex min-h-10 items-center gap-3 rounded-lg border px-3 text-sm">
+          <label key={check} className="flex min-h-10 items-center gap-3 rounded-xl border border-slate-200 px-3 text-sm dark:border-white/10">
             <input type="checkbox" />
             {check}
           </label>
@@ -315,7 +313,7 @@ function SyncEventsView({
   return (
     <section className="space-y-3">
       {issueGroups.length > 0 ? (
-        <div className="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm dark:border-white/10 dark:bg-surface-900">
+        <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm dark:border-white/10 dark:bg-surface-900">
           <div className="mb-3 flex items-center gap-2 font-semibold text-slate-950 dark:text-white">
             <AlertTriangle className="h-4 w-4" />
             Требуют внимания
@@ -324,7 +322,7 @@ function SyncEventsView({
             {issueGroups.map((group) => (
               <div
                 key={`${group.direction}:${group.entityType}:${group.operation}:${group.status}:${group.reason}`}
-                className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 dark:border-white/10 dark:bg-white/[0.04]"
+                className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-white/10 dark:bg-white/[0.04]"
               >
                 <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0">
@@ -347,7 +345,7 @@ function SyncEventsView({
           <Metric key={status} label={syncStatusLabel(status)} value={counts[status] ?? 0} />
         ))}
       </div>
-      <div className="overflow-hidden rounded-lg border bg-white dark:bg-surface-900">
+      <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white/90 shadow-sm shadow-slate-950/[0.04] dark:border-white/10 dark:bg-surface-900/90 dark:shadow-black/20">
         <div className="flex flex-col gap-3 border-b px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h3 className="text-sm font-semibold">События синхронизации</h3>
@@ -355,22 +353,22 @@ function SyncEventsView({
               По умолчанию показаны только записи, которые требуют внимания.
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <select className="input h-10 w-auto min-w-36 py-1.5" value={directionFilter} onChange={(event) => setDirectionFilter(event.target.value as 'ALL' | SyncEventRow['direction'])} aria-label="Направление синхронизации">
+          <div className="grid w-full gap-2 sm:flex sm:w-auto sm:flex-wrap">
+            <select className="input h-10 w-full py-1.5 sm:w-auto sm:min-w-36" value={directionFilter} onChange={(event) => setDirectionFilter(event.target.value as 'ALL' | SyncEventRow['direction'])} aria-label="Направление синхронизации">
               <option value="ALL">Оба направления</option>
               <option value="CABINET_TO_REMNASHOP">Cabinet → Remnashop</option>
               <option value="REMNASHOP_TO_CABINET">Remnashop → Cabinet</option>
             </select>
-            <select className="input h-10 w-auto min-w-32 py-1.5" value={entityFilter} onChange={(event) => setEntityFilter(event.target.value)} aria-label="Тип записи">
+            <select className="input h-10 w-full py-1.5 sm:w-auto sm:min-w-32" value={entityFilter} onChange={(event) => setEntityFilter(event.target.value)} aria-label="Тип записи">
               <option value="ALL">Все типы</option>
               {entityTypes.map((type) => <option key={type} value={type}>{entityLabel(type)}</option>)}
             </select>
-            <button type="button" className="btn-secondary h-10 px-3" onClick={() => setShowHistory((value) => !value)}>
+            <button type="button" className="btn-secondary h-10 w-full px-3 sm:w-auto" onClick={() => setShowHistory((value) => !value)}>
               <Clock3 className="h-4 w-4" />
               {showHistory ? 'Скрыть успешные' : 'Показать историю'}
             </button>
             {failedCount > 0 ? (
-              <button type="button" className="btn-primary h-10 px-3" onClick={onRetryFailed} disabled={loading}>
+              <button type="button" className="btn-primary h-10 w-full px-3 sm:w-auto" onClick={onRetryFailed} disabled={loading}>
                 <RotateCcw className="h-4 w-4" />
                 Повторить ошибки ({failedCount})
               </button>
@@ -401,7 +399,7 @@ function SyncEventsView({
                 </div>
                 <button
                   type="button"
-                  className="btn-secondary h-10 px-3"
+                  className="btn-secondary h-10 w-full px-3 md:w-auto"
                   onClick={() => onRetry(event.id)}
                   disabled={loading}
                 >
@@ -431,9 +429,9 @@ function SyncOverview({ report }: { report: RemnashopSyncReport }) {
   const healthy = failed === 0 && pending === 0 && warnings === 0
 
   return (
-    <section className="grid gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-surface-900 lg:grid-cols-[1fr_auto_1fr] lg:items-center">
+    <section className="grid gap-3 rounded-2xl border border-slate-200/80 bg-white/90 p-4 shadow-sm shadow-slate-950/[0.04] dark:border-white/10 dark:bg-surface-900/90 dark:shadow-black/20 lg:grid-cols-[1fr_auto_1fr] lg:items-center">
       <div className="flex items-center gap-3">
-        <span className="grid h-10 w-10 place-items-center rounded-lg bg-slate-100 text-slate-700 dark:bg-white/10 dark:text-slate-200">
+        <span className="grid h-10 w-10 place-items-center rounded-xl bg-slate-100 text-slate-700 dark:bg-white/10 dark:text-slate-200">
           <Activity className="h-5 w-5" />
         </span>
         <div>
@@ -450,7 +448,7 @@ function SyncOverview({ report }: { report: RemnashopSyncReport }) {
           <div className="text-xs font-medium uppercase text-slate-400">Remnashop</div>
           <div className="font-semibold text-slate-950 dark:text-white">Магазин и каталог</div>
         </div>
-        <span className="grid h-10 w-10 place-items-center rounded-lg bg-slate-100 text-slate-700 dark:bg-white/10 dark:text-slate-200">
+        <span className="grid h-10 w-10 place-items-center rounded-xl bg-slate-100 text-slate-700 dark:bg-white/10 dark:text-slate-200">
           <RefreshCw className="h-5 w-5" />
         </span>
       </div>
@@ -469,14 +467,14 @@ function SyncHealthSummary({ report }: { report: RemnashopSyncReport }) {
 
   if (!hasProblems) {
     return (
-      <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-100">
+      <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-100">
         Последний запуск прошёл без явных проблем, backlog событий чистый.
       </div>
     )
   }
 
   return (
-    <div className="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm dark:border-white/10 dark:bg-surface-900 dark:text-slate-200">
+    <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm dark:border-white/10 dark:bg-surface-900 dark:text-slate-200">
       <div className="font-semibold text-slate-950 dark:text-white">Как читать этот экран</div>
       <div className="mt-2 grid gap-2 md:grid-cols-2">
         <InfoLine
@@ -502,7 +500,7 @@ function SyncHealthSummary({ report }: { report: RemnashopSyncReport }) {
 
 function InfoLine({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg bg-slate-50 px-3 py-2 dark:bg-white/5">
+    <div className="rounded-xl bg-slate-50 px-3 py-2 dark:bg-white/5">
       <div className="text-xs uppercase text-slate-400">{label}</div>
       <div className="mt-1 font-medium">{value}</div>
     </div>
@@ -528,7 +526,7 @@ function DiffView({ report }: { report: RemnashopSyncReport }) {
 
   if (report.mode !== 'dryRun') {
     return (
-      <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-100">
+      <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-100">
         Синхронизация выполнена. Для свежего diff нажмите “Проверить”.
       </div>
     )
@@ -619,7 +617,7 @@ function DiffSection<T>({
           )}
         </div>
       ) : (
-        <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500 dark:border-white/10 dark:bg-white/[0.04]">
+        <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500 dark:border-white/10 dark:bg-white/[0.04]">
           {empty}
         </div>
       )}
@@ -636,7 +634,7 @@ function DiffLine({ title, meta, tone }: { title: string; meta: string; tone: 'c
         : 'border-cyan-200 bg-cyan-50 text-cyan-800 dark:border-cyan-500/25 dark:bg-cyan-500/10 dark:text-cyan-100'
 
   return (
-    <div className={`rounded-lg border px-3 py-2 ${toneClass}`}>
+    <div className={`rounded-xl border px-3 py-2 ${toneClass}`}>
       <div className="truncate text-sm font-semibold">{title}</div>
       <div className="mt-0.5 truncate text-xs opacity-75">{meta}</div>
     </div>

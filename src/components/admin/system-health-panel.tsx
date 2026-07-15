@@ -53,7 +53,7 @@ export function SystemHealthPanel({ initialReport }: { initialReport: SystemHeal
 
   return (
     <div className="space-y-4">
-      <section className="rounded-lg border bg-white/85 p-4 shadow-sm shadow-slate-200/60 dark:bg-surface-900/80 dark:shadow-black/20">
+      <section className="rounded-2xl border border-slate-200/80 bg-white/90 p-4 shadow-sm shadow-slate-950/[0.04] dark:border-white/10 dark:bg-surface-900/90 dark:shadow-black/20" aria-busy={loading}>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <div className="text-sm font-medium uppercase tracking-wide text-slate-400">Состояние</div>
@@ -68,14 +68,14 @@ export function SystemHealthPanel({ initialReport }: { initialReport: SystemHeal
             type="button"
             onClick={runFullCheck}
             disabled={loading}
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-slate-950 px-4 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/10 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200"
+            className="btn-primary w-full sm:w-auto"
           >
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
             Запустить полную проверку
           </button>
         </div>
         {error && (
-          <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-500/25 dark:bg-red-500/10 dark:text-red-200">
+          <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-500/25 dark:bg-red-500/10 dark:text-red-200" role="alert">
             {error}
           </div>
         )}
@@ -87,7 +87,7 @@ export function SystemHealthPanel({ initialReport }: { initialReport: SystemHeal
           return (
             <article
               key={item.id}
-              className="min-h-40 rounded-lg border bg-white/85 p-4 shadow-sm shadow-slate-200/60 dark:bg-surface-900/80 dark:shadow-black/20"
+              className="rounded-2xl border border-slate-200/80 bg-white/90 p-4 shadow-sm shadow-slate-950/[0.04] dark:border-white/10 dark:bg-surface-900/90 dark:shadow-black/20"
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
@@ -105,7 +105,7 @@ export function SystemHealthPanel({ initialReport }: { initialReport: SystemHeal
                 </span>
               </div>
               {item.details && (
-                <div className="mt-4 rounded-lg bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-500 dark:bg-white/5 dark:text-slate-400">
+                <div className="mt-4 rounded-xl bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-500 dark:bg-white/5 dark:text-slate-400">
                   {item.details}
                 </div>
               )}

@@ -49,7 +49,7 @@ export function BonusBoxAttemptsButton({
     <>
       <button
         type="button"
-        className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-600 shadow-sm transition-colors hover:border-cyan-200 hover:bg-cyan-50 hover:text-cyan-700 dark:border-white/10 dark:bg-surface-900 dark:text-slate-200 dark:hover:bg-cyan-500/10 dark:hover:text-cyan-200"
+        className="btn-secondary h-9 min-h-9 w-9 shrink-0 px-0 hover:text-cyan-700 dark:hover:text-cyan-200"
         onClick={() => setOpen(true)}
         title="Начислить подарок"
         aria-label="Начислить подарок"
@@ -67,7 +67,7 @@ export function BonusBoxAttemptsButton({
         size="md"
       >
         <div className="grid gap-4">
-          <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-sm dark:border-white/10 dark:bg-surface-800">
+          <div className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2 text-sm dark:border-white/10 dark:bg-surface-800">
             Сейчас доступно: <span className="font-semibold">{attemptsCount}</span>
           </div>
           <label className="block">
@@ -87,7 +87,7 @@ export function BonusBoxAttemptsButton({
           </p>
         </div>
 
-        <div className="mt-5 flex justify-end gap-2">
+        <div className="mt-5 grid grid-cols-2 gap-2 border-t pt-4 sm:flex sm:justify-end">
           <button type="button" className="btn-secondary" onClick={() => setOpen(false)} disabled={loading}>
             Отмена
           </button>

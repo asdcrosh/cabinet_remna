@@ -80,7 +80,7 @@ export function UserProfileEditButton({
     <>
       <button
         type="button"
-        className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-600 shadow-sm transition-colors hover:border-cyan-200 hover:bg-cyan-50 hover:text-cyan-700 dark:border-white/10 dark:bg-surface-900 dark:text-slate-200 dark:hover:bg-cyan-500/10 dark:hover:text-cyan-200"
+        className="btn-secondary h-9 min-h-9 w-9 shrink-0 px-0 hover:text-cyan-700 dark:hover:text-cyan-200"
         onClick={() => setOpen(true)}
         title="Редактировать профиль"
         aria-label="Редактировать профиль"
@@ -122,7 +122,7 @@ export function UserProfileEditButton({
             </label>
           </div>
 
-          <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-white/10 dark:bg-white/[0.03]">
+          <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-white/10 dark:bg-white/[0.03]">
             <input
               type="checkbox"
               className="mt-0.5 h-4 w-4 rounded border-slate-300"
@@ -137,7 +137,7 @@ export function UserProfileEditButton({
             </span>
           </label>
 
-          <section className="space-y-3 rounded-lg border border-slate-200 p-4 dark:border-white/10">
+          <section className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/40 p-4 dark:border-white/10 dark:bg-white/[0.02]">
             <div>
               <h3 className="font-semibold">Связанные аккаунты</h3>
               <p className="mt-1 text-sm text-slate-500">Заполняйте вручную, если нужно связать профиль после импорта или ошибки синхронизации.</p>
@@ -175,7 +175,7 @@ export function UserProfileEditButton({
             </div>
           </section>
 
-          <section className="space-y-3 rounded-lg border border-slate-200 p-4 dark:border-white/10">
+          <section className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/40 p-4 dark:border-white/10 dark:bg-white/[0.02]">
             <div>
               <h3 className="font-semibold">Remnawave</h3>
               <p className="mt-1 text-sm text-slate-500">Эти данные выдаются автоматически и не редактируются вручную.</p>
@@ -187,7 +187,7 @@ export function UserProfileEditButton({
             </div>
           </section>
 
-          <div className="flex justify-end gap-2 border-t pt-4">
+          <div className="grid grid-cols-2 gap-2 border-t pt-4 sm:flex sm:justify-end">
             <button type="button" className="btn-secondary" onClick={close} disabled={loading}>
               Отмена
             </button>
@@ -204,7 +204,7 @@ export function UserProfileEditButton({
 
 function ReadonlyIdentity({ label, value }: { label: string; value?: string | null }) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 dark:border-white/10 dark:bg-white/[0.03]">
+    <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 dark:border-white/10 dark:bg-white/[0.03]">
       <div className="text-xs font-medium uppercase text-slate-400">{label}</div>
       <div className="mt-1 break-all font-mono text-sm text-slate-700 dark:text-slate-200">{value || '—'}</div>
     </div>

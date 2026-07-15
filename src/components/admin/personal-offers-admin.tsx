@@ -110,7 +110,7 @@ export function PersonalOffersAdmin({
         <div className="flex flex-col gap-4">
           <div className="min-w-0">
             <div className="flex items-center gap-3">
-              <div className="grid h-10 w-10 place-items-center rounded-lg bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-100">
+              <div className="grid h-10 w-10 place-items-center rounded-xl bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-100">
                 <Gift className="h-5 w-5" />
               </div>
               <div>
@@ -120,14 +120,14 @@ export function PersonalOffersAdmin({
                 </p>
               </div>
             </div>
-            <div className="mt-3 rounded-lg border border-emerald-100 bg-white/80 px-3 py-2 text-sm text-slate-600 dark:border-emerald-500/20 dark:bg-white/[0.04] dark:text-slate-300">
+            <div className="mt-3 rounded-xl border border-emerald-100 bg-white/80 px-3 py-2 text-sm text-slate-600 dark:border-emerald-500/20 dark:bg-white/[0.04] dark:text-slate-300">
               <span className="font-medium text-slate-950 dark:text-white">Сейчас: </span>
               {welcomeSummary(welcomeForm, trialPlans, promoCodes)}
             </div>
           </div>
 
           <div className="grid w-full gap-3">
-            <label className="flex min-h-12 items-center gap-2 rounded-lg border border-emerald-100 bg-white px-3 py-2 text-sm font-medium shadow-sm dark:border-emerald-500/20 dark:bg-surface-900">
+            <label className="flex min-h-12 items-center gap-2 rounded-xl border border-emerald-100 bg-white px-3 py-2 text-sm font-medium shadow-sm dark:border-emerald-500/20 dark:bg-surface-900">
               <input
                 type="checkbox"
                 checked={welcomeForm.enabled}
@@ -202,16 +202,19 @@ export function PersonalOffersAdmin({
         </div>
       </section>
 
-      <section className="surface-card overflow-hidden p-0">
-        <div className="border-b border-slate-100 px-4 py-3 dark:border-white/10">
+      <section className="space-y-3">
+        <div>
           <h2 className="font-semibold text-slate-950 dark:text-white">Офферы на главной</h2>
           <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
             Порядок, текст и кнопки для разных состояний пользователя.
           </p>
         </div>
-        <div className="divide-y divide-slate-100 dark:divide-white/10">
+        <div className="grid gap-3">
           {offers.map((offer) => (
-            <article key={offer.id} className="grid gap-3 px-4 py-3 lg:grid-cols-[13rem_minmax(0,1fr)_13rem_auto] lg:items-center">
+            <article
+              key={offer.id}
+              className="grid gap-4 rounded-2xl border border-slate-200/80 bg-white/90 p-4 shadow-sm shadow-slate-950/[0.04] dark:border-white/10 dark:bg-surface-900/90 dark:shadow-black/20 lg:grid-cols-[13rem_minmax(0,1fr)_13rem_auto] lg:items-center"
+            >
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className={offer.enabled ? 'badge-active' : 'badge-muted'}>
@@ -239,7 +242,7 @@ export function PersonalOffersAdmin({
                 <div className="mt-1 truncate">{rewardSummary(offer)}</div>
               </div>
 
-              <button type="button" className="btn-secondary min-h-10 justify-center px-3 lg:w-32" onClick={() => openEdit(offer)}>
+              <button type="button" className="btn-secondary min-h-10 w-full justify-center px-3 lg:w-32" onClick={() => openEdit(offer)}>
                 <Edit3 className="h-4 w-4" />
                 Изменить
               </button>
@@ -283,7 +286,7 @@ export function PersonalOffersAdmin({
               <Field label="Описание">
                 <textarea className="input min-h-28 resize-y" value={form.description} onChange={(event) => setFormValue('description', event.target.value)} />
               </Field>
-              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-white/10 dark:bg-white/[0.04]">
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-white/10 dark:bg-white/[0.04]">
                 <div className="mb-2 text-sm font-medium text-slate-700 dark:text-slate-200">Подстановки</div>
                 <div className="flex flex-wrap gap-2">
                   {personalOfferPlaceholders.map((item) => (
@@ -299,7 +302,7 @@ export function PersonalOffersAdmin({
           {editorSection === 'BEHAVIOR' ? (
             <div className="space-y-4">
               <div className="grid gap-3 sm:grid-cols-[1fr_8rem_12rem]">
-                <label className="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 dark:border-white/10 dark:bg-white/[0.04]">
+                <label className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-white/10 dark:bg-white/[0.04]">
                   <input type="checkbox" checked={form.enabled} onChange={(event) => setForm((prev) => ({ ...prev, enabled: event.target.checked }))} />
                   <span className="text-sm font-medium">Показывать</span>
                 </label>
@@ -359,7 +362,7 @@ function OfferPreview({ form }: { form: OfferForm }) {
         : 'border-cyan-200 bg-cyan-50 dark:border-cyan-500/25 dark:bg-cyan-500/10'
 
   return (
-    <div className={cn('rounded-lg border p-4', tone)}>
+    <div className={cn('rounded-2xl border p-4', tone)}>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase text-slate-500">
@@ -401,12 +404,12 @@ function WelcomeBonusOption({
 }) {
   return (
     <div className={cn(
-      'flex min-h-36 flex-col rounded-xl border bg-white p-3 shadow-sm transition-colors dark:bg-surface-900',
+      'flex min-h-36 flex-col rounded-2xl border bg-white p-3 shadow-sm transition-colors dark:bg-surface-900',
       checked ? 'border-emerald-300 ring-2 ring-emerald-100 dark:border-emerald-500/40 dark:ring-emerald-500/10' : 'border-slate-200 dark:border-white/10'
     )}>
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 gap-3">
-          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-200">
+          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-200">
             {icon}
           </div>
           <div className="min-w-0">

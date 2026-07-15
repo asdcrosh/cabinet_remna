@@ -52,8 +52,8 @@ export function AdminNotificationsList({ initialNotifications }: { initialNotifi
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-white/10 dark:bg-surface-950 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex min-w-0 gap-2 overflow-x-auto">
+      <div className="flex flex-col gap-3 rounded-2xl border border-slate-200/80 bg-white/90 p-3 shadow-sm shadow-slate-950/[0.04] dark:border-white/10 dark:bg-surface-950/90 dark:shadow-black/20 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 gap-1 overflow-x-auto rounded-xl bg-slate-100/80 p-1 dark:bg-white/[0.05]">
           {filters.map((item) => (
             <button
               key={item.value}
@@ -62,18 +62,19 @@ export function AdminNotificationsList({ initialNotifications }: { initialNotifi
                 setFilter(item.value)
                 void load(item.value, onlyUnread)
               }}
+              aria-pressed={filter === item.value}
               className={cn(
-                'h-9 shrink-0 rounded-lg px-3 text-sm font-medium transition',
+                'h-9 shrink-0 rounded-lg px-3 text-sm font-medium transition-colors',
                 filter === item.value
-                  ? 'bg-slate-950 text-white dark:bg-white dark:text-slate-950'
-                  : 'border border-slate-200 text-slate-600 hover:bg-slate-50 dark:border-white/10 dark:text-slate-300 dark:hover:bg-white/10'
+                  ? 'bg-slate-950 text-white shadow-sm dark:bg-white dark:text-slate-950'
+                  : 'text-slate-600 hover:bg-white/70 dark:text-slate-300 dark:hover:bg-white/10'
               )}
             >
               {item.label}
             </button>
           ))}
         </div>
-        <div className="flex gap-2">
+        <div className="grid grid-cols-2 gap-2 sm:flex">
           <button
             type="button"
             onClick={() => {
@@ -81,8 +82,9 @@ export function AdminNotificationsList({ initialNotifications }: { initialNotifi
               setOnlyUnread(next)
               void load(filter, next)
             }}
+            aria-pressed={onlyUnread}
             className={cn(
-              'h-9 rounded-lg px-3 text-sm font-medium transition',
+              'h-10 rounded-xl px-3 text-sm font-medium transition-colors',
               onlyUnread
                 ? 'bg-cyan-100 text-cyan-800 dark:bg-cyan-950/40 dark:text-cyan-200'
                 : 'border border-slate-200 text-slate-600 hover:bg-slate-50 dark:border-white/10 dark:text-slate-300 dark:hover:bg-white/10'
@@ -93,19 +95,20 @@ export function AdminNotificationsList({ initialNotifications }: { initialNotifi
           <button
             type="button"
             onClick={markAllRead}
-            className="inline-flex h-9 items-center gap-2 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-600 transition hover:bg-slate-50 dark:border-white/10 dark:text-slate-300 dark:hover:bg-white/10"
+            disabled={loading}
+            className="btn-secondary h-10 min-h-10 px-3"
           >
             <CheckCheck className="h-4 w-4" />
-            Прочитано
+            Прочитать все
           </button>
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-surface-950">
-        {loading && <div className="border-b border-slate-100 px-4 py-2 text-sm text-slate-500 dark:border-white/10">Загрузка...</div>}
+      <div className="space-y-3" aria-busy={loading}>
+        {loading && <div className="rounded-xl bg-slate-100 px-4 py-2 text-sm text-slate-500 dark:bg-white/[0.05]">Загрузка...</div>}
         {notifications.length > 0 ? (
           notifications.map((item) => (
-            <div key={item.id} className={cn('border-b border-slate-100 p-4 last:border-0 dark:border-white/10', !item.readAt && 'bg-cyan-50/40 dark:bg-cyan-950/10')}>
+            <article key={item.id} className={cn('rounded-2xl border border-slate-200/80 bg-white/90 p-4 shadow-sm shadow-slate-950/[0.04] dark:border-white/10 dark:bg-surface-950/90 dark:shadow-black/20', !item.readAt && 'border-cyan-200 bg-cyan-50/50 dark:border-cyan-500/25 dark:bg-cyan-950/10')}>
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
@@ -118,12 +121,12 @@ export function AdminNotificationsList({ initialNotifications }: { initialNotifi
                   <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-300">{item.body}</p>
                   <div className="mt-2 text-xs text-slate-400">{formatDate(item.createdAt)}</div>
                 </div>
-                <div className="flex shrink-0 gap-2">
+                <div className="flex w-full shrink-0 gap-2 sm:w-auto">
                   {!item.readAt && (
                     <button
                       type="button"
                       onClick={() => void markOneRead(item.id)}
-                      className="h-9 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-600 transition hover:bg-slate-50 dark:border-white/10 dark:text-slate-300 dark:hover:bg-white/10"
+                      className="btn-secondary h-10 min-h-10 flex-1 px-3 sm:flex-none"
                     >
                       Прочитано
                     </button>
@@ -132,7 +135,7 @@ export function AdminNotificationsList({ initialNotifications }: { initialNotifi
                     <Link
                       href={item.actionHref}
                       onClick={() => void markOneRead(item.id)}
-                      className="inline-flex h-9 items-center gap-2 rounded-lg bg-slate-950 px-3 text-sm font-medium text-white transition hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200"
+                      className="btn-primary h-10 min-h-10 flex-1 px-3 sm:flex-none"
                     >
                       {item.actionLabel || 'Открыть'}
                       <ExternalLink className="h-4 w-4" />
@@ -140,12 +143,10 @@ export function AdminNotificationsList({ initialNotifications }: { initialNotifi
                   )}
                 </div>
               </div>
-            </div>
+            </article>
           ))
         ) : (
-          <div className="p-4">
-            <AdminEmptyState title="Уведомлений нет" description="Новые системные события появятся здесь." />
-          </div>
+          <AdminEmptyState title="Уведомлений нет" description="Новые системные события появятся здесь." />
         )}
       </div>
     </div>

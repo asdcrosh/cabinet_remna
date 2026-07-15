@@ -60,7 +60,7 @@ export function UserPlanButton({
     <>
       <button
         type="button"
-        className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-600 shadow-sm transition-colors hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700 dark:border-white/10 dark:bg-surface-900"
+        className="btn-secondary h-9 min-h-9 w-9 shrink-0 px-0 hover:text-emerald-700 dark:hover:text-emerald-300"
         onClick={() => setOpen(true)}
         title="Назначить тариф"
         aria-label="Назначить тариф"
@@ -90,7 +90,7 @@ export function UserPlanButton({
             {filteredPlans.map((plan) => (
               <label
                 key={plan.id}
-                className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors hover:bg-slate-50 dark:hover:bg-white/5 ${
+                className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition-colors hover:bg-slate-50 dark:hover:bg-white/5 ${
                   planId === plan.id ? 'border-slate-950 bg-slate-50 dark:border-white dark:bg-white/5' : ''
                 }`}
               >
@@ -104,13 +104,13 @@ export function UserPlanButton({
               </label>
             ))}
             {filteredPlans.length === 0 && (
-              <div className="rounded-lg border border-dashed px-3 py-8 text-center text-sm text-slate-500 sm:col-span-2">
+              <div className="rounded-xl border border-dashed px-3 py-8 text-center text-sm text-slate-500 sm:col-span-2">
                 Тарифы не найдены
               </div>
             )}
           </div>
 
-          <div className="grid gap-2 rounded-lg bg-slate-50 p-1 dark:bg-white/5 sm:grid-cols-2">
+          <div className="grid gap-2 rounded-xl bg-slate-50 p-1 dark:bg-white/5 sm:grid-cols-2">
             <button type="button" className={mode === 'REPLACE' ? 'btn-primary' : 'btn-secondary'} onClick={() => setMode('REPLACE')}>
               Выдать заново
             </button>
@@ -124,7 +124,7 @@ export function UserPlanButton({
               : 'Срок выбранного тарифа добавится к текущей подписке.'}
           </p>
 
-          <div className="flex justify-end gap-2 border-t pt-4">
+          <div className="grid grid-cols-2 gap-2 border-t pt-4 sm:flex sm:justify-end">
             <button type="button" className="btn-secondary" onClick={() => setOpen(false)} disabled={loading}>Отмена</button>
             <button type="submit" className="btn-primary" disabled={loading || !planId}>
               <Save className="h-4 w-4" />

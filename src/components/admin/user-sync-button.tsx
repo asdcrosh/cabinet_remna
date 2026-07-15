@@ -43,7 +43,7 @@ export function UserSyncButton({ userId }: { userId: string }) {
   return (
     <button
       type="button"
-      className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-600 shadow-sm transition-colors hover:border-sky-200 hover:bg-sky-50 hover:text-sky-700 disabled:opacity-60 dark:border-white/10 dark:bg-surface-900"
+      className="btn-secondary h-9 min-h-9 w-9 shrink-0 px-0 hover:text-sky-700 dark:hover:text-sky-300"
       onClick={() => void sync()}
       disabled={loading}
       title="Синхронизировать пользователя"
