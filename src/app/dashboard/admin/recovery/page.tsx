@@ -37,88 +37,35 @@ export default async function AdminRecoveryPage() {
           icon={<CheckCircle2 className="h-7 w-7 text-emerald-600" />}
         />
       ) : (
-        <>
-          <div className="table-shell hidden 2xl:block">
-            <table className="data-table min-w-[900px]">
-              <caption className="sr-only">Платежи, для которых требуется повторная выдача подписки</caption>
-              <thead className="bg-slate-50 text-left text-slate-500 dark:bg-surface-800">
-                <tr>
-                  <th className="w-[260px]">Пользователь</th>
-                  <th className="w-[140px]">Тариф</th>
-                  <th className="w-[120px]">Сумма</th>
-                  <th className="w-[260px]">Ошибка</th>
-                  <th className="sticky-actions-head w-[150px] min-w-[150px]">Действие</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {payments.map((payment) => (
-                  <tr key={payment.id}>
-                    <td>
-                      <div className="max-w-[230px] truncate font-medium">{payment.user.email}</div>
-                      <div className="text-xs text-slate-500">{new Date(payment.createdAt).toLocaleString('ru-RU')}</div>
-                    </td>
-                    <td>{payment.plan.name}</td>
-                    <td className="font-medium">{formatPrice(payment.amountKopecks)}</td>
-                    <td className="max-w-xs">
-                      <div className="line-clamp-2 text-xs text-slate-500">
-                        {payment.provisioningJob
-                          ? `${payment.provisioningJob.status}, попыток: ${payment.provisioningJob.attempts}`
-                          : 'Job ещё не создавался'}
-                      </div>
-                      <div className="line-clamp-2 text-xs text-slate-500">
-                        {payment.provisioningJob?.lastError || payment.provisioningError || 'Подписка не была выдана.'}
-                      </div>
-                      {payment.provisioningJob?.nextRetryAt && (
-                        <div className="text-xs text-slate-400">
-                          Следующая попытка: {payment.provisioningJob.nextRetryAt.toLocaleString('ru-RU')}
-                        </div>
-                      )}
-                    </td>
-                    <td className="sticky-actions-cell w-[150px] min-w-[150px]">
-                      <div className="action-row">
-                        <RecoveryActionButton paymentId={payment.id} />
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white divide-y divide-slate-200 dark:border-white/10 dark:bg-white/[0.025] dark:divide-white/[0.07] 2xl:hidden">
-            {payments.map((payment) => (
-              <article key={payment.id} className="overflow-hidden">
-                <div className="px-4 pb-2 pt-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="break-words text-sm font-semibold">{payment.user.email}</div>
-                      <div className="mt-0.5 text-xs text-slate-500">{new Date(payment.createdAt).toLocaleString('ru-RU')}</div>
-                    </div>
-                  </div>
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white divide-y divide-slate-200 dark:border-white/10 dark:bg-white/[0.025] dark:divide-white/[0.07]">
+          {payments.map((payment) => (
+            <article key={payment.id} className="grid gap-4 border-l-4 border-l-amber-400 px-4 py-4 lg:grid-cols-[minmax(15rem,1.2fr)_minmax(9rem,.65fr)_minmax(16rem,1fr)_auto] lg:items-center">
+              <div className="min-w-0">
+                <div className="break-words text-sm font-semibold">{payment.user.email}</div>
+                <div className="mt-1 text-xs text-slate-500">{new Date(payment.createdAt).toLocaleString('ru-RU')}</div>
+              </div>
+              <div className="flex items-baseline justify-between gap-3 lg:block">
+                <span className="truncate text-sm font-medium">{payment.plan.name}</span>
+                <span className="shrink-0 font-semibold lg:mt-1 lg:block">{formatPrice(payment.amountKopecks)}</span>
+              </div>
+              <div className="min-w-0">
+                <div className="text-sm text-amber-800 dark:text-amber-100">
+                  {payment.provisioningJob?.lastError || payment.provisioningError || 'Подписка не была выдана.'}
                 </div>
-                <div className="space-y-3 px-4 pb-4">
-                  <div className="flex items-baseline justify-between gap-3 text-sm">
-                    <span className="font-medium">{payment.plan.name}</span>
-                    <span className="shrink-0 font-semibold">{formatPrice(payment.amountKopecks)}</span>
+                <details className="mt-2 text-xs text-slate-500">
+                  <summary className="cursor-pointer font-medium">Технические детали</summary>
+                  <div className="mt-2 space-y-1 rounded-xl bg-slate-50 px-3 py-2 dark:bg-white/[0.04]">
+                    <div>Задача: {payment.provisioningJob ? `${payment.provisioningJob.status}, попыток: ${payment.provisioningJob.attempts}` : 'не создавалась'}</div>
+                    <div>Повтор: {payment.provisioningJob?.nextRetryAt ? payment.provisioningJob.nextRetryAt.toLocaleString('ru-RU') : 'не запланирован'}</div>
                   </div>
-                  <div className="rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:bg-amber-500/10 dark:text-amber-100">
-                    {payment.provisioningJob?.lastError || payment.provisioningError || 'Подписка не была выдана.'}
-                  </div>
-                  <details className="text-xs text-slate-500">
-                    <summary className="cursor-pointer font-medium">Технические детали</summary>
-                    <div className="mt-2 space-y-1 rounded-xl bg-slate-50 px-3 py-2 dark:bg-white/[0.04]">
-                      <div>Job: {payment.provisioningJob ? `${payment.provisioningJob.status}, попыток: ${payment.provisioningJob.attempts}` : 'не создавался'}</div>
-                      <div>Retry: {payment.provisioningJob?.nextRetryAt ? payment.provisioningJob.nextRetryAt.toLocaleString('ru-RU') : 'не запланирован'}</div>
-                    </div>
-                  </details>
-                  <div className="grid gap-2 sm:flex sm:justify-end">
-                    <RecoveryActionButton paymentId={payment.id} />
-                  </div>
-                </div>
-              </article>
-            ))}
-          </div>
-        </>
+                </details>
+              </div>
+              <div className="grid lg:justify-end">
+                <RecoveryActionButton paymentId={payment.id} />
+              </div>
+            </article>
+          ))}
+        </div>
       )}
     </div>
   )

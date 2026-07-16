@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { requireAdminPage } from '@/lib/auth/admin-page'
 import { formatPrice } from '@/lib/format'
 import { PageHeader } from '@/components/dashboard/page-header'
-import { PaymentBadge, ProvisioningBadge } from '@/components/admin/admin-badges'
+import { PaymentBadge } from '@/components/admin/admin-badges'
 import { PaymentSyncButton, RecoveryActionButton, RemnashopPaymentRetryButton } from '@/components/admin/recovery-actions'
 import { LazyListLoader } from '@/components/admin/lazy-list-loader'
 import { ADMIN_LIST_PAGE_SIZE, parseAdminListLimit } from '@/lib/admin-list'
@@ -81,9 +81,9 @@ export default async function AdminPaymentsPage({
       />
 
       <section className="grid grid-cols-3 overflow-hidden rounded-xl border border-slate-200 bg-white divide-x divide-slate-200 dark:border-white/10 dark:bg-white/[0.025] dark:divide-white/10">
-        <PaymentStat title="Ожидают" value={pendingCount} tone="amber" />
-        <PaymentStat title="Довыдача" value={retryCount} tone={retryCount > 0 ? 'red' : 'slate'} />
-        <PaymentStat title="Оплачено" value={succeededCount} tone="emerald" />
+        <PaymentStat title="Ожидают" value={pendingCount} tone="amber" href="/dashboard/admin/payments?status=PENDING" />
+        <PaymentStat title="Довыдача" value={retryCount} tone={retryCount > 0 ? 'red' : 'slate'} href="/dashboard/admin/payments?delivery=RETRY" />
+        <PaymentStat title="Оплачено" value={succeededCount} tone="emerald" href="/dashboard/admin/payments?status=SUCCEEDED" />
       </section>
 
       <AdminFilterBar
@@ -91,7 +91,7 @@ export default async function AdminPaymentsPage({
         resetHref="/dashboard/admin/payments"
         resetVisible={Boolean(q || status !== 'ALL' || delivery !== 'ALL' || range !== 'ALL' || params.from || params.to)}
         count={{ shown: payments.length, total }}
-        className="md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-[minmax(14rem,1fr)_10rem_12rem_10rem_9rem_9rem_auto]"
+        className="md:grid-cols-2 xl:grid-cols-[minmax(16rem,1fr)_11rem_12rem_10rem_auto]"
       >
         <input type="hidden" name="limit" value={ADMIN_LIST_PAGE_SIZE} />
         <AdminFilterField label="Поиск платежей">
@@ -124,12 +124,16 @@ export default async function AdminPaymentsPage({
             <option value="CUSTOM">Свой период</option>
           </select>
         </AdminFilterField>
-        <AdminFilterField label="Дата от">
-          <input name="from" defaultValue={params.from ?? ''} type="date" className="input" />
-        </AdminFilterField>
-        <AdminFilterField label="Дата до">
-          <input name="to" defaultValue={params.to ?? ''} type="date" className="input" />
-        </AdminFilterField>
+        {range === 'CUSTOM' ? (
+          <>
+            <AdminFilterField label="Дата от">
+              <input name="from" defaultValue={params.from ?? ''} type="date" className="input" />
+            </AdminFilterField>
+            <AdminFilterField label="Дата до">
+              <input name="to" defaultValue={params.to ?? ''} type="date" className="input" />
+            </AdminFilterField>
+          </>
+        ) : null}
         <AdminFilterSubmitButton />
       </AdminFilterBar>
 
@@ -137,144 +141,63 @@ export default async function AdminPaymentsPage({
         <AdminEmptyState title="Платежи не найдены" description="Измените фильтры или сбросьте поиск." />
       )}
 
-      <div className={payments.length > 0 ? 'table-shell hidden 2xl:block' : 'hidden'}>
-        <table className="data-table min-w-[1120px]">
-          <caption className="sr-only">Платежи пользователей и состояние выдачи подписки</caption>
-          <thead className="bg-slate-50 text-left text-slate-500 dark:bg-surface-800">
-            <tr>
-              <th className="w-[150px]">Дата</th>
-              <th className="w-[250px]">Пользователь</th>
-              <th className="w-[130px]">Тариф</th>
-              <th className="w-[130px]">Сумма</th>
-              <th className="w-[110px]">Промокод</th>
-              <th className="w-[120px]">Статус</th>
-              <th className="w-[190px]">Выдача</th>
-              <th className="sticky-actions-head w-[176px] min-w-[176px]">Действия</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-            {payments.map((payment) => {
-              const needsRetry = payment.status === 'SUCCEEDED' && !payment.subscriptionProvisionedAt
-              const needsRemnashopRetry = payment.status === 'SUCCEEDED' && Boolean(payment.subscriptionProvisionedAt) && !payment.remnashopSyncedAt
-              const canCheckPayment = Boolean(payment.yookassaId) && payment.status !== 'SUCCEEDED'
-              return (
-                <tr key={payment.id}>
-                  <td className={`border-l-4 text-slate-500 ${paymentRailClass(payment.status, needsRetry || needsRemnashopRetry)}`}>{new Date(payment.createdAt).toLocaleString('ru-RU')}</td>
-                  <td>
-                    <div className="max-w-[220px] truncate font-medium">{payment.user.email}</div>
-                    <div className="text-xs text-slate-500">{payment.user.name || 'Без имени'}</div>
-                  </td>
-                  <td>{payment.plan.name}</td>
-                  <td>
-                    <PaymentAmount
-                      amountKopecks={payment.amountKopecks}
-                      originalAmountKopecks={payment.originalAmountKopecks}
-                      discountKopecks={payment.discountKopecks}
-                    />
-                  </td>
-                  <td className="text-slate-500">{getPromoCodeLabel(payment.promoCodeSnapshot)}</td>
-                  <td><PaymentBadge status={payment.status} /></td>
-                  <td>
-                    <div className="space-y-1">
-                      <ProvisioningBadge provisioned={Boolean(payment.subscriptionProvisionedAt)} />
-                      {payment.provisioningError && (
-                        <div className="max-w-[180px] truncate text-xs text-slate-500">{payment.provisioningError}</div>
-                      )}
-                      {payment.subscriptionProvisionedAt && (
-                        <div
-                          className={payment.remnashopSyncedAt ? 'text-xs text-emerald-600 dark:text-emerald-300' : 'max-w-[180px] truncate text-xs text-amber-600 dark:text-amber-300'}
-                          title={humanSyncError(payment.remnashopSyncError)}
-                        >
-                          {payment.remnashopSyncedAt ? 'Remnashop синхр.' : humanSyncError(payment.remnashopSyncError)}
-                        </div>
-                      )}
-                    </div>
-                  </td>
-                  <td className="sticky-actions-cell w-[176px] min-w-[176px]">
-                    <div className="action-row">
-                      {canCheckPayment && <PaymentSyncButton paymentId={payment.id} />}
-                      {needsRetry ? (
-                        <RecoveryActionButton paymentId={payment.id} />
-                      ) : needsRemnashopRetry ? (
-                        <RemnashopPaymentRetryButton paymentId={payment.id} />
-                      ) : payment.subscriptionId ? (
-                        <Link href={`/dashboard/admin/users?q=${encodeURIComponent(payment.user.email)}`} className="btn-secondary min-w-[112px] px-3 text-xs">
-                          Пользователь
-                        </Link>
-                      ) : null}
-                    </div>
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
-      </div>
-
-      <div className={payments.length > 0 ? 'overflow-hidden rounded-2xl border border-slate-200 bg-white divide-y divide-slate-200 dark:border-white/10 dark:bg-white/[0.025] dark:divide-white/[0.07] 2xl:hidden' : 'hidden'}>
+      <div className={payments.length > 0 ? 'overflow-hidden rounded-2xl border border-slate-200 bg-white divide-y divide-slate-200 dark:border-white/10 dark:bg-white/[0.025] dark:divide-white/[0.07]' : 'hidden'}>
         {payments.map((payment) => {
           const needsRetry = payment.status === 'SUCCEEDED' && !payment.subscriptionProvisionedAt
           const needsRemnashopRetry = payment.status === 'SUCCEEDED' && Boolean(payment.subscriptionProvisionedAt) && !payment.remnashopSyncedAt
           const canCheckPayment = Boolean(payment.yookassaId) && payment.status !== 'SUCCEEDED'
+          const action = canCheckPayment ? (
+            <PaymentSyncButton paymentId={payment.id} />
+          ) : needsRetry ? (
+            <RecoveryActionButton paymentId={payment.id} />
+          ) : needsRemnashopRetry ? (
+            <RemnashopPaymentRetryButton paymentId={payment.id} />
+          ) : (
+            <Link href={`/dashboard/admin/users?q=${encodeURIComponent(payment.user.email)}`} className="btn-secondary min-w-[112px] px-3 text-xs">
+              Пользователь
+            </Link>
+          )
           return (
             <article key={payment.id} className={`overflow-hidden border-l-4 ${paymentRailClass(payment.status, needsRetry || needsRemnashopRetry)}`}>
-              <div className="px-4 pb-2 pt-4">
-                <div className="flex items-start justify-between gap-3">
+              <div className="grid gap-4 px-4 py-4 lg:grid-cols-[minmax(15rem,1.2fr)_minmax(9rem,.65fr)_minmax(15rem,1fr)_auto] lg:items-center">
+                <div className="flex min-w-0 items-start justify-between gap-3 lg:block">
                   <div className="min-w-0">
                     <div className="break-words text-sm font-semibold">{payment.user.email}</div>
-                    <div className="mt-0.5 text-xs text-slate-500">{formatAdminPaymentDate(payment.createdAt)}</div>
-                  </div>
-                  <PaymentBadge status={payment.status} />
-                </div>
-              </div>
-              <div className="space-y-3 px-4 pb-4">
-                <div className="flex items-baseline justify-between gap-3">
-                  <div>
-                    <div className="text-xs uppercase tracking-wide text-slate-400">Тариф</div>
-                    <div className="mt-1 font-medium">{payment.plan.name}</div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-xs uppercase tracking-wide text-slate-400">Сумма</div>
-                    <PaymentAmount
-                      amountKopecks={payment.amountKopecks}
-                      originalAmountKopecks={payment.originalAmountKopecks}
-                      discountKopecks={payment.discountKopecks}
-                      align="right"
-                    />
-                  </div>
-                </div>
-                <PaymentFlow
-                  paid={payment.status === 'SUCCEEDED'}
-                  provisioned={Boolean(payment.subscriptionProvisionedAt)}
-                  remnashopSynced={Boolean(payment.remnashopSyncedAt)}
-                />
-                <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
-                  {getPromoCodeLabel(payment.promoCodeSnapshot) !== '—' ? (
-                    <span>Промокод: <span className="font-medium text-slate-700 dark:text-slate-200">{getPromoCodeLabel(payment.promoCodeSnapshot)}</span></span>
-                  ) : null}
-                  <span className="font-mono">ID: {shortId(payment.yookassaId || payment.id)}</span>
-                </div>
-                {(payment.provisioningError || (payment.subscriptionProvisionedAt && !payment.remnashopSyncedAt)) ? (
-                  <details className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
-                    <summary className="cursor-pointer font-semibold">Технические детали</summary>
-                    <div className="mt-2 space-y-1">
-                      {payment.provisioningError ? <div>{payment.provisioningError}</div> : null}
-                      {payment.subscriptionProvisionedAt && !payment.remnashopSyncedAt ? <div>Remnashop: {humanSyncError(payment.remnashopSyncError)}</div> : null}
+                    <div className="mt-1 flex flex-wrap gap-x-2 gap-y-1 text-xs text-slate-500">
+                      <span>{formatAdminPaymentDate(payment.createdAt)}</span>
+                      <span className="font-mono">{shortId(payment.yookassaId || payment.id)}</span>
                     </div>
-                  </details>
-                ) : null}
-                <div className="grid gap-2 sm:flex sm:flex-wrap sm:justify-end">
-                  {canCheckPayment && <PaymentSyncButton paymentId={payment.id} />}
-                  {needsRetry ? (
-                    <RecoveryActionButton paymentId={payment.id} />
-                  ) : needsRemnashopRetry ? (
-                    <RemnashopPaymentRetryButton paymentId={payment.id} />
-                  ) : payment.subscriptionId ? (
-                    <Link href={`/dashboard/admin/users?q=${encodeURIComponent(payment.user.email)}`} className="btn-secondary min-w-[112px] px-3 text-xs">
-                      Пользователь
-                    </Link>
+                  </div>
+                  <div className="lg:mt-2"><PaymentBadge status={payment.status} /></div>
+                </div>
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-medium">{payment.plan.name}</div>
+                  <PaymentAmount
+                    amountKopecks={payment.amountKopecks}
+                    originalAmountKopecks={payment.originalAmountKopecks}
+                    discountKopecks={payment.discountKopecks}
+                  />
+                  {getPromoCodeLabel(payment.promoCodeSnapshot) !== '—' ? (
+                    <div className="mt-1 text-xs text-slate-500">Промокод {getPromoCodeLabel(payment.promoCodeSnapshot)}</div>
                   ) : null}
                 </div>
+                <div className="min-w-0 space-y-2">
+                  <PaymentFlow
+                    paid={payment.status === 'SUCCEEDED'}
+                    provisioned={Boolean(payment.subscriptionProvisionedAt)}
+                    remnashopSynced={Boolean(payment.remnashopSyncedAt)}
+                  />
+                  {(payment.provisioningError || (payment.subscriptionProvisionedAt && !payment.remnashopSyncedAt)) ? (
+                    <details className="text-xs text-amber-700 dark:text-amber-200">
+                      <summary className="cursor-pointer font-medium">Почему требуется внимание</summary>
+                      <div className="mt-2 space-y-1 rounded-xl bg-amber-50 px-3 py-2 dark:bg-amber-500/10">
+                        {payment.provisioningError ? <div>{payment.provisioningError}</div> : null}
+                        {payment.subscriptionProvisionedAt && !payment.remnashopSyncedAt ? <div>Remnashop: {humanSyncError(payment.remnashopSyncError)}</div> : null}
+                      </div>
+                    </details>
+                  ) : null}
+                </div>
+                <div className="grid lg:justify-end">{action}</div>
               </div>
             </article>
           )
@@ -358,7 +281,7 @@ function buildPaymentsExportHref(q: string, status: string, delivery: string, ra
   return `/api/admin/payments?${params.toString()}`
 }
 
-function PaymentStat({ title, value, tone }: { title: string; value: number; tone: 'amber' | 'emerald' | 'red' | 'slate' }) {
+function PaymentStat({ title, value, tone, href }: { title: string; value: number; tone: 'amber' | 'emerald' | 'red' | 'slate'; href: string }) {
   const toneClass = {
     amber: 'text-amber-700 dark:text-amber-200',
     emerald: 'text-emerald-700 dark:text-emerald-200',
@@ -367,10 +290,10 @@ function PaymentStat({ title, value, tone }: { title: string; value: number; ton
   }[tone]
 
   return (
-    <div className="min-w-0 px-3 py-2.5 text-center sm:text-left">
+    <Link href={href} className="min-w-0 px-3 py-2.5 text-center transition-colors hover:bg-slate-50 sm:text-left dark:hover:bg-white/[0.04]">
       <div className="truncate text-xs text-slate-500">{title}</div>
       <div className={`mt-0.5 text-xl font-semibold tabular-nums sm:text-2xl ${toneClass}`}>{value}</div>
-    </div>
+    </Link>
   )
 }
 

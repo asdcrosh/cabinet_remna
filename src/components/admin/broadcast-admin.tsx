@@ -280,35 +280,27 @@ export function BroadcastAdmin({
   const previewActionLabel = renderPreview(actionLabel || 'Открыть')
   const previewImageUrl = getPreviewImageUrl(imageUrl)
   const visibleTemplates: BroadcastTemplateItem[] = [...customTemplates, ...templates]
-  const stepSummary = {
-    message: body.trim() ? body.trim().split('\n').find(Boolean)?.slice(0, 42) ?? 'Сообщение' : 'Выберите шаблон или напишите текст',
-    audience: `${segmentLabel(segment, inactiveDays)} · ${selectedChannels.map(channelLabel).join(', ')}`,
-    delivery: canSend ? 'Готово к отправке' : 'Заполните сообщение и канал',
-  }
 
   return (
     <section className="grid w-full min-w-0 max-w-full gap-4 overflow-hidden">
-      <div className="card w-full min-w-0 overflow-hidden p-2 sm:p-3">
-        <div className="flex w-full min-w-0 gap-2 overflow-x-auto lg:grid lg:grid-cols-3 lg:overflow-visible">
+      <div className="card w-full min-w-0 overflow-hidden p-1.5">
+        <div className="grid w-full min-w-0 grid-cols-3 gap-1">
           <BroadcastStepButton
             active={step === 'message'}
             number="1"
             title="Сообщение"
-            description={stepSummary.message}
             onClick={() => setStep('message')}
           />
           <BroadcastStepButton
             active={step === 'audience'}
             number="2"
-            title="Кому и куда"
-            description={stepSummary.audience}
+            title="Аудитория"
             onClick={() => setStep('audience')}
           />
           <BroadcastStepButton
             active={step === 'delivery'}
             number="3"
-            title="Проверка"
-            description={stepSummary.delivery}
+            title="Отправка"
             onClick={() => setStep('delivery')}
           />
         </div>
@@ -320,26 +312,13 @@ export function BroadcastAdmin({
             <UsersRound className="h-5 w-5 text-cyan-600" />
             <h2 className="font-semibold">Кому отправить</h2>
           </div>
-          <div className="mt-4 grid gap-2">
-            {segments.map((item) => (
-              <button
-                key={item.value}
-                type="button"
-                onClick={() => setSegment(item.value)}
-                className={cn(
-                  'rounded-xl border p-3 text-left transition-colors',
-                  segment === item.value
-                    ? 'border-slate-950 bg-slate-950 text-white dark:border-white dark:bg-white dark:text-slate-950'
-                    : 'border-slate-200 bg-white hover:bg-slate-50 dark:border-white/10 dark:bg-surface-900 dark:hover:bg-white/5'
-                )}
-              >
-                <div className="text-sm font-semibold">{item.label}</div>
-                <div className={cn('mt-0.5 text-xs', segment === item.value ? 'text-white/70 dark:text-slate-600' : 'text-slate-500')}>
-                  {item.description}
-                </div>
-              </button>
-            ))}
-          </div>
+          <label className="mt-4 block">
+            <span className="text-sm font-medium">Аудитория</span>
+            <select className="input mt-1" value={segment} onChange={(event) => setSegment(event.target.value as BroadcastSegment)}>
+              {segments.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+            </select>
+            <span className="mt-1 block text-xs text-slate-500">{segments.find((item) => item.value === segment)?.description}</span>
+          </label>
 
           {segment === 'INACTIVE_N_DAYS' && (
             <label className="mt-4 block rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-white/10 dark:bg-white/5">
@@ -402,60 +381,59 @@ export function BroadcastAdmin({
 
         <div className={cn('card min-w-0 overflow-hidden p-4', step !== 'message' && 'hidden')}>
           <div className="grid min-w-0 gap-4">
-            <div className="min-w-0">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <div className="text-sm font-semibold text-slate-950 dark:text-white">Шаблон сообщения</div>
-                  <div className="text-xs text-slate-500 dark:text-slate-400">Готовые полноценные сценарии для продаж, сервиса и возврата пользователей.</div>
-                </div>
-                <button type="button" className="btn-secondary min-h-9 px-3 text-xs" onClick={saveTemplate} disabled={!canSend}>
-                  Сохранить
-                </button>
-              </div>
-              <div className="-mx-1 mt-3 flex min-w-0 snap-x gap-3 overflow-x-auto px-1 pb-2 [scrollbar-width:thin]">
-                {visibleTemplates.map((template) => (
-                  <div
-                    key={template.id || template.title}
-                    className="flex min-w-[15rem] max-w-[17rem] snap-start flex-col rounded-2xl border border-slate-200 bg-white p-3 transition-colors hover:border-slate-300 dark:border-white/10 dark:bg-white/[0.035] dark:hover:border-white/20"
-                  >
-                    <div className="text-base font-semibold text-slate-950 dark:text-white">{template.title}</div>
-                    <div className="mt-1 line-clamp-2 min-h-8 text-xs leading-4 text-slate-500 dark:text-slate-400">{template.description || 'Пользовательский шаблон'}</div>
-                    <div className="mt-3 flex flex-wrap gap-1.5 text-[11px] font-medium">
-                      <span className="rounded-full bg-slate-100 px-2 py-1 text-slate-600 dark:bg-white/10 dark:text-slate-300">
-                        {segmentLabel(template.segment, template.inactiveDays ?? undefined)}
-                      </span>
-                      {template.channels.map((channel) => (
-                        <span key={channel} className="rounded-full bg-cyan-50 px-2 py-1 text-cyan-700 dark:bg-cyan-500/10 dark:text-cyan-200">
-                          {channelLabel(channel)}
-                        </span>
-                      ))}
-                    </div>
-                    <p className="mt-3 line-clamp-4 whitespace-pre-line text-xs leading-5 text-slate-600 dark:text-slate-300">
-                      {renderPreview(template.body)}
-                    </p>
-                    <div className="mt-auto flex items-center gap-2 pt-4">
-                      <button type="button" onClick={() => applyTemplate(template)} className="btn-primary min-h-10 flex-1 px-3 text-xs">
-                        Использовать
+            <div className="grid min-w-0 gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+              <label className="block min-w-0">
+                <span className="text-sm font-medium">Шаблон</span>
+                <select
+                  className="input mt-1"
+                  defaultValue=""
+                  onChange={(event) => {
+                    const template = visibleTemplates[Number(event.target.value)]
+                    if (template) applyTemplate(template)
+                    event.currentTarget.value = ''
+                  }}
+                >
+                  <option value="" disabled>Выбрать готовое сообщение</option>
+                  {visibleTemplates.map((template, index) => (
+                    <option key={template.id || template.title} value={index}>
+                      {template.id ? 'Мой шаблон' : 'Готовый'} · {template.title}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button type="button" className="btn-secondary min-h-11 px-4 text-sm" onClick={saveTemplate} disabled={!canSend}>
+                Сохранить шаблон
+              </button>
+            </div>
+
+            {customTemplates.length > 0 ? (
+              <details className="rounded-xl border border-slate-200 px-3 py-2 text-sm dark:border-white/10">
+                <summary className="cursor-pointer font-medium">Мои шаблоны ({customTemplates.length})</summary>
+                <div className="mt-2 divide-y divide-slate-100 dark:divide-white/10">
+                  {customTemplates.map((template) => (
+                    <div key={template.id || template.title} className="flex items-center justify-between gap-3 py-2">
+                      <button type="button" className="min-w-0 truncate text-left font-medium hover:text-cyan-700" onClick={() => applyTemplate(template)}>
+                        {template.title}
                       </button>
                       {template.id ? (
-                        <button type="button" className="btn-secondary min-h-10 px-3 text-xs text-red-600 dark:text-red-300" onClick={() => deleteTemplate(template.id!)}>
+                        <button type="button" className="text-xs font-medium text-red-600 dark:text-red-300" onClick={() => deleteTemplate(template.id!)}>
                           Удалить
                         </button>
                       ) : null}
                     </div>
-                  </div>
-                ))}
-              </div>
-            </div>
+                  ))}
+                </div>
+              </details>
+            ) : null}
 
-            <div className="min-w-0 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-white/10 dark:bg-white/5">
-              <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Подстановки</div>
-              <div className="mt-2 flex flex-wrap gap-2 text-xs">
+            <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs">
+              <span className="font-medium text-slate-500">Подстановки:</span>
+              <div className="flex flex-wrap gap-1.5">
                 {['{name}', '{email}', '{days_left}', '{plan}', '{ref_link}'].map((token) => (
                   <button
                     key={token}
                     type="button"
-                    className="rounded-full border border-slate-200 bg-white px-2.5 py-1 font-mono text-slate-600 hover:bg-slate-100 dark:border-white/10 dark:bg-surface-900 dark:text-slate-300"
+                    className="rounded-lg bg-slate-100 px-2 py-1 font-mono text-slate-600 hover:bg-slate-200 dark:bg-white/[0.06] dark:text-slate-300 dark:hover:bg-white/10"
                     onClick={() => insertBodyEmoji(token)}
                   >
                     {token}
@@ -469,7 +447,7 @@ export function BroadcastAdmin({
               <div className="relative mt-1">
                 <textarea
                   ref={bodyInputRef}
-                  className="input min-h-52 resize-y py-3 pr-14 leading-6 sm:min-h-64"
+                  className="input min-h-44 resize-y py-3 pr-14 leading-6 sm:min-h-48"
                   value={body}
                   onChange={(event) => setBody(event.target.value)}
                   maxLength={1200}
@@ -484,120 +462,125 @@ export function BroadcastAdmin({
               <span className="mt-1 block text-xs text-slate-400">{body.length}/1200</span>
             </label>
 
-            <div className="grid min-w-0 gap-3 lg:grid-cols-[minmax(0,1fr)_13rem]">
-              <label className="block">
-                <span className="text-sm font-medium">Куда ведет кнопка</span>
-                <select
-                  className="input mt-1"
-                  value={selectedPreset ? selectedPreset.href : 'CUSTOM'}
-                  onChange={(event) => {
-                    const preset = actionPresets.find((item) => item.href === event.target.value) ?? actionPresets[0]
-                    if (event.target.value === 'CUSTOM') {
-                      setActionHref(actionHref || '/dashboard')
-                      setActionLabel((current) => current || 'Открыть')
-                      return
-                    }
-                    if (!preset) return
-                    setActionHref(preset.href)
-                    setActionLabel(preset.label)
-                    if (!preset.href) setActionOpenInTelegram(false)
-                  }}
-                >
-                  {actionPresets.map((preset) => (
-                    <option key={preset.title} value={preset.href}>
-                      {preset.title}
-                    </option>
-                  ))}
-                  <option value="CUSTOM">Своя ссылка</option>
-                </select>
-                <span className="mt-1 block text-xs text-slate-400">{selectedPreset?.description ?? 'Путь внутри кабинета, можно с параметрами'}</span>
-              </label>
-              <label className="block">
-                <span className="text-sm font-medium">Текст кнопки</span>
-                <input
-                  className="input mt-1"
-                  value={actionLabel}
-                  onChange={(event) => setActionLabel(event.target.value)}
-                  maxLength={32}
-                  placeholder={actionHref ? 'Открыть' : 'Без кнопки'}
-                  disabled={!actionHref}
-                />
-              </label>
-            </div>
+            <details className="rounded-xl border border-slate-200 px-3 py-2 dark:border-white/10">
+              <summary className="cursor-pointer text-sm font-medium">Кнопка и изображение</summary>
+              <div className="mt-3 grid min-w-0 gap-3">
+                <div className="grid min-w-0 gap-3 lg:grid-cols-[minmax(0,1fr)_13rem]">
+                  <label className="block">
+                    <span className="text-sm font-medium">Куда ведет кнопка</span>
+                    <select
+                      className="input mt-1"
+                      value={selectedPreset ? selectedPreset.href : 'CUSTOM'}
+                      onChange={(event) => {
+                        const preset = actionPresets.find((item) => item.href === event.target.value) ?? actionPresets[0]
+                        if (event.target.value === 'CUSTOM') {
+                          setActionHref(actionHref || '/dashboard')
+                          setActionLabel((current) => current || 'Открыть')
+                          return
+                        }
+                        if (!preset) return
+                        setActionHref(preset.href)
+                        setActionLabel(preset.label)
+                        if (!preset.href) setActionOpenInTelegram(false)
+                      }}
+                    >
+                      {actionPresets.map((preset) => (
+                        <option key={preset.title} value={preset.href}>
+                          {preset.title}
+                        </option>
+                      ))}
+                      <option value="CUSTOM">Своя ссылка</option>
+                    </select>
+                    <span className="mt-1 block text-xs text-slate-400">{selectedPreset?.description ?? 'Путь внутри кабинета, можно с параметрами'}</span>
+                  </label>
+                  <label className="block">
+                    <span className="text-sm font-medium">Текст кнопки</span>
+                    <input
+                      className="input mt-1"
+                      value={actionLabel}
+                      onChange={(event) => setActionLabel(event.target.value)}
+                      maxLength={32}
+                      placeholder={actionHref ? 'Открыть' : 'Без кнопки'}
+                      disabled={!actionHref}
+                    />
+                  </label>
+                </div>
 
-            <label className="block">
-              <span className="text-sm font-medium">Адрес кнопки</span>
-              <input
-                className="input mt-1 font-mono text-sm"
-                value={actionHref}
-                onChange={(event) => {
-                  const href = event.target.value
-                  setActionHref(href)
-                  if (!href) setActionOpenInTelegram(false)
-                }}
-                maxLength={600}
-                placeholder="/dashboard/plans?promo=COMEBACK"
-              />
-            </label>
-
-            {actionHref ? (
-              <label className="flex min-h-12 items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-white/10 dark:bg-white/5">
-                <span className="min-w-0">
-                  <span className="block text-sm font-medium text-slate-950 dark:text-white">Открывать в Telegram</span>
-                  <span className="mt-0.5 block text-xs text-slate-500 dark:text-slate-400">Web App для Telegram-кнопки</span>
-                </span>
-                <input
-                  type="checkbox"
-                  className="h-5 w-5 shrink-0"
-                  checked={actionOpenInTelegram}
-                  onChange={(event) => setActionOpenInTelegram(event.target.checked)}
-                />
-              </label>
-            ) : null}
-
-            <label className="block">
-              <span className="text-sm font-medium">Картинка</span>
-              <div className="mt-1 grid min-w-0 gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
-                <input
-                  className="input"
-                  value={imageUrl}
-                  onChange={(event) => {
-                    setImageUrl(event.target.value)
-                    setImageLoadFailed(false)
-                  }}
-                  maxLength={600}
-                  placeholder="Ссылка появится после загрузки"
-                />
-                <label className={cn('btn-secondary min-h-11 cursor-pointer px-4', uploadingImage && 'pointer-events-none opacity-60')}>
-                  <ImageIcon className="h-4 w-4" />
-                  {uploadingImage ? 'Загрузка...' : 'Загрузить'}
+                <label className="block">
+                  <span className="text-sm font-medium">Адрес кнопки</span>
                   <input
-                    type="file"
-                    accept="image/png,image/jpeg,image/webp,image/gif"
-                    className="sr-only"
+                    className="input mt-1 font-mono text-sm"
+                    value={actionHref}
                     onChange={(event) => {
-                      const file = event.target.files?.[0] ?? null
-                      void uploadImage(file)
-                      event.currentTarget.value = ''
+                      const href = event.target.value
+                      setActionHref(href)
+                      if (!href) setActionOpenInTelegram(false)
                     }}
+                    maxLength={600}
+                    placeholder="/dashboard/plans?promo=COMEBACK"
                   />
                 </label>
-                {imageUrl ? (
-                  <button
-                    type="button"
-                    className="btn-secondary min-h-11 px-4"
-                    onClick={() => {
-                      setImageUrl('')
-                      setImageLoadFailed(false)
-                    }}
-                  >
-                    <X className="h-4 w-4" />
-                    Убрать
-                  </button>
+
+                {actionHref ? (
+                  <label className="flex min-h-12 items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-white/10 dark:bg-white/5">
+                    <span className="min-w-0">
+                      <span className="block text-sm font-medium text-slate-950 dark:text-white">Открывать в Telegram</span>
+                      <span className="mt-0.5 block text-xs text-slate-500 dark:text-slate-400">Web App для Telegram-кнопки</span>
+                    </span>
+                    <input
+                      type="checkbox"
+                      className="h-5 w-5 shrink-0"
+                      checked={actionOpenInTelegram}
+                      onChange={(event) => setActionOpenInTelegram(event.target.checked)}
+                    />
+                  </label>
                 ) : null}
+
+                <label className="block">
+                  <span className="text-sm font-medium">Картинка</span>
+                  <div className="mt-1 grid min-w-0 gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
+                    <input
+                      className="input"
+                      value={imageUrl}
+                      onChange={(event) => {
+                        setImageUrl(event.target.value)
+                        setImageLoadFailed(false)
+                      }}
+                      maxLength={600}
+                      placeholder="Ссылка появится после загрузки"
+                    />
+                    <label className={cn('btn-secondary min-h-11 cursor-pointer px-4', uploadingImage && 'pointer-events-none opacity-60')}>
+                      <ImageIcon className="h-4 w-4" />
+                      {uploadingImage ? 'Загрузка...' : 'Загрузить'}
+                      <input
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp,image/gif"
+                        className="sr-only"
+                        onChange={(event) => {
+                          const file = event.target.files?.[0] ?? null
+                          void uploadImage(file)
+                          event.currentTarget.value = ''
+                        }}
+                      />
+                    </label>
+                    {imageUrl ? (
+                      <button
+                        type="button"
+                        className="btn-secondary min-h-11 px-4"
+                        onClick={() => {
+                          setImageUrl('')
+                          setImageLoadFailed(false)
+                        }}
+                      >
+                        <X className="h-4 w-4" />
+                        Убрать
+                      </button>
+                    ) : null}
+                  </div>
+                  <span className="mt-1 block text-xs text-slate-400">До 15 МБ: JPG, PNG, WEBP или GIF. Можно оставить пустым.</span>
+                </label>
               </div>
-              <span className="mt-1 block text-xs text-slate-400">До 15 МБ: JPG, PNG, WEBP или GIF. Можно оставить пустым.</span>
-            </label>
+            </details>
 
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="text-sm text-slate-500">Шаблон и текст готовы, дальше выберите аудиторию и канал.</div>
@@ -648,14 +631,9 @@ export function BroadcastAdmin({
                           onError={() => setImageLoadFailed(true)}
                         />
                       </div>
-                    ) : (
-                      <div className="grid min-h-32 place-items-center bg-slate-100 px-4 text-center text-slate-400 dark:bg-white/5">
-                        <div className="grid justify-items-center gap-2">
-                          <ImageIcon className="h-7 w-7" />
-                          <div className="text-sm">{imageLoadFailed ? 'Картинку не удалось открыть' : 'Картинка не выбрана'}</div>
-                        </div>
-                      </div>
-                    )}
+                    ) : imageLoadFailed ? (
+                      <div className="bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:bg-amber-500/10 dark:text-amber-100">Картинку не удалось открыть</div>
+                    ) : null}
 
                     <div className="p-4">
                       <p className="whitespace-pre-wrap text-sm leading-6 text-slate-600 dark:text-slate-300">{previewBody}</p>
@@ -712,38 +690,31 @@ function BroadcastStepButton({
   active,
   number,
   title,
-  description,
   onClick,
 }: {
   active: boolean
   number: string
   title: string
-  description: string
   onClick: () => void
 }) {
   return (
     <button
       type="button"
       className={cn(
-        'flex min-h-[4.5rem] w-[16.5rem] shrink-0 items-center gap-3 rounded-xl border p-3 text-left transition-colors lg:min-h-20 lg:w-auto lg:min-w-0',
+        'flex min-h-11 min-w-0 items-center justify-center gap-2 rounded-lg px-2 text-left text-sm transition-colors sm:px-3',
         active
-          ? 'border-slate-950 bg-slate-950 text-white dark:border-white dark:bg-white dark:text-slate-950'
-          : 'border-slate-200 bg-white hover:bg-slate-50 dark:border-white/10 dark:bg-white/[0.03] dark:hover:bg-white/[0.06]'
+          ? 'bg-slate-950 text-white dark:bg-white dark:text-slate-950'
+          : 'text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-white/[0.06]'
       )}
       onClick={onClick}
     >
       <span className={cn(
-        'grid h-9 w-9 shrink-0 place-items-center rounded-xl text-sm font-semibold',
-        active ? 'bg-white text-slate-950 dark:bg-slate-950 dark:text-white' : 'bg-cyan-50 text-cyan-700 dark:bg-cyan-500/10 dark:text-cyan-200'
+        'grid h-6 w-6 shrink-0 place-items-center rounded-full text-xs font-semibold',
+        active ? 'bg-white/15 text-white dark:bg-slate-950/10 dark:text-slate-950' : 'bg-slate-100 text-slate-500 dark:bg-white/[0.06] dark:text-slate-400'
       )}>
         {number}
       </span>
-      <span className="min-w-0">
-        <span className="block truncate font-semibold">{title}</span>
-        <span className={cn('mt-0.5 block truncate text-sm', active ? 'text-white/70 dark:text-slate-500' : 'text-slate-500 dark:text-slate-400')}>
-          {description}
-        </span>
-      </span>
+      <span className="min-w-0 truncate font-semibold">{title}</span>
     </button>
   )
 }
@@ -788,9 +759,9 @@ function BroadcastHistory({
           className="mt-4"
         />
       ) : (
-        <div className="mt-4 grid gap-2">
+        <div className="mt-4 overflow-hidden rounded-xl border border-slate-200 divide-y divide-slate-100 dark:border-white/10 dark:divide-white/10">
           {history.map((item) => (
-            <div key={item.id} className="min-w-0 rounded-xl border border-slate-200 bg-white p-3 dark:border-white/10 dark:bg-surface-900">
+            <div key={item.id} className="min-w-0 p-3">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
                   <div className="truncate font-semibold">{item.title}</div>
@@ -807,15 +778,13 @@ function BroadcastHistory({
                     <RotateCcw className="h-4 w-4" />
                     Повторить
                   </button>
-                  <div className="col-span-2 grid min-h-9 place-items-center rounded-xl bg-slate-50 px-3 text-sm font-semibold text-slate-950 dark:bg-white/5 dark:text-white sm:col-span-1">
+                  <div className="col-span-2 grid min-h-9 place-items-center px-2 text-sm font-semibold text-slate-950 dark:text-white sm:col-span-1">
                     {item.recipients} получ.
                   </div>
                 </div>
               </div>
-              <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-500">
-                <HistoryMetric label="Кабинет" value={item.inAppCount} />
-                <HistoryMetric label="Telegram" value={item.telegramSent} failed={item.telegramFailed} />
-                <HistoryMetric label="Email" value={item.emailSent} failed={item.emailFailed} />
+              <div className="mt-2 text-xs text-slate-500">
+                Кабинет {item.inAppCount} · Telegram {item.telegramSent}{item.telegramFailed ? ` (${item.telegramFailed} ошибок)` : ''} · Email {item.emailSent}{item.emailFailed ? ` (${item.emailFailed} ошибок)` : ''}
               </div>
               {item.limited ? <div className="mt-2 text-xs text-amber-600">Отправлено первым 5000 получателей</div> : null}
             </div>

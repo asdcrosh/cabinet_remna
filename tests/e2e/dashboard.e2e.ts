@@ -152,3 +152,31 @@ test('экраны админки не создают горизонтальну
     await expectNoHorizontalOverflow(page)
   }
 })
+
+test('рассылка собирается в компактном редакторе', async ({ page }) => {
+  await login(page, E2E_USERS.admin.email)
+  await page.goto('/dashboard/admin/broadcasts')
+
+  const main = page.getByRole('main')
+  await expect(main.getByRole('heading', { level: 1, name: 'Рассылки' })).toBeVisible()
+  await main.getByLabel('Шаблон').selectOption({ index: 1 })
+  await expect(main.getByPlaceholder('Короткое сообщение для пользователя')).not.toHaveValue('')
+
+  await main.getByRole('button', { name: /Аудитория/ }).click()
+  await expect(main.getByRole('combobox', { name: /^Аудитория/ })).toBeVisible()
+  await main.getByRole('button', { name: /Отправка/ }).click()
+  await expect(main.getByText('Предпросмотр', { exact: true })).toBeVisible()
+  await expectNoHorizontalOverflow(page)
+})
+
+test('уведомления используют компактные фильтры', async ({ page }) => {
+  await login(page, E2E_USERS.admin.email)
+  await page.goto('/dashboard/admin/notifications')
+
+  const main = page.getByRole('main')
+  await expect(main.getByRole('heading', { level: 1, name: 'Уведомления' })).toBeVisible()
+  await main.getByLabel('Тип уведомлений').selectOption('payment')
+  await main.getByRole('button', { name: 'Только непрочитанные' }).click()
+  await expect(main.getByRole('button', { name: 'Только непрочитанные' })).toHaveAttribute('aria-pressed', 'true')
+  await expectNoHorizontalOverflow(page)
+})
