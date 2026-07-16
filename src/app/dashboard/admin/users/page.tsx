@@ -123,7 +123,7 @@ export default async function AdminUsersPage({
     <div className="page-stack">
       <PageHeader
         title="Пользователи"
-        description="Аккаунты, роли, профили Remnawave и последние подписки"
+        description="Аккаунты, роли и подписки"
         action={
           <a href={buildUsersExportHref(q, role, account)} className="btn-secondary w-full sm:w-auto">
             <Download className="h-4 w-4" />
@@ -175,14 +175,14 @@ export default async function AdminUsersPage({
         <AdminEmptyState title="Пользователи не найдены" description="Измените фильтры или очистите строку поиска." />
       )}
 
-      <div className={users.length > 0 ? 'space-y-3' : 'hidden'}>
+      <div className={users.length > 0 ? 'overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.025]' : 'hidden'}>
         {users.map((user) => {
           const subscription = user.subscriptions[0]
           const lastPayment = user.payments[0]
           const attemptsCount = attemptsByUser.get(user.id) ?? 0
           return (
-            <article key={user.id} className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.035]">
-              <div className="grid gap-4 p-4 lg:grid-cols-[minmax(15rem,1.4fr)_minmax(11rem,.8fr)_minmax(13rem,1fr)_auto] lg:items-center">
+            <article key={user.id} className="border-b border-slate-100 last:border-b-0 dark:border-white/[0.07]">
+              <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-2 px-4 py-3 lg:grid-cols-[minmax(16rem,1.4fr)_10rem_minmax(13rem,1fr)_auto_auto] lg:items-center lg:gap-x-4">
                 <div className="min-w-0">
                   <div className="flex min-w-0 items-center gap-2">
                     <span className={`h-2 w-2 shrink-0 rounded-full ${user.lastLoginAt ? 'bg-emerald-500' : 'bg-slate-300'}`} />
@@ -203,19 +203,11 @@ export default async function AdminUsersPage({
                   </div>
                 </div>
 
-                <div className="flex min-w-0 flex-wrap items-center gap-2 lg:contents">
-                  <div>
-                    <span className="inline-flex h-7 items-center rounded-full bg-slate-100 px-2.5 text-xs font-medium text-slate-600 dark:bg-white/[0.07] dark:text-slate-300 lg:hidden">
+                <div className="col-span-2 flex min-w-0 flex-wrap items-center gap-x-5 gap-y-2 lg:contents">
+                  <div className="min-w-0">
+                    <span className="inline-flex h-7 items-center rounded-full bg-slate-100 px-2.5 text-xs font-medium text-slate-600 dark:bg-white/[0.07] dark:text-slate-300">
                       {roleLabel(user.role)}
                     </span>
-                    <div className="hidden lg:block">
-                      <UserRoleSelect
-                        userId={user.id}
-                        role={user.role}
-                        actorId={session.uid}
-                        actorRole={actor.role}
-                      />
-                    </div>
                   </div>
 
                   <div className="min-w-0">
@@ -231,55 +223,43 @@ export default async function AdminUsersPage({
                       <span className="text-sm text-slate-400">Подписки нет</span>
                     )}
                   </div>
-                </div>
 
-                <div className="flex flex-wrap items-center justify-between gap-2 lg:justify-end">
-                  <div className="flex flex-wrap gap-1.5 text-xs">
+                  <div className="flex flex-wrap gap-3 text-xs text-slate-500 lg:justify-end">
                     <Counter value={user._count.payments} label="оплат" />
                     <Counter value={user._count.devices} label="устр." />
                     <Counter value={attemptsCount} label="подар." />
                   </div>
-                  <div className="hidden flex-wrap justify-end gap-2 xl:flex">
+                </div>
+
+                <div className="col-start-2 row-start-1 lg:col-auto lg:row-auto">
+                  <AdminActionsMenu compact label={`Действия: ${user.email}`}>
+                    <div className="rounded-xl bg-slate-50 p-3 dark:bg-white/[0.04]">
+                      <div className="mb-2 text-xs font-medium text-slate-500">Роль пользователя</div>
+                      <UserRoleSelect
+                        userId={user.id}
+                        role={user.role}
+                        actorId={session.uid}
+                        actorRole={actor.role}
+                      />
+                    </div>
                     <UserActions
                       user={user}
                       subscriptionPlanId={subscription?.planId ?? null}
                       attemptsCount={attemptsCount}
                       actorRole={actor.role}
                       plans={plans}
+                      showLabels
                     />
-                  </div>
-                  <div className="xl:hidden">
-                    <AdminActionsMenu>
-                      <div className="rounded-2xl bg-slate-50 p-3 dark:bg-white/[0.04] lg:hidden">
-                        <div className="mb-2 text-xs font-medium text-slate-500">Роль пользователя</div>
-                        <UserRoleSelect
-                          userId={user.id}
-                          role={user.role}
-                          actorId={session.uid}
-                          actorRole={actor.role}
-                        />
-                      </div>
-                      <UserActions
-                        user={user}
-                        subscriptionPlanId={subscription?.planId ?? null}
-                        attemptsCount={attemptsCount}
-                        actorRole={actor.role}
-                        plans={plans}
-                        showLabels
-                      />
-                    </AdminActionsMenu>
-                  </div>
+                  </AdminActionsMenu>
                 </div>
               </div>
 
               <details className="group border-t border-slate-100 dark:border-white/10">
-                <summary className="flex cursor-pointer list-none items-center justify-between bg-slate-50/50 px-4 py-3 text-sm font-medium text-slate-600 transition hover:bg-slate-50 dark:bg-white/[0.02] dark:hover:bg-white/[0.04]">
-                  <span className="flex items-center gap-2">
-                    Подробнее
-                  </span>
+                <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-2 text-xs font-medium text-slate-500 transition hover:bg-slate-50 dark:hover:bg-white/[0.03]">
+                  <span>Данные аккаунта</span>
                   <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" />
                 </summary>
-                <div className="border-t border-slate-100 bg-slate-50/30 p-4 dark:border-white/10 dark:bg-white/[0.02]">
+                <div className="border-t border-slate-100 bg-slate-50/50 p-4 dark:border-white/10 dark:bg-white/[0.02]">
                   <div className="grid gap-4 lg:grid-cols-3">
                     <DetailPanel title="Связи">
                       <DetailRow label="Email" value={user.emailVerifiedAt ? user.emailVerifiedAt.toLocaleDateString('ru-RU') : 'Не подтверждён'} ok={Boolean(user.emailVerifiedAt)} />
@@ -458,9 +438,9 @@ function formatDateTime(value: Date) {
 
 function Counter({ value, label }: { value: number; label: string }) {
   return (
-    <div className="inline-flex items-baseline gap-1 rounded-full bg-slate-50 px-2.5 py-1.5 dark:bg-white/5">
+    <div className="inline-flex items-baseline gap-1">
       <span className="font-semibold text-slate-800 dark:text-slate-100">{value}</span>
-      <span className="text-[10px] text-slate-400">{label}</span>
+      <span className="text-xs text-slate-400">{label}</span>
     </div>
   )
 }
@@ -541,7 +521,7 @@ function UserActions({
 
 function DetailPanel({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section className="min-w-0 rounded-2xl border border-slate-200 bg-white p-3 dark:border-white/10 dark:bg-white/[0.035]">
+    <section className="min-w-0 rounded-xl bg-white p-3 dark:bg-white/[0.035]">
       <h3 className="mb-2 text-xs font-semibold uppercase text-slate-400">{title}</h3>
       <div className="space-y-2">{children}</div>
     </section>

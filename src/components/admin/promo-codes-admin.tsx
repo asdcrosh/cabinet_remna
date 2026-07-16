@@ -370,10 +370,9 @@ export function PromoCodesAdmin({
           </button>
         </div>
 
-        <div className="mt-4 grid items-end gap-3 xl:grid-cols-[minmax(0,1fr)_16rem]">
+        <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_14rem]">
           <div className="min-w-0">
-            <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">Статус</div>
-            <div data-testid="promo-status-filter" className="grid grid-cols-3 gap-1 rounded-xl bg-slate-100/80 p-1 dark:bg-white/[0.05]">
+            <div data-testid="promo-status-filter" aria-label="Статус промокодов" className="grid grid-cols-3 gap-1 rounded-xl bg-slate-100/80 p-1 dark:bg-white/[0.05]">
               {([
                 ['AVAILABLE', 'Доступны', TicketCheck],
                 ['USED', 'Использованы', CheckCheck],
@@ -384,7 +383,7 @@ export function PromoCodesAdmin({
                   type="button"
                   onClick={() => setTab(value)}
                   className={cn(
-                    'inline-flex min-h-10 min-w-0 items-center justify-center gap-1.5 rounded-lg px-2 text-xs font-medium transition-colors sm:text-sm',
+                    'inline-flex h-10 min-w-0 items-center justify-center gap-1.5 rounded-lg px-2 text-xs font-medium transition-colors sm:text-sm',
                     tab === value ? 'bg-slate-950 text-white dark:bg-white dark:text-slate-950' : 'text-slate-500 hover:bg-white/70 dark:hover:bg-white/5'
                   )}
                 >
@@ -399,10 +398,10 @@ export function PromoCodesAdmin({
           </div>
 
           <div className="min-w-0">
-            <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">Источник</div>
             <select
               data-testid="promo-origin-filter"
-              className="input min-h-12"
+              aria-label="Источник промокодов"
+              className="input h-12"
               value={origin}
               onChange={(event) => {
                 setOrigin(event.target.value as 'ALL' | PromoOrigin)
@@ -600,80 +599,67 @@ export function PromoCodesAdmin({
       </AdminModal>
 
       {filteredPromoCodes.length > 0 && (
-        <div data-testid="admin-promo-grid" className="space-y-2">
+        <div data-testid="admin-promo-grid" className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.025]">
           {filteredPromoCodes.map((promoCode) => {
             const status = promoStatus(promoCode)
             return (
               <article
                 key={promoCode.id}
                 data-testid="admin-promo-card"
-                className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.035] lg:grid lg:grid-cols-[minmax(13rem,1fr)_minmax(20rem,1.6fr)_minmax(13rem,1fr)] lg:gap-x-6"
+                className="flex min-w-0 items-start gap-3 border-b border-slate-100 px-4 py-3 last:border-b-0 dark:border-white/[0.07]"
               >
-                <div className="flex items-start gap-3">
-                  <input
-                    className="mt-1.5 shrink-0"
-                    type="checkbox"
-                    checked={selectedIds.includes(promoCode.id)}
-                    onChange={() => toggleSelected(promoCode.id)}
-                    aria-label={`Выбрать промокод ${promoCode.code}`}
-                  />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="break-all font-mono text-base font-semibold" title={promoCode.code}>{promoCode.code}</h3>
+                <input
+                  className="mt-1.5 shrink-0"
+                  type="checkbox"
+                  checked={selectedIds.includes(promoCode.id)}
+                  onChange={() => toggleSelected(promoCode.id)}
+                  aria-label={`Выбрать промокод ${promoCode.code}`}
+                />
+
+                <div className="grid min-w-0 flex-1 gap-x-4 gap-y-2 sm:grid-cols-[minmax(10rem,1fr)_6rem] lg:grid-cols-[minmax(12rem,1fr)_6rem_minmax(18rem,1.5fr)_minmax(12rem,1fr)] lg:items-center">
+                  <div className="min-w-0">
+                    <div className="flex min-w-0 flex-wrap items-center gap-2">
+                      <h3 className="truncate font-mono text-sm font-semibold" title={promoCode.code}>{promoCode.code}</h3>
                       <span className={status === 'AVAILABLE' ? 'badge-active' : status === 'USED' ? 'badge-disabled' : 'badge-limited'}>
                         {status === 'AVAILABLE' ? 'Активен' : status === 'USED' ? 'Использован' : 'Архив'}
                       </span>
-                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500 dark:bg-white/10 dark:text-slate-300">
-                        {originTitle(promoCode.origin)}
-                      </span>
+                    </div>
+                    <div className="mt-1 truncate text-xs text-slate-400">{originTitle(promoCode.origin)}</div>
+                  </div>
+
+                  <div className="text-xl font-semibold tracking-tight text-emerald-600 dark:text-emerald-300">
+                    -{promoCode.discountPercent}%
+                  </div>
+
+                  <div className="min-w-0 sm:col-span-2 lg:col-span-1">
+                    <div className="truncate text-sm font-medium text-slate-700 dark:text-slate-200" title={promoCode.planNames.join(', ')}>
+                      {promoCode.planNames.length > 0 ? promoCode.planNames.join(', ') : 'Все тарифы'}
+                    </div>
+                    <div className="mt-1 truncate text-xs text-slate-500" title={audienceTitle(promoCode)}>
+                      {audienceTitle(promoCode)} · {formatRange(promoCode.startsAt, promoCode.expiresAt)}
+                    </div>
+                    <div className="mt-1 text-xs text-slate-400">
+                      Использовано {promoCode.usedCount}/{promoCode.maxUses ?? '∞'} · на одного {promoCode.maxUsesPerUser}
                     </div>
                   </div>
-                  <div className="shrink-0 text-2xl font-semibold tracking-tight text-emerald-600 dark:text-emerald-300">-{promoCode.discountPercent}%</div>
-                </div>
 
-                <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1.5 text-xs text-slate-500 lg:col-start-2 lg:row-start-1 lg:mt-0 lg:py-1">
-                  <span>Использовано <strong className="font-semibold text-slate-800 dark:text-slate-100">{promoCode.usedCount}/{promoCode.maxUses ?? '∞'}</strong></span>
-                  <span>На одного <strong className="font-semibold text-slate-800 dark:text-slate-100">{promoCode.maxUsesPerUser}</strong></span>
-                  <span>{formatRange(promoCode.startsAt, promoCode.expiresAt)}</span>
-                </div>
-
-                <div className="mt-3 space-y-1.5 text-sm lg:col-start-2 lg:row-start-2">
-                  <div className="flex min-w-0 gap-3">
-                    <span className="w-16 shrink-0 text-slate-400">Тарифы</span>
-                    <span className="line-clamp-2 font-medium text-slate-700 dark:text-slate-200">{promoCode.planNames.length > 0 ? promoCode.planNames.join(', ') : 'Все тарифы'}</span>
-                  </div>
-                  <div className="flex min-w-0 gap-3">
-                    <span className="w-16 shrink-0 text-slate-400">Доступ</span>
-                    <span className="line-clamp-2 font-medium text-slate-700 dark:text-slate-200" title={audienceTitle(promoCode)}>{audienceTitle(promoCode)}</span>
+                  <div className="min-w-0 sm:col-span-2 lg:col-span-1">
+                    {promoCode.assignees.length > 0 ? (
+                      <AssigneesBlock assignees={promoCode.assignees} />
+                    ) : (
+                      <span className="text-xs text-slate-400">Без владельца</span>
+                    )}
                   </div>
                 </div>
 
-                {promoCode.assignees.length > 0 ? (
-                  <div className="mt-3 lg:col-start-3 lg:row-span-2 lg:row-start-1 lg:mt-0">
-                    <AssigneesBlock assignees={promoCode.assignees} />
-                  </div>
-                ) : null}
-
-                <div className="mt-4 flex justify-end border-t border-slate-200/70 pt-3 dark:border-white/[0.07] lg:col-span-3">
-                  <div className="lg:hidden">
-                    <AdminActionsMenu>
-                      <PromoActions
-                        promoCode={promoCode}
-                        onEdit={() => startEdit(promoCode)}
-                        onToggle={() => void toggleActive(promoCode)}
-                        onDelete={() => void deletePromoCode(promoCode)}
-                      />
-                    </AdminActionsMenu>
-                  </div>
-                  <div className="hidden flex-wrap gap-2 lg:flex">
-                    <PromoActions
-                      promoCode={promoCode}
-                      onEdit={() => startEdit(promoCode)}
-                      onToggle={() => void toggleActive(promoCode)}
-                      onDelete={() => void deletePromoCode(promoCode)}
-                    />
-                  </div>
-                </div>
+                <AdminActionsMenu compact label={`Действия: ${promoCode.code}`}>
+                  <PromoActions
+                    promoCode={promoCode}
+                    onEdit={() => startEdit(promoCode)}
+                    onToggle={() => void toggleActive(promoCode)}
+                    onDelete={() => void deletePromoCode(promoCode)}
+                  />
+                </AdminActionsMenu>
               </article>
             )
           })}
@@ -744,9 +730,9 @@ function AssigneesBlock({ assignees }: { assignees: PromoCodeAssignee[] }) {
 
   return (
     <div className="min-w-0">
-      <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase text-slate-400">
+      <div className="flex items-center gap-1.5 text-xs text-slate-400">
         <UserRound className="h-3.5 w-3.5" />
-        За кем числится
+        Владелец
       </div>
       {firstAssignee ? (
         <div className="mt-1 min-w-0">
@@ -765,16 +751,8 @@ function AssigneesBlock({ assignees }: { assignees: PromoCodeAssignee[] }) {
             ) : null}
           </div>
           <div className="mt-0.5 truncate text-xs text-slate-500 dark:text-slate-400">
-            {firstAssignee.name ? firstAssignee.email : firstAssignee.createdAt ? formatDate(firstAssignee.createdAt) : 'Пользователь'}
+            {firstAssignee.name ? firstAssignee.email : firstAssignee.sourceLabel}
           </div>
-          {firstAssignee.name && firstAssignee.createdAt ? (
-            <div className="mt-0.5 text-xs text-slate-400">{formatDate(firstAssignee.createdAt)}</div>
-          ) : null}
-          {hiddenCount > 0 ? (
-            <div className="mt-0.5 truncate text-xs text-slate-400" title={assignees.slice(1).map((assignee) => assignee.email).join(', ')}>
-              {assignees.slice(1).map((assignee) => assignee.email).join(', ')}
-            </div>
-          ) : null}
         </div>
       ) : (
         <div className="mt-1 text-sm text-slate-500 dark:text-slate-400">Не закреплён за пользователем</div>
@@ -841,8 +819,4 @@ function formatRange(startsAt: string | null, expiresAt: string | null) {
   const start = startsAt ? new Date(startsAt).toLocaleDateString('ru-RU') : 'сейчас'
   const end = expiresAt ? new Date(expiresAt).toLocaleDateString('ru-RU') : 'без конца'
   return `${start} - ${end}`
-}
-
-function formatDate(value: string) {
-  return new Date(value).toLocaleDateString('ru-RU')
 }

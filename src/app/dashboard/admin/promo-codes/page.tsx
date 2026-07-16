@@ -98,7 +98,7 @@ export default async function AdminPromoCodesPage({
     <div className="page-stack">
       <PageHeader
         title="Промокоды"
-        description="Процентные скидки, сроки действия, лимиты и привязка к тарифам"
+        description="Скидки и условия использования"
       />
       <PromoCodesAdmin
         promoCodes={rows}

@@ -6,7 +6,15 @@ import { createPortal } from 'react-dom'
 import { MoreHorizontal, X } from 'lucide-react'
 import { useBodyScrollLock } from '@/lib/use-body-scroll-lock'
 
-export function AdminActionsMenu({ children, label = 'Действия' }: { children: ReactNode; label?: string }) {
+export function AdminActionsMenu({
+  children,
+  label = 'Действия',
+  compact = false,
+}: {
+  children: ReactNode
+  label?: string
+  compact?: boolean
+}) {
   const [open, setOpen] = useState(false)
   const [mounted, setMounted] = useState(false)
 
@@ -30,14 +38,14 @@ export function AdminActionsMenu({ children, label = 'Действия' }: { chi
     <div className="relative z-50">
       <button
         type="button"
-        className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-200 dark:hover:bg-white/[0.08]"
+        className={`inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-200 dark:hover:bg-white/[0.08] ${compact ? 'w-10 px-0' : 'px-3'}`}
         aria-label={label}
         aria-haspopup="dialog"
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
       >
         <MoreHorizontal className="h-5 w-5" />
-        <span>{label}</span>
+        <span className={compact ? 'sr-only' : ''}>{label}</span>
       </button>
       {mounted ? createPortal(
         <div
