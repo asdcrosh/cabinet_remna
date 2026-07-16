@@ -61,6 +61,7 @@ describe('admin plans route', () => {
       priceKopecks: 29900,
       durationDays: 30,
       isActive: true,
+      promoCodesEnabled: true,
       isFeatured: true,
     })
   })
@@ -87,6 +88,7 @@ describe('admin plans route', () => {
         description: 'Популярный тариф',
         allowedEmails: ['user@example.com'],
         allowedTelegramIds: ['123'],
+        promoCodesEnabled: true,
         isFeatured: true,
         featuredSlot: 1,
       }),
@@ -95,5 +97,14 @@ describe('admin plans route', () => {
       action: 'ADMIN_PLAN_CREATED',
       metadata: expect.objectContaining({ planId: 'plan-1', isFeatured: true }),
     }))
+  })
+
+  it('stores a tariff-level promo code restriction', async () => {
+    const response = await POST(planRequest({ promoCodesEnabled: false, isFeatured: false }))
+
+    expect(response.status).toBe(201)
+    expect(mocks.tx.plan.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ promoCodesEnabled: false }),
+    })
   })
 })

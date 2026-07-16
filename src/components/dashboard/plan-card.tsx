@@ -19,6 +19,7 @@ export interface PlanCardProps {
   trafficLimitGb: number | null;
   deviceLimit: number;
   isPromo?: boolean;
+  promoCodesEnabled?: boolean;
   popular?: boolean;
   current?: boolean;
   initialPromoCode?: string;
@@ -42,6 +43,7 @@ export function PlanCard({
   trafficLimitGb,
   deviceLimit,
   isPromo = false,
+  promoCodesEnabled = true,
   popular,
   current,
   initialPromoCode,
@@ -83,7 +85,7 @@ export function PlanCard({
     promoOpen && (manualPromoOpen || suggestedPromoCodes.length === 0);
 
   useEffect(() => {
-    if (!initialPromoCode || isPromoPlan) return;
+    if (!initialPromoCode || isPromoPlan || !promoCodesEnabled) return;
     const awardedPromo = suggestedPromoCodes.find((promo) => promo.code.toUpperCase() === normalizedInitialPromoCode);
 
     setPromoOpen(true);
@@ -106,7 +108,7 @@ export function PlanCard({
 
     setManualPromoOpen(true);
     setPromoInput(initialPromoCode);
-  }, [initialPromoCode, isPromoPlan, normalizedInitialPromoCode, suggestedPromoCodes]);
+  }, [initialPromoCode, isPromoPlan, normalizedInitialPromoCode, promoCodesEnabled, suggestedPromoCodes]);
 
   async function buy() {
     if (isPromoPlan) {
@@ -128,7 +130,7 @@ export function PlanCard({
       return;
     }
 
-    if (trimmedPromo && !appliedPromo) {
+    if (promoCodesEnabled && trimmedPromo && !appliedPromo) {
       toast("Сначала примените промокод или очистите поле");
       return;
     }
@@ -275,7 +277,7 @@ export function PlanCard({
         <PlanFact label="Устройства" value={`До ${deviceLimit}`} />
       </div>
 
-      {!isPromoPlan && (promoOpen || appliedPromo) ? (
+      {!isPromoPlan && promoCodesEnabled && (promoOpen || appliedPromo) ? (
         <div className="mt-4 space-y-2 border-t border-slate-100 pt-3 dark:border-white/10">
           {suggestedPromoCodes.length > 0 && !manualPromoOpen ? (
             <select
@@ -337,7 +339,7 @@ export function PlanCard({
             </div>
           )}
         </div>
-      ) : !isPromoPlan ? (
+      ) : !isPromoPlan && promoCodesEnabled ? (
         <div className="mt-auto pt-4">
           <button
             type="button"

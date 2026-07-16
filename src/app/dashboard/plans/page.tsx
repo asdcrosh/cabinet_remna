@@ -112,6 +112,7 @@ export default async function PlansPage({
     trafficLimitGb: plan.trafficLimitGb,
     deviceLimit: plan.deviceLimit,
     isPromo: plan.isPromo,
+    promoCodesEnabled: plan.promoCodesEnabled,
     popular: plan.isFeatured,
     current: currentSubscription?.planId === plan.id,
     initialPromoCode,

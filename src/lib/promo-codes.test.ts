@@ -26,6 +26,7 @@ const prisma = {
 const plan = {
   id: 'plan-1',
   priceKopecks: 10000,
+  promoCodesEnabled: true,
 }
 
 function promoCode(overrides: Record<string, unknown> = {}) {
@@ -112,6 +113,19 @@ describe('promo code helpers', () => {
         plan,
       })
     ).rejects.toMatchObject({ code: 'PROMO_PLAN_NOT_ALLOWED' })
+  })
+
+  it('rejects all promo codes when the plan disables discounts', async () => {
+    await expect(
+      validatePromoCodeForPlan({
+        prisma,
+        code: 'SALE20',
+        userId: 'user-1',
+        plan: { ...plan, promoCodesEnabled: false },
+      })
+    ).rejects.toMatchObject({ code: 'PROMO_DISABLED_FOR_PLAN' })
+
+    expect(prisma.promoCode.findUnique).not.toHaveBeenCalled()
   })
 
   it('rejects a promo code when total limit is reached', async () => {

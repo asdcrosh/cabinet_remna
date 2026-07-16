@@ -33,6 +33,7 @@ model Plan {
   allowedEmails        String[]         @default([]) // явный доступ для availability=ALLOWED
   allowedTelegramIds   String[]         @default([]) // Telegram ID строками, чтобы безопасно отдавать JSON
   isPromo              Boolean          @default(false) // бесплатный одноразовый ознакомительный тариф
+  promoCodesEnabled    Boolean          @default(true) // можно ли применять скидочные промокоды к тарифу
   isFeatured           Boolean          @default(false) // тариф, выделенный в витрине
   featuredSlot         Int?             @unique // 1 только у одного выделенного тарифа
   isActive             Boolean          @default(true)

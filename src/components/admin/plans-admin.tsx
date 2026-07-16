@@ -36,6 +36,7 @@ export interface PlanAdminRow {
   allowedEmails: string[]
   allowedTelegramIds: string[]
   isPromo: boolean
+  promoCodesEnabled: boolean
   isFeatured: boolean
   isActive: boolean
   sortOrder: number
@@ -56,6 +57,7 @@ interface PlanFormState {
   allowedUsers: string
   sortOrder: string
   isPromo: boolean
+  promoCodesEnabled: boolean
   isFeatured: boolean
   isActive: boolean
 }
@@ -79,6 +81,7 @@ const emptyForm: PlanFormState = {
   allowedUsers: '',
   sortOrder: '10',
   isPromo: false,
+  promoCodesEnabled: true,
   isFeatured: false,
   isActive: true,
 }
@@ -289,6 +292,7 @@ export function PlansAdmin({ plans }: { plans: PlanAdminRow[] }) {
                       <h3 className="break-words font-semibold tracking-tight">{plan.name}</h3>
                       <span className={plan.isActive ? 'badge-active' : 'badge-disabled'}>{plan.isActive ? 'Опубликован' : 'Скрыт'}</span>
                       {plan.isPromo && <span className="badge-limited">Пробный</span>}
+                      {!plan.promoCodesEnabled && <span className="badge-disabled">Без промокодов</span>}
                       {plan.isFeatured && <span className="badge-active">Популярный</span>}
                     </div>
                     {plan.description && <p className="mt-1 line-clamp-2 text-sm leading-5 text-slate-500 dark:text-slate-400">{plan.description}</p>}
@@ -450,6 +454,7 @@ function PlanEditor({
         </Field>
         <Toggle checked={form.unlimitedTraffic} onChange={(value) => set('unlimitedTraffic', value)} label="Безлимитный трафик" />
         <Toggle checked={form.isPromo} onChange={(value) => set('isPromo', value)} label="Пробный тариф" />
+        <Toggle checked={form.promoCodesEnabled} onChange={(value) => set('promoCodesEnabled', value)} label="Разрешать промокоды" />
         <Toggle checked={form.isFeatured} onChange={(value) => set('isFeatured', value)} label="Популярный тариф" />
         <Toggle checked={form.isActive} onChange={(value) => set('isActive', value)} label="Опубликован" />
         <Field label="Кому доступен тариф" className="md:col-span-2">
@@ -567,6 +572,7 @@ function formFromPlan(plan: PlanAdminRow): PlanFormState {
     allowedUsers: [...plan.allowedEmails, ...plan.allowedTelegramIds].join('\n'),
     sortOrder: String(plan.sortOrder),
     isPromo: plan.isPromo,
+    promoCodesEnabled: plan.promoCodesEnabled,
     isFeatured: plan.isFeatured,
     isActive: plan.isActive,
   }
@@ -586,6 +592,7 @@ function toPayload(form: PlanFormState) {
     allowedTelegramIds: parseAllowedUsers(form.allowedUsers).telegramIds,
     sortOrder: Number(form.sortOrder),
     isPromo: form.isPromo,
+    promoCodesEnabled: form.promoCodesEnabled,
     isFeatured: form.isFeatured,
     isActive: form.isActive,
   }

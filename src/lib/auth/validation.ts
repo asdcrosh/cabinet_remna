@@ -217,6 +217,7 @@ const adminPlanBaseSchema = z.object({
   allowedEmails: z.array(z.string().trim().email()).max(10_000).default([]),
   allowedTelegramIds: z.array(z.string().trim().regex(/^\d+$/, 'Telegram ID должен состоять из цифр')).max(10_000).default([]),
   isPromo: z.boolean(),
+  promoCodesEnabled: z.boolean().default(true),
   isFeatured: z.boolean().default(false),
   isActive: z.boolean(),
   sortOrder: z.coerce.number().int().min(0).max(100_000),

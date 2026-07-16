@@ -68,6 +68,7 @@ export const POST = withAuth(async (req: Request) => {
       priceKopecks: plan.priceKopecks,
       durationDays: plan.durationDays,
       isActive: plan.isActive,
+      promoCodesEnabled: plan.promoCodesEnabled,
       isFeatured: plan.isFeatured,
     },
     request: req,

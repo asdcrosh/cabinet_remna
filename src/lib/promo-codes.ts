@@ -64,12 +64,15 @@ export async function validatePromoCodeForPlan({
   prisma: PromoPrisma
   code: string
   userId: string
-  plan: Pick<Plan, 'id' | 'priceKopecks'>
+  plan: Pick<Plan, 'id' | 'priceKopecks' | 'promoCodesEnabled'>
   now?: Date
 }): Promise<PromoDiscountResult> {
   const normalizedCode = normalizePromoCode(code)
   if (!normalizedCode) {
     throw new PromoCodeError('Введите промокод', 400, 'PROMO_EMPTY')
+  }
+  if (!plan.promoCodesEnabled) {
+    throw new PromoCodeError('Промокоды не действуют на этот тариф', 400, 'PROMO_DISABLED_FOR_PLAN')
   }
 
   const promoCode = await prisma.promoCode.findUnique({

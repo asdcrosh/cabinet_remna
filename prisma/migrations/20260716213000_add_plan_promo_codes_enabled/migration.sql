@@ -1,0 +1,2 @@
+ALTER TABLE "Plan"
+ADD COLUMN "promoCodesEnabled" BOOLEAN NOT NULL DEFAULT true;

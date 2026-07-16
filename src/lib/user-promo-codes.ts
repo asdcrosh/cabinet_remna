@@ -17,7 +17,7 @@ export async function getAvailableUserPromoCodesByPlan({
   linkPromoCode,
 }: {
   userId: string
-  plans: Array<Pick<Plan, 'id' | 'priceKopecks' | 'isPromo'>>
+  plans: Array<Pick<Plan, 'id' | 'priceKopecks' | 'isPromo' | 'promoCodesEnabled'>>
   linkPromoCode?: string | null
 }) {
   await cleanupExpiredBonusBoxPromoCodes()
@@ -25,7 +25,7 @@ export async function getAvailableUserPromoCodesByPlan({
   const result = new Map<string, AvailableUserPromoCode[]>()
 
   await Promise.all(plans.map(async (plan) => {
-    if (plan.isPromo) {
+    if (plan.isPromo || !plan.promoCodesEnabled) {
       result.set(plan.id, [])
       return
     }
