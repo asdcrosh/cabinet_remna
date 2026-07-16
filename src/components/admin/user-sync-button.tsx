@@ -6,7 +6,7 @@ import { RefreshCw } from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
 import { toast } from '@/components/ui/toaster'
 
-export function UserSyncButton({ userId }: { userId: string }) {
+export function UserSyncButton({ userId, showLabel = false }: { userId: string; showLabel?: boolean }) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
 
@@ -43,13 +43,14 @@ export function UserSyncButton({ userId }: { userId: string }) {
   return (
     <button
       type="button"
-      className="btn-secondary h-9 min-h-9 w-9 shrink-0 px-0 hover:text-sky-700 dark:hover:text-sky-300"
+      className={`btn-secondary h-10 min-h-10 shrink-0 hover:text-sky-700 dark:hover:text-sky-300 ${showLabel ? 'px-3' : 'w-10 px-0'}`}
       onClick={() => void sync()}
       disabled={loading}
       title="Синхронизировать пользователя"
       aria-label="Синхронизировать пользователя"
     >
       <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+      {showLabel ? <span>{loading ? 'Синхронизация...' : 'Синхронизировать'}</span> : null}
     </button>
   )
 }

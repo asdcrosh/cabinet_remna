@@ -22,11 +22,13 @@ export function UserPlanButton({
   email,
   currentPlanId,
   plans,
+  showLabel = false,
 }: {
   userId: string
   email: string
   currentPlanId: string | null
   plans: UserPlanOption[]
+  showLabel?: boolean
 }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
@@ -68,12 +70,13 @@ export function UserPlanButton({
     <>
       <button
         type="button"
-        className="btn-secondary h-9 min-h-9 w-9 shrink-0 px-0 hover:text-emerald-700 dark:hover:text-emerald-300"
+        className={`btn-secondary h-10 min-h-10 shrink-0 hover:text-emerald-700 dark:hover:text-emerald-300 ${showLabel ? 'px-3' : 'w-10 px-0'}`}
         onClick={() => setOpen(true)}
         title="Назначить тариф"
         aria-label="Назначить тариф"
       >
         <CalendarPlus className="h-4 w-4" />
+        {showLabel ? <span>Назначить тариф</span> : null}
       </button>
 
       <AdminModal

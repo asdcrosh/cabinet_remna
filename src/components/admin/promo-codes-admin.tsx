@@ -9,6 +9,7 @@ import { apiFetch } from '@/lib/api-client'
 import { toast } from '@/components/ui/toaster'
 import { cn } from '@/lib/cn'
 import { AdminEmptyState } from '@/components/admin/admin-empty-state'
+import { AdminActionsMenu } from '@/components/admin/admin-actions-menu'
 import { AdminModal } from '@/components/admin/admin-modal'
 import { ConfirmDialog } from '@/components/dashboard/confirm-dialog'
 import { ADMIN_LIST_PAGE_SIZE } from '@/lib/admin-list'
@@ -350,28 +351,23 @@ export function PromoCodesAdmin({
   return (
     <div className="space-y-4">
       <section className="pb-2">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h2 className="font-semibold">Промокоды</h2>
-            <p className="mt-1 text-sm text-slate-500">Скидки, ограничения и доступные тарифы</p>
+        <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <input
+              value={query}
+              onChange={(event) => {
+                setQuery(event.target.value)
+                setSelectedIds([])
+              }}
+              className="input pl-9"
+              placeholder="Код, email или имя"
+            />
           </div>
-          <button type="button" className="btn-primary w-full sm:w-auto" onClick={startCreate}>
+          <button type="button" className="btn-primary" onClick={startCreate}>
             <Plus className="h-4 w-4" />
             Новый промокод
           </button>
-        </div>
-
-        <div className="relative mt-4">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          <input
-            value={query}
-            onChange={(event) => {
-              setQuery(event.target.value)
-              setSelectedIds([])
-            }}
-            className="input pl-9"
-            placeholder="Поиск по коду, email или имени"
-          />
         </div>
 
         <div className="mt-4 grid items-end gap-3 xl:grid-cols-[minmax(0,1fr)_16rem]">
@@ -422,7 +418,7 @@ export function PromoCodesAdmin({
         </div>
       </section>
 
-      <div className={selectedIds.length > 0 ? 'admin-bulk-bar' : 'flex min-h-10 items-center px-1'}>
+      <div className={selectedIds.length > 0 ? 'admin-bulk-bar' : 'flex items-center justify-between px-1'}>
         <label className="flex min-h-10 items-center gap-3 text-sm font-medium text-slate-600 dark:text-slate-300">
           <input
             type="checkbox"
@@ -430,7 +426,7 @@ export function PromoCodesAdmin({
             onChange={toggleSelectedInTab}
             disabled={filteredIds.length === 0}
           />
-          Выбрать в текущем разделе
+          Выбрать все
           {selectedIds.length > 0 && (
             <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500 dark:bg-white/10">
               выбрано {selectedIds.length}
@@ -611,7 +607,7 @@ export function PromoCodesAdmin({
               <article
                 key={promoCode.id}
                 data-testid="admin-promo-card"
-                className="min-w-0 rounded-xl border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.035] lg:grid lg:grid-cols-[minmax(13rem,1fr)_minmax(20rem,1.6fr)_minmax(13rem,1fr)] lg:gap-x-6"
+                className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.035] lg:grid lg:grid-cols-[minmax(13rem,1fr)_minmax(20rem,1.6fr)_minmax(13rem,1fr)] lg:gap-x-6"
               >
                 <div className="flex items-start gap-3">
                   <input
@@ -635,19 +631,10 @@ export function PromoCodesAdmin({
                   <div className="shrink-0 text-2xl font-semibold tracking-tight text-emerald-600 dark:text-emerald-300">-{promoCode.discountPercent}%</div>
                 </div>
 
-                <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 border-y border-slate-200/70 py-3 dark:border-white/[0.07] sm:grid-cols-3 lg:col-start-2 lg:row-start-1 lg:mt-0 lg:border-0 lg:py-1">
-                  <div>
-                    <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Использовано</div>
-                    <div className="mt-0.5 text-sm font-medium">{promoCode.usedCount}/{promoCode.maxUses ?? '∞'}</div>
-                  </div>
-                  <div>
-                    <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">На одного</div>
-                    <div className="mt-0.5 text-sm font-medium">{promoCode.maxUsesPerUser}</div>
-                  </div>
-                  <div className="col-span-2 sm:col-span-1">
-                    <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Срок</div>
-                    <div className="mt-0.5 text-sm font-medium">{formatRange(promoCode.startsAt, promoCode.expiresAt)}</div>
-                  </div>
+                <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1.5 text-xs text-slate-500 lg:col-start-2 lg:row-start-1 lg:mt-0 lg:py-1">
+                  <span>Использовано <strong className="font-semibold text-slate-800 dark:text-slate-100">{promoCode.usedCount}/{promoCode.maxUses ?? '∞'}</strong></span>
+                  <span>На одного <strong className="font-semibold text-slate-800 dark:text-slate-100">{promoCode.maxUsesPerUser}</strong></span>
+                  <span>{formatRange(promoCode.startsAt, promoCode.expiresAt)}</span>
                 </div>
 
                 <div className="mt-3 space-y-1.5 text-sm lg:col-start-2 lg:row-start-2">
@@ -661,33 +648,31 @@ export function PromoCodesAdmin({
                   </div>
                 </div>
 
-                <div className="mt-4 lg:col-start-3 lg:row-span-2 lg:row-start-1 lg:mt-0">
-                  <AssigneesBlock assignees={promoCode.assignees} />
-                </div>
+                {promoCode.assignees.length > 0 ? (
+                  <div className="mt-3 lg:col-start-3 lg:row-span-2 lg:row-start-1 lg:mt-0">
+                    <AssigneesBlock assignees={promoCode.assignees} />
+                  </div>
+                ) : null}
 
-                <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-slate-200/70 pt-3 dark:border-white/[0.07] lg:col-span-3">
-                  <button type="button" className="btn-secondary min-h-10 px-3 py-2 text-xs" onClick={() => startEdit(promoCode)} aria-label={`Изменить промокод ${promoCode.code}`}>
-                    <Edit3 className="h-4 w-4" />
-                    Изменить
-                  </button>
-                  <button
-                    type="button"
-                    className={cn('btn-secondary min-h-10 px-3 py-2 text-xs', promoCode.isActive ? 'text-amber-700 dark:text-amber-200' : 'text-emerald-700 dark:text-emerald-200')}
-                    onClick={() => toggleActive(promoCode)}
-                    aria-label={`${promoCode.isActive ? 'Отключить' : 'Включить'} промокод ${promoCode.code}`}
-                  >
-                    <Power className="h-4 w-4" />
-                    {promoCode.isActive ? 'Отключить' : 'Включить'}
-                  </button>
-                  <button
-                    type="button"
-                    className="btn-secondary ml-auto min-h-10 px-3 py-2 text-xs text-red-600 hover:border-red-200 hover:bg-red-50 hover:text-red-700 dark:text-red-300 dark:hover:border-red-500/30 dark:hover:bg-red-500/10"
-                    onClick={() => void deletePromoCode(promoCode)}
-                    aria-label={`Удалить промокод ${promoCode.code}`}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    Удалить
-                  </button>
+                <div className="mt-4 flex justify-end border-t border-slate-200/70 pt-3 dark:border-white/[0.07] lg:col-span-3">
+                  <div className="lg:hidden">
+                    <AdminActionsMenu>
+                      <PromoActions
+                        promoCode={promoCode}
+                        onEdit={() => startEdit(promoCode)}
+                        onToggle={() => void toggleActive(promoCode)}
+                        onDelete={() => void deletePromoCode(promoCode)}
+                      />
+                    </AdminActionsMenu>
+                  </div>
+                  <div className="hidden flex-wrap gap-2 lg:flex">
+                    <PromoActions
+                      promoCode={promoCode}
+                      onEdit={() => startEdit(promoCode)}
+                      onToggle={() => void toggleActive(promoCode)}
+                      onDelete={() => void deletePromoCode(promoCode)}
+                    />
+                  </div>
                 </div>
               </article>
             )
@@ -711,6 +696,45 @@ export function PromoCodesAdmin({
         onCancel={() => setConfirmAction(null)}
       />
     </div>
+  )
+}
+
+function PromoActions({
+  promoCode,
+  onEdit,
+  onToggle,
+  onDelete,
+}: {
+  promoCode: PromoCodeAdminRow
+  onEdit: () => void
+  onToggle: () => void
+  onDelete: () => void
+}) {
+  return (
+    <>
+      <button type="button" className="btn-secondary min-h-10 px-3 py-2 text-xs" onClick={onEdit} aria-label={`Изменить промокод ${promoCode.code}`}>
+        <Edit3 className="h-4 w-4" />
+        Изменить
+      </button>
+      <button
+        type="button"
+        className={cn('btn-secondary min-h-10 px-3 py-2 text-xs', promoCode.isActive ? 'text-amber-700 dark:text-amber-200' : 'text-emerald-700 dark:text-emerald-200')}
+        onClick={onToggle}
+        aria-label={`${promoCode.isActive ? 'Отключить' : 'Включить'} промокод ${promoCode.code}`}
+      >
+        <Power className="h-4 w-4" />
+        {promoCode.isActive ? 'Отключить' : 'Включить'}
+      </button>
+      <button
+        type="button"
+        className="btn-secondary min-h-10 px-3 py-2 text-xs text-red-600 hover:border-red-200 hover:bg-red-50 hover:text-red-700 dark:text-red-300 dark:hover:border-red-500/30 dark:hover:bg-red-500/10"
+        onClick={onDelete}
+        aria-label={`Удалить промокод ${promoCode.code}`}
+      >
+        <Trash2 className="h-4 w-4" />
+        Удалить
+      </button>
+    </>
   )
 }
 

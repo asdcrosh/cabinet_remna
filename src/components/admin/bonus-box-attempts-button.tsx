@@ -11,10 +11,12 @@ export function BonusBoxAttemptsButton({
   userId,
   email,
   attemptsCount,
+  showLabel = false,
 }: {
   userId: string
   email: string
   attemptsCount: number
+  showLabel?: boolean
 }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
@@ -49,12 +51,13 @@ export function BonusBoxAttemptsButton({
     <>
       <button
         type="button"
-        className="btn-secondary h-9 min-h-9 w-9 shrink-0 px-0 hover:text-cyan-700 dark:hover:text-cyan-200"
+        className={`btn-secondary h-10 min-h-10 shrink-0 hover:text-cyan-700 dark:hover:text-cyan-200 ${showLabel ? 'px-3' : 'w-10 px-0'}`}
         onClick={() => setOpen(true)}
         title="Начислить подарок"
         aria-label="Начислить подарок"
       >
         <Gift className="h-4 w-4" />
+        {showLabel ? <span>Начислить подарок</span> : null}
       </button>
 
       <AdminModal

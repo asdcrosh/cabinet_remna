@@ -80,10 +80,10 @@ export default async function AdminPaymentsPage({
         }
       />
 
-      <section className="grid gap-3 sm:grid-cols-3">
-        <PaymentStat title="Ожидают оплаты" value={pendingCount} tone="amber" />
-        <PaymentStat title="Нужна довыдача" value={retryCount} tone={retryCount > 0 ? 'red' : 'slate'} />
-        <PaymentStat title="Оплачено всего" value={succeededCount} tone="emerald" />
+      <section className="grid grid-cols-3 gap-2">
+        <PaymentStat title="Ожидают" value={pendingCount} tone="amber" />
+        <PaymentStat title="Довыдача" value={retryCount} tone={retryCount > 0 ? 'red' : 'slate'} />
+        <PaymentStat title="Оплачено" value={succeededCount} tone="emerald" />
       </section>
 
       <AdminFilterBar
@@ -218,7 +218,7 @@ export default async function AdminPaymentsPage({
           const canCheckPayment = Boolean(payment.yookassaId) && payment.status !== 'SUCCEEDED'
           return (
             <article key={payment.id} className={`overflow-hidden rounded-2xl border border-l-4 bg-white dark:bg-white/[0.035] ${paymentRailClass(payment.status, needsRetry || needsRemnashopRetry)}`}>
-              <div className="border-b bg-slate-50/70 px-4 py-3 dark:bg-white/[0.03]">
+              <div className="px-4 pb-2 pt-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="break-words text-sm font-semibold">{payment.user.email}</div>
@@ -227,7 +227,7 @@ export default async function AdminPaymentsPage({
                   <PaymentBadge status={payment.status} />
                 </div>
               </div>
-              <div className="space-y-3 px-4 py-4">
+              <div className="space-y-3 px-4 pb-4">
                 <div className="flex items-baseline justify-between gap-3">
                   <div>
                     <div className="text-xs uppercase tracking-wide text-slate-400">Тариф</div>
@@ -248,9 +248,11 @@ export default async function AdminPaymentsPage({
                   provisioned={Boolean(payment.subscriptionProvisionedAt)}
                   remnashopSynced={Boolean(payment.remnashopSyncedAt)}
                 />
-                <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
-                  <AdminInfoCell label="Промокод" value={getPromoCodeLabel(payment.promoCodeSnapshot)} />
-                  <AdminInfoCell label="ID платежа" value={shortId(payment.yookassaId || payment.id)} mono />
+                <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
+                  {getPromoCodeLabel(payment.promoCodeSnapshot) !== '—' ? (
+                    <span>Промокод: <span className="font-medium text-slate-700 dark:text-slate-200">{getPromoCodeLabel(payment.promoCodeSnapshot)}</span></span>
+                  ) : null}
+                  <span className="font-mono">ID: {shortId(payment.yookassaId || payment.id)}</span>
                 </div>
                 {(payment.provisioningError || (payment.subscriptionProvisionedAt && !payment.remnashopSyncedAt)) ? (
                   <details className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
@@ -292,11 +294,14 @@ function PaymentFlow({ paid, provisioned, remnashopSynced }: { paid: boolean; pr
   ]
 
   return (
-    <div className="grid grid-cols-3 overflow-hidden rounded-xl border border-slate-200 dark:border-white/10">
+    <div className="flex flex-wrap items-center gap-2 text-xs">
       {steps.map((step, index) => (
-        <div key={step.label} className={`relative px-2 py-2 text-center text-xs font-medium ${step.done ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-200' : 'bg-slate-50 text-slate-400 dark:bg-white/[0.03]'}`}>
-          {index > 0 ? <span className="absolute inset-y-2 left-0 w-px bg-slate-200 dark:bg-white/10" /> : null}
-          {step.label}
+        <div key={step.label} className="flex items-center gap-2">
+          {index > 0 ? <span className="text-slate-300 dark:text-slate-600">→</span> : null}
+          <span className={`inline-flex items-center gap-1.5 font-medium ${step.done ? 'text-emerald-700 dark:text-emerald-300' : 'text-slate-400'}`}>
+            <span className={`h-1.5 w-1.5 rounded-full ${step.done ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-600'}`} />
+            {step.label}
+          </span>
         </div>
       ))}
     </div>
@@ -362,18 +367,9 @@ function PaymentStat({ title, value, tone }: { title: string; value: number; ton
   }[tone]
 
   return (
-    <div className={`rounded-2xl border px-4 py-3 ${toneClass}`}>
-      <div className="text-sm opacity-75">{title}</div>
-      <div className="mt-1 text-2xl font-semibold">{value}</div>
-    </div>
-  )
-}
-
-function AdminInfoCell({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
-  return (
-    <div className="info-cell">
-      <div className="text-xs text-slate-500">{label}</div>
-      <div className={mono ? 'mt-1 truncate font-mono text-xs' : 'mt-1 truncate font-medium'}>{value}</div>
+    <div className={`min-w-0 rounded-xl border px-3 py-2.5 ${toneClass}`}>
+      <div className="truncate text-xs opacity-75">{title}</div>
+      <div className="mt-0.5 text-xl font-semibold tabular-nums sm:text-2xl">{value}</div>
     </div>
   )
 }

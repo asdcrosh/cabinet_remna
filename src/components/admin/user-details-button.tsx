@@ -43,7 +43,7 @@ export interface AdminUserDetails {
   }>
 }
 
-export function UserDetailsButton({ details }: { details: AdminUserDetails }) {
+export function UserDetailsButton({ details, showLabel = false }: { details: AdminUserDetails; showLabel?: boolean }) {
   const [open, setOpen] = useState(false)
   const [tab, setTab] = useState<'PROFILE' | 'SUBSCRIPTIONS' | 'PAYMENTS' | 'DEVICES'>('PROFILE')
 
@@ -51,7 +51,7 @@ export function UserDetailsButton({ details }: { details: AdminUserDetails }) {
     <>
       <button
         type="button"
-        className="btn-secondary h-9 min-h-9 w-9 shrink-0 px-0"
+        className={`btn-secondary h-10 min-h-10 shrink-0 ${showLabel ? 'px-3' : 'w-10 px-0'}`}
         onClick={() => {
           setTab('PROFILE')
           setOpen(true)
@@ -60,6 +60,7 @@ export function UserDetailsButton({ details }: { details: AdminUserDetails }) {
         aria-label="Открыть пользователя"
       >
         <Eye className="h-4 w-4" />
+        {showLabel ? <span>Открыть профиль</span> : null}
       </button>
 
       <AdminModal

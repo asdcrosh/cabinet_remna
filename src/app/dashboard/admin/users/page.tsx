@@ -181,7 +181,7 @@ export default async function AdminUsersPage({
           const lastPayment = user.payments[0]
           const attemptsCount = attemptsByUser.get(user.id) ?? 0
           return (
-            <article key={user.id} className="relative overflow-visible rounded-2xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.035]">
+            <article key={user.id} className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.035]">
               <div className="grid gap-4 p-4 lg:grid-cols-[minmax(15rem,1.4fr)_minmax(11rem,.8fr)_minmax(13rem,1fr)_auto] lg:items-center">
                 <div className="min-w-0">
                   <div className="flex min-w-0 items-center gap-2">
@@ -203,29 +203,38 @@ export default async function AdminUsersPage({
                   </div>
                 </div>
 
-                <UserRoleSelect
-                  userId={user.id}
-                  role={user.role}
-                  actorId={session.uid}
-                  actorRole={actor.role}
-                />
-
-                <div className="min-w-0">
-                  {subscription ? (
-                    <div className="flex items-center gap-3">
-                      <SubscriptionBadge status={subscription.status} />
-                      <div className="min-w-0 text-xs text-slate-500">
-                        <div className="truncate font-medium text-slate-700 dark:text-slate-200">{subscription.plan?.name || 'Без тарифа'}</div>
-                        <div>до {subscription.expireAt.toLocaleDateString('ru-RU')}</div>
-                      </div>
+                <div className="flex min-w-0 flex-wrap items-center gap-2 lg:contents">
+                  <div>
+                    <span className="inline-flex h-7 items-center rounded-full bg-slate-100 px-2.5 text-xs font-medium text-slate-600 dark:bg-white/[0.07] dark:text-slate-300 lg:hidden">
+                      {roleLabel(user.role)}
+                    </span>
+                    <div className="hidden lg:block">
+                      <UserRoleSelect
+                        userId={user.id}
+                        role={user.role}
+                        actorId={session.uid}
+                        actorRole={actor.role}
+                      />
                     </div>
-                  ) : (
-                    <span className="text-sm text-slate-400">Подписки нет</span>
-                  )}
+                  </div>
+
+                  <div className="min-w-0">
+                    {subscription ? (
+                      <div className="flex items-center gap-2">
+                        <SubscriptionBadge status={subscription.status} />
+                        <div className="min-w-0 text-xs text-slate-500">
+                          <div className="truncate font-medium text-slate-700 dark:text-slate-200">{subscription.plan?.name || 'Без тарифа'}</div>
+                          <div>до {subscription.expireAt.toLocaleDateString('ru-RU')}</div>
+                        </div>
+                      </div>
+                    ) : (
+                      <span className="text-sm text-slate-400">Подписки нет</span>
+                    )}
+                  </div>
                 </div>
 
                 <div className="flex flex-wrap items-center justify-between gap-2 lg:justify-end">
-                  <div className="grid grid-cols-3 gap-1 text-center text-xs">
+                  <div className="flex flex-wrap gap-1.5 text-xs">
                     <Counter value={user._count.payments} label="оплат" />
                     <Counter value={user._count.devices} label="устр." />
                     <Counter value={attemptsCount} label="подар." />
@@ -239,14 +248,24 @@ export default async function AdminUsersPage({
                       plans={plans}
                     />
                   </div>
-                  <div className="relative z-30 xl:hidden">
+                  <div className="xl:hidden">
                     <AdminActionsMenu>
+                      <div className="rounded-2xl bg-slate-50 p-3 dark:bg-white/[0.04] lg:hidden">
+                        <div className="mb-2 text-xs font-medium text-slate-500">Роль пользователя</div>
+                        <UserRoleSelect
+                          userId={user.id}
+                          role={user.role}
+                          actorId={session.uid}
+                          actorRole={actor.role}
+                        />
+                      </div>
                       <UserActions
                         user={user}
                         subscriptionPlanId={subscription?.planId ?? null}
                         attemptsCount={attemptsCount}
                         actorRole={actor.role}
                         plans={plans}
+                        showLabels
                       />
                     </AdminActionsMenu>
                   </div>
@@ -256,8 +275,7 @@ export default async function AdminUsersPage({
               <details className="group border-t border-slate-100 dark:border-white/10">
                 <summary className="flex cursor-pointer list-none items-center justify-between bg-slate-50/50 px-4 py-3 text-sm font-medium text-slate-600 transition hover:bg-slate-50 dark:bg-white/[0.02] dark:hover:bg-white/[0.04]">
                   <span className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-cyan-600" />
-                    Детали аккаунта
+                    Подробнее
                   </span>
                   <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" />
                 </summary>
@@ -440,9 +458,9 @@ function formatDateTime(value: Date) {
 
 function Counter({ value, label }: { value: number; label: string }) {
   return (
-    <div className="min-w-12 rounded-md bg-slate-50 px-2 py-1.5 dark:bg-white/5">
-      <div className="font-semibold text-slate-800 dark:text-slate-100">{value}</div>
-      <div className="text-[10px] text-slate-400">{label}</div>
+    <div className="inline-flex items-baseline gap-1 rounded-full bg-slate-50 px-2.5 py-1.5 dark:bg-white/5">
+      <span className="font-semibold text-slate-800 dark:text-slate-100">{value}</span>
+      <span className="text-[10px] text-slate-400">{label}</span>
     </div>
   )
 }
@@ -453,6 +471,7 @@ function UserActions({
   attemptsCount,
   actorRole,
   plans,
+  showLabels = false,
 }: {
   user: {
     id: string
@@ -476,18 +495,20 @@ function UserActions({
   attemptsCount: number
   actorRole: string
   plans: Array<{ id: string; name: string; priceKopecks: number; durationDays: number; isActive: boolean }>
+  showLabels?: boolean
 }) {
   const canManageUser = actorRole === 'SUPER_ADMIN' || user.role !== 'SUPER_ADMIN'
 
   return (
     <>
-      <UserDetailsButton details={buildUserDetails(user)} />
-      <UserSyncButton userId={user.id} />
+      <UserDetailsButton details={buildUserDetails(user)} showLabel={showLabels} />
+      <UserSyncButton userId={user.id} showLabel={showLabels} />
       {actorRole === 'SUPER_ADMIN' && (
         <BonusBoxAttemptsButton
           userId={user.id}
           email={user.email}
           attemptsCount={attemptsCount}
+          showLabel={showLabels}
         />
       )}
       {canManageUser && (
@@ -496,6 +517,7 @@ function UserActions({
           email={user.email}
           currentPlanId={subscriptionPlanId}
           plans={plans}
+          showLabel={showLabels}
         />
       )}
       {canManageUser && (
@@ -510,6 +532,7 @@ function UserActions({
           remnawaveUuid={user.remnawaveUuid}
           remnawaveShortUuid={user.remnawaveShortUuid}
           remnawaveUsername={user.remnawaveUsername}
+          showLabel={showLabels}
         />
       )}
     </>

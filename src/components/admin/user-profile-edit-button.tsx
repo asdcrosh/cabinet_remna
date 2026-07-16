@@ -19,6 +19,7 @@ export function UserProfileEditButton({
   remnawaveUuid,
   remnawaveShortUuid,
   remnawaveUsername,
+  showLabel = false,
 }: {
   userId: string
   email: string
@@ -30,6 +31,7 @@ export function UserProfileEditButton({
   remnawaveUuid?: string | null
   remnawaveShortUuid?: string | null
   remnawaveUsername?: string | null
+  showLabel?: boolean
 }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
@@ -83,12 +85,13 @@ export function UserProfileEditButton({
     <>
       <button
         type="button"
-        className="btn-secondary h-9 min-h-9 w-9 shrink-0 px-0 hover:text-cyan-700 dark:hover:text-cyan-200"
+        className={`btn-secondary h-10 min-h-10 shrink-0 hover:text-cyan-700 dark:hover:text-cyan-200 ${showLabel ? 'px-3' : 'w-10 px-0'}`}
         onClick={() => setOpen(true)}
         title="Редактировать профиль"
         aria-label="Редактировать профиль"
       >
         <Pencil className="h-4 w-4" />
+        {showLabel ? <span>Редактировать профиль</span> : null}
       </button>
 
       <AdminModal

@@ -106,99 +106,101 @@ export function PersonalOffersAdmin({
 
   return (
     <>
-      <section className="surface-card border-emerald-100 bg-emerald-50/50 p-4 dark:border-emerald-500/20 dark:bg-emerald-500/10">
-        <div className="flex flex-col gap-4">
-          <div className="min-w-0">
-            <div className="flex items-center gap-3">
-              <div className="grid h-10 w-10 place-items-center rounded-xl bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-100">
-                <Gift className="h-5 w-5" />
-              </div>
-              <div>
-                <h2 className="text-lg font-semibold text-slate-950 dark:text-white">Приветственный бонус</h2>
-                <p className="text-sm text-slate-500 dark:text-slate-400">
-                  Отдельная выдача для новых пользователей: пробный период, рулетка или промокод.
-                </p>
-              </div>
+      <section className="surface-card p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-200">
+              <Gift className="h-5 w-5" />
             </div>
-            <div className="mt-3 rounded-xl border border-emerald-100 bg-white/80 px-3 py-2 text-sm text-slate-600 dark:border-emerald-500/20 dark:bg-white/[0.04] dark:text-slate-300">
-              <span className="font-medium text-slate-950 dark:text-white">Сейчас: </span>
-              {welcomeSummary(welcomeForm, trialPlans, promoCodes)}
+            <div className="min-w-0">
+              <h2 className="font-semibold text-slate-950 dark:text-white">Приветственный бонус</h2>
+              <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
+                {welcomeSummary(welcomeForm, trialPlans, promoCodes)}
+              </p>
             </div>
           </div>
+          <label className="inline-flex shrink-0 items-center gap-2 text-sm font-medium">
+            <span className="hidden sm:inline">Включён</span>
+            <span className="sr-only">Включить приветственный бонус</span>
+            <input
+              type="checkbox"
+              className="h-5 w-5"
+              checked={welcomeForm.enabled}
+              onChange={(event) => setWelcomeForm((prev) => ({ ...prev, enabled: event.target.checked }))}
+            />
+          </label>
+        </div>
 
-          <div className="grid w-full gap-3">
-            <label className="flex min-h-12 items-center gap-2 rounded-xl border border-emerald-100 bg-white px-3 py-2 text-sm font-medium dark:border-emerald-500/20 dark:bg-white/[0.035]">
+        <details className="group mt-4 border-t border-slate-200 pt-3 dark:border-white/10">
+          <summary className="flex cursor-pointer list-none items-center justify-between text-sm font-medium text-slate-600 dark:text-slate-300">
+            Настроить варианты
+            <span className="text-xs text-slate-400 group-open:hidden">Открыть</span>
+            <span className="hidden text-xs text-slate-400 group-open:inline">Свернуть</span>
+          </summary>
+          <div className="mt-3 grid gap-3 xl:grid-cols-3">
+            <WelcomeBonusOption
+              title="Пробный период"
+              description="Бесплатный тариф для нового пользователя."
+              icon={<Sparkles className="h-5 w-5" />}
+              checked={welcomeForm.trialEnabled}
+              onToggle={(checked) => setWelcomeForm((prev) => ({ ...prev, trialEnabled: checked }))}
+            >
+              <select
+                className="input"
+                value={welcomeForm.trialPlanId}
+                onChange={(event) => setWelcomeForm((prev) => ({ ...prev, trialPlanId: event.target.value }))}
+              >
+                <option value="">Выберите тариф</option>
+                {trialPlans.map((plan) => (
+                  <option key={plan.id} value={plan.id}>{plan.name} · {plan.durationDays} дн.</option>
+                ))}
+              </select>
+            </WelcomeBonusOption>
+
+            <WelcomeBonusOption
+              title="Промокод"
+              description="Код на первую оплату."
+              icon={<Ticket className="h-5 w-5" />}
+              checked={welcomeForm.promoCodeEnabled}
+              onToggle={(checked) => setWelcomeForm((prev) => ({ ...prev, promoCodeEnabled: checked }))}
+            >
+              <select
+                className="input"
+                value={welcomeForm.promoCodeId}
+                onChange={(event) => setWelcomeForm((prev) => ({ ...prev, promoCodeId: event.target.value }))}
+              >
+                <option value="">Выберите промокод</option>
+                {promoCodes.map((promoCode) => (
+                  <option key={promoCode.id} value={promoCode.id}>
+                    {promoCode.code} · {promoCode.discountPercent}%
+                  </option>
+                ))}
+              </select>
+            </WelcomeBonusOption>
+
+            <WelcomeBonusOption
+              title="Рулетка"
+              description="Попытки в подарочном боксе."
+              icon={<WandSparkles className="h-5 w-5" />}
+              checked={welcomeForm.bonusAttemptsEnabled}
+              onToggle={(checked) => setWelcomeForm((prev) => ({ ...prev, bonusAttemptsEnabled: checked }))}
+            >
               <input
-                type="checkbox"
-                checked={welcomeForm.enabled}
-                onChange={(event) => setWelcomeForm((prev) => ({ ...prev, enabled: event.target.checked }))}
+                className="input"
+                type="number"
+                min={1}
+                max={50}
+                value={welcomeForm.bonusAttempts}
+                onChange={(event) => setWelcomeForm((prev) => ({ ...prev, bonusAttempts: Number(event.target.value) }))}
               />
-              Включить приветственный бонус
-            </label>
-
-            <div className="grid gap-3 xl:grid-cols-3">
-              <WelcomeBonusOption
-                title="Пробный период"
-                description="Новый пользователь сможет выбрать бесплатный тариф."
-                icon={<Sparkles className="h-5 w-5" />}
-                checked={welcomeForm.trialEnabled}
-                onToggle={(checked) => setWelcomeForm((prev) => ({ ...prev, trialEnabled: checked }))}
-              >
-                <select
-                  className="input"
-                  value={welcomeForm.trialPlanId}
-                  onChange={(event) => setWelcomeForm((prev) => ({ ...prev, trialPlanId: event.target.value }))}
-                >
-                  <option value="">Выберите тариф</option>
-                  {trialPlans.map((plan) => (
-                    <option key={plan.id} value={plan.id}>{plan.name} · {plan.durationDays} дн.</option>
-                  ))}
-                </select>
-              </WelcomeBonusOption>
-
-              <WelcomeBonusOption
-                title="Промокод"
-                description="Пользователь получит код на первую оплату."
-                icon={<Ticket className="h-5 w-5" />}
-                checked={welcomeForm.promoCodeEnabled}
-                onToggle={(checked) => setWelcomeForm((prev) => ({ ...prev, promoCodeEnabled: checked }))}
-              >
-                <select
-                  className="input"
-                  value={welcomeForm.promoCodeId}
-                  onChange={(event) => setWelcomeForm((prev) => ({ ...prev, promoCodeId: event.target.value }))}
-                >
-                  <option value="">Выберите промокод</option>
-                  {promoCodes.map((promoCode) => (
-                    <option key={promoCode.id} value={promoCode.id}>
-                      {promoCode.code} · {promoCode.discountPercent}%
-                    </option>
-                  ))}
-                </select>
-              </WelcomeBonusOption>
-
-              <WelcomeBonusOption
-                title="Рулетка"
-                description="Начислить попытки в подарочном боксе."
-                icon={<WandSparkles className="h-5 w-5" />}
-                checked={welcomeForm.bonusAttemptsEnabled}
-                onToggle={(checked) => setWelcomeForm((prev) => ({ ...prev, bonusAttemptsEnabled: checked }))}
-              >
-                <input
-                  className="input"
-                  type="number"
-                  min={1}
-                  max={50}
-                  value={welcomeForm.bonusAttempts}
-                  onChange={(event) => setWelcomeForm((prev) => ({ ...prev, bonusAttempts: Number(event.target.value) }))}
-                />
-              </WelcomeBonusOption>
-            </div>
-
-            <button type="button" className="btn-primary min-h-11 justify-center sm:w-fit sm:px-5" onClick={() => void saveWelcomeBonus()} disabled={welcomeLoading}>
-              {welcomeLoading ? 'Сохраняем...' : 'Сохранить'}
-            </button>
+            </WelcomeBonusOption>
           </div>
+
+        </details>
+        <div className="mt-3 flex justify-end">
+          <button type="button" className="btn-primary min-h-11 justify-center sm:px-5" onClick={() => void saveWelcomeBonus()} disabled={welcomeLoading}>
+            {welcomeLoading ? 'Сохраняем...' : 'Сохранить бонус'}
+          </button>
         </div>
       </section>
 
@@ -213,39 +215,39 @@ export function PersonalOffersAdmin({
           {offers.map((offer) => (
             <article
               key={offer.id}
-              className="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.035] lg:grid-cols-[13rem_minmax(0,1fr)_13rem_auto] lg:items-center"
+              className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.035]"
             >
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className={offer.enabled ? 'badge-active' : 'badge-muted'}>
-                    {offer.enabled ? 'Вкл' : 'Выкл'}
-                  </span>
-                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-500 dark:bg-white/10 dark:text-slate-300">
-                    #{offer.priority}
-                  </span>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className={offer.enabled ? 'badge-active' : 'badge-muted'}>
+                      {offer.enabled ? 'Вкл' : 'Выкл'}
+                    </span>
+                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-500 dark:bg-white/10 dark:text-slate-300">
+                      #{offer.priority}
+                    </span>
+                    <span className="text-sm font-medium text-slate-600 dark:text-slate-300">
+                      {personalOfferScenarioLabels[offer.scenario]}
+                    </span>
+                  </div>
                 </div>
-                <div className="mt-2 truncate font-medium text-slate-950 dark:text-white">
-                  {personalOfferScenarioLabels[offer.scenario]}
-                </div>
+                <button type="button" className="btn-secondary h-10 min-h-10 shrink-0 px-3" onClick={() => openEdit(offer)} aria-label={`Изменить оффер ${personalOfferScenarioLabels[offer.scenario]}`}>
+                  <Edit3 className="h-4 w-4" />
+                  <span className="hidden sm:inline">Изменить</span>
+                </button>
               </div>
 
-              <div className="min-w-0">
-                <div className="truncate font-semibold text-slate-950 dark:text-white">{offer.title}</div>
+              <div className="mt-3 min-w-0">
+                <div className="font-semibold text-slate-950 dark:text-white">{offer.title}</div>
                 <div className="mt-1 line-clamp-2 text-sm leading-5 text-slate-500 dark:text-slate-400">
                   {offer.description}
                 </div>
               </div>
 
-              <div className="min-w-0 text-sm text-slate-500 dark:text-slate-400">
-                <div className="truncate font-medium text-slate-700 dark:text-slate-200">{offer.cta || 'Без кнопки'}</div>
-                <div className="mt-1 truncate">{offer.href || 'Нет ссылки'}</div>
-                <div className="mt-1 truncate">{rewardSummary(offer)}</div>
+              <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
+                <span>Кнопка: <strong className="font-medium text-slate-700 dark:text-slate-200">{offer.cta || 'нет'}</strong></span>
+                <span>{rewardSummary(offer)}</span>
               </div>
-
-              <button type="button" className="btn-secondary min-h-10 w-full justify-center px-3 lg:w-32" onClick={() => openEdit(offer)}>
-                <Edit3 className="h-4 w-4" />
-                Изменить
-              </button>
             </article>
           ))}
         </div>
@@ -404,7 +406,7 @@ function WelcomeBonusOption({
 }) {
   return (
     <div className={cn(
-      'flex min-h-36 flex-col rounded-2xl border bg-white p-3 transition-colors dark:bg-white/[0.035]',
+      'flex flex-col rounded-2xl border bg-white p-3 transition-colors dark:bg-white/[0.035]',
       checked ? 'border-emerald-300 ring-2 ring-emerald-100 dark:border-emerald-500/40 dark:ring-emerald-500/10' : 'border-slate-200 dark:border-white/10'
     )}>
       <div className="flex items-start justify-between gap-3">
