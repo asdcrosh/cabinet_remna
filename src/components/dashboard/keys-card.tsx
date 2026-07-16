@@ -105,7 +105,6 @@ export function KeysCard({ subscriptionUrl, happLink }: KeysCardProps) {
   const [qrOpen, setQrOpen] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [revoking, setRevoking] = useState(false)
-  const [, setConnectionStep] = useState<1 | 2>(1)
 
   useEffect(() => {
     const detected = detectDevice(navigator.userAgent)
@@ -133,7 +132,6 @@ export function KeysCard({ subscriptionUrl, happLink }: KeysCardProps) {
 
   function openInApp() {
     if (!subscriptionUrl) return
-    setConnectionStep(2)
 
     if (!primaryLink) {
       void copy(subscriptionUrl, 'Ссылка подписки')
@@ -163,32 +161,18 @@ export function KeysCard({ subscriptionUrl, happLink }: KeysCardProps) {
   }
 
   return (
-    <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.035]">
+    <section aria-labelledby="connection-title" className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.035]">
       <div className="grid gap-0 sm:grid-cols-[minmax(0,1fr)_14rem] lg:grid-cols-[minmax(0,1fr)_18rem]">
         <div className="min-w-0 p-4 sm:p-5">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div className="min-w-0">
-              <div className="inline-flex max-w-full items-center gap-2 rounded-full bg-cyan-50 px-3 py-1 text-xs font-semibold text-cyan-700 dark:bg-cyan-500/10 dark:text-cyan-200">
-                <DeviceIcon device={device} />
-                <span className="truncate">{deviceLabel(device)} определено</span>
-              </div>
-              <h2 className="mt-3 text-xl font-semibold tracking-tight text-slate-950 dark:text-white">Подключите устройство</h2>
-              <p className="mt-1 max-w-xl text-sm leading-6 text-slate-500 dark:text-slate-400">
-                Выберите приложение и добавьте подписку одним нажатием.
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setConfirmOpen(true)}
-              disabled={revoking}
-              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl px-2 text-sm font-medium text-slate-500 transition hover:bg-slate-50 hover:text-slate-900 disabled:opacity-60 dark:text-slate-400 dark:hover:bg-white/[0.05] dark:hover:text-white sm:shrink-0"
-            >
-              <RefreshCw className="h-4 w-4" />
-              <span>{revoking ? 'Обновляем' : 'Обновить ссылку'}</span>
-            </button>
+          <div className="flex min-w-0 items-center justify-between gap-3">
+            <h2 id="connection-title" className="text-xl font-semibold tracking-tight text-slate-950 dark:text-white">Подключение</h2>
+            <span className="inline-flex min-w-0 items-center gap-1.5 text-xs font-medium text-slate-500 dark:text-slate-400">
+              <DeviceIcon device={device} />
+              <span className="truncate">{deviceLabel(device)}</span>
+            </span>
           </div>
 
-          <div className="-mx-4 mt-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:grid sm:grid-cols-3 sm:overflow-visible sm:px-0 sm:pb-0">
+          <div className="mt-4 grid grid-cols-3 gap-2">
             {availableApps.map((option) => {
               const active = option.id === selectedApp.id
               const Icon = option.icon
@@ -196,12 +180,10 @@ export function KeysCard({ subscriptionUrl, happLink }: KeysCardProps) {
                 <button
                   key={option.id}
                   type="button"
-                  onClick={() => {
-                    setSelectedAppId(option.id)
-                    setConnectionStep(1)
-                  }}
+                  aria-label={option.name}
+                  onClick={() => setSelectedAppId(option.id)}
                   className={cn(
-                    'flex min-h-16 min-w-[9.5rem] items-center gap-2.5 rounded-xl border p-2.5 text-left transition sm:min-w-0 sm:gap-3 sm:p-3',
+                    'flex min-w-0 items-center justify-center gap-2 rounded-xl border px-2 py-3 text-left transition sm:justify-start sm:px-3',
                     active
                       ? 'border-slate-950 bg-slate-950 text-white dark:border-white dark:bg-white dark:text-slate-950'
                       : 'border-slate-200 bg-slate-50/70 hover:border-slate-300 hover:bg-white dark:border-white/10 dark:bg-white/[0.03] dark:hover:bg-white/[0.06]'
@@ -209,18 +191,13 @@ export function KeysCard({ subscriptionUrl, happLink }: KeysCardProps) {
                 >
                   <span
                     className={cn(
-                      'grid h-9 w-9 shrink-0 place-items-center rounded-xl sm:h-10 sm:w-10',
+                      'grid h-7 w-7 shrink-0 place-items-center',
                       active ? 'text-cyan-300 dark:text-cyan-700' : 'text-cyan-700 dark:text-cyan-200'
                     )}
                   >
-                    <Icon className="h-5 w-5" />
+                    <Icon className="h-4 w-4" />
                   </span>
-                  <span className="min-w-0">
-                    <span className="block truncate text-sm font-semibold">{option.name}</span>
-                    <span className={cn('mt-0.5 block truncate text-[11px] sm:text-xs', active ? 'text-cyan-700 dark:text-cyan-200' : 'text-slate-500')}>
-                      {option.subtitle}
-                    </span>
-                  </span>
+                  <span className="min-w-0 truncate text-sm font-semibold">{option.id === 'rabbit-hole' ? 'Rabbit' : option.name}</span>
                 </button>
               )
             })}
@@ -265,22 +242,25 @@ export function KeysCard({ subscriptionUrl, happLink }: KeysCardProps) {
             </button>
           </div>
 
-          <div className="mt-3 flex flex-col gap-2 text-xs text-slate-500 dark:text-slate-400 sm:flex-row sm:items-center sm:justify-between">
-            <span className="min-w-0 rounded-xl bg-slate-50 px-3 py-2 dark:bg-white/[0.03] sm:hidden">
-              {subscriptionUrl ? 'Ссылка подписки готова' : 'Ссылка подписки пока недоступна'}
-            </span>
-            <span className="hidden min-w-0 truncate rounded-xl bg-slate-50 px-3 py-2 font-mono dark:bg-white/[0.03] sm:block">
-              {subscriptionUrl || 'Ссылка подписки пока недоступна'}
-            </span>
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 text-sm">
             <a
               href={selectedApp.installUrl}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex h-9 items-center justify-center gap-2 rounded-lg text-sm font-semibold text-cyan-700 hover:text-cyan-900 dark:text-cyan-200"
+              className="inline-flex items-center gap-1.5 font-medium text-cyan-700 hover:text-cyan-900 dark:text-cyan-200"
             >
               Скачать {selectedApp.name}
               <ExternalLink className="h-3.5 w-3.5" />
             </a>
+            <button
+              type="button"
+              onClick={() => setConfirmOpen(true)}
+              disabled={revoking}
+              className="inline-flex items-center gap-1.5 font-medium text-slate-500 hover:text-slate-900 disabled:opacity-60 dark:text-slate-400 dark:hover:text-white"
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+              {revoking ? 'Обновляем' : 'Обновить ссылку'}
+            </button>
           </div>
         </div>
 

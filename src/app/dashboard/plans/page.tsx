@@ -144,10 +144,10 @@ export default async function PlansPage({
       )}
 
       {needsTelegramCheckForPromo && (
-        <div className="flex flex-col gap-3 rounded-2xl border border-amber-200 bg-amber-50/80 px-4 py-3 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50/80 px-4 py-3 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
           <span>Пробный тариф откроется после проверки Telegram.</span>
-          <Link href="/dashboard/settings" className="btn-secondary h-10 shrink-0 px-4 text-sm">
-            Проверить Telegram
+          <Link href="/dashboard/settings" className="shrink-0 font-semibold underline decoration-amber-400/60 underline-offset-4 hover:text-amber-950 dark:hover:text-white">
+            Проверить
           </Link>
         </div>
       )}

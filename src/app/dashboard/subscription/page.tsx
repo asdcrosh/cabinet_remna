@@ -77,19 +77,13 @@ export default async function SubscriptionPage() {
 
   return (
     <div className="page-stack">
-      <section className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-white/10 dark:bg-white/[0.035] sm:p-6">
-        <div className="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
+      <section className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.035] sm:p-5">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className={subscriptionExpired ? 'badge-expired' : u.isActive ? 'badge-active' : 'badge-disabled'}>{statusText}</span>
-              <span className="badge bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-slate-300">
-                {u.username}
-              </span>
-            </div>
-            <h1 className="mt-3 text-2xl font-semibold tracking-tight sm:text-3xl">Подключение VPN</h1>
-            <p className="mt-1.5 max-w-xl text-sm leading-6 text-slate-500 dark:text-slate-400">Выберите приложение и добавьте подписку. QR-код и ручная ссылка доступны ниже.</p>
+            <span className={subscriptionExpired ? 'badge-expired' : u.isActive ? 'badge-active' : 'badge-disabled'}>{statusText}</span>
+            <h1 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">Подписка</h1>
           </div>
-          <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto] xl:min-w-[34rem]">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-[1fr_1fr_auto] xl:min-w-[34rem]">
             <CompactMetric
               icon={<CalendarClock className="h-4 w-4" />}
               label={subscriptionExpired ? 'Срок' : 'До'}
@@ -102,7 +96,7 @@ export default async function SubscriptionPage() {
               value={u.trafficUsed}
               hint={isUnlimited ? 'безлимит' : `из ${u.trafficLimit}`}
             />
-            <Link href="/dashboard/plans?intent=renew" className="btn-primary justify-center sm:px-5">
+            <Link href="/dashboard/plans?intent=renew" className="btn-primary col-span-2 justify-center sm:col-span-1 sm:px-5">
               Продлить
             </Link>
           </div>
