@@ -54,7 +54,7 @@ export default async function AdminOffersPage() {
     <div className="page-stack">
       <PageHeader
         title="Персональные офферы"
-        description="Настройте блок на главной под разные сценарии пользователя"
+        description="Предложения для разных сценариев"
       />
       <PersonalOffersAdmin
         offers={offers}

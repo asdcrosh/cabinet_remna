@@ -65,7 +65,7 @@ export function AdminActionsMenu({
             <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3 dark:border-white/10">
               <div>
                 <div className="font-semibold">{label}</div>
-                <div className="text-xs text-slate-500">Выберите действие с аккаунтом</div>
+                <div className="text-xs text-slate-500">Выберите действие</div>
               </div>
               <button
                 type="button"

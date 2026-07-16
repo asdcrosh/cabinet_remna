@@ -75,8 +75,11 @@ test('каталог тарифов использует компактные с
   const grid = page.getByTestId('admin-plan-grid')
   const card = page.getByTestId('admin-plan-card').filter({ hasText: 'E2E Стандарт' })
   await expect(card).toHaveCount(1)
-  await expect(card.getByRole('button', { name: 'Изменить тариф E2E Стандарт' })).toBeVisible()
-  await expect(card.getByRole('button', { name: 'Скрыть тариф E2E Стандарт' })).toBeVisible()
+  await card.getByRole('button', { name: 'Действия: E2E Стандарт' }).click()
+  const actions = page.getByRole('dialog', { name: 'Действия: E2E Стандарт' })
+  await expect(actions.getByRole('button', { name: 'Изменить тариф E2E Стандарт' })).toBeVisible()
+  await expect(actions.getByRole('button', { name: 'Скрыть тариф E2E Стандарт' })).toBeVisible()
+  await page.keyboard.press('Escape')
 
   const [gridBox, cardBox] = await Promise.all([grid.boundingBox(), card.boundingBox()])
   expect(gridBox).not.toBeNull()

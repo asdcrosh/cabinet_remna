@@ -205,49 +205,39 @@ export function PersonalOffersAdmin({
       </section>
 
       <section className="space-y-3">
-        <div>
+        <div className="flex items-center justify-between gap-3">
           <h2 className="font-semibold text-slate-950 dark:text-white">Офферы на главной</h2>
-          <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
-            Порядок, текст и кнопки для разных состояний пользователя.
-          </p>
+          <span className="text-sm text-slate-500">{offers.length}</span>
         </div>
-        <div className="grid gap-3">
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white divide-y divide-slate-200 dark:border-white/10 dark:bg-white/[0.025] dark:divide-white/[0.07]">
           {offers.map((offer) => (
             <article
               key={offer.id}
-              className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.035]"
+              className="grid min-w-0 gap-3 p-4 sm:grid-cols-[minmax(11rem,.7fr)_minmax(16rem,1.3fr)_auto] sm:items-center sm:gap-5"
             >
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className={offer.enabled ? 'badge-active' : 'badge-muted'}>
-                      {offer.enabled ? 'Вкл' : 'Выкл'}
-                    </span>
-                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-500 dark:bg-white/10 dark:text-slate-300">
-                      #{offer.priority}
-                    </span>
-                    <span className="text-sm font-medium text-slate-600 dark:text-slate-300">
-                      {personalOfferScenarioLabels[offer.scenario]}
-                    </span>
-                  </div>
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className={offer.enabled ? 'badge-active' : 'badge-muted'}>
+                    {offer.enabled ? 'Вкл' : 'Выкл'}
+                  </span>
+                  <span className="text-sm font-medium text-slate-600 dark:text-slate-300">
+                    {personalOfferScenarioLabels[offer.scenario]}
+                  </span>
                 </div>
-                <button type="button" className="btn-secondary h-10 min-h-10 shrink-0 px-3" onClick={() => openEdit(offer)} aria-label={`Изменить оффер ${personalOfferScenarioLabels[offer.scenario]}`}>
-                  <Edit3 className="h-4 w-4" />
-                  <span className="hidden sm:inline">Изменить</span>
-                </button>
+                <div className="mt-1 text-xs text-slate-400">Приоритет {offer.priority}</div>
               </div>
 
-              <div className="mt-3 min-w-0">
+              <div className="min-w-0">
                 <div className="font-semibold text-slate-950 dark:text-white">{offer.title}</div>
-                <div className="mt-1 line-clamp-2 text-sm leading-5 text-slate-500 dark:text-slate-400">
+                <div className="mt-0.5 line-clamp-1 text-sm text-slate-500 dark:text-slate-400">
                   {offer.description}
                 </div>
+                <div className="mt-1 text-xs text-slate-400">{offer.cta || 'Без кнопки'} · {rewardSummary(offer)}</div>
               </div>
 
-              <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
-                <span>Кнопка: <strong className="font-medium text-slate-700 dark:text-slate-200">{offer.cta || 'нет'}</strong></span>
-                <span>{rewardSummary(offer)}</span>
-              </div>
+              <button type="button" className="btn-secondary h-10 min-h-10 w-10 shrink-0 px-0 sm:justify-self-end" onClick={() => openEdit(offer)} aria-label={`Изменить оффер ${personalOfferScenarioLabels[offer.scenario]}`}>
+                <Edit3 className="h-4 w-4" />
+              </button>
             </article>
           ))}
         </div>

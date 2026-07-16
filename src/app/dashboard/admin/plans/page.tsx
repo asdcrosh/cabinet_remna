@@ -45,7 +45,7 @@ export default async function AdminPlansPage() {
     <div className="page-stack">
       <PageHeader
         title="Тарифы"
-        description="Цены, лимиты, серверные группы и аудитория каждого тарифа"
+        description="Цены, доступ и серверные группы"
       />
       <PlansAdmin plans={rows} />
     </div>

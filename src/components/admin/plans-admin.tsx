@@ -268,7 +268,10 @@ export function PlansAdmin({ plans }: { plans: PlanAdminRow[] }) {
       )}
 
       {plans.length > 0 && (
-        <div data-testid="admin-plan-grid" className="space-y-2">
+        <div
+          data-testid="admin-plan-grid"
+          className="overflow-hidden rounded-2xl border border-slate-200 bg-white divide-y divide-slate-200 dark:border-white/10 dark:bg-white/[0.025] dark:divide-white/[0.07]"
+        >
           {plans.map((plan) => {
             const selectedSquads = plan.activeInternalSquads.map((id) => squadById.get(id)).filter(Boolean) as RemnawaveSquad[]
             const unknownSquads = plan.activeInternalSquads.filter((id) => !squadById.has(id))
@@ -278,67 +281,50 @@ export function PlansAdmin({ plans }: { plans: PlanAdminRow[] }) {
               <article
                 key={plan.id}
                 data-testid="admin-plan-card"
-                className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.035] lg:grid lg:grid-cols-[minmax(13rem,1.1fr)_minmax(19rem,1.5fr)_minmax(13rem,1fr)] lg:gap-x-6"
+                className="min-w-0 p-4 lg:grid lg:grid-cols-[minmax(14rem,1.15fr)_minmax(12rem,.9fr)_minmax(12rem,.9fr)_auto] lg:items-center lg:gap-x-6"
               >
-                <div className="flex items-start justify-between gap-4">
+                <div className="flex min-w-0 items-start justify-between gap-4 lg:block">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="break-words text-lg font-semibold tracking-tight">{plan.name}</h3>
+                      <h3 className="break-words font-semibold tracking-tight">{plan.name}</h3>
                       <span className={plan.isActive ? 'badge-active' : 'badge-disabled'}>{plan.isActive ? 'Опубликован' : 'Скрыт'}</span>
                       {plan.isPromo && <span className="badge-limited">Пробный</span>}
                       {plan.isFeatured && <span className="badge-active">Популярный</span>}
                     </div>
                     {plan.description && <p className="mt-1 line-clamp-2 text-sm leading-5 text-slate-500 dark:text-slate-400">{plan.description}</p>}
                   </div>
-                  <div className="shrink-0 text-right text-xl font-semibold tracking-tight">{formatPrice(plan.priceKopecks)}</div>
+                  <div className="shrink-0 text-right font-semibold tracking-tight lg:mt-1 lg:text-left">{formatPrice(plan.priceKopecks)}</div>
                 </div>
 
-                <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1.5 text-sm text-slate-500 lg:col-start-2 lg:row-start-1 lg:mt-0 lg:py-1">
+                <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-500 lg:mt-0">
                   <span><strong className="font-semibold text-slate-800 dark:text-slate-100">{plan.durationDays}</strong> дн.</span>
                   <span>{plan.trafficLimitGb == null ? 'Безлимит' : `${plan.trafficLimitGb} ГБ`}</span>
-                  <span>Устройств: <strong className="font-semibold text-slate-800 dark:text-slate-100">{plan.deviceLimit}</strong></span>
+                  <span>{plan.deviceLimit} устр.</span>
+                  <span>{planAvailabilityLabels[plan.availability]}</span>
                 </div>
 
-                <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-sm text-slate-500 dark:text-slate-400 lg:col-start-2 lg:row-start-2">
-                  <span><span className="text-slate-400">Доступ:</span> {planAvailabilityLabels[plan.availability]}</span>
-                  {plan.availability === 'ALLOWED' && <span>Пользователей: {allowedUsersCount}</span>}
-                  <span>Подписок: {plan.subscriptionsCount}</span>
-                  <span>Оплат: {plan.paymentsCount}</span>
+                <div className="mt-3 min-w-0 text-sm text-slate-500 dark:text-slate-400 lg:mt-0">
+                  {plan.activeInternalSquads.length > 0 ? (
+                    <div className="flex min-w-0 items-center gap-2">
+                      <Server className="h-4 w-4 shrink-0 text-slate-400" />
+                      <span className="truncate">
+                        {selectedSquads.slice(0, 2).map((squad) => squad.name).join(', ') || 'Группы не найдены'}
+                      </span>
+                      {plan.activeInternalSquads.length > 2 && <span className="shrink-0">+{plan.activeInternalSquads.length - 2}</span>}
+                      {unknownSquads.length > 0 && <span className="shrink-0 text-amber-600">{unknownSquads.length}?</span>}
+                    </div>
+                  ) : (
+                    <span>Без серверных групп</span>
+                  )}
+                  <div className="mt-1 flex flex-wrap gap-x-3 text-xs">
+                    {plan.availability === 'ALLOWED' && <span>{allowedUsersCount} польз.</span>}
+                    <span>{plan.subscriptionsCount} подписок</span>
+                    <span>{plan.paymentsCount} оплат</span>
+                  </div>
                 </div>
 
-                {plan.activeInternalSquads.length > 0 ? (
-                  <div className="mt-3 min-w-0 lg:col-start-3 lg:row-span-2 lg:row-start-1 lg:mt-0">
-                    <div className="mb-2 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-                      <Server className="h-3.5 w-3.5" />
-                      Группы Remnawave
-                    </div>
-                    <div className="flex min-h-7 flex-wrap gap-1.5">
-                      {selectedSquads.slice(0, 3).map((squad) => (
-                        <span key={squad.uuid} className="inline-flex max-w-44 items-center gap-1.5 truncate rounded-lg bg-cyan-50 px-2 py-1 text-xs text-cyan-800 dark:bg-cyan-400/10 dark:text-cyan-200">
-                          <span className={cn('h-1.5 w-1.5 shrink-0 rounded-full', squad.isActive ? 'bg-emerald-500' : 'bg-slate-400')} />
-                          {squad.name}
-                        </span>
-                      ))}
-                      {plan.activeInternalSquads.length > 3 && <span className="rounded-lg bg-slate-100 px-2 py-1 text-xs text-slate-500">+{plan.activeInternalSquads.length - 3}</span>}
-                      {unknownSquads.length > 0 && <span className="rounded-lg bg-amber-50 px-2 py-1 text-xs text-amber-700">Не найдено: {unknownSquads.length}</span>}
-                    </div>
-                  </div>
-                ) : null}
-
-                <div className="mt-4 flex justify-end border-t border-slate-200/70 pt-3 dark:border-white/[0.07] lg:col-span-3">
-                  <div className="lg:hidden">
-                    <AdminActionsMenu>
-                      <PlanActions
-                        plan={plan}
-                        loading={loadingId === plan.id}
-                        onEdit={() => startEdit(plan)}
-                        onCopy={() => void copyPlanLink(plan)}
-                        onToggle={() => void toggleActive(plan)}
-                        onDelete={() => requestDeletePlan(plan)}
-                      />
-                    </AdminActionsMenu>
-                  </div>
-                  <div className="hidden flex-wrap gap-2 lg:flex">
+                <div className="mt-3 flex justify-end lg:mt-0">
+                  <AdminActionsMenu compact label={`Действия: ${plan.name}`}>
                     <PlanActions
                       plan={plan}
                       loading={loadingId === plan.id}
@@ -347,7 +333,7 @@ export function PlansAdmin({ plans }: { plans: PlanAdminRow[] }) {
                       onToggle={() => void toggleActive(plan)}
                       onDelete={() => requestDeletePlan(plan)}
                     />
-                  </div>
+                  </AdminActionsMenu>
                 </div>
               </article>
             )
