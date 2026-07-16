@@ -81,18 +81,25 @@ export function SystemHealthPanel({ initialReport }: { initialReport: SystemHeal
         )}
       </section>
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+      <div className="space-y-2">
         {report.checks.map((item) => {
           const view = statusView[item.status]
           return (
             <article
               key={item.id}
-              className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.035]"
+              className={cn(
+                'rounded-2xl border bg-white p-3 dark:bg-white/[0.035]',
+                item.status === 'error'
+                  ? 'border-red-200 dark:border-red-500/30'
+                  : item.status === 'warn'
+                    ? 'border-amber-200 dark:border-amber-500/30'
+                    : 'border-slate-200 dark:border-white/10'
+              )}
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <h3 className="truncate text-base font-semibold">{item.title}</h3>
-                  <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">{item.message}</p>
+                  <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{item.message}</p>
                 </div>
                 <span
                   className={cn(
@@ -104,11 +111,12 @@ export function SystemHealthPanel({ initialReport }: { initialReport: SystemHeal
                   {view.label}
                 </span>
               </div>
-              {item.details && (
-                <div className="mt-4 rounded-xl bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-500 dark:bg-white/5 dark:text-slate-400">
-                  {item.details}
-                </div>
-              )}
+              {item.details ? (
+                <details className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                  <summary className="cursor-pointer font-medium">Подробнее</summary>
+                  <div className="mt-2 rounded-xl bg-slate-50 px-3 py-2 leading-5 dark:bg-white/5">{item.details}</div>
+                </details>
+              ) : null}
             </article>
           )
         })}

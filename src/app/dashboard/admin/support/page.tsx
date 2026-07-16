@@ -92,7 +92,7 @@ export default async function AdminSupportPage({
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Поддержка" description="Админка: обращения пользователей и контекст по аккаунтам" />
+      <PageHeader title="Поддержка" description="Обращения пользователей и контекст аккаунта" />
       <SupportPanelDynamic
         mode="admin"
         initialTotal={total}

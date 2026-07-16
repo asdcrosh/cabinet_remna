@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { Activity, CalendarClock, Search } from 'lucide-react'
+import { CalendarClock, Search } from 'lucide-react'
 import { AuditAction } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { requireAdminPage } from '@/lib/auth/admin-page'
@@ -114,20 +114,15 @@ export default async function AdminAuditPage({
         )}
         {visibleLogs.map((log) => (
           <article key={log.id} className="card p-0">
-            <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-start sm:justify-between">
-              <div className="flex min-w-0 gap-3">
-                <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-slate-950 text-cyan-200 dark:bg-white dark:text-slate-950">
-                  <Activity className="h-5 w-5" />
+            <div className="flex flex-col gap-2 p-3.5 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className={auditActionBadgeClass(log.action)}>{ACTION_LABELS[log.action]}</span>
+                  <h2 className="font-semibold leading-5">{log.message}</h2>
                 </div>
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className={auditActionBadgeClass(log.action)}>{ACTION_LABELS[log.action]}</span>
-                    <h2 className="font-semibold">{log.message}</h2>
-                  </div>
-                  <div className="mt-1 text-sm text-slate-500">
-                    {log.actor ? `Автор: ${log.actor.email}` : 'Системное действие'}
-                    {log.target ? ` · Пользователь: ${log.target.email}` : ''}
-                  </div>
+                <div className="mt-1 text-sm text-slate-500">
+                  {log.actor ? `Автор: ${log.actor.email}` : 'Системное действие'}
+                  {log.target ? ` · Пользователь: ${log.target.email}` : ''}
                 </div>
               </div>
               <div className="flex shrink-0 items-center gap-1 text-xs text-slate-500">

@@ -1,9 +1,8 @@
-import { AlertTriangle, CheckCircle2 } from 'lucide-react'
+import { CheckCircle2 } from 'lucide-react'
 import { prisma } from '@/lib/prisma'
 import { requireAdminPage } from '@/lib/auth/admin-page'
 import { formatPrice } from '@/lib/format'
 import { PageHeader } from '@/components/dashboard/page-header'
-import { PaymentBadge } from '@/components/admin/admin-badges'
 import { BulkRecoveryActionButton, RecoveryActionButton } from '@/components/admin/recovery-actions'
 import { AdminEmptyState } from '@/components/admin/admin-empty-state'
 
@@ -61,7 +60,6 @@ export default async function AdminRecoveryPage() {
                     <td>{payment.plan.name}</td>
                     <td className="font-medium">{formatPrice(payment.amountKopecks)}</td>
                     <td className="max-w-xs">
-                      <div className="mb-1"><PaymentBadge status={payment.status} /></div>
                       <div className="line-clamp-2 text-xs text-slate-500">
                         {payment.provisioningJob
                           ? `${payment.provisioningJob.status}, попыток: ${payment.provisioningJob.attempts}`
@@ -90,31 +88,29 @@ export default async function AdminRecoveryPage() {
           <div className="space-y-3 2xl:hidden">
             {payments.map((payment) => (
               <article key={payment.id} className="overflow-hidden rounded-2xl border bg-white dark:border-white/10 dark:bg-white/[0.035]">
-                <div className="border-b bg-slate-50/70 px-4 py-3 dark:border-white/10 dark:bg-white/[0.03]">
+                <div className="px-4 pb-2 pt-4">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="break-words text-sm font-semibold">{payment.user.email}</div>
                       <div className="mt-0.5 text-xs text-slate-500">{new Date(payment.createdAt).toLocaleString('ru-RU')}</div>
                     </div>
-                    <PaymentBadge status={payment.status} />
                   </div>
                 </div>
-                <div className="space-y-3 p-4">
-                  <div className="grid gap-3 text-sm sm:grid-cols-2">
-                    <InfoCell label="Тариф" value={payment.plan.name} />
-                    <InfoCell label="Сумма" value={formatPrice(payment.amountKopecks)} />
-                    <InfoCell
-                      label="Job"
-                      value={payment.provisioningJob ? `${payment.provisioningJob.status}, попыток: ${payment.provisioningJob.attempts}` : 'Не создавался'}
-                    />
-                    <InfoCell
-                      label="Retry"
-                      value={payment.provisioningJob?.nextRetryAt ? payment.provisioningJob.nextRetryAt.toLocaleString('ru-RU') : '—'}
-                    />
+                <div className="space-y-3 px-4 pb-4">
+                  <div className="flex items-baseline justify-between gap-3 text-sm">
+                    <span className="font-medium">{payment.plan.name}</span>
+                    <span className="shrink-0 font-semibold">{formatPrice(payment.amountKopecks)}</span>
                   </div>
                   <div className="rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:bg-amber-500/10 dark:text-amber-100">
                     {payment.provisioningJob?.lastError || payment.provisioningError || 'Подписка не была выдана.'}
                   </div>
+                  <details className="text-xs text-slate-500">
+                    <summary className="cursor-pointer font-medium">Технические детали</summary>
+                    <div className="mt-2 space-y-1 rounded-xl bg-slate-50 px-3 py-2 dark:bg-white/[0.04]">
+                      <div>Job: {payment.provisioningJob ? `${payment.provisioningJob.status}, попыток: ${payment.provisioningJob.attempts}` : 'не создавался'}</div>
+                      <div>Retry: {payment.provisioningJob?.nextRetryAt ? payment.provisioningJob.nextRetryAt.toLocaleString('ru-RU') : 'не запланирован'}</div>
+                    </div>
+                  </details>
                   <div className="grid gap-2 sm:flex sm:justify-end">
                     <RecoveryActionButton paymentId={payment.id} />
                   </div>
@@ -124,24 +120,6 @@ export default async function AdminRecoveryPage() {
           </div>
         </>
       )}
-
-      {payments.length > 0 && (
-        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
-          <div className="flex gap-2">
-            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-            <div>После довыдачи пользователь получит или обновит Remnawave-профиль, а платёж будет связан с подпиской.</div>
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
-function InfoCell({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="min-w-0 rounded-xl bg-slate-50 px-3 py-2 dark:bg-white/[0.04]">
-      <div className="text-xs text-slate-500">{label}</div>
-      <div className="mt-1 truncate font-medium">{value}</div>
     </div>
   )
 }

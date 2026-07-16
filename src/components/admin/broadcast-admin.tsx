@@ -366,7 +366,7 @@ export function BroadcastAdmin({
                 Все каналы
               </button>
             </div>
-            <div className="mt-2 grid grid-cols-3 gap-2">
+            <div className="mt-2 grid gap-2 sm:grid-cols-3">
               {channels.map((item) => {
                 const Icon = item.icon
                 const active = selectedChannels.includes(item.value)
@@ -376,7 +376,7 @@ export function BroadcastAdmin({
                     type="button"
                     onClick={() => toggleChannel(item.value)}
                     className={cn(
-                      'flex min-h-20 flex-col items-center justify-center gap-2 rounded-xl border px-2 text-sm font-medium transition-colors',
+                      'flex min-h-12 items-center justify-center gap-2 rounded-xl border px-3 text-sm font-medium transition-colors',
                       active
                         ? 'border-cyan-200 bg-cyan-50 text-cyan-800 dark:border-cyan-500/25 dark:bg-cyan-500/10 dark:text-cyan-100'
                         : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50 dark:border-white/10 dark:bg-surface-900 dark:hover:bg-white/5'
@@ -416,7 +416,7 @@ export function BroadcastAdmin({
                 {visibleTemplates.map((template) => (
                   <div
                     key={template.id || template.title}
-                    className="flex min-h-[16rem] min-w-[17rem] max-w-[19rem] snap-start flex-col rounded-2xl border border-slate-200 bg-white p-4 transition-colors hover:border-slate-300 dark:border-white/10 dark:bg-white/[0.035] dark:hover:border-white/20"
+                    className="flex min-w-[15rem] max-w-[17rem] snap-start flex-col rounded-2xl border border-slate-200 bg-white p-3 transition-colors hover:border-slate-300 dark:border-white/10 dark:bg-white/[0.035] dark:hover:border-white/20"
                   >
                     <div className="text-base font-semibold text-slate-950 dark:text-white">{template.title}</div>
                     <div className="mt-1 line-clamp-2 min-h-8 text-xs leading-4 text-slate-500 dark:text-slate-400">{template.description || 'Пользовательский шаблон'}</div>
@@ -812,7 +812,7 @@ function BroadcastHistory({
                   </div>
                 </div>
               </div>
-              <div className="mt-3 grid gap-2 text-xs text-slate-500 sm:grid-cols-3">
+              <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-500">
                 <HistoryMetric label="Кабинет" value={item.inAppCount} />
                 <HistoryMetric label="Telegram" value={item.telegramSent} failed={item.telegramFailed} />
                 <HistoryMetric label="Email" value={item.emailSent} failed={item.emailFailed} />
@@ -861,7 +861,7 @@ function BroadcastHistoryModal({ item, onClose }: { item: BroadcastHistoryItem; 
           ) : null}
         </div>
 
-        <div className="grid gap-2 text-sm sm:grid-cols-3">
+        <div className="flex flex-wrap gap-2 text-sm">
           <HistoryMetric label="Кабинет" value={item.inAppCount} />
           <HistoryMetric label="Telegram" value={item.telegramSent} failed={item.telegramFailed + item.telegramSkipped + item.telegramDuplicate} />
           <HistoryMetric label="Email" value={item.emailSent} failed={item.emailFailed + item.emailSkipped + item.emailDuplicate} />
@@ -884,11 +884,9 @@ function BroadcastStats({ stats }: { stats: BroadcastStats }) {
 
 function HistoryMetric({ label, value, failed = 0 }: { label: string; value: number; failed?: number }) {
   return (
-    <div className="rounded-xl bg-slate-50 px-3 py-2 dark:bg-white/5">
-      <div className="font-medium text-slate-700 dark:text-slate-200">{label}</div>
-      <div className="mt-0.5">
-        {value} отправлено{failed ? `, ${failed} ошибок` : ''}
-      </div>
+    <div className="inline-flex items-center gap-1.5 rounded-full bg-slate-50 px-2.5 py-1.5 dark:bg-white/5">
+      <span className="font-medium text-slate-700 dark:text-slate-200">{label}</span>
+      <span>{value}{failed ? ` · ${failed} ош.` : ''}</span>
     </div>
   )
 }

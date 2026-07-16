@@ -176,43 +176,26 @@ export default async function AdminDashboardPage() {
       />
 
       <section className="space-y-3">
-        <div>
-          <h2 className="text-lg font-semibold tracking-tight">Требует внимания</h2>
-          <p className="text-sm text-slate-500">Очереди и ошибки, которые влияют на пользователей</p>
-        </div>
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <PriorityCard
-          href="/dashboard/admin/support"
-          icon={<LifeBuoy className="h-5 w-5" />}
-          title="Поддержка"
-          value={supportWaiting}
-          text={supportWaiting > 0 ? 'Есть обращения без ответа' : 'Очередь чистая'}
-          urgent={supportWaiting > 0}
-        />
-        <PriorityCard
-          href="/dashboard/admin/recovery"
-          icon={<Database className="h-5 w-5" />}
-          title="Довыдача"
-          value={recoveryCount}
-          text={recoveryCount > 0 ? 'Нужно восстановить доступ' : 'Ошибок выдачи нет'}
-          urgent={recoveryCount > 0}
-        />
-        <PriorityCard
-          href="/dashboard/admin/remnashop-sync"
-          icon={<RefreshCw className="h-5 w-5" />}
-          title="Синхронизация"
-          value={syncFailed}
-          text={syncFailed > 0 ? 'Есть необработанные ошибки' : 'Ошибок синхронизации нет'}
-          urgent={syncFailed > 0}
-        />
-        <PriorityCard
-          href="/dashboard/admin/duplicates"
-          icon={<SearchCheck className="h-5 w-5" />}
-          title="Дубли"
-          value={duplicateCandidates.length}
-          text={duplicateCandidates.length > 0 ? 'Проверьте связанные аккаунты' : 'Подозрительных дублей нет'}
-          urgent={duplicateCandidates.length > 0}
-        />
+        <h2 className="text-lg font-semibold tracking-tight">Требует внимания</h2>
+        <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+          {supportWaiting > 0 && (
+            <PriorityCard href="/dashboard/admin/support" icon={<LifeBuoy className="h-4 w-4" />} title="Поддержка" value={supportWaiting} text="Обращения без ответа" />
+          )}
+          {recoveryCount > 0 && (
+            <PriorityCard href="/dashboard/admin/recovery" icon={<Database className="h-4 w-4" />} title="Довыдача" value={recoveryCount} text="Не выданы подписки" />
+          )}
+          {syncFailed > 0 && (
+            <PriorityCard href="/dashboard/admin/remnashop-sync" icon={<RefreshCw className="h-4 w-4" />} title="Синхронизация" value={syncFailed} text="Необработанные ошибки" />
+          )}
+          {duplicateCandidates.length > 0 && (
+            <PriorityCard href="/dashboard/admin/duplicates" icon={<SearchCheck className="h-4 w-4" />} title="Дубли" value={duplicateCandidates.length} text="Нужна ручная проверка" />
+          )}
+          {supportWaiting === 0 && recoveryCount === 0 && syncFailed === 0 && duplicateCandidates.length === 0 && (
+            <div className="col-span-full flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800 dark:border-emerald-500/25 dark:bg-emerald-500/10 dark:text-emerald-200">
+              <ShieldCheck className="h-4 w-4" />
+              Очереди чистые, срочных действий нет
+            </div>
+          )}
         </div>
       </section>
 
@@ -227,7 +210,7 @@ export default async function AdminDashboardPage() {
           </div>
         </div>
 
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid overflow-hidden rounded-2xl border border-slate-200 bg-white dark:divide-white/10 dark:border-white/10 dark:bg-white/[0.035] md:grid-cols-2 md:divide-x xl:grid-cols-4">
           <AnalyticsCard
             icon={<UserPlus className="h-5 w-5" />}
             title="Регистрации"
@@ -289,7 +272,7 @@ export default async function AdminDashboardPage() {
             </div>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
+          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white divide-y divide-slate-100 dark:divide-white/10 dark:border-white/10 dark:bg-white/[0.035]">
             <CompactMetric
               icon={<ShieldCheck className="h-5 w-5" />}
               label="Активные подписки"
@@ -332,7 +315,7 @@ export default async function AdminDashboardPage() {
           <p className="text-sm text-slate-500">Основные админские действия</p>
         </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6">
         <AdminTile
           href="/dashboard/admin/users"
           icon={<Users className="h-5 w-5" />}
@@ -468,23 +451,18 @@ function AnalyticsCard({
   details: Array<{ label: string; value: React.ReactNode }>
 }) {
   return (
-    <div className="metric-card">
-      <div className="flex items-start justify-between gap-3">
-        <div className="grid h-10 w-10 place-items-center rounded-xl bg-slate-100 text-slate-700 dark:bg-white/10 dark:text-cyan-200">
-          {icon}
+    <div className="min-w-0 border-b border-slate-100 p-4 last:border-b-0 dark:border-white/10 md:border-b-0">
+      <div className="flex items-center justify-between gap-3">
+        <div className="inline-flex min-w-0 items-center gap-2 text-sm font-medium text-slate-500">
+          <span className="text-slate-400">{icon}</span>
+          <span className="truncate">{title}</span>
         </div>
-        <div className="min-w-0 text-right">
-          <div className="truncate text-sm font-medium text-slate-500">{title}</div>
-          <div className="mt-1 text-2xl font-semibold tracking-tight">{value}</div>
-          <div className="mt-0.5 text-xs text-slate-400">{hint}</div>
-        </div>
+        <div className="text-xs text-slate-400">{hint}</div>
       </div>
-      <div className="mt-4 grid grid-cols-2 gap-2">
+      <div className="mt-2 text-2xl font-semibold tracking-tight">{value}</div>
+      <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
         {details.map((detail) => (
-          <div key={detail.label} className="rounded-xl bg-slate-50 px-3 py-2 dark:bg-white/5">
-            <div className="truncate text-[11px] uppercase text-slate-400">{detail.label}</div>
-            <div className="mt-1 truncate text-sm font-semibold">{detail.value}</div>
-          </div>
+          <span key={detail.label}>{detail.label}: <strong className="font-semibold text-slate-700 dark:text-slate-200">{detail.value}</strong></span>
         ))}
       </div>
     </div>
@@ -503,15 +481,15 @@ function CompactMetric({
   hint: string
 }) {
   return (
-    <div className="metric-card flex items-center gap-3">
-      <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-700 dark:bg-white/10 dark:text-cyan-200">
+    <div className="flex items-center gap-3 px-4 py-3">
+      <div className="grid h-8 w-8 shrink-0 place-items-center text-slate-400">
         {icon}
       </div>
-      <div className="min-w-0">
-        <div className="truncate text-sm font-medium text-slate-500">{label}</div>
-        <div className="mt-1 text-2xl font-semibold tracking-tight">{value}</div>
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-sm font-medium">{label}</div>
         <div className="mt-0.5 truncate text-xs text-slate-400">{hint}</div>
       </div>
+      <div className="shrink-0 text-lg font-semibold tracking-tight">{value}</div>
     </div>
   )
 }
@@ -599,23 +577,21 @@ function AdminTile({
     <Link
       href={href}
       className={cn(
-        'group flex min-h-32 min-w-0 flex-col justify-between rounded-2xl border bg-white p-4 transition-colors hover:border-slate-300 hover:bg-slate-50 dark:bg-white/[0.035] dark:hover:border-white/20 dark:hover:bg-white/[0.05]',
+        'group flex min-h-20 min-w-0 items-center gap-3 rounded-2xl border bg-white p-3 transition-colors hover:border-slate-300 hover:bg-slate-50 dark:bg-white/[0.035] dark:hover:border-white/20 dark:hover:bg-white/[0.05]',
         warning && 'border-amber-300 bg-amber-50/70 dark:border-amber-500/30 dark:bg-amber-500/10'
       )}
     >
-      <div className="flex items-start justify-between gap-2">
-        <div className={cn(
-          'grid h-9 w-9 place-items-center rounded-xl bg-slate-100 text-slate-700 dark:bg-white/10 dark:text-cyan-200',
+      <div className={cn(
+          'grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-700 dark:bg-white/10 dark:text-cyan-200',
           warning && 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-200'
         )}>
-          {icon}
-        </div>
-        {value !== undefined && <div className="text-2xl font-semibold tracking-tight">{value}</div>}
+        {icon}
       </div>
-      <div className="min-w-0">
+      <div className="min-w-0 flex-1">
         <div className="truncate text-sm font-semibold">{title}</div>
         {note && <div className="mt-0.5 truncate text-xs text-slate-500">{note}</div>}
       </div>
+      {value !== undefined && <div className="shrink-0 text-lg font-semibold tracking-tight">{value}</div>}
     </Link>
   )
 }
@@ -626,36 +602,28 @@ function PriorityCard({
   title,
   value,
   text,
-  urgent,
 }: {
   href: string
   icon: React.ReactNode
   title: string
   value: number
   text: string
-  urgent: boolean
 }) {
   return (
     <Link
       href={href}
-      className={cn(
-        'metric-card group flex items-center justify-between gap-4 transition-colors hover:border-cyan-200 hover:bg-cyan-50/40 dark:hover:border-cyan-500/30 dark:hover:bg-cyan-500/[0.06]',
-        urgent && 'border-amber-300 bg-amber-50/80 dark:border-amber-500/30 dark:bg-amber-500/10'
-      )}
+      className="group flex items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50/70 px-3 py-3 transition-colors hover:border-amber-300 dark:border-amber-500/25 dark:bg-amber-500/10"
     >
       <div className="flex min-w-0 items-center gap-3">
-        <div className={cn(
-          'grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-700 dark:bg-white/10 dark:text-cyan-200',
-          urgent && 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-200'
-        )}>
+        <div className="grid h-8 w-8 shrink-0 place-items-center text-amber-700 dark:text-amber-200">
           {icon}
         </div>
         <div className="min-w-0">
           <div className="font-semibold text-slate-950 dark:text-white">{title}</div>
-          <div className="mt-1 truncate text-sm text-slate-500 dark:text-slate-400">{text}</div>
+          <div className="truncate text-xs text-slate-500 dark:text-slate-400">{text}</div>
         </div>
       </div>
-      <div className="text-2xl font-semibold tracking-tight">{value}</div>
+      <div className="text-lg font-semibold tracking-tight">{value}</div>
     </Link>
   )
 }

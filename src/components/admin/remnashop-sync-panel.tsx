@@ -2,7 +2,7 @@
 
 import type { ReactNode } from 'react'
 import { useState } from 'react'
-import { Activity, AlertTriangle, ArrowLeftRight, CheckCircle2, Clock3, RefreshCw, RotateCcw } from 'lucide-react'
+import { Activity, AlertTriangle, ArrowLeftRight, Clock3, RefreshCw, RotateCcw } from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
 import { toast } from '@/components/ui/toaster'
 import { AdminEmptyState } from '@/components/admin/admin-empty-state'
@@ -180,7 +180,7 @@ export function RemnashopSyncPanel() {
             </button>
           </div>
         </div>
-        <label className="mt-4 flex min-h-11 cursor-pointer items-center gap-3 rounded-xl border border-slate-200 bg-slate-50/80 px-3 text-sm dark:border-white/10 dark:bg-white/[0.04]">
+        <label className="mt-3 flex cursor-pointer items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
           <input type="checkbox" checked={includePromoCodes} onChange={(event) => setIncludePromoCodes(event.target.checked)} />
           Синхронизировать промокоды
         </label>
@@ -196,7 +196,7 @@ export function RemnashopSyncPanel() {
         <>
           <SyncOverview report={report} />
 
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="flex flex-wrap gap-2">
             {Object.entries(report.summary ?? report.counts).slice(0, 8).map(([key, value]) => (
               <Metric key={key} label={labelize(key)} value={value} />
             ))}
@@ -216,16 +216,12 @@ export function RemnashopSyncPanel() {
                 ))}
               </ul>
             </div>
-          ) : (
-            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-100">
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4" />
-                Критичных предупреждений нет.
-              </div>
-            </div>
-          )}
+          ) : null}
 
-          <DiffView report={report} />
+          <details className="card">
+            <summary className="cursor-pointer font-medium">Расхождения данных</summary>
+            <div className="mt-3"><DiffView report={report} /></div>
+          </details>
           <SyncEventsView
             events={report.syncEvents ?? []}
             counts={report.syncStatusCounts ?? {}}
@@ -268,8 +264,8 @@ function LiveCheckList() {
   ]
 
   return (
-    <section className="card">
-      <h3 className="text-sm font-semibold">Живая проверка после деплоя</h3>
+    <details className="card">
+      <summary className="cursor-pointer text-sm font-semibold">Живая проверка после деплоя</summary>
       <div className="mt-3 grid gap-2 md:grid-cols-2">
         {checks.map((check) => (
           <label key={check} className="flex min-h-10 items-center gap-3 rounded-xl border border-slate-200 px-3 text-sm dark:border-white/10">
@@ -278,7 +274,7 @@ function LiveCheckList() {
           </label>
         ))}
       </div>
-    </section>
+    </details>
   )
 }
 
@@ -340,7 +336,7 @@ function SyncEventsView({
           </div>
         </div>
       ) : null}
-      <div className="grid gap-3 sm:grid-cols-4">
+      <div className="flex flex-wrap gap-2">
         {(['FAILED', 'PENDING', 'SKIPPED', 'SUCCEEDED'] as const).map((status) => (
           <Metric key={status} label={syncStatusLabel(status)} value={counts[status] ?? 0} />
         ))}
@@ -466,11 +462,7 @@ function SyncHealthSummary({ report }: { report: RemnashopSyncReport }) {
   const hasProblems = subscriptionFailures > 0 || failedEvents > 0 || skippedEvents > 0 || report.warnings.length > 0
 
   if (!hasProblems) {
-    return (
-      <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-100">
-        Последний запуск прошёл без явных проблем, backlog событий чистый.
-      </div>
-    )
+    return null
   }
 
   return (
@@ -509,9 +501,9 @@ function InfoLine({ label, value }: { label: string; value: string }) {
 
 function Metric({ label, value }: { label: string; value: number }) {
   return (
-    <div className="metric-card">
-      <div className="text-sm text-slate-500">{label}</div>
-      <div className="mt-1 text-2xl font-semibold">{value}</div>
+    <div className="inline-flex items-baseline gap-2 rounded-full bg-slate-50 px-3 py-2 text-sm dark:bg-white/5">
+      <span className="text-slate-500">{label}</span>
+      <span className="font-semibold tabular-nums text-slate-900 dark:text-white">{value}</span>
     </div>
   )
 }
