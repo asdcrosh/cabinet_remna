@@ -37,7 +37,6 @@ RUN ./node_modules/.bin/esbuild \
   --outdir=.next/ops \
   --entry-names='[name]' \
   --external:@prisma/client \
-  --external:@sentry/nextjs \
   --external:pg
 
 FROM node:24-alpine AS release
@@ -57,6 +56,11 @@ COPY --chown=nextjs:nextjs --from=builder /app/.next/static ./.next/static
 COPY --chown=nextjs:nextjs --from=builder /app/.next/ops ./ops
 COPY --chown=nextjs:nextjs --from=builder /app/scripts/check-env.mjs ./ops/check-env.mjs
 COPY --chown=nextjs:nextjs --from=builder /app/prisma ./prisma
+
+# Fail the image build if a bundled worker references a dependency that is not
+# present in the final release image.
+RUN OPS_STARTUP_CHECK=true node ops/payment-reconciler.js \
+  && OPS_STARTUP_CHECK=true node ops/broadcast-worker.js
 
 # Prisma CLI is needed only for `migrate deploy`. Workers and seed are bundled
 # above, so the image does not need source files, tsx or full node_modules.

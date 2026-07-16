@@ -47,7 +47,15 @@ function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
-main()
+async function start() {
+  if (process.env.OPS_STARTUP_CHECK === 'true') {
+    logInfo('broadcast_worker.startup_check_passed')
+    return
+  }
+  await main()
+}
+
+start()
   .catch((error) => {
     logError('broadcast_worker.fatal', error)
     process.exitCode = 1

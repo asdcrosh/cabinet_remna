@@ -325,7 +325,16 @@ function readNonNegativeInt(name: string, fallback: number) {
   return Number.isInteger(value) && value >= 0 ? value : fallback
 }
 
-main().catch(async (error) => {
+async function start() {
+  if (process.env.OPS_STARTUP_CHECK === 'true') {
+    logInfo('payment_reconciler.startup_check_passed')
+    await prisma.$disconnect()
+    return
+  }
+  await main()
+}
+
+start().catch(async (error) => {
   logError('payment_reconciler.fatal', error)
   await prisma.$disconnect()
   process.exit(1)

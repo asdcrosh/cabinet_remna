@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="1.4.0"
+VERSION="1.4.1"
 BRANCH="${BRANCH:-main}"
 RAW_BASE_URL="${RAW_BASE_URL:-https://raw.githubusercontent.com/asdcrosh/cabinet_remna/${BRANCH}}"
 GITHUB_API_URL="${GITHUB_API_URL:-https://api.github.com/repos/asdcrosh/cabinet_remna/commits/${BRANCH}}"
@@ -508,26 +508,8 @@ show_status() {
 
   print_service_state "Кабинет" "remnawave-cabinet-app"
   print_service_state "База" "remnawave-cabinet-db"
-  local payment_state broadcast_state workers_state
-  payment_state="$(container_state remnawave-cabinet-worker)"
-  broadcast_state="$(container_state remnawave-cabinet-broadcast-worker)"
-  if [[ "${payment_state}" == "running" && "${broadcast_state}" == "running" ]]; then
-    workers_state="running"
-  elif [[ "${payment_state}" == "restarting" || "${broadcast_state}" == "restarting" ]]; then
-    workers_state="restarting"
-  elif [[ "${payment_state}" == "не найден" && "${broadcast_state}" == "не найден" ]]; then
-    workers_state="не найден"
-  else
-    workers_state="exited"
-  fi
-  local workers_label
-  case "${workers_state}" in
-    running) workers_label="${GREEN}работают${RESET}" ;;
-    restarting) workers_label="${YELLOW}перезапускаются${RESET}" ;;
-    exited) workers_label="${RED}остановлены${RESET}" ;;
-    *) workers_label="${DIM}не найдены${RESET}" ;;
-  esac
-  print_status_row "$(state_marker "${workers_state}")" "Фоновые задачи" "${workers_label}"
+  print_service_state "Платежи" "remnawave-cabinet-worker"
+  print_service_state "Рассылки" "remnawave-cabinet-broadcast-worker"
 }
 
 show_logs() {
