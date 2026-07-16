@@ -71,7 +71,7 @@ export function SystemHealthPanel({ initialReport }: { initialReport: SystemHeal
             className="btn-primary w-full sm:w-auto"
           >
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-            Запустить полную проверку
+            Проверить систему
           </button>
         </div>
         {error && (
@@ -88,12 +88,12 @@ export function SystemHealthPanel({ initialReport }: { initialReport: SystemHeal
             <article
               key={item.id}
               className={cn(
-                'p-4',
+                'border-l-4 p-4',
                 item.status === 'error'
-                  ? 'bg-red-50/60 dark:bg-red-500/[0.05]'
+                  ? 'border-l-red-500'
                   : item.status === 'warn'
-                    ? 'bg-amber-50/60 dark:bg-amber-500/[0.05]'
-                    : ''
+                    ? 'border-l-amber-400'
+                    : 'border-l-emerald-500'
               )}
             >
               <div className="flex items-start justify-between gap-3">

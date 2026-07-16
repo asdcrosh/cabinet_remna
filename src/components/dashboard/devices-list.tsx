@@ -213,11 +213,20 @@ function DeviceActionButton({
 
 function DevicesSkeleton() {
   return (
-    <div className="rounded-3xl border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-surface-900">
-      <div className="mb-4 h-10 w-48 animate-pulse rounded-xl bg-slate-200 dark:bg-surface-800" />
-      <div className="grid gap-3 lg:grid-cols-2 2xl:grid-cols-3">
+    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.035]">
+      <div className="border-b border-slate-100 px-4 py-4 dark:border-white/10">
+        <div className="h-5 w-48 animate-pulse rounded-lg bg-slate-200 dark:bg-surface-800" />
+      </div>
+      <div className="divide-y divide-slate-100 dark:divide-white/10">
         {[0, 1, 2].map((item) => (
-          <div key={item} className="h-44 animate-pulse rounded-2xl bg-slate-100 dark:bg-surface-800" />
+          <div key={item} className="flex items-center gap-3 px-4 py-4">
+            <div className="h-9 w-9 shrink-0 animate-pulse rounded-xl bg-slate-200 dark:bg-surface-800" />
+            <div className="min-w-0 flex-1 space-y-2">
+              <div className="h-4 w-40 max-w-full animate-pulse rounded bg-slate-200 dark:bg-surface-800" />
+              <div className="h-3 w-64 max-w-[80%] animate-pulse rounded bg-slate-100 dark:bg-surface-800" />
+            </div>
+            <div className="hidden h-9 w-24 animate-pulse rounded-xl bg-slate-100 dark:bg-surface-800 sm:block" />
+          </div>
         ))}
       </div>
     </div>

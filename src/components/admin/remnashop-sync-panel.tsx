@@ -2,7 +2,7 @@
 
 import type { ReactNode } from 'react'
 import { useState } from 'react'
-import { Activity, AlertTriangle, ArrowLeftRight, Clock3, RefreshCw, RotateCcw } from 'lucide-react'
+import { Activity, AlertTriangle, Clock3, RefreshCw, RotateCcw } from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
 import { toast } from '@/components/ui/toaster'
 import { AdminEmptyState } from '@/components/admin/admin-empty-state'
@@ -196,14 +196,6 @@ export function RemnashopSyncPanel() {
         <>
           <SyncOverview report={report} />
 
-          <div className="flex flex-wrap gap-2">
-            {Object.entries(report.summary ?? report.counts).slice(0, 8).map(([key, value]) => (
-              <Metric key={key} label={labelize(key)} value={value} />
-            ))}
-          </div>
-
-          <SyncHealthSummary report={report} />
-
           {report.warnings.length > 0 ? (
             <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
               <div className="mb-2 flex items-center gap-2 font-medium">
@@ -218,19 +210,23 @@ export function RemnashopSyncPanel() {
             </div>
           ) : null}
 
-          <details className="card">
-            <summary className="cursor-pointer font-medium">Расхождения данных</summary>
-            <div className="mt-3"><DiffView report={report} /></div>
-          </details>
           <SyncEventsView
             events={report.syncEvents ?? []}
-            counts={report.syncStatusCounts ?? {}}
             issueGroups={report.syncIssueGroups ?? []}
             loading={loading}
             onRetry={(id) => void retryEvent(id)}
             onRetryFailed={() => void retryFailedEvents()}
           />
-          <LiveCheckList />
+
+          <details className="card">
+            <summary className="cursor-pointer font-medium">Результаты проверки и расхождения</summary>
+            <div className="mt-4 flex flex-wrap gap-2">
+              {Object.entries(report.summary ?? report.counts).slice(0, 8).map(([key, value]) => (
+                <Metric key={key} label={labelize(key)} value={value} />
+              ))}
+            </div>
+            <div className="mt-4"><DiffView report={report} /></div>
+          </details>
 
           <details className="card">
             <summary className="cursor-pointer font-medium">Технические детали</summary>
@@ -253,41 +249,14 @@ export function RemnashopSyncPanel() {
   )
 }
 
-function LiveCheckList() {
-  const checks = [
-    'Регистрация в кабинете появляется в Remnashop',
-    'Регистрация в Remnashop появляется в кабинете',
-    'Покупка в кабинете появляется в Remnashop',
-    'Покупка в Remnashop появляется в кабинете',
-    'Промокод из кабинета появляется в Remnashop',
-    'Промокод из Remnashop появляется в кабинете',
-  ]
-
-  return (
-    <details className="card">
-      <summary className="cursor-pointer text-sm font-semibold">Живая проверка после деплоя</summary>
-      <div className="mt-3 grid gap-2 md:grid-cols-2">
-        {checks.map((check) => (
-          <label key={check} className="flex min-h-10 items-center gap-3 rounded-xl border border-slate-200 px-3 text-sm dark:border-white/10">
-            <input type="checkbox" />
-            {check}
-          </label>
-        ))}
-      </div>
-    </details>
-  )
-}
-
 function SyncEventsView({
   events,
-  counts,
   issueGroups,
   loading,
   onRetry,
   onRetryFailed,
 }: {
   events: SyncEventRow[]
-  counts: Record<string, number>
   issueGroups: SyncIssueGroup[]
   loading: boolean
   onRetry: (id: string) => void
@@ -309,16 +278,16 @@ function SyncEventsView({
   return (
     <section className="space-y-3">
       {issueGroups.length > 0 ? (
-        <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm dark:border-white/10 dark:bg-surface-900">
-          <div className="mb-3 flex items-center gap-2 font-semibold text-slate-950 dark:text-white">
+        <div className="overflow-hidden rounded-2xl border border-amber-200 bg-white text-sm dark:border-amber-500/25 dark:bg-surface-900">
+          <div className="flex items-center gap-2 border-b border-amber-100 px-4 py-3 font-semibold text-slate-950 dark:border-amber-500/15 dark:text-white">
             <AlertTriangle className="h-4 w-4" />
             Требуют внимания
           </div>
-          <div className="space-y-2">
+          <div className="divide-y divide-slate-100 dark:divide-white/10">
             {issueGroups.map((group) => (
               <div
                 key={`${group.direction}:${group.entityType}:${group.operation}:${group.status}:${group.reason}`}
-                className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-white/10 dark:bg-white/[0.04]"
+                className="px-4 py-3"
               >
                 <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0">
@@ -336,11 +305,6 @@ function SyncEventsView({
           </div>
         </div>
       ) : null}
-      <div className="flex flex-wrap gap-2">
-        {(['FAILED', 'PENDING', 'SKIPPED', 'SUCCEEDED'] as const).map((status) => (
-          <Metric key={status} label={syncStatusLabel(status)} value={counts[status] ?? 0} />
-        ))}
-      </div>
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.035]">
         <div className="flex flex-col gap-3 border-b px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
@@ -421,80 +385,40 @@ function SyncEventsView({
 function SyncOverview({ report }: { report: RemnashopSyncReport }) {
   const failed = report.syncStatusCounts?.FAILED ?? 0
   const pending = report.syncStatusCounts?.PENDING ?? 0
+  const skipped = report.syncStatusCounts?.SKIPPED ?? 0
   const warnings = report.warnings.length
   const healthy = failed === 0 && pending === 0 && warnings === 0
 
   return (
-    <section className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.035] lg:grid-cols-[1fr_auto_1fr] lg:items-center">
-      <div className="flex items-center gap-3">
-        <span className="grid h-10 w-10 place-items-center rounded-xl bg-slate-100 text-slate-700 dark:bg-white/10 dark:text-slate-200">
+    <section className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.035] sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex min-w-0 items-center gap-3">
+        <span className={healthy ? 'grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-200' : 'grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-200'}>
           <Activity className="h-5 w-5" />
         </span>
-        <div>
-          <div className="text-xs font-medium uppercase text-slate-400">Cabinet</div>
-          <div className="font-semibold text-slate-950 dark:text-white">Основные данные</div>
+        <div className="min-w-0">
+          <div className="font-semibold text-slate-950 dark:text-white">{healthy ? 'Синхронизация в порядке' : 'Нужно внимание'}</div>
+          <div className="mt-0.5 text-xs text-slate-500">Проверено {formatDateTime(report.generatedAt)}</div>
         </div>
       </div>
-      <div className="flex items-center justify-center gap-2 text-sm font-medium text-slate-500">
-        <ArrowLeftRight className="h-5 w-5" />
-        <span className={healthy ? 'badge-active' : 'badge-limited'}>{healthy ? 'Системы согласованы' : 'Нужна проверка'}</span>
-      </div>
-      <div className="flex items-center gap-3 lg:justify-end lg:text-right">
-        <div>
-          <div className="text-xs font-medium uppercase text-slate-400">Remnashop</div>
-          <div className="font-semibold text-slate-950 dark:text-white">Магазин и каталог</div>
-        </div>
-        <span className="grid h-10 w-10 place-items-center rounded-xl bg-slate-100 text-slate-700 dark:bg-white/10 dark:text-slate-200">
-          <RefreshCw className="h-5 w-5" />
-        </span>
+      <div className="grid grid-cols-3 gap-4 text-center sm:text-right">
+        <OverviewMetric label="Ошибки" value={failed} tone={failed > 0 ? 'red' : 'slate'} />
+        <OverviewMetric label="Ожидают" value={pending} tone={pending > 0 ? 'amber' : 'slate'} />
+        <OverviewMetric label="Пропущено" value={skipped} tone="slate" />
       </div>
     </section>
   )
 }
 
-function SyncHealthSummary({ report }: { report: RemnashopSyncReport }) {
-  const counts = report.counts
-  const failedEvents = report.syncStatusCounts?.FAILED ?? 0
-  const skippedEvents = report.syncStatusCounts?.SKIPPED ?? 0
-  const subscriptionFailures = counts.subscriptionsFailed ?? 0
-  const subscriptionSkipped = counts.subscriptionsSkipped ?? 0
-  const usersSkipped = counts.usersSkipped ?? 0
-  const hasProblems = subscriptionFailures > 0 || failedEvents > 0 || skippedEvents > 0 || report.warnings.length > 0
-
-  if (!hasProblems) {
-    return null
-  }
-
+function OverviewMetric({ label, value, tone }: { label: string; value: number; tone: 'red' | 'amber' | 'slate' }) {
+  const valueClass = tone === 'red'
+    ? 'text-red-600 dark:text-red-300'
+    : tone === 'amber'
+      ? 'text-amber-600 dark:text-amber-300'
+      : 'text-slate-800 dark:text-slate-100'
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 dark:border-white/10 dark:bg-white/[0.035] dark:text-slate-200">
-      <div className="font-semibold text-slate-950 dark:text-white">Как читать этот экран</div>
-      <div className="mt-2 grid gap-2 md:grid-cols-2">
-        <InfoLine
-          label="Последний запуск"
-          value={
-            subscriptionFailures > 0
-              ? `${subscriptionFailures} подписок не подтянулись из Remnawave`
-              : subscriptionSkipped > 0
-                ? `${subscriptionSkipped} подписок уже свежие, поэтому пропущены`
-                : usersSkipped > 0
-                  ? `${usersSkipped} пользователей пропущены без email/Telegram`
-                  : 'Каталог и пользователи обработаны'
-          }
-        />
-        <InfoLine
-          label="Backlog событий"
-          value={`${failedEvents} ошибок, ${skippedEvents} пропусков за всё время журнала`}
-        />
-      </div>
-    </div>
-  )
-}
-
-function InfoLine({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-xl bg-slate-50 px-3 py-2 dark:bg-white/5">
-      <div className="text-xs uppercase text-slate-400">{label}</div>
-      <div className="mt-1 font-medium">{value}</div>
+    <div>
+      <div className={`text-xl font-semibold tabular-nums ${valueClass}`}>{value}</div>
+      <div className="text-xs text-slate-500">{label}</div>
     </div>
   )
 }

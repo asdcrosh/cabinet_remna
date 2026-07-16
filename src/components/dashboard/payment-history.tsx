@@ -8,102 +8,53 @@ import { EmptyState } from '@/components/dashboard/empty-state'
 export type PaymentHistoryPayment = Prisma.PaymentGetPayload<{ include: { plan: true; subscription: true } }>
 
 export function PaymentHistory({ payments }: { payments: PaymentHistoryPayment[] }) {
-  return (
-    <div className="space-y-3">
-      <div className="table-shell hidden 2xl:block">
-        <table className="data-table min-w-[900px]">
-          <caption className="sr-only">История платежей и состояние выданных подписок</caption>
-          <thead className="bg-slate-50 text-left text-slate-500 dark:bg-surface-800">
-            <tr>
-              <th>Дата</th>
-              <th>Тариф</th>
-              <th>Сумма</th>
-              <th>Промокод</th>
-              <th>Статус</th>
-              <th>Подписка</th>
-              <th>Действие</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-            {payments.length === 0 && (
-              <tr>
-                <td colSpan={7} className="py-10">
-                  <PaymentHistoryEmpty compact />
-                </td>
-              </tr>
-            )}
-            {payments.map((payment) => (
-              <tr key={payment.id}>
-                <td>{new Date(payment.createdAt).toLocaleString('ru-RU')}</td>
-                <td>{payment.plan.name}</td>
-                <td>
-                  <PaymentAmount
-                    amountKopecks={payment.amountKopecks}
-                    originalAmountKopecks={payment.originalAmountKopecks}
-                    discountKopecks={payment.discountKopecks}
-                  />
-                </td>
-                <td className="text-slate-500">{getPromoCodeLabel(payment.promoCodeSnapshot)}</td>
-                <td><PaymentStatusBadge status={payment.status} createdAt={payment.createdAt} /></td>
-                <td><ProvisioningBadge provisioned={Boolean(payment.subscriptionProvisionedAt)} status={payment.status} /></td>
-                <td><PaymentAction confirmationUrl={payment.confirmationUrl} status={payment.status} createdAt={payment.createdAt} /></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+  if (payments.length === 0) return <PaymentHistoryEmpty />
 
-      <div className="space-y-3 2xl:hidden">
-        {payments.length === 0 && <PaymentHistoryEmpty />}
-        {payments.map((payment) => (
-          <article key={payment.id} className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.035]">
-            <div className="border-b border-slate-100 px-4 py-4 dark:border-white/10">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="truncate text-sm font-semibold text-slate-950 dark:text-white">{payment.plan.name}</div>
-                  <div className="mt-0.5 text-xs text-slate-500">{formatPaymentDate(payment.createdAt)}</div>
-                </div>
-                <PaymentStatusBadge status={payment.status} createdAt={payment.createdAt} />
-              </div>
+  return (
+    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white divide-y divide-slate-200 dark:border-white/10 dark:bg-white/[0.025] dark:divide-white/[0.07]">
+      {payments.map((payment) => (
+        <article key={payment.id} className="grid gap-3 border-l-4 border-l-slate-300 px-4 py-4 sm:grid-cols-[minmax(0,1.2fr)_minmax(7rem,.55fr)] lg:grid-cols-[minmax(14rem,1.2fr)_minmax(8rem,.55fr)_minmax(10rem,.7fr)_auto] lg:items-center dark:border-l-slate-600">
+          <div className="flex min-w-0 items-start justify-between gap-3 lg:block">
+            <div className="min-w-0">
+              <div className="truncate text-sm font-semibold text-slate-950 dark:text-white">{payment.plan.name}</div>
+              <div className="mt-1 text-xs text-slate-500">{formatPaymentDate(payment.createdAt)}</div>
             </div>
-            <div className="space-y-4 px-4 py-4">
-              <div className="flex items-baseline justify-between gap-3">
-                <span className="text-xs font-medium text-slate-500">Сумма</span>
-                <PaymentAmount
-                  amountKopecks={payment.amountKopecks}
-                  originalAmountKopecks={payment.originalAmountKopecks}
-                  discountKopecks={payment.discountKopecks}
-                  align="right"
-                />
-              </div>
-              <div className="grid gap-3 text-sm sm:grid-cols-2">
-                <InfoCell label="Подписка" value={getProvisioningLabel(Boolean(payment.subscriptionProvisionedAt), payment.status)} />
-                <InfoCell label="Промокод" value={getPromoCodeLabel(payment.promoCodeSnapshot)} />
-                <InfoCell label="ID оплаты" value={payment.yookassaId ? shortId(payment.yookassaId) : shortId(payment.id)} mono />
-              </div>
+            <div className="lg:mt-2"><PaymentStatusBadge status={payment.status} createdAt={payment.createdAt} /></div>
+          </div>
+
+          <div className="text-right sm:text-left">
+            <PaymentAmount
+              amountKopecks={payment.amountKopecks}
+              originalAmountKopecks={payment.originalAmountKopecks}
+              discountKopecks={payment.discountKopecks}
+              align="right"
+            />
+            {getPromoCodeLabel(payment.promoCodeSnapshot) !== '—' ? (
+              <div className="mt-1 text-xs text-slate-500">Промокод {getPromoCodeLabel(payment.promoCodeSnapshot)}</div>
+            ) : null}
+          </div>
+
+          <div className="min-w-0 sm:col-span-2 lg:col-span-1">
+            <ProvisioningBadge provisioned={Boolean(payment.subscriptionProvisionedAt)} status={payment.status} />
+            <details className="mt-2 text-xs text-slate-400">
+              <summary className="cursor-pointer">ID платежа</summary>
+              <div className="mt-1 truncate font-mono">{payment.yookassaId ? shortId(payment.yookassaId) : shortId(payment.id)}</div>
+            </details>
+          </div>
+
+          {payment.status === 'PENDING' ? (
+            <div className="grid sm:col-span-2 lg:col-span-1 lg:justify-end">
               <PaymentAction confirmationUrl={payment.confirmationUrl} status={payment.status} createdAt={payment.createdAt} fullWidth />
             </div>
-          </article>
-        ))}
-      </div>
+          ) : null}
+        </article>
+      ))}
     </div>
   )
 }
 
-function PaymentHistoryEmpty({ compact = false }: { compact?: boolean }) {
+function PaymentHistoryEmpty() {
   const action = <Link href="/dashboard/plans" className="btn-primary w-full sm:w-auto">Выбрать тариф</Link>
-
-  if (compact) {
-    return (
-      <div className="mx-auto max-w-md text-center">
-        <div className="text-base font-semibold text-slate-900 dark:text-white">Платежей пока нет</div>
-        <p className="mt-1 text-sm text-slate-500">
-          После покупки здесь появятся сумма, статус и выданная подписка.
-        </p>
-        <div className="mt-4 inline-flex">{action}</div>
-      </div>
-    )
-  }
 
   return (
     <EmptyState
@@ -111,15 +62,6 @@ function PaymentHistoryEmpty({ compact = false }: { compact?: boolean }) {
       description="После первой покупки здесь появится история оплат и состояние выдачи подписки."
       action={action}
     />
-  )
-}
-
-function InfoCell({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
-  return (
-    <div className="min-w-0 border-l border-slate-200 pl-3 dark:border-white/10">
-      <div className="text-xs text-slate-500">{label}</div>
-      <div className={mono ? 'mt-1 truncate font-mono text-xs' : 'mt-1 truncate font-medium'}>{value}</div>
-    </div>
   )
 }
 
@@ -208,13 +150,6 @@ function getPromoCodeLabel(snapshot: unknown) {
   if (!snapshot || typeof snapshot !== 'object') return '—'
   const code = (snapshot as { code?: unknown }).code
   return typeof code === 'string' && code ? code : '—'
-}
-
-function getProvisioningLabel(provisioned: boolean, status: string) {
-  if (provisioned) return 'Выдана'
-  if (status === 'SUCCEEDED') return 'Выдача идёт'
-  if (status === 'PENDING') return 'После оплаты'
-  return '—'
 }
 
 function formatPaymentDate(date: Date) {

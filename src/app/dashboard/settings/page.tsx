@@ -1,13 +1,6 @@
-import type { ReactNode } from 'react'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import {
-  CreditCard,
-  Database,
-  LockKeyhole,
-  MailPlus,
-  UserRound,
-} from 'lucide-react'
+import { MailPlus } from 'lucide-react'
 import { getCurrentUser } from '@/lib/auth/cookies'
 import { prisma } from '@/lib/prisma'
 import { ChangePasswordForm } from '@/components/dashboard/change-password-form'
@@ -16,7 +9,6 @@ import { ProfileForm } from '@/components/dashboard/profile-form'
 import { SettingsTabs } from '@/components/dashboard/settings-tabs'
 import { TelegramLinkCard } from '@/components/dashboard/telegram-link-card'
 import { PageHeader } from '@/components/dashboard/page-header'
-import { cn } from '@/lib/cn'
 
 export const dynamic = 'force-dynamic'
 
@@ -49,11 +41,9 @@ export default async function SettingsPage() {
             id: 'account',
             title: 'Аккаунт',
             shortTitle: 'Аккаунт',
-            description: 'Инфа и статус',
             children: (
               <SettingsSection
                 id="account"
-                icon={<UserRound className="h-5 w-5" />}
                 title="Аккаунт"
                 description="Информация профиля и текущий статус"
               >
@@ -73,11 +63,9 @@ export default async function SettingsPage() {
             id: 'sync',
             title: 'Синхронизация',
             shortTitle: 'Связь',
-            description: 'Telegram и email',
             children: (
               <SettingsSection
                 id="sync"
-                icon={<Database className="h-5 w-5" />}
                 title="Синхронизация"
                 description="Перенос Telegram и привязка email"
               >
@@ -121,11 +109,9 @@ export default async function SettingsPage() {
             id: 'security',
             title: 'Безопасность',
             shortTitle: 'Пароль',
-            description: 'Смена пароля',
             children: (
               <SettingsSection
                 id="security"
-                icon={<LockKeyhole className="h-5 w-5" />}
                 title="Безопасность"
                 description="Смена пароля для входа по email"
               >
@@ -143,11 +129,9 @@ export default async function SettingsPage() {
             id: 'payments',
             title: 'История платежей',
             shortTitle: 'Платежи',
-            description: `${payments.length} записей`,
             children: (
               <SettingsSection
                 id="payments"
-                icon={<CreditCard className="h-5 w-5" />}
                 title="История платежей"
                 description="Оплаты, статусы и выдача подписки"
               >
@@ -163,39 +147,27 @@ export default async function SettingsPage() {
 
 function SettingsSection({
   id,
-  icon,
   title,
   description,
   children,
   className,
 }: {
   id: string
-  icon: ReactNode
   title: string
   description: string
-  children: ReactNode
+  children: React.ReactNode
   className?: string
 }) {
   return (
     <section
       id={id}
-      className={cn(
-        'scroll-mt-20 overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.035]',
-        className
-      )}
+      className={`scroll-mt-20 rounded-2xl border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.035] sm:p-5 ${className ?? ''}`}
     >
-      <div className="border-b border-slate-100 px-4 py-4 dark:border-white/10 sm:px-5">
-        <div className="flex items-center gap-3">
-          <div className="grid h-10 w-10 shrink-0 place-items-center text-cyan-700 dark:text-cyan-200">
-            {icon}
-          </div>
-          <div className="min-w-0">
-            <h2 className="text-base font-semibold text-slate-950 dark:text-white sm:text-lg">{title}</h2>
-            <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">{description}</p>
-          </div>
-        </div>
+      <div className="mb-4 min-w-0">
+        <h2 className="text-base font-semibold text-slate-950 dark:text-white sm:text-lg">{title}</h2>
+        <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">{description}</p>
       </div>
-      <div className="p-4 sm:p-5">{children}</div>
+      {children}
     </section>
   )
 }
