@@ -152,6 +152,17 @@ export function DashboardNav({
   return <NavList role={role} badges={badges} features={features} className="space-y-1 py-1" />
 }
 
+export function DashboardAreaLabel({ isStaff }: { isStaff: boolean }) {
+  const pathname = usePathname()
+  const label = isStaff && pathname.startsWith('/dashboard/admin') ? 'Администрирование' : 'Личный кабинет'
+
+  return (
+    <div className="hidden text-xs font-semibold uppercase tracking-[0.16em] text-slate-400 lg:block">
+      {label}
+    </div>
+  )
+}
+
 export function MobileDashboardNav({
   role,
   email,
@@ -240,11 +251,31 @@ export function MobileDashboardNav({
   )
 }
 
-export function MobileBottomNav({ badges = {}, features }: { badges?: NavBadges; features: FeatureFlags }) {
+export function MobileBottomNav({
+  role,
+  badges = {},
+  features,
+}: {
+  role: UserRole
+  badges?: NavBadges
+  features: FeatureFlags
+}) {
   const pathname = usePathname()
   const liveBadges = useNavBadgeValues(badges)
-  const items = filterUserNav(bottomNav, features)
-  const moreItems = filterUserNav(bottomMoreNav, features)
+  const adminArea = pathname.startsWith('/dashboard/admin') && role !== 'USER'
+  const availableAdminItems = adminArea ? getAdminItems(role, features) : []
+  const adminPrimaryHrefs = new Set([
+    '/dashboard/admin',
+    '/dashboard/admin/users',
+    '/dashboard/admin/plans',
+    '/dashboard/admin/payments',
+  ])
+  const items = adminArea
+    ? availableAdminItems.filter((item) => adminPrimaryHrefs.has(item.href))
+    : filterUserNav(bottomNav, features)
+  const moreItems = adminArea
+    ? availableAdminItems.filter((item) => !adminPrimaryHrefs.has(item.href))
+    : filterUserNav(bottomMoreNav, features)
   const [moreOpen, setMoreOpen] = useState(false)
   const [mounted, setMounted] = useState(false)
   const moreTriggerRef = useRef<HTMLButtonElement | null>(null)
@@ -279,8 +310,8 @@ export function MobileBottomNav({ badges = {}, features }: { badges?: NavBadges;
       >
         <div className="mb-3 flex items-center justify-between gap-3">
           <div>
-            <div id="mobile-more-menu-title" className="font-semibold text-slate-950 dark:text-white">Ещё</div>
-            <div className="text-sm text-slate-500 dark:text-slate-400">Разделы кабинета</div>
+            <div id="mobile-more-menu-title" className="font-semibold text-slate-950 dark:text-white">{adminArea ? 'Админка' : 'Ещё'}</div>
+            <div className="text-sm text-slate-500 dark:text-slate-400">{adminArea ? 'Остальные разделы' : 'Разделы кабинета'}</div>
           </div>
           <button
             ref={moreCloseButtonRef}
@@ -348,7 +379,7 @@ export function MobileBottomNav({ badges = {}, features }: { badges?: NavBadges;
               className={cn(
                 'relative flex min-h-12 min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1.5 text-[10px] font-semibold transition-colors',
                 active
-                  ? 'bg-slate-100 text-slate-950 dark:bg-white/10 dark:text-white'
+                  ? 'bg-cyan-50 text-cyan-800 dark:bg-cyan-400/10 dark:text-cyan-100'
                   : 'text-slate-500 hover:bg-slate-100 hover:text-slate-950 dark:text-slate-400 dark:hover:bg-white/10 dark:hover:text-white'
               )}
             >
@@ -375,7 +406,7 @@ export function MobileBottomNav({ badges = {}, features }: { badges?: NavBadges;
           className={cn(
             'relative flex min-h-12 min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1.5 text-[10px] font-semibold transition-colors',
             moreActive
-              ? 'bg-slate-100 text-slate-950 dark:bg-white/10 dark:text-white'
+              ? 'bg-cyan-50 text-cyan-800 dark:bg-cyan-400/10 dark:text-cyan-100'
               : 'text-slate-500 hover:bg-slate-100 hover:text-slate-950 dark:text-slate-400 dark:hover:bg-white/10 dark:hover:text-white'
           )}
         >
@@ -391,7 +422,7 @@ export function MobileBottomNav({ badges = {}, features }: { badges?: NavBadges;
 export function Brand({ compact = false, brandName }: { compact?: boolean; brandName: string }) {
   return (
     <Link href="/dashboard" className="flex min-w-0 items-center gap-2.5">
-      <div className="relative grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-slate-950 text-white dark:bg-white dark:text-slate-950">
+      <div className="relative grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-cyan-200 bg-cyan-50 text-cyan-700 dark:border-cyan-400/20 dark:bg-cyan-400/10 dark:text-cyan-200">
         <ShieldCheck className="h-4 w-4" />
       </div>
       <div className="min-w-0">
@@ -419,24 +450,56 @@ function NavList({
 }) {
   const pathname = usePathname()
   const liveBadges = useNavBadgeValues(badges)
+  const adminArea = pathname.startsWith('/dashboard/admin')
 
   return (
     <nav className={className}>
       {role === 'USER' ? (
         <NavGroup items={filterUserNav(nav, features)} pathname={pathname} badges={liveBadges} onNavigate={onNavigate} />
       ) : (
-        <div className="space-y-1.5">
-          <AdminNavGroup
-            title="Личный кабинет"
-            items={filterUserNav(nav, features)}
-            pathname={pathname}
-            badges={liveBadges}
-            onNavigate={onNavigate}
-          />
-          <AdminNavGroups role={role} features={features} pathname={pathname} badges={liveBadges} onNavigate={onNavigate} />
+        <div className="space-y-3">
+          <WorkspaceSwitch adminArea={adminArea} onNavigate={onNavigate} />
+          {adminArea ? (
+            <AdminNavGroups role={role} features={features} pathname={pathname} badges={liveBadges} onNavigate={onNavigate} />
+          ) : (
+            <NavGroup items={filterUserNav(nav, features)} pathname={pathname} badges={liveBadges} onNavigate={onNavigate} />
+          )}
         </div>
       )}
     </nav>
+  )
+}
+
+function WorkspaceSwitch({ adminArea, onNavigate }: { adminArea: boolean; onNavigate?: () => void }) {
+  return (
+    <div className="grid grid-cols-2 rounded-xl bg-slate-100 p-1 dark:bg-white/[0.05]">
+      <Link
+        href="/dashboard"
+        onClick={onNavigate}
+        className={cn(
+          'flex h-9 items-center justify-center gap-1.5 rounded-lg px-2 text-xs font-semibold transition-colors',
+          !adminArea
+            ? 'bg-white text-cyan-800 shadow-sm dark:bg-cyan-400/10 dark:text-cyan-100'
+            : 'text-slate-500 hover:text-slate-950 dark:text-slate-400 dark:hover:text-white'
+        )}
+      >
+        <Home className="h-3.5 w-3.5" />
+        Кабинет
+      </Link>
+      <Link
+        href="/dashboard/admin"
+        onClick={onNavigate}
+        className={cn(
+          'flex h-9 items-center justify-center gap-1.5 rounded-lg px-2 text-xs font-semibold transition-colors',
+          adminArea
+            ? 'bg-white text-cyan-800 shadow-sm dark:bg-cyan-400/10 dark:text-cyan-100'
+            : 'text-slate-500 hover:text-slate-950 dark:text-slate-400 dark:hover:text-white'
+        )}
+      >
+        <UserCog className="h-3.5 w-3.5" />
+        Админка
+      </Link>
+    </div>
   )
 }
 
@@ -539,7 +602,7 @@ function NavGroup({
             className={cn(
               'flex min-h-10 items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-colors duration-150',
               active
-                ? 'bg-slate-100 text-slate-950 dark:bg-white/10 dark:text-white'
+                ? 'bg-cyan-50 text-cyan-900 dark:bg-cyan-400/10 dark:text-cyan-100'
                 : 'text-slate-600 hover:bg-slate-50 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-white/[0.05] dark:hover:text-white'
             )}
           >

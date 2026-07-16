@@ -6,7 +6,7 @@ import { prisma } from '@/lib/prisma'
 import { getBrandName } from '@/lib/branding'
 import { getFeatureFlags } from '@/lib/feature-flags'
 import { LogoutButton } from '@/components/dashboard/logout-button'
-import { Brand, DashboardNav, MobileBottomNav, MobileDashboardNav, NavBadgesProvider } from '@/components/dashboard/dashboard-nav'
+import { Brand, DashboardAreaLabel, DashboardNav, MobileBottomNav, MobileDashboardNav, NavBadgesProvider } from '@/components/dashboard/dashboard-nav'
 import { NotificationBell } from '@/components/dashboard/notification-bell'
 import { logWarn } from '@/lib/logger'
 
@@ -50,14 +50,14 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   return (
     <NavBadgesProvider initialBadges={navBadges} supportEnabled={features.support}>
-      <div className="dashboard-shell min-h-screen bg-transparent dark:bg-surface-950">
+      <div className="dashboard-shell min-h-screen bg-slate-50/70 dark:bg-[#080b0f]">
         <a
           href="#dashboard-content"
           className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[200] focus:rounded-lg focus:bg-slate-950 focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-white"
         >
           Перейти к содержимому
         </a>
-        <aside className="dashboard-sidebar fixed inset-y-0 left-0 z-40 hidden h-dvh w-[14.5rem] flex-col overflow-hidden border-r border-slate-200 bg-white dark:border-white/[0.08] dark:bg-surface-950 lg:flex">
+        <aside className="dashboard-sidebar fixed inset-y-0 left-0 z-40 hidden h-dvh w-[14.5rem] flex-col overflow-hidden border-r border-slate-200/80 bg-white/95 backdrop-blur dark:border-white/[0.07] dark:bg-[#0b0f14]/95 lg:flex">
           <div className="shrink-0 px-4 py-4">
             <Brand brandName={brandName} />
           </div>
@@ -73,18 +73,19 @@ export default async function DashboardLayout({ children }: { children: React.Re
           </div>
         </aside>
         <main className="min-w-0 w-full overflow-x-clip lg:ml-[14.5rem] lg:w-auto">
-          <div className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-slate-200 bg-white/95 px-4 dark:border-white/[0.07] dark:bg-surface-950/95 lg:fixed lg:right-5 lg:top-4 lg:h-auto lg:border-0 lg:bg-transparent lg:p-0 lg:dark:bg-transparent">
+          <div className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-slate-200/80 bg-white/90 px-4 backdrop-blur-xl dark:border-white/[0.07] dark:bg-[#080b0f]/90 lg:h-16 lg:px-8">
             <div className="lg:hidden">
               <Brand compact brandName={brandName} />
             </div>
+            <DashboardAreaLabel isStaff={isStaff} />
             <div className="flex items-center gap-2">
               <NotificationBell showAdmin={isStaff} />
               {isStaff ? <MobileDashboardNav role={role} email={accountLabel} brandName={brandName} badges={navBadges} features={features} /> : null}
             </div>
           </div>
-          <div id="dashboard-content" className="page-transition mx-auto w-full max-w-6xl min-w-0 scroll-mt-20 px-4 pb-28 pt-5 sm:px-6 sm:pt-7 lg:px-8 lg:py-8">{children}</div>
+          <div id="dashboard-content" className="page-transition mx-auto w-full max-w-7xl min-w-0 scroll-mt-20 px-4 pb-28 pt-5 sm:px-6 sm:pt-7 lg:px-8 lg:py-7">{children}</div>
         </main>
-        <MobileBottomNav badges={navBadges} features={features} />
+        <MobileBottomNav role={role} badges={navBadges} features={features} />
       </div>
     </NavBadgesProvider>
   )
