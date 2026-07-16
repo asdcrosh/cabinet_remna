@@ -33,8 +33,8 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Docker web metadata
-        id: meta_web
+      - name: Docker metadata
+        id: meta
         uses: docker/metadata-action@v5
         with:
           images: ghcr.io/${{ github.repository }}
@@ -44,31 +44,13 @@ jobs:
             type=ref,event=tag
             type=sha,prefix=sha-
 
-      - name: Docker ops metadata
-        id: meta_ops
-        uses: docker/metadata-action@v5
-        with:
-          images: ghcr.io/${{ github.repository }}
-          tags: |
-            type=raw,value=ops-latest,enable={{is_default_branch}}
-            type=ref,event=branch,suffix=-ops
-            type=ref,event=tag,suffix=-ops
-            type=sha,prefix=ops-sha-
-
-      - name: Build and push web
+      - name: Build and push image
         uses: docker/build-push-action@v6
         with:
           context: .
           target: release
           push: true
-          tags: ${{ steps.meta_web.outputs.tags }}
-          labels: ${{ steps.meta_web.outputs.labels }}
-
-      - name: Build and push ops
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          target: ops
-          push: true
-          tags: ${{ steps.meta_ops.outputs.tags }}
-          labels: ${{ steps.meta_ops.outputs.labels }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

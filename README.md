@@ -336,8 +336,7 @@ NODE_ENV=production npm run check:env
 | `APP_URL` | Публичный HTTPS URL кабинета |
 | `ALLOWED_ORIGINS` | Разрешённые origins через запятую, без путей (обычно = APP_URL; в production только HTTPS) |
 | `TRUSTED_PROXY_HEADERS` | `true` за Caddy/Nginx, требуется стандартной production-конфигурацией |
-| `CABINET_IMAGE` | Web image (`release`) |
-| `CABINET_OPS_IMAGE` | Ops image для workers/migrations/cleanup |
+| `CABINET_IMAGE` | Единый image приложения, workers и миграций (`release`) |
 | `DATABASE_URL` | PostgreSQL с `connection_limit` и `pool_timeout` |
 | `JWT_SECRET` | Секрет сессий (>= 32 символов) |
 | `HEALTHCHECK_TOKEN` | Токен для `/api/health` |
@@ -600,12 +599,9 @@ deploy/            production compose, installer, runbook
 5. `npm run build`
 
 Docker-образ публикуется в GHCR ([docker-image.yml](./.github/workflows/docker-image.yml)) при push в `main`.
-CI собирает два target:
-
-- `release` → web-only Next.js standalone image (`CABINET_IMAGE`);
-- `ops` → migrations, seed, check-env, workers и cleanup (`CABINET_OPS_IMAGE`).
-
-Так основной web-образ не тащит `src`, `scripts`, Prisma migrations и полный `node_modules`.
+CI собирает один target `release` (`CABINET_IMAGE`). Workers и seed заранее
+собираются в компактные JavaScript-файлы, поэтому образ не содержит `src`,
+`tsx` и полный `node_modules`.
 
 ### Технические правила
 

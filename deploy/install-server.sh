@@ -12,7 +12,6 @@ ENV_FILE="${INSTALL_DIR}/.env"
 VERSION_FILE="${INSTALL_DIR}/.cabinet-version"
 LEGACY_ENV_FILE="${INSTALL_DIR}/.env.production"
 DEFAULT_CABINET_IMAGE="ghcr.io/asdcrosh/cabinet_remna:latest"
-DEFAULT_CABINET_OPS_IMAGE="ghcr.io/asdcrosh/cabinet_remna:ops-latest"
 TTY_DEVICE="${TTY_DEVICE:-/dev/tty}"
 CABINETCTL_URL="${CABINETCTL_URL:-${RAW_BASE_URL}/deploy/cabinetctl.sh}"
 CABINETCTL_PATH="${CABINETCTL_PATH:-/usr/local/bin/cabinetctl}"
@@ -770,18 +769,6 @@ if [[ -n "${CABINET_IMAGE:-}" ]]; then
 elif ! env_key_exists "CABINET_IMAGE"; then
   replace_env_value "CABINET_IMAGE" "${DEFAULT_CABINET_IMAGE}"
 fi
-if [[ -n "${CABINET_OPS_IMAGE:-}" ]]; then
-  replace_env_value "CABINET_OPS_IMAGE" "${CABINET_OPS_IMAGE}"
-elif ! env_key_exists "CABINET_OPS_IMAGE"; then
-  replace_env_value "CABINET_OPS_IMAGE" "${DEFAULT_CABINET_OPS_IMAGE}"
-fi
-
-if [[ -n "${CABINET_PULL_POLICY:-}" ]]; then
-  replace_env_value "CABINET_PULL_POLICY" "${CABINET_PULL_POLICY}"
-elif ! env_key_exists "CABINET_PULL_POLICY"; then
-  replace_env_value "CABINET_PULL_POLICY" "always"
-fi
-
 if [[ -n "${COMPOSE_PROFILES+x}" ]]; then
   replace_env_value "COMPOSE_PROFILES" "${COMPOSE_PROFILES}"
 elif ! env_key_exists "COMPOSE_PROFILES"; then

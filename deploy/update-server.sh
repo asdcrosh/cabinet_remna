@@ -148,7 +148,9 @@ from pathlib import Path
 import os
 
 path = Path(os.environ["ENV_FILE_PATH"])
-lines = path.read_text().splitlines()
+original_lines = path.read_text().splitlines()
+obsolete_keys = ("CABINET_OPS_IMAGE=", "CABINET_PULL_POLICY=")
+lines = [line for line in original_lines if not line.startswith(obsolete_keys)]
 defaults = {
     "APP_LOG_LEVEL": "info",
     "APP_REQUEST_LOGS": "true",
@@ -164,7 +166,7 @@ existing = {
     for line in lines
     if line.strip() and not line.strip().startswith("#") and "=" in line
 }
-changed = False
+changed = len(lines) != len(original_lines)
 for key, value in defaults.items():
     if key not in existing:
         lines.append(f'{key}="{value}"')
@@ -338,6 +340,7 @@ cleanup_docker_artifacts() {
 
   echo "Removing unused legacy project images..."
   for image in \
+    ghcr.io/asdcrosh/cabinet_remna:ops-latest \
     remnawave-cabinet-app \
     remnawave-cabinet-worker \
     remnawave-cabinet-migrate \

@@ -20,10 +20,9 @@ services:
       - cabinet
 
   check-env:
-    image: ${CABINET_OPS_IMAGE:-ghcr.io/asdcrosh/cabinet_remna:ops-latest}
-    pull_policy: ${CABINET_PULL_POLICY:-always}
+    image: ${CABINET_IMAGE:-ghcr.io/asdcrosh/cabinet_remna:latest}
     container_name: remnawave-cabinet-check-env
-    command: ["node", "scripts/check-env.mjs"]
+    command: ["node", "ops/check-env.mjs"]
     env_file:
       - ${CABINET_ENV_FILE:-.env}
     restart: "no"
@@ -31,10 +30,9 @@ services:
       - cabinet
 
   migrate:
-    image: ${CABINET_OPS_IMAGE:-ghcr.io/asdcrosh/cabinet_remna:ops-latest}
-    pull_policy: ${CABINET_PULL_POLICY:-always}
+    image: ${CABINET_IMAGE:-ghcr.io/asdcrosh/cabinet_remna:latest}
     container_name: remnawave-cabinet-migrate
-    command: ["./node_modules/.bin/prisma", "migrate", "deploy"]
+    command: ["node", "node_modules/prisma/build/index.js", "migrate", "deploy"]
     env_file:
       - ${CABINET_ENV_FILE:-.env}
     depends_on:
@@ -50,10 +48,9 @@ services:
       - remnawave_external
 
   seed:
-    image: ${CABINET_OPS_IMAGE:-ghcr.io/asdcrosh/cabinet_remna:ops-latest}
-    pull_policy: ${CABINET_PULL_POLICY:-always}
+    image: ${CABINET_IMAGE:-ghcr.io/asdcrosh/cabinet_remna:latest}
     container_name: remnawave-cabinet-seed
-    command: ["./node_modules/.bin/tsx", "prisma/seed.ts"]
+    command: ["node", "ops/seed.js"]
     env_file:
       - ${CABINET_ENV_FILE:-.env}
     depends_on:
@@ -68,7 +65,6 @@ services:
 
   app:
     image: ${CABINET_IMAGE:-ghcr.io/asdcrosh/cabinet_remna:latest}
-    pull_policy: ${CABINET_PULL_POLICY:-always}
     container_name: remnawave-cabinet-app
     restart: unless-stopped
     env_file:
@@ -102,10 +98,9 @@ services:
           - remnawave-cabinet-app
 
   worker:
-    image: ${CABINET_OPS_IMAGE:-ghcr.io/asdcrosh/cabinet_remna:ops-latest}
-    pull_policy: ${CABINET_PULL_POLICY:-always}
+    image: ${CABINET_IMAGE:-ghcr.io/asdcrosh/cabinet_remna:latest}
     container_name: remnawave-cabinet-worker
-    command: ["./node_modules/.bin/tsx", "scripts/payment-reconciler.ts"]
+    command: ["node", "ops/payment-reconciler.js"]
     restart: unless-stopped
     env_file:
       - ${CABINET_ENV_FILE:-.env}
@@ -119,10 +114,9 @@ services:
       - remnawave_external
 
   broadcast-worker:
-    image: ${CABINET_OPS_IMAGE:-ghcr.io/asdcrosh/cabinet_remna:ops-latest}
-    pull_policy: ${CABINET_PULL_POLICY:-always}
+    image: ${CABINET_IMAGE:-ghcr.io/asdcrosh/cabinet_remna:latest}
     container_name: remnawave-cabinet-broadcast-worker
-    command: ["./node_modules/.bin/tsx", "scripts/broadcast-worker.ts"]
+    command: ["node", "ops/broadcast-worker.js"]
     restart: unless-stopped
     env_file:
       - ${CABINET_ENV_FILE:-.env}
@@ -136,14 +130,13 @@ services:
       - remnawave_external
 
   retention-cleanup:
-    image: ${CABINET_OPS_IMAGE:-ghcr.io/asdcrosh/cabinet_remna:ops-latest}
-    pull_policy: ${CABINET_PULL_POLICY:-always}
+    image: ${CABINET_IMAGE:-ghcr.io/asdcrosh/cabinet_remna:latest}
     container_name: remnawave-cabinet-retention-cleanup
     command:
       [
         "sh",
         "-c",
-        "while true; do ./node_modules/.bin/tsx scripts/cleanup-retention.ts; sleep $${RETENTION_CLEANUP_INTERVAL_SECONDS:-86400}; done",
+        "while true; do node ops/cleanup-retention.js; sleep $${RETENTION_CLEANUP_INTERVAL_SECONDS:-86400}; done",
       ]
     restart: unless-stopped
     profiles:
