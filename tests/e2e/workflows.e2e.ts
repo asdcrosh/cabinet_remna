@@ -10,6 +10,7 @@ test('пользователь обновляет профиль через на
   await page.goto('/dashboard/settings')
 
   const nameInput = page.locator('#profile-name')
+  await expect(nameInput).toHaveCount(1)
   await expect(nameInput).toBeEnabled()
   await nameInput.fill('Тест Обновлён')
   const updateResponse = page.waitForResponse((response) =>

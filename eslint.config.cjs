@@ -7,6 +7,8 @@ module.exports = [
       '.next/**',
       'coverage/**',
       'node_modules/**',
+      'playwright-report/**',
+      'test-results/**',
       'next-env.d.ts',
       'next.config.js',
       'postcss.config.js',

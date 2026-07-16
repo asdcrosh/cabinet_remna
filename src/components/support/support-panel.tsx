@@ -20,11 +20,14 @@ import {
   Lock,
   MessageCircle,
   MessageSquarePlus,
+  PanelRight,
   Send,
   Search,
   Smile,
   Tag,
   Timer,
+  UserRound,
+  X,
   XCircle,
 } from 'lucide-react'
 import { cn } from '@/lib/cn'
@@ -132,6 +135,7 @@ export function SupportPanel({
   )
   const [folder, setFolder] = useState<TicketFolder>('active')
   const [mobileChatOpen, setMobileChatOpen] = useState(false)
+  const [detailsOpen, setDetailsOpen] = useState(false)
   const [message, setMessage] = useState('')
   const [newMessage, setNewMessage] = useState('')
   const [newCategory, setNewCategory] = useState<SupportCategoryValue>('connection')
@@ -329,6 +333,7 @@ export function SupportPanel({
     setSelectedId(id)
     setNewTicketOpen(false)
     setMobileChatOpen(true)
+    setDetailsOpen(false)
     stickToBottomRef.current = true
     setError('')
 
@@ -512,7 +517,7 @@ export function SupportPanel({
       className={cn(
         'grid h-[calc(100dvh-10rem-env(safe-area-inset-bottom))] min-h-[26rem] gap-3 overflow-hidden xl:h-[calc(100dvh-6.25rem)] xl:min-h-[35rem]',
         mode === 'admin'
-          ? 'xl:h-[calc(100dvh-5.5rem)] xl:grid-cols-[19rem_minmax(0,1fr)_16rem]'
+          ? 'xl:h-[calc(100dvh-5.5rem)] xl:grid-cols-[21rem_minmax(0,1fr)]'
           : 'xl:grid-cols-[18rem_minmax(0,1fr)]'
       )}
     >
@@ -524,9 +529,11 @@ export function SupportPanel({
           )}>
             <div className="flex items-center justify-between gap-3">
               <div>
-                <div className="font-semibold">{mode === 'admin' ? 'Обращения' : 'Поддержка'}</div>
+                <div className="font-semibold">{mode === 'admin' ? 'Очередь' : 'Поддержка'}</div>
                 <div className="text-xs text-slate-500">
-                  {unreadTotal > 0 ? `${unreadTotal} новых сообщений` : mode === 'admin' ? `${listTotal} всего в очереди` : 'Выберите диалог или создайте новый'}
+                  {mode === 'admin'
+                    ? `${listTotal} обращений${folderCounts['need-answer'] > 0 ? ` · ${folderCounts['need-answer']} ждут ответа` : ''}`
+                    : unreadTotal > 0 ? `${unreadTotal} новых сообщений` : 'Выберите диалог или создайте новый'}
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -620,7 +627,7 @@ export function SupportPanel({
       </section>
 
       <section className={cn(
-        'min-h-0 overflow-hidden rounded-3xl border border-slate-200/80 bg-white/95 shadow-sm shadow-slate-950/[0.05] backdrop-blur dark:border-white/10 dark:bg-surface-900/90 dark:shadow-black/20',
+        'relative min-h-0 overflow-hidden rounded-3xl border border-slate-200/80 bg-white/95 shadow-sm shadow-slate-950/[0.05] backdrop-blur dark:border-white/10 dark:bg-surface-900/90 dark:shadow-black/20',
         mode === 'admin' && 'shadow-sm',
         !mobileChatOpen && 'hidden xl:block'
       )}>
@@ -662,8 +669,21 @@ export function SupportPanel({
                     </div>
                   </div>
                 </div>
-                <div className={cn(mode === 'admin' ? 'hidden 2xl:block' : 'xl:hidden')}>
-                  <TicketActions selected={selected} mode={mode} isPending={isPending} onUpdateStatus={updateStatus} />
+                <div className="flex shrink-0 items-center gap-2">
+                  {mode === 'admin' && (
+                    <button
+                      type="button"
+                      className={cn('btn-secondary h-9 px-3 text-sm', detailsOpen && 'border-cyan-200 bg-cyan-50 text-cyan-800 dark:border-cyan-400/30 dark:bg-cyan-400/10 dark:text-cyan-100')}
+                      onClick={() => setDetailsOpen((current) => !current)}
+                      aria-expanded={detailsOpen}
+                    >
+                      <UserRound className="h-4 w-4" />
+                      <span className="hidden sm:inline">Клиент</span>
+                    </button>
+                  )}
+                  <div className={cn(mode === 'admin' ? 'hidden 2xl:block' : 'xl:hidden')}>
+                    <TicketActions selected={selected} mode={mode} isPending={isPending} onUpdateStatus={updateStatus} />
+                  </div>
                 </div>
               </div>
             </div>
@@ -730,6 +750,26 @@ export function SupportPanel({
                 </div>
               )}
             </form>
+
+            {mode === 'admin' && detailsOpen && (
+              <>
+                <button
+                  type="button"
+                  className="absolute inset-0 z-20 bg-slate-950/10 backdrop-blur-[1px] dark:bg-black/30"
+                  onClick={() => setDetailsOpen(false)}
+                  aria-label="Закрыть данные клиента"
+                />
+                <aside className="absolute inset-y-0 right-0 z-30 w-[min(24rem,calc(100%-1rem))] border-l border-slate-200 bg-white shadow-2xl shadow-slate-950/15 dark:border-white/10 dark:bg-surface-900">
+                  <TicketSideMenu
+                    selected={selected}
+                    mode={mode}
+                    isPending={isPending}
+                    onUpdateStatus={updateStatus}
+                    onClose={() => setDetailsOpen(false)}
+                  />
+                </aside>
+              </>
+            )}
           </div>
         ) : (
           <div className="grid min-h-[36rem] place-items-center p-8 text-center">
@@ -744,12 +784,6 @@ export function SupportPanel({
         )}
       </section>
 
-      <aside className={cn(
-        'hidden min-h-0 overflow-hidden rounded-3xl border border-slate-200/80 bg-white/90 shadow-sm shadow-slate-950/[0.04] backdrop-blur dark:border-white/10 dark:bg-surface-900/80 dark:shadow-black/20',
-        mode === 'admin' && 'xl:block'
-      )}>
-        <TicketSideMenu selected={selected} mode={mode} isPending={isPending} onUpdateStatus={updateStatus} />
-      </aside>
     </div>
   )
 }
@@ -994,7 +1028,10 @@ function FolderTabs({
   ]
 
   return (
-    <div className={cn('mt-3 flex gap-1 overflow-x-auto rounded-xl bg-slate-100 p-1 dark:bg-white/5')}>
+    <div className={cn(
+      'mt-3 gap-1 rounded-xl bg-slate-100 p-1 dark:bg-white/5',
+      mode === 'admin' ? 'grid grid-cols-4' : 'flex overflow-x-auto'
+    )}>
       {items.map((item) => {
         const Icon = item.icon
         const active = folder === item.value
@@ -1004,17 +1041,17 @@ function FolderTabs({
             type="button"
             onClick={() => onChange(item.value)}
             className={cn(
-              'flex min-w-fit flex-1 items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium transition-colors',
+              'flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium transition-colors',
               active
                 ? 'bg-white text-slate-950 shadow-sm dark:bg-surface-800 dark:text-white'
                 : 'text-slate-500 hover:text-slate-950 dark:text-slate-400 dark:hover:text-white'
             )}
           >
             <span className="flex min-w-0 items-center gap-1.5">
-              <Icon className="h-3.5 w-3.5 shrink-0" />
+              <Icon className={cn('h-3.5 w-3.5 shrink-0', mode === 'admin' && 'hidden 2xl:block')} />
               <span className="truncate">{item.label}</span>
             </span>
-            <span className={cn('rounded-full px-1.5 py-0.5 text-[10px]', active ? 'bg-white/15 dark:bg-slate-950/10' : 'bg-slate-100 dark:bg-slate-800')}>
+            <span className={cn('rounded-full px-1.5 py-0.5 text-[10px]', mode === 'admin' && 'hidden min-[1500px]:inline', active ? 'bg-white/15 dark:bg-slate-950/10' : 'bg-slate-100 dark:bg-slate-800')}>
               {counts[item.value]}
             </span>
           </button>
@@ -1042,28 +1079,34 @@ function TicketListItem({
       type="button"
       onClick={onClick}
       className={cn(
-        'group w-full rounded-xl border px-3 py-2.5 text-left transition-colors',
-        mode === 'admin' && 'py-3',
+        'group relative w-full rounded-xl border px-3 py-2.5 text-left transition-colors',
+        mode === 'admin' && 'py-3 pl-4',
         active
-          ? 'border-slate-300 bg-slate-50 shadow-sm shadow-slate-200/60 ring-1 ring-slate-200 dark:border-slate-700 dark:bg-surface-800 dark:ring-slate-700'
+          ? 'border-cyan-200 bg-cyan-50/70 text-slate-950 dark:border-cyan-400/25 dark:bg-cyan-400/10 dark:text-white'
           : 'border-transparent hover:border-slate-200 hover:bg-slate-50 dark:hover:border-slate-800 dark:hover:bg-surface-800'
       )}
     >
+      {active && <span className="absolute inset-y-3 left-0 w-0.5 rounded-full bg-cyan-500" />}
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex min-w-0 items-center gap-2">
             {unread > 0 && <span className="h-2 w-2 shrink-0 rounded-full bg-red-500" />}
-            <div className="truncate font-medium">{mode === 'admin' && ticket.user ? ticket.user.email : ticket.subject}</div>
+            <div className="truncate font-semibold">{mode === 'admin' && ticket.user ? ticket.user.name || ticket.user.email : ticket.subject}</div>
           </div>
           <div className="mt-1 truncate text-xs text-slate-500 dark:text-slate-400">
             {mode === 'admin'
-              ? `${supportCategoryLabel(ticket.category)} · ${ticket.subject}`
+              ? ticket.user?.name ? ticket.user.email : `${supportCategoryLabel(ticket.category)} · ${ticket.subject}`
               : formatDate(ticket.lastMessageAt)}
           </div>
         </div>
-        <TicketStatusBadge status={ticket.status} mode={mode} active={active} />
+        <TicketStatusBadge status={ticket.status} mode={mode} />
       </div>
-      <div className="mt-1 line-clamp-1 text-sm text-slate-500 dark:text-slate-400">
+      {mode === 'admin' && ticket.user?.name && (
+        <div className="mt-1 truncate text-xs text-slate-500 dark:text-slate-400">
+          {supportCategoryLabel(ticket.category)} · {ticket.subject}
+        </div>
+      )}
+      <div className="mt-1.5 line-clamp-2 text-sm leading-5 text-slate-600 dark:text-slate-300">
         {ticket.messages.at(-1)?.body || ticket.messages[0]?.body || 'Без сообщений'}
       </div>
       <div className="mt-2 flex items-center justify-between gap-3">
@@ -1126,11 +1169,13 @@ function TicketSideMenu({
   mode,
   isPending,
   onUpdateStatus,
+  onClose,
 }: {
   selected: SupportTicket | null
   mode: 'user' | 'admin'
   isPending: boolean
   onUpdateStatus: (status: TicketStatus) => void
+  onClose?: () => void
 }) {
   if (!selected) {
     return (
@@ -1143,34 +1188,54 @@ function TicketSideMenu({
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="border-b border-slate-100 px-4 py-4 dark:border-slate-800">
-        <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Карточка обращения</div>
-        <div className="mt-2 line-clamp-2 text-sm font-semibold text-slate-950 dark:text-white">{selected.subject}</div>
-        <div className="mt-2">
-          <TicketStatusBadge status={selected.status} mode={mode} />
+      <div className="flex items-start justify-between gap-3 border-b border-slate-100 px-5 py-4 dark:border-slate-800">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 text-sm font-semibold text-slate-950 dark:text-white">
+            <PanelRight className="h-4 w-4 text-cyan-600 dark:text-cyan-300" />
+            Данные клиента
+          </div>
+          <div className="mt-1 truncate text-xs text-slate-500">{selected.subject}</div>
         </div>
+        {onClose && (
+          <button
+            type="button"
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-xl text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-950 dark:hover:bg-white/5 dark:hover:text-white"
+            onClick={onClose}
+            aria-label="Закрыть данные клиента"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
       </div>
-      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
-        <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-surface-950">
-          <div className="text-xs font-medium text-slate-400">Тема</div>
-          <div className="mt-2 text-sm font-medium text-slate-700 dark:text-slate-200">{supportCategoryLabel(selected.category)}</div>
+      <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-5">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="text-xs text-slate-400">Обращение</div>
+            <div className="mt-1 line-clamp-2 font-semibold text-slate-950 dark:text-white">{selected.subject}</div>
+            <div className="mt-1 text-sm text-slate-500">{supportCategoryLabel(selected.category)}</div>
+          </div>
+          <TicketStatusBadge status={selected.status} mode={mode} />
         </div>
         {mode === 'admin' && selected.user && (
           <>
-            <InfoBlock label="Пользователь">
-              <span className="break-all">{selected.user.email}</span>
-            </InfoBlock>
+            <div className="flex items-center gap-3 border-y border-slate-100 py-4 dark:border-white/10">
+              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-cyan-50 text-cyan-700 dark:bg-cyan-400/10 dark:text-cyan-200">
+                <UserRound className="h-5 w-5" />
+              </div>
+              <div className="min-w-0">
+                <div className="truncate text-sm font-semibold text-slate-950 dark:text-white">{selected.user.name || 'Пользователь'}</div>
+                <div className="truncate text-xs text-slate-500" title={selected.user.email}>{selected.user.email}</div>
+              </div>
+            </div>
             <SupportUserDiagnostics user={selected.user} />
           </>
         )}
-        <InfoBlock label="Создано">
-          <span>{formatDate(selected.createdAt)}</span>
-        </InfoBlock>
-        <InfoBlock label="Сообщений">
-          <span>{selected.messages.length}</span>
-        </InfoBlock>
+        <div className="grid grid-cols-2 gap-3 text-sm">
+          <InfoBlock label="Создано"><span>{formatDate(selected.createdAt)}</span></InfoBlock>
+          <InfoBlock label="Сообщений"><span>{selected.messages.length}</span></InfoBlock>
+        </div>
       </div>
-      <div className="border-t border-slate-100 p-4 dark:border-slate-800">
+      <div className="border-t border-slate-100 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-white/[0.02]">
         <TicketActions selected={selected} mode={mode} isPending={isPending} onUpdateStatus={onUpdateStatus} />
       </div>
     </div>
@@ -1187,9 +1252,9 @@ function SupportUserDiagnostics({ user }: { user: NonNullable<SupportTicket['use
   ].filter(Boolean)
 
   return (
-    <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-surface-950">
+    <div className="space-y-4">
       <div className="flex items-center justify-between gap-2">
-        <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Диагностика</div>
+        <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Состояние аккаунта</div>
         <a
           href={`/dashboard/admin/users?q=${encodeURIComponent(user.email)}`}
           className="text-xs font-semibold text-cyan-700 hover:text-slate-950 dark:text-cyan-200 dark:hover:text-white"
@@ -1198,27 +1263,29 @@ function SupportUserDiagnostics({ user }: { user: NonNullable<SupportTicket['use
         </a>
       </div>
 
-      <div className="grid gap-2 text-xs">
+      <div className="grid gap-2.5 text-xs">
         <DiagnosticRow label="Telegram" value={user.telegramId ? `TG ${user.telegramId}` : 'не привязан'} ok={Boolean(user.telegramId)} />
         <DiagnosticRow label="Remnashop" value={user.remnashopUserId ? `ID ${user.remnashopUserId}` : 'не связан'} ok={Boolean(user.remnashopUserId)} />
         <DiagnosticRow label="Remnawave" value={user.remnawaveUsername || user.remnawaveUuid || 'нет'} ok={Boolean(user.remnawaveUuid)} mono />
       </div>
 
       {subscription ? (
-        <div className="rounded-lg border border-white bg-white p-2.5 text-xs dark:border-white/10 dark:bg-white/[0.04]">
+        <div className="border-t border-slate-100 pt-3 text-xs dark:border-white/10">
+          <div className="text-slate-400">Подписка</div>
           <div className="font-semibold text-slate-900 dark:text-white">{subscription.plan?.name ?? 'Подписка'}</div>
           <div className="mt-1 text-slate-500">
             {subscription.status} до {formatDate(subscription.expireAt)}
           </div>
         </div>
       ) : (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-2.5 text-xs text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
+        <div className="border-t border-amber-200 pt-3 text-xs text-amber-700 dark:border-amber-500/30 dark:text-amber-200">
           Активная подписка не найдена
         </div>
       )}
 
       {payment && (
-        <div className="rounded-lg border border-white bg-white p-2.5 text-xs dark:border-white/10 dark:bg-white/[0.04]">
+        <div className="border-t border-slate-100 pt-3 text-xs dark:border-white/10">
+          <div className="mb-1 text-slate-400">Последний платёж</div>
           <div className="flex items-center justify-between gap-2">
             <span className="font-semibold text-slate-900 dark:text-white">{payment.plan?.name ?? 'Платеж'}</span>
             <span className={cn(
@@ -1243,7 +1310,7 @@ function SupportUserDiagnostics({ user }: { user: NonNullable<SupportTicket['use
       )}
 
       {syncProblems.length > 0 && (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-2.5 text-xs text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-100">
+        <div className="rounded-xl bg-red-50 p-3 text-xs text-red-700 dark:bg-red-500/10 dark:text-red-100">
           <div className="mb-1 font-semibold">Проблемы</div>
           <ul className="space-y-1">
             {syncProblems.map((problem) => <li key={problem}>{problem}</li>)}
@@ -1251,11 +1318,11 @@ function SupportUserDiagnostics({ user }: { user: NonNullable<SupportTicket['use
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-2">
-        <a href={`/dashboard/admin/payments?q=${encodeURIComponent(user.email)}`} className="btn-secondary h-9 px-2 text-xs">
+      <div className="grid grid-cols-2 gap-2 border-t border-slate-100 pt-3 dark:border-white/10">
+        <a href={`/dashboard/admin/payments?q=${encodeURIComponent(user.email)}`} className="btn-secondary h-9 justify-center px-2 text-xs">
           Платежи
         </a>
-        <a href="/dashboard/admin/recovery" className="btn-secondary h-9 px-2 text-xs">
+        <a href="/dashboard/admin/recovery" className="btn-secondary h-9 justify-center px-2 text-xs">
           Довыдача
         </a>
       </div>
@@ -1291,17 +1358,18 @@ function QuickReplies({ mode, onPick }: { mode: 'user' | 'admin'; onPick: (value
       ]
 
   return (
-    <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-1.5 dark:border-white/10 dark:bg-white/[0.035] sm:p-2">
-      <div className="mb-1.5 px-0.5 text-xs font-semibold uppercase tracking-wide text-slate-400">
-        {mode === 'admin' ? 'Шаблоны ответа' : 'Быстрый старт'}
+    <div className="flex items-center gap-2 overflow-hidden">
+      <div className="shrink-0 text-xs font-medium text-slate-400">
+        {mode === 'admin' ? 'Шаблоны' : 'Быстрый ответ'}
       </div>
-      <div className="flex gap-1.5 overflow-x-auto pb-0.5">
+      <div className="flex min-w-0 gap-1.5 overflow-x-auto pb-0.5">
       {replies.map((reply) => (
         <button
           key={reply}
           type="button"
           onClick={() => onPick(reply)}
-          className="min-w-fit rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:border-cyan-200 hover:bg-cyan-50 hover:text-cyan-800 dark:border-slate-800 dark:bg-white/5 dark:text-slate-300 dark:hover:border-cyan-400/30 dark:hover:bg-cyan-400/10 dark:hover:text-cyan-100 sm:px-3"
+          className="max-w-64 shrink-0 truncate rounded-full bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-cyan-50 hover:text-cyan-800 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-cyan-400/10 dark:hover:text-cyan-100"
+          title={reply}
         >
           {reply}
         </button>
@@ -1325,9 +1393,9 @@ function MessageBubble({ message, own }: { message: SupportMessage; own: boolean
     <div className={cn('flex', own ? 'justify-end' : 'justify-start')}>
       <div
         className={cn(
-          'max-w-[min(42rem,88%)] rounded-2xl px-4 py-3 shadow-sm ring-1',
+          'max-w-[min(42rem,82%)] rounded-2xl px-4 py-3 ring-1',
           own
-            ? 'bg-slate-950 text-white shadow-slate-950/10 ring-slate-950/10 dark:bg-white dark:text-slate-950 dark:ring-white/20'
+            ? 'bg-cyan-600 text-white ring-cyan-600 dark:bg-cyan-300 dark:text-slate-950 dark:ring-cyan-300'
             : 'bg-white text-slate-900 ring-slate-200 dark:bg-surface-800 dark:text-white dark:ring-slate-700'
         )}
       >
