@@ -5,6 +5,7 @@ BRANCH="${BRANCH:-main}"
 RAW_BASE_URL="${RAW_BASE_URL:-https://raw.githubusercontent.com/asdcrosh/cabinet_remna/${BRANCH}}"
 GITHUB_API_URL="${GITHUB_API_URL:-https://api.github.com/repos/asdcrosh/cabinet_remna/commits/${BRANCH}}"
 COMPOSE_URL="${COMPOSE_URL:-${RAW_BASE_URL}/deploy/docker-compose.server.yml}"
+ENV_TEMPLATE_URL="${ENV_TEMPLATE_URL:-${RAW_BASE_URL}/deploy/env.production.example}"
 INSTALL_DIR="${INSTALL_DIR:-/opt/remnawave-cabinet}"
 COMPOSE_FILE="${INSTALL_DIR}/docker-compose.yml"
 ENV_FILE="${INSTALL_DIR}/.env"
@@ -16,6 +17,7 @@ CABINETCTL_TEMP="${CABINETCTL_PATH}.tmp"
 FULL_BACKUP_URL="${FULL_BACKUP_URL:-${RAW_BASE_URL}/deploy/full-stack-backup.sh}"
 FULL_BACKUP_PATH="${FULL_BACKUP_PATH:-/usr/local/bin/remna-backup}"
 FULL_BACKUP_TEMP="${FULL_BACKUP_PATH}.tmp"
+ENV_TEMPLATE_TEMP="${INSTALL_DIR}/.env.template.tmp"
 
 if [[ "$(id -u)" -ne 0 ]]; then
   echo "Run as root or with sudo:"
@@ -232,37 +234,69 @@ if ! grep -q '^CABINET_DB_PORT=' "${ENV_FILE}"; then
   fi
 fi
 
-ENV_FILE_PATH="${ENV_FILE}" python3 <<'PY'
+echo "Synchronizing .env schema..."
+curl -fsSL --connect-timeout 5 --max-time 20 "${ENV_TEMPLATE_URL}" -o "${ENV_TEMPLATE_TEMP}"
+ENV_FILE_PATH="${ENV_FILE}" ENV_TEMPLATE_PATH="${ENV_TEMPLATE_TEMP}" python3 <<'PY'
 from pathlib import Path
 import os
+import re
+import secrets
 
 path = Path(os.environ["ENV_FILE_PATH"])
+template_path = Path(os.environ["ENV_TEMPLATE_PATH"])
 original_lines = path.read_text().splitlines()
-obsolete_keys = ("CABINET_OPS_IMAGE=", "CABINET_PULL_POLICY=")
-lines = [line for line in original_lines if not line.startswith(obsolete_keys)]
-defaults = {
-    "APP_LOG_LEVEL": "info",
-    "APP_REQUEST_LOGS": "true",
-    "CABINET_DB_BIND": "127.0.0.1",
-    "CABINET_DB_PORT": "5433",
-    "REMNASHOP_USERS_SYNC_INTERVAL_SECONDS": "300",
-    "REMNASHOP_USER_SUBSCRIPTION_SYNC_STALE_SECONDS": "300",
-    "REMNASHOP_REVERSE_SYNC_BATCH_SIZE": "25",
-    "REMNASHOP_REVERSE_SYNC_LOOKBACK_DAYS": "14",
+obsolete = {"CABINET_OPS_IMAGE", "CABINET_PULL_POLICY"}
+assignment = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)=(.*)$")
+lines = []
+existing = {}
+for line in original_lines:
+    match = assignment.match(line.strip())
+    if match and match.group(1) in obsolete:
+        continue
+    lines.append(line)
+    if match:
+        existing[match.group(1)] = match.group(2).strip().strip("\"'")
+
+domain = existing.get("CABINET_DOMAIN", "")
+brand = existing.get("CABINET_BRAND_NAME", "")
+generated_secrets = {
+    "JWT_SECRET",
+    "HEALTHCHECK_TOKEN",
+    "BROADCAST_UPLOAD_SIGNING_SECRET",
+    "EMAIL_VERIFICATION_WEBHOOK_SECRET",
 }
-existing = {
-    line.split("=", 1)[0].strip()
-    for line in lines
-    if line.strip() and not line.strip().startswith("#") and "=" in line
-}
-changed = len(lines) != len(original_lines)
-for key, value in defaults.items():
-    if key not in existing:
-        lines.append(f'{key}="{value}"')
-        changed = True
+additions = []
+added_keys = []
+for raw_line in template_path.read_text().splitlines():
+    match = assignment.match(raw_line.strip())
+    if not match:
+        continue
+    key, raw_value = match.groups()
+    if key in existing or key in obsolete:
+        continue
+    value = raw_value
+    if domain:
+        value = value.replace("ВСТАВЬ_СЮДА_ДОМЕН_КАБИНЕТА", domain)
+    if brand:
+        value = value.replace("ВСТАВЬ_СЮДА_НАЗВАНИЕ_СЕРВИСА", brand)
+    if key in generated_secrets and "ВСТАВЬ_СЮДА" in value:
+        value = f'"{secrets.token_hex(32)}"'
+    additions.append(f"{key}={value}")
+    added_keys.append(key)
+
+changed = lines != original_lines
+if additions:
+    if lines and lines[-1].strip():
+        lines.append("")
+    lines.append("# Added automatically during cabinet update from the current env template.")
+    lines.extend(additions)
+    changed = True
 if changed:
     path.write_text("\n".join(lines) + "\n")
+if added_keys:
+    print(f"Added {len(added_keys)} new .env variables.")
 PY
+rm -f "${ENV_TEMPLATE_TEMP}"
 
 echo "Updating compose file..."
 curl -fsSL "${COMPOSE_URL}" -o "${COMPOSE_FILE}"

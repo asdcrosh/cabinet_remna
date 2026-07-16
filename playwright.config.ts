@@ -2,6 +2,10 @@ import { defineConfig, devices } from '@playwright/test'
 
 const baseURL = process.env.PLAYWRIGHT_TEST_BASE_URL || 'http://localhost:3000'
 const usesExternalServer = Boolean(process.env.PLAYWRIGHT_TEST_BASE_URL)
+const testClientIp = {
+  desktop: '198.51.100.10',
+  mobile: '198.51.100.11',
+} as const
 
 export default defineConfig({
   testDir: './tests/e2e',
@@ -27,11 +31,18 @@ export default defineConfig({
   projects: [
     {
       name: 'desktop-chromium',
-      use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 1000 } },
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1440, height: 1000 },
+        extraHTTPHeaders: { 'x-forwarded-for': testClientIp.desktop },
+      },
     },
     {
       name: 'mobile-chromium',
-      use: { ...devices['Pixel 7'] },
+      use: {
+        ...devices['Pixel 7'],
+        extraHTTPHeaders: { 'x-forwarded-for': testClientIp.mobile },
+      },
     },
   ],
   webServer: usesExternalServer
@@ -54,6 +65,7 @@ export default defineConfig({
             APP_URL: baseURL,
             NEXT_PUBLIC_APP_URL: baseURL,
             ALLOWED_ORIGINS: baseURL,
+            TRUSTED_PROXY_HEADERS: 'true',
             REMNAWAVE_BASE_URL: 'http://127.0.0.1:4010',
             REMNAWAVE_TOKEN: 'e2e-token',
           },

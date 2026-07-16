@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="1.3.0"
+VERSION="1.4.0"
 BRANCH="${BRANCH:-main}"
 RAW_BASE_URL="${RAW_BASE_URL:-https://raw.githubusercontent.com/asdcrosh/cabinet_remna/${BRANCH}}"
 GITHUB_API_URL="${GITHUB_API_URL:-https://api.github.com/repos/asdcrosh/cabinet_remna/commits/${BRANCH}}"
@@ -10,6 +10,7 @@ UPDATE_URL="${UPDATE_URL:-${RAW_BASE_URL}/deploy/update-server.sh}"
 NGINX_SETUP_URL="${NGINX_SETUP_URL:-${RAW_BASE_URL}/deploy/setup-nginx-proxy.sh}"
 CONSOLE_INSTALL_URL="${CONSOLE_INSTALL_URL:-${RAW_BASE_URL}/deploy/install-console.sh}"
 BACKUP_SCRIPT_URL="${BACKUP_SCRIPT_URL:-${RAW_BASE_URL}/deploy/full-stack-backup.sh}"
+ENV_TEMPLATE_URL="${ENV_TEMPLATE_URL:-${RAW_BASE_URL}/deploy/env.production.example}"
 CABINETCTL_PATH="${CABINETCTL_PATH:-/usr/local/bin/cabinetctl}"
 BACKUP_SCRIPT_PATH="${BACKUP_SCRIPT_PATH:-/usr/local/bin/remna-backup}"
 CABINET_DIR="${INSTALL_DIR:-/opt/remnawave-cabinet}"
@@ -17,8 +18,10 @@ CABINET_ENV="${CABINET_DIR}/.env"
 CABINET_COMPOSE="${CABINET_DIR}/docker-compose.yml"
 CABINET_VERSION_FILE="${CABINET_VERSION_FILE:-${CABINET_DIR}/.cabinet-version}"
 UPDATE_STATUS_CACHE="${CABINETCTL_UPDATE_CACHE:-/var/cache/remnawave-cabinet/update-status}"
-UPDATE_STATUS_CACHE_TTL="${CABINETCTL_UPDATE_CACHE_TTL:-3600}"
-CHECK_UPDATES_IN_MENU="${CABINETCTL_CHECK_UPDATES_IN_MENU:-0}"
+UPDATE_STATUS_CACHE_TTL="${CABINETCTL_UPDATE_CACHE_TTL:-1800}"
+CHECK_UPDATES_IN_MENU="${CABINETCTL_CHECK_UPDATES_IN_MENU:-1}"
+ENV_SCHEMA_SYNCED=0
+ENV_SYNC_NOTICE=""
 
 if [[ -t 1 ]]; then
   BOLD=$'\033[1m'
@@ -36,10 +39,6 @@ info() { printf '%s\n' "${CYAN}•${RESET} $*"; }
 ok() { printf '%s\n' "${GREEN}✓${RESET} $*"; }
 warn() { printf '%s\n' "${YELLOW}!${RESET} $*"; }
 fail() { printf '%s\n' "${RED}Ошибка:${RESET} $*" >&2; return 1; }
-
-rule() {
-  printf '%s\n' "${DIM}--------------------------------------------------------${RESET}"
-}
 
 pause() {
   if [[ -r /dev/tty ]]; then
@@ -108,7 +107,41 @@ state_label() {
 print_service_state() {
   local label="$1"
   local container="$2"
-  printf '  %-18s %s\n' "${label}" "$(state_label "$(container_state "${container}")")"
+  local state marker
+  state="$(container_state "${container}")"
+  marker="$(state_marker "${state}")"
+  print_status_row "${marker}" "${label}" "$(state_label "${state}")"
+}
+
+state_marker() {
+  case "${1:-}" in
+    running) printf '%s' "${GREEN}●${RESET}" ;;
+    restarting|created) printf '%s' "${YELLOW}●${RESET}" ;;
+    exited|dead|removing|paused) printf '%s' "${RED}●${RESET}" ;;
+    *) printf '%s' "${DIM}○${RESET}" ;;
+  esac
+}
+
+print_status_row() {
+  local marker="$1"
+  local label="$2"
+  local value="$3"
+  local padding=$((16 - ${#label}))
+  (( padding > 0 )) || padding=1
+  printf '  %b  %s%*s%b\n' "${marker}" "${label}" "${padding}" "" "${value}"
+}
+
+print_menu_row() {
+  local left_number="$1"
+  local left_label="$2"
+  local right_number="$3"
+  local right_label="$4"
+  local padding=$((22 - ${#left_label}))
+  (( padding > 0 )) || padding=1
+  printf '  %s%s%s  %s%*s%s%s%s  %s\n' \
+    "${CYAN}" "${left_number}" "${RESET}" \
+    "${left_label}" "${padding}" "" \
+    "${CYAN}" "${right_number}" "${RESET}" "${right_label}"
 }
 
 env_value() {
@@ -123,6 +156,95 @@ env_value() {
       exit
     }
   ' "${CABINET_ENV}" 2>/dev/null || true
+}
+
+sync_env_schema() {
+  if [[ "${ENV_SCHEMA_SYNCED}" == "1" ]]; then
+    return 0
+  fi
+  ENV_SCHEMA_SYNCED=1
+
+  cabinet_installed || return 0
+  command -v curl >/dev/null 2>&1 || return 0
+  command -v python3 >/dev/null 2>&1 || return 0
+
+  local template_file result added_count
+  template_file="$(mktemp)"
+  if ! curl -fsSL --connect-timeout 2 --max-time 5 "${ENV_TEMPLATE_URL}" -o "${template_file}" 2>/dev/null; then
+    rm -f "${template_file}"
+    return 0
+  fi
+
+  result="$(ENV_FILE_PATH="${CABINET_ENV}" ENV_TEMPLATE_PATH="${template_file}" python3 <<'PY'
+from pathlib import Path
+import os
+import re
+import secrets
+
+env_path = Path(os.environ["ENV_FILE_PATH"])
+template_path = Path(os.environ["ENV_TEMPLATE_PATH"])
+original_lines = env_path.read_text().splitlines()
+obsolete = {"CABINET_OPS_IMAGE", "CABINET_PULL_POLICY"}
+lines = []
+existing = {}
+
+assignment = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)=(.*)$")
+for line in original_lines:
+    match = assignment.match(line.strip())
+    if match and match.group(1) in obsolete:
+        continue
+    lines.append(line)
+    if match:
+        existing[match.group(1)] = match.group(2).strip().strip("\"'")
+
+domain = existing.get("CABINET_DOMAIN", "")
+brand = existing.get("CABINET_BRAND_NAME", "")
+generated_secrets = {
+    "JWT_SECRET",
+    "HEALTHCHECK_TOKEN",
+    "BROADCAST_UPLOAD_SIGNING_SECRET",
+    "EMAIL_VERIFICATION_WEBHOOK_SECRET",
+}
+additions = []
+added_keys = []
+
+for raw_line in template_path.read_text().splitlines():
+    match = assignment.match(raw_line.strip())
+    if not match:
+        continue
+    key, raw_value = match.groups()
+    if key in existing or key in obsolete:
+        continue
+    value = raw_value
+    if domain:
+        value = value.replace("ВСТАВЬ_СЮДА_ДОМЕН_КАБИНЕТА", domain)
+    if brand:
+        value = value.replace("ВСТАВЬ_СЮДА_НАЗВАНИЕ_СЕРВИСА", brand)
+    if key in generated_secrets and "ВСТАВЬ_СЮДА" in value:
+        value = f'"{secrets.token_hex(32)}"'
+    additions.append(f"{key}={value}")
+    added_keys.append(key)
+
+changed = lines != original_lines
+if additions:
+    if lines and lines[-1].strip():
+        lines.append("")
+    lines.append("# Added automatically by cabinetctl from the current env template.")
+    lines.extend(additions)
+    changed = True
+
+if changed:
+    env_path.write_text("\n".join(lines) + "\n")
+
+print(len(added_keys))
+PY
+)"
+  rm -f "${template_file}"
+
+  added_count="${result}"
+  if [[ "${added_count}" =~ ^[1-9][0-9]*$ ]]; then
+    ENV_SYNC_NOTICE="добавлено новых параметров: ${added_count}"
+  fi
 }
 
 compose_image() {
@@ -154,7 +276,7 @@ pull_latest_image() {
 remote_commit_sha() {
   local response
   command -v curl >/dev/null 2>&1 || return 1
-  response="$(curl -fsSL -H 'Accept: application/vnd.github+json' "${GITHUB_API_URL}" 2>/dev/null || true)"
+  response="$(curl -fsSL --connect-timeout 2 --max-time 5 -H 'Accept: application/vnd.github+json' "${GITHUB_API_URL}" 2>/dev/null || true)"
   printf '%s\n' "${response}" \
     | sed -n 's/.*"sha"[[:space:]]*:[[:space:]]*"\([0-9a-f]\{40\}\)".*/\1/p' \
     | head -n 1
@@ -219,13 +341,13 @@ check_update_status() {
 
 print_update_status_key() {
   case "${1:-unknown}" in
-    latest|current) printf '  %-18s %s\n' "Версия кабинета" "${GREEN}актуальная${RESET}" ;;
-    available) printf '  %-18s %s\n' "Версия кабинета" "${YELLOW}доступно обновление${RESET}" ;;
-    check-failed|check_failed|unknown) printf '  %-18s %s\n' "Версия кабинета" "${YELLOW}не удалось проверить${RESET}" ;;
-    version-unknown|version_unknown) printf '  %-18s %s\n' "Версия кабинета" "${YELLOW}не зафиксирована${RESET}" ;;
-    docker-unavailable|docker_unavailable) printf '  %-18s %s\n' "Версия кабинета" "${YELLOW}Docker недоступен${RESET}" ;;
-    app-not-running|app_not_running) printf '  %-18s %s\n' "Версия кабинета" "${YELLOW}кабинет не запущен${RESET}" ;;
-    not-installed|not_installed) printf '  %-18s %s\n' "Версия кабинета" "${DIM}после установки${RESET}" ;;
+    latest|current) print_status_row "${GREEN}●${RESET}" "Обновление" "${GREEN}не требуется${RESET}" ;;
+    available) print_status_row "${YELLOW}↑${RESET}" "Обновление" "${YELLOW}${BOLD}доступно${RESET}" ;;
+    check-failed|check_failed|unknown) print_status_row "${DIM}○${RESET}" "Обновление" "${DIM}проверим позже${RESET}" ;;
+    version-unknown|version_unknown) print_status_row "${YELLOW}○${RESET}" "Обновление" "${YELLOW}версия не определена${RESET}" ;;
+    docker-unavailable|docker_unavailable) print_status_row "${YELLOW}○${RESET}" "Обновление" "${YELLOW}Docker недоступен${RESET}" ;;
+    app-not-running|app_not_running) print_status_row "${YELLOW}○${RESET}" "Обновление" "${YELLOW}кабинет не запущен${RESET}" ;;
+    not-installed|not_installed) print_status_row "${DIM}○${RESET}" "Обновление" "${DIM}после установки${RESET}" ;;
     *) return 1 ;;
   esac
 }
@@ -253,7 +375,7 @@ read_update_status_cache() {
 
 update_status_line() {
   if ! cabinet_installed; then
-    printf '  %-18s %s\n' "Версия кабинета" "${DIM}после установки${RESET}"
+    print_update_status_key "not-installed"
     return
   fi
 
@@ -269,7 +391,7 @@ update_status_line() {
     return
   fi
 
-  printf '  %-18s %s\n' "Версия кабинета" "${DIM}не проверена, пункт 8${RESET}"
+  print_update_status_key "unknown"
 }
 
 show_update_check_result() {
@@ -356,6 +478,7 @@ edit_env() {
     fail "Файл конфигурации появится после установки кабинета."
     return 1
   }
+  sync_env_schema
   local editor="${EDITOR:-}"
   if [[ -z "${editor}" ]]; then
     if command -v nano >/dev/null 2>&1; then
@@ -370,24 +493,41 @@ edit_env() {
 
 show_status() {
   if ! docker_available; then
-    printf '  %-18s %s\n' "Docker" "${YELLOW}не установлен${RESET}"
+    print_status_row "${YELLOW}○${RESET}" "Docker" "${YELLOW}не установлен${RESET}"
     return
   fi
   if ! docker_running; then
-    printf '  %-18s %s\n' "Docker" "${RED}не запущен${RESET}"
+    print_status_row "${RED}●${RESET}" "Docker" "${RED}не запущен${RESET}"
     return
   fi
 
-  printf '  %-18s %s\n' "Docker" "${GREEN}готов${RESET}"
   if ! cabinet_installed; then
-    printf '  %-18s %s\n' "Кабинет" "${DIM}не установлен${RESET}"
+    print_status_row "${DIM}○${RESET}" "Кабинет" "${DIM}не установлен${RESET}"
     return
   fi
 
   print_service_state "Кабинет" "remnawave-cabinet-app"
-  print_service_state "Платежи" "remnawave-cabinet-worker"
-  print_service_state "Рассылки" "remnawave-cabinet-broadcast-worker"
   print_service_state "База" "remnawave-cabinet-db"
+  local payment_state broadcast_state workers_state
+  payment_state="$(container_state remnawave-cabinet-worker)"
+  broadcast_state="$(container_state remnawave-cabinet-broadcast-worker)"
+  if [[ "${payment_state}" == "running" && "${broadcast_state}" == "running" ]]; then
+    workers_state="running"
+  elif [[ "${payment_state}" == "restarting" || "${broadcast_state}" == "restarting" ]]; then
+    workers_state="restarting"
+  elif [[ "${payment_state}" == "не найден" && "${broadcast_state}" == "не найден" ]]; then
+    workers_state="не найден"
+  else
+    workers_state="exited"
+  fi
+  local workers_label
+  case "${workers_state}" in
+    running) workers_label="${GREEN}работают${RESET}" ;;
+    restarting) workers_label="${YELLOW}перезапускаются${RESET}" ;;
+    exited) workers_label="${RED}остановлены${RESET}" ;;
+    *) workers_label="${DIM}не найдены${RESET}" ;;
+  esac
+  print_status_row "$(state_marker "${workers_state}")" "Фоновые задачи" "${workers_label}"
 }
 
 show_logs() {
@@ -424,6 +564,7 @@ logs_menu() {
 }
 
 restart_cabinet() {
+  sync_env_schema
   cabinet_compose restart app worker broadcast-worker
   ok "Сервисы кабинета перезапущены."
   cabinet_compose ps
@@ -434,6 +575,7 @@ show_services() {
 }
 
 check_config() {
+  sync_env_schema
   info "Проверяем конфигурацию кабинета..."
   cabinet_compose run --rm check-env
   ok "Конфигурация прошла проверку."
@@ -526,44 +668,33 @@ restore_backup() {
 
 show_header() {
   clear 2>/dev/null || true
-  printf '%s\n' "${BOLD}Remnawave Cabinet${RESET}  ${DIM}cabinetctl v${VERSION}${RESET}"
+  printf '%s\n' "${BOLD}${CYAN}Remnawave Cabinet${RESET}  ${DIM}v${VERSION}${RESET}"
   printf '%s\n' "${DIM}${CABINET_DIR}${RESET}"
-  rule
-  printf '%s\n' "${BOLD}Состояние${RESET}"
+  printf '\n'
   show_status
   update_status_line
-  rule
+  if [[ -n "${ENV_SYNC_NOTICE}" ]]; then
+    print_status_row "${CYAN}+${RESET}" ".env" "${CYAN}${ENV_SYNC_NOTICE}${RESET}"
+  fi
 }
 
 show_menu() {
   show_header
+  printf '\n'
   if cabinet_installed; then
-    printf '%s\n' \
-      "${BOLD}Кабинет${RESET}" \
-      "  1  Обновить" \
-      "  2  Перезапустить" \
-      "  3  Проверить систему" \
-      "" \
-      "${BOLD}Настройка${RESET}" \
-      "  4  Открыть .env" \
-      "  5  Проверить .env" \
-      "  6  Логи" \
-      "  7  Бэкапы" \
-      "" \
-      "${BOLD}Консоль${RESET}" \
-      "  8  Проверить обновление кабинета" \
-      "  9  Обновить cabinetctl" \
-      "  0  Выход"
+    print_menu_row "1" "Обновить кабинет" "5" "Проверить .env"
+    print_menu_row "2" "Перезапустить" "6" "Логи"
+    print_menu_row "3" "Диагностика" "7" "Бэкапы"
+    print_menu_row "4" "Открыть .env" "8" "Обновить cabinetctl"
+    printf '\n  %s0%s  Выход\n' "${DIM}" "${RESET}"
   else
-    printf '%s\n' \
-      "${BOLD}Кабинет не установлен${RESET}" \
-      "  1  Установить" \
-      "  2  Проверить систему" \
-      "  3  Бэкапы" \
-      "  9  Обновить cabinetctl" \
-      "  0  Выход"
+    printf '  %s1%s  Установить кабинет\n' "${CYAN}" "${RESET}"
+    printf '  %s2%s  Диагностика\n' "${CYAN}" "${RESET}"
+    printf '  %s3%s  Бэкапы\n' "${CYAN}" "${RESET}"
+    printf '  %s8%s  Обновить cabinetctl\n' "${CYAN}" "${RESET}"
+    printf '\n  %s0%s  Выход\n' "${DIM}" "${RESET}"
   fi
-  printf '\nВыберите действие: ' >/dev/tty
+  printf '\n%s›%s ' "${CYAN}" "${RESET}" >/dev/tty
 }
 
 run_menu() {
@@ -571,6 +702,8 @@ run_menu() {
     show_help
     exit 1
   }
+
+  sync_env_schema
 
   while true; do
     show_menu
@@ -586,8 +719,7 @@ run_menu() {
         5) check_config || true; pause ;;
         6) logs_menu || true; pause ;;
         7) backup_menu || true; pause ;;
-        8) check_update_command || true; pause ;;
-        9) update_console || true; pause ;;
+        8) update_console || true; pause ;;
         0) exit 0 ;;
         *) warn "Неизвестный пункт."; pause ;;
       esac
@@ -596,7 +728,7 @@ run_menu() {
         1) install_cabinet || true; pause ;;
         2) health_check || true; pause ;;
         3) backup_menu || true; pause ;;
-        9) update_console || true; pause ;;
+        8) update_console || true; pause ;;
         0) exit 0 ;;
         *) warn "Неизвестный пункт."; pause ;;
       esac
@@ -638,7 +770,7 @@ case "${1:-menu}" in
 esac
 
 if [[ "$(id -u)" -ne 0 ]]; then
-  exec sudo --preserve-env=BRANCH,RAW_BASE_URL,GITHUB_API_URL,INSTALL_URL,UPDATE_URL,NGINX_SETUP_URL,CONSOLE_INSTALL_URL,BACKUP_SCRIPT_URL,CABINETCTL_PATH,BACKUP_SCRIPT_PATH,INSTALL_DIR,CABINET_VERSION_FILE,CABINETCTL_UPDATE_CACHE,CABINETCTL_UPDATE_CACHE_TTL,CABINETCTL_CHECK_UPDATES_IN_MENU "$0" "$@"
+  exec sudo --preserve-env=BRANCH,RAW_BASE_URL,GITHUB_API_URL,INSTALL_URL,UPDATE_URL,NGINX_SETUP_URL,CONSOLE_INSTALL_URL,BACKUP_SCRIPT_URL,ENV_TEMPLATE_URL,CABINETCTL_PATH,BACKUP_SCRIPT_PATH,INSTALL_DIR,CABINET_VERSION_FILE,CABINETCTL_UPDATE_CACHE,CABINETCTL_UPDATE_CACHE_TTL,CABINETCTL_CHECK_UPDATES_IN_MENU "$0" "$@"
 fi
 
 case "${1:-menu}" in
