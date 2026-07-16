@@ -590,7 +590,7 @@ deploy/            production compose, installer, runbook
 
 ### CI/CD
 
-На каждый PR и push в `main` ([quality.yml](./.github/workflows/quality.yml)):
+На каждый pull request запускается [quality.yml](./.github/workflows/quality.yml):
 
 1. `prisma validate`
 2. `npm run lint`
@@ -598,7 +598,8 @@ deploy/            production compose, installer, runbook
 4. `npm run test`
 5. `npm run build`
 
-Docker-образ публикуется в GHCR ([docker-image.yml](./.github/workflows/docker-image.yml)) при push в `main`.
+При push в `main` запускается один [docker-image.yml](./.github/workflows/docker-image.yml):
+сначала проверки и E2E, затем единственная production-сборка и публикация в GHCR.
 CI собирает один target `release` (`CABINET_IMAGE`). Workers и seed заранее
 собираются в компактные JavaScript-файлы, поэтому образ не содержит `src`,
 `tsx` и полный `node_modules`.
