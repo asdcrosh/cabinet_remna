@@ -757,7 +757,7 @@ export function SupportPanel({
                   type="button"
                   className="absolute inset-0 z-20 bg-slate-950/10 backdrop-blur-[1px] dark:bg-black/30"
                   onClick={() => setDetailsOpen(false)}
-                  aria-label="Закрыть данные клиента"
+                  aria-label="Закрыть панель"
                 />
                 <aside className="absolute inset-y-0 right-0 z-30 w-[min(24rem,calc(100%-1rem))] border-l border-slate-200 bg-white shadow-2xl shadow-slate-950/15 dark:border-white/10 dark:bg-surface-900">
                   <TicketSideMenu
