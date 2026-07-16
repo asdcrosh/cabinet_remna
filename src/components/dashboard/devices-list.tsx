@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
-import { Clock3, Hash, Laptop, Loader2, Monitor, RefreshCw, Smartphone, Tablet, Unlink2 } from 'lucide-react'
+import { Laptop, Loader2, Monitor, RefreshCw, Smartphone, Tablet, Unlink2 } from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
 import { EmptyState, InlineAlert } from './empty-state'
 import { ConfirmDialog } from './confirm-dialog'
@@ -91,13 +91,13 @@ export function DevicesList() {
         />
       )}
       <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.035]">
-        <div className="border-b border-slate-100 p-4 dark:border-white/10 sm:p-5">
-          <div className="space-y-4">
-            <div className="flex items-center justify-between gap-3">
-              <div className="min-w-0">
-                <h2 className="text-xl font-semibold tracking-tight text-slate-950 dark:text-white">Подключённые устройства</h2>
-                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Всего: {devices.length}</p>
-              </div>
+        <div className="border-b border-slate-100 px-4 py-3 dark:border-white/10">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex min-w-0 flex-wrap items-baseline gap-x-4 gap-y-1">
+              <h2 className="font-semibold text-slate-950 dark:text-white">Подключённые устройства</h2>
+              <DeviceMetric label="всего" value={devices.length.toString()} />
+              <DeviceMetric label="активны сегодня" value={countRecentDevices(devices).toString()} />
+            </div>
               <button
                 type="button"
                 className="btn-secondary min-h-10 shrink-0 px-3"
@@ -108,16 +108,10 @@ export function DevicesList() {
                 <RefreshCw className={cn('h-4 w-4', refreshing && 'animate-spin')} />
                 <span className="hidden sm:inline">Обновить</span>
               </button>
-            </div>
-            <div className="flex flex-wrap gap-x-6 gap-y-2 border-t border-slate-100 pt-3 dark:border-white/10">
-              <DeviceMetric label="Активны сегодня" value={countRecentDevices(devices).toString()} />
-              <DeviceMetric label="За неделю" value={countWeekDevices(devices).toString()} />
-              <DeviceMetric label="Подключено" value={devices.length.toString()} />
-            </div>
           </div>
         </div>
 
-        <div className="grid gap-3 p-4 sm:p-5 lg:grid-cols-2 2xl:grid-cols-3">
+        <div className="divide-y divide-slate-100 dark:divide-white/10">
           {devices.map((d) => (
             <DeviceCard
               key={d.hwid}
@@ -154,47 +148,23 @@ function DeviceCard({
   const Icon = getDeviceIcon(device)
 
   return (
-    <article className="rounded-2xl border border-slate-200 p-3.5 transition-colors hover:border-slate-300 dark:border-white/10 sm:p-4">
-      <div className="relative space-y-3 sm:space-y-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex min-w-0 items-start gap-3">
-            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-600 dark:bg-white/[0.06] dark:text-slate-300">
-              <Icon className="h-5 w-5" />
-            </div>
-            <div className="min-w-0">
-              <h2 className="line-clamp-2 text-sm font-semibold text-slate-950 dark:text-white sm:text-base">{getDeviceTitle(device)}</h2>
-              <p className="mt-1 line-clamp-2 text-sm leading-5 text-slate-500 dark:text-slate-400">{getDeviceSubtitle(device)}</p>
-            </div>
+    <article className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex min-w-0 items-start gap-3">
+        <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-600 dark:bg-white/[0.06] dark:text-slate-300">
+          <Icon className="h-4 w-4" />
+        </div>
+        <div className="min-w-0">
+          <h2 className="truncate text-sm font-semibold text-slate-950 dark:text-white sm:text-base">{getDeviceTitle(device)}</h2>
+          <p className="mt-0.5 truncate text-sm text-slate-500 dark:text-slate-400">{getDeviceSubtitle(device)}</p>
+          <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-400">
+            <span>{formatDeviceDate(device.updatedAt || device.createdAt)}</span>
+            <span className="font-mono" title={device.hwid}>ID {shortDeviceId(device.hwid)}</span>
           </div>
         </div>
-
-        <div className="grid gap-3 border-y border-slate-100 py-3 text-xs text-slate-500 dark:border-white/10 dark:text-slate-400 sm:grid-cols-2">
-          <div>
-            <div className="flex items-center gap-1.5 font-medium text-slate-700 dark:text-slate-200">
-              <Clock3 className="h-3.5 w-3.5" />
-              Активность
-            </div>
-            <div className="mt-1">{formatDeviceDate(device.updatedAt || device.createdAt)}</div>
-          </div>
-          <div>
-            <div className="flex items-center gap-1.5 font-medium text-slate-700 dark:text-slate-200">
-              <Hash className="h-3.5 w-3.5" />
-              ID
-            </div>
-            <div className="mt-1 truncate font-mono">{shortDeviceId(device.hwid)}</div>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <span className={cn('rounded-full border px-2.5 py-1 text-xs font-medium', activity.className)}>
-            {activity.label}
-          </span>
-          <DeviceActionButton
-            loading={loading}
-            label="Отвязать"
-            onClick={onRemove}
-          />
-        </div>
+      </div>
+      <div className="flex items-center justify-between gap-2 sm:shrink-0 sm:justify-end">
+        <span className={cn('rounded-full border px-2.5 py-1 text-xs font-medium', activity.className)}>{activity.label}</span>
+        <DeviceActionButton loading={loading} label="Отвязать" onClick={onRemove} />
       </div>
     </article>
   )
@@ -304,14 +274,6 @@ function countRecentDevices(devices: Device[]) {
   return devices.filter((device) => {
     const date = device.updatedAt || device.createdAt
     return date ? Date.now() - new Date(date).getTime() <= dayMs : false
-  }).length
-}
-
-function countWeekDevices(devices: Device[]) {
-  const weekMs = 7 * 24 * 60 * 60 * 1000
-  return devices.filter((device) => {
-    const date = device.updatedAt || device.createdAt
-    return date ? Date.now() - new Date(date).getTime() <= weekMs : false
   }).length
 }
 

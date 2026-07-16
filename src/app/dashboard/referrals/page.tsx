@@ -99,7 +99,7 @@ export default async function ReferralsPage() {
         <ReferralLinkCard code={referralCode} url={referralUrl} bonusDays={bonusDays} />
       </section>
 
-      <section className="grid grid-cols-2 gap-2 sm:gap-3 xl:grid-cols-4">
+      <section className="grid grid-cols-2 overflow-hidden rounded-2xl border border-slate-200 bg-white dark:divide-white/10 dark:border-white/10 dark:bg-white/[0.035] sm:grid-cols-4">
         <SummaryCard label="Приглашено" value={invitedCount} />
         <SummaryCard label="Оплатили" value={paidCount} />
         <SummaryCard label="Конверсия" value={`${conversion}%`} />
@@ -171,9 +171,9 @@ function SummaryCard({ label, value, hint }: { label: string; value: string | nu
   const count = parseCountValue(value)
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-3 dark:border-white/10 dark:bg-white/[0.035] sm:p-4">
-      <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{label}</div>
-      <div className="mt-2 text-xl font-semibold text-slate-950 dark:text-white sm:text-2xl">
+    <div className="min-w-0 border-b border-r border-slate-100 p-3 last:border-r-0 dark:border-white/10 sm:border-b-0 sm:p-4">
+      <div className="text-xs text-slate-500 dark:text-slate-400">{label}</div>
+      <div className="mt-1 text-xl font-semibold text-slate-950 dark:text-white">
         {count ? <CountUp value={count.value} prefix={count.prefix} suffix={count.suffix} /> : value}
       </div>
       {hint && <div className="mt-1 text-xs text-slate-400">{hint}</div>}
@@ -194,8 +194,8 @@ function parseCountValue(value: string | number) {
 
 function HistoryCell({ label, value }: { label: string; value: string }) {
   return (
-    <div className="min-w-0 rounded-xl bg-slate-50 p-2.5 dark:bg-white/5 md:bg-transparent md:p-0 md:dark:bg-transparent">
-      <div className="text-xs uppercase text-slate-400">{label}</div>
+    <div className="min-w-0 py-1 md:p-0">
+      <div className="text-xs text-slate-400">{label}</div>
       <div className="mt-1 truncate text-sm font-medium">{value}</div>
     </div>
   )

@@ -2,12 +2,10 @@ import type { ReactNode } from 'react'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import {
-  CheckCircle2,
   CreditCard,
   Database,
   LockKeyhole,
   MailPlus,
-  ShieldCheck,
   UserRound,
 } from 'lucide-react'
 import { getCurrentUser } from '@/lib/auth/cookies'
@@ -59,20 +57,14 @@ export default async function SettingsPage() {
                 title="Аккаунт"
                 description="Информация профиля и текущий статус"
               >
-                <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_18rem]">
-                  <div className="min-w-0">
-                    <div className="mb-4 grid gap-2 text-sm sm:grid-cols-3">
-                      <AccountFact label="Email" value={hasVerifiedEmail ? user.email : 'не добавлен'} />
-                      <AccountFact label="Регистрация" value={new Date(user.createdAt).toLocaleDateString('ru-RU')} />
-                      <AccountFact label="VPN профиль" value={user.remnawaveUsername ? 'создан' : 'пока не создан'} />
-                    </div>
-                    <ProfileForm name={user.name} />
+                <div className="min-w-0">
+                  <div className="mb-4 grid gap-x-3 gap-y-2 text-sm sm:grid-cols-2 xl:grid-cols-4">
+                    <AccountFact label="Email" value={hasVerifiedEmail ? user.email : 'не добавлен'} />
+                    <AccountFact label="Telegram" value={user.telegramId ? 'привязан' : 'не привязан'} />
+                    <AccountFact label="VPN" value={user.remnawaveUsername ? 'готов' : 'пока нет'} />
+                    <AccountFact label="Регистрация" value={new Date(user.createdAt).toLocaleDateString('ru-RU')} />
                   </div>
-                  <StatusPanel
-                    emailReady={hasVerifiedEmail}
-                    telegramReady={Boolean(user.telegramId)}
-                    vpnReady={Boolean(user.remnawaveUsername)}
-                  />
+                  <ProfileForm name={user.name} />
                 </div>
               </SettingsSection>
             ),
@@ -213,49 +205,6 @@ function AccountFact({ label, value }: { label: string; value: string }) {
     <div className="min-w-0 border-l border-slate-200 px-3 py-1 dark:border-white/10">
       <div className="text-xs text-slate-500 dark:text-slate-400">{label}</div>
       <div className="mt-1 truncate font-medium text-slate-950 dark:text-white" title={value}>{value}</div>
-    </div>
-  )
-}
-
-function StatusPanel({
-  emailReady,
-  telegramReady,
-  vpnReady,
-}: {
-  emailReady: boolean
-  telegramReady: boolean
-  vpnReady: boolean
-}) {
-  const readyCount = [emailReady, telegramReady, vpnReady].filter(Boolean).length
-
-  return (
-    <div className="border-l border-slate-200 p-4 dark:border-white/10">
-      <div className="flex items-center gap-3">
-        <div className="grid h-10 w-10 shrink-0 place-items-center text-emerald-600 dark:text-emerald-300">
-          <ShieldCheck className="h-5 w-5" />
-        </div>
-        <div className="min-w-0">
-          <h2 className="font-semibold text-slate-950 dark:text-white">Статус аккаунта</h2>
-          <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">{readyCount}/3 готово</p>
-        </div>
-      </div>
-      <div className="mt-4 grid gap-2">
-        <StatusLine label="Email" value={emailReady ? 'подтверждён' : 'не добавлен'} active={emailReady} />
-        <StatusLine label="Telegram" value={telegramReady ? 'привязан' : 'не привязан'} active={telegramReady} />
-        <StatusLine label="VPN" value={vpnReady ? 'готов' : 'пока нет'} active={vpnReady} />
-      </div>
-    </div>
-  )
-}
-
-function StatusLine({ label, value, active }: { label: string; value: string; active: boolean }) {
-  return (
-    <div className="flex items-center justify-between gap-3 border-b border-slate-100 py-2.5 text-sm last:border-b-0 dark:border-white/10">
-      <span className="text-slate-500 dark:text-slate-400">{label}</span>
-      <span className={`inline-flex items-center gap-1.5 font-medium ${active ? 'text-emerald-600 dark:text-emerald-300' : 'text-slate-400'}`}>
-        {active ? <CheckCircle2 className="h-3.5 w-3.5" /> : null}
-        {value}
-      </span>
     </div>
   )
 }
