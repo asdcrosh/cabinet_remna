@@ -32,6 +32,7 @@ describe('public plans route', () => {
         trafficLimitGb: true,
         deviceLimit: true,
         isPromo: true,
+        promoCodesEnabled: true,
         isFeatured: true,
         sortOrder: true,
       },
