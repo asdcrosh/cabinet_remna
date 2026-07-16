@@ -26,13 +26,12 @@ export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Админка' }
 
 export default async function AdminDashboardPage() {
-  const { user } = await requireAdminPage()
+  await requireAdminPage()
 
   const now = new Date()
   const soon = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
   const todayStart = new Date(now)
   todayStart.setHours(0, 0, 0, 0)
-  const dayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000)
   const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
   const stalePaymentDate = new Date(now.getTime() - getPendingPaymentTtlMs())
   const twoWeeksAgo = new Date(now.getTime() - 13 * 24 * 60 * 60 * 1000)

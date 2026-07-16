@@ -108,14 +108,26 @@ test('фильтры промокодов помещаются без скрыт
   await expectNoHorizontalOverflow(page)
 })
 
-test('подарки и уведомления не создают горизонтальную прокрутку', async ({ page }) => {
+test('экраны админки не создают горизонтальную прокрутку', async ({ page }) => {
   await login(page, E2E_USERS.admin.email)
 
-  await page.goto('/dashboard/admin/bonus-box')
-  await expect(page.getByRole('heading', { level: 1, name: 'Подарки' })).toBeVisible()
-  await expectNoHorizontalOverflow(page)
+  const screens = [
+    ['/dashboard/admin', 'Обзор'],
+    ['/dashboard/admin/payments', 'Платежи'],
+    ['/dashboard/admin/support', 'Поддержка'],
+    ['/dashboard/admin/duplicates', 'Возможные дубли'],
+    ['/dashboard/admin/audit', 'История действий'],
+    ['/dashboard/admin/recovery', 'Довыдача'],
+    ['/dashboard/admin/bonus-box', 'Подарки'],
+    ['/dashboard/admin/notifications', 'Уведомления'],
+    ['/dashboard/admin/broadcasts', 'Рассылки'],
+    ['/dashboard/admin/remnashop-sync', 'Синхронизация'],
+    ['/dashboard/admin/system', 'Система'],
+  ] as const
 
-  await page.goto('/dashboard/admin/notifications')
-  await expect(page.getByRole('heading', { level: 1, name: 'Уведомления' })).toBeVisible()
-  await expectNoHorizontalOverflow(page)
+  for (const [href, title] of screens) {
+    await page.goto(href)
+    await expect(page.getByRole('heading', { level: 1, name: title })).toBeVisible()
+    await expectNoHorizontalOverflow(page)
+  }
 })

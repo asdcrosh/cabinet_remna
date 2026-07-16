@@ -122,7 +122,7 @@ export default async function PlansPage({
     <div className="page-stack">
       <PageHeader
         title="Тарифы"
-        description="Выберите срок доступа. Подписка активируется сразу после оплаты."
+        description="Выберите срок и оплатите доступ"
         action={(
           <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
             {canManagePlans && (

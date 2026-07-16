@@ -13,7 +13,7 @@ export default async function AdminSystemPage() {
   return (
     <AdminPageShell
       title="Система"
-      description="Проверка боевых интеграций, бэкапов и готовности кабинета"
+      description="Интеграции, бэкапы и состояние сервисов"
     >
       <SystemHealthPanel initialReport={report} />
     </AdminPageShell>

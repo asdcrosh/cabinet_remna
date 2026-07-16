@@ -40,7 +40,7 @@ export default async function SettingsPage() {
     <div className="mx-auto max-w-6xl page-stack">
       <PageHeader
         title="Настройки"
-        description="Аккаунт, синхронизация, безопасность и платежи"
+        description="Аккаунт и безопасность"
       />
 
       <SettingsTabs
