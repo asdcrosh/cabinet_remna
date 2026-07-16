@@ -26,7 +26,7 @@ export default async function AdminRecoveryPage() {
     <div className="page-stack">
       <PageHeader
         title="Довыдача"
-        description="Оплаты, которые прошли, но подписка ещё не была выдана"
+        description="Оплаченные, но не выданные подписки"
         action={payments.length > 0 ? <BulkRecoveryActionButton paymentIds={payments.map((payment) => payment.id)} /> : null}
       />
 
@@ -85,9 +85,9 @@ export default async function AdminRecoveryPage() {
             </table>
           </div>
 
-          <div className="space-y-3 2xl:hidden">
+          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white divide-y divide-slate-200 dark:border-white/10 dark:bg-white/[0.025] dark:divide-white/[0.07] 2xl:hidden">
             {payments.map((payment) => (
-              <article key={payment.id} className="overflow-hidden rounded-2xl border bg-white dark:border-white/10 dark:bg-white/[0.035]">
+              <article key={payment.id} className="overflow-hidden">
                 <div className="px-4 pb-2 pt-4">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">

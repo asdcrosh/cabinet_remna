@@ -9,6 +9,7 @@ import { apiFetch } from '@/lib/api-client'
 import { toast } from '@/components/ui/toaster'
 import { cn } from '@/lib/cn'
 import { AdminEmptyState } from '@/components/admin/admin-empty-state'
+import { AdminActionsMenu } from '@/components/admin/admin-actions-menu'
 import { LazyListLoader } from '@/components/admin/lazy-list-loader'
 import { useBodyScrollLock } from '@/lib/use-body-scroll-lock'
 
@@ -283,7 +284,7 @@ export function BonusBoxPrizesAdmin({
       </div>
 
       {activeTab === 'prizes' && (
-        <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white divide-y divide-slate-200 dark:border-white/10 dark:bg-white/[0.025] dark:divide-white/[0.07]">
           {prizes.map((prize) => (
             <PrizeAdminRow
               key={prize.id}
@@ -297,7 +298,6 @@ export function BonusBoxPrizesAdmin({
               title="Подарков пока нет"
               description="Добавьте первый подарок для Подарочного бокса."
               surface="plain"
-              className="md:col-span-2 xl:col-span-3"
             />
           )}
         </section>
@@ -421,41 +421,40 @@ function PrizeAdminRow({
   onToggle: () => void
 }) {
   return (
-    <article className={cn('group relative overflow-hidden rounded-2xl border bg-white transition-colors hover:border-slate-300 dark:bg-white/[0.035] dark:hover:border-white/20', prizeAdminBorderClass(prize))}>
-      <div className={cn('h-0.5', prizeAdminTopClass(prize))} />
-      <div className="space-y-3 p-3">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <h3 className="truncate text-base font-semibold text-slate-950 dark:text-white">{prize.title}</h3>
-            <span className={prize.isActive ? 'badge-active' : 'badge-disabled'}>
-              {prize.isActive ? 'Активен' : 'Отключён'}
-            </span>
-            <span className={cn('rounded-full px-2 py-1 text-xs font-semibold', rarityClass(prize.rarity))}>
-              {rarityLabel(prize.rarity)}
-            </span>
-          </div>
-          <div className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500 dark:text-slate-400">
-            {prize.description || prizeTypeLabel(prize.type)}
-          </div>
+    <article className="grid min-w-0 gap-3 p-4 sm:grid-cols-[minmax(13rem,1fr)_minmax(16rem,1.2fr)_auto] sm:items-center sm:gap-5">
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-center gap-2">
+          <h3 className="truncate font-semibold text-slate-950 dark:text-white">{prize.title}</h3>
+          <span className={prize.isActive ? 'badge-active' : 'badge-disabled'}>
+            {prize.isActive ? 'Активен' : 'Отключён'}
+          </span>
+          <span className={cn('rounded-full px-2 py-0.5 text-xs font-semibold', rarityClass(prize.rarity))}>
+            {rarityLabel(prize.rarity)}
+          </span>
         </div>
-
-        <div className="flex flex-wrap gap-x-4 gap-y-1 border-y border-slate-100 py-2 dark:border-white/10">
-          <CompactMetric label="Подарок" value={prizeValue(prize)} />
-          <CompactMetric label="Шанс" value={formatChance(prize.chance)} />
-          <CompactMetric label="Вес" value={prize.weight} />
-          <CompactMetric label="Выпало" value={`${prize.winsCount}/${prize.maxWins ?? '∞'}`} />
+        <div className="mt-1 truncate text-xs text-slate-500 dark:text-slate-400">
+          {prize.description || prizeTypeLabel(prize.type)}
         </div>
+      </div>
 
-        <div className="grid grid-cols-2 gap-2">
-          <button type="button" className="btn-secondary min-h-10 justify-center px-3 text-xs" onClick={onEdit}>
+      <div className="flex flex-wrap gap-x-4 gap-y-1">
+        <CompactMetric label="Подарок" value={prizeValue(prize)} />
+        <CompactMetric label="Шанс" value={formatChance(prize.chance)} />
+        <CompactMetric label="Вес" value={prize.weight} />
+        <CompactMetric label="Выпало" value={`${prize.winsCount}/${prize.maxWins ?? '∞'}`} />
+      </div>
+
+      <div className="flex justify-end">
+        <AdminActionsMenu compact label={`Действия: ${prize.title}`}>
+          <button type="button" className="btn-secondary min-h-10 px-3 text-xs" onClick={onEdit}>
             <Edit3 className="h-3.5 w-3.5" />
             Изменить
           </button>
-          <button type="button" className="btn-secondary min-h-10 justify-center px-3 text-xs" onClick={onToggle}>
+          <button type="button" className="btn-secondary min-h-10 px-3 text-xs" onClick={onToggle}>
             <Power className="h-3.5 w-3.5" />
             {prize.isActive ? 'Отключить' : 'Включить'}
           </button>
-        </div>
+        </AdminActionsMenu>
       </div>
     </article>
   )
@@ -1087,20 +1086,4 @@ function rarityClass(rarity: Rarity) {
   if (rarity === 'EPIC') return 'bg-fuchsia-100 text-fuchsia-800 dark:bg-fuchsia-500/15 dark:text-fuchsia-100'
   if (rarity === 'RARE') return 'bg-cyan-100 text-cyan-800 dark:bg-cyan-500/15 dark:text-cyan-100'
   return 'bg-slate-100 text-slate-700 dark:bg-white/10 dark:text-slate-200'
-}
-
-function prizeAdminBorderClass(prize: BonusBoxPrizeAdminRow) {
-  if (prize.type === 'NO_PRIZE') return 'border-red-300 dark:border-red-500/60'
-  if (prize.rarity === 'LEGENDARY') return 'border-amber-200 dark:border-amber-500/40'
-  if (prize.rarity === 'EPIC') return 'border-fuchsia-200 dark:border-fuchsia-500/40'
-  if (prize.rarity === 'RARE') return 'border-cyan-200 dark:border-cyan-500/40'
-  return 'border-slate-200 dark:border-white/10'
-}
-
-function prizeAdminTopClass(prize: BonusBoxPrizeAdminRow) {
-  if (prize.type === 'NO_PRIZE') return 'bg-red-500'
-  if (prize.rarity === 'LEGENDARY') return 'bg-amber-400'
-  if (prize.rarity === 'EPIC') return 'bg-fuchsia-400'
-  if (prize.rarity === 'RARE') return 'bg-cyan-400'
-  return 'bg-slate-400'
 }

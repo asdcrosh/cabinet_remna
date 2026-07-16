@@ -81,7 +81,7 @@ export default async function AdminAuditPage({
 
   return (
     <div className="page-stack">
-      <PageHeader title="История действий" description="Админские операции, выдачи тарифов и важные изменения" />
+      <PageHeader title="История действий" description="Изменения и операции администраторов" />
 
       <AdminFilterBar
         action="/dashboard/admin/audit"
@@ -108,12 +108,12 @@ export default async function AdminAuditPage({
         <AdminFilterSubmitButton />
       </AdminFilterBar>
 
-      <div className="space-y-3">
+      <div className={visibleLogs.length > 0 ? 'overflow-hidden rounded-2xl border border-slate-200 bg-white divide-y divide-slate-200 dark:border-white/10 dark:bg-white/[0.025] dark:divide-white/[0.07]' : ''}>
         {visibleLogs.length === 0 && (
           <AdminEmptyState title="Записей пока нет" description="История появится после админских действий." />
         )}
         {visibleLogs.map((log) => (
-          <article key={log.id} className="card p-0">
+          <article key={log.id}>
             <div className="flex flex-col gap-2 p-3.5 sm:flex-row sm:items-start sm:justify-between">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
@@ -144,7 +144,7 @@ export default async function AdminAuditPage({
         ))}
         {hasMore && (
           <div className="text-center">
-            <Link href={buildMoreHref(q, action, limit + 50)} className="btn-secondary w-full sm:w-auto">
+            <Link href={buildMoreHref(q, action, limit + 50)} className="btn-secondary my-3 w-[calc(100%-1.5rem)] justify-center sm:w-auto">
               Показать еще
             </Link>
           </div>

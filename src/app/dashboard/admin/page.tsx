@@ -8,13 +8,9 @@ import {
   LifeBuoy,
   Percent,
   RefreshCw,
-  ServerCog,
   ShieldCheck,
-  SlidersHorizontal,
   SearchCheck,
-  Tag,
   TrendingUp,
-  Users,
   UserPlus,
   Wallet,
 } from 'lucide-react'
@@ -50,11 +46,8 @@ export default async function AdminDashboardPage() {
     paymentsAggregate,
     paymentsToday,
     paymentsWeek,
-    activePromoCodes,
-    activePlans,
     supportWaiting,
     expiringSoon,
-    auditEvents,
     payingUsersResult,
     sourceRows,
     dailyPaymentRows,
@@ -96,15 +89,10 @@ export default async function AdminDashboardPage() {
       _sum: { amountKopecks: true },
       _count: true,
     }),
-    prisma.promoCode.count({ where: { isActive: true } }),
-    prisma.plan.count({ where: { isActive: true } }),
     prisma.supportTicket.count({ where: { status: 'WAITING_ADMIN' } }),
     prisma.subscription.count({
       where: { status: { in: ['ACTIVE', 'LIMITED'] }, expireAt: { gte: now, lte: soon } },
     }),
-    user.role === 'SUPER_ADMIN'
-      ? prisma.auditLog.count({ where: { createdAt: { gte: dayAgo } } })
-      : Promise.resolve(0),
     prisma.$queryRaw<Array<{ count: bigint }>>`
       SELECT COUNT(DISTINCT p."userId")::bigint AS count
       FROM "Payment" p
@@ -172,7 +160,7 @@ export default async function AdminDashboardPage() {
     <div className="page-stack">
       <PageHeader
         title="Обзор"
-        description="Операционная сводка, риски и быстрые переходы по админке."
+        description="Показатели и задачи кабинета"
       />
 
       <section className="space-y-3">
@@ -307,63 +295,6 @@ export default async function AdminDashboardPage() {
         </div>
 
         <TrendPanel days={trendDays} />
-      </section>
-
-      <section className="space-y-3">
-        <div>
-          <h2 className="text-lg font-semibold tracking-tight">Быстрые разделы</h2>
-          <p className="text-sm text-slate-500">Основные админские действия</p>
-        </div>
-
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6">
-        <AdminTile
-          href="/dashboard/admin/users"
-          icon={<Users className="h-5 w-5" />}
-          title="Пользователи"
-          value={usersTotal}
-          note={usersWeek > 0 ? `+${usersWeek} за неделю` : undefined}
-        />
-        <AdminTile
-          href="/dashboard/admin/plans"
-          icon={<SlidersHorizontal className="h-5 w-5" />}
-          title="Тарифы"
-          value={activePlans}
-        />
-        <AdminTile
-          href="/dashboard/admin/payments"
-          icon={<CreditCard className="h-5 w-5" />}
-          title="Платежи"
-          value={paymentsAggregate._count}
-          note={`${formatPrice(paymentsAggregate._sum.amountKopecks ?? 0)} всего`}
-        />
-        <AdminTile
-          href="/dashboard/admin/promo-codes"
-          icon={<Tag className="h-5 w-5" />}
-          title="Промокоды"
-          value={activePromoCodes}
-        />
-        <AdminTile
-          href="/dashboard/admin/remnashop-sync"
-          icon={<RefreshCw className="h-5 w-5" />}
-          title="Синхронизация"
-          note="Remnashop"
-        />
-        <AdminTile
-          href="/dashboard/admin/system"
-          icon={<ServerCog className="h-5 w-5" />}
-          title="Система"
-          note="Health и бэкапы"
-        />
-        {user.role === 'SUPER_ADMIN' && (
-          <AdminTile
-            href="/dashboard/admin/audit"
-            icon={<FileClock className="h-5 w-5" />}
-            title="История"
-            value={auditEvents}
-            note="За 24 часа"
-          />
-        )}
-      </div>
       </section>
     </div>
   )
@@ -556,44 +487,6 @@ function buildTrendDays(
 
 function dayKey(date: Date) {
   return date.toISOString().slice(0, 10)
-}
-
-function AdminTile({
-  href,
-  icon,
-  title,
-  value,
-  note,
-  warning = false,
-}: {
-  href: string
-  icon: React.ReactNode
-  title: string
-  value?: React.ReactNode
-  note?: string
-  warning?: boolean
-}) {
-  return (
-    <Link
-      href={href}
-      className={cn(
-        'group flex min-h-20 min-w-0 items-center gap-3 rounded-2xl border bg-white p-3 transition-colors hover:border-slate-300 hover:bg-slate-50 dark:bg-white/[0.035] dark:hover:border-white/20 dark:hover:bg-white/[0.05]',
-        warning && 'border-amber-300 bg-amber-50/70 dark:border-amber-500/30 dark:bg-amber-500/10'
-      )}
-    >
-      <div className={cn(
-          'grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-700 dark:bg-white/10 dark:text-cyan-200',
-          warning && 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-200'
-        )}>
-        {icon}
-      </div>
-      <div className="min-w-0 flex-1">
-        <div className="truncate text-sm font-semibold">{title}</div>
-        {note && <div className="mt-0.5 truncate text-xs text-slate-500">{note}</div>}
-      </div>
-      {value !== undefined && <div className="shrink-0 text-lg font-semibold tracking-tight">{value}</div>}
-    </Link>
-  )
 }
 
 function PriorityCard({

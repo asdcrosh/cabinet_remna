@@ -15,7 +15,7 @@ export default async function AdminNotificationsPage() {
   return (
     <AdminPageShell
       title="Уведомления"
-      description="Регистрации, оплаты, поддержка и важные события сервиса."
+      description="События кабинета и системы"
     >
       <AdminNotificationsList initialNotifications={notifications.map(serializeAdminNotification)} />
     </AdminPageShell>

@@ -71,7 +71,7 @@ export default async function AdminPaymentsPage({
     <div className="page-stack">
       <PageHeader
         title="Платежи"
-        description="Все платежи, их статус и результат выдачи подписки"
+        description="Оплаты и выдача подписок"
         action={
           <Link href={buildPaymentsExportHref(q, status, delivery, range, params.from, params.to)} className="btn-secondary w-full sm:w-auto">
             <Download className="h-4 w-4" />
@@ -80,7 +80,7 @@ export default async function AdminPaymentsPage({
         }
       />
 
-      <section className="grid grid-cols-3 gap-2">
+      <section className="grid grid-cols-3 overflow-hidden rounded-xl border border-slate-200 bg-white divide-x divide-slate-200 dark:border-white/10 dark:bg-white/[0.025] dark:divide-white/10">
         <PaymentStat title="Ожидают" value={pendingCount} tone="amber" />
         <PaymentStat title="Довыдача" value={retryCount} tone={retryCount > 0 ? 'red' : 'slate'} />
         <PaymentStat title="Оплачено" value={succeededCount} tone="emerald" />
@@ -211,13 +211,13 @@ export default async function AdminPaymentsPage({
         </table>
       </div>
 
-      <div className={payments.length > 0 ? 'space-y-3 2xl:hidden' : 'hidden'}>
+      <div className={payments.length > 0 ? 'overflow-hidden rounded-2xl border border-slate-200 bg-white divide-y divide-slate-200 dark:border-white/10 dark:bg-white/[0.025] dark:divide-white/[0.07] 2xl:hidden' : 'hidden'}>
         {payments.map((payment) => {
           const needsRetry = payment.status === 'SUCCEEDED' && !payment.subscriptionProvisionedAt
           const needsRemnashopRetry = payment.status === 'SUCCEEDED' && Boolean(payment.subscriptionProvisionedAt) && !payment.remnashopSyncedAt
           const canCheckPayment = Boolean(payment.yookassaId) && payment.status !== 'SUCCEEDED'
           return (
-            <article key={payment.id} className={`overflow-hidden rounded-2xl border border-l-4 bg-white dark:bg-white/[0.035] ${paymentRailClass(payment.status, needsRetry || needsRemnashopRetry)}`}>
+            <article key={payment.id} className={`overflow-hidden border-l-4 ${paymentRailClass(payment.status, needsRetry || needsRemnashopRetry)}`}>
               <div className="px-4 pb-2 pt-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
@@ -360,16 +360,16 @@ function buildPaymentsExportHref(q: string, status: string, delivery: string, ra
 
 function PaymentStat({ title, value, tone }: { title: string; value: number; tone: 'amber' | 'emerald' | 'red' | 'slate' }) {
   const toneClass = {
-    amber: 'border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-500/25 dark:bg-amber-500/10 dark:text-amber-100',
-    emerald: 'border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-500/25 dark:bg-emerald-500/10 dark:text-emerald-100',
-    red: 'border-red-200 bg-red-50 text-red-900 dark:border-red-500/25 dark:bg-red-500/10 dark:text-red-100',
-    slate: 'border-slate-200 bg-white text-slate-900 dark:border-white/10 dark:bg-surface-900 dark:text-white',
+    amber: 'text-amber-700 dark:text-amber-200',
+    emerald: 'text-emerald-700 dark:text-emerald-200',
+    red: 'text-red-700 dark:text-red-200',
+    slate: 'text-slate-700 dark:text-slate-200',
   }[tone]
 
   return (
-    <div className={`min-w-0 rounded-xl border px-3 py-2.5 ${toneClass}`}>
-      <div className="truncate text-xs opacity-75">{title}</div>
-      <div className="mt-0.5 text-xl font-semibold tabular-nums sm:text-2xl">{value}</div>
+    <div className="min-w-0 px-3 py-2.5 text-center sm:text-left">
+      <div className="truncate text-xs text-slate-500">{title}</div>
+      <div className={`mt-0.5 text-xl font-semibold tabular-nums sm:text-2xl ${toneClass}`}>{value}</div>
     </div>
   )
 }

@@ -50,7 +50,7 @@ export default async function BroadcastsPage() {
   return (
     <AdminPageShell
       title="Рассылки"
-      description="Отправляйте сообщения выбранному сегменту через кабинет, Telegram и email."
+      description="Сообщения в кабинет, Telegram и email"
     >
       <BroadcastAdminDynamic
         initialHistoryTotal={historyTotal}

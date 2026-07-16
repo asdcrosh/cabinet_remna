@@ -81,19 +81,19 @@ export function SystemHealthPanel({ initialReport }: { initialReport: SystemHeal
         )}
       </section>
 
-      <div className="space-y-2">
+      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white divide-y divide-slate-200 dark:border-white/10 dark:bg-white/[0.025] dark:divide-white/[0.07]">
         {report.checks.map((item) => {
           const view = statusView[item.status]
           return (
             <article
               key={item.id}
               className={cn(
-                'rounded-2xl border bg-white p-3 dark:bg-white/[0.035]',
+                'p-4',
                 item.status === 'error'
-                  ? 'border-red-200 dark:border-red-500/30'
+                  ? 'bg-red-50/60 dark:bg-red-500/[0.05]'
                   : item.status === 'warn'
-                    ? 'border-amber-200 dark:border-amber-500/30'
-                    : 'border-slate-200 dark:border-white/10'
+                    ? 'bg-amber-50/60 dark:bg-amber-500/[0.05]'
+                    : ''
               )}
             >
               <div className="flex items-start justify-between gap-3">

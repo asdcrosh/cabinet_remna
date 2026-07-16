@@ -80,7 +80,7 @@ export default async function AdminBonusBoxPage({
     <div className="page-stack">
       <PageHeader
         title="Подарки"
-        description="Настройка подарочного бокса, шансов, лимитов и истории открытий"
+        description="Состав, шансы и история открытий"
       />
       <BonusBoxPrizesAdmin
         prizes={rows}

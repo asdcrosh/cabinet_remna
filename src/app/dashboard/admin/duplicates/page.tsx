@@ -17,7 +17,7 @@ export default async function AdminDuplicatesPage() {
     <div className="page-stack">
       <PageHeader
         title="Возможные дубли"
-        description="Технические Telegram-аккаунты, похожие на email-аккаунты"
+        description="Аккаунты с похожими данными"
         action={candidates.length > 0 ? <span className="badge-muted">Найдено: {candidates.length}</span> : null}
       />
 
@@ -28,9 +28,9 @@ export default async function AdminDuplicatesPage() {
           icon={<SearchCheck className="h-7 w-7 text-emerald-600" />}
         />
       ) : (
-        <div className="grid gap-3">
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white divide-y divide-slate-200 dark:border-white/10 dark:bg-white/[0.025] dark:divide-white/[0.07]">
           {candidates.map((candidate) => (
-            <article key={`${candidate.technicalUserId}:${candidate.emailUserId}`} className="card p-3">
+            <article key={`${candidate.technicalUserId}:${candidate.emailUserId}`} className="p-4">
               <div className="flex flex-col gap-3 2xl:flex-row 2xl:items-center 2xl:justify-between">
                 <div className="grid min-w-0 gap-2 md:grid-cols-[1fr_auto_1fr] md:items-center">
                   <IdentityBox
