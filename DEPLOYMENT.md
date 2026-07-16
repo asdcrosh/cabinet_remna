@@ -119,6 +119,9 @@ CABINET_APP_BIND="127.0.0.1"
 CABINET_APP_PORT="3000"
 ```
 
+The installer and updater detect this port conflict and remove the `caddy`
+profile automatically before starting services.
+
 Then proxy to:
 
 ```text

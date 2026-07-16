@@ -116,8 +116,8 @@ Bundled Caddy is enabled by default:
 COMPOSE_PROFILES="caddy"
 ```
 
-If ports `80` or `443` are already used by Remnawave, the installer disables
-bundled Caddy automatically.
+If ports `80` or `443` are already used by Remnawave or another reverse proxy,
+the installer and updater disable bundled Caddy automatically.
 
 If this server already has a reverse proxy on ports `80` and `443`, disable
 bundled Caddy:

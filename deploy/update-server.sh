@@ -134,6 +134,95 @@ configure_remnashop_link_function() {
     | docker exec -i "${container}" psql -v ON_ERROR_STOP=1 -U "${db_user}" -d "${db_name}" >/dev/null
 }
 
+read_update_env_value() {
+  local key="$1"
+  awk -F= -v key="${key}" '
+    $1 == key {
+      sub(/^[^=]*=/, "")
+      gsub(/^"|"$/, "")
+      print
+      exit
+    }
+  ' "${ENV_FILE}" 2>/dev/null || true
+}
+
+write_update_env_value() {
+  local key="$1"
+  local value="$2"
+  ENV_FILE_PATH="${ENV_FILE}" python3 - "${key}" "${value}" <<'PY'
+from pathlib import Path
+import os
+import sys
+
+key, value = sys.argv[1], sys.argv[2]
+path = Path(os.environ["ENV_FILE_PATH"])
+lines = path.read_text().splitlines()
+for index, line in enumerate(lines):
+    if line.startswith(f"{key}="):
+        lines[index] = f'{key}="{value}"'
+        break
+else:
+    lines.append(f'{key}="{value}"')
+path.write_text("\n".join(lines) + "\n")
+PY
+}
+
+host_port_available() {
+  local bind_address="$1"
+  local port="$2"
+
+  if command -v ss >/dev/null 2>&1; then
+    if ss -H -ltn "sport = :${port}" 2>/dev/null | grep -q .; then
+      return 1
+    fi
+  fi
+
+  python3 - "${bind_address}" "${port}" <<'PY'
+import socket
+import sys
+
+sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+try:
+    sock.bind((sys.argv[1], int(sys.argv[2])))
+except OSError:
+    sys.exit(1)
+finally:
+    sock.close()
+PY
+}
+
+disable_bundled_caddy_if_conflicting() {
+  local current_profiles
+  local normalized_profiles
+  local next_profiles
+  local own_caddy_running
+
+  current_profiles="$(read_update_env_value COMPOSE_PROFILES)"
+  normalized_profiles=",${current_profiles// /},"
+  if [[ "${normalized_profiles}" != *",caddy,"* ]]; then
+    return 1
+  fi
+
+  own_caddy_running="$(docker inspect remnawave-cabinet-caddy --format '{{.State.Running}}' 2>/dev/null || true)"
+  if [[ "${own_caddy_running}" == "true" ]]; then
+    return 1
+  fi
+
+  if host_port_available "0.0.0.0" "80" && host_port_available "0.0.0.0" "443"; then
+    return 1
+  fi
+
+  next_profiles=",${current_profiles// /},"
+  next_profiles="${next_profiles//,caddy,/,}"
+  next_profiles="${next_profiles#,}"
+  next_profiles="${next_profiles%,}"
+  write_update_env_value "COMPOSE_PROFILES" "${next_profiles}"
+  docker rm -f remnawave-cabinet-caddy >/dev/null 2>&1 || true
+  echo "Ports 80/443 are already in use. Bundled Caddy is disabled; the existing reverse proxy stays in charge."
+  return 0
+}
+
 if ! grep -q '^CABINET_DB_PORT=' "${ENV_FILE}"; then
   current_db_port="$(docker inspect remnawave-cabinet-db --format '{{with index .HostConfig.PortBindings "5432/tcp"}}{{(index . 0).HostPort}}{{end}}' 2>/dev/null || true)"
   current_db_bind="$(docker inspect remnawave-cabinet-db --format '{{with index .HostConfig.PortBindings "5432/tcp"}}{{(index . 0).HostIp}}{{end}}' 2>/dev/null || true)"
@@ -185,6 +274,7 @@ install -m 755 "${FULL_BACKUP_TEMP}" "${FULL_BACKUP_PATH}"
 rm -f "${FULL_BACKUP_TEMP}"
 rm -f /usr/local/bin/remnactl
 configure_remnashop_link_function
+disable_bundled_caddy_if_conflicting || true
 
 COMPOSE=(docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}")
 
@@ -199,7 +289,13 @@ if ! grep -Eq '^COMPOSE_PROFILES=.*caddy' "${ENV_FILE}"; then
 fi
 
 echo "Applying migrations and restarting services..."
-CABINET_ENV_FILE="${ENV_FILE}" "${COMPOSE[@]}" up -d --remove-orphans
+if ! CABINET_ENV_FILE="${ENV_FILE}" "${COMPOSE[@]}" up -d --remove-orphans; then
+  if disable_bundled_caddy_if_conflicting; then
+    CABINET_ENV_FILE="${ENV_FILE}" "${COMPOSE[@]}" up -d --remove-orphans
+  else
+    exit 1
+  fi
+fi
 
 wait_for_container() {
   local service="$1"
