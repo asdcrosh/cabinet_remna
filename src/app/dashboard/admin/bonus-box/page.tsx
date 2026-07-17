@@ -19,7 +19,7 @@ export default async function AdminBonusBoxPage({
 }: {
   searchParams: Promise<{ limit?: string }>
 }) {
-  if (!isFeatureEnabled('bonusBox')) notFound()
+  if (!await isFeatureEnabled('bonusBox')) notFound()
   await requireAdminPage()
   const params = await searchParams
   const limit = parseAdminListLimit(params.limit)

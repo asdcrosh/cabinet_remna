@@ -43,7 +43,7 @@ const OFFER_RETURN_PROMO_DAYS = 45
 export default async function DashboardHome() {
   const session = await getCurrentUser()
   if (!session) redirect('/login')
-  const features = getFeatureFlags()
+  const features = await getFeatureFlags()
   const freshPendingCutoff = getFreshPendingPaymentCutoff()
   const user = await prisma.user.findUnique({
     where: { id: session.uid },

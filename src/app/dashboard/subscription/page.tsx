@@ -14,7 +14,7 @@ import { formatSubscriptionDaysLeft, isSubscriptionExpired } from '@/lib/subscri
 export const dynamic = 'force-dynamic'
 
 export default async function SubscriptionPage() {
-  const features = getFeatureFlags()
+  const features = await getFeatureFlags()
   const session = await getCurrentUser()
   if (!session) redirect('/login')
   const user = await prisma.user.findUnique({ where: { id: session.uid } })

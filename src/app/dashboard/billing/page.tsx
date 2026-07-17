@@ -23,7 +23,7 @@ export default async function BillingPage({
   searchParams: Promise<{ paid?: string; payment?: string; page?: string }>
 }) {
   const params = await searchParams
-  const features = getFeatureFlags()
+  const features = await getFeatureFlags()
   const session = await getCurrentUser()
   if (!session) redirect('/login')
   const returnPaymentId = typeof params.payment === 'string' ? params.payment : null

@@ -39,6 +39,7 @@ const mocks = vi.hoisted(() => {
 
 vi.mock('./prisma', () => ({ prisma: mocks.prisma }))
 vi.mock('./remnawave', () => ({ remnawave: {} }))
+vi.mock('./feature-flags', () => ({ isFeatureEnabled: vi.fn(async () => true) }))
 
 import {
   applyBonusBoxEconomyGuard,

@@ -1,5 +1,6 @@
 import { prisma } from '../src/lib/prisma'
-import { notifySubscriptionExpiring, notifyTrafficLimit } from '../src/lib/notifications'
+import { notifyTrafficLimit } from '../src/lib/notifications'
+import { reconcileSubscriptionExpiryNotifications } from '../src/lib/subscription-expiry-notifications'
 import { syncPaymentProvisioning } from '../src/lib/payment-sync'
 import { provisionPaymentSubscription } from '../src/lib/provisioning'
 import { syncCabinetPaymentToRemnashopBestEffort } from '../src/lib/remnashop-reverse-sync'
@@ -85,7 +86,10 @@ async function runOnce() {
 
   await retryProvisioningJobs()
   await retryRemnashopReverseSync()
-  await notifyExpiringSubscriptions()
+  await reconcileSubscriptionExpiryNotifications({
+    batchSize: notificationBatchSize,
+    shouldStop: () => stopped,
+  })
   await notifyTrafficThresholds()
 }
 
@@ -220,40 +224,6 @@ async function filterRetryableRemnashopPaymentIds(paymentIds: string[]) {
   })
   const delayedIds = new Set(delayed.map((event) => event.entityId))
   return paymentIds.filter((paymentId) => !delayedIds.has(paymentId))
-}
-
-async function notifyExpiringSubscriptions() {
-  const now = Date.now()
-  const subscriptions = await prisma.subscription.findMany({
-    where: {
-      status: { in: ['ACTIVE', 'LIMITED'] },
-      expireAt: {
-        gt: new Date(now),
-        lte: new Date(now + 3 * 24 * 60 * 60 * 1000),
-      },
-    },
-    orderBy: { expireAt: 'asc' },
-    take: notificationBatchSize,
-    select: {
-      id: true,
-      userId: true,
-      expireAt: true,
-      plan: { select: { name: true } },
-    },
-  })
-
-  for (const subscription of subscriptions) {
-    if (stopped) break
-    const leftMs = subscription.expireAt.getTime() - now
-    const stage = leftMs <= 6 * 60 * 60 * 1000 ? '6h' : leftMs <= 24 * 60 * 60 * 1000 ? '1d' : '3d'
-    await notifySubscriptionExpiring({
-      userId: subscription.userId,
-      subscriptionId: subscription.id,
-      expireAt: subscription.expireAt,
-      stage,
-      planName: subscription.plan?.name,
-    })
-  }
 }
 
 async function notifyTrafficThresholds() {

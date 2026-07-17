@@ -143,6 +143,16 @@ enum UserRole {
   SUPER_ADMIN
 }
 
+model FeatureSetting {
+  id         String   @id @default("default")
+  referrals  Boolean  @default(true)
+  bonusBox   Boolean  @default(true)
+  support    Boolean  @default(true)
+  broadcasts Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
 model NotificationLog {
   id        String              @id @default(cuid())
   userId    String
@@ -1045,6 +1055,7 @@ enum AuditAction {
   ADMIN_BONUS_PRIZE_CREATED
   ADMIN_BONUS_PRIZE_UPDATED
   ADMIN_BONUS_SETTINGS_UPDATED
+  ADMIN_FEATURES_UPDATED
   ADMIN_SUPPORT_UPDATED
   ADMIN_BROADCAST_CREATED
   ADMIN_BROADCAST_TEMPLATE_CREATED

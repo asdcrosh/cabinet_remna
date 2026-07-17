@@ -18,7 +18,7 @@ export const metadata = { title: 'Рефералы' }
 type RewardStatus = 'PENDING' | 'PROCESSING' | 'APPLIED'
 
 export default async function ReferralsPage() {
-  if (!isFeatureEnabled('referrals')) notFound()
+  if (!await isFeatureEnabled('referrals')) notFound()
   const session = await getCurrentUser()
   if (!session) redirect('/login')
 

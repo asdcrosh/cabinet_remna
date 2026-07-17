@@ -185,6 +185,20 @@ test('экраны админки не создают горизонтальну
   }
 })
 
+test('функции кабинета управляются из системного раздела', async ({ page }) => {
+  await login(page, E2E_USERS.admin.email)
+  await page.goto('/dashboard/admin/system')
+
+  const features = page.getByRole('main').getByTestId('feature-settings')
+  await expect(features).toBeVisible()
+  await expect(features.getByRole('switch')).toHaveCount(4)
+  await expect(features.getByText('Рефералы', { exact: true })).toBeVisible()
+  await expect(features.getByText('Подарки', { exact: true })).toBeVisible()
+  await expect(features.getByText('Поддержка', { exact: true })).toBeVisible()
+  await expect(features.getByText('Рассылки', { exact: true })).toBeVisible()
+  await expectNoHorizontalOverflow(page)
+})
+
 test('рассылка собирается в компактном редакторе', async ({ page }) => {
   await login(page, E2E_USERS.admin.email)
   await page.goto('/dashboard/admin/broadcasts')

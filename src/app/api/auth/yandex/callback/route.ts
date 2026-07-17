@@ -8,6 +8,7 @@ import { getAppUrlOrRequestOrigin } from '@/lib/app-url'
 import { checkRemnawaveProfileOnLogin } from '@/lib/remnawave-profile-check'
 import { logWarn } from '@/lib/logger'
 import { generateUniqueReferralCode, normalizeReferralCode } from '@/lib/referrals'
+import { isFeatureEnabled } from '@/lib/feature-flags'
 import {
   exchangeYandexCode,
   fetchYandexProfile,
@@ -49,7 +50,9 @@ export async function GET(req: Request) {
   try {
     const tokenResponse = await exchangeYandexCode(code)
     const profile = await fetchYandexProfile(tokenResponse.accessToken)
-    const referralCode = normalizeReferralCode(cookieStore.get(YANDEX_OAUTH_REF_COOKIE)?.value)
+    const referralCode = await isFeatureEnabled('referrals')
+      ? normalizeReferralCode(cookieStore.get(YANDEX_OAUTH_REF_COOKIE)?.value)
+      : null
     const user = await findOrCreateYandexUser(profile, referralCode)
 
     await prisma.user.update({

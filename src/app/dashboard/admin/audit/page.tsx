@@ -31,6 +31,7 @@ const ACTION_LABELS: Record<AuditAction, string> = {
   ADMIN_BONUS_PRIZE_CREATED: 'Подарок создан',
   ADMIN_BONUS_PRIZE_UPDATED: 'Подарок изменён',
   ADMIN_BONUS_SETTINGS_UPDATED: 'Настройки подарков',
+  ADMIN_FEATURES_UPDATED: 'Функции кабинета',
   ADMIN_SUPPORT_UPDATED: 'Поддержка',
   ADMIN_BROADCAST_CREATED: 'Рассылка создана',
   ADMIN_BROADCAST_TEMPLATE_CREATED: 'Шаблон создан',

@@ -22,7 +22,7 @@ vi.mock('./app-url', () => ({ getAppUrl: () => 'https://cabinet.example.test' })
 vi.mock('./branding', () => ({ getBrandName: () => 'Cabinet' }))
 vi.mock('./email-template', () => ({ renderActionEmail: () => '<p>Email</p>' }))
 
-import { notifyUser } from './notifications'
+import { notifySubscriptionExpiring, notifyUser } from './notifications'
 
 describe('notifyUser', () => {
   beforeEach(() => {
@@ -312,5 +312,69 @@ describe('notifyUser', () => {
       'https://api.telegram.org/bottelegram-token/sendMessage',
       expect.objectContaining({ method: 'POST' })
     )
+  })
+
+  it('sends an expired subscription message through all channels', async () => {
+    mocks.prisma.user.findUnique.mockResolvedValue({
+      id: 'user-1',
+      email: 'user@example.test',
+      emailVerifiedAt: new Date(),
+      name: 'User',
+      telegramId: 123n,
+    })
+    mocks.prisma.notificationLog.createMany.mockResolvedValue({ count: 1 })
+    mocks.prisma.userNotification.createMany.mockResolvedValue({ count: 1 })
+    const expireAt = new Date('2026-07-17T09:00:00.000Z')
+
+    await notifySubscriptionExpiring({
+      userId: 'user-1',
+      subscriptionId: 'subscription-1',
+      expireAt,
+      stage: 'expired',
+      planName: 'Стандарт',
+    })
+
+    expect(mocks.prisma.userNotification.createMany).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        title: 'Подписка закончилась',
+        body: expect.stringContaining('Продлите её'),
+        dedupeKey: expect.stringContaining(expireAt.toISOString()),
+      }),
+    }))
+    expect(mocks.prisma.notificationLog.createMany).toHaveBeenCalledTimes(2)
+    expect(fetch).toHaveBeenCalledTimes(2)
+  })
+
+  it('uses separate dedupe keys after a subscription renewal', async () => {
+    mocks.prisma.user.findUnique.mockResolvedValue({
+      id: 'user-1',
+      email: 'user@example.test',
+      emailVerifiedAt: null,
+      name: 'User',
+      telegramId: null,
+    })
+    mocks.prisma.userNotification.createMany.mockResolvedValue({ count: 1 })
+
+    await notifySubscriptionExpiring({
+      userId: 'user-1',
+      subscriptionId: 'subscription-1',
+      expireAt: new Date('2026-07-20T09:00:00.000Z'),
+      stage: '3d',
+    })
+    await notifySubscriptionExpiring({
+      userId: 'user-1',
+      subscriptionId: 'subscription-1',
+      expireAt: new Date('2026-08-20T09:00:00.000Z'),
+      stage: '3d',
+    })
+
+    const firstCall = mocks.prisma.userNotification.createMany.mock.calls[0]
+    const secondCall = mocks.prisma.userNotification.createMany.mock.calls[1]
+    expect(firstCall).toBeDefined()
+    expect(secondCall).toBeDefined()
+    if (!firstCall || !secondCall) throw new Error('Expected two notifications')
+    const first = firstCall[0].data.dedupeKey
+    const second = secondCall[0].data.dedupeKey
+    expect(first).not.toBe(second)
   })
 })

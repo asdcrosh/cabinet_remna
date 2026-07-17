@@ -14,7 +14,7 @@ const schema = z.object({
 })
 
 export const POST = withAuth(async (req: Request, { params }: { params: Promise<{ id: string }> }) => {
-  if (!isFeatureEnabled('bonusBox')) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  if (!await isFeatureEnabled('bonusBox')) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   const session = await requireSuperAdmin()
   const { id } = await params
 

@@ -37,6 +37,7 @@ vi.mock('@/lib/remnashop-api', () => ({ registerRemnashopEmailUser: mocks.regist
 vi.mock('@/lib/remnashop-users', () => ({ findRemnashopUserByEmail: mocks.findRemnashopUserByEmail }))
 vi.mock('@/lib/admin-notifications', () => ({ createAdminNotification: mocks.createAdminNotification }))
 vi.mock('@/lib/logger', () => ({ logWarn: mocks.logWarn }))
+vi.mock('@/lib/feature-flags', () => ({ isFeatureEnabled: vi.fn(async () => true) }))
 
 import { POST } from './route'
 

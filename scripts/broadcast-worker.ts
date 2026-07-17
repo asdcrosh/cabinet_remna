@@ -1,6 +1,7 @@
 import { processBroadcastDeliveryBatch } from '../src/lib/broadcast-delivery'
 import { logError, logInfo } from '../src/lib/logger'
 import { prisma } from '../src/lib/prisma'
+import { isFeatureEnabled } from '../src/lib/feature-flags'
 
 const intervalSeconds = readIntervalSeconds()
 let stopRequested = false
@@ -11,14 +12,18 @@ async function main() {
   if (intervalSeconds !== null) {
     logInfo('broadcast_worker.started', { intervalSeconds })
     while (!stopRequested) {
-      await processBroadcastDeliveryBatch()
+      if (await isFeatureEnabled('broadcasts')) {
+        await processBroadcastDeliveryBatch()
+      }
       await sleep(intervalSeconds * 1000)
     }
     logInfo('broadcast_worker.stopped')
     return
   }
 
-  await processBroadcastDeliveryBatch()
+  if (await isFeatureEnabled('broadcasts')) {
+    await processBroadcastDeliveryBatch()
+  }
 }
 
 function readIntervalSeconds() {

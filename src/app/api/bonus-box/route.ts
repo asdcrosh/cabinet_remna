@@ -8,14 +8,14 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 export const GET = withAuth(async () => {
-  if (!isFeatureEnabled('bonusBox')) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  if (!await isFeatureEnabled('bonusBox')) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   const session = await requireAuth()
   const overview = await getBonusBoxOverview(session.uid)
   return NextResponse.json(overview)
 })
 
 export const POST = withAuth(async (req: Request) => {
-  if (!isFeatureEnabled('bonusBox')) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  if (!await isFeatureEnabled('bonusBox')) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   const session = await requireAuth()
   const limited = await rateLimit(req, `bonus-box-open:${session.uid}`, 8, 60_000)
   if (!limited.ok) {

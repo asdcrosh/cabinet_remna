@@ -66,7 +66,7 @@ const broadcastCampaignSelect = {
 type BroadcastCampaignListItem = Prisma.BroadcastCampaignGetPayload<{ select: typeof broadcastCampaignSelect }>
 
 export const GET = withAuth(async (req: Request) => {
-  if (!isFeatureEnabled('broadcasts')) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  if (!await isFeatureEnabled('broadcasts')) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   await requireAdmin()
   const url = new URL(req.url)
   const skip = Math.max(0, Number(url.searchParams.get('skip') || '0') || 0)
@@ -89,7 +89,7 @@ export const GET = withAuth(async (req: Request) => {
 })
 
 export const POST = withAuth(async (req: Request) => {
-  if (!isFeatureEnabled('broadcasts')) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  if (!await isFeatureEnabled('broadcasts')) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   const session = await requireAdmin()
   const parsed = schema.safeParse(await req.json().catch(() => null))
   if (!parsed.success) {

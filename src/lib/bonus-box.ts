@@ -6,6 +6,7 @@ import { remnawave } from './remnawave'
 import { gbToBytes } from './format'
 import { cleanupExpiredBonusBoxPromoCodes } from './promo-code-cleanup'
 import { syncCabinetPromoCodeToRemnashopBestEffort } from './remnashop-promo-sync'
+import { isFeatureEnabled } from './feature-flags'
 
 const DEFAULT_RUB_PER_ATTEMPT = 300
 const DEFAULT_ATTEMPT_TTL_DAYS = 30
@@ -157,8 +158,11 @@ export async function updateBonusBoxSettings(input: BonusBoxSettings) {
 
 async function getBonusBoxRuntimeConfig() {
   const config = getBonusBoxConfig()
-  const settings = await getBonusBoxSettings()
-  return { ...config, ...settings }
+  const [settings, enabled] = await Promise.all([
+    getBonusBoxSettings(),
+    isFeatureEnabled('bonusBox'),
+  ])
+  return { ...config, ...settings, enabled }
 }
 
 export async function getBonusBoxOverview(userId: string) {
@@ -241,7 +245,7 @@ export async function getBonusBoxOverview(userId: string) {
 
 export async function grantPaymentBonusBoxAttempts(paymentId: string) {
   const config = getBonusBoxConfig()
-  if (!config.enabled) return { granted: 0 }
+  if (!await isFeatureEnabled('bonusBox')) return { granted: 0 }
 
   const payment = await prisma.payment.findUnique({
     where: { id: paymentId },
@@ -282,7 +286,11 @@ export async function grantPaymentBonusBoxAttempts(paymentId: string) {
 
 export async function grantReferralBonusBoxAttemptsForPayment(paymentId: string) {
   const config = getBonusBoxConfig()
-  if (!config.enabled || (config.referrerAttempts <= 0 && config.referredAttempts <= 0)) {
+  const [bonusBoxEnabled, referralsEnabled] = await Promise.all([
+    isFeatureEnabled('bonusBox'),
+    isFeatureEnabled('referrals'),
+  ])
+  if (!bonusBoxEnabled || !referralsEnabled || (config.referrerAttempts <= 0 && config.referredAttempts <= 0)) {
     return { granted: 0 }
   }
 
@@ -336,8 +344,7 @@ export async function grantManualBonusBoxAttempts(input: {
   adminId: string
   attemptsCount: number
 }) {
-  const config = getBonusBoxConfig()
-  if (!config.enabled) {
+  if (!await isFeatureEnabled('bonusBox')) {
     throw new BonusBoxError('Подарочный бокс сейчас недоступен', 403, 'BONUS_BOX_DISABLED')
   }
 
@@ -369,7 +376,7 @@ export async function grantManualBonusBoxAttempts(input: {
 
 export async function grantWeeklyBonusBoxAttempts(userId: string) {
   const config = getBonusBoxConfig()
-  if (!config.enabled || !config.weeklyEnabled || config.weeklyAttempts <= 0) return { granted: 0 }
+  if (!await isFeatureEnabled('bonusBox') || !config.weeklyEnabled || config.weeklyAttempts <= 0) return { granted: 0 }
 
   const now = new Date()
   const weeklyBonusDate = getCurrentWeeklyBonusDate(now, config.weeklyDay)

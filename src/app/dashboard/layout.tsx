@@ -10,6 +10,8 @@ import { Brand, DashboardAreaLabel, DashboardNav, MobileBottomNav, MobileDashboa
 import { NotificationBell } from '@/components/dashboard/notification-bell'
 import { logWarn } from '@/lib/logger'
 
+export const dynamic = 'force-dynamic'
+
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const session = await getCurrentUser()
   if (!session) redirect('/login?next=/dashboard')
@@ -23,7 +25,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   }
 
   const role = freshUser.role
-  const features = getFeatureFlags()
+  const features = await getFeatureFlags()
   const accountLabel = freshUser.email.endsWith('@pending.invalid')
     ? `@${freshUser.telegramUsername || freshUser.telegramId?.toString() || 'telegram'}`
     : freshUser.email

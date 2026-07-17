@@ -19,7 +19,7 @@ const ALLOWED_TYPES = new Map([
 ])
 
 export const POST = withAuth(async (req: Request) => {
-  if (!isFeatureEnabled('broadcasts')) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  if (!await isFeatureEnabled('broadcasts')) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   await requireAdmin()
 
   const form = await req.formData().catch(() => null)

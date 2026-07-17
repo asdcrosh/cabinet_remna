@@ -15,7 +15,7 @@ export default async function AdminSupportPage({
 }: {
   searchParams: Promise<{ status?: string; q?: string; limit?: string }>
 }) {
-  if (!isFeatureEnabled('support')) notFound()
+  if (!await isFeatureEnabled('support')) notFound()
   await requireStaffPage()
 
   const params = await searchParams

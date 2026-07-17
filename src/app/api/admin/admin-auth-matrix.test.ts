@@ -30,6 +30,7 @@ vi.mock('@/lib/auth/guard', () => ({
     }
   },
 }))
+vi.mock('@/lib/feature-flags', () => ({ isFeatureEnabled: vi.fn(async () => true) }))
 
 type AdminRouteCase = {
   name: string
@@ -40,6 +41,8 @@ type AdminRouteCase = {
 }
 
 const routeCases: AdminRouteCase[] = [
+  { name: 'feature settings read', module: './system/features/route', method: 'GET' },
+  { name: 'feature settings update', module: './system/features/route', method: 'PATCH' },
   { name: 'bonus prize update', module: './bonus-box/prizes/[id]/route', method: 'PATCH', params: { id: 'prize-1' } },
   { name: 'bonus prizes list', module: './bonus-box/prizes/route', method: 'GET' },
   { name: 'bonus prize create', module: './bonus-box/prizes/route', method: 'POST' },

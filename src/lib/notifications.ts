@@ -375,28 +375,33 @@ export async function notifySubscriptionExpiring(input: {
   userId: string
   subscriptionId: string
   expireAt: Date
-  stage: '3d' | '1d' | '6h'
+  stage: '3d' | '1d' | 'expired'
   planName?: string | null
 }) {
-  const label = input.stage === '3d' ? 'через 3 дня' : input.stage === '1d' ? 'через 1 день' : 'в течение 6 часов'
-  const body = `Подписка ${input.planName ? `«${input.planName}» ` : ''}заканчивается ${label}, ${formatDate(input.expireAt)}.`
+  const plan = input.planName ? ` «${input.planName}»` : ''
+  const expired = input.stage === 'expired'
+  const title = expired ? 'Подписка закончилась' : 'Подписка скоро закончится'
+  const body = expired
+    ? `Подписка${plan} закончилась ${formatDate(input.expireAt)}. Продлите её, чтобы вернуть доступ.`
+    : `Подписка${plan} закончится ${input.stage === '3d' ? 'через 3 дня' : 'через сутки'}, ${formatDate(input.expireAt)}.`
+  const expiryKey = input.expireAt.toISOString()
   await notifyUser({
     userId: input.userId,
     type: 'SUBSCRIPTION_EXPIRING',
-    dedupeKey: `subscription-expiring:${input.subscriptionId}:${input.stage}`,
-    title: 'Подписка скоро закончится',
+    dedupeKey: `subscription-expiring:${input.subscriptionId}:${expiryKey}:${input.stage}`,
+    title,
     body,
     actionHref: RENEW_PATH,
     actionLabel: 'Продлить',
-    telegramText: [`<b>Подписка скоро закончится</b>`, escapeTelegram(body)].join('\n'),
+    telegramText: [`<b>${title}</b>`, escapeTelegram(body)].join('\n'),
     telegramActionUrl: `${getAppUrl()}${RENEW_PATH}`,
     telegramActionLabel: 'Продлить',
     telegramActionOpenInTelegram: true,
-    emailSubject: `Подписка скоро закончится — ${getBrandName()}`,
+    emailSubject: `${title} — ${getBrandName()}`,
     emailText: `${body}\n\nПродлить: ${getAppUrl()}${RENEW_PATH}`,
     emailHtml: renderNotificationEmail({
       eyebrow: 'Подписка',
-      title: 'Подписка скоро закончится',
+      title,
       lead: body,
       ctaLabel: 'Продлить подписку',
       ctaUrl: `${getAppUrl()}${RENEW_PATH}`,

@@ -15,6 +15,7 @@ import { registerRemnashopEmailUser } from '@/lib/remnashop-api'
 import { findRemnashopUserByEmail } from '@/lib/remnashop-users'
 import { createAdminNotification } from '@/lib/admin-notifications'
 import { logWarn } from '@/lib/logger'
+import { isFeatureEnabled } from '@/lib/feature-flags'
 
 export const runtime = 'nodejs'
 
@@ -80,7 +81,9 @@ export async function POST(req: Request) {
   }
 
   const { email, password, name, agreeToTerms } = parsed.data
-  const referralCode = normalizeReferralCode(parsed.data.referralCode)
+  const referralCode = await isFeatureEnabled('referrals')
+    ? normalizeReferralCode(parsed.data.referralCode)
+    : null
 
   const existing = await prisma.user.findUnique({ where: { email } })
   if (existing) {

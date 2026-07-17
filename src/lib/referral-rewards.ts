@@ -1,5 +1,6 @@
 import { prisma } from './prisma'
 import { remnawave } from './remnawave'
+import { isFeatureEnabled } from './feature-flags'
 
 const DEFAULT_REFERRAL_BONUS_DAYS = 7
 
@@ -16,6 +17,10 @@ export function getReferralBonusDays() {
 }
 
 export async function grantReferralRewardForPayment(paymentId: string) {
+  if (!await isFeatureEnabled('referrals')) {
+    return { granted: false as const, reason: 'referrals_disabled' as const }
+  }
+
   const payment = await prisma.payment.findUnique({
     where: { id: paymentId },
     select: {
@@ -65,6 +70,8 @@ export async function grantReferralRewardForPayment(paymentId: string) {
 }
 
 export async function applyPendingReferralRewardsForUser(referrerId: string) {
+  if (!await isFeatureEnabled('referrals')) return []
+
   const rewards = await prisma.referralReward.findMany({
     where: { referrerId, status: 'PENDING' },
     orderBy: { createdAt: 'asc' },

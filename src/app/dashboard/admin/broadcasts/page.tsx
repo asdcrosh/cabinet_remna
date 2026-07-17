@@ -8,7 +8,7 @@ import { isFeatureEnabled } from '@/lib/feature-flags'
 export const metadata = { title: 'Рассылки — Админка' }
 
 export default async function BroadcastsPage() {
-  if (!isFeatureEnabled('broadcasts')) notFound()
+  if (!await isFeatureEnabled('broadcasts')) notFound()
   await requireAdminPage()
   const [historyTotal, history, templates] = await prisma.$transaction([
     prisma.broadcastCampaign.count(),

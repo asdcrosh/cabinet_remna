@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Поддержка' }
 
 export default async function SupportPage() {
-  if (!isFeatureEnabled('support')) notFound()
+  if (!await isFeatureEnabled('support')) notFound()
   const session = await getCurrentUser()
   if (!session) redirect('/login?next=/dashboard/support')
 

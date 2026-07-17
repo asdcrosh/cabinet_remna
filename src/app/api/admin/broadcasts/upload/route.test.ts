@@ -11,6 +11,7 @@ vi.mock('@/lib/auth/guard', () => ({
   withAuth: (handler: (req: Request) => Promise<Response>) => handler,
 }))
 vi.mock('@/lib/app-url', () => ({ getAppUrl: () => 'https://cabinet.example' }))
+vi.mock('@/lib/feature-flags', () => ({ isFeatureEnabled: vi.fn(async () => true) }))
 
 import { POST } from './route'
 

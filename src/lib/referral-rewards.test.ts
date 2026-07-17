@@ -30,6 +30,7 @@ vi.mock('./prisma', () => ({
 vi.mock('./remnawave', () => ({
   remnawave: { updateUser: mocks.remnawaveUpdateUser },
 }))
+vi.mock('./feature-flags', () => ({ isFeatureEnabled: vi.fn(async () => true) }))
 
 import { getReferralBonusDays, grantReferralRewardForPayment } from './referral-rewards'
 

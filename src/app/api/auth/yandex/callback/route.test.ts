@@ -35,6 +35,7 @@ vi.mock('@/lib/remnawave-profile-check', () => ({
   checkRemnawaveProfileOnLogin: mocks.checkRemnawaveProfileOnLogin,
 }))
 vi.mock('@/lib/admin-notifications', () => ({ createAdminNotification: mocks.createAdminNotification }))
+vi.mock('@/lib/feature-flags', () => ({ isFeatureEnabled: vi.fn(async () => true) }))
 vi.mock('@/lib/referrals', () => ({
   generateUniqueReferralCode: mocks.generateUniqueReferralCode,
   normalizeReferralCode: (value: string | undefined) => value || '',

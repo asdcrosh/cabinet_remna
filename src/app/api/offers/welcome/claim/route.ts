@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma'
 import { rateLimit } from '@/lib/rate-limit'
 import { provisionPaymentSubscription } from '@/lib/provisioning'
 import { getBonusBoxConfig } from '@/lib/bonus-box'
+import { isFeatureEnabled } from '@/lib/feature-flags'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -216,7 +217,7 @@ async function claimBonusAttempts({
   setting: { id: string; bonusAttempts: number }
 }) {
   const config = getBonusBoxConfig()
-  if (!config.enabled) {
+  if (!await isFeatureEnabled('bonusBox')) {
     return NextResponse.json({ error: 'Подарочный бокс сейчас недоступен' }, { status: 403 })
   }
 

@@ -16,7 +16,7 @@ export const dynamic = 'force-dynamic'
 const MESSAGE_PAGE_SIZE = 50
 
 export const GET = withAuth(async (req: Request, { params }: { params: Promise<{ id: string }> }) => {
-  if (!isFeatureEnabled('support')) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  if (!await isFeatureEnabled('support')) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   const session = await requireAuth()
   const { id } = await params
   const before = new URL(req.url).searchParams.get('before')?.trim() || null
@@ -67,7 +67,7 @@ export const GET = withAuth(async (req: Request, { params }: { params: Promise<{
 })
 
 export const POST = withAuth(async (req: Request, { params }: { params: Promise<{ id: string }> }) => {
-  if (!isFeatureEnabled('support')) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  if (!await isFeatureEnabled('support')) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   const session = await requireAuth()
   const { id } = await params
   const limited = await rateLimit(req, `support:message:${session.uid}`, 20, 10 * 60 * 1000)
@@ -141,7 +141,7 @@ export const POST = withAuth(async (req: Request, { params }: { params: Promise<
 })
 
 export const PATCH = withAuth(async (req: Request, { params }: { params: Promise<{ id: string }> }) => {
-  if (!isFeatureEnabled('support')) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  if (!await isFeatureEnabled('support')) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   const session = await requireAuth()
   const { id } = await params
 

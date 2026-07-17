@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Бонусы' }
 
 export default async function BonusBoxPage() {
-  if (!isFeatureEnabled('bonusBox')) notFound()
+  if (!await isFeatureEnabled('bonusBox')) notFound()
   const session = await getCurrentUser()
   if (!session) redirect('/login?next=/dashboard/bonus-box')
 
