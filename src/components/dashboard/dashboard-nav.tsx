@@ -152,17 +152,6 @@ export function DashboardNav({
   return <NavList role={role} badges={badges} features={features} className="space-y-1 py-1" />
 }
 
-export function DashboardAreaLabel({ isStaff }: { isStaff: boolean }) {
-  const pathname = usePathname()
-  const label = isStaff && pathname.startsWith('/dashboard/admin') ? 'Администрирование' : 'Личный кабинет'
-
-  return (
-    <div className="hidden text-xs font-semibold uppercase tracking-[0.16em] text-slate-400 lg:block">
-      {label}
-    </div>
-  )
-}
-
 export function MobileDashboardNav({
   role,
   email,
@@ -211,7 +200,7 @@ export function MobileDashboardNav({
           <button
             ref={closeButtonRef}
             type="button"
-            className="grid h-10 w-10 place-items-center rounded-xl border bg-white text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-900 dark:bg-surface-900 dark:hover:bg-surface-800 dark:hover:text-white"
+            className="grid h-11 w-11 place-items-center rounded-xl border bg-white text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-900 dark:bg-surface-900 dark:hover:bg-surface-800 dark:hover:text-white"
             onClick={closeMenu}
             aria-label="Закрыть меню"
           >
@@ -237,7 +226,7 @@ export function MobileDashboardNav({
       <button
         ref={triggerRef}
         type="button"
-        className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-slate-200 bg-white text-slate-700 transition-colors hover:bg-slate-50 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-200 dark:hover:bg-white/[0.08] lg:hidden"
+        className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-slate-200 bg-white text-slate-700 transition-colors hover:bg-slate-50 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-200 dark:hover:bg-white/[0.08] lg:hidden"
         onClick={() => setOpen(true)}
         aria-label="Открыть меню"
         aria-expanded={open}
@@ -276,6 +265,7 @@ export function MobileBottomNav({
   const moreItems = adminArea
     ? availableAdminItems.filter((item) => !adminPrimaryHrefs.has(item.href))
     : filterUserNav(bottomMoreNav, features)
+  const showMore = !adminArea
   const [moreOpen, setMoreOpen] = useState(false)
   const [mounted, setMounted] = useState(false)
   const moreTriggerRef = useRef<HTMLButtonElement | null>(null)
@@ -306,7 +296,7 @@ export function MobileBottomNav({
         aria-modal="true"
         aria-labelledby="mobile-more-menu-title"
         tabIndex={-1}
-        className="absolute inset-x-0 bottom-0 rounded-t-2xl border border-slate-200 bg-white p-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] shadow-xl dark:border-white/10 dark:bg-surface-950"
+        className="absolute inset-x-0 bottom-0 max-h-[calc(100dvh-1rem)] overflow-y-auto overscroll-contain rounded-t-2xl border border-slate-200 bg-white p-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] shadow-xl dark:border-white/10 dark:bg-surface-950"
       >
         <div className="mb-3 flex items-center justify-between gap-3">
           <div>
@@ -316,7 +306,7 @@ export function MobileBottomNav({
           <button
             ref={moreCloseButtonRef}
             type="button"
-            className="grid h-10 w-10 place-items-center rounded-xl border bg-white text-slate-500 transition hover:bg-slate-50 hover:text-slate-950 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white"
+            className="grid h-11 w-11 place-items-center rounded-xl border bg-white text-slate-500 transition hover:bg-slate-50 hover:text-slate-950 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white"
             onClick={closeMore}
             aria-label="Закрыть"
           >
@@ -365,7 +355,10 @@ export function MobileBottomNav({
       aria-label="Основная мобильная навигация"
       className="fixed inset-x-3 bottom-[max(.5rem,env(safe-area-inset-bottom))] z-40 rounded-2xl border border-slate-200 bg-white/95 p-1.5 shadow-lg shadow-slate-950/10 dark:border-white/[0.12] dark:bg-surface-900/95 dark:shadow-black/30 lg:hidden"
     >
-      <div className="mx-auto grid max-w-md grid-cols-5 gap-1">
+      <div
+        className="mx-auto grid max-w-md gap-1"
+        style={{ gridTemplateColumns: `repeat(${Math.max(1, items.length + (showMore ? 1 : 0))}, minmax(0, 1fr))` }}
+      >
         {items.map((item) => {
           const Icon = item.icon
           const active = item.exact ? pathname === item.href : pathname.startsWith(item.href)
@@ -395,26 +388,28 @@ export function MobileBottomNav({
             </Link>
           )
         })}
-        <button
-          ref={moreTriggerRef}
-          type="button"
-          aria-expanded={moreOpen}
-          aria-label="Открыть ещё разделы"
-          aria-controls="mobile-more-menu"
-          aria-haspopup="dialog"
-          onClick={() => setMoreOpen(true)}
-          className={cn(
-            'relative flex min-h-12 min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1.5 text-[10px] font-semibold transition-colors',
-            moreActive
-              ? 'bg-cyan-50 text-cyan-800 dark:bg-cyan-400/10 dark:text-cyan-100'
-              : 'text-slate-500 hover:bg-slate-100 hover:text-slate-950 dark:text-slate-400 dark:hover:bg-white/10 dark:hover:text-white'
-          )}
-        >
-          <MoreHorizontal className="h-[18px] w-[18px]" />
-          <span className="max-w-full truncate">Ещё</span>
-        </button>
+        {showMore ? (
+          <button
+            ref={moreTriggerRef}
+            type="button"
+            aria-expanded={moreOpen}
+            aria-label="Открыть ещё разделы"
+            aria-controls="mobile-more-menu"
+            aria-haspopup="dialog"
+            onClick={() => setMoreOpen(true)}
+            className={cn(
+              'relative flex min-h-12 min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1.5 text-[10px] font-semibold transition-colors',
+              moreActive
+                ? 'bg-cyan-50 text-cyan-800 dark:bg-cyan-400/10 dark:text-cyan-100'
+                : 'text-slate-500 hover:bg-slate-100 hover:text-slate-950 dark:text-slate-400 dark:hover:bg-white/10 dark:hover:text-white'
+            )}
+          >
+            <MoreHorizontal className="h-[18px] w-[18px]" />
+            <span className="max-w-full truncate">Ещё</span>
+          </button>
+        ) : null}
       </div>
-      {mounted && moreOpen ? createPortal(moreDrawer, document.body) : null}
+      {showMore && mounted && moreOpen ? createPortal(moreDrawer, document.body) : null}
     </nav>
   )
 }

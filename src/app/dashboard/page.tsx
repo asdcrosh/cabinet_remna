@@ -161,15 +161,6 @@ export default async function DashboardHome() {
     return (
       <div className="page-stack">
         <DashboardOnboardingCard state={onboardingState} mode="full" supportEnabled={features.support} />
-        {personalOffer && <PersonalOffer offer={personalOffer} welcomeBonusOptions={welcomeBonusOptions} />}
-        <SmartInsights
-          emailVerified={onboardingState.emailVerified}
-          telegramLinked={onboardingState.telegramLinked}
-          deviceCount={onboardingState.deviceCount}
-          subscriptionExpireAt={subRow?.expireAt ?? null}
-          pendingPayment={user.payments[0] ?? null}
-          suppress={primaryHomeNudge}
-        />
       </div>
     )
   }
@@ -230,7 +221,7 @@ export default async function DashboardHome() {
               <div className="min-w-0">
                 <div className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-cyan-200">Ваш VPN</div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <h2 className="truncate text-2xl font-bold leading-tight tracking-[-0.035em] text-white sm:text-4xl">
+                  <h2 className="break-words text-2xl font-bold leading-tight tracking-[-0.035em] text-white sm:text-4xl">
                     {subRow?.plan?.name ?? 'VPN-подписка'}
                   </h2>
                   <StatusBadge status={subscriptionStatus} />
@@ -288,8 +279,11 @@ export default async function DashboardHome() {
         pendingPayment={user.payments[0] ?? null}
         suppress={primaryHomeNudge}
       />
-      {personalOffer && <PersonalOffer offer={personalOffer} welcomeBonusOptions={welcomeBonusOptions} />}
-      <DashboardOnboardingCard state={onboardingState} supportEnabled={features.support} />
+      {primaryHomeNudge ? (
+        <DashboardOnboardingCard state={onboardingState} supportEnabled={features.support} />
+      ) : personalOffer ? (
+        <PersonalOffer offer={personalOffer} welcomeBonusOptions={welcomeBonusOptions} />
+      ) : null}
 
       <TrafficChart
         userId={user.id}

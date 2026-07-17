@@ -52,7 +52,7 @@
     @apply btn bg-red-600 text-white hover:bg-red-700;
   }
   .input {
-    @apply min-h-11 w-full rounded-xl border bg-white px-3.5 py-2.5 text-sm
+    @apply min-h-11 w-full rounded-xl border bg-white px-3.5 py-2.5 text-base sm:text-sm
            text-slate-900 placeholder:text-slate-400
            focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20
            dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-100 dark:placeholder:text-slate-500;

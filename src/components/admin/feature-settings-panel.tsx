@@ -56,7 +56,7 @@ export function FeatureSettingsPanel({ initialFeatures }: { initialFeatures: Fea
       <div className="flex flex-col gap-3 border-b border-slate-200 p-4 dark:border-white/[0.07] sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-lg font-semibold">Функции кабинета</h2>
-          <p className="mt-0.5 text-sm text-slate-500">Изменения применяются сразу, без правки .env</p>
+          <p className="mt-0.5 text-sm text-slate-500">Настройки хранятся в кабинете, без правки .env</p>
         </div>
         <button type="button" className="btn-primary w-full sm:w-auto" disabled={!dirty || saving} onClick={save}>
           {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}

@@ -311,7 +311,7 @@ export function PlanCard({
               />
               <button
                 type="button"
-                className="grid h-8 w-8 shrink-0 place-items-center rounded-md bg-slate-950 text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-slate-950"
+                className="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-slate-950 text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-slate-950"
                 onClick={applyPromo}
                 disabled={validatingPromo}
                 aria-label="Применить промокод"
@@ -321,7 +321,7 @@ export function PlanCard({
               {promoInput ? (
                 <button
                   type="button"
-                  className="grid h-8 w-8 shrink-0 place-items-center rounded-md text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-surface-800 dark:hover:text-slate-200"
+                  className="grid h-11 w-11 shrink-0 place-items-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-surface-800 dark:hover:text-slate-200"
                   onClick={resetPromo}
                   aria-label="Очистить промокод"
                 >

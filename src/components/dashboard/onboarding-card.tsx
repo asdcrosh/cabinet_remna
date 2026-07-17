@@ -75,7 +75,7 @@ export function DashboardOnboardingCard({ state, mode = 'compact', supportEnable
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-cyan-700 dark:text-cyan-200">
                 {action ? 'Следующий шаг' : 'Готово'}
               </p>
-              <h2 className={`${isFull ? 'text-xl sm:text-2xl' : 'text-lg sm:text-xl'} truncate font-semibold`}>
+              <h2 className={`${isFull ? 'text-xl sm:text-2xl' : 'text-lg sm:text-xl'} line-clamp-2 font-semibold leading-tight`}>
                 {action?.title ?? 'Кабинет настроен'}
               </h2>
             </div>
@@ -235,9 +235,9 @@ function ChecklistItem({
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5 text-sm font-medium">
           <span className="shrink-0 text-slate-400 dark:text-slate-500">{icon}</span>
-          <span className="truncate">{title}</span>
+          <span className="line-clamp-2 leading-tight">{title}</span>
         </div>
-        <div className="truncate text-xs text-slate-500 dark:text-slate-400">{description}</div>
+        <div className="line-clamp-2 text-xs leading-5 text-slate-500 dark:text-slate-400">{description}</div>
       </div>
     </div>
   )

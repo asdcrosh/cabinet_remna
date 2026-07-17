@@ -55,7 +55,7 @@ export function ReferralLinkCard({
             <div className="min-w-0 flex-1 overflow-hidden truncate font-mono text-xs text-slate-600 dark:text-slate-300 sm:text-sm">{url}</div>
             <button
               type="button"
-              className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white"
+              className="grid h-11 w-11 shrink-0 place-items-center rounded-lg text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white"
               onClick={() => copy(url)}
               aria-label="Копировать ссылку"
             >

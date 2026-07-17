@@ -79,7 +79,7 @@ export default async function SettingsPage() {
                     remnawaveUsername={user.remnawaveUsername}
                     embedded
                   />
-                  <div className="border-l border-slate-200 p-4 dark:border-white/10">
+                  <div className="border-t border-slate-200 pt-4 dark:border-white/10 xl:border-l xl:border-t-0 xl:pl-4 xl:pt-0">
                     <div className="flex items-center gap-3">
                       <div className="grid h-10 w-10 shrink-0 place-items-center text-cyan-700 dark:text-cyan-200">
                         <MailPlus className="h-5 w-5" />

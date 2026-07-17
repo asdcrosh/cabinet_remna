@@ -5,6 +5,8 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { CheckCircle2, X, XCircle } from 'lucide-react'
+import { usePathname } from 'next/navigation'
+import { cn } from '@/lib/cn'
 
 type Toast = { id: number; type: 'error' | 'success'; message: string }
 
@@ -15,6 +17,7 @@ export function toast(message: string, type: 'error' | 'success' = 'error') {
 }
 
 export function Toaster() {
+  const pathname = usePathname()
   const [items, setItems] = useState<Toast[]>([])
   const timersRef = useRef(new Map<number, number>())
   const dismiss = useCallback((id: number) => {
@@ -40,7 +43,15 @@ export function Toaster() {
   }, [dismiss])
 
   return (
-    <div aria-label="Системные уведомления" className="fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+5.35rem)] z-[250] flex flex-col items-center gap-2 sm:inset-x-auto sm:bottom-4 sm:right-4 sm:w-96 sm:items-stretch">
+    <div
+      aria-label="Системные уведомления"
+      className={cn(
+        'fixed inset-x-3 z-[250] flex flex-col items-center gap-2 sm:inset-x-auto sm:bottom-4 sm:right-4 sm:w-96 sm:items-stretch',
+        pathname.startsWith('/dashboard')
+          ? 'bottom-[calc(env(safe-area-inset-bottom)+5.35rem)]'
+          : 'bottom-[max(1rem,env(safe-area-inset-bottom))]'
+      )}
+    >
       {items.map((t) => (
         <div
           key={t.id}

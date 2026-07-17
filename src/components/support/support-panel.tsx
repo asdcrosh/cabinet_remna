@@ -515,14 +515,14 @@ export function SupportPanel({
   return (
     <div
       className={cn(
-        'grid h-[calc(100dvh-10rem-env(safe-area-inset-bottom))] min-h-[26rem] gap-3 overflow-hidden xl:h-[calc(100dvh-6.25rem)] xl:min-h-[35rem]',
+        'grid h-[calc(100dvh-10rem-env(safe-area-inset-bottom))] min-h-0 gap-3 overflow-hidden xl:h-[calc(100dvh-6.25rem)]',
         mode === 'admin'
           ? 'xl:h-[calc(100dvh-5.5rem)] xl:grid-cols-[21rem_minmax(0,1fr)]'
           : 'xl:grid-cols-[18rem_minmax(0,1fr)]'
       )}
     >
       <section className={cn('min-h-0 overflow-y-auto pr-0.5 xl:flex xl:flex-col xl:overflow-hidden', mobileChatOpen && 'hidden xl:flex')}>
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-3xl border border-slate-200/80 bg-white/90 shadow-sm shadow-slate-950/[0.04] backdrop-blur dark:border-white/10 dark:bg-surface-900/80 dark:shadow-black/20">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-white/10 dark:bg-surface-900">
           <div className={cn(
             'border-b border-slate-100 bg-white/80 px-3 py-2.5 dark:border-slate-800 dark:bg-surface-900/60',
             mode === 'admin' && 'bg-slate-50/85 dark:bg-surface-950/70'
@@ -561,7 +561,7 @@ export function SupportPanel({
               <input
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
-                className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400"
+                className="min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-slate-400 sm:text-sm"
                 placeholder={mode === 'admin' ? 'Поиск по email, теме или тексту' : 'Найти диалог'}
               />
             </div>
@@ -627,7 +627,7 @@ export function SupportPanel({
       </section>
 
       <section className={cn(
-        'relative min-h-0 overflow-hidden rounded-3xl border border-slate-200/80 bg-white/95 shadow-sm shadow-slate-950/[0.05] backdrop-blur dark:border-white/10 dark:bg-surface-900/90 dark:shadow-black/20',
+        'relative min-h-0 overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-white/10 dark:bg-surface-900',
         mode === 'admin' && 'shadow-sm',
         !mobileChatOpen && 'hidden xl:block'
       )}>
@@ -735,7 +735,7 @@ export function SupportPanel({
                     <EmojiPicker onPick={insertMessageEmoji} />
                     <textarea
                       ref={messageInputRef}
-                      className="max-h-28 min-h-10 flex-1 resize-none rounded-xl border-0 bg-transparent px-2 py-2 text-sm outline-none placeholder:text-slate-400 focus:ring-0"
+                      className="max-h-28 min-h-11 flex-1 resize-none rounded-xl border-0 bg-transparent px-2 py-2 text-base outline-none placeholder:text-slate-400 focus:ring-0 sm:text-sm"
                       value={message}
                       onChange={(event) => setMessage(event.target.value)}
                       onKeyDown={handleMessageKeyDown}
@@ -772,7 +772,7 @@ export function SupportPanel({
             )}
           </div>
         ) : (
-          <div className="grid min-h-[36rem] place-items-center p-8 text-center">
+          <div className="grid h-full min-h-0 place-items-center p-8 text-center">
             <div>
               <div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-brand-50 text-brand-600">
                 <LifeBuoy className="h-7 w-7" />

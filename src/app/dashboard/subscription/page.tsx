@@ -130,8 +130,8 @@ function CompactMetric({
         {icon}
         {label}
       </div>
-      <div className="mt-1 truncate text-sm font-semibold">{value}</div>
-      <div className="truncate text-xs text-slate-500">{hint}</div>
+      <div className="mt-1 break-words text-sm font-semibold leading-snug">{value}</div>
+      <div className="break-words text-xs leading-5 text-slate-500">{hint}</div>
     </div>
   )
 }
