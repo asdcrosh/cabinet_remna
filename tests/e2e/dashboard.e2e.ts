@@ -147,6 +147,17 @@ test('каталог тарифов использует компактные с
   await actions.getByRole('button', { name: 'Скрыть тариф E2E Стандарт' }).click()
   await expect.poll(() => toggleIsActive).toBe(false)
 
+  const lastCard = page.getByTestId('admin-plan-card').last()
+  await lastCard.scrollIntoViewIfNeeded()
+  await lastCard.getByRole('button', { name: /^Действия:/ }).click()
+  const lastMenu = page.getByRole('menu')
+  await expect(lastMenu).toBeVisible()
+  const menuBox = await lastMenu.boundingBox()
+  expect(menuBox).not.toBeNull()
+  expect(menuBox!.y).toBeGreaterThanOrEqual(8)
+  expect(menuBox!.y + menuBox!.height).toBeLessThanOrEqual(page.viewportSize()!.height - 8)
+  await page.keyboard.press('Escape')
+
   const [gridBox, cardBox] = await Promise.all([grid.boundingBox(), card.boundingBox()])
   expect(gridBox).not.toBeNull()
   expect(cardBox).not.toBeNull()

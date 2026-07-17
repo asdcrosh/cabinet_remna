@@ -1,7 +1,7 @@
 'use client'
 
 import type { ReactNode } from 'react'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { MoreHorizontal, X } from 'lucide-react'
 import { useBodyScrollLock } from '@/lib/use-body-scroll-lock'
@@ -65,6 +65,18 @@ export function AdminActionsMenu({
     }
   }, [mobile, open])
 
+  useLayoutEffect(() => {
+    if (!open || mobile || !triggerRef.current || !menuRef.current) return
+    const rect = triggerRef.current.getBoundingClientRect()
+    const menuHeight = menuRef.current.offsetHeight
+    const below = rect.bottom + 8
+    const top = below + menuHeight <= window.innerHeight - 12
+      ? below
+      : Math.max(12, rect.top - menuHeight - 8)
+    const left = Math.max(12, Math.min(rect.right - 224, window.innerWidth - 236))
+    setAnchor({ top, left })
+  }, [mobile, open])
+
   const actionList = (
     <div
       className="grid gap-1 p-2 [&_a]:w-full [&_button]:w-full [&_.btn-secondary]:min-h-10 [&_.btn-secondary]:justify-start [&_.btn-primary]:min-h-10 [&_.btn-primary]:justify-start"
@@ -88,8 +100,12 @@ export function AdminActionsMenu({
         onClick={() => {
           if (!open && triggerRef.current) {
             const rect = triggerRef.current.getBoundingClientRect()
+            const estimatedHeight = 180
+            const below = rect.bottom + 8
             setAnchor({
-              top: rect.bottom + 8,
+              top: below + estimatedHeight <= window.innerHeight - 12
+                ? below
+                : Math.max(12, rect.top - estimatedHeight - 8),
               left: Math.max(12, Math.min(rect.right - 224, window.innerWidth - 236)),
             })
           }
@@ -104,7 +120,7 @@ export function AdminActionsMenu({
           ref={menuRef}
           role="menu"
           aria-label={label}
-          className="fixed z-[160] w-56 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl shadow-slate-950/10 dark:border-white/10 dark:bg-surface-950 dark:shadow-black/30"
+          className="fixed z-[160] max-h-[calc(100dvh-1.5rem)] w-56 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-xl shadow-slate-950/10 dark:border-white/10 dark:bg-surface-950 dark:shadow-black/30"
           style={{ top: anchor.top, left: anchor.left }}
         >
           {actionList}

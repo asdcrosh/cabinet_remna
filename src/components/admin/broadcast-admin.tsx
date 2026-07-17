@@ -56,6 +56,7 @@ export function BroadcastAdmin({
   const [customTemplates, setCustomTemplates] = useState<BroadcastTemplateItem[]>(initialTemplates)
   const [selectedHistoryItem, setSelectedHistoryItem] = useState<BroadcastHistoryItem | null>(null)
   const [step, setStep] = useState<BroadcastStep>('message')
+  const [view, setView] = useState<'compose' | 'history'>('compose')
 
   useEffect(() => {
     try {
@@ -212,6 +213,8 @@ export function BroadcastAdmin({
     setImageUrl(item.imageUrl || '')
     setImageLoadFailed(false)
     setStats(null)
+    setView('compose')
+    setStep('message')
     toast('Рассылка загружена в редактор', 'success')
   }
 
@@ -283,6 +286,29 @@ export function BroadcastAdmin({
 
   return (
     <section className="grid w-full min-w-0 max-w-full gap-4 overflow-hidden">
+      <div className="grid grid-cols-2 gap-1 rounded-xl bg-slate-100 p-1 dark:bg-white/[0.05]" role="tablist" aria-label="Разделы рассылок">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={view === 'compose'}
+          onClick={() => setView('compose')}
+          className={cn('min-h-11 rounded-lg px-4 text-sm font-semibold transition-colors', view === 'compose' ? 'bg-white text-slate-950 shadow-sm dark:bg-surface-800 dark:text-white' : 'text-slate-500 hover:text-slate-950 dark:hover:text-white')}
+        >
+          Создать
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={view === 'history'}
+          onClick={() => setView('history')}
+          className={cn('min-h-11 rounded-lg px-4 text-sm font-semibold transition-colors', view === 'history' ? 'bg-white text-slate-950 shadow-sm dark:bg-surface-800 dark:text-white' : 'text-slate-500 hover:text-slate-950 dark:hover:text-white')}
+        >
+          История · {historyTotal}
+        </button>
+      </div>
+
+      {view === 'compose' ? (
+        <>
       <div className="card w-full min-w-0 overflow-hidden p-1.5">
         <div className="grid w-full min-w-0 grid-cols-3 gap-1">
           <BroadcastStepButton
@@ -670,8 +696,10 @@ export function BroadcastAdmin({
           </div>
         </div>
       </div>
+        </>
+      ) : null}
 
-      <div className="min-w-0 overflow-hidden">
+      {view === 'history' ? <div className="min-w-0 overflow-hidden">
         <BroadcastHistory
           history={history}
           total={historyTotal}
@@ -680,7 +708,7 @@ export function BroadcastAdmin({
           onRepeat={applyHistoryItem}
           onView={setSelectedHistoryItem}
         />
-      </div>
+      </div> : null}
       {selectedHistoryItem ? <BroadcastHistoryModal item={selectedHistoryItem} onClose={() => setSelectedHistoryItem(null)} /> : null}
     </section>
   )

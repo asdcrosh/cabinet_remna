@@ -40,14 +40,9 @@ export function NotificationsList({ initialNotifications }: { initialNotificatio
   return (
     <section className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3">
-          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-600 dark:bg-white/[0.06] dark:text-slate-300">
-            <Bell className="h-5 w-5" />
-          </div>
-          <div>
-            <div className="font-semibold text-slate-950 dark:text-white">{unreadCount > 0 ? `${unreadCount} непрочитанных` : 'Всё прочитано'}</div>
-            <div className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">Всего событий: {notifications.length}</div>
-          </div>
+        <div>
+          <div className="font-semibold text-slate-950 dark:text-white">{unreadCount > 0 ? `${unreadCount} непрочитанных` : 'Всё прочитано'}</div>
+          <div className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">{notifications.length} событий</div>
         </div>
         <button
           type="button"
@@ -60,14 +55,14 @@ export function NotificationsList({ initialNotifications }: { initialNotificatio
         </button>
       </div>
 
-      <div className="flex gap-1 overflow-x-auto border-b border-slate-200 pb-2 dark:border-white/10">
+      <div className="flex gap-1 overflow-x-auto border-b border-slate-200 pb-2 [scrollbar-width:none] dark:border-white/10 [&::-webkit-scrollbar]:hidden">
         {filterItems.map((item) => (
           <button
             key={item.value}
             type="button"
             onClick={() => setFilter(item.value)}
             className={cn(
-              'flex min-w-fit items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition',
+              'flex min-h-10 min-w-fit items-center gap-2 rounded-lg px-3 text-sm font-medium transition',
               filter === item.value
                 ? 'bg-slate-100 text-slate-950 dark:bg-white/10 dark:text-white'
                 : 'text-slate-500 hover:bg-slate-50 hover:text-slate-950 dark:hover:bg-white/5 dark:hover:text-white'
@@ -119,11 +114,11 @@ function NotificationItem({ notification }: { notification: UserNotificationView
   const content = (
     <div
       className={cn(
-        'flex gap-3 border-b border-slate-100 px-4 py-4 last:border-b-0 dark:border-white/10',
+        'flex gap-3 border-b border-slate-100 px-4 py-3.5 last:border-b-0 dark:border-white/10',
         notification.readAt ? 'bg-white/40 dark:bg-transparent' : 'bg-cyan-50/60 dark:bg-cyan-950/20'
       )}
     >
-      <span className={cn('mt-1 grid h-10 w-10 shrink-0 place-items-center rounded-xl', notification.readAt ? 'bg-slate-100 text-slate-400 dark:bg-white/10' : 'bg-cyan-50 text-cyan-700 dark:bg-cyan-500/10 dark:text-cyan-200')}>
+      <span className={cn('mt-1 grid h-8 w-8 shrink-0 place-items-center', notification.readAt ? 'text-slate-400' : 'text-cyan-700 dark:text-cyan-200')}>
         <Icon className="h-4 w-4" />
       </span>
       <div className="min-w-0 flex-1">
