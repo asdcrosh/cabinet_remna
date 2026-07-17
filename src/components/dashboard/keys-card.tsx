@@ -18,7 +18,6 @@ import {
   Smartphone,
 } from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
-import { cn } from '@/lib/cn'
 import { Modal } from '@/components/ui/modal'
 import { toast } from '@/components/ui/toaster'
 import { ConfirmDialog } from './confirm-dialog'
@@ -115,6 +114,7 @@ export function KeysCard({ subscriptionUrl, happLink }: KeysCardProps) {
   const availableApps = useMemo(() => orderAppsForDevice(device), [device])
 
   const selectedApp = appOptions.find((option) => option.id === selectedAppId) ?? defaultApp
+  const SelectedAppIcon = selectedApp.icon
   const selectedDeepLinks = selectedApp.getOpenLinks
     ? selectedApp.getOpenLinks({ subscriptionUrl, happLink, device })
     : selectedApp.deepLinks(subscriptionUrl)
@@ -172,35 +172,24 @@ export function KeysCard({ subscriptionUrl, happLink }: KeysCardProps) {
             </span>
           </div>
 
-          <div className="mt-4 grid grid-cols-3 gap-2">
-            {availableApps.map((option) => {
-              const active = option.id === selectedApp.id
-              const Icon = option.icon
-              return (
-                <button
-                  key={option.id}
-                  type="button"
-                  aria-label={option.name}
-                  onClick={() => setSelectedAppId(option.id)}
-                  className={cn(
-                    'flex min-w-0 items-center justify-center gap-2 rounded-xl border px-2 py-3 text-left transition sm:justify-start sm:px-3',
-                    active
-                      ? 'border-slate-950 bg-slate-950 text-white dark:border-white dark:bg-white dark:text-slate-950'
-                      : 'border-slate-200 bg-slate-50/70 hover:border-slate-300 hover:bg-white dark:border-white/10 dark:bg-white/[0.03] dark:hover:bg-white/[0.06]'
-                  )}
-                >
-                  <span
-                    className={cn(
-                      'grid h-7 w-7 shrink-0 place-items-center',
-                      active ? 'text-cyan-300 dark:text-cyan-700' : 'text-cyan-700 dark:text-cyan-200'
-                    )}
-                  >
-                    <Icon className="h-4 w-4" />
-                  </span>
-                  <span className="min-w-0 truncate text-sm font-semibold">{option.id === 'rabbit-hole' ? 'Rabbit' : option.name}</span>
-                </button>
-              )
-            })}
+          <div className="mt-4 flex items-center justify-between gap-3 border-y border-slate-100 py-3 dark:border-white/10">
+            <div className="flex min-w-0 items-center gap-3">
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-cyan-50 text-cyan-700 dark:bg-cyan-400/10 dark:text-cyan-200">
+                <SelectedAppIcon className="h-5 w-5" />
+              </span>
+              <span className="min-w-0">
+                <span className="block font-semibold text-slate-950 dark:text-white">{selectedApp.name}</span>
+                <span className="block truncate text-xs text-slate-500">{selectedApp.subtitle}</span>
+              </span>
+            </div>
+            <a
+              href={selectedApp.installUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="shrink-0 text-sm font-medium text-cyan-700 hover:text-cyan-900 dark:text-cyan-200 dark:hover:text-white"
+            >
+              Скачать
+            </a>
           </div>
 
           <div className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-[1fr_auto_auto]">
@@ -243,15 +232,33 @@ export function KeysCard({ subscriptionUrl, happLink }: KeysCardProps) {
           </div>
 
           <div className="mt-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 text-sm">
-            <a
-              href={selectedApp.installUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1.5 font-medium text-cyan-700 hover:text-cyan-900 dark:text-cyan-200"
-            >
-              Скачать {selectedApp.name}
-              <ExternalLink className="h-3.5 w-3.5" />
-            </a>
+            <details className="group min-w-0">
+              <summary className="cursor-pointer font-medium text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white">
+                Другие приложения
+              </summary>
+              <div className="mt-2 grid min-w-[15rem] gap-1 rounded-xl border border-slate-200 bg-white p-1.5 shadow-lg dark:border-white/10 dark:bg-surface-900">
+                {availableApps.filter((option) => option.id !== selectedApp.id).map((option) => {
+                  const Icon = option.icon
+                  return (
+                    <button
+                      key={option.id}
+                      type="button"
+                      onClick={(event) => {
+                        setSelectedAppId(option.id)
+                        event.currentTarget.closest('details')?.removeAttribute('open')
+                      }}
+                      className="flex min-h-11 items-center gap-3 rounded-lg px-3 text-left text-sm transition-colors hover:bg-slate-50 dark:hover:bg-white/[0.05]"
+                    >
+                      <Icon className="h-4 w-4 shrink-0 text-cyan-600 dark:text-cyan-300" />
+                      <span>
+                        <span className="block font-medium">{option.name}</span>
+                        <span className="block text-xs text-slate-500">{option.subtitle}</span>
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+            </details>
             <button
               type="button"
               onClick={() => setConfirmOpen(true)}

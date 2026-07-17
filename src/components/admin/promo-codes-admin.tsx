@@ -589,7 +589,7 @@ export function PromoCodesAdmin({
           </div>
           </details>
 
-          <div className="grid grid-cols-2 gap-2 border-t pt-4 sm:flex sm:justify-end">
+          <div className="sticky -bottom-5 -mx-4 grid grid-cols-2 gap-2 border-t border-slate-200 bg-white/95 px-4 py-3 backdrop-blur dark:border-white/10 dark:bg-surface-900/95 sm:-mx-6 sm:flex sm:justify-end sm:px-6">
             <button type="button" className="btn-secondary" onClick={resetForm}>Отмена</button>
             <button type="button" className="btn-primary" onClick={submit} disabled={loading}>
               {loading ? 'Сохраняем...' : editingId ? 'Сохранить' : 'Создать'}
@@ -599,14 +599,24 @@ export function PromoCodesAdmin({
       </AdminModal>
 
       {filteredPromoCodes.length > 0 && (
-        <div data-testid="admin-promo-grid" className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.025]">
+        <div data-testid="admin-promo-grid" className="admin-list">
+          <div className="admin-list-header grid-cols-[1.25rem_minmax(0,1fr)_2.5rem] gap-3">
+            <span className="sr-only">Выбор</span>
+            <div className="grid grid-cols-[minmax(12rem,1fr)_6rem_minmax(18rem,1.5fr)_minmax(12rem,1fr)] items-center gap-x-4">
+              <span>Промокод</span>
+              <span>Скидка</span>
+              <span>Условия</span>
+              <span>Владелец</span>
+            </div>
+            <span className="sr-only">Действия</span>
+          </div>
           {filteredPromoCodes.map((promoCode) => {
             const status = promoStatus(promoCode)
             return (
               <article
                 key={promoCode.id}
                 data-testid="admin-promo-card"
-                className="flex min-w-0 items-start gap-3 border-b border-slate-100 px-4 py-3 last:border-b-0 dark:border-white/[0.07]"
+                className="admin-list-row flex min-w-0 items-start gap-3 px-4 py-3"
               >
                 <input
                   className="mt-1.5 shrink-0"

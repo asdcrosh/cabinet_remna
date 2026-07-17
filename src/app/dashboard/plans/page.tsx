@@ -3,8 +3,7 @@
 
 import Link from 'next/link'
 import { prisma } from '@/lib/prisma'
-import { PlanCard } from '@/components/dashboard/plan-card'
-import { MobilePlanPicker } from '@/components/dashboard/mobile-plan-picker'
+import { PlanCatalog } from '@/components/dashboard/mobile-plan-picker'
 import { formatPrice } from '@/lib/format'
 import { PageHeader } from '@/components/dashboard/page-header'
 import { getCurrentUser } from '@/lib/auth/cookies'
@@ -102,7 +101,6 @@ export default async function PlansPage({
     name: plan.name,
     description: plan.description,
     price: formatPrice(plan.priceKopecks),
-    shortPrice: formatPrice(plan.priceKopecks),
     priceKopecks: plan.priceKopecks,
     monthlyPrice: formatPrice(Math.round((plan.priceKopecks / Math.max(1, plan.durationDays)) * 30)),
     savingsPercent: !plan.isPromo && referenceDailyPrice > 0
@@ -153,35 +151,15 @@ export default async function PlansPage({
         </div>
       )}
 
-      {planViews.length > 0 ? (
-        <MobilePlanPicker plans={planViews} initialPlanId={linkedPlanId} />
-      ) : null}
-
-      <div className="hidden gap-5 md:grid md:auto-rows-fr md:grid-cols-2 xl:grid-cols-3">
-        {planViews.length === 0 && (
-          <div className="card w-full py-12 text-center md:col-span-full">
-            <h3 className="text-lg font-semibold">Тарифы скоро появятся</h3>
-            <p className="mx-auto mt-2 max-w-md text-sm text-slate-500 dark:text-slate-400">
-              Сейчас нет опубликованных тарифов.
-            </p>
-            {canManagePlans && (
-              <Link href="/dashboard/admin/plans" className="btn-primary mt-5 inline-flex">
-                Создать тариф
-              </Link>
-            )}
-          </div>
-        )}
-        {planViews.map((plan) => (
-          <div key={plan.id} className="min-w-0">
-            <PlanCard {...plan} />
-          </div>
-        ))}
-      </div>
+      {planViews.length > 0 ? <PlanCatalog plans={planViews} initialPlanId={linkedPlanId} /> : null}
 
       {planViews.length === 0 && (
-        <div className="card py-10 text-center md:hidden">
+        <div className="card py-10 text-center">
           <h3 className="text-lg font-semibold">Тарифы скоро появятся</h3>
           <p className="mx-auto mt-2 max-w-md text-sm text-slate-500 dark:text-slate-400">Сейчас нет опубликованных тарифов.</p>
+          {canManagePlans && (
+            <Link href="/dashboard/admin/plans" className="btn-primary mt-5 inline-flex">Создать тариф</Link>
+          )}
         </div>
       )}
 

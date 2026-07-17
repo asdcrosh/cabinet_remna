@@ -271,10 +271,13 @@ export function PlansAdmin({ plans }: { plans: PlanAdminRow[] }) {
       )}
 
       {plans.length > 0 && (
-        <div
-          data-testid="admin-plan-grid"
-          className="overflow-hidden rounded-2xl border border-slate-200 bg-white divide-y divide-slate-200 dark:border-white/10 dark:bg-white/[0.025] dark:divide-white/[0.07]"
-        >
+        <div data-testid="admin-plan-grid" className="admin-list">
+          <div className="admin-list-header grid-cols-[minmax(14rem,1.15fr)_minmax(12rem,.9fr)_minmax(12rem,.9fr)_2.5rem] items-center gap-x-6">
+            <span>Тариф</span>
+            <span>Условия</span>
+            <span>Доступ и использование</span>
+            <span className="sr-only">Действия</span>
+          </div>
           {plans.map((plan) => {
             const selectedSquads = plan.activeInternalSquads.map((id) => squadById.get(id)).filter(Boolean) as RemnawaveSquad[]
             const unknownSquads = plan.activeInternalSquads.filter((id) => !squadById.has(id))
@@ -284,16 +287,14 @@ export function PlansAdmin({ plans }: { plans: PlanAdminRow[] }) {
               <article
                 key={plan.id}
                 data-testid="admin-plan-card"
-                className="min-w-0 p-4 lg:grid lg:grid-cols-[minmax(14rem,1.15fr)_minmax(12rem,.9fr)_minmax(12rem,.9fr)_auto] lg:items-center lg:gap-x-6"
+                className="admin-list-row min-w-0 p-4 lg:grid lg:grid-cols-[minmax(14rem,1.15fr)_minmax(12rem,.9fr)_minmax(12rem,.9fr)_auto] lg:items-center lg:gap-x-6"
               >
                 <div className="flex min-w-0 items-start justify-between gap-4 lg:block">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <h3 className="break-words font-semibold tracking-tight">{plan.name}</h3>
-                      <span className={plan.isActive ? 'badge-active' : 'badge-disabled'}>{plan.isActive ? 'Опубликован' : 'Скрыт'}</span>
+                      {!plan.isActive && <span className="badge-disabled">Скрыт</span>}
                       {plan.isPromo && <span className="badge-limited">Пробный</span>}
-                      {!plan.promoCodesEnabled && <span className="badge-disabled">Без промокодов</span>}
-                      {plan.isFeatured && <span className="badge-active">Популярный</span>}
                     </div>
                     {plan.description && <p className="mt-1 line-clamp-2 text-sm leading-5 text-slate-500 dark:text-slate-400">{plan.description}</p>}
                   </div>
@@ -321,6 +322,8 @@ export function PlansAdmin({ plans }: { plans: PlanAdminRow[] }) {
                     <span>Без серверных групп</span>
                   )}
                   <div className="mt-1 flex flex-wrap gap-x-3 text-xs">
+                    {plan.isFeatured && <span>Популярный</span>}
+                    {!plan.promoCodesEnabled && <span>Без скидок</span>}
                     {plan.availability === 'ALLOWED' && <span>{allowedUsersCount} польз.</span>}
                     <span>{plan.subscriptionsCount} подписок</span>
                     <span>{plan.paymentsCount} оплат</span>
@@ -536,7 +539,7 @@ function PlanEditor({
         </details>
       </div>
 
-      <div className="flex justify-end border-t pt-4">
+      <div className="sticky -bottom-5 -mx-4 flex justify-end border-t border-slate-200 bg-white/95 px-4 py-3 backdrop-blur dark:border-white/10 dark:bg-surface-900/95 sm:-mx-6 sm:px-6">
         <button type="button" className="btn-primary w-full sm:w-auto" onClick={onSubmit} disabled={loading}>
           {loading ? 'Сохраняем...' : submitLabel}
         </button>

@@ -78,37 +78,38 @@ export default async function SubscriptionPage() {
   return (
     <div className="page-stack">
       <section className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.035] sm:p-5">
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
-            <span className={subscriptionExpired ? 'badge-expired' : u.isActive ? 'badge-active' : 'badge-disabled'}>{statusText}</span>
-            <h1 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">Подписка</h1>
+            <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Доступ к VPN</div>
+            <div className="mt-2 flex items-center gap-2.5">
+              <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${subscriptionExpired ? 'bg-amber-500' : u.isActive ? 'bg-emerald-500' : 'bg-slate-400'}`} />
+              <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">{statusText}</h1>
+            </div>
+            <p className="mt-1.5 text-sm text-slate-500">
+              {subscriptionExpired ? `Доступ закончился ${expiresAtLabel}` : `Доступ до ${expiresAtLabel}`}
+            </p>
           </div>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-[1fr_1fr_auto] xl:min-w-[34rem]">
-            <CompactMetric
-              icon={<CalendarClock className="h-4 w-4" />}
-              label={subscriptionExpired ? 'Срок' : 'До'}
-              value={subscriptionExpired ? 'Истекла' : expiresAtLabel}
-              hint={subscriptionExpired ? `Была активна до ${expiresAtLabel}` : formatSubscriptionDaysLeft(u.daysLeft, u.userStatus)}
-            />
-            <CompactMetric
-              icon={<Database className="h-4 w-4" />}
-              label="Трафик"
-              value={u.trafficUsed}
-              hint={isUnlimited ? 'безлимит' : `из ${u.trafficLimit}`}
-            />
-            <Link href="/dashboard/plans?intent=renew" className="btn-primary col-span-2 justify-center sm:col-span-1 sm:px-5">
-              Продлить
-            </Link>
-          </div>
+          <Link href="/dashboard/plans?intent=renew" className="btn-primary w-full justify-center sm:w-auto sm:px-5">Продлить</Link>
+        </div>
+        <div className="mt-5 grid gap-y-4 border-t border-slate-100 pt-4 dark:border-white/10 sm:grid-cols-2">
+          <CompactMetric
+            icon={<CalendarClock className="h-4 w-4" />}
+            label="Осталось"
+            value={formatSubscriptionDaysLeft(u.daysLeft, u.userStatus)}
+            hint={subscriptionExpired ? 'Требуется продление' : `до ${expiresAtLabel}`}
+          />
+          <CompactMetric
+            icon={<Database className="h-4 w-4" />}
+            label="Трафик"
+            value={u.trafficUsed}
+            hint={isUnlimited ? 'без ограничений' : `из ${u.trafficLimit}`}
+            divided
+          />
         </div>
       </section>
 
       <KeysCard subscriptionUrl={data.response.subscriptionUrl} happLink={happLink} />
 
-      <div className="flex flex-wrap justify-center gap-x-5 gap-y-2 text-sm text-slate-500 dark:text-slate-400">
-        <Link href="/dashboard/devices" className="font-medium hover:text-cyan-700 dark:hover:text-cyan-200">Мои устройства</Link>
-        {features.support && <Link href="/dashboard/support" className="font-medium hover:text-cyan-700 dark:hover:text-cyan-200">Помощь с подключением</Link>}
-      </div>
     </div>
   )
 }
@@ -118,14 +119,16 @@ function CompactMetric({
   label,
   value,
   hint,
+  divided = false,
 }: {
   icon: React.ReactNode
   label: string
   value: string
   hint: string
+  divided?: boolean
 }) {
   return (
-    <div className="min-w-0 border-l border-slate-200 px-3.5 py-1 dark:border-white/10">
+    <div className={`min-w-0 px-1 sm:px-3.5 ${divided ? 'sm:border-l sm:border-slate-200 dark:sm:border-white/10' : ''}`}>
       <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">
         {icon}
         {label}

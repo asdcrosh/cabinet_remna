@@ -12,8 +12,14 @@ export function PaymentHistory({ payments }: { payments: PaymentHistoryPayment[]
 
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white divide-y divide-slate-200 dark:border-white/10 dark:bg-white/[0.025] dark:divide-white/[0.07]">
+      <div className="hidden grid-cols-[minmax(14rem,1.2fr)_minmax(8rem,.55fr)_minmax(10rem,.7fr)_auto] items-center gap-3 bg-slate-50/80 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-400 dark:bg-white/[0.025] lg:grid">
+        <span>Тариф</span>
+        <span>Сумма</span>
+        <span>Выдача</span>
+        <span className="text-right">Действие</span>
+      </div>
       {payments.map((payment) => (
-        <article key={payment.id} className="grid gap-3 border-l-4 border-l-slate-300 px-4 py-4 sm:grid-cols-[minmax(0,1.2fr)_minmax(7rem,.55fr)] lg:grid-cols-[minmax(14rem,1.2fr)_minmax(8rem,.55fr)_minmax(10rem,.7fr)_auto] lg:items-center dark:border-l-slate-600">
+        <article key={payment.id} className="grid gap-3 px-4 py-4 transition-colors hover:bg-slate-50/60 sm:grid-cols-[minmax(0,1.2fr)_minmax(7rem,.55fr)] lg:grid-cols-[minmax(14rem,1.2fr)_minmax(8rem,.55fr)_minmax(10rem,.7fr)_auto] lg:items-center dark:hover:bg-white/[0.02]">
           <div className="flex min-w-0 items-start justify-between gap-3 lg:block">
             <div className="min-w-0">
               <div className="truncate text-sm font-semibold text-slate-950 dark:text-white">{payment.plan.name}</div>
@@ -27,7 +33,6 @@ export function PaymentHistory({ payments }: { payments: PaymentHistoryPayment[]
               amountKopecks={payment.amountKopecks}
               originalAmountKopecks={payment.originalAmountKopecks}
               discountKopecks={payment.discountKopecks}
-              align="right"
             />
             {getPromoCodeLabel(payment.promoCodeSnapshot) !== '—' ? (
               <div className="mt-1 text-xs text-slate-500">Промокод {getPromoCodeLabel(payment.promoCodeSnapshot)}</div>

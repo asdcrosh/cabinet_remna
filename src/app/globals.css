@@ -76,6 +76,17 @@
     @apply hover:border-slate-300 hover:bg-slate-50/60
            dark:hover:border-cyan-500/30 dark:hover:bg-white/[0.06];
   }
+  .admin-list {
+    @apply overflow-hidden rounded-2xl border border-slate-200 bg-white divide-y divide-slate-200
+           dark:border-white/10 dark:bg-white/[0.025] dark:divide-white/[0.07];
+  }
+  .admin-list-header {
+    @apply hidden bg-slate-50/80 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.08em]
+           text-slate-400 dark:bg-white/[0.025] dark:text-slate-500 lg:grid;
+  }
+  .admin-list-row {
+    @apply transition-colors hover:bg-slate-50/60 dark:hover:bg-white/[0.02];
+  }
   .nav-active-glow {
     box-shadow: none;
   }

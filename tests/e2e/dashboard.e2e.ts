@@ -55,8 +55,7 @@ test('мобильный выбор тарифа остаётся компакт
   await page.goto('/dashboard/plans')
 
   await expect(page.getByRole('heading', { name: 'Выберите срок' })).toBeVisible()
-  await page.getByRole('button', { name: /7 дней 130[.,]00 ₽/ }).click()
-  const card = page.locator('section[aria-labelledby="mobile-plan-picker-title"]').getByTestId('plan-card')
+  const card = page.locator('section[aria-labelledby="mobile-plan-picker-title"]').getByTestId('plan-card').first()
   await expect(card.getByRole('heading', { name: 'E2E Стандарт' })).toBeVisible()
   await expect(card.getByText('7 дн.', { exact: true })).toBeVisible()
   await expect(card.getByText('Безлимит', { exact: true })).toBeVisible()

@@ -1,59 +1,33 @@
 'use client'
 
-import { useMemo, useState } from 'react'
-import { Check } from 'lucide-react'
-import { cn } from '@/lib/cn'
+import { useMemo } from 'react'
 import { PlanCard, type PlanCardProps } from './plan-card'
 
-type MobilePlan = PlanCardProps & {
-  shortPrice: string
-}
+type CatalogPlan = PlanCardProps
 
-export function MobilePlanPicker({ plans, initialPlanId }: { plans: MobilePlan[]; initialPlanId?: string }) {
-  const initialId = useMemo(() => {
+export function PlanCatalog({ plans, initialPlanId }: { plans: CatalogPlan[]; initialPlanId?: string }) {
+  const featuredId = useMemo(() => {
     if (initialPlanId && plans.some((plan) => plan.id === initialPlanId)) return initialPlanId
     return plans.find((plan) => plan.current)?.id ?? plans.find((plan) => plan.popular)?.id ?? plans[0]?.id ?? ''
   }, [initialPlanId, plans])
-  const [selectedId, setSelectedId] = useState(initialId)
-  const selectedPlan = plans.find((plan) => plan.id === selectedId) ?? plans[0]
+  const orderedPlans = useMemo(() => {
+    const featured = plans.find((plan) => plan.id === featuredId)
+    return featured ? [featured, ...plans.filter((plan) => plan.id !== featured.id)] : plans
+  }, [featuredId, plans])
 
-  if (!selectedPlan) return null
+  if (orderedPlans.length === 0) return null
 
   return (
-    <section className="md:hidden" aria-labelledby="mobile-plan-picker-title">
-      <h2 id="mobile-plan-picker-title" className="mb-3 text-lg font-semibold text-slate-950 dark:text-white">Выберите срок</h2>
+    <section aria-labelledby="mobile-plan-picker-title">
+      <h2 id="mobile-plan-picker-title" className="mb-3 text-lg font-semibold text-slate-950 dark:text-white md:sr-only">Выберите срок</h2>
 
-      <div className="-mx-4 flex snap-x gap-2 overflow-x-auto px-4 pb-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {plans.map((plan) => {
-          const selected = plan.id === selectedPlan.id
-          return (
-            <button
-              key={plan.id}
-              type="button"
-              aria-pressed={selected}
-              onClick={() => setSelectedId(plan.id)}
-              className={cn(
-                'relative min-w-[7rem] snap-start rounded-xl border px-3 py-2.5 text-left transition-colors',
-                selected
-                  ? 'border-slate-950 bg-slate-950 text-white dark:border-white dark:bg-white dark:text-slate-950'
-                  : 'border-slate-200 bg-white/80 text-slate-700 dark:border-white/10 dark:bg-white/[0.035] dark:text-slate-200'
-              )}
-            >
-              <span className="block text-sm font-semibold">{plan.durationDays} дней</span>
-              <span className={cn('mt-0.5 block text-xs', selected ? 'text-cyan-700 dark:text-cyan-200' : 'text-slate-500 dark:text-slate-400')}>
-                {plan.shortPrice}
-              </span>
-              {selected ? (
-                <span className="absolute right-2 top-2 grid h-5 w-5 place-items-center">
-                  <Check className="h-3 w-3" />
-                </span>
-              ) : null}
-            </button>
-          )
-        })}
+      <div className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-2 [scrollbar-width:none] md:mx-0 md:grid md:auto-rows-fr md:grid-cols-2 md:gap-4 md:overflow-visible md:px-0 md:pb-0 xl:grid-cols-3 [&::-webkit-scrollbar]:hidden">
+        {orderedPlans.map((plan) => (
+          <div key={plan.id} className="w-[min(88vw,23rem)] shrink-0 snap-center first:snap-start md:w-auto md:min-w-0 md:snap-none">
+            <PlanCard {...plan} />
+          </div>
+        ))}
       </div>
-
-      <PlanCard {...selectedPlan} />
     </section>
   )
 }

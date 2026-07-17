@@ -271,7 +271,7 @@ export function PlanCard({
         </div>
       </div>
 
-      <div className="mt-4 grid grid-cols-3 divide-x divide-slate-200 rounded-xl bg-slate-50 px-1 py-3 text-center dark:divide-white/10 dark:bg-white/[0.04]">
+      <div className="mt-4 grid grid-cols-3 divide-x divide-slate-200 border-y border-slate-100 py-3 text-center dark:divide-white/10 dark:border-white/10">
         <PlanFact label="Срок" value={`${durationDays} дн.`} />
         <PlanFact label="Трафик" value={trafficLimitGb == null ? "Безлимит" : `${trafficLimitGb} ГБ`} />
         <PlanFact label="Устройства" value={`До ${deviceLimit}`} />
@@ -305,7 +305,7 @@ export function PlanCard({
                   setAppliedPromo(null);
                 }}
                 placeholder="Промокод"
-                className="min-w-0 flex-1 bg-transparent text-sm font-medium uppercase outline-none placeholder:normal-case placeholder:text-slate-400"
+                className="min-w-0 flex-1 bg-transparent text-base font-medium uppercase outline-none placeholder:normal-case placeholder:text-slate-400 sm:text-sm"
                 autoComplete="off"
                 spellCheck={false}
               />
@@ -377,8 +377,8 @@ export function PlanCard({
 function PlanFact({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0 px-2">
-      <div className="truncate text-sm font-semibold text-slate-900 dark:text-white">{value}</div>
-      <div className="mt-0.5 truncate text-xs text-slate-500">{label}</div>
+      <div className="break-words text-sm font-semibold leading-tight text-slate-900 dark:text-white">{value}</div>
+      <div className="mt-1 text-xs text-slate-500">{label}</div>
     </div>
   );
 }

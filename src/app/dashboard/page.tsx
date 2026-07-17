@@ -22,7 +22,6 @@ import {
   KeyRound,
   Laptop,
   MessageCircleQuestion,
-  ShieldCheck,
   Sparkles,
   UsersRound,
 } from 'lucide-react'
@@ -232,9 +231,6 @@ export default async function DashboardHome() {
                     : 'Тариф синхронизируется'}
                 </p>
               </div>
-              <div className="grid h-10 w-10 shrink-0 place-items-center text-cyan-200">
-                <ShieldCheck className="h-5 w-5" />
-              </div>
             </div>
 
             <div className="mt-7 grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3">
@@ -247,11 +243,6 @@ export default async function DashboardHome() {
               <OverviewMetric label="Лимит" value={hasRemoteUsage ? isUnlimited ? 'Безлимит' : formatBytes(limit) : '—'} />
             </div>
 
-            <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm font-medium text-slate-300">
-              <Link href="/dashboard/devices" className="transition-colors hover:text-white">Устройства</Link>
-              <Link href="/dashboard/billing" className="transition-colors hover:text-white">Платежи</Link>
-              {features.support && <Link href="/dashboard/support" className="transition-colors hover:text-white">Поддержка</Link>}
-            </div>
           </div>
 
           <div className="flex flex-col justify-end border-t border-white/10 pt-5 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
@@ -805,7 +796,7 @@ function SmartInsights({
           tone: 'slate' as const,
         }
       : null,
-  ].filter(Boolean).slice(0, 2) as Array<{
+  ].filter(Boolean).slice(0, 1) as Array<{
     title: string
     text: string
     href: string
@@ -817,7 +808,7 @@ function SmartInsights({
   if (items.length === 0) return null
 
   return (
-    <section className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+    <section>
       {items.map((item) => (
         <Link
           key={item.title}

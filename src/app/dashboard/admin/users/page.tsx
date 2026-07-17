@@ -175,13 +175,20 @@ export default async function AdminUsersPage({
         <AdminEmptyState title="Пользователи не найдены" description="Измените фильтры или очистите строку поиска." />
       )}
 
-      <div className={users.length > 0 ? 'overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.025]' : 'hidden'}>
+      <div className={users.length > 0 ? 'admin-list' : 'hidden'}>
+        <div className="admin-list-header grid-cols-[minmax(16rem,1.4fr)_10rem_minmax(13rem,1fr)_auto_2.5rem] items-center gap-x-4">
+          <span>Аккаунт</span>
+          <span>Роль</span>
+          <span>Подписка</span>
+          <span className="text-right">Активность</span>
+          <span className="sr-only">Действия</span>
+        </div>
         {users.map((user) => {
           const subscription = user.subscriptions[0]
           const lastPayment = user.payments[0]
           const attemptsCount = attemptsByUser.get(user.id) ?? 0
           return (
-            <article key={user.id} className="border-b border-slate-100 last:border-b-0 dark:border-white/[0.07]">
+            <article key={user.id} className="admin-list-row">
               <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-2 px-4 py-3 lg:grid-cols-[minmax(16rem,1.4fr)_10rem_minmax(13rem,1fr)_auto_auto] lg:items-center lg:gap-x-4">
                 <div className="min-w-0">
                   <div className="flex min-w-0 items-center gap-2">

@@ -141,7 +141,13 @@ export default async function AdminPaymentsPage({
         <AdminEmptyState title="Платежи не найдены" description="Измените фильтры или сбросьте поиск." />
       )}
 
-      <div className={payments.length > 0 ? 'overflow-hidden rounded-2xl border border-slate-200 bg-white divide-y divide-slate-200 dark:border-white/10 dark:bg-white/[0.025] dark:divide-white/[0.07]' : 'hidden'}>
+      <div className={payments.length > 0 ? 'admin-list' : 'hidden'}>
+        <div className="admin-list-header grid-cols-[minmax(15rem,1.2fr)_minmax(9rem,.65fr)_minmax(15rem,1fr)_auto] items-center gap-4">
+          <span>Покупатель</span>
+          <span>Тариф и сумма</span>
+          <span>Обработка</span>
+          <span className="text-right">Действие</span>
+        </div>
         {payments.map((payment) => {
           const needsRetry = payment.status === 'SUCCEEDED' && !payment.subscriptionProvisionedAt
           const needsRemnashopRetry = payment.status === 'SUCCEEDED' && Boolean(payment.subscriptionProvisionedAt) && !payment.remnashopSyncedAt
@@ -158,7 +164,7 @@ export default async function AdminPaymentsPage({
             </Link>
           )
           return (
-            <article key={payment.id} className={`overflow-hidden border-l-4 ${paymentRailClass(payment.status, needsRetry || needsRemnashopRetry)}`}>
+            <article key={payment.id} className={`admin-list-row overflow-hidden ${paymentAttentionClass(needsRetry || needsRemnashopRetry)}`}>
               <div className="grid gap-4 px-4 py-4 lg:grid-cols-[minmax(15rem,1.2fr)_minmax(9rem,.65fr)_minmax(15rem,1fr)_auto] lg:items-center">
                 <div className="flex min-w-0 items-start justify-between gap-3 lg:block">
                   <div className="min-w-0">
@@ -231,11 +237,8 @@ function PaymentFlow({ paid, provisioned, remnashopSynced }: { paid: boolean; pr
   )
 }
 
-function paymentRailClass(status: string, requiresAttention: boolean) {
-  if (requiresAttention) return 'border-l-red-500'
-  if (status === 'SUCCEEDED') return 'border-l-emerald-500'
-  if (status === 'PENDING') return 'border-l-amber-400'
-  return 'border-l-slate-300 dark:border-l-slate-600'
+function paymentAttentionClass(requiresAttention: boolean) {
+  return requiresAttention ? 'bg-red-50/50 dark:bg-red-500/[0.035]' : ''
 }
 
 function humanSyncError(value: string | null) {
