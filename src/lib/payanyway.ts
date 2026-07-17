@@ -1,6 +1,7 @@
 import { createHash, timingSafeEqual } from 'node:crypto'
+import { getResolvedPaymentProviderSettings, isResolvedPayAnyWayConfigured } from './payment-settings'
 
-const PRODUCTION_PAYMENT_URL = 'https://moneta.ru/assistant.htm'
+const PRODUCTION_PAYMENT_URL = 'https://www.payanyway.ru/assistant.htm'
 const TEST_PAYMENT_URL = 'https://demo.moneta.ru/assistant.htm'
 
 export type PayAnyWayCallback = {
@@ -14,19 +15,11 @@ export type PayAnyWayCallback = {
   signature: string
 }
 
-export function isPayAnyWayEnabled() {
-  return parseBoolean(process.env.PAYANYWAY_ENABLED)
+export async function isPayAnyWayConfigured() {
+  return isResolvedPayAnyWayConfigured(await getResolvedPaymentProviderSettings())
 }
 
-export function isPayAnyWayConfigured() {
-  return Boolean(
-    isPayAnyWayEnabled() &&
-    process.env.PAYANYWAY_MNT_ID?.trim() &&
-    process.env.PAYANYWAY_INTEGRITY_CODE?.trim()
-  )
-}
-
-export function createPayAnyWayPaymentUrl(input: {
+export async function createPayAnyWayPaymentUrl(input: {
   transactionId: string
   amountKopecks: number
   description: string
@@ -35,12 +28,18 @@ export function createPayAnyWayPaymentUrl(input: {
   failUrl: string
   returnUrl: string
 }) {
-  const config = getConfig()
+  const config = await getConfig()
   const amount = formatAmount(input.amountKopecks)
   const currency = 'RUB'
   const testMode = config.testMode ? '1' : '0'
   const signature = md5(
-    config.merchantId + input.transactionId + amount + currency + testMode + config.integrityCode
+    config.merchantId +
+    input.transactionId +
+    amount +
+    currency +
+    input.subscriberId +
+    testMode +
+    config.integrityCode
   )
   const params = new URLSearchParams({
     MNT_ID: config.merchantId,
@@ -75,8 +74,8 @@ export function parsePayAnyWayCallback(params: URLSearchParams): PayAnyWayCallba
   return callback
 }
 
-export function verifyPayAnyWayCallback(callback: PayAnyWayCallback) {
-  const config = getConfig()
+export async function verifyPayAnyWayCallback(callback: PayAnyWayCallback) {
+  const config = await getConfig()
   if (callback.merchantId !== config.merchantId) return { ok: false as const, error: 'merchant_mismatch' }
   if (!callback.transactionId || !callback.operationId) return { ok: false as const, error: 'missing_payment_id' }
   if (callback.currency !== 'RUB') return { ok: false as const, error: 'currency_mismatch' }
@@ -98,18 +97,16 @@ export function verifyPayAnyWayCallback(callback: PayAnyWayCallback) {
   return { ok: true as const, amountKopecks: parseAmountKopecks(callback.amount) }
 }
 
-function getConfig() {
-  const merchantId = process.env.PAYANYWAY_MNT_ID?.trim()
-  const integrityCode = process.env.PAYANYWAY_INTEGRITY_CODE?.trim()
-  if (!isPayAnyWayEnabled() || !merchantId || !integrityCode) {
+async function getConfig() {
+  const { payAnyWay } = await getResolvedPaymentProviderSettings()
+  if (!payAnyWay.merchantId || !payAnyWay.integrityCode) {
     throw new Error('PayAnyWay is not configured')
   }
-  const testMode = parseBoolean(process.env.PAYANYWAY_TEST_MODE)
   return {
-    merchantId,
-    integrityCode,
-    testMode,
-    paymentUrl: process.env.PAYANYWAY_PAYMENT_URL?.trim() || (testMode ? TEST_PAYMENT_URL : PRODUCTION_PAYMENT_URL),
+    merchantId: payAnyWay.merchantId,
+    integrityCode: payAnyWay.integrityCode,
+    testMode: payAnyWay.testMode,
+    paymentUrl: payAnyWay.paymentUrl || (payAnyWay.testMode ? TEST_PAYMENT_URL : PRODUCTION_PAYMENT_URL),
   }
 }
 
@@ -134,8 +131,4 @@ function safeEqual(actual: string, expected: string) {
   const actualBuffer = Buffer.from(actual, 'hex')
   const expectedBuffer = Buffer.from(expected, 'hex')
   return actualBuffer.length === expectedBuffer.length && timingSafeEqual(actualBuffer, expectedBuffer)
-}
-
-function parseBoolean(value: string | undefined) {
-  return ['1', 'true', 'yes', 'on'].includes((value ?? '').trim().toLowerCase())
 }

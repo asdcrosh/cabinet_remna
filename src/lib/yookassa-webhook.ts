@@ -1,8 +1,11 @@
 import { logWarn } from './logger'
 import { getClientIp, isIpAllowed } from './security'
 
-export function assertYookassaWebhookSource(req: Request): { ok: true } | { ok: false; error: string } {
-  const allowlist = (process.env.YOOKASSA_WEBHOOK_ALLOWED_IPS || '')
+export function assertYookassaWebhookSource(
+  req: Request,
+  allowedIps = process.env.YOOKASSA_WEBHOOK_ALLOWED_IPS || ''
+): { ok: true } | { ok: false; error: string } {
+  const allowlist = allowedIps
     .split(',')
     .map((item) => item.trim())
     .filter(Boolean)

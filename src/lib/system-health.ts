@@ -2,6 +2,7 @@ import { readdir, stat } from 'fs/promises'
 import { prisma } from '@/lib/prisma'
 import { remnawave } from '@/lib/remnawave'
 import { getProvisioningQueueHealth } from '@/lib/job-health'
+import { getResolvedPaymentProviderSettings } from '@/lib/payment-settings'
 
 export type SystemHealthStatus = 'ok' | 'warn' | 'error'
 
@@ -77,8 +78,10 @@ async function checkRemnawave() {
 }
 
 async function checkYooKassa() {
-  const shopId = env('YOOKASSA_SHOP_ID')
-  const secretKey = env('YOOKASSA_SECRET_KEY')
+  const { yookassa } = await getResolvedPaymentProviderSettings()
+  if (!yookassa.enabled) return check('yookassa', 'YooKassa', 'ok', 'Отключена')
+
+  const { shopId, secretKey } = yookassa
   if (!shopId || !secretKey) {
     return check('yookassa', 'YooKassa', 'error', 'Не заполнены YOOKASSA_SHOP_ID или YOOKASSA_SECRET_KEY')
   }
@@ -102,12 +105,11 @@ async function checkYooKassa() {
   }
 }
 
-function checkPayAnyWay() {
-  const enabled = ['1', 'true', 'yes', 'on'].includes(env('PAYANYWAY_ENABLED').toLowerCase())
-  if (!enabled) return check('payanyway', 'PayAnyWay', 'ok', 'Отключён')
+async function checkPayAnyWay() {
+  const { payAnyWay } = await getResolvedPaymentProviderSettings()
+  if (!payAnyWay.enabled) return check('payanyway', 'PayAnyWay', 'ok', 'Отключён')
 
-  const merchantId = env('PAYANYWAY_MNT_ID')
-  const integrityCode = env('PAYANYWAY_INTEGRITY_CODE')
+  const { merchantId, integrityCode } = payAnyWay
   if (!merchantId || !integrityCode) {
     return check('payanyway', 'PayAnyWay', 'error', 'Не заполнены номер счёта или код проверки целостности')
   }

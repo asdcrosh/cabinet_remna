@@ -42,6 +42,18 @@ vi.mock('@/lib/provisioning', () => ({ provisionPaymentSubscription: mocks.provi
 vi.mock('@/lib/payment-sync', () => ({ cancelOtherPendingPaymentsForUser: mocks.cancelOtherPendingPaymentsForUser }))
 vi.mock('@/lib/notifications', () => ({ notifyPaymentStuck: mocks.notifyPaymentStuck }))
 vi.mock('@/lib/logger', () => ({ logError: mocks.logError, logWarn: mocks.logWarn }))
+vi.mock('@/lib/payment-settings', () => ({
+  getResolvedPaymentProviderSettings: vi.fn(async () => ({
+    payAnyWay: {
+      enabled: true,
+      merchantId: '49907299',
+      integrityCode: 'b'.repeat(64),
+      testMode: false,
+      paymentUrl: '',
+    },
+  })),
+  isResolvedPayAnyWayConfigured: vi.fn(() => true),
+}))
 
 import { POST } from './route'
 

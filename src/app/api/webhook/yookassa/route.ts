@@ -10,6 +10,7 @@ import { notifyPaymentCanceled, notifyPaymentStuck } from '@/lib/notifications'
 import { provisionPaymentSubscription } from '@/lib/provisioning'
 import { getPayment } from '@/lib/yookassa'
 import { assertYookassaWebhookSource } from '@/lib/yookassa-webhook'
+import { getResolvedPaymentProviderSettings } from '@/lib/payment-settings'
 
 export const runtime = 'nodejs'
 
@@ -24,7 +25,8 @@ interface YookassaWebhookEvent {
 }
 
 export async function POST(req: Request) {
-  const sourceCheck = assertYookassaWebhookSource(req)
+  const settings = await getResolvedPaymentProviderSettings()
+  const sourceCheck = assertYookassaWebhookSource(req, settings.yookassa.webhookAllowedIps)
   if (!sourceCheck.ok) {
     return NextResponse.json({ error: sourceCheck.error }, { status: 403 })
   }

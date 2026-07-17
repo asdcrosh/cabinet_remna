@@ -32,9 +32,9 @@ async function handlePayAnyWayRequest(params: URLSearchParams) {
   // PayAnyWay проверяет доступность Pay URL пустым запросом при сохранении настроек.
   if (!callback) return payAnyWayResponse('SUCCESS')
 
-  let verification: ReturnType<typeof verifyPayAnyWayCallback>
+  let verification: Awaited<ReturnType<typeof verifyPayAnyWayCallback>>
   try {
-    verification = verifyPayAnyWayCallback(callback)
+    verification = await verifyPayAnyWayCallback(callback)
   } catch (error) {
     logError('webhook.payanyway.configuration_failed', error)
     return payAnyWayResponse('FAIL', 503)

@@ -3,22 +3,13 @@
 // Авторизация: Basic auth (shop_id:secret_key в base64).
 
 import { logWarn } from './logger'
-
-const SHOP_ID = process.env.YOOKASSA_SHOP_ID
-const SECRET_KEY = process.env.YOOKASSA_SECRET_KEY
-
-if (!SHOP_ID || !SECRET_KEY) {
-  logWarn('yookassa.missing_credentials', { hasShopId: Boolean(SHOP_ID), hasSecretKey: Boolean(SECRET_KEY) })
-}
+import { getResolvedPaymentProviderSettings, isResolvedYooKassaConfigured } from './payment-settings'
 
 const BASE_URL = 'https://api.yookassa.ru/v3'
 const REQUEST_TIMEOUT_MS = 15_000
 
-const authHeader = () =>
-  'Basic ' + Buffer.from(`${SHOP_ID}:${SECRET_KEY}`).toString('base64')
-
-export function isYookassaConfigured() {
-  return Boolean(SHOP_ID && SECRET_KEY)
+export async function isYookassaConfigured() {
+  return isResolvedYooKassaConfigured(await getResolvedPaymentProviderSettings())
 }
 
 // ---- Типы ---------------------------------------------------------------
@@ -57,7 +48,7 @@ export interface YooPayment {
 // ---- API ----------------------------------------------------------------
 
 export async function createPayment(input: CreatePaymentInput): Promise<YooPayment> {
-  if (!SHOP_ID || !SECRET_KEY) throw new Error('YooKassa not configured')
+  const config = await getYooKassaConfig()
   const idempotenceKey =
     input.idempotenceKey ??
     `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
@@ -84,7 +75,7 @@ export async function createPayment(input: CreatePaymentInput): Promise<YooPayme
     headers: {
       'Content-Type': 'application/json',
       'Idempotence-Key': idempotenceKey,
-      Authorization: authHeader(),
+      Authorization: authHeader(config.shopId, config.secretKey),
     },
     body: JSON.stringify(body),
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
@@ -98,9 +89,9 @@ export async function createPayment(input: CreatePaymentInput): Promise<YooPayme
 }
 
 export async function getPayment(id: string): Promise<YooPayment> {
-  if (!SHOP_ID || !SECRET_KEY) throw new Error('YooKassa not configured')
+  const config = await getYooKassaConfig()
   const res = await fetch(`${BASE_URL}/payments/${id}`, {
-    headers: { Authorization: authHeader() },
+    headers: { Authorization: authHeader(config.shopId, config.secretKey) },
     cache: 'no-store',
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   })
@@ -112,13 +103,13 @@ export async function getPayment(id: string): Promise<YooPayment> {
 }
 
 export async function cancelPayment(id: string, idempotenceKey = `cancel-${id}`): Promise<YooPayment> {
-  if (!SHOP_ID || !SECRET_KEY) throw new Error('YooKassa not configured')
+  const config = await getYooKassaConfig()
   const res = await fetch(`${BASE_URL}/payments/${id}/cancel`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'Idempotence-Key': idempotenceKey,
-      Authorization: authHeader(),
+      Authorization: authHeader(config.shopId, config.secretKey),
     },
     body: '{}',
     cache: 'no-store',
@@ -129,4 +120,20 @@ export async function cancelPayment(id: string, idempotenceKey = `cancel-${id}`)
     throw new Error(`YooKassa cancelPayment failed: ${res.status} ${text}`)
   }
   return (await res.json()) as YooPayment
+}
+
+async function getYooKassaConfig() {
+  const { yookassa } = await getResolvedPaymentProviderSettings()
+  if (!yookassa.shopId || !yookassa.secretKey) {
+    logWarn('yookassa.missing_credentials', {
+      hasShopId: Boolean(yookassa.shopId),
+      hasSecretKey: Boolean(yookassa.secretKey),
+    })
+    throw new Error('YooKassa not configured')
+  }
+  return yookassa
+}
+
+function authHeader(shopId: string, secretKey: string) {
+  return 'Basic ' + Buffer.from(`${shopId}:${secretKey}`).toString('base64')
 }

@@ -142,7 +142,7 @@ export const POST = withAuth(async (req: Request) => {
     return provisionPromoPayment(promoPayment, user, plan)
   }
 
-  if (!isPaymentProviderAvailable(provider)) {
+  if (!(await isPaymentProviderAvailable(provider))) {
     return NextResponse.json(
       { error: provider === 'PAYANYWAY' ? 'PayAnyWay пока не настроен' : 'ЮKassa пока не настроена' },
       { status: 503 }
@@ -224,7 +224,7 @@ export const POST = withAuth(async (req: Request) => {
 
   if (provider === 'PAYANYWAY') {
     try {
-      const confirmationUrl = createPayAnyWayPaymentUrl({
+      const confirmationUrl = await createPayAnyWayPaymentUrl({
         transactionId: localPayment.id,
         amountKopecks: localPayment.amountKopecks,
         description,

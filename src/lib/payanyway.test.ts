@@ -1,10 +1,23 @@
 import { createHash } from 'node:crypto'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   createPayAnyWayPaymentUrl,
   parsePayAnyWayCallback,
   verifyPayAnyWayCallback,
 } from './payanyway'
+
+vi.mock('./payment-settings', () => ({
+  getResolvedPaymentProviderSettings: vi.fn(async () => ({
+    payAnyWay: {
+      enabled: true,
+      merchantId: '49907299',
+      integrityCode: 'a'.repeat(64),
+      testMode: false,
+      paymentUrl: '',
+    },
+  })),
+  isResolvedPayAnyWayConfigured: vi.fn(() => true),
+}))
 
 const integrityCode = 'a'.repeat(64)
 
@@ -17,8 +30,8 @@ describe('PayAnyWay integration', () => {
     delete process.env.PAYANYWAY_PAYMENT_URL
   })
 
-  it('creates a signed payment URL with an immutable amount', () => {
-    const url = new URL(createPayAnyWayPaymentUrl({
+  it('creates a signed payment URL with an immutable amount', async () => {
+    const url = new URL(await createPayAnyWayPaymentUrl({
       transactionId: 'payment-1',
       amountKopecks: 13000,
       description: 'Стандарт 7 дней',
@@ -28,16 +41,16 @@ describe('PayAnyWay integration', () => {
       returnUrl: 'https://cabinet.example/dashboard/billing',
     }))
 
-    expect(url.origin + url.pathname).toBe('https://moneta.ru/assistant.htm')
+    expect(url.origin + url.pathname).toBe('https://www.payanyway.ru/assistant.htm')
     expect(url.searchParams.get('MNT_AMOUNT')).toBe('130.00')
     expect(url.searchParams.get('MNT_CURRENCY_CODE')).toBe('RUB')
     expect(url.searchParams.get('MNT_TRANSACTION_ID')).toBe('payment-1')
     expect(url.searchParams.get('MNT_SIGNATURE')).toBe(
-      md5(`49907299payment-1130.00RUB0${integrityCode}`)
+      md5(`49907299payment-1130.00RUBuser-10${integrityCode}`)
     )
   })
 
-  it('accepts only a callback with the exact provider signature', () => {
+  it('accepts only a callback with the exact provider signature', async () => {
     const amount = '130.00'
     const signature = md5(`49907299payment-1operation-1${amount}RUBuser-10${integrityCode}`)
     const callback = parsePayAnyWayCallback(new URLSearchParams({
@@ -52,8 +65,8 @@ describe('PayAnyWay integration', () => {
     }))
 
     expect(callback).not.toBeNull()
-    expect(verifyPayAnyWayCallback(callback!)).toEqual({ ok: true, amountKopecks: 13000 })
-    expect(verifyPayAnyWayCallback({ ...callback!, signature: '0'.repeat(32) })).toEqual({
+    await expect(verifyPayAnyWayCallback(callback!)).resolves.toEqual({ ok: true, amountKopecks: 13000 })
+    await expect(verifyPayAnyWayCallback({ ...callback!, signature: '0'.repeat(32) })).resolves.toEqual({
       ok: false,
       error: 'invalid_signature',
     })

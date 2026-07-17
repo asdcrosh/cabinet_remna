@@ -3,6 +3,18 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 process.env.YOOKASSA_SHOP_ID = 'shop-id'
 process.env.YOOKASSA_SECRET_KEY = 'secret-key'
 
+vi.mock('./payment-settings', () => ({
+  getResolvedPaymentProviderSettings: vi.fn(async () => ({
+    yookassa: {
+      enabled: true,
+      shopId: 'shop-id',
+      secretKey: 'secret-key',
+      webhookAllowedIps: '',
+    },
+  })),
+  isResolvedYooKassaConfigured: vi.fn(() => true),
+}))
+
 describe('yookassa client', () => {
   beforeEach(() => {
     vi.resetModules()

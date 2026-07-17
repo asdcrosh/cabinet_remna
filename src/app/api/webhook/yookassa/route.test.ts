@@ -50,6 +50,11 @@ vi.mock('@/lib/notifications', () => ({
   notifyPaymentCanceled: mocks.notifyPaymentCanceled,
   notifyPaymentStuck: mocks.notifyPaymentStuck,
 }))
+vi.mock('@/lib/payment-settings', () => ({
+  getResolvedPaymentProviderSettings: vi.fn(async () => ({
+    yookassa: { webhookAllowedIps: '185.71.76.0/27' },
+  })),
+}))
 
 import { POST } from './route'
 

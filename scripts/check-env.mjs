@@ -12,10 +12,6 @@ const requiredProduction = [
   "EMAIL_VERIFICATION_WEBHOOK_URL",
   "REMNAWAVE_BASE_URL",
   "REMNAWAVE_TOKEN",
-  "YOOKASSA_SHOP_ID",
-  "YOOKASSA_SECRET_KEY",
-  "YOOKASSA_WEBHOOK_URL",
-  "YOOKASSA_WEBHOOK_ALLOWED_IPS",
   "LEGAL_OPERATOR_NAME",
   "LEGAL_OPERATOR_TAX_ID",
   "LEGAL_SUPPORT_EMAIL",
@@ -40,6 +36,7 @@ const optionalBooleans = [
   "BONUS_BOX_PITY_ENABLED",
   "BONUS_BOX_SHOW_BEST_RECENT_OPENING",
   "TELEGRAM_MINIAPP_AUTO_MERGE_TECHNICAL",
+  "YOOKASSA_ENABLED",
   "PAYANYWAY_ENABLED",
   "PAYANYWAY_TEST_MODE",
 ];
@@ -104,7 +101,7 @@ if (value("JWT_SECRET") && value("JWT_SECRET").length < 32) {
 checkPublicUrl("APP_URL");
 checkPublicUrl("NEXTAUTH_URL", { optional: true });
 checkPublicUrl("REMNAWAVE_BASE_URL");
-checkPublicUrl("YOOKASSA_WEBHOOK_URL", { pathPrefix: "/api/webhook/yookassa" });
+checkPublicUrl("YOOKASSA_WEBHOOK_URL", { optional: true, pathPrefix: "/api/webhook/yookassa" });
 checkAllowedOrigins();
 
 if (
@@ -161,6 +158,10 @@ if (["1", "true", "yes", "on"].includes(value("PAYANYWAY_ENABLED").toLowerCase()
   if (value("PAYANYWAY_MNT_ID") && !/^\d+$/.test(value("PAYANYWAY_MNT_ID"))) {
     errors.push("PAYANYWAY_MNT_ID must contain only digits");
   }
+}
+
+if (value("PAYMENT_SETTINGS_ENCRYPTION_KEY") && value("PAYMENT_SETTINGS_ENCRYPTION_KEY").length < 32) {
+  errors.push("PAYMENT_SETTINGS_ENCRYPTION_KEY must be at least 32 characters");
 }
 
 for (const key of optionalBooleans) {

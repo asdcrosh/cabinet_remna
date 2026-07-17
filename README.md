@@ -342,10 +342,6 @@ NODE_ENV=production npm run check:env
 | `HEALTHCHECK_TOKEN` | Токен для `/api/health` |
 | `REMNAWAVE_BASE_URL` | URL Remnawave Panel |
 | `REMNAWAVE_TOKEN` | API token Remnawave |
-| `YOOKASSA_SHOP_ID` | ID магазина YooKassa |
-| `YOOKASSA_SECRET_KEY` | Secret key YooKassa |
-| `YOOKASSA_WEBHOOK_URL` | `https://домен/api/webhook/yookassa` |
-| `YOOKASSA_WEBHOOK_ALLOWED_IPS` | IP/CIDR YooKassa |
 | `EMAIL_VERIFICATION_WEBHOOK_URL` | Endpoint отправки email |
 | `BROADCAST_UPLOAD_SIGNING_SECRET` | Подпись URL картинок рассылок (>= 32 символов) |
 | `BROADCAST_UPLOAD_ALLOW_UNSIGNED_LEGACY` | Должно быть `false` |
@@ -359,10 +355,16 @@ NODE_ENV=production npm run check:env
 | --- | --- |
 | `CABINET_DOMAIN` | Домен без `https://` |
 | `CABINET_BRAND_NAME` | Название сервиса в UI и письмах |
+| `YOOKASSA_ENABLED` | Включает YooKassa; настройки из админки имеют приоритет |
+| `YOOKASSA_SHOP_ID` | ID магазина YooKassa |
+| `YOOKASSA_SECRET_KEY` | Secret key YooKassa |
+| `YOOKASSA_WEBHOOK_URL` | `https://домен/api/webhook/yookassa` |
+| `YOOKASSA_WEBHOOK_ALLOWED_IPS` | IP/CIDR YooKassa |
 | `PAYANYWAY_ENABLED` | Включает PayAnyWay как второй способ оплаты |
 | `PAYANYWAY_MNT_ID` | Номер бизнес-счёта PayAnyWay |
 | `PAYANYWAY_INTEGRITY_CODE` | Секрет проверки подписей PayAnyWay, минимум 32 символа |
 | `PAYANYWAY_TEST_MODE` | `true` для demo.moneta.ru, иначе `false` |
+| `PAYMENT_SETTINGS_ENCRYPTION_KEY` | Необязательный отдельный ключ шифрования секретов из админки; иначе используется `JWT_SECRET` |
 | `LEGAL_OPERATOR_ADDRESS` | Необязательный адрес исполнителя; пустое значение не показывается |
 | `REMNASHOP_DATABASE_URL` | Read-only доступ к БД Remnashop |
 | `REMNASHOP_API_URL` | Public API Remnashop |
@@ -409,6 +411,14 @@ curl -fsSL https://raw.githubusercontent.com/asdcrosh/cabinet_remna/main/deploy/
 
 ## Интеграции
 
+Провайдеры можно настроить двумя способами:
+
+- через `.env`;
+- в админке: `Система` → `Платёжные системы`.
+
+Настройки из админки имеют приоритет. Кнопка «Взять из .env» удаляет переопределение из базы.
+Секретные ключи в API не возвращаются и хранятся в базе в зашифрованном виде.
+
 ### YooKassa
 
 Webhook URL:
@@ -432,7 +442,7 @@ Pay URL: https://ВАШ_ДОМЕН/api/webhook/payanyway
 Замена URL: включена
 ```
 
-`Check URL` оставьте пустым. Затем заполните `.env`:
+`Check URL` оставьте пустым. Затем заполните `.env` или те же поля в разделе «Система»:
 
 ```env
 PAYANYWAY_ENABLED="true"

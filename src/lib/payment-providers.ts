@@ -4,16 +4,20 @@ import { isYookassaConfigured } from './yookassa'
 export const CHECKOUT_PAYMENT_PROVIDERS = ['YOOKASSA', 'PAYANYWAY'] as const
 export type CheckoutPaymentProvider = typeof CHECKOUT_PAYMENT_PROVIDERS[number]
 
-export function getAvailablePaymentProviders(): Array<{
+export async function getAvailablePaymentProviders(): Promise<Array<{
   id: CheckoutPaymentProvider
   label: string
-}> {
+}>> {
+  const [yookassaConfigured, payAnyWayConfigured] = await Promise.all([
+    isYookassaConfigured(),
+    isPayAnyWayConfigured(),
+  ])
   return [
-    ...(isYookassaConfigured() ? [{ id: 'YOOKASSA' as const, label: 'ЮKassa' }] : []),
-    ...(isPayAnyWayConfigured() ? [{ id: 'PAYANYWAY' as const, label: 'PayAnyWay' }] : []),
+    ...(yookassaConfigured ? [{ id: 'YOOKASSA' as const, label: 'ЮKassa' }] : []),
+    ...(payAnyWayConfigured ? [{ id: 'PAYANYWAY' as const, label: 'PayAnyWay' }] : []),
   ]
 }
 
-export function isPaymentProviderAvailable(provider: CheckoutPaymentProvider) {
+export async function isPaymentProviderAvailable(provider: CheckoutPaymentProvider) {
   return provider === 'YOOKASSA' ? isYookassaConfigured() : isPayAnyWayConfigured()
 }

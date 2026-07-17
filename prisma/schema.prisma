@@ -153,6 +153,20 @@ model FeatureSetting {
   updatedAt  DateTime @updatedAt
 }
 
+model PaymentProviderSetting {
+  id                              String   @id @default("default")
+  yookassaEnabled                 Boolean?
+  yookassaShopId                  String?
+  yookassaSecretKeyEncrypted      String?
+  yookassaWebhookAllowedIps       String?
+  payAnyWayEnabled                Boolean?
+  payAnyWayMerchantId             String?
+  payAnyWayIntegrityCodeEncrypted String?
+  payAnyWayTestMode               Boolean?
+  createdAt                       DateTime @default(now())
+  updatedAt                       DateTime @updatedAt
+}
+
 model NotificationLog {
   id        String              @id @default(cuid())
   userId    String
@@ -1069,6 +1083,8 @@ enum AuditAction {
   ADMIN_BONUS_PRIZE_UPDATED
   ADMIN_BONUS_SETTINGS_UPDATED
   ADMIN_FEATURES_UPDATED
+  ADMIN_PAYMENT_PROVIDERS_UPDATED
+  ADMIN_PAYMENT_PROVIDERS_RESET
   ADMIN_SUPPORT_UPDATED
   ADMIN_BROADCAST_CREATED
   ADMIN_BROADCAST_TEMPLATE_CREATED

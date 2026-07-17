@@ -19,7 +19,7 @@ export default async function PlansPage({
   searchParams: Promise<{ plan?: string; promo?: string; intent?: string }>
 }) {
   const params = await searchParams
-  const paymentProviders = getAvailablePaymentProviders()
+  const paymentProviders = await getAvailablePaymentProviders()
   const session = await getCurrentUser()
   const linkedPlanId = params.plan?.trim()
   const initialPromoCode = params.promo?.trim()
