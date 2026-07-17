@@ -128,10 +128,24 @@ test('каталог тарифов использует компактные с
   const card = page.getByTestId('admin-plan-card').filter({ hasText: 'E2E Стандарт' })
   await expect(card).toHaveCount(1)
   await card.getByRole('button', { name: 'Действия: E2E Стандарт' }).click()
-  const actions = page.getByRole('dialog', { name: 'Действия: E2E Стандарт' })
-  await expect(actions.getByRole('button', { name: 'Изменить тариф E2E Стандарт' })).toBeVisible()
-  await expect(actions.getByRole('button', { name: 'Скрыть тариф E2E Стандарт' })).toBeVisible()
-  await page.keyboard.press('Escape')
+  const actions = page.getByRole('menu', { name: 'Действия: E2E Стандарт' })
+  await actions.getByRole('button', { name: 'Изменить тариф E2E Стандарт' }).click()
+  const editor = page.getByRole('dialog', { name: /Редактировать «E2E Стандарт»/ })
+  await expect(editor).toBeVisible()
+  await editor.getByRole('button', { name: 'Закрыть' }).click()
+
+  let toggleIsActive: boolean | undefined
+  await page.route(/\/api\/admin\/plans\/[^/]+$/, async (route) => {
+    if (route.request().method() !== 'PATCH') {
+      await route.continue()
+      return
+    }
+    toggleIsActive = (route.request().postDataJSON() as { isActive?: boolean }).isActive
+    await route.fulfill({ status: 200, contentType: 'application/json', body: '{}' })
+  })
+  await card.getByRole('button', { name: 'Действия: E2E Стандарт' }).click()
+  await actions.getByRole('button', { name: 'Скрыть тариф E2E Стандарт' }).click()
+  await expect.poll(() => toggleIsActive).toBe(false)
 
   const [gridBox, cardBox] = await Promise.all([grid.boundingBox(), card.boundingBox()])
   expect(gridBox).not.toBeNull()

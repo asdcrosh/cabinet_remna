@@ -68,7 +68,7 @@ export function AdminActionsMenu({
   const actionList = (
     <div
       className="grid gap-1 p-2 [&_a]:w-full [&_button]:w-full [&_.btn-secondary]:min-h-10 [&_.btn-secondary]:justify-start [&_.btn-primary]:min-h-10 [&_.btn-primary]:justify-start"
-      onClickCapture={(event) => {
+      onClick={(event) => {
         if ((event.target as HTMLElement).closest('button, a')) setOpen(false)
       }}
     >
