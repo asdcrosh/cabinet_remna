@@ -12,6 +12,8 @@ import { AdminFilterSubmitButton } from '@/components/admin/admin-filter-submit-
 import { AdminFilterBar, AdminFilterField } from '@/components/admin/admin-filter-bar'
 import { AdminEmptyState } from '@/components/admin/admin-empty-state'
 import { describeSyncError } from '@/lib/sync-error'
+import { paymentProviderLabel } from '@/lib/payment-provider-label'
+import type { PaymentProvider } from '@prisma/client'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Платежи — Админка' }
@@ -19,19 +21,21 @@ export const metadata = { title: 'Платежи — Админка' }
 export default async function AdminPaymentsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; status?: string; delivery?: string; from?: string; to?: string; range?: string; limit?: string }>
+  searchParams: Promise<{ q?: string; status?: string; provider?: string; delivery?: string; from?: string; to?: string; range?: string; limit?: string }>
 }) {
   await requireAdminPage()
 
   const params = await searchParams
   const q = params.q?.trim() ?? ''
   const status = params.status ?? 'ALL'
+  const provider = params.provider ?? 'ALL'
   const delivery = params.delivery ?? 'ALL'
   const range = params.range ?? 'ALL'
   const { from, to } = resolveDateRange(range, params.from, params.to)
   const limit = parseAdminListLimit(params.limit)
   const where = {
     ...(status !== 'ALL' ? { status: status as any } : {}),
+    ...(provider !== 'ALL' ? { provider: provider as PaymentProvider } : {}),
     ...(delivery === 'DELIVERED'
       ? { subscriptionProvisionedAt: { not: null } }
       : delivery === 'RETRY'
@@ -45,6 +49,7 @@ export default async function AdminPaymentsPage({
             { user: { name: { contains: q, mode: 'insensitive' as const } } },
             { plan: { name: { contains: q, mode: 'insensitive' as const } } },
             { yookassaId: { contains: q, mode: 'insensitive' as const } },
+            { externalPaymentId: { contains: q, mode: 'insensitive' as const } },
           ],
         }
       : {}),
@@ -73,7 +78,7 @@ export default async function AdminPaymentsPage({
         title="Платежи"
         description="Оплаты и выдача подписок"
         action={
-          <Link href={buildPaymentsExportHref(q, status, delivery, range, params.from, params.to)} className="btn-secondary w-full sm:w-auto">
+          <Link href={buildPaymentsExportHref(q, status, provider, delivery, range, params.from, params.to)} className="btn-secondary w-full sm:w-auto">
             <Download className="h-4 w-4" />
             CSV
           </Link>
@@ -89,9 +94,9 @@ export default async function AdminPaymentsPage({
       <AdminFilterBar
         action="/dashboard/admin/payments"
         resetHref="/dashboard/admin/payments"
-        resetVisible={Boolean(q || status !== 'ALL' || delivery !== 'ALL' || range !== 'ALL' || params.from || params.to)}
+        resetVisible={Boolean(q || status !== 'ALL' || provider !== 'ALL' || delivery !== 'ALL' || range !== 'ALL' || params.from || params.to)}
         count={{ shown: payments.length, total }}
-        className="md:grid-cols-2 xl:grid-cols-[minmax(16rem,1fr)_11rem_12rem_10rem_auto]"
+        className="md:grid-cols-2 xl:grid-cols-[minmax(15rem,1fr)_10rem_10rem_11rem_9rem_auto]"
       >
         <input type="hidden" name="limit" value={ADMIN_LIST_PAGE_SIZE} />
         <AdminFilterField label="Поиск платежей">
@@ -107,6 +112,14 @@ export default async function AdminPaymentsPage({
             <option value="SUCCEEDED">Оплачены</option>
             <option value="CANCELED">Отменены</option>
             <option value="REFUNDED">Возвраты</option>
+          </select>
+        </AdminFilterField>
+        <AdminFilterField label="Провайдер">
+          <select name="provider" defaultValue={provider} className="input">
+            <option value="ALL">Все</option>
+            <option value="YOOKASSA">ЮKassa</option>
+            <option value="PAYANYWAY">PayAnyWay</option>
+            <option value="LOCAL">Без оплаты</option>
           </select>
         </AdminFilterField>
         <AdminFilterField label="Выдача подписки">
@@ -151,7 +164,7 @@ export default async function AdminPaymentsPage({
         {payments.map((payment) => {
           const needsRetry = payment.status === 'SUCCEEDED' && !payment.subscriptionProvisionedAt
           const needsRemnashopRetry = payment.status === 'SUCCEEDED' && Boolean(payment.subscriptionProvisionedAt) && !payment.remnashopSyncedAt
-          const canCheckPayment = Boolean(payment.yookassaId) && payment.status !== 'SUCCEEDED'
+          const canCheckPayment = payment.provider === 'YOOKASSA' && Boolean(payment.yookassaId) && payment.status !== 'SUCCEEDED'
           const action = canCheckPayment ? (
             <PaymentSyncButton paymentId={payment.id} />
           ) : needsRetry ? (
@@ -171,7 +184,8 @@ export default async function AdminPaymentsPage({
                     <div className="break-words text-sm font-semibold">{payment.user.email}</div>
                     <div className="mt-1 flex flex-wrap gap-x-2 gap-y-1 text-xs text-slate-500">
                       <span>{formatAdminPaymentDate(payment.createdAt)}</span>
-                      <span className="font-mono">{shortId(payment.yookassaId || payment.id)}</span>
+                      <span>{paymentProviderLabel(payment.provider)}</span>
+                      <span className="font-mono">{shortId(payment.externalPaymentId || payment.yookassaId || payment.id)}</span>
                     </div>
                   </div>
                   <div className="lg:mt-2"><PaymentBadge status={payment.status} /></div>
@@ -273,10 +287,11 @@ function parseDateInput(value: string | undefined, edge: 'start' | 'end') {
   return Number.isNaN(date.getTime()) ? null : date
 }
 
-function buildPaymentsExportHref(q: string, status: string, delivery: string, range: string, from?: string, to?: string) {
+function buildPaymentsExportHref(q: string, status: string, provider: string, delivery: string, range: string, from?: string, to?: string) {
   const params = new URLSearchParams({ format: 'csv' })
   if (q) params.set('q', q)
   if (status !== 'ALL') params.set('status', status)
+  if (provider !== 'ALL') params.set('provider', provider)
   if (delivery !== 'ALL') params.set('delivery', delivery)
   if (range !== 'ALL') params.set('range', range)
   if (from) params.set('from', from)

@@ -4,6 +4,7 @@ import { ExternalLink } from 'lucide-react'
 import { formatPrice } from '@/lib/format'
 import { getPendingPaymentTtlMs } from '@/lib/payment-sync'
 import { EmptyState } from '@/components/dashboard/empty-state'
+import { paymentProviderLabel } from '@/lib/payment-provider-label'
 
 export type PaymentHistoryPayment = Prisma.PaymentGetPayload<{ include: { plan: true; subscription: true } }>
 
@@ -23,7 +24,10 @@ export function PaymentHistory({ payments }: { payments: PaymentHistoryPayment[]
           <div className="flex min-w-0 items-start justify-between gap-3 lg:block">
             <div className="min-w-0">
               <div className="truncate text-sm font-semibold text-slate-950 dark:text-white">{payment.plan.name}</div>
-              <div className="mt-1 text-xs text-slate-500">{formatPaymentDate(payment.createdAt)}</div>
+              <div className="mt-1 flex flex-wrap gap-x-2 text-xs text-slate-500">
+                <span>{formatPaymentDate(payment.createdAt)}</span>
+                <span>{paymentProviderLabel(payment.provider)}</span>
+              </div>
             </div>
             <div className="lg:mt-2"><PaymentStatusBadge status={payment.status} createdAt={payment.createdAt} /></div>
           </div>
@@ -43,7 +47,7 @@ export function PaymentHistory({ payments }: { payments: PaymentHistoryPayment[]
             <ProvisioningBadge provisioned={Boolean(payment.subscriptionProvisionedAt)} status={payment.status} />
             <details className="mt-2 text-xs text-slate-400">
               <summary className="cursor-pointer">ID платежа</summary>
-              <div className="mt-1 truncate font-mono">{payment.yookassaId ? shortId(payment.yookassaId) : shortId(payment.id)}</div>
+              <div className="mt-1 truncate font-mono">{shortId(payment.externalPaymentId || payment.yookassaId || payment.id)}</div>
             </details>
           </div>
 

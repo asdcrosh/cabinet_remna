@@ -102,6 +102,21 @@ async function checkYooKassa() {
   }
 }
 
+function checkPayAnyWay() {
+  const enabled = ['1', 'true', 'yes', 'on'].includes(env('PAYANYWAY_ENABLED').toLowerCase())
+  if (!enabled) return check('payanyway', 'PayAnyWay', 'ok', 'Отключён')
+
+  const merchantId = env('PAYANYWAY_MNT_ID')
+  const integrityCode = env('PAYANYWAY_INTEGRITY_CODE')
+  if (!merchantId || !integrityCode) {
+    return check('payanyway', 'PayAnyWay', 'error', 'Не заполнены номер счёта или код проверки целостности')
+  }
+  if (!/^\d+$/.test(merchantId) || integrityCode.length < 32) {
+    return check('payanyway', 'PayAnyWay', 'error', 'Проверьте номер счёта и задайте секрет длиной от 32 символов')
+  }
+  return check('payanyway', 'PayAnyWay', 'ok', 'Платёжная форма и Pay URL настроены')
+}
+
 async function checkTelegram() {
   const token = env('TELEGRAM_BOT_TOKEN')
   if (!token) {
@@ -319,6 +334,7 @@ export async function getSystemHealth(options: { sendEmail?: boolean } = {}): Pr
     checkDatabase(),
     checkRemnawave(),
     checkYooKassa(),
+    checkPayAnyWay(),
     checkEmail(Boolean(options.sendEmail)),
     checkTelegram(),
     latestBackup(),

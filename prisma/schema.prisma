@@ -516,8 +516,8 @@ enum SubscriptionStatus {
 // ----------------------------------------------------------------------
 // 4. Платёж
 // ----------------------------------------------------------------------
-// Платёж проходит через ЮKassa. Idempotency-key здесь — наш internal ID
-// платежа, чтобы при ретрае webhook'а не создать две подписки.
+// Платёж может проходить через несколько провайдеров. Наш internal ID
+// используется как idempotency key и номер заказа у внешнего провайдера.
 // ----------------------------------------------------------------------
 model Payment {
   id             String  @id @default(cuid())
@@ -533,7 +533,12 @@ model Payment {
   discountKopecks       Int   @default(0)
   promoCodeSnapshot     Json?
 
-  // Данные ЮKassa
+  // Общие данные внешнего провайдера
+  provider          PaymentProvider @default(YOOKASSA)
+  externalPaymentId String?
+  providerStatus    String?
+
+  // Legacy-поля ЮKassa. Сохраняются для совместимости со старыми платежами.
   yookassaId      String?                @unique
   yookassaStatus  YookassaPaymentStatus?
   confirmationUrl String? // URL для редиректа пользователя
@@ -565,7 +570,15 @@ model Payment {
   @@index([status, createdAt])
   @@index([status, subscriptionProvisionedAt, createdAt])
   @@index([status, subscriptionProvisionedAt, remnashopSyncedAt, updatedAt], map: "Payment_status_subscriptionProvisionedAt_remnashopSyncedAt_upda")
+  @@unique([provider, externalPaymentId])
+  @@index([provider, status, createdAt])
   @@index([promoCodeId])
+}
+
+enum PaymentProvider {
+  YOOKASSA
+  PAYANYWAY
+  LOCAL
 }
 
 enum PaymentStatus {

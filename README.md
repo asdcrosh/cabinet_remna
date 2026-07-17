@@ -359,6 +359,10 @@ NODE_ENV=production npm run check:env
 | --- | --- |
 | `CABINET_DOMAIN` | Домен без `https://` |
 | `CABINET_BRAND_NAME` | Название сервиса в UI и письмах |
+| `PAYANYWAY_ENABLED` | Включает PayAnyWay как второй способ оплаты |
+| `PAYANYWAY_MNT_ID` | Номер бизнес-счёта PayAnyWay |
+| `PAYANYWAY_INTEGRITY_CODE` | Секрет проверки подписей PayAnyWay, минимум 32 символа |
+| `PAYANYWAY_TEST_MODE` | `true` для demo.moneta.ru, иначе `false` |
 | `LEGAL_OPERATOR_ADDRESS` | Необязательный адрес исполнителя; пустое значение не показывается |
 | `REMNASHOP_DATABASE_URL` | Read-only доступ к БД Remnashop |
 | `REMNASHOP_API_URL` | Public API Remnashop |
@@ -416,6 +420,29 @@ https://ВАШ_ДОМЕН/api/webhook/yookassa
 События: `payment.succeeded`, `payment.canceled`, `payment.waiting_for_capture`.
 
 Кабинет также проверяет платёж после возврата пользователя; worker периодически сверяет pending-платежи.
+
+### PayAnyWay
+
+В настройках бизнес-счёта укажите:
+
+```text
+Pay URL: https://ВАШ_ДОМЕН/api/webhook/payanyway
+Метод отправки: POST
+Подпись формы оплаты: обязательна
+Замена URL: включена
+```
+
+`Check URL` оставьте пустым. Затем заполните `.env`:
+
+```env
+PAYANYWAY_ENABLED="true"
+PAYANYWAY_MNT_ID="НОМЕР_БИЗНЕС_СЧЁТА"
+PAYANYWAY_INTEGRITY_CODE="СЕКРЕТ_ИЗ_НАСТРОЕК_СЧЁТА"
+PAYANYWAY_TEST_MODE="false"
+```
+
+После оплаты PayAnyWay отправляет подписанный отчёт на Pay URL. Кабинет проверяет подпись, сумму,
+номер счёта и заказ, после чего выдаёт подписку. Не используйте в качестве секрета короткие значения.
 
 ### Email
 

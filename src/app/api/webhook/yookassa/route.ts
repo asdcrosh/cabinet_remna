@@ -72,6 +72,7 @@ export async function POST(req: Request) {
       data: {
         status: 'SUCCEEDED',
         yookassaStatus: 'succeeded',
+        providerStatus: 'succeeded',
         paidAt: payment.paidAt ?? new Date(),
       },
     })
@@ -116,7 +117,7 @@ export async function POST(req: Request) {
   if (status === 'canceled') {
     await prisma.payment.update({
       where: { id: payment.id },
-      data: { status: 'CANCELED', yookassaStatus: 'canceled' },
+      data: { status: 'CANCELED', yookassaStatus: 'canceled', providerStatus: 'canceled' },
     })
     await prisma.promoCodeRedemption.updateMany({
       where: { paymentId: payment.id, status: 'PENDING' },

@@ -1,4 +1,4 @@
-// POST /api/payment/create — создаёт платёж в ЮKassa и возвращает URL для редиректа.
+// POST /api/payment/create — создаёт платёж у выбранного провайдера и возвращает URL для редиректа.
 // Вызывается из UI страницы /plans.
 
 import { NextResponse } from 'next/server'
@@ -7,6 +7,8 @@ import { prisma } from '@/lib/prisma'
 import { requireAuth, withAuth } from '@/lib/auth/guard'
 import { createPaymentSchema } from '@/lib/auth/validation'
 import { createPayment } from '@/lib/yookassa'
+import { createPayAnyWayPaymentUrl } from '@/lib/payanyway'
+import { isPaymentProviderAvailable } from '@/lib/payment-providers'
 import { PromoCodeError, validatePromoCodeForPlan } from '@/lib/promo-codes'
 import { getAppUrl } from '@/lib/app-url'
 import { rateLimit } from '@/lib/rate-limit'
@@ -40,7 +42,7 @@ export const POST = withAuth(async (req: Request) => {
       { status: 400 }
     )
   }
-  const { planId, promoCode } = parsed.data
+  const { planId, promoCode, provider } = parsed.data
 
   const plan = await prisma.plan.findUnique({ where: { id: planId } })
   if (!plan || !plan.isActive) {
@@ -111,6 +113,8 @@ export const POST = withAuth(async (req: Request) => {
               amountKopecks: 0,
               originalAmountKopecks: plan.priceKopecks,
               discountKopecks: plan.priceKopecks,
+              provider: 'LOCAL',
+              providerStatus: 'succeeded',
               status: 'SUCCEEDED',
               paidAt: new Date(),
             },
@@ -136,6 +140,13 @@ export const POST = withAuth(async (req: Request) => {
     }
 
     return provisionPromoPayment(promoPayment, user, plan)
+  }
+
+  if (!isPaymentProviderAvailable(provider)) {
+    return NextResponse.json(
+      { error: provider === 'PAYANYWAY' ? 'PayAnyWay пока не настроен' : 'ЮKassa пока не настроена' },
+      { status: 503 }
+    )
   }
 
   let localPayment: Payment
@@ -170,6 +181,8 @@ export const POST = withAuth(async (req: Request) => {
                   finalAmountKopecks: discount.finalAmountKopecks,
                 }
               : undefined,
+            provider,
+            providerStatus: 'pending',
             status: 'PENDING',
           },
         })
@@ -205,14 +218,50 @@ export const POST = withAuth(async (req: Request) => {
   const amountRub = localPayment.amountKopecks / 100
   const baseUrl = getAppUrl()
   const returnUrl = `${baseUrl}/dashboard/billing?paid=1&payment=${localPayment.id}`
+  const description = appliedPromo
+    ? `Подписка: ${plan.name} (${plan.durationDays} дн.), промокод ${appliedPromo.normalizedCode}`
+    : `Подписка: ${plan.name} (${plan.durationDays} дн.)`
+
+  if (provider === 'PAYANYWAY') {
+    try {
+      const confirmationUrl = createPayAnyWayPaymentUrl({
+        transactionId: localPayment.id,
+        amountKopecks: localPayment.amountKopecks,
+        description,
+        subscriberId: user.id,
+        successUrl: returnUrl,
+        failUrl: `${baseUrl}/dashboard/billing?payment=${localPayment.id}&failed=1`,
+        returnUrl: `${baseUrl}/dashboard/billing?payment=${localPayment.id}`,
+      })
+      await prisma.payment.update({
+        where: { id: localPayment.id },
+        data: { confirmationUrl },
+      })
+      return NextResponse.json({
+        confirmationUrl,
+        paymentId: localPayment.id,
+        localPaymentId: localPayment.id,
+        provider,
+      })
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'PayAnyWay create payment failed'
+      await cancelFailedLocalPayment(localPayment.id, message)
+      logError('payment.create.payanyway_failed', e, { localPaymentId: localPayment.id })
+      return NextResponse.json(
+        {
+          error: 'PayAnyWay не удалось создать ссылку на оплату. Проверьте номер счёта и код проверки целостности.',
+          details: process.env.NODE_ENV === 'development' ? message : undefined,
+        },
+        { status: 502 }
+      )
+    }
+  }
 
   let payment
   try {
     payment = await createPayment({
       amount: amountRub,
-      description: appliedPromo
-        ? `Подписка: ${plan.name} (${plan.durationDays} дн.), промокод ${appliedPromo.normalizedCode}`
-        : `Подписка: ${plan.name} (${plan.durationDays} дн.)`,
+      description,
       returnUrl,
       metadata: {
         userId: user.id,
@@ -229,17 +278,7 @@ export const POST = withAuth(async (req: Request) => {
     })
   } catch (e) {
     const message = e instanceof Error ? e.message : 'YooKassa createPayment failed'
-    await prisma.payment.update({
-      where: { id: localPayment.id },
-      data: {
-        status: 'CANCELED',
-        provisioningError: message.slice(0, 1000),
-      },
-    })
-    await prisma.promoCodeRedemption.updateMany({
-      where: { paymentId: localPayment.id },
-      data: { status: 'CANCELED' },
-    })
+    await cancelFailedLocalPayment(localPayment.id, message)
     logError('payment.create.yookassa_failed', e, { localPaymentId: localPayment.id })
     return NextResponse.json(
       {
@@ -256,6 +295,8 @@ export const POST = withAuth(async (req: Request) => {
     data: {
       yookassaId: payment.id,
       yookassaStatus: payment.status,
+      externalPaymentId: payment.id,
+      providerStatus: payment.status,
       confirmationUrl: payment.confirmation?.confirmation_url ?? null,
     },
   })
@@ -264,8 +305,26 @@ export const POST = withAuth(async (req: Request) => {
     confirmationUrl: payment.confirmation?.confirmation_url,
     paymentId: payment.id,
     localPaymentId: localPayment.id,
+    provider,
   })
 })
+
+async function cancelFailedLocalPayment(paymentId: string, message: string) {
+  await prisma.$transaction([
+    prisma.payment.update({
+      where: { id: paymentId },
+      data: {
+        status: 'CANCELED',
+        providerStatus: 'failed',
+        provisioningError: message.slice(0, 1000),
+      },
+    }),
+    prisma.promoCodeRedemption.updateMany({
+      where: { paymentId },
+      data: { status: 'CANCELED' },
+    }),
+  ])
+}
 
 async function provisionPromoPayment(
   payment: Payment,

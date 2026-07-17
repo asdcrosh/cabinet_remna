@@ -40,6 +40,8 @@ const optionalBooleans = [
   "BONUS_BOX_PITY_ENABLED",
   "BONUS_BOX_SHOW_BEST_RECENT_OPENING",
   "TELEGRAM_MINIAPP_AUTO_MERGE_TECHNICAL",
+  "PAYANYWAY_ENABLED",
+  "PAYANYWAY_TEST_MODE",
 ];
 
 const optionalNonNegativeIntegers = [
@@ -147,6 +149,18 @@ for (const [left, right] of optionalPairs) {
 
 if (value("TELEGRAM_NOTIFY_CHAT_ID") && !value("TELEGRAM_BOT_TOKEN")) {
   warnings.push("TELEGRAM_BOT_TOKEN is required for Telegram deploy notifications");
+}
+
+if (["1", "true", "yes", "on"].includes(value("PAYANYWAY_ENABLED").toLowerCase())) {
+  if (!value("PAYANYWAY_MNT_ID")) errors.push("PAYANYWAY_MNT_ID is required when PayAnyWay is enabled");
+  if (!value("PAYANYWAY_INTEGRITY_CODE")) {
+    errors.push("PAYANYWAY_INTEGRITY_CODE is required when PayAnyWay is enabled");
+  } else if (value("PAYANYWAY_INTEGRITY_CODE").length < 32) {
+    errors.push("PAYANYWAY_INTEGRITY_CODE must be at least 32 characters");
+  }
+  if (value("PAYANYWAY_MNT_ID") && !/^\d+$/.test(value("PAYANYWAY_MNT_ID"))) {
+    errors.push("PAYANYWAY_MNT_ID must contain only digits");
+  }
 }
 
 for (const key of optionalBooleans) {

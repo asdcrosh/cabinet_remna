@@ -132,6 +132,8 @@ async function claimTrialPlan({
             amountKopecks: 0,
             originalAmountKopecks: plan.priceKopecks,
             discountKopecks: plan.priceKopecks,
+            provider: 'LOCAL',
+            providerStatus: 'succeeded',
             status: 'SUCCEEDED',
             paidAt: new Date(),
             promoCodeSnapshot: {

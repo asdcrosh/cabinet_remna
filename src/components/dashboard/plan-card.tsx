@@ -23,6 +23,10 @@ export interface PlanCardProps {
   popular?: boolean;
   current?: boolean;
   initialPromoCode?: string;
+  paymentProviders?: Array<{
+    id: "YOOKASSA" | "PAYANYWAY";
+    label: string;
+  }>;
   availablePromoCodes?: Array<{
     code: string;
     discountPercent: number;
@@ -47,12 +51,16 @@ export function PlanCard({
   popular,
   current,
   initialPromoCode,
+  paymentProviders = [{ id: "YOOKASSA", label: "ЮKassa" }],
   availablePromoCodes = [],
 }: PlanCardProps) {
   const [loading, setLoading] = useState(false);
   const [validatingPromo, setValidatingPromo] = useState(false);
   const [promoOpen, setPromoOpen] = useState(false);
   const [manualPromoOpen, setManualPromoOpen] = useState(false);
+  const [selectedProvider, setSelectedProvider] = useState<"YOOKASSA" | "PAYANYWAY">(
+    paymentProviders[0]?.id ?? "YOOKASSA",
+  );
   const [promoInput, setPromoInput] = useState("");
   const [appliedPromo, setAppliedPromo] = useState<{
     code: string;
@@ -134,6 +142,10 @@ export function PlanCard({
       toast("Сначала примените промокод или очистите поле");
       return;
     }
+    if (paymentProviders.length === 0) {
+      toast("Оплата временно недоступна");
+      return;
+    }
 
     setLoading(true);
     try {
@@ -144,6 +156,7 @@ export function PlanCard({
         method: "POST",
         body: JSON.stringify({
           planId: id,
+          provider: selectedProvider,
           ...(appliedPromo ? { promoCode: appliedPromo.code } : {}),
         }),
       });
@@ -353,10 +366,34 @@ export function PlanCard({
       ) : (
         <div className="mt-auto" />
       )}
+      {!isPromoPlan && paymentProviders.length > 1 ? (
+        <div className="mt-4 grid grid-cols-2 rounded-xl bg-slate-100 p-1 dark:bg-white/[0.06]" role="radiogroup" aria-label="Способ оплаты">
+          {paymentProviders.map((provider) => (
+            <button
+              key={provider.id}
+              type="button"
+              role="radio"
+              aria-checked={selectedProvider === provider.id}
+              onClick={() => setSelectedProvider(provider.id)}
+              className={cn(
+                "min-h-9 rounded-lg px-3 text-xs font-semibold transition",
+                selectedProvider === provider.id
+                  ? "bg-white text-slate-950 shadow-sm dark:bg-surface-800 dark:text-white"
+                  : "text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white",
+              )}
+            >
+              {provider.label}
+            </button>
+          ))}
+        </div>
+      ) : null}
+      {!isPromoPlan && paymentProviders.length === 0 ? (
+        <div className="mt-4 text-center text-xs text-amber-700 dark:text-amber-300">Оплата временно недоступна</div>
+      ) : null}
       <button
         type="button"
         onClick={buy}
-        disabled={loading}
+        disabled={loading || (!isPromoPlan && paymentProviders.length === 0)}
         className="btn-primary mt-4 w-full min-h-11"
       >
         <CreditCard className="h-4 w-4" />

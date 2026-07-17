@@ -106,8 +106,13 @@ export async function getRemnashopSyncDryRun() {
       select: { id: true, user: { select: { remnawaveUuid: true } } },
     }),
     prisma.payment.findMany({
-      where: { yookassaId: { in: paymentIds } },
-      select: { id: true, yookassaId: true },
+      where: {
+        OR: [
+          { externalPaymentId: { in: paymentIds } },
+          { yookassaId: { in: paymentIds } },
+        ],
+      },
+      select: { id: true, externalPaymentId: true, yookassaId: true },
     }),
     prisma.plan.findMany({
       where: { name: { in: planNames } },
@@ -127,7 +132,7 @@ export async function getRemnashopSyncDryRun() {
   )
   const cabinetPaymentIds = new Set(
     cabinetPayments
-      .map((payment) => payment.yookassaId)
+      .map((payment) => payment.externalPaymentId || payment.yookassaId)
       .filter((id): id is string => Boolean(id))
   )
   const cabinetPlanKeys = new Set(

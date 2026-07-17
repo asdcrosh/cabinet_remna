@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { PaymentStatus, Prisma } from '@prisma/client'
+import { PaymentProvider, PaymentStatus, Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { requireAdmin, withAuth } from '@/lib/auth/guard'
 import { serializePayment } from '@/lib/api-serializers'
@@ -13,6 +13,7 @@ export const GET = withAuth(async (req: Request) => {
 
   const url = new URL(req.url)
   const status = url.searchParams.get('status')
+  const provider = url.searchParams.get('provider')
   const needsProvisioning = url.searchParams.get('needsProvisioning') === 'true'
   const q = url.searchParams.get('q')?.trim()
   const { from, to } = resolveDateRange(
@@ -27,6 +28,7 @@ export const GET = withAuth(async (req: Request) => {
 
   const baseWhere: Prisma.PaymentWhereInput = {
     ...(status && status in PaymentStatus ? { status: status as PaymentStatus } : {}),
+    ...(provider && provider in PaymentProvider ? { provider: provider as PaymentProvider } : {}),
     ...(needsProvisioning || delivery === 'RETRY' ? { status: 'SUCCEEDED', subscriptionProvisionedAt: null } : {}),
     ...(delivery === 'DELIVERED' ? { subscriptionProvisionedAt: { not: null } } : {}),
     ...(from || to ? { createdAt: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } } : {}),
@@ -35,6 +37,7 @@ export const GET = withAuth(async (req: Request) => {
           OR: [
             { id: { contains: q, mode: 'insensitive' } },
             { yookassaId: { contains: q, mode: 'insensitive' } },
+            { externalPaymentId: { contains: q, mode: 'insensitive' } },
             { user: { email: { contains: q, mode: 'insensitive' } } },
           ],
         }
@@ -59,6 +62,8 @@ export const GET = withAuth(async (req: Request) => {
       plan: payment.plan.name,
       amountRub: (payment.amountKopecks / 100).toFixed(2),
       status: payment.status,
+      provider: payment.provider,
+      externalPaymentId: payment.externalPaymentId ?? '',
       yookassaId: payment.yookassaId ?? '',
       provisionedAt: payment.subscriptionProvisionedAt ?? '',
       remnashopSyncedAt: payment.remnashopSyncedAt ?? '',

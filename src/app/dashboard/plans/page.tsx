@@ -9,6 +9,7 @@ import { PageHeader } from '@/components/dashboard/page-header'
 import { getCurrentUser } from '@/lib/auth/cookies'
 import { getPlanAudienceContext, isPlanAvailableForUser } from '@/lib/plan-access'
 import { getAvailableUserPromoCodesByPlan } from '@/lib/user-promo-codes'
+import { getAvailablePaymentProviders } from '@/lib/payment-providers'
 
 export const revalidate = 300 // кэш на 5 минут
 
@@ -18,6 +19,7 @@ export default async function PlansPage({
   searchParams: Promise<{ plan?: string; promo?: string; intent?: string }>
 }) {
   const params = await searchParams
+  const paymentProviders = getAvailablePaymentProviders()
   const session = await getCurrentUser()
   const linkedPlanId = params.plan?.trim()
   const initialPromoCode = params.promo?.trim()
@@ -115,6 +117,7 @@ export default async function PlansPage({
     current: currentSubscription?.planId === plan.id,
     initialPromoCode,
     availablePromoCodes: availablePromoCodesByPlan.get(plan.id) ?? [],
+    paymentProviders,
   }))
 
   return (

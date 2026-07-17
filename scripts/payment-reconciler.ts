@@ -55,13 +55,13 @@ async function runOnce() {
     where: {
       createdAt: { lte: cutoff },
       OR: [
-        { status: 'PENDING' },
+        { status: 'PENDING', provider: 'YOOKASSA' },
         { status: 'SUCCEEDED', subscriptionProvisionedAt: null },
       ],
     },
     orderBy: { createdAt: 'asc' },
     take: batchSize,
-    select: { id: true, status: true, yookassaId: true },
+    select: { id: true, status: true, provider: true, yookassaId: true },
   })
 
   if (payments.length > 0) {

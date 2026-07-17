@@ -131,7 +131,7 @@ describe('YooKassa webhook route', () => {
     expect(body).toEqual({ ok: true })
     expect(mocks.prisma.payment.update).toHaveBeenCalledWith({
       where: { id: 'pay-1' },
-      data: { status: 'CANCELED', yookassaStatus: 'canceled' },
+      data: { status: 'CANCELED', yookassaStatus: 'canceled', providerStatus: 'canceled' },
     })
     expect(mocks.prisma.promoCodeRedemption.updateMany).toHaveBeenCalledWith({
       where: { paymentId: 'pay-1', status: 'PENDING' },

@@ -15,6 +15,7 @@ export type PaymentSyncResult =
 type PendingPaymentForCancel = {
   id: string
   userId: string
+  provider: 'YOOKASSA' | 'PAYANYWAY' | 'LOCAL'
   yookassaId: string | null
 }
 
@@ -34,6 +35,11 @@ export async function syncPaymentProvisioning(input: {
   if (!payment) return { ok: true, status: 'not_found', provisioned: false }
   if (payment.status === 'CANCELED') {
     return { ok: true, status: 'canceled', provisioned: false }
+  }
+  // PayAnyWay подтверждает оплату подписанным Pay URL. Без Merchant API
+  // мы не отменяем и не считаем такой платёж неоплаченным по таймеру.
+  if (payment.provider === 'PAYANYWAY' && payment.status !== 'SUCCEEDED') {
+    return { ok: true, status: 'pending', provisioned: false }
   }
   if (!payment.yookassaId) {
     if (payment.status !== 'SUCCEEDED') {
@@ -105,7 +111,7 @@ export async function syncPaymentProvisioning(input: {
     await prisma.$transaction([
       prisma.payment.update({
         where: { id: payment.id },
-        data: { status: 'CANCELED', yookassaStatus: 'canceled' },
+        data: { status: 'CANCELED', yookassaStatus: 'canceled', providerStatus: 'canceled' },
       }),
       prisma.promoCodeRedemption.updateMany({
         where: { paymentId: payment.id, status: 'PENDING' },
@@ -131,7 +137,7 @@ export async function syncPaymentProvisioning(input: {
 
     await prisma.payment.update({
       where: { id: payment.id },
-      data: { yookassaStatus: yooPayment.status },
+      data: { yookassaStatus: yooPayment.status, providerStatus: yooPayment.status },
     })
 
     return { ok: true, status: 'pending', provisioned: false }
@@ -143,6 +149,7 @@ export async function syncPaymentProvisioning(input: {
       data: {
         status: 'SUCCEEDED',
         yookassaStatus: 'succeeded',
+        providerStatus: 'succeeded',
         paidAt: payment.paidAt ?? new Date(),
       },
     }),
@@ -200,11 +207,12 @@ export async function cancelOtherPendingPaymentsForUser(userId: string, paidPaym
     where: {
       userId,
       status: 'PENDING',
+      provider: 'YOOKASSA',
       id: { not: paidPaymentId },
     },
     orderBy: { createdAt: 'asc' },
     take: limit,
-    select: { id: true, userId: true, yookassaId: true },
+    select: { id: true, userId: true, provider: true, yookassaId: true },
   })
 
   let canceled = 0
@@ -240,6 +248,7 @@ export async function cancelOtherPendingPaymentsForUser(userId: string, paidPaym
 }
 
 async function cancelPendingPayment(payment: PendingPaymentForCancel, reason: string) {
+  if (payment.provider !== 'YOOKASSA') return null
   if (!payment.yookassaId) {
     await cancelLocalPayment(payment.id, null)
     await notifyPaymentCanceled(payment.id, reason)
@@ -291,6 +300,7 @@ async function cancelLocalPayment(paymentId: string, yookassaStatus: YooKassaPay
       data: {
         status: 'CANCELED',
         yookassaStatus,
+        providerStatus: yookassaStatus ?? 'canceled',
       },
     }),
     prisma.promoCodeRedemption.updateMany({
@@ -316,6 +326,7 @@ export async function reconcileStalePendingPaymentsForUser(userId: string, limit
     where: {
       userId,
       status: 'PENDING',
+      provider: 'YOOKASSA',
       createdAt: { lte: cutoff },
     },
     orderBy: { createdAt: 'asc' },

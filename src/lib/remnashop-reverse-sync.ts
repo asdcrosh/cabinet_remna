@@ -268,7 +268,7 @@ async function upsertRemnashopTransaction(input: {
   payment: PaymentForRemnashopSync
 }) {
   const columns = await tableColumns('transactions')
-  const paymentExternalId = input.payment.yookassaId || input.payment.id
+  const paymentExternalId = input.payment.externalPaymentId || input.payment.yookassaId || input.payment.id
   const existingByPaymentId = columns.has('payment_id')
     ? await remnashopQuery<IdRow>(
         'SELECT id::text AS id FROM transactions WHERE payment_id::text = $1 LIMIT 1',

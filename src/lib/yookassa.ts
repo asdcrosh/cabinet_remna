@@ -17,6 +17,10 @@ const REQUEST_TIMEOUT_MS = 15_000
 const authHeader = () =>
   'Basic ' + Buffer.from(`${SHOP_ID}:${SECRET_KEY}`).toString('base64')
 
+export function isYookassaConfigured() {
+  return Boolean(SHOP_ID && SECRET_KEY)
+}
+
 // ---- Типы ---------------------------------------------------------------
 
 export type PaymentStatus =

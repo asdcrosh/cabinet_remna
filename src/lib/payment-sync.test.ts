@@ -69,6 +69,7 @@ describe('payment sync pending expiration', () => {
   it('locally cancels stale pending payments without YooKassa id', async () => {
     mocks.prisma.payment.findFirst.mockResolvedValue({
       id: 'pay-1',
+      provider: 'YOOKASSA',
       yookassaId: null,
       status: 'PENDING',
       createdAt: new Date('2026-06-26T11:40:00.000Z'),
@@ -93,7 +94,7 @@ describe('payment sync pending expiration', () => {
     expect(result).toEqual({ ok: true, status: 'canceled', provisioned: false })
     expect(mocks.prisma.payment.update).toHaveBeenCalledWith({
       where: { id: 'pay-1' },
-      data: { status: 'CANCELED', yookassaStatus: null },
+      data: { status: 'CANCELED', yookassaStatus: null, providerStatus: 'canceled' },
     })
     expect(mocks.notifyPaymentCanceled).toHaveBeenCalledWith(
       'pay-1',
@@ -105,6 +106,7 @@ describe('payment sync pending expiration', () => {
     mocks.prisma.payment.findMany.mockResolvedValue([{ id: 'old-pay' }])
     mocks.prisma.payment.findFirst.mockResolvedValue({
       id: 'old-pay',
+      provider: 'YOOKASSA',
       yookassaId: 'yoo-1',
       status: 'PENDING',
       createdAt: new Date('2026-06-26T11:40:00.000Z'),
@@ -140,6 +142,7 @@ describe('payment sync pending expiration', () => {
     mocks.prisma.payment.findFirst.mockResolvedValue({
       id: 'old-pay',
       userId: 'user-1',
+      provider: 'YOOKASSA',
       yookassaId: 'yoo-1',
       status: 'PENDING',
       createdAt: new Date('2026-06-26T11:40:00.000Z'),
@@ -166,7 +169,7 @@ describe('payment sync pending expiration', () => {
     expect(result).toEqual({ ok: true, status: 'canceled', provisioned: false })
     expect(mocks.prisma.payment.update).toHaveBeenCalledWith({
       where: { id: 'old-pay' },
-      data: { status: 'CANCELED', yookassaStatus: 'pending' },
+      data: { status: 'CANCELED', yookassaStatus: 'pending', providerStatus: 'pending' },
     })
   })
 
@@ -174,6 +177,7 @@ describe('payment sync pending expiration', () => {
     mocks.prisma.payment.findFirst.mockResolvedValue({
       id: 'paid-pay',
       userId: 'user-1',
+      provider: 'YOOKASSA',
       yookassaId: 'yoo-paid',
       status: 'PENDING',
       paidAt: null,
@@ -191,8 +195,8 @@ describe('payment sync pending expiration', () => {
       subscription: { id: 'sub-1' },
     })
     mocks.prisma.payment.findMany.mockResolvedValue([
-      { id: 'old-pay-1', userId: 'user-1', yookassaId: 'yoo-old-1' },
-      { id: 'old-pay-2', userId: 'user-1', yookassaId: null },
+      { id: 'old-pay-1', userId: 'user-1', provider: 'YOOKASSA', yookassaId: 'yoo-old-1' },
+      { id: 'old-pay-2', userId: 'user-1', provider: 'YOOKASSA', yookassaId: null },
     ])
     mocks.getPayment.mockResolvedValueOnce({ status: 'succeeded' }).mockResolvedValueOnce({ status: 'pending' })
     mocks.cancelPayment.mockResolvedValue({ status: 'canceled' })
@@ -218,7 +222,7 @@ describe('payment sync pending expiration', () => {
     expect(mocks.cancelPayment).toHaveBeenCalledWith('yoo-old-1', 'cancel-old-pay-1')
     expect(mocks.prisma.payment.update).toHaveBeenCalledWith({
       where: { id: 'old-pay-2' },
-      data: { status: 'CANCELED', yookassaStatus: null },
+      data: { status: 'CANCELED', yookassaStatus: null, providerStatus: 'canceled' },
     })
   })
 
@@ -226,6 +230,7 @@ describe('payment sync pending expiration', () => {
     const mainPayment = {
       id: 'paid-pay',
       userId: 'user-1',
+      provider: 'YOOKASSA',
       yookassaId: 'yoo-paid',
       status: 'PENDING',
       paidAt: null,
@@ -253,7 +258,7 @@ describe('payment sync pending expiration', () => {
       .mockResolvedValueOnce(mainPayment)
       .mockResolvedValueOnce(siblingPayment)
     mocks.prisma.payment.findMany
-      .mockResolvedValueOnce([{ id: 'old-paid', userId: 'user-1', yookassaId: 'yoo-old-paid' }])
+      .mockResolvedValueOnce([{ id: 'old-paid', userId: 'user-1', provider: 'YOOKASSA', yookassaId: 'yoo-old-paid' }])
       .mockResolvedValueOnce([])
     mocks.getPayment
       .mockResolvedValueOnce({ status: 'succeeded' })

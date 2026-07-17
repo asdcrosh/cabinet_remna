@@ -55,13 +55,22 @@ test('мобильный выбор тарифа остаётся компакт
   await page.goto('/dashboard/plans')
 
   await expect(page.getByRole('heading', { name: 'Выберите срок' })).toBeVisible()
-  const card = page.locator('section[aria-labelledby="mobile-plan-picker-title"]').getByTestId('plan-card').first()
+  const card = page
+    .locator('section[aria-labelledby="mobile-plan-picker-title"]')
+    .getByTestId('plan-card')
+    .filter({ hasText: 'E2E Стандарт' })
+  await card.scrollIntoViewIfNeeded()
   await expect(card.getByRole('heading', { name: 'E2E Стандарт' })).toBeVisible()
   await expect(card.getByText('7 дн.', { exact: true })).toBeVisible()
   await expect(card.getByText('Безлимит', { exact: true })).toBeVisible()
   await expect(card.getByText('До 5', { exact: true })).toBeVisible()
   await expect(card.getByText('К оплате', { exact: true })).toHaveCount(0)
   await expect(card.getByText('Доступ сразу после оплаты', { exact: true })).toHaveCount(0)
+  const paymentProviders = card.getByRole('radiogroup', { name: 'Способ оплаты' })
+  await expect(paymentProviders.getByRole('radio', { name: 'ЮKassa' })).toBeVisible()
+  await expect(paymentProviders.getByRole('radio', { name: 'PayAnyWay' })).toBeVisible()
+  await paymentProviders.getByRole('radio', { name: 'PayAnyWay' }).click()
+  await expect(paymentProviders.getByRole('radio', { name: 'PayAnyWay' })).toHaveAttribute('aria-checked', 'true')
   await expectNoHorizontalOverflow(page)
 })
 
