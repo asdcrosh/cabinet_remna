@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   paymentUpdate: vi.fn(),
   userUpdate: vi.fn(),
   remnashopQuery: vi.fn(),
+  getSubscriptionByUsername: vi.fn(),
 }))
 
 vi.mock('./prisma', () => ({
@@ -21,6 +22,12 @@ vi.mock('./prisma', () => ({
 
 vi.mock('./remnashop-db', () => ({
   remnashopQuery: mocks.remnashopQuery,
+}))
+
+vi.mock('./remnawave', () => ({
+  remnawave: {
+    getSubscriptionByUsername: mocks.getSubscriptionByUsername,
+  },
 }))
 
 vi.mock('./logger', () => ({
@@ -58,6 +65,8 @@ const payment = {
     telegramUsername: null,
     remnashopUserId: 10,
     remnawaveUuid: 'remna-uuid',
+    remnawaveUsername: 'remna-user',
+    remnawaveShortUuid: 'remna-short',
   },
   plan: {
     id: 'plan-1',
@@ -83,6 +92,9 @@ describe('remnashop reverse sync', () => {
     mocks.paymentFindUnique.mockResolvedValue(payment)
     mocks.paymentUpdate.mockResolvedValue({})
     mocks.userUpdate.mockResolvedValue({})
+    mocks.getSubscriptionByUsername.mockResolvedValue({
+      response: { subscriptionUrl: 'https://subscription.example/remna-short' },
+    })
     mocks.remnashopQuery.mockImplementation(async (sql: string, values: unknown[] = []) => {
       if (sql.includes('information_schema.columns') && values[0] === 'subscriptions') {
         return {
@@ -91,6 +103,7 @@ describe('remnashop reverse sync', () => {
             'user_id',
             'plan_id',
             'user_remna_id',
+            'url',
             'status',
             'is_trial',
             'internal_squads',
@@ -179,6 +192,8 @@ describe('remnashop reverse sync', () => {
     expect(subscriptionInsert?.[1]).toContain(false)
     expect(subscriptionInsert?.[0]).toContain('"internal_squads"')
     expect(subscriptionInsert?.[1]).toContainEqual(['squad-1'])
+    expect(subscriptionInsert?.[0]).toContain('"url"')
+    expect(subscriptionInsert?.[1]).toContain('https://subscription.example/remna-short')
   })
 
   it('fills Remnashop language columns when creating a missing user', async () => {

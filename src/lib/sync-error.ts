@@ -18,6 +18,8 @@ export function describeSyncError(error: unknown) {
   if (/remnashop promo code table not found/i.test(message)) return 'Таблица промокодов Remnashop не найдена.'
   if (/internal_squads/i.test(message)) return 'Remnashop не принял подписку: не заполнены internal squads тарифа.'
   if (/is_trial/i.test(message)) return 'Remnashop не принял подписку: не заполнен признак пробного тарифа.'
+  if (/null value.*column "url".*subscriptions/i.test(message)) return 'Remnashop не принял подписку: не передана ссылка из Remnawave.'
+  if (/remnawave subscription url is missing/i.test(message)) return 'Не удалось получить ссылку подписки из Remnawave.'
   if (/remnashop user not found/i.test(message)) return 'Пользователь ещё не найден в Remnashop.'
   if (/subscription is missing/i.test(message)) return 'Подписка ещё не выдана.'
   if (/remnawave user is missing/i.test(message)) return 'Профиль Remnawave ещё не создан.'

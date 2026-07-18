@@ -1,5 +1,6 @@
 import type { Prisma } from '@prisma/client'
 import { prisma } from './prisma'
+import { remnawave } from './remnawave'
 import { remnashopQuery } from './remnashop-db'
 import { logInfo, logWarn } from './logger'
 import { markSyncFailed, markSyncSkipped, markSyncSucceeded } from './sync-events'
@@ -234,6 +235,9 @@ async function upsertRemnashopSubscription(input: {
   if (columns.has('plan_id') && input.payment.plan.remnashopPlanId == null) {
     throw new Error('remnashop plan is not linked to cabinet plan')
   }
+  const subscriptionUrl = columns.has('url')
+    ? await resolveRemnawaveSubscriptionUrl(input.payment.user)
+    : undefined
   const snapshot = buildPlanSnapshot(input.payment)
   const existingId = columns.has('plan_snapshot')
     ? await findRowByCabinetPayment('subscriptions', input.payment.id)
@@ -242,6 +246,7 @@ async function upsertRemnashopSubscription(input: {
     user_id: input.remnashopUserId,
     plan_id: input.payment.plan.remnashopPlanId,
     user_remna_id: input.payment.user.remnawaveUuid,
+    url: subscriptionUrl,
     status: mapSubscriptionStatus(input.payment.subscription.status),
     is_trial: false,
     internal_squads: input.payment.plan.activeInternalSquads ?? [],
@@ -260,6 +265,34 @@ async function upsertRemnashopSubscription(input: {
 
   const id = await insertRow('subscriptions', columns, data)
   return Number(id)
+}
+
+async function resolveRemnawaveSubscriptionUrl(user: {
+  remnawaveUsername: string | null
+  remnawaveShortUuid: string | null
+}) {
+  const lookups = [
+    user.remnawaveUsername
+      ? () => remnawave.getSubscriptionByUsername(user.remnawaveUsername as string)
+      : null,
+    user.remnawaveShortUuid
+      ? () => remnawave.getSubscriptionByShortUuid(user.remnawaveShortUuid as string)
+      : null,
+  ].filter((lookup): lookup is () => ReturnType<typeof remnawave.getSubscriptionByUsername> => Boolean(lookup))
+
+  let lastError: unknown = null
+  for (const lookup of lookups) {
+    try {
+      const data = await lookup()
+      const url = data.response.subscriptionUrl?.trim()
+      if (url) return url
+    } catch (error) {
+      lastError = error
+    }
+  }
+
+  if (lastError) throw lastError
+  throw new Error('remnawave subscription url is missing')
 }
 
 async function upsertRemnashopTransaction(input: {
