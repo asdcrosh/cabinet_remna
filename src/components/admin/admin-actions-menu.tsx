@@ -115,21 +115,23 @@ export function AdminActionsMenu({
         <MoreHorizontal className="h-5 w-5" />
         <span className={compact ? 'sr-only' : ''}>{label}</span>
       </button>
-      {mounted && open && !mobile ? createPortal(
+      {mounted && !mobile ? createPortal(
         <section
           ref={menuRef}
           role="menu"
           aria-label={label}
-          className="fixed z-[160] max-h-[calc(100dvh-1.5rem)] w-56 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-xl shadow-slate-950/10 dark:border-white/10 dark:bg-surface-950 dark:shadow-black/30"
+          aria-hidden={!open}
+          className={`${open ? 'block' : 'hidden'} fixed z-[160] max-h-[calc(100dvh-1.5rem)] w-56 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-xl shadow-slate-950/10 dark:border-white/10 dark:bg-surface-950 dark:shadow-black/30`}
           style={{ top: anchor.top, left: anchor.left }}
         >
           {actionList}
         </section>,
         document.body
       ) : null}
-      {mounted && mobile && open ? createPortal(
+      {mounted && mobile ? createPortal(
         <div
-          className="fixed inset-0 z-[150] flex items-end justify-center bg-slate-950/55 p-3 backdrop-blur-[2px]"
+          aria-hidden={!open}
+          className={`${open ? 'flex' : 'hidden'} fixed inset-0 z-[150] items-end justify-center bg-slate-950/55 p-3 backdrop-blur-[2px]`}
           onMouseDown={(event) => {
             if (event.target === event.currentTarget) setOpen(false)
           }}
