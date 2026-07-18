@@ -42,7 +42,7 @@ describe('PayAnyWay integration', () => {
       returnUrl: 'https://cabinet.example/dashboard/billing',
     })
 
-    expect(request.action).toBe('https://payanyway.ru/assistant.htm')
+    expect(request.action).toBe('https://www.payanyway.ru/assistant.htm')
     expect(request.fields.MNT_AMOUNT).toBe('130.00')
     expect(request.fields.MNT_CURRENCY_CODE).toBe('RUB')
     expect(request.fields.MNT_TRANSACTION_ID).toBe('payment-1')

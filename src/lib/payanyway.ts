@@ -1,7 +1,7 @@
 import { createHash, timingSafeEqual } from 'node:crypto'
 import { getResolvedPaymentProviderSettings, isResolvedPayAnyWayConfigured } from './payment-settings'
 
-const PRODUCTION_PAYMENT_URL = 'https://payanyway.ru/assistant.htm'
+const PRODUCTION_PAYMENT_URL = 'https://www.payanyway.ru/assistant.htm'
 const TEST_PAYMENT_URL = 'https://demo.moneta.ru/assistant.htm'
 
 export type PayAnyWayCallback = {

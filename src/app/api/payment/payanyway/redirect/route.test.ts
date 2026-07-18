@@ -33,7 +33,7 @@ describe('PayAnyWay payment form redirect', () => {
       plan: { name: 'Стандарт', durationDays: 30 },
     })
     mocks.createPayAnyWayPaymentRequest.mockResolvedValue({
-      action: 'https://payanyway.ru/assistant.htm',
+      action: 'https://www.payanyway.ru/assistant.htm',
       fields: {
         MNT_ID: '49907299',
         MNT_TRANSACTION_ID: 'payment-1',
@@ -52,18 +52,25 @@ describe('PayAnyWay payment form redirect', () => {
     })
   })
 
-  it('redirects to the signed CMS GET URL and logs safe diagnostics', async () => {
+  it('submits the signed payment fields as a protected POST form', async () => {
     const response = await GET(new Request(
       'https://cabinet.example/api/payment/payanyway/redirect?payment=payment-1'
     ))
-    const paymentUrl = new URL(response.headers.get('location')!)
+    const html = await response.text()
 
-    expect(response.status).toBe(302)
-    expect(paymentUrl.origin + paymentUrl.pathname).toBe('https://payanyway.ru/assistant.htm')
-    expect(paymentUrl.searchParams.get('MNT_TRANSACTION_ID')).toBe('payment-1')
-    expect(paymentUrl.searchParams.get('MNT_SUBSCRIBER_ID')).toBe('user@example.com')
-    expect(paymentUrl.searchParams.get('MNT_TEST_MODE')).toBe('0')
-    expect(paymentUrl.searchParams.get('MNT_SIGNATURE')).toBe('0123456789abcdef0123456789abcdef')
+    expect(response.status).toBe(200)
+    expect(response.headers.get('cache-control')).toBe('no-store, max-age=0')
+    expect(response.headers.get('content-security-policy')).toContain(
+      'form-action https://www.payanyway.ru'
+    )
+    expect(html).toContain('method="post"')
+    expect(html).toContain('action="https://www.payanyway.ru/assistant.htm"')
+    expect(html).toContain('name="MNT_TRANSACTION_ID" value="payment-1"')
+    expect(html).toContain('name="MNT_SUBSCRIBER_ID" value="user@example.com"')
+    expect(html).toContain('name="MNT_TEST_MODE" value="0"')
+    expect(html).toContain(
+      'name="MNT_SIGNATURE" value="0123456789abcdef0123456789abcdef"'
+    )
     expect(mocks.createPayAnyWayPaymentRequest).toHaveBeenCalledWith({
       transactionId: 'payment-1',
       amountKopecks: 30000,
@@ -83,6 +90,7 @@ describe('PayAnyWay payment form redirect', () => {
       integrityLength: 32,
       integrityFingerprint: 'secret-fp-12',
       payloadFingerprint: 'payload-fp12',
+      submissionMethod: 'POST',
     })
   })
 
