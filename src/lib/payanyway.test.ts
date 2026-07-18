@@ -46,6 +46,7 @@ describe('PayAnyWay integration', () => {
     expect(request.fields.MNT_AMOUNT).toBe('130.00')
     expect(request.fields.MNT_CURRENCY_CODE).toBe('RUB')
     expect(request.fields.MNT_TRANSACTION_ID).toBe('payment-1')
+    expect(request.fields).not.toHaveProperty('MNT_TEST_MODE')
     expect(request.fields.MNT_SIGNATURE).toBe(
       md5(`49907299payment-1130.00RUBuser-10${integrityCode}`)
     )

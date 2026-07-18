@@ -39,7 +39,6 @@ describe('PayAnyWay payment form redirect', () => {
         MNT_TRANSACTION_ID: 'payment-1',
         MNT_AMOUNT: '300.00',
         MNT_CURRENCY_CODE: 'RUB',
-        MNT_TEST_MODE: '0',
         MNT_SIGNATURE: '0123456789abcdef0123456789abcdef',
       },
       diagnostics: {
@@ -79,6 +78,7 @@ describe('PayAnyWay payment form redirect', () => {
       amount: '300.00',
       subscriberId: 'not_sent',
       testMode: '0',
+      testModeFieldSent: false,
       configSource: 'environment',
       integrityLength: 32,
       integrityFingerprint: 'secret-fp-12',

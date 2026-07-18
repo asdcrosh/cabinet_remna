@@ -46,7 +46,6 @@ export async function createPayAnyWayPaymentRequest(input: {
       MNT_TRANSACTION_ID: input.transactionId,
       MNT_AMOUNT: amount,
       MNT_CURRENCY_CODE: currency,
-      MNT_TEST_MODE: testMode,
       MNT_DESCRIPTION: input.description.slice(0, 500),
       MNT_SIGNATURE: md5(signaturePayload),
       MNT_SUCCESS_URL: input.successUrl,
@@ -54,6 +53,7 @@ export async function createPayAnyWayPaymentRequest(input: {
       MNT_RETURN_URL: input.returnUrl,
   }
   if (subscriberId) fields.MNT_SUBSCRIBER_ID = subscriberId
+  if (config.testMode) fields.MNT_TEST_MODE = '1'
 
   return {
     action: config.paymentUrl,
