@@ -134,7 +134,7 @@ function callbackRequest(overrides: Record<string, string> = {}) {
     MNT_OPERATION_ID: 'operation-1',
     MNT_AMOUNT: '130.00',
     MNT_CURRENCY_CODE: 'RUB',
-    MNT_SUBSCRIBER_ID: 'user-1',
+    MNT_SUBSCRIBER_ID: 'user@example.com',
     MNT_TEST_MODE: '0',
     ...overrides,
   }

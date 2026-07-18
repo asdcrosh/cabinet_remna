@@ -1,7 +1,7 @@
 import { createHash, timingSafeEqual } from 'node:crypto'
 import { getResolvedPaymentProviderSettings, isResolvedPayAnyWayConfigured } from './payment-settings'
 
-const PRODUCTION_PAYMENT_URL = 'https://www.payanyway.ru/assistant.htm'
+const PRODUCTION_PAYMENT_URL = 'https://payanyway.ru/assistant.htm'
 const TEST_PAYMENT_URL = 'https://demo.moneta.ru/assistant.htm'
 
 export type PayAnyWayCallback = {
@@ -23,7 +23,7 @@ export async function createPayAnyWayPaymentRequest(input: {
   transactionId: string
   amountKopecks: number
   description: string
-  subscriberId?: string
+  subscriberId: string
   successUrl: string
   failUrl: string
   returnUrl: string
@@ -32,7 +32,8 @@ export async function createPayAnyWayPaymentRequest(input: {
   const amount = formatAmount(input.amountKopecks)
   const currency = 'RUB'
   const testMode = config.testMode ? '1' : '0'
-  const subscriberId = input.subscriberId?.trim() ?? ''
+  const subscriberId = input.subscriberId.trim()
+  if (!subscriberId) throw new Error('PayAnyWay subscriber ID is required')
   const signaturePayload =
     config.merchantId +
     input.transactionId +
@@ -42,18 +43,18 @@ export async function createPayAnyWayPaymentRequest(input: {
     testMode +
     config.integrityCode
   const fields: Record<string, string> = {
-      MNT_ID: config.merchantId,
-      MNT_TRANSACTION_ID: input.transactionId,
-      MNT_AMOUNT: amount,
-      MNT_CURRENCY_CODE: currency,
-      MNT_DESCRIPTION: input.description.slice(0, 500),
-      MNT_SIGNATURE: md5(signaturePayload),
-      MNT_SUCCESS_URL: input.successUrl,
-      MNT_FAIL_URL: input.failUrl,
-      MNT_RETURN_URL: input.returnUrl,
+    MNT_ID: config.merchantId,
+    MNT_TRANSACTION_ID: input.transactionId,
+    MNT_AMOUNT: amount,
+    MNT_CURRENCY_CODE: currency,
+    MNT_TEST_MODE: testMode,
+    MNT_DESCRIPTION: input.description.slice(0, 500),
+    MNT_SUBSCRIBER_ID: subscriberId,
+    MNT_SIGNATURE: md5(signaturePayload),
+    MNT_SUCCESS_URL: input.successUrl,
+    MNT_FAIL_URL: input.failUrl,
+    MNT_RETURN_URL: input.returnUrl,
   }
-  if (subscriberId) fields.MNT_SUBSCRIBER_ID = subscriberId
-  if (config.testMode) fields.MNT_TEST_MODE = '1'
 
   return {
     action: config.paymentUrl,

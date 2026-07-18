@@ -63,7 +63,11 @@ async function handlePayAnyWayRequest(params: URLSearchParams) {
     })
     return payAnyWayResponse('FAIL', 409)
   }
-  if (callback.subscriberId && callback.subscriberId !== payment.userId) {
+  if (
+    callback.subscriberId &&
+    callback.subscriberId !== payment.user.email &&
+    callback.subscriberId !== payment.userId
+  ) {
     logWarn('webhook.payanyway.subscriber_mismatch', { paymentId: payment.id })
     return payAnyWayResponse('FAIL', 409)
   }
