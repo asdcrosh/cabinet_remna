@@ -140,6 +140,10 @@ export async function getRemnashopSyncDryRun() {
   )
 
   const activeSubscriptions = subscriptions.filter((item) => item.status === 'ACTIVE')
+  const activeRemnaUuids = new Set(activeSubscriptions.map((item) => item.user_remna_id))
+  const unmatchedActiveRemnaUuids = Array.from(activeRemnaUuids).filter(
+    (uuid) => !cabinetUsersByRemnaUuid.has(uuid)
+  )
   const linkableActiveSubscriptions = activeSubscriptions.filter((item) =>
     cabinetUsersByRemnaUuid.has(item.user_remna_id)
   )
@@ -208,11 +212,11 @@ export async function getRemnashopSyncDryRun() {
       cabinetMatchedSubscriptions: cabinetSubscriptionRemnaUuids.size,
       cabinetMatchedPayments: cabinetPaymentIds.size,
     },
-    warnings: buildWarnings(userStats, cabinetUsersByRemnaUuid.size, remnaUuids.length, writeAccess),
+    warnings: buildWarnings(userStats, unmatchedActiveRemnaUuids.length, writeAccess),
     summary: {
       plansWouldCreate: planActions.filter((item) => item.action === 'wouldCreate').length,
       promoCodesWouldUpsert: promoActions.length,
-      usersWouldNeedIdentityDecision: Math.max(0, remnaUuids.length - cabinetUsersByRemnaUuid.size),
+      usersWouldNeedIdentityDecision: unmatchedActiveRemnaUuids.length,
       subscriptionsWouldCreateOrUpdate: linkableActiveSubscriptions.filter(
         (item) => !cabinetSubscriptionRemnaUuids.has(item.user_remna_id)
       ).length,
@@ -618,20 +622,25 @@ async function fetchRemnashopWriteAccess() {
 
 function buildWarnings(
   userStats: RemnashopUserStatsRow,
-  matchedCabinetUsers: number,
-  remnashopRemnaUsers: number,
+  unmatchedActiveSubscriptions: number,
   writeAccess: RemnashopWriteAccessRow[]
 ) {
   const warnings: string[] = []
   if (numberFromPg(userStats.with_email) === 0) {
     warnings.push('В remnashop нет email у пользователей: для импорта аккаунтов нужен Telegram login или привязка email.')
   }
-  if (matchedCabinetUsers < remnashopRemnaUsers) {
-    warnings.push('Часть remnashop подписок ссылается на Remnawave UUID, которых пока нет среди cabinet пользователей.')
+  if (unmatchedActiveSubscriptions > 0) {
+    warnings.push(`Не связаны с Cabinet активные подписки Remnashop: ${unmatchedActiveSubscriptions}. Запустите синхронизацию пользователей.`)
   }
   const missingWriteAccess = writeAccess.filter((row) => !row.can_insert || !row.can_update)
-  if (missingWriteAccess.length > 0) {
-    warnings.push(`Для двусторонней синхронизации нужен INSERT/UPDATE в Remnashop: ${missingWriteAccess.map((row) => row.table_name).join(', ')}.`)
+  const promoTables = new Set(['promo_codes', 'promocodes', 'coupons', 'discount_codes'])
+  const missingPromoAccess = missingWriteAccess.filter((row) => promoTables.has(row.table_name))
+  const missingCoreAccess = missingWriteAccess.filter((row) => !promoTables.has(row.table_name))
+  if (missingCoreAccess.length > 0) {
+    warnings.push(`Запись основных данных в Remnashop недоступна: нет INSERT/UPDATE для ${missingCoreAccess.map((row) => row.table_name).join(', ')}.`)
+  }
+  if (missingPromoAccess.length > 0) {
+    warnings.push(`Промокоды импортируются, но запись из Cabinet в Remnashop недоступна: нет INSERT/UPDATE для ${missingPromoAccess.map((row) => row.table_name).join(', ')}.`)
   }
   return warnings
 }
