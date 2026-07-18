@@ -331,6 +331,13 @@ if ! CABINET_ENV_FILE="${ENV_FILE}" "${COMPOSE[@]}" up -d --remove-orphans; then
   fi
 fi
 
+# A mutable `latest` tag can be pulled successfully while Compose keeps an
+# already-running container. Recreate runtime services explicitly so the
+# update always starts the image that was just pulled without touching the DB.
+echo "Recreating runtime services from the pulled image..."
+CABINET_ENV_FILE="${ENV_FILE}" "${COMPOSE[@]}" up -d --no-deps --force-recreate \
+  app worker broadcast-worker
+
 wait_for_container() {
   local service="$1"
   local attempts="${2:-60}"
