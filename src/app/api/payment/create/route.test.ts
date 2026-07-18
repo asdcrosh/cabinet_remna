@@ -7,7 +7,6 @@ const mocks = vi.hoisted(() => ({
   getPlanAudienceContext: vi.fn(),
   isPlanAvailableForUser: vi.fn(),
   createPayment: vi.fn(),
-  createPayAnyWayPaymentUrl: vi.fn(),
   isPaymentProviderAvailable: vi.fn(),
   validatePromoCodeForPlan: vi.fn(),
   logError: vi.fn(),
@@ -38,7 +37,6 @@ vi.mock('@/lib/plan-access', () => ({
   isPlanAvailableForUser: mocks.isPlanAvailableForUser,
 }))
 vi.mock('@/lib/yookassa', () => ({ createPayment: mocks.createPayment }))
-vi.mock('@/lib/payanyway', () => ({ createPayAnyWayPaymentUrl: mocks.createPayAnyWayPaymentUrl }))
 vi.mock('@/lib/payment-providers', () => ({ isPaymentProviderAvailable: mocks.isPaymentProviderAvailable }))
 vi.mock('@/lib/promo-codes', () => ({
   PromoCodeError: class PromoCodeError extends Error {
@@ -199,9 +197,7 @@ describe('payment create route', () => {
     })
   })
 
-  it('creates a signed PayAnyWay redirect without calling YooKassa', async () => {
-    mocks.createPayAnyWayPaymentUrl.mockReturnValue('https://moneta.ru/assistant.htm?signed=1')
-
+  it('creates an internal PayAnyWay form redirect without calling YooKassa', async () => {
     const response = await POST(paymentRequest({ planId: plan.id, provider: 'PAYANYWAY' }))
     const body = await response.json()
 
@@ -209,15 +205,15 @@ describe('payment create route', () => {
     expect(mocks.txPaymentCreate).toHaveBeenCalledWith({
       data: expect.objectContaining({ provider: 'PAYANYWAY', providerStatus: 'pending' }),
     })
-    expect(mocks.createPayAnyWayPaymentUrl).toHaveBeenCalledWith(expect.objectContaining({
-      transactionId: 'payment-1',
-      amountKopecks: 30000,
-      subscriberId: 'user-1',
-      successUrl: 'https://cabinet.example/dashboard/billing?paid=1&payment=payment-1',
-    }))
     expect(mocks.createPayment).not.toHaveBeenCalled()
+    expect(mocks.prisma.payment.update).toHaveBeenCalledWith({
+      where: { id: 'payment-1' },
+      data: {
+        confirmationUrl: 'https://cabinet.example/api/payment/payanyway/redirect?payment=payment-1',
+      },
+    })
     expect(body).toEqual({
-      confirmationUrl: 'https://moneta.ru/assistant.htm?signed=1',
+      confirmationUrl: 'https://cabinet.example/api/payment/payanyway/redirect?payment=payment-1',
       paymentId: 'payment-1',
       localPaymentId: 'payment-1',
       provider: 'PAYANYWAY',

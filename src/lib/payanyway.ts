@@ -19,7 +19,7 @@ export async function isPayAnyWayConfigured() {
   return isResolvedPayAnyWayConfigured(await getResolvedPaymentProviderSettings())
 }
 
-export async function createPayAnyWayPaymentUrl(input: {
+export async function createPayAnyWayPaymentRequest(input: {
   transactionId: string
   amountKopecks: number
   description: string
@@ -32,7 +32,7 @@ export async function createPayAnyWayPaymentUrl(input: {
   const amount = formatAmount(input.amountKopecks)
   const currency = 'RUB'
   const testMode = config.testMode ? '1' : '0'
-  const signature = md5(
+  const signaturePayload =
     config.merchantId +
     input.transactionId +
     amount +
@@ -40,22 +40,28 @@ export async function createPayAnyWayPaymentUrl(input: {
     input.subscriberId +
     testMode +
     config.integrityCode
-  )
-  const params = new URLSearchParams({
-    MNT_ID: config.merchantId,
-    MNT_TRANSACTION_ID: input.transactionId,
-    MNT_AMOUNT: amount,
-    MNT_CURRENCY_CODE: currency,
-    MNT_TEST_MODE: testMode,
-    MNT_DESCRIPTION: input.description.slice(0, 500),
-    MNT_SUBSCRIBER_ID: input.subscriberId,
-    MNT_SIGNATURE: signature,
-    MNT_SUCCESS_URL: input.successUrl,
-    MNT_FAIL_URL: input.failUrl,
-    MNT_RETURN_URL: input.returnUrl,
-  })
-
-  return `${config.paymentUrl}?${params.toString()}`
+  return {
+    action: config.paymentUrl,
+    fields: {
+      MNT_ID: config.merchantId,
+      MNT_TRANSACTION_ID: input.transactionId,
+      MNT_AMOUNT: amount,
+      MNT_CURRENCY_CODE: currency,
+      MNT_TEST_MODE: testMode,
+      MNT_DESCRIPTION: input.description.slice(0, 500),
+      MNT_SUBSCRIBER_ID: input.subscriberId,
+      MNT_SIGNATURE: md5(signaturePayload),
+      MNT_SUCCESS_URL: input.successUrl,
+      MNT_FAIL_URL: input.failUrl,
+      MNT_RETURN_URL: input.returnUrl,
+    },
+    diagnostics: {
+      source: config.source,
+      secretLength: config.integrityCode.length,
+      secretFingerprint: sha256(config.integrityCode).slice(0, 12),
+      payloadFingerprint: sha256(signaturePayload).slice(0, 12),
+    },
+  }
 }
 
 export function parsePayAnyWayCallback(params: URLSearchParams): PayAnyWayCallback | null {
@@ -98,7 +104,7 @@ export async function verifyPayAnyWayCallback(callback: PayAnyWayCallback) {
 }
 
 async function getConfig() {
-  const { payAnyWay } = await getResolvedPaymentProviderSettings()
+  const { payAnyWay, source } = await getResolvedPaymentProviderSettings()
   if (!payAnyWay.merchantId || !payAnyWay.integrityCode) {
     throw new Error('PayAnyWay is not configured')
   }
@@ -107,6 +113,7 @@ async function getConfig() {
     integrityCode: payAnyWay.integrityCode,
     testMode: payAnyWay.testMode,
     paymentUrl: payAnyWay.paymentUrl || (payAnyWay.testMode ? TEST_PAYMENT_URL : PRODUCTION_PAYMENT_URL),
+    source,
   }
 }
 
@@ -124,6 +131,10 @@ function parseAmountKopecks(amount: string) {
 
 function md5(value: string) {
   return createHash('md5').update(value, 'utf8').digest('hex')
+}
+
+function sha256(value: string) {
+  return createHash('sha256').update(value, 'utf8').digest('hex')
 }
 
 function safeEqual(actual: string, expected: string) {

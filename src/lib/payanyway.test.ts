@@ -1,13 +1,14 @@
 import { createHash } from 'node:crypto'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
-  createPayAnyWayPaymentUrl,
+  createPayAnyWayPaymentRequest,
   parsePayAnyWayCallback,
   verifyPayAnyWayCallback,
 } from './payanyway'
 
 vi.mock('./payment-settings', () => ({
   getResolvedPaymentProviderSettings: vi.fn(async () => ({
+    source: 'environment',
     payAnyWay: {
       enabled: true,
       merchantId: '49907299',
@@ -30,8 +31,8 @@ describe('PayAnyWay integration', () => {
     delete process.env.PAYANYWAY_PAYMENT_URL
   })
 
-  it('creates a signed payment URL with an immutable amount', async () => {
-    const url = new URL(await createPayAnyWayPaymentUrl({
+  it('creates signed POST fields with an immutable amount', async () => {
+    const request = await createPayAnyWayPaymentRequest({
       transactionId: 'payment-1',
       amountKopecks: 13000,
       description: 'Стандарт 7 дней',
@@ -39,15 +40,16 @@ describe('PayAnyWay integration', () => {
       successUrl: 'https://cabinet.example/dashboard/billing?paid=1',
       failUrl: 'https://cabinet.example/dashboard/billing?failed=1',
       returnUrl: 'https://cabinet.example/dashboard/billing',
-    }))
+    })
 
-    expect(url.origin + url.pathname).toBe('https://www.payanyway.ru/assistant.htm')
-    expect(url.searchParams.get('MNT_AMOUNT')).toBe('130.00')
-    expect(url.searchParams.get('MNT_CURRENCY_CODE')).toBe('RUB')
-    expect(url.searchParams.get('MNT_TRANSACTION_ID')).toBe('payment-1')
-    expect(url.searchParams.get('MNT_SIGNATURE')).toBe(
+    expect(request.action).toBe('https://www.payanyway.ru/assistant.htm')
+    expect(request.fields.MNT_AMOUNT).toBe('130.00')
+    expect(request.fields.MNT_CURRENCY_CODE).toBe('RUB')
+    expect(request.fields.MNT_TRANSACTION_ID).toBe('payment-1')
+    expect(request.fields.MNT_SIGNATURE).toBe(
       md5(`49907299payment-1130.00RUBuser-10${integrityCode}`)
     )
+    expect(request.diagnostics).toMatchObject({ source: 'environment', secretLength: 64 })
   })
 
   it('accepts only a callback with the exact provider signature', async () => {
