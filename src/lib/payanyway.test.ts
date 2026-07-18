@@ -52,6 +52,22 @@ describe('PayAnyWay integration', () => {
     expect(request.diagnostics).toMatchObject({ source: 'environment', secretLength: 64 })
   })
 
+  it('uses an empty subscriber value when the optional field is not sent', async () => {
+    const request = await createPayAnyWayPaymentRequest({
+      transactionId: 'payment-2',
+      amountKopecks: 30000,
+      description: 'Стандарт 30 дней',
+      successUrl: 'https://cabinet.example/dashboard/billing?paid=1',
+      failUrl: 'https://cabinet.example/dashboard/billing?failed=1',
+      returnUrl: 'https://cabinet.example/dashboard/billing',
+    })
+
+    expect(request.fields).not.toHaveProperty('MNT_SUBSCRIBER_ID')
+    expect(request.fields.MNT_SIGNATURE).toBe(
+      md5(`49907299payment-2300.00RUB0${integrityCode}`)
+    )
+  })
+
   it('accepts only a callback with the exact provider signature', async () => {
     const amount = '130.00'
     const signature = md5(`49907299payment-1operation-1${amount}RUBuser-10${integrityCode}`)

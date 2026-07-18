@@ -23,7 +23,7 @@ export async function createPayAnyWayPaymentRequest(input: {
   transactionId: string
   amountKopecks: number
   description: string
-  subscriberId: string
+  subscriberId?: string
   successUrl: string
   failUrl: string
   returnUrl: string
@@ -32,29 +32,32 @@ export async function createPayAnyWayPaymentRequest(input: {
   const amount = formatAmount(input.amountKopecks)
   const currency = 'RUB'
   const testMode = config.testMode ? '1' : '0'
+  const subscriberId = input.subscriberId?.trim() ?? ''
   const signaturePayload =
     config.merchantId +
     input.transactionId +
     amount +
     currency +
-    input.subscriberId +
+    subscriberId +
     testMode +
     config.integrityCode
-  return {
-    action: config.paymentUrl,
-    fields: {
+  const fields: Record<string, string> = {
       MNT_ID: config.merchantId,
       MNT_TRANSACTION_ID: input.transactionId,
       MNT_AMOUNT: amount,
       MNT_CURRENCY_CODE: currency,
       MNT_TEST_MODE: testMode,
       MNT_DESCRIPTION: input.description.slice(0, 500),
-      MNT_SUBSCRIBER_ID: input.subscriberId,
       MNT_SIGNATURE: md5(signaturePayload),
       MNT_SUCCESS_URL: input.successUrl,
       MNT_FAIL_URL: input.failUrl,
       MNT_RETURN_URL: input.returnUrl,
-    },
+  }
+  if (subscriberId) fields.MNT_SUBSCRIBER_ID = subscriberId
+
+  return {
+    action: config.paymentUrl,
+    fields,
     diagnostics: {
       source: config.source,
       secretLength: config.integrityCode.length,
