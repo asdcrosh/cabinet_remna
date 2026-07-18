@@ -24,8 +24,8 @@ const schema = z.object({
     merchantId: z.string().trim().max(100).refine((value) => !value || /^\d+$/.test(value), {
       message: 'Номер счёта PayAnyWay должен содержать только цифры',
     }),
-    integrityCode: optionalSecret.refine((value) => !value || value.length >= 32, {
-      message: 'Код проверки целостности должен быть не короче 32 символов',
+    integrityCode: optionalSecret.refine((value) => !value || value.length >= 32 || value === '12345', {
+      message: 'Код должен быть не короче 32 символов или равен legacy-коду Self.PayAnyWay',
     }),
     testMode: z.boolean(),
   }).strict(),

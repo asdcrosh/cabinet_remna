@@ -189,9 +189,14 @@ export function PaymentProviderSettingsPanel({
               autoComplete="new-password"
               value={payAnyWaySecret}
               onChange={(event) => setPayAnyWaySecret(event.target.value)}
-              placeholder={settings.payAnyWay.integrityCodeConfigured ? 'Оставьте пустым, чтобы не менять' : 'Не короче 32 символов'}
+              placeholder={settings.payAnyWay.integrityCodeConfigured ? 'Оставьте пустым, чтобы не менять' : 'Код из Self.PayAnyWay'}
               disabled={!settings.payAnyWay.enabled}
             />
+            {payAnyWaySecret === '12345' ? (
+              <p className="mt-1.5 text-xs text-amber-600 dark:text-amber-400">
+                Временный legacy-код Self.PayAnyWay. После синхронизации у провайдера замените его на случайный.
+              </p>
+            ) : null}
           </Field>
           <div className="flex items-center justify-between gap-4 rounded-xl border border-slate-200 px-3 py-2.5 dark:border-white/10">
             <div>

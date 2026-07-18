@@ -113,8 +113,11 @@ async function checkPayAnyWay() {
   if (!merchantId || !integrityCode) {
     return check('payanyway', 'PayAnyWay', 'error', 'Не заполнены номер счёта или код проверки целостности')
   }
-  if (!/^\d+$/.test(merchantId) || integrityCode.length < 32) {
+  if (!/^\d+$/.test(merchantId) || (integrityCode.length < 32 && integrityCode !== '12345')) {
     return check('payanyway', 'PayAnyWay', 'error', 'Проверьте номер счёта и задайте секрет длиной от 32 символов')
+  }
+  if (integrityCode === '12345') {
+    return check('payanyway', 'PayAnyWay', 'warn', 'Используется legacy-код Self.PayAnyWay. Обратитесь в поддержку для синхронизации нового кода')
   }
   return check('payanyway', 'PayAnyWay', 'ok', 'Платёжная форма и Pay URL настроены')
 }

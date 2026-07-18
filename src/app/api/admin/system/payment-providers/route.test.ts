@@ -89,6 +89,22 @@ describe('admin payment provider settings route', () => {
     expect(mocks.updateSettings).not.toHaveBeenCalled()
   })
 
+  it('accepts the known Self.PayAnyWay legacy integrity code', async () => {
+    const input = {
+      yookassa: { enabled: false, shopId: '', webhookAllowedIps: '' },
+      payAnyWay: { enabled: true, merchantId: '49907299', integrityCode: '12345', testMode: false },
+    }
+    const request = new Request('https://cabinet.example/api/admin/system/payment-providers', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    })
+    const response = await PATCH(request)
+
+    expect(response.status).toBe(200)
+    expect(mocks.updateSettings).toHaveBeenCalledWith(input)
+  })
+
   it('resets database overrides to .env', async () => {
     const request = new Request('https://cabinet.example/api/admin/system/payment-providers', { method: 'DELETE' })
     const response = await DELETE(request)

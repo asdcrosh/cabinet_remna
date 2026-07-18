@@ -152,8 +152,10 @@ if (["1", "true", "yes", "on"].includes(value("PAYANYWAY_ENABLED").toLowerCase()
   if (!value("PAYANYWAY_MNT_ID")) errors.push("PAYANYWAY_MNT_ID is required when PayAnyWay is enabled");
   if (!value("PAYANYWAY_INTEGRITY_CODE")) {
     errors.push("PAYANYWAY_INTEGRITY_CODE is required when PayAnyWay is enabled");
-  } else if (value("PAYANYWAY_INTEGRITY_CODE").length < 32) {
-    errors.push("PAYANYWAY_INTEGRITY_CODE must be at least 32 characters");
+  } else if (value("PAYANYWAY_INTEGRITY_CODE").length < 32 && value("PAYANYWAY_INTEGRITY_CODE") !== "12345") {
+    errors.push("PAYANYWAY_INTEGRITY_CODE must be at least 32 characters or the Self.PayAnyWay legacy code");
+  } else if (value("PAYANYWAY_INTEGRITY_CODE") === "12345") {
+    warnings.push("PAYANYWAY_INTEGRITY_CODE uses the insecure Self.PayAnyWay legacy code; ask provider support to synchronize a new code");
   }
   if (value("PAYANYWAY_MNT_ID") && !/^\d+$/.test(value("PAYANYWAY_MNT_ID"))) {
     errors.push("PAYANYWAY_MNT_ID must contain only digits");
