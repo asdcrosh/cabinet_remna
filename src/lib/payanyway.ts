@@ -198,7 +198,7 @@ function sanitizeReceiptItemName(value: string) {
     .replace(/[^\p{L}\p{N}\s.,()\-]/gu, ' ')
     .replace(/\s+/g, ' ')
     .trim()
-  return cleaned.slice(0, 128) || 'VPN подписка'
+  return cleaned.slice(0, 128) || 'Доступ к сервису'
 }
 
 function escapeXml(value: string) {

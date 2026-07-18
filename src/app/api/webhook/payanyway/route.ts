@@ -86,7 +86,7 @@ async function handlePayAnyWayRequest(params: URLSearchParams) {
       merchantId: callback.merchantId,
       transactionId: payment.id,
       amountKopecks: payment.amountKopecks,
-      itemName: `Доступ к VPN ${payment.plan.name} ${payment.plan.durationDays} дн.`,
+      itemName: `Доступ к сервису ${payment.plan.name} на ${payment.plan.durationDays} дн.`,
       customerEmail: payment.user.email,
     })
   } catch (error) {

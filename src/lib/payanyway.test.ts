@@ -72,7 +72,7 @@ describe('PayAnyWay integration', () => {
       merchantId: '49907299',
       transactionId: 'payment-1',
       amountKopecks: 13000,
-      itemName: 'Доступ к VPN «Стандарт» & 7 дн.',
+      itemName: 'Доступ к сервису «Стандарт» & 7 дн.',
       customerEmail: 'user+vpn@example.com',
     })
 
