@@ -68,6 +68,50 @@ export async function createPayAnyWayPaymentRequest(input: {
   }
 }
 
+export async function createPayAnyWayReceiptResponse(input: {
+  merchantId: string
+  transactionId: string
+  amountKopecks: number
+  itemName: string
+  customerEmail: string
+}) {
+  const config = await getConfig()
+  if (input.merchantId !== config.merchantId) {
+    throw new Error('PayAnyWay receipt merchant mismatch')
+  }
+
+  const inventory = JSON.stringify([{
+    name: sanitizeReceiptItemName(input.itemName),
+    price: formatAmount(input.amountKopecks),
+    quantity: '1',
+    vatTag: '1105',
+    pm: 'full_payment',
+    po: 'service',
+  }])
+  const resultCode = '200'
+  const signature = md5(
+    resultCode + config.merchantId + input.transactionId + config.integrityCode
+  )
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<MNT_RESPONSE>
+  <MNT_ID>${escapeXml(config.merchantId)}</MNT_ID>
+  <MNT_TRANSACTION_ID>${escapeXml(input.transactionId)}</MNT_TRANSACTION_ID>
+  <MNT_RESULT_CODE>${resultCode}</MNT_RESULT_CODE>
+  <MNT_SIGNATURE>${signature}</MNT_SIGNATURE>
+  <MNT_ATTRIBUTES>
+    <ATTRIBUTE>
+      <KEY>INVENTORY</KEY>
+      <VALUE>${escapeXml(inventory)}</VALUE>
+    </ATTRIBUTE>
+    <ATTRIBUTE>
+      <KEY>CUSTOMER</KEY>
+      <VALUE>${escapeXml(input.customerEmail.trim())}</VALUE>
+    </ATTRIBUTE>
+  </MNT_ATTRIBUTES>
+</MNT_RESPONSE>`
+}
+
 export function parsePayAnyWayCallback(params: URLSearchParams): PayAnyWayCallback | null {
   const callback = {
     merchantId: params.get('MNT_ID')?.trim() ?? '',
@@ -146,4 +190,22 @@ function safeEqual(actual: string, expected: string) {
   const actualBuffer = Buffer.from(actual, 'hex')
   const expectedBuffer = Buffer.from(expected, 'hex')
   return actualBuffer.length === expectedBuffer.length && timingSafeEqual(actualBuffer, expectedBuffer)
+}
+
+function sanitizeReceiptItemName(value: string) {
+  const cleaned = value
+    .normalize('NFKC')
+    .replace(/[^\p{L}\p{N}\s.,()\-]/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+  return cleaned.slice(0, 128) || 'VPN подписка'
+}
+
+function escapeXml(value: string) {
+  return value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&apos;')
 }

@@ -78,7 +78,15 @@ describe('PayAnyWay Pay URL', () => {
     const response = await POST(callbackRequest())
 
     expect(response.status).toBe(200)
-    expect(await response.text()).toBe('SUCCESS')
+    expect(response.headers.get('content-type')).toBe('application/xml; charset=utf-8')
+    const body = await response.text()
+    expect(body).toContain('<MNT_RESULT_CODE>200</MNT_RESULT_CODE>')
+    expect(body).toContain('<KEY>INVENTORY</KEY>')
+    expect(body).toContain('&quot;name&quot;:&quot;Доступ к VPN Стандарт 7 дн.&quot;')
+    expect(body).toContain('&quot;price&quot;:&quot;130.00&quot;')
+    expect(body).toContain('&quot;po&quot;:&quot;service&quot;')
+    expect(body).toContain('<KEY>CUSTOMER</KEY>')
+    expect(body).toContain('<VALUE>user@example.com</VALUE>')
     expect(mocks.prisma.payment.update).toHaveBeenCalledWith({
       where: { id: 'payment-1' },
       data: expect.objectContaining({
@@ -121,7 +129,8 @@ describe('PayAnyWay Pay URL', () => {
     const response = await POST(callbackRequest())
 
     expect(response.status).toBe(200)
-    expect(await response.text()).toBe('SUCCESS')
+    expect(response.headers.get('content-type')).toBe('application/xml; charset=utf-8')
+    expect(await response.text()).toContain('<KEY>INVENTORY</KEY>')
     expect(mocks.prisma.payment.update).not.toHaveBeenCalled()
     expect(mocks.provisionPaymentSubscription).not.toHaveBeenCalled()
   })

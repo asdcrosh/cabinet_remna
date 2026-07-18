@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   createPayAnyWayPaymentRequest,
+  createPayAnyWayReceiptResponse,
   parsePayAnyWayCallback,
   verifyPayAnyWayCallback,
 } from './payanyway'
@@ -64,6 +65,28 @@ describe('PayAnyWay integration', () => {
       failUrl: 'https://cabinet.example/dashboard/billing?failed=1',
       returnUrl: 'https://cabinet.example/dashboard/billing',
     })).rejects.toThrow('PayAnyWay subscriber ID is required')
+  })
+
+  it('creates a signed XML receipt response with service nomenclature', async () => {
+    const response = await createPayAnyWayReceiptResponse({
+      merchantId: '49907299',
+      transactionId: 'payment-1',
+      amountKopecks: 13000,
+      itemName: 'Доступ к VPN «Стандарт» & 7 дн.',
+      customerEmail: 'user+vpn@example.com',
+    })
+
+    expect(response).toContain('<MNT_RESULT_CODE>200</MNT_RESULT_CODE>')
+    expect(response).toContain(
+      `<MNT_SIGNATURE>${md5(`20049907299payment-1${integrityCode}`)}</MNT_SIGNATURE>`
+    )
+    expect(response).toContain('<KEY>INVENTORY</KEY>')
+    expect(response).toContain('&quot;price&quot;:&quot;130.00&quot;')
+    expect(response).toContain('&quot;quantity&quot;:&quot;1&quot;')
+    expect(response).toContain('&quot;po&quot;:&quot;service&quot;')
+    expect(response).toContain('<VALUE>user+vpn@example.com</VALUE>')
+    expect(response).not.toContain('«')
+    expect(response).not.toContain('& 7')
   })
 
   it('accepts only a callback with the exact provider signature', async () => {

@@ -3,7 +3,11 @@ import { prisma } from '@/lib/prisma'
 import { logError, logWarn } from '@/lib/logger'
 import { notifyPaymentStuck } from '@/lib/notifications'
 import { cancelOtherPendingPaymentsForUser } from '@/lib/payment-sync'
-import { parsePayAnyWayCallback, verifyPayAnyWayCallback } from '@/lib/payanyway'
+import {
+  createPayAnyWayReceiptResponse,
+  parsePayAnyWayCallback,
+  verifyPayAnyWayCallback,
+} from '@/lib/payanyway'
 import { provisionPaymentSubscription } from '@/lib/provisioning'
 
 export const runtime = 'nodejs'
@@ -76,6 +80,20 @@ async function handlePayAnyWayRequest(params: URLSearchParams) {
     return payAnyWayResponse('FAIL', 409)
   }
 
+  let receiptResponse: string
+  try {
+    receiptResponse = await createPayAnyWayReceiptResponse({
+      merchantId: callback.merchantId,
+      transactionId: payment.id,
+      amountKopecks: payment.amountKopecks,
+      itemName: `Доступ к VPN ${payment.plan.name} ${payment.plan.durationDays} дн.`,
+      customerEmail: payment.user.email,
+    })
+  } catch (error) {
+    logError('webhook.payanyway.receipt_failed', error, { paymentId: payment.id })
+    return payAnyWayResponse('FAIL', 500)
+  }
+
   if (payment.status !== 'SUCCEEDED') {
     try {
       await prisma.$transaction([
@@ -102,7 +120,7 @@ async function handlePayAnyWayRequest(params: URLSearchParams) {
   }
 
   if (payment.subscriptionProvisionedAt && payment.subscription) {
-    return payAnyWayResponse('SUCCESS')
+    return payAnyWayXmlResponse(receiptResponse)
   }
 
   try {
@@ -130,12 +148,22 @@ async function handlePayAnyWayRequest(params: URLSearchParams) {
     // Оплату уже надёжно записали. Внутренний worker выполнит повторную выдачу.
   }
 
-  return payAnyWayResponse('SUCCESS')
+  return payAnyWayXmlResponse(receiptResponse)
 }
 
 function payAnyWayResponse(body: 'SUCCESS' | 'FAIL', status = 200) {
   return new NextResponse(body, {
     status,
     headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+  })
+}
+
+function payAnyWayXmlResponse(body: string) {
+  return new NextResponse(body, {
+    status: 200,
+    headers: {
+      'Content-Type': 'application/xml; charset=utf-8',
+      'Cache-Control': 'no-store',
+    },
   })
 }
