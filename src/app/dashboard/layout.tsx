@@ -74,15 +74,13 @@ export default async function DashboardLayout({ children }: { children: React.Re
             <LogoutButton />
           </div>
         </aside>
-        <div className={`fixed top-1.5 z-50 lg:right-6 lg:top-4 ${isStaff ? 'right-[4.25rem]' : 'right-4'}`}>
-          <NotificationBell showAdmin={isStaff} />
-        </div>
         <main className="min-w-0 w-full overflow-x-clip lg:ml-[14.5rem] lg:w-auto">
-          <div className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-slate-200/80 bg-white/90 px-4 backdrop-blur-xl dark:border-white/[0.07] dark:bg-[#080b0f]/90 lg:hidden">
-            <div>
+          <div className="sticky top-0 z-50 flex h-14 items-center justify-between border-b border-slate-200/80 bg-white/90 px-4 backdrop-blur-xl dark:border-white/[0.07] dark:bg-[#080b0f]/90 lg:fixed lg:right-6 lg:top-4 lg:h-auto lg:w-auto lg:border-0 lg:bg-transparent lg:p-0 lg:backdrop-blur-none lg:dark:bg-transparent">
+            <div className="lg:hidden">
               <Brand compact brandName={brandName} />
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex shrink-0 items-center gap-2">
+              <NotificationBell showAdmin={isStaff} />
               {isStaff ? <MobileDashboardNav role={role} email={accountLabel} brandName={brandName} badges={navBadges} features={features} /> : null}
             </div>
           </div>

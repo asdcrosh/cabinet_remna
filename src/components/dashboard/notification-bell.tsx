@@ -361,7 +361,7 @@ export function NotificationBell({ showAdmin = false }: { showAdmin?: boolean })
         ref={triggerRef}
         type="button"
         onClick={() => setOpen((value) => !value)}
-        className="relative grid h-10 w-10 place-items-center rounded-xl border border-slate-200 bg-white text-slate-700 transition-colors hover:bg-slate-50 hover:text-slate-950 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-200 dark:hover:bg-white/[0.08] dark:hover:text-white"
+        className="relative grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-slate-200 bg-white text-slate-700 transition-colors hover:bg-slate-50 hover:text-slate-950 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-200 dark:hover:bg-white/[0.08] dark:hover:text-white"
         aria-label={totalUnread > 0 ? `Уведомления, новых: ${totalUnread}` : 'Уведомления, новых нет'}
         aria-expanded={open}
         aria-controls="notification-panel"
