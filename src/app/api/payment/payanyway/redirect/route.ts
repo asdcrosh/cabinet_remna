@@ -5,6 +5,7 @@ import { requireAuth, withAuth } from '@/lib/auth/guard'
 import { getAppUrl } from '@/lib/app-url'
 import { logInfo } from '@/lib/logger'
 import { createPayAnyWayPaymentRequest } from '@/lib/payanyway'
+import { buildPaymentServiceName } from '@/lib/payment-service-name'
 import { prisma } from '@/lib/prisma'
 
 export const runtime = 'nodejs'
@@ -26,7 +27,7 @@ export const GET = withAuth(async (req: Request) => {
       provider: 'PAYANYWAY',
       status: 'PENDING',
     },
-    include: { plan: { select: { name: true, durationDays: true } } },
+    include: { plan: { select: { durationDays: true } } },
   })
   if (!payment) {
     return NextResponse.json({ error: 'Платёж не найден или уже завершён' }, { status: 404 })
@@ -36,7 +37,7 @@ export const GET = withAuth(async (req: Request) => {
   const request = await createPayAnyWayPaymentRequest({
     transactionId: payment.id,
     amountKopecks: payment.amountKopecks,
-    description: `Подписка: ${payment.plan.name} (${payment.plan.durationDays} дн.)`,
+    description: buildPaymentServiceName(payment.plan.durationDays),
     subscriberId: session.email,
     successUrl: `${baseUrl}/dashboard/billing?paid=1&payment=${payment.id}`,
     failUrl: `${baseUrl}/dashboard/billing?payment=${payment.id}&failed=1`,

@@ -15,6 +15,7 @@ import { provisionPaymentSubscription } from '@/lib/provisioning'
 import { getPlanAudienceContext, isPlanAvailableForUser } from '@/lib/plan-access'
 import { reconcileStalePendingPaymentsForUser } from '@/lib/payment-sync'
 import { logError } from '@/lib/logger'
+import { buildPaymentServiceName } from '@/lib/payment-service-name'
 
 export const runtime = 'nodejs'
 
@@ -217,9 +218,7 @@ export const POST = withAuth(async (req: Request) => {
   const amountRub = localPayment.amountKopecks / 100
   const baseUrl = getAppUrl()
   const returnUrl = `${baseUrl}/dashboard/billing?paid=1&payment=${localPayment.id}`
-  const description = appliedPromo
-    ? `Подписка: ${plan.name} (${plan.durationDays} дн.), промокод ${appliedPromo.normalizedCode}`
-    : `Подписка: ${plan.name} (${plan.durationDays} дн.)`
+  const description = buildPaymentServiceName(plan.durationDays)
 
   if (provider === 'PAYANYWAY') {
     try {

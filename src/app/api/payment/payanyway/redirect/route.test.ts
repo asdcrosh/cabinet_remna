@@ -30,7 +30,7 @@ describe('PayAnyWay payment form redirect', () => {
       id: 'payment-1',
       userId: 'user-1',
       amountKopecks: 30000,
-      plan: { name: 'Стандарт', durationDays: 30 },
+      plan: { durationDays: 30 },
     })
     mocks.createPayAnyWayPaymentRequest.mockResolvedValue({
       action: 'https://www.payanyway.ru/assistant.htm',
@@ -74,7 +74,7 @@ describe('PayAnyWay payment form redirect', () => {
     expect(mocks.createPayAnyWayPaymentRequest).toHaveBeenCalledWith({
       transactionId: 'payment-1',
       amountKopecks: 30000,
-      description: 'Подписка: Стандарт (30 дн.)',
+      description: 'Доступ к цифровому сервису на 30 дн.',
       subscriberId: 'user@example.com',
       successUrl: 'https://cabinet.example/dashboard/billing?paid=1&payment=payment-1',
       failUrl: 'https://cabinet.example/dashboard/billing?payment=payment-1&failed=1',
@@ -109,7 +109,7 @@ describe('PayAnyWay payment form redirect', () => {
         provider: 'PAYANYWAY',
         status: 'PENDING',
       },
-      include: { plan: { select: { name: true, durationDays: true } } },
+      include: { plan: { select: { durationDays: true } } },
     })
     expect(mocks.createPayAnyWayPaymentRequest).not.toHaveBeenCalled()
   })

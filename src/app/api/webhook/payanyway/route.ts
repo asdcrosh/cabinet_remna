@@ -8,6 +8,7 @@ import {
   parsePayAnyWayCallback,
   verifyPayAnyWayCallback,
 } from '@/lib/payanyway'
+import { buildPaymentServiceName } from '@/lib/payment-service-name'
 import { provisionPaymentSubscription } from '@/lib/provisioning'
 
 export const runtime = 'nodejs'
@@ -86,7 +87,7 @@ async function handlePayAnyWayRequest(params: URLSearchParams) {
       merchantId: callback.merchantId,
       transactionId: payment.id,
       amountKopecks: payment.amountKopecks,
-      itemName: `Доступ к сервису ${payment.plan.name} на ${payment.plan.durationDays} дн.`,
+      itemName: buildPaymentServiceName(payment.plan.durationDays),
       customerEmail: payment.user.email,
     })
   } catch (error) {

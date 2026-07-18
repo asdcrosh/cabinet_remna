@@ -82,7 +82,7 @@ describe('PayAnyWay Pay URL', () => {
     const body = await response.text()
     expect(body).toContain('<MNT_RESULT_CODE>200</MNT_RESULT_CODE>')
     expect(body).toContain('<KEY>INVENTORY</KEY>')
-    expect(body).toContain('&quot;name&quot;:&quot;Доступ к сервису Стандарт на 7 дн.&quot;')
+    expect(body).toContain('&quot;name&quot;:&quot;Доступ к цифровому сервису на 7 дн.&quot;')
     expect(body).not.toContain('VPN')
     expect(body).toContain('&quot;price&quot;:&quot;130.00&quot;')
     expect(body).toContain('&quot;po&quot;:&quot;service&quot;')
