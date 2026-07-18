@@ -8,6 +8,8 @@ interface YandexAuthButtonProps {
   referralCode?: string
   label?: string
   className?: string
+  legalAccepted?: boolean
+  registering?: boolean
 }
 
 export function YandexAuthButton({
@@ -15,9 +17,31 @@ export function YandexAuthButton({
   referralCode = '',
   label = 'Продолжить через Яндекс',
   className,
+  legalAccepted = true,
+  registering = false,
 }: YandexAuthButtonProps) {
   const params = new URLSearchParams({ next })
   if (referralCode) params.set('ref', referralCode)
+  if (registering && legalAccepted) params.set('legal', '1')
+
+  if (registering && !legalAccepted) {
+    return (
+      <button
+        type="button"
+        disabled
+        title="Сначала примите соглашение и дайте согласие на обработку персональных данных"
+        className={cn(
+          'flex min-h-11 w-full cursor-not-allowed items-center justify-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-semibold text-slate-400 dark:border-slate-800 dark:bg-surface-950 dark:text-slate-600',
+          className
+        )}
+      >
+        <span className="grid h-6 w-6 place-items-center rounded-full bg-[#fc3f1d]/50 text-sm font-bold text-white">
+          Я
+        </span>
+        {label}
+      </button>
+    )
+  }
 
   return (
     <Link

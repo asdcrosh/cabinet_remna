@@ -5,9 +5,15 @@ const baseInput = {
   email: 'user@example.com',
   password: 'Password1',
   agreeToTerms: true,
+  agreeToPersonalData: true,
 }
 
 describe('auth validation', () => {
+  it('requires separate terms and personal data confirmations', () => {
+    expect(registerSchema.safeParse({ ...baseInput, agreeToTerms: false }).success).toBe(false)
+    expect(registerSchema.safeParse({ ...baseInput, agreeToPersonalData: false }).success).toBe(false)
+  })
+
   it('accepts normal names', () => {
     expect(registerSchema.safeParse({ ...baseInput, name: 'Артем Алексеев' }).success).toBe(true)
     expect(registerSchema.safeParse({ ...baseInput, name: "Anne-Marie O'Neil" }).success).toBe(true)
@@ -27,6 +33,7 @@ describe('auth validation', () => {
         email: 'telegram@example.com',
         password: 'old-password',
         agreeToTerms: true,
+        agreeToPersonalData: true,
       }).success
     ).toBe(true)
     expect(
@@ -34,6 +41,7 @@ describe('auth validation', () => {
         email: 'telegram@example.com',
         password: '',
         agreeToTerms: true,
+        agreeToPersonalData: true,
       }).success
     ).toBe(false)
   })

@@ -4,9 +4,11 @@ import { ArrowLeft, FileText, Mail, ShieldCheck } from 'lucide-react'
 import { cn } from '@/lib/cn'
 
 const documents = [
-  { href: '/terms', label: 'Условия' },
-  { href: '/privacy', label: 'Конфиденциальность' },
+  { href: '/terms', label: 'Соглашение' },
+  { href: '/privacy', label: 'Политика ПД' },
+  { href: '/consent', label: 'Согласие' },
   { href: '/refunds', label: 'Возвраты' },
+  { href: '/contacts', label: 'Контакты' },
 ] as const
 
 interface LegalPageProps {

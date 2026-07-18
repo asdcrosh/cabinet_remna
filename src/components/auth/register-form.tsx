@@ -23,13 +23,21 @@ export function RegisterForm({
   const { register, handleSubmit, watch, formState: { errors, isSubmitting } } =
     useForm<RegisterInput>({
       resolver: zodResolver(registerSchema),
-      defaultValues: { email: '', password: '', name: '', referralCode: initialReferralCode, agreeToTerms: false as any },
+      defaultValues: {
+        email: '',
+        password: '',
+        name: '',
+        referralCode: initialReferralCode,
+        agreeToTerms: false as any,
+        agreeToPersonalData: false as any,
+      },
     })
   const [serverError, setServerError] = useState<string | null>(null)
   const [showPassword, setShowPassword] = useState(false)
   const [registeredEmail, setRegisteredEmail] = useState<string | null>(null)
   const [emailDelivery, setEmailDelivery] = useState<string | null>(null)
   const password = watch('password')
+  const legalAccepted = watch('agreeToTerms') && watch('agreeToPersonalData')
 
   const onSubmit = handleSubmit(async (values) => {
     setServerError(null)
@@ -82,11 +90,48 @@ export function RegisterForm({
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
+      <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-3 dark:border-slate-800 dark:bg-white/[0.03]">
+        <label className="flex items-start gap-2 text-sm text-slate-600 dark:text-slate-300">
+          <input
+            type="checkbox"
+            className="mt-0.5"
+            {...register('agreeToTerms')}
+          />
+          <span>
+            Принимаю{' '}
+            <Link href="/terms" className="text-brand-600 hover:underline">
+              пользовательское соглашение
+            </Link>
+          </span>
+        </label>
+        <label className="flex items-start gap-2 text-sm text-slate-600 dark:text-slate-300">
+          <input
+            type="checkbox"
+            className="mt-0.5"
+            {...register('agreeToPersonalData')}
+          />
+          <span>
+            Даю отдельное{' '}
+            <Link href="/consent" className="text-brand-600 hover:underline">
+              согласие на обработку персональных данных
+            </Link>
+            {' '}и ознакомлен с{' '}
+            <Link href="/privacy" className="text-brand-600 hover:underline">
+              политикой
+            </Link>
+          </span>
+        </label>
+        {(errors.agreeToTerms || errors.agreeToPersonalData) && (
+          <p className="text-xs text-red-600">Подтвердите оба документа для регистрации</p>
+        )}
+      </div>
       {yandexEnabled && (
         <>
           <YandexAuthButton
             referralCode={initialReferralCode}
             label="Зарегистрироваться через Яндекс"
+            legalAccepted={legalAccepted}
+            registering
           />
           <div className="flex items-center gap-3 text-xs text-slate-400">
             <span className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
@@ -155,22 +200,6 @@ export function RegisterForm({
           <StrengthIndicator value={password} />
         )}
       </div>
-      <label className="flex items-start gap-2 text-sm text-slate-600 dark:text-slate-300">
-        <input
-          type="checkbox"
-          className="mt-0.5"
-          {...register('agreeToTerms')}
-        />
-        <span>
-          Согласен с{' '}
-          <Link href="/terms" className="text-brand-600 hover:underline">
-            условиями использования
-          </Link>
-        </span>
-      </label>
-      {errors.agreeToTerms && (
-        <p className="text-xs text-red-600">Нужно согласиться с условиями</p>
-      )}
       {serverError && (
         <FormAlert>{serverError}</FormAlert>
       )}

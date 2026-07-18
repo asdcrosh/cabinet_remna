@@ -39,6 +39,9 @@ const sourceUser = {
   remnawaveShortUuid: 'short',
   remnawaveUsername: 'remna-user',
   agreedToTermsAt: new Date('2026-01-01T00:00:00.000Z'),
+  agreedToTermsVersion: '2026-01-01',
+  personalDataConsentAt: new Date('2026-01-01T00:00:00.000Z'),
+  personalDataConsentVersion: '2026-01-01',
   emailVerifiedAt: null,
   referredById: null,
 }
@@ -57,6 +60,9 @@ const targetUser = {
   remnawaveShortUuid: null,
   remnawaveUsername: null,
   agreedToTermsAt: null,
+  agreedToTermsVersion: null,
+  personalDataConsentAt: null,
+  personalDataConsentVersion: null,
   emailVerifiedAt: new Date('2026-01-02T00:00:00.000Z'),
   referredById: null,
 }

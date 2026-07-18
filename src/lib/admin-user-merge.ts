@@ -38,6 +38,18 @@ export async function mergeTechnicalTelegramUserIntoEmailUser(input: AdminMergeU
     }
 
     const conflicts: string[] = []
+    const termsConsent = pickLatestConsent(
+      target.agreedToTermsAt,
+      target.agreedToTermsVersion,
+      source.agreedToTermsAt,
+      source.agreedToTermsVersion
+    )
+    const personalDataConsent = pickLatestConsent(
+      target.personalDataConsentAt,
+      target.personalDataConsentVersion,
+      source.personalDataConsentAt,
+      source.personalDataConsentVersion
+    )
     const targetData: Prisma.UserUpdateInput = {
       name: target.name || source.name,
       telegramId: pickUniqueField('telegramId', target.telegramId, source.telegramId, conflicts),
@@ -48,7 +60,10 @@ export async function mergeTechnicalTelegramUserIntoEmailUser(input: AdminMergeU
       remnawaveUuid: pickUniqueField('remnawaveUuid', target.remnawaveUuid, source.remnawaveUuid, conflicts),
       remnawaveShortUuid: pickUniqueField('remnawaveShortUuid', target.remnawaveShortUuid, source.remnawaveShortUuid, conflicts),
       remnawaveUsername: pickUniqueField('remnawaveUsername', target.remnawaveUsername, source.remnawaveUsername, conflicts),
-      agreedToTermsAt: target.agreedToTermsAt || source.agreedToTermsAt,
+      agreedToTermsAt: termsConsent.at,
+      agreedToTermsVersion: termsConsent.version,
+      personalDataConsentAt: personalDataConsent.at,
+      personalDataConsentVersion: personalDataConsent.version,
       emailVerifiedAt: target.emailVerifiedAt || source.emailVerifiedAt,
     }
 
@@ -110,6 +125,17 @@ export async function mergeTechnicalTelegramUserIntoEmailUser(input: AdminMergeU
   })
 
   return summary
+}
+
+function pickLatestConsent(
+  targetAt: Date | null,
+  targetVersion: string | null,
+  sourceAt: Date | null,
+  sourceVersion: string | null
+) {
+  if (!targetAt) return { at: sourceAt, version: sourceVersion }
+  if (sourceAt && sourceAt > targetAt) return { at: sourceAt, version: sourceVersion }
+  return { at: targetAt, version: targetVersion }
 }
 
 function isTechnicalTelegramUser(email: string) {

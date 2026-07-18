@@ -1,5 +1,5 @@
 import { getBrandName } from '@/lib/branding'
-import { getLegalDetails } from '@/lib/legal'
+import { getLegalDetails, LEGAL_UPDATED_AT } from '@/lib/legal'
 import { LegalPage, LegalSection } from '@/components/legal/legal-page'
 
 export const metadata = { title: 'Правила возврата' }
@@ -18,7 +18,7 @@ export default function RefundsPage() {
       description="Условия обращения, порядок проверки и способ возврата оплаты."
       supportEmail={legal.supportEmail}
       title="Правила возврата"
-      updatedAt="14 июля 2026 года"
+      updatedAt={LEGAL_UPDATED_AT}
     >
         <LegalSection title="Когда можно запросить возврат">
           <p>Запрос рассматривается, если оплата подтверждена, но доступ не был выдан по технической причине либо существенная неисправность сервиса не была устранена в разумный срок.</p>

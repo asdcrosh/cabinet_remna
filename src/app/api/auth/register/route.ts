@@ -14,6 +14,7 @@ import { generateUniqueReferralCode, normalizeReferralCode } from '@/lib/referra
 import { registerRemnashopEmailUser } from '@/lib/remnashop-api'
 import { findRemnashopUserByEmail } from '@/lib/remnashop-users'
 import { createAdminNotification } from '@/lib/admin-notifications'
+import { PERSONAL_DATA_CONSENT_VERSION, TERMS_VERSION } from '@/lib/legal'
 import { logWarn } from '@/lib/logger'
 import { isFeatureEnabled } from '@/lib/feature-flags'
 
@@ -80,7 +81,7 @@ export async function POST(req: Request) {
     )
   }
 
-  const { email, password, name, agreeToTerms } = parsed.data
+  const { email, password, name } = parsed.data
   const referralCode = await isFeatureEnabled('referrals')
     ? normalizeReferralCode(parsed.data.referralCode)
     : null
@@ -112,7 +113,10 @@ export async function POST(req: Request) {
         role: 'USER',
         referralCode: await generateUniqueReferralCode(),
         referredById: referrer?.id,
-        agreedToTermsAt: agreeToTerms ? new Date() : null,
+        agreedToTermsAt: new Date(),
+        agreedToTermsVersion: TERMS_VERSION,
+        personalDataConsentAt: new Date(),
+        personalDataConsentVersion: PERSONAL_DATA_CONSENT_VERSION,
       },
       select: { id: true, email: true, role: true, name: true },
     })

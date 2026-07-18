@@ -7,6 +7,7 @@ import {
   getYandexOAuthCookieOptions,
   sanitizeOAuthNext,
   sanitizeOAuthReferral,
+  YANDEX_OAUTH_LEGAL_COOKIE,
   YANDEX_OAUTH_NEXT_COOKIE,
   YANDEX_OAUTH_REF_COOKIE,
   YANDEX_OAUTH_STATE_COOKIE,
@@ -28,6 +29,7 @@ export async function GET(req: Request) {
   const state = createYandexOAuthState()
   const next = sanitizeOAuthNext(requestUrl.searchParams.get('next'))
   const referralCode = sanitizeOAuthReferral(requestUrl.searchParams.get('ref'))
+  const legalAccepted = requestUrl.searchParams.get('legal') === '1'
 
   let yandexUrl: URL
   try {
@@ -42,6 +44,11 @@ export async function GET(req: Request) {
   const cookieStore = await cookies()
   cookieStore.set(YANDEX_OAUTH_STATE_COOKIE, state, cookieOptions)
   cookieStore.set(YANDEX_OAUTH_NEXT_COOKIE, next, cookieOptions)
+  if (legalAccepted) {
+    cookieStore.set(YANDEX_OAUTH_LEGAL_COOKIE, '1', cookieOptions)
+  } else {
+    cookieStore.delete(YANDEX_OAUTH_LEGAL_COOKIE)
+  }
   if (referralCode) {
     cookieStore.set(YANDEX_OAUTH_REF_COOKIE, referralCode, cookieOptions)
   } else {

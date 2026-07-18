@@ -1,12 +1,11 @@
 import { getBrandName } from '@/lib/branding'
-import { getLegalDetails } from '@/lib/legal'
+import { getLegalDetails, LEGAL_UPDATED_AT, TERMS_VERSION } from '@/lib/legal'
 import { LegalPage, LegalSection } from '@/components/legal/legal-page'
 
-export const metadata = { title: 'Условия использования' }
+export const metadata = { title: 'Пользовательское соглашение' }
 export const dynamic = 'force-dynamic'
 
 export default function TermsPage() {
-  const updatedAt = '21 июня 2026'
   const brandName = getBrandName()
   const legal = getLegalDetails()
 
@@ -16,10 +15,10 @@ export default function TermsPage() {
       backHref="/register"
       backLabel="К регистрации"
       brandName={brandName}
-      description="Правила использования сервиса, оплаты и управления VPN-доступом."
+      description="Условия использования сервиса, оплаты, поддержки и предоставления доступа."
       supportEmail={legal.supportEmail}
-      title="Условия использования"
-      updatedAt={updatedAt}
+      title="Пользовательское соглашение"
+      updatedAt={LEGAL_UPDATED_AT}
     >
         <LegalSection title="1. Общие положения">
           <p>
@@ -27,6 +26,7 @@ export default function TermsPage() {
             получение доступа и управление подпиской. Создавая аккаунт или оплачивая тариф,
             пользователь подтверждает согласие с этими условиями.
           </p>
+          <p>Версия Соглашения: {TERMS_VERSION}. Согласие на обработку персональных данных оформляется отдельно и не является частью настоящего Соглашения.</p>
           <p>
             Сервис предоставляет технический доступ к VPN-инфраструктуре. Сервис не предназначен для
             нарушения законодательства, обхода законных ограничений, атак на сети, рассылки спама или
@@ -120,6 +120,7 @@ export default function TermsPage() {
             сведения о подтверждении email, выбранные тарифы, платежи, подписки, технические статусы выдачи,
             Telegram ID при привязке, а также данные устройств и подключений, получаемые от VPN-системы.
           </p>
+          <p>Подробные правила приведены в Политике обработки персональных данных и отдельном Согласии на обработку персональных данных.</p>
           <p>
             Платёжные данные банковских карт обрабатываются платёжным провайдером. Кабинет не хранит полный
             номер карты, CVC/CVV и другие секретные данные карты.

@@ -54,6 +54,7 @@ const validBody = {
   password: 'Password1',
   name: 'New User',
   agreeToTerms: true,
+  agreeToPersonalData: true,
 }
 
 describe('register route', () => {
@@ -110,6 +111,8 @@ describe('register route', () => {
         name: validBody.name,
         role: 'USER',
         referralCode: 'REF123',
+        agreedToTermsVersion: '2026-07-18',
+        personalDataConsentVersion: '2026-07-18',
       }),
       select: { id: true, email: true, role: true, name: true },
     })

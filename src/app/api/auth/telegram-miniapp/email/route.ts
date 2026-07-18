@@ -14,6 +14,7 @@ import {
   TelegramAccountMergeError,
 } from '@/lib/telegram-account-merge'
 import { findCanonicalTelegramSessionUser } from '@/lib/telegram-session'
+import { PERSONAL_DATA_CONSENT_VERSION, TERMS_VERSION } from '@/lib/legal'
 
 export const runtime = 'nodejs'
 
@@ -119,6 +120,9 @@ export async function POST(req: Request) {
       where: { id: emailOwner.id },
       data: {
         agreedToTermsAt: new Date(),
+        agreedToTermsVersion: TERMS_VERSION,
+        personalDataConsentAt: new Date(),
+        personalDataConsentVersion: PERSONAL_DATA_CONSENT_VERSION,
         lastLoginAt: emailOwner.emailVerifiedAt ? new Date() : undefined,
       },
       select: {
@@ -209,6 +213,9 @@ export async function POST(req: Request) {
         email: parsed.data.email,
         passwordHash: await hash(newPassword.data, 12),
         agreedToTermsAt: new Date(),
+        agreedToTermsVersion: TERMS_VERSION,
+        personalDataConsentAt: new Date(),
+        personalDataConsentVersion: PERSONAL_DATA_CONSENT_VERSION,
       },
       select: { id: true, email: true, name: true },
     })

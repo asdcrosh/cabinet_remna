@@ -349,6 +349,8 @@ NODE_ENV=production npm run check:env
 | `LEGAL_OPERATOR_TAX_ID` | ИНН без слова «ИНН» |
 | `LEGAL_SUPPORT_EMAIL` | Публичный email поддержки и возвратов |
 
+Перед production-запуском пройдите [чек-лист по 152-ФЗ](deploy/152-fz-checklist.md). Публикация документов в интерфейсе не заменяет организационные меры оператора.
+
 ### Важные опциональные переменные
 
 | Переменная | Назначение |
@@ -366,6 +368,8 @@ NODE_ENV=production npm run check:env
 | `PAYANYWAY_TEST_MODE` | `true` для demo.moneta.ru, иначе `false` |
 | `PAYMENT_SETTINGS_ENCRYPTION_KEY` | Необязательный отдельный ключ шифрования секретов из админки; иначе используется `JWT_SECRET` |
 | `LEGAL_OPERATOR_ADDRESS` | Необязательный адрес исполнителя; пустое значение не показывается |
+| `LEGAL_SUPPORT_PHONE` | Необязательный публичный телефон поддержки |
+| `LEGAL_SUPPORT_TELEGRAM` | Необязательный username или URL Telegram поддержки |
 | `REMNASHOP_DATABASE_URL` | Read-only доступ к БД Remnashop |
 | `REMNASHOP_API_URL` | Public API Remnashop |
 | `TELEGRAM_BOT_TOKEN` | Mini App и Telegram-уведомления |

@@ -13,12 +13,14 @@ import {
   exchangeYandexCode,
   fetchYandexProfile,
   sanitizeOAuthNext,
+  YANDEX_OAUTH_LEGAL_COOKIE,
   YANDEX_OAUTH_NEXT_COOKIE,
   YANDEX_OAUTH_REF_COOKIE,
   YANDEX_OAUTH_STATE_COOKIE,
   type YandexProfile,
 } from '@/lib/yandex-oauth'
 import { createAdminNotification } from '@/lib/admin-notifications'
+import { PERSONAL_DATA_CONSENT_VERSION, TERMS_VERSION } from '@/lib/legal'
 
 export const runtime = 'nodejs'
 
@@ -53,7 +55,8 @@ export async function GET(req: Request) {
     const referralCode = await isFeatureEnabled('referrals')
       ? normalizeReferralCode(cookieStore.get(YANDEX_OAUTH_REF_COOKIE)?.value)
       : null
-    const user = await findOrCreateYandexUser(profile, referralCode)
+    const allowCreate = cookieStore.get(YANDEX_OAUTH_LEGAL_COOKIE)?.value === '1'
+    const user = await findOrCreateYandexUser(profile, referralCode, allowCreate)
 
     await prisma.user.update({
       where: { id: user.id },
@@ -77,12 +80,21 @@ export async function GET(req: Request) {
     logWarn('auth.yandex.callback_failed', {
       message: error instanceof Error ? error.message : 'unknown error',
     })
-    errorUrl.searchParams.set('yandex_error', 'yandex_auth_failed')
+    errorUrl.searchParams.set(
+      'yandex_error',
+      error instanceof Error && error.message === 'yandex_legal_consent_required'
+        ? 'legal_required'
+        : 'yandex_auth_failed'
+    )
     return clearYandexCookies(NextResponse.redirect(errorUrl))
   }
 }
 
-async function findOrCreateYandexUser(profile: YandexProfile, referralCode: string | null) {
+async function findOrCreateYandexUser(
+  profile: YandexProfile,
+  referralCode: string | null,
+  allowCreate: boolean
+) {
   if (!profile.emailVerified) {
     throw new Error('yandex_email_not_verified')
   }
@@ -103,6 +115,7 @@ async function findOrCreateYandexUser(profile: YandexProfile, referralCode: stri
         ? existingAccount.user
         : await prisma.user.findUnique({ where: { email: profile.email } })
     if (!emailOwner && existingAccount.user.email.toLowerCase() !== profile.email.toLowerCase()) {
+      assertCanCreateYandexUser(allowCreate)
       emailOwner = await createYandexUser(profile, { createOAuthAccount: false, referralCode })
     }
     if (
@@ -130,7 +143,6 @@ async function findOrCreateYandexUser(profile: YandexProfile, referralCode: stri
         where: { id: user.id },
         data: {
           emailVerifiedAt: user.emailVerifiedAt ?? (profile.emailVerified ? new Date() : undefined),
-          agreedToTermsAt: user.agreedToTermsAt ?? new Date(),
           name: user.name ?? profile.name,
         },
       })
@@ -148,7 +160,6 @@ async function findOrCreateYandexUser(profile: YandexProfile, referralCode: stri
       where: { id: existingUser.id },
       data: {
         emailVerifiedAt: existingUser.emailVerifiedAt ?? new Date(),
-        agreedToTermsAt: existingUser.agreedToTermsAt ?? new Date(),
         name: existingUser.name ?? profile.name,
         oauthAccounts: {
           create: {
@@ -164,7 +175,12 @@ async function findOrCreateYandexUser(profile: YandexProfile, referralCode: stri
     })
   }
 
+  assertCanCreateYandexUser(allowCreate)
   return createYandexUser(profile, { createOAuthAccount: true, referralCode })
+}
+
+function assertCanCreateYandexUser(allowCreate: boolean) {
+  if (!allowCreate) throw new Error('yandex_legal_consent_required')
 }
 
 function canLinkYandexToExistingEmailUser(
@@ -191,6 +207,9 @@ async function createYandexUser(
       referralCode: await generateUniqueReferralCode(),
       referredById: referrer?.id,
       agreedToTermsAt: new Date(),
+      agreedToTermsVersion: TERMS_VERSION,
+      personalDataConsentAt: new Date(),
+      personalDataConsentVersion: PERSONAL_DATA_CONSENT_VERSION,
       emailVerifiedAt: new Date(),
       oauthAccounts: options.createOAuthAccount
         ? {
@@ -224,5 +243,6 @@ function clearYandexCookies(response: NextResponse) {
   response.cookies.delete(YANDEX_OAUTH_STATE_COOKIE)
   response.cookies.delete(YANDEX_OAUTH_NEXT_COOKIE)
   response.cookies.delete(YANDEX_OAUTH_REF_COOKIE)
+  response.cookies.delete(YANDEX_OAUTH_LEGAL_COOKIE)
   return response
 }

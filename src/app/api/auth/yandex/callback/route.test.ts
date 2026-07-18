@@ -70,6 +70,9 @@ const existingUser = {
   name: null,
   emailVerifiedAt: new Date('2026-01-01T00:00:00.000Z'),
   agreedToTermsAt: null,
+  agreedToTermsVersion: null,
+  personalDataConsentAt: null,
+  personalDataConsentVersion: null,
   remnawaveUuid: null,
   remnawaveUsername: null,
 }
@@ -132,6 +135,17 @@ describe('Yandex OAuth callback', () => {
       email: existingUser.email,
       role: existingUser.role,
     })
+  })
+
+  it('does not create a new user without separate legal acceptance', async () => {
+    mocks.prisma.user.findUnique.mockResolvedValue(null)
+
+    const response = await GET(new Request('https://cabinet.example/api/auth/yandex/callback?code=code-1&state=state-1'))
+
+    expect(response.status).toBe(307)
+    expect(locationPath(response)).toBe('/login?yandex_error=legal_required')
+    expect(mocks.prisma.user.create).not.toHaveBeenCalled()
+    expect(mocks.setSessionCookieOnResponse).not.toHaveBeenCalled()
   })
 })
 

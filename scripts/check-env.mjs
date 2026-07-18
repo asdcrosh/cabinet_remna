@@ -92,6 +92,16 @@ if (isProduction) {
   for (const key of requiredProduction) {
     if (!value(key)) errors.push(`${key} is required in production`);
   }
+
+  if (/(ВСТАВЬ|Оператор сервиса|example\.com)/i.test(value("LEGAL_OPERATOR_NAME"))) {
+    errors.push("LEGAL_OPERATOR_NAME must contain the real operator name");
+  }
+  if (!/^\d{10}(\d{2})?$/.test(value("LEGAL_OPERATOR_TAX_ID"))) {
+    errors.push("LEGAL_OPERATOR_TAX_ID must contain a 10 or 12 digit INN");
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value("LEGAL_SUPPORT_EMAIL"))) {
+    errors.push("LEGAL_SUPPORT_EMAIL must be a valid public email address");
+  }
 }
 
 if (value("JWT_SECRET") && value("JWT_SECRET").length < 32) {

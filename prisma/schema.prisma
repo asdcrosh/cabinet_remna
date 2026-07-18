@@ -97,9 +97,12 @@ model User {
   remnawaveShortUuid String? @unique
   remnawaveUsername  String? @unique
 
-  // Согласия
-  agreedToTermsAt DateTime?
-  emailVerifiedAt DateTime?
+  // Согласия: время и редакция документа фиксируются отдельно.
+  agreedToTermsAt            DateTime?
+  agreedToTermsVersion       String?
+  personalDataConsentAt      DateTime?
+  personalDataConsentVersion String?
+  emailVerifiedAt            DateTime?
 
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt

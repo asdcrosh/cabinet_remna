@@ -13,6 +13,7 @@ export function TelegramEmailForm({ telegramName, initialEmail }: { telegramName
   const [showPassword, setShowPassword] = useState(false)
   const [showPasswordConfirmation, setShowPasswordConfirmation] = useState(false)
   const [agreed, setAgreed] = useState(false)
+  const [personalDataAgreed, setPersonalDataAgreed] = useState(false)
   const [sending, setSending] = useState(false)
   const [sentTo, setSentTo] = useState<string | null>(null)
   const [serverError, setServerError] = useState<string | null>(null)
@@ -50,7 +51,12 @@ export function TelegramEmailForm({ telegramName, initialEmail }: { telegramName
       const response = await fetch('/api/auth/telegram-miniapp/email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, agreeToTerms: agreed }),
+        body: JSON.stringify({
+          email,
+          password,
+          agreeToTerms: agreed,
+          agreeToPersonalData: personalDataAgreed,
+        }),
       })
       const data = await response.json().catch(() => null)
       if (!response.ok) throw new Error(data?.error || 'Не удалось отправить письмо')
@@ -158,6 +164,19 @@ export function TelegramEmailForm({ telegramName, initialEmail }: { telegramName
         <input className="mt-1" type="checkbox" checked={agreed} onChange={(event) => setAgreed(event.target.checked)} required />
         <span>
           Я принимаю <Link href="/terms" target="_blank" className="text-brand-600 hover:underline">условия использования</Link>
+        </span>
+      </label>
+      <label className="flex cursor-pointer items-start gap-3 text-sm text-slate-600 dark:text-slate-300">
+        <input
+          className="mt-1"
+          type="checkbox"
+          checked={personalDataAgreed}
+          onChange={(event) => setPersonalDataAgreed(event.target.checked)}
+          required
+        />
+        <span>
+          Даю отдельное <Link href="/consent" target="_blank" className="text-brand-600 hover:underline">согласие на обработку персональных данных</Link>
+          {' '}и ознакомлен с <Link href="/privacy" target="_blank" className="text-brand-600 hover:underline">политикой</Link>
         </span>
       </label>
       {serverError && (

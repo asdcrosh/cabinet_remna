@@ -6,6 +6,7 @@ const OAUTH_TIMEOUT_MS = 10_000
 export const YANDEX_OAUTH_STATE_COOKIE = 'yandex_oauth_state'
 export const YANDEX_OAUTH_NEXT_COOKIE = 'yandex_oauth_next'
 export const YANDEX_OAUTH_REF_COOKIE = 'yandex_oauth_ref'
+export const YANDEX_OAUTH_LEGAL_COOKIE = 'yandex_oauth_legal'
 
 export interface YandexProfile {
   providerUserId: string

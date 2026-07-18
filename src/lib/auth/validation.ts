@@ -37,6 +37,9 @@ export const registerSchema = z.object({
   agreeToTerms: z.literal(true, {
     errorMap: () => ({ message: 'Нужно согласиться с условиями' }),
   }),
+  agreeToPersonalData: z.literal(true, {
+    errorMap: () => ({ message: 'Нужно дать согласие на обработку персональных данных' }),
+  }),
 })
 
 export const loginSchema = z.object({
@@ -49,6 +52,9 @@ export const telegramMiniAppEmailSchema = z.object({
   password: z.string().min(1, 'Введите пароль').max(128, 'Максимум 128 символов'),
   agreeToTerms: z.literal(true, {
     errorMap: () => ({ message: 'Нужно согласиться с условиями' }),
+  }),
+  agreeToPersonalData: z.literal(true, {
+    errorMap: () => ({ message: 'Нужно дать согласие на обработку персональных данных' }),
   }),
 })
 

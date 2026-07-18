@@ -67,7 +67,9 @@ export function AuthLayout({
           <div className="mt-3 flex flex-wrap justify-center gap-x-3 gap-y-1 text-xs text-slate-400">
             <Link href="/terms">Условия</Link>
             <Link href="/privacy">Конфиденциальность</Link>
+            <Link href="/consent">Обработка данных</Link>
             <Link href="/refunds">Возвраты</Link>
+            <Link href="/contacts">Контакты</Link>
           </div>
         </div>
       </div>
