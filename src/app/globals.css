@@ -172,12 +172,31 @@
     @apply space-y-4 sm:space-y-5;
   }
 
-  .dashboard-hero {
-    @apply relative overflow-hidden rounded-3xl border border-white/10 p-5 text-white sm:p-6;
-    background: linear-gradient(135deg, rgb(12 20 34), rgb(10 52 59));
+  .dashboard-shell {
+    background-image: radial-gradient(circle at 100% 0%, rgba(14, 165, 233, 0.055), transparent 30rem);
+    background-attachment: fixed;
   }
-  .dashboard-hero::after {
-    content: none;
+  .dark .dashboard-shell {
+    background-image: radial-gradient(circle at 100% 0%, rgba(34, 211, 238, 0.055), transparent 30rem);
+  }
+
+  .dashboard-hero {
+    @apply relative isolate overflow-hidden rounded-3xl border border-white/10 p-4 text-white sm:p-6;
+    background:
+      radial-gradient(circle at 92% 6%, rgba(34, 211, 238, 0.20), transparent 30%),
+      linear-gradient(135deg, rgb(12 20 34), rgb(8 43 50));
+    box-shadow: 0 20px 55px -36px rgba(8, 47, 73, 0.65);
+  }
+  .dashboard-hero::before {
+    content: '';
+    position: absolute;
+    inset: auto -5rem -8rem auto;
+    width: 18rem;
+    height: 18rem;
+    border-radius: 999px;
+    background: rgba(45, 212, 191, 0.09);
+    filter: blur(8px);
+    pointer-events: none;
   }
   .dashboard-hero > * {
     position: relative;
@@ -187,7 +206,7 @@
     @apply border-white bg-none bg-white text-slate-950 hover:bg-slate-100;
   }
   .dashboard-hero-metric {
-    @apply min-w-0 border-l border-white/15 px-3 py-1 sm:px-4;
+    @apply min-w-0 rounded-2xl border border-white/10 bg-white/[0.045] px-3.5 py-3 sm:px-4 sm:py-3.5;
   }
   .page-transition {
     animation: page-soft-enter 120ms ease-out both;
