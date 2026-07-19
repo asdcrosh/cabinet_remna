@@ -293,7 +293,7 @@ export function MobileBottomNav({
   const moreItems = adminArea
     ? availableAdminItems.filter((item) => !adminPrimaryHrefs.has(item.href))
     : [...accountMoreItems, ...infoNav]
-  const showMore = !adminArea
+  const showMore = moreItems.length > 0
   const [moreOpen, setMoreOpen] = useState(false)
   const [mounted, setMounted] = useState(false)
   const moreTriggerRef = useRef<HTMLButtonElement | null>(null)

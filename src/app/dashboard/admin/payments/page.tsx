@@ -3,7 +3,7 @@ import { Download, Search } from 'lucide-react'
 import { prisma } from '@/lib/prisma'
 import { requireAdminPage } from '@/lib/auth/admin-page'
 import { formatPrice } from '@/lib/format'
-import { PageHeader } from '@/components/dashboard/page-header'
+import { AdminPageShell } from '@/components/admin/admin-page-shell'
 import { PaymentBadge } from '@/components/admin/admin-badges'
 import { PaymentSyncButton, RecoveryActionButton, RemnashopPaymentRetryButton } from '@/components/admin/recovery-actions'
 import { LazyListLoader } from '@/components/admin/lazy-list-loader'
@@ -73,22 +73,20 @@ export default async function AdminPaymentsPage({
   ])
 
   return (
-    <div className="page-stack">
-      <PageHeader
-        title="Платежи"
-        description="Оплаты и выдача подписок"
-        action={
-          <Link href={buildPaymentsExportHref(q, status, provider, delivery, range, params.from, params.to)} className="btn-secondary w-full sm:w-auto">
-            <Download className="h-4 w-4" />
-            CSV
-          </Link>
-        }
-      />
-
-      <section className="grid grid-cols-3 overflow-hidden rounded-xl border border-slate-200 bg-white divide-x divide-slate-200 dark:border-white/10 dark:bg-white/[0.025] dark:divide-white/10">
-        <PaymentStat title="Ожидают" value={pendingCount} tone="amber" href="/dashboard/admin/payments?status=PENDING" />
-        <PaymentStat title="Довыдача" value={retryCount} tone={retryCount > 0 ? 'red' : 'slate'} href="/dashboard/admin/payments?delivery=RETRY" />
-        <PaymentStat title="Оплачено" value={succeededCount} tone="emerald" href="/dashboard/admin/payments?status=SUCCEEDED" />
+    <AdminPageShell
+      title="Платежи"
+      description="Оплаты и выдача подписок"
+      action={
+        <Link href={buildPaymentsExportHref(q, status, provider, delivery, range, params.from, params.to)} className="btn-secondary w-full sm:w-auto">
+          <Download className="h-4 w-4" />
+          Экспорт CSV
+        </Link>
+      }
+    >
+      <section className="grid grid-cols-3 gap-2" aria-label="Состояние платежей">
+        <PaymentStat title="Ожидают" value={pendingCount} tone="amber" href="/dashboard/admin/payments?status=PENDING" active={status === 'PENDING'} />
+        <PaymentStat title="Довыдача" value={retryCount} tone={retryCount > 0 ? 'red' : 'slate'} href="/dashboard/admin/payments?delivery=RETRY" active={delivery === 'RETRY'} />
+        <PaymentStat title="Оплачено" value={succeededCount} tone="emerald" href="/dashboard/admin/payments?status=SUCCEEDED" active={status === 'SUCCEEDED' && delivery !== 'RETRY'} />
       </section>
 
       <AdminFilterBar
@@ -96,7 +94,7 @@ export default async function AdminPaymentsPage({
         resetHref="/dashboard/admin/payments"
         resetVisible={Boolean(q || status !== 'ALL' || provider !== 'ALL' || delivery !== 'ALL' || range !== 'ALL' || params.from || params.to)}
         count={{ shown: payments.length, total }}
-        className="md:grid-cols-2 xl:grid-cols-[minmax(15rem,1fr)_10rem_10rem_11rem_9rem_auto]"
+        className="md:grid-cols-2 2xl:grid-cols-[minmax(15rem,1fr)_10rem_10rem_11rem_9rem_auto]"
       >
         <input type="hidden" name="limit" value={ADMIN_LIST_PAGE_SIZE} />
         <AdminFilterField label="Поиск платежей">
@@ -147,7 +145,7 @@ export default async function AdminPaymentsPage({
             </AdminFilterField>
           </>
         ) : null}
-        <AdminFilterSubmitButton />
+        <AdminFilterSubmitButton idleText="Применить" />
       </AdminFilterBar>
 
       {payments.length === 0 && (
@@ -155,7 +153,7 @@ export default async function AdminPaymentsPage({
       )}
 
       <div className={payments.length > 0 ? 'admin-list' : 'hidden'}>
-        <div className="admin-list-header grid-cols-[minmax(15rem,1.2fr)_minmax(9rem,.65fr)_minmax(15rem,1fr)_auto] items-center gap-4">
+        <div className="admin-list-header grid-cols-[minmax(16rem,1.25fr)_minmax(10rem,.7fr)_minmax(17rem,1fr)_auto] items-center gap-5">
           <span>Покупатель</span>
           <span>Тариф и сумма</span>
           <span>Обработка</span>
@@ -172,26 +170,28 @@ export default async function AdminPaymentsPage({
           ) : needsRemnashopRetry ? (
             <RemnashopPaymentRetryButton paymentId={payment.id} />
           ) : (
-            <Link href={`/dashboard/admin/users?q=${encodeURIComponent(payment.user.email)}`} className="btn-secondary min-w-[112px] px-3 text-xs">
+            <Link href={`/dashboard/admin/users?q=${encodeURIComponent(payment.user.email)}`} className="btn-secondary w-full min-w-[112px] px-3 text-xs lg:w-auto">
               Пользователь
             </Link>
           )
           return (
             <article key={payment.id} className={`admin-list-row overflow-hidden ${paymentAttentionClass(needsRetry || needsRemnashopRetry)}`}>
-              <div className="grid gap-4 px-4 py-4 lg:grid-cols-[minmax(15rem,1.2fr)_minmax(9rem,.65fr)_minmax(15rem,1fr)_auto] lg:items-center">
+              <div className="grid gap-3 px-4 py-4 lg:grid-cols-[minmax(16rem,1.25fr)_minmax(10rem,.7fr)_minmax(17rem,1fr)_auto] lg:items-center lg:gap-5">
                 <div className="flex min-w-0 items-start justify-between gap-3 lg:block">
                   <div className="min-w-0">
-                    <div className="break-words text-sm font-semibold">{payment.user.email}</div>
+                    <div className="break-words text-sm font-semibold sm:text-base lg:text-sm">{payment.user.email}</div>
+                    {payment.user.name ? <div className="mt-0.5 truncate text-xs text-slate-500">{payment.user.name}</div> : null}
                     <div className="mt-1 flex flex-wrap gap-x-2 gap-y-1 text-xs text-slate-500">
                       <span>{formatAdminPaymentDate(payment.createdAt)}</span>
                       <span>{paymentProviderLabel(payment.provider)}</span>
-                      <span className="font-mono">{shortId(payment.externalPaymentId || payment.yookassaId || payment.id)}</span>
+                      <span className="font-mono text-[11px]">{shortId(payment.externalPaymentId || payment.yookassaId || payment.id)}</span>
                     </div>
                   </div>
-                  <div className="lg:mt-2"><PaymentBadge status={payment.status} /></div>
+                  <div className="shrink-0 lg:mt-2"><PaymentBadge status={payment.status} /></div>
                 </div>
-                <div className="min-w-0">
-                  <div className="truncate text-sm font-medium">{payment.plan.name}</div>
+                <div className="min-w-0 rounded-xl border border-slate-200 bg-white/70 p-3 dark:border-white/[0.07] dark:bg-white/[0.025] lg:rounded-none lg:border-0 lg:bg-transparent lg:p-0 lg:dark:bg-transparent">
+                  <div className="mb-1 text-[11px] font-medium uppercase tracking-wide text-slate-400 lg:hidden">Тариф и сумма</div>
+                  <div className="truncate text-sm font-medium text-slate-800 dark:text-slate-100">{payment.plan.name}</div>
                   <PaymentAmount
                     amountKopecks={payment.amountKopecks}
                     originalAmountKopecks={payment.originalAmountKopecks}
@@ -201,23 +201,24 @@ export default async function AdminPaymentsPage({
                     <div className="mt-1 text-xs text-slate-500">Промокод {getPromoCodeLabel(payment.promoCodeSnapshot)}</div>
                   ) : null}
                 </div>
-                <div className="min-w-0 space-y-2">
+                <div className="min-w-0 space-y-2 rounded-xl border border-slate-200 bg-white/70 p-3 dark:border-white/[0.07] dark:bg-white/[0.025] lg:rounded-none lg:border-0 lg:bg-transparent lg:p-0 lg:dark:bg-transparent">
+                  <div className="text-[11px] font-medium uppercase tracking-wide text-slate-400 lg:hidden">Обработка</div>
                   <PaymentFlow
                     paid={payment.status === 'SUCCEEDED'}
                     provisioned={Boolean(payment.subscriptionProvisionedAt)}
                     remnashopSynced={Boolean(payment.remnashopSyncedAt)}
                   />
                   {(payment.provisioningError || (payment.subscriptionProvisionedAt && !payment.remnashopSyncedAt)) ? (
-                    <details className="text-xs text-amber-700 dark:text-amber-200">
-                      <summary className="cursor-pointer font-medium">Почему требуется внимание</summary>
-                      <div className="mt-2 space-y-1 rounded-xl bg-amber-50 px-3 py-2 dark:bg-amber-500/10">
+                    <details className="rounded-lg border border-amber-200 bg-amber-50/80 text-xs text-amber-700 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
+                      <summary className="cursor-pointer px-3 py-2 font-medium">Требуется внимание</summary>
+                      <div className="space-y-1 border-t border-amber-200 px-3 py-2 dark:border-amber-500/20">
                         {payment.provisioningError ? <div>{payment.provisioningError}</div> : null}
                         {payment.subscriptionProvisionedAt && !payment.remnashopSyncedAt ? <div>Remnashop: {humanSyncError(payment.remnashopSyncError)}</div> : null}
                       </div>
                     </details>
                   ) : null}
                 </div>
-                <div className="grid lg:justify-end">{action}</div>
+                <div className="grid border-t border-slate-200 pt-3 dark:border-white/[0.07] lg:justify-end lg:border-0 lg:pt-0">{action}</div>
               </div>
             </article>
           )
@@ -225,7 +226,7 @@ export default async function AdminPaymentsPage({
       </div>
 
       <LazyListLoader loaded={payments.length} total={total} step={ADMIN_LIST_PAGE_SIZE} />
-    </div>
+    </AdminPageShell>
   )
 }
 
@@ -237,14 +238,14 @@ function PaymentFlow({ paid, provisioned, remnashopSynced }: { paid: boolean; pr
   ]
 
   return (
-    <div className="flex flex-wrap items-center gap-2 text-xs">
-      {steps.map((step, index) => (
-        <div key={step.label} className="flex items-center gap-2">
-          {index > 0 ? <span className="text-slate-300 dark:text-slate-600">→</span> : null}
-          <span className={`inline-flex items-center gap-1.5 font-medium ${step.done ? 'text-emerald-700 dark:text-emerald-300' : 'text-slate-400'}`}>
-            <span className={`h-1.5 w-1.5 rounded-full ${step.done ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-600'}`} />
-            {step.label}
-          </span>
+    <div className="grid grid-cols-3 gap-1.5" aria-label="Этапы обработки платежа">
+      {steps.map((step) => (
+        <div
+          key={step.label}
+          className={`flex min-w-0 items-center justify-center gap-1.5 rounded-lg px-1.5 py-2 text-[11px] font-medium ${step.done ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300' : 'bg-slate-100 text-slate-400 dark:bg-white/[0.05]'}`}
+        >
+          <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${step.done ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-600'}`} />
+          <span className="truncate">{step.label}</span>
         </div>
       ))}
     </div>
@@ -299,7 +300,19 @@ function buildPaymentsExportHref(q: string, status: string, provider: string, de
   return `/api/admin/payments?${params.toString()}`
 }
 
-function PaymentStat({ title, value, tone, href }: { title: string; value: number; tone: 'amber' | 'emerald' | 'red' | 'slate'; href: string }) {
+function PaymentStat({
+  title,
+  value,
+  tone,
+  href,
+  active,
+}: {
+  title: string
+  value: number
+  tone: 'amber' | 'emerald' | 'red' | 'slate'
+  href: string
+  active: boolean
+}) {
   const toneClass = {
     amber: 'text-amber-700 dark:text-amber-200',
     emerald: 'text-emerald-700 dark:text-emerald-200',
@@ -308,7 +321,11 @@ function PaymentStat({ title, value, tone, href }: { title: string; value: numbe
   }[tone]
 
   return (
-    <Link href={href} className="min-w-0 px-3 py-2.5 text-center transition-colors hover:bg-slate-50 sm:text-left dark:hover:bg-white/[0.04]">
+    <Link
+      href={href}
+      aria-current={active ? 'page' : undefined}
+      className={`min-w-0 rounded-2xl border px-2.5 py-3 text-center transition-colors sm:px-4 sm:text-left ${active ? 'border-cyan-300 bg-cyan-50/70 dark:border-cyan-500/30 dark:bg-cyan-500/10' : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50 dark:border-white/10 dark:bg-white/[0.025] dark:hover:bg-white/[0.05]'}`}
+    >
       <div className="truncate text-xs text-slate-500">{title}</div>
       <div className={`mt-0.5 text-xl font-semibold tabular-nums sm:text-2xl ${toneClass}`}>{value}</div>
     </Link>

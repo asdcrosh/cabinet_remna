@@ -12,7 +12,7 @@ export function AdminFilterSubmitButton({
   const { pending } = useFormStatus()
 
   return (
-    <button className="btn-primary self-end" type="submit" disabled={pending} aria-busy={pending}>
+    <button className="btn-primary w-full self-end" type="submit" disabled={pending} aria-busy={pending}>
       {pending ? pendingText : idleText}
     </button>
   )

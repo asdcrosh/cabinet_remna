@@ -286,7 +286,7 @@ export function BroadcastAdmin({
 
   return (
     <section className="grid w-full min-w-0 max-w-full gap-4 overflow-hidden">
-      <div className="grid grid-cols-2 gap-1 rounded-xl bg-slate-100 p-1 dark:bg-white/[0.05]" role="tablist" aria-label="Разделы рассылок">
+      <div className="grid grid-cols-2 gap-1 rounded-2xl bg-slate-100 p-1 dark:bg-white/[0.05]" role="tablist" aria-label="Разделы рассылок">
         <button
           type="button"
           role="tab"

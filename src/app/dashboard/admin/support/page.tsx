@@ -3,7 +3,7 @@ import { requireStaffPage } from '@/lib/auth/admin-page'
 import { serializeSupportMessage, serializeSupportTicket } from '@/lib/support'
 import { SupportPanelDynamic } from '@/components/support/support-panel-dynamic'
 import { parseAdminListLimit } from '@/lib/admin-list'
-import { PageHeader } from '@/components/dashboard/page-header'
+import { AdminPageShell } from '@/components/admin/admin-page-shell'
 import { notFound } from 'next/navigation'
 import { isFeatureEnabled } from '@/lib/feature-flags'
 
@@ -91,8 +91,7 @@ export default async function AdminSupportPage({
   ])
 
   return (
-    <div className="space-y-4">
-      <PageHeader title="Поддержка" description="Обращения пользователей" />
+    <AdminPageShell title="Поддержка" description="Очередь обращений и переписка с пользователями">
       <SupportPanelDynamic
         mode="admin"
         initialTotal={total}
@@ -102,6 +101,6 @@ export default async function AdminSupportPage({
           messages: ticket.messages.map(serializeSupportMessage),
         }))}
       />
-    </div>
+    </AdminPageShell>
   )
 }

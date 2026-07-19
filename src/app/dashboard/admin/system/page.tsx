@@ -23,7 +23,7 @@ export default async function AdminSystemPage() {
       title="Система"
       description="Интеграции, бэкапы и состояние сервисов"
     >
-      <div className="space-y-4">
+      <div className="space-y-5">
         <FeatureSettingsPanel initialFeatures={features} />
         <PaymentProviderSettingsPanel initialSettings={paymentSettings} />
         <SystemHealthPanel initialReport={report} />

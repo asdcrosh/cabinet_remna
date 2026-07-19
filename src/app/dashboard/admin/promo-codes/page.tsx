@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { requireAdminPage } from '@/lib/auth/admin-page'
-import { PageHeader } from '@/components/dashboard/page-header'
+import { AdminPageShell } from '@/components/admin/admin-page-shell'
 import { PromoCodesAdmin, type PromoCodeAdminRow } from '@/components/admin/promo-codes-admin'
 import { LazyListLoader } from '@/components/admin/lazy-list-loader'
 import { ADMIN_LIST_PAGE_SIZE, parseAdminListLimit } from '@/lib/admin-list'
@@ -95,18 +95,17 @@ export default async function AdminPromoCodesPage({
   })
 
   return (
-    <div className="page-stack">
-      <PageHeader
-        title="Промокоды"
-        description="Скидки и условия использования"
-      />
+    <AdminPageShell
+      title="Промокоды"
+      description="Скидки, аудитории и лимиты использования"
+    >
       <PromoCodesAdmin
         promoCodes={rows}
         plans={plans.map((plan) => ({ id: plan.id, name: plan.name }))}
         initialQuery={q}
       />
       <LazyListLoader loaded={promoCodes.length} total={total} step={ADMIN_LIST_PAGE_SIZE} />
-    </div>
+    </AdminPageShell>
   )
 }
 

@@ -77,7 +77,7 @@
            dark:hover:border-cyan-500/30 dark:hover:bg-white/[0.06];
   }
   .admin-list {
-    @apply overflow-hidden rounded-2xl border border-slate-200 bg-white divide-y divide-slate-200
+    @apply overflow-hidden rounded-3xl border border-slate-200 bg-white divide-y divide-slate-200
            dark:border-white/10 dark:bg-white/[0.025] dark:divide-white/[0.07];
   }
   .admin-list-header {

@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { requireAdminPage } from '@/lib/auth/admin-page'
-import { PageHeader } from '@/components/dashboard/page-header'
+import { AdminPageShell } from '@/components/admin/admin-page-shell'
 import { PlansAdmin, type PlanAdminRow } from '@/components/admin/plans-admin'
 
 export const dynamic = 'force-dynamic'
@@ -43,12 +43,11 @@ export default async function AdminPlansPage() {
   }))
 
   return (
-    <div className="page-stack">
-      <PageHeader
-        title="Тарифы"
-        description="Цены, доступ и серверные группы"
-      />
+    <AdminPageShell
+      title="Тарифы"
+      description="Каталог, ограничения и серверные группы"
+    >
       <PlansAdmin plans={rows} />
-    </div>
+    </AdminPageShell>
   )
 }

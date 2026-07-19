@@ -195,23 +195,28 @@ export function PlansAdmin({ plans }: { plans: PlanAdminRow[] }) {
   }
 
   const squadById = useMemo(() => new Map(squads.map((squad) => [squad.uuid, squad])), [squads])
+  const activePlansCount = plans.filter((plan) => plan.isActive).length
+  const subscriptionsCount = plans.reduce((total, plan) => total + plan.subscriptionsCount, 0)
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-3 pb-2">
-        <div className="text-sm text-slate-500">Тарифов: {plans.length}</div>
-        <div className="flex gap-2">
-          <button type="button" className="btn-secondary flex-1 sm:flex-none" onClick={() => void loadSquads()} disabled={squadsLoading} aria-label="Обновить группы Remnawave">
+      <section className="grid gap-3 rounded-3xl border border-slate-200 bg-white p-3 dark:border-white/10 dark:bg-white/[0.03] sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:p-4">
+        <div className="grid grid-cols-3 divide-x divide-slate-200 rounded-2xl bg-slate-50 px-2 py-3 dark:divide-white/10 dark:bg-white/[0.035] sm:max-w-lg">
+          <CatalogMetric value={plans.length} label="Тарифы" />
+          <CatalogMetric value={activePlansCount} label="Активны" />
+          <CatalogMetric value={subscriptionsCount} label="Подписки" />
+        </div>
+        <div className="grid grid-cols-2 gap-2 sm:flex">
+          <button type="button" className="btn-secondary justify-center sm:flex-none" onClick={() => void loadSquads()} disabled={squadsLoading} aria-label="Обновить группы Remnawave">
             <RefreshCw className={cn('h-4 w-4', squadsLoading && 'animate-spin')} />
-            <span className="hidden sm:inline">Группы</span>
+            <span>Группы</span>
           </button>
-          <button type="button" className="btn-primary flex-1 sm:flex-none" onClick={() => setCreateOpen(true)}>
+          <button type="button" className="btn-primary justify-center sm:flex-none" onClick={() => setCreateOpen(true)}>
             <Plus className="h-4 w-4" />
-            <span className="hidden sm:inline">Новый тариф</span>
-            <span className="sm:hidden">Добавить</span>
+            <span>Новый тариф</span>
           </button>
         </div>
-      </div>
+      </section>
 
       <AdminModal
         open={createOpen}
@@ -287,9 +292,9 @@ export function PlansAdmin({ plans }: { plans: PlanAdminRow[] }) {
               <article
                 key={plan.id}
                 data-testid="admin-plan-card"
-                className="admin-list-row min-w-0 p-4 lg:grid lg:grid-cols-[minmax(14rem,1.15fr)_minmax(12rem,.9fr)_minmax(12rem,.9fr)_auto] lg:items-center lg:gap-x-6"
+                className="admin-list-row min-w-0 p-3.5 sm:p-4 lg:grid lg:grid-cols-[minmax(14rem,1.15fr)_minmax(12rem,.9fr)_minmax(12rem,.9fr)_auto] lg:items-center lg:gap-x-6"
               >
-                <div className="flex min-w-0 items-start justify-between gap-4 lg:block">
+                <div className="min-w-0">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <h3 className="break-words font-semibold tracking-tight">{plan.name}</h3>
@@ -298,21 +303,24 @@ export function PlansAdmin({ plans }: { plans: PlanAdminRow[] }) {
                     </div>
                     {plan.description && <p className="mt-1 line-clamp-2 text-sm leading-5 text-slate-500 dark:text-slate-400">{plan.description}</p>}
                   </div>
-                  <div className="shrink-0 text-right font-semibold tracking-tight lg:mt-1 lg:text-left">{formatPrice(plan.priceKopecks)}</div>
+                  <div className="mt-3 flex items-baseline gap-1.5 lg:mt-2">
+                    <span className="text-lg font-semibold tracking-tight text-slate-950 dark:text-white">{formatPrice(plan.priceKopecks)}</span>
+                    <span className="text-xs text-slate-400">за {plan.durationDays} дн.</span>
+                  </div>
                 </div>
 
-                <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-500 lg:mt-0">
-                  <span><strong className="font-semibold text-slate-800 dark:text-slate-100">{plan.durationDays}</strong> дн.</span>
-                  <span>{plan.trafficLimitGb == null ? 'Безлимит' : `${plan.trafficLimitGb} ГБ`}</span>
-                  <span>{plan.deviceLimit} устр.</span>
-                  <span>{planAvailabilityLabels[plan.availability]}</span>
+                <div className="mt-3 grid grid-cols-2 gap-2 lg:mt-0">
+                  <PlanFact label="Срок" value={`${plan.durationDays} дней`} />
+                  <PlanFact label="Трафик" value={plan.trafficLimitGb == null ? 'Безлимит' : `${plan.trafficLimitGb} ГБ`} />
+                  <PlanFact label="Устройства" value={String(plan.deviceLimit)} />
+                  <PlanFact label="Доступ" value={planAvailabilityLabels[plan.availability]} />
                 </div>
 
-                <div className="mt-3 min-w-0 text-sm text-slate-500 dark:text-slate-400 lg:mt-0">
+                <div className="mt-3 min-w-0 rounded-2xl bg-slate-50 p-3 text-sm text-slate-500 dark:bg-white/[0.035] dark:text-slate-400 lg:mt-0 lg:rounded-none lg:bg-transparent lg:p-0 lg:dark:bg-transparent">
                   {plan.activeInternalSquads.length > 0 ? (
                     <div className="flex min-w-0 items-center gap-2">
                       <Server className="h-4 w-4 shrink-0 text-slate-400" />
-                      <span className="truncate">
+                      <span className="min-w-0 break-words lg:truncate">
                         {selectedSquads.slice(0, 2).map((squad) => squad.name).join(', ') || 'Группы не найдены'}
                       </span>
                       {plan.activeInternalSquads.length > 2 && <span className="shrink-0">+{plan.activeInternalSquads.length - 2}</span>}
@@ -321,16 +329,16 @@ export function PlansAdmin({ plans }: { plans: PlanAdminRow[] }) {
                   ) : (
                     <span>Без серверных групп</span>
                   )}
-                  <div className="mt-1 flex flex-wrap gap-x-3 text-xs">
-                    {plan.isFeatured && <span>Популярный</span>}
-                    {!plan.promoCodesEnabled && <span>Без скидок</span>}
-                    {plan.availability === 'ALLOWED' && <span>{allowedUsersCount} польз.</span>}
-                    <span>{plan.subscriptionsCount} подписок</span>
-                    <span>{plan.paymentsCount} оплат</span>
+                  <div className="mt-2 flex flex-wrap gap-1.5 text-xs">
+                    {plan.isFeatured && <PlanTag>Популярный</PlanTag>}
+                    {!plan.promoCodesEnabled && <PlanTag>Без скидок</PlanTag>}
+                    {plan.availability === 'ALLOWED' && <PlanTag>{allowedUsersCount} польз.</PlanTag>}
+                    <PlanTag>{plan.subscriptionsCount} подписок</PlanTag>
+                    <PlanTag>{plan.paymentsCount} оплат</PlanTag>
                   </div>
                 </div>
 
-                <div className="mt-3 flex justify-end lg:mt-0">
+                <div className="mt-3 flex justify-end border-t border-slate-100 pt-3 dark:border-white/[0.07] lg:mt-0 lg:border-0 lg:pt-0">
                   <AdminActionsMenu compact label={`Действия: ${plan.name}`}>
                     <PlanActions
                       plan={plan}
@@ -357,6 +365,32 @@ export function PlansAdmin({ plans }: { plans: PlanAdminRow[] }) {
         onCancel={() => setDeleteCandidate(null)}
       />
     </div>
+  )
+}
+
+function CatalogMetric({ value, label }: { value: number; label: string }) {
+  return (
+    <div className="min-w-0 px-2 text-center sm:px-4 sm:text-left">
+      <div className="truncate text-lg font-semibold tracking-tight text-slate-950 dark:text-white">{value}</div>
+      <div className="truncate text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400">{label}</div>
+    </div>
+  )
+}
+
+function PlanFact({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0 rounded-xl bg-slate-50 px-2.5 py-2 dark:bg-white/[0.035]">
+      <div className="text-[10px] font-semibold uppercase tracking-[0.07em] text-slate-400">{label}</div>
+      <div className="mt-0.5 truncate text-sm font-medium text-slate-800 dark:text-slate-100" title={value}>{value}</div>
+    </div>
+  )
+}
+
+function PlanTag({ children }: { children: ReactNode }) {
+  return (
+    <span className="rounded-full bg-white px-2 py-1 text-slate-500 ring-1 ring-slate-200 dark:bg-white/[0.04] dark:text-slate-300 dark:ring-white/10">
+      {children}
+    </span>
   )
 }
 
@@ -436,46 +470,65 @@ function PlanEditor({
 
   return (
     <div className="space-y-5">
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <Field label="Название">
-          <input value={form.name} onChange={(event) => set('name', event.target.value)} className="input" placeholder="Стандарт 30 дней" />
-        </Field>
-        <Field label="Цена, ₽">
-          <input value={form.priceRub} onChange={(event) => set('priceRub', event.target.value)} className="input" type="number" min={0} step="0.01" />
-        </Field>
-        <Field label="Срок, дней">
-          <input value={form.durationDays} onChange={(event) => set('durationDays', event.target.value)} className="input" type="number" min={1} />
-        </Field>
-        <Field label="Устройств">
-          <input value={form.deviceLimit} onChange={(event) => set('deviceLimit', event.target.value)} className="input" type="number" min={1} />
-        </Field>
-        <Field label="Трафик, ГБ">
-          <input value={form.trafficLimitGb} onChange={(event) => set('trafficLimitGb', event.target.value)} className="input" type="number" min={1} disabled={form.unlimitedTraffic} placeholder="Безлимит" />
-        </Field>
-        <Field label="Порядок">
-          <input value={form.sortOrder} onChange={(event) => set('sortOrder', event.target.value)} className="input" type="number" min={0} />
-        </Field>
-        <Toggle checked={form.unlimitedTraffic} onChange={(value) => set('unlimitedTraffic', value)} label="Безлимитный трафик" />
-        <Toggle checked={form.isPromo} onChange={(value) => set('isPromo', value)} label="Пробный тариф" />
-        <Toggle checked={form.promoCodesEnabled} onChange={(value) => set('promoCodesEnabled', value)} label="Разрешать промокоды" />
-        <Toggle checked={form.isFeatured} onChange={(value) => set('isFeatured', value)} label="Популярный тариф" />
-        <Toggle checked={form.isActive} onChange={(value) => set('isActive', value)} label="Опубликован" />
-        <Field label="Кому доступен тариф" className="md:col-span-2">
+      <EditorSection title="Основное" description="Название и текст, которые увидит пользователь.">
+        <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)]">
+          <Field label="Название">
+            <input value={form.name} onChange={(event) => set('name', event.target.value)} className="input" placeholder="Стандарт 30 дней" />
+          </Field>
+          <Field label="Описание">
+            <textarea value={form.description} onChange={(event) => set('description', event.target.value)} className="input min-h-11 resize-y" placeholder="Короткое описание для карточки" />
+          </Field>
+        </div>
+      </EditorSection>
+
+      <EditorSection title="Условия тарифа" description="Цена, срок и пользовательские ограничения.">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+          <Field label="Цена, ₽">
+            <input value={form.priceRub} onChange={(event) => set('priceRub', event.target.value)} className="input" type="number" min={0} step="0.01" />
+          </Field>
+          <Field label="Срок, дней">
+            <input value={form.durationDays} onChange={(event) => set('durationDays', event.target.value)} className="input" type="number" min={1} />
+          </Field>
+          <Field label="Устройств">
+            <input value={form.deviceLimit} onChange={(event) => set('deviceLimit', event.target.value)} className="input" type="number" min={1} />
+          </Field>
+          <Field label="Трафик, ГБ">
+            <input value={form.trafficLimitGb} onChange={(event) => set('trafficLimitGb', event.target.value)} className="input" type="number" min={1} disabled={form.unlimitedTraffic} placeholder="Безлимит" />
+          </Field>
+          <Field label="Порядок">
+            <input value={form.sortOrder} onChange={(event) => set('sortOrder', event.target.value)} className="input" type="number" min={0} />
+          </Field>
+        </div>
+        <div className="mt-3">
+          <Toggle
+            checked={form.unlimitedTraffic}
+            onChange={(value) => set('unlimitedTraffic', value)}
+            label="Безлимитный трафик"
+            description="Лимит в гигабайтах не применяется"
+          />
+        </div>
+      </EditorSection>
+
+      <EditorSection title="Публикация и доступ" description="Кому показывать тариф и как он участвует в каталоге.">
+        <Field label="Кому доступен тариф">
           <select value={form.availability} onChange={(event) => set('availability', event.target.value as PlanAvailabilityValue)} className="input">
             {Object.entries(planAvailabilityLabels).map(([value, label]) => (
               <option key={value} value={value}>{label}</option>
             ))}
           </select>
         </Field>
-        <Field label="Описание" className="md:col-span-2 xl:col-span-3">
-          <input value={form.description} onChange={(event) => set('description', event.target.value)} className="input" placeholder="Короткое описание для карточки" />
-        </Field>
-      </div>
+        <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+          <Toggle checked={form.isActive} onChange={(value) => set('isActive', value)} label="Опубликован" description="Доступен в каталоге" />
+          <Toggle checked={form.isFeatured} onChange={(value) => set('isFeatured', value)} label="Популярный" description="Выделен в списке" />
+          <Toggle checked={form.isPromo} onChange={(value) => set('isPromo', value)} label="Пробный" description="Промо-тариф" />
+          <Toggle checked={form.promoCodesEnabled} onChange={(value) => set('promoCodesEnabled', value)} label="Промокоды" description="Скидки разрешены" />
+        </div>
+      </EditorSection>
 
       {form.availability === 'ALLOWED' && (
-        <div className="rounded-2xl border border-amber-200 bg-amber-50/60 p-4 dark:border-amber-500/20 dark:bg-amber-500/5">
-          <div className="font-medium">Разрешённые пользователи</div>
-          <p className="mt-1 text-xs text-slate-500">
+        <div className="rounded-3xl border border-amber-200 bg-amber-50/60 p-4 dark:border-amber-500/20 dark:bg-amber-500/5 sm:p-5">
+          <div className="font-semibold text-slate-950 dark:text-white">Разрешённые пользователи</div>
+          <p className="mt-1 text-sm leading-5 text-slate-500">
             По одному email или Telegram ID на строку. При синхронизации этот список переносится из Remnashop.
           </p>
           <textarea
@@ -487,15 +540,15 @@ function PlanEditor({
         </div>
       )}
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-surface-900">
-        <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <div className="rounded-3xl border border-slate-200 bg-slate-50/70 p-4 dark:border-white/10 dark:bg-white/[0.025] sm:p-5">
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <div className="font-medium">Группы Remnawave</div>
-            <div className="text-xs text-slate-500">Выберите серверные группы, доступные по тарифу.</div>
+            <div className="font-semibold text-slate-950 dark:text-white">Группы Remnawave</div>
+            <div className="mt-1 text-sm text-slate-500">Выберите серверные группы, доступные по тарифу.</div>
           </div>
-          <div className="flex gap-2">
-            <button type="button" className="btn-secondary px-3 py-2 text-xs" onClick={selectAllActive}>Все активные</button>
-            <button type="button" className="btn-secondary px-3 py-2 text-xs" onClick={() => set('activeInternalSquads', '')}>Очистить</button>
+          <div className="grid grid-cols-2 gap-2 sm:flex">
+            <button type="button" className="btn-secondary justify-center px-3 py-2 text-xs" onClick={selectAllActive}>Все активные</button>
+            <button type="button" className="btn-secondary justify-center px-3 py-2 text-xs" onClick={() => set('activeInternalSquads', '')}>Очистить</button>
           </div>
         </div>
         {squads.length > 0 ? (
@@ -509,7 +562,7 @@ function PlanEditor({
                   'flex min-w-0 items-center gap-3 rounded-xl border px-3 py-3 text-left transition-colors',
                   selected.has(squad.uuid)
                     ? 'border-cyan-300 bg-cyan-50 text-cyan-950 dark:border-cyan-400/40 dark:bg-cyan-400/10 dark:text-cyan-100'
-                    : 'border-slate-200 bg-white hover:border-slate-300 dark:border-white/10 dark:bg-surface-900 dark:hover:border-white/20'
+                    : 'border-slate-200 bg-white hover:border-slate-300 dark:border-white/10 dark:bg-surface-900/70 dark:hover:border-white/20'
                 )}
               >
                 <span className={cn('grid h-5 w-5 shrink-0 place-items-center rounded border text-xs', selected.has(squad.uuid) ? 'border-cyan-500 bg-cyan-500 text-white' : 'border-slate-300')}>
@@ -530,8 +583,8 @@ function PlanEditor({
             {squadsLoading ? 'Загружаем группы...' : squadsError || 'Группы не найдены'}
           </div>
         )}
-        <details className="mt-3">
-          <summary className="flex cursor-pointer items-center gap-1 text-xs text-slate-500">
+        <details className="mt-4 rounded-2xl border border-slate-200 bg-white px-3 py-2.5 dark:border-white/10 dark:bg-surface-900/60">
+          <summary className="flex cursor-pointer items-center gap-1 text-xs font-medium text-slate-500">
             <ChevronDown className="h-3.5 w-3.5" />
             Ручной ввод UUID
           </summary>
@@ -548,15 +601,58 @@ function PlanEditor({
   )
 }
 
-function Field({ label, children, className }: { label: string; children: ReactNode; className?: string }) {
-  return <label className={cn('block', className)}><span className="mb-1 block text-sm font-medium">{label}</span>{children}</label>
+function EditorSection({
+  title,
+  description,
+  children,
+}: {
+  title: string
+  description: string
+  children: ReactNode
+}) {
+  return (
+    <section className="rounded-3xl border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-surface-900/60 sm:p-5">
+      <div className="mb-4">
+        <h3 className="font-semibold text-slate-950 dark:text-white">{title}</h3>
+        <p className="mt-1 text-sm leading-5 text-slate-500">{description}</p>
+      </div>
+      {children}
+    </section>
+  )
 }
 
-function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (value: boolean) => void; label: string }) {
+function Field({ label, children, className }: { label: string; children: ReactNode; className?: string }) {
   return (
-    <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-xl border border-slate-200 px-3 text-sm dark:border-white/10">
-      <input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} />
-      {label}
+    <label className={cn('block', className)}>
+      <span className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-200">{label}</span>
+      {children}
+    </label>
+  )
+}
+
+function Toggle({
+  checked,
+  onChange,
+  label,
+  description,
+}: {
+  checked: boolean
+  onChange: (value: boolean) => void
+  label: string
+  description?: string
+}) {
+  return (
+    <label className={cn(
+      'flex min-h-14 cursor-pointer items-center gap-3 rounded-2xl border px-3 py-2.5 transition-colors',
+      checked
+        ? 'border-cyan-200 bg-cyan-50/70 dark:border-cyan-400/30 dark:bg-cyan-400/10'
+        : 'border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.025]'
+    )}>
+      <input className="h-4 w-4 shrink-0" type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} />
+      <span className="min-w-0">
+        <span className="block text-sm font-medium text-slate-800 dark:text-slate-100">{label}</span>
+        {description && <span className="mt-0.5 block text-xs text-slate-500">{description}</span>}
+      </span>
     </label>
   )
 }

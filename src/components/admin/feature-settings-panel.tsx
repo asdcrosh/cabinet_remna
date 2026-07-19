@@ -52,7 +52,7 @@ export function FeatureSettingsPanel({ initialFeatures }: { initialFeatures: Fea
   }
 
   return (
-    <section data-testid="feature-settings" className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.025]">
+    <section data-testid="feature-settings" className="overflow-hidden rounded-3xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.025]">
       <div className="flex flex-col gap-3 border-b border-slate-200 p-4 dark:border-white/[0.07] sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-lg font-semibold">Функции кабинета</h2>

@@ -199,7 +199,7 @@ export function BonusBoxPrizesAdmin({
 
   return (
     <div className="page-stack">
-      <section className="card p-4">
+      <section className="rounded-3xl border border-slate-200 bg-white p-4 dark:border-white/[0.08] dark:bg-white/[0.035] sm:p-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0">
               <h2 className="text-lg font-semibold tracking-tight text-slate-950 dark:text-white">Состав подарков</h2>
@@ -229,7 +229,7 @@ export function BonusBoxPrizesAdmin({
           </details>
       </section>
 
-      <details className="card">
+      <details className="overflow-hidden rounded-3xl border border-slate-200 bg-white dark:border-white/[0.08] dark:bg-white/[0.035]">
         <summary className="cursor-pointer px-4 py-3 font-semibold">Настройки рулетки</summary>
         <div className="border-t border-slate-100 p-4 dark:border-white/10">
           <div className="grid gap-3 xl:grid-cols-2">
@@ -266,7 +266,7 @@ export function BonusBoxPrizesAdmin({
         </div>
       </details>
 
-      <div className="flex flex-wrap gap-2 border-b border-slate-200 pb-2 dark:border-white/10">
+      <div className="grid grid-cols-2 gap-1 rounded-2xl bg-slate-100 p-1 dark:bg-white/[0.05]">
         <AdminTabButton
           active={activeTab === 'prizes'}
           icon={<Gift className="h-4 w-4" />}
@@ -284,7 +284,7 @@ export function BonusBoxPrizesAdmin({
       </div>
 
       {activeTab === 'prizes' && (
-        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white divide-y divide-slate-200 dark:border-white/10 dark:bg-white/[0.025] dark:divide-white/[0.07]">
+        <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white divide-y divide-slate-200 dark:border-white/10 dark:bg-white/[0.025] dark:divide-white/[0.07]">
           {prizes.map((prize) => (
             <PrizeAdminRow
               key={prize.id}

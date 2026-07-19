@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { Archive, CheckCheck, Edit3, Plus, Power, Search, TicketCheck, Trash2, UserRound } from 'lucide-react'
+import { Archive, CheckCheck, Edit3, Plus, Power, Search, TicketCheck, Trash2, UserRound, X } from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
 import { toast } from '@/components/ui/toaster'
 import { cn } from '@/lib/cn'
@@ -350,7 +350,7 @@ export function PromoCodesAdmin({
 
   return (
     <div className="space-y-4">
-      <section className="pb-2">
+      <section className="rounded-3xl border border-slate-200 bg-white p-3 dark:border-white/10 dark:bg-white/[0.03] sm:p-4">
         <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
           <div className="relative">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -360,11 +360,24 @@ export function PromoCodesAdmin({
                 setQuery(event.target.value)
                 setSelectedIds([])
               }}
-              className="input pl-9"
+              className="input pl-9 pr-10"
               placeholder="Код, email или имя"
             />
+            {query && (
+              <button
+                type="button"
+                className="absolute right-1.5 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-xl text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-white/10 dark:hover:text-slate-100"
+                onClick={() => {
+                  setQuery('')
+                  setSelectedIds([])
+                }}
+                aria-label="Очистить поиск"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
           </div>
-          <button type="button" className="btn-primary" onClick={startCreate}>
+          <button type="button" className="btn-primary w-full justify-center sm:w-auto" onClick={startCreate}>
             <Plus className="h-4 w-4" />
             Новый промокод
           </button>
@@ -383,12 +396,12 @@ export function PromoCodesAdmin({
                   type="button"
                   onClick={() => setTab(value)}
                   className={cn(
-                    'inline-flex h-10 min-w-0 items-center justify-center gap-1.5 rounded-lg px-2 text-xs font-medium transition-colors sm:text-sm',
+                    'inline-flex h-10 min-w-0 items-center justify-center gap-1 rounded-lg px-1.5 text-[11px] font-medium transition-colors sm:gap-1.5 sm:px-2 sm:text-sm',
                     tab === value ? 'bg-slate-950 text-white dark:bg-white dark:text-slate-950' : 'text-slate-500 hover:bg-white/70 dark:hover:bg-white/5'
                   )}
                 >
-                  <Icon className="h-4 w-4" />
-                  {label}
+                  <Icon className="hidden h-4 w-4 sm:block" />
+                  <span className="truncate">{label}</span>
                   <span className={cn('rounded-full px-1.5 text-xs', tab === value ? 'bg-white/15' : 'bg-white dark:bg-white/10')}>
                     {counts[value]}
                   </span>
@@ -401,7 +414,7 @@ export function PromoCodesAdmin({
             <select
               data-testid="promo-origin-filter"
               aria-label="Источник промокодов"
-              className="input h-12"
+              className="input h-11"
               value={origin}
               onChange={(event) => {
                 setOrigin(event.target.value as 'ALL' | PromoOrigin)
@@ -432,6 +445,11 @@ export function PromoCodesAdmin({
             </span>
           )}
         </label>
+        {selectedIds.length === 0 && (
+          <span className="text-xs text-slate-400">
+            Показано {filteredPromoCodes.length} из {promoCodes.length}
+          </span>
+        )}
         {selectedIds.length > 0 && <div className="grid w-full grid-cols-2 gap-2 sm:w-auto sm:flex sm:flex-wrap">
           <button
             type="button"
@@ -471,62 +489,73 @@ export function PromoCodesAdmin({
         size="lg"
       >
         <div className="space-y-5">
-          <div className="grid gap-3 md:grid-cols-2">
-            <Field label="Код">
-              <input
-                value={form.code}
-                onChange={(event) => setForm((current) => ({ ...current, code: event.target.value }))}
-                className="input"
-                placeholder="SUMMER20"
-              />
-            </Field>
-            <Field label="Скидка, %">
-              <input
-                value={form.discountPercent}
-                onChange={(event) => setForm((current) => ({ ...current, discountPercent: event.target.value }))}
-                className="input"
-                type="number"
-                min={1}
-                max={99}
-              />
-            </Field>
-            <Field label="Кому доступен">
-              <select
-                value={form.audience}
-                onChange={(event) => setForm((current) => ({
-                  ...current,
-                  audience: event.target.value as PromoAudience,
-                  allowedEmails: event.target.value === 'PERSONAL' ? current.allowedEmails : '',
-                }))}
-                className="input min-h-11"
-              >
-                <option value="ALL">Всем пользователям</option>
-                <option value="NEW_USERS">Новым пользователям</option>
-                <option value="NO_ACTIVE_SUBSCRIPTION">Без активной подписки</option>
-                <option value="PERSONAL">Персональный список</option>
-              </select>
-            </Field>
-            <Field label="Пользователи">
-              <textarea
-                value={form.allowedEmails}
-                onChange={(event) => setForm((current) => ({ ...current, allowedEmails: event.target.value }))}
-                className="input min-h-11 resize-y"
-                placeholder="email@example.com"
-                disabled={form.audience !== 'PERSONAL'}
-              />
-            </Field>
-          </div>
+          <section className="rounded-3xl border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-surface-900/60 sm:p-5">
+            <div className="grid gap-3 md:grid-cols-2">
+              <Field label="Код">
+                <input
+                  value={form.code}
+                  onChange={(event) => setForm((current) => ({ ...current, code: event.target.value }))}
+                  className="input font-mono uppercase"
+                  placeholder="SUMMER20"
+                />
+              </Field>
+              <Field label="Скидка, %">
+                <input
+                  value={form.discountPercent}
+                  onChange={(event) => setForm((current) => ({ ...current, discountPercent: event.target.value }))}
+                  className="input"
+                  type="number"
+                  min={1}
+                  max={99}
+                />
+              </Field>
+              <Field label="Кому доступен">
+                <select
+                  value={form.audience}
+                  onChange={(event) => setForm((current) => ({
+                    ...current,
+                    audience: event.target.value as PromoAudience,
+                    allowedEmails: event.target.value === 'PERSONAL' ? current.allowedEmails : '',
+                  }))}
+                  className="input min-h-11"
+                >
+                  <option value="ALL">Всем пользователям</option>
+                  <option value="NEW_USERS">Новым пользователям</option>
+                  <option value="NO_ACTIVE_SUBSCRIPTION">Без активной подписки</option>
+                  <option value="PERSONAL">Персональный список</option>
+                </select>
+              </Field>
+              <label className={cn(
+                'flex min-h-11 cursor-pointer items-center gap-3 rounded-2xl border px-3 text-sm font-medium transition-colors',
+                form.isActive
+                  ? 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-100'
+                  : 'border-slate-200 bg-slate-50 text-slate-500 dark:border-white/10 dark:bg-white/[0.03]'
+              )}>
+                <input
+                  type="checkbox"
+                  checked={form.isActive}
+                  onChange={(event) => setForm((current) => ({ ...current, isActive: event.target.checked }))}
+                />
+                {form.isActive ? 'Промокод активен' : 'Промокод выключен'}
+              </label>
+            </div>
 
-          <label className="flex min-h-11 items-center gap-3 rounded-xl border px-3 text-sm">
-            <input
-              type="checkbox"
-              checked={form.isActive}
-              onChange={(event) => setForm((current) => ({ ...current, isActive: event.target.checked }))}
-            />
-            Промокод активен
-          </label>
+            {form.audience === 'PERSONAL' && (
+              <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50/70 p-3 dark:border-amber-500/20 dark:bg-amber-500/5">
+                <Field label="Персональный список">
+                  <textarea
+                    value={form.allowedEmails}
+                    onChange={(event) => setForm((current) => ({ ...current, allowedEmails: event.target.value }))}
+                    className="input min-h-24 resize-y font-mono text-sm"
+                    placeholder="email@example.com"
+                  />
+                </Field>
+                <p className="mt-2 text-xs text-slate-500">Добавляйте email через пробел, запятую или с новой строки.</p>
+              </div>
+            )}
+          </section>
 
-          <details className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3 dark:border-white/10 dark:bg-white/[0.03]">
+          <details className="rounded-3xl border border-slate-200 bg-slate-50/70 p-4 dark:border-white/10 dark:bg-white/[0.03]">
             <summary className="cursor-pointer text-sm font-semibold text-slate-950 dark:text-white">Сроки и лимиты</summary>
             <div className="mt-4 grid gap-3 md:grid-cols-2">
               <Field label="Общий лимит">
@@ -544,49 +573,49 @@ export function PromoCodesAdmin({
             </div>
           </details>
 
-          <details className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3 dark:border-white/10 dark:bg-white/[0.03]">
+          <details className="rounded-3xl border border-slate-200 bg-slate-50/70 p-4 dark:border-white/10 dark:bg-white/[0.03]">
             <summary className="cursor-pointer text-sm font-semibold text-slate-950 dark:text-white">
               Тарифы · {form.planIds.length === 0 ? 'все' : `выбрано ${form.planIds.length}`}
             </summary>
-          <div className="mt-4">
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <div className="text-sm font-medium">Тарифы</div>
-                <div className="text-xs text-slate-500">
-                  {form.planIds.length === 0 ? 'Действует на все тарифы' : `Выбрано ${form.planIds.length} из ${plans.length}`}
+            <div className="mt-4">
+              <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <div className="text-sm font-medium">Тарифы</div>
+                  <div className="text-xs text-slate-500">
+                    {form.planIds.length === 0 ? 'Действует на все тарифы' : `Выбрано ${form.planIds.length} из ${plans.length}`}
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2 sm:flex">
+                  <button type="button" className="btn-secondary justify-center px-3 py-2 text-xs" onClick={() => setForm((current) => ({ ...current, planIds: plans.map((plan) => plan.id) }))}>
+                    <CheckCheck className="h-3.5 w-3.5" />
+                    Все
+                  </button>
+                  <button type="button" className="btn-secondary justify-center px-3 py-2 text-xs" onClick={() => setForm((current) => ({ ...current, planIds: [] }))}>
+                    Очистить
+                  </button>
                 </div>
               </div>
-              <div className="flex gap-2">
-                <button type="button" className="btn-secondary px-3 py-2 text-xs" onClick={() => setForm((current) => ({ ...current, planIds: plans.map((plan) => plan.id) }))}>
-                  <CheckCheck className="h-3.5 w-3.5" />
-                  Все
-                </button>
-                <button type="button" className="btn-secondary px-3 py-2 text-xs" onClick={() => setForm((current) => ({ ...current, planIds: [] }))}>
-                  Очистить
-                </button>
+              <div className="grid max-h-56 gap-2 overflow-y-auto pr-1 sm:grid-cols-2">
+                {plans.map((plan) => (
+                  <button
+                    key={plan.id}
+                    type="button"
+                    onClick={() => togglePlan(plan.id)}
+                    className={cn(
+                      'flex items-center gap-3 rounded-xl border px-3 py-2.5 text-left text-sm transition-colors',
+                      form.planIds.includes(plan.id)
+                        ? 'border-brand-300 bg-brand-50 text-brand-700 dark:border-brand-500/60 dark:bg-brand-500/10 dark:text-brand-200'
+                        : 'bg-white text-slate-600 hover:bg-slate-50 dark:bg-surface-900 dark:text-slate-300'
+                    )}
+                  >
+                    <span className={cn('grid h-5 w-5 shrink-0 place-items-center rounded border text-xs', form.planIds.includes(plan.id) && 'border-brand-500 bg-brand-500 text-white')}>
+                      {form.planIds.includes(plan.id) ? '✓' : ''}
+                    </span>
+                    {plan.name}
+                  </button>
+                ))}
               </div>
             </div>
-            <div className="grid max-h-56 gap-2 overflow-y-auto pr-1 sm:grid-cols-2">
-              {plans.map((plan) => (
-                <button
-                  key={plan.id}
-                  type="button"
-                  onClick={() => togglePlan(plan.id)}
-                  className={cn(
-                    'flex items-center gap-3 rounded-xl border px-3 py-2.5 text-left text-sm transition-colors',
-                    form.planIds.includes(plan.id)
-                      ? 'border-brand-300 bg-brand-50 text-brand-700 dark:border-brand-500/60 dark:bg-brand-500/10 dark:text-brand-200'
-                      : 'bg-white text-slate-600 hover:bg-slate-50 dark:bg-surface-900 dark:text-slate-300'
-                  )}
-                >
-                  <span className={cn('grid h-5 w-5 shrink-0 place-items-center rounded border text-xs', form.planIds.includes(plan.id) && 'border-brand-500 bg-brand-500 text-white')}>
-                    {form.planIds.includes(plan.id) ? '✓' : ''}
-                  </span>
-                  {plan.name}
-                </button>
-              ))}
-            </div>
-          </div>
           </details>
 
           <div className="sticky -bottom-5 -mx-4 grid grid-cols-2 gap-2 border-t border-slate-200 bg-white/95 px-4 py-3 backdrop-blur dark:border-white/10 dark:bg-surface-900/95 sm:-mx-6 sm:flex sm:justify-end sm:px-6">
@@ -616,17 +645,20 @@ export function PromoCodesAdmin({
               <article
                 key={promoCode.id}
                 data-testid="admin-promo-card"
-                className="admin-list-row flex min-w-0 items-start gap-3 px-4 py-3"
+                className={cn(
+                  'admin-list-row flex min-w-0 items-start gap-3 px-3.5 py-3.5 sm:px-4',
+                  selectedIds.includes(promoCode.id) && 'bg-cyan-50/50 dark:bg-cyan-400/[0.04]'
+                )}
               >
                 <input
-                  className="mt-1.5 shrink-0"
+                  className="mt-2 shrink-0"
                   type="checkbox"
                   checked={selectedIds.includes(promoCode.id)}
                   onChange={() => toggleSelected(promoCode.id)}
                   aria-label={`Выбрать промокод ${promoCode.code}`}
                 />
 
-                <div className="grid min-w-0 flex-1 gap-x-4 gap-y-2 sm:grid-cols-[minmax(10rem,1fr)_6rem] lg:grid-cols-[minmax(12rem,1fr)_6rem_minmax(18rem,1.5fr)_minmax(12rem,1fr)] lg:items-center">
+                <div className="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-3 sm:grid-cols-[minmax(10rem,1fr)_6rem] sm:gap-x-4 lg:grid-cols-[minmax(12rem,1fr)_6rem_minmax(18rem,1.5fr)_minmax(12rem,1fr)] lg:items-center">
                   <div className="min-w-0">
                     <div className="flex min-w-0 flex-wrap items-center gap-2">
                       <h3 className="truncate font-mono text-sm font-semibold" title={promoCode.code}>{promoCode.code}</h3>
@@ -637,23 +669,33 @@ export function PromoCodesAdmin({
                     <div className="mt-1 truncate text-xs text-slate-400">{originTitle(promoCode.origin)}</div>
                   </div>
 
-                  <div className="text-xl font-semibold tracking-tight text-emerald-600 dark:text-emerald-300">
+                  <div className="text-right text-xl font-semibold tracking-tight text-emerald-600 dark:text-emerald-300 sm:text-left">
                     -{promoCode.discountPercent}%
                   </div>
 
-                  <div className="min-w-0 sm:col-span-2 lg:col-span-1">
-                    <div className="truncate text-sm font-medium text-slate-700 dark:text-slate-200" title={promoCode.planNames.join(', ')}>
+                  <div className="col-span-2 min-w-0 rounded-2xl bg-slate-50 p-3 dark:bg-white/[0.035] lg:col-span-1 lg:rounded-none lg:bg-transparent lg:p-0 lg:dark:bg-transparent">
+                    <div className="break-words text-sm font-medium text-slate-700 dark:text-slate-200 lg:truncate" title={promoCode.planNames.join(', ')}>
                       {promoCode.planNames.length > 0 ? promoCode.planNames.join(', ') : 'Все тарифы'}
                     </div>
-                    <div className="mt-1 truncate text-xs text-slate-500" title={audienceTitle(promoCode)}>
+                    <div className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500 lg:block lg:truncate" title={audienceTitle(promoCode)}>
                       {audienceTitle(promoCode)} · {formatRange(promoCode.startsAt, promoCode.expiresAt)}
                     </div>
-                    <div className="mt-1 text-xs text-slate-400">
-                      Использовано {promoCode.usedCount}/{promoCode.maxUses ?? '∞'} · на одного {promoCode.maxUsesPerUser}
+                    <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] text-slate-500">
+                      <span className="rounded-full bg-white px-2 py-1 ring-1 ring-slate-200 dark:bg-white/[0.04] dark:ring-white/10">
+                        Использовано {promoCode.usedCount}/{promoCode.maxUses ?? '∞'}
+                      </span>
+                      {promoCode.reservedCount > promoCode.usedCount && (
+                        <span className="rounded-full bg-white px-2 py-1 ring-1 ring-slate-200 dark:bg-white/[0.04] dark:ring-white/10">
+                          В резерве {promoCode.reservedCount - promoCode.usedCount}
+                        </span>
+                      )}
+                      <span className="rounded-full bg-white px-2 py-1 ring-1 ring-slate-200 dark:bg-white/[0.04] dark:ring-white/10">
+                        На одного {promoCode.maxUsesPerUser}
+                      </span>
                     </div>
                   </div>
 
-                  <div className="min-w-0 sm:col-span-2 lg:col-span-1">
+                  <div className="col-span-2 min-w-0 lg:col-span-1">
                     {promoCode.assignees.length > 0 ? (
                       <AssigneesBlock assignees={promoCode.assignees} />
                     ) : (
@@ -678,8 +720,8 @@ export function PromoCodesAdmin({
 
       {filteredPromoCodes.length === 0 && (
         <AdminEmptyState
-          title="Промокодов пока нет"
-          description="В этом разделе пока нет промокодов."
+          title={query.trim() ? 'Промокоды не найдены' : 'В разделе пока пусто'}
+          description={query.trim() ? 'Измените запрос или очистите поиск.' : 'Создайте промокод или выберите другой статус.'}
         />
       )}
       <ConfirmDialog
@@ -811,7 +853,7 @@ function parseAllowedEmails(value: string) {
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <label className="block">
-      <span className="mb-1 block text-sm font-medium">{label}</span>
+      <span className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-200">{label}</span>
       {children}
     </label>
   )

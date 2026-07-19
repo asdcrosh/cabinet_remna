@@ -4,7 +4,7 @@ import { CalendarClock, Search } from 'lucide-react'
 import { AuditAction } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { requireAdminPage } from '@/lib/auth/admin-page'
-import { PageHeader } from '@/components/dashboard/page-header'
+import { AdminPageShell } from '@/components/admin/admin-page-shell'
 import { AdminFilterSubmitButton } from '@/components/admin/admin-filter-submit-button'
 import { AdminFilterBar, AdminFilterField } from '@/components/admin/admin-filter-bar'
 import { AdminEmptyState } from '@/components/admin/admin-empty-state'
@@ -83,9 +83,7 @@ export default async function AdminAuditPage({
   const visibleLogs = hasMore ? logs.slice(0, limit) : logs
 
   return (
-    <div className="page-stack">
-      <PageHeader title="История действий" description="Изменения и операции администраторов" />
-
+    <AdminPageShell title="История действий" description="Изменения и операции администраторов">
       <AdminFilterBar
         action="/dashboard/admin/audit"
         resetHref="/dashboard/admin/audit"
@@ -111,7 +109,7 @@ export default async function AdminAuditPage({
         <AdminFilterSubmitButton />
       </AdminFilterBar>
 
-      <div className={visibleLogs.length > 0 ? 'overflow-hidden rounded-2xl border border-slate-200 bg-white divide-y divide-slate-200 dark:border-white/10 dark:bg-white/[0.025] dark:divide-white/[0.07]' : ''}>
+      <div className={visibleLogs.length > 0 ? 'overflow-hidden rounded-3xl border border-slate-200 bg-white divide-y divide-slate-200 dark:border-white/10 dark:bg-white/[0.025] dark:divide-white/[0.07]' : ''}>
         {visibleLogs.length === 0 && (
           <AdminEmptyState title="Записей пока нет" description="История появится после админских действий." />
         )}
@@ -153,7 +151,7 @@ export default async function AdminAuditPage({
           </div>
         )}
       </div>
-    </div>
+    </AdminPageShell>
   )
 }
 

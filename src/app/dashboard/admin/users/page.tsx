@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 import { CalendarDays, CheckCircle2, ChevronDown, Download, Search, Send, XCircle } from 'lucide-react'
 import { prisma } from '@/lib/prisma'
 import { requireAdminPage } from '@/lib/auth/admin-page'
-import { PageHeader } from '@/components/dashboard/page-header'
+import { AdminPageShell } from '@/components/admin/admin-page-shell'
 import { SubscriptionBadge } from '@/components/admin/admin-badges'
 import { UserRoleSelect } from '@/components/admin/user-role-select'
 import { BonusBoxAttemptsButton } from '@/components/admin/bonus-box-attempts-button'
@@ -120,24 +120,22 @@ export default async function AdminUsersPage({
   const attemptsByUser = new Map(attemptsRows.map((row) => [row.userId, row._count._all]))
 
   return (
-    <div className="page-stack">
-      <PageHeader
-        title="Пользователи"
-        description="Аккаунты, роли и подписки"
-        action={
-          <a href={buildUsersExportHref(q, role, account)} className="btn-secondary w-full sm:w-auto">
-            <Download className="h-4 w-4" />
-            CSV
-          </a>
-        }
-      />
-
+    <AdminPageShell
+      title="Пользователи"
+      description="Аккаунты, роли и подписки"
+      action={
+        <a href={buildUsersExportHref(q, role, account)} className="btn-secondary w-full sm:w-auto">
+          <Download className="h-4 w-4" />
+          Экспорт CSV
+        </a>
+      }
+    >
       <AdminFilterBar
         action="/dashboard/admin/users"
         resetHref="/dashboard/admin/users"
         resetVisible={Boolean(q || role !== 'ALL' || account !== 'ALL')}
         count={{ shown: users.length, total }}
-        className="md:grid-cols-[minmax(14rem,1fr)_11rem_12rem_auto_auto]"
+        className="md:grid-cols-2 xl:grid-cols-[minmax(16rem,1fr)_11rem_13rem_auto_auto]"
       >
         <input type="hidden" name="limit" value={ADMIN_LIST_PAGE_SIZE} />
         <AdminFilterField label="Поиск пользователей">
@@ -176,7 +174,7 @@ export default async function AdminUsersPage({
       )}
 
       <div className={users.length > 0 ? 'admin-list' : 'hidden'}>
-        <div className="admin-list-header grid-cols-[minmax(16rem,1.4fr)_10rem_minmax(13rem,1fr)_auto_2.5rem] items-center gap-x-4">
+        <div className="admin-list-header grid-cols-[minmax(17rem,1.4fr)_10rem_minmax(14rem,1fr)_12rem_2.5rem] items-center gap-x-5">
           <span>Аккаунт</span>
           <span>Роль</span>
           <span>Подписка</span>
@@ -189,11 +187,14 @@ export default async function AdminUsersPage({
           const attemptsCount = attemptsByUser.get(user.id) ?? 0
           return (
             <article key={user.id} className="admin-list-row">
-              <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-2 px-4 py-3 lg:grid-cols-[minmax(16rem,1.4fr)_10rem_minmax(13rem,1fr)_auto_auto] lg:items-center lg:gap-x-4">
+              <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-3 px-4 py-4 lg:grid-cols-[minmax(17rem,1.4fr)_10rem_minmax(14rem,1fr)_12rem_auto] lg:items-center lg:gap-x-5 lg:gap-y-0">
                 <div className="min-w-0">
                   <div className="flex min-w-0 items-center gap-2">
-                    <span className={`h-2 w-2 shrink-0 rounded-full ${user.lastLoginAt ? 'bg-emerald-500' : 'bg-slate-300'}`} />
-                    <div className="truncate font-semibold">{user.email}</div>
+                    <span
+                      className={`h-2 w-2 shrink-0 rounded-full ${user.lastLoginAt ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-600'}`}
+                      title={user.lastLoginAt ? 'Пользователь входил в кабинет' : 'Входов не было'}
+                    />
+                    <div className="min-w-0 break-words text-sm font-semibold sm:text-base">{user.email}</div>
                   </div>
                   <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
                     <span>{user.name || 'Без имени'}</span>
@@ -207,17 +208,22 @@ export default async function AdminUsersPage({
                         @{user.telegramUsername || user.telegramId.toString()}
                       </span>
                     )}
+                    <span className={user.remnawaveUuid ? 'text-emerald-600 dark:text-emerald-300' : 'text-slate-400'}>
+                      {user.remnawaveUuid ? 'VPN-профиль готов' : 'Без VPN-профиля'}
+                    </span>
                   </div>
                 </div>
 
-                <div className="col-span-2 flex min-w-0 flex-wrap items-center gap-x-5 gap-y-2 lg:contents">
-                  <div className="min-w-0">
-                    <span className="inline-flex h-7 items-center rounded-full bg-slate-100 px-2.5 text-xs font-medium text-slate-600 dark:bg-white/[0.07] dark:text-slate-300">
+                <div className="col-span-2 grid min-w-0 gap-2 min-[480px]:grid-cols-2 lg:contents">
+                  <div className="min-w-0 rounded-xl border border-slate-200 bg-slate-50/70 p-3 dark:border-white/[0.07] dark:bg-white/[0.025] lg:rounded-none lg:border-0 lg:bg-transparent lg:p-0 lg:dark:bg-transparent">
+                    <div className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-slate-400 lg:hidden">Роль</div>
+                    <span className={`inline-flex min-h-7 max-w-full items-center rounded-full px-2.5 text-xs font-medium ${roleBadgeClass(user.role)}`}>
                       {roleLabel(user.role)}
                     </span>
                   </div>
 
-                  <div className="min-w-0">
+                  <div className="min-w-0 rounded-xl border border-slate-200 bg-slate-50/70 p-3 dark:border-white/[0.07] dark:bg-white/[0.025] lg:rounded-none lg:border-0 lg:bg-transparent lg:p-0 lg:dark:bg-transparent">
+                    <div className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-slate-400 lg:hidden">Подписка</div>
                     {subscription ? (
                       <div className="flex items-center gap-2">
                         <SubscriptionBadge status={subscription.status} />
@@ -231,7 +237,7 @@ export default async function AdminUsersPage({
                     )}
                   </div>
 
-                  <div className="flex flex-wrap gap-3 text-xs text-slate-500 lg:justify-end">
+                  <div className="grid grid-cols-3 gap-1.5 rounded-xl bg-slate-50 p-1.5 text-xs text-slate-500 dark:bg-white/[0.025] min-[480px]:col-span-2 lg:col-auto lg:flex lg:flex-wrap lg:justify-end lg:gap-3 lg:bg-transparent lg:p-0 lg:dark:bg-transparent">
                     <Counter value={user._count.payments} label="оплат" />
                     <Counter value={user._count.devices} label="устр." />
                     <Counter value={attemptsCount} label="подар." />
@@ -262,11 +268,11 @@ export default async function AdminUsersPage({
               </div>
 
               <details className="group border-t border-slate-100 dark:border-white/10">
-                <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-2 text-xs font-medium text-slate-500 transition hover:bg-slate-50 dark:hover:bg-white/[0.03]">
-                  <span>Данные аккаунта</span>
+                <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between px-4 py-2 text-xs font-medium text-slate-500 transition hover:bg-slate-50 dark:hover:bg-white/[0.03]">
+                  <span>Данные и история аккаунта</span>
                   <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" />
                 </summary>
-                <div className="border-t border-slate-100 bg-slate-50/50 p-4 dark:border-white/10 dark:bg-white/[0.02]">
+                <div className="border-t border-slate-100 bg-slate-50/60 p-3 dark:border-white/10 dark:bg-white/[0.02] sm:p-4">
                   <div className="grid gap-4 lg:grid-cols-3">
                     <DetailPanel title="Связи">
                       <DetailRow label="Email" value={user.emailVerifiedAt ? user.emailVerifiedAt.toLocaleDateString('ru-RU') : 'Не подтверждён'} ok={Boolean(user.emailVerifiedAt)} />
@@ -302,7 +308,7 @@ export default async function AdminUsersPage({
       </div>
 
       <LazyListLoader loaded={users.length} total={total} step={ADMIN_LIST_PAGE_SIZE} />
-    </div>
+    </AdminPageShell>
   )
 }
 
@@ -422,6 +428,13 @@ function roleLabel(role: string) {
   return labels[role] ?? role
 }
 
+function roleBadgeClass(role: string) {
+  if (role === 'SUPER_ADMIN') return 'bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-200'
+  if (role === 'ADMIN') return 'bg-cyan-100 text-cyan-700 dark:bg-cyan-500/15 dark:text-cyan-200'
+  if (role === 'MODERATOR') return 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-200'
+  return 'bg-slate-100 text-slate-600 dark:bg-white/[0.07] dark:text-slate-300'
+}
+
 function formatTraffic(used: bigint, limit: bigint | null) {
   const usedLabel = formatBytes(used)
   return limit ? `${usedLabel} из ${formatBytes(limit)}` : `${usedLabel} · безлимит`
@@ -445,7 +458,7 @@ function formatDateTime(value: Date) {
 
 function Counter({ value, label }: { value: number; label: string }) {
   return (
-    <div className="inline-flex items-baseline gap-1">
+    <div className="flex min-w-0 items-baseline justify-center gap-1 rounded-lg bg-white px-1.5 py-2 dark:bg-white/[0.035] lg:inline-flex lg:justify-start lg:rounded-none lg:bg-transparent lg:p-0 lg:dark:bg-transparent">
       <span className="font-semibold text-slate-800 dark:text-slate-100">{value}</span>
       <span className="text-xs text-slate-400">{label}</span>
     </div>
@@ -528,7 +541,7 @@ function UserActions({
 
 function DetailPanel({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section className="min-w-0 rounded-xl bg-white p-3 dark:bg-white/[0.035]">
+    <section className="min-w-0 rounded-xl border border-slate-200 bg-white p-3 dark:border-white/[0.07] dark:bg-white/[0.035]">
       <h3 className="mb-2 text-xs font-semibold uppercase text-slate-400">{title}</h3>
       <div className="space-y-2">{children}</div>
     </section>

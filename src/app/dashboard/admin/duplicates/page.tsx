@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { GitMerge, SearchCheck } from 'lucide-react'
 import { requireAdminPage } from '@/lib/auth/admin-page'
 import { findIdentityDuplicateCandidates } from '@/lib/identity-duplicates'
-import { PageHeader } from '@/components/dashboard/page-header'
+import { AdminPageShell } from '@/components/admin/admin-page-shell'
 import { DuplicateMergeButton } from '@/components/admin/duplicate-merge-button'
 import { AdminEmptyState } from '@/components/admin/admin-empty-state'
 
@@ -14,13 +14,11 @@ export default async function AdminDuplicatesPage() {
   const candidates = await findIdentityDuplicateCandidates()
 
   return (
-    <div className="page-stack">
-      <PageHeader
-        title="Возможные дубли"
-        description="Аккаунты с похожими данными"
-        action={candidates.length > 0 ? <span className="badge-muted">Найдено: {candidates.length}</span> : null}
-      />
-
+    <AdminPageShell
+      title="Возможные дубли"
+      description="Аккаунты с похожими данными"
+      action={candidates.length > 0 ? <span className="badge-muted">Найдено: {candidates.length}</span> : null}
+    >
       {candidates.length === 0 ? (
         <AdminEmptyState
           title="Подозрительных дублей нет"
@@ -28,7 +26,7 @@ export default async function AdminDuplicatesPage() {
           icon={<SearchCheck className="h-7 w-7 text-emerald-600" />}
         />
       ) : (
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white divide-y divide-slate-200 dark:border-white/10 dark:bg-white/[0.025] dark:divide-white/[0.07]">
+        <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white divide-y divide-slate-200 dark:border-white/10 dark:bg-white/[0.025] dark:divide-white/[0.07]">
           {candidates.map((candidate) => (
             <article key={`${candidate.technicalUserId}:${candidate.emailUserId}`} className="p-4">
               <div className="flex flex-col gap-3 2xl:flex-row 2xl:items-center 2xl:justify-between">
@@ -65,7 +63,7 @@ export default async function AdminDuplicatesPage() {
           ))}
         </div>
       )}
-    </div>
+    </AdminPageShell>
   )
 }
 

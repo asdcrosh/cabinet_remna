@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { requireAdminPage } from '@/lib/auth/admin-page'
-import { PageHeader } from '@/components/dashboard/page-header'
+import { AdminPageShell } from '@/components/admin/admin-page-shell'
 import {
   BonusBoxPrizesAdmin,
   type BonusBoxOpeningAdminRow,
@@ -77,17 +77,16 @@ export default async function AdminBonusBoxPage({
   }))
 
   return (
-    <div className="page-stack">
-      <PageHeader
-        title="Подарки"
-        description="Состав, шансы и история открытий"
-      />
+    <AdminPageShell
+      title="Подарки"
+      description="Состав, шансы и история открытий"
+    >
       <BonusBoxPrizesAdmin
         prizes={rows}
         openings={openingRows}
         settings={settings}
         totalOpenings={totalOpenings}
       />
-    </div>
+    </AdminPageShell>
   )
 }

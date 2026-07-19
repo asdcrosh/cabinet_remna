@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { requireAdminPage } from '@/lib/auth/admin-page'
-import { PageHeader } from '@/components/dashboard/page-header'
+import { AdminPageShell } from '@/components/admin/admin-page-shell'
 import { PersonalOffersAdmin } from '@/components/admin/personal-offers-admin'
 
 export const dynamic = 'force-dynamic'
@@ -51,17 +51,16 @@ export default async function AdminOffersPage() {
     : welcomeBonusSetting
 
   return (
-    <div className="page-stack">
-      <PageHeader
-        title="Персональные офферы"
-        description="Предложения для разных сценариев"
-      />
+    <AdminPageShell
+      title="Персональные офферы"
+      description="Приветственный бонус и предложения по сценариям"
+    >
       <PersonalOffersAdmin
         offers={offers}
         promoCodes={promoCodes}
         trialPlans={trialPlans}
         welcomeBonusSetting={welcomeBonusForForm}
       />
-    </div>
+    </AdminPageShell>
   )
 }

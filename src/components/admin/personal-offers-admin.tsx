@@ -67,6 +67,7 @@ export function PersonalOffersAdmin({
   const [editorSection, setEditorSection] = useState<'CONTENT' | 'BEHAVIOR' | 'PREVIEW'>('CONTENT')
 
   const activeOffer = useMemo(() => editing, [editing])
+  const activeOffersCount = offers.filter((offer) => offer.enabled).length
 
   function openEdit(offer: Offer) {
     setEditing(offer)
@@ -106,21 +107,26 @@ export function PersonalOffersAdmin({
 
   return (
     <>
-      <section className="surface-card p-4">
-        <div className="flex items-start justify-between gap-3">
+      <section className="rounded-3xl border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.03] sm:p-5">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-200">
+            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-200">
               <Gift className="h-5 w-5" />
             </div>
             <div className="min-w-0">
               <h2 className="font-semibold text-slate-950 dark:text-white">Приветственный бонус</h2>
-              <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
+              <p className="mt-1 text-sm leading-5 text-slate-500 dark:text-slate-400">
                 {welcomeSummary(welcomeForm, trialPlans, promoCodes)}
               </p>
             </div>
           </div>
-          <label className="inline-flex shrink-0 items-center gap-2 text-sm font-medium">
-            <span className="hidden sm:inline">Включён</span>
+          <label className={cn(
+            'inline-flex min-h-10 shrink-0 cursor-pointer items-center justify-between gap-3 rounded-2xl border px-3 text-sm font-medium transition-colors sm:justify-start',
+            welcomeForm.enabled
+              ? 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-100'
+              : 'border-slate-200 bg-slate-50 text-slate-500 dark:border-white/10 dark:bg-white/[0.03]'
+          )}>
+            <span>{welcomeForm.enabled ? 'Бонус включён' : 'Бонус выключен'}</span>
             <span className="sr-only">Включить приветственный бонус</span>
             <input
               type="checkbox"
@@ -131,8 +137,8 @@ export function PersonalOffersAdmin({
           </label>
         </div>
 
-        <details className="group mt-4 border-t border-slate-200 pt-3 dark:border-white/10">
-          <summary className="flex cursor-pointer list-none items-center justify-between text-sm font-medium text-slate-600 dark:text-slate-300">
+        <details className="group mt-4 rounded-2xl border border-slate-200 bg-slate-50/70 p-3 dark:border-white/10 dark:bg-white/[0.025] sm:p-4">
+          <summary className="flex cursor-pointer list-none items-center justify-between text-sm font-semibold text-slate-700 dark:text-slate-200">
             Настроить варианты
             <span className="text-xs text-slate-400 group-open:hidden">Открыть</span>
             <span className="hidden text-xs text-slate-400 group-open:inline">Свернуть</span>
@@ -197,23 +203,33 @@ export function PersonalOffersAdmin({
           </div>
 
         </details>
-        <div className="mt-3 flex justify-end">
-          <button type="button" className="btn-primary min-h-11 justify-center sm:px-5" onClick={() => void saveWelcomeBonus()} disabled={welcomeLoading}>
+        <div className="mt-4 flex justify-end">
+          <button type="button" className="btn-primary min-h-11 w-full justify-center sm:w-auto sm:px-5" onClick={() => void saveWelcomeBonus()} disabled={welcomeLoading}>
             {welcomeLoading ? 'Сохраняем...' : 'Сохранить бонус'}
           </button>
         </div>
       </section>
 
       <section className="space-y-3">
-        <div className="flex items-center justify-between gap-3">
-          <h2 className="font-semibold text-slate-950 dark:text-white">Офферы на главной</h2>
-          <span className="text-sm text-slate-500">{offers.length}</span>
+        <div className="flex flex-wrap items-end justify-between gap-3 px-1">
+          <div>
+            <h2 className="font-semibold text-slate-950 dark:text-white">Офферы на главной</h2>
+            <p className="mt-1 text-sm text-slate-500">Карточки подбираются по сценарию пользователя.</p>
+          </div>
+          <div className="flex items-center gap-2 text-xs">
+            <span className="rounded-full bg-emerald-50 px-2.5 py-1 font-medium text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-200">
+              Активны {activeOffersCount}
+            </span>
+            <span className="rounded-full bg-slate-100 px-2.5 py-1 font-medium text-slate-500 dark:bg-white/[0.06]">
+              Всего {offers.length}
+            </span>
+          </div>
         </div>
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white divide-y divide-slate-200 dark:border-white/10 dark:bg-white/[0.025] dark:divide-white/[0.07]">
+        <div className="grid gap-3">
           {offers.map((offer) => (
             <article
               key={offer.id}
-              className="grid min-w-0 gap-3 p-4 sm:grid-cols-[minmax(11rem,.7fr)_minmax(16rem,1.3fr)_auto] sm:items-center sm:gap-5"
+              className="grid min-w-0 gap-4 rounded-3xl border border-slate-200 bg-white p-4 transition-colors hover:border-slate-300 dark:border-white/10 dark:bg-white/[0.025] dark:hover:border-white/20 sm:grid-cols-[minmax(11rem,.65fr)_minmax(16rem,1.35fr)_auto] sm:items-center sm:gap-5"
             >
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
@@ -224,19 +240,29 @@ export function PersonalOffersAdmin({
                     {personalOfferScenarioLabels[offer.scenario]}
                   </span>
                 </div>
-                <div className="mt-1 text-xs text-slate-400">Приоритет {offer.priority}</div>
+                <div className="mt-2 inline-flex rounded-full bg-slate-100 px-2 py-1 text-[11px] font-medium text-slate-500 dark:bg-white/[0.06]">
+                  Приоритет {offer.priority}
+                </div>
               </div>
 
               <div className="min-w-0">
                 <div className="font-semibold text-slate-950 dark:text-white">{offer.title}</div>
-                <div className="mt-0.5 line-clamp-1 text-sm text-slate-500 dark:text-slate-400">
+                <div className="mt-1 line-clamp-2 text-sm leading-5 text-slate-500 dark:text-slate-400">
                   {offer.description}
                 </div>
-                <div className="mt-1 text-xs text-slate-400">{offer.cta || 'Без кнопки'} · {rewardSummary(offer)}</div>
+                <div className="mt-2 flex flex-wrap gap-1.5 text-xs text-slate-500">
+                  <span className="rounded-full bg-slate-50 px-2 py-1 ring-1 ring-slate-200 dark:bg-white/[0.035] dark:ring-white/10">
+                    {offer.cta || 'Без кнопки'}
+                  </span>
+                  <span className="rounded-full bg-slate-50 px-2 py-1 ring-1 ring-slate-200 dark:bg-white/[0.035] dark:ring-white/10">
+                    {rewardSummary(offer)}
+                  </span>
+                </div>
               </div>
 
-              <button type="button" className="btn-secondary h-10 min-h-10 w-10 shrink-0 px-0 sm:justify-self-end" onClick={() => openEdit(offer)} aria-label={`Изменить оффер ${personalOfferScenarioLabels[offer.scenario]}`}>
+              <button type="button" className="btn-secondary min-h-11 w-full justify-center sm:w-auto sm:justify-self-end" onClick={() => openEdit(offer)} aria-label={`Изменить оффер ${personalOfferScenarioLabels[offer.scenario]}`}>
                 <Edit3 className="h-4 w-4" />
+                Изменить
               </button>
             </article>
           ))}
@@ -326,11 +352,11 @@ export function PersonalOffersAdmin({
 
           {editorSection === 'PREVIEW' ? <OfferPreview form={form} /> : null}
 
-          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-            <button type="button" className="btn-secondary" onClick={() => setEditing(null)} disabled={loading}>
+          <div className="sticky -bottom-5 -mx-4 grid grid-cols-2 gap-2 border-t border-slate-200 bg-white/95 px-4 py-3 backdrop-blur dark:border-white/10 dark:bg-surface-900/95 sm:-mx-6 sm:flex sm:justify-end sm:px-6">
+            <button type="button" className="btn-secondary justify-center" onClick={() => setEditing(null)} disabled={loading}>
               Отмена
             </button>
-            <button type="button" className="btn-primary" onClick={() => void save()} disabled={loading}>
+            <button type="button" className="btn-primary justify-center" onClick={() => void save()} disabled={loading}>
               {loading ? 'Сохраняем...' : 'Сохранить'}
             </button>
           </div>
@@ -364,7 +390,7 @@ function OfferPreview({ form }: { form: OfferForm }) {
           <h3 className="mt-2 text-xl font-semibold text-slate-950 dark:text-white">{form.title || 'Заголовок оффера'}</h3>
           <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-300">{form.description || 'Описание появится здесь.'}</p>
         </div>
-        <span className="btn-primary shrink-0">{form.cta || 'Кнопка'}</span>
+        <span className="btn-primary w-full shrink-0 justify-center sm:w-auto">{form.cta || 'Кнопка'}</span>
       </div>
     </div>
   )
@@ -373,7 +399,7 @@ function OfferPreview({ form }: { form: OfferForm }) {
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block">
-      <span className="mb-1 block text-sm font-medium text-slate-600 dark:text-slate-300">{label}</span>
+      <span className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-200">{label}</span>
       {children}
     </label>
   )
@@ -396,8 +422,8 @@ function WelcomeBonusOption({
 }) {
   return (
     <div className={cn(
-      'flex flex-col rounded-2xl border bg-white p-3 transition-colors dark:bg-white/[0.035]',
-      checked ? 'border-emerald-300 ring-2 ring-emerald-100 dark:border-emerald-500/40 dark:ring-emerald-500/10' : 'border-slate-200 dark:border-white/10'
+      'flex flex-col rounded-2xl border bg-white p-4 transition-colors dark:bg-white/[0.035]',
+      checked ? 'border-emerald-300 shadow-sm shadow-emerald-100 dark:border-emerald-500/40 dark:shadow-none' : 'border-slate-200 dark:border-white/10'
     )}>
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 gap-3">
@@ -409,14 +435,17 @@ function WelcomeBonusOption({
             <p className="mt-1 text-sm leading-5 text-slate-500 dark:text-slate-400">{description}</p>
           </div>
         </div>
-        <input
-          type="checkbox"
-          className="mt-1 h-5 w-5"
-          checked={checked}
-          onChange={(event) => onToggle(event.target.checked)}
-        />
+        <label className="grid h-9 w-9 shrink-0 cursor-pointer place-items-center rounded-xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.04]">
+          <span className="sr-only">{checked ? 'Отключить' : 'Включить'} {title}</span>
+          <input
+            type="checkbox"
+            className="h-5 w-5"
+            checked={checked}
+            onChange={(event) => onToggle(event.target.checked)}
+          />
+        </label>
       </div>
-      <div className={cn('mt-3', !checked && 'opacity-50')}>{children}</div>
+      <div className={cn('mt-4', !checked && 'opacity-50')}>{children}</div>
     </div>
   )
 }

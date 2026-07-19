@@ -26,12 +26,13 @@ export function ProvisioningBadge({ provisioned }: { provisioned: boolean }) {
   return (
     <span
       className={cn(
-        'badge',
+        'badge gap-1.5 whitespace-nowrap ring-1 ring-inset',
         provisioned
-          ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
-          : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
+          ? 'bg-emerald-50 text-emerald-700 ring-emerald-200/80 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-500/20'
+          : 'bg-amber-50 text-amber-700 ring-amber-200/80 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-500/20'
       )}
     >
+      <span className={cn('h-1.5 w-1.5 rounded-full', provisioned ? 'bg-emerald-500' : 'bg-amber-500')} />
       {provisioned ? 'Выдана' : 'Нужен retry'}
     </span>
   )
@@ -40,10 +41,29 @@ export function ProvisioningBadge({ provisioned }: { provisioned: boolean }) {
 function StatusPill({ status, labels }: { status: string; labels: Record<string, string> }) {
   const tone =
     status === 'SUCCEEDED' || status === 'ACTIVE'
-      ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
+      ? {
+          className: 'bg-emerald-50 text-emerald-700 ring-emerald-200/80 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-500/20',
+          dot: 'bg-emerald-500',
+        }
       : status === 'PENDING' || status === 'LIMITED'
-        ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
-        : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
+        ? {
+            className: 'bg-amber-50 text-amber-700 ring-amber-200/80 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-500/20',
+            dot: 'bg-amber-500',
+          }
+        : status === 'CANCELED' || status === 'REFUNDED' || status === 'EXPIRED' || status === 'DISABLED'
+          ? {
+              className: 'bg-rose-50 text-rose-700 ring-rose-200/80 dark:bg-rose-500/10 dark:text-rose-300 dark:ring-rose-500/20',
+              dot: 'bg-rose-500',
+            }
+          : {
+              className: 'bg-slate-100 text-slate-600 ring-slate-200/80 dark:bg-white/[0.06] dark:text-slate-300 dark:ring-white/10',
+              dot: 'bg-slate-400',
+            }
 
-  return <span className={cn('badge', tone)}>{labels[status] ?? status}</span>
+  return (
+    <span className={cn('badge gap-1.5 whitespace-nowrap ring-1 ring-inset', tone.className)}>
+      <span className={cn('h-1.5 w-1.5 rounded-full', tone.dot)} />
+      {labels[status] ?? status}
+    </span>
+  )
 }

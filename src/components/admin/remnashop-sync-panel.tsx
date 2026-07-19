@@ -161,7 +161,7 @@ export function RemnashopSyncPanel() {
 
   return (
     <div className="space-y-4">
-      <section className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.035]">
+      <section className="rounded-3xl border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.035] sm:p-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="min-w-0">
             <h2 className="text-lg font-semibold">Remnashop</h2>
@@ -169,20 +169,23 @@ export function RemnashopSyncPanel() {
               Проверка и перенос пользователей, подписок, тарифов и промокодов.
             </p>
           </div>
-          <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto">
-            <button type="button" className="btn-secondary" onClick={runDryRun} disabled={loading}>
+          <div className="grid w-full grid-cols-1 gap-2 sm:w-auto sm:grid-cols-2">
+            <button type="button" className="btn-secondary w-full" onClick={runDryRun} disabled={loading}>
               <RefreshCw className={loading ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />
               Проверить
             </button>
-            <button type="button" className="btn-primary" onClick={() => setApplyConfirmOpen(true)} disabled={loading}>
+            <button type="button" className="btn-primary w-full" onClick={() => setApplyConfirmOpen(true)} disabled={loading}>
               <RefreshCw className={loading ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />
               Синхронизировать
             </button>
           </div>
         </div>
-        <label className="mt-3 flex cursor-pointer items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
-          <input type="checkbox" checked={includePromoCodes} onChange={(event) => setIncludePromoCodes(event.target.checked)} />
-          Синхронизировать промокоды
+        <label className="mt-4 flex cursor-pointer items-center justify-between gap-4 rounded-2xl border border-slate-100 bg-slate-50/70 px-3.5 py-3 text-sm text-slate-600 dark:border-white/[0.07] dark:bg-white/[0.025] dark:text-slate-300">
+          <span className="min-w-0">
+            <span className="block font-medium text-slate-900 dark:text-white">Промокоды</span>
+            <span className="mt-0.5 block text-xs text-slate-500">Включить их в текущую синхронизацию</span>
+          </span>
+          <input className="h-5 w-5 shrink-0 accent-cyan-600" type="checkbox" checked={includePromoCodes} onChange={(event) => setIncludePromoCodes(event.target.checked)} />
         </label>
       </section>
 
@@ -606,8 +609,8 @@ function syncStatusLabel(value: string) {
 function statusClass(status: SyncEventRow['status']) {
   if (status === 'SUCCEEDED') return 'badge-active'
   if (status === 'FAILED') return 'badge-disabled'
-  if (status === 'SKIPPED') return 'badge-limited'
-  return 'badge-disabled'
+  if (status === 'PENDING') return 'badge-limited'
+  return 'badge-muted'
 }
 
 function formatDateTime(value: string) {

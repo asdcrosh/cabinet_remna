@@ -2,7 +2,7 @@ import { CheckCircle2 } from 'lucide-react'
 import { prisma } from '@/lib/prisma'
 import { requireAdminPage } from '@/lib/auth/admin-page'
 import { formatPrice } from '@/lib/format'
-import { PageHeader } from '@/components/dashboard/page-header'
+import { AdminPageShell } from '@/components/admin/admin-page-shell'
 import { BulkRecoveryActionButton, RecoveryActionButton } from '@/components/admin/recovery-actions'
 import { AdminEmptyState } from '@/components/admin/admin-empty-state'
 
@@ -23,13 +23,11 @@ export default async function AdminRecoveryPage() {
   })
 
   return (
-    <div className="page-stack">
-      <PageHeader
-        title="Довыдача"
-        description="Оплаченные, но не выданные подписки"
-        action={payments.length > 0 ? <BulkRecoveryActionButton paymentIds={payments.map((payment) => payment.id)} /> : null}
-      />
-
+    <AdminPageShell
+      title="Довыдача"
+      description="Оплаченные, но не выданные подписки"
+      action={payments.length > 0 ? <BulkRecoveryActionButton paymentIds={payments.map((payment) => payment.id)} /> : null}
+    >
       {payments.length === 0 ? (
         <AdminEmptyState
           title="Очередь пустая"
@@ -37,7 +35,7 @@ export default async function AdminRecoveryPage() {
           icon={<CheckCircle2 className="h-7 w-7 text-emerald-600" />}
         />
       ) : (
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white divide-y divide-slate-200 dark:border-white/10 dark:bg-white/[0.025] dark:divide-white/[0.07]">
+        <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white divide-y divide-slate-200 dark:border-white/10 dark:bg-white/[0.025] dark:divide-white/[0.07]">
           {payments.map((payment) => (
             <article key={payment.id} className="grid gap-4 border-l-4 border-l-amber-400 px-4 py-4 lg:grid-cols-[minmax(15rem,1.2fr)_minmax(9rem,.65fr)_minmax(16rem,1fr)_auto] lg:items-center">
               <div className="min-w-0">
@@ -67,6 +65,6 @@ export default async function AdminRecoveryPage() {
           ))}
         </div>
       )}
-    </div>
+    </AdminPageShell>
   )
 }
