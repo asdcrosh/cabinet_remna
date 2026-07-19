@@ -1,7 +1,7 @@
 export const legalNavigation = [
   { href: '/offer', label: 'Оферта' },
   { href: '/terms', label: 'Соглашение' },
-  { href: '/privacy', label: 'Конфиденциальность' },
+  { href: '/privacy', label: 'Политика ПД' },
   { href: '/consent', label: 'Согласие на ПД' },
   { href: '/refunds', label: 'Возвраты' },
   { href: '/contacts', label: 'Контакты' },
