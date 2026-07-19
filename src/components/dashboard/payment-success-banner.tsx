@@ -3,10 +3,10 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { AlertTriangle, Check, CheckCircle2, Circle, CreditCard, KeyRound, Loader2 } from 'lucide-react'
+import { AlertTriangle, Check, CheckCircle2, Circle, CreditCard, KeyRound, Loader2, X } from 'lucide-react'
 import { cn } from '@/lib/cn'
 
-type PaymentSuccessBannerStatus = 'ready' | 'processing' | 'attention'
+type PaymentSuccessBannerStatus = 'ready' | 'processing' | 'attention' | 'canceled' | 'not_found'
 
 export function PaymentSuccessBanner({
   status = 'processing',
@@ -37,7 +37,11 @@ export function PaymentSuccessBanner({
   const copy = getBannerCopy(status, seconds)
 
   return (
-    <section className={cn('relative overflow-hidden rounded-3xl border p-4 sm:p-5', copy.shell)}>
+    <section
+      className={cn('relative overflow-hidden rounded-3xl border p-4 sm:p-5', copy.shell)}
+      role={status === 'attention' || status === 'canceled' || status === 'not_found' ? 'alert' : 'status'}
+      aria-live="polite"
+    >
       <div className="flex items-start gap-3.5">
         <span className={cn('grid h-10 w-10 shrink-0 place-items-center rounded-2xl', copy.iconShell)}>
           {copy.icon}
@@ -45,23 +49,34 @@ export function PaymentSuccessBanner({
         <div className="min-w-0 flex-1 pt-0.5">
           <div className="font-semibold tracking-tight">{copy.title}</div>
           <div className="mt-1 text-sm leading-5 opacity-80">{copy.description}</div>
-          <PaymentProgress status={status} />
+          {status !== 'not_found' && <PaymentProgress status={status} />}
           {status === 'ready' && (
-            <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-              <Link href="/dashboard/subscription" className="btn-primary min-h-11 px-4">
+            <div className="mt-4">
+              <Link href="/dashboard/subscription" className="btn-primary min-h-11 w-full px-4 sm:w-auto">
                 <KeyRound className="h-4 w-4" />
                 Подключить устройство
-              </Link>
-              <Link href="/dashboard/billing" className="btn-secondary min-h-11 px-4">
-                <CreditCard className="h-4 w-4" />
-                Открыть платёж
               </Link>
             </div>
           )}
           {status === 'attention' && (
             <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-              <Link href="/dashboard/billing" className="btn-primary min-h-11 px-4">Проверить платёж</Link>
+              <button type="button" onClick={() => router.refresh()} className="btn-primary min-h-11 px-4">Обновить статус</button>
               {supportEnabled && <Link href="/dashboard/support" className="btn-secondary min-h-11 px-4">Написать в поддержку</Link>}
+            </div>
+          )}
+          {status === 'canceled' && (
+            <div className="mt-4">
+              <Link href="/dashboard/plans" className="btn-primary min-h-11 w-full px-4 sm:w-auto">
+                <CreditCard className="h-4 w-4" />
+                Выбрать тариф
+              </Link>
+            </div>
+          )}
+          {status === 'not_found' && (
+            <div className="mt-4">
+              <Link href="/dashboard/billing" className="btn-secondary min-h-11 w-full px-4 sm:w-auto">
+                Открыть историю платежей
+              </Link>
             </div>
           )}
         </div>
@@ -71,9 +86,10 @@ export function PaymentSuccessBanner({
 }
 
 function PaymentProgress({ status }: { status: PaymentSuccessBannerStatus }) {
+  const canceled = status === 'canceled'
   const steps = [
-    { label: 'Оплата', done: true },
-    { label: 'Выдача', done: status === 'ready', active: status === 'processing' },
+    { label: 'Оплата', done: !canceled, failed: canceled },
+    { label: 'Выдача', done: status === 'ready', active: status === 'processing' || status === 'attention' },
     { label: 'Подключение', done: false, active: status === 'ready' },
   ]
 
@@ -83,9 +99,15 @@ function PaymentProgress({ status }: { status: PaymentSuccessBannerStatus }) {
       {steps.map((step) => (
         <div key={step.label} className="relative z-10 flex flex-col items-center gap-1.5 text-center text-xs font-semibold">
           <span className="grid h-5 w-5 place-items-center rounded-full bg-white dark:bg-surface-900">
-            {step.done ? <Check className="h-3.5 w-3.5" /> : step.active ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Circle className="h-3.5 w-3.5 opacity-45" />}
+            {step.failed
+              ? <X className="h-3.5 w-3.5" />
+              : step.done
+                ? <Check className="h-3.5 w-3.5" />
+                : step.active
+                  ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  : <Circle className="h-3.5 w-3.5 opacity-45" />}
           </span>
-          <span className={step.done ? 'opacity-100' : step.active ? 'opacity-80' : 'opacity-45'}>{step.label}</span>
+          <span className={step.done || step.failed ? 'opacity-100' : step.active ? 'opacity-80' : 'opacity-45'}>{step.label}</span>
         </div>
       ))}
     </div>
@@ -107,6 +129,26 @@ function getBannerCopy(status: PaymentSuccessBannerStatus, seconds: number) {
     return {
       title: 'Оплата сохранена',
       description: 'Доступ пока не выдан. Обновите страницу чуть позже или проверьте платежи в кабинете.',
+      icon: <AlertTriangle className="h-5 w-5" />,
+      shell: 'border-amber-200 bg-amber-50/80 text-amber-950 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100',
+      iconShell: 'bg-amber-100 text-amber-700 dark:bg-amber-300/10 dark:text-amber-100',
+    }
+  }
+
+  if (status === 'canceled') {
+    return {
+      title: 'Оплата не завершена',
+      description: 'Платёж отменён или ссылка на оплату устарела. Новый доступ не оформлен.',
+      icon: <X className="h-5 w-5" />,
+      shell: 'border-slate-200 bg-white text-slate-950 dark:border-white/10 dark:bg-white/[0.035] dark:text-white',
+      iconShell: 'bg-slate-100 text-slate-600 dark:bg-white/[0.07] dark:text-slate-300',
+    }
+  }
+
+  if (status === 'not_found') {
+    return {
+      title: 'Платёж не найден',
+      description: 'Не удалось найти этот платёж в вашем аккаунте. Проверьте историю операций.',
       icon: <AlertTriangle className="h-5 w-5" />,
       shell: 'border-amber-200 bg-amber-50/80 text-amber-950 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100',
       iconShell: 'bg-amber-100 text-amber-700 dark:bg-amber-300/10 dark:text-amber-100',

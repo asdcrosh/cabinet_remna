@@ -54,7 +54,7 @@ export default async function BillingPage({
     <div className="page-stack">
       <PageHeader
         title="Платежи"
-        description="История оплат, статусы платежей и выдача подписки."
+        description="Статусы оплат и выдача доступа в одном месте."
         action={(
           <Link href="/dashboard/plans" className="btn-primary group w-full justify-between px-4 sm:w-auto sm:gap-3">
             <span className="inline-flex items-center gap-2">
@@ -66,9 +66,28 @@ export default async function BillingPage({
         )}
       />
 
-      {params.paid === '1' && <PaymentSuccessBanner status={getBannerStatus(syncResult)} supportEnabled={features.support} />}
+      {params.paid === '1' && returnPaymentId && (
+        <PaymentSuccessBanner status={getBannerStatus(syncResult)} supportEnabled={features.support} />
+      )}
 
-      <PaymentHistory payments={payments} />
+      <section aria-labelledby="payment-history-title">
+        <div className="mb-3 flex items-end justify-between gap-3 px-1">
+          <div>
+            <h2 id="payment-history-title" className="text-lg font-semibold tracking-tight text-slate-950 dark:text-white">
+              История операций
+            </h2>
+            <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+              {total === 0 ? 'Покупок пока нет' : `${total} ${paymentCountLabel(total)}`}
+            </p>
+          </div>
+          {pages > 1 && (
+            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-500 dark:bg-white/[0.06] dark:text-slate-400">
+              Страница {Math.min(page, pages)}
+            </span>
+          )}
+        </div>
+        <PaymentHistory payments={payments} />
+      </section>
 
       {pages > 1 && (
         <nav className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 rounded-2xl border border-slate-200 bg-white p-2 dark:border-white/[0.09] dark:bg-white/[0.03] sm:gap-3" aria-label="Страницы платежей">
@@ -87,7 +106,18 @@ export default async function BillingPage({
 
 function getBannerStatus(syncResult: PaymentSyncResult | null) {
   if (!syncResult) return 'processing'
+  if (syncResult.status === 'not_found') return 'not_found'
+  if (syncResult.status === 'canceled') return 'canceled'
   if (syncResult.status === 'succeeded' && syncResult.provisioned) return 'ready'
-  if (!syncResult.ok || syncResult.status === 'canceled') return 'attention'
+  if (!syncResult.ok) return 'attention'
   return 'processing'
+}
+
+function paymentCountLabel(count: number) {
+  const mod100 = count % 100
+  const mod10 = count % 10
+  if (mod100 >= 11 && mod100 <= 14) return 'платежей'
+  if (mod10 === 1) return 'платёж'
+  if (mod10 >= 2 && mod10 <= 4) return 'платежа'
+  return 'платежей'
 }

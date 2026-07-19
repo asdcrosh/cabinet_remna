@@ -16,7 +16,7 @@ export default function DevicesPage() {
         action={
           <Link href="/dashboard/subscription#connection" className="btn-primary w-full sm:w-auto">
             <PlugZap className="h-4 w-4" />
-            Новое подключение
+            Подключить устройство
           </Link>
         }
       />

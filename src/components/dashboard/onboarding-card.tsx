@@ -12,6 +12,7 @@ import {
   ShoppingBag,
   Smartphone,
 } from 'lucide-react'
+import { cn } from '@/lib/cn'
 
 export interface DashboardOnboardingState {
   emailVerified: boolean
@@ -42,20 +43,24 @@ export function DashboardOnboardingCard({ state, mode = 'compact', supportEnable
   const action = getNextAction(state)
   const steps = getSteps(state)
   const isFull = mode === 'full'
+  const completedSteps = steps.filter((step) => step.done).length
 
   if (!action && !isFull) return null
 
   if (!isFull && action) {
     return (
-      <section className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.035] sm:flex-row sm:items-center sm:justify-between">
+      <section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-950/[0.025] dark:border-white/10 dark:bg-white/[0.035] dark:shadow-none sm:p-5">
         <div className="flex min-w-0 items-start gap-3">
-          <div className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${toneClass(action.tone)}`}>{action.icon}</div>
-          <div className="min-w-0">
-            <h2 className="font-semibold text-slate-950 dark:text-white">{action.title}</h2>
-            <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">{action.description}</p>
+          <div className={cn('grid h-11 w-11 shrink-0 place-items-center rounded-2xl', toneClass(action.tone))}>
+            {action.icon}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.13em] text-cyan-700 dark:text-cyan-200">Следующий шаг</p>
+            <h2 className="mt-1 text-lg font-semibold leading-tight tracking-tight text-slate-950 dark:text-white">{action.title}</h2>
+            <p className="mt-1 text-sm leading-5 text-slate-500 dark:text-slate-400">{action.description}</p>
           </div>
         </div>
-        <Link href={action.href} className="btn-primary shrink-0">
+        <Link href={action.href} className="btn-primary mt-4 min-h-11 w-full justify-between rounded-2xl px-4 sm:w-auto sm:justify-center">
           {action.label}
           <ArrowRight className="h-4 w-4" />
         </Link>
@@ -64,49 +69,72 @@ export function DashboardOnboardingCard({ state, mode = 'compact', supportEnable
   }
 
   return (
-    <section className={`card ${isFull ? 'p-5 sm:p-6' : 'p-4'}`}>
-      <div className={`grid gap-4 ${isFull ? 'lg:grid-cols-[0.9fr_1.1fr] lg:items-center' : 'xl:grid-cols-[0.85fr_1.15fr] xl:items-center'}`}>
+    <section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-950/[0.025] dark:border-white/10 dark:bg-white/[0.035] dark:shadow-none sm:p-6">
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,.8fr)] lg:items-center lg:gap-7">
         <div className="min-w-0">
-          <div className="mb-3 flex items-center gap-3">
-            <div className={`grid shrink-0 place-items-center rounded-lg ${toneClass(action?.tone ?? 'emerald')} ${isFull ? 'h-11 w-11' : 'h-10 w-10'}`}>
+          <div className="flex items-start gap-3">
+            <div className={cn('grid h-12 w-12 shrink-0 place-items-center rounded-2xl', toneClass(action?.tone ?? 'emerald'))}>
               {action?.icon ?? <ShieldCheck className="h-5 w-5" />}
             </div>
             <div className="min-w-0">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-cyan-700 dark:text-cyan-200">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-cyan-700 dark:text-cyan-200">
                 {action ? 'Следующий шаг' : 'Готово'}
               </p>
-              <h2 className={`${isFull ? 'text-xl sm:text-2xl' : 'text-lg sm:text-xl'} line-clamp-2 font-semibold leading-tight`}>
+              <h2 className="mt-1 text-xl font-semibold leading-tight tracking-tight text-slate-950 dark:text-white sm:text-2xl">
                 {action?.title ?? 'Кабинет настроен'}
               </h2>
             </div>
           </div>
-          <p className="max-w-xl text-sm text-slate-500 dark:text-slate-400">
+          <p className="mt-3 max-w-xl text-sm leading-6 text-slate-500 dark:text-slate-400">
             {action?.description ?? 'Можно смотреть подписку, устройства, платежи и бонусы.'}
           </p>
-          <div className="mt-5 flex flex-wrap items-center gap-3">
+          <div className="mt-5 grid gap-2 sm:flex sm:flex-wrap sm:items-center">
             {action ? (
-              <Link href={action.href} className="btn-primary min-h-9 px-3 py-1.5">
+              <Link href={action.href} className="btn-primary min-h-11 w-full justify-between rounded-2xl px-4 sm:w-auto sm:justify-center">
                 {action.label}
                 <ArrowRight className="h-4 w-4" />
               </Link>
             ) : (
-              <Link href="/dashboard/subscription" className="btn-primary min-h-9 px-3 py-1.5">
+              <Link href="/dashboard/subscription" className="btn-primary min-h-11 w-full justify-between rounded-2xl px-4 sm:w-auto sm:justify-center">
                 Открыть подписку
                 <ArrowRight className="h-4 w-4" />
               </Link>
             )}
             {supportEnabled && (
-              <Link href="/dashboard/support" className="text-sm font-medium text-slate-500 hover:text-cyan-700 dark:text-slate-400 dark:hover:text-cyan-200">
+              <Link href="/dashboard/support" className="inline-flex min-h-10 items-center justify-center rounded-2xl px-3 text-sm font-medium text-slate-500 transition-colors hover:bg-slate-100 hover:text-cyan-700 dark:text-slate-400 dark:hover:bg-white/[0.05] dark:hover:text-cyan-200">
                 Нужна помощь?
               </Link>
             )}
           </div>
         </div>
 
-        <div className="grid gap-2 sm:grid-cols-2">
-          {steps.map((step) => (
-            <ChecklistItem key={step.title} {...step} />
-          ))}
+        <div className="rounded-3xl bg-slate-50 p-3.5 dark:bg-white/[0.035] sm:p-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <div className="text-sm font-semibold text-slate-900 dark:text-white">Настройка кабинета</div>
+              <div className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{completedSteps} из {steps.length} этапов готовы</div>
+            </div>
+            <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 ring-1 ring-slate-200 dark:bg-white/[0.05] dark:text-slate-200 dark:ring-white/10">
+              {completedSteps}/{steps.length}
+            </span>
+          </div>
+          <div className="mt-3 grid grid-cols-4 gap-1.5" aria-hidden="true">
+            {steps.map((step) => (
+              <span key={step.title} className={cn('h-1.5 rounded-full', step.done ? 'bg-cyan-500 dark:bg-cyan-300' : 'bg-slate-200 dark:bg-white/10')} />
+            ))}
+          </div>
+          <details className="group mt-3">
+            <summary className="flex min-h-10 cursor-pointer list-none items-center justify-between rounded-2xl px-2 text-sm font-medium text-slate-600 transition-colors hover:bg-white dark:text-slate-300 dark:hover:bg-white/[0.04]">
+              Этапы настройки
+              <span className="text-xs text-slate-400 group-open:hidden">Показать</span>
+              <span className="hidden text-xs text-slate-400 group-open:inline">Скрыть</span>
+            </summary>
+            <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
+              {steps.map((step) => (
+                <ChecklistItem key={step.title} {...step} />
+              ))}
+            </div>
+          </details>
         </div>
       </div>
     </section>
@@ -228,7 +256,7 @@ function ChecklistItem({
   icon: ReactNode
 }) {
   return (
-    <div className="flex min-h-16 items-center gap-3 rounded-lg border border-slate-100 bg-slate-50/80 px-3 py-2.5 dark:border-slate-800 dark:bg-surface-800/70">
+    <div className="flex min-h-14 items-center gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-2.5 dark:border-white/10 dark:bg-white/[0.035]">
       <div className={done ? 'text-emerald-500' : 'text-slate-400 dark:text-slate-500'}>
         {done ? <CheckCircle2 className="h-5 w-5" /> : <Circle className="h-5 w-5" />}
       </div>
@@ -237,7 +265,7 @@ function ChecklistItem({
           <span className="shrink-0 text-slate-400 dark:text-slate-500">{icon}</span>
           <span className="line-clamp-2 leading-tight">{title}</span>
         </div>
-        <div className="line-clamp-2 text-xs leading-5 text-slate-500 dark:text-slate-400">{description}</div>
+        <div className="line-clamp-1 text-xs leading-5 text-slate-500 dark:text-slate-400">{description}</div>
       </div>
     </div>
   )
@@ -252,6 +280,6 @@ function toneClass(tone: NextAction['tone']) {
     case 'amber':
       return 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-200'
     default:
-      return 'bg-slate-950 text-cyan-200 dark:bg-white dark:text-slate-950'
+      return 'bg-slate-100 text-slate-700 dark:bg-white/[0.08] dark:text-slate-200'
   }
 }

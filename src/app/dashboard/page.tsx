@@ -184,12 +184,19 @@ export default async function DashboardHome() {
     : user._count.devices === 0
       ? { href: '/dashboard/subscription', label: 'Подключить устройство', icon: <KeyRound className="h-4 w-4" /> }
       : { href: '/dashboard/subscription', label: 'Открыть подписку', icon: <KeyRound className="h-4 w-4" /> }
+  const focusedNextStep = user.payments[0]
+    ? 'insight'
+    : primaryHomeNudge
+      ? 'onboarding'
+      : personalOffer
+        ? 'offer'
+        : null
 
   return (
     <div className="page-stack">
       <header className="pb-1 sm:pb-2">
         <div>
-          <h1 className="text-2xl font-semibold tracking-[-0.025em] text-slate-950 dark:text-white sm:text-[2rem]">
+          <h1 className="text-[1.65rem] font-semibold leading-tight tracking-[-0.025em] text-slate-950 dark:text-white sm:text-[2rem]">
             С возвращением, {dashboardDisplayName(user.name, user.email)}
           </h1>
           <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-500 dark:text-slate-400">
@@ -218,8 +225,23 @@ export default async function DashboardHome() {
         </div>
       )}
 
+      {focusedNextStep === 'insight' ? (
+        <SmartInsights
+          emailVerified={onboardingState.emailVerified}
+          telegramLinked={onboardingState.telegramLinked}
+          deviceCount={onboardingState.deviceCount}
+          subscriptionExpireAt={subRow?.expireAt ?? null}
+          pendingPayment={user.payments[0] ?? null}
+          suppress={primaryHomeNudge}
+        />
+      ) : focusedNextStep === 'onboarding' ? (
+        <DashboardOnboardingCard state={onboardingState} supportEnabled={features.support} />
+      ) : focusedNextStep === 'offer' && personalOffer ? (
+        <PersonalOffer offer={personalOffer} welcomeBonusOptions={welcomeBonusOptions} />
+      ) : null}
+
       <section className="dashboard-hero" data-testid="subscription-overview">
-        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_17rem] lg:gap-7">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_17rem] lg:gap-6">
           <div className="min-w-0">
             <div className="flex items-start gap-3.5">
               <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-white/10 bg-white/[0.07] text-cyan-100 shadow-sm shadow-black/10">
@@ -244,7 +266,7 @@ export default async function DashboardHome() {
             </div>
           </div>
 
-          <div className="flex flex-col justify-between rounded-2xl border border-white/10 bg-white/[0.055] p-4 shadow-sm shadow-black/10 backdrop-blur-sm">
+          <div className="flex flex-col justify-center rounded-2xl border border-white/10 bg-white/[0.055] p-4 shadow-sm shadow-black/10 backdrop-blur-sm">
             <div className="flex items-start gap-3">
               <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-cyan-300/10 text-cyan-100">
                 <KeyRound className="h-4 w-4" />
@@ -260,13 +282,15 @@ export default async function DashboardHome() {
                 </div>
               </div>
             </div>
-            <Link href={primaryAction.href} className="btn-primary group mt-4 w-full min-h-11 justify-between px-4">
-              <span className="inline-flex items-center gap-2">
-                {primaryAction.icon}
-                {primaryAction.label}
-              </span>
-              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-            </Link>
+            {focusedNextStep === null && (
+              <Link href={primaryAction.href} className="btn-primary group mt-4 min-h-11 w-full justify-between rounded-2xl px-4">
+                <span className="inline-flex items-center gap-2">
+                  {primaryAction.icon}
+                  {primaryAction.label}
+                </span>
+                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+              </Link>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-2.5 lg:col-span-2 lg:grid-cols-3">
@@ -289,20 +313,6 @@ export default async function DashboardHome() {
           </div>
         </div>
       </section>
-
-      <SmartInsights
-        emailVerified={onboardingState.emailVerified}
-        telegramLinked={onboardingState.telegramLinked}
-        deviceCount={onboardingState.deviceCount}
-        subscriptionExpireAt={subRow?.expireAt ?? null}
-        pendingPayment={user.payments[0] ?? null}
-        suppress={primaryHomeNudge}
-      />
-      {primaryHomeNudge ? (
-        <DashboardOnboardingCard state={onboardingState} supportEnabled={features.support} />
-      ) : personalOffer ? (
-        <PersonalOffer offer={personalOffer} welcomeBonusOptions={welcomeBonusOptions} />
-      ) : null}
 
       <TrafficChart
         userId={user.id}
@@ -654,10 +664,10 @@ function PersonalOffer({
   const tone = personalOfferTone(offer.tone)
 
   return (
-    <section className={`rounded-2xl border p-4 sm:p-5 ${tone.shell}`}>
+    <section className={`rounded-3xl border p-4 shadow-sm shadow-slate-950/[0.025] dark:shadow-none sm:p-5 ${tone.shell}`}>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex min-w-0 gap-3">
-          <div className={`grid h-11 w-11 shrink-0 place-items-center rounded-lg ${tone.icon}`}>
+          <div className={`grid h-11 w-11 shrink-0 place-items-center rounded-2xl ${tone.icon}`}>
             {offer.icon}
           </div>
           <div className="min-w-0">
@@ -665,7 +675,7 @@ function PersonalOffer({
               <span className={`text-xs font-semibold uppercase tracking-wide ${tone.eyebrow}`}>
                 {offer.eyebrow}
               </span>
-              <span className="text-xs text-slate-500 dark:text-slate-400">
+              <span className="rounded-full bg-white/70 px-2 py-0.5 text-xs text-slate-500 ring-1 ring-slate-200/70 dark:bg-white/[0.05] dark:text-slate-400 dark:ring-white/10">
                 {offer.meta}
               </span>
             </div>
@@ -678,9 +688,11 @@ function PersonalOffer({
           </div>
         </div>
         {offer.action === 'WELCOME_BONUS' ? (
-          <WelcomeOfferButton label={offer.cta} options={welcomeBonusOptions} />
+          <div className="w-full shrink-0 sm:w-auto [&>button]:w-full">
+            <WelcomeOfferButton label={offer.cta} options={welcomeBonusOptions} />
+          </div>
         ) : (
-          <Link href={offer.href} className="btn-primary min-h-11 shrink-0 justify-center px-4">
+          <Link href={offer.href} className="btn-primary min-h-11 w-full shrink-0 justify-center rounded-2xl px-4 sm:w-auto">
             <Sparkles className="h-4 w-4" />
             {offer.cta}
           </Link>
@@ -873,16 +885,16 @@ function SmartInsights({
           href={item.href}
           target={item.external ? '_blank' : undefined}
           rel={item.external ? 'noreferrer' : undefined}
-          className={`group flex min-h-20 items-start gap-3 rounded-2xl border p-3 transition-colors ${insightTone(item.tone)}`}
+          className={`group flex min-h-20 items-start gap-3 rounded-3xl border p-4 shadow-sm shadow-slate-950/[0.025] transition-colors dark:shadow-none ${insightTone(item.tone)}`}
         >
-          <span className="grid h-9 w-9 shrink-0 place-items-center text-current">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-white/70 text-current ring-1 ring-black/[0.04] dark:bg-white/[0.06] dark:ring-white/10">
             {item.icon}
           </span>
           <span className="min-w-0 flex-1">
             <span className="block text-sm font-semibold text-slate-950 dark:text-white">{item.title}</span>
             <span className="mt-1 block text-xs leading-5 opacity-80">{item.text}</span>
           </span>
-          <ArrowRight className="mt-1 h-4 w-4 shrink-0 transition-transform group-hover:translate-x-0.5" />
+          <ArrowRight className="mt-3 h-4 w-4 shrink-0 transition-transform group-hover:translate-x-0.5" />
         </Link>
       ))}
     </section>

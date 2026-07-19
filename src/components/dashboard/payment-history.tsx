@@ -5,6 +5,7 @@ import { formatPrice } from '@/lib/format'
 import { getPendingPaymentTtlMs } from '@/lib/payment-sync'
 import { EmptyState } from '@/components/dashboard/empty-state'
 import { paymentProviderLabel } from '@/lib/payment-provider-label'
+import { cn } from '@/lib/cn'
 
 export type PaymentHistoryPayment = Prisma.PaymentGetPayload<{ include: { plan: true; subscription: true } }>
 
@@ -13,59 +14,68 @@ export function PaymentHistory({ payments }: { payments: PaymentHistoryPayment[]
 
   return (
     <div className="space-y-3">
-      {payments.map((payment) => (
-        <article
-          key={payment.id}
-          className="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-950/[0.02] transition-colors hover:border-slate-300 dark:border-white/[0.09] dark:bg-white/[0.03] dark:shadow-none dark:hover:border-white/[0.14] sm:grid-cols-2 lg:grid-cols-[minmax(14rem,1.25fr)_minmax(8rem,.5fr)_minmax(9rem,.55fr)_minmax(8rem,.45fr)] lg:items-center lg:gap-5"
-        >
-          <div className="flex min-w-0 items-start gap-3 sm:col-span-2 lg:col-span-1">
-            <PaymentStatusIcon status={payment.status} createdAt={payment.createdAt} />
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <div className="truncate text-sm font-semibold text-slate-950 dark:text-white">{payment.plan.name}</div>
-                <PaymentStatusBadge status={payment.status} createdAt={payment.createdAt} />
-              </div>
-              <div className="mt-1.5 flex flex-wrap gap-x-2 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
-                <span>{formatPaymentDate(payment.createdAt)}</span>
-                <span aria-hidden="true">·</span>
-                <span>{paymentProviderLabel(payment.provider)}</span>
+      {payments.map((payment) => {
+        const freshPending = payment.status === 'PENDING' && isFreshPendingPayment(payment.createdAt)
+
+        return (
+          <article
+            key={payment.id}
+            className={cn(
+              'grid gap-4 rounded-3xl border bg-white p-4 shadow-sm shadow-slate-950/[0.02] transition-colors dark:bg-white/[0.03] dark:shadow-none sm:grid-cols-2 lg:grid-cols-[minmax(14rem,1.25fr)_minmax(8rem,.5fr)_minmax(9rem,.55fr)_minmax(8rem,.45fr)] lg:items-center lg:gap-5',
+              freshPending
+                ? 'border-amber-200 ring-1 ring-amber-100 hover:border-amber-300 dark:border-amber-400/25 dark:ring-amber-400/10'
+                : 'border-slate-200 hover:border-slate-300 dark:border-white/[0.09] dark:hover:border-white/[0.14]',
+            )}
+          >
+            <div className="flex min-w-0 items-start gap-3 sm:col-span-2 lg:col-span-1">
+              <PaymentStatusIcon status={payment.status} createdAt={payment.createdAt} />
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="truncate text-sm font-semibold text-slate-950 dark:text-white">{payment.plan.name}</div>
+                  <PaymentStatusBadge status={payment.status} createdAt={payment.createdAt} />
+                </div>
+                <div className="mt-1.5 flex flex-wrap gap-x-2 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
+                  <span>{formatPaymentDate(payment.createdAt)}</span>
+                  <span aria-hidden="true">·</span>
+                  <span>{paymentProviderLabel(payment.provider)}</span>
+                </div>
               </div>
             </div>
-          </div>
 
-          <div className="flex items-end justify-between gap-3 border-t border-slate-100 pt-3 sm:block sm:border-0 sm:pt-0">
-            <div className="text-[11px] font-medium uppercase tracking-wide text-slate-400 sm:mb-1.5">Сумма</div>
-            <PaymentAmount
-              amountKopecks={payment.amountKopecks}
-              originalAmountKopecks={payment.originalAmountKopecks}
-              discountKopecks={payment.discountKopecks}
-            />
-            {getPromoCodeLabel(payment.promoCodeSnapshot) !== '—' ? (
-              <div className="mt-1 hidden items-center gap-1 text-xs text-slate-500 sm:flex">
-                <Tag className="h-3 w-3" />
-                {getPromoCodeLabel(payment.promoCodeSnapshot)}
-              </div>
-            ) : null}
-          </div>
-
-          <div className="flex items-end justify-between gap-3 border-t border-slate-100 pt-3 sm:block sm:border-0 sm:pt-0">
-            <div className="text-[11px] font-medium uppercase tracking-wide text-slate-400 sm:mb-1.5">Подписка</div>
-            <div className="sm:mt-0">
-              <ProvisioningBadge provisioned={Boolean(payment.subscriptionProvisionedAt)} status={payment.status} />
+            <div className="flex items-end justify-between gap-3 border-t border-slate-100 pt-3 dark:border-white/[0.07] sm:block sm:border-0 sm:pt-0">
+              <div className="text-[11px] font-medium uppercase tracking-wide text-slate-400 sm:mb-1.5">Сумма</div>
+              <PaymentAmount
+                amountKopecks={payment.amountKopecks}
+                originalAmountKopecks={payment.originalAmountKopecks}
+                discountKopecks={payment.discountKopecks}
+              />
+              {getPromoCodeLabel(payment.promoCodeSnapshot) !== '—' ? (
+                <div className="mt-1 flex items-center gap-1 text-xs text-slate-500">
+                  <Tag className="h-3 w-3" />
+                  {getPromoCodeLabel(payment.promoCodeSnapshot)}
+                </div>
+              ) : null}
             </div>
-          </div>
 
-          <div className="flex flex-col justify-center gap-2 border-t border-slate-100 pt-3 sm:col-span-2 lg:col-span-1 lg:border-0 lg:pt-0">
-            <details className="text-xs text-slate-400 lg:text-right">
-              <summary className="cursor-pointer select-none hover:text-slate-600 dark:hover:text-slate-200">ID платежа</summary>
-              <div className="mt-1 truncate font-mono">{shortId(payment.externalPaymentId || payment.yookassaId || payment.id)}</div>
-            </details>
-            {payment.status === 'PENDING' ? (
-              <PaymentAction confirmationUrl={payment.confirmationUrl} status={payment.status} createdAt={payment.createdAt} fullWidth />
-            ) : null}
-          </div>
-        </article>
-      ))}
+            <div className="flex items-end justify-between gap-3 border-t border-slate-100 pt-3 dark:border-white/[0.07] sm:block sm:border-0 sm:pt-0">
+              <div className="text-[11px] font-medium uppercase tracking-wide text-slate-400 sm:mb-1.5">Подписка</div>
+              <div className="sm:mt-0">
+                <ProvisioningBadge provisioned={Boolean(payment.subscriptionProvisionedAt)} status={payment.status} />
+              </div>
+            </div>
+
+            <div className="flex flex-col justify-center gap-2 border-t border-slate-100 pt-3 dark:border-white/[0.07] sm:col-span-2 lg:col-span-1 lg:border-0 lg:pt-0">
+              <details className="text-xs text-slate-400 lg:text-right">
+                <summary className="cursor-pointer select-none hover:text-slate-600 dark:hover:text-slate-200">ID платежа</summary>
+                <div className="mt-1 truncate font-mono">{shortId(payment.externalPaymentId || payment.yookassaId || payment.id)}</div>
+              </details>
+              {payment.status === 'PENDING' ? (
+                <PaymentAction confirmationUrl={payment.confirmationUrl} status={payment.status} createdAt={payment.createdAt} fullWidth />
+              ) : null}
+            </div>
+          </article>
+        )
+      })}
     </div>
   )
 }
@@ -126,7 +136,11 @@ function PaymentAction({
   fullWidth?: boolean
 }) {
   if (status === 'PENDING' && !isFreshPendingPayment(createdAt)) {
-    return <span className="text-sm text-slate-400">Ссылка устарела</span>
+    return (
+      <Link href="/dashboard/plans" className="btn-secondary min-h-10 w-full justify-center px-3 py-2 text-xs">
+        Создать новый платёж
+      </Link>
+    )
   }
   if (status !== 'PENDING') return <span className="text-sm text-slate-400">—</span>
   if (!confirmationUrl) return <span className="text-sm text-slate-400">Ссылка недоступна</span>
@@ -138,7 +152,7 @@ function PaymentAction({
       rel="noreferrer"
     >
       <ExternalLink className="h-4 w-4" />
-      Оплатить
+      Продолжить оплату
     </a>
   )
 }

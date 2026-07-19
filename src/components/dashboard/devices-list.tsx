@@ -178,18 +178,18 @@ function DeviceCard({
           <Icon className="h-5 w-5" />
         </div>
         <div className="min-w-0 flex-1">
-          <div className="flex min-w-0 items-start justify-between gap-2">
-            <h3 className="min-w-0 truncate text-sm font-semibold text-slate-950 dark:text-white sm:text-base">{getDeviceTitle(device)}</h3>
+          <div className="flex min-w-0 flex-col items-start gap-1.5 min-[380px]:flex-row min-[380px]:justify-between min-[380px]:gap-2">
+            <h3 className="min-w-0 break-words text-sm font-semibold text-slate-950 dark:text-white sm:text-base">{getDeviceTitle(device)}</h3>
             <span className={cn('shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-semibold', activity.className)}>{activity.label}</span>
           </div>
           <p className="mt-1 break-words text-sm leading-5 text-slate-500 dark:text-slate-400">{getDeviceSubtitle(device)}</p>
         </div>
       </div>
-      <div className="mt-4 flex items-end justify-between gap-3 border-t border-slate-200/70 pt-3 dark:border-white/[0.08]">
+      <div className="mt-4 flex flex-col items-stretch gap-3 border-t border-slate-200/70 pt-3 dark:border-white/[0.08] min-[380px]:flex-row min-[380px]:items-end min-[380px]:justify-between">
         <div className="min-w-0 text-xs text-slate-400 dark:text-slate-500">
           <div>Последняя активность</div>
-          <div className="mt-0.5 truncate font-medium text-slate-600 dark:text-slate-300">{formatDeviceDate(device.updatedAt || device.createdAt)}</div>
-          <div className="mt-0.5 truncate font-mono text-[11px]" title={device.hwid}>ID {shortDeviceId(device.hwid)}</div>
+          <div className="mt-0.5 break-words font-medium text-slate-600 dark:text-slate-300">{formatDeviceDate(device.updatedAt || device.createdAt)}</div>
+          <div className="mt-0.5 break-all font-mono text-[11px]" title={device.hwid}>ID {shortDeviceId(device.hwid)}</div>
         </div>
         <DeviceActionButton loading={loading} label="Отвязать" onClick={onRemove} />
       </div>
@@ -225,13 +225,13 @@ function DeviceActionButton({
         'hover:border-red-300 hover:bg-red-50 hover:text-red-800',
         'disabled:cursor-not-allowed disabled:opacity-60',
         'dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200 dark:hover:bg-red-500/15',
-        'shrink-0'
+        'w-full shrink-0 min-[380px]:w-auto'
       )}
       disabled={loading}
       onClick={onClick}
     >
       <Icon className={cn('h-4 w-4 shrink-0', loading && 'animate-spin')} />
-      <span className="truncate">{loading ? 'Ждем...' : label}</span>
+      <span className="truncate">{loading ? 'Ждём...' : label}</span>
     </button>
   )
 }

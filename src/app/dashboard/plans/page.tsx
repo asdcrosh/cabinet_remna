@@ -125,7 +125,7 @@ export default async function PlansPage({
     <div className="page-stack">
       <PageHeader
         title="Тарифы"
-        description="Выберите подходящий срок. Доступ обновится автоматически после оплаты."
+        description="Сравните варианты, выберите один тариф и перейдите к безопасной оплате."
         action={(
           <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
             {canManagePlans && (
@@ -138,8 +138,8 @@ export default async function PlansPage({
       />
 
       {isRenewIntent && (
-        <section className="flex items-start gap-3 rounded-2xl border border-cyan-200 bg-cyan-50/80 px-4 py-3.5 text-sm text-cyan-950 dark:border-cyan-400/30 dark:bg-cyan-400/10 dark:text-cyan-50">
-          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-cyan-100 text-cyan-700 dark:bg-cyan-300/10 dark:text-cyan-100">
+        <section className="flex items-start gap-3 rounded-[1.5rem] border border-cyan-200/80 bg-cyan-50/70 px-4 py-3.5 text-sm text-cyan-950 dark:border-cyan-400/25 dark:bg-cyan-400/[0.08] dark:text-cyan-50">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-white/80 text-cyan-700 shadow-sm ring-1 ring-cyan-200/80 dark:bg-cyan-300/10 dark:text-cyan-100 dark:ring-cyan-300/15">
             <RefreshCw className="h-4 w-4" />
           </span>
           <div className="min-w-0 pt-0.5">
@@ -152,13 +152,18 @@ export default async function PlansPage({
       )}
 
       {needsTelegramCheckForPromo && (
-        <div className="flex flex-col gap-3 rounded-2xl border border-amber-200 bg-amber-50/80 px-4 py-3.5 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-3 rounded-[1.5rem] border border-amber-200/80 bg-amber-50/70 px-4 py-3.5 text-sm text-amber-900 dark:border-amber-500/25 dark:bg-amber-500/[0.08] dark:text-amber-100 sm:flex-row sm:items-center sm:justify-between">
           <span className="flex min-w-0 items-center gap-3">
-            <MessageCircleQuestion className="h-5 w-5 shrink-0" />
-            <span>Пробный тариф откроется после проверки Telegram.</span>
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-white/80 shadow-sm ring-1 ring-amber-200/80 dark:bg-amber-300/10 dark:ring-amber-300/15">
+              <MessageCircleQuestion className="h-5 w-5" />
+            </span>
+            <span className="min-w-0">
+              <span className="block font-semibold">Доступен пробный тариф</span>
+              <span className="mt-0.5 block text-xs leading-5 text-amber-800/80 dark:text-amber-100/70">Сначала подтвердите аккаунт через Telegram.</span>
+            </span>
           </span>
-          <Link href="/dashboard/settings" className="inline-flex min-h-9 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-amber-100 px-3 font-semibold text-amber-900 transition-colors hover:bg-amber-200 dark:bg-amber-300/10 dark:text-amber-100 dark:hover:bg-amber-300/15">
-            Проверить
+          <Link href="/dashboard/settings" className="inline-flex min-h-10 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-white px-3 font-semibold text-amber-900 shadow-sm ring-1 ring-amber-200/80 transition-colors hover:bg-amber-100 dark:bg-amber-300/10 dark:text-amber-100 dark:ring-amber-300/15 dark:hover:bg-amber-300/15">
+            Перейти к проверке
             <ArrowRight className="h-4 w-4" />
           </Link>
         </div>
@@ -167,9 +172,9 @@ export default async function PlansPage({
       {planViews.length > 0 ? <PlanCatalog plans={planViews} initialPlanId={linkedPlanId} /> : null}
 
       {planViews.length === 0 && (
-        <div className="card py-10 text-center sm:py-12">
-          <div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-cyan-50 text-cyan-700 dark:bg-cyan-400/10 dark:text-cyan-200">
-            <ShieldCheck className="h-7 w-7" />
+        <div className="rounded-[1.75rem] border border-slate-200/80 bg-white px-4 py-10 text-center dark:border-white/[0.08] dark:bg-white/[0.025] sm:px-6 sm:py-12">
+          <div className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-2xl bg-cyan-50 text-cyan-700 ring-1 ring-cyan-200/70 dark:bg-cyan-400/10 dark:text-cyan-200 dark:ring-cyan-400/20">
+            <ShieldCheck className="h-6 w-6" />
           </div>
           <h3 className="text-lg font-semibold">Тарифы скоро появятся</h3>
           <p className="mx-auto mt-2 max-w-md text-sm text-slate-500 dark:text-slate-400">Сейчас нет опубликованных тарифов.</p>
@@ -186,41 +191,72 @@ export default async function PlansPage({
 
 function PlanComparison({ plans }: { plans: Array<{ id: string; name: string; priceKopecks: number; durationDays: number; trafficLimitGb: number | null; deviceLimit: number }> }) {
   return (
-    <details className="group overflow-hidden rounded-3xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.035]">
-      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-4 text-sm font-semibold text-slate-950 transition-colors hover:bg-slate-50 dark:text-white dark:hover:bg-white/[0.025] sm:px-5 [&::-webkit-details-marker]:hidden">
-        <span>Сравнить характеристики</span>
-        <ChevronDown className="h-4 w-4 shrink-0 text-slate-400 transition-transform group-open:rotate-180" />
+    <details className="group overflow-hidden rounded-[1.75rem] border border-slate-200/80 bg-white dark:border-white/[0.08] dark:bg-white/[0.025]">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-4 text-slate-950 transition-colors hover:bg-slate-50/70 dark:text-white dark:hover:bg-white/[0.025] sm:px-5 [&::-webkit-details-marker]:hidden">
+        <span className="min-w-0">
+          <span className="block text-sm font-semibold">Сравнить все характеристики</span>
+          <span className="mt-0.5 block text-xs font-normal text-slate-500 dark:text-slate-400">Срок, трафик, устройства и итоговая цена</span>
+        </span>
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-400 dark:bg-white/[0.06]">
+          <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" />
+        </span>
       </summary>
-      <div
-        role="region"
-        aria-label="Сравнение тарифов с горизонтальной прокруткой"
-        tabIndex={0}
-        className="overflow-x-auto border-t border-slate-100 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-cyan-400 dark:border-white/10"
-      >
-        <table className="w-full min-w-[680px] text-sm">
-          <caption className="sr-only">Сравнение срока, трафика, устройств и цены тарифов</caption>
-          <thead className="bg-slate-50 text-left text-slate-500 dark:bg-surface-800">
-            <tr>
-              <th className="px-4 py-3">Тариф</th>
-              <th className="px-4 py-3">Срок</th>
-              <th className="px-4 py-3">Трафик</th>
-              <th className="px-4 py-3">Устройства</th>
-              <th className="px-4 py-3 text-right">Цена</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100 dark:divide-white/10">
-            {plans.map((plan) => (
-              <tr key={plan.id} className="transition-colors hover:bg-slate-50/70 dark:hover:bg-white/[0.025]">
-                <td className="px-4 py-3 font-medium">{plan.name}</td>
-                <td className="px-4 py-3 text-slate-500">{plan.durationDays} дн.</td>
-                <td className="px-4 py-3 text-slate-500">{plan.trafficLimitGb == null ? 'Безлимит' : `${plan.trafficLimitGb} ГБ`}</td>
-                <td className="px-4 py-3 text-slate-500">{plan.deviceLimit}</td>
-                <td className="px-4 py-3 text-right font-semibold">{formatPrice(plan.priceKopecks)}</td>
+      <div className="border-t border-slate-100 dark:border-white/[0.08]">
+        <div className="grid gap-2 p-3 md:hidden" role="region" aria-label="Сравнение тарифов">
+          {plans.map((plan) => (
+            <article key={plan.id} className="rounded-2xl bg-slate-50/80 p-3.5 ring-1 ring-slate-200/70 dark:bg-white/[0.035] dark:ring-white/[0.08]">
+              <div className="flex items-baseline justify-between gap-3">
+                <h3 className="min-w-0 truncate text-sm font-semibold text-slate-950 dark:text-white">{plan.name}</h3>
+                <span className="shrink-0 text-sm font-semibold tabular-nums text-slate-950 dark:text-white">{formatPrice(plan.priceKopecks)}</span>
+              </div>
+              <div className="mt-3 grid grid-cols-3 gap-2">
+                <ComparisonFact label="Срок" value={`${plan.durationDays} дн.`} />
+                <ComparisonFact label="Трафик" value={plan.trafficLimitGb == null ? 'Безлимит' : `${plan.trafficLimitGb} ГБ`} />
+                <ComparisonFact label="Устройства" value={`До ${plan.deviceLimit}`} />
+              </div>
+            </article>
+          ))}
+        </div>
+        <div
+          role="region"
+          aria-label="Таблица сравнения тарифов"
+          tabIndex={0}
+          className="hidden overflow-x-auto focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-cyan-400 md:block"
+        >
+          <table className="w-full min-w-[680px] text-sm">
+            <caption className="sr-only">Сравнение срока, трафика, устройств и цены тарифов</caption>
+            <thead className="bg-slate-50/80 text-left text-xs font-semibold uppercase tracking-wide text-slate-400 dark:bg-white/[0.025] dark:text-slate-500">
+              <tr>
+                <th className="px-4 py-3">Тариф</th>
+                <th className="px-4 py-3">Срок</th>
+                <th className="px-4 py-3">Трафик</th>
+                <th className="px-4 py-3">Устройства</th>
+                <th className="px-4 py-3 text-right">Цена</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-white/[0.08]">
+              {plans.map((plan) => (
+                <tr key={plan.id} className="transition-colors hover:bg-slate-50/70 dark:hover:bg-white/[0.025]">
+                  <td className="px-4 py-3 font-medium text-slate-950 dark:text-white">{plan.name}</td>
+                  <td className="px-4 py-3 text-slate-500 dark:text-slate-400">{plan.durationDays} дн.</td>
+                  <td className="px-4 py-3 text-slate-500 dark:text-slate-400">{plan.trafficLimitGb == null ? 'Безлимит' : `${plan.trafficLimitGb} ГБ`}</td>
+                  <td className="px-4 py-3 text-slate-500 dark:text-slate-400">До {plan.deviceLimit}</td>
+                  <td className="px-4 py-3 text-right font-semibold tabular-nums text-slate-950 dark:text-white">{formatPrice(plan.priceKopecks)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </details>
+  )
+}
+
+function ComparisonFact({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0 border-l border-slate-200 pl-2 first:border-l-0 first:pl-0 dark:border-white/10">
+      <div className="truncate text-[10px] text-slate-400">{label}</div>
+      <div className="mt-0.5 truncate text-xs font-semibold text-slate-700 dark:text-slate-200">{value}</div>
+    </div>
   )
 }
