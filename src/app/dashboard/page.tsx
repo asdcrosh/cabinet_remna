@@ -33,6 +33,7 @@ import { getPlanAudienceContext, isPlanAvailableForUser } from '@/lib/plan-acces
 import { normalizeOfferTone, renderPersonalOfferTemplate } from '@/lib/personal-offers'
 import { getFeatureFlags } from '@/lib/feature-flags'
 import { cn } from '@/lib/cn'
+import { legalNavigation } from '@/lib/legal-links'
 
 export const dynamic = 'force-dynamic'
 
@@ -160,6 +161,7 @@ export default async function DashboardHome() {
     return (
       <div className="page-stack">
         <DashboardOnboardingCard state={onboardingState} mode="full" supportEnabled={features.support} />
+        <DashboardInformation />
       </div>
     )
   }
@@ -281,8 +283,35 @@ export default async function DashboardHome() {
         initialUsedBytes={used.toString()}
         initialLimitBytes={isUnlimited ? null : limit.toString()}
       />
-
+      <DashboardInformation />
     </div>
+  )
+}
+
+function DashboardInformation() {
+  return (
+    <section className="panel p-4 sm:p-5" aria-labelledby="dashboard-information-title">
+      <div className="flex items-end justify-between gap-3">
+        <div>
+          <h2 id="dashboard-information-title" className="text-sm font-semibold text-slate-950 dark:text-white">
+            Документы и контакты
+          </h2>
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Условия сервиса и каналы связи.</p>
+        </div>
+      </div>
+      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+        {legalNavigation.map((item) => (
+          <Link
+            key={item.href}
+            href={item.href}
+            className="group flex min-h-10 min-w-0 items-center justify-between gap-2 rounded-xl border border-slate-200 px-3 py-2 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-950 dark:border-white/10 dark:text-slate-300 dark:hover:bg-white/[0.05] dark:hover:text-white"
+          >
+            <span className="truncate">{item.label}</span>
+            <ArrowRight className="h-3.5 w-3.5 shrink-0 transition-transform group-hover:translate-x-0.5" />
+          </Link>
+        ))}
+      </div>
+    </section>
   )
 }
 

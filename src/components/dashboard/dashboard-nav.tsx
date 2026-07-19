@@ -6,17 +6,21 @@ import { usePathname } from 'next/navigation'
 import { createPortal } from 'react-dom'
 import {
   Bell,
+  BookOpen,
   ChevronDown,
   CreditCard,
   Database,
+  FileCheck2,
   FileClock,
   Gift,
   Home,
   KeyRound,
   Laptop,
+  Mail,
   Menu,
   MessageCircleQuestion,
   MoreHorizontal,
+  RotateCcw,
   Send,
   ServerCog,
   Settings,
@@ -28,14 +32,23 @@ import {
   UserCog,
   UsersRound,
   X,
+  type LucideIcon,
 } from 'lucide-react'
 import { cn } from '@/lib/cn'
+import { legalNavigation, type LegalPath } from '@/lib/legal-links'
 import { useBodyScrollLock } from '@/lib/use-body-scroll-lock'
 import { useDialogFocus } from '@/lib/use-dialog-focus'
 import type { FeatureFlags } from '@/lib/feature-flags'
 import { LogoutButton } from './logout-button'
 
-const nav = [
+type NavigationItem = {
+  href: string
+  label: string
+  icon: LucideIcon
+  exact?: boolean
+}
+
+const nav: NavigationItem[] = [
   { href: '/dashboard', label: 'Главная', icon: Home, exact: true },
   { href: '/dashboard/subscription', label: 'Подписка', icon: KeyRound },
   { href: '/dashboard/plans', label: 'Тарифы', icon: ShieldCheck },
@@ -47,14 +60,14 @@ const nav = [
   { href: '/dashboard/settings', label: 'Настройки', icon: Settings },
 ]
 
-const bottomNav = [
+const bottomNav: NavigationItem[] = [
   { href: '/dashboard', label: 'Главная', icon: Home, exact: true },
   { href: '/dashboard/subscription', label: 'Подписка', icon: KeyRound },
   { href: '/dashboard/plans', label: 'Тарифы', icon: ShieldCheck },
   { href: '/dashboard/support', label: 'Поддержка', icon: MessageCircleQuestion },
 ]
 
-const bottomMoreNav = [
+const bottomMoreNav: NavigationItem[] = [
   { href: '/dashboard/billing', label: 'Платежи', icon: CreditCard },
   { href: '/dashboard/bonus-box', label: 'Бонусы', icon: Gift },
   { href: '/dashboard/referrals', label: 'Рефералы', icon: UsersRound },
@@ -63,9 +76,23 @@ const bottomMoreNav = [
   { href: '/dashboard/settings', label: 'Настройки', icon: Settings },
 ]
 
+const legalIcons: Record<LegalPath, LucideIcon> = {
+  '/offer': FileCheck2,
+  '/terms': BookOpen,
+  '/privacy': ShieldCheck,
+  '/consent': FileCheck2,
+  '/refunds': RotateCcw,
+  '/contacts': Mail,
+}
+
+const infoNav: NavigationItem[] = legalNavigation.map((item) => ({
+  ...item,
+  icon: legalIcons[item.href],
+}))
+
 const NAV_BADGES_REFRESH_MS = 15_000
 
-const adminNav = [
+const adminNav: NavigationItem[] = [
   { href: '/dashboard/admin', label: 'Обзор', icon: UserCog, exact: true },
   { href: '/dashboard/admin/notifications', label: 'Уведомления', icon: Bell },
   { href: '/dashboard/admin/broadcasts', label: 'Рассылки', icon: Send },
@@ -121,7 +148,7 @@ const adminNavGroups = [
   },
 ]
 
-type NavItem = (typeof nav)[number] | (typeof adminNav)[number]
+type NavItem = NavigationItem
 type NavBadges = Record<string, number>
 type UserRole = 'USER' | 'MODERATOR' | 'ADMIN' | 'SUPER_ADMIN'
 
@@ -262,9 +289,10 @@ export function MobileBottomNav({
   const items = adminArea
     ? availableAdminItems.filter((item) => adminPrimaryHrefs.has(item.href))
     : filterUserNav(bottomNav, features)
+  const accountMoreItems = filterUserNav(bottomMoreNav, features)
   const moreItems = adminArea
     ? availableAdminItems.filter((item) => !adminPrimaryHrefs.has(item.href))
-    : filterUserNav(bottomMoreNav, features)
+    : [...accountMoreItems, ...infoNav]
   const showMore = !adminArea
   const [moreOpen, setMoreOpen] = useState(false)
   const [mounted, setMounted] = useState(false)
@@ -313,36 +341,26 @@ export function MobileBottomNav({
             <X className="h-4 w-4" />
           </button>
         </div>
-        <div className="grid grid-cols-2 gap-2">
-          {moreItems.map((item) => {
-            const Icon = item.icon
-            const active = ('exact' in item && item.exact) ? pathname === item.href : pathname.startsWith(item.href)
-            const badge = liveBadges[item.href] ?? 0
-
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={closeMore}
-                aria-current={active ? 'page' : undefined}
-                className={cn(
-                  'relative flex min-h-12 min-w-0 items-center gap-3 rounded-xl border px-3 py-2 text-sm font-semibold transition',
-                  active
-                    ? 'border-slate-300 bg-slate-100 text-slate-950 dark:border-white/15 dark:bg-white/10 dark:text-white'
-                    : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-950 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white'
-                )}
-              >
-                <Icon className="h-4 w-4 shrink-0" />
-                <span className="min-w-0 flex-1 truncate">{item.label}</span>
-                {badge > 0 && (
-                  <span className="grid h-5 min-w-5 place-items-center rounded-full bg-red-600 px-1.5 text-[11px] text-white">
-                    {badge > 99 ? '99+' : badge}
-                  </span>
-                )}
-              </Link>
-            )
-          })}
-        </div>
+        {adminArea ? (
+          <MobileMoreGrid items={moreItems} pathname={pathname} badges={liveBadges} onNavigate={closeMore} />
+        ) : (
+          <div className="space-y-4">
+            <MobileMoreSection
+              title="Кабинет"
+              items={accountMoreItems}
+              pathname={pathname}
+              badges={liveBadges}
+              onNavigate={closeMore}
+            />
+            <MobileMoreSection
+              title="Информация"
+              items={infoNav}
+              pathname={pathname}
+              badges={liveBadges}
+              onNavigate={closeMore}
+            />
+          </div>
+        )}
         <div className="mt-3 border-t border-slate-200 pt-3 dark:border-white/10">
           <LogoutButton />
         </div>
@@ -414,6 +432,74 @@ export function MobileBottomNav({
   )
 }
 
+function MobileMoreSection({
+  title,
+  items,
+  pathname,
+  badges,
+  onNavigate,
+}: {
+  title: string
+  items: NavItem[]
+  pathname: string
+  badges: NavBadges
+  onNavigate: () => void
+}) {
+  if (items.length === 0) return null
+
+  return (
+    <section>
+      <h2 className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">{title}</h2>
+      <MobileMoreGrid items={items} pathname={pathname} badges={badges} onNavigate={onNavigate} />
+    </section>
+  )
+}
+
+function MobileMoreGrid({
+  items,
+  pathname,
+  badges,
+  onNavigate,
+}: {
+  items: NavItem[]
+  pathname: string
+  badges: NavBadges
+  onNavigate: () => void
+}) {
+  return (
+    <div className="grid grid-cols-2 gap-2">
+      {items.map((item) => {
+        const Icon = item.icon
+        const active = item.exact ? pathname === item.href : pathname.startsWith(item.href)
+        const badge = badges[item.href] ?? 0
+
+        return (
+          <Link
+            key={item.href}
+            href={item.href}
+            onClick={onNavigate}
+            aria-current={active ? 'page' : undefined}
+            className={cn(
+              'relative flex min-h-12 min-w-0 items-center gap-3 rounded-xl border px-3 py-2 text-sm font-semibold transition',
+              active
+                ? 'border-slate-300 bg-slate-100 text-slate-950 dark:border-white/15 dark:bg-white/10 dark:text-white'
+                : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-950 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white'
+            )}
+          >
+            <Icon className="h-4 w-4 shrink-0" />
+            <span className="min-w-0 flex-1 truncate">{item.label}</span>
+            {badge > 0 && (
+              <span className="grid h-5 min-w-5 place-items-center rounded-full bg-red-600 px-1.5 text-[11px] text-white">
+                {badge > 99 ? '99+' : badge}
+              </span>
+            )}
+          </Link>
+        )
+      })}
+    </div>
+  )
+}
+
 export function Brand({ compact = false, brandName }: { compact?: boolean; brandName: string }) {
   return (
     <Link href="/dashboard" className="flex min-w-0 items-center gap-2.5">
@@ -450,18 +536,61 @@ function NavList({
   return (
     <nav className={className}>
       {role === 'USER' ? (
-        <NavGroup items={filterUserNav(nav, features)} pathname={pathname} badges={liveBadges} onNavigate={onNavigate} />
+        <div className="space-y-3">
+          <NavGroup items={filterUserNav(nav, features)} pathname={pathname} badges={liveBadges} onNavigate={onNavigate} />
+          <InfoNavGroup pathname={pathname} badges={liveBadges} onNavigate={onNavigate} />
+        </div>
       ) : (
         <div className="space-y-3">
           <WorkspaceSwitch adminArea={adminArea} onNavigate={onNavigate} />
           {adminArea ? (
             <AdminNavGroups role={role} features={features} pathname={pathname} badges={liveBadges} onNavigate={onNavigate} />
           ) : (
-            <NavGroup items={filterUserNav(nav, features)} pathname={pathname} badges={liveBadges} onNavigate={onNavigate} />
+            <div className="space-y-3">
+              <NavGroup items={filterUserNav(nav, features)} pathname={pathname} badges={liveBadges} onNavigate={onNavigate} />
+              <InfoNavGroup pathname={pathname} badges={liveBadges} onNavigate={onNavigate} />
+            </div>
           )}
         </div>
       )}
     </nav>
+  )
+}
+
+function InfoNavGroup({
+  pathname,
+  badges,
+  onNavigate,
+}: {
+  pathname: string
+  badges: NavBadges
+  onNavigate?: () => void
+}) {
+  const hasActiveItem = infoNav.some((item) => pathname === item.href)
+  const [open, setOpen] = useState(hasActiveItem)
+
+  useEffect(() => {
+    if (hasActiveItem) setOpen(true)
+  }, [hasActiveItem])
+
+  return (
+    <div className="border-t border-slate-200 pt-2 dark:border-white/10">
+      <button
+        type="button"
+        className="flex min-h-10 w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-white/[0.05] dark:hover:text-white"
+        onClick={() => setOpen((value) => !value)}
+        aria-expanded={open}
+      >
+        <BookOpen className="h-4 w-4 shrink-0" />
+        <span className="min-w-0 flex-1 truncate">Информация</span>
+        <ChevronDown className={cn('h-4 w-4 shrink-0 transition-transform', open && 'rotate-180')} />
+      </button>
+      {open && (
+        <div className="mt-1 pl-2">
+          <NavGroup items={infoNav} pathname={pathname} badges={badges} onNavigate={onNavigate} />
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -498,7 +627,7 @@ function WorkspaceSwitch({ adminArea, onNavigate }: { adminArea: boolean; onNavi
   )
 }
 
-function filterUserNav<T extends NavItem>(items: T[], features: FeatureFlags) {
+function filterUserNav<T extends NavigationItem>(items: T[], features: FeatureFlags) {
   return items.filter((item) => {
     if (item.href === '/dashboard/referrals') return features.referrals
     if (item.href === '/dashboard/bonus-box') return features.bonusBox

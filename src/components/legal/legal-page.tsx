@@ -2,17 +2,10 @@ import Link from 'next/link'
 import type { ReactNode } from 'react'
 import { ArrowLeft, FileText, Mail, ShieldCheck } from 'lucide-react'
 import { cn } from '@/lib/cn'
-
-const documents = [
-  { href: '/terms', label: 'Соглашение' },
-  { href: '/privacy', label: 'Политика ПД' },
-  { href: '/consent', label: 'Согласие' },
-  { href: '/refunds', label: 'Возвраты' },
-  { href: '/contacts', label: 'Контакты' },
-] as const
+import { legalNavigation, type LegalPath } from '@/lib/legal-links'
 
 interface LegalPageProps {
-  activePath: (typeof documents)[number]['href']
+  activePath: LegalPath
   backHref: string
   backLabel: string
   brandName: string
@@ -53,7 +46,7 @@ export function LegalPage({
 
         <div className="grid items-start gap-5 lg:grid-cols-[13.5rem_minmax(0,1fr)] lg:gap-7">
           <nav aria-label="Юридические документы" className="panel flex gap-1 overflow-x-auto p-1.5 lg:sticky lg:top-6 lg:flex-col">
-            {documents.map((document) => {
+            {legalNavigation.map((document) => {
               const active = document.href === activePath
               return (
                 <Link

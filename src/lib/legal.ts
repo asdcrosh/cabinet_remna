@@ -1,7 +1,9 @@
 export const TERMS_VERSION = '2026-07-18'
 export const PRIVACY_POLICY_VERSION = '2026-07-18'
 export const PERSONAL_DATA_CONSENT_VERSION = '2026-07-18'
+export const OFFER_VERSION = '2026-07-19'
 export const LEGAL_UPDATED_AT = '18 июля 2026 года'
+export const OFFER_UPDATED_AT = '19 июля 2026 года'
 
 export function getLegalDetails() {
   return {
