@@ -1,6 +1,6 @@
 import type { Prisma } from '@prisma/client'
 import Link from 'next/link'
-import { ExternalLink } from 'lucide-react'
+import { CheckCircle2, Clock3, CreditCard, ExternalLink, ReceiptText, Tag, XCircle } from 'lucide-react'
 import { formatPrice } from '@/lib/format'
 import { getPendingPaymentTtlMs } from '@/lib/payment-sync'
 import { EmptyState } from '@/components/dashboard/empty-state'
@@ -12,50 +12,58 @@ export function PaymentHistory({ payments }: { payments: PaymentHistoryPayment[]
   if (payments.length === 0) return <PaymentHistoryEmpty />
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white divide-y divide-slate-200 dark:border-white/10 dark:bg-white/[0.025] dark:divide-white/[0.07]">
-      <div className="hidden grid-cols-[minmax(14rem,1.2fr)_minmax(8rem,.55fr)_minmax(10rem,.7fr)_auto] items-center gap-3 bg-slate-50/80 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-400 dark:bg-white/[0.025] lg:grid">
-        <span>Тариф</span>
-        <span>Сумма</span>
-        <span>Выдача</span>
-        <span className="text-right">Действие</span>
-      </div>
+    <div className="space-y-3">
       {payments.map((payment) => (
-        <article key={payment.id} className="grid gap-3 px-4 py-4 transition-colors hover:bg-slate-50/60 sm:grid-cols-[minmax(0,1.2fr)_minmax(7rem,.55fr)] lg:grid-cols-[minmax(14rem,1.2fr)_minmax(8rem,.55fr)_minmax(10rem,.7fr)_auto] lg:items-center dark:hover:bg-white/[0.02]">
-          <div className="flex min-w-0 items-start justify-between gap-3 lg:block">
+        <article
+          key={payment.id}
+          className="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-950/[0.02] transition-colors hover:border-slate-300 dark:border-white/[0.09] dark:bg-white/[0.03] dark:shadow-none dark:hover:border-white/[0.14] sm:grid-cols-2 lg:grid-cols-[minmax(14rem,1.25fr)_minmax(8rem,.5fr)_minmax(9rem,.55fr)_minmax(8rem,.45fr)] lg:items-center lg:gap-5"
+        >
+          <div className="flex min-w-0 items-start gap-3 sm:col-span-2 lg:col-span-1">
+            <PaymentStatusIcon status={payment.status} createdAt={payment.createdAt} />
             <div className="min-w-0">
-              <div className="truncate text-sm font-semibold text-slate-950 dark:text-white">{payment.plan.name}</div>
-              <div className="mt-1 flex flex-wrap gap-x-2 text-xs text-slate-500">
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="truncate text-sm font-semibold text-slate-950 dark:text-white">{payment.plan.name}</div>
+                <PaymentStatusBadge status={payment.status} createdAt={payment.createdAt} />
+              </div>
+              <div className="mt-1.5 flex flex-wrap gap-x-2 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
                 <span>{formatPaymentDate(payment.createdAt)}</span>
+                <span aria-hidden="true">·</span>
                 <span>{paymentProviderLabel(payment.provider)}</span>
               </div>
             </div>
-            <div className="lg:mt-2"><PaymentStatusBadge status={payment.status} createdAt={payment.createdAt} /></div>
           </div>
 
-          <div className="text-right sm:text-left">
+          <div className="flex items-end justify-between gap-3 border-t border-slate-100 pt-3 sm:block sm:border-0 sm:pt-0">
+            <div className="text-[11px] font-medium uppercase tracking-wide text-slate-400 sm:mb-1.5">Сумма</div>
             <PaymentAmount
               amountKopecks={payment.amountKopecks}
               originalAmountKopecks={payment.originalAmountKopecks}
               discountKopecks={payment.discountKopecks}
             />
             {getPromoCodeLabel(payment.promoCodeSnapshot) !== '—' ? (
-              <div className="mt-1 text-xs text-slate-500">Промокод {getPromoCodeLabel(payment.promoCodeSnapshot)}</div>
+              <div className="mt-1 hidden items-center gap-1 text-xs text-slate-500 sm:flex">
+                <Tag className="h-3 w-3" />
+                {getPromoCodeLabel(payment.promoCodeSnapshot)}
+              </div>
             ) : null}
           </div>
 
-          <div className="min-w-0 sm:col-span-2 lg:col-span-1">
-            <ProvisioningBadge provisioned={Boolean(payment.subscriptionProvisionedAt)} status={payment.status} />
-            <details className="mt-2 text-xs text-slate-400">
-              <summary className="cursor-pointer">ID платежа</summary>
-              <div className="mt-1 truncate font-mono">{shortId(payment.externalPaymentId || payment.yookassaId || payment.id)}</div>
-            </details>
+          <div className="flex items-end justify-between gap-3 border-t border-slate-100 pt-3 sm:block sm:border-0 sm:pt-0">
+            <div className="text-[11px] font-medium uppercase tracking-wide text-slate-400 sm:mb-1.5">Подписка</div>
+            <div className="sm:mt-0">
+              <ProvisioningBadge provisioned={Boolean(payment.subscriptionProvisionedAt)} status={payment.status} />
+            </div>
           </div>
 
-          {payment.status === 'PENDING' ? (
-            <div className="grid sm:col-span-2 lg:col-span-1 lg:justify-end">
+          <div className="flex flex-col justify-center gap-2 border-t border-slate-100 pt-3 sm:col-span-2 lg:col-span-1 lg:border-0 lg:pt-0">
+            <details className="text-xs text-slate-400 lg:text-right">
+              <summary className="cursor-pointer select-none hover:text-slate-600 dark:hover:text-slate-200">ID платежа</summary>
+              <div className="mt-1 truncate font-mono">{shortId(payment.externalPaymentId || payment.yookassaId || payment.id)}</div>
+            </details>
+            {payment.status === 'PENDING' ? (
               <PaymentAction confirmationUrl={payment.confirmationUrl} status={payment.status} createdAt={payment.createdAt} fullWidth />
-            </div>
-          ) : null}
+            ) : null}
+          </div>
         </article>
       ))}
     </div>
@@ -63,12 +71,18 @@ export function PaymentHistory({ payments }: { payments: PaymentHistoryPayment[]
 }
 
 function PaymentHistoryEmpty() {
-  const action = <Link href="/dashboard/plans" className="btn-primary w-full sm:w-auto">Выбрать тариф</Link>
+  const action = (
+    <Link href="/dashboard/plans" className="btn-primary w-full sm:w-auto">
+      <CreditCard className="h-4 w-4" />
+      Выбрать тариф
+    </Link>
+  )
 
   return (
     <EmptyState
       title="Платежей пока нет"
       description="После первой покупки здесь появится история оплат и состояние выдачи подписки."
+      icon={<ReceiptText className="h-7 w-7" />}
       action={action}
     />
   )
@@ -119,13 +133,42 @@ function PaymentAction({
   return (
     <a
       href={confirmationUrl}
-      className={`btn-secondary min-h-9 px-3 py-1.5 text-xs ${fullWidth ? 'w-full justify-center' : ''}`}
+      className={`btn-primary min-h-10 px-3 py-2 text-xs ${fullWidth ? 'w-full justify-center' : ''}`}
       target="_blank"
       rel="noreferrer"
     >
       <ExternalLink className="h-4 w-4" />
       Оплатить
     </a>
+  )
+}
+
+function PaymentStatusIcon({ status, createdAt }: { status: string; createdAt: Date }) {
+  if (status === 'PENDING' && !isFreshPendingPayment(createdAt)) {
+    return (
+      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-slate-100 text-slate-500 dark:bg-white/[0.06] dark:text-slate-300">
+        <Clock3 className="h-5 w-5" />
+      </span>
+    )
+  }
+  if (status === 'SUCCEEDED') {
+    return (
+      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-emerald-50 text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-200">
+        <CheckCircle2 className="h-5 w-5" />
+      </span>
+    )
+  }
+  if (status === 'PENDING') {
+    return (
+      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-amber-50 text-amber-700 dark:bg-amber-400/10 dark:text-amber-200">
+        <Clock3 className="h-5 w-5" />
+      </span>
+    )
+  }
+  return (
+    <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-red-50 text-red-600 dark:bg-red-400/10 dark:text-red-200">
+      <XCircle className="h-5 w-5" />
+    </span>
   )
 }
 

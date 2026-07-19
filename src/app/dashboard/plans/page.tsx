@@ -10,6 +10,7 @@ import { getCurrentUser } from '@/lib/auth/cookies'
 import { getPlanAudienceContext, isPlanAvailableForUser } from '@/lib/plan-access'
 import { getAvailableUserPromoCodesByPlan } from '@/lib/user-promo-codes'
 import { getAvailablePaymentProviders } from '@/lib/payment-providers'
+import { ArrowRight, ChevronDown, MessageCircleQuestion, RefreshCw, ShieldCheck } from 'lucide-react'
 
 export const revalidate = 300 // кэш на 5 минут
 
@@ -124,7 +125,7 @@ export default async function PlansPage({
     <div className="page-stack">
       <PageHeader
         title="Тарифы"
-        description="Выберите срок и оплатите доступ"
+        description="Выберите подходящий срок. Доступ обновится автоматически после оплаты."
         action={(
           <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
             {canManagePlans && (
@@ -137,19 +138,28 @@ export default async function PlansPage({
       />
 
       {isRenewIntent && (
-        <section className="rounded-2xl border border-cyan-200 bg-cyan-50/80 px-4 py-3 text-sm text-cyan-950 dark:border-cyan-400/30 dark:bg-cyan-400/10 dark:text-cyan-50">
-          <div className="font-semibold">Продление подписки</div>
-          <div className="mt-1 text-cyan-900/75 dark:text-cyan-50/75">
-            Выберите текущий или любой другой тариф. После оплаты срок доступа обновится автоматически.
+        <section className="flex items-start gap-3 rounded-2xl border border-cyan-200 bg-cyan-50/80 px-4 py-3.5 text-sm text-cyan-950 dark:border-cyan-400/30 dark:bg-cyan-400/10 dark:text-cyan-50">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-cyan-100 text-cyan-700 dark:bg-cyan-300/10 dark:text-cyan-100">
+            <RefreshCw className="h-4 w-4" />
+          </span>
+          <div className="min-w-0 pt-0.5">
+            <div className="font-semibold">Продление подписки</div>
+            <div className="mt-1 leading-5 text-cyan-900/75 dark:text-cyan-50/75">
+              Можно выбрать текущий или другой тариф. Оплаченный срок добавится автоматически.
+            </div>
           </div>
         </section>
       )}
 
       {needsTelegramCheckForPromo && (
-        <div className="flex items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50/80 px-4 py-3 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
-          <span>Пробный тариф откроется после проверки Telegram.</span>
-          <Link href="/dashboard/settings" className="shrink-0 font-semibold underline decoration-amber-400/60 underline-offset-4 hover:text-amber-950 dark:hover:text-white">
+        <div className="flex flex-col gap-3 rounded-2xl border border-amber-200 bg-amber-50/80 px-4 py-3.5 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100 sm:flex-row sm:items-center sm:justify-between">
+          <span className="flex min-w-0 items-center gap-3">
+            <MessageCircleQuestion className="h-5 w-5 shrink-0" />
+            <span>Пробный тариф откроется после проверки Telegram.</span>
+          </span>
+          <Link href="/dashboard/settings" className="inline-flex min-h-9 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-amber-100 px-3 font-semibold text-amber-900 transition-colors hover:bg-amber-200 dark:bg-amber-300/10 dark:text-amber-100 dark:hover:bg-amber-300/15">
             Проверить
+            <ArrowRight className="h-4 w-4" />
           </Link>
         </div>
       )}
@@ -157,7 +167,10 @@ export default async function PlansPage({
       {planViews.length > 0 ? <PlanCatalog plans={planViews} initialPlanId={linkedPlanId} /> : null}
 
       {planViews.length === 0 && (
-        <div className="card py-10 text-center">
+        <div className="card py-10 text-center sm:py-12">
+          <div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-cyan-50 text-cyan-700 dark:bg-cyan-400/10 dark:text-cyan-200">
+            <ShieldCheck className="h-7 w-7" />
+          </div>
           <h3 className="text-lg font-semibold">Тарифы скоро появятся</h3>
           <p className="mx-auto mt-2 max-w-md text-sm text-slate-500 dark:text-slate-400">Сейчас нет опубликованных тарифов.</p>
           {canManagePlans && (
@@ -173,8 +186,11 @@ export default async function PlansPage({
 
 function PlanComparison({ plans }: { plans: Array<{ id: string; name: string; priceKopecks: number; durationDays: number; trafficLimitGb: number | null; deviceLimit: number }> }) {
   return (
-    <details className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.035]">
-      <summary className="cursor-pointer px-4 py-4 text-sm font-semibold text-slate-950 dark:text-white">Сравнить все тарифы</summary>
+    <details className="group overflow-hidden rounded-3xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.035]">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-4 text-sm font-semibold text-slate-950 transition-colors hover:bg-slate-50 dark:text-white dark:hover:bg-white/[0.025] sm:px-5 [&::-webkit-details-marker]:hidden">
+        <span>Сравнить характеристики</span>
+        <ChevronDown className="h-4 w-4 shrink-0 text-slate-400 transition-transform group-open:rotate-180" />
+      </summary>
       <div
         role="region"
         aria-label="Сравнение тарифов с горизонтальной прокруткой"
@@ -194,7 +210,7 @@ function PlanComparison({ plans }: { plans: Array<{ id: string; name: string; pr
           </thead>
           <tbody className="divide-y divide-slate-100 dark:divide-white/10">
             {plans.map((plan) => (
-              <tr key={plan.id}>
+              <tr key={plan.id} className="transition-colors hover:bg-slate-50/70 dark:hover:bg-white/[0.025]">
                 <td className="px-4 py-3 font-medium">{plan.name}</td>
                 <td className="px-4 py-3 text-slate-500">{plan.durationDays} дн.</td>
                 <td className="px-4 py-3 text-slate-500">{plan.trafficLimitGb == null ? 'Безлимит' : `${plan.trafficLimitGb} ГБ`}</td>

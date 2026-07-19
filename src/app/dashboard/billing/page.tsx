@@ -13,6 +13,7 @@ import {
   type PaymentSyncResult,
 } from '@/lib/payment-sync'
 import { getFeatureFlags } from '@/lib/feature-flags'
+import { ArrowRight, CreditCard } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
 const PAGE_SIZE = 20
@@ -53,8 +54,16 @@ export default async function BillingPage({
     <div className="page-stack">
       <PageHeader
         title="Платежи"
-        description="История оплат и состояние выдачи подписки"
-        action={<Link href="/dashboard/plans" className="btn-primary w-full sm:w-auto">Выбрать тариф</Link>}
+        description="История оплат, статусы платежей и выдача подписки."
+        action={(
+          <Link href="/dashboard/plans" className="btn-primary group w-full justify-between px-4 sm:w-auto sm:gap-3">
+            <span className="inline-flex items-center gap-2">
+              <CreditCard className="h-4 w-4" />
+              Выбрать тариф
+            </span>
+            <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+          </Link>
+        )}
       />
 
       {params.paid === '1' && <PaymentSuccessBanner status={getBannerStatus(syncResult)} supportEnabled={features.support} />}
@@ -62,13 +71,13 @@ export default async function BillingPage({
       <PaymentHistory payments={payments} />
 
       {pages > 1 && (
-        <nav className="grid grid-cols-[1fr_auto_1fr] items-center gap-3" aria-label="Страницы платежей">
+        <nav className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 rounded-2xl border border-slate-200 bg-white p-2 dark:border-white/[0.09] dark:bg-white/[0.03] sm:gap-3" aria-label="Страницы платежей">
           {page > 1
-            ? <Link href={`/dashboard/billing?page=${page - 1}`} className="btn-secondary justify-self-start">Назад</Link>
+            ? <Link href={`/dashboard/billing?page=${page - 1}`} className="btn-secondary min-h-10 justify-self-start px-3 py-2">Назад</Link>
             : <span />}
-          <span className="text-center text-sm text-slate-500">Страница {Math.min(page, pages)} из {pages}</span>
+          <span className="text-center text-xs font-medium text-slate-500 sm:text-sm">{Math.min(page, pages)} из {pages}</span>
           {page < pages
-            ? <Link href={`/dashboard/billing?page=${page + 1}`} className="btn-secondary justify-self-end">Дальше</Link>
+            ? <Link href={`/dashboard/billing?page=${page + 1}`} className="btn-secondary min-h-10 justify-self-end px-3 py-2">Дальше</Link>
             : <span />}
         </nav>
       )}

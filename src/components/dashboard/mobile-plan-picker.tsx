@@ -19,11 +19,23 @@ export function PlanCatalog({ plans, initialPlanId }: { plans: CatalogPlan[]; in
 
   return (
     <section aria-labelledby="mobile-plan-picker-title">
-      <h2 id="mobile-plan-picker-title" className="mb-3 text-lg font-semibold text-slate-950 dark:text-white md:sr-only">Выберите срок</h2>
+      <div className="mb-3 flex items-end justify-between gap-3">
+        <div>
+          <h2 id="mobile-plan-picker-title" className="text-lg font-semibold tracking-tight text-slate-950 dark:text-white">
+            Выберите тариф
+          </h2>
+          <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+            Цена указана за весь срок доступа
+          </p>
+        </div>
+        <span className="shrink-0 text-xs font-medium text-slate-400">
+          Доступно: {orderedPlans.length}
+        </span>
+      </div>
 
-      <div className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-2 [scrollbar-width:none] md:mx-0 md:grid md:auto-rows-fr md:grid-cols-2 md:gap-4 md:overflow-visible md:px-0 md:pb-0 xl:grid-cols-3 [&::-webkit-scrollbar]:hidden">
+      <div className="grid auto-rows-fr grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-3">
         {orderedPlans.map((plan) => (
-          <div key={plan.id} className="w-[min(88vw,23rem)] shrink-0 snap-center first:snap-start md:w-auto md:min-w-0 md:snap-none">
+          <div key={plan.id} className="min-w-0">
             <PlanCard {...plan} />
           </div>
         ))}
