@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Laptop, Loader2, Monitor, RefreshCw, Smartphone, Tablet, Unlink2 } from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
-import { EmptyState, InlineAlert } from './empty-state'
+import { InlineAlert } from './empty-state'
 import { ConfirmDialog } from './confirm-dialog'
 import { cn } from '@/lib/cn'
 
@@ -19,7 +19,12 @@ interface Device {
   updatedAt?: string | null
 }
 
-export function DevicesList() {
+interface DevicesListProps {
+  embedded?: boolean
+  deviceLimit?: number | null
+}
+
+export function DevicesList({ embedded = false, deviceLimit }: DevicesListProps = {}) {
   const [devices, setDevices] = useState<Device[] | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
@@ -73,13 +78,26 @@ export function DevicesList() {
   if (!devices) return <DevicesSkeleton />
   if (devices.length === 0) {
     return (
-      <EmptyState
-        title="Устройств пока нет"
-        description="Подключите VPN в приложении, и устройство автоматически появится здесь."
-        action={<Link href="/dashboard/subscription" className="btn-primary w-full sm:w-auto">Подключить устройство</Link>}
-      />
+      <section id="connected-devices" className="overflow-hidden rounded-3xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.035]">
+        <div className="border-b border-slate-100 px-4 py-4 dark:border-white/10 sm:px-5">
+          {embedded && <div className="text-xs font-semibold uppercase tracking-[0.14em] text-cyan-700 dark:text-cyan-200">Шаг 3</div>}
+          <h2 className={cn('font-semibold tracking-tight text-slate-950 dark:text-white', embedded ? 'mt-1 text-xl sm:text-2xl' : 'text-lg')}>Проверьте подключение</h2>
+          <p className="mt-1 text-sm leading-6 text-slate-500 dark:text-slate-400">После первого запуска VPN устройство появится здесь автоматически.</p>
+        </div>
+        <div className="px-4 py-8 text-center sm:px-5 sm:py-10">
+          <span className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-slate-100 text-slate-500 dark:bg-white/[0.06] dark:text-slate-300">
+            <Smartphone className="h-6 w-6" />
+          </span>
+          <div className="mt-4 font-semibold text-slate-950 dark:text-white">Устройств пока нет</div>
+          <p className="mx-auto mt-1 max-w-md text-sm leading-6 text-slate-500 dark:text-slate-400">Вернитесь к подключению, добавьте подписку в приложение и включите VPN.</p>
+          <Link href="/dashboard/subscription#connection" className="btn-primary mt-5 w-full sm:w-auto">Подключить устройство</Link>
+        </div>
+      </section>
     )
   }
+
+  const recentDevices = countRecentDevices(devices)
+  const devicesValue = deviceLimit && deviceLimit > 0 ? `${devices.length} из ${deviceLimit}` : devices.length.toString()
 
   return (
     <>
@@ -90,28 +108,34 @@ export function DevicesList() {
           description={actionError || loadError || undefined}
         />
       )}
-      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.035]">
-        <div className="border-b border-slate-100 px-4 py-3 dark:border-white/10">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex min-w-0 flex-wrap items-baseline gap-x-4 gap-y-1">
-              <h2 className="font-semibold text-slate-950 dark:text-white">Подключённые устройства</h2>
-              <DeviceMetric label="всего" value={devices.length.toString()} />
-              <DeviceMetric label="активны сегодня" value={countRecentDevices(devices).toString()} />
+      <section id="connected-devices" className="overflow-hidden rounded-3xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.035]">
+        <div className="border-b border-slate-100 px-4 py-4 dark:border-white/10 sm:px-5 sm:py-5">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0">
+              {embedded && <div className="text-xs font-semibold uppercase tracking-[0.14em] text-cyan-700 dark:text-cyan-200">Шаг 3</div>}
+              <h2 className={cn('font-semibold tracking-tight text-slate-950 dark:text-white', embedded ? 'mt-1 text-xl sm:text-2xl' : 'text-lg')}>Подключённые устройства</h2>
+              <p className="mt-1 text-sm leading-6 text-slate-500 dark:text-slate-400">
+                {recentDevices > 0 ? 'Подключение работает. Здесь можно проверить активность и отвязать старые устройства.' : 'Устройства найдены, но сегодня ещё не подключались.'}
+              </p>
             </div>
-              <button
-                type="button"
-                className="btn-secondary min-h-10 shrink-0 px-3"
-                onClick={() => void loadDevices()}
-                disabled={refreshing}
-                aria-label="Обновить устройства"
-              >
-                <RefreshCw className={cn('h-4 w-4', refreshing && 'animate-spin')} />
-                <span className="hidden sm:inline">Обновить</span>
-              </button>
+            <button
+              type="button"
+              className="btn-secondary min-h-10 w-full shrink-0 px-3 sm:w-auto"
+              onClick={() => void loadDevices()}
+              disabled={refreshing}
+              aria-label="Обновить устройства"
+            >
+              <RefreshCw className={cn('h-4 w-4', refreshing && 'animate-spin')} />
+              Обновить
+            </button>
+          </div>
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            <DeviceMetric label={deviceLimit && deviceLimit > 0 ? 'использовано' : 'всего'} value={devicesValue} />
+            <DeviceMetric label="активны сегодня" value={recentDevices.toString()} active={recentDevices > 0} />
           </div>
         </div>
 
-        <div className="divide-y divide-slate-100 dark:divide-white/10">
+        <div className="grid gap-3 p-3 sm:grid-cols-2 sm:p-4">
           {devices.map((d) => (
             <DeviceCard
               key={d.hwid}
@@ -148,45 +172,46 @@ function DeviceCard({
   const Icon = getDeviceIcon(device)
 
   return (
-    <article className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+    <article className="flex min-w-0 flex-col rounded-2xl border border-slate-200 bg-slate-50/60 p-4 dark:border-white/[0.08] dark:bg-white/[0.025]">
       <div className="flex min-w-0 items-start gap-3">
-        <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-600 dark:bg-white/[0.06] dark:text-slate-300">
-          <Icon className="h-4 w-4" />
+        <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-white text-cyan-700 shadow-sm dark:bg-white/[0.06] dark:text-cyan-200 dark:shadow-none">
+          <Icon className="h-5 w-5" />
         </div>
-        <div className="min-w-0">
-          <h2 className="truncate text-sm font-semibold text-slate-950 dark:text-white sm:text-base">{getDeviceTitle(device)}</h2>
-          <p className="mt-0.5 truncate text-sm text-slate-500 dark:text-slate-400">{getDeviceSubtitle(device)}</p>
-          <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-400">
-            <span>{formatDeviceDate(device.updatedAt || device.createdAt)}</span>
-            <span className="font-mono" title={device.hwid}>ID {shortDeviceId(device.hwid)}</span>
+        <div className="min-w-0 flex-1">
+          <div className="flex min-w-0 items-start justify-between gap-2">
+            <h3 className="min-w-0 truncate text-sm font-semibold text-slate-950 dark:text-white sm:text-base">{getDeviceTitle(device)}</h3>
+            <span className={cn('shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-semibold', activity.className)}>{activity.label}</span>
           </div>
+          <p className="mt-1 break-words text-sm leading-5 text-slate-500 dark:text-slate-400">{getDeviceSubtitle(device)}</p>
         </div>
       </div>
-      <div className="flex items-center justify-between gap-2 sm:shrink-0 sm:justify-end">
-        <span className={cn('rounded-full border px-2.5 py-1 text-xs font-medium', activity.className)}>{activity.label}</span>
+      <div className="mt-4 flex items-end justify-between gap-3 border-t border-slate-200/70 pt-3 dark:border-white/[0.08]">
+        <div className="min-w-0 text-xs text-slate-400 dark:text-slate-500">
+          <div>Последняя активность</div>
+          <div className="mt-0.5 truncate font-medium text-slate-600 dark:text-slate-300">{formatDeviceDate(device.updatedAt || device.createdAt)}</div>
+          <div className="mt-0.5 truncate font-mono text-[11px]" title={device.hwid}>ID {shortDeviceId(device.hwid)}</div>
+        </div>
         <DeviceActionButton loading={loading} label="Отвязать" onClick={onRemove} />
       </div>
     </article>
   )
 }
 
-function DeviceMetric({ label, value }: { label: string; value: string }) {
+function DeviceMetric({ label, value, active = false }: { label: string; value: string; active?: boolean }) {
   return (
-    <div className="flex items-baseline gap-2 text-sm">
-      <div className="font-semibold text-slate-950 dark:text-white">{value}</div>
-      <div className="text-xs text-slate-500 dark:text-slate-400">{label}</div>
+    <div className="rounded-xl border border-slate-100 bg-slate-50/70 px-3 py-2.5 dark:border-white/[0.07] dark:bg-white/[0.025]">
+      <div className={cn('text-lg font-semibold tracking-tight text-slate-950 dark:text-white', active && 'text-emerald-700 dark:text-emerald-200')}>{value}</div>
+      <div className="text-[11px] font-medium uppercase tracking-wide text-slate-400">{label}</div>
     </div>
   )
 }
 
 function DeviceActionButton({
   loading,
-  fullWidth = false,
   label = 'Отвязать',
   onClick,
 }: {
   loading: boolean
-  fullWidth?: boolean
   label?: string
   onClick: () => void
 }) {
@@ -200,7 +225,7 @@ function DeviceActionButton({
         'hover:border-red-300 hover:bg-red-50 hover:text-red-800',
         'disabled:cursor-not-allowed disabled:opacity-60',
         'dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200 dark:hover:bg-red-500/15',
-        fullWidth ? 'w-full' : 'w-[104px]'
+        'shrink-0'
       )}
       disabled={loading}
       onClick={onClick}
@@ -213,19 +238,27 @@ function DeviceActionButton({
 
 function DevicesSkeleton() {
   return (
-    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.035]">
-      <div className="border-b border-slate-100 px-4 py-4 dark:border-white/10">
-        <div className="h-5 w-48 animate-pulse rounded-lg bg-slate-200 dark:bg-surface-800" />
+    <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.035]">
+      <div className="space-y-2 border-b border-slate-100 px-4 py-4 dark:border-white/10 sm:px-5 sm:py-5">
+        <div className="h-4 w-16 animate-pulse rounded-lg bg-slate-200 dark:bg-surface-800" />
+        <div className="h-7 w-56 max-w-full animate-pulse rounded-lg bg-slate-200 dark:bg-surface-800" />
+        <div className="h-4 w-80 max-w-full animate-pulse rounded-lg bg-slate-100 dark:bg-surface-800" />
+        <div className="grid grid-cols-2 gap-2 pt-2">
+          <div className="h-14 animate-pulse rounded-xl bg-slate-100 dark:bg-surface-800" />
+          <div className="h-14 animate-pulse rounded-xl bg-slate-100 dark:bg-surface-800" />
+        </div>
       </div>
-      <div className="divide-y divide-slate-100 dark:divide-white/10">
-        {[0, 1, 2].map((item) => (
-          <div key={item} className="flex items-center gap-3 px-4 py-4">
-            <div className="h-9 w-9 shrink-0 animate-pulse rounded-xl bg-slate-200 dark:bg-surface-800" />
-            <div className="min-w-0 flex-1 space-y-2">
-              <div className="h-4 w-40 max-w-full animate-pulse rounded bg-slate-200 dark:bg-surface-800" />
-              <div className="h-3 w-64 max-w-[80%] animate-pulse rounded bg-slate-100 dark:bg-surface-800" />
+      <div className="grid gap-3 p-3 sm:grid-cols-2 sm:p-4">
+        {[0, 1].map((item) => (
+          <div key={item} className="rounded-2xl border border-slate-100 p-4 dark:border-white/[0.06]">
+            <div className="flex items-center gap-3">
+              <div className="h-11 w-11 shrink-0 animate-pulse rounded-2xl bg-slate-200 dark:bg-surface-800" />
+              <div className="min-w-0 flex-1 space-y-2">
+                <div className="h-4 w-36 max-w-full animate-pulse rounded bg-slate-200 dark:bg-surface-800" />
+                <div className="h-3 w-48 max-w-[80%] animate-pulse rounded bg-slate-100 dark:bg-surface-800" />
+              </div>
             </div>
-            <div className="hidden h-9 w-24 animate-pulse rounded-xl bg-slate-100 dark:bg-surface-800 sm:block" />
+            <div className="mt-5 h-10 animate-pulse rounded-xl bg-slate-100 dark:bg-surface-800" />
           </div>
         ))}
       </div>

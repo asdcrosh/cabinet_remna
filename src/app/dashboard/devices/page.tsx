@@ -12,11 +12,11 @@ export default function DevicesPage() {
     <div className="page-stack">
       <PageHeader
         title="Устройства"
-        description="Устройства появляются после первого подключения VPN"
+        description="Проверяйте активность и удаляйте устройства, которыми больше не пользуетесь."
         action={
-          <Link href="/dashboard/subscription" className="btn-primary w-full sm:w-auto">
+          <Link href="/dashboard/subscription#connection" className="btn-primary w-full sm:w-auto">
             <PlugZap className="h-4 w-4" />
-            Подключить устройство
+            Новое подключение
           </Link>
         }
       />

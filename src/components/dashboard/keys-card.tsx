@@ -7,7 +7,9 @@ import Image from 'next/image'
 import {
   Apple,
   CheckCircle2,
+  ChevronDown,
   Copy,
+  Download,
   ExternalLink,
   HelpCircle,
   Laptop,
@@ -104,6 +106,7 @@ export function KeysCard({ subscriptionUrl, happLink }: KeysCardProps) {
   const [qrOpen, setQrOpen] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [revoking, setRevoking] = useState(false)
+  const [copied, setCopied] = useState(false)
 
   useEffect(() => {
     const detected = detectDevice(navigator.userAgent)
@@ -124,6 +127,8 @@ export function KeysCard({ subscriptionUrl, happLink }: KeysCardProps) {
     if (!text) return
     try {
       await navigator.clipboard.writeText(text)
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 1800)
       toast(`${label} скопирована`, 'success')
     } catch {
       toast('Не удалось скопировать')
@@ -161,56 +166,80 @@ export function KeysCard({ subscriptionUrl, happLink }: KeysCardProps) {
   }
 
   return (
-    <section aria-labelledby="connection-title" className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.035]">
-      <div className="grid gap-0 sm:grid-cols-[minmax(0,1fr)_14rem] lg:grid-cols-[minmax(0,1fr)_18rem]">
+    <section id="connection" aria-labelledby="connection-title" className="overflow-hidden rounded-3xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.035]">
+      <header className="border-b border-slate-100 px-4 py-4 dark:border-white/10 sm:px-5 sm:py-5">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
+            <div className="text-xs font-semibold uppercase tracking-[0.14em] text-cyan-700 dark:text-cyan-200">Шаги 1 и 2</div>
+            <h2 id="connection-title" className="mt-1 text-xl font-semibold tracking-tight text-slate-950 dark:text-white sm:text-2xl">Подключите это устройство</h2>
+            <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-500 dark:text-slate-400">Установите подходящее приложение и добавьте в него подписку.</p>
+          </div>
+          <span className="inline-flex w-fit min-w-0 items-center gap-2 rounded-full bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-600 dark:bg-white/[0.06] dark:text-slate-300">
+            <DeviceIcon device={device} />
+            <span className="truncate">{deviceLabel(device)}</span>
+          </span>
+        </div>
+      </header>
+
+      <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_19rem]">
         <div className="min-w-0 p-4 sm:p-5">
-          <div className="flex min-w-0 items-center justify-between gap-3">
-            <h2 id="connection-title" className="text-xl font-semibold tracking-tight text-slate-950 dark:text-white">Подключение</h2>
-            <span className="inline-flex min-w-0 items-center gap-1.5 text-xs font-medium text-slate-500 dark:text-slate-400">
-              <DeviceIcon device={device} />
-              <span className="truncate">{deviceLabel(device)}</span>
-            </span>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <article className="flex min-h-[11rem] flex-col rounded-2xl border border-slate-200 bg-slate-50/70 p-4 dark:border-white/[0.08] dark:bg-white/[0.025] sm:min-h-52">
+              <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                <span className="grid h-6 w-6 place-items-center rounded-full bg-slate-950 text-[11px] text-white dark:bg-white dark:text-slate-950">1</span>
+                Установите приложение
+              </div>
+              <div className="mt-5 flex min-w-0 items-center gap-3">
+                <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-cyan-100 text-cyan-700 dark:bg-cyan-400/10 dark:text-cyan-200">
+                  <SelectedAppIcon className="h-6 w-6" />
+                </span>
+                <span className="min-w-0">
+                  <span className="block truncate text-lg font-semibold text-slate-950 dark:text-white">{selectedApp.name}</span>
+                  <span className="block truncate text-xs text-slate-500 dark:text-slate-400">{selectedApp.subtitle}</span>
+                </span>
+              </div>
+              <a
+                href={selectedApp.installUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="btn-secondary mt-auto w-full justify-center"
+              >
+                <Download className="h-4 w-4" />
+                Скачать {selectedApp.name}
+              </a>
+            </article>
+
+            <article className="flex min-h-[11rem] flex-col rounded-2xl border border-cyan-200 bg-cyan-50/70 p-4 dark:border-cyan-400/20 dark:bg-cyan-400/[0.07] sm:min-h-52">
+              <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-cyan-700 dark:text-cyan-200">
+                <span className="grid h-6 w-6 place-items-center rounded-full bg-cyan-700 text-[11px] text-white dark:bg-cyan-200 dark:text-slate-950">2</span>
+                Добавьте подписку
+              </div>
+              <div className="mt-5">
+                <div className="text-lg font-semibold text-slate-950 dark:text-white">Откройте доступ в приложении</div>
+                <p className="mt-1 text-sm leading-5 text-slate-600 dark:text-slate-300">Приложение получит готовую ссылку автоматически.</p>
+              </div>
+              <button
+                type="button"
+                onClick={openInApp}
+                disabled={!subscriptionUrl}
+                className="btn-primary mt-auto w-full justify-center"
+              >
+                <ExternalLink className="h-4 w-4" />
+                {`Подключить в ${selectedApp.name}`}
+              </button>
+            </article>
           </div>
 
-          <div className="mt-4 flex items-center justify-between gap-3 border-y border-slate-100 py-3 dark:border-white/10">
-            <div className="flex min-w-0 items-center gap-3">
-              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-cyan-50 text-cyan-700 dark:bg-cyan-400/10 dark:text-cyan-200">
-                <SelectedAppIcon className="h-5 w-5" />
-              </span>
-              <span className="min-w-0">
-                <span className="block font-semibold text-slate-950 dark:text-white">{selectedApp.name}</span>
-                <span className="block truncate text-xs text-slate-500">{selectedApp.subtitle}</span>
-              </span>
-            </div>
-            <a
-              href={selectedApp.installUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="shrink-0 text-sm font-medium text-cyan-700 hover:text-cyan-900 dark:text-cyan-200 dark:hover:text-white"
-            >
-              Скачать
-            </a>
-          </div>
-
-          <div className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-[1fr_auto_auto]">
-            <button
-              type="button"
-              onClick={openInApp}
-              disabled={!subscriptionUrl}
-              className="btn-primary col-span-3 h-12 sm:col-span-1"
-            >
-              <ExternalLink className="h-4 w-4" />
-              {`Подключить в ${selectedApp.name}`}
-            </button>
+          <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-2">
             <button
               type="button"
               onClick={() => copy(subscriptionUrl, 'Ссылка подписки')}
               disabled={!subscriptionUrl}
-              className="btn-secondary h-11 px-3 disabled:cursor-not-allowed sm:h-12 sm:px-4"
+              className="btn-secondary h-11 px-3 disabled:cursor-not-allowed sm:px-4"
             >
-              <Copy className="h-4 w-4" />
-              <span className="hidden sm:inline">Скопировать</span>
-              <span className="sm:hidden">Ссылка</span>
+              {copied ? <CheckCircle2 className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
+              <span className="hidden sm:inline">{copied ? 'Скопировано' : 'Скопировать ссылку'}</span>
+              <span className="sm:hidden">{copied ? 'Готово' : 'Ссылка'}</span>
             </button>
             <button
               type="button"
@@ -223,59 +252,51 @@ export function KeysCard({ subscriptionUrl, happLink }: KeysCardProps) {
             <button
               type="button"
               onClick={() => setInstructionsOpen(true)}
-              className="btn-secondary h-11 px-3 sm:h-12 sm:px-4"
+              className="btn-secondary h-11 px-3 sm:px-4"
             >
               <HelpCircle className="h-4 w-4" />
-              <span className="hidden sm:inline">Инструкция</span>
+              <span className="hidden sm:inline">Пошаговая инструкция</span>
               <span className="sm:hidden">Помощь</span>
             </button>
           </div>
 
-          <div className="mt-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 text-sm">
-            <details className="group min-w-0">
-              <summary className="cursor-pointer font-medium text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white">
-                Другие приложения
-              </summary>
-              <div className="mt-2 grid min-w-[15rem] gap-1 rounded-xl border border-slate-200 bg-white p-1.5 shadow-lg dark:border-white/10 dark:bg-surface-900">
-                {availableApps.filter((option) => option.id !== selectedApp.id).map((option) => {
-                  const Icon = option.icon
-                  return (
-                    <button
-                      key={option.id}
-                      type="button"
-                      onClick={(event) => {
-                        setSelectedAppId(option.id)
-                        event.currentTarget.closest('details')?.removeAttribute('open')
-                      }}
-                      className="flex min-h-11 items-center gap-3 rounded-lg px-3 text-left text-sm transition-colors hover:bg-slate-50 dark:hover:bg-white/[0.05]"
-                    >
-                      <Icon className="h-4 w-4 shrink-0 text-cyan-600 dark:text-cyan-300" />
-                      <span>
-                        <span className="block font-medium">{option.name}</span>
-                        <span className="block text-xs text-slate-500">{option.subtitle}</span>
-                      </span>
-                    </button>
-                  )
-                })}
-              </div>
-            </details>
-            <button
-              type="button"
-              onClick={() => setConfirmOpen(true)}
-              disabled={revoking}
-              className="inline-flex items-center gap-1.5 font-medium text-slate-500 hover:text-slate-900 disabled:opacity-60 dark:text-slate-400 dark:hover:text-white"
-            >
-              <RefreshCw className="h-3.5 w-3.5" />
-              {revoking ? 'Обновляем' : 'Обновить ссылку'}
-            </button>
-          </div>
+          <details className="group mt-3 rounded-2xl border border-slate-200 dark:border-white/[0.08]">
+            <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-3.5 text-sm font-semibold text-slate-600 hover:text-slate-950 dark:text-slate-300 dark:hover:text-white [&::-webkit-details-marker]:hidden">
+              Выбрать другое приложение
+              <ChevronDown className="h-4 w-4 shrink-0 text-slate-400 transition-transform group-open:rotate-180" />
+            </summary>
+            <div className="grid gap-1 border-t border-slate-100 p-1.5 dark:border-white/[0.08] sm:grid-cols-2">
+              {availableApps.filter((option) => option.id !== selectedApp.id).map((option) => {
+                const Icon = option.icon
+                return (
+                  <button
+                    key={option.id}
+                    type="button"
+                    onClick={(event) => {
+                      setSelectedAppId(option.id)
+                      event.currentTarget.closest('details')?.removeAttribute('open')
+                    }}
+                    className="flex min-h-12 items-center gap-3 rounded-xl px-3 text-left text-sm transition-colors hover:bg-slate-50 dark:hover:bg-white/[0.05]"
+                  >
+                    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-cyan-50 text-cyan-700 dark:bg-cyan-400/10 dark:text-cyan-200">
+                      <Icon className="h-4 w-4" />
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block truncate font-semibold">{option.name}</span>
+                      <span className="block truncate text-xs text-slate-500">{option.subtitle}</span>
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          </details>
         </div>
 
-        <aside className="hidden border-t border-slate-100 p-4 dark:border-white/10 sm:block sm:border-l sm:border-t-0">
+        <aside className="hidden border-l border-slate-100 bg-slate-50/55 p-5 dark:border-white/10 dark:bg-white/[0.02] lg:flex lg:flex-col lg:justify-center">
           <button
             type="button"
             onClick={() => setQrOpen(true)}
-            className="group w-full rounded-xl p-2 text-left transition-colors hover:bg-slate-50 dark:hover:bg-white/[0.04]"
+            className="group w-full rounded-2xl border border-slate-200 bg-white p-3 text-left transition-colors hover:border-cyan-300 dark:border-white/10 dark:bg-white/[0.035] dark:hover:border-cyan-400/30"
           >
             {subscriptionUrl ? (
               <Image
@@ -283,7 +304,7 @@ export function KeysCard({ subscriptionUrl, happLink }: KeysCardProps) {
                 alt="QR-код подписки"
                 width={220}
                 height={220}
-                className="mx-auto h-auto w-full max-w-[180px] rounded-xl"
+                className="mx-auto h-auto w-full max-w-[220px] rounded-xl"
                 unoptimized
               />
             ) : (
@@ -293,11 +314,25 @@ export function KeysCard({ subscriptionUrl, happLink }: KeysCardProps) {
             )}
             <div className="mt-3 flex items-center justify-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-200">
               <QrCode className="h-4 w-4 text-cyan-600" />
-              Открыть QR
+              Подключить по QR
             </div>
           </button>
+          <p className="mt-3 text-center text-xs leading-5 text-slate-500 dark:text-slate-400">Откройте камеру в VPN-приложении на другом устройстве.</p>
         </aside>
       </div>
+
+      <footer className="flex flex-col gap-2 border-t border-slate-100 px-4 py-3 text-xs text-slate-500 dark:border-white/10 dark:text-slate-400 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+        <span>Ссылка подписки приватная. Не отправляйте её другим людям.</span>
+        <button
+          type="button"
+          onClick={() => setConfirmOpen(true)}
+          disabled={revoking}
+          className="inline-flex min-h-9 w-fit items-center gap-1.5 font-semibold text-slate-500 hover:text-slate-950 disabled:opacity-60 dark:text-slate-400 dark:hover:text-white"
+        >
+          <RefreshCw className="h-3.5 w-3.5" />
+          {revoking ? 'Обновляем' : 'Обновить ссылку'}
+        </button>
+      </footer>
 
       <InstructionModal
         open={instructionsOpen}
