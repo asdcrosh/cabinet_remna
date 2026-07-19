@@ -31,7 +31,7 @@ export function YandexAuthButton({
         disabled
         title="Сначала примите соглашение и дайте согласие на обработку персональных данных"
         className={cn(
-          'flex min-h-11 w-full cursor-not-allowed items-center justify-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-semibold text-slate-400 dark:border-slate-800 dark:bg-surface-950 dark:text-slate-600',
+          'flex min-h-12 w-full cursor-not-allowed items-center justify-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-semibold text-slate-400 dark:border-white/[0.08] dark:bg-white/[0.025] dark:text-slate-600',
           className
         )}
       >
@@ -47,7 +47,7 @@ export function YandexAuthButton({
     <Link
       href={`/api/auth/yandex/start?${params.toString()}`}
       className={cn(
-        'flex min-h-11 w-full items-center justify-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-800 shadow-sm transition-colors hover:bg-slate-50 dark:border-slate-800 dark:bg-surface-950 dark:text-white dark:hover:bg-surface-900',
+        'flex min-h-12 w-full items-center justify-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-800 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50 dark:border-white/[0.08] dark:bg-white/[0.025] dark:text-white dark:hover:bg-white/[0.05]',
         className
       )}
     >

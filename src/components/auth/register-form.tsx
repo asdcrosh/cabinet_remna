@@ -9,7 +9,7 @@ import { apiFetch } from '@/lib/api-client'
 import { registerSchema, type RegisterInput } from '@/lib/auth/validation'
 import { toast } from '@/components/ui/toaster'
 import { FormAlert } from '@/components/ui/form-alert'
-import { CheckCircle2, Eye, EyeOff, Mail } from 'lucide-react'
+import { CheckCircle2, Eye, EyeOff, LockKeyhole, Mail, Ticket, UserRound } from 'lucide-react'
 import { YandexAuthButton } from './yandex-auth-button'
 
 export function RegisterForm({
@@ -90,11 +90,12 @@ export function RegisterForm({
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
-      <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-3 dark:border-slate-800 dark:bg-white/[0.03]">
-        <label className="flex items-start gap-2 text-sm text-slate-600 dark:text-slate-300">
+      <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-3.5 dark:border-white/[0.08] dark:bg-white/[0.025]">
+        <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Документы</div>
+        <label className="flex cursor-pointer items-start gap-3 text-sm leading-5 text-slate-600 dark:text-slate-300">
           <input
             type="checkbox"
-            className="mt-0.5"
+            className="mt-0.5 h-4 w-4 shrink-0"
             {...register('agreeToTerms')}
           />
           <span>
@@ -104,10 +105,10 @@ export function RegisterForm({
             </Link>
           </span>
         </label>
-        <label className="flex items-start gap-2 text-sm text-slate-600 dark:text-slate-300">
+        <label className="flex cursor-pointer items-start gap-3 text-sm leading-5 text-slate-600 dark:text-slate-300">
           <input
             type="checkbox"
-            className="mt-0.5"
+            className="mt-0.5 h-4 w-4 shrink-0"
             {...register('agreeToPersonalData')}
           />
           <span>
@@ -133,7 +134,7 @@ export function RegisterForm({
             legalAccepted={legalAccepted}
             registering
           />
-          <div className="flex items-center gap-3 text-xs text-slate-400">
+          <div className="flex items-center gap-3 text-xs font-medium text-slate-400">
             <span className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
             или email
             <span className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
@@ -142,46 +143,61 @@ export function RegisterForm({
       )}
       <div>
         <label className="label" htmlFor="email">Email</label>
-        <input
-          id="email"
-          type="email"
-          autoComplete="email"
-          className="input"
-          {...register('email')}
-        />
+        <div className="relative">
+          <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <input
+            id="email"
+            type="email"
+            autoComplete="email"
+            className="input pl-10"
+            placeholder="name@example.com"
+            {...register('email')}
+          />
+        </div>
         {errors.email && <p className="text-xs text-red-600 mt-1">{errors.email.message}</p>}
       </div>
-      <div>
-        <label className="label" htmlFor="name">Имя <span className="text-slate-400">(необязательно)</span></label>
-        <input
-          id="name"
-          type="text"
-          className="input"
-          autoComplete="name"
-          maxLength={40}
-          placeholder="Артем"
-          {...register('name')}
-        />
-        {errors.name && <p className="text-xs text-red-600 mt-1">{errors.name.message}</p>}
-      </div>
-      <div>
-        <label className="label" htmlFor="referralCode">Реферальный код <span className="text-slate-400">(необязательно)</span></label>
-        <input
-          id="referralCode"
-          type="text"
-          className="input uppercase"
-          autoComplete="off"
-          {...register('referralCode')}
-        />
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div>
+          <label className="label" htmlFor="name">Имя <span className="text-slate-400">(необязательно)</span></label>
+          <div className="relative">
+            <UserRound className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <input
+              id="name"
+              type="text"
+              className="input pl-10"
+              autoComplete="name"
+              maxLength={40}
+              placeholder="Как к вам обращаться"
+              {...register('name')}
+            />
+          </div>
+          {errors.name && <p className="text-xs text-red-600 mt-1">{errors.name.message}</p>}
+        </div>
+        <div>
+          <label className="label" htmlFor="referralCode">Реферальный код <span className="text-slate-400">(необязательно)</span></label>
+          <div className="relative">
+            <Ticket className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <input
+              id="referralCode"
+              type="text"
+              className="input pl-10 uppercase"
+              autoComplete="off"
+              placeholder="Код приглашения"
+              {...register('referralCode')}
+            />
+          </div>
+        </div>
       </div>
       <div>
         <label className="label" htmlFor="password">Пароль</label>
         <div className="relative">
+          <LockKeyhole className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <input
             id="password"
             type={showPassword ? 'text' : 'password'}
             autoComplete="new-password"
-            className="input pr-11"
+            className="input px-10"
+            placeholder="Придумайте пароль"
             {...register('password')}
           />
           <button
@@ -203,7 +219,8 @@ export function RegisterForm({
       {serverError && (
         <FormAlert>{serverError}</FormAlert>
       )}
-      <button type="submit" disabled={isSubmitting} className="btn-primary w-full">
+      <button type="submit" disabled={isSubmitting} className="btn-primary min-h-12 w-full">
+        <UserRound className="h-4 w-4" />
         {isSubmitting ? 'Создаём аккаунт...' : 'Зарегистрироваться'}
       </button>
     </form>

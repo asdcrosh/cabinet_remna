@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { ExternalLink, RefreshCw, Send } from 'lucide-react'
+import { BadgeCheck, ExternalLink, RefreshCw, Send } from 'lucide-react'
 import { toast } from '@/components/ui/toaster'
 import { apiFetch } from '@/lib/api-client'
 
@@ -76,9 +76,9 @@ export function TelegramLinkCard({
 
   return (
     <div className={embedded ? '' : 'card'}>
-      <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex min-w-0 items-center gap-3">
-          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-sky-50 text-sky-600 dark:bg-sky-500/10 dark:text-sky-300">
+          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white text-sky-600 shadow-sm dark:bg-white/[0.06] dark:text-sky-300 dark:shadow-none">
             <Send className="h-5 w-5" />
           </div>
           <div className="min-w-0">
@@ -101,8 +101,9 @@ export function TelegramLinkCard({
       </div>
 
       {telegramId ? (
-        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-sm text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-100">
-          Telegram привязан. Если старая подписка найдена, она появится в кабинете.
+        <div className="flex items-start gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-sm text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-100">
+          <BadgeCheck className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>Telegram привязан. Старые покупки синхронизируются с кабинетом.</span>
         </div>
       ) : !telegramClientId ? (
         <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
@@ -134,7 +135,7 @@ function TelegramOidcHint() {
 
 function Info({ label, value }: { label: string; value: string }) {
   return (
-    <div className="min-w-0 rounded-xl border border-slate-200/80 bg-slate-50/80 px-3 py-2.5 dark:border-white/10 dark:bg-surface-950/45">
+    <div className="min-w-0 rounded-xl border border-slate-200/80 bg-white px-3 py-2.5 dark:border-white/10 dark:bg-white/[0.035]">
       <div className="text-xs text-slate-500 dark:text-slate-400">{label}</div>
       <div className="mt-1 truncate font-medium text-slate-950 dark:text-white">{value}</div>
     </div>

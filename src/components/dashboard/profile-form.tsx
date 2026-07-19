@@ -14,7 +14,7 @@ export function ProfileForm({ name }: { name: string | null }) {
   const router = useRouter()
   const [isHydrated, setIsHydrated] = useState(false)
   const [serverError, setServerError] = useState<string | null>(null)
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<UpdateProfileInput>({
+  const { register, handleSubmit, reset, formState: { errors, isDirty, isSubmitting } } = useForm<UpdateProfileInput>({
     resolver: zodResolver(updateProfileSchema),
     defaultValues: { name: name ?? '' },
   })
@@ -27,6 +27,7 @@ export function ProfileForm({ name }: { name: string | null }) {
     setServerError(null)
     try {
       await apiFetch('/api/me', { method: 'PATCH', body: JSON.stringify({ name: values.name }) })
+      reset({ name: values.name })
       toast('Профиль обновлён', 'success')
       router.refresh()
     } catch (e) {
@@ -37,7 +38,7 @@ export function ProfileForm({ name }: { name: string | null }) {
   return (
     <form onSubmit={onSubmit} className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
       <div className="min-w-0">
-        <label className="label" htmlFor="profile-name">Имя</label>
+        <label className="label" htmlFor="profile-name">Отображаемое имя</label>
         <input
           id="profile-name"
           className="input"
@@ -45,14 +46,15 @@ export function ProfileForm({ name }: { name: string | null }) {
           disabled={!isHydrated || isSubmitting}
           {...register('name')}
         />
+        {!errors.name && <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Используется в кабинете и уведомлениях.</p>}
         {errors.name && <p className="mt-1 text-xs text-red-600">{errors.name.message}</p>}
       </div>
       {serverError && (
         <FormAlert className="sm:col-span-2">{serverError}</FormAlert>
       )}
-      <button type="submit" className="btn-primary w-full sm:min-w-48" disabled={!isHydrated || isSubmitting}>
+      <button type="submit" className="btn-primary w-full sm:min-w-40" disabled={!isHydrated || !isDirty || isSubmitting}>
         <Save className="h-4 w-4" />
-        {isSubmitting ? 'Сохраняем...' : 'Сохранить профиль'}
+        {isSubmitting ? 'Сохраняем...' : isDirty ? 'Сохранить' : 'Сохранено'}
       </button>
     </form>
   )

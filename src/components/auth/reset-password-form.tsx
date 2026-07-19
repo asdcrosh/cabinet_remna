@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Eye, EyeOff } from 'lucide-react'
+import { Eye, EyeOff, KeyRound, LockKeyhole } from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
 import { resetPasswordSchema, type ResetPasswordInput } from '@/lib/auth/validation'
 import { toast } from '@/components/ui/toaster'
@@ -38,11 +38,13 @@ export function ResetPasswordForm({ token }: { token: string }) {
       <div>
         <label className="label" htmlFor="password">Новый пароль</label>
         <div className="relative">
+          <LockKeyhole className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <input
             id="password"
             type={showPassword ? 'text' : 'password'}
             autoComplete="new-password"
-            className="input pr-11"
+            className="input px-10"
+            placeholder="Придумайте новый пароль"
             {...register('password')}
           />
           <button
@@ -59,7 +61,8 @@ export function ResetPasswordForm({ token }: { token: string }) {
       {serverError && (
         <FormAlert>{serverError}</FormAlert>
       )}
-      <button type="submit" disabled={isSubmitting} className="btn-primary w-full">
+      <button type="submit" disabled={isSubmitting} className="btn-primary min-h-12 w-full">
+        <KeyRound className="h-4 w-4" />
         {isSubmitting ? 'Сохраняем...' : 'Сохранить пароль'}
       </button>
     </form>

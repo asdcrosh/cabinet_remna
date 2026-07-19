@@ -1,10 +1,10 @@
 'use client'
 
 import { type ReactNode, useRef, useState } from 'react'
-import { CreditCard, Database, LockKeyhole, UserRound } from 'lucide-react'
+import { Link2, LockKeyhole, UserRound } from 'lucide-react'
 import { cn } from '@/lib/cn'
 
-type SettingsTabId = 'account' | 'sync' | 'security' | 'payments'
+type SettingsTabId = 'account' | 'sync' | 'security'
 
 type SettingsTabSection = {
   id: SettingsTabId
@@ -15,9 +15,8 @@ type SettingsTabSection = {
 
 const tabIcons: Record<SettingsTabId, ReactNode> = {
   account: <UserRound className="h-4 w-4" />,
-  sync: <Database className="h-4 w-4" />,
+  sync: <Link2 className="h-4 w-4" />,
   security: <LockKeyhole className="h-4 w-4" />,
-  payments: <CreditCard className="h-4 w-4" />,
 }
 
 export function SettingsTabs({ sections }: { sections: SettingsTabSection[] }) {
@@ -33,10 +32,10 @@ export function SettingsTabs({ sections }: { sections: SettingsTabSection[] }) {
   }
 
   return (
-    <div className="space-y-4 lg:grid lg:grid-cols-[13rem_minmax(0,1fr)] lg:items-start lg:gap-5 lg:space-y-0">
+    <div className="space-y-4 lg:grid lg:grid-cols-[14rem_minmax(0,1fr)] lg:items-start lg:gap-5 lg:space-y-0">
       <div className="sticky top-14 z-20 -mx-4 bg-slate-50 px-4 py-2 dark:bg-surface-950 sm:static sm:mx-0 sm:bg-transparent sm:px-0 sm:py-0 lg:sticky lg:top-6">
         <div className="rounded-2xl border border-slate-200 bg-white p-1 dark:border-white/10 dark:bg-white/[0.035]">
-          <div role="tablist" aria-label="Разделы настроек" className="grid grid-cols-4 gap-1 sm:grid-cols-2 lg:grid-cols-1">
+          <div role="tablist" aria-label="Разделы настроек" className="grid grid-cols-3 gap-1 lg:grid-cols-1">
           {sections.map((section, index) => {
             const active = section.id === activeId
 
@@ -51,9 +50,9 @@ export function SettingsTabs({ sections }: { sections: SettingsTabSection[] }) {
                 aria-controls={`settings-panel-${section.id}`}
                 tabIndex={active ? 0 : -1}
                 className={cn(
-                  'flex h-11 min-w-0 items-center justify-center gap-1.5 rounded-xl px-1.5 text-[11px] font-medium transition sm:gap-2 sm:px-3 sm:text-sm lg:justify-start lg:text-left',
+                  'flex h-11 min-w-0 items-center justify-center gap-1.5 rounded-xl px-1.5 text-[11px] font-semibold transition sm:gap-2 sm:px-3 sm:text-sm lg:justify-start lg:text-left',
                   active
-                    ? 'bg-slate-100 text-slate-950 dark:bg-white/10 dark:text-white'
+                    ? 'bg-cyan-50 text-cyan-950 shadow-sm dark:bg-cyan-400/10 dark:text-cyan-50 dark:shadow-none'
                     : 'text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-white/5'
                 )}
                 onClick={() => setActiveId(section.id)}

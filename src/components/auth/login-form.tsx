@@ -9,7 +9,7 @@ import { apiFetch } from '@/lib/api-client'
 import { loginSchema, type LoginInput } from '@/lib/auth/validation'
 import { toast } from '@/components/ui/toaster'
 import { FormAlert } from '@/components/ui/form-alert'
-import { CheckCircle2, Eye, EyeOff, RefreshCw } from 'lucide-react'
+import { CheckCircle2, Eye, EyeOff, LockKeyhole, LogIn, Mail, RefreshCw } from 'lucide-react'
 import { YandexAuthButton } from './yandex-auth-button'
 import { sanitizeInternalNext } from '@/lib/auth/next-path'
 
@@ -74,7 +74,7 @@ export function LoginForm({ yandexEnabled = false }: { yandexEnabled?: boolean }
       {yandexEnabled && (
         <>
           <YandexAuthButton next={next} />
-          <div className="flex items-center gap-3 text-xs text-slate-400">
+          <div className="flex items-center gap-3 text-xs font-medium text-slate-400">
             <span className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
             или email
             <span className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
@@ -99,13 +99,17 @@ export function LoginForm({ yandexEnabled = false }: { yandexEnabled?: boolean }
       )}
       <div>
         <label className="label" htmlFor="email">Email</label>
-        <input
-          id="email"
-          type="email"
-          autoComplete="email"
-          className="input"
-          {...register('email')}
-        />
+        <div className="relative">
+          <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <input
+            id="email"
+            type="email"
+            autoComplete="email"
+            className="input pl-10"
+            placeholder="name@example.com"
+            {...register('email')}
+          />
+        </div>
         {errors.email && <p className="text-xs text-red-600 mt-1">{errors.email.message}</p>}
       </div>
       <div>
@@ -116,11 +120,13 @@ export function LoginForm({ yandexEnabled = false }: { yandexEnabled?: boolean }
           </Link>
         </div>
         <div className="relative">
+          <LockKeyhole className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <input
             id="password"
             type={showPassword ? 'text' : 'password'}
             autoComplete="current-password"
-            className="input pr-11"
+            className="input px-10"
+            placeholder="Введите пароль"
             {...register('password')}
           />
           <button
@@ -148,7 +154,8 @@ export function LoginForm({ yandexEnabled = false }: { yandexEnabled?: boolean }
           {resending ? 'Отправляем...' : 'Отправить ссылку повторно'}
         </button>
       )}
-      <button type="submit" disabled={isSubmitting} className="btn-primary w-full">
+      <button type="submit" disabled={isSubmitting} className="btn-primary min-h-12 w-full">
+        <LogIn className="h-4 w-4" />
         {isSubmitting ? 'Входим...' : 'Войти'}
       </button>
     </form>

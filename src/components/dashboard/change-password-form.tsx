@@ -7,7 +7,7 @@ import { z } from 'zod'
 import { apiFetch } from '@/lib/api-client'
 import { newPasswordSchema } from '@/lib/auth/validation'
 import { toast } from '@/components/ui/toaster'
-import { Eye, EyeOff } from 'lucide-react'
+import { Eye, EyeOff, KeyRound } from 'lucide-react'
 import { FormAlert } from '@/components/ui/form-alert'
 
 const changePasswordFormSchema = z
@@ -45,8 +45,8 @@ export function ChangePasswordForm() {
   })
 
   return (
-    <form onSubmit={onSubmit} className="max-w-2xl space-y-4">
-      <div>
+    <form onSubmit={onSubmit} className="max-w-3xl space-y-4">
+      <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 dark:border-white/[0.08] dark:bg-white/[0.025]">
         <label className="label" htmlFor="oldPassword">Текущий пароль</label>
         <PasswordField
           id="oldPassword"
@@ -57,32 +57,37 @@ export function ChangePasswordForm() {
           <p className="mt-1 text-xs text-red-600 dark:text-red-300">{errors.oldPassword.message}</p>
         )}
       </div>
-      <div>
-        <label className="label" htmlFor="newPassword">Новый пароль</label>
-        <PasswordField
-          id="newPassword"
-          autoComplete="new-password"
-          register={register('newPassword')}
-        />
-        {errors.newPassword && (
-          <p className="mt-1 text-xs text-red-600 dark:text-red-300">{errors.newPassword.message}</p>
-        )}
-      </div>
-      <div>
-        <label className="label" htmlFor="confirm">Подтверждение</label>
-        <PasswordField
-          id="confirm"
-          autoComplete="new-password"
-          register={register('confirm')}
-        />
-        {errors.confirm && (
-          <p className="mt-1 text-xs text-red-600 dark:text-red-300">{errors.confirm.message}</p>
-        )}
+      <div className="grid gap-4 rounded-2xl border border-cyan-200 bg-cyan-50/55 p-4 dark:border-cyan-400/20 dark:bg-cyan-400/[0.06] sm:grid-cols-2">
+        <div>
+          <label className="label" htmlFor="newPassword">Новый пароль</label>
+          <PasswordField
+            id="newPassword"
+            autoComplete="new-password"
+            register={register('newPassword')}
+          />
+          {errors.newPassword ? (
+            <p className="mt-1 text-xs text-red-600 dark:text-red-300">{errors.newPassword.message}</p>
+          ) : (
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Используйте буквы, цифры и символы.</p>
+          )}
+        </div>
+        <div>
+          <label className="label" htmlFor="confirm">Повторите пароль</label>
+          <PasswordField
+            id="confirm"
+            autoComplete="new-password"
+            register={register('confirm')}
+          />
+          {errors.confirm && (
+            <p className="mt-1 text-xs text-red-600 dark:text-red-300">{errors.confirm.message}</p>
+          )}
+        </div>
       </div>
       {serverError && (
         <FormAlert>{serverError}</FormAlert>
       )}
-      <button type="submit" disabled={isSubmitting} className="btn-primary w-full">
+      <button type="submit" disabled={isSubmitting} className="btn-primary w-full sm:w-auto sm:min-w-48">
+        <KeyRound className="h-4 w-4" />
         {isSubmitting ? 'Сохраняем...' : 'Сменить пароль'}
       </button>
     </form>
