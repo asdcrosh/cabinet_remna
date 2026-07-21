@@ -1,6 +1,7 @@
 import { prisma } from './prisma'
 import { logError } from './logger'
 import { notifyPaymentCanceled, notifyPaymentStuck } from './notifications'
+import { getPlategaTransaction, type PlategaTransaction } from './platega'
 import { provisionPaymentSubscription } from './provisioning'
 import { cancelPayment, getPayment } from './yookassa'
 import type { PaymentStatus as YooKassaPaymentStatus } from './yookassa'
@@ -15,7 +16,7 @@ export type PaymentSyncResult =
 type PendingPaymentForCancel = {
   id: string
   userId: string
-  provider: 'YOOKASSA' | 'PAYANYWAY' | 'LOCAL'
+  provider: 'YOOKASSA' | 'PAYANYWAY' | 'PLATEGA' | 'LOCAL'
   yookassaId: string | null
 }
 
@@ -33,13 +34,97 @@ export async function syncPaymentProvisioning(input: {
   })
 
   if (!payment) return { ok: true, status: 'not_found', provisioned: false }
-  if (payment.status === 'CANCELED') {
+  if (payment.status === 'CANCELED' || payment.status === 'REFUNDED') {
     return { ok: true, status: 'canceled', provisioned: false }
   }
   // PayAnyWay подтверждает оплату подписанным Pay URL. Без Merchant API
   // мы не отменяем и не считаем такой платёж неоплаченным по таймеру.
   if (payment.provider === 'PAYANYWAY' && payment.status !== 'SUCCEEDED') {
     return { ok: true, status: 'pending', provisioned: false }
+  }
+  if (payment.provider === 'PLATEGA' && payment.status !== 'SUCCEEDED') {
+    if (!payment.externalPaymentId) {
+      return { ok: true, status: 'missing_external_id', provisioned: false }
+    }
+
+    let plategaPayment: PlategaTransaction
+    try {
+      plategaPayment = await getPlategaTransaction(payment.externalPaymentId)
+      validatePlategaTransaction(payment, plategaPayment)
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'payment status check failed'
+      await prisma.payment.update({
+        where: { id: payment.id },
+        data: { provisioningError: message.slice(0, 1000) },
+      })
+      return { ok: false, status: 'check_failed', provisioned: false, error: message }
+    }
+
+    if (plategaPayment.status === 'CANCELED') {
+      await prisma.$transaction([
+        prisma.payment.update({
+          where: { id: payment.id },
+          data: { status: 'CANCELED', providerStatus: 'CANCELED' },
+        }),
+        prisma.promoCodeRedemption.updateMany({
+          where: { paymentId: payment.id, status: 'PENDING' },
+          data: { status: 'CANCELED' },
+        }),
+      ])
+      await notifyPaymentCanceled(payment.id)
+      return { ok: true, status: 'canceled', provisioned: false }
+    }
+
+    if (plategaPayment.status === 'CHARGEBACKED') {
+      await prisma.$transaction([
+        prisma.payment.update({
+          where: { id: payment.id },
+          data: { status: 'REFUNDED', providerStatus: 'CHARGEBACKED' },
+        }),
+        prisma.promoCodeRedemption.updateMany({
+          where: { paymentId: payment.id, status: 'PENDING' },
+          data: { status: 'CANCELED' },
+        }),
+      ])
+      return { ok: true, status: 'canceled', provisioned: false }
+    }
+
+    if (plategaPayment.status === 'PENDING') {
+      await prisma.payment.update({
+        where: { id: payment.id },
+        data: { providerStatus: 'PENDING', provisioningError: null },
+      })
+      return { ok: true, status: 'pending', provisioned: false }
+    }
+
+    await prisma.$transaction([
+      prisma.payment.update({
+        where: { id: payment.id },
+        data: {
+          status: 'SUCCEEDED',
+          providerStatus: 'CONFIRMED',
+          paidAt: payment.paidAt ?? new Date(),
+          provisioningError: null,
+        },
+      }),
+      prisma.promoCodeRedemption.updateMany({
+        where: { paymentId: payment.id, status: 'PENDING' },
+        data: { status: 'SUCCEEDED' },
+      }),
+    ])
+    await cancelOtherPendingPaymentsForUser(payment.userId, payment.id)
+
+    if (payment.subscriptionProvisionedAt && payment.subscription) {
+      return {
+        ok: true,
+        status: 'succeeded',
+        provisioned: true,
+        alreadyProvisioned: true,
+        subscriptionId: payment.subscription.id,
+      }
+    }
+
+    return provisionSubscription(payment)
   }
   if (!payment.yookassaId) {
     if (payment.status !== 'SUCCEEDED') {
@@ -63,36 +148,7 @@ export async function syncPaymentProvisioning(input: {
       }
     }
 
-    try {
-      const result = await provisionPaymentSubscription({
-        userId: payment.user.id,
-        email: payment.user.email,
-        paymentId: payment.id,
-        plan: {
-          id: payment.plan.id,
-          name: payment.plan.name,
-          durationDays: payment.plan.durationDays,
-          trafficLimitGb: payment.plan.trafficLimitGb,
-          deviceLimit: payment.plan.deviceLimit,
-          activeInternalSquads: payment.plan.activeInternalSquads,
-        },
-      })
-
-      return {
-        ok: true,
-        status: 'succeeded',
-        provisioned: true,
-        subscriptionId: result.subscription.id,
-      }
-    } catch (e) {
-      const message = e instanceof Error ? e.message : 'subscription provisioning failed'
-      await prisma.payment.update({
-        where: { id: payment.id },
-        data: { provisioningError: message.slice(0, 1000) },
-      })
-      await notifyPaymentStuck(payment.id, 'Платёж прошёл, но подписка пока не выдана автоматически.')
-      return { ok: false, status: 'provisioning_failed', provisioned: false, error: message }
-    }
+    return provisionSubscription(payment)
   }
 
   let yooPayment
@@ -170,36 +226,7 @@ export async function syncPaymentProvisioning(input: {
     }
   }
 
-  try {
-    const result = await provisionPaymentSubscription({
-      userId: payment.user.id,
-      email: payment.user.email,
-      paymentId: payment.id,
-      plan: {
-        id: payment.plan.id,
-        name: payment.plan.name,
-        durationDays: payment.plan.durationDays,
-        trafficLimitGb: payment.plan.trafficLimitGb,
-        deviceLimit: payment.plan.deviceLimit,
-        activeInternalSquads: payment.plan.activeInternalSquads,
-      },
-    })
-
-    return {
-      ok: true,
-      status: 'succeeded',
-      provisioned: true,
-      subscriptionId: result.subscription.id,
-    }
-  } catch (e) {
-    const message = e instanceof Error ? e.message : 'subscription provisioning failed'
-    await prisma.payment.update({
-      where: { id: payment.id },
-      data: { provisioningError: message.slice(0, 1000) },
-    })
-    await notifyPaymentStuck(payment.id, 'Платёж прошёл, но подписка пока не выдана автоматически.')
-    return { ok: false, status: 'provisioning_failed', provisioned: false, error: message }
-  }
+  return provisionSubscription(payment)
 }
 
 export async function cancelOtherPendingPaymentsForUser(userId: string, paidPaymentId: string, limit = 25) {
@@ -326,7 +353,7 @@ export async function reconcileStalePendingPaymentsForUser(userId: string, limit
     where: {
       userId,
       status: 'PENDING',
-      provider: 'YOOKASSA',
+      provider: { in: ['YOOKASSA', 'PLATEGA'] },
       createdAt: { lte: cutoff },
     },
     orderBy: { createdAt: 'asc' },
@@ -356,4 +383,59 @@ function readPositiveInt(name: string) {
   if (!raw) return null
   const value = Number(raw)
   return Number.isInteger(value) && value > 0 ? value : null
+}
+
+function validatePlategaTransaction(
+  payment: { id: string; amountKopecks: number; externalPaymentId: string | null },
+  transaction: PlategaTransaction
+) {
+  if (transaction.id !== payment.externalPaymentId) {
+    throw new Error('Platega transaction id mismatch')
+  }
+  if (transaction.payload && transaction.payload !== payment.id) {
+    throw new Error('Platega transaction payload mismatch')
+  }
+  if (transaction.paymentDetails.currency !== 'RUB') {
+    throw new Error('Platega transaction currency mismatch')
+  }
+  if (Math.round(transaction.paymentDetails.amount * 100) !== payment.amountKopecks) {
+    throw new Error('Platega transaction amount mismatch')
+  }
+}
+
+async function provisionSubscription(payment: {
+  id: string
+  user: { id: string; email: string }
+  plan: {
+    id: string
+    name: string
+    durationDays: number
+    trafficLimitGb: number | null
+    deviceLimit: number
+    activeInternalSquads: string[]
+  }
+}): Promise<PaymentSyncResult> {
+  try {
+    const result = await provisionPaymentSubscription({
+      userId: payment.user.id,
+      email: payment.user.email,
+      paymentId: payment.id,
+      plan: payment.plan,
+    })
+
+    return {
+      ok: true,
+      status: 'succeeded',
+      provisioned: true,
+      subscriptionId: result.subscription.id,
+    }
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'subscription provisioning failed'
+    await prisma.payment.update({
+      where: { id: payment.id },
+      data: { provisioningError: message.slice(0, 1000) },
+    })
+    await notifyPaymentStuck(payment.id, 'Платёж прошёл, но подписка пока не выдана автоматически.')
+    return { ok: false, status: 'provisioning_failed', provisioned: false, error: message }
+  }
 }

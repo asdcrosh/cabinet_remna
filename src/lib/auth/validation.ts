@@ -82,7 +82,7 @@ export const changePasswordSchema = z
 export const createPaymentSchema = z.object({
   planId: z.string().min(1).max(64),
   promoCode: z.string().trim().min(1).max(64).optional(),
-  provider: z.enum(['YOOKASSA', 'PAYANYWAY']).default('YOOKASSA'),
+  provider: z.enum(['YOOKASSA', 'PAYANYWAY', 'PLATEGA']).default('YOOKASSA'),
 })
 
 export const validatePromoCodeSchema = z.object({

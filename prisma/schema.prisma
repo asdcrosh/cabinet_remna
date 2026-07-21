@@ -166,6 +166,9 @@ model PaymentProviderSetting {
   payAnyWayMerchantId             String?
   payAnyWayIntegrityCodeEncrypted String?
   payAnyWayTestMode               Boolean?
+  plategaEnabled                  Boolean?
+  plategaMerchantId               String?
+  plategaSecretEncrypted          String?
   createdAt                       DateTime @default(now())
   updatedAt                       DateTime @updatedAt
 }
@@ -595,6 +598,7 @@ model Payment {
 enum PaymentProvider {
   YOOKASSA
   PAYANYWAY
+  PLATEGA
   LOCAL
 }
 

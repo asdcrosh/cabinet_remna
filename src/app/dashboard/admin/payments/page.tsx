@@ -117,6 +117,7 @@ export default async function AdminPaymentsPage({
             <option value="ALL">Все</option>
             <option value="YOOKASSA">ЮKassa</option>
             <option value="PAYANYWAY">PayAnyWay</option>
+            <option value="PLATEGA">Platega</option>
             <option value="LOCAL">Без оплаты</option>
           </select>
         </AdminFilterField>
@@ -162,7 +163,10 @@ export default async function AdminPaymentsPage({
         {payments.map((payment) => {
           const needsRetry = payment.status === 'SUCCEEDED' && !payment.subscriptionProvisionedAt
           const needsRemnashopRetry = payment.status === 'SUCCEEDED' && Boolean(payment.subscriptionProvisionedAt) && !payment.remnashopSyncedAt
-          const canCheckPayment = payment.provider === 'YOOKASSA' && Boolean(payment.yookassaId) && payment.status !== 'SUCCEEDED'
+          const canCheckPayment = payment.status === 'PENDING' && (
+            (payment.provider === 'YOOKASSA' && Boolean(payment.yookassaId)) ||
+            (payment.provider === 'PLATEGA' && Boolean(payment.externalPaymentId))
+          )
           const action = canCheckPayment ? (
             <PaymentSyncButton paymentId={payment.id} />
           ) : needsRetry ? (

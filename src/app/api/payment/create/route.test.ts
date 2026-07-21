@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   getPlanAudienceContext: vi.fn(),
   isPlanAvailableForUser: vi.fn(),
   createPayment: vi.fn(),
+  createPlategaPayment: vi.fn(),
   isPaymentProviderAvailable: vi.fn(),
   validatePromoCodeForPlan: vi.fn(),
   logError: vi.fn(),
@@ -37,6 +38,7 @@ vi.mock('@/lib/plan-access', () => ({
   isPlanAvailableForUser: mocks.isPlanAvailableForUser,
 }))
 vi.mock('@/lib/yookassa', () => ({ createPayment: mocks.createPayment }))
+vi.mock('@/lib/platega', () => ({ createPlategaPayment: mocks.createPlategaPayment }))
 vi.mock('@/lib/payment-providers', () => ({ isPaymentProviderAvailable: mocks.isPaymentProviderAvailable }))
 vi.mock('@/lib/promo-codes', () => ({
   PromoCodeError: class PromoCodeError extends Error {
@@ -115,6 +117,12 @@ describe('payment create route', () => {
       id: 'yoo-1',
       status: 'pending',
       confirmation: { confirmation_url: 'https://pay.example/confirm' },
+    })
+    mocks.createPlategaPayment.mockResolvedValue({
+      transactionId: 'platega-1',
+      status: 'PENDING',
+      url: 'https://pay.platega.io/?id=platega-1',
+      expiresIn: '00:15:00',
     })
     mocks.prisma.payment.update.mockResolvedValue({})
     mocks.prisma.promoCodeRedemption.updateMany.mockResolvedValue({ count: 0 })
@@ -217,6 +225,39 @@ describe('payment create route', () => {
       paymentId: 'payment-1',
       localPaymentId: 'payment-1',
       provider: 'PAYANYWAY',
+    })
+  })
+
+  it('creates a Platega checkout and stores the external transaction', async () => {
+    const response = await POST(paymentRequest({ planId: plan.id, provider: 'PLATEGA' }))
+    const body = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(mocks.txPaymentCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({ provider: 'PLATEGA', providerStatus: 'pending' }),
+    })
+    expect(mocks.createPayment).not.toHaveBeenCalled()
+    expect(mocks.createPlategaPayment).toHaveBeenCalledWith({
+      amountKopecks: 30000,
+      description: expect.any(String),
+      returnUrl: 'https://cabinet.example/dashboard/billing?paid=1&payment=payment-1',
+      failedUrl: 'https://cabinet.example/dashboard/billing?paid=1&payment=payment-1',
+      payload: 'payment-1',
+      metadata: { userId: 'user-1', userName: 'user@example.com' },
+    })
+    expect(mocks.prisma.payment.update).toHaveBeenCalledWith({
+      where: { id: 'payment-1' },
+      data: {
+        externalPaymentId: 'platega-1',
+        providerStatus: 'PENDING',
+        confirmationUrl: 'https://pay.platega.io/?id=platega-1',
+      },
+    })
+    expect(body).toEqual({
+      confirmationUrl: 'https://pay.platega.io/?id=platega-1',
+      paymentId: 'platega-1',
+      localPaymentId: 'payment-1',
+      provider: 'PLATEGA',
     })
   })
 })

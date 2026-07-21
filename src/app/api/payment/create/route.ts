@@ -7,6 +7,7 @@ import { prisma } from '@/lib/prisma'
 import { requireAuth, withAuth } from '@/lib/auth/guard'
 import { createPaymentSchema } from '@/lib/auth/validation'
 import { createPayment } from '@/lib/yookassa'
+import { createPlategaPayment } from '@/lib/platega'
 import { isPaymentProviderAvailable } from '@/lib/payment-providers'
 import { PromoCodeError, validatePromoCodeForPlan } from '@/lib/promo-codes'
 import { getAppUrl } from '@/lib/app-url'
@@ -144,7 +145,7 @@ export const POST = withAuth(async (req: Request) => {
 
   if (!(await isPaymentProviderAvailable(provider))) {
     return NextResponse.json(
-      { error: provider === 'PAYANYWAY' ? 'PayAnyWay пока не настроен' : 'ЮKassa пока не настроена' },
+      { error: paymentProviderUnavailableMessage(provider) },
       { status: 503 }
     )
   }
@@ -247,6 +248,47 @@ export const POST = withAuth(async (req: Request) => {
     }
   }
 
+  if (provider === 'PLATEGA') {
+    try {
+      const payment = await createPlategaPayment({
+        amountKopecks: localPayment.amountKopecks,
+        description,
+        returnUrl,
+        failedUrl: returnUrl,
+        payload: localPayment.id,
+        metadata: {
+          userId: user.id,
+          userName: user.email,
+        },
+      })
+      await prisma.payment.update({
+        where: { id: localPayment.id },
+        data: {
+          externalPaymentId: payment.transactionId,
+          providerStatus: payment.status,
+          confirmationUrl: payment.url,
+        },
+      })
+      return NextResponse.json({
+        confirmationUrl: payment.url,
+        paymentId: payment.transactionId,
+        localPaymentId: localPayment.id,
+        provider,
+      })
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'Platega create payment failed'
+      await cancelFailedLocalPayment(localPayment.id, message)
+      logError('payment.create.platega_failed', e, { localPaymentId: localPayment.id })
+      return NextResponse.json(
+        {
+          error: 'Platega не удалось создать ссылку на оплату. Проверьте Merchant ID и API secret.',
+          details: process.env.NODE_ENV === 'development' ? message : undefined,
+        },
+        { status: 502 }
+      )
+    }
+  }
+
   let payment
   try {
     payment = await createPayment({
@@ -298,6 +340,12 @@ export const POST = withAuth(async (req: Request) => {
     provider,
   })
 })
+
+function paymentProviderUnavailableMessage(provider: 'YOOKASSA' | 'PAYANYWAY' | 'PLATEGA') {
+  if (provider === 'PAYANYWAY') return 'PayAnyWay пока не настроен'
+  if (provider === 'PLATEGA') return 'Platega пока не настроена'
+  return 'ЮKassa пока не настроена'
+}
 
 async function cancelFailedLocalPayment(paymentId: string, message: string) {
   await prisma.$transaction([

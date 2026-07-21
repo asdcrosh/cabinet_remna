@@ -55,7 +55,7 @@ async function runOnce() {
     where: {
       createdAt: { lte: cutoff },
       OR: [
-        { status: 'PENDING', provider: 'YOOKASSA' },
+        { status: 'PENDING', provider: { in: ['YOOKASSA', 'PLATEGA'] } },
         { status: 'SUCCEEDED', subscriptionProvisionedAt: null },
       ],
     },

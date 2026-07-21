@@ -366,6 +366,10 @@ NODE_ENV=production npm run check:env
 | `PAYANYWAY_MNT_ID` | Номер бизнес-счёта PayAnyWay |
 | `PAYANYWAY_INTEGRITY_CODE` | Секрет проверки подписей PayAnyWay, минимум 32 символа |
 | `PAYANYWAY_TEST_MODE` | `true` для demo.moneta.ru, иначе `false` |
+| `PLATEGA_ENABLED` | Включает Platega; настройки из админки имеют приоритет |
+| `PLATEGA_MERCHANT_ID` | Merchant ID из личного кабинета Platega |
+| `PLATEGA_SECRET` | API Secret Platega |
+| `PLATEGA_WEBHOOK_URL` | `https://домен/api/webhook/platega` |
 | `PAYMENT_SETTINGS_ENCRYPTION_KEY` | Необязательный отдельный ключ шифрования секретов из админки; иначе используется `JWT_SECRET` |
 | `LEGAL_OPERATOR_ADDRESS` | Необязательный адрес исполнителя; пустое значение не показывается |
 | `LEGAL_SUPPORT_PHONE` | Необязательный публичный телефон поддержки |
@@ -458,6 +462,27 @@ PAYANYWAY_TEST_MODE="false"
 После оплаты PayAnyWay отправляет подписанный отчёт на Pay URL. Кабинет проверяет подпись, сумму,
 номер счёта и заказ, выдаёт подписку и возвращает подписанный XML с номенклатурой услуги. Этот ответ
 нужен Self.PayAnyWay для автоматической регистрации дохода самозанятого и формирования чека.
+
+### Platega
+
+Заполните `.env` или те же поля в разделе «Система»:
+
+```env
+PLATEGA_ENABLED="true"
+PLATEGA_MERCHANT_ID="MERCHANT_ID"
+PLATEGA_SECRET="API_SECRET"
+PLATEGA_WEBHOOK_URL="https://ВАШ_ДОМЕН/api/webhook/platega"
+```
+
+В личном кабинете Platega укажите Callback URL:
+
+```text
+https://ВАШ_ДОМЕН/api/webhook/platega
+```
+
+Callback должен быть доступен по публичному HTTPS. Кабинет проверяет Merchant ID, API Secret,
+идентификатор транзакции, валюту и сумму, а затем идемпотентно выдаёт подписку. Worker дополнительно
+сверяет зависшие платежи через API статуса Platega.
 
 ### Email
 

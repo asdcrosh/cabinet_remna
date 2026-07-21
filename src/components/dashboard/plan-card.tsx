@@ -6,6 +6,7 @@ import { apiFetch } from "@/lib/api-client";
 import { toast } from "@/components/ui/toaster";
 import { cn } from "@/lib/cn";
 import { formatPrice } from "@/lib/format";
+import type { CheckoutPaymentProvider } from "@/lib/payment-providers";
 import {
   ArrowRight,
   BadgePercent,
@@ -37,7 +38,7 @@ export interface PlanCardProps {
   current?: boolean;
   initialPromoCode?: string;
   paymentProviders?: Array<{
-    id: "YOOKASSA" | "PAYANYWAY";
+    id: CheckoutPaymentProvider;
     label: string;
   }>;
   availablePromoCodes?: Array<{
@@ -71,7 +72,7 @@ export function PlanCard({
   const [validatingPromo, setValidatingPromo] = useState(false);
   const [promoOpen, setPromoOpen] = useState(false);
   const [manualPromoOpen, setManualPromoOpen] = useState(false);
-  const [selectedProvider, setSelectedProvider] = useState<"YOOKASSA" | "PAYANYWAY">(
+  const [selectedProvider, setSelectedProvider] = useState<CheckoutPaymentProvider>(
     paymentProviders[0]?.id ?? "YOOKASSA",
   );
   const [promoInput, setPromoInput] = useState("");
@@ -446,7 +447,11 @@ export function PlanCard({
         {!isPromoPlan && paymentProviders.length > 1 ? (
           <fieldset className="mt-2.5 rounded-[1.15rem] border border-slate-200/80 p-3 dark:border-white/[0.08]">
             <legend className="px-1 text-xs font-medium text-slate-500 dark:text-slate-400">Способ оплаты</legend>
-            <div className="grid grid-cols-2 rounded-xl bg-slate-100 p-1 dark:bg-white/[0.06]" role="radiogroup" aria-label="Способ оплаты">
+            <div
+              className="grid grid-cols-[repeat(auto-fit,minmax(5.5rem,1fr))] gap-1 rounded-xl bg-slate-100 p-1 dark:bg-white/[0.06]"
+              role="radiogroup"
+              aria-label="Способ оплаты"
+            >
               {paymentProviders.map((provider) => (
                 <button
                   key={provider.id}
@@ -465,12 +470,20 @@ export function PlanCard({
                 </button>
               ))}
             </div>
+            <p className="mt-2 px-1 text-[11px] leading-4 text-slate-400 dark:text-slate-500">
+              {paymentProviderHint(selectedProvider)}
+            </p>
           </fieldset>
         ) : !isPromoPlan && paymentProviders.length === 1 ? (
-          <div className="mt-2.5 flex min-h-11 items-center justify-between gap-3 rounded-[1.15rem] border border-slate-200/80 px-3.5 text-xs text-slate-500 dark:border-white/[0.08] dark:text-slate-400">
+          <div className="mt-2.5 flex min-h-12 items-center justify-between gap-3 rounded-[1.15rem] border border-slate-200/80 px-3.5 py-2 text-xs text-slate-500 dark:border-white/[0.08] dark:text-slate-400">
             <span className="inline-flex items-center gap-2">
               <CreditCard className="h-4 w-4 text-slate-400" />
-              Способ оплаты
+              <span>
+                <span className="block font-medium text-slate-600 dark:text-slate-300">Способ оплаты</span>
+                <span className="mt-0.5 block text-[11px] text-slate-400">
+                  {paymentProviderHint(paymentProviders[0]!.id)}
+                </span>
+              </span>
             </span>
             <span className="font-semibold text-slate-700 dark:text-slate-200">{paymentProviders[0]?.label}</span>
           </div>
@@ -508,6 +521,12 @@ export function PlanCard({
       </div>
     </div>
   );
+}
+
+function paymentProviderHint(provider: CheckoutPaymentProvider) {
+  if (provider === "PLATEGA") return "Выбор метода продолжится на защищённой странице Platega";
+  if (provider === "PAYANYWAY") return "Оплата продолжится на защищённой форме PayAnyWay";
+  return "Оплата продолжится на защищённой странице ЮKassa";
 }
 
 function PlanFact({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {

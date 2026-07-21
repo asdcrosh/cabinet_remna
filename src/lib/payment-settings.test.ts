@@ -36,6 +36,9 @@ describe('payment provider settings', () => {
     process.env.PAYANYWAY_ENABLED = 'false'
     process.env.PAYANYWAY_MNT_ID = '49907299'
     process.env.PAYANYWAY_INTEGRITY_CODE = 'e'.repeat(64)
+    process.env.PLATEGA_ENABLED = 'false'
+    process.env.PLATEGA_MERCHANT_ID = 'env-platega-merchant'
+    process.env.PLATEGA_SECRET = 'env-platega-secret'
     stored = null
     mocks.findUnique.mockImplementation(async () => stored)
     mocks.upsert.mockImplementation(async ({ create, update }) => {
@@ -53,6 +56,7 @@ describe('payment provider settings', () => {
       source: 'environment',
       yookassa: expect.objectContaining({ enabled: true, shopId: 'env-shop', configured: true }),
       payAnyWay: expect.objectContaining({ enabled: false, merchantId: '49907299' }),
+      platega: expect.objectContaining({ enabled: false, merchantId: 'env-platega-merchant' }),
     }))
   })
 
@@ -70,18 +74,26 @@ describe('payment provider settings', () => {
         integrityCode: 'p'.repeat(64),
         testMode: true,
       },
+      platega: {
+        enabled: true,
+        merchantId: 'db-platega-merchant',
+        secret: 'db-platega-secret',
+      },
     })
 
     expect(stored?.yookassaSecretKeyEncrypted).not.toBe('db-yookassa-secret')
     expect(decryptPaymentSecret(String(stored?.yookassaSecretKeyEncrypted))).toBe('db-yookassa-secret')
     expect(decryptPaymentSecret(String(stored?.payAnyWayIntegrityCodeEncrypted))).toBe('p'.repeat(64))
+    expect(decryptPaymentSecret(String(stored?.plategaSecretEncrypted))).toBe('db-platega-secret')
     expect(result).toEqual(expect.objectContaining({
       source: 'database',
       yookassa: expect.objectContaining({ enabled: false, secretConfigured: true }),
       payAnyWay: expect.objectContaining({ enabled: true, configured: true, integrityCodeConfigured: true }),
+      platega: expect.objectContaining({ enabled: true, configured: true, secretConfigured: true }),
     }))
     expect(JSON.stringify(result)).not.toContain('db-yookassa-secret')
     expect(JSON.stringify(result)).not.toContain('p'.repeat(64))
+    expect(JSON.stringify(result)).not.toContain('db-platega-secret')
   })
 
   it('returns to .env settings after reset', async () => {

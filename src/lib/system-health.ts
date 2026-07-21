@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { remnawave } from '@/lib/remnawave'
 import { getProvisioningQueueHealth } from '@/lib/job-health'
 import { getResolvedPaymentProviderSettings } from '@/lib/payment-settings'
+import { checkPlategaConnection } from '@/lib/platega'
 
 export type SystemHealthStatus = 'ok' | 'warn' | 'error'
 
@@ -120,6 +121,21 @@ async function checkPayAnyWay() {
     return check('payanyway', 'PayAnyWay', 'warn', 'Используется legacy-код Self.PayAnyWay. Обратитесь в поддержку для синхронизации нового кода')
   }
   return check('payanyway', 'PayAnyWay', 'ok', 'Платёжная форма и Pay URL настроены')
+}
+
+async function checkPlatega() {
+  const { platega } = await getResolvedPaymentProviderSettings()
+  if (!platega.enabled) return check('platega', 'Platega', 'ok', 'Отключена')
+  if (!platega.merchantId || !platega.secret) {
+    return check('platega', 'Platega', 'error', 'Не заполнены Merchant ID или API Secret')
+  }
+
+  try {
+    await checkPlategaConnection()
+    return check('platega', 'Platega', 'ok', 'Ключи приняты, API отвечает')
+  } catch (error) {
+    return check('platega', 'Platega', 'error', 'Не удалось проверить Platega', errorMessage(error))
+  }
 }
 
 async function checkTelegram() {
@@ -340,6 +356,7 @@ export async function getSystemHealth(options: { sendEmail?: boolean } = {}): Pr
     checkRemnawave(),
     checkYooKassa(),
     checkPayAnyWay(),
+    checkPlatega(),
     checkEmail(Boolean(options.sendEmail)),
     checkTelegram(),
     latestBackup(),

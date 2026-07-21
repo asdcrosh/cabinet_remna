@@ -17,9 +17,12 @@ export function PaymentProviderSettingsPanel({
   const [source, setSource] = useState(initialSettings.source)
   const [yookassaSecret, setYookassaSecret] = useState('')
   const [payAnyWaySecret, setPayAnyWaySecret] = useState('')
+  const [plategaSecret, setPlategaSecret] = useState('')
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
-  const dirty = JSON.stringify(settings) !== JSON.stringify(saved) || Boolean(yookassaSecret || payAnyWaySecret)
+  const dirty = JSON.stringify(settings) !== JSON.stringify(saved) || Boolean(
+    yookassaSecret || payAnyWaySecret || plategaSecret
+  )
 
   async function save() {
     setSaving(true)
@@ -40,6 +43,11 @@ export function PaymentProviderSettingsPanel({
             merchantId: settings.payAnyWay.merchantId,
             integrityCode: payAnyWaySecret || undefined,
             testMode: settings.payAnyWay.testMode,
+          },
+          platega: {
+            enabled: settings.platega.enabled,
+            merchantId: settings.platega.merchantId,
+            secret: plategaSecret || undefined,
           },
         }),
       })
@@ -77,6 +85,7 @@ export function PaymentProviderSettingsPanel({
     setSource(next.source)
     setYookassaSecret('')
     setPayAnyWaySecret('')
+    setPlategaSecret('')
   }
 
   return (
@@ -102,7 +111,7 @@ export function PaymentProviderSettingsPanel({
         </div>
       </div>
 
-      <div className="grid gap-0 divide-y divide-slate-200 dark:divide-white/[0.07] lg:grid-cols-2 lg:divide-x lg:divide-y-0">
+      <div className="grid gap-0 divide-y divide-slate-200 dark:divide-white/[0.07] lg:grid-cols-3 lg:divide-x lg:divide-y-0">
         <ProviderCard
           icon={<CreditCard className="h-5 w-5" />}
           title="ЮKassa"
@@ -215,6 +224,49 @@ export function PaymentProviderSettingsPanel({
           </div>
           <CallbackPath path="/api/webhook/payanyway" label="Pay URL" />
         </ProviderCard>
+
+        <ProviderCard
+          icon={<ShieldCheck className="h-5 w-5" />}
+          title="Platega"
+          enabled={settings.platega.enabled}
+          configured={Boolean(
+            settings.platega.enabled &&
+            settings.platega.merchantId.trim() &&
+            (settings.platega.secretConfigured || plategaSecret.trim())
+          )}
+          onToggle={() => setSettings((current) => ({
+            ...current,
+            platega: { ...current.platega, enabled: !current.platega.enabled },
+          }))}
+        >
+          <Field label="Merchant ID">
+            <input
+              className="input"
+              value={settings.platega.merchantId}
+              onChange={(event) => setSettings((current) => ({
+                ...current,
+                platega: { ...current.platega, merchantId: event.target.value },
+              }))}
+              placeholder="Идентификатор магазина Platega"
+              disabled={!settings.platega.enabled}
+            />
+          </Field>
+          <Field label="API secret" hint={settings.platega.secretConfigured ? 'Ключ уже сохранён' : 'Ключ не задан'}>
+            <input
+              className="input"
+              type="password"
+              autoComplete="new-password"
+              value={plategaSecret}
+              onChange={(event) => setPlategaSecret(event.target.value)}
+              placeholder={settings.platega.secretConfigured ? 'Оставьте пустым, чтобы не менять' : 'X-Secret из Platega'}
+              disabled={!settings.platega.enabled}
+            />
+          </Field>
+          <div className="rounded-xl border border-cyan-200/80 bg-cyan-50/70 px-3 py-2.5 text-xs leading-5 text-cyan-800 dark:border-cyan-400/20 dark:bg-cyan-400/[0.07] dark:text-cyan-100">
+            Покупатель выберет доступный способ на защищённой странице Platega.
+          </div>
+          <CallbackPath path="/api/webhook/platega" />
+        </ProviderCard>
       </div>
 
       {message ? (
@@ -316,5 +368,9 @@ function Switch({
 }
 
 function stripSource(settings: PublicPaymentProviderSettings): EditableSettings {
-  return { yookassa: settings.yookassa, payAnyWay: settings.payAnyWay }
+  return {
+    yookassa: settings.yookassa,
+    payAnyWay: settings.payAnyWay,
+    platega: settings.platega,
+  }
 }

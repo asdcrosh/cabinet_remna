@@ -37,6 +37,12 @@ const publicSettings = {
     integrityCodeConfigured: false,
     testMode: false,
   },
+  platega: {
+    enabled: false,
+    configured: false,
+    merchantId: '',
+    secretConfigured: false,
+  },
 }
 
 describe('admin payment provider settings route', () => {
@@ -58,6 +64,7 @@ describe('admin payment provider settings route', () => {
     const input = {
       yookassa: { enabled: true, shopId: 'shop-1', secretKey: 'secret-key', webhookAllowedIps: '127.0.0.1' },
       payAnyWay: { enabled: true, merchantId: '49907299', integrityCode: 'a'.repeat(64), testMode: false },
+      platega: { enabled: true, merchantId: 'merchant-1', secret: 'platega-secret' },
     }
     const request = new Request('https://cabinet.example/api/admin/system/payment-providers', {
       method: 'PATCH',
@@ -81,6 +88,7 @@ describe('admin payment provider settings route', () => {
       body: JSON.stringify({
         yookassa: { enabled: false, shopId: '', webhookAllowedIps: '' },
         payAnyWay: { enabled: true, merchantId: '49907299', integrityCode: 'short', testMode: false },
+        platega: { enabled: false, merchantId: '' },
       }),
     })
     const response = await PATCH(request)
@@ -93,6 +101,7 @@ describe('admin payment provider settings route', () => {
     const input = {
       yookassa: { enabled: false, shopId: '', webhookAllowedIps: '' },
       payAnyWay: { enabled: true, merchantId: '49907299', integrityCode: '12345', testMode: false },
+      platega: { enabled: false, merchantId: '' },
     }
     const request = new Request('https://cabinet.example/api/admin/system/payment-providers', {
       method: 'PATCH',

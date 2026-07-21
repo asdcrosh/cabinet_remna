@@ -15,6 +15,11 @@ export type PaymentProviderSettingsInput = {
     integrityCode?: string
     testMode: boolean
   }
+  platega: {
+    enabled: boolean
+    merchantId: string
+    secret?: string
+  }
 }
 
 export type PublicPaymentProviderSettings = {
@@ -33,6 +38,12 @@ export type PublicPaymentProviderSettings = {
     integrityCodeConfigured: boolean
     testMode: boolean
   }
+  platega: {
+    enabled: boolean
+    configured: boolean
+    merchantId: string
+    secretConfigured: boolean
+  }
 }
 
 export type ResolvedPaymentProviderSettings = {
@@ -50,6 +61,11 @@ export type ResolvedPaymentProviderSettings = {
     testMode: boolean
     paymentUrl: string
   }
+  platega: {
+    enabled: boolean
+    merchantId: string
+    secret: string
+  }
 }
 
 export async function getResolvedPaymentProviderSettings(): Promise<ResolvedPaymentProviderSettings> {
@@ -60,6 +76,9 @@ export async function getResolvedPaymentProviderSettings(): Promise<ResolvedPaym
   const payAnyWayIntegrityCode = setting?.payAnyWayIntegrityCodeEncrypted
     ? decryptStoredSecret(setting.payAnyWayIntegrityCodeEncrypted, 'payanyway')
     : env('PAYANYWAY_INTEGRITY_CODE')
+  const plategaSecret = setting?.plategaSecretEncrypted
+    ? decryptStoredSecret(setting.plategaSecretEncrypted, 'platega')
+    : env('PLATEGA_SECRET')
 
   return {
     source: setting ? 'database' : 'environment',
@@ -75,6 +94,11 @@ export async function getResolvedPaymentProviderSettings(): Promise<ResolvedPaym
       integrityCode: payAnyWayIntegrityCode,
       testMode: setting?.payAnyWayTestMode ?? envFlag('PAYANYWAY_TEST_MODE', false),
       paymentUrl: env('PAYANYWAY_PAYMENT_URL'),
+    },
+    platega: {
+      enabled: setting?.plategaEnabled ?? envFlag('PLATEGA_ENABLED', false),
+      merchantId: setting?.plategaMerchantId?.trim() || env('PLATEGA_MERCHANT_ID'),
+      secret: plategaSecret,
     },
   }
 }
@@ -98,6 +122,11 @@ export async function updatePaymentProviderSettings(input: PaymentProviderSettin
       ? encryptPaymentSecret(input.payAnyWay.integrityCode.trim())
       : current?.payAnyWayIntegrityCodeEncrypted,
     payAnyWayTestMode: input.payAnyWay.testMode,
+    plategaEnabled: input.platega.enabled,
+    plategaMerchantId: clean(input.platega.merchantId),
+    plategaSecretEncrypted: input.platega.secret?.trim()
+      ? encryptPaymentSecret(input.platega.secret.trim())
+      : current?.plategaSecretEncrypted,
   }
 
   await prisma.paymentProviderSetting.upsert({
@@ -121,6 +150,10 @@ export function isResolvedPayAnyWayConfigured(settings: ResolvedPaymentProviderS
   return Boolean(settings.payAnyWay.enabled && settings.payAnyWay.merchantId && settings.payAnyWay.integrityCode)
 }
 
+export function isResolvedPlategaConfigured(settings: ResolvedPaymentProviderSettings) {
+  return Boolean(settings.platega.enabled && settings.platega.merchantId && settings.platega.secret)
+}
+
 function toPublicSettings(settings: ResolvedPaymentProviderSettings): PublicPaymentProviderSettings {
   return {
     source: settings.source,
@@ -137,6 +170,12 @@ function toPublicSettings(settings: ResolvedPaymentProviderSettings): PublicPaym
       merchantId: settings.payAnyWay.merchantId,
       integrityCodeConfigured: Boolean(settings.payAnyWay.integrityCode),
       testMode: settings.payAnyWay.testMode,
+    },
+    platega: {
+      enabled: settings.platega.enabled,
+      configured: isResolvedPlategaConfigured(settings),
+      merchantId: settings.platega.merchantId,
+      secretConfigured: Boolean(settings.platega.secret),
     },
   }
 }
@@ -155,7 +194,7 @@ function clean(value: string) {
   return value.trim() || null
 }
 
-function decryptStoredSecret(value: string, provider: 'yookassa' | 'payanyway') {
+function decryptStoredSecret(value: string, provider: 'yookassa' | 'payanyway' | 'platega') {
   try {
     return decryptPaymentSecret(value)
   } catch (error) {

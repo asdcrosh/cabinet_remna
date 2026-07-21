@@ -39,6 +39,7 @@ const optionalBooleans = [
   "YOOKASSA_ENABLED",
   "PAYANYWAY_ENABLED",
   "PAYANYWAY_TEST_MODE",
+  "PLATEGA_ENABLED",
 ];
 
 const optionalNonNegativeIntegers = [
@@ -112,6 +113,7 @@ checkPublicUrl("APP_URL");
 checkPublicUrl("NEXTAUTH_URL", { optional: true });
 checkPublicUrl("REMNAWAVE_BASE_URL");
 checkPublicUrl("YOOKASSA_WEBHOOK_URL", { optional: true, pathPrefix: "/api/webhook/yookassa" });
+checkPublicUrl("PLATEGA_WEBHOOK_URL", { optional: true, pathPrefix: "/api/webhook/platega" });
 checkAllowedOrigins();
 
 if (
@@ -169,6 +171,18 @@ if (["1", "true", "yes", "on"].includes(value("PAYANYWAY_ENABLED").toLowerCase()
   }
   if (value("PAYANYWAY_MNT_ID") && !/^\d+$/.test(value("PAYANYWAY_MNT_ID"))) {
     errors.push("PAYANYWAY_MNT_ID must contain only digits");
+  }
+}
+
+if (["1", "true", "yes", "on"].includes(value("PLATEGA_ENABLED").toLowerCase())) {
+  if (!value("PLATEGA_MERCHANT_ID")) {
+    errors.push("PLATEGA_MERCHANT_ID is required when Platega is enabled");
+  }
+  if (!value("PLATEGA_SECRET")) {
+    errors.push("PLATEGA_SECRET is required when Platega is enabled");
+  }
+  if (isProduction && !value("PLATEGA_WEBHOOK_URL")) {
+    errors.push("PLATEGA_WEBHOOK_URL is required when Platega is enabled in production");
   }
 }
 

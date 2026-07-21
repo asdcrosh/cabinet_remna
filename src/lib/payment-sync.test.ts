@@ -17,6 +17,7 @@ const mocks = vi.hoisted(() => {
     prisma,
     getPayment: vi.fn(),
     cancelPayment: vi.fn(),
+    getPlategaTransaction: vi.fn(),
     provisionPaymentSubscription: vi.fn(),
     notifyPaymentCanceled: vi.fn(),
     notifyPaymentStuck: vi.fn(),
@@ -27,6 +28,9 @@ vi.mock('./prisma', () => ({ prisma: mocks.prisma }))
 vi.mock('./yookassa', () => ({
   getPayment: mocks.getPayment,
   cancelPayment: mocks.cancelPayment,
+}))
+vi.mock('./platega', () => ({
+  getPlategaTransaction: mocks.getPlategaTransaction,
 }))
 vi.mock('./provisioning', () => ({
   provisionPaymentSubscription: mocks.provisionPaymentSubscription,
@@ -283,4 +287,110 @@ describe('payment sync pending expiration', () => {
       }),
     })
   })
+
+  it('confirms and provisions a Platega payment from the status API', async () => {
+    mocks.prisma.payment.findFirst.mockResolvedValue(plategaPayment())
+    mocks.prisma.payment.findMany.mockResolvedValue([])
+    mocks.getPlategaTransaction.mockResolvedValue({
+      id: 'platega-1',
+      status: 'CONFIRMED',
+      paymentDetails: { amount: 599, currency: 'RUB' },
+      paymentMethod: 2,
+      expiresIn: null,
+      payload: 'pay-platega',
+    })
+    mocks.provisionPaymentSubscription.mockResolvedValue({ subscription: { id: 'sub-platega' } })
+
+    await expect(syncPaymentProvisioning({ paymentId: 'pay-platega', userId: 'user-1' })).resolves.toEqual({
+      ok: true,
+      status: 'succeeded',
+      provisioned: true,
+      subscriptionId: 'sub-platega',
+    })
+
+    expect(mocks.prisma.payment.update).toHaveBeenCalledWith({
+      where: { id: 'pay-platega' },
+      data: expect.objectContaining({
+        status: 'SUCCEEDED',
+        providerStatus: 'CONFIRMED',
+        provisioningError: null,
+      }),
+    })
+    expect(mocks.provisionPaymentSubscription).toHaveBeenCalledWith(
+      expect.objectContaining({ paymentId: 'pay-platega', userId: 'user-1' })
+    )
+  })
+
+  it('keeps a pending Platega payment active without canceling it by the local TTL', async () => {
+    mocks.prisma.payment.findFirst.mockResolvedValue(plategaPayment())
+    mocks.getPlategaTransaction.mockResolvedValue({
+      id: 'platega-1',
+      status: 'PENDING',
+      paymentDetails: { amount: 599, currency: 'RUB' },
+      paymentMethod: null,
+      expiresIn: '2026-06-26T12:15:00.000Z',
+      payload: 'pay-platega',
+    })
+
+    await expect(
+      syncPaymentProvisioning({
+        paymentId: 'pay-platega',
+        userId: 'user-1',
+        cancelPendingOlderThanMs: 1,
+      })
+    ).resolves.toEqual({ ok: true, status: 'pending', provisioned: false })
+
+    expect(mocks.prisma.payment.update).toHaveBeenCalledWith({
+      where: { id: 'pay-platega' },
+      data: { providerStatus: 'PENDING', provisioningError: null },
+    })
+    expect(mocks.notifyPaymentCanceled).not.toHaveBeenCalled()
+  })
+
+  it('rejects a Platega status response with a different amount', async () => {
+    mocks.prisma.payment.findFirst.mockResolvedValue(plategaPayment())
+    mocks.getPlategaTransaction.mockResolvedValue({
+      id: 'platega-1',
+      status: 'CONFIRMED',
+      paymentDetails: { amount: 1, currency: 'RUB' },
+      paymentMethod: 2,
+      expiresIn: null,
+      payload: 'pay-platega',
+    })
+
+    const result = await syncPaymentProvisioning({ paymentId: 'pay-platega', userId: 'user-1' })
+
+    expect(result).toEqual({
+      ok: false,
+      status: 'check_failed',
+      provisioned: false,
+      error: 'Platega transaction amount mismatch',
+    })
+    expect(mocks.provisionPaymentSubscription).not.toHaveBeenCalled()
+  })
 })
+
+function plategaPayment() {
+  return {
+    id: 'pay-platega',
+    userId: 'user-1',
+    provider: 'PLATEGA',
+    externalPaymentId: 'platega-1',
+    yookassaId: null,
+    amountKopecks: 59_900,
+    status: 'PENDING',
+    paidAt: null,
+    subscriptionProvisionedAt: null,
+    createdAt: new Date('2026-06-26T11:40:00.000Z'),
+    user: { id: 'user-1', email: 'user@example.test' },
+    plan: {
+      id: 'plan-1',
+      name: 'Стандарт',
+      durationDays: 30,
+      trafficLimitGb: null,
+      deviceLimit: 5,
+      activeInternalSquads: [],
+    },
+    subscription: null,
+  }
+}

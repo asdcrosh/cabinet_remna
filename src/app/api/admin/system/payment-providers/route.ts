@@ -29,6 +29,11 @@ const schema = z.object({
     }),
     testMode: z.boolean(),
   }).strict(),
+  platega: z.object({
+    enabled: z.boolean(),
+    merchantId: z.string().trim().max(100),
+    secret: optionalSecret,
+  }).strict(),
 }).strict()
 
 export const GET = withAuth(async () => {

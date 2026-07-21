@@ -45,7 +45,7 @@ export const POST = withAuth(async (req: Request) => {
 
   if (result.status === 'not_found') return NextResponse.json({ error: 'Payment not found' }, { status: 404 })
   if (result.status === 'missing_external_id') {
-    return NextResponse.json({ error: 'У платежа нет ID ЮKassa для проверки' }, { status: 409 })
+    return NextResponse.json({ error: 'У платежа нет внешнего ID для проверки' }, { status: 409 })
   }
 
   if (result.status === 'canceled') {
