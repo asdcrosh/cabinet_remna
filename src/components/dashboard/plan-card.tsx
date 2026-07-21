@@ -501,29 +501,37 @@ export function PlanCard({
           </div>
         ) : null}
 
-        <button
-          type="button"
-          onClick={buy}
-          disabled={loading || (!isPromoPlan && paymentProviders.length === 0)}
-          className="btn-primary group mt-3 w-full min-h-12 justify-between px-4"
+        <div
+          className={cn(
+            checkoutDisplay
+              ? "sticky bottom-0 z-20 -mx-4 mt-3 border-t border-slate-200/80 bg-white/95 px-4 pb-[max(.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur dark:border-white/[0.08] dark:bg-surface-950/95"
+              : "mt-3",
+          )}
         >
-          <span className="inline-flex items-center gap-2">
-            {isPromoPlan ? <Sparkles className="h-4 w-4" /> : <CreditCard className="h-4 w-4" />}
-            {loading
-              ? isPromoPlan
-                ? "Активируем..."
-                : "Создаём платёж..."
-              : isPromoPlan
-                ? "Активировать бесплатно"
-                : current
-                  ? "Продлить тариф"
-                  : "Перейти к оплате"}
-          </span>
-          <span className="inline-flex shrink-0 items-center gap-2">
-            {!loading && !isPromoPlan ? <span className="tabular-nums">{effectivePrice}</span> : null}
-            <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-          </span>
-        </button>
+          <button
+            type="button"
+            onClick={buy}
+            disabled={loading || (!isPromoPlan && paymentProviders.length === 0)}
+            className="btn-primary group min-h-12 w-full justify-between px-4"
+          >
+            <span className="inline-flex items-center gap-2">
+              {isPromoPlan ? <Sparkles className="h-4 w-4" /> : <CreditCard className="h-4 w-4" />}
+              {loading
+                ? isPromoPlan
+                  ? "Активируем..."
+                  : "Создаём платёж..."
+                : isPromoPlan
+                  ? "Активировать бесплатно"
+                  : current
+                    ? "Продлить тариф"
+                    : "Перейти к оплате"}
+            </span>
+            <span className="inline-flex shrink-0 items-center gap-2">
+              {!loading && !isPromoPlan ? <span className="tabular-nums">{effectivePrice}</span> : null}
+              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+            </span>
+          </button>
+        </div>
       </div>
     </div>
   );

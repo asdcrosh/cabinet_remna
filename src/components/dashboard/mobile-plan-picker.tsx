@@ -2,6 +2,7 @@
 
 import type { ReactNode } from 'react'
 import { useEffect, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { ArrowRight, Check, CreditCard, X } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { formatPrice } from '@/lib/format'
@@ -84,19 +85,19 @@ export function PlanCatalog({ plans, initialPlanId }: { plans: CatalogPlan[]; in
                 {plan.price}
               </span>
             </div>
-            <button
-              type="button"
-              aria-haspopup="dialog"
-              onClick={() => setMobileCheckoutPlanId(plan.id)}
-              disabled={!plan.isPromo && plan.paymentProviders?.length === 0}
-              className="btn-primary group mt-3 min-h-11 w-full justify-between px-3.5"
-            >
-              <span className="inline-flex items-center gap-2">
+            <div className="mt-3 flex justify-end border-t border-slate-100 pt-3 dark:border-white/[0.06]">
+              <button
+                type="button"
+                aria-haspopup="dialog"
+                onClick={() => setMobileCheckoutPlanId(plan.id)}
+                disabled={!plan.isPromo && plan.paymentProviders?.length === 0}
+                className="group inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-slate-100 px-3.5 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-200 hover:text-slate-950 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white/[0.06] dark:text-slate-200 dark:hover:bg-white/[0.1] dark:hover:text-white"
+              >
                 <CreditCard className="h-4 w-4" />
                 {mobileCtaLabel(plan)}
-              </span>
-              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-            </button>
+                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+              </button>
+            </div>
           </article>
         ))}
       </div>
@@ -180,8 +181,8 @@ export function PlanCatalog({ plans, initialPlanId }: { plans: CatalogPlan[]; in
         </div>
       </div>
 
-      {mobileCheckoutPlan ? (
-        <div className="fixed inset-0 z-[90] xl:hidden">
+      {mobileCheckoutPlan ? createPortal(
+        <div className="fixed inset-0 z-[110] xl:hidden">
           <button
             type="button"
             className="absolute inset-0 bg-slate-950/65 backdrop-blur-sm"
@@ -209,11 +210,12 @@ export function PlanCatalog({ plans, initialPlanId }: { plans: CatalogPlan[]; in
                 <X className="h-4 w-4" />
               </button>
             </div>
-            <div className="px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4">
+            <div className="px-4 pt-4">
               <PlanCard key={mobileCheckoutPlan.id} {...mobileCheckoutPlan} display="checkout" />
             </div>
           </section>
-        </div>
+        </div>,
+        document.body,
       ) : null}
     </section>
   )
