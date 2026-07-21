@@ -254,7 +254,7 @@ export function PlanCard({
       data-testid="plan-card"
       className={cn(
         "relative flex h-full min-h-0 flex-col overflow-hidden rounded-[1.75rem] border border-slate-200/80 bg-white p-4 shadow-sm shadow-slate-950/[0.025] dark:border-white/[0.09] dark:bg-white/[0.035] dark:shadow-none sm:p-5",
-        checkoutDisplay && "rounded-none border-0 bg-transparent p-0 shadow-none dark:border-0 dark:bg-transparent sm:p-0",
+        checkoutDisplay && "overflow-visible rounded-none border-0 bg-transparent p-0 shadow-none dark:border-0 dark:bg-transparent sm:p-0",
         !checkoutDisplay && popular && "border-cyan-300/80 dark:border-cyan-400/35",
         !checkoutDisplay && current && "border-cyan-300/80 bg-cyan-50/45 shadow-cyan-950/[0.04] dark:border-cyan-400/35 dark:bg-cyan-500/[0.06]",
         !checkoutDisplay && isPromoPlan && "border-emerald-200/80 dark:border-emerald-400/25",
