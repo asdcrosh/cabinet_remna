@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import type { ReactNode } from 'react'
-import { ArrowUpRight, Headphones, Mail, MessageCircle, Phone, ShieldCheck } from 'lucide-react'
+import { ArrowUpRight, Headphones, Mail, MessageCircle, Phone } from 'lucide-react'
 import { getBrandName } from '@/lib/branding'
 import { getLegalDetails, LEGAL_UPDATED_AT } from '@/lib/legal'
 import { LegalPage, LegalSection } from '@/components/legal/legal-page'

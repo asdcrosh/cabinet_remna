@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { getBrandName } from '@/lib/branding'
-import { getLegalDetails, OFFER_UPDATED_AT, OFFER_VERSION } from '@/lib/legal'
+import { getLegalDetails, OFFER_UPDATED_AT } from '@/lib/legal'
 import { LegalPage, LegalSection } from '@/components/legal/legal-page'
 
 export const metadata = { title: 'Публичная оферта' }

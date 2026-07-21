@@ -2,7 +2,6 @@ import { getBrandName } from '@/lib/branding'
 import {
   getLegalDetails,
   LEGAL_UPDATED_AT,
-  PRIVACY_POLICY_VERSION,
 } from '@/lib/legal'
 import { LegalPage, LegalSection } from '@/components/legal/legal-page'
 
