@@ -36,6 +36,7 @@ export interface PlanCardProps {
   promoCodesEnabled?: boolean;
   popular?: boolean;
   current?: boolean;
+  display?: "full" | "checkout";
   initialPromoCode?: string;
   paymentProviders?: Array<{
     id: CheckoutPaymentProvider;
@@ -64,10 +65,12 @@ export function PlanCard({
   promoCodesEnabled = true,
   popular,
   current,
+  display = "full",
   initialPromoCode,
   paymentProviders = [{ id: "YOOKASSA", label: "ЮKassa" }],
   availablePromoCodes = [],
 }: PlanCardProps) {
+  const checkoutDisplay = display === "checkout";
   const [loading, setLoading] = useState(false);
   const [validatingPromo, setValidatingPromo] = useState(false);
   const [promoOpen, setPromoOpen] = useState(false);
@@ -251,12 +254,13 @@ export function PlanCard({
       data-testid="plan-card"
       className={cn(
         "relative flex h-full min-h-0 flex-col overflow-hidden rounded-[1.75rem] border border-slate-200/80 bg-white p-4 shadow-sm shadow-slate-950/[0.025] dark:border-white/[0.09] dark:bg-white/[0.035] dark:shadow-none sm:p-5",
-        popular && "border-cyan-300/80 dark:border-cyan-400/35",
-        current && "border-cyan-300/80 bg-cyan-50/45 shadow-cyan-950/[0.04] dark:border-cyan-400/35 dark:bg-cyan-500/[0.06]",
-        isPromoPlan && "border-emerald-200/80 dark:border-emerald-400/25",
+        checkoutDisplay && "rounded-none border-0 bg-transparent p-0 shadow-none dark:border-0 dark:bg-transparent sm:p-0",
+        !checkoutDisplay && popular && "border-cyan-300/80 dark:border-cyan-400/35",
+        !checkoutDisplay && current && "border-cyan-300/80 bg-cyan-50/45 shadow-cyan-950/[0.04] dark:border-cyan-400/35 dark:bg-cyan-500/[0.06]",
+        !checkoutDisplay && isPromoPlan && "border-emerald-200/80 dark:border-emerald-400/25",
       )}
     >
-      {(popular || current || isPromoPlan) && (
+      {!checkoutDisplay && (popular || current || isPromoPlan) && (
         <span
           className={cn(
             "absolute inset-x-7 top-0 h-0.5 rounded-b-full",
@@ -281,7 +285,7 @@ export function PlanCard({
             <h3 className="break-words text-lg font-semibold leading-tight tracking-[-0.02em] text-slate-950 dark:text-white sm:text-xl">
               {name}
             </h3>
-            {description && (
+            {description && !checkoutDisplay && (
               <p className="mt-1.5 line-clamp-2 text-sm leading-5 text-slate-500 dark:text-slate-400">
                 {description}
               </p>
@@ -308,7 +312,7 @@ export function PlanCard({
         )}
       </div>
 
-      <div className="mt-5 rounded-[1.35rem] bg-slate-50/80 p-4 ring-1 ring-slate-200/70 dark:bg-white/[0.035] dark:ring-white/[0.08]">
+      <div className={cn("rounded-[1.35rem] bg-slate-50/80 p-4 ring-1 ring-slate-200/70 dark:bg-white/[0.035] dark:ring-white/[0.08]", checkoutDisplay ? "mt-4" : "mt-5")}>
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div className="flex flex-wrap items-baseline gap-2">
             <div className="whitespace-nowrap text-[2rem] font-semibold leading-none tracking-[-0.04em] tabular-nums text-slate-950 dark:text-white sm:text-4xl">
@@ -331,15 +335,17 @@ export function PlanCard({
         </div>
       </div>
 
-      <div className="mt-3 grid grid-cols-3 gap-2">
-        <PlanFact icon={<CalendarDays className="h-4 w-4" />} label="Срок" value={`${durationDays} дн.`} />
-        <PlanFact
-          icon={<Gauge className="h-4 w-4" />}
-          label="Трафик"
-          value={trafficLimitGb == null ? "Безлимит" : `${trafficLimitGb} ГБ`}
-        />
-        <PlanFact icon={<MonitorSmartphone className="h-4 w-4" />} label="Устройства" value={`До ${deviceLimit}`} />
-      </div>
+      {!checkoutDisplay ? (
+        <div className="mt-3 grid grid-cols-3 gap-2">
+          <PlanFact icon={<CalendarDays className="h-4 w-4" />} label="Срок" value={`${durationDays} дн.`} />
+          <PlanFact
+            icon={<Gauge className="h-4 w-4" />}
+            label="Трафик"
+            value={trafficLimitGb == null ? "Безлимит" : `${trafficLimitGb} ГБ`}
+          />
+          <PlanFact icon={<MonitorSmartphone className="h-4 w-4" />} label="Устройства" value={`До ${deviceLimit}`} />
+        </div>
+      ) : null}
 
       <div className="mt-auto pt-4">
         {!isPromoPlan && promoCodesEnabled && (promoOpen || appliedPromo) ? (

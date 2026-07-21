@@ -1,8 +1,8 @@
 'use client'
 
 import type { ReactNode } from 'react'
-import { useMemo, useState } from 'react'
-import { Check } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { ArrowRight, Check, CreditCard, X } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { formatPrice } from '@/lib/format'
 import { PlanCard, type PlanCardProps } from './plan-card'
@@ -19,7 +19,27 @@ export function PlanCatalog({ plans, initialPlanId }: { plans: CatalogPlan[]; in
     return featured ? [featured, ...plans.filter((plan) => plan.id !== featured.id)] : plans
   }, [featuredId, plans])
   const [selectedPlanId, setSelectedPlanId] = useState(featuredId)
+  const [mobileCheckoutPlanId, setMobileCheckoutPlanId] = useState<string | null>(null)
   const activePlanId = orderedPlans.some((plan) => plan.id === selectedPlanId) ? selectedPlanId : featuredId
+  const activePlan = orderedPlans.find((plan) => plan.id === activePlanId) ?? orderedPlans[0]
+  const mobileCheckoutPlan = orderedPlans.find((plan) => plan.id === mobileCheckoutPlanId) ?? null
+  const mobileCheckoutOpen = Boolean(mobileCheckoutPlan)
+
+  useEffect(() => {
+    if (!mobileCheckoutOpen) return
+
+    const previousOverflow = document.body.style.overflow
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setMobileCheckoutPlanId(null)
+    }
+    document.body.style.overflow = 'hidden'
+    document.addEventListener('keydown', closeOnEscape)
+
+    return () => {
+      document.body.style.overflow = previousOverflow
+      document.removeEventListener('keydown', closeOnEscape)
+    }
+  }, [mobileCheckoutOpen])
 
   if (orderedPlans.length === 0) return null
 
@@ -39,8 +59,50 @@ export function PlanCatalog({ plans, initialPlanId }: { plans: CatalogPlan[]; in
         </span>
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.08fr)_minmax(25rem,0.72fr)] xl:items-start">
-        <div className="overflow-hidden rounded-[1.75rem] border border-slate-200/80 bg-slate-50/65 p-3 dark:border-white/[0.08] dark:bg-white/[0.025] sm:p-4">
+      <div className="grid gap-2.5 xl:hidden">
+        {orderedPlans.map((plan) => (
+          <article
+            key={plan.id}
+            className={cn(
+              'rounded-[1.35rem] border border-slate-200/80 bg-white p-3.5 shadow-sm shadow-slate-950/[0.025] dark:border-white/[0.08] dark:bg-white/[0.035] dark:shadow-none',
+              plan.current && 'border-cyan-300/80 bg-cyan-50/45 dark:border-cyan-400/35 dark:bg-cyan-500/[0.06]'
+            )}
+          >
+            <div className="flex min-w-0 items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <h3 className="break-words text-base font-semibold tracking-tight text-slate-950 dark:text-white">{plan.name}</h3>
+                  {plan.current ? <PlanPickerBadge>Текущий</PlanPickerBadge> : null}
+                  {!plan.current && plan.popular ? <PlanPickerBadge>Популярный</PlanPickerBadge> : null}
+                  {plan.savingsPercent > 0 && !plan.isPromo ? <PlanPickerBadge>−{plan.savingsPercent}%</PlanPickerBadge> : null}
+                </div>
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  {plan.durationDays} дней · {dailyRateLabel(plan)}
+                </p>
+              </div>
+              <span className="shrink-0 whitespace-nowrap text-lg font-semibold tabular-nums text-slate-950 dark:text-white">
+                {plan.price}
+              </span>
+            </div>
+            <button
+              type="button"
+              aria-haspopup="dialog"
+              onClick={() => setMobileCheckoutPlanId(plan.id)}
+              disabled={!plan.isPromo && plan.paymentProviders?.length === 0}
+              className="btn-primary group mt-3 min-h-11 w-full justify-between px-3.5"
+            >
+              <span className="inline-flex items-center gap-2">
+                <CreditCard className="h-4 w-4" />
+                {mobileCtaLabel(plan)}
+              </span>
+              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+            </button>
+          </article>
+        ))}
+      </div>
+
+      <div className="hidden gap-4 xl:grid xl:grid-cols-2 xl:items-stretch">
+        <div className="flex h-full flex-col overflow-hidden rounded-[1.75rem] border border-slate-200/80 bg-slate-50/65 p-4 dark:border-white/[0.08] dark:bg-white/[0.025]">
           <div className="mb-3 px-1 sm:flex sm:items-end sm:justify-between sm:gap-4">
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-cyan-600 dark:text-cyan-300">
@@ -107,20 +169,52 @@ export function PlanCatalog({ plans, initialPlanId }: { plans: CatalogPlan[]; in
             })}
           </div>
 
-          <div className="mt-3 flex items-start gap-2.5 rounded-2xl bg-white/70 px-3.5 py-3 text-xs leading-5 text-slate-500 ring-1 ring-slate-200/70 dark:bg-white/[0.025] dark:text-slate-400 dark:ring-white/[0.07]">
+          <div className="mt-auto flex items-start gap-2.5 rounded-2xl bg-white/70 px-3.5 py-3 text-xs leading-5 text-slate-500 ring-1 ring-slate-200/70 dark:bg-white/[0.025] dark:text-slate-400 dark:ring-white/[0.07]">
             <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-cyan-400" />
             <span>Цена фиксирована за весь выбранный срок. Доступ активируется автоматически после подтверждения оплаты.</span>
           </div>
         </div>
 
-        <div className="min-w-0 xl:sticky xl:top-5">
-          {orderedPlans.map((plan) => (
-            <div key={plan.id} className="min-w-0" hidden={plan.id !== activePlanId}>
-              <PlanCard {...plan} />
-            </div>
-          ))}
+        <div className="min-w-0">
+          {activePlan ? <PlanCard key={activePlan.id} {...activePlan} /> : null}
         </div>
       </div>
+
+      {mobileCheckoutPlan ? (
+        <div className="fixed inset-0 z-[90] xl:hidden">
+          <button
+            type="button"
+            className="absolute inset-0 bg-slate-950/65 backdrop-blur-sm"
+            aria-label="Закрыть окно оплаты"
+            onClick={() => setMobileCheckoutPlanId(null)}
+          />
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="mobile-checkout-title"
+            className="absolute inset-x-0 bottom-0 max-h-[92dvh] overflow-y-auto rounded-t-[2rem] border-t border-slate-200 bg-white shadow-2xl dark:border-white/[0.1] dark:bg-surface-950"
+          >
+            <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-slate-100 bg-white/95 px-4 py-3.5 backdrop-blur dark:border-white/[0.08] dark:bg-surface-950/95">
+              <div>
+                <h2 id="mobile-checkout-title" className="font-semibold tracking-tight text-slate-950 dark:text-white">Оплата тарифа</h2>
+                <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Выберите способ оплаты и подтвердите</p>
+              </div>
+              <button
+                type="button"
+                autoFocus
+                className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-500 transition-colors hover:bg-slate-200 hover:text-slate-950 dark:bg-white/[0.07] dark:text-slate-300 dark:hover:bg-white/[0.11] dark:hover:text-white"
+                aria-label="Закрыть"
+                onClick={() => setMobileCheckoutPlanId(null)}
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4">
+              <PlanCard key={mobileCheckoutPlan.id} {...mobileCheckoutPlan} display="checkout" />
+            </div>
+          </section>
+        </div>
+      ) : null}
     </section>
   )
 }
@@ -143,4 +237,10 @@ function dailyRateLabel(plan: CatalogPlan) {
   if (plan.isPromo || plan.priceKopecks <= 0) return 'Бесплатно'
   const dailyPrice = Math.round(plan.priceKopecks / Math.max(1, plan.durationDays))
   return `${formatPrice(dailyPrice)} в день`
+}
+
+function mobileCtaLabel(plan: CatalogPlan) {
+  if (plan.isPromo) return 'Активировать'
+  if (plan.current) return 'Продлить'
+  return 'Оплатить'
 }

@@ -197,7 +197,7 @@ export default async function PlansPage({
 
 function PlanComparison({ plans }: { plans: Array<{ id: string; name: string; priceKopecks: number; durationDays: number; trafficLimitGb: number | null; deviceLimit: number }> }) {
   return (
-    <details className="group overflow-hidden rounded-[1.75rem] border border-slate-200/80 bg-white dark:border-white/[0.08] dark:bg-white/[0.025]">
+    <details className="group hidden overflow-hidden rounded-[1.75rem] border border-slate-200/80 bg-white dark:border-white/[0.08] dark:bg-white/[0.025] xl:block">
       <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-4 text-slate-950 transition-colors hover:bg-slate-50/70 dark:text-white dark:hover:bg-white/[0.025] sm:px-5 [&::-webkit-details-marker]:hidden">
         <span className="min-w-0">
           <span className="block text-sm font-semibold">Сравнить все характеристики</span>
