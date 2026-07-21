@@ -151,13 +151,13 @@ export default function TermsPage() {
           </p>
         </LegalSection>
 
-        <LegalSection title="11. Исполнитель и контакты">
+        {/* <LegalSection title="11. Исполнитель и контакты">
           <p>{legal.operatorName}, ИНН {legal.taxId}.</p>
           <p>
             {legal.address && <>Адрес: {legal.address}. </>}
             Поддержка: <a className="text-brand-600 hover:underline" href={`mailto:${legal.supportEmail}`}>{legal.supportEmail}</a>.
           </p>
-        </LegalSection>
+        </LegalSection> */}
     </LegalPage>
   )
 }

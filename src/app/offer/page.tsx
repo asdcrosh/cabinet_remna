@@ -21,13 +21,13 @@ export default function OfferPage() {
       title="Публичная оферта"
       updatedAt={OFFER_UPDATED_AT}
     >
-      <LegalSection title="1. Статус документа">
+      {/* <LegalSection title="1. Статус документа">
         <p>
           Настоящий документ является публичной офертой {legal.operatorName}, ИНН {legal.taxId},
           адресованной физическим лицам. Версия оферты: {OFFER_VERSION}.
         </p>
         {legal.address && <p>Адрес исполнителя: {legal.address}.</p>}
-      </LegalSection>
+      </LegalSection> */}
 
       <LegalSection title="2. Предмет оферты">
         <p>

@@ -26,7 +26,7 @@ export default function PrivacyPage() {
     >
       <LegalSection title="1. Общие положения">
         <p>Настоящая Политика разработана в соответствии с Федеральным законом № 152-ФЗ «О персональных данных» и применяется ко всем данным, которые обрабатываются при использовании сайта и личного кабинета {brandName}.</p>
-        <p>Версия Политики: {PRIVACY_POLICY_VERSION}. Оператором персональных данных является {legal.operatorName}, ИНН {legal.taxId}{legal.address ? `, адрес: ${legal.address}` : ''}.</p>
+        {/* <p>Версия Политики: {PRIVACY_POLICY_VERSION}. Оператором персональных данных является {legal.operatorName}, ИНН {legal.taxId}{legal.address ? `, адрес: ${legal.address}` : ''}.</p> */}
       </LegalSection>
 
       <LegalSection title="2. Категории субъектов и данных">
@@ -89,7 +89,7 @@ export default function PrivacyPage() {
 
       <LegalSection title="11. Изменение Политики и контакты">
         <p>Новая редакция публикуется на этой странице. При существенных изменениях оператор может запросить повторное подтверждение согласия.</p>
-        <p>{legal.operatorName}, ИНН {legal.taxId}{legal.address ? `, адрес: ${legal.address}` : ''}. Email по вопросам персональных данных и поддержки: <a className="text-brand-600 hover:underline" href={`mailto:${legal.supportEmail}`}>{legal.supportEmail}</a>.</p>
+        {/* <p>{legal.operatorName}, ИНН {legal.taxId}{legal.address ? `, адрес: ${legal.address}` : ''}. Email по вопросам персональных данных и поддержки: <a className="text-brand-600 hover:underline" href={`mailto:${legal.supportEmail}`}>{legal.supportEmail}</a>.</p> */}
       </LegalSection>
     </LegalPage>
   )

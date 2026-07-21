@@ -77,7 +77,7 @@ export default function ContactsPage() {
         </LegalSection>
       )}
 
-      <LegalSection title="Исполнитель и оператор данных">
+      {/* <LegalSection title="Исполнитель и оператор данных">
         <div className="flex gap-3 rounded-2xl bg-slate-50 p-3.5 dark:bg-white/[0.035]">
           <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-cyan-50 text-cyan-700 dark:bg-cyan-400/10 dark:text-cyan-200">
             <ShieldCheck className="h-5 w-5" />
@@ -87,7 +87,7 @@ export default function ContactsPage() {
             {legal.address && <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Адрес: {legal.address}.</p>}
           </div>
         </div>
-      </LegalSection>
+      </LegalSection> */}
     </LegalPage>
   )
 }

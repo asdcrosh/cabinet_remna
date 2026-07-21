@@ -24,9 +24,9 @@ export default function ConsentPage() {
       title="Согласие на обработку персональных данных"
       updatedAt={LEGAL_UPDATED_AT}
     >
-      <LegalSection title="1. Оператор и версия">
+      {/* <LegalSection title="1. Оператор и версия">
         <p>Согласие предоставляется оператору: {legal.operatorName}, ИНН {legal.taxId}{legal.address ? `, адрес: ${legal.address}` : ''}. Версия согласия: {PERSONAL_DATA_CONSENT_VERSION}.</p>
-      </LegalSection>
+      </LegalSection> */}
 
       <LegalSection title="2. Данные">
         <p>Пользователь даёт согласие на обработку email, имени, данных Telegram и Яндекс ID при использовании соответствующих способов входа, сведений об аккаунте, оплатах, тарифах, подписках, устройствах, обращениях, IP-адресе, user-agent и технических событиях.</p>

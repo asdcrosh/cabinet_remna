@@ -32,12 +32,12 @@ export default function RefundsPage() {
         <LegalSection title="Срок и способ возврата">
           <p>После проверки решение сообщается по email. Одобренный возврат отправляется через исходный способ оплаты. Фактический срок зачисления зависит от платёжного провайдера и банка.</p>
         </LegalSection>
-        <LegalSection title="Исполнитель">
+        {/* <LegalSection title="Исполнитель">
           <p>
             {legal.operatorName}, ИНН {legal.taxId}.
             {legal.address && <> Адрес: {legal.address}.</>}
           </p>
-        </LegalSection>
+        </LegalSection> */}
     </LegalPage>
   )
 }
