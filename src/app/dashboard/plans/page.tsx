@@ -12,7 +12,7 @@ import { getAvailableUserPromoCodesByPlan } from '@/lib/user-promo-codes'
 import { getAvailablePaymentProviders } from '@/lib/payment-providers'
 import { ArrowRight, ChevronDown, MessageCircleQuestion, RefreshCw, ShieldCheck } from 'lucide-react'
 
-export const revalidate = 300 // кэш на 5 минут
+export const dynamic = 'force-dynamic'
 
 export default async function PlansPage({
   searchParams,
@@ -169,7 +169,13 @@ export default async function PlansPage({
         </div>
       )}
 
-      {planViews.length > 0 ? <PlanCatalog plans={planViews} initialPlanId={linkedPlanId} /> : null}
+      {planViews.length > 0 ? (
+        <PlanCatalog
+          key={`${currentSubscription?.planId ?? 'none'}:${linkedPlanId ?? ''}`}
+          plans={planViews}
+          initialPlanId={linkedPlanId}
+        />
+      ) : null}
 
       {planViews.length === 0 && (
         <div className="rounded-[1.75rem] border border-slate-200/80 bg-white px-4 py-10 text-center dark:border-white/[0.08] dark:bg-white/[0.025] sm:px-6 sm:py-12">

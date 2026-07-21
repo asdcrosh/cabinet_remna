@@ -14,6 +14,7 @@ import { AdminEmptyState } from '@/components/admin/admin-empty-state'
 import { describeSyncError } from '@/lib/sync-error'
 import { paymentProviderLabel } from '@/lib/payment-provider-label'
 import type { PaymentProvider } from '@prisma/client'
+import { PaymentLiveSync } from '@/components/admin/payment-live-sync'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Платежи — Админка' }
@@ -71,6 +72,12 @@ export default async function AdminPaymentsPage({
     prisma.payment.count({ where: { status: 'SUCCEEDED', subscriptionProvisionedAt: null } }),
     prisma.payment.count({ where: { status: 'SUCCEEDED' } }),
   ])
+  const autoSyncPaymentIds = payments
+    .filter((payment) => payment.status === 'PENDING' && (
+      (payment.provider === 'YOOKASSA' && Boolean(payment.yookassaId)) ||
+      (payment.provider === 'PLATEGA' && Boolean(payment.externalPaymentId))
+    ))
+    .map((payment) => payment.id)
 
   return (
     <AdminPageShell
@@ -88,6 +95,8 @@ export default async function AdminPaymentsPage({
         <PaymentStat title="Довыдача" value={retryCount} tone={retryCount > 0 ? 'red' : 'slate'} href="/dashboard/admin/payments?delivery=RETRY" active={delivery === 'RETRY'} />
         <PaymentStat title="Оплачено" value={succeededCount} tone="emerald" href="/dashboard/admin/payments?status=SUCCEEDED" active={status === 'SUCCEEDED' && delivery !== 'RETRY'} />
       </section>
+
+      <PaymentLiveSync paymentIds={autoSyncPaymentIds} />
 
       <AdminFilterBar
         action="/dashboard/admin/payments"

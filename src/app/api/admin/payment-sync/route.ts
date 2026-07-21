@@ -20,6 +20,9 @@ export const POST = withAuth(async (req: Request) => {
     body && typeof body === 'object' && 'paymentId' in body && typeof body.paymentId === 'string'
       ? body.paymentId
       : null
+  const automatic = Boolean(
+    body && typeof body === 'object' && 'automatic' in body && body.automatic === true
+  )
 
   if (!paymentId) {
     return NextResponse.json({ error: 'paymentId is required' }, { status: 400 })
@@ -29,19 +32,22 @@ export const POST = withAuth(async (req: Request) => {
     paymentId,
     cancelPendingOlderThanMs: getPendingPaymentTtlMs(),
   })
-  await writeAuditLog({
-    actorId: session.uid,
-    targetId: result.status === 'not_found' ? null : paymentId,
-    action: 'PAYMENT_SYNCED',
-    message: 'Администратор вручную проверил платёж',
-    metadata: {
-      paymentId,
-      status: result.status,
-      ok: 'ok' in result ? result.ok : undefined,
-      provisioned: 'provisioned' in result ? result.provisioned : undefined,
-    },
-    request: req,
-  })
+  if (!automatic || result.status !== 'pending') {
+    await writeAuditLog({
+      actorId: session.uid,
+      targetId: result.status === 'not_found' ? null : paymentId,
+      action: 'PAYMENT_SYNCED',
+      message: automatic ? 'Платёж проверен автоматически' : 'Администратор вручную проверил платёж',
+      metadata: {
+        paymentId,
+        automatic,
+        status: result.status,
+        ok: 'ok' in result ? result.ok : undefined,
+        provisioned: 'provisioned' in result ? result.provisioned : undefined,
+      },
+      request: req,
+    })
+  }
 
   if (result.status === 'not_found') return NextResponse.json({ error: 'Payment not found' }, { status: 404 })
   if (result.status === 'missing_external_id') {

@@ -7,6 +7,8 @@ import { AlertTriangle, Check, CheckCircle2, Circle, CreditCard, KeyRound, Loade
 import { cn } from '@/lib/cn'
 
 type PaymentSuccessBannerStatus = 'ready' | 'processing' | 'attention' | 'canceled' | 'not_found'
+const PAYMENT_STATUS_POLL_SECONDS = 60
+const PAYMENT_STATUS_POLL_INTERVAL_MS = 3000
 
 export function PaymentSuccessBanner({
   status = 'processing',
@@ -16,20 +18,21 @@ export function PaymentSuccessBanner({
   supportEnabled?: boolean
 }) {
   const router = useRouter()
-  const [seconds, setSeconds] = useState(12)
+  const [seconds, setSeconds] = useState(PAYMENT_STATUS_POLL_SECONDS)
 
   useEffect(() => {
     if (status !== 'processing') return
-    setSeconds(12)
+    setSeconds(PAYMENT_STATUS_POLL_SECONDS)
     let refreshCount = 0
+    const maxRefreshCount = PAYMENT_STATUS_POLL_SECONDS / (PAYMENT_STATUS_POLL_INTERVAL_MS / 1000)
 
     const refresh = window.setInterval(() => {
       if (document.visibilityState === 'hidden') return
       refreshCount += 1
       router.refresh()
-      setSeconds(Math.max(0, 12 - refreshCount * 3))
-      if (refreshCount >= 4) window.clearInterval(refresh)
-    }, 3000)
+      setSeconds(Math.max(0, PAYMENT_STATUS_POLL_SECONDS - refreshCount * 3))
+      if (refreshCount >= maxRefreshCount) window.clearInterval(refresh)
+    }, PAYMENT_STATUS_POLL_INTERVAL_MS)
 
     return () => window.clearInterval(refresh)
   }, [router, status])
