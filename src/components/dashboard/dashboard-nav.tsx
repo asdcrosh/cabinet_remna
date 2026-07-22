@@ -2,7 +2,7 @@
 
 import { createContext, type ReactNode, useContext, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { createPortal } from 'react-dom'
 import {
   Bell,
@@ -277,6 +277,7 @@ export function MobileBottomNav({
   features: FeatureFlags
 }) {
   const pathname = usePathname()
+  const router = useRouter()
   const liveBadges = useNavBadgeValues(badges)
   const adminArea = pathname.startsWith('/dashboard/admin') && role !== 'USER'
   const availableAdminItems = adminArea ? getAdminItems(role, features) : []
@@ -294,8 +295,10 @@ export function MobileBottomNav({
     ? availableAdminItems.filter((item) => !adminPrimaryHrefs.has(item.href))
     : [...accountMoreItems, ...infoNav]
   const showMore = moreItems.length > 0
+  const swipeHrefKey = adminArea ? '' : items.map((item) => item.href).join('\n')
   const [moreOpen, setMoreOpen] = useState(false)
   const [mounted, setMounted] = useState(false)
+  const swipeStartRef = useRef<{ x: number; y: number; time: number } | null>(null)
   const moreTriggerRef = useRef<HTMLButtonElement | null>(null)
   const moreDialogRef = useRef<HTMLDivElement | null>(null)
   const moreCloseButtonRef = useRef<HTMLButtonElement | null>(null)
@@ -308,6 +311,70 @@ export function MobileBottomNav({
   useEffect(() => {
     setMounted(true)
   }, [])
+
+  useEffect(() => {
+    if (!swipeHrefKey || moreOpen) return
+
+    const content = document.getElementById('dashboard-content')
+    if (!content) return
+
+    const swipeHrefs = swipeHrefKey.split('\n')
+    const activeIndex = swipeHrefs.findIndex((href) =>
+      href === '/dashboard' ? pathname === href : pathname.startsWith(href)
+    )
+    if (activeIndex < 0) return
+
+    const onTouchStart = (event: TouchEvent) => {
+      const touch = event.touches[0]
+      if (
+        window.matchMedia('(min-width: 1024px)').matches ||
+        event.touches.length !== 1 ||
+        !touch ||
+        touch.clientX < 24 ||
+        touch.clientX > window.innerWidth - 24 ||
+        shouldIgnoreDashboardSwipe(event.target)
+      ) {
+        swipeStartRef.current = null
+        return
+      }
+
+      swipeStartRef.current = {
+        x: touch.clientX,
+        y: touch.clientY,
+        time: Date.now(),
+      }
+    }
+
+    const onTouchEnd = (event: TouchEvent) => {
+      const start = swipeStartRef.current
+      const touch = event.changedTouches[0]
+      swipeStartRef.current = null
+      if (!start || !touch || Date.now() - start.time > 800) return
+
+      const deltaX = touch.clientX - start.x
+      const deltaY = touch.clientY - start.y
+      const horizontalDistance = Math.abs(deltaX)
+      if (horizontalDistance < 64 || horizontalDistance < Math.abs(deltaY) * 1.35) return
+
+      const nextIndex = deltaX < 0 ? activeIndex + 1 : activeIndex - 1
+      const destination = swipeHrefs[nextIndex]
+      if (destination) router.push(destination)
+    }
+
+    const onTouchCancel = () => {
+      swipeStartRef.current = null
+    }
+
+    content.addEventListener('touchstart', onTouchStart, { passive: true })
+    content.addEventListener('touchend', onTouchEnd, { passive: true })
+    content.addEventListener('touchcancel', onTouchCancel, { passive: true })
+
+    return () => {
+      content.removeEventListener('touchstart', onTouchStart)
+      content.removeEventListener('touchend', onTouchEnd)
+      content.removeEventListener('touchcancel', onTouchCancel)
+    }
+  }, [moreOpen, pathname, router, swipeHrefKey])
 
   const moreDrawer = (
     <div className="fixed inset-0 z-[95] h-dvh w-dvw lg:hidden">
@@ -430,6 +497,28 @@ export function MobileBottomNav({
       {showMore && mounted && moreOpen ? createPortal(moreDrawer, document.body) : null}
     </nav>
   )
+}
+
+function shouldIgnoreDashboardSwipe(target: EventTarget | null) {
+  if (!(target instanceof HTMLElement)) return true
+  if (
+    target.closest(
+      'a, button, input, textarea, select, label, [contenteditable="true"], [role="slider"], [role="dialog"], [data-swipe-navigation="ignore"]'
+    )
+  ) {
+    return true
+  }
+
+  let element: HTMLElement | null = target
+  while (element && element.id !== 'dashboard-content') {
+    const overflowX = window.getComputedStyle(element).overflowX
+    if ((overflowX === 'auto' || overflowX === 'scroll') && element.scrollWidth > element.clientWidth + 1) {
+      return true
+    }
+    element = element.parentElement
+  }
+
+  return Boolean(document.querySelector('[role="dialog"][aria-modal="true"]'))
 }
 
 function MobileMoreSection({
