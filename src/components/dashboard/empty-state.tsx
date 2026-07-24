@@ -12,13 +12,15 @@ interface EmptyStateProps {
 
 export function EmptyState({ title, description, icon, action, className }: EmptyStateProps) {
   return (
-    <div className={cn('card relative overflow-hidden px-4 py-9 text-center sm:py-12', className)}>
-      <div className="mx-auto mb-5 grid h-14 w-14 place-items-center text-cyan-700 dark:text-cyan-200">
+    <div className={cn('card relative overflow-hidden border-dashed px-4 py-7 sm:flex sm:items-center sm:gap-5 sm:px-6 sm:py-8', className)}>
+      <div className="mb-4 grid h-10 w-10 shrink-0 place-items-center border border-cyan-700 text-cyan-700 dark:border-cyan-300 dark:text-cyan-200 sm:mb-0">
         {icon ?? <Info className="h-7 w-7" />}
       </div>
-      <h2 className="text-xl font-semibold tracking-tight">{title}</h2>
-      {description && <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500 dark:text-slate-400">{description}</p>}
-      {action && <div className="mx-auto mt-6 flex w-full max-w-xs flex-col sm:w-auto sm:max-w-none">{action}</div>}
+      <div className="min-w-0 flex-1">
+        <h2 className="text-lg font-semibold">{title}</h2>
+        {description && <p className="mt-1 max-w-xl text-sm leading-6 text-slate-500 dark:text-slate-400">{description}</p>}
+      </div>
+      {action && <div className="mt-5 flex w-full shrink-0 flex-col sm:mt-0 sm:w-auto">{action}</div>}
     </div>
   )
 }
@@ -42,7 +44,7 @@ export function InlineAlert({
 
   return (
     <div
-      className={cn('rounded-2xl border px-4 py-3 text-sm', styles[tone])}
+      className={cn('rounded-lg border-l-4 px-4 py-3 text-sm', styles[tone])}
       role={tone === 'danger' ? 'alert' : 'status'}
     >
       <div className="flex gap-2">

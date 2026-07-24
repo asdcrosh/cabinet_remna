@@ -23,17 +23,17 @@ export function AdminEmptyState({
     <div
       className={cn(
         surface === 'card'
-          ? 'rounded-[1.75rem] border border-slate-200/80 bg-white px-4 py-10 text-center dark:border-white/[0.08] dark:bg-white/[0.025] sm:px-6 sm:py-12'
-          : 'rounded-[1.5rem] border border-dashed border-slate-300/80 bg-slate-50/70 px-4 py-8 text-center dark:border-white/15 dark:bg-white/[0.025]',
+          ? 'rounded-xl border border-dashed border-slate-300/80 bg-white px-4 py-8 text-left dark:border-white/[0.1] dark:bg-white/[0.025] sm:px-6'
+          : 'rounded-xl border border-dashed border-slate-300/80 bg-slate-50/70 px-4 py-8 text-left dark:border-white/15 dark:bg-white/[0.025]',
         className
       )}
     >
-      <div className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-2xl bg-slate-100 text-slate-500 ring-1 ring-slate-200/70 dark:bg-white/[0.06] dark:text-slate-300 dark:ring-white/10">
+      <div className="mb-4 grid h-10 w-10 place-items-center border border-slate-400 text-slate-500 dark:border-white/25 dark:text-slate-300">
         {icon ?? <Inbox className="h-6 w-6" />}
       </div>
       <h2 className="text-base font-semibold text-slate-950 dark:text-white sm:text-lg">{title}</h2>
-      {description ? <p className="mx-auto mt-1.5 max-w-md text-sm leading-5 text-slate-500 dark:text-slate-400">{description}</p> : null}
-      {action ? <div className="mt-5 flex flex-wrap justify-center gap-2">{action}</div> : null}
+      {description ? <p className="mt-1.5 max-w-xl text-sm leading-5 text-slate-500 dark:text-slate-400">{description}</p> : null}
+      {action ? <div className="mt-5 flex flex-wrap gap-2">{action}</div> : null}
     </div>
   )
 }

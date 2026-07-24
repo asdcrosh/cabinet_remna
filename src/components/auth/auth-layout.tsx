@@ -22,13 +22,13 @@ export function AuthLayout({
   const brandName = getBrandName()
 
   return (
-    <div className="min-h-dvh bg-slate-100/70 dark:bg-surface-950 lg:grid lg:grid-cols-[minmax(25rem,0.9fr)_minmax(0,1.1fr)]">
+    <div className="min-h-dvh bg-[#f4f5f1] dark:bg-[#0a0c0d] lg:grid lg:grid-cols-[minmax(25rem,0.9fr)_minmax(0,1.1fr)]">
       {enableTelegramMiniApp && <TelegramMiniAppAuth />}
-      <aside className="relative m-4 mr-0 hidden h-[calc(100dvh-2rem)] overflow-hidden rounded-3xl border border-white/[0.08] bg-slate-950 p-9 text-white lg:sticky lg:top-4 lg:flex lg:flex-col lg:justify-between xl:p-11">
-        <div aria-hidden="true" className="absolute inset-0 bg-[radial-gradient(circle_at_12%_12%,rgba(8,145,178,0.16),transparent_38%)]" />
+      <aside className="relative hidden h-dvh overflow-hidden border-r border-white/[0.1] bg-[#0d1417] p-9 text-white lg:sticky lg:top-0 lg:flex lg:flex-col lg:justify-between xl:p-11">
+        <div aria-hidden="true" className="absolute inset-y-0 left-0 w-1 bg-cyan-400" />
         <nav aria-label="Основная навигация" className="relative flex items-center justify-between gap-4">
           <Link href="/" className="flex min-w-0 items-center gap-3">
-            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-white text-slate-950">
+            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-md border border-white/20 bg-white text-slate-950">
               <ShieldCheck className="h-6 w-6" />
             </div>
             <div className="min-w-0">
@@ -36,20 +36,21 @@ export function AuthLayout({
               <div className="text-sm text-white/55">Личный кабинет</div>
             </div>
           </Link>
-          <Link href="/" className="inline-flex min-h-10 shrink-0 items-center gap-2 rounded-xl border border-white/10 bg-white/[0.05] px-3 text-sm font-medium text-white/75 hover:bg-white/[0.09] hover:text-white">
+          <Link href="/" className="inline-flex min-h-10 shrink-0 items-center gap-2 rounded-md border border-white/15 px-3 text-sm font-medium text-white/70 hover:border-white/30 hover:text-white">
             <ArrowLeft className="h-4 w-4" />
             На главную
           </Link>
         </nav>
         <div className="relative max-w-xl">
-          <div className="mb-5 inline-flex rounded-full border border-cyan-300/15 bg-cyan-300/[0.07] px-3 py-1 text-sm text-cyan-100/80">
-            Всё необходимое в одном кабинете
+          <div className="mb-5 flex items-center gap-2 font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-cyan-200">
+            <span className="h-px w-8 bg-cyan-300" />
+            Управление VPN
           </div>
-          <h2 className="text-4xl font-semibold leading-tight tracking-tight xl:text-5xl">VPN работает. Кабинет помогает.</h2>
+          <h2 className="max-w-lg text-4xl font-semibold leading-[1.06] tracking-[-0.035em] xl:text-5xl">Подписка под контролем.</h2>
           <p className="mt-4 max-w-lg text-base leading-7 text-white/60">
-            Оплата, подключение и контроль устройств без длинных инструкций и лишних настроек.
+            Срок, трафик, ключи устройств и продление собраны в одном рабочем экране.
           </p>
-          <div className="mt-8 grid gap-2">
+          <div className="mt-9 border-y border-white/15">
             <AuthSignal icon={<KeyRound className="h-4 w-4" />} label="Подключение" value="Ссылка и QR-код" />
             <AuthSignal icon={<Activity className="h-4 w-4" />} label="Статус" value="Трафик и срок подписки" />
             <AuthSignal icon={<CreditCard className="h-4 w-4" />} label="Оплата" value="Быстрое продление" />
@@ -65,26 +66,26 @@ export function AuthLayout({
         <div className="w-full max-w-[32rem]">
           <nav aria-label="Основная навигация" className="mb-5 flex items-center justify-between gap-3 lg:hidden">
             <Link href="/" className="flex min-w-0 items-center gap-3">
-              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-slate-950 text-white dark:bg-white dark:text-slate-950">
+              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-md bg-slate-950 text-white dark:bg-white dark:text-slate-950">
                 <ShieldCheck className="h-5 w-5" />
               </div>
               <span className="truncate font-semibold text-slate-950 dark:text-white">{brandName}</span>
             </Link>
-            <Link href="/" aria-label="Вернуться на главную" className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-slate-200 bg-white text-slate-600 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-300">
+            <Link href="/" aria-label="Вернуться на главную" className="grid h-10 w-10 shrink-0 place-items-center rounded-md border border-slate-300 bg-white text-slate-600 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-300">
               <ArrowLeft className="h-4 w-4" />
             </Link>
           </nav>
 
-          <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-[0_28px_80px_-52px_rgba(15,23,42,0.55)] dark:border-white/10 dark:bg-white/[0.035] dark:shadow-none sm:p-7">
+          <section className="rounded-xl border border-slate-300/80 border-t-[3px] border-t-cyan-600 bg-white p-5 dark:border-white/10 dark:border-t-cyan-300 dark:bg-white/[0.03] sm:p-7">
             <header className="mb-6">
-              <div className="inline-flex rounded-full bg-cyan-50 px-2.5 py-1 text-xs font-semibold text-cyan-700 dark:bg-cyan-500/10 dark:text-cyan-200">Личный кабинет</div>
-              <h1 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950 dark:text-white sm:text-3xl">{title}</h1>
+              <div className="font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-700 dark:text-cyan-300">Личный кабинет / Вход</div>
+              <h1 className="mt-2.5 text-2xl font-semibold tracking-[-0.02em] text-slate-950 dark:text-white sm:text-3xl">{title}</h1>
               <p className="mt-1.5 text-sm leading-6 text-slate-500 dark:text-slate-400">{description}</p>
             </header>
             {children}
           </section>
 
-          <footer className="mt-4 rounded-3xl border border-slate-200/80 bg-white/60 px-4 py-3.5 dark:border-white/[0.07] dark:bg-white/[0.02]">
+          <footer className="mt-5 border-t border-slate-300/80 px-1 pt-4 dark:border-white/[0.1]">
             <div className="text-center text-sm text-slate-600 dark:text-slate-400">{footer}</div>
             <nav aria-label="Правовая информация" className="mt-3 flex flex-wrap justify-center gap-x-3 gap-y-2 border-t border-slate-200/80 pt-3 text-xs text-slate-400 dark:border-white/[0.07] dark:text-slate-500">
               <Link href="/offer" className="hover:text-slate-700 dark:hover:text-slate-300">Оферта</Link>
@@ -103,9 +104,9 @@ export function AuthLayout({
 
 function AuthSignal({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between gap-4 rounded-2xl border border-white/[0.08] bg-white/[0.045] px-3.5 py-3 text-sm">
+    <div className="flex items-center justify-between gap-4 border-b border-white/10 px-0 py-3.5 text-sm last:border-b-0">
       <div className="flex items-center gap-2 text-white/65">
-        <span className="grid h-8 w-8 place-items-center rounded-xl bg-cyan-300/[0.08] text-cyan-200">{icon}</span>
+        <span className="grid h-7 w-7 place-items-center border border-white/15 text-cyan-200">{icon}</span>
         {label}
       </div>
       <div className="text-right font-medium text-white/85">{value}</div>

@@ -55,7 +55,7 @@ export function PlanCatalog({ plans, initialPlanId }: { plans: CatalogPlan[]; in
             Сначала выберите срок, затем проверьте детали и перейдите к оплате
           </p>
         </div>
-        <span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium tabular-nums text-slate-500 dark:bg-white/[0.06] dark:text-slate-400">
+        <span className="shrink-0 border-l-2 border-cyan-400 pl-2 font-mono text-[10px] font-semibold uppercase tracking-[0.14em] tabular-nums text-slate-500 dark:text-slate-400">
           {orderedPlans.length} {planCountLabel(orderedPlans.length)}
         </span>
       </div>
@@ -65,8 +65,10 @@ export function PlanCatalog({ plans, initialPlanId }: { plans: CatalogPlan[]; in
           <article
             key={plan.id}
             className={cn(
-              'rounded-[1.35rem] border border-slate-200/80 bg-white p-3.5 shadow-sm shadow-slate-950/[0.025] dark:border-white/[0.08] dark:bg-white/[0.035] dark:shadow-none',
-              plan.current && 'border-cyan-300/80 bg-cyan-50/45 dark:border-cyan-400/35 dark:bg-cyan-500/[0.06]'
+              'rounded-lg border border-slate-200/90 border-l-2 bg-white p-3.5 dark:border-white/[0.09] dark:bg-white/[0.025]',
+              plan.current
+                ? 'border-l-cyan-500 bg-cyan-50/35 dark:border-l-cyan-300 dark:bg-cyan-500/[0.04]'
+                : 'border-l-slate-300 dark:border-l-white/15'
             )}
           >
             <div className="flex min-w-0 items-start justify-between gap-3">
@@ -91,7 +93,7 @@ export function PlanCatalog({ plans, initialPlanId }: { plans: CatalogPlan[]; in
                 aria-haspopup="dialog"
                 onClick={() => setMobileCheckoutPlanId(plan.id)}
                 disabled={!plan.isPromo && plan.paymentProviders?.length === 0}
-                className="group inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-slate-100 px-3.5 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-200 hover:text-slate-950 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white/[0.06] dark:text-slate-200 dark:hover:bg-white/[0.1] dark:hover:text-white"
+                className="group inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-slate-300 bg-transparent px-3.5 text-sm font-semibold text-slate-700 transition-colors hover:border-slate-950 hover:text-slate-950 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/15 dark:text-slate-200 dark:hover:border-white/40 dark:hover:text-white"
               >
                 <CreditCard className="h-4 w-4" />
                 {mobileCtaLabel(plan)}
@@ -103,10 +105,10 @@ export function PlanCatalog({ plans, initialPlanId }: { plans: CatalogPlan[]; in
       </div>
 
       <div className="hidden gap-4 xl:grid xl:grid-cols-2 xl:items-stretch">
-        <div className="flex h-full flex-col overflow-hidden rounded-[1.75rem] border border-slate-200/80 bg-slate-50/65 p-4 dark:border-white/[0.08] dark:bg-white/[0.025]">
+        <div className="flex h-full flex-col overflow-hidden rounded-xl border border-slate-200/90 bg-slate-50/45 p-4 dark:border-white/[0.09] dark:bg-white/[0.018]">
           <div className="mb-3 px-1 sm:flex sm:items-end sm:justify-between sm:gap-4">
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-cyan-600 dark:text-cyan-300">
+              <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-700 dark:text-cyan-300">
                 Период подписки
               </p>
               <h3 className="mt-1 text-base font-semibold text-slate-950 dark:text-white">Выберите удобный срок</h3>
@@ -127,10 +129,10 @@ export function PlanCatalog({ plans, initialPlanId }: { plans: CatalogPlan[]; in
                   aria-checked={selected}
                   onClick={() => setSelectedPlanId(plan.id)}
                   className={cn(
-                    'group grid w-full min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-3 rounded-[1.2rem] border px-3.5 py-3.5 text-left transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center sm:px-4 sm:py-4',
+                    'group grid w-full min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-3 rounded-lg border border-l-2 px-3.5 py-3.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center sm:px-4 sm:py-4',
                     selected
-                      ? 'border-cyan-300 bg-white shadow-sm shadow-cyan-950/[0.04] dark:border-cyan-400/40 dark:bg-white/[0.07]'
-                      : 'border-transparent bg-white/55 hover:border-slate-200 hover:bg-white dark:bg-white/[0.02] dark:hover:border-white/10 dark:hover:bg-white/[0.05]'
+                      ? 'border-slate-200 border-l-cyan-500 bg-white dark:border-white/10 dark:border-l-cyan-300 dark:bg-white/[0.05]'
+                      : 'border-transparent border-l-slate-300 bg-white/55 hover:border-slate-200 hover:border-l-slate-500 hover:bg-white dark:border-l-white/10 dark:bg-white/[0.015] dark:hover:border-white/10 dark:hover:bg-white/[0.04]'
                   )}
                 >
                   <span
@@ -170,8 +172,8 @@ export function PlanCatalog({ plans, initialPlanId }: { plans: CatalogPlan[]; in
             })}
           </div>
 
-          <div className="mt-auto flex items-start gap-2.5 rounded-2xl bg-white/70 px-3.5 py-3 text-xs leading-5 text-slate-500 ring-1 ring-slate-200/70 dark:bg-white/[0.025] dark:text-slate-400 dark:ring-white/[0.07]">
-            <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-cyan-400" />
+          <div className="mt-auto flex items-start gap-2.5 border-t border-slate-200/90 px-1 pt-3 text-xs leading-5 text-slate-500 dark:border-white/[0.09] dark:text-slate-400">
+            <span className="mt-0.5 h-3 w-0.5 shrink-0 bg-cyan-400" />
             <span>Цена фиксирована за весь выбранный срок. Доступ активируется автоматически после подтверждения оплаты.</span>
           </div>
         </div>
@@ -193,7 +195,7 @@ export function PlanCatalog({ plans, initialPlanId }: { plans: CatalogPlan[]; in
             role="dialog"
             aria-modal="true"
             aria-labelledby="mobile-checkout-title"
-            className="absolute inset-x-0 bottom-0 max-h-[92dvh] overflow-y-auto rounded-t-[2rem] border-t border-slate-200 bg-white shadow-2xl dark:border-white/[0.1] dark:bg-surface-950"
+            className="absolute inset-x-0 bottom-0 max-h-[92dvh] overflow-y-auto rounded-t-xl border-t-2 border-cyan-400 bg-white shadow-2xl dark:bg-surface-950"
           >
             <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-slate-100 bg-white/95 px-4 py-3.5 backdrop-blur dark:border-white/[0.08] dark:bg-surface-950/95">
               <div>
@@ -203,7 +205,7 @@ export function PlanCatalog({ plans, initialPlanId }: { plans: CatalogPlan[]; in
               <button
                 type="button"
                 autoFocus
-                className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-500 transition-colors hover:bg-slate-200 hover:text-slate-950 dark:bg-white/[0.07] dark:text-slate-300 dark:hover:bg-white/[0.11] dark:hover:text-white"
+                className="grid h-10 w-10 shrink-0 place-items-center rounded-md border border-slate-200 text-slate-500 transition-colors hover:border-slate-400 hover:text-slate-950 dark:border-white/10 dark:text-slate-300 dark:hover:border-white/25 dark:hover:text-white"
                 aria-label="Закрыть"
                 onClick={() => setMobileCheckoutPlanId(null)}
               >
@@ -223,7 +225,7 @@ export function PlanCatalog({ plans, initialPlanId }: { plans: CatalogPlan[]; in
 
 function PlanPickerBadge({ children }: { children: ReactNode }) {
   return (
-    <span className="rounded-full bg-cyan-50 px-2 py-0.5 text-[10px] font-semibold text-cyan-700 dark:bg-cyan-500/10 dark:text-cyan-300">
+    <span className="rounded-sm bg-cyan-50 px-1.5 py-0.5 font-mono text-[9px] font-semibold uppercase tracking-wide text-cyan-700 dark:bg-cyan-500/10 dark:text-cyan-300">
       {children}
     </span>
   )

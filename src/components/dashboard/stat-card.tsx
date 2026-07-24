@@ -11,15 +11,15 @@ interface StatCardProps {
 
 export function StatCard({ label, value, hint, icon, className }: StatCardProps) {
   return (
-    <div className={cn('card', className)}>
+    <div className={cn('card relative border-t-2 border-t-slate-900 dark:border-t-cyan-300', className)}>
       <div className="flex items-start justify-between gap-4">
-        <div>
-          <p className="stat-label">{label}</p>
-          <div className="mt-2 stat">{value}</div>
+        <div className="min-w-0">
+          <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-500 dark:text-slate-400">{label}</p>
+          <div className="mt-3 stat">{value}</div>
           {hint && <p className="stat-label mt-1">{hint}</p>}
         </div>
         {icon && (
-          <div className="rounded-xl bg-slate-100 p-3 text-slate-600 dark:bg-white/[0.06] dark:text-slate-300">
+          <div className="shrink-0 pt-0.5 text-slate-400 dark:text-slate-500">
             {icon}
           </div>
         )}

@@ -194,15 +194,17 @@ export default async function DashboardHome() {
 
   return (
     <div className="page-stack">
-      <header className="pb-1 sm:pb-2">
-        <div>
-          <h1 className="text-[1.65rem] font-semibold leading-tight tracking-[-0.025em] text-slate-950 dark:text-white sm:text-[2rem]">
-            С возвращением, {dashboardDisplayName(user.name, user.email)}
-          </h1>
-          <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-500 dark:text-slate-400">
-            Всё важное о подключении на одном экране.
-          </p>
+      <header className="border-b border-slate-200/90 pb-4 dark:border-white/[0.09] sm:pb-5">
+        <div className="mb-2 flex items-center gap-3 font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-700 dark:text-cyan-300">
+          <span>Сводка кабинета</span>
+          <span className="h-px w-10 bg-cyan-400/70" aria-hidden="true" />
         </div>
+        <h1 className="text-[1.65rem] font-semibold leading-tight text-slate-950 dark:text-white sm:text-[2rem]">
+          {dashboardDisplayName(user.name, user.email)}, всё работает
+        </h1>
+        <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-500 dark:text-slate-400">
+          Текущий доступ, расход трафика и следующий шаг.
+        </p>
       </header>
       {remnawaveErrorStatus !== null && (
         <div className="flex flex-col gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100 sm:flex-row sm:items-center sm:justify-between">
@@ -244,11 +246,11 @@ export default async function DashboardHome() {
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_17rem] lg:gap-6">
           <div className="min-w-0">
             <div className="flex items-start gap-3.5">
-              <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-white/10 bg-white/[0.07] text-cyan-100 shadow-sm shadow-black/10">
+              <div className="grid h-11 w-11 shrink-0 place-items-center rounded-md border border-cyan-300/30 text-cyan-100">
                 <ShieldCheck className="h-5 w-5" />
               </div>
               <div className="min-w-0">
-                <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-cyan-200">
+                <div className="mb-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-200">
                   Ваш VPN
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
@@ -266,13 +268,13 @@ export default async function DashboardHome() {
             </div>
           </div>
 
-          <div className="flex flex-col justify-center rounded-2xl border border-white/10 bg-white/[0.055] p-4 shadow-sm shadow-black/10 backdrop-blur-sm">
+          <div className="flex flex-col justify-center border-t border-white/15 pt-4 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0">
             <div className="flex items-start gap-3">
-              <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-cyan-300/10 text-cyan-100">
+              <div className="grid h-9 w-9 shrink-0 place-items-center rounded-md border border-white/15 text-cyan-100">
                 <KeyRound className="h-4 w-4" />
               </div>
               <div className="min-w-0">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-cyan-200">Доступ</div>
+                <div className="font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-200">Доступ</div>
                 <div className="mt-1 text-sm leading-5 text-slate-200">
                   {subscriptionExpired
                     ? 'Срок доступа истёк'
@@ -283,7 +285,7 @@ export default async function DashboardHome() {
               </div>
             </div>
             {focusedNextStep === null && (
-              <Link href={primaryAction.href} className="btn-primary group mt-4 min-h-11 w-full justify-between rounded-2xl px-4">
+              <Link href={primaryAction.href} className="btn-primary group mt-4 min-h-11 w-full justify-between rounded-lg px-4">
                 <span className="inline-flex items-center gap-2">
                   {primaryAction.icon}
                   {primaryAction.label}
@@ -922,7 +924,7 @@ function OverviewMetric({
     <div className={cn('dashboard-hero-metric text-left', className)}>
       <div className="flex items-center gap-2 text-slate-400">
         <span className="text-cyan-200">{icon}</span>
-        <span className="text-[11px] font-medium uppercase tracking-wide">{label}</span>
+        <span className="font-mono text-[10px] font-medium uppercase tracking-[0.16em]">{label}</span>
       </div>
       <div className="mt-2 break-words text-base font-semibold leading-tight text-white sm:text-lg">{value}</div>
     </div>

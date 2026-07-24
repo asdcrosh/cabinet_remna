@@ -391,7 +391,7 @@ export function MobileBottomNav({
         aria-modal="true"
         aria-labelledby="mobile-more-menu-title"
         tabIndex={-1}
-        className="absolute inset-x-0 bottom-0 max-h-[calc(100dvh-1rem)] overflow-y-auto overscroll-contain rounded-t-2xl border border-slate-200 bg-white p-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] shadow-xl dark:border-white/10 dark:bg-surface-950"
+        className="absolute inset-x-0 bottom-0 max-h-[calc(100dvh-1rem)] overflow-y-auto overscroll-contain rounded-t-xl border border-slate-300 bg-[#f8f9f5] p-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] shadow-xl dark:border-white/10 dark:bg-[#0d1011]"
       >
         <div className="mb-3 flex items-center justify-between gap-3">
           <div>
@@ -401,7 +401,7 @@ export function MobileBottomNav({
           <button
             ref={moreCloseButtonRef}
             type="button"
-            className="grid h-11 w-11 place-items-center rounded-xl border bg-white text-slate-500 transition hover:bg-slate-50 hover:text-slate-950 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white"
+            className="grid h-11 w-11 place-items-center rounded-md border bg-white text-slate-500 transition hover:bg-slate-50 hover:text-slate-950 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white"
             onClick={closeMore}
             aria-label="Закрыть"
           >
@@ -438,7 +438,7 @@ export function MobileBottomNav({
   return (
     <nav
       aria-label="Основная мобильная навигация"
-      className="fixed inset-x-3 bottom-[max(.5rem,env(safe-area-inset-bottom))] z-40 rounded-2xl border border-slate-200 bg-white/95 p-1.5 shadow-lg shadow-slate-950/10 dark:border-white/[0.12] dark:bg-surface-900/95 dark:shadow-black/30 lg:hidden"
+      className="fixed inset-x-2 bottom-[max(.5rem,env(safe-area-inset-bottom))] z-40 rounded-xl border border-slate-300/90 bg-[#f8f9f5]/95 p-1.5 shadow-[0_8px_24px_-16px_rgba(15,23,42,0.5)] backdrop-blur dark:border-white/[0.14] dark:bg-[#111516]/95 dark:shadow-black/30 lg:hidden"
     >
       <div
         className="mx-auto grid max-w-md gap-1"
@@ -455,10 +455,10 @@ export function MobileBottomNav({
               href={item.href}
               aria-current={active ? 'page' : undefined}
               className={cn(
-                'relative flex min-h-12 min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1.5 text-[10px] font-semibold transition-colors',
+                'relative flex min-h-12 min-w-0 flex-col items-center justify-center gap-0.5 rounded-md border-t-2 px-1 py-1.5 text-[10px] font-semibold transition-colors',
                 active
-                  ? 'bg-cyan-50 text-cyan-800 dark:bg-cyan-400/10 dark:text-cyan-100'
-                  : 'text-slate-500 hover:bg-slate-100 hover:text-slate-950 dark:text-slate-400 dark:hover:bg-white/10 dark:hover:text-white'
+                  ? 'border-cyan-600 bg-white text-slate-950 dark:border-cyan-300 dark:bg-white/[0.06] dark:text-white'
+                  : 'border-transparent text-slate-500 hover:bg-white hover:text-slate-950 dark:text-slate-400 dark:hover:bg-white/[0.04] dark:hover:text-white'
               )}
             >
               <span className="relative">
@@ -483,10 +483,10 @@ export function MobileBottomNav({
             aria-haspopup="dialog"
             onClick={() => setMoreOpen(true)}
             className={cn(
-              'relative flex min-h-12 min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1.5 text-[10px] font-semibold transition-colors',
+              'relative flex min-h-12 min-w-0 flex-col items-center justify-center gap-0.5 rounded-md border-t-2 px-1 py-1.5 text-[10px] font-semibold transition-colors',
               moreActive
-                ? 'bg-cyan-50 text-cyan-800 dark:bg-cyan-400/10 dark:text-cyan-100'
-                : 'text-slate-500 hover:bg-slate-100 hover:text-slate-950 dark:text-slate-400 dark:hover:bg-white/10 dark:hover:text-white'
+                ? 'border-cyan-600 bg-white text-slate-950 dark:border-cyan-300 dark:bg-white/[0.06] dark:text-white'
+                : 'border-transparent text-slate-500 hover:bg-white hover:text-slate-950 dark:text-slate-400 dark:hover:bg-white/[0.04] dark:hover:text-white'
             )}
           >
             <MoreHorizontal className="h-[18px] w-[18px]" />
@@ -569,7 +569,7 @@ function MobileMoreGrid({
             onClick={onNavigate}
             aria-current={active ? 'page' : undefined}
             className={cn(
-              'relative flex min-h-12 min-w-0 items-center gap-3 rounded-xl border px-3 py-2 text-sm font-semibold transition',
+              'relative flex min-h-12 min-w-0 items-center gap-3 rounded-md border px-3 py-2 text-sm font-semibold transition',
               active
                 ? 'border-slate-300 bg-slate-100 text-slate-950 dark:border-white/15 dark:bg-white/10 dark:text-white'
                 : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-950 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white'
@@ -592,13 +592,13 @@ function MobileMoreGrid({
 export function Brand({ compact = false, brandName }: { compact?: boolean; brandName: string }) {
   return (
     <Link href="/dashboard" className="flex min-w-0 items-center gap-2.5">
-      <div className="relative grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-cyan-200 bg-cyan-50 text-cyan-700 dark:border-cyan-400/20 dark:bg-cyan-400/10 dark:text-cyan-200">
+      <div className="relative grid h-9 w-9 shrink-0 place-items-center rounded-md border border-slate-950 bg-slate-950 text-white dark:border-white dark:bg-white dark:text-slate-950">
         <ShieldCheck className="h-4 w-4" />
       </div>
       <div className="min-w-0">
         <div className="truncate text-sm font-semibold tracking-tight text-slate-950 dark:text-white">{brandName}</div>
-        <div className={cn('truncate text-xs text-slate-500', compact && 'hidden')}>
-          Личный кабинет
+        <div className={cn('truncate font-mono text-[10px] uppercase tracking-[0.08em] text-slate-500', compact && 'hidden')}>
+          VPN / Кабинет
         </div>
       </div>
     </Link>
@@ -666,7 +666,7 @@ function InfoNavGroup({
     <div className="border-t border-slate-200 pt-2 dark:border-white/10">
       <button
         type="button"
-        className="flex min-h-10 w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-white/[0.05] dark:hover:text-white"
+        className="flex min-h-10 w-full items-center gap-3 rounded-md border-l-2 border-transparent px-3 py-2 text-left text-sm font-medium text-slate-600 transition-colors hover:bg-white hover:text-slate-950 dark:text-slate-300 dark:hover:bg-white/[0.04] dark:hover:text-white"
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
       >
@@ -685,14 +685,14 @@ function InfoNavGroup({
 
 function WorkspaceSwitch({ adminArea, onNavigate }: { adminArea: boolean; onNavigate?: () => void }) {
   return (
-    <div className="grid grid-cols-2 rounded-xl bg-slate-100 p-1 dark:bg-white/[0.05]">
+    <div className="grid grid-cols-2 rounded-md border border-slate-300 bg-transparent p-1 dark:border-white/10">
       <Link
         href="/dashboard"
         onClick={onNavigate}
         className={cn(
-          'flex h-9 items-center justify-center gap-1.5 rounded-lg px-2 text-xs font-semibold transition-colors',
+          'flex h-9 items-center justify-center gap-1.5 rounded px-2 text-xs font-semibold transition-colors',
           !adminArea
-            ? 'bg-white text-cyan-800 shadow-sm dark:bg-cyan-400/10 dark:text-cyan-100'
+            ? 'bg-slate-950 text-white dark:bg-white dark:text-slate-950'
             : 'text-slate-500 hover:text-slate-950 dark:text-slate-400 dark:hover:text-white'
         )}
       >
@@ -703,9 +703,9 @@ function WorkspaceSwitch({ adminArea, onNavigate }: { adminArea: boolean; onNavi
         href="/dashboard/admin"
         onClick={onNavigate}
         className={cn(
-          'flex h-9 items-center justify-center gap-1.5 rounded-lg px-2 text-xs font-semibold transition-colors',
+          'flex h-9 items-center justify-center gap-1.5 rounded px-2 text-xs font-semibold transition-colors',
           adminArea
-            ? 'bg-white text-cyan-800 shadow-sm dark:bg-cyan-400/10 dark:text-cyan-100'
+            ? 'bg-slate-950 text-white dark:bg-white dark:text-slate-950'
             : 'text-slate-500 hover:text-slate-950 dark:text-slate-400 dark:hover:text-white'
         )}
       >
@@ -813,10 +813,10 @@ function NavGroup({
             onClick={onNavigate}
             aria-current={active ? 'page' : undefined}
             className={cn(
-              'flex min-h-10 items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-colors duration-150',
+              'flex min-h-10 items-center gap-3 rounded-md border-l-2 px-3 py-2 text-sm font-medium transition-colors duration-150',
               active
-                ? 'bg-cyan-50 text-cyan-900 dark:bg-cyan-400/10 dark:text-cyan-100'
-                : 'text-slate-600 hover:bg-slate-50 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-white/[0.05] dark:hover:text-white'
+                ? 'border-cyan-600 bg-white text-slate-950 dark:border-cyan-300 dark:bg-white/[0.05] dark:text-white'
+                : 'border-transparent text-slate-600 hover:bg-white hover:text-slate-950 dark:text-slate-300 dark:hover:bg-white/[0.04] dark:hover:text-white'
             )}
           >
             <Icon className={cn('h-4 w-4 shrink-0', active && 'text-cyan-600 dark:text-cyan-300')} />
