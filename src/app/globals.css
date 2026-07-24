@@ -1193,6 +1193,70 @@
   }
 }
 
+@layer components {
+  .bonus-box-stage::before,
+  .bonus-box-reel-shell::before {
+    display: none;
+  }
+
+  .bonus-box-stage--opening,
+  .bonus-box-stage--reveal-common,
+  .bonus-box-stage--reveal-rare,
+  .bonus-box-stage--reveal-epic,
+  .bonus-box-stage--reveal-legendary,
+  .bonus-box-stage--reveal-empty {
+    animation: none;
+    box-shadow: none;
+  }
+
+  .bonus-box-stage-header,
+  .dark .bonus-box-stage-header {
+    background: transparent;
+  }
+
+  .bonus-box-reel-shell,
+  .dark .bonus-box-reel-shell {
+    background: transparent;
+  }
+
+  .bonus-box-reel-shell::after {
+    background: linear-gradient(
+      90deg,
+      transparent 0 49.85%,
+      rgb(34 211 238 / 0.72) 49.85% 50.15%,
+      transparent 50.15% 100%
+    );
+    mask-image: linear-gradient(to bottom, transparent, #000 18%, #000 82%, transparent);
+    opacity: 1;
+  }
+
+  .bonus-box-portal {
+    border: 1px solid rgb(34 211 238 / 0.38);
+    border-block-width: 2px;
+  }
+
+  .bonus-box-portal::before,
+  .bonus-box-portal::after,
+  .bonus-box-portal-core,
+  .bonus-box-portal-line {
+    display: none;
+  }
+
+  .bonus-box-reel-card,
+  .bonus-box-reel-card--winner {
+    box-shadow: none;
+  }
+
+  .bonus-box-reel-card--winner {
+    transform: translateY(-0.125rem);
+    border-color: rgb(34 211 238 / 0.8);
+  }
+
+  .bonus-box-result::before {
+    display: none;
+  }
+}
+
 @layer utilities {
   .dashboard-shell .rounded-3xl {
     border-radius: 0.875rem;

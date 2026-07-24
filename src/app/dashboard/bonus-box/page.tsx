@@ -2,6 +2,7 @@ import { notFound, redirect } from 'next/navigation'
 import { getCurrentUser } from '@/lib/auth/cookies'
 import { getBonusBoxOverview } from '@/lib/bonus-box'
 import { BonusBoxClientDynamic } from '@/components/bonus-box/bonus-box-client-dynamic'
+import { PageHeader } from '@/components/dashboard/page-header'
 import { isFeatureEnabled } from '@/lib/feature-flags'
 
 export const dynamic = 'force-dynamic'
@@ -15,7 +16,11 @@ export default async function BonusBoxPage() {
   const data = await getBonusBoxOverview(session.uid)
 
   return (
-    <div>
+    <div className="page-stack">
+      <PageHeader
+        title="Бонусы"
+        description="Открывайте подарки, следите за доступными попытками и используйте выигранные промокоды."
+      />
       <BonusBoxClientDynamic initialData={data} />
     </div>
   )

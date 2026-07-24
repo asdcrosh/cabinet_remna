@@ -1,6 +1,6 @@
 "use client";
 
-import { type CSSProperties, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { type KeyboardEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import {
   CalendarClock,
   CalendarPlus,
@@ -29,7 +29,6 @@ import {
   makeIdleReel,
   MOBILE_CARD_GAP,
   MOBILE_CARD_WIDTH,
-  OPENING_EFFECT_PARTICLES,
   prizeBorderClass,
   prizeLabel,
   prizeReelClass,
@@ -52,6 +51,10 @@ import type {
 
 export type { BonusBoxPrizeView } from "@/components/bonus-box/bonus-box-types";
 
+const REEL_DURATION_MS = 2800;
+const REVEAL_EFFECT_DURATION_MS = 900;
+const BONUS_TABS: BonusBoxTab[] = ["outcomes", "history", "rules"];
+
 export function BonusBoxClient({
   initialData,
 }: {
@@ -64,10 +67,19 @@ export function BonusBoxClient({
   const [opening, setOpening] = useState(false);
   const [revealEffect, setRevealEffect] = useState(false);
   const [result, setResult] = useState<OpenBoxResponse | null>(null);
+  const [pendingResult, setPendingResult] = useState<OpenBoxResponse | null>(null);
   const [activeTab, setActiveTab] = useState<BonusBoxTab>("outcomes");
   const [mobileReel, setMobileReel] = useState(false);
+  const [reducedMotion, setReducedMotion] = useState(false);
+  const revealTimerRef = useRef<number | null>(null);
+  const effectTimerRef = useRef<number | null>(null);
+  const finishingRef = useRef(false);
   const canUseWelcomeAttempts =
     !data.hasActiveSubscription && data.welcomeAttemptsCount > 0;
+  const availableNow = data.hasActiveSubscription
+    ? data.attemptsCount
+    : data.welcomeAttemptsCount;
+  const lockedAttempts = Math.max(0, data.attemptsCount - availableNow);
   const cardWidth = mobileReel ? MOBILE_CARD_WIDTH : DESKTOP_CARD_WIDTH;
   const cardGap = mobileReel ? MOBILE_CARD_GAP : DESKTOP_CARD_GAP;
   const reelStep = cardWidth + cardGap;
@@ -85,24 +97,75 @@ export function BonusBoxClient({
     () => data.prizes.reduce((sum, prize) => sum + prize.chance, 0),
     [data.prizes],
   );
+  const hasRareOrBetter = data.prizes.some((prize) => prize.rarity !== "COMMON");
   const openButtonClass =
-    "bonus-box-open-button group relative inline-flex min-h-11 items-center justify-center overflow-hidden rounded-xl border border-slate-950 px-4 text-sm font-semibold text-white shadow-sm shadow-slate-950/15 transition-colors duration-200 hover:border-slate-800 hover:bg-slate-800 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 disabled:shadow-none dark:border-white dark:text-slate-950 dark:shadow-black/20 dark:hover:border-slate-200 dark:disabled:border-white/10 dark:disabled:bg-white/10 dark:disabled:text-slate-500 sm:min-w-44";
+    "bonus-box-open-button group relative inline-flex min-h-11 items-center justify-center overflow-hidden rounded-md border border-slate-950 px-4 text-sm font-semibold text-white transition-colors duration-200 hover:border-slate-800 hover:bg-slate-800 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 dark:border-white dark:text-slate-950 dark:hover:border-slate-200 dark:disabled:border-white/10 dark:disabled:bg-white/10 dark:disabled:text-slate-500 sm:min-w-44";
   const revealClass = result ? bonusBoxRevealClass(result.prize) : null;
 
   useEffect(() => {
-    const media = window.matchMedia("(max-width: 639px)");
-    const sync = () => setMobileReel(media.matches);
+    const mobileMedia = window.matchMedia("(max-width: 639px)");
+    const motionMedia = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const sync = () => {
+      setMobileReel(mobileMedia.matches);
+      setReducedMotion(motionMedia.matches);
+    };
 
     sync();
-    media.addEventListener("change", sync);
-    return () => media.removeEventListener("change", sync);
+    mobileMedia.addEventListener("change", sync);
+    motionMedia.addEventListener("change", sync);
+    return () => {
+      mobileMedia.removeEventListener("change", sync);
+      motionMedia.removeEventListener("change", sync);
+    };
   }, []);
+
+  useEffect(() => () => {
+    if (revealTimerRef.current !== null) window.clearTimeout(revealTimerRef.current);
+    if (effectTimerRef.current !== null) window.clearTimeout(effectTimerRef.current);
+  }, []);
+
+  async function finishOpening(response: OpenBoxResponse) {
+    if (finishingRef.current) return;
+    finishingRef.current = true;
+    if (revealTimerRef.current !== null) {
+      window.clearTimeout(revealTimerRef.current);
+      revealTimerRef.current = null;
+    }
+    setResult(response);
+    setPendingResult(null);
+    setRevealEffect(!reducedMotion);
+    const freshData = await apiFetch<BonusBoxOverview>("/api/bonus-box").catch(() => null);
+    if (freshData) {
+      setData(freshData);
+    } else {
+      setData((current) => ({
+        ...current,
+        attemptsCount: response.remainingAttempts,
+        openings: [
+          {
+            id: response.id,
+            createdAt: new Date().toISOString(),
+            prize: response.prize,
+            promoCode: response.promoCode,
+            promoCodeExpiresAt: response.promoCodeExpiresAt,
+          },
+          ...current.openings,
+        ].slice(0, 12),
+      }));
+    }
+    setOpening(false);
+    if (!reducedMotion) {
+      effectTimerRef.current = window.setTimeout(() => setRevealEffect(false), REVEAL_EFFECT_DURATION_MS);
+    }
+  }
 
   async function openBox() {
     if (!canOpen) return;
+    finishingRef.current = false;
     setOpening(true);
     setRevealEffect(false);
     setResult(null);
+    setPendingResult(null);
     setOffset(0);
 
     try {
@@ -110,44 +173,44 @@ export function BonusBoxClient({
         method: "POST",
       });
       setReel(response.reel);
+      setPendingResult(response);
 
-      requestAnimationFrame(() => {
+      if (reducedMotion) {
+        void finishOpening(response);
+      } else {
         requestAnimationFrame(() => {
-          const stopRatio = Math.min(0.72, Math.max(0.28, response.stopOffsetRatio));
-          const target = response.winningIndex * reelStep + cardWidth * stopRatio;
-          setOffset(-target);
+          requestAnimationFrame(() => {
+            const stopRatio = Math.min(0.72, Math.max(0.28, response.stopOffsetRatio));
+            const target = response.winningIndex * reelStep + cardWidth * stopRatio;
+            setOffset(-target);
+          });
         });
-      });
-
-      window.setTimeout(async () => {
-        setResult(response);
-        setRevealEffect(true);
-        const freshData = await apiFetch<BonusBoxOverview>("/api/bonus-box").catch(() => null);
-        if (freshData) {
-          setData(freshData);
-        } else {
-          setData((current) => ({
-            ...current,
-            attemptsCount: response.remainingAttempts,
-            openings: [
-              {
-                id: response.id,
-                createdAt: new Date().toISOString(),
-                prize: response.prize,
-                promoCode: response.promoCode,
-                promoCodeExpiresAt: response.promoCodeExpiresAt,
-              },
-              ...current.openings,
-            ].slice(0, 12),
-          }));
-        }
-        setOpening(false);
-        window.setTimeout(() => setRevealEffect(false), 1600);
-      }, 5900);
+        revealTimerRef.current = window.setTimeout(() => {
+          void finishOpening(response);
+        }, REEL_DURATION_MS + 180);
+      }
     } catch {
       setOpening(false);
+      setPendingResult(null);
       setRevealEffect(false);
     }
+  }
+
+  function handleTabKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+    event.preventDefault();
+    const currentIndex = BONUS_TABS.indexOf(activeTab);
+    const nextTab =
+      event.key === "Home"
+        ? BONUS_TABS[0]!
+        : event.key === "End"
+          ? BONUS_TABS[BONUS_TABS.length - 1]!
+          : BONUS_TABS[
+              (currentIndex + (event.key === "ArrowRight" ? 1 : -1) + BONUS_TABS.length) %
+                BONUS_TABS.length
+            ]!;
+    setActiveTab(nextTab);
+    requestAnimationFrame(() => document.getElementById(`bonus-tab-${nextTab}`)?.focus());
   }
 
   async function copyPromoCode(code: string) {
@@ -188,8 +251,9 @@ export function BonusBoxClient({
   return (
     <div className="flex flex-col gap-4 sm:gap-5">
       <section
+        aria-busy={opening}
         className={cn(
-          "bonus-box-stage order-first overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-sm shadow-slate-950/[0.05] dark:border-white/10 dark:bg-surface-900 dark:shadow-black/20",
+          "bonus-box-stage order-first overflow-hidden rounded-xl border border-slate-200/90 border-t-2 border-t-cyan-400 bg-white dark:border-white/10 dark:border-t-cyan-300 dark:bg-surface-900",
           opening && "bonus-box-stage--opening",
           revealEffect && "bonus-box-stage--reveal",
           revealEffect && result?.prize.type !== "NO_PRIZE" && "bonus-box-stage--win",
@@ -201,11 +265,11 @@ export function BonusBoxClient({
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="text-base font-semibold text-slate-950 dark:text-white sm:text-lg">Рулетка бонусов</h2>
-              <span className="rounded-full border border-cyan-200 bg-cyan-50 px-2.5 py-1 text-xs font-semibold text-cyan-700 dark:border-cyan-500/25 dark:bg-cyan-500/10 dark:text-cyan-100">
-                {data.attemptsCount} доступно
+              <span className="border-l-2 border-cyan-400 pl-2 font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-cyan-700 dark:text-cyan-200">
+                {availableNow} доступно сейчас
               </span>
             </div>
-            <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400 sm:text-sm">
+            <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400 sm:text-sm" aria-live="polite">
               {opening
                 ? "Крутим и фиксируем подарок в центре."
                 : result
@@ -215,6 +279,15 @@ export function BonusBoxClient({
           </div>
           <div className="min-w-0">
             {openCaseCta}
+            {opening && pendingResult && !reducedMotion && (
+              <button
+                type="button"
+                className="mt-2 w-full text-center text-xs font-medium text-slate-500 underline-offset-4 hover:text-slate-900 hover:underline dark:text-slate-400 dark:hover:text-white"
+                onClick={() => void finishOpening(pendingResult)}
+              >
+                Показать результат сразу
+              </button>
+            )}
             {data.canOpenReason && !subscribeCta && (
               <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">{data.canOpenReason}</p>
             )}
@@ -222,7 +295,6 @@ export function BonusBoxClient({
         </div>
 
         <div className="bonus-box-reel-shell relative overflow-hidden py-3 sm:py-5">
-          <BonusBoxOpeningEffects />
           <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-5 bg-gradient-to-r from-white via-white/75 to-transparent dark:from-surface-900 dark:via-surface-900/75 sm:w-32" />
           <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-5 bg-gradient-to-l from-white via-white/75 to-transparent dark:from-surface-900 dark:via-surface-900/75 sm:w-32" />
           <div className="bonus-box-portal" aria-hidden="true">
@@ -236,8 +308,8 @@ export function BonusBoxClient({
               style={{
                 gap: `${cardGap}px`,
                 transform: `translate3d(${offset}px,0,0)`,
-                transition: opening
-                  ? "transform 5.7s cubic-bezier(.08,.82,.07,1)"
+                transition: opening && !reducedMotion
+                  ? `transform ${REEL_DURATION_MS}ms cubic-bezier(.08,.82,.07,1)`
                   : "none",
                 paddingLeft: "50%",
                 paddingRight: "50%",
@@ -256,19 +328,21 @@ export function BonusBoxClient({
           </div>
         </div>
 
-        {(canUseWelcomeAttempts || (!data.hasActiveSubscription && data.attemptsCount > 0)) && (
+        {(canUseWelcomeAttempts || lockedAttempts > 0) && (
           <div className="border-t border-slate-200 bg-slate-50/80 px-3 py-2 text-sm text-slate-600 dark:border-white/10 dark:bg-white/[0.035] dark:text-slate-300 sm:px-5">
             {canUseWelcomeAttempts
-              ? "Приветственные открытия доступны без подписки."
-              : "Открытия сохраняются на балансе. Активируйте подписку, чтобы забрать подарок."}
+              ? `Приветственных открытий сейчас: ${data.welcomeAttemptsCount}.${lockedAttempts > 0 ? ` Ещё ${lockedAttempts} будут доступны после активации подписки.` : ""}`
+              : `${lockedAttempts} открытий сохранено на балансе и станет доступно после активации подписки.`}
           </div>
         )}
       </section>
 
       {result && (
         <section
+          role="status"
+          aria-live="polite"
           className={cn(
-            "bonus-box-result relative order-2 overflow-hidden rounded-2xl border bg-white shadow-sm shadow-slate-950/[0.04] dark:bg-surface-900 dark:shadow-black/20",
+            "bonus-box-result relative order-2 overflow-hidden rounded-lg border border-l-4 bg-white dark:bg-surface-900",
             result.prize.type === "NO_PRIZE"
               ? "border-red-200 dark:border-red-500/40"
               : "border-emerald-200 dark:border-emerald-500/30",
@@ -300,7 +374,11 @@ export function BonusBoxClient({
                     : "text-emerald-600 dark:text-emerald-300",
                 )}
               >
-                {result.prize.type === "NO_PRIZE" ? "Открытие завершено" : "Подарок начислен"}
+                {result.prize.type === "NO_PRIZE"
+                  ? "Открытие завершено"
+                  : !result.remoteSynced && prizeRequiresSubscription(result.prize)
+                    ? "Подарок сохранён"
+                    : "Подарок начислен"}
               </div>
               <div className="mt-1 text-2xl font-semibold tracking-tight text-slate-950 dark:text-white">
                 {result.prize.title}
@@ -320,6 +398,11 @@ export function BonusBoxClient({
                       до {formatDateOnly(result.promoCodeExpiresAt)}
                     </span>
                   )}
+                </div>
+              )}
+              {!result.remoteSynced && prizeRequiresSubscription(result.prize) && (
+                <div className="mt-3 border-l-2 border-amber-400 pl-3 text-sm text-amber-700 dark:text-amber-200">
+                  Применение к VPN ещё синхронизируется. Подарок сохранён и не потеряется.
                 </div>
               )}
             </div>
@@ -374,20 +457,51 @@ export function BonusBoxClient({
       )}
 
       <section className="order-4 space-y-4">
-        <div className="flex flex-wrap gap-1.5 rounded-2xl border border-slate-200/80 bg-white p-1.5 shadow-sm shadow-slate-950/[0.04] dark:border-white/10 dark:bg-surface-900 dark:shadow-black/20">
+        {data.pityProgress.enabled && hasRareOrBetter && (
+          <div className="flex flex-col gap-2 border-y border-slate-200 py-3 text-sm dark:border-white/10 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-700 dark:text-cyan-300">
+                Защита от неудач
+              </span>
+              <p className="mt-1 text-slate-600 dark:text-slate-300">
+                {data.pityProgress.guaranteedNext
+                  ? "Следующий подарок будет редким или лучше."
+                  : `До гарантированного редкого подарка: ${data.pityProgress.remaining ?? 0}.`}
+              </p>
+            </div>
+            <div className="h-1.5 w-full overflow-hidden bg-slate-200 sm:w-48 dark:bg-white/10">
+              <div
+                className="h-full bg-cyan-400"
+                style={{
+                  width: `${Math.min(100, (data.pityProgress.current / Math.max(1, data.pityProgress.threshold)) * 100)}%`,
+                }}
+              />
+            </div>
+          </div>
+        )}
+
+        <div
+          className="flex flex-wrap gap-1 border-y border-slate-200 py-1.5 dark:border-white/10"
+          role="tablist"
+          aria-label="Разделы бонусов"
+          onKeyDown={handleTabKeyDown}
+        >
           <BonusTabButton
+            tab="outcomes"
             active={activeTab === "outcomes"}
             onClick={() => setActiveTab("outcomes")}
             label="Что можно выиграть"
             meta={`${data.prizes.length}`}
           />
           <BonusTabButton
+            tab="history"
             active={activeTab === "history"}
             onClick={() => setActiveTab("history")}
             label="История"
             meta={`${data.openings.length}`}
           />
           <BonusTabButton
+            tab="rules"
             active={activeTab === "rules"}
             onClick={() => setActiveTab("rules")}
             label="Как получить"
@@ -396,11 +510,16 @@ export function BonusBoxClient({
         </div>
 
         {activeTab === "outcomes" && (
-          <div className="space-y-3">
+          <div
+            className="space-y-3"
+            id="bonus-panel-outcomes"
+            role="tabpanel"
+            aria-labelledby="bonus-tab-outcomes"
+          >
             <div className="flex items-center justify-between gap-3">
               <h2 className="text-lg font-semibold">Возможные исходы</h2>
               <div className="text-sm text-slate-500">
-                {Math.round(totalChance * 100)}%
+                Базовая сумма: {Math.round(totalChance * 100)}%
               </div>
             </div>
             <div className="grid grid-cols-[repeat(auto-fit,minmax(15rem,1fr))] gap-2.5">
@@ -417,7 +536,12 @@ export function BonusBoxClient({
         )}
 
         {activeTab === "history" && (
-          <section className="space-y-3">
+          <section
+            className="space-y-3"
+            id="bonus-panel-history"
+            role="tabpanel"
+            aria-labelledby="bonus-tab-history"
+          >
             <h2 className="text-lg font-semibold">Ваши результаты</h2>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {data.openings.map((opening) => (
@@ -433,40 +557,14 @@ export function BonusBoxClient({
         )}
 
         {activeTab === "rules" && (
-          <BonusBoxRules
-            config={data.config}
-            hasActiveSubscription={data.hasActiveSubscription}
-          />
+          <div id="bonus-panel-rules" role="tabpanel" aria-labelledby="bonus-tab-rules">
+            <BonusBoxRules
+              config={data.config}
+              hasActiveSubscription={data.hasActiveSubscription}
+            />
+          </div>
         )}
       </section>
-    </div>
-  );
-}
-
-function BonusBoxOpeningEffects() {
-  return (
-    <div className="bonus-box-fx-layer" aria-hidden="true">
-      <div className="bonus-box-fx-aurora" />
-      <div className="bonus-box-fx-scanner" />
-      <div className="bonus-box-fx-ring bonus-box-fx-ring-one" />
-      <div className="bonus-box-fx-ring bonus-box-fx-ring-two" />
-      <div className="bonus-box-fx-flash" />
-      <div className="bonus-box-fx-particles">
-        {OPENING_EFFECT_PARTICLES.map((particle) => (
-          <span
-            key={`${particle.x}-${particle.delay}`}
-            style={
-              {
-                "--bonus-particle-x": `${particle.x}%`,
-                "--bonus-particle-delay": `${particle.delay}ms`,
-                "--bonus-particle-size": `${particle.size}px`,
-                "--bonus-particle-drift": `${particle.drift}px`,
-                "--bonus-particle-duration": `${particle.duration}ms`,
-              } as CSSProperties
-            }
-          />
-        ))}
-      </div>
     </div>
   );
 }
@@ -479,7 +577,7 @@ function ActivePromoRewards({
   onCopy: (code: string) => void;
 }) {
   return (
-    <section className="order-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm shadow-slate-950/[0.03] dark:border-white/10 dark:bg-surface-900 dark:shadow-black/20 sm:p-4">
+    <section className="order-3 rounded-lg border border-slate-200 border-l-2 border-l-cyan-400 bg-white p-3 dark:border-white/10 dark:border-l-cyan-300 dark:bg-surface-900 sm:p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-base font-semibold text-slate-950 dark:text-white sm:text-lg">Ваши активные промокоды</h2>
@@ -487,7 +585,7 @@ function ActivePromoRewards({
             Можно скопировать или сразу применить к тарифу.
           </p>
         </div>
-        <span className="rounded-full bg-cyan-50 px-3 py-1 text-xs font-semibold text-cyan-700 dark:bg-cyan-500/10 dark:text-cyan-100">
+        <span className="border-l-2 border-cyan-400 pl-2 font-mono text-[10px] font-semibold uppercase text-cyan-700 dark:text-cyan-100">
           {rewards.length}
         </span>
       </div>
@@ -505,6 +603,11 @@ function ActivePromoRewards({
                 <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                   -{reward.discountPercent}% · {reward.prizeTitle}
                 </div>
+                {reward.expiresAt && (
+                  <div className="mt-1 font-mono text-[10px] uppercase tracking-wide text-amber-700 dark:text-amber-300">
+                    Действует до {formatDateOnly(reward.expiresAt)}
+                  </div>
+                )}
               </div>
               <TicketPercent className="h-5 w-5 shrink-0 text-emerald-500" />
             </div>
@@ -557,27 +660,34 @@ function BonusTabButton({
   label,
   meta,
   onClick,
+  tab,
 }: {
   active: boolean;
   label: string;
   meta: string;
   onClick: () => void;
+  tab: BonusBoxTab;
 }) {
   return (
     <button
       type="button"
+      id={`bonus-tab-${tab}`}
+      role="tab"
+      aria-selected={active}
+      aria-controls={`bonus-panel-${tab}`}
+      tabIndex={active ? 0 : -1}
       className={cn(
-        "flex min-h-10 flex-1 items-center justify-between gap-3 rounded-xl px-3 py-2 text-left text-sm transition-colors sm:flex-none sm:min-w-40",
+        "flex min-h-10 flex-1 items-center justify-between gap-3 rounded-md border-l-2 px-3 py-2 text-left text-sm transition-colors sm:flex-none sm:min-w-40",
         active
-          ? "bg-cyan-50 text-cyan-900 ring-1 ring-cyan-200 dark:bg-cyan-400/10 dark:text-cyan-100 dark:ring-cyan-400/20"
-          : "text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-white/5",
+          ? "border-cyan-400 bg-white text-slate-950 dark:bg-white/[0.06] dark:text-white"
+          : "border-transparent text-slate-600 hover:border-slate-300 hover:bg-white/60 dark:text-slate-300 dark:hover:border-white/15 dark:hover:bg-white/[0.04]",
       )}
       onClick={onClick}
     >
       <span className="font-semibold">{label}</span>
       <span
         className={cn(
-          "rounded-full px-2 py-0.5 text-[11px] font-semibold",
+          "rounded-sm px-1.5 py-0.5 font-mono text-[9px] font-semibold uppercase",
           active
             ? "bg-cyan-100 text-cyan-800 dark:bg-cyan-300/15 dark:text-cyan-100"
             : "bg-slate-100 text-slate-500 dark:bg-white/10 dark:text-slate-400",
@@ -595,7 +705,7 @@ function OutcomeRow({ prize }: { prize: BonusBoxPrizeView }) {
   return (
     <article
       className={cn(
-        "relative min-h-[5.5rem] overflow-hidden rounded-2xl border bg-white/80 p-3 shadow-sm shadow-slate-950/[0.03] transition-colors hover:bg-white dark:bg-white/[0.035] dark:shadow-black/10 dark:hover:bg-white/[0.055]",
+        "relative min-h-[5.5rem] overflow-hidden rounded-lg border bg-white/70 p-3 transition-colors hover:bg-white dark:bg-white/[0.025] dark:hover:bg-white/[0.045]",
         prizeBorderClass(prize),
       )}
     >
@@ -608,7 +718,7 @@ function OutcomeRow({ prize }: { prize: BonusBoxPrizeView }) {
             <h3 className="truncate text-sm font-semibold leading-tight text-slate-950 dark:text-white">{prize.title}</h3>
             <span
               className={cn(
-                "shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold",
+                "shrink-0 rounded-sm px-1.5 py-0.5 font-mono text-[9px] font-semibold uppercase",
                 rarityClass(prize.rarity),
               )}
             >
@@ -630,11 +740,11 @@ function OutcomeRow({ prize }: { prize: BonusBoxPrizeView }) {
             />
           </div>
         </div>
-        <div className="shrink-0 rounded-xl bg-slate-50 px-2 py-1.5 text-right dark:bg-white/5">
+        <div className="shrink-0 border-l border-slate-200 pl-2 text-right dark:border-white/10">
           <div className="text-sm font-semibold leading-none text-slate-950 dark:text-white">
             {chancePercent.toFixed(1)}%
           </div>
-          <div className="mt-0.5 text-[10px] text-slate-400">шанс</div>
+          <div className="mt-0.5 text-[10px] text-slate-400">базовый шанс</div>
         </div>
       </div>
     </article>
@@ -656,13 +766,13 @@ function OpeningRow({ opening }: { opening: BonusBoxOpeningView }) {
   return (
     <article
       className={cn(
-        "rounded-2xl border bg-white p-3 shadow-sm shadow-slate-950/[0.03] transition-colors hover:bg-slate-50 dark:bg-surface-900 dark:shadow-black/20 dark:hover:bg-white/[0.04]",
+        "rounded-lg border bg-white p-3 transition-colors hover:bg-slate-50 dark:bg-surface-900 dark:hover:bg-white/[0.04]",
         prizeBorderClass(opening.prize),
       )}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 gap-3">
-          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-700 dark:bg-white/10 dark:text-slate-200">
+          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-md border border-slate-200 text-slate-700 dark:border-white/10 dark:text-slate-200">
             <Icon className="h-5 w-5" />
           </div>
           <div className="min-w-0">
@@ -678,7 +788,7 @@ function OpeningRow({ opening }: { opening: BonusBoxOpeningView }) {
           </div>
           <span
             className={cn(
-              "mt-2 inline-flex rounded-full px-2 py-1 text-[11px] font-semibold",
+              "mt-2 inline-flex rounded-sm px-2 py-1 font-mono text-[9px] font-semibold uppercase",
               rarityClass(opening.prize.rarity),
             )}
           >
@@ -759,13 +869,13 @@ function RuleCard({
   return (
     <div
       className={cn(
-        "rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-950/[0.03] dark:border-white/10 dark:bg-surface-900 dark:shadow-black/20",
+        "rounded-lg border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-surface-900",
         muted &&
           "bg-slate-50/80 text-slate-500 dark:bg-surface-900/80 dark:text-slate-400",
       )}
     >
       <div className="flex items-start gap-3">
-        <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-700 dark:bg-white/10 dark:text-slate-200">
+        <div className="grid h-10 w-10 shrink-0 place-items-center rounded-md border border-slate-200 text-slate-700 dark:border-white/10 dark:text-slate-200">
           {icon}
         </div>
         <div className="min-w-0">
@@ -804,7 +914,7 @@ function PrizeCard({
   return (
     <div
       className={cn(
-        "relative shrink-0 overflow-hidden rounded-2xl border p-3 transition-colors duration-200",
+        "relative shrink-0 overflow-hidden rounded-lg border p-3 transition-colors duration-200",
         compact
           ? "bonus-box-reel-card h-32 text-slate-950 shadow-sm shadow-slate-200/70 dark:text-white dark:shadow-black/20 sm:h-40"
           : "min-h-[132px] bg-white shadow-sm hover:border-cyan-200 dark:bg-surface-900",
@@ -837,7 +947,7 @@ function PrizeCard({
         </div>
         <span
           className={cn(
-            "shrink-0 rounded-full px-2 py-1 text-[11px] font-semibold",
+            "shrink-0 rounded-sm px-1.5 py-1 font-mono text-[9px] font-semibold uppercase",
             rarityClass(prize.rarity),
           )}
         >
@@ -846,7 +956,7 @@ function PrizeCard({
       </div>
       {compact && (
         <div className="relative mt-5 flex items-end justify-between sm:mt-8">
-          <div className="grid h-10 w-10 place-items-center rounded-xl border border-slate-200 bg-white/70 text-slate-700 shadow-inner shadow-slate-200/60 dark:border-white/10 dark:bg-white/10 dark:text-slate-100 dark:shadow-white/5 sm:h-12 sm:w-12">
+          <div className="grid h-10 w-10 place-items-center rounded-md border border-slate-200 bg-white/70 text-slate-700 dark:border-white/10 dark:bg-white/10 dark:text-slate-100 sm:h-12 sm:w-12">
             <Icon className="h-5 w-5 sm:h-6 sm:w-6" />
           </div>
           <div className="flex items-end gap-1">

@@ -39,6 +39,7 @@ export function getDisabledCtaLabel(reason: string) {
   if (reason.includes("подписк")) return "Оформить подписку";
   if (reason.includes("Нет доступных")) return "Нет открытий";
   if (reason.includes("настро")) return "Подарки скоро";
+  if (reason.includes("подходящ")) return "Нет подходящих подарков";
   return "Недоступно";
 }
 

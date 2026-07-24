@@ -201,14 +201,21 @@ export async function getBonusBoxOverview(userId: string) {
             status: { in: ['ACTIVE', 'LIMITED'] },
             expireAt: { gt: now },
           },
-          select: { id: true },
+          select: { id: true, trafficLimitBytes: true },
           take: 1,
         },
       },
     }),
   ])
-  const prizes = publicPrizesWithChances(prizeRows, prizeRows)
   const hasActiveSubscription = Boolean(vpnAccess?.remnawaveUuid && vpnAccess.subscriptions.length > 0)
+  const subscription = vpnAccess?.subscriptions[0]
+  const eligiblePrizeRows = prizeRows.filter((prize) =>
+    isPrizeApplicable(prize, {
+      hasActiveSubscription,
+      trafficLimitBytes: subscription?.trafficLimitBytes ?? null,
+    })
+  )
+  const prizes = publicPrizesWithChances(eligiblePrizeRows, eligiblePrizeRows)
   const welcomeAttemptsCount = attempts.filter(isWelcomeBonusAttempt).length
 
   return {
@@ -224,7 +231,8 @@ export async function getBonusBoxOverview(userId: string) {
     canOpenReason: getCanOpenReason({
       enabled: config.enabled,
       attemptsCount: attempts.length,
-      prizesCount: prizeRows.length,
+      configuredPrizesCount: prizeRows.length,
+      eligiblePrizesCount: eligiblePrizeRows.length,
       hasActiveSubscription,
       welcomeAttemptsCount,
     }),
@@ -487,14 +495,6 @@ export async function openBonusBox(userId: string): Promise<BonusBoxOpeningResul
         throw new BonusBoxError('Нужна активная VPN-подписка', 403, 'NO_ACTIVE_SUBSCRIPTION')
       }
 
-      const claimedAttempt = await tx.bonusBoxAttempt.updateMany({
-        where: { id: attempt.id, usedAt: null },
-        data: { usedAt: now },
-      })
-      if (claimedAttempt.count !== 1) {
-        throw new BonusBoxError('Открытие уже использовано', 409, 'ATTEMPT_ALREADY_USED')
-      }
-
       const prizes = await tx.bonusBoxPrize.findMany({
         where: {
           isActive: true,
@@ -504,12 +504,28 @@ export async function openBonusBox(userId: string): Promise<BonusBoxOpeningResul
       })
       const eligiblePrizes = prizes
         .filter((prize) => prize.maxWins == null || prize.winsCount < prize.maxWins)
+        .filter((prize) =>
+          isPrizeApplicable(prize, {
+            hasActiveSubscription,
+            trafficLimitBytes: subscription?.trafficLimitBytes ?? null,
+          })
+        )
       if (eligiblePrizes.length === 0) {
         throw new BonusBoxError(
-          'Администратор ещё не настроил подарки',
+          prizes.length === 0
+            ? 'Администратор ещё не настроил подарки'
+            : 'Для текущего тарифа пока нет подходящих подарков',
           409,
           'NO_PRIZES'
         )
+      }
+
+      const claimedAttempt = await tx.bonusBoxAttempt.updateMany({
+        where: { id: attempt.id, usedAt: null },
+        data: { usedAt: now },
+      })
+      if (claimedAttempt.count !== 1) {
+        throw new BonusBoxError('Открытие уже использовано', 409, 'ATTEMPT_ALREADY_USED')
       }
 
       const recentOpenings = await tx.bonusBoxOpening.findMany({
@@ -560,6 +576,7 @@ export async function openBonusBox(userId: string): Promise<BonusBoxOpeningResul
       return {
         openingId: opening.id,
         prize,
+        eligiblePrizeIds: eligiblePrizes.map((item) => item.id),
         promoCodeId: application.promoCodeId,
         promoCode: opening.promoCode?.code ?? null,
         promoCodeExpiresAt: opening.promoCode?.expiresAt?.toISOString() ?? null,
@@ -584,11 +601,17 @@ export async function openBonusBox(userId: string): Promise<BonusBoxOpeningResul
     countAvailableAttempts(userId),
     getPublicPrizes(),
   ])
+  const eligiblePublicPrizeRows = prizes.filter((prize) => txResult.eligiblePrizeIds.includes(prize.id))
+  const eligibleTotalWeight = eligiblePublicPrizeRows.reduce((sum, prize) => sum + prize.weight, 0)
+  const eligiblePublicPrizes = eligiblePublicPrizeRows.map((prize) => ({
+    ...prize,
+    chance: eligibleTotalWeight > 0 ? prize.weight / eligibleTotalWeight : 0,
+  }))
   const publicPrize = publicPrizeFromPrize(
     txResult.prize,
-    chanceForPrize(txResult.prize, prizes)
+    chanceForPrize(txResult.prize, eligiblePublicPrizes)
   )
-  const reel = buildReel(prizes.length > 0 ? prizes : [publicPrize], publicPrize)
+  const reel = buildReel(eligiblePublicPrizes.length > 0 ? eligiblePublicPrizes : [publicPrize], publicPrize)
 
   return {
     id: txResult.openingId,
@@ -605,6 +628,22 @@ export async function openBonusBox(userId: string): Promise<BonusBoxOpeningResul
 
 function isWelcomeBonusAttempt(attempt: { source: string; sourceKey: string }) {
   return attempt.source === 'MANUAL' && attempt.sourceKey.startsWith(WELCOME_ATTEMPT_PREFIX)
+}
+
+function isPrizeApplicable(
+  prize: Pick<BonusBoxPrize, 'type'>,
+  context: {
+    hasActiveSubscription: boolean
+    trafficLimitBytes: bigint | null
+  }
+) {
+  if (!context.hasActiveSubscription) {
+    return prize.type !== 'SUBSCRIPTION_DAYS' && prize.type !== 'TRAFFIC_GB'
+  }
+  if (prize.type === 'TRAFFIC_GB' && context.trafficLimitBytes == null) {
+    return false
+  }
+  return true
 }
 
 export async function getPublicPrizes(tx: Pick<BonusBoxTx, 'bonusBoxPrize'> = prisma) {
@@ -1036,9 +1075,10 @@ async function getBestRecentOpening(now: Date) {
       prize: { type: { not: 'NO_PRIZE' } },
     },
     orderBy: { createdAt: 'desc' },
+    take: 500,
     include: {
       prize: true,
-      user: { select: { name: true, email: true } },
+      user: { select: { email: true } },
     },
   })
   const best = openings
@@ -1056,7 +1096,7 @@ async function getBestRecentOpening(now: Date) {
     title: best.prize.title,
     label: prizeValueLabel(best.prize),
     rarity: best.prize.rarity,
-    userLabel: best.user?.name?.trim() || maskEmail(best.user?.email) || 'Пользователь',
+    userLabel: maskEmail(best.user?.email) || 'Пользователь',
     createdAt: best.createdAt.toISOString(),
   }
 }
@@ -1064,12 +1104,14 @@ async function getBestRecentOpening(now: Date) {
 function getCanOpenReason(input: {
   enabled: boolean
   attemptsCount: number
-  prizesCount: number
+  configuredPrizesCount: number
+  eligiblePrizesCount: number
   hasActiveSubscription: boolean
   welcomeAttemptsCount: number
 }) {
   if (!input.enabled) return 'Подарочный бокс временно выключен'
-  if (input.prizesCount <= 0) return 'Подарки ещё не настроены'
+  if (input.configuredPrizesCount <= 0) return 'Подарки ещё не настроены'
+  if (input.eligiblePrizesCount <= 0) return 'Для текущего тарифа пока нет подходящих подарков'
   if (input.attemptsCount <= 0) {
     return 'Нет доступных открытий. Их можно получить за покупку, приглашение или еженедельный бонус.'
   }
