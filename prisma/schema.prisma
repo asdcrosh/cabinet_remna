@@ -1009,6 +1009,10 @@ model BonusBoxOpening {
   prizeSnapshot         Json
   awardedSubscriptionId String?
   promoCodeId           String?
+  remoteSynced          Boolean  @default(true)
+  syncAttempts          Int      @default(0)
+  lastSyncError         String?
+  nextSyncAt            DateTime?
   createdAt             DateTime @default(now())
 
   user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -1019,6 +1023,7 @@ model BonusBoxOpening {
   @@index([userId, createdAt])
   @@index([prizeId, createdAt])
   @@index([promoCodeId])
+  @@index([userId, remoteSynced, nextSyncAt])
 }
 
 enum BonusBoxPrizeType {

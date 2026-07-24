@@ -146,8 +146,9 @@ export function BonusBoxClient({
             id: response.id,
             createdAt: new Date().toISOString(),
             prize: response.prize,
-            promoCode: response.promoCode,
-            promoCodeExpiresAt: response.promoCodeExpiresAt,
+                promoCode: response.promoCode,
+                promoCodeExpiresAt: response.promoCodeExpiresAt,
+                remoteSynced: response.remoteSynced,
           },
           ...current.openings,
         ].slice(0, 12),
@@ -803,6 +804,11 @@ function OpeningRow({ opening }: { opening: BonusBoxOpeningView }) {
           {opening.promoCodeExpiresAt && (
             <span className="text-slate-500 dark:text-slate-400">до {formatDateOnly(opening.promoCodeExpiresAt)}</span>
           )}
+        </div>
+      )}
+      {!opening.remoteSynced && prizeRequiresSubscription(opening.prize) && (
+        <div className="mt-3 border-l-2 border-amber-400 pl-2 text-xs text-amber-700 dark:text-amber-200">
+          Ожидает синхронизации с VPN
         </div>
       )}
     </article>

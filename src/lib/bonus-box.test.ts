@@ -24,8 +24,10 @@ const mocks = vi.hoisted(() => {
     bonusBoxOpening: {
       findMany: vi.fn(),
       create: vi.fn(),
+      update: vi.fn(),
     },
     subscription: {
+      findUnique: vi.fn(),
       update: vi.fn(),
     },
     promoCode: {
@@ -34,11 +36,15 @@ const mocks = vi.hoisted(() => {
     $transaction: vi.fn(async (fn) => fn(prisma)),
   }
 
-  return { prisma }
+  const remnawave = {
+    updateUser: vi.fn(),
+  }
+
+  return { prisma, remnawave }
 })
 
 vi.mock('./prisma', () => ({ prisma: mocks.prisma }))
-vi.mock('./remnawave', () => ({ remnawave: {} }))
+vi.mock('./remnawave', () => ({ remnawave: mocks.remnawave }))
 vi.mock('./feature-flags', () => ({ isFeatureEnabled: vi.fn(async () => true) }))
 
 import {
@@ -47,6 +53,7 @@ import {
   getBonusBoxOverview,
   grantWeeklyBonusBoxAttempts,
   openBonusBox,
+  retryPendingBonusBoxSyncsForUser,
 } from './bonus-box'
 
 type Config = ReturnType<typeof getBonusBoxConfig>
@@ -468,6 +475,88 @@ describe('getBonusBoxOverview', () => {
       label: '+30 дн.',
       rarity: 'LEGENDARY',
       userLabel: 'ol***@example.com',
+    })
+  })
+})
+
+describe('retryPendingBonusBoxSyncsForUser', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-06-24T12:00:00.000Z'))
+    mocks.prisma.user.findUnique.mockResolvedValue({ remnawaveUuid: 'rw-1' })
+    mocks.prisma.bonusBoxOpening.update.mockResolvedValue({})
+    mocks.prisma.subscription.update.mockResolvedValue({})
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('retries a pending subscription-days reward from the local subscription state', async () => {
+    mocks.prisma.bonusBoxOpening.findMany.mockResolvedValue([
+      {
+        id: 'opening-1',
+        awardedSubscriptionId: 'sub-1',
+        syncAttempts: 1,
+        prize: { type: 'SUBSCRIPTION_DAYS' },
+      },
+    ])
+    mocks.prisma.subscription.findUnique.mockResolvedValue({
+      id: 'sub-1',
+      expireAt: new Date('2026-07-10T00:00:00.000Z'),
+      trafficLimitBytes: null,
+    })
+    mocks.remnawave.updateUser.mockResolvedValue({
+      response: { expireAt: '2026-07-10T00:00:00.000Z' },
+    })
+
+    const result = await retryPendingBonusBoxSyncsForUser('user-1')
+
+    expect(result).toEqual({ attempted: 1, synced: 1 })
+    expect(mocks.remnawave.updateUser).toHaveBeenCalledWith({
+      uuid: 'rw-1',
+      status: 'ACTIVE',
+      expireAt: '2026-07-10T00:00:00.000Z',
+    })
+    expect(mocks.prisma.bonusBoxOpening.update).toHaveBeenLastCalledWith({
+      where: { id: 'opening-1' },
+      data: {
+        remoteSynced: true,
+        syncAttempts: 2,
+        lastSyncError: null,
+        nextSyncAt: null,
+      },
+    })
+  })
+
+  it('keeps a failed reward pending with exponential retry time', async () => {
+    mocks.prisma.bonusBoxOpening.findMany.mockResolvedValue([
+      {
+        id: 'opening-1',
+        awardedSubscriptionId: 'sub-1',
+        syncAttempts: 1,
+        prize: { type: 'TRAFFIC_GB' },
+      },
+    ])
+    mocks.prisma.subscription.findUnique.mockResolvedValue({
+      id: 'sub-1',
+      expireAt: new Date('2026-07-10T00:00:00.000Z'),
+      trafficLimitBytes: 25n,
+    })
+    mocks.remnawave.updateUser.mockRejectedValue(new Error('temporarily unavailable'))
+
+    const result = await retryPendingBonusBoxSyncsForUser('user-1')
+
+    expect(result).toEqual({ attempted: 1, synced: 0 })
+    expect(mocks.prisma.bonusBoxOpening.update).toHaveBeenLastCalledWith({
+      where: { id: 'opening-1' },
+      data: {
+        remoteSynced: false,
+        syncAttempts: 2,
+        lastSyncError: 'Remnawave временно недоступен',
+        nextSyncAt: new Date('2026-06-24T12:04:00.000Z'),
+      },
     })
   })
 })

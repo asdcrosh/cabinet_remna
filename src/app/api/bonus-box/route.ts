@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { BonusBoxError, getBonusBoxOverview, openBonusBox } from '@/lib/bonus-box'
+import { BonusBoxError, getBonusBoxOverview, openBonusBox, retryPendingBonusBoxSyncsForUser } from '@/lib/bonus-box'
 import { requireAuth, withAuth } from '@/lib/auth/guard'
 import { rateLimit } from '@/lib/rate-limit'
 import { isFeatureEnabled } from '@/lib/feature-flags'
@@ -10,6 +10,7 @@ export const dynamic = 'force-dynamic'
 export const GET = withAuth(async () => {
   if (!await isFeatureEnabled('bonusBox')) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   const session = await requireAuth()
+  await retryPendingBonusBoxSyncsForUser(session.uid)
   const overview = await getBonusBoxOverview(session.uid)
   return NextResponse.json(overview)
 })

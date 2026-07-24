@@ -11,6 +11,7 @@ import { remnawave, RemnawaveError } from '@/lib/remnawave'
 import { serializeSubscription } from '@/lib/api-serializers'
 import { readRemnawaveBigInt } from '@/lib/remnawave-usage'
 import { logError } from '@/lib/logger'
+import { retryPendingBonusBoxSyncsForUser } from '@/lib/bonus-box'
 
 export const runtime = 'nodejs'
 
@@ -34,6 +35,29 @@ export const GET = withAuth(async () => {
   // 2) Нет Remnawave-профиля → пользователь ещё ничего не покупал
   if (!user.remnawaveUsername) {
     return NextResponse.json({ subscription: serializeSubscription(subscription) })
+  }
+
+  if (subscription?.pendingSync) {
+    await retryPendingBonusBoxSyncsForUser(user.id)
+    subscription = await prisma.subscription.findFirst({
+      where: { userId: user.id },
+      orderBy: { createdAt: 'desc' },
+      include: { plan: true },
+    })
+    const hasPendingBonusSync = subscription
+      ? await prisma.bonusBoxOpening.count({
+          where: {
+            awardedSubscriptionId: subscription.id,
+            remoteSynced: false,
+          },
+        }) > 0
+      : false
+    if (hasPendingBonusSync) {
+      return NextResponse.json({
+        subscription: serializeSubscription(subscription),
+        warning: 'Бонус сохранён локально и ожидает синхронизации с Remnawave',
+      })
+    }
   }
 
   // 3) Синхронизация с Remnawave, если данные устарели

@@ -24,6 +24,7 @@ export type BonusBoxOpeningView = {
   prize: BonusBoxPrizeView;
   promoCode: string | null;
   promoCodeExpiresAt: string | null;
+  remoteSynced: boolean;
 };
 
 export type BonusBoxConfigView = {

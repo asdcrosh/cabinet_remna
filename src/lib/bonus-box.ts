@@ -247,6 +247,7 @@ export async function getBonusBoxOverview(userId: string) {
       prize: publicPrizeFromPrize(opening.prize, 0),
       promoCode: opening.promoCode?.code ?? null,
       promoCodeExpiresAt: opening.promoCode?.expiresAt?.toISOString() ?? null,
+      remoteSynced: opening.remoteSynced,
     })),
   }
 }
@@ -569,6 +570,7 @@ export async function openBonusBox(userId: string): Promise<BonusBoxOpeningResul
           prizeSnapshot: makePrizeSnapshot(prize),
           awardedSubscriptionId: application.subscriptionId,
           promoCodeId: application.promoCodeId,
+          remoteSynced: !application.remoteUpdate,
         },
         include: { promoCode: true },
       })
@@ -592,6 +594,7 @@ export async function openBonusBox(userId: string): Promise<BonusBoxOpeningResul
   let remoteSynced = true
   if (txResult.remoteUpdate) {
     remoteSynced = await syncPrizeToRemnawave(txResult.remoteUpdate)
+    await updateBonusBoxSyncState(txResult.openingId, remoteSynced, 1)
   }
   if (txResult.promoCodeId) {
     await syncCabinetPromoCodeToRemnashopBestEffort(txResult.promoCodeId)
@@ -808,6 +811,110 @@ async function syncPrizeToRemnawave(
     }).catch(() => undefined)
     return false
   }
+}
+
+export async function retryPendingBonusBoxSyncsForUser(userId: string) {
+  const now = new Date()
+  const [user, pendingOpenings] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: userId },
+      select: { remnawaveUuid: true },
+    }),
+    prisma.bonusBoxOpening.findMany({
+      where: {
+        userId,
+        remoteSynced: false,
+        awardedSubscriptionId: { not: null },
+        OR: [{ nextSyncAt: null }, { nextSyncAt: { lte: now } }],
+      },
+      orderBy: { createdAt: 'asc' },
+      take: 3,
+      select: {
+        id: true,
+        awardedSubscriptionId: true,
+        syncAttempts: true,
+        prize: { select: { type: true } },
+      },
+    }),
+  ])
+  if (!user?.remnawaveUuid || pendingOpenings.length === 0) {
+    return { attempted: 0, synced: 0 }
+  }
+
+  let synced = 0
+  for (const opening of pendingOpenings) {
+    const subscription = opening.awardedSubscriptionId
+      ? await prisma.subscription.findUnique({
+          where: { id: opening.awardedSubscriptionId },
+          select: { id: true, expireAt: true, trafficLimitBytes: true },
+        })
+      : null
+    const attemptNumber = opening.syncAttempts + 1
+    if (!subscription) {
+      await updateBonusBoxSyncState(opening.id, false, attemptNumber, 'Локальная подписка не найдена')
+      continue
+    }
+
+    if (opening.prize.type === 'SUBSCRIPTION_DAYS') {
+      const ok = await syncPrizeToRemnawave({
+        type: 'SUBSCRIPTION_DAYS',
+        remnawaveUuid: user.remnawaveUuid,
+        subscriptionId: subscription.id,
+        expireAt: subscription.expireAt,
+      })
+      await updateBonusBoxSyncState(opening.id, ok, attemptNumber)
+      if (ok) synced += 1
+      continue
+    }
+
+    if (opening.prize.type === 'TRAFFIC_GB' && subscription.trafficLimitBytes != null) {
+      const ok = await syncPrizeToRemnawave({
+        type: 'TRAFFIC_GB',
+        remnawaveUuid: user.remnawaveUuid,
+        subscriptionId: subscription.id,
+        trafficLimitBytes: subscription.trafficLimitBytes,
+      })
+      await updateBonusBoxSyncState(opening.id, ok, attemptNumber)
+      if (ok) synced += 1
+      continue
+    }
+
+    await updateBonusBoxSyncState(opening.id, true, attemptNumber)
+    synced += 1
+  }
+
+  return { attempted: pendingOpenings.length, synced }
+}
+
+async function updateBonusBoxSyncState(
+  openingId: string,
+  synced: boolean,
+  attempts: number,
+  error = 'Remnawave временно недоступен'
+) {
+  await prisma.bonusBoxOpening.update({
+    where: { id: openingId },
+    data: synced
+      ? {
+          remoteSynced: true,
+          syncAttempts: attempts,
+          lastSyncError: null,
+          nextSyncAt: null,
+        }
+      : {
+          remoteSynced: false,
+          syncAttempts: attempts,
+          lastSyncError: error.slice(0, 1000),
+          nextSyncAt: nextBonusSyncAt(attempts),
+        },
+  }).catch((stateError) => {
+    logError('bonus_box.sync_state_update_failed', stateError, { openingId })
+  })
+}
+
+function nextBonusSyncAt(attempts: number) {
+  const delayMinutes = Math.min(120, Math.max(1, 2 ** Math.min(attempts, 6)))
+  return new Date(Date.now() + delayMinutes * 60 * 1000)
 }
 
 function makeAttempts(input: {

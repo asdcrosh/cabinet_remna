@@ -60,6 +60,9 @@ export type BonusBoxOpeningAdminRow = {
   prizeRarity: Rarity
   promoCode: string | null
   promoCodeExpiresAt: string | null
+  remoteSynced: boolean
+  syncAttempts: number
+  lastSyncError: string | null
 }
 
 type FormState = {
@@ -91,11 +94,13 @@ export function BonusBoxPrizesAdmin({
   openings,
   settings,
   totalOpenings,
+  pendingSyncCount,
 }: {
   prizes: BonusBoxPrizeAdminRow[]
   openings: BonusBoxOpeningAdminRow[]
   settings: BonusBoxSettingsAdminRow
   totalOpenings: number
+  pendingSyncCount: number
 }) {
   const router = useRouter()
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -216,6 +221,7 @@ export function BonusBoxPrizesAdmin({
             <SummaryCell label="Шанс награды" value={formatChance(stats.rewardChance)} />
             <SummaryCell label="Без подарка" value={formatChance(stats.noPrizeChance)} tone="danger" />
             <SummaryCell label="Открытий" value={totalOpenings} />
+            <SummaryCell label="Ожидают синхронизации" value={pendingSyncCount} tone={pendingSyncCount > 0 ? 'danger' : undefined} />
           </div>
 
           <details className="mt-4 border-t border-slate-100 pt-3 text-sm dark:border-white/10">
@@ -703,7 +709,7 @@ function BonusBoxOpeningHistory({ openings }: { openings: BonusBoxOpeningAdminRo
       {openings.length > 0 ? (
         <>
         <div className="hidden overflow-hidden rounded-2xl border border-slate-200 dark:border-white/10 xl:block">
-          <table className="w-full min-w-[760px] text-sm">
+          <table className="w-full min-w-[860px] text-sm">
             <caption className="sr-only">История открытий бонусной коробки</caption>
             <thead className="text-left text-xs uppercase tracking-wide text-slate-400">
               <tr>
@@ -712,6 +718,7 @@ function BonusBoxOpeningHistory({ openings }: { openings: BonusBoxOpeningAdminRo
                 <th className="px-4 py-2 font-medium">Подарок</th>
                 <th className="px-4 py-2 font-medium">Источник</th>
                 <th className="py-2 pl-4 font-medium">Промокод</th>
+                <th className="py-2 pl-4 font-medium">Синхронизация</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-white/10">
@@ -756,6 +763,19 @@ function BonusBoxOpeningHistory({ openings }: { openings: BonusBoxOpeningAdminRo
                       <span className="text-slate-400">—</span>
                     )}
                   </td>
+                  <td className="py-3 pl-4">
+                    <span
+                      className={cn(
+                        'inline-flex rounded-sm px-2 py-1 font-mono text-[9px] font-semibold uppercase',
+                        opening.remoteSynced
+                          ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-200'
+                          : 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-200'
+                      )}
+                      title={opening.lastSyncError ?? undefined}
+                    >
+                      {opening.remoteSynced ? 'Готово' : `Ожидает · ${opening.syncAttempts}`}
+                    </span>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -799,6 +819,12 @@ function BonusBoxOpeningHistory({ openings }: { openings: BonusBoxOpeningAdminRo
                   )}
                 </div>
               ) : null}
+              {!opening.remoteSynced && (
+                <div className="mt-3 border-l-2 border-amber-400 pl-2 text-xs text-amber-700 dark:text-amber-200">
+                  Ожидает синхронизации, попыток: {opening.syncAttempts}
+                  {opening.lastSyncError ? ` · ${opening.lastSyncError}` : ''}
+                </div>
+              )}
             </article>
           ))}
         </div>

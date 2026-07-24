@@ -1,6 +1,6 @@
 import { notFound, redirect } from 'next/navigation'
 import { getCurrentUser } from '@/lib/auth/cookies'
-import { getBonusBoxOverview } from '@/lib/bonus-box'
+import { getBonusBoxOverview, retryPendingBonusBoxSyncsForUser } from '@/lib/bonus-box'
 import { BonusBoxClientDynamic } from '@/components/bonus-box/bonus-box-client-dynamic'
 import { PageHeader } from '@/components/dashboard/page-header'
 import { isFeatureEnabled } from '@/lib/feature-flags'
@@ -13,6 +13,7 @@ export default async function BonusBoxPage() {
   const session = await getCurrentUser()
   if (!session) redirect('/login?next=/dashboard/bonus-box')
 
+  await retryPendingBonusBoxSyncsForUser(session.uid)
   const data = await getBonusBoxOverview(session.uid)
 
   return (

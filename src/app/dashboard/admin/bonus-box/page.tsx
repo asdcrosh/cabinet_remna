@@ -24,11 +24,12 @@ export default async function AdminBonusBoxPage({
   const params = await searchParams
   const limit = parseAdminListLimit(params.limit)
 
-  const [prizes, totalOpenings, openings, settings] = await Promise.all([
+  const [prizes, totalOpenings, pendingSyncCount, openings, settings] = await Promise.all([
     prisma.bonusBoxPrize.findMany({
       orderBy: [{ isActive: 'desc' }, { createdAt: 'desc' }],
     }),
     prisma.bonusBoxOpening.count(),
+    prisma.bonusBoxOpening.count({ where: { remoteSynced: false } }),
     prisma.bonusBoxOpening.findMany({
       orderBy: { createdAt: 'desc' },
       take: limit,
@@ -74,6 +75,9 @@ export default async function AdminBonusBoxPage({
     prizeRarity: opening.prize.rarity,
     promoCode: opening.promoCode?.code ?? null,
     promoCodeExpiresAt: opening.promoCode?.expiresAt?.toISOString() ?? null,
+    remoteSynced: opening.remoteSynced,
+    syncAttempts: opening.syncAttempts,
+    lastSyncError: opening.lastSyncError,
   }))
 
   return (
@@ -86,6 +90,7 @@ export default async function AdminBonusBoxPage({
         openings={openingRows}
         settings={settings}
         totalOpenings={totalOpenings}
+        pendingSyncCount={pendingSyncCount}
       />
     </AdminPageShell>
   )
