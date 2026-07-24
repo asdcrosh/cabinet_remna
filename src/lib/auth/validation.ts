@@ -139,6 +139,8 @@ const adminBonusBoxPrizeBaseSchema = z.object({
   isActive: z.boolean().default(true),
   maxWins: z.coerce.number().int().min(1).optional().nullable(),
   promoExpiresInDays: z.coerce.number().int().min(1).max(365).optional().nullable(),
+  estimatedCostKopecks: z.coerce.number().int().min(0).max(100_000_000).default(0),
+  eventOnly: z.boolean().default(false),
 })
 
 export const adminBonusBoxPrizeSchema = adminBonusBoxPrizeBaseSchema.refine(

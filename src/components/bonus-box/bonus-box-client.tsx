@@ -4,6 +4,7 @@ import { type KeyboardEvent, type ReactNode, useEffect, useMemo, useRef, useStat
 import {
   CalendarClock,
   CalendarPlus,
+  Check,
   CircleSlash,
   Copy,
   CreditCard,
@@ -44,6 +45,8 @@ import type {
   BonusBoxConfigView,
   BonusBoxOpeningView,
   BonusBoxOverview,
+  BonusBoxMissionView,
+  BonusBoxEventView,
   BonusBoxPrizeView,
   BonusBoxTab,
   OpenBoxResponse,
@@ -71,6 +74,7 @@ export function BonusBoxClient({
   const [activeTab, setActiveTab] = useState<BonusBoxTab>("outcomes");
   const [mobileReel, setMobileReel] = useState(false);
   const [reducedMotion, setReducedMotion] = useState(false);
+  const [claimingMissionId, setClaimingMissionId] = useState<string | null>(null);
   const revealTimerRef = useRef<number | null>(null);
   const effectTimerRef = useRef<number | null>(null);
   const finishingRef = useRef(false);
@@ -157,6 +161,23 @@ export function BonusBoxClient({
     setOpening(false);
     if (!reducedMotion) {
       effectTimerRef.current = window.setTimeout(() => setRevealEffect(false), REVEAL_EFFECT_DURATION_MS);
+    }
+  }
+
+  async function claimMission(mission: BonusBoxMissionView) {
+    setClaimingMissionId(mission.id);
+    try {
+      const result = await apiFetch<{ attempts: number }>(
+        `/api/bonus-box/missions/${mission.id}/claim`,
+        { method: "POST" },
+      );
+      toast(`Начислено открытий: ${result.attempts}`, "success");
+      const freshData = await apiFetch<BonusBoxOverview>("/api/bonus-box");
+      setData(freshData);
+    } catch {
+      // apiFetch уже покажет toast
+    } finally {
+      setClaimingMissionId(null);
     }
   }
 
@@ -337,6 +358,15 @@ export function BonusBoxClient({
           </div>
         )}
       </section>
+
+      {(data.events.length > 0 || data.missions.length > 0) && (
+        <BonusEngagementPanel
+          events={data.events}
+          missions={data.missions}
+          claimingMissionId={claimingMissionId}
+          onClaim={claimMission}
+        />
+      )}
 
       {result && (
         <section
@@ -568,6 +598,112 @@ export function BonusBoxClient({
       </section>
     </div>
   );
+}
+
+function BonusEngagementPanel({
+  events,
+  missions,
+  claimingMissionId,
+  onClaim,
+}: {
+  events: BonusBoxEventView[];
+  missions: BonusBoxMissionView[];
+  claimingMissionId: string | null;
+  onClaim: (mission: BonusBoxMissionView) => void;
+}) {
+  return (
+    <section className="order-3 grid gap-3 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
+      {events.length > 0 && (
+        <div className="border-y border-cyan-200 bg-cyan-50/40 px-1 py-3 dark:border-cyan-300/20 dark:bg-cyan-300/[0.035]">
+          <div className="font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-700 dark:text-cyan-200">
+            Сезон сейчас
+          </div>
+          <div className="mt-2 space-y-3">
+            {events.map((event) => (
+              <article key={event.id} className="border-l-2 border-cyan-400 pl-3">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div>
+                    <h2 className="font-semibold text-slate-950 dark:text-white">{event.title}</h2>
+                    {event.description && (
+                      <p className="mt-1 text-sm leading-5 text-slate-600 dark:text-slate-300">{event.description}</p>
+                    )}
+                  </div>
+                  <span className="font-mono text-[10px] uppercase text-slate-500">
+                    до {formatDateOnly(event.endsAt)}
+                  </span>
+                </div>
+                <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
+                  {event.attemptsGranted > 0 && <span>Получено открытий: {event.attemptsGranted}</span>}
+                  {event.boostedPrizeTitles.length > 0 && (
+                    <span>
+                      Шанс x{event.weightMultiplier}: {event.boostedPrizeTitles.join(", ")}
+                    </span>
+                  )}
+                </div>
+              </article>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {missions.length > 0 && (
+        <div className="border-y border-slate-200 px-1 py-3 dark:border-white/10">
+          <div className="font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+            Задания
+          </div>
+          <div className="mt-2 grid gap-2 sm:grid-cols-2">
+            {missions.map((mission) => {
+              const percent = Math.min(100, (mission.value / Math.max(1, mission.target)) * 100);
+              return (
+                <article key={mission.id} className="border-l-2 border-slate-300 pl-3 dark:border-white/20">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <h3 className="text-sm font-semibold text-slate-950 dark:text-white">{mission.title}</h3>
+                      <p className="mt-0.5 text-xs leading-5 text-slate-500">
+                        {mission.description || missionDescription(mission)}
+                      </p>
+                    </div>
+                    <span className="shrink-0 font-mono text-[10px] text-slate-500">
+                      +{mission.rewardAttempts}
+                    </span>
+                  </div>
+                  <div className="mt-2 h-1.5 overflow-hidden bg-slate-100 dark:bg-white/10">
+                    <div className="h-full bg-cyan-400" style={{ width: `${percent}%` }} />
+                  </div>
+                  <div className="mt-2 flex items-center justify-between gap-3">
+                    <span className="text-xs text-slate-500">{mission.value}/{mission.target}</span>
+                    {mission.claimed ? (
+                      <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-600 dark:text-emerald-300">
+                        <Check className="h-3.5 w-3.5" />
+                        Получено
+                      </span>
+                    ) : mission.completed ? (
+                      <button
+                        type="button"
+                        className="btn-primary min-h-9 px-3 text-xs"
+                        disabled={claimingMissionId === mission.id}
+                        onClick={() => onClaim(mission)}
+                      >
+                        {claimingMissionId === mission.id ? "Начисляем..." : "Получить"}
+                      </button>
+                    ) : mission.endsAt ? (
+                      <span className="text-[10px] text-slate-400">до {formatDateOnly(mission.endsAt)}</span>
+                    ) : null}
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function missionDescription(mission: BonusBoxMissionView) {
+  if (mission.type === "PAYMENT_COUNT") return `Совершить оплат: ${mission.target}.`;
+  if (mission.type === "REFERRAL_COUNT") return `Привести друзей с первой оплатой: ${mission.target}.`;
+  return `Заходить подряд дней: ${mission.target}.`;
 }
 
 function ActivePromoRewards({

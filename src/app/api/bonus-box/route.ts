@@ -3,6 +3,8 @@ import { BonusBoxError, getBonusBoxOverview, openBonusBox, retryPendingBonusBoxS
 import { requireAuth, withAuth } from '@/lib/auth/guard'
 import { rateLimit } from '@/lib/rate-limit'
 import { isFeatureEnabled } from '@/lib/feature-flags'
+import { assessBonusBoxRisk, BonusBoxRiskError } from '@/lib/bonus-box-engagement'
+import { notifyUser } from '@/lib/notifications'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -27,11 +29,27 @@ export const POST = withAuth(async (req: Request) => {
   }
 
   try {
+    await assessBonusBoxRisk(session.uid, req)
     const result = await openBonusBox(session.uid)
+    await notifyUser({
+      userId: session.uid,
+      type: 'BONUS_GRANTED',
+      dedupeKey: `bonus-prize:${result.id}`,
+      title: 'Подарок получен',
+      body: `${result.prize.title}. Результат сохранён в истории.`,
+      actionHref: '/dashboard/bonus-box',
+      actionLabel: 'Открыть историю',
+    }).catch(() => undefined)
     return NextResponse.json(result)
   } catch (error) {
     if (error instanceof BonusBoxError) {
       return NextResponse.json({ error: error.message, code: error.code }, { status: error.status })
+    }
+    if (error instanceof BonusBoxRiskError) {
+      return NextResponse.json(
+        { error: error.message, code: 'BONUS_RISK_REVIEW', score: error.score },
+        { status: 403 }
+      )
     }
     throw error
   }

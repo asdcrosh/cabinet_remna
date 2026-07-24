@@ -7,6 +7,13 @@ import { gbToBytes } from './format'
 import { cleanupExpiredBonusBoxPromoCodes } from './promo-code-cleanup'
 import { syncCabinetPromoCodeToRemnashopBestEffort } from './remnashop-promo-sync'
 import { isFeatureEnabled } from './feature-flags'
+import {
+  activeEventForPrize,
+  applyActiveEventWeights,
+  getBonusBoxEngagement,
+  runBonusBoxLifecycleNotifications,
+} from './bonus-box-engagement'
+import { notifyUser } from './notifications'
 
 const DEFAULT_RUB_PER_ATTEMPT = 300
 const DEFAULT_ATTEMPT_TTL_DAYS = 30
@@ -166,14 +173,15 @@ async function getBonusBoxRuntimeConfig() {
 }
 
 export async function getBonusBoxOverview(userId: string) {
-  await Promise.all([
+  const [engagement] = await Promise.all([
+    getBonusBoxEngagement(userId),
     grantWeeklyBonusBoxAttempts(userId),
     cleanupExpiredBonusBoxPromoCodes(),
   ])
 
   const now = new Date()
   const config = await getBonusBoxRuntimeConfig()
-  const [attempts, prizeRows, openings, activePromoRewards, bestRecentOpening, vpnAccess] = await Promise.all([
+  const [attempts, prizeRows, openings, activePromoRewards, bestRecentOpening, vpnAccess, activeEvents] = await Promise.all([
     prisma.bonusBoxAttempt.findMany({
       where: {
         userId,
@@ -206,17 +214,32 @@ export async function getBonusBoxOverview(userId: string) {
         },
       },
     }),
+    prisma.bonusBoxEvent.findMany({
+      where: {
+        isActive: true,
+        startsAt: { lte: now },
+        endsAt: { gt: now },
+      },
+      select: { id: true, prizeIds: true, weightMultiplier: true },
+    }),
   ])
   const hasActiveSubscription = Boolean(vpnAccess?.remnawaveUuid && vpnAccess.subscriptions.length > 0)
   const subscription = vpnAccess?.subscriptions[0]
-  const eligiblePrizeRows = prizeRows.filter((prize) =>
-    isPrizeApplicable(prize, {
-      hasActiveSubscription,
-      trafficLimitBytes: subscription?.trafficLimitBytes ?? null,
-    })
+  const eventPrizeIds = new Set(activeEvents.flatMap((event) => event.prizeIds))
+  const eligiblePrizeRows = applyActiveEventWeights(
+    prizeRows
+      .filter((prize) => !prize.eventOnly || eventPrizeIds.has(prize.id))
+      .filter((prize) =>
+        isPrizeApplicable(prize, {
+          hasActiveSubscription,
+          trafficLimitBytes: subscription?.trafficLimitBytes ?? null,
+        })
+      ),
+    activeEvents
   )
   const prizes = publicPrizesWithChances(eligiblePrizeRows, eligiblePrizeRows)
   const welcomeAttemptsCount = attempts.filter(isWelcomeBonusAttempt).length
+  await runBonusBoxLifecycleNotifications(userId)
 
   return {
     config,
@@ -240,6 +263,8 @@ export async function getBonusBoxOverview(userId: string) {
     openingStreak: buildOpeningStreak(openings.length),
     bestRecentOpening,
     activePromoRewards,
+    missions: engagement.missions,
+    events: engagement.events,
     prizes,
     openings: openings.slice(0, 12).map((opening) => ({
       id: opening.id,
@@ -503,14 +528,27 @@ export async function openBonusBox(userId: string): Promise<BonusBoxOpeningResul
         },
         orderBy: { createdAt: 'asc' },
       })
-      const eligiblePrizes = prizes
+      const activeEvents = await tx.bonusBoxEvent.findMany({
+        where: {
+          isActive: true,
+          startsAt: { lte: now },
+          endsAt: { gt: now },
+        },
+        select: { id: true, prizeIds: true, weightMultiplier: true },
+      })
+      const eventPrizeIds = new Set(activeEvents.flatMap((event) => event.prizeIds))
+      const eligiblePrizes = applyActiveEventWeights(
+        prizes
+        .filter((prize) => !prize.eventOnly || eventPrizeIds.has(prize.id))
         .filter((prize) => prize.maxWins == null || prize.winsCount < prize.maxWins)
         .filter((prize) =>
           isPrizeApplicable(prize, {
             hasActiveSubscription,
             trafficLimitBytes: subscription?.trafficLimitBytes ?? null,
           })
-        )
+        ),
+        activeEvents
+      )
       if (eligiblePrizes.length === 0) {
         throw new BonusBoxError(
           prizes.length === 0
@@ -541,7 +579,15 @@ export async function openBonusBox(userId: string): Promise<BonusBoxOpeningResul
         pityProgress.guaranteedNext
           ? eligiblePrizes.filter((item) => rarityRank(item.rarity) >= 1)
           : []
-      const prize = pickWeightedPrize(guaranteedPrizes.length > 0 ? guaranteedPrizes : guardedPrizes)
+      const selectionPool = guaranteedPrizes.length > 0 ? guaranteedPrizes : guardedPrizes
+      const prize = pickWeightedPrize(selectionPool)
+      const selectionWeight = selectionPool.reduce((sum, item) => sum + item.weight, 0)
+      const expectedChance = selectionWeight > 0 ? prize.weight / selectionWeight : 0
+      const expectedDistribution = selectionPool.map((item) => ({
+        prizeId: item.id,
+        title: item.title,
+        probability: selectionWeight > 0 ? item.weight / selectionWeight : 0,
+      }))
       const claimedPrize = await tx.bonusBoxPrize.updateMany({
         where: {
           id: prize.id,
@@ -571,6 +617,9 @@ export async function openBonusBox(userId: string): Promise<BonusBoxOpeningResul
           awardedSubscriptionId: application.subscriptionId,
           promoCodeId: application.promoCodeId,
           remoteSynced: !application.remoteUpdate,
+          expectedChance,
+          expectedDistribution,
+          seasonalEventId: activeEventForPrize(prize.id, activeEvents),
         },
         include: { promoCode: true },
       })
@@ -578,7 +627,7 @@ export async function openBonusBox(userId: string): Promise<BonusBoxOpeningResul
       return {
         openingId: opening.id,
         prize,
-        eligiblePrizeIds: eligiblePrizes.map((item) => item.id),
+        eligiblePrizes,
         promoCodeId: application.promoCodeId,
         promoCode: opening.promoCode?.code ?? null,
         promoCodeExpiresAt: opening.promoCode?.expiresAt?.toISOString() ?? null,
@@ -600,16 +649,11 @@ export async function openBonusBox(userId: string): Promise<BonusBoxOpeningResul
     await syncCabinetPromoCodeToRemnashopBestEffort(txResult.promoCodeId)
   }
 
-  const [remainingAttempts, prizes] = await Promise.all([
-    countAvailableAttempts(userId),
-    getPublicPrizes(),
-  ])
-  const eligiblePublicPrizeRows = prizes.filter((prize) => txResult.eligiblePrizeIds.includes(prize.id))
-  const eligibleTotalWeight = eligiblePublicPrizeRows.reduce((sum, prize) => sum + prize.weight, 0)
-  const eligiblePublicPrizes = eligiblePublicPrizeRows.map((prize) => ({
-    ...prize,
-    chance: eligibleTotalWeight > 0 ? prize.weight / eligibleTotalWeight : 0,
-  }))
+  const remainingAttempts = await countAvailableAttempts(userId)
+  const eligiblePublicPrizes = publicPrizesWithChances(
+    txResult.eligiblePrizes,
+    txResult.eligiblePrizes
+  )
   const publicPrize = publicPrizeFromPrize(
     txResult.prize,
     chanceForPrize(txResult.prize, eligiblePublicPrizes)
@@ -839,7 +883,7 @@ export async function retryPendingBonusBoxSyncsForUser(
         id: true,
         awardedSubscriptionId: true,
         syncAttempts: true,
-        prize: { select: { type: true } },
+        prize: { select: { type: true, title: true } },
       },
     }),
   ])
@@ -869,7 +913,10 @@ export async function retryPendingBonusBoxSyncsForUser(
         expireAt: subscription.expireAt,
       })
       await updateBonusBoxSyncState(opening.id, ok, attemptNumber)
-      if (ok) synced += 1
+      if (ok) {
+        synced += 1
+        await notifyBonusSyncRestored(userId, opening.id, opening.prize.title)
+      }
       continue
     }
 
@@ -881,7 +928,10 @@ export async function retryPendingBonusBoxSyncsForUser(
         trafficLimitBytes: subscription.trafficLimitBytes,
       })
       await updateBonusBoxSyncState(opening.id, ok, attemptNumber)
-      if (ok) synced += 1
+      if (ok) {
+        synced += 1
+        await notifyBonusSyncRestored(userId, opening.id, opening.prize.title)
+      }
       continue
     }
 
@@ -890,6 +940,18 @@ export async function retryPendingBonusBoxSyncsForUser(
   }
 
   return { attempted: pendingOpenings.length, synced }
+}
+
+async function notifyBonusSyncRestored(userId: string, openingId: string, prizeTitle: string) {
+  await notifyUser({
+    userId,
+    type: 'BONUS_GRANTED',
+    dedupeKey: `bonus-sync-restored:${openingId}`,
+    title: 'Подарок начислен',
+    body: `${prizeTitle}: синхронизация завершена.`,
+    actionHref: '/dashboard/bonus-box',
+    actionLabel: 'Открыть бонусы',
+  }).catch(() => undefined)
 }
 
 async function updateBonusBoxSyncState(

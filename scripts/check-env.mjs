@@ -109,6 +109,10 @@ if (value("JWT_SECRET") && value("JWT_SECRET").length < 32) {
   errors.push("JWT_SECRET must be at least 32 characters");
 }
 
+if (value("BONUS_BOX_RISK_SALT") && value("BONUS_BOX_RISK_SALT").length < 32) {
+  errors.push("BONUS_BOX_RISK_SALT must be at least 32 characters");
+}
+
 checkPublicUrl("APP_URL");
 checkPublicUrl("NEXTAUTH_URL", { optional: true });
 checkPublicUrl("REMNAWAVE_BASE_URL");

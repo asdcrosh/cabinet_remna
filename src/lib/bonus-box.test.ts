@@ -26,6 +26,9 @@ const mocks = vi.hoisted(() => {
       create: vi.fn(),
       update: vi.fn(),
     },
+    bonusBoxEvent: {
+      findMany: vi.fn().mockResolvedValue([]),
+    },
     subscription: {
       findUnique: vi.fn(),
       update: vi.fn(),
@@ -46,6 +49,12 @@ const mocks = vi.hoisted(() => {
 vi.mock('./prisma', () => ({ prisma: mocks.prisma }))
 vi.mock('./remnawave', () => ({ remnawave: mocks.remnawave }))
 vi.mock('./feature-flags', () => ({ isFeatureEnabled: vi.fn(async () => true) }))
+vi.mock('./bonus-box-engagement', () => ({
+  activeEventForPrize: vi.fn(() => null),
+  applyActiveEventWeights: vi.fn((prizes) => prizes),
+  getBonusBoxEngagement: vi.fn(async () => ({ missions: [], events: [] })),
+  runBonusBoxLifecycleNotifications: vi.fn(async () => undefined),
+}))
 
 import {
   applyBonusBoxEconomyGuard,
@@ -168,6 +177,17 @@ describe('openBonusBox', () => {
         expect.objectContaining({ userId: 'user-1', source: 'PRIZE' }),
       ]),
       skipDuplicates: true,
+    })
+    expect(mocks.prisma.bonusBoxOpening.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        expectedChance: 1,
+        expectedDistribution: [{
+          prizeId: attemptPrize.id,
+          title: attemptPrize.title,
+          probability: 1,
+        }],
+      }),
+      include: { promoCode: true },
     })
   })
 
@@ -577,7 +597,7 @@ describe('retryPendingBonusBoxSyncsForUser', () => {
         id: true,
         awardedSubscriptionId: true,
         syncAttempts: true,
-        prize: { select: { type: true } },
+        prize: { select: { type: true, title: true } },
       },
     })
   })
@@ -696,6 +716,8 @@ function prize(
     maxWins: null,
     winsCount: 0,
     promoExpiresInDays: null,
+    estimatedCostKopecks: 0,
+    eventOnly: false,
     createdAt: new Date('2026-01-01T00:00:00.000Z'),
     updatedAt: new Date('2026-01-01T00:00:00.000Z'),
   }

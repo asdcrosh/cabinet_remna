@@ -58,6 +58,8 @@ export type BonusBoxPrizeAdminRow = {
   maxWins: number | null
   winsCount: number
   promoExpiresInDays: number | null
+  estimatedCostKopecks: number
+  eventOnly: boolean
   chance: number
 }
 
@@ -88,6 +90,8 @@ type FormState = {
   isActive: boolean
   maxWins: string
   promoExpiresInDays: string
+  estimatedCostRubles: string
+  eventOnly: boolean
 }
 
 const emptyForm: FormState = {
@@ -100,6 +104,8 @@ const emptyForm: FormState = {
   isActive: true,
   maxWins: '',
   promoExpiresInDays: '',
+  estimatedCostRubles: '0',
+  eventOnly: false,
 }
 
 export function BonusBoxPrizesAdmin({
@@ -108,12 +114,24 @@ export function BonusBoxPrizesAdmin({
   settings,
   totalOpenings,
   pendingSyncCount,
+  filteredOpenings,
+  historyFilters,
+  initialTab,
 }: {
   prizes: BonusBoxPrizeAdminRow[]
   openings: BonusBoxOpeningAdminRow[]
   settings: BonusBoxSettingsAdminRow
   totalOpenings: number
   pendingSyncCount: number
+  filteredOpenings: number
+  historyFilters: {
+    q: string
+    prizeId: string
+    sync: string
+    from: string
+    to: string
+  }
+  initialTab: AdminBonusTab
 }) {
   const router = useRouter()
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -121,7 +139,7 @@ export function BonusBoxPrizesAdmin({
   const [loading, setLoading] = useState(false)
   const [syncLoading, setSyncLoading] = useState(false)
   const [settingsLoading, setSettingsLoading] = useState(false)
-  const [activeTab, setActiveTab] = useState<AdminBonusTab>('prizes')
+  const [activeTab, setActiveTab] = useState<AdminBonusTab>(initialTab)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [settingsForm, setSettingsForm] = useState<BonusBoxSettingsAdminRow>(settings)
 
@@ -217,6 +235,8 @@ export function BonusBoxPrizesAdmin({
       isActive: prize.isActive,
       maxWins: prize.maxWins == null ? '' : String(prize.maxWins),
       promoExpiresInDays: prize.promoExpiresInDays == null ? '' : String(prize.promoExpiresInDays),
+      estimatedCostRubles: String(prize.estimatedCostKopecks / 100),
+      eventOnly: prize.eventOnly,
     })
   }
 
@@ -387,8 +407,13 @@ export function BonusBoxPrizesAdmin({
 
       {activeTab === 'history' && (
         <>
-          <BonusBoxOpeningHistory openings={openings} />
-          <LazyListLoader loaded={openings.length} total={totalOpenings} />
+          <BonusBoxOpeningHistory
+            openings={openings}
+            prizes={prizes}
+            filters={historyFilters}
+            total={filteredOpenings}
+          />
+          <LazyListLoader loaded={openings.length} total={filteredOpenings} />
         </>
       )}
 
@@ -524,6 +549,8 @@ function PrizeAdminRow({
         <CompactMetric label="Шанс" value={formatChance(prize.chance)} />
         <CompactMetric label="Вес" value={prize.weight} />
         <CompactMetric label="Выпало" value={`${prize.winsCount}/${prize.maxWins ?? '∞'}`} />
+        <CompactMetric label="Себестоимость" value={`${(prize.estimatedCostKopecks / 100).toFixed(0)} ₽`} />
+        {prize.eventOnly && <CompactMetric label="Доступность" value="Только событие" />}
       </div>
 
       <div className="flex justify-end">
@@ -729,6 +756,16 @@ function PrizeEditorDrawer({
                 disabled={form.type !== 'PROMO_CODE_PERCENT'}
               />
             </Field>
+            <Field label="Себестоимость, ₽">
+              <input
+                value={form.estimatedCostRubles}
+                onChange={(event) => onChange((current) => ({ ...current, estimatedCostRubles: event.target.value }))}
+                className="input"
+                type="number"
+                min={0}
+                step="0.01"
+              />
+            </Field>
           </div>
 
           <PrizeFormPreview form={form} estimatedChance={estimatedChance} />
@@ -740,6 +777,14 @@ function PrizeEditorDrawer({
               onChange={(event) => onChange((current) => ({ ...current, isActive: event.target.checked }))}
             />
             Активен
+          </label>
+          <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm dark:border-white/10 dark:bg-white/[0.04]">
+            <input
+              type="checkbox"
+              checked={form.eventOnly}
+              onChange={(event) => onChange((current) => ({ ...current, eventOnly: event.target.checked }))}
+            />
+            Доступен только во время выбранного сезонного события
           </label>
 
           <Field label="Описание">
@@ -766,7 +811,29 @@ function PrizeEditorDrawer({
   )
 }
 
-function BonusBoxOpeningHistory({ openings }: { openings: BonusBoxOpeningAdminRow[] }) {
+function BonusBoxOpeningHistory({
+  openings,
+  prizes,
+  filters,
+  total,
+}: {
+  openings: BonusBoxOpeningAdminRow[]
+  prizes: BonusBoxPrizeAdminRow[]
+  filters: {
+    q: string
+    prizeId: string
+    sync: string
+    from: string
+    to: string
+  }
+  total: number
+}) {
+  const exportParams = new URLSearchParams()
+  if (filters.q) exportParams.set('q', filters.q)
+  if (filters.prizeId) exportParams.set('prize', filters.prizeId)
+  if (filters.sync) exportParams.set('sync', filters.sync)
+  if (filters.from) exportParams.set('from', filters.from)
+  if (filters.to) exportParams.set('to', filters.to)
   return (
     <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.035]">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -778,9 +845,36 @@ function BonusBoxOpeningHistory({ openings }: { openings: BonusBoxOpeningAdminRo
         </div>
         <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 dark:bg-white/10 dark:text-slate-300">
           <Clock3 className="h-3.5 w-3.5" />
-          {openings.length}
+          {total}
         </span>
       </div>
+
+      <form action="/dashboard/admin/bonus-box" method="get" className="grid gap-2 border-y border-slate-100 py-3 dark:border-white/10 sm:grid-cols-2 xl:grid-cols-[1.2fr_1fr_0.8fr_0.8fr_0.8fr_auto]">
+        <input type="hidden" name="view" value="history" />
+        <input className="input" name="q" defaultValue={filters.q} placeholder="Email или имя" />
+        <select className="input" name="prize" defaultValue={filters.prizeId}>
+          <option value="">Все подарки</option>
+          {prizes.map((prize) => <option key={prize.id} value={prize.id}>{prize.title}</option>)}
+        </select>
+        <select className="input" name="sync" defaultValue={filters.sync}>
+          <option value="">Любой статус</option>
+          <option value="ready">Синхронизировано</option>
+          <option value="pending">Ожидает</option>
+        </select>
+        <input className="input" type="date" name="from" defaultValue={filters.from} aria-label="Дата от" />
+        <input className="input" type="date" name="to" defaultValue={filters.to} aria-label="Дата до" />
+        <button type="submit" className="btn-secondary justify-center">Найти</button>
+        <div className="flex flex-wrap gap-2 sm:col-span-2 xl:col-span-6">
+          <a className="text-sm font-medium text-cyan-700 hover:underline dark:text-cyan-300" href={`/api/admin/bonus-box/export?${exportParams.toString()}`}>
+            Скачать CSV
+          </a>
+          {(filters.q || filters.prizeId || filters.sync || filters.from || filters.to) && (
+            <a className="text-sm text-slate-500 hover:underline" href="/dashboard/admin/bonus-box?view=history">
+              Сбросить фильтры
+            </a>
+          )}
+        </div>
+      </form>
 
       {openings.length > 0 ? (
         <>
@@ -930,6 +1024,8 @@ function toPayload(form: FormState) {
       form.type === 'PROMO_CODE_PERCENT' && form.promoExpiresInDays
         ? Number(form.promoExpiresInDays)
         : null,
+    estimatedCostKopecks: Math.max(0, Math.round(Number(form.estimatedCostRubles || 0) * 100)),
+    eventOnly: form.eventOnly,
   }
 }
 
@@ -1055,7 +1151,7 @@ function CompactMetric({ label, value }: { label: string; value: ReactNode }) {
 }
 
 function getPrizeStats(prizes: BonusBoxPrizeAdminRow[]) {
-  const activePrizes = prizes.filter((prize) => prize.isActive && prize.weight > 0 && (prize.maxWins == null || prize.winsCount < prize.maxWins))
+  const activePrizes = prizes.filter((prize) => prize.chance > 0)
   const active = activePrizes.length
   const noPrizeChance = activePrizes
     .filter((prize) => prize.type === 'NO_PRIZE')
@@ -1082,9 +1178,7 @@ function getEconomyWarnings(
 ) {
   const activePrizes = prizes.filter(
     (prize) =>
-      prize.isActive
-      && prize.weight > 0
-      && (prize.maxWins == null || prize.winsCount < prize.maxWins)
+      prize.chance > 0
   )
   const warnings: Array<{
     title: string

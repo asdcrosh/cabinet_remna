@@ -78,6 +78,30 @@ export type BestRecentOpeningView = {
   createdAt: string;
 };
 
+export type BonusBoxMissionView = {
+  id: string;
+  title: string;
+  description: string | null;
+  type: "PAYMENT_COUNT" | "REFERRAL_COUNT" | "LOGIN_STREAK";
+  target: number;
+  value: number;
+  rewardAttempts: number;
+  completed: boolean;
+  claimed: boolean;
+  endsAt: string | null;
+};
+
+export type BonusBoxEventView = {
+  id: string;
+  title: string;
+  description: string | null;
+  endsAt: string;
+  attemptsPerUser: number;
+  weightMultiplier: number;
+  boostedPrizeTitles: string[];
+  attemptsGranted: number;
+};
+
 export type BonusBoxOverview = {
   config: BonusBoxConfigView;
   hasActiveSubscription: boolean;
@@ -88,6 +112,8 @@ export type BonusBoxOverview = {
   openingStreak: BonusBoxOpeningStreak;
   bestRecentOpening: BestRecentOpeningView | null;
   activePromoRewards: ActivePromoRewardView[];
+  missions: BonusBoxMissionView[];
+  events: BonusBoxEventView[];
   prizes: BonusBoxPrizeView[];
   openings: BonusBoxOpeningView[];
 };
