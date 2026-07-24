@@ -4,7 +4,20 @@ import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import type { Dispatch, ReactNode, SetStateAction } from 'react'
 import { useRouter } from 'next/navigation'
 import { createPortal } from 'react-dom'
-import { Clock3, Edit3, Gift, History, Plus, Power, ShieldCheck, TicketPercent, UserRound, X } from 'lucide-react'
+import {
+  AlertTriangle,
+  Clock3,
+  Edit3,
+  Gift,
+  History,
+  Plus,
+  Power,
+  RefreshCw,
+  ShieldCheck,
+  TicketPercent,
+  UserRound,
+  X,
+} from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
 import { toast } from '@/components/ui/toaster'
 import { cn } from '@/lib/cn'
@@ -106,6 +119,7 @@ export function BonusBoxPrizesAdmin({
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState<FormState>(emptyForm)
   const [loading, setLoading] = useState(false)
+  const [syncLoading, setSyncLoading] = useState(false)
   const [settingsLoading, setSettingsLoading] = useState(false)
   const [activeTab, setActiveTab] = useState<AdminBonusTab>('prizes')
   const [drawerOpen, setDrawerOpen] = useState(false)
@@ -113,6 +127,10 @@ export function BonusBoxPrizesAdmin({
 
   const editingPrize = useMemo(() => prizes.find((prize) => prize.id === editingId) ?? null, [editingId, prizes])
   const stats = useMemo(() => getPrizeStats(prizes), [prizes])
+  const economyWarnings = useMemo(
+    () => getEconomyWarnings(prizes, settingsForm),
+    [prizes, settingsForm]
+  )
   const estimatedChance = useMemo(
     () => estimatePrizeChance(prizes, editingId, editingPrize, form),
     [editingId, editingPrize, form, prizes]
@@ -164,6 +182,28 @@ export function BonusBoxPrizesAdmin({
     }
   }
 
+  async function retryPendingSyncs() {
+    setSyncLoading(true)
+    try {
+      const result = await apiFetch<{ attempted: number; synced: number; pending: number }>(
+        '/api/admin/bonus-box/sync',
+        { method: 'POST' }
+      )
+      if (result.attempted === 0) {
+        toast('Начислений для повтора не найдено', 'success')
+      } else if (result.synced === result.attempted) {
+        toast(`Синхронизировано начислений: ${result.synced}`, 'success')
+      } else {
+        toast(`Синхронизировано ${result.synced} из ${result.attempted}. Осталось: ${result.pending}`)
+      }
+      router.refresh()
+    } catch {
+      // apiFetch уже покажет toast
+    } finally {
+      setSyncLoading(false)
+    }
+  }
+
   function startEdit(prize: BonusBoxPrizeAdminRow) {
     setEditingId(prize.id)
     setDrawerOpen(true)
@@ -210,10 +250,23 @@ export function BonusBoxPrizesAdmin({
               <h2 className="text-lg font-semibold tracking-tight text-slate-950 dark:text-white">Состав подарков</h2>
               <p className="mt-1 text-sm text-slate-500">Вес определяет шанс среди активных исходов.</p>
             </div>
-            <button type="button" className="btn-primary w-full shrink-0 justify-center sm:w-auto" onClick={startCreate}>
-              <Plus className="h-4 w-4" />
-              Создать подарок
-            </button>
+            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+              {pendingSyncCount > 0 && (
+                <button
+                  type="button"
+                  className="btn-secondary w-full shrink-0 justify-center sm:w-auto"
+                  onClick={retryPendingSyncs}
+                  disabled={syncLoading}
+                >
+                  <RefreshCw className={cn('h-4 w-4', syncLoading && 'animate-spin')} />
+                  {syncLoading ? 'Повторяем...' : 'Повторить начисления'}
+                </button>
+              )}
+              <button type="button" className="btn-primary w-full shrink-0 justify-center sm:w-auto" onClick={startCreate}>
+                <Plus className="h-4 w-4" />
+                Создать подарок
+              </button>
+            </div>
           </div>
 
           <div className="mt-4 flex flex-wrap gap-2">
@@ -233,6 +286,29 @@ export function BonusBoxPrizesAdmin({
               <EconomyLine label="Доп. открытия" value={stats.attemptChance} className="bg-cyan-500" />
             </div>
           </details>
+
+          {economyWarnings.length > 0 && (
+            <div className="mt-4 border-t border-slate-100 pt-4 dark:border-white/10" role="status">
+              <div className="flex items-center gap-2 text-sm font-semibold text-amber-800 dark:text-amber-200">
+                <AlertTriangle className="h-4 w-4" />
+                Проверьте настройку рулетки
+              </div>
+              <div className="mt-3 divide-y divide-slate-100 border-y border-slate-100 dark:divide-white/10 dark:border-white/10">
+                {economyWarnings.map((warning) => (
+                  <div
+                    key={warning.title}
+                    className={cn(
+                      'border-l-2 py-2.5 pl-3',
+                      warning.tone === 'danger' ? 'border-red-500' : 'border-amber-400'
+                    )}
+                  >
+                    <div className="text-sm font-semibold text-slate-900 dark:text-white">{warning.title}</div>
+                    <div className="mt-0.5 text-xs leading-5 text-slate-500 dark:text-slate-400">{warning.detail}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
       </section>
 
       <details className="overflow-hidden rounded-3xl border border-slate-200 bg-white dark:border-white/[0.08] dark:bg-white/[0.035]">
@@ -998,6 +1074,96 @@ function getPrizeStats(prizes: BonusBoxPrizeAdminRow[]) {
     attemptChance,
     rewardChance: Math.max(0, 1 - noPrizeChance),
   }
+}
+
+function getEconomyWarnings(
+  prizes: BonusBoxPrizeAdminRow[],
+  settings: BonusBoxSettingsAdminRow
+) {
+  const activePrizes = prizes.filter(
+    (prize) =>
+      prize.isActive
+      && prize.weight > 0
+      && (prize.maxWins == null || prize.winsCount < prize.maxWins)
+  )
+  const warnings: Array<{
+    title: string
+    detail: string
+    tone: 'warning' | 'danger'
+  }> = []
+
+  if (activePrizes.length === 0) {
+    return [{
+      title: 'Нет доступных исходов',
+      detail: 'Все подарки отключены, имеют нулевой вес или исчерпали лимит выпадений.',
+      tone: 'danger' as const,
+    }]
+  }
+
+  const rewardPrizes = activePrizes.filter((prize) => prize.type !== 'NO_PRIZE')
+  const welcomeRewards = rewardPrizes.filter(
+    (prize) => prize.type === 'PROMO_CODE_PERCENT' || prize.type === 'BONUS_ATTEMPTS'
+  )
+  const unlimitedRewards = rewardPrizes.filter((prize) => prize.type !== 'TRAFFIC_GB')
+  const rareRewards = rewardPrizes.filter((prize) => prize.rarity !== 'COMMON')
+  const bonusAttemptReturn = activePrizes
+    .filter((prize) => prize.type === 'BONUS_ATTEMPTS')
+    .reduce((sum, prize) => sum + prize.chance * prize.value, 0)
+  const almostExhausted = activePrizes.filter(
+    (prize) => prize.maxWins != null && prize.maxWins - prize.winsCount <= 5
+  )
+
+  if (rewardPrizes.length === 0) {
+    warnings.push({
+      title: 'Шанс награды равен нулю',
+      detail: 'Сейчас любое открытие заканчивается без начисления.',
+      tone: 'danger',
+    })
+  }
+  if (welcomeRewards.length === 0) {
+    warnings.push({
+      title: 'Стартовому открытию нечего выдать',
+      detail: 'Добавьте активный промокод или дополнительные открытия для пользователя без подписки.',
+      tone: 'danger',
+    })
+  }
+  if (unlimitedRewards.length === 0) {
+    warnings.push({
+      title: 'Нет награды для безлимитной подписки',
+      detail: 'Трафик к безлимиту не применяется. Нужны дни, промокод или дополнительные открытия.',
+      tone: 'danger',
+    })
+  }
+  if (settings.pityEnabled && rareRewards.length === 0) {
+    warnings.push({
+      title: 'Гарантия редкого не сработает',
+      detail: 'Гарантия включена, но среди доступных наград нет редких, эпических или легендарных.',
+      tone: 'warning',
+    })
+  }
+  if (bonusAttemptReturn >= 1) {
+    warnings.push({
+      title: 'Дополнительные открытия воспроизводят сами себя',
+      detail: `Средний возврат: ${bonusAttemptReturn.toFixed(2)} открытия на одно. Баланс попыток может расти без оплаты.`,
+      tone: 'danger',
+    })
+  } else if (bonusAttemptReturn >= 0.5) {
+    warnings.push({
+      title: 'Высокий возврат дополнительных открытий',
+      detail: `Средний возврат: ${bonusAttemptReturn.toFixed(2)} открытия на одно. Проверьте вес и размер награды.`,
+      tone: 'warning',
+    })
+  }
+  if (almostExhausted.length > 0) {
+    const prizeWord = almostExhausted.length === 1 ? 'подарка' : 'подарков'
+    warnings.push({
+      title: 'Часть подарков скоро закончится',
+      detail: `У ${almostExhausted.length} ${prizeWord} осталось не больше пяти выпадений.`,
+      tone: 'warning',
+    })
+  }
+
+  return warnings
 }
 
 function estimatePrizeChance(

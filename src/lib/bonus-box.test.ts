@@ -559,6 +559,28 @@ describe('retryPendingBonusBoxSyncsForUser', () => {
       },
     })
   })
+
+  it('ignores the retry delay when an administrator forces recovery', async () => {
+    mocks.prisma.bonusBoxOpening.findMany.mockResolvedValue([])
+
+    await retryPendingBonusBoxSyncsForUser('user-1', { force: true, limit: 8 })
+
+    expect(mocks.prisma.bonusBoxOpening.findMany).toHaveBeenCalledWith({
+      where: {
+        userId: 'user-1',
+        remoteSynced: false,
+        awardedSubscriptionId: { not: null },
+      },
+      orderBy: { createdAt: 'asc' },
+      take: 8,
+      select: {
+        id: true,
+        awardedSubscriptionId: true,
+        syncAttempts: true,
+        prize: { select: { type: true } },
+      },
+    })
+  })
 })
 
 describe('applyBonusBoxEconomyGuard', () => {

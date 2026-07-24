@@ -813,8 +813,12 @@ async function syncPrizeToRemnawave(
   }
 }
 
-export async function retryPendingBonusBoxSyncsForUser(userId: string) {
+export async function retryPendingBonusBoxSyncsForUser(
+  userId: string,
+  options: { force?: boolean; limit?: number } = {}
+) {
   const now = new Date()
+  const limit = Math.min(20, Math.max(1, Math.trunc(options.limit ?? 3)))
   const [user, pendingOpenings] = await Promise.all([
     prisma.user.findUnique({
       where: { id: userId },
@@ -825,10 +829,12 @@ export async function retryPendingBonusBoxSyncsForUser(userId: string) {
         userId,
         remoteSynced: false,
         awardedSubscriptionId: { not: null },
-        OR: [{ nextSyncAt: null }, { nextSyncAt: { lte: now } }],
+        ...(options.force ? {} : {
+          OR: [{ nextSyncAt: null }, { nextSyncAt: { lte: now } }],
+        }),
       },
       orderBy: { createdAt: 'asc' },
-      take: 3,
+      take: limit,
       select: {
         id: true,
         awardedSubscriptionId: true,
