@@ -137,7 +137,7 @@ export default async function AdminDashboardPage() {
           <h2 className="text-lg font-semibold tracking-tight text-slate-950 dark:text-white">Требует внимания</h2>
           <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">Очереди для ручной проверки</p>
         </div>
-        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
           {supportWaiting > 0 && (
             <PriorityCard href="/dashboard/admin/support" icon={<LifeBuoy className="h-4 w-4" />} title="Поддержка" value={supportWaiting} text="Обращения без ответа" />
           )}
@@ -388,18 +388,20 @@ function PriorityCard({
   return (
     <Link
       href={href}
-      className="group flex min-h-16 items-center justify-between gap-3 rounded-[1.25rem] border border-amber-200/80 bg-amber-50/70 px-3.5 py-3 transition-colors hover:border-amber-300 hover:bg-amber-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/60 dark:border-amber-500/20 dark:bg-amber-500/10 dark:hover:border-amber-500/35"
+      className="group grid min-h-[5.25rem] grid-cols-[auto_minmax(0,1fr)] items-center gap-3 rounded-[1.25rem] border border-amber-200/80 bg-amber-50/70 px-3.5 py-3 transition-colors hover:border-amber-300 hover:bg-amber-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/60 dark:border-amber-500/20 dark:bg-amber-500/10 dark:hover:border-amber-500/35"
     >
-      <div className="flex min-w-0 items-center gap-3">
-        <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white/80 text-amber-700 shadow-sm ring-1 ring-amber-200/80 dark:bg-amber-500/10 dark:text-amber-200 dark:ring-amber-500/20">
-          {icon}
-        </div>
-        <div className="min-w-0">
-          <div className="font-semibold text-slate-950 dark:text-white">{title}</div>
-          <div className="truncate text-xs text-slate-500 dark:text-slate-400">{text}</div>
-        </div>
+      <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white/80 text-amber-700 shadow-sm ring-1 ring-amber-200/80 dark:bg-amber-500/10 dark:text-amber-200 dark:ring-amber-500/20">
+        {icon}
       </div>
-      <div className="shrink-0 rounded-xl bg-white/80 px-2.5 py-1 text-lg font-semibold tracking-tight tabular-nums text-slate-950 shadow-sm ring-1 ring-amber-200/70 dark:bg-white/[0.05] dark:text-white dark:ring-amber-500/20">{value}</div>
+      <div className="min-w-0">
+        <div className="flex min-w-0 items-start justify-between gap-2">
+          <div className="min-w-0 break-words text-sm font-semibold leading-5 text-slate-950 dark:text-white">{title}</div>
+          <div className="inline-flex min-h-7 min-w-7 shrink-0 items-center justify-center rounded-lg bg-amber-100/80 px-2 text-sm font-semibold tabular-nums text-amber-950 ring-1 ring-inset ring-amber-200/80 dark:bg-amber-400/10 dark:text-amber-100 dark:ring-amber-400/15">
+            {value}
+          </div>
+        </div>
+        <div className="mt-1 line-clamp-2 text-xs leading-4 text-slate-500 dark:text-slate-400">{text}</div>
+      </div>
     </Link>
   )
 }
