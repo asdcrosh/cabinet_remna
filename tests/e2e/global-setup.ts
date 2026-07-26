@@ -2,6 +2,7 @@ import { PrismaClient } from '@prisma/client'
 import { hash } from 'bcryptjs'
 import {
   E2E_PASSWORD,
+  E2E_ACTIVE_SUBSCRIPTION_ID,
   E2E_PLAN_ID,
   E2E_SUBSCRIPTION_ID,
   E2E_USERS,
@@ -16,6 +17,7 @@ export default async function globalSetup() {
   const now = new Date()
   const startAt = new Date(now.getTime() - 32 * 24 * 60 * 60 * 1000)
   const expireAt = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000)
+  const activeExpireAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)
 
   try {
     await prisma.rateLimitBucket.deleteMany({
@@ -69,6 +71,26 @@ export default async function globalSetup() {
             startAt,
             expireAt,
             status: 'EXPIRED',
+            trafficLimitBytes: null,
+          },
+        },
+      },
+    })
+
+    await prisma.user.create({
+      data: {
+        ...E2E_USERS.active,
+        passwordHash,
+        emailVerifiedAt: now,
+        agreedToTermsAt: now,
+        referralCode: 'E2EACTIVE',
+        subscriptions: {
+          create: {
+            id: E2E_ACTIVE_SUBSCRIPTION_ID,
+            planId: E2E_PLAN_ID,
+            startAt: now,
+            expireAt: activeExpireAt,
+            status: 'ACTIVE',
             trafficLimitBytes: null,
           },
         },

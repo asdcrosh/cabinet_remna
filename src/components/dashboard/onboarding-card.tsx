@@ -64,42 +64,43 @@ export function DashboardOnboardingCard({ state, mode = 'compact', supportEnable
   }
 
   return (
-    <section className="subscription-ticket p-5 sm:p-7">
-      <div className="max-w-2xl">
+    <section className="access-pass p-5 sm:p-6">
+      <div className="grid gap-5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+        <div className="min-w-0">
           <div className="flex items-start gap-3">
-            <div className={cn('grid h-11 w-11 shrink-0 place-items-center rounded-xl', toneClass(action?.tone ?? 'emerald'))}>
+            <div className={cn('grid h-10 w-10 shrink-0 place-items-center rounded-xl', toneClass(action?.tone ?? 'emerald'))}>
               {action?.icon ?? <ShieldCheck className="h-5 w-5" />}
             </div>
             <div className="min-w-0">
               <p className="text-xs font-medium text-cyan-700 dark:text-cyan-200">
-                {action ? 'Начните отсюда' : 'Всё готово'}
+                {action ? 'Следующее действие' : 'Всё готово'}
               </p>
-              <h2 className="mt-1 text-xl font-semibold leading-tight tracking-tight text-slate-950 dark:text-white sm:text-2xl">
+              <h2 className="mt-1 text-xl font-semibold leading-tight tracking-tight text-slate-950 dark:text-white">
                 {action?.title ?? 'Кабинет настроен'}
               </h2>
+              <p className="mt-2 max-w-xl text-sm leading-6 text-slate-500 dark:text-slate-400">
+                {action?.description ?? 'Подписка и подключённые устройства доступны в кабинете.'}
+              </p>
             </div>
           </div>
-          <p className="mt-4 max-w-xl text-sm leading-6 text-slate-500 dark:text-slate-400">
-            {action?.description ?? 'Можно смотреть подписку, устройства, платежи и бонусы.'}
-          </p>
-          <div className="mt-5 grid gap-2 sm:flex sm:flex-wrap sm:items-center">
-            {action ? (
-              <Link href={action.href} className="btn-primary min-h-11 w-full justify-between px-4 sm:w-auto sm:justify-center">
-                {action.label}
-                <ArrowRight className="h-4 w-4" />
-              </Link>
-            ) : (
-              <Link href="/dashboard/subscription" className="btn-primary min-h-11 w-full justify-between px-4 sm:w-auto sm:justify-center">
-                Открыть подписку
-                <ArrowRight className="h-4 w-4" />
-              </Link>
-            )}
-            {supportEnabled && (
-              <Link href="/dashboard/support" className="inline-flex min-h-10 items-center justify-center rounded-xl px-3 text-sm font-medium text-slate-500 transition-colors hover:bg-slate-100 hover:text-cyan-700 dark:text-slate-400 dark:hover:bg-white/[0.05] dark:hover:text-cyan-200">
-                Нужна помощь?
-              </Link>
-            )}
-          </div>
+        </div>
+        <div className="grid gap-1.5">
+          <Link
+            href={action?.href ?? '/dashboard/subscription'}
+            className="btn-primary min-h-11 w-full justify-between px-4 sm:w-auto sm:min-w-40"
+          >
+            {action?.label ?? 'Открыть подписку'}
+            <ArrowRight className="h-4 w-4" />
+          </Link>
+          {supportEnabled && (
+            <Link
+              href="/dashboard/support"
+              className="inline-flex min-h-9 items-center justify-center rounded-lg px-3 text-sm font-medium text-slate-500 transition-colors hover:text-slate-950 dark:text-slate-400 dark:hover:text-white"
+            >
+              Нужна помощь?
+            </Link>
+          )}
+        </div>
       </div>
     </section>
   )

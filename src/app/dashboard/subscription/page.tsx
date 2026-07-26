@@ -1,13 +1,14 @@
 // /dashboard/subscription — единая ссылка подписки, QR-код и управление доступом.
 
 import { redirect } from 'next/navigation'
+import type { ReactNode } from 'react'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth/cookies'
 import { remnawave, RemnawaveError } from '@/lib/remnawave'
 import { KeysCard } from '@/components/dashboard/keys-card'
 import { DevicesList } from '@/components/dashboard/devices-list'
 import Link from 'next/link'
-import { ShieldAlert, Sparkles } from 'lucide-react'
+import { ArrowRight, CalendarDays, Gauge, ShieldAlert, Sparkles } from 'lucide-react'
 import { EmptyState } from '@/components/dashboard/empty-state'
 import { getFeatureFlags } from '@/lib/feature-flags'
 import { formatSubscriptionDaysLeft, isSubscriptionExpired } from '@/lib/subscription-time'
@@ -24,14 +25,14 @@ export default async function SubscriptionPage() {
     prisma.subscription.findFirst({
       where: { userId: session.uid, status: { in: ['ACTIVE', 'LIMITED'] } },
       orderBy: { expireAt: 'desc' },
-      select: { plan: { select: { deviceLimit: true } } },
+      select: { plan: { select: { name: true, deviceLimit: true } } },
     }),
   ])
   if (!user?.remnawaveUsername) {
     return (
       <EmptyState
-        title="Нет активной подписки"
-        description="Выберите тариф, после оплаты здесь появятся QR-код, ссылка и быстрые кнопки подключения."
+        title="Подписки пока нет"
+        description="Выберите срок доступа. Ссылка и подключение появятся здесь сразу после оплаты."
         icon={<ShieldAlert className="h-7 w-7" />}
         action={<Link href="/dashboard/plans" className="btn-primary">Выбрать тариф</Link>}
       />
@@ -88,45 +89,89 @@ export default async function SubscriptionPage() {
     <div className="page-stack">
       <PageHeader
         title="Подключение"
-        description="Ссылка, приложения и подключённые устройства."
-        action={(
-          <Link href="/dashboard/plans?intent=renew" className={`${subscriptionExpired ? 'btn-primary' : 'btn-secondary'} w-full justify-center sm:w-auto`}>
-            <Sparkles className="h-4 w-4" />
-            Продлить
-          </Link>
-        )}
+        description="Добавьте подписку в приложение и управляйте своими устройствами."
       />
 
-      <section className="dashboard-signal rounded-xl border border-slate-200 bg-white p-4 pl-5 dark:border-white/10 dark:bg-white/[0.03]">
-        <div className="flex items-center gap-2">
-          <span className={`h-2 w-2 rounded-full ${subscriptionExpired ? 'bg-amber-500' : u.isActive ? 'bg-emerald-500' : 'bg-slate-400'}`} />
-          <h2 className="text-base font-semibold text-slate-950 dark:text-white">{statusText}</h2>
-        </div>
-        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-          {subscriptionExpired ? `Доступ закончился ${expiresAtLabel}` : `Доступ до ${expiresAtLabel}`}
-        </p>
-        <div className="mt-3 grid gap-2 border-t border-slate-200 pt-3 text-sm dark:border-white/10 sm:grid-cols-2">
-          <div className="flex items-center justify-between gap-3">
-            <span className="text-slate-500 dark:text-slate-400">Осталось</span>
-            <strong>{formatSubscriptionDaysLeft(u.daysLeft, u.userStatus)}</strong>
+      <section
+        data-testid="subscription-access"
+        className={`access-pass ${subscriptionExpired ? 'access-pass--expired' : ''}`}
+      >
+        <div className="grid lg:grid-cols-[minmax(0,1fr)_auto]">
+          <div className="p-4 sm:p-5">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className={`h-2 w-2 rounded-full ${subscriptionExpired ? 'bg-amber-500' : u.isActive ? 'bg-emerald-500' : 'bg-slate-400'}`} />
+              <h2 className="text-base font-semibold text-slate-950 dark:text-white">{statusText}</h2>
+              <span className="text-sm text-slate-400">·</span>
+              <span className="text-sm text-slate-500 dark:text-slate-400">
+                {localSubscription?.plan?.name ?? 'VPN-подписка'}
+              </span>
+            </div>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+              {subscriptionExpired
+                ? 'Продлите доступ, затем подключение снова заработает без повторной настройки.'
+                : 'Ссылка активна и готова для подключения устройств.'}
+            </p>
+
+            <div className="mt-4 grid gap-3 border-t border-dashed border-slate-300 pt-4 dark:border-white/15 sm:grid-cols-3">
+              <AccessMetric
+                icon={<Sparkles className="h-4 w-4" />}
+                label="Состояние"
+                value={formatSubscriptionDaysLeft(u.daysLeft, u.userStatus)}
+              />
+              <AccessMetric
+                icon={<CalendarDays className="h-4 w-4" />}
+                label={subscriptionExpired ? 'Завершилась' : 'Оплачено до'}
+                value={expiresAtLabel}
+              />
+              <AccessMetric
+                icon={<Gauge className="h-4 w-4" />}
+                label="Трафик"
+                value={`${u.trafficUsed}${isUnlimited ? ' · безлимит' : ` из ${u.trafficLimit}`}`}
+              />
+            </div>
           </div>
-          <div className="flex items-center justify-between gap-3 sm:border-l sm:border-slate-200 sm:pl-3 dark:sm:border-white/10">
-            <span className="text-slate-500 dark:text-slate-400">Трафик</span>
-            <strong>{u.trafficUsed}{isUnlimited ? ' · безлимит' : ` из ${u.trafficLimit}`}</strong>
+
+          <div className="flex items-center border-t border-dashed border-slate-300 p-4 dark:border-white/15 lg:border-l lg:border-t-0">
+            <Link
+              href="/dashboard/plans?intent=renew"
+              className={`${subscriptionExpired ? 'btn-primary' : 'btn-secondary'} group w-full justify-between lg:min-w-44`}
+            >
+              <span className="inline-flex items-center gap-2">
+                <Sparkles className="h-4 w-4" />
+                Продлить
+              </span>
+              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+            </Link>
           </div>
         </div>
       </section>
 
-      {subscriptionExpired ? (
-        <div className="border-l-2 border-amber-400 px-3 py-1 text-sm text-slate-600 dark:text-slate-300">
-          После продления ссылка и приложения снова появятся здесь.
-        </div>
-      ) : (
-        <>
+      {!subscriptionExpired && (
+        <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_22rem]">
           <KeysCard subscriptionUrl={data.response.subscriptionUrl} happLink={happLink} />
           <DevicesList embedded deviceLimit={localSubscription?.plan?.deviceLimit} />
-        </>
+        </div>
       )}
+    </div>
+  )
+}
+
+function AccessMetric({
+  icon,
+  label,
+  value,
+}: {
+  icon: ReactNode
+  label: string
+  value: string
+}) {
+  return (
+    <div className="flex min-w-0 items-start gap-2.5">
+      <span className="mt-0.5 text-slate-400">{icon}</span>
+      <span className="min-w-0">
+        <span className="block text-xs uppercase tracking-[0.07em] text-slate-400">{label}</span>
+        <strong className="mt-1 block break-words text-sm text-slate-950 dark:text-white">{value}</strong>
+      </span>
     </div>
   )
 }

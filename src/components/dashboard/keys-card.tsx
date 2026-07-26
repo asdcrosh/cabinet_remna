@@ -7,7 +7,6 @@ import Image from 'next/image'
 import {
   Apple,
   CheckCircle2,
-  ChevronDown,
   Copy,
   Download,
   ExternalLink,
@@ -23,6 +22,7 @@ import { apiFetch } from '@/lib/api-client'
 import { Modal } from '@/components/ui/modal'
 import { toast } from '@/components/ui/toaster'
 import { ConfirmDialog } from './confirm-dialog'
+import { cn } from '@/lib/cn'
 
 type Device = 'ios' | 'android' | 'macos' | 'windows' | 'desktop'
 type AppId = 'happ' | 'v2ray' | 'rabbit-hole'
@@ -115,6 +115,10 @@ export function KeysCard({ subscriptionUrl, happLink }: KeysCardProps) {
   }, [])
 
   const availableApps = useMemo(() => orderAppsForDevice(device), [device])
+  const compatibleApps = useMemo(
+    () => availableApps.filter((option) => option.devices.includes(device)),
+    [availableApps, device]
+  )
 
   const selectedApp = appOptions.find((option) => option.id === selectedAppId) ?? defaultApp
   const SelectedAppIcon = selectedApp.icon
@@ -167,126 +171,120 @@ export function KeysCard({ subscriptionUrl, happLink }: KeysCardProps) {
   }
 
   return (
-    <section id="connection" aria-labelledby="connection-title" className="overflow-hidden border-y border-slate-200 dark:border-white/10">
-      <header className="flex flex-col gap-3 py-4 sm:flex-row sm:items-start sm:justify-between">
+    <section
+      id="connection"
+      aria-labelledby="connection-title"
+      className="overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.03]"
+    >
+      <header className="flex items-start justify-between gap-4 border-b border-slate-200 p-4 dark:border-white/10 sm:p-5">
         <div className="min-w-0">
-          <h2 id="connection-title" className="text-lg font-semibold tracking-tight text-slate-950 dark:text-white">Подключить устройство</h2>
-          <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-500 dark:text-slate-400">
-            Выберите приложение и откройте в нём подписку.
+          <h2 id="connection-title" className="text-lg font-semibold tracking-tight text-slate-950 dark:text-white">
+            Подключить устройство
+          </h2>
+          <p className="mt-1 text-sm leading-5 text-slate-500 dark:text-slate-400">
+            Выберите приложение для этого устройства.
           </p>
         </div>
-        <span className="inline-flex w-fit min-w-0 items-center gap-2 text-xs font-medium text-slate-500 dark:text-slate-400">
+        <span className="inline-flex min-w-0 shrink-0 items-center gap-2 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-500 dark:border-white/10 dark:text-slate-400">
           <DeviceIcon device={device} />
-          <span className="truncate">{deviceLabel(device)}</span>
+          <span className="max-w-28 truncate">{deviceLabel(device)}</span>
         </span>
       </header>
 
-      <div className="grid border-t border-slate-200 dark:border-white/10 lg:grid-cols-[minmax(0,1fr)_17rem]">
-        <div className="min-w-0 py-4 lg:pr-5">
-          <div className="flex min-w-0 items-start gap-3">
-            <SelectedAppIcon className="mt-1 h-5 w-5 shrink-0 text-cyan-600 dark:text-cyan-300" />
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <h3 className="truncate text-lg font-semibold text-slate-950 dark:text-white">{selectedApp.name}</h3>
-                <span className="border-l-2 border-cyan-400 pl-2 text-xs font-medium text-slate-500 dark:text-slate-400">
-                  {selectedIsRecommended ? 'Подходит для устройства' : 'Выбрано'}
+      <div className="p-4 sm:p-5">
+        <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Приложение для подключения">
+          {compatibleApps.map((option) => {
+            const Icon = option.icon
+            const selected = option.id === selectedApp.id
+            return (
+              <button
+                key={option.id}
+                type="button"
+                role="radio"
+                aria-checked={selected}
+                onClick={() => setSelectedAppId(option.id)}
+                className={cn(
+                  'flex min-h-14 min-w-0 items-center gap-2.5 rounded-xl border px-3 text-left transition-colors',
+                  selected
+                    ? 'border-cyan-500 bg-cyan-500/10 text-slate-950 dark:text-white'
+                    : 'border-slate-200 text-slate-500 hover:border-slate-300 hover:text-slate-900 dark:border-white/10 dark:text-slate-400 dark:hover:text-white'
+                )}
+              >
+                <Icon className={cn('h-4 w-4 shrink-0', selected && 'text-cyan-600 dark:text-cyan-300')} />
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-semibold">{option.name}</span>
+                  <span className="block truncate text-[11px] opacity-70">
+                    {option.id === recommendedAppForDevice(device).id ? 'Рекомендуем' : 'Другой вариант'}
+                  </span>
                 </span>
-              </div>
-              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{selectedApp.subtitle}</p>
-            </div>
-          </div>
-
-          <div className="mt-4 grid gap-2 sm:grid-cols-2">
-            <button type="button" onClick={openInApp} disabled={!subscriptionUrl} className="btn-primary w-full justify-center">
-              <ExternalLink className="h-4 w-4" />
-              Подключить
-            </button>
-            <a href={selectedApp.installUrl} target="_blank" rel="noreferrer" className="btn-secondary w-full justify-center">
-              <Download className="h-4 w-4" />
-              Скачать {selectedApp.name}
-            </a>
-          </div>
-
-          <div className="mt-4 grid gap-2 border-t border-slate-200 pt-4 dark:border-white/10 sm:grid-cols-3">
-            <button type="button" onClick={() => copy(subscriptionUrl, 'Ссылка подписки')} disabled={!subscriptionUrl} className="btn-secondary h-10 px-3 disabled:cursor-not-allowed">
-              {copied ? <CheckCircle2 className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
-              {copied ? 'Скопировано' : 'Скопировать ссылку'}
-            </button>
-            <button type="button" onClick={() => setQrOpen(true)} className="btn-secondary h-10 px-3 lg:hidden">
-              <QrCode className="h-4 w-4" />
-              QR-код
-            </button>
-            <button type="button" onClick={() => setInstructionsOpen(true)} className="btn-secondary h-10 px-3">
-              <HelpCircle className="h-4 w-4" />
-              Инструкция
-            </button>
-          </div>
-
-          <details className="group mt-3 border-t border-slate-200 dark:border-white/10">
-            <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 text-sm font-medium text-slate-500 hover:text-slate-950 dark:text-slate-400 dark:hover:text-white [&::-webkit-details-marker]:hidden">
-              Другое приложение
-              <ChevronDown className="h-4 w-4 shrink-0 transition-transform group-open:rotate-180" />
-            </summary>
-            <div className="grid border-t border-slate-200 dark:border-white/10 sm:grid-cols-2">
-              {availableApps.filter((option) => option.id !== selectedApp.id).map((option) => {
-                const Icon = option.icon
-                return (
-                  <button
-                    key={option.id}
-                    type="button"
-                    onClick={(event) => {
-                      setSelectedAppId(option.id)
-                      event.currentTarget.closest('details')?.removeAttribute('open')
-                    }}
-                    className="flex min-h-12 items-center gap-3 border-b border-slate-200 px-1 text-left text-sm transition-colors hover:text-cyan-700 dark:border-white/10 dark:hover:text-cyan-300 sm:odd:border-r"
-                  >
-                    <Icon className="h-4 w-4 shrink-0 text-slate-400" />
-                    <span className="min-w-0">
-                      <span className="block truncate font-semibold">{option.name}</span>
-                      <span className="block truncate text-xs text-slate-500">{option.subtitle}</span>
-                    </span>
-                  </button>
-                )
-              })}
-            </div>
-          </details>
+              </button>
+            )
+          })}
         </div>
 
-        <aside className="hidden border-l border-slate-200 p-5 dark:border-white/10 lg:flex lg:flex-col lg:justify-center">
-          <button type="button" onClick={() => setQrOpen(true)} className="group w-full text-left">
-            {subscriptionUrl ? (
-              <Image
-                src={`/api/qr?text=${encodeURIComponent(subscriptionUrl)}`}
-                alt="QR-код подписки"
-                width={220}
-                height={220}
-                className="mx-auto h-auto w-full max-w-[200px]"
-                unoptimized
-              />
-            ) : (
-              <div className="grid aspect-square place-items-center border border-dashed text-center text-sm text-slate-400">
-                QR появится после выдачи подписки
-              </div>
-            )}
-            <div className="mt-3 flex items-center justify-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-200">
-              <QrCode className="h-4 w-4 text-cyan-600" />
-              Подключить по QR
+        <div className="mt-5 flex min-w-0 items-start gap-3 border-t border-dashed border-slate-300 pt-5 dark:border-white/15">
+          <SelectedAppIcon className="mt-0.5 h-5 w-5 shrink-0 text-cyan-600 dark:text-cyan-300" />
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="text-base font-semibold text-slate-950 dark:text-white">{selectedApp.name}</h3>
+              {selectedIsRecommended && (
+                <span className="text-xs font-medium text-cyan-700 dark:text-cyan-200">подходит устройству</span>
+              )}
             </div>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{selectedApp.subtitle}</p>
+          </div>
+        </div>
+
+        <div className="mt-4 grid gap-2 sm:grid-cols-2">
+          <button type="button" onClick={openInApp} disabled={!subscriptionUrl} className="btn-primary w-full justify-center">
+            <ExternalLink className="h-4 w-4" />
+            Открыть в {selectedApp.name}
           </button>
-          <p className="mt-2 text-center text-xs leading-5 text-slate-500 dark:text-slate-400">Для подключения другого устройства.</p>
-        </aside>
+          <a href={selectedApp.installUrl} target="_blank" rel="noreferrer" className="btn-secondary w-full justify-center">
+            <Download className="h-4 w-4" />
+            Установить приложение
+          </a>
+        </div>
+
+        <div className="mt-2 grid grid-cols-3 gap-2">
+          <button
+            type="button"
+            onClick={() => copy(subscriptionUrl, 'Ссылка подписки')}
+            disabled={!subscriptionUrl}
+            className="inline-flex min-h-10 min-w-0 items-center justify-center gap-1.5 rounded-lg px-2 text-xs font-semibold text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-950 disabled:cursor-not-allowed dark:text-slate-400 dark:hover:bg-white/[0.06] dark:hover:text-white"
+          >
+            {copied ? <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" /> : <Copy className="h-4 w-4 shrink-0" />}
+            <span className="truncate">{copied ? 'Готово' : 'Ссылка'}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setQrOpen(true)}
+            className="inline-flex min-h-10 min-w-0 items-center justify-center gap-1.5 rounded-lg px-2 text-xs font-semibold text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-950 dark:text-slate-400 dark:hover:bg-white/[0.06] dark:hover:text-white"
+          >
+            <QrCode className="h-4 w-4 shrink-0" />
+            QR-код
+          </button>
+          <button
+            type="button"
+            onClick={() => setInstructionsOpen(true)}
+            className="inline-flex min-h-10 min-w-0 items-center justify-center gap-1.5 rounded-lg px-2 text-xs font-semibold text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-950 dark:text-slate-400 dark:hover:bg-white/[0.06] dark:hover:text-white"
+          >
+            <HelpCircle className="h-4 w-4 shrink-0" />
+            Инструкция
+          </button>
+        </div>
       </div>
 
-      <footer className="flex flex-col gap-2 border-t border-slate-200 py-3 text-xs text-slate-500 dark:border-white/10 dark:text-slate-400 sm:flex-row sm:items-center sm:justify-between">
-        <span>Ссылка подписки приватная. Не отправляйте её другим людям.</span>
+      <footer className="flex flex-col gap-2 border-t border-slate-200 px-4 py-3 text-xs text-slate-500 dark:border-white/10 dark:text-slate-400 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+        <span>Ссылка приватная. Не пересылайте её другим людям.</span>
         <button
           type="button"
           onClick={() => setConfirmOpen(true)}
           disabled={revoking}
-          className="inline-flex min-h-9 w-fit items-center gap-1.5 font-semibold text-slate-500 hover:text-slate-950 disabled:opacity-60 dark:text-slate-400 dark:hover:text-white"
+          className="inline-flex min-h-8 w-fit items-center gap-1.5 font-semibold text-slate-500 hover:text-slate-950 disabled:opacity-60 dark:text-slate-400 dark:hover:text-white"
         >
           <RefreshCw className="h-3.5 w-3.5" />
-          {revoking ? 'Обновляем' : 'Обновить ссылку'}
+          {revoking ? 'Обновляем' : 'Сменить ссылку'}
         </button>
       </footer>
 

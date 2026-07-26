@@ -2,8 +2,9 @@ import { createServer } from 'node:http'
 
 const port = Number(process.env.E2E_REMNAWAVE_PORT || 4010)
 const expireAt = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
+const activeExpireAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
 
-const user = {
+const expiredUser = {
   uuid: 'e2e-expired-uuid',
   shortUuid: 'e2e-expired-short',
   username: 'e2e-expired',
@@ -19,9 +20,25 @@ const user = {
   ssPassword: 'e2e-ss-password',
 }
 
-const device = {
+const activeUser = {
+  uuid: 'e2e-active-uuid',
+  shortUuid: 'e2e-active-short',
+  username: 'e2e-active',
+  status: 'ACTIVE',
+  usedTrafficBytes: '12884901888',
+  lifetimeUsedTrafficBytes: '25769803776',
+  trafficLimitBytes: '0',
+  trafficLimitStrategy: 'NO_RESET',
+  expireAt: activeExpireAt,
+  createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+  vlessUuid: '00000000-0000-4000-8000-000000000002',
+  trojanPassword: 'e2e-active-trojan-password',
+  ssPassword: 'e2e-active-ss-password',
+}
+
+const activeDevice = {
   hwid: 'e2e-device-pixel-8',
-  userUuid: user.uuid,
+  userUuid: activeUser.uuid,
   platform: 'Android',
   osVersion: '15',
   deviceModel: 'Pixel 8',
@@ -39,11 +56,19 @@ const server = createServer((request, response) => {
   }
 
   if (request.method === 'GET' && request.url === '/api/users/e2e-expired-uuid') {
-    return json(response, 200, { response: user })
+    return json(response, 200, { response: expiredUser })
+  }
+
+  if (request.method === 'GET' && request.url === '/api/users/e2e-active-uuid') {
+    return json(response, 200, { response: activeUser })
   }
 
   if (request.method === 'GET' && request.url === '/api/hwid/devices/e2e-expired-uuid') {
-    return json(response, 200, { response: { total: 1, devices: [device] } })
+    return json(response, 200, { response: { total: 0, devices: [] } })
+  }
+
+  if (request.method === 'GET' && request.url === '/api/hwid/devices/e2e-active-uuid') {
+    return json(response, 200, { response: { total: 1, devices: [activeDevice] } })
   }
 
   if (request.method === 'POST' && request.url === '/api/hwid/devices/delete') {
@@ -55,8 +80,8 @@ const server = createServer((request, response) => {
       response: {
         isFound: true,
         user: {
-          shortUuid: user.shortUuid,
-          username: user.username,
+          shortUuid: expiredUser.shortUuid,
+          username: expiredUser.username,
           daysLeft: -2,
           trafficUsed: '0 B',
           trafficLimit: '0 B',
@@ -75,9 +100,40 @@ const server = createServer((request, response) => {
     })
   }
 
+  if (request.method === 'GET' && request.url === '/api/subscriptions/by-username/e2e-active') {
+    return json(response, 200, {
+      response: {
+        isFound: true,
+        user: {
+          shortUuid: activeUser.shortUuid,
+          username: activeUser.username,
+          daysLeft: 30,
+          trafficUsed: '12 GB',
+          trafficLimit: '0 B',
+          lifetimeTrafficUsed: '24 GB',
+          trafficUsedBytes: activeUser.usedTrafficBytes,
+          trafficLimitBytes: activeUser.trafficLimitBytes,
+          lifetimeTrafficUsedBytes: activeUser.lifetimeUsedTrafficBytes,
+          expiresAt: activeExpireAt,
+          isActive: true,
+          userStatus: 'ACTIVE',
+          trafficLimitStrategy: 'NO_RESET',
+        },
+        links: [],
+        subscriptionUrl: 'https://subscription.example.test/e2e-active-short',
+        happ: {
+          cryptoLink: 'happ://add/e2e-active-short',
+        },
+      },
+    })
+  }
+
   if (
     request.method === 'GET' &&
-    request.url?.startsWith('/api/bandwidth-stats/users/e2e-expired-uuid?')
+    (
+      request.url?.startsWith('/api/bandwidth-stats/users/e2e-expired-uuid?')
+      || request.url?.startsWith('/api/bandwidth-stats/users/e2e-active-uuid?')
+    )
   ) {
     return json(response, 200, {
       response: {

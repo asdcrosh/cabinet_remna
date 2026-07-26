@@ -255,6 +255,22 @@ body {
   letter-spacing: -0.045em;
 }
 
+.access-pass {
+  overflow: hidden;
+  border: 1px solid var(--app-line);
+  border-radius: 1rem;
+  background: var(--app-surface-raised);
+  box-shadow:
+    inset 3px 0 0 var(--app-accent),
+    0 20px 45px -40px color-mix(in srgb, var(--app-text) 38%, transparent);
+}
+
+.access-pass--expired {
+  box-shadow:
+    inset 3px 0 0 #d97706,
+    0 20px 45px -40px color-mix(in srgb, #d97706 42%, transparent);
+}
+
 .subscription-ticket {
   position: relative;
   isolation: isolate;

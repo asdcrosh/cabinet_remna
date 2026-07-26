@@ -75,13 +75,35 @@ export function DevicesList({ embedded = false, deviceLimit }: DevicesListProps 
       </div>
     )
   }
-  if (!devices) return <DevicesSkeleton />
+  if (!devices) return <DevicesSkeleton compact={embedded} />
   if (devices.length === 0) {
+    if (embedded) {
+      return (
+        <section id="connected-devices" className="overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.03]">
+          <div className="border-b border-slate-200 p-4 dark:border-white/10">
+            <h2 className="text-lg font-semibold tracking-tight text-slate-950 dark:text-white">Устройства</h2>
+            <p className="mt-1 text-sm leading-5 text-slate-500 dark:text-slate-400">
+              Появятся после первого запуска VPN.
+            </p>
+          </div>
+          <div className="px-4 py-7 text-center">
+            <Smartphone className="mx-auto h-6 w-6 text-slate-400" />
+            <div className="mt-3 text-sm font-semibold text-slate-950 dark:text-white">Пока пусто</div>
+            <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
+              Сначала подключите приложение слева.
+            </p>
+            <Link href="/dashboard/subscription#connection" className="btn-secondary mt-4 w-full justify-center">
+              К подключению
+            </Link>
+          </div>
+        </section>
+      )
+    }
+
     return (
       <section id="connected-devices" className="overflow-hidden rounded-3xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.035]">
         <div className="border-b border-slate-100 px-4 py-4 dark:border-white/10 sm:px-5">
-          {embedded && <div className="text-xs font-semibold uppercase tracking-[0.14em] text-cyan-700 dark:text-cyan-200">Шаг 3</div>}
-          <h2 className={cn('font-semibold tracking-tight text-slate-950 dark:text-white', embedded ? 'mt-1 text-xl sm:text-2xl' : 'text-lg')}>Проверьте подключение</h2>
+          <h2 className="text-lg font-semibold tracking-tight text-slate-950 dark:text-white">Проверьте подключение</h2>
           <p className="mt-1 text-sm leading-6 text-slate-500 dark:text-slate-400">После первого запуска VPN устройство появится здесь автоматически.</p>
         </div>
         <div className="px-4 py-8 text-center sm:px-5 sm:py-10">
@@ -99,6 +121,64 @@ export function DevicesList({ embedded = false, deviceLimit }: DevicesListProps 
   const recentDevices = countRecentDevices(devices)
   const devicesValue = deviceLimit && deviceLimit > 0 ? `${devices.length} из ${deviceLimit}` : devices.length.toString()
 
+  if (embedded) {
+    return (
+      <>
+        {(loadError || actionError) && (
+          <InlineAlert
+            tone="danger"
+            title={actionError ? 'Не удалось отвязать устройство' : 'Не удалось обновить список'}
+            description={actionError || loadError || undefined}
+          />
+        )}
+        <section id="connected-devices" className="overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.03]">
+          <div className="flex items-start justify-between gap-3 border-b border-slate-200 p-4 dark:border-white/10">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="text-lg font-semibold tracking-tight text-slate-950 dark:text-white">Устройства</h2>
+                <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600 dark:bg-white/[0.07] dark:text-slate-300">
+                  {devicesValue}
+                </span>
+              </div>
+              <p className="mt-1 text-sm leading-5 text-slate-500 dark:text-slate-400">
+                {recentDevices > 0 ? 'VPN использовался сегодня.' : 'Сегодня подключений не было.'}
+              </p>
+            </div>
+            <button
+              type="button"
+              className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-slate-200 text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-950 dark:border-white/10 dark:text-slate-400 dark:hover:bg-white/[0.06] dark:hover:text-white"
+              onClick={() => void loadDevices()}
+              disabled={refreshing}
+              aria-label="Обновить устройства"
+            >
+              <RefreshCw className={cn('h-4 w-4', refreshing && 'animate-spin')} />
+            </button>
+          </div>
+
+          <div className="divide-y divide-slate-200 dark:divide-white/10">
+            {devices.map((device) => (
+              <CompactDeviceRow
+                key={device.hwid}
+                device={device}
+                loading={removingHwid === device.hwid}
+                onRemove={() => setSelectedDevice(device)}
+              />
+            ))}
+          </div>
+        </section>
+        <ConfirmDialog
+          open={Boolean(selectedDevice)}
+          title="Отвязать устройство?"
+          description="Устройство исчезнет из списка привязок. При следующем подключении может потребоваться повторная авторизация."
+          confirmLabel="Отвязать"
+          loading={Boolean(removingHwid)}
+          onCancel={() => setSelectedDevice(null)}
+          onConfirm={() => selectedDevice && removeDevice(selectedDevice)}
+        />
+      </>
+    )
+  }
+
   return (
     <>
       {(loadError || actionError) && (
@@ -112,8 +192,7 @@ export function DevicesList({ embedded = false, deviceLimit }: DevicesListProps 
         <div className="border-b border-slate-100 px-4 py-4 dark:border-white/10 sm:px-5 sm:py-5">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0">
-              {embedded && <div className="text-xs font-semibold uppercase tracking-[0.14em] text-cyan-700 dark:text-cyan-200">Шаг 3</div>}
-              <h2 className={cn('font-semibold tracking-tight text-slate-950 dark:text-white', embedded ? 'mt-1 text-xl sm:text-2xl' : 'text-lg')}>Подключённые устройства</h2>
+              <h2 className="text-lg font-semibold tracking-tight text-slate-950 dark:text-white">Подключённые устройства</h2>
               <p className="mt-1 text-sm leading-6 text-slate-500 dark:text-slate-400">
                 {recentDevices > 0 ? 'Подключение работает. Здесь можно проверить активность и отвязать старые устройства.' : 'Устройства найдены, но сегодня ещё не подключались.'}
               </p>
@@ -197,6 +276,48 @@ function DeviceCard({
   )
 }
 
+function CompactDeviceRow({
+  device,
+  loading,
+  onRemove,
+}: {
+  device: Device
+  loading: boolean
+  onRemove: () => void
+}) {
+  const activity = getActivityState(device.updatedAt || device.createdAt)
+  const Icon = getDeviceIcon(device)
+
+  return (
+    <article className="flex min-w-0 items-center gap-3 px-4 py-3.5">
+      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-slate-100 text-cyan-700 dark:bg-white/[0.06] dark:text-cyan-200">
+        <Icon className="h-4 w-4" />
+      </span>
+      <div className="min-w-0 flex-1">
+        <h3 className="truncate text-sm font-semibold text-slate-950 dark:text-white" title={getDeviceTitle(device)}>
+          {getDeviceTitle(device)}
+        </h3>
+        <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+          <span className={cn(
+            'h-1.5 w-1.5 shrink-0 rounded-full',
+            activity.label === 'Активно сегодня' ? 'bg-emerald-500' : 'bg-slate-400'
+          )} />
+          <span className="truncate">{activity.label}</span>
+        </div>
+      </div>
+      <button
+        type="button"
+        className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-slate-400 transition-colors hover:bg-red-50 hover:text-red-700 disabled:opacity-50 dark:hover:bg-red-500/10 dark:hover:text-red-200"
+        disabled={loading}
+        onClick={onRemove}
+        aria-label={`Отвязать ${getDeviceTitle(device)}`}
+      >
+        {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Unlink2 className="h-4 w-4" />}
+      </button>
+    </article>
+  )
+}
+
 function DeviceMetric({ label, value, active = false }: { label: string; value: string; active?: boolean }) {
   return (
     <div className="rounded-xl border border-slate-100 bg-slate-50/70 px-3 py-2.5 dark:border-white/[0.07] dark:bg-white/[0.025]">
@@ -236,7 +357,30 @@ function DeviceActionButton({
   )
 }
 
-function DevicesSkeleton() {
+function DevicesSkeleton({ compact = false }: { compact?: boolean }) {
+  if (compact) {
+    return (
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.03]">
+        <div className="space-y-2 border-b border-slate-200 p-4 dark:border-white/10">
+          <div className="skeleton h-5 w-28 rounded-md" />
+          <div className="skeleton h-3 w-44 max-w-full rounded-md" />
+        </div>
+        <div className="divide-y divide-slate-200 dark:divide-white/10">
+          {[0, 1].map((item) => (
+            <div key={item} className="flex items-center gap-3 px-4 py-3.5">
+              <div className="skeleton h-9 w-9 shrink-0 rounded-lg" />
+              <div className="min-w-0 flex-1 space-y-2">
+                <div className="skeleton h-3.5 w-32 max-w-full rounded" />
+                <div className="skeleton h-3 w-20 rounded" />
+              </div>
+              <div className="skeleton h-9 w-9 shrink-0 rounded-lg" />
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.035]">
       <div className="space-y-2 border-b border-slate-100 px-4 py-4 dark:border-white/10 sm:px-5 sm:py-5">

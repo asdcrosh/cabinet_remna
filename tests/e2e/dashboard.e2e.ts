@@ -76,7 +76,7 @@ test('свайп переключает основные разделы каби
   })
 
   await expect(page).toHaveURL(/\/dashboard\/subscription(?:\?|$)/)
-  await expect(page.getByRole('heading', { name: 'Нет активной подписки' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Подписки пока нет' })).toBeVisible()
 })
 
 test('мобильный выбор тарифа открывает оплату отдельным окном', async ({ page }, testInfo) => {
@@ -117,6 +117,19 @@ test('истёкшее подключение показывает только 
   await expect(page.locator('h2:visible', { hasText: 'Подписка истекла' })).toBeVisible()
   await expect(page.getByRole('link', { name: 'Продлить' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'HAPP', exact: true })).toHaveCount(0)
+  await expectNoHorizontalOverflow(page)
+})
+
+test('активное подключение показывает компактный выбор приложения и устройства', async ({ page }) => {
+  await login(page, E2E_USERS.active.email)
+  await page.goto('/dashboard/subscription')
+
+  const access = page.getByTestId('subscription-access')
+  await expect(access.getByRole('heading', { name: 'Подписка активна' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Подключить устройство' })).toBeVisible()
+  await expect(page.getByRole('radiogroup', { name: 'Приложение для подключения' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Устройства' })).toBeVisible()
+  await expect(page.getByText('Pixel 8 · Android')).toBeVisible()
   await expectNoHorizontalOverflow(page)
 })
 

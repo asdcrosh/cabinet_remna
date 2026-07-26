@@ -14,6 +14,14 @@ export const E2E_USERS = {
     remnawaveShortUuid: 'e2e-expired-short',
     remnawaveUsername: 'e2e-expired',
   },
+  active: {
+    id: 'e2e-active-user',
+    email: 'e2e-active@example.test',
+    name: 'E2E Активный',
+    remnawaveUuid: 'e2e-active-uuid',
+    remnawaveShortUuid: 'e2e-active-short',
+    remnawaveUsername: 'e2e-active',
+  },
   admin: {
     id: 'e2e-admin-user',
     email: 'e2e-admin@example.test',
@@ -23,3 +31,4 @@ export const E2E_USERS = {
 
 export const E2E_PLAN_ID = 'e2e-expired-plan'
 export const E2E_SUBSCRIPTION_ID = 'e2e-expired-subscription'
+export const E2E_ACTIVE_SUBSCRIPTION_ID = 'e2e-active-subscription'
