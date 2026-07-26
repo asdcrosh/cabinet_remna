@@ -371,6 +371,30 @@ export async function notifyBonusGranted(input: { userId: string; attemptsCount:
   })
 }
 
+export async function notifyBonusGrantedInAppBulk(input: {
+  userIds: string[]
+  attemptsCount: number
+  operationId: string
+}) {
+  const body = `Вам начислено открытий подарочного бокса: ${input.attemptsCount}.`
+
+  for (let offset = 0; offset < input.userIds.length; offset += 500) {
+    const userIds = input.userIds.slice(offset, offset + 500)
+    await prisma.userNotification.createMany({
+      data: userIds.map((userId) => ({
+        userId,
+        type: 'BONUS_GRANTED' as const,
+        dedupeKey: `BONUS_GRANTED:bonus-granted:${input.operationId}`,
+        title: 'Бонус начислен',
+        body,
+        actionHref: '/dashboard/bonus-box',
+        actionLabel: 'Открыть бонусы',
+      })),
+      skipDuplicates: true,
+    })
+  }
+}
+
 export async function notifySubscriptionExpiring(input: {
   userId: string
   subscriptionId: string

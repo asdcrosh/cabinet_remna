@@ -41,7 +41,7 @@ export default async function AdminBonusBoxPage({
   }>
 }) {
   if (!await isFeatureEnabled('bonusBox')) notFound()
-  await requireAdminPage()
+  const { user: adminUser } = await requireAdminPage()
   const params = await searchParams
   const limit = parseAdminListLimit(params.limit)
   const historyFilters: BonusBoxHistoryFilters = {
@@ -67,6 +67,7 @@ export default async function AdminBonusBoxPage({
     events,
     riskSignals,
     analytics,
+    eligibleUsersCount,
   ] = await Promise.all([
     prisma.bonusBoxPrize.findMany({
       orderBy: [{ isActive: 'desc' }, { createdAt: 'desc' }],
@@ -113,6 +114,9 @@ export default async function AdminBonusBoxPage({
       include: { user: { select: { email: true, name: true } } },
     }),
     getBonusBoxAdminAnalytics(),
+    adminUser.role === 'SUPER_ADMIN'
+      ? prisma.user.count({ where: { role: 'USER' } })
+      : Promise.resolve(0),
   ])
   const now = new Date()
   const activeEvents = events.filter(
@@ -240,6 +244,8 @@ export default async function AdminBonusBoxPage({
               to: historyFilters.to ?? '',
             }}
             initialTab={params.view === 'history' ? 'history' : 'prizes'}
+            canGrantAttempts={adminUser.role === 'SUPER_ADMIN'}
+            eligibleUsersCount={eligibleUsersCount}
           />
         )}
       />

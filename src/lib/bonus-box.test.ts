@@ -5,12 +5,14 @@ const mocks = vi.hoisted(() => {
   const prisma = {
     user: {
       findUnique: vi.fn(),
+      findMany: vi.fn(),
     },
     bonusBoxAttempt: {
       count: vi.fn(),
       createMany: vi.fn(),
       findMany: vi.fn(),
       findFirst: vi.fn(),
+      groupBy: vi.fn(),
       updateMany: vi.fn(),
     },
     bonusBoxPrize: {
@@ -60,6 +62,7 @@ import {
   applyBonusBoxEconomyGuard,
   getBonusBoxConfig,
   getBonusBoxOverview,
+  grantManualBonusBoxAttemptsBulk,
   grantWeeklyBonusBoxAttempts,
   openBonusBox,
   retryPendingBonusBoxSyncsForUser,
@@ -91,6 +94,87 @@ const config: Config = {
   showBestRecentOpening: true,
   activePromoRewardsLimit: 3,
 }
+
+describe('grantManualBonusBoxAttemptsBulk', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mocks.prisma.bonusBoxAttempt.groupBy.mockResolvedValue([])
+    mocks.prisma.bonusBoxAttempt.createMany.mockImplementation(({ data }) =>
+      Promise.resolve({ count: data.length })
+    )
+  })
+
+  it('grants the selected users a deterministic, retry-safe batch', async () => {
+    mocks.prisma.user.findMany.mockResolvedValue([{ id: 'user-1' }, { id: 'user-2' }])
+
+    const result = await grantManualBonusBoxAttemptsBulk({
+      audience: 'SELECTED',
+      userIds: ['user-1', 'user-2', 'user-1'],
+      adminId: 'admin-1',
+      attemptsCount: 3,
+      operationId: 'operation-1',
+    })
+
+    expect(mocks.prisma.user.findMany).toHaveBeenCalledWith({
+      where: {
+        role: 'USER',
+        id: { in: ['user-1', 'user-2'] },
+      },
+      orderBy: { createdAt: 'asc' },
+      select: { id: true },
+    })
+    expect(mocks.prisma.bonusBoxAttempt.createMany).toHaveBeenCalledWith({
+      data: expect.arrayContaining([
+        expect.objectContaining({
+          userId: 'user-1',
+          source: 'MANUAL',
+          sourceKey: 'admin:admin-1:batch:operation-1:user-1:1',
+        }),
+        expect.objectContaining({
+          userId: 'user-2',
+          source: 'MANUAL',
+          sourceKey: 'admin:admin-1:batch:operation-1:user-2:3',
+        }),
+      ]),
+      skipDuplicates: true,
+    })
+    expect(result).toMatchObject({
+      recipientsCount: 2,
+      recipientsGranted: 2,
+      attemptsGranted: 6,
+      attemptsPerUser: 3,
+      alreadyProcessed: false,
+    })
+  })
+
+  it('does not grant the same operation twice', async () => {
+    mocks.prisma.user.findMany.mockResolvedValue([{ id: 'user-1' }, { id: 'user-2' }])
+    mocks.prisma.bonusBoxAttempt.groupBy.mockResolvedValue([
+      { userId: 'user-1' },
+      { userId: 'user-2' },
+    ])
+
+    const result = await grantManualBonusBoxAttemptsBulk({
+      audience: 'ALL',
+      adminId: 'admin-1',
+      attemptsCount: 5,
+      operationId: 'operation-1',
+    })
+
+    expect(mocks.prisma.user.findMany).toHaveBeenCalledWith({
+      where: { role: 'USER' },
+      orderBy: { createdAt: 'asc' },
+      select: { id: true },
+    })
+    expect(mocks.prisma.bonusBoxAttempt.createMany).not.toHaveBeenCalled()
+    expect(result).toMatchObject({
+      recipientsCount: 2,
+      recipientsGranted: 0,
+      attemptsGranted: 0,
+      alreadyProcessed: true,
+    })
+  })
+})
 
 describe('grantWeeklyBonusBoxAttempts', () => {
   beforeEach(() => {

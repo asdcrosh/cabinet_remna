@@ -26,6 +26,7 @@ import { AdminActionsMenu } from '@/components/admin/admin-actions-menu'
 import { LazyListLoader } from '@/components/admin/lazy-list-loader'
 import { AutoSubmitForm } from '@/components/ui/auto-submit-form'
 import { useBodyScrollLock } from '@/lib/use-body-scroll-lock'
+import { BonusBoxAttemptGrantPanel } from '@/components/admin/bonus-box-attempt-grant-panel'
 
 type PrizeType = 'SUBSCRIPTION_DAYS' | 'TRAFFIC_GB' | 'PROMO_CODE_PERCENT' | 'BONUS_ATTEMPTS' | 'NO_PRIZE'
 type Rarity = 'COMMON' | 'RARE' | 'EPIC' | 'LEGENDARY'
@@ -118,6 +119,8 @@ export function BonusBoxPrizesAdmin({
   filteredOpenings,
   historyFilters,
   initialTab,
+  canGrantAttempts,
+  eligibleUsersCount,
 }: {
   prizes: BonusBoxPrizeAdminRow[]
   openings: BonusBoxOpeningAdminRow[]
@@ -133,6 +136,8 @@ export function BonusBoxPrizesAdmin({
     to: string
   }
   initialTab: AdminBonusTab
+  canGrantAttempts: boolean
+  eligibleUsersCount: number
 }) {
   const router = useRouter()
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -366,6 +371,9 @@ export function BonusBoxPrizesAdmin({
               {settingsLoading ? 'Сохраняем...' : 'Сохранить настройки'}
             </button>
           </div>
+          {canGrantAttempts && (
+            <BonusBoxAttemptGrantPanel eligibleUsersCount={eligibleUsersCount} />
+          )}
         </div>
       </details>
 

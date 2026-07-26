@@ -48,6 +48,8 @@ const routeCases: AdminRouteCase[] = [
   { name: 'bonus prize create', module: './bonus-box/prizes/route', method: 'POST' },
   { name: 'bonus settings read', module: './bonus-box/settings/route', method: 'GET' },
   { name: 'bonus settings update', module: './bonus-box/settings/route', method: 'PATCH' },
+  { name: 'bonus grant recipients search', module: './bonus-box/attempt-grants/route', method: 'GET' },
+  { name: 'bonus bulk grant', module: './bonus-box/attempt-grants/route', method: 'POST' },
   { name: 'broadcast template delete', module: './broadcast-templates/[id]/route', method: 'DELETE', params: { id: 'template-1' } },
   { name: 'broadcast templates list', module: './broadcast-templates/route', method: 'GET' },
   { name: 'broadcast template create', module: './broadcast-templates/route', method: 'POST' },

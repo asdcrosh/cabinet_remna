@@ -408,6 +408,81 @@ export async function grantManualBonusBoxAttempts(input: {
   }
 }
 
+export async function grantManualBonusBoxAttemptsBulk(input: {
+  audience: 'ALL' | 'SELECTED'
+  userIds?: string[]
+  adminId: string
+  attemptsCount: number
+  operationId: string
+}) {
+  if (!await isFeatureEnabled('bonusBox')) {
+    throw new BonusBoxError('Подарочный бокс сейчас недоступен', 403, 'BONUS_BOX_DISABLED')
+  }
+
+  const attemptsCount = clamp(input.attemptsCount, 1, 100)
+  const requestedUserIds = [...new Set(input.userIds ?? [])]
+  const recipients = await prisma.user.findMany({
+    where: {
+      role: 'USER',
+      ...(input.audience === 'SELECTED' ? { id: { in: requestedUserIds } } : {}),
+    },
+    orderBy: { createdAt: 'asc' },
+    select: { id: true },
+  })
+
+  if (recipients.length === 0) {
+    throw new BonusBoxError(
+      input.audience === 'ALL' ? 'Нет пользователей для начисления' : 'Не выбраны подходящие пользователи',
+      400,
+      'BONUS_RECIPIENTS_NOT_FOUND'
+    )
+  }
+
+  const sourceKeyPrefix = `admin:${input.adminId}:batch:${input.operationId}`
+  const processedRecipients = await prisma.bonusBoxAttempt.groupBy({
+    by: ['userId'],
+    where: {
+      userId: { in: recipients.map((recipient) => recipient.id) },
+      source: 'MANUAL',
+      sourceKey: { startsWith: `${sourceKeyPrefix}:` },
+    },
+  })
+  const processedUserIds = new Set(processedRecipients.map((recipient) => recipient.userId))
+  const pendingRecipients = recipients.filter((recipient) => !processedUserIds.has(recipient.id))
+  const grantedUserIds: string[] = []
+  let attemptsGranted = 0
+
+  for (let offset = 0; offset < pendingRecipients.length; offset += 50) {
+    const chunk = pendingRecipients.slice(offset, offset + 50)
+    const rows = chunk.flatMap((recipient) =>
+      makeAttempts({
+        userId: recipient.id,
+        source: 'MANUAL',
+        sourceKeyPrefix: `${sourceKeyPrefix}:${recipient.id}`,
+        attemptsCount,
+      })
+    )
+    const result = await prisma.bonusBoxAttempt.createMany({
+      data: rows,
+      skipDuplicates: true,
+    })
+
+    attemptsGranted += result.count
+    if (result.count === rows.length) {
+      grantedUserIds.push(...chunk.map((recipient) => recipient.id))
+    }
+  }
+
+  return {
+    recipientsCount: recipients.length,
+    recipientsGranted: grantedUserIds.length,
+    attemptsGranted,
+    attemptsPerUser: attemptsCount,
+    grantedUserIds,
+    alreadyProcessed: pendingRecipients.length === 0,
+  }
+}
+
 export async function grantWeeklyBonusBoxAttempts(userId: string) {
   const config = getBonusBoxConfig()
   if (!await isFeatureEnabled('bonusBox') || !config.weeklyEnabled || config.weeklyAttempts <= 0) return { granted: 0 }

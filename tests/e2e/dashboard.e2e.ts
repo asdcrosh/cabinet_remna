@@ -140,6 +140,33 @@ test('админская навигация не смешивается с ли�
   }
 })
 
+test('массовое начисление прокруток позволяет выбрать получателя и проверить итог', async ({ page }) => {
+  await login(page, E2E_USERS.admin.email)
+  await page.goto('/dashboard/admin/bonus-box')
+
+  await page.getByRole('tab', { name: 'Призы и история' }).click()
+  await page.getByText('Настройки рулетки', { exact: true }).click()
+
+  const grantPanel = page.getByTestId('bonus-attempt-grant-panel')
+  await expect(grantPanel).toBeVisible()
+  await grantPanel.getByRole('button', { name: /Выбрать/ }).click()
+  await grantPanel.getByLabel('Найти пользователя').fill(E2E_USERS.basic.email)
+
+  const recipient = grantPanel.getByRole('button', { name: new RegExp(E2E_USERS.basic.email) })
+  await expect(recipient).toBeVisible()
+  await recipient.click()
+  await grantPanel.getByRole('button', { name: '3', exact: true }).click()
+  await expect(grantPanel.getByLabel('Количество прокруток каждому')).toHaveValue('3')
+  await grantPanel.getByRole('button', { name: 'Начислить', exact: true }).click()
+
+  const confirmation = page.getByRole('dialog', { name: 'Подтвердить начисление' })
+  await expect(confirmation).toBeVisible()
+  await expect(confirmation.getByText('Получателей')).toBeVisible()
+  await expect(confirmation.getByText('Всего прокруток')).toBeVisible()
+  await confirmation.getByRole('button', { name: 'Отмена' }).click()
+  await expectNoHorizontalOverflow(page)
+})
+
 test('фильтры списков применяются без отдельной кнопки', async ({ page }, testInfo) => {
   await login(page, E2E_USERS.admin.email)
   await page.goto('/dashboard/admin/payments')
