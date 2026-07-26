@@ -5,6 +5,7 @@ import { useId, useState } from 'react'
 import Link from 'next/link'
 import { ChevronDown, SlidersHorizontal } from 'lucide-react'
 import { cn } from '@/lib/cn'
+import { AutoSubmitForm } from '@/components/ui/auto-submit-form'
 
 type AdminFilterBarProps = {
   action: string
@@ -59,9 +60,9 @@ export function AdminFilterBar({
           </div>
         ) : null}
       </div>
-      <form
+      <AutoSubmitForm
         id={filtersId}
-        aria-label="Фильтры списка"
+        ariaLabel="Фильтры списка"
         className={cn(
           mobileOpen ? 'grid' : 'hidden',
           'mt-2 min-w-0 flex-1 gap-2 border-t border-slate-200/80 pt-3 dark:border-white/[0.08] md:mt-0 md:grid md:border-0 md:pt-0',
@@ -71,7 +72,7 @@ export function AdminFilterBar({
       >
         {children}
         {resetVisible && resetHref ? <Link href={resetHref} className="btn-secondary w-full self-end">Сбросить</Link> : null}
-      </form>
+      </AutoSubmitForm>
     </section>
   )
 }

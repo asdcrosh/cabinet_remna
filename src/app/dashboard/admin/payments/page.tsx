@@ -8,7 +8,6 @@ import { PaymentBadge } from '@/components/admin/admin-badges'
 import { PaymentSyncButton, RecoveryActionButton, RemnashopPaymentRetryButton } from '@/components/admin/recovery-actions'
 import { LazyListLoader } from '@/components/admin/lazy-list-loader'
 import { ADMIN_LIST_PAGE_SIZE, parseAdminListLimit } from '@/lib/admin-list'
-import { AdminFilterSubmitButton } from '@/components/admin/admin-filter-submit-button'
 import { AdminFilterBar, AdminFilterField } from '@/components/admin/admin-filter-bar'
 import { AdminEmptyState } from '@/components/admin/admin-empty-state'
 import { describeSyncError } from '@/lib/sync-error'
@@ -103,7 +102,7 @@ export default async function AdminPaymentsPage({
         resetHref="/dashboard/admin/payments"
         resetVisible={Boolean(q || status !== 'ALL' || provider !== 'ALL' || delivery !== 'ALL' || range !== 'ALL' || params.from || params.to)}
         count={{ shown: payments.length, total }}
-        className="md:grid-cols-2 2xl:grid-cols-[minmax(15rem,1fr)_10rem_10rem_11rem_9rem_auto]"
+        className="md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-[minmax(15rem,1.4fr)_repeat(4,minmax(9rem,1fr))_auto]"
       >
         <input type="hidden" name="limit" value={ADMIN_LIST_PAGE_SIZE} />
         <AdminFilterField label="Поиск платежей">
@@ -155,7 +154,6 @@ export default async function AdminPaymentsPage({
             </AdminFilterField>
           </>
         ) : null}
-        <AdminFilterSubmitButton idleText="Применить" />
       </AdminFilterBar>
 
       {payments.length === 0 && (

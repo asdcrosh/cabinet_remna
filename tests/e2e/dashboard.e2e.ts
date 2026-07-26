@@ -140,6 +140,23 @@ test('админская навигация не смешивается с ли�
   }
 })
 
+test('фильтры списков применяются без отдельной кнопки', async ({ page }, testInfo) => {
+  await login(page, E2E_USERS.admin.email)
+  await page.goto('/dashboard/admin/payments')
+
+  if (testInfo.project.name === 'mobile-chromium') {
+    await page.getByRole('button', { name: 'Поиск и фильтры' }).click()
+  }
+  const filters = page.getByRole('form', { name: 'Фильтры списка' })
+  await expect(filters.getByRole('button', { name: /Применить|Найти|Искать/ })).toHaveCount(0)
+
+  await filters.getByLabel('Провайдер').selectOption('PLATEGA')
+  await expect(page).toHaveURL(/provider=PLATEGA/)
+
+  await filters.getByLabel('Поиск платежей').fill('e2e')
+  await expect(page).toHaveURL(/q=e2e/)
+})
+
 test('действия пользователя открывают формы и не закрываются вместе с меню', async ({ page }, testInfo) => {
   await login(page, E2E_USERS.admin.email)
   await page.goto(`/dashboard/admin/users?q=${encodeURIComponent(E2E_USERS.basic.email)}`)

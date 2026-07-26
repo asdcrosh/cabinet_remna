@@ -5,7 +5,6 @@ import { AuditAction } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { requireAdminPage } from '@/lib/auth/admin-page'
 import { AdminPageShell } from '@/components/admin/admin-page-shell'
-import { AdminFilterSubmitButton } from '@/components/admin/admin-filter-submit-button'
 import { AdminFilterBar, AdminFilterField } from '@/components/admin/admin-filter-bar'
 import { AdminEmptyState } from '@/components/admin/admin-empty-state'
 
@@ -94,7 +93,7 @@ export default async function AdminAuditPage({
         resetHref="/dashboard/admin/audit"
         resetVisible={Boolean(q || action !== 'ALL')}
         count={{ shown: visibleLogs.length, total }}
-        className="md:grid-cols-[minmax(14rem,1fr)_14rem_auto_auto]"
+        className="md:grid-cols-[minmax(14rem,1fr)_14rem_auto]"
       >
         <input type="hidden" name="limit" value="50" />
         <AdminFilterField label="Поиск в истории">
@@ -111,7 +110,6 @@ export default async function AdminAuditPage({
             ))}
           </select>
         </AdminFilterField>
-        <AdminFilterSubmitButton />
       </AdminFilterBar>
 
       <div className={visibleLogs.length > 0 ? 'overflow-hidden rounded-3xl border border-slate-200 bg-white divide-y divide-slate-200 dark:border-white/10 dark:bg-white/[0.025] dark:divide-white/[0.07]' : ''}>

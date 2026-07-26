@@ -24,6 +24,7 @@ import { cn } from '@/lib/cn'
 import { AdminEmptyState } from '@/components/admin/admin-empty-state'
 import { AdminActionsMenu } from '@/components/admin/admin-actions-menu'
 import { LazyListLoader } from '@/components/admin/lazy-list-loader'
+import { AutoSubmitForm } from '@/components/ui/auto-submit-form'
 import { useBodyScrollLock } from '@/lib/use-body-scroll-lock'
 
 type PrizeType = 'SUBSCRIPTION_DAYS' | 'TRAFFIC_GB' | 'PROMO_CODE_PERCENT' | 'BONUS_ATTEMPTS' | 'NO_PRIZE'
@@ -849,7 +850,7 @@ function BonusBoxOpeningHistory({
         </span>
       </div>
 
-      <form action="/dashboard/admin/bonus-box" method="get" className="grid gap-2 border-y border-slate-100 py-3 dark:border-white/10 sm:grid-cols-2 xl:grid-cols-[1.2fr_1fr_0.8fr_0.8fr_0.8fr_auto]">
+      <AutoSubmitForm action="/dashboard/admin/bonus-box" className="grid gap-2 border-y border-slate-100 py-3 dark:border-white/10 sm:grid-cols-2 xl:grid-cols-[1.2fr_1fr_0.8fr_0.8fr_0.8fr]">
         <input type="hidden" name="view" value="history" />
         <input className="input" name="q" defaultValue={filters.q} placeholder="Email или имя" />
         <select className="input" name="prize" defaultValue={filters.prizeId}>
@@ -863,8 +864,7 @@ function BonusBoxOpeningHistory({
         </select>
         <input className="input" type="date" name="from" defaultValue={filters.from} aria-label="Дата от" />
         <input className="input" type="date" name="to" defaultValue={filters.to} aria-label="Дата до" />
-        <button type="submit" className="btn-secondary justify-center">Найти</button>
-        <div className="flex flex-wrap gap-2 sm:col-span-2 xl:col-span-6">
+        <div className="flex flex-wrap gap-2 sm:col-span-2 xl:col-span-5">
           <a className="text-sm font-medium text-cyan-700 hover:underline dark:text-cyan-300" href={`/api/admin/bonus-box/export?${exportParams.toString()}`}>
             Скачать CSV
           </a>
@@ -874,7 +874,7 @@ function BonusBoxOpeningHistory({
             </a>
           )}
         </div>
-      </form>
+      </AutoSubmitForm>
 
       {openings.length > 0 ? (
         <>

@@ -68,6 +68,18 @@ export function PersonalOffersAdmin({
 
   const activeOffer = useMemo(() => editing, [editing])
   const activeOffersCount = offers.filter((offer) => offer.enabled).length
+  const welcomeBenefits = useMemo(() => {
+    const benefits: string[] = []
+    if (welcomeForm.trialEnabled) {
+      benefits.push(trialPlans.find((plan) => plan.id === welcomeForm.trialPlanId)?.name || 'Пробный период')
+    }
+    if (welcomeForm.promoCodeEnabled) {
+      const promo = promoCodes.find((item) => item.id === welcomeForm.promoCodeId)
+      benefits.push(promo ? `${promo.code} · ${promo.discountPercent}%` : 'Промокод')
+    }
+    if (welcomeForm.bonusAttemptsEnabled) benefits.push(`${welcomeForm.bonusAttempts} прокруток`)
+    return benefits
+  }, [promoCodes, trialPlans, welcomeForm])
 
   function openEdit(offer: Offer) {
     setEditing(offer)
@@ -107,46 +119,47 @@ export function PersonalOffersAdmin({
 
   return (
     <>
-      <section className="rounded-3xl border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.03] sm:p-5">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+      <section className="overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.025]">
+        <div className="flex flex-col gap-4 border-b border-slate-200/80 px-4 py-4 dark:border-white/[0.08] sm:flex-row sm:items-center sm:justify-between sm:px-5">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-200">
+            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-200">
               <Gift className="h-5 w-5" />
             </div>
             <div className="min-w-0">
               <h2 className="font-semibold text-slate-950 dark:text-white">Приветственный бонус</h2>
-              <p className="mt-1 text-sm leading-5 text-slate-500 dark:text-slate-400">
-                {welcomeSummary(welcomeForm, trialPlans, promoCodes)}
-              </p>
+              <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">Подарок автоматически выдаётся новому пользователю</p>
             </div>
           </div>
-          <label className={cn(
-            'inline-flex min-h-10 shrink-0 cursor-pointer items-center justify-between gap-3 rounded-2xl border px-3 text-sm font-medium transition-colors sm:justify-start',
-            welcomeForm.enabled
-              ? 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-100'
-              : 'border-slate-200 bg-slate-50 text-slate-500 dark:border-white/10 dark:bg-white/[0.03]'
-          )}>
-            <span>{welcomeForm.enabled ? 'Бонус включён' : 'Бонус выключен'}</span>
-            <span className="sr-only">Включить приветственный бонус</span>
-            <input
-              type="checkbox"
-              className="h-5 w-5"
-              checked={welcomeForm.enabled}
-              onChange={(event) => setWelcomeForm((prev) => ({ ...prev, enabled: event.target.checked }))}
-            />
-          </label>
+          <ToggleSwitch
+            checked={welcomeForm.enabled}
+            onChange={(checked) => setWelcomeForm((prev) => ({ ...prev, enabled: checked }))}
+            label={welcomeForm.enabled ? 'Бонус включён' : 'Бонус выключен'}
+          />
         </div>
 
-        <details className="group mt-4 rounded-2xl border border-slate-200 bg-slate-50/70 p-3 dark:border-white/10 dark:bg-white/[0.025] sm:p-4">
-          <summary className="flex cursor-pointer list-none items-center justify-between text-sm font-semibold text-slate-700 dark:text-slate-200">
-            Настроить варианты
-            <span className="text-xs text-slate-400 group-open:hidden">Открыть</span>
-            <span className="hidden text-xs text-slate-400 group-open:inline">Свернуть</span>
-          </summary>
-          <div className="mt-3 grid gap-3 xl:grid-cols-3">
+        <div className="p-4 sm:p-5">
+          <div className={cn(
+            'rounded-[1.25rem] px-4 py-3.5',
+            welcomeForm.enabled
+              ? 'bg-gradient-to-r from-emerald-50 to-cyan-50/60 dark:from-emerald-400/[0.08] dark:to-cyan-400/[0.04]'
+              : 'bg-slate-100/70 dark:bg-white/[0.035]'
+          )}>
+            <div className="text-xs font-semibold text-slate-500 dark:text-slate-400">Новый пользователь получит</div>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {welcomeBenefits.length > 0 ? welcomeBenefits.map((benefit) => (
+                <span key={benefit} className="rounded-full bg-white/80 px-2.5 py-1 text-xs font-medium text-slate-700 ring-1 ring-slate-200/70 dark:bg-white/[0.06] dark:text-slate-200 dark:ring-white/[0.08]">
+                  {benefit}
+                </span>
+              )) : (
+                <span className="text-sm text-slate-500 dark:text-slate-400">Выберите хотя бы один вариант бонуса</span>
+              )}
+            </div>
+          </div>
+
+          <div className="mt-4 grid gap-3 xl:grid-cols-3">
             <WelcomeBonusOption
               title="Пробный период"
-              description="Бесплатный тариф для нового пользователя."
+              description="Доступ сразу после регистрации"
               icon={<Sparkles className="h-5 w-5" />}
               checked={welcomeForm.trialEnabled}
               onToggle={(checked) => setWelcomeForm((prev) => ({ ...prev, trialEnabled: checked }))}
@@ -165,7 +178,7 @@ export function PersonalOffersAdmin({
 
             <WelcomeBonusOption
               title="Промокод"
-              description="Код на первую оплату."
+              description="Скидка на первую оплату"
               icon={<Ticket className="h-5 w-5" />}
               checked={welcomeForm.promoCodeEnabled}
               onToggle={(checked) => setWelcomeForm((prev) => ({ ...prev, promoCodeEnabled: checked }))}
@@ -186,7 +199,7 @@ export function PersonalOffersAdmin({
 
             <WelcomeBonusOption
               title="Рулетка"
-              description="Попытки в подарочном боксе."
+              description="Дополнительные прокрутки"
               icon={<WandSparkles className="h-5 w-5" />}
               checked={welcomeForm.bonusAttemptsEnabled}
               onToggle={(checked) => setWelcomeForm((prev) => ({ ...prev, bonusAttemptsEnabled: checked }))}
@@ -202,11 +215,12 @@ export function PersonalOffersAdmin({
             </WelcomeBonusOption>
           </div>
 
-        </details>
-        <div className="mt-4 flex justify-end">
-          <button type="button" className="btn-primary min-h-11 w-full justify-center sm:w-auto sm:px-5" onClick={() => void saveWelcomeBonus()} disabled={welcomeLoading}>
-            {welcomeLoading ? 'Сохраняем...' : 'Сохранить бонус'}
-          </button>
+          <div className="mt-4 flex flex-col gap-2 border-t border-slate-200/80 pt-4 dark:border-white/[0.08] sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-xs text-slate-500 dark:text-slate-400">{welcomeSummary(welcomeForm, trialPlans, promoCodes)}</p>
+            <button type="button" className="btn-primary min-h-10 w-full justify-center sm:w-auto sm:px-5" onClick={() => void saveWelcomeBonus()} disabled={welcomeLoading}>
+              {welcomeLoading ? 'Сохраняем...' : 'Сохранить изменения'}
+            </button>
+          </div>
         </div>
       </section>
 
@@ -422,31 +436,58 @@ function WelcomeBonusOption({
 }) {
   return (
     <div className={cn(
-      'flex flex-col rounded-2xl border bg-white p-4 transition-colors dark:bg-white/[0.035]',
-      checked ? 'border-emerald-300 shadow-sm shadow-emerald-100 dark:border-emerald-500/40 dark:shadow-none' : 'border-slate-200 dark:border-white/10'
+      'relative flex min-h-0 flex-col overflow-hidden rounded-[1.25rem] border p-4 transition-colors xl:min-h-[12rem]',
+      checked
+        ? 'border-emerald-300/80 bg-emerald-50/45 dark:border-emerald-500/30 dark:bg-emerald-400/[0.055]'
+        : 'border-slate-200 bg-slate-50/55 dark:border-white/[0.08] dark:bg-white/[0.018]'
     )}>
+      <span className={cn('absolute inset-x-0 top-0 h-0.5', checked ? 'bg-emerald-400' : 'bg-transparent')} aria-hidden="true" />
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 gap-3">
-          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-200">
+          <div className={cn(
+            'grid h-9 w-9 shrink-0 place-items-center rounded-xl',
+            checked
+              ? 'bg-emerald-100/80 text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-200'
+              : 'bg-slate-200/60 text-slate-500 dark:bg-white/[0.05] dark:text-slate-400'
+          )}>
             {icon}
           </div>
           <div className="min-w-0">
             <div className="font-semibold text-slate-950 dark:text-white">{title}</div>
-            <p className="mt-1 text-sm leading-5 text-slate-500 dark:text-slate-400">{description}</p>
+            <p className="mt-0.5 text-xs leading-4 text-slate-500 dark:text-slate-400">{description}</p>
           </div>
         </div>
-        <label className="grid h-9 w-9 shrink-0 cursor-pointer place-items-center rounded-xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.04]">
-          <span className="sr-only">{checked ? 'Отключить' : 'Включить'} {title}</span>
-          <input
-            type="checkbox"
-            className="h-5 w-5"
-            checked={checked}
-            onChange={(event) => onToggle(event.target.checked)}
-          />
-        </label>
+        <ToggleSwitch checked={checked} onChange={onToggle} label={checked ? `Отключить ${title}` : `Включить ${title}`} compact />
       </div>
-      <div className={cn('mt-4', !checked && 'opacity-50')}>{children}</div>
+      <fieldset disabled={!checked} className={cn('mt-auto border-0 pt-5', !checked && 'opacity-40')}>
+        {children}
+      </fieldset>
     </div>
+  )
+}
+
+function ToggleSwitch({
+  checked,
+  onChange,
+  label,
+  compact = false,
+}: {
+  checked: boolean
+  onChange: (checked: boolean) => void
+  label: string
+  compact?: boolean
+}) {
+  return (
+    <label className={cn('inline-flex shrink-0 cursor-pointer items-center gap-3', !compact && 'justify-between sm:justify-start')}>
+      {!compact ? <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{label}</span> : <span className="sr-only">{label}</span>}
+      <input
+        type="checkbox"
+        className="peer sr-only"
+        checked={checked}
+        onChange={(event) => onChange(event.target.checked)}
+      />
+      <span className="relative h-6 w-11 rounded-full bg-slate-300 transition-colors after:absolute after:left-0.5 after:top-0.5 after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow-sm after:transition-transform peer-checked:bg-emerald-500 peer-checked:after:translate-x-5 peer-focus-visible:ring-4 peer-focus-visible:ring-emerald-400/20 dark:bg-white/15 dark:peer-checked:bg-emerald-400" aria-hidden="true" />
+    </label>
   )
 }
 

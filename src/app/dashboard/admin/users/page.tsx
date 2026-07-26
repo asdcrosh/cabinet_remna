@@ -13,7 +13,6 @@ import { UserPlanButton } from '@/components/admin/user-plan-button'
 import { UserDetailsButton, type AdminUserDetails } from '@/components/admin/user-details-button'
 import { UserSyncButton } from '@/components/admin/user-sync-button'
 import { formatPrice } from '@/lib/format'
-import { AdminFilterSubmitButton } from '@/components/admin/admin-filter-submit-button'
 import { AdminFilterBar, AdminFilterField } from '@/components/admin/admin-filter-bar'
 import { AdminEmptyState } from '@/components/admin/admin-empty-state'
 import { AdminActionsMenu } from '@/components/admin/admin-actions-menu'
@@ -135,7 +134,7 @@ export default async function AdminUsersPage({
         resetHref="/dashboard/admin/users"
         resetVisible={Boolean(q || role !== 'ALL' || account !== 'ALL')}
         count={{ shown: users.length, total }}
-        className="md:grid-cols-2 xl:grid-cols-[minmax(16rem,1fr)_11rem_13rem_auto_auto]"
+        className="md:grid-cols-2 xl:grid-cols-[minmax(16rem,1fr)_11rem_13rem_auto]"
       >
         <input type="hidden" name="limit" value={ADMIN_LIST_PAGE_SIZE} />
         <AdminFilterField label="Поиск пользователей">
@@ -166,7 +165,6 @@ export default async function AdminUsersPage({
             <option value="UNLINKED">Без профиля</option>
           </select>
         </AdminFilterField>
-        <AdminFilterSubmitButton idleText="Найти" />
       </AdminFilterBar>
 
       {users.length === 0 && (
