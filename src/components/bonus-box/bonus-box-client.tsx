@@ -12,7 +12,6 @@ import {
   Sparkles,
   ShoppingCart,
   TicketPercent,
-  Trophy,
   Users,
   Zap,
 } from "lucide-react";
@@ -41,7 +40,6 @@ import {
 } from "@/components/bonus-box/bonus-box-display";
 import type {
   ActivePromoRewardView,
-  BestRecentOpeningView,
   BonusBoxConfigView,
   BonusBoxOpeningView,
   BonusBoxOverview,
@@ -56,7 +54,7 @@ export type { BonusBoxPrizeView } from "@/components/bonus-box/bonus-box-types";
 
 const REEL_DURATION_MS = 2800;
 const REVEAL_EFFECT_DURATION_MS = 900;
-const BONUS_TABS: BonusBoxTab[] = ["outcomes", "history", "rules"];
+const BONUS_TABS: BonusBoxTab[] = ["missions", "outcomes", "history"];
 
 export function BonusBoxClient({
   initialData,
@@ -71,7 +69,9 @@ export function BonusBoxClient({
   const [revealEffect, setRevealEffect] = useState(false);
   const [result, setResult] = useState<OpenBoxResponse | null>(null);
   const [pendingResult, setPendingResult] = useState<OpenBoxResponse | null>(null);
-  const [activeTab, setActiveTab] = useState<BonusBoxTab>("outcomes");
+  const [activeTab, setActiveTab] = useState<BonusBoxTab>(
+    initialData.events.length > 0 || initialData.missions.length > 0 ? "missions" : "outcomes",
+  );
   const [mobileReel, setMobileReel] = useState(false);
   const [reducedMotion, setReducedMotion] = useState(false);
   const [claimingMissionId, setClaimingMissionId] = useState<string | null>(null);
@@ -359,15 +359,6 @@ export function BonusBoxClient({
         )}
       </section>
 
-      {(data.events.length > 0 || data.missions.length > 0) && (
-        <BonusEngagementPanel
-          events={data.events}
-          missions={data.missions}
-          claimingMissionId={claimingMissionId}
-          onClaim={claimMission}
-        />
-      )}
-
       {result && (
         <section
           role="status"
@@ -476,17 +467,6 @@ export function BonusBoxClient({
         </section>
       )}
 
-      {data.activePromoRewards.length > 0 && (
-        <ActivePromoRewards
-          rewards={data.activePromoRewards}
-          onCopy={copyPromoCode}
-        />
-      )}
-
-      {data.config.showBestRecentOpening && data.bestRecentOpening && (
-        <BestRecentOpening opening={data.bestRecentOpening} />
-      )}
-
       <section className="order-4 space-y-4">
         {data.pityProgress.enabled && hasRareOrBetter && (
           <div className="flex flex-col gap-2 border-y border-slate-200 py-3 text-sm dark:border-white/10 sm:flex-row sm:items-center sm:justify-between">
@@ -518,10 +498,17 @@ export function BonusBoxClient({
           onKeyDown={handleTabKeyDown}
         >
           <BonusTabButton
+            tab="missions"
+            active={activeTab === "missions"}
+            onClick={() => setActiveTab("missions")}
+            label="Задания"
+            meta={`${data.missions.length}`}
+          />
+          <BonusTabButton
             tab="outcomes"
             active={activeTab === "outcomes"}
             onClick={() => setActiveTab("outcomes")}
-            label="Что можно выиграть"
+            label="Призы"
             meta={`${data.prizes.length}`}
           />
           <BonusTabButton
@@ -531,14 +518,40 @@ export function BonusBoxClient({
             label="История"
             meta={`${data.openings.length}`}
           />
-          <BonusTabButton
-            tab="rules"
-            active={activeTab === "rules"}
-            onClick={() => setActiveTab("rules")}
-            label="Как получить"
-            meta={data.hasActiveSubscription ? "активно" : "подписка"}
-          />
         </div>
+
+        {activeTab === "missions" && (
+          <div
+            className="space-y-4"
+            id="bonus-panel-missions"
+            role="tabpanel"
+            aria-labelledby="bonus-tab-missions"
+          >
+            {(data.events.length > 0 || data.missions.length > 0) ? (
+              <BonusEngagementPanel
+                events={data.events}
+                missions={data.missions}
+                claimingMissionId={claimingMissionId}
+                onClaim={claimMission}
+              />
+            ) : (
+              <p className="border-y border-slate-200 py-4 text-sm text-slate-500 dark:border-white/10 dark:text-slate-400">
+                Новых заданий пока нет.
+              </p>
+            )}
+            <details className="group border-t border-slate-200 pt-3 dark:border-white/10">
+              <summary className="cursor-pointer list-none text-sm font-medium text-slate-600 hover:text-slate-950 dark:text-slate-300 dark:hover:text-white [&::-webkit-details-marker]:hidden">
+                Как получить открытия
+              </summary>
+              <div className="pt-3">
+                <BonusBoxRules
+                  config={data.config}
+                  hasActiveSubscription={data.hasActiveSubscription}
+                />
+              </div>
+            </details>
+          </div>
+        )}
 
         {activeTab === "outcomes" && (
           <div
@@ -563,6 +576,12 @@ export function BonusBoxClient({
                 </div>
               )}
             </div>
+            {data.activePromoRewards.length > 0 && (
+              <ActivePromoRewards
+                rewards={data.activePromoRewards}
+                onCopy={copyPromoCode}
+              />
+            )}
           </div>
         )}
 
@@ -587,14 +606,6 @@ export function BonusBoxClient({
           </section>
         )}
 
-        {activeTab === "rules" && (
-          <div id="bonus-panel-rules" role="tabpanel" aria-labelledby="bonus-tab-rules">
-            <BonusBoxRules
-              config={data.config}
-              hasActiveSubscription={data.hasActiveSubscription}
-            />
-          </div>
-        )}
       </section>
     </div>
   );
@@ -612,27 +623,18 @@ function BonusEngagementPanel({
   onClaim: (mission: BonusBoxMissionView) => void;
 }) {
   return (
-    <section className="order-3 grid gap-3 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
+    <section className="space-y-4">
       {events.length > 0 && (
-        <div className="border-y border-cyan-200 bg-cyan-50/40 px-1 py-3 dark:border-cyan-300/20 dark:bg-cyan-300/[0.035]">
-          <div className="font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-700 dark:text-cyan-200">
-            Сезон сейчас
-          </div>
-          <div className="mt-2 space-y-3">
+        <div className="border-y border-cyan-200 dark:border-cyan-300/20">
+          <div className="divide-y divide-cyan-100 dark:divide-cyan-300/10">
             {events.map((event) => (
-              <article key={event.id} className="border-l-2 border-cyan-400 pl-3">
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div>
-                    <h2 className="font-semibold text-slate-950 dark:text-white">{event.title}</h2>
-                    {event.description && (
-                      <p className="mt-1 text-sm leading-5 text-slate-600 dark:text-slate-300">{event.description}</p>
-                    )}
-                  </div>
-                  <span className="font-mono text-[10px] uppercase text-slate-500">
-                    до {formatDateOnly(event.endsAt)}
-                  </span>
+              <article key={event.id} className="dashboard-signal py-3 pl-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h2 className="text-sm font-semibold text-slate-950 dark:text-white">{event.title}</h2>
+                  <span className="text-xs text-slate-500">до {formatDateOnly(event.endsAt)}</span>
                 </div>
-                <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
+                <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
+                  {event.description && <span>{event.description}</span>}
                   {event.attemptsGranted > 0 && <span>Получено открытий: {event.attemptsGranted}</span>}
                   {event.boostedPrizeTitles.length > 0 && (
                     <span>
@@ -647,33 +649,34 @@ function BonusEngagementPanel({
       )}
 
       {missions.length > 0 && (
-        <div className="border-y border-slate-200 px-1 py-3 dark:border-white/10">
-          <div className="font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-            Задания
-          </div>
-          <div className="mt-2 grid gap-2 sm:grid-cols-2">
+        <div className="border-y border-slate-200 dark:border-white/10">
+          <div className="divide-y divide-slate-200 dark:divide-white/10">
             {missions.map((mission) => {
               const percent = Math.min(100, (mission.value / Math.max(1, mission.target)) * 100);
               return (
-                <article key={mission.id} className="border-l-2 border-slate-300 pl-3 dark:border-white/20">
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
+                <article key={mission.id} className="grid gap-3 py-3 sm:grid-cols-[minmax(0,1fr)_9rem] sm:items-center">
+                  <div className="min-w-0">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
                       <h3 className="text-sm font-semibold text-slate-950 dark:text-white">{mission.title}</h3>
                       <p className="mt-0.5 text-xs leading-5 text-slate-500">
                         {mission.description || missionDescription(mission)}
                       </p>
+                      </div>
+                      <span className="shrink-0 text-xs font-medium text-cyan-700 dark:text-cyan-300">
+                        +{mission.rewardAttempts}
+                      </span>
                     </div>
-                    <span className="shrink-0 font-mono text-[10px] text-slate-500">
-                      +{mission.rewardAttempts}
-                    </span>
+                    <div className="mt-2 flex items-center gap-2">
+                      <div className="h-1 flex-1 overflow-hidden bg-slate-100 dark:bg-white/10">
+                        <div className="h-full bg-cyan-400" style={{ width: `${percent}%` }} />
+                      </div>
+                      <span className="text-xs tabular-nums text-slate-500">{mission.value}/{mission.target}</span>
+                    </div>
                   </div>
-                  <div className="mt-2 h-1.5 overflow-hidden bg-slate-100 dark:bg-white/10">
-                    <div className="h-full bg-cyan-400" style={{ width: `${percent}%` }} />
-                  </div>
-                  <div className="mt-2 flex items-center justify-between gap-3">
-                    <span className="text-xs text-slate-500">{mission.value}/{mission.target}</span>
+                  <div className="sm:text-right">
                     {mission.claimed ? (
-                      <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-600 dark:text-emerald-300">
+                      <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-600 dark:text-emerald-300">
                         <Check className="h-3.5 w-3.5" />
                         Получено
                       </span>
@@ -759,34 +762,6 @@ function ActivePromoRewards({
             </div>
           </article>
         ))}
-      </div>
-    </section>
-  );
-}
-
-function BestRecentOpening({ opening }: { opening: BestRecentOpeningView }) {
-  return (
-    <section className="order-3 rounded-2xl border border-amber-200 bg-white p-3 shadow-sm shadow-amber-950/5 dark:border-amber-400/20 dark:bg-surface-900 dark:shadow-black/20 sm:p-4">
-      <div className="grid gap-3 sm:grid-cols-[auto_1fr_auto] sm:items-center">
-        <div className="grid h-11 w-11 place-items-center rounded-xl bg-amber-50 text-amber-600 dark:bg-amber-400/10 dark:text-amber-200">
-          <Trophy className="h-5 w-5" />
-        </div>
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-base font-semibold text-slate-950 dark:text-white">Лучший выигрыш за 30 дней</h2>
-            <span className={cn("rounded-full px-2 py-1 text-[11px] font-semibold", rarityClass(opening.rarity))}>
-              {rarityLabel(opening.rarity)}
-            </span>
-          </div>
-          <div className="mt-1 min-w-0 text-sm text-slate-500 dark:text-slate-400">
-            <span className="font-semibold text-slate-700 dark:text-slate-200">{opening.title}</span>
-            <span> · {opening.label}</span>
-            <span> · {opening.userLabel}</span>
-          </div>
-        </div>
-        <div className="text-sm text-slate-500 sm:text-right">
-          {formatDate(opening.createdAt)}
-        </div>
       </div>
     </section>
   );

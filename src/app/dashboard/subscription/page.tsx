@@ -7,10 +7,11 @@ import { remnawave, RemnawaveError } from '@/lib/remnawave'
 import { KeysCard } from '@/components/dashboard/keys-card'
 import { DevicesList } from '@/components/dashboard/devices-list'
 import Link from 'next/link'
-import { CalendarClock, Database, ShieldAlert, Sparkles } from 'lucide-react'
+import { ShieldAlert, Sparkles } from 'lucide-react'
 import { EmptyState } from '@/components/dashboard/empty-state'
 import { getFeatureFlags } from '@/lib/feature-flags'
 import { formatSubscriptionDaysLeft, isSubscriptionExpired } from '@/lib/subscription-time'
+import { PageHeader } from '@/components/dashboard/page-header'
 
 export const dynamic = 'force-dynamic'
 
@@ -85,68 +86,47 @@ export default async function SubscriptionPage() {
 
   return (
     <div className="page-stack">
-      <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.035] sm:p-5">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="min-w-0">
-            <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 dark:bg-white/[0.06] dark:text-slate-300">
-              <span className={`h-2 w-2 rounded-full ${subscriptionExpired ? 'bg-amber-500' : u.isActive ? 'bg-emerald-500' : 'bg-slate-400'}`} />
-              Доступ к VPN
-            </div>
-            <h1 className="mt-2 text-xl font-semibold tracking-tight text-slate-950 dark:text-white sm:text-2xl">{statusText}</h1>
-            <p className="mt-1.5 text-sm text-slate-500 dark:text-slate-400">
-              {subscriptionExpired ? `Доступ закончился ${expiresAtLabel}` : `Доступ до ${expiresAtLabel}`}
-            </p>
-          </div>
-          <Link href="/dashboard/plans?intent=renew" className={`${subscriptionExpired ? 'btn-primary' : 'btn-secondary'} w-full justify-center sm:w-auto sm:px-5`}>
+      <PageHeader
+        title="Подключение"
+        description="Ссылка, приложения и подключённые устройства."
+        action={(
+          <Link href="/dashboard/plans?intent=renew" className={`${subscriptionExpired ? 'btn-primary' : 'btn-secondary'} w-full justify-center sm:w-auto`}>
             <Sparkles className="h-4 w-4" />
-            Продлить подписку
+            Продлить
           </Link>
+        )}
+      />
+
+      <section className="dashboard-signal rounded-xl border border-slate-200 bg-white p-4 pl-5 dark:border-white/10 dark:bg-white/[0.03]">
+        <div className="flex items-center gap-2">
+          <span className={`h-2 w-2 rounded-full ${subscriptionExpired ? 'bg-amber-500' : u.isActive ? 'bg-emerald-500' : 'bg-slate-400'}`} />
+          <h2 className="text-base font-semibold text-slate-950 dark:text-white">{statusText}</h2>
         </div>
-        <div className="mt-4 grid grid-cols-2 gap-2">
-          <CompactMetric
-            icon={<CalendarClock className="h-4 w-4" />}
-            label="Осталось"
-            value={formatSubscriptionDaysLeft(u.daysLeft, u.userStatus)}
-            hint={subscriptionExpired ? 'Требуется продление' : `до ${expiresAtLabel}`}
-          />
-          <CompactMetric
-            icon={<Database className="h-4 w-4" />}
-            label="Трафик"
-            value={u.trafficUsed}
-            hint={isUnlimited ? 'без ограничений' : `из ${u.trafficLimit}`}
-          />
+        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+          {subscriptionExpired ? `Доступ закончился ${expiresAtLabel}` : `Доступ до ${expiresAtLabel}`}
+        </p>
+        <div className="mt-3 grid gap-2 border-t border-slate-200 pt-3 text-sm dark:border-white/10 sm:grid-cols-2">
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-slate-500 dark:text-slate-400">Осталось</span>
+            <strong>{formatSubscriptionDaysLeft(u.daysLeft, u.userStatus)}</strong>
+          </div>
+          <div className="flex items-center justify-between gap-3 sm:border-l sm:border-slate-200 sm:pl-3 dark:sm:border-white/10">
+            <span className="text-slate-500 dark:text-slate-400">Трафик</span>
+            <strong>{u.trafficUsed}{isUnlimited ? ' · безлимит' : ` из ${u.trafficLimit}`}</strong>
+          </div>
         </div>
       </section>
 
-      <KeysCard subscriptionUrl={data.response.subscriptionUrl} happLink={happLink} />
-      <DevicesList embedded deviceLimit={localSubscription?.plan?.deviceLimit} />
-    </div>
-  )
-}
-
-function CompactMetric({
-  icon,
-  label,
-  value,
-  hint,
-}: {
-  icon: React.ReactNode
-  label: string
-  value: string
-  hint: string
-}) {
-  return (
-    <div className="min-w-0 rounded-2xl border border-slate-100 bg-slate-50/80 p-3 dark:border-white/[0.07] dark:bg-white/[0.025]">
-      <div className="flex min-w-0 flex-col gap-2 min-[380px]:flex-row min-[380px]:items-center min-[380px]:gap-3">
-        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-white text-cyan-700 dark:bg-white/[0.06] dark:text-cyan-200">
-          {icon}
-        </span>
-        <span className="min-w-0">
-          <span className="block text-[11px] font-semibold uppercase tracking-wide text-slate-400">{label}</span>
-          <span className="mt-0.5 block break-words text-sm font-semibold leading-snug text-slate-950 dark:text-white">{value}</span>
-          <span className="block break-words text-xs leading-5 text-slate-500 dark:text-slate-400">{hint}</span>
-        </span>
-      </div>
+      {subscriptionExpired ? (
+        <div className="border-l-2 border-amber-400 px-3 py-1 text-sm text-slate-600 dark:text-slate-300">
+          После продления ссылка и приложения снова появятся здесь.
+        </div>
+      ) : (
+        <>
+          <KeysCard subscriptionUrl={data.response.subscriptionUrl} happLink={happLink} />
+          <DevicesList embedded deviceLimit={localSubscription?.plan?.deviceLimit} />
+        </>
+      )}
     </div>
   )
 }

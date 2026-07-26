@@ -1,6 +1,5 @@
 import Link from 'next/link'
 import {
-  AlertTriangle,
   BarChart3,
   CreditCard,
   Database,
@@ -10,7 +9,6 @@ import {
   RefreshCw,
   ShieldCheck,
   SearchCheck,
-  TrendingUp,
   UserPlus,
   Wallet,
 } from 'lucide-react'
@@ -29,7 +27,6 @@ export default async function AdminDashboardPage() {
   await requireAdminPage()
 
   const now = new Date()
-  const soon = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
   const todayStart = new Date(now)
   todayStart.setHours(0, 0, 0, 0)
   const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
@@ -40,26 +37,22 @@ export default async function AdminDashboardPage() {
     usersTotal,
     usersToday,
     usersWeek,
-    activeSubscriptions,
     recoveryCount,
     paymentsAggregate,
     paymentsToday,
     paymentsWeek,
     supportWaiting,
-    expiringSoon,
     payingUsersResult,
-    sourceRows,
+    customersTotal,
     dailyPaymentRows,
     dailyUserRows,
     stalePendingPayments,
-    pendingPayments,
     syncFailed,
     duplicateCandidates,
   ] = await Promise.all([
     prisma.user.count(),
     prisma.user.count({ where: { createdAt: { gte: todayStart } } }),
     prisma.user.count({ where: { createdAt: { gte: weekAgo } } }),
-    prisma.subscription.count({ where: { status: { in: ['ACTIVE', 'LIMITED'] }, expireAt: { gt: now } } }),
     prisma.payment.count({ where: { status: 'SUCCEEDED', subscriptionProvisionedAt: null } }),
     prisma.payment.aggregate({
       where: { status: 'SUCCEEDED' },
@@ -89,38 +82,13 @@ export default async function AdminDashboardPage() {
       _count: true,
     }),
     prisma.supportTicket.count({ where: { status: 'WAITING_ADMIN' } }),
-    prisma.subscription.count({
-      where: { status: { in: ['ACTIVE', 'LIMITED'] }, expireAt: { gte: now, lte: soon } },
-    }),
     prisma.$queryRaw<Array<{ count: bigint }>>`
       SELECT COUNT(DISTINCT p."userId")::bigint AS count
       FROM "Payment" p
       INNER JOIN "User" u ON u.id = p."userId"
       WHERE p.status = 'SUCCEEDED' AND u.role = 'USER'
     `,
-    prisma.$queryRaw<Array<{ source: string; count: bigint }>>`
-      WITH categorized AS (
-        SELECT
-          u.id,
-          CASE
-            WHEN u."telegramId" IS NOT NULL OR u.email LIKE 'telegram-%@pending.invalid%' THEN 'telegram'
-            WHEN EXISTS (
-              SELECT 1 FROM "OAuthAccount" oa
-              WHERE oa."userId" = u.id AND lower(oa.provider) = 'google'
-            ) THEN 'google'
-            WHEN EXISTS (
-              SELECT 1 FROM "OAuthAccount" oa
-              WHERE oa."userId" = u.id AND lower(oa.provider) = 'yandex'
-            ) THEN 'yandex'
-            ELSE 'email'
-          END AS source
-        FROM "User" u
-        WHERE u.role = 'USER'
-      )
-      SELECT source, COUNT(*)::bigint AS count
-      FROM categorized
-      GROUP BY source
-    `,
+    prisma.user.count({ where: { role: 'USER' } }),
     prisma.$queryRaw<Array<{ day: Date; payments: bigint; amount: bigint }>>`
       SELECT
         date_trunc('day', COALESCE(p."paidAt", p."createdAt"))::date AS day,
@@ -140,19 +108,11 @@ export default async function AdminDashboardPage() {
       ORDER BY 1 ASC
     `,
     prisma.payment.count({ where: { status: 'PENDING', createdAt: { lt: stalePaymentDate } } }),
-    prisma.payment.count({ where: { status: 'PENDING' } }),
     prisma.syncEvent.count({ where: { status: 'FAILED' } }),
     findIdentityDuplicateCandidates(20),
   ])
-  const customersTotal = sourceRows.reduce((sum, row) => sum + Number(row.count), 0)
   const payingUsers = Number(payingUsersResult[0]?.count ?? 0)
   const conversion = customersTotal > 0 ? (payingUsers / customersTotal) * 100 : 0
-  const sourceCounts = {
-    telegram: sourceCount(sourceRows, 'telegram'),
-    google: sourceCount(sourceRows, 'google'),
-    yandex: sourceCount(sourceRows, 'yandex'),
-    email: sourceCount(sourceRows, 'email'),
-  }
   const trendDays = buildTrendDays(twoWeeksAgo, now, dailyPaymentRows, dailyUserRows)
   const updatedAt = now.toLocaleString('ru-RU', {
     day: '2-digit',
@@ -166,7 +126,7 @@ export default async function AdminDashboardPage() {
       title="Обзор"
       description="Показатели и задачи кабинета"
       action={(
-        <div className="inline-flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-xs text-slate-500 shadow-sm ring-1 ring-slate-200/80 dark:bg-white/[0.045] dark:text-slate-300 dark:ring-white/10">
+        <div className="inline-flex items-center gap-2 text-xs text-slate-500 dark:text-slate-300">
           <span className="h-2 w-2 rounded-full bg-emerald-500" />
           <span>Обновлено {updatedAt}</span>
         </div>
@@ -177,7 +137,7 @@ export default async function AdminDashboardPage() {
           <h2 className="text-lg font-semibold tracking-tight text-slate-950 dark:text-white">Требует внимания</h2>
           <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">Очереди для ручной проверки</p>
         </div>
-        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
           {supportWaiting > 0 && (
             <PriorityCard href="/dashboard/admin/support" icon={<LifeBuoy className="h-4 w-4" />} title="Поддержка" value={supportWaiting} text="Обращения без ответа" />
           )}
@@ -190,7 +150,10 @@ export default async function AdminDashboardPage() {
           {duplicateCandidates.length > 0 && (
             <PriorityCard href="/dashboard/admin/duplicates" icon={<SearchCheck className="h-4 w-4" />} title="Дубли" value={duplicateCandidates.length} text="Нужна ручная проверка" />
           )}
-          {supportWaiting === 0 && recoveryCount === 0 && syncFailed === 0 && duplicateCandidates.length === 0 && (
+          {stalePendingPayments > 0 && (
+            <PriorityCard href="/dashboard/admin/payments?status=PENDING" icon={<FileClock className="h-4 w-4" />} title="Оплаты" value={stalePendingPayments} text="Зависли в ожидании" />
+          )}
+          {supportWaiting === 0 && recoveryCount === 0 && syncFailed === 0 && duplicateCandidates.length === 0 && stalePendingPayments === 0 && (
             <div className="col-span-full flex min-h-16 items-center gap-3 rounded-[1.25rem] border border-emerald-200/80 bg-emerald-50/80 px-4 py-3 text-sm font-medium text-emerald-800 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200">
               <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white/80 text-emerald-600 shadow-sm ring-1 ring-emerald-200/80 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-500/20">
                 <ShieldCheck className="h-4 w-4" />
@@ -253,62 +216,6 @@ export default async function AdminDashboardPage() {
               { label: 'Клиентов', value: customersTotal },
             ]}
           />
-        </div>
-
-        <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,0.65fr)]">
-          <div className="min-w-0 rounded-[1.5rem] border border-slate-200/80 bg-white p-4 dark:border-white/[0.08] dark:bg-white/[0.025] sm:p-5">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <div className="text-sm font-semibold">Источники пользователей</div>
-                <div className="mt-0.5 text-xs text-slate-500">По текущим признакам аккаунта</div>
-              </div>
-              <div className="inline-flex items-center gap-2 rounded-xl bg-slate-50 px-2.5 py-1.5 text-sm font-semibold tabular-nums text-slate-700 ring-1 ring-slate-200/70 dark:bg-white/[0.045] dark:text-slate-200 dark:ring-white/10">
-                <BarChart3 className="h-4 w-4 text-slate-400" />
-                {customersTotal}
-              </div>
-            </div>
-            <div className="mt-4 space-y-3">
-              <SourceLine label="Telegram" value={sourceCounts.telegram} total={customersTotal} className="bg-cyan-500" />
-              <SourceLine label="Google" value={sourceCounts.google} total={customersTotal} className="bg-emerald-500" />
-              <SourceLine label="Email" value={sourceCounts.email} total={customersTotal} className="bg-slate-500" />
-              {sourceCounts.yandex > 0 && (
-                <SourceLine label="Яндекс" value={sourceCounts.yandex} total={customersTotal} className="bg-amber-500" />
-              )}
-            </div>
-          </div>
-
-          <div className="overflow-hidden rounded-[1.5rem] border border-slate-200/80 bg-white divide-y divide-slate-100 dark:divide-white/[0.08] dark:border-white/[0.08] dark:bg-white/[0.025]">
-            <CompactMetric
-              icon={<ShieldCheck className="h-5 w-5" />}
-              label="Активные подписки"
-              value={activeSubscriptions}
-              hint={expiringSoon > 0 ? `${expiringSoon} истекают за 7 дней` : 'Без срочных окончаний'}
-            />
-            <CompactMetric
-              icon={<TrendingUp className="h-5 w-5" />}
-              label="Средний чек"
-              value={formatPrice(paymentsAggregate._count > 0 ? Math.round((paymentsAggregate._sum.amountKopecks ?? 0) / paymentsAggregate._count) : 0)}
-              hint="по успешным оплатам"
-            />
-            <CompactMetric
-              icon={<FileClock className="h-5 w-5" />}
-              label="Pending-платежи"
-              value={pendingPayments}
-              hint={pendingPayments > 0 ? 'ожидают оплаты' : 'нет ожидания'}
-            />
-            <CompactMetric
-              icon={<AlertTriangle className="h-5 w-5" />}
-              label="Зависшие оплаты"
-              value={stalePendingPayments}
-              hint={stalePendingPayments > 0 ? 'нужна сверка' : 'очередь чистая'}
-            />
-            <CompactMetric
-              icon={<SearchCheck className="h-5 w-5" />}
-              label="Возможные дубли"
-              value={duplicateCandidates.length}
-              hint={duplicateCandidates.length > 0 ? 'проверьте связи' : 'не найдено'}
-            />
-          </div>
         </div>
 
         <TrendPanel days={trendDays} />
@@ -432,60 +339,6 @@ function AnalyticsCard({
       </div>
     </div>
   )
-}
-
-function CompactMetric({
-  icon,
-  label,
-  value,
-  hint,
-}: {
-  icon: React.ReactNode
-  label: string
-  value: React.ReactNode
-  hint: string
-}) {
-  return (
-    <div className="flex min-h-16 items-center gap-3 px-4 py-3">
-      <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-slate-50 text-slate-400 ring-1 ring-slate-200/70 dark:bg-white/[0.04] dark:ring-white/[0.08]">
-        {icon}
-      </div>
-      <div className="min-w-0 flex-1">
-        <div className="truncate text-sm font-medium">{label}</div>
-        <div className="mt-0.5 truncate text-xs text-slate-500 dark:text-slate-400">{hint}</div>
-      </div>
-      <div className="max-w-[45%] shrink-0 truncate text-lg font-semibold tracking-tight tabular-nums text-slate-950 dark:text-white">{value}</div>
-    </div>
-  )
-}
-
-function SourceLine({
-  label,
-  value,
-  total,
-  className,
-}: {
-  label: string
-  value: number
-  total: number
-  className: string
-}) {
-  const percent = total > 0 ? (value / total) * 100 : 0
-  return (
-    <div>
-      <div className="mb-1.5 flex items-center justify-between gap-3 text-sm">
-        <span className="font-medium">{label}</span>
-        <span className="tabular-nums text-slate-500 dark:text-slate-400">{value} · {percent.toFixed(1)}%</span>
-      </div>
-      <div className="h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-white/[0.08]">
-        <div className={cn('h-full rounded-full', className)} style={{ width: `${Math.max(percent, value > 0 ? 2 : 0)}%` }} />
-      </div>
-    </div>
-  )
-}
-
-function sourceCount(rows: Array<{ source: string; count: bigint }>, source: string) {
-  return Number(rows.find((row) => row.source === source)?.count ?? 0)
 }
 
 function buildTrendDays(

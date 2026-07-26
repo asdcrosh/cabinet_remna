@@ -15,7 +15,6 @@ import {
   Gift,
   Home,
   KeyRound,
-  Laptop,
   Mail,
   Menu,
   MessageCircleQuestion,
@@ -50,31 +49,21 @@ type NavigationItem = {
 
 const nav: NavigationItem[] = [
   { href: '/dashboard', label: 'Главная', icon: Home, exact: true },
-  { href: '/dashboard/subscription', label: 'Подписка', icon: KeyRound },
+  { href: '/dashboard/subscription', label: 'Подключение', icon: KeyRound },
   { href: '/dashboard/plans', label: 'Тарифы', icon: ShieldCheck },
-  { href: '/dashboard/billing', label: 'Платежи', icon: CreditCard },
   { href: '/dashboard/bonus-box', label: 'Бонусы', icon: Gift },
-  { href: '/dashboard/referrals', label: 'Рефералы', icon: UsersRound },
-  { href: '/dashboard/devices', label: 'Устройства', icon: Laptop },
-  { href: '/dashboard/support', label: 'Поддержка', icon: MessageCircleQuestion },
-  { href: '/dashboard/settings', label: 'Настройки', icon: Settings },
+  { href: '/dashboard/settings', label: 'Аккаунт', icon: Settings },
 ]
 
 const bottomNav: NavigationItem[] = [
   { href: '/dashboard', label: 'Главная', icon: Home, exact: true },
-  { href: '/dashboard/subscription', label: 'Подписка', icon: KeyRound },
+  { href: '/dashboard/subscription', label: 'Подключение', icon: KeyRound },
   { href: '/dashboard/plans', label: 'Тарифы', icon: ShieldCheck },
-  { href: '/dashboard/support', label: 'Поддержка', icon: MessageCircleQuestion },
+  { href: '/dashboard/bonus-box', label: 'Бонусы', icon: Gift },
+  { href: '/dashboard/settings', label: 'Аккаунт', icon: Settings },
 ]
 
-const bottomMoreNav: NavigationItem[] = [
-  { href: '/dashboard/billing', label: 'Платежи', icon: CreditCard },
-  { href: '/dashboard/bonus-box', label: 'Бонусы', icon: Gift },
-  { href: '/dashboard/referrals', label: 'Рефералы', icon: UsersRound },
-  { href: '/dashboard/devices', label: 'Устройства', icon: Laptop },
-  { href: '/dashboard/notifications', label: 'Уведомления', icon: Bell },
-  { href: '/dashboard/settings', label: 'Настройки', icon: Settings },
-]
+const bottomMoreNav: NavigationItem[] = []
 
 const legalIcons: Record<LegalPath, LucideIcon> = {
   '/offer': FileCheck2,
@@ -112,11 +101,28 @@ const adminNav: NavigationItem[] = [
 
 const adminNavGroups = [
   {
-    title: 'Аккаунты',
+    title: 'Очередь',
     items: [
       '/dashboard/admin',
-      '/dashboard/admin/users',
       '/dashboard/admin/duplicates',
+      '/dashboard/admin/recovery',
+      '/dashboard/admin/remnashop-sync',
+    ],
+  },
+  {
+    title: 'Пользователи',
+    items: [
+      '/dashboard/admin/users',
+    ],
+  },
+  {
+    title: 'Продажи',
+    items: [
+      '/dashboard/admin/payments',
+      '/dashboard/admin/plans',
+      '/dashboard/admin/offers',
+      '/dashboard/admin/promo-codes',
+      '/dashboard/admin/bonus-box',
     ],
   },
   {
@@ -128,20 +134,8 @@ const adminNavGroups = [
     ],
   },
   {
-    title: 'Продажи',
+    title: 'Настройки',
     items: [
-      '/dashboard/admin/offers',
-      '/dashboard/admin/plans',
-      '/dashboard/admin/promo-codes',
-      '/dashboard/admin/bonus-box',
-      '/dashboard/admin/payments',
-      '/dashboard/admin/recovery',
-    ],
-  },
-  {
-    title: 'Система',
-    items: [
-      '/dashboard/admin/remnashop-sync',
       '/dashboard/admin/system',
       '/dashboard/admin/audit',
     ],
@@ -284,7 +278,6 @@ export function MobileBottomNav({
   const adminPrimaryHrefs = new Set([
     '/dashboard/admin',
     '/dashboard/admin/users',
-    '/dashboard/admin/plans',
     '/dashboard/admin/payments',
   ])
   const items = adminArea
@@ -293,7 +286,7 @@ export function MobileBottomNav({
   const accountMoreItems = filterUserNav(bottomMoreNav, features)
   const moreItems = adminArea
     ? availableAdminItems.filter((item) => !adminPrimaryHrefs.has(item.href))
-    : [...accountMoreItems, ...infoNav]
+    : []
   const showMore = moreItems.length > 0
   const swipeHrefKey = adminArea ? '' : items.map((item) => item.href).join('\n')
   const [moreOpen, setMoreOpen] = useState(false)
@@ -625,61 +618,18 @@ function NavList({
   return (
     <nav className={className}>
       {role === 'USER' ? (
-        <div className="space-y-3">
-          <NavGroup items={filterUserNav(nav, features)} pathname={pathname} badges={liveBadges} onNavigate={onNavigate} />
-          <InfoNavGroup pathname={pathname} badges={liveBadges} onNavigate={onNavigate} />
-        </div>
+        <NavGroup items={filterUserNav(nav, features)} pathname={pathname} badges={liveBadges} onNavigate={onNavigate} />
       ) : (
         <div className="space-y-3">
           <WorkspaceSwitch adminArea={adminArea} onNavigate={onNavigate} />
           {adminArea ? (
             <AdminNavGroups role={role} features={features} pathname={pathname} badges={liveBadges} onNavigate={onNavigate} />
           ) : (
-            <div className="space-y-3">
-              <NavGroup items={filterUserNav(nav, features)} pathname={pathname} badges={liveBadges} onNavigate={onNavigate} />
-              <InfoNavGroup pathname={pathname} badges={liveBadges} onNavigate={onNavigate} />
-            </div>
+            <NavGroup items={filterUserNav(nav, features)} pathname={pathname} badges={liveBadges} onNavigate={onNavigate} />
           )}
         </div>
       )}
     </nav>
-  )
-}
-
-function InfoNavGroup({
-  pathname,
-  badges,
-  onNavigate,
-}: {
-  pathname: string
-  badges: NavBadges
-  onNavigate?: () => void
-}) {
-  const hasActiveItem = infoNav.some((item) => pathname === item.href)
-  const [open, setOpen] = useState(hasActiveItem)
-
-  useEffect(() => {
-    if (hasActiveItem) setOpen(true)
-  }, [hasActiveItem])
-
-  return (
-    <div className="border-t border-slate-200 pt-2 dark:border-white/10">
-      <button
-        type="button"
-        className="flex min-h-10 w-full items-center gap-3 rounded-md border-l-2 border-transparent px-3 py-2 text-left text-sm font-medium text-slate-600 transition-colors hover:bg-white hover:text-slate-950 dark:text-slate-300 dark:hover:bg-white/[0.04] dark:hover:text-white"
-        onClick={() => setOpen((value) => !value)}
-        aria-expanded={open}
-      >
-        <BookOpen className="h-4 w-4 shrink-0" />
-        <span className="min-w-0 flex-1 truncate">Информация</span>
-        <ChevronDown className={cn('h-4 w-4 shrink-0 transition-transform', open && 'rotate-180')} />
-      </button>
-      {open && (
-        <div className="mt-1 pl-2">
-          <NavGroup items={infoNav} pathname={pathname} badges={badges} onNavigate={onNavigate} />
-        </div>
-      )}
-    </div>
   )
 }
 

@@ -70,12 +70,9 @@ export function LegalPage({
             })}
           </nav>
 
-          <article className="min-w-0 overflow-hidden rounded-xl border border-slate-200 border-t-2 border-t-cyan-400 bg-white dark:border-white/10 dark:border-t-cyan-300 dark:bg-white/[0.02]">
+          <article className="min-w-0 overflow-hidden border border-slate-200 border-t-2 border-t-cyan-400 bg-white dark:border-white/10 dark:border-t-cyan-300 dark:bg-white/[0.02]">
             <header className="border-b border-slate-200/80 p-5 dark:border-white/10 sm:p-8">
-              <div className="font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-700 dark:text-cyan-300">
-                Документы сервиса
-              </div>
-              <h1 className="mt-2 max-w-3xl text-2xl font-semibold tracking-tight text-slate-950 dark:text-white sm:text-3xl">
+              <h1 className="max-w-3xl text-2xl font-semibold tracking-tight text-slate-950 dark:text-white sm:text-3xl">
                 {title}
               </h1>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500 dark:text-slate-400">{description}</p>
@@ -84,9 +81,9 @@ export function LegalPage({
               </p>
             </header>
 
-            <div className="space-y-1 bg-slate-50/35 p-3 dark:bg-black/10 sm:p-6">{children}</div>
+            <div>{children}</div>
 
-            <footer className="flex flex-col gap-4 border-t border-slate-200/80 bg-white p-4 dark:border-white/10 dark:bg-white/[0.02] sm:flex-row sm:items-center sm:justify-between sm:p-6">
+            <footer className="flex flex-col gap-3 border-t border-slate-200/80 p-4 dark:border-white/10 sm:flex-row sm:items-center sm:justify-between sm:px-6">
               <div>
                 <div className="text-sm font-medium text-slate-900 dark:text-white">Есть вопрос по документам?</div>
                 <div className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Напишите в поддержку с email вашего аккаунта.</div>
@@ -105,8 +102,8 @@ export function LegalPage({
 
 export function LegalSection({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section className="border-b border-slate-200 bg-white/70 p-4 dark:border-white/10 dark:bg-white/[0.015] sm:p-5">
-      <h2 className="text-lg font-semibold text-slate-950 dark:text-white">{title}</h2>
+    <section className="border-b border-slate-200 px-5 py-6 last:border-b-0 dark:border-white/10 sm:px-8">
+      <h2 className="text-base font-semibold text-slate-950 dark:text-white">{title}</h2>
       <div className="mt-3 space-y-3 text-[15px] leading-7 text-slate-600 dark:text-slate-300">{children}</div>
     </section>
   )

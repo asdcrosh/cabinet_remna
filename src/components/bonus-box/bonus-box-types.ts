@@ -130,4 +130,4 @@ export type OpenBoxResponse = {
   remoteSynced: boolean;
 };
 
-export type BonusBoxTab = "outcomes" | "history" | "rules";
+export type BonusBoxTab = "missions" | "outcomes" | "history";

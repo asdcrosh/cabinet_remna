@@ -1,4 +1,5 @@
 import './globals.css'
+import './design-system.css'
 import type { Metadata, Viewport } from 'next'
 import { Toaster } from '@/components/ui/toaster'
 import { getBrandName } from '@/lib/branding'

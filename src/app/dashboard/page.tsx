@@ -22,11 +22,8 @@ import {
   KeyRound,
   Laptop,
   MessageCircleQuestion,
-  Gauge,
-  ShieldCheck,
   Sparkles,
   UsersRound,
-  Wifi,
 } from 'lucide-react'
 import { logWarn } from '@/lib/logger'
 import { formatSubscriptionDaysLeft, isSubscriptionExpired } from '@/lib/subscription-time'
@@ -35,8 +32,6 @@ import { getFreshPendingPaymentCutoff } from '@/lib/payment-sync'
 import { getPlanAudienceContext, isPlanAvailableForUser } from '@/lib/plan-access'
 import { normalizeOfferTone, renderPersonalOfferTemplate } from '@/lib/personal-offers'
 import { getFeatureFlags } from '@/lib/feature-flags'
-import { cn } from '@/lib/cn'
-import { legalNavigation } from '@/lib/legal-links'
 
 export const dynamic = 'force-dynamic'
 
@@ -163,8 +158,15 @@ export default async function DashboardHome() {
   if (!user.remnawaveUsername) {
     return (
       <div className="page-stack">
+        <header className="border-b border-slate-200/90 pb-4 dark:border-white/[0.09]">
+          <h1 className="text-[1.65rem] font-semibold leading-tight tracking-[-0.03em] text-slate-950 dark:text-white">
+            Здравствуйте, {dashboardDisplayName(user.name, user.email)}
+          </h1>
+          <p className="mt-1 text-sm leading-5 text-slate-500 dark:text-slate-400">
+            Остался один шаг до подключения.
+          </p>
+        </header>
         <DashboardOnboardingCard state={onboardingState} mode="full" supportEnabled={features.support} />
-        <DashboardInformation />
       </div>
     )
   }
@@ -194,16 +196,12 @@ export default async function DashboardHome() {
 
   return (
     <div className="page-stack">
-      <header className="border-b border-slate-200/90 pb-4 dark:border-white/[0.09] sm:pb-5">
-        <div className="mb-2 flex items-center gap-3 font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-700 dark:text-cyan-300">
-          <span>Сводка кабинета</span>
-          <span className="h-px w-10 bg-cyan-400/70" aria-hidden="true" />
-        </div>
-        <h1 className="text-[1.65rem] font-semibold leading-tight text-slate-950 dark:text-white sm:text-[2rem]">
-          {dashboardDisplayName(user.name, user.email)}, всё работает
+      <header className="border-b border-slate-200/90 pb-4 dark:border-white/[0.09]">
+        <h1 className="text-[1.65rem] font-semibold leading-tight tracking-[-0.03em] text-slate-950 dark:text-white">
+          Здравствуйте, {dashboardDisplayName(user.name, user.email)}
         </h1>
-        <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-500 dark:text-slate-400">
-          Текущий доступ, расход трафика и следующий шаг.
+        <p className="mt-1 text-sm leading-5 text-slate-500 dark:text-slate-400">
+          Здесь только состояние VPN и следующий шаг.
         </p>
       </header>
       {remnawaveErrorStatus !== null && (
@@ -242,117 +240,66 @@ export default async function DashboardHome() {
         <PersonalOffer offer={personalOffer} welcomeBonusOptions={welcomeBonusOptions} />
       ) : null}
 
-      <section className="dashboard-hero" data-testid="subscription-overview">
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_17rem] lg:gap-6">
+      <section className="dashboard-signal rounded-xl border border-slate-300/80 bg-white p-4 pl-5 dark:border-white/10 dark:bg-white/[0.03] sm:p-5 sm:pl-6" data-testid="subscription-overview">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
-            <div className="flex items-start gap-3.5">
-              <div className="grid h-11 w-11 shrink-0 place-items-center rounded-md border border-cyan-300/30 text-cyan-100">
-                <ShieldCheck className="h-5 w-5" />
-              </div>
-              <div className="min-w-0">
-                <div className="mb-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-200">
-                  Ваш VPN
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <h2 className="break-words text-2xl font-semibold leading-tight tracking-[-0.035em] text-white sm:text-3xl">
-                    {subRow?.plan?.name ?? 'VPN-подписка'}
-                  </h2>
-                  <StatusBadge status={subscriptionStatus} />
-                </div>
-                <p className="mt-1.5 text-sm text-slate-300">
-                  {subRow?.plan
-                    ? `${formatPrice(subRow.plan.priceKopecks)} · ${subRow.plan.durationDays} дн.`
-                    : 'Тариф синхронизируется'}
-                </p>
-              </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="break-words text-xl font-semibold tracking-[-0.025em] text-slate-950 dark:text-white">
+                {subRow?.plan?.name ?? 'VPN-подписка'}
+              </h2>
+              <StatusBadge status={subscriptionStatus} />
             </div>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+              {subscriptionExpired
+                ? 'Срок доступа истёк'
+                : daysLeft > 0
+                  ? `Активна ещё ${daysLeft} дн.`
+                  : 'Закончится сегодня'}
+            </p>
           </div>
-
-          <div className="flex flex-col justify-center border-t border-white/15 pt-4 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0">
-            <div className="flex items-start gap-3">
-              <div className="grid h-9 w-9 shrink-0 place-items-center rounded-md border border-white/15 text-cyan-100">
-                <KeyRound className="h-4 w-4" />
-              </div>
-              <div className="min-w-0">
-                <div className="font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-200">Доступ</div>
-                <div className="mt-1 text-sm leading-5 text-slate-200">
-                  {subscriptionExpired
-                    ? 'Срок доступа истёк'
-                    : daysLeft > 0
-                      ? `Активен ещё ${daysLeft} дн.`
-                      : 'Закончится сегодня'}
-                </div>
-              </div>
-            </div>
-            {focusedNextStep === null && (
-              <Link href={primaryAction.href} className="btn-primary group mt-4 min-h-11 w-full justify-between rounded-lg px-4">
-                <span className="inline-flex items-center gap-2">
-                  {primaryAction.icon}
-                  {primaryAction.label}
-                </span>
-                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-              </Link>
-            )}
+          {focusedNextStep === null && (
+            <Link href={primaryAction.href} className="btn-primary group w-full justify-between sm:w-auto">
+              <span className="inline-flex items-center gap-2">
+                {primaryAction.icon}
+                {primaryAction.label}
+              </span>
+              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+            </Link>
+          )}
+        </div>
+        <div className="mt-4 grid gap-3 border-t border-slate-200 pt-3 text-sm dark:border-white/10 sm:grid-cols-2">
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-slate-500 dark:text-slate-400">Осталось</span>
+            <strong className="font-semibold text-slate-950 dark:text-white">
+              {subRow || sub ? formatSubscriptionDaysLeft(daysLeft, subscriptionStatus) : '—'}
+            </strong>
           </div>
-
-          <div className="grid grid-cols-2 gap-2.5 lg:col-span-2 lg:grid-cols-3">
-            <OverviewMetric
-              className="col-span-2 lg:col-span-1"
-              icon={<Clock3 className="h-4 w-4" />}
-              label="Осталось"
-              value={subRow || sub ? formatSubscriptionDaysLeft(daysLeft, subscriptionStatus) : '—'}
-            />
-            <OverviewMetric
-              icon={<Gauge className="h-4 w-4" />}
-              label="Использовано"
-              value={hasRemoteUsage ? formatBytes(used) : '—'}
-            />
-            <OverviewMetric
-              icon={<Wifi className="h-4 w-4" />}
-              label="Лимит"
-              value={hasRemoteUsage ? isUnlimited ? 'Безлимит' : formatBytes(limit) : '—'}
-            />
+          <div className="flex items-center justify-between gap-3 sm:border-l sm:border-slate-200 sm:pl-3 dark:sm:border-white/10">
+            <span className="text-slate-500 dark:text-slate-400">Трафик</span>
+            <strong className="font-semibold text-slate-950 dark:text-white">
+              {hasRemoteUsage
+                ? `${formatBytes(used)}${isUnlimited ? ' · безлимит' : ` из ${formatBytes(limit)}`}`
+                : '—'}
+            </strong>
           </div>
         </div>
       </section>
 
-      <TrafficChart
-        userId={user.id}
-        initialUsedBytes={used.toString()}
-        initialLimitBytes={isUnlimited ? null : limit.toString()}
-      />
-      <DashboardInformation />
-    </div>
-  )
-}
-
-function DashboardInformation() {
-  return (
-    <section
-      className="border-t border-slate-200/80 px-1 pt-4 dark:border-white/[0.08] sm:pt-5"
-      aria-labelledby="dashboard-information-title"
-    >
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 id="dashboard-information-title" className="text-sm font-semibold text-slate-950 dark:text-white">
-            Документы и контакты
-          </h2>
-          <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Важная информация о сервисе.</p>
+      <details className="group border-t border-slate-200 pt-3 dark:border-white/10">
+        <summary className="flex min-h-10 cursor-pointer list-none items-center justify-between gap-3 text-sm font-medium text-slate-600 hover:text-slate-950 dark:text-slate-300 dark:hover:text-white [&::-webkit-details-marker]:hidden">
+          <span>Расход трафика</span>
+          <span className="text-xs text-slate-400 group-open:hidden">Подробнее</span>
+          <span className="hidden text-xs text-slate-400 group-open:inline">Скрыть</span>
+        </summary>
+        <div className="pt-3">
+          <TrafficChart
+            userId={user.id}
+            initialUsedBytes={used.toString()}
+            initialLimitBytes={isUnlimited ? null : limit.toString()}
+          />
         </div>
-        <nav className="flex flex-wrap gap-x-4 gap-y-2" aria-label="Документы и контакты">
-          {legalNavigation.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className="group inline-flex min-h-8 items-center gap-1.5 text-xs font-medium text-slate-500 transition-colors hover:text-slate-950 dark:text-slate-400 dark:hover:text-white"
-            >
-              <span>{item.label}</span>
-              <ArrowRight className="h-3 w-3 shrink-0 opacity-50 transition-transform group-hover:translate-x-0.5 group-hover:opacity-100" />
-            </Link>
-          ))}
-        </nav>
-      </div>
-    </section>
+      </details>
+    </div>
   )
 }
 
@@ -907,28 +854,6 @@ function insightTone(tone: 'amber' | 'cyan' | 'slate') {
   if (tone === 'amber') return 'border-amber-200 bg-amber-50/80 text-amber-800 dark:border-amber-500/25 dark:bg-amber-500/10 dark:text-amber-100'
   if (tone === 'cyan') return 'border-cyan-200 bg-cyan-50/80 text-cyan-800 dark:border-cyan-500/25 dark:bg-cyan-500/10 dark:text-cyan-100'
   return 'border-slate-200 bg-white/80 text-slate-600 dark:border-white/10 dark:bg-surface-900/80 dark:text-slate-300'
-}
-
-function OverviewMetric({
-  className,
-  icon,
-  label,
-  value,
-}: {
-  className?: string
-  icon: ReactElement
-  label: string
-  value: string
-}) {
-  return (
-    <div className={cn('dashboard-hero-metric text-left', className)}>
-      <div className="flex items-center gap-2 text-slate-400">
-        <span className="text-cyan-200">{icon}</span>
-        <span className="font-mono text-[10px] font-medium uppercase tracking-[0.16em]">{label}</span>
-      </div>
-      <div className="mt-2 break-words text-base font-semibold leading-tight text-white sm:text-lg">{value}</div>
-    </div>
-  )
 }
 
 function dashboardDisplayName(name: string | null, email: string) {

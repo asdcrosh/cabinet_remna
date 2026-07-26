@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test'
 import { expectNoHorizontalOverflow, login } from './helpers'
 import { E2E_USERS } from './test-data'
 
-test('истёкшая подписка не показывает отрицательные дни', async ({ page }, testInfo) => {
+test('истёкшая подписка не показывает отрицательные дни', async ({ page }) => {
   await login(page, E2E_USERS.expired.email)
 
   const subscriptionOverview = page.getByTestId('subscription-overview')
@@ -10,82 +10,113 @@ test('истёкшая подписка не показывает отрицат
   await expect(subscriptionOverview.getByText('-2 дн.', { exact: true })).toHaveCount(0)
   await expect(subscriptionOverview.getByText('Срок доступа истёк', { exact: true })).toBeVisible()
 
-  const metrics = subscriptionOverview.locator('.dashboard-hero-metric')
-  await expect(metrics).toHaveCount(3)
-  expect(await metrics.evaluateAll((items) => items.every((item) => item.scrollWidth <= item.clientWidth))).toBe(true)
-  if (testInfo.project.name === 'mobile-chromium') {
-    const [daysMetric, usageMetric] = await Promise.all([metrics.nth(0).boundingBox(), metrics.nth(1).boundingBox()])
-    expect(daysMetric).not.toBeNull()
-    expect(usageMetric).not.toBeNull()
-    expect(daysMetric!.width).toBeGreaterThan(usageMetric!.width * 1.5)
-  }
+  await expect(subscriptionOverview.getByText('Осталось', { exact: true })).toBeVisible()
+  await expect(subscriptionOverview.getByText('Трафик', { exact: true })).toBeVisible()
   await expectNoHorizontalOverflow(page)
 })
 
-test('мобильная навигация открывает дополнительные разделы', async ({ page }, testInfo) => {
+test('мобильная навигация показывает пять основных разделов', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'mobile-chromium', 'Проверка предназначена для mobile viewport')
   await login(page, E2E_USERS.basic.email)
 
   const navigation = page.getByRole('navigation', { name: 'Основная мобильная навигация' })
   await expect(navigation).toBeVisible()
-  await navigation.getByRole('button', { name: 'Открыть ещё разделы' }).click()
-
-  const dialog = page.getByRole('dialog', { name: 'Ещё' })
-  await expect(dialog).toBeVisible()
-  await dialog.getByRole('link', { name: 'Настройки' }).click()
+  await expect(navigation.getByRole('link')).toHaveCount(5)
+  await expect(navigation.getByRole('link', { name: 'Главная' })).toBeVisible()
+  await expect(navigation.getByRole('link', { name: 'Подключение' })).toBeVisible()
+  await expect(navigation.getByRole('link', { name: 'Тарифы' })).toBeVisible()
+  await expect(navigation.getByRole('link', { name: 'Бонусы' })).toBeVisible()
+  await navigation.getByRole('link', { name: 'Аккаунт' }).click()
 
   await expect(page).toHaveURL(/\/dashboard\/settings(?:\?|$)/)
-  await expect(page.getByRole('heading', { name: 'Настройки' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Аккаунт' })).toBeVisible()
   const settingsTabs = page.getByRole('tablist', { name: 'Разделы настроек' })
-  await expect(settingsTabs.getByRole('tab')).toHaveCount(4)
-  await expect(settingsTabs.getByRole('tab', { name: 'Платежи' })).toBeVisible()
+  await expect(settingsTabs.getByRole('tab')).toHaveCount(3)
   expect(await settingsTabs.locator('..').evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true)
   await expectNoHorizontalOverflow(page)
 
-  await navigation.getByRole('button', { name: 'Открыть ещё разделы' }).click()
-  const settingsDialog = page.getByRole('dialog', { name: 'Ещё' })
-  await expect(settingsDialog).toBeVisible()
-  await settingsDialog.getByRole('button', { name: 'Выйти' }).click()
+  await page.getByRole('button', { name: 'Выйти' }).click()
   await expect(page).toHaveURL(/\/login(?:\?|$)/)
 })
 
-test('мобильный выбор тарифа остаётся компактным', async ({ page }, testInfo) => {
+test('свайп переключает основные разделы кабинета', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'mobile-chromium', 'Проверка предназначена для mobile viewport')
+  await login(page, E2E_USERS.basic.email)
+
+  await page.locator('#dashboard-content').evaluate((content) => {
+    const makeTouch = (x: number) => new Touch({
+      identifier: 1,
+      target: content,
+      clientX: x,
+      clientY: 240,
+      screenX: x,
+      screenY: 240,
+      pageX: x,
+      pageY: 240,
+      radiusX: 2,
+      radiusY: 2,
+      force: 1,
+    })
+    const start = makeTouch(320)
+    const end = makeTouch(90)
+    content.dispatchEvent(new TouchEvent('touchstart', {
+      bubbles: true,
+      cancelable: true,
+      touches: [start],
+      targetTouches: [start],
+      changedTouches: [start],
+    }))
+    content.dispatchEvent(new TouchEvent('touchend', {
+      bubbles: true,
+      cancelable: true,
+      touches: [],
+      targetTouches: [],
+      changedTouches: [end],
+    }))
+  })
+
+  await expect(page).toHaveURL(/\/dashboard\/subscription(?:\?|$)/)
+  await expect(page.getByRole('heading', { name: 'Нет активной подписки' })).toBeVisible()
+})
+
+test('мобильный выбор тарифа открывает оплату отдельным окном', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'mobile-chromium', 'Проверка предназначена для mobile viewport')
   await login(page, E2E_USERS.basic.email)
   await page.goto('/dashboard/plans')
 
-  await expect(page.getByRole('heading', { name: 'Выберите срок' })).toBeVisible()
-  const card = page
+  await expect(page.getByRole('heading', { name: 'Тарифы' })).toBeVisible()
+  const catalog = page
     .locator('section[aria-labelledby="mobile-plan-picker-title"]')
-    .getByTestId('plan-card')
-    .filter({ hasText: 'E2E Стандарт' })
-  await card.scrollIntoViewIfNeeded()
-  await expect(card.getByRole('heading', { name: 'E2E Стандарт' })).toBeVisible()
-  await expect(card.getByText('7 дн.', { exact: true })).toBeVisible()
-  await expect(card.getByText('Безлимит', { exact: true })).toBeVisible()
-  await expect(card.getByText('До 5', { exact: true })).toBeVisible()
-  await expect(card.getByText('К оплате', { exact: true })).toHaveCount(0)
-  await expect(card.getByText('Доступ сразу после оплаты', { exact: true })).toHaveCount(0)
-  const paymentProviders = card.getByRole('radiogroup', { name: 'Способ оплаты' })
+  const period = catalog.locator('article').filter({ hasText: 'E2E Стандарт' }).first()
+  await period.scrollIntoViewIfNeeded()
+  await expect(period.getByText('7 дней', { exact: false })).toBeVisible()
+  await period.getByRole('button', { name: 'Оплатить' }).click()
+
+  const checkout = page.getByRole('dialog', { name: 'Оплата тарифа' })
+  await expect(checkout).toBeVisible()
+  await expect(checkout.getByRole('heading', { name: 'E2E Стандарт' })).toBeVisible()
+  const paymentProviders = checkout.getByRole('radiogroup', { name: 'Способ оплаты' })
   await expect(paymentProviders.getByRole('radio', { name: 'ЮKassa' })).toBeVisible()
   await expect(paymentProviders.getByRole('radio', { name: 'PayAnyWay' })).toBeVisible()
   await paymentProviders.getByRole('radio', { name: 'PayAnyWay' }).click()
   await expect(paymentProviders.getByRole('radio', { name: 'PayAnyWay' })).toHaveAttribute('aria-checked', 'true')
+  const payButton = checkout.getByRole('button', { name: /Перейти к оплате/ })
+  await expect(payButton).toBeVisible()
+  const payButtonBox = await payButton.boundingBox()
+  expect(payButtonBox).not.toBeNull()
+  expect(payButtonBox!.y + payButtonBox!.height).toBeLessThanOrEqual(page.viewportSize()!.height)
   await expectNoHorizontalOverflow(page)
 })
 
-test('подключение подписки показывает только основные действия', async ({ page }, testInfo) => {
+test('истёкшее подключение показывает только продление', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'mobile-chromium', 'Проверка предназначена для mobile viewport')
   await login(page, E2E_USERS.expired.email)
   await page.goto('/dashboard/subscription')
 
-  const connection = page.getByRole('region', { name: 'Подключение' })
-  await expect(connection).toBeVisible()
-  await expect(connection.getByRole('button', { name: 'HAPP', exact: true })).toBeVisible()
-  await expect(connection.getByRole('button', { name: 'V2Ray', exact: true })).toBeVisible()
-  await expect(connection.getByRole('button', { name: 'Rabbit Hole', exact: true })).toBeVisible()
-  await expect(connection.getByRole('button', { name: /Подключить в (HAPP|V2Ray)/ })).toBeVisible()
-  await expect(connection.getByText('https://subscription.example.test/e2e-expired-short', { exact: true })).toHaveCount(0)
+  await expect(page.getByRole('heading', { name: 'Подключение' })).toBeVisible()
+  await expect(page.getByText('Подписка истекла', { exact: true })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Продлить' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'HAPP', exact: true })).toHaveCount(0)
   await expectNoHorizontalOverflow(page)
 })
 
@@ -97,7 +128,6 @@ test('админская навигация не смешивается с ли�
     const navigation = page.getByRole('navigation', { name: 'Основная мобильная навигация' })
     await expect(navigation.getByRole('link', { name: 'Обзор' })).toBeVisible()
     await expect(navigation.getByRole('link', { name: 'Пользователи' })).toBeVisible()
-    await expect(navigation.getByRole('link', { name: 'Тарифы' })).toBeVisible()
     await expect(navigation.getByRole('link', { name: 'Платежи' })).toBeVisible()
     await expect(navigation.getByRole('link', { name: 'Главная' })).toHaveCount(0)
     await navigation.getByRole('button', { name: 'Открыть ещё разделы' }).click()

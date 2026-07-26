@@ -1,0 +1,161 @@
+/*
+ * Спокойная техническая панель.
+ * Этот слой намеренно последний: он выравнивает старые экраны, пока крупные
+ * компоненты переводятся с вложенных карточек на строки и секции.
+ */
+
+:root {
+  --app-bg: #f4f3ef;
+  --app-surface: #fcfcfa;
+  --app-text: #151918;
+  --app-muted: #6f7773;
+  --app-line: #d8dcd6;
+  --app-accent: #12b8d4;
+}
+
+body {
+  color: var(--app-text);
+  background: var(--app-bg);
+}
+
+.dashboard-shell {
+  background: var(--app-bg) !important;
+}
+
+.dashboard-sidebar {
+  background: color-mix(in srgb, var(--app-surface) 92%, var(--app-bg)) !important;
+}
+
+.dashboard-shell :where(.card, .panel, .surface-card, .metric-card, .table-shell, .admin-list) {
+  border-color: var(--app-line);
+  border-radius: 0.75rem;
+  background: var(--app-surface);
+  box-shadow: none;
+}
+
+.dashboard-shell :where(.shadow, .shadow-sm, .shadow-md, .shadow-lg, .shadow-xl, .shadow-2xl) {
+  box-shadow: none !important;
+}
+
+.dashboard-shell :where(.page-stack) {
+  gap: 0;
+  margin-top: 0;
+}
+
+.dashboard-shell .page-stack > * + * {
+  margin-top: 1.25rem;
+}
+
+.dashboard-shell :where(.section-title) {
+  letter-spacing: -0.015em;
+}
+
+.dashboard-shell :where(.section-description, .stat-label) {
+  color: var(--app-muted);
+}
+
+.dashboard-shell :where(.btn, .btn-primary, .btn-secondary, .input) {
+  border-radius: 0.5rem;
+}
+
+.dashboard-shell :where(.btn-primary) {
+  border-color: var(--app-text);
+  background: var(--app-text);
+}
+
+.dashboard-shell :where(.btn-secondary) {
+  border-color: var(--app-line);
+  background: transparent;
+}
+
+.dashboard-shell :where(.rounded-3xl, .rounded-\[1\.75rem\], .rounded-\[1\.5rem\], .rounded-\[1\.25rem\]) {
+  border-radius: 0.75rem;
+}
+
+.dashboard-shell :where(.rounded-2xl, .rounded-xl) {
+  border-radius: 0.5rem;
+}
+
+.dashboard-signal {
+  position: relative;
+}
+
+.dashboard-signal::before {
+  position: absolute;
+  inset-block: 0;
+  left: 0;
+  width: 2px;
+  content: '';
+  background: var(--app-accent);
+}
+
+.dashboard-rule {
+  border-color: var(--app-line);
+}
+
+.dashboard-section {
+  border-top: 1px solid var(--app-line);
+  padding-top: 1rem;
+}
+
+.dashboard-row {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.875rem;
+  padding-block: 0.875rem;
+  border-bottom: 1px solid var(--app-line);
+}
+
+.dashboard-row:last-child {
+  border-bottom: 0;
+}
+
+.dashboard-kpi {
+  min-width: 0;
+  padding: 1rem;
+  border: 1px solid var(--app-line);
+  border-radius: 0.75rem;
+  background: var(--app-surface);
+}
+
+.dashboard-kpi strong {
+  display: block;
+  margin-top: 0.4rem;
+  font-size: clamp(1.35rem, 2vw, 1.75rem);
+  line-height: 1;
+  letter-spacing: -0.035em;
+}
+
+@media (max-width: 639px) {
+  .dashboard-shell .page-stack > * + * {
+    margin-top: 1rem;
+  }
+
+  .dashboard-shell :where(.panel-pad, .card, .surface-card, .metric-card) {
+    padding: 0.875rem;
+  }
+}
+
+.dark {
+  --app-bg: #0a0c0d;
+  --app-surface: #101314;
+  --app-text: #f4f7f5;
+  --app-muted: #949d98;
+  --app-line: #29302d;
+}
+
+.dark body,
+.dark .dashboard-shell {
+  color: var(--app-text);
+  background: var(--app-bg) !important;
+}
+
+.dark .dashboard-sidebar {
+  background: #0d1011 !important;
+}
+
+.dark .dashboard-shell :where(.card, .panel, .surface-card, .metric-card, .table-shell, .admin-list, .dashboard-kpi) {
+  border-color: var(--app-line);
+  background: var(--app-surface);
+}

@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { BadgeCheck, CircleAlert, CircleUserRound, Link2, LockKeyhole, MailPlus, ReceiptText } from 'lucide-react'
+import { BadgeCheck, BookOpen, CircleAlert, CircleUserRound, Gift, Link2, LockKeyhole, MailPlus, MessageCircleQuestion, ReceiptText } from 'lucide-react'
 import { getCurrentUser } from '@/lib/auth/cookies'
 import { prisma } from '@/lib/prisma'
 import { ChangePasswordForm } from '@/components/dashboard/change-password-form'
@@ -8,6 +8,9 @@ import { ProfileForm } from '@/components/dashboard/profile-form'
 import { SettingsTabs } from '@/components/dashboard/settings-tabs'
 import { TelegramLinkCard } from '@/components/dashboard/telegram-link-card'
 import { PageHeader } from '@/components/dashboard/page-header'
+import { LogoutButton } from '@/components/dashboard/logout-button'
+import { getFeatureFlags } from '@/lib/feature-flags'
+import { legalNavigation } from '@/lib/legal-links'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,20 +22,39 @@ export default async function SettingsPage() {
   if (!session) redirect('/login')
   const user = await prisma.user.findUnique({ where: { id: session.uid } })
   if (!user) redirect('/login')
+  const features = await getFeatureFlags()
   const hasVerifiedEmail = Boolean(user.emailVerifiedAt && !user.email.endsWith('@pending.invalid'))
+  const accountLinks = [
+    { href: '/dashboard/billing', label: 'Покупки', description: 'Платежи и чеки', icon: ReceiptText, visible: true },
+    { href: '/dashboard/referrals', label: 'Приглашения', description: 'Ссылка и вознаграждения', icon: Gift, visible: features.referrals },
+    { href: '/dashboard/support', label: 'Поддержка', description: 'Вопросы и обращения', icon: MessageCircleQuestion, visible: features.support },
+  ].filter((item) => item.visible)
 
   return (
     <div className="mx-auto max-w-6xl page-stack">
       <PageHeader
-        title="Настройки"
-        description="Профиль, способы входа и безопасность аккаунта."
-        action={(
-          <Link href="/dashboard/billing" className="btn-secondary w-full sm:w-auto">
-            <ReceiptText className="h-4 w-4" />
-            История платежей
-          </Link>
-        )}
+        title="Аккаунт"
+        description="Профиль, способы входа и полезные разделы."
       />
+
+      <section aria-labelledby="account-links-title">
+        <h2 id="account-links-title" className="mb-2 text-sm font-semibold text-slate-950 dark:text-white">Разделы</h2>
+        <div className="overflow-hidden border-y border-slate-200 dark:border-white/10">
+          {accountLinks.map((item) => {
+            const Icon = item.icon
+            return (
+              <Link key={item.href} href={item.href} className="dashboard-row group">
+                <Icon className="h-4 w-4 shrink-0 text-slate-400 group-hover:text-cyan-600 dark:group-hover:text-cyan-300" />
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-medium text-slate-950 dark:text-white">{item.label}</span>
+                  <span className="block text-xs text-slate-500 dark:text-slate-400">{item.description}</span>
+                </span>
+                <span className="text-sm text-slate-400">Открыть</span>
+              </Link>
+            )
+          })}
+        </div>
+      </section>
 
       <SettingsTabs
         sections={[
@@ -48,15 +70,11 @@ export default async function SettingsPage() {
                 icon={<CircleUserRound className="h-5 w-5" />}
               >
                 <div className="min-w-0">
-                  <div className="mb-5 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                  <div className="mb-4 grid gap-x-6 gap-y-2 border-y border-slate-200 py-3 sm:grid-cols-2 dark:border-white/10">
                     <AccountFact label="Email" value={hasVerifiedEmail ? user.email : 'Не добавлен'} ready={hasVerifiedEmail} />
-                    <AccountFact label="Telegram" value={user.telegramId ? 'Привязан' : 'Не привязан'} ready={Boolean(user.telegramId)} />
-                    <AccountFact label="VPN-профиль" value={user.remnawaveUsername ? 'Готов' : 'Пока нет'} ready={Boolean(user.remnawaveUsername)} />
                     <AccountFact label="Регистрация" value={new Date(user.createdAt).toLocaleDateString('ru-RU')} />
                   </div>
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 dark:border-white/[0.08] dark:bg-white/[0.025]">
-                    <ProfileForm name={user.name} />
-                  </div>
+                  <ProfileForm name={user.name} />
                 </div>
               </SettingsSection>
             ),
@@ -72,8 +90,8 @@ export default async function SettingsPage() {
                 description="Свяжите Telegram и email с одним аккаунтом"
                 icon={<Link2 className="h-5 w-5" />}
               >
-                <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_20rem]">
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 dark:border-white/[0.08] dark:bg-white/[0.025]">
+                <div className="grid border-y border-slate-200 dark:border-white/10 xl:grid-cols-[minmax(0,1fr)_20rem]">
+                  <div className="py-4 xl:pr-5">
                     <TelegramLinkCard
                       telegramClientId={telegramClientId}
                       appUrl={appUrl}
@@ -84,11 +102,9 @@ export default async function SettingsPage() {
                       embedded
                     />
                   </div>
-                  <div className="flex flex-col rounded-2xl border border-slate-200 bg-slate-50/70 p-4 dark:border-white/[0.08] dark:bg-white/[0.025]">
+                  <div className="flex flex-col border-t border-slate-200 py-4 dark:border-white/10 xl:border-l xl:border-t-0 xl:pl-5">
                     <div className="flex items-center gap-3">
-                      <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white text-cyan-700 shadow-sm dark:bg-white/[0.06] dark:text-cyan-200 dark:shadow-none">
-                        <MailPlus className="h-5 w-5" />
-                      </div>
+                      <MailPlus className="h-5 w-5 shrink-0 text-cyan-600 dark:text-cyan-300" />
                       <div className="min-w-0">
                         <h3 className="font-semibold text-slate-950 dark:text-white">Email</h3>
                         <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
@@ -101,7 +117,7 @@ export default async function SettingsPage() {
                         Добавить email
                       </Link>
                     ) : (
-                      <div className={`mt-4 flex items-start gap-2 rounded-xl border px-3 py-2.5 text-sm ${hasVerifiedEmail ? 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-100' : 'border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100'}`}>
+                      <div className={`mt-4 flex items-start gap-2 border-l-2 px-3 py-1.5 text-sm ${hasVerifiedEmail ? 'border-emerald-400 text-emerald-800 dark:text-emerald-100' : 'border-amber-400 text-amber-900 dark:text-amber-100'}`}>
                         {hasVerifiedEmail ? <BadgeCheck className="mt-0.5 h-4 w-4 shrink-0" /> : <CircleAlert className="mt-0.5 h-4 w-4 shrink-0" />}
                         <span className="min-w-0 break-all">{hasVerifiedEmail ? user.email : 'Сначала привяжите Telegram.'}</span>
                       </div>
@@ -125,7 +141,7 @@ export default async function SettingsPage() {
                 {hasVerifiedEmail ? (
                   <ChangePasswordForm />
                 ) : (
-                  <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
+                  <div className="border-l-2 border-amber-400 px-3 py-1.5 text-sm text-amber-900 dark:text-amber-100">
                     Добавьте и подтвердите email, чтобы включить вход по паролю.
                   </div>
                 )}
@@ -134,6 +150,24 @@ export default async function SettingsPage() {
           },
         ]}
       />
+
+      <section className="border-t border-slate-200 pt-4 dark:border-white/10" aria-labelledby="legal-title">
+        <div className="mb-2 flex items-center gap-2">
+          <BookOpen className="h-4 w-4 text-slate-400" />
+          <h2 id="legal-title" className="text-sm font-semibold text-slate-950 dark:text-white">Документы</h2>
+        </div>
+        <nav className="flex flex-wrap gap-x-4 gap-y-2" aria-label="Правовая информация">
+          {legalNavigation.map((item) => (
+            <Link key={item.href} href={item.href} className="text-xs font-medium text-slate-500 hover:text-slate-950 dark:text-slate-400 dark:hover:text-white">
+              {item.label}
+            </Link>
+          ))}
+        </nav>
+      </section>
+
+      <section className="max-w-40 border-t border-slate-200 pt-2 dark:border-white/10" aria-label="Выход из аккаунта">
+        <LogoutButton />
+      </section>
     </div>
   )
 }
@@ -156,10 +190,10 @@ function SettingsSection({
   return (
     <section
       id={id}
-      className={`scroll-mt-20 rounded-3xl border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.035] sm:p-5 ${className ?? ''}`}
+      className={`scroll-mt-20 border-t border-slate-200 pt-4 dark:border-white/10 ${className ?? ''}`}
     >
-      <div className="mb-5 flex min-w-0 items-start gap-3">
-        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-cyan-50 text-cyan-700 dark:bg-cyan-400/10 dark:text-cyan-200">{icon}</span>
+      <div className="mb-4 flex min-w-0 items-start gap-2.5">
+        <span className="mt-0.5 shrink-0 text-slate-400">{icon}</span>
         <div className="min-w-0 pt-0.5">
           <h2 className="text-base font-semibold text-slate-950 dark:text-white sm:text-lg">{title}</h2>
           <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">{description}</p>
@@ -172,12 +206,12 @@ function SettingsSection({
 
 function AccountFact({ label, value, ready }: { label: string; value: string; ready?: boolean }) {
   return (
-    <div className="min-w-0 rounded-xl border border-slate-100 bg-slate-50/70 px-3 py-2.5 dark:border-white/[0.07] dark:bg-white/[0.025]">
-      <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+    <div className="flex min-w-0 items-center justify-between gap-3 py-1">
+      <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
         {ready !== undefined && <span className={`h-1.5 w-1.5 rounded-full ${ready ? 'bg-emerald-500' : 'bg-amber-500'}`} />}
         {label}
       </div>
-      <div className="mt-1 truncate text-sm font-semibold text-slate-950 dark:text-white" title={value}>{value}</div>
+      <div className="truncate text-sm font-medium text-slate-950 dark:text-white" title={value}>{value}</div>
     </div>
   )
 }

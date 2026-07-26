@@ -46,7 +46,7 @@ export function PlanCatalog({ plans, initialPlanId }: { plans: CatalogPlan[]; in
 
   return (
     <section aria-labelledby="mobile-plan-picker-title">
-      <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+      <div className="mb-4 hidden flex-wrap items-end justify-between gap-3 xl:flex">
         <div>
           <h2 id="mobile-plan-picker-title" className="text-lg font-semibold tracking-tight text-slate-950 dark:text-white">
             Выберите тариф
@@ -65,7 +65,7 @@ export function PlanCatalog({ plans, initialPlanId }: { plans: CatalogPlan[]; in
           <article
             key={plan.id}
             className={cn(
-              'rounded-lg border border-slate-200/90 border-l-2 bg-white p-3.5 dark:border-white/[0.09] dark:bg-white/[0.025]',
+              'border-b border-l-2 border-slate-200/90 bg-transparent px-1 py-3.5 dark:border-white/[0.09]',
               plan.current
                 ? 'border-l-cyan-500 bg-cyan-50/35 dark:border-l-cyan-300 dark:bg-cyan-500/[0.04]'
                 : 'border-l-slate-300 dark:border-l-white/15'
@@ -87,7 +87,7 @@ export function PlanCatalog({ plans, initialPlanId }: { plans: CatalogPlan[]; in
                 {plan.price}
               </span>
             </div>
-            <div className="mt-3 flex justify-end border-t border-slate-100 pt-3 dark:border-white/[0.06]">
+            <div className="mt-3 flex justify-end">
               <button
                 type="button"
                 aria-haspopup="dialog"
@@ -108,10 +108,7 @@ export function PlanCatalog({ plans, initialPlanId }: { plans: CatalogPlan[]; in
         <div className="flex h-full flex-col overflow-hidden rounded-xl border border-slate-200/90 bg-slate-50/45 p-4 dark:border-white/[0.09] dark:bg-white/[0.018]">
           <div className="mb-3 px-1 sm:flex sm:items-end sm:justify-between sm:gap-4">
             <div>
-              <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-700 dark:text-cyan-300">
-                Период подписки
-              </p>
-              <h3 className="mt-1 text-base font-semibold text-slate-950 dark:text-white">Выберите удобный срок</h3>
+              <h3 className="text-base font-semibold text-slate-950 dark:text-white">Период подписки</h3>
             </div>
             <p className="mt-1 text-xs text-slate-500 dark:text-slate-400 sm:mt-0 sm:text-right">
               Дольше срок, ниже стоимость дня

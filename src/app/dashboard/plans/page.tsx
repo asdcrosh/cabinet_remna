@@ -10,7 +10,7 @@ import { getCurrentUser } from '@/lib/auth/cookies'
 import { getPlanAudienceContext, isPlanAvailableForUser } from '@/lib/plan-access'
 import { getAvailableUserPromoCodesByPlan } from '@/lib/user-promo-codes'
 import { getAvailablePaymentProviders } from '@/lib/payment-providers'
-import { ArrowRight, ChevronDown, MessageCircleQuestion, RefreshCw, ShieldCheck } from 'lucide-react'
+import { ArrowRight, MessageCircleQuestion, RefreshCw, ShieldCheck } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
 
@@ -125,7 +125,7 @@ export default async function PlansPage({
     <div className="page-stack">
       <PageHeader
         title="Тарифы"
-        description="Сравните варианты, выберите один тариф и перейдите к безопасной оплате."
+        description="Выберите срок. На телефоне способ оплаты откроется отдельным окном."
         action={(
           <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
             {canManagePlans && (
@@ -189,80 +189,6 @@ export default async function PlansPage({
           )}
         </div>
       )}
-
-      {visiblePlans.length > 1 ? <PlanComparison plans={visiblePlans} /> : null}
-    </div>
-  )
-}
-
-function PlanComparison({ plans }: { plans: Array<{ id: string; name: string; priceKopecks: number; durationDays: number; trafficLimitGb: number | null; deviceLimit: number }> }) {
-  return (
-    <details className="group hidden overflow-hidden rounded-[1.75rem] border border-slate-200/80 bg-white dark:border-white/[0.08] dark:bg-white/[0.025] xl:block">
-      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-4 text-slate-950 transition-colors hover:bg-slate-50/70 dark:text-white dark:hover:bg-white/[0.025] sm:px-5 [&::-webkit-details-marker]:hidden">
-        <span className="min-w-0">
-          <span className="block text-sm font-semibold">Сравнить все характеристики</span>
-          <span className="mt-0.5 block text-xs font-normal text-slate-500 dark:text-slate-400">Срок, трафик, устройства и итоговая цена</span>
-        </span>
-        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-400 dark:bg-white/[0.06]">
-          <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" />
-        </span>
-      </summary>
-      <div className="border-t border-slate-100 dark:border-white/[0.08]">
-        <div className="grid gap-2 p-3 md:hidden" role="region" aria-label="Сравнение тарифов">
-          {plans.map((plan) => (
-            <article key={plan.id} className="rounded-2xl bg-slate-50/80 p-3.5 ring-1 ring-slate-200/70 dark:bg-white/[0.035] dark:ring-white/[0.08]">
-              <div className="flex items-baseline justify-between gap-3">
-                <h3 className="min-w-0 truncate text-sm font-semibold text-slate-950 dark:text-white">{plan.name}</h3>
-                <span className="shrink-0 text-sm font-semibold tabular-nums text-slate-950 dark:text-white">{formatPrice(plan.priceKopecks)}</span>
-              </div>
-              <div className="mt-3 grid grid-cols-3 gap-2">
-                <ComparisonFact label="Срок" value={`${plan.durationDays} дн.`} />
-                <ComparisonFact label="Трафик" value={plan.trafficLimitGb == null ? 'Безлимит' : `${plan.trafficLimitGb} ГБ`} />
-                <ComparisonFact label="Устройства" value={`До ${plan.deviceLimit}`} />
-              </div>
-            </article>
-          ))}
-        </div>
-        <div
-          role="region"
-          aria-label="Таблица сравнения тарифов"
-          tabIndex={0}
-          className="hidden overflow-x-auto focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-cyan-400 md:block"
-        >
-          <table className="w-full min-w-[680px] text-sm">
-            <caption className="sr-only">Сравнение срока, трафика, устройств и цены тарифов</caption>
-            <thead className="bg-slate-50/80 text-left text-xs font-semibold uppercase tracking-wide text-slate-400 dark:bg-white/[0.025] dark:text-slate-500">
-              <tr>
-                <th className="px-4 py-3">Тариф</th>
-                <th className="px-4 py-3">Срок</th>
-                <th className="px-4 py-3">Трафик</th>
-                <th className="px-4 py-3">Устройства</th>
-                <th className="px-4 py-3 text-right">Цена</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-white/[0.08]">
-              {plans.map((plan) => (
-                <tr key={plan.id} className="transition-colors hover:bg-slate-50/70 dark:hover:bg-white/[0.025]">
-                  <td className="px-4 py-3 font-medium text-slate-950 dark:text-white">{plan.name}</td>
-                  <td className="px-4 py-3 text-slate-500 dark:text-slate-400">{plan.durationDays} дн.</td>
-                  <td className="px-4 py-3 text-slate-500 dark:text-slate-400">{plan.trafficLimitGb == null ? 'Безлимит' : `${plan.trafficLimitGb} ГБ`}</td>
-                  <td className="px-4 py-3 text-slate-500 dark:text-slate-400">До {plan.deviceLimit}</td>
-                  <td className="px-4 py-3 text-right font-semibold tabular-nums text-slate-950 dark:text-white">{formatPrice(plan.priceKopecks)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </details>
-  )
-}
-
-function ComparisonFact({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="min-w-0 border-l border-slate-200 pl-2 first:border-l-0 first:pl-0 dark:border-white/10">
-      <div className="truncate text-[10px] text-slate-400">{label}</div>
-      <div className="mt-0.5 truncate text-xs font-semibold text-slate-700 dark:text-slate-200">{value}</div>
     </div>
   )
 }

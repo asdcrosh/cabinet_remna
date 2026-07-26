@@ -22,6 +22,7 @@ import {
   getBonusBoxAdminAnalytics,
   type BonusBoxHistoryFilters,
 } from '@/lib/bonus-box-admin'
+import { BonusBoxWorkspace } from '@/components/admin/bonus-box-workspace'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Подарки — Админка' }
@@ -212,28 +213,35 @@ export default async function AdminBonusBoxPage({
       title="Подарки"
       description="Состав, шансы и история открытий"
     >
-      <BonusBoxEngagementAdmin
-        analytics={analytics as BonusAnalyticsAdmin}
-        missions={missionRows}
-        events={eventRows}
-        riskSignals={riskRows}
-        prizes={rows.map((prize) => ({ id: prize.id, title: prize.title }))}
-      />
-      <BonusBoxPrizesAdmin
-        prizes={rows}
-        openings={openingRows}
-        settings={settings}
-        totalOpenings={totalOpenings}
-        filteredOpenings={filteredOpenings}
-        pendingSyncCount={pendingSyncCount}
-        historyFilters={{
-          q: historyFilters.q ?? '',
-          prizeId: historyFilters.prizeId ?? '',
-          sync: historyFilters.sync ?? '',
-          from: historyFilters.from ?? '',
-          to: historyFilters.to ?? '',
-        }}
-        initialTab={params.view === 'history' ? 'history' : 'prizes'}
+      <BonusBoxWorkspace
+        initialTab={params.view === 'history' || params.view === 'prizes' ? 'catalog' : 'overview'}
+        overview={(
+          <BonusBoxEngagementAdmin
+            analytics={analytics as BonusAnalyticsAdmin}
+            missions={missionRows}
+            events={eventRows}
+            riskSignals={riskRows}
+            prizes={rows.map((prize) => ({ id: prize.id, title: prize.title }))}
+          />
+        )}
+        catalog={(
+          <BonusBoxPrizesAdmin
+            prizes={rows}
+            openings={openingRows}
+            settings={settings}
+            totalOpenings={totalOpenings}
+            filteredOpenings={filteredOpenings}
+            pendingSyncCount={pendingSyncCount}
+            historyFilters={{
+              q: historyFilters.q ?? '',
+              prizeId: historyFilters.prizeId ?? '',
+              sync: historyFilters.sync ?? '',
+              from: historyFilters.from ?? '',
+              to: historyFilters.to ?? '',
+            }}
+            initialTab={params.view === 'history' ? 'history' : 'prizes'}
+          />
+        )}
       />
     </AdminPageShell>
   )
