@@ -188,6 +188,8 @@ test('настройки рефералов задают условие и на�
   const panel = page.getByTestId('referral-settings')
   const trigger = panel.getByRole('radiogroup', { name: 'Момент начисления' })
   await expect(trigger.getByRole('radio')).toHaveCount(2)
+  await panel.getByLabel('Акция действует до').fill('2099-12-31')
+  await expect(panel.getByText(/До 31 дек/)).toBeVisible()
   await trigger.getByRole('radio', { name: /После регистрации/ }).click()
   await expect(panel.getByLabel('Минимальная сумма первой оплаты')).toBeDisabled()
 

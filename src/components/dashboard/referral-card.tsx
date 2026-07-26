@@ -33,7 +33,10 @@ export function ReferralLinkCard({
       : settings.minimumPaymentKopecks > 0
         ? `после первой оплаты от ${Math.floor(settings.minimumPaymentKopecks / 100)} ₽`
         : 'после первой оплаты'
-    const text = `Присоединяйся по моей ссылке. ${referralRewardText(settings, 'referred', 'Ты')} ${condition}, а ${referralRewardText(settings, 'referrer', 'я').toLowerCase()}.`
+    const promotionEnd = settings.promotionEndsAt
+      ? ` Акция действует до ${formatPromotionEnd(settings.promotionEndsAt)}.`
+      : ''
+    const text = `Присоединяйся по моей ссылке. ${referralRewardText(settings, 'referred', 'Ты')} ${condition}, а ${referralRewardText(settings, 'referrer', 'я').toLowerCase()}.${promotionEnd}`
     if (navigator.share) {
       try {
         await navigator.share({
@@ -58,6 +61,11 @@ export function ReferralLinkCard({
             <span className="rounded-full bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-200">
               {settings.trigger === 'REGISTRATION' ? 'за регистрацию' : 'за первую оплату'}
             </span>
+            {settings.promotionEndsAt && (
+              <span className="rounded-full bg-cyan-50 px-2 py-1 text-xs font-semibold text-cyan-700 dark:bg-cyan-500/10 dark:text-cyan-200">
+                до {formatPromotionEnd(settings.promotionEndsAt)}
+              </span>
+            )}
           </div>
           <div className="mt-3 flex min-w-0 max-w-full items-center gap-2 overflow-hidden rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 dark:border-white/10 dark:bg-surface-950/70">
             <div className="min-w-0 flex-1 overflow-hidden truncate font-mono text-xs text-slate-600 dark:text-slate-300 sm:text-sm">{url}</div>
@@ -100,4 +108,13 @@ function referralRewardText(
   if (days > 0) rewards.push(`+${days} дн.`)
   if (attempts > 0) rewards.push(`+${attempts} прокр.`)
   return `${subject}: ${rewards.join(' и ') || 'без награды'}`
+}
+
+function formatPromotionEnd(value: string) {
+  return new Date(value).toLocaleDateString('ru-RU', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'Europe/Moscow',
+  })
 }

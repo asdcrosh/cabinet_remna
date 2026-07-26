@@ -27,6 +27,7 @@ const settings = {
   referredBonusDays: 3,
   referrerAttempts: 2,
   referredAttempts: 1,
+  promotionEndsAt: null,
 } as const
 
 describe('admin referral settings route', () => {
@@ -66,6 +67,15 @@ describe('admin referral settings route', () => {
         trigger: 'REGISTRATION',
         minimumPaymentKopecks: 0,
       })
+    )
+  })
+
+  it('saves the promotion end date', async () => {
+    const promotionEndsAt = '2026-08-31T20:59:59.999Z'
+    await PATCH(referralSettingsRequest({ ...settings, promotionEndsAt }))
+
+    expect(mocks.updateReferralSettings).toHaveBeenCalledWith(
+      expect.objectContaining({ promotionEndsAt })
     )
   })
 

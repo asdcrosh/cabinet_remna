@@ -12,9 +12,21 @@ export type ReferralSettings = {
   referredBonusDays: number
   referrerAttempts: number
   referredAttempts: number
+  promotionEndsAt: string | null
 }
 
 type ReferralSettingsClient = Pick<Prisma.TransactionClient, 'referralSetting'>
+
+export const STANDARD_REFERRAL_SETTINGS: ReferralSettings = {
+  trigger: 'FIRST_PAYMENT',
+  minimumPaymentKopecks: 0,
+  maxRewardsPerReferrer: 0,
+  referrerBonusDays: DEFAULT_REFERRAL_BONUS_DAYS,
+  referredBonusDays: 0,
+  referrerAttempts: 0,
+  referredAttempts: 0,
+  promotionEndsAt: null,
+}
 
 export async function getReferralSettings(
   tx: ReferralSettingsClient = prisma
@@ -30,7 +42,26 @@ export async function getReferralSettings(
     referredBonusDays: 0,
     referrerAttempts: envInt('BONUS_BOX_REFERRER_ATTEMPTS', 2, 0, 100),
     referredAttempts: envInt('BONUS_BOX_REFERRED_ATTEMPTS', 1, 0, 100),
+    promotionEndsAt: null,
   }
+}
+
+export async function getEffectiveReferralSettings(
+  tx: ReferralSettingsClient = prisma,
+  now = new Date()
+) {
+  return resolveReferralSettings(await getReferralSettings(tx), now)
+}
+
+export function resolveReferralSettings(settings: ReferralSettings, now = new Date()) {
+  if (!settings.promotionEndsAt) return settings
+
+  const promotionEndsAt = new Date(settings.promotionEndsAt)
+  if (Number.isNaN(promotionEndsAt.getTime()) || now.getTime() <= promotionEndsAt.getTime()) {
+    return settings
+  }
+
+  return STANDARD_REFERRAL_SETTINGS
 }
 
 export async function updateReferralSettings(input: ReferralSettings) {
@@ -42,7 +73,11 @@ export async function updateReferralSettings(input: ReferralSettings) {
   })
 }
 
-function normalizeReferralSettings(input: ReferralSettings): ReferralSettings {
+function normalizeReferralSettings(
+  input: Omit<ReferralSettings, 'promotionEndsAt'> & {
+    promotionEndsAt?: string | Date | null
+  }
+): ReferralSettings {
   return {
     trigger: input.trigger === 'REGISTRATION' ? 'REGISTRATION' : 'FIRST_PAYMENT',
     minimumPaymentKopecks: clamp(input.minimumPaymentKopecks, 0, 100_000_000),
@@ -51,7 +86,14 @@ function normalizeReferralSettings(input: ReferralSettings): ReferralSettings {
     referredBonusDays: clamp(input.referredBonusDays, 0, 365),
     referrerAttempts: clamp(input.referrerAttempts, 0, 100),
     referredAttempts: clamp(input.referredAttempts, 0, 100),
+    promotionEndsAt: normalizeDate(input.promotionEndsAt),
   }
+}
+
+function normalizeDate(value: string | Date | null | undefined) {
+  if (!value) return null
+  const date = value instanceof Date ? value : new Date(value)
+  return Number.isNaN(date.getTime()) ? null : date.toISOString()
 }
 
 function referralDaysFromEnv() {

@@ -14,7 +14,7 @@ import {
   runBonusBoxLifecycleNotifications,
 } from './bonus-box-engagement'
 import { notifyUser } from './notifications'
-import { getReferralSettings } from './referral-settings'
+import { getEffectiveReferralSettings } from './referral-settings'
 
 const DEFAULT_RUB_PER_ATTEMPT = 300
 const DEFAULT_ATTEMPT_TTL_DAYS = 30
@@ -168,7 +168,7 @@ async function getBonusBoxRuntimeConfig() {
   const config = getBonusBoxConfig()
   const [settings, referralSettings, enabled] = await Promise.all([
     getBonusBoxSettings(),
-    getReferralSettings(),
+    getEffectiveReferralSettings(),
     isFeatureEnabled('bonusBox'),
   ])
   return {

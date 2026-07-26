@@ -2,7 +2,7 @@ import type { Prisma, ReferralRewardTrigger } from '@prisma/client'
 import { prisma } from './prisma'
 import { remnawave } from './remnawave'
 import { isFeatureEnabled } from './feature-flags'
-import { getReferralSettings, type ReferralSettings } from './referral-settings'
+import { getEffectiveReferralSettings, type ReferralSettings } from './referral-settings'
 import { grantReferralBonusBoxAttemptsForReward } from './bonus-box'
 
 const DEFAULT_REFERRAL_BONUS_DAYS = 7
@@ -23,7 +23,7 @@ export async function grantReferralRewardForRegistration(userId: string) {
     return { granted: false as const, reason: 'referrals_disabled' as const }
   }
 
-  const settings = await getReferralSettings()
+  const settings = await getEffectiveReferralSettings()
   if (settings.trigger !== 'REGISTRATION') {
     return { granted: false as const, reason: 'wrong_trigger' as const }
   }
@@ -48,7 +48,7 @@ export async function grantReferralRewardForPayment(paymentId: string) {
     return { granted: false as const, reason: 'referrals_disabled' as const }
   }
 
-  const settings = await getReferralSettings()
+  const settings = await getEffectiveReferralSettings()
   if (settings.trigger !== 'FIRST_PAYMENT') {
     return { granted: false as const, reason: 'wrong_trigger' as const }
   }

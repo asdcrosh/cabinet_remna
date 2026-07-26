@@ -3,6 +3,7 @@
 import { type ReactNode, useMemo, useState } from 'react'
 import {
   ArrowRight,
+  CalendarClock,
   CalendarDays,
   Check,
   Save,
@@ -28,6 +29,7 @@ export function ReferralSettingsAdmin({
   const [saving, setSaving] = useState(false)
   const dirty = JSON.stringify(settings) !== JSON.stringify(saved)
   const summary = useMemo(() => buildSummary(settings), [settings])
+  const promotion = getPromotionState(settings.promotionEndsAt)
 
   function update<K extends keyof ReferralSettings>(key: K, value: ReferralSettings[K]) {
     setSettings((current) => ({ ...current, [key]: value }))
@@ -91,7 +93,54 @@ export function ReferralSettingsAdmin({
             )}
           </div>
 
-          <div className="mt-5 grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="Момент начисления">
+          <div className={cn(
+            'mt-5 rounded-xl border p-3.5',
+            promotion.expired
+              ? 'border-amber-300 bg-amber-50/70 dark:border-amber-400/20 dark:bg-amber-400/[0.06]'
+              : 'border-cyan-200 bg-cyan-50/60 dark:border-cyan-400/20 dark:bg-cyan-400/[0.05]'
+          )}>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+              <span className={cn(
+                'grid h-10 w-10 shrink-0 place-items-center rounded-xl',
+                promotion.expired
+                  ? 'bg-amber-100 text-amber-700 dark:bg-amber-400/10 dark:text-amber-200'
+                  : 'bg-cyan-100 text-cyan-700 dark:bg-cyan-400/10 dark:text-cyan-200'
+              )}>
+                <CalendarClock className="h-5 w-5" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="text-sm font-semibold text-slate-950 dark:text-white">Срок действия акции</h3>
+                  <span className={cn(
+                    'rounded-full px-2 py-0.5 text-[11px] font-semibold',
+                    promotion.expired
+                      ? 'bg-amber-100 text-amber-800 dark:bg-amber-400/10 dark:text-amber-200'
+                      : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-400/10 dark:text-emerald-200'
+                  )}>
+                    {promotion.label}
+                  </span>
+                </div>
+                <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
+                  После окончания автоматически: первая оплата и +7 дней только пригласившему.
+                </p>
+              </div>
+              <label className="min-w-0 sm:w-52">
+                <span className="sr-only">Акция действует до</span>
+                <input
+                  className="input w-full"
+                  type="date"
+                  value={promotionDateValue(settings.promotionEndsAt)}
+                  onChange={(event) => update(
+                    'promotionEndsAt',
+                    promotionEndIso(event.target.value)
+                  )}
+                  aria-label="Акция действует до"
+                />
+              </label>
+            </div>
+          </div>
+
+          <div className="mt-4 grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="Момент начисления">
             <TriggerOption
               selected={settings.trigger === 'REGISTRATION'}
               title="После регистрации"
@@ -179,7 +228,7 @@ export function ReferralSettingsAdmin({
         </div>
 
         <div className="flex flex-col gap-3 border-t border-slate-200 bg-slate-50/70 px-4 py-3.5 dark:border-white/10 dark:bg-white/[0.02] sm:flex-row sm:items-center">
-          <span className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-400">Итог</span>
+          <span className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-400">Условия акции</span>
           <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 text-sm">
             <span className="font-medium text-slate-950 dark:text-white">{summary.condition}</span>
             <ArrowRight className="h-3.5 w-3.5 text-slate-400" />
@@ -354,4 +403,30 @@ function rewardText(days: number, attempts: number) {
   if (days > 0) parts.push(`+${days} дн.`)
   if (attempts > 0) parts.push(`+${attempts} прокр.`)
   return parts.join(' и ') || 'без награды'
+}
+
+function promotionDateValue(value: string | null) {
+  return value?.slice(0, 10) ?? ''
+}
+
+function promotionEndIso(value: string) {
+  if (!value) return null
+  return new Date(`${value}T23:59:59.999+03:00`).toISOString()
+}
+
+function getPromotionState(value: string | null) {
+  if (!value) return { expired: false, label: 'Без срока' }
+
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return { expired: false, label: 'Без срока' }
+
+  const formatted = date.toLocaleDateString('ru-RU', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    timeZone: 'Europe/Moscow',
+  })
+  return Date.now() > date.getTime()
+    ? { expired: true, label: `Завершена ${formatted}` }
+    : { expired: false, label: `До ${formatted}` }
 }

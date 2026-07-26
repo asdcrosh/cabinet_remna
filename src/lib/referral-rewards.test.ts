@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
   paymentFindUnique: vi.fn(),
@@ -57,6 +57,7 @@ const defaultSettings = {
   referredBonusDays: 3,
   referrerAttempts: 2,
   referredAttempts: 1,
+  promotionEndsAt: null,
   createdAt: new Date('2026-01-01T00:00:00.000Z'),
   updatedAt: new Date('2026-01-01T00:00:00.000Z'),
 }
@@ -71,6 +72,10 @@ describe('referral rewards', () => {
     mocks.referralRewardCount.mockResolvedValue(0)
     mocks.transaction.mockImplementation(async (operations) => Promise.all(operations))
     mocks.grantReferralAttempts.mockResolvedValue({ granted: 3 })
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
   })
 
   it('keeps the legacy environment fallback inside the allowed range', () => {
@@ -208,5 +213,47 @@ describe('referral rewards', () => {
       reason: 'referrer_limit_reached',
     })
     expect(mocks.referralRewardUpsert).not.toHaveBeenCalled()
+  })
+
+  it('returns to seven days for the inviter after the promotion ends', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-08-01T00:00:00.000Z'))
+    mocks.referralSettingFindUnique.mockResolvedValue({
+      ...defaultSettings,
+      trigger: 'REGISTRATION',
+      referrerBonusDays: 30,
+      referredBonusDays: 14,
+      referrerAttempts: 10,
+      referredAttempts: 5,
+      promotionEndsAt: new Date('2026-07-31T20:59:59.999Z'),
+    })
+    mocks.paymentFindUnique.mockResolvedValue({
+      id: 'payment-1',
+      userId: 'user-1',
+      amountKopecks: 30_000,
+      status: 'SUCCEEDED',
+      subscriptionProvisionedAt: new Date('2026-08-01T00:00:00.000Z'),
+      user: { referredById: 'referrer-1' },
+    })
+    mocks.referralRewardUpsert.mockResolvedValue({
+      id: 'reward-1',
+      referrerId: 'referrer-1',
+      referredUserId: 'user-1',
+      status: 'PENDING',
+    })
+
+    await grantReferralRewardForPayment('payment-1')
+
+    expect(mocks.referralRewardUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          trigger: 'FIRST_PAYMENT',
+          bonusDays: 7,
+          referredBonusDays: 0,
+          referrerAttempts: 0,
+          referredAttempts: 0,
+        }),
+      })
+    )
   })
 })

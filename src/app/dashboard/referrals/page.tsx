@@ -6,7 +6,7 @@ import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth/cookies'
 import { getAppUrl } from '@/lib/app-url'
 import { ensureUserReferralCode } from '@/lib/referrals'
-import { getReferralSettings, type ReferralSettings } from '@/lib/referral-settings'
+import { getEffectiveReferralSettings, type ReferralSettings } from '@/lib/referral-settings'
 import { ReferralLinkCard } from '@/components/dashboard/referral-card'
 import { PageHeader } from '@/components/dashboard/page-header'
 import { CountUp } from '@/components/dashboard/count-up'
@@ -22,7 +22,7 @@ export default async function ReferralsPage() {
   const session = await getCurrentUser()
   if (!session) redirect('/login')
 
-  const settings = await getReferralSettings()
+  const settings = await getEffectiveReferralSettings()
   const referralCode = await ensureUserReferralCode(session.uid)
   const appUrl = getAppUrl()
   const referralUrl = `${appUrl}/register?ref=${encodeURIComponent(referralCode)}`

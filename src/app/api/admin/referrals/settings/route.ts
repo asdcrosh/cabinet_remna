@@ -12,6 +12,7 @@ const settingsSchema = z.object({
   referredBonusDays: z.number().int().min(0).max(365),
   referrerAttempts: z.number().int().min(0).max(100),
   referredAttempts: z.number().int().min(0).max(100),
+  promotionEndsAt: z.string().datetime().nullable(),
 }).refine((value) =>
   value.referrerBonusDays > 0
   || value.referredBonusDays > 0
