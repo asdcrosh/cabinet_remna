@@ -270,70 +270,108 @@ export function PlanCard({
         />
       )}
 
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="flex min-w-0 flex-1 items-start gap-3">
-          <span
-            className={cn(
-              "grid h-11 w-11 shrink-0 place-items-center rounded-md border border-slate-200 text-slate-600 dark:border-white/[0.12] dark:text-slate-200",
-              (current || popular) && "border-cyan-300 text-cyan-700 dark:border-cyan-400/35 dark:text-cyan-200",
-              isPromoPlan && "border-emerald-300 text-emerald-700 dark:border-emerald-400/30 dark:text-emerald-200",
-            )}
-          >
-            {isPromoPlan ? <Sparkles className="h-5 w-5" /> : <ShieldCheck className="h-5 w-5" />}
-          </span>
-          <div className="min-w-0 pt-0.5">
-            <h3 className="break-words text-lg font-semibold leading-tight tracking-[-0.02em] text-slate-950 dark:text-white sm:text-xl">
-              {name}
-            </h3>
-            {description && !checkoutDisplay && (
-              <p className="mt-1.5 line-clamp-2 text-sm leading-5 text-slate-500 dark:text-slate-400">
-                {description}
-              </p>
-            )}
-          </div>
-        </div>
-        {current ? (
-          <span className="badge-active shrink-0 gap-1.5 ring-1 ring-inset ring-emerald-200/70 dark:ring-emerald-500/20">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-            Ваш тариф
-          </span>
-        ) : isPromo ? (
-          <span className="badge shrink-0 bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200/70 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-500/20">
-            <Sparkles className="mr-1 h-3 w-3" />
-            Пробный
-          </span>
-        ) : (
-          popular && (
-            <span className="badge shrink-0 bg-slate-950 text-white dark:bg-white dark:text-slate-950">
-              <Sparkles className="mr-1 h-3 w-3" />
-              Популярный
-            </span>
-          )
-        )}
-      </div>
-
-      <div className={cn("border-y border-slate-200/90 py-4 dark:border-white/[0.09]", checkoutDisplay ? "mt-4" : "mt-5")}>
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div className="flex flex-wrap items-baseline gap-2">
-            <div className="whitespace-nowrap text-[2rem] font-semibold leading-none tracking-[-0.04em] tabular-nums text-slate-950 dark:text-white sm:text-4xl">
-              {effectivePrice}
+      {checkoutDisplay ? (
+        <div className="rounded-[1.35rem] bg-slate-100/75 p-4 dark:bg-white/[0.045]">
+          <div className="flex min-w-0 items-start justify-between gap-3">
+            <div className="min-w-0">
+              <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">Вы выбрали</span>
+              <h3 className="mt-1 truncate text-lg font-semibold tracking-[-0.025em] text-slate-950 dark:text-white">
+                {name}
+              </h3>
             </div>
-            {appliedPromo && (
-              <div className="text-sm text-slate-400 line-through">{price}</div>
+            {savingsPercent > 0 && !isPromoPlan ? (
+              <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-100/80 px-2 py-1 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-200">
+                <BadgePercent className="h-3.5 w-3.5" />
+                −{savingsPercent}%
+              </span>
+            ) : null}
+          </div>
+          <div className="mt-5 flex items-end justify-between gap-3">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-baseline gap-2">
+                <div className="whitespace-nowrap text-[2rem] font-semibold leading-none tracking-[-0.04em] tabular-nums text-slate-950 dark:text-white">
+                  {effectivePrice}
+                </div>
+                {appliedPromo && <div className="text-sm text-slate-400 line-through">{price}</div>}
+              </div>
+              <span className="mt-1.5 block text-[11px] text-slate-500 dark:text-slate-400">
+                {isPromo ? "Один раз на аккаунт" : "Итоговая сумма"}
+              </span>
+            </div>
+            <div className="shrink-0 text-right">
+              <span className="block text-sm font-semibold text-slate-800 dark:text-slate-200">{durationDays} дн.</span>
+              <span className="mt-1 block text-[11px] text-slate-500 dark:text-slate-400">
+                {isPromo ? "бесплатно" : `${monthlyPrice} / 30 дней`}
+              </span>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="flex min-w-0 flex-1 items-start gap-3">
+              <span
+                className={cn(
+                  "grid h-11 w-11 shrink-0 place-items-center rounded-md border border-slate-200 text-slate-600 dark:border-white/[0.12] dark:text-slate-200",
+                  (current || popular) && "border-cyan-300 text-cyan-700 dark:border-cyan-400/35 dark:text-cyan-200",
+                  isPromoPlan && "border-emerald-300 text-emerald-700 dark:border-emerald-400/30 dark:text-emerald-200",
+                )}
+              >
+                {isPromoPlan ? <Sparkles className="h-5 w-5" /> : <ShieldCheck className="h-5 w-5" />}
+              </span>
+              <div className="min-w-0 pt-0.5">
+                <h3 className="break-words text-lg font-semibold leading-tight tracking-[-0.02em] text-slate-950 dark:text-white sm:text-xl">
+                  {name}
+                </h3>
+                {description && (
+                  <p className="mt-1.5 line-clamp-2 text-sm leading-5 text-slate-500 dark:text-slate-400">
+                    {description}
+                  </p>
+                )}
+              </div>
+            </div>
+            {current ? (
+              <span className="badge-active shrink-0 gap-1.5 ring-1 ring-inset ring-emerald-200/70 dark:ring-emerald-500/20">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                Ваш тариф
+              </span>
+            ) : isPromo ? (
+              <span className="badge shrink-0 bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200/70 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-500/20">
+                <Sparkles className="mr-1 h-3 w-3" />
+                Пробный
+              </span>
+            ) : (
+              popular && (
+                <span className="badge shrink-0 bg-slate-950 text-white dark:bg-white dark:text-slate-950">
+                  <Sparkles className="mr-1 h-3 w-3" />
+                  Популярный
+                </span>
+              )
             )}
           </div>
-          {savingsPercent > 0 && !isPromoPlan ? (
-            <span className="inline-flex items-center gap-1 rounded-sm bg-emerald-100/80 px-2 py-1 font-mono text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-200">
-              <BadgePercent className="h-3.5 w-3.5" />
-              -{savingsPercent}%
-            </span>
-          ) : null}
-        </div>
-        <div className="mt-2 flex flex-wrap items-center justify-between gap-1.5 text-xs text-slate-500 dark:text-slate-400">
-          <span>{isPromo ? "Один раз на аккаунт" : `${monthlyPrice} за 30 дней`}</span>
-          <span>за весь срок</span>
-        </div>
-      </div>
+
+          <div className="mt-5 border-y border-slate-200/90 py-4 dark:border-white/[0.09]">
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div className="flex flex-wrap items-baseline gap-2">
+                <div className="whitespace-nowrap text-[2rem] font-semibold leading-none tracking-[-0.04em] tabular-nums text-slate-950 dark:text-white sm:text-4xl">
+                  {effectivePrice}
+                </div>
+                {appliedPromo && <div className="text-sm text-slate-400 line-through">{price}</div>}
+              </div>
+              {savingsPercent > 0 && !isPromoPlan ? (
+                <span className="inline-flex items-center gap-1 rounded-sm bg-emerald-100/80 px-2 py-1 font-mono text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-200">
+                  <BadgePercent className="h-3.5 w-3.5" />
+                  -{savingsPercent}%
+                </span>
+              ) : null}
+            </div>
+            <div className="mt-2 flex flex-wrap items-center justify-between gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+              <span>{isPromo ? "Один раз на аккаунт" : `${monthlyPrice} за 30 дней`}</span>
+              <span>за весь срок</span>
+            </div>
+          </div>
+        </>
+      )}
 
       {!checkoutDisplay ? (
         <div className="mt-3 grid grid-cols-3 gap-2">
@@ -347,7 +385,7 @@ export function PlanCard({
         </div>
       ) : null}
 
-      <div className="mt-auto pt-4">
+      <div className={cn("mt-auto", checkoutDisplay ? "pt-3" : "pt-4")}>
         {!isPromoPlan && promoCodesEnabled && (promoOpen || appliedPromo) ? (
           <div className="rounded-lg border border-slate-200/80 bg-slate-50/70 p-3.5 dark:border-white/[0.08] dark:bg-white/[0.03]">
             <div className="mb-2.5 flex items-center justify-between gap-2">
@@ -428,7 +466,12 @@ export function PlanCard({
         ) : !isPromoPlan && promoCodesEnabled ? (
           <button
             type="button"
-            className="flex min-h-12 w-full items-center justify-between gap-3 rounded-lg border border-slate-200/80 bg-transparent px-3.5 py-2.5 text-left text-sm text-slate-600 transition-colors hover:border-cyan-300 hover:text-cyan-800 dark:border-white/[0.08] dark:text-slate-300 dark:hover:border-cyan-400/25 dark:hover:text-cyan-100"
+            className={cn(
+              "flex min-h-12 w-full items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left text-sm text-slate-600 transition-colors hover:text-cyan-800 dark:text-slate-300 dark:hover:text-cyan-100",
+              checkoutDisplay
+                ? "bg-slate-100/70 hover:bg-slate-100 dark:bg-white/[0.035] dark:hover:bg-white/[0.06]"
+                : "border border-slate-200/80 bg-transparent hover:border-cyan-300 dark:border-white/[0.08] dark:hover:border-cyan-400/25",
+            )}
             onClick={openPromoBlock}
           >
             <span className="inline-flex min-w-0 items-center gap-2">
@@ -444,17 +487,24 @@ export function PlanCard({
                 </span>
               </span>
             </span>
-            <span className="shrink-0 rounded-lg bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-600 shadow-sm ring-1 ring-slate-200/70 dark:bg-white/[0.05] dark:text-slate-300 dark:ring-white/[0.08]">
+            <span className="shrink-0 text-xs font-semibold text-slate-500 dark:text-slate-300">
               {bestPromo ? "Применить" : "Добавить"}
             </span>
           </button>
         ) : null}
 
         {!isPromoPlan && paymentProviders.length > 1 ? (
-          <fieldset className="mt-2.5 rounded-lg border border-slate-200/80 p-3 dark:border-white/[0.08]">
-            <legend className="px-1 text-xs font-medium text-slate-500 dark:text-slate-400">Способ оплаты</legend>
+          <fieldset
+            className={cn(
+              "mt-3",
+              checkoutDisplay ? "border-0 p-0" : "rounded-lg border border-slate-200/80 p-3 dark:border-white/[0.08]",
+            )}
+          >
+            <legend className={cn("text-xs font-medium text-slate-500 dark:text-slate-400", checkoutDisplay ? "mb-2 px-0" : "px-1")}>
+              Способ оплаты
+            </legend>
             <div
-              className="grid grid-cols-[repeat(auto-fit,minmax(5.5rem,1fr))] gap-1 rounded-xl bg-slate-100 p-1 dark:bg-white/[0.06]"
+              className="grid grid-cols-[repeat(auto-fit,minmax(5.5rem,1fr))] gap-1 rounded-xl bg-slate-100/80 p-1 dark:bg-white/[0.055]"
               role="radiogroup"
               aria-label="Способ оплаты"
             >
@@ -466,7 +516,7 @@ export function PlanCard({
                   aria-checked={selectedProvider === provider.id}
                   onClick={() => setSelectedProvider(provider.id)}
                   className={cn(
-                    "min-h-9 rounded-lg px-3 text-xs font-semibold transition-colors",
+                    "min-h-10 rounded-lg px-3 text-xs font-semibold transition-colors",
                     selectedProvider === provider.id
                       ? "bg-white text-slate-950 shadow-sm dark:bg-surface-800 dark:text-white"
                       : "text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white",
@@ -476,12 +526,19 @@ export function PlanCard({
                 </button>
               ))}
             </div>
-            <p className="mt-2 px-1 text-[11px] leading-4 text-slate-400 dark:text-slate-500">
+            <p className="mt-2 px-1 text-[10px] leading-4 text-slate-400 dark:text-slate-500">
               {paymentProviderHint(selectedProvider)}
             </p>
           </fieldset>
         ) : !isPromoPlan && paymentProviders.length === 1 ? (
-          <div className="mt-2.5 flex min-h-12 items-center justify-between gap-3 rounded-lg border border-slate-200/80 px-3.5 py-2 text-xs text-slate-500 dark:border-white/[0.08] dark:text-slate-400">
+          <div
+            className={cn(
+              "mt-3 flex min-h-12 items-center justify-between gap-3 rounded-xl px-3 py-2 text-xs text-slate-500 dark:text-slate-400",
+              checkoutDisplay
+                ? "bg-slate-100/70 dark:bg-white/[0.035]"
+                : "border border-slate-200/80 dark:border-white/[0.08]",
+            )}
+          >
             <span className="inline-flex items-center gap-2">
               <CreditCard className="h-4 w-4 text-slate-400" />
               <span>
@@ -504,7 +561,7 @@ export function PlanCard({
         <div
           className={cn(
             checkoutDisplay
-              ? "sticky bottom-0 z-20 -mx-4 mt-3 border-t border-slate-200/80 bg-white/95 px-4 pb-[max(.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur dark:border-white/[0.08] dark:bg-surface-950/95"
+              ? "sticky bottom-0 z-20 -mx-4 mt-3 border-t border-slate-200/80 bg-white/95 px-4 pb-[max(.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur dark:border-white/[0.08] dark:bg-surface-950/95 sm:-mx-5 sm:px-5 sm:pb-4"
               : "mt-3",
           )}
         >

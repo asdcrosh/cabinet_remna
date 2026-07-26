@@ -196,7 +196,7 @@ export function PlanCatalog({ plans, initialPlanId }: { plans: CatalogPlan[]; in
         <div className="fixed inset-0 z-[110] xl:hidden">
           <button
             type="button"
-            className="absolute inset-0 bg-slate-950/65 backdrop-blur-sm"
+            className="absolute inset-0 bg-slate-950/70 backdrop-blur-[3px]"
             aria-label="Закрыть окно оплаты"
             onClick={() => setMobileCheckoutPlanId(null)}
           />
@@ -204,24 +204,27 @@ export function PlanCatalog({ plans, initialPlanId }: { plans: CatalogPlan[]; in
             role="dialog"
             aria-modal="true"
             aria-labelledby="mobile-checkout-title"
-            className="absolute inset-x-0 bottom-0 max-h-[92dvh] overflow-y-auto rounded-t-xl border-t-2 border-cyan-400 bg-white shadow-2xl dark:bg-surface-950"
+            className="absolute inset-x-0 bottom-0 max-h-[94dvh] overflow-y-auto rounded-t-[1.75rem] border border-b-0 border-slate-200 bg-white shadow-[0_-24px_80px_-32px_rgba(0,0,0,0.65)] dark:border-white/[0.1] dark:bg-surface-950 sm:inset-x-4 sm:bottom-4 sm:mx-auto sm:max-w-[32rem] sm:rounded-[1.75rem] sm:border"
           >
-            <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-slate-100 bg-white/95 px-4 py-3.5 backdrop-blur dark:border-white/[0.08] dark:bg-surface-950/95">
+            <div className="sticky top-0 z-10 bg-white/95 px-4 pb-3 pt-2 backdrop-blur dark:bg-surface-950/95 sm:px-5 sm:pt-4">
+              <span className="mx-auto mb-2 block h-1 w-10 rounded-full bg-slate-200 dark:bg-white/10 sm:hidden" aria-hidden="true" />
+              <div className="flex items-center justify-between gap-3">
               <div>
                 <h2 id="mobile-checkout-title" className="font-semibold tracking-tight text-slate-950 dark:text-white">Оплата тарифа</h2>
-                <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Выберите способ оплаты и подтвердите</p>
+                <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Проверьте детали перед оплатой</p>
               </div>
               <button
                 type="button"
                 autoFocus
-                className="grid h-10 w-10 shrink-0 place-items-center rounded-md border border-slate-200 text-slate-500 transition-colors hover:border-slate-400 hover:text-slate-950 dark:border-white/10 dark:text-slate-300 dark:hover:border-white/25 dark:hover:text-white"
+                className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-500 transition-colors hover:bg-slate-200 hover:text-slate-950 dark:bg-white/[0.06] dark:text-slate-300 dark:hover:bg-white/[0.1] dark:hover:text-white"
                 aria-label="Закрыть"
                 onClick={() => setMobileCheckoutPlanId(null)}
               >
                 <X className="h-4 w-4" />
               </button>
+              </div>
             </div>
-            <div className="px-4 pt-4">
+            <div className="px-4 pb-1 sm:px-5">
               <PlanCard key={mobileCheckoutPlan.id} {...mobileCheckoutPlan} display="checkout" />
             </div>
           </section>
