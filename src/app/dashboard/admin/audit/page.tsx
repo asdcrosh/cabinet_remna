@@ -35,6 +35,7 @@ const ACTION_LABELS: Record<AuditAction, string> = {
   ADMIN_BONUS_EVENT_CREATED: 'Событие создано',
   ADMIN_BONUS_EVENT_UPDATED: 'Событие изменено',
   ADMIN_BONUS_RISK_REVIEWED: 'Антифрод проверен',
+  ADMIN_REFERRAL_SETTINGS_UPDATED: 'Настройки рефералов',
   ADMIN_FEATURES_UPDATED: 'Функции кабинета',
   ADMIN_PAYMENT_PROVIDERS_UPDATED: 'Платёжные системы',
   ADMIN_PAYMENT_PROVIDERS_RESET: 'Платёжные системы из .env',

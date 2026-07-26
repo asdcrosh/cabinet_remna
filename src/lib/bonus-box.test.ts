@@ -23,6 +23,12 @@ const mocks = vi.hoisted(() => {
       findUnique: vi.fn(),
       upsert: vi.fn(),
     },
+    referralSetting: {
+      findUnique: vi.fn(),
+    },
+    referralReward: {
+      findUnique: vi.fn(),
+    },
     bonusBoxOpening: {
       findMany: vi.fn(),
       create: vi.fn(),
@@ -62,6 +68,7 @@ import {
   applyBonusBoxEconomyGuard,
   getBonusBoxConfig,
   getBonusBoxOverview,
+  grantReferralBonusBoxAttemptsForReward,
   grantManualBonusBoxAttemptsBulk,
   grantWeeklyBonusBoxAttempts,
   openBonusBox,
@@ -94,6 +101,44 @@ const config: Config = {
   showBestRecentOpening: true,
   activePromoRewardsLimit: 3,
 }
+
+describe('grantReferralBonusBoxAttemptsForReward', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mocks.prisma.bonusBoxAttempt.createMany.mockImplementation(({ data }) =>
+      Promise.resolve({ count: data.length })
+    )
+  })
+
+  it('grants the configured attempts to both referral participants once', async () => {
+    mocks.prisma.referralReward.findUnique.mockResolvedValue({
+      id: 'reward-1',
+      referrerId: 'referrer-1',
+      referredUserId: 'referred-1',
+      referrerAttempts: 4,
+      referredAttempts: 3,
+    })
+
+    const result = await grantReferralBonusBoxAttemptsForReward('reward-1')
+
+    expect(result).toEqual({ granted: 7 })
+    expect(mocks.prisma.bonusBoxAttempt.createMany).toHaveBeenCalledWith({
+      data: expect.arrayContaining([
+        expect.objectContaining({
+          userId: 'referrer-1',
+          source: 'REFERRAL',
+          sourceKey: 'referrer:reward-1:1',
+        }),
+        expect.objectContaining({
+          userId: 'referred-1',
+          source: 'REFERRAL',
+          sourceKey: 'referred:reward-1:3',
+        }),
+      ]),
+      skipDuplicates: true,
+    })
+  })
+})
 
 describe('grantManualBonusBoxAttemptsBulk', () => {
   beforeEach(() => {

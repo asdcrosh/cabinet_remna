@@ -14,6 +14,7 @@ import {
   runBonusBoxLifecycleNotifications,
 } from './bonus-box-engagement'
 import { notifyUser } from './notifications'
+import { getReferralSettings } from './referral-settings'
 
 const DEFAULT_RUB_PER_ATTEMPT = 300
 const DEFAULT_ATTEMPT_TTL_DAYS = 30
@@ -165,11 +166,18 @@ export async function updateBonusBoxSettings(input: BonusBoxSettings) {
 
 async function getBonusBoxRuntimeConfig() {
   const config = getBonusBoxConfig()
-  const [settings, enabled] = await Promise.all([
+  const [settings, referralSettings, enabled] = await Promise.all([
     getBonusBoxSettings(),
+    getReferralSettings(),
     isFeatureEnabled('bonusBox'),
   ])
-  return { ...config, ...settings, enabled }
+  return {
+    ...config,
+    ...settings,
+    referrerAttempts: referralSettings.referrerAttempts,
+    referredAttempts: referralSettings.referredAttempts,
+    enabled,
+  }
 }
 
 export async function getBonusBoxOverview(userId: string) {
@@ -319,52 +327,50 @@ export async function grantPaymentBonusBoxAttempts(paymentId: string) {
 }
 
 export async function grantReferralBonusBoxAttemptsForPayment(paymentId: string) {
-  const config = getBonusBoxConfig()
-  const [bonusBoxEnabled, referralsEnabled] = await Promise.all([
-    isFeatureEnabled('bonusBox'),
-    isFeatureEnabled('referrals'),
-  ])
-  if (!bonusBoxEnabled || !referralsEnabled || (config.referrerAttempts <= 0 && config.referredAttempts <= 0)) {
-    return { granted: 0 }
-  }
-
   const payment = await prisma.payment.findUnique({
     where: { id: paymentId },
-    select: {
-      id: true,
-      userId: true,
-      amountKopecks: true,
-      status: true,
-      subscriptionProvisionedAt: true,
-      user: { select: { referredById: true } },
-    },
+    select: { userId: true },
   })
-
-  if (!payment || payment.status !== 'SUCCEEDED' || !payment.subscriptionProvisionedAt || payment.amountKopecks <= 0) {
-    return { granted: 0 }
-  }
-  if (!payment.user.referredById || payment.user.referredById === payment.userId) {
-    return { granted: 0 }
-  }
+  if (!payment) return { granted: 0 }
 
   const reward = await prisma.referralReward.findUnique({
     where: { referredUserId: payment.userId },
-    select: { id: true, referrerId: true, referredUserId: true },
+    select: { id: true },
   })
   if (!reward) return { granted: 0 }
+
+  return grantReferralBonusBoxAttemptsForReward(reward.id)
+}
+
+export async function grantReferralBonusBoxAttemptsForReward(rewardId: string) {
+  const [bonusBoxEnabled, referralsEnabled, reward] = await Promise.all([
+    isFeatureEnabled('bonusBox'),
+    isFeatureEnabled('referrals'),
+    prisma.referralReward.findUnique({
+      where: { id: rewardId },
+      select: {
+        id: true,
+        referrerId: true,
+        referredUserId: true,
+        referrerAttempts: true,
+        referredAttempts: true,
+      },
+    }),
+  ])
+  if (!bonusBoxEnabled || !referralsEnabled || !reward) return { granted: 0 }
 
   const rows = [
     ...makeAttempts({
       userId: reward.referrerId,
       source: 'REFERRAL',
       sourceKeyPrefix: `referrer:${reward.id}`,
-      attemptsCount: config.referrerAttempts,
+      attemptsCount: reward.referrerAttempts,
     }),
     ...makeAttempts({
       userId: reward.referredUserId,
       source: 'REFERRAL',
       sourceKeyPrefix: `referred:${reward.id}`,
-      attemptsCount: config.referredAttempts,
+      attemptsCount: reward.referredAttempts,
     }),
   ]
 

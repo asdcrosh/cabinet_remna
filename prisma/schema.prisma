@@ -159,6 +159,19 @@ model FeatureSetting {
   updatedAt  DateTime @updatedAt
 }
 
+model ReferralSetting {
+  id                    String                @id @default("default")
+  trigger               ReferralRewardTrigger @default(FIRST_PAYMENT)
+  minimumPaymentKopecks Int                   @default(0)
+  maxRewardsPerReferrer Int                   @default(0)
+  referrerBonusDays     Int                   @default(7)
+  referredBonusDays     Int                   @default(0)
+  referrerAttempts      Int                   @default(2)
+  referredAttempts      Int                   @default(1)
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+}
+
 model PaymentProviderSetting {
   id                              String   @id @default("default")
   yookassaEnabled                 Boolean?
@@ -656,21 +669,32 @@ model ReferralReward {
   id                    String               @id @default(cuid())
   referrerId            String
   referredUserId        String               @unique
-  triggeringPaymentId   String               @unique
+  triggeringPaymentId   String?              @unique
+  trigger               ReferralRewardTrigger @default(FIRST_PAYMENT)
   bonusDays             Int
+  referredBonusDays     Int                  @default(0)
+  referrerAttempts      Int                  @default(2)
+  referredAttempts      Int                  @default(1)
   status                ReferralRewardStatus @default(PENDING)
   appliedSubscriptionId String?
   appliedAt             DateTime?
+  referredAppliedSubscriptionId String?
+  referredAppliedAt     DateTime?
   lastError             String?
   createdAt             DateTime             @default(now())
   updatedAt             DateTime             @updatedAt
 
   referrer          User    @relation("ReferralRewardsEarned", fields: [referrerId], references: [id], onDelete: Cascade)
   referredUser      User    @relation("ReferralRewardReferred", fields: [referredUserId], references: [id], onDelete: Cascade)
-  triggeringPayment Payment @relation(fields: [triggeringPaymentId], references: [id], onDelete: Cascade)
+  triggeringPayment Payment? @relation(fields: [triggeringPaymentId], references: [id], onDelete: Cascade)
 
   @@index([referrerId, status])
   @@index([status, createdAt])
+}
+
+enum ReferralRewardTrigger {
+  REGISTRATION
+  FIRST_PAYMENT
 }
 
 enum ReferralRewardStatus {
@@ -1213,6 +1237,7 @@ enum AuditAction {
   ADMIN_BONUS_EVENT_CREATED
   ADMIN_BONUS_EVENT_UPDATED
   ADMIN_BONUS_RISK_REVIEWED
+  ADMIN_REFERRAL_SETTINGS_UPDATED
   ADMIN_FEATURES_UPDATED
   ADMIN_PAYMENT_PROVIDERS_UPDATED
   ADMIN_PAYMENT_PROVIDERS_RESET

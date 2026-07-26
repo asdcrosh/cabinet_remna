@@ -6,7 +6,7 @@ import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth/cookies'
 import { getAppUrl } from '@/lib/app-url'
 import { ensureUserReferralCode } from '@/lib/referrals'
-import { getReferralBonusDays } from '@/lib/referral-rewards'
+import { getReferralSettings, type ReferralSettings } from '@/lib/referral-settings'
 import { ReferralLinkCard } from '@/components/dashboard/referral-card'
 import { PageHeader } from '@/components/dashboard/page-header'
 import { CountUp } from '@/components/dashboard/count-up'
@@ -22,7 +22,7 @@ export default async function ReferralsPage() {
   const session = await getCurrentUser()
   if (!session) redirect('/login')
 
-  const bonusDays = getReferralBonusDays()
+  const settings = await getReferralSettings()
   const referralCode = await ensureUserReferralCode(session.uid)
   const appUrl = getAppUrl()
   const referralUrl = `${appUrl}/register?ref=${encodeURIComponent(referralCode)}`
@@ -35,7 +35,7 @@ export default async function ReferralsPage() {
         payments: {
           some: {
             status: 'SUCCEEDED',
-            amountKopecks: { gt: 0 },
+            amountKopecks: { gte: Math.max(1, settings.minimumPaymentKopecks) },
             subscriptionProvisionedAt: { not: null },
           },
         },
@@ -64,7 +64,7 @@ export default async function ReferralsPage() {
         payments: {
           where: {
             status: 'SUCCEEDED',
-            amountKopecks: { gt: 0 },
+            amountKopecks: { gte: Math.max(1, settings.minimumPaymentKopecks) },
             subscriptionProvisionedAt: { not: null },
           },
           orderBy: { createdAt: 'desc' },
@@ -79,6 +79,7 @@ export default async function ReferralsPage() {
           select: {
             status: true,
             bonusDays: true,
+            referrerAttempts: true,
             appliedAt: true,
             createdAt: true,
           },
@@ -93,10 +94,13 @@ export default async function ReferralsPage() {
 
   return (
     <div className="page-stack">
-      <PageHeader title="Рефералы" description={`+${bonusDays} дней за первую оплату друга`} />
+      <PageHeader
+        title="Рефералы"
+        description={referralConditionText(settings)}
+      />
 
       <section id="referral-link" className="min-w-0 scroll-mt-24">
-        <ReferralLinkCard code={referralCode} url={referralUrl} bonusDays={bonusDays} />
+        <ReferralLinkCard code={referralCode} url={referralUrl} settings={settings} />
       </section>
 
       <section className="grid grid-cols-2 overflow-hidden rounded-2xl border border-slate-200 bg-white dark:divide-white/10 dark:border-white/10 dark:bg-white/[0.035] sm:grid-cols-4">
@@ -104,7 +108,7 @@ export default async function ReferralsPage() {
         <SummaryCard label="Оплатили" value={paidCount} />
         <SummaryCard label="Конверсия" value={`${conversion}%`} />
         <SummaryCard
-          label="Начислено"
+          label="Дней начислено"
           value={`+${appliedDays}`}
           hint={pendingDays > 0 ? `+${pendingDays} дн. ожидают` : undefined}
         />
@@ -134,7 +138,7 @@ export default async function ReferralsPage() {
             <div className="divide-y divide-slate-100 dark:divide-white/10">
               {referrals.map((user) => {
                 const paidAt = user.payments[0]?.paidAt ?? user.payments[0]?.createdAt ?? null
-                const reward = getReferralStatus(user.referralRewardAsReferred, Boolean(paidAt))
+                const reward = getReferralStatus(user.referralRewardAsReferred, Boolean(paidAt), settings)
                 return (
                   <article key={user.id} className="grid gap-3 px-3 py-3 sm:px-4 md:grid-cols-[minmax(0,1fr)_8rem_8rem_10rem] md:items-center">
                     <div className="min-w-0">
@@ -202,27 +206,37 @@ function HistoryCell({ label, value }: { label: string; value: string }) {
 }
 
 function getReferralStatus(
-  reward: { status: RewardStatus; bonusDays: number; appliedAt: Date | null; createdAt: Date } | null,
-  hasPaid: boolean
+  reward: {
+    status: RewardStatus
+    bonusDays: number
+    referrerAttempts: number
+    appliedAt: Date | null
+    createdAt: Date
+  } | null,
+  hasPaid: boolean,
+  settings: ReferralSettings
 ) {
+  const rewardSummary = reward
+    ? formatRewardSummary(reward.bonusDays, reward.referrerAttempts)
+    : formatRewardSummary(settings.referrerBonusDays, settings.referrerAttempts)
   if (reward?.status === 'APPLIED') {
     return {
       label: 'Начислен',
-      description: `+${reward.bonusDays} дн.${reward.appliedAt ? ` · ${formatReferralDate(reward.appliedAt)}` : ''}`,
+      description: `${rewardSummary}${reward.appliedAt ? ` · ${formatReferralDate(reward.appliedAt)}` : ''}`,
       className: 'badge-active',
     }
   }
   if (reward?.status === 'PROCESSING') {
     return {
       label: 'Начисляется',
-      description: `+${reward.bonusDays} дн. в обработке`,
+      description: `${rewardSummary} в обработке`,
       className: 'badge-limited',
     }
   }
   if (reward?.status === 'PENDING') {
     return {
       label: 'Ожидает начисление',
-      description: hasPaid ? `+${reward.bonusDays} дн. готовы` : 'После оплаты друга',
+      description: hasPaid ? `${rewardSummary} готовы` : referralConditionText(settings),
       className: 'badge-limited',
     }
   }
@@ -235,9 +249,24 @@ function getReferralStatus(
   }
   return {
     label: 'Ожидает оплату',
-    description: 'Бонус после первой покупки',
+    description: referralConditionText(settings),
     className: 'badge-disabled',
   }
+}
+
+function formatRewardSummary(days: number, attempts: number) {
+  const parts = []
+  if (days > 0) parts.push(`+${days} дн.`)
+  if (attempts > 0) parts.push(`+${attempts} прокр.`)
+  return parts.join(' и ') || 'Награда'
+}
+
+function referralConditionText(settings: ReferralSettings) {
+  if (settings.trigger === 'REGISTRATION') return 'Награды после регистрации по вашей ссылке'
+  if (settings.minimumPaymentKopecks > 0) {
+    return `Награды после первой оплаты от ${Math.floor(settings.minimumPaymentKopecks / 100)} ₽`
+  }
+  return 'Награды после первой оплаты приглашённого'
 }
 
 function displayReferralName(user: { name: string | null; telegramUsername: string | null; email: string }) {

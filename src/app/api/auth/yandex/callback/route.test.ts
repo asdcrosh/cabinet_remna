@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   checkRemnawaveProfileOnLogin: vi.fn(),
   createAdminNotification: vi.fn(),
   generateUniqueReferralCode: vi.fn(),
+  grantReferralRewardForRegistration: vi.fn(),
   prisma: {
     oAuthAccount: {
       findUnique: vi.fn(),
@@ -39,6 +40,9 @@ vi.mock('@/lib/feature-flags', () => ({ isFeatureEnabled: vi.fn(async () => true
 vi.mock('@/lib/referrals', () => ({
   generateUniqueReferralCode: mocks.generateUniqueReferralCode,
   normalizeReferralCode: (value: string | undefined) => value || '',
+}))
+vi.mock('@/lib/referral-rewards', () => ({
+  grantReferralRewardForRegistration: mocks.grantReferralRewardForRegistration,
 }))
 vi.mock('@/lib/yandex-oauth', async () => {
   const actual = await vi.importActual<typeof import('@/lib/yandex-oauth')>('@/lib/yandex-oauth')
@@ -92,6 +96,7 @@ describe('Yandex OAuth callback', () => {
       ...data,
     }))
     mocks.generateUniqueReferralCode.mockResolvedValue('REF123')
+    mocks.grantReferralRewardForRegistration.mockResolvedValue({ granted: true })
   })
 
   it('rejects callbacks with invalid state before token exchange', async () => {

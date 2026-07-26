@@ -88,6 +88,7 @@ const adminNav: NavigationItem[] = [
   { href: '/dashboard/admin/support', label: 'Поддержка', icon: MessageCircleQuestion },
   { href: '/dashboard/admin/users', label: 'Пользователи', icon: UsersRound },
   { href: '/dashboard/admin/duplicates', label: 'Дубли', icon: SearchCheck },
+  { href: '/dashboard/admin/referrals', label: 'Рефералы', icon: UsersRound },
   { href: '/dashboard/admin/offers', label: 'Офферы', icon: Sparkles },
   { href: '/dashboard/admin/plans', label: 'Тарифы', icon: SlidersHorizontal },
   { href: '/dashboard/admin/promo-codes', label: 'Промокоды', icon: Tag },
@@ -120,6 +121,7 @@ const adminNavGroups = [
     items: [
       '/dashboard/admin/payments',
       '/dashboard/admin/plans',
+      '/dashboard/admin/referrals',
       '/dashboard/admin/offers',
       '/dashboard/admin/promo-codes',
       '/dashboard/admin/bonus-box',
@@ -678,6 +680,7 @@ function getAdminItems(role: UserRole, features: FeatureFlags) {
     if (item.href === '/dashboard/admin/support') return features.support
     if (item.href === '/dashboard/admin/broadcasts') return features.broadcasts
     if (item.href === '/dashboard/admin/bonus-box') return features.bonusBox
+    if (item.href === '/dashboard/admin/referrals') return features.referrals
     return true
   })
   if (role === 'MODERATOR') return available.filter((item) => item.href === '/dashboard/admin/support')

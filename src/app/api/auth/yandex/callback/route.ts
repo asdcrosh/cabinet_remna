@@ -21,6 +21,7 @@ import {
 } from '@/lib/yandex-oauth'
 import { createAdminNotification } from '@/lib/admin-notifications'
 import { PERSONAL_DATA_CONSENT_VERSION, TERMS_VERSION } from '@/lib/legal'
+import { grantReferralRewardForRegistration } from '@/lib/referral-rewards'
 
 export const runtime = 'nodejs'
 
@@ -225,6 +226,14 @@ async function createYandexUser(
         : undefined,
     },
   })
+  if (referrer) {
+    await grantReferralRewardForRegistration(user.id).catch((error) => {
+      logWarn('auth.yandex.referral_reward_deferred', {
+        userId: user.id,
+        message: error instanceof Error ? error.message : 'unknown error',
+      })
+    })
+  }
   await createAdminNotification({
     type: 'registration',
     severity: 'INFO',

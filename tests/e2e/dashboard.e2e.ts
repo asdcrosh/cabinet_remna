@@ -180,6 +180,25 @@ test('массовое начисление прокруток позволяе�
   await expectNoHorizontalOverflow(page)
 })
 
+test('настройки рефералов задают условие и награды обеим сторонам', async ({ page }) => {
+  await login(page, E2E_USERS.admin.email)
+  await page.goto('/dashboard/admin/referrals')
+
+  await expect(page.getByRole('heading', { name: 'Реферальная программа' })).toBeVisible()
+  const panel = page.getByTestId('referral-settings')
+  const trigger = panel.getByRole('radiogroup', { name: 'Момент начисления' })
+  await expect(trigger.getByRole('radio')).toHaveCount(2)
+  await trigger.getByRole('radio', { name: /После регистрации/ }).click()
+  await expect(panel.getByLabel('Минимальная сумма первой оплаты')).toBeDisabled()
+
+  const referrerReward = panel.getByRole('region', { name: 'Пригласившему' })
+  const referredReward = panel.getByRole('region', { name: 'Новому пользователю' })
+  await referrerReward.getByLabel('Дней подписки').fill('10')
+  await referredReward.getByLabel('Прокруток').fill('3')
+  await expect(panel.getByRole('button', { name: 'Сохранить условия' })).toBeEnabled()
+  await expectNoHorizontalOverflow(page)
+})
+
 test('фильтры списков применяются без отдельной кнопки', async ({ page }, testInfo) => {
   await login(page, E2E_USERS.admin.email)
   await page.goto('/dashboard/admin/payments')

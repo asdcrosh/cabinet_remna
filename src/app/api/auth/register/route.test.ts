@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   registerRemnashopEmailUser: vi.fn(),
   findRemnashopUserByEmail: vi.fn(),
   createAdminNotification: vi.fn(),
+  grantReferralRewardForRegistration: vi.fn(),
   logWarn: vi.fn(),
   prisma: {
     user: {
@@ -38,6 +39,9 @@ vi.mock('@/lib/remnashop-users', () => ({ findRemnashopUserByEmail: mocks.findRe
 vi.mock('@/lib/admin-notifications', () => ({ createAdminNotification: mocks.createAdminNotification }))
 vi.mock('@/lib/logger', () => ({ logWarn: mocks.logWarn }))
 vi.mock('@/lib/feature-flags', () => ({ isFeatureEnabled: vi.fn(async () => true) }))
+vi.mock('@/lib/referral-rewards', () => ({
+  grantReferralRewardForRegistration: mocks.grantReferralRewardForRegistration,
+}))
 
 import { POST } from './route'
 
@@ -73,6 +77,7 @@ describe('register route', () => {
     mocks.createEmailVerificationToken.mockResolvedValue('verify-token')
     mocks.sendEmailVerificationLink.mockResolvedValue({ sent: true })
     mocks.registerRemnashopEmailUser.mockResolvedValue({ configured: false })
+    mocks.grantReferralRewardForRegistration.mockResolvedValue({ granted: true })
   })
 
   it('returns neutral response for an existing email', async () => {
@@ -121,5 +126,16 @@ describe('register route', () => {
       name: validBody.name,
       token: 'verify-token',
     })
+  })
+
+  it('creates a registration reward when a referral code is present', async () => {
+    mocks.prisma.user.findUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ id: 'referrer-1' })
+
+    const response = await POST(registerRequest({ ...validBody, referralCode: 'INVITE1' }))
+
+    expect(response.status).toBe(201)
+    expect(mocks.grantReferralRewardForRegistration).toHaveBeenCalledWith('user-1')
   })
 })

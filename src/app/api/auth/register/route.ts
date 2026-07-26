@@ -17,6 +17,7 @@ import { createAdminNotification } from '@/lib/admin-notifications'
 import { PERSONAL_DATA_CONSENT_VERSION, TERMS_VERSION } from '@/lib/legal'
 import { logWarn } from '@/lib/logger'
 import { isFeatureEnabled } from '@/lib/feature-flags'
+import { grantReferralRewardForRegistration } from '@/lib/referral-rewards'
 
 export const runtime = 'nodejs'
 
@@ -169,6 +170,15 @@ export async function POST(req: Request) {
     actionHref: '/dashboard/admin/users',
     actionLabel: 'Открыть пользователей',
   })
+
+  if (referrer) {
+    await grantReferralRewardForRegistration(user.id).catch((error) => {
+      logWarn('auth.register.referral_reward_deferred', {
+        userId: user.id,
+        message: error instanceof Error ? error.message : 'unknown error',
+      })
+    })
+  }
 
   return NextResponse.json(
     {
