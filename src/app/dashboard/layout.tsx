@@ -59,8 +59,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
         >
           Перейти к содержимому
         </a>
-        <aside className="dashboard-sidebar fixed inset-y-0 left-0 z-40 hidden h-dvh w-[13.5rem] flex-col overflow-hidden border-r border-slate-300/80 bg-[#f8f9f5] dark:border-white/[0.09] dark:bg-[#0d1011] lg:flex">
-          <div className="shrink-0 px-4 py-4">
+        <aside className="dashboard-sidebar fixed inset-y-0 left-0 z-40 hidden h-dvh w-[14.75rem] flex-col overflow-hidden border-r lg:flex">
+          <div className="shrink-0 px-5 py-5">
             <Brand brandName={brandName} />
           </div>
           <div className="dashboard-sidebar-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-3">
@@ -74,8 +74,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
             <LogoutButton />
           </div>
         </aside>
-        <main className="min-w-0 w-full overflow-x-clip lg:ml-[13.5rem] lg:w-auto">
-          <div className="sticky top-0 z-50 flex h-14 items-center justify-between border-b border-slate-300/80 bg-[#f8f9f5]/95 px-4 backdrop-blur dark:border-white/[0.09] dark:bg-[#0d1011]/95 lg:fixed lg:right-6 lg:top-4 lg:h-auto lg:w-auto lg:border-0 lg:bg-transparent lg:p-0 lg:backdrop-blur-none lg:dark:bg-transparent">
+        <main className="min-w-0 w-full overflow-x-clip lg:ml-[14.75rem] lg:w-auto">
+          <div className="dashboard-topbar sticky top-0 z-50 flex h-14 items-center justify-between border-b px-4 backdrop-blur lg:fixed lg:right-6 lg:top-4 lg:h-auto lg:w-auto lg:border-0 lg:bg-transparent lg:p-0 lg:backdrop-blur-none">
             <div className="lg:hidden">
               <Brand compact brandName={brandName} />
             </div>
@@ -84,7 +84,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
               {isStaff ? <MobileDashboardNav role={role} email={accountLabel} brandName={brandName} badges={navBadges} features={features} /> : null}
             </div>
           </div>
-          <div id="dashboard-content" className="page-transition mx-auto w-full max-w-[74rem] min-w-0 scroll-mt-20 px-4 pb-28 pt-5 sm:px-6 sm:pt-7 lg:py-8 lg:pl-7 lg:pr-20">{children}</div>
+          <div id="dashboard-content" className="page-transition mx-auto w-full max-w-[78rem] min-w-0 scroll-mt-20 px-4 pb-28 pt-6 sm:px-6 sm:pt-8 lg:py-10 lg:pl-9 lg:pr-24">{children}</div>
         </main>
         <MobileBottomNav role={role} badges={navBadges} features={features} />
       </div>

@@ -60,7 +60,7 @@ export function PlanCatalog({ plans, initialPlanId }: { plans: CatalogPlan[]; in
         </span>
       </div>
 
-      <div className="grid gap-2.5 xl:hidden">
+      <div className="plan-period-list overflow-hidden xl:hidden">
         {orderedPlans.map((plan) => (
           <article
             key={plan.id}
@@ -105,7 +105,7 @@ export function PlanCatalog({ plans, initialPlanId }: { plans: CatalogPlan[]; in
       </div>
 
       <div className="hidden gap-4 xl:grid xl:grid-cols-2 xl:items-stretch">
-        <div className="flex h-full flex-col overflow-hidden rounded-xl border border-slate-200/90 bg-slate-50/45 p-4 dark:border-white/[0.09] dark:bg-white/[0.018]">
+        <div className="plan-period-panel flex h-full flex-col overflow-hidden rounded-xl border p-4">
           <div className="mb-3 px-1 sm:flex sm:items-end sm:justify-between sm:gap-4">
             <div>
               <h3 className="text-base font-semibold text-slate-950 dark:text-white">Период подписки</h3>

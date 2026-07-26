@@ -1,16 +1,15 @@
-/*
- * Спокойная техническая панель.
- * Этот слой намеренно последний: он выравнивает старые экраны, пока крупные
- * компоненты переводятся с вложенных карточек на строки и секции.
- */
-
 :root {
-  --app-bg: #f4f3ef;
-  --app-surface: #fcfcfa;
-  --app-text: #151918;
-  --app-muted: #6f7773;
-  --app-line: #d8dcd6;
-  --app-accent: #12b8d4;
+  --app-bg: #f1f0eb;
+  --app-surface: #fbfaf6;
+  --app-surface-raised: #ffffff;
+  --app-text: #171b19;
+  --app-muted: #69716c;
+  --app-line: rgba(27, 35, 31, 0.12);
+  --app-line-strong: rgba(27, 35, 31, 0.2);
+  --app-accent: #147d64;
+  --app-accent-soft: #dff3ea;
+  --app-accent-contrast: #f6fff9;
+  --app-shadow: 0 18px 48px -38px rgba(24, 32, 28, 0.42);
 }
 
 body {
@@ -19,22 +18,50 @@ body {
 }
 
 .dashboard-shell {
-  background: var(--app-bg) !important;
+  color: var(--app-text);
+  background:
+    radial-gradient(70rem 36rem at 88% -12rem, color-mix(in srgb, var(--app-accent) 8%, transparent), transparent 72%),
+    var(--app-bg) !important;
 }
 
 .dashboard-sidebar {
-  background: color-mix(in srgb, var(--app-surface) 92%, var(--app-bg)) !important;
+  border-color: var(--app-line) !important;
+  background: color-mix(in srgb, var(--app-surface) 88%, transparent) !important;
+  backdrop-filter: blur(22px);
 }
 
-.dashboard-shell :where(.card, .panel, .surface-card, .metric-card, .table-shell, .admin-list) {
+.dashboard-topbar {
   border-color: var(--app-line);
-  border-radius: 0.75rem;
-  background: var(--app-surface);
-  box-shadow: none;
+  background: color-mix(in srgb, var(--app-bg) 82%, transparent);
 }
 
-.dashboard-shell :where(.shadow, .shadow-sm, .shadow-md, .shadow-lg, .shadow-xl, .shadow-2xl) {
-  box-shadow: none !important;
+.brand-mark::after {
+  position: absolute;
+  right: -0.15rem;
+  bottom: -0.15rem;
+  width: 0.55rem;
+  height: 0.55rem;
+  border: 2px solid var(--app-surface);
+  border-radius: 50%;
+  content: '';
+  background: var(--app-accent);
+}
+
+.dashboard-mobile-nav {
+  border-color: var(--app-line);
+  background: color-mix(in srgb, var(--app-surface-raised) 90%, transparent);
+  box-shadow: 0 18px 48px -26px rgba(15, 22, 18, 0.55);
+}
+
+.dashboard-shell :where(.card, .panel, .surface-card, .metric-card, .table-shell, .admin-list, .dashboard-kpi) {
+  border: 1px solid var(--app-line);
+  border-radius: 1rem;
+  background: linear-gradient(180deg, var(--app-surface-raised), var(--app-surface));
+  box-shadow: var(--app-shadow);
+}
+
+.dashboard-shell :where(.card, .surface-card, .metric-card, .dashboard-kpi):hover {
+  border-color: var(--app-line-strong);
 }
 
 .dashboard-shell :where(.page-stack) {
@@ -47,7 +74,7 @@ body {
 }
 
 .dashboard-shell :where(.section-title) {
-  letter-spacing: -0.015em;
+  letter-spacing: -0.025em;
 }
 
 .dashboard-shell :where(.section-description, .stat-label) {
@@ -55,25 +82,83 @@ body {
 }
 
 .dashboard-shell :where(.btn, .btn-primary, .btn-secondary, .input) {
-  border-radius: 0.5rem;
+  border-radius: 0.75rem;
 }
 
 .dashboard-shell :where(.btn-primary) {
   border-color: var(--app-text);
   background: var(--app-text);
+  color: var(--app-bg);
+  box-shadow: 0 8px 18px -14px color-mix(in srgb, var(--app-text) 72%, transparent);
+}
+
+.dashboard-shell :where(.btn-primary:hover) {
+  border-color: color-mix(in srgb, var(--app-text) 82%, var(--app-accent));
+  background: color-mix(in srgb, var(--app-text) 88%, var(--app-accent));
 }
 
 .dashboard-shell :where(.btn-secondary) {
   border-color: var(--app-line);
-  background: transparent;
+  background: color-mix(in srgb, var(--app-surface-raised) 78%, transparent);
+  color: var(--app-text);
+}
+
+.dashboard-shell :where(.input) {
+  border-color: var(--app-line);
+  background: var(--app-surface-raised);
 }
 
 .dashboard-shell :where(.rounded-3xl, .rounded-\[1\.75rem\], .rounded-\[1\.5rem\], .rounded-\[1\.25rem\]) {
-  border-radius: 0.75rem;
+  border-radius: 1.125rem;
 }
 
 .dashboard-shell :where(.rounded-2xl, .rounded-xl) {
-  border-radius: 0.5rem;
+  border-radius: 0.875rem;
+}
+
+.dashboard-sidebar a[aria-current='page'] {
+  position: relative;
+  border-color: var(--app-line) !important;
+  border-left-color: var(--app-line) !important;
+  background: var(--app-surface-raised) !important;
+  color: var(--app-text) !important;
+  box-shadow: var(--app-shadow);
+}
+
+.dashboard-sidebar a[aria-current='page']::before {
+  position: absolute;
+  top: 50%;
+  left: -0.2rem;
+  width: 0.35rem;
+  height: 1.1rem;
+  border-radius: 999px;
+  content: '';
+  background: var(--app-accent);
+  transform: translateY(-50%);
+}
+
+.dashboard-sidebar a[aria-current='page'] svg {
+  color: var(--app-accent) !important;
+}
+
+.dashboard-shell [role='tab'][aria-selected='true'] {
+  border-color: var(--app-accent) !important;
+}
+
+.dashboard-shell [class~='bg-cyan-400'],
+.dashboard-shell [class~='bg-cyan-500'] {
+  background-color: var(--app-accent) !important;
+}
+
+.dashboard-shell [class~='border-cyan-400'],
+.dashboard-shell [class~='border-cyan-500'] {
+  border-color: var(--app-accent) !important;
+}
+
+.dashboard-shell [class~='text-cyan-300'],
+.dashboard-shell [class~='text-cyan-600'],
+.dashboard-shell [class~='text-cyan-700'] {
+  color: var(--app-accent) !important;
 }
 
 .dashboard-signal {
@@ -82,9 +167,11 @@ body {
 
 .dashboard-signal::before {
   position: absolute;
-  inset-block: 0;
+  top: 1rem;
+  bottom: 1rem;
   left: 0;
-  width: 2px;
+  width: 3px;
+  border-radius: 999px;
   content: '';
   background: var(--app-accent);
 }
@@ -103,7 +190,7 @@ body {
   min-width: 0;
   align-items: center;
   gap: 0.875rem;
-  padding-block: 0.875rem;
+  padding-block: 0.95rem;
   border-bottom: 1px solid var(--app-line);
 }
 
@@ -114,17 +201,106 @@ body {
 .dashboard-kpi {
   min-width: 0;
   padding: 1rem;
-  border: 1px solid var(--app-line);
-  border-radius: 0.75rem;
-  background: var(--app-surface);
 }
 
 .dashboard-kpi strong {
   display: block;
-  margin-top: 0.4rem;
-  font-size: clamp(1.35rem, 2vw, 1.75rem);
+  margin-top: 0.45rem;
+  font-size: clamp(1.5rem, 2vw, 1.9rem);
   line-height: 1;
-  letter-spacing: -0.035em;
+  letter-spacing: -0.045em;
+}
+
+.subscription-ticket {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border: 1px solid var(--app-line);
+  border-radius: 1.25rem;
+  background:
+    linear-gradient(115deg, color-mix(in srgb, var(--app-accent-soft) 62%, var(--app-surface-raised)), var(--app-surface-raised) 58%);
+  box-shadow: 0 24px 55px -42px color-mix(in srgb, var(--app-accent) 50%, transparent);
+}
+
+.subscription-ticket::after {
+  position: absolute;
+  top: -3rem;
+  right: -2rem;
+  z-index: -1;
+  width: 13rem;
+  height: 13rem;
+  border: 1px solid color-mix(in srgb, var(--app-accent) 18%, transparent);
+  border-radius: 50%;
+  content: '';
+  box-shadow:
+    0 0 0 2.5rem color-mix(in srgb, var(--app-accent) 4%, transparent),
+    0 0 0 5rem color-mix(in srgb, var(--app-accent) 3%, transparent);
+}
+
+.subscription-ticket--expired {
+  background:
+    linear-gradient(115deg, color-mix(in srgb, #f4d8cf 54%, var(--app-surface-raised)), var(--app-surface-raised) 58%);
+}
+
+.subscription-ticket--expired::after {
+  border-color: color-mix(in srgb, #d76d4c 20%, transparent);
+  box-shadow:
+    0 0 0 2.5rem color-mix(in srgb, #d76d4c 4%, transparent),
+    0 0 0 5rem color-mix(in srgb, #d76d4c 3%, transparent);
+}
+
+.subscription-ticket__metric {
+  border-top: 1px solid var(--app-line);
+}
+
+.plan-period-panel,
+.plan-period-list,
+.plan-checkout-card {
+  border-color: var(--app-line) !important;
+  background: linear-gradient(180deg, var(--app-surface-raised), var(--app-surface)) !important;
+  box-shadow: var(--app-shadow);
+}
+
+.plan-period-list {
+  border: 1px solid var(--app-line);
+  border-radius: 1rem;
+}
+
+.plan-period-list article:last-child {
+  border-bottom: 0;
+}
+
+.plan-period-panel [aria-checked='true'] {
+  border-color: var(--app-line-strong) !important;
+  border-left-color: var(--app-accent) !important;
+  background: var(--app-surface-raised) !important;
+  box-shadow: 0 12px 30px -26px color-mix(in srgb, var(--app-accent) 55%, transparent);
+}
+
+.plan-checkout-card:not(.rounded-none) {
+  border-radius: 1rem;
+}
+
+.bonus-box-stage {
+  border-color: var(--app-line) !important;
+  border-top-color: var(--app-accent) !important;
+  border-radius: 1rem !important;
+  background: linear-gradient(180deg, var(--app-surface-raised), var(--app-surface)) !important;
+  box-shadow: var(--app-shadow);
+}
+
+.bonus-box-stage-header {
+  border-color: var(--app-line) !important;
+}
+
+.bonus-box-stage:not(.bonus-box-stage--opening) .bonus-box-reel-shell {
+  background:
+    radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--app-accent) 8%, transparent), transparent 54%),
+    transparent;
+}
+
+.dashboard-shell details > summary {
+  border-radius: 0.75rem;
 }
 
 @media (max-width: 639px) {
@@ -133,29 +309,58 @@ body {
   }
 
   .dashboard-shell :where(.panel-pad, .card, .surface-card, .metric-card) {
-    padding: 0.875rem;
+    padding: 0.95rem;
+  }
+
+  .subscription-ticket {
+    border-radius: 1rem;
   }
 }
 
 .dark {
-  --app-bg: #0a0c0d;
-  --app-surface: #101314;
-  --app-text: #f4f7f5;
-  --app-muted: #949d98;
-  --app-line: #29302d;
+  --app-bg: #0b0f0d;
+  --app-surface: #121714;
+  --app-surface-raised: #171d1a;
+  --app-text: #f2f1ea;
+  --app-muted: #929c96;
+  --app-line: rgba(235, 242, 237, 0.1);
+  --app-line-strong: rgba(235, 242, 237, 0.18);
+  --app-accent: #7ee2b8;
+  --app-accent-soft: #17352a;
+  --app-accent-contrast: #092118;
+  --app-shadow: 0 22px 52px -38px rgba(0, 0, 0, 0.86);
 }
 
 .dark body,
 .dark .dashboard-shell {
   color: var(--app-text);
-  background: var(--app-bg) !important;
+  background-color: var(--app-bg) !important;
 }
 
 .dark .dashboard-sidebar {
-  background: #0d1011 !important;
+  background: rgba(14, 19, 16, 0.88) !important;
+}
+
+.dark .dashboard-topbar {
+  background: rgba(11, 15, 13, 0.84);
+}
+
+.dark .dashboard-mobile-nav {
+  background: rgba(20, 26, 22, 0.92);
+  box-shadow: 0 18px 54px -24px rgba(0, 0, 0, 0.9);
 }
 
 .dark .dashboard-shell :where(.card, .panel, .surface-card, .metric-card, .table-shell, .admin-list, .dashboard-kpi) {
   border-color: var(--app-line);
-  background: var(--app-surface);
+  background: linear-gradient(180deg, var(--app-surface-raised), var(--app-surface));
+}
+
+.dark .subscription-ticket {
+  background:
+    linear-gradient(115deg, color-mix(in srgb, var(--app-accent-soft) 72%, var(--app-surface-raised)), var(--app-surface-raised) 60%);
+}
+
+.dark .subscription-ticket--expired {
+  background:
+    linear-gradient(115deg, color-mix(in srgb, #4a241d 58%, var(--app-surface-raised)), var(--app-surface-raised) 60%);
 }

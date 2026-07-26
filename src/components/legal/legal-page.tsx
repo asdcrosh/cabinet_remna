@@ -28,7 +28,7 @@ export function LegalPage({
   updatedAt,
 }: LegalPageProps) {
   return (
-    <main className="min-h-dvh bg-[#f4f5f1] px-3 py-3 dark:bg-[#0a0c0d] sm:px-6 sm:py-6">
+    <main className="min-h-dvh bg-[#f1f0eb] px-3 py-3 dark:bg-[#0b0f0d] sm:px-6 sm:py-6">
       <div className="mx-auto max-w-6xl">
         <header className="mb-4 flex items-center justify-between gap-3 border-b border-slate-200 p-3 dark:border-white/10 sm:mb-6 sm:px-0 sm:py-4">
           <Link href="/" className="flex min-w-0 items-center gap-3">
@@ -59,7 +59,7 @@ export function LegalPage({
                   className={cn(
                     'flex min-h-11 shrink-0 snap-start items-center gap-2 rounded-md border-l-2 px-3 py-2 text-sm font-medium transition-colors',
                     active
-                      ? 'border-cyan-400 bg-slate-950 text-white dark:bg-white dark:text-slate-950'
+                      ? 'border-brand-400 bg-slate-950 text-white dark:bg-white dark:text-slate-950'
                       : 'border-transparent text-slate-500 hover:border-slate-300 hover:bg-white/60 hover:text-slate-900 dark:text-slate-400 dark:hover:border-white/15 dark:hover:bg-white/[0.04] dark:hover:text-white',
                   )}
                 >
@@ -70,13 +70,13 @@ export function LegalPage({
             })}
           </nav>
 
-          <article className="min-w-0 overflow-hidden border border-slate-200 border-t-2 border-t-cyan-400 bg-white dark:border-white/10 dark:border-t-cyan-300 dark:bg-white/[0.02]">
+          <article className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 border-t-2 border-t-brand-400 bg-white dark:border-white/10 dark:border-t-brand-300 dark:bg-white/[0.03]">
             <header className="border-b border-slate-200/80 p-5 dark:border-white/10 sm:p-8">
               <h1 className="max-w-3xl text-2xl font-semibold tracking-tight text-slate-950 dark:text-white sm:text-3xl">
                 {title}
               </h1>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500 dark:text-slate-400">{description}</p>
-              <p className="mt-4 inline-flex border-l-2 border-cyan-400 pl-2 font-mono text-[10px] font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              <p className="mt-4 inline-flex border-l-2 border-brand-400 pl-2 text-xs font-medium text-slate-500 dark:text-slate-400">
                 Редакция от {updatedAt}
               </p>
             </header>

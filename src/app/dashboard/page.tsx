@@ -32,6 +32,7 @@ import { getFreshPendingPaymentCutoff } from '@/lib/payment-sync'
 import { getPlanAudienceContext, isPlanAvailableForUser } from '@/lib/plan-access'
 import { normalizeOfferTone, renderPersonalOfferTemplate } from '@/lib/personal-offers'
 import { getFeatureFlags } from '@/lib/feature-flags'
+import { cn } from '@/lib/cn'
 
 export const dynamic = 'force-dynamic'
 
@@ -158,12 +159,12 @@ export default async function DashboardHome() {
   if (!user.remnawaveUsername) {
     return (
       <div className="page-stack">
-        <header className="border-b border-slate-200/90 pb-4 dark:border-white/[0.09]">
-          <h1 className="text-[1.65rem] font-semibold leading-tight tracking-[-0.03em] text-slate-950 dark:text-white">
-            Здравствуйте, {dashboardDisplayName(user.name, user.email)}
+        <header className="pb-1">
+          <h1 className="text-[1.8rem] font-semibold leading-tight tracking-[-0.04em] text-slate-950 dark:text-white sm:text-[2rem]">
+            Добрый день, {dashboardDisplayName(user.name, user.email)}
           </h1>
           <p className="mt-1 text-sm leading-5 text-slate-500 dark:text-slate-400">
-            Остался один шаг до подключения.
+            Подключение займёт пару минут.
           </p>
         </header>
         <DashboardOnboardingCard state={onboardingState} mode="full" supportEnabled={features.support} />
@@ -188,20 +189,18 @@ export default async function DashboardHome() {
       : { href: '/dashboard/subscription', label: 'Открыть подписку', icon: <KeyRound className="h-4 w-4" /> }
   const focusedNextStep = user.payments[0]
     ? 'insight'
-    : primaryHomeNudge
-      ? 'onboarding'
-      : personalOffer
-        ? 'offer'
-        : null
+    : personalOffer
+      ? 'offer'
+      : null
 
   return (
     <div className="page-stack">
-      <header className="border-b border-slate-200/90 pb-4 dark:border-white/[0.09]">
-        <h1 className="text-[1.65rem] font-semibold leading-tight tracking-[-0.03em] text-slate-950 dark:text-white">
-          Здравствуйте, {dashboardDisplayName(user.name, user.email)}
+      <header className="pb-1">
+        <h1 className="text-[1.8rem] font-semibold leading-tight tracking-[-0.04em] text-slate-950 dark:text-white sm:text-[2rem]">
+          Добрый день, {dashboardDisplayName(user.name, user.email)}
         </h1>
         <p className="mt-1 text-sm leading-5 text-slate-500 dark:text-slate-400">
-          Здесь только состояние VPN и следующий шаг.
+          Всё важное о подписке на одном экране.
         </p>
       </header>
       {remnawaveErrorStatus !== null && (
@@ -225,6 +224,54 @@ export default async function DashboardHome() {
         </div>
       )}
 
+      <section
+        className={cn('subscription-ticket', subscriptionExpired && 'subscription-ticket--expired')}
+        data-testid="subscription-overview"
+      >
+        <div className="grid min-h-[15rem] md:grid-cols-[minmax(0,1.35fr)_minmax(18rem,.65fr)]">
+          <div className="flex min-w-0 flex-col p-5 sm:p-6">
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="break-words text-base font-semibold tracking-[-0.02em] text-slate-950 dark:text-white">
+                {subRow?.plan?.name ?? 'VPN-подписка'}
+              </h2>
+              <StatusBadge status={subscriptionStatus} />
+            </div>
+
+            <div className="mt-auto pt-8">
+              <div className="text-sm text-slate-500 dark:text-slate-400">
+                {subscriptionExpired ? 'Состояние подписки' : 'Доступно ещё'}
+              </div>
+              <strong className="mt-1 block text-[2.65rem] font-semibold leading-none tracking-[-0.055em] text-slate-950 dark:text-white sm:text-5xl">
+                {subRow || sub ? formatSubscriptionDaysLeft(daysLeft, subscriptionStatus) : '—'}
+              </strong>
+              <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">
+                {subscriptionExpired
+                  ? 'Продлите доступ, настройки устройств сохранятся.'
+                  : 'Подписка работает без ограничений.'}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-col border-t border-slate-900/10 p-5 dark:border-white/10 sm:p-6 md:border-l md:border-t-0">
+            <div className="subscription-ticket__metric flex items-center justify-between gap-3 pt-4 md:mt-auto">
+              <span className="text-sm text-slate-500 dark:text-slate-400">Трафик</span>
+              <strong className="text-right font-semibold text-slate-950 dark:text-white">
+                {hasRemoteUsage
+                  ? `${formatBytes(used)}${isUnlimited ? ' · безлимит' : ` из ${formatBytes(limit)}`}`
+                  : '—'}
+              </strong>
+            </div>
+            <Link href={primaryAction.href} className="btn-primary group mt-5 w-full justify-between">
+              <span className="inline-flex items-center gap-2">
+                {primaryAction.icon}
+                {primaryAction.label}
+              </span>
+              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+            </Link>
+          </div>
+        </div>
+      </section>
+
       {focusedNextStep === 'insight' ? (
         <SmartInsights
           emailVerified={onboardingState.emailVerified}
@@ -234,56 +281,9 @@ export default async function DashboardHome() {
           pendingPayment={user.payments[0] ?? null}
           suppress={primaryHomeNudge}
         />
-      ) : focusedNextStep === 'onboarding' ? (
-        <DashboardOnboardingCard state={onboardingState} supportEnabled={features.support} />
       ) : focusedNextStep === 'offer' && personalOffer ? (
         <PersonalOffer offer={personalOffer} welcomeBonusOptions={welcomeBonusOptions} />
       ) : null}
-
-      <section className="dashboard-signal rounded-xl border border-slate-300/80 bg-white p-4 pl-5 dark:border-white/10 dark:bg-white/[0.03] sm:p-5 sm:pl-6" data-testid="subscription-overview">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <h2 className="break-words text-xl font-semibold tracking-[-0.025em] text-slate-950 dark:text-white">
-                {subRow?.plan?.name ?? 'VPN-подписка'}
-              </h2>
-              <StatusBadge status={subscriptionStatus} />
-            </div>
-            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-              {subscriptionExpired
-                ? 'Срок доступа истёк'
-                : daysLeft > 0
-                  ? `Активна ещё ${daysLeft} дн.`
-                  : 'Закончится сегодня'}
-            </p>
-          </div>
-          {focusedNextStep === null && (
-            <Link href={primaryAction.href} className="btn-primary group w-full justify-between sm:w-auto">
-              <span className="inline-flex items-center gap-2">
-                {primaryAction.icon}
-                {primaryAction.label}
-              </span>
-              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-            </Link>
-          )}
-        </div>
-        <div className="mt-4 grid gap-3 border-t border-slate-200 pt-3 text-sm dark:border-white/10 sm:grid-cols-2">
-          <div className="flex items-center justify-between gap-3">
-            <span className="text-slate-500 dark:text-slate-400">Осталось</span>
-            <strong className="font-semibold text-slate-950 dark:text-white">
-              {subRow || sub ? formatSubscriptionDaysLeft(daysLeft, subscriptionStatus) : '—'}
-            </strong>
-          </div>
-          <div className="flex items-center justify-between gap-3 sm:border-l sm:border-slate-200 sm:pl-3 dark:sm:border-white/10">
-            <span className="text-slate-500 dark:text-slate-400">Трафик</span>
-            <strong className="font-semibold text-slate-950 dark:text-white">
-              {hasRemoteUsage
-                ? `${formatBytes(used)}${isUnlimited ? ' · безлимит' : ` из ${formatBytes(limit)}`}`
-                : '—'}
-            </strong>
-          </div>
-        </div>
-      </section>
 
       <details className="group border-t border-slate-200 pt-3 dark:border-white/10">
         <summary className="flex min-h-10 cursor-pointer list-none items-center justify-between gap-3 text-sm font-medium text-slate-600 hover:text-slate-950 dark:text-slate-300 dark:hover:text-white [&::-webkit-details-marker]:hidden">
@@ -613,25 +613,25 @@ function PersonalOffer({
   const tone = personalOfferTone(offer.tone)
 
   return (
-    <section className={`rounded-3xl border p-4 shadow-sm shadow-slate-950/[0.025] dark:shadow-none sm:p-5 ${tone.shell}`}>
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <section className={`border-y px-1 py-4 ${tone.shell}`}>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex min-w-0 gap-3">
-          <div className={`grid h-11 w-11 shrink-0 place-items-center rounded-2xl ${tone.icon}`}>
+          <div className={`mt-0.5 shrink-0 ${tone.icon}`}>
             {offer.icon}
           </div>
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <span className={`text-xs font-semibold uppercase tracking-wide ${tone.eyebrow}`}>
+              <span className={`text-xs font-medium ${tone.eyebrow}`}>
                 {offer.eyebrow}
               </span>
-              <span className="rounded-full bg-white/70 px-2 py-0.5 text-xs text-slate-500 ring-1 ring-slate-200/70 dark:bg-white/[0.05] dark:text-slate-400 dark:ring-white/10">
+              <span className="text-xs text-slate-400">
                 {offer.meta}
               </span>
             </div>
-            <h2 className="mt-1 text-xl font-semibold tracking-tight text-slate-950 dark:text-white">
+            <h2 className="mt-1 text-base font-semibold tracking-tight text-slate-950 dark:text-white">
               {offer.title}
             </h2>
-            <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">
+            <p className="mt-1 max-w-2xl text-sm leading-5 text-slate-500 dark:text-slate-400">
               {offer.description}
             </p>
           </div>
@@ -641,7 +641,7 @@ function PersonalOffer({
             <WelcomeOfferButton label={offer.cta} options={welcomeBonusOptions} />
           </div>
         ) : (
-          <Link href={offer.href} className="btn-primary min-h-11 w-full shrink-0 justify-center rounded-2xl px-4 sm:w-auto">
+          <Link href={offer.href} className="btn-secondary min-h-10 w-full shrink-0 justify-center px-4 sm:w-auto">
             <Sparkles className="h-4 w-4" />
             {offer.cta}
           </Link>
@@ -723,28 +723,28 @@ function isWelcomeBonusEligible({
 function personalOfferTone(tone: PersonalOfferView['tone']) {
   if (tone === 'amber') {
     return {
-      shell: 'border-amber-200 bg-amber-50/80 dark:border-amber-500/25 dark:bg-amber-500/10',
-      icon: 'bg-amber-100 text-amber-700 dark:bg-amber-400/15 dark:text-amber-100',
+      shell: 'border-amber-200 dark:border-amber-500/25',
+      icon: 'text-amber-700 dark:text-amber-100',
       eyebrow: 'text-amber-700 dark:text-amber-200',
     }
   }
   if (tone === 'emerald') {
     return {
-      shell: 'border-emerald-200 bg-emerald-50/80 dark:border-emerald-500/25 dark:bg-emerald-500/10',
-      icon: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-400/15 dark:text-emerald-100',
+      shell: 'border-emerald-200 dark:border-emerald-500/25',
+      icon: 'text-emerald-700 dark:text-emerald-100',
       eyebrow: 'text-emerald-700 dark:text-emerald-200',
     }
   }
   if (tone === 'violet') {
     return {
-      shell: 'border-violet-200 bg-violet-50/80 dark:border-violet-500/25 dark:bg-violet-500/10',
-      icon: 'bg-violet-100 text-violet-700 dark:bg-violet-400/15 dark:text-violet-100',
+      shell: 'border-violet-200 dark:border-violet-500/25',
+      icon: 'text-violet-700 dark:text-violet-100',
       eyebrow: 'text-violet-700 dark:text-violet-200',
     }
   }
   return {
-    shell: 'border-cyan-200 bg-cyan-50/80 dark:border-cyan-500/25 dark:bg-cyan-500/10',
-    icon: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-400/15 dark:text-cyan-100',
+    shell: 'border-cyan-200 dark:border-cyan-500/25',
+    icon: 'text-cyan-700 dark:text-cyan-100',
     eyebrow: 'text-cyan-700 dark:text-cyan-200',
   }
 }

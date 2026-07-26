@@ -53,11 +53,11 @@ export default async function HomePage() {
   const brandName = getBrandName()
 
   return (
-    <main className="min-h-dvh overflow-hidden bg-[#f4f5f1] text-slate-950 dark:bg-[#0a0c0d] dark:text-white">
+    <main className="min-h-dvh overflow-hidden bg-[#f1f0eb] text-slate-950 dark:bg-[#0b0f0d] dark:text-white">
       <section className="relative isolate border-b border-slate-200/80 dark:border-white/[0.08]">
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute inset-y-0 left-0 -z-10 w-1 bg-cyan-400"
+          className="pointer-events-none absolute inset-y-0 left-0 -z-10 w-1 bg-brand-400"
         />
 
         <header className="mx-auto flex h-[4.5rem] max-w-7xl items-center justify-between gap-4 border-b border-slate-200/80 px-4 sm:h-20 sm:px-6 lg:px-8 dark:border-white/[0.08]">
@@ -114,7 +114,7 @@ export default async function HomePage() {
           <div className="mt-7 grid border-y border-slate-200/80 md:grid-cols-3 dark:border-white/[0.08]">
             {benefits.map(({ icon: Icon, title, description }) => (
               <article key={title} className="border-slate-200/80 p-5 first:border-b sm:p-6 md:border-r md:first:border-b-0 md:last:border-r-0 dark:border-white/[0.08]">
-                <Icon className="h-5 w-5 text-cyan-600 dark:text-cyan-300" />
+                <Icon className="h-5 w-5 text-brand-600 dark:text-brand-300" />
                 <h3 className="mt-4 text-base font-semibold tracking-tight text-slate-950 dark:text-white">{title}</h3>
                 <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">{description}</p>
               </article>
@@ -124,7 +124,7 @@ export default async function HomePage() {
       </section>
 
       <section id="connection" className="scroll-mt-8 px-4 pb-12 sm:px-6 sm:pb-16 lg:px-8">
-        <div className="mx-auto grid max-w-7xl overflow-hidden border-l-4 border-cyan-400 bg-slate-950 text-white lg:grid-cols-[0.8fr_1.2fr]">
+        <div className="mx-auto grid max-w-7xl overflow-hidden rounded-2xl border-l-4 border-brand-400 bg-[#111713] text-white lg:grid-cols-[0.8fr_1.2fr]">
           <div className="relative isolate p-6 sm:p-8 lg:p-10">
             <h2 className="max-w-xl text-2xl font-semibold sm:text-3xl">От регистрации до подключения</h2>
             <p className="mt-4 max-w-xl text-sm leading-6 text-white/60 sm:text-base sm:leading-7">После оплаты кабинет покажет данные подписки и предложит подходящий способ подключения.</p>
@@ -137,7 +137,7 @@ export default async function HomePage() {
           <ol className="grid gap-px bg-white/[0.08] sm:grid-cols-3">
             {steps.map(([number, title, description]) => (
               <li key={number} className="flex gap-3 bg-slate-900/95 p-5">
-                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-md border border-cyan-300/30 font-mono text-xs font-semibold text-cyan-200">{number}</span>
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-md border border-brand-300/30 font-mono text-xs font-semibold text-brand-200">{number}</span>
                 <div>
                   <h3 className="font-semibold text-white">{title}</h3>
                   <p className="mt-1 text-sm leading-6 text-white/55">{description}</p>
@@ -170,7 +170,7 @@ function CabinetPreview({ brandName }: { brandName: string }) {
       aria-label="Пример личного кабинета с активной подпиской"
       className="relative mx-auto w-full max-w-xl lg:mx-0"
     >
-      <div className="overflow-hidden border border-slate-200/90 border-t-2 border-t-cyan-400 bg-white p-4 dark:border-white/10 dark:border-t-cyan-300 dark:bg-slate-900">
+      <div className="overflow-hidden rounded-2xl border border-slate-200/90 border-t-2 border-t-brand-400 bg-white p-4 shadow-[0_24px_60px_-48px_rgba(20,30,25,.5)] dark:border-white/10 dark:border-t-brand-300 dark:bg-[#141a17]">
         <div className="flex items-center justify-between px-1 pb-3">
           <div className="flex items-center gap-2.5">
             <span className="grid h-8 w-8 place-items-center rounded-md bg-slate-950 text-white dark:bg-white dark:text-slate-950"><ShieldCheck className="h-4 w-4" /></span>
@@ -182,13 +182,13 @@ function CabinetPreview({ brandName }: { brandName: string }) {
           <span className="flex items-center gap-1.5 rounded-sm bg-emerald-50 px-2 py-1 font-mono text-[9px] font-semibold uppercase tracking-wide text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-300"><span className="h-1.5 w-1.5 bg-emerald-500" />Активна</span>
         </div>
 
-        <div className="border-l-2 border-cyan-400 bg-slate-950 p-4 text-white sm:p-5">
+        <div className="rounded-xl border-l-2 border-brand-400 bg-[#111713] p-4 text-white sm:p-5">
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-xs text-white/50">Подписка</p>
               <p className="mt-1 text-xl font-semibold tracking-tight sm:text-2xl">26 дней осталось</p>
             </div>
-            <span className="grid h-10 w-10 place-items-center rounded-md border border-white/15 text-cyan-200"><Wifi className="h-5 w-5" /></span>
+            <span className="grid h-10 w-10 place-items-center rounded-md border border-white/15 text-brand-200"><Wifi className="h-5 w-5" /></span>
           </div>
           <div className="mt-5 grid grid-cols-2 border-t border-white/10 pt-4">
             <div className="border-r border-white/10 pr-3">

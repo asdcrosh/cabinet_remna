@@ -431,7 +431,7 @@ export function MobileBottomNav({
   return (
     <nav
       aria-label="Основная мобильная навигация"
-      className="fixed inset-x-2 bottom-[max(.5rem,env(safe-area-inset-bottom))] z-40 rounded-xl border border-slate-300/90 bg-[#f8f9f5]/95 p-1.5 shadow-[0_8px_24px_-16px_rgba(15,23,42,0.5)] backdrop-blur dark:border-white/[0.14] dark:bg-[#111516]/95 dark:shadow-black/30 lg:hidden"
+      className="dashboard-mobile-nav fixed inset-x-2 bottom-[max(.5rem,env(safe-area-inset-bottom))] z-40 rounded-xl border p-1.5 backdrop-blur lg:hidden"
     >
       <div
         className="mx-auto grid max-w-md gap-1"
@@ -585,14 +585,12 @@ function MobileMoreGrid({
 export function Brand({ compact = false, brandName }: { compact?: boolean; brandName: string }) {
   return (
     <Link href="/dashboard" className="flex min-w-0 items-center gap-2.5">
-      <div className="relative grid h-9 w-9 shrink-0 place-items-center rounded-md border border-slate-950 bg-slate-950 text-white dark:border-white dark:bg-white dark:text-slate-950">
+      <div className="brand-mark relative grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-slate-950 bg-slate-950 text-white dark:border-white/15 dark:bg-white/10 dark:text-white">
         <ShieldCheck className="h-4 w-4" />
       </div>
       <div className="min-w-0">
         <div className="truncate text-sm font-semibold tracking-tight text-slate-950 dark:text-white">{brandName}</div>
-        <div className={cn('truncate font-mono text-[10px] uppercase tracking-[0.08em] text-slate-500', compact && 'hidden')}>
-          VPN / Кабинет
-        </div>
+        {!compact && <div className="mt-0.5 truncate text-[11px] text-slate-500 dark:text-slate-400">Личный кабинет</div>}
       </div>
     </Link>
   )
@@ -856,7 +854,7 @@ function AdminNavGroup({
     <div>
       <button
         type="button"
-        className="flex w-full items-center justify-between gap-2 rounded-lg px-3 py-1.5 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-400 transition-colors hover:bg-slate-50 hover:text-slate-600 dark:hover:bg-white/5 dark:hover:text-slate-200"
+        className="flex w-full items-center justify-between gap-2 rounded-lg px-3 py-1.5 text-left text-xs font-medium text-slate-400 transition-colors hover:bg-slate-50 hover:text-slate-600 dark:hover:bg-white/5 dark:hover:text-slate-200"
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
       >

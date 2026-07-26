@@ -155,9 +155,7 @@ export default async function AdminDashboardPage() {
           )}
           {supportWaiting === 0 && recoveryCount === 0 && syncFailed === 0 && duplicateCandidates.length === 0 && stalePendingPayments === 0 && (
             <div className="col-span-full flex min-h-16 items-center gap-3 rounded-[1.25rem] border border-emerald-200/80 bg-emerald-50/80 px-4 py-3 text-sm font-medium text-emerald-800 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200">
-              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white/80 text-emerald-600 shadow-sm ring-1 ring-emerald-200/80 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-500/20">
-                <ShieldCheck className="h-4 w-4" />
-              </span>
+              <ShieldCheck className="h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-300" />
               <div>
                 <div className="font-semibold">Очереди чистые</div>
                 <div className="mt-0.5 text-xs font-normal text-emerald-700/80 dark:text-emerald-300/80">Срочных действий нет</div>
@@ -175,7 +173,7 @@ export default async function AdminDashboardPage() {
           </div>
         </div>
 
-        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2 xl:grid-cols-4">
           <AnalyticsCard
             icon={<UserPlus className="h-5 w-5" />}
             title="Регистрации"
@@ -321,14 +319,12 @@ function AnalyticsCard({
 }) {
   return (
     <div className="min-w-0 rounded-[1.25rem] border border-slate-200/80 bg-white p-4 dark:border-white/[0.08] dark:bg-white/[0.025]">
-      <div className="flex items-center justify-between gap-3">
-        <div className="inline-flex min-w-0 items-center gap-2.5 text-sm font-medium text-slate-500 dark:text-slate-400">
+      <div className="flex items-center gap-2.5 text-sm font-medium text-slate-500 dark:text-slate-400">
           <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-slate-50 text-slate-400 ring-1 ring-slate-200/70 dark:bg-white/[0.04] dark:ring-white/[0.08]">{icon}</span>
           <span className="truncate">{title}</span>
-        </div>
-        <div className="shrink-0 rounded-lg bg-slate-50 px-2 py-1 text-[11px] font-medium text-slate-400 dark:bg-white/[0.04]">{hint}</div>
       </div>
       <div className="mt-3 truncate text-2xl font-semibold tracking-tight tabular-nums text-slate-950 dark:text-white">{value}</div>
+      <div className="mt-1 truncate text-[11px] text-slate-400">{hint}</div>
       <div className="mt-3 grid grid-cols-2 gap-2 border-t border-slate-100 pt-3 text-xs text-slate-500 dark:border-white/[0.07] dark:text-slate-400">
         {details.map((detail) => (
           <span key={detail.label} className="min-w-0">

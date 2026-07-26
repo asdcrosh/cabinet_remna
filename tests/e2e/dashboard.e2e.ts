@@ -8,9 +8,9 @@ test('истёкшая подписка не показывает отрицат
   const subscriptionOverview = page.getByTestId('subscription-overview')
   await expect(subscriptionOverview.getByRole('heading', { name: 'E2E Стандарт' })).toBeVisible()
   await expect(subscriptionOverview.getByText('-2 дн.', { exact: true })).toHaveCount(0)
-  await expect(subscriptionOverview.getByText('Срок доступа истёк', { exact: true })).toBeVisible()
+  await expect(subscriptionOverview.getByText('Истекла', { exact: true }).first()).toBeVisible()
 
-  await expect(subscriptionOverview.getByText('Осталось', { exact: true })).toBeVisible()
+  await expect(subscriptionOverview.getByText('Состояние подписки', { exact: true })).toBeVisible()
   await expect(subscriptionOverview.getByText('Трафик', { exact: true })).toBeVisible()
   await expectNoHorizontalOverflow(page)
 })
@@ -114,7 +114,7 @@ test('истёкшее подключение показывает только 
   await page.goto('/dashboard/subscription')
 
   await expect(page.getByRole('heading', { name: 'Подключение' })).toBeVisible()
-  await expect(page.getByText('Подписка истекла', { exact: true })).toBeVisible()
+  await expect(page.locator('h2:visible', { hasText: 'Подписка истекла' })).toBeVisible()
   await expect(page.getByRole('link', { name: 'Продлить' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'HAPP', exact: true })).toHaveCount(0)
   await expectNoHorizontalOverflow(page)

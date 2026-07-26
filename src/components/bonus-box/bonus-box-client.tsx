@@ -287,8 +287,8 @@ export function BonusBoxClient({
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="text-base font-semibold text-slate-950 dark:text-white sm:text-lg">Рулетка бонусов</h2>
-              <span className="border-l-2 border-cyan-400 pl-2 font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-cyan-700 dark:text-cyan-200">
-                {availableNow} доступно сейчас
+              <span className="border-l-2 border-cyan-400 pl-2 text-xs font-medium text-slate-500 dark:text-slate-400">
+                {availableNow} доступно
               </span>
             </div>
             <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400 sm:text-sm" aria-live="polite">
@@ -316,7 +316,7 @@ export function BonusBoxClient({
           </div>
         </div>
 
-        <div className="bonus-box-reel-shell relative overflow-hidden py-3 sm:py-5">
+        {data.prizes.length > 0 && <div className="bonus-box-reel-shell relative overflow-hidden py-3 sm:py-5">
           <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-5 bg-gradient-to-r from-white via-white/75 to-transparent dark:from-surface-900 dark:via-surface-900/75 sm:w-32" />
           <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-5 bg-gradient-to-l from-white via-white/75 to-transparent dark:from-surface-900 dark:via-surface-900/75 sm:w-32" />
           <div className="bonus-box-portal" aria-hidden="true">
@@ -348,7 +348,7 @@ export function BonusBoxClient({
               ))}
             </div>
           </div>
-        </div>
+        </div>}
 
         {(canUseWelcomeAttempts || lockedAttempts > 0) && (
           <div className="border-t border-slate-200 bg-slate-50/80 px-3 py-2 text-sm text-slate-600 dark:border-white/10 dark:bg-white/[0.035] dark:text-slate-300 sm:px-5">

@@ -253,7 +253,7 @@ export function PlanCard({
     <div
       data-testid="plan-card"
       className={cn(
-        "relative flex h-full min-h-0 flex-col overflow-hidden rounded-xl border border-slate-200/90 bg-white p-4 dark:border-white/[0.09] dark:bg-white/[0.025] sm:p-5",
+        "plan-checkout-card relative flex h-full min-h-0 flex-col overflow-hidden rounded-xl border border-slate-200/90 bg-white p-4 dark:border-white/[0.09] dark:bg-white/[0.025] sm:p-5",
         checkoutDisplay && "overflow-visible rounded-none border-0 bg-transparent p-0 shadow-none dark:border-0 dark:bg-transparent sm:p-0",
         !checkoutDisplay && popular && "border-cyan-300/80 dark:border-cyan-400/35",
         !checkoutDisplay && current && "border-cyan-300/80 bg-cyan-50/45 shadow-cyan-950/[0.04] dark:border-cyan-400/35 dark:bg-cyan-500/[0.06]",
