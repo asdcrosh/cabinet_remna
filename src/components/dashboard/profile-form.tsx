@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Save } from 'lucide-react'
+import { Check, Save } from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
 import { updateProfileSchema, type UpdateProfileInput } from '@/lib/auth/validation'
 import { toast } from '@/components/ui/toaster'
@@ -36,26 +36,30 @@ export function ProfileForm({ name }: { name: string | null }) {
   })
 
   return (
-    <form onSubmit={onSubmit} className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
-      <div className="min-w-0">
-        <label className="label" htmlFor="profile-name">Отображаемое имя</label>
+    <form onSubmit={onSubmit}>
+      <label className="label" htmlFor="profile-name">Отображаемое имя</label>
+      <div className="grid gap-2.5 sm:grid-cols-[minmax(0,1fr)_auto]">
         <input
           id="profile-name"
-          className="input"
+          className="input min-h-11"
           placeholder="Как к вам обращаться"
           disabled={!isHydrated || isSubmitting}
           {...register('name')}
         />
-        {!errors.name && <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Используется в кабинете и уведомлениях.</p>}
-        {errors.name && <p className="mt-1 text-xs text-red-600">{errors.name.message}</p>}
+        <button
+          type="submit"
+          className={isDirty ? 'btn-primary min-h-11 w-full justify-center sm:min-w-36' : 'btn-secondary min-h-11 w-full justify-center sm:min-w-36'}
+          disabled={!isHydrated || !isDirty || isSubmitting}
+        >
+          {isDirty ? <Save className="h-4 w-4" /> : <Check className="h-4 w-4" />}
+          {isSubmitting ? 'Сохраняем...' : isDirty ? 'Сохранить' : 'Сохранено'}
+        </button>
       </div>
+      {!errors.name && <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">Используется в кабинете и уведомлениях.</p>}
+      {errors.name && <p className="mt-1.5 text-xs text-red-600">{errors.name.message}</p>}
       {serverError && (
-        <FormAlert className="sm:col-span-2">{serverError}</FormAlert>
+        <FormAlert className="mt-2">{serverError}</FormAlert>
       )}
-      <button type="submit" className="btn-primary w-full sm:min-w-40" disabled={!isHydrated || !isDirty || isSubmitting}>
-        <Save className="h-4 w-4" />
-        {isSubmitting ? 'Сохраняем...' : isDirty ? 'Сохранить' : 'Сохранено'}
-      </button>
     </form>
   )
 }

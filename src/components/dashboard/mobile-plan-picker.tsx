@@ -3,7 +3,7 @@
 import type { ReactNode } from 'react'
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { ArrowRight, Check, CreditCard, X } from 'lucide-react'
+import { ArrowRight, Check, X } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { formatPrice } from '@/lib/format'
 import { PlanCard, type PlanCardProps } from './plan-card'
@@ -60,44 +60,44 @@ export function PlanCatalog({ plans, initialPlanId }: { plans: CatalogPlan[]; in
         </span>
       </div>
 
-      <div className="plan-period-list overflow-hidden xl:hidden">
+      <div className="plan-period-list grid gap-2.5 xl:hidden">
         {orderedPlans.map((plan) => (
           <article
             key={plan.id}
             className={cn(
-              'border-b border-l-2 border-slate-200/90 bg-transparent px-1 py-3.5 dark:border-white/[0.09]',
+              'relative grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 overflow-hidden rounded-[1.15rem] border px-3.5 py-3 dark:border-white/[0.09]',
               plan.current
-                ? 'border-l-cyan-500 bg-cyan-50/35 dark:border-l-cyan-300 dark:bg-cyan-500/[0.04]'
-                : 'border-l-slate-300 dark:border-l-white/15'
+                ? 'border-cyan-300/70 bg-cyan-50/65 dark:border-cyan-300/20 dark:bg-cyan-300/[0.055]'
+                : 'border-slate-200/90 bg-white/60 dark:bg-white/[0.02]'
             )}
           >
-            <div className="flex min-w-0 items-start justify-between gap-3">
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <h3 className="break-words text-base font-semibold tracking-tight text-slate-950 dark:text-white">{plan.name}</h3>
-                  {plan.current ? <PlanPickerBadge>Текущий</PlanPickerBadge> : null}
-                  {!plan.current && plan.popular ? <PlanPickerBadge>Популярный</PlanPickerBadge> : null}
-                  {plan.savingsPercent > 0 && !plan.isPromo ? <PlanPickerBadge>−{plan.savingsPercent}%</PlanPickerBadge> : null}
-                </div>
-                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                  {plan.durationDays} дней · {dailyRateLabel(plan)}
-                </p>
+            {plan.current ? <span className="absolute inset-y-3 left-0 w-0.5 rounded-r-full bg-cyan-400" /> : null}
+
+            <div className="min-w-0">
+              <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                <h3 className="min-w-0 truncate text-[15px] font-semibold tracking-tight text-slate-950 dark:text-white">{plan.name}</h3>
+                {plan.current ? <PlanPickerBadge>Текущий</PlanPickerBadge> : null}
+                {!plan.current && plan.popular ? <PlanPickerBadge>Популярный</PlanPickerBadge> : null}
+                {plan.savingsPercent > 0 && !plan.isPromo ? <PlanPickerBadge>−{plan.savingsPercent}%</PlanPickerBadge> : null}
               </div>
-              <span className="shrink-0 whitespace-nowrap text-lg font-semibold tabular-nums text-slate-950 dark:text-white">
+              <p className="mt-1 truncate text-xs text-slate-500 dark:text-slate-400">
+                {plan.durationDays} дней · {dailyRateLabel(plan)}
+              </p>
+            </div>
+
+            <div className="flex shrink-0 flex-col items-end gap-1.5">
+              <span className="whitespace-nowrap text-base font-semibold tabular-nums text-slate-950 dark:text-white">
                 {plan.price}
               </span>
-            </div>
-            <div className="mt-3 flex justify-end">
               <button
                 type="button"
                 aria-haspopup="dialog"
                 onClick={() => setMobileCheckoutPlanId(plan.id)}
                 disabled={!plan.isPromo && plan.paymentProviders?.length === 0}
-                className="group inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-slate-300 bg-transparent px-3.5 text-sm font-semibold text-slate-700 transition-colors hover:border-slate-950 hover:text-slate-950 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/15 dark:text-slate-200 dark:hover:border-white/40 dark:hover:text-white"
+                className="group inline-flex min-h-8 items-center justify-center gap-1 rounded-lg bg-slate-950 px-2.5 text-xs font-semibold text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white/[0.09] dark:text-white dark:hover:bg-white/[0.14]"
               >
-                <CreditCard className="h-4 w-4" />
                 {mobileCtaLabel(plan)}
-                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
               </button>
             </div>
           </article>

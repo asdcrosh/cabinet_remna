@@ -125,13 +125,19 @@ export default async function PlansPage({
     <div className="page-stack">
       <PageHeader
         title="Тарифы"
-        description="Выберите срок. На телефоне способ оплаты откроется отдельным окном."
+        description="Выберите период подписки."
         action={(
           <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
             {canManagePlans && (
-              <Link href="/dashboard/admin/plans" className="btn-secondary">
-                Управлять тарифами
-              </Link>
+              <>
+                <Link href="/dashboard/admin/plans" className="hidden xl:inline-flex btn-secondary">
+                  Управлять тарифами
+                </Link>
+                <Link href="/dashboard/admin/plans" className="inline-flex min-h-9 items-center text-sm font-medium text-slate-500 transition-colors hover:text-slate-950 dark:text-slate-400 dark:hover:text-white xl:hidden">
+                  Управление
+                  <ArrowRight className="ml-1 h-3.5 w-3.5" />
+                </Link>
+              </>
             )}
           </div>
         )}

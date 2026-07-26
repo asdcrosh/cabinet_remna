@@ -262,12 +262,10 @@ body {
 }
 
 .plan-period-list {
-  border: 1px solid var(--app-line);
-  border-radius: 1rem;
-}
-
-.plan-period-list article:last-child {
-  border-bottom: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent !important;
+  box-shadow: none;
 }
 
 .plan-period-panel [aria-checked='true'] {
