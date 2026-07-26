@@ -306,6 +306,10 @@ body {
     margin-top: 1rem;
   }
 
+  .plan-period-list article:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
+
   .dashboard-shell :where(.panel-pad, .card, .surface-card, .metric-card) {
     padding: 0.95rem;
   }

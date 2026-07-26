@@ -60,41 +60,53 @@ export function PlanCatalog({ plans, initialPlanId }: { plans: CatalogPlan[]; in
         </span>
       </div>
 
-      <div className="plan-period-list grid gap-2.5 xl:hidden">
+      <div className="plan-period-list grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4 xl:hidden">
         {orderedPlans.map((plan) => (
           <article
             key={plan.id}
             className={cn(
-              'relative grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 overflow-hidden rounded-[1.15rem] border px-3.5 py-3 dark:border-white/[0.09]',
+              'relative flex min-h-[9.75rem] min-w-0 flex-col overflow-hidden rounded-[1.35rem] border p-3.5 dark:border-white/[0.09] sm:min-h-[10.5rem] sm:p-4',
               plan.current
-                ? 'border-cyan-300/70 bg-cyan-50/65 dark:border-cyan-300/20 dark:bg-cyan-300/[0.055]'
-                : 'border-slate-200/90 bg-white/60 dark:bg-white/[0.02]'
+                ? 'border-cyan-300/70 bg-cyan-50/75 dark:border-cyan-300/25 dark:bg-cyan-300/[0.07]'
+                : 'border-slate-200/90 bg-white/65 dark:bg-white/[0.025]'
             )}
           >
-            {plan.current ? <span className="absolute inset-y-3 left-0 w-0.5 rounded-r-full bg-cyan-400" /> : null}
-
-            <div className="min-w-0">
-              <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-                <h3 className="min-w-0 truncate text-[15px] font-semibold tracking-tight text-slate-950 dark:text-white">{plan.name}</h3>
+            <div className="flex min-w-0 items-start justify-between gap-2">
+              <div className="min-w-0">
+                <h3 className="text-xl font-semibold leading-none tracking-[-0.035em] text-slate-950 dark:text-white sm:text-2xl">
+                  {plan.durationDays}
+                  {' '}
+                  <span className="ml-1 text-sm font-medium tracking-normal text-slate-500 dark:text-slate-400">
+                    {dayLabel(plan.durationDays)}
+                  </span>
+                </h3>
+                <p className="mt-2 truncate text-[11px] text-slate-500 dark:text-slate-400">{plan.name}</p>
+              </div>
+              <div className="flex shrink-0 flex-col items-end gap-1">
                 {plan.current ? <PlanPickerBadge>Текущий</PlanPickerBadge> : null}
-                {!plan.current && plan.popular ? <PlanPickerBadge>Популярный</PlanPickerBadge> : null}
+                {!plan.current && plan.popular ? <PlanPickerBadge>Выбор</PlanPickerBadge> : null}
                 {plan.savingsPercent > 0 && !plan.isPromo ? <PlanPickerBadge>−{plan.savingsPercent}%</PlanPickerBadge> : null}
               </div>
-              <p className="mt-1 truncate text-xs text-slate-500 dark:text-slate-400">
-                {plan.durationDays} дней · {dailyRateLabel(plan)}
-              </p>
             </div>
 
-            <div className="flex shrink-0 flex-col items-end gap-1.5">
-              <span className="whitespace-nowrap text-base font-semibold tabular-nums text-slate-950 dark:text-white">
+            <div className="mt-auto">
+              <div className="mb-2.5">
+                <span className="block whitespace-nowrap text-lg font-semibold tracking-tight tabular-nums text-slate-950 dark:text-white sm:text-xl">
                 {plan.price}
-              </span>
+                </span>
+                <span className="mt-0.5 block truncate text-[10px] text-slate-500 dark:text-slate-400">{dailyRateLabel(plan)}</span>
+              </div>
               <button
                 type="button"
                 aria-haspopup="dialog"
                 onClick={() => setMobileCheckoutPlanId(plan.id)}
                 disabled={!plan.isPromo && plan.paymentProviders?.length === 0}
-                className="group inline-flex min-h-8 items-center justify-center gap-1 rounded-lg bg-slate-950 px-2.5 text-xs font-semibold text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white/[0.09] dark:text-white dark:hover:bg-white/[0.14]"
+                className={cn(
+                  'group inline-flex min-h-9 w-full items-center justify-between gap-1 rounded-xl px-3 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50',
+                  plan.current
+                    ? 'bg-cyan-600 text-white hover:bg-cyan-700 dark:bg-cyan-300 dark:text-slate-950 dark:hover:bg-cyan-200'
+                    : 'bg-slate-950 text-white hover:bg-slate-800 dark:bg-white/[0.09] dark:text-white dark:hover:bg-white/[0.14]'
+                )}
               >
                 {mobileCtaLabel(plan)}
                 <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
@@ -222,7 +234,7 @@ export function PlanCatalog({ plans, initialPlanId }: { plans: CatalogPlan[]; in
 
 function PlanPickerBadge({ children }: { children: ReactNode }) {
   return (
-    <span className="rounded-sm bg-cyan-50 px-1.5 py-0.5 font-mono text-[9px] font-semibold uppercase tracking-wide text-cyan-700 dark:bg-cyan-500/10 dark:text-cyan-300">
+    <span className="rounded-full bg-cyan-50 px-1.5 py-0.5 text-[9px] font-semibold text-cyan-700 dark:bg-cyan-500/10 dark:text-cyan-300">
       {children}
     </span>
   )
@@ -238,6 +250,15 @@ function dailyRateLabel(plan: CatalogPlan) {
   if (plan.isPromo || plan.priceKopecks <= 0) return 'Бесплатно'
   const dailyPrice = Math.round(plan.priceKopecks / Math.max(1, plan.durationDays))
   return `${formatPrice(dailyPrice)} в день`
+}
+
+function dayLabel(days: number) {
+  const lastTwo = days % 100
+  if (lastTwo >= 11 && lastTwo <= 14) return 'дней'
+  const last = days % 10
+  if (last === 1) return 'день'
+  if (last >= 2 && last <= 4) return 'дня'
+  return 'дней'
 }
 
 function mobileCtaLabel(plan: CatalogPlan) {

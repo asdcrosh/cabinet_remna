@@ -158,18 +158,18 @@ export default async function PlansPage({
       )}
 
       {needsTelegramCheckForPromo && (
-        <div className="flex flex-col gap-3 rounded-[1.5rem] border border-amber-200/80 bg-amber-50/70 px-4 py-3.5 text-sm text-amber-900 dark:border-amber-500/25 dark:bg-amber-500/[0.08] dark:text-amber-100 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3 rounded-[1.25rem] border border-amber-200/80 bg-amber-50/70 px-3.5 py-3 text-sm text-amber-900 dark:border-amber-500/25 dark:bg-amber-500/[0.08] dark:text-amber-100">
           <span className="flex min-w-0 items-center gap-3">
-            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-white/80 shadow-sm ring-1 ring-amber-200/80 dark:bg-amber-300/10 dark:ring-amber-300/15">
-              <MessageCircleQuestion className="h-5 w-5" />
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white/80 ring-1 ring-amber-200/80 dark:bg-amber-300/10 dark:ring-amber-300/15">
+              <MessageCircleQuestion className="h-4 w-4" />
             </span>
             <span className="min-w-0">
               <span className="block font-semibold">Доступен пробный тариф</span>
-              <span className="mt-0.5 block text-xs leading-5 text-amber-800/80 dark:text-amber-100/70">Сначала подтвердите аккаунт через Telegram.</span>
+              <span className="mt-0.5 block truncate text-xs text-amber-800/80 dark:text-amber-100/70">Подтвердите аккаунт через Telegram</span>
             </span>
           </span>
-          <Link href="/dashboard/settings" className="inline-flex min-h-10 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-white px-3 font-semibold text-amber-900 shadow-sm ring-1 ring-amber-200/80 transition-colors hover:bg-amber-100 dark:bg-amber-300/10 dark:text-amber-100 dark:ring-amber-300/15 dark:hover:bg-amber-300/15">
-            Перейти к проверке
+          <Link href="/dashboard/settings" aria-label="Перейти к проверке аккаунта" className="ml-auto inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-white px-2.5 font-semibold text-amber-900 ring-1 ring-amber-200/80 transition-colors hover:bg-amber-100 dark:bg-amber-300/10 dark:text-amber-100 dark:ring-amber-300/15 dark:hover:bg-amber-300/15 sm:px-3">
+            <span className="hidden sm:inline">Проверить</span>
             <ArrowRight className="h-4 w-4" />
           </Link>
         </div>

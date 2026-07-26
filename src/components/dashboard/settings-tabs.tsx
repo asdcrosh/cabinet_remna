@@ -32,10 +32,10 @@ export function SettingsTabs({ sections }: { sections: SettingsTabSection[] }) {
   }
 
   return (
-    <div className="space-y-4 lg:grid lg:grid-cols-[14rem_minmax(0,1fr)] lg:items-start lg:gap-5 lg:space-y-0">
-      <div className="sticky top-14 z-20 -mx-4 bg-slate-50 px-4 py-2 dark:bg-surface-950 sm:static sm:mx-0 sm:bg-transparent sm:px-0 sm:py-0 lg:sticky lg:top-6">
-        <div className="rounded-2xl border border-slate-200 bg-white p-1 dark:border-white/10 dark:bg-white/[0.035]">
-          <div role="tablist" aria-label="Разделы настроек" className="grid grid-cols-3 gap-1 lg:grid-cols-1">
+    <div className="space-y-3">
+      <div className="sticky top-14 z-20 -mx-4 bg-slate-50/95 px-4 py-2 backdrop-blur dark:bg-surface-950/95 sm:static sm:mx-0 sm:bg-transparent sm:px-0 sm:py-0 sm:backdrop-blur-none">
+        <div className="rounded-xl border border-slate-200 bg-white/65 p-1 dark:border-white/10 dark:bg-white/[0.03]">
+          <div role="tablist" aria-label="Разделы настроек" className="grid grid-cols-3 gap-1">
           {sections.map((section, index) => {
             const active = section.id === activeId
 
@@ -50,7 +50,7 @@ export function SettingsTabs({ sections }: { sections: SettingsTabSection[] }) {
                 aria-controls={`settings-panel-${section.id}`}
                 tabIndex={active ? 0 : -1}
                 className={cn(
-                  'flex h-11 min-w-0 items-center justify-center gap-1.5 rounded-xl px-1.5 text-[11px] font-semibold transition sm:gap-2 sm:px-3 sm:text-sm lg:justify-start lg:text-left',
+                  'flex h-10 min-w-0 items-center justify-center gap-1.5 rounded-lg px-1.5 text-[11px] font-semibold transition sm:gap-2 sm:px-3 sm:text-sm',
                   active
                     ? 'bg-cyan-50 text-cyan-950 shadow-sm dark:bg-cyan-400/10 dark:text-cyan-50 dark:shadow-none'
                     : 'text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-white/5'
