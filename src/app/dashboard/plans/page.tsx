@@ -144,13 +144,11 @@ export default async function PlansPage({
       />
 
       {isRenewIntent && (
-        <section className="flex items-start gap-3 rounded-[1.5rem] border border-cyan-200/80 bg-cyan-50/70 px-4 py-3.5 text-sm text-cyan-950 dark:border-cyan-400/25 dark:bg-cyan-400/[0.08] dark:text-cyan-50">
-          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-white/80 text-cyan-700 shadow-sm ring-1 ring-cyan-200/80 dark:bg-cyan-300/10 dark:text-cyan-100 dark:ring-cyan-300/15">
-            <RefreshCw className="h-4 w-4" />
-          </span>
-          <div className="min-w-0 pt-0.5">
+        <section className="flex items-start gap-3 border-l-2 border-cyan-500 py-1 pl-3 text-sm text-slate-700 dark:text-slate-200">
+          <RefreshCw className="mt-0.5 h-4 w-4 shrink-0 text-cyan-700 dark:text-cyan-300" />
+          <div className="min-w-0">
             <div className="font-semibold">Продление подписки</div>
-            <div className="mt-1 leading-5 text-cyan-900/75 dark:text-cyan-50/75">
+            <div className="mt-1 leading-5 text-slate-500 dark:text-slate-400">
               Можно выбрать текущий или другой тариф. Оплаченный срок добавится автоматически.
             </div>
           </div>
@@ -158,17 +156,15 @@ export default async function PlansPage({
       )}
 
       {needsTelegramCheckForPromo && (
-        <div className="flex items-center gap-3 rounded-[1.25rem] border border-amber-200/80 bg-amber-50/70 px-3.5 py-3 text-sm text-amber-900 dark:border-amber-500/25 dark:bg-amber-500/[0.08] dark:text-amber-100">
+        <div className="flex items-center gap-3 border-l-2 border-amber-400 py-1 pl-3 text-sm text-slate-800 dark:text-slate-100">
           <span className="flex min-w-0 items-center gap-3">
-            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white/80 ring-1 ring-amber-200/80 dark:bg-amber-300/10 dark:ring-amber-300/15">
-              <MessageCircleQuestion className="h-4 w-4" />
-            </span>
+            <MessageCircleQuestion className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-300" />
             <span className="min-w-0">
               <span className="block font-semibold">Доступен пробный тариф</span>
-              <span className="mt-0.5 block truncate text-xs text-amber-800/80 dark:text-amber-100/70">Подтвердите аккаунт через Telegram</span>
+              <span className="mt-0.5 block truncate text-xs text-slate-500 dark:text-slate-400">Подтвердите аккаунт через Telegram</span>
             </span>
           </span>
-          <Link href="/dashboard/settings" aria-label="Перейти к проверке аккаунта" className="ml-auto inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-white px-2.5 font-semibold text-amber-900 ring-1 ring-amber-200/80 transition-colors hover:bg-amber-100 dark:bg-amber-300/10 dark:text-amber-100 dark:ring-amber-300/15 dark:hover:bg-amber-300/15 sm:px-3">
+          <Link href="/dashboard/settings" aria-label="Перейти к проверке аккаунта" className="ml-auto inline-flex min-h-9 shrink-0 items-center justify-center gap-1.5 px-1 font-semibold text-slate-800 underline decoration-slate-300 underline-offset-4 hover:decoration-cyan-500 dark:text-slate-100 dark:decoration-white/20 sm:px-3">
             <span className="hidden sm:inline">Проверить</span>
             <ArrowRight className="h-4 w-4" />
           </Link>
@@ -184,10 +180,8 @@ export default async function PlansPage({
       ) : null}
 
       {planViews.length === 0 && (
-        <div className="rounded-[1.75rem] border border-slate-200/80 bg-white px-4 py-10 text-center dark:border-white/[0.08] dark:bg-white/[0.025] sm:px-6 sm:py-12">
-          <div className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-2xl bg-cyan-50 text-cyan-700 ring-1 ring-cyan-200/70 dark:bg-cyan-400/10 dark:text-cyan-200 dark:ring-cyan-400/20">
-            <ShieldCheck className="h-6 w-6" />
-          </div>
+        <div className="border-y border-slate-200 px-4 py-10 text-center dark:border-white/[0.08] sm:px-6 sm:py-12">
+          <ShieldCheck className="mx-auto mb-4 h-7 w-7 text-cyan-700 dark:text-cyan-200" />
           <h3 className="text-lg font-semibold">Тарифы скоро появятся</h3>
           <p className="mx-auto mt-2 max-w-md text-sm text-slate-500 dark:text-slate-400">Сейчас нет опубликованных тарифов.</p>
           {canManagePlans && (

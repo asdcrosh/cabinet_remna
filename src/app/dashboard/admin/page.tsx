@@ -240,7 +240,7 @@ function TrendPanel({
   )
 
   return (
-    <div className="min-w-0 rounded-[1.5rem] border border-slate-200/80 bg-white p-4 dark:border-white/[0.08] dark:bg-white/[0.025] sm:p-5">
+    <div className="min-w-0 border-y border-slate-200/90 py-4 dark:border-white/[0.09] sm:py-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="text-sm font-semibold">Динамика за 14 дней</div>
@@ -288,7 +288,7 @@ function TrendPanel({
 
 function TrendTotal({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-lg bg-slate-50 px-2.5 py-1.5 text-slate-500 ring-1 ring-slate-200/70 dark:bg-white/[0.04] dark:text-slate-400 dark:ring-white/[0.08]">
+    <span className="inline-flex items-center gap-1.5 border-l border-slate-300 pl-2.5 text-slate-500 dark:border-white/15 dark:text-slate-400">
       {label}
       <strong className="font-semibold tabular-nums text-slate-800 dark:text-slate-100">{value}</strong>
     </span>
@@ -318,9 +318,9 @@ function AnalyticsCard({
   details: Array<{ label: string; value: React.ReactNode }>
 }) {
   return (
-    <div className="min-w-0 rounded-[1.25rem] border border-slate-200/80 bg-white p-4 dark:border-white/[0.08] dark:bg-white/[0.025]">
+    <div className="min-w-0 border-t border-slate-300 py-3.5 dark:border-white/15">
       <div className="flex items-center gap-2.5 text-sm font-medium text-slate-500 dark:text-slate-400">
-          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-slate-50 text-slate-400 ring-1 ring-slate-200/70 dark:bg-white/[0.04] dark:ring-white/[0.08]">{icon}</span>
+          <span className="shrink-0 text-slate-400">{icon}</span>
           <span className="truncate">{title}</span>
       </div>
       <div className="mt-3 truncate text-2xl font-semibold tracking-tight tabular-nums text-slate-950 dark:text-white">{value}</div>
@@ -388,15 +388,15 @@ function PriorityCard({
   return (
     <Link
       href={href}
-      className="group grid min-h-[5.25rem] grid-cols-[auto_minmax(0,1fr)] items-center gap-3 rounded-[1.25rem] border border-amber-200/80 bg-amber-50/70 px-3.5 py-3 transition-colors hover:border-amber-300 hover:bg-amber-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/60 dark:border-amber-500/20 dark:bg-amber-500/10 dark:hover:border-amber-500/35"
+      className="group grid min-h-[4.5rem] grid-cols-[auto_minmax(0,1fr)] items-center gap-3 border-l-2 border-amber-400 px-3 py-2 transition-colors hover:bg-amber-50/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/60 dark:hover:bg-amber-500/[0.06]"
     >
-      <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white/80 text-amber-700 shadow-sm ring-1 ring-amber-200/80 dark:bg-amber-500/10 dark:text-amber-200 dark:ring-amber-500/20">
+      <div className="shrink-0 text-amber-700 dark:text-amber-200">
         {icon}
       </div>
       <div className="min-w-0">
         <div className="flex min-w-0 items-start justify-between gap-2">
           <div className="min-w-0 break-words text-sm font-semibold leading-5 text-slate-950 dark:text-white">{title}</div>
-          <div className="inline-flex min-h-7 min-w-7 shrink-0 items-center justify-center rounded-lg bg-amber-100/80 px-2 text-sm font-semibold tabular-nums text-amber-950 ring-1 ring-inset ring-amber-200/80 dark:bg-amber-400/10 dark:text-amber-100 dark:ring-amber-400/15">
+          <div className="inline-flex min-h-7 min-w-7 shrink-0 items-center justify-center border-l border-amber-300 px-2 text-sm font-semibold tabular-nums text-amber-950 dark:border-amber-400/25 dark:text-amber-100">
             {value}
           </div>
         </div>

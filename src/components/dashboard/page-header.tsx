@@ -8,7 +8,7 @@ interface PageHeaderProps {
 
 export function PageHeader({ title, description, action }: PageHeaderProps) {
   return (
-    <header className="pb-1">
+    <header className="page-header pb-2">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0">
           <h1 className="text-[1.8rem] font-semibold leading-tight tracking-[-0.04em] text-slate-950 dark:text-white sm:text-[2rem]">{title}</h1>
@@ -16,6 +16,7 @@ export function PageHeader({ title, description, action }: PageHeaderProps) {
         </div>
         {action && <div className="shrink-0 sm:text-right">{action}</div>}
       </div>
+      <span className="page-header-mark" aria-hidden="true" />
     </header>
   )
 }

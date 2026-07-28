@@ -31,10 +31,10 @@ export function AdminFilterBar({
   const filtersId = useId()
 
   return (
-    <section className="rounded-[1.5rem] border border-slate-200/80 bg-white p-2.5 dark:border-white/[0.08] dark:bg-white/[0.025] sm:p-3">
+    <section className="border-y border-slate-200/90 py-2.5 dark:border-white/[0.09] sm:py-3">
       <button
         type="button"
-        className="flex min-h-11 w-full items-center gap-2.5 rounded-2xl bg-slate-50 px-3 text-left text-sm font-semibold text-slate-800 dark:bg-white/[0.045] dark:text-slate-100 md:hidden"
+        className="flex min-h-11 w-full items-center gap-2.5 bg-transparent px-1 text-left text-sm font-semibold text-slate-800 dark:text-slate-100 md:hidden"
         aria-expanded={mobileOpen}
         aria-controls={filtersId}
         onClick={() => setMobileOpen((value) => !value)}
@@ -43,7 +43,7 @@ export function AdminFilterBar({
         <span className="flex-1">Поиск и фильтры</span>
         {resetVisible ? <span className="h-2 w-2 rounded-full bg-cyan-500" aria-label="Фильтры применены" /> : null}
         {count ? (
-          <span className="rounded-lg bg-white px-2 py-1 text-xs tabular-nums text-slate-500 shadow-sm ring-1 ring-slate-200/80 dark:bg-white/[0.06] dark:text-slate-300 dark:ring-white/10">
+          <span className="border-l border-slate-200 pl-2 text-xs tabular-nums text-slate-500 dark:border-white/10 dark:text-slate-300">
             {count.shown}/{count.total}
           </span>
         ) : null}

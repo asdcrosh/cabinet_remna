@@ -21,7 +21,7 @@
 ## Возможности
 
 - Email-регистрация, подтверждение почты и восстановление пароля.
-- Покупка и продление VPN через YooKassa.
+- Покупка и продление VPN через YooKassa, PayAnyWay или Platega.
 - Одноразовые промо-тарифы без оплаты.
 - Промокоды, лимиты и привязка скидок к тарифам.
 - Подарочный бокс с днями подписки, трафиком и скидочными промокодами.
@@ -30,6 +30,7 @@
 - Worker для проверки ожидающих платежей и отмены зависших оплат.
 - Broadcast worker для асинхронной рассылки уведомлений.
 - Реферальные бонусы за первую платную покупку приглашённого пользователя.
+- Единый центр кампаний для промокодов, рефералов, приветственного бонуса, офферов и бонусных событий.
 - Синхронизация тарифов, промокодов и пользователей с Remnashop.
 - Telegram Mini App с автоматическим входом и подтверждением email.
 - Админка: тарифы, промокоды, пользователи, платежи, рассылки, поддержка, аудит.
@@ -129,7 +130,7 @@ npm run validate
 ```bash
 npm run lint          # ESLint 9 (eslint.config.cjs)
 npm run typecheck     # TypeScript
-npm run test          # Vitest (205+ тестов)
+npm run test          # Vitest (300+ тестов)
 npm run test:coverage # с порогами coverage
 npm run build         # production build
 ```
@@ -300,7 +301,8 @@ app + worker + broadcast-worker
 | `remnawave-cabinet-caddy` | HTTPS reverse proxy (profile `caddy`) |
 | `remnawave-cabinet-retention-cleanup` | Очистка старых логов циклом (profile `maintenance`) |
 
-Файл compose: [deploy/docker-compose.server.yml](./deploy/docker-compose.server.yml).
+Единственный канонический production compose: [deploy/docker-compose.server.yml](./deploy/docker-compose.server.yml).
+Локальная разработка использует отдельный [docker-compose.local.yml](./docker-compose.local.yml).
 
 Обычный деплой должен показывать `app`, `worker`, `broadcast-worker` и `retention-cleanup` в `docker compose ps`.
 Если cleanup не нужен, уберите `maintenance` из `COMPOSE_PROFILES`.
@@ -670,9 +672,9 @@ deploy/            production compose, installer, runbook
 4. `npm run test`
 5. `npm run build`
 
-При push в `main` запускается один [docker-image.yml](./.github/workflows/docker-image.yml):
-сначала проверки и E2E, затем единственная production-сборка и публикация в GHCR.
-CI собирает один target `release` (`CABINET_IMAGE`). Workers и seed заранее
+При push в `main` [docker-image.yml](./.github/workflows/docker-image.yml)
+собирает target `release` и публикует production-образ в GHCR.
+Workers и seed заранее
 собираются в компактные JavaScript-файлы, поэтому образ не содержит `src`,
 `tsx` и полный `node_modules`.
 

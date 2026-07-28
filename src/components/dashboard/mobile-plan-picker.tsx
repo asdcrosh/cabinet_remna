@@ -46,7 +46,7 @@ export function PlanCatalog({ plans, initialPlanId }: { plans: CatalogPlan[]; in
 
   return (
     <section aria-labelledby="mobile-plan-picker-title">
-      <div className="mb-4 hidden flex-wrap items-end justify-between gap-3 xl:flex">
+      <div className="mb-4 hidden flex-wrap items-end justify-between gap-3 lg:flex">
         <div>
           <h2 id="mobile-plan-picker-title" className="text-lg font-semibold tracking-tight text-slate-950 dark:text-white">
             Выберите тариф
@@ -60,12 +60,12 @@ export function PlanCatalog({ plans, initialPlanId }: { plans: CatalogPlan[]; in
         </span>
       </div>
 
-      <div className="plan-period-list grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4 xl:hidden">
+      <div className="plan-period-list grid gap-2 sm:grid-cols-3 lg:hidden">
         {orderedPlans.map((plan) => (
           <article
             key={plan.id}
             className={cn(
-              'relative flex min-h-[9.75rem] min-w-0 flex-col overflow-hidden rounded-[1.35rem] border p-3.5 dark:border-white/[0.09] sm:min-h-[10.5rem] sm:p-4',
+              'relative grid min-h-0 min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 border-y border-slate-200 px-1 py-3.5 dark:border-white/[0.09] sm:flex sm:min-h-[10rem] sm:flex-col sm:items-stretch sm:border sm:p-4',
               plan.current
                 ? 'border-cyan-300/70 bg-cyan-50/75 dark:border-cyan-300/25 dark:bg-cyan-300/[0.07]'
                 : 'border-slate-200/90 bg-white/65 dark:bg-white/[0.025]'
@@ -116,7 +116,7 @@ export function PlanCatalog({ plans, initialPlanId }: { plans: CatalogPlan[]; in
         ))}
       </div>
 
-      <div className="hidden gap-4 xl:grid xl:grid-cols-2 xl:items-stretch">
+        <div className="hidden gap-4 lg:grid lg:grid-cols-2 lg:items-stretch">
         <div className="plan-period-panel flex h-full flex-col overflow-hidden rounded-xl border p-4">
           <div className="mb-3 px-1 sm:flex sm:items-end sm:justify-between sm:gap-4">
             <div>
@@ -193,7 +193,7 @@ export function PlanCatalog({ plans, initialPlanId }: { plans: CatalogPlan[]; in
       </div>
 
       {mobileCheckoutPlan ? createPortal(
-        <div className="fixed inset-0 z-[110] xl:hidden">
+        <div className="fixed inset-0 z-[110] lg:hidden">
           <button
             type="button"
             className="absolute inset-0 bg-slate-950/70 backdrop-blur-[3px]"

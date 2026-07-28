@@ -5,148 +5,36 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createPortal } from 'react-dom'
 import {
-  Bell,
-  BookOpen,
   ChevronDown,
-  CreditCard,
-  Database,
-  FileCheck2,
-  FileClock,
-  Gift,
   Home,
-  KeyRound,
-  Mail,
   Menu,
-  MessageCircleQuestion,
   MoreHorizontal,
-  RotateCcw,
-  Send,
-  ServerCog,
-  Settings,
-  SearchCheck,
   ShieldCheck,
-  SlidersHorizontal,
-  Sparkles,
-  Tag,
   UserCog,
-  UsersRound,
   X,
-  type LucideIcon,
 } from 'lucide-react'
 import { cn } from '@/lib/cn'
-import { legalNavigation, type LegalPath } from '@/lib/legal-links'
 import { useBodyScrollLock } from '@/lib/use-body-scroll-lock'
 import { useDialogFocus } from '@/lib/use-dialog-focus'
 import type { FeatureFlags } from '@/lib/feature-flags'
 import { LogoutButton } from './logout-button'
-
-type NavigationItem = {
-  href: string
-  label: string
-  icon: LucideIcon
-  exact?: boolean
-}
-
-const nav: NavigationItem[] = [
-  { href: '/dashboard', label: 'Главная', icon: Home, exact: true },
-  { href: '/dashboard/subscription', label: 'Подключение', icon: KeyRound },
-  { href: '/dashboard/plans', label: 'Тарифы', icon: ShieldCheck },
-  { href: '/dashboard/bonus-box', label: 'Бонусы', icon: Gift },
-  { href: '/dashboard/settings', label: 'Аккаунт', icon: Settings },
-]
-
-const bottomNav: NavigationItem[] = [
-  { href: '/dashboard', label: 'Главная', icon: Home, exact: true },
-  { href: '/dashboard/subscription', label: 'Подключение', icon: KeyRound },
-  { href: '/dashboard/plans', label: 'Тарифы', icon: ShieldCheck },
-  { href: '/dashboard/bonus-box', label: 'Бонусы', icon: Gift },
-  { href: '/dashboard/settings', label: 'Аккаунт', icon: Settings },
-]
-
-const bottomMoreNav: NavigationItem[] = []
-
-const legalIcons: Record<LegalPath, LucideIcon> = {
-  '/offer': FileCheck2,
-  '/terms': BookOpen,
-  '/privacy': ShieldCheck,
-  '/consent': FileCheck2,
-  '/refunds': RotateCcw,
-  '/contacts': Mail,
-}
-
-const infoNav: NavigationItem[] = legalNavigation.map((item) => ({
-  ...item,
-  icon: legalIcons[item.href],
-}))
+import {
+  adminNavigationGroups,
+  bottomMoreNavigation,
+  bottomNavigation,
+  filterUserNavigation,
+  getAvailableAdminNavigation,
+  informationNavigation,
+  userNavigation,
+  userRoleLabel,
+  type NavigationItem,
+  type UserRole,
+} from './dashboard-nav-config'
 
 const NAV_BADGES_REFRESH_MS = 15_000
 
-const adminNav: NavigationItem[] = [
-  { href: '/dashboard/admin', label: 'Обзор', icon: UserCog, exact: true },
-  { href: '/dashboard/admin/notifications', label: 'Уведомления', icon: Bell },
-  { href: '/dashboard/admin/broadcasts', label: 'Рассылки', icon: Send },
-  { href: '/dashboard/admin/support', label: 'Поддержка', icon: MessageCircleQuestion },
-  { href: '/dashboard/admin/users', label: 'Пользователи', icon: UsersRound },
-  { href: '/dashboard/admin/duplicates', label: 'Дубли', icon: SearchCheck },
-  { href: '/dashboard/admin/referrals', label: 'Рефералы', icon: UsersRound },
-  { href: '/dashboard/admin/offers', label: 'Офферы', icon: Sparkles },
-  { href: '/dashboard/admin/plans', label: 'Тарифы', icon: SlidersHorizontal },
-  { href: '/dashboard/admin/promo-codes', label: 'Промокоды', icon: Tag },
-  { href: '/dashboard/admin/bonus-box', label: 'Подарки', icon: Gift },
-  { href: '/dashboard/admin/payments', label: 'Платежи', icon: CreditCard },
-  { href: '/dashboard/admin/recovery', label: 'Довыдача', icon: FileClock },
-  { href: '/dashboard/admin/remnashop-sync', label: 'Синхронизация', icon: Database },
-  { href: '/dashboard/admin/system', label: 'Система', icon: ServerCog },
-  { href: '/dashboard/admin/audit', label: 'История', icon: FileClock },
-]
-
-const adminNavGroups = [
-  {
-    title: 'Очередь',
-    items: [
-      '/dashboard/admin',
-      '/dashboard/admin/duplicates',
-      '/dashboard/admin/recovery',
-      '/dashboard/admin/remnashop-sync',
-    ],
-  },
-  {
-    title: 'Пользователи',
-    items: [
-      '/dashboard/admin/users',
-    ],
-  },
-  {
-    title: 'Продажи',
-    items: [
-      '/dashboard/admin/payments',
-      '/dashboard/admin/plans',
-      '/dashboard/admin/referrals',
-      '/dashboard/admin/offers',
-      '/dashboard/admin/promo-codes',
-      '/dashboard/admin/bonus-box',
-    ],
-  },
-  {
-    title: 'Коммуникации',
-    items: [
-      '/dashboard/admin/notifications',
-      '/dashboard/admin/broadcasts',
-      '/dashboard/admin/support',
-    ],
-  },
-  {
-    title: 'Настройки',
-    items: [
-      '/dashboard/admin/system',
-      '/dashboard/admin/audit',
-    ],
-  },
-]
-
 type NavItem = NavigationItem
 type NavBadges = Record<string, number>
-type UserRole = 'USER' | 'MODERATOR' | 'ADMIN' | 'SUPER_ADMIN'
 
 const NavBadgesContext = createContext<NavBadges | null>(null)
 
@@ -236,7 +124,7 @@ export function MobileDashboardNav({
         <div className="border-t border-white/70 p-3 dark:border-white/10">
           <div className="mb-2 rounded-lg border border-slate-100 bg-slate-50/80 px-3 py-2 text-xs text-slate-500 dark:border-slate-800 dark:bg-surface-900/80">
             <div className="truncate font-medium text-slate-700 dark:text-slate-200">{email}</div>
-            <div>{roleLabel(role)}</div>
+            <div>{userRoleLabel(role)}</div>
           </div>
           <LogoutButton />
         </div>
@@ -276,7 +164,7 @@ export function MobileBottomNav({
   const router = useRouter()
   const liveBadges = useNavBadgeValues(badges)
   const adminArea = pathname.startsWith('/dashboard/admin') && role !== 'USER'
-  const availableAdminItems = adminArea ? getAdminItems(role, features) : []
+  const availableAdminItems = adminArea ? getAvailableAdminNavigation(role, features) : []
   const adminPrimaryHrefs = new Set([
     '/dashboard/admin',
     '/dashboard/admin/users',
@@ -284,8 +172,8 @@ export function MobileBottomNav({
   ])
   const items = adminArea
     ? availableAdminItems.filter((item) => adminPrimaryHrefs.has(item.href))
-    : filterUserNav(bottomNav, features)
-  const accountMoreItems = filterUserNav(bottomMoreNav, features)
+    : filterUserNavigation(bottomNavigation, features)
+  const accountMoreItems = filterUserNavigation(bottomMoreNavigation, features)
   const moreItems = adminArea
     ? availableAdminItems.filter((item) => !adminPrimaryHrefs.has(item.href))
     : []
@@ -416,7 +304,7 @@ export function MobileBottomNav({
             />
             <MobileMoreSection
               title="Информация"
-              items={infoNav}
+              items={informationNavigation}
               pathname={pathname}
               badges={liveBadges}
               onNavigate={closeMore}
@@ -618,14 +506,14 @@ function NavList({
   return (
     <nav className={className}>
       {role === 'USER' ? (
-        <NavGroup items={filterUserNav(nav, features)} pathname={pathname} badges={liveBadges} onNavigate={onNavigate} />
+        <NavGroup items={filterUserNavigation(userNavigation, features)} pathname={pathname} badges={liveBadges} onNavigate={onNavigate} />
       ) : (
         <div className="space-y-3">
           <WorkspaceSwitch adminArea={adminArea} onNavigate={onNavigate} />
           {adminArea ? (
             <AdminNavGroups role={role} features={features} pathname={pathname} badges={liveBadges} onNavigate={onNavigate} />
           ) : (
-            <NavGroup items={filterUserNav(nav, features)} pathname={pathname} badges={liveBadges} onNavigate={onNavigate} />
+            <NavGroup items={filterUserNavigation(userNavigation, features)} pathname={pathname} badges={liveBadges} onNavigate={onNavigate} />
           )}
         </div>
       )}
@@ -664,35 +552,6 @@ function WorkspaceSwitch({ adminArea, onNavigate }: { adminArea: boolean; onNavi
       </Link>
     </div>
   )
-}
-
-function filterUserNav<T extends NavigationItem>(items: T[], features: FeatureFlags) {
-  return items.filter((item) => {
-    if (item.href === '/dashboard/referrals') return features.referrals
-    if (item.href === '/dashboard/bonus-box') return features.bonusBox
-    if (item.href === '/dashboard/support') return features.support
-    return true
-  })
-}
-
-function getAdminItems(role: UserRole, features: FeatureFlags) {
-  const available = adminNav.filter((item) => {
-    if (item.href === '/dashboard/admin/support') return features.support
-    if (item.href === '/dashboard/admin/broadcasts') return features.broadcasts
-    if (item.href === '/dashboard/admin/bonus-box') return features.bonusBox
-    if (item.href === '/dashboard/admin/referrals') return features.referrals
-    return true
-  })
-  if (role === 'MODERATOR') return available.filter((item) => item.href === '/dashboard/admin/support')
-  if (role === 'ADMIN') return available.filter((item) => item.href !== '/dashboard/admin/audit')
-  return available
-}
-
-function roleLabel(role: UserRole) {
-  if (role === 'SUPER_ADMIN') return 'Главный администратор'
-  if (role === 'ADMIN') return 'Администратор'
-  if (role === 'MODERATOR') return 'Модератор поддержки'
-  return 'Аккаунт пользователя'
 }
 
 function useLiveBadges(initialBadges: NavBadges, supportEnabled: boolean) {
@@ -802,9 +661,9 @@ function AdminNavGroups({
   badges: NavBadges
   onNavigate?: () => void
 }) {
-  const availableItems = getAdminItems(role, features)
+  const availableItems = getAvailableAdminNavigation(role, features)
   const availableByHref = new Map(availableItems.map((item) => [item.href, item]))
-  const groups = adminNavGroups
+  const groups = adminNavigationGroups
     .map((group) => ({
       ...group,
       items: group.items

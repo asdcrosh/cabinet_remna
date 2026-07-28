@@ -1,0 +1,5 @@
+services:
+  coffee-like-menu:
+    volumes:
+      - ./data:/app/data
+      - ./public/uploads:/app/public/uploads

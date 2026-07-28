@@ -34,8 +34,8 @@ export function SettingsTabs({ sections }: { sections: SettingsTabSection[] }) {
   return (
     <div className="space-y-3">
       <div className="sticky top-14 z-20 -mx-4 bg-slate-50/95 px-4 py-2 backdrop-blur dark:bg-surface-950/95 sm:static sm:mx-0 sm:bg-transparent sm:px-0 sm:py-0 sm:backdrop-blur-none">
-        <div className="rounded-xl border border-slate-200 bg-white/65 p-1 dark:border-white/10 dark:bg-white/[0.03]">
-          <div role="tablist" aria-label="Разделы настроек" className="grid grid-cols-3 gap-1">
+        <div className="border-b border-slate-200 dark:border-white/10">
+          <div role="tablist" aria-label="Разделы настроек" className="grid grid-cols-3">
           {sections.map((section, index) => {
             const active = section.id === activeId
 
@@ -50,10 +50,10 @@ export function SettingsTabs({ sections }: { sections: SettingsTabSection[] }) {
                 aria-controls={`settings-panel-${section.id}`}
                 tabIndex={active ? 0 : -1}
                 className={cn(
-                  'flex h-10 min-w-0 items-center justify-center gap-1.5 rounded-lg px-1.5 text-[11px] font-semibold transition sm:gap-2 sm:px-3 sm:text-sm',
+                  'relative flex h-11 min-w-0 items-center justify-center gap-1.5 px-1.5 text-[11px] font-semibold transition after:absolute after:inset-x-0 after:-bottom-px after:h-0.5 sm:gap-2 sm:px-3 sm:text-sm',
                   active
-                    ? 'bg-cyan-50 text-cyan-950 shadow-sm dark:bg-cyan-400/10 dark:text-cyan-50 dark:shadow-none'
-                    : 'text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-white/5'
+                    ? 'text-slate-950 after:bg-cyan-500 dark:text-white'
+                    : 'text-slate-500 after:bg-transparent hover:text-slate-950 dark:text-slate-400 dark:hover:text-white'
                 )}
                 onClick={() => setActiveId(section.id)}
                 onKeyDown={(event) => {

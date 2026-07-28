@@ -39,77 +39,23 @@ import {
   type SupportCategoryValue,
 } from '@/lib/support'
 import { emojiCategories, emojiKeywords, type EmojiCategory } from './support-emojis'
-
-type TicketStatus = 'OPEN' | 'WAITING_ADMIN' | 'WAITING_USER' | 'CLOSED'
-type SenderRole = 'USER' | 'ADMIN'
-type TicketFolder = 'active' | 'need-answer' | 'answered' | 'closed'
+import {
+  formatSupportDate,
+  formatSupportPrice,
+  getSupportTicketCursor,
+  getUnreadCount,
+  insertAtSelection,
+  mergeSupportTicket,
+  needsCurrentActor,
+  type SupportMessage,
+  type SupportPanelProps,
+  type SupportTicket,
+  type TicketFolder,
+  type TicketStatus,
+} from './support-panel-model'
 
 const SUPPORT_LIST_REFRESH_MS = 20_000
 const SUPPORT_ACTIVE_TICKET_REFRESH_MS = 5_000
-
-interface SupportMessage {
-  id: string
-  body: string
-  senderRole: SenderRole
-  createdAt: string
-  sender?: {
-    email: string
-    name: string | null
-  } | null
-}
-
-interface SupportTicket {
-  id: string
-  subject: string
-  category: string
-  status: TicketStatus
-  userUnreadCount: number
-  adminUnreadCount: number
-  lastMessageAt: string
-  createdAt: string
-  closedAt: string | null
-  user?: {
-    id: string
-    email: string
-    name: string | null
-    telegramId?: string | null
-    remnashopUserId?: number | null
-    remnashopSyncedAt?: string | null
-    remnawaveUuid?: string | null
-    remnawaveUsername?: string | null
-    subscriptions?: Array<{
-      id: string
-      status: string
-      expireAt: string
-      pendingSync: boolean
-      plan: { name: string } | null
-    }>
-    payments?: Array<{
-      id: string
-      status: string
-      amountKopecks: number
-      paidAt: string | null
-      createdAt: string
-      subscriptionProvisionedAt: string | null
-      provisioningError: string | null
-      remnashopSyncedAt: string | null
-      remnashopSyncError: string | null
-      plan: { name: string } | null
-    }>
-  } | null
-  messages: SupportMessage[]
-  messagePagination?: {
-    hasMore: boolean
-    before: string | null
-  }
-}
-
-interface SupportPanelProps {
-  mode: 'user' | 'admin'
-  initialTickets: SupportTicket[]
-  initialTotal?: number
-  pageSize?: number
-}
 
 export function SupportPanel({
   mode,
@@ -1454,59 +1400,6 @@ function TicketStatusBadge({
   )
 }
 
-function getUnreadCount(ticket: SupportTicket, mode: 'user' | 'admin') {
-  return mode === 'admin' ? ticket.adminUnreadCount : ticket.userUnreadCount
-}
-
-function needsCurrentActor(ticket: SupportTicket, mode: 'user' | 'admin') {
-  if (mode === 'admin') return ticket.status === 'WAITING_ADMIN'
-  return ticket.userUnreadCount > 0 || ticket.status === 'WAITING_USER'
-}
-
-function mergeSupportTicket(current: SupportTicket, incoming: SupportTicket, preservePagination = false) {
-  const messages = new Map<string, SupportMessage>()
-  for (const message of [...current.messages, ...incoming.messages]) messages.set(message.id, message)
-  return {
-    ...current,
-    ...incoming,
-    messages: [...messages.values()].sort((left, right) => {
-      const dateOrder = new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime()
-      return dateOrder || left.id.localeCompare(right.id)
-    }),
-    messagePagination: preservePagination && current.messagePagination
-      ? current.messagePagination
-      : incoming.messagePagination,
-  }
-}
-
-function getSupportTicketCursor(ticket: SupportTicket | undefined) {
-  if (!ticket) return null
-  return `${ticket.adminUnreadCount}|${ticket.lastMessageAt}|${ticket.id}`
-}
-
-function insertAtSelection(value: string, insert: string, start: number, end: number, maxLength: number) {
-  const safeStart = Math.max(0, Math.min(start, value.length))
-  const safeEnd = Math.max(safeStart, Math.min(end, value.length))
-  const nextValue = `${value.slice(0, safeStart)}${insert}${value.slice(safeEnd)}`.slice(0, maxLength)
-  return {
-    value: nextValue,
-    cursor: Math.min(safeStart + insert.length, nextValue.length),
-  }
-}
-
 function formatDate(value: string) {
-  return new Intl.DateTimeFormat('ru-RU', {
-    day: '2-digit',
-    month: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(new Date(value))
-}
-
-function formatSupportPrice(value: number) {
-  return new Intl.NumberFormat('ru-RU', {
-    style: 'currency',
-    currency: 'RUB',
-    maximumFractionDigits: 0,
-  }).format(value / 100)
+  return formatSupportDate(value)
 }

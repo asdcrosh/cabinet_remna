@@ -37,7 +37,7 @@ export default async function SettingsPage() {
         description="Личные данные и безопасность."
       />
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_17.5rem] xl:items-start">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_17.5rem] xl:items-start">
         <div className="min-w-0">
           <SettingsTabs
             sections={[
@@ -135,16 +135,14 @@ export default async function SettingsPage() {
           />
         </div>
 
-        <aside className="rounded-[1.25rem] border border-slate-200/90 bg-white/45 p-3 dark:border-white/[0.09] dark:bg-white/[0.018]" aria-labelledby="account-links-title">
-          <h2 id="account-links-title" className="px-1 pb-2 text-xs font-semibold text-slate-500 dark:text-slate-400">Быстрый доступ</h2>
+        <aside className="border-l border-slate-200 pl-4 dark:border-white/[0.09]" aria-labelledby="account-links-title">
+          <h2 id="account-links-title" className="pb-2 text-xs font-semibold uppercase tracking-[0.1em] text-slate-400 dark:text-slate-500">Быстрый доступ</h2>
           <div className="grid gap-1.5 sm:grid-cols-3 xl:grid-cols-1">
             {accountLinks.map((item) => {
               const Icon = item.icon
               return (
-                <Link key={item.href} href={item.href} className="group flex min-w-0 items-center gap-3 rounded-xl px-2.5 py-2.5 transition-colors hover:bg-white dark:hover:bg-white/[0.05]">
-                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-500 transition-colors group-hover:bg-cyan-50 group-hover:text-cyan-700 dark:bg-white/[0.05] dark:text-slate-300 dark:group-hover:bg-cyan-300/10 dark:group-hover:text-cyan-200">
-                    <Icon className="h-4 w-4" />
-                  </span>
+                <Link key={item.href} href={item.href} className="group flex min-w-0 items-center gap-3 border-b border-slate-200 py-3 transition-colors last:border-b-0 dark:border-white/[0.08]">
+                  <Icon className="h-4 w-4 shrink-0 text-slate-400 transition-colors group-hover:text-cyan-700 dark:group-hover:text-cyan-200" />
                   <span className="min-w-0 flex-1">
                     <span className="block text-sm font-semibold text-slate-950 dark:text-white">{item.label}</span>
                     <span className="block truncate text-xs text-slate-500 dark:text-slate-400">{item.description}</span>
@@ -198,7 +196,7 @@ function SettingsSection({
   return (
     <section
       id={id}
-      className={`scroll-mt-20 rounded-[1.25rem] border border-slate-200/90 bg-white/60 p-4 shadow-[0_18px_50px_-45px_rgba(15,23,42,0.55)] dark:border-white/[0.09] dark:bg-white/[0.025] sm:p-5 ${className ?? ''}`}
+      className={`scroll-mt-20 border-y border-slate-200/90 py-4 dark:border-white/[0.09] sm:py-5 ${className ?? ''}`}
     >
       <div className="mb-4 flex min-w-0 items-start gap-2.5">
         <span className="mt-0.5 shrink-0 text-slate-400">{icon}</span>
@@ -214,7 +212,7 @@ function SettingsSection({
 
 function AccountFact({ label, value, ready }: { label: string; value: string; ready?: boolean }) {
   return (
-    <div className="min-w-0 rounded-xl bg-slate-100/70 px-3 py-2.5 dark:bg-white/[0.04]">
+    <div className="min-w-0 border-l border-slate-300 px-3 py-1.5 dark:border-white/15">
       <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
         {ready !== undefined && <span className={`h-1.5 w-1.5 rounded-full ${ready ? 'bg-emerald-500' : 'bg-amber-500'}`} />}
         {label}

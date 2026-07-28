@@ -119,12 +119,10 @@ export function PersonalOffersAdmin({
 
   return (
     <>
-      <section className="overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.025]">
+      <section className="overflow-hidden border-y border-slate-200 dark:border-white/10">
         <div className="flex flex-col gap-4 border-b border-slate-200/80 px-4 py-4 dark:border-white/[0.08] sm:flex-row sm:items-center sm:justify-between sm:px-5">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-200">
-              <Gift className="h-5 w-5" />
-            </div>
+            <Gift className="h-5 w-5 shrink-0 text-emerald-700 dark:text-emerald-200" />
             <div className="min-w-0">
               <h2 className="font-semibold text-slate-950 dark:text-white">Приветственный бонус</h2>
               <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">Подарок автоматически выдаётся новому пользователю</p>
@@ -139,15 +137,14 @@ export function PersonalOffersAdmin({
 
         <div className="p-4 sm:p-5">
           <div className={cn(
-            'rounded-[1.25rem] px-4 py-3.5',
-            welcomeForm.enabled
-              ? 'bg-gradient-to-r from-emerald-50 to-cyan-50/60 dark:from-emerald-400/[0.08] dark:to-cyan-400/[0.04]'
-              : 'bg-slate-100/70 dark:bg-white/[0.035]'
+            'border-l-2 px-3 py-1.5',
+            welcomeForm.enabled ? 'border-emerald-400' : 'border-slate-300 dark:border-white/15'
           )}>
             <div className="text-xs font-semibold text-slate-500 dark:text-slate-400">Новый пользователь получит</div>
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {welcomeBenefits.length > 0 ? welcomeBenefits.map((benefit) => (
-                <span key={benefit} className="rounded-full bg-white/80 px-2.5 py-1 text-xs font-medium text-slate-700 ring-1 ring-slate-200/70 dark:bg-white/[0.06] dark:text-slate-200 dark:ring-white/[0.08]">
+            <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+              {welcomeBenefits.length > 0 ? welcomeBenefits.map((benefit, index) => (
+                <span key={benefit} className="inline-flex items-center gap-2">
+                  {index > 0 ? <span className="text-slate-300 dark:text-white/20">·</span> : null}
                   {benefit}
                 </span>
               )) : (
@@ -231,19 +228,19 @@ export function PersonalOffersAdmin({
             <p className="mt-1 text-sm text-slate-500">Карточки подбираются по сценарию пользователя.</p>
           </div>
           <div className="flex items-center gap-2 text-xs">
-            <span className="rounded-full bg-emerald-50 px-2.5 py-1 font-medium text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-200">
+            <span className="border-l-2 border-emerald-400 pl-2 font-medium text-emerald-700 dark:text-emerald-200">
               Активны {activeOffersCount}
             </span>
-            <span className="rounded-full bg-slate-100 px-2.5 py-1 font-medium text-slate-500 dark:bg-white/[0.06]">
+            <span className="border-l border-slate-300 pl-2 font-medium text-slate-500 dark:border-white/15">
               Всего {offers.length}
             </span>
           </div>
         </div>
-        <div className="grid gap-3">
+        <div className="divide-y divide-slate-200 border-y border-slate-200 dark:divide-white/[0.08] dark:border-white/[0.08]">
           {offers.map((offer) => (
             <article
               key={offer.id}
-              className="grid min-w-0 gap-4 rounded-3xl border border-slate-200 bg-white p-4 transition-colors hover:border-slate-300 dark:border-white/10 dark:bg-white/[0.025] dark:hover:border-white/20 sm:grid-cols-[minmax(11rem,.65fr)_minmax(16rem,1.35fr)_auto] sm:items-center sm:gap-5"
+              className="grid min-w-0 gap-4 px-1 py-4 transition-colors hover:bg-slate-950/[0.02] dark:hover:bg-white/[0.02] sm:grid-cols-[minmax(11rem,.65fr)_minmax(16rem,1.35fr)_auto] sm:items-center sm:gap-5 sm:px-3"
             >
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
@@ -254,7 +251,7 @@ export function PersonalOffersAdmin({
                     {personalOfferScenarioLabels[offer.scenario]}
                   </span>
                 </div>
-                <div className="mt-2 inline-flex rounded-full bg-slate-100 px-2 py-1 text-[11px] font-medium text-slate-500 dark:bg-white/[0.06]">
+                <div className="mt-2 inline-flex border-l border-slate-300 pl-2 text-[11px] font-medium text-slate-500 dark:border-white/15">
                   Приоритет {offer.priority}
                 </div>
               </div>
@@ -436,19 +433,17 @@ function WelcomeBonusOption({
 }) {
   return (
     <div className={cn(
-      'relative flex min-h-0 flex-col overflow-hidden rounded-[1.25rem] border p-4 transition-colors xl:min-h-[12rem]',
+      'relative flex min-h-0 flex-col overflow-hidden border-t px-1 py-4 transition-colors xl:min-h-[12rem] xl:px-4',
       checked
-        ? 'border-emerald-300/80 bg-emerald-50/45 dark:border-emerald-500/30 dark:bg-emerald-400/[0.055]'
-        : 'border-slate-200 bg-slate-50/55 dark:border-white/[0.08] dark:bg-white/[0.018]'
+        ? 'border-emerald-400'
+        : 'border-slate-200 dark:border-white/[0.08]'
     )}>
       <span className={cn('absolute inset-x-0 top-0 h-0.5', checked ? 'bg-emerald-400' : 'bg-transparent')} aria-hidden="true" />
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 gap-3">
           <div className={cn(
-            'grid h-9 w-9 shrink-0 place-items-center rounded-xl',
-            checked
-              ? 'bg-emerald-100/80 text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-200'
-              : 'bg-slate-200/60 text-slate-500 dark:bg-white/[0.05] dark:text-slate-400'
+            'mt-0.5 shrink-0',
+            checked ? 'text-emerald-700 dark:text-emerald-200' : 'text-slate-400'
           )}>
             {icon}
           </div>
