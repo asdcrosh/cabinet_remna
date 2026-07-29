@@ -406,11 +406,18 @@ export async function getRemnashopSyncDryRun() {
 export async function syncRemnashopCatalog(options: {
   includePromoCodes?: boolean
 } = {}) {
-  const [plans, promoSource] = await Promise.all([
+  const [plans, promoSource, writeAccess] = await Promise.all([
     fetchRemnashopPlans(),
     fetchRemnashopPromoCodesWithMeta(),
+    fetchRemnashopWriteAccess(),
   ])
   const promoCodes = options.includePromoCodes === false ? [] : promoSource.rows
+  const promoWriteAccess = promoSource.table
+    ? writeAccess.find((row) => row.table_name === promoSource.table)
+    : undefined
+  const promoTableWritable = Boolean(
+    promoWriteAccess?.can_insert && promoWriteAccess?.can_update
+  )
 
   const warnings: string[] = []
   let plansDeactivated = 0
@@ -585,6 +592,14 @@ export async function syncRemnashopCatalog(options: {
       entityId: 'remnashop',
       operation: 'check',
     }, 'remnashop promo code schema is not recognized')
+  } else if (options.includePromoCodes !== false && !promoTableWritable) {
+    warnings.push('Промокоды прочитаны, но у Cabinet нет прав на их запись в Remnashop.')
+    await markSyncSkipped({
+      direction: 'CABINET_TO_REMNASHOP',
+      entityType: 'promoCodeConfig',
+      entityId: 'remnashop',
+      operation: 'check',
+    }, 'remnashop promo code table is not writable')
   } else if (options.includePromoCodes !== false) {
     await markSyncSucceeded({
       direction: 'CABINET_TO_REMNASHOP',
@@ -850,18 +865,18 @@ async function fetchRemnashopPromoCodes() {
 
 async function fetchRemnashopPromoCodesWithMeta() {
   const table = await firstExistingTable(['promo_codes', 'promocodes', 'coupons', 'discount_codes'])
-  if (!table) return { rows: [] as RemnashopPromoCodeRow[], recognized: false }
+  if (!table) return { rows: [] as RemnashopPromoCodeRow[], recognized: false, table: null }
 
   const columns = await tableColumns(table)
   const codeColumn = firstExistingColumn(columns, ['code', 'name'])
   const currentSchema = columns.has('reward_type') && columns.has('reward')
   const discountColumn = firstExistingColumn(columns, ['discount_percent', 'discount', 'percent'])
   if (!codeColumn || (!currentSchema && !discountColumn)) {
-    return { rows: [] as RemnashopPromoCodeRow[], recognized: false }
+    return { rows: [] as RemnashopPromoCodeRow[], recognized: false, table }
   }
 
   const idColumn = firstExistingColumn(columns, ['id'])
-  if (!idColumn) return { rows: [] as RemnashopPromoCodeRow[], recognized: false }
+  if (!idColumn) return { rows: [] as RemnashopPromoCodeRow[], recognized: false, table }
 
   const isActiveColumn = firstExistingColumn(columns, ['is_active', 'active'])
   const startsAtColumn = firstExistingColumn(columns, ['starts_at', 'start_at', 'active_from'])
@@ -916,7 +931,7 @@ async function fetchRemnashopPromoCodesWithMeta() {
       : ''}
     ORDER BY pc.${quoteIdent(idColumn)}
   `)
-  return { rows: result.rows, recognized: true }
+  return { rows: result.rows, recognized: true, table }
 }
 
 async function firstExistingTable(candidates: string[]) {

@@ -3,12 +3,14 @@ import { createAdminNotification } from './admin-notifications'
 import { prisma } from './prisma'
 import {
   deactivateCabinetPromoCodesInRemnashop,
+  isRemnashopPromoLocalOnlyReason,
+  isRemnashopPromoSyncUnavailableReason,
   syncCabinetPromoCodeToRemnashop,
 } from './remnashop-promo-sync'
 import { syncCabinetPaymentToRemnashop } from './remnashop-reverse-sync'
 import { syncRemnashopCatalog, syncRemnashopPaymentsToCabinet } from './remnashop-sync'
 import { syncRemnashopUserBySourceId } from './remnashop-users'
-import { markSyncFailed, markSyncPending, markSyncSucceeded } from './sync-events'
+import { markSyncFailed, markSyncPending, markSyncSkipped, markSyncSucceeded } from './sync-events'
 
 type RetryableSyncEvent = {
   direction: SyncDirection
@@ -32,14 +34,28 @@ export async function retryRemnashopSyncEvent(event: RetryableSyncEvent) {
     event.operation === 'deactivate'
   ) {
     const result = await deactivateCabinetPromoCodesInRemnashop([event.entityId])
-    if (!result.ok) throw new Error(result.skipped)
+    if (!result.ok) {
+      if (isRemnashopPromoSyncUnavailableReason(result.skipped)) {
+        await markPromoConfigurationSkipped(result.skipped)
+        return result
+      }
+      throw new Error(result.skipped)
+    }
     return result
   }
 
   if (event.direction === 'CABINET_TO_REMNASHOP' && event.entityType === 'promoCode') {
     const result = await syncCabinetPromoCodeToRemnashop(event.entityId)
+    if (!result.ok && 'skipped' in result) {
+      if (isRemnashopPromoSyncUnavailableReason(result.skipped)) {
+        await markPromoConfigurationSkipped(result.skipped)
+        return result
+      }
+      if (isRemnashopPromoLocalOnlyReason(result.skipped)) return result
+      throw new Error(result.skipped)
+    }
     if (!result.ok) {
-      throw new Error('skipped' in result ? result.skipped : 'Promo code sync did not complete')
+      throw new Error('Promo code sync did not complete')
     }
     return result
   }
@@ -65,6 +81,15 @@ export async function retryRemnashopSyncEvent(event: RetryableSyncEvent) {
   }
 
   throw new Error(`Retry is not supported for ${event.direction}:${event.entityType}`)
+}
+
+async function markPromoConfigurationSkipped(reason: string) {
+  await markSyncSkipped({
+    direction: 'CABINET_TO_REMNASHOP',
+    entityType: 'promoCodeConfig',
+    entityId: 'remnashop',
+    operation: 'check',
+  }, reason)
 }
 
 export async function retryDueRemnashopSyncEvents(options: {

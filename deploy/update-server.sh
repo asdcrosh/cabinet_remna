@@ -122,7 +122,8 @@ fi
 
 configure_remnashop_link_function() {
   local container="${REMNASHOP_DB_CONTAINER:-remnashop-db}"
-  local db_user db_name
+  local db_user db_name database_url integration_role role role_exists
+  local roles=("remnashop_readonly")
   if ! docker inspect "${container}" >/dev/null 2>&1; then
     return
   fi
@@ -134,15 +135,38 @@ configure_remnashop_link_function() {
   echo "Updating secure Remnashop account-link function..."
   curl -fsSL "${RAW_BASE_URL}/deploy/remnashop-cabinet-link.sql" \
     | docker exec -i "${container}" psql -v ON_ERROR_STOP=1 -U "${db_user}" -d "${db_name}" >/dev/null
-  if [[ "$(docker exec "${container}" psql -U "${db_user}" -d "${db_name}" -tAc "SELECT 1 FROM pg_roles WHERE rolname = 'remnashop_readonly';" 2>/dev/null | tr -d '[:space:]')" == "1" ]]; then
-    echo "Updating Remnashop integration database permissions..."
-    docker exec "${container}" psql -v ON_ERROR_STOP=1 -U "${db_user}" -d "${db_name}" \
-      -c "GRANT USAGE ON SCHEMA public TO remnashop_readonly;" \
-      -c "GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO remnashop_readonly;" \
-      -c "GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO remnashop_readonly;" \
-      -c "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO remnashop_readonly;" \
-      -c "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO remnashop_readonly;" >/dev/null
+
+  database_url="$(read_update_env_value REMNASHOP_DATABASE_URL)"
+  integration_role="$(python3 - "${database_url}" <<'PY'
+from urllib.parse import unquote, urlparse
+import re
+import sys
+
+try:
+    username = unquote(urlparse(sys.argv[1]).username or "")
+except Exception:
+    username = ""
+print(username if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", username) else "")
+PY
+)"
+  if [[ -n "${integration_role}" && "${integration_role}" != "remnashop_readonly" ]]; then
+    roles+=("${integration_role}")
   fi
+
+  echo "Updating Remnashop integration database permissions..."
+  for role in "${roles[@]}"; do
+    role_exists="$(docker exec "${container}" psql -U "${db_user}" -d "${db_name}" -tAc "SELECT 1 FROM pg_roles WHERE rolname = '${role}';" 2>/dev/null | tr -d '[:space:]')"
+    if [[ "${role_exists}" != "1" ]]; then
+      continue
+    fi
+    docker exec "${container}" psql -v ON_ERROR_STOP=1 -U "${db_user}" -d "${db_name}" \
+      -c "GRANT USAGE ON SCHEMA public TO \"${role}\";" \
+      -c "GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO \"${role}\";" \
+      -c "GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO \"${role}\";" \
+      -c "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO \"${role}\";" \
+      -c "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO \"${role}\";" \
+      -c "GRANT EXECUTE ON FUNCTION public.cabinet_link_email_to_telegram(bigint, text, boolean) TO \"${role}\";" >/dev/null
+  done
 }
 
 read_update_env_value() {

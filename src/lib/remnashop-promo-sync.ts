@@ -45,10 +45,27 @@ const PLAN_LINK_TABLES = [
   'discount_code_plans',
 ]
 const PROMO_SYNC_UNAVAILABLE_REASONS = new Set([
+  'REMNASHOP_DATABASE_URL is not configured',
   'remnashop promo code table not found',
   'remnashop promo code schema is not recognized',
   'remnashop promo code table is not writable',
 ])
+const PROMO_SYNC_LOCAL_ONLY_REASONS = new Set([
+  'promo code not found',
+  'current remnashop does not support personal email audience for discount promocodes',
+  'current remnashop does not support no-active-subscription audience for discount promocodes',
+  'current remnashop does not support plan-limited purchase discount promocodes',
+  'current remnashop does not support a future promocode start date',
+  'current remnashop only supports one activation or unlimited reuse per user',
+])
+
+export function isRemnashopPromoSyncUnavailableReason(reason: string) {
+  return PROMO_SYNC_UNAVAILABLE_REASONS.has(reason)
+}
+
+export function isRemnashopPromoLocalOnlyReason(reason: string) {
+  return PROMO_SYNC_LOCAL_ONLY_REASONS.has(reason)
+}
 
 export async function syncCabinetPromoCodeToRemnashop(promoCodeId: string) {
   if (!process.env.REMNASHOP_DATABASE_URL) {
@@ -110,17 +127,19 @@ export async function syncCabinetPromoCodeToRemnashopBestEffort(promoCodeId: str
   try {
     const result = await syncCabinetPromoCodeToRemnashop(promoCodeId)
     if (!result.ok && 'skipped' in result) {
-      await markSyncSkipped(
-        PROMO_SYNC_UNAVAILABLE_REASONS.has(result.skipped)
-          ? {
-              direction: 'CABINET_TO_REMNASHOP',
-              entityType: 'promoCodeConfig',
-              entityId: 'remnashop',
-              operation: 'check',
-            }
-          : event,
-        result.skipped
-      )
+      if (isRemnashopPromoSyncUnavailableReason(result.skipped)) {
+        await markSyncSkipped({
+          direction: 'CABINET_TO_REMNASHOP',
+          entityType: 'promoCodeConfig',
+          entityId: 'remnashop',
+          operation: 'check',
+        }, result.skipped)
+        await markSyncSucceeded(event)
+      } else if (isRemnashopPromoLocalOnlyReason(result.skipped)) {
+        await markSyncSucceeded(event)
+      } else {
+        await markSyncSkipped(event, result.skipped)
+      }
       logWarn('remnashop.promo_code_sync.skipped', { promoCodeId, reason: result.skipped })
     } else if (result.ok) {
       await markSyncSucceeded(event)
