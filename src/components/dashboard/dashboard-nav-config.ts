@@ -68,40 +68,38 @@ export const adminNavigation: NavigationItem[] = [
   { href: '/dashboard/admin/broadcasts', label: 'Рассылки', icon: Send },
   { href: '/dashboard/admin/support', label: 'Поддержка', icon: MessageCircleQuestion },
   { href: '/dashboard/admin/users', label: 'Пользователи', icon: UsersRound },
-  { href: '/dashboard/admin/duplicates', label: 'Дубли', icon: SearchCheck },
+  { href: '/dashboard/admin/duplicates', label: 'Дубли аккаунтов', icon: SearchCheck },
   { href: '/dashboard/admin/referrals', label: 'Рефералы', icon: UsersRound },
-  { href: '/dashboard/admin/offers', label: 'Офферы', icon: Sparkles },
+  { href: '/dashboard/admin/offers', label: 'Предложения', icon: Sparkles },
   { href: '/dashboard/admin/plans', label: 'Тарифы', icon: SlidersHorizontal },
   { href: '/dashboard/admin/promo-codes', label: 'Промокоды', icon: Tag },
-  { href: '/dashboard/admin/bonus-box', label: 'Подарки', icon: Gift },
+  { href: '/dashboard/admin/bonus-box', label: 'Бонусы', icon: Gift },
   { href: '/dashboard/admin/payments', label: 'Платежи', icon: CreditCard },
-  { href: '/dashboard/admin/recovery', label: 'Довыдача', icon: FileClock },
-  { href: '/dashboard/admin/remnashop-sync', label: 'Синхронизация', icon: Database },
-  { href: '/dashboard/admin/system', label: 'Система', icon: ServerCog },
+  { href: '/dashboard/admin/recovery', label: 'Восстановление', icon: FileClock },
+  { href: '/dashboard/admin/remnashop-sync', label: 'Remnashop', icon: Database },
+  { href: '/dashboard/admin/system', label: 'Настройки', icon: ServerCog },
   { href: '/dashboard/admin/audit', label: 'История', icon: FileClock },
 ]
 
 export const adminNavigationGroups = [
   {
-    title: 'Очередь',
+    title: 'Главное',
     items: [
       '/dashboard/admin',
-      '/dashboard/admin/duplicates',
-      '/dashboard/admin/recovery',
-      '/dashboard/admin/remnashop-sync',
+      '/dashboard/admin/users',
+      '/dashboard/admin/payments',
+      '/dashboard/admin/support',
     ],
   },
-  { title: 'Пользователи', items: ['/dashboard/admin/users'] },
   {
     title: 'Продажи',
     items: [
-      '/dashboard/admin/payments',
       '/dashboard/admin/plans',
-      '/dashboard/admin/campaigns',
-      '/dashboard/admin/referrals',
-      '/dashboard/admin/offers',
       '/dashboard/admin/promo-codes',
+      '/dashboard/admin/offers',
+      '/dashboard/admin/referrals',
       '/dashboard/admin/bonus-box',
+      '/dashboard/admin/campaigns',
     ],
   },
   {
@@ -109,10 +107,17 @@ export const adminNavigationGroups = [
     items: [
       '/dashboard/admin/notifications',
       '/dashboard/admin/broadcasts',
-      '/dashboard/admin/support',
     ],
   },
-  { title: 'Настройки', items: ['/dashboard/admin/system', '/dashboard/admin/audit'] },
+  {
+    title: 'Контроль',
+    items: [
+      '/dashboard/admin/duplicates',
+      '/dashboard/admin/recovery',
+    ],
+  },
+  { title: 'Интеграции', items: ['/dashboard/admin/remnashop-sync'] },
+  { title: 'Система', items: ['/dashboard/admin/system', '/dashboard/admin/audit'] },
 ]
 
 export function filterUserNavigation<T extends NavigationItem>(items: T[], features: FeatureFlags) {

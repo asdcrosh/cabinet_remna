@@ -59,7 +59,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         >
           Перейти к содержимому
         </a>
-        <aside className="dashboard-sidebar fixed inset-y-0 left-0 z-40 hidden h-dvh w-[14.75rem] flex-col overflow-hidden border-r lg:flex">
+        <aside className="dashboard-sidebar fixed inset-y-0 left-0 z-40 hidden h-dvh w-64 flex-col overflow-hidden border-r lg:flex">
           <div className="shrink-0 px-5 py-5">
             <Brand brandName={brandName} />
           </div>
@@ -74,7 +74,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
             <LogoutButton />
           </div>
         </aside>
-        <main className="min-w-0 w-full overflow-x-clip lg:ml-[14.75rem] lg:w-auto">
+        <main className="min-w-0 w-full overflow-x-clip lg:ml-64 lg:w-auto">
           <div className="dashboard-topbar sticky top-0 z-50 flex h-14 items-center justify-between border-b px-4 backdrop-blur lg:fixed lg:right-6 lg:top-4 lg:h-auto lg:w-auto lg:border-0 lg:bg-transparent lg:p-0 lg:backdrop-blur-none">
             <div className="lg:hidden">
               <Brand compact brandName={brandName} />

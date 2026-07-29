@@ -5,7 +5,6 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createPortal } from 'react-dom'
 import {
-  ChevronDown,
   Home,
   Menu,
   MoreHorizontal,
@@ -76,6 +75,7 @@ export function MobileDashboardNav({
   badges?: NavBadges
   features: FeatureFlags
 }) {
+  const pathname = usePathname()
   const [open, setOpen] = useState(false)
   const [mounted, setMounted] = useState(false)
   const triggerRef = useRef<HTMLButtonElement | null>(null)
@@ -88,6 +88,8 @@ export function MobileDashboardNav({
   useEffect(() => {
     setMounted(true)
   }, [])
+
+  if (pathname.startsWith('/dashboard/admin')) return null
 
   const menu = (
     <div className="fixed inset-0 z-[100] h-dvh w-dvw lg:hidden">
@@ -169,6 +171,7 @@ export function MobileBottomNav({
     '/dashboard/admin',
     '/dashboard/admin/users',
     '/dashboard/admin/payments',
+    '/dashboard/admin/support',
   ])
   const items = adminArea
     ? availableAdminItems.filter((item) => adminPrimaryHrefs.has(item.href))
@@ -177,7 +180,7 @@ export function MobileBottomNav({
   const moreItems = adminArea
     ? availableAdminItems.filter((item) => !adminPrimaryHrefs.has(item.href))
     : []
-  const showMore = moreItems.length > 0
+  const showMore = adminArea || moreItems.length > 0
   const swipeHrefKey = adminArea ? '' : items.map((item) => item.href).join('\n')
   const [moreOpen, setMoreOpen] = useState(false)
   const [mounted, setMounted] = useState(false)
@@ -278,8 +281,8 @@ export function MobileBottomNav({
       >
         <div className="mb-3 flex items-center justify-between gap-3">
           <div>
-            <div id="mobile-more-menu-title" className="font-semibold text-slate-950 dark:text-white">{adminArea ? 'Админка' : 'Ещё'}</div>
-            <div className="text-sm text-slate-500 dark:text-slate-400">{adminArea ? 'Остальные разделы' : 'Разделы кабинета'}</div>
+            <div id="mobile-more-menu-title" className="font-semibold text-slate-950 dark:text-white">{adminArea ? 'Разделы админки' : 'Ещё'}</div>
+            <div className="text-sm text-slate-500 dark:text-slate-400">{adminArea ? 'Инструменты сгруппированы по задачам' : 'Разделы кабинета'}</div>
           </div>
           <button
             ref={moreCloseButtonRef}
@@ -292,7 +295,15 @@ export function MobileBottomNav({
           </button>
         </div>
         {adminArea ? (
-          <MobileMoreGrid items={moreItems} pathname={pathname} badges={liveBadges} onNavigate={closeMore} />
+          <div className="space-y-4">
+            <WorkspaceSwitch adminArea onNavigate={closeMore} />
+            <MobileAdminMoreSections
+              items={moreItems}
+              pathname={pathname}
+              badges={liveBadges}
+              onNavigate={closeMore}
+            />
+          </div>
         ) : (
           <div className="space-y-4">
             <MobileMoreSection
@@ -379,6 +390,41 @@ export function MobileBottomNav({
       </div>
       {showMore && mounted && moreOpen ? createPortal(moreDrawer, document.body) : null}
     </nav>
+  )
+}
+
+function MobileAdminMoreSections({
+  items,
+  pathname,
+  badges,
+  onNavigate,
+}: {
+  items: NavItem[]
+  pathname: string
+  badges: NavBadges
+  onNavigate: () => void
+}) {
+  const itemsByHref = new Map(items.map((item) => [item.href, item]))
+
+  return (
+    <div className="space-y-4">
+      {adminNavigationGroups.map((group) => {
+        const groupItems = group.items
+          .map((href) => itemsByHref.get(href))
+          .filter((item): item is NavItem => Boolean(item))
+
+        return (
+          <MobileMoreSection
+            key={group.title}
+            title={group.title}
+            items={groupItems}
+            pathname={pathname}
+            badges={badges}
+            onNavigate={onNavigate}
+          />
+        )
+      })}
+    </div>
   )
 }
 
@@ -677,57 +723,20 @@ function AdminNavGroups({
   }
 
   return (
-    <div className="space-y-1.5">
+    <div className="space-y-4">
       {groups.map((group) => (
-        <AdminNavGroup
-          key={group.title}
-          title={group.title}
-          items={group.items}
-          pathname={pathname}
-          badges={badges}
-          onNavigate={onNavigate}
-        />
+        <section key={group.title} aria-label={group.title}>
+          <h2 className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400 dark:text-slate-500">
+            {group.title}
+          </h2>
+          <NavGroup
+            items={group.items}
+            pathname={pathname}
+            badges={badges}
+            onNavigate={onNavigate}
+          />
+        </section>
       ))}
-    </div>
-  )
-}
-
-function AdminNavGroup({
-  title,
-  items,
-  pathname,
-  badges,
-  onNavigate,
-}: {
-  title: string
-  items: NavItem[]
-  pathname: string
-  badges: NavBadges
-  onNavigate?: () => void
-}) {
-  const hasActiveItem = items.some((item) => item.exact ? pathname === item.href : pathname.startsWith(item.href))
-  const [open, setOpen] = useState(hasActiveItem)
-
-  useEffect(() => {
-    if (hasActiveItem) setOpen(true)
-  }, [hasActiveItem])
-
-  return (
-    <div>
-      <button
-        type="button"
-        className="flex w-full items-center justify-between gap-2 rounded-lg px-3 py-1.5 text-left text-xs font-medium text-slate-400 transition-colors hover:bg-slate-50 hover:text-slate-600 dark:hover:bg-white/5 dark:hover:text-slate-200"
-        onClick={() => setOpen((value) => !value)}
-        aria-expanded={open}
-      >
-        <span>{title}</span>
-        <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', open && 'rotate-180')} />
-      </button>
-      {open && (
-        <div className="mt-1 space-y-1">
-          <NavGroup items={items} pathname={pathname} badges={badges} onNavigate={onNavigate} />
-        </div>
-      )}
     </div>
   )
 }
