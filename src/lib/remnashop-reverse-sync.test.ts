@@ -169,6 +169,17 @@ describe('remnashop reverse sync', () => {
           ].map((column_name) => ({ column_name })),
         }
       }
+      if (sql.includes('information_schema.columns') && values[0] === 'promocodes') {
+        return {
+          rows: ['id', 'code'].map((column_name) => ({ column_name })),
+        }
+      }
+      if (sql.includes('information_schema.columns') && values[0] === 'promocode_activations') {
+        return {
+          rows: ['id', 'promocode_id', 'user_id', 'activated_at']
+            .map((column_name) => ({ column_name })),
+        }
+      }
       if (sql.includes('FROM users WHERE')) {
         return { rows: [] }
       }
@@ -207,6 +218,8 @@ describe('remnashop reverse sync', () => {
     expect(subscriptionInsert?.[1]).toContain(false)
     expect(subscriptionInsert?.[0]).toContain('"internal_squads"')
     expect(subscriptionInsert?.[1]).toContainEqual(['squad-1'])
+    expect(subscriptionInsert?.[0]).toContain('"traffic_limit_strategy"')
+    expect(subscriptionInsert?.[1]).toContain('NO_RESET')
     expect(subscriptionInsert?.[0]).toContain('"url"')
     expect(subscriptionInsert?.[1]).toContain('https://subscription.example/remna-short')
   })
@@ -256,5 +269,20 @@ describe('remnashop reverse sync', () => {
       discount_percent: 0,
       final_amount: 300,
     }))
+  })
+
+  it('records promo activation without relying on a missing database constraint', async () => {
+    mocks.paymentFindUnique.mockResolvedValue({
+      ...payment,
+      promoCodeSnapshot: { code: 'HELLO20' },
+    })
+
+    await expect(syncCabinetPaymentToRemnashop('pay-1')).resolves.toMatchObject({ ok: true })
+
+    const activationInsert = mocks.remnashopQuery.mock.calls.find(([sql]) =>
+      String(sql).includes('INSERT INTO promocode_activations')
+    )
+    expect(activationInsert?.[0]).toContain('NOT EXISTS')
+    expect(activationInsert?.[0]).not.toContain('ON CONFLICT')
   })
 })

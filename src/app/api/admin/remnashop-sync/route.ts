@@ -10,6 +10,7 @@ import { syncRemnashopUsersToCabinet } from '@/lib/remnashop-users'
 import { prisma } from '@/lib/prisma'
 import { writeAuditLog } from '@/lib/audit-log'
 import { describeSyncError } from '@/lib/sync-error'
+import { retryDueRemnashopSyncEvents } from '@/lib/remnashop-retry'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -35,6 +36,7 @@ export const POST = withAuth(async (req: Request) => {
     const catalog = await syncRemnashopCatalog({ includePromoCodes })
     const users = await syncRemnashopUsersToCabinet({ forceRemnawaveSubscriptions: true })
     const payments = await syncRemnashopPaymentsToCabinet()
+    const retries = await retryDueRemnashopSyncEvents({ batchSize: 50, force: true })
     const integration = await getRemnashopIntegrationStatus()
     const reportBase = {
       ...catalog,
@@ -52,6 +54,8 @@ export const POST = withAuth(async (req: Request) => {
         paymentsSkipped: payments.skipped,
         paymentsBlocked: payments.blocked,
         paymentsFailed: payments.failed,
+        syncRetriesSucceeded: retries.succeeded,
+        syncRetriesFailed: retries.failed,
       },
     }
     await writeAuditLog({
@@ -243,6 +247,9 @@ function normalizeIssueReason(reason: string | null) {
   }
   if (value.includes('not configured')) return 'Не настроено подключение'
   if (value === 'remnashop user not found') return 'Пользователь ещё не связан с Remnashop'
+  if (/Remnawave .* 404|remnawave.*not found/i.test(value)) {
+    return 'Пользователь есть в Remnashop, но его профиль уже отсутствует в Remnawave'
+  }
   if (value.includes('not found')) return 'Связанная запись не найдена'
   if (value.includes('not recognized')) return 'Схема таблицы не распознана'
   return value.length > 180 ? `${value.slice(0, 180)}...` : value

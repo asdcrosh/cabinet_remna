@@ -8,7 +8,7 @@ import { generateUniqueReferralCode } from './referrals'
 import { toRemnawaveTelegramId } from './telegram-remnawave'
 import { upsertLocalSubscriptionFromRemnawave } from './remnawave-local-sync'
 import { logDebug, logInfo, logWarn } from './logger'
-import { markSyncFailed, markSyncSkipped, markSyncSucceeded } from './sync-events'
+import { markSyncFailed, markSyncSucceeded } from './sync-events'
 
 interface RemnashopIdentityRow {
   id: number
@@ -93,8 +93,6 @@ export async function syncRemnashopUsersToCabinet(options: {
       } as const
       if (row.subscriptionAction === 'failed') {
         await markSyncFailed(event, new Error(row.subscriptionError || 'subscription sync failed'))
-      } else if (row.subscriptionAction === 'skipped' && row.subscriptionError) {
-        await markSyncSkipped(event, row.subscriptionError)
       } else {
         await markSyncSucceeded(event)
       }
@@ -154,8 +152,6 @@ export async function syncRemnashopUserBySourceId(remnashopUserId: number, optio
     const row = await syncRemnashopSourceToCabinet(source, options)
     if (row.subscriptionAction === 'failed') {
       await markSyncFailed(event, new Error(row.subscriptionError || 'subscription sync failed'))
-    } else if (row.subscriptionAction === 'skipped' && row.subscriptionError) {
-      await markSyncSkipped(event, row.subscriptionError)
     } else {
       await markSyncSucceeded(event)
     }

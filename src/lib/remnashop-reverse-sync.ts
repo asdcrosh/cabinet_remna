@@ -391,10 +391,15 @@ async function syncRemnashopPromoActivation(
   await remnashopQuery(
     `
       INSERT INTO promocode_activations (promocode_id, user_id, activated_at)
-      SELECT id, $2, $3
-      FROM promocodes
-      WHERE upper(code) = upper($1)
-      ON CONFLICT (promocode_id, user_id) DO NOTHING
+      SELECT promo.id, $2, $3
+      FROM promocodes promo
+      WHERE upper(promo.code) = upper($1)
+        AND NOT EXISTS (
+          SELECT 1
+          FROM promocode_activations activation
+          WHERE activation.promocode_id = promo.id
+            AND activation.user_id = $2
+        )
     `,
     [code, userId, payment.paidAt ?? payment.createdAt]
   )

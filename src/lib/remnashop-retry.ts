@@ -70,16 +70,21 @@ export async function retryRemnashopSyncEvent(event: RetryableSyncEvent) {
 export async function retryDueRemnashopSyncEvents(options: {
   batchSize?: number
   shouldStop?: () => boolean
+  force?: boolean
 } = {}) {
   if (!process.env.REMNASHOP_DATABASE_URL) return { attempted: 0, succeeded: 0, failed: 0 }
 
   const events = await prisma.syncEvent.findMany({
     where: {
       status: 'FAILED',
-      OR: [
-        { nextRetryAt: null },
-        { nextRetryAt: { lte: new Date() } },
-      ],
+      ...(options.force
+        ? {}
+        : {
+            OR: [
+              { nextRetryAt: null },
+              { nextRetryAt: { lte: new Date() } },
+            ],
+          }),
       AND: [{
         OR: [
           { direction: 'CABINET_TO_REMNASHOP', entityType: { in: ['payment', 'promoCode'] } },

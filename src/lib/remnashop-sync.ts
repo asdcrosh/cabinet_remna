@@ -151,8 +151,7 @@ export async function getRemnashopIntegrationStatus(): Promise<RemnashopIntegrat
       ? writable('transactions') && writable('subscriptions') ? 'READY' : 'READ_ONLY'
       : 'UNAVAILABLE'
     const promoCodesState = promoTable && readable(promoTable)
-      ? writable(promoTable) &&
-        (promoTable !== 'promocodes' || writable('promocode_activations'))
+      ? writable(promoTable)
         ? 'READY'
         : 'READ_ONLY'
       : 'UNAVAILABLE'
@@ -163,14 +162,14 @@ export async function getRemnashopIntegrationStatus(): Promise<RemnashopIntegrat
       promoCodes: promoCodesState,
     } satisfies RemnashopIntegrationStatus['channels']
     const allReady = Object.values(channels).every((value) => value === 'READY')
-    const hasReadOnly = Object.values(channels).some((value) => value === 'READ_ONLY')
+    const allReadOnly = Object.values(channels).every((value) => value === 'READ_ONLY')
     const hasUnavailable = Object.values(channels).some((value) => value === 'UNAVAILABLE')
     const coreWritable = writable('users') && writable('subscriptions') && writable('transactions')
 
     return {
       state: allReady && apiConfigured
         ? 'READY'
-        : hasReadOnly && !hasUnavailable
+        : allReadOnly && !hasUnavailable
           ? 'READ_ONLY'
           : 'PARTIAL',
       database: { configured: true, connected: true, writable: coreWritable },
@@ -181,8 +180,10 @@ export async function getRemnashopIntegrationStatus(): Promise<RemnashopIntegrat
         ? 'База подключена, но REMNASHOP_API_URL не задан. Общий вход по email работать не будет.'
         : !eventsConfigured
           ? 'Обмен работает по расписанию. Для мгновенных событий задайте REMNASHOP_WEBHOOK_SECRET.'
-        : coreWritable
+        : allReady
           ? 'Подключение активно: Cabinet читает и записывает данные Remnashop.'
+          : coreWritable
+            ? 'Основной обмен работает. Отдельные каналы ограничены и показаны ниже.'
           : 'База доступна только частично. Проверьте права INSERT и UPDATE.',
     }
   } catch (error) {
@@ -578,6 +579,19 @@ export async function syncRemnashopCatalog(options: {
 
   if (options.includePromoCodes !== false && !promoSource.recognized) {
     warnings.push('Схема промокодов Remnashop не распознана. Деактивация пропущена.')
+    await markSyncSkipped({
+      direction: 'CABINET_TO_REMNASHOP',
+      entityType: 'promoCodeConfig',
+      entityId: 'remnashop',
+      operation: 'check',
+    }, 'remnashop promo code schema is not recognized')
+  } else if (options.includePromoCodes !== false) {
+    await markSyncSucceeded({
+      direction: 'CABINET_TO_REMNASHOP',
+      entityType: 'promoCodeConfig',
+      entityId: 'remnashop',
+      operation: 'check',
+    })
   }
 
   return {
