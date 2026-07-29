@@ -605,6 +605,13 @@ bootstrap_superuser() {
   local email="${SUPERUSER_EMAIL:-}"
   local password="${SUPERUSER_PASSWORD:-}"
 
+  if "${COMPOSE[@]}" exec -T \
+    -e SUPERUSER_CHECK_ONLY="true" \
+    app node ops/bootstrap-superuser.js >/dev/null 2>&1; then
+    echo "Administrator account already exists; bootstrap skipped."
+    return 0
+  fi
+
   if [[ -z "${email}" && -r "${TTY_DEVICE}" ]]; then
     echo "" >"${TTY_DEVICE}"
     echo "Create first administrator account." >"${TTY_DEVICE}"
@@ -635,88 +642,7 @@ EOF
   "${COMPOSE[@]}" exec -T \
     -e SUPERUSER_EMAIL="${email}" \
     -e SUPERUSER_PASSWORD="${password}" \
-    app node <<'NODE'
-const { PrismaClient } = require('@prisma/client')
-const bcrypt = require('bcryptjs')
-const crypto = require('node:crypto')
-
-const email = process.env.SUPERUSER_EMAIL?.trim().toLowerCase()
-const password = process.env.SUPERUSER_PASSWORD
-
-if (!email || !password) {
-  console.error('SUPERUSER_EMAIL and SUPERUSER_PASSWORD are required')
-  process.exit(1)
-}
-if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
-  console.error('Invalid admin email')
-  process.exit(1)
-}
-if (password.length < 8) {
-  console.error('Admin password must be at least 8 characters')
-  process.exit(1)
-}
-if (!/[A-Za-z]/.test(password) || !/[0-9]/.test(password)) {
-  console.error('Admin password must contain at least one latin letter and one digit')
-  process.exit(1)
-}
-
-const prisma = new PrismaClient()
-
-function referralCode() {
-  return crypto.randomBytes(5).toString('base64url').replace(/[^A-Za-z0-9]/g, '').slice(0, 8).toUpperCase()
-}
-
-async function uniqueReferralCode() {
-  for (let attempt = 0; attempt < 20; attempt++) {
-    const code = referralCode()
-    const existing = await prisma.user.findUnique({ where: { referralCode: code }, select: { id: true } })
-    if (!existing) return code
-  }
-  throw new Error('Failed to generate referral code')
-}
-
-async function main() {
-  const passwordHash = await bcrypt.hash(password, 12)
-  const existing = await prisma.user.findUnique({ where: { email }, select: { id: true, referralCode: true } })
-  const now = new Date()
-
-  if (existing) {
-    await prisma.user.update({
-      where: { id: existing.id },
-      data: {
-        passwordHash,
-        role: 'SUPER_ADMIN',
-        emailVerifiedAt: now,
-        referralCode: existing.referralCode ?? await uniqueReferralCode(),
-      },
-    })
-    console.log(`Admin user updated: ${email}`)
-    return
-  }
-
-  await prisma.user.create({
-    data: {
-      email,
-      passwordHash,
-      role: 'SUPER_ADMIN',
-      name: 'Administrator',
-      emailVerifiedAt: now,
-      agreedToTermsAt: now,
-      referralCode: await uniqueReferralCode(),
-    },
-  })
-  console.log(`Admin user created: ${email}`)
-}
-
-main()
-  .catch((error) => {
-    console.error(error)
-    process.exit(1)
-  })
-  .finally(async () => {
-    await prisma.$disconnect()
-  })
-NODE
+    app node ops/bootstrap-superuser.js
 }
 
 CURRENT_CABINET_DOMAIN="$(read_env_value CABINET_DOMAIN || true)"

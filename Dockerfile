@@ -29,6 +29,7 @@ RUN ./node_modules/.bin/esbuild \
   scripts/payment-reconciler.ts \
   scripts/broadcast-worker.ts \
   scripts/cleanup-retention.ts \
+  scripts/bootstrap-superuser.ts \
   prisma/seed.ts \
   --bundle \
   --platform=node \
@@ -60,7 +61,8 @@ COPY --chown=nextjs:nextjs --from=builder /app/prisma ./prisma
 # Fail the image build if a bundled worker references a dependency that is not
 # present in the final release image.
 RUN OPS_STARTUP_CHECK=true node ops/payment-reconciler.js \
-  && OPS_STARTUP_CHECK=true node ops/broadcast-worker.js
+  && OPS_STARTUP_CHECK=true node ops/broadcast-worker.js \
+  && OPS_STARTUP_CHECK=true node ops/bootstrap-superuser.js
 
 # Prisma CLI is needed only for `migrate deploy`. Workers and seed are bundled
 # above, so the image does not need source files, tsx or full node_modules.
