@@ -7,7 +7,7 @@ import { Bell, CheckCheck, ExternalLink, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import type { UserNotificationView } from '@/lib/user-notifications'
 import type { AdminNotificationView } from '@/lib/admin-notifications'
-import { ConfirmDialog } from './confirm-dialog'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { toast } from '@/components/ui/toaster'
 
 const NOTIFICATION_REFRESH_MS = 15_000

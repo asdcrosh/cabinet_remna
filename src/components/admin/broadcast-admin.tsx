@@ -8,6 +8,8 @@ import { cn } from '@/lib/cn'
 import { AdminEmptyState } from '@/components/admin/admin-empty-state'
 import { AdminModal } from '@/components/admin/admin-modal'
 import { EmojiPicker } from '@/components/ui/emoji-picker'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
+import { Switch } from '@/components/ui/switch'
 import {
   broadcastActionPresets as actionPresets,
   broadcastChannels as channels,
@@ -55,6 +57,9 @@ export function BroadcastAdmin({
   const [historyLoading, setHistoryLoading] = useState(false)
   const [customTemplates, setCustomTemplates] = useState<BroadcastTemplateItem[]>(initialTemplates)
   const [selectedHistoryItem, setSelectedHistoryItem] = useState<BroadcastHistoryItem | null>(null)
+  const [sendConfirmOpen, setSendConfirmOpen] = useState(false)
+  const [templateToDelete, setTemplateToDelete] = useState<BroadcastTemplateItem | null>(null)
+  const [deletingTemplate, setDeletingTemplate] = useState(false)
   const [step, setStep] = useState<BroadcastStep>('message')
   const [view, setView] = useState<'compose' | 'history'>('compose')
 
@@ -123,6 +128,7 @@ export function BroadcastAdmin({
       // apiFetch покажет ошибку.
     } finally {
       setLoading(false)
+      if (!testMode) setSendConfirmOpen(false)
     }
   }
 
@@ -191,12 +197,16 @@ export function BroadcastAdmin({
   }
 
   async function deleteTemplate(templateId: string) {
+    setDeletingTemplate(true)
     try {
       await apiFetch(`/api/admin/broadcast-templates/${encodeURIComponent(templateId)}`, { method: 'DELETE' })
       setCustomTemplates((current) => current.filter((template) => template.id !== templateId))
       toast('Шаблон удалён', 'success')
     } catch {
       // apiFetch покажет ошибку.
+    } finally {
+      setDeletingTemplate(false)
+      setTemplateToDelete(null)
     }
   }
 
@@ -442,7 +452,7 @@ export function BroadcastAdmin({
                         {template.title}
                       </button>
                       {template.id ? (
-                        <button type="button" className="text-xs font-medium text-red-600 dark:text-red-300" onClick={() => deleteTemplate(template.id!)}>
+                        <button type="button" className="text-xs font-medium text-red-600 dark:text-red-300" onClick={() => setTemplateToDelete(template)}>
                           Удалить
                         </button>
                       ) : null}
@@ -548,18 +558,13 @@ export function BroadcastAdmin({
                 </label>
 
                 {actionHref ? (
-                  <label className="flex min-h-12 items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-white/10 dark:bg-white/5">
-                    <span className="min-w-0">
-                      <span className="block text-sm font-medium text-slate-950 dark:text-white">Открывать в Telegram</span>
-                      <span className="mt-0.5 block text-xs text-slate-500 dark:text-slate-400">Web App для Telegram-кнопки</span>
-                    </span>
-                    <input
-                      type="checkbox"
-                      className="h-5 w-5 shrink-0"
-                      checked={actionOpenInTelegram}
-                      onChange={(event) => setActionOpenInTelegram(event.target.checked)}
-                    />
-                  </label>
+                  <Switch
+                    checked={actionOpenInTelegram}
+                    onCheckedChange={setActionOpenInTelegram}
+                    label="Открывать в Telegram"
+                    description="Web App для Telegram-кнопки"
+                    className="border-y border-slate-200/90 py-2 dark:border-white/[0.09]"
+                  />
                 ) : null}
 
                 <label className="block">
@@ -687,7 +692,7 @@ export function BroadcastAdmin({
                   <Send className="h-4 w-4" />
                   Тест себе
                 </button>
-                <button type="button" className="btn-primary min-h-11 px-5" onClick={() => submit(false)} disabled={!canSend}>
+                <button type="button" className="btn-primary min-h-11 px-5" onClick={() => setSendConfirmOpen(true)} disabled={!canSend}>
                   <Send className="h-4 w-4" />
                   {loading ? 'Отправляем...' : 'Отправить'}
                 </button>
@@ -709,6 +714,28 @@ export function BroadcastAdmin({
           onView={setSelectedHistoryItem}
         />
       </div> : null}
+      <ConfirmDialog
+        open={sendConfirmOpen}
+        title="Отправить рассылку?"
+        description={`Сегмент: ${segmentLabel(segment, inactiveDays)}. Каналы: ${selectedChannels.map(channelLabel).join(', ')}.`}
+        confirmLabel="Поставить в очередь"
+        loading={loading}
+        tone="warning"
+        details="После запуска получатели начнут получать сообщения. Проверьте текст, ссылки и выбранный сегмент."
+        onCancel={() => setSendConfirmOpen(false)}
+        onConfirm={() => void submit(false)}
+      />
+      <ConfirmDialog
+        open={Boolean(templateToDelete)}
+        title="Удалить шаблон?"
+        description={`Шаблон «${templateToDelete?.title ?? ''}» исчезнет из списка. Отправленные рассылки сохранятся.`}
+        confirmLabel="Удалить шаблон"
+        loading={deletingTemplate}
+        onCancel={() => setTemplateToDelete(null)}
+        onConfirm={() => {
+          if (templateToDelete?.id) void deleteTemplate(templateToDelete.id)
+        }}
+      />
       {selectedHistoryItem ? <BroadcastHistoryModal item={selectedHistoryItem} onClose={() => setSelectedHistoryItem(null)} /> : null}
     </section>
   )

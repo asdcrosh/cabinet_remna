@@ -16,6 +16,7 @@ import type { ReferralSettings } from '@/lib/referral-settings'
 import { apiFetch } from '@/lib/api-client'
 import { toast } from '@/components/ui/toaster'
 import { cn } from '@/lib/cn'
+import { useUnsavedChanges } from '@/lib/use-unsaved-changes'
 
 export function ReferralSettingsAdmin({
   initialSettings,
@@ -28,6 +29,7 @@ export function ReferralSettingsAdmin({
   const [saved, setSaved] = useState(initialSettings)
   const [saving, setSaving] = useState(false)
   const dirty = JSON.stringify(settings) !== JSON.stringify(saved)
+  useUnsavedChanges(dirty && !saving)
   const summary = useMemo(() => buildSummary(settings), [settings])
   const promotion = getPromotionState(settings.promotionEndsAt)
 

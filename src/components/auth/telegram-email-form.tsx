@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { CheckCircle2, Eye, EyeOff, Loader2, LockKeyhole, Mail, Send } from 'lucide-react'
 import { toast } from '@/components/ui/toaster'
 import { FormAlert } from '@/components/ui/form-alert'
+import { Checkbox } from '@/components/ui/checkbox'
 
 export function TelegramEmailForm({ telegramName, initialEmail }: { telegramName: string | null; initialEmail: string }) {
   const [email, setEmail] = useState(initialEmail.endsWith('@pending.invalid') ? '' : initialEmail)
@@ -165,25 +166,27 @@ export function TelegramEmailForm({ telegramName, initialEmail }: { telegramName
       <p className="-mt-2 text-xs leading-5 text-slate-500 dark:text-slate-400">Если этот email уже связан с кабинетом, используйте пароль от него.</p>
       <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-3.5 dark:border-white/[0.08] dark:bg-white/[0.025]">
         <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Документы</div>
-        <label className="flex cursor-pointer items-start gap-3 text-sm leading-5 text-slate-600 dark:text-slate-300">
-          <input className="mt-0.5 h-4 w-4 shrink-0" type="checkbox" checked={agreed} onChange={(event) => setAgreed(event.target.checked)} required />
-          <span>
+        <Checkbox
+          checked={agreed}
+          onChange={(event) => setAgreed(event.target.checked)}
+          required
+          label={(
+            <>
             Я принимаю <Link href="/terms" target="_blank" className="text-brand-600 hover:underline">условия использования</Link>
-          </span>
-        </label>
-        <label className="flex cursor-pointer items-start gap-3 text-sm leading-5 text-slate-600 dark:text-slate-300">
-          <input
-            className="mt-0.5 h-4 w-4 shrink-0"
-            type="checkbox"
-            checked={personalDataAgreed}
-            onChange={(event) => setPersonalDataAgreed(event.target.checked)}
-            required
-          />
-          <span>
+            </>
+          )}
+        />
+        <Checkbox
+          checked={personalDataAgreed}
+          onChange={(event) => setPersonalDataAgreed(event.target.checked)}
+          required
+          label={(
+            <>
             Даю отдельное <Link href="/consent" target="_blank" className="text-brand-600 hover:underline">согласие на обработку персональных данных</Link>
             {' '}и ознакомлен с <Link href="/privacy" target="_blank" className="text-brand-600 hover:underline">политикой</Link>
-          </span>
-        </label>
+            </>
+          )}
+        />
       </div>
       {serverError && (
         <FormAlert>{serverError}</FormAlert>

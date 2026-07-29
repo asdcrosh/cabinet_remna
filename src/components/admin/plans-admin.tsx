@@ -21,7 +21,8 @@ import { planAvailabilityLabels, type PlanAvailabilityValue } from '@/lib/plan-a
 import { AdminModal } from '@/components/admin/admin-modal'
 import { AdminActionsMenu } from '@/components/admin/admin-actions-menu'
 import { AdminEmptyState } from '@/components/admin/admin-empty-state'
-import { ConfirmDialog } from '@/components/dashboard/confirm-dialog'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
+import { Checkbox } from '@/components/ui/checkbox'
 
 export interface PlanAdminRow {
   id: string
@@ -642,18 +643,18 @@ function Toggle({
   description?: string
 }) {
   return (
-    <label className={cn(
-      'flex min-h-14 cursor-pointer items-center gap-3 rounded-2xl border px-3 py-2.5 transition-colors',
-      checked
-        ? 'border-cyan-200 bg-cyan-50/70 dark:border-cyan-400/30 dark:bg-cyan-400/10'
-        : 'border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.025]'
-    )}>
-      <input className="h-4 w-4 shrink-0" type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} />
-      <span className="min-w-0">
-        <span className="block text-sm font-medium text-slate-800 dark:text-slate-100">{label}</span>
-        {description && <span className="mt-0.5 block text-xs text-slate-500">{description}</span>}
-      </span>
-    </label>
+    <Checkbox
+      checked={checked}
+      onChange={(event) => onChange(event.target.checked)}
+      label={label}
+      description={description}
+      className={cn(
+        'flex min-h-14 items-center rounded-xl border px-3 py-2.5 transition-colors',
+        checked
+          ? 'border-cyan-200 bg-cyan-50/70 dark:border-cyan-400/30 dark:bg-cyan-400/10'
+          : 'border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.025]'
+      )}
+    />
   )
 }
 

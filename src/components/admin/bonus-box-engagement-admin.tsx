@@ -16,6 +16,7 @@ import {
 import { apiFetch } from '@/lib/api-client'
 import { toast } from '@/components/ui/toaster'
 import { cn } from '@/lib/cn'
+import { Checkbox } from '@/components/ui/checkbox'
 
 export type BonusMissionAdminRow = {
   id: string
@@ -386,19 +387,18 @@ export function BonusBoxEngagementAdmin({
                 <div className="text-sm font-medium">Усиленные и временные подарки</div>
                 <div className="mt-2 grid gap-2 sm:grid-cols-2">
                   {prizes.map((prize) => (
-                    <label key={prize.id} className="flex items-center gap-2 text-sm">
-                      <input
-                        type="checkbox"
-                        checked={eventForm.prizeIds.includes(prize.id)}
-                        onChange={(event) => setEventForm((form) => ({
-                          ...form,
-                          prizeIds: event.target.checked
-                            ? [...form.prizeIds, prize.id]
-                            : form.prizeIds.filter((id) => id !== prize.id),
-                        }))}
-                      />
-                      {prize.title}
-                    </label>
+                    <Checkbox
+                      key={prize.id}
+                      checked={eventForm.prizeIds.includes(prize.id)}
+                      onChange={(event) => setEventForm((form) => ({
+                        ...form,
+                        prizeIds: event.target.checked
+                          ? [...form.prizeIds, prize.id]
+                          : form.prizeIds.filter((id) => id !== prize.id),
+                      }))}
+                      label={prize.title}
+                      className="items-center"
+                    />
                   ))}
                 </div>
               </div>

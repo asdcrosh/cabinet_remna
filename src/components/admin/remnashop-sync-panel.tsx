@@ -6,7 +6,8 @@ import { Activity, AlertTriangle, Clock3, RefreshCw, RotateCcw } from 'lucide-re
 import { apiFetch } from '@/lib/api-client'
 import { toast } from '@/components/ui/toaster'
 import { AdminEmptyState } from '@/components/admin/admin-empty-state'
-import { ConfirmDialog } from '@/components/dashboard/confirm-dialog'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
+import { Checkbox } from '@/components/ui/checkbox'
 
 interface RemnashopPlanDiff {
   sourceId: number
@@ -180,13 +181,13 @@ export function RemnashopSyncPanel() {
             </button>
           </div>
         </div>
-        <label className="mt-4 flex cursor-pointer items-center justify-between gap-4 rounded-2xl border border-slate-100 bg-slate-50/70 px-3.5 py-3 text-sm text-slate-600 dark:border-white/[0.07] dark:bg-white/[0.025] dark:text-slate-300">
-          <span className="min-w-0">
-            <span className="block font-medium text-slate-900 dark:text-white">Промокоды</span>
-            <span className="mt-0.5 block text-xs text-slate-500">Включить их в текущую синхронизацию</span>
-          </span>
-          <input className="h-5 w-5 shrink-0 accent-cyan-600" type="checkbox" checked={includePromoCodes} onChange={(event) => setIncludePromoCodes(event.target.checked)} />
-        </label>
+        <Checkbox
+          checked={includePromoCodes}
+          onChange={(event) => setIncludePromoCodes(event.target.checked)}
+          label="Промокоды"
+          description="Включить их в текущую синхронизацию"
+          className="mt-4 flex w-full flex-row-reverse items-center justify-between border-y border-slate-200/90 py-3 dark:border-white/[0.09]"
+        />
       </section>
 
       {error && (

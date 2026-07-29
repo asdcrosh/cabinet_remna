@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { Laptop, Loader2, Monitor, RefreshCw, Smartphone, Tablet, Unlink2 } from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
 import { InlineAlert } from './empty-state'
-import { ConfirmDialog } from './confirm-dialog'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { cn } from '@/lib/cn'
 
 interface Device {

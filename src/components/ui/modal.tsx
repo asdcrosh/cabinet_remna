@@ -18,6 +18,7 @@ export interface ModalProps {
   overlayClassName?: string
   panelClassName?: string
   bodyClassName?: string
+  initialFocusRef?: React.RefObject<HTMLElement | null>
 }
 
 export function Modal({
@@ -31,6 +32,7 @@ export function Modal({
   overlayClassName,
   panelClassName,
   bodyClassName,
+  initialFocusRef,
 }: ModalProps) {
   const [mounted, setMounted] = React.useState(false)
   const titleId = React.useId()
@@ -51,8 +53,9 @@ export function Modal({
     previouslyFocusedRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
 
     window.setTimeout(() => {
+      const preferred = initialFocusRef?.current
       const firstFocusable = getFocusableElements(dialogRef.current)[0]
-      firstFocusable?.focus()
+      ;(preferred ?? firstFocusable ?? dialogRef.current)?.focus()
     }, 0)
 
     function onKeyDown(event: KeyboardEvent) {
@@ -85,7 +88,7 @@ export function Modal({
       previouslyFocusedRef.current?.focus()
       previouslyFocusedRef.current = null
     }
-  }, [open])
+  }, [initialFocusRef, open])
 
   if (!mounted || !open) return null
 

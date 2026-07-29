@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { PageLoading } from './page-loading'
 import { Switch } from './switch'
 import { SystemState } from './system-state'
+import { Checkbox } from './checkbox'
 
 describe('общие состояния интерфейса', () => {
   it('рендерит доступный переключатель с подписью и описанием', () => {
@@ -19,6 +20,16 @@ describe('общие состояния интерфейса', () => {
     expect(html).toContain('checked=""')
     expect(html).toContain('Показывать оффер')
     expect(html).toContain('Виден подходящим пользователям')
+  })
+
+  it('рендерит настоящий checkbox с общей визуальной оболочкой', () => {
+    const html = renderToStaticMarkup(
+      <Checkbox checked readOnly label="Выбрать промокод" />,
+    )
+
+    expect(html).toContain('type="checkbox"')
+    expect(html).toContain('checked=""')
+    expect(html).toContain('Выбрать промокод')
   })
 
   it('сообщает скринридеру о загрузке страницы', () => {

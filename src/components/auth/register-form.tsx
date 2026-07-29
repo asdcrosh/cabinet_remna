@@ -9,6 +9,7 @@ import { apiFetch } from '@/lib/api-client'
 import { registerSchema, type RegisterInput } from '@/lib/auth/validation'
 import { toast } from '@/components/ui/toaster'
 import { FormAlert } from '@/components/ui/form-alert'
+import { Checkbox } from '@/components/ui/checkbox'
 import { CheckCircle2, Eye, EyeOff, LockKeyhole, Mail, Ticket, UserRound } from 'lucide-react'
 import { YandexAuthButton } from './yandex-auth-button'
 
@@ -92,26 +93,21 @@ export function RegisterForm({
     <form onSubmit={onSubmit} className="space-y-4">
       <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-3.5 dark:border-white/[0.08] dark:bg-white/[0.025]">
         <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Документы</div>
-        <label className="flex cursor-pointer items-start gap-3 text-sm leading-5 text-slate-600 dark:text-slate-300">
-          <input
-            type="checkbox"
-            className="mt-0.5 h-4 w-4 shrink-0"
-            {...register('agreeToTerms')}
-          />
-          <span>
+        <Checkbox
+          {...register('agreeToTerms')}
+          label={(
+            <>
             Принимаю{' '}
             <Link href="/terms" className="text-brand-600 hover:underline">
               пользовательское соглашение
             </Link>
-          </span>
-        </label>
-        <label className="flex cursor-pointer items-start gap-3 text-sm leading-5 text-slate-600 dark:text-slate-300">
-          <input
-            type="checkbox"
-            className="mt-0.5 h-4 w-4 shrink-0"
-            {...register('agreeToPersonalData')}
-          />
-          <span>
+            </>
+          )}
+        />
+        <Checkbox
+          {...register('agreeToPersonalData')}
+          label={(
+            <>
             Даю отдельное{' '}
             <Link href="/consent" className="text-brand-600 hover:underline">
               согласие на обработку персональных данных
@@ -120,8 +116,9 @@ export function RegisterForm({
             <Link href="/privacy" className="text-brand-600 hover:underline">
               политикой
             </Link>
-          </span>
-        </label>
+            </>
+          )}
+        />
         {(errors.agreeToTerms || errors.agreeToPersonalData) && (
           <p className="text-xs text-red-600">Подтвердите оба документа для регистрации</p>
         )}

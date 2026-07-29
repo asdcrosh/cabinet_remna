@@ -3,7 +3,8 @@
 import { useState } from 'react'
 import { Loader2 } from 'lucide-react'
 import type { FeatureFlags } from '@/lib/feature-flags'
-import { cn } from '@/lib/cn'
+import { useUnsavedChanges } from '@/lib/use-unsaved-changes'
+import { Switch } from '@/components/ui/switch'
 
 const items: Array<{
   key: keyof FeatureFlags
@@ -22,6 +23,7 @@ export function FeatureSettingsPanel({ initialFeatures }: { initialFeatures: Fea
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const dirty = items.some(({ key }) => features[key] !== saved[key])
+  useUnsavedChanges(dirty && !saving)
 
   function toggle(key: keyof FeatureFlags) {
     setFeatures((current) => ({ ...current, [key]: !current[key] }))
@@ -73,22 +75,12 @@ export function FeatureSettingsPanel({ initialFeatures }: { initialFeatures: Fea
                 <div className="font-medium">{item.title}</div>
                 <div className="mt-0.5 text-sm text-slate-500">{item.description}</div>
               </div>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={enabled}
-                aria-label={`${enabled ? 'Выключить' : 'Включить'} ${item.title.toLowerCase()}`}
-                onClick={() => toggle(item.key)}
-                className={cn(
-                  'relative h-7 w-12 shrink-0 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2 dark:ring-offset-[#0b0f14]',
-                  enabled ? 'bg-cyan-500' : 'bg-slate-300 dark:bg-white/15'
-                )}
-              >
-                <span className={cn(
-                  'absolute left-0 top-1 h-5 w-5 rounded-full bg-white shadow-sm transition-transform',
-                  enabled ? 'translate-x-5' : 'translate-x-1'
-                )} />
-              </button>
+              <Switch
+                checked={enabled}
+                onCheckedChange={() => toggle(item.key)}
+                label={`${enabled ? 'Выключить' : 'Включить'} ${item.title.toLowerCase()}`}
+                compact
+              />
             </div>
           )
         })}

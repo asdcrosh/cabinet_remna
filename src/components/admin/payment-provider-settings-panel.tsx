@@ -4,6 +4,9 @@ import { useState } from 'react'
 import { CreditCard, Loader2, RotateCcw, ShieldCheck } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import type { PublicPaymentProviderSettings } from '@/lib/payment-settings'
+import { useUnsavedChanges } from '@/lib/use-unsaved-changes'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
+import { Switch } from '@/components/ui/switch'
 
 type EditableSettings = Omit<PublicPaymentProviderSettings, 'source'>
 
@@ -20,9 +23,11 @@ export function PaymentProviderSettingsPanel({
   const [plategaSecret, setPlategaSecret] = useState('')
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
+  const [resetOpen, setResetOpen] = useState(false)
   const dirty = JSON.stringify(settings) !== JSON.stringify(saved) || Boolean(
     yookassaSecret || payAnyWaySecret || plategaSecret
   )
+  useUnsavedChanges(dirty && !saving)
 
   async function save() {
     setSaving(true)
@@ -75,6 +80,7 @@ export function PaymentProviderSettingsPanel({
       setMessage(error instanceof Error ? error.message : 'Не удалось загрузить настройки .env')
     } finally {
       setSaving(false)
+      setResetOpen(false)
     }
   }
 
@@ -99,7 +105,7 @@ export function PaymentProviderSettingsPanel({
         </div>
         <div className="flex flex-col gap-2 sm:flex-row">
           {source === 'database' ? (
-            <button type="button" className="btn-secondary" disabled={saving} onClick={resetToEnvironment}>
+            <button type="button" className="btn-secondary" disabled={saving} onClick={() => setResetOpen(true)}>
               <RotateCcw className="h-4 w-4" />
               Взять из .env
             </button>
@@ -216,7 +222,8 @@ export function PaymentProviderSettingsPanel({
               label="Тестовый режим PayAnyWay"
               checked={settings.payAnyWay.testMode}
               disabled={!settings.payAnyWay.enabled}
-              onClick={() => setSettings((current) => ({
+              compact
+              onCheckedChange={() => setSettings((current) => ({
                 ...current,
                 payAnyWay: { ...current.payAnyWay, testMode: !current.payAnyWay.testMode },
               }))}
@@ -274,6 +281,16 @@ export function PaymentProviderSettingsPanel({
           {message}
         </div>
       ) : null}
+      <ConfirmDialog
+        open={resetOpen}
+        title="Вернуть настройки из .env?"
+        description="Переопределения платёжных систем из кабинета будут удалены."
+        confirmLabel="Вернуть из .env"
+        loading={saving}
+        tone="warning"
+        onCancel={() => setResetOpen(false)}
+        onConfirm={() => void resetToEnvironment()}
+      />
     </section>
   )
 }
@@ -307,7 +324,12 @@ function ProviderCard({
             </div>
           </div>
         </div>
-        <Switch label={`${enabled ? 'Выключить' : 'Включить'} ${title}`} checked={enabled} onClick={onToggle} />
+        <Switch
+          label={`${enabled ? 'Выключить' : 'Включить'} ${title}`}
+          checked={enabled}
+          onCheckedChange={onToggle}
+          compact
+        />
       </div>
       <div className="space-y-3">{children}</div>
     </div>
@@ -332,38 +354,6 @@ function CallbackPath({ path, label = 'Webhook URL' }: { path: string; label?: s
       <div className="text-xs font-medium text-slate-400">{label}</div>
       <code className="mt-1 block break-all text-xs text-slate-600 dark:text-slate-300">{path}</code>
     </div>
-  )
-}
-
-function Switch({
-  label,
-  checked,
-  disabled = false,
-  onClick,
-}: {
-  label: string
-  checked: boolean
-  disabled?: boolean
-  onClick: () => void
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-label={label}
-      aria-checked={checked}
-      disabled={disabled}
-      onClick={onClick}
-      className={cn(
-        'relative h-7 w-12 shrink-0 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 disabled:cursor-not-allowed disabled:opacity-40',
-        checked ? 'bg-cyan-500' : 'bg-slate-300 dark:bg-white/15'
-      )}
-    >
-      <span className={cn(
-        'absolute left-0 top-1 h-5 w-5 rounded-full bg-white shadow-sm transition-transform',
-        checked ? 'translate-x-5' : 'translate-x-1'
-      )} />
-    </button>
   )
 }
 

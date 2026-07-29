@@ -11,7 +11,9 @@ import { cn } from '@/lib/cn'
 import { AdminEmptyState } from '@/components/admin/admin-empty-state'
 import { AdminActionsMenu } from '@/components/admin/admin-actions-menu'
 import { AdminModal } from '@/components/admin/admin-modal'
-import { ConfirmDialog } from '@/components/dashboard/confirm-dialog'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Switch } from '@/components/ui/switch'
 import { ADMIN_LIST_PAGE_SIZE } from '@/lib/admin-list'
 
 type PromoAudience = 'ALL' | 'NEW_USERS' | 'NO_ACTIVE_SUBSCRIPTION' | 'PERSONAL'
@@ -431,20 +433,22 @@ export function PromoCodesAdmin({
       </section>
 
       <div className={selectedIds.length > 0 ? 'admin-bulk-bar' : 'flex items-center justify-between px-1'}>
-        <label className="flex min-h-10 items-center gap-3 text-sm font-medium text-slate-600 dark:text-slate-300">
-          <input
-            type="checkbox"
-            checked={allInTabSelected}
-            onChange={toggleSelectedInTab}
-            disabled={filteredIds.length === 0}
-          />
-          Выбрать все
-          {selectedIds.length > 0 && (
-            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500 dark:bg-white/10">
-              выбрано {selectedIds.length}
+        <Checkbox
+          checked={allInTabSelected}
+          onChange={toggleSelectedInTab}
+          disabled={filteredIds.length === 0}
+          className="min-h-10 items-center font-medium"
+          label={(
+            <span className="inline-flex flex-wrap items-center gap-2">
+              Выбрать все
+              {selectedIds.length > 0 ? (
+                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500 dark:bg-white/10">
+                  выбрано {selectedIds.length}
+                </span>
+              ) : null}
             </span>
           )}
-        </label>
+        />
         {selectedIds.length === 0 && (
           <span className="text-xs text-slate-400">
             Показано {filteredPromoCodes.length} из {promoCodes.length}
@@ -525,19 +529,12 @@ export function PromoCodesAdmin({
                   <option value="PERSONAL">Персональный список</option>
                 </select>
               </Field>
-              <label className={cn(
-                'flex min-h-11 cursor-pointer items-center gap-3 rounded-2xl border px-3 text-sm font-medium transition-colors',
-                form.isActive
-                  ? 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-100'
-                  : 'border-slate-200 bg-slate-50 text-slate-500 dark:border-white/10 dark:bg-white/[0.03]'
-              )}>
-                <input
-                  type="checkbox"
-                  checked={form.isActive}
-                  onChange={(event) => setForm((current) => ({ ...current, isActive: event.target.checked }))}
-                />
-                {form.isActive ? 'Промокод активен' : 'Промокод выключен'}
-              </label>
+              <Switch
+                checked={form.isActive}
+                onCheckedChange={(checked) => setForm((current) => ({ ...current, isActive: checked }))}
+                label={form.isActive ? 'Промокод активен' : 'Промокод выключен'}
+                className="border-y border-slate-200/90 px-1 py-2 dark:border-white/[0.09]"
+              />
             </div>
 
             {form.audience === 'PERSONAL' && (
@@ -650,12 +647,12 @@ export function PromoCodesAdmin({
                   selectedIds.includes(promoCode.id) && 'bg-cyan-50/50 dark:bg-cyan-400/[0.04]'
                 )}
               >
-                <input
-                  className="mt-2 shrink-0"
-                  type="checkbox"
+                <Checkbox
+                  className="mt-1.5 shrink-0"
                   checked={selectedIds.includes(promoCode.id)}
                   onChange={() => toggleSelected(promoCode.id)}
-                  aria-label={`Выбрать промокод ${promoCode.code}`}
+                  label={`Выбрать промокод ${promoCode.code}`}
+                  compact
                 />
 
                 <div className="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-3 sm:grid-cols-[minmax(10rem,1fr)_6rem] sm:gap-x-4 lg:grid-cols-[minmax(12rem,1fr)_6rem_minmax(18rem,1.5fr)_minmax(12rem,1fr)] lg:items-center">

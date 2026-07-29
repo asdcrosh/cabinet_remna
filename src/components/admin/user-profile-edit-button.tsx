@@ -7,6 +7,7 @@ import { AdminModal } from '@/components/admin/admin-modal'
 import { toast } from '@/components/ui/toaster'
 import { apiFetch } from '@/lib/api-client'
 import { FormAlert } from '@/components/ui/form-alert'
+import { Switch } from '@/components/ui/switch'
 
 export function UserProfileEditButton({
   userId,
@@ -128,20 +129,13 @@ export function UserProfileEditButton({
             </label>
           </div>
 
-          <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-white/10 dark:bg-white/[0.03]">
-            <input
-              type="checkbox"
-              className="mt-0.5 h-4 w-4 rounded border-slate-300"
-              checked={form.emailVerified}
-              onChange={(event) => setForm((current) => ({ ...current, emailVerified: event.target.checked }))}
-            />
-            <span>
-              <span className="block text-sm font-medium">Email подтверждён</span>
-              <span className="mt-0.5 block text-xs leading-5 text-slate-500">
-                Включайте только если адрес проверен. После сохранения он будет использован для связи с Remnashop.
-              </span>
-            </span>
-          </label>
+          <Switch
+            checked={form.emailVerified}
+            onCheckedChange={(checked) => setForm((current) => ({ ...current, emailVerified: checked }))}
+            label="Email подтверждён"
+            description="Включайте только если адрес проверен. После сохранения он будет использован для связи с Remnashop."
+            className="border-y border-slate-200/90 py-3 dark:border-white/[0.09]"
+          />
 
           <section className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/40 p-4 dark:border-white/10 dark:bg-white/[0.02]">
             <div>

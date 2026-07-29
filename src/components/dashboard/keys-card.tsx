@@ -21,7 +21,7 @@ import {
 import { apiFetch } from '@/lib/api-client'
 import { Modal } from '@/components/ui/modal'
 import { toast } from '@/components/ui/toaster'
-import { ConfirmDialog } from './confirm-dialog'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { cn } from '@/lib/cn'
 
 type Device = 'ios' | 'android' | 'macos' | 'windows' | 'desktop'

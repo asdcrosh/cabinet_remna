@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { RefreshCw } from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
 import { toast } from '@/components/ui/toaster'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 
 export function RecoveryActionButton({ paymentId }: { paymentId: string }) {
   const router = useRouter()
@@ -40,40 +41,56 @@ export function RecoveryActionButton({ paymentId }: { paymentId: string }) {
 export function BulkRecoveryActionButton({ paymentIds }: { paymentIds: string[] }) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
+  const [confirmOpen, setConfirmOpen] = useState(false)
   const uniquePaymentIds = Array.from(new Set(paymentIds)).slice(0, 100)
 
+  async function recoverPayments() {
+    setLoading(true)
+    try {
+      const result = await apiFetch<{
+        total: number
+        provisioned: number
+        alreadyProvisioned: number
+        failed: number
+      }>('/api/admin/sync', {
+        method: 'POST',
+        body: JSON.stringify({ paymentIds: uniquePaymentIds }),
+      })
+      toast(
+        `Довыдача: ${result.provisioned} выдано, ${result.alreadyProvisioned} уже было, ${result.failed} ошибок из ${result.total}`,
+        result.failed > 0 ? 'error' : 'success'
+      )
+      setConfirmOpen(false)
+      router.refresh()
+    } catch {
+      // apiFetch уже покажет toast
+    } finally {
+      setLoading(false)
+    }
+  }
+
   return (
-    <button
-      type="button"
-      className="btn-primary w-full sm:w-auto"
-      disabled={loading || uniquePaymentIds.length === 0}
-      onClick={async () => {
-        setLoading(true)
-        try {
-          const result = await apiFetch<{
-            total: number
-            provisioned: number
-            alreadyProvisioned: number
-            failed: number
-          }>('/api/admin/sync', {
-            method: 'POST',
-            body: JSON.stringify({ paymentIds: uniquePaymentIds }),
-          })
-          toast(
-            `Довыдача: ${result.provisioned} выдано, ${result.alreadyProvisioned} уже было, ${result.failed} ошибок из ${result.total}`,
-            result.failed > 0 ? 'error' : 'success'
-          )
-          router.refresh()
-        } catch {
-          // apiFetch уже покажет toast
-        } finally {
-          setLoading(false)
-        }
-      }}
-    >
-      <RefreshCw className="h-4 w-4" />
-      {loading ? 'Выдаём...' : `Довыдать все (${uniquePaymentIds.length})`}
-    </button>
+    <>
+      <button
+        type="button"
+        className="btn-primary w-full sm:w-auto"
+        disabled={loading || uniquePaymentIds.length === 0}
+        onClick={() => setConfirmOpen(true)}
+      >
+        <RefreshCw className="h-4 w-4" />
+        {loading ? 'Выдаём...' : `Довыдать все (${uniquePaymentIds.length})`}
+      </button>
+      <ConfirmDialog
+        open={confirmOpen}
+        title="Довыдать подписки массово?"
+        description={`Будут повторно проверены платежи: ${uniquePaymentIds.length}. Уже обработанные платежи останутся без изменений.`}
+        confirmLabel="Запустить довыдачу"
+        loading={loading}
+        tone="warning"
+        onCancel={() => setConfirmOpen(false)}
+        onConfirm={() => void recoverPayments()}
+      />
+    </>
   )
 }
 
