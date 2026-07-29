@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
   promoCodeFindUnique: vi.fn(),
+  promoCodeUpdate: vi.fn(),
   remnashopQuery: vi.fn(),
 }))
 
@@ -9,6 +10,7 @@ vi.mock('./prisma', () => ({
   prisma: {
     promoCode: {
       findUnique: mocks.promoCodeFindUnique,
+      update: mocks.promoCodeUpdate,
     },
   },
 }))
@@ -35,6 +37,7 @@ const originalDatabaseUrl = process.env.REMNASHOP_DATABASE_URL
 const promoCode = {
   id: 'promo-1',
   code: 'HELLO20',
+  remnashopPromoCodeId: null,
   discountPercent: 20,
   audience: 'ALL',
   allowedEmails: [],

@@ -48,8 +48,10 @@ export const POST = withAuth(async (req: Request) => {
         subscriptionsSkipped: users.subscriptionsSkipped,
         subscriptionsFailed: users.subscriptionsFailed,
         paymentsCreated: payments.created,
+        paymentsUpdated: payments.updated,
         paymentsSkipped: payments.skipped,
         paymentsBlocked: payments.blocked,
+        paymentsFailed: payments.failed,
       },
     }
     await writeAuditLog({

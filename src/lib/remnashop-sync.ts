@@ -1,6 +1,7 @@
 import { prisma } from './prisma'
 import { remnashopQuery } from './remnashop-db'
 import { syncRemnashopUsersToCabinet } from './remnashop-users'
+import { markSyncFailed, markSyncSkipped, markSyncSucceeded } from './sync-events'
 
 type RemnashopSubscriptionStatus = 'ACTIVE' | 'DISABLED' | 'EXPIRED' | 'DELETED'
 type RemnashopTransactionStatus = 'PENDING' | 'COMPLETED' | 'CANCELED' | 'REFUNDED' | 'FAILED'
@@ -97,6 +98,10 @@ export interface RemnashopIntegrationStatus {
   api: {
     configured: boolean
   }
+  events: {
+    configured: boolean
+    mode: 'REALTIME' | 'POLLING'
+  }
   channels: {
     users: RemnashopChannelState
     catalog: RemnashopChannelState
@@ -109,11 +114,13 @@ export interface RemnashopIntegrationStatus {
 export async function getRemnashopIntegrationStatus(): Promise<RemnashopIntegrationStatus> {
   const databaseConfigured = Boolean(process.env.REMNASHOP_DATABASE_URL)
   const apiConfigured = Boolean(process.env.REMNASHOP_API_URL?.trim())
+  const eventsConfigured = Boolean(process.env.REMNASHOP_WEBHOOK_SECRET?.trim())
   if (!databaseConfigured) {
     return {
       state: 'NOT_CONFIGURED',
       database: { configured: false, connected: false, writable: false },
       api: { configured: apiConfigured },
+      events: { configured: eventsConfigured, mode: eventsConfigured ? 'REALTIME' : 'POLLING' },
       channels: {
         users: 'UNAVAILABLE',
         catalog: 'UNAVAILABLE',
@@ -168,9 +175,12 @@ export async function getRemnashopIntegrationStatus(): Promise<RemnashopIntegrat
           : 'PARTIAL',
       database: { configured: true, connected: true, writable: coreWritable },
       api: { configured: apiConfigured },
+      events: { configured: eventsConfigured, mode: eventsConfigured ? 'REALTIME' : 'POLLING' },
       channels,
       message: !apiConfigured
         ? 'База подключена, но REMNASHOP_API_URL не задан. Общий вход по email работать не будет.'
+        : !eventsConfigured
+          ? 'Обмен работает по расписанию. Для мгновенных событий задайте REMNASHOP_WEBHOOK_SECRET.'
         : coreWritable
           ? 'Подключение активно: Cabinet читает и записывает данные Remnashop.'
           : 'База доступна только частично. Проверьте права INSERT и UPDATE.',
@@ -180,6 +190,7 @@ export async function getRemnashopIntegrationStatus(): Promise<RemnashopIntegrat
       state: 'ERROR',
       database: { configured: true, connected: false, writable: false },
       api: { configured: apiConfigured },
+      events: { configured: eventsConfigured, mode: eventsConfigured ? 'REALTIME' : 'POLLING' },
       channels: {
         users: 'UNAVAILABLE',
         catalog: 'UNAVAILABLE',
@@ -240,7 +251,13 @@ export async function getRemnashopSyncDryRun() {
           { yookassaId: { in: paymentIds } },
         ],
       },
-      select: { id: true, externalPaymentId: true, yookassaId: true },
+      select: {
+        id: true,
+        externalPaymentId: true,
+        yookassaId: true,
+        providerStatus: true,
+        status: true,
+      },
     }),
     prisma.plan.findMany({
       where: { name: { in: planNames } },
@@ -258,11 +275,11 @@ export async function getRemnashopSyncDryRun() {
       .map((subscription) => subscription.user.remnawaveUuid)
       .filter((uuid): uuid is string => Boolean(uuid))
   )
-  const cabinetPaymentIds = new Set(
-    cabinetPayments
-      .map((payment) => payment.externalPaymentId || payment.yookassaId)
-      .filter((id): id is string => Boolean(id))
-  )
+  const cabinetPaymentsByExternalId = new Map<string, (typeof cabinetPayments)[number]>()
+  for (const payment of cabinetPayments) {
+    const externalId = payment.externalPaymentId || payment.yookassaId
+    if (externalId) cabinetPaymentsByExternalId.set(externalId, payment)
+  }
   const cabinetPlanKeys = new Set(
     cabinetPlans.map((plan) => makePlanKey(plan.name, plan.durationDays, plan.priceKopecks))
   )
@@ -306,17 +323,28 @@ export async function getRemnashopSyncDryRun() {
       ? cabinetUsersByRemnaUuid.get(transaction.user_remna_id)
       : null
     const originatedInCabinet = transaction.gateway_display_name?.toLowerCase().includes('cabinet') ?? false
-    const existsInCabinet = originatedInCabinet || cabinetPaymentIds.has(transaction.payment_id)
+    const cabinetPayment = cabinetPaymentsByExternalId.get(transaction.payment_id)
+    const existsInCabinet = originatedInCabinet || Boolean(cabinetPayment)
+    const mappedStatus = mapTransactionStatus(transaction.status)
+    const needsUpdate = Boolean(
+      cabinetPayment &&
+      (
+        cabinetPayment.status !== mappedStatus ||
+        cabinetPayment.providerStatus !== transaction.status
+      )
+    )
     return {
       sourceId: transaction.id,
       paymentId: transaction.payment_id,
       status: transaction.status,
-      mappedStatus: mapTransactionStatus(transaction.status),
+      mappedStatus,
       userRemnaId: transaction.user_remna_id,
       hasCabinetUser: Boolean(cabinetUser),
       existsInCabinet,
-      action: existsInCabinet
-        ? 'keep'
+      action: needsUpdate
+        ? 'wouldUpdate'
+        : existsInCabinet
+          ? 'keep'
         : cabinetUser
           ? 'wouldCreate'
           : 'blockedNoCabinetUser',
@@ -341,7 +369,7 @@ export async function getRemnashopSyncDryRun() {
       remnashopTransactions: transactions.length,
       cabinetMatchedUsers: cabinetUsersByRemnaUuid.size,
       cabinetMatchedSubscriptions: cabinetSubscriptionRemnaUuids.size,
-      cabinetMatchedPayments: cabinetPaymentIds.size,
+      cabinetMatchedPayments: cabinetPaymentsByExternalId.size,
     },
     warnings: buildWarnings(userStats, unmatchedActiveRemnaUuids.length, writeAccess),
     summary: {
@@ -352,6 +380,7 @@ export async function getRemnashopSyncDryRun() {
         (item) => !cabinetSubscriptionRemnaUuids.has(item.user_remna_id)
       ).length,
       paymentsWouldCreate: transactionActions.filter((item) => item.action === 'wouldCreate').length,
+      paymentsWouldUpdate: transactionActions.filter((item) => item.action === 'wouldUpdate').length,
       paymentsBlockedNoCabinetUser: transactionActions.filter((item) => item.action === 'blockedNoCabinetUser').length,
     },
     samples: {
@@ -376,13 +405,15 @@ export async function getRemnashopSyncDryRun() {
 export async function syncRemnashopCatalog(options: {
   includePromoCodes?: boolean
 } = {}) {
-  const [plans, sourcePromoCodes] = await Promise.all([
+  const [plans, promoSource] = await Promise.all([
     fetchRemnashopPlans(),
-    fetchRemnashopPromoCodes(),
+    fetchRemnashopPromoCodesWithMeta(),
   ])
-  const promoCodes = options.includePromoCodes === false ? [] : sourcePromoCodes
+  const promoCodes = options.includePromoCodes === false ? [] : promoSource.rows
 
   const warnings: string[] = []
+  let plansDeactivated = 0
+  let promoCodesDeactivated = 0
   const planResults: Array<{
     sourceId: number
     name: string
@@ -463,9 +494,13 @@ export async function syncRemnashopCatalog(options: {
         continue
       }
 
-      const existing = await tx.promoCode.findUnique({ where: { code } })
+      const existingBySource = await tx.promoCode.findUnique({
+        where: { remnashopPromoCodeId: promoCode.id },
+      })
+      const existing = existingBySource ?? await tx.promoCode.findUnique({ where: { code } })
       const data = {
         code,
+        remnashopPromoCodeId: promoCode.id,
         discountPercent: clampDiscountPercent(promoCode.discount_percent),
         isActive: promoCode.is_active,
         startsAt: promoCode.starts_at,
@@ -505,10 +540,44 @@ export async function syncRemnashopCatalog(options: {
         skippedPlans: Math.max(0, promoCode.plan_ids.length - linkedPlanIds.size),
       })
     }
+
+    const sourcePlanKeys = new Set(
+      plans.map((plan) => makeSourcePlanKey(plan.id, plan.duration_days))
+    )
+    const importedPlans = await tx.plan.findMany({
+      where: { remnashopPlanId: { not: null }, isActive: true },
+      select: { id: true, remnashopPlanId: true, durationDays: true },
+    })
+    const stalePlanIds = importedPlans
+      .filter((plan) =>
+        plan.remnashopPlanId !== null &&
+        !sourcePlanKeys.has(makeSourcePlanKey(plan.remnashopPlanId, plan.durationDays))
+      )
+      .map((plan) => plan.id)
+    if (stalePlanIds.length > 0) {
+      plansDeactivated = (await tx.plan.updateMany({
+        where: { id: { in: stalePlanIds } },
+        data: { isActive: false },
+      })).count
+    }
+
+    if (options.includePromoCodes !== false && promoSource.recognized) {
+      const sourcePromoCodeIds = promoCodes.map((promoCode) => promoCode.id)
+      promoCodesDeactivated = (await tx.promoCode.updateMany({
+        where: {
+          remnashopPromoCodeId: {
+            not: null,
+            ...(sourcePromoCodeIds.length > 0 ? { notIn: sourcePromoCodeIds } : {}),
+          },
+          isActive: true,
+        },
+        data: { isActive: false },
+      })).count
+    }
   })
 
-  if (options.includePromoCodes !== false && promoCodes.length === 0) {
-    warnings.push('Промокоды remnashop не найдены или схема промокодов не распознана.')
+  if (options.includePromoCodes !== false && !promoSource.recognized) {
+    warnings.push('Схема промокодов Remnashop не распознана. Деактивация пропущена.')
   }
 
   return {
@@ -520,9 +589,11 @@ export async function syncRemnashopCatalog(options: {
       remnashopPromoCodes: promoCodes.length,
       plansCreated: planResults.filter((item) => item.action === 'created').length,
       plansUpdated: planResults.filter((item) => item.action === 'updated').length,
+      plansDeactivated,
       promoCodesCreated: promoResults.filter((item) => item.action === 'created').length,
       promoCodesUpdated: promoResults.filter((item) => item.action === 'updated').length,
       promoCodesSkipped: promoResults.filter((item) => item.action === 'skipped').length,
+      promoCodesDeactivated,
     },
     warnings,
     samples: {
@@ -532,114 +603,173 @@ export async function syncRemnashopCatalog(options: {
   }
 }
 
-export async function syncRemnashopPaymentsToCabinet() {
-  const transactions = await fetchRemnashopTransactions()
+export async function syncRemnashopPaymentsToCabinet(options: {
+  paymentId?: string
+} = {}) {
+  const transactions = await fetchRemnashopTransactions(options.paymentId)
   let created = 0
+  let updated = 0
   let skipped = 0
   let blocked = 0
+  let failed = 0
 
   for (const transaction of transactions) {
-    if (transaction.gateway_display_name?.toLowerCase().includes('cabinet')) {
-      skipped += 1
-      continue
+    const event = {
+      direction: 'REMNASHOP_TO_CABINET' as const,
+      entityType: 'payment',
+      entityId: transaction.payment_id,
+      operation: 'upsert',
     }
-
-    const provider = mapRemnashopGateway(transaction.gateway_type)
-    const existing = await prisma.payment.findFirst({
-      where: {
-        provider,
-        externalPaymentId: transaction.payment_id,
-      },
-      select: { id: true },
-    })
-    if (existing) {
-      skipped += 1
-      continue
+    try {
+      const action = await syncRemnashopTransactionToCabinet(transaction)
+      if (action === 'created') created += 1
+      if (action === 'updated') updated += 1
+      if (action === 'skipped') skipped += 1
+      if (action === 'blocked') {
+        blocked += 1
+        await markSyncSkipped(event, 'Cabinet user or plan is not linked')
+      } else {
+        await markSyncSucceeded(event)
+      }
+    } catch (error) {
+      failed += 1
+      await markSyncFailed(event, error)
     }
+  }
 
-    const user = await prisma.user.findFirst({
-      where: {
-        OR: [
-          { remnashopUserId: transaction.user_id },
-          ...(transaction.user_remna_id
-            ? [{ remnawaveUuid: transaction.user_remna_id }]
-            : []),
-        ],
-      },
-      select: {
-        id: true,
-        subscriptions: {
-          orderBy: { expireAt: 'desc' },
-          take: 1,
-          select: { id: true, planId: true },
+  return { total: transactions.length, created, updated, skipped, blocked, failed }
+}
+
+async function syncRemnashopTransactionToCabinet(
+  transaction: RemnashopTransactionRow
+): Promise<'created' | 'updated' | 'skipped' | 'blocked'> {
+  const provider = mapRemnashopGateway(transaction.gateway_type)
+  const status = mapTransactionStatus(transaction.status)
+  const existing = await prisma.payment.findFirst({
+    where: {
+      OR: [
+        { provider, externalPaymentId: transaction.payment_id },
+        { yookassaId: transaction.payment_id },
+      ],
+    },
+    select: {
+      id: true,
+      status: true,
+      providerStatus: true,
+      paidAt: true,
+    },
+  })
+
+  if (existing) {
+    const statusChanged = existing.status !== status || existing.providerStatus !== transaction.status
+    await prisma.$transaction(async (tx) => {
+      await tx.payment.update({
+        where: { id: existing.id },
+        data: {
+          status,
+          providerStatus: transaction.status,
+          remnashopSyncedAt: new Date(),
+          ...(status === 'SUCCEEDED' || status === 'REFUNDED'
+            ? { paidAt: existing.paidAt ?? transaction.created_at }
+            : {}),
         },
-      },
+      })
+      if (status === 'SUCCEEDED') {
+        await tx.promoCodeRedemption.updateMany({
+          where: { paymentId: existing.id },
+          data: { status: 'SUCCEEDED' },
+        })
+      } else if (status === 'CANCELED' || status === 'REFUNDED') {
+        await tx.promoCodeRedemption.updateMany({
+          where: { paymentId: existing.id },
+          data: { status: 'CANCELED' },
+        })
+      }
     })
-    if (!user) {
-      blocked += 1
-      continue
-    }
+    return statusChanged ? 'updated' : 'skipped'
+  }
 
-    const snapshot = parseJsonRecord(transaction.plan_snapshot)
-    const durationDays = readPositiveInt(snapshot, ['duration', 'duration_days', 'durationDays'])
-    const sourcePlanId = readPositiveInt(snapshot, ['id', 'plan_id', 'planId'])
-    const snapshotName = readText(snapshot, ['name'])
-    const plan = sourcePlanId
+  const originatedInCabinet =
+    transaction.gateway_display_name?.toLowerCase().includes('cabinet') ?? false
+  if (originatedInCabinet) return 'skipped'
+
+  const user = await prisma.user.findFirst({
+    where: {
+      OR: [
+        { remnashopUserId: transaction.user_id },
+        ...(transaction.user_remna_id
+          ? [{ remnawaveUuid: transaction.user_remna_id }]
+          : []),
+      ],
+    },
+    select: {
+      id: true,
+      subscriptions: {
+        orderBy: { expireAt: 'desc' },
+        take: 1,
+        select: { id: true, planId: true },
+      },
+    },
+  })
+  if (!user) return 'blocked'
+
+  const snapshot = parseJsonRecord(transaction.plan_snapshot)
+  const durationDays = readPositiveInt(snapshot, ['duration', 'duration_days', 'durationDays'])
+  const sourcePlanId = readPositiveInt(snapshot, ['id', 'plan_id', 'planId'])
+  const snapshotName = readText(snapshot, ['name'])
+  const plan = sourcePlanId
+    ? await prisma.plan.findFirst({
+        where: {
+          remnashopPlanId: sourcePlanId,
+          ...(durationDays ? { durationDays } : {}),
+        },
+        select: { id: true },
+      })
+    : snapshotName
       ? await prisma.plan.findFirst({
           where: {
-            remnashopPlanId: sourcePlanId,
+            name: snapshotName,
             ...(durationDays ? { durationDays } : {}),
           },
           select: { id: true },
         })
-      : snapshotName
-        ? await prisma.plan.findFirst({
-            where: {
-              name: snapshotName,
-              ...(durationDays ? { durationDays } : {}),
-            },
-            select: { id: true },
-          })
-        : null
-    const planId = plan?.id ?? user.subscriptions[0]?.planId
-    if (!planId) {
-      blocked += 1
-      continue
-    }
+      : null
+  const planId = plan?.id ?? user.subscriptions[0]?.planId
+  if (!planId) return 'blocked'
 
-    const pricing = parseJsonRecord(transaction.pricing)
-    const originalAmountKopecks = readMoneyKopecks(pricing, 'original_amount', 'original_amount_kopecks')
-    const amountKopecks = readMoneyKopecks(pricing, 'final_amount', 'amount_kopecks')
-    const discountPercent = readPositiveInt(pricing, ['discount_percent']) ?? 0
-    const status = mapTransactionStatus(transaction.status)
-    const subscriptionId = user.subscriptions[0]?.id ?? null
+  const pricing = parseJsonRecord(transaction.pricing)
+  const originalAmountKopecks = readMoneyKopecks(
+    pricing,
+    'original_amount',
+    'original_amount_kopecks'
+  )
+  const amountKopecks = readMoneyKopecks(pricing, 'final_amount', 'amount_kopecks')
+  const discountPercent = readPositiveInt(pricing, ['discount_percent']) ?? 0
+  const subscriptionId = user.subscriptions[0]?.id ?? null
 
-    await prisma.payment.create({
-      data: {
-        userId: user.id,
-        subscriptionId,
-        planId,
-        amountKopecks,
-        originalAmountKopecks,
-        discountPercent,
-        discountKopecks: Math.max(0, originalAmountKopecks - amountKopecks),
-        provider,
-        externalPaymentId: transaction.payment_id,
-        providerStatus: transaction.status,
-        status,
-        paidAt: status === 'SUCCEEDED' || status === 'REFUNDED'
-          ? transaction.created_at
-          : null,
-        subscriptionProvisionedAt: status === 'SUCCEEDED' && subscriptionId
-          ? transaction.updated_at
-          : null,
-        remnashopSyncedAt: new Date(),
-      },
-    })
-    created += 1
-  }
-
-  return { total: transactions.length, created, skipped, blocked }
+  await prisma.payment.create({
+    data: {
+      userId: user.id,
+      subscriptionId,
+      planId,
+      amountKopecks,
+      originalAmountKopecks,
+      discountPercent,
+      discountKopecks: Math.max(0, originalAmountKopecks - amountKopecks),
+      provider,
+      externalPaymentId: transaction.payment_id,
+      providerStatus: transaction.status,
+      status,
+      paidAt: status === 'SUCCEEDED' || status === 'REFUNDED'
+        ? transaction.created_at
+        : null,
+      subscriptionProvisionedAt: status === 'SUCCEEDED' && subscriptionId
+        ? transaction.updated_at
+        : null,
+      remnashopSyncedAt: new Date(),
+    },
+  })
+  return 'created'
 }
 
 export async function maybeSyncRemnashopCatalog() {
@@ -701,17 +831,23 @@ async function fetchRemnashopPlans() {
 }
 
 async function fetchRemnashopPromoCodes() {
+  return (await fetchRemnashopPromoCodesWithMeta()).rows
+}
+
+async function fetchRemnashopPromoCodesWithMeta() {
   const table = await firstExistingTable(['promo_codes', 'promocodes', 'coupons', 'discount_codes'])
-  if (!table) return []
+  if (!table) return { rows: [] as RemnashopPromoCodeRow[], recognized: false }
 
   const columns = await tableColumns(table)
   const codeColumn = firstExistingColumn(columns, ['code', 'name'])
   const currentSchema = columns.has('reward_type') && columns.has('reward')
   const discountColumn = firstExistingColumn(columns, ['discount_percent', 'discount', 'percent'])
-  if (!codeColumn || (!currentSchema && !discountColumn)) return []
+  if (!codeColumn || (!currentSchema && !discountColumn)) {
+    return { rows: [] as RemnashopPromoCodeRow[], recognized: false }
+  }
 
   const idColumn = firstExistingColumn(columns, ['id'])
-  if (!idColumn) return []
+  if (!idColumn) return { rows: [] as RemnashopPromoCodeRow[], recognized: false }
 
   const isActiveColumn = firstExistingColumn(columns, ['is_active', 'active'])
   const startsAtColumn = firstExistingColumn(columns, ['starts_at', 'start_at', 'active_from'])
@@ -766,7 +902,7 @@ async function fetchRemnashopPromoCodes() {
       : ''}
     ORDER BY pc.${quoteIdent(idColumn)}
   `)
-  return result.rows
+  return { rows: result.rows, recognized: true }
 }
 
 async function firstExistingTable(candidates: string[]) {
@@ -838,7 +974,7 @@ async function fetchRemnashopSubscriptions() {
   return result.rows
 }
 
-async function fetchRemnashopTransactions() {
+async function fetchRemnashopTransactions(paymentId?: string) {
   const result = await remnashopQuery<RemnashopTransactionRow>(`
     SELECT
       t.id,
@@ -858,8 +994,9 @@ async function fetchRemnashopTransactions() {
     FROM transactions t
     LEFT JOIN users u ON u.id = t.user_id
     LEFT JOIN subscriptions s ON s.id = u.current_subscription_id
+    ${paymentId ? 'WHERE t.payment_id::text = $1' : ''}
     ORDER BY t.created_at DESC
-  `)
+  `, paymentId ? [paymentId] : [])
   return result.rows
 }
 

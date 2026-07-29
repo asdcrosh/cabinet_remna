@@ -376,8 +376,9 @@ NODE_ENV=production npm run check:env
 | `LEGAL_OPERATOR_ADDRESS` | Необязательный адрес исполнителя; пустое значение не показывается |
 | `LEGAL_SUPPORT_PHONE` | Необязательный публичный телефон поддержки |
 | `LEGAL_SUPPORT_TELEGRAM` | Необязательный username или URL Telegram поддержки |
-| `REMNASHOP_DATABASE_URL` | Read-only доступ к БД Remnashop |
+| `REMNASHOP_DATABASE_URL` | Доступ интеграции к БД Remnashop |
 | `REMNASHOP_API_URL` | Public API Remnashop |
+| `REMNASHOP_WEBHOOK_SECRET` | Секрет событий Remnashop -> Cabinet |
 | `TELEGRAM_BOT_TOKEN` | Mini App и Telegram-уведомления |
 | `YANDEX_CLIENT_ID` / `YANDEX_CLIENT_SECRET` | Вход через Яндекс ID |
 | `REFERRAL_BONUS_DAYS` | Бонус за реферала |
@@ -530,8 +531,11 @@ YANDEX_CLIENT_SECRET="..."
 - создаст read-only роль;
 - подключит кабinet к Docker-сети;
 - заполнит `REMNASHOP_DATABASE_URL`.
+- создаст `REMNASHOP_WEBHOOK_SECRET`.
 
-Каталог синхронизируется по интервалу `REMNASHOP_CATALOG_SYNC_INTERVAL_SECONDS`. Пользователи — через payment worker (`REMNASHOP_USERS_SYNC_INTERVAL_SECONDS`).
+Каталог и пользователи синхронизируются через payment worker. Для мгновенных
+обновлений Remnashop может отправлять события на
+`/api/integrations/remnashop/events`; периодический опрос остаётся резервным.
 
 ---
 

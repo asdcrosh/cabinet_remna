@@ -109,6 +109,16 @@ services:
         condition: service_completed_successfully
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "node -e \"const fs=require('fs');const p='/tmp/payment-reconciler-heartbeat';const max=(Number(process.env.PAYMENT_WORKER_HEARTBEAT_MAX_AGE_SECONDS||180)*1000);try{process.exit(Date.now()-fs.statSync(p).mtimeMs<max?0:1)}catch{process.exit(1)}\"",
+        ]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 90s
     networks:
       - cabinet
       - remnawave_external

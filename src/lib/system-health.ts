@@ -4,6 +4,8 @@ import { remnawave } from '@/lib/remnawave'
 import { getProvisioningQueueHealth } from '@/lib/job-health'
 import { getResolvedPaymentProviderSettings } from '@/lib/payment-settings'
 import { checkPlategaConnection } from '@/lib/platega'
+import { getRemnashopIntegrationStatus } from '@/lib/remnashop-sync'
+import { getPaymentWorkerHeartbeat } from '@/lib/worker-health'
 
 export type SystemHealthStatus = 'ok' | 'warn' | 'error'
 
@@ -75,6 +77,38 @@ async function checkRemnawave() {
     return check('remnawave', 'Remnawave API', 'ok', 'Панель отвечает')
   } catch (error) {
     return check('remnawave', 'Remnawave API', 'error', 'Не удалось подключиться к панели', errorMessage(error))
+  }
+}
+
+async function checkRemnashop() {
+  const integration = await getRemnashopIntegrationStatus()
+  if (integration.state === 'READY') {
+    return check('remnashop', 'Remnashop', 'ok', integration.message)
+  }
+  if (integration.state === 'ERROR') {
+    return check('remnashop', 'Remnashop', 'error', integration.message)
+  }
+  return check('remnashop', 'Remnashop', 'warn', integration.message)
+}
+
+async function checkPaymentWorker() {
+  try {
+    const heartbeat = await getPaymentWorkerHeartbeat()
+    if (!heartbeat) {
+      return check('payment-worker', 'Фоновая обработка', 'warn', 'Воркер ещё не передавал сигнал')
+    }
+    if (heartbeat.resetAt <= new Date()) {
+      return check(
+        'payment-worker',
+        'Фоновая обработка',
+        'error',
+        'Воркер платежей не отвечает',
+        `Последний сигнал: ${heartbeat.updatedAt.toISOString()}`
+      )
+    }
+    return check('payment-worker', 'Фоновая обработка', 'ok', 'Воркер платежей работает')
+  } catch (error) {
+    return check('payment-worker', 'Фоновая обработка', 'warn', 'Не удалось проверить воркер', errorMessage(error))
   }
 }
 
@@ -354,6 +388,8 @@ export async function getSystemHealth(options: { sendEmail?: boolean } = {}): Pr
   const checks = await Promise.all([
     checkDatabase(),
     checkRemnawave(),
+    checkRemnashop(),
+    checkPaymentWorker(),
     checkYooKassa(),
     checkPayAnyWay(),
     checkPlatega(),

@@ -1,9 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAdmin, withAuth } from '@/lib/auth/guard'
-import { syncCabinetPaymentToRemnashop } from '@/lib/remnashop-reverse-sync'
-import { syncCabinetPromoCodeToRemnashop } from '@/lib/remnashop-promo-sync'
-import { syncRemnashopUserToCabinet, syncRemnashopUsersToCabinet } from '@/lib/remnashop-users'
+import { retryRemnashopSyncEvent } from '@/lib/remnashop-retry'
 import { markSyncFailed, markSyncPending, markSyncSucceeded } from '@/lib/sync-events'
 import { writeAuditLog } from '@/lib/audit-log'
 
@@ -28,7 +26,7 @@ export const POST = withAuth(async (req: Request) => {
   })
 
   try {
-    const result = await retryEvent(event)
+    const result = await retryRemnashopSyncEvent(event)
     await markSyncSucceeded({
       direction: event.direction,
       entityType: event.entityType,
@@ -60,37 +58,3 @@ export const POST = withAuth(async (req: Request) => {
     return NextResponse.json({ error: message }, { status: 500 })
   }
 })
-
-async function retryEvent(event: {
-  direction: 'CABINET_TO_REMNASHOP' | 'REMNASHOP_TO_CABINET'
-  entityType: string
-  entityId: string
-}) {
-  if (event.direction === 'CABINET_TO_REMNASHOP' && event.entityType === 'payment') {
-    const result = await syncCabinetPaymentToRemnashop(event.entityId)
-    if (!result.ok) throw new Error('skipped' in result ? result.skipped : 'Payment sync did not complete')
-    return result
-  }
-
-  if (event.direction === 'CABINET_TO_REMNASHOP' && event.entityType === 'promoCode') {
-    const result = await syncCabinetPromoCodeToRemnashop(event.entityId)
-    if (!result.ok) throw new Error('skipped' in result ? result.skipped : 'Promo code sync did not complete')
-    return result
-  }
-
-  if (event.direction === 'REMNASHOP_TO_CABINET' && event.entityType === 'user') {
-    const remnashopUserId = Number(event.entityId)
-    if (Number.isFinite(remnashopUserId)) {
-      const localUser = await prisma.user.findUnique({
-        where: { remnashopUserId },
-        select: { id: true },
-      })
-      if (localUser) {
-        return syncRemnashopUserToCabinet(localUser.id, { forceRemnawaveSubscriptions: true })
-      }
-    }
-    return syncRemnashopUsersToCabinet({ forceRemnawaveSubscriptions: true })
-  }
-
-  throw new Error(`Retry is not supported for ${event.direction}:${event.entityType}`)
-}

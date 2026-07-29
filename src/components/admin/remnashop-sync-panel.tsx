@@ -71,6 +71,10 @@ interface RemnashopIntegrationStatus {
   api: {
     configured: boolean
   }
+  events: {
+    configured: boolean
+    mode: 'REALTIME' | 'POLLING'
+  }
   channels: Record<'users' | 'catalog' | 'payments' | 'promoCodes', 'READY' | 'READ_ONLY' | 'UNAVAILABLE'>
   message: string
 }
@@ -308,6 +312,7 @@ function IntegrationStatus({ status }: { status: RemnashopIntegrationStatus }) {
       <div className="flex flex-wrap gap-x-5 gap-y-2 border-t border-slate-200 px-4 py-3 text-xs text-slate-500 dark:border-white/10">
         <span>База: {status.database.connected ? (status.database.writable ? 'чтение и запись' : 'только чтение') : 'нет связи'}</span>
         <span>API входа: {status.api.configured ? 'настроен' : 'не настроен'}</span>
+        <span>События: {status.events.mode === 'REALTIME' ? 'приём включён + резервный опрос' : 'только опрос'}</span>
       </div>
     </section>
   )

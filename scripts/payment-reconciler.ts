@@ -1,11 +1,14 @@
+import { writeFile } from 'node:fs/promises'
 import { prisma } from '../src/lib/prisma'
 import { notifyTrafficLimit } from '../src/lib/notifications'
 import { reconcileSubscriptionExpiryNotifications } from '../src/lib/subscription-expiry-notifications'
 import { syncPaymentProvisioning } from '../src/lib/payment-sync'
 import { provisionPaymentSubscription } from '../src/lib/provisioning'
 import { syncCabinetPaymentToRemnashopBestEffort } from '../src/lib/remnashop-reverse-sync'
+import { retryDueRemnashopSyncEvents } from '../src/lib/remnashop-retry'
 import { maybeSyncRemnashopCatalog } from '../src/lib/remnashop-sync'
 import { syncRemnashopUsersToCabinet } from '../src/lib/remnashop-users'
+import { recordPaymentWorkerHeartbeat } from '../src/lib/worker-health'
 import { logError, logInfo } from '../src/lib/logger'
 
 const intervalMs = readPositiveInt('PAYMENT_RECONCILE_INTERVAL_SECONDS', 60) * 1000
@@ -17,6 +20,7 @@ const notificationBatchSize = readPositiveInt('NOTIFICATION_RECONCILE_BATCH_SIZE
 const remnashopUsersSyncIntervalMs = readNonNegativeInt('REMNASHOP_USERS_SYNC_INTERVAL_SECONDS', 300) * 1000
 const remnashopReverseSyncBatchSize = readPositiveInt('REMNASHOP_REVERSE_SYNC_BATCH_SIZE', 25)
 const remnashopReverseSyncLookbackDays = readPositiveInt('REMNASHOP_REVERSE_SYNC_LOOKBACK_DAYS', 14)
+const remnashopSyncRetryBatchSize = readPositiveInt('REMNASHOP_SYNC_RETRY_BATCH_SIZE', 50)
 
 let stopped = false
 let wakeSleep: (() => void) | null = null
@@ -34,9 +38,11 @@ async function main() {
   })
 
   while (!stopped) {
+    await updateHeartbeat()
     await runOnce().catch((error) => {
       logError('payment_reconciler.batch_failed', error)
     })
+    await updateHeartbeat()
     await sleep(intervalMs)
   }
 
@@ -85,12 +91,34 @@ async function runOnce() {
   }
 
   await retryProvisioningJobs()
+  await retryRemnashopSyncEvents()
   await retryRemnashopReverseSync()
   await reconcileSubscriptionExpiryNotifications({
     batchSize: notificationBatchSize,
     shouldStop: () => stopped,
   })
   await notifyTrafficThresholds()
+}
+
+async function retryRemnashopSyncEvents() {
+  try {
+    const result = await retryDueRemnashopSyncEvents({
+      batchSize: remnashopSyncRetryBatchSize,
+      shouldStop: () => stopped,
+    })
+    if (result.attempted > 0) {
+      logInfo('remnashop_sync.retry_completed', result)
+    }
+  } catch (error) {
+    logError('remnashop_sync.retry_failed', error)
+  }
+}
+
+async function updateHeartbeat() {
+  await Promise.allSettled([
+    recordPaymentWorkerHeartbeat(),
+    writeFile('/tmp/payment-reconciler-heartbeat', new Date().toISOString(), 'utf8'),
+  ])
 }
 
 async function retryProvisioningJobs() {

@@ -130,6 +130,42 @@ export async function syncRemnashopUsersToCabinet(options: {
   }
 }
 
+export async function syncRemnashopUserBySourceId(remnashopUserId: number, options: {
+  forceRemnawaveSubscriptions?: boolean
+} = {}) {
+  if (!Number.isSafeInteger(remnashopUserId) || remnashopUserId <= 0) {
+    return { found: false as const, reason: 'invalid_remnashop_user_id' as const }
+  }
+
+  const source = (await fetchRemnashopSources({
+    whereSql: 'u.id = $1',
+    values: [remnashopUserId],
+    limit: 1,
+  })).rows[0]
+  if (!source) return { found: false as const, reason: 'remnashop_user_not_found' as const }
+
+  const event = {
+    direction: 'REMNASHOP_TO_CABINET' as const,
+    entityType: 'user',
+    entityId: String(source.id),
+    operation: 'upsert',
+  }
+  try {
+    const row = await syncRemnashopSourceToCabinet(source, options)
+    if (row.subscriptionAction === 'failed') {
+      await markSyncFailed(event, new Error(row.subscriptionError || 'subscription sync failed'))
+    } else if (row.subscriptionAction === 'skipped' && row.subscriptionError) {
+      await markSyncSkipped(event, row.subscriptionError)
+    } else {
+      await markSyncSucceeded(event)
+    }
+    return { found: true as const, remnashopUserId: source.id, ...row }
+  } catch (error) {
+    await markSyncFailed(event, error)
+    throw error
+  }
+}
+
 async function syncRemnashopSourceToCabinet(source: RemnashopUserRow, options: {
   forceRemnawaveSubscriptions?: boolean
   existingUserId?: string

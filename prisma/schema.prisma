@@ -752,18 +752,19 @@ enum ProvisioningJobStatus {
 // чтобы история оплат не зависела от будущих изменений кода.
 // ----------------------------------------------------------------------
 model PromoCode {
-  id              String            @id @default(cuid())
-  code            String            @unique
-  discountPercent Int
-  audience        PromoCodeAudience @default(ALL)
-  allowedEmails   String[]          @default([])
-  isActive        Boolean           @default(true)
-  startsAt        DateTime?
-  expiresAt       DateTime?
-  maxUses         Int?
-  maxUsesPerUser  Int               @default(1)
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
+  id                    String            @id @default(cuid())
+  code                  String            @unique
+  remnashopPromoCodeId  Int?              @unique
+  discountPercent       Int
+  audience              PromoCodeAudience @default(ALL)
+  allowedEmails         String[]          @default([])
+  isActive              Boolean           @default(true)
+  startsAt              DateTime?
+  expiresAt             DateTime?
+  maxUses               Int?
+  maxUsesPerUser        Int               @default(1)
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
 
   payments                Payment[]
   redemptions             PromoCodeRedemption[]

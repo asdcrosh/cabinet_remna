@@ -73,6 +73,8 @@ const optionalPositiveIntegers = [
   "BONUS_BOX_PROMO_EXPIRES_IN_DAYS",
   "BONUS_BOX_PITY_OPENINGS",
   "RETENTION_CLEANUP_INTERVAL_SECONDS",
+  "REMNASHOP_SYNC_RETRY_BATCH_SIZE",
+  "PAYMENT_WORKER_HEARTBEAT_MAX_AGE_SECONDS",
 ];
 
 const optionalSampleRates = [
@@ -143,6 +145,16 @@ if (Boolean(value("REMNASHOP_DATABASE_URL")) !== Boolean(value("REMNASHOP_API_UR
   warnings.push(
     "REMNASHOP_DATABASE_URL and REMNASHOP_API_URL should be configured together for full integration",
   );
+}
+
+if (value("REMNASHOP_DATABASE_URL") && !value("REMNASHOP_WEBHOOK_SECRET")) {
+  warnings.push(
+    "REMNASHOP_WEBHOOK_SECRET is not configured; integration will use periodic polling only",
+  );
+}
+
+if (value("REMNASHOP_WEBHOOK_SECRET") && value("REMNASHOP_WEBHOOK_SECRET").length < 32) {
+  errors.push("REMNASHOP_WEBHOOK_SECRET must be at least 32 characters");
 }
 
 if (isProduction && value("DATABASE_URL")) {

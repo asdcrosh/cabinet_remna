@@ -79,6 +79,17 @@ export async function syncCabinetPromoCodeToRemnashop(promoCodeId: string) {
     : await insertPromoCode(table, idColumn, values)
 
   await syncPromoCodePlanLinks(remnashopPromoCodeId, promoCode)
+  const numericRemnashopPromoCodeId = Number(remnashopPromoCodeId)
+  if (
+    Number.isSafeInteger(numericRemnashopPromoCodeId) &&
+    numericRemnashopPromoCodeId > 0 &&
+    promoCode.remnashopPromoCodeId !== numericRemnashopPromoCodeId
+  ) {
+    await prisma.promoCode.update({
+      where: { id: promoCode.id },
+      data: { remnashopPromoCodeId: numericRemnashopPromoCodeId },
+    })
+  }
 
   logInfo('remnashop.promo_code_sync.completed', {
     promoCodeId: promoCode.id,
@@ -130,29 +141,16 @@ export async function deactivateCabinetPromoCodesInRemnashopBestEffort(codes: st
   if (uniqueCodes.length === 0 || !process.env.REMNASHOP_DATABASE_URL) return
 
   try {
-    const capability = await diagnosePromoSyncCapability()
-    if (!capability.ok) {
+    const result = await deactivateCabinetPromoCodesInRemnashop(uniqueCodes)
+    if (!result.ok) {
       await markSyncSkipped({
         direction: 'CABINET_TO_REMNASHOP',
         entityType: 'promoCodeConfig',
         entityId: 'remnashop',
         operation: 'check',
-      }, capability.skipped)
+      }, result.skipped)
       return
     }
-    const { table, columns } = capability
-    const codeColumn = firstExistingColumn(columns, ['code', 'name'])
-    const isActiveColumn = firstExistingColumn(columns, ['is_active', 'active'])
-    if (!codeColumn || !isActiveColumn) return
-
-    await remnashopQuery(
-      `
-        UPDATE ${quoteIdent(table)}
-        SET ${quoteIdent(isActiveColumn)} = false
-        WHERE upper(${quoteIdent(codeColumn)}) = ANY($1::text[])
-      `,
-      [uniqueCodes.map((code) => code.toUpperCase())]
-    )
     for (const code of uniqueCodes) {
       await markSyncSucceeded({
         direction: 'CABINET_TO_REMNASHOP',
@@ -175,6 +173,34 @@ export async function deactivateCabinetPromoCodesInRemnashopBestEffort(codes: st
       message: error instanceof Error ? error.message : 'unknown error',
     })
   }
+}
+
+export async function deactivateCabinetPromoCodesInRemnashop(codes: string[]) {
+  const uniqueCodes = Array.from(new Set(codes.map((code) => code.trim()).filter(Boolean)))
+  if (uniqueCodes.length === 0) return { ok: true as const, count: 0 }
+  if (!process.env.REMNASHOP_DATABASE_URL) {
+    return { ok: false as const, skipped: 'REMNASHOP_DATABASE_URL is not configured' }
+  }
+
+  const capability = await diagnosePromoSyncCapability()
+  if (!capability.ok) return { ok: false as const, skipped: capability.skipped }
+
+  const { table, columns } = capability
+  const codeColumn = firstExistingColumn(columns, ['code', 'name'])
+  const isActiveColumn = firstExistingColumn(columns, ['is_active', 'active'])
+  if (!codeColumn || !isActiveColumn) {
+    return { ok: false as const, skipped: 'remnashop promo code active column is not recognized' }
+  }
+
+  await remnashopQuery(
+    `
+      UPDATE ${quoteIdent(table)}
+      SET ${quoteIdent(isActiveColumn)} = false
+      WHERE upper(${quoteIdent(codeColumn)}) = ANY($1::text[])
+    `,
+    [uniqueCodes.map((code) => code.toUpperCase())]
+  )
+  return { ok: true as const, count: uniqueCodes.length }
 }
 
 async function diagnosePromoSyncCapability(): Promise<PromoSyncCapability> {

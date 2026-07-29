@@ -273,6 +273,7 @@ generated_secrets = {
     "HEALTHCHECK_TOKEN",
     "BROADCAST_UPLOAD_SIGNING_SECRET",
     "EMAIL_VERIFICATION_WEBHOOK_SECRET",
+    "REMNASHOP_WEBHOOK_SECRET",
 }
 additions = []
 added_keys = []

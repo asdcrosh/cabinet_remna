@@ -106,6 +106,8 @@ REMNASHOP_USER_SUBSCRIPTION_SYNC_STALE_SECONDS="300"
 REMNASHOP_USERS_SYNC_INTERVAL_SECONDS="300"
 REMNASHOP_REVERSE_SYNC_BATCH_SIZE="25"
 REMNASHOP_REVERSE_SYNC_LOOKBACK_DAYS="14"
+REMNASHOP_SYNC_RETRY_BATCH_SIZE="50"
+PAYMENT_WORKER_HEARTBEAT_MAX_AGE_SECONDS="180"
 ```
 
 ## 4. Reverse proxy
@@ -229,12 +231,28 @@ Then set in cabinet `.env`:
 REMNASHOP_DATABASE_URL="postgresql://remnashop_readonly:ВСТАВЬ_СЮДА_ПАРОЛЬ@ВСТАВЬ_СЮДА_IP_ИЛИ_HOST_REMNASHOP:5432/remnashop?schema=public"
 REMNASHOP_DATABASE_SSL="true"
 REMNASHOP_API_URL="https://ВСТАВЬ_СЮДА_ДОМЕН_REMNASHOP/api/v1/public"
+REMNASHOP_WEBHOOK_SECRET="ВСТАВЬ_СЮДА_СЕКРЕТ_ОТ_openssl_rand_hex_32"
 ```
 
 Use `REMNASHOP_DATABASE_SSL="false"` only if PostgreSQL has no SSL and the
 network is private/trusted. Configure both the database and API URL: the
 database exchanges catalog, users, subscriptions, payments, and promocodes;
 the API provides common registration and email/password authentication.
+
+Для мгновенной синхронизации Remnashop должен отправлять `POST` на
+`https://ДОМЕН_КАБИНЕТА/api/integrations/remnashop/events`. Передайте секрет
+как `Authorization: Bearer REMNASHOP_WEBHOOK_SECRET` либо подпись тела
+`x-remnashop-signature: sha256=HMAC_SHA256`. Поддерживаются события
+`user.created`, `user.updated`, `payment.created`, `payment.updated`,
+`payment.refunded`, `payment.canceled`, `plan.updated`, `promo.updated` и
+`catalog.updated`. Тело:
+
+```json
+{"event":"payment.updated","paymentId":"ID_ПЛАТЕЖА","data":{"userId":123}}
+```
+
+Если Remnashop пока не умеет отправлять события, синхронизация продолжит
+работать по расписанию, но с задержкой до заданного интервала.
 
 ## 8. Update
 
