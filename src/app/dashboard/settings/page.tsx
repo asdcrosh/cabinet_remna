@@ -53,9 +53,11 @@ export default async function SettingsPage() {
                 icon={<CircleUserRound className="h-5 w-5" />}
               >
                 <div className="min-w-0">
-                  <div className="mb-4 grid gap-2 sm:grid-cols-2">
-                    <AccountFact label="Email" value={hasVerifiedEmail ? user.email : 'Не добавлен'} ready={hasVerifiedEmail} />
-                    <AccountFact label="Регистрация" value={new Date(user.createdAt).toLocaleDateString('ru-RU')} />
+                  <div className="mb-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                    <AccountFact label="Email" value={hasVerifiedEmail ? 'Подтверждён' : 'Требует подтверждения'} ready={hasVerifiedEmail} />
+                    <AccountFact label="Telegram" value={user.telegramId ? 'Привязан' : 'Не привязан'} ready={Boolean(user.telegramId)} />
+                    <AccountFact label="Remnashop" value={user.remnashopUserId ? 'Связан' : 'Ожидает связи'} ready={Boolean(user.remnashopUserId)} />
+                    <AccountFact label="VPN-профиль" value={user.remnawaveUuid ? 'Связан' : 'Создастся при покупке'} ready={Boolean(user.remnawaveUuid)} />
                   </div>
                   <ProfileForm name={user.name} />
                 </div>

@@ -18,13 +18,46 @@ export async function GET() {
   // Подтянем свежие данные (имя, согласия) из БД
   const user = await prisma.user.findUnique({
     where: { id: session.uid },
-    select: { id: true, email: true, name: true, role: true, createdAt: true },
+    select: {
+      id: true,
+      email: true,
+      name: true,
+      role: true,
+      createdAt: true,
+      emailVerifiedAt: true,
+      telegramId: true,
+      remnashopUserId: true,
+      remnawaveUuid: true,
+    },
   })
   if (!user) {
     logWarn('auth.me.stale_session', { userId: session.uid })
     return NextResponse.json({ user: null })
   }
-  return NextResponse.json({ user })
+  const emailVerified = Boolean(user.emailVerifiedAt && !user.email.endsWith('@pending.invalid'))
+  return NextResponse.json({
+    user: {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      createdAt: user.createdAt,
+    },
+    identity: {
+      canonicalUserId: user.id,
+      emailVerified,
+      telegramLinked: Boolean(user.telegramId),
+      remnashopLinked: Boolean(user.remnashopUserId),
+      remnawaveLinked: Boolean(user.remnawaveUuid),
+      canPay: emailVerified,
+      nextAction: emailVerified
+        ? null
+        : {
+            href: user.telegramId ? '/telegram-email' : '/dashboard/settings',
+            label: 'Подтвердить email',
+          },
+    },
+  })
 }
 
 export const PATCH = withAuth(async (req: Request) => {

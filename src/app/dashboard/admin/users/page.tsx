@@ -41,6 +41,7 @@ export default async function AdminUsersPage({
         : {}),
     ...(q ? {
         OR: [
+          { id: { equals: q } },
           { email: { contains: q, mode: 'insensitive' as const } },
           { name: { contains: q, mode: 'insensitive' as const } },
           { remnawaveUsername: { contains: q, mode: 'insensitive' as const } },
@@ -144,7 +145,7 @@ export default async function AdminUsersPage({
               type="search"
               name="q"
               defaultValue={q}
-              placeholder="Email, имя или Remnawave username"
+              placeholder="Email, имя, ID или Remnawave username"
               className="input pl-9"
             />
           </div>

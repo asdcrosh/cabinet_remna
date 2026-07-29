@@ -23,15 +23,32 @@ BEGIN
   WHERE telegram_id = p_telegram_id
   FOR UPDATE;
 
-  IF telegram_user.id IS NULL THEN
-    RETURN;
-  END IF;
-
   SELECT * INTO email_user
   FROM users
   WHERE lower(email) = normalized_email
-    AND id <> telegram_user.id
+    AND (telegram_user.id IS NULL OR id <> telegram_user.id)
   FOR UPDATE;
+
+  IF telegram_user.id IS NULL THEN
+    IF email_user.id IS NULL THEN
+      RETURN;
+    END IF;
+    IF email_user.telegram_id IS NOT NULL AND email_user.telegram_id <> p_telegram_id THEN
+      RAISE EXCEPTION 'email is already linked to another telegram account';
+    END IF;
+
+    UPDATE users
+    SET telegram_id = p_telegram_id,
+        is_email_verified = p_email_verified,
+        pending_email = NULL,
+        email_verification_code_hash = NULL,
+        email_verification_expires_at = NULL,
+        updated_at = timezone('UTC', now())
+    WHERE id = email_user.id;
+
+    RETURN QUERY SELECT email_user.id, false;
+    RETURN;
+  END IF;
 
   IF email_user.id IS NOT NULL THEN
     UPDATE subscriptions AS subscription

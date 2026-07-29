@@ -174,7 +174,7 @@ describe('technical Telegram account merge', () => {
     })
   })
 
-  it('moves a Telegram identity away from another regular user into the selected email account', async () => {
+  it('rejects moving a Telegram identity away from another real account', async () => {
     mocks.findUnique
       .mockResolvedValueOnce({ ...target, remnawaveUuid: null })
       .mockResolvedValueOnce(technicalSource({
@@ -191,45 +191,62 @@ describe('technical Telegram account merge', () => {
         telegramUsername: 'telegram_user',
         telegramName: 'Telegram User',
       })
-    ).resolves.toMatchObject({
-      merged: true,
-      sourceUserId: 'old-email-user',
-      sourceWasTechnical: false,
-    })
+    ).rejects.toMatchObject({ code: 'IDENTITY_CONFLICT' })
 
-    expect(mocks.userUpdate).toHaveBeenCalledWith({
-      where: { id: 'old-email-user' },
-      data: expect.objectContaining({
-        telegramId: null,
-        remnawaveUuid: null,
-      }),
-    })
-    expect(mocks.userUpdate).toHaveBeenCalledWith({
-      where: { id: 'old-email-user' },
-      data: expect.objectContaining({
-        telegramUsername: null,
-        telegramLinkedAt: null,
-      }),
-    })
-    expect(mocks.userUpdate).not.toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { id: 'old-email-user' },
-        data: expect.objectContaining({
-          email: 'merged-old-email-user@pending.invalid',
-        }),
-      })
-    )
+    expect(mocks.transaction).not.toHaveBeenCalled()
+    expect(mocks.userUpdate).not.toHaveBeenCalled()
     expect(mocks.userDelete).not.toHaveBeenCalled()
-    expect(mocks.userUpdate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { id: 'email-user' },
-        data: expect.objectContaining({
-          telegramId: 123n,
-          remnawaveUuid: 'active-remna-uuid',
-        }),
+  })
+
+  it('rejects replacing Telegram already linked to the target account', async () => {
+    mocks.findUnique
+      .mockResolvedValueOnce({ ...target, telegramId: 999n })
+      .mockResolvedValueOnce(technicalSource())
+
+    await expect(
+      mergeTechnicalTelegramAccount({
+        targetUserId: target.id,
+        telegramId: 123n,
+        telegramUsername: 'telegram_user',
+        telegramName: 'Telegram User',
       })
-    )
-    expect(mocks.oauthUpdateMany).not.toHaveBeenCalled()
+    ).rejects.toMatchObject({ code: 'TELEGRAM_ALREADY_LINKED' })
+
+    expect(mocks.transaction).not.toHaveBeenCalled()
+  })
+
+  it('rejects merging two different Remnawave identities', async () => {
+    mocks.findUnique
+      .mockResolvedValueOnce({ ...target, remnawaveUuid: 'target-remna-uuid' })
+      .mockResolvedValueOnce(technicalSource({ remnawaveUuid: 'source-remna-uuid' }))
+
+    await expect(
+      mergeTechnicalTelegramAccount({
+        targetUserId: target.id,
+        telegramId: 123n,
+        telegramUsername: 'telegram_user',
+        telegramName: 'Telegram User',
+      })
+    ).rejects.toMatchObject({ code: 'IDENTITY_CONFLICT' })
+
+    expect(mocks.transaction).not.toHaveBeenCalled()
+  })
+
+  it('rejects ambiguous Remnashop identities when the database is unavailable', async () => {
+    mocks.findUnique
+      .mockResolvedValueOnce({ ...target, remnashopUserId: 99 })
+      .mockResolvedValueOnce(technicalSource({ remnashopUserId: 42 }))
+
+    await expect(
+      mergeTechnicalTelegramAccount({
+        targetUserId: target.id,
+        telegramId: 123n,
+        telegramUsername: 'telegram_user',
+        telegramName: 'Telegram User',
+      })
+    ).rejects.toMatchObject({ code: 'IDENTITY_CONFLICT' })
+
+    expect(mocks.transaction).not.toHaveBeenCalled()
   })
 
   it('rejects moving a Telegram identity away from a privileged account', async () => {

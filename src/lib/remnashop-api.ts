@@ -68,3 +68,71 @@ export async function authenticateRemnashopEmail(email: string, password: string
 export async function ensureRemnashopTelegramUser(initData: string) {
   return request('/auth/telegram/webapp', { init_data: initData })
 }
+
+export async function changeRemnashopPassword(input: {
+  email: string
+  currentPassword: string
+  newPassword: string
+}) {
+  const baseUrl = getBaseUrl()
+  if (!baseUrl) return { configured: false as const }
+
+  const loginResponse = await fetch(`${baseUrl}/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      email: input.email,
+      password: input.currentPassword,
+    }),
+    cache: 'no-store',
+    signal: AbortSignal.timeout(5000),
+  })
+  const loginData = (await loginResponse.json().catch(() => null)) as RemnashopApiErrorBody | null
+  if (!loginResponse.ok) {
+    return {
+      configured: true as const,
+      changed: false as const,
+      reason: 'current_password_mismatch' as const,
+      detail: loginData?.detail,
+    }
+  }
+
+  const cookie = getResponseCookieHeader(loginResponse.headers)
+  if (!cookie) {
+    throw new RemnashopApiError(502, 'Remnashop did not return an authenticated session')
+  }
+
+  const changeResponse = await fetch(`${baseUrl}/auth/change-password`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Cookie: cookie,
+    },
+    body: JSON.stringify({
+      current_password: input.currentPassword,
+      new_password: input.newPassword,
+    }),
+    cache: 'no-store',
+    signal: AbortSignal.timeout(5000),
+  })
+  const changeData = (await changeResponse.json().catch(() => null)) as RemnashopApiErrorBody | null
+  if (!changeResponse.ok) {
+    throw new RemnashopApiError(
+      changeResponse.status,
+      changeData?.detail || `Remnashop API error ${changeResponse.status}`
+    )
+  }
+
+  return { configured: true as const, changed: true as const }
+}
+
+function getResponseCookieHeader(headers: Headers) {
+  const cookieHeaders =
+    (headers as Headers & { getSetCookie?: () => string[] }).getSetCookie?.() ??
+    (headers.get('set-cookie') ? [headers.get('set-cookie') as string] : [])
+
+  return cookieHeaders
+    .map((value) => value.split(';', 1)[0]?.trim())
+    .filter(Boolean)
+    .join('; ')
+}

@@ -15,6 +15,7 @@ import { mergeTechnicalTelegramAccount, TelegramAccountMergeError } from '@/lib/
 import { createAdminNotification } from '@/lib/admin-notifications'
 import { resolveTelegramIdentity } from '@/lib/identity-resolver'
 import { writeAuditLog } from '@/lib/audit-log'
+import { recordIdentityConflict } from '@/lib/identity-conflicts'
 
 export const runtime = 'nodejs'
 
@@ -101,6 +102,13 @@ export async function POST(req: Request) {
           user = await prisma.user.findUnique({ where: { id: identity.target.id } })
         } catch (error) {
           if (!(error instanceof TelegramAccountMergeError)) throw error
+          await recordIdentityConflict({
+            targetUserId: identity.target.id,
+            sourceUserId: identity.source.id,
+            telegramId: telegram.id,
+            code: error.code,
+            request: req,
+          })
           logWarn('auth.telegram_miniapp.merge_deferred', {
             targetUserId: identity.target.id,
             sourceUserId: identity.source.id,

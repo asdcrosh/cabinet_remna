@@ -51,6 +51,16 @@ export const POST = withAuth(async (req: Request) => {
   }
   const user = await prisma.user.findUnique({ where: { id: session.uid } })
   if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+  if (!user.emailVerifiedAt || user.email.endsWith('@pending.invalid')) {
+    return NextResponse.json(
+      {
+        error: 'Подтвердите email перед оплатой',
+        code: 'EMAIL_VERIFICATION_REQUIRED',
+        actionHref: user.telegramId ? '/telegram-email' : '/dashboard/settings',
+      },
+      { status: 403 }
+    )
+  }
   await reconcileStalePendingPaymentsForUser(user.id)
   const audienceContext = await getPlanAudienceContext(user.id)
   if (!audienceContext || !isPlanAvailableForUser(plan, audienceContext, { allowLink: plan.availability === 'LINK' })) {

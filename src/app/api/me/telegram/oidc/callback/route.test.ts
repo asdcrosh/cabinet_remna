@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   requireAuth: vi.fn(),
   verifyTelegramIdToken: vi.fn(),
   mergeTechnicalTelegramAccount: vi.fn(),
+  recordIdentityConflict: vi.fn(),
   attachRemnashopIdentityToCabinetUser: vi.fn(),
   prisma: {
     user: {
@@ -40,6 +41,9 @@ vi.mock('@/lib/telegram-link-sync', () => ({
 vi.mock('@/lib/telegram-account-merge', () => ({
   mergeTechnicalTelegramAccount: mocks.mergeTechnicalTelegramAccount,
   TelegramAccountMergeError: mocks.TelegramAccountMergeError,
+}))
+vi.mock('@/lib/identity-conflicts', () => ({
+  recordIdentityConflict: mocks.recordIdentityConflict,
 }))
 vi.mock('@/lib/telegram-oidc', async () => {
   const actual = await vi.importActual<typeof import('@/lib/telegram-oidc')>('@/lib/telegram-oidc')
@@ -108,6 +112,11 @@ describe('Telegram OIDC callback', () => {
 
     expect(response.status).toBe(307)
     expect(locationPath(response)).toBe('/dashboard/settings?telegram_error=telegram_identity_conflict')
+    expect(mocks.recordIdentityConflict).toHaveBeenCalledWith(expect.objectContaining({
+      targetUserId: session.uid,
+      telegramId: telegramUser.id,
+      code: 'IDENTITY_CONFLICT',
+    }))
     expect(mocks.prisma.user.update).not.toHaveBeenCalled()
   })
 

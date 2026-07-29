@@ -76,7 +76,7 @@ describe('email verification helpers', () => {
 
     const result = await verifyEmailToken(token)
 
-    expect(result).toEqual({ ok: true, email: 'user@example.com' })
+    expect(result).toEqual({ ok: true, userId: 'user-1', email: 'user@example.com' })
     expect(mocks.prisma.user.update).toHaveBeenCalledWith({
       where: { id: 'user-1' },
       data: { emailVerifiedAt: new Date('2026-01-01T00:00:00.000Z') },

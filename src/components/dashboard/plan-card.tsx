@@ -161,7 +161,7 @@ export function PlanCard({
         window.location.href = redirectUrl || "/dashboard/subscription";
       } catch (error) {
         resetFailedCheckoutAttempt(error);
-        // apiFetch показал toast
+        redirectToRequiredAction(error);
       } finally {
         setLoading(false);
       }
@@ -200,7 +200,7 @@ export function PlanCard({
       }
     } catch (error) {
       resetFailedCheckoutAttempt(error);
-      // apiFetch показал toast
+      redirectToRequiredAction(error);
     } finally {
       setLoading(false);
     }
@@ -219,6 +219,21 @@ export function PlanCard({
       )
     ) {
       checkoutAttemptRef.current = null;
+    }
+  }
+
+  function redirectToRequiredAction(error: unknown) {
+    if (
+      error instanceof Error
+      && "data" in error
+      && typeof error.data === "object"
+      && error.data !== null
+      && "code" in error.data
+      && error.data.code === "EMAIL_VERIFICATION_REQUIRED"
+      && "actionHref" in error.data
+      && typeof error.data.actionHref === "string"
+    ) {
+      window.location.href = error.data.actionHref;
     }
   }
 

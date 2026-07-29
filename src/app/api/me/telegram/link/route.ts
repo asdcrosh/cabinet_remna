@@ -13,6 +13,7 @@ import {
 } from '@/lib/telegram-account-merge'
 import { writeAuditLog } from '@/lib/audit-log'
 import { describeSyncError } from '@/lib/sync-error'
+import { recordIdentityConflict } from '@/lib/identity-conflicts'
 
 export const runtime = 'nodejs'
 
@@ -50,6 +51,12 @@ export const POST = withAuth(async (req: Request) => {
     })
   } catch (error) {
     if (error instanceof TelegramAccountMergeError) {
+      await recordIdentityConflict({
+        targetUserId: session.uid,
+        telegramId,
+        code: error.code,
+        request: req,
+      })
       return NextResponse.json(
         {
           error:

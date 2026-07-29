@@ -72,6 +72,7 @@ const plan = {
 const user = {
   id: 'user-1',
   email: 'user@example.com',
+  emailVerifiedAt: new Date('2026-01-01T00:00:00.000Z'),
   telegramId: null,
   remnashopSyncedAt: null,
   remnashopUserId: null,
@@ -173,6 +174,26 @@ describe('payment create route', () => {
       localPaymentId: 'payment-1',
       provider: 'YOOKASSA',
     })
+  })
+
+  it('does not create payments before email verification', async () => {
+    mocks.prisma.user.findUnique.mockResolvedValue({
+      ...user,
+      emailVerifiedAt: null,
+      telegramId: 123n,
+    })
+
+    const response = await POST(paymentRequest())
+    const body = await response.json()
+
+    expect(response.status).toBe(403)
+    expect(body).toEqual({
+      error: 'Подтвердите email перед оплатой',
+      code: 'EMAIL_VERIFICATION_REQUIRED',
+      actionHref: '/telegram-email',
+    })
+    expect(mocks.reconcileStalePendingPaymentsForUser).not.toHaveBeenCalled()
+    expect(mocks.prisma.$transaction).not.toHaveBeenCalled()
   })
 
   it('returns the existing checkout when the same request is retried', async () => {

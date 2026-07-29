@@ -39,6 +39,7 @@ describe('attachRemnashopIdentityToCabinetUser', () => {
     mocks.userFindUnique.mockResolvedValue({
       email: 'user@example.com',
       emailVerifiedAt: new Date('2026-06-25T00:00:00Z'),
+      remnashopUserId: null,
     })
     mocks.remnashopQuery
       .mockResolvedValueOnce({ rows: [{ user_id: 42, merged_duplicate: true }] })
@@ -79,6 +80,7 @@ describe('attachRemnashopIdentityToCabinetUser', () => {
     mocks.userFindUnique.mockResolvedValue({
       email: 'telegram-123@pending.invalid',
       emailVerifiedAt: null,
+      remnashopUserId: null,
     })
     mocks.remnashopQuery.mockResolvedValueOnce({ rows: [] })
 
@@ -89,5 +91,31 @@ describe('attachRemnashopIdentityToCabinetUser', () => {
 
     expect(mocks.remnashopQuery).toHaveBeenCalledTimes(1)
     expect(mocks.remnashopQuery.mock.calls[0]?.[0]).toContain('FROM users u')
+  })
+
+  it('does not replace a different Remnashop identity without the merge function', async () => {
+    mocks.userFindUnique.mockResolvedValue({
+      email: 'user@example.com',
+      emailVerifiedAt: new Date('2026-06-25T00:00:00Z'),
+      remnashopUserId: 99,
+    })
+    mocks.remnashopQuery
+      .mockRejectedValueOnce(Object.assign(new Error('function not found'), { code: '42883' }))
+      .mockResolvedValueOnce({
+        rows: [{
+          id: 42,
+          telegram_id: '123',
+          name: 'User',
+          current_subscription_id: null,
+          user_remna_id: null,
+        }],
+      })
+
+    await expect(attachRemnashopIdentityToCabinetUser({
+      localUserId: 'cabinet-user',
+      telegramId: 123n,
+    })).rejects.toThrow('Remnashop identity conflict')
+
+    expect(mocks.userUpdate).not.toHaveBeenCalled()
   })
 })

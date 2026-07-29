@@ -51,16 +51,19 @@ export async function attachRemnashopIdentityToCabinetUser(input: {
     select: {
       email: true,
       emailVerifiedAt: true,
+      remnashopUserId: true,
     },
   })
   if (!localUser) throw new Error('Cabinet user not found')
 
+  let remnashopIdentityLinked = false
   if (localUser.emailVerifiedAt && !localUser.email.endsWith('@pending.invalid')) {
     try {
       await remnashopQuery(
         'SELECT * FROM public.cabinet_link_email_to_telegram($1::bigint, $2::text, $3::boolean)',
         [input.telegramId.toString(), localUser.email, true]
       )
+      remnashopIdentityLinked = true
     } catch (error) {
       const code = typeof error === 'object' && error && 'code' in error ? String(error.code) : ''
       if (code !== '42883') throw error
@@ -74,6 +77,13 @@ export async function attachRemnashopIdentityToCabinetUser(input: {
       data: { remnashopSyncedAt: new Date() },
     })
     return null
+  }
+  if (
+    localUser.remnashopUserId &&
+    localUser.remnashopUserId !== remnashopUser.id &&
+    !remnashopIdentityLinked
+  ) {
+    throw new Error('Remnashop identity conflict: link function is not installed')
   }
 
   await prisma.user.update({

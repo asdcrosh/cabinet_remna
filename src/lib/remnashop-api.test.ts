@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   authenticateRemnashopEmail,
+  changeRemnashopPassword,
   ensureRemnashopTelegramUser,
   registerRemnashopEmailUser,
 } from './remnashop-api'
@@ -68,5 +69,60 @@ describe('Remnashop public API client', () => {
       'http://remnashop:5000/api/v1/public/auth/telegram/webapp',
       expect.objectContaining({ method: 'POST' })
     )
+  })
+
+  it('changes the Remnashop password in the same operation as Cabinet', async () => {
+    process.env.REMNASHOP_API_URL = 'http://remnashop:5000/api/v1/public'
+    const fetchMock = vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ expires_at: '2026-01-01' }), {
+          status: 200,
+          headers: {
+            'Content-Type': 'application/json',
+            'Set-Cookie': 'access_token=token-1; Path=/; HttpOnly',
+          },
+        })
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ success: true }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      )
+
+    await expect(changeRemnashopPassword({
+      email: 'user@example.com',
+      currentPassword: 'Password1',
+      newPassword: 'Password2',
+    })).resolves.toEqual({ configured: true, changed: true })
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      'http://remnashop:5000/api/v1/public/auth/change-password',
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({ Cookie: 'access_token=token-1' }),
+      })
+    )
+  })
+
+  it('reports legacy password divergence without changing either side', async () => {
+    process.env.REMNASHOP_API_URL = 'http://remnashop:5000/api/v1/public'
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ detail: 'Invalid credentials' }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    )
+
+    await expect(changeRemnashopPassword({
+      email: 'user@example.com',
+      currentPassword: 'Password1',
+      newPassword: 'Password2',
+    })).resolves.toEqual({
+      configured: true,
+      changed: false,
+      reason: 'current_password_mismatch',
+      detail: 'Invalid credentials',
+    })
   })
 })

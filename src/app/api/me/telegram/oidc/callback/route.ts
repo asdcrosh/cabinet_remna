@@ -14,6 +14,7 @@ import {
   mergeTechnicalTelegramAccount,
   TelegramAccountMergeError,
 } from '@/lib/telegram-account-merge'
+import { recordIdentityConflict } from '@/lib/identity-conflicts'
 
 export const runtime = 'nodejs'
 const OAUTH_TIMEOUT_MS = 10_000
@@ -66,6 +67,12 @@ export const GET = withAuth(async (req: Request) => {
       })
     } catch (error) {
       if (error instanceof TelegramAccountMergeError) {
+        await recordIdentityConflict({
+          targetUserId: session.uid,
+          telegramId: telegramUser.id,
+          code: error.code,
+          request: req,
+        })
         settingsUrl.searchParams.set(
           'telegram_error',
           error.code === 'PRIVILEGED_SOURCE'

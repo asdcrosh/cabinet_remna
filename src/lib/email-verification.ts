@@ -61,7 +61,7 @@ export async function verifyEmailToken(token: string) {
     }),
   ])
 
-  return { ok: true as const, email: row.user.email }
+  return { ok: true as const, userId: row.userId, email: row.user.email }
 }
 
 export async function sendEmailVerificationLink(input: {

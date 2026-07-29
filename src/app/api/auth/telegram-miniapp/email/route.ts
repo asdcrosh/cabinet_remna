@@ -15,6 +15,8 @@ import {
 } from '@/lib/telegram-account-merge'
 import { findCanonicalTelegramSessionUser } from '@/lib/telegram-session'
 import { PERSONAL_DATA_CONSENT_VERSION, TERMS_VERSION } from '@/lib/legal'
+import { recordIdentityConflict } from '@/lib/identity-conflicts'
+import { registerRemnashopEmailUser } from '@/lib/remnashop-api'
 
 export const runtime = 'nodejs'
 
@@ -97,6 +99,13 @@ export async function POST(req: Request) {
       })
     } catch (error) {
       if (error instanceof TelegramAccountMergeError) {
+        await recordIdentityConflict({
+          targetUserId: emailOwner.id,
+          sourceUserId: current.id,
+          telegramId: current.telegramId,
+          code: error.code,
+          request: req,
+        })
         logWarn('auth.telegram_email.merge_rejected', {
           currentUserId: current.id,
           targetUserId: emailOwner.id,
@@ -138,6 +147,12 @@ export async function POST(req: Request) {
       sourceUserId: current.id,
       targetUserId: mergedUser.id,
       verified: Boolean(mergedUser.emailVerifiedAt),
+    })
+    await prepareRemnashopEmailIdentity({
+      userId: mergedUser.id,
+      email: mergedUser.email,
+      password: parsed.data.password,
+      name: mergedUser.name,
     })
 
     if (mergedUser.emailVerifiedAt) {
@@ -229,6 +244,12 @@ export async function POST(req: Request) {
     throw error
   }
   logInfo('auth.telegram_email.email_attached', { userId: user.id })
+  await prepareRemnashopEmailIdentity({
+    userId: user.id,
+    email: user.email,
+    password: parsed.data.password,
+    name: user.name,
+  })
   const token = await createEmailVerificationToken(user.id)
   const delivery = await sendEmailVerificationLink({ email: user.email, name: user.name, token })
 
@@ -244,4 +265,29 @@ export async function POST(req: Request) {
     role: 'USER',
     stage: 'FULL',
   })
+}
+
+async function prepareRemnashopEmailIdentity(input: {
+  userId: string
+  email: string
+  password: string
+  name: string | null
+}) {
+  try {
+    const result = await registerRemnashopEmailUser({
+      email: input.email,
+      password: input.password,
+      name: input.name,
+    })
+    logInfo('auth.telegram_email.remnashop_email_prepared', {
+      userId: input.userId,
+      configured: result.configured,
+      alreadyExists: 'alreadyExists' in result,
+    })
+  } catch (error) {
+    logWarn('auth.telegram_email.remnashop_email_deferred', {
+      userId: input.userId,
+      message: error instanceof Error ? error.message : 'unknown error',
+    })
+  }
 }

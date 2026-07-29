@@ -31,12 +31,23 @@ export async function mergeTechnicalTelegramAccount(input: {
 
   if (!target) throw new TelegramAccountMergeError('IDENTITY_CONFLICT')
   if (!source || source.id === target.id) return { merged: false as const }
+  if (target.telegramId && target.telegramId !== input.telegramId) {
+    throw new TelegramAccountMergeError('TELEGRAM_ALREADY_LINKED')
+  }
   if (source.role !== 'USER') throw new TelegramAccountMergeError('PRIVILEGED_SOURCE')
 
   const isTechnicalSource =
     source.role === 'USER' &&
     source.email.endsWith('@pending.invalid') &&
     !source.emailVerifiedAt
+  if (!isTechnicalSource) throw new TelegramAccountMergeError('IDENTITY_CONFLICT')
+  if (
+    target.remnawaveUuid &&
+    source.remnawaveUuid &&
+    target.remnawaveUuid !== source.remnawaveUuid
+  ) {
+    throw new TelegramAccountMergeError('IDENTITY_CONFLICT')
+  }
 
   const remnashopUserId = await resolveRemnashopIdentity(
     target.remnashopUserId,
@@ -219,32 +230,22 @@ export async function mergeTechnicalTelegramAccount(input: {
         referredById: target.referredById ?? source.referredById,
       },
     })
-    if (isTechnicalSource) {
-      await tx.user.delete({ where: { id: source.id } })
-    } else if (source.role === 'USER') {
-      await tx.user.update({
-        where: { id: source.id },
-        data: {
-          telegramUsername: null,
-          telegramLinkedAt: null,
-          remnashopSyncedAt: null,
-          referredById: null,
-        },
-      })
-    }
+    await tx.user.delete({ where: { id: source.id } })
   })
 
   return {
     merged: true as const,
     sourceUserId: source.id,
-    sourceWasTechnical: isTechnicalSource,
-    sourceWasPrivileged: source.role !== 'USER',
+    sourceWasTechnical: true as const,
+    sourceWasPrivileged: false as const,
   }
 }
 
 async function resolveRemnashopIdentity(targetId: number | null, sourceId: number | null) {
   if (!targetId || !sourceId || targetId === sourceId) return sourceId ?? targetId
-  if (!process.env.REMNASHOP_DATABASE_URL) return sourceId
+  if (!process.env.REMNASHOP_DATABASE_URL) {
+    throw new TelegramAccountMergeError('IDENTITY_CONFLICT')
+  }
 
   const result = await remnashopQuery<{
     id: number
@@ -259,6 +260,10 @@ async function resolveRemnashopIdentity(targetId: number | null, sourceId: numbe
   )
   const target = result.rows.find((row) => row.id === targetId)
   const source = result.rows.find((row) => row.id === sourceId)
+  if (!target || !source) throw new TelegramAccountMergeError('IDENTITY_CONFLICT')
+  if (target.current_subscription_id && source.current_subscription_id) {
+    throw new TelegramAccountMergeError('IDENTITY_CONFLICT')
+  }
   if (source?.current_subscription_id) return sourceId
   if (target?.current_subscription_id) return targetId
 
