@@ -20,8 +20,9 @@ export function serializeSubscription(subscription: SubscriptionWithPlan | null 
 }
 
 export function serializePayment(payment: PaymentWithRelations) {
+  const { checkoutKey: _checkoutKey, ...serializablePayment } = payment
   return {
-    ...payment,
+    ...serializablePayment,
     subscription: serializeSubscription(payment.subscription),
     plan: payment.plan ?? null,
     provisioningJob: payment.provisioningJob ?? null,

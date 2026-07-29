@@ -40,6 +40,7 @@ describe('api serializers', () => {
       provider: 'YOOKASSA',
       externalPaymentId: 'yk-1',
       providerStatus: 'succeeded',
+      checkoutKey: null,
       yookassaId: 'yk-1',
       yookassaStatus: 'succeeded',
       confirmationUrl: null,
@@ -57,5 +58,6 @@ describe('api serializers', () => {
 
     expect(payment.subscription).toBeNull()
     expect(payment.plan).toBeNull()
+    expect(payment).not.toHaveProperty('checkoutKey')
   })
 })

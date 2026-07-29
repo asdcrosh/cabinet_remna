@@ -574,6 +574,7 @@ model Payment {
   provider          PaymentProvider @default(YOOKASSA)
   externalPaymentId String?
   providerStatus    String?
+  checkoutKey       String?
 
   // Legacy-поля ЮKassa. Сохраняются для совместимости со старыми платежами.
   yookassaId      String?                @unique
@@ -601,6 +602,7 @@ model Payment {
   welcomeBonusRedemptions   WelcomeBonusRedemption[]
 
   @@unique([provider, externalPaymentId])
+  @@unique([userId, checkoutKey])
   @@index([userId, createdAt])
   @@index([userId, status, createdAt])
   @@index([status])

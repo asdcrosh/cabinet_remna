@@ -16,7 +16,7 @@ const mocks = vi.hoisted(() => ({
   prisma: {
     plan: { findUnique: vi.fn() },
     user: { findUnique: vi.fn() },
-    payment: { update: vi.fn() },
+    payment: { findUnique: vi.fn(), update: vi.fn() },
     promoCodeRedemption: { updateMany: vi.fn() },
     subscription: { count: vi.fn() },
     trialPlanRedemption: { findUnique: vi.fn() },
@@ -85,10 +85,12 @@ const localPayment = {
   amountKopecks: plan.priceKopecks,
 }
 
-function paymentRequest(body: unknown = { planId: plan.id }) {
+const idempotencyKey = '6dad4f34-1b9e-4863-9ce1-5db7a29e12f7'
+
+function paymentRequest(body: Record<string, unknown> = {}) {
   return new Request('http://localhost:3000/api/payment/create', {
     method: 'POST',
-    body: JSON.stringify(body),
+    body: JSON.stringify({ planId: plan.id, idempotencyKey, ...body }),
   })
 }
 
@@ -100,6 +102,7 @@ describe('payment create route', () => {
     mocks.rateLimit.mockResolvedValue({ ok: true })
     mocks.prisma.plan.findUnique.mockResolvedValue(plan)
     mocks.prisma.user.findUnique.mockResolvedValue(user)
+    mocks.prisma.payment.findUnique.mockResolvedValue(null)
     mocks.reconcileStalePendingPaymentsForUser.mockResolvedValue(undefined)
     mocks.getPlanAudienceContext.mockResolvedValue({})
     mocks.isPlanAvailableForUser.mockReturnValue(true)
@@ -140,6 +143,7 @@ describe('payment create route', () => {
         amountKopecks: plan.priceKopecks,
         provider: 'YOOKASSA',
         providerStatus: 'pending',
+        checkoutKey: idempotencyKey,
         status: 'PENDING',
       }),
     })
@@ -171,6 +175,54 @@ describe('payment create route', () => {
     })
   })
 
+  it('returns the existing checkout when the same request is retried', async () => {
+    mocks.prisma.payment.findUnique.mockResolvedValue({
+      id: 'payment-existing',
+      userId: user.id,
+      planId: plan.id,
+      amountKopecks: plan.priceKopecks,
+      provider: 'YOOKASSA',
+      externalPaymentId: 'yoo-existing',
+      yookassaId: 'yoo-existing',
+      confirmationUrl: 'https://pay.example/existing',
+      promoCodeSnapshot: null,
+      status: 'PENDING',
+    })
+
+    const response = await POST(paymentRequest())
+    const body = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(body).toEqual({
+      confirmationUrl: 'https://pay.example/existing',
+      paymentId: 'yoo-existing',
+      localPaymentId: 'payment-existing',
+      provider: 'YOOKASSA',
+      idempotent: true,
+    })
+    expect(mocks.prisma.$transaction).not.toHaveBeenCalled()
+    expect(mocks.createPayment).not.toHaveBeenCalled()
+  })
+
+  it('rejects reuse of a checkout key with different parameters', async () => {
+    mocks.prisma.payment.findUnique.mockResolvedValue({
+      id: 'payment-existing',
+      userId: user.id,
+      planId: 'another-plan',
+      provider: 'YOOKASSA',
+      promoCodeSnapshot: null,
+      status: 'PENDING',
+      confirmationUrl: 'https://pay.example/existing',
+    })
+
+    const response = await POST(paymentRequest())
+    const body = await response.json()
+
+    expect(response.status).toBe(409)
+    expect(body.code).toBe('PAYMENT_IDEMPOTENCY_CONFLICT')
+    expect(mocks.prisma.$transaction).not.toHaveBeenCalled()
+  })
+
   it('rejects a free non-promo plan before creating payment records', async () => {
     mocks.prisma.plan.findUnique.mockResolvedValue({ ...plan, priceKopecks: 0, isPromo: false })
 
@@ -183,6 +235,17 @@ describe('payment create route', () => {
     expect(mocks.createPayment).not.toHaveBeenCalled()
   })
 
+  it('requires an idempotency key before creating payment records', async () => {
+    const response = await POST(new Request('http://localhost:3000/api/payment/create', {
+      method: 'POST',
+      body: JSON.stringify({ planId: plan.id }),
+    }))
+
+    expect(response.status).toBe(400)
+    expect(mocks.prisma.plan.findUnique).not.toHaveBeenCalled()
+    expect(mocks.prisma.$transaction).not.toHaveBeenCalled()
+  })
+
   it('cancels the local payment and promo redemption when YooKassa rejects creation', async () => {
     mocks.createPayment.mockRejectedValue(new Error('bad credentials'))
 
@@ -191,6 +254,7 @@ describe('payment create route', () => {
 
     expect(response.status).toBe(502)
     expect(body.error).toContain('ЮKassa')
+    expect(body.code).toBe('PAYMENT_PROVIDER_CREATE_FAILED')
     expect(mocks.prisma.payment.update).toHaveBeenCalledWith({
       where: { id: 'payment-1' },
       data: {

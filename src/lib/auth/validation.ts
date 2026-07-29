@@ -83,6 +83,7 @@ export const createPaymentSchema = z.object({
   planId: z.string().min(1).max(64),
   promoCode: z.string().trim().min(1).max(64).optional(),
   provider: z.enum(['YOOKASSA', 'PAYANYWAY', 'PLATEGA']).default('YOOKASSA'),
+  idempotencyKey: z.string().uuid(),
 })
 
 export const validatePromoCodeSchema = z.object({

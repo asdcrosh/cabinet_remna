@@ -43,7 +43,7 @@ export const POST = withAuth(async (req: Request) => {
       { status: 400 }
     )
   }
-  const { planId, promoCode, provider } = parsed.data
+  const { planId, promoCode, provider, idempotencyKey } = parsed.data
 
   const plan = await prisma.plan.findUnique({ where: { id: planId } })
   if (!plan || !plan.isActive) {
@@ -116,6 +116,7 @@ export const POST = withAuth(async (req: Request) => {
               discountKopecks: plan.priceKopecks,
               provider: 'LOCAL',
               providerStatus: 'succeeded',
+              checkoutKey: idempotencyKey,
               status: 'SUCCEEDED',
               paidAt: new Date(),
             },
@@ -135,12 +136,31 @@ export const POST = withAuth(async (req: Request) => {
       )
     } catch (e) {
       if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+        const claimedTrial = await prisma.trialPlanRedemption.findUnique({
+          where: { userId_planId: { userId: user.id, planId: plan.id } },
+          include: { payment: true },
+        })
+        if (claimedTrial) {
+          return provisionPromoPayment(claimedTrial.payment, user, plan)
+        }
         return NextResponse.json({ error: 'Вы уже использовали этот ознакомительный тариф' }, { status: 409 })
       }
       throw e
     }
 
     return provisionPromoPayment(promoPayment, user, plan)
+  }
+
+  const existingCheckout = await prisma.payment.findUnique({
+    where: {
+      userId_checkoutKey: {
+        userId: user.id,
+        checkoutKey: idempotencyKey,
+      },
+    },
+  })
+  if (existingCheckout) {
+    return existingCheckoutResponse(existingCheckout, { planId, promoCode, provider })
   }
 
   if (!(await isPaymentProviderAvailable(provider))) {
@@ -184,6 +204,7 @@ export const POST = withAuth(async (req: Request) => {
               : undefined,
             provider,
             providerStatus: 'pending',
+            checkoutKey: idempotencyKey,
             status: 'PENDING',
           },
         })
@@ -210,6 +231,10 @@ export const POST = withAuth(async (req: Request) => {
     localPayment = result.payment
     appliedPromo = result.discount
   } catch (e) {
+    const duplicateCheckout = await findDuplicateCheckout(user.id, idempotencyKey)
+    if (duplicateCheckout) {
+      return existingCheckoutResponse(duplicateCheckout, { planId, promoCode, provider })
+    }
     if (e instanceof PromoCodeError) {
       return NextResponse.json({ error: e.message, code: e.code }, { status: e.status })
     }
@@ -241,6 +266,7 @@ export const POST = withAuth(async (req: Request) => {
       return NextResponse.json(
         {
           error: 'PayAnyWay не удалось создать ссылку на оплату. Проверьте номер счёта и код проверки целостности.',
+          code: 'PAYMENT_PROVIDER_CREATE_FAILED',
           details: process.env.NODE_ENV === 'development' ? message : undefined,
         },
         { status: 502 }
@@ -282,6 +308,7 @@ export const POST = withAuth(async (req: Request) => {
       return NextResponse.json(
         {
           error: 'Platega не удалось создать ссылку на оплату. Проверьте Merchant ID и API secret.',
+          code: 'PAYMENT_PROVIDER_CREATE_FAILED',
           details: process.env.NODE_ENV === 'development' ? message : undefined,
         },
         { status: 502 }
@@ -316,6 +343,7 @@ export const POST = withAuth(async (req: Request) => {
       {
         error:
           'ЮKassa не приняла shopId/secretKey. Проверьте, что в .env указаны API-ключи магазина, а не OAuth/токен другого типа.',
+        code: 'PAYMENT_PROVIDER_CREATE_FAILED',
         details: process.env.NODE_ENV === 'development' ? message : undefined,
       },
       { status: 502 }
@@ -340,6 +368,79 @@ export const POST = withAuth(async (req: Request) => {
     provider,
   })
 })
+
+async function findDuplicateCheckout(userId: string, checkoutKey: string) {
+  return prisma.payment.findUnique({
+    where: {
+      userId_checkoutKey: {
+        userId,
+        checkoutKey,
+      },
+    },
+  })
+}
+
+function existingCheckoutResponse(
+  payment: Payment,
+  input: {
+    planId: string
+    promoCode?: string
+    provider: 'YOOKASSA' | 'PAYANYWAY' | 'PLATEGA'
+  }
+) {
+  const requestedPromoCode = input.promoCode?.trim().toUpperCase() ?? null
+  const storedPromoCode = promoCodeFromSnapshot(payment.promoCodeSnapshot)
+  if (
+    payment.planId !== input.planId
+    || payment.provider !== input.provider
+    || storedPromoCode !== requestedPromoCode
+  ) {
+    return NextResponse.json({
+      error: 'Ключ оплаты уже использован для другого заказа',
+      code: 'PAYMENT_IDEMPOTENCY_CONFLICT',
+    }, { status: 409 })
+  }
+
+  if (payment.status === 'CANCELED') {
+    return NextResponse.json({
+      error: 'Предыдущая попытка оплаты завершилась ошибкой. Повторите ещё раз.',
+      code: 'PAYMENT_ATTEMPT_CANCELED',
+    }, { status: 409 })
+  }
+
+  if (payment.status === 'SUCCEEDED') {
+    return NextResponse.json({
+      redirectUrl: `/dashboard/billing?paid=1&payment=${payment.id}`,
+      localPaymentId: payment.id,
+      provider: payment.provider,
+      idempotent: true,
+    })
+  }
+
+  if (!payment.confirmationUrl) {
+    return NextResponse.json({
+      error: 'Ссылка на оплату ещё создаётся. Повторите через несколько секунд.',
+      code: 'PAYMENT_CREATION_IN_PROGRESS',
+    }, {
+      status: 409,
+      headers: { 'Retry-After': '2' },
+    })
+  }
+
+  return NextResponse.json({
+    confirmationUrl: payment.confirmationUrl,
+    paymentId: payment.externalPaymentId ?? payment.yookassaId ?? payment.id,
+    localPaymentId: payment.id,
+    provider: payment.provider,
+    idempotent: true,
+  })
+}
+
+function promoCodeFromSnapshot(snapshot: Prisma.JsonValue | null) {
+  if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)) return null
+  const code = snapshot.code
+  return typeof code === 'string' ? code.trim().toUpperCase() : null
+}
 
 function paymentProviderUnavailableMessage(provider: 'YOOKASSA' | 'PAYANYWAY' | 'PLATEGA') {
   if (provider === 'PAYANYWAY') return 'PayAnyWay пока не настроен'

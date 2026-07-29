@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { apiFetch } from "@/lib/api-client";
 import { toast } from "@/components/ui/toaster";
 import { cn } from "@/lib/cn";
@@ -85,6 +85,7 @@ export function PlanCard({
     discountKopecks: number;
     finalAmountKopecks: number;
   } | null>(null);
+  const checkoutAttemptRef = useRef<{ key: string; fingerprint: string } | null>(null);
 
   const isPromoPlan = isPromo;
   const trimmedPromo = promoInput.trim();
@@ -136,6 +137,17 @@ export function PlanCard({
   }, [initialPromoCode, isPromoPlan, normalizedInitialPromoCode, promoCodesEnabled, suggestedPromoCodes]);
 
   async function buy() {
+    const checkoutFingerprint = isPromoPlan
+      ? `${id}:LOCAL`
+      : `${id}:${selectedProvider}:${appliedPromo?.code ?? ""}`;
+    if (checkoutAttemptRef.current?.fingerprint !== checkoutFingerprint) {
+      checkoutAttemptRef.current = {
+        key: crypto.randomUUID(),
+        fingerprint: checkoutFingerprint,
+      };
+    }
+    const idempotencyKey = checkoutAttemptRef.current.key;
+
     if (isPromoPlan) {
       setLoading(true);
       try {
@@ -143,11 +155,12 @@ export function PlanCard({
           "/api/payment/create",
           {
             method: "POST",
-            body: JSON.stringify({ planId: id }),
+            body: JSON.stringify({ planId: id, idempotencyKey }),
           },
         );
         window.location.href = redirectUrl || "/dashboard/subscription";
-      } catch {
+      } catch (error) {
+        resetFailedCheckoutAttempt(error);
         // apiFetch показал toast
       } finally {
         setLoading(false);
@@ -174,6 +187,7 @@ export function PlanCard({
         body: JSON.stringify({
           planId: id,
           provider: selectedProvider,
+          idempotencyKey,
           ...(appliedPromo ? { promoCode: appliedPromo.code } : {}),
         }),
       });
@@ -184,10 +198,27 @@ export function PlanCard({
       } else {
         toast("Не получили ссылку на оплату");
       }
-    } catch {
+    } catch (error) {
+      resetFailedCheckoutAttempt(error);
       // apiFetch показал toast
     } finally {
       setLoading(false);
+    }
+  }
+
+  function resetFailedCheckoutAttempt(error: unknown) {
+    if (
+      error instanceof Error
+      && "data" in error
+      && typeof error.data === "object"
+      && error.data !== null
+      && "code" in error.data
+      && (
+        error.data.code === "PAYMENT_PROVIDER_CREATE_FAILED"
+        || error.data.code === "PAYMENT_ATTEMPT_CANCELED"
+      )
+    ) {
+      checkoutAttemptRef.current = null;
     }
   }
 
