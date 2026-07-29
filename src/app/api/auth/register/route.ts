@@ -141,7 +141,6 @@ export async function POST(req: Request) {
       email,
       password,
       name: name || null,
-      referralCode,
     })
     remnashopSync = !result.configured
       ? 'not_configured'

@@ -139,6 +139,12 @@ if (isProduction && value("REMNASHOP_DATABASE_SSL") === "no-verify") {
   warnings.push("REMNASHOP_DATABASE_SSL=no-verify disables TLS verification");
 }
 
+if (Boolean(value("REMNASHOP_DATABASE_URL")) !== Boolean(value("REMNASHOP_API_URL"))) {
+  warnings.push(
+    "REMNASHOP_DATABASE_URL and REMNASHOP_API_URL should be configured together for full integration",
+  );
+}
+
 if (isProduction && value("DATABASE_URL")) {
   try {
     const databaseUrl = new URL(value("DATABASE_URL"));

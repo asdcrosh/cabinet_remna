@@ -3,7 +3,7 @@ import { remnashopQuery } from './remnashop-db'
 import { syncRemnashopUsersToCabinet } from './remnashop-users'
 
 type RemnashopSubscriptionStatus = 'ACTIVE' | 'DISABLED' | 'EXPIRED' | 'DELETED'
-type RemnashopTransactionStatus = 'COMPLETED' | 'CANCELED' | 'FAILED'
+type RemnashopTransactionStatus = 'PENDING' | 'COMPLETED' | 'CANCELED' | 'REFUNDED' | 'FAILED'
 type CatalogSyncAction = 'created' | 'updated' | 'skipped'
 
 interface RemnashopPlanRow {
@@ -43,6 +43,7 @@ interface RemnashopUserStatsRow {
 
 interface RemnashopWriteAccessRow {
   table_name: string
+  can_select: boolean
   can_insert: boolean
   can_update: boolean
 }
@@ -67,6 +68,8 @@ interface RemnashopTransactionRow {
   payment_id: string
   status: RemnashopTransactionStatus
   gateway_type: string
+  gateway_display_name: string | null
+  payment_method: string | null
   purchase_type: string
   currency: string
   pricing: unknown
@@ -82,7 +85,132 @@ interface CabinetUserRow {
   remnawaveUuid: string | null
 }
 
+export type RemnashopChannelState = 'READY' | 'READ_ONLY' | 'UNAVAILABLE'
+
+export interface RemnashopIntegrationStatus {
+  state: 'READY' | 'PARTIAL' | 'READ_ONLY' | 'NOT_CONFIGURED' | 'ERROR'
+  database: {
+    configured: boolean
+    connected: boolean
+    writable: boolean
+  }
+  api: {
+    configured: boolean
+  }
+  channels: {
+    users: RemnashopChannelState
+    catalog: RemnashopChannelState
+    payments: RemnashopChannelState
+    promoCodes: RemnashopChannelState
+  }
+  message: string
+}
+
+export async function getRemnashopIntegrationStatus(): Promise<RemnashopIntegrationStatus> {
+  const databaseConfigured = Boolean(process.env.REMNASHOP_DATABASE_URL)
+  const apiConfigured = Boolean(process.env.REMNASHOP_API_URL?.trim())
+  if (!databaseConfigured) {
+    return {
+      state: 'NOT_CONFIGURED',
+      database: { configured: false, connected: false, writable: false },
+      api: { configured: apiConfigured },
+      channels: {
+        users: 'UNAVAILABLE',
+        catalog: 'UNAVAILABLE',
+        payments: 'UNAVAILABLE',
+        promoCodes: 'UNAVAILABLE',
+      },
+      message: 'Не задан REMNASHOP_DATABASE_URL. Обмен данными с Remnashop выключен.',
+    }
+  }
+
+  try {
+    const access = await fetchRemnashopWriteAccess()
+    const byTable = new Map(access.map((row) => [row.table_name, row]))
+    const readable = (table: string) => Boolean(byTable.get(table)?.can_select)
+    const writable = (table: string) =>
+      Boolean(byTable.get(table)?.can_insert && byTable.get(table)?.can_update)
+    const promoTable = ['promocodes', 'promo_codes', 'coupons', 'discount_codes']
+      .find((table) => byTable.has(table))
+    const usersState = readable('users')
+      ? writable('users') && writable('subscriptions') ? 'READY' : 'READ_ONLY'
+      : 'UNAVAILABLE'
+    const catalogState = readable('plans') &&
+      readable('plan_durations') &&
+      readable('plan_prices')
+      ? 'READY'
+      : 'UNAVAILABLE'
+    const paymentsState = readable('transactions')
+      ? writable('transactions') && writable('subscriptions') ? 'READY' : 'READ_ONLY'
+      : 'UNAVAILABLE'
+    const promoCodesState = promoTable && readable(promoTable)
+      ? writable(promoTable) &&
+        (promoTable !== 'promocodes' || writable('promocode_activations'))
+        ? 'READY'
+        : 'READ_ONLY'
+      : 'UNAVAILABLE'
+    const channels = {
+      users: usersState,
+      catalog: catalogState,
+      payments: paymentsState,
+      promoCodes: promoCodesState,
+    } satisfies RemnashopIntegrationStatus['channels']
+    const allReady = Object.values(channels).every((value) => value === 'READY')
+    const hasReadOnly = Object.values(channels).some((value) => value === 'READ_ONLY')
+    const hasUnavailable = Object.values(channels).some((value) => value === 'UNAVAILABLE')
+    const coreWritable = writable('users') && writable('subscriptions') && writable('transactions')
+
+    return {
+      state: allReady && apiConfigured
+        ? 'READY'
+        : hasReadOnly && !hasUnavailable
+          ? 'READ_ONLY'
+          : 'PARTIAL',
+      database: { configured: true, connected: true, writable: coreWritable },
+      api: { configured: apiConfigured },
+      channels,
+      message: !apiConfigured
+        ? 'База подключена, но REMNASHOP_API_URL не задан. Общий вход по email работать не будет.'
+        : coreWritable
+          ? 'Подключение активно: Cabinet читает и записывает данные Remnashop.'
+          : 'База доступна только частично. Проверьте права INSERT и UPDATE.',
+    }
+  } catch (error) {
+    return {
+      state: 'ERROR',
+      database: { configured: true, connected: false, writable: false },
+      api: { configured: apiConfigured },
+      channels: {
+        users: 'UNAVAILABLE',
+        catalog: 'UNAVAILABLE',
+        payments: 'UNAVAILABLE',
+        promoCodes: 'UNAVAILABLE',
+      },
+      message: error instanceof Error ? error.message : 'Не удалось подключиться к Remnashop',
+    }
+  }
+}
+
 export async function getRemnashopSyncDryRun() {
+  const integration = await getRemnashopIntegrationStatus()
+  if (!integration.database.connected) {
+    return {
+      mode: 'dryRun' as const,
+      source: 'remnashop',
+      generatedAt: new Date().toISOString(),
+      integration,
+      counts: {},
+      warnings: [integration.message],
+      summary: {},
+      samples: {
+        plans: [],
+        promoCodes: [],
+        activeSubscriptions: [],
+        transactions: [],
+      },
+    }
+  }
+
   const [plans, promoCodes, userStats, subscriptions, transactions, writeAccess] = await Promise.all([
     fetchRemnashopPlans(),
     fetchRemnashopPromoCodes(),
@@ -177,6 +305,8 @@ export async function getRemnashopSyncDryRun() {
     const cabinetUser = transaction.user_remna_id
       ? cabinetUsersByRemnaUuid.get(transaction.user_remna_id)
       : null
+    const originatedInCabinet = transaction.gateway_display_name?.toLowerCase().includes('cabinet') ?? false
+    const existsInCabinet = originatedInCabinet || cabinetPaymentIds.has(transaction.payment_id)
     return {
       sourceId: transaction.id,
       paymentId: transaction.payment_id,
@@ -184,8 +314,8 @@ export async function getRemnashopSyncDryRun() {
       mappedStatus: mapTransactionStatus(transaction.status),
       userRemnaId: transaction.user_remna_id,
       hasCabinetUser: Boolean(cabinetUser),
-      existsInCabinet: cabinetPaymentIds.has(transaction.payment_id),
-      action: cabinetPaymentIds.has(transaction.payment_id)
+      existsInCabinet,
+      action: existsInCabinet
         ? 'keep'
         : cabinetUser
           ? 'wouldCreate'
@@ -197,6 +327,7 @@ export async function getRemnashopSyncDryRun() {
     mode: 'dryRun' as const,
     source: 'remnashop',
     generatedAt: new Date().toISOString(),
+    integration,
     counts: {
       remnashopUsers: numberFromPg(userStats.total),
       remnashopUsersWithEmail: numberFromPg(userStats.with_email),
@@ -401,6 +532,116 @@ export async function syncRemnashopCatalog(options: {
   }
 }
 
+export async function syncRemnashopPaymentsToCabinet() {
+  const transactions = await fetchRemnashopTransactions()
+  let created = 0
+  let skipped = 0
+  let blocked = 0
+
+  for (const transaction of transactions) {
+    if (transaction.gateway_display_name?.toLowerCase().includes('cabinet')) {
+      skipped += 1
+      continue
+    }
+
+    const provider = mapRemnashopGateway(transaction.gateway_type)
+    const existing = await prisma.payment.findFirst({
+      where: {
+        provider,
+        externalPaymentId: transaction.payment_id,
+      },
+      select: { id: true },
+    })
+    if (existing) {
+      skipped += 1
+      continue
+    }
+
+    const user = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { remnashopUserId: transaction.user_id },
+          ...(transaction.user_remna_id
+            ? [{ remnawaveUuid: transaction.user_remna_id }]
+            : []),
+        ],
+      },
+      select: {
+        id: true,
+        subscriptions: {
+          orderBy: { expireAt: 'desc' },
+          take: 1,
+          select: { id: true, planId: true },
+        },
+      },
+    })
+    if (!user) {
+      blocked += 1
+      continue
+    }
+
+    const snapshot = parseJsonRecord(transaction.plan_snapshot)
+    const durationDays = readPositiveInt(snapshot, ['duration', 'duration_days', 'durationDays'])
+    const sourcePlanId = readPositiveInt(snapshot, ['id', 'plan_id', 'planId'])
+    const snapshotName = readText(snapshot, ['name'])
+    const plan = sourcePlanId
+      ? await prisma.plan.findFirst({
+          where: {
+            remnashopPlanId: sourcePlanId,
+            ...(durationDays ? { durationDays } : {}),
+          },
+          select: { id: true },
+        })
+      : snapshotName
+        ? await prisma.plan.findFirst({
+            where: {
+              name: snapshotName,
+              ...(durationDays ? { durationDays } : {}),
+            },
+            select: { id: true },
+          })
+        : null
+    const planId = plan?.id ?? user.subscriptions[0]?.planId
+    if (!planId) {
+      blocked += 1
+      continue
+    }
+
+    const pricing = parseJsonRecord(transaction.pricing)
+    const originalAmountKopecks = readMoneyKopecks(pricing, 'original_amount', 'original_amount_kopecks')
+    const amountKopecks = readMoneyKopecks(pricing, 'final_amount', 'amount_kopecks')
+    const discountPercent = readPositiveInt(pricing, ['discount_percent']) ?? 0
+    const status = mapTransactionStatus(transaction.status)
+    const subscriptionId = user.subscriptions[0]?.id ?? null
+
+    await prisma.payment.create({
+      data: {
+        userId: user.id,
+        subscriptionId,
+        planId,
+        amountKopecks,
+        originalAmountKopecks,
+        discountPercent,
+        discountKopecks: Math.max(0, originalAmountKopecks - amountKopecks),
+        provider,
+        externalPaymentId: transaction.payment_id,
+        providerStatus: transaction.status,
+        status,
+        paidAt: status === 'SUCCEEDED' || status === 'REFUNDED'
+          ? transaction.created_at
+          : null,
+        subscriptionProvisionedAt: status === 'SUCCEEDED' && subscriptionId
+          ? transaction.updated_at
+          : null,
+        remnashopSyncedAt: new Date(),
+      },
+    })
+    created += 1
+  }
+
+  return { total: transactions.length, created, skipped, blocked }
+}
+
 export async function maybeSyncRemnashopCatalog() {
   if (!process.env.REMNASHOP_DATABASE_URL) {
     return { skipped: true, reason: 'not_configured' as const }
@@ -428,7 +669,8 @@ export async function maybeSyncRemnashopCatalog() {
 
   const catalog = await syncRemnashopCatalog()
   const users = await syncRemnashopUsersToCabinet()
-  return { skipped: false, nextSyncAt, report: { catalog, users } }
+  const payments = await syncRemnashopPaymentsToCabinet()
+  return { skipped: false, nextSyncAt, report: { catalog, users, payments } }
 }
 
 async function fetchRemnashopPlans() {
@@ -464,8 +706,9 @@ async function fetchRemnashopPromoCodes() {
 
   const columns = await tableColumns(table)
   const codeColumn = firstExistingColumn(columns, ['code', 'name'])
+  const currentSchema = columns.has('reward_type') && columns.has('reward')
   const discountColumn = firstExistingColumn(columns, ['discount_percent', 'discount', 'percent'])
-  if (!codeColumn || !discountColumn) return []
+  if (!codeColumn || (!currentSchema && !discountColumn)) return []
 
   const idColumn = firstExistingColumn(columns, ['id'])
   if (!idColumn) return []
@@ -473,7 +716,12 @@ async function fetchRemnashopPromoCodes() {
   const isActiveColumn = firstExistingColumn(columns, ['is_active', 'active'])
   const startsAtColumn = firstExistingColumn(columns, ['starts_at', 'start_at', 'active_from'])
   const expiresAtColumn = firstExistingColumn(columns, ['expires_at', 'expire_at', 'active_until'])
-  const maxUsesColumn = firstExistingColumn(columns, ['max_uses', 'usage_limit', 'uses_limit'])
+  const maxUsesColumn = firstExistingColumn(columns, [
+    'max_activations',
+    'max_uses',
+    'usage_limit',
+    'uses_limit',
+  ])
   const maxUsesPerUserColumn = firstExistingColumn(columns, ['max_uses_per_user', 'uses_per_user', 'user_limit'])
 
   const planLinkTable = await firstExistingTable([
@@ -501,7 +749,9 @@ async function fetchRemnashopPromoCodes() {
     SELECT
       pc.${quoteIdent(idColumn)}::int AS id,
       pc.${quoteIdent(codeColumn)}::text AS code,
-      pc.${quoteIdent(discountColumn)}::int AS discount_percent,
+      ${currentSchema
+        ? 'COALESCE(pc."reward"::int, 0)'
+        : `pc.${quoteIdent(discountColumn as string)}::int`} AS discount_percent,
       ${isActiveColumn ? `COALESCE(pc.${quoteIdent(isActiveColumn)}, true)` : 'true'} AS is_active,
       ${startsAtColumn ? `pc.${quoteIdent(startsAtColumn)}` : 'NULL::timestamp'} AS starts_at,
       ${expiresAtColumn ? `pc.${quoteIdent(expiresAtColumn)}` : 'NULL::timestamp'} AS expires_at,
@@ -509,6 +759,11 @@ async function fetchRemnashopPromoCodes() {
       ${maxUsesPerUserColumn ? `COALESCE(pc.${quoteIdent(maxUsesPerUserColumn)}::int, 1)` : '1'} AS max_uses_per_user,
       ${planIdsSelect} AS plan_ids
     FROM ${quoteIdent(table)} pc
+    ${currentSchema
+      ? `WHERE pc."reward_type"::text = 'PURCHASE_DISCOUNT'
+          AND pc."reward" IS NOT NULL
+          AND pc."reward"::int BETWEEN 1 AND 99`
+      : ''}
     ORDER BY pc.${quoteIdent(idColumn)}
   `)
   return result.rows
@@ -590,6 +845,8 @@ async function fetchRemnashopTransactions() {
       t.payment_id::text AS payment_id,
       t.status,
       t.gateway_type,
+      t.gateway_display_name,
+      t.payment_method,
       t.purchase_type,
       t.currency,
       t.pricing,
@@ -610,13 +867,26 @@ async function fetchRemnashopWriteAccess() {
   const result = await remnashopQuery<RemnashopWriteAccessRow>(`
     SELECT
       table_name,
+      has_table_privilege(current_user, format('public.%I', table_name), 'SELECT') AS can_select,
       has_table_privilege(current_user, format('public.%I', table_name), 'INSERT') AS can_insert,
       has_table_privilege(current_user, format('public.%I', table_name), 'UPDATE') AS can_update
     FROM information_schema.tables
     WHERE table_schema = 'public'
       AND table_name = ANY($1::text[])
     ORDER BY table_name
-  `, [['users', 'subscriptions', 'transactions', 'promo_codes', 'promocodes', 'coupons', 'discount_codes']])
+  `, [[
+    'users',
+    'plans',
+    'plan_durations',
+    'plan_prices',
+    'subscriptions',
+    'transactions',
+    'promocode_activations',
+    'promo_codes',
+    'promocodes',
+    'coupons',
+    'discount_codes',
+  ]])
   return result.rows
 }
 
@@ -715,10 +985,62 @@ function quoteIdent(value: string) {
 
 function mapTransactionStatus(status: RemnashopTransactionStatus) {
   switch (status) {
+    case 'PENDING':
+      return 'PENDING'
     case 'COMPLETED':
       return 'SUCCEEDED'
+    case 'REFUNDED':
+      return 'REFUNDED'
     case 'CANCELED':
     case 'FAILED':
       return 'CANCELED'
   }
+}
+
+function mapRemnashopGateway(gateway: string) {
+  if (gateway === 'PLATEGA') return 'PLATEGA' as const
+  return 'YOOKASSA' as const
+}
+
+function parseJsonRecord(value: unknown): Record<string, unknown> {
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    return value as Record<string, unknown>
+  }
+  if (typeof value !== 'string') return {}
+  try {
+    const parsed = JSON.parse(value)
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? parsed as Record<string, unknown>
+      : {}
+  } catch {
+    return {}
+  }
+}
+
+function readPositiveInt(source: Record<string, unknown>, keys: string[]) {
+  for (const key of keys) {
+    const value = source[key]
+    const number = typeof value === 'number' ? value : Number(value)
+    if (Number.isFinite(number) && number > 0) return Math.trunc(number)
+  }
+  return null
+}
+
+function readText(source: Record<string, unknown>, keys: string[]) {
+  for (const key of keys) {
+    const value = source[key]
+    if (typeof value === 'string' && value.trim()) return value.trim()
+  }
+  return null
+}
+
+function readMoneyKopecks(
+  source: Record<string, unknown>,
+  rublesKey: string,
+  kopecksKey: string
+) {
+  const kopecks = Number(source[kopecksKey])
+  if (Number.isFinite(kopecks) && kopecks >= 0) return Math.round(kopecks)
+  const rubles = Number(source[rublesKey])
+  return Number.isFinite(rubles) && rubles >= 0 ? Math.round(rubles * 100) : 0
 }

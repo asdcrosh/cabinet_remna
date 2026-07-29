@@ -134,6 +134,15 @@ configure_remnashop_link_function() {
   echo "Updating secure Remnashop account-link function..."
   curl -fsSL "${RAW_BASE_URL}/deploy/remnashop-cabinet-link.sql" \
     | docker exec -i "${container}" psql -v ON_ERROR_STOP=1 -U "${db_user}" -d "${db_name}" >/dev/null
+  if [[ "$(docker exec "${container}" psql -U "${db_user}" -d "${db_name}" -tAc "SELECT 1 FROM pg_roles WHERE rolname = 'remnashop_readonly';" 2>/dev/null | tr -d '[:space:]')" == "1" ]]; then
+    echo "Updating Remnashop integration database permissions..."
+    docker exec "${container}" psql -v ON_ERROR_STOP=1 -U "${db_user}" -d "${db_name}" \
+      -c "GRANT USAGE ON SCHEMA public TO remnashop_readonly;" \
+      -c "GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO remnashop_readonly;" \
+      -c "GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO remnashop_readonly;" \
+      -c "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO remnashop_readonly;" \
+      -c "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO remnashop_readonly;" >/dev/null
+  fi
 }
 
 read_update_env_value() {

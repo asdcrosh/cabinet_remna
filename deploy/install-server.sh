@@ -385,7 +385,7 @@ configure_local_remnashop_database() {
   readonly_password_literal="$(sql_literal "${readonly_password}")"
   db_name_identifier="$(sql_identifier "${db_name}")"
 
-  echo "Local ${container} detected. Configuring read-only remnashop sync..."
+  echo "Local ${container} detected. Configuring Remnashop integration access..."
 
   role_exists="$(docker exec "${container}" psql -U "${db_user}" -d "${db_name}" -tAc "SELECT 1 FROM pg_roles WHERE rolname = 'remnashop_readonly';" 2>/dev/null | tr -d '[:space:]' || true)"
   if [[ "${role_exists}" == "1" ]]; then
@@ -399,8 +399,10 @@ configure_local_remnashop_database() {
   docker exec "${container}" psql -v ON_ERROR_STOP=1 -U "${db_user}" -d "${db_name}" \
     -c "GRANT CONNECT ON DATABASE ${db_name_identifier} TO remnashop_readonly;" \
     -c "GRANT USAGE ON SCHEMA public TO remnashop_readonly;" \
-    -c "GRANT SELECT ON ALL TABLES IN SCHEMA public TO remnashop_readonly;" \
-    -c "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO remnashop_readonly;" >/dev/null
+    -c "GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO remnashop_readonly;" \
+    -c "GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO remnashop_readonly;" \
+    -c "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO remnashop_readonly;" \
+    -c "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO remnashop_readonly;" >/dev/null
 
   curl -fsSL "${RAW_BASE_URL}/deploy/remnashop-cabinet-link.sql" \
     | docker exec -i "${container}" psql -v ON_ERROR_STOP=1 -U "${db_user}" -d "${db_name}" >/dev/null

@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import type { Prisma } from '@prisma/client'
 import { prisma } from './prisma'
 import { remnawave } from './remnawave'
@@ -14,8 +15,6 @@ interface RemnashopUserRow {
 interface IdRow {
   id: string
 }
-
-const SOURCE = 'cabinet'
 
 type PaymentWithRelations = Prisma.PaymentGetPayload<{
   include: {
@@ -71,6 +70,7 @@ export async function syncCabinetPaymentToRemnashop(paymentId: string) {
     remnashopSubscriptionId,
     payment: syncPayment,
   })
+  await syncRemnashopPromoActivation(remnashopUserId, syncPayment)
   await setCurrentRemnashopSubscription(remnashopUserId, remnashopSubscriptionId)
   await markPaymentRemnashopSyncSucceeded(payment.id)
 
@@ -191,20 +191,29 @@ async function createRemnashopUserForCabinet(user: {
   telegramUsername: string | null
 }) {
   const hasRealEmail = !user.email.endsWith('@pending.invalid')
-  if (!hasRealEmail && !user.telegramId) return null
+  // Email accounts must be created through the Remnashop API so that their
+  // password is valid there too. Direct DB creation is only safe for Telegram.
+  if (!user.telegramId) return null
 
   const columns = await tableColumns('users')
   const now = new Date()
   const data = pickExistingColumns(columns, {
+    auth_type: 'telegram',
     email: hasRealEmail ? user.email : null,
     is_email_verified: Boolean(hasRealEmail && user.emailVerifiedAt),
     name: user.name || (user.telegramUsername ? `@${user.telegramUsername}` : 'Cabinet user'),
     username: user.telegramUsername,
     telegram_id: user.telegramId?.toString() ?? null,
+    referral_code: buildRemnashopReferralCode(user.id),
     role: 'USER',
     language: 'ru',
-    language_code: 'ru',
-    source: SOURCE,
+    personal_discount: 0,
+    purchase_discount: 0,
+    points: 0,
+    is_blocked: false,
+    is_bot_blocked: false,
+    is_rules_accepted: true,
+    is_trial_available: true,
     created_at: now,
     updated_at: now,
   })
@@ -239,8 +248,11 @@ async function upsertRemnashopSubscription(input: {
     ? await resolveRemnawaveSubscriptionUrl(input.payment.user)
     : undefined
   const snapshot = buildPlanSnapshot(input.payment)
-  const existingId = columns.has('plan_snapshot')
-    ? await findRowByCabinetPayment('subscriptions', input.payment.id)
+  const existingId = columns.has('user_remna_id')
+    ? await findRemnashopSubscription(
+        input.remnashopUserId,
+        input.payment.user.remnawaveUuid as string
+      )
     : null
   const data = pickExistingColumns(columns, {
     user_id: input.remnashopUserId,
@@ -249,7 +261,11 @@ async function upsertRemnashopSubscription(input: {
     url: subscriptionUrl,
     status: mapSubscriptionStatus(input.payment.subscription.status),
     is_trial: false,
+    disabled_by_channel_leave: false,
     internal_squads: input.payment.plan.activeInternalSquads ?? [],
+    external_squad: null,
+    traffic_limit_strategy: 'NO_RESET',
+    tag: null,
     expire_at: input.payment.subscription.expireAt,
     traffic_limit: input.payment.plan.trafficLimitGb ?? 0,
     device_limit: input.payment.plan.deviceLimit,
@@ -301,26 +317,28 @@ async function upsertRemnashopTransaction(input: {
   payment: PaymentForRemnashopSync
 }) {
   const columns = await tableColumns('transactions')
-  const paymentExternalId = input.payment.externalPaymentId || input.payment.yookassaId || input.payment.id
+  const paymentExternalId = stableRemnashopPaymentId(input.payment.id)
   const existingByPaymentId = columns.has('payment_id')
     ? await remnashopQuery<IdRow>(
         'SELECT id::text AS id FROM transactions WHERE payment_id::text = $1 LIMIT 1',
         [paymentExternalId]
       )
     : null
-  const existingId = existingByPaymentId?.rows[0]?.id ?? (
-    columns.has('pricing') ? await findRowByCabinetPayment('transactions', input.payment.id) : null
-  )
+  const existingId = existingByPaymentId?.rows[0]?.id ?? null
   const pricing = buildPricingSnapshot(input.payment)
   const planSnapshot = buildPlanSnapshot(input.payment)
+  const gateway = mapPaymentGateway(input.payment.provider)
   const data = pickExistingColumns(columns, {
     user_id: input.remnashopUserId,
     subscription_id: input.remnashopSubscriptionId,
     plan_id: input.payment.plan.remnashopPlanId,
     payment_id: paymentExternalId,
     status: 'COMPLETED',
-    gateway_type: 'YOOKASSA',
-    purchase_type: 'SUBSCRIPTION',
+    is_test: input.payment.provider === 'LOCAL' || input.payment.amountKopecks === 0,
+    gateway_type: gateway.type,
+    gateway_display_name: gateway.displayName,
+    payment_method: input.payment.provider,
+    purchase_type: inferPurchaseType(input.payment),
     currency: 'RUB',
     amount: input.payment.amountKopecks,
     amount_kopecks: input.payment.amountKopecks,
@@ -353,16 +371,48 @@ async function setCurrentRemnashopSubscription(userId: number, subscriptionId: n
   )
 }
 
-async function findRowByCabinetPayment(table: 'subscriptions' | 'transactions', paymentId: string) {
-  const jsonColumn = table === 'subscriptions' ? 'plan_snapshot' : 'pricing'
+async function syncRemnashopPromoActivation(
+  userId: number,
+  payment: PaymentForRemnashopSync
+) {
+  const code = extractPromoCode(payment.promoCodeSnapshot)
+  if (!code) return
+
+  const promoColumns = await tableColumns('promocodes')
+  const activationColumns = await tableColumns('promocode_activations')
+  if (
+    !promoColumns.has('code') ||
+    !activationColumns.has('promocode_id') ||
+    !activationColumns.has('user_id')
+  ) {
+    return
+  }
+
+  await remnashopQuery(
+    `
+      INSERT INTO promocode_activations (promocode_id, user_id, activated_at)
+      SELECT id, $2, $3
+      FROM promocodes
+      WHERE upper(code) = upper($1)
+      ON CONFLICT (promocode_id, user_id) DO NOTHING
+    `,
+    [code, userId, payment.paidAt ?? payment.createdAt]
+  )
+}
+
+async function findRemnashopSubscription(userId: number, remnawaveUuid: string) {
   const result = await remnashopQuery<IdRow>(
     `
-      SELECT id::text AS id
-      FROM ${quoteIdent(table)}
-      WHERE ${quoteIdent(jsonColumn)}::jsonb ->> 'cabinetPaymentId' = $1
+      SELECT s.id::text AS id
+      FROM subscriptions s
+      WHERE s.user_id = $1
+        AND s.user_remna_id::text = $2
+      ORDER BY
+        (s.id = (SELECT current_subscription_id FROM users WHERE id = $1)) DESC,
+        s.updated_at DESC
       LIMIT 1
     `,
-    [paymentId]
+    [userId, remnawaveUuid]
   )
   return result.rows[0]?.id ?? null
 }
@@ -419,36 +469,74 @@ async function updateRow(
 }
 
 function buildPlanSnapshot(payment: PaymentForRemnashopSync) {
+  const hasTrafficLimit = payment.plan.trafficLimitGb != null
+  const hasDeviceLimit = payment.plan.deviceLimit > 0
   return {
-    source: SOURCE,
-    cabinetPaymentId: payment.id,
-    cabinetSubscriptionId: payment.subscription?.id,
-    cabinetPlanId: payment.plan.id,
-    remnashopPlanId: payment.plan.remnashopPlanId,
+    id: payment.plan.remnashopPlanId ?? -1,
     name: payment.plan.name,
-    duration_days: payment.plan.durationDays,
+    tag: null,
+    type: hasTrafficLimit && hasDeviceLimit
+      ? 'BOTH'
+      : hasTrafficLimit
+        ? 'TRAFFIC'
+        : hasDeviceLimit
+          ? 'DEVICES'
+          : 'UNLIMITED',
+    traffic_limit_strategy: 'NO_RESET',
     traffic_limit: payment.plan.trafficLimitGb ?? 0,
     device_limit: payment.plan.deviceLimit,
-    price_kopecks: payment.amountKopecks,
+    duration: payment.plan.durationDays,
+    internal_squads: payment.plan.activeInternalSquads ?? [],
+    external_squad: null,
+    is_trial: false,
   }
 }
 
 function buildPricingSnapshot(payment: PaymentForRemnashopSync) {
+  const originalAmount = payment.originalAmountKopecks ?? payment.amountKopecks
+  const derivedDiscountPercent = originalAmount > 0
+    ? Math.round((payment.discountKopecks / originalAmount) * 100)
+    : 0
   return {
-    source: SOURCE,
-    cabinetPaymentId: payment.id,
-    amount_kopecks: payment.amountKopecks,
-    original_amount_kopecks: payment.originalAmountKopecks ?? payment.amountKopecks,
-    discount_kopecks: payment.discountKopecks,
-    discount_percent: payment.discountPercent,
-    promo_code: extractPromoCode(payment.promoCodeSnapshot),
+    original_amount: originalAmount / 100,
+    discount_percent: payment.discountPercent ?? derivedDiscountPercent,
+    final_amount: payment.amountKopecks / 100,
   }
 }
 
 function extractPromoCode(value: unknown) {
   if (!value || typeof value !== 'object') return null
   const code = (value as { code?: unknown }).code
-  return typeof code === 'string' ? code : null
+  return typeof code === 'string' && code.trim() ? code.trim() : null
+}
+
+function buildRemnashopReferralCode(userId: string) {
+  return `cab_${createHash('sha256').update(userId).digest('hex').slice(0, 32)}`
+}
+
+function stableRemnashopPaymentId(paymentId: string) {
+  const hex = createHash('sha256').update(`remnashop-payment:${paymentId}`).digest('hex')
+  const variant = ((Number.parseInt(hex.charAt(16), 16) & 0x3) | 0x8).toString(16)
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-5${hex.slice(13, 16)}-${variant}${hex.slice(17, 20)}-${hex.slice(20, 32)}`
+}
+
+function mapPaymentGateway(provider: string) {
+  if (provider === 'PLATEGA') {
+    return { type: 'PLATEGA', displayName: 'Platega через Cabinet' }
+  }
+  if (provider === 'YOOKASSA') {
+    return { type: 'YOOKASSA', displayName: 'ЮKassa через Cabinet' }
+  }
+  return {
+    type: 'YOOKASSA',
+    displayName: provider === 'PAYANYWAY' ? 'PayAnyWay через Cabinet' : 'Cabinet',
+  }
+}
+
+function inferPurchaseType(payment: PaymentForRemnashopSync) {
+  return payment.subscription.startAt.getTime() < payment.createdAt.getTime() - 60_000
+    ? 'RENEW'
+    : 'NEW'
 }
 
 function mapSubscriptionStatus(status: string) {

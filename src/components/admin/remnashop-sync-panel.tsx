@@ -1,7 +1,7 @@
 'use client'
 
 import type { ReactNode } from 'react'
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Activity, AlertTriangle, Clock3, RefreshCw, RotateCcw } from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
 import { toast } from '@/components/ui/toaster'
@@ -58,6 +58,21 @@ interface RemnashopSyncReport {
   syncEvents?: SyncEventRow[]
   syncStatusCounts?: Record<string, number>
   syncIssueGroups?: SyncIssueGroup[]
+  integration?: RemnashopIntegrationStatus
+}
+
+interface RemnashopIntegrationStatus {
+  state: 'READY' | 'PARTIAL' | 'READ_ONLY' | 'NOT_CONFIGURED' | 'ERROR'
+  database: {
+    configured: boolean
+    connected: boolean
+    writable: boolean
+  }
+  api: {
+    configured: boolean
+  }
+  channels: Record<'users' | 'catalog' | 'payments' | 'promoCodes', 'READY' | 'READ_ONLY' | 'UNAVAILABLE'>
+  message: string
 }
 
 interface SyncEventRow {
@@ -91,7 +106,7 @@ export function RemnashopSyncPanel() {
   const [includePromoCodes, setIncludePromoCodes] = useState(true)
   const [applyConfirmOpen, setApplyConfirmOpen] = useState(false)
 
-  async function runDryRun() {
+  const runDryRun = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
@@ -102,7 +117,11 @@ export function RemnashopSyncPanel() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    void runDryRun()
+  }, [runDryRun])
 
   async function applyCatalogSync() {
     setLoading(true)
@@ -167,13 +186,13 @@ export function RemnashopSyncPanel() {
           <div className="min-w-0">
             <h2 className="text-lg font-semibold">Remnashop</h2>
             <p className="mt-1 text-sm text-slate-500">
-              Проверка и перенос пользователей, подписок, тарифов и промокодов.
+              Общие пользователи, тарифы, подписки, платежи и промокоды в обе стороны.
             </p>
           </div>
           <div className="grid w-full grid-cols-1 gap-2 sm:w-auto sm:grid-cols-2">
             <button type="button" className="btn-secondary w-full" onClick={runDryRun} disabled={loading}>
               <RefreshCw className={loading ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />
-              Проверить
+              Обновить статус
             </button>
             <button type="button" className="btn-primary w-full" onClick={() => setApplyConfirmOpen(true)} disabled={loading}>
               <RefreshCw className={loading ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />
@@ -198,6 +217,7 @@ export function RemnashopSyncPanel() {
 
       {report && (
         <>
+          {report.integration ? <IntegrationStatus status={report.integration} /> : null}
           <SyncOverview report={report} />
 
           {report.warnings.length > 0 ? (
@@ -243,7 +263,7 @@ export function RemnashopSyncPanel() {
       <ConfirmDialog
         open={applyConfirmOpen}
         title="Запустить синхронизацию"
-        description="Пользователи, тарифы и промокоды будут синхронизированы из Remnashop в кабинет."
+        description="Пользователи, тарифы, подписки, платежи и поддерживаемые промокоды будут синхронизированы из Remnashop в кабинет."
         confirmLabel="Синхронизировать"
         loading={loading}
         onConfirm={() => void applyCatalogSync()}
@@ -251,6 +271,73 @@ export function RemnashopSyncPanel() {
       />
     </div>
   )
+}
+
+function IntegrationStatus({ status }: { status: RemnashopIntegrationStatus }) {
+  const channels = [
+    ['users', 'Пользователи', 'Регистрация, вход и связь аккаунтов'],
+    ['catalog', 'Тарифы', 'Каталог и сроки подписки'],
+    ['payments', 'Платежи', 'Оплаты и выданные подписки'],
+    ['promoCodes', 'Промокоды', 'Глобальные скидки на покупку'],
+  ] as const
+
+  return (
+    <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.035]">
+      <div className="flex flex-col gap-2 border-b border-slate-200 px-4 py-4 dark:border-white/10 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h3 className="font-semibold text-slate-950 dark:text-white">Что реально подключено</h3>
+          <p className="mt-1 text-sm text-slate-500">{status.message}</p>
+        </div>
+        <span className={integrationStateClass(status.state)}>
+          {integrationStateLabel(status.state)}
+        </span>
+      </div>
+      <div className="grid divide-y divide-slate-200 dark:divide-white/10 md:grid-cols-2 md:divide-x md:divide-y-0 xl:grid-cols-4">
+        {channels.map(([key, title, description]) => (
+          <div key={key} className="flex min-h-28 flex-col justify-between gap-4 px-4 py-4">
+            <div>
+              <div className="text-sm font-semibold text-slate-950 dark:text-white">{title}</div>
+              <div className="mt-1 text-xs leading-5 text-slate-500">{description}</div>
+            </div>
+            <span className={channelStateClass(status.channels[key])}>
+              {channelStateLabel(status.channels[key])}
+            </span>
+          </div>
+        ))}
+      </div>
+      <div className="flex flex-wrap gap-x-5 gap-y-2 border-t border-slate-200 px-4 py-3 text-xs text-slate-500 dark:border-white/10">
+        <span>База: {status.database.connected ? (status.database.writable ? 'чтение и запись' : 'только чтение') : 'нет связи'}</span>
+        <span>API входа: {status.api.configured ? 'настроен' : 'не настроен'}</span>
+      </div>
+    </section>
+  )
+}
+
+function integrationStateLabel(state: RemnashopIntegrationStatus['state']) {
+  if (state === 'READY') return 'Интеграция работает'
+  if (state === 'READ_ONLY') return 'Только чтение'
+  if (state === 'PARTIAL') return 'Работает частично'
+  if (state === 'ERROR') return 'Ошибка подключения'
+  return 'Не настроено'
+}
+
+function integrationStateClass(state: RemnashopIntegrationStatus['state']) {
+  if (state === 'READY') return 'badge-active shrink-0'
+  if (state === 'ERROR') return 'badge-disabled shrink-0'
+  if (state === 'NOT_CONFIGURED') return 'badge-muted shrink-0'
+  return 'badge-limited shrink-0'
+}
+
+function channelStateLabel(state: RemnashopIntegrationStatus['channels'][keyof RemnashopIntegrationStatus['channels']]) {
+  if (state === 'READY') return 'Работает'
+  if (state === 'READ_ONLY') return 'Только из Remnashop'
+  return 'Недоступно'
+}
+
+function channelStateClass(state: RemnashopIntegrationStatus['channels'][keyof RemnashopIntegrationStatus['channels']]) {
+  if (state === 'READY') return 'badge-active w-fit'
+  if (state === 'READ_ONLY') return 'badge-limited w-fit'
+  return 'badge-muted w-fit'
 }
 
 function SyncEventsView({
@@ -595,6 +682,7 @@ function directionLabel(value: SyncEventRow['direction']) {
 function entityLabel(value: string) {
   if (value === 'payment') return 'Платеж'
   if (value === 'promoCode') return 'Промокод'
+  if (value === 'promoCodeConfig') return 'Настройка промокодов'
   if (value === 'user') return 'Пользователь'
   return value
 }
@@ -634,6 +722,11 @@ function humanIssueReason(value: string) {
   if (value.includes('таблица промокодов')) {
     return 'Кабинет не понял структуру промокодов Remnashop. Нужно проверить реальные названия таблицы и колонок промокодов в базе Remnashop.'
   }
+  if (value.includes('Личный промокод нельзя')) return value
+  if (value.includes('Аудитория «без активной подписки»')) return value
+  if (value.includes('ограничивать скидочный промокод выбранными тарифами')) return value
+  if (value.includes('дату начала действия промокода')) return value
+  if (value.includes('одно использование или безлимит')) return value
   if (value.includes('Пользователь ещё не связан')) {
     return 'Платёж нельзя отправить в Remnashop, пока пользователь не найден или не создан там. После синхронизации пользователей нажмите retry по платежам.'
   }
@@ -672,4 +765,7 @@ const syncLabels: Record<string, string> = {
   subscriptionsSynced: 'Синхронизировано подписок',
   subscriptionsSkipped: 'Пропущено подписок',
   subscriptionsFailed: 'Ошибок подписок',
+  paymentsCreated: 'Добавлено платежей',
+  paymentsSkipped: 'Платежей уже было',
+  paymentsBlocked: 'Платежей требуют связи',
 }

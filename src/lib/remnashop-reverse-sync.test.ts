@@ -53,6 +53,7 @@ const payment = {
   discountKopecks: 0,
   discountPercent: null,
   promoCodeSnapshot: null,
+  provider: 'YOOKASSA',
   yookassaId: 'yk-1',
   paidAt: new Date('2026-07-04T10:00:00.000Z'),
   createdAt: new Date('2026-07-04T09:59:00.000Z'),
@@ -106,7 +107,11 @@ describe('remnashop reverse sync', () => {
             'url',
             'status',
             'is_trial',
+            'disabled_by_channel_leave',
             'internal_squads',
+            'external_squad',
+            'traffic_limit_strategy',
+            'tag',
             'expire_at',
             'traffic_limit',
             'device_limit',
@@ -125,11 +130,14 @@ describe('remnashop reverse sync', () => {
             'plan_id',
             'payment_id',
             'status',
+            'is_test',
             'gateway_type',
+            'gateway_display_name',
+            'payment_method',
             'purchase_type',
             'currency',
-            'amount',
             'pricing',
+            'plan_snapshot',
             'created_at',
             'updated_at',
           ].map((column_name) => ({ column_name })),
@@ -144,10 +152,17 @@ describe('remnashop reverse sync', () => {
             'name',
             'username',
             'telegram_id',
+            'auth_type',
+            'referral_code',
             'role',
             'language',
-            'language_code',
-            'source',
+            'personal_discount',
+            'purchase_discount',
+            'points',
+            'is_blocked',
+            'is_bot_blocked',
+            'is_rules_accepted',
+            'is_trial_available',
             'current_subscription_id',
             'created_at',
             'updated_at',
@@ -202,6 +217,7 @@ describe('remnashop reverse sync', () => {
       user: {
         ...payment.user,
         remnashopUserId: null,
+        telegramId: 123456789n,
       },
     })
 
@@ -215,6 +231,30 @@ describe('remnashop reverse sync', () => {
     )
     expect(userInsert?.[0]).toContain('"language"')
     expect(userInsert?.[1]).toContain('ru')
-    expect(userInsert?.[0]).toContain('"language_code"')
+    expect(userInsert?.[0]).toContain('"auth_type"')
+    expect(userInsert?.[1]).toContain('telegram')
+    expect(userInsert?.[0]).toContain('"referral_code"')
+    expect(userInsert?.[0]).toContain('"is_rules_accepted"')
+    expect(userInsert?.[1]).toContain(true)
+  })
+
+  it('writes current Remnashop transaction snapshots and gateway fields', async () => {
+    await expect(syncCabinetPaymentToRemnashop('pay-1')).resolves.toMatchObject({ ok: true })
+
+    const transactionInsert = mocks.remnashopQuery.mock.calls.find(([sql]) =>
+      String(sql).includes('INSERT INTO "transactions"')
+    )
+    expect(transactionInsert?.[0]).toContain('"is_test"')
+    expect(transactionInsert?.[0]).toContain('"gateway_display_name"')
+    expect(transactionInsert?.[0]).toContain('"plan_snapshot"')
+    expect(transactionInsert?.[1]).toContain('NEW')
+    expect(transactionInsert?.[1]).toContainEqual(expect.stringMatching(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+    ))
+    expect(transactionInsert?.[1]).toContain(JSON.stringify({
+      original_amount: 300,
+      discount_percent: 0,
+      final_amount: 300,
+    }))
   })
 })

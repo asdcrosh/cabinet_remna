@@ -8,10 +8,11 @@ type RemnashopColumns = Set<string>
 type PromoSyncCapability =
   | {
       ok: true
+      schema: 'current' | 'legacy'
       table: string
       idColumn: string
       codeColumn: string
-      discountColumn: string
+      discountColumn: string | null
       columns: RemnashopColumns
     }
   | {
@@ -63,12 +64,15 @@ export async function syncCabinetPromoCodeToRemnashop(promoCodeId: string) {
   const capability = await diagnosePromoSyncCapability()
   if (!capability.ok) return { ok: false as const, skipped: capability.skipped }
 
-  const { table, columns, idColumn, codeColumn, discountColumn } = capability
+  const compatibilityIssue = getCurrentSchemaCompatibilityIssue(promoCode, capability.schema)
+  if (compatibilityIssue) return { ok: false as const, skipped: compatibilityIssue }
+
+  const { table, columns, idColumn, codeColumn, discountColumn, schema } = capability
 
   const existingId = await findPromoCodeId(table, idColumn, codeColumn, promoCode.code)
-  const values = pickExistingColumns(columns, buildPromoCodeValues(promoCode))
+  const values = pickExistingColumns(columns, buildPromoCodeValues(promoCode, schema))
   values[codeColumn] = promoCode.code
-  values[discountColumn] = promoCode.discountPercent
+  if (discountColumn) values[discountColumn] = promoCode.discountPercent
 
   const remnashopPromoCodeId = existingId
     ? await updatePromoCode(table, idColumn, existingId, values)
@@ -180,8 +184,9 @@ async function diagnosePromoSyncCapability(): Promise<PromoSyncCapability> {
   const columns = await tableColumns(table)
   const idColumn = firstExistingColumn(columns, ['id'])
   const codeColumn = firstExistingColumn(columns, ['code', 'name'])
+  const currentSchema = columns.has('reward_type') && columns.has('reward')
   const discountColumn = firstExistingColumn(columns, ['discount_percent', 'discount', 'percent'])
-  if (!idColumn || !codeColumn || !discountColumn) {
+  if (!idColumn || !codeColumn || (!currentSchema && !discountColumn)) {
     return { ok: false, skipped: 'remnashop promo code schema is not recognized', table, columns }
   }
 
@@ -190,7 +195,15 @@ async function diagnosePromoSyncCapability(): Promise<PromoSyncCapability> {
     return { ok: false, skipped: 'remnashop promo code table is not writable', table, columns }
   }
 
-  return { ok: true, table, idColumn, codeColumn, discountColumn, columns }
+  return {
+    ok: true,
+    schema: currentSchema ? 'current' : 'legacy',
+    table,
+    idColumn,
+    codeColumn,
+    discountColumn,
+    columns,
+  }
 }
 
 async function tableWriteAccess(table: string) {
@@ -205,7 +218,26 @@ async function tableWriteAccess(table: string) {
   return result.rows[0] ?? { can_insert: false, can_update: false }
 }
 
-function buildPromoCodeValues(promoCode: PromoCodeForRemnashopSync) {
+function buildPromoCodeValues(
+  promoCode: PromoCodeForRemnashopSync,
+  schema: 'current' | 'legacy'
+) {
+  if (schema === 'current') {
+    return {
+      code: promoCode.code,
+      is_active: promoCode.isActive,
+      reward_type: 'PURCHASE_DISCOUNT',
+      reward: promoCode.discountPercent,
+      plan_snapshot: null,
+      availability: mapCurrentAudience(promoCode.audience),
+      expires_at: promoCode.expiresAt,
+      max_activations: promoCode.maxUses,
+      is_reusable: false,
+      updated_at: new Date(),
+      created_at: promoCode.createdAt,
+    }
+  }
+
   const planIds = promoCode.plans
     .map((item) => item.plan.remnashopPlanId)
     .filter((id): id is number => typeof id === 'number')
@@ -237,6 +269,29 @@ function buildPromoCodeValues(promoCode: PromoCodeForRemnashopSync) {
     updated_at: new Date(),
     created_at: promoCode.createdAt,
   }
+}
+
+function getCurrentSchemaCompatibilityIssue(
+  promoCode: PromoCodeForRemnashopSync,
+  schema: 'current' | 'legacy'
+) {
+  if (schema !== 'current') return null
+  if (promoCode.audience === 'PERSONAL') {
+    return 'current remnashop does not support personal email audience for discount promocodes'
+  }
+  if (promoCode.audience === 'NO_ACTIVE_SUBSCRIPTION') {
+    return 'current remnashop does not support no-active-subscription audience for discount promocodes'
+  }
+  if (promoCode.plans.length > 0) {
+    return 'current remnashop does not support plan-limited purchase discount promocodes'
+  }
+  if (promoCode.startsAt && promoCode.startsAt > new Date()) {
+    return 'current remnashop does not support a future promocode start date'
+  }
+  if (promoCode.maxUsesPerUser > 1) {
+    return 'current remnashop only supports one activation or unlimited reuse per user'
+  }
+  return null
 }
 
 async function syncPromoCodePlanLinks(remnashopPromoCodeId: string, promoCode: PromoCodeForRemnashopSync) {
@@ -361,6 +416,10 @@ function mapAudience(audience: string) {
   if (audience === 'NO_ACTIVE_SUBSCRIPTION') return 'NO_ACTIVE_SUBSCRIPTION'
   if (audience === 'PERSONAL') return 'ALLOWED'
   return 'ALL'
+}
+
+function mapCurrentAudience(audience: string) {
+  return audience === 'NEW_USERS' ? 'NEW' : 'ALL'
 }
 
 function toDbValue(value: unknown) {

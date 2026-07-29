@@ -1,6 +1,11 @@
 import { NextResponse } from 'next/server'
 import { requireAdmin, withAuth } from '@/lib/auth/guard'
-import { getRemnashopSyncDryRun, syncRemnashopCatalog } from '@/lib/remnashop-sync'
+import {
+  getRemnashopSyncDryRun,
+  getRemnashopIntegrationStatus,
+  syncRemnashopCatalog,
+  syncRemnashopPaymentsToCabinet,
+} from '@/lib/remnashop-sync'
 import { syncRemnashopUsersToCabinet } from '@/lib/remnashop-users'
 import { prisma } from '@/lib/prisma'
 import { writeAuditLog } from '@/lib/audit-log'
@@ -29,8 +34,11 @@ export const POST = withAuth(async (req: Request) => {
   try {
     const catalog = await syncRemnashopCatalog({ includePromoCodes })
     const users = await syncRemnashopUsersToCabinet({ forceRemnawaveSubscriptions: true })
+    const payments = await syncRemnashopPaymentsToCabinet()
+    const integration = await getRemnashopIntegrationStatus()
     const reportBase = {
       ...catalog,
+      integration,
       counts: {
         ...catalog.counts,
         usersCreated: users.created,
@@ -39,6 +47,9 @@ export const POST = withAuth(async (req: Request) => {
         subscriptionsSynced: users.subscriptionsSynced,
         subscriptionsSkipped: users.subscriptionsSkipped,
         subscriptionsFailed: users.subscriptionsFailed,
+        paymentsCreated: payments.created,
+        paymentsSkipped: payments.skipped,
+        paymentsBlocked: payments.blocked,
       },
     }
     await writeAuditLog({
@@ -212,6 +223,21 @@ function normalizeIssueReason(reason: string | null) {
   }
   if (value === 'remnashop promo code schema is not recognized') {
     return 'Не распознана таблица промокодов Remnashop'
+  }
+  if (value === 'current remnashop does not support personal email audience for discount promocodes') {
+    return 'Личный промокод нельзя безопасно перенести: Remnashop не ограничивает скидку списком email'
+  }
+  if (value === 'current remnashop does not support no-active-subscription audience for discount promocodes') {
+    return 'Аудитория «без активной подписки» не поддерживается Remnashop'
+  }
+  if (value === 'current remnashop does not support plan-limited purchase discount promocodes') {
+    return 'Remnashop не умеет ограничивать скидочный промокод выбранными тарифами'
+  }
+  if (value === 'current remnashop does not support a future promocode start date') {
+    return 'Remnashop не поддерживает дату начала действия промокода'
+  }
+  if (value === 'current remnashop only supports one activation or unlimited reuse per user') {
+    return 'Remnashop поддерживает одно использование или безлимит, но не заданное число на пользователя'
   }
   if (value.includes('not configured')) return 'Не настроено подключение'
   if (value === 'remnashop user not found') return 'Пользователь ещё не связан с Remnashop'

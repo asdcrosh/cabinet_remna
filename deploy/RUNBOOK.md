@@ -201,20 +201,24 @@ openssl rand -hex 32
 ## 7. Remnashop Database
 
 If `remnashop-db` runs on the same server, `install-server.sh` detects it
-automatically, creates/updates the `remnashop_readonly` role, grants read-only
-access, joins the cabinet to the same Docker network, and writes
+automatically, creates/updates the legacy `remnashop_readonly` role, grants the
+read and write access required by the integration, joins the cabinet to the same
+Docker network, and writes
 `REMNASHOP_DATABASE_URL` to `.env`.
 
 Manual setup is only needed when remnashop database is on another server.
 
-On the remote remnashop PostgreSQL server, create a read-only user:
+On the remote remnashop PostgreSQL server, create a dedicated integration user.
+The legacy role name is retained for compatibility:
 
 ```sql
 CREATE USER remnashop_readonly WITH PASSWORD 'ВСТАВЬ_СЮДА_СИЛЬНЫЙ_ПАРОЛЬ';
 GRANT CONNECT ON DATABASE remnashop TO remnashop_readonly;
 GRANT USAGE ON SCHEMA public TO remnashop_readonly;
-GRANT SELECT ON ALL TABLES IN SCHEMA public TO remnashop_readonly;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO remnashop_readonly;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO remnashop_readonly;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO remnashop_readonly;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO remnashop_readonly;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO remnashop_readonly;
 ```
 
 Allow PostgreSQL port `5432` only from the cabinet server IP.
@@ -224,10 +228,13 @@ Then set in cabinet `.env`:
 ```env
 REMNASHOP_DATABASE_URL="postgresql://remnashop_readonly:ВСТАВЬ_СЮДА_ПАРОЛЬ@ВСТАВЬ_СЮДА_IP_ИЛИ_HOST_REMNASHOP:5432/remnashop?schema=public"
 REMNASHOP_DATABASE_SSL="true"
+REMNASHOP_API_URL="https://ВСТАВЬ_СЮДА_ДОМЕН_REMNASHOP/api/v1/public"
 ```
 
 Use `REMNASHOP_DATABASE_SSL="false"` only if PostgreSQL has no SSL and the
-network is private/trusted.
+network is private/trusted. Configure both the database and API URL: the
+database exchanges catalog, users, subscriptions, payments, and promocodes;
+the API provides common registration and email/password authentication.
 
 ## 8. Update
 
