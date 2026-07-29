@@ -2,6 +2,7 @@
 
 import { useState, type ReactNode } from 'react'
 import { cn } from '@/lib/cn'
+import { handleTabListKeyDown } from '@/lib/tab-keyboard'
 
 type WorkspaceTab = 'overview' | 'catalog'
 
@@ -18,15 +19,34 @@ export function BonusBoxWorkspace({
 
   return (
     <div>
-      <div className="mb-5 flex gap-1 border-b border-slate-200 dark:border-white/10" role="tablist" aria-label="Разделы управления бонусами">
-        <WorkspaceTabButton active={tab === 'overview'} onClick={() => setTab('overview')}>
+      <div
+        className="mb-5 flex gap-1 border-b border-slate-200 dark:border-white/10"
+        role="tablist"
+        aria-label="Разделы управления бонусами"
+        onKeyDown={handleTabListKeyDown}
+      >
+        <WorkspaceTabButton
+          id="bonus-workspace-tab-overview"
+          controls="bonus-workspace-panel-overview"
+          active={tab === 'overview'}
+          onClick={() => setTab('overview')}
+        >
           Обзор и задания
         </WorkspaceTabButton>
-        <WorkspaceTabButton active={tab === 'catalog'} onClick={() => setTab('catalog')}>
+        <WorkspaceTabButton
+          id="bonus-workspace-tab-catalog"
+          controls="bonus-workspace-panel-catalog"
+          active={tab === 'catalog'}
+          onClick={() => setTab('catalog')}
+        >
           Призы и история
         </WorkspaceTabButton>
       </div>
-      <div role="tabpanel">
+      <div
+        id={`bonus-workspace-panel-${tab}`}
+        role="tabpanel"
+        aria-labelledby={`bonus-workspace-tab-${tab}`}
+      >
         {tab === 'overview' ? overview : catalog}
       </div>
     </div>
@@ -35,10 +55,14 @@ export function BonusBoxWorkspace({
 
 function WorkspaceTabButton({
   active,
+  id,
+  controls,
   onClick,
   children,
 }: {
   active: boolean
+  id: string
+  controls: string
   onClick: () => void
   children: ReactNode
 }) {
@@ -46,7 +70,10 @@ function WorkspaceTabButton({
     <button
       type="button"
       role="tab"
+      id={id}
+      aria-controls={controls}
       aria-selected={active}
+      tabIndex={active ? 0 : -1}
       className={cn(
         'relative min-h-11 px-3 text-sm font-medium transition-colors',
         active

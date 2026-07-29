@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { useBodyScrollLock } from '@/lib/use-body-scroll-lock'
+import { isTopDialogLayer, registerDialogLayer } from '@/lib/dialog-stack'
 import { Button } from './button'
 
 export interface ModalProps {
@@ -40,6 +41,7 @@ export function Modal({
   const dialogRef = React.useRef<HTMLDivElement | null>(null)
   const onCloseRef = React.useRef(onClose)
   const previouslyFocusedRef = React.useRef<HTMLElement | null>(null)
+  const dialogLayerRef = React.useRef(Symbol('modal'))
 
   useBodyScrollLock(open)
 
@@ -50,6 +52,8 @@ export function Modal({
 
   React.useEffect(() => {
     if (!open) return
+    const layerId = dialogLayerRef.current
+    const unregisterLayer = registerDialogLayer(layerId)
     previouslyFocusedRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
 
     window.setTimeout(() => {
@@ -59,7 +63,11 @@ export function Modal({
     }, 0)
 
     function onKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') onCloseRef.current()
+      if (!isTopDialogLayer(layerId)) return
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        onCloseRef.current()
+      }
       if (event.key !== 'Tab') return
 
       const focusable = getFocusableElements(dialogRef.current)
@@ -85,6 +93,7 @@ export function Modal({
     window.addEventListener('keydown', onKeyDown)
     return () => {
       window.removeEventListener('keydown', onKeyDown)
+      unregisterLayer()
       previouslyFocusedRef.current?.focus()
       previouslyFocusedRef.current = null
     }

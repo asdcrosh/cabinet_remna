@@ -4,6 +4,7 @@ import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 import { useBodyScrollLock } from '@/lib/use-body-scroll-lock'
+import { isTopDialogLayer, registerDialogLayer } from '@/lib/dialog-stack'
 
 const FOCUSABLE_SELECTOR = [
   'a[href]',
@@ -35,6 +36,7 @@ export function AdminModal({
   const dialogRef = useRef<HTMLElement | null>(null)
   const onCloseRef = useRef(onClose)
   const previouslyFocusedRef = useRef<HTMLElement | null>(null)
+  const dialogLayerRef = useRef(Symbol('admin-modal'))
 
   useEffect(() => setMounted(true), [])
   useEffect(() => {
@@ -44,6 +46,8 @@ export function AdminModal({
 
   useEffect(() => {
     if (!open) return
+    const layerId = dialogLayerRef.current
+    const unregisterLayer = registerDialogLayer(layerId)
     previouslyFocusedRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
 
     window.setTimeout(() => {
@@ -51,7 +55,9 @@ export function AdminModal({
     }, 0)
 
     const onKeyDown = (event: KeyboardEvent) => {
+      if (!isTopDialogLayer(layerId)) return
       if (event.key === 'Escape') {
+        event.preventDefault()
         onCloseRef.current()
         return
       }
@@ -80,6 +86,7 @@ export function AdminModal({
     window.addEventListener('keydown', onKeyDown)
     return () => {
       window.removeEventListener('keydown', onKeyDown)
+      unregisterLayer()
       previouslyFocusedRef.current?.focus()
       previouslyFocusedRef.current = null
     }

@@ -5,6 +5,7 @@ import { Clock3, Eye, ImageIcon, MessageCircle, RotateCcw, Send, UsersRound, X }
 import { apiFetch } from '@/lib/api-client'
 import { toast } from '@/components/ui/toaster'
 import { cn } from '@/lib/cn'
+import { handleTabListKeyDown } from '@/lib/tab-keyboard'
 import { AdminEmptyState } from '@/components/admin/admin-empty-state'
 import { AdminModal } from '@/components/admin/admin-modal'
 import { EmojiPicker } from '@/components/ui/emoji-picker'
@@ -296,11 +297,19 @@ export function BroadcastAdmin({
 
   return (
     <section className="grid w-full min-w-0 max-w-full gap-4 overflow-hidden">
-      <div className="grid grid-cols-2 gap-1 rounded-2xl bg-slate-100 p-1 dark:bg-white/[0.05]" role="tablist" aria-label="Разделы рассылок">
+      <div
+        className="grid grid-cols-2 gap-1 rounded-2xl bg-slate-100 p-1 dark:bg-white/[0.05]"
+        role="tablist"
+        aria-label="Разделы рассылок"
+        onKeyDown={handleTabListKeyDown}
+      >
         <button
           type="button"
           role="tab"
+          id="broadcast-tab-compose"
+          aria-controls="broadcast-panel-compose"
           aria-selected={view === 'compose'}
+          tabIndex={view === 'compose' ? 0 : -1}
           onClick={() => setView('compose')}
           className={cn('min-h-11 rounded-lg px-4 text-sm font-semibold transition-colors', view === 'compose' ? 'bg-white text-slate-950 shadow-sm dark:bg-surface-800 dark:text-white' : 'text-slate-500 hover:text-slate-950 dark:hover:text-white')}
         >
@@ -309,7 +318,10 @@ export function BroadcastAdmin({
         <button
           type="button"
           role="tab"
+          id="broadcast-tab-history"
+          aria-controls="broadcast-panel-history"
           aria-selected={view === 'history'}
+          tabIndex={view === 'history' ? 0 : -1}
           onClick={() => setView('history')}
           className={cn('min-h-11 rounded-lg px-4 text-sm font-semibold transition-colors', view === 'history' ? 'bg-white text-slate-950 shadow-sm dark:bg-surface-800 dark:text-white' : 'text-slate-500 hover:text-slate-950 dark:hover:text-white')}
         >
@@ -318,7 +330,12 @@ export function BroadcastAdmin({
       </div>
 
       {view === 'compose' ? (
-        <>
+        <div
+          id="broadcast-panel-compose"
+          role="tabpanel"
+          aria-labelledby="broadcast-tab-compose"
+          className="contents"
+        >
       <div className="card w-full min-w-0 overflow-hidden p-1.5">
         <div className="grid w-full min-w-0 grid-cols-3 gap-1">
           <BroadcastStepButton
@@ -701,10 +718,15 @@ export function BroadcastAdmin({
           </div>
         </div>
       </div>
-        </>
+        </div>
       ) : null}
 
-      {view === 'history' ? <div className="min-w-0 overflow-hidden">
+      {view === 'history' ? <div
+        id="broadcast-panel-history"
+        role="tabpanel"
+        aria-labelledby="broadcast-tab-history"
+        className="min-w-0 overflow-hidden"
+      >
         <BroadcastHistory
           history={history}
           total={historyTotal}

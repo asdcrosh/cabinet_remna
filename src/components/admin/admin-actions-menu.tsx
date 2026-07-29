@@ -5,6 +5,9 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { MoreHorizontal, X } from 'lucide-react'
 import { useBodyScrollLock } from '@/lib/use-body-scroll-lock'
+import { isTopDialogLayer, registerDialogLayer } from '@/lib/dialog-stack'
+
+const ACTION_SELECTOR = 'button:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])'
 
 export function AdminActionsMenu({
   children,
@@ -22,6 +25,8 @@ export function AdminActionsMenu({
   const rootRef = useRef<HTMLDivElement | null>(null)
   const triggerRef = useRef<HTMLButtonElement | null>(null)
   const menuRef = useRef<HTMLElement | null>(null)
+  const previouslyFocusedRef = useRef<HTMLElement | null>(null)
+  const dialogLayerRef = useRef(Symbol('actions-menu'))
 
   useEffect(() => {
     setMounted(true)
@@ -35,16 +40,60 @@ export function AdminActionsMenu({
 
   useEffect(() => {
     if (!open) return
+    const layerId = dialogLayerRef.current
+    const unregisterLayer = registerDialogLayer(layerId)
+    previouslyFocusedRef.current = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null
+    const frame = window.requestAnimationFrame(() => {
+      getActionElements(menuRef.current)[0]?.focus()
+    })
 
     function onKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') setOpen(false)
+      if (!isTopDialogLayer(layerId)) return
+      const actions = getActionElements(menuRef.current)
+      const currentIndex = actions.indexOf(document.activeElement as HTMLElement)
+
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        setOpen(false)
+        return
+      }
+      if (actions.length === 0) return
+      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        event.preventDefault()
+        const direction = event.key === 'ArrowDown' ? 1 : -1
+        const fallback = direction > 0 ? -1 : 0
+        const nextIndex = (Math.max(currentIndex, fallback) + direction + actions.length) % actions.length
+        actions[nextIndex]?.focus()
+        return
+      }
+      if (event.key === 'Home' || event.key === 'End') {
+        event.preventDefault()
+        actions[event.key === 'Home' ? 0 : actions.length - 1]?.focus()
+        return
+      }
+      if (!mobile || event.key !== 'Tab' || actions.length === 0) return
+      const first = actions[0]
+      const last = actions[actions.length - 1]
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault()
+        last?.focus()
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault()
+        first?.focus()
+      }
     }
 
     window.addEventListener('keydown', onKeyDown)
     return () => {
+      window.cancelAnimationFrame(frame)
       window.removeEventListener('keydown', onKeyDown)
+      unregisterLayer()
+      previouslyFocusedRef.current?.focus()
+      previouslyFocusedRef.current = null
     }
-  }, [open])
+  }, [mobile, open])
 
   useEffect(() => {
     if (!open || mobile) return
@@ -95,7 +144,7 @@ export function AdminActionsMenu({
         type="button"
         className={`inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-200 dark:hover:bg-white/[0.08] ${compact ? 'w-10 px-0' : 'px-3'}`}
         aria-label={label}
-        aria-haspopup="menu"
+        aria-haspopup="dialog"
         aria-expanded={open}
         onClick={() => {
           if (!open && triggerRef.current) {
@@ -118,7 +167,8 @@ export function AdminActionsMenu({
       {mounted && !mobile ? createPortal(
         <section
           ref={menuRef}
-          role="menu"
+          role="dialog"
+          aria-modal="false"
           aria-label={label}
           aria-hidden={!open}
           className={`${open ? 'block' : 'hidden'} fixed z-[160] max-h-[calc(100dvh-1.5rem)] w-56 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-xl shadow-slate-950/10 dark:border-white/10 dark:bg-surface-950 dark:shadow-black/30`}
@@ -137,6 +187,7 @@ export function AdminActionsMenu({
           }}
         >
           <section
+            ref={menuRef}
             role="dialog"
             aria-modal="true"
             aria-label={label}
@@ -165,4 +216,10 @@ export function AdminActionsMenu({
       ) : null}
     </div>
   )
+}
+
+function getActionElements(root: HTMLElement | null) {
+  if (!root) return []
+  return Array.from(root.querySelectorAll<HTMLElement>(ACTION_SELECTOR))
+    .filter((element) => !element.hasAttribute('disabled') && element.offsetParent !== null)
 }

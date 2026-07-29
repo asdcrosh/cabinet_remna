@@ -21,6 +21,7 @@ import {
 import { apiFetch } from '@/lib/api-client'
 import { toast } from '@/components/ui/toaster'
 import { cn } from '@/lib/cn'
+import { handleTabListKeyDown } from '@/lib/tab-keyboard'
 import { AdminEmptyState } from '@/components/admin/admin-empty-state'
 import { AdminActionsMenu } from '@/components/admin/admin-actions-menu'
 import { LazyListLoader } from '@/components/admin/lazy-list-loader'
@@ -326,8 +327,15 @@ export function BonusBoxPrizesAdmin({
         </div>
       </details>
 
-      <div className="grid grid-cols-2 gap-1 rounded-2xl bg-slate-100 p-1 dark:bg-white/[0.05]">
+      <div
+        className="grid grid-cols-2 gap-1 rounded-2xl bg-slate-100 p-1 dark:bg-white/[0.05]"
+        role="tablist"
+        aria-label="Состав и история подарков"
+        onKeyDown={handleTabListKeyDown}
+      >
         <AdminTabButton
+          id="bonus-admin-tab-prizes"
+          controls="bonus-admin-panel-prizes"
           active={activeTab === 'prizes'}
           icon={<Gift className="h-4 w-4" />}
           label="Состав"
@@ -335,6 +343,8 @@ export function BonusBoxPrizesAdmin({
           onClick={() => setActiveTab('prizes')}
         />
         <AdminTabButton
+          id="bonus-admin-tab-history"
+          controls="bonus-admin-panel-history"
           active={activeTab === 'history'}
           icon={<History className="h-4 w-4" />}
           label="История"
@@ -344,7 +354,12 @@ export function BonusBoxPrizesAdmin({
       </div>
 
       {activeTab === 'prizes' && (
-        <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white divide-y divide-slate-200 dark:border-white/10 dark:bg-white/[0.025] dark:divide-white/[0.07]">
+        <section
+          id="bonus-admin-panel-prizes"
+          role="tabpanel"
+          aria-labelledby="bonus-admin-tab-prizes"
+          className="overflow-hidden rounded-3xl border border-slate-200 bg-white divide-y divide-slate-200 dark:border-white/10 dark:bg-white/[0.025] dark:divide-white/[0.07]"
+        >
           {prizes.map((prize) => (
             <PrizeAdminRow
               key={prize.id}
@@ -364,7 +379,12 @@ export function BonusBoxPrizesAdmin({
       )}
 
       {activeTab === 'history' && (
-        <>
+        <div
+          id="bonus-admin-panel-history"
+          role="tabpanel"
+          aria-labelledby="bonus-admin-tab-history"
+          className="space-y-4"
+        >
           <BonusBoxOpeningHistory
             openings={openings}
             prizes={prizes}
@@ -372,7 +392,7 @@ export function BonusBoxPrizesAdmin({
             total={filteredOpenings}
           />
           <LazyListLoader loaded={openings.length} total={filteredOpenings} />
-        </>
+        </div>
       )}
 
       <PrizeEditorDrawer
@@ -392,12 +412,16 @@ export function BonusBoxPrizesAdmin({
 
 function AdminTabButton({
   active,
+  id,
+  controls,
   icon,
   label,
   meta,
   onClick,
 }: {
   active: boolean
+  id: string
+  controls: string
   icon: ReactNode
   label: string
   meta: string
@@ -406,6 +430,11 @@ function AdminTabButton({
   return (
     <button
       type="button"
+      role="tab"
+      id={id}
+      aria-controls={controls}
+      aria-selected={active}
+      tabIndex={active ? 0 : -1}
       className={cn(
         'flex min-h-10 flex-1 items-center justify-between gap-3 rounded-xl px-3 py-2 text-left text-sm transition-colors sm:flex-none sm:min-w-40',
         active
