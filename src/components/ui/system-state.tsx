@@ -26,26 +26,26 @@ export function SystemState({
   return (
     <section
       className={cn(
-        'panel relative w-full max-w-lg overflow-hidden px-5 py-9 text-center sm:px-8 sm:py-11',
+        'relative w-full max-w-lg overflow-hidden border-y border-slate-200/90 px-4 py-8 text-center dark:border-white/[0.09] sm:px-6 sm:py-10',
         className,
       )}
       role={danger ? 'alert' : 'status'}
     >
       <div
         className={cn(
-          'pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent to-transparent',
-          danger ? 'via-red-400/80' : 'via-cyan-300/80',
+          'pointer-events-none absolute inset-y-6 left-0 w-0.5',
+          danger ? 'bg-red-400' : 'bg-cyan-400',
         )}
       />
       <div
         className={cn(
-          'mx-auto mb-5 grid h-14 w-14 place-items-center rounded-2xl border shadow-sm',
+          'mx-auto mb-4 grid h-10 w-10 place-items-center',
           danger
-            ? 'border-red-100 bg-red-50 text-red-600 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300'
-            : 'border-cyan-100 bg-cyan-50 text-cyan-700 dark:border-cyan-500/20 dark:bg-cyan-500/10 dark:text-cyan-200',
+            ? 'text-red-600 dark:text-red-300'
+            : 'text-cyan-700 dark:text-cyan-200',
         )}
       >
-        {icon ?? (danger ? <AlertTriangle className="h-7 w-7" /> : <Info className="h-7 w-7" />)}
+        {icon ?? (danger ? <AlertTriangle className="h-6 w-6" /> : <Info className="h-6 w-6" />)}
       </div>
       {eyebrow && (
         <div className={cn('mb-2 text-xs font-semibold uppercase tracking-[0.14em]', danger ? 'text-red-600 dark:text-red-300' : 'text-brand-600 dark:text-brand-400')}>

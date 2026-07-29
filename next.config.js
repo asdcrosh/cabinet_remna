@@ -4,6 +4,7 @@ const { withSentryConfig } = require('@sentry/nextjs')
 const nextConfig = {
   reactStrictMode: true,
   output: 'standalone',
+  allowedDevOrigins: ['127.0.0.1'],
   experimental: {
     serverActions: { bodySizeLimit: '25mb' },
   },

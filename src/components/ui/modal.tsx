@@ -14,9 +14,24 @@ export interface ModalProps {
   children: React.ReactNode
   footer?: React.ReactNode
   onClose: () => void
+  variant?: 'dialog' | 'sheet'
+  overlayClassName?: string
+  panelClassName?: string
+  bodyClassName?: string
 }
 
-export function Modal({ open, title, description, children, footer, onClose }: ModalProps) {
+export function Modal({
+  open,
+  title,
+  description,
+  children,
+  footer,
+  onClose,
+  variant = 'dialog',
+  overlayClassName,
+  panelClassName,
+  bodyClassName,
+}: ModalProps) {
   const [mounted, setMounted] = React.useState(false)
   const titleId = React.useId()
   const descriptionId = React.useId()
@@ -76,7 +91,10 @@ export function Modal({ open, title, description, children, footer, onClose }: M
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[160] grid place-items-end bg-slate-950/45 p-0 backdrop-blur-sm sm:place-items-center sm:p-4"
+      className={cn(
+        'fixed inset-0 z-[160] grid place-items-end bg-slate-950/45 p-0 backdrop-blur-sm sm:place-items-center sm:p-4',
+        overlayClassName,
+      )}
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onCloseRef.current()
       }}
@@ -89,8 +107,11 @@ export function Modal({ open, title, description, children, footer, onClose }: M
         aria-describedby={description ? descriptionId : undefined}
         tabIndex={-1}
         className={cn(
-          'flex h-dvh max-h-dvh w-full flex-col overflow-hidden border-0 bg-white shadow-2xl dark:bg-slate-950',
-          'sm:h-auto sm:max-h-[calc(100dvh-24px)] sm:max-w-lg sm:rounded-2xl sm:border sm:border-slate-200 dark:sm:border-white/10'
+          'flex w-full flex-col overflow-hidden bg-white shadow-2xl dark:bg-slate-950',
+          variant === 'sheet'
+            ? 'h-auto max-h-[94dvh] rounded-t-3xl border border-b-0 border-slate-200 dark:border-white/10 sm:max-h-[calc(100dvh-24px)] sm:max-w-lg sm:rounded-2xl sm:border'
+            : 'h-dvh max-h-dvh border-0 sm:h-auto sm:max-h-[calc(100dvh-24px)] sm:max-w-lg sm:rounded-2xl sm:border sm:border-slate-200 dark:sm:border-white/10',
+          panelClassName,
         )}
       >
         <div className="flex shrink-0 items-start justify-between gap-4 border-b border-slate-200 px-5 py-4 dark:border-white/10">
@@ -108,7 +129,9 @@ export function Modal({ open, title, description, children, footer, onClose }: M
             <X className="h-5 w-5" />
           </Button>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4">{children}</div>
+        <div className={cn('min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4', bodyClassName)}>
+          {children}
+        </div>
         {footer ? <div className="shrink-0 border-t border-slate-200 px-5 py-4 dark:border-white/10">{footer}</div> : null}
       </div>
     </div>,

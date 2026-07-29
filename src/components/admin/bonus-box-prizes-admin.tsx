@@ -25,6 +25,7 @@ import { AdminEmptyState } from '@/components/admin/admin-empty-state'
 import { AdminActionsMenu } from '@/components/admin/admin-actions-menu'
 import { LazyListLoader } from '@/components/admin/lazy-list-loader'
 import { AutoSubmitForm } from '@/components/ui/auto-submit-form'
+import { Switch } from '@/components/ui/switch'
 import { useBodyScrollLock } from '@/lib/use-body-scroll-lock'
 import { BonusBoxAttemptGrantPanel } from '@/components/admin/bonus-box-attempt-grant-panel'
 import {
@@ -727,22 +728,20 @@ function PrizeEditorDrawer({
 
           <PrizeFormPreview form={form} estimatedChance={estimatedChance} />
 
-          <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm dark:border-white/10 dark:bg-white/[0.04]">
-            <input
-              type="checkbox"
-              checked={form.isActive}
-              onChange={(event) => onChange((current) => ({ ...current, isActive: event.target.checked }))}
-            />
-            Активен
-          </label>
-          <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm dark:border-white/10 dark:bg-white/[0.04]">
-            <input
-              type="checkbox"
-              checked={form.eventOnly}
-              onChange={(event) => onChange((current) => ({ ...current, eventOnly: event.target.checked }))}
-            />
-            Доступен только во время выбранного сезонного события
-          </label>
+          <Switch
+            checked={form.isActive}
+            onCheckedChange={(checked) => onChange((current) => ({ ...current, isActive: checked }))}
+            label="Подарок активен"
+            description="Участвует в следующих открытиях бокса"
+            className="border-y border-slate-200/90 py-3 dark:border-white/[0.09]"
+          />
+          <Switch
+            checked={form.eventOnly}
+            onCheckedChange={(checked) => onChange((current) => ({ ...current, eventOnly: checked }))}
+            label="Только для сезонного события"
+            description="В обычном режиме подарок выпадать не будет"
+            className="border-b border-slate-200/90 pb-3 dark:border-white/[0.09]"
+          />
 
           <Field label="Описание">
             <textarea
@@ -1019,33 +1018,12 @@ function SettingsCard({
 }) {
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.035]">
-      <label className="flex cursor-pointer items-start justify-between gap-4">
-        <span className="min-w-0">
-          <span className="block text-base font-semibold text-slate-950 dark:text-white">{title}</span>
-          <span className="mt-1 block max-w-lg text-sm leading-6 text-slate-500 dark:text-slate-400">{description}</span>
-        </span>
-        <span
-          className={cn(
-            'relative mt-0.5 h-7 w-12 shrink-0 rounded-full border transition-colors',
-            checked
-              ? 'border-cyan-500 bg-cyan-500'
-              : 'border-slate-300 bg-slate-200 dark:border-white/10 dark:bg-white/10'
-          )}
-        >
-          <input
-            type="checkbox"
-            checked={checked}
-            onChange={(event) => onToggle(event.target.checked)}
-            className="sr-only"
-          />
-          <span
-            className={cn(
-              'absolute left-1 top-1 h-5 w-5 rounded-full bg-white shadow-sm transition-transform',
-              checked && 'translate-x-5'
-            )}
-          />
-        </span>
-      </label>
+      <Switch
+        checked={checked}
+        onCheckedChange={onToggle}
+        label={title}
+        description={description}
+      />
       <label className={cn('mt-4 block border-t border-slate-100 pt-4 dark:border-white/10', fieldDisabled && 'opacity-55')}>
         <span className="mb-1.5 block text-sm font-semibold text-slate-700 dark:text-slate-200">{fieldLabel}</span>
         <input

@@ -9,6 +9,7 @@ import { apiFetch } from '@/lib/api-client'
 import { cn } from '@/lib/cn'
 import { toast } from '@/components/ui/toaster'
 import { Tabs } from '@/components/ui/tabs'
+import { Switch } from '@/components/ui/switch'
 import {
   personalOfferPlaceholders,
   personalOfferScenarioLabels,
@@ -128,10 +129,11 @@ export function PersonalOffersAdmin({
               <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">Подарок автоматически выдаётся новому пользователю</p>
             </div>
           </div>
-          <ToggleSwitch
+          <Switch
             checked={welcomeForm.enabled}
-            onChange={(checked) => setWelcomeForm((prev) => ({ ...prev, enabled: checked }))}
+            onCheckedChange={(checked) => setWelcomeForm((prev) => ({ ...prev, enabled: checked }))}
             label={welcomeForm.enabled ? 'Бонус включён' : 'Бонус выключен'}
+            className="w-auto shrink-0"
           />
         </div>
 
@@ -331,10 +333,13 @@ export function PersonalOffersAdmin({
           {editorSection === 'BEHAVIOR' ? (
             <div className="space-y-4">
               <div className="grid gap-3 sm:grid-cols-[1fr_8rem_12rem]">
-                <label className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-white/10 dark:bg-white/[0.04]">
-                  <input type="checkbox" checked={form.enabled} onChange={(event) => setForm((prev) => ({ ...prev, enabled: event.target.checked }))} />
-                  <span className="text-sm font-medium">Показывать</span>
-                </label>
+                <Switch
+                  checked={form.enabled}
+                  onCheckedChange={(checked) => setForm((prev) => ({ ...prev, enabled: checked }))}
+                  label="Показывать"
+                  description="Оффер виден подходящим пользователям"
+                  className="border-y border-slate-200/90 px-1 py-2 dark:border-white/[0.09]"
+                />
                 <Field label="Приоритет">
                   <input className="input" type="number" min={0} max={1000} value={form.priority} onChange={(event) => setForm((prev) => ({ ...prev, priority: Number(event.target.value) }))} />
                 </Field>
@@ -452,37 +457,12 @@ function WelcomeBonusOption({
             <p className="mt-0.5 text-xs leading-4 text-slate-500 dark:text-slate-400">{description}</p>
           </div>
         </div>
-        <ToggleSwitch checked={checked} onChange={onToggle} label={checked ? `Отключить ${title}` : `Включить ${title}`} compact />
+        <Switch checked={checked} onCheckedChange={onToggle} label={checked ? `Отключить ${title}` : `Включить ${title}`} compact />
       </div>
       <fieldset disabled={!checked} className={cn('mt-auto border-0 pt-5', !checked && 'opacity-40')}>
         {children}
       </fieldset>
     </div>
-  )
-}
-
-function ToggleSwitch({
-  checked,
-  onChange,
-  label,
-  compact = false,
-}: {
-  checked: boolean
-  onChange: (checked: boolean) => void
-  label: string
-  compact?: boolean
-}) {
-  return (
-    <label className={cn('inline-flex shrink-0 cursor-pointer items-center gap-3', !compact && 'justify-between sm:justify-start')}>
-      {!compact ? <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{label}</span> : <span className="sr-only">{label}</span>}
-      <input
-        type="checkbox"
-        className="peer sr-only"
-        checked={checked}
-        onChange={(event) => onChange(event.target.checked)}
-      />
-      <span className="relative h-6 w-11 rounded-full bg-slate-300 transition-colors after:absolute after:left-0.5 after:top-0.5 after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow-sm after:transition-transform peer-checked:bg-emerald-500 peer-checked:after:translate-x-5 peer-focus-visible:ring-4 peer-focus-visible:ring-emerald-400/20 dark:bg-white/15 dark:peer-checked:bg-emerald-400" aria-hidden="true" />
-    </label>
   )
 }
 
