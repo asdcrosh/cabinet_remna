@@ -34,6 +34,29 @@ describe('logger', () => {
     expect(payload.time).toEqual(expect.any(String))
   })
 
+  it('isolates request IDs between overlapping async operations', async () => {
+    let releaseSecond!: () => void
+    const secondGate = new Promise<void>((resolve) => {
+      releaseSecond = resolve
+    })
+
+    const first = withRequestLogContext({ requestId: 'req_first_12345678' }, async () => {
+      await Promise.resolve()
+      logInfo('test.first')
+      releaseSecond()
+    })
+    const second = withRequestLogContext({ requestId: 'req_second_12345678' }, async () => {
+      await secondGate
+      logInfo('test.second')
+    })
+
+    await Promise.all([first, second])
+    const payloads = vi.mocked(console.log).mock.calls.map(([line]) => JSON.parse(String(line)))
+
+    expect(payloads.find((payload) => payload.event === 'test.first')?.requestId).toBe('req_first_12345678')
+    expect(payloads.find((payload) => payload.event === 'test.second')?.requestId).toBe('req_second_12345678')
+  })
+
   it('redacts sensitive keys recursively', () => {
     logError('test.error', new Error('boom'), {
       password: 'secret-password',

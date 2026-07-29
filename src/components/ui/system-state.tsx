@@ -10,6 +10,7 @@ interface SystemStateProps {
   eyebrow?: string
   icon?: ReactNode
   tone?: 'danger' | 'neutral'
+  reference?: string
 }
 
 export function SystemState({
@@ -20,6 +21,7 @@ export function SystemState({
   eyebrow,
   icon,
   tone = 'neutral',
+  reference,
 }: SystemStateProps) {
   const danger = tone === 'danger'
 
@@ -54,6 +56,11 @@ export function SystemState({
       )}
       <h1 className="text-xl font-semibold tracking-tight text-slate-950 sm:text-2xl dark:text-white">{title}</h1>
       <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500 dark:text-slate-400">{description}</p>
+      {reference ? (
+        <p className="mt-3 font-mono text-[11px] text-slate-400">
+          Код ошибки: {reference}
+        </p>
+      ) : null}
       {action && <div className="mx-auto mt-6 flex w-full max-w-sm flex-col gap-2 sm:flex-row sm:justify-center">{action}</div>}
     </section>
   )

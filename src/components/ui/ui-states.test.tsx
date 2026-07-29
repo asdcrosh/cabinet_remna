@@ -42,10 +42,16 @@ describe('общие состояния интерфейса', () => {
 
   it('использует alert для критического состояния', () => {
     const html = renderToStaticMarkup(
-      <SystemState tone="danger" title="Не удалось загрузить" description="Повторите запрос" />,
+      <SystemState
+        tone="danger"
+        title="Не удалось загрузить"
+        description="Повторите запрос"
+        reference="digest-123"
+      />,
     )
 
     expect(html).toContain('role="alert"')
     expect(html).toContain('Не удалось загрузить')
+    expect(html).toContain('Код ошибки: digest-123')
   })
 })

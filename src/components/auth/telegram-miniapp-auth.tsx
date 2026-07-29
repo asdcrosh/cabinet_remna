@@ -3,8 +3,10 @@
 import { useEffect, useState } from 'react'
 import { Loader2, RefreshCw, Send, TriangleAlert } from 'lucide-react'
 import { getTelegramLaunchData } from '@/lib/telegram-miniapp-client'
-import { logError } from '@/lib/logger'
+import { reportClientError } from '@/lib/client-logger'
 import { sanitizeInternalNext } from '@/lib/auth/next-path'
+
+const AUTH_REQUEST_TIMEOUT_MS = 20_000
 
 export function TelegramMiniAppAuth() {
   const [state, setState] = useState<'browser' | 'authenticating' | 'error'>('browser')
@@ -33,6 +35,7 @@ export function TelegramMiniAppAuth() {
           headers: { 'Content-Type': 'application/json' },
           credentials: 'same-origin',
           body: JSON.stringify({ initData }),
+          signal: AbortSignal.timeout(AUTH_REQUEST_TIMEOUT_MS),
         })
         const data = await response.json().catch(() => null)
         if (!response.ok) throw new Error(data?.error || 'Telegram authentication failed')
@@ -40,6 +43,7 @@ export function TelegramMiniAppAuth() {
         const sessionResponse = await fetch('/api/me', {
           cache: 'no-store',
           credentials: 'same-origin',
+          signal: AbortSignal.timeout(AUTH_REQUEST_TIMEOUT_MS),
         })
         const sessionData = await sessionResponse.json().catch(() => null)
         if (!sessionResponse.ok || !sessionData?.user?.id) {
@@ -48,10 +52,12 @@ export function TelegramMiniAppAuth() {
 
         window.location.replace(getSafeNextPath(window.location))
       } catch (error) {
-        logError('telegram_miniapp.auth_failed', error)
+        reportClientError('telegram_miniapp.auth_failed', error)
         if (!cancelled) {
           setError(
-            error instanceof Error && error.message
+            error instanceof Error && ['TimeoutError', 'AbortError'].includes(error.name)
+              ? 'Сервер не ответил вовремя. Проверьте соединение и попробуйте ещё раз.'
+              : error instanceof Error && error.message
               ? error.message
               : 'Не удалось войти через Telegram. Попробуйте открыть кабинет заново.'
           )

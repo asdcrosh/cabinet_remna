@@ -6,7 +6,7 @@ import { getSession } from './cookies'
 import type { SessionPayload } from './jwt'
 import { assertSameOrigin } from '@/lib/security'
 import { prisma } from '@/lib/prisma'
-import { withRequestLogContext } from '@/lib/logger'
+import { logError, withRequestLogContext } from '@/lib/logger'
 
 export class AuthError extends Error {
   constructor(public status: number, message: string) {
@@ -64,23 +64,42 @@ export function withAuth<T extends (...args: any[]) => Promise<NextResponse>>(
   handler: T
 ): T {
   return (async (...args: any[]) => {
-    try {
-      if (args[0] instanceof Request) {
-        assertSameOrigin(args[0])
-        return await withRequestLogContext(
-          { requestId: args[0].headers.get('x-request-id') || undefined },
-          () => handler(...args)
+    const request = args[0] instanceof Request ? args[0] : null
+    const requestId = request ? resolveRequestId(request) : undefined
+    const run = async () => {
+      try {
+        if (request) assertSameOrigin(request)
+        return await handler(...args)
+      } catch (e) {
+        if (e instanceof AuthError) {
+          return NextResponse.json({ error: e.message }, { status: e.status })
+        }
+        if (e instanceof Error && e.message === 'Invalid request origin') {
+          return NextResponse.json({ error: e.message }, { status: 403 })
+        }
+        logError('api.request_failed', e, {
+          method: request?.method,
+          path: request ? new URL(request.url).pathname : undefined,
+        })
+        return NextResponse.json(
+          {
+            error: 'Внутренняя ошибка сервера.',
+            ...(requestId ? { requestId } : {}),
+          },
+          { status: 500 }
         )
       }
-      return await handler(...args)
-    } catch (e) {
-      if (e instanceof AuthError) {
-        return NextResponse.json({ error: e.message }, { status: e.status })
-      }
-      if (e instanceof Error && e.message === 'Invalid request origin') {
-        return NextResponse.json({ error: e.message }, { status: 403 })
-      }
-      throw e
     }
+    const response = requestId
+      ? await withRequestLogContext({ requestId }, run)
+      : await run()
+    if (requestId) response.headers.set('x-request-id', requestId)
+    return response
   }) as T
+}
+
+function resolveRequestId(request: Request) {
+  const incoming = request.headers.get('x-request-id')?.trim()
+  if (incoming && /^[a-zA-Z0-9._:-]{8,128}$/.test(incoming)) return incoming
+  return crypto.randomUUID()
 }

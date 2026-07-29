@@ -6,6 +6,7 @@ import { toast } from '@/components/ui/toaster'
 export interface ApiError {
   error: string
   details?: unknown
+  requestId?: string
 }
 
 const API_TIMEOUT_MS = 20_000
@@ -56,7 +57,11 @@ export async function apiFetch<T = unknown>(
     /* not JSON */
   }
   if (!res.ok) {
-    const message = getApiErrorMessage(res.status, data)
+    const message = getApiErrorMessage(
+      res.status,
+      data,
+      res.headers.get('x-request-id') || data?.requestId
+    )
     if (init.method && init.method !== 'GET') toast(message)
     const err = new Error(message) as Error & { status: number; data: any }
     err.status = res.status
@@ -66,7 +71,10 @@ export async function apiFetch<T = unknown>(
   return data as T
 }
 
-function getApiErrorMessage(status: number, data: any) {
-  if (data && typeof data.error === 'string' && data.error.trim()) return data.error
-  return STATUS_MESSAGES[status] ?? `Ошибка ${status}. Попробуйте повторить действие.`
+function getApiErrorMessage(status: number, data: any, requestId?: string | null) {
+  const baseMessage = data && typeof data.error === 'string' && data.error.trim()
+    ? data.error
+    : STATUS_MESSAGES[status] ?? `Ошибка ${status}. Попробуйте повторить действие.`
+  if (status < 500 || !requestId) return baseMessage
+  return `${baseMessage} Код: ${requestId.slice(0, 8)}`
 }

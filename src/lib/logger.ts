@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from 'node:async_hooks'
 import * as Sentry from '@sentry/nextjs'
 
 type LogLevel = 'debug' | 'info' | 'warn' | 'error'
@@ -9,7 +10,7 @@ const LEVELS: Record<LogLevel, number> = {
   error: 40,
 }
 
-const requestContextStack: Array<{ requestId?: string }> = []
+const requestContextStorage = new AsyncLocalStorage<{ requestId?: string }>()
 const REDACTED = '[REDACTED]'
 const SENSITIVE_KEY_PATTERN = /(password|token|secret|authorization|cookie|set-cookie|api[-_]?key)/i
 
@@ -24,20 +25,7 @@ export function isRequestLoggingEnabled() {
 }
 
 export function withRequestLogContext<T>(context: { requestId?: string }, callback: () => T) {
-  requestContextStack.push(context)
-  try {
-    const result = callback()
-    if (result instanceof Promise) {
-      return result.finally(() => {
-        requestContextStack.pop()
-      }) as T
-    }
-    requestContextStack.pop()
-    return result
-  } catch (error) {
-    requestContextStack.pop()
-    throw error
-  }
+  return requestContextStorage.run(context, callback)
 }
 
 export function logDebug(event: string, details?: Record<string, unknown>) {
@@ -104,7 +92,7 @@ function sanitize(value: unknown, key = ''): unknown {
 }
 
 function currentRequestContext() {
-  const requestId = requestContextStack[requestContextStack.length - 1]?.requestId
+  const requestId = requestContextStorage.getStore()?.requestId
   return requestId ? { requestId } : {}
 }
 

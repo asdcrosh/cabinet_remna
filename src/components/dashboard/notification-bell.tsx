@@ -11,6 +11,7 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { toast } from '@/components/ui/toaster'
 
 const NOTIFICATION_REFRESH_MS = 60_000
+const NOTIFICATION_REQUEST_TIMEOUT_MS = 10_000
 const FOCUSABLE_SELECTOR = [
   'a[href]',
   'button:not([disabled])',
@@ -56,9 +57,12 @@ export function NotificationBell({ showAdmin = false }: { showAdmin?: boolean })
     if (refreshInFlightRef.current) return
     refreshInFlightRef.current = true
     try {
+      const signal = AbortSignal.timeout(NOTIFICATION_REQUEST_TIMEOUT_MS)
       const [userRes, adminRes] = await Promise.all([
-        fetch('/api/notifications/summary', { cache: 'no-store' }),
-        showAdmin ? fetch('/api/admin/notifications/summary', { cache: 'no-store' }) : Promise.resolve(null),
+        fetch('/api/notifications/summary', { cache: 'no-store', signal }),
+        showAdmin
+          ? fetch('/api/admin/notifications/summary', { cache: 'no-store', signal })
+          : Promise.resolve(null),
       ])
       const data = await userRes.json().catch(() => null)
       if (userRes.ok && data) {
@@ -98,7 +102,10 @@ export function NotificationBell({ showAdmin = false }: { showAdmin?: boolean })
       }))
     }
     try {
-      const res = await fetch(tab === 'admin' ? '/api/admin/notifications' : '/api/notifications', { method: 'PATCH' })
+      const res = await fetch(tab === 'admin' ? '/api/admin/notifications' : '/api/notifications', {
+        method: 'PATCH',
+        signal: AbortSignal.timeout(NOTIFICATION_REQUEST_TIMEOUT_MS),
+      })
       if (!res.ok) {
         setSummary(previousUser)
         setAdminSummary(previousAdmin)
@@ -126,7 +133,10 @@ export function NotificationBell({ showAdmin = false }: { showAdmin?: boolean })
       }))
     }
     try {
-      await fetch(tab === 'admin' ? `/api/admin/notifications/${id}` : `/api/notifications/${id}`, { method: 'PATCH' })
+      await fetch(tab === 'admin' ? `/api/admin/notifications/${id}` : `/api/notifications/${id}`, {
+        method: 'PATCH',
+        signal: AbortSignal.timeout(NOTIFICATION_REQUEST_TIMEOUT_MS),
+      })
     } catch {
       // Counter will self-heal on the next polling cycle.
     }
@@ -148,7 +158,10 @@ export function NotificationBell({ showAdmin = false }: { showAdmin?: boolean })
     }
 
     try {
-      const res = await fetch(tab === 'admin' ? '/api/admin/notifications' : '/api/notifications', { method: 'DELETE' })
+      const res = await fetch(tab === 'admin' ? '/api/admin/notifications' : '/api/notifications', {
+        method: 'DELETE',
+        signal: AbortSignal.timeout(NOTIFICATION_REQUEST_TIMEOUT_MS),
+      })
       if (!res.ok) {
         setSummary(previousUser)
         setAdminSummary(previousAdmin)
