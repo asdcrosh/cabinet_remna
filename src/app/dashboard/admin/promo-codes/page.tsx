@@ -8,6 +8,7 @@ import { cleanupExpiredBonusBoxPromoCodes } from '@/lib/promo-code-cleanup'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Промокоды — Админка' }
+const PROMO_RELATION_PREVIEW_SIZE = 25
 
 export default async function AdminPromoCodesPage({
   searchParams,
@@ -48,6 +49,7 @@ export default async function AdminPromoCodesPage({
             user: { select: { id: true, email: true, name: true } },
           },
           orderBy: { createdAt: 'desc' },
+          take: PROMO_RELATION_PREVIEW_SIZE,
         },
         bonusBoxOpenings: {
           select: {
@@ -56,6 +58,7 @@ export default async function AdminPromoCodesPage({
             user: { select: { id: true, email: true, name: true } },
           },
           orderBy: { createdAt: 'desc' },
+          take: PROMO_RELATION_PREVIEW_SIZE,
         },
         welcomeBonusRedemptions: {
           select: {
@@ -63,16 +66,51 @@ export default async function AdminPromoCodesPage({
             user: { select: { id: true, email: true, name: true } },
           },
           orderBy: { createdAt: 'desc' },
+          take: PROMO_RELATION_PREVIEW_SIZE,
+        },
+        _count: {
+          select: {
+            redemptions: true,
+            bonusBoxOpenings: true,
+            welcomeBonusRedemptions: true,
+          },
         },
       },
     }),
     prisma.plan.findMany({ orderBy: { sortOrder: 'asc' }, select: { id: true, name: true } }),
   ])
+  const promoCodeIds = promoCodes.map((promoCode) => promoCode.id)
+  const [redemptionCounts, ownBonusOpenings] = promoCodeIds.length > 0
+    ? await Promise.all([
+        prisma.promoCodeRedemption.groupBy({
+          by: ['promoCodeId', 'status'],
+          where: {
+            promoCodeId: { in: promoCodeIds },
+            status: { in: ['PENDING', 'SUCCEEDED'] },
+          },
+          _count: { _all: true },
+        }),
+        prisma.bonusBoxOpening.findMany({
+          where: {
+            promoCodeId: { in: promoCodeIds },
+            userId: user.id,
+          },
+          distinct: ['promoCodeId'],
+          select: { promoCodeId: true },
+        }),
+      ])
+    : [[], []]
+  const redemptionCountByPromo = new Map(
+    redemptionCounts.map((row) => [`${row.promoCodeId}:${row.status}`, row._count._all])
+  )
+  const ownBonusPromoIds = new Set(
+    ownBonusOpenings.flatMap((opening) => opening.promoCodeId ? [opening.promoCodeId] : [])
+  )
 
   const rows: PromoCodeAdminRow[] = promoCodes.map((promoCode) => {
-    const reservedCount = promoCode.redemptions.filter((redemption) =>
-      ['PENDING', 'SUCCEEDED'].includes(redemption.status)
-    ).length
+    const usedCount = redemptionCountByPromo.get(`${promoCode.id}:SUCCEEDED`) ?? 0
+    const reservedCount = usedCount + (redemptionCountByPromo.get(`${promoCode.id}:PENDING`) ?? 0)
+    const assignees = buildPromoCodeAssignees(promoCode)
 
     return {
       id: promoCode.id,
@@ -85,12 +123,16 @@ export default async function AdminPromoCodesPage({
       expiresAt: promoCode.expiresAt?.toISOString() ?? null,
       maxUses: promoCode.maxUses,
       maxUsesPerUser: promoCode.maxUsesPerUser,
-      usedCount: promoCode.redemptions.filter((redemption) => redemption.status === 'SUCCEEDED').length,
+      usedCount,
       reservedCount,
       planIds: promoCode.plans.map((promoPlan) => promoPlan.planId),
       planNames: promoCode.plans.map((promoPlan) => promoPlan.plan.name),
-      assignees: buildPromoCodeAssignees(promoCode),
-      origin: getPromoCodeOrigin(promoCode, user.id),
+      assignees,
+      hasMoreAssignees:
+        promoCode._count.redemptions > promoCode.redemptions.length
+        || promoCode._count.bonusBoxOpenings > promoCode.bonusBoxOpenings.length
+        || promoCode._count.welcomeBonusRedemptions > promoCode.welcomeBonusRedemptions.length,
+      origin: getPromoCodeOrigin(promoCode, ownBonusPromoIds.has(promoCode.id)),
     }
   })
 
@@ -125,6 +167,11 @@ type PromoCodeForAssignees = Awaited<ReturnType<typeof prisma.promoCode.findMany
     createdAt: Date
     user: { id: string; email: string; name: string | null }
   }>
+  _count: {
+    redemptions: number
+    bonusBoxOpenings: number
+    welcomeBonusRedemptions: number
+  }
 }
 
 function buildPromoCodeAssignees(promoCode: PromoCodeForAssignees): PromoCodeAdminRow['assignees'] {
@@ -197,10 +244,8 @@ function buildPromoCodeAssignees(promoCode: PromoCodeForAssignees): PromoCodeAdm
 
 function getPromoCodeOrigin(
   promoCode: PromoCodeForAssignees,
-  currentUserId: string
+  hasOwnBonusOpening: boolean
 ): PromoCodeAdminRow['origin'] {
-  if (promoCode.bonusBoxOpenings.length === 0) return 'CREATED'
-  return promoCode.bonusBoxOpenings.some((opening) => opening.user.id === currentUserId)
-    ? 'MY_BOX'
-    : 'OTHER_BOX'
+  if (promoCode._count.bonusBoxOpenings === 0) return 'CREATED'
+  return hasOwnBonusOpening ? 'MY_BOX' : 'OTHER_BOX'
 }

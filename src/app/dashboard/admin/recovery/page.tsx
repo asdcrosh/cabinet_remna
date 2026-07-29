@@ -5,27 +5,45 @@ import { formatPrice } from '@/lib/format'
 import { AdminPageShell } from '@/components/admin/admin-page-shell'
 import { BulkRecoveryActionButton, RecoveryActionButton } from '@/components/admin/recovery-actions'
 import { AdminEmptyState } from '@/components/admin/admin-empty-state'
+import { LazyListLoader } from '@/components/admin/lazy-list-loader'
+import { ADMIN_LIST_PAGE_SIZE, parseAdminListLimit } from '@/lib/admin-list'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Довыдача — Админка' }
+const RECOVERY_LIST_MAX_SIZE = 100
 
-export default async function AdminRecoveryPage() {
+export default async function AdminRecoveryPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ limit?: string }>
+}) {
   await requireAdminPage()
+  const params = await searchParams
+  const limit = parseAdminListLimit(
+    params.limit,
+    ADMIN_LIST_PAGE_SIZE,
+    RECOVERY_LIST_MAX_SIZE
+  )
+  const where = { status: 'SUCCEEDED' as const, subscriptionProvisionedAt: null }
 
-  const payments = await prisma.payment.findMany({
-    where: { status: 'SUCCEEDED', subscriptionProvisionedAt: null },
-    orderBy: { createdAt: 'desc' },
-    include: {
-      user: { select: { email: true, name: true, remnawaveUuid: true, remnawaveUsername: true } },
-      plan: true,
-      provisioningJob: true,
-    },
-  })
+  const [total, payments] = await prisma.$transaction([
+    prisma.payment.count({ where }),
+    prisma.payment.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+      include: {
+        user: { select: { email: true, name: true, remnawaveUuid: true, remnawaveUsername: true } },
+        plan: true,
+        provisioningJob: true,
+      },
+    }),
+  ])
 
   return (
     <AdminPageShell
       title="Довыдача"
-      description="Оплаченные, но не выданные подписки"
+      description={total > 0 ? `Оплаченные, но не выданные подписки · ${total}` : 'Оплаченные, но не выданные подписки'}
       action={payments.length > 0 ? <BulkRecoveryActionButton paymentIds={payments.map((payment) => payment.id)} /> : null}
     >
       {payments.length === 0 ? (
@@ -65,6 +83,12 @@ export default async function AdminRecoveryPage() {
           ))}
         </div>
       )}
+      <LazyListLoader
+        loaded={payments.length}
+        total={total}
+        step={ADMIN_LIST_PAGE_SIZE}
+        max={RECOVERY_LIST_MAX_SIZE}
+      />
     </AdminPageShell>
   )
 }

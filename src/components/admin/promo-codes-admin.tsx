@@ -46,6 +46,7 @@ export interface PromoCodeAdminRow {
   planIds: string[]
   planNames: string[]
   assignees: PromoCodeAssignee[]
+  hasMoreAssignees: boolean
   origin: PromoOrigin
 }
 
@@ -307,10 +308,11 @@ export function PromoCodesAdmin({
   }
 
   const normalizedQuery = query.trim().toLowerCase()
+  const queryHandledByServer = normalizedQuery === initialQuery.trim().toLowerCase()
   const filteredPromoCodes = promoCodes.filter((promoCode) => {
     const matchesStatus = promoStatus(promoCode) === tab
     const matchesOrigin = origin === 'ALL' || promoCode.origin === origin
-    const matchesQuery = !normalizedQuery || [
+    const matchesQuery = !normalizedQuery || queryHandledByServer || [
       promoCode.code,
       ...promoCode.allowedEmails,
       ...promoCode.assignees.map((assignee) => `${assignee.email} ${assignee.name ?? ''}`),
@@ -694,7 +696,10 @@ export function PromoCodesAdmin({
 
                   <div className="col-span-2 min-w-0 lg:col-span-1">
                     {promoCode.assignees.length > 0 ? (
-                      <AssigneesBlock assignees={promoCode.assignees} />
+                      <AssigneesBlock
+                        assignees={promoCode.assignees}
+                        hasMore={promoCode.hasMoreAssignees}
+                      />
                     ) : (
                       <span className="text-xs text-slate-400">Без владельца</span>
                     )}
@@ -773,7 +778,13 @@ function PromoActions({
   )
 }
 
-function AssigneesBlock({ assignees }: { assignees: PromoCodeAssignee[] }) {
+function AssigneesBlock({
+  assignees,
+  hasMore,
+}: {
+  assignees: PromoCodeAssignee[]
+  hasMore: boolean
+}) {
   const firstAssignee = assignees[0]
   const hiddenCount = Math.max(0, assignees.length - 1)
 
@@ -793,9 +804,9 @@ function AssigneesBlock({ assignees }: { assignees: PromoCodeAssignee[] }) {
             >
               {firstAssignee.name || firstAssignee.email}
             </Link>
-            {hiddenCount > 0 ? (
+            {hiddenCount > 0 || hasMore ? (
               <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500 dark:bg-white/10 dark:text-slate-300">
-                +{hiddenCount}
+                {hasMore ? '+ ещё' : `+${hiddenCount}`}
               </span>
             ) : null}
           </div>

@@ -78,7 +78,7 @@ export function BulkRecoveryActionButton({ paymentIds }: { paymentIds: string[] 
         onClick={() => setConfirmOpen(true)}
       >
         <RefreshCw className="h-4 w-4" />
-        {loading ? 'Выдаём...' : `Довыдать все (${uniquePaymentIds.length})`}
+        {loading ? 'Выдаём...' : `Довыдать показанные (${uniquePaymentIds.length})`}
       </button>
       <ConfirmDialog
         open={confirmOpen}

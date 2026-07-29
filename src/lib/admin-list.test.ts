@@ -10,6 +10,10 @@ describe('parseAdminListLimit', () => {
 
   it('rounds limits to complete batches and caps excessive values', () => {
     expect(parseAdminListLimit('26')).toBe(50)
-    expect(parseAdminListLimit('5001')).toBe(5000)
+    expect(parseAdminListLimit('5001')).toBe(250)
+  })
+
+  it('supports a smaller limit for operational queues', () => {
+    expect(parseAdminListLimit('81', 25, 100)).toBe(100)
   })
 })

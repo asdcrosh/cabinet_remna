@@ -10,7 +10,7 @@ import type { AdminNotificationView } from '@/lib/admin-notifications'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { toast } from '@/components/ui/toaster'
 
-const NOTIFICATION_REFRESH_MS = 15_000
+const NOTIFICATION_REFRESH_MS = 60_000
 const FOCUSABLE_SELECTOR = [
   'a[href]',
   'button:not([disabled])',
@@ -43,6 +43,7 @@ export function NotificationBell({ showAdmin = false }: { showAdmin?: boolean })
   const triggerRef = useRef<HTMLButtonElement | null>(null)
   const userTabRef = useRef<HTMLButtonElement | null>(null)
   const adminTabRef = useRef<HTMLButtonElement | null>(null)
+  const refreshInFlightRef = useRef(false)
   const activeSummary = tab === 'admin' ? adminSummary : summary
   const totalUnread = summary.unreadCount + (showAdmin ? adminSummary.unreadCount : 0)
 
@@ -52,6 +53,8 @@ export function NotificationBell({ showAdmin = false }: { showAdmin?: boolean })
   }, [])
 
   const refresh = useCallback(async () => {
+    if (refreshInFlightRef.current) return
+    refreshInFlightRef.current = true
     try {
       const [userRes, adminRes] = await Promise.all([
         fetch('/api/notifications/summary', { cache: 'no-store' }),
@@ -75,6 +78,8 @@ export function NotificationBell({ showAdmin = false }: { showAdmin?: boolean })
       }
     } catch {
       // Silent polling. The last known state is enough for the header.
+    } finally {
+      refreshInFlightRef.current = false
     }
   }, [showAdmin])
 

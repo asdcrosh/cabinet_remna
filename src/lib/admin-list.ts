@@ -1,5 +1,5 @@
 export const ADMIN_LIST_PAGE_SIZE = 25
-export const ADMIN_LIST_MAX_SIZE = 5000
+export const ADMIN_LIST_MAX_SIZE = 250
 
 export function parseAdminListLimit(
   value: string | undefined,

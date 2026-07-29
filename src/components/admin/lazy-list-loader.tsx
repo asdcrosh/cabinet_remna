@@ -2,12 +2,14 @@
 
 import { useCallback, useEffect, useRef, useTransition } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { ADMIN_LIST_MAX_SIZE } from '@/lib/admin-list'
 
 type LazyListLoaderProps = {
   loaded: number
   total: number
   step?: number
   param?: string
+  max?: number
 }
 
 export function LazyListLoader({
@@ -15,23 +17,24 @@ export function LazyListLoader({
   total,
   step = 25,
   param = 'limit',
+  max = ADMIN_LIST_MAX_SIZE,
 }: LazyListLoaderProps) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const [isPending, startTransition] = useTransition()
   const markerRef = useRef<HTMLDivElement | null>(null)
-  const hasMore = loaded < total
+  const hasMore = loaded < total && loaded < max
 
   const loadMore = useCallback(() => {
     if (!hasMore || isPending) return
     startTransition(() => {
-      const nextLimit = Math.min(Math.max(loaded + step, step), total)
+      const nextLimit = Math.min(Math.max(loaded + step, step), total, max)
       const next = new URLSearchParams(searchParams.toString())
       next.set(param, String(nextLimit))
       router.replace(`${pathname}?${next.toString()}`, { scroll: false })
     })
-  }, [hasMore, isPending, loaded, step, total, searchParams, param, pathname, router])
+  }, [hasMore, isPending, loaded, step, total, max, searchParams, param, pathname, router])
 
   useEffect(() => {
     const marker = markerRef.current
@@ -50,7 +53,16 @@ export function LazyListLoader({
     return () => observer.disconnect()
   }, [hasMore, loadMore])
 
-  if (!hasMore) return null
+  if (!hasMore) {
+    if (loaded < total && loaded >= max) {
+      return (
+        <p className="py-5 text-center text-xs text-slate-500">
+          Показаны первые {loaded} из {total}. Уточните фильтр, чтобы найти остальные.
+        </p>
+      )
+    }
+    return null
+  }
 
   return (
     <div className="flex flex-col items-center gap-3 py-6">

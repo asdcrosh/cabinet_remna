@@ -1,22 +1,22 @@
 import { prisma } from '@/lib/prisma'
 import { requireAdminPage } from '@/lib/auth/admin-page'
 import { AdminPageShell } from '@/components/admin/admin-page-shell'
-import {
-  BonusBoxPrizesAdmin,
-  type BonusBoxOpeningAdminRow,
-  type BonusBoxPrizeAdminRow,
+import type {
+  BonusBoxOpeningAdminRow,
+  BonusBoxPrizeAdminRow,
 } from '@/components/admin/bonus-box-prizes-admin'
+import { BonusBoxPrizesAdminDynamic } from '@/components/admin/bonus-box-prizes-admin-dynamic'
 import { parseAdminListLimit } from '@/lib/admin-list'
 import { getBonusBoxSettings } from '@/lib/bonus-box'
 import { notFound } from 'next/navigation'
 import { isFeatureEnabled } from '@/lib/feature-flags'
-import {
-  BonusBoxEngagementAdmin,
-  type BonusAnalyticsAdmin,
-  type BonusEventAdminRow,
-  type BonusMissionAdminRow,
-  type BonusRiskAdminRow,
+import type {
+  BonusAnalyticsAdmin,
+  BonusEventAdminRow,
+  BonusMissionAdminRow,
+  BonusRiskAdminRow,
 } from '@/components/admin/bonus-box-engagement-admin'
+import { BonusBoxEngagementAdminDynamic } from '@/components/admin/bonus-box-engagement-admin-dynamic'
 import {
   bonusBoxHistoryWhere,
   getBonusBoxAdminAnalytics,
@@ -220,7 +220,7 @@ export default async function AdminBonusBoxPage({
       <BonusBoxWorkspace
         initialTab={params.view === 'history' || params.view === 'prizes' ? 'catalog' : 'overview'}
         overview={(
-          <BonusBoxEngagementAdmin
+          <BonusBoxEngagementAdminDynamic
             analytics={analytics as BonusAnalyticsAdmin}
             missions={missionRows}
             events={eventRows}
@@ -229,7 +229,7 @@ export default async function AdminBonusBoxPage({
           />
         )}
         catalog={(
-          <BonusBoxPrizesAdmin
+          <BonusBoxPrizesAdminDynamic
             prizes={rows}
             openings={openingRows}
             settings={settings}
