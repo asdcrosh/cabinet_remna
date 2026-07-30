@@ -153,7 +153,7 @@ export async function syncLinkedTelegramUser(input: {
 
   let remnawaveUser = (await remnawave.getUserByUuid(remnashopUser.user_remna_id)).response
   const telegramId = toRemnawaveTelegramId(input.telegramId)
-  if (telegramId) {
+  if (telegramId && remnawaveUser.telegramId !== telegramId) {
     remnawaveUser = (await remnawave.updateUser({
       uuid: remnawaveUser.uuid,
       telegramId,
@@ -191,11 +191,14 @@ async function syncRemnawaveTelegramId(remnawaveUuid: string | null | undefined,
   const telegramId = toRemnawaveTelegramId(telegramIdValue)
   if (!telegramId) return false as const
 
-  await remnawave.updateUser({
-    uuid: remnawaveUuid,
-    telegramId,
-    tag: 'IMPORTED',
-  })
+  const remnawaveUser = (await remnawave.getUserByUuid(remnawaveUuid)).response
+  if (remnawaveUser.telegramId !== telegramId) {
+    await remnawave.updateUser({
+      uuid: remnawaveUuid,
+      telegramId,
+      tag: 'IMPORTED',
+    })
+  }
 
   return true as const
 }
