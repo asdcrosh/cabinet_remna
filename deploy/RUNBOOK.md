@@ -206,7 +206,9 @@ If `remnashop-db` runs on the same server, `install-server.sh` detects it
 automatically, creates/updates the legacy `remnashop_readonly` role, grants the
 read and write access required by the integration, joins the cabinet to the same
 Docker network, and writes
-`REMNASHOP_DATABASE_URL` to `.env`.
+`REMNASHOP_DATABASE_URL`, `REMNASHOP_CRYPT_KEY` and `REMNASHOP_REDIS_URL`
+to `.env`. The last two values let Cabinet update the Remnashop password and
+revoke old sessions after account recovery.
 
 Manual setup is only needed when remnashop database is on another server.
 
@@ -231,6 +233,8 @@ Then set in cabinet `.env`:
 REMNASHOP_DATABASE_URL="postgresql://remnashop_readonly:ВСТАВЬ_СЮДА_ПАРОЛЬ@ВСТАВЬ_СЮДА_IP_ИЛИ_HOST_REMNASHOP:5432/remnashop?schema=public"
 REMNASHOP_DATABASE_SSL="true"
 REMNASHOP_API_URL="https://ВСТАВЬ_СЮДА_ДОМЕН_REMNASHOP/api/v1/public"
+REMNASHOP_CRYPT_KEY="APP_CRYPT_KEY_ИЗ_REMNASHOP"
+REMNASHOP_REDIS_URL="redis://:ПАРОЛЬ_REDIS@ХОСТ_REDIS:6379/НОМЕР_БАЗЫ_REDIS"
 REMNASHOP_WEBHOOK_SECRET="ВСТАВЬ_СЮДА_СЕКРЕТ_ОТ_openssl_rand_hex_32"
 ```
 
@@ -238,6 +242,9 @@ Use `REMNASHOP_DATABASE_SSL="false"` only if PostgreSQL has no SSL and the
 network is private/trusted. Configure both the database and API URL: the
 database exchanges catalog, users, subscriptions, payments, and promocodes;
 the API provides common registration and email/password authentication.
+Keep `REMNASHOP_CRYPT_KEY` and `REMNASHOP_REDIS_URL` secret. Without either
+value Cabinet will not change the Remnashop password during account recovery,
+because doing so without revoking old sessions is unsafe.
 
 Для мгновенной синхронизации Remnashop должен отправлять `POST` на
 `https://ДОМЕН_КАБИНЕТА/api/integrations/remnashop/events`. Передайте секрет

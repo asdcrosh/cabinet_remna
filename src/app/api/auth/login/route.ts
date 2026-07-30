@@ -53,7 +53,14 @@ export async function POST(req: Request) {
   const fakeHash = '$2a$12$0000000000000000000000.0000000000000000000000000000000000'
   let isValid = await compare(password, user?.passwordHash ?? fakeHash)
 
-  if (!isValid && process.env.REMNASHOP_API_URL && process.env.REMNASHOP_DATABASE_URL) {
+  const canUseRemnashopFallback =
+    !user || (user.role === 'USER' && user.remnashopUserId !== null)
+  if (
+    !isValid &&
+    canUseRemnashopFallback &&
+    process.env.REMNASHOP_API_URL &&
+    process.env.REMNASHOP_DATABASE_URL
+  ) {
     try {
       const authenticated = await authenticateRemnashopEmail(email, password)
       if (authenticated) {
@@ -123,14 +130,21 @@ export async function POST(req: Request) {
 
   if (process.env.REMNASHOP_API_URL && !user.remnashopUserId) {
     try {
-      await registerRemnashopEmailUser({
-        email: user.email,
-        password,
-        name: user.name,
-      })
-      const source = process.env.REMNASHOP_DATABASE_URL
-        ? await findRemnashopUserByEmail(user.email)
-        : null
+      const authenticated = await authenticateRemnashopEmail(user.email, password)
+      const registration = authenticated
+        ? null
+        : await registerRemnashopEmailUser({
+            email: user.email,
+            password,
+            name: user.name,
+          })
+      const created =
+        registration?.configured === true && !('alreadyExists' in registration)
+      const canLink = authenticated || created
+      const source =
+        canLink && process.env.REMNASHOP_DATABASE_URL
+          ? await findRemnashopUserByEmail(user.email)
+          : null
       if (source) {
         user = await prisma.user.update({
           where: { id: user.id },
@@ -138,6 +152,22 @@ export async function POST(req: Request) {
             remnashopUserId: source.id,
             remnashopSyncedAt: new Date(),
           },
+        })
+      } else if (registration && 'alreadyExists' in registration) {
+        logWarn('auth.login.remnashop_identity_conflict', {
+          userId: user.id,
+          message: 'Remnashop account with the same email rejected the Cabinet password',
+        })
+        await createAdminNotification({
+          type: 'identity_conflict',
+          severity: 'WARNING',
+          dedupeKey: `admin:remnashop-password-conflict:${user.id}`,
+          title: 'Не удалось связать аккаунт Remnashop',
+          body: `${user.email}: в Remnashop уже есть аккаунт с другим паролем`,
+          entityType: 'user',
+          entityId: user.id,
+          actionHref: '/dashboard/admin/duplicates',
+          actionLabel: 'Проверить аккаунты',
         })
       }
     } catch (error) {

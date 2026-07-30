@@ -360,6 +360,11 @@ configure_local_remnashop_database() {
   local readonly_password_literal
   local db_name_identifier
   local encoded_password
+  local remnashop_crypt_key
+  local redis_password
+  local redis_database
+  local encoded_redis_password
+  local redis_url
   local database_url
   local role_exists
 
@@ -415,6 +420,24 @@ configure_local_remnashop_database() {
   replace_env_value "REMNASHOP_DATABASE_SSL" "false"
   if docker inspect remnashop >/dev/null 2>&1; then
     replace_env_value "REMNASHOP_API_URL" "http://remnashop:5000/api/v1/public"
+    remnashop_crypt_key="$(docker_env_value remnashop APP_CRYPT_KEY)"
+    if [[ -n "${remnashop_crypt_key}" ]]; then
+      replace_env_value "REMNASHOP_CRYPT_KEY" "${remnashop_crypt_key}"
+    fi
+  fi
+  if docker inspect remnashop-redis >/dev/null 2>&1; then
+    redis_password="$(docker_env_value remnashop-redis REDIS_PASSWORD)"
+    redis_database="$(docker_env_value remnashop REDIS_NAME)"
+    if [[ ! "${redis_database}" =~ ^[0-9]+$ ]]; then
+      redis_database="0"
+    fi
+    if [[ -n "${redis_password}" ]]; then
+      encoded_redis_password="$(urlencode "${redis_password}")"
+      redis_url="redis://:${encoded_redis_password}@remnashop-redis:6379/${redis_database}"
+    else
+      redis_url="redis://remnashop-redis:6379/${redis_database}"
+    fi
+    replace_env_value "REMNASHOP_REDIS_URL" "${redis_url}"
   fi
   replace_env_value "CABINET_EXTERNAL_NETWORK" "${network}"
 
@@ -741,6 +764,8 @@ for key in \
   REMNAWAVE_TOKEN \
   REMNAWAVE_INTERNAL_SQUAD_UUIDS \
   REMNASHOP_DB_CONTAINER \
+  REMNASHOP_CRYPT_KEY \
+  REMNASHOP_REDIS_URL \
   REMNASHOP_USERS_SYNC_INTERVAL_SECONDS \
   REMNASHOP_USER_SUBSCRIPTION_SYNC_STALE_SECONDS \
   REMNASHOP_REVERSE_SYNC_BATCH_SIZE \

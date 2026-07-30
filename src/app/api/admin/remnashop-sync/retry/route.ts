@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAdmin, withAuth } from '@/lib/auth/guard'
-import { retryRemnashopSyncEvent } from '@/lib/remnashop-retry'
+import { retryDueRemnashopSyncEvents, retryRemnashopSyncEvent } from '@/lib/remnashop-retry'
 import { markSyncFailed, markSyncPending, markSyncSucceeded } from '@/lib/sync-events'
 import { writeAuditLog } from '@/lib/audit-log'
 
@@ -11,7 +11,22 @@ export const dynamic = 'force-dynamic'
 export const POST = withAuth(async (req: Request) => {
   const session = await requireAdmin()
 
-  const body = (await req.json().catch(() => null)) as { id?: unknown } | null
+  const body = (await req.json().catch(() => null)) as {
+    id?: unknown
+    allFailed?: unknown
+  } | null
+  if (body?.allFailed === true) {
+    const result = await retryDueRemnashopSyncEvents({ batchSize: 250, force: true })
+    await writeAuditLog({
+      actorId: session.uid,
+      action: 'PAYMENT_SYNCED',
+      message: 'Администратор повторил ошибки синхронизации Remnashop',
+      metadata: result,
+      request: req,
+    })
+    return NextResponse.json({ ok: result.failed === 0, result })
+  }
+
   const id = typeof body?.id === 'string' ? body.id : null
   if (!id) return NextResponse.json({ error: 'id is required' }, { status: 400 })
 

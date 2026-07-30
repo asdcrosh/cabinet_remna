@@ -153,6 +153,15 @@ if (value("REMNASHOP_DATABASE_URL") && !value("REMNASHOP_WEBHOOK_SECRET")) {
   );
 }
 
+if (
+  value("REMNASHOP_DATABASE_URL") &&
+  (!value("REMNASHOP_CRYPT_KEY") || !value("REMNASHOP_REDIS_URL"))
+) {
+  warnings.push(
+    "Remnashop password reset synchronization is disabled; configure REMNASHOP_CRYPT_KEY and REMNASHOP_REDIS_URL",
+  );
+}
+
 if (value("REMNASHOP_WEBHOOK_SECRET") && value("REMNASHOP_WEBHOOK_SECRET").length < 32) {
   errors.push("REMNASHOP_WEBHOOK_SECRET must be at least 32 characters");
 }

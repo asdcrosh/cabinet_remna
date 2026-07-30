@@ -5,6 +5,8 @@ import { getAppUrl } from './app-url'
 import { getBrandName } from './branding'
 import { renderActionEmail } from './email-template'
 import { logError, logInfo } from './logger'
+import { createAdminNotification } from './admin-notifications'
+import { syncResetPasswordToRemnashop } from './remnashop-password-sync'
 
 const TOKEN_BYTES = 32
 const TOKEN_TTL_MS = 60 * 60 * 1000
@@ -98,7 +100,17 @@ export async function sendPasswordResetLink(input: {
 
 export async function resetPasswordByToken(input: { token: string; password: string }) {
   const tokenHash = hashPasswordResetToken(input.token)
-  const row = await prisma.passwordResetToken.findUnique({ where: { tokenHash } })
+  const row = await prisma.passwordResetToken.findUnique({
+    where: { tokenHash },
+    include: {
+      user: {
+        select: {
+          email: true,
+          remnashopUserId: true,
+        },
+      },
+    },
+  })
 
   if (!row || row.usedAt || row.expiresAt <= new Date()) {
     return { ok: false as const }
@@ -119,5 +131,57 @@ export async function resetPasswordByToken(input: { token: string; password: str
     }),
   ])
 
-  return { ok: true as const }
+  let remnashopSync: 'synced' | 'not_linked' | 'not_configured' | 'failed' = 'not_linked'
+  if (row.user.remnashopUserId) {
+    try {
+      const result = await syncResetPasswordToRemnashop({
+        remnashopUserId: row.user.remnashopUserId,
+        email: row.user.email,
+        password: input.password,
+      })
+      remnashopSync = result.ok
+        ? 'synced'
+        : result.reason === 'database_not_configured'
+          ? 'not_configured'
+          : 'failed'
+      if (!result.ok && result.reason !== 'database_not_configured') {
+        await notifyRemnashopPasswordSyncIssue(row.userId, row.user.email, result.reason)
+      }
+    } catch (error) {
+      remnashopSync = 'failed'
+      logError('password_reset.remnashop_sync_failed', error, { userId: row.userId })
+      await notifyRemnashopPasswordSyncIssue(row.userId, row.user.email, 'sync_failed')
+    }
+  }
+
+  return { ok: true as const, remnashopSync }
+}
+
+async function notifyRemnashopPasswordSyncIssue(
+  userId: string,
+  email: string,
+  reason: string
+) {
+  try {
+    await createAdminNotification({
+      type: 'remnashop_sync_error',
+      severity: 'WARNING',
+      dedupeKey: `admin:remnashop-password-reset:${userId}`,
+      title: 'Пароль Remnashop не обновлён',
+      body: `${email}: ${passwordSyncReason(reason)}`,
+      entityType: 'user',
+      entityId: userId,
+      actionHref: '/dashboard/admin/remnashop-sync',
+      actionLabel: 'Проверить интеграцию',
+    })
+  } catch (error) {
+    logError('password_reset.remnashop_notification_failed', error, { userId })
+  }
+}
+
+function passwordSyncReason(reason: string) {
+  if (reason === 'crypt_key_not_configured') return 'не настроен ключ хеширования Remnashop'
+  if (reason === 'redis_not_configured') return 'не настроен отзыв активных сессий Remnashop'
+  if (reason === 'user_not_found') return 'связанный пользователь не найден'
+  return 'ошибка синхронизации после восстановления пароля'
 }

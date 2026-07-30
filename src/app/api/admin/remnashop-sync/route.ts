@@ -122,7 +122,10 @@ async function withSyncEvents<T extends Record<string, unknown>>(reportBase: T) 
       },
     }),
   ])
-  const visibleIssueEvents = filterSupersededIssueEvents(issueEvents)
+  const issueContext = {
+    hasPromoConfigIssue: hasPromoConfigurationIssue(issueEvents),
+  }
+  const visibleIssueEvents = issueEvents.filter((event) => isActionableIssue(event, issueContext))
   const visibleIssueStatusCounts = visibleIssueEvents.reduce<Record<string, number>>((acc, event) => {
     acc[event.status] = (acc[event.status] ?? 0) + 1
     return acc
@@ -135,6 +138,9 @@ async function withSyncEvents<T extends Record<string, unknown>>(reportBase: T) 
     ...reportBase,
     syncEvents: events.map((event) => ({
       ...event,
+      requiresAttention:
+        (event.status === 'FAILED' || event.status === 'SKIPPED') &&
+        isActionableIssue(event, issueContext),
       nextRetryAt: event.nextRetryAt?.toISOString() ?? null,
       lastSyncedAt: event.lastSyncedAt?.toISOString() ?? null,
       updatedAt: event.updatedAt.toISOString(),
@@ -144,31 +150,56 @@ async function withSyncEvents<T extends Record<string, unknown>>(reportBase: T) 
   }
 }
 
-function filterSupersededIssueEvents(events: Array<{
+type SyncIssueCandidate = {
   direction: string
   entityType: string
   operation: string
   status: string
   lastError: string | null
   updatedAt: Date
-}>) {
-  const hasPromoConfigIssue = events.some((event) =>
+}
+
+function hasPromoConfigurationIssue(events: SyncIssueCandidate[]) {
+  return events.some((event) =>
     event.direction === 'CABINET_TO_REMNASHOP' &&
     event.entityType === 'promoCodeConfig' &&
     ['remnashop promo code table not found', 'remnashop promo code schema is not recognized', 'remnashop promo code table is not writable'].includes(event.lastError ?? '')
   )
-  if (!hasPromoConfigIssue) return events
+}
 
-  return events.filter((event) => {
-    if (event.direction !== 'CABINET_TO_REMNASHOP' || event.entityType !== 'promoCode') return true
+function isActionableIssue(
+  event: SyncIssueCandidate,
+  context: { hasPromoConfigIssue: boolean }
+) {
+  if (event.status !== 'FAILED' && event.status !== 'SKIPPED') return false
+  const reason = event.lastError ?? ''
+  if (
+    /Remnawave .* 404|remnawave.*not found/i.test(reason) ||
+    reason === 'promo code not found' ||
+    reason === 'current remnashop does not support personal email audience for discount promocodes' ||
+    reason === 'current remnashop does not support no-active-subscription audience for discount promocodes' ||
+    reason === 'current remnashop does not support plan-limited purchase discount promocodes' ||
+    reason === 'current remnashop does not support a future promocode start date' ||
+    reason === 'current remnashop only supports one activation or unlimited reuse per user'
+  ) {
+    return false
+  }
+  if (
+    context.hasPromoConfigIssue &&
+    event.direction === 'CABINET_TO_REMNASHOP' &&
+    event.entityType === 'promoCode'
+  ) {
     const reason = event.lastError ?? ''
-    return !(
+    if (
       reason === 'remnashop promo code schema is not recognized' ||
       reason === 'remnashop promo code table not found' ||
       reason === 'remnashop promo code table is not writable' ||
       /permission denied/i.test(reason)
-    )
-  })
+    ) {
+      return false
+    }
+  }
+  return true
 }
 
 function groupSyncIssues(events: Array<{

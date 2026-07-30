@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
   compare: vi.fn(),
@@ -47,7 +47,13 @@ const user = {
   remnashopUserId: 10,
   remnawaveUuid: 'uuid-1',
   remnawaveUsername: 'user-1',
+  telegramId: null,
+  telegramUsername: null,
+  telegramLinkedAt: null,
 }
+
+const originalRemnashopApiUrl = process.env.REMNASHOP_API_URL
+const originalRemnashopDatabaseUrl = process.env.REMNASHOP_DATABASE_URL
 
 function loginRequest(body: unknown, origin = 'https://cabinet.example') {
   return new Request('https://cabinet.example/api/auth/login', {
@@ -60,11 +66,18 @@ function loginRequest(body: unknown, origin = 'https://cabinet.example') {
 describe('login route', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    process.env.REMNASHOP_API_URL = originalRemnashopApiUrl
+    process.env.REMNASHOP_DATABASE_URL = originalRemnashopDatabaseUrl
     mocks.rateLimit.mockResolvedValue({ ok: true })
     mocks.prisma.user.findUnique.mockResolvedValue(user)
     mocks.prisma.user.update.mockResolvedValue(user)
     mocks.compare.mockResolvedValue(true)
     mocks.checkRemnawaveProfileOnLogin.mockResolvedValue(undefined)
+  })
+
+  afterEach(() => {
+    process.env.REMNASHOP_API_URL = originalRemnashopApiUrl
+    process.env.REMNASHOP_DATABASE_URL = originalRemnashopDatabaseUrl
   })
 
   it('rejects cross-origin login attempts before rate limit and DB work', async () => {
@@ -92,5 +105,112 @@ describe('login route', () => {
       email: user.email,
       role: user.role,
     })
+  })
+
+  it('allows an imported Remnashop user to sign in with the Remnashop password', async () => {
+    process.env.REMNASHOP_API_URL = 'http://remnashop/api'
+    process.env.REMNASHOP_DATABASE_URL = 'postgresql://remnashop@db/remnashop'
+    mocks.prisma.user.findUnique.mockResolvedValue(null)
+    mocks.compare.mockResolvedValue(false)
+    mocks.authenticateRemnashopEmail.mockResolvedValue(true)
+    mocks.findRemnashopUserByEmail.mockResolvedValue({
+      id: 42,
+      email: user.email,
+      name: user.name,
+      username: null,
+      telegram_id: null,
+      is_email_verified: true,
+    })
+    mocks.hash.mockResolvedValue('imported-password-hash')
+    mocks.generateUniqueReferralCode.mockResolvedValue('IMPORT42')
+    mocks.prisma.user.create.mockResolvedValue({ ...user, remnashopUserId: 42 })
+
+    const response = await POST(loginRequest({ email: user.email, password: 'Remnashop1' }))
+
+    expect(response.status).toBe(200)
+    expect(mocks.prisma.user.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        email: user.email,
+        passwordHash: 'imported-password-hash',
+        remnashopUserId: 42,
+      }),
+    })
+    expect(mocks.createAdminNotification).toHaveBeenCalledOnce()
+  })
+
+  it('never uses Remnashop credentials to take over a privileged local account', async () => {
+    process.env.REMNASHOP_API_URL = 'http://remnashop/api'
+    process.env.REMNASHOP_DATABASE_URL = 'postgresql://remnashop@db/remnashop'
+    mocks.prisma.user.findUnique.mockResolvedValue({
+      ...user,
+      role: 'ADMIN',
+      remnashopUserId: 42,
+    })
+    mocks.compare.mockResolvedValue(false)
+
+    const response = await POST(loginRequest({ email: user.email, password: 'WrongPassword1' }))
+
+    expect(response.status).toBe(401)
+    expect(mocks.authenticateRemnashopEmail).not.toHaveBeenCalled()
+    expect(mocks.prisma.user.update).not.toHaveBeenCalled()
+  })
+
+  it('repairs a missed Remnashop registration after a valid Cabinet login', async () => {
+    process.env.REMNASHOP_API_URL = 'http://remnashop/api'
+    process.env.REMNASHOP_DATABASE_URL = 'postgresql://remnashop@db/remnashop'
+    mocks.prisma.user.findUnique.mockResolvedValue({ ...user, remnashopUserId: null })
+    mocks.authenticateRemnashopEmail.mockResolvedValue(false)
+    mocks.registerRemnashopEmailUser.mockResolvedValue({ configured: true })
+    mocks.findRemnashopUserByEmail.mockResolvedValue({
+      id: 43,
+      email: user.email,
+      name: user.name,
+      username: null,
+      telegram_id: null,
+      is_email_verified: true,
+    })
+    mocks.prisma.user.update
+      .mockResolvedValueOnce({ ...user, remnashopUserId: 43 })
+      .mockResolvedValueOnce({ ...user, remnashopUserId: 43 })
+
+    const response = await POST(loginRequest({ email: user.email, password: 'Password1' }))
+
+    expect(response.status).toBe(200)
+    expect(mocks.authenticateRemnashopEmail).toHaveBeenCalledWith(user.email, 'Password1')
+    expect(mocks.registerRemnashopEmailUser).toHaveBeenCalledOnce()
+    expect(mocks.prisma.user.update).toHaveBeenCalledWith({
+      where: { id: user.id },
+      data: {
+        remnashopUserId: 43,
+        remnashopSyncedAt: expect.any(Date),
+      },
+    })
+  })
+
+  it('does not link an existing Remnashop account when its password is different', async () => {
+    process.env.REMNASHOP_API_URL = 'http://remnashop/api'
+    process.env.REMNASHOP_DATABASE_URL = 'postgresql://remnashop@db/remnashop'
+    mocks.prisma.user.findUnique.mockResolvedValue({ ...user, remnashopUserId: null })
+    mocks.authenticateRemnashopEmail.mockResolvedValue(false)
+    mocks.registerRemnashopEmailUser.mockResolvedValue({
+      configured: true,
+      alreadyExists: true,
+    })
+
+    const response = await POST(loginRequest({ email: user.email, password: 'Password1' }))
+
+    expect(response.status).toBe(200)
+    expect(mocks.findRemnashopUserByEmail).not.toHaveBeenCalled()
+    expect(mocks.logWarn).toHaveBeenCalledWith(
+      'auth.login.remnashop_identity_conflict',
+      expect.objectContaining({ userId: user.id })
+    )
+    expect(mocks.createAdminNotification).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'identity_conflict',
+        severity: 'WARNING',
+        entityId: user.id,
+      })
+    )
   })
 })

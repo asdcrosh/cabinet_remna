@@ -100,22 +100,55 @@ cd "${INSTALL_DIR}"
 PREVIOUS_DEPLOYED_REVISION="$(running_app_revision || installed_version_revision || true)"
 
 if docker inspect remnashop >/dev/null 2>&1; then
-  ENV_FILE_PATH="${ENV_FILE}" python3 <<'PY'
+  REMNASHOP_CRYPT_KEY_VALUE="$(docker inspect remnashop --format '{{range .Config.Env}}{{println .}}{{end}}' | sed -n 's/^APP_CRYPT_KEY=//p' | head -n1)"
+  REMNASHOP_REDIS_DATABASE_VALUE="$(docker inspect remnashop --format '{{range .Config.Env}}{{println .}}{{end}}' | sed -n 's/^REDIS_NAME=//p' | head -n1)"
+  REMNASHOP_REDIS_PASSWORD_VALUE=""
+  REMNASHOP_REDIS_PRESENT_VALUE="false"
+  if docker inspect remnashop-redis >/dev/null 2>&1; then
+    REMNASHOP_REDIS_PRESENT_VALUE="true"
+    REMNASHOP_REDIS_PASSWORD_VALUE="$(docker inspect remnashop-redis --format '{{range .Config.Env}}{{println .}}{{end}}' | sed -n 's/^REDIS_PASSWORD=//p' | head -n1)"
+  fi
+  ENV_FILE_PATH="${ENV_FILE}" \
+    REMNASHOP_CRYPT_KEY_VALUE="${REMNASHOP_CRYPT_KEY_VALUE}" \
+    REMNASHOP_REDIS_DATABASE_VALUE="${REMNASHOP_REDIS_DATABASE_VALUE}" \
+    REMNASHOP_REDIS_PASSWORD_VALUE="${REMNASHOP_REDIS_PASSWORD_VALUE}" \
+    REMNASHOP_REDIS_PRESENT_VALUE="${REMNASHOP_REDIS_PRESENT_VALUE}" \
+    python3 <<'PY'
 from pathlib import Path
 import os
+from urllib.parse import quote
 
 path = Path(os.environ["ENV_FILE_PATH"])
 lines = path.read_text().splitlines()
-key = "REMNASHOP_API_URL"
-value = "http://remnashop:5000/api/v1/public"
-for index, line in enumerate(lines):
-    if line.startswith(f"{key}="):
-        current = line.split("=", 1)[1].strip().strip("\"'")
-        if not current:
-            lines[index] = f'{key}="{value}"'
-        break
-else:
-    lines.append(f'{key}="{value}"')
+redis_password = os.environ.get("REMNASHOP_REDIS_PASSWORD_VALUE", "")
+redis_database = os.environ.get("REMNASHOP_REDIS_DATABASE_VALUE", "")
+if not redis_database.isdigit():
+    redis_database = "0"
+redis_present = os.environ.get("REMNASHOP_REDIS_PRESENT_VALUE") == "true"
+values = {
+    "REMNASHOP_API_URL": "http://remnashop:5000/api/v1/public",
+    "REMNASHOP_CRYPT_KEY": os.environ.get("REMNASHOP_CRYPT_KEY_VALUE", ""),
+    "REMNASHOP_REDIS_URL": (
+        (
+            f"redis://:{quote(redis_password, safe='')}@remnashop-redis:6379/{redis_database}"
+            if redis_password
+            else f"redis://remnashop-redis:6379/{redis_database}"
+        )
+        if redis_present
+        else ""
+    ),
+}
+for key, value in values.items():
+    if not value:
+        continue
+    for index, line in enumerate(lines):
+        if line.startswith(f"{key}="):
+            current = line.split("=", 1)[1].strip().strip("\"'")
+            if key != "REMNASHOP_API_URL" or not current:
+                lines[index] = f'{key}="{value}"'
+            break
+    else:
+        lines.append(f'{key}="{value}"')
 path.write_text("\n".join(lines) + "\n")
 PY
 fi

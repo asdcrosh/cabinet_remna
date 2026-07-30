@@ -75,6 +75,9 @@ interface RemnashopIntegrationStatus {
     configured: boolean
     mode: 'REALTIME' | 'POLLING'
   }
+  passwordReset: {
+    configured: boolean
+  }
   channels: Record<'users' | 'catalog' | 'payments' | 'promoCodes', 'READY' | 'READ_ONLY' | 'UNAVAILABLE'>
   message: string
 }
@@ -91,6 +94,7 @@ interface SyncEventRow {
   nextRetryAt: string | null
   lastSyncedAt: string | null
   updatedAt: string
+  requiresAttention: boolean
 }
 
 interface SyncIssueGroup {
@@ -138,7 +142,7 @@ export function RemnashopSyncPanel() {
       setReport(result)
       setApplyConfirmOpen(false)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Не удалось выполнить синхронизацию')
+      setError(e instanceof Error ? translateError(e.message) : 'Не удалось выполнить синхронизацию')
     } finally {
       setLoading(false)
     }
@@ -155,29 +159,33 @@ export function RemnashopSyncPanel() {
       toast('Повтор синхронизации выполнен', 'success')
       await runDryRun()
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Не удалось повторить синхронизацию')
+      setError(e instanceof Error ? translateError(e.message) : 'Не удалось повторить синхронизацию')
     } finally {
       setLoading(false)
     }
   }
 
   async function retryFailedEvents() {
-    const failed = (report?.syncEvents ?? []).filter((event) => event.status === 'FAILED')
-    if (failed.length === 0) return
+    if ((report?.syncStatusCounts?.FAILED ?? 0) === 0) return
     setLoading(true)
     setError(null)
     try {
-      for (const event of failed) {
-        await apiFetch('/api/admin/remnashop-sync/retry', {
-          method: 'POST',
-          body: JSON.stringify({ id: event.id }),
-        })
-      }
-      toast(`Повторено событий: ${failed.length}`, 'success')
+      const retry = await apiFetch<{
+        result: { attempted: number; succeeded: number; failed: number }
+      }>('/api/admin/remnashop-sync/retry', {
+        method: 'POST',
+        body: JSON.stringify({ allFailed: true }),
+      })
+      toast(
+        retry.result.failed > 0
+          ? `Исправлено: ${retry.result.succeeded}, осталось: ${retry.result.failed}`
+          : `Исправлено событий: ${retry.result.succeeded}`,
+        retry.result.failed > 0 ? 'error' : 'success'
+      )
       const result = await apiFetch<RemnashopSyncReport>('/api/admin/remnashop-sync')
       setReport(result)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Не удалось повторить ошибки')
+      setError(e instanceof Error ? translateError(e.message) : 'Не удалось повторить ошибки')
     } finally {
       setLoading(false)
     }
@@ -241,6 +249,7 @@ export function RemnashopSyncPanel() {
           <SyncEventsView
             events={report.syncEvents ?? []}
             issueGroups={report.syncIssueGroups ?? []}
+            failedCount={report.syncStatusCounts?.FAILED ?? 0}
             loading={loading}
             onRetry={(id) => void retryEvent(id)}
             onRetryFailed={() => void retryFailedEvents()}
@@ -313,6 +322,9 @@ function IntegrationStatus({ status }: { status: RemnashopIntegrationStatus }) {
         <span>База: {status.database.connected ? (status.database.writable ? 'чтение и запись' : 'только чтение') : 'нет связи'}</span>
         <span>API входа: {status.api.configured ? 'настроен' : 'не настроен'}</span>
         <span>События: {status.events.mode === 'REALTIME' ? 'приём включён + резервный опрос' : 'только опрос'}</span>
+        <span>
+          Сброс пароля: {status.passwordReset.configured ? 'синхронизируется' : 'только в Cabinet'}
+        </span>
       </div>
     </section>
   )
@@ -348,12 +360,14 @@ function channelStateClass(state: RemnashopIntegrationStatus['channels'][keyof R
 function SyncEventsView({
   events,
   issueGroups,
+  failedCount,
   loading,
   onRetry,
   onRetryFailed,
 }: {
   events: SyncEventRow[]
   issueGroups: SyncIssueGroup[]
+  failedCount: number
   loading: boolean
   onRetry: (id: string) => void
   onRetryFailed: () => void
@@ -363,13 +377,12 @@ function SyncEventsView({
   const [entityFilter, setEntityFilter] = useState('ALL')
   const baseEvents = showHistory
     ? events
-    : events.filter((event) => event.status !== 'SUCCEEDED')
+    : events.filter((event) => event.requiresAttention)
   const visibleEvents = baseEvents.filter((event) =>
     (directionFilter === 'ALL' || event.direction === directionFilter) &&
     (entityFilter === 'ALL' || event.entityType === entityFilter)
   )
   const entityTypes = Array.from(new Set(events.map((event) => event.entityType))).sort()
-  const failedCount = events.filter((event) => event.status === 'FAILED').length
 
   return (
     <section className="space-y-3">
@@ -391,6 +404,11 @@ function SyncEventsView({
                       {directionLabel(group.direction)} · {entityLabel(group.entityType)} · {syncStatusLabel(group.status)}
                     </div>
                     <div className="mt-1 break-words text-xs text-slate-500 dark:text-slate-400">{humanIssueReason(group.reason)}</div>
+                    {humanIssueAction(group.reason) ? (
+                      <div className="mt-2 text-xs font-medium text-slate-700 dark:text-slate-200">
+                        Что делать: {humanIssueAction(group.reason)}
+                      </div>
+                    ) : null}
                   </div>
                   <div className="shrink-0 text-xs text-slate-400">
                     {group.count} шт. · {formatDateTime(group.lastSeenAt)}
@@ -451,17 +469,21 @@ function SyncEventsView({
                   ) : (
                     <div>обновлено {formatDateTime(event.updatedAt)}</div>
                   )}
-                  {event.nextRetryAt ? <div>retry: {formatDateTime(event.nextRetryAt)}</div> : null}
+                  {event.nextRetryAt ? <div>следующая попытка: {formatDateTime(event.nextRetryAt)}</div> : null}
                 </div>
-                <button
-                  type="button"
-                  className="btn-secondary h-10 w-full px-3 md:w-auto"
-                  onClick={() => onRetry(event.id)}
-                  disabled={loading}
-                >
-                  <RotateCcw className="h-4 w-4" />
-                  Повторить
-                </button>
+                {event.requiresAttention ? (
+                  <button
+                    type="button"
+                    className="btn-secondary h-10 w-full px-3 md:w-auto"
+                    onClick={() => onRetry(event.id)}
+                    disabled={loading}
+                  >
+                    <RotateCcw className="h-4 w-4" />
+                    Повторить
+                  </button>
+                ) : (
+                  <span className="text-xs text-slate-400 md:text-right">Действий не требуется</span>
+                )}
               </div>
             ))}
           </div>
@@ -677,6 +699,12 @@ function translateError(value: string) {
   if (value.includes('not configured')) return 'Подключение к базе Remnashop не настроено'
   if (value.includes('timeout')) return 'Remnashop не ответил вовремя'
   if (value.includes('password authentication')) return 'Не удалось войти в базу Remnashop'
+  if (value.includes('promo code table is not writable')) {
+    return 'У Cabinet нет прав на запись промокодов в Remnashop. Запустите обновление сервера и повторите проверку.'
+  }
+  if (/permission denied/i.test(value)) {
+    return 'У пользователя базы Remnashop недостаточно прав для этой операции'
+  }
   return value
 }
 
@@ -712,6 +740,15 @@ function formatDateTime(value: string) {
 }
 
 function humanIssueReason(value: string) {
+  if (value.includes('promo code table is not writable')) {
+    return 'У пользователя базы Remnashop нет прав на запись промокодов.'
+  }
+  if (value.includes('promo code table not found')) {
+    return 'Таблица промокодов Remnashop не найдена.'
+  }
+  if (value.includes('promo code schema is not recognized')) {
+    return 'Cabinet не распознал структуру таблицы промокодов Remnashop.'
+  }
   if (value.includes('internal_squads')) {
     return 'При записи платежей Remnashop требует internal_squads. Код теперь отправляет squads тарифа или пустой список, после retry эта ошибка должна уйти.'
   }
@@ -737,6 +774,27 @@ function humanIssueReason(value: string) {
   }
   if (value === 'Причина не записана') return value
   return value
+}
+
+function humanIssueAction(value: string) {
+  if (
+    value.includes('Нет прав на запись промокодов') ||
+    value.includes('не хватает прав') ||
+    value.includes('нет прав на запись промокодов') ||
+    value.includes('promo code table is not writable')
+  ) {
+    return 'обновить Cabinet на сервере, затем нажать «Синхронизировать».'
+  }
+  if (value.includes('Не распознана таблица промокодов') || value.includes('таблица промокодов')) {
+    return 'проверить версию Remnashop и повторно запустить обновление Cabinet.'
+  }
+  if (value.includes('Пользователь ещё не связан')) {
+    return 'сначала синхронизировать пользователей, затем повторить платежи.'
+  }
+  if (value.includes('internal_squads') || value.includes('is_trial')) {
+    return 'обновить Cabinet и повторить ошибочные события.'
+  }
+  return null
 }
 
 const syncLabels: Record<string, string> = {

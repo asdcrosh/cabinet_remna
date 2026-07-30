@@ -102,6 +102,9 @@ export interface RemnashopIntegrationStatus {
     configured: boolean
     mode: 'REALTIME' | 'POLLING'
   }
+  passwordReset: {
+    configured: boolean
+  }
   channels: {
     users: RemnashopChannelState
     catalog: RemnashopChannelState
@@ -115,12 +118,18 @@ export async function getRemnashopIntegrationStatus(): Promise<RemnashopIntegrat
   const databaseConfigured = Boolean(process.env.REMNASHOP_DATABASE_URL)
   const apiConfigured = Boolean(process.env.REMNASHOP_API_URL?.trim())
   const eventsConfigured = Boolean(process.env.REMNASHOP_WEBHOOK_SECRET?.trim())
+  const passwordResetConfigured = Boolean(
+    databaseConfigured &&
+    process.env.REMNASHOP_CRYPT_KEY?.trim() &&
+    process.env.REMNASHOP_REDIS_URL?.trim()
+  )
   if (!databaseConfigured) {
     return {
       state: 'NOT_CONFIGURED',
       database: { configured: false, connected: false, writable: false },
       api: { configured: apiConfigured },
       events: { configured: eventsConfigured, mode: eventsConfigured ? 'REALTIME' : 'POLLING' },
+      passwordReset: { configured: passwordResetConfigured },
       channels: {
         users: 'UNAVAILABLE',
         catalog: 'UNAVAILABLE',
@@ -165,9 +174,10 @@ export async function getRemnashopIntegrationStatus(): Promise<RemnashopIntegrat
     const allReadOnly = Object.values(channels).every((value) => value === 'READ_ONLY')
     const hasUnavailable = Object.values(channels).some((value) => value === 'UNAVAILABLE')
     const coreWritable = writable('users') && writable('subscriptions') && writable('transactions')
+    const fullyReady = allReady && apiConfigured && passwordResetConfigured
 
     return {
-      state: allReady && apiConfigured
+      state: fullyReady
         ? 'READY'
         : allReadOnly && !hasUnavailable
           ? 'READ_ONLY'
@@ -175,9 +185,12 @@ export async function getRemnashopIntegrationStatus(): Promise<RemnashopIntegrat
       database: { configured: true, connected: true, writable: coreWritable },
       api: { configured: apiConfigured },
       events: { configured: eventsConfigured, mode: eventsConfigured ? 'REALTIME' : 'POLLING' },
+      passwordReset: { configured: passwordResetConfigured },
       channels,
       message: !apiConfigured
         ? 'База подключена, но REMNASHOP_API_URL не задан. Общий вход по email работать не будет.'
+        : !passwordResetConfigured
+          ? 'Основной обмен работает, но восстановление пароля пока обновляет только Cabinet.'
         : !eventsConfigured
           ? 'Обмен работает по расписанию. Для мгновенных событий задайте REMNASHOP_WEBHOOK_SECRET.'
         : allReady
@@ -192,6 +205,7 @@ export async function getRemnashopIntegrationStatus(): Promise<RemnashopIntegrat
       database: { configured: true, connected: false, writable: false },
       api: { configured: apiConfigured },
       events: { configured: eventsConfigured, mode: eventsConfigured ? 'REALTIME' : 'POLLING' },
+      passwordReset: { configured: passwordResetConfigured },
       channels: {
         users: 'UNAVAILABLE',
         catalog: 'UNAVAILABLE',
