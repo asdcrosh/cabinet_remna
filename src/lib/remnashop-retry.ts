@@ -11,6 +11,7 @@ import { syncCabinetPaymentToRemnashop } from './remnashop-reverse-sync'
 import { syncRemnashopCatalog, syncRemnashopPaymentsToCabinet } from './remnashop-sync'
 import { syncRemnashopUserBySourceId } from './remnashop-users'
 import { markSyncFailed, markSyncPending, markSyncSkipped, markSyncSucceeded } from './sync-events'
+import { syncLinkedTelegramUser } from './telegram-link-sync'
 
 type RetryableSyncEvent = {
   direction: SyncDirection
@@ -80,6 +81,25 @@ export async function retryRemnashopSyncEvent(event: RetryableSyncEvent) {
     return syncRemnashopCatalog()
   }
 
+  if (event.direction === 'REMNASHOP_TO_CABINET' && event.entityType === 'telegramIdentity') {
+    const user = await prisma.user.findUnique({
+      where: { id: event.entityId },
+      select: { telegramId: true },
+    })
+    if (!user?.telegramId) throw new Error('Cabinet user with linked Telegram not found')
+
+    const result = await syncLinkedTelegramUser(
+      {
+        localUserId: event.entityId,
+        telegramId: user.telegramId,
+      },
+      { trackEvent: false }
+    )
+    if (result.alreadyRunning) throw new Error('Telegram identity sync is already running')
+    if (result.warnings.length > 0) throw new Error(result.warnings.join('; '))
+    return result
+  }
+
   throw new Error(`Retry is not supported for ${event.direction}:${event.entityType}`)
 }
 
@@ -113,7 +133,10 @@ export async function retryDueRemnashopSyncEvents(options: {
       AND: [{
         OR: [
           { direction: 'CABINET_TO_REMNASHOP', entityType: { in: ['payment', 'promoCode'] } },
-          { direction: 'REMNASHOP_TO_CABINET', entityType: { in: ['user', 'payment', 'catalog'] } },
+          {
+            direction: 'REMNASHOP_TO_CABINET',
+            entityType: { in: ['user', 'payment', 'catalog', 'telegramIdentity'] },
+          },
         ],
       }],
     },

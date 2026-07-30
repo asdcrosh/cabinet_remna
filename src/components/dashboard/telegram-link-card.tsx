@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { BadgeCheck, ExternalLink, RefreshCw, Send } from 'lucide-react'
 import { toast } from '@/components/ui/toaster'
@@ -28,9 +28,10 @@ export function TelegramLinkCard({
   const router = useRouter()
   const searchParams = useSearchParams()
   const [syncing, setSyncing] = useState(false)
+  const callbackHandled = useRef(false)
   const telegramStartUrl = appUrl ? `${appUrl.replace(/\/+$/, '')}/api/me/telegram/oidc/start` : '/api/me/telegram/oidc/start'
 
-  const syncTelegram = useCallback(async (clearCallbackState = false) => {
+  const syncTelegram = useCallback(async () => {
     setSyncing(true)
     try {
       const response = await apiFetch<{
@@ -44,11 +45,7 @@ export function TelegramLinkCard({
           : `Telegram синхронизирован. Устройств: ${response.sync?.devicesSynced ?? 0}`,
         warnings.length ? undefined : 'success'
       )
-      if (clearCallbackState) {
-        router.replace('/dashboard/settings')
-      } else {
-        router.refresh()
-      }
+      router.refresh()
     } catch {
       // apiFetch уже покажет toast
     } finally {
@@ -57,22 +54,26 @@ export function TelegramLinkCard({
   }, [router])
 
   useEffect(() => {
+    if (callbackHandled.current) return
     const error = searchParams.get('telegram_error')
     if (searchParams.get('telegram_linked') === '1') {
-      if (searchParams.get('telegram_sync') === 'pending') {
-        void syncTelegram(true)
-        return
-      }
+      callbackHandled.current = true
+      const syncStatus = searchParams.get('telegram_sync')
       toast(
-        searchParams.get('telegram_sync') === 'failed'
+        syncStatus === 'failed'
           ? 'Telegram привязан, но синхронизация не удалась'
-          : 'Telegram привязан и синхронизирован',
-        searchParams.get('telegram_sync') === 'failed' ? undefined : 'success'
+          : syncStatus === 'running'
+            ? 'Telegram привязан. Синхронизация уже выполняется'
+            : 'Telegram привязан и синхронизирован',
+        syncStatus === 'failed' || syncStatus === 'running' ? undefined : 'success'
       )
+      router.replace('/dashboard/settings')
     } else if (error) {
+      callbackHandled.current = true
       toast(`Telegram не привязан: ${error}`)
+      router.replace('/dashboard/settings')
     }
-  }, [searchParams, syncTelegram])
+  }, [router, searchParams])
 
   return (
     <div className={embedded ? '' : 'card'}>

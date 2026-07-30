@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getSession, setSessionCookieOnResponse } from '@/lib/auth/cookies'
 import { prisma } from '@/lib/prisma'
-import { syncLinkedTelegramUser } from '@/lib/telegram-link-sync'
 import { findCanonicalTelegramSessionUser } from '@/lib/telegram-session'
 
 export const runtime = 'nodejs'
@@ -28,11 +27,6 @@ export async function GET() {
 
   const telegramId = user.telegramId
   if (!telegramId) return NextResponse.json({ authenticated: false }, { status: 401 })
-  try {
-    await syncLinkedTelegramUser({ localUserId: user.id, telegramId })
-  } catch {
-    // Login must not be blocked by an optional legacy subscription sync.
-  }
 
   const sessionUser = await findCanonicalTelegramSessionUser({
     telegramId,

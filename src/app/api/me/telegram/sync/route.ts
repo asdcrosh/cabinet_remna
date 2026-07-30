@@ -4,11 +4,26 @@ import { requireAuth, withAuth } from '@/lib/auth/guard'
 import { syncLinkedTelegramUser } from '@/lib/telegram-link-sync'
 import { describeSyncError } from '@/lib/sync-error'
 import { logError } from '@/lib/logger'
+import { assertSameOrigin } from '@/lib/security'
+import { rateLimit } from '@/lib/rate-limit'
 
 export const runtime = 'nodejs'
 
-export const POST = withAuth(async () => {
+export const POST = withAuth(async (req: Request) => {
+  try {
+    assertSameOrigin(req)
+  } catch {
+    return NextResponse.json({ error: 'Invalid request origin' }, { status: 403 })
+  }
+
   const session = await requireAuth()
+  const limited = await rateLimit(req, `telegram-sync:${session.uid}`, 5, 60_000)
+  if (!limited.ok) {
+    return NextResponse.json(
+      { error: 'Слишком много запусков синхронизации. Повторите позже.' },
+      { status: 429, headers: { 'Retry-After': String(limited.retryAfter) } }
+    )
+  }
 
   const user = await prisma.user.findUnique({
     where: { id: session.uid },
@@ -29,7 +44,10 @@ export const POST = withAuth(async () => {
       telegramId: user.telegramId,
     })
 
-    return NextResponse.json({ ok: true, sync, warnings: sync.warnings ?? [] })
+    return NextResponse.json(
+      { ok: true, sync, warnings: sync.warnings ?? [] },
+      { status: sync.alreadyRunning ? 202 : 200 }
+    )
   } catch (error) {
     const message = describeSyncError(error)
     logError('telegram.sync.failed', error, {

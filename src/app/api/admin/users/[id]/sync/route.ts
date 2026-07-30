@@ -8,13 +8,28 @@ import { syncCabinetPaymentToRemnashopBestEffort } from '@/lib/remnashop-reverse
 import { writeAuditLog } from '@/lib/audit-log'
 import { syncLocalDevicesFromRemnawave } from '@/lib/remnawave-device-sync'
 import { describeSyncError } from '@/lib/sync-error'
+import { assertSameOrigin } from '@/lib/security'
+import { rateLimit } from '@/lib/rate-limit'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 export const POST = withAuth(async (req: Request, { params }: { params: Promise<{ id: string }> }) => {
+  try {
+    assertSameOrigin(req)
+  } catch {
+    return NextResponse.json({ error: 'Invalid request origin' }, { status: 403 })
+  }
+
   const session = await requireAdmin()
   const { id } = await params
+  const limited = await rateLimit(req, `admin-user-sync:${session.uid}:${id}`, 10, 60_000)
+  if (!limited.ok) {
+    return NextResponse.json(
+      { error: 'Слишком много запусков синхронизации. Повторите позже.' },
+      { status: 429, headers: { 'Retry-After': String(limited.retryAfter) } }
+    )
+  }
   const [actor, user] = await Promise.all([
     prisma.user.findUnique({ where: { id: session.uid }, select: { role: true } }),
     prisma.user.findUnique({
@@ -51,35 +66,40 @@ export const POST = withAuth(async (req: Request, { params }: { params: Promise<
       result.telegram = true
       result.devices = Math.max(result.devices, sync.devicesSynced ?? 0)
       result.warnings.push(...(sync.warnings ?? []))
+      if (sync.alreadyRunning) {
+        result.warnings.push('Синхронизация пользователя уже выполняется.')
+      } else {
+        result.remnawave = sync.syncedRemnawave
+      }
     } catch (error) {
       result.warnings.push(`Telegram/Remnashop: ${describeSyncError(error)}`)
     }
-  }
+  } else {
+    try {
+      const remnawaveUser = user.remnawaveUuid
+        ? (await remnawave.getUserByUuid(user.remnawaveUuid)).response
+        : user.remnawaveUsername
+          ? (await remnawave.getUserByUsername(user.remnawaveUsername)).response
+          : null
 
-  try {
-    const remnawaveUser = user.remnawaveUuid
-      ? (await remnawave.getUserByUuid(user.remnawaveUuid)).response
-      : user.remnawaveUsername
-        ? (await remnawave.getUserByUsername(user.remnawaveUsername)).response
-        : null
-
-    if (remnawaveUser) {
-      await upsertLocalSubscriptionFromRemnawave({
-        localUserId: user.id,
-        remnawaveUser,
-      })
-      try {
-        result.devices = Math.max(result.devices, (await syncLocalDevicesFromRemnawave({
+      if (remnawaveUser) {
+        await upsertLocalSubscriptionFromRemnawave({
           localUserId: user.id,
-          remnawaveUuid: remnawaveUser.uuid,
-        })).total)
-      } catch (error) {
-        result.warnings.push(`Устройства: ${describeSyncError(error)}`)
+          remnawaveUser,
+        })
+        try {
+          result.devices = Math.max(result.devices, (await syncLocalDevicesFromRemnawave({
+            localUserId: user.id,
+            remnawaveUuid: remnawaveUser.uuid,
+          })).total)
+        } catch (error) {
+          result.warnings.push(`Устройства: ${describeSyncError(error)}`)
+        }
+        result.remnawave = true
       }
-      result.remnawave = true
+    } catch (error) {
+      result.warnings.push(`Remnawave: ${describeSyncError(error)}`)
     }
-  } catch (error) {
-    result.warnings.push(`Remnawave: ${describeSyncError(error)}`)
   }
 
   const payments = await prisma.payment.findMany({

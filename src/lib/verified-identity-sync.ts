@@ -1,6 +1,6 @@
 import { prisma } from './prisma'
 import { findRemnashopUserByEmail } from './remnashop-users'
-import { attachRemnashopIdentityToCabinetUser } from './telegram-link-sync'
+import { syncLinkedTelegramUser } from './telegram-link-sync'
 
 export async function syncVerifiedIdentity(userId: string) {
   const user = await prisma.user.findUnique({
@@ -21,14 +21,21 @@ export async function syncVerifiedIdentity(userId: string) {
   }
 
   if (user.telegramId) {
-    const remnashopUser = await attachRemnashopIdentityToCabinetUser({
+    const sync = await syncLinkedTelegramUser({
       localUserId: user.id,
       telegramId: user.telegramId,
     })
+    if (sync.alreadyRunning) {
+      return {
+        ok: true as const,
+        reason: 'sync_in_progress' as const,
+        remnashopUserId: null,
+      }
+    }
     return {
-      ok: Boolean(remnashopUser),
-      reason: remnashopUser ? null : 'remnashop_user_not_found',
-      remnashopUserId: remnashopUser?.id ?? null,
+      ok: sync.foundRemnashopUser,
+      reason: sync.foundRemnashopUser ? null : 'remnashop_user_not_found',
+      remnashopUserId: sync.remnashopUserId,
     }
   }
 

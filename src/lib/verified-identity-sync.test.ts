@@ -4,7 +4,7 @@ const mocks = vi.hoisted(() => ({
   userFindUnique: vi.fn(),
   userUpdate: vi.fn(),
   findRemnashopUserByEmail: vi.fn(),
-  attachRemnashopIdentityToCabinetUser: vi.fn(),
+  syncLinkedTelegramUser: vi.fn(),
 }))
 
 vi.mock('./prisma', () => ({
@@ -19,7 +19,7 @@ vi.mock('./remnashop-users', () => ({
   findRemnashopUserByEmail: mocks.findRemnashopUserByEmail,
 }))
 vi.mock('./telegram-link-sync', () => ({
-  attachRemnashopIdentityToCabinetUser: mocks.attachRemnashopIdentityToCabinetUser,
+  syncLinkedTelegramUser: mocks.syncLinkedTelegramUser,
 }))
 
 import { syncVerifiedIdentity } from './verified-identity-sync'
@@ -37,14 +37,18 @@ describe('syncVerifiedIdentity', () => {
       emailVerifiedAt: new Date(),
       telegramId: 123n,
     })
-    mocks.attachRemnashopIdentityToCabinetUser.mockResolvedValue({ id: 42 })
+    mocks.syncLinkedTelegramUser.mockResolvedValue({
+      alreadyRunning: false,
+      foundRemnashopUser: true,
+      remnashopUserId: 42,
+    })
 
     await expect(syncVerifiedIdentity('user-1')).resolves.toEqual({
       ok: true,
       reason: null,
       remnashopUserId: 42,
     })
-    expect(mocks.attachRemnashopIdentityToCabinetUser).toHaveBeenCalledWith({
+    expect(mocks.syncLinkedTelegramUser).toHaveBeenCalledWith({
       localUserId: 'user-1',
       telegramId: 123n,
     })
@@ -85,6 +89,6 @@ describe('syncVerifiedIdentity', () => {
       ok: false,
       reason: 'email_not_verified',
     })
-    expect(mocks.attachRemnashopIdentityToCabinetUser).not.toHaveBeenCalled()
+    expect(mocks.syncLinkedTelegramUser).not.toHaveBeenCalled()
   })
 })

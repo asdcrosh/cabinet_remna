@@ -717,6 +717,7 @@ function entityLabel(value: string) {
   if (value === 'promoCode') return 'Промокод'
   if (value === 'promoCodeConfig') return 'Настройка промокодов'
   if (value === 'user') return 'Пользователь'
+  if (value === 'telegramIdentity') return 'Связь Telegram'
   return value
 }
 

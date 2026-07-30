@@ -12,7 +12,7 @@ const mocks = vi.hoisted(() => ({
   verifyTelegramIdToken: vi.fn(),
   mergeTechnicalTelegramAccount: vi.fn(),
   recordIdentityConflict: vi.fn(),
-  attachRemnashopIdentityToCabinetUser: vi.fn(),
+  syncLinkedTelegramUser: vi.fn(),
   prisma: {
     user: {
       findUnique: vi.fn(),
@@ -36,7 +36,7 @@ vi.mock('@/lib/auth/guard', () => ({
 vi.mock('@/lib/prisma', () => ({ prisma: mocks.prisma }))
 vi.mock('@/lib/telegram-auth', () => ({ verifyTelegramIdToken: mocks.verifyTelegramIdToken }))
 vi.mock('@/lib/telegram-link-sync', () => ({
-  attachRemnashopIdentityToCabinetUser: mocks.attachRemnashopIdentityToCabinetUser,
+  syncLinkedTelegramUser: mocks.syncLinkedTelegramUser,
 }))
 vi.mock('@/lib/telegram-account-merge', () => ({
   mergeTechnicalTelegramAccount: mocks.mergeTechnicalTelegramAccount,
@@ -82,7 +82,11 @@ describe('Telegram OIDC callback', () => {
     })
     mocks.prisma.user.update.mockResolvedValue({})
     mocks.mergeTechnicalTelegramAccount.mockResolvedValue(undefined)
-    mocks.attachRemnashopIdentityToCabinetUser.mockResolvedValue(null)
+    mocks.syncLinkedTelegramUser.mockResolvedValue({
+      alreadyRunning: false,
+      foundRemnashopUser: false,
+      remnashopUserId: null,
+    })
     vi.stubGlobal('fetch', vi.fn(async () => Response.json({ id_token: 'id-token-1' })))
     process.env.TELEGRAM_CLIENT_ID = 'telegram-client'
     process.env.TELEGRAM_CLIENT_SECRET = 'telegram-secret'
@@ -139,6 +143,10 @@ describe('Telegram OIDC callback', () => {
         telegramLinkedAt: expect.any(Date),
         name: telegramUser.name,
       },
+    })
+    expect(mocks.syncLinkedTelegramUser).toHaveBeenCalledWith({
+      localUserId: session.uid,
+      telegramId: telegramUser.id,
     })
   })
 })

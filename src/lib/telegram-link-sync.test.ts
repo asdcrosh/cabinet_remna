@@ -8,6 +8,11 @@ const mocks = vi.hoisted(() => ({
   updateUser: vi.fn(),
   upsertSubscription: vi.fn(),
   syncDevices: vi.fn(),
+  withDistributedLock: vi.fn(),
+  markSyncPending: vi.fn(),
+  markSyncSucceeded: vi.fn(),
+  markSyncFailed: vi.fn(),
+  createAdminNotification: vi.fn(),
 }))
 
 vi.mock('./prisma', () => ({
@@ -30,6 +35,17 @@ vi.mock('./remnawave-local-sync', () => ({
 }))
 vi.mock('./remnawave-device-sync', () => ({
   syncLocalDevicesFromRemnawave: mocks.syncDevices,
+}))
+vi.mock('./distributed-lock', () => ({
+  withDistributedLock: mocks.withDistributedLock,
+}))
+vi.mock('./sync-events', () => ({
+  markSyncPending: mocks.markSyncPending,
+  markSyncSucceeded: mocks.markSyncSucceeded,
+  markSyncFailed: mocks.markSyncFailed,
+}))
+vi.mock('./admin-notifications', () => ({
+  createAdminNotification: mocks.createAdminNotification,
 }))
 
 import {
@@ -159,16 +175,19 @@ describe('syncLinkedTelegramUser', () => {
       })
     mocks.syncDevices.mockResolvedValue({ total: 2 })
     mocks.upsertSubscription.mockResolvedValue({ id: 'subscription-1' })
+    mocks.withDistributedLock.mockImplementation(async (
+      _key: string,
+      task: () => Promise<unknown>
+    ) => ({
+      acquired: true,
+      value: await task(),
+    }))
   })
 
   it('updates the same Remnawave profile only once', async () => {
-    mocks.getUserByUuid
-      .mockResolvedValueOnce({
-        response: { uuid: remnawaveUuid, telegramId: null },
-      })
-      .mockResolvedValueOnce({
-        response: { uuid: remnawaveUuid, telegramId: Number(telegramId) },
-      })
+    mocks.getUserByUuid.mockResolvedValue({
+      response: { uuid: remnawaveUuid, telegramId: null },
+    })
     mocks.updateUser.mockResolvedValue({
       response: { uuid: remnawaveUuid, telegramId: Number(telegramId) },
     })
@@ -184,11 +203,14 @@ describe('syncLinkedTelegramUser', () => {
       telegramId: Number(telegramId),
       tag: 'IMPORTED',
     })
+    expect(mocks.getUserByUuid).toHaveBeenCalledOnce()
+    expect(mocks.syncDevices).toHaveBeenCalledOnce()
+    expect(mocks.markSyncSucceeded).toHaveBeenCalledOnce()
   })
 
-  it('does not modify Remnawave when Telegram ID already matches', async () => {
+  it('does not modify Remnawave when a string Telegram ID already matches', async () => {
     mocks.getUserByUuid.mockResolvedValue({
-      response: { uuid: remnawaveUuid, telegramId: Number(telegramId) },
+      response: { uuid: remnawaveUuid, telegramId: telegramId.toString() },
     })
 
     await syncLinkedTelegramUser({
@@ -196,6 +218,23 @@ describe('syncLinkedTelegramUser', () => {
       telegramId,
     })
 
+    expect(mocks.updateUser).not.toHaveBeenCalled()
+  })
+
+  it('does not start a second concurrent synchronization', async () => {
+    mocks.withDistributedLock.mockResolvedValue({ acquired: false })
+
+    await expect(syncLinkedTelegramUser({
+      localUserId: 'cabinet-user-1',
+      telegramId,
+    })).resolves.toEqual({
+      foundRemnashopUser: null,
+      syncedRemnawave: false,
+      devicesSynced: 0,
+      warnings: [],
+      alreadyRunning: true,
+    })
+    expect(mocks.userFindUnique).not.toHaveBeenCalled()
     expect(mocks.updateUser).not.toHaveBeenCalled()
   })
 })

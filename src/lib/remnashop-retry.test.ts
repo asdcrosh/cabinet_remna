@@ -3,10 +3,18 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const mocks = vi.hoisted(() => ({
   syncPromo: vi.fn(),
   markSyncSkipped: vi.fn(),
+  userFindUnique: vi.fn(),
+  syncLinkedTelegramUser: vi.fn(),
 }))
 
 vi.mock('./admin-notifications', () => ({ createAdminNotification: vi.fn() }))
-vi.mock('./prisma', () => ({ prisma: {} }))
+vi.mock('./prisma', () => ({
+  prisma: {
+    user: {
+      findUnique: mocks.userFindUnique,
+    },
+  },
+}))
 vi.mock('./remnashop-promo-sync', () => ({
   deactivateCabinetPromoCodesInRemnashop: vi.fn(),
   isRemnashopPromoSyncUnavailableReason: (reason: string) =>
@@ -21,6 +29,9 @@ vi.mock('./remnashop-sync', () => ({
   syncRemnashopPaymentsToCabinet: vi.fn(),
 }))
 vi.mock('./remnashop-users', () => ({ syncRemnashopUserBySourceId: vi.fn() }))
+vi.mock('./telegram-link-sync', () => ({
+  syncLinkedTelegramUser: mocks.syncLinkedTelegramUser,
+}))
 vi.mock('./sync-events', () => ({
   markSyncFailed: vi.fn(),
   markSyncPending: vi.fn(),
@@ -65,5 +76,24 @@ describe('Remnashop sync retries', () => {
 
     await expect(retryRemnashopSyncEvent(promoEvent)).resolves.toMatchObject({ ok: false })
     expect(mocks.markSyncSkipped).not.toHaveBeenCalled()
+  })
+
+  it('retries a failed Telegram identity sync without creating a nested sync event', async () => {
+    mocks.userFindUnique.mockResolvedValue({ telegramId: 123n })
+    mocks.syncLinkedTelegramUser.mockResolvedValue({
+      alreadyRunning: false,
+      warnings: [],
+    })
+
+    await expect(retryRemnashopSyncEvent({
+      direction: 'REMNASHOP_TO_CABINET',
+      entityType: 'telegramIdentity',
+      entityId: 'user-1',
+      operation: 'sync',
+    })).resolves.toMatchObject({ alreadyRunning: false })
+    expect(mocks.syncLinkedTelegramUser).toHaveBeenCalledWith({
+      localUserId: 'user-1',
+      telegramId: 123n,
+    }, { trackEvent: false })
   })
 })

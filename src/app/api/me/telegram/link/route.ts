@@ -14,11 +14,26 @@ import {
 import { writeAuditLog } from '@/lib/audit-log'
 import { describeSyncError } from '@/lib/sync-error'
 import { recordIdentityConflict } from '@/lib/identity-conflicts'
+import { assertSameOrigin } from '@/lib/security'
+import { rateLimit } from '@/lib/rate-limit'
 
 export const runtime = 'nodejs'
 
 export const POST = withAuth(async (req: Request) => {
+  try {
+    assertSameOrigin(req)
+  } catch {
+    return NextResponse.json({ error: 'Invalid request origin' }, { status: 403 })
+  }
+
   const session = await requireAuth()
+  const limited = await rateLimit(req, `telegram-link:${session.uid}`, 5, 60_000)
+  if (!limited.ok) {
+    return NextResponse.json(
+      { error: 'Слишком много попыток привязки. Повторите позже.' },
+      { status: 429, headers: { 'Retry-After': String(limited.retryAfter) } }
+    )
+  }
 
   let payload: TelegramAuthPayload
   try {

@@ -5,6 +5,15 @@ import { toRemnawaveTelegramId } from './telegram-remnawave'
 import { upsertLocalSubscriptionFromRemnawave } from './remnawave-local-sync'
 import { syncLocalDevicesFromRemnawave } from './remnawave-device-sync'
 import { describeSyncError } from './sync-error'
+import { withDistributedLock } from './distributed-lock'
+import {
+  markSyncFailed,
+  markSyncPending,
+  markSyncSucceeded,
+  type SyncEventInput,
+} from './sync-events'
+import { createAdminNotification } from './admin-notifications'
+import { logWarn } from './logger'
 
 interface RemnashopTelegramUserRow {
   id: number
@@ -101,83 +110,129 @@ export async function attachRemnashopIdentityToCabinetUser(input: {
 export async function syncLinkedTelegramUser(input: {
   localUserId: string
   telegramId: bigint
+}, options: {
+  trackEvent?: boolean
+} = {}) {
+  const event: SyncEventInput = {
+    direction: 'REMNASHOP_TO_CABINET',
+    entityType: 'telegramIdentity',
+    entityId: input.localUserId,
+    operation: 'sync',
+    metadata: {
+      telegramId: input.telegramId.toString(),
+    },
+  }
+  const trackEvent = options.trackEvent !== false
+  const locked = await withDistributedLock(
+    `telegram-identity-sync:${input.localUserId}`,
+    async () => {
+      if (trackEvent) await markSyncPending(event)
+      try {
+        const result = await performLinkedTelegramSync(input)
+        if (trackEvent && result.warnings.length > 0) {
+          const warning = new Error(result.warnings.join('; '))
+          await markSyncFailed(event, warning)
+          await notifyTelegramSyncIssue(input.localUserId, warning, 'WARNING')
+        } else if (trackEvent) {
+          await markSyncSucceeded(event)
+        }
+        return {
+          ...result,
+          alreadyRunning: false as const,
+        }
+      } catch (error) {
+        if (trackEvent) {
+          await markSyncFailed(event, error)
+          await notifyTelegramSyncIssue(input.localUserId, error, 'ERROR')
+        }
+        throw error
+      }
+    }
+  )
+
+  if (!locked.acquired) {
+    return {
+      foundRemnashopUser: null,
+      syncedRemnawave: false,
+      devicesSynced: 0,
+      warnings: [],
+      alreadyRunning: true as const,
+    }
+  }
+
+  return locked.value
+}
+
+async function performLinkedTelegramSync(input: {
+  localUserId: string
+  telegramId: bigint
 }) {
   const warnings: string[] = []
   const localUser = await prisma.user.findUnique({
     where: { id: input.localUserId },
     select: { remnawaveUuid: true },
   })
-  const localRemnawaveSynced = await syncRemnawaveTelegramId(localUser?.remnawaveUuid, input.telegramId)
-  let localDevicesSynced = 0
-  if (localUser?.remnawaveUuid) {
+  const remnashopUser = await attachRemnashopIdentityToCabinetUser(input)
+  const remnawaveUuid = remnashopUser?.user_remna_id ?? localUser?.remnawaveUuid ?? null
+  const telegramId = toRemnawaveTelegramId(input.telegramId)
+  let remnawaveUser = null
+  let remnawaveChanged = false
+  if (remnawaveUuid) {
+    remnawaveUser = (await remnawave.getUserByUuid(remnawaveUuid)).response
+    if (telegramId && !sameTelegramId(remnawaveUser.telegramId, telegramId)) {
+      remnawaveUser = (await remnawave.updateUser({
+        uuid: remnawaveUser.uuid,
+        telegramId,
+        tag: 'IMPORTED',
+      })).response
+      remnawaveChanged = true
+    }
+  }
+
+  let devicesSynced = 0
+  if (remnawaveUuid) {
     try {
-      localDevicesSynced = (await syncLocalDevicesFromRemnawave({
+      devicesSynced = (await syncLocalDevicesFromRemnawave({
         localUserId: input.localUserId,
-        remnawaveUuid: localUser.remnawaveUuid,
+        remnawaveUuid,
       })).total
     } catch (error) {
       warnings.push(`Устройства не обновлены: ${describeSyncError(error)}`)
     }
   }
-  const remnashopUser = await attachRemnashopIdentityToCabinetUser(input)
+
   if (!remnashopUser) {
-    await prisma.user.update({
-      where: { id: input.localUserId },
-      data: { remnashopSyncedAt: new Date() },
-    })
     return {
       foundRemnashopUser: false as const,
-      syncedRemnawave: localRemnawaveSynced,
-      devicesSynced: localDevicesSynced,
+      syncedRemnawave: Boolean(remnawaveUser && telegramId),
+      remnawaveChanged,
+      devicesSynced,
       warnings,
     }
   }
 
-  if (!remnashopUser.user_remna_id) {
+  if (!remnawaveUser) {
     warnings.push('Пользователь найден в Remnashop, но у него нет связанного профиля Remnawave.')
-    await prisma.user.update({
-      where: { id: input.localUserId },
-      data: {
-        remnashopUserId: remnashopUser.id,
-        remnashopSyncedAt: new Date(),
-      },
-    })
     return {
       foundRemnashopUser: true as const,
-      syncedRemnawave: localRemnawaveSynced,
+      syncedRemnawave: Boolean(remnawaveUser && telegramId),
+      remnawaveChanged,
       remnashopUserId: remnashopUser.id,
-      devicesSynced: localDevicesSynced,
+      devicesSynced,
       warnings,
     }
   }
 
-  let remnawaveUser = (await remnawave.getUserByUuid(remnashopUser.user_remna_id)).response
-  const telegramId = toRemnawaveTelegramId(input.telegramId)
-  if (telegramId && remnawaveUser.telegramId !== telegramId) {
-    remnawaveUser = (await remnawave.updateUser({
-      uuid: remnawaveUser.uuid,
-      telegramId,
-      tag: 'IMPORTED',
-    })).response
-  }
   const subscription = await upsertLocalSubscriptionFromRemnawave({
     localUserId: input.localUserId,
     remnashopUserId: remnashopUser.id,
     remnawaveUser,
   })
-  let devicesSynced = localDevicesSynced
-  try {
-    devicesSynced = (await syncLocalDevicesFromRemnawave({
-      localUserId: input.localUserId,
-      remnawaveUuid: remnawaveUser.uuid,
-    })).total
-  } catch (error) {
-    warnings.push(`Устройства не обновлены: ${describeSyncError(error)}`)
-  }
 
   return {
     foundRemnashopUser: true as const,
-    syncedRemnawave: true as const,
+    syncedRemnawave: Boolean(telegramId),
+    remnawaveChanged,
     remnashopUserId: remnashopUser.id,
     remnawaveUuid: remnawaveUser.uuid,
     subscriptionId: subscription.id,
@@ -186,19 +241,34 @@ export async function syncLinkedTelegramUser(input: {
   }
 }
 
-async function syncRemnawaveTelegramId(remnawaveUuid: string | null | undefined, telegramIdValue: bigint) {
-  if (!remnawaveUuid) return false as const
-  const telegramId = toRemnawaveTelegramId(telegramIdValue)
-  if (!telegramId) return false as const
+function sameTelegramId(current: number | string | null | undefined, expected: number) {
+  if (current == null) return false
+  return String(current).trim() === String(expected)
+}
 
-  const remnawaveUser = (await remnawave.getUserByUuid(remnawaveUuid)).response
-  if (remnawaveUser.telegramId !== telegramId) {
-    await remnawave.updateUser({
-      uuid: remnawaveUuid,
-      telegramId,
-      tag: 'IMPORTED',
+async function notifyTelegramSyncIssue(
+  userId: string,
+  error: unknown,
+  severity: 'WARNING' | 'ERROR'
+) {
+  const message = error instanceof Error ? error.message : String(error || 'Неизвестная ошибка')
+  const day = new Date().toISOString().slice(0, 10)
+  await createAdminNotification({
+    type: 'remnashop_sync_error',
+    severity,
+    dedupeKey: `telegram-identity-sync:${userId}:${day}`,
+    title: severity === 'ERROR'
+      ? 'Связь Telegram не синхронизирована'
+      : 'Связь Telegram синхронизирована частично',
+    body: message.slice(0, 500),
+    entityType: 'telegramIdentity',
+    entityId: userId,
+    actionHref: `/dashboard/admin/users?q=${encodeURIComponent(userId)}`,
+    actionLabel: 'Проверить пользователя',
+  }).catch((notificationError) => {
+    logWarn('telegram.sync_notification_failed', {
+      userId,
+      message: notificationError instanceof Error ? notificationError.message : 'unknown error',
     })
-  }
-
-  return true as const
+  })
 }
