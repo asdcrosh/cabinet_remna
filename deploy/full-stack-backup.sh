@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="1.2.0"
+VERSION="1.2.1"
 INSTALL_PATH="${FULL_BACKUP_INSTALL_PATH:-/usr/local/bin/remna-backup}"
 BACKUP_DIR="${FULL_BACKUP_DIR:-/opt/remnawave-backups}"
 S3_CONFIG_FILE="${FULL_BACKUP_S3_CONFIG:-/etc/remna-backup-s3.conf}"
 REMNAWAVE_DIR="${REMNAWAVE_DIR:-/opt/remnawave}"
+REMNAWAVE_SUBSCRIPTION_DIR="${REMNAWAVE_SUBSCRIPTION_DIR:-${REMNAWAVE_DIR}/subscription}"
 REMNASHOP_DIR="${REMNASHOP_DIR:-/opt/remnashop}"
 CABINET_DIR="${CABINET_DIR:-/opt/remnawave-cabinet}"
 REMNAWAVE_DB_CONTAINER="${REMNAWAVE_DB_CONTAINER:-remnawave-db}"
@@ -314,6 +315,7 @@ SCRIPT_VERSION=${VERSION}
 CREATED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 SOURCE_HOST=$(hostname)
 REMNAWAVE_DIR=${REMNAWAVE_DIR}
+REMNAWAVE_SUBSCRIPTION_DIR=${REMNAWAVE_SUBSCRIPTION_DIR}
 REMNASHOP_DIR=${REMNASHOP_DIR}
 CABINET_DIR=${CABINET_DIR}
 REMNAWAVE_DB_CONTAINER=${REMNAWAVE_DB_CONTAINER}
@@ -477,6 +479,14 @@ start_optional_nginx() {
   fi
 }
 
+start_optional_remnawave_subscription() {
+  if [[ -d "${REMNAWAVE_SUBSCRIPTION_DIR}" ]] \
+    && find_compose_file "${REMNAWAVE_SUBSCRIPTION_DIR}" >/dev/null; then
+    info "Запускаем страницу подписки Remnawave..."
+    compose "${REMNAWAVE_SUBSCRIPTION_DIR}" up -d
+  fi
+}
+
 restore_backup() {
   require_root
   require_commands
@@ -521,6 +531,9 @@ restore_backup() {
   if [[ -d "${REMNAWAVE_DIR}/nginx" ]]; then
     stop_component "${REMNAWAVE_DIR}/nginx"
   fi
+  if [[ -d "${REMNAWAVE_SUBSCRIPTION_DIR}" ]]; then
+    stop_component "${REMNAWAVE_SUBSCRIPTION_DIR}"
+  fi
   stop_component "${REMNAWAVE_DIR}"
 
   mkdir -p "${safety_dir}"
@@ -537,6 +550,7 @@ restore_backup() {
 
   restore_database "Remnawave" "${REMNAWAVE_DIR}" "${REMNAWAVE_DB_SERVICE}" "${REMNAWAVE_DB_CONTAINER}" "${staging}/databases/remnawave.dump"
   compose "${REMNAWAVE_DIR}" up -d
+  start_optional_remnawave_subscription
 
   restore_database "Remnashop" "${REMNASHOP_DIR}" "${REMNASHOP_DB_SERVICE}" "${REMNASHOP_DB_CONTAINER}" "${staging}/databases/remnashop.dump"
   compose "${REMNASHOP_DIR}" up -d
@@ -792,6 +806,7 @@ Remnawave Full Backup ${VERSION}
   FULL_BACKUP_KEEP_DAYS=${KEEP_DAYS}
   FULL_BACKUP_S3_CONFIG=${S3_CONFIG_FILE}
   REMNAWAVE_DIR=${REMNAWAVE_DIR}
+  REMNAWAVE_SUBSCRIPTION_DIR=${REMNAWAVE_SUBSCRIPTION_DIR}
   REMNASHOP_DIR=${REMNASHOP_DIR}
   CABINET_DIR=${CABINET_DIR}
 EOF
