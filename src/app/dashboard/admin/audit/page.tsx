@@ -7,6 +7,9 @@ import { requireAdminPage } from '@/lib/auth/admin-page'
 import { AdminPageShell } from '@/components/admin/admin-page-shell'
 import { AdminFilterBar, AdminFilterField } from '@/components/admin/admin-filter-bar'
 import { AdminEmptyState } from '@/components/admin/admin-empty-state'
+import { SystemState } from '@/components/ui/system-state'
+import { buildServerErrorDiagnostics } from '@/lib/error-diagnostics'
+import { logError } from '@/lib/logger'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'История действий — Админка' }
@@ -61,7 +64,7 @@ export default async function AdminAuditPage({
   const action = params.action ?? 'ALL'
   const limit = normalizeLimit(params.limit)
   const where = {
-    ...(action !== 'ALL' && action in AuditAction ? { action: action as AuditAction } : {}),
+    ...(action !== 'ALL' && Object.values(AuditAction).includes(action as AuditAction) ? { action: action as AuditAction } : {}),
     ...(q
       ? {
           OR: [
@@ -73,18 +76,54 @@ export default async function AdminAuditPage({
       : {}),
   }
 
-  const [total, logs] = await prisma.$transaction([
-    prisma.auditLog.count({ where }),
-    prisma.auditLog.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
-      take: limit + 1,
-      include: {
-        actor: { select: { email: true, name: true } },
-        target: { select: { email: true, name: true } },
-      },
-    }),
-  ])
+  const auditResult = await prisma.$transaction([
+      prisma.auditLog.count({ where }),
+      prisma.auditLog.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        take: limit + 1,
+        include: {
+          actor: { select: { email: true, name: true } },
+          target: { select: { email: true, name: true } },
+        },
+      }),
+    ])
+    .then((data) => ({ data, diagnostics: null }))
+    .catch((error: unknown) => {
+      const diagnostics = buildServerErrorDiagnostics(error)
+      logError('admin.audit.load_failed', error, {
+        action,
+        hasSearch: Boolean(q),
+        limit,
+        diagnostics,
+      })
+      return { data: null, diagnostics }
+    })
+
+  if (!auditResult.data) {
+    const diagnostics = auditResult.diagnostics
+    return (
+      <AdminPageShell title="История действий" description="Изменения и операции администраторов">
+        <SystemState
+          tone="danger"
+          eyebrow="История недоступна"
+          title="Не удалось прочитать журнал действий"
+          description={diagnostics?.reason ?? 'База данных не вернула историю действий.'}
+          reference={diagnostics?.code}
+        />
+        {diagnostics ? (
+          <details className="rounded-[12px] border border-slate-200 bg-white p-4 text-xs text-slate-600 dark:border-white/10 dark:bg-white/[0.025] dark:text-slate-300">
+            <summary className="cursor-pointer font-semibold">Диагностика сервера</summary>
+            <pre className="mt-3 max-h-64 overflow-auto whitespace-pre-wrap break-words font-mono">
+              {JSON.stringify(diagnostics, null, 2)}
+            </pre>
+          </details>
+        ) : null}
+      </AdminPageShell>
+    )
+  }
+
+  const [total, logs] = auditResult.data
   const hasMore = logs.length > limit
   const visibleLogs = hasMore ? logs.slice(0, limit) : logs
 
@@ -123,7 +162,7 @@ export default async function AdminAuditPage({
             <div className="flex flex-col gap-2 p-3.5 sm:flex-row sm:items-start sm:justify-between">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className={auditActionBadgeClass(log.action)}>{ACTION_LABELS[log.action]}</span>
+                  <span className={auditActionBadgeClass(log.action)}>{ACTION_LABELS[log.action] ?? log.action}</span>
                   <h2 className="font-semibold leading-5">{log.message}</h2>
                 </div>
                 <div className="mt-1 text-sm text-slate-500">
@@ -142,7 +181,7 @@ export default async function AdminAuditPage({
                   Технические данные
                 </summary>
                 <pre className="mt-3 max-h-40 overflow-auto whitespace-pre-wrap break-words rounded-xl bg-white p-3 font-mono [scrollbar-width:thin] dark:bg-surface-950">
-                  {JSON.stringify(log.metadata, null, 2)}
+                  {formatAuditMetadata(log.metadata)}
                 </pre>
               </details>
             )}
@@ -165,6 +204,14 @@ function auditActionBadgeClass(action: AuditAction) {
   if (action.includes('CREATED')) return 'badge-active'
   if (action.includes('MERGED')) return 'badge-limited'
   return 'badge-muted'
+}
+
+function formatAuditMetadata(metadata: unknown) {
+  try {
+    return JSON.stringify(metadata, (_, value) => typeof value === 'bigint' ? value.toString() : value, 2)
+  } catch {
+    return 'Технические данные этой записи не удалось преобразовать в текст.'
+  }
 }
 
 function normalizeLimit(value: string | undefined) {
