@@ -126,7 +126,9 @@ export default async function SubscriptionPage() {
               <AccessMetric
                 icon={<Gauge className="h-4 w-4" />}
                 label="Трафик"
-                value={`${u.trafficUsed}${isUnlimited ? ' · безлимит' : ` из ${u.trafficLimit}`}`}
+                value={subscriptionExpired
+                  ? '0 доступно'
+                  : `${u.trafficUsed}${isUnlimited ? ' · безлимит' : ` из ${u.trafficLimit}`}`}
               />
             </div>
           </div>

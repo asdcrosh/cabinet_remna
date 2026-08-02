@@ -54,7 +54,7 @@ describe('admin subscription deletion', () => {
     mocks.terminateUserSubscription.mockResolvedValue({ hadSubscription: true })
   })
 
-  it('removes access and records the administrator action', async () => {
+  it('disables access and records the administrator action', async () => {
     const response = await DELETE(request(), context)
 
     expect(response.status).toBe(200)
@@ -65,11 +65,11 @@ describe('admin subscription deletion', () => {
     expect(mocks.writeAuditLog).toHaveBeenCalledWith(expect.objectContaining({
       actorId: 'admin-1',
       targetId: 'user-1',
-      action: 'ADMIN_SUBSCRIPTION_DELETED',
+      action: 'ADMIN_SUBSCRIPTION_DISABLED',
     }))
   })
 
-  it('returns 502 when Remnawave does not remove the user', async () => {
+  it('returns 502 when Remnawave does not disable the subscription', async () => {
     mocks.terminateUserSubscription.mockRejectedValue(
       new mocks.TestRemnawaveError(503, null)
     )

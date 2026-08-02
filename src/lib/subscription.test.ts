@@ -265,6 +265,34 @@ describe('ensureRemnawaveSubscription', () => {
     )
   })
 
+  it('reactivates the existing Remnawave profile after a canceled subscription', async () => {
+    mocks.prisma.payment.findUnique.mockResolvedValue(null)
+    mocks.prisma.user.findUnique.mockResolvedValue({
+      id: 'user-1',
+      email: 'user@example.com',
+      telegramId: null,
+      remnawaveUuid: 'rw-1',
+      subscriptions: [],
+    })
+    mocks.remnawave.updateUser.mockResolvedValue({ response: remnawaveUser })
+    mocks.prisma.subscription.create.mockResolvedValue({ id: 'sub-new' })
+
+    await ensureRemnawaveSubscription({
+      userId: 'user-1',
+      email: 'user@example.com',
+      plan,
+    })
+
+    expect(mocks.remnawave.updateUser).toHaveBeenCalledWith(expect.objectContaining({
+      uuid: 'rw-1',
+      status: 'ACTIVE',
+      expireAt: new Date('2026-01-31T00:00:00.000Z').toISOString(),
+    }))
+    expect(mocks.remnawave.createUser).not.toHaveBeenCalled()
+    expect(mocks.prisma.user.update).not.toHaveBeenCalled()
+    expect(mocks.prisma.subscription.create).toHaveBeenCalled()
+  })
+
   it('recreates Remnawave user when local profile was deleted remotely', async () => {
     const currentExpireAt = new Date('2026-01-15T00:00:00.000Z')
     mocks.prisma.payment.findUnique.mockResolvedValue(null)

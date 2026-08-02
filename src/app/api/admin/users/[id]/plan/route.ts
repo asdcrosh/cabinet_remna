@@ -110,7 +110,7 @@ export const DELETE = withAuth(async (req: Request, { params }: { params: Promis
   } catch (error) {
     if (error instanceof RemnawaveError) {
       return NextResponse.json(
-        { error: 'Не удалось удалить подписку в Remnawave. Повторите позже.' },
+        { error: 'Не удалось отключить подписку в Remnawave. Повторите позже.' },
         { status: 502 }
       )
     }
@@ -120,8 +120,8 @@ export const DELETE = withAuth(async (req: Request, { params }: { params: Promis
   await writeAuditLog({
     actorId: session.uid,
     targetId: user.id,
-    action: 'ADMIN_SUBSCRIPTION_DELETED',
-    message: 'Администратор удалил подписку пользователя',
+    action: 'ADMIN_SUBSCRIPTION_DISABLED',
+    message: 'Администратор отключил подписку пользователя',
     metadata: {
       email: user.email,
       remnawaveUuid: user.remnawaveUuid,

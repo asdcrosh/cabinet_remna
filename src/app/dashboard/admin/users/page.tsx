@@ -521,8 +521,7 @@ function UserActions({
         />
       )}
       {canManageUser && (
-        user.remnawaveUuid ||
-        (user.subscriptions[0] && ['ACTIVE', 'LIMITED'].includes(user.subscriptions[0].status))
+        user.subscriptions[0] && ['ACTIVE', 'LIMITED'].includes(user.subscriptions[0].status)
       ) && (
         <UserSubscriptionDeleteButton
           userId={user.id}

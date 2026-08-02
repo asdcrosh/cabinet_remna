@@ -399,7 +399,7 @@ describe('notifyUser', () => {
       data: expect.objectContaining({
         type: 'SUBSCRIPTION_TERMINATED',
         dedupeKey: 'SUBSCRIPTION_TERMINATED:subscription-terminated:subscription:subscription-1',
-        title: 'Подписка удалена администратором',
+        title: 'Подписка отключена администратором',
         actionHref: '/dashboard/support',
       }),
     }))

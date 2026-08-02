@@ -11,9 +11,11 @@ const mocks = vi.hoisted(() => {
     userFindUnique: vi.fn(),
     subscriptionUpdateMany: vi.fn(),
     deviceDeleteMany: vi.fn(),
-    userUpdate: vi.fn(),
     transaction: vi.fn(),
-    deleteUser: vi.fn(),
+    updateUser: vi.fn(),
+    resetTraffic: vi.fn(),
+    getUserDevices: vi.fn(),
+    deleteUserDevice: vi.fn(),
     removeRemnashopSubscription: vi.fn(),
     markSyncFailed: vi.fn(),
     markSyncSkipped: vi.fn(),
@@ -29,7 +31,12 @@ vi.mock('./prisma', () => ({
   },
 }))
 vi.mock('./remnawave', () => ({
-  remnawave: { deleteUser: mocks.deleteUser },
+  remnawave: {
+    updateUser: mocks.updateUser,
+    resetTraffic: mocks.resetTraffic,
+    getUserDevices: mocks.getUserDevices,
+    deleteUserDevice: mocks.deleteUserDevice,
+  },
   RemnawaveError: mocks.TestRemnawaveError,
 }))
 vi.mock('./remnashop-subscription-removal', () => ({
@@ -56,35 +63,44 @@ describe('terminateUserSubscription', () => {
       remnashopUserId: null,
       subscriptions: [{ id: 'subscription-1' }],
     })
-    mocks.deleteUser.mockResolvedValue({ response: { isDeleted: true } })
+    mocks.updateUser.mockResolvedValue({ response: { status: 'DISABLED' } })
+    mocks.resetTraffic.mockResolvedValue({ response: { usedTrafficBytes: '0' } })
+    mocks.getUserDevices.mockResolvedValue({
+      response: { total: 2, devices: [{ hwid: 'device-1' }, { hwid: 'device-2' }] },
+    })
+    mocks.deleteUserDevice.mockResolvedValue({ response: [] })
     mocks.transaction.mockImplementation(async (callback) => callback({
       subscription: { updateMany: mocks.subscriptionUpdateMany },
       device: { deleteMany: mocks.deviceDeleteMany },
-      user: { update: mocks.userUpdate },
     }))
   })
 
-  it('deletes the Remnawave user and disables local access', async () => {
+  it('disables access without deleting the Remnawave profile', async () => {
     const result = await terminateUserSubscription({
       userId: 'user-1',
       source: 'USER_REQUEST',
     })
 
     expect(result).toEqual({ hadSubscription: true })
-    expect(mocks.deleteUser).toHaveBeenCalledWith('uuid-1')
+    expect(mocks.updateUser).toHaveBeenCalledWith(expect.objectContaining({
+      uuid: 'uuid-1',
+      status: 'DISABLED',
+      expireAt: expect.any(String),
+    }))
+    expect(mocks.resetTraffic).toHaveBeenCalledWith('uuid-1')
+    expect(mocks.deleteUserDevice).toHaveBeenCalledTimes(2)
+    expect(mocks.deleteUserDevice).toHaveBeenCalledWith('uuid-1', 'device-1')
+    expect(mocks.deleteUserDevice).toHaveBeenCalledWith('uuid-1', 'device-2')
     expect(mocks.subscriptionUpdateMany).toHaveBeenCalledWith(expect.objectContaining({
       where: { userId: 'user-1', status: { in: ['ACTIVE', 'LIMITED'] } },
-      data: expect.objectContaining({ status: 'DISABLED', pendingSync: false }),
+      data: expect.objectContaining({
+        status: 'DISABLED',
+        trafficLimitBytes: 0n,
+        trafficUsedBytes: 0n,
+        pendingSync: false,
+      }),
     }))
     expect(mocks.deviceDeleteMany).toHaveBeenCalledWith({ where: { userId: 'user-1' } })
-    expect(mocks.userUpdate).toHaveBeenCalledWith({
-      where: { id: 'user-1' },
-      data: {
-        remnawaveUuid: null,
-        remnawaveShortUuid: null,
-        remnawaveUsername: null,
-      },
-    })
     expect(mocks.notifySubscriptionTerminated).toHaveBeenCalledWith({
       userId: 'user-1',
       source: 'USER_REQUEST',
@@ -92,8 +108,8 @@ describe('terminateUserSubscription', () => {
     })
   })
 
-  it('finishes local cleanup when Remnawave already deleted the user', async () => {
-    mocks.deleteUser.mockRejectedValue(new mocks.TestRemnawaveError(404, null))
+  it('finishes local cleanup when the Remnawave profile was already deleted', async () => {
+    mocks.updateUser.mockRejectedValue(new mocks.TestRemnawaveError(404, null))
 
     await expect(terminateUserSubscription({
       userId: 'user-1',
@@ -123,7 +139,7 @@ describe('terminateUserSubscription', () => {
   })
 
   it('does not clear local identifiers when Remnawave is unavailable', async () => {
-    mocks.deleteUser.mockRejectedValue(new mocks.TestRemnawaveError(503, null))
+    mocks.updateUser.mockRejectedValue(new mocks.TestRemnawaveError(503, null))
 
     await expect(terminateUserSubscription({
       userId: 'user-1',

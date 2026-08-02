@@ -36,7 +36,7 @@ export async function terminateUserSubscription(input: TerminateUserSubscription
   })
   if (!user) throw new Error('User not found')
 
-  const hadSubscription = Boolean(user.remnawaveUuid || user.subscriptions.length > 0)
+  const hadSubscription = user.subscriptions.length > 0
   const notificationDedupeId = input.paymentId
     ? `payment:${input.paymentId}`
     : user.subscriptions[0]?.id
@@ -44,34 +44,40 @@ export async function terminateUserSubscription(input: TerminateUserSubscription
       : user.remnawaveUuid
         ? `profile:${user.remnawaveUuid}`
         : null
-  if (user.remnawaveUuid) {
+  const now = new Date()
+  const remnawaveUuid = user.remnawaveUuid
+  if (remnawaveUuid) {
     try {
-      await remnawave.deleteUser(user.remnawaveUuid)
+      await remnawave.updateUser({
+        uuid: remnawaveUuid,
+        status: 'DISABLED',
+        expireAt: now.toISOString(),
+      })
+      await remnawave.resetTraffic(remnawaveUuid)
+      const devices = await remnawave.getUserDevices(remnawaveUuid)
+      await Promise.all(
+        devices.response.devices.map((device) =>
+          remnawave.deleteUserDevice(remnawaveUuid, device.hwid)
+        )
+      )
     } catch (error) {
       if (!isRemnawaveUserMissing(error)) throw error
     }
   }
 
-  const now = new Date()
   await prisma.$transaction(async (tx) => {
     await tx.subscription.updateMany({
       where: { userId: user.id, status: { in: ['ACTIVE', 'LIMITED'] } },
       data: {
         status: 'DISABLED',
         expireAt: now,
+        trafficLimitBytes: 0n,
+        trafficUsedBytes: 0n,
         pendingSync: false,
         lastSyncedAt: now,
       },
     })
     await tx.device.deleteMany({ where: { userId: user.id } })
-    await tx.user.update({
-      where: { id: user.id },
-      data: {
-        remnawaveUuid: null,
-        remnawaveShortUuid: null,
-        remnawaveUsername: null,
-      },
-    })
   })
 
   if (

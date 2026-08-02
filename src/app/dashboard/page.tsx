@@ -133,7 +133,7 @@ export default async function DashboardHome() {
       <HomeHeader
         name={dashboardDisplayName(user.name, user.email)}
         description={subscriptionExpired
-          ? 'Доступ остановлен, но настройки и устройства сохранены.'
+          ? 'Доступ остановлен, профиль сохранён и готов к повторной активации.'
           : user._count.devices === 0
             ? 'Подписка готова. Теперь подключите первое устройство.'
             : 'Подписка работает. Здесь только актуальное состояние.'}
@@ -192,11 +192,13 @@ export default async function DashboardHome() {
             <div className="grid grid-cols-2 gap-4">
               <HomeMetric
                 label="Трафик"
-                value={hasRemoteUsage
-                  ? isUnlimited
-                    ? `${formatBytes(used)} использовано`
-                    : `${formatBytes(used)} из ${formatBytes(limit)}`
-                  : 'Обновляется'}
+                value={subscriptionExpired
+                  ? '0 доступно'
+                  : hasRemoteUsage
+                    ? isUnlimited
+                      ? `${formatBytes(used)} использовано`
+                      : `${formatBytes(used)} из ${formatBytes(limit)}`
+                    : 'Обновляется'}
               />
               <HomeMetric
                 label="Устройства"
@@ -211,12 +213,12 @@ export default async function DashboardHome() {
                     'h-full rounded-full',
                     subscriptionExpired ? 'bg-amber-500' : 'bg-cyan-500'
                   )}
-                  style={{ width: isUnlimited ? '100%' : `${trafficPercent ?? 0}%` }}
+                  style={{ width: subscriptionExpired ? '0%' : isUnlimited ? '100%' : `${trafficPercent ?? 0}%` }}
                 />
               </div>
               <div className="mt-2 flex items-center justify-between gap-3 text-xs text-slate-500 dark:text-slate-400">
-                <span>{isUnlimited ? 'Безлимитный трафик' : 'Использование за период'}</span>
-                {!isUnlimited && trafficPercent != null && <span>{trafficPercent}%</span>}
+                <span>{subscriptionExpired ? 'Доступ остановлен' : isUnlimited ? 'Безлимитный трафик' : 'Использование за период'}</span>
+                {!subscriptionExpired && !isUnlimited && trafficPercent != null && <span>{trafficPercent}%</span>}
               </div>
             </div>
 

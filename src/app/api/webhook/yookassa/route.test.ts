@@ -171,7 +171,7 @@ describe('YooKassa webhook route', () => {
     })
   })
 
-  it('records a full refund and removes the subscription', async () => {
+  it('records a full refund and disables the subscription', async () => {
     mocks.prisma.payment.findUnique.mockResolvedValue({
       id: 'pay-1',
       userId: 'user-1',
