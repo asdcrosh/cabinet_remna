@@ -48,7 +48,7 @@ export function PlanCatalog({ plans, initialPlanId }: { plans: CatalogPlan[]; in
           <article
             key={plan.id}
             className={cn(
-              'relative grid min-h-0 min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 border-y border-slate-200 px-1 py-3.5 dark:border-white/[0.09] sm:flex sm:min-h-[10rem] sm:flex-col sm:items-stretch sm:border sm:p-4',
+              'plan-period-card relative grid min-h-0 min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 border border-slate-200 p-4 dark:border-white/[0.09] sm:flex sm:min-h-[10rem] sm:flex-col sm:items-stretch',
               plan.current
                 ? 'border-cyan-300/70 bg-cyan-50/75 dark:border-cyan-300/25 dark:bg-cyan-300/[0.07]'
                 : 'border-slate-200/90 bg-white/65 dark:bg-white/[0.025]'
@@ -85,9 +85,9 @@ export function PlanCatalog({ plans, initialPlanId }: { plans: CatalogPlan[]; in
                 onClick={() => setMobileCheckoutPlanId(plan.id)}
                 disabled={!plan.isPromo && plan.paymentProviders?.length === 0}
                 className={cn(
-                  'group inline-flex min-h-9 w-full items-center justify-between gap-1 rounded-xl px-3 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50',
+                  'group inline-flex min-h-10 w-full items-center justify-between gap-1 rounded-[9px] px-3 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50',
                   plan.current
-                    ? 'bg-cyan-600 text-white hover:bg-cyan-700 dark:bg-cyan-300 dark:text-slate-950 dark:hover:bg-cyan-200'
+                    ? 'bg-brand-600 text-white hover:bg-brand-700 dark:bg-brand-400 dark:text-white dark:hover:bg-brand-300'
                     : 'bg-slate-950 text-white hover:bg-slate-800 dark:bg-white/[0.09] dark:text-white dark:hover:bg-white/[0.14]'
                 )}
               >
@@ -193,7 +193,7 @@ export function PlanCatalog({ plans, initialPlanId }: { plans: CatalogPlan[]; in
 
 function PlanPickerBadge({ children }: { children: ReactNode }) {
   return (
-    <span className="rounded-full bg-cyan-50 px-1.5 py-0.5 text-[9px] font-semibold text-cyan-700 dark:bg-cyan-500/10 dark:text-cyan-300">
+    <span className="rounded-[5px] bg-brand-50 px-1.5 py-0.5 font-mono text-[9px] font-semibold uppercase text-brand-700 dark:bg-brand-500/10 dark:text-brand-300">
       {children}
     </span>
   )

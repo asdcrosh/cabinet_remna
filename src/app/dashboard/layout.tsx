@@ -61,8 +61,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
         >
           Перейти к содержимому
         </a>
-        <aside className="dashboard-sidebar fixed inset-y-0 left-0 z-40 hidden h-dvh w-60 flex-col overflow-hidden border-r lg:flex">
-          <div className="shrink-0 px-5 pb-4 pt-6">
+        <aside className="dashboard-sidebar fixed inset-y-0 left-0 z-40 hidden h-dvh w-64 flex-col overflow-hidden border-r lg:flex">
+          <div className="shrink-0 px-5 pb-5 pt-5">
             <Brand brandName={brandName} />
           </div>
           <div className="dashboard-sidebar-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-4">
@@ -76,7 +76,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
             <LogoutButton />
           </div>
         </aside>
-        <main className="min-w-0 w-full overflow-x-clip lg:ml-60 lg:w-auto">
+        <main className="min-w-0 w-full overflow-x-clip lg:ml-64 lg:w-auto">
           <div className="dashboard-topbar sticky top-0 z-50 flex h-14 items-center justify-between border-b px-4 backdrop-blur lg:fixed lg:right-6 lg:top-4 lg:h-auto lg:w-auto lg:border-0 lg:bg-transparent lg:p-0 lg:backdrop-blur-none">
             <div className="lg:hidden">
               <Brand compact brandName={brandName} />
@@ -86,7 +86,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
               {isStaff ? <MobileDashboardNav role={role} email={accountLabel} brandName={brandName} badges={navBadges} features={features} /> : null}
             </div>
           </div>
-          <div id="dashboard-content" className="page-transition mx-auto w-full max-w-[86rem] min-w-0 scroll-mt-20 px-4 pb-28 pt-5 sm:px-6 sm:pt-7 lg:px-8 lg:pb-12 lg:pr-24 lg:pt-8">{children}</div>
+          <div id="dashboard-content" className="page-transition mx-auto w-full max-w-[92rem] min-w-0 scroll-mt-20 px-4 pb-28 pt-5 sm:px-7 sm:pt-8 lg:px-10 lg:pb-14 lg:pr-24 lg:pt-10">{children}</div>
         </main>
         <MobileBottomNav role={role} badges={navBadges} features={features} />
       </div>

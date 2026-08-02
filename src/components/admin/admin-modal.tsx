@@ -115,7 +115,7 @@ export function AdminModal({
         aria-labelledby={titleId}
         aria-describedby={description ? descriptionId : undefined}
         tabIndex={-1}
-        className={`relative z-10 flex h-[calc(100dvh-0.75rem)] max-h-[calc(100dvh-0.75rem)] w-full flex-col overflow-hidden rounded-t-2xl border-0 bg-white shadow-2xl dark:bg-surface-900 sm:h-auto sm:max-h-[94dvh] sm:rounded-2xl sm:border dark:sm:border-white/10 ${widths[size]}`}
+        className={`relative z-10 flex h-auto max-h-[92dvh] w-full flex-col overflow-hidden rounded-t-[22px] border border-b-0 border-slate-200 bg-white shadow-[0_32px_90px_rgba(15,23,42,.26)] dark:border-white/10 dark:bg-surface-900 sm:max-h-[calc(100dvh-40px)] sm:rounded-[16px] sm:border ${widths[size]}`}
       >
         <header className="flex shrink-0 items-start justify-between gap-4 border-b px-4 py-4 sm:px-6">
           <div className="min-w-0">

@@ -104,7 +104,7 @@ export function Modal({
   return createPortal(
     <div
       className={cn(
-        'fixed inset-0 z-[160] grid place-items-end bg-slate-950/45 p-0 backdrop-blur-sm sm:place-items-center sm:p-4',
+        'fixed inset-0 z-[160] grid place-items-end bg-slate-950/55 p-0 backdrop-blur-[3px] sm:place-items-center sm:p-5',
         overlayClassName,
       )}
       onMouseDown={(event) => {
@@ -119,14 +119,14 @@ export function Modal({
         aria-describedby={description ? descriptionId : undefined}
         tabIndex={-1}
         className={cn(
-          'flex w-full flex-col overflow-hidden bg-white shadow-2xl dark:bg-slate-950',
+          'flex w-full flex-col overflow-hidden bg-white shadow-[0_32px_90px_rgba(15,23,42,.24)] dark:bg-surface-900',
           variant === 'sheet'
-            ? 'h-auto max-h-[94dvh] rounded-t-3xl border border-b-0 border-slate-200 dark:border-white/10 sm:max-h-[calc(100dvh-24px)] sm:max-w-lg sm:rounded-2xl sm:border'
-            : 'h-dvh max-h-dvh border-0 sm:h-auto sm:max-h-[calc(100dvh-24px)] sm:max-w-lg sm:rounded-2xl sm:border sm:border-slate-200 dark:sm:border-white/10',
+            ? 'h-auto max-h-[90dvh] rounded-t-[22px] border border-b-0 border-slate-200 dark:border-white/10 sm:max-h-[calc(100dvh-40px)] sm:max-w-lg sm:rounded-[16px] sm:border'
+            : 'h-auto max-h-[92dvh] rounded-t-[22px] border border-b-0 border-slate-200 dark:border-white/10 sm:max-h-[calc(100dvh-40px)] sm:max-w-lg sm:rounded-[16px] sm:border',
           panelClassName,
         )}
       >
-        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-slate-200 px-5 py-4 dark:border-white/10">
+        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-slate-200 px-5 py-[1.125rem] dark:border-white/10">
           <div>
             <h2 id={titleId} className="text-base font-semibold text-slate-950 dark:text-white">
               {title}

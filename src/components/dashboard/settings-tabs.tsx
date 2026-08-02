@@ -32,10 +32,10 @@ export function SettingsTabs({ sections }: { sections: SettingsTabSection[] }) {
   }
 
   return (
-    <div className="space-y-3">
-      <div className="sticky top-14 z-20 -mx-4 bg-slate-50/95 px-4 py-2 backdrop-blur dark:bg-surface-950/95 sm:static sm:mx-0 sm:bg-transparent sm:px-0 sm:py-0 sm:backdrop-blur-none">
-        <div className="border-b border-slate-200 dark:border-white/10">
-          <div role="tablist" aria-label="Разделы настроек" className="grid grid-cols-3">
+    <div className="space-y-4">
+      <div className="sticky top-14 z-20 -mx-4 bg-surface-50/95 px-4 py-2 backdrop-blur dark:bg-surface-950/95 sm:static sm:mx-0 sm:bg-transparent sm:px-0 sm:py-0 sm:backdrop-blur-none">
+        <div className="rounded-[12px] border border-slate-200 bg-white p-1 dark:border-white/10 dark:bg-white/[0.03]">
+          <div role="tablist" aria-label="Разделы настроек" className="grid grid-cols-3 gap-1">
           {sections.map((section, index) => {
             const active = section.id === activeId
 
@@ -50,10 +50,10 @@ export function SettingsTabs({ sections }: { sections: SettingsTabSection[] }) {
                 aria-controls={`settings-panel-${section.id}`}
                 tabIndex={active ? 0 : -1}
                 className={cn(
-                  'relative flex h-11 min-w-0 items-center justify-center gap-1.5 px-1.5 text-[11px] font-semibold transition after:absolute after:inset-x-0 after:-bottom-px after:h-0.5 sm:gap-2 sm:px-3 sm:text-sm',
+                  'flex h-11 min-w-0 items-center justify-center gap-1.5 rounded-[8px] px-1.5 text-[11px] font-semibold transition sm:gap-2 sm:px-3 sm:text-sm',
                   active
-                    ? 'text-slate-950 after:bg-cyan-500 dark:text-white'
-                    : 'text-slate-500 after:bg-transparent hover:text-slate-950 dark:text-slate-400 dark:hover:text-white'
+                    ? 'bg-slate-950 text-white dark:bg-white dark:text-slate-950'
+                    : 'text-slate-500 hover:bg-slate-950/[0.04] hover:text-slate-950 dark:text-slate-400 dark:hover:bg-white/[0.06] dark:hover:text-white'
                 )}
                 onClick={() => setActiveId(section.id)}
                 onKeyDown={(event) => {
@@ -73,7 +73,7 @@ export function SettingsTabs({ sections }: { sections: SettingsTabSection[] }) {
                 }}
               >
                 <span
-                  className={cn('grid h-6 w-6 shrink-0 place-items-center', active ? 'text-cyan-700 dark:text-cyan-200' : 'text-slate-400')}
+                  className={cn('grid h-6 w-6 shrink-0 place-items-center', active ? 'text-brand-300 dark:text-brand-700' : 'text-slate-400')}
                 >
                   {tabIcons[section.id]}
                 </span>

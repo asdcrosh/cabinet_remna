@@ -31,7 +31,7 @@ export function AdminFilterBar({
   const filtersId = useId()
 
   return (
-    <section className="border-y border-slate-200/90 py-2.5 dark:border-white/[0.09] sm:py-3">
+    <section className="admin-filter-bar rounded-[14px] border border-slate-200 bg-white p-2.5 dark:border-white/[0.09] dark:bg-white/[0.025] sm:p-3">
       <button
         type="button"
         className="flex min-h-11 w-full items-center gap-2.5 bg-transparent px-1 text-left text-sm font-semibold text-slate-800 dark:text-slate-100 md:hidden"
@@ -39,9 +39,9 @@ export function AdminFilterBar({
         aria-controls={filtersId}
         onClick={() => setMobileOpen((value) => !value)}
       >
-        <SlidersHorizontal className="h-4 w-4 text-cyan-600" />
+        <SlidersHorizontal className="h-4 w-4 text-brand-600" />
         <span className="flex-1">Поиск и фильтры</span>
-        {resetVisible ? <span className="h-2 w-2 rounded-full bg-cyan-500" aria-label="Фильтры применены" /> : null}
+        {resetVisible ? <span className="h-2 w-2 rounded-full bg-brand-500" aria-label="Фильтры применены" /> : null}
         {count ? (
           <span className="border-l border-slate-200 pl-2 text-xs tabular-nums text-slate-500 dark:border-white/10 dark:text-slate-300">
             {count.shown}/{count.total}

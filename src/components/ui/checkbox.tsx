@@ -20,11 +20,11 @@ export const Checkbox = React.forwardRef<HTMLInputElement, CheckboxProps>(
       <span
         aria-hidden="true"
         className={cn(
-          'relative mt-0.5 h-5 w-5 shrink-0 rounded-md border border-slate-300 bg-white transition',
+          'relative mt-0.5 h-5 w-5 shrink-0 rounded-[6px] border border-slate-300 bg-white transition',
           'after:absolute after:left-[6px] after:top-[2px] after:hidden after:h-3 after:w-1.5 after:rotate-45 after:border-b-2 after:border-r-2 after:border-white',
-          'peer-checked:border-cyan-500 peer-checked:bg-cyan-500 peer-checked:after:block',
-          'peer-focus-visible:ring-4 peer-focus-visible:ring-cyan-400/25',
-          'dark:border-white/20 dark:bg-white/[0.05] dark:peer-checked:border-cyan-300 dark:peer-checked:bg-cyan-300 dark:peer-checked:after:border-slate-950',
+          'peer-checked:border-brand-600 peer-checked:bg-brand-600 peer-checked:after:block',
+          'peer-focus-visible:ring-4 peer-focus-visible:ring-brand-400/20',
+          'dark:border-white/20 dark:bg-white/[0.05] dark:peer-checked:border-brand-400 dark:peer-checked:bg-brand-400 dark:peer-checked:after:border-white',
         )}
       />
       <span className={compact ? 'sr-only' : 'min-w-0 text-sm leading-5 text-slate-700 dark:text-slate-200'}>

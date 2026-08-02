@@ -31,7 +31,7 @@ export function Tabs<T extends string>({ items, value, onValueChange, className,
       role="tablist"
       aria-label={ariaLabel}
       className={cn(
-        'inline-flex max-w-full gap-1 overflow-x-auto rounded-lg bg-slate-100 p-1 dark:bg-white/10',
+        'inline-flex max-w-full gap-1 overflow-x-auto rounded-[12px] border border-slate-200 bg-white p-1 dark:border-white/10 dark:bg-white/[0.03]',
         className
       )}
     >
@@ -46,8 +46,8 @@ export function Tabs<T extends string>({ items, value, onValueChange, className,
             aria-selected={selected}
             tabIndex={selected ? 0 : -1}
             className={cn(
-              'h-9 shrink-0 rounded-lg px-3 text-sm font-semibold text-slate-600 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 dark:text-slate-300',
-              selected && 'bg-white text-slate-950 shadow-sm dark:bg-slate-950 dark:text-white'
+              'h-9 shrink-0 rounded-[8px] px-3 text-sm font-semibold text-slate-500 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 dark:text-slate-400',
+              selected && 'bg-slate-950 text-white dark:bg-white dark:text-slate-950'
             )}
             onClick={() => onValueChange(item.value)}
             onKeyDown={(event) => {

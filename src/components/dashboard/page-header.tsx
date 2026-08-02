@@ -4,19 +4,20 @@ interface PageHeaderProps {
   title: string
   description?: string
   action?: ReactNode
+  eyebrow?: string
 }
 
-export function PageHeader({ title, description, action }: PageHeaderProps) {
+export function PageHeader({ title, description, action, eyebrow = 'Личный кабинет' }: PageHeaderProps) {
   return (
-    <header className="page-header pb-2">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+    <header className="page-header">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0">
-          <h1 className="text-[1.8rem] font-semibold leading-tight tracking-[-0.04em] text-slate-950 dark:text-white sm:text-[2rem]">{title}</h1>
-          {description && <p className="mt-1 max-w-2xl text-sm leading-5 text-slate-500 dark:text-slate-400">{description}</p>}
+          {eyebrow ? <p className="page-eyebrow">{eyebrow}</p> : null}
+          <h1 className="page-title">{title}</h1>
+          {description && <p className="page-description">{description}</p>}
         </div>
         {action && <div className="shrink-0 sm:text-right">{action}</div>}
       </div>
-      <span className="page-header-mark" aria-hidden="true" />
     </header>
   )
 }

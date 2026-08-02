@@ -11,7 +11,7 @@ interface AdminPageShellProps {
 export function AdminPageShell({ title, description, action, children }: AdminPageShellProps) {
   return (
     <div className="page-stack min-w-0">
-      <PageHeader title={title} description={description} action={action} />
+      <PageHeader eyebrow="Управление" title={title} description={description} action={action} />
       {children}
     </div>
   )

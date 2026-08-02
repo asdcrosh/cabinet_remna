@@ -137,14 +137,14 @@ export default async function SettingsPage() {
           />
         </div>
 
-        <aside className="border-l border-slate-200 pl-4 dark:border-white/[0.09]" aria-labelledby="account-links-title">
-          <h2 id="account-links-title" className="pb-2 text-xs font-semibold uppercase tracking-[0.1em] text-slate-400 dark:text-slate-500">Быстрый доступ</h2>
+        <aside className="rounded-[14px] border border-slate-200 bg-white p-4 dark:border-white/[0.09] dark:bg-white/[0.025]" aria-labelledby="account-links-title">
+          <h2 id="account-links-title" className="pb-2 font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400 dark:text-slate-500">Быстрый доступ</h2>
           <div className="grid gap-1.5 sm:grid-cols-3 xl:grid-cols-1">
             {accountLinks.map((item) => {
               const Icon = item.icon
               return (
                 <Link key={item.href} href={item.href} className="group flex min-w-0 items-center gap-3 border-b border-slate-200 py-3 transition-colors last:border-b-0 dark:border-white/[0.08]">
-                  <Icon className="h-4 w-4 shrink-0 text-slate-400 transition-colors group-hover:text-cyan-700 dark:group-hover:text-cyan-200" />
+                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[8px] bg-brand-50 text-brand-700 dark:bg-brand-500/10 dark:text-brand-300"><Icon className="h-4 w-4" /></span>
                   <span className="min-w-0 flex-1">
                     <span className="block text-sm font-semibold text-slate-950 dark:text-white">{item.label}</span>
                     <span className="block truncate text-xs text-slate-500 dark:text-slate-400">{item.description}</span>
@@ -198,10 +198,10 @@ function SettingsSection({
   return (
     <section
       id={id}
-      className={`scroll-mt-20 border-y border-slate-200/90 py-4 dark:border-white/[0.09] sm:py-5 ${className ?? ''}`}
+      className={`settings-section scroll-mt-20 border border-slate-200 bg-white p-4 dark:border-white/[0.09] dark:bg-white/[0.025] sm:p-5 ${className ?? ''}`}
     >
       <div className="mb-4 flex min-w-0 items-start gap-2.5">
-        <span className="mt-0.5 shrink-0 text-slate-400">{icon}</span>
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[9px] bg-brand-50 text-brand-700 dark:bg-brand-500/10 dark:text-brand-300">{icon}</span>
         <div className="min-w-0 pt-0.5">
           <h2 className="text-base font-semibold text-slate-950 dark:text-white sm:text-lg">{title}</h2>
           <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">{description}</p>
@@ -214,8 +214,8 @@ function SettingsSection({
 
 function AccountFact({ label, value, ready }: { label: string; value: string; ready?: boolean }) {
   return (
-    <div className="min-w-0 border-l border-slate-300 px-3 py-1.5 dark:border-white/15">
-      <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+    <div className="min-w-0 rounded-[9px] border border-slate-200 bg-slate-50/70 px-3 py-2.5 dark:border-white/10 dark:bg-white/[0.03]">
+      <div className="flex items-center gap-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.07em] text-slate-500 dark:text-slate-400">
         {ready !== undefined && <span className={`h-1.5 w-1.5 rounded-full ${ready ? 'bg-emerald-500' : 'bg-amber-500'}`} />}
         {label}
       </div>

@@ -520,13 +520,18 @@ function MobileMoreGrid({
 
 export function Brand({ compact = false, brandName }: { compact?: boolean; brandName: string }) {
   return (
-    <Link href="/dashboard" className="flex min-w-0 items-center gap-2.5">
-      <div className="brand-mark relative grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-slate-950 bg-slate-950 text-white dark:border-white/15 dark:bg-white/10 dark:text-white">
+    <Link href="/dashboard" className="dashboard-brand flex min-w-0 items-center gap-3">
+      <div className={cn(
+        'brand-mark relative grid h-9 w-9 shrink-0 place-items-center rounded-[10px] border',
+        compact
+          ? 'border-slate-200 bg-slate-950 text-white dark:border-white/10 dark:bg-white dark:text-slate-950'
+          : 'border-white/15 bg-white text-slate-950'
+      )}>
         <ShieldCheck className="h-4 w-4" />
       </div>
       <div className="min-w-0">
-        <div className="truncate text-sm font-semibold tracking-tight text-slate-950 dark:text-white">{brandName}</div>
-        {!compact && <div className="mt-0.5 truncate text-[11px] text-slate-500 dark:text-slate-400">Личный кабинет</div>}
+        <div className={cn('truncate text-sm font-semibold tracking-tight', compact ? 'text-slate-950 dark:text-white' : 'text-white')}>{brandName}</div>
+        {!compact && <div className="mt-0.5 truncate font-mono text-[9px] uppercase tracking-[0.14em] text-slate-400">Control room</div>}
       </div>
     </Link>
   )
@@ -569,15 +574,15 @@ function NavList({
 
 function WorkspaceSwitch({ adminArea, onNavigate }: { adminArea: boolean; onNavigate?: () => void }) {
   return (
-    <div className="grid grid-cols-2 rounded-md border border-slate-300 bg-transparent p-1 dark:border-white/10">
+    <div className="grid grid-cols-2 rounded-[10px] border border-white/10 bg-white/[0.04] p-1">
       <Link
         href="/dashboard"
         onClick={onNavigate}
         className={cn(
-          'flex h-9 items-center justify-center gap-1.5 rounded px-2 text-xs font-semibold transition-colors',
+          'flex h-9 items-center justify-center gap-1.5 rounded-[7px] px-2 text-xs font-semibold transition-colors',
           !adminArea
-            ? 'bg-slate-950 text-white dark:bg-white dark:text-slate-950'
-            : 'text-slate-500 hover:text-slate-950 dark:text-slate-400 dark:hover:text-white'
+            ? 'bg-white text-slate-950'
+            : 'text-slate-400 hover:text-white'
         )}
       >
         <Home className="h-3.5 w-3.5" />
@@ -587,10 +592,10 @@ function WorkspaceSwitch({ adminArea, onNavigate }: { adminArea: boolean; onNavi
         href="/dashboard/admin"
         onClick={onNavigate}
         className={cn(
-          'flex h-9 items-center justify-center gap-1.5 rounded px-2 text-xs font-semibold transition-colors',
+          'flex h-9 items-center justify-center gap-1.5 rounded-[7px] px-2 text-xs font-semibold transition-colors',
           adminArea
-            ? 'bg-slate-950 text-white dark:bg-white dark:text-slate-950'
-            : 'text-slate-500 hover:text-slate-950 dark:text-slate-400 dark:hover:text-white'
+            ? 'bg-white text-slate-950'
+            : 'text-slate-400 hover:text-white'
         )}
       >
         <UserCog className="h-3.5 w-3.5" />
@@ -669,19 +674,19 @@ function NavGroup({
             onClick={onNavigate}
             aria-current={active ? 'page' : undefined}
             className={cn(
-              'flex min-h-10 items-center gap-3 rounded-md border-l-2 px-3 py-2 text-sm font-medium transition-colors duration-150',
+              'flex min-h-10 items-center gap-3 rounded-[9px] px-3 py-2 text-sm font-medium transition-colors duration-150',
               active
-                ? 'border-cyan-600 bg-white text-slate-950 dark:border-cyan-300 dark:bg-white/[0.05] dark:text-white'
-                : 'border-transparent text-slate-600 hover:bg-white hover:text-slate-950 dark:text-slate-300 dark:hover:bg-white/[0.04] dark:hover:text-white'
+                ? 'bg-white text-slate-950'
+                : 'text-slate-300 hover:bg-white/[0.06] hover:text-white'
             )}
           >
-            <Icon className={cn('h-4 w-4 shrink-0', active && 'text-cyan-600 dark:text-cyan-300')} />
+            <Icon className={cn('h-4 w-4 shrink-0', active ? 'text-brand-600' : 'text-slate-500')} />
             <span className="min-w-0 flex-1 truncate">{item.label}</span>
             {badge > 0 && (
               <span
                 className={cn(
                   'ml-auto grid h-5 min-w-5 place-items-center rounded-full px-1.5 text-[11px] font-semibold',
-                  active ? 'bg-cyan-600 text-white dark:bg-cyan-300 dark:text-slate-950' : 'bg-red-600 text-white'
+                  active ? 'bg-brand-600 text-white' : 'bg-red-600 text-white'
                 )}
               >
                 {badge > 99 ? '99+' : badge}
