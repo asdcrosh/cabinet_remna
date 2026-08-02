@@ -25,7 +25,7 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { cn } from '@/lib/cn'
 
 type Device = 'ios' | 'android' | 'macos' | 'windows' | 'desktop'
-type AppId = 'happ' | 'v2ray' | 'rabbit-hole'
+type AppId = 'incy' | 'happ' | 'rabbit-hole'
 
 interface KeysCardProps {
   subscriptionUrl: string
@@ -40,18 +40,35 @@ interface AppOption {
   primaryDevices: Device[]
   icon: typeof Smartphone
   deepLinks: (subscriptionUrl: string) => string[]
-  installUrl: string
+  installUrl: string | ((device: Device) => string)
   steps: string[]
   getOpenLinks?: (input: { subscriptionUrl: string; happLink?: string | null; device: Device }) => string[]
 }
 
 const appOptions: AppOption[] = [
   {
+    id: 'incy',
+    name: 'INCY',
+    subtitle: 'Основное приложение для подключения',
+    devices: ['ios', 'android', 'macos'],
+    primaryDevices: ['ios', 'android', 'macos'],
+    icon: ShieldCheck,
+    deepLinks: (subscriptionUrl) => [`incy://import/${subscriptionUrl}`],
+    installUrl: (device) => device === 'android'
+      ? 'https://play.google.com/store/apps/details?id=llc.itdev.incy'
+      : 'https://apps.apple.com/app/incy/id6756943388',
+    steps: [
+      'Установите INCY из App Store или Google Play.',
+      'Вернитесь в кабинет и нажмите “Открыть в INCY”.',
+      'Подтвердите импорт подписки, выберите сервер и включите VPN.',
+    ],
+  },
+  {
     id: 'happ',
     name: 'HAPP',
-    subtitle: 'Рекомендуемый вариант',
+    subtitle: 'Запасной вариант',
     devices: ['ios', 'android', 'macos', 'windows', 'desktop'],
-    primaryDevices: ['ios', 'android', 'desktop'],
+    primaryDevices: ['windows', 'desktop'],
     icon: ShieldCheck,
     deepLinks: () => [],
     getOpenLinks: ({ subscriptionUrl, happLink }) => buildHappLinks(subscriptionUrl, happLink),
@@ -60,22 +77,6 @@ const appOptions: AppOption[] = [
       'Установите HAPP на устройство.',
       'Нажмите “Подключить в HAPP”. Если приложение не открылось, используйте кнопку копирования.',
       'При ручном добавлении в HAPP нажмите “Буфер обмена” и подтвердите подписку.',
-    ],
-  },
-  {
-    id: 'v2ray',
-    name: 'V2Ray',
-    subtitle: 'Android / Windows',
-    devices: ['android', 'windows', 'desktop'],
-    primaryDevices: ['android', 'windows'],
-    icon: Smartphone,
-    deepLinks: () => [],
-    getOpenLinks: ({ subscriptionUrl, device }) => buildV2RayLinks(subscriptionUrl, device),
-    installUrl: 'https://github.com/2dust/v2rayNG/releases',
-    steps: [
-      'Установите V2Ray-клиент для вашей системы.',
-      'Нажмите “Подключить” или скопируйте ссылку подписки.',
-      'Если приложение попросит тип импорта, выберите подписку по URL.',
     ],
   },
   {
@@ -101,7 +102,7 @@ const defaultApp = appOptions[0] as AppOption
 
 export function KeysCard({ subscriptionUrl, happLink }: KeysCardProps) {
   const [device, setDevice] = useState<Device>('desktop')
-  const [selectedAppId, setSelectedAppId] = useState<AppId>('happ')
+  const [selectedAppId, setSelectedAppId] = useState<AppId>('incy')
   const [instructionsOpen, setInstructionsOpen] = useState(false)
   const [qrOpen, setQrOpen] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
@@ -127,6 +128,9 @@ export function KeysCard({ subscriptionUrl, happLink }: KeysCardProps) {
     : selectedApp.deepLinks(subscriptionUrl)
   const primaryLink = selectedDeepLinks[0]
   const selectedIsRecommended = selectedApp.id === recommendedAppForDevice(device).id
+  const selectedInstallUrl = typeof selectedApp.installUrl === 'function'
+    ? selectedApp.installUrl(device)
+    : selectedApp.installUrl
 
   async function copy(text: string, label = 'Ссылка') {
     if (!text) return
@@ -182,7 +186,7 @@ export function KeysCard({ subscriptionUrl, happLink }: KeysCardProps) {
             Подключить устройство
           </h2>
           <p className="mt-1 text-sm leading-5 text-slate-500 dark:text-slate-400">
-            Выберите приложение для этого устройства.
+            Установите INCY и добавьте подписку одной кнопкой.
           </p>
         </div>
         <span className="inline-flex min-w-0 shrink-0 items-center gap-2 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-500 dark:border-white/10 dark:text-slate-400">
@@ -240,9 +244,9 @@ export function KeysCard({ subscriptionUrl, happLink }: KeysCardProps) {
             <ExternalLink className="h-4 w-4" />
             Открыть в {selectedApp.name}
           </button>
-          <a href={selectedApp.installUrl} target="_blank" rel="noreferrer" className="btn-secondary w-full justify-center">
+          <a href={selectedInstallUrl} target="_blank" rel="noreferrer" className="btn-secondary w-full justify-center">
             <Download className="h-4 w-4" />
-            Установить приложение
+            {installButtonLabel(selectedApp, device)}
           </a>
         </div>
 
@@ -424,20 +428,6 @@ function buildHappLinks(subscriptionUrl: string, happLink?: string | null) {
   return Array.from(new Set(links))
 }
 
-function buildV2RayLinks(subscriptionUrl: string, device: Device) {
-  const encodedUrl = encodeURIComponent(subscriptionUrl)
-  if (device === 'android') {
-    return [
-      `v2rayng://install-sub?url=${encodedUrl}`,
-      `v2rayng://install-config?url=${encodedUrl}`,
-    ]
-  }
-  if (device === 'windows') {
-    return [`v2rayn://install-sub?url=${encodedUrl}`]
-  }
-  return []
-}
-
 function openExternal(url: string, fallbackUrls: string[] = [], appName = 'приложение') {
   const webApp = window.Telegram?.WebApp
   const isMiniApp = isTelegramMiniAppContext()
@@ -497,8 +487,7 @@ function buildOpenAppBridgeUrl(url: string, fallbackUrl: string | undefined, app
 }
 
 function recommendedAppForDevice(device: Device) {
-  if (device === 'android' || device === 'windows') return appOptions[1] ?? defaultApp
-  if (device === 'macos') return appOptions[2] ?? defaultApp
+  if (device === 'windows' || device === 'desktop') return appOptions[1] ?? defaultApp
   return defaultApp
 }
 
@@ -523,4 +512,12 @@ function deviceLabel(device: Device) {
   if (device === 'macos') return 'macOS'
   if (device === 'windows') return 'Windows'
   return 'Устройство'
+}
+
+function installButtonLabel(app: AppOption, device: Device) {
+  if (app.id !== 'incy') return 'Установить приложение'
+  if (device === 'android') return 'Скачать в Google Play'
+  if (device === 'ios') return 'Скачать в App Store'
+  if (device === 'macos') return 'Скачать для macOS'
+  return 'Установить INCY'
 }

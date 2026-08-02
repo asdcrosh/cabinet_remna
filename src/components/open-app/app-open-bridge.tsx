@@ -6,7 +6,7 @@ import { useSearchParams } from 'next/navigation'
 import { ArrowLeft, Check, Copy, ExternalLink, ShieldAlert, ShieldCheck } from 'lucide-react'
 import { toast } from '@/components/ui/toaster'
 
-const allowedSchemes = ['happ:', 'v2rayng:', 'v2rayn:', 'rabbithole:', 'rabbit-hole:']
+const allowedSchemes = ['incy:', 'happ:', 'rabbithole:', 'rabbit-hole:']
 
 export function AppOpenBridge({ brandName }: { brandName: string }) {
   const searchParams = useSearchParams()
@@ -161,6 +161,8 @@ function isAllowedAppUrl(value: string) {
 
 function extractSubscriptionUrl(value: string) {
   if (!value) return ''
+  if (value.startsWith('incy://import/')) return value.slice('incy://import/'.length)
+  if (value.startsWith('incy://add/')) return value.slice('incy://add/'.length)
   if (value.startsWith('happ://add/')) return value.slice('happ://add/'.length)
   try {
     const url = new URL(value)
