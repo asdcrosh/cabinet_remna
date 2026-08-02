@@ -20,6 +20,7 @@ const ACTION_LABELS: Record<AuditAction, string> = {
   ADMIN_PLAN_DELETED: 'Тариф удалён',
   ADMIN_PLAN_ASSIGNED: 'Тариф',
   ADMIN_SUBSCRIPTION_DISABLED: 'Подписка отключена',
+  ADMIN_SUBSCRIPTION_DELETED: 'Подписка отключена',
   ADMIN_ROLE_CHANGED: 'Роль',
   ADMIN_PROFILE_UPDATED: 'Профиль',
   ADMIN_USERS_MERGED: 'Объединение',
