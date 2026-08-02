@@ -100,25 +100,48 @@ export function createRuntimeErrorReport(
   context?: string,
 ): AdminErrorReport {
   const normalized = error instanceof Error ? error : new Error(String(error))
+  const digest = readErrorDigest(error)
+  const serverRenderFailed = /Server Components render/i.test(normalized.message)
   return {
     id: createId(),
     source,
     title: source === 'promise' ? 'Ошибка фоновой операции' : 'Ошибка интерфейса',
-    message: humanizeError(normalized.message),
-    explanation: context
-      ? `Сбой произошёл в разделе «${context}». Интерфейс не смог завершить операцию.`
-      : 'Интерфейс не смог завершить операцию. Изменение могло не примениться.',
-    recommendations: [
-      'Закройте окно и повторите действие один раз.',
-      'Если ошибка повторится, скопируйте диагностику и найдите событие в Sentry или серверных логах.',
-    ],
+    message: serverRenderFailed
+      ? 'Сервер не смог сформировать страницу.'
+      : humanizeError(normalized.message),
+    explanation: serverRenderFailed
+      ? `Next.js скрыл исходную серверную ошибку в production.${digest ? ` Для поиска используйте digest ${digest}.` : ' Полная причина находится в серверных логах.'}`
+      : context
+        ? `Сбой произошёл в разделе «${context}». Интерфейс не смог завершить операцию.`
+        : 'Интерфейс не смог завершить операцию. Изменение могло не примениться.',
+    recommendations: serverRenderFailed
+      ? [
+          digest
+            ? `Найдите digest ${digest} в Sentry или логах контейнера app.`
+            : 'Найдите событие next.request_error в Sentry или логах контейнера app.',
+          'Не повторяйте изменение многократно, пока не установлена исходная серверная причина.',
+        ]
+      : [
+          'Закройте окно и повторите действие один раз.',
+          'Если ошибка повторится, скопируйте диагностику и найдите событие в Sentry или серверных логах.',
+        ],
     occurredAt: new Date().toISOString(),
+    errorCode: digest,
     technicalDetails: sanitizeDiagnosticValue({
       type: normalized.name,
       reason: normalized.message,
+      digest,
       stack: normalized.stack,
     }),
   }
+}
+
+function readErrorDigest(error: unknown) {
+  if (!error || typeof error !== 'object' || !('digest' in error)) return undefined
+  const digest = (error as { digest?: unknown }).digest
+  return typeof digest === 'string' && digest.trim()
+    ? sanitizeDiagnosticText(digest.trim())
+    : undefined
 }
 
 export function createManualErrorReport(message: string): AdminErrorReport {

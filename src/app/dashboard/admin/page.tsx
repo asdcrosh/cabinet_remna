@@ -9,6 +9,7 @@ import {
   RefreshCw,
   ShieldCheck,
   SearchCheck,
+  TriangleAlert,
   UserPlus,
   Wallet,
 } from 'lucide-react'
@@ -18,6 +19,7 @@ import { formatPrice } from '@/lib/format'
 import { cn } from '@/lib/cn'
 import { getPendingPaymentTtlMs } from '@/lib/payment-sync'
 import { findIdentityDuplicateCandidates } from '@/lib/identity-duplicates'
+import { logError } from '@/lib/logger'
 import { AdminPageShell } from '@/components/admin/admin-page-shell'
 
 export const dynamic = 'force-dynamic'
@@ -33,6 +35,7 @@ export default async function AdminDashboardPage() {
   const stalePaymentDate = new Date(now.getTime() - getPendingPaymentTtlMs())
   const twoWeeksAgo = new Date(now.getTime() - 13 * 24 * 60 * 60 * 1000)
   twoWeeksAgo.setHours(0, 0, 0, 0)
+  const failedMetrics: string[] = []
   const [
     usersTotal,
     usersToday,
@@ -50,16 +53,16 @@ export default async function AdminDashboardPage() {
     syncFailed,
     duplicateCandidates,
   ] = await Promise.all([
-    prisma.user.count(),
-    prisma.user.count({ where: { createdAt: { gte: todayStart } } }),
-    prisma.user.count({ where: { createdAt: { gte: weekAgo } } }),
-    prisma.payment.count({ where: { status: 'SUCCEEDED', subscriptionProvisionedAt: null } }),
-    prisma.payment.aggregate({
+    loadAdminMetric('Пользователи: всего', prisma.user.count(), 0, failedMetrics),
+    loadAdminMetric('Пользователи: сегодня', prisma.user.count({ where: { createdAt: { gte: todayStart } } }), 0, failedMetrics),
+    loadAdminMetric('Пользователи: неделя', prisma.user.count({ where: { createdAt: { gte: weekAgo } } }), 0, failedMetrics),
+    loadAdminMetric('Довыдача подписок', prisma.payment.count({ where: { status: 'SUCCEEDED', subscriptionProvisionedAt: null } }), 0, failedMetrics),
+    loadAdminMetric('Оплаты: всего', prisma.payment.aggregate({
       where: { status: 'SUCCEEDED' },
       _sum: { amountKopecks: true },
       _count: true,
-    }),
-    prisma.payment.aggregate({
+    }), { _sum: { amountKopecks: null }, _count: 0 }, failedMetrics),
+    loadAdminMetric('Оплаты: сегодня', prisma.payment.aggregate({
       where: {
         status: 'SUCCEEDED',
         OR: [
@@ -69,8 +72,8 @@ export default async function AdminDashboardPage() {
       },
       _sum: { amountKopecks: true },
       _count: true,
-    }),
-    prisma.payment.aggregate({
+    }), { _sum: { amountKopecks: null }, _count: 0 }, failedMetrics),
+    loadAdminMetric('Оплаты: неделя', prisma.payment.aggregate({
       where: {
         status: 'SUCCEEDED',
         OR: [
@@ -80,16 +83,16 @@ export default async function AdminDashboardPage() {
       },
       _sum: { amountKopecks: true },
       _count: true,
-    }),
-    prisma.supportTicket.count({ where: { status: 'WAITING_ADMIN' } }),
-    prisma.$queryRaw<Array<{ count: bigint }>>`
+    }), { _sum: { amountKopecks: null }, _count: 0 }, failedMetrics),
+    loadAdminMetric('Поддержка', prisma.supportTicket.count({ where: { status: 'WAITING_ADMIN' } }), 0, failedMetrics),
+    loadAdminMetric('Платящие пользователи', prisma.$queryRaw<Array<{ count: bigint }>>`
       SELECT COUNT(DISTINCT p."userId")::bigint AS count
       FROM "Payment" p
       INNER JOIN "User" u ON u.id = p."userId"
       WHERE p.status = 'SUCCEEDED' AND u.role = 'USER'
-    `,
-    prisma.user.count({ where: { role: 'USER' } }),
-    prisma.$queryRaw<Array<{ day: Date; payments: bigint; amount: bigint }>>`
+    `, [], failedMetrics),
+    loadAdminMetric('Клиенты', prisma.user.count({ where: { role: 'USER' } }), 0, failedMetrics),
+    loadAdminMetric('График оплат', prisma.$queryRaw<Array<{ day: Date; payments: bigint; amount: bigint }>>`
       SELECT
         date_trunc('day', COALESCE(p."paidAt", p."createdAt"))::date AS day,
         COUNT(*)::bigint AS payments,
@@ -99,17 +102,17 @@ export default async function AdminDashboardPage() {
         AND COALESCE(p."paidAt", p."createdAt") >= ${twoWeeksAgo}
       GROUP BY 1
       ORDER BY 1 ASC
-    `,
-    prisma.$queryRaw<Array<{ day: Date; users: bigint }>>`
+    `, [], failedMetrics),
+    loadAdminMetric('График регистраций', prisma.$queryRaw<Array<{ day: Date; users: bigint }>>`
       SELECT date_trunc('day', u."createdAt")::date AS day, COUNT(*)::bigint AS users
       FROM "User" u
       WHERE u."createdAt" >= ${twoWeeksAgo}
       GROUP BY 1
       ORDER BY 1 ASC
-    `,
-    prisma.payment.count({ where: { status: 'PENDING', createdAt: { lt: stalePaymentDate } } }),
-    prisma.syncEvent.count({ where: { status: 'FAILED' } }),
-    findIdentityDuplicateCandidates(20),
+    `, [], failedMetrics),
+    loadAdminMetric('Зависшие оплаты', prisma.payment.count({ where: { status: 'PENDING', createdAt: { lt: stalePaymentDate } } }), 0, failedMetrics),
+    loadAdminMetric('Ошибки синхронизации', prisma.syncEvent.count({ where: { status: 'FAILED' } }), 0, failedMetrics),
+    loadAdminMetric('Дубли аккаунтов', findIdentityDuplicateCandidates(20), [], failedMetrics),
   ])
   const payingUsers = Number(payingUsersResult[0]?.count ?? 0)
   const conversion = customersTotal > 0 ? (payingUsers / customersTotal) * 100 : 0
@@ -132,6 +135,15 @@ export default async function AdminDashboardPage() {
         </div>
       )}
     >
+      {failedMetrics.length > 0 ? (
+        <section className="flex items-start gap-3 rounded-[12px] border border-amber-300 bg-amber-50 px-4 py-3 text-amber-950 dark:border-amber-400/25 dark:bg-amber-400/10 dark:text-amber-100">
+          <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
+          <div className="min-w-0">
+            <h2 className="text-sm font-semibold">Часть показателей недоступна</h2>
+            <p className="mt-1 text-xs leading-5 opacity-80">Не загрузились: {failedMetrics.join(', ')}. Остальная админка продолжает работать, точная причина записана в лог app и Sentry.</p>
+          </div>
+        </section>
+      ) : null}
       <section className="space-y-3">
         <div>
           <h2 className="text-lg font-semibold tracking-tight text-slate-950 dark:text-white">Требует внимания</h2>
@@ -220,6 +232,21 @@ export default async function AdminDashboardPage() {
       </section>
     </AdminPageShell>
   )
+}
+
+async function loadAdminMetric<T>(
+  metric: string,
+  operation: Promise<T>,
+  fallback: T,
+  failedMetrics: string[],
+) {
+  try {
+    return await operation
+  } catch (error) {
+    failedMetrics.push(metric)
+    logError('admin.dashboard.metric_failed', error, { metric })
+    return fallback
+  }
 }
 
 function TrendPanel({

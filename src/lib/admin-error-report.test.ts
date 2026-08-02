@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createApiErrorReport, formatAdminErrorReport } from './admin-error-report'
+import { createApiErrorReport, createRuntimeErrorReport, formatAdminErrorReport } from './admin-error-report'
 
 describe('admin error report', () => {
   it('explains database permission errors and keeps the full request id', () => {
@@ -36,5 +36,20 @@ describe('admin error report', () => {
     expect(report.title).toBe('Нет ответа от сервера')
     expect(report.message).toBe('Не удалось связаться с сервером.')
     expect(report.recommendations.join(' ')).toContain('REMNASHOP_API_URL')
+  })
+
+  it('keeps the production Server Components digest and explains how to find the cause', () => {
+    const error = Object.assign(
+      new Error('An error occurred in the Server Components render. The specific message is omitted in production builds.'),
+      { digest: '1847362910' },
+    )
+
+    const report = createRuntimeErrorReport(error, 'interface', 'Администрирование')
+
+    expect(report.message).toBe('Сервер не смог сформировать страницу.')
+    expect(report.errorCode).toBe('1847362910')
+    expect(report.explanation).toContain('digest 1847362910')
+    expect(report.technicalDetails).toMatchObject({ digest: '1847362910' })
+    expect(formatAdminErrorReport(report)).toContain('Код ошибки: 1847362910')
   })
 })
