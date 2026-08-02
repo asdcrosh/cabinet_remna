@@ -2,6 +2,7 @@
 // опционально показывает toast. Используется во всех формах.
 
 import { toast } from '@/components/ui/toaster'
+import { isAdminErrorPresentationActive } from '@/lib/admin-error-report'
 
 export interface ApiError {
   error: string
@@ -45,7 +46,7 @@ export async function apiFetch<T = unknown>(
   } catch (error) {
     if (error instanceof Error && error.name === 'TimeoutError') {
       const message = 'Сервер не ответил вовремя. Попробуйте ещё раз.'
-      if (init.method && init.method !== 'GET') toast(message)
+      if (init.method && init.method !== 'GET' && !isAdminPage()) toast(message)
       throw new Error(message)
     }
     throw error
@@ -62,13 +63,20 @@ export async function apiFetch<T = unknown>(
       data,
       res.headers.get('x-request-id') || data?.requestId
     )
-    if (init.method && init.method !== 'GET') toast(message)
+    if (init.method && init.method !== 'GET' && !isAdminPage()) toast(message)
     const err = new Error(message) as Error & { status: number; data: any }
     err.status = res.status
     err.data = data
     throw err
   }
   return data as T
+}
+
+function isAdminPage() {
+  return typeof window !== 'undefined' && (
+    window.location.pathname.startsWith('/dashboard/admin')
+    || isAdminErrorPresentationActive()
+  )
 }
 
 function getApiErrorMessage(status: number, data: any, requestId?: string | null) {

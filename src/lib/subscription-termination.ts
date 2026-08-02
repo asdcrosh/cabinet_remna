@@ -48,17 +48,15 @@ export async function terminateUserSubscription(input: TerminateUserSubscription
   const remnawaveUuid = user.remnawaveUuid
   if (remnawaveUuid) {
     try {
-      await remnawave.updateUser({
-        uuid: remnawaveUuid,
-        status: 'DISABLED',
-        expireAt: now.toISOString(),
-      })
-      await remnawave.resetTraffic(remnawaveUuid)
-      const devices = await remnawave.getUserDevices(remnawaveUuid)
-      await Promise.all(
-        devices.response.devices.map((device) =>
-          remnawave.deleteUserDevice(remnawaveUuid, device.hwid)
-        )
+      const disabled = await remnawave.disableUser(remnawaveUuid)
+      await runRemnawaveCleanup(user.id, 'expire', () =>
+        remnawave.updateUser({ uuid: remnawaveUuid, expireAt: now.toISOString() })
+      )
+      await runRemnawaveCleanup(user.id, 'traffic', () =>
+        remnawave.resetTraffic(remnawaveUuid)
+      )
+      await runRemnawaveCleanup(user.id, 'devices', () =>
+        remnawave.deleteAllUserDevices(remnawaveUuid, disabled.response.id)
       )
     } catch (error) {
       if (!isRemnawaveUserMissing(error)) throw error
@@ -142,6 +140,22 @@ export async function terminateUserSubscription(input: TerminateUserSubscription
   })
 
   return { hadSubscription }
+}
+
+async function runRemnawaveCleanup(
+  userId: string,
+  stage: 'expire' | 'traffic' | 'devices',
+  cleanup: () => Promise<unknown>
+) {
+  try {
+    await cleanup()
+  } catch (error) {
+    logWarn('subscription.remnawave_cleanup_deferred', {
+      userId,
+      stage,
+      message: error instanceof Error ? error.message : String(error),
+    })
+  }
 }
 
 function isRemnawaveUserMissing(error: unknown) {

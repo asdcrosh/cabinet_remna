@@ -12,10 +12,10 @@ const mocks = vi.hoisted(() => {
     subscriptionUpdateMany: vi.fn(),
     deviceDeleteMany: vi.fn(),
     transaction: vi.fn(),
+    disableUser: vi.fn(),
     updateUser: vi.fn(),
     resetTraffic: vi.fn(),
-    getUserDevices: vi.fn(),
-    deleteUserDevice: vi.fn(),
+    deleteAllUserDevices: vi.fn(),
     removeRemnashopSubscription: vi.fn(),
     markSyncFailed: vi.fn(),
     markSyncSkipped: vi.fn(),
@@ -32,10 +32,10 @@ vi.mock('./prisma', () => ({
 }))
 vi.mock('./remnawave', () => ({
   remnawave: {
+    disableUser: mocks.disableUser,
     updateUser: mocks.updateUser,
     resetTraffic: mocks.resetTraffic,
-    getUserDevices: mocks.getUserDevices,
-    deleteUserDevice: mocks.deleteUserDevice,
+    deleteAllUserDevices: mocks.deleteAllUserDevices,
   },
   RemnawaveError: mocks.TestRemnawaveError,
 }))
@@ -63,12 +63,10 @@ describe('terminateUserSubscription', () => {
       remnashopUserId: null,
       subscriptions: [{ id: 'subscription-1' }],
     })
-    mocks.updateUser.mockResolvedValue({ response: { status: 'DISABLED' } })
+    mocks.disableUser.mockResolvedValue({ response: { id: 42, status: 'DISABLED' } })
+    mocks.updateUser.mockResolvedValue({ response: { id: 42, status: 'DISABLED' } })
     mocks.resetTraffic.mockResolvedValue({ response: { usedTrafficBytes: '0' } })
-    mocks.getUserDevices.mockResolvedValue({
-      response: { total: 2, devices: [{ hwid: 'device-1' }, { hwid: 'device-2' }] },
-    })
-    mocks.deleteUserDevice.mockResolvedValue({ response: [] })
+    mocks.deleteAllUserDevices.mockResolvedValue({ response: { isDeleted: true } })
     mocks.transaction.mockImplementation(async (callback) => callback({
       subscription: { updateMany: mocks.subscriptionUpdateMany },
       device: { deleteMany: mocks.deviceDeleteMany },
@@ -82,15 +80,13 @@ describe('terminateUserSubscription', () => {
     })
 
     expect(result).toEqual({ hadSubscription: true })
+    expect(mocks.disableUser).toHaveBeenCalledWith('uuid-1')
     expect(mocks.updateUser).toHaveBeenCalledWith(expect.objectContaining({
       uuid: 'uuid-1',
-      status: 'DISABLED',
       expireAt: expect.any(String),
     }))
     expect(mocks.resetTraffic).toHaveBeenCalledWith('uuid-1')
-    expect(mocks.deleteUserDevice).toHaveBeenCalledTimes(2)
-    expect(mocks.deleteUserDevice).toHaveBeenCalledWith('uuid-1', 'device-1')
-    expect(mocks.deleteUserDevice).toHaveBeenCalledWith('uuid-1', 'device-2')
+    expect(mocks.deleteAllUserDevices).toHaveBeenCalledWith('uuid-1', 42)
     expect(mocks.subscriptionUpdateMany).toHaveBeenCalledWith(expect.objectContaining({
       where: { userId: 'user-1', status: { in: ['ACTIVE', 'LIMITED'] } },
       data: expect.objectContaining({
@@ -109,7 +105,7 @@ describe('terminateUserSubscription', () => {
   })
 
   it('finishes local cleanup when the Remnawave profile was already deleted', async () => {
-    mocks.updateUser.mockRejectedValue(new mocks.TestRemnawaveError(404, null))
+    mocks.disableUser.mockRejectedValue(new mocks.TestRemnawaveError(404, null))
 
     await expect(terminateUserSubscription({
       userId: 'user-1',
@@ -139,12 +135,26 @@ describe('terminateUserSubscription', () => {
   })
 
   it('does not clear local identifiers when Remnawave is unavailable', async () => {
-    mocks.updateUser.mockRejectedValue(new mocks.TestRemnawaveError(503, null))
+    mocks.disableUser.mockRejectedValue(new mocks.TestRemnawaveError(503, null))
 
     await expect(terminateUserSubscription({
       userId: 'user-1',
       source: 'USER_REQUEST',
     })).rejects.toBeInstanceOf(mocks.TestRemnawaveError)
     expect(mocks.transaction).not.toHaveBeenCalled()
+  })
+
+  it('keeps the successful disable when optional Remnawave cleanup fails', async () => {
+    mocks.updateUser.mockRejectedValue(new mocks.TestRemnawaveError(422, null))
+    mocks.resetTraffic.mockRejectedValue(new mocks.TestRemnawaveError(503, null))
+    mocks.deleteAllUserDevices.mockRejectedValue(new mocks.TestRemnawaveError(400, null))
+
+    await expect(terminateUserSubscription({
+      userId: 'user-1',
+      source: 'ADMIN_REQUEST',
+    })).resolves.toEqual({ hadSubscription: true })
+
+    expect(mocks.disableUser).toHaveBeenCalledWith('uuid-1')
+    expect(mocks.transaction).toHaveBeenCalledOnce()
   })
 })

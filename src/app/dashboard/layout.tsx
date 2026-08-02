@@ -9,6 +9,7 @@ import { LogoutButton } from '@/components/dashboard/logout-button'
 import { Brand, DashboardNav, MobileBottomNav, MobileDashboardNav, NavBadgesProvider } from '@/components/dashboard/dashboard-nav'
 import { NotificationBell } from '@/components/dashboard/notification-bell'
 import { logWarn } from '@/lib/logger'
+import { AdminErrorCenter } from '@/components/admin/admin-error-center'
 
 export const dynamic = 'force-dynamic'
 
@@ -52,6 +53,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   return (
     <NavBadgesProvider initialBadges={navBadges} supportEnabled={features.support}>
+      {isStaff ? <AdminErrorCenter /> : null}
       <div className="dashboard-shell min-h-screen">
         <a
           href="#dashboard-content"

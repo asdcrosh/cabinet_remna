@@ -7,6 +7,7 @@ import type { SessionPayload } from './jwt'
 import { assertSameOrigin } from '@/lib/security'
 import { prisma } from '@/lib/prisma'
 import { logError, withRequestLogContext } from '@/lib/logger'
+import { buildServerErrorDiagnostics } from '@/lib/error-diagnostics'
 
 export class AuthError extends Error {
   constructor(public status: number, message: string) {
@@ -81,9 +82,11 @@ export function withAuth<T extends (...args: any[]) => Promise<NextResponse>>(
           method: request?.method,
           path: request ? new URL(request.url).pathname : undefined,
         })
+        const details = request ? await getAdminErrorDetails(request, e) : undefined
         return NextResponse.json(
           {
             error: 'Внутренняя ошибка сервера.',
+            ...(details ? { details } : {}),
             ...(requestId ? { requestId } : {}),
           },
           { status: 500 }
@@ -96,6 +99,17 @@ export function withAuth<T extends (...args: any[]) => Promise<NextResponse>>(
     if (requestId) response.headers.set('x-request-id', requestId)
     return response
   }) as T
+}
+
+async function getAdminErrorDetails(request: Request, error: unknown) {
+  if (!new URL(request.url).pathname.startsWith('/api/admin/')) return undefined
+  try {
+    const session = await getSession()
+    if (!session || !['MODERATOR', 'ADMIN', 'SUPER_ADMIN'].includes(session.role)) return undefined
+    return buildServerErrorDiagnostics(error)
+  } catch {
+    return undefined
+  }
 }
 
 function resolveRequestId(request: Request) {

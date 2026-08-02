@@ -7,12 +7,29 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { CheckCircle2, X, XCircle } from 'lucide-react'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/cn'
+import {
+  createManualErrorReport,
+  isAdminErrorPresentationActive,
+  publishAdminError,
+  wasAdminErrorPublishedRecently,
+} from '@/lib/admin-error-report'
 
 type Toast = { id: number; type: 'error' | 'success'; message: string }
 
 let listeners: Array<(t: Toast) => void> = []
 
 export function toast(message: string, type: 'error' | 'success' = 'error') {
+  if (
+    type === 'error'
+    && typeof window !== 'undefined'
+    && (
+      window.location.pathname.startsWith('/dashboard/admin')
+      || isAdminErrorPresentationActive()
+    )
+  ) {
+    if (!wasAdminErrorPublishedRecently()) publishAdminError(createManualErrorReport(message))
+    return
+  }
   listeners.forEach((fn) => fn({ id: Date.now() + Math.random(), type, message }))
 }
 

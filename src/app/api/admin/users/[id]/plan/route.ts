@@ -4,8 +4,10 @@ import { prisma } from '@/lib/prisma'
 import { requireAdmin, withAuth } from '@/lib/auth/guard'
 import { ensureRemnawaveSubscription } from '@/lib/subscription'
 import { writeAuditLog } from '@/lib/audit-log'
+import { logError } from '@/lib/logger'
 import { RemnawaveError } from '@/lib/remnawave'
 import { terminateUserSubscription } from '@/lib/subscription-termination'
+import { buildServerErrorDiagnostics } from '@/lib/error-diagnostics'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -109,8 +111,16 @@ export const DELETE = withAuth(async (req: Request, { params }: { params: Promis
     }
   } catch (error) {
     if (error instanceof RemnawaveError) {
+      logError('admin.subscription_disable_failed', error, {
+        userId: user.id,
+        remnawaveUuid: user.remnawaveUuid,
+        status: error.status,
+      })
       return NextResponse.json(
-        { error: 'Не удалось отключить подписку в Remnawave. Повторите позже.' },
+        {
+          error: 'Не удалось отключить подписку в Remnawave. Повторите позже.',
+          details: buildServerErrorDiagnostics(error),
+        },
         { status: 502 }
       )
     }

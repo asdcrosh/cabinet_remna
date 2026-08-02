@@ -107,6 +107,7 @@ export interface UpdateUserRequest {
 }
 
 export interface UserResponse {
+  id?: number
   uuid: string
   shortUuid: string
   username: string
@@ -190,6 +191,7 @@ export interface SubscriptionRequestRecord {
 
 export interface HwidUserDevice {
   hwid: string
+  userId?: number
   userUuid?: string
   platform?: string
   osVersion?: string
@@ -335,6 +337,14 @@ export const remnawave = {
       'POST',
       '/api/hwid/devices/delete',
       { userUuid: uuid, hwid }
+    )
+  },
+
+  async deleteAllUserDevices(uuid: string, userId?: number) {
+    return request<{ response: unknown }>(
+      'POST',
+      '/api/hwid/devices/delete-all',
+      userId ? { userId } : { userUuid: uuid }
     )
   },
 }
