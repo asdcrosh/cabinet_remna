@@ -264,10 +264,13 @@ body {
 
 .dashboard-signal::before {
   position: absolute;
-  inset: 0 auto 0 0;
-  width: 100%;
+  top: 0.75rem;
+  bottom: 0.75rem;
+  left: 0;
+  width: 2px;
+  border-radius: 999px;
   content: '';
-  background: var(--app-accent-bright);
+  background: var(--app-accent);
 }
 
 .dashboard-rule {

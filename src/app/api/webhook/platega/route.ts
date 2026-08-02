@@ -5,6 +5,8 @@ import { notifyPaymentCanceled } from '@/lib/notifications'
 import { prisma } from '@/lib/prisma'
 import { verifyPlategaCallbackHeaders } from '@/lib/platega'
 import { cancelOtherPendingPaymentsForUser, syncPaymentProvisioning } from '@/lib/payment-sync'
+import { recordSucceededRefund } from '@/lib/payment-refunds'
+import { terminateUserSubscription } from '@/lib/subscription-termination'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -63,19 +65,26 @@ export async function POST(request: Request) {
   }
 
   if (callback.status === 'CHARGEBACKED') {
-    await prisma.$transaction([
-      prisma.payment.update({
-        where: { id: payment.id },
-        data: {
-          status: 'REFUNDED',
-          providerStatus: callback.status,
-        },
-      }),
-      prisma.promoCodeRedemption.updateMany({
-        where: { paymentId: payment.id, status: 'PENDING' },
-        data: { status: 'CANCELED' },
-      }),
-    ])
+    await recordSucceededRefund({
+      paymentId: payment.id,
+      providerRefundId: `platega-chargeback:${callback.id}`,
+      amountKopecks,
+      paymentAmountKopecks: payment.amountKopecks,
+      providerStatus: callback.status,
+    })
+    try {
+      await terminateUserSubscription({
+        userId: payment.userId,
+        source: 'PLATEGA_CHARGEBACK',
+        paymentId: payment.id,
+      })
+    } catch (error) {
+      logError('webhook.platega.chargeback_revoke_failed', error, {
+        paymentId: payment.id,
+        transactionId: callback.id,
+      })
+      return NextResponse.json({ error: 'Subscription removal failed' }, { status: 503 })
+    }
     logWarn('webhook.platega.chargeback', { paymentId: payment.id, transactionId: callback.id })
     return new NextResponse(null, { status: 200 })
   }

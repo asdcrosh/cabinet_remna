@@ -438,7 +438,7 @@ Webhook URL:
 https://ВАШ_ДОМЕН/api/webhook/yookassa
 ```
 
-События: `payment.succeeded`, `payment.canceled`, `payment.waiting_for_capture`.
+События: `payment.succeeded`, `payment.canceled`, `payment.waiting_for_capture`, `refund.succeeded`.
 
 Кабинет также проверяет платёж после возврата пользователя; worker периодически сверяет pending-платежи.
 

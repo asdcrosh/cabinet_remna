@@ -11,10 +11,12 @@ import { provisionPaymentSubscription } from '@/lib/provisioning'
 import { getPayment } from '@/lib/yookassa'
 import { assertYookassaWebhookSource } from '@/lib/yookassa-webhook'
 import { getResolvedPaymentProviderSettings } from '@/lib/payment-settings'
+import { recordSucceededRefund } from '@/lib/payment-refunds'
+import { terminateUserSubscription } from '@/lib/subscription-termination'
 
 export const runtime = 'nodejs'
 
-interface YookassaWebhookEvent {
+interface YookassaPaymentWebhookEvent {
   type: string
   event: 'payment.succeeded' | 'payment.canceled' | 'payment.waiting_for_capture'
   object: {
@@ -23,6 +25,22 @@ interface YookassaWebhookEvent {
     metadata?: Record<string, string>
   }
 }
+
+interface YookassaRefundWebhookEvent {
+  type: string
+  event: 'refund.succeeded'
+  object: {
+    id: string
+    status: 'succeeded'
+    payment_id: string
+    amount: {
+      value: string
+      currency: string
+    }
+  }
+}
+
+type YookassaWebhookEvent = YookassaPaymentWebhookEvent | YookassaRefundWebhookEvent
 
 export async function POST(req: Request) {
   const settings = await getResolvedPaymentProviderSettings()
@@ -40,6 +58,10 @@ export async function POST(req: Request) {
 
   if (event.type !== 'notification') {
     return NextResponse.json({ ok: true, skipped: true })
+  }
+
+  if (event.event === 'refund.succeeded') {
+    return handleSucceededRefund(event)
   }
 
   const yookassaId = event.object.id
@@ -130,4 +152,72 @@ export async function POST(req: Request) {
   }
 
   return NextResponse.json({ ok: true, deferred: true })
+}
+
+async function handleSucceededRefund(event: YookassaRefundWebhookEvent) {
+  const refund = event.object
+  const amountKopecks = moneyToKopecks(refund.amount.value)
+  if (
+    !refund.id ||
+    !refund.payment_id ||
+    refund.status !== 'succeeded' ||
+    refund.amount.currency.toUpperCase() !== 'RUB' ||
+    amountKopecks == null
+  ) {
+    return NextResponse.json({ error: 'Invalid refund payload' }, { status: 400 })
+  }
+
+  const payment = await prisma.payment.findUnique({
+    where: { yookassaId: refund.payment_id },
+    select: {
+      id: true,
+      userId: true,
+      amountKopecks: true,
+    },
+  })
+  if (!payment) {
+    logWarn('webhook.yookassa.refund_payment_not_found', {
+      refundId: refund.id,
+      yookassaId: refund.payment_id,
+    })
+    return NextResponse.json({ ok: true, notFound: true })
+  }
+
+  const result = await recordSucceededRefund({
+    paymentId: payment.id,
+    providerRefundId: `yookassa-refund:${refund.id}`,
+    amountKopecks,
+    paymentAmountKopecks: payment.amountKopecks,
+    providerStatus: 'refund.succeeded',
+  })
+  if (!result.fullyRefunded) {
+    return NextResponse.json({
+      ok: true,
+      partialRefund: true,
+      refundedAmountKopecks: result.refundedAmountKopecks,
+    })
+  }
+
+  try {
+    await terminateUserSubscription({
+      userId: payment.userId,
+      source: 'YOOKASSA_REFUND',
+      paymentId: payment.id,
+    })
+  } catch (error) {
+    logError('webhook.yookassa.refund_revoke_failed', error, {
+      paymentId: payment.id,
+      refundId: refund.id,
+    })
+    return NextResponse.json({ error: 'Subscription removal failed' }, { status: 503 })
+  }
+
+  return NextResponse.json({ ok: true, refunded: true })
+}
+
+function moneyToKopecks(value: string) {
+  if (!/^\d+(?:\.\d{1,2})?$/.test(value)) return null
+  const [rubles, kopecks = ''] = value.split('.')
+  const amount = Number(rubles) * 100 + Number(kopecks.padEnd(2, '0'))
+  return Number.isSafeInteger(amount) && amount > 0 ? amount : null
 }

@@ -4,6 +4,8 @@ import { prisma } from '@/lib/prisma'
 import { requireAdmin, withAuth } from '@/lib/auth/guard'
 import { ensureRemnawaveSubscription } from '@/lib/subscription'
 import { writeAuditLog } from '@/lib/audit-log'
+import { RemnawaveError } from '@/lib/remnawave'
+import { terminateUserSubscription } from '@/lib/subscription-termination'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -78,4 +80,54 @@ export const POST = withAuth(async (req: Request, { params }: { params: Promise<
       status: result.subscription.status,
     },
   })
+})
+
+export const DELETE = withAuth(async (req: Request, { params }: { params: Promise<{ id: string }> }) => {
+  const session = await requireAdmin()
+  const { id } = await params
+  const [actor, user] = await Promise.all([
+    prisma.user.findUnique({ where: { id: session.uid }, select: { role: true } }),
+    prisma.user.findUnique({
+      where: { id },
+      select: { id: true, email: true, role: true, remnawaveUuid: true },
+    }),
+  ])
+  if (!actor || !user) {
+    return NextResponse.json({ error: 'Пользователь не найден' }, { status: 404 })
+  }
+  if (user.role === 'SUPER_ADMIN' && actor.role !== 'SUPER_ADMIN') {
+    return NextResponse.json({ error: 'Изменять главного администратора нельзя' }, { status: 403 })
+  }
+
+  try {
+    const result = await terminateUserSubscription({
+      userId: user.id,
+      source: 'ADMIN_REQUEST',
+    })
+    if (!result.hadSubscription) {
+      return NextResponse.json({ error: 'Активная подписка не найдена' }, { status: 404 })
+    }
+  } catch (error) {
+    if (error instanceof RemnawaveError) {
+      return NextResponse.json(
+        { error: 'Не удалось удалить подписку в Remnawave. Повторите позже.' },
+        { status: 502 }
+      )
+    }
+    throw error
+  }
+
+  await writeAuditLog({
+    actorId: session.uid,
+    targetId: user.id,
+    action: 'ADMIN_SUBSCRIPTION_DELETED',
+    message: 'Администратор удалил подписку пользователя',
+    metadata: {
+      email: user.email,
+      remnawaveUuid: user.remnawaveUuid,
+    },
+    request: req,
+  })
+
+  return NextResponse.json({ ok: true })
 })

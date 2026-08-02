@@ -433,6 +433,53 @@ export async function notifySubscriptionExpiring(input: {
   })
 }
 
+export async function notifySubscriptionTerminated(input: {
+  userId: string
+  source: 'USER_REQUEST' | 'ADMIN_REQUEST' | 'YOOKASSA_REFUND' | 'PLATEGA_CHARGEBACK' | 'REMNASHOP_REFUND'
+  dedupeId: string
+}) {
+  const adminRemoval = input.source === 'ADMIN_REQUEST'
+  const userRemoval = input.source === 'USER_REQUEST'
+  const title = adminRemoval
+    ? 'Подписка удалена администратором'
+    : userRemoval
+      ? 'Подписка удалена'
+      : 'Подписка удалена после возврата'
+  const body = adminRemoval
+    ? 'Доступ отключён на всех устройствах. Если это произошло неожиданно, напишите в поддержку.'
+    : userRemoval
+      ? 'Доступ отключён на всех устройствах. Новый тариф можно выбрать в кабинете.'
+      : input.source === 'PLATEGA_CHARGEBACK'
+        ? 'Платёж был возвращён или оспорен, поэтому доступ отключён на всех устройствах.'
+        : 'Возврат платежа подтверждён, поэтому доступ отключён на всех устройствах.'
+  const actionHref = adminRemoval ? '/dashboard/support' : RENEW_PATH
+  const actionLabel = adminRemoval ? 'Написать в поддержку' : 'Выбрать тариф'
+  const actionUrl = `${getAppUrl()}${actionHref}`
+
+  await notifyUser({
+    userId: input.userId,
+    type: 'SUBSCRIPTION_TERMINATED',
+    dedupeKey: `subscription-terminated:${input.dedupeId}`,
+    title,
+    body,
+    actionHref,
+    actionLabel,
+    telegramText: [`<b>${escapeTelegram(title)}</b>`, escapeTelegram(body)].join('\n'),
+    telegramActionUrl: actionUrl,
+    telegramActionLabel: actionLabel,
+    telegramActionOpenInTelegram: true,
+    emailSubject: `${title} — ${getBrandName()}`,
+    emailText: `${body}\n\n${actionLabel}: ${actionUrl}`,
+    emailHtml: renderNotificationEmail({
+      eyebrow: 'Подписка',
+      title,
+      lead: body,
+      ctaLabel: actionLabel,
+      ctaUrl: actionUrl,
+    }),
+  })
+}
+
 export async function notifyTrafficLimit(input: {
   userId: string
   subscriptionId: string

@@ -1,4 +1,4 @@
-import type { SyncDirection } from '@prisma/client'
+import type { Prisma, SyncDirection } from '@prisma/client'
 import { createAdminNotification } from './admin-notifications'
 import { prisma } from './prisma'
 import {
@@ -8,6 +8,7 @@ import {
   syncCabinetPromoCodeToRemnashop,
 } from './remnashop-promo-sync'
 import { syncCabinetPaymentToRemnashop } from './remnashop-reverse-sync'
+import { removeRemnashopSubscription } from './remnashop-subscription-removal'
 import { syncRemnashopCatalog, syncRemnashopPaymentsToCabinet } from './remnashop-sync'
 import { syncRemnashopUserBySourceId } from './remnashop-users'
 import { markSyncFailed, markSyncPending, markSyncSkipped, markSyncSucceeded } from './sync-events'
@@ -18,9 +19,20 @@ type RetryableSyncEvent = {
   entityType: string
   entityId: string
   operation: string
+  metadata?: Prisma.JsonValue | null
 }
 
 export async function retryRemnashopSyncEvent(event: RetryableSyncEvent) {
+  if (
+    event.direction === 'CABINET_TO_REMNASHOP' &&
+    event.entityType === 'subscription' &&
+    event.operation === 'delete'
+  ) {
+    const metadata = readSubscriptionRemovalMetadata(event.metadata)
+    await removeRemnashopSubscription(metadata)
+    return { ok: true as const }
+  }
+
   if (event.direction === 'CABINET_TO_REMNASHOP' && event.entityType === 'payment') {
     const result = await syncCabinetPaymentToRemnashop(event.entityId)
     if (!result.ok) {
@@ -132,7 +144,7 @@ export async function retryDueRemnashopSyncEvents(options: {
           }),
       AND: [{
         OR: [
-          { direction: 'CABINET_TO_REMNASHOP', entityType: { in: ['payment', 'promoCode'] } },
+          { direction: 'CABINET_TO_REMNASHOP', entityType: { in: ['payment', 'promoCode', 'subscription'] } },
           {
             direction: 'REMNASHOP_TO_CABINET',
             entityType: { in: ['user', 'payment', 'catalog', 'telegramIdentity'] },
@@ -172,6 +184,18 @@ export async function retryDueRemnashopSyncEvents(options: {
   }
 
   return { attempted: succeeded + failed, succeeded, failed }
+}
+
+function readSubscriptionRemovalMetadata(metadata: Prisma.JsonValue | null | undefined) {
+  if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) {
+    throw new Error('Subscription removal metadata is missing')
+  }
+  const remnashopUserId = metadata.remnashopUserId
+  const remnawaveUuid = metadata.remnawaveUuid
+  if (!Number.isInteger(remnashopUserId) || typeof remnawaveUuid !== 'string' || !remnawaveUuid) {
+    throw new Error('Subscription removal metadata is invalid')
+  }
+  return { remnashopUserId: Number(remnashopUserId), remnawaveUuid }
 }
 
 async function notifyRepeatedFailure(

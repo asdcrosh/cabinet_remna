@@ -22,7 +22,7 @@ vi.mock('./app-url', () => ({ getAppUrl: () => 'https://cabinet.example.test' })
 vi.mock('./branding', () => ({ getBrandName: () => 'Cabinet' }))
 vi.mock('./email-template', () => ({ renderActionEmail: () => '<p>Email</p>' }))
 
-import { notifySubscriptionExpiring, notifyUser } from './notifications'
+import { notifySubscriptionExpiring, notifySubscriptionTerminated, notifyUser } from './notifications'
 
 describe('notifyUser', () => {
   beforeEach(() => {
@@ -376,5 +376,34 @@ describe('notifyUser', () => {
     const first = firstCall[0].data.dedupeKey
     const second = secondCall[0].data.dedupeKey
     expect(first).not.toBe(second)
+  })
+
+  it('notifies the user when an administrator removes the subscription', async () => {
+    mocks.prisma.user.findUnique.mockResolvedValue({
+      id: 'user-1',
+      email: 'user@example.test',
+      emailVerifiedAt: new Date(),
+      name: 'User',
+      telegramId: 123n,
+    })
+    mocks.prisma.notificationLog.createMany.mockResolvedValue({ count: 1 })
+    mocks.prisma.userNotification.createMany.mockResolvedValue({ count: 1 })
+
+    await notifySubscriptionTerminated({
+      userId: 'user-1',
+      source: 'ADMIN_REQUEST',
+      dedupeId: 'subscription:subscription-1',
+    })
+
+    expect(mocks.prisma.userNotification.createMany).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        type: 'SUBSCRIPTION_TERMINATED',
+        dedupeKey: 'SUBSCRIPTION_TERMINATED:subscription-terminated:subscription:subscription-1',
+        title: 'Подписка удалена администратором',
+        actionHref: '/dashboard/support',
+      }),
+    }))
+    expect(mocks.prisma.notificationLog.createMany).toHaveBeenCalledTimes(2)
+    expect(fetch).toHaveBeenCalledTimes(2)
   })
 })

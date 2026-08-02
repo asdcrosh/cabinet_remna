@@ -16,6 +16,7 @@ import { formatPrice } from '@/lib/format'
 import { AdminFilterBar, AdminFilterField } from '@/components/admin/admin-filter-bar'
 import { AdminEmptyState } from '@/components/admin/admin-empty-state'
 import { AdminActionsMenu } from '@/components/admin/admin-actions-menu'
+import { UserSubscriptionDeleteButton } from '@/components/admin/user-subscription-delete-button'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Пользователи — Админка' }
@@ -516,6 +517,16 @@ function UserActions({
           email={user.email}
           currentPlanId={subscriptionPlanId}
           plans={plans}
+          showLabel={showLabels}
+        />
+      )}
+      {canManageUser && (
+        user.remnawaveUuid ||
+        (user.subscriptions[0] && ['ACTIVE', 'LIMITED'].includes(user.subscriptions[0].status))
+      ) && (
+        <UserSubscriptionDeleteButton
+          userId={user.id}
+          email={user.email}
           showLabel={showLabels}
         />
       )}

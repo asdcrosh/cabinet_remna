@@ -2,6 +2,7 @@ import { prisma } from './prisma'
 import { remnashopQuery } from './remnashop-db'
 import { syncRemnashopUsersToCabinet } from './remnashop-users'
 import { markSyncFailed, markSyncSkipped, markSyncSucceeded } from './sync-events'
+import { terminateUserSubscription } from './subscription-termination'
 
 type RemnashopSubscriptionStatus = 'ACTIVE' | 'DISABLED' | 'EXPIRED' | 'DELETED'
 type RemnashopTransactionStatus = 'PENDING' | 'COMPLETED' | 'CANCELED' | 'REFUNDED' | 'FAILED'
@@ -697,6 +698,7 @@ async function syncRemnashopTransactionToCabinet(
     },
     select: {
       id: true,
+      userId: true,
       status: true,
       providerStatus: true,
       paidAt: true,
@@ -729,6 +731,14 @@ async function syncRemnashopTransactionToCabinet(
         })
       }
     })
+    if (status === 'REFUNDED') {
+      await terminateUserSubscription({
+        userId: existing.userId,
+        source: 'REMNASHOP_REFUND',
+        paymentId: existing.id,
+        skipRemnashopSync: true,
+      })
+    }
     return statusChanged ? 'updated' : 'skipped'
   }
 
@@ -790,7 +800,7 @@ async function syncRemnashopTransactionToCabinet(
   const discountPercent = readPositiveInt(pricing, ['discount_percent']) ?? 0
   const subscriptionId = user.subscriptions[0]?.id ?? null
 
-  await prisma.payment.create({
+  const createdPayment = await prisma.payment.create({
     data: {
       userId: user.id,
       subscriptionId,
@@ -812,6 +822,14 @@ async function syncRemnashopTransactionToCabinet(
       remnashopSyncedAt: new Date(),
     },
   })
+  if (status === 'REFUNDED') {
+    await terminateUserSubscription({
+      userId: user.id,
+      source: 'REMNASHOP_REFUND',
+      paymentId: createdPayment.id,
+      skipRemnashopSync: true,
+    })
+  }
   return 'created'
 }
 

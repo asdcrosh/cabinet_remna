@@ -337,6 +337,7 @@ Events:
 ```text
 payment.succeeded
 payment.canceled
+refund.succeeded
 payment.waiting_for_capture
 ```
 

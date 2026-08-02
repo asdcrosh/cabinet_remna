@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => {
     markSyncFailed: vi.fn(),
     markSyncSkipped: vi.fn(),
     markSyncSucceeded: vi.fn(),
+    terminateUserSubscription: vi.fn(),
   }
 })
 
@@ -29,6 +30,9 @@ vi.mock('./sync-events', () => ({
   markSyncSkipped: mocks.markSyncSkipped,
   markSyncSucceeded: mocks.markSyncSucceeded,
 }))
+vi.mock('./subscription-termination', () => ({
+  terminateUserSubscription: mocks.terminateUserSubscription,
+}))
 
 import { syncRemnashopPaymentsToCabinet } from './remnashop-sync'
 
@@ -38,6 +42,7 @@ describe('Remnashop payment import', () => {
     mocks.prisma.$transaction.mockImplementation(async (callback) => callback(mocks.prisma))
     mocks.prisma.payment.findFirst.mockResolvedValue({
       id: 'cabinet-payment-1',
+      userId: 'user-1',
       status: 'SUCCEEDED',
       providerStatus: 'COMPLETED',
       paidAt: new Date('2026-07-20T10:00:00.000Z'),
@@ -46,6 +51,7 @@ describe('Remnashop payment import', () => {
     })
     mocks.prisma.payment.update.mockResolvedValue({})
     mocks.prisma.promoCodeRedemption.updateMany.mockResolvedValue({ count: 1 })
+    mocks.terminateUserSubscription.mockResolvedValue({ hadSubscription: true })
     mocks.remnashopQuery.mockResolvedValue({
       rows: [{
         id: 10,
@@ -91,5 +97,11 @@ describe('Remnashop payment import', () => {
       data: { status: 'CANCELED' },
     })
     expect(mocks.markSyncSucceeded).toHaveBeenCalled()
+    expect(mocks.terminateUserSubscription).toHaveBeenCalledWith({
+      userId: 'user-1',
+      source: 'REMNASHOP_REFUND',
+      paymentId: 'cabinet-payment-1',
+      skipRemnashopSync: true,
+    })
   })
 })

@@ -35,6 +35,8 @@ const mocks = vi.hoisted(() => {
     assertYookassaWebhookSource: vi.fn(),
     notifyPaymentCanceled: vi.fn(),
     notifyPaymentStuck: vi.fn(),
+    recordSucceededRefund: vi.fn(),
+    terminateUserSubscription: vi.fn(),
   }
 })
 
@@ -55,6 +57,10 @@ vi.mock('@/lib/payment-settings', () => ({
     yookassa: { webhookAllowedIps: '185.71.76.0/27' },
   })),
 }))
+vi.mock('@/lib/payment-refunds', () => ({ recordSucceededRefund: mocks.recordSucceededRefund }))
+vi.mock('@/lib/subscription-termination', () => ({
+  terminateUserSubscription: mocks.terminateUserSubscription,
+}))
 
 import { POST } from './route'
 
@@ -72,12 +78,33 @@ function webhookRequest(status: 'succeeded' | 'canceled' | 'waiting_for_capture'
   })
 }
 
+function refundWebhookRequest(value = '300.00', refundId = 'refund-1') {
+  return new Request('http://localhost:3000/api/webhook/yookassa', {
+    method: 'POST',
+    body: JSON.stringify({
+      type: 'notification',
+      event: 'refund.succeeded',
+      object: {
+        id: refundId,
+        status: 'succeeded',
+        payment_id: 'yoo-1',
+        amount: { value, currency: 'RUB' },
+      },
+    }),
+  })
+}
+
 describe('YooKassa webhook route', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mocks.assertYookassaWebhookSource.mockReturnValue({ ok: true })
     mocks.prisma.payment.update.mockResolvedValue({})
     mocks.prisma.promoCodeRedemption.updateMany.mockResolvedValue({ count: 0 })
+    mocks.recordSucceededRefund.mockResolvedValue({
+      fullyRefunded: true,
+      refundedAmountKopecks: 30000,
+    })
+    mocks.terminateUserSubscription.mockResolvedValue({ hadSubscription: true })
   })
 
   it('marks payment succeeded and provisions subscription', async () => {
@@ -142,5 +169,53 @@ describe('YooKassa webhook route', () => {
       where: { paymentId: 'pay-1', status: 'PENDING' },
       data: { status: 'CANCELED' },
     })
+  })
+
+  it('records a full refund and removes the subscription', async () => {
+    mocks.prisma.payment.findUnique.mockResolvedValue({
+      id: 'pay-1',
+      userId: 'user-1',
+      amountKopecks: 30000,
+    })
+
+    const res = await POST(refundWebhookRequest())
+    const body = await res.json()
+
+    expect(res.status).toBe(200)
+    expect(body).toEqual({ ok: true, refunded: true })
+    expect(mocks.recordSucceededRefund).toHaveBeenCalledWith({
+      paymentId: 'pay-1',
+      providerRefundId: 'yookassa-refund:refund-1',
+      amountKopecks: 30000,
+      paymentAmountKopecks: 30000,
+      providerStatus: 'refund.succeeded',
+    })
+    expect(mocks.terminateUserSubscription).toHaveBeenCalledWith({
+      userId: 'user-1',
+      source: 'YOOKASSA_REFUND',
+      paymentId: 'pay-1',
+    })
+  })
+
+  it('keeps access after a partial refund', async () => {
+    mocks.prisma.payment.findUnique.mockResolvedValue({
+      id: 'pay-1',
+      userId: 'user-1',
+      amountKopecks: 30000,
+    })
+    mocks.recordSucceededRefund.mockResolvedValue({
+      fullyRefunded: false,
+      refundedAmountKopecks: 10000,
+    })
+
+    const res = await POST(refundWebhookRequest('100.00'))
+    const body = await res.json()
+
+    expect(body).toEqual({
+      ok: true,
+      partialRefund: true,
+      refundedAmountKopecks: 10000,
+    })
+    expect(mocks.terminateUserSubscription).not.toHaveBeenCalled()
   })
 })

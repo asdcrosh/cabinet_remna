@@ -354,6 +354,7 @@ enum NotificationType {
   PAYMENT_FAILED
   PAYMENT_STUCK
   SUBSCRIPTION_EXPIRING
+  SUBSCRIPTION_TERMINATED
   TRAFFIC_LIMIT
   SUPPORT_REPLY
   BONUS_GRANTED
@@ -600,6 +601,7 @@ model Payment {
   provisioningJob           ProvisioningJob?
   referralRewardTriggered   ReferralReward?
   welcomeBonusRedemptions   WelcomeBonusRedemption[]
+  refunds                   PaymentRefund[]
 
   @@unique([provider, externalPaymentId])
   @@unique([userId, checkoutKey])
@@ -626,6 +628,18 @@ enum PaymentStatus {
   SUCCEEDED
   CANCELED
   REFUNDED
+}
+
+model PaymentRefund {
+  id               String   @id @default(cuid())
+  paymentId        String
+  providerRefundId String   @unique
+  amountKopecks    Int
+  createdAt        DateTime @default(now())
+
+  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+
+  @@index([paymentId, createdAt])
 }
 
 enum YookassaPaymentStatus {
@@ -1222,6 +1236,7 @@ enum AuditAction {
   ADMIN_PLAN_UPDATED
   ADMIN_PLAN_DELETED
   ADMIN_PLAN_ASSIGNED
+  ADMIN_SUBSCRIPTION_DELETED
   ADMIN_ROLE_CHANGED
   ADMIN_PROFILE_UPDATED
   ADMIN_USERS_MERGED

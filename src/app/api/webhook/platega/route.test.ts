@@ -11,6 +11,8 @@ const mocks = vi.hoisted(() => ({
   paymentUpdate: vi.fn(),
   redemptionUpdateMany: vi.fn(),
   transaction: vi.fn(),
+  recordSucceededRefund: vi.fn(),
+  terminateUserSubscription: vi.fn(),
 }))
 
 vi.mock('@/lib/platega', () => ({ verifyPlategaCallbackHeaders: mocks.verifyHeaders }))
@@ -20,6 +22,10 @@ vi.mock('@/lib/payment-sync', () => ({
 }))
 vi.mock('@/lib/notifications', () => ({ notifyPaymentCanceled: mocks.notifyPaymentCanceled }))
 vi.mock('@/lib/logger', () => ({ logWarn: mocks.logWarn, logError: mocks.logError }))
+vi.mock('@/lib/payment-refunds', () => ({ recordSucceededRefund: mocks.recordSucceededRefund }))
+vi.mock('@/lib/subscription-termination', () => ({
+  terminateUserSubscription: mocks.terminateUserSubscription,
+}))
 vi.mock('@/lib/prisma', () => ({
   prisma: {
     payment: { findFirst: mocks.paymentFindFirst, update: mocks.paymentUpdate },
@@ -70,6 +76,8 @@ describe('Platega webhook', () => {
     mocks.transaction.mockImplementation(async (queries) => Promise.all(queries))
     mocks.syncPaymentProvisioning.mockResolvedValue({ ok: true, status: 'succeeded', provisioned: true })
     mocks.cancelOtherPendingPaymentsForUser.mockResolvedValue({ canceled: 0, paid: 0 })
+    mocks.recordSucceededRefund.mockResolvedValue({ fullyRefunded: true, refundedAmountKopecks: 30000 })
+    mocks.terminateUserSubscription.mockResolvedValue({ hadSubscription: true })
   })
 
   it('rejects a callback with invalid credentials', async () => {
@@ -119,9 +127,17 @@ describe('Platega webhook', () => {
     const response = await POST(callbackRequest('CHARGEBACKED'))
 
     expect(response.status).toBe(200)
-    expect(mocks.paymentUpdate).toHaveBeenCalledWith({
-      where: { id: 'payment-1' },
-      data: { status: 'REFUNDED', providerStatus: 'CHARGEBACKED' },
+    expect(mocks.recordSucceededRefund).toHaveBeenCalledWith({
+      paymentId: 'payment-1',
+      providerRefundId: 'platega-chargeback:transaction-1',
+      amountKopecks: 30000,
+      paymentAmountKopecks: 30000,
+      providerStatus: 'CHARGEBACKED',
+    })
+    expect(mocks.terminateUserSubscription).toHaveBeenCalledWith({
+      userId: 'user-1',
+      source: 'PLATEGA_CHARGEBACK',
+      paymentId: 'payment-1',
     })
     expect(mocks.syncPaymentProvisioning).not.toHaveBeenCalled()
   })
