@@ -155,7 +155,8 @@ fi
 
 configure_remnashop_link_function() {
   local container="${REMNASHOP_DB_CONTAINER:-remnashop-db}"
-  local db_user db_name database_url integration_role role role_exists
+  local db_user db_name database_url integration_role integration_password
+  local readonly_password role role_exists role_password password_literal db_name_identifier
   local roles=("remnashop_readonly")
   if ! docker inspect "${container}" >/dev/null 2>&1; then
     return
@@ -165,10 +166,6 @@ configure_remnashop_link_function() {
   if [[ -z "${db_user}" || -z "${db_name}" ]]; then
     return
   fi
-  echo "Updating secure Remnashop account-link function..."
-  curl -fsSL "${RAW_BASE_URL}/deploy/remnashop-cabinet-link.sql" \
-    | docker exec -i "${container}" psql -v ON_ERROR_STOP=1 -U "${db_user}" -d "${db_name}" >/dev/null
-
   database_url="$(read_update_env_value REMNASHOP_DATABASE_URL)"
   integration_role="$(python3 - "${database_url}" <<'PY'
 from urllib.parse import unquote, urlparse
@@ -182,9 +179,56 @@ except Exception:
 print(username if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", username) else "")
 PY
 )"
+  integration_password="$(python3 - "${database_url}" <<'PY'
+from urllib.parse import unquote, urlparse
+import sys
+
+try:
+    print(unquote(urlparse(sys.argv[1]).password or ""))
+except Exception:
+    print("")
+PY
+)"
+  readonly_password="$(read_update_env_value REMNASHOP_READONLY_PASSWORD)"
   if [[ -n "${integration_role}" && "${integration_role}" != "remnashop_readonly" ]]; then
     roles+=("${integration_role}")
   fi
+
+  db_name_identifier="$(python3 - "${db_name}" <<'PY'
+import sys
+
+print('"' + sys.argv[1].replace('"', '""') + '"')
+PY
+)"
+
+  for role in "${roles[@]}"; do
+    role_exists="$(docker exec "${container}" psql -U "${db_user}" -d "${db_name}" -tAc "SELECT 1 FROM pg_roles WHERE rolname = '${role}';" 2>/dev/null | tr -d '[:space:]')"
+    if [[ "${role_exists}" == "1" ]]; then
+      continue
+    fi
+    role_password=""
+    if [[ "${role}" == "${integration_role}" ]]; then
+      role_password="${integration_password}"
+    elif [[ "${role}" == "remnashop_readonly" ]]; then
+      role_password="${readonly_password}"
+    fi
+    if [[ -z "${role_password}" ]]; then
+      echo "Warning: Remnashop integration role ${role} is missing and its password is unavailable."
+      continue
+    fi
+    password_literal="$(python3 - "${role_password}" <<'PY'
+import sys
+
+print("'" + sys.argv[1].replace("'", "''") + "'")
+PY
+)"
+    docker exec "${container}" psql -v ON_ERROR_STOP=1 -U "${db_user}" -d "${db_name}" \
+      -c "CREATE ROLE \"${role}\" WITH LOGIN PASSWORD ${password_literal};" >/dev/null
+  done
+
+  echo "Updating secure Remnashop account-link function..."
+  curl -fsSL "${RAW_BASE_URL}/deploy/remnashop-cabinet-link.sql" \
+    | docker exec -i "${container}" psql -v ON_ERROR_STOP=1 -U "${db_user}" -d "${db_name}" >/dev/null
 
   echo "Updating Remnashop integration database permissions..."
   for role in "${roles[@]}"; do
@@ -193,6 +237,7 @@ PY
       continue
     fi
     docker exec "${container}" psql -v ON_ERROR_STOP=1 -U "${db_user}" -d "${db_name}" \
+      -c "GRANT CONNECT ON DATABASE ${db_name_identifier} TO \"${role}\";" \
       -c "GRANT USAGE ON SCHEMA public TO \"${role}\";" \
       -c "GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO \"${role}\";" \
       -c "GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO \"${role}\";" \

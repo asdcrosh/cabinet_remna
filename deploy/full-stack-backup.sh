@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="1.2.1"
+VERSION="1.2.2"
 INSTALL_PATH="${FULL_BACKUP_INSTALL_PATH:-/usr/local/bin/remna-backup}"
 BACKUP_DIR="${FULL_BACKUP_DIR:-/opt/remnawave-backups}"
 S3_CONFIG_FILE="${FULL_BACKUP_S3_CONFIG:-/etc/remna-backup-s3.conf}"
@@ -67,7 +67,7 @@ require_root() {
 
 require_commands() {
   local command
-  for command in tar gzip sha256sum awk sed grep find; do
+  for command in tar gzip sha256sum awk sed grep find python3; do
     command -v "${command}" >/dev/null 2>&1 || fail "Не найдена команда: ${command}"
   done
 }
@@ -471,6 +471,80 @@ restore_database() {
     --no-privileges <"${dump}" || fail "${component}: восстановление базы завершилось ошибкой."
 }
 
+restore_remnashop_integration_access() {
+  local env_file="${CABINET_DIR}/.env"
+  local database_url db_user db_name role password role_exists password_literal db_name_identifier
+  local function_exists
+  local -a credentials=()
+
+  [[ -f "${env_file}" ]] || {
+    warn "Кабинет: .env не найден, доступ к Remnashop нужно будет восстановить вручную."
+    return
+  }
+  database_url="$(awk -F= '$1 == "REMNASHOP_DATABASE_URL" { sub(/^[^=]*=/, ""); gsub(/^\"|\"$/, ""); print; exit }' "${env_file}")"
+  [[ -n "${database_url}" ]] || return
+
+  mapfile -t credentials < <(python3 - "${database_url}" <<'PY'
+from urllib.parse import unquote, urlparse
+import re
+import sys
+
+try:
+    parsed = urlparse(sys.argv[1])
+    role = unquote(parsed.username or "")
+    password = unquote(parsed.password or "")
+except Exception:
+    role = password = ""
+print(role if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", role) else "")
+print(password)
+PY
+)
+  role="${credentials[0]:-}"
+  password="${credentials[1]:-}"
+  if [[ -z "${role}" || -z "${password}" ]]; then
+    warn "Кабинет: не удалось прочитать роль Remnashop из REMNASHOP_DATABASE_URL."
+    return
+  fi
+
+  db_user="$(container_env "${REMNASHOP_DB_CONTAINER}" POSTGRES_USER)"
+  db_name="$(container_env "${REMNASHOP_DB_CONTAINER}" POSTGRES_DB)"
+  [[ -n "${db_user}" ]] || db_user="postgres"
+  [[ -n "${db_name}" ]] || db_name="${db_user}"
+  role_exists="$(docker exec "${REMNASHOP_DB_CONTAINER}" psql -U "${db_user}" -d "${db_name}" -tAc "SELECT 1 FROM pg_roles WHERE rolname = '${role}';" 2>/dev/null | tr -d '[:space:]')"
+  password_literal="$(python3 - "${password}" <<'PY'
+import sys
+
+print("'" + sys.argv[1].replace("'", "''") + "'")
+PY
+)"
+  if [[ "${role_exists}" == "1" ]]; then
+    docker exec "${REMNASHOP_DB_CONTAINER}" psql -v ON_ERROR_STOP=1 -U "${db_user}" -d "${db_name}" \
+      -c "ALTER ROLE \"${role}\" WITH LOGIN PASSWORD ${password_literal};" >/dev/null
+  else
+    docker exec "${REMNASHOP_DB_CONTAINER}" psql -v ON_ERROR_STOP=1 -U "${db_user}" -d "${db_name}" \
+      -c "CREATE ROLE \"${role}\" WITH LOGIN PASSWORD ${password_literal};" >/dev/null
+  fi
+  db_name_identifier="$(python3 - "${db_name}" <<'PY'
+import sys
+
+print('"' + sys.argv[1].replace('"', '""') + '"')
+PY
+)"
+  docker exec "${REMNASHOP_DB_CONTAINER}" psql -v ON_ERROR_STOP=1 -U "${db_user}" -d "${db_name}" \
+    -c "GRANT CONNECT ON DATABASE ${db_name_identifier} TO \"${role}\";" \
+    -c "GRANT USAGE ON SCHEMA public TO \"${role}\";" \
+    -c "GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO \"${role}\";" \
+    -c "GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO \"${role}\";" \
+    -c "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO \"${role}\";" \
+    -c "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO \"${role}\";" >/dev/null
+  function_exists="$(docker exec "${REMNASHOP_DB_CONTAINER}" psql -U "${db_user}" -d "${db_name}" -tAc "SELECT to_regprocedure('public.cabinet_link_email_to_telegram(bigint,text,boolean)') IS NOT NULL;" 2>/dev/null | tr -d '[:space:]')"
+  if [[ "${function_exists}" == "t" ]]; then
+    docker exec "${REMNASHOP_DB_CONTAINER}" psql -v ON_ERROR_STOP=1 -U "${db_user}" -d "${db_name}" \
+      -c "GRANT EXECUTE ON FUNCTION public.cabinet_link_email_to_telegram(bigint, text, boolean) TO \"${role}\";" >/dev/null
+  fi
+  ok "Доступ кабинета к Remnashop восстановлен."
+}
+
 start_optional_nginx() {
   local nginx_dir="${REMNAWAVE_DIR}/nginx"
   if [[ -d "${nginx_dir}" ]] && find_compose_file "${nginx_dir}" >/dev/null; then
@@ -553,6 +627,7 @@ restore_backup() {
   start_optional_remnawave_subscription
 
   restore_database "Remnashop" "${REMNASHOP_DIR}" "${REMNASHOP_DB_SERVICE}" "${REMNASHOP_DB_CONTAINER}" "${staging}/databases/remnashop.dump"
+  restore_remnashop_integration_access
   compose "${REMNASHOP_DIR}" up -d
 
   restore_database "Кабинет" "${CABINET_DIR}" "${CABINET_DB_SERVICE}" "${CABINET_DB_CONTAINER}" "${staging}/databases/cabinet.dump"

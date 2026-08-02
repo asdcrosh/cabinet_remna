@@ -118,4 +118,10 @@ END;
 $$;
 
 REVOKE ALL ON FUNCTION public.cabinet_link_email_to_telegram(bigint, text, boolean) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.cabinet_link_email_to_telegram(bigint, text, boolean) TO remnashop_readonly;
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'remnashop_readonly') THEN
+    EXECUTE 'GRANT EXECUTE ON FUNCTION public.cabinet_link_email_to_telegram(bigint, text, boolean) TO remnashop_readonly';
+  END IF;
+END;
+$$;
