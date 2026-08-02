@@ -22,10 +22,10 @@ export function AuthLayout({
   const brandName = getBrandName()
 
   return (
-    <div className="min-h-dvh bg-[#f1f0eb] dark:bg-[#0b0f0d] lg:grid lg:grid-cols-[minmax(22rem,0.72fr)_minmax(0,1.28fr)]">
+    <div className="auth-shell min-h-dvh lg:grid lg:grid-cols-[minmax(21rem,0.68fr)_minmax(0,1.32fr)]">
       {enableTelegramMiniApp && <TelegramMiniAppAuth />}
-      <aside className="relative hidden h-dvh overflow-hidden border-r border-white/[0.1] bg-[#101713] p-8 text-white lg:sticky lg:top-0 lg:flex lg:flex-col lg:justify-between xl:p-10">
-        <div aria-hidden="true" className="absolute inset-y-0 left-0 w-1 bg-brand-300" />
+      <aside className="auth-aside relative hidden h-dvh overflow-hidden border-r p-8 text-white lg:sticky lg:top-0 lg:flex lg:flex-col lg:justify-between xl:p-10">
+        <div aria-hidden="true" className="absolute inset-y-0 left-0 w-0.5 bg-brand-300" />
         <nav aria-label="Основная навигация" className="relative flex items-center justify-between gap-4">
           <Link href="/" className="flex min-w-0 items-center gap-3">
             <div className="grid h-10 w-10 shrink-0 place-items-center rounded-md border border-white/20 bg-white text-slate-950">
@@ -42,8 +42,8 @@ export function AuthLayout({
           </Link>
         </nav>
         <div className="relative max-w-md">
-          <div className="mb-5 h-1 w-12 bg-brand-300" aria-hidden="true" />
-          <h2 className="text-3xl font-semibold leading-tight tracking-tight xl:text-4xl">Подключение без лишних экранов.</h2>
+          <div className="mb-5 font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-brand-200">Private access / 01</div>
+          <h2 className="text-3xl font-semibold leading-[1.05] tracking-[-0.04em] xl:text-[2.7rem]">Подключение без лишних экранов.</h2>
           <p className="mt-4 text-base leading-7 text-white/60">
             Войдите, чтобы увидеть статус подписки и следующий нужный шаг.
           </p>
@@ -68,7 +68,7 @@ export function AuthLayout({
             </Link>
           </nav>
 
-          <section className="rounded-2xl border border-slate-300/80 border-t-2 border-t-brand-500 bg-white p-5 shadow-[0_24px_60px_-48px_rgba(20,30,25,.5)] dark:border-white/10 dark:border-t-brand-300 dark:bg-white/[0.04] sm:p-7">
+          <section className="auth-panel border p-5 sm:p-7">
             <header className="mb-6">
               <h1 className="text-2xl font-semibold tracking-[-0.02em] text-slate-950 dark:text-white sm:text-3xl">{title}</h1>
               <p className="mt-1.5 text-sm leading-6 text-slate-500 dark:text-slate-400">{description}</p>

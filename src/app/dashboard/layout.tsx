@@ -52,29 +52,29 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   return (
     <NavBadgesProvider initialBadges={navBadges} supportEnabled={features.support}>
-      <div className="dashboard-shell min-h-screen bg-slate-50/70 dark:bg-[#080b0f]">
+      <div className="dashboard-shell min-h-screen">
         <a
           href="#dashboard-content"
           className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[200] focus:rounded-lg focus:bg-slate-950 focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-white"
         >
           Перейти к содержимому
         </a>
-        <aside className="dashboard-sidebar fixed inset-y-0 left-0 z-40 hidden h-dvh w-64 flex-col overflow-hidden border-r lg:flex">
-          <div className="shrink-0 px-5 py-5">
+        <aside className="dashboard-sidebar fixed inset-y-0 left-0 z-40 hidden h-dvh w-60 flex-col overflow-hidden border-r lg:flex">
+          <div className="shrink-0 px-5 pb-4 pt-6">
             <Brand brandName={brandName} />
           </div>
-          <div className="dashboard-sidebar-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-3">
+          <div className="dashboard-sidebar-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-4">
             <DashboardNav role={role} badges={navBadges} features={features} />
           </div>
           <div className="shrink-0 border-t border-slate-200 p-3 dark:border-white/[0.08]">
-            <div className="mb-1.5 px-3 py-2 text-xs text-slate-500">
+            <div className="mb-1 px-3 py-2 text-[11px] text-slate-500">
               <div className="truncate font-medium text-slate-700 dark:text-slate-200">{accountLabel}</div>
               <div>{roleLabel(role)}</div>
             </div>
             <LogoutButton />
           </div>
         </aside>
-        <main className="min-w-0 w-full overflow-x-clip lg:ml-64 lg:w-auto">
+        <main className="min-w-0 w-full overflow-x-clip lg:ml-60 lg:w-auto">
           <div className="dashboard-topbar sticky top-0 z-50 flex h-14 items-center justify-between border-b px-4 backdrop-blur lg:fixed lg:right-6 lg:top-4 lg:h-auto lg:w-auto lg:border-0 lg:bg-transparent lg:p-0 lg:backdrop-blur-none">
             <div className="lg:hidden">
               <Brand compact brandName={brandName} />
@@ -84,7 +84,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
               {isStaff ? <MobileDashboardNav role={role} email={accountLabel} brandName={brandName} badges={navBadges} features={features} /> : null}
             </div>
           </div>
-          <div id="dashboard-content" className="page-transition mx-auto w-full max-w-[78rem] min-w-0 scroll-mt-20 px-4 pb-28 pt-6 sm:px-6 sm:pt-8 lg:py-10 lg:pl-9 lg:pr-24">{children}</div>
+          <div id="dashboard-content" className="page-transition mx-auto w-full max-w-[86rem] min-w-0 scroll-mt-20 px-4 pb-28 pt-5 sm:px-6 sm:pt-7 lg:px-8 lg:pb-12 lg:pr-24 lg:pt-8">{children}</div>
         </main>
         <MobileBottomNav role={role} badges={navBadges} features={features} />
       </div>

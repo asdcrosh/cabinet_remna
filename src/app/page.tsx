@@ -53,14 +53,14 @@ export default async function HomePage() {
   const brandName = getBrandName()
 
   return (
-    <main className="min-h-dvh overflow-hidden bg-[#f1f0eb] text-slate-950 dark:bg-[#0b0f0d] dark:text-white">
+    <main className="site-shell min-h-dvh overflow-hidden text-slate-950 dark:text-white">
       <section className="relative isolate border-b border-slate-200/80 dark:border-white/[0.08]">
         <div
           aria-hidden="true"
           className="pointer-events-none absolute inset-y-0 left-0 -z-10 w-1 bg-brand-400"
         />
 
-        <header className="mx-auto flex h-[4.5rem] max-w-7xl items-center justify-between gap-4 border-b border-slate-200/80 px-4 sm:h-20 sm:px-6 lg:px-8 dark:border-white/[0.08]">
+        <header className="site-header mx-auto flex h-[4.5rem] max-w-[88rem] items-center justify-between gap-4 border-b px-4 sm:h-20 sm:px-6 lg:px-8">
           <Link href="/" className="flex min-w-0 items-center gap-3" aria-label={`${brandName}, главная`}>
             <span className="grid h-10 w-10 shrink-0 place-items-center rounded-md bg-slate-950 text-white dark:bg-white dark:text-slate-950">
               <ShieldCheck className="h-5 w-5" />
@@ -80,10 +80,10 @@ export default async function HomePage() {
           </div>
         </header>
 
-        <div className="mx-auto grid max-w-7xl items-center gap-10 px-4 pb-12 pt-9 sm:px-6 sm:pb-16 sm:pt-12 lg:grid-cols-[minmax(0,0.95fr)_minmax(25rem,0.8fr)] lg:gap-14 lg:px-8 lg:py-16">
+        <div className="mx-auto grid max-w-[88rem] items-center gap-10 px-4 pb-12 pt-9 sm:px-6 sm:pb-16 sm:pt-12 lg:min-h-[42rem] lg:grid-cols-[minmax(0,1.05fr)_minmax(25rem,0.8fr)] lg:gap-16 lg:px-8 lg:py-16">
           <div className="max-w-3xl">
-            <div className="dashboard-signal mb-5 h-1 w-12" aria-hidden="true" />
-            <h1 className="text-balance text-4xl font-semibold leading-[1.05] text-slate-950 sm:text-5xl dark:text-white">
+            <div className="mb-5 font-mono text-[10px] font-semibold uppercase tracking-[0.2em] text-brand-700 dark:text-brand-300">Private network / zero noise</div>
+            <h1 className="text-balance text-4xl font-semibold leading-[0.98] tracking-[-0.055em] text-slate-950 sm:text-6xl dark:text-white">
               VPN, который не требует разбираться в VPN
             </h1>
             <p className="mt-5 max-w-xl text-base leading-7 text-slate-600 sm:text-lg dark:text-slate-300">
@@ -105,7 +105,7 @@ export default async function HomePage() {
       </section>
 
       <section id="advantages" className="scroll-mt-8 px-4 py-12 sm:px-6 sm:py-16 lg:px-8">
-        <div className="mx-auto max-w-7xl">
+        <div className="mx-auto max-w-[88rem]">
           <div className="max-w-2xl">
             <h2 className="text-2xl font-semibold text-slate-950 sm:text-3xl dark:text-white">Три вещи, которые всегда под рукой</h2>
             <p className="mt-3 text-base leading-7 text-slate-500 dark:text-slate-400">Кабинет подсказывает следующий шаг и не перегружает техническими деталями.</p>
@@ -124,7 +124,7 @@ export default async function HomePage() {
       </section>
 
       <section id="connection" className="scroll-mt-8 px-4 pb-12 sm:px-6 sm:pb-16 lg:px-8">
-        <div className="mx-auto grid max-w-7xl overflow-hidden rounded-2xl border-l-4 border-brand-400 bg-[#111713] text-white lg:grid-cols-[0.8fr_1.2fr]">
+        <div className="site-band mx-auto grid max-w-[88rem] overflow-hidden border-l-2 border-brand-400 text-white lg:grid-cols-[0.8fr_1.2fr]">
           <div className="relative isolate p-6 sm:p-8 lg:p-10">
             <h2 className="max-w-xl text-2xl font-semibold sm:text-3xl">От регистрации до подключения</h2>
             <p className="mt-4 max-w-xl text-sm leading-6 text-white/60 sm:text-base sm:leading-7">После оплаты кабинет покажет данные подписки и предложит подходящий способ подключения.</p>
@@ -149,7 +149,7 @@ export default async function HomePage() {
       </section>
 
       <footer className="border-t border-slate-200/80 px-4 py-8 sm:px-6 dark:border-white/[0.08]">
-        <div className="mx-auto flex max-w-7xl flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+        <div className="mx-auto flex max-w-[88rem] flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
           <Link href="/" className="flex items-center gap-2.5 text-sm font-semibold">
             <span className="grid h-8 w-8 place-items-center rounded-md bg-slate-950 text-white dark:bg-white dark:text-slate-950"><ShieldCheck className="h-4 w-4" /></span>
             {brandName}
@@ -170,7 +170,7 @@ function CabinetPreview({ brandName }: { brandName: string }) {
       aria-label="Пример личного кабинета с активной подпиской"
       className="relative mx-auto w-full max-w-xl lg:mx-0"
     >
-      <div className="overflow-hidden rounded-2xl border border-slate-200/90 border-t-2 border-t-brand-400 bg-white p-4 shadow-[0_24px_60px_-48px_rgba(20,30,25,.5)] dark:border-white/10 dark:border-t-brand-300 dark:bg-[#141a17]">
+      <div className="site-preview overflow-hidden border p-4">
         <div className="flex items-center justify-between px-1 pb-3">
           <div className="flex items-center gap-2.5">
             <span className="grid h-8 w-8 place-items-center rounded-md bg-slate-950 text-white dark:bg-white dark:text-slate-950"><ShieldCheck className="h-4 w-4" /></span>
@@ -203,12 +203,12 @@ function CabinetPreview({ brandName }: { brandName: string }) {
         </div>
 
         <div className="mt-3 border-y border-slate-200 py-4 dark:border-white/[0.08]">
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-xs text-slate-400">Следующий шаг</p>
               <p className="mt-1 text-sm font-semibold text-slate-900 dark:text-white">Подключить устройство</p>
             </div>
-            <span className="flex h-9 items-center gap-2 rounded-md bg-slate-950 px-3 text-xs font-semibold text-white dark:bg-white dark:text-slate-950">
+            <span className="flex min-h-9 items-center justify-center gap-2 rounded-md bg-slate-950 px-3 text-xs font-semibold text-white dark:bg-white dark:text-slate-950">
               <KeyRound className="h-3.5 w-3.5" />
               Получить ссылку
             </span>

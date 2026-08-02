@@ -1,15 +1,18 @@
 :root {
-  --app-bg: #f1f0eb;
-  --app-surface: #fbfaf6;
-  --app-surface-raised: #ffffff;
+  --app-bg: #f3f1ea;
+  --app-surface: #f9f7f1;
+  --app-surface-raised: #fffef9;
+  --app-surface-strong: #171d1a;
   --app-text: #171b19;
-  --app-muted: #69716c;
-  --app-line: rgba(27, 35, 31, 0.12);
-  --app-line-strong: rgba(27, 35, 31, 0.2);
-  --app-accent: #147d64;
-  --app-accent-soft: #dff3ea;
-  --app-accent-contrast: #f6fff9;
-  --app-shadow: 0 18px 48px -38px rgba(24, 32, 28, 0.42);
+  --app-muted: #6f7772;
+  --app-line: rgba(23, 29, 26, 0.12);
+  --app-line-strong: rgba(23, 29, 26, 0.22);
+  --app-accent: #0f8064;
+  --app-accent-bright: #54d8a6;
+  --app-accent-soft: #dff2e9;
+  --app-warning: #c4672f;
+  --app-radius: 0.8rem;
+  --app-shadow: 0 16px 42px -38px rgba(14, 24, 19, 0.6);
 }
 
 body {
@@ -17,64 +20,113 @@ body {
   background: var(--app-bg);
 }
 
+::selection {
+  color: #07140f;
+  background: var(--app-accent-bright);
+}
+
 .dashboard-shell {
   color: var(--app-text);
-  background:
-    radial-gradient(70rem 36rem at 88% -12rem, color-mix(in srgb, var(--app-accent) 8%, transparent), transparent 72%),
-    var(--app-bg) !important;
+  background: var(--app-bg) !important;
 }
 
 .dashboard-sidebar {
   border-color: var(--app-line) !important;
-  background: color-mix(in srgb, var(--app-surface) 88%, transparent) !important;
-  backdrop-filter: blur(22px);
+  background: color-mix(in srgb, var(--app-surface) 94%, transparent) !important;
+  backdrop-filter: blur(20px);
+}
+
+.dashboard-sidebar::after {
+  position: absolute;
+  inset: 0 0 0 auto;
+  width: 1px;
+  content: '';
+  background: linear-gradient(180deg, transparent 2%, var(--app-accent) 20%, var(--app-line) 46%, transparent 96%);
+  opacity: 0.52;
+  pointer-events: none;
 }
 
 .dashboard-topbar {
   border-color: var(--app-line);
-  background: color-mix(in srgb, var(--app-bg) 82%, transparent);
+  background: color-mix(in srgb, var(--app-bg) 88%, transparent);
+}
+
+.brand-mark {
+  border-radius: 0.55rem !important;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
 }
 
 .brand-mark::after {
   position: absolute;
-  right: -0.15rem;
-  bottom: -0.15rem;
+  right: -0.18rem;
+  bottom: -0.18rem;
   width: 0.55rem;
   height: 0.55rem;
   border: 2px solid var(--app-surface);
   border-radius: 50%;
   content: '';
-  background: var(--app-accent);
+  background: var(--app-accent-bright);
 }
 
 .dashboard-mobile-nav {
   border-color: var(--app-line);
-  background: color-mix(in srgb, var(--app-surface-raised) 90%, transparent);
-  box-shadow: 0 18px 48px -26px rgba(15, 22, 18, 0.55);
+  background: color-mix(in srgb, var(--app-surface-raised) 93%, transparent);
+  box-shadow: 0 18px 45px -26px rgba(10, 20, 15, 0.55);
+  backdrop-filter: blur(22px);
 }
 
-.dashboard-shell :where(.card, .panel, .surface-card, .metric-card, .table-shell, .admin-list, .dashboard-kpi) {
+.dashboard-shell :where(.card, .panel, .surface-card, .table-shell, .admin-list, .dashboard-kpi) {
   border: 1px solid var(--app-line);
-  border-radius: 1rem;
-  background: linear-gradient(180deg, var(--app-surface-raised), var(--app-surface));
+  border-radius: var(--app-radius);
+  background: var(--app-surface-raised);
   box-shadow: var(--app-shadow);
 }
 
-.dashboard-shell :where(.card, .surface-card, .metric-card, .dashboard-kpi):hover {
-  border-color: var(--app-line-strong);
+.dashboard-shell :where(.card, .surface-card, .dashboard-kpi) {
+  transition: border-color 150ms ease, background-color 150ms ease;
 }
 
-.dashboard-shell :where(.page-stack) {
+.dashboard-shell :where(.card, .surface-card, .dashboard-kpi):hover {
+  border-color: var(--app-line-strong);
+  background: color-mix(in srgb, var(--app-surface-raised) 94%, var(--app-accent-soft));
+}
+
+.dashboard-shell .metric-card {
+  border: 0;
+  border-top: 1px solid var(--app-line-strong);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.dashboard-shell .page-stack {
   gap: 0;
   margin-top: 0;
 }
 
 .dashboard-shell .page-stack > * + * {
-  margin-top: 1.25rem;
+  margin-top: 1.5rem;
 }
 
-.dashboard-shell :where(.section-title) {
-  letter-spacing: -0.025em;
+.page-header {
+  position: relative;
+  padding-left: 1rem;
+}
+
+.page-header::before {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 2px;
+  content: '';
+  background: var(--app-accent);
+}
+
+.page-header-mark {
+  display: none;
+}
+
+.dashboard-shell :where(h1, .section-title) {
+  letter-spacing: -0.035em;
 }
 
 .dashboard-shell :where(.section-description, .stat-label) {
@@ -82,60 +134,70 @@ body {
 }
 
 .dashboard-shell :where(.btn, .btn-primary, .btn-secondary, .input) {
-  border-radius: 0.75rem;
+  border-radius: 0.62rem;
 }
 
-.dashboard-shell :where(.btn-primary) {
-  border-color: var(--app-text);
-  background: var(--app-text);
-  color: var(--app-bg);
-  box-shadow: 0 8px 18px -14px color-mix(in srgb, var(--app-text) 72%, transparent);
+.dashboard-shell .btn {
+  min-height: 2.6rem;
 }
 
-.dashboard-shell :where(.btn-primary:hover) {
-  border-color: color-mix(in srgb, var(--app-text) 82%, var(--app-accent));
-  background: color-mix(in srgb, var(--app-text) 88%, var(--app-accent));
+.dashboard-shell .btn-primary {
+  border-color: var(--app-surface-strong);
+  background: var(--app-surface-strong);
+  color: #fffef9;
+  box-shadow: none;
 }
 
-.dashboard-shell :where(.btn-secondary) {
-  border-color: var(--app-line);
-  background: color-mix(in srgb, var(--app-surface-raised) 78%, transparent);
+.dashboard-shell .btn-primary:hover {
+  border-color: var(--app-accent);
+  background: var(--app-accent);
+}
+
+.dashboard-shell .btn-secondary {
+  border-color: var(--app-line-strong);
+  background: transparent;
   color: var(--app-text);
 }
 
-.dashboard-shell :where(.input) {
-  border-color: var(--app-line);
+.dashboard-shell .btn-secondary:hover {
+  border-color: var(--app-accent);
+  background: var(--app-accent-soft);
+}
+
+.dashboard-shell .input {
+  border-color: var(--app-line-strong);
   background: var(--app-surface-raised);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.38);
+}
+
+.dashboard-shell .input:focus {
+  border-color: var(--app-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--app-accent) 12%, transparent);
 }
 
 .dashboard-shell input[type='checkbox']:not(.sr-only) {
-  width: 1.25rem;
-  height: 1.25rem;
+  width: 1.18rem;
+  height: 1.18rem;
   flex: 0 0 auto;
   appearance: none;
   border: 1px solid var(--app-line-strong);
-  border-radius: 0.4rem;
-  background-color: color-mix(in srgb, var(--app-surface-raised) 88%, transparent);
+  border-radius: 0.32rem;
+  background-color: var(--app-surface-raised);
   background-position: center;
   background-repeat: no-repeat;
-  background-size: 0.85rem;
+  background-size: 0.82rem;
   cursor: pointer;
-  transition:
-    border-color 150ms ease,
-    background-color 150ms ease,
-    box-shadow 150ms ease,
-    transform 150ms ease;
+  transition: border-color 150ms ease, background-color 150ms ease, transform 150ms ease;
 }
 
 .dashboard-shell input[type='checkbox']:not(.sr-only):hover {
-  border-color: color-mix(in srgb, var(--app-accent) 65%, var(--app-line-strong));
+  border-color: var(--app-accent);
 }
 
 .dashboard-shell input[type='checkbox']:not(.sr-only):checked {
   border-color: var(--app-accent);
   background-color: var(--app-accent);
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none'%3E%3Cpath d='m5 10.2 3.1 3.1L15.4 6' stroke='%23fff' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-  box-shadow: 0 5px 14px -9px color-mix(in srgb, var(--app-accent) 80%, transparent);
 }
 
 .dashboard-shell input[type='checkbox']:not(.sr-only):active {
@@ -144,7 +206,7 @@ body {
 
 .dashboard-shell input[type='checkbox']:not(.sr-only):focus-visible {
   outline: 0;
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--app-accent) 22%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--app-accent) 18%, transparent);
 }
 
 .dashboard-shell input[type='checkbox']:not(.sr-only):disabled {
@@ -152,29 +214,20 @@ body {
   opacity: 0.45;
 }
 
-.dashboard-shell :where(.rounded-3xl, .rounded-\[1\.75rem\], .rounded-\[1\.5rem\], .rounded-\[1\.25rem\]) {
-  border-radius: 1.125rem;
-}
-
-.dashboard-shell :where(.rounded-2xl, .rounded-xl) {
-  border-radius: 0.875rem;
-}
-
 .dashboard-sidebar a[aria-current='page'] {
   position: relative;
-  border-color: var(--app-line) !important;
-  border-left-color: var(--app-line) !important;
-  background: var(--app-surface-raised) !important;
+  border-color: transparent !important;
+  background: var(--app-accent-soft) !important;
   color: var(--app-text) !important;
-  box-shadow: var(--app-shadow);
+  box-shadow: none;
 }
 
 .dashboard-sidebar a[aria-current='page']::before {
   position: absolute;
   top: 50%;
-  left: -0.2rem;
-  width: 0.35rem;
-  height: 1.1rem;
+  left: -0.05rem;
+  width: 0.2rem;
+  height: 1.2rem;
   border-radius: 999px;
   content: '';
   background: var(--app-accent);
@@ -211,13 +264,10 @@ body {
 
 .dashboard-signal::before {
   position: absolute;
-  top: 1rem;
-  bottom: 1rem;
-  left: 0;
-  width: 3px;
-  border-radius: 999px;
+  inset: 0 auto 0 0;
+  width: 100%;
   content: '';
-  background: var(--app-accent);
+  background: var(--app-accent-bright);
 }
 
 .dashboard-rule {
@@ -226,7 +276,7 @@ body {
 
 .dashboard-section {
   border-top: 1px solid var(--app-line);
-  padding-top: 1rem;
+  padding-top: 1.15rem;
 }
 
 .dashboard-row {
@@ -234,7 +284,7 @@ body {
   min-width: 0;
   align-items: center;
   gap: 0.875rem;
-  padding-block: 0.95rem;
+  padding-block: 0.9rem;
   border-bottom: 1px solid var(--app-line);
 }
 
@@ -250,25 +300,21 @@ body {
 .dashboard-kpi strong {
   display: block;
   margin-top: 0.45rem;
-  font-size: clamp(1.5rem, 2vw, 1.9rem);
+  font-size: clamp(1.45rem, 2vw, 1.9rem);
   line-height: 1;
-  letter-spacing: -0.045em;
+  letter-spacing: -0.05em;
 }
 
 .access-pass {
   overflow: hidden;
   border: 1px solid var(--app-line);
-  border-radius: 1rem;
+  border-radius: var(--app-radius);
   background: var(--app-surface-raised);
-  box-shadow:
-    inset 3px 0 0 var(--app-accent),
-    0 20px 45px -40px color-mix(in srgb, var(--app-text) 38%, transparent);
+  box-shadow: inset 2px 0 0 var(--app-accent);
 }
 
 .access-pass--expired {
-  box-shadow:
-    inset 3px 0 0 #d97706,
-    0 20px 45px -40px color-mix(in srgb, #d97706 42%, transparent);
+  box-shadow: inset 2px 0 0 var(--app-warning);
 }
 
 .subscription-ticket {
@@ -276,37 +322,26 @@ body {
   isolation: isolate;
   overflow: hidden;
   border: 1px solid var(--app-line);
-  border-radius: 1.25rem;
-  background:
-    linear-gradient(115deg, color-mix(in srgb, var(--app-accent-soft) 62%, var(--app-surface-raised)), var(--app-surface-raised) 58%);
-  box-shadow: 0 24px 55px -42px color-mix(in srgb, var(--app-accent) 50%, transparent);
+  border-radius: var(--app-radius);
+  background: var(--app-surface-raised);
+  box-shadow: inset 2px 0 0 var(--app-accent);
 }
 
 .subscription-ticket::after {
   position: absolute;
-  top: -3rem;
-  right: -2rem;
+  top: 1.25rem;
+  right: 1.25rem;
   z-index: -1;
-  width: 13rem;
-  height: 13rem;
+  width: 4.25rem;
+  height: 4.25rem;
   border: 1px solid color-mix(in srgb, var(--app-accent) 18%, transparent);
   border-radius: 50%;
   content: '';
-  box-shadow:
-    0 0 0 2.5rem color-mix(in srgb, var(--app-accent) 4%, transparent),
-    0 0 0 5rem color-mix(in srgb, var(--app-accent) 3%, transparent);
+  box-shadow: 0 0 0 0.7rem color-mix(in srgb, var(--app-accent) 4%, transparent);
 }
 
 .subscription-ticket--expired {
-  background:
-    linear-gradient(115deg, color-mix(in srgb, #f4d8cf 54%, var(--app-surface-raised)), var(--app-surface-raised) 58%);
-}
-
-.subscription-ticket--expired::after {
-  border-color: color-mix(in srgb, #d76d4c 20%, transparent);
-  box-shadow:
-    0 0 0 2.5rem color-mix(in srgb, #d76d4c 4%, transparent),
-    0 0 0 5rem color-mix(in srgb, #d76d4c 3%, transparent);
+  box-shadow: inset 2px 0 0 var(--app-warning);
 }
 
 .subscription-ticket__metric {
@@ -317,34 +352,32 @@ body {
 .plan-period-list,
 .plan-checkout-card {
   border-color: var(--app-line) !important;
-  background: linear-gradient(180deg, var(--app-surface-raised), var(--app-surface)) !important;
-  box-shadow: var(--app-shadow);
+  background: var(--app-surface-raised) !important;
+  box-shadow: none;
 }
 
 .plan-period-list {
   border: 0;
   border-radius: 0;
   background: transparent !important;
-  box-shadow: none;
 }
 
 .plan-period-panel [aria-checked='true'] {
-  border-color: var(--app-line-strong) !important;
-  border-left-color: var(--app-accent) !important;
-  background: var(--app-surface-raised) !important;
-  box-shadow: 0 12px 30px -26px color-mix(in srgb, var(--app-accent) 55%, transparent);
+  border-color: var(--app-accent) !important;
+  background: var(--app-accent-soft) !important;
+  box-shadow: inset 2px 0 0 var(--app-accent);
 }
 
 .plan-checkout-card:not(.rounded-none) {
-  border-radius: 1rem;
+  border-radius: var(--app-radius);
 }
 
 .bonus-box-stage {
   border-color: var(--app-line) !important;
   border-top-color: var(--app-accent) !important;
-  border-radius: 1rem !important;
-  background: linear-gradient(180deg, var(--app-surface-raised), var(--app-surface)) !important;
-  box-shadow: var(--app-shadow);
+  border-radius: var(--app-radius) !important;
+  background: var(--app-surface-raised) !important;
+  box-shadow: none;
 }
 
 .bonus-box-stage-header {
@@ -352,45 +385,117 @@ body {
 }
 
 .bonus-box-stage:not(.bonus-box-stage--opening) .bonus-box-reel-shell {
-  background:
-    radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--app-accent) 8%, transparent), transparent 54%),
-    transparent;
+  background: color-mix(in srgb, var(--app-accent-soft) 36%, transparent);
 }
 
 .dashboard-shell details > summary {
-  border-radius: 0.75rem;
+  border-radius: 0.55rem;
+}
+
+.site-shell,
+.auth-shell {
+  color: var(--app-text);
+  background: var(--app-bg);
+}
+
+.site-shell {
+  background:
+    linear-gradient(90deg, transparent calc(50% - 0.5px), color-mix(in srgb, var(--app-line) 44%, transparent) 50%, transparent calc(50% + 0.5px)),
+    var(--app-bg);
+  background-size: min(100%, 88rem) 100%;
+  background-position: top center;
+  background-repeat: no-repeat;
+}
+
+.site-header {
+  border-color: var(--app-line);
+  background: color-mix(in srgb, var(--app-bg) 90%, transparent);
+  backdrop-filter: blur(16px);
+}
+
+.site-preview,
+.auth-panel {
+  border-color: var(--app-line);
+  border-radius: var(--app-radius);
+  background: var(--app-surface-raised);
+  box-shadow: var(--app-shadow);
+}
+
+.site-preview {
+  position: relative;
+  box-shadow:
+    inset 2px 0 0 var(--app-accent),
+    var(--app-shadow);
+}
+
+.site-preview::before {
+  position: absolute;
+  top: -1px;
+  right: 1.2rem;
+  width: 4.5rem;
+  height: 1px;
+  content: '';
+  background: var(--app-accent-bright);
+}
+
+.site-band,
+.auth-aside {
+  border-color: rgba(255, 255, 255, 0.1);
+  background: #111713;
+}
+
+.site-band {
+  border-radius: var(--app-radius);
+}
+
+.auth-aside::after {
+  position: absolute;
+  right: -9rem;
+  bottom: -9rem;
+  width: 24rem;
+  height: 24rem;
+  border: 1px solid rgba(126, 226, 184, 0.12);
+  border-radius: 50%;
+  content: '';
+  box-shadow:
+    0 0 0 4rem rgba(126, 226, 184, 0.025),
+    0 0 0 8rem rgba(126, 226, 184, 0.018);
+}
+
+.auth-panel {
+  position: relative;
+  box-shadow: inset 2px 0 0 var(--app-accent);
 }
 
 @media (max-width: 639px) {
   .dashboard-shell .page-stack > * + * {
-    margin-top: 1rem;
-  }
-
-  .plan-period-list article:last-child:nth-child(odd) {
-    grid-column: 1 / -1;
+    margin-top: 1.1rem;
   }
 
   .dashboard-shell :where(.panel-pad, .card, .surface-card, .metric-card) {
-    padding: 0.95rem;
+    padding: 0.9rem;
   }
 
-  .subscription-ticket {
-    border-radius: 1rem;
+  .subscription-ticket,
+  .access-pass {
+    border-radius: 0.7rem;
   }
 }
 
 .dark {
-  --app-bg: #0b0f0d;
-  --app-surface: #121714;
-  --app-surface-raised: #171d1a;
-  --app-text: #f2f1ea;
-  --app-muted: #929c96;
-  --app-line: rgba(235, 242, 237, 0.1);
-  --app-line-strong: rgba(235, 242, 237, 0.18);
-  --app-accent: #7ee2b8;
-  --app-accent-soft: #17352a;
-  --app-accent-contrast: #092118;
-  --app-shadow: 0 22px 52px -38px rgba(0, 0, 0, 0.86);
+  --app-bg: #090c0b;
+  --app-surface: #101512;
+  --app-surface-raised: #141a17;
+  --app-surface-strong: #f1f3ed;
+  --app-text: #f0f2ec;
+  --app-muted: #919b95;
+  --app-line: rgba(235, 244, 238, 0.1);
+  --app-line-strong: rgba(235, 244, 238, 0.18);
+  --app-accent: #59d9a7;
+  --app-accent-bright: #7dffc2;
+  --app-accent-soft: #163126;
+  --app-warning: #f29a63;
+  --app-shadow: 0 18px 46px -38px rgba(0, 0, 0, 0.9);
 }
 
 .dark body,
@@ -400,29 +505,47 @@ body {
 }
 
 .dark .dashboard-sidebar {
-  background: rgba(14, 19, 16, 0.88) !important;
+  background: rgba(13, 18, 15, 0.94) !important;
 }
 
 .dark .dashboard-topbar {
-  background: rgba(11, 15, 13, 0.84);
+  background: rgba(9, 12, 11, 0.88);
 }
 
 .dark .dashboard-mobile-nav {
-  background: rgba(20, 26, 22, 0.92);
-  box-shadow: 0 18px 54px -24px rgba(0, 0, 0, 0.9);
+  background: rgba(18, 24, 20, 0.94);
+  box-shadow: 0 18px 52px -24px rgba(0, 0, 0, 0.9);
 }
 
-.dark .dashboard-shell :where(.card, .panel, .surface-card, .metric-card, .table-shell, .admin-list, .dashboard-kpi) {
+.dark .dashboard-shell :where(.card, .panel, .surface-card, .table-shell, .admin-list, .dashboard-kpi) {
   border-color: var(--app-line);
-  background: linear-gradient(180deg, var(--app-surface-raised), var(--app-surface));
+  background: var(--app-surface-raised);
 }
 
-.dark .subscription-ticket {
-  background:
-    linear-gradient(115deg, color-mix(in srgb, var(--app-accent-soft) 72%, var(--app-surface-raised)), var(--app-surface-raised) 60%);
+.dark .dashboard-shell .btn-primary {
+  border-color: var(--app-surface-strong);
+  background: var(--app-surface-strong);
+  color: #101411;
 }
 
-.dark .subscription-ticket--expired {
-  background:
-    linear-gradient(115deg, color-mix(in srgb, #4a241d 58%, var(--app-surface-raised)), var(--app-surface-raised) 60%);
+.dark .dashboard-shell .btn-primary:hover {
+  border-color: var(--app-accent-bright);
+  background: var(--app-accent-bright);
+}
+
+.dark .site-shell,
+.dark .auth-shell {
+  color: var(--app-text);
+  background-color: var(--app-bg);
+}
+
+.dark .site-header {
+  border-color: var(--app-line);
+  background: rgba(9, 12, 11, 0.88);
+}
+
+.dark .site-preview,
+.dark .auth-panel {
+  border-color: var(--app-line);
+  background: var(--app-surface-raised);
 }
