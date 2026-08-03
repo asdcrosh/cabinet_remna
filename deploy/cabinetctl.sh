@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="1.4.1"
+VERSION="1.5.0"
 BRANCH="${BRANCH:-main}"
 RAW_BASE_URL="${RAW_BASE_URL:-https://raw.githubusercontent.com/asdcrosh/cabinet_remna/${BRANCH}}"
 GITHUB_API_URL="${GITHUB_API_URL:-https://api.github.com/repos/asdcrosh/cabinet_remna/commits/${BRANCH}}"
@@ -630,6 +630,16 @@ backup_menu() {
   "${BACKUP_SCRIPT_PATH}"
 }
 
+backup_schedule() {
+  ensure_backup_command
+  "${BACKUP_SCRIPT_PATH}" schedule
+}
+
+backup_schedule_status() {
+  ensure_backup_command
+  "${BACKUP_SCRIPT_PATH}" schedule-status
+}
+
 verify_backup() {
   ensure_backup_command
   "${BACKUP_SCRIPT_PATH}" verify "${1:-}"
@@ -735,6 +745,8 @@ Remnawave Cabinet ${VERSION}
   cabinetctl health             здоровье системы
   cabinetctl logs [service]     меню или логи app, worker, broadcast-worker, watch-worker, db
   cabinetctl backups            бэкапы, восстановление и S3
+  cabinetctl backup-schedule    настроить автоматический бэкап
+  cabinetctl backup-status      статус автоматического бэкапа
   cabinetctl status             краткое состояние сервисов
   cabinetctl ps                 состояние compose-сервисов
   cabinetctl url                показать адрес кабинета
@@ -781,6 +793,8 @@ case "${1:-menu}" in
   nginx) setup_nginx ;;
   backup) backup_full ;;
   backups) backup_menu ;;
+  backup-schedule|schedule-backup) backup_schedule ;;
+  backup-status|schedule-status) backup_schedule_status ;;
   verify) verify_backup "${2:-}" ;;
   restore) restore_backup "${2:-}" ;;
   self-update) update_console ;;

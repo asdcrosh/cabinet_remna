@@ -1,10 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="1.2.2"
+VERSION="1.3.0"
 INSTALL_PATH="${FULL_BACKUP_INSTALL_PATH:-/usr/local/bin/remna-backup}"
 BACKUP_DIR="${FULL_BACKUP_DIR:-/opt/remnawave-backups}"
 S3_CONFIG_FILE="${FULL_BACKUP_S3_CONFIG:-/etc/remna-backup-s3.conf}"
+SCHEDULE_CONFIG_FILE="${FULL_BACKUP_SCHEDULE_CONFIG:-/etc/remna-backup-schedule.conf}"
+SCHEDULE_SERVICE_NAME="remna-backup.service"
+SCHEDULE_TIMER_NAME="remna-backup.timer"
+SCHEDULE_SERVICE_FILE="${FULL_BACKUP_SYSTEMD_DIR:-/etc/systemd/system}/${SCHEDULE_SERVICE_NAME}"
+SCHEDULE_TIMER_FILE="${FULL_BACKUP_SYSTEMD_DIR:-/etc/systemd/system}/${SCHEDULE_TIMER_NAME}"
 REMNAWAVE_DIR="${REMNAWAVE_DIR:-/opt/remnawave}"
 REMNAWAVE_SUBSCRIPTION_DIR="${REMNAWAVE_SUBSCRIPTION_DIR:-${REMNAWAVE_DIR}/subscription}"
 REMNASHOP_DIR="${REMNASHOP_DIR:-/opt/remnashop}"
@@ -16,7 +21,6 @@ REMNAWAVE_DB_SERVICE="${REMNAWAVE_DB_SERVICE:-remnawave-db}"
 REMNASHOP_DB_SERVICE="${REMNASHOP_DB_SERVICE:-remnashop-db}"
 CABINET_DB_SERVICE="${CABINET_DB_SERVICE:-db}"
 LOCK_FILE="${FULL_BACKUP_LOCK_FILE:-/var/lock/remna-full-backup.lock}"
-KEEP_DAYS="${FULL_BACKUP_KEEP_DAYS:-14}"
 MAX_AGE_HOURS="${FULL_BACKUP_MAX_AGE_HOURS:-48}"
 CLEANUP_PATHS=("")
 
@@ -28,11 +32,24 @@ S3_ACCESS_KEY=""
 S3_SECRET_KEY=""
 S3_AUTO_UPLOAD="false"
 
+SCHEDULE_KIND="DAILY"
+SCHEDULE_TIME="03:00"
+SCHEDULE_WEEKDAY="Sun"
+SCHEDULE_KEEP_DAYS="14"
+
 if [[ -f "${S3_CONFIG_FILE}" ]]; then
   # The file is created root-only by this script and contains shell-escaped values.
   # shellcheck disable=SC1090
   source "${S3_CONFIG_FILE}"
 fi
+
+if [[ -f "${SCHEDULE_CONFIG_FILE}" ]]; then
+  # The file is created root-only by this script and contains validated values.
+  # shellcheck disable=SC1090
+  source "${SCHEDULE_CONFIG_FILE}"
+fi
+
+KEEP_DAYS="${FULL_BACKUP_KEEP_DAYS:-${SCHEDULE_KEEP_DAYS:-14}}"
 
 cleanup_paths() {
   local path
@@ -673,6 +690,323 @@ backup_age_hours() {
   printf '%s\n' $(((now - modified) / 3600))
 }
 
+require_systemd() {
+  command -v systemctl >/dev/null 2>&1 || fail "На сервере не найден systemd. Автоматическое расписание недоступно."
+  [[ -d /run/systemd/system ]] || fail "systemd не запущен. Автоматическое расписание недоступно."
+}
+
+server_timezone() {
+  local timezone=""
+  if command -v timedatectl >/dev/null 2>&1; then
+    timezone="$(timedatectl show --property=Timezone --value 2>/dev/null || true)"
+  fi
+  printf '%s\n' "${timezone:-$(date +%Z)}"
+}
+
+valid_schedule_time() {
+  [[ "${1:-}" =~ ^([01][0-9]|2[0-3]):[0-5][0-9]$ ]]
+}
+
+valid_keep_days() {
+  [[ "${1:-}" =~ ^[0-9]{1,4}$ ]] || return 1
+  local days=$((10#${1}))
+  ((days >= 1 && days <= 3650))
+}
+
+schedule_calendar() {
+  valid_schedule_time "${SCHEDULE_TIME}" || fail "В расписании указано неверное время: ${SCHEDULE_TIME}"
+  case "${SCHEDULE_KIND}" in
+    DAILY) printf '*-*-* %s:00\n' "${SCHEDULE_TIME}" ;;
+    WEEKDAYS) printf 'Mon..Fri *-*-* %s:00\n' "${SCHEDULE_TIME}" ;;
+    WEEKLY)
+      case "${SCHEDULE_WEEKDAY}" in
+        Mon|Tue|Wed|Thu|Fri|Sat|Sun) ;;
+        *) fail "В расписании указан неверный день недели: ${SCHEDULE_WEEKDAY}" ;;
+      esac
+      printf '%s *-*-* %s:00\n' "${SCHEDULE_WEEKDAY}" "${SCHEDULE_TIME}"
+      ;;
+    *) fail "Неизвестный режим расписания: ${SCHEDULE_KIND}" ;;
+  esac
+}
+
+schedule_description() {
+  local day
+  case "${SCHEDULE_WEEKDAY}" in
+    Mon) day="понедельник" ;;
+    Tue) day="вторник" ;;
+    Wed) day="среда" ;;
+    Thu) day="четверг" ;;
+    Fri) day="пятница" ;;
+    Sat) day="суббота" ;;
+    Sun) day="воскресенье" ;;
+    *) day="${SCHEDULE_WEEKDAY}" ;;
+  esac
+  case "${SCHEDULE_KIND}" in
+    DAILY) printf 'ежедневно в %s\n' "${SCHEDULE_TIME}" ;;
+    WEEKDAYS) printf 'по рабочим дням в %s\n' "${SCHEDULE_TIME}" ;;
+    WEEKLY) printf 'еженедельно, %s в %s\n' "${day}" "${SCHEDULE_TIME}" ;;
+    *) printf 'неизвестное расписание\n' ;;
+  esac
+}
+
+write_schedule_config() {
+  require_root
+  valid_schedule_time "${SCHEDULE_TIME}" || fail "Время должно быть в формате ЧЧ:ММ."
+  valid_keep_days "${SCHEDULE_KEEP_DAYS}" || fail "Срок хранения должен быть от 1 до 3650 дней."
+  schedule_calendar >/dev/null
+  mkdir -p "$(dirname "${SCHEDULE_CONFIG_FILE}")"
+  umask 077
+  {
+    printf 'SCHEDULE_KIND=%q\n' "${SCHEDULE_KIND}"
+    printf 'SCHEDULE_TIME=%q\n' "${SCHEDULE_TIME}"
+    printf 'SCHEDULE_WEEKDAY=%q\n' "${SCHEDULE_WEEKDAY}"
+    printf 'SCHEDULE_KEEP_DAYS=%q\n' "${SCHEDULE_KEEP_DAYS}"
+  } >"${SCHEDULE_CONFIG_FILE}"
+  chmod 600 "${SCHEDULE_CONFIG_FILE}"
+  KEEP_DAYS="${FULL_BACKUP_KEEP_DAYS:-${SCHEDULE_KEEP_DAYS}}"
+}
+
+install_schedule_units() {
+  require_root
+  require_systemd
+  [[ "${INSTALL_PATH}" =~ ^/[A-Za-z0-9_./-]+$ ]] || fail "Небезопасный путь команды бэкапа: ${INSTALL_PATH}"
+  [[ -x "${INSTALL_PATH}" ]] || install_script
+
+  local calendar service_tmp timer_tmp
+  calendar="$(schedule_calendar)"
+  if command -v systemd-analyze >/dev/null 2>&1; then
+    systemd-analyze calendar "${calendar}" >/dev/null \
+      || fail "systemd не принял расписание: ${calendar}"
+  fi
+  service_tmp="$(mktemp /tmp/remna-backup-service.XXXXXX)"
+  timer_tmp="$(mktemp /tmp/remna-backup-timer.XXXXXX)"
+  CLEANUP_PATHS+=("${service_tmp}" "${timer_tmp}")
+
+  cat >"${service_tmp}" <<EOF
+[Unit]
+Description=Remnawave full stack backup
+Wants=docker.service
+After=docker.service
+ConditionPathIsExecutable=${INSTALL_PATH}
+
+[Service]
+Type=oneshot
+ExecStart=${INSTALL_PATH} backup
+TimeoutStartSec=infinity
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+UMask=0077
+EOF
+
+  cat >"${timer_tmp}" <<EOF
+[Unit]
+Description=Schedule Remnawave full stack backup
+
+[Timer]
+OnCalendar=${calendar}
+Persistent=true
+AccuracySec=1min
+Unit=${SCHEDULE_SERVICE_NAME}
+
+[Install]
+WantedBy=timers.target
+EOF
+
+  install -m 644 "${service_tmp}" "${SCHEDULE_SERVICE_FILE}"
+  install -m 644 "${timer_tmp}" "${SCHEDULE_TIMER_FILE}"
+  systemctl daemon-reload
+  systemctl enable "${SCHEDULE_TIMER_NAME}" >/dev/null
+  systemctl restart "${SCHEDULE_TIMER_NAME}"
+}
+
+set_schedule_upload() {
+  local enabled="$1"
+  if [[ "${enabled}" == "true" ]]; then
+    if ! s3_configured; then
+      local configure
+      printf 'S3 не настроен. Настроить сейчас? [Y/n]: ' >/dev/tty
+      IFS= read -r configure </dev/tty
+      if [[ "${configure}" =~ ^[nNнН]$ ]]; then
+        fail "Без настройки S3 автоматическая отправка невозможна."
+      fi
+      configure_s3
+    fi
+    S3_AUTO_UPLOAD="true"
+    write_s3_config
+  elif [[ -f "${S3_CONFIG_FILE}" ]]; then
+    S3_AUTO_UPLOAD="false"
+    write_s3_config
+  fi
+}
+
+configure_schedule() {
+  require_root
+  require_tty
+  require_systemd
+
+  local choice value upload_default upload_value
+  printf '\nРасписание создаётся по часовому поясу сервера: %s\n' "$(server_timezone)" >/dev/tty
+  printf '%s\n' \
+    "  1. Каждый день" \
+    "  2. По рабочим дням" \
+    "  3. Один раз в неделю" >/dev/tty
+  printf 'Периодичность [%s]: ' "$(case "${SCHEDULE_KIND}" in DAILY) printf 1;; WEEKDAYS) printf 2;; WEEKLY) printf 3;; esac)" >/dev/tty
+  IFS= read -r choice </dev/tty
+  case "${choice:-}" in
+    "") ;;
+    1) SCHEDULE_KIND="DAILY" ;;
+    2) SCHEDULE_KIND="WEEKDAYS" ;;
+    3) SCHEDULE_KIND="WEEKLY" ;;
+    *) fail "Неизвестная периодичность." ;;
+  esac
+
+  if [[ "${SCHEDULE_KIND}" == "WEEKLY" ]]; then
+    printf '%s\n' \
+      "  1. Понедельник" "  2. Вторник" "  3. Среда" "  4. Четверг" \
+      "  5. Пятница" "  6. Суббота" "  7. Воскресенье" >/dev/tty
+    printf 'День недели [%s]: ' "${SCHEDULE_WEEKDAY}" >/dev/tty
+    IFS= read -r value </dev/tty
+    case "${value:-}" in
+      "") ;;
+      1) SCHEDULE_WEEKDAY="Mon" ;;
+      2) SCHEDULE_WEEKDAY="Tue" ;;
+      3) SCHEDULE_WEEKDAY="Wed" ;;
+      4) SCHEDULE_WEEKDAY="Thu" ;;
+      5) SCHEDULE_WEEKDAY="Fri" ;;
+      6) SCHEDULE_WEEKDAY="Sat" ;;
+      7) SCHEDULE_WEEKDAY="Sun" ;;
+      *) fail "Неизвестный день недели." ;;
+    esac
+  fi
+
+  printf 'Время запуска ЧЧ:ММ [%s]: ' "${SCHEDULE_TIME}" >/dev/tty
+  IFS= read -r value </dev/tty
+  SCHEDULE_TIME="${value:-${SCHEDULE_TIME}}"
+  valid_schedule_time "${SCHEDULE_TIME}" || fail "Введите время от 00:00 до 23:59."
+
+  printf 'Хранить локальные архивы, дней [%s]: ' "${SCHEDULE_KEEP_DAYS}" >/dev/tty
+  IFS= read -r value </dev/tty
+  SCHEDULE_KEEP_DAYS="${value:-${SCHEDULE_KEEP_DAYS}}"
+  valid_keep_days "${SCHEDULE_KEEP_DAYS}" || fail "Введите число от 1 до 3650."
+
+  upload_default="y/N"
+  is_truthy "${S3_AUTO_UPLOAD}" && upload_default="Y/n"
+  printf 'Сразу отправлять новый архив в S3? [%s]: ' "${upload_default}" >/dev/tty
+  IFS= read -r upload_value </dev/tty
+  if [[ -z "${upload_value}" ]]; then
+    if is_truthy "${S3_AUTO_UPLOAD}"; then upload_value="true"; else upload_value="false"; fi
+  elif [[ "${upload_value}" =~ ^[yYдД]$ ]]; then
+    upload_value="true"
+  elif [[ "${upload_value}" =~ ^[nNнН]$ ]]; then
+    upload_value="false"
+  else
+    fail "Ответьте y или n."
+  fi
+
+  set_schedule_upload "${upload_value}"
+  write_schedule_config
+  install_schedule_units
+  ok "Автоматический бэкап включён: $(schedule_description)."
+  printf '  Часовой пояс:   %s\n' "$(server_timezone)"
+  printf '  S3 отправка:    %s\n' "$(is_truthy "${S3_AUTO_UPLOAD}" && printf 'включена' || printf 'выключена')"
+  printf '  Хранение:       %s дней локально\n' "${SCHEDULE_KEEP_DAYS}"
+}
+
+enable_schedule() {
+  require_root
+  require_systemd
+  if [[ ! -f "${SCHEDULE_CONFIG_FILE}" ]]; then
+    configure_schedule
+    return
+  fi
+  install_schedule_units
+  ok "Автоматический бэкап включён: $(schedule_description)."
+}
+
+disable_schedule() {
+  require_root
+  require_systemd
+  if systemctl is-enabled --quiet "${SCHEDULE_TIMER_NAME}" 2>/dev/null \
+    || systemctl is-active --quiet "${SCHEDULE_TIMER_NAME}" 2>/dev/null; then
+    systemctl disable --now "${SCHEDULE_TIMER_NAME}" >/dev/null
+    ok "Автоматический бэкап выключен. Настройки сохранены."
+  else
+    warn "Автоматический бэкап уже выключен."
+  fi
+}
+
+schedule_status() {
+  printf '\n%s\n' "${BOLD}${CYAN}Автоматический бэкап${RESET}"
+  if [[ -f "${SCHEDULE_CONFIG_FILE}" ]]; then
+    printf '  Расписание:     %s\n' "$(schedule_description)"
+    printf '  Часовой пояс:   %s\n' "$(server_timezone)"
+    printf '  Хранение:       %s дней локально\n' "${SCHEDULE_KEEP_DAYS}"
+    printf '  S3 отправка:    %s\n' "$(is_truthy "${S3_AUTO_UPLOAD}" && printf 'включена' || printf 'выключена')"
+  else
+    printf '  Настройки:      не заданы\n'
+  fi
+  if ! command -v systemctl >/dev/null 2>&1 || [[ ! -d /run/systemd/system ]]; then
+    warn "systemd недоступен"
+    return 0
+  fi
+  if systemctl is-enabled --quiet "${SCHEDULE_TIMER_NAME}" 2>/dev/null; then
+    ok "Таймер включён"
+    systemctl list-timers "${SCHEDULE_TIMER_NAME}" --no-pager 2>/dev/null | sed -n '1,3p' || true
+  else
+    warn "Таймер выключен"
+  fi
+
+  local result timestamp
+  result="$(systemctl show "${SCHEDULE_SERVICE_NAME}" --property=Result --value 2>/dev/null || true)"
+  timestamp="$(systemctl show "${SCHEDULE_SERVICE_NAME}" --property=ExecMainExitTimestamp --value 2>/dev/null || true)"
+  if [[ -n "${timestamp}" ]]; then
+    printf '  Последний запуск: %s, результат: %s\n' "${timestamp}" "${result:-неизвестно}"
+  fi
+}
+
+run_scheduled_backup_now() {
+  require_root
+  require_systemd
+  [[ -f "${SCHEDULE_SERVICE_FILE}" ]] || fail "Сначала настройте автоматический бэкап."
+  info "Запускаем бэкап через systemd..."
+  systemctl start "${SCHEDULE_SERVICE_NAME}"
+  local result
+  result="$(systemctl show "${SCHEDULE_SERVICE_NAME}" --property=Result --value)"
+  [[ "${result}" == "success" ]] || fail "Бэкап завершился со статусом ${result}. Откройте логи расписания."
+  ok "Тестовый запуск завершён успешно."
+}
+
+schedule_logs() {
+  require_systemd
+  journalctl -u "${SCHEDULE_SERVICE_NAME}" -n 120 --no-pager
+}
+
+schedule_menu() {
+  require_tty
+  local choice
+  printf '%s\n' \
+    "  1. Настроить или изменить и включить" \
+    "  2. Включить с сохранёнными настройками" \
+    "  3. Выключить" \
+    "  4. Показать статус" \
+    "  5. Запустить сейчас для проверки" \
+    "  6. Показать логи" \
+    "  0. Назад" >/dev/tty
+  printf 'Выберите действие: ' >/dev/tty
+  IFS= read -r choice </dev/tty
+  case "${choice}" in
+    1) configure_schedule ;;
+    2) enable_schedule ;;
+    3) disable_schedule ;;
+    4) schedule_status ;;
+    5) run_scheduled_backup_now ;;
+    6) schedule_logs ;;
+    0) return ;;
+    *) warn "Неизвестный пункт." ;;
+  esac
+}
+
 backup_status() {
   require_root
   require_commands
@@ -717,6 +1051,8 @@ backup_status() {
   else
     warn "S3 не настроен"
   fi
+
+  schedule_status
 }
 
 choose_local_backup() {
@@ -840,9 +1176,13 @@ show_menu() {
       "  1. Создать бэкап" \
       "  2. Восстановить" \
       "  3. S3" \
-      "  4. Статус" \
+      "  4. Автоматический бэкап" \
+      "  5. Статус" \
       "  0. Выход"
-    printf '\nЛокальных архивов: %s · S3: %s\n' "$(local_backup_paths | wc -l | tr -d ' ')" "$(s3_configured && printf 'настроен' || printf 'не настроен')" >/dev/tty
+    printf '\nЛокальных архивов: %s · S3: %s · Авто: %s\n' \
+      "$(local_backup_paths | wc -l | tr -d ' ')" \
+      "$(s3_configured && printf 'настроен' || printf 'не настроен')" \
+      "$(systemctl is-enabled --quiet "${SCHEDULE_TIMER_NAME}" 2>/dev/null && printf 'включено' || printf 'выключено')" >/dev/tty
     printf 'Выберите действие: ' >/dev/tty
     local choice
     IFS= read -r choice </dev/tty
@@ -850,7 +1190,8 @@ show_menu() {
       1) create_backup ;;
       2) restore_menu ;;
       3) s3_menu ;;
-      4) backup_status ;;
+      4) schedule_menu ;;
+      5) backup_status ;;
       0) exit 0 ;;
       *) warn "Неизвестный пункт." ;;
     esac
@@ -867,6 +1208,12 @@ Remnawave Full Backup ${VERSION}
   remna-backup                       интерактивное меню
   remna-backup backup                полный бэкап трёх систем
   remna-backup status                свежесть локального бэкапа и S3
+  remna-backup schedule              настройка автоматического бэкапа
+  remna-backup schedule-status       состояние и следующий запуск
+  remna-backup schedule-enable       включить сохранённое расписание
+  remna-backup schedule-disable      выключить расписание
+  remna-backup schedule-run          запустить расписание сейчас
+  remna-backup schedule-logs         последние логи автоматизации
   remna-backup list                  список архивов
   remna-backup s3-config             настроить S3
   remna-backup s3-upload ARCHIVE     загрузить архив в S3
@@ -880,6 +1227,7 @@ Remnawave Full Backup ${VERSION}
   FULL_BACKUP_DIR=${BACKUP_DIR}
   FULL_BACKUP_KEEP_DAYS=${KEEP_DAYS}
   FULL_BACKUP_S3_CONFIG=${S3_CONFIG_FILE}
+  FULL_BACKUP_SCHEDULE_CONFIG=${SCHEDULE_CONFIG_FILE}
   REMNAWAVE_DIR=${REMNAWAVE_DIR}
   REMNAWAVE_SUBSCRIPTION_DIR=${REMNAWAVE_SUBSCRIPTION_DIR}
   REMNASHOP_DIR=${REMNASHOP_DIR}
@@ -891,6 +1239,12 @@ case "${1:-menu}" in
   menu) show_menu ;;
   backup) create_backup ;;
   status) backup_status ;;
+  schedule) schedule_menu ;;
+  schedule-status) schedule_status ;;
+  schedule-enable) enable_schedule ;;
+  schedule-disable) disable_schedule ;;
+  schedule-run) run_scheduled_backup_now ;;
+  schedule-logs) schedule_logs ;;
   list) list_backups ;;
   verify) verify_backup "${2:-}" ;;
   restore) restore_backup "${2:-}" ;;
