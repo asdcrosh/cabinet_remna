@@ -510,6 +510,7 @@ show_status() {
   print_service_state "База" "remnawave-cabinet-db"
   print_service_state "Платежи" "remnawave-cabinet-worker"
   print_service_state "Рассылки" "remnawave-cabinet-broadcast-worker"
+  print_service_state "Watch" "remnawave-cabinet-watch-worker"
 }
 
 show_logs() {
@@ -528,8 +529,9 @@ logs_menu() {
     "  1. Приложение" \
     "  2. Платежи" \
     "  3. Рассылки" \
-    "  4. База данных" \
-    "  5. Все сервисы кабинета" \
+    "  4. Watch" \
+    "  5. База данных" \
+    "  6. Все сервисы кабинета" \
     "  0. Назад" >/dev/tty
   printf 'Выберите логи: ' >/dev/tty
   local choice
@@ -538,8 +540,9 @@ logs_menu() {
     1) show_logs app ;;
     2) show_logs worker ;;
     3) show_logs broadcast-worker ;;
-    4) show_logs db ;;
-    5) warn "Для выхода из логов нажмите Ctrl+C."; cabinet_compose logs -f --tail=200 || true ;;
+    4) show_logs watch-worker ;;
+    5) show_logs db ;;
+    6) warn "Для выхода из логов нажмите Ctrl+C."; cabinet_compose logs -f --tail=200 || true ;;
     0) return ;;
     *) warn "Неизвестный пункт." ;;
   esac
@@ -547,7 +550,7 @@ logs_menu() {
 
 restart_cabinet() {
   sync_env_schema
-  cabinet_compose restart app worker broadcast-worker
+  cabinet_compose restart app worker broadcast-worker watch-worker
   ok "Сервисы кабинета перезапущены."
   cabinet_compose ps
 }
@@ -730,7 +733,7 @@ Remnawave Cabinet ${VERSION}
   cabinetctl env                открыть .env
   cabinetctl config-check       проверить переменные .env
   cabinetctl health             здоровье системы
-  cabinetctl logs [service]     меню или логи app, worker, broadcast-worker, db
+  cabinetctl logs [service]     меню или логи app, worker, broadcast-worker, watch-worker, db
   cabinetctl backups            бэкапы, восстановление и S3
   cabinetctl status             краткое состояние сервисов
   cabinetctl ps                 состояние compose-сервисов

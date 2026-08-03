@@ -271,7 +271,7 @@ curl -fsSL https://raw.githubusercontent.com/asdcrosh/cabinet_remna/main/deploy/
 ```
 
 The update script downloads the latest compose file, pulls the published image,
-reruns env checks, applies Prisma migrations, restarts the app and worker, and
+reruns env checks, applies Prisma migrations, restarts the app and workers (including Watch), and
 checks local/public health. After a successful health check it removes completed
 one-shot containers, unused legacy compose-build images for this project, and
 dangling Docker images. It never prunes Docker volumes.
@@ -301,6 +301,7 @@ Logs:
 cd /opt/remnawave-cabinet
 docker compose --env-file .env -f docker-compose.yml logs -f app
 docker compose --env-file .env -f docker-compose.yml logs -f worker
+docker compose --env-file .env -f docker-compose.yml logs -f watch-worker
 ```
 
 Status:

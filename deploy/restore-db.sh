@@ -36,15 +36,15 @@ if [[ "${RESTORE_CONFIRM:-}" != "I_UNDERSTAND_DATA_WILL_BE_OVERWRITTEN" ]]; then
   exit 1
 fi
 
-echo "Stopping app and worker before restore..."
-CABINET_ENV_FILE="${ENV_FILE}" docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" stop app worker >/dev/null || true
+echo "Stopping app and workers before restore..."
+CABINET_ENV_FILE="${ENV_FILE}" docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" stop app worker broadcast-worker watch-worker >/dev/null || true
 
 echo "Restoring database from: ${BACKUP_FILE}"
 cat "${BACKUP_FILE}" | CABINET_ENV_FILE="${ENV_FILE}" docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" exec -T db \
   sh -lc 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists --no-owner --no-privileges'
 
-echo "Starting app and worker..."
-CABINET_ENV_FILE="${ENV_FILE}" docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" up -d app worker >/dev/null
+echo "Starting app and workers..."
+CABINET_ENV_FILE="${ENV_FILE}" docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" up -d app worker broadcast-worker watch-worker >/dev/null
 
 echo "Restore complete. Run smoke-check next:"
 echo "  ./deploy/smoke-check.sh"

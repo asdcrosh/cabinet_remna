@@ -29,6 +29,7 @@
 - QR-код, ссылка подписки, трафик и устройства в кабинете.
 - Worker для проверки ожидающих платежей и отмены зависших оплат.
 - Broadcast worker для асинхронной рассылки уведомлений.
+- Watch для read-only проверки Panel API, Node API, XHTTP/TCP Reality и оповещений об инцидентах.
 - Реферальные бонусы за первую платную покупку приглашённого пользователя.
 - Единый центр кампаний для промокодов, рефералов, приветственного бонуса, офферов и бонусных событий.
 - Синхронизация тарифов, промокодов и пользователей с Remnashop.
@@ -148,6 +149,7 @@ npm run build         # production build
 | `npm run db:seed` | Начальные тарифы и настройки |
 | `npm run worker:payments` | Локальный payment reconciler |
 | `npm run worker:broadcasts` | Локальный broadcast worker |
+| `npm run worker:watch` | Локальный Watch worker |
 | `npm run cleanup:retention` | Очистка старых audit/notification/sync logs |
 
 ---
@@ -286,7 +288,7 @@ migrate (prisma migrate deploy)
   ↓
 seed (prisma db seed, идемпотентный)
   ↓
-app + worker + broadcast-worker
+app + worker + broadcast-worker + watch-worker
 ```
 
 | Контейнер | Назначение |
@@ -298,13 +300,14 @@ app + worker + broadcast-worker
 | `remnawave-cabinet-app` | Next.js приложение (:3000) |
 | `remnawave-cabinet-worker` | Payment reconciler + Remnashop sync |
 | `remnawave-cabinet-broadcast-worker` | Очередь рассылок |
+| `remnawave-cabinet-watch-worker` | Наблюдение за нодами и Reality-кромками |
 | `remnawave-cabinet-caddy` | HTTPS reverse proxy (profile `caddy`) |
 | `remnawave-cabinet-retention-cleanup` | Очистка старых логов циклом (profile `maintenance`) |
 
 Единственный канонический production compose: [deploy/docker-compose.server.yml](./deploy/docker-compose.server.yml).
 Локальная разработка использует отдельный [docker-compose.local.yml](./docker-compose.local.yml).
 
-Обычный деплой должен показывать `app`, `worker`, `broadcast-worker` и `retention-cleanup` в `docker compose ps`.
+Обычный деплой должен показывать `app`, `worker`, `broadcast-worker`, `watch-worker` и `retention-cleanup` в `docker compose ps`.
 Если cleanup не нужен, уберите `maintenance` из `COMPOSE_PROFILES`.
 
 ---
@@ -384,6 +387,7 @@ NODE_ENV=production npm run check:env
 | `REFERRAL_BONUS_DAYS` | Бонус за реферала |
 | `BONUS_BOX_*` | Настройки подарочного бокса |
 | `BROADCAST_WORKER_*` | Параметры broadcast worker |
+| `WATCH_*` | Интервал, таймаут, пороги инцидентов, хранение истории и отдельный Telegram chat Watch |
 | `RETENTION_CLEANUP_INTERVAL_SECONDS` | Интервал cleanup-контейнера в секундах |
 | `AUDIT_LOG_RETENTION_DAYS` | Срок хранения audit log |
 | `APP_LOG_LEVEL` | `debug` / `info` / `warn` / `error` |
@@ -606,6 +610,7 @@ Docker-образа сами по себе уведомление не отпр�
 docker compose --env-file .env -f docker-compose.yml logs -f app
 docker compose --env-file .env -f docker-compose.yml logs -f worker
 docker compose --env-file .env -f docker-compose.yml logs -f broadcast-worker
+docker compose --env-file .env -f docker-compose.yml logs -f watch-worker
 ```
 
 ### Роли
@@ -696,7 +701,7 @@ Workers и seed заранее
 - [ ] Тестовая покупка → выдача Remnawave-подписки
 - [ ] Webhook YooKassa отвечает 200
 - [ ] `BROADCAST_UPLOAD_SIGNING_SECRET` задан
-- [ ] `docker compose ps` показывает app, worker, broadcast-worker и retention-cleanup
+- [ ] `docker compose ps` показывает app, worker, broadcast-worker, watch-worker и retention-cleanup
 - [ ] `npm run validate` проходит локально
 - [ ] Первый бэкап после настройки
 

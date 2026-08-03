@@ -139,6 +139,32 @@ services:
       - cabinet
       - remnawave_external
 
+  watch-worker:
+    image: ${CABINET_IMAGE:-ghcr.io/asdcrosh/cabinet_remna:latest}
+    container_name: remnawave-cabinet-watch-worker
+    command: ["node", "ops/watch-worker.js"]
+    restart: unless-stopped
+    env_file:
+      - ${CABINET_ENV_FILE:-.env}
+    depends_on:
+      seed:
+        condition: service_completed_successfully
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "node -e \"const fs=require('fs');const p='/tmp/watch-worker-heartbeat';const max=(Number(process.env.WATCH_INTERVAL_SECONDS||60)*3*1000);try{process.exit(Date.now()-fs.statSync(p).mtimeMs<max?0:1)}catch{process.exit(1)}\"",
+        ]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 90s
+    networks:
+      - cabinet
+      - remnawave_external
+
   retention-cleanup:
     image: ${CABINET_IMAGE:-ghcr.io/asdcrosh/cabinet_remna:latest}
     container_name: remnawave-cabinet-retention-cleanup

@@ -213,11 +213,78 @@ export interface InternalSquadResponse {
   active?: boolean
 }
 
+export interface RemnawaveNodeInbound {
+  uuid?: string
+  tag?: string
+  type?: string
+  network?: string
+  security?: string
+  port?: number
+  rawInbound?: {
+    port?: number
+    streamSettings?: {
+      network?: string
+      security?: string
+      xhttpSettings?: {
+        mode?: string
+        path?: string
+      }
+      realitySettings?: {
+        serverNames?: string[]
+        target?: string
+        dest?: string
+      }
+    }
+  }
+}
+
+export interface RemnawaveNode {
+  uuid: string
+  name: string
+  address: string
+  countryCode?: string
+  port?: number
+  isConnected: boolean
+  isDisabled: boolean
+  lastStatusChange?: string
+  xrayUptime?: number | string
+  usersOnline?: number
+  configProfile?: {
+    activeConfigProfileUuid?: string
+    activeInbounds?: RemnawaveNodeInbound[]
+  }
+  system?: {
+    info?: {
+      memoryTotal?: number | string
+    }
+    stats?: {
+      memoryUsed?: number | string
+      loadAvg?: number[]
+      interface?: {
+        rxBytesPerSec?: number
+        txBytesPerSec?: number
+      }
+    }
+  }
+  versions?: {
+    xray?: string
+    node?: string
+  }
+}
+
+export interface GetNodesResponse {
+  response: RemnawaveNode[]
+}
+
 // ----------------------------------------------------------------------
 // Методы
 // ----------------------------------------------------------------------
 
 export const remnawave = {
+  async getNodes() {
+    return request<GetNodesResponse>('GET', '/api/nodes')
+  },
+
   // CRUD пользователей ----------------------------------------------------
 
   async createUser(input: CreateUserRequest) {

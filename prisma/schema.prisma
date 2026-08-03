@@ -921,6 +921,137 @@ model RateLimitBucket {
   @@index([resetAt])
 }
 
+// ----------------------------------------------------------------------
+// 8. Watch — read-only мониторинг нод Remnawave и транспортов Reality.
+// ----------------------------------------------------------------------
+model WatchRuntimeState {
+  id                   String            @id @default("default")
+  status               WatchHealthStatus @default(UNKNOWN)
+  consecutiveFailures  Int               @default(0)
+  consecutiveSuccesses Int               @default(0)
+  lastRunAt            DateTime?
+  lastSuccessAt        DateTime?
+  lastError            String?
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+}
+
+model WatchNodeState {
+  nodeUuid                  String            @id
+  name                      String
+  address                   String
+  countryCode               String?
+  isConnected               Boolean           @default(false)
+  isDisabled                Boolean           @default(false)
+  status                    WatchHealthStatus @default(UNKNOWN)
+  apiStatus                 WatchProbeStatus  @default(SKIPPED)
+  xhttpStatus               WatchProbeStatus  @default(SKIPPED)
+  tcpStatus                 WatchProbeStatus  @default(SKIPPED)
+  xhttpLatencyMs            Int?
+  tcpLatencyMs              Int?
+  usersOnline               Int               @default(0)
+  xrayUptimeSeconds         BigInt?
+  loadOne                   Float?
+  memoryUsedBytes           BigInt?
+  memoryTotalBytes          BigInt?
+  rxBytesPerSecond          Float?
+  txBytesPerSecond          Float?
+  xrayVersion               String?
+  nodeVersion               String?
+  apiConsecutiveFailures    Int               @default(0)
+  apiConsecutiveSuccesses   Int               @default(0)
+  xhttpConsecutiveFailures  Int               @default(0)
+  xhttpConsecutiveSuccesses Int               @default(0)
+  tcpConsecutiveFailures    Int               @default(0)
+  tcpConsecutiveSuccesses   Int               @default(0)
+  lastCheckedAt             DateTime?
+  lastHealthyAt             DateTime?
+  lastError                 String?
+  createdAt                 DateTime          @default(now())
+  updatedAt                 DateTime          @updatedAt
+
+  probes    WatchProbe[]
+  incidents WatchIncident[]
+
+  @@index([status, name])
+  @@index([lastCheckedAt])
+}
+
+model WatchProbe {
+  id               String            @id @default(cuid())
+  nodeUuid         String
+  status           WatchHealthStatus
+  apiStatus        WatchProbeStatus
+  xhttpStatus      WatchProbeStatus
+  tcpStatus        WatchProbeStatus
+  xhttpLatencyMs   Int?
+  tcpLatencyMs     Int?
+  isConnected      Boolean
+  isDisabled       Boolean
+  usersOnline      Int               @default(0)
+  loadOne          Float?
+  memoryUsedBytes  BigInt?
+  memoryTotalBytes BigInt?
+  rxBytesPerSecond Float?
+  txBytesPerSecond Float?
+  error            String?
+  checkedAt        DateTime          @default(now())
+
+  node WatchNodeState @relation(fields: [nodeUuid], references: [nodeUuid], onDelete: Cascade)
+
+  @@index([nodeUuid, checkedAt])
+  @@index([status, checkedAt])
+  @@index([checkedAt])
+}
+
+model WatchIncident {
+  id             String              @id @default(cuid())
+  nodeUuid       String?
+  nodeName       String?
+  type           WatchIncidentType
+  status         WatchIncidentStatus @default(OPEN)
+  title          String
+  message        String
+  occurrences    Int                 @default(1)
+  openedAt       DateTime            @default(now())
+  lastObservedAt DateTime            @default(now())
+  resolvedAt     DateTime?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  node WatchNodeState? @relation(fields: [nodeUuid], references: [nodeUuid], onDelete: SetNull)
+
+  @@index([status, openedAt])
+  @@index([nodeUuid, type, status])
+  @@index([resolvedAt])
+}
+
+enum WatchHealthStatus {
+  HEALTHY
+  DEGRADED
+  DOWN
+  DISABLED
+  UNKNOWN
+}
+
+enum WatchProbeStatus {
+  OK
+  FAIL
+  SKIPPED
+}
+
+enum WatchIncidentStatus {
+  OPEN
+  RESOLVED
+}
+
+enum WatchIncidentType {
+  PANEL_API
+  NODE_API
+  XHTTP
+  REALITY_TCP
+}
+
 model RevokedSession {
   id        String   @id @default(cuid())
   jti       String   @unique

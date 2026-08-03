@@ -28,6 +28,7 @@ RUN npm run build
 RUN ./node_modules/.bin/esbuild \
   scripts/payment-reconciler.ts \
   scripts/broadcast-worker.ts \
+  scripts/watch-worker.ts \
   scripts/cleanup-retention.ts \
   scripts/bootstrap-superuser.ts \
   prisma/seed.ts \
@@ -62,6 +63,7 @@ COPY --chown=nextjs:nextjs --from=builder /app/prisma ./prisma
 # present in the final release image.
 RUN OPS_STARTUP_CHECK=true node ops/payment-reconciler.js \
   && OPS_STARTUP_CHECK=true node ops/broadcast-worker.js \
+  && OPS_STARTUP_CHECK=true node ops/watch-worker.js \
   && OPS_STARTUP_CHECK=true node ops/bootstrap-superuser.js
 
 # Prisma CLI is needed only for `migrate deploy`. Workers and seed are bundled

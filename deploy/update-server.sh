@@ -448,7 +448,7 @@ fi
 # update always starts the image that was just pulled without touching the DB.
 echo "Recreating runtime services from the pulled image..."
 CABINET_ENV_FILE="${ENV_FILE}" "${COMPOSE[@]}" up -d --no-deps --force-recreate \
-  app worker broadcast-worker
+  app worker broadcast-worker watch-worker
 
 wait_for_container() {
   local service="$1"
@@ -592,11 +592,13 @@ cleanup_docker_artifacts() {
     ghcr.io/asdcrosh/cabinet_remna:ops-latest \
     remnawave-cabinet-app \
     remnawave-cabinet-worker \
+    remnawave-cabinet-watch-worker \
     remnawave-cabinet-migrate \
     remnawave-cabinet-check-env \
     remnawave-cabinet-seed \
     cabinet_remna-app \
     cabinet_remna-worker \
+    cabinet_remna-watch-worker \
     cabinet_remna-migrate
   do
     remove_image_if_unused "${image}"
@@ -635,6 +637,7 @@ wait_for_url() {
 }
 
 wait_for_container app 60
+wait_for_container watch-worker 60
 
 CABINET_APP_BIND="$(env_value CABINET_APP_BIND)"
 CABINET_APP_PORT="$(env_value CABINET_APP_PORT)"
@@ -667,3 +670,4 @@ echo "Useful commands:"
 echo "  cd ${INSTALL_DIR} && docker compose --env-file .env -f docker-compose.yml ps"
 echo "  cd ${INSTALL_DIR} && docker compose --env-file .env -f docker-compose.yml logs -f app"
 echo "  cd ${INSTALL_DIR} && docker compose --env-file .env -f docker-compose.yml logs -f worker"
+echo "  cd ${INSTALL_DIR} && docker compose --env-file .env -f docker-compose.yml logs -f watch-worker"

@@ -88,6 +88,8 @@ const routeCases: AdminRouteCase[] = [
   { name: 'manual sync', module: './sync/route', method: 'POST' },
   { name: 'system health read', module: './system/health/route', method: 'GET' },
   { name: 'system health email', module: './system/health/route', method: 'POST' },
+  { name: 'watch report', module: './watch/route', method: 'GET' },
+  { name: 'watch manual cycle', module: './watch/route', method: 'POST' },
   { name: 'bonus attempts grant', module: './users/[id]/bonus-box-attempts/route', method: 'POST', params: { id: 'user-1' } },
   { name: 'user plan assign', module: './users/[id]/plan/route', method: 'POST', params: { id: 'user-1' } },
   { name: 'user profile update', module: './users/[id]/profile/route', method: 'PATCH', params: { id: 'user-1' } },

@@ -1,4 +1,5 @@
 import {
+  Activity,
   Bell,
   BookOpen,
   CalendarRange,
@@ -77,6 +78,7 @@ export const adminNavigation: NavigationItem[] = [
   { href: '/dashboard/admin/payments', label: 'Платежи', icon: CreditCard },
   { href: '/dashboard/admin/recovery', label: 'Восстановление', icon: FileClock },
   { href: '/dashboard/admin/remnashop-sync', label: 'Remnashop', icon: Database },
+  { href: '/dashboard/admin/watch', label: 'Watch', icon: Activity },
   { href: '/dashboard/admin/system', label: 'Настройки', icon: ServerCog },
   { href: '/dashboard/admin/audit', label: 'История', icon: FileClock },
 ]
@@ -117,7 +119,7 @@ export const adminNavigationGroups = [
     ],
   },
   { title: 'Интеграции', items: ['/dashboard/admin/remnashop-sync'] },
-  { title: 'Система', items: ['/dashboard/admin/system', '/dashboard/admin/audit'] },
+  { title: 'Система', items: ['/dashboard/admin/watch', '/dashboard/admin/system', '/dashboard/admin/audit'] },
 ]
 
 export function filterUserNavigation<T extends NavigationItem>(items: T[], features: FeatureFlags) {
@@ -139,7 +141,9 @@ export function getAvailableAdminNavigation(role: UserRole, features: FeatureFla
   })
 
   if (role === 'MODERATOR') return available.filter((item) => item.href === '/dashboard/admin/support')
-  if (role === 'ADMIN') return available.filter((item) => item.href !== '/dashboard/admin/audit')
+  if (role === 'ADMIN') {
+    return available.filter((item) => !['/dashboard/admin/watch', '/dashboard/admin/audit'].includes(item.href))
+  }
   return available
 }
 

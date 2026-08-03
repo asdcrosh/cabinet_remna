@@ -36,6 +36,7 @@ const optionalBooleans = [
   "BONUS_BOX_PITY_ENABLED",
   "BONUS_BOX_SHOW_BEST_RECENT_OPENING",
   "TELEGRAM_MINIAPP_AUTO_MERGE_TECHNICAL",
+  "WATCH_ENABLED",
   "YOOKASSA_ENABLED",
   "PAYANYWAY_ENABLED",
   "PAYANYWAY_TEST_MODE",
@@ -75,6 +76,11 @@ const optionalPositiveIntegers = [
   "RETENTION_CLEANUP_INTERVAL_SECONDS",
   "REMNASHOP_SYNC_RETRY_BATCH_SIZE",
   "PAYMENT_WORKER_HEARTBEAT_MAX_AGE_SECONDS",
+  "WATCH_INTERVAL_SECONDS",
+  "WATCH_TIMEOUT_MS",
+  "WATCH_FAILURE_THRESHOLD",
+  "WATCH_RECOVERY_THRESHOLD",
+  "WATCH_RETENTION_DAYS",
 ];
 
 const optionalSampleRates = [
@@ -189,6 +195,10 @@ for (const [left, right] of optionalPairs) {
 
 if (value("TELEGRAM_NOTIFY_CHAT_ID") && !value("TELEGRAM_BOT_TOKEN")) {
   warnings.push("TELEGRAM_BOT_TOKEN is required for Telegram deploy notifications");
+}
+
+if (value("WATCH_TELEGRAM_CHAT_ID") && !value("TELEGRAM_BOT_TOKEN")) {
+  warnings.push("TELEGRAM_BOT_TOKEN is required for Watch Telegram alerts");
 }
 
 if (["1", "true", "yes", "on"].includes(value("PAYANYWAY_ENABLED").toLowerCase())) {

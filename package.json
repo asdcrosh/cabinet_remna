@@ -17,6 +17,7 @@
     "test:e2e:ui": "E2E_TEST_DATABASE=true playwright test --ui",
     "worker:payments": "tsx scripts/payment-reconciler.ts",
     "worker:broadcasts": "tsx scripts/broadcast-worker.ts",
+    "worker:watch": "tsx scripts/watch-worker.ts",
     "cleanup:retention": "tsx scripts/cleanup-retention.ts",
     "postinstall": "prisma generate",
     "prisma:generate": "prisma generate",
