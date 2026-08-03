@@ -54,7 +54,7 @@ export function AuthLayout({
         </div>
       </aside>
 
-      <main className="flex min-h-dvh items-start justify-center px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(1rem,env(safe-area-inset-top))] sm:px-8 sm:py-10 lg:items-center lg:px-10 xl:px-16">
+      <main className="flex min-h-dvh items-start justify-center px-4 pb-[max(1.5rem,env(safe-area-inset-bottom),var(--tg-content-safe-area-inset-bottom,0px))] pt-[max(1rem,env(safe-area-inset-top),var(--tg-content-safe-area-inset-top,0px))] sm:px-8 sm:py-10 lg:items-center lg:px-10 xl:px-16">
         <div className="w-full max-w-[32rem]">
           <nav aria-label="Основная навигация" className="mb-5 flex items-center justify-between gap-3 lg:hidden">
             <Link href="/" className="flex min-w-0 items-center gap-3">

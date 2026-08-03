@@ -65,8 +65,8 @@ export function Toaster() {
       className={cn(
         'fixed inset-x-3 z-[250] flex flex-col items-center gap-2 sm:inset-x-auto sm:bottom-4 sm:right-4 sm:w-96 sm:items-stretch',
         pathname.startsWith('/dashboard')
-          ? 'bottom-[calc(env(safe-area-inset-bottom)+5.35rem)]'
-          : 'bottom-[max(1rem,env(safe-area-inset-bottom))]'
+          ? 'bottom-[calc(max(env(safe-area-inset-bottom),var(--tg-content-safe-area-inset-bottom,0px))+5.35rem)]'
+          : 'bottom-[max(1rem,env(safe-area-inset-bottom),var(--tg-content-safe-area-inset-bottom,0px))]'
       )}
     >
       {items.map((t) => (

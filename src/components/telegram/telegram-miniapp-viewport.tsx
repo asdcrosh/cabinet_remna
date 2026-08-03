@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
+import { prepareTelegramMiniApp } from '@/lib/telegram-miniapp-viewport'
 
 export function TelegramMiniAppViewport() {
   useEffect(() => {
@@ -20,8 +21,7 @@ export function TelegramMiniAppViewport() {
         }
       }
 
-      webApp.ready?.()
-      webApp.expand?.()
+      prepareTelegramMiniApp(webApp)
       syncViewport()
       webApp.onEvent?.('viewportChanged', syncViewport)
       cleanup = () => {

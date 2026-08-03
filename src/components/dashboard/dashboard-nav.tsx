@@ -332,7 +332,7 @@ export function MobileBottomNav({
   return (
     <nav
       aria-label="Основная мобильная навигация"
-      className="dashboard-mobile-nav fixed inset-x-2 bottom-[max(.5rem,env(safe-area-inset-bottom))] z-40 rounded-xl border p-1.5 backdrop-blur lg:hidden"
+      className="dashboard-mobile-nav fixed inset-x-2 bottom-[max(.5rem,env(safe-area-inset-bottom),var(--tg-content-safe-area-inset-bottom,0px))] z-40 rounded-xl border p-1.5 backdrop-blur lg:hidden"
     >
       <div
         className="mx-auto grid max-w-md gap-1"
