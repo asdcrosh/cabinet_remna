@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { adminPlanSchema, registerSchema, telegramMiniAppEmailSchema } from './validation'
+import { adminPlanSchema, adminPromoCodeSchema, registerSchema, telegramMiniAppEmailSchema } from './validation'
 
 const baseInput = {
   email: 'user@example.com',
@@ -67,5 +67,25 @@ describe('auth validation', () => {
     expect(adminPlanSchema.safeParse(plan).success).toBe(false)
     expect(adminPlanSchema.safeParse({ ...plan, isPromo: true }).success).toBe(true)
     expect(adminPlanSchema.safeParse({ ...plan, priceKopecks: 10_000 }).success).toBe(true)
+  })
+
+  it('accepts renewal-only promo codes and rejects incompatible audiences', () => {
+    const promoCode = {
+      code: 'RENEW20',
+      discountPercent: 20,
+      audience: 'ALL',
+      purchaseScope: 'RENEWAL_ONLY',
+      allowedEmails: [],
+      isActive: true,
+      startsAt: null,
+      expiresAt: null,
+      maxUses: null,
+      maxUsesPerUser: 1,
+      planIds: [],
+    }
+
+    expect(adminPromoCodeSchema.safeParse(promoCode).success).toBe(true)
+    expect(adminPromoCodeSchema.safeParse({ ...promoCode, audience: 'NEW_USERS' }).success).toBe(false)
+    expect(adminPromoCodeSchema.safeParse({ ...promoCode, audience: 'NO_ACTIVE_SUBSCRIPTION' }).success).toBe(false)
   })
 })

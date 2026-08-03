@@ -40,13 +40,14 @@ export const PATCH = withAuth(async (req: Request, { params }: { params: Promise
 
   const existing = await prisma.promoCode.findUnique({
     where: { id },
-    select: { audience: true, allowedEmails: true },
+    select: { audience: true, purchaseScope: true, allowedEmails: true },
   })
   if (!existing) {
     return NextResponse.json({ error: 'Промокод не найден' }, { status: 404 })
   }
 
   const effectiveAudience = data.audience ?? existing.audience
+  const effectivePurchaseScope = data.purchaseScope ?? existing.purchaseScope
   const effectiveAllowedEmails =
     effectiveAudience === 'PERSONAL'
       ? normalizeAllowedEmails(data.allowedEmails ?? existing.allowedEmails)
@@ -58,6 +59,15 @@ export const PATCH = withAuth(async (req: Request, { params }: { params: Promise
       { status: 400 }
     )
   }
+  if (
+    effectivePurchaseScope === 'RENEWAL_ONLY'
+    && ['NEW_USERS', 'NO_ACTIVE_SUBSCRIPTION'].includes(effectiveAudience)
+  ) {
+    return NextResponse.json(
+      { error: 'Промокод на продление доступен только всем или выбранным пользователям' },
+      { status: 400 }
+    )
+  }
 
   try {
     const promoCode = await prisma.$transaction(async (tx) => {
@@ -65,6 +75,7 @@ export const PATCH = withAuth(async (req: Request, { params }: { params: Promise
       if (normalizedCode) updateData.code = normalizedCode
       if (data.discountPercent !== undefined) updateData.discountPercent = data.discountPercent
       updateData.audience = effectiveAudience
+      updateData.purchaseScope = effectivePurchaseScope
       updateData.allowedEmails = effectiveAllowedEmails
       if (data.isActive !== undefined) updateData.isActive = data.isActive
       if (data.startsAt !== undefined) updateData.startsAt = data.startsAt ? new Date(data.startsAt) : null
@@ -97,6 +108,7 @@ export const PATCH = withAuth(async (req: Request, { params }: { params: Promise
         promoCodeId: promoCode.id,
         code: promoCode.code,
         audience: promoCode.audience,
+        purchaseScope: promoCode.purchaseScope,
         allowedEmails: effectiveAllowedEmails,
         changedPlanIds: data.planIds,
       },

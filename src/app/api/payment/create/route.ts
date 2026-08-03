@@ -206,6 +206,7 @@ export const POST = withAuth(async (req: Request) => {
             promoCodeSnapshot: discount
               ? {
                   code: discount.normalizedCode,
+                  purchaseScope: discount.promoCode.purchaseScope,
                   discountPercent: discount.discountPercent,
                   discountKopecks: discount.discountKopecks,
                   originalAmountKopecks: discount.originalAmountKopecks,

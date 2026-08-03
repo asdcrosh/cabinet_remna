@@ -17,6 +17,7 @@ import { Switch } from '@/components/ui/switch'
 import { ADMIN_LIST_PAGE_SIZE } from '@/lib/admin-list'
 
 type PromoAudience = 'ALL' | 'NEW_USERS' | 'NO_ACTIVE_SUBSCRIPTION' | 'PERSONAL'
+type PromoPurchaseScope = 'ANY' | 'RENEWAL_ONLY'
 type PromoAssigneeSource = 'PERSONAL' | 'BONUS_BOX' | 'WELCOME_BONUS' | 'REDEMPTION'
 type PromoOrigin = 'CREATED' | 'MY_BOX' | 'OTHER_BOX'
 
@@ -35,6 +36,7 @@ export interface PromoCodeAdminRow {
   code: string
   discountPercent: number
   audience: PromoAudience
+  purchaseScope: PromoPurchaseScope
   allowedEmails: string[]
   isActive: boolean
   startsAt: string | null
@@ -59,6 +61,7 @@ interface PromoCodeFormState {
   code: string
   discountPercent: string
   audience: PromoAudience
+  purchaseScope: PromoPurchaseScope
   allowedEmails: string
   isActive: boolean
   startsAt: string
@@ -72,6 +75,7 @@ const emptyForm: PromoCodeFormState = {
   code: '',
   discountPercent: '10',
   audience: 'ALL',
+  purchaseScope: 'ANY',
   allowedEmails: '',
   isActive: true,
   startsAt: '',
@@ -145,6 +149,7 @@ export function PromoCodesAdmin({
           code: form.code,
           discountPercent: Number(form.discountPercent),
           audience: form.audience,
+          purchaseScope: form.purchaseScope,
           allowedEmails: form.audience === 'PERSONAL' ? parseAllowedEmails(form.allowedEmails) : [],
           isActive: form.isActive,
           startsAt: form.startsAt ? new Date(form.startsAt).toISOString() : null,
@@ -275,6 +280,7 @@ export function PromoCodesAdmin({
       code: promoCode.code,
       discountPercent: String(promoCode.discountPercent),
       audience: promoCode.audience,
+      purchaseScope: promoCode.purchaseScope,
       allowedEmails: promoCode.allowedEmails.join('\n'),
       isActive: promoCode.isActive,
       startsAt: toLocalDateTime(promoCode.startsAt),
@@ -521,6 +527,9 @@ export function PromoCodesAdmin({
                   onChange={(event) => setForm((current) => ({
                     ...current,
                     audience: event.target.value as PromoAudience,
+                    purchaseScope: ['NEW_USERS', 'NO_ACTIVE_SUBSCRIPTION'].includes(event.target.value)
+                      ? 'ANY'
+                      : current.purchaseScope,
                     allowedEmails: event.target.value === 'PERSONAL' ? current.allowedEmails : '',
                   }))}
                   className="input min-h-11"
@@ -537,6 +546,42 @@ export function PromoCodesAdmin({
                 label={form.isActive ? 'Промокод активен' : 'Промокод выключен'}
                 className="border-y border-slate-200/90 px-1 py-2 dark:border-white/[0.09]"
               />
+            </div>
+
+            <div className="mt-4">
+              <div className="mb-2 text-sm font-medium text-slate-700 dark:text-slate-200">Когда применять</div>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {([
+                  ['ANY', 'Любая покупка', 'Работает и при первой покупке, и при продлении'],
+                  ['RENEWAL_ONLY', 'Только продление', 'Только активная подписка на тот же тариф'],
+                ] as const).map(([value, title, description]) => {
+                  const selected = form.purchaseScope === value
+                  return (
+                    <button
+                      key={value}
+                      type="button"
+                      aria-pressed={selected}
+                      onClick={() => setForm((current) => ({
+                        ...current,
+                        purchaseScope: value,
+                        audience: value === 'RENEWAL_ONLY'
+                          && ['NEW_USERS', 'NO_ACTIVE_SUBSCRIPTION'].includes(current.audience)
+                          ? 'ALL'
+                          : current.audience,
+                      }))}
+                      className={cn(
+                        'rounded-2xl border p-3 text-left transition-colors',
+                        selected
+                          ? 'border-brand-400 bg-brand-50/70 dark:border-brand-500/60 dark:bg-brand-500/10'
+                          : 'border-slate-200 bg-slate-50/70 hover:border-slate-300 dark:border-white/10 dark:bg-white/[0.03] dark:hover:border-white/20'
+                      )}
+                    >
+                      <span className="block text-sm font-semibold text-slate-950 dark:text-white">{title}</span>
+                      <span className="mt-1 block text-xs leading-5 text-slate-500 dark:text-slate-400">{description}</span>
+                    </button>
+                  )
+                })}
+              </div>
             </div>
 
             {form.audience === 'PERSONAL' && (
@@ -676,8 +721,11 @@ export function PromoCodesAdmin({
                     <div className="break-words text-sm font-medium text-slate-700 dark:text-slate-200 lg:truncate" title={promoCode.planNames.join(', ')}>
                       {promoCode.planNames.length > 0 ? promoCode.planNames.join(', ') : 'Все тарифы'}
                     </div>
-                    <div className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500 lg:block lg:truncate" title={audienceTitle(promoCode)}>
-                      {audienceTitle(promoCode)} · {formatRange(promoCode.startsAt, promoCode.expiresAt)}
+                    <div
+                      className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500 lg:block lg:truncate"
+                      title={`${purchaseScopeTitle(promoCode.purchaseScope)} · ${audienceTitle(promoCode)}`}
+                    >
+                      {purchaseScopeTitle(promoCode.purchaseScope)} · {audienceTitle(promoCode)} · {formatRange(promoCode.startsAt, promoCode.expiresAt)}
                     </div>
                     <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] text-slate-500">
                       <span className="rounded-full bg-white px-2 py-1 ring-1 ring-slate-200 dark:bg-white/[0.04] dark:ring-white/10">
@@ -839,6 +887,10 @@ function audienceTitle(promoCode: PromoCodeAdminRow) {
       : 'Персональный список'
   }
   return 'Все пользователи'
+}
+
+function purchaseScopeTitle(scope: PromoPurchaseScope) {
+  return scope === 'RENEWAL_ONLY' ? 'Только продление' : 'Любая покупка'
 }
 
 function originTitle(origin: PromoOrigin) {

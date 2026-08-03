@@ -771,6 +771,7 @@ model PromoCode {
   remnashopPromoCodeId  Int?              @unique
   discountPercent       Int
   audience              PromoCodeAudience @default(ALL)
+  purchaseScope         PromoCodePurchaseScope @default(ANY)
   allowedEmails         String[]          @default([])
   isActive              Boolean           @default(true)
   startsAt              DateTime?
@@ -797,6 +798,11 @@ enum PromoCodeAudience {
   NEW_USERS
   NO_ACTIVE_SUBSCRIPTION
   PERSONAL
+}
+
+enum PromoCodePurchaseScope {
+  ANY
+  RENEWAL_ONLY
 }
 
 model PromoCodePlan {

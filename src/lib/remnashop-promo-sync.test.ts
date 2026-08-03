@@ -40,6 +40,7 @@ const promoCode = {
   remnashopPromoCodeId: null,
   discountPercent: 20,
   audience: 'ALL',
+  purchaseScope: 'ANY',
   allowedEmails: [],
   isActive: true,
   startsAt: null,
@@ -121,6 +122,22 @@ describe('remnashop promo sync', () => {
     await expect(syncCabinetPromoCodeToRemnashop('promo-1')).resolves.toEqual({
       ok: false,
       skipped: 'current remnashop does not support personal email audience for discount promocodes',
+    })
+    expect(mocks.remnashopQuery).not.toHaveBeenCalledWith(
+      expect.stringContaining('INSERT INTO "promocodes"'),
+      expect.anything()
+    )
+  })
+
+  it('keeps renewal-only promo codes local when Remnashop cannot enforce the scope', async () => {
+    mocks.promoCodeFindUnique.mockResolvedValue({
+      ...promoCode,
+      purchaseScope: 'RENEWAL_ONLY',
+    })
+
+    await expect(syncCabinetPromoCodeToRemnashop('promo-1')).resolves.toEqual({
+      ok: false,
+      skipped: 'remnashop does not support renewal-only discount promocodes',
     })
     expect(mocks.remnashopQuery).not.toHaveBeenCalledWith(
       expect.stringContaining('INSERT INTO "promocodes"'),

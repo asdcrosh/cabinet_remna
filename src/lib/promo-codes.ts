@@ -84,6 +84,13 @@ export async function validatePromoCodeForPlan({
     throw new PromoCodeError('Промокод не найден', 404, 'PROMO_NOT_FOUND')
   }
   assertPromoCodeCanBeUsed(promoCode, plan.id, now)
+  await assertPromoCodePurchaseScopeCanBeUsed({
+    prisma,
+    promoCode,
+    userId,
+    planId: plan.id,
+    now,
+  })
   await assertPromoCodeAudienceCanBeUsed({
     prisma,
     promoCode,
@@ -187,6 +194,39 @@ async function assertPromoCodeAudienceCanBeUsed({
 
   if (promoCode.audience === 'NO_ACTIVE_SUBSCRIPTION' && subscriptionsCount > 0) {
     throw new PromoCodeError('Промокод доступен только пользователям без активной подписки', 403, 'PROMO_NO_ACTIVE_SUBSCRIPTION_ONLY')
+  }
+}
+
+async function assertPromoCodePurchaseScopeCanBeUsed({
+  prisma,
+  promoCode,
+  userId,
+  planId,
+  now,
+}: {
+  prisma: PromoAudiencePrisma
+  promoCode: Pick<PromoCodeWithPlans, 'purchaseScope'>
+  userId: string
+  planId: string
+  now: Date
+}) {
+  if (promoCode.purchaseScope === 'ANY') return
+
+  const activeSubscription = await prisma.subscription.count({
+    where: {
+      userId,
+      planId,
+      status: { in: ['ACTIVE', 'LIMITED'] },
+      expireAt: { gt: now },
+    },
+  })
+
+  if (activeSubscription === 0) {
+    throw new PromoCodeError(
+      'Промокод действует только при продлении текущего тарифа',
+      403,
+      'PROMO_RENEWAL_ONLY'
+    )
   }
 }
 

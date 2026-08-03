@@ -100,6 +100,7 @@ const adminPromoCodeBaseSchema = z.object({
     .regex(/^[A-Za-z0-9_-]+$/, 'Только латиница, цифры, дефис и подчёркивание'),
   discountPercent: z.coerce.number().int().min(1).max(99),
   audience: z.enum(['ALL', 'NEW_USERS', 'NO_ACTIVE_SUBSCRIPTION', 'PERSONAL']).default('ALL'),
+  purchaseScope: z.enum(['ANY', 'RENEWAL_ONLY']).default('ANY'),
   allowedEmails: z.array(z.string().trim().email()).max(10_000).default([]),
   isActive: z.boolean().default(true),
   startsAt: z.string().datetime().optional().nullable(),
@@ -120,7 +121,14 @@ export const adminPromoCodeSchema = adminPromoCodeBaseSchema.refine(startsBefore
 }).refine((value) => value.audience !== 'PERSONAL' || value.allowedEmails.length > 0, {
   path: ['allowedEmails'],
   message: 'Для персонального промокода укажите хотя бы одного пользователя',
-})
+}).refine(
+  (value) => value.purchaseScope !== 'RENEWAL_ONLY'
+    || !['NEW_USERS', 'NO_ACTIVE_SUBSCRIPTION'].includes(value.audience),
+  {
+    path: ['purchaseScope'],
+    message: 'Промокод на продление доступен только всем или выбранным пользователям',
+  }
+)
 
 export const updateAdminPromoCodeSchema = adminPromoCodeBaseSchema.partial().refine(startsBeforeExpires, {
   path: ['expiresAt'],

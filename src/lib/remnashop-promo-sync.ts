@@ -54,6 +54,7 @@ const PROMO_SYNC_LOCAL_ONLY_REASONS = new Set([
   'promo code not found',
   'current remnashop does not support personal email audience for discount promocodes',
   'current remnashop does not support no-active-subscription audience for discount promocodes',
+  'remnashop does not support renewal-only discount promocodes',
   'current remnashop does not support plan-limited purchase discount promocodes',
   'current remnashop does not support a future promocode start date',
   'current remnashop only supports one activation or unlimited reuse per user',
@@ -82,7 +83,13 @@ export async function syncCabinetPromoCodeToRemnashop(promoCodeId: string) {
   if (!capability.ok) return { ok: false as const, skipped: capability.skipped }
 
   const compatibilityIssue = getCurrentSchemaCompatibilityIssue(promoCode, capability.schema)
-  if (compatibilityIssue) return { ok: false as const, skipped: compatibilityIssue }
+  if (compatibilityIssue) {
+    if (promoCode.purchaseScope === 'RENEWAL_ONLY') {
+      const deactivated = await deactivateCabinetPromoCodesInRemnashop([promoCode.code])
+      if (!deactivated.ok) return { ok: false as const, skipped: deactivated.skipped }
+    }
+    return { ok: false as const, skipped: compatibilityIssue }
+  }
 
   const { table, columns, idColumn, codeColumn, discountColumn, schema } = capability
 
@@ -320,6 +327,9 @@ function getCurrentSchemaCompatibilityIssue(
   promoCode: PromoCodeForRemnashopSync,
   schema: 'current' | 'legacy'
 ) {
+  if (promoCode.purchaseScope === 'RENEWAL_ONLY') {
+    return 'remnashop does not support renewal-only discount promocodes'
+  }
   if (schema !== 'current') return null
   if (promoCode.audience === 'PERSONAL') {
     return 'current remnashop does not support personal email audience for discount promocodes'

@@ -35,6 +35,7 @@ function promoCode(overrides: Record<string, unknown> = {}) {
     code: 'SALE20',
     discountPercent: 20,
     audience: 'ALL',
+    purchaseScope: 'ANY',
     allowedEmails: [],
     isActive: true,
     startsAt: null,
@@ -113,6 +114,42 @@ describe('promo code helpers', () => {
         plan,
       })
     ).rejects.toMatchObject({ code: 'PROMO_PLAN_NOT_ALLOWED' })
+  })
+
+  it('allows a renewal-only promo code for an active subscription on the same plan', async () => {
+    prisma.promoCode.findUnique.mockResolvedValue(promoCode({ purchaseScope: 'RENEWAL_ONLY' }))
+    prisma.subscription.count.mockResolvedValue(1)
+    prisma.promoCodeRedemption.count.mockResolvedValue(0)
+    const now = new Date('2026-01-01T00:00:00.000Z')
+
+    await expect(validatePromoCodeForPlan({
+      prisma,
+      code: 'SALE20',
+      userId: 'user-1',
+      plan,
+      now,
+    })).resolves.toMatchObject({ normalizedCode: 'SALE20' })
+
+    expect(prisma.subscription.count).toHaveBeenCalledWith({
+      where: {
+        userId: 'user-1',
+        planId: 'plan-1',
+        status: { in: ['ACTIVE', 'LIMITED'] },
+        expireAt: { gt: now },
+      },
+    })
+  })
+
+  it('rejects a renewal-only promo code without an active subscription on the same plan', async () => {
+    prisma.promoCode.findUnique.mockResolvedValue(promoCode({ purchaseScope: 'RENEWAL_ONLY' }))
+    prisma.subscription.count.mockResolvedValue(0)
+
+    await expect(validatePromoCodeForPlan({
+      prisma,
+      code: 'SALE20',
+      userId: 'user-1',
+      plan,
+    })).rejects.toMatchObject({ code: 'PROMO_RENEWAL_ONLY' })
   })
 
   it('rejects all promo codes when the plan disables discounts', async () => {
