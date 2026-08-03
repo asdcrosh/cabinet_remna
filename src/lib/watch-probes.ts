@@ -1,6 +1,6 @@
 import tls from 'node:tls'
 import { connect as connectTcp, isIP } from 'node:net'
-import type { RemnawaveNode, RemnawaveNodeInbound } from './remnawave'
+import type { RemnawaveHost, RemnawaveNode, RemnawaveNodeInbound } from './remnawave'
 
 export type TransportProbe = {
   status: 'OK' | 'FAIL' | 'SKIPPED'
@@ -17,25 +17,33 @@ export type WatchNodeCheck = {
   error: string | null
 }
 
-type ProbeTarget = {
+export type ProbeTarget = {
   host: string
   port: number
   servername: string
   path?: string
 }
 
-export async function checkRemnawaveNode(node: RemnawaveNode, timeoutMs: number): Promise<WatchNodeCheck> {
+export async function checkRemnawaveNode(
+  node: RemnawaveNode,
+  timeoutMs: number,
+  hosts: RemnawaveHost[] = [],
+): Promise<WatchNodeCheck> {
   if (node.isDisabled) {
     const skipped = skippedProbe()
     return { node, apiStatus: 'SKIPPED', xhttp: skipped, tcp: skipped, status: 'DISABLED', error: null }
   }
 
   const inbounds = node.configProfile?.activeInbounds ?? []
-  const xhttpTarget = resolveTarget(node, inbounds.find((item) => inboundNetwork(item) === 'xhttp'), 'xhttp')
-  const tcpTarget = resolveTarget(node, inbounds.find((item) => inboundNetwork(item) === 'tcp'), 'tcp')
+  const xhttpTargets = inbounds
+    .filter((item) => inboundNetwork(item) === 'xhttp')
+    .flatMap((inbound) => resolveProbeTargets(node, inbound, 'xhttp', hosts))
+  const tcpTargets = inbounds
+    .filter((item) => inboundNetwork(item) === 'tcp')
+    .flatMap((inbound) => resolveProbeTargets(node, inbound, 'tcp', hosts))
   const [xhttp, tcp] = await Promise.all([
-    xhttpTarget ? probeTlsTarget(xhttpTarget, timeoutMs, true) : Promise.resolve(skippedProbe()),
-    tcpTarget ? probeTcpTarget(tcpTarget, timeoutMs) : Promise.resolve(skippedProbe()),
+    probeTargets(xhttpTargets, (target) => probeTlsTarget(target, timeoutMs, true)),
+    probeTargets(tcpTargets, (target) => probeTcpTarget(target, timeoutMs)),
   ])
   const apiStatus = node.isConnected ? 'OK' : 'FAIL'
   const status = resolveNodeStatus({
@@ -81,19 +89,67 @@ function inboundNetwork(inbound: RemnawaveNodeInbound) {
   return inbound.network || inbound.rawInbound?.streamSettings?.network
 }
 
-function resolveTarget(node: RemnawaveNode, inbound: RemnawaveNodeInbound | undefined, kind: 'xhttp' | 'tcp'): ProbeTarget | null {
-  if (!inbound) return null
+export function resolveProbeTargets(
+  node: RemnawaveNode,
+  inbound: RemnawaveNodeInbound,
+  kind: 'xhttp' | 'tcp',
+  hosts: RemnawaveHost[] = [],
+): ProbeTarget[] {
   const stream = inbound.rawInbound?.streamSettings
   const serverNames = stream?.realitySettings?.serverNames ?? []
+  const publicTargets = hosts
+    .filter((host) => isDedicatedPublicHostForInbound(host, node, inbound))
+    .map((host) => {
+      const address = stripAddress(host.address)
+      const servername = host.sni?.trim() || firstHostValue(host.host) || address
+      return createTarget({
+        address,
+        port: host.port,
+        servername,
+        path: kind === 'xhttp' ? normalizePath(host.path || stream?.xhttpSettings?.path) : undefined,
+      })
+    })
+    .filter((target): target is ProbeTarget => target !== null)
+
+  if (publicTargets.length > 0) return uniqueTargets(publicTargets)
+
   const address = stripAddress(node.address)
   const servername = serverNames.find((name) => name === address) || serverNames[0] || address
-  if (!address || !servername) return null
-  return {
-    host: address,
+  const fallback = createTarget({
+    address,
     port: Number(inbound.port || inbound.rawInbound?.port || (kind === 'xhttp' ? 443 : 10443)),
     servername,
     path: kind === 'xhttp' ? normalizePath(stream?.xhttpSettings?.path) : undefined,
-  }
+  })
+  return fallback ? [fallback] : []
+}
+
+function isDedicatedPublicHostForInbound(
+  host: RemnawaveHost,
+  node: RemnawaveNode,
+  inbound: RemnawaveNodeInbound,
+) {
+  if (host.isDisabled || host.isHidden || host.nodes.length !== 1 || host.nodes[0] !== node.uuid) return false
+  if (!inbound.uuid || host.inbound.configProfileInboundUuid !== inbound.uuid) return false
+  const activeProfileUuid = node.configProfile?.activeConfigProfileUuid
+  return !activeProfileUuid || !host.inbound.configProfileUuid || host.inbound.configProfileUuid === activeProfileUuid
+}
+
+function createTarget(input: { address: string; port: number; servername: string; path?: string }): ProbeTarget | null {
+  const port = Number(input.port)
+  if (!input.address || !input.servername || !Number.isInteger(port) || port < 1 || port > 65_535) return null
+  return { host: input.address, port, servername: input.servername, path: input.path }
+}
+
+function firstHostValue(value?: string | null) {
+  return value?.split(',')[0]?.trim() || ''
+}
+
+function uniqueTargets(targets: ProbeTarget[]) {
+  return [...new Map(targets.map((target) => [
+    `${target.host}:${target.port}:${target.servername}:${target.path || ''}`,
+    target,
+  ])).values()]
 }
 
 function stripAddress(address: string) {
@@ -113,6 +169,27 @@ function normalizePath(path?: string) {
 
 function skippedProbe(): TransportProbe {
   return { status: 'SKIPPED', latencyMs: null, error: null }
+}
+
+async function probeTargets(
+  targets: ProbeTarget[],
+  probe: (target: ProbeTarget) => Promise<TransportProbe>,
+): Promise<TransportProbe> {
+  if (targets.length === 0) return skippedProbe()
+  const attempts = await Promise.all(targets.map(async (target) => ({ target, result: await probe(target) })))
+  const successful = attempts
+    .filter((attempt) => attempt.result.status === 'OK')
+    .sort((left, right) => (left.result.latencyMs ?? Infinity) - (right.result.latencyMs ?? Infinity))[0]
+  if (successful) return successful.result
+
+  return {
+    status: 'FAIL',
+    latencyMs: null,
+    error: attempts
+      .map(({ target, result }) => `${target.host}:${target.port} — ${result.error || 'ошибка проверки'}`)
+      .join(' · ')
+      .slice(0, 500),
+  }
 }
 
 function probeTlsTarget(target: ProbeTarget, timeoutMs: number, expectHttp: boolean): Promise<TransportProbe> {

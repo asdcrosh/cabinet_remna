@@ -1,6 +1,6 @@
 import type { WatchIncidentType, WatchProbeStatus } from '@prisma/client'
 import { prisma } from './prisma'
-import { remnawave, type RemnawaveNode } from './remnawave'
+import { remnawave, type RemnawaveHost, type RemnawaveNode } from './remnawave'
 import { checkRemnawaveNode, type WatchNodeCheck } from './watch-probes'
 import { getWatchConfig } from './watch-config'
 import { sendWatchAlert, type WatchAlertEvent } from './watch-alerts'
@@ -32,7 +32,14 @@ export async function runWatchCycle(source: 'worker' | 'manual' = 'worker') {
         throw error
       }
       const nodes = Array.isArray(payload.response) ? payload.response : []
-      const checks = await Promise.all(nodes.map((node) => checkRemnawaveNode(node, config.timeoutMs)))
+      let hosts: RemnawaveHost[] = []
+      try {
+        const hostPayload = await remnawave.getHosts()
+        hosts = Array.isArray(hostPayload.response) ? hostPayload.response : []
+      } catch (error) {
+        logWarn('watch.hosts_unavailable', { error: compactError(error) })
+      }
+      const checks = await Promise.all(nodes.map((node) => checkRemnawaveNode(node, config.timeoutMs, hosts)))
 
       for (const check of checks) {
         events.push(...await persistNodeCheck(check, config.failureThreshold, config.recoveryThreshold))

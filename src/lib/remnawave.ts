@@ -276,6 +276,27 @@ export interface GetNodesResponse {
   response: RemnawaveNode[]
 }
 
+export interface RemnawaveHost {
+  uuid: string
+  remark: string
+  address: string
+  port: number
+  path?: string | null
+  sni?: string | null
+  host?: string | null
+  isDisabled: boolean
+  isHidden?: boolean
+  inbound: {
+    configProfileUuid?: string | null
+    configProfileInboundUuid?: string | null
+  }
+  nodes: string[]
+}
+
+export interface GetHostsResponse {
+  response: RemnawaveHost[]
+}
+
 // ----------------------------------------------------------------------
 // Методы
 // ----------------------------------------------------------------------
@@ -283,6 +304,10 @@ export interface GetNodesResponse {
 export const remnawave = {
   async getNodes() {
     return request<GetNodesResponse>('GET', '/api/nodes')
+  },
+
+  async getHosts() {
+    return request<GetHostsResponse>('GET', '/api/hosts')
   },
 
   // CRUD пользователей ----------------------------------------------------
