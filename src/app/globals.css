@@ -9,6 +9,14 @@
     --muted: 103 113 113;
     --cabinet-line: 210 214 209;
     --cabinet-accent: 8 145 178;
+    --telegram-miniapp-top-offset: 0px;
+    --telegram-miniapp-bottom-offset: 0px;
+  }
+  @media (max-width: 1023px) {
+    html[data-telegram-mini-app='true'] {
+      --telegram-miniapp-top-offset: 4rem;
+      --telegram-miniapp-bottom-offset: 1rem;
+    }
   }
   html, body { @apply h-full; }
   html {

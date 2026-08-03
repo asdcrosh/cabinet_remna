@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
+import { markTelegramMiniApp } from '@/lib/telegram-miniapp-viewport'
 
 const SESSION_KEY = 'remnawave-cabinet:telegram-miniapp'
 const SCRIPT_ID = 'telegram-web-app-sdk'
@@ -17,6 +18,8 @@ export function TelegramMiniAppScript() {
       rememberedLaunch = isTelegramLaunch
     }
     if (!rememberedLaunch) return
+
+    markTelegramMiniApp(document.documentElement)
 
     if (window.Telegram?.WebApp) {
       window.dispatchEvent(new Event('telegram-web-app-ready'))

@@ -12,6 +12,10 @@ export type TelegramMiniAppViewportApi = {
 
 const MOBILE_PLATFORMS = new Set(['android', 'ios'])
 
+export function markTelegramMiniApp(root: { dataset: { telegramMiniApp?: string } }) {
+  root.dataset.telegramMiniApp = 'true'
+}
+
 export function prepareTelegramMiniApp(webApp: TelegramMiniAppViewportApi) {
   webApp.ready?.()
   webApp.expand?.()

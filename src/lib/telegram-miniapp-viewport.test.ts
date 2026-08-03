@@ -1,5 +1,15 @@
 import { describe, expect, it, vi } from 'vitest'
-import { prepareTelegramMiniApp } from './telegram-miniapp-viewport'
+import { markTelegramMiniApp, prepareTelegramMiniApp } from './telegram-miniapp-viewport'
+
+describe('markTelegramMiniApp', () => {
+  it('marks the document so Telegram-only spacing can be applied', () => {
+    const root: { dataset: { telegramMiniApp?: string } } = { dataset: {} }
+
+    markTelegramMiniApp(root)
+
+    expect(root.dataset.telegramMiniApp).toBe('true')
+  })
+})
 
 describe('prepareTelegramMiniApp', () => {
   it('opens supported mobile Telegram clients in fullscreen', () => {
