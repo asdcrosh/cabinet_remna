@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="1.3.0"
+VERSION="1.4.0"
 INSTALL_PATH="${FULL_BACKUP_INSTALL_PATH:-/usr/local/bin/remna-backup}"
 BACKUP_DIR="${FULL_BACKUP_DIR:-/opt/remnawave-backups}"
 S3_CONFIG_FILE="${FULL_BACKUP_S3_CONFIG:-/etc/remna-backup-s3.conf}"
@@ -14,6 +14,7 @@ REMNAWAVE_DIR="${REMNAWAVE_DIR:-/opt/remnawave}"
 REMNAWAVE_SUBSCRIPTION_DIR="${REMNAWAVE_SUBSCRIPTION_DIR:-${REMNAWAVE_DIR}/subscription}"
 REMNASHOP_DIR="${REMNASHOP_DIR:-/opt/remnashop}"
 CABINET_DIR="${CABINET_DIR:-/opt/remnawave-cabinet}"
+CABINET_ENV_FILE="${CABINET_ENV_FILE:-${CABINET_DIR}/.env}"
 REMNAWAVE_DB_CONTAINER="${REMNAWAVE_DB_CONTAINER:-remnawave-db}"
 REMNASHOP_DB_CONTAINER="${REMNASHOP_DB_CONTAINER:-remnashop-db}"
 CABINET_DB_CONTAINER="${CABINET_DB_CONTAINER:-remnawave-cabinet-db}"
@@ -36,6 +37,7 @@ SCHEDULE_KIND="DAILY"
 SCHEDULE_TIME="03:00"
 SCHEDULE_WEEKDAY="Sun"
 SCHEDULE_KEEP_DAYS="14"
+SCHEDULE_TELEGRAM_NOTIFY="true"
 
 if [[ -f "${S3_CONFIG_FILE}" ]]; then
   # The file is created root-only by this script and contains shell-escaped values.
@@ -98,6 +100,179 @@ is_truthy() {
     1|true|TRUE|yes|YES|y|Y) return 0 ;;
     *) return 1 ;;
   esac
+}
+
+cabinet_env_value() {
+  local key="$1"
+  [[ -f "${CABINET_ENV_FILE}" ]] || return 0
+  awk -F= -v key="${key}" '
+    $1 == key {
+      sub(/^[^=]*=/, "")
+      gsub(/^"|"$/, "")
+      gsub(/^\047|\047$/, "")
+      print
+      exit
+    }
+  ' "${CABINET_ENV_FILE}" 2>/dev/null || true
+}
+
+telegram_backup_configured() {
+  [[ -n "$(cabinet_env_value TELEGRAM_BOT_TOKEN)" \
+    && -n "$(cabinet_env_value TELEGRAM_NOTIFY_CHAT_ID)" ]]
+}
+
+next_backup_run() {
+  local next=""
+  if command -v systemctl >/dev/null 2>&1 && [[ -d /run/systemd/system ]]; then
+    next="$(systemctl show "${SCHEDULE_TIMER_NAME}" \
+      --property=NextElapseUSecRealtime --value 2>/dev/null || true)"
+  fi
+  printf '%s\n' "${next:-по расписанию}"
+}
+
+send_telegram_backup_notification() {
+  local message="$1"
+  is_truthy "${SCHEDULE_TELEGRAM_NOTIFY}" || return 0
+
+  local bot_token chat_id
+  bot_token="$(cabinet_env_value TELEGRAM_BOT_TOKEN)"
+  chat_id="$(cabinet_env_value TELEGRAM_NOTIFY_CHAT_ID)"
+  if [[ -z "${bot_token}" || -z "${chat_id}" ]]; then
+    warn "Telegram-уведомление пропущено: заполните TELEGRAM_BOT_TOKEN и TELEGRAM_NOTIFY_CHAT_ID в ${CABINET_ENV_FILE}."
+    return 1
+  fi
+  if ! command -v curl >/dev/null 2>&1; then
+    warn "Telegram-уведомление пропущено: не найден curl."
+    return 1
+  fi
+
+  local response_file http_code description
+  response_file="$(mktemp /tmp/remna-backup-telegram.XXXXXX)"
+  CLEANUP_PATHS+=("${response_file}")
+  if ! http_code="$(curl -sS --max-time 10 \
+    -X POST "https://api.telegram.org/bot${bot_token}/sendMessage" \
+    --data-urlencode "chat_id=${chat_id}" \
+    --data-urlencode "text=${message}" \
+    --data "disable_web_page_preview=true" \
+    --output "${response_file}" \
+    --write-out '%{http_code}')"; then
+    warn "Telegram недоступен: ошибка сети или таймаут."
+    return 1
+  fi
+
+  if [[ "${http_code}" == "200" ]] && grep -q '"ok"[[:space:]]*:[[:space:]]*true' "${response_file}"; then
+    ok "Уведомление о бэкапе отправлено в Telegram."
+  else
+    description="$(python3 -c '
+import json
+import sys
+try:
+    payload = json.load(open(sys.argv[1], encoding="utf-8"))
+    print(payload.get("description", ""))
+except Exception:
+    pass
+' "${response_file}" 2>/dev/null || true)"
+    warn "Telegram отклонил уведомление: ${description:-HTTP ${http_code}}"
+    return 1
+  fi
+  return 0
+}
+
+backup_s3_result() {
+  if s3_configured && is_truthy "${S3_AUTO_UPLOAD}"; then
+    printf 'архив загружен\n'
+  elif s3_configured; then
+    printf 'автоотправка выключена\n'
+  else
+    printf 'не настроен\n'
+  fi
+}
+
+notify_backup_success() {
+  local archive="$1"
+  local duration="$2"
+  local size checksum
+  size="$(du -h "${archive}" 2>/dev/null | awk '{print $1}')"
+  checksum="$(awk '{print $1}' "${archive}.sha256" 2>/dev/null || true)"
+  send_telegram_backup_notification "Бэкап создан
+
+Сервер: $(hostname)
+Архив: $(basename "${archive}")
+Размер: ${size:-неизвестно}
+SHA-256: ${checksum:-неизвестно}
+S3: $(backup_s3_result)
+Выполнено за: ${duration} сек.
+Следующий запуск: $(next_backup_run)
+Время: $(date -u '+%d.%m.%Y %H:%M UTC')" || true
+}
+
+notify_backup_failure() {
+  local status="$1"
+  local duration="$2"
+  local log_file="$3"
+  local archive="${4:-}"
+  local details archive_status
+  details="$(tail -n 12 "${log_file}" 2>/dev/null | cut -c 1-240 || true)"
+  archive_status="не создан"
+  [[ -n "${archive}" ]] && archive_status="$(basename "${archive}") сохранён локально"
+  send_telegram_backup_notification "Бэкап завершился с ошибкой
+
+Сервер: $(hostname)
+Код завершения: ${status}
+Локальный архив: ${archive_status}
+Прошло: ${duration} сек.
+Время: $(date -u '+%d.%m.%Y %H:%M UTC')
+
+Последние сообщения:
+${details:-Диагностика отсутствует}
+
+Логи: cabinetctl backups -> Автоматический бэкап -> Показать логи" || true
+}
+
+test_telegram_backup_notification() {
+  require_root
+  is_truthy "${SCHEDULE_TELEGRAM_NOTIFY}" \
+    || fail "Telegram-уведомления выключены в настройках автоматического бэкапа."
+  telegram_backup_configured \
+    || fail "Заполните TELEGRAM_BOT_TOKEN и TELEGRAM_NOTIFY_CHAT_ID в ${CABINET_ENV_FILE}."
+  send_telegram_backup_notification "Проверка уведомлений о бэкапах
+
+Сервер: $(hostname)
+Статус: подключение работает
+Время: $(date -u '+%d.%m.%Y %H:%M UTC')" \
+    || fail "Telegram отклонил тестовое уведомление. Проверьте chat ID и доступ бота к чату."
+}
+
+run_backup_with_notifications() {
+  require_root
+  local started log_file script_path status duration archive previous_archive
+  started="$(date +%s)"
+  previous_archive="$(latest_local_backup || true)"
+  log_file="$(mktemp /tmp/remna-backup-run.XXXXXX)"
+  CLEANUP_PATHS+=("${log_file}")
+  script_path="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
+
+  set +e
+  bash "${script_path}" backup-create 2>&1 | tee "${log_file}"
+  status="${PIPESTATUS[0]}"
+  set -e
+  duration="$(( $(date +%s) - started ))"
+
+  if [[ "${status}" == "0" ]]; then
+    archive="$(latest_local_backup || true)"
+    if [[ -n "${archive}" ]]; then
+      notify_backup_success "${archive}" "${duration}"
+    else
+      notify_backup_failure "1" "${duration}" "${log_file}"
+      fail "Бэкап завершился без итогового архива."
+    fi
+    return 0
+  fi
+
+  archive="$(latest_local_backup || true)"
+  [[ "${archive}" == "${previous_archive}" ]] && archive=""
+  notify_backup_failure "${status}" "${duration}" "${log_file}" "${archive}"
+  return "${status}"
 }
 
 ensure_aws_cli() {
@@ -761,6 +936,7 @@ write_schedule_config() {
     printf 'SCHEDULE_TIME=%q\n' "${SCHEDULE_TIME}"
     printf 'SCHEDULE_WEEKDAY=%q\n' "${SCHEDULE_WEEKDAY}"
     printf 'SCHEDULE_KEEP_DAYS=%q\n' "${SCHEDULE_KEEP_DAYS}"
+    printf 'SCHEDULE_TELEGRAM_NOTIFY=%q\n' "${SCHEDULE_TELEGRAM_NOTIFY}"
   } >"${SCHEDULE_CONFIG_FILE}"
   chmod 600 "${SCHEDULE_CONFIG_FILE}"
   KEEP_DAYS="${FULL_BACKUP_KEEP_DAYS:-${SCHEDULE_KEEP_DAYS}}"
@@ -845,7 +1021,7 @@ configure_schedule() {
   require_tty
   require_systemd
 
-  local choice value upload_default upload_value
+  local choice value upload_default upload_value telegram_default telegram_value
   printf '\nРасписание создаётся по часовому поясу сервера: %s\n' "$(server_timezone)" >/dev/tty
   printf '%s\n' \
     "  1. Каждый день" \
@@ -904,12 +1080,28 @@ configure_schedule() {
     fail "Ответьте y или n."
   fi
 
+  telegram_default="Y/n"
+  is_truthy "${SCHEDULE_TELEGRAM_NOTIFY}" || telegram_default="y/N"
+  printf 'Отправлять результат бэкапа в Telegram? [%s]: ' "${telegram_default}" >/dev/tty
+  IFS= read -r telegram_value </dev/tty
+  if [[ -z "${telegram_value}" ]]; then
+    if is_truthy "${SCHEDULE_TELEGRAM_NOTIFY}"; then telegram_value="true"; else telegram_value="false"; fi
+  elif [[ "${telegram_value}" =~ ^[yYдД]$ ]]; then
+    telegram_value="true"
+  elif [[ "${telegram_value}" =~ ^[nNнН]$ ]]; then
+    telegram_value="false"
+  else
+    fail "Ответьте y или n."
+  fi
+  SCHEDULE_TELEGRAM_NOTIFY="${telegram_value}"
+
   set_schedule_upload "${upload_value}"
   write_schedule_config
   install_schedule_units
   ok "Автоматический бэкап включён: $(schedule_description)."
   printf '  Часовой пояс:   %s\n' "$(server_timezone)"
   printf '  S3 отправка:    %s\n' "$(is_truthy "${S3_AUTO_UPLOAD}" && printf 'включена' || printf 'выключена')"
+  printf '  Telegram:       %s\n' "$(is_truthy "${SCHEDULE_TELEGRAM_NOTIFY}" && printf 'включён' || printf 'выключен')"
   printf '  Хранение:       %s дней локально\n' "${SCHEDULE_KEEP_DAYS}"
 }
 
@@ -943,6 +1135,11 @@ schedule_status() {
     printf '  Часовой пояс:   %s\n' "$(server_timezone)"
     printf '  Хранение:       %s дней локально\n' "${SCHEDULE_KEEP_DAYS}"
     printf '  S3 отправка:    %s\n' "$(is_truthy "${S3_AUTO_UPLOAD}" && printf 'включена' || printf 'выключена')"
+    if is_truthy "${SCHEDULE_TELEGRAM_NOTIFY}"; then
+      printf '  Telegram:       %s\n' "$(telegram_backup_configured && printf 'настроен' || printf 'нет токена или chat ID')"
+    else
+      printf '  Telegram:       выключен\n'
+    fi
   else
     printf '  Настройки:      не заданы\n'
   fi
@@ -992,6 +1189,7 @@ schedule_menu() {
     "  4. Показать статус" \
     "  5. Запустить сейчас для проверки" \
     "  6. Показать логи" \
+    "  7. Проверить Telegram-уведомление" \
     "  0. Назад" >/dev/tty
   printf 'Выберите действие: ' >/dev/tty
   IFS= read -r choice </dev/tty
@@ -1002,6 +1200,7 @@ schedule_menu() {
     4) schedule_status ;;
     5) run_scheduled_backup_now ;;
     6) schedule_logs ;;
+    7) test_telegram_backup_notification ;;
     0) return ;;
     *) warn "Неизвестный пункт." ;;
   esac
@@ -1206,7 +1405,7 @@ Remnawave Full Backup ${VERSION}
 
 Использование:
   remna-backup                       интерактивное меню
-  remna-backup backup                полный бэкап трёх систем
+  remna-backup backup                полный бэкап и Telegram-уведомление
   remna-backup status                свежесть локального бэкапа и S3
   remna-backup schedule              настройка автоматического бэкапа
   remna-backup schedule-status       состояние и следующий запуск
@@ -1214,6 +1413,7 @@ Remnawave Full Backup ${VERSION}
   remna-backup schedule-disable      выключить расписание
   remna-backup schedule-run          запустить расписание сейчас
   remna-backup schedule-logs         последние логи автоматизации
+  remna-backup schedule-notify-test  проверить уведомление в Telegram
   remna-backup list                  список архивов
   remna-backup s3-config             настроить S3
   remna-backup s3-upload ARCHIVE     загрузить архив в S3
@@ -1237,7 +1437,8 @@ EOF
 
 case "${1:-menu}" in
   menu) show_menu ;;
-  backup) create_backup ;;
+  backup) run_backup_with_notifications ;;
+  backup-create) create_backup ;;
   status) backup_status ;;
   schedule) schedule_menu ;;
   schedule-status) schedule_status ;;
@@ -1245,6 +1446,7 @@ case "${1:-menu}" in
   schedule-disable) disable_schedule ;;
   schedule-run) run_scheduled_backup_now ;;
   schedule-logs) schedule_logs ;;
+  schedule-notify-test) test_telegram_backup_notification ;;
   list) list_backups ;;
   verify) verify_backup "${2:-}" ;;
   restore) restore_backup "${2:-}" ;;

@@ -640,6 +640,11 @@ backup_schedule_status() {
   "${BACKUP_SCRIPT_PATH}" schedule-status
 }
 
+backup_notification_test() {
+  ensure_backup_command
+  "${BACKUP_SCRIPT_PATH}" schedule-notify-test
+}
+
 verify_backup() {
   ensure_backup_command
   "${BACKUP_SCRIPT_PATH}" verify "${1:-}"
@@ -747,6 +752,7 @@ Remnawave Cabinet ${VERSION}
   cabinetctl backups            бэкапы, восстановление и S3
   cabinetctl backup-schedule    настроить автоматический бэкап
   cabinetctl backup-status      статус автоматического бэкапа
+  cabinetctl backup-notify-test проверить Telegram-уведомление
   cabinetctl status             краткое состояние сервисов
   cabinetctl ps                 состояние compose-сервисов
   cabinetctl url                показать адрес кабинета
@@ -795,6 +801,7 @@ case "${1:-menu}" in
   backups) backup_menu ;;
   backup-schedule|schedule-backup) backup_schedule ;;
   backup-status|schedule-status) backup_schedule_status ;;
+  backup-notify-test) backup_notification_test ;;
   verify) verify_backup "${2:-}" ;;
   restore) restore_backup "${2:-}" ;;
   self-update) update_console ;;
