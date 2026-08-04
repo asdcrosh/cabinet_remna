@@ -387,7 +387,7 @@ NODE_ENV=production npm run check:env
 | `REFERRAL_BONUS_DAYS` | Бонус за реферала |
 | `BONUS_BOX_*` | Настройки подарочного бокса |
 | `BROADCAST_WORKER_*` | Параметры broadcast worker |
-| `WATCH_*` | Интервал, таймаут, пороги инцидентов, хранение истории и отдельный Telegram chat Watch |
+| `WATCH_*` | Интервал, таймаут, повторы проб, пороги подтверждения сбоя/восстановления, хранение истории и отдельный Telegram chat Watch. Оповещения объединяются по ноде; ручная проверка не влияет на инциденты |
 | `RETENTION_CLEANUP_INTERVAL_SECONDS` | Интервал cleanup-контейнера в секундах |
 | `AUDIT_LOG_RETENTION_DAYS` | Срок хранения audit log |
 | `APP_LOG_LEVEL` | `debug` / `info` / `warn` / `error` |

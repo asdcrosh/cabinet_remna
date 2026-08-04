@@ -1,3 +1,4 @@
+import { prisma } from './prisma'
 import { createAdminNotification } from './admin-notifications'
 import { getBrandName } from './branding'
 import { getWatchConfig } from './watch-config'
@@ -7,22 +8,76 @@ export type WatchAlertEvent = {
   id: string
   kind: 'OPEN' | 'RESOLVED'
   type: 'PANEL_API' | 'NODE_API' | 'XHTTP' | 'REALITY_TCP'
+  nodeUuid: string | null
   nodeName: string | null
   title: string
   message: string
 }
 
+export async function sendWatchAlerts(events: WatchAlertEvent[]) {
+  for (const group of groupAlertEvents(events)) {
+    if (!await shouldNotify(group)) continue
+    await sendAlertGroup(group)
+  }
+}
+
 export async function sendWatchAlert(event: WatchAlertEvent) {
-  const brand = getBrandName()
-  const isOpen = event.kind === 'OPEN'
+  await sendWatchAlerts([event])
+}
+
+export function groupAlertEvents(events: WatchAlertEvent[]) {
+  const groups = new Map<string, WatchAlertEvent[]>()
+  for (const event of events) {
+    const key = `${event.kind}:${event.nodeUuid || 'panel'}`
+    groups.set(key, [...(groups.get(key) ?? []), event])
+  }
+  return [...groups.values()]
+}
+
+async function shouldNotify(events: WatchAlertEvent[]) {
+  const first = events[0]
+  if (!first) return false
+
+  if (first.kind === 'OPEN') {
+    const existingOpen = await prisma.watchIncident.count({
+      where: {
+        nodeUuid: first.nodeUuid,
+        status: 'OPEN',
+        id: { notIn: events.map((event) => event.id) },
+      },
+    })
+    return existingOpen === 0
+  }
+
+  const remainingOpen = await prisma.watchIncident.count({
+    where: { nodeUuid: first.nodeUuid, status: 'OPEN' },
+  })
+  return remainingOpen === 0
+}
+
+async function sendAlertGroup(events: WatchAlertEvent[]) {
+  const first = events[0]
+  if (!first) return
+  const isOpen = first.kind === 'OPEN'
+  const nodeName = first.nodeName || 'Remnawave Panel'
+  const channels = [...new Set(events.map((event) => typeLabel(event.type)))]
+  const messages = [...new Set(events.map((event) => event.message).filter(Boolean))]
+  const title = isOpen
+    ? `${nodeName}: проблема подтверждена`
+    : `${nodeName}: работа восстановлена`
+  const body = isOpen
+    ? `Не отвечают: ${channels.join(', ')}. ${messages.join(' ')}`
+    : `Стабильность подтверждена. Восстановлены: ${channels.join(', ')}.`
+  const incidentIds = events.map((event) => event.id).sort()
+
   await createAdminNotification({
     type: isOpen ? 'WATCH_INCIDENT_OPEN' : 'WATCH_INCIDENT_RESOLVED',
     severity: isOpen ? 'ERROR' : 'SUCCESS',
-    dedupeKey: `watch:${event.id}:${event.kind.toLowerCase()}`,
-    title: event.title,
-    body: event.message,
+    dedupeKey: `watch:summary:${first.kind.toLowerCase()}:${incidentIds.join(':')}`,
+    title,
+    body,
     entityType: 'watch-incident',
-    entityId: event.id,
+    entityId: first.id,
     actionHref: '/dashboard/admin/watch',
     actionLabel: 'Открыть Watch',
   })
@@ -37,14 +92,18 @@ export async function sendWatchAlert(event: WatchAlertEvent) {
     return
   }
 
+  const brand = getBrandName()
   const appUrl = process.env.APP_URL?.replace(/\/$/, '')
   const lines = [
-    isOpen ? '🔴 <b>Открыт инцидент</b>' : '🟢 <b>Работа восстановлена</b>',
+    isOpen ? '<b>Проблема подтверждена</b>' : '<b>Работа восстановлена</b>',
     `<b>${escapeHtml(brand)} Watch</b>`,
-    event.nodeName ? `Нода: <b>${escapeHtml(event.nodeName)}</b>` : null,
-    `Контур: ${escapeHtml(typeLabel(event.type))}`,
-    escapeHtml(event.message),
-    appUrl ? `<a href="${escapeHtml(`${appUrl}/dashboard/admin/watch`)}">Открыть пульт</a>` : null,
+    first.nodeName ? `Нода: <b>${escapeHtml(first.nodeName)}</b>` : null,
+    `Каналы: ${escapeHtml(channels.join(', '))}`,
+    escapeHtml(body),
+    isOpen
+      ? `Подтверждение: ${config.failureThreshold} циклов подряд, по ${config.probeAttempts} попытки на канал.`
+      : `Восстановление: ${config.recoveryThreshold} успешных циклов подряд.`,
+    appUrl ? `<a href="${escapeHtml(`${appUrl}/dashboard/admin/watch`)}">Открыть Watch</a>` : null,
   ].filter(Boolean)
 
   try {
@@ -60,10 +119,10 @@ export async function sendWatchAlert(event: WatchAlertEvent) {
       signal: AbortSignal.timeout(10_000),
     })
     if (!response.ok) {
-      logWarn('watch.telegram_failed', { status: response.status, incidentId: event.id })
+      logWarn('watch.telegram_failed', { status: response.status, incidentIds })
     }
   } catch (error) {
-    logError('watch.telegram_failed', error, { incidentId: event.id })
+    logError('watch.telegram_failed', error, { incidentIds })
   }
 }
 

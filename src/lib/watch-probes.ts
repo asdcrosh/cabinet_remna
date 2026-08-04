@@ -28,6 +28,7 @@ export async function checkRemnawaveNode(
   node: RemnawaveNode,
   timeoutMs: number,
   hosts: RemnawaveHost[] = [],
+  probeAttempts = 1,
 ): Promise<WatchNodeCheck> {
   if (node.isDisabled) {
     const skipped = skippedProbe()
@@ -42,8 +43,8 @@ export async function checkRemnawaveNode(
     .filter((item) => inboundNetwork(item) === 'tcp')
     .flatMap((inbound) => resolveProbeTargets(node, inbound, 'tcp', hosts))
   const [xhttp, tcp] = await Promise.all([
-    probeTargets(xhttpTargets, (target) => probeTlsTarget(target, timeoutMs, true)),
-    probeTargets(tcpTargets, (target) => probeTcpTarget(target, timeoutMs)),
+    probeTargets(xhttpTargets, (target) => probeTlsTarget(target, timeoutMs, true), probeAttempts),
+    probeTargets(tcpTargets, (target) => probeTcpTarget(target, timeoutMs), probeAttempts),
   ])
   const apiStatus = node.isConnected ? 'OK' : 'FAIL'
   const status = resolveNodeStatus({
@@ -174,9 +175,13 @@ function skippedProbe(): TransportProbe {
 async function probeTargets(
   targets: ProbeTarget[],
   probe: (target: ProbeTarget) => Promise<TransportProbe>,
+  maxAttempts: number,
 ): Promise<TransportProbe> {
   if (targets.length === 0) return skippedProbe()
-  const attempts = await Promise.all(targets.map(async (target) => ({ target, result: await probe(target) })))
+  const attempts = await Promise.all(targets.map(async (target) => ({
+    target,
+    result: await probeWithRetries(target, probe, maxAttempts),
+  })))
   const successful = attempts
     .filter((attempt) => attempt.result.status === 'OK')
     .sort((left, right) => (left.result.latencyMs ?? Infinity) - (right.result.latencyMs ?? Infinity))[0]
@@ -190,6 +195,24 @@ async function probeTargets(
       .join(' · ')
       .slice(0, 500),
   }
+}
+
+async function probeWithRetries(
+  target: ProbeTarget,
+  probe: (target: ProbeTarget) => Promise<TransportProbe>,
+  maxAttempts: number,
+) {
+  const attempts = Math.max(1, Math.min(5, Math.floor(maxAttempts)))
+  let result = await probe(target)
+  for (let attempt = 1; result.status === 'FAIL' && attempt < attempts; attempt += 1) {
+    await delay(250)
+    result = await probe(target)
+  }
+  return result
+}
+
+function delay(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
 function probeTlsTarget(target: ProbeTarget, timeoutMs: number, expectHttp: boolean): Promise<TransportProbe> {

@@ -3,7 +3,7 @@ import { prisma } from './prisma'
 import { remnawave, type RemnawaveHost, type RemnawaveNode } from './remnawave'
 import { checkRemnawaveNode, type WatchNodeCheck } from './watch-probes'
 import { getWatchConfig } from './watch-config'
-import { sendWatchAlert, type WatchAlertEvent } from './watch-alerts'
+import { sendWatchAlerts, type WatchAlertEvent } from './watch-alerts'
 import { withDistributedLock } from './distributed-lock'
 import { logError, logInfo, logWarn } from './logger'
 
@@ -22,13 +22,14 @@ export async function runWatchCycle(source: 'worker' | 'manual' = 'worker') {
   const lock = await withDistributedLock('cabinet-watch-cycle', async () => {
     const startedAt = Date.now()
     const events: WatchAlertEvent[] = []
+    const trackIncidents = source === 'worker'
     try {
       let payload: Awaited<ReturnType<typeof remnawave.getNodes>>
       try {
         payload = await remnawave.getNodes()
-        events.push(...await markPanelSuccess(config.recoveryThreshold))
+        events.push(...await markPanelSuccess(config.recoveryThreshold, trackIncidents))
       } catch (error) {
-        events.push(...await markPanelFailure(error, config.failureThreshold))
+        events.push(...await markPanelFailure(error, config.failureThreshold, trackIncidents))
         throw error
       }
       const nodes = Array.isArray(payload.response) ? payload.response : []
@@ -39,10 +40,20 @@ export async function runWatchCycle(source: 'worker' | 'manual' = 'worker') {
       } catch (error) {
         logWarn('watch.hosts_unavailable', { error: compactError(error) })
       }
-      const checks = await Promise.all(nodes.map((node) => checkRemnawaveNode(node, config.timeoutMs, hosts)))
+      const checks = await Promise.all(nodes.map((node) => checkRemnawaveNode(
+        node,
+        config.timeoutMs,
+        hosts,
+        config.probeAttempts,
+      )))
 
       for (const check of checks) {
-        events.push(...await persistNodeCheck(check, config.failureThreshold, config.recoveryThreshold))
+        events.push(...await persistNodeCheck(
+          check,
+          config.failureThreshold,
+          config.recoveryThreshold,
+          trackIncidents,
+        ))
       }
 
       const networkStatus = checks.some((item) => item.status === 'DOWN')
@@ -63,7 +74,7 @@ export async function runWatchCycle(source: 'worker' | 'manual' = 'worker') {
       logError('watch.cycle_failed', error, { source, durationMs: Date.now() - startedAt })
       throw error
     } finally {
-      await Promise.allSettled(events.map((event) => sendWatchAlert(event)))
+      await Promise.allSettled([sendWatchAlerts(events)])
     }
   })
 
@@ -71,11 +82,22 @@ export async function runWatchCycle(source: 'worker' | 'manual' = 'worker') {
   return { acquired: lock.acquired, disabled: false, result: lock.acquired ? lock.value : null }
 }
 
-async function persistNodeCheck(check: WatchNodeCheck, failureThreshold: number, recoveryThreshold: number) {
+async function persistNodeCheck(
+  check: WatchNodeCheck,
+  failureThreshold: number,
+  recoveryThreshold: number,
+  trackIncidents: boolean,
+) {
   const previous = await prisma.watchNodeState.findUnique({ where: { nodeUuid: check.node.uuid } })
-  const apiCounters = nextCounters(check.apiStatus, previous?.apiConsecutiveFailures, previous?.apiConsecutiveSuccesses)
-  const xhttpCounters = nextCounters(check.xhttp.status, previous?.xhttpConsecutiveFailures, previous?.xhttpConsecutiveSuccesses)
-  const tcpCounters = nextCounters(check.tcp.status, previous?.tcpConsecutiveFailures, previous?.tcpConsecutiveSuccesses)
+  const apiCounters = trackIncidents
+    ? nextCounters(check.apiStatus, previous?.apiConsecutiveFailures, previous?.apiConsecutiveSuccesses)
+    : currentCounters(previous?.apiConsecutiveFailures, previous?.apiConsecutiveSuccesses)
+  const xhttpCounters = trackIncidents
+    ? nextCounters(check.xhttp.status, previous?.xhttpConsecutiveFailures, previous?.xhttpConsecutiveSuccesses)
+    : currentCounters(previous?.xhttpConsecutiveFailures, previous?.xhttpConsecutiveSuccesses)
+  const tcpCounters = trackIncidents
+    ? nextCounters(check.tcp.status, previous?.tcpConsecutiveFailures, previous?.tcpConsecutiveSuccesses)
+    : currentCounters(previous?.tcpConsecutiveFailures, previous?.tcpConsecutiveSuccesses)
   const metrics = readNodeMetrics(check.node)
   const checkedAt = new Date()
 
@@ -136,6 +158,8 @@ async function persistNodeCheck(check: WatchNodeCheck, failureThreshold: number,
       },
     }),
   ])
+
+  if (!trackIncidents) return []
 
   const channels: IncidentChannel[] = [
     {
@@ -210,9 +234,17 @@ async function reconcileIncident(
   return [toAlert({ ...incident, title: `${node.name}: ${incidentLabel(channel.type)} восстановлен`, message: `Успешно пройдено ${channel.successCount} проверки подряд.` }, 'RESOLVED')]
 }
 
-async function markPanelFailure(error: unknown, failureThreshold: number) {
+async function markPanelFailure(error: unknown, failureThreshold: number, trackIncidents: boolean) {
   const message = compactError(error)
   const previous = await prisma.watchRuntimeState.findUnique({ where: { id: 'default' } })
+  if (!trackIncidents) {
+    await prisma.watchRuntimeState.upsert({
+      where: { id: 'default' },
+      create: { id: 'default', status: 'DOWN', lastRunAt: new Date(), lastError: message },
+      update: { status: 'DOWN', lastRunAt: new Date(), lastError: message },
+    })
+    return []
+  }
   const failures = (previous?.consecutiveFailures ?? 0) + 1
   await prisma.watchRuntimeState.upsert({
     where: { id: 'default' },
@@ -231,8 +263,16 @@ async function markPanelFailure(error: unknown, failureThreshold: number) {
   return [toAlert(incident, 'OPEN')]
 }
 
-async function markPanelSuccess(recoveryThreshold: number) {
+async function markPanelSuccess(recoveryThreshold: number, trackIncidents: boolean) {
   const previous = await prisma.watchRuntimeState.findUnique({ where: { id: 'default' } })
+  if (!trackIncidents) {
+    await prisma.watchRuntimeState.upsert({
+      where: { id: 'default' },
+      create: { id: 'default', status: 'HEALTHY', lastRunAt: new Date(), lastSuccessAt: new Date() },
+      update: { status: 'HEALTHY', lastRunAt: new Date(), lastSuccessAt: new Date(), lastError: null },
+    })
+    return []
+  }
   const successes = (previous?.consecutiveSuccesses ?? 0) + 1
   await prisma.watchRuntimeState.upsert({
     where: { id: 'default' },
@@ -275,6 +315,7 @@ export async function getWatchReport() {
     config: {
       enabled: config.enabled,
       intervalSeconds: config.intervalSeconds,
+      probeAttempts: config.probeAttempts,
       failureThreshold: config.failureThreshold,
       recoveryThreshold: config.recoveryThreshold,
       telegramConfigured: Boolean(process.env.TELEGRAM_BOT_TOKEN && config.telegramChatId),
@@ -348,6 +389,10 @@ function nextCounters(status: WatchProbeStatus, failures = 0, successes = 0) {
   return { failures, successes }
 }
 
+function currentCounters(failures = 0, successes = 0) {
+  return { failures, successes }
+}
+
 function counterFields(
   api: ReturnType<typeof nextCounters>,
   xhttp: ReturnType<typeof nextCounters>,
@@ -417,8 +462,23 @@ function incidentLabel(type: WatchIncidentType) {
   return 'Panel API'
 }
 
-function toAlert(incident: { id: string; type: WatchIncidentType; nodeName: string | null; title: string; message: string }, kind: 'OPEN' | 'RESOLVED'): WatchAlertEvent {
-  return { id: incident.id, kind, type: incident.type, nodeName: incident.nodeName, title: incident.title, message: incident.message }
+function toAlert(incident: {
+  id: string
+  type: WatchIncidentType
+  nodeUuid: string | null
+  nodeName: string | null
+  title: string
+  message: string
+}, kind: 'OPEN' | 'RESOLVED'): WatchAlertEvent {
+  return {
+    id: incident.id,
+    kind,
+    type: incident.type,
+    nodeUuid: incident.nodeUuid,
+    nodeName: incident.nodeName,
+    title: incident.title,
+    message: incident.message,
+  }
 }
 
 function compactError(error: unknown) {

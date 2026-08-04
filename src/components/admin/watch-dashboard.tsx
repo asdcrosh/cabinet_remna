@@ -77,7 +77,7 @@ export function WatchDashboard({ initialReport }: { initialReport: WatchReport }
               </div>
               <h2 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">{networkLabel}</h2>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">
-                Node API, self-steal XHTTP и доступность TCP Reality проверяются каждые {report.config.intervalSeconds} сек. Watch ничего не перезапускает и не меняет в Remnawave.
+                Node API, self-steal XHTTP и TCP Reality проверяются каждые {report.config.intervalSeconds} сек. Один случайный сбой не создаёт инцидент и не отправляет сообщение.
               </p>
             </div>
             <button
@@ -97,6 +97,8 @@ export function WatchDashboard({ initialReport }: { initialReport: WatchReport }
             <span className="inline-flex items-center gap-2" suppressHydrationWarning><Clock3 className="h-3.5 w-3.5" /> Последний цикл: {formatRelative(report.runtime?.lastRunAt)}</span>
             <span className="inline-flex items-center gap-2"><UsersRound className="h-3.5 w-3.5" /> {report.summary.usersOnline} онлайн</span>
             <span className="inline-flex items-center gap-2"><ShieldCheck className="h-3.5 w-3.5" /> Telegram {report.config.telegramConfigured ? 'подключён' : 'не настроен'}</span>
+            <span className="inline-flex items-center gap-2"><Activity className="h-3.5 w-3.5" /> {report.config.probeAttempts} попытки, тревога после {report.config.failureThreshold} сбоев</span>
+            <span className="inline-flex items-center gap-2"><Check className="h-3.5 w-3.5" /> восстановление после {report.config.recoveryThreshold} стабильных циклов</span>
           </div>
         </div>
       </section>

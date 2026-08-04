@@ -2,6 +2,7 @@ export type WatchConfig = {
   enabled: boolean
   intervalSeconds: number
   timeoutMs: number
+  probeAttempts: number
   failureThreshold: number
   recoveryThreshold: number
   retentionDays: number
@@ -13,11 +14,18 @@ export function getWatchConfig(): WatchConfig {
     enabled: readBoolean('WATCH_ENABLED', true),
     intervalSeconds: readInteger('WATCH_INTERVAL_SECONDS', 60, 15, 3600),
     timeoutMs: readInteger('WATCH_TIMEOUT_MS', 5000, 1000, 30_000),
-    failureThreshold: readInteger('WATCH_FAILURE_THRESHOLD', 3, 1, 20),
-    recoveryThreshold: readInteger('WATCH_RECOVERY_THRESHOLD', 2, 1, 20),
+    probeAttempts: readInteger('WATCH_PROBE_ATTEMPTS', 2, 1, 5),
+    failureThreshold: readIntegerWithLegacy('WATCH_ALERT_FAILURE_THRESHOLD', 'WATCH_FAILURE_THRESHOLD', 5, 1, 20),
+    recoveryThreshold: readIntegerWithLegacy('WATCH_ALERT_RECOVERY_THRESHOLD', 'WATCH_RECOVERY_THRESHOLD', 5, 1, 20),
     retentionDays: readInteger('WATCH_RETENTION_DAYS', 30, 1, 365),
     telegramChatId: process.env.WATCH_TELEGRAM_CHAT_ID?.trim() || process.env.TELEGRAM_NOTIFY_CHAT_ID?.trim() || null,
   }
+}
+
+function readIntegerWithLegacy(key: string, legacyKey: string, fallback: number, min: number, max: number) {
+  return process.env[key]?.trim()
+    ? readInteger(key, fallback, min, max)
+    : readInteger(legacyKey, fallback, min, max)
 }
 
 function readBoolean(key: string, fallback: boolean) {
