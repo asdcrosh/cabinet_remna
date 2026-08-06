@@ -59,6 +59,7 @@ export function SystemHealthPanel({ initialReport }: { initialReport: SystemHeal
   const [report, setReport] = useState(initialReport)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [checkedAtLabel, setCheckedAtLabel] = useState('только что')
 
   const refresh = useCallback(async (visible = false) => {
     if (visible) setLoading(true)
@@ -79,6 +80,10 @@ export function SystemHealthPanel({ initialReport }: { initialReport: SystemHeal
     const timer = window.setInterval(() => void refresh(false), 60_000)
     return () => window.clearInterval(timer)
   }, [refresh])
+
+  useEffect(() => {
+    setCheckedAtLabel(new Date(report.checkedAt).toLocaleString('ru-RU'))
+  }, [report.checkedAt])
 
   const groups = useMemo(() => categoryOrder.map((category) => ({
     category,
@@ -169,8 +174,8 @@ export function SystemHealthPanel({ initialReport }: { initialReport: SystemHeal
         ))}
       </div>
 
-      <div className="flex items-center gap-2 px-1 text-xs text-slate-400" suppressHydrationWarning>
-        <Clock3 className="h-3.5 w-3.5" /> Проверено {new Date(report.checkedAt).toLocaleString('ru-RU')}
+      <div className="flex items-center gap-2 px-1 text-xs text-slate-400">
+        <Clock3 className="h-3.5 w-3.5" /> Проверено {checkedAtLabel}
       </div>
     </div>
   )
