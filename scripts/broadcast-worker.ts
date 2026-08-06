@@ -1,7 +1,9 @@
+import { writeFile } from 'node:fs/promises'
 import { processBroadcastDeliveryBatch } from '../src/lib/broadcast-delivery'
 import { logError, logInfo } from '../src/lib/logger'
 import { prisma } from '../src/lib/prisma'
 import { isFeatureEnabled } from '../src/lib/feature-flags'
+import { recordWorkerHeartbeat } from '../src/lib/worker-health'
 
 const intervalSeconds = readIntervalSeconds()
 let stopRequested = false
@@ -12,18 +14,19 @@ async function main() {
   if (intervalSeconds !== null) {
     logInfo('broadcast_worker.started', { intervalSeconds })
     while (!stopRequested) {
+      await heartbeat(intervalSeconds)
       if (await isFeatureEnabled('broadcasts')) {
         await processBroadcastDeliveryBatch()
       }
+      await heartbeat(intervalSeconds)
       await sleep(intervalSeconds * 1000)
     }
     logInfo('broadcast_worker.stopped')
     return
   }
 
-  if (await isFeatureEnabled('broadcasts')) {
-    await processBroadcastDeliveryBatch()
-  }
+  await heartbeat(10)
+  if (await isFeatureEnabled('broadcasts')) await processBroadcastDeliveryBatch()
 }
 
 function readIntervalSeconds() {
@@ -31,10 +34,17 @@ function readIntervalSeconds() {
   if (raw == null || raw.trim() === '') return null
 
   const value = Number(raw)
-  if (!Number.isInteger(value) || value < 1) {
-    throw new Error('BROADCAST_WORKER_INTERVAL_SECONDS must be a positive integer when set')
+  if (!Number.isInteger(value) || value < 0) {
+    throw new Error('BROADCAST_WORKER_INTERVAL_SECONDS must be a non-negative integer when set')
   }
-  return value
+  return value === 0 ? 10 : value
+}
+
+async function heartbeat(interval: number) {
+  await Promise.allSettled([
+    writeFile('/tmp/broadcast-worker-heartbeat', new Date().toISOString(), 'utf8'),
+    recordWorkerHeartbeat('broadcast', Math.max(90, interval * 4)),
+  ])
 }
 
 function bindShutdown() {

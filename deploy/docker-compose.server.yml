@@ -135,6 +135,16 @@ services:
         condition: service_completed_successfully
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "node -e \"const fs=require('fs');const p='/tmp/broadcast-worker-heartbeat';const raw=Number(process.env.BROADCAST_WORKER_INTERVAL_SECONDS);const interval=Number.isInteger(raw)&&raw>0?raw:10;try{process.exit(Date.now()-fs.statSync(p).mtimeMs<Math.max(90,interval*4)*1000?0:1)}catch{process.exit(1)}\"",
+        ]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 90s
     networks:
       - cabinet
       - remnawave_external

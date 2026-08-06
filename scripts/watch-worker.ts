@@ -3,6 +3,7 @@ import { getWatchConfig } from '../src/lib/watch-config'
 import { runWatchCycle } from '../src/lib/watch-service'
 import { logError, logInfo } from '../src/lib/logger'
 import { prisma } from '../src/lib/prisma'
+import { recordWorkerHeartbeat } from '../src/lib/worker-health'
 
 const heartbeatPath = '/tmp/watch-worker-heartbeat'
 let stopRequested = false
@@ -37,7 +38,10 @@ function bindShutdown() {
 }
 
 async function heartbeat() {
-  await writeFile(heartbeatPath, new Date().toISOString(), 'utf8')
+  await Promise.allSettled([
+    writeFile(heartbeatPath, new Date().toISOString(), 'utf8'),
+    recordWorkerHeartbeat('watch', Math.max(180, getWatchConfig().intervalSeconds * 4)),
+  ])
 }
 
 function sleep(ms: number) {

@@ -1,13 +1,24 @@
 import { prisma } from './prisma'
 
 export const PAYMENT_WORKER_HEARTBEAT_KEY = 'worker:payment-reconciler'
+export const BROADCAST_WORKER_HEARTBEAT_KEY = 'worker:broadcast'
+export const WATCH_WORKER_HEARTBEAT_KEY = 'worker:watch'
 
-export async function recordPaymentWorkerHeartbeat() {
-  const validUntil = new Date(Date.now() + readHeartbeatMaxAgeMs())
+export type WorkerHeartbeatName = 'payment' | 'broadcast' | 'watch'
+
+const heartbeatKeys: Record<WorkerHeartbeatName, string> = {
+  payment: PAYMENT_WORKER_HEARTBEAT_KEY,
+  broadcast: BROADCAST_WORKER_HEARTBEAT_KEY,
+  watch: WATCH_WORKER_HEARTBEAT_KEY,
+}
+
+export async function recordWorkerHeartbeat(worker: WorkerHeartbeatName, maxAgeSeconds: number) {
+  const ttlSeconds = Number.isInteger(maxAgeSeconds) && maxAgeSeconds >= 30 ? maxAgeSeconds : 180
+  const validUntil = new Date(Date.now() + ttlSeconds * 1000)
   await prisma.rateLimitBucket.upsert({
-    where: { key: PAYMENT_WORKER_HEARTBEAT_KEY },
+    where: { key: heartbeatKeys[worker] },
     create: {
-      key: PAYMENT_WORKER_HEARTBEAT_KEY,
+      key: heartbeatKeys[worker],
       count: 1,
       resetAt: validUntil,
     },
@@ -18,14 +29,22 @@ export async function recordPaymentWorkerHeartbeat() {
   })
 }
 
-export async function getPaymentWorkerHeartbeat() {
+export async function getWorkerHeartbeat(worker: WorkerHeartbeatName) {
   return prisma.rateLimitBucket.findUnique({
-    where: { key: PAYMENT_WORKER_HEARTBEAT_KEY },
+    where: { key: heartbeatKeys[worker] },
     select: { resetAt: true, updatedAt: true },
   })
 }
 
-function readHeartbeatMaxAgeMs() {
+export async function recordPaymentWorkerHeartbeat() {
+  await recordWorkerHeartbeat('payment', readHeartbeatMaxAgeSeconds())
+}
+
+export async function getPaymentWorkerHeartbeat() {
+  return getWorkerHeartbeat('payment')
+}
+
+function readHeartbeatMaxAgeSeconds() {
   const seconds = Number(process.env.PAYMENT_WORKER_HEARTBEAT_MAX_AGE_SECONDS || 180)
-  return (Number.isInteger(seconds) && seconds >= 60 ? seconds : 180) * 1000
+  return Number.isInteger(seconds) && seconds >= 60 ? seconds : 180
 }

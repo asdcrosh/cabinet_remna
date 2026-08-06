@@ -5,9 +5,17 @@ import { getProvisioningQueueHealth } from '@/lib/job-health'
 import { getResolvedPaymentProviderSettings } from '@/lib/payment-settings'
 import { checkPlategaConnection } from '@/lib/platega'
 import { getRemnashopIntegrationStatus } from '@/lib/remnashop-sync'
-import { getPaymentWorkerHeartbeat } from '@/lib/worker-health'
+import { getWatchConfig } from '@/lib/watch-config'
+import { getWorkerHeartbeat, type WorkerHeartbeatName } from '@/lib/worker-health'
 
-export type SystemHealthStatus = 'ok' | 'warn' | 'error'
+export type SystemHealthStatus = 'ok' | 'warn' | 'error' | 'off'
+export type SystemHealthCategory = 'core' | 'payments' | 'sync' | 'workers' | 'communications' | 'watch' | 'backups'
+
+export interface SystemHealthMetric {
+  label: string
+  value: string
+  tone?: 'neutral' | 'positive' | 'warning' | 'negative'
+}
 
 export interface SystemHealthCheck {
   id: string
@@ -15,6 +23,10 @@ export interface SystemHealthCheck {
   status: SystemHealthStatus
   message: string
   details?: string
+  category: SystemHealthCategory
+  actionHref?: string
+  actionLabel?: string
+  metrics?: SystemHealthMetric[]
   checkedAt: string
 }
 
@@ -35,9 +47,49 @@ function check(
   title: string,
   status: SystemHealthStatus,
   message: string,
-  details?: string
+  details?: string,
+  extra: Partial<Pick<SystemHealthCheck, 'metrics' | 'actionHref' | 'actionLabel'>> = {}
 ): SystemHealthCheck {
-  return { id, title, status, message, details, checkedAt: nowIso() }
+  return {
+    id,
+    title,
+    status,
+    message,
+    details,
+    category: categoryForCheck(id),
+    ...actionForCheck(id),
+    ...extra,
+    checkedAt: nowIso(),
+  }
+}
+
+function categoryForCheck(id: string): SystemHealthCategory {
+  if (['payment-overview', 'yookassa', 'payanyway', 'platega'].includes(id)) return 'payments'
+  if (['remnawave', 'remnashop', 'provisioning-queue', 'sync-events'].includes(id)) return 'sync'
+  if (id.endsWith('-worker') || id === 'broadcast-backlog') return 'workers'
+  if (['telegram', 'email'].includes(id)) return 'communications'
+  if (id === 'watch') return 'watch'
+  if (['backup', 's3'].includes(id)) return 'backups'
+  return 'core'
+}
+
+function actionForCheck(id: string) {
+  if (id === 'payment-overview' || ['yookassa', 'payanyway', 'platega'].includes(id)) {
+    return { actionHref: '/dashboard/admin/payments', actionLabel: 'Открыть платежи' }
+  }
+  if (id === 'remnashop' || id === 'sync-events') {
+    return { actionHref: '/dashboard/admin/remnashop-sync', actionLabel: 'Открыть синхронизацию' }
+  }
+  if (id === 'watch' || id === 'watch-worker') {
+    return { actionHref: '/dashboard/admin/watch', actionLabel: 'Открыть Watch' }
+  }
+  if (id === 'broadcast-backlog' || id === 'broadcast-worker') {
+    return { actionHref: '/dashboard/admin/broadcasts', actionLabel: 'Открыть рассылки' }
+  }
+  if (id === 'provisioning-queue' || id === 'payment-worker') {
+    return { actionHref: '/dashboard/admin/recovery', actionLabel: 'Открыть восстановление' }
+  }
+  return {}
 }
 
 function errorMessage(error: unknown) {
@@ -91,30 +143,62 @@ async function checkRemnashop() {
   return check('remnashop', 'Remnashop', 'warn', integration.message)
 }
 
-async function checkPaymentWorker() {
+async function checkWorker(worker: WorkerHeartbeatName, id: string, title: string) {
   try {
-    const heartbeat = await getPaymentWorkerHeartbeat()
+    const heartbeat = await getWorkerHeartbeat(worker)
     if (!heartbeat) {
-      return check('payment-worker', 'Фоновая обработка', 'warn', 'Воркер ещё не передавал сигнал')
+      return check(id, title, 'warn', 'Воркер ещё не передавал сигнал', 'После обновления дождитесь первого рабочего цикла.')
     }
     if (heartbeat.resetAt <= new Date()) {
       return check(
-        'payment-worker',
-        'Фоновая обработка',
+        id,
+        title,
         'error',
-        'Воркер платежей не отвечает',
+        'Воркер не отвечает',
         `Последний сигнал: ${heartbeat.updatedAt.toISOString()}`
       )
     }
-    return check('payment-worker', 'Фоновая обработка', 'ok', 'Воркер платежей работает')
+    return check(id, title, 'ok', 'Воркер работает', `Последний сигнал: ${heartbeat.updatedAt.toISOString()}`)
   } catch (error) {
-    return check('payment-worker', 'Фоновая обработка', 'warn', 'Не удалось проверить воркер', errorMessage(error))
+    return check(id, title, 'warn', 'Не удалось проверить воркер', errorMessage(error))
+  }
+}
+
+async function checkPaymentOverview() {
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000)
+  const cancelAfterSeconds = positiveInteger(env('PAYMENT_CANCEL_PENDING_AFTER_SECONDS'), 600)
+  const staleBefore = new Date(Date.now() - cancelAfterSeconds * 1000)
+  try {
+    const [succeeded, pending, canceled, refunded, stale, unprovisioned] = await Promise.all([
+      prisma.payment.count({ where: { status: 'SUCCEEDED', createdAt: { gte: since } } }),
+      prisma.payment.count({ where: { status: 'PENDING', createdAt: { gte: since } } }),
+      prisma.payment.count({ where: { status: 'CANCELED', createdAt: { gte: since } } }),
+      prisma.payment.count({ where: { status: 'REFUNDED', createdAt: { gte: since } } }),
+      prisma.payment.count({ where: { status: 'PENDING', createdAt: { lt: staleBefore } } }),
+      prisma.payment.count({ where: { status: 'SUCCEEDED', subscriptionProvisionedAt: null } }),
+    ])
+    const status: SystemHealthStatus = unprovisioned > 0 ? 'error' : stale > 0 ? 'warn' : 'ok'
+    const message = unprovisioned > 0
+      ? `Не выдано подписок: ${unprovisioned}`
+      : stale > 0
+        ? `Зависших платежей: ${stale}`
+        : 'Критичных операций нет'
+    return check('payment-overview', 'Платежи за 24 часа', status, message, undefined, {
+      metrics: [
+        { label: 'Успешно', value: String(succeeded), tone: 'positive' },
+        { label: 'Ожидают', value: String(pending), tone: pending > 0 ? 'warning' : 'neutral' },
+        { label: 'Отменено', value: String(canceled) },
+        { label: 'Возвраты', value: String(refunded) },
+      ],
+    })
+  } catch (error) {
+    return check('payment-overview', 'Платежи за 24 часа', 'error', 'Не удалось собрать статистику', errorMessage(error))
   }
 }
 
 async function checkYooKassa() {
   const { yookassa } = await getResolvedPaymentProviderSettings()
-  if (!yookassa.enabled) return check('yookassa', 'YooKassa', 'ok', 'Отключена')
+  if (!yookassa.enabled) return check('yookassa', 'YooKassa', 'off', 'Отключена')
 
   const { shopId, secretKey } = yookassa
   if (!shopId || !secretKey) {
@@ -142,7 +226,7 @@ async function checkYooKassa() {
 
 async function checkPayAnyWay() {
   const { payAnyWay } = await getResolvedPaymentProviderSettings()
-  if (!payAnyWay.enabled) return check('payanyway', 'PayAnyWay', 'ok', 'Отключён')
+  if (!payAnyWay.enabled) return check('payanyway', 'PayAnyWay', 'off', 'Отключён')
 
   const { merchantId, integrityCode } = payAnyWay
   if (!merchantId || !integrityCode) {
@@ -159,7 +243,7 @@ async function checkPayAnyWay() {
 
 async function checkPlatega() {
   const { platega } = await getResolvedPaymentProviderSettings()
-  if (!platega.enabled) return check('platega', 'Platega', 'ok', 'Отключена')
+  if (!platega.enabled) return check('platega', 'Platega', 'off', 'Отключена')
   if (!platega.merchantId || !platega.secret) {
     return check('platega', 'Platega', 'error', 'Не заполнены Merchant ID или API Secret')
   }
@@ -185,7 +269,25 @@ async function checkTelegram() {
     })
     const data = await response.json().catch(() => null) as { ok?: boolean; result?: { username?: string } } | null
     if (response.ok && data?.ok) {
-      return check('telegram', 'Telegram бот', 'ok', data.result?.username ? `Бот @${data.result.username} отвечает` : 'Бот отвечает')
+      const chatId = env('TELEGRAM_NOTIFY_CHAT_ID')
+      if (!chatId) {
+        return check(
+          'telegram',
+          'Telegram бот',
+          'warn',
+          data.result?.username ? `Бот @${data.result.username} отвечает` : 'Бот отвечает',
+          'TELEGRAM_NOTIFY_CHAT_ID не настроен: системные уведомления администратору не отправляются.'
+        )
+      }
+      const chatResponse = await fetch(`https://api.telegram.org/bot${token}/getChat?chat_id=${encodeURIComponent(chatId)}`, {
+        cache: 'no-store',
+        signal: AbortSignal.timeout(CHECK_TIMEOUT_MS),
+      })
+      if (!chatResponse.ok) {
+        const chatError = await chatResponse.text().catch(() => '')
+        return check('telegram', 'Telegram бот', 'error', 'Бот отвечает, но чат уведомлений недоступен', chatError.slice(0, 300))
+      }
+      return check('telegram', 'Telegram бот', 'ok', data.result?.username ? `Бот @${data.result.username} и чат доступны` : 'Бот и чат доступны')
     }
     return check('telegram', 'Telegram бот', 'error', `Telegram вернул ${response.status}`, JSON.stringify(data)?.slice(0, 300))
   } catch (error) {
@@ -297,10 +399,52 @@ async function checkS3() {
   const secretKey = env('SYSTEM_HEALTH_S3_SECRET_KEY') || env('S3_SECRET_KEY')
 
   if (!bucket || !accessKey || !secretKey) {
-    return check('s3', 'S3', 'ok', 'Проверяется в консоли cabinetctl', 'Для проверки из веба можно заполнить SYSTEM_HEALTH_S3_*')
+    return check('s3', 'S3', 'off', 'Не подключён к веб-проверке', 'Настройки host-level S3 проверяются командой cabinetctl backup-status.')
   }
 
   return check('s3', 'S3', 'ok', `S3 настроен для bucket ${bucket}`)
+}
+
+async function checkWatch() {
+  const config = getWatchConfig()
+  if (!config.enabled) return check('watch', 'Watch', 'off', 'Мониторинг отключён')
+
+  try {
+    const [runtime, openIncidents, downNodes, degradedNodes, totalNodes] = await Promise.all([
+      prisma.watchRuntimeState.findUnique({ where: { id: 'default' } }),
+      prisma.watchIncident.count({ where: { status: 'OPEN' } }),
+      prisma.watchNodeState.count({ where: { status: 'DOWN' } }),
+      prisma.watchNodeState.count({ where: { status: 'DEGRADED' } }),
+      prisma.watchNodeState.count(),
+    ])
+    if (!runtime?.lastRunAt) {
+      return check('watch', 'Watch', 'warn', 'Ожидается первая проверка')
+    }
+    const staleAfterMs = Math.max(180, config.intervalSeconds * 4) * 1000
+    const stale = Date.now() - runtime.lastRunAt.getTime() > staleAfterMs
+    const status: SystemHealthStatus = stale || downNodes > 0
+      ? 'error'
+      : degradedNodes > 0 || openIncidents > 0
+        ? 'warn'
+        : 'ok'
+    const message = stale
+      ? 'Проверки Watch остановились'
+      : downNodes > 0
+        ? `Недоступных нод: ${downNodes}`
+        : degradedNodes > 0
+          ? `Нод с деградацией: ${degradedNodes}`
+          : 'Ноды проверяются штатно'
+    return check('watch', 'Watch', status, message, `Последний цикл: ${runtime.lastRunAt.toISOString()}`, {
+      metrics: [
+        { label: 'Ноды', value: String(totalNodes) },
+        { label: 'Недоступны', value: String(downNodes), tone: downNodes > 0 ? 'negative' : 'neutral' },
+        { label: 'Деградация', value: String(degradedNodes), tone: degradedNodes > 0 ? 'warning' : 'neutral' },
+        { label: 'Инциденты', value: String(openIncidents), tone: openIncidents > 0 ? 'warning' : 'neutral' },
+      ],
+    })
+  } catch (error) {
+    return check('watch', 'Watch', 'error', 'Не удалось прочитать состояние Watch', errorMessage(error))
+  }
 }
 
 async function checkProvisioningQueue() {
@@ -387,14 +531,18 @@ export async function getSystemHealth(options: { sendEmail?: boolean } = {}): Pr
   const checkedAt = nowIso()
   const checks = await Promise.all([
     checkDatabase(),
+    checkPaymentOverview(),
     checkRemnawave(),
     checkRemnashop(),
-    checkPaymentWorker(),
+    checkWorker('payment', 'payment-worker', 'Обработка платежей'),
+    checkWorker('broadcast', 'broadcast-worker', 'Рассылки'),
+    checkWorker('watch', 'watch-worker', 'Watch worker'),
     checkYooKassa(),
     checkPayAnyWay(),
     checkPlatega(),
     checkEmail(Boolean(options.sendEmail)),
     checkTelegram(),
+    checkWatch(),
     latestBackup(),
     checkS3(),
     checkProvisioningQueue(),
@@ -407,4 +555,9 @@ export async function getSystemHealth(options: { sendEmail?: boolean } = {}): Pr
     checkedAt,
     checks,
   }
+}
+
+function positiveInteger(raw: string, fallback: number) {
+  const value = Number(raw)
+  return Number.isInteger(value) && value > 0 ? value : fallback
 }

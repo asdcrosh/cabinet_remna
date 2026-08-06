@@ -8,7 +8,7 @@ import { PaymentProviderSettingsPanel } from '@/components/admin/payment-provide
 import { getPublicPaymentProviderSettings } from '@/lib/payment-settings'
 
 export const dynamic = 'force-dynamic'
-export const metadata = { title: 'Система' }
+export const metadata = { title: 'Состояние системы' }
 
 export default async function AdminSystemPage() {
   await requireAdminPage()
@@ -20,13 +20,21 @@ export default async function AdminSystemPage() {
 
   return (
     <AdminPageShell
-      title="Система"
-      description="Интеграции, бэкапы и состояние сервисов"
+      title="Состояние системы"
+      description="Платежи, синхронизация, фоновые процессы и инфраструктура"
     >
-      <div className="space-y-5">
-        <FeatureSettingsPanel initialFeatures={features} />
-        <PaymentProviderSettingsPanel initialSettings={paymentSettings} />
+      <div className="space-y-8">
         <SystemHealthPanel initialReport={report} />
+        <div className="border-t border-slate-200 pt-7 dark:border-white/10">
+          <div className="mb-4 px-1">
+            <h2 className="text-xl font-semibold tracking-tight">Настройки</h2>
+            <p className="mt-1 text-sm text-slate-500">Функции кабинета и реквизиты платёжных провайдеров</p>
+          </div>
+          <div className="space-y-5">
+            <FeatureSettingsPanel initialFeatures={features} />
+            <PaymentProviderSettingsPanel initialSettings={paymentSettings} />
+          </div>
+        </div>
       </div>
     </AdminPageShell>
   )
