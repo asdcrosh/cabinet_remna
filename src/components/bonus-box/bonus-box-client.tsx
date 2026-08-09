@@ -1,6 +1,6 @@
 "use client";
 
-import { type KeyboardEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { type CSSProperties, type KeyboardEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import {
   CalendarClock,
   CalendarPlus,
@@ -21,17 +21,11 @@ import { cn } from "@/lib/cn";
 import {
   bonusBoxResultClass,
   bonusBoxRevealClass,
-  DESKTOP_CARD_GAP,
-  DESKTOP_CARD_WIDTH,
   formatDate,
   formatDateOnly,
   getDisabledCtaLabel,
-  makeIdleReel,
-  MOBILE_CARD_GAP,
-  MOBILE_CARD_WIDTH,
   prizeBorderClass,
   prizeLabel,
-  prizeReelClass,
   prizeRequiresSubscription,
   prizeTopClass,
   rarityClass,
@@ -52,19 +46,20 @@ import type {
 
 export type { BonusBoxPrizeView } from "@/components/bonus-box/bonus-box-types";
 
-const REEL_DURATION_MS = 2800;
+const WHEEL_DURATION_MS = 3400;
 const REVEAL_EFFECT_DURATION_MS = 900;
 const BONUS_TABS: BonusBoxTab[] = ["missions", "outcomes", "history"];
+const WHEEL_COLORS = ["#31126f", "#7029cf", "#b62bc1", "#4c1f9c", "#17627f"];
 
 export function BonusBoxClient({
   initialData,
 }: {
   initialData: BonusBoxOverview;
 }) {
-  const viewportRef = useRef<HTMLDivElement | null>(null);
   const [data, setData] = useState(initialData);
-  const [reel, setReel] = useState(() => makeIdleReel(initialData.prizes));
-  const [offset, setOffset] = useState(0);
+  const [wheelRotation, setWheelRotation] = useState(
+    () => -180 / Math.max(1, initialData.prizes.length),
+  );
   const [opening, setOpening] = useState(false);
   const [revealEffect, setRevealEffect] = useState(false);
   const [result, setResult] = useState<OpenBoxResponse | null>(null);
@@ -72,7 +67,6 @@ export function BonusBoxClient({
   const [activeTab, setActiveTab] = useState<BonusBoxTab>(
     initialData.events.length > 0 || initialData.missions.length > 0 ? "missions" : "outcomes",
   );
-  const [mobileReel, setMobileReel] = useState(false);
   const [reducedMotion, setReducedMotion] = useState(false);
   const [claimingMissionId, setClaimingMissionId] = useState<string | null>(null);
   const revealTimerRef = useRef<number | null>(null);
@@ -84,41 +78,46 @@ export function BonusBoxClient({
     ? data.attemptsCount
     : data.welcomeAttemptsCount;
   const lockedAttempts = Math.max(0, data.attemptsCount - availableNow);
-  const cardWidth = mobileReel ? MOBILE_CARD_WIDTH : DESKTOP_CARD_WIDTH;
-  const cardGap = mobileReel ? MOBILE_CARD_GAP : DESKTOP_CARD_GAP;
-  const reelStep = cardWidth + cardGap;
+  const wheelPrizes = data.prizes;
+  const segmentAngle = 360 / Math.max(1, wheelPrizes.length);
+  const wheelBackground = useMemo(() => {
+    if (wheelPrizes.length === 0) return WHEEL_COLORS[0];
+    return `conic-gradient(from -90deg, ${wheelPrizes
+      .map((_, index) => {
+        const start = index * segmentAngle;
+        const end = (index + 1) * segmentAngle;
+        return `${WHEEL_COLORS[index % WHEEL_COLORS.length]} ${start}deg ${end}deg`;
+      })
+      .join(", ")})`;
+  }, [segmentAngle, wheelPrizes]);
 
   const canOpen = !data.canOpenReason && !opening;
   const subscribeCta = Boolean(data.canOpenReason?.includes("подписк"));
   const openButtonLabel = opening
-    ? "Открываем..."
+    ? "Колесо вращается"
     : data.canOpenReason
       ? getDisabledCtaLabel(data.canOpenReason)
       : canUseWelcomeAttempts
-        ? "Открыть приветственный бонус"
-        : "Открыть кейс";
+        ? "Запустить приветственный ход"
+        : "Запустить рулетку";
   const totalChance = useMemo(
     () => data.prizes.reduce((sum, prize) => sum + prize.chance, 0),
     [data.prizes],
   );
   const hasRareOrBetter = data.prizes.some((prize) => prize.rarity !== "COMMON");
   const openButtonClass =
-    "bonus-box-open-button group relative inline-flex min-h-11 items-center justify-center overflow-hidden rounded-md border border-slate-950 px-4 text-sm font-semibold text-white transition-colors duration-200 hover:border-slate-800 hover:bg-slate-800 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 dark:border-white dark:text-slate-950 dark:hover:border-slate-200 dark:disabled:border-white/10 dark:disabled:bg-white/10 dark:disabled:text-slate-500 sm:min-w-44";
+    "bonus-box-open-button group relative inline-flex min-h-12 items-center justify-center overflow-hidden rounded-lg px-5 text-sm font-semibold text-white transition duration-200 disabled:cursor-not-allowed disabled:text-slate-400 sm:min-w-44";
   const revealClass = result ? bonusBoxRevealClass(result.prize) : null;
 
   useEffect(() => {
-    const mobileMedia = window.matchMedia("(max-width: 639px)");
     const motionMedia = window.matchMedia("(prefers-reduced-motion: reduce)");
     const sync = () => {
-      setMobileReel(mobileMedia.matches);
       setReducedMotion(motionMedia.matches);
     };
 
     sync();
-    mobileMedia.addEventListener("change", sync);
     motionMedia.addEventListener("change", sync);
     return () => {
-      mobileMedia.removeEventListener("change", sync);
       motionMedia.removeEventListener("change", sync);
     };
   }, []);
@@ -188,28 +187,28 @@ export function BonusBoxClient({
     setRevealEffect(false);
     setResult(null);
     setPendingResult(null);
-    setOffset(0);
 
     try {
       const response = await apiFetch<OpenBoxResponse>("/api/bonus-box", {
         method: "POST",
       });
-      setReel(response.reel);
       setPendingResult(response);
+
+      const winnerIndex = Math.max(0, wheelPrizes.findIndex((prize) => prize.id === response.prize.id));
+      const winnerCenter = (winnerIndex + 0.5) * segmentAngle;
+      const targetRotation = (360 - winnerCenter) % 360;
+      setWheelRotation((current) => {
+        const normalized = ((current % 360) + 360) % 360;
+        const correction = (targetRotation - normalized + 360) % 360;
+        return current + correction + 360 * 6;
+      });
 
       if (reducedMotion) {
         void finishOpening(response);
       } else {
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            const stopRatio = Math.min(0.72, Math.max(0.28, response.stopOffsetRatio));
-            const target = response.winningIndex * reelStep + cardWidth * stopRatio;
-            setOffset(-target);
-          });
-        });
         revealTimerRef.current = window.setTimeout(() => {
           void finishOpening(response);
-        }, REEL_DURATION_MS + 180);
+        }, WHEEL_DURATION_MS + 160);
       }
     } catch {
       setOpening(false);
@@ -265,7 +264,7 @@ export function BonusBoxClient({
     >
       <span className="relative flex items-center justify-center gap-2">
         <Gift className="h-4 w-4" />
-        <span>{opening ? "Открываем..." : openButtonLabel}</span>
+        <span>{opening ? "Колесо вращается" : openButtonLabel}</span>
       </span>
     </button>
   );
@@ -275,7 +274,7 @@ export function BonusBoxClient({
       <section
         aria-busy={opening}
         className={cn(
-          "bonus-box-stage order-first overflow-hidden rounded-xl border border-slate-200/90 border-t-2 border-t-cyan-400 bg-white dark:border-white/10 dark:border-t-cyan-300 dark:bg-surface-900",
+          "bonus-box-stage order-first overflow-hidden rounded-xl border border-brand-200/80 bg-white dark:border-brand-300/15 dark:bg-surface-900",
           opening && "bonus-box-stage--opening",
           revealEffect && "bonus-box-stage--reveal",
           revealEffect && result?.prize.type !== "NO_PRIZE" && "bonus-box-stage--win",
@@ -283,72 +282,84 @@ export function BonusBoxClient({
           revealEffect && revealClass,
         )}
       >
-        <div className="bonus-box-stage-header grid gap-3 border-b border-slate-200 px-4 py-3.5 dark:border-white/10 sm:grid-cols-[minmax(0,1fr)_minmax(12rem,18rem)] sm:items-center sm:px-5 sm:py-4">
+        <div className="bonus-box-stage-header flex flex-wrap items-center justify-between gap-3 border-b border-brand-200/70 px-4 py-4 dark:border-brand-300/10 sm:px-6">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <h2 className="text-base font-semibold text-slate-950 dark:text-white sm:text-lg">Рулетка бонусов</h2>
-              <span className="border-l-2 border-cyan-400 pl-2 text-xs font-medium text-slate-500 dark:text-slate-400">
-                {availableNow} доступно
-              </span>
+              <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-brand-600 dark:text-brand-300">Bonus drop</span>
+              <span className="h-1 w-1 rounded-full bg-fuchsia-400" />
+              <span className="text-xs font-medium text-slate-500 dark:text-slate-400">{availableNow} {turnWord(availableNow)}</span>
             </div>
-            <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400 sm:text-sm" aria-live="polite">
-              {opening
-                ? "Крутим и фиксируем подарок в центре."
-                : result
-                  ? `${rarityLabel(result.prize.rarity)} результат сохранён.`
-                  : data.canOpenReason || "Нажмите кнопку, результат появится здесь."}
-            </p>
+            <h2 className="mt-1 text-lg font-semibold tracking-tight text-slate-950 dark:text-white sm:text-xl">Колесо подарков</h2>
           </div>
-          <div className="min-w-0">
-            {openCaseCta}
-            {opening && pendingResult && !reducedMotion && (
-              <button
-                type="button"
-                className="mt-2 w-full text-center text-xs font-medium text-slate-500 underline-offset-4 hover:text-slate-900 hover:underline dark:text-slate-400 dark:hover:text-white"
-                onClick={() => void finishOpening(pendingResult)}
-              >
-                Показать результат сразу
-              </button>
-            )}
-            {data.canOpenReason && !subscribeCta && (
-              <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">{data.canOpenReason}</p>
-            )}
+          <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+            <span className={cn("h-2 w-2 rounded-full", opening ? "animate-pulse bg-fuchsia-400" : "bg-cyan-400")} />
+            <span aria-live="polite">{opening ? "Определяем подарок" : result ? `${rarityLabel(result.prize.rarity)} результат` : "Готово к запуску"}</span>
           </div>
         </div>
 
-        {data.prizes.length > 0 && <div className="bonus-box-reel-shell relative overflow-hidden py-3 sm:py-5">
-          <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-5 bg-gradient-to-r from-white via-white/75 to-transparent dark:from-surface-900 dark:via-surface-900/75 sm:w-32" />
-          <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-5 bg-gradient-to-l from-white via-white/75 to-transparent dark:from-surface-900 dark:via-surface-900/75 sm:w-32" />
-          <div className="bonus-box-portal" aria-hidden="true">
-            <div className="bonus-box-portal-core" />
-            <div className="bonus-box-portal-line" />
-          </div>
+        {wheelPrizes.length > 0 && (
+          <div className="bonus-wheel-layout">
+            <div className="bonus-wheel-area">
+              <div className="bonus-wheel-frame">
+                <div className="bonus-wheel-pointer" aria-hidden="true"><span /></div>
+                <div
+                  className="bonus-wheel"
+                  style={{
+                    "--bonus-segment-size": `${segmentAngle}deg`,
+                    background: wheelBackground,
+                    transform: `rotate(${wheelRotation}deg)`,
+                    transition: opening && !reducedMotion
+                      ? `transform ${WHEEL_DURATION_MS}ms cubic-bezier(.12,.72,.05,1)`
+                      : "none",
+                  } as CSSProperties}
+                >
+                  {wheelPrizes.map((prize, index) => {
+                    const angle = (index + 0.5) * segmentAngle;
+                    return (
+                      <div key={prize.id} className="bonus-wheel-segment" style={{ transform: `rotate(${angle}deg)` }}>
+                        <div className="bonus-wheel-segment-copy">
+                          <span>{prizeLabel(prize)}</span>
+                          <small>{prize.title}</small>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="bonus-wheel-hub" aria-hidden="true">
+                  <Sparkles className="h-4 w-4" />
+                  <strong>{availableNow}</strong>
+                  <span>{turnWord(availableNow)}</span>
+                </div>
+              </div>
+            </div>
 
-          <div ref={viewportRef} className="bonus-box-reel-viewport overflow-hidden">
-            <div
-              className="bonus-box-reel-track flex will-change-transform"
-              style={{
-                gap: `${cardGap}px`,
-                transform: `translate3d(${offset}px,0,0)`,
-                transition: opening && !reducedMotion
-                  ? `transform ${REEL_DURATION_MS}ms cubic-bezier(.08,.82,.07,1)`
-                  : "none",
-                paddingLeft: "50%",
-                paddingRight: "50%",
-              }}
-            >
-              {reel.map((prize, index) => (
-                <PrizeCard
-                  key={`${prize.id}-${index}`}
-                  prize={prize}
-                  compact
-                  cardWidth={cardWidth}
-                  highlighted={Boolean(revealEffect && result?.winningIndex === index)}
-                />
-              ))}
+            <div className="bonus-wheel-console">
+              <div>
+                <div className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-600 dark:text-brand-300">Ваш ход</div>
+                <p className="mt-2 text-lg font-semibold tracking-tight text-slate-950 dark:text-white">
+                  {opening ? "Колесо уже запущено" : "Один запуск, один результат"}
+                </p>
+                <p className="mt-1 text-sm leading-6 text-slate-500 dark:text-slate-400">
+                  {data.canOpenReason || "Подарок определяется на сервере и сразу сохраняется в истории."}
+                </p>
+              </div>
+              <div className="mt-5">{openCaseCta}</div>
+              {opening && pendingResult && !reducedMotion && (
+                <button
+                  type="button"
+                  className="mt-3 w-full text-center text-xs font-medium text-brand-600 underline-offset-4 hover:text-brand-800 hover:underline dark:text-brand-300 dark:hover:text-white"
+                  onClick={() => void finishOpening(pendingResult)}
+                >
+                  Показать результат сразу
+                </button>
+              )}
+              <div className="bonus-wheel-console-meta">
+                <span>{wheelPrizes.length} вариантов</span>
+                <span>Результат сохраняется</span>
+              </div>
             </div>
           </div>
-        </div>}
+        )}
 
         {(canUseWelcomeAttempts || lockedAttempts > 0) && (
           <div className="border-t border-slate-200 bg-slate-50/80 px-3 py-2 text-sm text-slate-600 dark:border-white/10 dark:bg-white/[0.035] dark:text-slate-300 sm:px-5">
@@ -377,7 +388,7 @@ export function BonusBoxClient({
                 "grid h-14 w-14 place-items-center rounded-2xl border shadow-inner",
                 result.prize.type === "NO_PRIZE"
                   ? "border-red-200 bg-red-50 text-red-500 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200"
-                  : "border-emerald-200 bg-emerald-50 text-emerald-600 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200",
+                  : "border-brand-200 bg-brand-50 text-brand-700 dark:border-brand-300/20 dark:bg-brand-400/10 dark:text-brand-200",
               )}
             >
               {result.prize.type === "NO_PRIZE" ? (
@@ -393,7 +404,7 @@ export function BonusBoxClient({
                   "text-sm font-semibold uppercase tracking-wide",
                   result.prize.type === "NO_PRIZE"
                     ? "text-slate-500 dark:text-slate-400"
-                    : "text-emerald-600 dark:text-emerald-300",
+                    : "text-brand-700 dark:text-brand-300",
                 )}
               >
                 {result.prize.type === "NO_PRIZE"
@@ -609,6 +620,15 @@ export function BonusBoxClient({
       </section>
     </div>
   );
+}
+
+function turnWord(value: number) {
+  const mod100 = value % 100;
+  const mod10 = value % 10;
+  if (mod100 >= 11 && mod100 <= 14) return 'ходов';
+  if (mod10 === 1) return 'ход';
+  if (mod10 >= 2 && mod10 <= 4) return 'хода';
+  return 'ходов';
 }
 
 function BonusEngagementPanel({
@@ -1002,103 +1022,6 @@ function RuleCard({
           </div>
         </div>
       </div>
-    </div>
-  );
-}
-
-function PrizeCard({
-  prize,
-  compact = false,
-  highlighted = false,
-  cardWidth,
-}: {
-  prize: BonusBoxPrizeView;
-  compact?: boolean;
-  highlighted?: boolean;
-  cardWidth?: number;
-}) {
-  const Icon =
-    prize.type === "NO_PRIZE"
-      ? CircleSlash
-      : prize.type === "SUBSCRIPTION_DAYS"
-        ? CalendarPlus
-        : prize.type === "TRAFFIC_GB"
-          ? Zap
-          : prize.type === "BONUS_ATTEMPTS"
-            ? Gift
-            : TicketPercent;
-
-  return (
-    <div
-      className={cn(
-        "relative shrink-0 overflow-hidden rounded-lg border p-3 transition-colors duration-200",
-        compact
-          ? "bonus-box-reel-card h-32 text-slate-950 shadow-sm shadow-slate-200/70 dark:text-white dark:shadow-black/20 sm:h-40"
-          : "min-h-[132px] bg-white shadow-sm hover:border-cyan-200 dark:bg-surface-900",
-        compact ? prizeReelClass(prize) : prizeBorderClass(prize),
-        highlighted && "bonus-box-reel-card--winner",
-      )}
-      style={compact ? { width: cardWidth ?? DESKTOP_CARD_WIDTH } : undefined}
-    >
-      <div
-        className={cn("absolute inset-x-0 top-0 h-1", prizeTopClass(prize))}
-      />
-      <div className="relative flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <div
-            className={cn(
-              "truncate font-semibold",
-              compact && "text-base text-slate-950 dark:text-white sm:text-lg",
-            )}
-          >
-            {prize.title}
-          </div>
-          <div
-            className={cn(
-              "mt-1 text-xs",
-              compact ? "text-slate-500 dark:text-slate-400" : "text-slate-500",
-            )}
-          >
-            {prizeLabel(prize)}
-          </div>
-        </div>
-        <span
-          className={cn(
-            "shrink-0 rounded-sm px-1.5 py-1 font-mono text-[9px] font-semibold uppercase",
-            rarityClass(prize.rarity),
-          )}
-        >
-          {rarityLabel(prize.rarity)}
-        </span>
-      </div>
-      {compact && (
-        <div className="relative mt-5 flex items-end justify-between sm:mt-8">
-          <div className="grid h-10 w-10 place-items-center rounded-md border border-slate-200 bg-white/70 text-slate-700 dark:border-white/10 dark:bg-white/10 dark:text-slate-100 sm:h-12 sm:w-12">
-            <Icon className="h-5 w-5 sm:h-6 sm:w-6" />
-          </div>
-          <div className="flex items-end gap-1">
-            <span
-              className={cn("h-5 w-1 rounded-full", prizeTopClass(prize))}
-            />
-            <span
-              className={cn("h-8 w-1 rounded-full", prizeTopClass(prize))}
-            />
-            <span
-              className={cn("h-3 w-1 rounded-full", prizeTopClass(prize))}
-            />
-          </div>
-        </div>
-      )}
-      {!compact && prize.description && (
-        <p className="mt-3 line-clamp-2 text-sm text-slate-500 dark:text-slate-400">
-          {prize.description}
-        </p>
-      )}
-      {!compact && (
-        <div className="mt-4 text-xs text-slate-400">
-          Шанс {(prize.chance * 100).toFixed(1)}%
-        </div>
-      )}
     </div>
   );
 }

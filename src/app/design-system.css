@@ -224,7 +224,6 @@ body {
 .settings-section,
 .plan-period-panel,
 .plan-checkout-card,
-.bonus-box-stage,
 .access-pass,
 .subscription-ticket {
   border-color: var(--app-border) !important;
@@ -571,8 +570,18 @@ textarea:focus {
 }
 
 .bonus-box-stage {
-  border-top: 3px solid var(--app-accent) !important;
-  background: var(--app-surface) !important;
+  border-color: color-mix(in srgb, var(--app-ink) 28%, var(--app-border)) !important;
+  background:
+    radial-gradient(circle at 26% 52%, color-mix(in srgb, var(--app-ink) 12%, transparent), transparent 40%),
+    linear-gradient(145deg, var(--app-surface), color-mix(in srgb, var(--app-surface-soft) 54%, var(--app-surface))) !important;
+  box-shadow: 0 24px 60px rgba(49, 18, 111, 0.08) !important;
+}
+
+.dark .bonus-box-stage {
+  background:
+    radial-gradient(circle at 26% 52%, rgba(112, 41, 207, 0.2), transparent 42%),
+    linear-gradient(145deg, #100925, #0b0a19 68%) !important;
+  box-shadow: 0 28px 70px rgba(0, 0, 0, 0.28) !important;
 }
 
 .app-modal-panel {

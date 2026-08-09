@@ -1,28 +1,5 @@
 import type { BonusBoxPrizeView, Rarity } from "@/components/bonus-box/bonus-box-types";
 
-export const DESKTOP_CARD_WIDTH = 184;
-export const MOBILE_CARD_WIDTH = 138;
-export const DESKTOP_CARD_GAP = 14;
-export const MOBILE_CARD_GAP = 12;
-
-export const OPENING_EFFECT_PARTICLES = [
-  { x: 7, delay: 0, size: 3, drift: -22, duration: 1700 },
-  { x: 26, delay: 80, size: 4, drift: 18, duration: 2100 },
-  { x: 39, delay: 220, size: 6, drift: 26, duration: 2300 },
-  { x: 50, delay: 120, size: 7, drift: 0, duration: 2200 },
-  { x: 62, delay: 60, size: 5, drift: -28, duration: 2050 },
-  { x: 75, delay: 260, size: 4, drift: -18, duration: 2000 },
-  { x: 88, delay: 140, size: 5, drift: -26, duration: 2150 },
-] as const;
-
-export function makeIdleReel(prizes: BonusBoxPrizeView[]) {
-  if (prizes.length === 0) return [];
-  return Array.from(
-    { length: 40 },
-    (_, index) => prizes[index % prizes.length],
-  ).filter((prize): prize is BonusBoxPrizeView => Boolean(prize));
-}
-
 export function prizeLabel(prize: BonusBoxPrizeView) {
   if (prize.type === "NO_PRIZE") return "Без начисления";
   if (prize.type === "SUBSCRIPTION_DAYS") return `+${prize.value} дн.`;
@@ -71,22 +48,6 @@ function rarityBorderClass(rarity: Rarity) {
   if (rarity === "EPIC") return "border-fuchsia-200 dark:border-fuchsia-500/40";
   if (rarity === "RARE") return "border-cyan-200 dark:border-cyan-500/40";
   return "border-slate-200 dark:border-white/10";
-}
-
-export function prizeReelClass(prize: BonusBoxPrizeView) {
-  if (prize.type === "NO_PRIZE")
-    return "border-red-200 bg-red-50/80 dark:border-red-500/35 dark:bg-red-500/10";
-  return rarityReelClass(prize.rarity);
-}
-
-function rarityReelClass(rarity: Rarity) {
-  if (rarity === "LEGENDARY")
-    return "rarity-shimmer border-amber-200 bg-amber-50/80 dark:border-amber-500/35 dark:bg-amber-500/10";
-  if (rarity === "EPIC")
-    return "border-fuchsia-200 bg-fuchsia-50/80 dark:border-fuchsia-500/35 dark:bg-fuchsia-500/10";
-  if (rarity === "RARE")
-    return "border-cyan-200 bg-cyan-50/80 dark:border-cyan-500/35 dark:bg-cyan-500/10";
-  return "border-slate-200 bg-slate-50/90 dark:border-white/10 dark:bg-white/[0.04]";
 }
 
 export function bonusBoxRevealClass(prize: BonusBoxPrizeView) {
