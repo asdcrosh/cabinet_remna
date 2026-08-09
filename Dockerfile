@@ -19,7 +19,11 @@ RUN rm -rf \
 
 FROM node:24-alpine AS builder
 WORKDIR /app
+ARG BUILD_REVISION=unknown
+ARG BUILD_CREATED_AT=unknown
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV APP_BUILD_REVISION=${BUILD_REVISION}
+ENV APP_BUILD_CREATED_AT=${BUILD_CREATED_AT}
 
 RUN apk add --no-cache openssl
 COPY --from=deps /app/node_modules ./node_modules
@@ -43,10 +47,17 @@ RUN ./node_modules/.bin/esbuild \
 
 FROM node:24-alpine AS release
 WORKDIR /app
+ARG BUILD_REVISION=unknown
+ARG BUILD_CREATED_AT=unknown
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
+ENV APP_BUILD_REVISION=${BUILD_REVISION}
+ENV APP_BUILD_CREATED_AT=${BUILD_CREATED_AT}
+
+LABEL org.opencontainers.image.revision=${BUILD_REVISION}
+LABEL org.opencontainers.image.created=${BUILD_CREATED_AT}
 
 RUN apk add --no-cache openssl wget \
   && addgroup -S nextjs \

@@ -14,6 +14,7 @@ import {
   HardDrive,
   Loader2,
   Radio,
+  Rocket,
   RefreshCw,
   Send,
   ServerCog,
@@ -29,6 +30,7 @@ import type {
 } from '@/lib/system-health'
 
 const categoryOrder: SystemHealthCategory[] = [
+  'deployment',
   'payments',
   'sync',
   'workers',
@@ -39,6 +41,7 @@ const categoryOrder: SystemHealthCategory[] = [
 ]
 
 const categoryView: Record<SystemHealthCategory, { title: string; description: string; icon: ComponentType<{ className?: string }> }> = {
+  deployment: { title: 'Обновления', description: 'Версия, миграции и результат деплоя', icon: Rocket },
   payments: { title: 'Платежи', description: 'Операции и провайдеры', icon: CreditCard },
   sync: { title: 'Синхронизация', description: 'Remnawave, Remnashop и выдача', icon: RefreshCw },
   workers: { title: 'Фоновые процессы', description: 'Обработчики и очереди', icon: ServerCog },

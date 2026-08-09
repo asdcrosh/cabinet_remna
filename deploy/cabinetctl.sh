@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="1.5.0"
+VERSION="1.6.0"
 BRANCH="${BRANCH:-main}"
 RAW_BASE_URL="${RAW_BASE_URL:-https://raw.githubusercontent.com/asdcrosh/cabinet_remna/${BRANCH}}"
 GITHUB_API_URL="${GITHUB_API_URL:-https://api.github.com/repos/asdcrosh/cabinet_remna/commits/${BRANCH}}"
+GITHUB_WORKFLOW_RUNS_URL="${GITHUB_WORKFLOW_RUNS_URL:-https://api.github.com/repos/asdcrosh/cabinet_remna/actions/workflows/docker-image.yml/runs}"
 INSTALL_URL="${INSTALL_URL:-${RAW_BASE_URL}/deploy/install-server.sh}"
 UPDATE_URL="${UPDATE_URL:-${RAW_BASE_URL}/deploy/update-server.sh}"
 NGINX_SETUP_URL="${NGINX_SETUP_URL:-${RAW_BASE_URL}/deploy/setup-nginx-proxy.sh}"
@@ -17,6 +18,7 @@ CABINET_DIR="${INSTALL_DIR:-/opt/remnawave-cabinet}"
 CABINET_ENV="${CABINET_DIR}/.env"
 CABINET_COMPOSE="${CABINET_DIR}/docker-compose.yml"
 CABINET_VERSION_FILE="${CABINET_VERSION_FILE:-${CABINET_DIR}/.cabinet-version}"
+DEPLOY_STATE_FILE="${CABINET_STATE_DIR:-${CABINET_DIR}/state}/deployment.json"
 UPDATE_STATUS_CACHE="${CABINETCTL_UPDATE_CACHE:-/var/cache/remnawave-cabinet/update-status}"
 UPDATE_STATUS_CACHE_TTL="${CABINETCTL_UPDATE_CACHE_TTL:-1800}"
 CHECK_UPDATES_IN_MENU="${CABINETCTL_CHECK_UPDATES_IN_MENU:-1}"
@@ -282,6 +284,21 @@ remote_commit_sha() {
     | head -n 1
 }
 
+remote_image_sha() {
+  local response
+  command -v curl >/dev/null 2>&1 || return 1
+  response="$(curl -fsSL --connect-timeout 2 --max-time 5 \
+    -H 'Accept: application/vnd.github+json' \
+    --get \
+    --data-urlencode "branch=${BRANCH}" \
+    --data-urlencode 'status=success' \
+    --data-urlencode 'per_page=1' \
+    "${GITHUB_WORKFLOW_RUNS_URL}" 2>/dev/null || true)"
+  printf '%s\n' "${response}" \
+    | sed -n 's/.*"head_sha"[[:space:]]*:[[:space:]]*"\([0-9a-f]\{40\}\)".*/\1/p' \
+    | head -n 1
+}
+
 installed_commit_sha() {
   local image_id image_revision
   image_id=""
@@ -318,7 +335,7 @@ check_update_status() {
   fi
 
   local remote_sha installed_sha
-  remote_sha="$(remote_commit_sha)"
+  remote_sha="$(remote_image_sha)"
   if [[ -z "${remote_sha}" ]]; then
     write_update_status_cache "check-failed"
     return 2
@@ -392,6 +409,61 @@ update_status_line() {
   fi
 
   print_update_status_key "unknown"
+}
+
+deployment_status_line() {
+  [[ -f "${DEPLOY_STATE_FILE}" ]] || return 0
+  local summary status revision finished_at
+  summary="$(python3 - "${DEPLOY_STATE_FILE}" <<'PY' 2>/dev/null || true
+import json
+import sys
+
+try:
+    data = json.load(open(sys.argv[1]))
+    revision = data.get("deployedRevision") or data.get("rollbackRevision") or data.get("targetRevision") or ""
+    print("|".join((str(data.get("status") or "unknown"), revision[:7], str(data.get("finishedAt") or ""))))
+except Exception:
+    pass
+PY
+)"
+  IFS='|' read -r status revision finished_at <<<"${summary}"
+  case "${status}" in
+    success) print_status_row "${GREEN}●${RESET}" "Деплой" "${GREEN}успешно ${revision}${RESET}" ;;
+    deploying) print_status_row "${YELLOW}●${RESET}" "Деплой" "${YELLOW}выполняется ${revision}${RESET}" ;;
+    rolled_back) print_status_row "${RED}↶${RESET}" "Деплой" "${RED}откат ${revision}${RESET}" ;;
+    failed) print_status_row "${RED}●${RESET}" "Деплой" "${RED}ошибка${RESET}" ;;
+  esac
+}
+
+show_deployment_status() {
+  if [[ ! -f "${DEPLOY_STATE_FILE}" ]]; then
+    warn "История деплоя ещё не записана. Она появится после следующего обновления."
+    return 0
+  fi
+  python3 - "${DEPLOY_STATE_FILE}" <<'PY'
+import json
+import sys
+
+data = json.load(open(sys.argv[1]))
+labels = {
+    "deploying": "выполняется",
+    "success": "успешно",
+    "failed": "ошибка",
+    "rolled_back": "выполнен автоматический откат",
+}
+print(f"Результат: {labels.get(data.get('status'), data.get('status', 'неизвестно'))}")
+print(f"Начало: {data.get('startedAt') or 'неизвестно'}")
+print(f"Завершение: {data.get('finishedAt') or 'ещё не завершено'}")
+print(f"Предыдущая версия: {(data.get('previousRevision') or 'неизвестно')[:12]}")
+print(f"Целевая версия: {(data.get('targetRevision') or 'неизвестно')[:12]}")
+print(f"Запущенная версия: {(data.get('deployedRevision') or data.get('rollbackRevision') or 'неизвестно')[:12]}")
+print(f"Миграции: {data.get('migrations') or 'неизвестно'}")
+health = data.get("health") or {}
+print(f"Локальная проверка: {health.get('local') or 'неизвестно'}")
+print(f"Публичная проверка: {health.get('public') or 'неизвестно'}")
+if data.get("message"):
+    print(f"Комментарий: {data['message']}")
+PY
 }
 
 show_update_check_result() {
@@ -600,6 +672,8 @@ health_check() {
       warn "Нет curl или HEALTHCHECK_TOKEN, глубокая HTTP-проверка пропущена"
     fi
     cabinet_compose ps
+    printf '\n%s\n' "${BOLD}Последний деплой${RESET}"
+    show_deployment_status
   else
     warn "Кабинет ещё не установлен."
   fi
@@ -673,6 +747,7 @@ show_header() {
   printf '\n'
   show_status
   update_status_line
+  deployment_status_line
   if [[ -n "${ENV_SYNC_NOTICE}" ]]; then
     print_status_row "${CYAN}+${RESET}" ".env" "${CYAN}${ENV_SYNC_NOTICE}${RESET}"
   fi
@@ -745,6 +820,7 @@ Remnawave Cabinet ${VERSION}
   cabinetctl install            установить кабинет
   cabinetctl update             обновить систему
   cabinetctl check-update       проверить наличие обновления
+  cabinetctl deploy-status      результат последнего обновления и health-check
   cabinetctl env                открыть .env
   cabinetctl config-check       проверить переменные .env
   cabinetctl health             здоровье системы
@@ -773,7 +849,7 @@ case "${1:-menu}" in
 esac
 
 if [[ "$(id -u)" -ne 0 ]]; then
-  exec sudo --preserve-env=BRANCH,RAW_BASE_URL,GITHUB_API_URL,INSTALL_URL,UPDATE_URL,NGINX_SETUP_URL,CONSOLE_INSTALL_URL,BACKUP_SCRIPT_URL,ENV_TEMPLATE_URL,CABINETCTL_PATH,BACKUP_SCRIPT_PATH,INSTALL_DIR,CABINET_VERSION_FILE,CABINETCTL_UPDATE_CACHE,CABINETCTL_UPDATE_CACHE_TTL,CABINETCTL_CHECK_UPDATES_IN_MENU "$0" "$@"
+  exec sudo --preserve-env=BRANCH,RAW_BASE_URL,GITHUB_API_URL,GITHUB_WORKFLOW_RUNS_URL,INSTALL_URL,UPDATE_URL,NGINX_SETUP_URL,CONSOLE_INSTALL_URL,BACKUP_SCRIPT_URL,ENV_TEMPLATE_URL,CABINETCTL_PATH,BACKUP_SCRIPT_PATH,INSTALL_DIR,CABINET_VERSION_FILE,CABINET_STATE_DIR,CABINETCTL_UPDATE_CACHE,CABINETCTL_UPDATE_CACHE_TTL,CABINETCTL_CHECK_UPDATES_IN_MENU "$0" "$@"
 fi
 
 case "${1:-menu}" in
@@ -781,6 +857,7 @@ case "${1:-menu}" in
   install) install_cabinet ;;
   update) update_cabinet ;;
   update-check|check-update) check_update_command ;;
+  deploy-status) show_deployment_status ;;
   env) edit_env ;;
   config-check|check-config) check_config ;;
   status) show_status ;;

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { logError } from '@/lib/logger'
+import { getBuildInfo } from '@/lib/deployment-health'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -25,7 +26,7 @@ export async function GET(req: Request) {
 
   try {
     await prisma.$queryRaw`SELECT 1`
-    return NextResponse.json({ ok: true, database: 'ok' })
+    return NextResponse.json({ ok: true, database: 'ok', build: getBuildInfo() })
   } catch (e) {
     logError('health.db_check_failed', e)
     return NextResponse.json({ ok: false, database: 'error' }, { status: 503 })

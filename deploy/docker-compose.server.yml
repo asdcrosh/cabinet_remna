@@ -69,6 +69,9 @@ services:
     restart: unless-stopped
     env_file:
       - ${CABINET_ENV_FILE:-.env}
+    environment:
+      APP_IMAGE_REFERENCE: ${CABINET_IMAGE:-ghcr.io/asdcrosh/cabinet_remna:latest}
+      DEPLOY_STATE_FILE: /run/cabinet-state/deployment.json
     depends_on:
       seed:
         condition: service_completed_successfully
@@ -80,6 +83,7 @@ services:
       - "${CABINET_APP_BIND:-127.0.0.1}:${CABINET_APP_PORT:-3000}:3000"
     volumes:
       - "${FULL_BACKUP_DIR:-/opt/remnawave-backups}:/backups:ro"
+      - "${CABINET_STATE_DIR:-/opt/remnawave-cabinet/state}:/run/cabinet-state:ro"
       - broadcast_uploads:/app/public/uploads
     healthcheck:
       test:

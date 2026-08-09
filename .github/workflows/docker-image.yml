@@ -45,6 +45,10 @@ jobs:
             type=ref,event=tag
             type=sha,prefix=sha-
 
+      - name: Build information
+        id: build_info
+        run: echo "created_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+
       - name: Build and push image
         uses: docker/build-push-action@v6
         with:
@@ -53,5 +57,8 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            BUILD_REVISION=${{ github.sha }}
+            BUILD_CREATED_AT=${{ steps.build_info.outputs.created_at }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

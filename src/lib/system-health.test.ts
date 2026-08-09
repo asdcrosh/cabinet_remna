@@ -45,6 +45,30 @@ vi.mock('@/lib/watch-config', () => ({
   getWatchConfig: () => ({ enabled: true, intervalSeconds: 60 }),
 }))
 vi.mock('@/lib/worker-health', () => ({ getWorkerHeartbeat: mocks.getWorkerHeartbeat }))
+vi.mock('@/lib/deployment-health', () => ({
+  getDeploymentHealthSnapshot: vi.fn().mockResolvedValue({
+    build: {
+      revision: '1111111111111111111111111111111111111111',
+      createdAt: '2026-08-09T12:00:00Z',
+      image: 'ghcr.io/asdcrosh/cabinet_remna:latest',
+    },
+    remoteRevision: '1111111111111111111111111111111111111111',
+    deployment: {
+      status: 'success',
+      deployedRevision: '1111111111111111111111111111111111111111',
+      health: { local: 'ok', public: 'ok' },
+    },
+    migration: {
+      status: 'ok',
+      expected: 12,
+      applied: 12,
+      latestExpected: 'latest',
+      latestApplied: 'latest',
+      failed: [],
+      missing: [],
+    },
+  }),
+}))
 
 import { getSystemHealth } from './system-health'
 
@@ -92,6 +116,7 @@ describe('getSystemHealth', () => {
     const categories = new Set(report.checks.map((item) => item.category))
 
     expect(categories).toEqual(new Set([
+      'deployment',
       'core',
       'payments',
       'sync',

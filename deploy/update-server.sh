@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -Eeuo pipefail
 
 BRANCH="${BRANCH:-main}"
 RAW_BASE_URL="${RAW_BASE_URL:-https://raw.githubusercontent.com/asdcrosh/cabinet_remna/${BRANCH}}"
@@ -11,6 +11,8 @@ COMPOSE_FILE="${INSTALL_DIR}/docker-compose.yml"
 ENV_FILE="${INSTALL_DIR}/.env"
 VERSION_FILE="${INSTALL_DIR}/.cabinet-version"
 DEPLOY_NOTIFICATION_FILE="${INSTALL_DIR}/.last-deploy-notification"
+STATE_DIR="${CABINET_STATE_DIR:-${INSTALL_DIR}/state}"
+DEPLOY_STATE_FILE="${STATE_DIR}/deployment.json"
 CABINETCTL_URL="${CABINETCTL_URL:-${RAW_BASE_URL}/deploy/cabinetctl.sh}"
 CABINETCTL_PATH="${CABINETCTL_PATH:-/usr/local/bin/cabinetctl}"
 CABINETCTL_TEMP="${CABINETCTL_PATH}.tmp"
@@ -85,6 +87,120 @@ installed_version_revision() {
   return 1
 }
 
+running_app_image_id() {
+  docker inspect remnawave-cabinet-app --format '{{.Image}}' 2>/dev/null || true
+}
+
+image_revision() {
+  local image="$1"
+  local revision
+  [[ -n "${image}" ]] || return 1
+  revision="$(docker image inspect "${image}" --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' 2>/dev/null || true)"
+  if [[ "${revision}" =~ ^[0-9a-f]{40}$ ]]; then
+    printf '%s\n' "${revision}"
+    return 0
+  fi
+  return 1
+}
+
+DEPLOY_STARTED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+DEPLOY_TARGET_REVISION=""
+DEPLOYED_REVISION=""
+ROLLBACK_REVISION=""
+ROLLBACK_IMAGE=""
+ROLLBACK_ARMED="false"
+MIGRATION_STATUS="pending"
+LOCAL_HEALTH_STATUS="pending"
+PUBLIC_HEALTH_STATUS="pending"
+
+write_deployment_state() {
+  local status="$1"
+  local message="$2"
+  local finished_at="${3:-}"
+  mkdir -p "${STATE_DIR}"
+  chmod 755 "${STATE_DIR}" 2>/dev/null || true
+  DEPLOY_STATE_PATH="${DEPLOY_STATE_FILE}" \
+    DEPLOY_STATUS="${status}" \
+    DEPLOY_MESSAGE="${message}" \
+    DEPLOY_STARTED_AT_VALUE="${DEPLOY_STARTED_AT}" \
+    DEPLOY_FINISHED_AT_VALUE="${finished_at}" \
+    DEPLOY_PREVIOUS_REVISION_VALUE="${PREVIOUS_DEPLOYED_REVISION:-}" \
+    DEPLOY_TARGET_REVISION_VALUE="${DEPLOY_TARGET_REVISION}" \
+    DEPLOYED_REVISION_VALUE="${DEPLOYED_REVISION}" \
+    ROLLBACK_REVISION_VALUE="${ROLLBACK_REVISION}" \
+    MIGRATION_STATUS_VALUE="${MIGRATION_STATUS}" \
+    LOCAL_HEALTH_STATUS_VALUE="${LOCAL_HEALTH_STATUS}" \
+    PUBLIC_HEALTH_STATUS_VALUE="${PUBLIC_HEALTH_STATUS}" \
+    python3 <<'PY'
+import json
+import os
+from pathlib import Path
+
+path = Path(os.environ["DEPLOY_STATE_PATH"])
+payload = {
+    "status": os.environ["DEPLOY_STATUS"],
+    "startedAt": os.environ["DEPLOY_STARTED_AT_VALUE"],
+    "previousRevision": os.environ.get("DEPLOY_PREVIOUS_REVISION_VALUE") or None,
+    "targetRevision": os.environ.get("DEPLOY_TARGET_REVISION_VALUE") or None,
+    "deployedRevision": os.environ.get("DEPLOYED_REVISION_VALUE") or None,
+    "rollbackRevision": os.environ.get("ROLLBACK_REVISION_VALUE") or None,
+    "message": os.environ.get("DEPLOY_MESSAGE") or None,
+    "migrations": os.environ["MIGRATION_STATUS_VALUE"],
+    "health": {
+        "local": os.environ["LOCAL_HEALTH_STATUS_VALUE"],
+        "public": os.environ["PUBLIC_HEALTH_STATUS_VALUE"],
+    },
+}
+finished_at = os.environ.get("DEPLOY_FINISHED_AT_VALUE")
+if finished_at:
+    payload["finishedAt"] = finished_at
+temporary = path.with_suffix(".tmp")
+temporary.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n")
+temporary.chmod(0o644)
+temporary.replace(path)
+PY
+}
+
+rollback_runtime_services() {
+  local bind_address app_port
+  [[ -n "${ROLLBACK_IMAGE}" ]] || return 1
+  echo "Health-check failed. Restoring previous runtime image..." >&2
+  CABINET_IMAGE="${ROLLBACK_IMAGE}" CABINET_ENV_FILE="${ENV_FILE}" "${COMPOSE[@]}" up -d --no-deps --force-recreate \
+    app worker broadcast-worker watch-worker
+  bind_address="$(read_update_env_value CABINET_APP_BIND)"
+  app_port="$(read_update_env_value CABINET_APP_PORT)"
+  bind_address="${bind_address:-127.0.0.1}"
+  [[ "${bind_address}" == "0.0.0.0" ]] && bind_address="127.0.0.1"
+  app_port="${app_port:-3000}"
+  for _ in $(seq 1 60); do
+    if curl -fsS --connect-timeout 2 --max-time 5 "http://${bind_address}:${app_port}/login" >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 2
+  done
+  return 1
+}
+
+handle_update_failure() {
+  local exit_code=$?
+  local finished_at
+  trap - ERR
+  set +e
+  finished_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  MIGRATION_STATUS="${MIGRATION_STATUS/pending/error}"
+  LOCAL_HEALTH_STATUS="${LOCAL_HEALTH_STATUS/pending/error}"
+  PUBLIC_HEALTH_STATUS="${PUBLIC_HEALTH_STATUS/pending/error}"
+  if [[ "${ROLLBACK_ARMED}" == "true" ]] && rollback_runtime_services; then
+    ROLLBACK_REVISION="$(running_app_revision || true)"
+    LOCAL_HEALTH_STATUS="ok"
+    write_deployment_state "rolled_back" "Новая версия не прошла проверку. Предыдущий образ восстановлен автоматически." "${finished_at}"
+    echo "Previous runtime image restored." >&2
+  else
+    write_deployment_state "failed" "Обновление завершилось ошибкой. Проверьте журнал update-server и контейнеры." "${finished_at}"
+  fi
+  exit "${exit_code}"
+}
+
 last_notified_revision() {
   local revision
   [[ -f "${DEPLOY_NOTIFICATION_FILE}" ]] || return 1
@@ -97,7 +213,17 @@ last_notified_revision() {
 }
 
 cd "${INSTALL_DIR}"
+ENV_STATE_DIR="$(awk -F= '$1 == "CABINET_STATE_DIR" { sub(/^[^=]*=/, ""); gsub(/^"|"$/, ""); print; exit }' "${ENV_FILE}" 2>/dev/null || true)"
+if [[ -n "${ENV_STATE_DIR}" ]]; then
+  STATE_DIR="${ENV_STATE_DIR}"
+  DEPLOY_STATE_FILE="${STATE_DIR}/deployment.json"
+fi
 PREVIOUS_DEPLOYED_REVISION="$(running_app_revision || installed_version_revision || true)"
+PREVIOUS_IMAGE_ID="$(running_app_image_id)"
+DEPLOY_TARGET_REVISION="$(remote_commit_sha || true)"
+mkdir -p "${STATE_DIR}"
+write_deployment_state "deploying" "Подготовка обновления и проверка конфигурации."
+trap handle_update_failure ERR
 
 if docker inspect remnashop >/dev/null 2>&1; then
   REMNASHOP_CRYPT_KEY_VALUE="$(docker inspect remnashop --format '{{range .Config.Env}}{{println .}}{{end}}' | sed -n 's/^APP_CRYPT_KEY=//p' | head -n1)"
@@ -424,8 +550,17 @@ disable_bundled_caddy_if_conflicting || true
 
 COMPOSE=(docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}")
 
+if [[ -n "${PREVIOUS_IMAGE_ID}" ]] && docker image inspect "${PREVIOUS_IMAGE_ID}" >/dev/null 2>&1; then
+  ROLLBACK_IMAGE="remnawave-cabinet:rollback-$(date -u +%Y%m%d%H%M%S)"
+  docker image tag "${PREVIOUS_IMAGE_ID}" "${ROLLBACK_IMAGE}"
+fi
+
 echo "Pulling latest images..."
 CABINET_ENV_FILE="${ENV_FILE}" "${COMPOSE[@]}" pull
+CABINET_IMAGE_REFERENCE="$(read_update_env_value CABINET_IMAGE)"
+CABINET_IMAGE_REFERENCE="${CABINET_IMAGE_REFERENCE:-ghcr.io/asdcrosh/cabinet_remna:latest}"
+DEPLOY_TARGET_REVISION="$(image_revision "${CABINET_IMAGE_REFERENCE}" || true)"
+write_deployment_state "deploying" "Новый образ загружен. Запускаются миграции."
 
 echo "Preparing one-shot services..."
 CABINET_ENV_FILE="${ENV_FILE}" "${COMPOSE[@]}" rm -fsv check-env migrate seed >/dev/null 2>&1 || true
@@ -435,13 +570,16 @@ if ! grep -Eq '^COMPOSE_PROFILES=.*caddy' "${ENV_FILE}"; then
 fi
 
 echo "Applying migrations and restarting services..."
+ROLLBACK_ARMED="true"
 if ! CABINET_ENV_FILE="${ENV_FILE}" "${COMPOSE[@]}" up -d --remove-orphans; then
   if disable_bundled_caddy_if_conflicting; then
     CABINET_ENV_FILE="${ENV_FILE}" "${COMPOSE[@]}" up -d --remove-orphans
   else
-    exit 1
+    false
   fi
 fi
+MIGRATION_STATUS="ok"
+write_deployment_state "deploying" "Миграции применены. Проверяется новая версия."
 
 # A mutable `latest` tag can be pulled successfully while Compose keeps an
 # already-running container. Recreate runtime services explicitly so the
@@ -618,6 +756,12 @@ cleanup_docker_artifacts() {
     echo "Pruning Docker build cache older than ${max_age}..."
     docker builder prune -f --filter "until=${max_age}" >/dev/null || true
   fi
+
+  docker image ls --format '{{.Repository}}:{{.Tag}}' --filter 'reference=remnawave-cabinet:rollback-*' \
+    | while read -r rollback_tag; do
+        [[ -n "${rollback_tag}" && "${rollback_tag}" != "${ROLLBACK_IMAGE}" ]] || continue
+        remove_image_if_unused "${rollback_tag}"
+      done || true
 }
 
 wait_for_url() {
@@ -637,6 +781,8 @@ wait_for_url() {
 }
 
 wait_for_container app 60
+wait_for_container worker 60
+wait_for_container broadcast-worker 60
 wait_for_container watch-worker 60
 
 CABINET_APP_BIND="$(env_value CABINET_APP_BIND)"
@@ -646,17 +792,35 @@ HEALTHCHECK_TOKEN="$(env_value HEALTHCHECK_TOKEN)"
 
 CABINET_APP_BIND="${CABINET_APP_BIND:-127.0.0.1}"
 CABINET_APP_PORT="${CABINET_APP_PORT:-3000}"
+[[ "${CABINET_APP_BIND}" == "0.0.0.0" ]] && CABINET_APP_BIND="127.0.0.1"
 
 echo "Checking local app on ${CABINET_APP_BIND}:${CABINET_APP_PORT}..."
-wait_for_url "http://${CABINET_APP_BIND}:${CABINET_APP_PORT}/login" 60
+if [[ -n "${HEALTHCHECK_TOKEN}" ]]; then
+  wait_for_url "http://${CABINET_APP_BIND}:${CABINET_APP_PORT}/api/health" 60 \
+    -H "x-healthcheck-token: ${HEALTHCHECK_TOKEN}"
+else
+  wait_for_url "http://${CABINET_APP_BIND}:${CABINET_APP_PORT}/login" 60
+fi
+LOCAL_HEALTH_STATUS="ok"
+write_deployment_state "deploying" "Локальный health-check пройден. Проверяется публичный адрес."
 
 if [[ -n "${APP_URL}" && -n "${HEALTHCHECK_TOKEN}" ]]; then
   echo "Checking public health..."
   wait_for_url "${APP_URL%/}/api/health" 60 -H "x-healthcheck-token: ${HEALTHCHECK_TOKEN}"
+  PUBLIC_HEALTH_STATUS="ok"
+else
+  PUBLIC_HEALTH_STATUS="skipped"
 fi
 
-cleanup_docker_artifacts
 DEPLOYED_REVISION="$(running_app_revision || true)"
+if [[ "${DEPLOY_TARGET_REVISION}" =~ ^[0-9a-f]{40}$ && "${DEPLOYED_REVISION}" != "${DEPLOY_TARGET_REVISION}" ]]; then
+  echo "Running image revision ${DEPLOYED_REVISION:-unknown} does not match pulled image ${DEPLOY_TARGET_REVISION}." >&2
+  false
+fi
+ROLLBACK_ARMED="false"
+write_deployment_state "success" "Новая версия запущена и прошла автоматические проверки." "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+cleanup_docker_artifacts
 VERSION_TO_RECORD="${DEPLOYED_REVISION:-$(remote_commit_sha || true)}"
 write_installed_version "${VERSION_TO_RECORD}"
 mkdir -p /var/cache/remnawave-cabinet 2>/dev/null || true

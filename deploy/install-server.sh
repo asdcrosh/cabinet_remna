@@ -10,6 +10,8 @@ INSTALL_DIR="${INSTALL_DIR:-/opt/remnawave-cabinet}"
 COMPOSE_FILE="${INSTALL_DIR}/docker-compose.yml"
 ENV_FILE="${INSTALL_DIR}/.env"
 VERSION_FILE="${INSTALL_DIR}/.cabinet-version"
+STATE_DIR="${CABINET_STATE_DIR:-${INSTALL_DIR}/state}"
+DEPLOY_STATE_FILE="${STATE_DIR}/deployment.json"
 LEGACY_ENV_FILE="${INSTALL_DIR}/.env.production"
 DEFAULT_CABINET_IMAGE="ghcr.io/asdcrosh/cabinet_remna:latest"
 TTY_DEVICE="${TTY_DEVICE:-/dev/tty}"
@@ -78,7 +80,8 @@ running_app_revision() {
 }
 
 echo "Preparing deployment files in ${INSTALL_DIR}..."
-mkdir -p "${INSTALL_DIR}"
+mkdir -p "${INSTALL_DIR}" "${STATE_DIR}"
+chmod 755 "${STATE_DIR}" 2>/dev/null || true
 curl -fsSL "${COMPOSE_URL}" -o "${COMPOSE_FILE}"
 curl -fsSL "${CABINETCTL_URL}" -o "${CABINETCTL_TEMP}"
 install -m 755 "${CABINETCTL_TEMP}" "${CABINETCTL_PATH}"
@@ -624,6 +627,28 @@ wait_for_app_container() {
   return 1
 }
 
+wait_for_app_health() {
+  local bind_address app_port health_token
+  bind_address="$(read_env_value CABINET_APP_BIND || true)"
+  app_port="$(read_env_value CABINET_APP_PORT || true)"
+  health_token="$(read_env_value HEALTHCHECK_TOKEN || true)"
+  bind_address="${bind_address:-127.0.0.1}"
+  [[ "${bind_address}" == "0.0.0.0" ]] && bind_address="127.0.0.1"
+  app_port="${app_port:-3000}"
+
+  echo "Checking local health on ${bind_address}:${app_port}..."
+  for _ in $(seq 1 60); do
+    if curl -fsS --connect-timeout 2 --max-time 5 \
+      -H "x-healthcheck-token: ${health_token}" \
+      "http://${bind_address}:${app_port}/api/health" >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 2
+  done
+  echo "Application health-check did not pass in time."
+  return 1
+}
+
 bootstrap_superuser() {
   local email="${SUPERUSER_EMAIL:-}"
   local password="${SUPERUSER_PASSWORD:-}"
@@ -866,7 +891,34 @@ CABINET_ENV_FILE="${ENV_FILE}" "${COMPOSE[@]}" up -d --remove-orphans
 
 wait_for_app_container
 bootstrap_superuser
-write_installed_version "$(running_app_revision || remote_commit_sha || true)"
+wait_for_app_health
+INSTALLED_REVISION="$(running_app_revision || remote_commit_sha || true)"
+write_installed_version "${INSTALLED_REVISION}"
+DEPLOY_STATE_PATH="${DEPLOY_STATE_FILE}" DEPLOY_REVISION="${INSTALLED_REVISION}" python3 <<'PY'
+import json
+import os
+from datetime import datetime, timezone
+from pathlib import Path
+
+now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+path = Path(os.environ["DEPLOY_STATE_PATH"])
+payload = {
+    "status": "success",
+    "startedAt": now,
+    "finishedAt": now,
+    "previousRevision": None,
+    "targetRevision": os.environ.get("DEPLOY_REVISION") or None,
+    "deployedRevision": os.environ.get("DEPLOY_REVISION") or None,
+    "rollbackRevision": None,
+    "message": "Первичная установка завершена и прошла локальный health-check.",
+    "migrations": "ok",
+    "health": {"local": "ok", "public": "skipped"},
+}
+temporary = path.with_suffix(".tmp")
+temporary.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n")
+temporary.chmod(0o644)
+temporary.replace(path)
+PY
 mkdir -p /var/cache/remnawave-cabinet 2>/dev/null || true
 printf '%s|%s\n' "$(date +%s)" latest >/var/cache/remnawave-cabinet/update-status 2>/dev/null || true
 

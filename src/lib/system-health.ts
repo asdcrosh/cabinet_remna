@@ -7,9 +7,10 @@ import { checkPlategaConnection } from '@/lib/platega'
 import { getRemnashopIntegrationStatus } from '@/lib/remnashop-sync'
 import { getWatchConfig } from '@/lib/watch-config'
 import { getWorkerHeartbeat, type WorkerHeartbeatName } from '@/lib/worker-health'
+import { getDeploymentHealthSnapshot } from '@/lib/deployment-health'
 
 export type SystemHealthStatus = 'ok' | 'warn' | 'error' | 'off'
-export type SystemHealthCategory = 'core' | 'payments' | 'sync' | 'workers' | 'communications' | 'watch' | 'backups'
+export type SystemHealthCategory = 'deployment' | 'core' | 'payments' | 'sync' | 'workers' | 'communications' | 'watch' | 'backups'
 
 export interface SystemHealthMetric {
   label: string
@@ -64,6 +65,7 @@ function check(
 }
 
 function categoryForCheck(id: string): SystemHealthCategory {
+  if (id.startsWith('deployment-')) return 'deployment'
   if (['payment-overview', 'yookassa', 'payanyway', 'platega'].includes(id)) return 'payments'
   if (['remnawave', 'remnashop', 'provisioning-queue', 'sync-events'].includes(id)) return 'sync'
   if (id.endsWith('-worker') || id === 'broadcast-backlog') return 'workers'
@@ -71,6 +73,93 @@ function categoryForCheck(id: string): SystemHealthCategory {
   if (id === 'watch') return 'watch'
   if (['backup', 's3'].includes(id)) return 'backups'
   return 'core'
+}
+
+function shortRevision(revision: string | null | undefined) {
+  return revision ? revision.slice(0, 7) : 'неизвестно'
+}
+
+async function checkDeployment() {
+  const snapshot = await getDeploymentHealthSnapshot()
+  const { build, remoteRevision, remoteError, deployment, migration } = snapshot
+  const updateAvailable = Boolean(build.revision && remoteRevision && build.revision !== remoteRevision)
+  const buildStatus: SystemHealthStatus = !build.revision ? 'warn' : updateAvailable ? 'warn' : 'ok'
+  const buildMessage = !build.revision
+    ? 'Версия запущенного образа не определена'
+    : updateAvailable
+      ? `Доступно обновление ${shortRevision(remoteRevision)}`
+      : 'Запущена актуальная версия'
+  const buildDetails = [
+    build.image ? `Образ: ${build.image}` : undefined,
+    build.createdAt ? `Сборка: ${build.createdAt}` : undefined,
+    remoteError ? `Проверка latest: ${remoteError}` : undefined,
+  ].filter(Boolean).join('. ')
+
+  const buildCheck = check(
+    'deployment-build',
+    'Версия приложения',
+    buildStatus,
+    buildMessage,
+    buildDetails || undefined,
+    {
+      metrics: [
+        { label: 'Запущено', value: shortRevision(build.revision) },
+        { label: 'Доступно', value: shortRevision(remoteRevision), tone: updateAvailable ? 'warning' : 'neutral' },
+      ],
+    }
+  )
+
+  const migrationStatus: SystemHealthStatus = migration.status === 'ok'
+    ? 'ok'
+    : migration.status === 'error'
+      ? 'error'
+      : 'warn'
+  const migrationMessage = migration.status === 'ok'
+    ? 'Схема базы актуальна'
+    : migration.failed.length > 0
+      ? `Не завершены миграции: ${migration.failed.length}`
+      : migration.missing.length > 0
+        ? `Не применены миграции: ${migration.missing.length}`
+        : 'Статус миграций не определён'
+  const migrationDetails = migration.details
+    || (migration.failed.length > 0 ? `С ошибкой: ${migration.failed.join(', ')}` : undefined)
+    || (migration.missing.length > 0 ? `Ожидают: ${migration.missing.join(', ')}` : undefined)
+  const migrationCheck = check('deployment-migrations', 'Миграции базы', migrationStatus, migrationMessage, migrationDetails, {
+    metrics: [
+      { label: 'Применено', value: String(migration.applied), tone: migration.status === 'ok' ? 'positive' : 'neutral' },
+      { label: 'В образе', value: String(migration.expected) },
+    ],
+  })
+
+  let deploymentStatus: SystemHealthStatus = 'warn'
+  let deploymentMessage = 'История обновлений ещё не записана'
+  let deploymentDetails: string | undefined
+  if (deployment) {
+    deploymentStatus = deployment.status === 'success'
+      ? 'ok'
+      : deployment.status === 'deploying'
+        ? 'warn'
+        : 'error'
+    deploymentMessage = deployment.status === 'success'
+      ? `Последнее обновление успешно: ${shortRevision(deployment.deployedRevision)}`
+      : deployment.status === 'deploying'
+        ? `Обновление выполняется: ${shortRevision(deployment.targetRevision)}`
+        : deployment.status === 'rolled_back'
+          ? `Обновление отменено, восстановлена ${shortRevision(deployment.rollbackRevision)}`
+          : 'Последнее обновление завершилось ошибкой'
+    deploymentDetails = [
+      deployment.message,
+      deployment.finishedAt ? `Завершено: ${deployment.finishedAt}` : undefined,
+      deployment.health?.local ? `Локальный health-check: ${deployment.health.local}` : undefined,
+      deployment.health?.public ? `Публичный health-check: ${deployment.health.public}` : undefined,
+    ].filter(Boolean).join('. ')
+  }
+
+  return [
+    buildCheck,
+    migrationCheck,
+    check('deployment-result', 'Последнее развёртывание', deploymentStatus, deploymentMessage, deploymentDetails),
+  ]
 }
 
 function actionForCheck(id: string) {
@@ -529,7 +618,8 @@ async function checkSyncEventsBacklog() {
 
 export async function getSystemHealth(options: { sendEmail?: boolean } = {}): Promise<SystemHealthReport> {
   const checkedAt = nowIso()
-  const checks = await Promise.all([
+  const [deploymentChecks, ...operationalChecks] = await Promise.all([
+    checkDeployment(),
     checkDatabase(),
     checkPaymentOverview(),
     checkRemnawave(),
@@ -549,6 +639,7 @@ export async function getSystemHealth(options: { sendEmail?: boolean } = {}): Pr
     checkBroadcastBacklog(),
     checkSyncEventsBacklog(),
   ])
+  const checks = [...deploymentChecks, ...operationalChecks]
 
   return {
     ok: checks.every((item) => item.status !== 'error'),
