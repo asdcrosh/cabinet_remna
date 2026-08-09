@@ -387,20 +387,15 @@ textarea:focus {
   position: absolute;
   top: 0;
   right: 0;
-  width: 4.25rem;
-  height: 4.25rem;
+  width: 4rem;
+  height: 3px;
   content: "";
-  background: linear-gradient(135deg, transparent 49%, var(--app-signal) 50%);
+  background: linear-gradient(90deg, var(--app-accent), var(--app-signal));
   pointer-events: none;
 }
 
 .access-pass--expired {
   border-left-color: var(--app-accent) !important;
-}
-
-.access-overview::after {
-  width: 5.5rem;
-  height: 5.5rem;
 }
 
 .access-overview__top,
