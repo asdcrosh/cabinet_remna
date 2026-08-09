@@ -602,6 +602,7 @@ model Payment {
   referralRewardTriggered   ReferralReward?
   welcomeBonusRedemptions   WelcomeBonusRedemption[]
   refunds                   PaymentRefund[]
+  events                    PaymentEvent[]
 
   @@unique([provider, externalPaymentId])
   @@unique([userId, checkoutKey])
@@ -628,6 +629,44 @@ enum PaymentStatus {
   SUCCEEDED
   CANCELED
   REFUNDED
+}
+
+model PaymentEvent {
+  id        String             @id @default(cuid())
+  paymentId String
+  stage     PaymentEventStage
+  status    PaymentEventStatus @default(INFO)
+  source    String
+  message   String
+  details   Json?
+  dedupeKey String?            @unique
+  attempts  Int                @default(1)
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+
+  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+
+  @@index([paymentId, createdAt])
+  @@index([status, updatedAt])
+}
+
+enum PaymentEventStage {
+  ORDER
+  PROVIDER
+  WEBHOOK
+  PAYMENT
+  PROVISIONING
+  SUBSCRIPTION
+  REMNASHOP
+  NOTIFICATION
+  REFUND
+}
+
+enum PaymentEventStatus {
+  INFO
+  SUCCESS
+  WARNING
+  ERROR
 }
 
 model PaymentRefund {

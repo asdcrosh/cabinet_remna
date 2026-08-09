@@ -10,6 +10,7 @@ import {
 } from '@/lib/payanyway'
 import { buildPaymentServiceName } from '@/lib/payment-service-name'
 import { provisionPaymentSubscription } from '@/lib/provisioning'
+import { paymentErrorDetails, recordPaymentEvent } from '@/lib/payment-events'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -60,6 +61,15 @@ async function handlePayAnyWayRequest(params: URLSearchParams) {
     logWarn('webhook.payanyway.payment_not_found', { transactionId: callback.transactionId })
     return payAnyWayResponse('FAIL', 404)
   }
+  await recordPaymentEvent({
+    paymentId: payment.id,
+    stage: 'WEBHOOK',
+    status: 'INFO',
+    source: 'payanyway-webhook',
+    message: 'Получено и проверено уведомление PayAnyWay',
+    details: { externalPaymentId: callback.operationId },
+    dedupeKey: `webhook-${callback.operationId}`,
+  })
   if (payment.amountKopecks !== verification.amountKopecks) {
     logWarn('webhook.payanyway.amount_mismatch', {
       paymentId: payment.id,
@@ -114,6 +124,14 @@ async function handlePayAnyWayRequest(params: URLSearchParams) {
         }),
       ])
       await cancelOtherPendingPaymentsForUser(payment.userId, payment.id)
+      await recordPaymentEvent({
+        paymentId: payment.id,
+        stage: 'PAYMENT',
+        status: 'SUCCESS',
+        source: 'payanyway-webhook',
+        message: 'Оплата подтверждена PayAnyWay',
+        dedupeKey: 'payment-succeeded',
+      })
     } catch (error) {
       logError('webhook.payanyway.payment_update_failed', error, { paymentId: payment.id })
       return payAnyWayResponse('FAIL', 500)
@@ -146,6 +164,15 @@ async function handlePayAnyWayRequest(params: URLSearchParams) {
       data: { provisioningError: message.slice(0, 1000) },
     }).catch(() => null)
     await notifyPaymentStuck(payment.id, 'Платёж прошёл, но подписка пока не выдана автоматически.')
+    await recordPaymentEvent({
+      paymentId: payment.id,
+      stage: 'PROVISIONING',
+      status: 'ERROR',
+      source: 'payanyway-webhook',
+      message: 'Выдача после оплаты отложена до автоматического повтора',
+      details: paymentErrorDetails(error),
+      dedupeKey: 'webhook-provisioning-deferred',
+    })
     // Оплату уже надёжно записали. Внутренний worker выполнит повторную выдачу.
   }
 

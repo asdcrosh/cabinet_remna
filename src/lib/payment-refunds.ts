@@ -1,4 +1,5 @@
 import { prisma } from './prisma'
+import { recordPaymentEvent } from './payment-events'
 
 interface RecordSucceededRefundInput {
   paymentId: string
@@ -13,7 +14,7 @@ export async function recordSucceededRefund(input: RecordSucceededRefundInput) {
     throw new Error('Refund amount must be a positive integer')
   }
 
-  return prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     await tx.paymentRefund.upsert({
       where: { providerRefundId: input.providerRefundId },
       create: {
@@ -50,4 +51,21 @@ export async function recordSucceededRefund(input: RecordSucceededRefundInput) {
 
     return { fullyRefunded, refundedAmountKopecks }
   })
+
+  await recordPaymentEvent({
+    paymentId: input.paymentId,
+    stage: 'REFUND',
+    status: result.fullyRefunded ? 'WARNING' : 'INFO',
+    source: 'refund',
+    message: result.fullyRefunded ? 'Полный возврат подтверждён' : 'Частичный возврат подтверждён',
+    details: {
+      providerRefundId: input.providerRefundId,
+      amountKopecks: input.amountKopecks,
+      refundedAmountKopecks: result.refundedAmountKopecks,
+      fullyRefunded: result.fullyRefunded,
+    },
+    dedupeKey: `refund-${input.providerRefundId}`,
+  })
+
+  return result
 }

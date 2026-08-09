@@ -17,6 +17,7 @@ import { getPlanAudienceContext, isPlanAvailableForUser } from '@/lib/plan-acces
 import { reconcileStalePendingPaymentsForUser } from '@/lib/payment-sync'
 import { logError } from '@/lib/logger'
 import { buildPaymentServiceName } from '@/lib/payment-service-name'
+import { paymentErrorDetails, recordPaymentEvent } from '@/lib/payment-events'
 
 export const runtime = 'nodejs'
 
@@ -158,6 +159,16 @@ export const POST = withAuth(async (req: Request) => {
       throw e
     }
 
+    await recordPaymentEvent({
+      paymentId: promoPayment.id,
+      stage: 'ORDER',
+      status: 'SUCCESS',
+      source: 'payment-create',
+      message: 'Бесплатный ознакомительный заказ создан',
+      details: { provider: 'LOCAL', amountKopecks: 0, planId: plan.id },
+      dedupeKey: 'order-created',
+    })
+
     return provisionPromoPayment(promoPayment, user, plan)
   }
 
@@ -252,6 +263,21 @@ export const POST = withAuth(async (req: Request) => {
     throw e
   }
 
+  await recordPaymentEvent({
+    paymentId: localPayment.id,
+    stage: 'ORDER',
+    status: 'SUCCESS',
+    source: 'payment-create',
+    message: 'Заказ создан и ожидает перехода к провайдеру',
+    details: {
+      provider,
+      planId: plan.id,
+      amountKopecks: localPayment.amountKopecks,
+      discountKopecks: localPayment.discountKopecks,
+    },
+    dedupeKey: 'order-created',
+  })
+
   const amountRub = localPayment.amountKopecks / 100
   const baseUrl = getAppUrl()
   const returnUrl = `${baseUrl}/dashboard/billing?paid=1&payment=${localPayment.id}`
@@ -263,6 +289,15 @@ export const POST = withAuth(async (req: Request) => {
       await prisma.payment.update({
         where: { id: localPayment.id },
         data: { confirmationUrl },
+      })
+      await recordPaymentEvent({
+        paymentId: localPayment.id,
+        stage: 'PROVIDER',
+        status: 'SUCCESS',
+        source: 'payment-create',
+        message: 'Ссылка PayAnyWay подготовлена',
+        details: { provider },
+        dedupeKey: 'provider-checkout-created',
       })
       return NextResponse.json({
         confirmationUrl,
@@ -305,6 +340,15 @@ export const POST = withAuth(async (req: Request) => {
           providerStatus: payment.status,
           confirmationUrl: payment.url,
         },
+      })
+      await recordPaymentEvent({
+        paymentId: localPayment.id,
+        stage: 'PROVIDER',
+        status: 'SUCCESS',
+        source: 'payment-create',
+        message: 'Platega создала платёж и ссылку на оплату',
+        details: { provider, providerStatus: payment.status, externalPaymentId: payment.transactionId },
+        dedupeKey: 'provider-checkout-created',
       })
       return NextResponse.json({
         confirmationUrl: payment.url,
@@ -370,6 +414,15 @@ export const POST = withAuth(async (req: Request) => {
       providerStatus: payment.status,
       confirmationUrl: payment.confirmation?.confirmation_url ?? null,
     },
+  })
+  await recordPaymentEvent({
+    paymentId: localPayment.id,
+    stage: 'PROVIDER',
+    status: 'SUCCESS',
+    source: 'payment-create',
+    message: 'ЮKassa создала платёж и ссылку на оплату',
+    details: { provider, providerStatus: payment.status, externalPaymentId: payment.id },
+    dedupeKey: 'provider-checkout-created',
   })
 
   return NextResponse.json({
@@ -474,6 +527,15 @@ async function cancelFailedLocalPayment(paymentId: string, message: string) {
       data: { status: 'CANCELED' },
     }),
   ])
+  await recordPaymentEvent({
+    paymentId,
+    stage: 'PROVIDER',
+    status: 'ERROR',
+    source: 'payment-create',
+    message: 'Провайдер не создал платёж',
+    details: paymentErrorDetails(message),
+    dedupeKey: 'provider-checkout-failed',
+  })
 }
 
 async function provisionPromoPayment(
@@ -488,6 +550,15 @@ async function provisionPromoPayment(
     activeInternalSquads: string[]
   }
 ) {
+  await recordPaymentEvent({
+    paymentId: payment.id,
+    stage: 'ORDER',
+    status: 'SUCCESS',
+    source: 'payment-create',
+    message: 'Ознакомительный заказ принят в обработку',
+    details: { provider: payment.provider, amountKopecks: payment.amountKopecks, planId: plan.id },
+    dedupeKey: 'order-created',
+  })
   try {
     await provisionPaymentSubscription({
       userId: user.id,

@@ -7,6 +7,7 @@ import { verifyPlategaCallbackHeaders } from '@/lib/platega'
 import { cancelOtherPendingPaymentsForUser, syncPaymentProvisioning } from '@/lib/payment-sync'
 import { recordSucceededRefund } from '@/lib/payment-refunds'
 import { terminateUserSubscription } from '@/lib/subscription-termination'
+import { recordPaymentEvent } from '@/lib/payment-events'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -52,6 +53,16 @@ export async function POST(request: Request) {
     logWarn('webhook.platega.payment_not_found', { transactionId: callback.id })
     return NextResponse.json({ error: 'Payment not found' }, { status: 503 })
   }
+
+  await recordPaymentEvent({
+    paymentId: payment.id,
+    stage: 'WEBHOOK',
+    status: 'INFO',
+    source: 'platega-webhook',
+    message: `Получено уведомление Platega: ${callback.status}`,
+    details: { providerStatus: callback.status, externalPaymentId: callback.id },
+    dedupeKey: `webhook-${callback.status}`,
+  })
 
   const amountKopecks = Math.round(callback.amount * 100)
   if (callback.currency.toUpperCase() !== 'RUB' || amountKopecks !== payment.amountKopecks) {
@@ -102,6 +113,14 @@ export async function POST(request: Request) {
         }),
       ])
       await notifyPaymentCanceled(payment.id)
+      await recordPaymentEvent({
+        paymentId: payment.id,
+        stage: 'PAYMENT',
+        status: 'WARNING',
+        source: 'platega-webhook',
+        message: 'Платёж отменён Platega',
+        dedupeKey: 'payment-canceled',
+      })
     }
     return new NextResponse(null, { status: 200 })
   }
@@ -126,6 +145,14 @@ export async function POST(request: Request) {
       }),
     ])
     await cancelOtherPendingPaymentsForUser(payment.userId, payment.id)
+    await recordPaymentEvent({
+      paymentId: payment.id,
+      stage: 'PAYMENT',
+      status: 'SUCCESS',
+      source: 'platega-webhook',
+      message: 'Оплата подтверждена Platega',
+      dedupeKey: 'payment-succeeded',
+    })
   }
 
   const syncResult = await syncPaymentProvisioning({

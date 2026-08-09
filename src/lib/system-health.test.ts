@@ -3,6 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 const mocks = vi.hoisted(() => ({
   queryRaw: vi.fn(),
   paymentCount: vi.fn(),
+  provisioningJobCount: vi.fn(),
+  paymentEventCount: vi.fn(),
   broadcastCount: vi.fn(),
   syncCount: vi.fn(),
   watchIncidentCount: vi.fn(),
@@ -19,6 +21,8 @@ vi.mock('@/lib/prisma', () => ({
   prisma: {
     $queryRaw: mocks.queryRaw,
     payment: { count: mocks.paymentCount },
+    provisioningJob: { count: mocks.provisioningJobCount },
+    paymentEvent: { count: mocks.paymentEventCount },
     broadcastDelivery: { count: mocks.broadcastCount },
     syncEvent: { count: mocks.syncCount },
     watchIncident: { count: mocks.watchIncidentCount },
@@ -81,6 +85,8 @@ beforeEach(() => {
     if (where.status === 'PENDING') return 1
     return 0
   })
+  mocks.provisioningJobCount.mockReset().mockResolvedValue(0)
+  mocks.paymentEventCount.mockReset().mockResolvedValue(0)
   mocks.broadcastCount.mockReset().mockResolvedValue(0)
   mocks.syncCount.mockReset().mockResolvedValue(0)
   mocks.watchIncidentCount.mockReset().mockResolvedValue(0)
@@ -130,6 +136,8 @@ describe('getSystemHealth', () => {
       { label: 'Ожидают', value: '1', tone: 'warning' },
       { label: 'Отменено', value: '0' },
       { label: 'Возвраты', value: '0' },
+      { label: 'Довыдача', value: '0', tone: 'neutral' },
+      { label: 'Ошибки цепочки', value: '0', tone: 'neutral' },
     ])
   })
 

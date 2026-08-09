@@ -5,6 +5,7 @@ import { grantPaymentBonusBoxAttempts, grantReferralBonusBoxAttemptsForPayment }
 import { notifyPaymentSucceeded } from './notifications'
 import { syncCabinetPaymentToRemnashopBestEffort } from './remnashop-reverse-sync'
 import { logError } from './logger'
+import { paymentErrorDetails, recordPaymentEvent } from './payment-events'
 
 export interface ProvisionPaymentSubscriptionInput extends EnsureSubscriptionInput {
   paymentId: string
@@ -37,7 +38,15 @@ export async function provisionPaymentSubscription(input: ProvisionPaymentSubscr
 
     await settleReferralRewards(input.paymentId, input.userId)
     await syncCabinetPaymentToRemnashopBestEffort(input.paymentId)
-    await notifyPaymentSucceeded(input.paymentId)
+    await notifyPaymentSuccessBestEffort(input.paymentId)
+    await recordPaymentEvent({
+      paymentId: input.paymentId,
+      stage: 'PROVISIONING',
+      status: 'SUCCESS',
+      source: 'provisioning',
+      message: 'Подписка уже была выдана, повторная операция не потребовалась',
+      dedupeKey: 'provisioning-idempotent',
+    })
 
     return {
       subscription: payment.subscription,
@@ -65,6 +74,16 @@ export async function provisionPaymentSubscription(input: ProvisionPaymentSubscr
     },
   })
 
+  await recordPaymentEvent({
+    paymentId: input.paymentId,
+    stage: 'PROVISIONING',
+    status: 'INFO',
+    source: 'provisioning',
+    message: `Запущена выдача подписки, попытка ${job.attempts}`,
+    details: { attempt: job.attempts },
+    dedupeKey: `provisioning-attempt-${job.attempts}`,
+  })
+
   try {
     const result = await ensureRemnawaveSubscription(input)
     await prisma.provisioningJob.update({
@@ -78,7 +97,16 @@ export async function provisionPaymentSubscription(input: ProvisionPaymentSubscr
     })
     await settleReferralRewards(input.paymentId, input.userId)
     await syncCabinetPaymentToRemnashopBestEffort(input.paymentId)
-    await notifyPaymentSucceeded(input.paymentId)
+    await notifyPaymentSuccessBestEffort(input.paymentId)
+    await recordPaymentEvent({
+      paymentId: input.paymentId,
+      stage: 'PROVISIONING',
+      status: 'SUCCESS',
+      source: 'provisioning',
+      message: 'Подписка успешно выдана',
+      details: { attempt: job.attempts },
+      dedupeKey: 'provisioning-succeeded',
+    })
     return { ...result, jobStatus: 'SUCCEEDED' as const }
   } catch (e) {
     const message = e instanceof Error ? e.message : 'subscription provisioning failed'
@@ -91,6 +119,15 @@ export async function provisionPaymentSubscription(input: ProvisionPaymentSubscr
         lockedAt: null,
         lastError: message.slice(0, 1000),
       },
+    })
+    await recordPaymentEvent({
+      paymentId: input.paymentId,
+      stage: 'PROVISIONING',
+      status: 'ERROR',
+      source: 'provisioning',
+      message: 'Не удалось выдать подписку, назначен автоматический повтор',
+      details: paymentErrorDetails(e, { attempt: job.attempts, nextRetryAt }),
+      dedupeKey: `provisioning-failed-${job.attempts}`,
     })
     throw e
   }
@@ -107,6 +144,26 @@ async function settleReferralRewards(paymentId: string, userId: string) {
       paymentId,
       userId,
       message: error instanceof Error ? error.message : 'unknown error',
+    })
+  }
+}
+
+async function notifyPaymentSuccessBestEffort(paymentId: string) {
+  try {
+    await notifyPaymentSucceeded(paymentId)
+  } catch (error) {
+    logError('provisioning.payment_notification_failed', error, {
+      paymentId,
+      message: error instanceof Error ? error.message : 'unknown error',
+    })
+    await recordPaymentEvent({
+      paymentId,
+      stage: 'NOTIFICATION',
+      status: 'ERROR',
+      source: 'provisioning',
+      message: 'Подписка выдана, но уведомление не отправлено',
+      details: paymentErrorDetails(error),
+      dedupeKey: 'notification-payment-success-failed',
     })
   }
 }

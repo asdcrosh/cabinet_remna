@@ -110,6 +110,7 @@ export async function notifyUser(input: NotifyUserInput) {
 }
 
 export async function notifyPaymentSucceeded(paymentId: string) {
+  const { recordPaymentEvent } = await import('./payment-events')
   const payment = await prisma.payment.findUnique({
     where: { id: paymentId },
     include: {
@@ -216,9 +217,18 @@ export async function notifyPaymentSucceeded(paymentId: string) {
     actionHref: '/dashboard/admin/payments',
     actionLabel: 'Открыть платежи',
   })
+  await recordPaymentEvent({
+    paymentId,
+    stage: 'NOTIFICATION',
+    status: 'SUCCESS',
+    source: 'notifications',
+    message: 'Уведомления об успешной оплате обработаны',
+    dedupeKey: 'notification-payment-success',
+  })
 }
 
 export async function notifyPaymentCanceled(paymentId: string, reason = 'Платёж отменён или не был завершён вовремя.') {
+  const { recordPaymentEvent } = await import('./payment-events')
   const payment = await prisma.payment.findUnique({
     where: { id: paymentId },
     include: {
@@ -264,9 +274,18 @@ export async function notifyPaymentCanceled(paymentId: string, reason = 'Пла�
     actionHref: '/dashboard/admin/payments',
     actionLabel: 'Открыть платежи',
   })
+  await recordPaymentEvent({
+    paymentId,
+    stage: 'NOTIFICATION',
+    status: 'SUCCESS',
+    source: 'notifications',
+    message: 'Уведомления об отмене платежа обработаны',
+    dedupeKey: 'notification-payment-canceled',
+  })
 }
 
 export async function notifyPaymentStuck(paymentId: string, reason = 'Платёж требует проверки.') {
+  const { recordPaymentEvent } = await import('./payment-events')
   const payment = await prisma.payment.findUnique({
     where: { id: paymentId },
     select: { id: true, userId: true, plan: { select: { name: true } }, user: { select: { name: true } } },
@@ -305,6 +324,15 @@ export async function notifyPaymentStuck(paymentId: string, reason = 'Платё
     entityId: payment.id,
     actionHref: '/dashboard/admin/payments',
     actionLabel: 'Проверить',
+  })
+  await recordPaymentEvent({
+    paymentId,
+    stage: 'NOTIFICATION',
+    status: 'WARNING',
+    source: 'notifications',
+    message: 'Пользователь и администратор уведомлены о задержке выдачи',
+    details: { reason },
+    dedupeKey: 'notification-payment-stuck',
   })
 }
 

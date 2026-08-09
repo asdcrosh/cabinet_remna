@@ -258,19 +258,25 @@ async function checkPaymentOverview() {
   const cancelAfterSeconds = positiveInteger(env('PAYMENT_CANCEL_PENDING_AFTER_SECONDS'), 600)
   const staleBefore = new Date(Date.now() - cancelAfterSeconds * 1000)
   try {
-    const [succeeded, pending, canceled, refunded, stale, unprovisioned] = await Promise.all([
+    const [succeeded, pending, canceled, refunded, stale, unprovisioned, failedJobs, eventErrors] = await Promise.all([
       prisma.payment.count({ where: { status: 'SUCCEEDED', createdAt: { gte: since } } }),
       prisma.payment.count({ where: { status: 'PENDING', createdAt: { gte: since } } }),
       prisma.payment.count({ where: { status: 'CANCELED', createdAt: { gte: since } } }),
       prisma.payment.count({ where: { status: 'REFUNDED', createdAt: { gte: since } } }),
       prisma.payment.count({ where: { status: 'PENDING', createdAt: { lt: staleBefore } } }),
       prisma.payment.count({ where: { status: 'SUCCEEDED', subscriptionProvisionedAt: null } }),
+      prisma.provisioningJob.count({ where: { status: 'FAILED' } }),
+      prisma.paymentEvent.count({ where: { status: 'ERROR', updatedAt: { gte: since } } }),
     ])
-    const status: SystemHealthStatus = unprovisioned > 0 ? 'error' : stale > 0 ? 'warn' : 'ok'
-    const message = unprovisioned > 0
-      ? `Не выдано подписок: ${unprovisioned}`
-      : stale > 0
-        ? `Зависших платежей: ${stale}`
+    const status: SystemHealthStatus = unprovisioned > 0 || failedJobs > 0
+      ? 'error'
+      : stale > 0 || eventErrors > 0
+        ? 'warn'
+        : 'ok'
+    const message = unprovisioned > 0 || failedJobs > 0
+      ? `Нужна довыдача: ${Math.max(unprovisioned, failedJobs)}`
+      : stale > 0 || eventErrors > 0
+        ? `Требуют проверки: ${stale + eventErrors}`
         : 'Критичных операций нет'
     return check('payment-overview', 'Платежи за 24 часа', status, message, undefined, {
       metrics: [
@@ -278,6 +284,8 @@ async function checkPaymentOverview() {
         { label: 'Ожидают', value: String(pending), tone: pending > 0 ? 'warning' : 'neutral' },
         { label: 'Отменено', value: String(canceled) },
         { label: 'Возвраты', value: String(refunded) },
+        { label: 'Довыдача', value: String(Math.max(unprovisioned, failedJobs)), tone: failedJobs > 0 ? 'negative' : 'neutral' },
+        { label: 'Ошибки цепочки', value: String(eventErrors), tone: eventErrors > 0 ? 'warning' : 'neutral' },
       ],
     })
   } catch (error) {

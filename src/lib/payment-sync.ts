@@ -5,6 +5,7 @@ import { getPlategaTransaction, type PlategaTransaction } from './platega'
 import { provisionPaymentSubscription } from './provisioning'
 import { cancelPayment, getPayment } from './yookassa'
 import type { PaymentStatus as YooKassaPaymentStatus } from './yookassa'
+import { paymentErrorDetails, recordPaymentEvent } from './payment-events'
 
 const DEFAULT_PENDING_TTL_SECONDS = 600
 
@@ -34,6 +35,15 @@ export async function syncPaymentProvisioning(input: {
   })
 
   if (!payment) return { ok: true, status: 'not_found', provisioned: false }
+  await recordPaymentEvent({
+    paymentId: payment.id,
+    stage: 'PAYMENT',
+    status: 'INFO',
+    source: 'payment-sync',
+    message: 'Запущена проверка состояния платежа',
+    details: { provider: payment.provider, currentStatus: payment.status },
+    dedupeKey: 'sync-started',
+  })
   if (payment.status === 'CANCELED' || payment.status === 'REFUNDED') {
     return { ok: true, status: 'canceled', provisioned: false }
   }
@@ -57,6 +67,15 @@ export async function syncPaymentProvisioning(input: {
         where: { id: payment.id },
         data: { provisioningError: message.slice(0, 1000) },
       })
+      await recordPaymentEvent({
+        paymentId: payment.id,
+        stage: 'PROVIDER',
+        status: 'ERROR',
+        source: 'payment-sync',
+        message: 'Не удалось получить статус платежа Platega',
+        details: paymentErrorDetails(e),
+        dedupeKey: 'provider-status-check-failed',
+      })
       return { ok: false, status: 'check_failed', provisioned: false, error: message }
     }
 
@@ -72,6 +91,14 @@ export async function syncPaymentProvisioning(input: {
         }),
       ])
       await notifyPaymentCanceled(payment.id)
+      await recordPaymentEvent({
+        paymentId: payment.id,
+        stage: 'PAYMENT',
+        status: 'WARNING',
+        source: 'payment-sync',
+        message: 'Platega сообщила об отмене платежа',
+        dedupeKey: 'payment-canceled',
+      })
       return { ok: true, status: 'canceled', provisioned: false }
     }
 
@@ -113,6 +140,14 @@ export async function syncPaymentProvisioning(input: {
       }),
     ])
     await cancelOtherPendingPaymentsForUser(payment.userId, payment.id)
+    await recordPaymentEvent({
+      paymentId: payment.id,
+      stage: 'PAYMENT',
+      status: 'SUCCESS',
+      source: 'payment-sync',
+      message: 'Platega подтвердила оплату при сверке',
+      dedupeKey: 'payment-succeeded',
+    })
 
     if (payment.subscriptionProvisionedAt && payment.subscription) {
       return {
@@ -160,6 +195,15 @@ export async function syncPaymentProvisioning(input: {
       where: { id: payment.id },
       data: { provisioningError: message.slice(0, 1000) },
     })
+    await recordPaymentEvent({
+      paymentId: payment.id,
+      stage: 'PROVIDER',
+      status: 'ERROR',
+      source: 'payment-sync',
+      message: 'Не удалось получить статус платежа ЮKassa',
+      details: paymentErrorDetails(e),
+      dedupeKey: 'provider-status-check-failed',
+    })
     return { ok: false, status: 'check_failed', provisioned: false, error: message }
   }
 
@@ -175,6 +219,14 @@ export async function syncPaymentProvisioning(input: {
       }),
     ])
     await notifyPaymentCanceled(payment.id)
+    await recordPaymentEvent({
+      paymentId: payment.id,
+      stage: 'PAYMENT',
+      status: 'WARNING',
+      source: 'payment-sync',
+      message: 'ЮKassa сообщила об отмене платежа',
+      dedupeKey: 'payment-canceled',
+    })
 
     return { ok: true, status: 'canceled', provisioned: false }
   }
@@ -215,6 +267,14 @@ export async function syncPaymentProvisioning(input: {
     }),
   ])
   await cancelOtherPendingPaymentsForUser(payment.userId, payment.id)
+  await recordPaymentEvent({
+    paymentId: payment.id,
+    stage: 'PAYMENT',
+    status: 'SUCCESS',
+    source: 'payment-sync',
+    message: 'ЮKassa подтвердила оплату при сверке',
+    dedupeKey: 'payment-succeeded',
+  })
 
   if (payment.subscriptionProvisionedAt && payment.subscription) {
     return {
@@ -335,6 +395,15 @@ async function cancelLocalPayment(paymentId: string, yookassaStatus: YooKassaPay
       data: { status: 'CANCELED' },
     }),
   ])
+  await recordPaymentEvent({
+    paymentId,
+    stage: 'PAYMENT',
+    status: 'WARNING',
+    source: 'payment-sync',
+    message: 'Ожидавший платёж отменён',
+    details: { providerStatus: yookassaStatus ?? 'canceled' },
+    dedupeKey: 'payment-canceled',
+  })
 }
 
 export function getPendingPaymentTtlMs() {

@@ -13,6 +13,7 @@ import { assertYookassaWebhookSource } from '@/lib/yookassa-webhook'
 import { getResolvedPaymentProviderSettings } from '@/lib/payment-settings'
 import { recordSucceededRefund } from '@/lib/payment-refunds'
 import { terminateUserSubscription } from '@/lib/subscription-termination'
+import { paymentErrorDetails, recordPaymentEvent } from '@/lib/payment-events'
 
 export const runtime = 'nodejs'
 
@@ -74,6 +75,16 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true, notFound: true })
   }
 
+  await recordPaymentEvent({
+    paymentId: payment.id,
+    stage: 'WEBHOOK',
+    status: 'INFO',
+    source: 'yookassa-webhook',
+    message: `Получено уведомление ЮKassa: ${event.event}`,
+    details: { providerStatus: event.object.status, externalPaymentId: yookassaId },
+    dedupeKey: `webhook-${event.event}`,
+  })
+
   if (payment.status === 'SUCCEEDED' && payment.subscriptionProvisionedAt) {
     await prisma.promoCodeRedemption.updateMany({
       where: { paymentId: payment.id, status: 'PENDING' },
@@ -88,6 +99,15 @@ export async function POST(req: Request) {
     status = fresh.status
   } catch (e) {
     logError('webhook.get_payment_failed', e, { yookassaId })
+    await recordPaymentEvent({
+      paymentId: payment.id,
+      stage: 'PROVIDER',
+      status: 'WARNING',
+      source: 'yookassa-webhook',
+      message: 'Не удалось перепроверить статус в ЮKassa, использован статус webhook',
+      details: paymentErrorDetails(e),
+      dedupeKey: 'provider-status-check-failed',
+    })
   }
 
   if (status === 'succeeded') {
@@ -103,6 +123,14 @@ export async function POST(req: Request) {
     await prisma.promoCodeRedemption.updateMany({
       where: { paymentId: payment.id, status: 'PENDING' },
       data: { status: 'SUCCEEDED' },
+    })
+    await recordPaymentEvent({
+      paymentId: payment.id,
+      stage: 'PAYMENT',
+      status: 'SUCCESS',
+      source: 'yookassa-webhook',
+      message: 'Оплата подтверждена ЮKassa',
+      dedupeKey: 'payment-succeeded',
     })
 
     if (!payment.user || !payment.plan) {
@@ -148,6 +176,14 @@ export async function POST(req: Request) {
       data: { status: 'CANCELED' },
     })
     await notifyPaymentCanceled(payment.id)
+    await recordPaymentEvent({
+      paymentId: payment.id,
+      stage: 'PAYMENT',
+      status: 'WARNING',
+      source: 'yookassa-webhook',
+      message: 'Платёж отменён ЮKassa',
+      dedupeKey: 'payment-canceled',
+    })
     return NextResponse.json({ ok: true })
   }
 

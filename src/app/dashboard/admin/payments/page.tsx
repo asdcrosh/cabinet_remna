@@ -14,6 +14,7 @@ import { describeSyncError } from '@/lib/sync-error'
 import { paymentProviderLabel } from '@/lib/payment-provider-label'
 import type { PaymentProvider } from '@prisma/client'
 import { PaymentLiveSync } from '@/components/admin/payment-live-sync'
+import { PaymentTimelineButton } from '@/components/admin/payment-timeline-button'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Платежи — Админка' }
@@ -65,6 +66,8 @@ export default async function AdminPaymentsPage({
         user: { select: { id: true, email: true, name: true } },
         plan: true,
         subscription: true,
+        provisioningJob: true,
+        events: { orderBy: { updatedAt: 'desc' }, take: 50 },
       },
     }),
     prisma.payment.count({ where: { status: 'PENDING' } }),
@@ -229,7 +232,36 @@ export default async function AdminPaymentsPage({
                     </details>
                   ) : null}
                 </div>
-                <div className="grid border-t border-slate-200 pt-3 dark:border-white/[0.07] lg:justify-end lg:border-0 lg:pt-0">{action}</div>
+                <div className="grid grid-cols-2 gap-2 border-t border-slate-200 pt-3 dark:border-white/[0.07] lg:grid-cols-1 lg:justify-end lg:border-0 lg:pt-0">
+                  <PaymentTimelineButton
+                    paymentId={payment.id}
+                    provider={paymentProviderLabel(payment.provider)}
+                    providerStatus={payment.providerStatus}
+                    paymentStatus={payment.status}
+                    createdAt={payment.createdAt.toISOString()}
+                    paidAt={payment.paidAt?.toISOString() ?? null}
+                    provisionedAt={payment.subscriptionProvisionedAt?.toISOString() ?? null}
+                    remnashopSyncedAt={payment.remnashopSyncedAt?.toISOString() ?? null}
+                    job={payment.provisioningJob ? {
+                      status: payment.provisioningJob.status,
+                      attempts: payment.provisioningJob.attempts,
+                      nextRetryAt: payment.provisioningJob.nextRetryAt?.toISOString() ?? null,
+                      lastError: payment.provisioningJob.lastError,
+                    } : null}
+                    events={payment.events.map((event) => ({
+                      id: event.id,
+                      stage: event.stage,
+                      status: event.status,
+                      source: event.source,
+                      message: event.message,
+                      details: event.details,
+                      attempts: event.attempts,
+                      createdAt: event.createdAt.toISOString(),
+                      updatedAt: event.updatedAt.toISOString(),
+                    }))}
+                  />
+                  {action}
+                </div>
               </div>
             </article>
           )

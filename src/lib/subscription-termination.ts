@@ -4,6 +4,7 @@ import { prisma } from './prisma'
 import { remnawave, RemnawaveError } from './remnawave'
 import { removeRemnashopSubscription } from './remnashop-subscription-removal'
 import { markSyncFailed, markSyncSkipped, markSyncSucceeded } from './sync-events'
+import { paymentErrorDetails, recordPaymentEvent } from './payment-events'
 
 export type SubscriptionTerminationSource =
   | 'USER_REQUEST'
@@ -20,6 +21,17 @@ interface TerminateUserSubscriptionInput {
 }
 
 export async function terminateUserSubscription(input: TerminateUserSubscriptionInput) {
+  if (input.paymentId) {
+    await recordPaymentEvent({
+      paymentId: input.paymentId,
+      stage: 'SUBSCRIPTION',
+      status: 'INFO',
+      source: 'subscription-termination',
+      message: 'Начато отключение подписки',
+      details: { source: input.source },
+      dedupeKey: `termination-started-${input.source}`,
+    })
+  }
   const user = await prisma.user.findUnique({
     where: { id: input.userId },
     select: {
@@ -59,7 +71,20 @@ export async function terminateUserSubscription(input: TerminateUserSubscription
         remnawave.deleteAllUserDevices(remnawaveUuid, disabled.response.id)
       )
     } catch (error) {
-      if (!isRemnawaveUserMissing(error)) throw error
+      if (!isRemnawaveUserMissing(error)) {
+        if (input.paymentId) {
+          await recordPaymentEvent({
+            paymentId: input.paymentId,
+            stage: 'SUBSCRIPTION',
+            status: 'ERROR',
+            source: 'subscription-termination',
+            message: 'Remnawave не отключил подписку',
+            details: paymentErrorDetails(error, { source: input.source }),
+            dedupeKey: `termination-failed-${input.source}`,
+          })
+        }
+        throw error
+      }
     }
   }
 
@@ -138,6 +163,18 @@ export async function terminateUserSubscription(input: TerminateUserSubscription
     paymentId: input.paymentId,
     hadSubscription,
   })
+
+  if (input.paymentId) {
+    await recordPaymentEvent({
+      paymentId: input.paymentId,
+      stage: 'SUBSCRIPTION',
+      status: 'SUCCESS',
+      source: 'subscription-termination',
+      message: 'Подписка отключена, профиль пользователя сохранён',
+      details: { source: input.source, hadSubscription },
+      dedupeKey: `termination-succeeded-${input.source}`,
+    })
+  }
 
   return { hadSubscription }
 }

@@ -19,6 +19,8 @@ const mocks = vi.hoisted(() => {
   const grantReferralBonusBoxAttemptsForPayment = vi.fn()
   const notifyPaymentSucceeded = vi.fn()
   const syncCabinetPaymentToRemnashopBestEffort = vi.fn()
+  const logError = vi.fn()
+  const logWarn = vi.fn()
 
   return {
     prisma,
@@ -29,6 +31,8 @@ const mocks = vi.hoisted(() => {
     grantReferralBonusBoxAttemptsForPayment,
     notifyPaymentSucceeded,
     syncCabinetPaymentToRemnashopBestEffort,
+    logError,
+    logWarn,
     subscription,
   }
 })
@@ -51,6 +55,7 @@ vi.mock('./notifications', () => ({
 vi.mock('./remnashop-reverse-sync', () => ({
   syncCabinetPaymentToRemnashopBestEffort: mocks.syncCabinetPaymentToRemnashopBestEffort,
 }))
+vi.mock('./logger', () => ({ logError: mocks.logError, logWarn: mocks.logWarn }))
 
 import { provisionPaymentSubscription } from './provisioning'
 
@@ -165,5 +170,36 @@ describe('provisionPaymentSubscription', () => {
     expect(mocks.grantPaymentBonusBoxAttempts).not.toHaveBeenCalled()
     expect(mocks.grantReferralBonusBoxAttemptsForPayment).not.toHaveBeenCalled()
     expect(mocks.syncCabinetPaymentToRemnashopBestEffort).not.toHaveBeenCalled()
+  })
+
+  it('keeps provisioning successful when only the notification fails', async () => {
+    mocks.prisma.payment.findUnique.mockResolvedValue({
+      id: 'pay-1',
+      subscriptionProvisionedAt: null,
+      subscription: null,
+      provisioningJob: null,
+    })
+    mocks.prisma.provisioningJob.upsert.mockResolvedValue({ id: 'job-1', attempts: 1 })
+    mocks.ensureRemnawaveSubscription.mockResolvedValue({
+      subscription: mocks.subscription,
+      remnawaveUser: null,
+      isNew: true,
+      idempotent: false,
+    })
+    mocks.notifyPaymentSucceeded.mockRejectedValue(new Error('Telegram unavailable'))
+
+    await expect(provisionPaymentSubscription(input)).resolves.toEqual(expect.objectContaining({
+      jobStatus: 'SUCCEEDED',
+    }))
+
+    expect(mocks.prisma.provisioningJob.update).toHaveBeenCalledTimes(1)
+    expect(mocks.prisma.provisioningJob.update).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ status: 'SUCCEEDED' }),
+    }))
+    expect(mocks.logError).toHaveBeenCalledWith(
+      'provisioning.payment_notification_failed',
+      expect.any(Error),
+      expect.objectContaining({ paymentId: 'pay-1' })
+    )
   })
 })

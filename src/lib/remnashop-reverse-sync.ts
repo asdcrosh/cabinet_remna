@@ -563,6 +563,7 @@ function quoteIdent(value: string) {
 }
 
 export async function syncCabinetPaymentToRemnashopBestEffort(paymentId: string) {
+  const { paymentErrorDetails, recordPaymentEvent } = await import('./payment-events')
   const event = {
     direction: 'CABINET_TO_REMNASHOP' as const,
     entityType: 'payment',
@@ -577,8 +578,25 @@ export async function syncCabinetPaymentToRemnashopBestEffort(paymentId: string)
         paymentId,
         reason: result.skipped,
       })
+      await recordPaymentEvent({
+        paymentId,
+        stage: 'REMNASHOP',
+        status: 'WARNING',
+        source: 'remnashop-reverse-sync',
+        message: 'Синхронизация с Remnashop пропущена',
+        details: { reason: result.skipped },
+        dedupeKey: 'remnashop-skipped',
+      })
     } else if (result.ok) {
       await markSyncSucceeded(event)
+      await recordPaymentEvent({
+        paymentId,
+        stage: 'REMNASHOP',
+        status: 'SUCCESS',
+        source: 'remnashop-reverse-sync',
+        message: 'Платёж синхронизирован с Remnashop',
+        dedupeKey: 'remnashop-succeeded',
+      })
     }
     return result
   } catch (error) {
@@ -590,6 +608,15 @@ export async function syncCabinetPaymentToRemnashopBestEffort(paymentId: string)
     logWarn('remnashop.reverse_sync.failed', {
       paymentId,
       message: error instanceof Error ? error.message : 'unknown error',
+    })
+    await recordPaymentEvent({
+      paymentId,
+      stage: 'REMNASHOP',
+      status: 'ERROR',
+      source: 'remnashop-reverse-sync',
+      message: 'Не удалось синхронизировать платёж с Remnashop',
+      details: paymentErrorDetails(error),
+      dedupeKey: 'remnashop-failed',
     })
     return { ok: false as const, error }
   }
