@@ -400,12 +400,90 @@ textarea:focus {
   border-left-color: var(--app-accent) !important;
 }
 
+.access-overview::after {
+  width: 5.5rem;
+  height: 5.5rem;
+}
+
+.access-overview__top,
+.access-overview__body,
+.access-overview__bottom {
+  position: relative;
+  z-index: 1;
+}
+
+.access-overview__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.1rem 1.25rem;
+  border-bottom: 1px solid var(--app-border);
+}
+
+.access-overview__label {
+  color: var(--app-muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.61rem;
+  font-weight: 750;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.access-overview__body {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(20rem, 0.85fr);
+}
+
+.access-overview__remaining {
+  min-width: 0;
+  padding: clamp(1.5rem, 3vw, 2.6rem);
+}
+
+.access-overview__facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border-left: 1px dashed var(--app-border-strong);
+}
+
+.access-overview__fact {
+  min-width: 0;
+  padding: clamp(1.35rem, 2.4vw, 2rem);
+}
+
+.access-overview__fact + .access-overview__fact {
+  border-left: 1px solid var(--app-border);
+}
+
+.access-overview__bottom {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.25rem 1.15rem;
+  border-top: 1px solid var(--app-border);
+}
+
+.access-overview__progress {
+  height: 3px;
+  overflow: hidden;
+  background: var(--app-surface-strong);
+}
+
+.access-overview__progress-value {
+  height: 100%;
+  background: var(--app-ink);
+}
+
+.access-overview__progress-value--expired {
+  background: var(--app-accent);
+}
+
 .plan-period-panel {
   padding: 1rem !important;
 }
 
 .plan-period-panel [role="radio"] {
-  border-radius: 7px !important;
+  border-radius: 0 !important;
 }
 
 .plan-period-panel [role="radio"][aria-checked="true"] {
@@ -417,6 +495,42 @@ textarea:focus {
 .plan-period-panel [role="radio"][aria-checked="true"] > span:first-child {
   border-color: var(--app-ink) !important;
   background: var(--app-ink) !important;
+}
+
+.plan-choice-index {
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  place-items: center;
+  border: 1px solid var(--app-border-strong);
+  border-radius: 50%;
+  color: var(--app-muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.62rem;
+  font-weight: 700;
+}
+
+[role="radio"][aria-checked="true"] .plan-choice-index {
+  border-color: var(--app-ink);
+  background: var(--app-ink);
+  color: #fff;
+}
+
+.plan-period-card__index {
+  margin-top: 0.08rem;
+  color: var(--app-accent);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.61rem;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+}
+
+.plan-period-card--current {
+  background: color-mix(in srgb, var(--app-signal) 12%, transparent);
+}
+
+.plan-period-card__action {
+  border-radius: 6px;
 }
 
 .plan-checkout-card {
@@ -617,28 +731,43 @@ textarea:focus {
   }
 
   .plan-period-list {
-    display: grid !important;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 0.65rem !important;
+    display: block !important;
   }
 
   .plan-period-list article,
   .plan-period-list article:first-child {
-    display: flex !important;
-    min-height: 9.75rem !important;
-    flex-direction: column;
-    align-items: stretch !important;
-    padding: 0.9rem !important;
-    border: 1px solid var(--app-border) !important;
-    border-radius: 9px !important;
-    background: var(--app-surface) !important;
+    display: grid !important;
+    min-height: 0 !important;
+    grid-template-columns: minmax(0, 1fr) 8.5rem;
+    align-items: center !important;
+    gap: 0.75rem;
+    padding: 1rem 0.75rem !important;
+    border: 0 !important;
+    border-bottom: 1px solid var(--app-border) !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+  }
+
+  .plan-period-list article:last-child {
+    border-bottom: 0 !important;
+  }
+
+  .plan-period-list article.plan-period-card--current {
+    background: color-mix(in srgb, var(--app-signal) 12%, transparent) !important;
   }
 
   .plan-period-list article button {
-    margin-top: 0.35rem;
+    margin-top: 0;
     border-radius: 6px !important;
-    background: var(--app-ink) !important;
-    color: #fff !important;
+  }
+
+  .access-overview__body {
+    grid-template-columns: 1fr;
+  }
+
+  .access-overview__facts {
+    border-top: 1px dashed var(--app-border-strong);
+    border-left: 0;
   }
 }
 
@@ -671,22 +800,31 @@ textarea:focus {
     border-radius: 9px !important;
   }
 
-  .plan-period-list {
-    grid-template-columns: 1fr;
-  }
-
   .plan-period-list article,
   .plan-period-list article:first-child {
-    display: grid !important;
-    min-height: 0 !important;
-    grid-template-columns: minmax(0, 1fr) 8.5rem;
-    align-items: center !important;
-    gap: 0.75rem;
     padding: 0.85rem !important;
   }
 
   .plan-period-list article > div:last-child {
     margin-top: 0 !important;
+  }
+
+  .access-overview__top,
+  .access-overview__bottom {
+    padding-inline: 1rem;
+  }
+
+  .access-overview__bottom {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .access-overview__facts {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .access-overview__fact {
+    padding: 1.1rem 1rem;
   }
 
   .app-modal-panel {

@@ -125,7 +125,7 @@ export default async function PlansPage({
     <div className="user-workspace page-stack">
       <PageHeader
         title="Тарифы"
-        description="Выберите период подписки."
+        description="Один доступ, разные сроки. Чем дольше период, тем ниже цена дня."
         action={(
           <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
             {canManagePlans && (

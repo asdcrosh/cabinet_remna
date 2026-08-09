@@ -28,56 +28,55 @@ export function PlanCatalog({ plans, initialPlanId }: { plans: CatalogPlan[]; in
   if (orderedPlans.length === 0) return null
 
   return (
-    <section aria-labelledby="mobile-plan-picker-title">
-      <div className="mb-4 hidden flex-wrap items-end justify-between gap-3 lg:flex">
+    <section className="plan-catalog" aria-labelledby="mobile-plan-picker-title">
+      <div className="plan-catalog__heading mb-4 hidden flex-wrap items-end justify-between gap-3 lg:flex">
         <div>
-          <h2 id="mobile-plan-picker-title" className="text-lg font-semibold tracking-tight text-slate-950 dark:text-white">
-            Выберите тариф
-          </h2>
-          <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
-            Сначала выберите срок, затем проверьте детали и перейдите к оплате
-          </p>
+          <div className="page-eyebrow">Срок подписки</div>
+          <h2 id="mobile-plan-picker-title" className="text-xl font-semibold tracking-[-0.035em] text-slate-950 dark:text-white">Выберите период</h2>
         </div>
         <span className="shrink-0 border-l-2 border-cyan-400 pl-2 font-mono text-[10px] font-semibold uppercase tracking-[0.14em] tabular-nums text-slate-500 dark:text-slate-400">
           {orderedPlans.length} {planCountLabel(orderedPlans.length)}
         </span>
       </div>
 
-      <div className="plan-period-list grid gap-2 sm:grid-cols-3 lg:hidden">
-        {orderedPlans.map((plan) => (
+      <div className="plan-period-list overflow-hidden border-y border-slate-200 dark:border-white/[0.09] lg:hidden">
+        {orderedPlans.map((plan, index) => (
           <article
             key={plan.id}
             className={cn(
-              'plan-period-card relative grid min-h-0 min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 border border-slate-200 p-4 dark:border-white/[0.09] sm:flex sm:min-h-[10rem] sm:flex-col sm:items-stretch',
+              'plan-period-card relative grid min-h-0 min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 border-b border-slate-200 px-1 py-4 last:border-b-0 dark:border-white/[0.09] sm:px-3',
               plan.current
-                ? 'border-cyan-300/70 bg-cyan-50/75 dark:border-cyan-300/25 dark:bg-cyan-300/[0.07]'
-                : 'border-slate-200/90 bg-white/65 dark:bg-white/[0.025]'
+                ? 'plan-period-card--current'
+                : ''
             )}
           >
-            <div className="flex min-w-0 items-start justify-between gap-2">
+            <div className="flex min-w-0 items-start gap-3">
+              <span className="plan-period-card__index" aria-hidden="true">
+                {String(index + 1).padStart(2, '0')}
+              </span>
               <div className="min-w-0">
-                <h3 className="text-xl font-semibold leading-none tracking-[-0.035em] text-slate-950 dark:text-white sm:text-2xl">
+                <h3 className="text-xl font-semibold leading-none tracking-[-0.045em] text-slate-950 dark:text-white">
                   {plan.durationDays}
                   {' '}
                   <span className="ml-1 text-sm font-medium tracking-normal text-slate-500 dark:text-slate-400">
                     {dayLabel(plan.durationDays)}
                   </span>
                 </h3>
-                <p className="mt-2 truncate text-[11px] text-slate-500 dark:text-slate-400">{plan.name}</p>
-              </div>
-              <div className="flex shrink-0 flex-col items-end gap-1">
-                {plan.current ? <PlanPickerBadge>Текущий</PlanPickerBadge> : null}
-                {!plan.current && plan.popular ? <PlanPickerBadge>Выбор</PlanPickerBadge> : null}
-                {plan.savingsPercent > 0 && !plan.isPromo ? <PlanPickerBadge>−{plan.savingsPercent}%</PlanPickerBadge> : null}
+                <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                  <p className="truncate text-[11px] text-slate-500 dark:text-slate-400">{plan.name}</p>
+                  {plan.current ? <PlanPickerBadge>Текущий</PlanPickerBadge> : null}
+                  {!plan.current && plan.popular ? <PlanPickerBadge>Выбор</PlanPickerBadge> : null}
+                  {plan.savingsPercent > 0 && !plan.isPromo ? <PlanPickerBadge>−{plan.savingsPercent}%</PlanPickerBadge> : null}
+                </div>
               </div>
             </div>
 
-            <div className="mt-auto">
-              <div className="mb-2.5">
-                <span className="block whitespace-nowrap text-lg font-semibold tracking-tight tabular-nums text-slate-950 dark:text-white sm:text-xl">
+            <div className="min-w-[7.6rem] text-right">
+              <div className="mb-2">
+                <span className="block whitespace-nowrap text-lg font-semibold tracking-[-0.03em] tabular-nums text-slate-950 dark:text-white">
                 {plan.price}
                 </span>
-                <span className="mt-0.5 block truncate text-[10px] text-slate-500 dark:text-slate-400">{dailyRateLabel(plan)}</span>
+                <span className="mt-0.5 block text-[10px] text-slate-500 dark:text-slate-400">{dailyRateLabel(plan)}</span>
               </div>
               <button
                 type="button"
@@ -85,10 +84,10 @@ export function PlanCatalog({ plans, initialPlanId }: { plans: CatalogPlan[]; in
                 onClick={() => setMobileCheckoutPlanId(plan.id)}
                 disabled={!plan.isPromo && plan.paymentProviders?.length === 0}
                 className={cn(
-                  'group inline-flex min-h-10 w-full items-center justify-between gap-1 rounded-[9px] px-3 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50',
+                  'plan-period-card__action group inline-flex min-h-9 w-full items-center justify-between gap-1 border px-3 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50',
                   plan.current
-                    ? 'bg-brand-600 text-white hover:bg-brand-700 dark:bg-brand-400 dark:text-white dark:hover:bg-brand-300'
-                    : 'bg-slate-950 text-white hover:bg-slate-800 dark:bg-white/[0.09] dark:text-white dark:hover:bg-white/[0.14]'
+                    ? 'border-brand-600 bg-brand-600 text-white hover:bg-brand-700 dark:border-brand-400 dark:bg-brand-400 dark:text-white dark:hover:bg-brand-300'
+                    : 'border-slate-300 bg-transparent text-slate-800 hover:border-slate-950 dark:border-white/15 dark:text-white dark:hover:border-white/40'
                 )}
               >
                 {mobileCtaLabel(plan)}
@@ -100,7 +99,7 @@ export function PlanCatalog({ plans, initialPlanId }: { plans: CatalogPlan[]; in
       </div>
 
       <div className="hidden gap-4 lg:grid lg:grid-cols-2 lg:items-stretch">
-        <div className="plan-period-panel flex h-full flex-col overflow-hidden rounded-xl border p-4">
+        <div className="plan-period-panel flex h-full flex-col overflow-hidden border p-4">
           <div className="mb-3 px-1 sm:flex sm:items-end sm:justify-between sm:gap-4">
             <div>
               <h3 className="text-base font-semibold text-slate-950 dark:text-white">Период подписки</h3>
@@ -111,7 +110,7 @@ export function PlanCatalog({ plans, initialPlanId }: { plans: CatalogPlan[]; in
           </div>
 
           <div className="grid gap-2" role="radiogroup" aria-label="Выбор тарифа">
-            {orderedPlans.map((plan) => {
+            {orderedPlans.map((plan, index) => {
               const selected = plan.id === activePlanId
               return (
                 <button
@@ -121,22 +120,14 @@ export function PlanCatalog({ plans, initialPlanId }: { plans: CatalogPlan[]; in
                   aria-checked={selected}
                   onClick={() => setSelectedPlanId(plan.id)}
                   className={cn(
-                    'group grid w-full min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-3 rounded-lg border border-l-2 px-3.5 py-3.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center sm:px-4 sm:py-4',
+                    'group grid w-full min-w-0 grid-cols-[2rem_minmax(0,1fr)] gap-3 border border-l-2 px-3.5 py-3.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 sm:grid-cols-[2rem_minmax(0,1fr)_auto] sm:items-center sm:px-4 sm:py-4',
                     selected
                       ? 'border-slate-200 border-l-cyan-500 bg-white dark:border-white/10 dark:border-l-cyan-300 dark:bg-white/[0.05]'
                       : 'border-transparent border-l-slate-300 bg-white/55 hover:border-slate-200 hover:border-l-slate-500 hover:bg-white dark:border-l-white/10 dark:bg-white/[0.015] dark:hover:border-white/10 dark:hover:bg-white/[0.04]'
                   )}
                 >
-                  <span
-                    className={cn(
-                      'mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full border transition-colors sm:mt-0',
-                      selected
-                        ? 'border-cyan-500 bg-cyan-500 text-white'
-                        : 'border-slate-300 bg-white text-transparent group-hover:border-slate-400 dark:border-white/20 dark:bg-white/[0.03]'
-                    )}
-                    aria-hidden="true"
-                  >
-                    <Check className="h-3.5 w-3.5" />
+                  <span className="plan-choice-index" aria-hidden="true">
+                    {selected ? <Check className="h-3.5 w-3.5" /> : String(index + 1).padStart(2, '0')}
                   </span>
 
                   <span className="min-w-0">
@@ -153,7 +144,7 @@ export function PlanCatalog({ plans, initialPlanId }: { plans: CatalogPlan[]; in
                     </span>
                   </span>
 
-                  <span className="col-span-2 flex items-end justify-between gap-3 pl-9 sm:col-span-1 sm:block sm:pl-0 sm:text-right">
+                  <span className="col-span-2 flex items-end justify-between gap-3 pl-11 sm:col-span-1 sm:block sm:pl-0 sm:text-right">
                     <span className="text-xs text-slate-400 dark:text-slate-500 sm:block">{dailyRateLabel(plan)}</span>
                     <span className="block whitespace-nowrap text-xl font-semibold tracking-tight tabular-nums text-slate-950 dark:text-white sm:mt-1">
                       {plan.price}
@@ -177,8 +168,8 @@ export function PlanCatalog({ plans, initialPlanId }: { plans: CatalogPlan[]; in
 
       <Modal
         open={Boolean(mobileCheckoutPlan)}
-        title="Оплата тарифа"
-        description="Проверьте детали и выберите способ оплаты"
+        title="Оформление подписки"
+        description="Проверьте срок, сумму и выберите способ оплаты"
         variant="sheet"
         overlayClassName="lg:hidden"
         panelClassName="sm:max-w-[32rem]"

@@ -161,75 +161,86 @@ export default async function DashboardHome() {
       )}
 
       <section
-        className={cn('access-pass', subscriptionExpired && 'access-pass--expired')}
+        className={cn('access-pass access-overview', subscriptionExpired && 'access-pass--expired')}
         data-testid="subscription-overview"
       >
-        <div className="grid lg:grid-cols-[minmax(0,1.08fr)_minmax(20rem,.92fr)]">
-          <div className="flex min-w-0 flex-col p-5 sm:p-6">
-            <div className="flex flex-wrap items-center gap-2">
-              <h2 className="break-words text-base font-semibold tracking-[-0.02em] text-slate-950 dark:text-white">
+        <div className="access-overview__top">
+          <div className="min-w-0">
+            <div className="access-overview__label">Текущий доступ</div>
+            <div className="mt-1.5 flex flex-wrap items-center gap-2.5">
+              <h2 className="break-words text-lg font-semibold tracking-[-0.03em] text-slate-950 dark:text-white sm:text-xl">
                 {subRow?.plan?.name ?? 'VPN-подписка'}
               </h2>
               <StatusBadge status={subscriptionStatus} />
             </div>
+          </div>
+          <Link href={primaryAction.href} className="btn-primary group hidden shrink-0 justify-between sm:inline-flex">
+            <span className="inline-flex items-center gap-2">
+              {primaryAction.icon}
+              {primaryAction.label}
+            </span>
+            <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+          </Link>
+        </div>
 
-            <div className="mt-8 sm:mt-10">
-              <div className="text-sm text-slate-500 dark:text-slate-400">Состояние подписки</div>
-              <strong className="mt-1 block text-[2.55rem] font-semibold leading-none tracking-[-0.055em] text-slate-950 dark:text-white sm:text-5xl">
-                {subRow || sub ? formatSubscriptionDaysLeft(daysLeft, subscriptionStatus) : 'Нет данных'}
-              </strong>
-              <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">
-                {subscriptionExpired
-                  ? 'Продлите подписку, повторная настройка не потребуется.'
-                  : expiresAtLabel
-                    ? `Доступ оплачен до ${expiresAtLabel}`
-                    : 'Доступ активен.'}
-              </p>
-            </div>
+        <div className="access-overview__body">
+          <div className="access-overview__remaining">
+            <div className="text-xs font-medium uppercase tracking-[0.12em] text-slate-400">Осталось</div>
+            <strong className="mt-2 block text-[3rem] font-semibold leading-none tracking-[-0.07em] text-slate-950 dark:text-white sm:text-[4.4rem]">
+              {subRow || sub ? formatSubscriptionDaysLeft(daysLeft, subscriptionStatus) : 'Нет данных'}
+            </strong>
+            <p className="mt-3 text-sm leading-5 text-slate-500 dark:text-slate-400">
+              {subscriptionExpired
+                ? 'Профиль сохранён. Продлите доступ без повторной настройки.'
+                : expiresAtLabel
+                  ? `Оплачено до ${expiresAtLabel}`
+                  : 'Доступ активен.'}
+            </p>
           </div>
 
-          <div className="flex flex-col border-t border-dashed border-slate-300 p-5 dark:border-white/15 sm:p-6 lg:border-l lg:border-t-0">
-            <div className="grid grid-cols-2 gap-4">
-              <HomeMetric
-                label="Трафик"
-                value={subscriptionExpired
-                  ? '0 доступно'
-                  : hasRemoteUsage
-                    ? isUnlimited
-                      ? `${formatBytes(used)} использовано`
-                      : `${formatBytes(used)} из ${formatBytes(limit)}`
-                    : 'Обновляется'}
-              />
-              <HomeMetric
-                label="Устройства"
-                value={user._count.devices > 0 ? `${user._count.devices} подключено` : 'Пока нет'}
-              />
-            </div>
-
-            <div className="mt-5">
-              <div className="h-1.5 overflow-hidden rounded-full bg-slate-200 dark:bg-white/10">
-                <div
-                  className={cn(
-                    'h-full rounded-full',
-                    subscriptionExpired ? 'bg-amber-500' : 'bg-cyan-500'
-                  )}
-                  style={{ width: subscriptionExpired ? '0%' : isUnlimited ? '100%' : `${trafficPercent ?? 0}%` }}
-                />
-              </div>
-              <div className="mt-2 flex items-center justify-between gap-3 text-xs text-slate-500 dark:text-slate-400">
-                <span>{subscriptionExpired ? 'Доступ остановлен' : isUnlimited ? 'Безлимитный трафик' : 'Использование за период'}</span>
-                {!subscriptionExpired && !isUnlimited && trafficPercent != null && <span>{trafficPercent}%</span>}
-              </div>
-            </div>
-
-            <Link href={primaryAction.href} className="btn-primary group mt-6 w-full justify-between lg:mt-auto">
-              <span className="inline-flex items-center gap-2">
-                {primaryAction.icon}
-                {primaryAction.label}
-              </span>
-              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-            </Link>
+          <div className="access-overview__facts">
+            <HomeMetric
+              label="Трафик"
+              value={subscriptionExpired
+                ? 'Недоступен'
+                : hasRemoteUsage
+                  ? isUnlimited
+                    ? `${formatBytes(used)} использовано`
+                    : `${formatBytes(used)} из ${formatBytes(limit)}`
+                  : 'Обновляется'}
+              note={subscriptionExpired ? 'до продления' : isUnlimited ? 'без ограничений' : 'за текущий период'}
+            />
+            <HomeMetric
+              label="Устройства"
+              value={user._count.devices > 0 ? `${user._count.devices} подключено` : 'Не подключены'}
+              note={user._count.devices > 0 ? 'можно управлять' : 'добавьте первое устройство'}
+            />
           </div>
+        </div>
+
+        <div className="access-overview__bottom">
+          <div className="min-w-0 flex-1">
+            <div className="access-overview__progress">
+              <div
+                className={cn(
+                  'access-overview__progress-value',
+                  subscriptionExpired && 'access-overview__progress-value--expired'
+                )}
+                style={{ width: subscriptionExpired ? '0%' : isUnlimited ? '100%' : `${trafficPercent ?? 0}%` }}
+              />
+            </div>
+            <div className="mt-2 flex items-center justify-between gap-3 text-xs text-slate-500 dark:text-slate-400">
+              <span>{subscriptionExpired ? 'Доступ остановлен' : isUnlimited ? 'Трафик без лимита' : 'Использование трафика'}</span>
+              {!subscriptionExpired && !isUnlimited && trafficPercent != null && <span>{trafficPercent}%</span>}
+            </div>
+          </div>
+          <Link href={primaryAction.href} className="btn-primary group w-full justify-between sm:hidden">
+            <span className="inline-flex items-center gap-2">
+              {primaryAction.icon}
+              {primaryAction.label}
+            </span>
+            <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+          </Link>
         </div>
       </section>
 
@@ -264,8 +275,9 @@ export default async function DashboardHome() {
 function HomeHeader({ name, description }: { name: string; description: string }) {
   return (
     <header className="home-intro pb-1">
+      <div className="page-eyebrow">Личный кабинет</div>
       <h1 className="text-[1.8rem] font-semibold leading-tight tracking-[-0.04em] text-slate-950 dark:text-white sm:text-[2rem]">
-        Добрый день, {name}
+        {name}, всё под контролем
       </h1>
       <p className="mt-1 max-w-2xl text-sm leading-5 text-slate-500 dark:text-slate-400">
         {description}
@@ -274,11 +286,12 @@ function HomeHeader({ name, description }: { name: string; description: string }
   )
 }
 
-function HomeMetric({ label, value }: { label: string; value: string }) {
+function HomeMetric({ label, value, note }: { label: string; value: string; note: string }) {
   return (
-    <div className="min-w-0">
-      <div className="text-xs font-medium uppercase tracking-[0.08em] text-slate-400">{label}</div>
-      <div className="mt-1 break-words text-sm font-semibold text-slate-950 dark:text-white sm:text-base">{value}</div>
+    <div className="access-overview__fact">
+      <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">{label}</div>
+      <div className="mt-2 break-words text-base font-semibold tracking-[-0.02em] text-slate-950 dark:text-white sm:text-lg">{value}</div>
+      <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">{note}</div>
     </div>
   )
 }
