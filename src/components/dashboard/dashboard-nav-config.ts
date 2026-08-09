@@ -76,7 +76,7 @@ export const adminNavigation: NavigationItem[] = [
   { href: '/dashboard/admin/promo-codes', label: 'Промокоды', icon: Tag },
   { href: '/dashboard/admin/bonus-box', label: 'Бонусы', icon: Gift },
   { href: '/dashboard/admin/payments', label: 'Платежи', icon: CreditCard },
-  { href: '/dashboard/admin/recovery', label: 'Восстановление', icon: FileClock },
+  { href: '/dashboard/admin/recovery', label: 'Контроль подписок', icon: FileClock },
   { href: '/dashboard/admin/remnashop-sync', label: 'Remnashop', icon: Database },
   { href: '/dashboard/admin/watch', label: 'Watch', icon: Activity },
   { href: '/dashboard/admin/system', label: 'Настройки', icon: ServerCog },

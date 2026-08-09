@@ -134,6 +134,7 @@ model User {
   adminNotificationReads     AdminNotificationRead[]
   revokedSessions            RevokedSession[]
   broadcastDeliveries        BroadcastDelivery[]
+  subscriptionHealth         SubscriptionHealth?
 
   @@index([email])
   @@index([role])
@@ -551,6 +552,56 @@ enum SubscriptionStatus {
   LIMITED
 }
 
+model SubscriptionHealth {
+  id             String                   @id @default(cuid())
+  userId         String                   @unique
+  subscriptionId String?
+  status         SubscriptionHealthStatus @default(HEALTHY)
+  issueCount     Int                      @default(0)
+  issues         Json                     @default("[]")
+  snapshots      Json?
+  lastError      String?
+  checkedAt      DateTime                 @default(now())
+  repairedAt     DateTime?
+  createdAt      DateTime                 @default(now())
+  updatedAt      DateTime                 @updatedAt
+
+  user   User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  events SubscriptionHealthEvent[]
+
+  @@index([status, checkedAt])
+  @@index([checkedAt])
+}
+
+model SubscriptionHealthEvent {
+  id        String                   @id @default(cuid())
+  healthId  String
+  action    SubscriptionHealthAction
+  status    SubscriptionHealthStatus
+  issues    Json                     @default("[]")
+  changes   Json?
+  error     String?
+  actorId   String?
+  createdAt DateTime                 @default(now())
+
+  health SubscriptionHealth @relation(fields: [healthId], references: [id], onDelete: Cascade)
+
+  @@index([healthId, createdAt])
+  @@index([status, createdAt])
+}
+
+enum SubscriptionHealthStatus {
+  HEALTHY
+  WARNING
+  ERROR
+}
+
+enum SubscriptionHealthAction {
+  CHECK
+  AUTO_REPAIR
+  MANUAL_REPAIR
+}
+
 // ----------------------------------------------------------------------
 // 4. Платёж
 // ----------------------------------------------------------------------
@@ -722,26 +773,26 @@ enum SyncEventStatus {
 }
 
 model ReferralReward {
-  id                    String               @id @default(cuid())
-  referrerId            String
-  referredUserId        String               @unique
-  triggeringPaymentId   String?              @unique
-  trigger               ReferralRewardTrigger @default(FIRST_PAYMENT)
-  bonusDays             Int
-  referredBonusDays     Int                  @default(0)
-  referrerAttempts      Int                  @default(2)
-  referredAttempts      Int                  @default(1)
-  status                ReferralRewardStatus @default(PENDING)
-  appliedSubscriptionId String?
-  appliedAt             DateTime?
+  id                            String                @id @default(cuid())
+  referrerId                    String
+  referredUserId                String                @unique
+  triggeringPaymentId           String?               @unique
+  trigger                       ReferralRewardTrigger @default(FIRST_PAYMENT)
+  bonusDays                     Int
+  referredBonusDays             Int                   @default(0)
+  referrerAttempts              Int                   @default(2)
+  referredAttempts              Int                   @default(1)
+  status                        ReferralRewardStatus  @default(PENDING)
+  appliedSubscriptionId         String?
+  appliedAt                     DateTime?
   referredAppliedSubscriptionId String?
-  referredAppliedAt     DateTime?
-  lastError             String?
-  createdAt             DateTime             @default(now())
-  updatedAt             DateTime             @updatedAt
+  referredAppliedAt             DateTime?
+  lastError                     String?
+  createdAt                     DateTime              @default(now())
+  updatedAt                     DateTime              @updatedAt
 
-  referrer          User    @relation("ReferralRewardsEarned", fields: [referrerId], references: [id], onDelete: Cascade)
-  referredUser      User    @relation("ReferralRewardReferred", fields: [referredUserId], references: [id], onDelete: Cascade)
+  referrer          User     @relation("ReferralRewardsEarned", fields: [referrerId], references: [id], onDelete: Cascade)
+  referredUser      User     @relation("ReferralRewardReferred", fields: [referredUserId], references: [id], onDelete: Cascade)
   triggeringPayment Payment? @relation(fields: [triggeringPaymentId], references: [id], onDelete: Cascade)
 
   @@index([referrerId, status])
@@ -805,20 +856,20 @@ enum ProvisioningJobStatus {
 // чтобы история оплат не зависела от будущих изменений кода.
 // ----------------------------------------------------------------------
 model PromoCode {
-  id                    String            @id @default(cuid())
-  code                  String            @unique
-  remnashopPromoCodeId  Int?              @unique
-  discountPercent       Int
-  audience              PromoCodeAudience @default(ALL)
-  purchaseScope         PromoCodePurchaseScope @default(ANY)
-  allowedEmails         String[]          @default([])
-  isActive              Boolean           @default(true)
-  startsAt              DateTime?
-  expiresAt             DateTime?
-  maxUses               Int?
-  maxUsesPerUser        Int               @default(1)
-  createdAt             DateTime          @default(now())
-  updatedAt             DateTime          @updatedAt
+  id                   String                 @id @default(cuid())
+  code                 String                 @unique
+  remnashopPromoCodeId Int?                   @unique
+  discountPercent      Int
+  audience             PromoCodeAudience      @default(ALL)
+  purchaseScope        PromoCodePurchaseScope @default(ANY)
+  allowedEmails        String[]               @default([])
+  isActive             Boolean                @default(true)
+  startsAt             DateTime?
+  expiresAt            DateTime?
+  maxUses              Int?
+  maxUsesPerUser       Int                    @default(1)
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
 
   payments                Payment[]
   redemptions             PromoCodeRedemption[]

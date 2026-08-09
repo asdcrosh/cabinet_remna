@@ -10,6 +10,7 @@ import { maybeSyncRemnashopCatalog } from '../src/lib/remnashop-sync'
 import { syncRemnashopUsersToCabinet } from '../src/lib/remnashop-users'
 import { recordPaymentWorkerHeartbeat } from '../src/lib/worker-health'
 import { logError, logInfo } from '../src/lib/logger'
+import { reconcileSubscriptionHealthBatch } from '../src/lib/subscription-health'
 
 const intervalMs = readPositiveInt('PAYMENT_RECONCILE_INTERVAL_SECONDS', 60) * 1000
 const batchSize = readPositiveInt('PAYMENT_RECONCILE_BATCH_SIZE', 25)
@@ -21,10 +22,13 @@ const remnashopUsersSyncIntervalMs = readNonNegativeInt('REMNASHOP_USERS_SYNC_IN
 const remnashopReverseSyncBatchSize = readPositiveInt('REMNASHOP_REVERSE_SYNC_BATCH_SIZE', 25)
 const remnashopReverseSyncLookbackDays = readPositiveInt('REMNASHOP_REVERSE_SYNC_LOOKBACK_DAYS', 14)
 const remnashopSyncRetryBatchSize = readPositiveInt('REMNASHOP_SYNC_RETRY_BATCH_SIZE', 50)
+const subscriptionHealthIntervalMs = readPositiveInt('SUBSCRIPTION_HEALTH_INTERVAL_SECONDS', 600) * 1000
+const subscriptionHealthBatchSize = readPositiveInt('SUBSCRIPTION_HEALTH_BATCH_SIZE', 10)
 
 let stopped = false
 let wakeSleep: (() => void) | null = null
 let lastRemnashopUsersSyncAt = 0
+let lastSubscriptionHealthAt = 0
 
 process.on('SIGTERM', stop)
 process.on('SIGINT', stop)
@@ -55,6 +59,7 @@ async function runOnce() {
     logError('remnashop_sync.background_failed', error)
   })
   await syncRemnashopUsersIfDue()
+  await syncSubscriptionHealthIfDue()
 
   const cutoff = new Date(Date.now() - minAgeMs)
   const payments = await prisma.payment.findMany({
@@ -98,6 +103,21 @@ async function runOnce() {
     shouldStop: () => stopped,
   })
   await notifyTrafficThresholds()
+}
+
+async function syncSubscriptionHealthIfDue() {
+  if (Date.now() - lastSubscriptionHealthAt < subscriptionHealthIntervalMs) return
+  lastSubscriptionHealthAt = Date.now()
+  try {
+    const result = await reconcileSubscriptionHealthBatch({
+      mode: 'AUTO',
+      limit: subscriptionHealthBatchSize,
+      shouldStop: () => stopped,
+    })
+    if (result.checked > 0) logInfo('subscription_health.completed', result)
+  } catch (error) {
+    logError('subscription_health.failed', error)
+  }
 }
 
 async function retryRemnashopSyncEvents() {

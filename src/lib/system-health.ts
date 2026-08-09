@@ -624,6 +624,43 @@ async function checkSyncEventsBacklog() {
   }
 }
 
+async function checkSubscriptionHealth() {
+  try {
+    const staleBefore = new Date(Date.now() - 30 * 60 * 1000)
+    const [errors, warnings, stale, tracked, eligible] = await Promise.all([
+      prisma.subscriptionHealth.count({ where: { status: 'ERROR' } }),
+      prisma.subscriptionHealth.count({ where: { status: 'WARNING' } }),
+      prisma.subscriptionHealth.count({ where: { checkedAt: { lt: staleBefore } } }),
+      prisma.subscriptionHealth.count(),
+      prisma.user.count({
+        where: {
+          role: 'USER',
+          OR: [{ remnawaveUuid: { not: null } }, { subscriptions: { some: {} } }],
+        },
+      }),
+    ])
+    const unchecked = Math.max(eligible - tracked, 0)
+    if (errors > 0) {
+      return check(
+        'subscription-health',
+        'Целостность подписок',
+        'error',
+        `Критических расхождений: ${errors}`,
+        `Предупреждений: ${warnings}, не проверено: ${unchecked}, устаревших: ${stale}`
+      )
+    }
+    return check(
+      'subscription-health',
+      'Целостность подписок',
+      warnings > 0 || unchecked > 0 || stale > 25 ? 'warn' : 'ok',
+      warnings > 0 ? `Требуют внимания: ${warnings}` : unchecked > 0 ? `Ожидают первой проверки: ${unchecked}` : 'Расхождений не найдено',
+      stale > 0 ? `Устаревших проверок: ${stale}` : undefined
+    )
+  } catch (error) {
+    return check('subscription-health', 'Целостность подписок', 'warn', 'Проверка ещё не готова', errorMessage(error))
+  }
+}
+
 export async function getSystemHealth(options: { sendEmail?: boolean } = {}): Promise<SystemHealthReport> {
   const checkedAt = nowIso()
   const [deploymentChecks, ...operationalChecks] = await Promise.all([
@@ -646,6 +683,7 @@ export async function getSystemHealth(options: { sendEmail?: boolean } = {}): Pr
     checkProvisioningQueue(),
     checkBroadcastBacklog(),
     checkSyncEventsBacklog(),
+    checkSubscriptionHealth(),
   ])
   const checks = [...deploymentChecks, ...operationalChecks]
 
