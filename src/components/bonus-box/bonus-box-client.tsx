@@ -47,7 +47,7 @@ import type {
 
 export type { BonusBoxPrizeView } from "@/components/bonus-box/bonus-box-types";
 
-const WHEEL_DURATION_MS = 4300;
+const WHEEL_DURATION_MS = 5000;
 const REVEAL_EFFECT_DURATION_MS = 900;
 const BONUS_TABS: BonusBoxTab[] = ["missions", "outcomes", "history"];
 const WHEEL_COLORS = ["#31126f", "#5b25b3", "#792aca", "#47208e"];
@@ -70,8 +70,11 @@ export function BonusBoxClient({
   );
   const [reducedMotion, setReducedMotion] = useState(false);
   const [claimingMissionId, setClaimingMissionId] = useState<string | null>(null);
-  const revealTimerRef = useRef<number | null>(null);
   const effectTimerRef = useRef<number | null>(null);
+  const wheelFrameRef = useRef<number | null>(null);
+  const wheelRef = useRef<HTMLDivElement | null>(null);
+  const wheelPointerRef = useRef<HTMLDivElement | null>(null);
+  const targetWheelRotationRef = useRef<number | null>(null);
   const finishingRef = useRef(false);
   const canUseWelcomeAttempts =
     !data.hasActiveSubscription && data.welcomeAttemptsCount > 0;
@@ -125,17 +128,61 @@ export function BonusBoxClient({
   }, []);
 
   useEffect(() => () => {
-    if (revealTimerRef.current !== null) window.clearTimeout(revealTimerRef.current);
     if (effectTimerRef.current !== null) window.clearTimeout(effectTimerRef.current);
+    if (wheelFrameRef.current !== null) window.cancelAnimationFrame(wheelFrameRef.current);
   }, []);
+
+  function settleWheel(targetRotation = targetWheelRotationRef.current) {
+    if (wheelFrameRef.current !== null) {
+      window.cancelAnimationFrame(wheelFrameRef.current);
+      wheelFrameRef.current = null;
+    }
+    if (targetRotation !== null) {
+      setWheelRotation(targetRotation);
+      if (wheelRef.current) wheelRef.current.style.transform = `rotate(${targetRotation}deg)`;
+    }
+    if (wheelPointerRef.current) {
+      wheelPointerRef.current.style.transform = "translateX(-50%) rotate(0deg)";
+    }
+  }
+
+  function animateWheel(startRotation: number, targetRotation: number, response: OpenBoxResponse) {
+    const startedAt = performance.now();
+    const distance = targetRotation - startRotation;
+
+    const frame = (now: number) => {
+      const elapsed = Math.min(1, (now - startedAt) / WHEEL_DURATION_MS);
+      const progress = 1 - Math.pow(1 - elapsed, 2.7);
+      const rotation = startRotation + distance * progress;
+
+      if (wheelRef.current) wheelRef.current.style.transform = `rotate(${rotation}deg)`;
+      if (wheelPointerRef.current) {
+        const phase = positiveModulo(rotation, segmentAngle) / segmentAngle;
+        const deflection = phase < 0.72
+          ? 0
+          : phase < 0.92
+            ? ((phase - 0.72) / 0.2) * 7
+            : 7 - ((phase - 0.92) / 0.08) * 12;
+        wheelPointerRef.current.style.transform = `translateX(-50%) rotate(${deflection}deg)`;
+      }
+
+      if (elapsed < 1) {
+        wheelFrameRef.current = window.requestAnimationFrame(frame);
+        return;
+      }
+
+      wheelFrameRef.current = null;
+      settleWheel(targetRotation);
+      void finishOpening(response);
+    };
+
+    wheelFrameRef.current = window.requestAnimationFrame(frame);
+  }
 
   async function finishOpening(response: OpenBoxResponse) {
     if (finishingRef.current) return;
     finishingRef.current = true;
-    if (revealTimerRef.current !== null) {
-      window.clearTimeout(revealTimerRef.current);
-      revealTimerRef.current = null;
-    }
+    settleWheel();
     setResult(response);
     setPendingResult(null);
     setRevealEffect(!reducedMotion);
@@ -199,18 +246,16 @@ export function BonusBoxClient({
       const winnerIndex = Math.max(0, wheelPrizes.findIndex((prize) => prize.id === response.prize.id));
       const winnerCenter = (winnerIndex + 0.5) * segmentAngle;
       const targetRotation = (360 - winnerCenter) % 360;
-      setWheelRotation((current) => {
-        const normalized = ((current % 360) + 360) % 360;
-        const correction = (targetRotation - normalized + 360) % 360;
-        return current + correction + 360 * 7;
-      });
+      const normalized = positiveModulo(wheelRotation, 360);
+      const correction = positiveModulo(targetRotation - normalized, 360);
+      const finalRotation = wheelRotation + correction + 360 * 7;
+      targetWheelRotationRef.current = finalRotation;
 
       if (reducedMotion) {
+        settleWheel(finalRotation);
         void finishOpening(response);
       } else {
-        revealTimerRef.current = window.setTimeout(() => {
-          void finishOpening(response);
-        }, WHEEL_DURATION_MS + 160);
+        animateWheel(wheelRotation, finalRotation, response);
       }
     } catch {
       setOpening(false);
@@ -291,17 +336,15 @@ export function BonusBoxClient({
           <div className="bonus-wheel-layout">
             <div className="bonus-wheel-area">
               <div className="bonus-wheel-frame">
-                <div className="bonus-wheel-pointer" aria-hidden="true"><span /></div>
+                <div ref={wheelPointerRef} className="bonus-wheel-pointer" aria-hidden="true"><span /></div>
                 <div
+                  ref={wheelRef}
                   className={cn("bonus-wheel", wheelPrizes.length > 8 && "bonus-wheel--dense")}
                   aria-label={`Колесо с ${wheelPrizes.length} вариантами призов`}
                   style={{
                     "--bonus-segment-size": `${segmentAngle}deg`,
                     background: wheelBackground,
                     transform: `rotate(${wheelRotation}deg)`,
-                    transition: opening && !reducedMotion
-                      ? `transform ${WHEEL_DURATION_MS}ms cubic-bezier(.08,.74,.09,1)`
-                      : "none",
                   } as CSSProperties}
                 >
                   {wheelPrizes.map((prize, index) => {
@@ -630,6 +673,10 @@ export function BonusBoxClient({
       </section>
     </div>
   );
+}
+
+function positiveModulo(value: number, divisor: number) {
+  return ((value % divisor) + divisor) % divisor;
 }
 
 function turnWord(value: number) {

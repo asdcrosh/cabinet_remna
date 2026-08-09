@@ -1683,7 +1683,9 @@
     width: 2.15rem;
     height: 3.15rem;
     transform: translateX(-50%);
+    transform-origin: 50% 0.55rem;
     filter: drop-shadow(0 7px 12px rgb(53 217 255 / 0.42));
+    will-change: transform;
   }
 
   .bonus-wheel-pointer::before {
@@ -1707,10 +1709,6 @@
     clip-path: polygon(0 0, 100% 0, 50% 100%);
   }
 
-  .bonus-box-stage--opening .bonus-wheel-pointer {
-    animation: bonus-wheel-pointer-tick 150ms cubic-bezier(.3,.8,.3,1) infinite alternate;
-  }
-
   .bonus-box-stage--opening .bonus-wheel-frame::before {
     animation: bonus-wheel-energy 900ms ease-in-out infinite alternate;
   }
@@ -1721,11 +1719,6 @@
 
   .bonus-box-stage--opening .bonus-wheel {
     filter: saturate(1.32) brightness(1.12);
-  }
-
-  .bonus-box-stage--opening .bonus-wheel-segment-copy {
-    opacity: 0.12;
-    filter: blur(2.5px);
   }
 
   .bonus-box-stage--opening .bonus-wheel-hub {
@@ -1847,11 +1840,6 @@
   }
 }
 
-@keyframes bonus-wheel-pointer-tick {
-  from { transform: translateX(-50%) rotate(-5deg); }
-  to { transform: translateX(-50%) rotate(5deg); }
-}
-
 @keyframes bonus-wheel-orbit {
   to { transform: rotate(360deg); }
 }
@@ -1887,8 +1875,4 @@
     transition: none !important;
   }
 
-  .bonus-box-stage--opening .bonus-wheel-segment-copy {
-    opacity: 1;
-    filter: none;
-  }
 }
