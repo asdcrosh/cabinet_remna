@@ -8,11 +8,11 @@ import {
   Home,
   Menu,
   MoreHorizontal,
-  ShieldCheck,
   UserCog,
   X,
 } from 'lucide-react'
 import { cn } from '@/lib/cn'
+import { BrandLogo } from '@/components/brand-logo'
 import { useBodyScrollLock } from '@/lib/use-body-scroll-lock'
 import { useDialogFocus } from '@/lib/use-dialog-focus'
 import type { FeatureFlags } from '@/lib/feature-flags'
@@ -277,7 +277,7 @@ export function MobileBottomNav({
         aria-modal="true"
         aria-labelledby="mobile-more-menu-title"
         tabIndex={-1}
-        className="absolute inset-x-0 bottom-0 max-h-[calc(100dvh-1rem)] overflow-y-auto overscroll-contain rounded-t-xl border border-slate-300 bg-[#f8f9f5] p-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] shadow-xl dark:border-white/10 dark:bg-[#0d1011]"
+        className="absolute inset-x-0 bottom-0 max-h-[calc(100dvh-1rem)] overflow-y-auto overscroll-contain rounded-t-xl border border-slate-300 bg-surface-50 p-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] shadow-xl dark:border-white/10 dark:bg-surface-950"
       >
         <div className="mb-3 flex items-center justify-between gap-3">
           <div>
@@ -521,14 +521,7 @@ function MobileMoreGrid({
 export function Brand({ compact = false, brandName }: { compact?: boolean; brandName: string }) {
   return (
     <Link href="/dashboard" className="dashboard-brand flex min-w-0 items-center gap-3">
-      <div className={cn(
-        'brand-mark relative grid h-9 w-9 shrink-0 place-items-center rounded-[10px] border',
-        compact
-          ? 'border-slate-200 bg-slate-950 text-white dark:border-white/10 dark:bg-white dark:text-slate-950'
-          : 'border-white/15 bg-white text-slate-950'
-      )}>
-        <ShieldCheck className="h-4 w-4" />
-      </div>
+      <BrandLogo className={cn('brand-mark', compact ? 'h-9 w-9' : 'h-10 w-10')} priority />
       <div className="min-w-0">
         <div className={cn('truncate text-sm font-semibold tracking-tight', compact ? 'text-slate-950 dark:text-white' : 'text-white')}>{brandName}</div>
         {!compact && <div className="mt-0.5 truncate font-mono text-[9px] uppercase tracking-[0.14em] text-slate-400">Control room</div>}

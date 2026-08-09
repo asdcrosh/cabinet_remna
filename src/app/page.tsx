@@ -6,9 +6,9 @@ import {
   CreditCard,
   KeyRound,
   QrCode,
-  ShieldCheck,
   Wifi,
 } from 'lucide-react'
+import { BrandLogo } from '@/components/brand-logo'
 import { getCurrentUser } from '@/lib/auth/cookies'
 import { getBrandName } from '@/lib/branding'
 import { legalNavigation } from '@/lib/legal-links'
@@ -62,9 +62,7 @@ export default async function HomePage() {
 
         <header className="site-header mx-auto flex h-[4.5rem] max-w-[88rem] items-center justify-between gap-4 border-b px-4 sm:h-20 sm:px-6 lg:px-8">
           <Link href="/" className="flex min-w-0 items-center gap-3" aria-label={`${brandName}, главная`}>
-            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-md bg-slate-950 text-white dark:bg-white dark:text-slate-950">
-              <ShieldCheck className="h-5 w-5" />
-            </span>
+            <BrandLogo className="h-10 w-10" priority />
             <span className="truncate text-sm font-semibold sm:text-base">{brandName}</span>
           </Link>
 
@@ -136,7 +134,7 @@ export default async function HomePage() {
 
           <ol className="grid gap-px bg-white/[0.08] sm:grid-cols-3">
             {steps.map(([number, title, description]) => (
-              <li key={number} className="flex gap-3 bg-slate-900/95 p-5">
+              <li key={number} className="site-band-step flex gap-3 p-5">
                 <span className="grid h-10 w-10 shrink-0 place-items-center rounded-md border border-brand-300/30 font-mono text-xs font-semibold text-brand-200">{number}</span>
                 <div>
                   <h3 className="font-semibold text-white">{title}</h3>
@@ -151,7 +149,7 @@ export default async function HomePage() {
       <footer className="border-t border-slate-200/80 px-4 py-8 sm:px-6 dark:border-white/[0.08]">
         <div className="mx-auto flex max-w-[88rem] flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
           <Link href="/" className="flex items-center gap-2.5 text-sm font-semibold">
-            <span className="grid h-8 w-8 place-items-center rounded-md bg-slate-950 text-white dark:bg-white dark:text-slate-950"><ShieldCheck className="h-4 w-4" /></span>
+            <BrandLogo className="h-8 w-8" />
             {brandName}
           </Link>
           <nav aria-label="Правовая информация" className="flex flex-wrap gap-x-4 gap-y-2 text-xs text-slate-500 dark:text-slate-400">
@@ -173,7 +171,7 @@ function CabinetPreview({ brandName }: { brandName: string }) {
       <div className="site-preview overflow-hidden border p-4">
         <div className="flex items-center justify-between px-1 pb-3">
           <div className="flex items-center gap-2.5">
-            <span className="grid h-8 w-8 place-items-center rounded-md bg-slate-950 text-white dark:bg-white dark:text-slate-950"><ShieldCheck className="h-4 w-4" /></span>
+            <BrandLogo className="h-8 w-8" />
             <div>
               <p className="max-w-40 truncate text-xs font-semibold text-slate-900 dark:text-white">{brandName}</p>
               <p className="text-[10px] text-slate-400">Личный кабинет</p>
@@ -182,7 +180,7 @@ function CabinetPreview({ brandName }: { brandName: string }) {
           <span className="flex items-center gap-1.5 rounded-sm bg-emerald-50 px-2 py-1 font-mono text-[9px] font-semibold uppercase tracking-wide text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-300"><span className="h-1.5 w-1.5 bg-emerald-500" />Активна</span>
         </div>
 
-        <div className="rounded-xl border-l-2 border-brand-400 bg-[#111713] p-4 text-white sm:p-5">
+        <div className="site-preview-access rounded-xl border-l-2 border-brand-400 p-4 text-white sm:p-5">
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-xs text-white/50">Подписка</p>

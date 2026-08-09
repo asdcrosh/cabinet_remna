@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import type { ReactNode } from 'react'
 import { ArrowLeft, ShieldCheck } from 'lucide-react'
+import { BrandLogo } from '@/components/brand-logo'
 import { getBrandName } from '@/lib/branding'
 import { TelegramMiniAppAuth } from './telegram-miniapp-auth'
 
@@ -28,9 +29,7 @@ export function AuthLayout({
         <div aria-hidden="true" className="absolute inset-y-0 left-0 w-0.5 bg-brand-300" />
         <nav aria-label="Основная навигация" className="relative flex items-center justify-between gap-4">
           <Link href="/" className="flex min-w-0 items-center gap-3">
-            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-md border border-white/20 bg-white text-slate-950">
-              <ShieldCheck className="h-6 w-6" />
-            </div>
+            <BrandLogo className="h-11 w-11" priority />
             <div className="min-w-0">
               <div className="truncate font-semibold">{brandName}</div>
               <div className="text-sm text-white/55">Личный кабинет</div>
@@ -58,9 +57,7 @@ export function AuthLayout({
         <div className="w-full max-w-[32rem]">
           <nav aria-label="Основная навигация" className="mb-5 flex items-center justify-between gap-3 lg:hidden">
             <Link href="/" className="flex min-w-0 items-center gap-3">
-              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-md bg-slate-950 text-white dark:bg-white dark:text-slate-950">
-                <ShieldCheck className="h-5 w-5" />
-              </div>
+              <BrandLogo className="h-10 w-10" priority />
               <span className="truncate font-semibold text-slate-950 dark:text-white">{brandName}</span>
             </Link>
             <Link href="/" aria-label="Вернуться на главную" className="grid h-10 w-10 shrink-0 place-items-center rounded-md border border-slate-300 bg-white text-slate-600 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-300">

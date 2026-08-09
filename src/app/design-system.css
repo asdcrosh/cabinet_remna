@@ -1,19 +1,19 @@
 :root {
-  --app-bg: #f1f0e9;
-  --app-surface: #fbfaf6;
-  --app-surface-soft: #e8e8df;
-  --app-surface-strong: #d9dbd1;
-  --app-text: #17211c;
-  --app-muted: #667069;
-  --app-border: #d5d8cf;
-  --app-border-strong: #b9c0b7;
-  --app-accent: #ed5a3a;
-  --app-accent-hover: #d94729;
-  --app-accent-soft: #fbe4da;
-  --app-ink: #183b2b;
-  --app-ink-hover: #214b38;
-  --app-signal: #c6ee73;
-  --app-success: #1f8c63;
+  --app-bg: #f7f5ff;
+  --app-surface: #fefcff;
+  --app-surface-soft: #efebfa;
+  --app-surface-strong: #ded6ef;
+  --app-text: #201536;
+  --app-muted: #716983;
+  --app-border: #ddd7ec;
+  --app-border-strong: #bdb2d3;
+  --app-accent: #d832d4;
+  --app-accent-hover: #b923bc;
+  --app-accent-soft: #f8ddfb;
+  --app-ink: #5424bc;
+  --app-ink-hover: #6a31dc;
+  --app-signal: #35d9ff;
+  --app-success: #199a73;
   --app-danger: #cf3f3f;
   --app-radius: 12px;
   --app-radius-sm: 7px;
@@ -32,7 +32,7 @@ body {
 
 ::selection {
   background: var(--app-signal);
-  color: #102219;
+  color: #17102d;
 }
 
 .dashboard-shell {
@@ -43,8 +43,8 @@ body {
 .dashboard-sidebar {
   width: 15.5rem !important;
   border-color: rgba(255, 255, 255, 0.1) !important;
-  background: var(--app-ink);
-  color: #f8f8f1;
+  background: linear-gradient(165deg, #100626 0%, #241052 58%, #111636 100%);
+  color: #fbf7ff;
 }
 
 .dashboard-sidebar::after {
@@ -52,7 +52,7 @@ body {
   inset: 0 0 0 auto;
   width: 1px;
   content: "";
-  background: linear-gradient(to bottom, var(--app-signal) 0 4rem, rgba(255, 255, 255, 0.08) 4rem 100%);
+  background: linear-gradient(to bottom, var(--app-accent) 0 4rem, rgba(53, 217, 255, 0.45) 4rem 8rem, rgba(255, 255, 255, 0.08) 8rem 100%);
 }
 
 .dashboard-sidebar-scroll {
@@ -68,14 +68,14 @@ body {
 
 .dashboard-sidebar nav a[aria-current="page"],
 .dashboard-sidebar nav a[data-active="true"] {
-  background: var(--app-signal) !important;
-  color: #102219 !important;
+  background: linear-gradient(100deg, #d832d4, #7d45ee) !important;
+  color: #fff !important;
   box-shadow: none !important;
 }
 
 .dashboard-sidebar nav a[aria-current="page"] svg,
 .dashboard-sidebar nav a[data-active="true"] svg {
-  color: #183b2b !important;
+  color: #fff !important;
 }
 
 .dashboard-sidebar nav a[aria-current="page"]::after,
@@ -86,12 +86,13 @@ body {
   height: 0.32rem;
   border-radius: 999px;
   content: "";
-  background: #fff;
+  background: var(--app-signal);
+  box-shadow: 0 0 12px rgba(53, 217, 255, 0.85);
 }
 
 .dashboard-sidebar .text-slate-500,
 .dashboard-sidebar .text-slate-400 {
-  color: #9caaa2 !important;
+  color: #aaa0c5 !important;
 }
 
 .dashboard-sidebar .border-slate-200,
@@ -100,10 +101,7 @@ body {
 }
 
 .dashboard-brand .brand-mark {
-  border-radius: 50% !important;
-  border-color: rgba(255, 255, 255, 0.14) !important;
-  background: transparent !important;
-  color: var(--app-signal) !important;
+  border-radius: 9px !important;
 }
 
 .dashboard-topbar {
@@ -285,7 +283,7 @@ body {
 
 .table-shell th,
 .admin-list-header {
-  color: #68736b !important;
+  color: #746a87 !important;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 0.62rem !important;
   font-weight: 750 !important;
@@ -373,8 +371,8 @@ textarea:focus {
 }
 
 .badge-active {
-  background: #dcefdc !important;
-  color: #1f633f !important;
+  background: #e4f8f3 !important;
+  color: #157659 !important;
 }
 
 .access-pass,
@@ -489,7 +487,7 @@ textarea:focus {
 .plan-period-panel [role="radio"][aria-checked="true"] {
   border-color: var(--app-ink) !important;
   border-left-color: var(--app-accent) !important;
-  background: #eef0e7 !important;
+  background: #f2eaff !important;
 }
 
 .plan-period-panel [role="radio"][aria-checked="true"] > span:first-child {
@@ -616,12 +614,40 @@ textarea:focus {
 
 .dashboard-mobile-nav [aria-current="page"] {
   border-color: transparent !important;
-  background: var(--app-ink) !important;
+  background: linear-gradient(100deg, var(--app-accent), #7648ee) !important;
   color: #fff !important;
 }
 
 .site-shell {
   background: var(--app-bg) !important;
+}
+
+.site-shell > section:first-child {
+  background:
+    radial-gradient(circle at 78% 15%, color-mix(in srgb, var(--app-accent) 11%, transparent), transparent 28rem),
+    radial-gradient(circle at 88% 50%, color-mix(in srgb, var(--app-signal) 9%, transparent), transparent 22rem);
+}
+
+.site-band {
+  background: linear-gradient(135deg, #170830, #37116a 58%, #15245a);
+  border-left-color: var(--app-accent) !important;
+}
+
+.site-preview {
+  border-color: var(--app-border) !important;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--app-surface) 92%, transparent);
+  box-shadow: 0 24px 70px rgba(79, 23, 108, 0.13);
+}
+
+.site-preview-access {
+  background:
+    radial-gradient(circle at 100% 0, rgba(53, 217, 255, 0.16), transparent 13rem),
+    linear-gradient(135deg, #15082e, #331068 72%, #172458);
+}
+
+.site-band-step {
+  background: rgba(12, 7, 31, 0.72);
 }
 
 .auth-shell {
@@ -630,7 +656,17 @@ textarea:focus {
 
 .auth-aside {
   border-color: rgba(255, 255, 255, 0.1) !important;
-  background: var(--app-ink) !important;
+  background:
+    linear-gradient(145deg, rgba(216, 50, 212, 0.16), transparent 40%),
+    radial-gradient(circle at 90% 72%, rgba(53, 217, 255, 0.14), transparent 23rem),
+    linear-gradient(165deg, #0f0525, #2c0e5d 58%, #111c46) !important;
+}
+
+.brand-logo {
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 9px;
+  background: #13072d;
+  box-shadow: 0 0 0 1px rgba(216, 50, 212, 0.14), 0 8px 24px rgba(69, 20, 132, 0.2);
 }
 
 .auth-panel,
@@ -673,25 +709,25 @@ textarea:focus {
 }
 
 .dark {
-  --app-bg: #0e1411;
-  --app-surface: #151d19;
-  --app-surface-soft: #1d2822;
-  --app-surface-strong: #28352e;
-  --app-text: #f2f3ec;
-  --app-muted: #99a49d;
-  --app-border: rgba(236, 241, 232, 0.1);
-  --app-border-strong: rgba(236, 241, 232, 0.18);
-  --app-accent: #ff7959;
-  --app-accent-hover: #ff8c70;
-  --app-accent-soft: rgba(255, 121, 89, 0.13);
-  --app-ink: #214b38;
-  --app-ink-hover: #2b5d47;
-  --app-signal: #c6ee73;
+  --app-bg: #080716;
+  --app-surface: #110d24;
+  --app-surface-soft: #1a1433;
+  --app-surface-strong: #2a2147;
+  --app-text: #f9f5ff;
+  --app-muted: #aaa1bb;
+  --app-border: rgba(221, 210, 255, 0.12);
+  --app-border-strong: rgba(221, 210, 255, 0.22);
+  --app-accent: #f04ee9;
+  --app-accent-hover: #ff6af5;
+  --app-accent-soft: rgba(240, 78, 233, 0.14);
+  --app-ink: #6330d8;
+  --app-ink-hover: #7745ef;
+  --app-signal: #35d9ff;
   --app-shadow: none;
 }
 
 .dark .dashboard-sidebar {
-  background: #101713;
+  background: linear-gradient(165deg, #080518, #1a0b38 62%, #0b132d);
 }
 
 .dark .dashboard-topbar {
@@ -703,7 +739,7 @@ textarea:focus {
 }
 
 .dark .plan-period-panel [role="radio"][aria-checked="true"] {
-  background: rgba(198, 238, 115, 0.07) !important;
+  background: rgba(216, 50, 212, 0.09) !important;
 }
 
 .dark .dashboard-mobile-nav {

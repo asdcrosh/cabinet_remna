@@ -14,12 +14,13 @@ export const metadata: Metadata = {
   },
   description: `${getBrandName()}: VPN-подписка, подключение и оплата`,
   icons: {
-    icon: '/icon.svg',
+    icon: '/alekseev-vp-logo.jpg',
+    apple: '/alekseev-vp-logo.jpg',
   },
 }
 
 export const viewport: Viewport = {
-  themeColor: '#080b10',
+  themeColor: '#090718',
   width: 'device-width',
   initialScale: 1,
 }

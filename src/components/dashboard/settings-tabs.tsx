@@ -73,7 +73,7 @@ export function SettingsTabs({ sections }: { sections: SettingsTabSection[] }) {
                 }}
               >
                 <span
-                  className={cn('grid h-6 w-6 shrink-0 place-items-center', active ? 'text-[#c6ee73] dark:text-brand-900' : 'text-slate-400')}
+                  className={cn('grid h-6 w-6 shrink-0 place-items-center', active ? 'text-cyan-200 dark:text-brand-900' : 'text-slate-400')}
                 >
                   {tabIcons[section.id]}
                 </span>
