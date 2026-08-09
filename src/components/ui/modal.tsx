@@ -119,14 +119,14 @@ export function Modal({
         aria-describedby={description ? descriptionId : undefined}
         tabIndex={-1}
         className={cn(
-          'flex w-full flex-col overflow-hidden bg-white shadow-[0_32px_90px_rgba(15,23,42,.24)] dark:bg-surface-900',
+          'app-modal-panel flex w-full flex-col overflow-hidden bg-white shadow-[0_32px_90px_rgba(15,23,42,.24)] dark:bg-surface-900',
           variant === 'sheet'
             ? 'h-auto max-h-[90dvh] rounded-t-[22px] border border-b-0 border-slate-200 dark:border-white/10 sm:max-h-[calc(100dvh-40px)] sm:max-w-lg sm:rounded-[16px] sm:border'
             : 'h-auto max-h-[92dvh] rounded-t-[22px] border border-b-0 border-slate-200 dark:border-white/10 sm:max-h-[calc(100dvh-40px)] sm:max-w-lg sm:rounded-[16px] sm:border',
           panelClassName,
         )}
       >
-        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-slate-200 px-5 py-[1.125rem] dark:border-white/10">
+        <div className="app-modal-header flex shrink-0 items-start justify-between gap-4 border-b border-slate-200 px-5 py-[1.125rem] dark:border-white/10">
           <div>
             <h2 id={titleId} className="text-base font-semibold text-slate-950 dark:text-white">
               {title}
@@ -144,7 +144,7 @@ export function Modal({
         <div className={cn('min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4', bodyClassName)}>
           {children}
         </div>
-        {footer ? <div className="shrink-0 border-t border-slate-200 px-5 py-4 dark:border-white/10">{footer}</div> : null}
+        {footer ? <div className="app-modal-footer shrink-0 border-t border-slate-200 px-5 py-4 dark:border-white/10">{footer}</div> : null}
       </div>
     </div>,
     document.body

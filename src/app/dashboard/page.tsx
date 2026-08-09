@@ -67,7 +67,7 @@ export default async function DashboardHome() {
 
   if (!user.remnawaveUsername) {
     return (
-      <div className="page-stack">
+      <div className="user-workspace page-stack">
         <HomeHeader
           name={dashboardDisplayName(user.name, user.email)}
           description={user.payments[0]
@@ -129,7 +129,7 @@ export default async function DashboardHome() {
   const primaryHomeNudge = getPrimaryHomeNudge(onboardingState)
 
   return (
-    <div className="page-stack">
+    <div className="user-workspace page-stack">
       <HomeHeader
         name={dashboardDisplayName(user.name, user.email)}
         description={subscriptionExpired
@@ -263,7 +263,7 @@ export default async function DashboardHome() {
 
 function HomeHeader({ name, description }: { name: string; description: string }) {
   return (
-    <header className="pb-1">
+    <header className="home-intro pb-1">
       <h1 className="text-[1.8rem] font-semibold leading-tight tracking-[-0.04em] text-slate-950 dark:text-white sm:text-[2rem]">
         Добрый день, {name}
       </h1>

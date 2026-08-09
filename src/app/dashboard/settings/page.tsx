@@ -31,13 +31,13 @@ export default async function SettingsPage() {
   ].filter((item) => item.visible)
 
   return (
-    <div className="mx-auto max-w-5xl page-stack">
+    <div className="user-workspace mx-auto max-w-6xl page-stack">
       <PageHeader
         title="Аккаунт"
         description="Личные данные и безопасность."
       />
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_17.5rem] xl:items-start">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_15rem] xl:items-start">
         <div className="min-w-0">
           <SettingsTabs
             sections={[

@@ -1334,25 +1334,3 @@
     display: none;
   }
 }
-
-@layer utilities {
-  .dashboard-shell .rounded-3xl {
-    border-radius: 0.875rem;
-  }
-
-  .dashboard-shell .rounded-2xl {
-    border-radius: 0.625rem;
-  }
-
-  .dashboard-shell .rounded-xl {
-    border-radius: 0.5rem;
-  }
-
-  .dashboard-shell [class*="rounded-[1."] {
-    border-radius: 0.75rem;
-  }
-
-  .dashboard-shell [class*="rounded-[2"] {
-    border-radius: 0.875rem;
-  }
-}

@@ -122,7 +122,7 @@ export default async function PlansPage({
   }))
 
   return (
-    <div className="page-stack">
+    <div className="user-workspace page-stack">
       <PageHeader
         title="Тарифы"
         description="Выберите период подписки."

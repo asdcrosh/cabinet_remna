@@ -86,7 +86,7 @@ export default async function SubscriptionPage() {
       : 'Подписка не активна'
 
   return (
-    <div className="page-stack">
+    <div className="user-workspace page-stack">
       <PageHeader
         title="Подключение"
         description="Добавьте подписку в приложение и управляйте своими устройствами."

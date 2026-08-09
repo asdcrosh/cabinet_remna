@@ -178,7 +178,7 @@ export function KeysCard({ subscriptionUrl, happLink }: KeysCardProps) {
     <section
       id="connection"
       aria-labelledby="connection-title"
-      className="overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.03]"
+      className="connection-panel overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.03]"
     >
       <header className="flex items-start justify-between gap-4 border-b border-slate-200 p-4 dark:border-white/10 sm:p-5">
         <div className="min-w-0">
