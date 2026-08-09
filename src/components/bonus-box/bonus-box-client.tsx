@@ -90,6 +90,7 @@ export function BonusBoxClient({
       })
       .join(", ")})`;
   }, [segmentAngle, wheelPrizes]);
+  const normalizedWheelRotation = ((wheelRotation % 360) + 360) % 360;
 
   const canOpen = !data.canOpenReason && !opening;
   const subscribeCta = Boolean(data.canOpenReason?.includes("подписк"));
@@ -303,7 +304,8 @@ export function BonusBoxClient({
               <div className="bonus-wheel-frame">
                 <div className="bonus-wheel-pointer" aria-hidden="true"><span /></div>
                 <div
-                  className="bonus-wheel"
+                  className={cn("bonus-wheel", wheelPrizes.length > 8 && "bonus-wheel--dense")}
+                  aria-label={`Колесо с ${wheelPrizes.length} вариантами призов`}
                   style={{
                     "--bonus-segment-size": `${segmentAngle}deg`,
                     background: wheelBackground,
@@ -317,9 +319,13 @@ export function BonusBoxClient({
                     const angle = (index + 0.5) * segmentAngle;
                     return (
                       <div key={prize.id} className="bonus-wheel-segment" style={{ transform: `rotate(${angle}deg)` }}>
-                        <div className="bonus-wheel-segment-copy">
-                          <span>{prizeLabel(prize)}</span>
-                          <small>{prize.title}</small>
+                        <div
+                          className="bonus-wheel-segment-copy"
+                          title={`${prize.title}: ${prizeLabel(prize)}`}
+                          style={{ transform: `translateX(-50%) rotate(${-angle - normalizedWheelRotation}deg)` }}
+                        >
+                          <span>{wheelPrizeLabel(prize)}</span>
+                          {wheelPrizes.length <= 8 && <small>{prize.title}</small>}
                         </div>
                       </div>
                     );
@@ -629,6 +635,14 @@ function turnWord(value: number) {
   if (mod10 === 1) return 'ход';
   if (mod10 >= 2 && mod10 <= 4) return 'хода';
   return 'ходов';
+}
+
+function wheelPrizeLabel(prize: BonusBoxPrizeView) {
+  if (prize.type === 'NO_PRIZE') return 'Ещё раз';
+  if (prize.type === 'SUBSCRIPTION_DAYS') return `+${prize.value} д`;
+  if (prize.type === 'TRAFFIC_GB') return `+${prize.value} ГБ`;
+  if (prize.type === 'BONUS_ATTEMPTS') return `+${prize.value} ход`;
+  return `−${prize.value}%`;
 }
 
 function BonusEngagementPanel({

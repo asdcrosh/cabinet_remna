@@ -1512,6 +1512,30 @@
     font-weight: 600;
   }
 
+  .bonus-wheel--dense .bonus-wheel-segment-copy {
+    top: 6.5%;
+    width: 4.25rem;
+  }
+
+  .bonus-wheel--dense .bonus-wheel-segment-copy span {
+    display: inline-flex;
+    min-height: 1.7rem;
+    max-width: 100%;
+    align-items: center;
+    justify-content: center;
+    padding: 0.24rem 0.42rem;
+    overflow: visible;
+    border: 1px solid rgb(255 255 255 / 0.22);
+    border-radius: 999px;
+    background: rgb(9 5 27 / 0.58);
+    box-shadow: 0 5px 14px rgb(5 2 20 / 0.18);
+    font-size: 0.69rem;
+    font-weight: 760;
+    letter-spacing: -0.025em;
+    line-height: 1;
+    text-overflow: clip;
+  }
+
   .bonus-wheel-hub {
     position: absolute;
     top: 50%;
@@ -1657,6 +1681,17 @@
 
     .bonus-wheel-segment-copy small {
       font-size: 0.5rem;
+    }
+
+    .bonus-wheel--dense .bonus-wheel-segment-copy {
+      top: 5.5%;
+      width: 3.25rem;
+    }
+
+    .bonus-wheel--dense .bonus-wheel-segment-copy span {
+      min-height: 1.35rem;
+      padding: 0.18rem 0.28rem;
+      font-size: 0.56rem;
     }
 
     .bonus-wheel-hub {
