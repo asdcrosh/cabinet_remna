@@ -9,6 +9,7 @@ import {
   Copy,
   CreditCard,
   Gift,
+  LoaderCircle,
   Sparkles,
   ShoppingCart,
   TicketPercent,
@@ -46,10 +47,10 @@ import type {
 
 export type { BonusBoxPrizeView } from "@/components/bonus-box/bonus-box-types";
 
-const WHEEL_DURATION_MS = 3400;
+const WHEEL_DURATION_MS = 4300;
 const REVEAL_EFFECT_DURATION_MS = 900;
 const BONUS_TABS: BonusBoxTab[] = ["missions", "outcomes", "history"];
-const WHEEL_COLORS = ["#31126f", "#7029cf", "#b62bc1", "#4c1f9c", "#17627f"];
+const WHEEL_COLORS = ["#31126f", "#5b25b3", "#792aca", "#47208e"];
 
 export function BonusBoxClient({
   initialData,
@@ -82,11 +83,11 @@ export function BonusBoxClient({
   const segmentAngle = 360 / Math.max(1, wheelPrizes.length);
   const wheelBackground = useMemo(() => {
     if (wheelPrizes.length === 0) return WHEEL_COLORS[0];
-    return `conic-gradient(from -90deg, ${wheelPrizes
-      .map((_, index) => {
+    return `conic-gradient(from 0deg, ${wheelPrizes
+      .map((prize, index) => {
         const start = index * segmentAngle;
         const end = (index + 1) * segmentAngle;
-        return `${WHEEL_COLORS[index % WHEEL_COLORS.length]} ${start}deg ${end}deg`;
+        return `${wheelSegmentColor(prize, index)} ${start}deg ${end}deg`;
       })
       .join(", ")})`;
   }, [segmentAngle, wheelPrizes]);
@@ -201,7 +202,7 @@ export function BonusBoxClient({
       setWheelRotation((current) => {
         const normalized = ((current % 360) + 360) % 360;
         const correction = (targetRotation - normalized + 360) % 360;
-        return current + correction + 360 * 6;
+        return current + correction + 360 * 7;
       });
 
       if (reducedMotion) {
@@ -256,19 +257,7 @@ export function BonusBoxClient({
       <Gift className="h-4 w-4 text-cyan-600 dark:text-cyan-300" />
       <span>{openButtonLabel}</span>
     </div>
-  ) : (
-    <button
-      type="button"
-      className={cn(openButtonClass, "w-full")}
-      onClick={openBox}
-      disabled={!canOpen}
-    >
-      <span className="relative flex items-center justify-center gap-2">
-        <Gift className="h-4 w-4" />
-        <span>{opening ? "Колесо вращается" : openButtonLabel}</span>
-      </span>
-    </button>
-  );
+  ) : null;
 
   return (
     <div className="flex flex-col gap-4 sm:gap-5">
@@ -311,7 +300,7 @@ export function BonusBoxClient({
                     background: wheelBackground,
                     transform: `rotate(${wheelRotation}deg)`,
                     transition: opening && !reducedMotion
-                      ? `transform ${WHEEL_DURATION_MS}ms cubic-bezier(.12,.72,.05,1)`
+                      ? `transform ${WHEEL_DURATION_MS}ms cubic-bezier(.08,.74,.09,1)`
                       : "none",
                   } as CSSProperties}
                 >
@@ -320,7 +309,13 @@ export function BonusBoxClient({
                     return (
                       <div key={prize.id} className="bonus-wheel-segment" style={{ transform: `rotate(${angle}deg)` }}>
                         <div
-                          className="bonus-wheel-segment-copy"
+                          className={cn(
+                            "bonus-wheel-segment-copy",
+                            prize.rarity === "EPIC" && "bonus-wheel-segment-copy--epic",
+                            prize.rarity === "LEGENDARY" && "bonus-wheel-segment-copy--legendary",
+                            result?.prize.id === prize.id && "bonus-wheel-segment-copy--winner",
+                          )}
+                          data-rarity={prize.rarity}
                           title={`${prize.title}: ${prizeLabel(prize)}`}
                           style={{ transform: `translateX(-50%) rotate(${-angle - normalizedWheelRotation}deg)` }}
                         >
@@ -331,11 +326,20 @@ export function BonusBoxClient({
                     );
                   })}
                 </div>
-                <div className="bonus-wheel-hub" aria-hidden="true">
-                  <Sparkles className="h-4 w-4" />
+                <button
+                  type="button"
+                  className="bonus-wheel-hub"
+                  onClick={openBox}
+                  disabled={!canOpen}
+                  aria-label={`${openButtonLabel}. Доступно: ${availableNow} ${turnWord(availableNow)}`}
+                >
+                  <span className="bonus-wheel-hub-icon" aria-hidden="true">
+                    {opening ? <LoaderCircle /> : <Sparkles />}
+                  </span>
                   <strong>{availableNow}</strong>
-                  <span>{turnWord(availableNow)}</span>
-                </div>
+                  <span className="bonus-wheel-hub-count-label">{turnWord(availableNow)}</span>
+                  <em>{opening ? "Крутим" : canOpen ? "Нажать" : "Закрыто"}</em>
+                </button>
               </div>
             </div>
 
@@ -343,13 +347,13 @@ export function BonusBoxClient({
               <div>
                 <div className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-600 dark:text-brand-300">Ваш ход</div>
                 <p className="mt-2 text-lg font-semibold tracking-tight text-slate-950 dark:text-white">
-                  {opening ? "Колесо уже запущено" : "Один запуск, один результат"}
+                  {opening ? "Колесо уже запущено" : "Нажмите на центр колеса"}
                 </p>
                 <p className="mt-1 text-sm leading-6 text-slate-500 dark:text-slate-400">
                   {data.canOpenReason || "Подарок определяется на сервере и сразу сохраняется в истории."}
                 </p>
               </div>
-              <div className="mt-5">{openCaseCta}</div>
+              {openCaseCta && <div className="mt-5">{openCaseCta}</div>}
               {opening && pendingResult && !reducedMotion && (
                 <button
                   type="button"
@@ -643,6 +647,13 @@ function wheelPrizeLabel(prize: BonusBoxPrizeView) {
   if (prize.type === 'TRAFFIC_GB') return `+${prize.value} ГБ`;
   if (prize.type === 'BONUS_ATTEMPTS') return `+${prize.value} ход`;
   return `−${prize.value}%`;
+}
+
+function wheelSegmentColor(prize: BonusBoxPrizeView, index: number) {
+  if (prize.rarity === 'LEGENDARY') return index % 2 === 0 ? '#c77b17' : '#df9b22';
+  if (prize.rarity === 'EPIC') return index % 2 === 0 ? '#b122b5' : '#d032c8';
+  if (prize.rarity === 'RARE') return index % 2 === 0 ? '#17627f' : '#1b7892';
+  return WHEEL_COLORS[index % WHEEL_COLORS.length];
 }
 
 function BonusEngagementPanel({
