@@ -14,13 +14,15 @@ import {
   ShoppingCart,
   TicketPercent,
   Users,
+  Volume2,
+  VolumeX,
+  X,
   Zap,
 } from "lucide-react";
 import { apiFetch } from "@/lib/api-client";
 import { toast } from "@/components/ui/toaster";
 import { cn } from "@/lib/cn";
 import {
-  bonusBoxResultClass,
   bonusBoxRevealClass,
   formatDate,
   formatDateOnly,
@@ -51,6 +53,9 @@ const WHEEL_DURATION_MS = 5000;
 const REVEAL_EFFECT_DURATION_MS = 900;
 const BONUS_TABS: BonusBoxTab[] = ["missions", "outcomes", "history"];
 const WHEEL_COLORS = ["#31126f", "#5b25b3", "#792aca", "#47208e"];
+const SOUND_PREFERENCE_KEY = "bonus-wheel-sound:v1";
+const PENDING_OPENING_KEY = "bonus-wheel-pending:v1";
+const OPENING_STARTED_KEY = "bonus-wheel-opening-started:v1";
 
 export function BonusBoxClient({
   initialData,
@@ -69,6 +74,7 @@ export function BonusBoxClient({
     initialData.events.length > 0 || initialData.missions.length > 0 ? "missions" : "outcomes",
   );
   const [reducedMotion, setReducedMotion] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState(true);
   const [claimingMissionId, setClaimingMissionId] = useState<string | null>(null);
   const effectTimerRef = useRef<number | null>(null);
   const wheelFrameRef = useRef<number | null>(null);
@@ -76,6 +82,10 @@ export function BonusBoxClient({
   const wheelPointerRef = useRef<HTMLDivElement | null>(null);
   const targetWheelRotationRef = useRef<number | null>(null);
   const finishingRef = useRef(false);
+  const requestInFlightRef = useRef(false);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const lastTickSegmentRef = useRef<number | null>(null);
+  const lastTickAtRef = useRef(0);
   const canUseWelcomeAttempts =
     !data.hasActiveSubscription && data.welcomeAttemptsCount > 0;
   const availableNow = data.hasActiveSubscription
@@ -127,10 +137,131 @@ export function BonusBoxClient({
     };
   }, []);
 
+  useEffect(() => {
+    try {
+      const preference = window.localStorage.getItem(SOUND_PREFERENCE_KEY);
+      setSoundEnabled(preference !== "off");
+    } catch {
+      setSoundEnabled(true);
+    }
+
+    const restored = readStoredOpening();
+    if (restored) {
+      setResult(restored);
+      return;
+    }
+
+    const startedAt = readOpeningStartedAt();
+    if (!Number.isFinite(startedAt) || startedAt <= 0) return;
+    const recovered = initialData.openings.find(
+      (opening) => new Date(opening.createdAt).getTime() >= startedAt - 2_000,
+    );
+    if (!recovered) return;
+
+    const response: OpenBoxResponse = {
+      ...recovered,
+      reel: initialData.prizes,
+      winningIndex: Math.max(0, initialData.prizes.findIndex((prize) => prize.id === recovered.prize.id)),
+      stopOffsetRatio: 0.5,
+      remainingAttempts: initialData.attemptsCount,
+    };
+    storeOpening(response);
+    setResult(response);
+  }, [initialData.attemptsCount, initialData.openings, initialData.prizes]);
+
   useEffect(() => () => {
     if (effectTimerRef.current !== null) window.clearTimeout(effectTimerRef.current);
     if (wheelFrameRef.current !== null) window.cancelAnimationFrame(wheelFrameRef.current);
+    void audioContextRef.current?.close();
   }, []);
+
+  function prepareSound() {
+    if (!soundEnabled || audioContextRef.current) return;
+    try {
+      audioContextRef.current = new AudioContext();
+    } catch {
+      audioContextRef.current = null;
+    }
+  }
+
+  function playTone(frequency: number, duration: number, volume: number, delay = 0) {
+    if (!soundEnabled) return;
+    const context = audioContextRef.current;
+    if (!context) return;
+    if (context.state === "suspended") void context.resume();
+
+    const startsAt = context.currentTime + delay;
+    const oscillator = context.createOscillator();
+    const gain = context.createGain();
+    oscillator.type = "triangle";
+    oscillator.frequency.setValueAtTime(frequency, startsAt);
+    gain.gain.setValueAtTime(0.0001, startsAt);
+    gain.gain.exponentialRampToValueAtTime(volume, startsAt + 0.008);
+    gain.gain.exponentialRampToValueAtTime(0.0001, startsAt + duration);
+    oscillator.connect(gain);
+    gain.connect(context.destination);
+    oscillator.start(startsAt);
+    oscillator.stop(startsAt + duration + 0.02);
+  }
+
+  function playWheelTick(rotation: number, progress: number) {
+    const tickSegment = Math.floor(positiveModulo(rotation, 360) / segmentAngle);
+    const now = performance.now();
+    if (tickSegment === lastTickSegmentRef.current || now - lastTickAtRef.current < 38) return;
+    lastTickSegmentRef.current = tickSegment;
+    lastTickAtRef.current = now;
+    playTone(780 - progress * 260, 0.035, 0.026);
+  }
+
+  function playWinSound(response: OpenBoxResponse) {
+    if (response.prize.type === "NO_PRIZE") {
+      playTone(220, 0.14, 0.035);
+      return;
+    }
+    const notes = response.prize.rarity === "LEGENDARY"
+      ? [523, 659, 784, 1047]
+      : response.prize.rarity === "EPIC"
+        ? [440, 554, 659]
+        : response.prize.rarity === "RARE"
+          ? [392, 494, 587]
+          : [392, 523];
+    notes.forEach((frequency, index) => playTone(frequency, 0.19, 0.045, index * 0.085));
+  }
+
+  function toggleSound() {
+    const nextValue = !soundEnabled;
+    setSoundEnabled(nextValue);
+    try {
+      window.localStorage.setItem(SOUND_PREFERENCE_KEY, nextValue ? "on" : "off");
+    } catch {
+      // Настройка останется активной до перезагрузки страницы.
+    }
+    if (nextValue) {
+      try {
+        if (!audioContextRef.current) audioContextRef.current = new AudioContext();
+      } catch {
+        audioContextRef.current = null;
+      }
+      const context = audioContextRef.current;
+      if (!context) return;
+      if (context.state === "suspended") void context.resume();
+      const oscillator = context.createOscillator();
+      const gain = context.createGain();
+      oscillator.frequency.setValueAtTime(520, context.currentTime);
+      gain.gain.setValueAtTime(0.025, context.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.07);
+      oscillator.connect(gain);
+      gain.connect(context.destination);
+      oscillator.start();
+      oscillator.stop(context.currentTime + 0.08);
+    }
+  }
+
+  function dismissResult() {
+    setRevealEffect(false);
+    setResult(null);
+    clearStoredOpening();
+  }
 
   function settleWheel(targetRotation = targetWheelRotationRef.current) {
     if (wheelFrameRef.current !== null) {
@@ -156,6 +287,7 @@ export function BonusBoxClient({
       const rotation = startRotation + distance * progress;
 
       if (wheelRef.current) wheelRef.current.style.transform = `rotate(${rotation}deg)`;
+      playWheelTick(rotation, progress);
       if (wheelPointerRef.current) {
         const phase = positiveModulo(rotation, segmentAngle) / segmentAngle;
         const deflection = phase < 0.72
@@ -184,8 +316,10 @@ export function BonusBoxClient({
     finishingRef.current = true;
     settleWheel();
     setResult(response);
+    storeOpening(response);
     setPendingResult(null);
     setRevealEffect(!reducedMotion);
+    playWinSound(response);
     const freshData = await apiFetch<BonusBoxOverview>("/api/bonus-box").catch(() => null);
     if (freshData) {
       setData(freshData);
@@ -207,6 +341,7 @@ export function BonusBoxClient({
       }));
     }
     setOpening(false);
+    requestInFlightRef.current = false;
     if (!reducedMotion) {
       effectTimerRef.current = window.setTimeout(() => setRevealEffect(false), REVEAL_EFFECT_DURATION_MS);
     }
@@ -230,7 +365,14 @@ export function BonusBoxClient({
   }
 
   async function openBox() {
-    if (!canOpen) return;
+    if (!canOpen || requestInFlightRef.current) return;
+    requestInFlightRef.current = true;
+    prepareSound();
+    try {
+      window.sessionStorage.setItem(OPENING_STARTED_KEY, String(Date.now()));
+    } catch {
+      // Открытие всё равно защищено серверной транзакцией.
+    }
     finishingRef.current = false;
     setOpening(true);
     setRevealEffect(false);
@@ -242,6 +384,7 @@ export function BonusBoxClient({
         method: "POST",
       });
       setPendingResult(response);
+      storeOpening(response);
 
       const winnerIndex = Math.max(0, wheelPrizes.findIndex((prize) => prize.id === response.prize.id));
       const winnerCenter = (winnerIndex + 0.5) * segmentAngle;
@@ -258,6 +401,8 @@ export function BonusBoxClient({
         animateWheel(wheelRotation, finalRotation, response);
       }
     } catch {
+      requestInFlightRef.current = false;
+      clearStoredOpening();
       setOpening(false);
       setPendingResult(null);
       setRevealEffect(false);
@@ -329,6 +474,15 @@ export function BonusBoxClient({
           <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
             <span className={cn("h-2 w-2 rounded-full", opening ? "animate-pulse bg-fuchsia-400" : "bg-cyan-400")} />
             <span aria-live="polite">{opening ? "Определяем подарок" : result ? `${rarityLabel(result.prize.rarity)} результат` : "Готово к запуску"}</span>
+            <button
+              type="button"
+              className="bonus-wheel-sound-toggle"
+              onClick={toggleSound}
+              aria-label={soundEnabled ? "Выключить звук рулетки" : "Включить звук рулетки"}
+              title={soundEnabled ? "Звук включён" : "Звук выключен"}
+            >
+              {soundEnabled ? <Volume2 /> : <VolumeX />}
+            </button>
           </div>
         </div>
 
@@ -383,10 +537,19 @@ export function BonusBoxClient({
                   <span className="bonus-wheel-hub-count-label">{turnWord(availableNow)}</span>
                   <em>{opening ? "Крутим" : canOpen ? "Нажать" : "Закрыто"}</em>
                 </button>
+                {result && (
+                  <BonusWheelResultOverlay
+                    result={result}
+                    revealEffect={revealEffect}
+                    hasActiveSubscription={data.hasActiveSubscription}
+                    onCopyPromoCode={copyPromoCode}
+                    onClose={dismissResult}
+                  />
+                )}
               </div>
             </div>
 
-            <div className="bonus-wheel-console">
+            <div className={cn("bonus-wheel-console", !openCaseCta && "bonus-wheel-console--informational")}>
               <div>
                 <div className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-600 dark:text-brand-300">Ваш ход</div>
                 <p className="mt-2 text-lg font-semibold tracking-tight text-slate-950 dark:text-white">
@@ -422,114 +585,6 @@ export function BonusBoxClient({
           </div>
         )}
       </section>
-
-      {result && (
-        <section
-          role="status"
-          aria-live="polite"
-          className={cn(
-            "bonus-box-result relative order-2 overflow-hidden rounded-lg border border-l-4 bg-white dark:bg-surface-900",
-            result.prize.type === "NO_PRIZE"
-              ? "border-red-200 dark:border-red-500/40"
-              : "border-emerald-200 dark:border-emerald-500/30",
-            bonusBoxResultClass(result.prize),
-          )}
-        >
-          <div className="relative grid gap-4 p-4 sm:p-5 md:grid-cols-[auto_1fr_auto] md:items-center">
-            <div
-              className={cn(
-                "grid h-14 w-14 place-items-center rounded-2xl border shadow-inner",
-                result.prize.type === "NO_PRIZE"
-                  ? "border-red-200 bg-red-50 text-red-500 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200"
-                  : "border-brand-200 bg-brand-50 text-brand-700 dark:border-brand-300/20 dark:bg-brand-400/10 dark:text-brand-200",
-              )}
-            >
-              {result.prize.type === "NO_PRIZE" ? (
-                <CircleSlash className="h-7 w-7" />
-              ) : (
-                <Sparkles className="h-7 w-7" />
-              )}
-            </div>
-
-            <div className="min-w-0">
-              <div
-                className={cn(
-                  "text-sm font-semibold uppercase tracking-wide",
-                  result.prize.type === "NO_PRIZE"
-                    ? "text-slate-500 dark:text-slate-400"
-                    : "text-brand-700 dark:text-brand-300",
-                )}
-              >
-                {result.prize.type === "NO_PRIZE"
-                  ? "Открытие завершено"
-                  : !result.remoteSynced && prizeRequiresSubscription(result.prize)
-                    ? "Подарок сохранён"
-                    : "Подарок начислен"}
-              </div>
-              <div className="mt-1 text-2xl font-semibold tracking-tight text-slate-950 dark:text-white">
-                {result.prize.title}
-              </div>
-              {(result.prize.description ||
-                result.prize.type === "NO_PRIZE") && (
-                <div className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                  {result.prize.description || "В этот раз без начисления. Следующее открытие может быть удачнее."}
-                </div>
-              )}
-              {result.promoCode && (
-                <div className="mt-3 inline-flex max-w-full flex-wrap items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-100">
-                  <TicketPercent className="h-4 w-4 shrink-0" />
-                  <span className="break-all">{result.promoCode}</span>
-                  {result.promoCodeExpiresAt && (
-                    <span className="text-xs font-medium text-emerald-700/80 dark:text-emerald-100/75">
-                      до {formatDateOnly(result.promoCodeExpiresAt)}
-                    </span>
-                  )}
-                </div>
-              )}
-              {!result.remoteSynced && prizeRequiresSubscription(result.prize) && (
-                <div className="mt-3 border-l-2 border-amber-400 pl-3 text-sm text-amber-700 dark:text-amber-200">
-                  Применение к VPN ещё синхронизируется. Подарок сохранён и не потеряется.
-                </div>
-              )}
-            </div>
-
-            <div className="flex flex-col gap-2 md:justify-self-end">
-              {result.promoCode && (
-                <>
-                  <button
-                    type="button"
-                    className="btn-primary"
-                    onClick={() => copyPromoCode(result.promoCode!)}
-                  >
-                    <Copy className="h-4 w-4" />
-                    Скопировать
-                  </button>
-                  <a className="btn-secondary" href={`/dashboard/plans?promo=${encodeURIComponent(result.promoCode)}`}>
-                    <TicketPercent className="h-4 w-4" />
-                    Применить к тарифу
-                  </a>
-                </>
-              )}
-              {!data.hasActiveSubscription && prizeRequiresSubscription(result.prize) && (
-                <a className="btn-primary" href="/dashboard/plans">
-                  <ShoppingCart className="h-4 w-4" />
-                  Оформить подписку
-                </a>
-              )}
-              <button
-                type="button"
-                className="btn-secondary"
-                onClick={() => {
-                  setRevealEffect(false);
-                  setResult(null);
-                }}
-              >
-                Закрыть
-              </button>
-            </div>
-          </div>
-        </section>
-      )}
 
       <section className="order-4 space-y-4">
         {data.pityProgress.enabled && hasRareOrBetter && (
@@ -673,6 +728,152 @@ export function BonusBoxClient({
       </section>
     </div>
   );
+}
+
+function BonusWheelResultOverlay({
+  result,
+  revealEffect,
+  hasActiveSubscription,
+  onCopyPromoCode,
+  onClose,
+}: {
+  result: OpenBoxResponse;
+  revealEffect: boolean;
+  hasActiveSubscription: boolean;
+  onCopyPromoCode: (code: string) => void;
+  onClose: () => void;
+}) {
+  const isEmpty = result.prize.type === "NO_PRIZE";
+  const isCelebration = !isEmpty && result.prize.rarity !== "COMMON";
+
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      className={cn(
+        "bonus-wheel-result-overlay",
+        `bonus-wheel-result-overlay--${isEmpty ? "empty" : result.prize.rarity.toLowerCase()}`,
+      )}
+    >
+      {revealEffect && isCelebration && (
+        <div className="bonus-wheel-celebration" aria-hidden="true">
+          {Array.from({ length: 18 }, (_, index) => (
+            <span
+              key={index}
+              style={{
+                "--particle-index": index,
+                "--particle-x": `${(index % 6) * 18 - 45}%`,
+                "--particle-delay": `${(index % 5) * 45}ms`,
+              } as CSSProperties}
+            />
+          ))}
+        </div>
+      )}
+
+      <div className="bonus-wheel-result-card">
+        <button type="button" className="bonus-wheel-result-close" onClick={onClose} aria-label="Закрыть результат">
+          <X />
+        </button>
+        <div className="bonus-wheel-result-icon" aria-hidden="true">
+          {isEmpty ? <CircleSlash /> : <Sparkles />}
+        </div>
+        <div className="bonus-wheel-result-kicker">
+          {isEmpty
+            ? "Открытие завершено"
+            : !result.remoteSynced && prizeRequiresSubscription(result.prize)
+              ? "Подарок сохранён"
+              : `${rarityLabel(result.prize.rarity)} подарок`}
+        </div>
+        <strong>{prizeLabel(result.prize)}</strong>
+        <h3>{result.prize.title}</h3>
+        <p>
+          {result.prize.description
+            || (isEmpty
+              ? "В этот раз без начисления. Следующий ход может оказаться удачнее."
+              : "Подарок уже сохранён в вашем кабинете.")}
+        </p>
+
+        {result.promoCode && (
+          <div className="bonus-wheel-result-promo">
+            <TicketPercent />
+            <span>{result.promoCode}</span>
+            {result.promoCodeExpiresAt && <small>до {formatDateOnly(result.promoCodeExpiresAt)}</small>}
+          </div>
+        )}
+
+        {!result.remoteSynced && prizeRequiresSubscription(result.prize) && (
+          <div className="bonus-wheel-result-sync">
+            Применение к VPN ещё синхронизируется. Подарок не потеряется.
+          </div>
+        )}
+
+        <div className="bonus-wheel-result-actions">
+          {result.promoCode && (
+            <button type="button" className="btn-primary" onClick={() => onCopyPromoCode(result.promoCode!)}>
+              <Copy />
+              Скопировать
+            </button>
+          )}
+          {result.promoCode && (
+            <a className="btn-secondary" href={`/dashboard/plans?promo=${encodeURIComponent(result.promoCode)}`}>
+              Применить
+            </a>
+          )}
+          {!hasActiveSubscription && prizeRequiresSubscription(result.prize) && (
+            <a className="btn-primary" href="/dashboard/plans">
+              <ShoppingCart />
+              Оформить подписку
+            </a>
+          )}
+          <button type="button" className="btn-secondary" onClick={onClose}>
+            Готово
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function storeOpening(response: OpenBoxResponse) {
+  try {
+    window.sessionStorage.setItem(PENDING_OPENING_KEY, JSON.stringify(response));
+  } catch {
+    // Результат остаётся сохранён на сервере и доступен в истории.
+  }
+}
+
+function readStoredOpening() {
+  try {
+    const raw = window.sessionStorage.getItem(PENDING_OPENING_KEY);
+    if (!raw) return null;
+    const value = JSON.parse(raw) as Partial<OpenBoxResponse>;
+    if (typeof value.id !== "string" || !value.prize || typeof value.prize.id !== "string") return null;
+    return value as OpenBoxResponse;
+  } catch {
+    try {
+      window.sessionStorage.removeItem(PENDING_OPENING_KEY);
+    } catch {
+      // Хранилище недоступно.
+    }
+    return null;
+  }
+}
+
+function readOpeningStartedAt() {
+  try {
+    return Number(window.sessionStorage.getItem(OPENING_STARTED_KEY));
+  } catch {
+    return 0;
+  }
+}
+
+function clearStoredOpening() {
+  try {
+    window.sessionStorage.removeItem(PENDING_OPENING_KEY);
+    window.sessionStorage.removeItem(OPENING_STARTED_KEY);
+  } catch {
+    // Хранилище может быть недоступно в приватном режиме браузера.
+  }
 }
 
 function positiveModulo(value: number, divisor: number) {
