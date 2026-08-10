@@ -108,6 +108,71 @@ describe('notifyUser', () => {
     expect(fetch).toHaveBeenCalledTimes(1)
   })
 
+  it('honors disabled user notification channels', async () => {
+    mocks.prisma.user.findUnique.mockResolvedValue({
+      id: 'user-1',
+      email: 'user@example.test',
+      emailVerifiedAt: new Date(),
+      name: 'User',
+      telegramId: 123n,
+      notificationPreference: {
+        inAppEnabled: false,
+        telegramEnabled: false,
+        emailEnabled: false,
+        broadcastsEnabled: true,
+      },
+    })
+
+    const result = await notifyUser({
+      userId: 'user-1',
+      type: 'SUPPORT_REPLY',
+      dedupeKey: 'support-disabled',
+      title: 'Ответ поддержки',
+      body: 'Ответ поддержки',
+      telegramText: 'Ответ поддержки',
+      emailSubject: 'Ответ поддержки',
+      emailText: 'Ответ поддержки',
+      emailHtml: '<p>Ответ поддержки</p>',
+    })
+
+    expect(result).toEqual({ telegram: 'skipped', email: 'skipped' })
+    expect(mocks.prisma.userNotification.createMany).not.toHaveBeenCalled()
+    expect(mocks.prisma.notificationLog.createMany).not.toHaveBeenCalled()
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
+  it('suppresses broadcasts while keeping important notification channels enabled', async () => {
+    mocks.prisma.user.findUnique.mockResolvedValue({
+      id: 'user-1',
+      email: 'user@example.test',
+      emailVerifiedAt: new Date(),
+      name: 'User',
+      telegramId: 123n,
+      notificationPreference: {
+        inAppEnabled: true,
+        telegramEnabled: true,
+        emailEnabled: true,
+        broadcastsEnabled: false,
+      },
+    })
+
+    const result = await notifyUser({
+      userId: 'user-1',
+      type: 'BROADCAST',
+      dedupeKey: 'broadcast-disabled',
+      title: 'Новость',
+      body: 'Новость',
+      telegramText: 'Новость',
+      emailSubject: 'Новость',
+      emailText: 'Новость',
+      emailHtml: '<p>Новость</p>',
+    })
+
+    expect(result).toEqual({ telegram: 'skipped', email: 'skipped' })
+    expect(mocks.prisma.userNotification.createMany).not.toHaveBeenCalled()
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
   it('logs delivery errors without throwing', async () => {
     mocks.prisma.user.findUnique.mockResolvedValue({
       id: 'user-1',

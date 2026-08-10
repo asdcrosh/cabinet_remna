@@ -43,3 +43,29 @@ export const PATCH = withAuth(async (
   })
   return NextResponse.json({ mission })
 })
+
+export const DELETE = withAuth(async (
+  req: Request,
+  { params }: { params: Promise<{ id: string }> }
+) => {
+  if (!await isFeatureEnabled('bonusBox')) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  }
+  const session = await requireAdmin()
+  const { id } = await params
+  const mission = await prisma.bonusBoxMission.findUnique({
+    where: { id },
+    select: { id: true, title: true, type: true },
+  })
+  if (!mission) return NextResponse.json({ error: 'Задание не найдено' }, { status: 404 })
+
+  await prisma.bonusBoxMission.delete({ where: { id } })
+  await writeAuditLog({
+    actorId: session.uid,
+    action: 'ADMIN_BONUS_MISSION_UPDATED',
+    message: 'Удалено задание бонусной системы',
+    metadata: { missionId: mission.id, title: mission.title, type: mission.type, deleted: true },
+    request: req,
+  })
+  return NextResponse.json({ ok: true })
+})

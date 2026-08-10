@@ -2,21 +2,25 @@ import './globals.css'
 import './design-system.css'
 import type { Metadata, Viewport } from 'next'
 import { Toaster } from '@/components/ui/toaster'
-import { getBrandName } from '@/lib/branding'
+import { brandCssVariables, getBrandName, getPublicBrandSettings } from '@/lib/branding'
 import Script from 'next/script'
 import { TelegramMiniAppViewport } from '@/components/telegram/telegram-miniapp-viewport'
 import { TelegramMiniAppScript } from '@/components/telegram/telegram-miniapp-script'
+import { BrandingProvider } from '@/components/branding-provider'
 
-export const metadata: Metadata = {
-  title: {
-    default: getBrandName(),
-    template: `%s — ${getBrandName()}`,
-  },
-  description: `${getBrandName()}: VPN-подписка, подключение и оплата`,
-  icons: {
-    icon: '/alekseev-vp-logo.jpg',
-    apple: '/alekseev-vp-logo.jpg',
-  },
+export const dynamic = 'force-dynamic'
+
+export async function generateMetadata(): Promise<Metadata> {
+  const branding = await getPublicBrandSettings()
+  const icon = branding.logoUrl || '/icon.svg'
+  return {
+    title: {
+      default: getBrandName(),
+      template: `%s — ${getBrandName()}`,
+    },
+    description: `${getBrandName()}: VPN-подписка, подключение и оплата`,
+    icons: { icon, apple: icon },
+  }
 }
 
 export const viewport: Viewport = {
@@ -25,9 +29,10 @@ export const viewport: Viewport = {
   initialScale: 1,
 }
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const branding = await getPublicBrandSettings()
   return (
-    <html lang="ru" suppressHydrationWarning>
+    <html lang="ru" suppressHydrationWarning style={brandCssVariables(branding)}>
       <body className="font-sans">
         <Script id="theme-init" strategy="beforeInteractive">
           {`(() => {
@@ -41,7 +46,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         </Script>
         <TelegramMiniAppScript />
         <TelegramMiniAppViewport />
-        {children}
+        <BrandingProvider settings={branding}>{children}</BrandingProvider>
         <Toaster />
       </body>
     </html>

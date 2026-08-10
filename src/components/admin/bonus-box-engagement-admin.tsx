@@ -11,12 +11,14 @@ import {
   Plus,
   ShieldAlert,
   Target,
+  Trash2,
   Users,
 } from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
 import { toast } from '@/components/ui/toaster'
 import { cn } from '@/lib/cn'
 import { Checkbox } from '@/components/ui/checkbox'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 
 export type BonusMissionAdminRow = {
   id: string
@@ -128,6 +130,9 @@ export function BonusBoxEngagementAdmin({
   const [missionForm, setMissionForm] = useState(missionInitial)
   const [eventForm, setEventForm] = useState(eventInitial)
   const [loading, setLoading] = useState<string | null>(null)
+  const [deleteCandidate, setDeleteCandidate] = useState<
+    { kind: 'mission'; item: BonusMissionAdminRow } | { kind: 'event'; item: BonusEventAdminRow } | null
+  >(null)
 
   async function createMission() {
     setLoading('mission')
@@ -238,6 +243,22 @@ export function BonusBoxEngagementAdmin({
     }
   }
 
+  async function confirmDelete() {
+    if (!deleteCandidate) return
+    const { kind, item } = deleteCandidate
+    setLoading(item.id)
+    try {
+      await apiFetch(`/api/admin/bonus-box/${kind === 'mission' ? 'missions' : 'events'}/${item.id}`, { method: 'DELETE' })
+      toast(kind === 'mission' ? 'Задание удалено' : 'Событие удалено', 'success')
+      setDeleteCandidate(null)
+      router.refresh()
+    } catch {
+      // apiFetch уже покажет подробную ошибку
+    } finally {
+      setLoading(null)
+    }
+  }
+
   return (
     <div className="page-stack">
       <section className="border-y border-slate-200 py-4 dark:border-white/10">
@@ -314,14 +335,19 @@ export function BonusBoxEngagementAdmin({
                     {missionTypeLabel(mission.type)} · цель {mission.target} · награда {mission.rewardAttempts} · получили {mission.claimed}/{mission.participants}
                   </div>
                 </div>
-                <button
-                  type="button"
-                  className="btn-secondary min-h-9 px-3 text-xs"
-                  disabled={loading === mission.id}
-                  onClick={() => toggleMission(mission)}
-                >
-                  {mission.isActive ? 'Остановить' : 'Запустить'}
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    className="btn-secondary min-h-9 px-3 text-xs"
+                    disabled={loading === mission.id}
+                    onClick={() => toggleMission(mission)}
+                  >
+                    {mission.isActive ? 'Остановить' : 'Запустить'}
+                  </button>
+                  <button type="button" className="btn-secondary min-h-9 px-3 text-red-600 dark:text-red-300" disabled={loading === mission.id} onClick={() => setDeleteCandidate({ kind: 'mission', item: mission })} aria-label={`Удалить задание ${mission.title}`}>
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -362,14 +388,19 @@ export function BonusBoxEngagementAdmin({
                     x{event.weightMultiplier} · +{event.attemptsPerUser} · участников {event.claimsCount}/{event.maxClaims ?? '∞'} · до {date(event.endsAt)}
                   </div>
                 </div>
-                <button
-                  type="button"
-                  className="btn-secondary min-h-9 px-3 text-xs"
-                  disabled={loading === event.id}
-                  onClick={() => toggleEvent(event)}
-                >
-                  {event.isActive ? 'Остановить' : 'Запустить'}
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    className="btn-secondary min-h-9 px-3 text-xs"
+                    disabled={loading === event.id}
+                    onClick={() => toggleEvent(event)}
+                  >
+                    {event.isActive ? 'Остановить' : 'Запустить'}
+                  </button>
+                  <button type="button" className="btn-secondary min-h-9 px-3 text-red-600 dark:text-red-300" disabled={loading === event.id} onClick={() => setDeleteCandidate({ kind: 'event', item: event })} aria-label={`Удалить событие ${event.title}`}>
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -445,6 +476,16 @@ export function BonusBoxEngagementAdmin({
           {riskSignals.length === 0 && <div className="py-4 text-sm text-slate-500">Непроверенных сигналов нет.</div>}
         </div>
       </section>
+
+      <ConfirmDialog
+        open={Boolean(deleteCandidate)}
+        title={deleteCandidate?.kind === 'mission' ? 'Удалить задание?' : 'Удалить событие?'}
+        description={deleteCandidate ? `«${deleteCandidate.item.title}» исчезнет из бонусной программы. История уже выданных открытий сохранится.` : ''}
+        confirmLabel="Удалить"
+        loading={Boolean(deleteCandidate && loading === deleteCandidate.item.id)}
+        onConfirm={() => void confirmDelete()}
+        onCancel={() => setDeleteCandidate(null)}
+      />
     </div>
   )
 }

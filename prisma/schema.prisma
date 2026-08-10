@@ -131,6 +131,7 @@ model User {
   broadcastTemplates         BroadcastTemplate[]         @relation("BroadcastTemplateAuthor")
   notificationLogs           NotificationLog[]
   notifications              UserNotification[]
+  notificationPreference     UserNotificationPreference?
   adminNotificationReads     AdminNotificationRead[]
   revokedSessions            RevokedSession[]
   broadcastDeliveries        BroadcastDelivery[]
@@ -158,6 +159,15 @@ model FeatureSetting {
   broadcasts Boolean  @default(true)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+}
+
+model BrandSetting {
+  id                   String   @id @default("default")
+  logoUrl              String?
+  accentColor          String   @default("#d832d4")
+  accentSecondaryColor String   @default("#5424bc")
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
 }
 
 model ReferralSetting {
@@ -224,6 +234,18 @@ model UserNotification {
   @@unique([userId, dedupeKey])
   @@index([userId, readAt, createdAt])
   @@index([userId, type, createdAt])
+}
+
+model UserNotificationPreference {
+  userId            String   @id
+  inAppEnabled      Boolean  @default(true)
+  telegramEnabled   Boolean  @default(true)
+  emailEnabled      Boolean  @default(true)
+  broadcastsEnabled Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model PersonalOfferSetting {

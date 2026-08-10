@@ -43,3 +43,29 @@ export const PATCH = withAuth(async (
   })
   return NextResponse.json({ event })
 })
+
+export const DELETE = withAuth(async (
+  req: Request,
+  { params }: { params: Promise<{ id: string }> }
+) => {
+  if (!await isFeatureEnabled('bonusBox')) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  }
+  const session = await requireAdmin()
+  const { id } = await params
+  const event = await prisma.bonusBoxEvent.findUnique({
+    where: { id },
+    select: { id: true, title: true, claimsCount: true },
+  })
+  if (!event) return NextResponse.json({ error: 'Событие не найдено' }, { status: 404 })
+
+  await prisma.bonusBoxEvent.delete({ where: { id } })
+  await writeAuditLog({
+    actorId: session.uid,
+    action: 'ADMIN_BONUS_EVENT_UPDATED',
+    message: 'Удалено сезонное событие',
+    metadata: { eventId: event.id, title: event.title, claimsCount: event.claimsCount, deleted: true },
+    request: req,
+  })
+  return NextResponse.json({ ok: true })
+})

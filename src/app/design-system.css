@@ -43,7 +43,7 @@ body {
 .dashboard-sidebar {
   width: 15.5rem !important;
   border-color: rgba(255, 255, 255, 0.1) !important;
-  background: linear-gradient(165deg, #100626 0%, #241052 58%, #111636 100%);
+  background: linear-gradient(165deg, color-mix(in srgb, var(--app-ink) 35%, #070410) 0%, var(--app-ink) 58%, color-mix(in srgb, var(--app-ink) 46%, #071328) 100%);
   color: #fbf7ff;
 }
 
@@ -68,7 +68,7 @@ body {
 
 .dashboard-sidebar nav a[aria-current="page"],
 .dashboard-sidebar nav a[data-active="true"] {
-  background: linear-gradient(100deg, #d832d4, #7d45ee) !important;
+  background: linear-gradient(100deg, var(--app-accent), var(--app-ink)) !important;
   color: #fff !important;
   box-shadow: none !important;
 }
@@ -655,7 +655,7 @@ textarea:focus {
 }
 
 .site-band {
-  background: linear-gradient(135deg, #170830, #37116a 58%, #15245a);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--app-ink) 35%, #080412), var(--app-ink) 58%, color-mix(in srgb, var(--app-ink) 55%, #07152e));
   border-left-color: var(--app-accent) !important;
 }
 
@@ -669,7 +669,7 @@ textarea:focus {
 .site-preview-access {
   background:
     radial-gradient(circle at 100% 0, rgba(53, 217, 255, 0.16), transparent 13rem),
-    linear-gradient(135deg, #15082e, #331068 72%, #172458);
+    linear-gradient(135deg, color-mix(in srgb, var(--app-ink) 34%, #080412), var(--app-ink) 72%, color-mix(in srgb, var(--app-ink) 48%, #07152e));
 }
 
 .site-band-step {
@@ -683,16 +683,17 @@ textarea:focus {
 .auth-aside {
   border-color: rgba(255, 255, 255, 0.1) !important;
   background:
-    linear-gradient(145deg, rgba(216, 50, 212, 0.16), transparent 40%),
+    linear-gradient(145deg, color-mix(in srgb, var(--app-accent) 16%, transparent), transparent 40%),
     radial-gradient(circle at 90% 72%, rgba(53, 217, 255, 0.14), transparent 23rem),
-    linear-gradient(165deg, #0f0525, #2c0e5d 58%, #111c46) !important;
+    linear-gradient(165deg, color-mix(in srgb, var(--app-ink) 32%, #070410), var(--app-ink) 58%, color-mix(in srgb, var(--app-ink) 48%, #07152e)) !important;
 }
 
 .brand-logo {
   border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 9px;
-  background: #13072d;
-  box-shadow: 0 0 0 1px rgba(216, 50, 212, 0.14), 0 8px 24px rgba(69, 20, 132, 0.2);
+  background: color-mix(in srgb, var(--app-ink) 42%, #080412);
+  color: #fff;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--app-accent) 14%, transparent), 0 8px 24px color-mix(in srgb, var(--app-ink) 20%, transparent);
 }
 
 .auth-panel,
@@ -734,6 +735,77 @@ textarea:focus {
   background-color: var(--app-accent-soft) !important;
 }
 
+[class~="text-brand-400"],
+[class~="text-brand-500"],
+[class~="text-brand-600"],
+[class~="text-brand-700"],
+[class~="text-brand-800"] {
+  color: var(--app-accent) !important;
+}
+
+[class~="text-brand-100"],
+[class~="text-brand-200"],
+[class~="text-brand-300"] {
+  color: color-mix(in srgb, var(--app-accent) 68%, white) !important;
+}
+
+[class~="bg-brand-300"],
+[class~="bg-brand-400"],
+[class~="bg-brand-500"],
+[class~="bg-brand-600"],
+[class~="bg-brand-700"] {
+  background-color: var(--app-accent) !important;
+}
+
+[class~="bg-brand-50"],
+[class~="bg-brand-50/45"],
+[class~="bg-brand-50/70"],
+[class~="bg-brand-400/10"],
+[class~="bg-brand-500/10"] {
+  background-color: var(--app-accent-soft) !important;
+}
+
+[class~="border-brand-200/70"],
+[class~="border-brand-200/80"],
+[class~="border-brand-300"],
+[class~="border-brand-300/10"],
+[class~="border-brand-300/15"],
+[class~="border-brand-300/30"],
+[class~="border-brand-300/80"],
+[class~="border-brand-400"],
+[class~="border-brand-400/25"],
+[class~="border-brand-400/35"],
+[class~="border-brand-500"],
+[class~="border-brand-500/60"],
+[class~="border-brand-600"] {
+  border-color: color-mix(in srgb, var(--app-accent) 52%, transparent) !important;
+}
+
+[class~="hover:text-brand-800"]:hover,
+.dark [class~="dark:hover:text-brand-100"]:hover,
+.dark [class~="dark:hover:text-brand-200"]:hover {
+  color: var(--app-accent-hover) !important;
+}
+
+.dark [class~="dark:text-brand-100"],
+.dark [class~="dark:text-brand-200"],
+.dark [class~="dark:text-brand-300"],
+.dark [class~="dark:text-brand-400"] {
+  color: color-mix(in srgb, var(--app-accent) 68%, white) !important;
+}
+
+.dark [class~="dark:bg-brand-400/10"],
+.dark [class~="dark:bg-brand-500/10"] {
+  background-color: var(--app-accent-soft) !important;
+}
+
+.dark [class~="dark:border-brand-300/15"],
+.dark [class~="dark:border-brand-400/25"],
+.dark [class~="dark:border-brand-400/35"],
+.dark [class~="dark:border-brand-500/60"] {
+  border-color: color-mix(in srgb, var(--app-accent) 46%, transparent) !important;
+}
+
 .dark {
   --app-bg: #080716;
   --app-surface: #110d24;
@@ -743,17 +815,12 @@ textarea:focus {
   --app-muted: #aaa1bb;
   --app-border: rgba(221, 210, 255, 0.12);
   --app-border-strong: rgba(221, 210, 255, 0.22);
-  --app-accent: #f04ee9;
-  --app-accent-hover: #ff6af5;
-  --app-accent-soft: rgba(240, 78, 233, 0.14);
-  --app-ink: #6330d8;
-  --app-ink-hover: #7745ef;
   --app-signal: #35d9ff;
   --app-shadow: none;
 }
 
 .dark .dashboard-sidebar {
-  background: linear-gradient(165deg, #080518, #1a0b38 62%, #0b132d);
+  background: linear-gradient(165deg, color-mix(in srgb, var(--app-ink) 22%, #05030d), color-mix(in srgb, var(--app-ink) 62%, #0b0618) 62%, color-mix(in srgb, var(--app-ink) 34%, #071124));
 }
 
 .dark .dashboard-topbar {

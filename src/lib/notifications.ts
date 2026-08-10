@@ -42,6 +42,14 @@ export async function notifyUser(input: NotifyUserInput) {
       emailVerifiedAt: true,
       name: true,
       telegramId: true,
+      notificationPreference: {
+        select: {
+          inAppEnabled: true,
+          telegramEnabled: true,
+          emailEnabled: true,
+          broadcastsEnabled: true,
+        },
+      },
     },
   })
 
@@ -49,7 +57,10 @@ export async function notifyUser(input: NotifyUserInput) {
     return { telegram: 'skipped' as NotifyResult, email: 'skipped' as NotifyResult }
   }
 
-  if (input.inApp !== false) {
+  const preferences = user.notificationPreference
+  const broadcastsAllowed = input.type !== 'BROADCAST' || preferences?.broadcastsEnabled !== false
+
+  if (broadcastsAllowed && input.inApp !== false && preferences?.inAppEnabled !== false) {
     await createInAppNotification({
       userId: user.id,
       type: input.type,
@@ -61,7 +72,7 @@ export async function notifyUser(input: NotifyUserInput) {
     })
   }
 
-  const telegram = user.telegramId && input.telegramText
+  const telegram = broadcastsAllowed && preferences?.telegramEnabled !== false && user.telegramId && input.telegramText
     ? await sendWithDedupe({
         userId: user.id,
         type: input.type,
@@ -80,6 +91,8 @@ export async function notifyUser(input: NotifyUserInput) {
     : 'skipped' as NotifyResult
 
   const emailAllowed =
+    broadcastsAllowed &&
+    preferences?.emailEnabled !== false &&
     user.emailVerifiedAt &&
     isRealEmail(user.email) &&
     input.emailSubject &&
@@ -372,31 +385,8 @@ export async function notifySupportReply(input: { ticketId: string; messageId: s
 }
 
 export async function notifyBonusGranted(input: { userId: string; attemptsCount: number }) {
-  const user = await prisma.user.findUnique({
-    where: { id: input.userId },
-    select: { name: true },
-  })
-  const body = `Вам начислено открытий подарочного бокса: ${input.attemptsCount}.`
-  await notifyUser({
-    userId: input.userId,
-    type: 'BONUS_GRANTED',
-    dedupeKey: `bonus-granted:${input.userId}:${Date.now()}`,
-    title: 'Бонус начислен',
-    body,
-    actionHref: '/dashboard/bonus-box',
-    actionLabel: 'Открыть бонусы',
-    telegramText: [`<b>Бонус начислен</b>`, escapeTelegram(body)].join('\n'),
-    emailSubject: `Бонус начислен — ${getBrandName()}`,
-    emailText: `${body}\n\nОткрыть бонусы: ${getAppUrl()}/dashboard`,
-    emailHtml: renderNotificationEmail({
-      eyebrow: 'Бонус',
-      title: 'Бонус начислен',
-      lead: body,
-      ctaLabel: 'Открыть кабинет',
-      ctaUrl: `${getAppUrl()}/dashboard`,
-      greetingName: user?.name,
-    }),
-  })
+  void input
+  return { telegram: 'skipped' as NotifyResult, email: 'skipped' as NotifyResult }
 }
 
 export async function notifyBonusGrantedInAppBulk(input: {
@@ -404,23 +394,7 @@ export async function notifyBonusGrantedInAppBulk(input: {
   attemptsCount: number
   operationId: string
 }) {
-  const body = `Вам начислено открытий подарочного бокса: ${input.attemptsCount}.`
-
-  for (let offset = 0; offset < input.userIds.length; offset += 500) {
-    const userIds = input.userIds.slice(offset, offset + 500)
-    await prisma.userNotification.createMany({
-      data: userIds.map((userId) => ({
-        userId,
-        type: 'BONUS_GRANTED' as const,
-        dedupeKey: `BONUS_GRANTED:bonus-granted:${input.operationId}`,
-        title: 'Бонус начислен',
-        body,
-        actionHref: '/dashboard/bonus-box',
-        actionLabel: 'Открыть бонусы',
-      })),
-      skipDuplicates: true,
-    })
-  }
+  void input
 }
 
 export async function notifySubscriptionExpiring(input: {

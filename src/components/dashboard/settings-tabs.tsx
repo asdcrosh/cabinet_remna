@@ -1,10 +1,10 @@
 'use client'
 
 import { type ReactNode, useRef, useState } from 'react'
-import { Link2, LockKeyhole, UserRound } from 'lucide-react'
+import { Bell, Link2, LockKeyhole, UserRound } from 'lucide-react'
 import { cn } from '@/lib/cn'
 
-type SettingsTabId = 'account' | 'sync' | 'security'
+type SettingsTabId = 'account' | 'notifications' | 'sync' | 'security'
 
 type SettingsTabSection = {
   id: SettingsTabId
@@ -15,6 +15,7 @@ type SettingsTabSection = {
 
 const tabIcons: Record<SettingsTabId, ReactNode> = {
   account: <UserRound className="h-4 w-4" />,
+  notifications: <Bell className="h-4 w-4" />,
   sync: <Link2 className="h-4 w-4" />,
   security: <LockKeyhole className="h-4 w-4" />,
 }
@@ -35,7 +36,7 @@ export function SettingsTabs({ sections }: { sections: SettingsTabSection[] }) {
     <div className="settings-workspace grid gap-4 md:grid-cols-[12.5rem_minmax(0,1fr)] md:gap-6">
       <div className="sticky top-14 z-20 -mx-4 bg-surface-50/95 px-4 py-2 backdrop-blur dark:bg-surface-950/95 sm:static sm:mx-0 sm:bg-transparent sm:px-0 sm:py-0 sm:backdrop-blur-none md:self-start">
         <div className="settings-workspace-tabs border-y border-slate-200 py-1 dark:border-white/10 md:sticky md:top-6 md:border-y-0 md:border-l md:py-0 md:pl-2">
-          <div role="tablist" aria-label="Разделы настроек" className="grid grid-cols-3 gap-1 md:grid-cols-1">
+          <div role="tablist" aria-label="Разделы настроек" className="grid grid-cols-4 gap-1 md:grid-cols-1">
           {sections.map((section, index) => {
             const active = section.id === activeId
 

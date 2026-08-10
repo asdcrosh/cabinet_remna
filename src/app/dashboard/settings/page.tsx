@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { ArrowRight, BadgeCheck, BookOpen, CircleAlert, CircleUserRound, Gift, Link2, LockKeyhole, MailPlus, MessageCircleQuestion, ReceiptText } from 'lucide-react'
+import { ArrowRight, BadgeCheck, Bell, BookOpen, CircleAlert, CircleUserRound, Gift, Link2, LockKeyhole, MailPlus, ReceiptText } from 'lucide-react'
 import { getCurrentUser } from '@/lib/auth/cookies'
 import { prisma } from '@/lib/prisma'
 import { ChangePasswordForm } from '@/components/dashboard/change-password-form'
@@ -11,6 +11,8 @@ import { PageHeader } from '@/components/dashboard/page-header'
 import { LogoutButton } from '@/components/dashboard/logout-button'
 import { getFeatureFlags } from '@/lib/feature-flags'
 import { legalNavigation } from '@/lib/legal-links'
+import { getNotificationPreferences } from '@/lib/notification-preferences'
+import { NotificationPreferencesPanel } from '@/components/dashboard/notification-preferences-panel'
 
 export const dynamic = 'force-dynamic'
 
@@ -22,19 +24,21 @@ export default async function SettingsPage() {
   if (!session) redirect('/login')
   const user = await prisma.user.findUnique({ where: { id: session.uid } })
   if (!user) redirect('/login')
-  const features = await getFeatureFlags()
+  const [features, notificationPreferences] = await Promise.all([
+    getFeatureFlags(),
+    getNotificationPreferences(user.id),
+  ])
   const hasVerifiedEmail = Boolean(user.emailVerifiedAt && !user.email.endsWith('@pending.invalid'))
   const accountLinks = [
     { href: '/dashboard/billing', label: 'Покупки', description: 'Платежи и чеки', icon: ReceiptText, visible: true },
     { href: '/dashboard/referrals', label: 'Приглашения', description: 'Ссылка и вознаграждения', icon: Gift, visible: features.referrals },
-    { href: '/dashboard/support', label: 'Поддержка', description: 'Вопросы и обращения', icon: MessageCircleQuestion, visible: features.support },
   ].filter((item) => item.visible)
 
   return (
     <div className="user-workspace mx-auto max-w-6xl page-stack">
       <PageHeader
         title="Аккаунт"
-        description="Личные данные и безопасность."
+        description="Профиль, уведомления и безопасность."
       />
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_15rem] xl:items-start">
@@ -61,6 +65,21 @@ export default async function SettingsPage() {
                   </div>
                   <ProfileForm name={user.name} />
                 </div>
+              </SettingsSection>
+            ),
+          },
+          {
+            id: 'notifications',
+            title: 'Уведомления',
+            shortTitle: 'События',
+            children: (
+              <SettingsSection
+                id="notifications"
+                title="Уведомления"
+                description="Выберите нужные каналы и отключите необязательные сообщения"
+                icon={<Bell className="h-5 w-5" />}
+              >
+                <NotificationPreferencesPanel initialPreferences={notificationPreferences} />
               </SettingsSection>
             ),
           },

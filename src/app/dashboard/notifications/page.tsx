@@ -16,7 +16,7 @@ export default async function NotificationsPage() {
 
   return (
     <div className="page-stack">
-      <PageHeader title="Уведомления" description="Платежи, подписка, поддержка и бонусы в одном месте." />
+      <PageHeader title="Уведомления" description="Только важные события по платежам, подписке и поддержке." />
       <NotificationsList initialNotifications={notifications.map(serializeUserNotification)} />
     </div>
   )

@@ -42,11 +42,20 @@ export const userNavigation: NavigationItem[] = [
   { href: '/dashboard/subscription', label: 'Подключение', icon: KeyRound },
   { href: '/dashboard/plans', label: 'Тарифы', icon: ShieldCheck },
   { href: '/dashboard/bonus-box', label: 'Бонусы', icon: Gift },
+  { href: '/dashboard/support', label: 'Поддержка', icon: MessageCircleQuestion },
   { href: '/dashboard/settings', label: 'Аккаунт', icon: Settings },
 ]
 
-export const bottomNavigation: NavigationItem[] = [...userNavigation]
-export const bottomMoreNavigation: NavigationItem[] = []
+export const bottomNavigation: NavigationItem[] = userNavigation.filter((item) => [
+  '/dashboard',
+  '/dashboard/subscription',
+  '/dashboard/plans',
+  '/dashboard/support',
+].includes(item.href))
+export const bottomMoreNavigation: NavigationItem[] = userNavigation.filter((item) => [
+  '/dashboard/bonus-box',
+  '/dashboard/settings',
+].includes(item.href))
 
 const legalIcons: Record<LegalPath, LucideIcon> = {
   '/offer': FileCheck2,

@@ -180,8 +180,8 @@ export function MobileBottomNav({
   const moreItems = adminArea
     ? availableAdminItems.filter((item) => !adminPrimaryHrefs.has(item.href))
     : []
-  const showMore = adminArea || moreItems.length > 0
-  const swipeHrefKey = adminArea ? '' : items.map((item) => item.href).join('\n')
+  const showMore = adminArea || accountMoreItems.length > 0
+  const swipeHrefKey = adminArea ? '' : filterUserNavigation(userNavigation, features).map((item) => item.href).join('\n')
   const [moreOpen, setMoreOpen] = useState(false)
   const [mounted, setMounted] = useState(false)
   const swipeStartRef = useRef<{ x: number; y: number; time: number } | null>(null)
@@ -189,7 +189,7 @@ export function MobileBottomNav({
   const moreDialogRef = useRef<HTMLDivElement | null>(null)
   const moreCloseButtonRef = useRef<HTMLButtonElement | null>(null)
   const closeMore = () => setMoreOpen(false)
-  const moreActive = moreItems.some((item) => ('exact' in item && item.exact) ? pathname === item.href : pathname.startsWith(item.href))
+  const moreActive = (adminArea ? moreItems : accountMoreItems).some((item) => ('exact' in item && item.exact) ? pathname === item.href : pathname.startsWith(item.href))
 
   useBodyScrollLock(moreOpen)
   useDialogFocus({ open: moreOpen, onClose: closeMore, dialogRef: moreDialogRef, initialFocusRef: moreCloseButtonRef, returnFocusRef: moreTriggerRef })

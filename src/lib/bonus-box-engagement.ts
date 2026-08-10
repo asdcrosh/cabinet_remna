@@ -154,16 +154,6 @@ export async function claimBonusBoxMission(userId: string, missionId: string) {
     }
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
 
-  await notifyUser({
-    userId,
-    type: 'BONUS_GRANTED',
-    dedupeKey: `bonus-mission:${missionId}`,
-    title: 'Задание выполнено',
-    body: `${result.title}: начислено открытий ${result.attempts}.`,
-    actionHref: '/dashboard/bonus-box',
-    actionLabel: 'Открыть бонусы',
-  }).catch(() => undefined)
-
   return result
 }
 
@@ -220,18 +210,7 @@ export async function grantActiveEventAttempts(userId: string) {
         return event.attemptsPerUser
       }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
 
-      if (count > 0) {
-        granted += count
-        await notifyUser({
-          userId,
-          type: 'BONUS_GRANTED',
-          dedupeKey: `bonus-event:${event.id}`,
-          title: event.title,
-          body: `Сезонное событие принесло открытий: ${count}.`,
-          actionHref: '/dashboard/bonus-box',
-          actionLabel: 'Открыть бонусы',
-        }).catch(() => undefined)
-      }
+      if (count > 0) granted += count
     } catch (error) {
       if (!(error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002')) {
         throw error
