@@ -9,6 +9,7 @@ import { KeysCard } from '@/components/dashboard/keys-card'
 import { DevicesList } from '@/components/dashboard/devices-list'
 import Link from 'next/link'
 import { ArrowRight, CalendarDays, Gauge, ShieldAlert, Sparkles } from 'lucide-react'
+import { cn } from '@/lib/cn'
 import { EmptyState } from '@/components/dashboard/empty-state'
 import { getFeatureFlags } from '@/lib/feature-flags'
 import { formatSubscriptionDaysLeft, isSubscriptionExpired } from '@/lib/subscription-time'
@@ -89,15 +90,15 @@ export default async function SubscriptionPage() {
     <div className="user-workspace page-stack">
       <PageHeader
         title="Подключение"
-        description="Добавьте подписку в приложение и управляйте своими устройствами."
+        description="Откройте подписку в INСY и управляйте подключёнными устройствами."
       />
 
       <section
         data-testid="subscription-access"
-        className={`access-pass ${subscriptionExpired ? 'access-pass--expired' : ''}`}
+        className={cn('connection-access-summary', subscriptionExpired && 'connection-access-summary--expired')}
       >
-        <div className="grid lg:grid-cols-[minmax(0,1fr)_auto]">
-          <div className="p-4 sm:p-5">
+        <div className="connection-access-summary__intro">
+          <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <span className={`h-2 w-2 rounded-full ${subscriptionExpired ? 'bg-amber-500' : u.isActive ? 'bg-emerald-500' : 'bg-slate-400'}`} />
               <h2 className="text-base font-semibold text-slate-950 dark:text-white">{statusText}</h2>
@@ -106,34 +107,14 @@ export default async function SubscriptionPage() {
                 {localSubscription?.plan?.name ?? 'VPN-подписка'}
               </span>
             </div>
-            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+            <p className="mt-1 text-sm leading-5 text-slate-500 dark:text-slate-400">
               {subscriptionExpired
-                ? 'Продлите доступ, затем подключение снова заработает без повторной настройки.'
-                : 'Ссылка активна и готова для подключения устройств.'}
+                ? 'Продлите доступ, затем ссылка и устройства снова заработают без новой настройки.'
+                : 'Ссылка готова. Подключите новое устройство или управляйте теми, что уже добавлены.'}
             </p>
-
-            <div className="mt-4 grid gap-3 border-t border-dashed border-slate-300 pt-4 dark:border-white/15 sm:grid-cols-3">
-              <AccessMetric
-                icon={<Sparkles className="h-4 w-4" />}
-                label="Состояние"
-                value={formatSubscriptionDaysLeft(u.daysLeft, u.userStatus)}
-              />
-              <AccessMetric
-                icon={<CalendarDays className="h-4 w-4" />}
-                label={subscriptionExpired ? 'Завершилась' : 'Оплачено до'}
-                value={expiresAtLabel}
-              />
-              <AccessMetric
-                icon={<Gauge className="h-4 w-4" />}
-                label="Трафик"
-                value={subscriptionExpired
-                  ? '0 доступно'
-                  : `${u.trafficUsed}${isUnlimited ? ' · безлимит' : ` из ${u.trafficLimit}`}`}
-              />
-            </div>
           </div>
 
-          <div className="flex items-center border-t border-dashed border-slate-300 p-4 dark:border-white/15 lg:border-l lg:border-t-0">
+          <div className="connection-access-summary__action">
             <Link
               href="/dashboard/plans?intent=renew"
               className={`${subscriptionExpired ? 'btn-primary' : 'btn-secondary'} group w-full justify-between lg:min-w-44`}
@@ -145,6 +126,26 @@ export default async function SubscriptionPage() {
               <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
             </Link>
           </div>
+        </div>
+
+        <div className="connection-access-summary__metrics">
+          <AccessMetric
+            icon={<Sparkles className="h-4 w-4" />}
+            label="Доступ"
+            value={formatSubscriptionDaysLeft(u.daysLeft, u.userStatus)}
+          />
+          <AccessMetric
+            icon={<CalendarDays className="h-4 w-4" />}
+            label={subscriptionExpired ? 'Завершилась' : 'Оплачено до'}
+            value={expiresAtLabel}
+          />
+          <AccessMetric
+            icon={<Gauge className="h-4 w-4" />}
+            label="Трафик"
+            value={subscriptionExpired
+              ? '0 доступно'
+              : `${u.trafficUsed}${isUnlimited ? ' · безлимит' : ` из ${u.trafficLimit}`}`}
+          />
         </div>
       </section>
 
