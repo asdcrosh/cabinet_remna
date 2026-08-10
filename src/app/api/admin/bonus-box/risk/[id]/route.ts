@@ -24,7 +24,7 @@ export const PATCH = withAuth(async (
     actorId: session.uid,
     targetId: signal.userId,
     action: 'ADMIN_BONUS_RISK_REVIEWED',
-    message: 'Проверен антифрод-сигнал бонусной системы',
+    message: 'Антифрод-сигнал проверен, открытие бонусов разрешено',
     metadata: { signalId: signal.id, kind: signal.kind, score: signal.score },
     request: req,
   })

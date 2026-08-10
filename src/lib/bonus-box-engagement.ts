@@ -426,7 +426,37 @@ export async function assessBonusBoxRisk(userId: string, req: Request) {
     })
   }
 
+  const existingSignals = signals.length > 0
+    ? await prisma.bonusBoxRiskSignal.findMany({
+        where: {
+          userId,
+          OR: signals.map((signal) => ({
+            kind: signal.kind,
+            keyHash: signal.keyHash,
+          })),
+        },
+        select: {
+          kind: true,
+          keyHash: true,
+          score: true,
+          reviewedAt: true,
+        },
+      })
+    : []
+  const existingByKey = new Map(
+    existingSignals.map((signal) => [`${signal.kind}:${signal.keyHash}`, signal])
+  )
+  let effectiveScore = 0
+
   for (const signal of signals) {
+    const existing = existingByKey.get(`${signal.kind}:${signal.keyHash}`)
+    const riskIncreasedAfterReview = Boolean(
+      existing?.reviewedAt && signal.score > existing.score
+    )
+    const reviewStillValid = Boolean(
+      existing?.reviewedAt && !riskIncreasedAfterReview
+    )
+
     await prisma.bonusBoxRiskSignal.upsert({
       where: {
         userId_kind_keyHash: {
@@ -439,16 +469,25 @@ export async function assessBonusBoxRisk(userId: string, req: Request) {
       update: {
         score: signal.score,
         details: signal.details,
-        reviewedAt: signal.score > 0 ? null : undefined,
+        reviewedAt: riskIncreasedAfterReview
+          ? null
+          : reviewStillValid
+            ? existing?.reviewedAt
+            : signal.score > 0
+              ? null
+              : undefined,
       },
     })
+
+    if (!reviewStillValid || riskIncreasedAfterReview) {
+      effectiveScore += signal.score
+    }
   }
 
-  const score = signals.reduce((sum, signal) => sum + signal.score, 0)
-  if (score >= 100) {
-    throw new BonusBoxRiskError('Открытие временно остановлено для автоматической проверки', score)
+  if (effectiveScore >= 100) {
+    throw new BonusBoxRiskError('Открытие временно остановлено для автоматической проверки', effectiveScore)
   }
-  return { score }
+  return { score: effectiveScore }
 }
 
 export function applyActiveEventWeights(

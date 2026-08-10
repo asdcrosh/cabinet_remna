@@ -229,7 +229,7 @@ export function BonusBoxEngagementAdmin({
     setLoading(id)
     try {
       await apiFetch(`/api/admin/bonus-box/risk/${id}`, { method: 'PATCH' })
-      toast('Сигнал отмечен проверенным', 'success')
+      toast('Сигнал разрешён, блокировка снята', 'success')
       router.refresh()
     } catch {
       // apiFetch уже покажет toast
@@ -438,7 +438,7 @@ export function BonusBoxEngagementAdmin({
                 )}
               </div>
               <button type="button" className="btn-secondary min-h-9 px-3 text-xs" disabled={loading === signal.id} onClick={() => reviewRisk(signal.id)}>
-                Проверено
+                Разрешить
               </button>
             </div>
           ))}

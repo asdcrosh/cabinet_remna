@@ -221,7 +221,76 @@ describe('bonus-box engagement', () => {
       score: 100,
     })
   })
+
+  it('allows an unchanged risk signal after an administrator reviewed it', async () => {
+    process.env.TRUSTED_PROXY_HEADERS = 'true'
+    const reviewedAt = new Date('2026-07-24T11:00:00.000Z')
+    mocks.prisma.bonusBoxRiskSignal.findMany
+      .mockResolvedValueOnce([
+        { userId: 'user-2' },
+        { userId: 'user-3' },
+        { userId: 'user-4' },
+        { userId: 'user-5' },
+      ])
+      .mockImplementationOnce(async (args) => [{
+        kind: args.where.OR[0].kind,
+        keyHash: args.where.OR[0].keyHash,
+        score: 100,
+        reviewedAt,
+      }])
+    mocks.prisma.user.findUnique.mockResolvedValue({ referredById: null })
+    mocks.prisma.bonusBoxAttempt.count.mockResolvedValue(1)
+    mocks.prisma.bonusBoxRiskSignal.upsert.mockResolvedValue({})
+
+    const result = await assessBonusBoxRisk('user-1', bonusRiskRequest())
+
+    expect(result).toEqual({ score: 0 })
+    expect(mocks.prisma.bonusBoxRiskSignal.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: expect.objectContaining({ reviewedAt }),
+      })
+    )
+  })
+
+  it('reopens a reviewed signal when its risk score increases', async () => {
+    process.env.TRUSTED_PROXY_HEADERS = 'true'
+    mocks.prisma.bonusBoxRiskSignal.findMany
+      .mockResolvedValueOnce([
+        { userId: 'user-2' },
+        { userId: 'user-3' },
+        { userId: 'user-4' },
+        { userId: 'user-5' },
+      ])
+      .mockImplementationOnce(async (args) => [{
+        kind: args.where.OR[0].kind,
+        keyHash: args.where.OR[0].keyHash,
+        score: 75,
+        reviewedAt: new Date('2026-07-24T11:00:00.000Z'),
+      }])
+    mocks.prisma.user.findUnique.mockResolvedValue({ referredById: null })
+    mocks.prisma.bonusBoxAttempt.count.mockResolvedValue(1)
+    mocks.prisma.bonusBoxRiskSignal.upsert.mockResolvedValue({})
+
+    await expect(assessBonusBoxRisk('user-1', bonusRiskRequest())).rejects.toMatchObject({
+      score: 100,
+    })
+    expect(mocks.prisma.bonusBoxRiskSignal.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: expect.objectContaining({ reviewedAt: null }),
+      })
+    )
+  })
 })
+
+function bonusRiskRequest() {
+  return new Request('https://cabinet.test/api/bonus-box', {
+    method: 'POST',
+    headers: {
+      'x-forwarded-for': '203.0.113.10',
+      'user-agent': 'test-browser',
+    },
+  })
+}
 
 function prize(id: string, weight: number): BonusBoxPrize {
   return {

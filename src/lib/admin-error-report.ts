@@ -79,10 +79,10 @@ export function createApiErrorReport(input: ApiReportInput): AdminErrorReport {
   return {
     id: createId(),
     source: 'api',
-    title: titleForStatus(input.status),
+    title: titleForStatus(input.status, errorCode),
     message,
-    explanation: buildExplanation(input.status, rawMessage, reason),
-    recommendations: buildRecommendations(input.status, `${rawMessage} ${reason ?? ''}`.trim(), endpoint),
+    explanation: buildExplanation(input.status, rawMessage, reason, errorCode),
+    recommendations: buildRecommendations(input.status, `${rawMessage} ${reason ?? ''}`.trim(), endpoint, errorCode),
     occurredAt: new Date().toISOString(),
     method: (input.method || 'GET').toUpperCase(),
     endpoint,
@@ -174,7 +174,10 @@ export function formatAdminErrorReport(report: AdminErrorReport) {
   return lines.join('\n')
 }
 
-function buildExplanation(status: number | undefined, rawMessage: string, reason?: string) {
+function buildExplanation(status: number | undefined, rawMessage: string, reason?: string, errorCode?: string) {
+  if (errorCode === 'BONUS_RISK_REVIEW') {
+    return 'Антифрод бонусной системы обнаружил необычное сочетание аккаунтов, окружения или баланса прокруток. Это не ошибка роли или Origin.'
+  }
   if (reason && reason !== rawMessage) return sanitizeDiagnosticText(reason)
   if (/permission denied/i.test(rawMessage)) {
     return 'База данных отклонила операцию: у технической роли нет прав на нужную таблицу или последовательность.'
@@ -206,9 +209,12 @@ function buildExplanation(status: number | undefined, rawMessage: string, reason
   }
 }
 
-function buildRecommendations(status: number | undefined, message: string, endpoint: string) {
+function buildRecommendations(status: number | undefined, message: string, endpoint: string, errorCode?: string) {
   const result: string[] = []
-  if (/permission denied/i.test(message)) {
+  if (errorCode === 'BONUS_RISK_REVIEW') {
+    result.push('Откройте «Админка → Бонусы → Обзор и задания → Антифрод» и проверьте причину сигнала.')
+    result.push('Если активность допустима, отметьте все сигналы пользователя как проверенные.')
+  } else if (/permission denied/i.test(message)) {
     result.push('Проверьте GRANT для роли интеграции на указанную таблицу и её sequence.')
   } else if (/no writable columns/i.test(message)) {
     result.push('Сверьте версию и фактические названия колонок внешней базы с адаптером интеграции.')
@@ -252,7 +258,8 @@ function fallbackMessage(status?: number) {
   return status ? `Сервер вернул ошибку HTTP ${status}.` : 'Не удалось связаться с сервером.'
 }
 
-function titleForStatus(status?: number) {
+function titleForStatus(status?: number, errorCode?: string) {
+  if (errorCode === 'BONUS_RISK_REVIEW') return 'Проверка бонусов'
   if (!status) return 'Нет ответа от сервера'
   if (status === 401) return 'Требуется повторный вход'
   if (status === 403) return 'Доступ запрещён'

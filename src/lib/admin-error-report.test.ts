@@ -38,6 +38,24 @@ describe('admin error report', () => {
     expect(report.recommendations.join(' ')).toContain('REMNASHOP_API_URL')
   })
 
+  it('explains a bonus antifraud block without blaming permissions', () => {
+    const report = createApiErrorReport({
+      method: 'POST',
+      endpoint: '/api/bonus-box',
+      status: 403,
+      data: {
+        error: 'Открытие временно остановлено для автоматической проверки',
+        code: 'BONUS_RISK_REVIEW',
+        score: 100,
+      },
+    })
+
+    expect(report.title).toBe('Проверка бонусов')
+    expect(report.explanation).toContain('Это не ошибка роли или Origin')
+    expect(report.recommendations.join(' ')).toContain('Антифрод')
+    expect(report.errorCode).toBe('BONUS_RISK_REVIEW')
+  })
+
   it('keeps the production Server Components digest and explains how to find the cause', () => {
     const error = Object.assign(
       new Error('An error occurred in the Server Components render. The specific message is omitted in production builds.'),
