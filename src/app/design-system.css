@@ -667,6 +667,62 @@ textarea:focus {
   border-left: 1px solid var(--app-border);
 }
 
+.device-panel {
+  border-color: color-mix(in srgb, var(--app-ink) 14%, var(--app-border)) !important;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--app-accent) 4%, var(--app-surface)), var(--app-surface) 45%) !important;
+  box-shadow: 0 12px 30px color-mix(in srgb, var(--app-ink) 6%, transparent) !important;
+}
+
+.device-panel--embedded {
+  box-shadow: none !important;
+}
+
+.device-count-chip {
+  border: 1px solid color-mix(in srgb, var(--app-accent) 24%, var(--app-border));
+  background: color-mix(in srgb, var(--app-accent) 8%, var(--app-surface)) !important;
+  color: var(--app-accent) !important;
+}
+
+.device-card {
+  border-color: var(--app-border) !important;
+  background: color-mix(in srgb, var(--app-surface) 94%, var(--app-ink) 6%) !important;
+  transition: border-color 180ms ease, transform 180ms ease, background-color 180ms ease;
+}
+
+.device-card:hover {
+  border-color: var(--app-border-strong) !important;
+  background: var(--app-surface) !important;
+  transform: translateY(-1px);
+}
+
+.device-card__icon,
+.device-row__icon {
+  background: color-mix(in srgb, var(--app-accent) 9%, var(--app-surface)) !important;
+  color: var(--app-accent) !important;
+  box-shadow: none !important;
+}
+
+.device-metric {
+  border-color: var(--app-border) !important;
+  background: color-mix(in srgb, var(--app-surface) 80%, transparent) !important;
+}
+
+.device-metric--active > div:first-child {
+  color: var(--app-signal) !important;
+}
+
+.device-row {
+  transition: background-color 180ms ease;
+}
+
+.device-row:hover {
+  background: color-mix(in srgb, var(--app-surface-soft) 70%, transparent);
+}
+
+.device-row__remove:hover {
+  background: color-mix(in srgb, #ef4444 10%, transparent) !important;
+}
+
 .plan-period-panel {
   padding: 1.1rem !important;
   border: 0 !important;
