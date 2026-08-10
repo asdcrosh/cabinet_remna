@@ -20,8 +20,10 @@ describe('branding settings', () => {
       accentSecondaryColor: '#1122cc',
     })
     expect(brandCssVariables(settings)).toMatchObject({
-      '--app-accent': '#ff00aa',
-      '--app-ink': '#1122cc',
+      '--brand-primary': '#ff00aa',
+      '--brand-secondary': '#1122cc',
+      '--brand-primary-on': '#000000',
+      '--brand-secondary-on': '#ffffff',
     })
   })
 

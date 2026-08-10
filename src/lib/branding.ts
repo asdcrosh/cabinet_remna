@@ -1,9 +1,10 @@
 import type { CSSProperties } from 'react'
 import { prisma } from './prisma'
+import { DEFAULT_BRAND_THEME, getBrandThemePreview, mixHex } from './branding-theme'
 
 const DEFAULT_BRAND_NAME = 'VPN Cabinet'
-export const DEFAULT_ACCENT_COLOR = '#d832d4'
-export const DEFAULT_ACCENT_SECONDARY_COLOR = '#5424bc'
+export const DEFAULT_ACCENT_COLOR = DEFAULT_BRAND_THEME.accentColor
+export const DEFAULT_ACCENT_SECONDARY_COLOR = DEFAULT_BRAND_THEME.accentSecondaryColor
 
 export type PublicBrandSettings = {
   logoUrl: string | null
@@ -52,12 +53,23 @@ export function normalizeBrandSettings(input: PublicBrandSettings): PublicBrandS
 }
 
 export function brandCssVariables(settings: PublicBrandSettings): CSSProperties {
+  const light = getBrandThemePreview(settings.accentColor, settings.accentSecondaryColor, 'light')
+  const dark = getBrandThemePreview(settings.accentColor, settings.accentSecondaryColor, 'dark')
+
   return {
-    '--app-accent': settings.accentColor,
-    '--app-accent-hover': mixHex(settings.accentColor, '#000000', 0.18),
-    '--app-accent-soft': `color-mix(in srgb, ${settings.accentColor} 15%, transparent)`,
-    '--app-ink': settings.accentSecondaryColor,
-    '--app-ink-hover': mixHex(settings.accentSecondaryColor, '#ffffff', 0.14),
+    '--brand-primary': settings.accentColor,
+    '--brand-secondary': settings.accentSecondaryColor,
+    '--brand-light-primary-text': light.accentText,
+    '--brand-dark-primary-text': dark.accentText,
+    '--brand-light-secondary-text': light.secondaryText,
+    '--brand-dark-secondary-text': dark.secondaryText,
+    '--brand-primary-on': light.accentOn,
+    '--brand-secondary-on': light.secondaryOn,
+    '--brand-gradient-on': light.gradientOn,
+    '--brand-primary-hover-light': mixHex(settings.accentColor, '#000000', 0.18),
+    '--brand-primary-hover-dark': mixHex(settings.accentColor, '#ffffff', 0.16),
+    '--brand-secondary-hover-light': mixHex(settings.accentSecondaryColor, '#000000', 0.12),
+    '--brand-secondary-hover-dark': mixHex(settings.accentSecondaryColor, '#ffffff', 0.14),
   } as CSSProperties
 }
 
@@ -72,15 +84,4 @@ function normalizeLogoUrl(value: string | null) {
 function normalizeHexColor(value: string, fallback: string) {
   const normalized = value.trim().toLowerCase()
   return /^#[0-9a-f]{6}$/.test(normalized) ? normalized : fallback
-}
-
-function mixHex(first: string, second: string, ratio: number) {
-  const a = hexChannels(first)
-  const b = hexChannels(second)
-  const channels = a.map((value, index) => Math.round(value * (1 - ratio) + b[index]! * ratio))
-  return `#${channels.map((value) => value.toString(16).padStart(2, '0')).join('')}`
-}
-
-function hexChannels(value: string) {
-  return [1, 3, 5].map((offset) => Number.parseInt(value.slice(offset, offset + 2), 16))
 }

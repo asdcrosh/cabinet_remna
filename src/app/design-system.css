@@ -1,4 +1,17 @@
 :root {
+  --brand-primary: #d832d4;
+  --brand-secondary: #5424bc;
+  --brand-light-primary-text: #9a1597;
+  --brand-dark-primary-text: #e958e5;
+  --brand-light-secondary-text: #5424bc;
+  --brand-dark-secondary-text: #9677e4;
+  --brand-primary-on: #17102d;
+  --brand-secondary-on: #ffffff;
+  --brand-gradient-on: #ffffff;
+  --brand-primary-hover-light: #b123ae;
+  --brand-primary-hover-dark: #df53dc;
+  --brand-secondary-hover-light: #4a20a5;
+  --brand-secondary-hover-dark: #6c43c5;
   --app-bg: #f7f5ff;
   --app-surface: #fefcff;
   --app-surface-soft: #efebfa;
@@ -7,11 +20,16 @@
   --app-muted: #716983;
   --app-border: #ddd7ec;
   --app-border-strong: #bdb2d3;
-  --app-accent: #d832d4;
-  --app-accent-hover: #b923bc;
-  --app-accent-soft: #f8ddfb;
-  --app-ink: #5424bc;
-  --app-ink-hover: #6a31dc;
+  --app-accent: var(--brand-primary);
+  --app-accent-text: var(--brand-light-primary-text);
+  --app-accent-on: var(--brand-primary-on);
+  --app-accent-hover: var(--brand-primary-hover-light);
+  --app-accent-soft: color-mix(in srgb, var(--brand-primary) 15%, transparent);
+  --app-ink: var(--brand-secondary);
+  --app-ink-text: var(--brand-light-secondary-text);
+  --app-ink-on: var(--brand-secondary-on);
+  --app-ink-hover: var(--brand-secondary-hover-light);
+  --app-gradient-on: var(--brand-gradient-on);
   --app-signal: #35d9ff;
   --app-success: #199a73;
   --app-danger: #cf3f3f;
@@ -69,13 +87,13 @@ body {
 .dashboard-sidebar nav a[aria-current="page"],
 .dashboard-sidebar nav a[data-active="true"] {
   background: linear-gradient(100deg, var(--app-accent), var(--app-ink)) !important;
-  color: #fff !important;
+  color: var(--app-gradient-on) !important;
   box-shadow: none !important;
 }
 
 .dashboard-sidebar nav a[aria-current="page"] svg,
 .dashboard-sidebar nav a[data-active="true"] svg {
-  color: #fff !important;
+  color: var(--app-gradient-on) !important;
 }
 
 .dashboard-sidebar nav a[aria-current="page"]::after,
@@ -150,7 +168,7 @@ body {
 
 .page-eyebrow {
   margin-bottom: 0.5rem;
-  color: var(--app-accent);
+  color: var(--app-accent-text);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 0.62rem;
   font-weight: 750;
@@ -315,7 +333,7 @@ body {
 .btn-primary {
   border-color: var(--app-ink) !important;
   background: var(--app-ink) !important;
-  color: #fff !important;
+  color: var(--app-ink-on) !important;
 }
 
 .btn-primary:hover {
@@ -359,6 +377,18 @@ select:focus,
 textarea:focus {
   border-color: var(--app-accent) !important;
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--app-accent) 15%, transparent) !important;
+  outline: none !important;
+}
+
+.brand-color-picker,
+.brand-color-hex-input,
+.brand-color-picker:focus,
+.brand-color-hex-input:focus {
+  min-height: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
   outline: none !important;
 }
 
@@ -503,7 +533,7 @@ textarea:focus {
 .plan-period-panel [role="radio"][aria-checked="true"] {
   border-color: var(--app-ink) !important;
   border-left-color: var(--app-accent) !important;
-  background: #f2eaff !important;
+  background: color-mix(in srgb, var(--app-accent) 9%, var(--app-surface)) !important;
 }
 
 .plan-period-panel [role="radio"][aria-checked="true"] > span:first-child {
@@ -527,12 +557,12 @@ textarea:focus {
 [role="radio"][aria-checked="true"] .plan-choice-index {
   border-color: var(--app-ink);
   background: var(--app-ink);
-  color: #fff;
+  color: var(--app-ink-on);
 }
 
 .plan-period-card__index {
   margin-top: 0.08rem;
-  color: var(--app-accent);
+  color: var(--app-accent-text);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 0.61rem;
   font-weight: 750;
@@ -554,6 +584,7 @@ textarea:focus {
 .plan-checkout-card .btn-primary {
   border-color: var(--app-accent) !important;
   background: var(--app-accent) !important;
+  color: var(--app-accent-on) !important;
 }
 
 .plan-checkout-card .btn-primary:hover {
@@ -640,8 +671,8 @@ textarea:focus {
 
 .dashboard-mobile-nav [aria-current="page"] {
   border-color: transparent !important;
-  background: linear-gradient(100deg, var(--app-accent), #7648ee) !important;
-  color: #fff !important;
+  background: linear-gradient(100deg, var(--app-accent), var(--app-ink)) !important;
+  color: var(--app-gradient-on) !important;
 }
 
 .site-shell {
@@ -711,7 +742,7 @@ textarea:focus {
 .text-cyan-600,
 .text-cyan-700,
 .text-cyan-800 {
-  color: var(--app-accent) !important;
+  color: var(--app-accent-text) !important;
 }
 
 .bg-cyan-300,
@@ -740,13 +771,13 @@ textarea:focus {
 [class~="text-brand-600"],
 [class~="text-brand-700"],
 [class~="text-brand-800"] {
-  color: var(--app-accent) !important;
+  color: var(--app-accent-text) !important;
 }
 
 [class~="text-brand-100"],
 [class~="text-brand-200"],
 [class~="text-brand-300"] {
-  color: color-mix(in srgb, var(--app-accent) 68%, white) !important;
+  color: var(--app-accent-text) !important;
 }
 
 [class~="bg-brand-300"],
@@ -784,14 +815,14 @@ textarea:focus {
 [class~="hover:text-brand-800"]:hover,
 .dark [class~="dark:hover:text-brand-100"]:hover,
 .dark [class~="dark:hover:text-brand-200"]:hover {
-  color: var(--app-accent-hover) !important;
+  color: var(--app-accent-text) !important;
 }
 
 .dark [class~="dark:text-brand-100"],
 .dark [class~="dark:text-brand-200"],
 .dark [class~="dark:text-brand-300"],
 .dark [class~="dark:text-brand-400"] {
-  color: color-mix(in srgb, var(--app-accent) 68%, white) !important;
+  color: var(--app-accent-text) !important;
 }
 
 .dark [class~="dark:bg-brand-400/10"],
@@ -815,6 +846,10 @@ textarea:focus {
   --app-muted: #aaa1bb;
   --app-border: rgba(221, 210, 255, 0.12);
   --app-border-strong: rgba(221, 210, 255, 0.22);
+  --app-accent-text: var(--brand-dark-primary-text);
+  --app-accent-hover: var(--brand-primary-hover-dark);
+  --app-ink-text: var(--brand-dark-secondary-text);
+  --app-ink-hover: var(--brand-secondary-hover-dark);
   --app-signal: #35d9ff;
   --app-shadow: none;
 }
