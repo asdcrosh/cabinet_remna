@@ -39,12 +39,12 @@ export function PlanCatalog({ plans, initialPlanId }: { plans: CatalogPlan[]; in
         </span>
       </div>
 
-      <div className="plan-period-list overflow-hidden border-y border-slate-200 dark:border-white/[0.09] lg:hidden">
+      <div className="plan-period-list grid gap-2 lg:hidden">
         {orderedPlans.map((plan, index) => (
           <article
             key={plan.id}
             className={cn(
-              'plan-period-card relative grid min-h-0 min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 border-b border-slate-200 px-1 py-4 last:border-b-0 dark:border-white/[0.09] sm:px-3',
+              'plan-period-card relative grid min-h-0 min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 rounded-2xl border border-slate-200 bg-white/70 px-3 py-3.5 dark:border-white/[0.08] dark:bg-white/[0.025] sm:px-4',
               plan.current
                 ? 'plan-period-card--current'
                 : ''
@@ -84,7 +84,7 @@ export function PlanCatalog({ plans, initialPlanId }: { plans: CatalogPlan[]; in
                 onClick={() => setMobileCheckoutPlanId(plan.id)}
                 disabled={!plan.isPromo && plan.paymentProviders?.length === 0}
                 className={cn(
-                  'plan-period-card__action group inline-flex min-h-9 w-full items-center justify-between gap-1 border px-3 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50',
+                  'plan-period-card__action group inline-flex min-h-9 w-full items-center justify-between gap-1 border px-3 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-50',
                   plan.current
                     ? 'border-brand-600 bg-brand-600 text-white hover:bg-brand-700 dark:border-brand-400 dark:bg-brand-400 dark:text-white dark:hover:bg-brand-300'
                     : 'border-slate-300 bg-transparent text-slate-800 hover:border-slate-950 dark:border-white/15 dark:text-white dark:hover:border-white/40'
@@ -161,8 +161,12 @@ export function PlanCatalog({ plans, initialPlanId }: { plans: CatalogPlan[]; in
           </div>
         </div>
 
-        <div className="min-w-0">
-          {activePlan ? <PlanCard key={activePlan.id} {...activePlan} /> : null}
+        <div className="min-w-0" aria-live="polite">
+          {activePlan ? (
+            <div key={activePlan.id} className="plan-checkout-transition">
+              <PlanCard {...activePlan} />
+            </div>
+          ) : null}
         </div>
       </div>
 
@@ -176,7 +180,11 @@ export function PlanCatalog({ plans, initialPlanId }: { plans: CatalogPlan[]; in
         bodyClassName="px-4 pb-1 pt-3 sm:px-5"
         onClose={() => setMobileCheckoutPlanId(null)}
       >
-        {mobileCheckoutPlan ? <PlanCard key={mobileCheckoutPlan.id} {...mobileCheckoutPlan} display="checkout" /> : null}
+        {mobileCheckoutPlan ? (
+          <div key={mobileCheckoutPlan.id} className="plan-checkout-transition">
+            <PlanCard {...mobileCheckoutPlan} display="checkout" />
+          </div>
+        ) : null}
       </Modal>
     </section>
   )

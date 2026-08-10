@@ -298,8 +298,9 @@ export function PlanCard({
   return (
     <div
       data-testid="plan-card"
+      data-display={display}
       className={cn(
-        "plan-checkout-card relative flex h-full min-h-0 flex-col overflow-hidden rounded-[14px] border border-slate-200/90 bg-white p-4 dark:border-white/[0.09] dark:bg-white/[0.025] sm:p-5",
+        "plan-checkout-card relative flex h-full min-h-0 flex-col overflow-hidden rounded-3xl border border-slate-200/90 bg-white p-4 dark:border-white/[0.09] dark:bg-white/[0.025] sm:p-5",
         checkoutDisplay && "overflow-visible rounded-none border-0 bg-transparent p-0 shadow-none dark:border-0 dark:bg-transparent sm:p-0",
         !checkoutDisplay && popular && "border-brand-300/80 dark:border-brand-400/35",
         !checkoutDisplay && current && "border-brand-300/80 bg-brand-50/45 dark:border-brand-400/35 dark:bg-brand-500/[0.06]",
@@ -317,7 +318,7 @@ export function PlanCard({
       )}
 
       {checkoutDisplay ? (
-        <div className="rounded-[12px] border border-slate-200 bg-slate-50 p-4 dark:border-white/[0.08] dark:bg-white/[0.035]">
+        <div className="plan-checkout-summary rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-white/[0.08] dark:bg-white/[0.035]">
           <div className="flex min-w-0 items-start justify-between gap-3">
             <div className="min-w-0">
               <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">Вы выбрали</span>
@@ -358,7 +359,7 @@ export function PlanCard({
             <div className="flex min-w-0 flex-1 items-start gap-3">
               <span
                 className={cn(
-                  "grid h-11 w-11 shrink-0 place-items-center rounded-md border border-slate-200 text-slate-600 dark:border-white/[0.12] dark:text-slate-200",
+                  "grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-slate-200 bg-slate-50 text-slate-600 dark:border-white/[0.12] dark:bg-white/[0.04] dark:text-slate-200",
                   (current || popular) && "border-brand-300 text-brand-700 dark:border-brand-400/35 dark:text-brand-200",
                   isPromoPlan && "border-emerald-300 text-emerald-700 dark:border-emerald-400/30 dark:text-emerald-200",
                 )}
@@ -396,7 +397,7 @@ export function PlanCard({
             )}
           </div>
 
-          <div className="mt-5 border-y border-slate-200/90 py-4 dark:border-white/[0.09]">
+          <div className="plan-price-panel mt-5 rounded-2xl border border-slate-200/80 bg-slate-50/70 p-4 dark:border-white/[0.08] dark:bg-white/[0.03]">
             <div className="flex flex-wrap items-end justify-between gap-3">
               <div className="flex flex-wrap items-baseline gap-2">
                 <div className="whitespace-nowrap text-[2rem] font-semibold leading-none tracking-[-0.04em] tabular-nums text-slate-950 dark:text-white sm:text-4xl">
@@ -433,7 +434,7 @@ export function PlanCard({
 
       <div className={cn("mt-auto", checkoutDisplay ? "pt-3" : "pt-4")}>
         {!isPromoPlan && promoCodesEnabled && (promoOpen || appliedPromo) ? (
-          <div className="rounded-[10px] border border-slate-200/80 bg-slate-50/70 p-3.5 dark:border-white/[0.08] dark:bg-white/[0.03]">
+          <div className="rounded-2xl border border-slate-200/80 bg-slate-50/70 p-3.5 dark:border-white/[0.08] dark:bg-white/[0.03]">
             <div className="mb-2.5 flex items-center justify-between gap-2">
               <span className="inline-flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-200">
                 <span className="grid h-7 w-7 place-items-center rounded-[7px] bg-brand-50 text-brand-600 ring-1 ring-brand-100 dark:bg-brand-500/10 dark:text-brand-300 dark:ring-brand-400/15">
@@ -513,7 +514,7 @@ export function PlanCard({
           <button
             type="button"
             className={cn(
-              "flex min-h-12 w-full items-center justify-between gap-3 rounded-[10px] px-3 py-2.5 text-left text-sm text-slate-600 transition-colors hover:text-brand-800 dark:text-slate-300 dark:hover:text-brand-100",
+              "flex min-h-12 w-full items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left text-sm text-slate-600 transition-colors hover:text-brand-800 dark:text-slate-300 dark:hover:text-brand-100",
               checkoutDisplay
                 ? "bg-slate-100/70 hover:bg-slate-100 dark:bg-white/[0.035] dark:hover:bg-white/[0.06]"
                 : "border border-slate-200/80 bg-transparent hover:border-brand-300 dark:border-white/[0.08] dark:hover:border-brand-400/25",
@@ -543,14 +544,14 @@ export function PlanCard({
           <fieldset
             className={cn(
               "mt-3",
-              checkoutDisplay ? "border-0 p-0" : "rounded-lg border border-slate-200/80 p-3 dark:border-white/[0.08]",
+              checkoutDisplay ? "border-0 p-0" : "rounded-2xl border border-slate-200/80 p-3 dark:border-white/[0.08]",
             )}
           >
             <legend className={cn("text-xs font-medium text-slate-500 dark:text-slate-400", checkoutDisplay ? "mb-2 px-0" : "px-1")}>
               Способ оплаты
             </legend>
             <div
-              className="grid grid-cols-[repeat(auto-fit,minmax(5.5rem,1fr))] gap-1 rounded-xl bg-slate-100/80 p-1 dark:bg-white/[0.055]"
+              className="grid grid-cols-1 gap-2 sm:grid-cols-2"
               role="radiogroup"
               aria-label="Способ оплаты"
             >
@@ -562,13 +563,36 @@ export function PlanCard({
                   aria-checked={selectedProvider === provider.id}
                   onClick={() => setSelectedProvider(provider.id)}
                   className={cn(
-                    "min-h-10 rounded-lg px-3 text-xs font-semibold transition-colors",
+                    "plan-payment-provider flex min-h-[3.75rem] items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition",
                     selectedProvider === provider.id
-                      ? "bg-white text-slate-950 shadow-sm dark:bg-surface-800 dark:text-white"
-                      : "text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white",
+                      ? "border-brand-300 bg-brand-50/70 text-slate-950 dark:border-brand-400/35 dark:bg-brand-500/10 dark:text-white"
+                      : "border-slate-200 bg-white/70 text-slate-700 hover:border-slate-300 hover:bg-white dark:border-white/[0.08] dark:bg-white/[0.025] dark:text-slate-300 dark:hover:border-white/15 dark:hover:bg-white/[0.045]",
                   )}
                 >
-                  {provider.label}
+                  <span
+                    className={cn(
+                      "grid h-9 w-9 shrink-0 place-items-center rounded-[10px]",
+                      selectedProvider === provider.id
+                        ? "bg-brand-500 text-white"
+                        : "bg-slate-100 text-slate-500 dark:bg-white/[0.06] dark:text-slate-400",
+                    )}
+                  >
+                    <CreditCard className="h-4 w-4" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-semibold">{provider.label}</span>
+                    <span className="mt-0.5 block text-[10px] font-normal text-slate-400 dark:text-slate-500">Безопасный переход</span>
+                  </span>
+                  <span
+                    className={cn(
+                      "grid h-5 w-5 shrink-0 place-items-center rounded-full border",
+                      selectedProvider === provider.id
+                        ? "border-brand-500 bg-brand-500 text-white"
+                        : "border-slate-300 text-transparent dark:border-white/15",
+                    )}
+                  >
+                    <Check className="h-3 w-3" />
+                  </span>
                 </button>
               ))}
             </div>
@@ -579,7 +603,7 @@ export function PlanCard({
         ) : !isPromoPlan && paymentProviders.length === 1 ? (
           <div
             className={cn(
-              "mt-3 flex min-h-12 items-center justify-between gap-3 rounded-xl px-3 py-2 text-xs text-slate-500 dark:text-slate-400",
+              "plan-payment-provider mt-3 flex min-h-[3.75rem] items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-xs text-slate-500 dark:text-slate-400",
               checkoutDisplay
                 ? "bg-slate-100/70 dark:bg-white/[0.035]"
                 : "border border-slate-200/80 dark:border-white/[0.08]",
@@ -615,7 +639,7 @@ export function PlanCard({
             type="button"
             onClick={buy}
             disabled={loading || (!isPromoPlan && paymentProviders.length === 0)}
-            className="btn-primary group min-h-12 w-full justify-between px-4"
+            className="plan-payment-cta btn-primary group min-h-12 w-full justify-between px-4"
           >
             <span className="inline-flex items-center gap-2">
               {isPromoPlan ? <Sparkles className="h-4 w-4" /> : <CreditCard className="h-4 w-4" />}
@@ -648,8 +672,8 @@ function paymentProviderHint(provider: CheckoutPaymentProvider) {
 
 function PlanFact({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
   return (
-    <div className="min-w-0 border-l border-slate-200 px-2.5 py-1 dark:border-white/[0.1]">
-      <div className="mb-2 text-slate-400 dark:text-slate-500">{icon}</div>
+    <div className="plan-fact min-w-0 rounded-xl border border-slate-200/70 bg-slate-50/70 px-2.5 py-2.5 dark:border-white/[0.07] dark:bg-white/[0.025]">
+      <div className="mb-2 text-brand-600 dark:text-brand-300">{icon}</div>
       <div className="break-words text-sm font-semibold leading-tight tabular-nums text-slate-900 dark:text-white">{value}</div>
       <div className="mt-1 text-[11px] leading-tight text-slate-500 dark:text-slate-400">{label}</div>
     </div>

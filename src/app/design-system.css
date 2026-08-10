@@ -605,15 +605,94 @@ textarea:focus {
 }
 
 .plan-period-card--current {
-  background: color-mix(in srgb, var(--app-signal) 12%, transparent);
+  border-color: color-mix(in srgb, var(--app-accent) 32%, var(--app-border)) !important;
+  background:
+    linear-gradient(110deg, color-mix(in srgb, var(--app-accent) 9%, var(--app-surface)), color-mix(in srgb, var(--app-ink) 4%, var(--app-surface))) !important;
+  box-shadow: 0 10px 26px color-mix(in srgb, var(--app-ink) 8%, transparent);
 }
 
 .plan-period-card__action {
-  border-radius: 6px;
+  border-radius: 0.75rem;
+}
+
+.plan-period-card__action:hover {
+  transform: translateY(-1px);
+}
+
+.plan-period-card--current .plan-period-card__action {
+  color: var(--app-accent-on) !important;
 }
 
 .plan-checkout-card {
-  border-top: 3px solid var(--app-accent) !important;
+  border-top-width: 1px !important;
+}
+
+.plan-checkout-card[data-display="full"] {
+  border-color: color-mix(in srgb, var(--app-ink) 18%, var(--app-border)) !important;
+  border-radius: 1.5rem !important;
+  background:
+    radial-gradient(circle at 100% 0, color-mix(in srgb, var(--app-accent) 10%, transparent), transparent 15rem),
+    var(--app-surface) !important;
+  box-shadow: 0 18px 48px color-mix(in srgb, var(--app-ink) 9%, transparent) !important;
+}
+
+.plan-checkout-card[data-display="checkout"] {
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.plan-checkout-summary,
+.plan-price-panel {
+  border-color: color-mix(in srgb, var(--app-ink) 12%, var(--app-border)) !important;
+  background:
+    linear-gradient(115deg, color-mix(in srgb, var(--app-accent) 7%, var(--app-surface)), color-mix(in srgb, var(--app-ink) 4%, var(--app-surface))) !important;
+}
+
+.plan-payment-provider {
+  box-shadow: none !important;
+}
+
+.plan-payment-provider[aria-checked="true"] {
+  border-color: color-mix(in srgb, var(--app-accent) 45%, var(--app-border)) !important;
+  background: color-mix(in srgb, var(--app-accent) 8%, var(--app-surface)) !important;
+  box-shadow: 0 8px 22px color-mix(in srgb, var(--app-ink) 8%, transparent) !important;
+}
+
+.plan-payment-provider[aria-checked="true"] > span:first-child,
+.plan-payment-provider[aria-checked="true"] > span:last-child {
+  border-color: var(--app-accent) !important;
+  background: var(--app-accent) !important;
+  color: var(--app-accent-on) !important;
+}
+
+.plan-payment-provider:hover {
+  transform: translateY(-1px);
+}
+
+.plan-fact {
+  transition: border-color 180ms ease, background-color 180ms ease;
+}
+
+.plan-fact:hover {
+  border-color: var(--app-border-strong) !important;
+  background: var(--app-surface) !important;
+}
+
+.plan-checkout-transition {
+  animation: plan-checkout-swap 240ms cubic-bezier(0.2, 0.78, 0.25, 1) both;
+}
+
+@keyframes plan-checkout-swap {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.992);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 .plan-checkout-card .btn-primary {
@@ -625,6 +704,25 @@ textarea:focus {
 .plan-checkout-card .btn-primary:hover {
   border-color: var(--app-accent-hover) !important;
   background: var(--app-accent-hover) !important;
+}
+
+@media (max-width: 420px) {
+  .plan-payment-cta {
+    gap: 0.75rem;
+    padding-inline: 0.85rem !important;
+    font-size: 0.78rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .plan-checkout-transition {
+    animation: none;
+  }
+
+  .plan-payment-provider,
+  .plan-period-panel [role="radio"] {
+    transition: none;
+  }
 }
 
 .settings-section {
