@@ -432,6 +432,16 @@ textarea:focus {
   border-color: color-mix(in srgb, var(--app-accent) 34%, var(--app-border)) !important;
 }
 
+.access-overview {
+  border-color: color-mix(in srgb, var(--app-ink) 18%, var(--app-border)) !important;
+  border-radius: 1.35rem !important;
+  box-shadow: 0 14px 36px color-mix(in srgb, var(--app-ink) 7%, transparent) !important;
+}
+
+.access-overview::after {
+  display: none;
+}
+
 .access-overview__top,
 .access-overview__body,
 .access-overview__bottom {
@@ -444,7 +454,7 @@ textarea:focus {
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  padding: 1.25rem 1.4rem 1rem;
+  padding: 1.15rem 1.3rem;
   border-bottom: 1px solid var(--app-border);
 }
 
@@ -464,8 +474,12 @@ textarea:focus {
 
 .access-overview__remaining {
   min-width: 0;
-  padding: clamp(1.5rem, 3vw, 2.6rem);
-  background: linear-gradient(118deg, color-mix(in srgb, var(--app-ink) 6%, transparent), transparent 54%);
+  padding: clamp(1.45rem, 2.7vw, 2.25rem);
+  background: linear-gradient(118deg, color-mix(in srgb, var(--app-accent) 7%, transparent), transparent 58%);
+}
+
+.access-overview__remaining strong {
+  font-size: clamp(2.75rem, 5vw, 4rem) !important;
 }
 
 .access-overview__facts {
@@ -477,7 +491,7 @@ textarea:focus {
 .access-overview__fact {
   position: relative;
   min-width: 0;
-  padding: clamp(1.35rem, 2.4vw, 2rem);
+  padding: clamp(1.2rem, 2.1vw, 1.75rem);
 }
 
 .access-overview__fact::before {
@@ -501,7 +515,7 @@ textarea:focus {
   display: flex;
   align-items: center;
   gap: 1rem;
-  padding: 1rem 1.25rem 1.15rem;
+  padding: 0.9rem 1.3rem 1rem;
   border-top: 1px solid var(--app-border);
 }
 
@@ -520,6 +534,99 @@ textarea:focus {
 
 .access-overview__progress-value--expired {
   background: var(--app-accent);
+}
+
+.home-quick-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border-top: 1px solid var(--app-border);
+  border-bottom: 1px solid var(--app-border);
+}
+
+.home-quick-actions--two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.home-quick-actions__item {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem 1.1rem;
+  transition: background-color 180ms ease;
+}
+
+.home-quick-actions__item + .home-quick-actions__item {
+  border-left: 1px solid var(--app-border);
+}
+
+.home-quick-actions__item:hover {
+  background: color-mix(in srgb, var(--app-surface-soft) 70%, transparent);
+}
+
+.home-quick-actions__icon,
+.connection-incy-flow__icon {
+  display: grid;
+  width: 2.4rem;
+  height: 2.4rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 0.85rem;
+  background: color-mix(in srgb, var(--app-accent) 10%, var(--app-surface));
+  color: var(--app-accent);
+}
+
+.connection-panel {
+  border-color: color-mix(in srgb, var(--app-ink) 14%, var(--app-border)) !important;
+  background: radial-gradient(circle at 100% 0, color-mix(in srgb, var(--app-accent) 8%, transparent), transparent 17rem), var(--app-surface) !important;
+}
+
+.connection-incy-flow {
+  padding: 0.2rem 0;
+}
+
+.connection-incy-flow__steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+  margin-top: 1.25rem;
+  padding: 0;
+  list-style: none;
+}
+
+.connection-incy-flow__steps li {
+  min-width: 0;
+  color: var(--app-muted);
+  font-size: 0.75rem;
+  line-height: 1.3;
+}
+
+.connection-incy-flow__steps span {
+  display: block;
+  width: fit-content;
+  margin-bottom: 0.45rem;
+  color: var(--app-accent);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.68rem;
+  font-weight: 750;
+}
+
+.connection-alternatives {
+  margin-top: 1rem;
+  border-top: 1px solid var(--app-border);
+  padding-top: 0.8rem;
+}
+
+.connection-alternatives summary {
+  cursor: pointer;
+  color: var(--app-muted);
+  font-size: 0.75rem;
+  font-weight: 650;
+}
+
+.connection-app-choice--selected {
+  border-color: color-mix(in srgb, var(--app-accent) 45%, var(--app-border)) !important;
+  background: color-mix(in srgb, var(--app-accent) 8%, var(--app-surface)) !important;
 }
 
 .plan-period-panel {
@@ -1028,7 +1135,8 @@ textarea:focus {
   }
 
   .plan-period-list {
-    display: block !important;
+    display: grid !important;
+    gap: 0.5rem;
   }
 
   .plan-period-list article,
@@ -1038,24 +1146,23 @@ textarea:focus {
     grid-template-columns: minmax(0, 1fr) 8.5rem;
     align-items: center !important;
     gap: 0.75rem;
-    padding: 1rem 0.75rem !important;
-    border: 0 !important;
-    border-bottom: 1px solid var(--app-border) !important;
-    border-radius: 0 !important;
-    background: transparent !important;
+    padding: 0.9rem !important;
+    border: 1px solid var(--app-border) !important;
+    border-radius: 1rem !important;
+    background: var(--app-surface) !important;
   }
 
   .plan-period-list article:last-child {
-    border-bottom: 0 !important;
+    border-bottom: 1px solid var(--app-border) !important;
   }
 
   .plan-period-list article.plan-period-card--current {
-    background: color-mix(in srgb, var(--app-signal) 12%, transparent) !important;
+    background: linear-gradient(110deg, color-mix(in srgb, var(--app-accent) 9%, var(--app-surface)), color-mix(in srgb, var(--app-ink) 4%, var(--app-surface))) !important;
   }
 
   .plan-period-list article button {
     margin-top: 0;
-    border-radius: 6px !important;
+    border-radius: 0.75rem !important;
   }
 
   .access-overview__body {
@@ -1064,6 +1171,15 @@ textarea:focus {
 
   .access-overview__facts {
     border-top: 1px dashed var(--app-border-strong);
+    border-left: 0;
+  }
+
+  .home-quick-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .home-quick-actions__item:nth-child(3) {
+    border-top: 1px solid var(--app-border);
     border-left: 0;
   }
 }
@@ -1122,6 +1238,20 @@ textarea:focus {
 
   .access-overview__fact {
     padding: 1.1rem 1rem;
+  }
+
+  .home-quick-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .home-quick-actions__item + .home-quick-actions__item,
+  .home-quick-actions__item:nth-child(3) {
+    border-top: 1px solid var(--app-border);
+    border-left: 0;
+  }
+
+  .connection-incy-flow__steps {
+    gap: 0.35rem;
   }
 
   .app-modal-panel {

@@ -131,6 +131,8 @@ export function KeysCard({ subscriptionUrl, happLink }: KeysCardProps) {
   const selectedInstallUrl = typeof selectedApp.installUrl === 'function'
     ? selectedApp.installUrl(device)
     : selectedApp.installUrl
+  const isIncyFlow = selectedApp.id === 'incy' && defaultApp.devices.includes(device)
+  const alternativeApps = compatibleApps.filter((option) => option.id !== 'incy')
 
   async function copy(text: string, label = 'Ссылка') {
     if (!text) return
@@ -178,7 +180,7 @@ export function KeysCard({ subscriptionUrl, happLink }: KeysCardProps) {
     <section
       id="connection"
       aria-labelledby="connection-title"
-      className="connection-panel overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.03]"
+      className="connection-panel overflow-hidden rounded-3xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.03]"
     >
       <header className="flex items-start justify-between gap-4 border-b border-slate-200 p-4 dark:border-white/10 sm:p-5">
         <div className="min-w-0">
@@ -196,35 +198,47 @@ export function KeysCard({ subscriptionUrl, happLink }: KeysCardProps) {
       </header>
 
       <div className="p-4 sm:p-5">
-        <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Приложение для подключения">
-          {compatibleApps.map((option) => {
-            const Icon = option.icon
-            const selected = option.id === selectedApp.id
-            return (
-              <button
+        {isIncyFlow ? (
+          <div className="connection-incy-flow">
+            <div className="flex min-w-0 items-center gap-3">
+              <span className="connection-incy-flow__icon">
+                <ShieldCheck className="h-5 w-5" />
+              </span>
+              <div className="min-w-0">
+                <div className="text-sm font-semibold text-slate-950 dark:text-white">INCY для {deviceLabel(device)}</div>
+                <p className="mt-0.5 text-xs leading-5 text-slate-500 dark:text-slate-400">Подписка добавляется в приложение одним действием.</p>
+              </div>
+            </div>
+
+            <ol className="connection-incy-flow__steps" aria-label="Шаги подключения">
+              <li><span>1</span>Установите INCY</li>
+              <li><span>2</span>Откройте подписку</li>
+              <li><span>3</span>Включите VPN</li>
+            </ol>
+
+            {alternativeApps.length > 0 && (
+              <details className="connection-alternatives">
+                <summary>Другие приложения</summary>
+                <div className="mt-2 grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="Другое приложение для подключения">
+                  {alternativeApps.map((option) => (
+                    <AppChoice key={option.id} option={option} selected={false} onSelect={() => setSelectedAppId(option.id)} />
+                  ))}
+                </div>
+              </details>
+            )}
+          </div>
+        ) : (
+          <div className="grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="Приложение для подключения">
+            {compatibleApps.map((option) => (
+              <AppChoice
                 key={option.id}
-                type="button"
-                role="radio"
-                aria-checked={selected}
-                onClick={() => setSelectedAppId(option.id)}
-                className={cn(
-                  'flex min-h-14 min-w-0 items-center gap-2.5 rounded-xl border px-3 text-left transition-colors',
-                  selected
-                    ? 'border-cyan-500 bg-cyan-500/10 text-slate-950 dark:text-white'
-                    : 'border-slate-200 text-slate-500 hover:border-slate-300 hover:text-slate-900 dark:border-white/10 dark:text-slate-400 dark:hover:text-white'
-                )}
-              >
-                <Icon className={cn('h-4 w-4 shrink-0', selected && 'text-cyan-600 dark:text-cyan-300')} />
-                <span className="min-w-0">
-                  <span className="block truncate text-sm font-semibold">{option.name}</span>
-                  <span className="block truncate text-[11px] opacity-70">
-                    {option.id === recommendedAppForDevice(device).id ? 'Рекомендуем' : 'Другой вариант'}
-                  </span>
-                </span>
-              </button>
-            )
-          })}
-        </div>
+                option={option}
+                selected={option.id === selectedApp.id}
+                onSelect={() => setSelectedAppId(option.id)}
+              />
+            ))}
+          </div>
+        )}
 
         <div className="mt-5 flex min-w-0 items-start gap-3 border-t border-dashed border-slate-300 pt-5 dark:border-white/15">
           <SelectedAppIcon className="mt-0.5 h-5 w-5 shrink-0 text-cyan-600 dark:text-cyan-300" />
@@ -315,6 +329,30 @@ export function KeysCard({ subscriptionUrl, happLink }: KeysCardProps) {
         }}
       />
     </section>
+  )
+}
+
+function AppChoice({ option, selected, onSelect }: { option: AppOption; selected: boolean; onSelect: () => void }) {
+  const Icon = option.icon
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={selected}
+      onClick={onSelect}
+      className={cn(
+        'connection-app-choice flex min-h-14 min-w-0 items-center gap-2.5 rounded-xl border px-3 text-left transition',
+        selected
+          ? 'connection-app-choice--selected text-slate-950 dark:text-white'
+          : 'border-slate-200 text-slate-500 hover:border-slate-300 hover:text-slate-900 dark:border-white/10 dark:text-slate-400 dark:hover:text-white'
+      )}
+    >
+      <Icon className={cn('h-4 w-4 shrink-0', selected && 'text-brand-600 dark:text-brand-300')} />
+      <span className="min-w-0">
+        <span className="block truncate text-sm font-semibold">{option.name}</span>
+        <span className="block truncate text-[11px] opacity-70">{option.subtitle}</span>
+      </span>
+    </button>
   )
 }
 

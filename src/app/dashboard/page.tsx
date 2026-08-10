@@ -244,6 +244,8 @@ export default async function DashboardHome() {
         </div>
       </section>
 
+      <HomeQuickActions supportEnabled={features.support} />
+
       <SmartInsights
         emailVerified={onboardingState.emailVerified}
         telegramLinked={onboardingState.telegramLinked}
@@ -277,12 +279,51 @@ function HomeHeader({ name, description }: { name: string; description: string }
     <header className="home-intro pb-1">
       <div className="page-eyebrow">Личный кабинет</div>
       <h1 className="text-[1.8rem] font-semibold leading-tight tracking-[-0.04em] text-slate-950 dark:text-white sm:text-[2rem]">
-        {name}, всё под контролем
+        Привет, {name}
       </h1>
       <p className="mt-1 max-w-2xl text-sm leading-5 text-slate-500 dark:text-slate-400">
         {description}
       </p>
     </header>
+  )
+}
+
+function HomeQuickActions({ supportEnabled }: { supportEnabled: boolean }) {
+  return (
+    <nav className={cn('home-quick-actions', !supportEnabled && 'home-quick-actions--two')} aria-label="Быстрые действия">
+      <Link href="/dashboard/subscription" className="home-quick-actions__item group">
+        <span className="home-quick-actions__icon">
+          <KeyRound className="h-4 w-4" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-semibold text-slate-950 dark:text-white">Подключение</span>
+          <span className="mt-0.5 block text-xs text-slate-500 dark:text-slate-400">INCY, ссылка и устройства</span>
+        </span>
+        <ArrowRight className="h-4 w-4 shrink-0 text-slate-400 transition-transform group-hover:translate-x-0.5 group-hover:text-slate-950 dark:group-hover:text-white" />
+      </Link>
+      <Link href="/dashboard/plans" className="home-quick-actions__item group">
+        <span className="home-quick-actions__icon">
+          <CreditCard className="h-4 w-4" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-semibold text-slate-950 dark:text-white">Тарифы</span>
+          <span className="mt-0.5 block text-xs text-slate-500 dark:text-slate-400">Продлить или сменить срок</span>
+        </span>
+        <ArrowRight className="h-4 w-4 shrink-0 text-slate-400 transition-transform group-hover:translate-x-0.5 group-hover:text-slate-950 dark:group-hover:text-white" />
+      </Link>
+      {supportEnabled && (
+        <Link href="/dashboard/support" className="home-quick-actions__item group">
+          <span className="home-quick-actions__icon">
+            <MessageCircleQuestion className="h-4 w-4" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-semibold text-slate-950 dark:text-white">Поддержка</span>
+            <span className="mt-0.5 block text-xs text-slate-500 dark:text-slate-400">Вопросы по доступу и оплате</span>
+          </span>
+          <ArrowRight className="h-4 w-4 shrink-0 text-slate-400 transition-transform group-hover:translate-x-0.5 group-hover:text-slate-950 dark:group-hover:text-white" />
+        </Link>
+      )}
+    </nav>
   )
 }
 
