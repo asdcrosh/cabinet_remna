@@ -98,8 +98,8 @@ export function PlanCatalog({ plans, initialPlanId }: { plans: CatalogPlan[]; in
         ))}
       </div>
 
-      <div className="hidden gap-4 lg:grid lg:grid-cols-2 lg:items-stretch">
-        <div className="plan-period-panel flex h-full flex-col overflow-hidden border p-4">
+      <div className="hidden gap-4 lg:grid lg:grid-cols-2 lg:items-start">
+        <div className="plan-period-panel flex flex-col border p-4">
           <div className="mb-3 px-1 sm:flex sm:items-end sm:justify-between sm:gap-4">
             <div>
               <h3 className="text-base font-semibold text-slate-950 dark:text-white">Период подписки</h3>
@@ -120,10 +120,10 @@ export function PlanCatalog({ plans, initialPlanId }: { plans: CatalogPlan[]; in
                   aria-checked={selected}
                   onClick={() => setSelectedPlanId(plan.id)}
                   className={cn(
-                    'group grid w-full min-w-0 grid-cols-[2rem_minmax(0,1fr)] gap-3 border border-l-2 px-3.5 py-3.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 sm:grid-cols-[2rem_minmax(0,1fr)_auto] sm:items-center sm:px-4 sm:py-4',
+                    'group grid w-full min-w-0 grid-cols-[2rem_minmax(0,1fr)] gap-3 border px-3.5 py-3.5 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 sm:grid-cols-[2rem_minmax(0,1fr)_auto] sm:items-center sm:px-4 sm:py-4',
                     selected
-                      ? 'border-slate-200 border-l-cyan-500 bg-white dark:border-white/10 dark:border-l-cyan-300 dark:bg-white/[0.05]'
-                      : 'border-transparent border-l-slate-300 bg-white/55 hover:border-slate-200 hover:border-l-slate-500 hover:bg-white dark:border-l-white/10 dark:bg-white/[0.015] dark:hover:border-white/10 dark:hover:bg-white/[0.04]'
+                      ? 'border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.05]'
+                      : 'border-transparent bg-white/55 hover:border-slate-200 hover:bg-white dark:bg-white/[0.015] dark:hover:border-white/10 dark:hover:bg-white/[0.04]'
                   )}
                 >
                   <span className="plan-choice-index" aria-hidden="true">
@@ -155,7 +155,7 @@ export function PlanCatalog({ plans, initialPlanId }: { plans: CatalogPlan[]; in
             })}
           </div>
 
-          <div className="mt-auto flex items-start gap-2.5 border-t border-slate-200/90 px-1 pt-3 text-xs leading-5 text-slate-500 dark:border-white/[0.09] dark:text-slate-400">
+          <div className="mt-4 flex items-start gap-2.5 border-t border-slate-200/90 px-1 pt-3 text-xs leading-5 text-slate-500 dark:border-white/[0.09] dark:text-slate-400">
             <span className="mt-0.5 h-3 w-0.5 shrink-0 bg-cyan-400" />
             <span>Цена фиксирована за весь выбранный срок. Доступ активируется автоматически после подтверждения оплаты.</span>
           </div>

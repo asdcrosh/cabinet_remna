@@ -523,17 +523,52 @@ textarea:focus {
 }
 
 .plan-period-panel {
-  padding: 1rem !important;
+  padding: 1.1rem !important;
+  border: 0 !important;
+  border-radius: 1.5rem !important;
+  background: color-mix(in srgb, var(--app-surface) 96%, var(--app-accent) 4%) !important;
+  box-shadow: inset 0 0 0 1px var(--app-border);
 }
 
 .plan-period-panel [role="radio"] {
-  border-radius: 0 !important;
+  position: relative;
+  overflow: hidden;
+  border-color: transparent !important;
+  border-radius: 1rem !important;
+  background: color-mix(in srgb, var(--app-surface) 68%, transparent) !important;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--app-border) 45%, transparent);
+  transition: border-color 180ms ease, background-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+}
+
+.plan-period-panel [role="radio"]::before {
+  position: absolute;
+  inset: 0.8rem auto 0.8rem 0;
+  width: 3px;
+  border-radius: 0 999px 999px 0;
+  content: "";
+  background: linear-gradient(to bottom, var(--app-accent), var(--app-ink));
+  opacity: 0;
+  transform: scaleY(0.45);
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+
+.plan-period-panel [role="radio"]:hover {
+  border-color: var(--app-border-strong) !important;
+  background: var(--app-surface) !important;
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--app-ink) 8%, transparent);
+  transform: translateY(-1px);
 }
 
 .plan-period-panel [role="radio"][aria-checked="true"] {
-  border-color: var(--app-ink) !important;
-  border-left-color: var(--app-accent) !important;
-  background: color-mix(in srgb, var(--app-accent) 9%, var(--app-surface)) !important;
+  border-color: color-mix(in srgb, var(--app-ink) 28%, var(--app-border)) !important;
+  background:
+    linear-gradient(105deg, color-mix(in srgb, var(--app-accent) 11%, var(--app-surface)), color-mix(in srgb, var(--app-ink) 5%, var(--app-surface))) !important;
+  box-shadow: 0 10px 30px color-mix(in srgb, var(--app-ink) 10%, transparent);
+}
+
+.plan-period-panel [role="radio"][aria-checked="true"]::before {
+  opacity: 1;
+  transform: scaleY(1);
 }
 
 .plan-period-panel [role="radio"][aria-checked="true"] > span:first-child {
