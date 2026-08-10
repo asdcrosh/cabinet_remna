@@ -1,5 +1,5 @@
 import { PrismaClient } from '@prisma/client'
-import { E2E_PLAN_ID, E2E_USERS } from './test-data'
+import { E2E_BONUS_PRIZE_IDS, E2E_PLAN_ID, E2E_USERS } from './test-data'
 
 const prisma = new PrismaClient()
 
@@ -17,6 +17,9 @@ export default async function globalTeardown() {
     })
     await prisma.user.deleteMany({
       where: { email: { in: Object.values(E2E_USERS).map((user) => user.email) } },
+    })
+    await prisma.bonusBoxPrize.deleteMany({
+      where: { id: { in: Object.values(E2E_BONUS_PRIZE_IDS) } },
     })
     await prisma.plan.deleteMany({ where: { id: E2E_PLAN_ID } })
   } finally {

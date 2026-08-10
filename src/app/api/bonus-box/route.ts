@@ -23,7 +23,10 @@ export const POST = withAuth(async (req: Request) => {
   const limited = await rateLimit(req, `bonus-box-open:${session.uid}`, 8, 60_000)
   if (!limited.ok) {
     return NextResponse.json(
-      { error: 'Слишком много открытий. Попробуйте позже.' },
+      {
+        error: 'Слишком много открытий. Попробуйте позже.',
+        retryAfter: limited.retryAfter,
+      },
       { status: 429, headers: { 'Retry-After': String(limited.retryAfter) } }
     )
   }

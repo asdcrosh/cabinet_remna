@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { expectNoHorizontalOverflow, login } from './helpers'
-import { E2E_USERS } from './test-data'
+import { E2E_BONUS_PRIZE_IDS, E2E_USERS } from './test-data'
 
 test('истёкшая подписка не показывает отрицательные дни', async ({ page }) => {
   await login(page, E2E_USERS.expired.email)
@@ -130,6 +130,100 @@ test('активное подключение показывает компак�
   await expect(page.getByRole('radiogroup', { name: 'Приложение для подключения' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Устройства' })).toBeVisible()
   await expect(page.getByText('Pixel 8 · Android')).toBeVisible()
+  await expectNoHorizontalOverflow(page)
+})
+
+test('рулетка отправляет только один запрос и показывает результат', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await login(page, E2E_USERS.active.email)
+
+  let openRequests = 0
+  const prize = {
+    id: E2E_BONUS_PRIZE_IDS.epic,
+    title: 'E2E скидка 25%',
+    description: 'Проверка редкого исхода',
+    type: 'PROMO_CODE_PERCENT',
+    value: 25,
+    weight: 20,
+    rarity: 'EPIC',
+    chance: 0.2,
+  }
+  const commonPrize = {
+    id: E2E_BONUS_PRIZE_IDS.common,
+    title: 'E2E ещё один ход',
+    description: 'Проверка обычного исхода',
+    type: 'BONUS_ATTEMPTS',
+    value: 1,
+    weight: 80,
+    rarity: 'COMMON',
+    chance: 0.8,
+  }
+
+  await page.route('**/api/bonus-box', async (route) => {
+    if (route.request().method() !== 'POST') {
+      await route.continue()
+      return
+    }
+    openRequests += 1
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        id: 'e2e-opening-result',
+        prize,
+        reel: [commonPrize, prize],
+        winningIndex: 1,
+        stopOffsetRatio: 0.5,
+        promoCode: 'E2EPROMO25',
+        promoCodeExpiresAt: '2099-12-31T00:00:00.000Z',
+        remainingAttempts: 2,
+        remoteSynced: true,
+      }),
+    })
+  })
+
+  await page.goto('/dashboard/bonus-box')
+  const hub = page.getByRole('button', { name: /Запустить рулетку/ })
+  await hub.click({ clickCount: 2 })
+
+  await expect(page.getByRole('status').filter({ hasText: 'E2E скидка 25%' })).toBeVisible()
+  expect(openRequests).toBe(1)
+  await expectNoHorizontalOverflow(page)
+})
+
+test('рулетка после ограничения показывает обратный отсчёт', async ({ page }) => {
+  await login(page, E2E_USERS.active.email)
+  await page.route('**/api/bonus-box', async (route) => {
+    if (route.request().method() !== 'POST') {
+      await route.continue()
+      return
+    }
+    await route.fulfill({
+      status: 429,
+      headers: { 'Retry-After': '2' },
+      contentType: 'application/json',
+      body: JSON.stringify({ error: 'Слишком много открытий. Попробуйте позже.', retryAfter: 2 }),
+    })
+  })
+
+  await page.goto('/dashboard/bonus-box')
+  await page.getByRole('button', { name: /Запустить рулетку/ }).click()
+
+  const cooldown = page.getByRole('status').filter({ hasText: 'Следующий запуск через' })
+  await expect(cooldown).toContainText('0:02')
+  await expect(page.getByRole('button', { name: /Повтор через/ })).toBeDisabled()
+  await expect(cooldown).toHaveCount(0, { timeout: 4_000 })
+  await expect(page.getByRole('button', { name: /Запустить рулетку/ })).toBeEnabled()
+})
+
+test('администратор видит карту вероятностей призов', async ({ page }) => {
+  await login(page, E2E_USERS.admin.email)
+  await page.goto('/dashboard/admin/bonus-box')
+  await page.getByRole('tab', { name: 'Призы и история' }).click()
+
+  const board = page.getByTestId('bonus-probability-board')
+  await expect(board.getByRole('heading', { name: 'Карта выпадения' })).toBeVisible()
+  await expect(board.getByText('E2E скидка 25%')).toBeVisible()
   await expectNoHorizontalOverflow(page)
 })
 

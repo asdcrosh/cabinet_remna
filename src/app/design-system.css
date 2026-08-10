@@ -189,16 +189,20 @@ body {
 
 .home-intro {
   position: relative;
-  max-width: 52rem;
-  padding-left: 1.15rem;
+  max-width: none;
+  padding: 0 0 1.1rem;
+  border-bottom: 1px solid var(--app-border);
 }
 
 .home-intro::before {
   position: absolute;
-  inset: 0.2rem auto 0.1rem 0;
-  width: 3px;
+  right: auto;
+  bottom: -1px;
+  left: 0;
+  width: clamp(4rem, 11vw, 8rem);
+  height: 2px;
   content: "";
-  background: var(--app-accent);
+  background: linear-gradient(90deg, var(--app-accent), var(--app-ink), var(--app-signal));
 }
 
 .home-intro h1 {
@@ -378,7 +382,7 @@ textarea:focus {
 .subscription-ticket {
   position: relative;
   overflow: hidden;
-  border-left: 4px solid var(--app-ink) !important;
+  border-left: 1px solid var(--app-border) !important;
 }
 
 .access-pass::after,
@@ -386,15 +390,16 @@ textarea:focus {
   position: absolute;
   top: 0;
   right: 0;
-  width: 4rem;
-  height: 3px;
+  left: 0;
+  width: auto;
+  height: 2px;
   content: "";
-  background: linear-gradient(90deg, var(--app-accent), var(--app-signal));
+  background: linear-gradient(90deg, var(--app-accent) 0 18%, var(--app-ink) 18% 68%, var(--app-signal) 68% 100%);
   pointer-events: none;
 }
 
 .access-pass--expired {
-  border-left-color: var(--app-accent) !important;
+  border-color: color-mix(in srgb, var(--app-accent) 34%, var(--app-border)) !important;
 }
 
 .access-overview__top,
@@ -409,7 +414,7 @@ textarea:focus {
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  padding: 1.1rem 1.25rem;
+  padding: 1.25rem 1.4rem 1rem;
   border-bottom: 1px solid var(--app-border);
 }
 
@@ -430,6 +435,7 @@ textarea:focus {
 .access-overview__remaining {
   min-width: 0;
   padding: clamp(1.5rem, 3vw, 2.6rem);
+  background: linear-gradient(118deg, color-mix(in srgb, var(--app-ink) 6%, transparent), transparent 54%);
 }
 
 .access-overview__facts {
@@ -439,8 +445,22 @@ textarea:focus {
 }
 
 .access-overview__fact {
+  position: relative;
   min-width: 0;
   padding: clamp(1.35rem, 2.4vw, 2rem);
+}
+
+.access-overview__fact::before {
+  display: block;
+  width: 1.15rem;
+  height: 2px;
+  margin-bottom: 0.8rem;
+  content: "";
+  background: var(--app-signal);
+}
+
+.access-overview__fact + .access-overview__fact::before {
+  background: var(--app-accent);
 }
 
 .access-overview__fact + .access-overview__fact {
@@ -456,14 +476,16 @@ textarea:focus {
 }
 
 .access-overview__progress {
-  height: 3px;
+  height: 4px;
   overflow: hidden;
+  border-radius: 999px;
   background: var(--app-surface-strong);
 }
 
 .access-overview__progress-value {
   height: 100%;
-  background: var(--app-ink);
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--app-ink), var(--app-accent), var(--app-signal));
 }
 
 .access-overview__progress-value--expired {

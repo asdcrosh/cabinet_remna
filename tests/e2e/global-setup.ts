@@ -3,6 +3,7 @@ import { hash } from 'bcryptjs'
 import {
   E2E_PASSWORD,
   E2E_ACTIVE_SUBSCRIPTION_ID,
+  E2E_BONUS_PRIZE_IDS,
   E2E_PLAN_ID,
   E2E_SUBSCRIPTION_ID,
   E2E_USERS,
@@ -20,6 +21,11 @@ export default async function globalSetup() {
   const activeExpireAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)
 
   try {
+    await prisma.featureSetting.upsert({
+      where: { id: 'default' },
+      create: { id: 'default', referrals: true, bonusBox: true, support: true, broadcasts: true },
+      update: { referrals: true, bonusBox: true, support: true, broadcasts: true },
+    })
     await prisma.rateLimitBucket.deleteMany({
       where: {
         OR: [
@@ -30,6 +36,9 @@ export default async function globalSetup() {
     })
     await prisma.user.deleteMany({
       where: { email: { in: Object.values(E2E_USERS).map((user) => user.email) } },
+    })
+    await prisma.bonusBoxPrize.deleteMany({
+      where: { id: { in: Object.values(E2E_BONUS_PRIZE_IDS) } },
     })
     await prisma.plan.deleteMany({ where: { id: E2E_PLAN_ID } })
 
@@ -55,6 +64,31 @@ export default async function globalSetup() {
         agreedToTermsAt: now,
         referralCode: 'E2EBASIC',
       },
+    })
+
+    await prisma.bonusBoxPrize.createMany({
+      data: [
+        {
+          id: E2E_BONUS_PRIZE_IDS.common,
+          title: 'E2E ещё один ход',
+          description: 'Проверка обычного исхода',
+          type: 'BONUS_ATTEMPTS',
+          value: 1,
+          weight: 80,
+          rarity: 'COMMON',
+          isActive: true,
+        },
+        {
+          id: E2E_BONUS_PRIZE_IDS.epic,
+          title: 'E2E скидка 25%',
+          description: 'Проверка редкого исхода',
+          type: 'PROMO_CODE_PERCENT',
+          value: 25,
+          weight: 20,
+          rarity: 'EPIC',
+          isActive: true,
+        },
+      ],
     })
 
     await prisma.user.create({
@@ -95,6 +129,14 @@ export default async function globalSetup() {
           },
         },
       },
+    })
+
+    await prisma.bonusBoxAttempt.createMany({
+      data: [1, 2, 3].map((index) => ({
+        userId: E2E_USERS.active.id,
+        source: 'MANUAL' as const,
+        sourceKey: `e2e-wheel-${index}`,
+      })),
     })
 
     await prisma.user.create({

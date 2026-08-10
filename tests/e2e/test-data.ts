@@ -32,3 +32,7 @@ export const E2E_USERS = {
 export const E2E_PLAN_ID = 'e2e-expired-plan'
 export const E2E_SUBSCRIPTION_ID = 'e2e-expired-subscription'
 export const E2E_ACTIVE_SUBSCRIPTION_ID = 'e2e-active-subscription'
+export const E2E_BONUS_PRIZE_IDS = {
+  common: 'e2e-bonus-common',
+  epic: 'e2e-bonus-epic',
+} as const

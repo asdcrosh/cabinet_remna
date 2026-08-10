@@ -253,15 +253,7 @@ export function BonusBoxPrizesAdmin({
             <SummaryCell label="Ожидают синхронизации" value={pendingSyncCount} tone={pendingSyncCount > 0 ? 'danger' : undefined} />
           </div>
 
-          <details className="mt-4 border-t border-slate-100 pt-3 text-sm dark:border-white/10">
-            <summary className="cursor-pointer font-medium text-slate-600 dark:text-slate-300">Распределение шансов</summary>
-            <div className="mt-3 space-y-2">
-              <EconomyLine label="Награды" value={stats.rewardChance} className="bg-emerald-500" />
-              <EconomyLine label="Без подарка" value={stats.noPrizeChance} className="bg-red-500" />
-              <EconomyLine label="Промокоды" value={stats.promoChance} className="bg-violet-500" />
-              <EconomyLine label="Доп. открытия" value={stats.attemptChance} className="bg-cyan-500" />
-            </div>
-          </details>
+          <PrizeProbabilityBoard prizes={prizes} />
 
           {economyWarnings.length > 0 && (
             <div className="mt-4 border-t border-slate-100 pt-4 dark:border-white/10" role="status">
@@ -480,29 +472,59 @@ function SummaryCell({
   )
 }
 
-function EconomyLine({
-  label,
-  value,
-  className,
-}: {
-  label: string
-  value: number
-  className: string
-}) {
-  const percent = value * 100
+function PrizeProbabilityBoard({ prizes }: { prizes: BonusBoxPrizeAdminRow[] }) {
+  const activePrizes = prizes.filter((prize) => prize.isActive && prize.chance > 0)
 
   return (
-    <div className="grid gap-2 sm:grid-cols-[130px_1fr_64px] sm:items-center">
-      <div className="text-sm font-medium text-slate-600 dark:text-slate-300">{label}</div>
-      <div className="h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-white/10">
-        <div
-          className={cn('h-full rounded-full', className)}
-          style={{ width: percent <= 0 ? '0%' : `${Math.max(2, Math.min(100, percent))}%` }}
-        />
+    <section className="bonus-admin-probability" aria-labelledby="bonus-probability-title" data-testid="bonus-probability-board">
+      <div className="flex flex-wrap items-end justify-between gap-2">
+        <div>
+          <div className="font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-violet-600 dark:text-violet-300">
+            Вероятности сейчас
+          </div>
+          <h3 id="bonus-probability-title" className="mt-1 text-sm font-semibold text-slate-950 dark:text-white">
+            Карта выпадения
+          </h3>
+        </div>
+        <span className="text-xs text-slate-500">Вес пересчитывается автоматически</span>
       </div>
-      <div className="text-sm text-slate-500 sm:text-right">{formatChance(value)}</div>
-    </div>
+
+      {activePrizes.length > 0 ? (
+        <>
+          <div className="bonus-admin-probability-bar mt-3" aria-hidden="true">
+            {activePrizes.map((prize) => (
+              <span
+                key={prize.id}
+                style={{
+                  width: `${prize.chance * 100}%`,
+                  background: probabilityColor(prize),
+                }}
+              />
+            ))}
+          </div>
+          <div className="bonus-admin-probability-list">
+            {activePrizes.map((prize) => (
+              <div className="bonus-admin-probability-item" key={prize.id}>
+                <i style={{ background: probabilityColor(prize) }} aria-hidden="true" />
+                <span title={prize.title}>{prize.title}</span>
+                <strong>{formatChance(prize.chance)}</strong>
+              </div>
+            ))}
+          </div>
+        </>
+      ) : (
+        <p className="mt-3 text-sm text-slate-500">Включите хотя бы один подарок с положительным весом.</p>
+      )}
+    </section>
   )
+}
+
+function probabilityColor(prize: BonusBoxPrizeAdminRow) {
+  if (prize.type === 'NO_PRIZE') return '#94a3b8'
+  if (prize.rarity === 'LEGENDARY') return '#e4a228'
+  if (prize.rarity === 'EPIC') return '#d832d4'
+  if (prize.rarity === 'RARE') return '#35d9ff'
+  return '#6f35df'
 }
 
 function PrizeAdminRow({

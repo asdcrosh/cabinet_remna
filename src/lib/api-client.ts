@@ -8,6 +8,13 @@ export interface ApiError {
   error: string
   details?: unknown
   requestId?: string
+  retryAfter?: number
+}
+
+export type ApiFetchError = Error & {
+  status: number
+  data: ApiError | null
+  retryAfter: number | null
 }
 
 const API_TIMEOUT_MS = 20_000
@@ -64,12 +71,23 @@ export async function apiFetch<T = unknown>(
       res.headers.get('x-request-id') || data?.requestId
     )
     if (init.method && init.method !== 'GET' && !isAdminPage()) toast(message)
-    const err = new Error(message) as Error & { status: number; data: any }
+    const retryAfterHeader = res.headers.get('retry-after')
+    const parsedRetryAfter = retryAfterHeader ? Number(retryAfterHeader) : Number.NaN
+    const err = new Error(message) as ApiFetchError
     err.status = res.status
     err.data = data
+    err.retryAfter = Number.isFinite(parsedRetryAfter) && parsedRetryAfter > 0
+      ? Math.ceil(parsedRetryAfter)
+      : null
     throw err
   }
   return data as T
+}
+
+export function isApiFetchError(error: unknown): error is ApiFetchError {
+  return error instanceof Error
+    && 'status' in error
+    && typeof (error as { status?: unknown }).status === 'number'
 }
 
 function isAdminPage() {
