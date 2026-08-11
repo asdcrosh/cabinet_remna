@@ -54,7 +54,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   return (
     <NavBadgesProvider initialBadges={navBadges} supportEnabled={features.support}>
       {isStaff ? <AdminErrorCenter /> : null}
-      <div className="dashboard-shell min-h-screen pt-[calc(var(--tg-content-safe-area-inset-top,0px)+var(--telegram-miniapp-top-offset,0px))] lg:pt-0">
+      <div className="dashboard-shell min-h-screen pt-[var(--telegram-miniapp-safe-top)] lg:pt-0">
         <a
           href="#dashboard-content"
           className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[200] focus:rounded-lg focus:bg-slate-950 focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-white"
@@ -77,7 +77,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           </div>
         </aside>
         <main className="dashboard-main min-w-0 w-full overflow-x-clip lg:ml-64 lg:w-auto">
-          <div className="dashboard-topbar sticky top-[calc(var(--tg-content-safe-area-inset-top,0px)+var(--telegram-miniapp-top-offset,0px))] z-50 flex h-14 items-center justify-between border-b px-4 backdrop-blur lg:fixed lg:right-6 lg:top-4 lg:h-auto lg:w-auto lg:border-0 lg:bg-transparent lg:p-0 lg:backdrop-blur-none">
+          <div className="dashboard-topbar sticky top-[var(--telegram-miniapp-safe-top)] z-50 flex h-14 items-center justify-between border-b px-4 backdrop-blur lg:fixed lg:right-6 lg:top-4 lg:h-auto lg:w-auto lg:border-0 lg:bg-transparent lg:p-0 lg:backdrop-blur-none">
             <div className="lg:hidden">
               <Brand compact brandName={brandName} />
             </div>

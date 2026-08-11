@@ -1,7 +1,18 @@
 'use client'
 
 import { useEffect } from 'react'
-import { markTelegramMiniApp, prepareTelegramMiniApp } from '@/lib/telegram-miniapp-viewport'
+import {
+  markTelegramMiniApp,
+  prepareTelegramMiniApp,
+  syncTelegramMiniAppInsets,
+} from '@/lib/telegram-miniapp-viewport'
+
+const VIEWPORT_EVENTS = [
+  'viewportChanged',
+  'safeAreaChanged',
+  'contentSafeAreaChanged',
+  'fullscreenChanged',
+] as const
 
 export function TelegramMiniAppViewport() {
   useEffect(() => {
@@ -21,13 +32,18 @@ export function TelegramMiniAppViewport() {
         if (webApp.viewportStableHeight) {
           document.documentElement.style.setProperty('--tg-viewport-stable-height', `${webApp.viewportStableHeight}px`)
         }
+        syncTelegramMiniAppInsets(webApp, document.documentElement.style)
       }
 
       prepareTelegramMiniApp(webApp)
       syncViewport()
-      webApp.onEvent?.('viewportChanged', syncViewport)
+      for (const event of VIEWPORT_EVENTS) {
+        webApp.onEvent?.(event, syncViewport)
+      }
       cleanup = () => {
-        webApp.offEvent?.('viewportChanged', syncViewport)
+        for (const event of VIEWPORT_EVENTS) {
+          webApp.offEvent?.(event, syncViewport)
+        }
       }
     }
 

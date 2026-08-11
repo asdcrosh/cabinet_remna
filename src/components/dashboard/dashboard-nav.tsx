@@ -106,7 +106,7 @@ export function MobileDashboardNav({
         aria-modal="true"
         aria-label="Меню кабинета"
         tabIndex={-1}
-        className="absolute right-0 top-0 z-10 flex h-dvh w-[min(22rem,88vw)] flex-col border-l border-slate-200 bg-white shadow-xl dark:border-white/10 dark:bg-surface-950"
+        className="absolute right-0 top-0 z-10 flex h-dvh w-[min(22rem,88vw)] flex-col border-l border-slate-200 bg-white pt-[var(--telegram-miniapp-safe-top)] shadow-xl dark:border-white/10 dark:bg-surface-950"
       >
         <div className="flex items-center justify-between border-b border-slate-200 px-4 py-4 dark:border-white/10">
           <Brand brandName={brandName} />
@@ -277,7 +277,7 @@ export function MobileBottomNav({
         aria-modal="true"
         aria-labelledby="mobile-more-menu-title"
         tabIndex={-1}
-        className="absolute inset-x-0 bottom-0 max-h-[calc(100dvh-1rem)] overflow-y-auto overscroll-contain rounded-t-xl border border-slate-300 bg-surface-50 p-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] shadow-xl dark:border-white/10 dark:bg-surface-950"
+        className="absolute inset-x-0 bottom-0 max-h-[calc(100dvh-var(--telegram-miniapp-safe-top)-1rem)] overflow-y-auto overscroll-contain rounded-t-xl border border-slate-300 bg-surface-50 p-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] shadow-xl dark:border-white/10 dark:bg-surface-950"
       >
         <div className="mb-3 flex items-center justify-between gap-3">
           <div>

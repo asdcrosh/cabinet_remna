@@ -11,6 +11,10 @@
     --cabinet-accent: 8 145 178;
     --telegram-miniapp-top-offset: 0px;
     --telegram-miniapp-bottom-offset: 0px;
+    --telegram-miniapp-safe-top: max(
+      env(safe-area-inset-top),
+      calc(var(--tg-content-safe-area-inset-top, 0px) + var(--telegram-miniapp-top-offset, 0px))
+    );
   }
   @media (max-width: 1023px) {
     html[data-telegram-mini-app='true'] {

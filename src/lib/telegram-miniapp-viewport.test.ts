@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
-import { markTelegramMiniApp, prepareTelegramMiniApp } from './telegram-miniapp-viewport'
+import {
+  markTelegramMiniApp,
+  prepareTelegramMiniApp,
+  syncTelegramMiniAppInsets,
+} from './telegram-miniapp-viewport'
 
 describe('markTelegramMiniApp', () => {
   it('marks the document so Telegram-only spacing can be applied', () => {
@@ -78,5 +82,43 @@ describe('prepareTelegramMiniApp', () => {
     })
 
     expect(requestFullscreen).not.toHaveBeenCalled()
+  })
+})
+
+describe('syncTelegramMiniAppInsets', () => {
+  it('publishes Telegram safe-area and content-safe-area values as CSS variables', () => {
+    const variables = new Map<string, string>()
+
+    syncTelegramMiniAppInsets(
+      {
+        safeAreaInset: { top: 47, bottom: 34, left: 0, right: 0 },
+        contentSafeAreaInset: { top: 54, bottom: 0, left: 0, right: 0 },
+      },
+      { setProperty: (property, value) => variables.set(property, value) },
+    )
+
+    expect(Object.fromEntries(variables)).toEqual({
+      '--tg-safe-area-inset-top': '47px',
+      '--tg-safe-area-inset-bottom': '34px',
+      '--tg-safe-area-inset-left': '0px',
+      '--tg-safe-area-inset-right': '0px',
+      '--tg-content-safe-area-inset-top': '54px',
+      '--tg-content-safe-area-inset-bottom': '0px',
+      '--tg-content-safe-area-inset-left': '0px',
+      '--tg-content-safe-area-inset-right': '0px',
+    })
+  })
+
+  it('ignores missing and invalid inset values', () => {
+    const setProperty = vi.fn()
+
+    syncTelegramMiniAppInsets(
+      {
+        safeAreaInset: { top: Number.NaN, bottom: -1 },
+      },
+      { setProperty },
+    )
+
+    expect(setProperty).not.toHaveBeenCalled()
   })
 })

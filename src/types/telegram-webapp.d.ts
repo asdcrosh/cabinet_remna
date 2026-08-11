@@ -8,6 +8,8 @@ declare global {
         platform?: string
         colorScheme?: 'light' | 'dark'
         isFullscreen?: boolean
+        safeAreaInset?: { top?: number; bottom?: number; left?: number; right?: number }
+        contentSafeAreaInset?: { top?: number; bottom?: number; left?: number; right?: number }
         isVersionAtLeast?: (version: string) => boolean
         ready?: () => void
         expand?: () => void
@@ -17,8 +19,14 @@ declare global {
         openLink?: (url: string, options?: { try_instant_view?: boolean }) => void
         viewportHeight?: number
         viewportStableHeight?: number
-        onEvent?: (event: 'viewportChanged', callback: () => void) => void
-        offEvent?: (event: 'viewportChanged', callback: () => void) => void
+        onEvent?: (
+          event: 'viewportChanged' | 'safeAreaChanged' | 'contentSafeAreaChanged' | 'fullscreenChanged',
+          callback: () => void,
+        ) => void
+        offEvent?: (
+          event: 'viewportChanged' | 'safeAreaChanged' | 'contentSafeAreaChanged' | 'fullscreenChanged',
+          callback: () => void,
+        ) => void
       }
     }
   }
