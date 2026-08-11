@@ -635,7 +635,12 @@ async function checkSubscriptionHealth() {
       prisma.user.count({
         where: {
           role: 'USER',
-          OR: [{ remnawaveUuid: { not: null } }, { subscriptions: { some: {} } }],
+          OR: [
+            { remnawaveId: { not: null } },
+            { remnawaveUuid: { not: null } },
+            { remnawaveUsername: { not: null } },
+            { subscriptions: { some: {} } },
+          ],
         },
       }),
     ])

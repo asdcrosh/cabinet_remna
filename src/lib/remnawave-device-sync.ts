@@ -1,11 +1,12 @@
 import { prisma } from './prisma'
-import { remnawave } from './remnawave'
+import { remnawave, type RemnawaveUserReference } from './remnawave'
 
 export async function syncLocalDevicesFromRemnawave(input: {
   localUserId: string
-  remnawaveUuid: string
+  reference: RemnawaveUserReference
 }) {
-  const data = await remnawave.getUserDevices(input.remnawaveUuid)
+  const remoteUser = (await remnawave.getUser(input.reference)).response
+  const data = await remnawave.getUserDevices(remoteUser)
   const devices = data.response.devices.map((device) => ({
     hwid: device.hwid,
     platform: device.platform ?? device.deviceModel ?? null,
@@ -43,6 +44,16 @@ export async function syncLocalDevicesFromRemnawave(input: {
     where: {
       userId: input.localUserId,
       hwid: { notIn: devices.map((device) => device.hwid) },
+    },
+  })
+
+  await prisma.user.update({
+    where: { id: input.localUserId },
+    data: {
+      remnawaveId: remoteUser.id,
+      remnawaveUuid: remoteUser.uuid ?? null,
+      remnawaveShortUuid: remoteUser.shortUuid,
+      remnawaveUsername: remoteUser.username,
     },
   })
 

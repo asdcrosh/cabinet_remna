@@ -1,7 +1,7 @@
 // Prisma schema для личного кабинета Remnawave
 // Datasource: PostgreSQL
 // БД хранит локальный профиль пользователя (email/пароль/тариф)
-// и ссылку на его профиль в Remnawave Panel (remnawaveUuid / remnawaveShortUuid).
+// и ссылку на его профиль в Remnawave Panel (numeric ID в v3, UUID в v2).
 
 generator client {
   provider = "prisma-client-js"
@@ -93,6 +93,7 @@ model User {
   remnashopSyncedAt DateTime?
 
   // Ссылка на пользователя в Remnawave Panel. Заполняется при первой покупке.
+  remnawaveId        Int?    @unique
   remnawaveUuid      String? @unique
   remnawaveShortUuid String? @unique
   remnawaveUsername  String? @unique

@@ -1,7 +1,12 @@
 import { logInfo, logWarn } from './logger'
 import { notifySubscriptionTerminated } from './notifications'
 import { prisma } from './prisma'
-import { remnawave, RemnawaveError } from './remnawave'
+import {
+  hasRemnawaveUserReference,
+  remnawave,
+  RemnawaveError,
+  remnawaveUserReference,
+} from './remnawave'
 import { removeRemnashopSubscription } from './remnashop-subscription-removal'
 import { markSyncFailed, markSyncSkipped, markSyncSucceeded } from './sync-events'
 import { paymentErrorDetails, recordPaymentEvent } from './payment-events'
@@ -36,7 +41,9 @@ export async function terminateUserSubscription(input: TerminateUserSubscription
     where: { id: input.userId },
     select: {
       id: true,
+      remnawaveId: true,
       remnawaveUuid: true,
+      remnawaveUsername: true,
       remnashopUserId: true,
       subscriptions: {
         where: { status: { in: ['ACTIVE', 'LIMITED'] } },
@@ -55,20 +62,22 @@ export async function terminateUserSubscription(input: TerminateUserSubscription
       ? `subscription:${user.subscriptions[0].id}`
       : user.remnawaveUuid
         ? `profile:${user.remnawaveUuid}`
+        : user.remnawaveId
+          ? `profile:${user.remnawaveId}`
         : null
   const now = new Date()
-  const remnawaveUuid = user.remnawaveUuid
-  if (remnawaveUuid) {
+  const reference = remnawaveUserReference(user)
+  if (hasRemnawaveUserReference(user)) {
     try {
-      const disabled = await remnawave.disableUser(remnawaveUuid)
+      const disabled = await remnawave.disableUser(reference)
       await runRemnawaveCleanup(user.id, 'expire', () =>
-        remnawave.updateUser({ uuid: remnawaveUuid, expireAt: now.toISOString() })
+        remnawave.updateUser(disabled.response, { expireAt: now.toISOString() })
       )
       await runRemnawaveCleanup(user.id, 'traffic', () =>
-        remnawave.resetTraffic(remnawaveUuid)
+        remnawave.resetTraffic(disabled.response)
       )
       await runRemnawaveCleanup(user.id, 'devices', () =>
-        remnawave.deleteAllUserDevices(remnawaveUuid, disabled.response.id)
+        remnawave.deleteAllUserDevices(disabled.response)
       )
     } catch (error) {
       if (!isRemnawaveUserMissing(error)) {

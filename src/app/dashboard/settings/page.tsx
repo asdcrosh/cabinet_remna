@@ -61,7 +61,11 @@ export default async function SettingsPage() {
                     <AccountFact label="Email" value={hasVerifiedEmail ? 'Подтверждён' : 'Требует подтверждения'} ready={hasVerifiedEmail} />
                     <AccountFact label="Telegram" value={user.telegramId ? 'Привязан' : 'Не привязан'} ready={Boolean(user.telegramId)} />
                     <AccountFact label="Remnashop" value={user.remnashopUserId ? 'Связан' : 'Ожидает связи'} ready={Boolean(user.remnashopUserId)} />
-                    <AccountFact label="VPN-профиль" value={user.remnawaveUuid ? 'Связан' : 'Создастся при покупке'} ready={Boolean(user.remnawaveUuid)} />
+                    <AccountFact
+                      label="VPN-профиль"
+                      value={user.remnawaveId || user.remnawaveUuid || user.remnawaveUsername ? 'Связан' : 'Создастся при покупке'}
+                      ready={Boolean(user.remnawaveId || user.remnawaveUuid || user.remnawaveUsername)}
+                    />
                   </div>
                   <ProfileForm name={user.name} />
                 </div>

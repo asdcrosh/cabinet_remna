@@ -28,7 +28,8 @@ export async function upsertLocalSubscriptionFromRemnawave(input: {
     data: {
       ...(input.remnashopUserId ? { remnashopUserId: input.remnashopUserId } : {}),
       remnashopSyncedAt: input.remnashopUserId ? new Date() : undefined,
-      remnawaveUuid: input.remnawaveUser.uuid,
+      remnawaveId: input.remnawaveUser.id,
+      remnawaveUuid: input.remnawaveUser.uuid ?? null,
       remnawaveShortUuid: input.remnawaveUser.shortUuid,
       remnawaveUsername: input.remnawaveUser.username,
     },

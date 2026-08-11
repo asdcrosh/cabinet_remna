@@ -30,6 +30,7 @@ export interface SupportTicket {
     telegramId?: string | null
     remnashopUserId?: number | null
     remnashopSyncedAt?: string | null
+    remnawaveId?: number | null
     remnawaveUuid?: string | null
     remnawaveUsername?: string | null
     subscriptions?: Array<{

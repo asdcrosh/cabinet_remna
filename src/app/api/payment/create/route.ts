@@ -97,7 +97,13 @@ export const POST = withAuth(async (req: Request) => {
       )
     }
 
-    if (user.remnashopUserId || user.remnawaveUuid || hasAnySubscription > 0) {
+    if (
+      user.remnashopUserId ||
+      user.remnawaveId ||
+      user.remnawaveUuid ||
+      user.remnawaveUsername ||
+      hasAnySubscription > 0
+    ) {
       return NextResponse.json({ error: 'Ознакомительный тариф доступен только новым пользователям' }, { status: 409 })
     }
 

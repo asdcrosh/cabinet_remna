@@ -68,7 +68,8 @@ function formatErrorBody(data: unknown) {
 }
 
 // ----------------------------------------------------------------------
-// Типы — по OpenAPI-спеке remnawave-panel (v2.x)
+// Типы — совместимый минимум OpenAPI Remnawave v2/v3.
+// В v2 пользователь адресуется по UUID, в v3 — по numeric ID.
 // Структура ответов обёрнута в { response: ... } — сохраняем как есть.
 // ----------------------------------------------------------------------
 
@@ -91,7 +92,6 @@ export interface CreateUserRequest {
 }
 
 export interface UpdateUserRequest {
-  uuid?: string
   username?: string
   status?: UserStatus
   expireAt?: string
@@ -108,7 +108,7 @@ export interface UpdateUserRequest {
 
 export interface UserResponse {
   id?: number
-  uuid: string
+  uuid?: string
   shortUuid: string
   username: string
   status: UserStatus
@@ -134,6 +134,12 @@ export interface CreateUserResponse {
 
 export interface GetUserByUuidResponse {
   response: UserResponse
+}
+
+export interface RemnawaveUserReference {
+  id?: number | null
+  uuid?: string | null
+  username?: string | null
 }
 
 export interface SubscriptionLink {
@@ -301,6 +307,109 @@ export interface GetHostsResponse {
 // Методы
 // ----------------------------------------------------------------------
 
+function hasNumericId(reference: RemnawaveUserReference) {
+  return typeof reference.id === 'number' && Number.isSafeInteger(reference.id) && reference.id > 0
+}
+
+function hasUuid(reference: RemnawaveUserReference) {
+  return typeof reference.uuid === 'string' && reference.uuid.trim().length > 0
+}
+
+function hasUsername(reference: RemnawaveUserReference) {
+  return typeof reference.username === 'string' && reference.username.trim().length > 0
+}
+
+function isReferenceMismatch(error: unknown) {
+  return error instanceof RemnawaveError && (error.status === 400 || error.status === 404)
+}
+
+function resolvedIdentifier(user: UserResponse) {
+  if (user.uuid) return { key: user.uuid, body: { uuid: user.uuid } }
+  if (typeof user.id === 'number' && Number.isSafeInteger(user.id) && user.id > 0) {
+    return { key: String(user.id), body: { id: user.id } }
+  }
+  throw new RemnawaveError(0, user, 'Remnawave user response has neither numeric id nor uuid')
+}
+
+function resolvedHwidIdentifier(user: UserResponse) {
+  if (user.uuid) return { userUuid: user.uuid }
+  if (typeof user.id === 'number' && Number.isSafeInteger(user.id) && user.id > 0) {
+    return { userId: user.id }
+  }
+  throw new RemnawaveError(0, user, 'Remnawave user response has neither numeric id nor uuid')
+}
+
+async function resolveUser(reference: RemnawaveUserReference): Promise<UserResponse> {
+  if (hasUsername(reference)) {
+    const data = await request<{ response: UserResponse }>(
+      'GET',
+      `/api/users/by-username/${encodeURIComponent(reference.username!.trim())}`
+    )
+    return data.response
+  }
+
+  let lastError: unknown
+  if (hasNumericId(reference)) {
+    try {
+      const data = await request<{ response: UserResponse }>('GET', `/api/users/${reference.id}`)
+      return data.response
+    } catch (error) {
+      lastError = error
+      if (!hasUuid(reference) || !isReferenceMismatch(error)) throw error
+    }
+  }
+
+  if (hasUuid(reference)) {
+    try {
+      const data = await request<{ response: UserResponse }>(
+        'GET',
+        `/api/users/${encodeURIComponent(reference.uuid!.trim())}`
+      )
+      return data.response
+    } catch (error) {
+      lastError = error
+      throw error
+    }
+  }
+
+  if (lastError) throw lastError
+  throw new RemnawaveError(0, reference, 'Remnawave user reference is missing')
+}
+
+async function requestUserAction(
+  reference: RemnawaveUserReference,
+  action: 'revoke' | 'disable' | 'enable' | 'reset-traffic'
+) {
+  const user = await resolveUser(reference)
+  const identifier = resolvedIdentifier(user)
+  return request<{ response: UserResponse }>(
+    'POST',
+    `/api/users/${encodeURIComponent(identifier.key)}/actions/${action}`
+  )
+}
+
+export function remnawaveUserReference(user: {
+  remnawaveId?: number | null
+  remnawaveUuid?: string | null
+  remnawaveUsername?: string | null
+}): RemnawaveUserReference {
+  return {
+    id: user.remnawaveId,
+    uuid: user.remnawaveUuid,
+    username: user.remnawaveUsername,
+  }
+}
+
+export function hasRemnawaveUserReference(user: {
+  remnawaveId?: number | null
+  remnawaveUuid?: string | null
+  remnawaveUsername?: string | null
+}) {
+  return hasNumericId({ id: user.remnawaveId }) ||
+    hasUuid({ uuid: user.remnawaveUuid }) ||
+    hasUsername({ username: user.remnawaveUsername })
+}
+
 export const remnawave = {
   async getNodes() {
     return request<GetNodesResponse>('GET', '/api/nodes')
@@ -316,8 +425,12 @@ export const remnawave = {
     return request<CreateUserResponse>('POST', '/api/users', input)
   },
 
+  async getUser(reference: RemnawaveUserReference) {
+    return { response: await resolveUser(reference) }
+  },
+
   async getUserByUuid(uuid: string) {
-    return request<GetUserByUuidResponse>('GET', `/api/users/${encodeURIComponent(uuid)}`)
+    return { response: await resolveUser({ uuid }) } as GetUserByUuidResponse
   },
 
   async getUserByUsername(username: string) {
@@ -327,8 +440,13 @@ export const remnawave = {
     )
   },
 
-  async updateUser(input: UpdateUserRequest) {
-    return request<{ response: UserResponse }>('PATCH', '/api/users', input)
+  async updateUser(reference: RemnawaveUserReference, input: UpdateUserRequest) {
+    const user = await resolveUser(reference)
+    const identifier = resolvedIdentifier(user)
+    return request<{ response: UserResponse }>('PATCH', '/api/users', {
+      ...identifier.body,
+      ...input,
+    })
   },
 
   async getInternalSquads() {
@@ -342,41 +460,31 @@ export const remnawave = {
     throw new RemnawaveError(404, null, 'Remnawave internal squads endpoint not found')
   },
 
-  async deleteUser(uuid: string) {
-    return request<{ response: { isDeleted: boolean } }>(
+  async deleteUser(reference: RemnawaveUserReference) {
+    const user = await resolveUser(reference)
+    const identifier = resolvedIdentifier(user)
+    return request<{ response: { isDeleted: boolean } } | null>(
       'DELETE',
-      `/api/users/${encodeURIComponent(uuid)}`
+      `/api/users/${encodeURIComponent(identifier.key)}`
     )
   },
 
   // Действия ---------------------------------------------------------------
 
-  async revokeSubscription(uuid: string) {
-    return request<{ response: UserResponse }>(
-      'POST',
-      `/api/users/${encodeURIComponent(uuid)}/actions/revoke`
-    )
+  async revokeSubscription(reference: RemnawaveUserReference) {
+    return requestUserAction(reference, 'revoke')
   },
 
-  async disableUser(uuid: string) {
-    return request<{ response: UserResponse }>(
-      'POST',
-      `/api/users/${encodeURIComponent(uuid)}/actions/disable`
-    )
+  async disableUser(reference: RemnawaveUserReference) {
+    return requestUserAction(reference, 'disable')
   },
 
-  async enableUser(uuid: string) {
-    return request<{ response: UserResponse }>(
-      'POST',
-      `/api/users/${encodeURIComponent(uuid)}/actions/enable`
-    )
+  async enableUser(reference: RemnawaveUserReference) {
+    return requestUserAction(reference, 'enable')
   },
 
-  async resetTraffic(uuid: string) {
-    return request<{ response: UserResponse }>(
-      'POST',
-      `/api/users/${encodeURIComponent(uuid)}/actions/reset-traffic`
-    )
+  async resetTraffic(reference: RemnawaveUserReference) {
+    return requestUserAction(reference, 'reset-traffic')
   },
 
   // Подписки ---------------------------------------------------------------
@@ -397,7 +505,9 @@ export const remnawave = {
 
   // Статистика -------------------------------------------------------------
 
-  async getUsageRange(uuid: string, start: Date, end: Date) {
+  async getUsageRange(reference: RemnawaveUserReference, start: Date, end: Date) {
+    const user = await resolveUser(reference)
+    const identifier = resolvedIdentifier(user)
     const qs = new URLSearchParams({
       start: start.toISOString().slice(0, 10),
       end: end.toISOString().slice(0, 10),
@@ -405,38 +515,46 @@ export const remnawave = {
     })
     return request<DailyUsageResponse>(
       'GET',
-      `/api/bandwidth-stats/users/${encodeURIComponent(uuid)}?${qs.toString()}`
+      `/api/bandwidth-stats/users/${encodeURIComponent(identifier.key)}?${qs.toString()}`
     )
   },
 
-  async getSubscriptionRequestHistory(uuid: string) {
+  async getSubscriptionRequestHistory(reference: RemnawaveUserReference) {
+    const user = await resolveUser(reference)
+    const identifier = resolvedIdentifier(user)
     return request<{ response: SubscriptionRequestRecord[] }>(
       'GET',
-      `/api/users/${encodeURIComponent(uuid)}/subscription-request-history`
+      `/api/users/${encodeURIComponent(identifier.key)}/subscription-request-history`
     )
   },
 
   // HWID -------------------------------------------------------------------
-  async getUserDevices(uuid: string) {
+  async getUserDevices(reference: RemnawaveUserReference) {
+    const user = await resolveUser(reference)
+    const identifier = resolvedIdentifier(user)
     return request<{ response: { total: number; devices: HwidUserDevice[] } }>(
       'GET',
-      `/api/hwid/devices/${encodeURIComponent(uuid)}`
+      `/api/hwid/devices/${encodeURIComponent(identifier.key)}`
     )
   },
 
-  async deleteUserDevice(uuid: string, hwid: string) {
+  async deleteUserDevice(reference: RemnawaveUserReference, hwid: string) {
+    const user = await resolveUser(reference)
+    const identifier = resolvedHwidIdentifier(user)
     return request<{ response: HwidUserDevice[] }>(
       'POST',
       '/api/hwid/devices/delete',
-      { userUuid: uuid, hwid }
+      { ...identifier, hwid }
     )
   },
 
-  async deleteAllUserDevices(uuid: string, userId?: number) {
+  async deleteAllUserDevices(reference: RemnawaveUserReference) {
+    const user = await resolveUser(reference)
+    const identifier = resolvedHwidIdentifier(user)
     return request<{ response: unknown }>(
       'POST',
       '/api/hwid/devices/delete-all',
-      userId ? { userId } : { userUuid: uuid }
+      identifier
     )
   },
 }

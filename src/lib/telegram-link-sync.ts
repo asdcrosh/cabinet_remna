@@ -1,5 +1,9 @@
 import { prisma } from './prisma'
-import { remnawave } from './remnawave'
+import {
+  hasRemnawaveUserReference,
+  remnawave,
+  type RemnawaveUserReference,
+} from './remnawave'
 import { remnashopQuery } from './remnashop-db'
 import { toRemnawaveTelegramId } from './telegram-remnawave'
 import { upsertLocalSubscriptionFromRemnawave } from './remnawave-local-sync'
@@ -170,18 +174,30 @@ async function performLinkedTelegramSync(input: {
   const warnings: string[] = []
   const localUser = await prisma.user.findUnique({
     where: { id: input.localUserId },
-    select: { remnawaveUuid: true },
+    select: {
+      remnawaveId: true,
+      remnawaveUuid: true,
+      remnawaveUsername: true,
+    },
   })
   const remnashopUser = await attachRemnashopIdentityToCabinetUser(input)
   const remnawaveUuid = remnashopUser?.user_remna_id ?? localUser?.remnawaveUuid ?? null
+  const reference: RemnawaveUserReference = {
+    id: localUser?.remnawaveId,
+    uuid: remnawaveUuid,
+    username: localUser?.remnawaveUsername,
+  }
   const telegramId = toRemnawaveTelegramId(input.telegramId)
   let remnawaveUser = null
   let remnawaveChanged = false
-  if (remnawaveUuid) {
-    remnawaveUser = (await remnawave.getUserByUuid(remnawaveUuid)).response
+  if (hasRemnawaveUserReference({
+    remnawaveId: reference.id,
+    remnawaveUuid: reference.uuid,
+    remnawaveUsername: reference.username,
+  })) {
+    remnawaveUser = (await remnawave.getUser(reference)).response
     if (telegramId && !sameTelegramId(remnawaveUser.telegramId, telegramId)) {
-      remnawaveUser = (await remnawave.updateUser({
-        uuid: remnawaveUser.uuid,
+      remnawaveUser = (await remnawave.updateUser(remnawaveUser, {
         telegramId,
         tag: 'IMPORTED',
       })).response
@@ -190,11 +206,11 @@ async function performLinkedTelegramSync(input: {
   }
 
   let devicesSynced = 0
-  if (remnawaveUuid) {
+  if (remnawaveUser) {
     try {
       devicesSynced = (await syncLocalDevicesFromRemnawave({
         localUserId: input.localUserId,
-        remnawaveUuid,
+        reference: remnawaveUser,
       })).total
     } catch (error) {
       warnings.push(`Устройства не обновлены: ${describeSyncError(error)}`)
@@ -234,7 +250,8 @@ async function performLinkedTelegramSync(input: {
     syncedRemnawave: Boolean(telegramId),
     remnawaveChanged,
     remnashopUserId: remnashopUser.id,
-    remnawaveUuid: remnawaveUser.uuid,
+    remnawaveId: remnawaveUser.id,
+    remnawaveUuid: remnawaveUser.uuid ?? null,
     subscriptionId: subscription.id,
     devicesSynced,
     warnings,

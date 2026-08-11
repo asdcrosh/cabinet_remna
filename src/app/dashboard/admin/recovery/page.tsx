@@ -34,7 +34,7 @@ export default async function AdminRecoveryPage({
       orderBy: { createdAt: 'desc' },
       take: limit,
       include: {
-        user: { select: { email: true, name: true, remnawaveUuid: true, remnawaveUsername: true } },
+        user: { select: { email: true, name: true, remnawaveId: true, remnawaveUuid: true, remnawaveUsername: true } },
         plan: true,
         provisioningJob: true,
       },

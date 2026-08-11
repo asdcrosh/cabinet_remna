@@ -37,7 +37,9 @@ export default async function PlansPage({
           telegramId: true,
           remnashopUserId: true,
           remnashopSyncedAt: true,
+          remnawaveId: true,
           remnawaveUuid: true,
+          remnawaveUsername: true,
         },
       })
     : null
@@ -71,7 +73,9 @@ export default async function PlansPage({
     !usedTrialPlanIds.size &&
     !hasAnySubscription &&
     !user?.remnashopUserId &&
-    !user?.remnawaveUuid
+    !user?.remnawaveId &&
+    !user?.remnawaveUuid &&
+    !user?.remnawaveUsername
   const audiencePlans = audienceContext
     ? plans.filter((plan) =>
         isPlanAvailableForUser(plan, audienceContext, {
@@ -88,7 +92,9 @@ export default async function PlansPage({
     !usedTrialPlanIds.size &&
     !hasAnySubscription &&
     !user?.remnashopUserId &&
-    !user?.remnawaveUuid
+    !user?.remnawaveId &&
+    !user?.remnawaveUuid &&
+    !user?.remnawaveUsername
   const needsTelegramCheckForPromo =
     hasPromoPlan &&
     isOtherwiseEligibleForPromo &&

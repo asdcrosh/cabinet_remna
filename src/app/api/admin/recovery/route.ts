@@ -13,7 +13,7 @@ export const GET = withAuth(async () => {
     where: { status: 'SUCCEEDED', subscriptionProvisionedAt: null },
     orderBy: { createdAt: 'desc' },
     include: {
-      user: { select: { id: true, email: true, name: true, remnawaveUuid: true, remnawaveUsername: true } },
+      user: { select: { id: true, email: true, name: true, remnawaveId: true, remnawaveUuid: true, remnawaveUsername: true } },
       plan: true,
       subscription: { include: { plan: true } },
       provisioningJob: true,

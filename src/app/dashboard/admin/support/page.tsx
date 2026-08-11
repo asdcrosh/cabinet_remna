@@ -50,6 +50,7 @@ export default async function AdminSupportPage({
             telegramId: true,
             remnashopUserId: true,
             remnashopSyncedAt: true,
+            remnawaveId: true,
             remnawaveUuid: true,
             remnawaveUsername: true,
             subscriptions: {

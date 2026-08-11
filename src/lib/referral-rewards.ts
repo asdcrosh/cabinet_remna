@@ -1,6 +1,10 @@
 import type { Prisma, ReferralRewardTrigger } from '@prisma/client'
 import { prisma } from './prisma'
-import { remnawave } from './remnawave'
+import {
+  hasRemnawaveUserReference,
+  remnawave,
+  remnawaveUserReference,
+} from './remnawave'
 import { isFeatureEnabled } from './feature-flags'
 import { getEffectiveReferralSettings, type ReferralSettings } from './referral-settings'
 import { grantReferralBonusBoxAttemptsForReward } from './bonus-box'
@@ -231,14 +235,16 @@ async function applyDaysReward(input: {
   bonusDays: number
   alreadyApplied: boolean
   user: {
+    remnawaveId: number | null
     remnawaveUuid: string | null
+    remnawaveUsername: string | null
     subscriptions: Array<{ id: string; expireAt: Date }>
   }
 }) {
   if (input.bonusDays <= 0 || input.alreadyApplied) return { done: true, error: null }
 
   const subscription = input.user.subscriptions[0]
-  if (!subscription || !input.user.remnawaveUuid) {
+  if (!subscription || !hasRemnawaveUserReference(input.user)) {
     return { done: false, error: null }
   }
 
@@ -246,8 +252,7 @@ async function applyDaysReward(input: {
   const newExpireAt = new Date(base.getTime() + input.bonusDays * 24 * 60 * 60 * 1000)
 
   try {
-    const updated = await remnawave.updateUser({
-      uuid: input.user.remnawaveUuid,
+    const updated = await remnawave.updateUser(remnawaveUserReference(input.user), {
       expireAt: newExpireAt.toISOString(),
       status: 'ACTIVE',
     })

@@ -17,6 +17,14 @@ vi.mock('@/lib/auth/guard', () => ({
 vi.mock('@/lib/prisma', () => ({ prisma: mocks.prisma }))
 vi.mock('@/lib/remnawave', () => ({
   remnawave: { revokeSubscription: mocks.revokeSubscription },
+  hasRemnawaveUserReference: (user: any) => Boolean(
+    user.remnawaveId || user.remnawaveUuid || user.remnawaveUsername
+  ),
+  remnawaveUserReference: (user: any) => ({
+    id: user.remnawaveId,
+    uuid: user.remnawaveUuid,
+    username: user.remnawaveUsername,
+  }),
   RemnawaveError: mocks.RemnawaveError,
 }))
 
@@ -55,7 +63,9 @@ describe('subscription revoke route', () => {
 
     expect(response.status).toBe(200)
     expect(body).toEqual({ ok: true })
-    expect(mocks.revokeSubscription).toHaveBeenCalledWith('uuid-1')
+    expect(mocks.revokeSubscription).toHaveBeenCalledWith(expect.objectContaining({
+      uuid: 'uuid-1',
+    }))
     expect(mocks.prisma.subscription.updateMany).toHaveBeenCalledWith({
       where: { userId: 'user-1', status: { in: ['ACTIVE', 'LIMITED'] } },
       data: { pendingSync: true },

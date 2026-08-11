@@ -4,7 +4,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAuth, withAuth } from '@/lib/auth/guard'
-import { RemnawaveError } from '@/lib/remnawave'
+import { hasRemnawaveUserReference, RemnawaveError, remnawaveUserReference } from '@/lib/remnawave'
 import { syncLocalDevicesFromRemnawave } from '@/lib/remnawave-device-sync'
 
 export const runtime = 'nodejs'
@@ -13,12 +13,12 @@ export const dynamic = 'force-dynamic'
 export const GET = withAuth(async () => {
   const session = await requireAuth()
   const user = await prisma.user.findUnique({ where: { id: session.uid } })
-  if (!user?.remnawaveUuid) return NextResponse.json({ devices: [] })
+  if (!user || !hasRemnawaveUserReference(user)) return NextResponse.json({ devices: [] })
 
   try {
     const { devices } = await syncLocalDevicesFromRemnawave({
       localUserId: user.id,
-      remnawaveUuid: user.remnawaveUuid,
+      reference: remnawaveUserReference(user),
     })
     return NextResponse.json({ devices })
   } catch (e) {

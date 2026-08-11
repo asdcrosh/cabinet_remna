@@ -27,7 +27,9 @@ export async function GET() {
       emailVerifiedAt: true,
       telegramId: true,
       remnashopUserId: true,
+      remnawaveId: true,
       remnawaveUuid: true,
+      remnawaveUsername: true,
     },
   })
   if (!user) {
@@ -48,7 +50,7 @@ export async function GET() {
       emailVerified,
       telegramLinked: Boolean(user.telegramId),
       remnashopLinked: Boolean(user.remnashopUserId),
-      remnawaveLinked: Boolean(user.remnawaveUuid),
+      remnawaveLinked: Boolean(user.remnawaveId || user.remnawaveUuid || user.remnawaveUsername),
       canPay: emailVerified,
       nextAction: emailVerified
         ? null

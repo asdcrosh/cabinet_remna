@@ -7,7 +7,13 @@
 // набором аргументов состояние не должно «разъехаться».
 
 import { prisma } from './prisma'
-import { remnawave, RemnawaveError, type UserResponse } from './remnawave'
+import {
+  hasRemnawaveUserReference,
+  remnawave,
+  RemnawaveError,
+  remnawaveUserReference,
+  type UserResponse,
+} from './remnawave'
 import { gbToBytes } from './format'
 import { toRemnawaveTelegramId } from './telegram-remnawave'
 import { readRemnawaveBigInt } from './remnawave-usage'
@@ -59,12 +65,11 @@ export async function ensureRemnawaveSubscription(input: EnsureSubscriptionInput
   let remnawaveUser: UserResponse
   let isNew = false
 
-  if (user.remnawaveUuid) {
+  if (hasRemnawaveUserReference(user)) {
     const activeSubscription = getLatestActiveSubscription(user.subscriptions)
     const newExpire = computeNewExpireAt(activeSubscription, input.plan, input.periodMode)
     try {
-      const updated = await remnawave.updateUser({
-        uuid: user.remnawaveUuid,
+      const updated = await remnawave.updateUser(remnawaveUserReference(user), {
         expireAt: newExpire.toISOString(),
         status: 'ACTIVE',
         // При продлении лимит обычно не меняется — но если у нового тарифа другой
@@ -78,7 +83,7 @@ export async function ensureRemnawaveSubscription(input: EnsureSubscriptionInput
       })
       remnawaveUser = updated.response
       if (input.periodMode === 'REPLACE') {
-        const reset = await remnawave.resetTraffic(user.remnawaveUuid)
+        const reset = await remnawave.resetTraffic(remnawaveUser)
         remnawaveUser = reset.response
       }
     } catch (e) {
@@ -100,7 +105,8 @@ export async function ensureRemnawaveSubscription(input: EnsureSubscriptionInput
       await prisma.user.update({
         where: { id: user.id },
         data: {
-          remnawaveUuid: remnawaveUser.uuid,
+          remnawaveId: remnawaveUser.id,
+          remnawaveUuid: remnawaveUser.uuid ?? null,
           remnawaveShortUuid: remnawaveUser.shortUuid,
           remnawaveUsername: remnawaveUser.username,
         },
@@ -123,12 +129,23 @@ export async function ensureRemnawaveSubscription(input: EnsureSubscriptionInput
     await prisma.user.update({
       where: { id: user.id },
       data: {
-        remnawaveUuid: remnawaveUser.uuid,
+        remnawaveId: remnawaveUser.id,
+        remnawaveUuid: remnawaveUser.uuid ?? null,
         remnawaveShortUuid: remnawaveUser.shortUuid,
         remnawaveUsername: remnawaveUser.username,
       },
     })
   }
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      remnawaveId: remnawaveUser.id,
+      remnawaveUuid: remnawaveUser.uuid ?? null,
+      remnawaveShortUuid: remnawaveUser.shortUuid,
+      remnawaveUsername: remnawaveUser.username,
+    },
+  })
 
   // Денормализуем в нашу БД
   const trafficLimit = readRemnawaveBigInt(remnawaveUser, ['trafficLimitBytes', 'trafficLimit'])

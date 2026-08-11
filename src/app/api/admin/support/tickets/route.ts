@@ -51,6 +51,7 @@ export const GET = withAuth(async (req: Request) => {
             telegramId: true,
             remnashopUserId: true,
             remnashopSyncedAt: true,
+            remnawaveId: true,
             remnawaveUuid: true,
             remnawaveUsername: true,
             subscriptions: {

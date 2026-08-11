@@ -15,6 +15,7 @@ export interface AdminUserDetails {
   emailVerifiedAt: string
   telegram: string
   remnashop: string
+  remnawaveId: string
   remnawaveUsername: string
   remnawaveUuid: string
   remnawaveShortUuid: string
@@ -91,6 +92,7 @@ export function UserDetailsButton({ details, showLabel = false }: { details: Adm
               <DetailCard label="Email" value={details.emailVerifiedAt} />
               <DetailCard label="Telegram" value={details.telegram} mono />
               <DetailCard label="Remnashop" value={details.remnashop} mono />
+              <DetailCard label="Remnawave ID" value={details.remnawaveId} mono />
               <DetailCard label="Remnawave username" value={details.remnawaveUsername} mono />
               <DetailCard label="Remnawave UUID" value={details.remnawaveUuid} mono />
               <DetailCard label="Short UUID" value={details.remnawaveShortUuid} mono />
@@ -169,7 +171,7 @@ function UserStatusOverview({ details }: { details: AdminUserDetails }) {
   const subscription = details.subscriptions[0]
   const hasTelegram = isConnected(details.telegram)
   const hasRemnashop = isConnected(details.remnashop)
-  const hasRemnawave = isConnected(details.remnawaveUsername) || isConnected(details.remnawaveUuid)
+  const hasRemnawave = isConnected(details.remnawaveId) || isConnected(details.remnawaveUsername) || isConnected(details.remnawaveUuid)
 
   return (
     <section className="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-3 dark:border-white/10 dark:bg-white/[0.03] sm:grid-cols-2 xl:grid-cols-4">

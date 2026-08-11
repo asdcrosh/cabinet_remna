@@ -37,7 +37,9 @@ export const POST = withAuth(async (req: Request) => {
       email: true,
       emailVerifiedAt: true,
       telegramId: true,
+      remnawaveId: true,
       remnawaveUuid: true,
+      remnawaveUsername: true,
       subscriptions: { select: { id: true }, take: 1 },
       payments: { where: { status: 'SUCCEEDED' }, select: { id: true }, take: 1 },
       trialPlanRedemptions: { select: { id: true }, take: 1 },
@@ -50,7 +52,9 @@ export const POST = withAuth(async (req: Request) => {
     return NextResponse.json({ error: 'Подтвердите email или войдите через Telegram, чтобы получить приветственный бонус' }, { status: 403 })
   }
   if (
+    user.remnawaveId ||
     user.remnawaveUuid ||
+    user.remnawaveUsername ||
     user.subscriptions.length > 0 ||
     user.payments.length > 0 ||
     user.trialPlanRedemptions.length > 0 ||

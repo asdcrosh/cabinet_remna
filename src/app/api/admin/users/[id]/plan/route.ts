@@ -91,7 +91,7 @@ export const DELETE = withAuth(async (req: Request, { params }: { params: Promis
     prisma.user.findUnique({ where: { id: session.uid }, select: { role: true } }),
     prisma.user.findUnique({
       where: { id },
-      select: { id: true, email: true, role: true, remnawaveUuid: true },
+      select: { id: true, email: true, role: true, remnawaveId: true, remnawaveUuid: true },
     }),
   ])
   if (!actor || !user) {
@@ -113,6 +113,7 @@ export const DELETE = withAuth(async (req: Request, { params }: { params: Promis
     if (error instanceof RemnawaveError) {
       logError('admin.subscription_disable_failed', error, {
         userId: user.id,
+        remnawaveId: user.remnawaveId,
         remnawaveUuid: user.remnawaveUuid,
         status: error.status,
       })
@@ -134,6 +135,7 @@ export const DELETE = withAuth(async (req: Request, { params }: { params: Promis
     message: 'Администратор отключил подписку пользователя',
     metadata: {
       email: user.email,
+      remnawaveId: user.remnawaveId,
       remnawaveUuid: user.remnawaveUuid,
     },
     request: req,

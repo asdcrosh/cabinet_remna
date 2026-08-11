@@ -29,6 +29,14 @@ const mocks = vi.hoisted(() => {
 vi.mock('./prisma', () => ({ prisma: mocks.prisma }))
 vi.mock('./remnawave', () => ({
   remnawave: mocks.remnawave,
+  hasRemnawaveUserReference: (user: any) => Boolean(
+    user.remnawaveId || user.remnawaveUuid || user.remnawaveUsername
+  ),
+  remnawaveUserReference: (user: any) => ({
+    id: user.remnawaveId,
+    uuid: user.remnawaveUuid,
+    username: user.remnawaveUsername,
+  }),
   RemnawaveError: class RemnawaveError extends Error {
     constructor(public status: number, public body: unknown, message: string) {
       super(message)
@@ -132,8 +140,8 @@ describe('ensureRemnawaveSubscription', () => {
     })
 
     expect(mocks.remnawave.updateUser).toHaveBeenCalledWith(
+      expect.objectContaining({ uuid: 'rw-1' }),
       expect.objectContaining({
-        uuid: 'rw-1',
         expireAt: new Date('2026-02-14T00:00:00.000Z').toISOString(),
         hwidDeviceLimit: 5,
         tag: 'IMPORTED',
@@ -167,8 +175,8 @@ describe('ensureRemnawaveSubscription', () => {
     })
 
     expect(mocks.remnawave.updateUser).toHaveBeenCalledWith(
+      expect.objectContaining({ uuid: 'rw-1' }),
       expect.objectContaining({
-        uuid: 'rw-1',
         expireAt: new Date('2026-01-31T00:00:00.000Z').toISOString(),
       })
     )
@@ -203,11 +211,14 @@ describe('ensureRemnawaveSubscription', () => {
     })
 
     expect(mocks.remnawave.updateUser).toHaveBeenCalledWith(
+      expect.objectContaining({ uuid: 'rw-1' }),
       expect.objectContaining({
         expireAt: new Date('2026-01-31T00:00:00.000Z').toISOString(),
       })
     )
-    expect(mocks.remnawave.resetTraffic).toHaveBeenCalledWith('rw-1')
+    expect(mocks.remnawave.resetTraffic).toHaveBeenCalledWith(
+      expect.objectContaining({ uuid: 'rw-1' })
+    )
   })
 
   it('uses plan squads before env fallback', async () => {
@@ -232,6 +243,7 @@ describe('ensureRemnawaveSubscription', () => {
     })
 
     expect(mocks.remnawave.updateUser).toHaveBeenCalledWith(
+      expect.objectContaining({ uuid: 'rw-1' }),
       expect.objectContaining({
         activeInternalSquads: ['plan-squad-1', 'plan-squad-2'],
       })
@@ -283,13 +295,18 @@ describe('ensureRemnawaveSubscription', () => {
       plan,
     })
 
-    expect(mocks.remnawave.updateUser).toHaveBeenCalledWith(expect.objectContaining({
-      uuid: 'rw-1',
-      status: 'ACTIVE',
-      expireAt: new Date('2026-01-31T00:00:00.000Z').toISOString(),
-    }))
+    expect(mocks.remnawave.updateUser).toHaveBeenCalledWith(
+      expect.objectContaining({ uuid: 'rw-1' }),
+      expect.objectContaining({
+        status: 'ACTIVE',
+        expireAt: new Date('2026-01-31T00:00:00.000Z').toISOString(),
+      })
+    )
     expect(mocks.remnawave.createUser).not.toHaveBeenCalled()
-    expect(mocks.prisma.user.update).not.toHaveBeenCalled()
+    expect(mocks.prisma.user.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: 'user-1' },
+      data: expect.objectContaining({ remnawaveUuid: 'rw-1' }),
+    }))
     expect(mocks.prisma.subscription.create).toHaveBeenCalled()
   })
 

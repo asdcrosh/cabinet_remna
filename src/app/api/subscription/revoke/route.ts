@@ -5,18 +5,23 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAuth, withAuth } from '@/lib/auth/guard'
-import { remnawave, RemnawaveError } from '@/lib/remnawave'
+import {
+  hasRemnawaveUserReference,
+  remnawave,
+  RemnawaveError,
+  remnawaveUserReference,
+} from '@/lib/remnawave'
 
 export const runtime = 'nodejs'
 
 export const POST = withAuth(async (_req: Request) => {
   const session = await requireAuth()
   const user = await prisma.user.findUnique({ where: { id: session.uid } })
-  if (!user?.remnawaveUuid) {
+  if (!user || !hasRemnawaveUserReference(user)) {
     return NextResponse.json({ error: 'Нет активной подписки' }, { status: 404 })
   }
   try {
-    await remnawave.revokeSubscription(user.remnawaveUuid)
+    await remnawave.revokeSubscription(remnawaveUserReference(user))
     await prisma.subscription.updateMany({
       where: { userId: user.id, status: { in: ['ACTIVE', 'LIMITED'] } },
       data: { pendingSync: true },

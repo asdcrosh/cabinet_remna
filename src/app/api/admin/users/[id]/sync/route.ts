@@ -1,7 +1,11 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAdmin, withAuth } from '@/lib/auth/guard'
-import { remnawave } from '@/lib/remnawave'
+import {
+  hasRemnawaveUserReference,
+  remnawave,
+  remnawaveUserReference,
+} from '@/lib/remnawave'
 import { upsertLocalSubscriptionFromRemnawave } from '@/lib/remnawave-local-sync'
 import { syncLinkedTelegramUser } from '@/lib/telegram-link-sync'
 import { syncCabinetPaymentToRemnashopBestEffort } from '@/lib/remnashop-reverse-sync'
@@ -39,6 +43,7 @@ export const POST = withAuth(async (req: Request, { params }: { params: Promise<
         email: true,
         role: true,
         telegramId: true,
+        remnawaveId: true,
         remnawaveUuid: true,
         remnawaveUsername: true,
       },
@@ -76,11 +81,9 @@ export const POST = withAuth(async (req: Request, { params }: { params: Promise<
     }
   } else {
     try {
-      const remnawaveUser = user.remnawaveUuid
-        ? (await remnawave.getUserByUuid(user.remnawaveUuid)).response
-        : user.remnawaveUsername
-          ? (await remnawave.getUserByUsername(user.remnawaveUsername)).response
-          : null
+      const remnawaveUser = hasRemnawaveUserReference(user)
+        ? (await remnawave.getUser(remnawaveUserReference(user))).response
+        : null
 
       if (remnawaveUser) {
         await upsertLocalSubscriptionFromRemnawave({
@@ -90,7 +93,7 @@ export const POST = withAuth(async (req: Request, { params }: { params: Promise<
         try {
           result.devices = Math.max(result.devices, (await syncLocalDevicesFromRemnawave({
             localUserId: user.id,
-            remnawaveUuid: remnawaveUser.uuid,
+            reference: remnawaveUser,
           })).total)
         } catch (error) {
           result.warnings.push(`Устройства: ${describeSyncError(error)}`)

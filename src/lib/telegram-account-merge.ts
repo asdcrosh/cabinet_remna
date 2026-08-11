@@ -42,6 +42,13 @@ export async function mergeTechnicalTelegramAccount(input: {
     !source.emailVerifiedAt
   if (!isTechnicalSource) throw new TelegramAccountMergeError('IDENTITY_CONFLICT')
   if (
+    target.remnawaveId &&
+    source.remnawaveId &&
+    target.remnawaveId !== source.remnawaveId
+  ) {
+    throw new TelegramAccountMergeError('IDENTITY_CONFLICT')
+  }
+  if (
     target.remnawaveUuid &&
     source.remnawaveUuid &&
     target.remnawaveUuid !== source.remnawaveUuid
@@ -60,6 +67,7 @@ export async function mergeTechnicalTelegramAccount(input: {
       data: {
         telegramId: null,
         remnashopUserId: null,
+        remnawaveId: null,
         remnawaveUuid: null,
         remnawaveShortUuid: null,
         remnawaveUsername: null,
@@ -224,6 +232,7 @@ export async function mergeTechnicalTelegramAccount(input: {
         name: target.name ?? input.telegramName ?? source.name,
         remnashopUserId,
         remnashopSyncedAt: source.remnashopSyncedAt ?? target.remnashopSyncedAt,
+        remnawaveId: source.remnawaveId ?? target.remnawaveId,
         remnawaveUuid: source.remnawaveUuid ?? target.remnawaveUuid,
         remnawaveShortUuid: source.remnawaveShortUuid ?? target.remnawaveShortUuid,
         remnawaveUsername: source.remnawaveUsername ?? target.remnawaveUsername,

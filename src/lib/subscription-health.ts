@@ -3,7 +3,13 @@ import { gbToBytes } from './format'
 import { prisma } from './prisma'
 import { remnashopQuery } from './remnashop-db'
 import { syncCabinetPaymentToRemnashopBestEffort } from './remnashop-reverse-sync'
-import { remnawave, RemnawaveError, type UserResponse } from './remnawave'
+import {
+  hasRemnawaveUserReference,
+  remnawave,
+  RemnawaveError,
+  remnawaveUserReference,
+  type UserResponse,
+} from './remnawave'
 import { syncLocalDevicesFromRemnawave } from './remnawave-device-sync'
 import { upsertLocalSubscriptionFromRemnawave } from './remnawave-local-sync'
 import { readRemnawaveBigInt } from './remnawave-usage'
@@ -122,6 +128,7 @@ export async function reconcileSubscriptionHealthBatch(input: {
     where: {
       role: 'USER',
       OR: [
+        { remnawaveId: { not: null } },
         { remnawaveUuid: { not: null } },
         { subscriptions: { some: {} } },
       ],
@@ -173,17 +180,15 @@ async function inspect(userId: string) {
   let remoteDevices: number | null = null
   let remnashop: RemnashopSnapshot | null = null
 
-  if (!user.remnawaveUuid && !user.remnawaveUsername) {
+  if (!hasRemnawaveUserReference(user)) {
     if (local) {
-      issues.push(issue('REMNAWAVE_LINK_MISSING', 'ERROR', 'REMNAWAVE', 'Нет связи с Remnawave', 'У локальной подписки нет UUID или username профиля Remnawave.', 'NONE'))
+      issues.push(issue('REMNAWAVE_LINK_MISSING', 'ERROR', 'REMNAWAVE', 'Нет связи с Remnawave', 'У локальной подписки нет ID, UUID или username профиля Remnawave.', 'NONE'))
     }
   } else {
     try {
-      remote = user.remnawaveUuid
-        ? (await remnawave.getUserByUuid(user.remnawaveUuid)).response
-        : (await remnawave.getUserByUsername(user.remnawaveUsername!)).response
+      remote = (await remnawave.getUser(remnawaveUserReference(user))).response
       try {
-        remoteDevices = (await remnawave.getUserDevices(remote.uuid)).response.total
+        remoteDevices = (await remnawave.getUserDevices(remote)).response.total
       } catch (error) {
         issues.push(issue('REMNAWAVE_DEVICES_UNAVAILABLE', 'WARNING', 'REMNAWAVE', 'Не проверены устройства', describeSyncError(error), 'AUTO'))
       }
@@ -228,6 +233,7 @@ async function inspect(userId: string) {
         devices: user._count.devices,
       } : null,
       remnawave: remote ? {
+        id: remote.id ?? null,
         uuid: remote.uuid,
         status: remote.status,
         expireAt: remote.expireAt,
@@ -311,7 +317,7 @@ function compareRemnashop(
   if (sourceExpireAt && (!shopExpireAt || Math.abs(sourceExpireAt.getTime() - shopExpireAt.getTime()) > EXPIRY_TOLERANCE_MS)) {
     issues.push(issue('REMNASHOP_EXPIRY_MISMATCH', 'WARNING', 'REMNASHOP', 'Не совпадает срок в Remnashop', `Ожидается ${formatDate(sourceExpireAt)}, в Remnashop ${shopExpireAt ? formatDate(shopExpireAt) : 'не задан'}.`, 'AUTO'))
   }
-  if (remote && shop.remnawaveUuid && shop.remnawaveUuid !== remote.uuid) {
+  if (remote?.uuid && shop.remnawaveUuid && shop.remnawaveUuid !== remote.uuid) {
     issues.push(issue('REMNASHOP_UUID_MISMATCH', 'ERROR', 'REMNASHOP', 'Remnashop связан с другим профилем', `Remnawave UUID: ${remote.uuid}, в Remnashop: ${shop.remnawaveUuid}.`, 'MANUAL'))
   }
 }
@@ -327,7 +333,10 @@ async function applySafeRepairs(state: Awaited<ReturnType<typeof inspect>>) {
     })
     changes.push('Состояние Remnawave сохранено в Cabinet')
     try {
-      await syncLocalDevicesFromRemnawave({ localUserId: state.user.id, remnawaveUuid: state.remote.uuid })
+      await syncLocalDevicesFromRemnawave({
+        localUserId: state.user.id,
+        reference: state.remote,
+      })
       changes.push('Список устройств обновлён')
     } catch {
       // Ошибка останется отдельным пунктом после повторной проверки и не блокирует другие исправления.
@@ -345,8 +354,7 @@ async function applyManualRepairs(state: Awaited<ReturnType<typeof inspect>>) {
   const local = state.user.subscriptions[0]
   const plan = local?.plan
   if (!state.remote || !local || !plan) return []
-  const updated = await remnawave.updateUser({
-    uuid: state.remote.uuid,
+  const updated = await remnawave.updateUser(state.remote, {
     status: local.status,
     expireAt: local.expireAt.toISOString(),
     trafficLimitBytes: plan.trafficLimitGb == null ? 0 : Number(gbToBytes(plan.trafficLimitGb)),

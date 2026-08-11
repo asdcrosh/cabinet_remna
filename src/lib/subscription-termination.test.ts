@@ -37,6 +37,14 @@ vi.mock('./remnawave', () => ({
     resetTraffic: mocks.resetTraffic,
     deleteAllUserDevices: mocks.deleteAllUserDevices,
   },
+  hasRemnawaveUserReference: (user: any) => Boolean(
+    user.remnawaveId || user.remnawaveUuid || user.remnawaveUsername
+  ),
+  remnawaveUserReference: (user: any) => ({
+    id: user.remnawaveId,
+    uuid: user.remnawaveUuid,
+    username: user.remnawaveUsername,
+  }),
   RemnawaveError: mocks.TestRemnawaveError,
 }))
 vi.mock('./remnashop-subscription-removal', () => ({
@@ -80,13 +88,13 @@ describe('terminateUserSubscription', () => {
     })
 
     expect(result).toEqual({ hadSubscription: true })
-    expect(mocks.disableUser).toHaveBeenCalledWith('uuid-1')
-    expect(mocks.updateUser).toHaveBeenCalledWith(expect.objectContaining({
-      uuid: 'uuid-1',
-      expireAt: expect.any(String),
-    }))
-    expect(mocks.resetTraffic).toHaveBeenCalledWith('uuid-1')
-    expect(mocks.deleteAllUserDevices).toHaveBeenCalledWith('uuid-1', 42)
+    expect(mocks.disableUser).toHaveBeenCalledWith(expect.objectContaining({ uuid: 'uuid-1' }))
+    expect(mocks.updateUser).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 42 }),
+      expect.objectContaining({ expireAt: expect.any(String) })
+    )
+    expect(mocks.resetTraffic).toHaveBeenCalledWith(expect.objectContaining({ id: 42 }))
+    expect(mocks.deleteAllUserDevices).toHaveBeenCalledWith(expect.objectContaining({ id: 42 }))
     expect(mocks.subscriptionUpdateMany).toHaveBeenCalledWith(expect.objectContaining({
       where: { userId: 'user-1', status: { in: ['ACTIVE', 'LIMITED'] } },
       data: expect.objectContaining({
@@ -154,7 +162,7 @@ describe('terminateUserSubscription', () => {
       source: 'ADMIN_REQUEST',
     })).resolves.toEqual({ hadSubscription: true })
 
-    expect(mocks.disableUser).toHaveBeenCalledWith('uuid-1')
+    expect(mocks.disableUser).toHaveBeenCalledWith(expect.objectContaining({ uuid: 'uuid-1' }))
     expect(mocks.transaction).toHaveBeenCalledOnce()
   })
 })

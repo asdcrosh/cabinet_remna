@@ -5,7 +5,12 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAuth, withAuth } from '@/lib/auth/guard'
-import { remnawave, RemnawaveError } from '@/lib/remnawave'
+import {
+  hasRemnawaveUserReference,
+  remnawave,
+  RemnawaveError,
+  remnawaveUserReference,
+} from '@/lib/remnawave'
 import { readRemnawaveBigInt } from '@/lib/remnawave-usage'
 import { hasTrafficUsage, normalizeUsageSeries } from '@/lib/traffic-usage'
 import { logWarn } from '@/lib/logger'
@@ -24,7 +29,7 @@ export const GET = withAuth(async (req: Request) => {
       },
     },
   })
-  if (!user?.remnawaveUuid) {
+  if (!user || !hasRemnawaveUserReference(user)) {
     return NextResponse.json({
       series: [],
       usedBytes: '0',
@@ -51,8 +56,8 @@ export const GET = withAuth(async (req: Request) => {
   const [profileResult, usageResult] = await Promise.allSettled([
     user.remnawaveUsername
       ? remnawave.getSubscriptionByUsername(user.remnawaveUsername)
-      : remnawave.getUserByUuid(user.remnawaveUuid),
-    remnawave.getUsageRange(user.remnawaveUuid, start, end),
+      : remnawave.getUser(remnawaveUserReference(user)),
+    remnawave.getUsageRange(remnawaveUserReference(user), start, end),
   ])
 
   if (profileResult.status === 'fulfilled') {

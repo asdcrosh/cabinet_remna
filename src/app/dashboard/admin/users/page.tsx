@@ -36,9 +36,9 @@ export default async function AdminUsersPage({
   const where = {
     ...(role !== 'ALL' ? { role: role as any } : {}),
     ...(account === 'LINKED'
-      ? { remnawaveUuid: { not: null } }
+      ? { NOT: { remnawaveId: null, remnawaveUuid: null, remnawaveUsername: null } }
       : account === 'UNLINKED'
-        ? { remnawaveUuid: null }
+        ? { remnawaveId: null, remnawaveUuid: null, remnawaveUsername: null }
         : {}),
     ...(q ? {
         OR: [
@@ -65,6 +65,7 @@ export default async function AdminUsersPage({
         telegramUsername: true,
         emailVerifiedAt: true,
         remnashopUserId: true,
+        remnawaveId: true,
         remnawaveUuid: true,
         remnawaveShortUuid: true,
         remnawaveUsername: true,
@@ -208,8 +209,8 @@ export default async function AdminUsersPage({
                         @{user.telegramUsername || user.telegramId.toString()}
                       </span>
                     )}
-                    <span className={user.remnawaveUuid ? 'text-emerald-600 dark:text-emerald-300' : 'text-slate-400'}>
-                      {user.remnawaveUuid ? 'VPN-профиль готов' : 'Без VPN-профиля'}
+                    <span className={user.remnawaveId || user.remnawaveUuid || user.remnawaveUsername ? 'text-emerald-600 dark:text-emerald-300' : 'text-slate-400'}>
+                      {user.remnawaveId || user.remnawaveUuid || user.remnawaveUsername ? 'VPN-профиль готов' : 'Без VPN-профиля'}
                     </span>
                   </div>
                 </div>
@@ -281,7 +282,8 @@ export default async function AdminUsersPage({
                     </DetailPanel>
 
                     <DetailPanel title="VPN профиль">
-                      <DetailRow label="Username" value={user.remnawaveUsername || 'Не создан'} ok={Boolean(user.remnawaveUuid)} mono />
+                      <DetailRow label="ID (v3)" value={user.remnawaveId || '—'} mono />
+                      <DetailRow label="Username" value={user.remnawaveUsername || 'Не создан'} ok={Boolean(user.remnawaveId || user.remnawaveUuid || user.remnawaveUsername)} mono />
                       <DetailRow label="UUID" value={user.remnawaveUuid || '—'} mono />
                       <DetailRow label="Short UUID" value={user.remnawaveShortUuid || '—'} mono />
                     </DetailPanel>
@@ -350,6 +352,7 @@ function buildUserDetails(user: {
   telegramId: bigint | null
   telegramUsername: string | null
   remnashopUserId: number | null
+  remnawaveId: number | null
   remnawaveUuid: string | null
   remnawaveShortUuid: string | null
   remnawaveUsername: string | null
@@ -389,6 +392,7 @@ function buildUserDetails(user: {
       ? `@${user.telegramUsername || user.telegramId.toString()} · ${user.telegramId.toString()}`
       : 'Не привязан',
     remnashop: user.remnashopUserId ? String(user.remnashopUserId) : 'Не связан',
+    remnawaveId: user.remnawaveId ? String(user.remnawaveId) : '—',
     remnawaveUsername: user.remnawaveUsername || 'Не создан',
     remnawaveUuid: user.remnawaveUuid || '—',
     remnawaveShortUuid: user.remnawaveShortUuid || '—',
@@ -482,6 +486,7 @@ function UserActions({
     telegramId: bigint | null
     telegramUsername: string | null
     remnashopUserId: number | null
+    remnawaveId: number | null
     remnawaveUuid: string | null
     remnawaveShortUuid: string | null
     remnawaveUsername: string | null
@@ -538,6 +543,7 @@ function UserActions({
           telegramId={user.telegramId?.toString() ?? null}
           telegramUsername={user.telegramUsername}
           remnashopUserId={user.remnashopUserId}
+          remnawaveId={user.remnawaveId}
           remnawaveUuid={user.remnawaveUuid}
           remnawaveShortUuid={user.remnawaveShortUuid}
           remnawaveUsername={user.remnawaveUsername}

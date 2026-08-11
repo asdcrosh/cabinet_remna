@@ -17,6 +17,7 @@ export function UserProfileEditButton({
   telegramId,
   telegramUsername,
   remnashopUserId,
+  remnawaveId,
   remnawaveUuid,
   remnawaveShortUuid,
   remnawaveUsername,
@@ -29,6 +30,7 @@ export function UserProfileEditButton({
   telegramId?: string | null
   telegramUsername?: string | null
   remnashopUserId?: number | null
+  remnawaveId?: number | null
   remnawaveUuid?: string | null
   remnawaveShortUuid?: string | null
   remnawaveUsername?: string | null
@@ -184,7 +186,8 @@ export function UserProfileEditButton({
               <h3 className="font-semibold">Remnawave</h3>
               <p className="mt-1 text-sm text-slate-500">Эти данные выдаются автоматически и не редактируются вручную.</p>
             </div>
-            <div className="grid gap-4 md:grid-cols-3">
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <ReadonlyIdentity label="ID (v3)" value={remnawaveId ? String(remnawaveId) : null} />
               <ReadonlyIdentity label="Username" value={remnawaveUsername} />
               <ReadonlyIdentity label="UUID" value={remnawaveUuid} />
               <ReadonlyIdentity label="Short UUID" value={remnawaveShortUuid} />

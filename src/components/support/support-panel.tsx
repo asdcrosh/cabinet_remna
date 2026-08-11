@@ -1212,7 +1212,12 @@ function SupportUserDiagnostics({ user }: { user: NonNullable<SupportTicket['use
       <div className="grid gap-2.5 text-xs">
         <DiagnosticRow label="Telegram" value={user.telegramId ? `TG ${user.telegramId}` : 'не привязан'} ok={Boolean(user.telegramId)} />
         <DiagnosticRow label="Remnashop" value={user.remnashopUserId ? `ID ${user.remnashopUserId}` : 'не связан'} ok={Boolean(user.remnashopUserId)} />
-        <DiagnosticRow label="Remnawave" value={user.remnawaveUsername || user.remnawaveUuid || 'нет'} ok={Boolean(user.remnawaveUuid)} mono />
+        <DiagnosticRow
+          label="Remnawave"
+          value={user.remnawaveUsername || (user.remnawaveId ? `ID ${user.remnawaveId}` : user.remnawaveUuid) || 'нет'}
+          ok={Boolean(user.remnawaveId || user.remnawaveUsername || user.remnawaveUuid)}
+          mono
+        />
       </div>
 
       {subscription ? (

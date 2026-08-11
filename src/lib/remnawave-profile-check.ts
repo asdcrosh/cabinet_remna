@@ -1,20 +1,32 @@
 import { prisma } from './prisma'
 import { logWarn } from './logger'
-import { remnawave, RemnawaveError } from './remnawave'
+import {
+  hasRemnawaveUserReference,
+  remnawave,
+  RemnawaveError,
+  remnawaveUserReference,
+} from './remnawave'
 
 export async function checkRemnawaveProfileOnLogin(user: {
   id: string
+  remnawaveId: number | null
   remnawaveUuid: string | null
   remnawaveUsername: string | null
 }) {
-  if (!user.remnawaveUuid && !user.remnawaveUsername) return
+  if (!hasRemnawaveUserReference(user)) return
 
   try {
-    if (user.remnawaveUuid) {
-      await remnawave.getUserByUuid(user.remnawaveUuid)
-    } else if (user.remnawaveUsername) {
-      await remnawave.getUserByUsername(user.remnawaveUsername)
-    }
+    const remoteUser = (await remnawave.getUser(remnawaveUserReference(user))).response
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        remnawaveId: remoteUser.id,
+        remnawaveUuid: remoteUser.uuid ?? null,
+        remnawaveShortUuid: remoteUser.shortUuid,
+        remnawaveUsername: remoteUser.username,
+      },
+    })
 
     await prisma.subscription.updateMany({
       where: { userId: user.id, pendingSync: true },

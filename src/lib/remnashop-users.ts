@@ -313,6 +313,7 @@ const localUserSelect = {
   email: true,
   name: true,
   remnashopUserId: true,
+  remnawaveId: true,
   remnawaveUuid: true,
   remnawaveUsername: true,
   telegramId: true,
@@ -412,11 +413,18 @@ async function syncSubscriptionFromRemnawave(input: {
   planId: string | null
   startAt: Date | null
 }) {
-  let remnawaveUser = (await remnawave.getUserByUuid(input.remnawaveUuid)).response
+  const localUser = await prisma.user.findUnique({
+    where: { id: input.localUserId },
+    select: { remnawaveId: true, remnawaveUsername: true },
+  })
+  let remnawaveUser = (await remnawave.getUser({
+    id: localUser?.remnawaveId,
+    uuid: input.remnawaveUuid,
+    username: localUser?.remnawaveUsername,
+  })).response
   const telegramId = toRemnawaveTelegramId(input.telegramId)
   if (telegramId && remnawaveUser.telegramId !== telegramId) {
-    remnawaveUser = (await remnawave.updateUser({
-      uuid: remnawaveUser.uuid,
+    remnawaveUser = (await remnawave.updateUser(remnawaveUser, {
       telegramId,
       tag: 'IMPORTED',
     })).response

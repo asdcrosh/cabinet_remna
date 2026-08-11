@@ -21,7 +21,9 @@ export async function getPlanAudienceContext(userId: string): Promise<PlanAudien
       telegramId: true,
       referredById: true,
       remnashopUserId: true,
+      remnawaveId: true,
       remnawaveUuid: true,
+      remnawaveUsername: true,
       subscriptions: {
         where: { plan: { isPromo: false } },
         select: { id: true },
@@ -38,7 +40,7 @@ export async function getPlanAudienceContext(userId: string): Promise<PlanAudien
     hasPaidSubscription:
       user.subscriptions.length > 0 ||
       Boolean(user.remnashopUserId) ||
-      Boolean(user.remnawaveUuid),
+      Boolean(user.remnawaveId || user.remnawaveUuid || user.remnawaveUsername),
   }
 }
 

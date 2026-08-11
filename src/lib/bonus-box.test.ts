@@ -55,7 +55,17 @@ const mocks = vi.hoisted(() => {
 })
 
 vi.mock('./prisma', () => ({ prisma: mocks.prisma }))
-vi.mock('./remnawave', () => ({ remnawave: mocks.remnawave }))
+vi.mock('./remnawave', () => ({
+  remnawave: mocks.remnawave,
+  hasRemnawaveUserReference: (user: any) => Boolean(
+    user.remnawaveId || user.remnawaveUuid || user.remnawaveUsername
+  ),
+  remnawaveUserReference: (user: any) => ({
+    id: user.remnawaveId,
+    uuid: user.remnawaveUuid,
+    username: user.remnawaveUsername,
+  }),
+}))
 vi.mock('./feature-flags', () => ({ isFeatureEnabled: vi.fn(async () => true) }))
 vi.mock('./bonus-box-engagement', () => ({
   activeEventForPrize: vi.fn(() => null),
@@ -663,11 +673,13 @@ describe('retryPendingBonusBoxSyncsForUser', () => {
     const result = await retryPendingBonusBoxSyncsForUser('user-1')
 
     expect(result).toEqual({ attempted: 1, synced: 1 })
-    expect(mocks.remnawave.updateUser).toHaveBeenCalledWith({
-      uuid: 'rw-1',
-      status: 'ACTIVE',
-      expireAt: '2026-07-10T00:00:00.000Z',
-    })
+    expect(mocks.remnawave.updateUser).toHaveBeenCalledWith(
+      expect.objectContaining({ uuid: 'rw-1' }),
+      {
+        status: 'ACTIVE',
+        expireAt: '2026-07-10T00:00:00.000Z',
+      }
+    )
     expect(mocks.prisma.bonusBoxOpening.update).toHaveBeenLastCalledWith({
       where: { id: 'opening-1' },
       data: {

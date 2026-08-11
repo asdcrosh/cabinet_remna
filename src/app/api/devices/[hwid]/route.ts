@@ -1,7 +1,12 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAuth, withAuth } from '@/lib/auth/guard'
-import { remnawave, RemnawaveError } from '@/lib/remnawave'
+import {
+  hasRemnawaveUserReference,
+  remnawave,
+  RemnawaveError,
+  remnawaveUserReference,
+} from '@/lib/remnawave'
 
 export const runtime = 'nodejs'
 
@@ -9,7 +14,7 @@ export const DELETE = withAuth(async (_req: Request, { params }: { params: Promi
   const session = await requireAuth()
   const { hwid: rawHwid } = await params
   const user = await prisma.user.findUnique({ where: { id: session.uid } })
-  if (!user?.remnawaveUuid) {
+  if (!user || !hasRemnawaveUserReference(user)) {
     return NextResponse.json({ error: 'Нет активной подписки' }, { status: 404 })
   }
 
@@ -19,7 +24,7 @@ export const DELETE = withAuth(async (_req: Request, { params }: { params: Promi
   }
 
   try {
-    await remnawave.deleteUserDevice(user.remnawaveUuid, hwid)
+    await remnawave.deleteUserDevice(remnawaveUserReference(user), hwid)
     await prisma.device.deleteMany({ where: { userId: user.id, hwid } })
     return NextResponse.json({ ok: true })
   } catch (e) {

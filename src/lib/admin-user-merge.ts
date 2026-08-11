@@ -57,6 +57,7 @@ export async function mergeTechnicalTelegramUserIntoEmailUser(input: AdminMergeU
       telegramLinkedAt: target.telegramLinkedAt || source.telegramLinkedAt,
       remnashopUserId: pickUniqueField('remnashopUserId', target.remnashopUserId, source.remnashopUserId, conflicts),
       remnashopSyncedAt: target.remnashopSyncedAt || source.remnashopSyncedAt,
+      remnawaveId: pickUniqueField('remnawaveId', target.remnawaveId, source.remnawaveId, conflicts),
       remnawaveUuid: pickUniqueField('remnawaveUuid', target.remnawaveUuid, source.remnawaveUuid, conflicts),
       remnawaveShortUuid: pickUniqueField('remnawaveShortUuid', target.remnawaveShortUuid, source.remnawaveShortUuid, conflicts),
       remnawaveUsername: pickUniqueField('remnawaveUsername', target.remnawaveUsername, source.remnawaveUsername, conflicts),
@@ -93,6 +94,7 @@ export async function mergeTechnicalTelegramUserIntoEmailUser(input: AdminMergeU
       data: {
         telegramId: null,
         remnashopUserId: null,
+        remnawaveId: null,
         remnawaveUuid: null,
         remnawaveShortUuid: null,
         remnawaveUsername: null,

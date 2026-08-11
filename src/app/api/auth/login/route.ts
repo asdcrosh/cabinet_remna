@@ -192,6 +192,7 @@ export async function POST(req: Request) {
 
   await checkRemnawaveProfileOnLogin({
     id: user.id,
+    remnawaveId: user.remnawaveId,
     remnawaveUuid: user.remnawaveUuid,
     remnawaveUsername: user.remnawaveUsername,
   })

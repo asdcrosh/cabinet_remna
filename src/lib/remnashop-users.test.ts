@@ -14,7 +14,7 @@ const mocks = vi.hoisted(() => {
   }
   const remnashopQuery = vi.fn()
   const remnawave = {
-    getUserByUuid: vi.fn(),
+    getUser: vi.fn(),
     updateUser: vi.fn(),
   }
   const upsertLocalSubscriptionFromRemnawave = vi.fn()
@@ -31,7 +31,14 @@ const mocks = vi.hoisted(() => {
 
 vi.mock('./prisma', () => ({ prisma: mocks.prisma }))
 vi.mock('./remnashop-db', () => ({ remnashopQuery: mocks.remnashopQuery }))
-vi.mock('./remnawave', () => ({ remnawave: mocks.remnawave }))
+vi.mock('./remnawave', () => ({
+  remnawave: mocks.remnawave,
+  RemnawaveError: class RemnawaveError extends Error {
+    constructor(public status: number, public body: unknown, message: string) {
+      super(message)
+    }
+  },
+}))
 vi.mock('./remnawave-local-sync', () => ({
   upsertLocalSubscriptionFromRemnawave: mocks.upsertLocalSubscriptionFromRemnawave,
 }))
@@ -107,16 +114,17 @@ describe('syncRemnashopUsersToCabinet', () => {
       remnawaveUsername: null,
       subscriptions: [],
     })
-    mocks.remnawave.getUserByUuid.mockResolvedValue({ response: remnawaveUser })
+    mocks.remnawave.getUser.mockResolvedValue({ response: remnawaveUser })
     mocks.remnawave.updateUser.mockResolvedValue({ response: { ...remnawaveUser, telegramId: '123' } })
     mocks.upsertLocalSubscriptionFromRemnawave.mockResolvedValue({ id: 'sub-1' })
     mocks.prisma.plan.findFirst.mockResolvedValue({ id: 'plan-light-7' })
 
     const result = await syncRemnashopUsersToCabinet()
 
-    expect(mocks.remnawave.getUserByUuid).toHaveBeenCalledWith('rw-1')
+    expect(mocks.remnawave.getUser).toHaveBeenCalledWith(expect.objectContaining({ uuid: 'rw-1' }))
     expect(mocks.remnawave.updateUser).toHaveBeenCalledWith(
-      expect.objectContaining({ uuid: 'rw-1', telegramId: 123, tag: 'IMPORTED' })
+      expect.objectContaining({ uuid: 'rw-1' }),
+      expect.objectContaining({ telegramId: 123, tag: 'IMPORTED' })
     )
     expect(mocks.prisma.plan.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -159,7 +167,7 @@ describe('syncRemnashopUsersToCabinet', () => {
 
     const result = await syncRemnashopUsersToCabinet()
 
-    expect(mocks.remnawave.getUserByUuid).not.toHaveBeenCalled()
+    expect(mocks.remnawave.getUser).not.toHaveBeenCalled()
     expect(mocks.upsertLocalSubscriptionFromRemnawave).not.toHaveBeenCalled()
     expect(result.subscriptionsSkipped).toBe(1)
   })
@@ -186,13 +194,13 @@ describe('syncRemnashopUsersToCabinet', () => {
       remnawaveUsername: 'rw_user',
       subscriptions: [{ id: 'sub-1', lastSyncedAt }],
     })
-    mocks.remnawave.getUserByUuid.mockResolvedValue({ response: remnawaveUser })
+    mocks.remnawave.getUser.mockResolvedValue({ response: remnawaveUser })
     mocks.remnawave.updateUser.mockResolvedValue({ response: { ...remnawaveUser, telegramId: '123' } })
     mocks.upsertLocalSubscriptionFromRemnawave.mockResolvedValue({ id: 'sub-1' })
 
     const result = await syncRemnashopUsersToCabinet({ forceRemnawaveSubscriptions: true })
 
-    expect(mocks.remnawave.getUserByUuid).toHaveBeenCalledWith('rw-1')
+    expect(mocks.remnawave.getUser).toHaveBeenCalledWith(expect.objectContaining({ uuid: 'rw-1' }))
     expect(mocks.upsertLocalSubscriptionFromRemnawave).toHaveBeenCalled()
     expect(result.subscriptionsSynced).toBe(1)
     expect(result.subscriptionsSkipped).toBe(0)
@@ -233,7 +241,7 @@ describe('syncRemnashopUsersToCabinet', () => {
       remnawaveUsername: null,
       subscriptions: [],
     })
-    mocks.remnawave.getUserByUuid.mockResolvedValue({ response: remnawaveUser })
+    mocks.remnawave.getUser.mockResolvedValue({ response: remnawaveUser })
     mocks.remnawave.updateUser.mockResolvedValue({ response: { ...remnawaveUser, telegramId: 123 } })
     mocks.upsertLocalSubscriptionFromRemnawave.mockResolvedValue({ id: 'sub-1' })
 

@@ -32,6 +32,7 @@ export const GET = withAuth(async (req: Request, { params }: { params: Promise<{
           telegramId: true,
           remnashopUserId: true,
           remnashopSyncedAt: true,
+          remnawaveId: true,
           remnawaveUuid: true,
           remnawaveUsername: true,
           subscriptions: {

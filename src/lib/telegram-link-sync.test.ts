@@ -4,7 +4,7 @@ const mocks = vi.hoisted(() => ({
   userFindUnique: vi.fn(),
   userUpdate: vi.fn(),
   remnashopQuery: vi.fn(),
-  getUserByUuid: vi.fn(),
+  getUser: vi.fn(),
   updateUser: vi.fn(),
   upsertSubscription: vi.fn(),
   syncDevices: vi.fn(),
@@ -26,9 +26,12 @@ vi.mock('./prisma', () => ({
 vi.mock('./remnashop-db', () => ({ remnashopQuery: mocks.remnashopQuery }))
 vi.mock('./remnawave', () => ({
   remnawave: {
-    getUserByUuid: mocks.getUserByUuid,
+    getUser: mocks.getUser,
     updateUser: mocks.updateUser,
   },
+  hasRemnawaveUserReference: (user: any) => Boolean(
+    user.remnawaveId || user.remnawaveUuid || user.remnawaveUsername
+  ),
 }))
 vi.mock('./remnawave-local-sync', () => ({
   upsertLocalSubscriptionFromRemnawave: mocks.upsertSubscription,
@@ -160,6 +163,7 @@ describe('syncLinkedTelegramUser', () => {
         remnashopUserId: 42,
       })
     mocks.userUpdate.mockResolvedValue({})
+    mocks.createAdminNotification.mockResolvedValue({})
     mocks.remnashopQuery
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({
@@ -185,7 +189,7 @@ describe('syncLinkedTelegramUser', () => {
   })
 
   it('updates the same Remnawave profile only once', async () => {
-    mocks.getUserByUuid.mockResolvedValue({
+    mocks.getUser.mockResolvedValue({
       response: { uuid: remnawaveUuid, telegramId: null },
     })
     mocks.updateUser.mockResolvedValue({
@@ -198,18 +202,20 @@ describe('syncLinkedTelegramUser', () => {
     })
 
     expect(mocks.updateUser).toHaveBeenCalledOnce()
-    expect(mocks.updateUser).toHaveBeenCalledWith({
-      uuid: remnawaveUuid,
-      telegramId: Number(telegramId),
-      tag: 'IMPORTED',
-    })
-    expect(mocks.getUserByUuid).toHaveBeenCalledOnce()
+    expect(mocks.updateUser).toHaveBeenCalledWith(
+      expect.objectContaining({ uuid: remnawaveUuid }),
+      {
+        telegramId: Number(telegramId),
+        tag: 'IMPORTED',
+      }
+    )
+    expect(mocks.getUser).toHaveBeenCalledOnce()
     expect(mocks.syncDevices).toHaveBeenCalledOnce()
     expect(mocks.markSyncSucceeded).toHaveBeenCalledOnce()
   })
 
   it('does not modify Remnawave when a string Telegram ID already matches', async () => {
-    mocks.getUserByUuid.mockResolvedValue({
+    mocks.getUser.mockResolvedValue({
       response: { uuid: remnawaveUuid, telegramId: telegramId.toString() },
     })
 

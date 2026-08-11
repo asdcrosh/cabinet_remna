@@ -23,9 +23,9 @@ export const GET = withAuth(async (req: Request) => {
   const baseWhere: Prisma.UserWhereInput = {
     ...(isUserRoleFilter(role) ? { role } : {}),
     ...(account === 'LINKED'
-      ? { remnawaveUuid: { not: null } }
+      ? { NOT: { remnawaveId: null, remnawaveUuid: null, remnawaveUsername: null } }
       : account === 'UNLINKED'
-        ? { remnawaveUuid: null }
+        ? { remnawaveId: null, remnawaveUuid: null, remnawaveUsername: null }
         : {}),
     ...(q
       ? {
@@ -87,6 +87,7 @@ export const GET = withAuth(async (req: Request) => {
         email: true,
         name: true,
         role: true,
+        remnawaveId: true,
         remnawaveUuid: true,
         remnawaveUsername: true,
         createdAt: true,

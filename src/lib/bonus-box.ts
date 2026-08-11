@@ -2,7 +2,12 @@ import { randomBytes, randomInt } from 'node:crypto'
 import { Prisma, type BonusBoxPrize, type BonusBoxPrizeType, type BonusBoxRarity } from '@prisma/client'
 import { prisma } from './prisma'
 import { logError } from './logger'
-import { remnawave } from './remnawave'
+import {
+  hasRemnawaveUserReference,
+  remnawave,
+  remnawaveUserReference,
+  type RemnawaveUserReference,
+} from './remnawave'
 import { gbToBytes } from './format'
 import { cleanupExpiredBonusBoxPromoCodes } from './promo-code-cleanup'
 import { syncCabinetPromoCodeToRemnashopBestEffort } from './remnashop-promo-sync'
@@ -224,7 +229,9 @@ export async function getBonusBoxOverview(userId: string) {
     prisma.user.findUnique({
       where: { id: userId },
       select: {
+        remnawaveId: true,
         remnawaveUuid: true,
+        remnawaveUsername: true,
         subscriptions: {
           where: {
             status: { in: ['ACTIVE', 'LIMITED'] },
@@ -244,7 +251,9 @@ export async function getBonusBoxOverview(userId: string) {
       select: { id: true, prizeIds: true, weightMultiplier: true },
     }),
   ])
-  const hasActiveSubscription = Boolean(vpnAccess?.remnawaveUuid && vpnAccess.subscriptions.length > 0)
+  const hasActiveSubscription = Boolean(
+    vpnAccess && hasRemnawaveUserReference(vpnAccess) && vpnAccess.subscriptions.length > 0
+  )
   const subscription = vpnAccess?.subscriptions[0]
   const eventPrizeIds = new Set(activeEvents.flatMap((event) => event.prizeIds))
   const eligiblePrizeRows = applyActiveEventWeights(
@@ -512,7 +521,9 @@ export async function grantWeeklyBonusBoxAttempts(userId: string) {
   const vpnAccess = await prisma.user.findUnique({
     where: { id: userId },
     select: {
+      remnawaveId: true,
       remnawaveUuid: true,
+      remnawaveUsername: true,
       subscriptions: {
         where: {
           status: { in: ['ACTIVE', 'LIMITED'] },
@@ -523,7 +534,7 @@ export async function grantWeeklyBonusBoxAttempts(userId: string) {
       },
     },
   })
-  if (!vpnAccess?.remnawaveUuid || vpnAccess.subscriptions.length === 0) {
+  if (!vpnAccess || !hasRemnawaveUserReference(vpnAccess) || vpnAccess.subscriptions.length === 0) {
     return { granted: 0, reason: 'no_active_subscription' as const }
   }
 
@@ -575,7 +586,9 @@ export async function openBonusBox(userId: string): Promise<BonusBoxOpeningResul
         where: { id: userId },
         select: {
           id: true,
+          remnawaveId: true,
           remnawaveUuid: true,
+          remnawaveUsername: true,
           subscriptions: {
             where: {
               status: { in: ['ACTIVE', 'LIMITED'] },
@@ -587,7 +600,9 @@ export async function openBonusBox(userId: string): Promise<BonusBoxOpeningResul
         },
       })
       const subscription = user?.subscriptions[0]
-      const hasActiveSubscription = Boolean(user && subscription && user.remnawaveUuid)
+      const hasActiveSubscription = Boolean(
+        user && subscription && hasRemnawaveUserReference(user)
+      )
       if (!user) {
         throw new BonusBoxError('Пользователь не найден', 404, 'USER_NOT_FOUND')
       }
@@ -727,7 +742,7 @@ export async function openBonusBox(userId: string): Promise<BonusBoxOpeningResul
         promoCodeExpiresAt: opening.promoCode?.expiresAt?.toISOString() ?? null,
         remoteUpdate:
           application.remoteUpdate
-            ? { ...application.remoteUpdate, remnawaveUuid: user.remnawaveUuid! }
+            ? { ...application.remoteUpdate, reference: remnawaveUserReference(user) }
             : null,
       }
     },
@@ -920,12 +935,11 @@ async function createPrizePromoCode(
 
 async function syncPrizeToRemnawave(
   input:
-    | { type: 'SUBSCRIPTION_DAYS'; remnawaveUuid: string; subscriptionId: string; expireAt: Date }
-    | { type: 'TRAFFIC_GB'; remnawaveUuid: string; subscriptionId: string; trafficLimitBytes: bigint }
+    | { type: 'SUBSCRIPTION_DAYS'; reference: RemnawaveUserReference; subscriptionId: string; expireAt: Date }
+    | { type: 'TRAFFIC_GB'; reference: RemnawaveUserReference; subscriptionId: string; trafficLimitBytes: bigint }
 ) {
   try {
-    const updated = await remnawave.updateUser({
-      uuid: input.remnawaveUuid,
+    const updated = await remnawave.updateUser(input.reference, {
       status: 'ACTIVE',
       ...(input.type === 'SUBSCRIPTION_DAYS'
         ? { expireAt: input.expireAt.toISOString() }
@@ -960,7 +974,11 @@ export async function retryPendingBonusBoxSyncsForUser(
   const [user, pendingOpenings] = await Promise.all([
     prisma.user.findUnique({
       where: { id: userId },
-      select: { remnawaveUuid: true },
+      select: {
+        remnawaveId: true,
+        remnawaveUuid: true,
+        remnawaveUsername: true,
+      },
     }),
     prisma.bonusBoxOpening.findMany({
       where: {
@@ -981,7 +999,7 @@ export async function retryPendingBonusBoxSyncsForUser(
       },
     }),
   ])
-  if (!user?.remnawaveUuid || pendingOpenings.length === 0) {
+  if (!user || !hasRemnawaveUserReference(user) || pendingOpenings.length === 0) {
     return { attempted: 0, synced: 0 }
   }
 
@@ -1002,7 +1020,7 @@ export async function retryPendingBonusBoxSyncsForUser(
     if (opening.prize.type === 'SUBSCRIPTION_DAYS') {
       const ok = await syncPrizeToRemnawave({
         type: 'SUBSCRIPTION_DAYS',
-        remnawaveUuid: user.remnawaveUuid,
+        reference: remnawaveUserReference(user),
         subscriptionId: subscription.id,
         expireAt: subscription.expireAt,
       })
@@ -1017,7 +1035,7 @@ export async function retryPendingBonusBoxSyncsForUser(
     if (opening.prize.type === 'TRAFFIC_GB' && subscription.trafficLimitBytes != null) {
       const ok = await syncPrizeToRemnawave({
         type: 'TRAFFIC_GB',
-        remnawaveUuid: user.remnawaveUuid,
+        reference: remnawaveUserReference(user),
         subscriptionId: subscription.id,
         trafficLimitBytes: subscription.trafficLimitBytes,
       })
