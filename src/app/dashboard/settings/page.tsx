@@ -158,7 +158,7 @@ export default async function SettingsPage() {
 
         <aside className="rounded-[14px] border border-slate-200 bg-white p-4 dark:border-white/[0.09] dark:bg-white/[0.025]" aria-labelledby="account-links-title">
           <h2 id="account-links-title" className="pb-2 font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400 dark:text-slate-500">Быстрый доступ</h2>
-          <div className="grid gap-1.5 sm:grid-cols-3 xl:grid-cols-1">
+          <div className="grid gap-1.5 sm:grid-cols-2 xl:grid-cols-1">
             {accountLinks.map((item) => {
               const Icon = item.icon
               return (

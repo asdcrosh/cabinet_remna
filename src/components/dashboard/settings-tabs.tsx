@@ -33,10 +33,10 @@ export function SettingsTabs({ sections }: { sections: SettingsTabSection[] }) {
   }
 
   return (
-    <div className="settings-workspace grid gap-4 md:grid-cols-[12.5rem_minmax(0,1fr)] md:gap-6">
-      <div className="sticky top-14 z-20 -mx-4 bg-surface-50/95 px-4 py-2 backdrop-blur dark:bg-surface-950/95 sm:static sm:mx-0 sm:bg-transparent sm:px-0 sm:py-0 sm:backdrop-blur-none md:self-start">
-        <div className="settings-workspace-tabs border-y border-slate-200 py-1 dark:border-white/10 md:sticky md:top-6 md:border-y-0 md:border-l md:py-0 md:pl-2">
-          <div role="tablist" aria-label="Разделы настроек" className="grid grid-cols-4 gap-1 md:grid-cols-1">
+    <div className="settings-workspace grid gap-4 xl:grid-cols-[12.5rem_minmax(0,1fr)] xl:gap-6">
+      <div className="sticky top-14 z-20 -mx-4 bg-surface-50/95 px-4 py-2 backdrop-blur dark:bg-surface-950/95 sm:static sm:mx-0 sm:bg-transparent sm:px-0 sm:py-0 sm:backdrop-blur-none xl:self-start">
+        <div className="settings-workspace-tabs border-y border-slate-200 py-1 dark:border-white/10 xl:sticky xl:top-6 xl:border-y-0 xl:border-l xl:py-0 xl:pl-2">
+          <div role="tablist" aria-label="Разделы настроек" className="grid grid-cols-4 gap-1 xl:grid-cols-1">
           {sections.map((section, index) => {
             const active = section.id === activeId
 
@@ -51,7 +51,7 @@ export function SettingsTabs({ sections }: { sections: SettingsTabSection[] }) {
                 aria-controls={`settings-panel-${section.id}`}
                 tabIndex={active ? 0 : -1}
                 className={cn(
-                  'flex h-11 min-w-0 items-center justify-center gap-1.5 rounded-[6px] px-1.5 text-[11px] font-semibold transition sm:gap-2 sm:px-3 sm:text-sm md:min-h-12 md:justify-start',
+                  'flex h-11 min-w-0 items-center justify-center gap-1.5 rounded-[6px] px-1.5 text-[11px] font-semibold transition sm:gap-2 sm:px-3 sm:text-sm xl:min-h-12 xl:justify-start',
                   active
                     ? 'bg-brand-50 text-brand-800 ring-1 ring-inset ring-brand-200 dark:bg-brand-400/10 dark:text-brand-200 dark:ring-brand-300/15'
                     : 'text-slate-500 hover:bg-slate-950/[0.04] hover:text-slate-950 dark:text-slate-400 dark:hover:bg-white/[0.06] dark:hover:text-white'
