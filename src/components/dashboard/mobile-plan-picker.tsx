@@ -28,18 +28,28 @@ export function PlanCatalog({ plans, initialPlanId }: { plans: CatalogPlan[]; in
   if (orderedPlans.length === 0) return null
 
   return (
-    <section className="plan-catalog" aria-labelledby="mobile-plan-picker-title">
-      <div className="plan-catalog__heading mb-4 hidden flex-wrap items-end justify-between gap-3 lg:flex">
+    <section className="plan-catalog" aria-label="Выбор тарифа">
+      <div className="plan-catalog__heading mb-4 hidden flex-wrap items-end justify-between gap-3 xl:flex">
         <div>
           <div className="page-eyebrow">Срок подписки</div>
-          <h2 id="mobile-plan-picker-title" className="text-xl font-semibold tracking-[-0.035em] text-slate-950 dark:text-white">Выберите период</h2>
+          <h2 className="text-xl font-semibold tracking-[-0.035em] text-slate-950 dark:text-white">Выберите период</h2>
         </div>
         <span className="shrink-0 border-l-2 border-cyan-400 pl-2 font-mono text-[10px] font-semibold uppercase tracking-[0.14em] tabular-nums text-slate-500 dark:text-slate-400">
           {orderedPlans.length} {planCountLabel(orderedPlans.length)}
         </span>
       </div>
 
-      <div className="plan-period-list grid gap-2 lg:hidden">
+      <div className="plan-catalog__compact-heading mb-3 flex items-center justify-between gap-3 xl:hidden">
+        <div>
+          <div className="page-eyebrow">Срок подписки</div>
+          <h2 className="text-lg font-semibold tracking-[-0.035em] text-slate-950 dark:text-white">Выберите период</h2>
+        </div>
+        <span className="shrink-0 border-l-2 border-brand-400 pl-2 font-mono text-[10px] font-semibold uppercase tracking-[0.14em] tabular-nums text-slate-500 dark:text-slate-400">
+          {orderedPlans.length} {planCountLabel(orderedPlans.length)}
+        </span>
+      </div>
+
+      <div className="plan-period-list grid gap-2 xl:hidden">
         {orderedPlans.map((plan, index) => (
           <article
             key={plan.id}
@@ -98,7 +108,7 @@ export function PlanCatalog({ plans, initialPlanId }: { plans: CatalogPlan[]; in
         ))}
       </div>
 
-      <div className="hidden gap-4 lg:grid lg:grid-cols-2 lg:items-start">
+      <div className="hidden gap-4 xl:grid xl:grid-cols-2 xl:items-start">
         <div className="plan-period-panel flex flex-col border p-4">
           <div className="mb-3 px-1 sm:flex sm:items-end sm:justify-between sm:gap-4">
             <div>
@@ -175,7 +185,7 @@ export function PlanCatalog({ plans, initialPlanId }: { plans: CatalogPlan[]; in
         title="Оформление подписки"
         description="Проверьте срок, сумму и выберите способ оплаты"
         variant="sheet"
-        overlayClassName="lg:hidden"
+        overlayClassName="xl:hidden"
         panelClassName="sm:max-w-[32rem]"
         bodyClassName="px-4 pb-1 pt-3 sm:px-5"
         onClose={() => setMobileCheckoutPlanId(null)}
