@@ -6,7 +6,7 @@ import { prisma } from '@/lib/prisma'
 import { getBrandName } from '@/lib/branding'
 import { getFeatureFlags } from '@/lib/feature-flags'
 import { LogoutButton } from '@/components/dashboard/logout-button'
-import { Brand, DashboardNav, MobileBottomNav, MobileDashboardNav, NavBadgesProvider } from '@/components/dashboard/dashboard-nav'
+import { Brand, DashboardNav, MobileBottomNav, NavBadgesProvider } from '@/components/dashboard/dashboard-nav'
 import { NotificationBell } from '@/components/dashboard/notification-bell'
 import { logWarn } from '@/lib/logger'
 import { AdminErrorCenter } from '@/components/admin/admin-error-center'
@@ -26,33 +26,40 @@ export default async function DashboardLayout({ children }: { children: React.Re
   }
 
   const role = freshUser.role
+  const isStaff = ['MODERATOR', 'ADMIN', 'SUPER_ADMIN'].includes(role)
   const features = await getFeatureFlags()
   const accountLabel = freshUser.email.endsWith('@pending.invalid')
     ? `@${freshUser.telegramUsername || freshUser.telegramId?.toString() || 'telegram'}`
     : freshUser.email
   const brandName = getBrandName()
-  const [supportUnreadCount, adminSupportUnreadCount] = await Promise.all([
+  const [supportUnreadCount, adminSupportUnreadCount, notificationUnreadCount, adminNotificationUnreadCount] = await Promise.all([
     features.support
       ? prisma.supportTicket.aggregate({
           where: { userId: session.uid },
           _sum: { userUnreadCount: true },
         })
       : Promise.resolve({ _sum: { userUnreadCount: 0 } }),
-    features.support && ['MODERATOR', 'ADMIN', 'SUPER_ADMIN'].includes(role)
+    features.support && isStaff
       ? prisma.supportTicket.aggregate({
           where: { status: 'WAITING_ADMIN' },
           _sum: { adminUnreadCount: true },
         })
       : Promise.resolve({ _sum: { adminUnreadCount: 0 } }),
+    prisma.userNotification.count({ where: { userId: session.uid, readAt: null } }),
+    isStaff
+      ? prisma.adminNotification.count({
+          where: { reads: { none: { userId: session.uid } } },
+        })
+      : Promise.resolve(0),
   ])
   const navBadges = {
     '/dashboard/support': supportUnreadCount._sum.userUnreadCount ?? 0,
     '/dashboard/admin/support': adminSupportUnreadCount._sum.adminUnreadCount ?? 0,
+    '/dashboard/notifications': notificationUnreadCount,
+    '/dashboard/admin/notifications': adminNotificationUnreadCount,
   }
-  const isStaff = ['MODERATOR', 'ADMIN', 'SUPER_ADMIN'].includes(role)
-
   return (
-    <NavBadgesProvider initialBadges={navBadges} supportEnabled={features.support}>
+    <NavBadgesProvider initialBadges={navBadges} supportEnabled={features.support} showAdmin={isStaff}>
       {isStaff ? <AdminErrorCenter /> : null}
       <div className="dashboard-shell min-h-screen pt-[var(--telegram-miniapp-safe-top)] lg:pt-0">
         <a
@@ -77,14 +84,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
           </div>
         </aside>
         <main className="dashboard-main min-w-0 w-full overflow-x-clip lg:ml-64 lg:w-auto">
-          <div className="dashboard-topbar sticky top-[var(--telegram-miniapp-safe-top)] z-50 flex h-14 items-center justify-between border-b px-4 backdrop-blur lg:fixed lg:right-6 lg:top-4 lg:h-auto lg:w-auto lg:border-0 lg:bg-transparent lg:p-0 lg:backdrop-blur-none">
-            <div className="lg:hidden">
-              <Brand compact brandName={brandName} />
-            </div>
-            <div className="flex shrink-0 items-center gap-2">
-              <NotificationBell showAdmin={isStaff} />
-              {isStaff ? <MobileDashboardNav role={role} email={accountLabel} brandName={brandName} badges={navBadges} features={features} /> : null}
-            </div>
+          <div className="dashboard-topbar z-50 hidden lg:fixed lg:right-6 lg:top-4 lg:flex lg:h-auto lg:w-auto lg:items-center lg:border-0 lg:bg-transparent lg:p-0 lg:backdrop-blur-none">
+            <NotificationBell showAdmin={isStaff} />
           </div>
           <div id="dashboard-content" className="page-transition mx-auto w-full max-w-[92rem] min-w-0 scroll-mt-20 px-4 pb-28 pt-5 sm:px-7 sm:pt-8 lg:px-9 lg:pb-14 lg:pr-24 lg:pt-9">{children}</div>
         </main>

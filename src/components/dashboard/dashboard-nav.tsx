@@ -6,7 +6,6 @@ import { usePathname, useRouter } from 'next/navigation'
 import { createPortal } from 'react-dom'
 import {
   Home,
-  Menu,
   MoreHorizontal,
   UserCog,
   X,
@@ -25,7 +24,6 @@ import {
   getAvailableAdminNavigation,
   informationNavigation,
   userNavigation,
-  userRoleLabel,
   type NavigationItem,
   type UserRole,
 } from './dashboard-nav-config'
@@ -40,13 +38,15 @@ const NavBadgesContext = createContext<NavBadges | null>(null)
 export function NavBadgesProvider({
   initialBadges,
   supportEnabled,
+  showAdmin = false,
   children,
 }: {
   initialBadges: NavBadges
   supportEnabled: boolean
+  showAdmin?: boolean
   children: ReactNode
 }) {
-  const badges = useLiveBadges(initialBadges, supportEnabled)
+  const badges = useLiveBadges(initialBadges, supportEnabled, showAdmin)
   return <NavBadgesContext.Provider value={badges}>{children}</NavBadgesContext.Provider>
 }
 
@@ -60,97 +60,6 @@ export function DashboardNav({
   features: FeatureFlags
 }) {
   return <NavList role={role} badges={badges} features={features} className="space-y-1 py-1" />
-}
-
-export function MobileDashboardNav({
-  role,
-  email,
-  brandName,
-  badges = {},
-  features,
-}: {
-  role: UserRole
-  email: string
-  brandName: string
-  badges?: NavBadges
-  features: FeatureFlags
-}) {
-  const pathname = usePathname()
-  const [open, setOpen] = useState(false)
-  const [mounted, setMounted] = useState(false)
-  const triggerRef = useRef<HTMLButtonElement | null>(null)
-  const dialogRef = useRef<HTMLElement | null>(null)
-  const closeButtonRef = useRef<HTMLButtonElement | null>(null)
-  const closeMenu = () => setOpen(false)
-  useBodyScrollLock(open)
-  useDialogFocus({ open, onClose: closeMenu, dialogRef, initialFocusRef: closeButtonRef, returnFocusRef: triggerRef })
-
-  useEffect(() => {
-    setMounted(true)
-  }, [])
-
-  if (pathname.startsWith('/dashboard/admin')) return null
-
-  const menu = (
-    <div className="fixed inset-0 z-[100] h-dvh w-dvw lg:hidden">
-      <button
-        type="button"
-        className="absolute inset-0 bg-slate-950/40"
-        onClick={closeMenu}
-        aria-label="Закрыть меню"
-      />
-      <aside
-        id="mobile-dashboard-menu"
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-label="Меню кабинета"
-        tabIndex={-1}
-        className="absolute right-0 top-0 z-10 flex h-dvh w-[min(22rem,88vw)] flex-col border-l border-slate-200 bg-white pt-[var(--telegram-miniapp-safe-top)] shadow-xl dark:border-white/10 dark:bg-surface-950"
-      >
-        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-4 dark:border-white/10">
-          <Brand brandName={brandName} />
-          <button
-            ref={closeButtonRef}
-            type="button"
-            className="grid h-11 w-11 place-items-center rounded-xl border bg-white text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-900 dark:bg-surface-900 dark:hover:bg-surface-800 dark:hover:text-white"
-            onClick={closeMenu}
-            aria-label="Закрыть меню"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-        <div className="flex-1 overflow-y-auto p-3">
-          <NavList role={role} badges={badges} features={features} onNavigate={closeMenu} className="space-y-1" />
-        </div>
-        <div className="border-t border-white/70 p-3 dark:border-white/10">
-          <div className="mb-2 rounded-lg border border-slate-100 bg-slate-50/80 px-3 py-2 text-xs text-slate-500 dark:border-slate-800 dark:bg-surface-900/80">
-            <div className="truncate font-medium text-slate-700 dark:text-slate-200">{email}</div>
-            <div>{userRoleLabel(role)}</div>
-          </div>
-          <LogoutButton />
-        </div>
-      </aside>
-    </div>
-  )
-
-  return (
-    <>
-      <button
-        ref={triggerRef}
-        type="button"
-        className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-slate-200 bg-white text-slate-700 transition-colors hover:bg-slate-50 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-200 dark:hover:bg-white/[0.08] lg:hidden"
-        onClick={() => setOpen(true)}
-        aria-label="Открыть меню"
-        aria-expanded={open}
-        aria-controls="mobile-dashboard-menu"
-        aria-haspopup="dialog"
-      >
-        <Menu className="h-5 w-5" />
-      </button>
-      {mounted && open ? createPortal(menu, document.body) : null}
-    </>
-  )
 }
 
 export function MobileBottomNav({
@@ -189,7 +98,12 @@ export function MobileBottomNav({
   const moreDialogRef = useRef<HTMLDivElement | null>(null)
   const moreCloseButtonRef = useRef<HTMLButtonElement | null>(null)
   const closeMore = () => setMoreOpen(false)
-  const moreActive = (adminArea ? moreItems : accountMoreItems).some((item) => ('exact' in item && item.exact) ? pathname === item.href : pathname.startsWith(item.href))
+  const visibleMoreItems = adminArea ? moreItems : accountMoreItems
+  const adminWorkspaceBadge = !adminArea && role !== 'USER'
+    ? (liveBadges['/dashboard/admin/notifications'] ?? 0)
+    : 0
+  const moreActive = visibleMoreItems.some((item) => ('exact' in item && item.exact) ? pathname === item.href : pathname.startsWith(item.href))
+  const moreBadge = visibleMoreItems.reduce((total, item) => total + (liveBadges[item.href] ?? 0), adminWorkspaceBadge)
 
   useBodyScrollLock(moreOpen)
   useDialogFocus({ open: moreOpen, onClose: closeMore, dialogRef: moreDialogRef, initialFocusRef: moreCloseButtonRef, returnFocusRef: moreTriggerRef })
@@ -306,6 +220,9 @@ export function MobileBottomNav({
           </div>
         ) : (
           <div className="space-y-4">
+            {role !== 'USER' ? (
+              <WorkspaceSwitch adminArea={false} adminBadge={adminWorkspaceBadge} onNavigate={closeMore} />
+            ) : null}
             <MobileMoreSection
               title="Кабинет"
               items={accountMoreItems}
@@ -383,7 +300,14 @@ export function MobileBottomNav({
                 : 'border-transparent text-slate-500 hover:bg-white hover:text-slate-950 dark:text-slate-400 dark:hover:bg-white/[0.04] dark:hover:text-white'
             )}
           >
-            <MoreHorizontal className="h-[18px] w-[18px]" />
+            <span className="relative">
+              <MoreHorizontal className="h-[18px] w-[18px]" />
+              {moreBadge > 0 && (
+                <span className="absolute -right-2 -top-2 grid min-w-4 place-items-center rounded-full bg-cyan-500 px-1 text-[10px] leading-4 text-white">
+                  {moreBadge > 9 ? '9+' : moreBadge}
+                </span>
+              )}
+            </span>
             <span className="max-w-full truncate">Ещё</span>
           </button>
         ) : null}
@@ -565,7 +489,15 @@ function NavList({
   )
 }
 
-function WorkspaceSwitch({ adminArea, onNavigate }: { adminArea: boolean; onNavigate?: () => void }) {
+function WorkspaceSwitch({
+  adminArea,
+  adminBadge = 0,
+  onNavigate,
+}: {
+  adminArea: boolean
+  adminBadge?: number
+  onNavigate?: () => void
+}) {
   return (
     <div className="grid grid-cols-2 rounded-[10px] border border-white/10 bg-white/[0.04] p-1">
       <Link
@@ -584,6 +516,7 @@ function WorkspaceSwitch({ adminArea, onNavigate }: { adminArea: boolean; onNavi
       <Link
         href="/dashboard/admin"
         onClick={onNavigate}
+        aria-label="Админка"
         className={cn(
           'flex h-9 items-center justify-center gap-1.5 rounded-[7px] px-2 text-xs font-semibold transition-colors',
           adminArea
@@ -593,12 +526,20 @@ function WorkspaceSwitch({ adminArea, onNavigate }: { adminArea: boolean; onNavi
       >
         <UserCog className="h-3.5 w-3.5" />
         Админка
+        {adminBadge > 0 ? (
+          <span
+            aria-hidden="true"
+            className="grid h-4 min-w-4 place-items-center rounded-full bg-cyan-500 px-1 text-[9px] leading-4 text-white"
+          >
+            {adminBadge > 9 ? '9+' : adminBadge}
+          </span>
+        ) : null}
       </Link>
     </div>
   )
 }
 
-function useLiveBadges(initialBadges: NavBadges, supportEnabled: boolean) {
+function useLiveBadges(initialBadges: NavBadges, supportEnabled: boolean, showAdmin: boolean) {
   const [badges, setBadges] = useState(initialBadges)
 
   useEffect(() => {
@@ -636,7 +577,46 @@ function useLiveBadges(initialBadges: NavBadges, supportEnabled: boolean) {
     }
   }, [supportEnabled])
 
+  useEffect(() => {
+    let active = true
+
+    async function refreshNotificationBadges() {
+      const [userSummary, adminSummary] = await Promise.all([
+        fetchNotificationSummary('/api/notifications/summary'),
+        showAdmin ? fetchNotificationSummary('/api/admin/notifications/summary') : Promise.resolve(null),
+      ])
+      if (!active) return
+
+      const updates: NavBadges = {}
+      if (userSummary !== null) updates['/dashboard/notifications'] = userSummary
+      if (adminSummary !== null) updates['/dashboard/admin/notifications'] = adminSummary
+      if (Object.keys(updates).length > 0) {
+        setBadges((current) => ({ ...current, ...updates }))
+      }
+    }
+
+    void refreshNotificationBadges()
+    const interval = window.setInterval(refreshNotificationBadges, 60_000)
+
+    return () => {
+      active = false
+      window.clearInterval(interval)
+    }
+  }, [showAdmin])
+
   return badges
+}
+
+async function fetchNotificationSummary(url: string) {
+  try {
+    const response = await fetch(url, { cache: 'no-store' })
+    const data = await response.json().catch(() => null)
+    if (!response.ok || !data) return null
+    const unreadCount = Number(data.unreadCount)
+    return Number.isFinite(unreadCount) && unreadCount >= 0 ? unreadCount : null
+  } catch {
+    return null
+  }
 }
 
 function useNavBadgeValues(fallback: NavBadges) {

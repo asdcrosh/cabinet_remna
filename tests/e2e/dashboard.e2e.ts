@@ -15,23 +15,31 @@ test('истёкшая подписка не показывает отрицат
   await expectNoHorizontalOverflow(page)
 })
 
-test('мобильная навигация показывает пять основных разделов', async ({ page }, testInfo) => {
+test('мобильная навигация переносит второстепенные разделы вниз', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'mobile-chromium', 'Проверка предназначена для mobile viewport')
   await login(page, E2E_USERS.basic.email)
 
+  await expect(page.locator('.dashboard-topbar')).toBeHidden()
   const navigation = page.getByRole('navigation', { name: 'Основная мобильная навигация' })
   await expect(navigation).toBeVisible()
-  await expect(navigation.getByRole('link')).toHaveCount(5)
+  await expect(navigation.getByRole('link')).toHaveCount(4)
   await expect(navigation.getByRole('link', { name: 'Главная' })).toBeVisible()
   await expect(navigation.getByRole('link', { name: 'Подключение' })).toBeVisible()
   await expect(navigation.getByRole('link', { name: 'Тарифы' })).toBeVisible()
-  await expect(navigation.getByRole('link', { name: 'Бонусы' })).toBeVisible()
-  await navigation.getByRole('link', { name: 'Аккаунт' }).click()
+  await expect(navigation.getByRole('link', { name: 'Поддержка' })).toBeVisible()
+  await navigation.getByRole('button', { name: 'Открыть ещё разделы' }).click()
+
+  const moreMenu = page.getByRole('dialog', { name: 'Ещё' })
+  await expect(moreMenu.getByRole('link', { name: 'Уведомления' })).toBeVisible()
+  await expect(moreMenu.getByRole('link', { name: 'Бонусы' })).toBeVisible()
+  await expect(moreMenu.getByRole('link', { name: 'Аккаунт' })).toBeVisible()
+  await expect(moreMenu.getByRole('link', { name: 'Админка', exact: true })).toHaveCount(0)
+  await moreMenu.getByRole('link', { name: 'Аккаунт' }).click()
 
   await expect(page).toHaveURL(/\/dashboard\/settings(?:\?|$)/)
   await expect(page.getByRole('heading', { name: 'Аккаунт' })).toBeVisible()
   const settingsTabs = page.getByRole('tablist', { name: 'Разделы настроек' })
-  await expect(settingsTabs.getByRole('tab')).toHaveCount(3)
+  await expect(settingsTabs.getByRole('tab')).toHaveCount(4)
   expect(await settingsTabs.locator('..').evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true)
   await expectNoHorizontalOverflow(page)
 
@@ -229,17 +237,27 @@ test('администратор видит карту вероятностей 
 
 test('админская навигация не смешивается с личным кабинетом', async ({ page }, testInfo) => {
   await login(page, E2E_USERS.admin.email)
-  await page.goto('/dashboard/admin')
 
   if (testInfo.project.name === 'mobile-chromium') {
-    const navigation = page.getByRole('navigation', { name: 'Основная мобильная навигация' })
+    await expect(page.locator('.dashboard-topbar')).toBeHidden()
+    let navigation = page.getByRole('navigation', { name: 'Основная мобильная навигация' })
+    await navigation.getByRole('button', { name: 'Открыть ещё разделы' }).click()
+    const cabinetMoreMenu = page.getByRole('dialog', { name: 'Ещё' })
+    await expect(cabinetMoreMenu.getByRole('link', { name: 'Кабинет', exact: true })).toBeVisible()
+    await cabinetMoreMenu.getByRole('link', { name: 'Админка', exact: true }).click()
+
+    await expect(page).toHaveURL(/\/dashboard\/admin(?:\?|$)/)
+    navigation = page.getByRole('navigation', { name: 'Основная мобильная навигация' })
     await expect(navigation.getByRole('link', { name: 'Обзор' })).toBeVisible()
     await expect(navigation.getByRole('link', { name: 'Пользователи' })).toBeVisible()
     await expect(navigation.getByRole('link', { name: 'Платежи' })).toBeVisible()
     await expect(navigation.getByRole('link', { name: 'Главная' })).toHaveCount(0)
     await navigation.getByRole('button', { name: 'Открыть ещё разделы' }).click()
-    await expect(page.getByRole('dialog', { name: 'Админка' })).toBeVisible()
+    const adminMoreMenu = page.getByRole('dialog', { name: 'Разделы админки' })
+    await expect(adminMoreMenu.getByRole('link', { name: 'Кабинет', exact: true })).toBeVisible()
+    await expect(adminMoreMenu.getByRole('link', { name: 'Админка', exact: true })).toBeVisible()
   } else {
+    await page.goto('/dashboard/admin')
     const sidebar = page.locator('.dashboard-sidebar')
     await expect(sidebar.getByRole('link', { name: 'Кабинет', exact: true })).toBeVisible()
     await expect(sidebar.getByRole('link', { name: 'Админка', exact: true })).toBeVisible()

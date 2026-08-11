@@ -52,10 +52,13 @@ export const bottomNavigation: NavigationItem[] = userNavigation.filter((item) =
   '/dashboard/plans',
   '/dashboard/support',
 ].includes(item.href))
-export const bottomMoreNavigation: NavigationItem[] = userNavigation.filter((item) => [
-  '/dashboard/bonus-box',
-  '/dashboard/settings',
-].includes(item.href))
+export const bottomMoreNavigation: NavigationItem[] = [
+  { href: '/dashboard/notifications', label: 'Уведомления', icon: Bell },
+  ...userNavigation.filter((item) => [
+    '/dashboard/bonus-box',
+    '/dashboard/settings',
+  ].includes(item.href)),
+]
 
 const legalIcons: Record<LegalPath, LucideIcon> = {
   '/offer': FileCheck2,
@@ -154,11 +157,4 @@ export function getAvailableAdminNavigation(role: UserRole, features: FeatureFla
     return available.filter((item) => !['/dashboard/admin/watch', '/dashboard/admin/audit'].includes(item.href))
   }
   return available
-}
-
-export function userRoleLabel(role: UserRole) {
-  if (role === 'SUPER_ADMIN') return 'Главный администратор'
-  if (role === 'ADMIN') return 'Администратор'
-  if (role === 'MODERATOR') return 'Модератор поддержки'
-  return 'Аккаунт пользователя'
 }
