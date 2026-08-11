@@ -1783,6 +1783,46 @@
     background: linear-gradient(145deg, rgb(84 36 188 / 0.055), transparent 66%);
   }
 
+  @media (max-width: 1279px) {
+    .bonus-wheel-layout {
+      grid-template-columns: minmax(0, 1fr);
+      min-height: 0;
+    }
+
+    .bonus-wheel-area {
+      min-height: 26rem;
+      padding: 2.6rem 1.5rem 2.1rem;
+    }
+
+    .bonus-wheel-frame {
+      width: min(100%, 22rem);
+    }
+
+    .bonus-wheel-console {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: end;
+      gap: 1.25rem;
+      padding: 1.35rem 1.5rem;
+      border-top: 1px solid rgb(112 41 207 / 0.18);
+      border-left: 0;
+    }
+
+    .bonus-wheel-console > :not(.bonus-wheel-console-meta) {
+      grid-column: 1;
+    }
+
+    .bonus-wheel-console-meta {
+      grid-column: 2;
+      grid-row: 1;
+      align-self: center;
+      margin: 0;
+      padding: 0 0 0 1.25rem;
+      border-top: 0;
+      border-left: 1px solid rgb(112 41 207 / 0.15);
+    }
+  }
+
   .dark .bonus-wheel-console {
     background: linear-gradient(145deg, rgb(112 41 207 / 0.12), transparent 68%);
   }
@@ -1836,82 +1876,74 @@
   }
 
   .bonus-wheel-result-overlay {
-    position: absolute;
-    inset: 0;
-    z-index: 20;
-    display: grid;
-    place-items: center;
-    padding: 1.25rem;
-    background: rgb(10 5 27 / 0.68);
-    backdrop-filter: blur(9px);
+    background: rgb(10 5 27 / 0.76);
+    backdrop-filter: blur(12px);
     animation: bonus-wheel-result-overlay-enter 360ms cubic-bezier(.16,1,.3,1) both;
   }
 
-  .bonus-wheel-result-card {
+  .bonus-wheel-result-modal {
     position: relative;
-    z-index: 2;
-    width: min(100%, 21rem);
-    padding: 1.4rem;
     overflow: hidden;
-    border: 1px solid rgb(255 255 255 / 0.18);
-    border-radius: 1.5rem;
+    border: 1px solid rgb(255 255 255 / 0.18) !important;
     background:
       radial-gradient(circle at 50% -8%, rgb(53 217 255 / 0.24), transparent 38%),
-      linear-gradient(155deg, rgb(35 16 78 / 0.97), rgb(12 8 29 / 0.98));
+      linear-gradient(155deg, rgb(35 16 78 / 0.97), rgb(12 8 29 / 0.98)) !important;
     color: #fff;
-    text-align: center;
-    box-shadow: 0 28px 70px rgb(0 0 0 / 0.45), 0 0 40px rgb(112 41 207 / 0.22);
+    box-shadow: 0 28px 70px rgb(0 0 0 / 0.45), 0 0 40px rgb(112 41 207 / 0.22) !important;
     animation: bonus-wheel-result-card-enter 480ms cubic-bezier(.16,1,.3,1) both;
   }
 
-  .bonus-wheel-result-overlay--rare .bonus-wheel-result-card {
-    border-color: rgb(92 226 255 / 0.48);
-    background:
-      radial-gradient(circle at 50% -8%, rgb(53 217 255 / 0.38), transparent 42%),
-      linear-gradient(155deg, rgb(18 75 100 / 0.98), rgb(10 12 32 / 0.98));
+  .bonus-wheel-result-modal .app-modal-header,
+  .bonus-wheel-result-modal .app-modal-footer {
+    border-color: rgb(255 255 255 / 0.12) !important;
+    background: rgb(8 4 24 / 0.14) !important;
   }
 
-  .bonus-wheel-result-overlay--epic .bonus-wheel-result-card {
-    border-color: rgb(250 137 255 / 0.55);
-    background:
-      radial-gradient(circle at 50% -8%, rgb(232 76 224 / 0.46), transparent 44%),
-      linear-gradient(155deg, rgb(78 19 99 / 0.98), rgb(18 8 39 / 0.98));
-    box-shadow: 0 28px 70px rgb(0 0 0 / 0.45), 0 0 48px rgb(216 50 212 / 0.34);
+  .bonus-wheel-result-modal .app-modal-header::before {
+    background: #35d9ff;
   }
 
-  .bonus-wheel-result-overlay--legendary .bonus-wheel-result-card {
-    border-color: rgb(255 223 132 / 0.72);
-    background:
-      radial-gradient(circle at 50% -8%, rgb(255 190 54 / 0.52), transparent 43%),
-      linear-gradient(155deg, rgb(91 51 8 / 0.98), rgb(25 12 20 / 0.98));
-    box-shadow: 0 28px 70px rgb(0 0 0 / 0.5), 0 0 54px rgb(255 184 43 / 0.42);
-  }
-
-  .bonus-wheel-result-overlay--empty .bonus-wheel-result-card {
-    border-color: rgb(255 255 255 / 0.12);
-    background: linear-gradient(155deg, rgb(40 35 55 / 0.98), rgb(14 12 24 / 0.98));
-  }
-
-  .bonus-wheel-result-close {
-    position: absolute;
-    top: 0.75rem;
-    right: 0.75rem;
-    display: grid;
-    width: 2rem;
-    height: 2rem;
-    place-items: center;
-    border: 1px solid rgb(255 255 255 / 0.12);
-    border-radius: 999px;
-    background: rgb(255 255 255 / 0.065);
-    color: rgb(255 255 255 / 0.72);
-  }
-
-  .bonus-wheel-result-close:hover {
-    background: rgb(255 255 255 / 0.13);
+  .bonus-wheel-result-modal .app-modal-header h2 {
     color: #fff;
   }
 
-  .bonus-wheel-result-close svg,
+  .bonus-wheel-result-modal .app-modal-header p {
+    color: rgb(255 255 255 / 0.62);
+  }
+
+  .bonus-wheel-result-modal .app-modal-header button {
+    border-color: rgb(255 255 255 / 0.14);
+    color: rgb(255 255 255 / 0.8);
+  }
+
+  .bonus-wheel-result-modal--rare {
+    border-color: rgb(92 226 255 / 0.48) !important;
+    background:
+      radial-gradient(circle at 50% -8%, rgb(53 217 255 / 0.38), transparent 42%),
+      linear-gradient(155deg, rgb(18 75 100 / 0.98), rgb(10 12 32 / 0.98)) !important;
+  }
+
+  .bonus-wheel-result-modal--epic {
+    border-color: rgb(250 137 255 / 0.55) !important;
+    background:
+      radial-gradient(circle at 50% -8%, rgb(232 76 224 / 0.46), transparent 44%),
+      linear-gradient(155deg, rgb(78 19 99 / 0.98), rgb(18 8 39 / 0.98)) !important;
+    box-shadow: 0 28px 70px rgb(0 0 0 / 0.45), 0 0 48px rgb(216 50 212 / 0.34) !important;
+  }
+
+  .bonus-wheel-result-modal--legendary {
+    border-color: rgb(255 223 132 / 0.72) !important;
+    background:
+      radial-gradient(circle at 50% -8%, rgb(255 190 54 / 0.52), transparent 43%),
+      linear-gradient(155deg, rgb(91 51 8 / 0.98), rgb(25 12 20 / 0.98)) !important;
+    box-shadow: 0 28px 70px rgb(0 0 0 / 0.5), 0 0 54px rgb(255 184 43 / 0.42) !important;
+  }
+
+  .bonus-wheel-result-modal--empty {
+    border-color: rgb(255 255 255 / 0.12) !important;
+    background: linear-gradient(155deg, rgb(40 35 55 / 0.98), rgb(14 12 24 / 0.98)) !important;
+  }
+
   .bonus-wheel-result-actions svg,
   .bonus-wheel-result-promo svg {
     width: 1rem;
@@ -1931,13 +1963,13 @@
     box-shadow: 0 0 25px rgb(53 217 255 / 0.2);
   }
 
-  .bonus-wheel-result-overlay--epic .bonus-wheel-result-icon {
+  .bonus-wheel-result-modal--epic .bonus-wheel-result-icon {
     border-color: rgb(250 137 255 / 0.44);
     background: rgb(232 76 224 / 0.13);
     color: #f7b5ff;
   }
 
-  .bonus-wheel-result-overlay--legendary .bonus-wheel-result-icon {
+  .bonus-wheel-result-modal--legendary .bonus-wheel-result-icon {
     border-color: rgb(255 223 132 / 0.52);
     background: rgb(255 190 54 / 0.13);
     color: #ffe3a0;
@@ -1952,7 +1984,18 @@
     text-transform: uppercase;
   }
 
-  .bonus-wheel-result-card > strong {
+  .bonus-wheel-result-body {
+    position: relative;
+    overflow: hidden;
+    text-align: center;
+  }
+
+  .bonus-wheel-result-copy {
+    position: relative;
+    z-index: 2;
+  }
+
+  .bonus-wheel-result-copy > strong {
     display: block;
     margin-top: 0.65rem;
     font-size: clamp(2rem, 5vw, 2.75rem);
@@ -1960,13 +2003,13 @@
     line-height: 1;
   }
 
-  .bonus-wheel-result-card > h3 {
+  .bonus-wheel-result-copy > h3 {
     margin-top: 0.45rem;
     font-size: 1rem;
     font-weight: 720;
   }
 
-  .bonus-wheel-result-card > p {
+  .bonus-wheel-result-copy > p {
     margin: 0.45rem auto 0;
     color: rgb(255 255 255 / 0.58);
     font-size: 0.78rem;
@@ -2007,7 +2050,7 @@
     flex-wrap: wrap;
     justify-content: center;
     gap: 0.5rem;
-    margin-top: 1rem;
+    margin: 0;
   }
 
   .bonus-wheel-result-actions .btn-primary,
@@ -2521,8 +2564,16 @@
     }
 
     .bonus-wheel-console {
+      display: flex;
       padding: 1.25rem;
       border-top: 1px solid rgb(112 41 207 / 0.18);
+      border-left: 0;
+    }
+
+    .bonus-wheel-console-meta {
+      margin-top: 1.25rem;
+      padding: 1rem 0 0;
+      border-top: 1px solid rgb(112 41 207 / 0.15);
       border-left: 0;
     }
 
@@ -2530,16 +2581,7 @@
       display: none;
     }
 
-    .bonus-wheel-result-overlay {
-      padding: 0.8rem;
-    }
-
-    .bonus-wheel-result-card {
-      padding: 1.15rem;
-      border-radius: 1.25rem;
-    }
-
-    .bonus-wheel-result-card > strong {
+    .bonus-wheel-result-copy > strong {
       font-size: 2rem;
     }
 
@@ -2657,7 +2699,7 @@
   .bonus-wheel-hub-icon svg,
   .bonus-wheel-segment-copy--winner span,
   .bonus-wheel-result-overlay,
-  .bonus-wheel-result-card,
+  .bonus-wheel-result-modal,
   .bonus-wheel-celebration span {
     animation: none !important;
     transition: none !important;

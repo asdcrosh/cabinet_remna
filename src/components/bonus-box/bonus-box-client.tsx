@@ -16,11 +16,11 @@ import {
   Users,
   Volume2,
   VolumeX,
-  X,
   Zap,
 } from "lucide-react";
 import { apiFetch, isApiFetchError } from "@/lib/api-client";
 import { toast } from "@/components/ui/toaster";
+import { Modal } from "@/components/ui/modal";
 import { cn } from "@/lib/cn";
 import {
   bonusBoxRevealClass,
@@ -791,15 +791,45 @@ function BonusWheelResultOverlay({
 }) {
   const isEmpty = result.prize.type === "NO_PRIZE";
   const isCelebration = !isEmpty && result.prize.rarity !== "COMMON";
+  const resultClass = `bonus-wheel-result-modal--${isEmpty ? "empty" : result.prize.rarity.toLowerCase()}`;
+  const title = isEmpty ? "Открытие завершено" : "Подарок получен";
+  const description = isEmpty
+    ? "Результат сохранён в истории открытий."
+    : "Подарок уже сохранён в вашем кабинете.";
 
   return (
-    <div
-      role="status"
-      aria-live="polite"
-      className={cn(
-        "bonus-wheel-result-overlay",
-        `bonus-wheel-result-overlay--${isEmpty ? "empty" : result.prize.rarity.toLowerCase()}`,
-      )}
+    <Modal
+      open
+      title={title}
+      description={description}
+      onClose={onClose}
+      overlayClassName="bonus-wheel-result-overlay"
+      panelClassName={cn("bonus-wheel-result-modal sm:max-w-md", resultClass)}
+      bodyClassName="bonus-wheel-result-body"
+      footer={
+        <div className="bonus-wheel-result-actions">
+          {result.promoCode && (
+            <button type="button" className="btn-primary" onClick={() => onCopyPromoCode(result.promoCode!)}>
+              <Copy />
+              Скопировать
+            </button>
+          )}
+          {result.promoCode && (
+            <a className="btn-secondary" href={`/dashboard/plans?promo=${encodeURIComponent(result.promoCode)}`}>
+              Применить
+            </a>
+          )}
+          {!hasActiveSubscription && prizeRequiresSubscription(result.prize) && (
+            <a className="btn-primary" href="/dashboard/plans">
+              <ShoppingCart />
+              Оформить подписку
+            </a>
+          )}
+          <button type="button" className="btn-secondary" onClick={onClose}>
+            Готово
+          </button>
+        </div>
+      }
     >
       {revealEffect && isCelebration && (
         <div className="bonus-wheel-celebration" aria-hidden="true">
@@ -816,10 +846,7 @@ function BonusWheelResultOverlay({
         </div>
       )}
 
-      <div className="bonus-wheel-result-card">
-        <button type="button" className="bonus-wheel-result-close" onClick={onClose} aria-label="Закрыть результат">
-          <X />
-        </button>
+      <div className="bonus-wheel-result-copy" role="status" aria-live="polite">
         <div className="bonus-wheel-result-icon" aria-hidden="true">
           {isEmpty ? <CircleSlash /> : <Sparkles />}
         </div>
@@ -852,31 +879,8 @@ function BonusWheelResultOverlay({
             Применение к VPN ещё синхронизируется. Подарок не потеряется.
           </div>
         )}
-
-        <div className="bonus-wheel-result-actions">
-          {result.promoCode && (
-            <button type="button" className="btn-primary" onClick={() => onCopyPromoCode(result.promoCode!)}>
-              <Copy />
-              Скопировать
-            </button>
-          )}
-          {result.promoCode && (
-            <a className="btn-secondary" href={`/dashboard/plans?promo=${encodeURIComponent(result.promoCode)}`}>
-              Применить
-            </a>
-          )}
-          {!hasActiveSubscription && prizeRequiresSubscription(result.prize) && (
-            <a className="btn-primary" href="/dashboard/plans">
-              <ShoppingCart />
-              Оформить подписку
-            </a>
-          )}
-          <button type="button" className="btn-secondary" onClick={onClose}>
-            Готово
-          </button>
-        </div>
       </div>
-    </div>
+    </Modal>
   );
 }
 
