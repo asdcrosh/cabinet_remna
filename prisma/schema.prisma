@@ -123,6 +123,7 @@ model User {
   bonusBoxAttempts           BonusBoxAttempt[]
   bonusBoxOpenings           BonusBoxOpening[]
   bonusBoxMissionProgress    BonusBoxMissionProgress[]
+  nodeProvisioningJobs       NodeProvisioningJob[]       @relation("NodeProvisioningJobCreator")
   bonusBoxEventClaims        BonusBoxEventClaim[]
   bonusBoxRiskSignals        BonusBoxRiskSignal[]
   welcomeBonusRedemptions    WelcomeBonusRedemption[]
@@ -873,6 +874,88 @@ enum ProvisioningJobStatus {
 }
 
 // ----------------------------------------------------------------------
+// Provisioning физических Remnawave-нод. Это отдельная очередь: установка
+// по SSH может занимать минуты и не должна удерживать HTTP-запрос или
+// транзакцию платёжного ProvisioningJob.
+// ----------------------------------------------------------------------
+model NodeProvisioningJob {
+  id                    String                 @id @default(cuid())
+  status                NodeProvisioningStatus @default(PENDING)
+  step                  NodeProvisioningStep   @default(QUEUED)
+  activeKey             String?                @unique
+  nodeName              String
+  fqdn                  String
+  serverIp              String
+  sshPort               Int                    @default(22)
+  sshUser               String
+  encryptedSshPassword  String                 @db.Text
+  credentialsExpireAt   DateTime
+  sshHostKeyFingerprint String?
+  tcpTemplateHostUuid   String
+  xhttpTemplateHostUuid String
+  remnawaveNodeUuid     String?
+  tcpHostUuid           String?
+  xhttpHostUuid         String?
+  dnsRecordId           String?
+  attempts              Int                    @default(0)
+  lockedAt              DateTime?
+  startedAt             DateTime?
+  completedAt           DateTime?
+  lastError             String?                @db.Text
+  createdById           String
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+
+  createdBy User                    @relation("NodeProvisioningJobCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  events    NodeProvisioningEvent[]
+
+  @@index([status, createdAt])
+  @@index([lockedAt])
+  @@index([createdById, createdAt])
+  @@index([fqdn, createdAt])
+  @@index([serverIp, createdAt])
+}
+
+model NodeProvisioningEvent {
+  id        String                     @id @default(cuid())
+  jobId     String
+  step      NodeProvisioningStep
+  level     NodeProvisioningEventLevel @default(INFO)
+  message   String                     @db.Text
+  createdAt DateTime                   @default(now())
+
+  job NodeProvisioningJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([jobId, createdAt])
+}
+
+enum NodeProvisioningStatus {
+  PENDING
+  RUNNING
+  SUCCEEDED
+  FAILED
+}
+
+enum NodeProvisioningStep {
+  QUEUED
+  DNS
+  SSH_PREFLIGHT
+  REMNAWAVE_NODE
+  ANSIBLE
+  NODE_CONNECT
+  HOSTS
+  VERIFY
+  DONE
+}
+
+enum NodeProvisioningEventLevel {
+  INFO
+  SUCCESS
+  WARNING
+  ERROR
+}
+
+// ----------------------------------------------------------------------
 // 5. Промокоды
 // ----------------------------------------------------------------------
 // Промокод хранит правила скидки, а Payment сохраняет снимок скидки,
@@ -1515,6 +1598,8 @@ enum AuditAction {
   ADMIN_BROADCAST_CREATED
   ADMIN_BROADCAST_TEMPLATE_CREATED
   ADMIN_BROADCAST_TEMPLATE_DELETED
+  ADMIN_NODE_PROVISIONING_CREATED
+  ADMIN_NODE_PROVISIONING_RETRIED
   REMNASHOP_SYNC_RUN
   SYSTEM_BACKUP_CREATED
 }

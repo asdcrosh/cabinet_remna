@@ -1,0 +1,487 @@
+---
+- name: Provision a Remnawave node
+  hosts: all
+  become: true
+  gather_facts: true
+
+  vars:
+    remnanode_dir: /opt/remnanode
+    remnanode_image: "{{ lookup('ansible.builtin.env', 'NODE_PROVISIONING_REMNANODE_IMAGE') }}"
+    remnanode_port: '{{ node_api_port | default(2222) }}'
+    effective_remnanode_secret_key: '{{ remnanode_secret_key | default(node_secret_key | default("")) }}'
+    effective_panel_api_cidr: '{{ panel_api_cidr | default(panel_ip | default("")) }}'
+    selfsteal_dir: /opt/nginx-selfsteal
+    selfsteal_acme_port: 8443
+    selfsteal_script_version: 2.6.0
+    selfsteal_script_url: https://raw.githubusercontent.com/DigneZzZ/remnawave-scripts/1a91ed27a61568cf7b5f2dc6f485cfdf4b155711/selfsteal.sh
+    selfsteal_script_sha256: 605218357e547c9d6767a04db110138b7c5709f9ca2222d285793c48ff9a0202
+    selfsteal_script_path: /usr/local/src/selfsteal-2.6.0.sh
+    public_tcp_ports:
+      - 80
+      - 443
+      - 10443
+    verify_transport_ports: false
+    transport_tcp_ports:
+      - 443
+      - 10443
+
+  pre_tasks:
+    - name: Validate the target and required provisioning variables
+      ansible.builtin.assert:
+        that:
+          - ansible_distribution in ['Debian', 'Ubuntu']
+          - node_fqdn is defined
+          - node_fqdn is match('^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,63}$')
+          - effective_remnanode_secret_key | length >= 32
+          - remnanode_image is defined
+          - remnanode_image | length > 0
+          - effective_panel_api_cidr | length > 0
+          - admin_email is defined
+          - admin_email is match('^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$')
+          - (remnanode_port | int) >= 1
+          - (remnanode_port | int) <= 65535
+          - (ansible_port | default(22) | int) >= 1
+          - (ansible_port | default(22) | int) <= 65535
+        fail_msg: >-
+          Provisioning requires Ubuntu/Debian, a lower-case FQDN,
+          remnanode_secret_key, panel_api_cidr and a valid admin_email.
+      no_log: true
+
+    - name: Refuse an unpinned Remnanode image unless explicitly allowed
+      ansible.builtin.assert:
+        that:
+          - >-
+            allow_unpinned_remnanode_image | default(false) | bool or
+            remnanode_image is match('^.+@sha256:[a-f0-9]{64}$') or
+            (remnanode_image is match('^.+:[^/:]+$') and not remnanode_image.endswith(':latest'))
+        fail_msg: >-
+          Set remnanode_image to an immutable digest or a non-latest tag.
+          For a deliberate development run only, set allow_unpinned_remnanode_image=true.
+
+  tasks:
+    - name: Install base operating-system packages
+      ansible.builtin.apt:
+        name:
+          - ca-certificates
+          - cron
+          - curl
+          - dnsutils
+          - git
+          - gnupg
+          - openssl
+          - python3-debian
+          - python3-pexpect
+          - socat
+          - ufw
+        state: present
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Create the APT keyrings directory
+      ansible.builtin.file:
+        path: /etc/apt/keyrings
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Install the Docker repository signing key
+      ansible.builtin.get_url:
+        url: https://download.docker.com/linux/{{ ansible_distribution | lower }}/gpg
+        dest: /etc/apt/keyrings/docker.asc
+        owner: root
+        group: root
+        mode: '0644'
+        force: false
+
+    - name: Read the Debian package architecture
+      ansible.builtin.command:
+        argv:
+          - dpkg
+          - --print-architecture
+      register: docker_deb_architecture
+      changed_when: false
+
+    - name: Configure the Docker APT repository
+      ansible.builtin.deb822_repository:
+        name: docker
+        types:
+          - deb
+        uris:
+          - https://download.docker.com/linux/{{ ansible_distribution | lower }}
+        suites:
+          - '{{ ansible_distribution_release }}'
+        components:
+          - stable
+        architectures:
+          - '{{ docker_deb_architecture.stdout }}'
+        signed_by: /etc/apt/keyrings/docker.asc
+        state: present
+
+    - name: Install Docker Engine and Compose
+      ansible.builtin.apt:
+        name:
+          - containerd.io
+          - docker-buildx-plugin
+          - docker-ce
+          - docker-ce-cli
+          - docker-compose-plugin
+        state: present
+        update_cache: true
+
+    - name: Enable Docker and cron
+      ansible.builtin.service:
+        name: '{{ item }}'
+        enabled: true
+        state: started
+      loop:
+        - docker
+        - cron
+
+    - name: Create the Remnanode directory
+      ansible.builtin.file:
+        path: '{{ remnanode_dir }}'
+        state: directory
+        owner: root
+        group: root
+        mode: '0750'
+
+    - name: Install the Remnanode environment
+      ansible.builtin.template:
+        src: templates/remnanode.env.j2
+        dest: '{{ remnanode_dir }}/.env'
+        owner: root
+        group: root
+        mode: '0600'
+      no_log: true
+      register: remnanode_environment
+
+    - name: Install the Remnanode Compose project
+      ansible.builtin.template:
+        src: templates/remnanode-compose.yml.j2
+        dest: '{{ remnanode_dir }}/docker-compose.yml'
+        owner: root
+        group: root
+        mode: '0640'
+      register: remnanode_compose
+
+    - name: Validate the Remnanode Compose project
+      ansible.builtin.command:
+        argv:
+          - docker
+          - compose
+          - --project-directory
+          - '{{ remnanode_dir }}'
+          - config
+          - --quiet
+      changed_when: false
+      no_log: true
+
+    - name: Start or reconcile Remnanode
+      ansible.builtin.command:
+        argv:
+          - docker
+          - compose
+          - --project-directory
+          - '{{ remnanode_dir }}'
+          - up
+          - -d
+          - --remove-orphans
+      register: remnanode_compose_up
+      changed_when: >-
+        remnanode_environment.changed or remnanode_compose.changed or
+        'Created' in remnanode_compose_up.stderr or
+        'Recreated' in remnanode_compose_up.stderr or
+        'Started' in remnanode_compose_up.stderr
+      no_log: true
+
+    - name: Read the initial firewall status
+      ansible.builtin.command:
+        argv:
+          - ufw
+          - status
+          - verbose
+      register: initial_ufw_status
+      changed_when: false
+
+    - name: Set the default UFW policies
+      ansible.builtin.command:
+        argv:
+          - ufw
+          - default
+          - '{{ item.policy }}'
+          - '{{ item.direction }}'
+      loop:
+        - policy: deny
+          direction: incoming
+          marker: 'Default: deny (incoming)'
+        - policy: allow
+          direction: outgoing
+          marker: 'allow (outgoing)'
+      when: item.marker not in initial_ufw_status.stdout
+
+    - name: Permit public node transport ports
+      ansible.builtin.command:
+        argv:
+          - ufw
+          - allow
+          - '{{ item }}/tcp'
+      loop: '{{ (public_tcp_ports + [selfsteal_acme_port | int]) | unique }}'
+      register: ufw_public_rule
+      changed_when: "'Rule added' in ufw_public_rule.stdout or 'Rules updated' in ufw_public_rule.stdout"
+
+    - name: Keep SSH publicly reachable on the active Ansible port
+      ansible.builtin.command:
+        argv:
+          - ufw
+          - allow
+          - '{{ ansible_port | default(22) | string }}/tcp'
+      register: ufw_ssh_rule
+      changed_when: "'Rule added' in ufw_ssh_rule.stdout or 'Rules updated' in ufw_ssh_rule.stdout"
+
+    - name: Permit the Remnanode API only from the panel network
+      ansible.builtin.command:
+        argv:
+          - ufw
+          - allow
+          - from
+          - '{{ effective_panel_api_cidr }}'
+          - to
+          - any
+          - port
+          - '{{ remnanode_port | string }}'
+          - proto
+          - tcp
+      register: ufw_panel_rule
+      changed_when: "'Rule added' in ufw_panel_rule.stdout or 'Rules updated' in ufw_panel_rule.stdout"
+
+    - name: Enable UFW
+      ansible.builtin.command:
+        argv:
+          - ufw
+          - --force
+          - enable
+      register: ufw_enable
+      when: "initial_ufw_status.stdout is not search('Status: active')"
+
+    - name: Create the local source directory
+      ansible.builtin.file:
+        path: /usr/local/src
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Download the pinned SelfSteal installer
+      ansible.builtin.get_url:
+        url: '{{ selfsteal_script_url }}'
+        dest: '{{ selfsteal_script_path }}'
+        checksum: sha256:{{ selfsteal_script_sha256 }}
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Check the required SelfSteal installation files
+      ansible.builtin.stat:
+        path: '{{ item }}'
+      loop:
+        - '{{ selfsteal_dir }}/docker-compose.yml'
+        - '{{ selfsteal_dir }}/nginx.conf'
+        - '{{ selfsteal_dir }}/ssl/fullchain.crt'
+        - '{{ selfsteal_dir }}/ssl/private.key'
+        - /root/.acme.sh/acme.sh
+      register: selfsteal_required_files
+
+    - name: Determine whether SelfSteal needs installation or repair
+      ansible.builtin.set_fact:
+        selfsteal_is_complete: >-
+          {{ selfsteal_required_files.results
+             | selectattr('stat.exists', 'equalto', false)
+             | list
+             | length == 0 }}
+
+    - name: Install SelfSteal non-interactively
+      ansible.builtin.expect:
+        command: >-
+          {{ selfsteal_script_path }} --nginx --socket
+          --acme-port {{ selfsteal_acme_port }} install
+        responses:
+          '(?i)Enter your domain.*:': '{{ node_fqdn }}'
+          '(?i)Select option.*\[1-2\].*:': '1'
+          '(?i)Try a different domain.*:': 'n'
+          '(?i)Do you want to continue anyway.*:': 'n'
+          '(?i)Enter custom port.*:': ''
+          '(?i)Continue with self-signed certificate.*:': 'n'
+          '(?i)Proceed with installation.*:': 'y'
+          '(?i)Select option.*\[1-3\].*:': '1'
+          '(?i)Select template option.*:': '1'
+        timeout: 1200
+        echo: false
+      environment:
+        DEBIAN_FRONTEND: noninteractive
+      when: not selfsteal_is_complete | bool
+      register: selfsteal_install
+
+    - name: Keep the local SelfSteal management command pinned
+      ansible.builtin.copy:
+        src: '{{ selfsteal_script_path }}'
+        dest: /usr/local/bin/selfsteal
+        remote_src: true
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Register the administrator email with acme.sh
+      ansible.builtin.command:
+        argv:
+          - /root/.acme.sh/acme.sh
+          - --update-account
+          - --accountemail
+          - '{{ admin_email }}'
+      changed_when: false
+      when:
+        - admin_email is defined
+        - admin_email | length > 3
+
+    - name: Validate the SelfSteal Compose project
+      ansible.builtin.command:
+        argv:
+          - docker
+          - compose
+          - --project-directory
+          - '{{ selfsteal_dir }}'
+          - config
+          - --quiet
+      changed_when: false
+
+    - name: Start or reconcile SelfSteal
+      ansible.builtin.command:
+        argv:
+          - docker
+          - compose
+          - --project-directory
+          - '{{ selfsteal_dir }}'
+          - up
+          - -d
+          - --remove-orphans
+      register: selfsteal_compose_up
+      changed_when: >-
+        selfsteal_install.changed | default(false) or
+        'Created' in selfsteal_compose_up.stderr or
+        'Recreated' in selfsteal_compose_up.stderr or
+        'Started' in selfsteal_compose_up.stderr
+
+    - name: Wait for the node API and SelfSteal HTTP listener
+      ansible.builtin.wait_for:
+        host: 127.0.0.1
+        port: '{{ item }}'
+        state: started
+        connect_timeout: 3
+        timeout: 120
+      loop:
+        - '{{ remnanode_port }}'
+        - 80
+
+    - name: Wait for the SelfSteal Unix socket
+      ansible.builtin.wait_for:
+        path: /dev/shm/nginx.sock
+        state: present
+        timeout: 120
+
+    - name: Wait for provisioned transport listeners
+      ansible.builtin.wait_for:
+        host: 127.0.0.1
+        port: '{{ item }}'
+        state: started
+        connect_timeout: 3
+        timeout: 120
+      loop: '{{ transport_tcp_ports }}'
+      when: verify_transport_ports | bool
+
+    - name: Validate the Nginx configuration inside SelfSteal
+      ansible.builtin.command:
+        argv:
+          - docker
+          - exec
+          - nginx-selfsteal
+          - nginx
+          - -t
+      changed_when: false
+
+    - name: Validate the certificate hostname
+      ansible.builtin.command:
+        argv:
+          - openssl
+          - x509
+          - -in
+          - '{{ selfsteal_dir }}/ssl/fullchain.crt'
+          - -noout
+          - -checkhost
+          - '{{ node_fqdn }}'
+      changed_when: false
+
+    - name: Read the certificate public-key fingerprint
+      ansible.builtin.shell: >-
+        set -o pipefail &&
+        openssl x509 -in {{ selfsteal_dir | quote }}/ssl/fullchain.crt -pubkey -noout |
+        openssl pkey -pubin -outform DER |
+        sha256sum | cut -d' ' -f1
+      args:
+        executable: /bin/bash
+      register: certificate_public_key
+      changed_when: false
+
+    - name: Read the private-key public-key fingerprint
+      ansible.builtin.shell: >-
+        set -o pipefail &&
+        openssl pkey -in {{ selfsteal_dir | quote }}/ssl/private.key -pubout -outform DER |
+        sha256sum | cut -d' ' -f1
+      args:
+        executable: /bin/bash
+      register: private_key_public_key
+      changed_when: false
+      no_log: true
+
+    - name: Verify that the certificate and private key match
+      ansible.builtin.assert:
+        that:
+          - certificate_public_key.stdout | length == 64
+          - certificate_public_key.stdout == private_key_public_key.stdout
+        fail_msg: SelfSteal certificate and private key do not match.
+      no_log: true
+
+    - name: Inspect required containers
+      ansible.builtin.command:
+        argv:
+          - docker
+          - inspect
+          - --format
+          - '{% raw %}{{.Name}} {{.State.Status}} {{.RestartCount}}{% endraw %}'
+          - '{{ item }}'
+      loop:
+        - remnanode
+        - nginx-selfsteal
+      register: required_containers
+      changed_when: false
+
+    - name: Require both containers to be running
+      ansible.builtin.assert:
+        that:
+          - item.stdout is search(' running [0-9]+$')
+        fail_msg: 'Container check failed: {{ item.stdout | default(item.stderr) }}'
+      loop: '{{ required_containers.results }}'
+
+    - name: Read final firewall status
+      ansible.builtin.command:
+        argv:
+          - ufw
+          - status
+          - verbose
+      register: final_ufw_status
+      changed_when: false
+
+    - name: Require an active firewall
+      ansible.builtin.assert:
+        that:
+          - final_ufw_status.stdout is search('Status: active')
+        fail_msg: UFW is not active after provisioning.

@@ -14,6 +14,7 @@ import {
   MessageCircleQuestion,
   RotateCcw,
   Send,
+  Server,
   ServerCog,
   Settings,
   SearchCheck,
@@ -90,6 +91,7 @@ export const adminNavigation: NavigationItem[] = [
   { href: '/dashboard/admin/payments', label: 'Платежи', icon: CreditCard },
   { href: '/dashboard/admin/recovery', label: 'Контроль подписок', icon: FileClock },
   { href: '/dashboard/admin/remnashop-sync', label: 'Remnashop', icon: Database },
+  { href: '/dashboard/admin/nodes', label: 'Ноды', icon: Server },
   { href: '/dashboard/admin/watch', label: 'Watch', icon: Activity },
   { href: '/dashboard/admin/system', label: 'Настройки', icon: ServerCog },
   { href: '/dashboard/admin/audit', label: 'История', icon: FileClock },
@@ -130,7 +132,7 @@ export const adminNavigationGroups = [
       '/dashboard/admin/recovery',
     ],
   },
-  { title: 'Интеграции', items: ['/dashboard/admin/remnashop-sync'] },
+  { title: 'Интеграции', items: ['/dashboard/admin/remnashop-sync', '/dashboard/admin/nodes'] },
   { title: 'Система', items: ['/dashboard/admin/watch', '/dashboard/admin/system', '/dashboard/admin/audit'] },
 ]
 
@@ -154,7 +156,11 @@ export function getAvailableAdminNavigation(role: UserRole, features: FeatureFla
 
   if (role === 'MODERATOR') return available.filter((item) => item.href === '/dashboard/admin/support')
   if (role === 'ADMIN') {
-    return available.filter((item) => !['/dashboard/admin/watch', '/dashboard/admin/audit'].includes(item.href))
+    return available.filter((item) => ![
+      '/dashboard/admin/nodes',
+      '/dashboard/admin/watch',
+      '/dashboard/admin/audit',
+    ].includes(item.href))
   }
   return available
 }

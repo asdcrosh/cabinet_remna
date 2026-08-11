@@ -1,0 +1,16 @@
+services:
+  remnanode:
+    image: {{ remnanode_image | quote }}
+    container_name: remnanode
+    hostname: remnanode
+    restart: unless-stopped
+    network_mode: host
+    env_file:
+      - .env
+    volumes:
+      - /dev/shm:/dev/shm:rw
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'

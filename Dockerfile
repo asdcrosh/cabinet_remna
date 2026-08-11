@@ -33,6 +33,7 @@ RUN ./node_modules/.bin/esbuild \
   scripts/payment-reconciler.ts \
   scripts/broadcast-worker.ts \
   scripts/watch-worker.ts \
+  scripts/node-provisioning-worker.ts \
   scripts/cleanup-retention.ts \
   scripts/bootstrap-superuser.ts \
   prisma/seed.ts \
@@ -44,6 +45,50 @@ RUN ./node_modules/.bin/esbuild \
   --entry-names='[name]' \
   --external:@prisma/client \
   --external:pg
+
+FROM node:24-alpine AS provisioner
+WORKDIR /app
+ARG BUILD_REVISION=unknown
+ARG BUILD_CREATED_AT=unknown
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV APP_BUILD_REVISION=${BUILD_REVISION}
+ENV APP_BUILD_CREATED_AT=${BUILD_CREATED_AT}
+ENV ANSIBLE_CONFIG=/app/deploy/provisioner/ansible/ansible.cfg
+ENV PATH=/opt/ansible/bin:${PATH}
+ENV HOME=/home/provisioner
+
+LABEL org.opencontainers.image.revision=${BUILD_REVISION}
+LABEL org.opencontainers.image.created=${BUILD_CREATED_AT}
+
+RUN apk add --no-cache \
+      ca-certificates \
+      openssh-client \
+      openssl \
+      python3 \
+      py3-pip \
+      py3-virtualenv \
+      sshpass \
+      tini \
+  && python3 -m venv /opt/ansible \
+  && /opt/ansible/bin/pip install --no-cache-dir \
+      ansible-core==2.19.10 \
+      ansible-runner==2.4.3 \
+      pexpect==4.9.0 \
+  && addgroup -S -g 10001 provisioner \
+  && adduser -S -D -h /home/provisioner -u 10001 provisioner -G provisioner
+
+COPY --chown=provisioner:provisioner --from=builder /app/.next/standalone ./
+COPY --chown=provisioner:provisioner --from=builder /app/.next/ops ./ops
+COPY --chown=provisioner:provisioner deploy/provisioner ./deploy/provisioner
+
+RUN mkdir -p /tmp/ansible-runner \
+  && chown provisioner:provisioner /tmp/ansible-runner \
+  && OPS_STARTUP_CHECK=true node ops/node-provisioning-worker.js
+
+USER provisioner
+ENTRYPOINT ["/sbin/tini", "--"]
+CMD ["node", "ops/node-provisioning-worker.js"]
 
 FROM node:24-alpine AS release
 WORKDIR /app

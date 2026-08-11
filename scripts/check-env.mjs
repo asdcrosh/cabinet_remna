@@ -84,6 +84,12 @@ const optionalPositiveIntegers = [
   "WATCH_FAILURE_THRESHOLD",
   "WATCH_RECOVERY_THRESHOLD",
   "WATCH_RETENTION_DAYS",
+  "NODE_PROVISIONING_WORKER_INTERVAL_SECONDS",
+  "NODE_PROVISIONING_WORKER_HEARTBEAT_MAX_AGE_SECONDS",
+  "NODE_PROVISIONING_CREDENTIALS_TTL_HOURS",
+  "NODE_PROVISIONING_DNS_TIMEOUT_SECONDS",
+  "NODE_PROVISIONING_CONNECT_TIMEOUT_SECONDS",
+  "NODE_PROVISIONING_ANSIBLE_TIMEOUT_SECONDS",
 ];
 
 const optionalSampleRates = [
@@ -118,6 +124,23 @@ if (isProduction) {
 
 if (value("JWT_SECRET") && value("JWT_SECRET").length < 32) {
   errors.push("JWT_SECRET must be at least 32 characters");
+}
+
+if (value("NODE_PROVISIONING_ENCRYPTION_KEY") && value("NODE_PROVISIONING_ENCRYPTION_KEY").length < 32) {
+  errors.push("NODE_PROVISIONING_ENCRYPTION_KEY must be at least 32 characters");
+}
+
+if (Boolean(value("NODE_PROVISIONING_BASE_DOMAIN")) !== Boolean(value("NODE_PROVISIONING_ENCRYPTION_KEY"))) {
+  warnings.push(
+    "NODE_PROVISIONING_BASE_DOMAIN and NODE_PROVISIONING_ENCRYPTION_KEY should be configured together",
+  );
+}
+
+if (
+  value("NODE_PROVISIONING_BASE_DOMAIN") &&
+  !/^(?=.{4,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/i.test(value("NODE_PROVISIONING_BASE_DOMAIN"))
+) {
+  errors.push("NODE_PROVISIONING_BASE_DOMAIN must be a valid base domain");
 }
 
 if (value("BONUS_BOX_RISK_SALT") && value("BONUS_BOX_RISK_SALT").length < 32) {

@@ -3,13 +3,15 @@ import { prisma } from './prisma'
 export const PAYMENT_WORKER_HEARTBEAT_KEY = 'worker:payment-reconciler'
 export const BROADCAST_WORKER_HEARTBEAT_KEY = 'worker:broadcast'
 export const WATCH_WORKER_HEARTBEAT_KEY = 'worker:watch'
+export const NODE_PROVISIONING_WORKER_HEARTBEAT_KEY = 'worker:node-provisioning'
 
-export type WorkerHeartbeatName = 'payment' | 'broadcast' | 'watch'
+export type WorkerHeartbeatName = 'payment' | 'broadcast' | 'watch' | 'node-provisioning'
 
 const heartbeatKeys: Record<WorkerHeartbeatName, string> = {
   payment: PAYMENT_WORKER_HEARTBEAT_KEY,
   broadcast: BROADCAST_WORKER_HEARTBEAT_KEY,
   watch: WATCH_WORKER_HEARTBEAT_KEY,
+  'node-provisioning': NODE_PROVISIONING_WORKER_HEARTBEAT_KEY,
 }
 
 export async function recordWorkerHeartbeat(worker: WorkerHeartbeatName, maxAgeSeconds: number) {

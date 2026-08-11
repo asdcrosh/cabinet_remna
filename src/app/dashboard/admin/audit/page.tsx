@@ -48,6 +48,8 @@ const ACTION_LABELS: Record<AuditAction, string> = {
   ADMIN_BROADCAST_CREATED: 'Рассылка создана',
   ADMIN_BROADCAST_TEMPLATE_CREATED: 'Шаблон создан',
   ADMIN_BROADCAST_TEMPLATE_DELETED: 'Шаблон удалён',
+  ADMIN_NODE_PROVISIONING_CREATED: 'Установка ноды создана',
+  ADMIN_NODE_PROVISIONING_RETRIED: 'Установка ноды повторена',
   REMNASHOP_SYNC_RUN: 'Remnashop sync',
   SYSTEM_BACKUP_CREATED: 'Бэкап',
 }

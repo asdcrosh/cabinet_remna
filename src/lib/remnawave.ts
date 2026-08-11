@@ -246,19 +246,37 @@ export interface RemnawaveNodeInbound {
 
 export interface RemnawaveNode {
   uuid: string
+  id?: number
   name: string
   address: string
   countryCode?: string
-  port?: number
+  port?: number | null
+  proxyUrl?: string | null
   isConnected: boolean
   isDisabled: boolean
-  lastStatusChange?: string
+  isConnecting?: boolean
+  lastStatusChange?: string | null
+  lastStatusMessage?: string | null
+  isTrafficTrackingActive?: boolean
+  trafficResetDay?: number | null
+  trafficLimitBytes?: number | null
+  trafficUsedBytes?: number | null
+  notifyPercent?: number | null
+  viewPosition?: number
+  consumptionMultiplier?: number
+  nodeConsumptionMultiplier?: number
+  tags?: string[]
+  createdAt?: string
+  updatedAt?: string
   xrayUptime?: number | string
   usersOnline?: number
   configProfile?: {
-    activeConfigProfileUuid?: string
+    activeConfigProfileUuid?: string | null
     activeInbounds?: RemnawaveNodeInbound[]
   }
+  providerUuid?: string | null
+  provider?: unknown | null
+  activePluginUuid?: string | null
   system?: {
     info?: {
       memoryTotal?: number | string
@@ -271,36 +289,234 @@ export interface RemnawaveNode {
         txBytesPerSec?: number
       }
     }
-  }
+  } | null
   versions?: {
     xray?: string
     node?: string
-  }
+  } | null
+  note?: string | null
 }
 
 export interface GetNodesResponse {
   response: RemnawaveNode[]
 }
 
+export interface CreateRemnawaveNodeRequest {
+  name: string
+  address: string
+  port?: number
+  proxyUrl?: string | null
+  isTrafficTrackingActive?: boolean
+  trafficLimitBytes?: number
+  notifyPercent?: number
+  trafficResetDay?: number
+  countryCode?: string
+  consumptionMultiplier?: number
+  nodeConsumptionMultiplier?: number
+  configProfile: {
+    activeConfigProfileUuid: string
+    activeInbounds: string[]
+  }
+  providerUuid?: string | null
+  tags?: string[]
+  activePluginUuid?: string | null
+  note?: string
+}
+
+export interface CreateNodeResponse {
+  response: RemnawaveNode
+}
+
+export interface GetNodeSecretResponse {
+  response: {
+    pubKey?: string
+    secretKey?: string
+  }
+}
+
+export type RemnawaveHostAlpn =
+  | 'h3'
+  | 'h2'
+  | 'http/1.1'
+  | 'h2,http/1.1'
+  | 'h3,h2,http/1.1'
+  | 'h3,h2'
+
+export type RemnawaveHostSecurityLayer = 'DEFAULT' | 'TLS' | 'NONE'
+export type RemnawaveMihomoIpVersion = 'dual' | 'ipv4' | 'ipv6' | 'ipv4-prefer' | 'ipv6-prefer'
+export type RemnawaveSubscriptionTemplateType =
+  | 'XRAY_JSON'
+  | 'XRAY_BASE64'
+  | 'MIHOMO'
+  | 'STASH'
+  | 'CLASH'
+  | 'SINGBOX'
+
+export interface RemnawaveHostInbound {
+  configProfileUuid: string | null
+  configProfileInboundUuid: string | null
+}
+
 export interface RemnawaveHost {
   uuid: string
+  viewPosition?: number
   remark: string
   address: string
   port: number
   path?: string | null
   sni?: string | null
   host?: string | null
+  alpn?: RemnawaveHostAlpn | null
+  fingerprint?: string | null
   isDisabled: boolean
+  securityLayer?: RemnawaveHostSecurityLayer
+  xhttpExtraParams?: unknown | null
+  muxParams?: unknown | null
+  sockoptParams?: unknown | null
+  finalMask?: unknown | null
+  serverDescription?: string | null
+  tags?: string[]
   isHidden?: boolean
-  inbound: {
-    configProfileUuid?: string | null
-    configProfileInboundUuid?: string | null
-  }
+  overrideSniFromAddress?: boolean
+  keepSniBlank?: boolean
+  pinnedPeerCertSha256?: string | null
+  verifyPeerCertByName?: string | null
+  vlessRouteId?: number | null
+  shuffleHost?: boolean
+  mihomoX25519?: boolean
+  mihomoIpVersion?: RemnawaveMihomoIpVersion | null
+  inbound: RemnawaveHostInbound
   nodes: string[]
+  xrayJsonTemplateUuid?: string | null
+  excludedInternalSquads?: string[]
+  excludeFromSubscriptionTypes?: RemnawaveSubscriptionTemplateType[]
 }
 
 export interface GetHostsResponse {
   response: RemnawaveHost[]
+}
+
+export interface CreateRemnawaveHostRequest {
+  inbound: {
+    configProfileUuid: string
+    configProfileInboundUuid: string
+  }
+  remark: string
+  address: string
+  port: number
+  path?: string | null
+  sni?: string | null
+  host?: string | null
+  alpn?: RemnawaveHostAlpn | null
+  fingerprint?: string | null
+  isDisabled?: boolean
+  securityLayer?: RemnawaveHostSecurityLayer
+  xhttpExtraParams?: unknown | null
+  muxParams?: unknown | null
+  sockoptParams?: unknown | null
+  finalMask?: unknown | null
+  serverDescription?: string | null
+  tags?: string[]
+  isHidden?: boolean
+  overrideSniFromAddress?: boolean
+  keepSniBlank?: boolean
+  pinnedPeerCertSha256?: string | null
+  verifyPeerCertByName?: string | null
+  vlessRouteId?: number | null
+  shuffleHost?: boolean
+  mihomoX25519?: boolean
+  mihomoIpVersion?: RemnawaveMihomoIpVersion | null
+  nodes?: string[]
+  xrayJsonTemplateUuid?: string | null
+  excludedInternalSquads?: string[]
+  excludeFromSubscriptionTypes?: RemnawaveSubscriptionTemplateType[]
+}
+
+export interface UpdateRemnawaveHostRequest extends Omit<Partial<CreateRemnawaveHostRequest>, 'inbound'> {
+  uuid: string
+  inbound?: CreateRemnawaveHostRequest['inbound']
+}
+
+export interface HostResponse {
+  response: RemnawaveHost
+}
+
+export interface DeleteRemnawaveEntityResponse {
+  response: {
+    isDeleted: boolean
+  }
+}
+
+const HOST_CLONE_OPTIONAL_FIELDS = [
+  'path',
+  'sni',
+  'host',
+  'alpn',
+  'fingerprint',
+  'isDisabled',
+  'securityLayer',
+  'xhttpExtraParams',
+  'muxParams',
+  'sockoptParams',
+  'finalMask',
+  'serverDescription',
+  'tags',
+  'isHidden',
+  'overrideSniFromAddress',
+  'keepSniBlank',
+  'pinnedPeerCertSha256',
+  'verifyPeerCertByName',
+  'vlessRouteId',
+  'shuffleHost',
+  'mihomoX25519',
+  'mihomoIpVersion',
+  'nodes',
+  'xrayJsonTemplateUuid',
+  'excludedInternalSquads',
+  'excludeFromSubscriptionTypes',
+] as const satisfies readonly (keyof CreateRemnawaveHostRequest)[]
+
+function pickHostCloneOptionalFields(source: object) {
+  const result: Partial<CreateRemnawaveHostRequest> = {}
+  const mutableResult = result as Record<string, unknown>
+  const record = source as Record<string, unknown>
+  for (const field of HOST_CLONE_OPTIONAL_FIELDS) {
+    if (record[field] !== undefined) mutableResult[field] = record[field]
+  }
+  return result
+}
+
+/**
+ * Creates a lossless host-create payload from an existing host while explicitly
+ * excluding response-only fields such as uuid and viewPosition.
+ */
+export function buildHostCloneRequest(
+  source: RemnawaveHost,
+  overrides: Partial<CreateRemnawaveHostRequest> = {}
+): CreateRemnawaveHostRequest {
+  const inbound = overrides.inbound ?? (
+    source.inbound.configProfileUuid && source.inbound.configProfileInboundUuid
+      ? {
+          configProfileUuid: source.inbound.configProfileUuid,
+          configProfileInboundUuid: source.inbound.configProfileInboundUuid,
+        }
+      : null
+  )
+  if (!inbound) {
+    throw new RemnawaveError(0, source, 'Remnawave host has no cloneable inbound reference')
+  }
+
+  const optionalFields = {
+    ...pickHostCloneOptionalFields(source),
+    ...pickHostCloneOptionalFields(overrides),
+  }
+  return {
+    ...optionalFields,
+    inbound,
+    remark: overrides.remark ?? source.remark,
+    address: overrides.address ?? source.address,
+    port: overrides.port ?? source.port,
+  }
 }
 
 // ----------------------------------------------------------------------
@@ -415,8 +631,32 @@ export const remnawave = {
     return request<GetNodesResponse>('GET', '/api/nodes')
   },
 
+  async createNode(input: CreateRemnawaveNodeRequest) {
+    return request<CreateNodeResponse>('POST', '/api/nodes', input)
+  },
+
+  async getNodeSecret() {
+    return request<GetNodeSecretResponse>('GET', '/api/keygen')
+  },
+
+  async deleteNode(uuid: string) {
+    return request<DeleteRemnawaveEntityResponse>('DELETE', `/api/nodes/${encodeURIComponent(uuid)}`)
+  },
+
   async getHosts() {
     return request<GetHostsResponse>('GET', '/api/hosts')
+  },
+
+  async createHost(input: CreateRemnawaveHostRequest) {
+    return request<HostResponse>('POST', '/api/hosts', input)
+  },
+
+  async updateHost(input: UpdateRemnawaveHostRequest) {
+    return request<HostResponse>('PATCH', '/api/hosts', input)
+  },
+
+  async deleteHost(uuid: string) {
+    return request<DeleteRemnawaveEntityResponse>('DELETE', `/api/hosts/${encodeURIComponent(uuid)}`)
   },
 
   // CRUD пользователей ----------------------------------------------------

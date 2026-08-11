@@ -18,6 +18,7 @@
     "worker:payments": "tsx scripts/payment-reconciler.ts",
     "worker:broadcasts": "tsx scripts/broadcast-worker.ts",
     "worker:watch": "tsx scripts/watch-worker.ts",
+    "worker:node-provisioning": "tsx scripts/node-provisioning-worker.ts",
     "cleanup:retention": "tsx scripts/cleanup-retention.ts",
     "postinstall": "prisma generate",
     "prisma:generate": "prisma generate",

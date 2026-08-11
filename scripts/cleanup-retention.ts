@@ -17,6 +17,7 @@ async function main() {
     oldNotificationLogs,
     oldSyncEvents,
     oldBroadcastDeliveries,
+    expiredNodeProvisioningSecrets,
   ] = await Promise.all([
     prisma.rateLimitBucket.deleteMany({
       where: { resetAt: { lt: now } },
@@ -39,6 +40,13 @@ async function main() {
         updatedAt: { lt: daysAgo(now, broadcastDeliveryDays) },
       },
     }),
+    prisma.nodeProvisioningJob.updateMany({
+      where: {
+        credentialsExpireAt: { lt: now },
+        encryptedSshPassword: { not: '' },
+      },
+      data: { encryptedSshPassword: '' },
+    }),
   ])
 
   logInfo('retention.cleanup_completed', {
@@ -48,6 +56,7 @@ async function main() {
     oldNotificationLogs: oldNotificationLogs.count,
     oldSyncEvents: oldSyncEvents.count,
     oldBroadcastDeliveries: oldBroadcastDeliveries.count,
+    expiredNodeProvisioningSecrets: expiredNodeProvisioningSecrets.count,
   })
 }
 

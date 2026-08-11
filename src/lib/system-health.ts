@@ -172,6 +172,9 @@ function actionForCheck(id: string) {
   if (id === 'watch' || id === 'watch-worker') {
     return { actionHref: '/dashboard/admin/watch', actionLabel: 'Открыть Watch' }
   }
+  if (id === 'node-provisioning-worker') {
+    return { actionHref: '/dashboard/admin/nodes', actionLabel: 'Открыть ноды' }
+  }
   if (id === 'broadcast-backlog' || id === 'broadcast-worker') {
     return { actionHref: '/dashboard/admin/broadcasts', actionLabel: 'Открыть рассылки' }
   }
@@ -677,6 +680,7 @@ export async function getSystemHealth(options: { sendEmail?: boolean } = {}): Pr
     checkWorker('payment', 'payment-worker', 'Обработка платежей'),
     checkWorker('broadcast', 'broadcast-worker', 'Рассылки'),
     checkWorker('watch', 'watch-worker', 'Watch worker'),
+    checkWorker('node-provisioning', 'node-provisioning-worker', 'Установка нод'),
     checkYooKassa(),
     checkPayAnyWay(),
     checkPlatega(),
