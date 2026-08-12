@@ -24,6 +24,13 @@ Required extra variables:
 The active SSH port remains publicly reachable, matching the existing manual
 runbook. The Remnanode API port 2222 is restricted to `panel_api_cidr`.
 
+SelfSteal is installed through its official non-interactive `--force --domain`
+mode, pinned to a reviewed commit and checksum. The worker also installs the
+pinned acme.sh release with the administrator email before certificate issuance.
+Retries leave a healthy SelfSteal installation untouched; an incomplete project
+owned by the same job (or an inactive legacy partial with the exact FQDN) is
+moved to `/opt/nginx-selfsteal.partial-<job>-<timestamp>` before recovery.
+
 GeoIP data is provided by [MaxMind GeoLite2](https://dev.maxmind.com/geoip/geolite2-free-geolocation-data)
 through the `geoip-country` package. Its license and EULA are copied into the
 provisioner image under `/app/licenses/geoip-country`.

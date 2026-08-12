@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+set -u
+
+ACME_HOME=/root/.acme.sh
+tls_ports=()
+
+cleanup_redirects() {
+  local port
+  for port in "${tls_ports[@]}"; do
+    iptables -t nat -D PREROUTING -p tcp --dport 443 -j REDIRECT --to-port "$port" 2>/dev/null || true
+    iptables -t nat -D OUTPUT -p tcp --dport 443 -o lo -j REDIRECT --to-port "$port" 2>/dev/null || true
+  done
+}
+
+trap cleanup_redirects EXIT INT TERM
+
+for domain_conf in "$ACME_HOME"/*/[!.]*.conf; do
+  [ -f "$domain_conf" ] || continue
+  saved_port=$(awk -F"'" '/^Le_TLSPort=/ { print $2; exit }' "$domain_conf")
+  if [ -n "$saved_port" ] && [ "$saved_port" != '443' ]; then
+    already=false
+    for port in "${tls_ports[@]}"; do
+      [ "$port" = "$saved_port" ] && already=true
+    done
+    [ "$already" = false ] && tls_ports+=("$saved_port")
+  fi
+done
+
+for port in "${tls_ports[@]}"; do
+  iptables -t nat -I PREROUTING 1 -p tcp --dport 443 -j REDIRECT --to-port "$port" 2>/dev/null || true
+  iptables -t nat -I OUTPUT 1 -p tcp --dport 443 -o lo -j REDIRECT --to-port "$port" 2>/dev/null || true
+done
+
+"$ACME_HOME/acme.sh" --cron --home "$ACME_HOME"

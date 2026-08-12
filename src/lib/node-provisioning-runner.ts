@@ -6,6 +6,7 @@ import { spawn } from 'node:child_process'
 import { isPublicIpv4 } from '@/lib/node-provisioning-validation'
 
 export type NodeAnsibleInput = {
+  jobId: string
   serverIp: string
   sshPort: number
   sshUser: string
@@ -56,6 +57,7 @@ export async function runNodeAnsible(
       throw new Error('NODE_PROVISIONING_ADMIN_EMAIL must be a valid email')
     }
     await writeSecure(varsPath, JSON.stringify({
+      provisioning_job_id: input.jobId,
       node_fqdn: input.fqdn,
       node_secret_key: input.nodeSecret,
       panel_ip: panelIp,
@@ -183,7 +185,10 @@ function positiveInteger(raw: string | undefined, fallback: number) {
 
 export class AnsibleProvisioningError extends Error {
   constructor(public exitCode: number, public output: string) {
-    super(`Ansible exited with code ${exitCode}: ${output.slice(-4_000)}`)
+    const label = exitCode === 124
+      ? 'Ansible timed out with code 124'
+      : `Ansible exited with code ${exitCode}`
+    super(`${label}: ${output.slice(-7_500)}`)
     this.name = 'AnsibleProvisioningError'
   }
 }

@@ -91,6 +91,7 @@ export async function processNodeProvisioningJob(jobId: string) {
     await advance(jobId, 'ANSIBLE', 'Запускаю идемпотентный Ansible playbook')
     const touchActivity = throttledJobTouch(jobId)
     const ansible = await runNodeAnsible({
+      jobId,
       serverIp: job.serverIp,
       sshPort: job.sshPort,
       sshUser: job.sshUser,

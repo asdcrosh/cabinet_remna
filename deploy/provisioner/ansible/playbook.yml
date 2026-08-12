@@ -12,10 +12,17 @@
     effective_panel_api_cidr: '{{ panel_api_cidr | default(panel_ip | default("")) }}'
     selfsteal_dir: /opt/nginx-selfsteal
     selfsteal_acme_port: 8443
-    selfsteal_script_version: 2.6.0
-    selfsteal_script_url: https://raw.githubusercontent.com/DigneZzZ/remnawave-scripts/1a91ed27a61568cf7b5f2dc6f485cfdf4b155711/selfsteal.sh
-    selfsteal_script_sha256: 605218357e547c9d6767a04db110138b7c5709f9ca2222d285793c48ff9a0202
-    selfsteal_script_path: /usr/local/src/selfsteal-2.6.0.sh
+    selfsteal_script_version: 2.10.0
+    selfsteal_script_url: https://raw.githubusercontent.com/DigneZzZ/remnawave-scripts/bab40b53e484deb1b01aff615f946dc78640f969/selfsteal.sh
+    selfsteal_script_sha256: 3594f3a4ddae19582f9dde95fdf65edeaf2892dec662eadabba55e1f8faff4c4
+    selfsteal_script_path: /usr/local/src/selfsteal-2.10.0.sh
+    selfsteal_marker_path: /opt/.cabinet-selfsteal-{{ provisioning_job_id }}
+    selfsteal_archive_path: /opt/nginx-selfsteal.partial-{{ provisioning_job_id }}-{{ ansible_date_time.epoch }}
+    acme_script_version: 3.1.4
+    acme_script_url: https://github.com/acmesh-official/acme.sh/archive/refs/tags/3.1.4.tar.gz
+    acme_script_sha256: e5f8e187bbf5251e0cd8891f2622daab9850366bd17bea9f92c2fe2ee091fd32
+    acme_script_archive: /usr/local/src/acme.sh-3.1.4.tar.gz
+    acme_script_source: /usr/local/src/acme.sh-3.1.4/acme.sh
     public_tcp_ports:
       - 80
       - 443
@@ -31,6 +38,8 @@
         that:
           - ansible_distribution in ['Debian', 'Ubuntu']
           - ansible_kernel is version('5.7', '>=')
+          - provisioning_job_id is defined
+          - provisioning_job_id is match('^[a-z0-9_-]{8,64}$')
           - node_fqdn is defined
           - node_fqdn is match('^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,63}$')
           - effective_remnanode_secret_key | length >= 32
@@ -45,7 +54,7 @@
           - (ansible_port | default(22) | int) <= 65535
         fail_msg: >-
           Provisioning requires Ubuntu/Debian with Linux 5.7+, a lower-case FQDN,
-          remnanode_secret_key, panel_api_cidr and a valid admin_email.
+          provisioning_job_id, remnanode_secret_key, panel_api_cidr and a valid admin_email.
       no_log: true
 
     - name: Validate the Remnanode image reference
@@ -70,7 +79,6 @@
           - nftables
           - openssl
           - python3-debian
-          - python3-pexpect
           - socat
           - ufw
         state: present
@@ -283,47 +291,375 @@
         group: root
         mode: '0755'
 
+    - name: Download the pinned acme.sh release
+      ansible.builtin.get_url:
+        url: '{{ acme_script_url }}'
+        dest: '{{ acme_script_archive }}'
+        checksum: sha256:{{ acme_script_sha256 }}
+        owner: root
+        group: root
+        mode: '0644'
+
+    - name: Read the installed acme.sh version
+      ansible.builtin.command:
+        argv:
+          - /root/.acme.sh/acme.sh
+          - --version
+      register: installed_acme_version
+      changed_when: false
+      failed_when: false
+
+    - name: Extract the pinned acme.sh release
+      ansible.builtin.unarchive:
+        src: '{{ acme_script_archive }}'
+        dest: /usr/local/src
+        remote_src: true
+        creates: '{{ acme_script_source }}'
+      when: >-
+        installed_acme_version.rc != 0 or
+        installed_acme_version.stdout is not search('v' + acme_script_version)
+
+    - name: Install or update acme.sh without modifying shell profiles
+      ansible.builtin.command:
+        argv:
+          - '{{ acme_script_source }}'
+          - --install
+          - --force
+          - --home
+          - /root/.acme.sh
+          - --config-home
+          - /root/.acme.sh
+          - --accountemail
+          - '{{ admin_email }}'
+          - --no-profile
+      when: >-
+        installed_acme_version.rc != 0 or
+        installed_acme_version.stdout is not search('v' + acme_script_version)
+
+    - name: Validate the pinned acme.sh installation
+      ansible.builtin.command:
+        argv:
+          - /root/.acme.sh/acme.sh
+          - --version
+      register: validated_acme_version
+      changed_when: false
+
+    - name: Require the expected acme.sh release
+      ansible.builtin.assert:
+        that:
+          - validated_acme_version.stdout is search('v' + acme_script_version)
+        fail_msg: acme.sh was installed, but its version does not match the pinned release.
+
+    - name: Use Let's Encrypt as the default ACME server
+      ansible.builtin.command:
+        argv:
+          - /root/.acme.sh/acme.sh
+          - --set-default-ca
+          - --server
+          - letsencrypt
+      changed_when: false
+
+    - name: Register the administrator ACME account
+      ansible.builtin.command:
+        argv:
+          - /root/.acme.sh/acme.sh
+          - --register-account
+          - --server
+          - letsencrypt
+          - --accountemail
+          - '{{ admin_email }}'
+      changed_when: false
+
+    - name: Keep the administrator email on the ACME account
+      ansible.builtin.command:
+        argv:
+          - /root/.acme.sh/acme.sh
+          - --update-account
+          - --server
+          - letsencrypt
+          - --accountemail
+          - '{{ admin_email }}'
+      changed_when: false
+
+    - name: Check the SelfSteal installation directory
+      ansible.builtin.stat:
+        path: '{{ selfsteal_dir }}'
+      register: selfsteal_directory
+
     - name: Check the required SelfSteal installation files
       ansible.builtin.stat:
         path: '{{ item }}'
       loop:
+        - '{{ selfsteal_dir }}/.env'
         - '{{ selfsteal_dir }}/docker-compose.yml'
         - '{{ selfsteal_dir }}/nginx.conf'
+        - '{{ selfsteal_dir }}/conf.d/selfsteal.conf'
         - '{{ selfsteal_dir }}/ssl/fullchain.crt'
         - '{{ selfsteal_dir }}/ssl/private.key'
-        - /root/.acme.sh/acme.sh
       register: selfsteal_required_files
 
-    - name: Determine whether SelfSteal needs installation or repair
+    - name: Read the configured SelfSteal domain
+      ansible.builtin.shell: >-
+        awk -F= '$1 == "SELF_STEAL_DOMAIN" { print $2; exit }'
+        {{ (selfsteal_dir + '/.env') | quote }}
+      args:
+        executable: /bin/bash
+      register: selfsteal_configured_domain
+      changed_when: false
+      failed_when: false
+
+    - name: Validate the existing SelfSteal Compose project
+      ansible.builtin.command:
+        argv:
+          - docker
+          - compose
+          - --project-directory
+          - '{{ selfsteal_dir }}'
+          - config
+          - --quiet
+      register: existing_selfsteal_compose
+      changed_when: false
+      failed_when: false
+      when: selfsteal_required_files.results[1].stat.exists
+
+    - name: Validate the existing certificate hostname
+      ansible.builtin.command:
+        argv:
+          - openssl
+          - x509
+          - -in
+          - '{{ selfsteal_dir }}/ssl/fullchain.crt'
+          - -noout
+          - -checkhost
+          - '{{ node_fqdn }}'
+      register: existing_selfsteal_certificate_hostname
+      changed_when: false
+      failed_when: false
+      when: selfsteal_required_files.results[4].stat.exists
+
+    - name: Validate the existing certificate lifetime
+      ansible.builtin.command:
+        argv:
+          - openssl
+          - x509
+          - -in
+          - '{{ selfsteal_dir }}/ssl/fullchain.crt'
+          - -noout
+          - -checkend
+          - '86400'
+      register: existing_selfsteal_certificate_lifetime
+      changed_when: false
+      failed_when: false
+      when: selfsteal_required_files.results[4].stat.exists
+
+    - name: Read the existing certificate subject
+      ansible.builtin.command:
+        argv:
+          - openssl
+          - x509
+          - -in
+          - '{{ selfsteal_dir }}/ssl/fullchain.crt'
+          - -noout
+          - -subject
+          - -nameopt
+          - RFC2253
+      register: existing_selfsteal_certificate_subject
+      changed_when: false
+      failed_when: false
+      when: selfsteal_required_files.results[4].stat.exists
+
+    - name: Read the existing certificate issuer
+      ansible.builtin.command:
+        argv:
+          - openssl
+          - x509
+          - -in
+          - '{{ selfsteal_dir }}/ssl/fullchain.crt'
+          - -noout
+          - -issuer
+          - -nameopt
+          - RFC2253
+      register: existing_selfsteal_certificate_issuer
+      changed_when: false
+      failed_when: false
+      when: selfsteal_required_files.results[4].stat.exists
+
+    - name: Read the existing certificate public-key fingerprint
+      ansible.builtin.shell: >-
+        set -o pipefail &&
+        openssl x509 -in {{ (selfsteal_dir + '/ssl/fullchain.crt') | quote }} -pubkey -noout |
+        openssl pkey -pubin -outform DER |
+        sha256sum | cut -d' ' -f1
+      args:
+        executable: /bin/bash
+      register: existing_selfsteal_certificate_public_key
+      changed_when: false
+      failed_when: false
+      when: selfsteal_required_files.results[4].stat.exists
+
+    - name: Read the existing private-key public-key fingerprint
+      ansible.builtin.shell: >-
+        set -o pipefail &&
+        openssl pkey -in {{ (selfsteal_dir + '/ssl/private.key') | quote }} -pubout -outform DER |
+        sha256sum | cut -d' ' -f1
+      args:
+        executable: /bin/bash
+      register: existing_selfsteal_private_key_public_key
+      changed_when: false
+      failed_when: false
+      no_log: true
+      when: selfsteal_required_files.results[5].stat.exists
+
+    - name: Inspect the existing SelfSteal container
+      ansible.builtin.command:
+        argv:
+          - docker
+          - inspect
+          - --format
+          - '{% raw %}{{.State.Running}}{% endraw %}'
+          - nginx-selfsteal
+      register: existing_selfsteal_container
+      changed_when: false
+      failed_when: false
+
+    - name: Check the cabinet SelfSteal ownership marker
+      ansible.builtin.stat:
+        path: '{{ selfsteal_marker_path }}'
+      register: selfsteal_marker
+
+    - name: Read the cabinet SelfSteal ownership marker
+      ansible.builtin.slurp:
+        src: '{{ selfsteal_marker_path }}'
+      register: selfsteal_marker_contents
+      when: selfsteal_marker.stat.exists
+      no_log: true
+
+    - name: Determine the current SelfSteal state
       ansible.builtin.set_fact:
-        selfsteal_is_complete: >-
+        selfsteal_is_healthy: >-
           {{ selfsteal_required_files.results
              | selectattr('stat.exists', 'equalto', false)
              | list
-             | length == 0 }}
+             | length == 0 and
+             selfsteal_configured_domain.rc == 0 and
+             selfsteal_configured_domain.stdout | trim == node_fqdn and
+             existing_selfsteal_compose.rc | default(1) == 0 and
+             existing_selfsteal_certificate_hostname.rc | default(1) == 0 and
+             existing_selfsteal_certificate_lifetime.rc | default(1) == 0 and
+             existing_selfsteal_certificate_subject.rc | default(1) == 0 and
+             existing_selfsteal_certificate_issuer.rc | default(1) == 0 and
+             (existing_selfsteal_certificate_subject.stdout | default('') | regex_replace('^subject=', '')) !=
+             (existing_selfsteal_certificate_issuer.stdout | default('') | regex_replace('^issuer=', '')) and
+             existing_selfsteal_certificate_public_key.rc | default(1) == 0 and
+             existing_selfsteal_private_key_public_key.rc | default(1) == 0 and
+             existing_selfsteal_certificate_public_key.stdout | default('') | length == 64 and
+             existing_selfsteal_certificate_public_key.stdout | default('') ==
+             existing_selfsteal_private_key_public_key.stdout | default('') }}
+        selfsteal_marker_is_owned: >-
+          {{ selfsteal_marker.stat.exists and
+             selfsteal_marker_contents.content | default('') | b64decode | trim ==
+             provisioning_job_id + ' ' + node_fqdn + ' ' + selfsteal_script_sha256 }}
 
-    - name: Install SelfSteal non-interactively
-      ansible.builtin.expect:
-        command: >-
-          {{ selfsteal_script_path }} --nginx --socket
-          --acme-port {{ selfsteal_acme_port }} install
-        responses:
-          '(?i)Enter your domain.*:': '{{ node_fqdn }}'
-          '(?i)Select option.*\[1-2\].*:': '1'
-          '(?i)Try a different domain.*:': 'n'
-          '(?i)Do you want to continue anyway.*:': 'n'
-          '(?i)Enter custom port.*:': ''
-          '(?i)Continue with self-signed certificate.*:': 'n'
-          '(?i)Proceed with installation.*:': 'y'
-          '(?i)Select option.*\[1-3\].*:': '1'
-          '(?i)Select template option.*:': '1'
-        timeout: 1200
-        echo: false
+    - name: Refuse to replace an unverified SelfSteal installation
+      ansible.builtin.assert:
+        that:
+          - >-
+            selfsteal_is_healthy | bool or
+            not selfsteal_directory.stat.exists or
+            (selfsteal_marker_is_owned | bool and
+             (existing_selfsteal_container.rc == 0 or
+              (existing_selfsteal_container.rc == 1 and
+               existing_selfsteal_container.stderr | default('') is search('No such object')))) or
+            (selfsteal_configured_domain.stdout | trim == node_fqdn and
+             existing_selfsteal_container.rc == 1 and
+             existing_selfsteal_container.stderr | default('') is search('No such object'))
+        fail_msg: >-
+          Existing SelfSteal is unhealthy but cannot be safely attributed to this job.
+          It was left untouched; inspect {{ selfsteal_dir }} manually.
+
+    - name: Stop an owned incomplete SelfSteal project before recovery
+      ansible.builtin.command:
+        argv:
+          - docker
+          - compose
+          - --project-directory
+          - '{{ selfsteal_dir }}'
+          - down
+      register: incomplete_selfsteal_down
+      changed_when: incomplete_selfsteal_down.rc == 0
+      failed_when: >-
+        existing_selfsteal_container.stdout | default('false') | trim == 'true' and
+        incomplete_selfsteal_down.rc != 0
+      when:
+        - not selfsteal_is_healthy | bool
+        - selfsteal_directory.stat.exists
+        - selfsteal_required_files.results[1].stat.exists
+        - selfsteal_marker_is_owned | bool or existing_selfsteal_container.stdout | default('false') | trim != 'true'
+
+    - name: Archive an incomplete SelfSteal installation
+      ansible.builtin.command:
+        argv:
+          - mv
+          - '{{ selfsteal_dir }}'
+          - '{{ selfsteal_archive_path }}'
+      when:
+        - not selfsteal_is_healthy | bool
+        - selfsteal_directory.stat.exists
+
+    - name: Protect the archived SelfSteal files
+      ansible.builtin.file:
+        path: '{{ selfsteal_archive_path }}'
+        owner: root
+        group: root
+        mode: u=rwX,go=
+        recurse: true
+      when:
+        - not selfsteal_is_healthy | bool
+        - selfsteal_directory.stat.exists
+
+    - name: Mark the SelfSteal installation as owned by this job
+      ansible.builtin.copy:
+        content: '{{ provisioning_job_id }} {{ node_fqdn }} {{ selfsteal_script_sha256 }}\n'
+        dest: '{{ selfsteal_marker_path }}'
+        owner: root
+        group: root
+        mode: '0600'
+      when: not selfsteal_is_healthy | bool
+
+    - name: Install SelfSteal through its official force mode
+      ansible.builtin.command:
+        argv:
+          - '{{ selfsteal_script_path }}'
+          - --nginx
+          - --socket
+          - --force
+          - --domain
+          - '{{ node_fqdn }}'
+          - --acme-port
+          - '{{ selfsteal_acme_port | string }}'
+          - --template
+          - '1'
+          - install
+        stdin: "y\n"
+        stdin_add_newline: false
       environment:
         DEBIAN_FRONTEND: noninteractive
         TERM: xterm
-      when: not selfsteal_is_complete | bool
+      when: not selfsteal_is_healthy | bool
       register: selfsteal_install
+
+    - name: Stop when SelfSteal used its self-signed fallback
+      ansible.builtin.fail:
+        msg: >-
+          SelfSteal could not obtain a trusted certificate and used its self-signed fallback.
+          Installer output: {{ ((selfsteal_install.stdout | default('') + '\n' +
+          selfsteal_install.stderr | default('')) | regex_replace('\u001b\\[[0-9;]*m', '') |
+          regex_replace('Bearer\\s+[A-Za-z0-9._~-]+', 'Bearer [REDACTED]') |
+          regex_replace('\\beyJ[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\b',
+          '[REDACTED_JWT]'))[-7500:] }}
+      when:
+        - selfsteal_install is not skipped
+        - selfsteal_install.stdout | default('') is search('Using self-signed certificate')
 
     - name: Keep the local SelfSteal management command pinned
       ansible.builtin.copy:
@@ -334,17 +670,41 @@
         group: root
         mode: '0755'
 
-    - name: Register the administrator email with acme.sh
-      ansible.builtin.command:
-        argv:
-          - /root/.acme.sh/acme.sh
-          - --update-account
-          - --accountemail
-          - '{{ admin_email }}'
-      changed_when: false
-      when:
-        - admin_email is defined
-        - admin_email | length > 3
+    - name: Install a fail-safe SelfSteal certificate renewal wrapper
+      ansible.builtin.template:
+        src: templates/acme-renew.sh.j2
+        dest: '{{ selfsteal_dir }}/acme-renew.sh'
+        owner: root
+        group: root
+        mode: '0700'
+      register: selfsteal_renewal_wrapper
+
+    - name: Remove the upstream raw SelfSteal renewal entry
+      ansible.builtin.shell: >-
+        set -o pipefail;
+        current="$(crontab -l 2>/dev/null || true)";
+        filtered="$(printf '%s\n' "$current" |
+        grep -vF '{{ selfsteal_dir }}/acme-renew.sh' |
+        grep -vE '/root/\\.acme\\.sh/acme\\.sh[[:space:]]+--cron([[:space:]]|$)' || true)";
+        if [ "$current" != "$filtered" ]; then
+          printf '%s\n' "$filtered" | crontab -;
+          echo changed;
+        fi
+      args:
+        executable: /bin/bash
+      register: removed_upstream_selfsteal_cron
+      changed_when: removed_upstream_selfsteal_cron.stdout is search('changed')
+
+    - name: Schedule the fail-safe SelfSteal certificate renewal
+      ansible.builtin.copy:
+        content: |
+          SHELL=/bin/bash
+          PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+          0 0 * * * root {{ selfsteal_dir }}/acme-renew.sh
+        dest: /etc/cron.d/selfsteal-acme-renew
+        owner: root
+        group: root
+        mode: '0644'
 
     - name: Validate the SelfSteal Compose project
       ansible.builtin.command:
@@ -423,6 +783,56 @@
           - '{{ node_fqdn }}'
       changed_when: false
 
+    - name: Validate the certificate lifetime
+      ansible.builtin.command:
+        argv:
+          - openssl
+          - x509
+          - -in
+          - '{{ selfsteal_dir }}/ssl/fullchain.crt'
+          - -noout
+          - -checkend
+          - '86400'
+      changed_when: false
+
+    - name: Read the certificate subject after installation
+      ansible.builtin.command:
+        argv:
+          - openssl
+          - x509
+          - -in
+          - '{{ selfsteal_dir }}/ssl/fullchain.crt'
+          - -noout
+          - -subject
+          - -nameopt
+          - RFC2253
+      register: installed_certificate_subject
+      changed_when: false
+
+    - name: Read the certificate issuer after installation
+      ansible.builtin.command:
+        argv:
+          - openssl
+          - x509
+          - -in
+          - '{{ selfsteal_dir }}/ssl/fullchain.crt'
+          - -noout
+          - -issuer
+          - -nameopt
+          - RFC2253
+      register: installed_certificate_issuer
+      changed_when: false
+
+    - name: Reject a SelfSteal self-signed fallback certificate
+      ansible.builtin.assert:
+        that:
+          - >-
+            (installed_certificate_subject.stdout | regex_replace('^subject=', '')) !=
+            (installed_certificate_issuer.stdout | regex_replace('^issuer=', ''))
+        fail_msg: >-
+          SelfSteal fell back to a self-signed certificate. The job remains failed
+          until Let's Encrypt issues a trusted certificate for {{ node_fqdn }}.
+
     - name: Read the certificate public-key fingerprint
       ansible.builtin.shell: >-
         set -o pipefail &&
@@ -488,3 +898,23 @@
         that:
           - final_ufw_status.stdout is search('Status: active')
         fail_msg: UFW is not active after provisioning.
+
+    - name: Find recovered SelfSteal archives for this job
+      ansible.builtin.find:
+        paths: /opt
+        patterns: nginx-selfsteal.partial-{{ provisioning_job_id }}-*
+        file_type: directory
+        recurse: false
+      register: recovered_selfsteal_archives
+
+    - name: Remove recovered SelfSteal archives after successful verification
+      ansible.builtin.file:
+        path: '{{ item.path }}'
+        state: absent
+      loop: '{{ recovered_selfsteal_archives.files }}'
+      no_log: true
+
+    - name: Clear the cabinet SelfSteal recovery marker
+      ansible.builtin.file:
+        path: '{{ selfsteal_marker_path }}'
+        state: absent
