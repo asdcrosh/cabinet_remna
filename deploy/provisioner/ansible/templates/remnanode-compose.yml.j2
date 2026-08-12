@@ -5,6 +5,12 @@ services:
     hostname: remnanode
     restart: unless-stopped
     network_mode: host
+    cap_add:
+      - NET_ADMIN
+    ulimits:
+      nofile:
+        soft: 1048576
+        hard: 1048576
     env_file:
       - .env
     volumes:

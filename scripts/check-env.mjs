@@ -173,12 +173,16 @@ if (provisioningEnabled) {
   ) {
     errors.push("NODE_PROVISIONING_ADMIN_EMAIL must be a valid email");
   }
+  const countryCode = value("NODE_PROVISIONING_COUNTRY_CODE").toUpperCase();
+  if (countryCode && countryCode !== "AUTO" && !/^[A-Z]{2}$/.test(countryCode)) {
+    errors.push("NODE_PROVISIONING_COUNTRY_CODE must be AUTO or a two-letter ISO country code");
+  }
   const nodeImage = value("NODE_PROVISIONING_REMNANODE_IMAGE");
   if (
     nodeImage &&
-    (nodeImage.endsWith(":latest") || (!nodeImage.includes("@sha256:") && !/^.+:[^/:]+$/.test(nodeImage)))
+    !nodeImage.includes("@sha256:") && !/^.+:[^/:]+$/.test(nodeImage)
   ) {
-    errors.push("NODE_PROVISIONING_REMNANODE_IMAGE must use a non-latest tag or digest");
+    errors.push("NODE_PROVISIONING_REMNANODE_IMAGE must use an image tag or digest");
   }
 }
 

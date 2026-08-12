@@ -55,6 +55,7 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV APP_BUILD_REVISION=${BUILD_REVISION}
 ENV APP_BUILD_CREATED_AT=${BUILD_CREATED_AT}
 ENV ANSIBLE_CONFIG=/app/deploy/provisioner/ansible/ansible.cfg
+ENV GEOIP_DATADIR=/app/geoip-data
 ENV PATH=/opt/ansible/bin:${PATH}
 ENV HOME=/home/provisioner
 
@@ -81,6 +82,9 @@ RUN apk add --no-cache \
 COPY --chown=provisioner:provisioner --from=builder /app/.next/standalone ./
 COPY --chown=provisioner:provisioner --from=builder /app/.next/ops ./ops
 COPY --chown=provisioner:provisioner deploy/provisioner ./deploy/provisioner
+COPY --chown=provisioner:provisioner --from=deps /app/node_modules/geoip-country/data ./geoip-data
+COPY --chown=provisioner:provisioner --from=deps /app/node_modules/geoip-country/LICENSE ./licenses/geoip-country/LICENSE
+COPY --chown=provisioner:provisioner --from=deps /app/node_modules/geoip-country/EULA ./licenses/geoip-country/EULA
 
 RUN mkdir -p /tmp/ansible-runner \
   && chown provisioner:provisioner /tmp/ansible-runner \

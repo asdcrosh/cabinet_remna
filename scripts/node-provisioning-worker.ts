@@ -1,6 +1,7 @@
 import { writeFile } from 'node:fs/promises'
 import { logError, logInfo } from '../src/lib/logger'
 import { processNodeProvisioningBatch } from '../src/lib/node-provisioning-worker'
+import { nodeHostRemark, resolveNodeCountryCode } from '../src/lib/node-country'
 import { prisma } from '../src/lib/prisma'
 import { recordWorkerHeartbeat } from '../src/lib/worker-health'
 import { isPublicIpv4 } from '../src/lib/node-provisioning-validation'
@@ -54,9 +55,13 @@ function validateWorkerConfiguration() {
   if (!/^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,63}$/.test(process.env.NODE_PROVISIONING_ADMIN_EMAIL!.trim())) {
     throw new Error('NODE_PROVISIONING_ADMIN_EMAIL must be a valid email')
   }
+  const countryCode = (process.env.NODE_PROVISIONING_COUNTRY_CODE || 'AUTO').trim().toUpperCase()
+  if (countryCode !== 'AUTO' && !/^[A-Z]{2}$/.test(countryCode)) {
+    throw new Error('NODE_PROVISIONING_COUNTRY_CODE must be AUTO or a two-letter ISO country code')
+  }
   const image = process.env.NODE_PROVISIONING_REMNANODE_IMAGE!.trim()
-  if (image.endsWith(':latest') || (!image.includes('@sha256:') && !/^.+:[^/:]+$/.test(image))) {
-    throw new Error('NODE_PROVISIONING_REMNANODE_IMAGE must use a non-latest tag or digest')
+  if (!image.includes('@sha256:') && !/^.+:[^/:]+$/.test(image)) {
+    throw new Error('NODE_PROVISIONING_REMNANODE_IMAGE must use an image tag or digest')
   }
   const remnawaveUrl = new URL(process.env.REMNAWAVE_BASE_URL!.trim())
   if (remnawaveUrl.protocol !== 'https:') throw new Error('REMNAWAVE_BASE_URL must use HTTPS')
@@ -104,7 +109,11 @@ function sleep(ms: number) {
 
 async function start() {
   if (process.env.OPS_STARTUP_CHECK === 'true') {
-    logInfo('node_provisioning_worker.startup_check_passed')
+    const geoIpCountry = resolveNodeCountryCode('8.8.8.8', 'AUTO')
+    if (geoIpCountry !== 'US') throw new Error(`GeoIP startup check returned ${geoIpCountry}, expected US`)
+    const geoIpHostRemark = nodeHostRemark(geoIpCountry, 'TCP')
+    if (geoIpHostRemark !== '🇺🇸 США') throw new Error(`GeoIP host remark check returned ${geoIpHostRemark}`)
+    logInfo('node_provisioning_worker.startup_check_passed', { geoIpCountry, geoIpHostRemark })
     return
   }
   await main()

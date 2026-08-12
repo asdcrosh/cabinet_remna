@@ -1,7 +1,9 @@
 import { resolve4 } from 'node:dns/promises'
 import { connect } from 'node:net'
+import { isDeepStrictEqual } from 'node:util'
 import type { NodeProvisioningJob, NodeProvisioningStep, Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
+import { nodeHostRemark, resolveNodeCountryCode } from '@/lib/node-country'
 import { decryptNodeProvisioningSecret } from '@/lib/node-provisioning-crypto'
 import { runNodeAnsible, sanitizeProvisioningOutput, scanSshHostKey } from '@/lib/node-provisioning-runner'
 import { upsertTimewebARecord } from '@/lib/timeweb'
@@ -57,6 +59,7 @@ export async function processNodeProvisioningJob(jobId: string) {
     let job = await requiredJob(jobId)
     if (job.credentialsExpireAt <= new Date()) throw new Error('Срок хранения SSH-пароля истёк')
     sshPassword = decryptNodeProvisioningSecret(job.encryptedSshPassword)
+    const countryCode = resolveNodeCountryCode(job.serverIp)
     const { templates, profileUuid, inboundUuids } = await loadTemplates(job)
 
     await advance(jobId, 'DNS', 'Создаю или обновляю A-запись в Timeweb')
@@ -73,8 +76,14 @@ export async function processNodeProvisioningJob(jobId: string) {
 
     await advance(jobId, 'REMNAWAVE_NODE', 'Создаю ноду в Remnawave')
     job = await requiredJob(jobId)
-    const node = await ensureRemnawaveNode(job, profileUuid, inboundUuids)
-    await updateJob(jobId, { remnawaveNodeUuid: node.uuid }, 'REMNAWAVE_NODE', `Нода создана: ${node.uuid}`)
+    const plugin = await ensureTorrentBlockPlugin()
+    const node = await ensureRemnawaveNode(job, profileUuid, inboundUuids, countryCode, plugin.uuid)
+    await updateJob(
+      jobId,
+      { remnawaveNodeUuid: node.uuid },
+      'REMNAWAVE_NODE',
+      `Нода настроена: ${node.uuid}; страна ${countryCode}; torrent_block включён`
+    )
     const secretResponse = await remnawave.getNodeSecret()
     nodeSecret = secretResponse.response.secretKey || secretResponse.response.pubKey || ''
     if (!nodeSecret) throw new Error('Remnawave не вернул SECRET_KEY ноды')
@@ -97,7 +106,7 @@ export async function processNodeProvisioningJob(jobId: string) {
     await addEvent(jobId, 'NODE_CONNECT', 'SUCCESS', 'Remnawave подтверждает подключение ноды')
 
     await advance(jobId, 'HOSTS', 'Клонирую эталонные TCP и XHTTP hosts')
-    const hosts = await ensureHosts(job, node.uuid, templates)
+    const hosts = await ensureHosts(job, node.uuid, countryCode, templates)
     await updateJob(jobId, {
       tcpHostUuid: hosts.tcp.uuid,
       xhttpHostUuid: hosts.xhttp.uuid,
@@ -140,18 +149,28 @@ export async function processNodeProvisioningJob(jobId: string) {
   }
 }
 
-async function ensureRemnawaveNode(job: NodeProvisioningJob, profileUuid: string, inboundUuids: string[]) {
+async function ensureRemnawaveNode(
+  job: NodeProvisioningJob,
+  profileUuid: string,
+  inboundUuids: string[],
+  countryCode: string,
+  activePluginUuid: string
+) {
   const nodes = (await remnawave.getNodes()).response
+  const alignNode = async (node: RemnawaveNode) => {
+    if (node.countryCode === countryCode && node.activePluginUuid === activePluginUuid) return node
+    return (await remnawave.updateNode({ uuid: node.uuid, countryCode, activePluginUuid })).response
+  }
   if (job.remnawaveNodeUuid) {
     const existing = nodes.find((node) => node.uuid === job.remnawaveNodeUuid)
-    if (existing) return existing
+    if (existing) return alignNode(existing)
     throw new Error('Созданная ранее нода не найдена в Remnawave')
   }
   const matches = nodes.filter((node) => node.name === job.nodeName && node.address === job.serverIp)
   const createdByThisJob = matches.filter((node) => node.note === `Created by cabinet job ${job.id}`)
   if (createdByThisJob.length === 1) {
     await addEvent(job.id, 'REMNAWAVE_NODE', 'WARNING', 'Найдена существующая точная нода, продолжаю без дубля')
-    return createdByThisJob[0]!
+    return alignNode(createdByThisJob[0]!)
   }
   if (createdByThisJob.length > 1) throw new Error('В Remnawave найдено несколько нод этой задачи')
   if (matches.length > 0) throw new Error('В Remnawave уже есть нода с таким именем и IP, но она создана не этой задачей')
@@ -160,13 +179,48 @@ async function ensureRemnawaveNode(job: NodeProvisioningJob, profileUuid: string
     name: job.nodeName,
     address: job.serverIp,
     port: 2222,
-    countryCode: (process.env.NODE_PROVISIONING_COUNTRY_CODE?.trim() || 'XX').toUpperCase(),
+    countryCode,
+    activePluginUuid,
     configProfile: {
       activeConfigProfileUuid: profileUuid,
       activeInbounds: inboundUuids,
     },
     note: `Created by cabinet job ${job.id}`,
   })).response
+}
+
+async function ensureTorrentBlockPlugin() {
+  const pluginName = 'torrent_block'
+  const plugins = (await remnawave.getNodePlugins()).response.nodePlugins
+  const matches = plugins.filter((plugin) => plugin.name.trim().toLowerCase() === pluginName)
+  if (matches.length > 1) throw new Error('В Remnawave найдено несколько plugins с именем torrent_block')
+
+  const pluginSummary = matches[0] ?? (await remnawave.createNodePlugin(pluginName)).response
+  let plugin = (await remnawave.getNodePlugin(pluginSummary.uuid)).response
+  const pluginConfig = buildTorrentBlockPluginConfig(plugin.pluginConfig)
+  if (!isDeepStrictEqual(plugin.pluginConfig, pluginConfig)) {
+    plugin = (await remnawave.updateNodePlugin(plugin.uuid, pluginConfig)).response
+  }
+  return plugin
+}
+
+export function buildTorrentBlockPluginConfig(value: unknown) {
+  const currentConfig = isRecord(value) ? value : {}
+  const currentTorrentBlocker = isRecord(currentConfig.torrentBlocker) ? currentConfig.torrentBlocker : {}
+  const currentIgnoreLists = isRecord(currentTorrentBlocker.ignoreLists) ? currentTorrentBlocker.ignoreLists : {}
+  return {
+    ...currentConfig,
+    torrentBlocker: {
+      ...currentTorrentBlocker,
+      enabled: true,
+      blockDuration: positiveNumber(currentTorrentBlocker.blockDuration, 3600),
+      ignoreLists: {
+        ...currentIgnoreLists,
+        ip: Array.isArray(currentIgnoreLists.ip) ? currentIgnoreLists.ip : [],
+        userId: Array.isArray(currentIgnoreLists.userId) ? currentIgnoreLists.userId : [],
+      },
+    },
+  }
 }
 
 async function loadTemplates(job: NodeProvisioningJob) {
@@ -192,7 +246,7 @@ async function loadTemplates(job: NodeProvisioningJob) {
   }
 }
 
-function assertTemplateTransport(host: RemnawaveHost, expected: 'tcp' | 'xhttp', nodes: RemnawaveNode[]) {
+export function assertTemplateTransport(host: RemnawaveHost, expected: 'tcp' | 'xhttp', nodes: RemnawaveNode[]) {
   const inboundUuid = host.inbound.configProfileInboundUuid
   const inbound = nodes
     .flatMap((node) => node.configProfile?.activeInbounds || [])
@@ -204,41 +258,64 @@ function assertTemplateTransport(host: RemnawaveHost, expected: 'tcp' | 'xhttp',
   if (!matches) {
     throw new Error(`Host ${host.remark} не подтверждён как ${expected.toUpperCase()} transport`)
   }
+  const sniffing = inbound?.sniffing ?? inbound?.rawInbound?.sniffing
+  const destinations = new Set((sniffing?.destOverride || []).map((item) => item.toLowerCase()))
+  const missingDestinations = ['http', 'tls', 'quic'].filter((item) => !destinations.has(item))
+  if (!sniffing?.enabled || missingDestinations.length > 0) {
+    throw new Error(
+      `Inbound для host ${host.remark} не готов к torrent_block: включите sniffing.enabled и destOverride http,tls,quic`
+    )
+  }
 }
 
 async function ensureHosts(
   job: NodeProvisioningJob,
   nodeUuid: string,
+  countryCode: string,
   templates: { tcp: RemnawaveHost; xhttp: RemnawaveHost }
 ) {
   const existing = (await remnawave.getHosts()).response
   const ensure = async (template: RemnawaveHost, kind: 'TCP' | 'XHTTP') => {
-    const remark = `${job.nodeName} · ${template.remark}`.slice(0, 40)
+    const remark = nodeHostRemark(countryCode, kind)
     const jobTag = `CAB_${kind}:${job.id.slice(-20).toUpperCase()}`
-    const matches = existing.filter((host) => host.tags?.includes(jobTag) && host.nodes.includes(nodeUuid))
-    if (matches.length > 1) throw new Error(`Найдено несколько клонов ${kind} host`)
-    if (matches[0]) {
-      const match = matches[0]
-      if (match.address !== job.fqdn
-        || match.inbound.configProfileInboundUuid !== template.inbound.configProfileInboundUuid) {
-        throw new Error(`Существующий клон ${kind} host не совпадает с эталоном`)
-      }
-      return match
-    }
     const payload = buildHostCloneRequest(template, {
       remark,
       address: job.fqdn,
+      sni: replaceTemplateHostname(template.sni, template.address, job.fqdn),
+      host: replaceTemplateHostname(template.host, template.address, job.fqdn),
+      verifyPeerCertByName: replaceTemplateHostname(template.verifyPeerCertByName, template.address, job.fqdn),
       nodes: [nodeUuid],
       tags: [...new Set([...(template.tags || []), jobTag])].slice(-10),
       isDisabled: true,
       isHidden: true,
     })
+    const matches = existing.filter((host) => host.tags?.includes(jobTag) && host.nodes.includes(nodeUuid))
+    if (matches.length > 1) throw new Error(`Найдено несколько клонов ${kind} host`)
+    if (matches[0]) {
+      const match = matches[0]
+      if (match.inbound.configProfileInboundUuid !== template.inbound.configProfileInboundUuid) {
+        throw new Error(`Существующий клон ${kind} host не совпадает с эталоном`)
+      }
+      return (await remnawave.updateHost({ uuid: match.uuid, ...payload })).response
+    }
     return (await remnawave.createHost(payload)).response
   }
   return {
     tcp: await ensure(templates.tcp, 'TCP'),
     xhttp: await ensure(templates.xhttp, 'XHTTP'),
   }
+}
+
+function replaceTemplateHostname(value: string | null | undefined, templateAddress: string, nodeFqdn: string) {
+  return value?.trim().toLowerCase() === templateAddress.trim().toLowerCase() ? nodeFqdn : value
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+}
+
+function positiveNumber(value: unknown, fallback: number) {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : fallback
 }
 
 async function verifyProvisionedNode(job: NodeProvisioningJob, nodeUuid: string, tcpPort: number) {

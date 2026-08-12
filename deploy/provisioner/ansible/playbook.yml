@@ -30,6 +30,7 @@
       ansible.builtin.assert:
         that:
           - ansible_distribution in ['Debian', 'Ubuntu']
+          - ansible_kernel is version('5.7', '>=')
           - node_fqdn is defined
           - node_fqdn is match('^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,63}$')
           - effective_remnanode_secret_key | length >= 32
@@ -43,20 +44,18 @@
           - (ansible_port | default(22) | int) >= 1
           - (ansible_port | default(22) | int) <= 65535
         fail_msg: >-
-          Provisioning requires Ubuntu/Debian, a lower-case FQDN,
+          Provisioning requires Ubuntu/Debian with Linux 5.7+, a lower-case FQDN,
           remnanode_secret_key, panel_api_cidr and a valid admin_email.
       no_log: true
 
-    - name: Refuse an unpinned Remnanode image unless explicitly allowed
+    - name: Validate the Remnanode image reference
       ansible.builtin.assert:
         that:
           - >-
-            allow_unpinned_remnanode_image | default(false) | bool or
             remnanode_image is match('^.+@sha256:[a-f0-9]{64}$') or
-            (remnanode_image is match('^.+:[^/:]+$') and not remnanode_image.endswith(':latest'))
+            remnanode_image is match('^.+:[^/:]+$')
         fail_msg: >-
-          Set remnanode_image to an immutable digest or a non-latest tag.
-          For a deliberate development run only, set allow_unpinned_remnanode_image=true.
+          Set remnanode_image to an image with an explicit tag or sha256 digest.
 
   tasks:
     - name: Install base operating-system packages
@@ -68,6 +67,7 @@
           - dnsutils
           - git
           - gnupg
+          - nftables
           - openssl
           - python3-debian
           - python3-pexpect
@@ -186,6 +186,8 @@
           - '{{ remnanode_dir }}'
           - up
           - -d
+          - --pull
+          - always
           - --remove-orphans
       register: remnanode_compose_up
       changed_when: >-
@@ -319,6 +321,7 @@
         echo: false
       environment:
         DEBIAN_FRONTEND: noninteractive
+        TERM: xterm
       when: not selfsteal_is_complete | bool
       register: selfsteal_install
 

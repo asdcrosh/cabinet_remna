@@ -119,8 +119,10 @@ export function NodeProvisioningPanel() {
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null)
   const [loadingJobs, setLoadingJobs] = useState(true)
   const [submitting, setSubmitting] = useState(false)
+  const [retryingJobId, setRetryingJobId] = useState<string | null>(null)
   const [listError, setListError] = useState<string | null>(null)
   const [submitError, setSubmitError] = useState<string | null>(null)
+  const [retryError, setRetryError] = useState<{ jobId: string; message: string } | null>(null)
   const [lastUpdatedAt, setLastUpdatedAt] = useState<string | null>(null)
   const [templates, setTemplates] = useState<ProvisioningTemplates | null>(null)
   const [configuration, setConfiguration] = useState<{ ready: boolean; missing: string[] } | null>(null)
@@ -220,6 +222,36 @@ export function NodeProvisioningPanel() {
       setSubmitError(error instanceof Error ? error.message : 'Не удалось запустить создание ноды')
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  async function retryJob(job: ProvisioningJob) {
+    if (job.status !== 'FAILED' || retryingJobId) return
+
+    setRetryingJobId(job.id)
+    setRetryError(null)
+    try {
+      const response = await fetch(`/api/admin/nodes/provisioning/${encodeURIComponent(job.id)}`, {
+        method: 'POST',
+        headers: { 'x-error-presentation': 'silent' },
+      })
+      const data = await response.json().catch(() => null) as ProvisioningResponse | null
+      if (!response.ok) throw new Error(formatApiError(data, 'Не удалось повторно запустить задачу'))
+      if (!data?.job) throw new Error('Сервер не вернул обновлённое состояние задачи')
+
+      setJobs((current) => current.some((item) => item.id === data.job!.id)
+        ? current.map((item) => item.id === data.job!.id ? data.job! : item)
+        : [data.job!, ...current])
+      setSelectedJobId(data.job.id)
+      toast('Повторный запуск поставлен в очередь', 'success')
+      await refreshJobs(false)
+    } catch (error) {
+      setRetryError({
+        jobId: job.id,
+        message: error instanceof Error ? error.message : 'Не удалось повторно запустить задачу',
+      })
+    } finally {
+      setRetryingJobId(null)
     }
   }
 
@@ -423,7 +455,14 @@ export function NodeProvisioningPanel() {
               <QueueUnavailable error={listError} onRetry={() => void refreshJobs(true)} />
             ) : null}
             {!loadingJobs && !listError && jobs.length === 0 ? <EmptyQueue /> : null}
-            {selectedJob ? <JobProgress job={selectedJob} /> : null}
+            {selectedJob ? (
+              <JobProgress
+                job={selectedJob}
+                retrying={retryingJobId === selectedJob.id}
+                retryError={retryError?.jobId === selectedJob.id ? retryError.message : null}
+                onRetry={() => void retryJob(selectedJob)}
+              />
+            ) : null}
           </div>
         </section>
       </div>
@@ -474,7 +513,17 @@ export function NodeProvisioningPanel() {
   }
 }
 
-function JobProgress({ job }: { job: ProvisioningJob }) {
+function JobProgress({
+  job,
+  retrying,
+  retryError,
+  onRetry,
+}: {
+  job: ProvisioningJob
+  retrying: boolean
+  retryError: string | null
+  onRetry: () => void
+}) {
   const steps = resolveSteps(job)
 
   return (
@@ -524,12 +573,40 @@ function JobProgress({ job }: { job: ProvisioningJob }) {
         })}
       </ol>
 
-      {job.lastError ? (
+      {job.lastError || job.status === 'FAILED' ? (
         <div className="mt-5 overflow-hidden rounded-2xl border border-red-200 bg-red-50 dark:border-red-500/25 dark:bg-red-500/10">
           <div className="flex items-center gap-2 border-b border-red-200 px-3.5 py-2.5 text-sm font-semibold text-red-900 dark:border-red-500/20 dark:text-red-100">
             <Terminal className="h-4 w-4" /> Ошибка выполнения
           </div>
-          <pre className="max-h-56 overflow-auto whitespace-pre-wrap break-words px-3.5 py-3 font-mono text-xs leading-5 text-red-800 dark:text-red-100">{job.lastError}</pre>
+          {job.lastError ? (
+            <pre className="max-h-56 overflow-auto whitespace-pre-wrap break-words px-3.5 py-3 font-mono text-xs leading-5 text-red-800 dark:text-red-100">{job.lastError}</pre>
+          ) : null}
+          {job.status === 'FAILED' ? (
+            <div className="border-t border-red-200 px-3.5 py-3 dark:border-red-500/20">
+              {retryError ? (
+                <div className="mb-3 flex items-start gap-2 text-sm leading-5 text-red-800 dark:text-red-100" role="alert">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                  <span>{retryError}</span>
+                </div>
+              ) : null}
+              <button
+                type="button"
+                className="btn-secondary min-h-10"
+                onClick={onRetry}
+                disabled={retrying}
+              >
+                {retrying ? (
+                  <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" />
+                ) : (
+                  <RefreshCw className="h-4 w-4" />
+                )}
+                {retrying ? 'Возвращаем в очередь...' : 'Повторить установку'}
+              </button>
+              <p className="mt-2 text-xs leading-5 text-red-700/80 dark:text-red-200/80">
+                Уже созданные этой задачей домен, нода и хосты будут использованы повторно.
+              </p>
+            </div>
+          ) : null}
         </div>
       ) : null}
     </div>

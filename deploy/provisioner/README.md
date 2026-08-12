@@ -14,11 +14,19 @@ Required extra variables:
 - `node_fqdn`
 - `remnanode_secret_key` (legacy runner alias: `node_secret_key`)
 - `panel_api_cidr` (legacy runner alias: `panel_ip`; allowed to reach port 2222)
-- `remnanode_image` pinned to a version or digest (defaults to the controller's
-  `NODE_PROVISIONING_REMNANODE_IMAGE` environment variable)
+- `remnanode_image` defaults to `remnawave/node:latest` and is pulled on every
+  provisioning or repair run
+- node country is detected locally from the bundled MaxMind GeoLite2 country
+  database; `NODE_PROVISIONING_COUNTRY_CODE` can override it with an ISO code
+- the shared `torrent_block` plugin is created/configured through Remnawave API
+  and attached to every provisioned node
 
 The active SSH port remains publicly reachable, matching the existing manual
 runbook. The Remnanode API port 2222 is restricted to `panel_api_cidr`.
+
+GeoIP data is provided by [MaxMind GeoLite2](https://dev.maxmind.com/geoip/geolite2-free-geolocation-data)
+through the `geoip-country` package. Its license and EULA are copied into the
+provisioner image under `/app/licenses/geoip-country`.
 
 Set `verify_transport_ports=true` only after the Remnawave panel has delivered
 the cloned TCP and XHTTP host configuration. The base play verifies Docker,

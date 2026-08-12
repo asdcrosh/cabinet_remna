@@ -178,6 +178,44 @@ describe('Remnawave v2/v3 user identifiers', () => {
     )
   })
 
+  it('lists, reads, creates, configures and assigns a node plugin through the supported endpoints', async () => {
+    const plugin = {
+      uuid: '55555555-5555-4555-8555-555555555555',
+      name: 'torrent_block',
+      pluginConfig: null,
+    }
+    const node = {
+      uuid: '11111111-1111-4111-8111-111111111111',
+      name: 'ams-01',
+      address: 'ams-01.example.test',
+      isConnected: false,
+      isDisabled: false,
+      activePluginUuid: plugin.uuid,
+    }
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({ response: { total: 0, nodePlugins: [] } }))
+      .mockResolvedValueOnce(jsonResponse({ response: { ...plugin, pluginConfig: { ingressFilter: { enabled: true } } } }))
+      .mockResolvedValueOnce(jsonResponse({ response: plugin }))
+      .mockResolvedValueOnce(jsonResponse({ response: { ...plugin, pluginConfig: { torrentBlocker: { enabled: true } } } }))
+      .mockResolvedValueOnce(jsonResponse({ response: node }))
+    vi.stubGlobal('fetch', fetchMock)
+    const { remnawave } = await import('./remnawave')
+
+    await remnawave.getNodePlugins()
+    await remnawave.getNodePlugin(plugin.uuid)
+    await remnawave.createNodePlugin('torrent_block')
+    await remnawave.updateNodePlugin(plugin.uuid, { torrentBlocker: { enabled: true } })
+    await remnawave.updateNode({ uuid: node.uuid, activePluginUuid: plugin.uuid })
+
+    expect(fetchMock.mock.calls.map(([url, init]) => [url, init?.method])).toEqual([
+      ['https://panel.example.test/api/node-plugins', 'GET'],
+      [`https://panel.example.test/api/node-plugins/${plugin.uuid}`, 'GET'],
+      ['https://panel.example.test/api/node-plugins', 'POST'],
+      ['https://panel.example.test/api/node-plugins', 'PATCH'],
+      ['https://panel.example.test/api/nodes', 'PATCH'],
+    ])
+  })
+
   it('builds a lossless whitelisted host clone payload and creates it', async () => {
     const source: RemnawaveHost & { unexpectedResponseField: string } = {
       uuid: '55555555-5555-4555-8555-555555555555',

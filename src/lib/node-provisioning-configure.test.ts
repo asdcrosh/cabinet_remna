@@ -22,7 +22,7 @@ describe('configure-node-provisioning.sh', () => {
     expect(result.stdout).toContain('Node provisioning is disabled')
     expect(env.COMPOSE_PROFILES).toBe('caddy,maintenance')
     expect(env.NODE_PROVISIONING_ENCRYPTION_KEY).toMatch(/^[a-f0-9]{64}$/)
-    expect(env.NODE_PROVISIONING_REMNANODE_IMAGE).toContain('@sha256:')
+    expect(env.NODE_PROVISIONING_REMNANODE_IMAGE).toBe('remnawave/node:latest')
     expect((await stat(fixture.envFile)).mode & 0o777).toBe(0o600)
   })
 
@@ -53,6 +53,39 @@ describe('configure-node-provisioning.sh', () => {
     expect(second.status).toBe(0)
     expect(secondEnv.COMPOSE_PROFILES).toBe('caddy,maintenance,provisioning')
     expect(secondEnv.NODE_PROVISIONING_ENCRYPTION_KEY).toBe(firstEnv.NODE_PROVISIONING_ENCRYPTION_KEY)
+  })
+
+  it('upgrades the released Remnanode 2.8 default to latest', async () => {
+    const fixture = await createFixture(completeEnv().replace(
+      'remnawave/node:latest',
+      'remnawave/node:2.8.0@sha256:03f14935751b4ab565181e2b1766ccd1a9ac349d6839acd3ee49014e543fa232',
+    ))
+
+    const result = run(fixture)
+    const env = await readEnv(fixture.envFile)
+
+    expect(result.status).toBe(0)
+    expect(env.NODE_PROVISIONING_REMNANODE_IMAGE).toBe('remnawave/node:latest')
+  })
+
+  it('upgrades the released XX country placeholder to automatic detection', async () => {
+    const fixture = await createFixture(`${completeEnv()}NODE_PROVISIONING_COUNTRY_CODE="XX"\n`)
+
+    const result = run(fixture)
+    const env = await readEnv(fixture.envFile)
+
+    expect(result.status).toBe(0)
+    expect(env.NODE_PROVISIONING_COUNTRY_CODE).toBe('AUTO')
+  })
+
+  it('preserves an explicitly configured custom Remnanode image', async () => {
+    const fixture = await createFixture(completeEnv().replace('remnawave/node:latest', 'registry.example.net/node:tested'))
+
+    const result = run(fixture)
+    const env = await readEnv(fixture.envFile)
+
+    expect(result.status).toBe(0)
+    expect(env.NODE_PROVISIONING_REMNANODE_IMAGE).toBe('registry.example.net/node:tested')
   })
 
   it('disables provisioning when an API token is rejected', async () => {
@@ -126,7 +159,7 @@ function completeEnv(profiles = 'caddy,maintenance') {
     `NODE_PROVISIONING_ENCRYPTION_KEY="${'a'.repeat(64)}"`,
     'NODE_PROVISIONING_PANEL_IP="8.8.8.8"',
     'NODE_PROVISIONING_ADMIN_EMAIL="admin@example.net"',
-    'NODE_PROVISIONING_REMNANODE_IMAGE="remnawave/node:2.8.0@sha256:03f14935751b4ab565181e2b1766ccd1a9ac349d6839acd3ee49014e543fa232"',
+    'NODE_PROVISIONING_REMNANODE_IMAGE="remnawave/node:latest"',
     '',
   ].join('\n')
 }

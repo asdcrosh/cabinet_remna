@@ -226,8 +226,16 @@ export interface RemnawaveNodeInbound {
   network?: string
   security?: string
   port?: number
+  sniffing?: {
+    enabled?: boolean
+    destOverride?: string[]
+  }
   rawInbound?: {
     port?: number
+    sniffing?: {
+      enabled?: boolean
+      destOverride?: string[]
+    }
     streamSettings?: {
       network?: string
       security?: string
@@ -325,6 +333,29 @@ export interface CreateRemnawaveNodeRequest {
 
 export interface CreateNodeResponse {
   response: RemnawaveNode
+}
+
+export interface UpdateRemnawaveNodeRequest extends Partial<Omit<CreateRemnawaveNodeRequest, 'configProfile'>> {
+  uuid: string
+  configProfile?: CreateRemnawaveNodeRequest['configProfile']
+}
+
+export interface RemnawaveNodePlugin {
+  uuid: string
+  viewPosition?: number
+  name: string
+  pluginConfig?: unknown | null
+}
+
+export interface GetNodePluginsResponse {
+  response: {
+    total: number
+    nodePlugins: RemnawaveNodePlugin[]
+  }
+}
+
+export interface NodePluginResponse {
+  response: RemnawaveNodePlugin
 }
 
 export interface GetNodeSecretResponse {
@@ -635,12 +666,32 @@ export const remnawave = {
     return request<CreateNodeResponse>('POST', '/api/nodes', input)
   },
 
+  async updateNode(input: UpdateRemnawaveNodeRequest) {
+    return request<CreateNodeResponse>('PATCH', '/api/nodes', input)
+  },
+
   async getNodeSecret() {
     return request<GetNodeSecretResponse>('GET', '/api/keygen')
   },
 
   async deleteNode(uuid: string) {
     return request<DeleteRemnawaveEntityResponse>('DELETE', `/api/nodes/${encodeURIComponent(uuid)}`)
+  },
+
+  async getNodePlugins() {
+    return request<GetNodePluginsResponse>('GET', '/api/node-plugins')
+  },
+
+  async getNodePlugin(uuid: string) {
+    return request<NodePluginResponse>('GET', `/api/node-plugins/${encodeURIComponent(uuid)}`)
+  },
+
+  async createNodePlugin(name: string) {
+    return request<NodePluginResponse>('POST', '/api/node-plugins', { name })
+  },
+
+  async updateNodePlugin(uuid: string, pluginConfig: unknown) {
+    return request<NodePluginResponse>('PATCH', '/api/node-plugins', { uuid, pluginConfig })
   },
 
   async getHosts() {
