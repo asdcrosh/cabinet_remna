@@ -619,7 +619,8 @@
 
     - name: Mark the SelfSteal installation as owned by this job
       ansible.builtin.copy:
-        content: '{{ provisioning_job_id }} {{ node_fqdn }} {{ selfsteal_script_sha256 }}\n'
+        content: |
+          {{ provisioning_job_id }} {{ node_fqdn }} {{ selfsteal_script_sha256 }}
         dest: '{{ selfsteal_marker_path }}'
         owner: root
         group: root

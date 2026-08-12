@@ -18,6 +18,8 @@ describe('node provisioning playbook safety', () => {
     expect(playbook).toContain("existing_selfsteal_container.stderr | default('') is search('No such object')")
     expect(playbook).toContain('Stop when SelfSteal used its self-signed fallback')
     expect(playbook).toContain("is search('Using self-signed certificate')")
+    expect(playbook).toMatch(/content: \|\n\s+\{\{ provisioning_job_id \}\} \{\{ node_fqdn \}\}/)
+    expect(playbook).not.toContain("selfsteal_script_sha256 }}\\n'")
   })
 
   it('always removes ACME redirect rules when renewal exits', () => {
