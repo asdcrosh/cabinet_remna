@@ -27,7 +27,11 @@ describe('Timeweb DNS', () => {
     vi.stubGlobal('fetch', fetchMock)
 
     await expect(upsertTimewebARecord('nl7.example.com', '1.1.1.1')).resolves.toEqual({ id: '8', created: false })
-    expect(fetchMock.mock.calls[1]?.[1]).toMatchObject({ method: 'PATCH', body: JSON.stringify({ type: 'A', value: '1.1.1.1' }) })
+    expect(fetchMock.mock.calls[1]?.[0]).toBe('https://api.timeweb.cloud/api/v2/domains/nl7.example.com/dns-records/8')
+    expect(fetchMock.mock.calls[1]?.[1]).toMatchObject({
+      method: 'PATCH',
+      body: JSON.stringify({ type: 'A', value: '1.1.1.1', ttl: 600 }),
+    })
   })
 
   it('creates an A record when missing', async () => {
@@ -56,7 +60,7 @@ describe('Timeweb DNS', () => {
       ['https://api.timeweb.cloud/api/v1/domains?limit=100&offset=0', 'GET'],
       ['https://api.timeweb.cloud/api/v1/domains/stealthnet.site/subdomains/us01', 'POST'],
       ['https://api.timeweb.cloud/api/v1/domains/us01.stealthnet.site/dns-records?limit=100&offset=0', 'GET'],
-      ['https://api.timeweb.cloud/api/v1/domains/us01.stealthnet.site/dns-records', 'POST'],
+      ['https://api.timeweb.cloud/api/v2/domains/us01.stealthnet.site/dns-records', 'POST'],
     ])
   })
 
@@ -73,6 +77,23 @@ describe('Timeweb DNS', () => {
     await expect(upsertTimewebARecord('us01.nodes.example.com', '1.1.1.1')).resolves.toEqual({ id: '12', created: true })
     expect(fetchMock.mock.calls[2]?.[0]).toBe(
       'https://api.timeweb.cloud/api/v1/domains/example.com/subdomains/us01.nodes'
+    )
+  })
+
+  it('includes the Timeweb error code and response id in a failed request', async () => {
+    process.env.TIMEWEB_API_TOKEN = 'token'
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(response({ dns_records: [] }))
+      .mockResolvedValueOnce(response({
+        status_code: 400,
+        error_code: 'VALIDATION_ERROR',
+        message: ['Invalid DNS value'],
+        response_id: 'response-123',
+      }, 400))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(upsertTimewebARecord('nl7.example.com', '1.1.1.1')).rejects.toThrow(
+      'VALIDATION_ERROR · ["Invalid DNS value"] · response_id=response-123'
     )
   })
 

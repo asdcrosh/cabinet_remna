@@ -1,4 +1,5 @@
-const TIMEWEB_BASE_URL = 'https://api.timeweb.cloud/api/v1'
+const TIMEWEB_API_ORIGIN = 'https://api.timeweb.cloud'
+const TIMEWEB_DNS_TTL = 600
 
 export class TimewebError extends Error {
   constructor(public status: number, public body: unknown, message: string) {
@@ -36,10 +37,16 @@ interface TimewebDomainsResponse {
   }
 }
 
-async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+async function request<T>(
+  method: string,
+  path: string,
+  body?: unknown,
+  apiVersion: 'v1' | 'v2' = 'v1'
+): Promise<T> {
   const token = process.env.TIMEWEB_API_TOKEN?.trim()
   if (!token) throw new TimewebError(0, null, 'TIMEWEB_API_TOKEN is not configured')
-  const response = await fetch(`${TIMEWEB_BASE_URL}${path}`, {
+  const apiPath = `/api/${apiVersion}${path}`
+  const response = await fetch(`${TIMEWEB_API_ORIGIN}${apiPath}`, {
     method,
     headers: {
       Authorization: `Bearer ${token}`,
@@ -53,7 +60,12 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   const text = await response.text()
   const data = text ? safeJson(text) : null
   if (!response.ok) {
-    throw new TimewebError(response.status, data, `Timeweb ${method} ${path} returned ${response.status}`)
+    const detail = timewebErrorDetail(data)
+    throw new TimewebError(
+      response.status,
+      data,
+      `Timeweb ${method} ${apiPath} returned ${response.status}${detail ? `: ${detail}` : ''}`
+    )
   }
   return data as T
 }
@@ -78,7 +90,8 @@ export async function upsertTimewebARecord(fqdn: string, serverIp: string) {
     const updated = await request<TimewebDnsRecordResponse>(
       'PATCH',
       `/domains/${encoded}/dns-records/${encodeURIComponent(String(aRecords[0].id))}`,
-      { type: 'A', value: serverIp }
+      { type: 'A', value: serverIp, ttl: TIMEWEB_DNS_TTL },
+      'v2'
     )
     return { id: String(updated.dns_record?.id ?? aRecords[0].id), created: false }
   }
@@ -86,7 +99,8 @@ export async function upsertTimewebARecord(fqdn: string, serverIp: string) {
   const created = await request<TimewebDnsRecordResponse>(
     'POST',
     `/domains/${encoded}/dns-records`,
-    { type: 'A', value: serverIp }
+    { type: 'A', value: serverIp, ttl: TIMEWEB_DNS_TTL },
+    'v2'
   )
   if (created.dns_record?.id == null) throw new TimewebError(502, created, 'Timeweb response has no DNS record id')
   return { id: String(created.dns_record.id), created: true }
@@ -161,5 +175,27 @@ function safeJson(text: string) {
     return JSON.parse(text)
   } catch {
     return text
+  }
+}
+
+function timewebErrorDetail(body: unknown) {
+  if (typeof body === 'string') return body.trim().slice(0, 1_000)
+  if (!body || typeof body !== 'object') return ''
+
+  const data = body as Record<string, unknown>
+  const code = typeof data.error_code === 'string' ? data.error_code : ''
+  const message = formatErrorValue(data.message ?? data.error ?? data.errors)
+  const responseId = typeof data.response_id === 'string' ? data.response_id : ''
+  const detail = [code, message, responseId ? `response_id=${responseId}` : ''].filter(Boolean).join(' · ')
+  return (detail || formatErrorValue(body)).slice(0, 1_000)
+}
+
+function formatErrorValue(value: unknown) {
+  if (typeof value === 'string') return value.trim()
+  if (value == null) return ''
+  try {
+    return JSON.stringify(value)
+  } catch {
+    return String(value)
   }
 }
