@@ -1,34 +1,90 @@
 #!/usr/bin/env bash
-set -u
+set -euo pipefail
 
 ACME_HOME=/root/.acme.sh
-tls_ports=()
+DOMAIN={{ node_fqdn | quote }}
+INSTALLED_CERT={{ (selfsteal_dir + '/ssl/fullchain.crt') | quote }}
+RENEW_BEFORE_SECONDS=$((30 * 24 * 60 * 60))
+ACME_TIMEOUT_SECONDS=300
+REMNANODE_WAS_RUNNING=false
 
-cleanup_redirects() {
-  local port
-  for port in "${tls_ports[@]}"; do
-    iptables -t nat -D PREROUTING -p tcp --dport 443 -j REDIRECT --to-port "$port" 2>/dev/null || true
-    iptables -t nat -D OUTPUT -p tcp --dport 443 -o lo -j REDIRECT --to-port "$port" 2>/dev/null || true
-  done
+certificate_key_fingerprint() {
+  openssl x509 -in "$1" -pubkey -noout 2>/dev/null \
+    | openssl pkey -pubin -outform DER 2>/dev/null \
+    | sha256sum | cut -d' ' -f1
 }
 
-trap cleanup_redirects EXIT INT TERM
-
-for domain_conf in "$ACME_HOME"/*/[!.]*.conf; do
-  [ -f "$domain_conf" ] || continue
-  saved_port=$(awk -F"'" '/^Le_TLSPort=/ { print $2; exit }' "$domain_conf")
-  if [ -n "$saved_port" ] && [ "$saved_port" != '443' ]; then
-    already=false
-    for port in "${tls_ports[@]}"; do
-      [ "$port" = "$saved_port" ] && already=true
-    done
-    [ "$already" = false ] && tls_ports+=("$saved_port")
+cleanup() {
+  while iptables -t nat -C PREROUTING -p tcp --dport 443 -j REDIRECT --to-port 8443 2>/dev/null; do
+    iptables -t nat -D PREROUTING -p tcp --dport 443 -j REDIRECT --to-port 8443 || true
+  done
+  while iptables -t nat -C OUTPUT -p tcp --dport 443 -o lo -j REDIRECT --to-port 8443 2>/dev/null; do
+    iptables -t nat -D OUTPUT -p tcp --dport 443 -o lo -j REDIRECT --to-port 8443 || true
+  done
+  if [ "$REMNANODE_WAS_RUNNING" = true ]; then
+    docker start remnanode >/dev/null
   fi
-done
+}
 
-for port in "${tls_ports[@]}"; do
-  iptables -t nat -I PREROUTING 1 -p tcp --dport 443 -j REDIRECT --to-port "$port" 2>/dev/null || true
-  iptables -t nat -I OUTPUT 1 -p tcp --dport 443 -o lo -j REDIRECT --to-port "$port" 2>/dev/null || true
-done
+trap cleanup EXIT INT TERM
 
-"$ACME_HOME/acme.sh" --cron --home "$ACME_HOME"
+installed_fingerprint="$(certificate_key_fingerprint "$INSTALLED_CERT")"
+ecc_dir="$ACME_HOME/${DOMAIN}_ecc"
+rsa_dir="$ACME_HOME/$DOMAIN"
+ecc_flag=()
+issue_keylength=2048
+
+if [ -f "$ecc_dir/fullchain.cer" ] \
+  && [ "$(certificate_key_fingerprint "$ecc_dir/fullchain.cer")" = "$installed_fingerprint" ]; then
+  domain_conf="$ecc_dir/$DOMAIN.conf"
+  ecc_flag=(--ecc)
+  issue_keylength=ec-256
+elif [ -f "$rsa_dir/fullchain.cer" ] \
+  && [ "$(certificate_key_fingerprint "$rsa_dir/fullchain.cer")" = "$installed_fingerprint" ]; then
+  domain_conf="$rsa_dir/$DOMAIN.conf"
+else
+  echo "Cannot match the installed SelfSteal certificate to an acme.sh domain" >&2
+  exit 1
+fi
+
+if [ ! -r "$domain_conf" ] \
+  || ! grep -Fx "Le_Domain='$DOMAIN'" "$domain_conf" >/dev/null \
+  || ! grep -Eq "^Le_Webroot='?(/|alpn|tls_alpn)" "$domain_conf"; then
+  echo "The active acme.sh domain configuration is missing or unsupported" >&2
+  exit 1
+fi
+
+if [ "${1:-}" = '--check' ]; then
+  exit 0
+fi
+
+if openssl x509 -in "$INSTALLED_CERT" -noout -checkend "$RENEW_BEFORE_SECONDS" >/dev/null 2>&1; then
+  exit 0
+fi
+
+if grep -Eq "^Le_Webroot='?(alpn|tls_alpn)'?$" "$domain_conf"; then
+  if [ "$(docker inspect --format '{% raw %}{{.State.Running}}{% endraw %}' remnanode 2>/dev/null || true)" = true ]; then
+    REMNANODE_WAS_RUNNING=true
+    docker stop remnanode >/dev/null
+  fi
+
+  while iptables -t nat -C PREROUTING -p tcp --dport 443 -j REDIRECT --to-port 8443 2>/dev/null; do
+    iptables -t nat -D PREROUTING -p tcp --dport 443 -j REDIRECT --to-port 8443
+  done
+  while iptables -t nat -C OUTPUT -p tcp --dport 443 -o lo -j REDIRECT --to-port 8443 2>/dev/null; do
+    iptables -t nat -D OUTPUT -p tcp --dport 443 -o lo -j REDIRECT --to-port 8443
+  done
+
+  timeout --signal=TERM --kill-after=10s "$ACME_TIMEOUT_SECONDS" \
+    "$ACME_HOME/acme.sh" --issue --domain "$DOMAIN" --keylength "$issue_keylength" \
+    --alpn --tlsport 443 --server letsencrypt --force
+else
+  timeout --signal=TERM --kill-after=10s "$ACME_TIMEOUT_SECONDS" \
+    "$ACME_HOME/acme.sh" --issue --domain "$DOMAIN" --keylength "$issue_keylength" \
+    --webroot {{ (selfsteal_dir + '/html') | quote }} --server letsencrypt --force
+fi
+
+"$ACME_HOME/acme.sh" --install-cert --domain "$DOMAIN" "${ecc_flag[@]}" \
+  --key-file {{ (selfsteal_dir + '/ssl/private.key') | quote }} \
+  --fullchain-file {{ (selfsteal_dir + '/ssl/fullchain.crt') | quote }} \
+  --reloadcmd 'docker exec nginx-selfsteal nginx -t && docker exec nginx-selfsteal nginx -s reload'
