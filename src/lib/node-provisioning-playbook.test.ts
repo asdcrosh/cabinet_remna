@@ -14,6 +14,10 @@ describe('node provisioning playbook safety', () => {
     expect(playbook).not.toContain('ansible.builtin.expect')
   })
 
+  it('runs the acme.sh installer from its extracted source directory', () => {
+    expect(playbook).toContain('chdir: /usr/local/src/acme.sh-{{ acme_script_version }}')
+  })
+
   it('fails closed for unknown Docker state and self-signed certificates', () => {
     expect(playbook).toContain("existing_selfsteal_container.stderr | default('') is search('No such object')")
     expect(playbook).toContain('Stop when SelfSteal used its self-signed fallback')

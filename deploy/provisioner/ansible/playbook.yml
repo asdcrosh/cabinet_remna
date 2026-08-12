@@ -332,6 +332,7 @@
           - --accountemail
           - '{{ admin_email }}'
           - --no-profile
+        chdir: /usr/local/src/acme.sh-{{ acme_script_version }}
       when: >-
         installed_acme_version.rc != 0 or
         installed_acme_version.stdout is not search('v' + acme_script_version)
