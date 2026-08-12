@@ -19,6 +19,7 @@
     selfsteal_marker_path: /opt/.cabinet-selfsteal-{{ provisioning_job_id }}
     selfsteal_archive_path: /opt/nginx-selfsteal.partial-{{ provisioning_job_id }}-{{ ansible_date_time.epoch }}
     selfsteal_bootstrap_tls_dir: /run/cabinet-selfsteal-{{ provisioning_job_id }}
+    selfsteal_certificate_stage_dir: /run/cabinet-selfsteal-cert-{{ provisioning_job_id }}
     acme_script_version: 3.1.4
     acme_script_url: https://github.com/acmesh-official/acme.sh/archive/refs/tags/3.1.4.tar.gz
     acme_script_sha256: e5f8e187bbf5251e0cd8891f2622daab9850366bd17bea9f92c2fe2ee091fd32
@@ -512,7 +513,7 @@
           - docker
           - inspect
           - --format
-          - '{% raw %}{{ index .Config.Labels "com.docker.compose.project.working_dir" }}|{{ index .Config.Labels "com.docker.compose.project.config_files" }}|{{.State.Running}}{% endraw %}'
+          - '{% raw %}{{ index .Config.Labels "com.docker.compose.project.working_dir" }}|{{ index .Config.Labels "com.docker.compose.project.config_files" }}|{{.State.Running}}|{{.State.Restarting}}{% endraw %}'
           - nginx-selfsteal
       register: existing_selfsteal_container
       changed_when: false
@@ -595,7 +596,10 @@
              existing_selfsteal_private_key_public_key.rc | default(1) == 0 and
              existing_selfsteal_certificate_public_key.stdout | default('') | length == 64 and
              existing_selfsteal_certificate_public_key.stdout | default('') ==
-             existing_selfsteal_private_key_public_key.stdout | default('') }}
+             existing_selfsteal_private_key_public_key.stdout | default('') and
+             existing_selfsteal_container.rc == 0 and
+             existing_selfsteal_container.stdout | trim ==
+             selfsteal_dir + '|' + selfsteal_dir + '/docker-compose.yml|true|false' }}
         selfsteal_marker_is_owned: >-
           {{ selfsteal_marker.stat.exists and
              selfsteal_marker_contents.content | default('') | b64decode | trim ==
@@ -603,9 +607,11 @@
         selfsteal_container_is_owned: >-
           {{ (existing_selfsteal_container.rc == 0 and
               (existing_selfsteal_container.stdout | trim ==
-               selfsteal_dir + '|' + selfsteal_dir + '/docker-compose.yml|true' or
+               selfsteal_dir + '|' + selfsteal_dir + '/docker-compose.yml|true|false' or
                existing_selfsteal_container.stdout | trim ==
-               selfsteal_dir + '|' + selfsteal_dir + '/docker-compose.yml|false')) or
+               selfsteal_dir + '|' + selfsteal_dir + '/docker-compose.yml|true|true' or
+               existing_selfsteal_container.stdout | trim ==
+               selfsteal_dir + '|' + selfsteal_dir + '/docker-compose.yml|false|false')) or
              existing_selfsteal_container_mounts.rc == 0 }}
         selfsteal_container_is_absent: >-
           {{ existing_docker_container_names.rc == 0 and
@@ -822,6 +828,24 @@
           - --quiet
       changed_when: false
 
+    - name: Stop an owned unstable SelfSteal container before recovery
+      ansible.builtin.command:
+        argv:
+          - docker
+          - compose
+          - --project-directory
+          - '{{ selfsteal_dir }}'
+          - down
+          - --remove-orphans
+      changed_when: true
+      when: selfsteal_is_resumable | bool
+
+    - name: Remove the stale SelfSteal Unix socket before recovery
+      ansible.builtin.file:
+        path: /dev/shm/nginx.sock
+        state: absent
+      when: selfsteal_is_resumable | bool
+
     - name: Start or reconcile SelfSteal
       ansible.builtin.command:
         argv:
@@ -835,9 +859,35 @@
       register: selfsteal_compose_up
       changed_when: >-
         selfsteal_install.changed | default(false) or
+        selfsteal_is_resumable | bool or
         'Created' in selfsteal_compose_up.stderr or
         'Recreated' in selfsteal_compose_up.stderr or
         'Started' in selfsteal_compose_up.stderr
+
+    - name: Wait for SelfSteal to remain stable
+      ansible.builtin.shell: |
+        stable_checks=0
+        last_state='unknown'
+        for attempt in $(seq 1 30); do
+          last_state="$(docker inspect --format \
+            '{% raw %}status={{.State.Status}} running={{.State.Running}} restarting={{.State.Restarting}} restarts={{.RestartCount}}{% endraw %}' \
+            nginx-selfsteal 2>&1 || true)"
+          if [[ "$last_state" == *'status=running running=true restarting=false'* ]]; then
+            stable_checks=$((stable_checks + 1))
+            if [ "$stable_checks" -ge 3 ]; then
+              exit 0
+            fi
+          else
+            stable_checks=0
+          fi
+          sleep 2
+        done
+        echo "SelfSteal did not remain stable: $last_state" >&2
+        docker logs --tail 100 nginx-selfsteal >&2 || true
+        exit 1
+      args:
+        executable: /bin/bash
+      changed_when: false
 
     - name: Wait for the node API and SelfSteal HTTP listener
       ansible.builtin.wait_for:
@@ -905,6 +955,21 @@
       changed_when: false
       failed_when: false
       when: not selfsteal_is_healthy | bool
+
+    - name: Determine whether the trusted certificate needs deployment
+      ansible.builtin.set_fact:
+        selfsteal_certificate_needs_deployment: >-
+          {{ existing_selfsteal_certificate_hostname.rc | default(1) != 0 or
+             existing_selfsteal_certificate_lifetime.rc | default(1) != 0 or
+             existing_selfsteal_certificate_subject.rc | default(1) != 0 or
+             existing_selfsteal_certificate_issuer.rc | default(1) != 0 or
+             (existing_selfsteal_certificate_subject.stdout | default('') | regex_replace('^subject=', '')) ==
+             (existing_selfsteal_certificate_issuer.stdout | default('') | regex_replace('^issuer=', '')) or
+             existing_selfsteal_certificate_public_key.rc | default(1) != 0 or
+             existing_selfsteal_private_key_public_key.rc | default(1) != 0 or
+             existing_selfsteal_certificate_public_key.stdout | default('') | length != 64 or
+             existing_selfsteal_certificate_public_key.stdout | default('') !=
+             existing_selfsteal_private_key_public_key.stdout | default('') }}
 
     - name: Issue the trusted SelfSteal certificate directly on port 443
       when:
@@ -1119,22 +1184,145 @@
         - selfsteal_direct_certificate_issue.rc | default(1) != 0
         - selfsteal_webroot_certificate_issue.rc | default(1) != 0
 
-    - name: Install the trusted SelfSteal certificate
-      ansible.builtin.command:
-        argv:
-          - /root/.acme.sh/acme.sh
-          - --install-cert
-          - --domain
-          - '{{ node_fqdn }}'
-          - --ecc
-          - --key-file
-          - '{{ selfsteal_dir }}/ssl/private.key'
-          - --fullchain-file
-          - '{{ selfsteal_dir }}/ssl/fullchain.crt'
-          - --reloadcmd
-          - docker exec nginx-selfsteal nginx -s reload
-      changed_when: true
-      when: not selfsteal_is_healthy | bool
+    - name: Deploy the trusted SelfSteal certificate from a validated staging area
+      when: selfsteal_certificate_needs_deployment | bool
+      block:
+        - name: Create the trusted certificate staging directory
+          ansible.builtin.file:
+            path: '{{ selfsteal_certificate_stage_dir }}'
+            state: directory
+            owner: root
+            group: root
+            mode: '0700'
+
+        - name: Stage the trusted certificate without reloading Nginx
+          ansible.builtin.command:
+            argv:
+              - /root/.acme.sh/acme.sh
+              - --install-cert
+              - --domain
+              - '{{ node_fqdn }}'
+              - --ecc
+              - --key-file
+              - '{{ selfsteal_certificate_stage_dir }}/private.key'
+              - --fullchain-file
+              - '{{ selfsteal_certificate_stage_dir }}/fullchain.crt'
+              - --reloadcmd
+              - /bin/true
+          changed_when: true
+          no_log: true
+
+        - name: Validate the staged certificate and private key
+          ansible.builtin.shell: >-
+            set -o pipefail &&
+            openssl x509 -in {{ (selfsteal_certificate_stage_dir + '/fullchain.crt') | quote }}
+            -noout -checkhost {{ node_fqdn | quote }} -checkend 86400 &&
+            test "$(openssl x509
+            -in {{ (selfsteal_certificate_stage_dir + '/fullchain.crt') | quote }}
+            -pubkey -noout | openssl pkey -pubin -outform DER | sha256sum | cut -d' ' -f1)" =
+            "$(openssl pkey
+            -in {{ (selfsteal_certificate_stage_dir + '/private.key') | quote }}
+            -pubout -outform DER | sha256sum | cut -d' ' -f1)" &&
+            test "$(openssl x509
+            -in {{ (selfsteal_certificate_stage_dir + '/fullchain.crt') | quote }}
+            -noout -subject -nameopt RFC2253 | sed 's/^subject=//')" !=
+            "$(openssl x509
+            -in {{ (selfsteal_certificate_stage_dir + '/fullchain.crt') | quote }}
+            -noout -issuer -nameopt RFC2253 | sed 's/^issuer=//')"
+          args:
+            executable: /bin/bash
+          changed_when: false
+          no_log: true
+
+        - name: Stop SelfSteal before replacing the certificate pair
+          ansible.builtin.command:
+            argv:
+              - docker
+              - compose
+              - --project-directory
+              - '{{ selfsteal_dir }}'
+              - down
+              - --remove-orphans
+          changed_when: true
+
+        - name: Remove the stale SelfSteal Unix socket before certificate deployment
+          ansible.builtin.file:
+            path: /dev/shm/nginx.sock
+            state: absent
+
+        - name: Install the staged SelfSteal certificate pair transactionally
+          ansible.builtin.shell: |
+            set -euo pipefail
+            live_key={{ (selfsteal_dir + '/ssl/private.key') | quote }}
+            live_cert={{ (selfsteal_dir + '/ssl/fullchain.crt') | quote }}
+            staged_key={{ (selfsteal_certificate_stage_dir + '/private.key') | quote }}
+            staged_cert={{ (selfsteal_certificate_stage_dir + '/fullchain.crt') | quote }}
+            previous_key={{ (selfsteal_certificate_stage_dir + '/previous.key') | quote }}
+            previous_cert={{ (selfsteal_certificate_stage_dir + '/previous.crt') | quote }}
+
+            install -o root -g root -m 0600 "$live_key" "$previous_key"
+            install -o root -g root -m 0644 "$live_cert" "$previous_cert"
+            restore_previous_pair() {
+              install -o root -g root -m 0600 "$previous_key" "$live_key" || true
+              install -o root -g root -m 0644 "$previous_cert" "$live_cert" || true
+            }
+            trap 'rc=$?; if [ "$rc" -ne 0 ]; then restore_previous_pair; fi; exit "$rc"' EXIT
+
+            install -o root -g root -m 0600 "$staged_key" "$live_key"
+            install -o root -g root -m 0644 "$staged_cert" "$live_cert"
+            test "$(openssl x509 -in "$live_cert" -pubkey -noout |
+              openssl pkey -pubin -outform DER | sha256sum | cut -d' ' -f1)" =
+              "$(openssl pkey -in "$live_key" -pubout -outform DER |
+              sha256sum | cut -d' ' -f1)"
+            trap - EXIT
+          args:
+            executable: /bin/bash
+          changed_when: true
+          no_log: true
+      always:
+        - name: Start SelfSteal after certificate deployment
+          ansible.builtin.command:
+            argv:
+              - docker
+              - compose
+              - --project-directory
+              - '{{ selfsteal_dir }}'
+              - up
+              - -d
+              - --remove-orphans
+          changed_when: true
+
+        - name: Remove the trusted certificate staging directory
+          ansible.builtin.file:
+            path: '{{ selfsteal_certificate_stage_dir }}'
+            state: absent
+          no_log: true
+
+        - name: Wait for SelfSteal after certificate deployment
+          ansible.builtin.shell: |
+            stable_checks=0
+            last_state='unknown'
+            for attempt in $(seq 1 30); do
+              last_state="$(docker inspect --format \
+                '{% raw %}status={{.State.Status}} running={{.State.Running}} restarting={{.State.Restarting}} restarts={{.RestartCount}}{% endraw %}' \
+                nginx-selfsteal 2>&1 || true)"
+              if [[ "$last_state" == *'status=running running=true restarting=false'* ]]; then
+                stable_checks=$((stable_checks + 1))
+                if [ "$stable_checks" -ge 3 ]; then
+                  docker exec nginx-selfsteal nginx -t
+                  exit 0
+                fi
+              else
+                stable_checks=0
+              fi
+              sleep 2
+            done
+            echo "SelfSteal did not recover after certificate deployment: $last_state" >&2
+            docker logs --tail 100 nginx-selfsteal >&2 || true
+            exit 1
+          args:
+            executable: /bin/bash
+          changed_when: false
 
     - name: Protect the installed SelfSteal private key
       ansible.builtin.file:

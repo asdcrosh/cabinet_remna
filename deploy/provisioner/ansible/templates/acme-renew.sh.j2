@@ -3,10 +3,14 @@ set -euo pipefail
 
 ACME_HOME=/root/.acme.sh
 DOMAIN={{ node_fqdn | quote }}
+SELFSTEAL_DIR={{ selfsteal_dir | quote }}
 INSTALLED_CERT={{ (selfsteal_dir + '/ssl/fullchain.crt') | quote }}
+INSTALLED_KEY={{ (selfsteal_dir + '/ssl/private.key') | quote }}
+STAGE_DIR=/run/selfsteal-cert-renew
 RENEW_BEFORE_SECONDS=$((30 * 24 * 60 * 60))
 ACME_TIMEOUT_SECONDS=300
 REMNANODE_WAS_RUNNING=false
+SELFSTEAL_NEEDS_START=false
 
 certificate_key_fingerprint() {
   openssl x509 -in "$1" -pubkey -noout 2>/dev/null \
@@ -14,7 +18,29 @@ certificate_key_fingerprint() {
     | sha256sum | cut -d' ' -f1
 }
 
+install_certificate_pair() {
+  install -o root -g root -m 0600 "$INSTALLED_KEY" "$STAGE_DIR/previous.key"
+  install -o root -g root -m 0644 "$INSTALLED_CERT" "$STAGE_DIR/previous.crt"
+  (
+    restore_previous_pair() {
+      install -o root -g root -m 0600 "$STAGE_DIR/previous.key" "$INSTALLED_KEY" || true
+      install -o root -g root -m 0644 "$STAGE_DIR/previous.crt" "$INSTALLED_CERT" || true
+    }
+    trap 'rc=$?; if [ "$rc" -ne 0 ]; then restore_previous_pair; fi; exit "$rc"' EXIT
+    install -o root -g root -m 0600 "$STAGE_DIR/private.key" "$INSTALLED_KEY"
+    install -o root -g root -m 0644 "$STAGE_DIR/fullchain.crt" "$INSTALLED_CERT"
+    test "$(certificate_key_fingerprint "$INSTALLED_CERT")" = \
+      "$(openssl pkey -in "$INSTALLED_KEY" -pubout -outform DER 2>/dev/null \
+        | sha256sum | cut -d' ' -f1)"
+    trap - EXIT
+  )
+}
+
 cleanup() {
+  rm -rf "$STAGE_DIR"
+  if [ "$SELFSTEAL_NEEDS_START" = true ]; then
+    docker compose --project-directory "$SELFSTEAL_DIR" up -d --remove-orphans >/dev/null 2>&1 || true
+  fi
   while iptables -t nat -C PREROUTING -p tcp --dport 443 -j REDIRECT --to-port 8443 2>/dev/null; do
     iptables -t nat -D PREROUTING -p tcp --dport 443 -j REDIRECT --to-port 8443 || true
   done
@@ -22,7 +48,7 @@ cleanup() {
     iptables -t nat -D OUTPUT -p tcp --dport 443 -o lo -j REDIRECT --to-port 8443 || true
   done
   if [ "$REMNANODE_WAS_RUNNING" = true ]; then
-    docker start remnanode >/dev/null
+    docker start remnanode >/dev/null 2>&1 || true
   fi
 }
 
@@ -84,7 +110,47 @@ else
     --webroot {{ (selfsteal_dir + '/html') | quote }} --server letsencrypt --force
 fi
 
+rm -rf "$STAGE_DIR"
+install -d -m 0700 "$STAGE_DIR"
+
 "$ACME_HOME/acme.sh" --install-cert --domain "$DOMAIN" "${ecc_flag[@]}" \
-  --key-file {{ (selfsteal_dir + '/ssl/private.key') | quote }} \
-  --fullchain-file {{ (selfsteal_dir + '/ssl/fullchain.crt') | quote }} \
-  --reloadcmd 'docker exec nginx-selfsteal nginx -t && docker exec nginx-selfsteal nginx -s reload'
+  --key-file "$STAGE_DIR/private.key" \
+  --fullchain-file "$STAGE_DIR/fullchain.crt" \
+  --reloadcmd /bin/true
+
+openssl x509 -in "$STAGE_DIR/fullchain.crt" -noout \
+  -checkhost "$DOMAIN" -checkend 86400 >/dev/null
+test "$(certificate_key_fingerprint "$STAGE_DIR/fullchain.crt")" = \
+  "$(openssl pkey -in "$STAGE_DIR/private.key" -pubout -outform DER 2>/dev/null \
+    | sha256sum | cut -d' ' -f1)"
+test "$(openssl x509 -in "$STAGE_DIR/fullchain.crt" -noout -subject -nameopt RFC2253 | sed 's/^subject=//')" != \
+  "$(openssl x509 -in "$STAGE_DIR/fullchain.crt" -noout -issuer -nameopt RFC2253 | sed 's/^issuer=//')"
+
+docker compose --project-directory "$SELFSTEAL_DIR" down --remove-orphans
+SELFSTEAL_NEEDS_START=true
+rm -f /dev/shm/nginx.sock
+install_certificate_pair
+docker compose --project-directory "$SELFSTEAL_DIR" up -d --remove-orphans
+SELFSTEAL_NEEDS_START=false
+
+stable_checks=0
+for attempt in $(seq 1 30); do
+  state="$(docker inspect --format \
+    '{% raw %}status={{.State.Status}} running={{.State.Running}} restarting={{.State.Restarting}}{% endraw %}' \
+    nginx-selfsteal 2>&1 || true)"
+  if [[ "$state" == *'status=running running=true restarting=false'* ]]; then
+    stable_checks=$((stable_checks + 1))
+    if [ "$stable_checks" -ge 3 ]; then
+      docker exec nginx-selfsteal nginx -t
+      rm -rf "$STAGE_DIR"
+      exit 0
+    fi
+  else
+    stable_checks=0
+  fi
+  sleep 2
+done
+
+echo "SelfSteal did not recover after certificate renewal: $state" >&2
+docker logs --tail 100 nginx-selfsteal >&2 || true
+exit 1
