@@ -530,6 +530,24 @@
       failed_when: false
       no_log: true
 
+    - name: Verify the mounts of the existing SelfSteal container
+      ansible.builtin.shell: |
+        set -o pipefail
+        mounts="$(
+          docker inspect --format \
+          '{% raw %}{{range .Mounts}}{{printf "%s|%s\n" .Source .Destination}}{{end}}{% endraw %}' \
+          nginx-selfsteal
+        )" &&
+        grep -Fx -- {{ (selfsteal_dir + '/nginx.conf|/etc/nginx/nginx.conf') | quote }} <<< "$mounts" &&
+        grep -Fx -- {{ (selfsteal_dir + '/conf.d|/etc/nginx/conf.d') | quote }} <<< "$mounts" &&
+        grep -Fx -- {{ (selfsteal_dir + '/ssl|/etc/nginx/ssl') | quote }} <<< "$mounts" &&
+        grep -Fx -- {{ (selfsteal_dir + '/html|/var/www/html') | quote }} <<< "$mounts"
+      args:
+        executable: /bin/bash
+      register: existing_selfsteal_container_mounts
+      changed_when: false
+      failed_when: false
+
     - name: Check the cabinet SelfSteal ownership marker
       ansible.builtin.stat:
         path: '{{ selfsteal_marker_path }}'
@@ -568,12 +586,12 @@
              selfsteal_marker_contents.content | default('') | b64decode | trim ==
              provisioning_job_id + ' ' + node_fqdn + ' ' + selfsteal_script_sha256 }}
         selfsteal_container_is_owned: >-
-          {{ existing_selfsteal_container.rc == 0 and
-             existing_selfsteal_container.stdout | trim ==
-             selfsteal_dir + '|' + selfsteal_dir + '/docker-compose.yml|true' or
-             existing_selfsteal_container.rc == 0 and
-             existing_selfsteal_container.stdout | trim ==
-             selfsteal_dir + '|' + selfsteal_dir + '/docker-compose.yml|false' }}
+          {{ (existing_selfsteal_container.rc == 0 and
+              (existing_selfsteal_container.stdout | trim ==
+               selfsteal_dir + '|' + selfsteal_dir + '/docker-compose.yml|true' or
+               existing_selfsteal_container.stdout | trim ==
+               selfsteal_dir + '|' + selfsteal_dir + '/docker-compose.yml|false')) or
+             existing_selfsteal_container_mounts.rc == 0 }}
         selfsteal_container_is_absent: >-
           {{ existing_selfsteal_container.rc == 1 and
              existing_selfsteal_container.stderr | default('') is search('No such object') }}
@@ -595,6 +613,12 @@
         fail_msg: >-
           Existing SelfSteal is unhealthy but cannot be safely attributed to this job.
           It was left untouched; inspect {{ selfsteal_dir }} manually.
+          Docker inspect rc={{ existing_selfsteal_container.rc }},
+          labels={{ existing_selfsteal_container.stdout | default('') | trim | quote }},
+          inspect error={{ existing_selfsteal_container.stderr | default('') | trim | quote }},
+          expected mounts={{ existing_selfsteal_container_mounts.rc == 0 }},
+          configured domain matches={{ selfsteal_configured_domain.stdout | trim == node_fqdn }},
+          container domain matches={{ selfsteal_container_domain_matches | bool }}.
 
     - name: Remove the attributed incomplete SelfSteal container before recovery
       ansible.builtin.command:
