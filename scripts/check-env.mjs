@@ -101,6 +101,10 @@ const optionalSampleRates = [
 
 const errors = [];
 const warnings = [];
+const provisioningEnabled = value("COMPOSE_PROFILES")
+  .split(",")
+  .map((profile) => profile.trim())
+  .includes("provisioning");
 
 for (const key of requiredAlways) {
   if (!value(key)) errors.push(`${key} is required`);
@@ -141,6 +145,41 @@ if (
   !/^(?=.{4,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/i.test(value("NODE_PROVISIONING_BASE_DOMAIN"))
 ) {
   errors.push("NODE_PROVISIONING_BASE_DOMAIN must be a valid base domain");
+}
+
+if (provisioningEnabled) {
+  const requiredProvisioning = [
+    "TIMEWEB_API_TOKEN",
+    "NODE_PROVISIONING_BASE_DOMAIN",
+    "NODE_PROVISIONING_ENCRYPTION_KEY",
+    "NODE_PROVISIONING_PANEL_IP",
+    "NODE_PROVISIONING_ADMIN_EMAIL",
+    "NODE_PROVISIONING_REMNANODE_IMAGE",
+  ];
+  for (const key of requiredProvisioning) {
+    if (!value(key)) errors.push(`${key} is required when provisioning profile is enabled`);
+  }
+  for (const key of ["TIMEWEB_API_TOKEN", "REMNAWAVE_TOKEN"]) {
+    if (value(key) && !isSafeEnvToken(value(key))) {
+      errors.push(`${key} contains unsupported characters`);
+    }
+  }
+  if (value("NODE_PROVISIONING_PANEL_IP") && !isPublicIpv4(value("NODE_PROVISIONING_PANEL_IP"))) {
+    errors.push("NODE_PROVISIONING_PANEL_IP must be a public IPv4 address");
+  }
+  if (
+    value("NODE_PROVISIONING_ADMIN_EMAIL") &&
+    !/^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,63}$/.test(value("NODE_PROVISIONING_ADMIN_EMAIL"))
+  ) {
+    errors.push("NODE_PROVISIONING_ADMIN_EMAIL must be a valid email");
+  }
+  const nodeImage = value("NODE_PROVISIONING_REMNANODE_IMAGE");
+  if (
+    nodeImage &&
+    (nodeImage.endsWith(":latest") || (!nodeImage.includes("@sha256:") && !/^.+:[^/:]+$/.test(nodeImage)))
+  ) {
+    errors.push("NODE_PROVISIONING_REMNANODE_IMAGE must use a non-latest tag or digest");
+  }
 }
 
 if (value("BONUS_BOX_RISK_SALT") && value("BONUS_BOX_RISK_SALT").length < 32) {
@@ -332,6 +371,10 @@ function value(key) {
   return (process.env[key] || "").trim();
 }
 
+function isSafeEnvToken(input) {
+  return input.length >= 8 && !/[\s"'\\$]/.test(input);
+}
+
 function loadEnvFile(file) {
   if (!existsSync(file)) return;
 
@@ -412,4 +455,23 @@ function checkAllowedOrigins() {
       errors.push(`ALLOWED_ORIGINS must use https in production: ${origin}`);
     }
   }
+}
+
+function isPublicIpv4(input) {
+  const parts = input.split(".");
+  if (parts.length !== 4 || parts.some((part) => !/^\d{1,3}$/.test(part))) return false;
+  const octets = parts.map(Number);
+  if (octets.some((octet) => octet < 0 || octet > 255)) return false;
+  if (parts.some((part, index) => String(octets[index]) !== part)) return false;
+  const [a, b, c] = octets;
+  if (a === 0 || a === 10 || a === 127 || a >= 224) return false;
+  if (a === 100 && b >= 64 && b <= 127) return false;
+  if (a === 169 && b === 254) return false;
+  if (a === 172 && b >= 16 && b <= 31) return false;
+  if (a === 192 && b === 168) return false;
+  if (a === 192 && b === 0 && [0, 2].includes(c)) return false;
+  if (a === 198 && [18, 19].includes(b)) return false;
+  if (a === 198 && b === 51 && c === 100) return false;
+  if (a === 203 && b === 0 && c === 113) return false;
+  return true;
 }

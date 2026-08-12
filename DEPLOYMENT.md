@@ -16,12 +16,14 @@ CABINET_IMAGE="ghcr.io/asdcrosh/cabinet_remna:latest"
 
 ## Build and publish
 
-`.github/workflows/docker-image.yml` publishes one Docker target to GitHub
+`.github/workflows/docker-image.yml` publishes two Docker targets to GitHub
 Container Registry on every push to `main`, on version tags, and on manual
 workflow dispatch:
 
 - `release` → `CABINET_IMAGE`, Next.js runner plus compact bundled workers,
   migrations, seed and env check.
+- `provisioner` → `CABINET_PROVISIONER_IMAGE`, isolated Ansible/SSH worker for
+  one-click node installation.
 
 Make sure the GHCR package is public, or run `docker login ghcr.io` on the
 server before deploying.
@@ -52,11 +54,13 @@ The installer will:
 - download `docker-compose.yml`
 - create `.env`
 - generate `POSTGRES_PASSWORD`, `JWT_SECRET`, `HEALTHCHECK_TOKEN`, and
-  `BROADCAST_UPLOAD_SIGNING_SECRET`
+  `BROADCAST_UPLOAD_SIGNING_SECRET`, plus the node-provisioning encryption key
 - ask for missing production values
 - create `CABINET_EXTERNAL_NETWORK` if it is missing
 - deploy automatically after required values are filled
 - ask for the first administrator email and password after services start
+- configure node provisioning in the same `.env`; when its two new required
+  values are missing, the worker stays disabled and the cabinet still starts
 
 For non-interactive install, pass `SUPERUSER_EMAIL` and `SUPERUSER_PASSWORD` to the installer.
 
@@ -76,6 +80,28 @@ Fill real production values:
 - `YOOKASSA_SECRET_KEY`
 
 Use only production YooKassa keys. Do not deploy `test_...` keys.
+
+## One-click node provisioning
+
+Provisioning uses the same `/opt/remnawave-cabinet/.env` as the cabinet. There
+is no second `.env.provisioner` file. Compose exposes the Timeweb token only to
+the provisioning worker. Run:
+
+```bash
+cabinetctl provisioning
+```
+
+Normally the wizard asks only for:
+
+- `TIMEWEB_API_TOKEN`
+- `NODE_PROVISIONING_BASE_DOMAIN`, for example `vpn.example.com`
+
+It reuses the existing Remnawave URL/token, generates the encryption key,
+detects the panel public IP when the panel domain resolves to this server,
+reuses the configured support email, fills pinned images/timeouts, validates
+both APIs with read-only requests, enables the
+`provisioning` Compose profile and starts the worker. TCP and XHTTP template
+hosts are selected in the admin page and do not have to be added to `.env`.
 
 `APP_URL`, `ALLOWED_ORIGINS`, and `YOOKASSA_WEBHOOK_URL` must point to the
 public HTTPS cabinet origin:

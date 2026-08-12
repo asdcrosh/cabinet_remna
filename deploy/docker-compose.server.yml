@@ -7,6 +7,9 @@ services:
     restart: unless-stopped
     env_file:
       - ${CABINET_ENV_FILE:-.env}
+    environment:
+      NODE_PROVISIONING_ENCRYPTION_KEY: ""
+      TIMEWEB_API_TOKEN: ""
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
@@ -35,6 +38,9 @@ services:
     command: ["node", "node_modules/prisma/build/index.js", "migrate", "deploy"]
     env_file:
       - ${CABINET_ENV_FILE:-.env}
+    environment:
+      NODE_PROVISIONING_ENCRYPTION_KEY: ""
+      TIMEWEB_API_TOKEN: ""
     depends_on:
       check-env:
         condition: service_completed_successfully
@@ -53,6 +59,9 @@ services:
     command: ["node", "ops/seed.js"]
     env_file:
       - ${CABINET_ENV_FILE:-.env}
+    environment:
+      NODE_PROVISIONING_ENCRYPTION_KEY: ""
+      TIMEWEB_API_TOKEN: ""
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -72,6 +81,7 @@ services:
     environment:
       APP_IMAGE_REFERENCE: ${CABINET_IMAGE:-ghcr.io/asdcrosh/cabinet_remna:latest}
       DEPLOY_STATE_FILE: /run/cabinet-state/deployment.json
+      TIMEWEB_API_TOKEN: ""
     depends_on:
       seed:
         condition: service_completed_successfully
@@ -108,6 +118,9 @@ services:
     restart: unless-stopped
     env_file:
       - ${CABINET_ENV_FILE:-.env}
+    environment:
+      NODE_PROVISIONING_ENCRYPTION_KEY: ""
+      TIMEWEB_API_TOKEN: ""
     depends_on:
       seed:
         condition: service_completed_successfully
@@ -134,6 +147,9 @@ services:
     restart: unless-stopped
     env_file:
       - ${CABINET_ENV_FILE:-.env}
+    environment:
+      NODE_PROVISIONING_ENCRYPTION_KEY: ""
+      TIMEWEB_API_TOKEN: ""
     depends_on:
       seed:
         condition: service_completed_successfully
@@ -160,6 +176,9 @@ services:
     restart: unless-stopped
     env_file:
       - ${CABINET_ENV_FILE:-.env}
+    environment:
+      NODE_PROVISIONING_ENCRYPTION_KEY: ""
+      TIMEWEB_API_TOKEN: ""
     depends_on:
       seed:
         condition: service_completed_successfully
@@ -186,8 +205,25 @@ services:
     restart: unless-stopped
     profiles:
       - provisioning
-    env_file:
-      - ${CABINET_PROVISIONER_ENV_FILE:-.env.provisioner}
+    environment:
+      NODE_ENV: production
+      APP_LOG_LEVEL: ${APP_LOG_LEVEL:-info}
+      DATABASE_URL: ${DATABASE_URL}
+      TIMEWEB_API_TOKEN: ${TIMEWEB_API_TOKEN:-}
+      REMNAWAVE_BASE_URL: ${REMNAWAVE_BASE_URL}
+      REMNAWAVE_TOKEN: ${REMNAWAVE_TOKEN}
+      NODE_PROVISIONING_BASE_DOMAIN: ${NODE_PROVISIONING_BASE_DOMAIN:-}
+      NODE_PROVISIONING_ENCRYPTION_KEY: ${NODE_PROVISIONING_ENCRYPTION_KEY:-}
+      NODE_PROVISIONING_COUNTRY_CODE: ${NODE_PROVISIONING_COUNTRY_CODE:-XX}
+      NODE_PROVISIONING_PANEL_IP: ${NODE_PROVISIONING_PANEL_IP:-}
+      NODE_PROVISIONING_ADMIN_EMAIL: ${NODE_PROVISIONING_ADMIN_EMAIL:-}
+      NODE_PROVISIONING_REMNANODE_IMAGE: ${NODE_PROVISIONING_REMNANODE_IMAGE:-}
+      NODE_PROVISIONING_WORKER_INTERVAL_SECONDS: ${NODE_PROVISIONING_WORKER_INTERVAL_SECONDS:-5}
+      NODE_PROVISIONING_WORKER_HEARTBEAT_MAX_AGE_SECONDS: ${NODE_PROVISIONING_WORKER_HEARTBEAT_MAX_AGE_SECONDS:-180}
+      NODE_PROVISIONING_DNS_TIMEOUT_SECONDS: ${NODE_PROVISIONING_DNS_TIMEOUT_SECONDS:-300}
+      NODE_PROVISIONING_CONNECT_TIMEOUT_SECONDS: ${NODE_PROVISIONING_CONNECT_TIMEOUT_SECONDS:-300}
+      NODE_PROVISIONING_ANSIBLE_PLAYBOOK: ${NODE_PROVISIONING_ANSIBLE_PLAYBOOK:-/app/deploy/provisioner/provision-remnanode.yml}
+      NODE_PROVISIONING_ANSIBLE_TIMEOUT_SECONDS: ${NODE_PROVISIONING_ANSIBLE_TIMEOUT_SECONDS:-1800}
     depends_on:
       seed:
         condition: service_completed_successfully
@@ -227,6 +263,9 @@ services:
       - maintenance
     env_file:
       - ${CABINET_ENV_FILE:-.env}
+    environment:
+      NODE_PROVISIONING_ENCRYPTION_KEY: ""
+      TIMEWEB_API_TOKEN: ""
     depends_on:
       seed:
         condition: service_completed_successfully
@@ -241,6 +280,9 @@ services:
       - caddy
     env_file:
       - ${CABINET_ENV_FILE:-.env}
+    environment:
+      NODE_PROVISIONING_ENCRYPTION_KEY: ""
+      TIMEWEB_API_TOKEN: ""
     command:
       - caddy
       - reverse-proxy

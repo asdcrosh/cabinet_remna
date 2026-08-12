@@ -6,11 +6,16 @@ import { recordWorkerHeartbeat } from '../src/lib/worker-health'
 import { isPublicIpv4 } from '../src/lib/node-provisioning-validation'
 
 const intervalSeconds = positiveInteger(process.env.NODE_PROVISIONING_WORKER_INTERVAL_SECONDS, 10)
+const heartbeatMaxAgeSeconds = positiveInteger(process.env.NODE_PROVISIONING_WORKER_HEARTBEAT_MAX_AGE_SECONDS, 180)
+const heartbeatIntervalMs = Math.max(15, Math.min(60, Math.floor(heartbeatMaxAgeSeconds / 3))) * 1000
 let stopRequested = false
+let heartbeatTimer: NodeJS.Timeout | null = null
+let heartbeatInFlight = false
 
 async function main() {
   validateWorkerConfiguration()
   bindShutdown()
+  startHeartbeatLoop()
   logInfo('node_provisioning_worker.started', { intervalSeconds })
   while (!stopRequested) {
     await heartbeat()
@@ -46,7 +51,7 @@ function validateWorkerConfiguration() {
   if (!isPublicIpv4(process.env.NODE_PROVISIONING_PANEL_IP!.trim())) {
     throw new Error('NODE_PROVISIONING_PANEL_IP must be a public IPv4 address')
   }
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(process.env.NODE_PROVISIONING_ADMIN_EMAIL!.trim())) {
+  if (!/^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,63}$/.test(process.env.NODE_PROVISIONING_ADMIN_EMAIL!.trim())) {
     throw new Error('NODE_PROVISIONING_ADMIN_EMAIL must be a valid email')
   }
   const image = process.env.NODE_PROVISIONING_REMNANODE_IMAGE!.trim()
@@ -58,16 +63,30 @@ function validateWorkerConfiguration() {
 }
 
 async function heartbeat() {
-  await Promise.allSettled([
-    writeFile('/tmp/node-provisioning-worker-heartbeat', new Date().toISOString(), 'utf8'),
-    recordWorkerHeartbeat('node-provisioning', Math.max(90, intervalSeconds * 4)),
-  ])
+  if (heartbeatInFlight) return
+  heartbeatInFlight = true
+  try {
+    await Promise.allSettled([
+      writeFile('/tmp/node-provisioning-worker-heartbeat', new Date().toISOString(), 'utf8'),
+      recordWorkerHeartbeat('node-provisioning', heartbeatMaxAgeSeconds),
+    ])
+  } finally {
+    heartbeatInFlight = false
+  }
+}
+
+function startHeartbeatLoop() {
+  heartbeatTimer = setInterval(() => {
+    void heartbeat()
+  }, heartbeatIntervalMs)
+  heartbeatTimer.unref()
 }
 
 function bindShutdown() {
   const stop = (signal: NodeJS.Signals) => {
     if (stopRequested) return
     stopRequested = true
+    if (heartbeatTimer) clearInterval(heartbeatTimer)
     logInfo('node_provisioning_worker.shutdown_requested', { signal })
   }
   process.once('SIGTERM', stop)

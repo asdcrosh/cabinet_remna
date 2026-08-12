@@ -20,6 +20,9 @@ FULL_BACKUP_URL="${FULL_BACKUP_URL:-${RAW_BASE_URL}/deploy/full-stack-backup.sh}
 FULL_BACKUP_PATH="${FULL_BACKUP_PATH:-/usr/local/bin/remna-backup}"
 FULL_BACKUP_TEMP="${FULL_BACKUP_PATH}.tmp"
 ENV_TEMPLATE_TEMP="${INSTALL_DIR}/.env.template.tmp"
+NODE_PROVISIONING_CONFIG_URL="${NODE_PROVISIONING_CONFIG_URL:-${RAW_BASE_URL}/deploy/configure-node-provisioning.sh}"
+NODE_PROVISIONING_CONFIG_PATH="${NODE_PROVISIONING_CONFIG_PATH:-/usr/local/bin/cabinet-node-provisioning}"
+NODE_PROVISIONING_CONFIG_TEMP="${NODE_PROVISIONING_CONFIG_PATH}.tmp"
 
 if [[ "$(id -u)" -ne 0 ]]; then
   echo "Run as root or with sudo:"
@@ -482,7 +485,7 @@ import secrets
 path = Path(os.environ["ENV_FILE_PATH"])
 template_path = Path(os.environ["ENV_TEMPLATE_PATH"])
 original_lines = path.read_text().splitlines()
-obsolete = {"CABINET_OPS_IMAGE", "CABINET_PULL_POLICY"}
+obsolete = {"CABINET_OPS_IMAGE", "CABINET_PULL_POLICY", "CABINET_PROVISIONER_ENV_FILE"}
 assignment = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)=(.*)$")
 lines = []
 existing = {}
@@ -502,6 +505,7 @@ generated_secrets = {
     "BROADCAST_UPLOAD_SIGNING_SECRET",
     "EMAIL_VERIFICATION_WEBHOOK_SECRET",
     "REMNASHOP_WEBHOOK_SECRET",
+    "NODE_PROVISIONING_ENCRYPTION_KEY",
 }
 additions = []
 added_keys = []
@@ -544,9 +548,21 @@ rm -f "${CABINETCTL_TEMP}"
 curl -fsSL "${FULL_BACKUP_URL}" -o "${FULL_BACKUP_TEMP}"
 install -m 755 "${FULL_BACKUP_TEMP}" "${FULL_BACKUP_PATH}"
 rm -f "${FULL_BACKUP_TEMP}"
+curl -fsSL "${NODE_PROVISIONING_CONFIG_URL}" -o "${NODE_PROVISIONING_CONFIG_TEMP}"
+bash -n "${NODE_PROVISIONING_CONFIG_TEMP}"
+install -m 755 "${NODE_PROVISIONING_CONFIG_TEMP}" "${NODE_PROVISIONING_CONFIG_PATH}"
+rm -f "${NODE_PROVISIONING_CONFIG_TEMP}"
 rm -f /usr/local/bin/remnactl
 configure_remnashop_link_function
 disable_bundled_caddy_if_conflicting || true
+
+ENV_FILE="${ENV_FILE}" \
+COMPOSE_FILE="${COMPOSE_FILE}" \
+NODE_PROVISIONING_INTERACTIVE="false" \
+NODE_PROVISIONING_START="false" \
+NODE_PROVISIONING_VALIDATE_APIS="false" \
+NODE_PROVISIONING_API_FAILURE_FATAL="false" \
+"${NODE_PROVISIONING_CONFIG_PATH}"
 
 COMPOSE=(docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}")
 
@@ -585,8 +601,11 @@ write_deployment_state "deploying" "Миграции применены. Про�
 # already-running container. Recreate runtime services explicitly so the
 # update always starts the image that was just pulled without touching the DB.
 echo "Recreating runtime services from the pulled image..."
-CABINET_ENV_FILE="${ENV_FILE}" "${COMPOSE[@]}" up -d --no-deps --force-recreate \
-  app worker broadcast-worker watch-worker
+runtime_services=(app worker broadcast-worker watch-worker)
+if [[ ",$(read_update_env_value COMPOSE_PROFILES | tr -d ' ')," == *",provisioning,"* ]]; then
+  runtime_services+=(node-provisioning-worker)
+fi
+CABINET_ENV_FILE="${ENV_FILE}" "${COMPOSE[@]}" up -d --no-deps --force-recreate "${runtime_services[@]}"
 
 wait_for_container() {
   local service="$1"
@@ -784,6 +803,9 @@ wait_for_container app 60
 wait_for_container worker 60
 wait_for_container broadcast-worker 60
 wait_for_container watch-worker 60
+if [[ " ${runtime_services[*]} " == *" node-provisioning-worker "* ]]; then
+  wait_for_container node-provisioning-worker 60
+fi
 
 CABINET_APP_BIND="$(env_value CABINET_APP_BIND)"
 CABINET_APP_PORT="$(env_value CABINET_APP_PORT)"

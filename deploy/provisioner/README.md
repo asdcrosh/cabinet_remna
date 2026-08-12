@@ -1,5 +1,10 @@
 # Node provisioner assets
 
+The cabinet and this worker share the single server `.env`. Configure it with
+`cabinetctl provisioning`; do not create a separate `.env.provisioner`.
+Compose passes a strict allowlist from that file to the provisioner and masks
+the Timeweb token from all other long-lived services.
+
 The worker runs the static `provision-remnanode.yml` through Ansible with a
 job-scoped inventory and SSH `known_hosts` file. Never disable host-key checking
 or persist the submitted SSH password in the runner artifact directory.

@@ -21,6 +21,9 @@ CABINETCTL_TEMP="${CABINETCTL_PATH}.tmp"
 FULL_BACKUP_URL="${FULL_BACKUP_URL:-${RAW_BASE_URL}/deploy/full-stack-backup.sh}"
 FULL_BACKUP_PATH="${FULL_BACKUP_PATH:-/usr/local/bin/remna-backup}"
 FULL_BACKUP_TEMP="${FULL_BACKUP_PATH}.tmp"
+NODE_PROVISIONING_CONFIG_URL="${NODE_PROVISIONING_CONFIG_URL:-${RAW_BASE_URL}/deploy/configure-node-provisioning.sh}"
+NODE_PROVISIONING_CONFIG_PATH="${NODE_PROVISIONING_CONFIG_PATH:-/usr/local/bin/cabinet-node-provisioning}"
+NODE_PROVISIONING_CONFIG_TEMP="${NODE_PROVISIONING_CONFIG_PATH}.tmp"
 
 if [[ "$(id -u)" -ne 0 ]]; then
   echo "Run as root or with sudo:"
@@ -89,6 +92,10 @@ rm -f "${CABINETCTL_TEMP}"
 curl -fsSL "${FULL_BACKUP_URL}" -o "${FULL_BACKUP_TEMP}"
 install -m 755 "${FULL_BACKUP_TEMP}" "${FULL_BACKUP_PATH}"
 rm -f "${FULL_BACKUP_TEMP}"
+curl -fsSL "${NODE_PROVISIONING_CONFIG_URL}" -o "${NODE_PROVISIONING_CONFIG_TEMP}"
+bash -n "${NODE_PROVISIONING_CONFIG_TEMP}"
+install -m 755 "${NODE_PROVISIONING_CONFIG_TEMP}" "${NODE_PROVISIONING_CONFIG_PATH}"
+rm -f "${NODE_PROVISIONING_CONFIG_TEMP}"
 rm -f /usr/local/bin/remnactl
 
 if [[ ! -f "${ENV_FILE}" ]]; then
@@ -175,7 +182,7 @@ for line in path.read_text().splitlines():
     stripped = line.strip()
     if not stripped or stripped.startswith("#") or "=" not in stripped:
         continue
-    _key, value = stripped.split("=", 1)
+    _, value = stripped.split("=", 1)
     if any(marker in value for marker in markers):
         sys.exit(0)
 sys.exit(1)
@@ -704,6 +711,7 @@ JWT_SECRET_VALUE="${JWT_SECRET:-$(existing_or_random_hex JWT_SECRET 32)}"
 HEALTHCHECK_TOKEN_VALUE="${HEALTHCHECK_TOKEN:-$(existing_or_random_hex HEALTHCHECK_TOKEN 32)}"
 BROADCAST_UPLOAD_SIGNING_SECRET_VALUE="${BROADCAST_UPLOAD_SIGNING_SECRET:-$(existing_or_random_hex BROADCAST_UPLOAD_SIGNING_SECRET 32)}"
 REMNASHOP_WEBHOOK_SECRET_VALUE="${REMNASHOP_WEBHOOK_SECRET:-$(existing_or_random_hex REMNASHOP_WEBHOOK_SECRET 32)}"
+NODE_PROVISIONING_ENCRYPTION_KEY_VALUE="${NODE_PROVISIONING_ENCRYPTION_KEY:-$(existing_or_random_hex NODE_PROVISIONING_ENCRYPTION_KEY 32)}"
 
 replace_env_value "CABINET_DOMAIN" "${CABINET_DOMAIN}"
 if [[ -n "${CABINET_BRAND_NAME:-}" ]]; then
@@ -721,6 +729,7 @@ replace_env_value "HEALTHCHECK_TOKEN" "${HEALTHCHECK_TOKEN_VALUE}"
 replace_env_value "BROADCAST_UPLOAD_SIGNING_SECRET" "${BROADCAST_UPLOAD_SIGNING_SECRET_VALUE}"
 replace_env_value "BROADCAST_UPLOAD_ALLOW_UNSIGNED_LEGACY" "false"
 replace_env_value "REMNASHOP_WEBHOOK_SECRET" "${REMNASHOP_WEBHOOK_SECRET_VALUE}"
+replace_env_value "NODE_PROVISIONING_ENCRYPTION_KEY" "${NODE_PROVISIONING_ENCRYPTION_KEY_VALUE}"
 if [[ -n "${APP_LOG_LEVEL:-}" ]]; then
   replace_env_value "APP_LOG_LEVEL" "${APP_LOG_LEVEL}"
 elif ! env_key_exists "APP_LOG_LEVEL"; then
@@ -788,6 +797,12 @@ for key in \
   REMNAWAVE_BASE_URL \
   REMNAWAVE_TOKEN \
   REMNAWAVE_INTERNAL_SQUAD_UUIDS \
+  TIMEWEB_API_TOKEN \
+  NODE_PROVISIONING_BASE_DOMAIN \
+  NODE_PROVISIONING_PANEL_IP \
+  NODE_PROVISIONING_ADMIN_EMAIL \
+  NODE_PROVISIONING_COUNTRY_CODE \
+  NODE_PROVISIONING_REMNANODE_IMAGE \
   REMNASHOP_DB_CONTAINER \
   REMNASHOP_CRYPT_KEY \
   REMNASHOP_REDIS_URL \
@@ -841,6 +856,13 @@ fi
 prompt_required_config
 normalize_url_env "REMNAWAVE_BASE_URL" "https"
 configure_local_remnashop_database
+ENV_FILE="${ENV_FILE}" \
+COMPOSE_FILE="${COMPOSE_FILE}" \
+NODE_PROVISIONING_INTERACTIVE="true" \
+NODE_PROVISIONING_START="false" \
+NODE_PROVISIONING_VALIDATE_APIS="true" \
+NODE_PROVISIONING_API_FAILURE_FATAL="false" \
+"${NODE_PROVISIONING_CONFIG_PATH}"
 
 EXTERNAL_NETWORK="$(read_env_value CABINET_EXTERNAL_NETWORK || true)"
 EXTERNAL_NETWORK="${EXTERNAL_NETWORK:-remnawave-network}"
@@ -930,3 +952,4 @@ echo "  cd ${INSTALL_DIR} && docker compose --env-file .env -f docker-compose.ym
 echo "  cd ${INSTALL_DIR} && docker compose --env-file .env -f docker-compose.yml logs -f app"
 echo "  cd ${INSTALL_DIR} && docker compose --env-file .env -f docker-compose.yml logs -f worker"
 echo "  cd ${INSTALL_DIR} && docker compose --env-file .env -f docker-compose.yml logs -f watch-worker"
+echo "  cabinetctl provisioning"

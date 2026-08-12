@@ -34,6 +34,8 @@ The installer will:
 - download `/opt/remnawave-cabinet/docker-compose.yml`
 - create `/opt/remnawave-cabinet/.env`
 - generate database password, `JWT_SECRET`, and `HEALTHCHECK_TOKEN`
+- generate the node-provisioning encryption key and keep all settings in the
+  same `.env`
 - ask for missing production values
 - create `CABINET_EXTERNAL_NETWORK` if it is missing
 - deploy automatically after required production values are filled
@@ -42,6 +44,16 @@ The installer will:
 This pulls the published image, starts PostgreSQL, validates `.env`, runs Prisma
 migrations, creates starter plans if the database is empty, starts the app, and
 starts the payment worker. After that it creates or updates the first admin user.
+
+Configure the node worker without editing a second env file:
+
+```bash
+cabinetctl provisioning
+```
+
+The wizard normally needs only the Timeweb token and base node domain. It
+detects/reuses the remaining settings, verifies provider credentials, enables
+the `provisioning` profile and starts the worker.
 
 ## 3. Required environment
 

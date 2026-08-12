@@ -52,7 +52,7 @@ export async function runNodeAnsible(
     const panelIp = requiredEnv('NODE_PROVISIONING_PANEL_IP')
     if (!isPublicIpv4(panelIp)) throw new Error('NODE_PROVISIONING_PANEL_IP must be a public IPv4 address')
     const adminEmail = requiredEnv('NODE_PROVISIONING_ADMIN_EMAIL')
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(adminEmail)) {
+    if (!/^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,63}$/.test(adminEmail)) {
       throw new Error('NODE_PROVISIONING_ADMIN_EMAIL must be a valid email')
     }
     await writeSecure(varsPath, JSON.stringify({

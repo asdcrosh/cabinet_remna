@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="1.6.0"
+VERSION="1.7.0"
 BRANCH="${BRANCH:-main}"
 RAW_BASE_URL="${RAW_BASE_URL:-https://raw.githubusercontent.com/asdcrosh/cabinet_remna/${BRANCH}}"
 GITHUB_API_URL="${GITHUB_API_URL:-https://api.github.com/repos/asdcrosh/cabinet_remna/commits/${BRANCH}}"
@@ -11,9 +11,11 @@ UPDATE_URL="${UPDATE_URL:-${RAW_BASE_URL}/deploy/update-server.sh}"
 NGINX_SETUP_URL="${NGINX_SETUP_URL:-${RAW_BASE_URL}/deploy/setup-nginx-proxy.sh}"
 CONSOLE_INSTALL_URL="${CONSOLE_INSTALL_URL:-${RAW_BASE_URL}/deploy/install-console.sh}"
 BACKUP_SCRIPT_URL="${BACKUP_SCRIPT_URL:-${RAW_BASE_URL}/deploy/full-stack-backup.sh}"
+NODE_PROVISIONING_CONFIG_URL="${NODE_PROVISIONING_CONFIG_URL:-${RAW_BASE_URL}/deploy/configure-node-provisioning.sh}"
 ENV_TEMPLATE_URL="${ENV_TEMPLATE_URL:-${RAW_BASE_URL}/deploy/env.production.example}"
 CABINETCTL_PATH="${CABINETCTL_PATH:-/usr/local/bin/cabinetctl}"
 BACKUP_SCRIPT_PATH="${BACKUP_SCRIPT_PATH:-/usr/local/bin/remna-backup}"
+NODE_PROVISIONING_CONFIG_PATH="${NODE_PROVISIONING_CONFIG_PATH:-/usr/local/bin/cabinet-node-provisioning}"
 CABINET_DIR="${INSTALL_DIR:-/opt/remnawave-cabinet}"
 CABINET_ENV="${CABINET_DIR}/.env"
 CABINET_COMPOSE="${CABINET_DIR}/docker-compose.yml"
@@ -186,7 +188,7 @@ import secrets
 env_path = Path(os.environ["ENV_FILE_PATH"])
 template_path = Path(os.environ["ENV_TEMPLATE_PATH"])
 original_lines = env_path.read_text().splitlines()
-obsolete = {"CABINET_OPS_IMAGE", "CABINET_PULL_POLICY"}
+obsolete = {"CABINET_OPS_IMAGE", "CABINET_PULL_POLICY", "CABINET_PROVISIONER_ENV_FILE"}
 lines = []
 existing = {}
 
@@ -206,6 +208,7 @@ generated_secrets = {
     "HEALTHCHECK_TOKEN",
     "BROADCAST_UPLOAD_SIGNING_SECRET",
     "EMAIL_VERIFICATION_WEBHOOK_SECRET",
+    "NODE_PROVISIONING_ENCRYPTION_KEY",
 }
 additions = []
 added_keys = []
@@ -508,6 +511,13 @@ ensure_backup_command() {
   fi
 }
 
+ensure_node_provisioning_command() {
+  if [[ ! -x "${NODE_PROVISIONING_CONFIG_PATH}" ]]; then
+    info "Устанавливаем мастер настройки нод..."
+    download_executable "${NODE_PROVISIONING_CONFIG_URL}" "${NODE_PROVISIONING_CONFIG_PATH}"
+  fi
+}
+
 cabinet_compose() {
   cabinet_installed || {
     fail "Кабинет ещё не установлен."
@@ -537,6 +547,26 @@ update_cabinet() {
   info "Обновляем кабинет..."
   curl -fsSL "${UPDATE_URL}" | bash
   write_update_status_cache latest
+}
+
+configure_node_provisioning() {
+  cabinet_installed || {
+    fail "Сначала установите кабинет."
+    return 1
+  }
+  ensure_docker
+  ensure_node_provisioning_command
+  info "Проверяем и настраиваем автоматическое создание нод..."
+  if ! ENV_FILE="${CABINET_ENV}" \
+    COMPOSE_FILE="${CABINET_COMPOSE}" \
+    NODE_PROVISIONING_INTERACTIVE="true" \
+    NODE_PROVISIONING_START="true" \
+    "${NODE_PROVISIONING_CONFIG_PATH}"
+  then
+    fail "Provisioning worker не запущен. Исправьте показанные выше настройки."
+    return 1
+  fi
+  ok "Provisioning worker настроен и запущен."
 }
 
 update_console() {
@@ -583,6 +613,7 @@ show_status() {
   print_service_state "Платежи" "remnawave-cabinet-worker"
   print_service_state "Рассылки" "remnawave-cabinet-broadcast-worker"
   print_service_state "Watch" "remnawave-cabinet-watch-worker"
+  print_service_state "Ноды" "remnawave-cabinet-node-provisioning-worker"
 }
 
 show_logs() {
@@ -603,7 +634,8 @@ logs_menu() {
     "  3. Рассылки" \
     "  4. Watch" \
     "  5. База данных" \
-    "  6. Все сервисы кабинета" \
+    "  6. Установка нод" \
+    "  7. Все сервисы кабинета" \
     "  0. Назад" >/dev/tty
   printf 'Выберите логи: ' >/dev/tty
   local choice
@@ -614,7 +646,8 @@ logs_menu() {
     3) show_logs broadcast-worker ;;
     4) show_logs watch-worker ;;
     5) show_logs db ;;
-    6) warn "Для выхода из логов нажмите Ctrl+C."; cabinet_compose logs -f --tail=200 || true ;;
+    6) show_logs node-provisioning-worker ;;
+    7) warn "Для выхода из логов нажмите Ctrl+C."; cabinet_compose logs -f --tail=200 || true ;;
     0) return ;;
     *) warn "Неизвестный пункт." ;;
   esac
@@ -757,10 +790,11 @@ show_menu() {
   show_header
   printf '\n'
   if cabinet_installed; then
-    print_menu_row "1" "Обновить кабинет" "5" "Проверить .env"
-    print_menu_row "2" "Перезапустить" "6" "Логи"
-    print_menu_row "3" "Диагностика" "7" "Бэкапы"
-    print_menu_row "4" "Открыть .env" "8" "Обновить cabinetctl"
+    print_menu_row "1" "Обновить кабинет" "6" "Проверить .env"
+    print_menu_row "2" "Перезапустить" "7" "Логи"
+    print_menu_row "3" "Диагностика" "8" "Бэкапы"
+    print_menu_row "4" "Настроить ноды" "9" "Обновить cabinetctl"
+    printf '  %s5%s  Открыть .env\n' "${CYAN}" "${RESET}"
     printf '\n  %s0%s  Выход\n' "${DIM}" "${RESET}"
   else
     printf '  %s1%s  Установить кабинет\n' "${CYAN}" "${RESET}"
@@ -790,11 +824,12 @@ run_menu() {
         1) update_cabinet || true; pause ;;
         2) restart_cabinet || true; pause ;;
         3) health_check || true; pause ;;
-        4) edit_env || true; pause ;;
-        5) check_config || true; pause ;;
-        6) logs_menu || true; pause ;;
-        7) backup_menu || true; pause ;;
-        8) update_console || true; pause ;;
+        4) configure_node_provisioning || true; pause ;;
+        5) edit_env || true; pause ;;
+        6) check_config || true; pause ;;
+        7) logs_menu || true; pause ;;
+        8) backup_menu || true; pause ;;
+        9) update_console || true; pause ;;
         0) exit 0 ;;
         *) warn "Неизвестный пункт."; pause ;;
       esac
@@ -823,8 +858,9 @@ Remnawave Cabinet ${VERSION}
   cabinetctl deploy-status      результат последнего обновления и health-check
   cabinetctl env                открыть .env
   cabinetctl config-check       проверить переменные .env
+  cabinetctl provisioning       настроить и запустить создание нод
   cabinetctl health             здоровье системы
-  cabinetctl logs [service]     меню или логи app, worker, broadcast-worker, watch-worker, db
+  cabinetctl logs [service]     логи app, worker, broadcast-worker, watch-worker, node-provisioning-worker, db
   cabinetctl backups            бэкапы, восстановление и S3
   cabinetctl backup-schedule    настроить автоматический бэкап
   cabinetctl backup-status      статус автоматического бэкапа
@@ -849,7 +885,7 @@ case "${1:-menu}" in
 esac
 
 if [[ "$(id -u)" -ne 0 ]]; then
-  exec sudo --preserve-env=BRANCH,RAW_BASE_URL,GITHUB_API_URL,GITHUB_WORKFLOW_RUNS_URL,INSTALL_URL,UPDATE_URL,NGINX_SETUP_URL,CONSOLE_INSTALL_URL,BACKUP_SCRIPT_URL,ENV_TEMPLATE_URL,CABINETCTL_PATH,BACKUP_SCRIPT_PATH,INSTALL_DIR,CABINET_VERSION_FILE,CABINET_STATE_DIR,CABINETCTL_UPDATE_CACHE,CABINETCTL_UPDATE_CACHE_TTL,CABINETCTL_CHECK_UPDATES_IN_MENU "$0" "$@"
+  exec sudo --preserve-env=BRANCH,RAW_BASE_URL,GITHUB_API_URL,GITHUB_WORKFLOW_RUNS_URL,INSTALL_URL,UPDATE_URL,NGINX_SETUP_URL,CONSOLE_INSTALL_URL,BACKUP_SCRIPT_URL,NODE_PROVISIONING_CONFIG_URL,ENV_TEMPLATE_URL,CABINETCTL_PATH,BACKUP_SCRIPT_PATH,NODE_PROVISIONING_CONFIG_PATH,INSTALL_DIR,CABINET_VERSION_FILE,CABINET_STATE_DIR,CABINETCTL_UPDATE_CACHE,CABINETCTL_UPDATE_CACHE_TTL,CABINETCTL_CHECK_UPDATES_IN_MENU "$0" "$@"
 fi
 
 case "${1:-menu}" in
@@ -860,6 +896,7 @@ case "${1:-menu}" in
   deploy-status) show_deployment_status ;;
   env) edit_env ;;
   config-check|check-config) check_config ;;
+  provisioning|nodes-setup) configure_node_provisioning ;;
   status) show_status ;;
   ps|services) show_services ;;
   url) show_url ;;
