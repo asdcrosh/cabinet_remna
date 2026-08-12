@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 
 const playbook = readFileSync(resolve('deploy/provisioner/ansible/playbook.yml'), 'utf8')
 const renewalWrapper = readFileSync(resolve('deploy/provisioner/ansible/templates/acme-renew.sh.j2'), 'utf8')
+const worker = readFileSync(resolve('src/lib/node-provisioning-worker.ts'), 'utf8')
 
 function taskBlock(name: string) {
   const start = playbook.indexOf(`    - name: ${name}`)
@@ -59,17 +60,29 @@ describe('node provisioning playbook safety', () => {
     expect(taskBlock('Validate the existing certificate lifetime')).not.toContain('\n      when:')
   })
 
+  it('resumes an owned bootstrap instead of reinstalling SelfSteal on every retry', () => {
+    const resumable = taskBlock('Determine whether an owned SelfSteal bootstrap can be resumed')
+    expect(resumable).toContain('selfsteal_marker_is_owned')
+    expect(resumable).toContain('existing_selfsteal_certificate_hostname')
+    expect(resumable).toContain('existing_selfsteal_certificate_public_key')
+    expect(resumable).toContain('existing_selfsteal_private_key_public_key')
+    expect(taskBlock('Archive an incomplete SelfSteal installation')).toContain('- not selfsteal_is_resumable | bool')
+    expect(taskBlock('Install SelfSteal through its official force mode')).toContain('- not selfsteal_is_resumable | bool')
+  })
+
   it('issues and renews certificates through the HTTP webroot without NAT redirects', () => {
-    const issueTask = taskBlock('Issue the trusted SelfSteal certificate through the HTTP webroot')
+    const issueTask = taskBlock('Issue the trusted SelfSteal certificate through the fallback HTTP webroot')
     expect(taskBlock('Validate a cached trusted SelfSteal certificate')).toContain('-checkhost')
     expect(taskBlock('Validate a cached trusted SelfSteal certificate')).toContain('-checkend 86400')
     expect(taskBlock('Validate a cached trusted SelfSteal certificate')).toContain(".conf') | quote")
     expect(taskBlock('Validate a cached trusted SelfSteal certificate')).toContain('openssl pkey')
     expect(taskBlock('Validate a cached trusted SelfSteal certificate')).toContain('Le_TLSPort')
-    expect(taskBlock('Verify the HTTP-01 route through Nginx')).toContain('status_code: 200')
-    expect(taskBlock('Verify the HTTP-01 route through Nginx')).toContain("Host: '{{ node_fqdn }}'")
-    expect(taskBlock('Verify the HTTP-01 route from the provisioning worker')).toContain('delegate_to: localhost')
-    expect(taskBlock('Verify the HTTP-01 route from the provisioning worker')).toContain('failed_when: false')
+    expect(taskBlock('Verify the fallback HTTP-01 route through Nginx')).toContain('status_code: 200')
+    expect(taskBlock('Verify the fallback HTTP-01 route through Nginx')).toContain("Host: '{{ node_fqdn }}'")
+    expect(taskBlock('Verify the fallback HTTP-01 route through Nginx')).toContain('failed_when: false')
+    expect(taskBlock('Verify the fallback HTTP-01 route through Nginx')).toContain('use_proxy: false')
+    expect(taskBlock('Verify the fallback HTTP-01 route from the provisioning worker')).toContain('delegate_to: localhost')
+    expect(taskBlock('Verify the fallback HTTP-01 route from the provisioning worker')).toContain('failed_when: false')
     expect(issueTask).toContain("- '{{ selfsteal_dir }}/html'")
     expect(issueTask).toContain('- timeout')
     expect(issueTask).toContain("- '{{ acme_issue_timeout_seconds | string }}'")
@@ -78,10 +91,9 @@ describe('node provisioning playbook safety', () => {
     expect(issueTask).not.toContain('--tlsport')
     expect(issueTask).toContain('- cached_selfsteal_certificate.rc != 0')
     expect(issueTask).toContain('failed_when: false')
-    expect(taskBlock('Fall back to direct TLS-ALPN when HTTP issuance fails')).toContain('direct-alpn')
     expect(taskBlock('Install the trusted SelfSteal certificate')).toContain('- --install-cert')
     expect(taskBlock('Install the trusted SelfSteal certificate')).toContain('- --ecc')
-    expect(playbook.indexOf('Issue the trusted SelfSteal certificate through the HTTP webroot'))
+    expect(playbook.indexOf('Issue the trusted SelfSteal certificate through the fallback HTTP webroot'))
       .toBeLessThan(playbook.indexOf('Validate the certificate hostname'))
     expect(renewalWrapper).toContain('set -euo pipefail')
     expect(renewalWrapper).toContain('--webroot')
@@ -89,9 +101,8 @@ describe('node provisioning playbook safety', () => {
     expect(taskBlock('Validate automatic SelfSteal certificate renewal')).toContain('- --check')
   })
 
-  it('falls back to direct port 443 TLS-ALPN and keeps legacy renewal safe', () => {
+  it('uses direct port 443 TLS-ALPN first and keeps legacy renewal safe', () => {
     const directIssue = taskBlock('Request the trusted SelfSteal certificate through direct TLS-ALPN')
-    expect(taskBlock('Select the trusted certificate challenge mode')).toContain("else 'direct-alpn'")
     expect(taskBlock('Stop Remnanode while the direct ACME listener owns port 443')).toContain('- remnanode')
     expect(directIssue).toContain('- --alpn')
     expect(directIssue).toContain('- timeout')
@@ -101,6 +112,10 @@ describe('node provisioning playbook safety', () => {
     expect(taskBlock('Stop when both trusted certificate challenges failed')).toContain('HTTP result:')
     expect(taskBlock('Stop when both trusted certificate challenges failed')).toContain('Direct TLS result:')
     expect(taskBlock('Stop when both trusted certificate challenges failed')).toContain('Public HTTP preflight:')
+    expect(taskBlock('Stop when both trusted certificate challenges failed')).toContain('HTTP diagnostics:')
+    expect(taskBlock('Collect SelfSteal HTTP diagnostics')).toContain("ss -ltnp '( sport = :80 )'")
+    expect(playbook.indexOf('Issue the trusted SelfSteal certificate directly on port 443'))
+      .toBeLessThan(playbook.indexOf('Issue the trusted SelfSteal certificate through the fallback HTTP webroot'))
     expect(renewalWrapper).toContain('trap cleanup EXIT INT TERM')
     expect(renewalWrapper).toContain('docker stop remnanode')
     expect(renewalWrapper).toContain('docker start remnanode')
@@ -113,6 +128,12 @@ describe('node provisioning playbook safety', () => {
     expect(renewalWrapper).toContain('--install-cert --domain "$DOMAIN"')
     expect(renewalWrapper).toContain('nginx-selfsteal nginx -s reload')
     expect(renewalWrapper).toContain("if [ \"${1:-}\" = '--check' ]")
+  })
+
+  it('does not fail an otherwise healthy node only because port 80 has no redirect', () => {
+    expect(worker).toContain("return `HTTP redirect недоступен (${redirect.status}), VPN и HTTPS работают`")
+    expect(worker).toContain("return 'HTTP redirect недоступен, VPN и HTTPS работают'")
+    expect(worker).toContain("addEvent(jobId, 'VERIFY', 'WARNING', verificationWarning)")
   })
 
   it('keeps the UFW assertion a string for Ansible 2.19', () => {

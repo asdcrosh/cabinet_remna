@@ -614,6 +614,26 @@
         selfsteal_container_domain_matches: >-
           {{ existing_selfsteal_container_domain.rc == 0 }}
 
+    - name: Determine whether an owned SelfSteal bootstrap can be resumed
+      ansible.builtin.set_fact:
+        selfsteal_is_resumable: >-
+          {{ not selfsteal_is_healthy | bool and
+             selfsteal_marker_is_owned | bool and
+             selfsteal_required_files.results
+             | selectattr('stat.exists', 'equalto', false)
+             | list
+             | length == 0 and
+             selfsteal_configured_domain.rc == 0 and
+             selfsteal_configured_domain.stdout | trim == node_fqdn and
+             existing_selfsteal_compose.rc | default(1) == 0 and
+             existing_selfsteal_certificate_hostname.rc | default(1) == 0 and
+             existing_selfsteal_certificate_public_key.rc | default(1) == 0 and
+             existing_selfsteal_private_key_public_key.rc | default(1) == 0 and
+             existing_selfsteal_certificate_public_key.stdout | default('') | length == 64 and
+             existing_selfsteal_certificate_public_key.stdout | default('') ==
+             existing_selfsteal_private_key_public_key.stdout | default('') and
+             (selfsteal_container_is_owned | bool or selfsteal_container_is_absent | bool) }}
+
     - name: Refuse to replace an unverified SelfSteal installation
       ansible.builtin.assert:
         that:
@@ -646,6 +666,7 @@
           - nginx-selfsteal
       when:
         - not selfsteal_is_healthy | bool
+        - not selfsteal_is_resumable | bool
         - selfsteal_container_is_owned | bool
 
     - name: Archive an incomplete SelfSteal installation
@@ -656,6 +677,7 @@
           - '{{ selfsteal_archive_path }}'
       when:
         - not selfsteal_is_healthy | bool
+        - not selfsteal_is_resumable | bool
         - selfsteal_directory.stat.exists
 
     - name: Protect the archived SelfSteal files
@@ -667,6 +689,7 @@
         recurse: true
       when:
         - not selfsteal_is_healthy | bool
+        - not selfsteal_is_resumable | bool
         - selfsteal_directory.stat.exists
 
     - name: Mark the SelfSteal installation as owned by this job
@@ -677,7 +700,9 @@
         owner: root
         group: root
         mode: '0600'
-      when: not selfsteal_is_healthy | bool
+      when:
+        - not selfsteal_is_healthy | bool
+        - not selfsteal_is_resumable | bool
 
     - name: Create the temporary SelfSteal TLS directory
       ansible.builtin.file:
@@ -686,7 +711,9 @@
         owner: root
         group: root
         mode: '0700'
-      when: not selfsteal_is_healthy | bool
+      when:
+        - not selfsteal_is_healthy | bool
+        - not selfsteal_is_resumable | bool
 
     - name: Create a temporary certificate for the SelfSteal bootstrap
       ansible.builtin.command:
@@ -709,7 +736,9 @@
           - -out
           - '{{ selfsteal_bootstrap_tls_dir }}/fullchain.crt'
       no_log: true
-      when: not selfsteal_is_healthy | bool
+      when:
+        - not selfsteal_is_healthy | bool
+        - not selfsteal_is_resumable | bool
 
     - name: Install SelfSteal through its official force mode
       ansible.builtin.command:
@@ -732,7 +761,9 @@
       environment:
         DEBIAN_FRONTEND: noninteractive
         TERM: xterm
-      when: not selfsteal_is_healthy | bool
+      when:
+        - not selfsteal_is_healthy | bool
+        - not selfsteal_is_resumable | bool
       register: selfsteal_install
 
     - name: Keep the local SelfSteal management command pinned
@@ -845,65 +876,6 @@
           - -t
       changed_when: false
 
-    - name: Create the HTTP-01 webroot preflight directory
-      ansible.builtin.file:
-        path: '{{ selfsteal_dir }}/html/.well-known/acme-challenge'
-        state: directory
-        owner: root
-        group: root
-        mode: '0755'
-      when: not selfsteal_is_healthy | bool
-
-    - name: Install the HTTP-01 webroot preflight token
-      ansible.builtin.copy:
-        content: '{{ provisioning_job_id }}'
-        dest: '{{ selfsteal_dir }}/html/.well-known/acme-challenge/cabinet-preflight'
-        owner: root
-        group: root
-        mode: '0644'
-      when: not selfsteal_is_healthy | bool
-
-    - name: Verify the HTTP-01 route through Nginx
-      ansible.builtin.uri:
-        url: http://127.0.0.1/.well-known/acme-challenge/cabinet-preflight
-        headers:
-          Host: '{{ node_fqdn }}'
-        return_content: true
-        status_code: 200
-      register: selfsteal_http01_preflight
-      failed_when: >-
-        selfsteal_http01_preflight.status != 200 or
-        selfsteal_http01_preflight.content != provisioning_job_id
-      when: not selfsteal_is_healthy | bool
-
-    - name: Verify the HTTP-01 route from the provisioning worker
-      ansible.builtin.uri:
-        url: http://{{ node_fqdn }}/.well-known/acme-challenge/cabinet-preflight
-        return_content: true
-        status_code: 200
-        timeout: 15
-      delegate_to: localhost
-      become: false
-      register: public_selfsteal_http01_preflight
-      changed_when: false
-      failed_when: false
-      when: not selfsteal_is_healthy | bool
-
-    - name: Select the trusted certificate challenge mode
-      ansible.builtin.set_fact:
-        selfsteal_certificate_challenge: >-
-          {{ 'webroot'
-             if public_selfsteal_http01_preflight.status | default(0) == 200 and
-                public_selfsteal_http01_preflight.content | default('') == provisioning_job_id
-             else 'direct-alpn' }}
-      when: not selfsteal_is_healthy | bool
-
-    - name: Remove the HTTP-01 webroot preflight token
-      ansible.builtin.file:
-        path: '{{ selfsteal_dir }}/html/.well-known/acme-challenge/cabinet-preflight'
-        state: absent
-      when: not selfsteal_is_healthy | bool
-
     - name: Validate a cached trusted SelfSteal certificate
       ansible.builtin.shell: >-
         set -o pipefail &&
@@ -934,48 +906,10 @@
       failed_when: false
       when: not selfsteal_is_healthy | bool
 
-    - name: Issue the trusted SelfSteal certificate through the HTTP webroot
-      ansible.builtin.command:
-        argv:
-          - timeout
-          - --signal=TERM
-          - --kill-after=10s
-          - '{{ acme_issue_timeout_seconds | string }}'
-          - /root/.acme.sh/acme.sh
-          - --issue
-          - --domain
-          - '{{ node_fqdn }}'
-          - --webroot
-          - '{{ selfsteal_dir }}/html'
-          - --keylength
-          - ec-256
-          - --server
-          - letsencrypt
-          - --force
-          - --debug
-          - '1'
-      register: selfsteal_webroot_certificate_issue
-      changed_when: true
-      failed_when: false
-      when:
-        - not selfsteal_is_healthy | bool
-        - cached_selfsteal_certificate.rc != 0
-        - selfsteal_certificate_challenge == 'webroot'
-
-    - name: Fall back to direct TLS-ALPN when HTTP issuance fails
-      ansible.builtin.set_fact:
-        selfsteal_certificate_challenge: direct-alpn
-      when:
-        - not selfsteal_is_healthy | bool
-        - cached_selfsteal_certificate.rc != 0
-        - selfsteal_certificate_challenge == 'webroot'
-        - selfsteal_webroot_certificate_issue.rc != 0
-
     - name: Issue the trusted SelfSteal certificate directly on port 443
       when:
         - not selfsteal_is_healthy | bool
         - cached_selfsteal_certificate.rc != 0
-        - selfsteal_certificate_challenge == 'direct-alpn'
       block:
         - name: Stop Remnanode while the direct ACME listener owns port 443
           ansible.builtin.command:
@@ -1043,22 +977,147 @@
           register: remnanode_start_after_acme
           changed_when: remnanode_start_after_acme.stdout | trim == 'remnanode'
 
-    - name: Stop when both trusted certificate challenges failed
-      ansible.builtin.fail:
-        msg: >-
-          Could not issue a trusted certificate for {{ node_fqdn }} through HTTP-01
-          or direct TLS-ALPN on port 443.
-          Public HTTP preflight: status={{ public_selfsteal_http01_preflight.status | default(0) }},
-          error={{ public_selfsteal_http01_preflight.msg | default('none') }}.
-          HTTP result: {{ ((selfsteal_webroot_certificate_issue.stdout | default('')) + '\n' +
-          (selfsteal_webroot_certificate_issue.stderr | default('')))[-2500:] }}
-          Direct TLS result: {{ ((selfsteal_direct_certificate_issue.stdout | default('')) + '\n' +
-          (selfsteal_direct_certificate_issue.stderr | default('')))[-2500:] }}
+    - name: Create the fallback HTTP-01 webroot preflight directory
+      ansible.builtin.file:
+        path: '{{ selfsteal_dir }}/html/.well-known/acme-challenge'
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
       when:
         - not selfsteal_is_healthy | bool
         - cached_selfsteal_certificate.rc != 0
-        - selfsteal_certificate_challenge == 'direct-alpn'
-        - selfsteal_direct_certificate_issue.rc != 0
+        - selfsteal_direct_certificate_issue.rc | default(1) != 0
+
+    - name: Install the fallback HTTP-01 webroot preflight token
+      ansible.builtin.copy:
+        content: '{{ provisioning_job_id }}'
+        dest: '{{ selfsteal_dir }}/html/.well-known/acme-challenge/cabinet-preflight'
+        owner: root
+        group: root
+        mode: '0644'
+      when:
+        - not selfsteal_is_healthy | bool
+        - cached_selfsteal_certificate.rc != 0
+        - selfsteal_direct_certificate_issue.rc | default(1) != 0
+
+    - name: Verify the fallback HTTP-01 route through Nginx
+      ansible.builtin.uri:
+        url: http://127.0.0.1/.well-known/acme-challenge/cabinet-preflight
+        headers:
+          Host: '{{ node_fqdn }}'
+        return_content: true
+        status_code: 200
+        timeout: 10
+        use_proxy: false
+      register: selfsteal_http01_preflight
+      changed_when: false
+      failed_when: false
+      when:
+        - not selfsteal_is_healthy | bool
+        - cached_selfsteal_certificate.rc != 0
+        - selfsteal_direct_certificate_issue.rc | default(1) != 0
+
+    - name: Verify the fallback HTTP-01 route from the provisioning worker
+      ansible.builtin.uri:
+        url: http://{{ node_fqdn }}/.well-known/acme-challenge/cabinet-preflight
+        return_content: true
+        status_code: 200
+        timeout: 15
+        use_proxy: false
+      delegate_to: localhost
+      become: false
+      register: public_selfsteal_http01_preflight
+      changed_when: false
+      failed_when: false
+      when:
+        - not selfsteal_is_healthy | bool
+        - cached_selfsteal_certificate.rc != 0
+        - selfsteal_direct_certificate_issue.rc | default(1) != 0
+
+    - name: Collect SelfSteal HTTP diagnostics
+      ansible.builtin.shell: |
+        set -o pipefail
+        ss -ltnp '( sport = :80 )' 2>&1 || true
+        docker inspect --format \
+          '{% raw %}state={{.State.Status}} running={{.State.Running}} restarts={{.RestartCount}} error={{.State.Error}}{% endraw %}' \
+          nginx-selfsteal 2>&1 || true
+        docker logs --tail 80 nginx-selfsteal 2>&1 || true
+      args:
+        executable: /bin/bash
+      register: selfsteal_http_diagnostics
+      changed_when: false
+      failed_when: false
+      when:
+        - not selfsteal_is_healthy | bool
+        - cached_selfsteal_certificate.rc != 0
+        - selfsteal_direct_certificate_issue.rc | default(1) != 0
+        - >-
+          selfsteal_http01_preflight.status | default(0) != 200 or
+          selfsteal_http01_preflight.content | default('') != provisioning_job_id or
+          public_selfsteal_http01_preflight.status | default(0) != 200 or
+          public_selfsteal_http01_preflight.content | default('') != provisioning_job_id
+
+    - name: Issue the trusted SelfSteal certificate through the fallback HTTP webroot
+      ansible.builtin.command:
+        argv:
+          - timeout
+          - --signal=TERM
+          - --kill-after=10s
+          - '{{ acme_issue_timeout_seconds | string }}'
+          - /root/.acme.sh/acme.sh
+          - --issue
+          - --domain
+          - '{{ node_fqdn }}'
+          - --webroot
+          - '{{ selfsteal_dir }}/html'
+          - --keylength
+          - ec-256
+          - --server
+          - letsencrypt
+          - --force
+          - --debug
+          - '1'
+      register: selfsteal_webroot_certificate_issue
+      changed_when: true
+      failed_when: false
+      when:
+        - not selfsteal_is_healthy | bool
+        - cached_selfsteal_certificate.rc != 0
+        - selfsteal_direct_certificate_issue.rc | default(1) != 0
+        - selfsteal_http01_preflight.status | default(0) == 200
+        - selfsteal_http01_preflight.content | default('') == provisioning_job_id
+        - public_selfsteal_http01_preflight.status | default(0) == 200
+        - public_selfsteal_http01_preflight.content | default('') == provisioning_job_id
+
+    - name: Remove the fallback HTTP-01 webroot preflight token
+      ansible.builtin.file:
+        path: '{{ selfsteal_dir }}/html/.well-known/acme-challenge/cabinet-preflight'
+        state: absent
+      when:
+        - not selfsteal_is_healthy | bool
+        - cached_selfsteal_certificate.rc != 0
+        - selfsteal_direct_certificate_issue.rc | default(1) != 0
+
+    - name: Stop when both trusted certificate challenges failed
+      ansible.builtin.fail:
+        msg: >-
+          Could not issue a trusted certificate for {{ node_fqdn }} through direct
+          TLS-ALPN on port 443 or the fallback HTTP-01 webroot.
+          Local HTTP preflight: status={{ selfsteal_http01_preflight.status | default(0) }},
+          error={{ selfsteal_http01_preflight.msg | default('none') }}.
+          Public HTTP preflight: status={{ public_selfsteal_http01_preflight.status | default(0) }},
+          error={{ public_selfsteal_http01_preflight.msg | default('none') }}.
+          Direct TLS result: {{ ((selfsteal_direct_certificate_issue.stdout | default('')) + '\n' +
+          (selfsteal_direct_certificate_issue.stderr | default('')))[-2200:] }}
+          HTTP result: {{ ((selfsteal_webroot_certificate_issue.stdout | default('')) + '\n' +
+          (selfsteal_webroot_certificate_issue.stderr | default('')))[-2200:] }}
+          HTTP diagnostics: {{ (selfsteal_http_diagnostics.stdout | default('not collected'))[-2200:] }}
+      when:
+        - not selfsteal_is_healthy | bool
+        - cached_selfsteal_certificate.rc != 0
+        - selfsteal_direct_certificate_issue.rc | default(1) != 0
+        - selfsteal_webroot_certificate_issue.rc | default(1) != 0
 
     - name: Install the trusted SelfSteal certificate
       ansible.builtin.command:

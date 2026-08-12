@@ -149,7 +149,8 @@ export async function processNodeProvisioningJob(jobId: string) {
     }, 'HOSTS', 'TCP и XHTTP hosts созданы в скрытом состоянии')
 
     await advance(jobId, 'VERIFY', 'Проверяю DNS, HTTPS, TCP и состояние ноды')
-    await verifyProvisionedNode(job, node.uuid, templates.tcp.port)
+    const verificationWarning = await verifyProvisionedNode(job, node.uuid, templates.tcp.port)
+    if (verificationWarning) await addEvent(jobId, 'VERIFY', 'WARNING', verificationWarning)
     await Promise.all([
       remnawave.updateHost({ uuid: hosts.tcp.uuid, isDisabled: templates.tcp.isDisabled, isHidden: templates.tcp.isHidden }),
       remnawave.updateHost({ uuid: hosts.xhttp.uuid, isDisabled: templates.xhttp.isDisabled, isHidden: templates.xhttp.isHidden }),
@@ -165,7 +166,15 @@ export async function processNodeProvisioningJob(jobId: string) {
         completedAt: new Date(),
         encryptedSshPassword: '',
         lastError: null,
-        events: { create: { step: 'DONE', level: 'SUCCESS', message: 'Нода подключена и готова к работе' } },
+        events: {
+          create: {
+            step: 'DONE',
+            level: 'SUCCESS',
+            message: verificationWarning
+              ? `Нода подключена и готова к работе; ${verificationWarning}`
+              : 'Нода подключена и готова к работе',
+          },
+        },
       },
     })
   } catch (error) {
@@ -446,14 +455,19 @@ async function verifyProvisionedNode(job: NodeProvisioningJob, nodeUuid: string,
     cache: 'no-store',
   })
   if (response.status < 200 || response.status >= 400) throw new Error(`SelfSteal HTTPS вернул ${response.status}`)
-  const redirect = await fetch(`http://${job.fqdn}`, {
-    redirect: 'manual',
-    signal: AbortSignal.timeout(10_000),
-    cache: 'no-store',
-  })
-  if (![301, 302, 307, 308].includes(redirect.status)) {
-    throw new Error(`SelfSteal HTTP не перенаправляет на HTTPS: ${redirect.status}`)
+  try {
+    const redirect = await fetch(`http://${job.fqdn}`, {
+      redirect: 'manual',
+      signal: AbortSignal.timeout(10_000),
+      cache: 'no-store',
+    })
+    if (![301, 302, 307, 308].includes(redirect.status)) {
+      return `HTTP redirect недоступен (${redirect.status}), VPN и HTTPS работают`
+    }
+  } catch {
+    return 'HTTP redirect недоступен, VPN и HTTPS работают'
   }
+  return null
 }
 
 async function waitForDns(fqdn: string, expectedIp: string, timeoutMs = positiveInteger(process.env.NODE_PROVISIONING_DNS_TIMEOUT_SECONDS, 300) * 1000) {
