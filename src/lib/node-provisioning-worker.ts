@@ -7,9 +7,44 @@ import { nodeHostRemark, resolveNodeCountryCode } from '@/lib/node-country'
 import { decryptNodeProvisioningSecret } from '@/lib/node-provisioning-crypto'
 import { runNodeAnsible, sanitizeProvisioningOutput, scanSshHostKey } from '@/lib/node-provisioning-runner'
 import { upsertTimewebARecord } from '@/lib/timeweb'
-import { buildHostCloneRequest, remnawave, type RemnawaveHost, type RemnawaveNode } from '@/lib/remnawave'
+import {
+  buildHostCloneRequest,
+  remnawave,
+  type RemnawaveHost,
+  type RemnawaveNode,
+  type UpdateRemnawaveNodeRequest,
+} from '@/lib/remnawave'
 
 const STALE_JOB_MS = 45 * 60_000
+const INTERRUPTED_JOB_MESSAGE = 'Worker был перезапущен во время выполнения. Повторите установку: уже выполненные этапы будут безопасно проверены повторно.'
+
+export async function failInterruptedNodeProvisioningJobs() {
+  const jobs = await prisma.nodeProvisioningJob.findMany({
+    where: { status: 'RUNNING' },
+    select: { id: true, step: true },
+  })
+  if (jobs.length === 0) return 0
+
+  const completedAt = new Date()
+  await prisma.$transaction(jobs.map((job) => prisma.nodeProvisioningJob.update({
+    where: { id: job.id },
+    data: {
+      status: 'FAILED',
+      activeKey: null,
+      lockedAt: null,
+      completedAt,
+      lastError: INTERRUPTED_JOB_MESSAGE,
+      events: {
+        create: {
+          step: job.step,
+          level: 'ERROR',
+          message: INTERRUPTED_JOB_MESSAGE,
+        },
+      },
+    },
+  })))
+  return jobs.length
+}
 
 export async function processNodeProvisioningBatch() {
   const job = await claimNodeProvisioningJob()
@@ -82,7 +117,7 @@ export async function processNodeProvisioningJob(jobId: string) {
       jobId,
       { remnawaveNodeUuid: node.uuid },
       'REMNAWAVE_NODE',
-      `Нода настроена: ${node.uuid}; страна ${countryCode}; torrent_block включён`
+      `Нода настроена: ${node.uuid}; адрес ${job.fqdn}; страна ${countryCode}; torrent_block включён`
     )
     const secretResponse = await remnawave.getNodeSecret()
     nodeSecret = secretResponse.response.secretKey || secretResponse.response.pubKey || ''
@@ -159,26 +194,38 @@ async function ensureRemnawaveNode(
 ) {
   const nodes = (await remnawave.getNodes()).response
   const alignNode = async (node: RemnawaveNode) => {
-    if (node.countryCode === countryCode && node.activePluginUuid === activePluginUuid) return node
-    return (await remnawave.updateNode({ uuid: node.uuid, countryCode, activePluginUuid })).response
+    const patch = buildRemnawaveNodeAlignmentPatch(node, {
+      address: job.fqdn,
+      countryCode,
+      activePluginUuid,
+    })
+    if (!patch) return node
+    return (await remnawave.updateNode(patch)).response
   }
   if (job.remnawaveNodeUuid) {
     const existing = nodes.find((node) => node.uuid === job.remnawaveNodeUuid)
     if (existing) return alignNode(existing)
     throw new Error('Созданная ранее нода не найдена в Remnawave')
   }
-  const matches = nodes.filter((node) => node.name === job.nodeName && node.address === job.serverIp)
-  const createdByThisJob = matches.filter((node) => node.note === `Created by cabinet job ${job.id}`)
+  const createdByThisJob = nodes.filter((node) => node.note === `Created by cabinet job ${job.id}`)
   if (createdByThisJob.length === 1) {
     await addEvent(job.id, 'REMNAWAVE_NODE', 'WARNING', 'Найдена существующая точная нода, продолжаю без дубля')
     return alignNode(createdByThisJob[0]!)
   }
   if (createdByThisJob.length > 1) throw new Error('В Remnawave найдено несколько нод этой задачи')
-  if (matches.length > 0) throw new Error('В Remnawave уже есть нода с таким именем и IP, но она создана не этой задачей')
+  const desiredAddress = job.fqdn.toLowerCase()
+  const conflicts = nodes.filter((node) =>
+    node.name === job.nodeName ||
+    node.address.trim().toLowerCase() === desiredAddress ||
+    node.address === job.serverIp
+  )
+  if (conflicts.length > 0) {
+    throw new Error('В Remnawave уже есть нода с таким именем, доменом или прежним IP, но она создана не этой задачей')
+  }
 
   return (await remnawave.createNode({
     name: job.nodeName,
-    address: job.serverIp,
+    address: job.fqdn,
     port: 2222,
     countryCode,
     activePluginUuid,
@@ -188,6 +235,23 @@ async function ensureRemnawaveNode(
     },
     note: `Created by cabinet job ${job.id}`,
   })).response
+}
+
+export function buildRemnawaveNodeAlignmentPatch(
+  node: RemnawaveNode,
+  desired: {
+    address: string
+    countryCode: string
+    activePluginUuid: string
+  }
+) {
+  const patch: UpdateRemnawaveNodeRequest = { uuid: node.uuid }
+  if (node.address.trim().toLowerCase() !== desired.address.trim().toLowerCase()) {
+    patch.address = desired.address
+  }
+  if (node.countryCode !== desired.countryCode) patch.countryCode = desired.countryCode
+  if (node.activePluginUuid !== desired.activePluginUuid) patch.activePluginUuid = desired.activePluginUuid
+  return Object.keys(patch).length > 1 ? patch : null
 }
 
 async function ensureTorrentBlockPlugin() {
@@ -323,7 +387,7 @@ async function verifyProvisionedNode(job: NodeProvisioningJob, nodeUuid: string,
   await waitForDns(job.fqdn, job.serverIp, 30_000)
   const node = (await remnawave.getNodes()).response.find((item) => item.uuid === nodeUuid)
   if (!node?.isConnected) throw new Error('Нода перестала быть connected во время финальной проверки')
-  await checkTcp(job.serverIp, tcpPort)
+  await checkTcp(job.fqdn, tcpPort)
   const response = await fetch(`https://${job.fqdn}`, {
     redirect: 'manual',
     signal: AbortSignal.timeout(10_000),

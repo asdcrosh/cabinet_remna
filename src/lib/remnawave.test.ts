@@ -205,7 +205,11 @@ describe('Remnawave v2/v3 user identifiers', () => {
     await remnawave.getNodePlugin(plugin.uuid)
     await remnawave.createNodePlugin('torrent_block')
     await remnawave.updateNodePlugin(plugin.uuid, { torrentBlocker: { enabled: true } })
-    await remnawave.updateNode({ uuid: node.uuid, activePluginUuid: plugin.uuid })
+    await remnawave.updateNode({
+      uuid: node.uuid,
+      address: 'ams-01.example.test',
+      activePluginUuid: plugin.uuid,
+    })
 
     expect(fetchMock.mock.calls.map(([url, init]) => [url, init?.method])).toEqual([
       ['https://panel.example.test/api/node-plugins', 'GET'],
@@ -214,6 +218,11 @@ describe('Remnawave v2/v3 user identifiers', () => {
       ['https://panel.example.test/api/node-plugins', 'PATCH'],
       ['https://panel.example.test/api/nodes', 'PATCH'],
     ])
+    expect(JSON.parse(String(fetchMock.mock.calls[4]?.[1]?.body))).toEqual({
+      uuid: node.uuid,
+      address: 'ams-01.example.test',
+      activePluginUuid: plugin.uuid,
+    })
   })
 
   it('builds a lossless whitelisted host clone payload and creates it', async () => {

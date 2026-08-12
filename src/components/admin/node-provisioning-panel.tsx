@@ -491,10 +491,10 @@ export function NodeProvisioningPanel() {
                 <div className="min-w-0">
                   <div className="flex min-w-0 items-center gap-2">
                     <span className="truncate font-semibold">{job.nodeName}</span>
-                    {job.domain ? <span className="hidden truncate text-xs text-slate-400 md:inline">{job.domain}</span> : null}
                   </div>
                   <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
-                    <span className="font-mono">{job.serverIp}{job.sshPort ? `:${job.sshPort}` : ''}</span>
+                    {job.domain ? <span className="font-mono text-slate-600 dark:text-slate-300">{job.domain}</span> : null}
+                    <span>SSH: <span className="font-mono">{job.serverIp}{job.sshPort ? `:${job.sshPort}` : ''}</span></span>
                     <span>{formatDate(job.createdAt)}</span>
                   </div>
                 </div>
@@ -535,9 +535,9 @@ function JobProgress({
             <JobStatusBadge status={job.status} />
           </div>
           <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500">
-            <span className="font-mono">{job.serverIp}{job.sshPort ? `:${job.sshPort}` : ''}</span>
-            {job.domain ? <span>{job.domain}</span> : null}
-            {job.sshUser ? <span>SSH: {job.sshUser}</span> : null}
+            {job.domain ? <span className="font-mono text-slate-600 dark:text-slate-300">{job.domain}</span> : null}
+            <span>SSH: <span className="font-mono">{job.serverIp}{job.sshPort ? `:${job.sshPort}` : ''}</span></span>
+            {job.sshUser ? <span>Пользователь: {job.sshUser}</span> : null}
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-1.5 text-xs text-slate-400">

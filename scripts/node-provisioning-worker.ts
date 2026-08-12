@@ -1,6 +1,7 @@
 import { writeFile } from 'node:fs/promises'
-import { logError, logInfo } from '../src/lib/logger'
-import { processNodeProvisioningBatch } from '../src/lib/node-provisioning-worker'
+import { Client } from 'pg'
+import { logError, logInfo, logWarn } from '../src/lib/logger'
+import { failInterruptedNodeProvisioningJobs, processNodeProvisioningBatch } from '../src/lib/node-provisioning-worker'
 import { nodeHostRemark, resolveNodeCountryCode } from '../src/lib/node-country'
 import { prisma } from '../src/lib/prisma'
 import { recordWorkerHeartbeat } from '../src/lib/worker-health'
@@ -12,19 +13,62 @@ const heartbeatIntervalMs = Math.max(15, Math.min(60, Math.floor(heartbeatMaxAge
 let stopRequested = false
 let heartbeatTimer: NodeJS.Timeout | null = null
 let heartbeatInFlight = false
+const workerLockId = '5737974967122994529'
 
 async function main() {
-  validateWorkerConfiguration()
-  bindShutdown()
-  startHeartbeatLoop()
-  logInfo('node_provisioning_worker.started', { intervalSeconds })
-  while (!stopRequested) {
-    await heartbeat()
-    const processed = await processNodeProvisioningBatch()
-    await heartbeat()
-    if (!processed) await sleep(intervalSeconds * 1000)
+  const lockClient = await acquireWorkerLock()
+  try {
+    bindShutdown()
+    const interruptedJobs = await failInterruptedNodeProvisioningJobs()
+    if (interruptedJobs > 0) {
+      logWarn('node_provisioning_worker.interrupted_jobs_failed', { count: interruptedJobs })
+    }
+    validateWorkerConfiguration()
+    startHeartbeatLoop()
+    logInfo('node_provisioning_worker.started', { intervalSeconds })
+    while (!stopRequested) {
+      await heartbeat()
+      const processed = await processNodeProvisioningBatch()
+      await heartbeat()
+      if (!processed) await sleep(intervalSeconds * 1000)
+    }
+    logInfo('node_provisioning_worker.stopped')
+  } finally {
+    if (heartbeatTimer) clearInterval(heartbeatTimer)
+    await releaseWorkerLock(lockClient)
   }
-  logInfo('node_provisioning_worker.stopped')
+}
+
+async function acquireWorkerLock() {
+  const connectionString = process.env.DATABASE_URL?.trim()
+  if (!connectionString) throw new Error('DATABASE_URL is not configured')
+  const client = new Client({
+    connectionString,
+    application_name: 'cabinet-node-provisioning-worker',
+  })
+  await client.connect()
+  try {
+    const result = await client.query<{ locked: boolean }>(
+      'SELECT pg_try_advisory_lock($1::bigint) AS locked',
+      [workerLockId],
+    )
+    if (!result.rows[0]?.locked) {
+      throw new Error('Another node provisioning worker already owns the database lock')
+    }
+    return client
+  } catch (error) {
+    await client.end().catch(() => undefined)
+    throw error
+  }
+}
+
+async function releaseWorkerLock(client: Client) {
+  await client.query('SELECT pg_advisory_unlock($1::bigint)', [workerLockId]).catch((error) => {
+    logWarn('node_provisioning_worker.lock_release_failed', {
+      message: error instanceof Error ? error.message : String(error),
+    })
+  })
+  await client.end().catch(() => undefined)
 }
 
 function validateWorkerConfiguration() {

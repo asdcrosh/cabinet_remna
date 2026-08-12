@@ -27,6 +27,9 @@ describe('node provisioning secrets', () => {
   it('rejects modified ciphertext', () => {
     process.env.NODE_PROVISIONING_ENCRYPTION_KEY = 'b'.repeat(32)
     const payload = encryptNodeProvisioningSecret('secret')
-    expect(() => decryptNodeProvisioningSecret(`${payload.slice(0, -1)}A`)).toThrow()
+    const parts = payload.split('.')
+    const ciphertext = parts[3]!
+    parts[3] = `${ciphertext[0] === 'A' ? 'B' : 'A'}${ciphertext.slice(1)}`
+    expect(() => decryptNodeProvisioningSecret(parts.join('.'))).toThrow()
   })
 })

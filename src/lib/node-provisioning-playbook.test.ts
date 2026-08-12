@@ -31,4 +31,9 @@ describe('node provisioning playbook safety', () => {
     expect(renewalWrapper).toContain('iptables -t nat -D PREROUTING')
     expect(renewalWrapper).toContain('iptables -t nat -D OUTPUT')
   })
+
+  it('keeps the UFW assertion a string for Ansible 2.19', () => {
+    expect(playbook).toContain(`- "'Status: active' in final_ufw_status.stdout"`)
+    expect(playbook).not.toContain("- final_ufw_status.stdout is search('Status: active')")
+  })
 })

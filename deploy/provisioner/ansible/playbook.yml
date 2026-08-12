@@ -898,7 +898,7 @@
     - name: Require an active firewall
       ansible.builtin.assert:
         that:
-          - final_ufw_status.stdout is search('Status: active')
+          - "'Status: active' in final_ufw_status.stdout"
         fail_msg: UFW is not active after provisioning.
 
     - name: Find recovered SelfSteal archives for this job

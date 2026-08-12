@@ -1,6 +1,25 @@
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { RemnawaveHost, RemnawaveNode } from './remnawave'
-import { assertTemplateTransport, buildTorrentBlockPluginConfig } from './node-provisioning-worker'
+import {
+  assertTemplateTransport,
+  buildRemnawaveNodeAlignmentPatch,
+  buildTorrentBlockPluginConfig,
+  failInterruptedNodeProvisioningJobs,
+} from './node-provisioning-worker'
+
+const prismaMock = vi.hoisted(() => ({
+  nodeProvisioningJob: {
+    findMany: vi.fn(),
+    update: vi.fn(),
+  },
+  $transaction: vi.fn(),
+}))
+
+vi.mock('@/lib/prisma', () => ({ prisma: prismaMock }))
+
+beforeEach(() => {
+  vi.clearAllMocks()
+})
 
 const host: RemnawaveHost = {
   uuid: '55555555-5555-4555-8555-555555555555',
@@ -62,6 +81,65 @@ describe('torrent_block plugin configuration', () => {
         blockDuration: 600,
         ignoreLists: { ip: ['1.1.1.1'], userId: [] },
       },
+    })
+  })
+})
+
+describe('Remnawave node address alignment', () => {
+  it('replaces a legacy IP address with the provisioned FQDN', () => {
+    const current = node()
+    current.address = '45.10.164.167'
+    current.countryCode = 'US'
+    current.activePluginUuid = '55555555-5555-4555-8555-555555555555'
+
+    expect(buildRemnawaveNodeAlignmentPatch(current, {
+      address: 'us01.stealthnet.site',
+      countryCode: 'US',
+      activePluginUuid: current.activePluginUuid,
+    })).toEqual({
+      uuid: current.uuid,
+      address: 'us01.stealthnet.site',
+    })
+  })
+
+  it('does not update a node that already uses the desired FQDN', () => {
+    const current = node()
+    current.address = 'us01.stealthnet.site'
+    current.countryCode = 'US'
+    current.activePluginUuid = '55555555-5555-4555-8555-555555555555'
+
+    expect(buildRemnawaveNodeAlignmentPatch(current, {
+      address: 'US01.STEALTHNET.SITE',
+      countryCode: 'US',
+      activePluginUuid: current.activePluginUuid,
+    })).toBeNull()
+  })
+})
+
+describe('interrupted provisioning recovery', () => {
+  it('makes jobs left RUNNING by a worker restart retryable', async () => {
+    prismaMock.nodeProvisioningJob.findMany.mockResolvedValueOnce([
+      { id: 'job-1', step: 'ANSIBLE' },
+    ])
+    prismaMock.nodeProvisioningJob.update.mockResolvedValueOnce({ id: 'job-1' })
+    prismaMock.$transaction.mockResolvedValueOnce([])
+
+    await expect(failInterruptedNodeProvisioningJobs()).resolves.toBe(1)
+    expect(prismaMock.nodeProvisioningJob.update).toHaveBeenCalledWith({
+      where: { id: 'job-1' },
+      data: expect.objectContaining({
+        status: 'FAILED',
+        activeKey: null,
+        lockedAt: null,
+        completedAt: expect.any(Date),
+        lastError: expect.stringContaining('Worker был перезапущен'),
+        events: {
+          create: expect.objectContaining({
+            step: 'ANSIBLE',
+            level: 'ERROR',
+          }),
+        },
+      }),
     })
   })
 })
