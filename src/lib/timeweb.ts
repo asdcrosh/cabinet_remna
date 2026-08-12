@@ -25,6 +25,17 @@ interface TimewebDnsRecordResponse {
   dns_record?: TimewebDnsRecord
 }
 
+interface TimewebDomain {
+  fqdn?: string
+}
+
+interface TimewebDomainsResponse {
+  domains?: TimewebDomain[]
+  meta?: {
+    total?: number
+  }
+}
+
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   const token = process.env.TIMEWEB_API_TOKEN?.trim()
   if (!token) throw new TimewebError(0, null, 'TIMEWEB_API_TOKEN is not configured')
@@ -49,7 +60,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 
 export async function upsertTimewebARecord(fqdn: string, serverIp: string) {
   const encoded = encodeURIComponent(fqdn)
-  const existing = await request<TimewebDnsRecordsResponse>('GET', `/domains/${encoded}/dns-records?limit=100&offset=0`)
+  const existing = await getDnsRecords(fqdn)
   const records = existing.dns_records || []
   const conflictingRecords = records.filter((record) => ['AAAA', 'CNAME'].includes(recordType(record)))
   if (conflictingRecords.length > 0) {
@@ -79,6 +90,62 @@ export async function upsertTimewebARecord(fqdn: string, serverIp: string) {
   )
   if (created.dns_record?.id == null) throw new TimewebError(502, created, 'Timeweb response has no DNS record id')
   return { id: String(created.dns_record.id), created: true }
+}
+
+async function getDnsRecords(fqdn: string) {
+  const encoded = encodeURIComponent(fqdn)
+  const path = `/domains/${encoded}/dns-records?limit=100&offset=0`
+  try {
+    return await request<TimewebDnsRecordsResponse>('GET', path)
+  } catch (error) {
+    if (!(error instanceof TimewebError) || error.status !== 404) throw error
+
+    const parentDomain = await findManagedParentDomain(fqdn)
+    const subdomain = relativeSubdomain(fqdn, parentDomain)
+    if (!subdomain) throw error
+
+    await request(
+      'POST',
+      `/domains/${encodeURIComponent(parentDomain)}/subdomains/${encodeURIComponent(subdomain)}`
+    )
+    return request<TimewebDnsRecordsResponse>('GET', path)
+  }
+}
+
+async function findManagedParentDomain(fqdn: string) {
+  const pageLimit = 100
+  const domains: TimewebDomain[] = []
+  let offset = 0
+
+  while (true) {
+    const page = await request<TimewebDomainsResponse>('GET', `/domains?limit=${pageLimit}&offset=${offset}`)
+    const pageDomains = page.domains || []
+    domains.push(...pageDomains)
+    const total = page.meta?.total
+    if (pageDomains.length < pageLimit || (typeof total === 'number' && domains.length >= total)) break
+    offset += pageDomains.length
+  }
+
+  const normalizedFqdn = normalizeDomain(fqdn)
+  const parent = domains
+    .map((domain) => normalizeDomain(domain.fqdn || ''))
+    .filter((domain) => domain && normalizedFqdn.endsWith(`.${domain}`))
+    .sort((left, right) => right.length - left.length)[0]
+
+  if (!parent) {
+    throw new TimewebError(404, domains, `No managed Timeweb parent domain found for ${fqdn}`)
+  }
+  return parent
+}
+
+function relativeSubdomain(fqdn: string, parentDomain: string) {
+  const normalizedFqdn = normalizeDomain(fqdn)
+  const suffix = `.${normalizeDomain(parentDomain)}`
+  return normalizedFqdn.endsWith(suffix) ? normalizedFqdn.slice(0, -suffix.length) : ''
+}
+
+function normalizeDomain(value: string) {
+  return value.trim().toLowerCase().replace(/\.$/, '')
 }
 
 function recordType(record: TimewebDnsRecord) {
