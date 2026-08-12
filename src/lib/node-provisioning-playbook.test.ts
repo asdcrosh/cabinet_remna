@@ -25,7 +25,11 @@ describe('node provisioning playbook safety', () => {
   })
 
   it('fails closed for unknown Docker state and self-signed certificates', () => {
-    expect(playbook).toContain("existing_selfsteal_container.stderr | default('') is search('No such object')")
+    expect(playbook).toContain('List all Docker container names')
+    expect(playbook).toContain('existing_docker_container_names.rc == 0')
+    expect(playbook).toContain("'nginx-selfsteal' not in")
+    expect(playbook).toContain('(existing_docker_container_names.stdout_lines | default([]))')
+    expect(playbook).not.toContain("is search('No such object')")
     expect(playbook).toContain('selfsteal_container_is_owned')
     expect(playbook).toContain('com.docker.compose.project.working_dir')
     expect(playbook).toContain('com.docker.compose.project.config_files')

@@ -516,6 +516,19 @@
       changed_when: false
       failed_when: false
 
+    - name: List all Docker container names
+      ansible.builtin.command:
+        argv:
+          - docker
+          - container
+          - ls
+          - --all
+          - --format
+          - '{% raw %}{{.Names}}{% endraw %}'
+      register: existing_docker_container_names
+      changed_when: false
+      failed_when: false
+
     - name: Verify the domain of the existing SelfSteal container
       ansible.builtin.shell: >-
         set -o pipefail &&
@@ -593,8 +606,9 @@
                selfsteal_dir + '|' + selfsteal_dir + '/docker-compose.yml|false')) or
              existing_selfsteal_container_mounts.rc == 0 }}
         selfsteal_container_is_absent: >-
-          {{ existing_selfsteal_container.rc == 1 and
-             existing_selfsteal_container.stderr | default('') is search('No such object') }}
+          {{ existing_docker_container_names.rc == 0 and
+             'nginx-selfsteal' not in
+             (existing_docker_container_names.stdout_lines | default([])) }}
         selfsteal_container_domain_matches: >-
           {{ existing_selfsteal_container_domain.rc == 0 }}
 
@@ -616,6 +630,7 @@
           Docker inspect rc={{ existing_selfsteal_container.rc }},
           labels={{ existing_selfsteal_container.stdout | default('') | trim | quote }},
           inspect error={{ existing_selfsteal_container.stderr | default('') | trim | quote }},
+          container list rc={{ existing_docker_container_names.rc }},
           expected mounts={{ existing_selfsteal_container_mounts.rc == 0 }},
           configured domain matches={{ selfsteal_configured_domain.stdout | trim == node_fqdn }},
           container domain matches={{ selfsteal_container_domain_matches | bool }}.
