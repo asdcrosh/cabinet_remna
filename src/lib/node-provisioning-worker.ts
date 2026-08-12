@@ -341,34 +341,86 @@ async function ensureHosts(
 ) {
   const existing = (await remnawave.getHosts()).response
   const ensure = async (template: RemnawaveHost, kind: 'TCP' | 'XHTTP') => {
-    const remark = nodeHostRemark(countryCode, kind)
-    const jobTag = `CAB_${kind}:${job.id.slice(-20).toUpperCase()}`
-    const payload = buildHostCloneRequest(template, {
-      remark,
-      address: job.fqdn,
-      sni: replaceTemplateHostname(template.sni, template.address, job.fqdn),
-      host: replaceTemplateHostname(template.host, template.address, job.fqdn),
-      verifyPeerCertByName: replaceTemplateHostname(template.verifyPeerCertByName, template.address, job.fqdn),
-      nodes: [nodeUuid],
-      tags: [...new Set([...(template.tags || []), jobTag])].slice(-10),
-      isDisabled: true,
-      isHidden: true,
+    const payload = buildProvisionedHostPayload(template, {
+      fqdn: job.fqdn,
+      nodeUuid,
+      countryCode,
+      kind,
     })
-    const matches = existing.filter((host) => host.tags?.includes(jobTag) && host.nodes.includes(nodeUuid))
+    const persistedUuid = kind === 'TCP' ? job.tcpHostUuid : job.xhttpHostUuid
+    const persisted = persistedUuid ? existing.find((host) => host.uuid === persistedUuid) : undefined
+    if (persistedUuid && !persisted) throw new Error(`Созданный ранее ${kind} host не найден в Remnawave`)
+
+    const legacyJobTag = `CAB_${kind}:${job.id.slice(-20).toUpperCase()}`
+    const recoveryMatches = persisted ? [persisted] : existing.filter((host) =>
+      host.tags?.includes(legacyJobTag) || isProvisionedHostRecoveryCandidate(host, payload, nodeUuid)
+    )
+    const matches = [...new Map(recoveryMatches.map((host) => [host.uuid, host])).values()]
     if (matches.length > 1) throw new Error(`Найдено несколько клонов ${kind} host`)
     if (matches[0]) {
       const match = matches[0]
       if (match.inbound.configProfileInboundUuid !== template.inbound.configProfileInboundUuid) {
         throw new Error(`Существующий клон ${kind} host не совпадает с эталоном`)
       }
-      return (await remnawave.updateHost({ uuid: match.uuid, ...payload })).response
+      const updated = (await remnawave.updateHost({ uuid: match.uuid, ...payload })).response
+      await persistProvisionedHostUuid(job.id, kind, updated.uuid)
+      return updated
     }
-    return (await remnawave.createHost(payload)).response
+    const created = (await remnawave.createHost(payload)).response
+    await persistProvisionedHostUuid(job.id, kind, created.uuid)
+    return created
   }
   return {
     tcp: await ensure(templates.tcp, 'TCP'),
     xhttp: await ensure(templates.xhttp, 'XHTTP'),
   }
+}
+
+async function persistProvisionedHostUuid(jobId: string, kind: 'TCP' | 'XHTTP', hostUuid: string) {
+  await prisma.nodeProvisioningJob.update({
+    where: { id: jobId },
+    data: kind === 'TCP' ? { tcpHostUuid: hostUuid } : { xhttpHostUuid: hostUuid },
+  })
+}
+
+export function buildProvisionedHostPayload(
+  template: RemnawaveHost,
+  input: {
+    fqdn: string
+    nodeUuid: string
+    countryCode: string
+    kind: 'TCP' | 'XHTTP'
+  }
+) {
+  return buildHostCloneRequest(template, {
+    remark: nodeHostRemark(input.countryCode, input.kind),
+    address: input.fqdn,
+    sni: replaceTemplateHostname(template.sni, template.address, input.fqdn),
+    host: replaceTemplateHostname(template.host, template.address, input.fqdn),
+    verifyPeerCertByName: replaceTemplateHostname(
+      template.verifyPeerCertByName,
+      template.address,
+      input.fqdn,
+    ),
+    nodes: [input.nodeUuid],
+    tags: [...(template.tags ?? [])],
+    isDisabled: true,
+    isHidden: true,
+  })
+}
+
+function isProvisionedHostRecoveryCandidate(
+  host: RemnawaveHost,
+  desired: ReturnType<typeof buildProvisionedHostPayload>,
+  nodeUuid: string,
+) {
+  return host.remark === desired.remark &&
+    host.address.trim().toLowerCase() === desired.address.trim().toLowerCase() &&
+    host.port === desired.port &&
+    host.inbound.configProfileUuid === desired.inbound.configProfileUuid &&
+    host.inbound.configProfileInboundUuid === desired.inbound.configProfileInboundUuid &&
+    host.nodes.length === 1 &&
+    host.nodes[0] === nodeUuid
 }
 
 function replaceTemplateHostname(value: string | null | undefined, templateAddress: string, nodeFqdn: string) {

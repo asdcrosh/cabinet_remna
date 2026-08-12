@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { RemnawaveHost, RemnawaveNode } from './remnawave'
 import {
   assertTemplateTransport,
+  buildProvisionedHostPayload,
   buildRemnawaveNodeAlignmentPatch,
   buildTorrentBlockPluginConfig,
   failInterruptedNodeProvisioningJobs,
@@ -113,6 +114,40 @@ describe('Remnawave node address alignment', () => {
       countryCode: 'US',
       activePluginUuid: current.activePluginUuid,
     })).toBeNull()
+  })
+})
+
+describe('provisioned host cloning', () => {
+  it('copies tags only from the matching TCP template', () => {
+    const payload = buildProvisionedHostPayload({
+      ...host,
+      tags: ['AUTO_MOBILE'],
+    }, {
+      fqdn: 'us01.stealthnet.site',
+      nodeUuid: '33333333-3333-4333-8333-333333333333',
+      countryCode: 'US',
+      kind: 'TCP',
+    })
+
+    expect(payload.tags).toEqual(['AUTO_MOBILE'])
+    expect(payload.tags?.some((tag) => tag.startsWith('CAB_'))).toBe(false)
+  })
+
+  it('keeps XHTTP tags empty when its own template has no tags', () => {
+    const payload = buildProvisionedHostPayload({
+      ...host,
+      remark: 'XHTTP template',
+      port: 443,
+      tags: [],
+    }, {
+      fqdn: 'us01.stealthnet.site',
+      nodeUuid: '33333333-3333-4333-8333-333333333333',
+      countryCode: 'US',
+      kind: 'XHTTP',
+    })
+
+    expect(payload.tags).toEqual([])
+    expect(payload.tags).not.toContain('AUTO_MOBILE')
   })
 })
 

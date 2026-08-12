@@ -320,6 +320,7 @@ describe('Remnawave v2/v3 user identifiers', () => {
       address: 'ams-01.example.test',
       isDisabled: false,
       nodes: ['88888888-8888-4888-8888-888888888888'],
+      tags: [],
     }
 
     await remnawave.updateHost(input)

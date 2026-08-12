@@ -5,6 +5,12 @@ import { describe, expect, it } from 'vitest'
 const playbook = readFileSync(resolve('deploy/provisioner/ansible/playbook.yml'), 'utf8')
 const renewalWrapper = readFileSync(resolve('deploy/provisioner/ansible/templates/acme-renew.sh.j2'), 'utf8')
 
+function taskBlock(name: string) {
+  const start = playbook.indexOf(`    - name: ${name}`)
+  const end = playbook.indexOf('\n    - name:', start + 1)
+  return playbook.slice(start, end < 0 ? undefined : end)
+}
+
 describe('node provisioning playbook safety', () => {
   it('uses the pinned official SelfSteal force mode without expect', () => {
     expect(playbook).toContain('selfsteal_script_version: 2.10.0')
@@ -20,10 +26,23 @@ describe('node provisioning playbook safety', () => {
 
   it('fails closed for unknown Docker state and self-signed certificates', () => {
     expect(playbook).toContain("existing_selfsteal_container.stderr | default('') is search('No such object')")
+    expect(playbook).toContain('selfsteal_container_is_owned')
+    expect(playbook).toContain('com.docker.compose.project.working_dir')
+    expect(playbook).toContain('com.docker.compose.project.config_files')
+    expect(playbook).toContain('selfsteal_configured_domain.stdout | trim == node_fqdn')
+    expect(playbook).toContain("grep -Fx -- {{ ('SELF_STEAL_DOMAIN=' + node_fqdn) | quote }}")
+    expect(playbook).toContain('selfsteal_container_domain_matches | bool')
+    expect(playbook).toContain('- selfsteal_container_is_owned | bool')
     expect(playbook).toContain('Stop when SelfSteal used its self-signed fallback')
     expect(playbook).toContain("is search('Using self-signed certificate')")
     expect(playbook).toMatch(/content: \|\n\s+\{\{ provisioning_job_id \}\} \{\{ node_fqdn \}\}/)
     expect(playbook).not.toContain("selfsteal_script_sha256 }}\\n'")
+  })
+
+  it('validates incomplete SelfSteal files instead of skipping their checks', () => {
+    expect(taskBlock('Validate the existing SelfSteal Compose project')).not.toContain('\n      when:')
+    expect(taskBlock('Validate the existing certificate hostname')).not.toContain('\n      when:')
+    expect(taskBlock('Validate the existing certificate lifetime')).not.toContain('\n      when:')
   })
 
   it('always removes ACME redirect rules when renewal exits', () => {

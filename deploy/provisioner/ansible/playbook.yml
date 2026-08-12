@@ -421,7 +421,6 @@
       register: existing_selfsteal_compose
       changed_when: false
       failed_when: false
-      when: selfsteal_required_files.results[1].stat.exists
 
     - name: Validate the existing certificate hostname
       ansible.builtin.command:
@@ -436,7 +435,6 @@
       register: existing_selfsteal_certificate_hostname
       changed_when: false
       failed_when: false
-      when: selfsteal_required_files.results[4].stat.exists
 
     - name: Validate the existing certificate lifetime
       ansible.builtin.command:
@@ -451,7 +449,6 @@
       register: existing_selfsteal_certificate_lifetime
       changed_when: false
       failed_when: false
-      when: selfsteal_required_files.results[4].stat.exists
 
     - name: Read the existing certificate subject
       ansible.builtin.command:
@@ -467,7 +464,6 @@
       register: existing_selfsteal_certificate_subject
       changed_when: false
       failed_when: false
-      when: selfsteal_required_files.results[4].stat.exists
 
     - name: Read the existing certificate issuer
       ansible.builtin.command:
@@ -483,7 +479,6 @@
       register: existing_selfsteal_certificate_issuer
       changed_when: false
       failed_when: false
-      when: selfsteal_required_files.results[4].stat.exists
 
     - name: Read the existing certificate public-key fingerprint
       ansible.builtin.shell: >-
@@ -496,7 +491,6 @@
       register: existing_selfsteal_certificate_public_key
       changed_when: false
       failed_when: false
-      when: selfsteal_required_files.results[4].stat.exists
 
     - name: Read the existing private-key public-key fingerprint
       ansible.builtin.shell: >-
@@ -509,7 +503,6 @@
       changed_when: false
       failed_when: false
       no_log: true
-      when: selfsteal_required_files.results[5].stat.exists
 
     - name: Inspect the existing SelfSteal container
       ansible.builtin.command:
@@ -517,11 +510,25 @@
           - docker
           - inspect
           - --format
-          - '{% raw %}{{.State.Running}}{% endraw %}'
+          - '{% raw %}{{ index .Config.Labels "com.docker.compose.project.working_dir" }}|{{ index .Config.Labels "com.docker.compose.project.config_files" }}|{{.State.Running}}{% endraw %}'
           - nginx-selfsteal
       register: existing_selfsteal_container
       changed_when: false
       failed_when: false
+
+    - name: Verify the domain of the existing SelfSteal container
+      ansible.builtin.shell: >-
+        set -o pipefail &&
+        docker inspect --format
+        '{% raw %}{{range .Config.Env}}{{println .}}{{end}}{% endraw %}'
+        nginx-selfsteal |
+        grep -Fx -- {{ ('SELF_STEAL_DOMAIN=' + node_fqdn) | quote }}
+      args:
+        executable: /bin/bash
+      register: existing_selfsteal_container_domain
+      changed_when: false
+      failed_when: false
+      no_log: true
 
     - name: Check the cabinet SelfSteal ownership marker
       ansible.builtin.stat:
@@ -560,42 +567,45 @@
           {{ selfsteal_marker.stat.exists and
              selfsteal_marker_contents.content | default('') | b64decode | trim ==
              provisioning_job_id + ' ' + node_fqdn + ' ' + selfsteal_script_sha256 }}
+        selfsteal_container_is_owned: >-
+          {{ existing_selfsteal_container.rc == 0 and
+             existing_selfsteal_container.stdout | trim ==
+             selfsteal_dir + '|' + selfsteal_dir + '/docker-compose.yml|true' or
+             existing_selfsteal_container.rc == 0 and
+             existing_selfsteal_container.stdout | trim ==
+             selfsteal_dir + '|' + selfsteal_dir + '/docker-compose.yml|false' }}
+        selfsteal_container_is_absent: >-
+          {{ existing_selfsteal_container.rc == 1 and
+             existing_selfsteal_container.stderr | default('') is search('No such object') }}
+        selfsteal_container_domain_matches: >-
+          {{ existing_selfsteal_container_domain.rc == 0 }}
 
     - name: Refuse to replace an unverified SelfSteal installation
       ansible.builtin.assert:
         that:
           - >-
             selfsteal_is_healthy | bool or
-            not selfsteal_directory.stat.exists or
+            (not selfsteal_directory.stat.exists and
+             (selfsteal_container_is_absent | bool or selfsteal_container_is_owned | bool)) or
             (selfsteal_marker_is_owned | bool and
-             (existing_selfsteal_container.rc == 0 or
-              (existing_selfsteal_container.rc == 1 and
-               existing_selfsteal_container.stderr | default('') is search('No such object')))) or
-            (selfsteal_configured_domain.stdout | trim == node_fqdn and
-             existing_selfsteal_container.rc == 1 and
-             existing_selfsteal_container.stderr | default('') is search('No such object'))
+             (selfsteal_container_is_owned | bool or selfsteal_container_is_absent | bool)) or
+            ((selfsteal_configured_domain.stdout | trim == node_fqdn or
+              selfsteal_container_domain_matches | bool) and
+             (selfsteal_container_is_owned | bool or selfsteal_container_is_absent | bool))
         fail_msg: >-
           Existing SelfSteal is unhealthy but cannot be safely attributed to this job.
           It was left untouched; inspect {{ selfsteal_dir }} manually.
 
-    - name: Stop an owned incomplete SelfSteal project before recovery
+    - name: Remove the attributed incomplete SelfSteal container before recovery
       ansible.builtin.command:
         argv:
           - docker
-          - compose
-          - --project-directory
-          - '{{ selfsteal_dir }}'
-          - down
-      register: incomplete_selfsteal_down
-      changed_when: incomplete_selfsteal_down.rc == 0
-      failed_when: >-
-        existing_selfsteal_container.stdout | default('false') | trim == 'true' and
-        incomplete_selfsteal_down.rc != 0
+          - rm
+          - --force
+          - nginx-selfsteal
       when:
         - not selfsteal_is_healthy | bool
-        - selfsteal_directory.stat.exists
-        - selfsteal_required_files.results[1].stat.exists
-        - selfsteal_marker_is_owned | bool or existing_selfsteal_container.stdout | default('false') | trim != 'true'
+        - selfsteal_container_is_owned | bool
 
     - name: Archive an incomplete SelfSteal installation
       ansible.builtin.command:
