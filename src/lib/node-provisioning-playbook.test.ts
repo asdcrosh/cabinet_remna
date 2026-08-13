@@ -26,6 +26,7 @@ describe('node provisioning playbook safety', () => {
 
   it('runs the acme.sh installer from its extracted source directory', () => {
     expect(playbook).toContain('chdir: /usr/local/src/acme.sh-{{ acme_script_version }}')
+    expect(taskBlock('Install base operating-system packages')).toContain('- iproute2')
   })
 
   it('fails closed for unknown Docker state and self-signed certificates', () => {
@@ -70,7 +71,7 @@ describe('node provisioning playbook safety', () => {
     expect(taskBlock('Install SelfSteal through its official force mode')).toContain('- not selfsteal_is_resumable | bool')
   })
 
-  it('issues and renews certificates through the HTTP webroot without NAT redirects', () => {
+  it('issues certificates through the HTTP fallback without unsafe deployment', () => {
     const issueTask = taskBlock('Issue the trusted SelfSteal certificate through the fallback HTTP webroot')
     expect(taskBlock('Validate a cached trusted SelfSteal certificate')).toContain('-checkhost')
     expect(taskBlock('Validate a cached trusted SelfSteal certificate')).toContain('-checkend 86400')
@@ -102,12 +103,11 @@ describe('node provisioning playbook safety', () => {
     expect(playbook.indexOf('Issue the trusted SelfSteal certificate through the fallback HTTP webroot'))
       .toBeLessThan(playbook.indexOf('Validate the certificate hostname'))
     expect(renewalWrapper).toContain('set -euo pipefail')
-    expect(renewalWrapper).toContain('--webroot')
     expect(renewalWrapper).toContain('certificate_key_fingerprint')
     expect(taskBlock('Validate automatic SelfSteal certificate renewal')).toContain('- --check')
   })
 
-  it('uses direct port 443 TLS-ALPN first and keeps legacy renewal safe', () => {
+  it('uses direct port 443 TLS-ALPN and renews independently of legacy ACME metadata', () => {
     const directIssue = taskBlock('Request the trusted SelfSteal certificate through direct TLS-ALPN')
     expect(taskBlock('Stop Remnanode while the direct ACME listener owns port 443')).toContain('- remnanode')
     expect(directIssue).toContain('- --alpn')
@@ -126,13 +126,13 @@ describe('node provisioning playbook safety', () => {
     expect(renewalWrapper).toContain('docker stop remnanode')
     expect(renewalWrapper).toContain('docker start remnanode')
     expect(renewalWrapper).toContain('--issue --domain "$DOMAIN"')
-    expect(renewalWrapper).toContain('--keylength "$issue_keylength"')
-    expect(renewalWrapper).toContain('issue_keylength=2048')
-    expect(renewalWrapper).toContain('issue_keylength=ec-256')
+    expect(renewalWrapper).toContain('--keylength ec-256')
     expect(renewalWrapper).toContain('--alpn --tlsport 443')
+    expect(renewalWrapper).toContain('port_443_is_free=false')
     expect(renewalWrapper).toContain('timeout --signal=TERM --kill-after=10s')
     expect(renewalWrapper).toContain('--install-cert --domain "$DOMAIN"')
-    expect(renewalWrapper).toContain('STAGE_DIR=/run/selfsteal-cert-renew')
+    expect(renewalWrapper).toContain('--ecc')
+    expect(renewalWrapper).toContain('SELFSTEAL_RENEW_STAGE_DIR:-/run/selfsteal-cert-renew')
     expect(renewalWrapper).toContain('--reloadcmd /bin/true')
     expect(renewalWrapper).toContain('docker compose --project-directory "$SELFSTEAL_DIR" down')
     expect(renewalWrapper).toContain('docker compose --project-directory "$SELFSTEAL_DIR" up')
@@ -140,6 +140,9 @@ describe('node provisioning playbook safety', () => {
     expect(renewalWrapper).toContain('restore_previous_pair')
     expect(renewalWrapper).toContain('docker exec nginx-selfsteal nginx -t')
     expect(renewalWrapper).toContain("if [ \"${1:-}\" = '--check' ]")
+    expect(renewalWrapper).toContain('-checkhost "$DOMAIN"')
+    expect(renewalWrapper).not.toContain('domain_conf')
+    expect(renewalWrapper).not.toContain('Le_Webroot')
   })
 
   it('treats a restarting SelfSteal container as resumable and waits for stability', () => {

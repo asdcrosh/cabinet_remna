@@ -79,6 +79,7 @@
           - dnsutils
           - git
           - gnupg
+          - iproute2
           - nftables
           - openssl
           - python3-debian

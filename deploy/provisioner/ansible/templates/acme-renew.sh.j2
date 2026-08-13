@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ACME_HOME=/root/.acme.sh
+ACME_HOME="${SELFSTEAL_ACME_HOME:-/root/.acme.sh}"
 DOMAIN={{ node_fqdn | quote }}
 SELFSTEAL_DIR={{ selfsteal_dir | quote }}
 INSTALLED_CERT={{ (selfsteal_dir + '/ssl/fullchain.crt') | quote }}
 INSTALLED_KEY={{ (selfsteal_dir + '/ssl/private.key') | quote }}
-STAGE_DIR=/run/selfsteal-cert-renew
+STAGE_DIR="${SELFSTEAL_RENEW_STAGE_DIR:-/run/selfsteal-cert-renew}"
 RENEW_BEFORE_SECONDS=$((30 * 24 * 60 * 60))
 ACME_TIMEOUT_SECONDS=300
 REMNANODE_WAS_RUNNING=false
@@ -54,29 +54,21 @@ cleanup() {
 
 trap cleanup EXIT INT TERM
 
-installed_fingerprint="$(certificate_key_fingerprint "$INSTALLED_CERT")"
-ecc_dir="$ACME_HOME/${DOMAIN}_ecc"
-rsa_dir="$ACME_HOME/$DOMAIN"
-ecc_flag=()
-issue_keylength=2048
-
-if [ -f "$ecc_dir/fullchain.cer" ] \
-  && [ "$(certificate_key_fingerprint "$ecc_dir/fullchain.cer")" = "$installed_fingerprint" ]; then
-  domain_conf="$ecc_dir/$DOMAIN.conf"
-  ecc_flag=(--ecc)
-  issue_keylength=ec-256
-elif [ -f "$rsa_dir/fullchain.cer" ] \
-  && [ "$(certificate_key_fingerprint "$rsa_dir/fullchain.cer")" = "$installed_fingerprint" ]; then
-  domain_conf="$rsa_dir/$DOMAIN.conf"
-else
-  echo "Cannot match the installed SelfSteal certificate to an acme.sh domain" >&2
+if [ ! -x "$ACME_HOME/acme.sh" ]; then
+  echo "The managed acme.sh client is missing or is not executable" >&2
   exit 1
 fi
 
-if [ ! -r "$domain_conf" ] \
-  || ! grep -Fx "Le_Domain='$DOMAIN'" "$domain_conf" >/dev/null \
-  || ! grep -Eq "^Le_Webroot='?(/|alpn|tls_alpn)" "$domain_conf"; then
-  echo "The active acme.sh domain configuration is missing or unsupported" >&2
+if ! openssl x509 -in "$INSTALLED_CERT" -noout \
+  -checkhost "$DOMAIN" >/dev/null 2>&1; then
+  echo "The installed SelfSteal certificate is invalid or belongs to another domain" >&2
+  exit 1
+fi
+
+if [ "$(certificate_key_fingerprint "$INSTALLED_CERT")" != \
+  "$(openssl pkey -in "$INSTALLED_KEY" -pubout -outform DER 2>/dev/null \
+    | sha256sum | cut -d' ' -f1)" ]; then
+  echo "The installed SelfSteal certificate and private key do not match" >&2
   exit 1
 fi
 
@@ -88,32 +80,40 @@ if openssl x509 -in "$INSTALLED_CERT" -noout -checkend "$RENEW_BEFORE_SECONDS" >
   exit 0
 fi
 
-if grep -Eq "^Le_Webroot='?(alpn|tls_alpn)'?$" "$domain_conf"; then
-  if [ "$(docker inspect --format '{% raw %}{{.State.Running}}{% endraw %}' remnanode 2>/dev/null || true)" = true ]; then
-    REMNANODE_WAS_RUNNING=true
-    docker stop remnanode >/dev/null
-  fi
-
-  while iptables -t nat -C PREROUTING -p tcp --dport 443 -j REDIRECT --to-port 8443 2>/dev/null; do
-    iptables -t nat -D PREROUTING -p tcp --dport 443 -j REDIRECT --to-port 8443
-  done
-  while iptables -t nat -C OUTPUT -p tcp --dport 443 -o lo -j REDIRECT --to-port 8443 2>/dev/null; do
-    iptables -t nat -D OUTPUT -p tcp --dport 443 -o lo -j REDIRECT --to-port 8443
-  done
-
-  timeout --signal=TERM --kill-after=10s "$ACME_TIMEOUT_SECONDS" \
-    "$ACME_HOME/acme.sh" --issue --domain "$DOMAIN" --keylength "$issue_keylength" \
-    --alpn --tlsport 443 --server letsencrypt --force
-else
-  timeout --signal=TERM --kill-after=10s "$ACME_TIMEOUT_SECONDS" \
-    "$ACME_HOME/acme.sh" --issue --domain "$DOMAIN" --keylength "$issue_keylength" \
-    --webroot {{ (selfsteal_dir + '/html') | quote }} --server letsencrypt --force
+if [ "$(docker inspect --format '{% raw %}{{.State.Running}}{% endraw %}' remnanode 2>/dev/null || true)" = true ]; then
+  REMNANODE_WAS_RUNNING=true
+  docker stop remnanode >/dev/null
 fi
+
+while iptables -t nat -C PREROUTING -p tcp --dport 443 -j REDIRECT --to-port 8443 2>/dev/null; do
+  iptables -t nat -D PREROUTING -p tcp --dport 443 -j REDIRECT --to-port 8443
+done
+while iptables -t nat -C OUTPUT -p tcp --dport 443 -o lo -j REDIRECT --to-port 8443 2>/dev/null; do
+  iptables -t nat -D OUTPUT -p tcp --dport 443 -o lo -j REDIRECT --to-port 8443
+done
+
+port_443_is_free=false
+for attempt in $(seq 1 30); do
+  if ! ss -H -ltn '( sport = :443 )' | grep -q .; then
+    port_443_is_free=true
+    break
+  fi
+  sleep 1
+done
+if [ "$port_443_is_free" != true ]; then
+  echo "Port 443 is still occupied after stopping Remnanode" >&2
+  ss -ltnp '( sport = :443 )' >&2 || true
+  exit 1
+fi
+
+timeout --signal=TERM --kill-after=10s "$ACME_TIMEOUT_SECONDS" \
+  "$ACME_HOME/acme.sh" --issue --domain "$DOMAIN" --keylength ec-256 \
+  --alpn --tlsport 443 --server letsencrypt --force
 
 rm -rf "$STAGE_DIR"
 install -d -m 0700 "$STAGE_DIR"
 
-"$ACME_HOME/acme.sh" --install-cert --domain "$DOMAIN" "${ecc_flag[@]}" \
+"$ACME_HOME/acme.sh" --install-cert --domain "$DOMAIN" --ecc \
   --key-file "$STAGE_DIR/private.key" \
   --fullchain-file "$STAGE_DIR/fullchain.crt" \
   --reloadcmd /bin/true
