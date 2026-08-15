@@ -996,10 +996,86 @@ textarea:focus {
   background: color-mix(in srgb, var(--app-surface-soft) 45%, transparent);
 }
 
-/* The reward reveal deliberately keeps its dark stage in both application themes.
-   It must follow the generic modal tokens declared above, otherwise the light
-   theme replaces its background while the reward copy remains white. */
+/* Reward reveal has complete visual variants. It must follow generic modal
+   styles because the reveal copy uses its own contrast palette. */
 .app-modal-panel.bonus-wheel-result-modal {
+  color: var(--app-text) !important;
+  border-color: color-mix(in srgb, var(--app-ink) 30%, var(--app-border)) !important;
+  background:
+    radial-gradient(circle at 50% -8%, color-mix(in srgb, var(--app-signal) 17%, transparent), transparent 40%),
+    linear-gradient(155deg, #ffffff, color-mix(in srgb, var(--app-surface-soft) 68%, #ffffff)) !important;
+  box-shadow: 0 28px 70px rgba(41, 22, 92, 0.18), 0 0 38px color-mix(in srgb, var(--app-ink) 10%, transparent) !important;
+}
+
+.app-modal-panel.bonus-wheel-result-modal .app-modal-header,
+.app-modal-panel.bonus-wheel-result-modal .app-modal-footer {
+  border-color: color-mix(in srgb, var(--app-ink) 16%, var(--app-border)) !important;
+  background: color-mix(in srgb, var(--app-surface-soft) 66%, #ffffff) !important;
+}
+
+.app-modal-panel.bonus-wheel-result-modal .app-modal-header h2,
+.app-modal-panel.bonus-wheel-result-modal .bonus-wheel-result-copy > strong,
+.app-modal-panel.bonus-wheel-result-modal .bonus-wheel-result-copy > h3,
+.app-modal-panel.bonus-wheel-result-modal .bonus-wheel-result-promo {
+  color: var(--app-text) !important;
+}
+
+.app-modal-panel.bonus-wheel-result-modal .app-modal-header p,
+.app-modal-panel.bonus-wheel-result-modal .bonus-wheel-result-kicker,
+.app-modal-panel.bonus-wheel-result-modal .bonus-wheel-result-copy > p,
+.app-modal-panel.bonus-wheel-result-modal .bonus-wheel-result-promo small {
+  color: var(--app-muted) !important;
+}
+
+.app-modal-panel.bonus-wheel-result-modal .app-modal-header button {
+  border-color: var(--app-border-strong) !important;
+  color: var(--app-text) !important;
+}
+
+.app-modal-panel.bonus-wheel-result-modal .bonus-wheel-result-promo {
+  border-color: color-mix(in srgb, var(--app-ink) 26%, var(--app-border)) !important;
+  background: color-mix(in srgb, var(--app-surface-soft) 70%, #ffffff) !important;
+}
+
+.app-modal-panel.bonus-wheel-result-modal .bonus-wheel-result-sync {
+  color: #8a5200 !important;
+}
+
+.app-modal-panel.bonus-wheel-result-modal .bonus-wheel-result-actions .btn-secondary {
+  border-color: var(--app-border-strong) !important;
+  background: var(--app-surface) !important;
+  color: var(--app-text) !important;
+}
+
+.app-modal-panel.bonus-wheel-result-modal--rare {
+  border-color: rgba(12, 161, 199, 0.45) !important;
+  background:
+    radial-gradient(circle at 50% -8%, rgba(53, 217, 255, 0.3), transparent 42%),
+    linear-gradient(155deg, #f4fdff, #edf9ff) !important;
+}
+
+.app-modal-panel.bonus-wheel-result-modal--epic {
+  border-color: rgba(216, 50, 212, 0.48) !important;
+  background:
+    radial-gradient(circle at 50% -8%, rgba(232, 76, 224, 0.26), transparent 44%),
+    linear-gradient(155deg, #fff9ff, #fdf1fd) !important;
+  box-shadow: 0 28px 70px rgba(41, 22, 92, 0.18), 0 0 42px rgba(216, 50, 212, 0.18) !important;
+}
+
+.app-modal-panel.bonus-wheel-result-modal--legendary {
+  border-color: rgba(201, 137, 17, 0.56) !important;
+  background:
+    radial-gradient(circle at 50% -8%, rgba(255, 190, 54, 0.33), transparent 43%),
+    linear-gradient(155deg, #fffdf7, #fff6dc) !important;
+  box-shadow: 0 28px 70px rgba(41, 22, 92, 0.18), 0 0 46px rgba(255, 184, 43, 0.2) !important;
+}
+
+.app-modal-panel.bonus-wheel-result-modal--empty {
+  border-color: var(--app-border-strong) !important;
+  background: linear-gradient(155deg, #ffffff, var(--app-surface-soft)) !important;
+}
+
+.dark .app-modal-panel.bonus-wheel-result-modal {
   color: #fff !important;
   border-color: rgba(255, 255, 255, 0.18) !important;
   background:
@@ -1008,20 +1084,45 @@ textarea:focus {
   box-shadow: 0 28px 70px rgba(0, 0, 0, 0.45), 0 0 40px rgba(112, 41, 207, 0.22) !important;
 }
 
-.app-modal-panel.bonus-wheel-result-modal .app-modal-header,
-.app-modal-panel.bonus-wheel-result-modal .app-modal-footer {
+.dark .app-modal-panel.bonus-wheel-result-modal .app-modal-header,
+.dark .app-modal-panel.bonus-wheel-result-modal .app-modal-footer {
   border-color: rgba(255, 255, 255, 0.12) !important;
   background: rgba(8, 4, 24, 0.32) !important;
 }
 
-.app-modal-panel.bonus-wheel-result-modal--rare {
+.dark .app-modal-panel.bonus-wheel-result-modal .app-modal-header h2,
+.dark .app-modal-panel.bonus-wheel-result-modal .bonus-wheel-result-copy > strong,
+.dark .app-modal-panel.bonus-wheel-result-modal .bonus-wheel-result-copy > h3,
+.dark .app-modal-panel.bonus-wheel-result-modal .bonus-wheel-result-promo,
+.dark .app-modal-panel.bonus-wheel-result-modal .bonus-wheel-result-actions .btn-secondary {
+  color: #fff !important;
+}
+
+.dark .app-modal-panel.bonus-wheel-result-modal .app-modal-header p,
+.dark .app-modal-panel.bonus-wheel-result-modal .bonus-wheel-result-kicker,
+.dark .app-modal-panel.bonus-wheel-result-modal .bonus-wheel-result-copy > p,
+.dark .app-modal-panel.bonus-wheel-result-modal .bonus-wheel-result-promo small {
+  color: rgba(255, 255, 255, 0.62) !important;
+}
+
+.dark .app-modal-panel.bonus-wheel-result-modal .app-modal-header button,
+.dark .app-modal-panel.bonus-wheel-result-modal .bonus-wheel-result-actions .btn-secondary {
+  border-color: rgba(255, 255, 255, 0.18) !important;
+}
+
+.dark .app-modal-panel.bonus-wheel-result-modal .bonus-wheel-result-promo,
+.dark .app-modal-panel.bonus-wheel-result-modal .bonus-wheel-result-actions .btn-secondary {
+  background: rgba(255, 255, 255, 0.07) !important;
+}
+
+.dark .app-modal-panel.bonus-wheel-result-modal--rare {
   border-color: rgba(92, 226, 255, 0.48) !important;
   background:
     radial-gradient(circle at 50% -8%, rgba(53, 217, 255, 0.38), transparent 42%),
     linear-gradient(155deg, rgba(18, 75, 100, 0.98), rgba(10, 12, 32, 0.98)) !important;
 }
 
-.app-modal-panel.bonus-wheel-result-modal--epic {
+.dark .app-modal-panel.bonus-wheel-result-modal--epic {
   border-color: rgba(250, 137, 255, 0.55) !important;
   background:
     radial-gradient(circle at 50% -8%, rgba(232, 76, 224, 0.46), transparent 44%),
@@ -1029,7 +1130,7 @@ textarea:focus {
   box-shadow: 0 28px 70px rgba(0, 0, 0, 0.45), 0 0 48px rgba(216, 50, 212, 0.34) !important;
 }
 
-.app-modal-panel.bonus-wheel-result-modal--legendary {
+.dark .app-modal-panel.bonus-wheel-result-modal--legendary {
   border-color: rgba(255, 223, 132, 0.72) !important;
   background:
     radial-gradient(circle at 50% -8%, rgba(255, 190, 54, 0.52), transparent 43%),
@@ -1037,7 +1138,7 @@ textarea:focus {
   box-shadow: 0 28px 70px rgba(0, 0, 0, 0.5), 0 0 54px rgba(255, 184, 43, 0.42) !important;
 }
 
-.app-modal-panel.bonus-wheel-result-modal--empty {
+.dark .app-modal-panel.bonus-wheel-result-modal--empty {
   border-color: rgba(255, 255, 255, 0.12) !important;
   background: linear-gradient(155deg, rgba(40, 35, 55, 0.98), rgba(14, 12, 24, 0.98)) !important;
 }
