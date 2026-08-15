@@ -325,6 +325,65 @@ describe('remnashop reverse sync', () => {
     )).toBe(false)
   })
 
+  it('reuses the current Remnashop legacy UUID for a Remnawave v3 user', async () => {
+    mocks.paymentFindUnique.mockResolvedValue({
+      ...payment,
+      user: {
+        ...payment.user,
+        remnawaveUuid: null,
+        remnawaveUsername: 'remna-v3-user',
+      },
+    })
+    mocks.remnashopQuery.mockImplementation(async (sql: string, values: unknown[] = []) => {
+      if (sql.includes('information_schema.columns') && values[0] === 'subscriptions') {
+        return {
+          rows: [
+            'id', 'user_id', 'plan_id', 'user_remna_id', 'url', 'status', 'is_trial',
+            'internal_squads', 'traffic_limit_strategy', 'expire_at', 'traffic_limit',
+            'device_limit', 'plan_snapshot', 'created_at', 'updated_at',
+          ].map((column_name) => ({ column_name })),
+        }
+      }
+      if (sql.includes('information_schema.columns') && values[0] === 'transactions') {
+        return {
+          rows: [
+            'id', 'user_id', 'subscription_id', 'plan_id', 'payment_id', 'status',
+            'gateway_type', 'gateway_display_name', 'purchase_type', 'currency',
+            'pricing', 'plan_snapshot', 'created_at', 'updated_at',
+          ].map((column_name) => ({ column_name })),
+        }
+      }
+      if (sql.includes('information_schema.columns') && values[0] === 'users') {
+        return { rows: ['id', 'current_subscription_id'].map((column_name) => ({ column_name })) }
+      }
+      if (sql.includes('information_schema.columns')) return { rows: [] }
+      if (sql.includes('AS remnawave_uuid')) {
+        return { rows: [{ remnawave_uuid: 'legacy-remnashop-uuid' }] }
+      }
+      if (sql.includes('FROM subscriptions s')) return { rows: [{ id: '100' }] }
+      if (sql.includes('FROM transactions WHERE payment_id::text = $1')) {
+        return { rows: [{ id: '200' }] }
+      }
+      return { rows: [] }
+    })
+
+    await expect(syncCabinetPaymentToRemnashop('pay-1')).resolves.toMatchObject({
+      ok: true,
+      remnashopSubscriptionId: 100,
+      remnashopTransactionId: 200,
+    })
+
+    const subscriptionLookup = mocks.remnashopQuery.mock.calls.find(([sql]) =>
+      String(sql).includes('FROM subscriptions s') && String(sql).includes('user_remna_id::text = $2')
+    )
+    expect(subscriptionLookup?.[1]).toEqual([10, 'legacy-remnashop-uuid'])
+
+    const subscriptionUpdate = mocks.remnashopQuery.mock.calls.find(([sql]) =>
+      String(sql).includes('UPDATE "subscriptions"')
+    )
+    expect(subscriptionUpdate?.[1]).toContain('legacy-remnashop-uuid')
+  })
+
   it('records promo activation without relying on a missing database constraint', async () => {
     mocks.paymentFindUnique.mockResolvedValue({
       ...payment,

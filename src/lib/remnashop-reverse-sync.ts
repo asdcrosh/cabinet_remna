@@ -16,6 +16,10 @@ interface IdRow {
   id: string
 }
 
+interface RemnashopRemnawaveIdentityRow {
+  remnawave_uuid: string
+}
+
 type PaymentWithRelations = Prisma.PaymentGetPayload<{
   include: {
     user: true
@@ -49,20 +53,25 @@ export async function syncCabinetPaymentToRemnashop(paymentId: string) {
     await markPaymentRemnashopSyncFailed(payment.id, 'subscription is missing')
     return { ok: false as const, skipped: 'subscription is missing' }
   }
-  if (!payment.user.remnawaveUuid) {
-    await markPaymentRemnashopSyncFailed(payment.id, 'remnawave user is missing')
-    return { ok: false as const, skipped: 'remnawave user is missing' }
-  }
-
   const remnashopUserId = await resolveRemnashopUserId(payment.user)
   if (!remnashopUserId) {
     await markPaymentRemnashopSyncFailed(payment.id, 'remnashop user not found')
     return { ok: false as const, skipped: 'remnashop user not found' }
   }
 
+  const remnashopRemnawaveUuid = await resolveRemnashopRemnawaveUuid(
+    remnashopUserId,
+    payment.user.remnawaveUuid
+  )
+  if (!remnashopRemnawaveUuid) {
+    await markPaymentRemnashopSyncFailed(payment.id, 'remnawave user is missing')
+    return { ok: false as const, skipped: 'remnawave user is missing' }
+  }
+
   const syncPayment = payment as PaymentForRemnashopSync
   const remnashopSubscriptionId = await upsertRemnashopSubscription({
     remnashopUserId,
+    remnashopRemnawaveUuid,
     payment: syncPayment,
   })
   const remnashopTransactionId = await upsertRemnashopTransaction({
@@ -238,6 +247,7 @@ async function createRemnashopUserForCabinet(user: {
 
 async function upsertRemnashopSubscription(input: {
   remnashopUserId: number
+  remnashopRemnawaveUuid: string
   payment: PaymentForRemnashopSync
 }) {
   const columns = await tableColumns('subscriptions')
@@ -251,13 +261,13 @@ async function upsertRemnashopSubscription(input: {
   const existingId = columns.has('user_remna_id')
     ? await findRemnashopSubscription(
         input.remnashopUserId,
-        input.payment.user.remnawaveUuid as string
+        input.remnashopRemnawaveUuid
       )
     : null
   const data = pickExistingColumns(columns, {
     user_id: input.remnashopUserId,
     plan_id: input.payment.plan.remnashopPlanId,
-    user_remna_id: input.payment.user.remnawaveUuid,
+    user_remna_id: input.remnashopRemnawaveUuid,
     url: subscriptionUrl,
     status: mapSubscriptionStatus(input.payment.subscription.status),
     is_trial: false,
@@ -436,6 +446,30 @@ async function findRemnashopSubscription(userId: number, remnawaveUuid: string) 
     [userId, remnawaveUuid]
   )
   return result.rows[0]?.id ?? null
+}
+
+async function resolveRemnashopRemnawaveUuid(
+  userId: number,
+  localRemnawaveUuid: string | null
+) {
+  const localUuid = localRemnawaveUuid?.trim()
+  if (localUuid) return localUuid
+
+  const result = await remnashopQuery<RemnashopRemnawaveIdentityRow>(
+    `
+      SELECT s.user_remna_id::text AS remnawave_uuid
+      FROM subscriptions s
+      WHERE s.user_id = $1
+        AND s.user_remna_id IS NOT NULL
+      ORDER BY
+        (s.id = (SELECT current_subscription_id FROM users WHERE id = $1)) DESC,
+        (s.status = 'ACTIVE') DESC,
+        s.updated_at DESC
+      LIMIT 1
+    `,
+    [userId]
+  )
+  return result.rows[0]?.remnawave_uuid?.trim() || null
 }
 
 async function tableColumns(table: string): Promise<RemnashopColumns> {
