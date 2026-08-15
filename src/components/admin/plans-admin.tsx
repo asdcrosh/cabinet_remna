@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { DragEvent, ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import {
@@ -68,6 +68,11 @@ interface RemnawaveSquad {
   isActive: boolean
 }
 
+type PlanDropTarget = {
+  planId: string
+  placement: 'before' | 'after'
+}
+
 const emptyForm: PlanFormState = {
   name: '',
   description: '',
@@ -89,6 +94,7 @@ export function PlansAdmin({ plans }: { plans: PlanAdminRow[] }) {
   const router = useRouter()
   const [orderedPlans, setOrderedPlans] = useState(plans)
   const [draggedPlanId, setDraggedPlanId] = useState<string | null>(null)
+  const [dropTarget, setDropTarget] = useState<PlanDropTarget | null>(null)
   const [reordering, setReordering] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
   const [createForm, setCreateForm] = useState<PlanFormState>(emptyForm)
@@ -99,12 +105,16 @@ export function PlansAdmin({ plans }: { plans: PlanAdminRow[] }) {
   const [squadsLoading, setSquadsLoading] = useState(false)
   const [squadsError, setSquadsError] = useState<string | null>(null)
   const [deleteCandidate, setDeleteCandidate] = useState<PlanAdminRow | null>(null)
+  const orderedPlansRef = useRef(plans)
+  const dragStartPlansRef = useRef<PlanAdminRow[] | null>(null)
+  const dragCommittedRef = useRef(false)
 
   useEffect(() => {
     void loadSquads()
   }, [])
 
   useEffect(() => {
+    orderedPlansRef.current = plans
     setOrderedPlans(plans)
   }, [plans])
 
@@ -200,27 +210,48 @@ export function PlansAdmin({ plans }: { plans: PlanAdminRow[] }) {
     setEditForm(null)
   }
 
+  function updatePlanOrder(nextPlans: PlanAdminRow[]) {
+    orderedPlansRef.current = nextPlans
+    setOrderedPlans(nextPlans)
+  }
+
   function beginDrag(event: DragEvent<HTMLButtonElement>, planId: string) {
     if (reordering) return
     event.dataTransfer.effectAllowed = 'move'
     event.dataTransfer.setData('text/plain', planId)
+    dragStartPlansRef.current = orderedPlansRef.current
+    dragCommittedRef.current = false
     setDraggedPlanId(planId)
+    setDropTarget(null)
   }
 
-  async function movePlan(targetPlanId: string) {
-    if (!draggedPlanId || draggedPlanId === targetPlanId || reordering) return
+  function previewMove(event: DragEvent<HTMLElement>, targetPlanId: string) {
+    const sourcePlanId = event.dataTransfer.getData('text/plain') || draggedPlanId
+    if (!sourcePlanId || sourcePlanId === targetPlanId || reordering) return
 
-    const previousPlans = orderedPlans
-    const sourceIndex = previousPlans.findIndex((plan) => plan.id === draggedPlanId)
-    const targetIndex = previousPlans.findIndex((plan) => plan.id === targetPlanId)
-    if (sourceIndex < 0 || targetIndex < 0) return
+    event.preventDefault()
+    event.dataTransfer.dropEffect = 'move'
+    const bounds = event.currentTarget.getBoundingClientRect()
+    const placement = event.clientY < bounds.top + bounds.height / 2 ? 'before' : 'after'
+    if (dropTarget?.planId === targetPlanId && dropTarget.placement === placement) return
 
-    const nextPlans = [...previousPlans]
-    const [movedPlan] = nextPlans.splice(sourceIndex, 1)
-    if (!movedPlan) return
-    nextPlans.splice(targetIndex, 0, movedPlan)
-    setOrderedPlans(nextPlans)
+    const nextPlans = reorderPlans(orderedPlansRef.current, sourcePlanId, targetPlanId, placement)
+    updatePlanOrder(nextPlans)
+    setDropTarget({ planId: targetPlanId, placement })
+  }
+
+  async function persistDraggedOrder() {
+    const previousPlans = dragStartPlansRef.current
+    const nextPlans = orderedPlansRef.current
+    dragCommittedRef.current = true
     setDraggedPlanId(null)
+    setDropTarget(null)
+
+    if (!previousPlans || hasSamePlanOrder(previousPlans, nextPlans)) {
+      dragStartPlansRef.current = null
+      return
+    }
+
     setReordering(true)
 
     try {
@@ -231,10 +262,21 @@ export function PlansAdmin({ plans }: { plans: PlanAdminRow[] }) {
       toast('Порядок тарифов сохранён', 'success')
       router.refresh()
     } catch {
-      setOrderedPlans(previousPlans)
+      updatePlanOrder(previousPlans)
     } finally {
       setReordering(false)
+      dragStartPlansRef.current = null
+      dragCommittedRef.current = false
     }
+  }
+
+  function cancelDrag() {
+    if (!dragCommittedRef.current && dragStartPlansRef.current) {
+      updatePlanOrder(dragStartPlansRef.current)
+    }
+    dragStartPlansRef.current = null
+    setDraggedPlanId(null)
+    setDropTarget(null)
   }
 
   const squadById = useMemo(() => new Map(squads.map((squad) => [squad.uuid, squad])), [squads])
@@ -319,9 +361,23 @@ export function PlansAdmin({ plans }: { plans: PlanAdminRow[] }) {
       )}
 
       {orderedPlans.length > 0 && (
-        <div data-testid="admin-plan-grid" className="admin-list">
+        <>
+          <div className="hidden items-center justify-between gap-4 rounded-2xl border border-violet-200/80 bg-violet-50/70 px-4 py-3 text-sm text-violet-950 dark:border-violet-400/20 dark:bg-violet-400/[0.06] dark:text-violet-100 lg:flex">
+            <span className="flex items-center gap-2.5">
+              <span className="grid h-8 w-8 place-items-center rounded-lg border border-violet-200 bg-white text-violet-600 dark:border-violet-400/30 dark:bg-violet-400/10 dark:text-violet-200">
+                <GripVertical className="h-4 w-4" />
+              </span>
+              <span><strong>Порядок каталога.</strong> Зажмите маркер у тарифа и проведите его к нужной позиции.</span>
+            </span>
+            <span className="shrink-0 font-medium text-violet-700 dark:text-violet-200">
+              {draggedPlanId && dropTarget
+                ? `Отпустите: ${dropTarget.placement === 'before' ? 'перед' : 'после'} «${orderedPlans.find((plan) => plan.id === dropTarget.planId)?.name ?? 'тарифа'}»`
+                : 'Порядок сохраняется после отпускания'}
+            </span>
+          </div>
+          <div data-testid="admin-plan-grid" className="admin-list">
           <div className="admin-list-header grid-cols-[minmax(14rem,1.15fr)_minmax(12rem,.9fr)_minmax(12rem,.9fr)_2.5rem] items-center gap-x-6">
-            <span>Тариф <span className="ml-2 hidden normal-case tracking-normal text-slate-400 lg:inline">Перетащите за маркер</span></span>
+            <span>Тариф <span className="ml-2 hidden normal-case tracking-normal text-slate-400 lg:inline">порядок можно менять</span></span>
             <span>Условия</span>
             <span>Доступ и использование</span>
             <span className="sr-only">Действия</span>
@@ -335,19 +391,31 @@ export function PlansAdmin({ plans }: { plans: PlanAdminRow[] }) {
               <article
                 key={plan.id}
                 data-testid="admin-plan-card"
-                onDragOver={(event) => {
-                  if (draggedPlanId && draggedPlanId !== plan.id) event.preventDefault()
-                }}
+                onDragOver={(event) => previewMove(event, plan.id)}
                 onDrop={(event) => {
                   event.preventDefault()
-                  void movePlan(plan.id)
+                  void persistDraggedOrder()
                 }}
                 className={cn(
-                  'admin-list-row min-w-0 p-3.5 transition-shadow sm:p-4 lg:grid lg:grid-cols-[minmax(14rem,1.15fr)_minmax(12rem,.9fr)_minmax(12rem,.9fr)_auto] lg:items-center lg:gap-x-6',
-                  draggedPlanId === plan.id && 'opacity-50',
-                  draggedPlanId && draggedPlanId !== plan.id && 'ring-1 ring-violet-400/60 ring-inset'
+                  'admin-list-row relative min-w-0 p-3.5 transition-[opacity,box-shadow,background-color] duration-150 sm:p-4 lg:grid lg:grid-cols-[minmax(14rem,1.15fr)_minmax(12rem,.9fr)_minmax(12rem,.9fr)_auto] lg:items-center lg:gap-x-6',
+                  draggedPlanId === plan.id && 'scale-[0.995] bg-violet-100/50 opacity-35 shadow-inner dark:bg-violet-400/[0.08]',
+                  dropTarget?.planId === plan.id && 'bg-violet-50/80 dark:bg-violet-400/[0.05]'
                 )}
               >
+                {dropTarget?.planId === plan.id && (
+                  <div
+                    aria-hidden="true"
+                    className={cn(
+                      'pointer-events-none absolute inset-x-3 z-10 flex items-center gap-2',
+                      dropTarget.placement === 'before' ? 'top-0 -translate-y-1/2' : 'bottom-0 translate-y-1/2'
+                    )}
+                  >
+                    <span className="h-1 flex-1 rounded-full bg-violet-500 shadow-[0_0_12px_rgba(139,92,246,0.8)]" />
+                    <span className="rounded-full bg-violet-600 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-white shadow-sm">
+                      {dropTarget.placement === 'before' ? 'Вставить перед' : 'Вставить после'}
+                    </span>
+                  </div>
+                )}
                 <div className="min-w-0">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
@@ -355,8 +423,8 @@ export function PlansAdmin({ plans }: { plans: PlanAdminRow[] }) {
                         type="button"
                         draggable={!reordering}
                         onDragStart={(event) => beginDrag(event, plan.id)}
-                        onDragEnd={() => setDraggedPlanId(null)}
-                        className="hidden cursor-grab touch-none text-slate-400 transition-colors hover:text-violet-600 active:cursor-grabbing dark:hover:text-violet-300 lg:inline-flex"
+                        onDragEnd={cancelDrag}
+                        className="hidden h-10 w-10 shrink-0 cursor-grab touch-none items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-500 shadow-sm transition-all hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700 active:cursor-grabbing active:scale-95 dark:border-white/10 dark:bg-white/[0.035] dark:text-slate-300 dark:hover:border-violet-400/40 dark:hover:bg-violet-400/10 dark:hover:text-violet-200 lg:inline-flex"
                         title="Перетащить тариф"
                         aria-label={`Перетащить тариф ${plan.name}`}
                         disabled={reordering}
@@ -419,7 +487,8 @@ export function PlansAdmin({ plans }: { plans: PlanAdminRow[] }) {
               </article>
             )
           })}
-        </div>
+          </div>
+        </>
       )}
       <ConfirmDialog
         open={Boolean(deleteCandidate)}
@@ -432,6 +501,31 @@ export function PlansAdmin({ plans }: { plans: PlanAdminRow[] }) {
       />
     </div>
   )
+}
+
+function reorderPlans(
+  plans: PlanAdminRow[],
+  sourcePlanId: string,
+  targetPlanId: string,
+  placement: PlanDropTarget['placement']
+) {
+  const sourcePlan = plans.find((plan) => plan.id === sourcePlanId)
+  if (!sourcePlan || sourcePlanId === targetPlanId) return plans
+
+  const withoutSource = plans.filter((plan) => plan.id !== sourcePlanId)
+  const targetIndex = withoutSource.findIndex((plan) => plan.id === targetPlanId)
+  if (targetIndex < 0) return plans
+
+  const insertionIndex = placement === 'before' ? targetIndex : targetIndex + 1
+  return [
+    ...withoutSource.slice(0, insertionIndex),
+    sourcePlan,
+    ...withoutSource.slice(insertionIndex),
+  ]
+}
+
+function hasSamePlanOrder(left: PlanAdminRow[], right: PlanAdminRow[]) {
+  return left.length === right.length && left.every((plan, index) => plan.id === right[index]?.id)
 }
 
 function CatalogMetric({ value, label }: { value: number; label: string }) {
