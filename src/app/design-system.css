@@ -996,6 +996,52 @@ textarea:focus {
   background: color-mix(in srgb, var(--app-surface-soft) 45%, transparent);
 }
 
+/* The reward reveal deliberately keeps its dark stage in both application themes.
+   It must follow the generic modal tokens declared above, otherwise the light
+   theme replaces its background while the reward copy remains white. */
+.app-modal-panel.bonus-wheel-result-modal {
+  color: #fff !important;
+  border-color: rgba(255, 255, 255, 0.18) !important;
+  background:
+    radial-gradient(circle at 50% -8%, rgba(53, 217, 255, 0.24), transparent 38%),
+    linear-gradient(155deg, rgba(35, 16, 78, 0.98), rgba(12, 8, 29, 0.98)) !important;
+  box-shadow: 0 28px 70px rgba(0, 0, 0, 0.45), 0 0 40px rgba(112, 41, 207, 0.22) !important;
+}
+
+.app-modal-panel.bonus-wheel-result-modal .app-modal-header,
+.app-modal-panel.bonus-wheel-result-modal .app-modal-footer {
+  border-color: rgba(255, 255, 255, 0.12) !important;
+  background: rgba(8, 4, 24, 0.32) !important;
+}
+
+.app-modal-panel.bonus-wheel-result-modal--rare {
+  border-color: rgba(92, 226, 255, 0.48) !important;
+  background:
+    radial-gradient(circle at 50% -8%, rgba(53, 217, 255, 0.38), transparent 42%),
+    linear-gradient(155deg, rgba(18, 75, 100, 0.98), rgba(10, 12, 32, 0.98)) !important;
+}
+
+.app-modal-panel.bonus-wheel-result-modal--epic {
+  border-color: rgba(250, 137, 255, 0.55) !important;
+  background:
+    radial-gradient(circle at 50% -8%, rgba(232, 76, 224, 0.46), transparent 44%),
+    linear-gradient(155deg, rgba(78, 19, 99, 0.98), rgba(18, 8, 39, 0.98)) !important;
+  box-shadow: 0 28px 70px rgba(0, 0, 0, 0.45), 0 0 48px rgba(216, 50, 212, 0.34) !important;
+}
+
+.app-modal-panel.bonus-wheel-result-modal--legendary {
+  border-color: rgba(255, 223, 132, 0.72) !important;
+  background:
+    radial-gradient(circle at 50% -8%, rgba(255, 190, 54, 0.52), transparent 43%),
+    linear-gradient(155deg, rgba(91, 51, 8, 0.98), rgba(25, 12, 20, 0.98)) !important;
+  box-shadow: 0 28px 70px rgba(0, 0, 0, 0.5), 0 0 54px rgba(255, 184, 43, 0.42) !important;
+}
+
+.app-modal-panel.bonus-wheel-result-modal--empty {
+  border-color: rgba(255, 255, 255, 0.12) !important;
+  background: linear-gradient(155deg, rgba(40, 35, 55, 0.98), rgba(14, 12, 24, 0.98)) !important;
+}
+
 .dashboard-mobile-nav {
   border-color: rgba(24, 59, 43, 0.18) !important;
   border-radius: 10px !important;
