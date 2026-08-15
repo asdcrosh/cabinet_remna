@@ -74,6 +74,7 @@ describe('payment sync pending expiration', () => {
     mocks.prisma.payment.findFirst.mockResolvedValue({
       id: 'pay-1',
       provider: 'YOOKASSA',
+      externalPaymentId: null,
       yookassaId: null,
       status: 'PENDING',
       createdAt: new Date('2026-06-26T11:40:00.000Z'),
@@ -111,6 +112,7 @@ describe('payment sync pending expiration', () => {
     mocks.prisma.payment.findFirst.mockResolvedValue({
       id: 'old-pay',
       provider: 'YOOKASSA',
+      externalPaymentId: null,
       yookassaId: 'yoo-1',
       status: 'PENDING',
       createdAt: new Date('2026-06-26T11:40:00.000Z'),
@@ -147,6 +149,7 @@ describe('payment sync pending expiration', () => {
       id: 'old-pay',
       userId: 'user-1',
       provider: 'YOOKASSA',
+      externalPaymentId: null,
       yookassaId: 'yoo-1',
       status: 'PENDING',
       createdAt: new Date('2026-06-26T11:40:00.000Z'),
@@ -182,6 +185,7 @@ describe('payment sync pending expiration', () => {
       id: 'paid-pay',
       userId: 'user-1',
       provider: 'YOOKASSA',
+      externalPaymentId: null,
       yookassaId: 'yoo-paid',
       status: 'PENDING',
       paidAt: null,
@@ -199,8 +203,8 @@ describe('payment sync pending expiration', () => {
       subscription: { id: 'sub-1' },
     })
     mocks.prisma.payment.findMany.mockResolvedValue([
-      { id: 'old-pay-1', userId: 'user-1', provider: 'YOOKASSA', yookassaId: 'yoo-old-1' },
-      { id: 'old-pay-2', userId: 'user-1', provider: 'YOOKASSA', yookassaId: null },
+      { id: 'old-pay-1', userId: 'user-1', provider: 'YOOKASSA', externalPaymentId: null, yookassaId: 'yoo-old-1' },
+      { id: 'old-pay-2', userId: 'user-1', provider: 'YOOKASSA', externalPaymentId: null, yookassaId: null },
     ])
     mocks.getPayment.mockResolvedValueOnce({ status: 'succeeded' }).mockResolvedValueOnce({ status: 'pending' })
     mocks.cancelPayment.mockResolvedValue({ status: 'canceled' })
@@ -235,6 +239,7 @@ describe('payment sync pending expiration', () => {
       id: 'paid-pay',
       userId: 'user-1',
       provider: 'YOOKASSA',
+      externalPaymentId: null,
       yookassaId: 'yoo-paid',
       status: 'PENDING',
       paidAt: null,
@@ -262,7 +267,7 @@ describe('payment sync pending expiration', () => {
       .mockResolvedValueOnce(mainPayment)
       .mockResolvedValueOnce(siblingPayment)
     mocks.prisma.payment.findMany
-      .mockResolvedValueOnce([{ id: 'old-paid', userId: 'user-1', provider: 'YOOKASSA', yookassaId: 'yoo-old-paid' }])
+      .mockResolvedValueOnce([{ id: 'old-paid', userId: 'user-1', provider: 'YOOKASSA', externalPaymentId: null, yookassaId: 'yoo-old-paid' }])
       .mockResolvedValueOnce([])
     mocks.getPayment
       .mockResolvedValueOnce({ status: 'succeeded' })
@@ -319,6 +324,48 @@ describe('payment sync pending expiration', () => {
     expect(mocks.provisionPaymentSubscription).toHaveBeenCalledWith(
       expect.objectContaining({ paymentId: 'pay-platega', userId: 'user-1' })
     )
+  })
+
+  it('uses the imported Remnashop payment id to check YooKassa before expiring it', async () => {
+    mocks.prisma.payment.findFirst.mockResolvedValue({
+      id: 'imported-pay',
+      userId: 'user-1',
+      provider: 'YOOKASSA',
+      externalPaymentId: 'yoo-imported',
+      yookassaId: null,
+      status: 'PENDING',
+      paidAt: null,
+      subscriptionProvisionedAt: null,
+      createdAt: new Date('2026-06-26T11:40:00.000Z'),
+      user: { id: 'user-1', email: 'user@example.test' },
+      plan: {
+        id: 'plan-1',
+        name: 'Стандарт',
+        durationDays: 30,
+        trafficLimitGb: null,
+        deviceLimit: 5,
+        activeInternalSquads: [],
+      },
+      subscription: null,
+    })
+    mocks.prisma.payment.findMany.mockResolvedValue([])
+    mocks.getPayment.mockResolvedValue({ status: 'succeeded' })
+    mocks.provisionPaymentSubscription.mockResolvedValue({ subscription: { id: 'sub-imported' } })
+
+    await expect(syncPaymentProvisioning({
+      paymentId: 'imported-pay',
+      userId: 'user-1',
+      cancelPendingOlderThanMs: 600_000,
+    })).resolves.toEqual({
+      ok: true,
+      status: 'succeeded',
+      provisioned: true,
+      subscriptionId: 'sub-imported',
+    })
+
+    expect(mocks.getPayment).toHaveBeenCalledWith('yoo-imported')
+    expect(mocks.cancelPayment).not.toHaveBeenCalled()
+    expect(mocks.notifyPaymentCanceled).not.toHaveBeenCalled()
   })
 
   it('keeps a pending Platega payment active without canceling it by the local TTL', async () => {

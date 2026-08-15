@@ -317,14 +317,30 @@ async function upsertRemnashopTransaction(input: {
   payment: PaymentForRemnashopSync
 }) {
   const columns = await tableColumns('transactions')
-  const paymentExternalId = stableRemnashopPaymentId(input.payment.id)
-  const existingByPaymentId = columns.has('payment_id')
+  const stablePaymentId = stableRemnashopPaymentId(input.payment.id)
+  const existingByStableId = columns.has('payment_id')
     ? await remnashopQuery<IdRow>(
         'SELECT id::text AS id FROM transactions WHERE payment_id::text = $1 LIMIT 1',
-        [paymentExternalId]
+        [stablePaymentId]
       )
     : null
-  const existingId = existingByPaymentId?.rows[0]?.id ?? null
+  let paymentExternalId = stablePaymentId
+  let existingId = existingByStableId?.rows[0]?.id ?? null
+  if (
+    !existingId &&
+    columns.has('payment_id') &&
+    input.payment.externalPaymentId &&
+    input.payment.externalPaymentId !== stablePaymentId
+  ) {
+    const existingByImportedId = await remnashopQuery<IdRow>(
+      'SELECT id::text AS id FROM transactions WHERE payment_id::text = $1 LIMIT 1',
+      [input.payment.externalPaymentId]
+    )
+    if (existingByImportedId.rows[0]?.id) {
+      existingId = existingByImportedId.rows[0].id
+      paymentExternalId = input.payment.externalPaymentId
+    }
+  }
   const pricing = buildPricingSnapshot(input.payment)
   const planSnapshot = buildPlanSnapshot(input.payment)
   const gateway = mapPaymentGateway(input.payment.provider)

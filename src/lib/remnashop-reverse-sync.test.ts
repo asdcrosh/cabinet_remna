@@ -54,7 +54,9 @@ const payment = {
   discountPercent: null,
   promoCodeSnapshot: null,
   provider: 'YOOKASSA',
+  externalPaymentId: 'yk-1',
   yookassaId: 'yk-1',
+  remnashopSyncedAt: null,
   paidAt: new Date('2026-07-04T10:00:00.000Z'),
   createdAt: new Date('2026-07-04T09:59:00.000Z'),
   user: {
@@ -269,6 +271,58 @@ describe('remnashop reverse sync', () => {
       discount_percent: 0,
       final_amount: 300,
     }))
+  })
+
+  it('updates the original transaction when the payment was imported from Remnashop', async () => {
+    mocks.paymentFindUnique.mockResolvedValue({
+      ...payment,
+      externalPaymentId: 'original-remnashop-payment',
+      remnashopSyncedAt: new Date('2026-07-04T10:01:00.000Z'),
+    })
+    mocks.remnashopQuery.mockImplementation(async (sql: string, values: unknown[] = []) => {
+      if (sql.includes('information_schema.columns') && values[0] === 'subscriptions') {
+        return {
+          rows: [
+            'id', 'user_id', 'plan_id', 'user_remna_id', 'url', 'status', 'is_trial',
+            'internal_squads', 'traffic_limit_strategy', 'expire_at', 'traffic_limit',
+            'device_limit', 'plan_snapshot', 'created_at', 'updated_at',
+          ].map((column_name) => ({ column_name })),
+        }
+      }
+      if (sql.includes('information_schema.columns') && values[0] === 'transactions') {
+        return {
+          rows: [
+            'id', 'user_id', 'subscription_id', 'plan_id', 'payment_id', 'status',
+            'gateway_type', 'gateway_display_name', 'purchase_type', 'currency',
+            'pricing', 'plan_snapshot', 'created_at', 'updated_at',
+          ].map((column_name) => ({ column_name })),
+        }
+      }
+      if (sql.includes('information_schema.columns') && values[0] === 'users') {
+        return { rows: ['id', 'current_subscription_id'].map((column_name) => ({ column_name })) }
+      }
+      if (sql.includes('information_schema.columns')) return { rows: [] }
+      if (sql.includes('FROM subscriptions s')) return { rows: [{ id: '100' }] }
+      if (sql.includes('FROM transactions WHERE payment_id::text = $1')) {
+        return values[0] === 'original-remnashop-payment'
+          ? { rows: [{ id: '200' }] }
+          : { rows: [] }
+      }
+      return { rows: [] }
+    })
+
+    await expect(syncCabinetPaymentToRemnashop('pay-1')).resolves.toMatchObject({
+      ok: true,
+      remnashopTransactionId: 200,
+    })
+
+    const transactionUpdate = mocks.remnashopQuery.mock.calls.find(([sql]) =>
+      String(sql).includes('UPDATE "transactions"')
+    )
+    expect(transactionUpdate?.[1]).toContain('original-remnashop-payment')
+    expect(mocks.remnashopQuery.mock.calls.some(([sql]) =>
+      String(sql).includes('INSERT INTO "transactions"')
+    )).toBe(false)
   })
 
   it('records promo activation without relying on a missing database constraint', async () => {

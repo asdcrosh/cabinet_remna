@@ -712,6 +712,9 @@ async function syncRemnashopTransactionToCabinet(
       status: true,
       providerStatus: true,
       paidAt: true,
+      subscriptionId: true,
+      subscriptionProvisionedAt: true,
+      yookassaId: true,
     },
   })
 
@@ -724,8 +727,17 @@ async function syncRemnashopTransactionToCabinet(
           status,
           providerStatus: transaction.status,
           remnashopSyncedAt: new Date(),
+          ...(provider === 'YOOKASSA'
+            ? { yookassaId: existing.yookassaId ?? transaction.payment_id }
+            : {}),
           ...(status === 'SUCCEEDED' || status === 'REFUNDED'
             ? { paidAt: existing.paidAt ?? transaction.created_at }
+            : {}),
+          ...(status === 'SUCCEEDED' && existing.subscriptionId
+            ? {
+                subscriptionProvisionedAt:
+                  existing.subscriptionProvisionedAt ?? transaction.updated_at,
+              }
             : {}),
         },
       })
@@ -821,6 +833,7 @@ async function syncRemnashopTransactionToCabinet(
       discountKopecks: Math.max(0, originalAmountKopecks - amountKopecks),
       provider,
       externalPaymentId: transaction.payment_id,
+      yookassaId: provider === 'YOOKASSA' ? transaction.payment_id : null,
       providerStatus: transaction.status,
       status,
       paidAt: status === 'SUCCEEDED' || status === 'REFUNDED'

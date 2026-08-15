@@ -48,6 +48,7 @@ describe('Remnashop payment import', () => {
       paidAt: new Date('2026-07-20T10:00:00.000Z'),
       subscriptionId: 'subscription-1',
       subscriptionProvisionedAt: new Date('2026-07-20T10:00:00.000Z'),
+      yookassaId: 'remnashop-payment-1',
     })
     mocks.prisma.payment.update.mockResolvedValue({})
     mocks.prisma.promoCodeRedemption.updateMany.mockResolvedValue({ count: 1 })
@@ -102,6 +103,51 @@ describe('Remnashop payment import', () => {
       source: 'REMNASHOP_REFUND',
       paymentId: 'cabinet-payment-1',
       skipRemnashopSync: true,
+    })
+  })
+
+  it('marks a native Remnashop success as already provisioned in Cabinet', async () => {
+    mocks.prisma.payment.findFirst.mockResolvedValue({
+      id: 'cabinet-payment-1',
+      userId: 'user-1',
+      status: 'CANCELED',
+      providerStatus: 'CANCELED',
+      paidAt: null,
+      subscriptionId: 'subscription-1',
+      subscriptionProvisionedAt: null,
+      yookassaId: null,
+    })
+    mocks.remnashopQuery.mockResolvedValue({
+      rows: [{
+        id: 10,
+        payment_id: 'remnashop-payment-1',
+        status: 'COMPLETED',
+        gateway_type: 'YOOKASSA',
+        gateway_display_name: 'YooKassa',
+        payment_method: null,
+        purchase_type: 'RENEW',
+        currency: 'RUB',
+        pricing: {},
+        plan_snapshot: {},
+        created_at: new Date('2026-07-20T10:00:00.000Z'),
+        updated_at: new Date('2026-07-21T10:00:00.000Z'),
+        user_id: 42,
+        user_remna_id: 'remna-uuid',
+      }],
+    })
+
+    await expect(syncRemnashopPaymentsToCabinet({
+      paymentId: 'remnashop-payment-1',
+    })).resolves.toMatchObject({ updated: 1, failed: 0 })
+
+    expect(mocks.prisma.payment.update).toHaveBeenCalledWith({
+      where: { id: 'cabinet-payment-1' },
+      data: expect.objectContaining({
+        status: 'SUCCEEDED',
+        providerStatus: 'COMPLETED',
+        yookassaId: 'remnashop-payment-1',
+        subscriptionProvisionedAt: new Date('2026-07-21T10:00:00.000Z'),
+      }),
     })
   })
 })

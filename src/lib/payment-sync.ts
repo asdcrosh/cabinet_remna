@@ -18,7 +18,17 @@ type PendingPaymentForCancel = {
   id: string
   userId: string
   provider: 'YOOKASSA' | 'PAYANYWAY' | 'PLATEGA' | 'LOCAL'
+  externalPaymentId: string | null
   yookassaId: string | null
+}
+
+function getYooKassaPaymentId(payment: {
+  provider: PendingPaymentForCancel['provider']
+  externalPaymentId: string | null
+  yookassaId: string | null
+}) {
+  if (payment.provider !== 'YOOKASSA') return null
+  return payment.yookassaId || payment.externalPaymentId
 }
 
 export async function syncPaymentProvisioning(input: {
@@ -161,7 +171,8 @@ export async function syncPaymentProvisioning(input: {
 
     return provisionSubscription(payment)
   }
-  if (!payment.yookassaId) {
+  const yooKassaPaymentId = getYooKassaPaymentId(payment)
+  if (!yooKassaPaymentId) {
     if (payment.status !== 'SUCCEEDED') {
       if (
         input.cancelPendingOlderThanMs &&
@@ -188,7 +199,7 @@ export async function syncPaymentProvisioning(input: {
 
   let yooPayment
   try {
-    yooPayment = await getPayment(payment.yookassaId)
+    yooPayment = await getPayment(yooKassaPaymentId)
   } catch (e) {
     const message = e instanceof Error ? e.message : 'payment status check failed'
     await prisma.payment.update({
@@ -299,7 +310,7 @@ export async function cancelOtherPendingPaymentsForUser(userId: string, paidPaym
     },
     orderBy: { createdAt: 'asc' },
     take: limit,
-    select: { id: true, userId: true, provider: true, yookassaId: true },
+    select: { id: true, userId: true, provider: true, externalPaymentId: true, yookassaId: true },
   })
 
   let canceled = 0
@@ -336,7 +347,8 @@ export async function cancelOtherPendingPaymentsForUser(userId: string, paidPaym
 
 async function cancelPendingPayment(payment: PendingPaymentForCancel, reason: string) {
   if (payment.provider !== 'YOOKASSA') return null
-  if (!payment.yookassaId) {
+  const yooKassaPaymentId = getYooKassaPaymentId(payment)
+  if (!yooKassaPaymentId) {
     await cancelLocalPayment(payment.id, null)
     await notifyPaymentCanceled(payment.id, reason)
     return 'canceled' as const
@@ -344,7 +356,7 @@ async function cancelPendingPayment(payment: PendingPaymentForCancel, reason: st
 
   let remoteStatus: YooKassaPaymentStatus | null = null
   try {
-    const remotePayment = await getPayment(payment.yookassaId)
+    const remotePayment = await getPayment(yooKassaPaymentId)
     remoteStatus = remotePayment.status
     if (remotePayment.status === 'succeeded') return 'paid' as const
     if (remotePayment.status === 'canceled') {
@@ -353,12 +365,12 @@ async function cancelPendingPayment(payment: PendingPaymentForCancel, reason: st
       return 'canceled' as const
     }
 
-    const canceledPayment = await cancelPayment(payment.yookassaId, `cancel-${payment.id}`)
+    const canceledPayment = await cancelPayment(yooKassaPaymentId, `cancel-${payment.id}`)
     remoteStatus = canceledPayment.status
     if (canceledPayment.status === 'succeeded') return 'paid' as const
   } catch (error) {
     try {
-      const remotePayment = await getPayment(payment.yookassaId)
+      const remotePayment = await getPayment(yooKassaPaymentId)
       remoteStatus = remotePayment.status
       if (remotePayment.status === 'succeeded') return 'paid' as const
       if (remotePayment.status === 'canceled') {
