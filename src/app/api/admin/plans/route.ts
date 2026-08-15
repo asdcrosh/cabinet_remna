@@ -50,7 +50,13 @@ export const POST = withAuth(async (req: Request) => {
           data: { isFeatured: false, featuredSlot: null },
         })
       }
-      return tx.plan.create({ data })
+      const lastPlan = await tx.plan.aggregate({ _max: { sortOrder: true } })
+      return tx.plan.create({
+        data: {
+          ...data,
+          sortOrder: (lastPlan._max.sortOrder ?? 0) + 10,
+        },
+      })
     })
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {

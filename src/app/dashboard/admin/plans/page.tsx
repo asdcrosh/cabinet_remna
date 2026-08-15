@@ -37,7 +37,6 @@ export default async function AdminPlansPage() {
     promoCodesEnabled: plan.promoCodesEnabled,
     isFeatured: plan.isFeatured,
     isActive: plan.isActive,
-    sortOrder: plan.sortOrder,
     paymentsCount: plan._count.payments,
     subscriptionsCount: plan._count.subscriptions,
   }))

@@ -454,6 +454,9 @@ export async function syncRemnashopCatalog(options: {
   const planIdMap = new Map<string, string>()
 
   await prisma.$transaction(async (tx) => {
+    const lastPlan = await tx.plan.aggregate({ _max: { sortOrder: true } })
+    let nextSortOrder = (lastPlan._max.sortOrder ?? 0) + 10
+
     for (const plan of plans) {
       const normalized = normalizeRemnashopPlan(plan)
       const sourcePlan = await tx.plan.findFirst({
@@ -481,7 +484,6 @@ export async function syncRemnashopCatalog(options: {
         activeInternalSquads: normalized.activeInternalSquads,
         isPromo: normalized.isPromo,
         isActive: normalized.isActive,
-        sortOrder: normalized.sortOrder,
       }
       const accessData = {
         availability: normalized.availability,
@@ -491,7 +493,15 @@ export async function syncRemnashopCatalog(options: {
 
       const cabinetPlan = existing
         ? await tx.plan.update({ where: { id: existing.id }, data: catalogData })
-        : await tx.plan.create({ data: { ...catalogData, ...accessData } })
+        : await tx.plan.create({
+            data: {
+              ...catalogData,
+              ...accessData,
+              sortOrder: nextSortOrder,
+            },
+          })
+
+      if (!existing) nextSortOrder += 10
 
       const key = makeSourcePlanKey(plan.id, plan.duration_days)
       planIdMap.set(key, cabinetPlan.id)
@@ -1134,7 +1144,6 @@ function normalizeRemnashopPlan(plan: RemnashopPlanRow) {
     allowedTelegramIds: plan.allowed_telegram_ids.map(String).filter(Boolean),
     isPromo: plan.is_trial,
     isActive: plan.is_active,
-    sortOrder: plan.id * 100 + plan.duration_days,
   }
 }
 

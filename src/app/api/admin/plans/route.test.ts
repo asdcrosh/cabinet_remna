@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => {
   const tx = {
     plan: {
       updateMany: vi.fn(),
+      aggregate: vi.fn(),
       create: vi.fn(),
     },
   }
@@ -44,7 +45,6 @@ function planRequest(overrides: Record<string, unknown> = {}) {
       isPromo: false,
       isFeatured: true,
       isActive: true,
-      sortOrder: 10,
       ...overrides,
     }),
   })
@@ -55,6 +55,7 @@ describe('admin plans route', () => {
     vi.clearAllMocks()
     mocks.requireAdmin.mockResolvedValue({ uid: 'admin-1', role: 'ADMIN' })
     mocks.prisma.$transaction.mockImplementation(async (callback: (tx: typeof mocks.tx) => unknown) => callback(mocks.tx))
+    mocks.tx.plan.aggregate.mockResolvedValue({ _max: { sortOrder: 0 } })
     mocks.tx.plan.create.mockResolvedValue({
       id: 'plan-1',
       name: 'Основной',
@@ -91,6 +92,7 @@ describe('admin plans route', () => {
         promoCodesEnabled: true,
         isFeatured: true,
         featuredSlot: 1,
+        sortOrder: 10,
       }),
     })
     expect(mocks.writeAuditLog).toHaveBeenCalledWith(expect.objectContaining({

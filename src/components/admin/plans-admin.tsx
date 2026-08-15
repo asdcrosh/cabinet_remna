@@ -1,11 +1,12 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import type { ReactNode } from 'react'
+import type { DragEvent, ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   ChevronDown,
   Edit3,
+  GripVertical,
   Link2,
   Plus,
   Power,
@@ -40,7 +41,6 @@ export interface PlanAdminRow {
   promoCodesEnabled: boolean
   isFeatured: boolean
   isActive: boolean
-  sortOrder: number
   paymentsCount: number
   subscriptionsCount: number
 }
@@ -56,7 +56,6 @@ interface PlanFormState {
   activeInternalSquads: string
   availability: PlanAvailabilityValue
   allowedUsers: string
-  sortOrder: string
   isPromo: boolean
   promoCodesEnabled: boolean
   isFeatured: boolean
@@ -80,7 +79,6 @@ const emptyForm: PlanFormState = {
   activeInternalSquads: '',
   availability: 'ALL',
   allowedUsers: '',
-  sortOrder: '10',
   isPromo: false,
   promoCodesEnabled: true,
   isFeatured: false,
@@ -89,6 +87,9 @@ const emptyForm: PlanFormState = {
 
 export function PlansAdmin({ plans }: { plans: PlanAdminRow[] }) {
   const router = useRouter()
+  const [orderedPlans, setOrderedPlans] = useState(plans)
+  const [draggedPlanId, setDraggedPlanId] = useState<string | null>(null)
+  const [reordering, setReordering] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
   const [createForm, setCreateForm] = useState<PlanFormState>(emptyForm)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -102,6 +103,10 @@ export function PlansAdmin({ plans }: { plans: PlanAdminRow[] }) {
   useEffect(() => {
     void loadSquads()
   }, [])
+
+  useEffect(() => {
+    setOrderedPlans(plans)
+  }, [plans])
 
   async function loadSquads() {
     setSquadsLoading(true)
@@ -195,15 +200,52 @@ export function PlansAdmin({ plans }: { plans: PlanAdminRow[] }) {
     setEditForm(null)
   }
 
+  function beginDrag(event: DragEvent<HTMLButtonElement>, planId: string) {
+    if (reordering) return
+    event.dataTransfer.effectAllowed = 'move'
+    event.dataTransfer.setData('text/plain', planId)
+    setDraggedPlanId(planId)
+  }
+
+  async function movePlan(targetPlanId: string) {
+    if (!draggedPlanId || draggedPlanId === targetPlanId || reordering) return
+
+    const previousPlans = orderedPlans
+    const sourceIndex = previousPlans.findIndex((plan) => plan.id === draggedPlanId)
+    const targetIndex = previousPlans.findIndex((plan) => plan.id === targetPlanId)
+    if (sourceIndex < 0 || targetIndex < 0) return
+
+    const nextPlans = [...previousPlans]
+    const [movedPlan] = nextPlans.splice(sourceIndex, 1)
+    if (!movedPlan) return
+    nextPlans.splice(targetIndex, 0, movedPlan)
+    setOrderedPlans(nextPlans)
+    setDraggedPlanId(null)
+    setReordering(true)
+
+    try {
+      await apiFetch('/api/admin/plans/reorder', {
+        method: 'PATCH',
+        body: JSON.stringify({ planIds: nextPlans.map((plan) => plan.id) }),
+      })
+      toast('Порядок тарифов сохранён', 'success')
+      router.refresh()
+    } catch {
+      setOrderedPlans(previousPlans)
+    } finally {
+      setReordering(false)
+    }
+  }
+
   const squadById = useMemo(() => new Map(squads.map((squad) => [squad.uuid, squad])), [squads])
-  const activePlansCount = plans.filter((plan) => plan.isActive).length
-  const subscriptionsCount = plans.reduce((total, plan) => total + plan.subscriptionsCount, 0)
+  const activePlansCount = orderedPlans.filter((plan) => plan.isActive).length
+  const subscriptionsCount = orderedPlans.reduce((total, plan) => total + plan.subscriptionsCount, 0)
 
   return (
     <div className="space-y-4">
       <section className="grid gap-3 rounded-3xl border border-slate-200 bg-white p-3 dark:border-white/10 dark:bg-white/[0.03] sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:p-4">
         <div className="grid grid-cols-3 divide-x divide-slate-200 rounded-2xl bg-slate-50 px-2 py-3 dark:divide-white/10 dark:bg-white/[0.035] sm:max-w-lg">
-          <CatalogMetric value={plans.length} label="Тарифы" />
+          <CatalogMetric value={orderedPlans.length} label="Тарифы" />
           <CatalogMetric value={activePlansCount} label="Активны" />
           <CatalogMetric value={subscriptionsCount} label="Подписки" />
         </div>
@@ -264,7 +306,7 @@ export function PlansAdmin({ plans }: { plans: PlanAdminRow[] }) {
         )}
       </AdminModal>
 
-      {plans.length === 0 && (
+      {orderedPlans.length === 0 && (
         <AdminEmptyState
           title="Тарифов пока нет"
           description="Создайте первый тариф, чтобы пользователи могли оформить подписку."
@@ -276,15 +318,15 @@ export function PlansAdmin({ plans }: { plans: PlanAdminRow[] }) {
         />
       )}
 
-      {plans.length > 0 && (
+      {orderedPlans.length > 0 && (
         <div data-testid="admin-plan-grid" className="admin-list">
           <div className="admin-list-header grid-cols-[minmax(14rem,1.15fr)_minmax(12rem,.9fr)_minmax(12rem,.9fr)_2.5rem] items-center gap-x-6">
-            <span>Тариф</span>
+            <span>Тариф <span className="ml-2 hidden normal-case tracking-normal text-slate-400 lg:inline">Перетащите за маркер</span></span>
             <span>Условия</span>
             <span>Доступ и использование</span>
             <span className="sr-only">Действия</span>
           </div>
-          {plans.map((plan) => {
+          {orderedPlans.map((plan) => {
             const selectedSquads = plan.activeInternalSquads.map((id) => squadById.get(id)).filter(Boolean) as RemnawaveSquad[]
             const unknownSquads = plan.activeInternalSquads.filter((id) => !squadById.has(id))
             const allowedUsersCount = new Set([...plan.allowedEmails, ...plan.allowedTelegramIds]).size
@@ -293,11 +335,34 @@ export function PlansAdmin({ plans }: { plans: PlanAdminRow[] }) {
               <article
                 key={plan.id}
                 data-testid="admin-plan-card"
-                className="admin-list-row min-w-0 p-3.5 sm:p-4 lg:grid lg:grid-cols-[minmax(14rem,1.15fr)_minmax(12rem,.9fr)_minmax(12rem,.9fr)_auto] lg:items-center lg:gap-x-6"
+                onDragOver={(event) => {
+                  if (draggedPlanId && draggedPlanId !== plan.id) event.preventDefault()
+                }}
+                onDrop={(event) => {
+                  event.preventDefault()
+                  void movePlan(plan.id)
+                }}
+                className={cn(
+                  'admin-list-row min-w-0 p-3.5 transition-shadow sm:p-4 lg:grid lg:grid-cols-[minmax(14rem,1.15fr)_minmax(12rem,.9fr)_minmax(12rem,.9fr)_auto] lg:items-center lg:gap-x-6',
+                  draggedPlanId === plan.id && 'opacity-50',
+                  draggedPlanId && draggedPlanId !== plan.id && 'ring-1 ring-violet-400/60 ring-inset'
+                )}
               >
                 <div className="min-w-0">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        draggable={!reordering}
+                        onDragStart={(event) => beginDrag(event, plan.id)}
+                        onDragEnd={() => setDraggedPlanId(null)}
+                        className="hidden cursor-grab touch-none text-slate-400 transition-colors hover:text-violet-600 active:cursor-grabbing dark:hover:text-violet-300 lg:inline-flex"
+                        title="Перетащить тариф"
+                        aria-label={`Перетащить тариф ${plan.name}`}
+                        disabled={reordering}
+                      >
+                        <GripVertical className="h-5 w-5" />
+                      </button>
                       <h3 className="break-words font-semibold tracking-tight">{plan.name}</h3>
                       {!plan.isActive && <span className="badge-disabled">Скрыт</span>}
                       {plan.isPromo && <span className="badge-limited">Пробный</span>}
@@ -483,7 +548,7 @@ function PlanEditor({
       </EditorSection>
 
       <EditorSection title="Условия тарифа" description="Цена, срок и пользовательские ограничения.">
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <Field label="Цена, ₽">
             <input value={form.priceRub} onChange={(event) => set('priceRub', event.target.value)} className="input" type="number" min={0} step="0.01" />
           </Field>
@@ -495,9 +560,6 @@ function PlanEditor({
           </Field>
           <Field label="Трафик, ГБ">
             <input value={form.trafficLimitGb} onChange={(event) => set('trafficLimitGb', event.target.value)} className="input" type="number" min={1} disabled={form.unlimitedTraffic} placeholder="Безлимит" />
-          </Field>
-          <Field label="Порядок">
-            <input value={form.sortOrder} onChange={(event) => set('sortOrder', event.target.value)} className="input" type="number" min={0} />
           </Field>
         </div>
         <div className="mt-3">
@@ -670,7 +732,6 @@ function formFromPlan(plan: PlanAdminRow): PlanFormState {
     activeInternalSquads: plan.activeInternalSquads.join('\n'),
     availability: plan.availability,
     allowedUsers: [...plan.allowedEmails, ...plan.allowedTelegramIds].join('\n'),
-    sortOrder: String(plan.sortOrder),
     isPromo: plan.isPromo,
     promoCodesEnabled: plan.promoCodesEnabled,
     isFeatured: plan.isFeatured,
@@ -690,7 +751,6 @@ function toPayload(form: PlanFormState) {
     availability: form.availability,
     allowedEmails: parseAllowedUsers(form.allowedUsers).emails,
     allowedTelegramIds: parseAllowedUsers(form.allowedUsers).telegramIds,
-    sortOrder: Number(form.sortOrder),
     isPromo: form.isPromo,
     promoCodesEnabled: form.promoCodesEnabled,
     isFeatured: form.isFeatured,

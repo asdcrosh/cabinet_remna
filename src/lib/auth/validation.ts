@@ -238,7 +238,6 @@ const adminPlanBaseSchema = z.object({
   promoCodesEnabled: z.boolean().default(true),
   isFeatured: z.boolean().default(false),
   isActive: z.boolean(),
-  sortOrder: z.coerce.number().int().min(0).max(100_000),
 })
 
 export const adminPlanSchema = adminPlanBaseSchema.superRefine((value, context) => {
