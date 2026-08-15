@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { Clock3, Eye, ImageIcon, MessageCircle, RotateCcw, Send, UsersRound, X } from 'lucide-react'
+import { Clock3, Eye, ImageIcon, Link2, MessageCircle, RotateCcw, Send, UsersRound, X } from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
 import { toast } from '@/components/ui/toaster'
 import { cn } from '@/lib/cn'
@@ -48,6 +48,7 @@ export function BroadcastAdmin({
   const [actionHref, setActionHref] = useState('/dashboard')
   const [actionLabel, setActionLabel] = useState('Открыть кабинет')
   const [actionOpenInTelegram, setActionOpenInTelegram] = useState(false)
+  const [actionMode, setActionMode] = useState<'preset' | 'custom'>('preset')
   const [imageUrl, setImageUrl] = useState('')
   const [uploadingImage, setUploadingImage] = useState(false)
   const [imageLoadFailed, setImageLoadFailed] = useState(false)
@@ -84,7 +85,10 @@ export function BroadcastAdmin({
       if (draft.segment) setSegment(normalizeSegment(draft.segment))
       if (typeof draft.inactiveDays === 'number') setInactiveDays(normalizeInactiveDays(draft.inactiveDays))
       if (draft.selectedChannels?.length) setSelectedChannels(draft.selectedChannels)
-      if (typeof draft.actionHref === 'string') setActionHref(draft.actionHref)
+      if (typeof draft.actionHref === 'string') {
+        setActionHref(draft.actionHref)
+        setActionMode(isCustomBroadcastAction(draft.actionHref) ? 'custom' : 'preset')
+      }
       if (typeof draft.actionLabel === 'string') setActionLabel(draft.actionLabel)
       if (typeof draft.actionOpenInTelegram === 'boolean') setActionOpenInTelegram(draft.actionOpenInTelegram)
       if (typeof draft.imageUrl === 'string') setImageUrl(draft.imageUrl)
@@ -167,6 +171,7 @@ export function BroadcastAdmin({
     setActionHref(template.actionHref || '')
     setActionLabel(template.actionLabel || '')
     setActionOpenInTelegram(Boolean(template.actionOpenInTelegram))
+    setActionMode(isCustomBroadcastAction(template.actionHref) ? 'custom' : 'preset')
     setImageUrl(template.imageUrl || '')
     setStats(null)
     setStep('message')
@@ -221,6 +226,7 @@ export function BroadcastAdmin({
     setActionHref(item.actionHref || '')
     setActionLabel(item.actionLabel || '')
     setActionOpenInTelegram(item.actionOpenInTelegram)
+    setActionMode(isCustomBroadcastAction(item.actionHref) ? 'custom' : 'preset')
     setImageUrl(item.imageUrl || '')
     setImageLoadFailed(false)
     setStats(null)
@@ -290,6 +296,7 @@ export function BroadcastAdmin({
 
   const canSend = body.trim().length >= 5 && selectedChannels.length > 0 && !loading
   const selectedPreset = actionPresets.find((preset) => preset.href === actionHref)
+  const actionSupportsTelegramWebApp = actionHref.startsWith('/dashboard')
   const previewBody = renderPreview(body || 'Текст сообщения будет показан здесь.')
   const previewActionLabel = renderPreview(actionLabel || 'Открыть')
   const previewImageUrl = getPreviewImageUrl(imageUrl)
@@ -336,8 +343,9 @@ export function BroadcastAdmin({
           aria-labelledby="broadcast-tab-compose"
           className="contents"
         >
-      <div className="card w-full min-w-0 overflow-hidden p-1.5">
-        <div className="grid w-full min-w-0 grid-cols-3 gap-1">
+      <div className="flex min-w-0 items-center gap-1 overflow-x-auto rounded-xl border border-slate-200 bg-slate-50 p-1.5 dark:border-white/10 dark:bg-white/[0.03]">
+        <span className="hidden shrink-0 px-2 text-[11px] font-bold uppercase tracking-[0.12em] text-slate-400 xl:inline">Создание</span>
+        <div className="grid min-w-[28rem] flex-1 grid-cols-3 gap-1">
           <BroadcastStepButton
             active={step === 'message'}
             number="1"
@@ -515,23 +523,34 @@ export function BroadcastAdmin({
               <span className="mt-1 block text-xs text-slate-400">{body.length}/1200</span>
             </label>
 
-            <details className="rounded-xl border border-slate-200 px-3 py-2 dark:border-white/10">
-              <summary className="cursor-pointer text-sm font-medium">Кнопка и изображение</summary>
-              <div className="mt-3 grid min-w-0 gap-3">
-                <div className="grid min-w-0 gap-3 lg:grid-cols-[minmax(0,1fr)_13rem]">
+            <section className="overflow-hidden rounded-xl border border-slate-200 dark:border-white/10">
+              <div className="flex items-center gap-2 border-b border-slate-200 px-3 py-2.5 dark:border-white/10">
+                <Link2 className="h-4 w-4 text-cyan-600" />
+                <div className="min-w-0">
+                  <h3 className="text-sm font-semibold">Кнопка в сообщении</h3>
+                  <p className="text-xs text-slate-500">Необязательно. Можно открыть раздел кабинета или внешний сайт.</p>
+                </div>
+              </div>
+
+              <div className="grid min-w-0 gap-3 p-3">
+                <div className="grid min-w-0 gap-3 sm:grid-cols-[minmax(0,1fr)_13rem]">
                   <label className="block">
-                    <span className="text-sm font-medium">Куда ведет кнопка</span>
+                    <span className="text-sm font-medium">Действие</span>
                     <select
                       className="input mt-1"
-                      value={selectedPreset ? selectedPreset.href : 'CUSTOM'}
+                      value={actionMode === 'custom' ? 'CUSTOM' : selectedPreset?.href ?? ''}
                       onChange={(event) => {
-                        const preset = actionPresets.find((item) => item.href === event.target.value) ?? actionPresets[0]
                         if (event.target.value === 'CUSTOM') {
-                          setActionHref(actionHref || '/dashboard')
-                          setActionLabel((current) => current || 'Открыть')
+                          setActionMode('custom')
+                          setActionHref('')
+                          setActionLabel('Открыть')
+                          setActionOpenInTelegram(false)
                           return
                         }
+
+                        const preset = actionPresets.find((item) => item.href === event.target.value)
                         if (!preset) return
+                        setActionMode('preset')
                         setActionHref(preset.href)
                         setActionLabel(preset.label)
                         if (!preset.href) setActionOpenInTelegram(false)
@@ -542,9 +561,8 @@ export function BroadcastAdmin({
                           {preset.title}
                         </option>
                       ))}
-                      <option value="CUSTOM">Своя ссылка</option>
+                      <option value="CUSTOM">Внешняя ссылка</option>
                     </select>
-                    <span className="mt-1 block text-xs text-slate-400">{selectedPreset?.description ?? 'Путь внутри кабинета, можно с параметрами'}</span>
                   </label>
                   <label className="block">
                     <span className="text-sm font-medium">Текст кнопки</span>
@@ -559,76 +577,80 @@ export function BroadcastAdmin({
                   </label>
                 </div>
 
-                <label className="block">
-                  <span className="text-sm font-medium">Адрес кнопки</span>
-                  <input
-                    className="input mt-1 font-mono text-sm"
-                    value={actionHref}
-                    onChange={(event) => {
-                      const href = event.target.value
-                      setActionHref(href)
-                      if (!href) setActionOpenInTelegram(false)
-                    }}
-                    maxLength={600}
-                    placeholder="/dashboard/plans?promo=COMEBACK"
-                  />
-                </label>
+                {actionMode === 'custom' ? (
+                  <label className="block">
+                    <span className="text-sm font-medium">Внешняя ссылка</span>
+                    <input
+                      className="input mt-1 font-mono text-sm"
+                      type="url"
+                      inputMode="url"
+                      value={actionHref}
+                      onChange={(event) => setActionHref(event.target.value)}
+                      maxLength={600}
+                      placeholder="https://example.com/offer"
+                    />
+                    <span className="mt-1 block text-xs text-slate-400">Только HTTPS. Ссылка откроется в Telegram, письме и уведомлении кабинета.</span>
+                  </label>
+                ) : null}
 
-                {actionHref ? (
+                {actionHref && actionSupportsTelegramWebApp ? (
                   <Switch
                     checked={actionOpenInTelegram}
                     onCheckedChange={setActionOpenInTelegram}
-                    label="Открывать в Telegram"
-                    description="Web App для Telegram-кнопки"
-                    className="border-y border-slate-200/90 py-2 dark:border-white/[0.09]"
+                    label="Открывать внутри Telegram"
+                    description="Только для страниц кабинета"
+                    className="border-t border-slate-200 pt-3 dark:border-white/[0.09]"
                   />
                 ) : null}
 
-                <label className="block">
-                  <span className="text-sm font-medium">Картинка</span>
-                  <div className="mt-1 grid min-w-0 gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
-                    <input
-                      className="input"
-                      value={imageUrl}
-                      onChange={(event) => {
-                        setImageUrl(event.target.value)
-                        setImageLoadFailed(false)
-                      }}
-                      maxLength={600}
-                      placeholder="Ссылка появится после загрузки"
-                    />
-                    <label className={cn('btn-secondary min-h-11 cursor-pointer px-4', uploadingImage && 'pointer-events-none opacity-60')}>
-                      <ImageIcon className="h-4 w-4" />
-                      {uploadingImage ? 'Загрузка...' : 'Загрузить'}
+                <details className="border-t border-slate-200 pt-3 dark:border-white/10">
+                  <summary className="cursor-pointer text-sm font-medium text-slate-600 dark:text-slate-300">Добавить изображение</summary>
+                  <label className="mt-3 block">
+                    <span className="sr-only">Картинка</span>
+                    <div className="grid min-w-0 gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
                       <input
-                        type="file"
-                        accept="image/png,image/jpeg,image/webp,image/gif"
-                        className="sr-only"
+                        className="input"
+                        value={imageUrl}
                         onChange={(event) => {
-                          const file = event.target.files?.[0] ?? null
-                          void uploadImage(file)
-                          event.currentTarget.value = ''
-                        }}
-                      />
-                    </label>
-                    {imageUrl ? (
-                      <button
-                        type="button"
-                        className="btn-secondary min-h-11 px-4"
-                        onClick={() => {
-                          setImageUrl('')
+                          setImageUrl(event.target.value)
                           setImageLoadFailed(false)
                         }}
-                      >
-                        <X className="h-4 w-4" />
-                        Убрать
-                      </button>
-                    ) : null}
-                  </div>
-                  <span className="mt-1 block text-xs text-slate-400">До 15 МБ: JPG, PNG, WEBP или GIF. Можно оставить пустым.</span>
-                </label>
+                        maxLength={600}
+                        placeholder="URL картинки или загрузите файл"
+                      />
+                      <label className={cn('btn-secondary min-h-11 cursor-pointer px-4', uploadingImage && 'pointer-events-none opacity-60')}>
+                        <ImageIcon className="h-4 w-4" />
+                        {uploadingImage ? 'Загрузка...' : 'Загрузить'}
+                        <input
+                          type="file"
+                          accept="image/png,image/jpeg,image/webp,image/gif"
+                          className="sr-only"
+                          onChange={(event) => {
+                            const file = event.target.files?.[0] ?? null
+                            void uploadImage(file)
+                            event.currentTarget.value = ''
+                          }}
+                        />
+                      </label>
+                      {imageUrl ? (
+                        <button
+                          type="button"
+                          className="btn-secondary min-h-11 px-4"
+                          onClick={() => {
+                            setImageUrl('')
+                            setImageLoadFailed(false)
+                          }}
+                        >
+                          <X className="h-4 w-4" />
+                          Убрать
+                        </button>
+                      ) : null}
+                    </div>
+                    <span className="mt-1 block text-xs text-slate-400">До 15 МБ: JPG, PNG, WEBP или GIF.</span>
+                  </label>
+                </details>
               </div>
-            </details>
+            </section>
 
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="text-sm text-slate-500">Шаблон и текст готовы, дальше выберите аудиторию и канал.</div>
@@ -952,6 +974,10 @@ function normalizeSegment(value: string): BroadcastSegment {
   if (value === 'EMAIL_VERIFIED' || value === 'TELEGRAM_LINKED') return 'ALL'
   if (segments.some((item) => item.value === value)) return value as BroadcastSegment
   return 'ALL'
+}
+
+function isCustomBroadcastAction(href: string | null | undefined) {
+  return Boolean(href && !actionPresets.some((preset) => preset.href === href))
 }
 
 function normalizeInactiveDays(value: string | number) {

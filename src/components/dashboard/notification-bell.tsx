@@ -433,6 +433,20 @@ function AdminNotificationRow({
   )
 
   if (notification.actionHref) {
+    if (notification.actionHref.startsWith('https://')) {
+      return (
+        <a
+          href={notification.actionHref}
+          target="_blank"
+          rel="noreferrer"
+          onClick={onNavigate}
+          className="block"
+        >
+          {content}
+        </a>
+      )
+    }
+
     return (
       <Link href={notification.actionHref} onClick={onNavigate} className="block">
         {content}
@@ -469,6 +483,20 @@ function NotificationRow({
   )
 
   if (notification.actionHref) {
+    if (notification.actionHref.startsWith('https://')) {
+      return (
+        <a
+          href={notification.actionHref}
+          target="_blank"
+          rel="noreferrer"
+          onClick={onNavigate}
+          className="block"
+        >
+          {content}
+        </a>
+      )
+    }
+
     return (
       <Link href={notification.actionHref} onClick={onNavigate} className="block">
         {content}

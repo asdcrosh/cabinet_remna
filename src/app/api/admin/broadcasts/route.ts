@@ -15,6 +15,7 @@ import { logWarn } from '@/lib/logger'
 import type { BroadcastDeliveryPayload } from '@/lib/broadcast-delivery'
 import { writeAuditLog } from '@/lib/audit-log'
 import { isFeatureEnabled } from '@/lib/feature-flags'
+import { getBroadcastActionUrl, normalizeBroadcastActionHref } from '@/lib/broadcast-action-url'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -121,10 +122,14 @@ export const POST = withAuth(async (req: Request) => {
       })
     : await findBroadcastUsers(segment, inactiveDays ?? DEFAULT_INACTIVE_DAYS, input.channels)
 
-  const actionHref = normalizeActionHref(input.actionHref)
-  const actionUrl = actionHref ? `${getAppUrl()}${actionHref}` : getAppUrl()
+  const appUrl = getAppUrl()
+  const actionHref = normalizeBroadcastActionHref(input.actionHref, appUrl)
+  if (input.actionHref && !actionHref) {
+    return NextResponse.json({ error: 'Ссылка должна вести на раздел кабинета или быть HTTPS-адресом' }, { status: 400 })
+  }
+  const actionUrl = getBroadcastActionUrl(actionHref, appUrl)
   const actionLabel = input.actionLabel || (actionHref ? 'Открыть кабинет' : undefined)
-  const actionOpenInTelegram = Boolean(input.actionOpenInTelegram && actionHref)
+  const actionOpenInTelegram = Boolean(input.actionOpenInTelegram && actionHref?.startsWith('/dashboard'))
   const imageUrl = normalizeImageUrl(input.imageUrl)
   const plainBody = stripTelegramCustomEmojiMarkup(input.body)
   const batchKey = `broadcast:${Date.now()}:${session.uid}`
@@ -693,22 +698,6 @@ function combineWhere(...items: Prisma.UserWhereInput[]): Prisma.UserWhereInput 
   if (activeItems.length === 0) return {}
   if (activeItems.length === 1) return activeItems[0] ?? {}
   return { AND: activeItems }
-}
-
-function normalizeActionHref(value: string | null | undefined) {
-  let href = value?.trim()
-  if (!href) return null
-  if (href.startsWith('http://') || href.startsWith('https://')) {
-    try {
-      const url = new URL(href)
-      if (url.origin !== getAppUrl()) return null
-      href = `${url.pathname}${url.search}${url.hash}`
-    } catch {
-      return null
-    }
-  }
-  if (!href.startsWith('/dashboard')) return null
-  return href
 }
 
 function normalizeImageUrl(value: string | null | undefined) {

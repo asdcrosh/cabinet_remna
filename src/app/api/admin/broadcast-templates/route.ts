@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma'
 import { getAppUrl } from '@/lib/app-url'
 import { writeAuditLog } from '@/lib/audit-log'
 import { isFeatureEnabled } from '@/lib/feature-flags'
+import { normalizeBroadcastActionHref } from '@/lib/broadcast-action-url'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -49,6 +50,11 @@ export const POST = withAuth(async (req: Request) => {
   }
 
   const input = parsed.data
+  const appUrl = getAppUrl()
+  const actionHref = normalizeBroadcastActionHref(input.actionHref, appUrl)
+  if (input.actionHref && !actionHref) {
+    return NextResponse.json({ error: 'Ссылка должна вести на раздел кабинета или быть HTTPS-адресом' }, { status: 400 })
+  }
   const template = await prisma.broadcastTemplate.create({
     data: {
       title: input.title,
@@ -57,9 +63,9 @@ export const POST = withAuth(async (req: Request) => {
       segment: input.segment === 'INACTIVE_45D' ? 'INACTIVE_N_DAYS' : input.segment,
       inactiveDays: input.segment === 'INACTIVE_45D' || input.segment === 'INACTIVE_N_DAYS' ? input.inactiveDays ?? 45 : null,
       channels: input.channels,
-      actionHref: normalizeActionHref(input.actionHref),
+      actionHref,
       actionLabel: input.actionLabel || null,
-      actionOpenInTelegram: Boolean(input.actionOpenInTelegram && normalizeActionHref(input.actionHref)),
+      actionOpenInTelegram: Boolean(input.actionOpenInTelegram && actionHref?.startsWith('/dashboard')),
       imageUrl: input.imageUrl || null,
       createdById: session.uid,
     },
@@ -86,19 +92,3 @@ export const POST = withAuth(async (req: Request) => {
     },
   })
 })
-
-function normalizeActionHref(value: string | null | undefined) {
-  let href = value?.trim()
-  if (!href) return null
-  if (href.startsWith('http://') || href.startsWith('https://')) {
-    try {
-      const url = new URL(href)
-      if (url.origin !== getAppUrl()) return null
-      href = `${url.pathname}${url.search}${url.hash}`
-    } catch {
-      return null
-    }
-  }
-  if (!href.startsWith('/dashboard')) return null
-  return href
-}
