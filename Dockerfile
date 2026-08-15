@@ -31,6 +31,7 @@ COPY . .
 RUN npm run build
 RUN ./node_modules/.bin/esbuild \
   scripts/payment-reconciler.ts \
+  scripts/admin-telegram-test.ts \
   scripts/broadcast-worker.ts \
   scripts/watch-worker.ts \
   scripts/node-provisioning-worker.ts \

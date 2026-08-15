@@ -266,6 +266,14 @@ if (value("TELEGRAM_NOTIFY_CHAT_ID") && !value("TELEGRAM_BOT_TOKEN")) {
   warnings.push("TELEGRAM_BOT_TOKEN is required for Telegram deploy notifications");
 }
 
+if (value("ADMIN_TELEGRAM_CHAT_ID") && !value("TELEGRAM_BOT_TOKEN")) {
+  warnings.push("TELEGRAM_BOT_TOKEN is required for admin business notifications");
+}
+
+if (value("ADMIN_TELEGRAM_CHAT_ID") && !/^-?\d+$/.test(value("ADMIN_TELEGRAM_CHAT_ID"))) {
+  errors.push("ADMIN_TELEGRAM_CHAT_ID must be a numeric Telegram chat ID");
+}
+
 if (value("WATCH_TELEGRAM_CHAT_ID") && !value("TELEGRAM_BOT_TOKEN")) {
   warnings.push("TELEGRAM_BOT_TOKEN is required for Watch Telegram alerts");
 }

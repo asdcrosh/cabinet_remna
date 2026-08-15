@@ -6,6 +6,11 @@ import { prisma } from './prisma'
 import { createAdminNotification } from './admin-notifications'
 import { logError, logWarn } from './logger'
 import { remnawave } from './remnawave'
+import {
+  buildAdminPaymentStuckTelegramText,
+  buildAdminPaymentTelegramText,
+} from './admin-telegram-notifications'
+import { paymentProviderLabel } from './payment-provider-label'
 
 const RENEW_PATH = '/dashboard/plans?intent=renew'
 const SUBSCRIPTION_PATH = '/dashboard/subscription'
@@ -127,7 +132,15 @@ export async function notifyPaymentSucceeded(paymentId: string) {
   const payment = await prisma.payment.findUnique({
     where: { id: paymentId },
     include: {
-      user: { select: { id: true, name: true, remnawaveUsername: true } },
+      user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          telegramUsername: true,
+          remnawaveUsername: true,
+        },
+      },
       plan: { select: { name: true, durationDays: true, trafficLimitGb: true, deviceLimit: true } },
       subscription: { select: { startAt: true, expireAt: true } },
     },
@@ -229,6 +242,22 @@ export async function notifyPaymentSucceeded(paymentId: string) {
     entityId: payment.id,
     actionHref: '/dashboard/admin/payments',
     actionLabel: 'Открыть платежи',
+    telegram: {
+      text: buildAdminPaymentTelegramText({
+        amount,
+        planName,
+        durationDays: payment.plan?.durationDays ?? null,
+        customerName: payment.user.name,
+        customerEmail: payment.user.email,
+        telegramUsername: payment.user.telegramUsername,
+        provider: paymentProviderLabel(payment.provider),
+        expireAt: payment.subscription?.expireAt ?? null,
+        isPaid,
+        isRenewal,
+      }),
+      actionHref: `/dashboard/admin/payments?q=${encodeURIComponent(payment.externalPaymentId ?? payment.id)}`,
+      actionLabel: 'Открыть платёж',
+    },
   })
   await recordPaymentEvent({
     paymentId,
@@ -301,7 +330,21 @@ export async function notifyPaymentStuck(paymentId: string, reason = 'Платё
   const { recordPaymentEvent } = await import('./payment-events')
   const payment = await prisma.payment.findUnique({
     where: { id: paymentId },
-    select: { id: true, userId: true, plan: { select: { name: true } }, user: { select: { name: true } } },
+    select: {
+      id: true,
+      userId: true,
+      amountKopecks: true,
+      provider: true,
+      externalPaymentId: true,
+      plan: { select: { name: true } },
+      user: {
+        select: {
+          name: true,
+          email: true,
+          telegramUsername: true,
+        },
+      },
+    },
   })
   if (!payment) return
 
@@ -337,6 +380,19 @@ export async function notifyPaymentStuck(paymentId: string, reason = 'Платё
     entityId: payment.id,
     actionHref: '/dashboard/admin/payments',
     actionLabel: 'Проверить',
+    telegram: {
+      text: buildAdminPaymentStuckTelegramText({
+        amount: formatRubles(payment.amountKopecks),
+        planName: payment.plan?.name ?? 'Тариф',
+        customerName: payment.user.name,
+        customerEmail: payment.user.email,
+        telegramUsername: payment.user.telegramUsername,
+        provider: paymentProviderLabel(payment.provider),
+        reason,
+      }),
+      actionHref: `/dashboard/admin/payments?q=${encodeURIComponent(payment.externalPaymentId ?? payment.id)}`,
+      actionLabel: 'Проверить платёж',
+    },
   })
   await recordPaymentEvent({
     paymentId,

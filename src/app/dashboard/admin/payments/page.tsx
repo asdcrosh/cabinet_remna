@@ -46,6 +46,7 @@ export default async function AdminPaymentsPage({
     ...(q
       ? {
           OR: [
+            { id: { equals: q } },
             { user: { email: { contains: q, mode: 'insensitive' as const } } },
             { user: { name: { contains: q, mode: 'insensitive' as const } } },
             { plan: { name: { contains: q, mode: 'insensitive' as const } } },

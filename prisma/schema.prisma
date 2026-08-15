@@ -347,11 +347,42 @@ model AdminNotification {
   actionLabel String?
   createdAt   DateTime                  @default(now())
 
-  reads AdminNotificationRead[]
+  reads            AdminNotificationRead[]
+  telegramDelivery AdminTelegramDelivery?
 
   @@index([type, createdAt])
   @@index([severity, createdAt])
   @@index([createdAt])
+}
+
+model AdminTelegramDelivery {
+  id                String                      @id @default(cuid())
+  notificationId    String                      @unique
+  text              String
+  actionHref        String?
+  actionLabel       String?
+  status            AdminTelegramDeliveryStatus @default(PENDING)
+  attempts          Int                         @default(0)
+  nextRetryAt       DateTime                    @default(now())
+  lockedAt          DateTime?
+  sentAt            DateTime?
+  telegramMessageId String?
+  lastError         String?
+  createdAt         DateTime                    @default(now())
+  updatedAt         DateTime                    @updatedAt
+
+  notification AdminNotification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+
+  @@index([status, nextRetryAt])
+  @@index([status, lockedAt])
+}
+
+enum AdminTelegramDeliveryStatus {
+  PENDING
+  PROCESSING
+  RETRYING
+  SENT
+  FAILED
 }
 
 enum AdminNotificationSeverity {

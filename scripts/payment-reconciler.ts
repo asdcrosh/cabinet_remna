@@ -11,6 +11,7 @@ import { syncRemnashopUsersToCabinet } from '../src/lib/remnashop-users'
 import { recordPaymentWorkerHeartbeat } from '../src/lib/worker-health'
 import { logError, logInfo } from '../src/lib/logger'
 import { reconcileSubscriptionHealthBatch } from '../src/lib/subscription-health'
+import { processAdminTelegramDeliveries } from '../src/lib/admin-telegram-notifications'
 
 const intervalMs = readPositiveInt('PAYMENT_RECONCILE_INTERVAL_SECONDS', 60) * 1000
 const batchSize = readPositiveInt('PAYMENT_RECONCILE_BATCH_SIZE', 25)
@@ -24,6 +25,7 @@ const remnashopReverseSyncLookbackDays = readPositiveInt('REMNASHOP_REVERSE_SYNC
 const remnashopSyncRetryBatchSize = readPositiveInt('REMNASHOP_SYNC_RETRY_BATCH_SIZE', 50)
 const subscriptionHealthIntervalMs = readPositiveInt('SUBSCRIPTION_HEALTH_INTERVAL_SECONDS', 600) * 1000
 const subscriptionHealthBatchSize = readPositiveInt('SUBSCRIPTION_HEALTH_BATCH_SIZE', 10)
+const adminTelegramBatchSize = readPositiveInt('ADMIN_TELEGRAM_NOTIFICATION_BATCH_SIZE', 20)
 
 let stopped = false
 let wakeSleep: (() => void) | null = null
@@ -98,11 +100,24 @@ async function runOnce() {
   await retryProvisioningJobs()
   await retryRemnashopSyncEvents()
   await retryRemnashopReverseSync()
+  await deliverAdminTelegramNotifications()
   await reconcileSubscriptionExpiryNotifications({
     batchSize: notificationBatchSize,
     shouldStop: () => stopped,
   })
   await notifyTrafficThresholds()
+}
+
+async function deliverAdminTelegramNotifications() {
+  try {
+    const result = await processAdminTelegramDeliveries({
+      batchSize: adminTelegramBatchSize,
+      shouldStop: () => stopped,
+    })
+    if (result.attempted > 0) logInfo('admin_telegram.batch_completed', result)
+  } catch (error) {
+    logError('admin_telegram.batch_failed', error)
+  }
 }
 
 async function syncSubscriptionHealthIfDue() {

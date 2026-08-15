@@ -113,7 +113,7 @@ npm run dev
 | **PayAnyWay** | Второй платёжный способ с подписанным callback | `/api/webhook/payanyway` |
 | **Platega** | Альтернативный платёжный метод | `/api/webhook/platega` |
 | **Resend или свой webhook** | Письма подтверждения и восстановления | `EMAIL_VERIFICATION_WEBHOOK_*` |
-| **Telegram** | Mini App, вход, уведомления и бэкапы | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_NOTIFY_CHAT_ID` |
+| **Telegram** | Mini App, вход, owner-only уведомления об оплатах и поддержке, бэкапы | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_NOTIFY_CHAT_ID`, `ADMIN_TELEGRAM_CHAT_ID` |
 | **Watch** | Проверка Panel API, нод, XHTTP/TCP Reality и уведомления об инцидентах | Админка → Watch, `WATCH_*` |
 
 ### Remnashop: ожидаемая схема работы
@@ -208,6 +208,12 @@ cabinetctl update
 ```
 
 Обновление сохраняет `.env`, Docker volume базы и администратора. После успешного health-check оно может отправить одно уведомление в Telegram, если заданы `TELEGRAM_BOT_TOKEN` и корректный `TELEGRAM_NOTIFY_CHAT_ID`.
+
+Уведомления об успешных покупках, задержке выдачи подписки и новых сообщениях поддержки отправляются только владельцу. Получатель задаётся через `ADMIN_TELEGRAM_CHAT_ID`; если он пуст, используется `TELEGRAM_NOTIFY_CHAT_ID`. Для отключения установите `ADMIN_TELEGRAM_NOTIFICATIONS_ENABLED=false`. Очередь хранится в базе, защищена от дублей и повторяет временно неудачные отправки. Проверка на сервере без создания платежа или обращения:
+
+```bash
+docker exec remnawave-cabinet-worker node ops/admin-telegram-test.js
+```
 
 ### Бэкапы и перенос
 

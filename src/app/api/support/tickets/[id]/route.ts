@@ -10,6 +10,7 @@ import {
 } from '@/lib/support'
 import { createAdminNotification } from '@/lib/admin-notifications'
 import { isFeatureEnabled } from '@/lib/feature-flags'
+import { buildAdminSupportTelegramText } from '@/lib/admin-telegram-notifications'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -89,7 +90,7 @@ export const POST = withAuth(async (req: Request, { params }: { params: Promise<
 
   const ticket = await prisma.supportTicket.findFirst({
     where: { id, userId: session.uid },
-    select: { id: true, status: true },
+    select: { id: true, status: true, subject: true },
   })
   if (!ticket) {
     return NextResponse.json({ error: 'Обращение не найдено.' }, { status: 404 })
@@ -124,6 +125,10 @@ export const POST = withAuth(async (req: Request, { params }: { params: Promise<
     })
     return created
   })
+  const customer = await prisma.user.findUnique({
+    where: { id: session.uid },
+    select: { name: true, email: true, telegramUsername: true },
+  })
 
   await createAdminNotification({
     type: 'support',
@@ -135,6 +140,22 @@ export const POST = withAuth(async (req: Request, { params }: { params: Promise<
     entityId: ticket.id,
     actionHref: '/dashboard/admin/support',
     actionLabel: 'Открыть чат',
+    ...(customer
+      ? {
+          telegram: {
+            text: buildAdminSupportTelegramText({
+              kind: 'message',
+              subject: ticket.subject,
+              message: parsed.data.message,
+              customerName: customer.name,
+              customerEmail: customer.email,
+              telegramUsername: customer.telegramUsername,
+            }),
+            actionHref: `/dashboard/admin/support?q=${encodeURIComponent(ticket.id)}`,
+            actionLabel: 'Открыть и ответить',
+          },
+        }
+      : {}),
   })
 
   return NextResponse.json({ message: serializeSupportMessage(message) }, { status: 201 })

@@ -10,6 +10,7 @@ import {
 } from '@/lib/support'
 import { createAdminNotification } from '@/lib/admin-notifications'
 import { isFeatureEnabled } from '@/lib/feature-flags'
+import { buildAdminSupportTelegramText } from '@/lib/admin-telegram-notifications'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -83,6 +84,10 @@ export const POST = withAuth(async (req: Request) => {
     })
     return created
   })
+  const customer = await prisma.user.findUnique({
+    where: { id: session.uid },
+    select: { name: true, email: true, telegramUsername: true },
+  })
 
   await createAdminNotification({
     type: 'support',
@@ -94,6 +99,22 @@ export const POST = withAuth(async (req: Request) => {
     entityId: ticket.id,
     actionHref: '/dashboard/admin/support',
     actionLabel: 'Открыть поддержку',
+    ...(customer
+      ? {
+          telegram: {
+            text: buildAdminSupportTelegramText({
+              kind: 'ticket',
+              subject: ticket.subject,
+              message: parsed.data.message,
+              customerName: customer.name,
+              customerEmail: customer.email,
+              telegramUsername: customer.telegramUsername,
+            }),
+            actionHref: `/dashboard/admin/support?q=${encodeURIComponent(ticket.id)}`,
+            actionLabel: 'Открыть и ответить',
+          },
+        }
+      : {}),
   })
 
   return NextResponse.json({

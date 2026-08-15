@@ -1,5 +1,6 @@
 import { Prisma, type AdminNotification } from '@prisma/client'
 import { prisma } from './prisma'
+import type { AdminTelegramPayload } from './admin-telegram-notifications'
 
 export type AdminNotificationSeverity = 'INFO' | 'SUCCESS' | 'WARNING' | 'ERROR'
 
@@ -27,6 +28,7 @@ export async function createAdminNotification(input: {
   entityId?: string
   actionHref?: string
   actionLabel?: string
+  telegram?: AdminTelegramPayload
 }) {
   try {
     return await prisma.adminNotification.create({
@@ -40,6 +42,17 @@ export async function createAdminNotification(input: {
         entityId: input.entityId,
         actionHref: input.actionHref,
         actionLabel: input.actionLabel,
+        ...(input.telegram
+          ? {
+              telegramDelivery: {
+                create: {
+                  text: input.telegram.text,
+                  actionHref: input.telegram.actionHref,
+                  actionLabel: input.telegram.actionLabel,
+                },
+              },
+            }
+          : {}),
       },
     })
   } catch (error) {

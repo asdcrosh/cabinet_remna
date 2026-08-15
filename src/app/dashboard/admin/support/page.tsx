@@ -27,6 +27,7 @@ export default async function AdminSupportPage({
     ...(q
       ? {
           OR: [
+            { id: { equals: q } },
             { subject: { contains: q, mode: 'insensitive' as const } },
             { user: { email: { contains: q, mode: 'insensitive' as const } } },
             { user: { name: { contains: q, mode: 'insensitive' as const } } },
