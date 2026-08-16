@@ -299,6 +299,12 @@ test('настройки рефералов задают условие и на�
   const panel = page.getByTestId('referral-settings')
   const trigger = panel.getByRole('radiogroup', { name: 'Момент начисления' })
   await expect(trigger.getByRole('radio')).toHaveCount(2)
+  const registrationTrigger = trigger.getByRole('radio', { name: /После регистрации/ })
+  const minimumPayment = panel.getByLabel('Минимальная сумма первой оплаты')
+  await registrationTrigger.click()
+  await expect(registrationTrigger).toBeChecked()
+  await expect(minimumPayment).toBeDisabled()
+
   const promotionEnd = panel.getByLabel('Акция действует до')
   await promotionEnd.evaluate((element) => {
     const input = element as HTMLInputElement
@@ -309,8 +315,6 @@ test('настройки рефералов задают условие и на�
     input.dispatchEvent(new Event('change', { bubbles: true }))
   })
   await expect(panel.getByText(/До 31 дек/)).toBeVisible()
-  await trigger.getByRole('radio', { name: /После регистрации/ }).click()
-  await expect(panel.getByLabel('Минимальная сумма первой оплаты')).toBeDisabled()
 
   const referrerReward = panel.getByRole('region', { name: 'Пригласившему' })
   const referredReward = panel.getByRole('region', { name: 'Новому пользователю' })

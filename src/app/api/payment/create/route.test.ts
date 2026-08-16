@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   isPaymentProviderAvailable: vi.fn(),
   validatePromoCodeForPlan: vi.fn(),
   logError: vi.fn(),
+  logWarn: vi.fn(),
   txPaymentCreate: vi.fn(),
   txPromoCreate: vi.fn(),
   prisma: {
@@ -52,7 +53,7 @@ vi.mock('@/lib/promo-codes', () => ({
   },
   validatePromoCodeForPlan: mocks.validatePromoCodeForPlan,
 }))
-vi.mock('@/lib/logger', () => ({ logError: mocks.logError }))
+vi.mock('@/lib/logger', () => ({ logError: mocks.logError, logWarn: mocks.logWarn }))
 
 import { POST } from './route'
 
