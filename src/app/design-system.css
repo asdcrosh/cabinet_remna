@@ -1534,3 +1534,537 @@ textarea:focus {
     animation: none;
   }
 }
+
+/* Visual system v2: quieter surfaces, a compact intermediate layout and
+   accents that guide an action instead of outlining every container. */
+:root {
+  --app-bg: #f7f6fb;
+  --app-surface: #ffffff;
+  --app-surface-soft: #f1eff8;
+  --app-surface-strong: #e5e0f0;
+  --app-text: #1d1830;
+  --app-muted: #716b82;
+  --app-border: #e1ddea;
+  --app-border-strong: #c9c1d8;
+  --app-radius: 16px;
+  --app-radius-sm: 10px;
+  --app-shadow: 0 18px 44px rgba(38, 24, 73, 0.08);
+}
+
+body {
+  background:
+    radial-gradient(circle at 100% -12rem, color-mix(in srgb, var(--app-accent) 5%, transparent), transparent 34rem),
+    var(--app-bg) !important;
+}
+
+.dashboard-shell {
+  background:
+    radial-gradient(circle at 100% -15rem, color-mix(in srgb, var(--app-accent) 4%, transparent), transparent 38rem),
+    var(--app-bg) !important;
+}
+
+.dashboard-sidebar {
+  width: 16rem !important;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--app-ink) 54%, #0c0915), color-mix(in srgb, var(--app-ink) 66%, #0a0810)) !important;
+}
+
+.dashboard-sidebar::after {
+  display: none;
+}
+
+.dashboard-sidebar nav a,
+.dashboard-sidebar nav button {
+  border-radius: 9px !important;
+}
+
+.dashboard-sidebar nav a[aria-current="page"],
+.dashboard-sidebar nav a[data-active="true"] {
+  background: color-mix(in srgb, var(--app-accent) 18%, transparent) !important;
+  box-shadow: inset 2px 0 0 var(--app-accent) !important;
+}
+
+.dashboard-sidebar nav a[aria-current="page"]::after,
+.dashboard-sidebar nav a[data-active="true"]::after {
+  display: none;
+}
+
+.page-header {
+  padding: 0 0 1.2rem !important;
+  border-bottom-color: var(--app-border) !important;
+}
+
+.page-header::before {
+  display: none;
+}
+
+.page-header::after {
+  width: 4.25rem !important;
+  height: 2px !important;
+  background: linear-gradient(90deg, var(--app-accent), var(--app-ink)) !important;
+}
+
+.page-title,
+.home-intro h1 {
+  letter-spacing: -0.052em !important;
+  line-height: 1.02 !important;
+}
+
+.page-description,
+.home-intro p {
+  max-width: 38rem !important;
+  font-size: 0.95rem !important;
+}
+
+.card,
+.panel,
+.surface-card,
+.settings-section,
+.plan-period-panel,
+.plan-checkout-card,
+.access-pass,
+.subscription-ticket,
+.admin-list,
+.table-shell,
+.admin-filter-bar {
+  border-color: var(--app-border) !important;
+  border-radius: var(--app-radius) !important;
+  background: color-mix(in srgb, var(--app-surface) 96%, var(--app-bg)) !important;
+}
+
+.card:hover,
+.surface-card:hover,
+.device-card:hover {
+  border-color: color-mix(in srgb, var(--app-accent) 28%, var(--app-border)) !important;
+  transform: none !important;
+}
+
+.btn,
+.btn-primary,
+.btn-secondary,
+.btn-ghost,
+.btn-danger {
+  min-height: 2.75rem;
+  border-radius: 10px !important;
+}
+
+.btn-primary {
+  border-color: var(--app-ink) !important;
+  background: linear-gradient(135deg, var(--app-ink), color-mix(in srgb, var(--app-ink) 84%, var(--app-accent))) !important;
+}
+
+.btn-primary:hover {
+  border-color: var(--app-ink-hover) !important;
+  background: var(--app-ink-hover) !important;
+}
+
+.btn-secondary {
+  background: var(--app-surface) !important;
+}
+
+.metric-card,
+.stat-card {
+  border-top-color: var(--app-border) !important;
+}
+
+.metric-card::after,
+.stat-card::after {
+  width: 1.4rem !important;
+  background: var(--app-accent) !important;
+}
+
+.access-overview,
+.connection-access-summary,
+.connection-panel,
+.device-panel {
+  border-color: var(--app-border) !important;
+  border-radius: 18px !important;
+  box-shadow: none !important;
+}
+
+.access-overview__remaining,
+.connection-panel,
+.device-panel {
+  background: linear-gradient(115deg, color-mix(in srgb, var(--app-accent) 5%, var(--app-surface)), var(--app-surface) 55%) !important;
+}
+
+.access-overview__facts {
+  border-left-style: solid !important;
+  border-left-color: var(--app-border) !important;
+}
+
+.access-overview__fact::before {
+  width: 1rem !important;
+  background: var(--app-accent) !important;
+}
+
+.plan-period-panel {
+  padding: 1rem !important;
+  background: var(--app-surface) !important;
+  box-shadow: none !important;
+}
+
+.plan-period-panel [role="radio"] {
+  border: 1px solid transparent !important;
+  border-radius: 12px !important;
+  background: var(--app-surface) !important;
+  box-shadow: none !important;
+}
+
+.plan-period-panel [role="radio"]:hover {
+  background: color-mix(in srgb, var(--app-accent) 4%, var(--app-surface)) !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+.plan-period-panel [role="radio"][aria-checked="true"] {
+  border-color: color-mix(in srgb, var(--app-accent) 30%, var(--app-border)) !important;
+  background: color-mix(in srgb, var(--app-accent) 8%, var(--app-surface)) !important;
+  box-shadow: inset 3px 0 0 var(--app-accent) !important;
+}
+
+.plan-period-panel [role="radio"]::before {
+  display: none;
+}
+
+.plan-period-card {
+  border-color: var(--app-border) !important;
+  border-radius: 14px !important;
+  background: var(--app-surface) !important;
+  box-shadow: none !important;
+}
+
+.plan-period-card--current {
+  border-color: color-mix(in srgb, var(--app-accent) 32%, var(--app-border)) !important;
+  background: color-mix(in srgb, var(--app-accent) 7%, var(--app-surface)) !important;
+  box-shadow: inset 3px 0 0 var(--app-accent) !important;
+}
+
+.plan-period-card__action,
+.plan-period-card__action:hover {
+  border-radius: 9px !important;
+  transform: none !important;
+}
+
+.plan-checkout-card[data-display="full"] {
+  border-radius: 18px !important;
+  background: var(--app-surface) !important;
+  box-shadow: none !important;
+}
+
+.plan-checkout-summary,
+.plan-price-panel {
+  background: color-mix(in srgb, var(--app-accent) 5%, var(--app-surface)) !important;
+}
+
+.settings-section {
+  border-top: 1px solid var(--app-border) !important;
+  box-shadow: none !important;
+}
+
+.settings-workspace-tabs {
+  border-color: var(--app-border) !important;
+}
+
+.settings-workspace [role="tab"][aria-selected="true"] {
+  background: color-mix(in srgb, var(--app-accent) 9%, var(--app-surface)) !important;
+  box-shadow: inset 2px 0 0 var(--app-accent) !important;
+}
+
+.bonus-box-stage {
+  border-color: var(--app-border) !important;
+  border-radius: 20px !important;
+  background: var(--app-surface) !important;
+  box-shadow: none !important;
+}
+
+.bonus-box-stage::before {
+  opacity: 0.38 !important;
+}
+
+.bonus-box-stage-header {
+  background: color-mix(in srgb, var(--app-surface-soft) 55%, var(--app-surface)) !important;
+}
+
+.bonus-wheel-console {
+  background: color-mix(in srgb, var(--app-accent) 4%, var(--app-surface)) !important;
+}
+
+.app-modal-panel {
+  border-color: var(--app-border) !important;
+  border-radius: 18px !important;
+  background: var(--app-surface) !important;
+  box-shadow: 0 24px 72px rgba(30, 20, 54, 0.2) !important;
+}
+
+.app-modal-header,
+.app-modal-footer {
+  background: var(--app-surface) !important;
+  border-color: var(--app-border) !important;
+}
+
+html:not(.dark) .app-modal-panel.bonus-wheel-result-modal,
+html:not(.dark) .app-modal-panel.bonus-wheel-result-modal--rare,
+html:not(.dark) .app-modal-panel.bonus-wheel-result-modal--epic,
+html:not(.dark) .app-modal-panel.bonus-wheel-result-modal--legendary,
+html:not(.dark) .app-modal-panel.bonus-wheel-result-modal--empty {
+  color: var(--app-text) !important;
+  background: var(--app-surface) !important;
+}
+
+html:not(.dark) .bonus-wheel-result-modal .app-modal-header,
+html:not(.dark) .bonus-wheel-result-modal .app-modal-footer,
+html:not(.dark) .bonus-wheel-result-modal .bonus-wheel-result-promo {
+  background: color-mix(in srgb, var(--app-accent) 5%, var(--app-surface)) !important;
+}
+
+html:not(.dark) .bonus-wheel-result-modal .app-modal-header h2,
+html:not(.dark) .bonus-wheel-result-modal .bonus-wheel-result-copy > strong,
+html:not(.dark) .bonus-wheel-result-modal .bonus-wheel-result-copy > h3,
+html:not(.dark) .bonus-wheel-result-modal .bonus-wheel-result-promo,
+html:not(.dark) .bonus-wheel-result-modal .bonus-wheel-result-actions .btn-secondary {
+  color: var(--app-text) !important;
+}
+
+html:not(.dark) .bonus-wheel-result-modal .app-modal-header p,
+html:not(.dark) .bonus-wheel-result-modal .bonus-wheel-result-kicker,
+html:not(.dark) .bonus-wheel-result-modal .bonus-wheel-result-copy > p,
+html:not(.dark) .bonus-wheel-result-modal .bonus-wheel-result-promo small {
+  color: var(--app-muted) !important;
+}
+
+.dashboard-mobile-nav {
+  border-color: color-mix(in srgb, var(--app-ink) 15%, var(--app-border)) !important;
+  border-radius: 14px !important;
+  background: color-mix(in srgb, var(--app-surface) 94%, transparent) !important;
+  box-shadow: 0 18px 45px rgba(30, 20, 54, 0.17) !important;
+}
+
+.dashboard-mobile-nav [aria-current="page"] {
+  background: color-mix(in srgb, var(--app-accent) 12%, var(--app-surface)) !important;
+  color: var(--app-accent-text) !important;
+  box-shadow: inset 0 2px 0 var(--app-accent) !important;
+}
+
+.dark {
+  --app-bg: #0c0a14;
+  --app-surface: #15121f;
+  --app-surface-soft: #201b2d;
+  --app-surface-strong: #2c263b;
+  --app-text: #f6f3fb;
+  --app-muted: #aaa4b7;
+  --app-border: rgba(235, 229, 249, 0.1);
+  --app-border-strong: rgba(235, 229, 249, 0.18);
+}
+
+.dark .dashboard-sidebar {
+  background: linear-gradient(180deg, #130d20, #0b0911) !important;
+}
+
+.dark .bonus-box-stage,
+.dark .app-modal-panel {
+  background: var(--app-surface) !important;
+}
+
+.dark .dashboard-mobile-nav {
+  background: color-mix(in srgb, var(--app-surface) 92%, transparent) !important;
+}
+
+/* Forms and data-heavy admin screens share the same quiet hierarchy. */
+.dashboard-main .input,
+.dashboard-main select,
+.dashboard-main textarea,
+.dashboard-main input:not([type='checkbox']):not([type='radio']) {
+  border-color: var(--app-border) !important;
+  border-radius: 10px !important;
+  background: var(--app-surface) !important;
+  box-shadow: none !important;
+}
+
+.dashboard-main .input:focus,
+.dashboard-main select:focus,
+.dashboard-main textarea:focus,
+.dashboard-main input:not([type='checkbox']):not([type='radio']):focus {
+  border-color: color-mix(in srgb, var(--app-accent) 58%, var(--app-border)) !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--app-accent) 12%, transparent) !important;
+}
+
+.dashboard-main .label {
+  color: var(--app-muted) !important;
+  font-size: 0.78rem !important;
+  font-weight: 650 !important;
+  letter-spacing: 0.015em;
+}
+
+.admin-list-header {
+  border-bottom: 1px solid var(--app-border) !important;
+  background: color-mix(in srgb, var(--app-surface-soft) 58%, var(--app-surface)) !important;
+  color: var(--app-muted) !important;
+}
+
+.admin-list-row {
+  border-color: var(--app-border) !important;
+}
+
+.admin-list-row:hover {
+  background: color-mix(in srgb, var(--app-accent) 3%, var(--app-surface)) !important;
+}
+
+.table-shell table th {
+  background: color-mix(in srgb, var(--app-surface-soft) 56%, var(--app-surface)) !important;
+  color: var(--app-muted) !important;
+}
+
+.table-shell table tr {
+  border-color: var(--app-border) !important;
+}
+
+.table-shell table tbody tr:hover {
+  background: color-mix(in srgb, var(--app-accent) 3%, var(--app-surface)) !important;
+}
+
+.admin-filter-bar {
+  padding: clamp(1rem, 2vw, 1.35rem) !important;
+  box-shadow: none !important;
+}
+
+.status-chip,
+.status-badge,
+.tag-chip,
+.data-chip {
+  border-radius: 999px !important;
+  box-shadow: none !important;
+}
+
+/* Public pages and authentication use the same brand, without a decorative
+   gradient occupying half of the screen. */
+.site-shell > section:first-child {
+  background:
+    radial-gradient(circle at 100% -8rem, color-mix(in srgb, var(--app-accent) 8%, transparent), transparent 28rem),
+    var(--app-bg) !important;
+}
+
+.site-band {
+  border-left-width: 2px !important;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--app-ink) 82%, #0d0a16), #100d19) !important;
+}
+
+.site-preview,
+.auth-panel,
+.auth-card,
+.site-card {
+  border-radius: 16px !important;
+  box-shadow: 0 16px 42px rgba(33, 23, 63, 0.07) !important;
+}
+
+.auth-aside {
+  background:
+    linear-gradient(165deg, color-mix(in srgb, var(--app-ink) 76%, #110d1c), #100d17 70%, #0a0910) !important;
+}
+
+.auth-aside::after {
+  position: absolute;
+  top: 6rem;
+  bottom: 6rem;
+  left: 0;
+  width: 2px;
+  content: '';
+  background: linear-gradient(var(--app-accent), transparent 80%);
+}
+
+.auth-aside > * {
+  position: relative;
+  z-index: 1;
+}
+
+.auth-aside [aria-hidden='true'] {
+  display: none;
+}
+
+.auth-panel {
+  background: color-mix(in srgb, var(--app-surface) 98%, var(--app-bg)) !important;
+}
+
+.auth-shell main {
+  background:
+    radial-gradient(circle at 100% 0, color-mix(in srgb, var(--app-accent) 4%, transparent), transparent 26rem),
+    var(--app-bg);
+}
+
+.dark .auth-shell main {
+  background:
+    radial-gradient(circle at 100% 0, color-mix(in srgb, var(--app-accent) 7%, transparent), transparent 27rem),
+    var(--app-bg);
+}
+
+@media (min-width: 1280px) {
+  main.dashboard-main {
+    margin-left: 16rem !important;
+  }
+}
+
+@media (max-width: 1359px) {
+  .plan-period-list article,
+  .plan-period-list article:first-child {
+    grid-template-columns: minmax(0, 1fr) 8.5rem !important;
+    gap: 0.85rem !important;
+    padding: 1rem !important;
+  }
+
+  .plan-period-list article:last-child {
+    border-bottom: 1px solid var(--app-border) !important;
+  }
+}
+
+@media (max-width: 1279px) {
+  main.dashboard-main {
+    margin-left: 0 !important;
+  }
+
+  .dashboard-mobile-nav {
+    right: auto !important;
+    left: 50% !important;
+    width: min(calc(100% - 2rem), 46rem) !important;
+    transform: translateX(-50%);
+  }
+
+  .access-overview__body {
+    grid-template-columns: 1fr;
+  }
+
+  .access-overview__facts {
+    border-top: 1px solid var(--app-border);
+    border-left: 0 !important;
+  }
+}
+
+@media (max-width: 639px) {
+  .page-title,
+  .admin-workspace .page-title,
+  .home-intro h1 {
+    font-size: 2rem !important;
+  }
+
+  .page-header {
+    padding-bottom: 1rem !important;
+  }
+
+  .plan-period-list article,
+  .plan-period-list article:first-child {
+    grid-template-columns: minmax(0, 1fr) 7.25rem !important;
+    padding: 0.85rem !important;
+  }
+
+  .plan-period-card__action {
+    padding-inline: 0.7rem !important;
+  }
+
+  .settings-workspace-tabs {
+    border-radius: 12px;
+    background: var(--app-surface-soft) !important;
+  }
+
+  .settings-workspace [role="tab"][aria-selected="true"] {
+    box-shadow: inset 0 2px 0 var(--app-accent) !important;
+  }
+}

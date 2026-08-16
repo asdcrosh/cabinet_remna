@@ -41,7 +41,7 @@ export default async function SettingsPage() {
         description="Профиль, уведомления и безопасность."
       />
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_15rem] xl:items-start">
+      <div className="grid gap-6 min-[1360px]:grid-cols-[minmax(0,1fr)_15rem] min-[1360px]:items-start">
         <div className="min-w-0">
           <SettingsTabs
             sections={[

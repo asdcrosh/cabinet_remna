@@ -127,7 +127,7 @@ export function MobileBottomNav({
     const onTouchStart = (event: TouchEvent) => {
       const touch = event.touches[0]
       if (
-        window.matchMedia('(min-width: 1024px)').matches ||
+        window.matchMedia('(min-width: 1280px)').matches ||
         event.touches.length !== 1 ||
         !touch ||
         touch.clientX < 24 ||
@@ -177,7 +177,7 @@ export function MobileBottomNav({
   }, [moreOpen, pathname, router, swipeHrefKey])
 
   const moreDrawer = (
-    <div className="fixed inset-0 z-[95] h-dvh w-dvw lg:hidden">
+    <div className="fixed inset-0 z-[95] h-dvh w-dvw xl:hidden">
       <button
         type="button"
         className="absolute inset-0 bg-slate-950/40"
@@ -249,7 +249,7 @@ export function MobileBottomNav({
   return (
     <nav
       aria-label="Основная мобильная навигация"
-      className="dashboard-mobile-nav fixed inset-x-2 bottom-[max(.5rem,env(safe-area-inset-bottom),var(--tg-content-safe-area-inset-bottom,0px),var(--telegram-miniapp-bottom-offset,0px))] z-40 rounded-xl border p-1.5 backdrop-blur lg:hidden"
+      className="dashboard-mobile-nav fixed inset-x-2 bottom-[max(.5rem,env(safe-area-inset-bottom),var(--tg-content-safe-area-inset-bottom,0px),var(--telegram-miniapp-bottom-offset,0px))] z-40 rounded-xl border p-1.5 backdrop-blur xl:hidden"
     >
       <div
         className="mx-auto grid max-w-md gap-1"

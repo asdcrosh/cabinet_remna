@@ -23,9 +23,9 @@ export function AuthLayout({
   const brandName = getBrandName()
 
   return (
-    <div className="auth-shell min-h-dvh lg:grid lg:grid-cols-[minmax(21rem,0.68fr)_minmax(0,1.32fr)]">
+    <div className="auth-shell min-h-dvh min-[1200px]:grid min-[1200px]:grid-cols-[minmax(24rem,0.68fr)_minmax(0,1.32fr)]">
       {enableTelegramMiniApp && <TelegramMiniAppAuth />}
-      <aside className="auth-aside relative hidden h-dvh overflow-hidden border-r p-8 text-white lg:sticky lg:top-0 lg:flex lg:flex-col lg:justify-between xl:p-10">
+      <aside className="auth-aside relative hidden h-dvh overflow-hidden border-r p-8 text-white min-[1200px]:sticky min-[1200px]:top-0 min-[1200px]:flex min-[1200px]:flex-col min-[1200px]:justify-between xl:p-10">
         <div aria-hidden="true" className="absolute inset-y-0 left-0 w-0.5 bg-brand-300" />
         <nav aria-label="Основная навигация" className="relative flex items-center justify-between gap-4">
           <Link href="/" className="flex min-w-0 items-center gap-3">
@@ -53,9 +53,9 @@ export function AuthLayout({
         </div>
       </aside>
 
-      <main className="flex min-h-dvh items-start justify-center px-4 pb-[max(1.5rem,env(safe-area-inset-bottom),var(--tg-content-safe-area-inset-bottom,0px),var(--telegram-miniapp-bottom-offset,0px))] pt-[max(1rem,env(safe-area-inset-top),calc(var(--tg-content-safe-area-inset-top,0px)+var(--telegram-miniapp-top-offset,0px)))] sm:px-8 sm:py-10 lg:items-center lg:px-10 xl:px-16">
+      <main className="flex min-h-dvh items-start justify-center px-4 pb-[max(1.5rem,env(safe-area-inset-bottom),var(--tg-content-safe-area-inset-bottom,0px),var(--telegram-miniapp-bottom-offset,0px))] pt-[max(1rem,env(safe-area-inset-top),calc(var(--tg-content-safe-area-inset-top,0px)+var(--telegram-miniapp-top-offset,0px)))] sm:px-8 sm:py-10 min-[1200px]:items-center min-[1200px]:px-10 xl:px-16">
         <div className="w-full max-w-[32rem]">
-          <nav aria-label="Основная навигация" className="mb-5 flex items-center justify-between gap-3 lg:hidden">
+          <nav aria-label="Основная навигация" className="mb-5 flex items-center justify-between gap-3 min-[1200px]:hidden">
             <Link href="/" className="flex min-w-0 items-center gap-3">
               <BrandLogo className="h-10 w-10" priority />
               <span className="truncate font-semibold text-slate-950 dark:text-white">{brandName}</span>
