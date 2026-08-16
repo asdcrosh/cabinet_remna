@@ -1265,13 +1265,14 @@
             install -o root -g root -m 0644 "$staged_cert" "$pending_cert"
             install -o root -g root -m 0600 "$live_key" "$previous_key"
             install -o root -g root -m 0644 "$live_cert" "$previous_cert"
-            test "$(openssl x509 -in "$pending_cert" -pubkey -noout |
-              openssl pkey -pubin -outform DER | sha256sum | cut -d' ' -f1)" =
-              "$(openssl pkey -in "$pending_key" -pubout -outform DER |
-              sha256sum | cut -d' ' -f1)" || {
+            pending_certificate_key_fingerprint="$(openssl x509 -in "$pending_cert" -pubkey -noout |
+              openssl pkey -pubin -outform DER | sha256sum | cut -d' ' -f1)"
+            pending_private_key_fingerprint="$(openssl pkey -in "$pending_key" -pubout -outform DER |
+              sha256sum | cut -d' ' -f1)"
+            if [[ "$pending_certificate_key_fingerprint" != "$pending_private_key_fingerprint" ]]; then
               echo "Prepared SelfSteal certificate and private key do not match" >&2
               exit 1
-            }
+            fi
           args:
             executable: /bin/bash
           changed_when: true
@@ -1325,10 +1326,14 @@
             test -f "$previous_cert" || { echo "SelfSteal certificate rollback file is missing" >&2; exit 1; }
             mv -fT -- "$pending_key" "$live_key"
             mv -fT -- "$pending_cert" "$live_cert"
-            test "$(openssl x509 -in "$live_cert" -pubkey -noout |
-              openssl pkey -pubin -outform DER | sha256sum | cut -d' ' -f1)" =
-              "$(openssl pkey -in "$live_key" -pubout -outform DER |
+            live_certificate_key_fingerprint="$(openssl x509 -in "$live_cert" -pubkey -noout |
+              openssl pkey -pubin -outform DER | sha256sum | cut -d' ' -f1)"
+            live_private_key_fingerprint="$(openssl pkey -in "$live_key" -pubout -outform DER |
               sha256sum | cut -d' ' -f1)"
+            if [[ "$live_certificate_key_fingerprint" != "$live_private_key_fingerprint" ]]; then
+              echo "Deployed SelfSteal certificate and private key do not match" >&2
+              exit 1
+            fi
             rm -f -- "$previous_key" "$previous_cert"
             trap - EXIT INT TERM
           args:
