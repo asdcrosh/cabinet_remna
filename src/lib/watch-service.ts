@@ -24,15 +24,19 @@ export async function runWatchCycle(source: 'worker' | 'manual' = 'worker') {
     const events: WatchAlertEvent[] = []
     const trackIncidents = source === 'worker'
     try {
-      let payload: Awaited<ReturnType<typeof remnawave.getNodes>>
+      let nodes: RemnawaveNode[]
       try {
-        payload = await remnawave.getNodes()
+        const payload = await remnawave.getNodes()
+        if (!Array.isArray(payload.response) || payload.response.some((node) => !node || typeof node.uuid !== 'string' || !node.uuid.trim())) {
+          throw new Error('Remnawave /api/nodes вернул некорректный список нод')
+        }
+        nodes = payload.response
         events.push(...await markPanelSuccess(config.recoveryThreshold, trackIncidents))
       } catch (error) {
         events.push(...await markPanelFailure(error, config.failureThreshold, trackIncidents))
         throw error
       }
-      const nodes = Array.isArray(payload.response) ? payload.response : []
+      const removedNodes = await syncWatchNodeInventory(nodes.map((node) => node.uuid))
       let hosts: RemnawaveHost[] = []
       try {
         const hostPayload = await remnawave.getHosts()
@@ -68,8 +72,14 @@ export async function runWatchCycle(source: 'worker' | 'manual' = 'worker') {
         data: { status: networkStatus, lastRunAt: new Date(), lastSuccessAt: new Date(), lastError: null },
       })
       await cleanupWatchHistory(config.retentionDays)
-      logInfo('watch.cycle_complete', { source, nodes: checks.length, durationMs: Date.now() - startedAt, networkStatus })
-      return { nodes: checks.length, networkStatus }
+      logInfo('watch.cycle_complete', {
+        source,
+        nodes: checks.length,
+        removedNodes,
+        durationMs: Date.now() - startedAt,
+        networkStatus,
+      })
+      return { nodes: checks.length, removedNodes, networkStatus }
     } catch (error) {
       logError('watch.cycle_failed', error, { source, durationMs: Date.now() - startedAt })
       throw error
@@ -377,6 +387,43 @@ export async function getWatchReport() {
 }
 
 export type WatchReport = Awaited<ReturnType<typeof getWatchReport>>
+
+export async function syncWatchNodeInventory(activeNodeUuids: string[]) {
+  const uniqueActiveNodeUuids = [...new Set(activeNodeUuids)]
+  const [deletedIncidents, deletedNodes] = uniqueActiveNodeUuids.length
+    ? await prisma.$transaction([
+        prisma.watchIncident.deleteMany({
+          where: {
+            OR: [
+              { nodeUuid: { notIn: uniqueActiveNodeUuids } },
+              { nodeUuid: null, nodeName: { not: null } },
+            ],
+          },
+        }),
+        prisma.watchNodeState.deleteMany({
+          where: { nodeUuid: { notIn: uniqueActiveNodeUuids } },
+        }),
+      ])
+    : await prisma.$transaction([
+        prisma.watchIncident.deleteMany({
+          where: {
+            OR: [
+              { nodeUuid: { not: null } },
+              { nodeUuid: null, nodeName: { not: null } },
+            ],
+          },
+        }),
+        prisma.watchNodeState.deleteMany(),
+      ])
+
+  if (deletedNodes.count > 0 || deletedIncidents.count > 0) {
+    logInfo('watch.inventory_pruned', {
+      nodes: deletedNodes.count,
+      incidents: deletedIncidents.count,
+    })
+  }
+  return deletedNodes.count
+}
 
 async function cleanupWatchHistory(retentionDays: number) {
   const before = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000)
