@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="1.4.0"
+VERSION="1.4.1"
 INSTALL_PATH="${FULL_BACKUP_INSTALL_PATH:-/usr/local/bin/remna-backup}"
 BACKUP_DIR="${FULL_BACKUP_DIR:-/opt/remnawave-backups}"
 S3_CONFIG_FILE="${FULL_BACKUP_S3_CONFIG:-/etc/remna-backup-s3.conf}"
@@ -628,7 +628,14 @@ wait_for_database() {
       db_name="$(container_env "${container}" POSTGRES_DB)"
       [[ -n "${db_user}" ]] || db_user="postgres"
       [[ -n "${db_name}" ]] || db_name="${db_user}"
-      if docker exec "${container}" pg_isready -U "${db_user}" -d "${db_name}" >/dev/null 2>&1; then
+      # pg_isready reports the server as ready even while the official
+      # PostgreSQL entrypoint is still creating POSTGRES_DB. Restore only
+      # after a real query to the required database succeeds.
+      if docker exec "${container}" psql \
+        -v ON_ERROR_STOP=1 \
+        -U "${db_user}" \
+        -d "${db_name}" \
+        -Atqc 'SELECT 1' >/dev/null 2>&1; then
         return 0
       fi
     fi
