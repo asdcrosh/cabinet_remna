@@ -12,7 +12,10 @@ test('пользователь обновляет профиль через на
   const nameInput = page.locator('#profile-name')
   await expect(nameInput).toHaveCount(1)
   await expect(nameInput).toBeEnabled()
-  await nameInput.fill('Тест Обновлён')
+  const updatedName = await nameInput.inputValue() === 'Тест Обновлён'
+    ? 'E2E Пользователь'
+    : 'Тест Обновлён'
+  await nameInput.fill(updatedName)
   const updateResponse = page.waitForResponse((response) =>
     response.url().endsWith('/api/me') && response.request().method() === 'PATCH'
   )
@@ -23,7 +26,7 @@ test('пользователь обновляет профиль через на
   await page.reload()
   const persistedNameInput = page.locator('#profile-name')
   await expect(persistedNameInput).toHaveCount(1)
-  await expect(persistedNameInput).toHaveValue('Тест Обновлён')
+  await expect(persistedNameInput).toHaveValue(updatedName)
   await expectNoHorizontalOverflow(page)
 })
 

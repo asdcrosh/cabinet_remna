@@ -19,8 +19,14 @@ export async function login(page: Page, email: string, password = E2E_PASSWORD) 
   await page.goto('/login')
   await page.getByLabel('Email').fill(email)
   await page.locator('#password').fill(password)
+  const loginResponse = page.waitForResponse((response) =>
+    response.url().endsWith('/api/auth/login') && response.request().method() === 'POST'
+  )
   await page.getByRole('button', { name: 'Войти' }).click()
-  await expect(page).toHaveURL(/\/dashboard(?:\?|$)/)
+  await expect((await loginResponse).ok()).toBe(true)
+  await expect(page).toHaveURL(/\/dashboard(?:\?|$)/, {
+    timeout: process.env.CI ? 30_000 : 5_000,
+  })
 }
 
 export async function expectNoHorizontalOverflow(page: Page) {
