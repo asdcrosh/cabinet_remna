@@ -42,7 +42,7 @@ flowchart LR
 Подходит для чистого Ubuntu/Debian-сервера или сервера, где уже работают Remnawave и Remnashop.
 
 1. Создайте `A`-запись домена кабинета на IP сервера.
-2. Установите управляющую консоль и запустите мастер:
+2. Установите только управляющую консоль:
 
 ```bash
 installer="$(mktemp)"
@@ -52,12 +52,32 @@ curl -fsSL --proto '=https' --tlsv1.2 \
 bash -n "${installer}"
 sudo bash "${installer}"
 rm -f "${installer}"
+```
+
+После этой команды установлен только `/usr/local/bin/cabinetctl`. Docker,
+Remnawave, Remnashop, Cabinet, контейнеры и модуль бэкапов не устанавливаются.
+
+3. Выберите нужный сценарий:
+
+Новая установка Cabinet:
+
+```bash
 sudo cabinetctl install
 ```
 
-3. Ответьте на вопросы мастера: домен, Remnawave, email и платёжный провайдер.
-4. Создайте первого администратора в конце установки.
-5. Проверьте запуск:
+Перенос существующей установки из полного бэкапа:
+
+```bash
+sudo cabinetctl backups
+```
+
+Во втором случае не запускайте `cabinetctl install`. Команда `cabinetctl backups`
+сама установит Docker и модуль бэкапов, после чего откроет меню настройки S3 и
+восстановления локального или удалённого архива.
+
+4. При новой установке ответьте на вопросы мастера: домен, Remnawave, email и
+   платёжный провайдер, затем создайте первого администратора.
+5. После установки или восстановления проверьте запуск:
 
 ```bash
 cabinetctl health
@@ -231,11 +251,27 @@ cabinetctl backups
 cabinetctl backup-schedule
 ```
 
-Расписание использует persistent systemd timer: пропущенный из-за перезагрузки запуск выполнится после старта сервера. Успех и ошибка отправляются в Telegram. Для восстановления на новом сервере сначала установите `cabinetctl`, затем откройте `cabinetctl backups` и выберите восстановление.
+Расписание использует persistent systemd timer: пропущенный из-за перезагрузки запуск выполнится после старта сервера. Успех и ошибка отправляются в Telegram. Для восстановления на новом сервере сначала установите только `cabinetctl`:
+
+```bash
+installer="$(mktemp)"
+curl -fsSL --proto '=https' --tlsv1.2 \
+  https://raw.githubusercontent.com/asdcrosh/cabinet_remna/main/deploy/install-console.sh \
+  -o "${installer}"
+bash -n "${installer}"
+sudo bash "${installer}"
+rm -f "${installer}"
+```
+
+Затем отдельно откройте восстановление:
+
+```bash
+sudo cabinetctl backups
+```
 
 При переносе всего стека не устанавливайте Remnawave, Remnashop или Cabinet отдельно до восстановления. На новом сервере:
 
-1. установите только `cabinetctl` по команде из раздела быстрого запуска;
+1. установите только `cabinetctl` командой выше;
 2. откройте `cabinetctl backups`;
 3. для удалённого архива сначала настройте S3, для локального — скопируйте его в `/opt/remnawave-backups`;
 4. запустите восстановление и после него проверьте DNS, firewall и адреса нод Remnawave.

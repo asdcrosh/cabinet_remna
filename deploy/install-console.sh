@@ -7,9 +7,7 @@ GITHUB_API_URL="${GITHUB_API_URL:-https://api.github.com/repos/asdcrosh/cabinet_
 OFFICIAL_RAW_REPOSITORY="https://raw.githubusercontent.com/asdcrosh/cabinet_remna"
 OFFICIAL_CONTENTS_API="https://api.github.com/repos/asdcrosh/cabinet_remna/contents"
 CABINETCTL_URL="${CABINETCTL_URL:-${RAW_BASE_URL}/deploy/cabinetctl.sh}"
-BACKUP_SCRIPT_URL="${BACKUP_SCRIPT_URL:-${RAW_BASE_URL}/deploy/full-stack-backup.sh}"
 CABINETCTL_PATH="${CABINETCTL_PATH:-/usr/local/bin/cabinetctl}"
-BACKUP_SCRIPT_PATH="${BACKUP_SCRIPT_PATH:-/usr/local/bin/remna-backup}"
 RESOLVED_RELEASE_SHA=""
 
 if [[ "$(id -u)" -ne 0 ]]; then
@@ -103,9 +101,9 @@ install_remote_script() {
 
 echo "Устанавливаем cabinetctl..."
 install_remote_script "${CABINETCTL_URL}" "${CABINETCTL_PATH}"
-install_remote_script "${BACKUP_SCRIPT_URL}" "${BACKUP_SCRIPT_PATH}"
-rm -f /usr/local/bin/remnactl
 
 echo
-echo "Готово. Запустите:"
-echo "  cabinetctl"
+echo "Готово. Установлен только cabinetctl: ${CABINETCTL_PATH}"
+echo "Docker, Remnawave, Remnashop, Cabinet и модуль бэкапов не устанавливались."
+echo "Для восстановления запустите:"
+echo "  cabinetctl backups"

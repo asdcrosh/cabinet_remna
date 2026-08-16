@@ -88,6 +88,20 @@ describe('production deployment security', () => {
     }
   })
 
+  it('keeps the console installer minimal and defers restore dependencies', () => {
+    const installer = read('deploy/install-console.sh')
+    const cabinetctl = read('deploy/cabinetctl.sh')
+    const backupMenu = cabinetctl.match(/backup_menu\(\) \{([\s\S]*?)\n\}/)?.[1] || ''
+
+    expect(installer).toContain('install_remote_script "${CABINETCTL_URL}" "${CABINETCTL_PATH}"')
+    expect(installer).not.toContain('BACKUP_SCRIPT_URL=')
+    expect(installer).not.toContain('BACKUP_SCRIPT_PATH=')
+    expect(installer).not.toContain('install_remote_script "${BACKUP_SCRIPT_URL}"')
+    expect(installer).not.toContain('install-server.sh')
+    expect(backupMenu).toContain('ensure_docker')
+    expect(backupMenu).toContain('ensure_backup_command')
+  })
+
   it('deploys verified cabinet releases by immutable sha image tag', () => {
     const cabinetctl = read('deploy/cabinetctl.sh')
     const updater = read('deploy/update-server.sh')

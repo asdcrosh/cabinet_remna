@@ -42,14 +42,7 @@ only Prisma CLI files required by `migrate deploy` are included.
 
 ## One-command install
 
-If this server is the destination of a full-stack migration and a backup of the
-existing Remnawave, Remnashop, and Cabinet installation is available, install
-only the management console first. Do not run `cabinetctl install` or install
-the three applications separately. Run `sudo cabinetctl`, open `Backups`,
-configure S3 or place the local archive in `/opt/remnawave-backups`, and restore
-the stack from there.
-
-For a clean Ubuntu/Debian server:
+Install only the management console on Ubuntu/Debian:
 
 ```bash
 installer="$(mktemp)"
@@ -59,10 +52,18 @@ curl -fsSL --proto '=https' --tlsv1.2 \
 bash -n "${installer}"
 sudo bash "${installer}"
 rm -f "${installer}"
+```
+
+This installs only `/usr/local/bin/cabinetctl`. It does not install Docker,
+Remnawave, Remnashop, Cabinet, containers, or the backup module.
+
+For a new Cabinet installation, continue with:
+
+```bash
 sudo cabinetctl install
 ```
 
-The installer will:
+The `cabinetctl install` command will:
 
 - install Docker and the Docker Compose plugin
 - download `docker-compose.yml`
@@ -77,6 +78,17 @@ The installer will:
   values are missing, the worker stays disabled and the cabinet still starts
 
 For non-interactive install, pass `SUPERUSER_EMAIL` and `SUPERUSER_PASSWORD` to the installer.
+
+If this server is the destination of a full-stack migration, do not run
+`cabinetctl install`. Start the backup console instead:
+
+```bash
+sudo cabinetctl backups
+```
+
+It installs Docker and the backup module on demand. Configure S3 or place the
+local archive in `/opt/remnawave-backups`, then restore Remnawave, Remnashop,
+and Cabinet from the backup menu.
 
 ## Required environment
 

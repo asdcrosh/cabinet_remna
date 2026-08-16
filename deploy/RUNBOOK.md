@@ -22,13 +22,7 @@ dig +short ВСТАВЬ_СЮДА_ДОМЕН_КАБИНЕТА
 
 ## 2. Install
 
-If an existing Remnawave stack is being moved to this server from a full backup,
-install only `cabinetctl` by running the commands through `rm -f` below. Do not run
-`sudo cabinetctl install`. Instead run `sudo cabinetctl`, open `Backups`,
-configure S3 or place the archive in `/opt/remnawave-backups`, and restore the
-Remnawave, Remnashop, and Cabinet stack from the console.
-
-Fast path on a clean Ubuntu/Debian server:
+Install only `cabinetctl` on a clean Ubuntu/Debian server:
 
 ```bash
 installer="$(mktemp)"
@@ -38,10 +32,29 @@ curl -fsSL --proto '=https' --tlsv1.2 \
 bash -n "${installer}"
 sudo bash "${installer}"
 rm -f "${installer}"
+```
+
+At this point only `/usr/local/bin/cabinetctl` is installed. Docker, panels,
+containers, and the backup module have not been installed.
+
+For a new Cabinet installation, continue with:
+
+```bash
 sudo cabinetctl install
 ```
 
-The installer will:
+If an existing Remnawave stack is being moved from a full backup, do not run
+`cabinetctl install`. Start the restore flow instead:
+
+```bash
+sudo cabinetctl backups
+```
+
+This command installs Docker and the backup module on demand. Configure S3 or
+place the archive in `/opt/remnawave-backups`, then restore Remnawave,
+Remnashop, and Cabinet from the menu.
+
+The `cabinetctl install` command will:
 
 - install Docker and Docker Compose plugin
 - download `/opt/remnawave-cabinet/docker-compose.yml`
