@@ -7,9 +7,25 @@ on:
       - main
   workflow_dispatch:
 
+env:
+  CI: true
+  DATABASE_URL: postgresql://cabinet:cabinet@localhost:5432/cabinet?schema=public
+  DIRECT_URL: postgresql://cabinet:cabinet@localhost:5432/cabinet?schema=public
+  JWT_SECRET: ci-jwt-secret-with-enough-length
+  NEXTAUTH_SECRET: ci-nextauth-secret-with-enough-length
+  NEXT_PUBLIC_APP_URL: http://localhost:3000
+  APP_URL: http://localhost:3000
+  ALLOWED_ORIGINS: http://localhost:3000
+  YOOKASSA_SHOP_ID: ci-shop
+  YOOKASSA_SECRET_KEY: ci-secret
+  YOOKASSA_WEBHOOK_ALLOWED_IPS: 127.0.0.1
+  REMNAWAVE_BASE_URL: https://remnawave.example
+  REMNAWAVE_TOKEN: ci-token
+
 jobs:
   quality:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     services:
       postgres:
         image: postgres:16-alpine
@@ -24,20 +40,6 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 10
-    env:
-      CI: true
-      DATABASE_URL: postgresql://cabinet:cabinet@localhost:5432/cabinet?schema=public
-      DIRECT_URL: postgresql://cabinet:cabinet@localhost:5432/cabinet?schema=public
-      JWT_SECRET: ci-jwt-secret-with-enough-length
-      NEXTAUTH_SECRET: ci-nextauth-secret-with-enough-length
-      NEXT_PUBLIC_APP_URL: http://localhost:3000
-      APP_URL: http://localhost:3000
-      ALLOWED_ORIGINS: http://localhost:3000
-      YOOKASSA_SHOP_ID: ci-shop
-      YOOKASSA_SECRET_KEY: ci-secret
-      YOOKASSA_WEBHOOK_ALLOWED_IPS: 127.0.0.1
-      REMNAWAVE_BASE_URL: https://remnawave.example
-      REMNAWAVE_TOKEN: ci-token
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
@@ -57,23 +59,66 @@ jobs:
       - run: npm run typecheck
       - run: npm run test:coverage
       - run: npm run build
-      - name: Install Playwright Chromium
-        run: npx playwright install --with-deps chromium
-      - name: Browser E2E checks
-        run: npm run test:e2e
-      - name: Upload Playwright report
-        if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
-        with:
-          name: playwright-report
-          path: |
-            playwright-report/
-            test-results/
-          if-no-files-found: ignore
-          retention-days: 14
       - name: Production smoke checks
         run: |
           npm run start &
           server_pid=$!
           trap 'kill $server_pid' EXIT
           npm run test:smoke
+
+  browser-e2e:
+    name: browser-e2e (${{ matrix.shard }})
+    needs: quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - shard: 1/4
+            artifact: 1
+          - shard: 2/4
+            artifact: 2
+          - shard: 3/4
+            artifact: 3
+          - shard: 4/4
+            artifact: 4
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: cabinet
+          POSTGRES_PASSWORD: cabinet
+          POSTGRES_DB: cabinet
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U cabinet -d cabinet"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+      - name: Apply test database migrations
+        run: npx prisma migrate deploy
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Browser E2E checks
+        run: npm run test:e2e -- --shard=${{ matrix.shard }}
+      - name: Upload Playwright report
+        if: ${{ always() }}
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: playwright-report-${{ matrix.artifact }}
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 14
