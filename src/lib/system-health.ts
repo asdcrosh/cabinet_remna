@@ -450,7 +450,7 @@ async function latestBackup() {
   const required = env('SYSTEM_HEALTH_BACKUP_REQUIRED') === 'true'
 
   try {
-    const entries = await readdir(backupDir)
+    const entries = await readdir(/*turbopackIgnore: true*/ backupDir)
     const archives = await Promise.all(
       entries
         .filter((entry) => /^remna-full-backup-.*\.tar\.gz$/.test(entry))

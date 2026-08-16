@@ -42,10 +42,17 @@ flowchart LR
 Подходит для чистого Ubuntu/Debian-сервера или сервера, где уже работают Remnawave и Remnashop.
 
 1. Создайте `A`-запись домена кабинета на IP сервера.
-2. Запустите установщик:
+2. Установите управляющую консоль и запустите мастер:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/asdcrosh/cabinet_remna/main/deploy/install-server.sh | sudo bash
+installer="$(mktemp)"
+curl -fsSL --proto '=https' --tlsv1.2 \
+  https://raw.githubusercontent.com/asdcrosh/cabinet_remna/main/deploy/install-console.sh \
+  -o "${installer}"
+bash -n "${installer}"
+sudo bash "${installer}"
+rm -f "${installer}"
+sudo cabinetctl install
 ```
 
 3. Ответьте на вопросы мастера: домен, Remnawave, email и платёжный провайдер.
@@ -65,7 +72,7 @@ cabinetctl url
 Установщик не должен занимать чужие порты. Для автоматического подключения кабинета к nginx рядом с Remnawave используйте:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/asdcrosh/cabinet_remna/main/deploy/setup-nginx-proxy.sh | sudo bash
+sudo cabinetctl nginx
 ```
 
 Подробности и безопасный откат: [deploy/RUNBOOK.md](./deploy/RUNBOOK.md#5-existing-remnawave-nginx).
@@ -225,6 +232,13 @@ cabinetctl backup-schedule
 ```
 
 Расписание использует persistent systemd timer: пропущенный из-за перезагрузки запуск выполнится после старта сервера. Успех и ошибка отправляются в Telegram. Для восстановления на новом сервере сначала установите `cabinetctl`, затем откройте `cabinetctl backups` и выберите восстановление.
+
+При переносе всего стека не устанавливайте Remnawave, Remnashop или Cabinet отдельно до восстановления. На новом сервере:
+
+1. установите только `cabinetctl` по команде из раздела быстрого запуска;
+2. откройте `cabinetctl backups`;
+3. для удалённого архива сначала настройте S3, для локального — скопируйте его в `/opt/remnawave-backups`;
+4. запустите восстановление и после него проверьте DNS, firewall и адреса нод Remnawave.
 
 > [!WARNING]
 > Не используйте `docker volume rm`, `docker compose down -v` или `git reset --hard` на production-сервере без проверенного бэкапа.

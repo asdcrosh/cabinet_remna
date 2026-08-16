@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { isRequestLoggingEnabled, logInfo, withRequestLogContext } from '@/lib/logger'
+import { getClientIp as getTrustedClientIp } from '@/lib/security'
 
 export function proxy(req: NextRequest) {
   const requestId = getRequestId(req)
@@ -16,10 +17,10 @@ function handleMiddleware(req: NextRequest, requestId: string) {
       requestId,
       method: req.method,
       path: req.nextUrl.pathname,
-      search: req.nextUrl.search || undefined,
-      ip: getClientIp(req),
+      queryKeys: getQueryKeys(req),
+      ip: getTrustedClientIp(req) || undefined,
       userAgent: req.headers.get('user-agent') || undefined,
-      referer: req.headers.get('referer') || undefined,
+      referer: getSafeReferer(req.headers.get('referer')),
     })
   }
 
@@ -48,7 +49,10 @@ function getMiddlewareResponse(req: NextRequest, requestId: string) {
 function applySecurityHeaders(res: NextResponse, req: NextRequest) {
   res.headers.set('X-Content-Type-Options', 'nosniff')
   res.headers.set('X-Frame-Options', 'DENY')
-  res.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin')
+  res.headers.set(
+    'Referrer-Policy',
+    isSensitiveQueryPath(req.nextUrl.pathname) ? 'no-referrer' : 'strict-origin-when-cross-origin'
+  )
   res.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()')
   res.headers.set('Cross-Origin-Opener-Policy', 'same-origin')
   res.headers.set('X-Permitted-Cross-Domain-Policies', 'none')
@@ -91,13 +95,28 @@ export const config = {
   matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
 }
 
-function getClientIp(req: NextRequest) {
-  return (
-    req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-    req.headers.get('x-real-ip') ||
-    req.headers.get('cf-connecting-ip') ||
-    undefined
-  )
+function getQueryKeys(req: NextRequest) {
+  const keys = [...new Set(req.nextUrl.searchParams.keys())]
+  return keys.length > 0 ? keys.slice(0, 50) : undefined
+}
+
+function getSafeReferer(value: string | null) {
+  if (!value) return undefined
+  try {
+    const url = new URL(value)
+    return `${url.origin}${url.pathname}`
+  } catch {
+    return undefined
+  }
+}
+
+function isSensitiveQueryPath(pathname: string) {
+  return [
+    '/reset-password',
+    '/api/auth/verify-email',
+    '/api/auth/yandex/callback',
+    '/api/me/telegram/oidc/callback',
+  ].includes(pathname)
 }
 
 function getRequestId(req: NextRequest) {

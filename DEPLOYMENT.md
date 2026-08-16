@@ -42,10 +42,24 @@ only Prisma CLI files required by `migrate deploy` are included.
 
 ## One-command install
 
+If this server is the destination of a full-stack migration and a backup of the
+existing Remnawave, Remnashop, and Cabinet installation is available, install
+only the management console first. Do not run `cabinetctl install` or install
+the three applications separately. Run `sudo cabinetctl`, open `Backups`,
+configure S3 or place the local archive in `/opt/remnawave-backups`, and restore
+the stack from there.
+
 For a clean Ubuntu/Debian server:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/asdcrosh/cabinet_remna/main/deploy/install-server.sh | sudo bash
+installer="$(mktemp)"
+curl -fsSL --proto '=https' --tlsv1.2 \
+  https://raw.githubusercontent.com/asdcrosh/cabinet_remna/main/deploy/install-console.sh \
+  -o "${installer}"
+bash -n "${installer}"
+sudo bash "${installer}"
+rm -f "${installer}"
+sudo cabinetctl install
 ```
 
 The installer will:
@@ -166,7 +180,7 @@ http://remnawave-cabinet-app:3000
 Update to the newest published image:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/asdcrosh/cabinet_remna/main/deploy/update-server.sh | sudo bash
+sudo cabinetctl update
 ```
 
 Logs:

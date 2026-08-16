@@ -7,12 +7,21 @@ export interface RateLimitResult {
   retryAfter?: number
 }
 
+type RateLimitBucketRow = {
+  count: number
+  resetAt: Date
+}
+
 export async function rateLimit(
   req: Request,
   key: string,
   limit: number,
   windowMs: number
 ): Promise<RateLimitResult> {
+  if (!Number.isInteger(limit) || limit < 1 || !Number.isInteger(windowMs) || windowMs < 1) {
+    throw new Error('Rate limit and window must be positive integers')
+  }
+
   const now = Date.now()
   const ip = getClientIp(req)
   if (!ip && process.env.NODE_ENV === 'production') {
@@ -20,43 +29,32 @@ export async function rateLimit(
   }
   const bucketKey = `${key}:${ip}`
   const nowDate = new Date(now)
+  const nextResetAt = new Date(now + windowMs)
 
-  const result = await prisma.$transaction(async (tx) => {
-    const current = await tx.rateLimitBucket.findUnique({
-      where: { key: bucketKey },
-    })
+  const rows = await prisma.$queryRaw<RateLimitBucketRow[]>`
+    INSERT INTO "RateLimitBucket" AS bucket ("key", "count", "resetAt", "createdAt", "updatedAt")
+    VALUES (${bucketKey}, 1, ${nextResetAt}, ${nowDate}, ${nowDate})
+    ON CONFLICT ("key") DO UPDATE SET
+      "count" = CASE
+        WHEN bucket."resetAt" <= ${nowDate} THEN 1
+        ELSE bucket."count" + 1
+      END,
+      "resetAt" = CASE
+        WHEN bucket."resetAt" <= ${nowDate} THEN EXCLUDED."resetAt"
+        ELSE bucket."resetAt"
+      END,
+      "updatedAt" = EXCLUDED."updatedAt"
+    RETURNING "count", "resetAt"
+  `
+  const updated = rows[0]
+  if (!updated) throw new Error('Rate limit bucket update returned no row')
 
-    if (!current || current.resetAt <= nowDate) {
-      await tx.rateLimitBucket.upsert({
-        where: { key: bucketKey },
-        create: {
-          key: bucketKey,
-          count: 1,
-          resetAt: new Date(now + windowMs),
-        },
-        update: {
-          count: 1,
-          resetAt: new Date(now + windowMs),
-        },
-      })
-      return { ok: true, remaining: limit - 1 }
+  if (updated.count > limit) {
+    return {
+      ok: false,
+      retryAfter: Math.max(1, Math.ceil((updated.resetAt.getTime() - now) / 1000)),
     }
+  }
 
-    if (current.count >= limit) {
-      return {
-        ok: false,
-        retryAfter: Math.max(1, Math.ceil((current.resetAt.getTime() - now) / 1000)),
-      }
-    }
-
-    const updated = await tx.rateLimitBucket.update({
-      where: { key: bucketKey },
-      data: { count: { increment: 1 } },
-      select: { count: true },
-    })
-
-    return { ok: true, remaining: Math.max(0, limit - updated.count) }
-  })
-
-  return result
+  return { ok: true, remaining: Math.max(0, limit - updated.count) }
 }

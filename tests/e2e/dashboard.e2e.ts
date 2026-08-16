@@ -10,7 +10,7 @@ test('истёкшая подписка не показывает отрицат
   await expect(subscriptionOverview.getByText('-2 дн.', { exact: true })).toHaveCount(0)
   await expect(subscriptionOverview.getByText('Истекла', { exact: true }).first()).toBeVisible()
 
-  await expect(subscriptionOverview.getByText('Состояние подписки', { exact: true })).toBeVisible()
+  await expect(subscriptionOverview.getByText('Осталось', { exact: true })).toBeVisible()
   await expect(subscriptionOverview.getByText('Трафик', { exact: true })).toBeVisible()
   await expectNoHorizontalOverflow(page)
 })
@@ -93,14 +93,13 @@ test('мобильный выбор тарифа открывает оплату
   await page.goto('/dashboard/plans')
 
   await expect(page.getByRole('heading', { name: 'Тарифы' })).toBeVisible()
-  const catalog = page
-    .locator('section[aria-labelledby="mobile-plan-picker-title"]')
+  const catalog = page.getByRole('region', { name: 'Выбор тарифа' })
   const period = catalog.locator('article').filter({ hasText: 'E2E Стандарт' }).first()
   await period.scrollIntoViewIfNeeded()
   await expect(period.getByText('7 дней', { exact: false })).toBeVisible()
   await period.getByRole('button', { name: 'Оплатить' }).click()
 
-  const checkout = page.getByRole('dialog', { name: 'Оплата тарифа' })
+  const checkout = page.getByRole('dialog', { name: 'Оформление подписки' })
   await expect(checkout).toBeVisible()
   await expect(checkout.getByRole('heading', { name: 'E2E Стандарт' })).toBeVisible()
   const paymentProviders = checkout.getByRole('radiogroup', { name: 'Способ оплаты' })
@@ -300,7 +299,15 @@ test('настройки рефералов задают условие и на�
   const panel = page.getByTestId('referral-settings')
   const trigger = panel.getByRole('radiogroup', { name: 'Момент начисления' })
   await expect(trigger.getByRole('radio')).toHaveCount(2)
-  await panel.getByLabel('Акция действует до').fill('2099-12-31')
+  const promotionEnd = panel.getByLabel('Акция действует до')
+  await promotionEnd.evaluate((element) => {
+    const input = element as HTMLInputElement
+    const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
+    if (!valueSetter) throw new Error('Native date input setter is unavailable')
+    valueSetter.call(input, '2099-12-31')
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+    input.dispatchEvent(new Event('change', { bubbles: true }))
+  })
   await expect(panel.getByText(/До 31 дек/)).toBeVisible()
   await trigger.getByRole('radio', { name: /После регистрации/ }).click()
   await expect(panel.getByLabel('Минимальная сумма первой оплаты')).toBeDisabled()
@@ -330,16 +337,15 @@ test('фильтры списков применяются без отдельн
   await expect(page).toHaveURL(/q=e2e/)
 })
 
-test('действия пользователя открывают формы и не закрываются вместе с меню', async ({ page }, testInfo) => {
+test('действия пользователя открывают формы и не закрываются вместе с меню', async ({ page }) => {
   await login(page, E2E_USERS.admin.email)
   await page.goto(`/dashboard/admin/users?q=${encodeURIComponent(E2E_USERS.basic.email)}`)
 
   const label = `Действия: ${E2E_USERS.basic.email}`
   const userCard = page.locator('article').filter({ hasText: E2E_USERS.basic.email })
-  const menuRole = testInfo.project.name === 'mobile-chromium' ? 'dialog' : 'menu'
   const openUserAction = async (name: string) => {
     await userCard.getByRole('button', { name: label }).click()
-    await page.getByRole(menuRole, { name: label }).getByRole('button', { name }).click()
+    await page.getByRole('dialog', { name: label }).getByRole('button', { name }).click()
   }
   const closeDialog = async (name: string) => {
     const dialog = page.getByRole('dialog', { name })
@@ -357,21 +363,18 @@ test('действия пользователя открывают формы и
   await closeDialog('Профиль пользователя')
 })
 
-test('мобильные уведомления раскрываются под верхней панелью', async ({ page }, testInfo) => {
+test('мобильные уведомления доступны через меню «Ещё»', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'mobile-chromium', 'Проверка предназначена для mobile viewport')
   await login(page, E2E_USERS.basic.email)
 
-  const trigger = page.getByRole('button', { name: /^Уведомления/ })
-  await trigger.click()
+  const navigation = page.getByRole('navigation', { name: 'Основная мобильная навигация' })
+  await navigation.getByRole('button', { name: 'Открыть ещё разделы' }).click()
+  const moreMenu = page.getByRole('dialog', { name: 'Ещё' })
+  await moreMenu.getByRole('link', { name: 'Уведомления' }).click()
 
-  const panel = page.getByRole('dialog', { name: 'Уведомления' })
-  await expect(panel).toBeVisible()
-
-  const [triggerBox, panelBox] = await Promise.all([trigger.boundingBox(), panel.boundingBox()])
-  expect(triggerBox).not.toBeNull()
-  expect(panelBox).not.toBeNull()
-  expect(panelBox!.y).toBeGreaterThanOrEqual(triggerBox!.y + triggerBox!.height)
-  expect(panelBox!.y).toBeLessThan(page.viewportSize()!.height / 3)
+  await expect(page).toHaveURL(/\/dashboard\/notifications(?:\?|$)/)
+  await expect(page.getByRole('heading', { name: 'Уведомления' })).toBeVisible()
+  await expectNoHorizontalOverflow(page)
 })
 
 test('каталог тарифов использует компактные строки с понятными действиями', async ({ page }, testInfo) => {
@@ -384,7 +387,7 @@ test('каталог тарифов использует компактные с
   const card = page.getByTestId('admin-plan-card').filter({ hasText: 'E2E Стандарт' })
   await expect(card).toHaveCount(1)
   await card.getByRole('button', { name: 'Действия: E2E Стандарт' }).click()
-  const actions = page.getByRole('menu', { name: 'Действия: E2E Стандарт' })
+  const actions = page.getByRole('dialog', { name: 'Действия: E2E Стандарт' })
   await actions.getByRole('button', { name: 'Изменить тариф E2E Стандарт' }).click()
   const editor = page.getByRole('dialog', { name: /Редактировать «E2E Стандарт»/ })
   await expect(editor).toBeVisible()
@@ -406,7 +409,7 @@ test('каталог тарифов использует компактные с
   const lastCard = page.getByTestId('admin-plan-card').last()
   await lastCard.scrollIntoViewIfNeeded()
   await lastCard.getByRole('button', { name: /^Действия:/ }).click()
-  const lastMenu = page.getByRole('menu')
+  const lastMenu = page.getByRole('dialog', { name: /^Действия:/ })
   await expect(lastMenu).toBeVisible()
   const menuBox = await lastMenu.boundingBox()
   expect(menuBox).not.toBeNull()
@@ -450,12 +453,12 @@ test('экраны админки не создают горизонтальну
     ['/dashboard/admin/support', 'Поддержка'],
     ['/dashboard/admin/duplicates', 'Возможные дубли'],
     ['/dashboard/admin/audit', 'История действий'],
-    ['/dashboard/admin/recovery', 'Довыдача'],
+    ['/dashboard/admin/recovery', 'Контроль подписок'],
     ['/dashboard/admin/bonus-box', 'Подарки'],
     ['/dashboard/admin/notifications', 'Уведомления'],
     ['/dashboard/admin/broadcasts', 'Рассылки'],
-    ['/dashboard/admin/remnashop-sync', 'Синхронизация'],
-    ['/dashboard/admin/system', 'Система'],
+    ['/dashboard/admin/remnashop-sync', 'Remnashop'],
+    ['/dashboard/admin/system', 'Состояние системы'],
   ] as const
 
   for (const [href, title] of screens) {

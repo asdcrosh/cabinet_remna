@@ -104,10 +104,14 @@ export async function POST(req: Request) {
       stage: 'PROVIDER',
       status: 'WARNING',
       source: 'yookassa-webhook',
-      message: 'Не удалось перепроверить статус в ЮKassa, использован статус webhook',
+      message: 'Не удалось перепроверить статус в ЮKassa, изменения платежа не применены',
       details: paymentErrorDetails(e),
       dedupeKey: 'provider-status-check-failed',
     })
+    return NextResponse.json(
+      { error: 'provider-status-unavailable' },
+      { status: 503, headers: { 'Retry-After': '30' } }
+    )
   }
 
   if (status === 'succeeded') {

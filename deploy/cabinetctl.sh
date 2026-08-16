@@ -6,6 +6,8 @@ BRANCH="${BRANCH:-main}"
 RAW_BASE_URL="${RAW_BASE_URL:-https://raw.githubusercontent.com/asdcrosh/cabinet_remna/${BRANCH}}"
 GITHUB_API_URL="${GITHUB_API_URL:-https://api.github.com/repos/asdcrosh/cabinet_remna/commits/${BRANCH}}"
 GITHUB_WORKFLOW_RUNS_URL="${GITHUB_WORKFLOW_RUNS_URL:-https://api.github.com/repos/asdcrosh/cabinet_remna/actions/workflows/docker-image.yml/runs}"
+OFFICIAL_RAW_REPOSITORY="https://raw.githubusercontent.com/asdcrosh/cabinet_remna"
+OFFICIAL_CONTENTS_API="https://api.github.com/repos/asdcrosh/cabinet_remna/contents"
 INSTALL_URL="${INSTALL_URL:-${RAW_BASE_URL}/deploy/install-server.sh}"
 UPDATE_URL="${UPDATE_URL:-${RAW_BASE_URL}/deploy/update-server.sh}"
 NGINX_SETUP_URL="${NGINX_SETUP_URL:-${RAW_BASE_URL}/deploy/setup-nginx-proxy.sh}"
@@ -24,8 +26,13 @@ DEPLOY_STATE_FILE="${CABINET_STATE_DIR:-${CABINET_DIR}/state}/deployment.json"
 UPDATE_STATUS_CACHE="${CABINETCTL_UPDATE_CACHE:-/var/cache/remnawave-cabinet/update-status}"
 UPDATE_STATUS_CACHE_TTL="${CABINETCTL_UPDATE_CACHE_TTL:-1800}"
 CHECK_UPDATES_IN_MENU="${CABINETCTL_CHECK_UPDATES_IN_MENU:-1}"
+DOCKER_INSTALL_COMMIT="a23123f03978989e95d257beb9de0c5ad9da6e70"
+DOCKER_INSTALL_SHA256="754dc3837b3da3eb65c8a355a713569cf7f0328addd3edc783897c3b9a54e192"
+DOCKER_INSTALL_URL="https://raw.githubusercontent.com/docker/docker-install/${DOCKER_INSTALL_COMMIT}/install.sh"
 ENV_SCHEMA_SYNCED=0
 ENV_SYNC_NOTICE=""
+RESOLVED_RELEASE_SHA=""
+VERIFIED_RELEASE_RAW_BASE_URL=""
 
 if [[ -t 1 ]]; then
   BOLD=$'\033[1m'
@@ -83,11 +90,30 @@ ensure_docker() {
     apt-get install -y ca-certificates curl
   }
   info "Устанавливаем Docker..."
-  curl -fsSL https://get.docker.com | sh
+  install_verified_docker
   docker compose version >/dev/null 2>&1 || {
     fail "Docker Compose plugin не установлен."
     return 1
   }
+}
+
+install_verified_docker() {
+  local installer actual_sha
+  installer="$(mktemp)"
+  if ! curl -fsSL --proto '=https' --tlsv1.2 "${DOCKER_INSTALL_URL}" -o "${installer}"; then
+    rm -f "${installer}"
+    fail "Не удалось скачать официальный Docker installer."
+    return 1
+  fi
+  actual_sha="$(sha256sum "${installer}" | awk '{print $1}')"
+  if [[ "${actual_sha}" != "${DOCKER_INSTALL_SHA256}" ]]; then
+    rm -f "${installer}"
+    fail "Контрольная сумма Docker installer не совпала. Установка остановлена."
+    return 1
+  fi
+  sh -n "${installer}"
+  sh "${installer}"
+  rm -f "${installer}"
 }
 
 container_state() {
@@ -174,7 +200,7 @@ sync_env_schema() {
 
   local template_file result added_count
   template_file="$(mktemp)"
-  if ! curl -fsSL --connect-timeout 2 --max-time 5 "${ENV_TEMPLATE_URL}" -o "${template_file}" 2>/dev/null; then
+  if ! download_verified_release_file "${ENV_TEMPLATE_URL}" "${template_file}" 2>/dev/null; then
     rm -f "${template_file}"
     return 0
   fi
@@ -285,6 +311,109 @@ remote_commit_sha() {
   printf '%s\n' "${response}" \
     | sed -n 's/.*"sha"[[:space:]]*:[[:space:]]*"\([0-9a-f]\{40\}\)".*/\1/p' \
     | head -n 1
+}
+
+resolve_release_sha() {
+  if [[ "${RESOLVED_RELEASE_SHA}" =~ ^[0-9a-f]{40}$ ]]; then
+    return 0
+  fi
+  RESOLVED_RELEASE_SHA="$(remote_image_sha || true)"
+  if [[ ! "${RESOLVED_RELEASE_SHA}" =~ ^[0-9a-f]{40}$ ]]; then
+    RESOLVED_RELEASE_SHA=""
+    fail "Не удалось определить commit последней успешно собранной версии."
+    return 1
+  fi
+}
+
+remote_blob_sha() {
+  local relative_path="$1"
+  local commit_sha="$2"
+  local response
+  response="$(curl -fsSL --proto '=https' --tlsv1.2 \
+    --connect-timeout 5 --max-time 20 \
+    -H 'Accept: application/vnd.github+json' \
+    --get --data-urlencode "ref=${commit_sha}" \
+    "${OFFICIAL_CONTENTS_API}/${relative_path}" 2>/dev/null || true)"
+  printf '%s\n' "${response}" \
+    | sed -n 's/.*"sha"[[:space:]]*:[[:space:]]*"\([0-9a-f]\{40\}\)".*/\1/p' \
+    | head -n 1
+}
+
+git_blob_sha() {
+  local file="$1"
+  local size
+  size="$(wc -c <"${file}" | tr -d '[:space:]')"
+  { printf 'blob %s\0' "${size}"; cat "${file}"; } | sha1sum | awk '{print $1}'
+}
+
+download_verified_release_file() {
+  local url="$1"
+  local destination="$2"
+  local official_prefix="${OFFICIAL_RAW_REPOSITORY}/${BRANCH}/"
+  local source_url="${url}"
+  local relative_path=""
+  local expected_blob_sha=""
+  local actual_blob_sha=""
+
+  VERIFIED_RELEASE_RAW_BASE_URL=""
+  if [[ "${url}" == "${official_prefix}"* ]]; then
+    resolve_release_sha || return 1
+    relative_path="${url#${official_prefix}}"
+    source_url="${OFFICIAL_RAW_REPOSITORY}/${RESOLVED_RELEASE_SHA}/${relative_path}"
+    expected_blob_sha="$(remote_blob_sha "${relative_path}" "${RESOLVED_RELEASE_SHA}")"
+    if [[ ! "${expected_blob_sha}" =~ ^[0-9a-f]{40}$ ]]; then
+      fail "Не удалось получить checksum ${relative_path} из commit ${RESOLVED_RELEASE_SHA}."
+      return 1
+    fi
+    VERIFIED_RELEASE_RAW_BASE_URL="${OFFICIAL_RAW_REPOSITORY}/${RESOLVED_RELEASE_SHA}"
+  fi
+
+  if ! curl -fsSL --proto '=https' --tlsv1.2 --connect-timeout 5 --max-time 60 \
+    "${source_url}" -o "${destination}"; then
+    return 1
+  fi
+
+  if [[ -n "${expected_blob_sha}" ]]; then
+    actual_blob_sha="$(git_blob_sha "${destination}")"
+    if [[ "${actual_blob_sha}" != "${expected_blob_sha}" ]]; then
+      rm -f "${destination}"
+      fail "Checksum ${relative_path} не совпал с Git tree. Выполнение остановлено."
+      return 1
+    fi
+  fi
+}
+
+run_verified_script() {
+  local url="$1"
+  local temporary status digest verified_raw_base verified_release_sha
+  temporary="$(mktemp)"
+  if ! download_verified_release_file "${url}" "${temporary}"; then
+    rm -f "${temporary}"
+    return 1
+  fi
+  bash -n "${temporary}"
+  digest="$(sha256sum "${temporary}" | awk '{print $1}')"
+  verified_raw_base="${VERIFIED_RELEASE_RAW_BASE_URL}"
+  verified_release_sha="${RESOLVED_RELEASE_SHA}"
+  info "Проверен установочный скрипт sha256:${digest}"
+
+  status=0
+  if [[ -n "${verified_raw_base}" ]]; then
+    if [[ -n "${CABINET_IMAGE:-}" ]]; then
+      RAW_BASE_URL="${verified_raw_base}" \
+        CABINET_RELEASE_SHA="${verified_release_sha}" \
+        bash "${temporary}" || status=$?
+    else
+      RAW_BASE_URL="${verified_raw_base}" \
+        CABINET_RELEASE_SHA="${verified_release_sha}" \
+        CABINET_IMAGE="ghcr.io/asdcrosh/cabinet_remna:sha-${verified_release_sha}" \
+        bash "${temporary}" || status=$?
+    fi
+  else
+    bash "${temporary}" || status=$?
+  fi
+  rm -f "${temporary}"
+  return "${status}"
 }
 
 remote_image_sha() {
@@ -498,7 +627,7 @@ download_executable() {
   local url="$1"
   local destination="$2"
   local temporary="${destination}.tmp"
-  curl -fsSL "${url}" -o "${temporary}"
+  download_verified_release_file "${url}" "${temporary}"
   bash -n "${temporary}"
   install -m 755 "${temporary}" "${destination}"
   rm -f "${temporary}"
@@ -535,7 +664,7 @@ install_cabinet() {
   fi
   ensure_docker
   info "Запускаем мастер установки кабинета..."
-  curl -fsSL "${INSTALL_URL}" | bash
+  run_verified_script "${INSTALL_URL}"
   write_update_status_cache "latest"
 }
 
@@ -545,7 +674,7 @@ update_cabinet() {
     return 1
   }
   info "Обновляем кабинет..."
-  curl -fsSL "${UPDATE_URL}" | bash
+  run_verified_script "${UPDATE_URL}"
   write_update_status_cache latest
 }
 
@@ -571,7 +700,7 @@ configure_node_provisioning() {
 
 update_console() {
   info "Обновляем управляющую консоль..."
-  curl -fsSL "${CONSOLE_INSTALL_URL}" | bash
+  run_verified_script "${CONSOLE_INSTALL_URL}"
   ok "Консоль обновлена. Перезапустите cabinetctl для загрузки новой версии."
 }
 
@@ -723,7 +852,7 @@ setup_nginx() {
     return 1
   }
   info "Настраиваем существующий nginx Remnawave..."
-  curl -fsSL "${NGINX_SETUP_URL}" | bash
+  run_verified_script "${NGINX_SETUP_URL}"
 }
 
 backup_full() {
@@ -733,6 +862,7 @@ backup_full() {
 }
 
 backup_menu() {
+  ensure_docker
   ensure_backup_command
   "${BACKUP_SCRIPT_PATH}"
 }
@@ -759,6 +889,7 @@ verify_backup() {
 
 restore_backup() {
   if [[ -z "${1:-}" && -r /dev/tty ]]; then
+    ensure_docker
     ensure_backup_command
     "${BACKUP_SCRIPT_PATH}" menu
     return

@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   writeAuditLog: vi.fn(),
   sourceFindUnique: vi.fn(),
   targetFindUnique: vi.fn(),
+  actorFindUnique: vi.fn(),
   userUpdate: vi.fn(),
   relationUpdateMany: vi.fn(),
   relationFindMany: vi.fn(),
@@ -70,6 +71,7 @@ const targetUser = {
 describe('admin user merge', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mocks.actorFindUnique.mockResolvedValue({ role: 'SUPER_ADMIN' })
     mocks.relationUpdateMany.mockResolvedValue({ count: 1 })
     mocks.relationFindMany.mockResolvedValue([])
     mocks.relationFindUnique.mockResolvedValue(null)
@@ -103,6 +105,23 @@ describe('admin user merge', () => {
         actorId: 'admin-user',
       })
     ).rejects.toBeInstanceOf(AdminMergeUsersError)
+
+    expect(mocks.userUpdate).not.toHaveBeenCalled()
+    expect(mocks.writeAuditLog).not.toHaveBeenCalled()
+  })
+
+  it('blocks a regular admin from merging into another account', async () => {
+    mocks.sourceFindUnique.mockResolvedValueOnce(sourceUser)
+    mocks.targetFindUnique.mockResolvedValueOnce({ ...targetUser, role: 'SUPER_ADMIN' })
+    mocks.actorFindUnique.mockResolvedValueOnce({ role: 'ADMIN' })
+
+    await expect(
+      mergeTechnicalTelegramUserIntoEmailUser({
+        sourceUserId: sourceUser.id,
+        targetUserId: targetUser.id,
+        actorId: 'admin-user',
+      })
+    ).rejects.toMatchObject({ status: 403 })
 
     expect(mocks.userUpdate).not.toHaveBeenCalled()
     expect(mocks.writeAuditLog).not.toHaveBeenCalled()
@@ -156,9 +175,11 @@ describe('admin user merge', () => {
 function createTx() {
   return {
     user: {
-      findUnique: vi.fn()
-        .mockImplementationOnce(mocks.sourceFindUnique)
-        .mockImplementationOnce(mocks.targetFindUnique),
+      findUnique: vi.fn(({ where }: { where: { id: string } }) => {
+        if (where.id === sourceUser.id) return mocks.sourceFindUnique()
+        if (where.id === targetUser.id) return mocks.targetFindUnique()
+        return mocks.actorFindUnique()
+      }),
       update: mocks.userUpdate,
       updateMany: mocks.relationUpdateMany,
     },

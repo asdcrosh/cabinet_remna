@@ -22,13 +22,17 @@ export async function mergeTechnicalTelegramUserIntoEmailUser(input: AdminMergeU
   }
 
   const summary = await prisma.$transaction(async (tx) => {
-    const [source, target] = await Promise.all([
+    const [source, target, actor] = await Promise.all([
       tx.user.findUnique({ where: { id: input.sourceUserId } }),
       tx.user.findUnique({ where: { id: input.targetUserId } }),
+      tx.user.findUnique({ where: { id: input.actorId }, select: { role: true } }),
     ])
 
     if (!source || !target) {
       throw new AdminMergeUsersError(404, 'Пользователь не найден')
+    }
+    if (actor?.role !== 'SUPER_ADMIN') {
+      throw new AdminMergeUsersError(403, 'Объединять аккаунты может только суперадминистратор')
     }
     if (isTechnicalTelegramUser(target.email)) {
       throw new AdminMergeUsersError(400, 'Целевой аккаунт должен быть email-аккаунтом')

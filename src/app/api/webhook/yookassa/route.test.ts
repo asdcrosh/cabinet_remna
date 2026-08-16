@@ -133,6 +133,20 @@ describe('YooKassa webhook route', () => {
     )
   })
 
+  it('fails closed when YooKassa status cannot be verified', async () => {
+    mocks.prisma.payment.findUnique.mockResolvedValue(mocks.payment)
+    mocks.getPayment.mockRejectedValue(new Error('provider unavailable'))
+
+    const res = await POST(webhookRequest('succeeded'))
+    const body = await res.json()
+
+    expect(res.status).toBe(503)
+    expect(res.headers.get('Retry-After')).toBe('30')
+    expect(body).toEqual({ error: 'provider-status-unavailable' })
+    expect(mocks.prisma.payment.update).not.toHaveBeenCalled()
+    expect(mocks.provisionPaymentSubscription).not.toHaveBeenCalled()
+  })
+
   it('does not provision again when payment is already provisioned', async () => {
     mocks.prisma.payment.findUnique.mockResolvedValue({
       ...mocks.payment,

@@ -24,10 +24,13 @@ FULL_BACKUP_TEMP="${FULL_BACKUP_PATH}.tmp"
 NODE_PROVISIONING_CONFIG_URL="${NODE_PROVISIONING_CONFIG_URL:-${RAW_BASE_URL}/deploy/configure-node-provisioning.sh}"
 NODE_PROVISIONING_CONFIG_PATH="${NODE_PROVISIONING_CONFIG_PATH:-/usr/local/bin/cabinet-node-provisioning}"
 NODE_PROVISIONING_CONFIG_TEMP="${NODE_PROVISIONING_CONFIG_PATH}.tmp"
+DOCKER_INSTALL_COMMIT="a23123f03978989e95d257beb9de0c5ad9da6e70"
+DOCKER_INSTALL_SHA256="754dc3837b3da3eb65c8a355a713569cf7f0328addd3edc783897c3b9a54e192"
+DOCKER_INSTALL_URL="https://raw.githubusercontent.com/docker/docker-install/${DOCKER_INSTALL_COMMIT}/install.sh"
 
 if [[ "$(id -u)" -ne 0 ]]; then
   echo "Run as root or with sudo:"
-  echo "  curl -fsSL https://raw.githubusercontent.com/asdcrosh/cabinet_remna/main/deploy/install-server.sh | sudo bash"
+  echo "  sudo cabinetctl install"
   exit 1
 fi
 
@@ -41,8 +44,22 @@ else
 fi
 
 if ! command -v docker >/dev/null 2>&1; then
+  DOCKER_INSTALL_TEMP="$(mktemp)"
   echo "Installing Docker..."
-  curl -fsSL https://get.docker.com | sh
+  if ! curl -fsSL --proto '=https' --tlsv1.2 "${DOCKER_INSTALL_URL}" -o "${DOCKER_INSTALL_TEMP}"; then
+    rm -f "${DOCKER_INSTALL_TEMP}"
+    echo "Failed to download the official Docker installer."
+    exit 1
+  fi
+  DOCKER_INSTALL_ACTUAL_SHA="$(sha256sum "${DOCKER_INSTALL_TEMP}" | awk '{print $1}')"
+  if [[ "${DOCKER_INSTALL_ACTUAL_SHA}" != "${DOCKER_INSTALL_SHA256}" ]]; then
+    rm -f "${DOCKER_INSTALL_TEMP}"
+    echo "Docker installer checksum mismatch. Installation stopped."
+    exit 1
+  fi
+  sh -n "${DOCKER_INSTALL_TEMP}"
+  sh "${DOCKER_INSTALL_TEMP}"
+  rm -f "${DOCKER_INSTALL_TEMP}"
 fi
 
 if ! docker compose version >/dev/null 2>&1; then
@@ -678,7 +695,9 @@ bootstrap_superuser() {
 
 Admin account was not created because this install is non-interactive.
 Create it later with:
-  curl -fsSL ${RAW_BASE_URL}/deploy/install-server.sh | sudo env SUPERUSER_EMAIL="admin@example.com" SUPERUSER_PASSWORD="strong-password" bash
+  cd ${INSTALL_DIR} && sudo docker compose --env-file .env -f docker-compose.yml exec -T \
+    -e SUPERUSER_EMAIL="admin@example.com" -e SUPERUSER_PASSWORD="strong-password" \
+    app node ops/bootstrap-superuser.js
 
 EOF
     return 0

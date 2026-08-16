@@ -26,14 +26,14 @@ NODE_PROVISIONING_CONFIG_TEMP="${NODE_PROVISIONING_CONFIG_PATH}.tmp"
 
 if [[ "$(id -u)" -ne 0 ]]; then
   echo "Run as root or with sudo:"
-  echo "  curl -fsSL https://raw.githubusercontent.com/asdcrosh/cabinet_remna/main/deploy/update-server.sh | sudo bash"
+  echo "  sudo cabinetctl update"
   exit 1
 fi
 
 if [[ ! -d "${INSTALL_DIR}" ]]; then
   echo "${INSTALL_DIR} does not exist."
   echo "Run first install instead:"
-  echo "  curl -fsSL https://raw.githubusercontent.com/asdcrosh/cabinet_remna/main/deploy/install-server.sh | sudo bash"
+  echo "  sudo cabinetctl install"
   exit 1
 fi
 
@@ -573,7 +573,7 @@ fi
 
 echo "Pulling latest images..."
 CABINET_ENV_FILE="${ENV_FILE}" "${COMPOSE[@]}" pull
-CABINET_IMAGE_REFERENCE="$(read_update_env_value CABINET_IMAGE)"
+CABINET_IMAGE_REFERENCE="${CABINET_IMAGE:-$(read_update_env_value CABINET_IMAGE)}"
 CABINET_IMAGE_REFERENCE="${CABINET_IMAGE_REFERENCE:-ghcr.io/asdcrosh/cabinet_remna:latest}"
 DEPLOY_TARGET_REVISION="$(image_revision "${CABINET_IMAGE_REFERENCE}" || true)"
 write_deployment_state "deploying" "Новый образ загружен. Запускаются миграции."
@@ -840,6 +840,11 @@ if [[ "${DEPLOY_TARGET_REVISION}" =~ ^[0-9a-f]{40}$ && "${DEPLOYED_REVISION}" !=
   false
 fi
 ROLLBACK_ARMED="false"
+if [[ "${CABINET_RELEASE_SHA:-}" =~ ^[0-9a-f]{40}$ \
+  && "${DEPLOYED_REVISION}" == "${CABINET_RELEASE_SHA}" \
+  && "${CABINET_IMAGE:-}" == "ghcr.io/asdcrosh/cabinet_remna:sha-${CABINET_RELEASE_SHA}" ]]; then
+  write_update_env_value "CABINET_IMAGE" "${CABINET_IMAGE}"
+fi
 write_deployment_state "success" "Новая версия запущена и прошла автоматические проверки." "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
 cleanup_docker_artifacts

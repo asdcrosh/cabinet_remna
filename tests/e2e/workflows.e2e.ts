@@ -16,7 +16,7 @@ test('пользователь обновляет профиль через на
   const updateResponse = page.waitForResponse((response) =>
     response.url().endsWith('/api/me') && response.request().method() === 'PATCH'
   )
-  await page.getByRole('button', { name: 'Сохранить профиль' }).click()
+  await page.getByRole('button', { name: 'Сохранить', exact: true }).click()
   await expect((await updateResponse).ok()).toBe(true)
   await expect(page.getByText('Профиль обновлён', { exact: true })).toBeVisible()
 
@@ -92,7 +92,7 @@ test('смена пароля сохраняет текущую сессию и 
 
 test('пользователь отвязывает устройство с подтверждением', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop-chromium', 'Сценарий достаточно проверить один раз')
-  await login(page, E2E_USERS.expired.email)
+  await login(page, E2E_USERS.active.email)
   await page.goto('/dashboard/devices')
 
   await expect(page.getByRole('heading', { name: 'Pixel 8 · Android' })).toBeVisible()
@@ -109,7 +109,7 @@ test('пользователь отвязывает устройство с по
 async function changePassword(page: import('@playwright/test').Page, oldPassword: string, newPassword: string) {
   await page.getByLabel('Текущий пароль').fill(oldPassword)
   await page.getByLabel('Новый пароль').fill(newPassword)
-  await page.getByLabel('Подтверждение').fill(newPassword)
+  await page.getByLabel('Повторите пароль').fill(newPassword)
   const response = page.waitForResponse((candidate) =>
     candidate.url().endsWith('/api/me/password') && candidate.request().method() === 'POST'
   )

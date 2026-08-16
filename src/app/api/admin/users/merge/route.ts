@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server'
 import { Prisma } from '@prisma/client'
-import { requireAdmin, withAuth } from '@/lib/auth/guard'
+import { requireSuperAdmin, withAuth } from '@/lib/auth/guard'
 import { AdminMergeUsersError, mergeTechnicalTelegramUserIntoEmailUser } from '@/lib/admin-user-merge'
+import { logError } from '@/lib/logger'
 
 export const POST = withAuth(async (req: Request) => {
-  const session = await requireAdmin()
+  const session = await requireSuperAdmin()
   const body = await req.json().catch(() => null)
   const sourceUserId = typeof body?.sourceUserId === 'string' ? body.sourceUserId.trim() : ''
   const targetUserId = typeof body?.targetUserId === 'string' ? body.targetUserId.trim() : ''
@@ -31,9 +32,7 @@ export const POST = withAuth(async (req: Request) => {
         { status: 409 }
       )
     }
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Не удалось объединить аккаунты' },
-      { status: 500 }
-    )
+    logError('admin.users.merge_failed', error, { sourceUserId, targetUserId, actorId: session.uid })
+    return NextResponse.json({ error: 'Не удалось объединить аккаунты' }, { status: 500 })
   }
 })

@@ -5,11 +5,10 @@ services:
     image: postgres:16-alpine
     container_name: remnawave-cabinet-db
     restart: unless-stopped
-    env_file:
-      - ${CABINET_ENV_FILE:-.env}
     environment:
-      NODE_PROVISIONING_ENCRYPTION_KEY: ""
-      TIMEWEB_API_TOKEN: ""
+      POSTGRES_DB: ${POSTGRES_DB:-cabinet}
+      POSTGRES_USER: ${POSTGRES_USER:-cabinet}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
@@ -278,11 +277,6 @@ services:
     restart: unless-stopped
     profiles:
       - caddy
-    env_file:
-      - ${CABINET_ENV_FILE:-.env}
-    environment:
-      NODE_PROVISIONING_ENCRYPTION_KEY: ""
-      TIMEWEB_API_TOKEN: ""
     command:
       - caddy
       - reverse-proxy

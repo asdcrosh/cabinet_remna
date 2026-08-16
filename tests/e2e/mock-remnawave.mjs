@@ -63,6 +63,28 @@ const server = createServer((request, response) => {
     return json(response, 200, { response: activeUser })
   }
 
+  if (request.method === 'GET' && request.url === '/api/users/by-username/e2e-expired') {
+    return json(response, 200, { response: expiredUser })
+  }
+
+  if (request.method === 'GET' && request.url === '/api/users/by-username/e2e-active') {
+    return json(response, 200, { response: activeUser })
+  }
+
+  if (
+    request.method === 'GET'
+    && (
+      request.url === '/api/users/e2e-expired-uuid/subscription-request-history'
+      || request.url === '/api/users/e2e-active-uuid/subscription-request-history'
+    )
+  ) {
+    return json(response, 200, { response: [] })
+  }
+
+  if (request.method === 'GET' && request.url === '/api/internal-squads') {
+    return json(response, 200, { response: { internalSquads: [] } })
+  }
+
   if (request.method === 'GET' && request.url === '/api/hwid/devices/e2e-expired-uuid') {
     return json(response, 200, { response: { total: 0, devices: [] } })
   }

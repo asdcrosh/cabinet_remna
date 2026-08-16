@@ -68,7 +68,7 @@ export function getBuildInfo(): BuildInfo {
 export async function readDeploymentState(): Promise<DeploymentState | null> {
   const stateFile = value('DEPLOY_STATE_FILE') || '/run/cabinet-state/deployment.json'
   try {
-    const parsed = JSON.parse(await readFile(stateFile, 'utf8')) as Partial<DeploymentState>
+    const parsed = JSON.parse(await readFile(/*turbopackIgnore: true*/ stateFile, 'utf8')) as Partial<DeploymentState>
     if (!['deploying', 'success', 'failed', 'rolled_back'].includes(parsed.status || '')) return null
     return parsed as DeploymentState
   } catch {

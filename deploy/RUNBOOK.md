@@ -22,10 +22,23 @@ dig +short ВСТАВЬ_СЮДА_ДОМЕН_КАБИНЕТА
 
 ## 2. Install
 
+If an existing Remnawave stack is being moved to this server from a full backup,
+install only `cabinetctl` by running the commands through `rm -f` below. Do not run
+`sudo cabinetctl install`. Instead run `sudo cabinetctl`, open `Backups`,
+configure S3 or place the archive in `/opt/remnawave-backups`, and restore the
+Remnawave, Remnashop, and Cabinet stack from the console.
+
 Fast path on a clean Ubuntu/Debian server:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/asdcrosh/cabinet_remna/main/deploy/install-server.sh | sudo bash
+installer="$(mktemp)"
+curl -fsSL --proto '=https' --tlsv1.2 \
+  https://raw.githubusercontent.com/asdcrosh/cabinet_remna/main/deploy/install-console.sh \
+  -o "${installer}"
+bash -n "${installer}"
+sudo bash "${installer}"
+rm -f "${installer}"
+sudo cabinetctl install
 ```
 
 The installer will:
@@ -164,7 +177,7 @@ If cabinet is installed on the same server as Remnawave and Remnawave already
 owns ports `80/443`, configure the existing nginx automatically:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/asdcrosh/cabinet_remna/main/deploy/setup-nginx-proxy.sh | sudo bash
+sudo cabinetctl nginx
 ```
 
 The script:
@@ -279,7 +292,7 @@ Update an existing installation without recreating `.env`, the database, or the
 admin account:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/asdcrosh/cabinet_remna/main/deploy/update-server.sh | sudo bash
+sudo cabinetctl update
 ```
 
 The update script downloads the latest compose file, pulls the published image,

@@ -15,10 +15,13 @@ CERT_FULLCHAIN_CONTAINER="${CERT_FULLCHAIN_CONTAINER:-/etc/nginx/ssl/cabinet_ful
 CERT_PRIVKEY_CONTAINER="${CERT_PRIVKEY_CONTAINER:-/etc/nginx/ssl/cabinet_privkey.key}"
 MARKER_BEGIN="# BEGIN REMNAWAVE CABINET"
 MARKER_END="# END REMNAWAVE CABINET"
+ACME_SH_VERSION="3.1.4"
+ACME_SH_SHA256="fcabf274d4f96966ec933879ae0257266e8ef2f7d16161f14b84dd896c0cac32"
+ACME_SH_URL="https://raw.githubusercontent.com/acmesh-official/acme.sh/${ACME_SH_VERSION}/acme.sh"
 
 if [[ "$(id -u)" -ne 0 ]]; then
   echo "Run as root or with sudo:"
-  echo "  curl -fsSL https://raw.githubusercontent.com/asdcrosh/cabinet_remna/main/deploy/setup-nginx-proxy.sh | sudo bash"
+  echo "  sudo cabinetctl nginx"
   exit 1
 fi
 
@@ -101,8 +104,22 @@ install_acme() {
     return
   fi
 
-  echo "Installing acme.sh..."
-  curl -fsSL https://get.acme.sh | sh
+  local installer actual_sha
+  installer="$(mktemp)"
+  echo "Installing verified acme.sh ${ACME_SH_VERSION}..."
+  if ! curl -fsSL --proto '=https' --tlsv1.2 "${ACME_SH_URL}" -o "${installer}"; then
+    rm -f "${installer}"
+    return 1
+  fi
+  actual_sha="$(sha256sum "${installer}" | awk '{print $1}')"
+  if [[ "${actual_sha}" != "${ACME_SH_SHA256}" ]]; then
+    rm -f "${installer}"
+    echo "acme.sh checksum mismatch. Installation stopped."
+    return 1
+  fi
+  sh -n "${installer}"
+  sh "${installer}" --install
+  rm -f "${installer}"
 }
 
 ensure_certificate() {
@@ -327,7 +344,7 @@ server {
 
     add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
     add_header X-Content-Type-Options "nosniff" always;
-    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header Referrer-Policy "no-referrer" always;
 
     resolver 127.0.0.11 1.1.1.1 8.8.8.8 valid=30s ipv6=off;
 
@@ -338,7 +355,9 @@ server {
 
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        # Replace any client-supplied chain: the cabinet trusts this header for
+        # rate limits and payment webhook allowlists.
+        proxy_set_header X-Forwarded-For \$remote_addr;
         proxy_set_header X-Forwarded-Proto \$scheme;
         proxy_set_header X-Forwarded-Host \$host;
         proxy_set_header X-Forwarded-Port \$server_port;

@@ -63,4 +63,37 @@ describe('middleware request id', () => {
       })
     )
   })
+
+  it('does not write query values or referer query strings to request logs', () => {
+    const req = new NextRequest('https://example.com/reset-password?token=reset-secret&next=%2Fdashboard', {
+      headers: {
+        referer: 'https://example.com/api/auth/verify-email?token=verify-secret',
+      },
+    })
+
+    const res = proxy(req)
+    const loggedDetails = logInfoMock.mock.calls[0]?.[1]
+
+    expect(res.headers.get('Referrer-Policy')).toBe('no-referrer')
+    expect(loggedDetails).toMatchObject({
+      path: '/reset-password',
+      queryKeys: ['token', 'next'],
+      referer: 'https://example.com/api/auth/verify-email',
+    })
+    expect(JSON.stringify(loggedDetails)).not.toContain('reset-secret')
+    expect(JSON.stringify(loggedDetails)).not.toContain('verify-secret')
+  })
+
+  it('logs proxy client headers only when proxy trust is enabled', () => {
+    const req = new NextRequest('https://example.com/api/plans', {
+      headers: { 'x-forwarded-for': '203.0.113.10' },
+    })
+
+    proxy(req)
+
+    expect(logInfoMock).toHaveBeenCalledWith(
+      'http.request',
+      expect.objectContaining({ ip: undefined })
+    )
+  })
 })
