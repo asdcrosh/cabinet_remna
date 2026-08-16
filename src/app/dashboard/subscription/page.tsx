@@ -117,7 +117,7 @@ export default async function SubscriptionPage() {
           <div className="connection-access-summary__action">
             <Link
               href="/dashboard/plans?intent=renew"
-              className={`${subscriptionExpired ? 'btn-primary' : 'btn-secondary'} group w-full justify-between lg:min-w-44`}
+              className={`${subscriptionExpired ? 'btn-primary' : 'btn-secondary'} group w-full justify-between min-[1360px]:min-w-44`}
             >
               <span className="inline-flex items-center gap-2">
                 <Sparkles className="h-4 w-4" />
@@ -150,7 +150,7 @@ export default async function SubscriptionPage() {
       </section>
 
       {!subscriptionExpired && (
-        <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_22rem]">
+        <div className="grid items-start gap-5 min-[1360px]:grid-cols-[minmax(0,1fr)_22rem]">
           <KeysCard subscriptionUrl={data.response.subscriptionUrl} happLink={happLink} />
           <DevicesList embedded deviceLimit={localSubscription?.plan?.deviceLimit} />
         </div>

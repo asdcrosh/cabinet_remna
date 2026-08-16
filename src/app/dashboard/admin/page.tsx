@@ -149,7 +149,7 @@ export default async function AdminDashboardPage() {
           <h2 className="text-lg font-semibold tracking-tight text-slate-950 dark:text-white">Требует внимания</h2>
           <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">Очереди для ручной проверки</p>
         </div>
-        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
+        <div className="grid gap-2 sm:grid-cols-2 min-[1360px]:grid-cols-3 2xl:grid-cols-5">
           {supportWaiting > 0 && (
             <PriorityCard href="/dashboard/admin/support" icon={<LifeBuoy className="h-4 w-4" />} title="Поддержка" value={supportWaiting} text="Обращения без ответа" />
           )}
@@ -185,7 +185,7 @@ export default async function AdminDashboardPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-2 xl:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2 min-[1360px]:grid-cols-4">
           <AnalyticsCard
             icon={<UserPlus className="h-5 w-5" />}
             title="Регистрации"

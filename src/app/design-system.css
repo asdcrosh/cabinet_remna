@@ -2038,6 +2038,63 @@ html:not(.dark) .bonus-wheel-result-modal .bonus-wheel-result-promo small {
   }
 }
 
+/* Compact layouts keep one reading direction. The sidebar is absent here, so
+   content should use the full width instead of recreating a narrow desktop. */
+@media (max-width: 959px) {
+  .connection-access-summary__intro {
+    grid-template-columns: 1fr;
+  }
+
+  .connection-access-summary__action {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .connection-access-summary__metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .connection-access-summary__metrics > *:nth-child(3) {
+    grid-column: 1 / -1;
+    border-top: 1px solid var(--app-border);
+    border-left: 0;
+  }
+}
+
+@media (max-width: 767px) {
+  .home-quick-actions,
+  .home-quick-actions--two {
+    grid-template-columns: 1fr;
+  }
+
+  .home-quick-actions__item + .home-quick-actions__item {
+    border-top: 1px solid var(--app-border);
+    border-left: 0;
+  }
+
+  .access-overview__top {
+    align-items: flex-start;
+  }
+
+  .access-overview__facts {
+    grid-template-columns: 1fr;
+  }
+
+  .access-overview__fact + .access-overview__fact {
+    border-top: 1px solid var(--app-border);
+    border-left: 0;
+  }
+
+  .connection-access-summary__metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .connection-access-summary__metrics > * + * {
+    border-top: 1px solid var(--app-border);
+    border-left: 0;
+  }
+}
+
 @media (max-width: 639px) {
   .page-title,
   .admin-workspace .page-title,

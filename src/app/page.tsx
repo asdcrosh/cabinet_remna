@@ -78,7 +78,7 @@ export default async function HomePage() {
           </div>
         </header>
 
-        <div className="mx-auto grid max-w-[88rem] items-center gap-10 px-4 pb-12 pt-9 sm:px-6 sm:pb-16 sm:pt-12 lg:min-h-[42rem] lg:grid-cols-[minmax(0,1.05fr)_minmax(25rem,0.8fr)] lg:gap-16 lg:px-8 lg:py-16">
+        <div className="mx-auto grid max-w-[88rem] items-center gap-10 px-4 pb-12 pt-9 sm:px-6 sm:pb-16 sm:pt-12 lg:px-8 lg:py-16 min-[1180px]:min-h-[42rem] min-[1180px]:grid-cols-[minmax(0,1.05fr)_minmax(25rem,0.8fr)] min-[1180px]:gap-16">
           <div className="max-w-3xl">
             <div className="mb-5 font-mono text-[10px] font-semibold uppercase tracking-[0.2em] text-brand-700 dark:text-brand-300">Private network / zero noise</div>
             <h1 className="text-balance text-4xl font-semibold leading-[0.98] tracking-[-0.055em] text-slate-950 sm:text-6xl dark:text-white">
@@ -122,7 +122,7 @@ export default async function HomePage() {
       </section>
 
       <section id="connection" className="scroll-mt-8 px-4 pb-12 sm:px-6 sm:pb-16 lg:px-8">
-        <div className="site-band mx-auto grid max-w-[88rem] overflow-hidden border-l-2 border-brand-400 text-white lg:grid-cols-[0.8fr_1.2fr]">
+        <div className="site-band mx-auto grid max-w-[88rem] overflow-hidden border-l-2 border-brand-400 text-white min-[1180px]:grid-cols-[0.8fr_1.2fr]">
           <div className="relative isolate p-6 sm:p-8 lg:p-10">
             <h2 className="max-w-xl text-2xl font-semibold sm:text-3xl">От регистрации до подключения</h2>
             <p className="mt-4 max-w-xl text-sm leading-6 text-white/60 sm:text-base sm:leading-7">После оплаты кабинет покажет данные подписки и предложит подходящий способ подключения.</p>
