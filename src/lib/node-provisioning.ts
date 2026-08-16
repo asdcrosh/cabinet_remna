@@ -1,6 +1,7 @@
 import type { NodeProvisioningEvent, NodeProvisioningJob, Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { remnawave } from '@/lib/remnawave'
+import type { RemnawaveConfigProfileInbound, RemnawaveHost } from '@/lib/remnawave'
 import { encryptNodeProvisioningSecret } from '@/lib/node-provisioning-crypto'
 import { buildProvisioningFqdn } from '@/lib/node-provisioning-validation'
 
@@ -146,7 +147,13 @@ export async function getNodeProvisioningTemplates() {
 }
 
 async function loadNodeProvisioningTemplates() {
-  const { response } = await remnawave.getHosts()
+  const [{ response }, inboundsResult] = await Promise.all([
+    remnawave.getHosts(),
+    remnawave.getConfigProfileInbounds(),
+  ])
+  const inbounds = new Map(
+    inboundsResult.response.inbounds.map((inbound) => [inbound.uuid, inbound])
+  )
   return {
     tcpTemplateHostUuid: process.env.NODE_PROVISIONING_TCP_TEMPLATE_HOST_UUID?.trim() || null,
     xhttpTemplateHostUuid: process.env.NODE_PROVISIONING_XHTTP_TEMPLATE_HOST_UUID?.trim() || null,
@@ -155,8 +162,14 @@ async function loadNodeProvisioningTemplates() {
       remark: host.remark,
       address: host.address,
       port: host.port,
-      kind: inferHostKind(host),
+      kind: inferHostKind(
+        host,
+        host.inbound.configProfileInboundUuid
+          ? inbounds.get(host.inbound.configProfileInboundUuid)
+          : undefined
+      ),
       isDisabled: host.isDisabled,
+      isHidden: host.isHidden ?? false,
       configProfileUuid: host.inbound.configProfileUuid ?? null,
     })),
   }
@@ -209,7 +222,17 @@ function serializeNodeProvisioningEvent(event: Pick<NodeProvisioningEvent, 'id' 
   }
 }
 
-function inferHostKind(host: { remark: string; path?: string | null; port: number }) {
+export function inferHostKind(
+  host: Pick<RemnawaveHost, 'remark' | 'path' | 'port' | 'xhttpExtraParams'>,
+  inbound?: Pick<RemnawaveConfigProfileInbound, 'network' | 'rawInbound'>
+) {
+  const network = String(
+    inbound?.network ?? inbound?.rawInbound?.streamSettings?.network ?? ''
+  ).toLowerCase()
+  if (network === 'xhttp' || network === 'splithttp') return 'XHTTP'
+  if (network === 'tcp') return 'TCP'
+
+  if (host.xhttpExtraParams != null) return 'XHTTP'
   const text = `${host.remark} ${host.path || ''}`.toLowerCase()
   if (text.includes('xhttp') || text.includes('split')) return 'XHTTP'
   if (text.includes('tcp') || host.port === 10443) return 'TCP'

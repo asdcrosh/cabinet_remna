@@ -223,9 +223,9 @@ export interface RemnawaveNodeInbound {
   uuid?: string
   tag?: string
   type?: string
-  network?: string
-  security?: string
-  port?: number
+  network?: string | null
+  security?: string | null
+  port?: number | null
   sniffing?: {
     enabled?: boolean
     destOverride?: string[]
@@ -249,6 +249,19 @@ export interface RemnawaveNodeInbound {
         dest?: string
       }
     }
+  } | null
+}
+
+export interface RemnawaveConfigProfileInbound extends RemnawaveNodeInbound {
+  uuid: string
+  profileUuid: string
+  activeSquads?: string[]
+}
+
+export interface GetConfigProfileInboundsResponse {
+  response: {
+    total: number
+    inbounds: RemnawaveConfigProfileInbound[]
   }
 }
 
@@ -696,6 +709,10 @@ export const remnawave = {
 
   async getHosts() {
     return request<GetHostsResponse>('GET', '/api/hosts')
+  },
+
+  async getConfigProfileInbounds() {
+    return request<GetConfigProfileInboundsResponse>('GET', '/api/config-profiles/inbounds')
   },
 
   async createHost(input: CreateRemnawaveHostRequest) {

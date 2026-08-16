@@ -93,6 +93,7 @@ type ProvisioningTemplates = {
     port: number
     kind: 'TCP' | 'XHTTP' | 'OTHER' | string
     isDisabled?: boolean
+    isHidden?: boolean
   }>
 }
 
@@ -775,6 +776,11 @@ function TemplateHostPicker({
                       {host.isDisabled ? (
                         <span className="rounded-md bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800 dark:bg-amber-400/10 dark:text-amber-200">
                           отключён
+                        </span>
+                      ) : null}
+                      {host.isHidden ? (
+                        <span className="rounded-md bg-slate-200 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-700 dark:bg-white/10 dark:text-slate-300">
+                          скрыт
                         </span>
                       ) : null}
                     </span>

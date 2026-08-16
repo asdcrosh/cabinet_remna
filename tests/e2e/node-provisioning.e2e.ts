@@ -58,7 +58,7 @@ test('суперадмин запускает создание ноды и ви�
           xhttpTemplateHostUuid: null,
           hosts: [
             { uuid: tcpTemplateUuid, remark: 'TCP template', address: 'tcp.example.com', port: 10443, kind: 'TCP' },
-            { uuid: xhttpTemplateUuid, remark: 'XHTTP template', address: 'xhttp.example.com', port: 443, kind: 'XHTTP', isDisabled: true },
+            { uuid: xhttpTemplateUuid, remark: 'Finland reserve', address: 'xhttp.example.com', port: 443, kind: 'XHTTP', isDisabled: true, isHidden: true },
           ],
         },
       }),
@@ -77,8 +77,10 @@ test('суперадмин запускает создание ноды и ви�
   await page.getByRole('searchbox', { name: 'Поиск TCP-шаблона' }).fill('tcp.example.com')
   await page.getByRole('option', { name: /TCP template/ }).click()
   await page.getByRole('button', { name: 'Выбрать XHTTP-шаблон' }).click()
-  await page.getByRole('searchbox', { name: 'Поиск XHTTP-шаблона' }).fill('XHTTP template')
-  await page.getByRole('option', { name: /XHTTP template/ }).click()
+  await page.getByRole('searchbox', { name: 'Поиск XHTTP-шаблона' }).fill('xhttp.example.com')
+  const hiddenXhttp = page.getByRole('option', { name: /Finland reserve/ })
+  await expect(hiddenXhttp.getByText('скрыт', { exact: true })).toBeVisible()
+  await hiddenXhttp.click()
   await expect(page.getByRole('button', { name: 'Создать и настроить ноду' })).toBeEnabled()
   await page.getByRole('button', { name: 'Создать и настроить ноду' }).click()
 

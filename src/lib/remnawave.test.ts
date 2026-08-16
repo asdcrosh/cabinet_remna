@@ -331,6 +331,32 @@ describe('Remnawave v2/v3 user identifiers', () => {
     )
   })
 
+  it('loads all config profile inbounds for exact host transport detection', async () => {
+    const response = {
+      total: 1,
+      inbounds: [{
+        uuid: '77777777-7777-4777-8777-777777777777',
+        profileUuid: '66666666-6666-4666-8666-666666666666',
+        tag: 'VLESS_XHTTP',
+        type: 'vless',
+        network: 'xhttp',
+        security: 'reality',
+        port: 443,
+        rawInbound: null,
+        activeSquads: [],
+      }],
+    }
+    const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse({ response }))
+    vi.stubGlobal('fetch', fetchMock)
+    const { remnawave } = await import('./remnawave')
+
+    await expect(remnawave.getConfigProfileInbounds()).resolves.toEqual({ response })
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://panel.example.test/api/config-profiles/inbounds',
+      expect.objectContaining({ method: 'GET' })
+    )
+  })
+
   it('deletes nodes and hosts through UUID path parameters', async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(jsonResponse({ response: { isDeleted: true } }))
