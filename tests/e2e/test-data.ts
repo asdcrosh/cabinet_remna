@@ -6,6 +6,11 @@ export const E2E_USERS = {
     email: 'e2e-basic@example.test',
     name: 'E2E Пользователь',
   },
+  password: {
+    id: 'e2e-password-user',
+    email: 'e2e-password@example.test',
+    name: 'E2E Смена пароля',
+  },
   expired: {
     id: 'e2e-expired-user',
     email: 'e2e-expired@example.test',

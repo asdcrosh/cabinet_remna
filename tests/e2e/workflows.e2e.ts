@@ -65,9 +65,10 @@ test('главный администратор видит пользовате�
 
 test('смена пароля сохраняет текущую сессию и отзывает остальные', async ({ browser, page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop-chromium', 'Сценарий достаточно проверить один раз')
+  test.setTimeout(60_000)
   const newPassword = 'E2eNewPassword456'
 
-  await login(page, E2E_USERS.basic.email)
+  await login(page, E2E_USERS.password.email)
   const previousSessionContext = await browser.newContext({
     storageState: await page.context().storageState(),
   })

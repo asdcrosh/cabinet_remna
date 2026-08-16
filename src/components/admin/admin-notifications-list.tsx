@@ -147,6 +147,7 @@ function typeLabel(type: string) {
 
 function formatDate(value: string) {
   return new Intl.DateTimeFormat('ru-RU', {
+    timeZone: 'Europe/Moscow',
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',

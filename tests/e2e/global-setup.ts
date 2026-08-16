@@ -66,6 +66,16 @@ export default async function globalSetup() {
       },
     })
 
+    await prisma.user.create({
+      data: {
+        ...E2E_USERS.password,
+        passwordHash,
+        emailVerifiedAt: now,
+        agreedToTermsAt: now,
+        referralCode: 'E2EPASSWORD',
+      },
+    })
+
     await prisma.bonusBoxPrize.createMany({
       data: [
         {
