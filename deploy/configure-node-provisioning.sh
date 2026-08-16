@@ -102,28 +102,6 @@ raise SystemExit(0 if re.fullmatch(pattern, value) else 1)
 PY
 }
 
-valid_public_ipv4() {
-  python3 - "$1" <<'PY'
-import ipaddress
-import sys
-
-try:
-    address = ipaddress.ip_address(sys.argv[1])
-except ValueError:
-    raise SystemExit(1)
-blocked = (
-    address.version != 4
-    or address.is_private
-    or address.is_loopback
-    or address.is_link_local
-    or address.is_multicast
-    or address.is_reserved
-    or address.is_unspecified
-)
-raise SystemExit(1 if blocked else 0)
-PY
-}
-
 valid_email() {
   [[ "$1" =~ ^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,63}$ ]]
 }
@@ -178,7 +156,6 @@ valid_config_value() {
     REMNAWAVE_BASE_URL) valid_https_url "${value}" ;;
     NODE_PROVISIONING_BASE_DOMAIN) valid_domain "${value}" ;;
     NODE_PROVISIONING_ENCRYPTION_KEY) valid_secret "${value}" ;;
-    NODE_PROVISIONING_PANEL_IP) valid_public_ipv4 "${value}" ;;
     NODE_PROVISIONING_ADMIN_EMAIL) valid_email "${value}" ;;
     NODE_PROVISIONING_COUNTRY_CODE) [[ "${value}" == "AUTO" || "${value}" =~ ^[A-Za-z]{2}$ ]] ;;
     NODE_PROVISIONING_REMNANODE_IMAGE) valid_pinned_image "${value}" ;;
@@ -239,7 +216,6 @@ import_legacy_env() {
     NODE_PROVISIONING_TCP_TEMPLATE_HOST_UUID \
     NODE_PROVISIONING_XHTTP_TEMPLATE_HOST_UUID \
     NODE_PROVISIONING_COUNTRY_CODE \
-    NODE_PROVISIONING_PANEL_IP \
     NODE_PROVISIONING_ADMIN_EMAIL \
     NODE_PROVISIONING_REMNANODE_IMAGE \
     NODE_PROVISIONING_WORKER_INTERVAL_SECONDS \
@@ -311,46 +287,6 @@ detect_admin_email() {
   fi
 }
 
-detect_public_ip() {
-  local candidate
-  for endpoint in https://api.ipify.org https://ifconfig.me/ip; do
-    candidate="$(curl -4fsS --connect-timeout 3 --max-time 5 "${endpoint}" 2>/dev/null || true)"
-    candidate="${candidate//$'\n'/}"
-    if valid_public_ipv4 "${candidate}"; then
-      printf '%s\n' "${candidate}"
-      return 0
-    fi
-  done
-}
-
-detect_panel_ip() {
-  local panel_url public_ip
-  panel_url="$(read_env_value REMNAWAVE_BASE_URL || true)"
-  valid_https_url "${panel_url}" || return 0
-  public_ip="$(detect_public_ip || true)"
-  valid_public_ipv4 "${public_ip}" || return 0
-  python3 - "${panel_url}" "${public_ip}" <<'PY'
-import ipaddress
-import socket
-import sys
-from urllib.parse import urlparse
-
-hostname = urlparse(sys.argv[1]).hostname
-public_ip = sys.argv[2]
-if not hostname:
-    raise SystemExit(0)
-try:
-    addresses = [hostname] if ipaddress.ip_address(hostname).version == 4 else []
-except ValueError:
-    try:
-        addresses = [item[4][0] for item in socket.getaddrinfo(hostname, 443, socket.AF_INET)]
-    except OSError:
-        addresses = []
-if public_ip in addresses:
-    print(public_ip)
-PY
-}
-
 set_profile() {
   local action="$1"
   local current normalized next
@@ -371,11 +307,11 @@ set_profile() {
 
 import_legacy_env
 remove_env_key CABINET_PROVISIONER_ENV_FILE
+remove_env_key NODE_PROVISIONING_PANEL_IP
 
 for key in \
   TIMEWEB_API_TOKEN \
   NODE_PROVISIONING_BASE_DOMAIN \
-  NODE_PROVISIONING_PANEL_IP \
   NODE_PROVISIONING_ADMIN_EMAIL \
   NODE_PROVISIONING_COUNTRY_CODE \
   NODE_PROVISIONING_REMNANODE_IMAGE
@@ -407,18 +343,6 @@ if ! valid_email "${admin_email}"; then
   fi
 fi
 
-panel_ip="$(read_env_value NODE_PROVISIONING_PANEL_IP || true)"
-if ! valid_public_ipv4 "${panel_ip}" && { \
-  [[ "${INTERACTIVE}" == "true" ]] \
-  || { usable_value "$(read_env_value TIMEWEB_API_TOKEN || true)" \
-    && valid_domain "$(read_env_value NODE_PROVISIONING_BASE_DOMAIN || true)"; }; \
-}; then
-  panel_ip="$(detect_panel_ip || true)"
-  if valid_public_ipv4 "${panel_ip}"; then
-    write_env_value NODE_PROVISIONING_PANEL_IP "${panel_ip}"
-  fi
-fi
-
 base_domain="$(read_env_value NODE_PROVISIONING_BASE_DOMAIN || true)"
 if ! valid_domain "${base_domain}"; then
   base_domain="$(prompt_text 'Основной домен для нод, например vpn.example.com' || true)"
@@ -441,14 +365,6 @@ if ! valid_email "${admin_email}"; then
   admin_email="$(prompt_text 'Email администратора для сертификатов' || true)"
   if valid_email "${admin_email}"; then
     write_env_value NODE_PROVISIONING_ADMIN_EMAIL "${admin_email}"
-  fi
-fi
-
-panel_ip="$(read_env_value NODE_PROVISIONING_PANEL_IP || true)"
-if ! valid_public_ipv4 "${panel_ip}"; then
-  panel_ip="$(prompt_text 'Публичный IPv4 панели Remnawave' || true)"
-  if valid_public_ipv4 "${panel_ip}"; then
-    write_env_value NODE_PROVISIONING_PANEL_IP "${panel_ip}"
   fi
 fi
 
@@ -478,7 +394,6 @@ for key in \
   REMNAWAVE_TOKEN \
   NODE_PROVISIONING_BASE_DOMAIN \
   NODE_PROVISIONING_ENCRYPTION_KEY \
-  NODE_PROVISIONING_PANEL_IP \
   NODE_PROVISIONING_ADMIN_EMAIL \
   NODE_PROVISIONING_REMNANODE_IMAGE
 do
@@ -487,7 +402,6 @@ do
 done
 
 base_domain="$(read_env_value NODE_PROVISIONING_BASE_DOMAIN || true)"
-panel_ip="$(read_env_value NODE_PROVISIONING_PANEL_IP || true)"
 admin_email="$(read_env_value NODE_PROVISIONING_ADMIN_EMAIL || true)"
 remnanode_image="$(read_env_value NODE_PROVISIONING_REMNANODE_IMAGE || true)"
 remnawave_url="$(read_env_value REMNAWAVE_BASE_URL || true)"
@@ -496,7 +410,6 @@ timeweb_token="$(read_env_value TIMEWEB_API_TOKEN || true)"
 remnawave_token="$(read_env_value REMNAWAVE_TOKEN || true)"
 
 valid_domain "${base_domain}" || missing+=("NODE_PROVISIONING_BASE_DOMAIN(valid domain)")
-valid_public_ipv4 "${panel_ip}" || missing+=("NODE_PROVISIONING_PANEL_IP(public IPv4)")
 valid_email "${admin_email}" || missing+=("NODE_PROVISIONING_ADMIN_EMAIL(valid email)")
 valid_https_url "${remnawave_url}" || missing+=("REMNAWAVE_BASE_URL(valid HTTPS URL)")
 valid_api_token "${timeweb_token}" || missing+=("TIMEWEB_API_TOKEN(valid token)")
@@ -571,5 +484,5 @@ fi
 
 echo "Node provisioning is configured in ${ENV_FILE}."
 echo "Domain template: <node>.${base_domain}"
-echo "Panel IP: ${panel_ip}"
+echo "Panel API IP: resolved from REMNAWAVE_BASE_URL for each node deployment"
 echo "Worker profile: provisioning"

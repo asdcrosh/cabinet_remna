@@ -125,26 +125,22 @@ describe('configure-node-provisioning.sh', () => {
     expect(result.stdout).toContain('Node provisioning is disabled')
   })
 
-  it('does not guess the panel IP when the panel is on another server', async () => {
+  it('removes the obsolete static panel IP setting', async () => {
     const fixture = await createFixture([
       'COMPOSE_PROFILES="caddy,maintenance"',
       'REMNAWAVE_BASE_URL="https://panel.example.net"',
       'REMNAWAVE_TOKEN="remnawave-token-valid"',
       'TIMEWEB_API_TOKEN="timeweb-token-valid"',
       'NODE_PROVISIONING_BASE_DOMAIN="nodes.example.net"',
+      'NODE_PROVISIONING_PANEL_IP="8.8.8.8"',
       'LEGAL_SUPPORT_EMAIL="admin@example.net"',
       '',
     ].join('\n'))
-    const curl = await fakeCurl(fixture.dir, '8.8.8.8')
-
-    const result = run(fixture, {
-      PATH: `${curl.binDir}:${process.env.PATH}`,
-      NODE_PROVISIONING_PANEL_IP: '',
-    })
+    const result = run(fixture)
     const env = await readEnv(fixture.envFile)
 
     expect(result.status).toBe(0)
-    expect(result.stdout).toContain('NODE_PROVISIONING_PANEL_IP')
+    expect(result.stdout).toContain('Panel API IP: resolved from REMNAWAVE_BASE_URL')
     expect(env.NODE_PROVISIONING_PANEL_IP).toBeUndefined()
   })
 })
@@ -157,7 +153,6 @@ function completeEnv(profiles = 'caddy,maintenance') {
     'TIMEWEB_API_TOKEN="timeweb-token-valid"',
     'NODE_PROVISIONING_BASE_DOMAIN="nodes.example.net"',
     `NODE_PROVISIONING_ENCRYPTION_KEY="${'a'.repeat(64)}"`,
-    'NODE_PROVISIONING_PANEL_IP="8.8.8.8"',
     'NODE_PROVISIONING_ADMIN_EMAIL="admin@example.net"',
     'NODE_PROVISIONING_REMNANODE_IMAGE="remnawave/node:latest"',
     '',

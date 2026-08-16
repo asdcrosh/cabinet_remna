@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { AnsibleProvisioningError, sanitizeProvisioningOutput } from './node-provisioning-runner'
+import { AnsibleProvisioningError, resolvePanelApiCidrs, sanitizeProvisioningOutput } from './node-provisioning-runner'
 
 describe('provisioning output sanitizer', () => {
   it('removes passwords, bearer tokens, JWT and terminal colors', () => {
@@ -26,5 +26,20 @@ describe('provisioning output sanitizer', () => {
     const error = new AnsibleProvisioningError(124, 'ansible-playbook timed out')
 
     expect(error.message).toContain('Ansible timed out with code 124')
+  })
+
+  it('resolves all current public panel IPv4 addresses before provisioning', async () => {
+    const resolveIpv4 = async (hostname: string) => {
+      expect(hostname).toBe('panel.example.net')
+      return ['10.0.0.10', '8.8.8.8', '8.8.8.8']
+    }
+
+    await expect(resolvePanelApiCidrs('https://panel.example.net', resolveIpv4))
+      .resolves.toEqual(['8.8.8.8'])
+  })
+
+  it('fails closed when the current panel address cannot be resolved', async () => {
+    await expect(resolvePanelApiCidrs('https://panel.example.net', async () => []))
+      .rejects.toThrow('Remnawave panel DNS has no public IPv4 address')
   })
 })

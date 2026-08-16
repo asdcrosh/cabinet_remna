@@ -13,7 +13,7 @@ Required extra variables:
 
 - `node_fqdn`
 - `remnanode_secret_key` (legacy runner alias: `node_secret_key`)
-- `panel_api_cidr` (legacy runner alias: `panel_ip`; allowed to reach port 2222)
+- `panel_api_cidrs` (legacy aliases: `panel_api_cidr`, `panel_ip`; allowed to reach port 2222)
 - `remnanode_image` defaults to `remnawave/node:latest` and is pulled on every
   provisioning or repair run
 - node country is detected locally from the bundled MaxMind GeoLite2 country
@@ -22,7 +22,9 @@ Required extra variables:
   and attached to every provisioned node
 
 The active SSH port remains publicly reachable, matching the existing manual
-runbook. The Remnanode API port 2222 is restricted to `panel_api_cidr`.
+runbook. The Remnanode API port 2222 is restricted to `panel_api_cidrs`. Cabinet
+resolves these addresses from `REMNAWAVE_BASE_URL` immediately before every
+deployment and removes outdated rules for this port.
 
 SelfSteal is installed through its official non-interactive `--force --domain`
 mode, pinned to a reviewed commit and checksum. The worker also installs the

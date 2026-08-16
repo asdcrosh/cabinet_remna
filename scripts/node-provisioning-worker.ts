@@ -5,7 +5,6 @@ import { failInterruptedNodeProvisioningJobs, processNodeProvisioningBatch } fro
 import { nodeHostRemark, resolveNodeCountryCode } from '../src/lib/node-country'
 import { prisma } from '../src/lib/prisma'
 import { recordWorkerHeartbeat } from '../src/lib/worker-health'
-import { isPublicIpv4 } from '../src/lib/node-provisioning-validation'
 
 const intervalSeconds = positiveInteger(process.env.NODE_PROVISIONING_WORKER_INTERVAL_SECONDS, 10)
 const heartbeatMaxAgeSeconds = positiveInteger(process.env.NODE_PROVISIONING_WORKER_HEARTBEAT_MAX_AGE_SECONDS, 180)
@@ -79,7 +78,6 @@ function validateWorkerConfiguration() {
     'REMNAWAVE_TOKEN',
     'NODE_PROVISIONING_BASE_DOMAIN',
     'NODE_PROVISIONING_ENCRYPTION_KEY',
-    'NODE_PROVISIONING_PANEL_IP',
     'NODE_PROVISIONING_ADMIN_EMAIL',
     'NODE_PROVISIONING_REMNANODE_IMAGE',
   ] as const
@@ -92,9 +90,6 @@ function validateWorkerConfiguration() {
   const baseDomain = process.env.NODE_PROVISIONING_BASE_DOMAIN!.trim()
   if (!/^(?=.{4,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/i.test(baseDomain)) {
     throw new Error('NODE_PROVISIONING_BASE_DOMAIN must be a valid base domain')
-  }
-  if (!isPublicIpv4(process.env.NODE_PROVISIONING_PANEL_IP!.trim())) {
-    throw new Error('NODE_PROVISIONING_PANEL_IP must be a public IPv4 address')
   }
   if (!/^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,63}$/.test(process.env.NODE_PROVISIONING_ADMIN_EMAIL!.trim())) {
     throw new Error('NODE_PROVISIONING_ADMIN_EMAIL must be a valid email')

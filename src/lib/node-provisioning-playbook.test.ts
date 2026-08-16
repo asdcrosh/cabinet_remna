@@ -183,4 +183,12 @@ describe('node provisioning playbook safety', () => {
     expect(playbook).toContain(`- "'Status: active' in final_ufw_status.stdout"`)
     expect(playbook).not.toContain("- final_ufw_status.stdout is search('Status: active')")
   })
+
+  it('replaces stale Remnanode API rules with the current panel addresses', () => {
+    expect(playbook).toContain('effective_panel_api_cidrs')
+    expect(taskBlock('Remove outdated Remnanode API firewall rules')).toContain('ufw status numbered')
+    expect(taskBlock('Remove outdated Remnanode API firewall rules')).toContain('ufw --force delete')
+    expect(taskBlock('Permit the Remnanode API only from the current panel addresses'))
+      .toContain("loop: '{{ effective_panel_api_cidrs")
+  })
 })

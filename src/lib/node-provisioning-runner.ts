@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto'
+import { resolve4 } from 'node:dns/promises'
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -50,8 +51,7 @@ export async function runNodeAnsible(
         },
       },
     }))
-    const panelIp = requiredEnv('NODE_PROVISIONING_PANEL_IP')
-    if (!isPublicIpv4(panelIp)) throw new Error('NODE_PROVISIONING_PANEL_IP must be a public IPv4 address')
+    const panelApiCidrs = await resolvePanelApiCidrs(requiredEnv('REMNAWAVE_BASE_URL'))
     const adminEmail = requiredEnv('NODE_PROVISIONING_ADMIN_EMAIL')
     if (!/^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,63}$/.test(adminEmail)) {
       throw new Error('NODE_PROVISIONING_ADMIN_EMAIL must be a valid email')
@@ -60,7 +60,7 @@ export async function runNodeAnsible(
       provisioning_job_id: input.jobId,
       node_fqdn: input.fqdn,
       node_secret_key: input.nodeSecret,
-      panel_ip: panelIp,
+      panel_api_cidrs: panelApiCidrs,
       admin_email: adminEmail,
       remnanode_image: requiredEnv('NODE_PROVISIONING_REMNANODE_IMAGE'),
       node_api_port: 2222,
@@ -88,6 +88,34 @@ export async function runNodeAnsible(
   } finally {
     await rm(workDir, { recursive: true, force: true })
   }
+}
+
+export async function resolvePanelApiCidrs(
+  remnawaveBaseUrl: string,
+  resolveIpv4: (hostname: string) => Promise<string[]> = resolve4,
+) {
+  let url: URL
+  try {
+    url = new URL(remnawaveBaseUrl)
+  } catch {
+    throw new Error('REMNAWAVE_BASE_URL must be a valid HTTPS URL')
+  }
+  if (url.protocol !== 'https:') throw new Error('REMNAWAVE_BASE_URL must use HTTPS')
+
+  if (isPublicIpv4(url.hostname)) return [url.hostname]
+
+  let addresses: string[]
+  try {
+    addresses = await resolveIpv4(url.hostname)
+  } catch {
+    throw new Error(`Could not resolve the current IPv4 address of the Remnawave panel: ${url.hostname}`)
+  }
+
+  const publicAddresses = [...new Set(addresses.filter(isPublicIpv4))]
+  if (publicAddresses.length === 0) {
+    throw new Error(`Remnawave panel DNS has no public IPv4 address: ${url.hostname}`)
+  }
+  return publicAddresses
 }
 
 export async function scanSshHostKey(serverIp: string, sshPort: number) {

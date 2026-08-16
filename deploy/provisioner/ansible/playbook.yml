@@ -9,7 +9,7 @@
     remnanode_image: "{{ lookup('ansible.builtin.env', 'NODE_PROVISIONING_REMNANODE_IMAGE') }}"
     remnanode_port: '{{ node_api_port | default(2222) }}'
     effective_remnanode_secret_key: '{{ remnanode_secret_key | default(node_secret_key | default("")) }}'
-    effective_panel_api_cidr: '{{ panel_api_cidr | default(panel_ip | default("")) }}'
+    effective_panel_api_cidrs: '{{ panel_api_cidrs | default([panel_api_cidr | default(panel_ip | default(""))]) }}'
     selfsteal_dir: /opt/nginx-selfsteal
     selfsteal_acme_port: 8443
     selfsteal_script_version: 2.10.0
@@ -48,7 +48,8 @@
           - effective_remnanode_secret_key | length >= 32
           - remnanode_image is defined
           - remnanode_image | length > 0
-          - effective_panel_api_cidr | length > 0
+          - effective_panel_api_cidrs | length > 0
+          - effective_panel_api_cidrs | select | list | length > 0
           - admin_email is defined
           - admin_email is match('^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$')
           - (remnanode_port | int) >= 1
@@ -57,7 +58,7 @@
           - (ansible_port | default(22) | int) <= 65535
         fail_msg: >-
           Provisioning requires Ubuntu/Debian with Linux 5.7+, a lower-case FQDN,
-          provisioning_job_id, remnanode_secret_key, panel_api_cidr and a valid admin_email.
+          provisioning_job_id, remnanode_secret_key, panel_api_cidrs and a valid admin_email.
       no_log: true
 
     - name: Validate the Remnanode image reference
@@ -253,19 +254,41 @@
       register: ufw_ssh_rule
       changed_when: "'Rule added' in ufw_ssh_rule.stdout or 'Rules updated' in ufw_ssh_rule.stdout"
 
-    - name: Permit the Remnanode API only from the panel network
+    - name: Remove outdated Remnanode API firewall rules
+      ansible.builtin.shell: |
+        set -euo pipefail
+        mapfile -t rule_numbers < <(
+          ufw status numbered | awk -v port='{{ remnanode_port | string }}' '
+            /^\[[[:space:]]*[0-9]+\]/ && $0 ~ ("(^|[[:space:]])" port "/tcp([[:space:]]|$)") && $0 ~ /ALLOW IN/ {
+              line = $0
+              sub(/^\[[[:space:]]*/, "", line)
+              sub(/\].*$/, "", line)
+              print line
+            }
+          ' | sort -rn
+        )
+        for rule_number in "${rule_numbers[@]}"; do
+          ufw --force delete "${rule_number}"
+        done
+      args:
+        executable: /bin/bash
+      register: ufw_stale_panel_rules
+      changed_when: "'Rule deleted' in ufw_stale_panel_rules.stdout"
+
+    - name: Permit the Remnanode API only from the current panel addresses
       ansible.builtin.command:
         argv:
           - ufw
           - allow
           - from
-          - '{{ effective_panel_api_cidr }}'
+          - '{{ item }}'
           - to
           - any
           - port
           - '{{ remnanode_port | string }}'
           - proto
           - tcp
+      loop: '{{ effective_panel_api_cidrs | select | unique }}'
       register: ufw_panel_rule
       changed_when: "'Rule added' in ufw_panel_rule.stdout or 'Rules updated' in ufw_panel_rule.stdout"
 
