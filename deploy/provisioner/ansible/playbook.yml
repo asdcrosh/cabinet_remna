@@ -1235,6 +1235,47 @@
           changed_when: false
           no_log: true
 
+        - name: Prepare the SelfSteal certificate pair for atomic deployment
+          ansible.builtin.shell: |
+            set -euo pipefail
+            live_dir={{ (selfsteal_dir + '/ssl') | quote }}
+            live_key="$live_dir/private.key"
+            live_cert="$live_dir/fullchain.crt"
+            staged_key={{ (selfsteal_certificate_stage_dir + '/private.key') | quote }}
+            staged_cert={{ (selfsteal_certificate_stage_dir + '/fullchain.crt') | quote }}
+            pending_key="$live_dir/.cabinet-{{ provisioning_job_id }}-private.key.pending"
+            pending_cert="$live_dir/.cabinet-{{ provisioning_job_id }}-fullchain.crt.pending"
+            previous_key="$live_dir/.cabinet-{{ provisioning_job_id }}-private.key.previous"
+            previous_cert="$live_dir/.cabinet-{{ provisioning_job_id }}-fullchain.crt.previous"
+
+            test -d "$live_dir" || {
+              echo "SelfSteal SSL directory is missing: $live_dir" >&2
+              exit 1
+            }
+            test -r "$live_key" || {
+              echo "Existing SelfSteal private key is not readable: $live_key" >&2
+              exit 1
+            }
+            test -r "$live_cert" || {
+              echo "Existing SelfSteal certificate is not readable: $live_cert" >&2
+              exit 1
+            }
+            rm -f -- "$pending_key" "$pending_cert" "$previous_key" "$previous_cert"
+            install -o root -g root -m 0600 "$staged_key" "$pending_key"
+            install -o root -g root -m 0644 "$staged_cert" "$pending_cert"
+            install -o root -g root -m 0600 "$live_key" "$previous_key"
+            install -o root -g root -m 0644 "$live_cert" "$previous_cert"
+            test "$(openssl x509 -in "$pending_cert" -pubkey -noout |
+              openssl pkey -pubin -outform DER | sha256sum | cut -d' ' -f1)" =
+              "$(openssl pkey -in "$pending_key" -pubout -outform DER |
+              sha256sum | cut -d' ' -f1)" || {
+              echo "Prepared SelfSteal certificate and private key do not match" >&2
+              exit 1
+            }
+          args:
+            executable: /bin/bash
+          changed_when: true
+
         - name: Stop SelfSteal before replacing the certificate pair
           ansible.builtin.command:
             argv:
@@ -1254,32 +1295,45 @@
         - name: Install the staged SelfSteal certificate pair transactionally
           ansible.builtin.shell: |
             set -euo pipefail
-            live_key={{ (selfsteal_dir + '/ssl/private.key') | quote }}
-            live_cert={{ (selfsteal_dir + '/ssl/fullchain.crt') | quote }}
-            staged_key={{ (selfsteal_certificate_stage_dir + '/private.key') | quote }}
-            staged_cert={{ (selfsteal_certificate_stage_dir + '/fullchain.crt') | quote }}
-            previous_key={{ (selfsteal_certificate_stage_dir + '/previous.key') | quote }}
-            previous_cert={{ (selfsteal_certificate_stage_dir + '/previous.crt') | quote }}
+            live_dir={{ (selfsteal_dir + '/ssl') | quote }}
+            live_key="$live_dir/private.key"
+            live_cert="$live_dir/fullchain.crt"
+            pending_key="$live_dir/.cabinet-{{ provisioning_job_id }}-private.key.pending"
+            pending_cert="$live_dir/.cabinet-{{ provisioning_job_id }}-fullchain.crt.pending"
+            previous_key="$live_dir/.cabinet-{{ provisioning_job_id }}-private.key.previous"
+            previous_cert="$live_dir/.cabinet-{{ provisioning_job_id }}-fullchain.crt.previous"
 
-            install -o root -g root -m 0600 "$live_key" "$previous_key"
-            install -o root -g root -m 0644 "$live_cert" "$previous_cert"
             restore_previous_pair() {
-              install -o root -g root -m 0600 "$previous_key" "$live_key" || true
-              install -o root -g root -m 0644 "$previous_cert" "$live_cert" || true
+              echo "Certificate deployment failed; restoring the previous SelfSteal pair" >&2
+              if [ -f "$previous_key" ] && ! mv -fT -- "$previous_key" "$live_key"; then
+                echo "Could not restore the previous SelfSteal private key" >&2
+              fi
+              if [ -f "$previous_cert" ] && ! mv -fT -- "$previous_cert" "$live_cert"; then
+                echo "Could not restore the previous SelfSteal certificate" >&2
+              fi
             }
-            trap 'rc=$?; if [ "$rc" -ne 0 ]; then restore_previous_pair; fi; exit "$rc"' EXIT
+            cleanup_pending_pair() {
+              rm -f -- "$pending_key" "$pending_cert"
+            }
+            trap 'rc=$?; if [ "$rc" -ne 0 ]; then restore_previous_pair; fi; cleanup_pending_pair; exit "$rc"' EXIT
+            trap 'exit 130' INT
+            trap 'exit 143' TERM
 
-            install -o root -g root -m 0600 "$staged_key" "$live_key"
-            install -o root -g root -m 0644 "$staged_cert" "$live_cert"
+            test -f "$pending_key" || { echo "Prepared SelfSteal private key is missing" >&2; exit 1; }
+            test -f "$pending_cert" || { echo "Prepared SelfSteal certificate is missing" >&2; exit 1; }
+            test -f "$previous_key" || { echo "SelfSteal private-key rollback file is missing" >&2; exit 1; }
+            test -f "$previous_cert" || { echo "SelfSteal certificate rollback file is missing" >&2; exit 1; }
+            mv -fT -- "$pending_key" "$live_key"
+            mv -fT -- "$pending_cert" "$live_cert"
             test "$(openssl x509 -in "$live_cert" -pubkey -noout |
               openssl pkey -pubin -outform DER | sha256sum | cut -d' ' -f1)" =
               "$(openssl pkey -in "$live_key" -pubout -outform DER |
               sha256sum | cut -d' ' -f1)"
-            trap - EXIT
+            rm -f -- "$previous_key" "$previous_cert"
+            trap - EXIT INT TERM
           args:
             executable: /bin/bash
           changed_when: true
-          no_log: true
       always:
         - name: Start SelfSteal after certificate deployment
           ansible.builtin.command:
