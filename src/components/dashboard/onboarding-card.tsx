@@ -25,6 +25,7 @@ interface DashboardOnboardingCardProps {
   state: DashboardOnboardingState
   mode?: 'full' | 'compact'
   supportEnabled?: boolean
+  focus?: 'access' | 'all'
 }
 
 interface NextAction {
@@ -36,8 +37,13 @@ interface NextAction {
   tone: 'cyan' | 'emerald' | 'amber' | 'slate'
 }
 
-export function DashboardOnboardingCard({ state, mode = 'compact', supportEnabled = true }: DashboardOnboardingCardProps) {
-  const action = getNextAction(state)
+export function DashboardOnboardingCard({
+  state,
+  mode = 'compact',
+  supportEnabled = true,
+  focus = 'all',
+}: DashboardOnboardingCardProps) {
+  const action = getNextAction(state, focus)
   const isFull = mode === 'full'
 
   if (!action && !isFull) return null
@@ -106,7 +112,7 @@ export function DashboardOnboardingCard({ state, mode = 'compact', supportEnable
   )
 }
 
-function getNextAction(state: DashboardOnboardingState): NextAction | null {
+function getNextAction(state: DashboardOnboardingState, focus: DashboardOnboardingCardProps['focus']): NextAction | null {
   if (state.pendingSync && !state.hasRemnawaveProfile) {
     return {
       title: 'Проверить подписку',
@@ -138,6 +144,21 @@ function getNextAction(state: DashboardOnboardingState): NextAction | null {
       icon: <QrCode className="h-5 w-5" />,
       tone: 'emerald',
     }
+  }
+
+  if (focus === 'access') {
+    if (state.hasLocalSubscription && !state.hasRemnawaveProfile) {
+      return {
+        title: 'Подготавливаем доступ',
+        description: 'Оплата сохранена. Откройте подписку, чтобы проверить появление ссылки и QR-кода.',
+        href: '/dashboard/subscription',
+        label: 'Проверить доступ',
+        icon: <KeyRound className="h-5 w-5" />,
+        tone: 'amber',
+      }
+    }
+
+    return null
   }
 
   if (!state.emailVerified) {

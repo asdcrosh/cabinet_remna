@@ -23,6 +23,8 @@ import {
   filterUserNavigation,
   getAvailableAdminNavigation,
   informationNavigation,
+  userPrimaryNavigation,
+  userSecondaryNavigation,
   userNavigation,
   type NavigationItem,
   type UserRole,
@@ -90,7 +92,7 @@ export function MobileBottomNav({
     ? availableAdminItems.filter((item) => !adminPrimaryHrefs.has(item.href))
     : []
   const showMore = adminArea || accountMoreItems.length > 0
-  const swipeHrefKey = adminArea ? '' : filterUserNavigation(userNavigation, features).map((item) => item.href).join('\n')
+  const swipeHrefKey = adminArea ? '' : filterUserNavigation(userPrimaryNavigation, features).map((item) => item.href).join('\n')
   const [moreOpen, setMoreOpen] = useState(false)
   const [mounted, setMounted] = useState(false)
   const swipeStartRef = useRef<{ x: number; y: number; time: number } | null>(null)
@@ -470,11 +472,21 @@ function NavList({
   const pathname = usePathname()
   const liveBadges = useNavBadgeValues(badges)
   const adminArea = pathname.startsWith('/dashboard/admin')
+  const userPrimaryItems = filterUserNavigation(userPrimaryNavigation, features)
+  const userSecondaryItems = filterUserNavigation(userSecondaryNavigation, features)
 
   return (
     <nav className={className}>
       {role === 'USER' ? (
-        <NavGroup items={filterUserNavigation(userNavigation, features)} pathname={pathname} badges={liveBadges} onNavigate={onNavigate} />
+        <div className="space-y-4">
+          <NavGroup items={userPrimaryItems} pathname={pathname} badges={liveBadges} onNavigate={onNavigate} />
+          {userSecondaryItems.length > 0 && (
+            <section className="border-t border-white/10 pt-3" aria-label="Дополнительные разделы">
+              <div className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">Ещё</div>
+              <NavGroup items={userSecondaryItems} pathname={pathname} badges={liveBadges} onNavigate={onNavigate} />
+            </section>
+          )}
+        </div>
       ) : (
         <div className="space-y-3">
           <WorkspaceSwitch adminArea={adminArea} onNavigate={onNavigate} />

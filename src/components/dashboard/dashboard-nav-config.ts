@@ -47,18 +47,22 @@ export const userNavigation: NavigationItem[] = [
   { href: '/dashboard/settings', label: 'Аккаунт', icon: Settings },
 ]
 
-export const bottomNavigation: NavigationItem[] = userNavigation.filter((item) => [
+export const userPrimaryNavigation = userNavigation.filter((item) => [
   '/dashboard',
   '/dashboard/subscription',
   '/dashboard/plans',
   '/dashboard/support',
 ].includes(item.href))
+
+export const userSecondaryNavigation = userNavigation.filter((item) => [
+  '/dashboard/bonus-box',
+  '/dashboard/settings',
+].includes(item.href))
+
+export const bottomNavigation: NavigationItem[] = userPrimaryNavigation
 export const bottomMoreNavigation: NavigationItem[] = [
   { href: '/dashboard/notifications', label: 'Уведомления', icon: Bell },
-  ...userNavigation.filter((item) => [
-    '/dashboard/bonus-box',
-    '/dashboard/settings',
-  ].includes(item.href)),
+  ...userSecondaryNavigation,
 ]
 
 const legalIcons: Record<LegalPath, LucideIcon> = {

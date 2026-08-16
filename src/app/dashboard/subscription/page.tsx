@@ -14,6 +14,7 @@ import { EmptyState } from '@/components/dashboard/empty-state'
 import { getFeatureFlags } from '@/lib/feature-flags'
 import { formatSubscriptionDaysLeft, isSubscriptionExpired } from '@/lib/subscription-time'
 import { PageHeader } from '@/components/dashboard/page-header'
+import { VpnConnectionCheck } from '@/components/dashboard/vpn-connection-check'
 
 export const dynamic = 'force-dynamic'
 
@@ -148,6 +149,8 @@ export default async function SubscriptionPage() {
           />
         </div>
       </section>
+
+      <VpnConnectionCheck supportEnabled={features.support} />
 
       {!subscriptionExpired && (
         <div className="grid items-start gap-5 min-[1360px]:grid-cols-[minmax(0,1fr)_22rem]">

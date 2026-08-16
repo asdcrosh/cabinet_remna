@@ -20,7 +20,7 @@ export const dynamic = 'force-dynamic'
 
 const STALE_AFTER_MS = 60 * 1000 // 1 минута
 
-export const GET = withAuth(async () => {
+export const GET = withAuth(async (request: Request) => {
   const session = await requireAuth()
   const user = await prisma.user.findUnique({ where: { id: session.uid } })
   if (!user) return NextResponse.json({ error: 'Not found' }, { status: 404 })
@@ -61,7 +61,9 @@ export const GET = withAuth(async () => {
   }
 
   // 3) Синхронизация с Remnawave, если данные устарели
+  const forceSync = new URL(request.url).searchParams.get('refresh') === '1'
   const needSync =
+    forceSync ||
     !subscription ||
     Date.now() - subscription.lastSyncedAt.getTime() > STALE_AFTER_MS ||
     subscription.pendingSync

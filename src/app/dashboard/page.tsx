@@ -1,27 +1,21 @@
 // Главная кабинета: состояние доступа и одно следующее действие.
 
 import Link from 'next/link'
-import type { ReactElement } from 'react'
 import { redirect } from 'next/navigation'
 import {
   AlertTriangle,
   ArrowRight,
-  Bell,
   CreditCard,
   KeyRound,
-  Laptop,
   MessageCircleQuestion,
 } from 'lucide-react'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth/cookies'
 import { remnawave, RemnawaveError, type UserStatus } from '@/lib/remnawave'
-import { formatBytes } from '@/lib/format'
 import { StatusBadge } from '@/components/dashboard/status-badge'
-import { TrafficChart } from '@/components/dashboard/traffic-chart'
 import { DashboardOnboardingCard, type DashboardOnboardingState } from '@/components/dashboard/onboarding-card'
 import { logWarn } from '@/lib/logger'
 import { formatSubscriptionDaysLeft, isSubscriptionExpired } from '@/lib/subscription-time'
-import { readRemnawaveBigInt } from '@/lib/remnawave-usage'
 import { getFreshPendingPaymentCutoff } from '@/lib/payment-sync'
 import { getFeatureFlags } from '@/lib/feature-flags'
 import { cn } from '@/lib/cn'
@@ -77,7 +71,12 @@ export default async function DashboardHome() {
         {user.payments[0] ? (
           <PendingPaymentCard payment={user.payments[0]} />
         ) : (
-          <DashboardOnboardingCard state={onboardingState} mode="full" supportEnabled={features.support} />
+          <DashboardOnboardingCard
+            state={onboardingState}
+            mode="full"
+            supportEnabled={features.support}
+            focus="access"
+          />
         )}
       </div>
     )
@@ -92,10 +91,6 @@ export default async function DashboardHome() {
   const remnawaveCard = remnawaveCardResult.data
   const remnawaveErrorStatus = remnawaveCardResult.errorStatus
   const sub = remnawaveCard?.response.user
-  const hasRemoteUsage = Boolean(sub)
-  const used = sub ? readRemnawaveBigInt(sub, ['trafficUsedBytes', 'usedTrafficBytes']) : 0n
-  const limit = sub ? readRemnawaveBigInt(sub, ['trafficLimitBytes', 'trafficLimit']) : 0n
-  const isUnlimited = hasRemoteUsage && limit === 0n
   const localDaysLeft = subRow
     ? Math.ceil((subRow.expireAt.getTime() - Date.now()) / (24 * 60 * 60 * 1000))
     : 0
@@ -108,7 +103,6 @@ export default async function DashboardHome() {
     month: 'long',
     year: 'numeric',
   }) ?? null
-  const trafficPercent = getTrafficPercent(used, limit, isUnlimited)
   const primaryAction = subscriptionExpired || daysLeft <= 7
     ? {
         href: '/dashboard/plans?intent=renew',
@@ -126,8 +120,6 @@ export default async function DashboardHome() {
           label: 'Управлять подключением',
           icon: <KeyRound className="h-4 w-4" />,
         }
-  const primaryHomeNudge = getPrimaryHomeNudge(onboardingState)
-
   return (
     <div className="user-workspace page-stack">
       <HomeHeader
@@ -161,7 +153,7 @@ export default async function DashboardHome() {
       )}
 
       <section
-        className={cn('access-pass access-overview', subscriptionExpired && 'access-pass--expired')}
+        className={cn('access-pass access-overview access-overview--focused', subscriptionExpired && 'access-pass--expired')}
         data-testid="subscription-overview"
       >
         <div className="access-overview__top">
@@ -196,80 +188,18 @@ export default async function DashboardHome() {
                   ? `Оплачено до ${expiresAtLabel}`
                   : 'Доступ активен.'}
             </p>
+            <Link href={primaryAction.href} className="btn-primary group mt-5 w-full justify-between sm:hidden">
+              <span className="inline-flex items-center gap-2">
+                {primaryAction.icon}
+                {primaryAction.label}
+              </span>
+              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+            </Link>
           </div>
-
-          <div className="access-overview__facts">
-            <HomeMetric
-              label="Трафик"
-              value={subscriptionExpired
-                ? 'Недоступен'
-                : hasRemoteUsage
-                  ? isUnlimited
-                    ? `${formatBytes(used)} использовано`
-                    : `${formatBytes(used)} из ${formatBytes(limit)}`
-                  : 'Обновляется'}
-              note={subscriptionExpired ? 'до продления' : isUnlimited ? 'без ограничений' : 'за текущий период'}
-            />
-            <HomeMetric
-              label="Устройства"
-              value={user._count.devices > 0 ? `${user._count.devices} подключено` : 'Не подключены'}
-              note={user._count.devices > 0 ? 'можно управлять' : 'добавьте первое устройство'}
-            />
-          </div>
-        </div>
-
-        <div className="access-overview__bottom">
-          <div className="min-w-0 flex-1">
-            <div className="access-overview__progress">
-              <div
-                className={cn(
-                  'access-overview__progress-value',
-                  subscriptionExpired && 'access-overview__progress-value--expired'
-                )}
-                style={{ width: subscriptionExpired ? '0%' : isUnlimited ? '100%' : `${trafficPercent ?? 0}%` }}
-              />
-            </div>
-            <div className="mt-2 flex items-center justify-between gap-3 text-xs text-slate-500 dark:text-slate-400">
-              <span>{subscriptionExpired ? 'Доступ остановлен' : isUnlimited ? 'Трафик без лимита' : 'Использование трафика'}</span>
-              {!subscriptionExpired && !isUnlimited && trafficPercent != null && <span>{trafficPercent}%</span>}
-            </div>
-          </div>
-          <Link href={primaryAction.href} className="btn-primary group w-full justify-between sm:hidden">
-            <span className="inline-flex items-center gap-2">
-              {primaryAction.icon}
-              {primaryAction.label}
-            </span>
-            <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-          </Link>
         </div>
       </section>
 
       <HomeQuickActions supportEnabled={features.support} />
-
-      <SmartInsights
-        emailVerified={onboardingState.emailVerified}
-        telegramLinked={onboardingState.telegramLinked}
-        deviceCount={onboardingState.deviceCount}
-        pendingPayment={user.payments[0] ?? null}
-        suppress={primaryHomeNudge}
-      />
-
-      {hasRemoteUsage && (
-        <details className="group border-t border-slate-200 pt-3 dark:border-white/10">
-          <summary className="flex min-h-10 cursor-pointer list-none items-center justify-between gap-3 text-sm font-medium text-slate-600 hover:text-slate-950 dark:text-slate-300 dark:hover:text-white [&::-webkit-details-marker]:hidden">
-            <span>Расход трафика</span>
-            <span className="text-xs text-slate-400 group-open:hidden">Показать график</span>
-            <span className="hidden text-xs text-slate-400 group-open:inline">Скрыть</span>
-          </summary>
-          <div className="pt-3">
-            <TrafficChart
-              userId={user.id}
-              initialUsedBytes={used.toString()}
-              initialLimitBytes={isUnlimited ? null : limit.toString()}
-            />
-          </div>
-        </details>
-      )}
     </div>
   )
 }
@@ -301,13 +231,13 @@ function HomeQuickActions({ supportEnabled }: { supportEnabled: boolean }) {
         </span>
         <ArrowRight className="h-4 w-4 shrink-0 text-slate-400 transition-transform group-hover:translate-x-0.5 group-hover:text-slate-950 dark:group-hover:text-white" />
       </Link>
-      <Link href="/dashboard/plans" className="home-quick-actions__item group">
+      <Link href="/dashboard/plans?intent=renew" className="home-quick-actions__item group">
         <span className="home-quick-actions__icon">
           <CreditCard className="h-4 w-4" />
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block text-sm font-semibold text-slate-950 dark:text-white">Тарифы</span>
-          <span className="mt-0.5 block text-xs text-slate-500 dark:text-slate-400">Продлить или сменить срок</span>
+          <span className="block text-sm font-semibold text-slate-950 dark:text-white">Продлить доступ</span>
+          <span className="mt-0.5 block text-xs text-slate-500 dark:text-slate-400">Выбрать подходящий срок</span>
         </span>
         <ArrowRight className="h-4 w-4 shrink-0 text-slate-400 transition-transform group-hover:translate-x-0.5 group-hover:text-slate-950 dark:group-hover:text-white" />
       </Link>
@@ -324,16 +254,6 @@ function HomeQuickActions({ supportEnabled }: { supportEnabled: boolean }) {
         </Link>
       )}
     </nav>
-  )
-}
-
-function HomeMetric({ label, value, note }: { label: string; value: string; note: string }) {
-  return (
-    <div className="access-overview__fact">
-      <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">{label}</div>
-      <div className="mt-2 break-words text-base font-semibold tracking-[-0.02em] text-slate-950 dark:text-white sm:text-lg">{value}</div>
-      <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">{note}</div>
-    </div>
   )
 }
 
@@ -369,118 +289,6 @@ function PendingPaymentCard({
       </div>
     </section>
   )
-}
-
-type HomeNudgeKey = 'subscription' | 'device' | 'email' | 'telegram' | 'sync' | null
-
-function getPrimaryHomeNudge(state: DashboardOnboardingState): HomeNudgeKey {
-  if (state.pendingSync && !state.hasRemnawaveProfile) return 'sync'
-  if (!state.hasLocalSubscription && !state.hasRemnawaveProfile) return 'subscription'
-  if (state.hasRemnawaveProfile && state.deviceCount === 0) return 'device'
-  if (!state.emailVerified) return 'email'
-  if (!state.telegramLinked) return 'telegram'
-  if (state.telegramLinked && !state.remnashopSynced) return 'sync'
-  return null
-}
-
-function SmartInsights({
-  emailVerified,
-  telegramLinked,
-  deviceCount,
-  pendingPayment,
-  suppress = null,
-}: {
-  emailVerified: boolean
-  telegramLinked: boolean
-  deviceCount: number
-  pendingPayment: { id: string; confirmationUrl: string | null; createdAt: Date } | null
-  suppress?: HomeNudgeKey
-}) {
-  const items = [
-    pendingPayment
-      ? {
-          title: 'Есть незавершённая оплата',
-          text: 'Продолжите оплату или откройте историю платежей.',
-          href: pendingPayment.confirmationUrl || '/dashboard/billing',
-          external: Boolean(pendingPayment.confirmationUrl),
-          icon: <CreditCard className="h-4 w-4" />,
-          tone: 'amber' as const,
-        }
-      : null,
-    suppress !== 'device' && deviceCount === 0
-      ? {
-          title: 'Устройство ещё не подключено',
-          text: 'Добавьте подписку в приложение и включите VPN.',
-          href: '/dashboard/subscription',
-          icon: <Laptop className="h-4 w-4" />,
-          tone: 'cyan' as const,
-        }
-      : null,
-    suppress !== 'email' && !emailVerified
-      ? {
-          title: 'Подтвердите email',
-          text: 'Он понадобится для восстановления доступа.',
-          href: '/dashboard/settings',
-          icon: <Bell className="h-4 w-4" />,
-          tone: 'slate' as const,
-        }
-      : null,
-    suppress !== 'telegram' && !telegramLinked
-      ? {
-          title: 'Привяжите Telegram',
-          text: 'Кабинет сможет найти старые покупки и присылать важные уведомления.',
-          href: '/dashboard/settings',
-          icon: <MessageCircleQuestion className="h-4 w-4" />,
-          tone: 'slate' as const,
-        }
-      : null,
-  ].filter(Boolean).slice(0, 1) as Array<{
-    title: string
-    text: string
-    href: string
-    external?: boolean
-    icon: ReactElement
-    tone: 'amber' | 'cyan' | 'slate'
-  }>
-
-  if (items.length === 0) return null
-
-  return (
-    <section>
-      {items.map((item) => (
-        <Link
-          key={item.title}
-          href={item.href}
-          target={item.external ? '_blank' : undefined}
-          rel={item.external ? 'noreferrer' : undefined}
-          className={cn(
-            'group flex min-h-16 items-center gap-3 border-y px-1 py-3 transition-colors',
-            insightTone(item.tone)
-          )}
-        >
-          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white/70 text-current ring-1 ring-black/[0.04] dark:bg-white/[0.06] dark:ring-white/10">
-            {item.icon}
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block text-sm font-semibold text-slate-950 dark:text-white">{item.title}</span>
-            <span className="mt-0.5 block text-xs leading-5 opacity-80">{item.text}</span>
-          </span>
-          <ArrowRight className="h-4 w-4 shrink-0 transition-transform group-hover:translate-x-0.5" />
-        </Link>
-      ))}
-    </section>
-  )
-}
-
-function insightTone(tone: 'amber' | 'cyan' | 'slate') {
-  if (tone === 'amber') return 'border-amber-200 text-amber-800 dark:border-amber-500/25 dark:text-amber-100'
-  if (tone === 'cyan') return 'border-cyan-200 text-cyan-800 dark:border-cyan-500/25 dark:text-cyan-100'
-  return 'border-slate-200 text-slate-600 dark:border-white/10 dark:text-slate-300'
-}
-
-function getTrafficPercent(used: bigint, limit: bigint, unlimited: boolean) {
-  if (unlimited || limit <= 0n) return null
-  return Math.min(100, Math.max(0, Number((used * 100n) / limit)))
 }
 
 function dashboardDisplayName(name: string | null, email: string) {

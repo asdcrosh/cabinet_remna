@@ -472,6 +472,10 @@ textarea:focus {
   grid-template-columns: minmax(0, 1.15fr) minmax(20rem, 0.85fr);
 }
 
+.access-overview--focused .access-overview__body {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .access-overview__remaining {
   min-width: 0;
   padding: clamp(1.45rem, 2.7vw, 2.25rem);
@@ -665,6 +669,53 @@ textarea:focus {
 
 .connection-access-summary__metrics > * + * {
   border-left: 1px solid var(--app-border);
+}
+
+.connection-client-check {
+  border-top: 1px solid var(--app-border);
+  border-bottom: 1px solid var(--app-border);
+  padding: 1rem 0;
+}
+
+.connection-client-check__icon {
+  display: grid;
+  width: 2.25rem;
+  height: 2.25rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 0.75rem;
+  background: color-mix(in srgb, var(--app-accent) 9%, var(--app-surface));
+  color: var(--app-accent);
+}
+
+.connection-client-check__result {
+  display: flex;
+  gap: 0.6rem;
+  margin-top: 0.85rem;
+  padding: 0.75rem 0.85rem;
+  border-radius: 0.8rem;
+}
+
+.connection-client-check__result--connected {
+  background: color-mix(in srgb, #10b981 10%, var(--app-surface));
+  color: color-mix(in srgb, #047857 85%, var(--app-text));
+}
+
+.connection-client-check__result--waiting,
+.connection-client-check__result--stopped,
+.connection-client-check__result--error {
+  background: color-mix(in srgb, #f59e0b 10%, var(--app-surface));
+  color: color-mix(in srgb, #92400e 82%, var(--app-text));
+}
+
+.dark .connection-client-check__result--connected {
+  color: #a7f3d0;
+}
+
+.dark .connection-client-check__result--waiting,
+.dark .connection-client-check__result--stopped,
+.dark .connection-client-check__result--error {
+  color: #fde68a;
 }
 
 .device-panel {
