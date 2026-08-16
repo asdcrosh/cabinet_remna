@@ -1,7 +1,7 @@
 import type { NodeProvisioningEvent, NodeProvisioningJob, Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
-import { remnawave } from '@/lib/remnawave'
-import type { RemnawaveConfigProfileInbound, RemnawaveHost } from '@/lib/remnawave'
+import { remnawave, RemnawaveError } from '@/lib/remnawave'
+import type { RemnawaveHost, RemnawaveNodeInbound } from '@/lib/remnawave'
 import { encryptNodeProvisioningSecret } from '@/lib/node-provisioning-crypto'
 import { buildProvisioningFqdn } from '@/lib/node-provisioning-validation'
 
@@ -147,12 +147,12 @@ export async function getNodeProvisioningTemplates() {
 }
 
 async function loadNodeProvisioningTemplates() {
-  const [{ response }, inboundsResult] = await Promise.all([
+  const [{ response }, profileInbounds] = await Promise.all([
     remnawave.getHosts(),
-    remnawave.getConfigProfileInbounds(),
+    loadNodeProvisioningInbounds(),
   ])
-  const inbounds = new Map(
-    inboundsResult.response.inbounds.map((inbound) => [inbound.uuid, inbound])
+  const inbounds = new Map<string, RemnawaveNodeInbound>(
+    profileInbounds.flatMap((inbound) => inbound.uuid ? [[inbound.uuid, inbound]] : [])
   )
   return {
     tcpTemplateHostUuid: process.env.NODE_PROVISIONING_TCP_TEMPLATE_HOST_UUID?.trim() || null,
@@ -172,6 +172,16 @@ async function loadNodeProvisioningTemplates() {
       isHidden: host.isHidden ?? false,
       configProfileUuid: host.inbound.configProfileUuid ?? null,
     })),
+  }
+}
+
+async function loadNodeProvisioningInbounds(): Promise<RemnawaveNodeInbound[]> {
+  try {
+    return (await remnawave.getConfigProfileInbounds()).response.inbounds
+  } catch (error) {
+    if (!(error instanceof RemnawaveError) || ![403, 404].includes(error.status)) throw error
+    const { response: nodes } = await remnawave.getNodes()
+    return nodes.flatMap((node) => node.configProfile?.activeInbounds ?? [])
   }
 }
 
@@ -224,7 +234,7 @@ function serializeNodeProvisioningEvent(event: Pick<NodeProvisioningEvent, 'id' 
 
 export function inferHostKind(
   host: Pick<RemnawaveHost, 'remark' | 'path' | 'port' | 'xhttpExtraParams'>,
-  inbound?: Pick<RemnawaveConfigProfileInbound, 'network' | 'rawInbound'>
+  inbound?: Pick<RemnawaveNodeInbound, 'network' | 'rawInbound'>
 ) {
   const network = String(
     inbound?.network ?? inbound?.rawInbound?.streamSettings?.network ?? ''
