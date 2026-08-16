@@ -1,9 +1,11 @@
 'use client'
 
-import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { FormEvent, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import {
   AlertTriangle,
+  Check,
   CheckCircle2,
+  ChevronDown,
   ChevronRight,
   Circle,
   CircleDot,
@@ -13,6 +15,7 @@ import {
   Loader2,
   RefreshCw,
   Rocket,
+  Search,
   Server,
   ShieldCheck,
   Terminal,
@@ -92,6 +95,8 @@ type ProvisioningTemplates = {
     isDisabled?: boolean
   }>
 }
+
+type ProvisioningTemplateHost = NonNullable<ProvisioningTemplates['hosts']>[number]
 
 type FormState = {
   nodeName: string
@@ -191,6 +196,10 @@ export function NodeProvisioningPanel() {
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (submitting) return
+    if (!form.tcpTemplateHostUuid || !form.xhttpTemplateHostUuid) {
+      setSubmitError('Выберите TCP- и XHTTP-шаблоны из списка')
+      return
+    }
 
     setSubmitting(true)
     setSubmitError(null)
@@ -372,32 +381,18 @@ export function NodeProvisioningPanel() {
               <legend className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-950 dark:text-white">
                 <Globe2 className="h-4 w-4 text-slate-400" /> Шаблоны хостов
               </legend>
-              <Field label="UUID TCP-шаблона">
-                <input
-                  name="tcpTemplateHostUuid"
-                  list="node-provisioning-tcp-templates"
-                  className="input font-mono text-sm"
-                  value={form.tcpTemplateHostUuid}
-                  onChange={(event) => updateForm('tcpTemplateHostUuid', event.target.value)}
-                  placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-                  autoComplete="off"
-                  required
-                />
-                <TemplateOptions id="node-provisioning-tcp-templates" templates={templates} kind="TCP" />
-              </Field>
-              <Field label="UUID XHTTP-шаблона">
-                <input
-                  name="xhttpTemplateHostUuid"
-                  list="node-provisioning-xhttp-templates"
-                  className="input font-mono text-sm"
-                  value={form.xhttpTemplateHostUuid}
-                  onChange={(event) => updateForm('xhttpTemplateHostUuid', event.target.value)}
-                  placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-                  autoComplete="off"
-                  required
-                />
-                <TemplateOptions id="node-provisioning-xhttp-templates" templates={templates} kind="XHTTP" />
-              </Field>
+              <TemplateHostPicker
+                kind="TCP"
+                hosts={templates?.hosts ?? []}
+                value={form.tcpTemplateHostUuid}
+                onChange={(uuid) => updateForm('tcpTemplateHostUuid', uuid)}
+              />
+              <TemplateHostPicker
+                kind="XHTTP"
+                hosts={templates?.hosts ?? []}
+                value={form.xhttpTemplateHostUuid}
+                onChange={(uuid) => updateForm('xhttpTemplateHostUuid', uuid)}
+              />
             </fieldset>
 
             {submitError ? (
@@ -417,11 +412,15 @@ export function NodeProvisioningPanel() {
             {templatesError ? (
               <div className="flex items-start gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-3.5 py-3 text-sm leading-5 text-amber-900 dark:border-amber-500/25 dark:bg-amber-500/10 dark:text-amber-100" role="status">
                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                <span>Список шаблонов недоступен. UUID можно ввести вручную. {templatesError}</span>
+                <span>Список шаблонов недоступен. Проверьте подключение к Remnawave и обновите страницу. {templatesError}</span>
               </div>
             ) : null}
 
-            <button type="submit" className="btn-primary min-h-12 w-full justify-center" disabled={submitting || configuration?.ready === false}>
+            <button
+              type="submit"
+              className="btn-primary min-h-12 w-full justify-center"
+              disabled={submitting || configuration?.ready === false || !form.tcpTemplateHostUuid || !form.xhttpTemplateHostUuid}
+            >
               {submitting ? <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" /> : <Rocket className="h-4 w-4" />}
               {submitting ? 'Запускаем создание...' : 'Создать и настроить ноду'}
             </button>
@@ -625,14 +624,175 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
   )
 }
 
-function TemplateOptions({ id, templates, kind }: { id: string; templates: ProvisioningTemplates | null; kind: 'TCP' | 'XHTTP' }) {
-  const hosts = templates?.hosts?.filter((host) => host.kind === kind && !host.isDisabled) ?? []
+function TemplateHostPicker({
+  kind,
+  hosts,
+  value,
+  onChange,
+}: {
+  kind: 'TCP' | 'XHTTP'
+  hosts: ProvisioningTemplateHost[]
+  value: string
+  onChange: (uuid: string) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState('')
+  const rootRef = useRef<HTMLDivElement>(null)
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const searchRef = useRef<HTMLInputElement>(null)
+  const panelId = useId()
+  const availableHosts = useMemo(
+    () => hosts.filter((host) => host.kind === kind),
+    [hosts, kind]
+  )
+  const selectedHost = hosts.find((host) => host.uuid === value)
+  const filteredHosts = useMemo(() => {
+    const normalizedQuery = query.trim().toLocaleLowerCase('ru-RU')
+    if (!normalizedQuery) return availableHosts
+    return availableHosts.filter((host) => [
+      host.remark,
+      host.address,
+      String(host.port),
+      host.uuid,
+    ].some((field) => field.toLocaleLowerCase('ru-RU').includes(normalizedQuery)))
+  }, [availableHosts, query])
+
+  useEffect(() => {
+    if (!open) return
+    searchRef.current?.focus()
+
+    function onPointerDown(event: PointerEvent) {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false)
+    }
+
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key !== 'Escape') return
+      setOpen(false)
+      triggerRef.current?.focus()
+    }
+
+    document.addEventListener('pointerdown', onPointerDown)
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown)
+      document.removeEventListener('keydown', onKeyDown)
+    }
+  }, [open])
+
   return (
-    <datalist id={id}>
-      {hosts.map((host) => (
-        <option key={host.uuid} value={host.uuid}>{host.remark} · {host.address}:{host.port}</option>
-      ))}
-    </datalist>
+    <div ref={rootRef} className="min-w-0">
+      <div className="mb-1.5 flex items-center justify-between gap-2">
+        <span className="text-sm font-medium">{kind}-шаблон</span>
+        <span className="text-xs text-slate-400">{availableHosts.length} в списке</span>
+      </div>
+      <button
+        ref={triggerRef}
+        type="button"
+        className={cn(
+          'flex min-h-14 w-full items-center gap-3 rounded-xl border bg-white px-3 py-2.5 text-left transition-colors dark:bg-white/[0.025]',
+          open
+            ? 'border-cyan-500 ring-2 ring-cyan-500/15'
+            : 'border-slate-200 hover:border-slate-300 dark:border-white/10 dark:hover:border-white/20'
+        )}
+        aria-label={`Выбрать ${kind}-шаблон`}
+        aria-expanded={open}
+        aria-controls={panelId}
+        aria-haspopup="listbox"
+        onClick={() => {
+          setOpen((current) => !current)
+          setQuery('')
+        }}
+      >
+        <span className={cn(
+          'grid h-8 min-w-12 shrink-0 place-items-center rounded-lg px-2 font-mono text-xs font-semibold',
+          kind === 'TCP'
+            ? 'bg-cyan-50 text-cyan-700 dark:bg-cyan-400/10 dark:text-cyan-200'
+            : 'bg-violet-50 text-violet-700 dark:bg-violet-400/10 dark:text-violet-200'
+        )}>
+          {kind}
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className={cn('block truncate text-sm font-semibold', !selectedHost && !value && 'text-slate-500')}>
+            {selectedHost?.remark || (value ? 'Шаблон из настроек' : `Выберите ${kind}-host`)}
+          </span>
+          <span className="mt-0.5 block truncate font-mono text-xs text-slate-500">
+            {selectedHost ? `${selectedHost.address}:${selectedHost.port}` : value || 'Поиск по имени или адресу'}
+          </span>
+        </span>
+        <ChevronDown className={cn('h-4 w-4 shrink-0 text-slate-400 transition-transform', open && 'rotate-180')} />
+      </button>
+
+      {open ? (
+        <div id={panelId} className="mt-2 overflow-hidden rounded-2xl border border-slate-200 bg-slate-50/80 shadow-sm dark:border-white/10 dark:bg-slate-950/40">
+          <div className="border-b border-slate-200 p-2.5 dark:border-white/10">
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input
+                ref={searchRef}
+                type="search"
+                className="input min-h-10 bg-white pl-9 text-sm dark:bg-white/[0.04]"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Имя, домен, порт или UUID"
+                aria-label={`Поиск ${kind}-шаблона`}
+                autoComplete="off"
+              />
+            </div>
+          </div>
+          <div className="max-h-64 overflow-y-auto p-1.5" role="listbox" aria-label={`${kind}-шаблоны`}>
+            {filteredHosts.length ? filteredHosts.map((host) => {
+              const selected = host.uuid === value
+              return (
+                <button
+                  key={host.uuid}
+                  type="button"
+                  role="option"
+                  aria-selected={selected}
+                  className={cn(
+                    'flex w-full items-start gap-2.5 rounded-xl px-3 py-2.5 text-left transition-colors',
+                    selected
+                      ? 'bg-cyan-50 text-cyan-950 dark:bg-cyan-400/10 dark:text-cyan-50'
+                      : 'hover:bg-white dark:hover:bg-white/[0.05]'
+                  )}
+                  onClick={() => {
+                    onChange(host.uuid)
+                    setOpen(false)
+                    setQuery('')
+                    triggerRef.current?.focus()
+                  }}
+                >
+                  <span className={cn(
+                    'mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full border',
+                    selected
+                      ? 'border-cyan-500 bg-cyan-500 text-white'
+                      : 'border-slate-300 text-transparent dark:border-slate-600'
+                  )}>
+                    <Check className="h-3 w-3" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="flex flex-wrap items-center gap-1.5">
+                      <span className="break-words text-sm font-semibold">{host.remark}</span>
+                      {host.isDisabled ? (
+                        <span className="rounded-md bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800 dark:bg-amber-400/10 dark:text-amber-200">
+                          отключён
+                        </span>
+                      ) : null}
+                    </span>
+                    <span className="mt-0.5 block break-all font-mono text-xs text-slate-500">
+                      {host.address}:{host.port}
+                    </span>
+                  </span>
+                </button>
+              )
+            }) : (
+              <div className="px-3 py-6 text-center text-sm text-slate-500">
+                {availableHosts.length ? 'По этому запросу ничего не найдено' : `${kind}-шаблоны не найдены в Remnawave`}
+              </div>
+            )}
+          </div>
+        </div>
+      ) : null}
+    </div>
   )
 }
 

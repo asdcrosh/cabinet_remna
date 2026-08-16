@@ -54,11 +54,11 @@ test('суперадмин запускает создание ноды и ви�
         jobs,
         configuration: { ready: true, missing: [] },
         templates: {
-          tcpTemplateHostUuid: tcpTemplateUuid,
-          xhttpTemplateHostUuid: xhttpTemplateUuid,
+          tcpTemplateHostUuid: null,
+          xhttpTemplateHostUuid: null,
           hosts: [
             { uuid: tcpTemplateUuid, remark: 'TCP template', address: 'tcp.example.com', port: 10443, kind: 'TCP' },
-            { uuid: xhttpTemplateUuid, remark: 'XHTTP template', address: 'xhttp.example.com', port: 443, kind: 'XHTTP' },
+            { uuid: xhttpTemplateUuid, remark: 'XHTTP template', address: 'xhttp.example.com', port: 443, kind: 'XHTTP', isDisabled: true },
           ],
         },
       }),
@@ -73,8 +73,13 @@ test('суперадмин запускает создание ноды и ви�
   await page.getByLabel('Имя ноды').fill('nl-07')
   await page.getByLabel('IP-адрес').fill('1.1.1.1')
   await page.getByLabel('SSH-пароль').fill('E2e-node-password')
-  await expect(page.getByLabel('UUID TCP-шаблона')).toHaveValue(tcpTemplateUuid)
-  await expect(page.getByLabel('UUID XHTTP-шаблона')).toHaveValue(xhttpTemplateUuid)
+  await page.getByRole('button', { name: 'Выбрать TCP-шаблон' }).click()
+  await page.getByRole('searchbox', { name: 'Поиск TCP-шаблона' }).fill('tcp.example.com')
+  await page.getByRole('option', { name: /TCP template/ }).click()
+  await page.getByRole('button', { name: 'Выбрать XHTTP-шаблон' }).click()
+  await page.getByRole('searchbox', { name: 'Поиск XHTTP-шаблона' }).fill('XHTTP template')
+  await page.getByRole('option', { name: /XHTTP template/ }).click()
+  await expect(page.getByRole('button', { name: 'Создать и настроить ноду' })).toBeEnabled()
   await page.getByRole('button', { name: 'Создать и настроить ноду' }).click()
 
   await expect(page.getByText('Создание ноды запущено')).toBeVisible()
