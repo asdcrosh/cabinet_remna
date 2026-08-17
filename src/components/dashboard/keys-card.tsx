@@ -199,12 +199,12 @@ export function KeysCard({
       <header className="flex items-start justify-between gap-4 border-b border-slate-200 p-4 dark:border-white/10 sm:p-5">
         <div className="min-w-0">
           <h2 id="connection-title" className="text-lg font-semibold tracking-tight text-slate-950 dark:text-white">
-            {onboarding ? 'Подключите первое устройство' : 'Подключить устройство'}
+            {onboarding ? 'Подключите первое устройство' : 'Подключить ещё устройство'}
           </h2>
           <p className="mt-1 text-sm leading-5 text-slate-500 dark:text-slate-400">
             {onboarding
               ? 'Три коротких шага. После проверки откроется управление устройствами.'
-              : 'Установите INCY и добавьте подписку одной кнопкой.'}
+              : 'Откройте подписку на новом устройстве. Текущие подключения сохранятся.'}
           </p>
         </div>
         <span className="inline-flex min-w-0 shrink-0 items-center gap-2 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-500 dark:border-white/10 dark:text-slate-400">
@@ -320,7 +320,7 @@ export function KeysCard({
           <div className="mt-4 grid gap-2 sm:grid-cols-2">
             <button type="button" onClick={openInApp} disabled={!subscriptionUrl} className="btn-primary w-full justify-center">
               <ExternalLink className="h-4 w-4" />
-              Открыть в {selectedApp.name}
+              Подключить ещё в {selectedApp.name}
             </button>
             <a href={selectedInstallUrl} target="_blank" rel="noreferrer" className="btn-secondary w-full justify-center">
               <Download className="h-4 w-4" />
