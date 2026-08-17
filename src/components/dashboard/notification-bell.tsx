@@ -9,6 +9,7 @@ import type { UserNotificationView } from '@/lib/user-notifications'
 import type { AdminNotificationView } from '@/lib/admin-notifications'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { toast } from '@/components/ui/toaster'
+import { fetchNotificationSummary } from '@/lib/notification-summary-client'
 
 const NOTIFICATION_REFRESH_MS = 60_000
 const NOTIFICATION_REQUEST_TIMEOUT_MS = 10_000
@@ -57,28 +58,23 @@ export function NotificationBell({ showAdmin = false }: { showAdmin?: boolean })
     if (refreshInFlightRef.current) return
     refreshInFlightRef.current = true
     try {
-      const signal = AbortSignal.timeout(NOTIFICATION_REQUEST_TIMEOUT_MS)
-      const [userRes, adminRes] = await Promise.all([
-        fetch('/api/notifications/summary', { cache: 'no-store', signal }),
+      const [userData, adminData] = await Promise.all([
+        fetchNotificationSummary<UserNotificationView>('/api/notifications/summary'),
         showAdmin
-          ? fetch('/api/admin/notifications/summary', { cache: 'no-store', signal })
+          ? fetchNotificationSummary<AdminNotificationView>('/api/admin/notifications/summary')
           : Promise.resolve(null),
       ])
-      const data = await userRes.json().catch(() => null)
-      if (userRes.ok && data) {
+      if (userData) {
         setSummary({
-          unreadCount: Number(data.unreadCount || 0),
-          notifications: Array.isArray(data.notifications) ? data.notifications : [],
+          unreadCount: userData.unreadCount,
+          notifications: userData.notifications,
         })
       }
-      if (adminRes) {
-        const adminData = await adminRes.json().catch(() => null)
-        if (adminRes.ok && adminData) {
-          setAdminSummary({
-            unreadCount: Number(adminData.unreadCount || 0),
-            notifications: Array.isArray(adminData.notifications) ? adminData.notifications : [],
-          })
-        }
+      if (adminData) {
+        setAdminSummary({
+          unreadCount: adminData.unreadCount,
+          notifications: adminData.notifications,
+        })
       }
     } catch {
       // Silent polling. The last known state is enough for the header.

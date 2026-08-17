@@ -15,6 +15,7 @@ import { BrandLogo } from '@/components/brand-logo'
 import { useBodyScrollLock } from '@/lib/use-body-scroll-lock'
 import { useDialogFocus } from '@/lib/use-dialog-focus'
 import type { FeatureFlags } from '@/lib/feature-flags'
+import { fetchNotificationSummary } from '@/lib/notification-summary-client'
 import { LogoutButton } from './logout-button'
 import {
   adminNavigationGroups,
@@ -560,7 +561,10 @@ function useLiveBadges(initialBadges: NavBadges, supportEnabled: boolean, showAd
 
     async function refreshBadges() {
       try {
-        const res = await fetch('/api/support/summary', { cache: 'no-store' })
+        const res = await fetch('/api/support/summary', {
+          cache: 'no-store',
+          headers: { 'x-error-presentation': 'silent' },
+        })
         const data = await res.json().catch(() => null)
         if (active && res.ok && data?.badges) {
           setBadges(data.badges)
@@ -600,8 +604,8 @@ function useLiveBadges(initialBadges: NavBadges, supportEnabled: boolean, showAd
       if (!active) return
 
       const updates: NavBadges = {}
-      if (userSummary !== null) updates['/dashboard/notifications'] = userSummary
-      if (adminSummary !== null) updates['/dashboard/admin/notifications'] = adminSummary
+      if (userSummary !== null) updates['/dashboard/notifications'] = userSummary.unreadCount
+      if (adminSummary !== null) updates['/dashboard/admin/notifications'] = adminSummary.unreadCount
       if (Object.keys(updates).length > 0) {
         setBadges((current) => ({ ...current, ...updates }))
       }
@@ -617,18 +621,6 @@ function useLiveBadges(initialBadges: NavBadges, supportEnabled: boolean, showAd
   }, [showAdmin])
 
   return badges
-}
-
-async function fetchNotificationSummary(url: string) {
-  try {
-    const response = await fetch(url, { cache: 'no-store' })
-    const data = await response.json().catch(() => null)
-    if (!response.ok || !data) return null
-    const unreadCount = Number(data.unreadCount)
-    return Number.isFinite(unreadCount) && unreadCount >= 0 ? unreadCount : null
-  } catch {
-    return null
-  }
 }
 
 function useNavBadgeValues(fallback: NavBadges) {
