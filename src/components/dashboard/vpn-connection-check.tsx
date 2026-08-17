@@ -16,10 +16,22 @@ type Device = {
 type CheckState =
   | { status: 'idle' }
   | { status: 'loading' }
-  | { status: 'connected'; deviceCount: number; checkedAt: string }
+  | { status: 'vpn'; deviceCount: number; checkedAt: string; publicIp: string; nodeName: string; country: string | null }
+  | { status: 'direct'; checkedAt: string; publicIp: string }
   | { status: 'waiting'; checkedAt: string }
   | { status: 'stopped'; checkedAt: string }
+  | { status: 'unknown'; checkedAt: string; message: string }
   | { status: 'error'; message: string }
+
+type VpnCheckResponse = {
+  status: 'vpn' | 'direct' | 'unknown'
+  publicIp?: string
+  message?: string
+  node?: {
+    name: string
+    country: string | null
+  } | null
+}
 
 export function VpnConnectionCheck({ supportEnabled }: { supportEnabled: boolean }) {
   const [state, setState] = useState<CheckState>({ status: 'idle' })
@@ -28,9 +40,10 @@ export function VpnConnectionCheck({ supportEnabled }: { supportEnabled: boolean
     setState({ status: 'loading' })
 
     try {
-      const [subscriptionResponse, devicesResponse] = await Promise.all([
+      const [subscriptionResponse, devicesResponse, vpnResponse] = await Promise.all([
         apiFetch<{ subscription: { status?: string | null } | null; warning?: string }>('/api/subscription?refresh=1'),
         apiFetch<{ devices: Device[] }>('/api/devices'),
+        apiFetch<VpnCheckResponse>('/api/vpn-check', { cache: 'no-store' }),
       ])
       const checkedAt = new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
 
@@ -45,8 +58,29 @@ export function VpnConnectionCheck({ supportEnabled }: { supportEnabled: boolean
       }
 
       const activeDevices = devicesResponse.devices.filter((device) => isActiveToday(device.updatedAt ?? device.createdAt))
-      if (activeDevices.length > 0) {
-        setState({ status: 'connected', deviceCount: activeDevices.length, checkedAt })
+      if (vpnResponse.status === 'vpn' && vpnResponse.publicIp && vpnResponse.node) {
+        setState({
+          status: 'vpn',
+          deviceCount: activeDevices.length,
+          checkedAt,
+          publicIp: vpnResponse.publicIp,
+          nodeName: vpnResponse.node.name,
+          country: vpnResponse.node.country,
+        })
+        return
+      }
+
+      if (vpnResponse.status === 'direct' && vpnResponse.publicIp) {
+        setState({ status: 'direct', publicIp: vpnResponse.publicIp, checkedAt })
+        return
+      }
+
+      if (vpnResponse.status === 'unknown') {
+        setState({
+          status: 'unknown',
+          checkedAt,
+          message: vpnResponse.message || 'Не удалось сопоставить внешний IP с доступными нодами.',
+        })
         return
       }
 
@@ -66,7 +100,7 @@ export function VpnConnectionCheck({ supportEnabled }: { supportEnabled: boolean
         <div className="min-w-0 flex-1">
           <div className="text-sm font-semibold text-slate-950 dark:text-white">Проверить VPN</div>
           <p className="mt-0.5 text-xs leading-5 text-slate-500 dark:text-slate-400">
-            Проверим подписку и увидим, дошло ли подключение с вашего устройства до сервера.
+            Проверим, идёт ли запрос этого устройства к кабинету через VPN-ноду.
           </p>
         </div>
         <button
@@ -76,23 +110,29 @@ export function VpnConnectionCheck({ supportEnabled }: { supportEnabled: boolean
           disabled={state.status === 'loading'}
         >
           {state.status === 'loading' ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-          Проверить
+          Проверить сейчас
         </button>
       </div>
 
       {state.status !== 'idle' && state.status !== 'loading' && (
         <div className={`connection-client-check__result connection-client-check__result--${state.status}`}>
-          {state.status === 'connected' && <CheckCircle2 className="h-4 w-4 shrink-0" />}
-          {(state.status === 'waiting' || state.status === 'stopped' || state.status === 'error') && <ShieldAlert className="h-4 w-4 shrink-0" />}
+          {state.status === 'vpn' && <CheckCircle2 className="h-4 w-4 shrink-0" />}
+          {(state.status === 'direct' || state.status === 'waiting' || state.status === 'stopped' || state.status === 'unknown' || state.status === 'error') && <ShieldAlert className="h-4 w-4 shrink-0" />}
           <div className="min-w-0 text-xs leading-5">
-            {state.status === 'connected' && (
-              <><strong>VPN работает.</strong> Сегодня сервер уже видел активность: {state.deviceCount} {pluralDevices(state.deviceCount)}. Проверено в {state.checkedAt}.</>
+            {state.status === 'vpn' && (
+              <><strong>VPN подключён.</strong> Этот браузер выходит через ноду «{state.nodeName}»{state.country ? `, ${state.country}` : ''}. IP: {state.publicIp}. {state.deviceCount > 0 && `Активных сегодня устройств: ${state.deviceCount} ${pluralDevices(state.deviceCount)}. `}Проверено в {state.checkedAt}.</>
+            )}
+            {state.status === 'direct' && (
+              <><strong>Кабинет открыт напрямую.</strong> Внешний IP устройства: {state.publicIp}. Включите VPN в INCY, обновите страницу и проверьте снова.</>
             )}
             {state.status === 'waiting' && (
               <><strong>Подписка готова, но подключения пока не видно.</strong> Включите VPN в INCY, откройте любой сайт, подождите несколько секунд и проверьте снова. Проверено в {state.checkedAt}.</>
             )}
             {state.status === 'stopped' && (
               <><strong>Доступ сейчас не активен.</strong> Продлите подписку, затем снова включите VPN в INCY. Проверено в {state.checkedAt}.</>
+            )}
+            {state.status === 'unknown' && (
+              <><strong>Не удалось подтвердить маршрут через VPN.</strong> {state.message} Проверьте, что INCY включён, и повторите попытку.</>
             )}
             {state.status === 'error' && (
               <><strong>Проверка не завершилась.</strong> {state.message} {supportEnabled && <Link href="/dashboard/support" className="underline underline-offset-2">Написать в поддержку</Link>}</>

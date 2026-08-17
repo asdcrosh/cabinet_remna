@@ -696,24 +696,28 @@ textarea:focus {
   border-radius: 0.8rem;
 }
 
-.connection-client-check__result--connected {
+.connection-client-check__result--vpn {
   background: color-mix(in srgb, #10b981 10%, var(--app-surface));
   color: color-mix(in srgb, #047857 85%, var(--app-text));
 }
 
+.connection-client-check__result--direct,
 .connection-client-check__result--waiting,
 .connection-client-check__result--stopped,
+.connection-client-check__result--unknown,
 .connection-client-check__result--error {
   background: color-mix(in srgb, #f59e0b 10%, var(--app-surface));
   color: color-mix(in srgb, #92400e 82%, var(--app-text));
 }
 
-.dark .connection-client-check__result--connected {
+.dark .connection-client-check__result--vpn {
   color: #a7f3d0;
 }
 
+.dark .connection-client-check__result--direct,
 .dark .connection-client-check__result--waiting,
 .dark .connection-client-check__result--stopped,
+.dark .connection-client-check__result--unknown,
 .dark .connection-client-check__result--error {
   color: #fde68a;
 }
