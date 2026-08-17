@@ -141,8 +141,11 @@ export function KeysCard({
   const selectedInstallUrl = typeof selectedApp.installUrl === 'function'
     ? selectedApp.installUrl(device)
     : selectedApp.installUrl
-  const isIncyFlow = selectedApp.id === 'incy' && defaultApp.devices.includes(device)
-  const alternativeApps = compatibleApps.filter((option) => option.id !== 'incy')
+
+  function selectDevice(nextDevice: Device) {
+    setDevice(nextDevice)
+    setSelectedAppId(recommendedAppForDevice(nextDevice).id)
+  }
 
   async function copy(text: string, label = 'Ссылка') {
     if (!text) return
@@ -207,10 +210,23 @@ export function KeysCard({
               : 'Откройте подписку на новом устройстве. Текущие подключения сохранятся.'}
           </p>
         </div>
-        <span className="inline-flex min-w-0 shrink-0 items-center gap-2 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-500 dark:border-white/10 dark:text-slate-400">
-          <DeviceIcon device={device} />
-          <span className="max-w-28 truncate">{deviceLabel(device)}</span>
-        </span>
+        <label className="connection-device-picker">
+          <span className="connection-device-picker__label">Устройство</span>
+          <span className="connection-device-picker__control">
+            <DeviceIcon device={device} />
+            <select
+              aria-label="Устройство для подключения"
+              value={device}
+              onChange={(event) => selectDevice(event.target.value as Device)}
+            >
+              <option value="macos">macOS</option>
+              <option value="ios">iPhone / iPad</option>
+              <option value="android">Android</option>
+              <option value="windows">Windows</option>
+              <option value="desktop">Другой компьютер</option>
+            </select>
+          </span>
+        </label>
       </header>
 
       <div className="p-4 sm:p-5">
@@ -261,101 +277,74 @@ export function KeysCard({
               <VpnConnectionCheck supportEnabled={supportEnabled} onVerified={finishFirstConnection} />
             </div>
           </div>
-        ) : isIncyFlow ? (
-          <div className="connection-incy-flow">
-            <div className="flex min-w-0 items-center gap-3">
-              <span className="connection-incy-flow__icon">
-                <ShieldCheck className="h-5 w-5" />
-              </span>
-              <div className="min-w-0">
-                <div className="text-sm font-semibold text-slate-950 dark:text-white">INCY для {deviceLabel(device)}</div>
-                <p className="mt-0.5 text-xs leading-5 text-slate-500 dark:text-slate-400">Подписка добавляется в приложение одним действием.</p>
+        ) : (
+          <div className="connection-connect">
+            <div className="connection-connect__hero">
+              <div className="connection-connect__app">
+                <span className="connection-connect__icon">
+                  <SelectedAppIcon className="h-5 w-5" />
+                </span>
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="text-base font-semibold text-slate-950 dark:text-white">{selectedApp.name}</h3>
+                    {selectedIsRecommended && <span className="connection-connect__badge">Рекомендуем</span>}
+                  </div>
+                  <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                    Для {deviceLabel(device)}. Текущие устройства останутся подключёнными.
+                  </p>
+                </div>
+              </div>
+
+              <div className="connection-connect__actions">
+                <button type="button" onClick={openInApp} disabled={!subscriptionUrl} className="btn-primary justify-center">
+                  <ExternalLink className="h-4 w-4" />
+                  Подключить в {selectedApp.name}
+                </button>
+                <a href={selectedInstallUrl} target="_blank" rel="noreferrer" className="btn-secondary justify-center">
+                  <Download className="h-4 w-4" />
+                  {installButtonLabel(selectedApp, device)}
+                </a>
               </div>
             </div>
 
-            <ol className="connection-incy-flow__steps" aria-label="Шаги подключения">
-              <li><span>1</span>Установите INCY</li>
-              <li><span>2</span>Откройте подписку</li>
-              <li><span>3</span>Включите VPN</li>
+            <ol className="connection-connect__steps" aria-label="Шаги подключения">
+              <li><span>1</span><div><strong>Установите</strong><small>{selectedApp.name}</small></div></li>
+              <li><span>2</span><div><strong>Добавьте доступ</strong><small>Одним нажатием</small></div></li>
+              <li><span>3</span><div><strong>Включите VPN</strong><small>Готово к работе</small></div></li>
             </ol>
 
-            {alternativeApps.length > 0 && (
-              <details className="connection-alternatives">
-                <summary>Другие приложения</summary>
-                <div className="mt-2 grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="Другое приложение для подключения">
-                  {alternativeApps.map((option) => (
-                    <AppChoice key={option.id} option={option} selected={false} onSelect={() => setSelectedAppId(option.id)} />
+            <div className="connection-connect__tools" aria-label="Другие способы подключения">
+              <button type="button" onClick={() => copy(subscriptionUrl, 'Ссылка подписки')} disabled={!subscriptionUrl}>
+                {copied ? <CheckCircle2 className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
+                {copied ? 'Ссылка скопирована' : 'Скопировать ссылку'}
+              </button>
+              <button type="button" onClick={() => setQrOpen(true)}>
+                <QrCode className="h-4 w-4" />
+                Показать QR-код
+              </button>
+              <button type="button" onClick={() => setInstructionsOpen(true)}>
+                <HelpCircle className="h-4 w-4" />
+                Открыть инструкцию
+              </button>
+            </div>
+
+            {compatibleApps.length > 1 && (
+              <details className="connection-alternatives connection-connect__alternatives">
+                <summary>Выбрать другое приложение</summary>
+                <div className="mt-3 grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="Приложение для подключения">
+                  {compatibleApps.map((option) => (
+                    <AppChoice
+                      key={option.id}
+                      option={option}
+                      selected={option.id === selectedApp.id}
+                      onSelect={() => setSelectedAppId(option.id)}
+                    />
                   ))}
                 </div>
               </details>
             )}
           </div>
-        ) : (
-          <div className="grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="Приложение для подключения">
-            {compatibleApps.map((option) => (
-              <AppChoice
-                key={option.id}
-                option={option}
-                selected={option.id === selectedApp.id}
-                onSelect={() => setSelectedAppId(option.id)}
-              />
-            ))}
-          </div>
         )}
-
-        {!onboarding && <>
-          <div className="mt-5 flex min-w-0 items-start gap-3 border-t border-dashed border-slate-300 pt-5 dark:border-white/15">
-            <SelectedAppIcon className="mt-0.5 h-5 w-5 shrink-0 text-cyan-600 dark:text-cyan-300" />
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <h3 className="text-base font-semibold text-slate-950 dark:text-white">{selectedApp.name}</h3>
-                {selectedIsRecommended && (
-                  <span className="text-xs font-medium text-cyan-700 dark:text-cyan-200">подходит устройству</span>
-                )}
-              </div>
-              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{selectedApp.subtitle}</p>
-            </div>
-          </div>
-
-          <div className="mt-4 grid gap-2 sm:grid-cols-2">
-            <button type="button" onClick={openInApp} disabled={!subscriptionUrl} className="btn-primary w-full justify-center">
-              <ExternalLink className="h-4 w-4" />
-              Подключить ещё в {selectedApp.name}
-            </button>
-            <a href={selectedInstallUrl} target="_blank" rel="noreferrer" className="btn-secondary w-full justify-center">
-              <Download className="h-4 w-4" />
-              {installButtonLabel(selectedApp, device)}
-            </a>
-          </div>
-
-          <div className="mt-2 grid grid-cols-3 gap-2">
-          <button
-            type="button"
-            onClick={() => copy(subscriptionUrl, 'Ссылка подписки')}
-            disabled={!subscriptionUrl}
-            className="inline-flex min-h-10 min-w-0 items-center justify-center gap-1.5 rounded-lg px-2 text-xs font-semibold text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-950 disabled:cursor-not-allowed dark:text-slate-400 dark:hover:bg-white/[0.06] dark:hover:text-white"
-          >
-            {copied ? <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" /> : <Copy className="h-4 w-4 shrink-0" />}
-            <span className="truncate">{copied ? 'Готово' : 'Ссылка'}</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setQrOpen(true)}
-            className="inline-flex min-h-10 min-w-0 items-center justify-center gap-1.5 rounded-lg px-2 text-xs font-semibold text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-950 dark:text-slate-400 dark:hover:bg-white/[0.06] dark:hover:text-white"
-          >
-            <QrCode className="h-4 w-4 shrink-0" />
-            QR-код
-          </button>
-          <button
-            type="button"
-            onClick={() => setInstructionsOpen(true)}
-            className="inline-flex min-h-10 min-w-0 items-center justify-center gap-1.5 rounded-lg px-2 text-xs font-semibold text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-950 dark:text-slate-400 dark:hover:bg-white/[0.06] dark:hover:text-white"
-          >
-            <HelpCircle className="h-4 w-4 shrink-0" />
-            Инструкция
-          </button>
-          </div>
-        </>}
       </div>
 
       {!onboarding && <footer className="flex flex-col gap-2 border-t border-slate-200 px-4 py-3 text-xs text-slate-500 dark:border-white/10 dark:text-slate-400 sm:flex-row sm:items-center sm:justify-between sm:px-5">
