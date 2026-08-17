@@ -4,7 +4,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAuth, withAuth } from '@/lib/auth/guard'
-import { hasRemnawaveUserReference, RemnawaveError, remnawaveUserReference } from '@/lib/remnawave'
+import { hasRemnawaveUserReference, remnawave, RemnawaveError, remnawaveUserReference } from '@/lib/remnawave'
 import { syncLocalDevicesFromRemnawave } from '@/lib/remnawave-device-sync'
 
 export const runtime = 'nodejs'
@@ -26,6 +26,28 @@ export const GET = withAuth(async () => {
       return NextResponse.json(
         { devices: [], error: 'Не удалось загрузить устройства. Попробуйте позже.' },
         { status: 200 }
+      )
+    }
+    throw e
+  }
+})
+
+export const DELETE = withAuth(async () => {
+  const session = await requireAuth()
+  const user = await prisma.user.findUnique({ where: { id: session.uid } })
+  if (!user || !hasRemnawaveUserReference(user)) {
+    return NextResponse.json({ error: 'Нет активной подписки' }, { status: 404 })
+  }
+
+  try {
+    await remnawave.deleteAllUserDevices(remnawaveUserReference(user))
+    const result = await prisma.device.deleteMany({ where: { userId: user.id } })
+    return NextResponse.json({ ok: true, removed: result.count })
+  } catch (e) {
+    if (e instanceof RemnawaveError) {
+      return NextResponse.json(
+        { error: 'Не удалось отвязать устройства. Попробуйте позже.' },
+        { status: 502 }
       )
     }
     throw e

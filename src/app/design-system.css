@@ -812,6 +812,68 @@ textarea:focus {
   color: var(--app-signal) !important;
 }
 
+.device-limit-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.35rem;
+  margin-top: 0.6rem;
+  color: var(--app-muted);
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
+
+.device-limit-notice--warning {
+  color: #a16207;
+}
+
+.device-limit-notice--danger {
+  color: var(--app-danger);
+}
+
+.dark .device-limit-notice--warning {
+  color: #fcd34d;
+}
+
+.dark .device-limit-notice--danger {
+  color: #fca5a5;
+}
+
+.device-limit-notice--compact {
+  margin-top: 0.45rem;
+}
+
+.device-list-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+  border-top: 1px solid var(--app-border);
+  padding: 0.8rem 1rem;
+}
+
+.device-list-actions__add {
+  min-height: 2.25rem;
+  padding-inline: 0.75rem;
+  font-size: 0.8rem;
+}
+
+.device-list-actions__remove {
+  display: inline-flex;
+  min-height: 2.25rem;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.25rem 0.25rem;
+  color: var(--app-muted);
+  font-size: 0.75rem;
+  font-weight: 650;
+  transition: color 160ms ease;
+}
+
+.device-list-actions__remove:hover {
+  color: var(--app-danger);
+}
+
 .device-row {
   transition: background-color 180ms ease;
 }

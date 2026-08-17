@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
-import { Laptop, Loader2, Monitor, RefreshCw, Smartphone, Tablet, Unlink2 } from 'lucide-react'
+import { CircleAlert, Laptop, Loader2, Monitor, Plus, RefreshCw, Smartphone, Tablet, Trash2, Unlink2 } from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
 import { InlineAlert } from './empty-state'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
@@ -22,15 +22,18 @@ interface Device {
 interface DevicesListProps {
   embedded?: boolean
   deviceLimit?: number | null
+  subscriptionUrl?: string
 }
 
-export function DevicesList({ embedded = false, deviceLimit }: DevicesListProps = {}) {
+export function DevicesList({ embedded = false, deviceLimit, subscriptionUrl }: DevicesListProps = {}) {
   const [devices, setDevices] = useState<Device[] | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
   const [removingHwid, setRemovingHwid] = useState<string | null>(null)
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null)
+  const [bulkDialogOpen, setBulkDialogOpen] = useState(false)
+  const [bulkRemoving, setBulkRemoving] = useState(false)
 
   const loadDevices = useCallback(async () => {
     setLoadError(null)
@@ -62,6 +65,32 @@ export function DevicesList({ embedded = false, deviceLimit }: DevicesListProps 
     } finally {
       setRemovingHwid(null)
     }
+  }
+
+  async function removeAllDevices() {
+    setBulkRemoving(true)
+    setActionError(null)
+    try {
+      await apiFetch('/api/devices', { method: 'DELETE' })
+      setDevices([])
+      setBulkDialogOpen(false)
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : 'Не удалось отвязать устройства')
+    } finally {
+      setBulkRemoving(false)
+    }
+  }
+
+  function addDevice() {
+    if (!subscriptionUrl) {
+      window.location.assign('/dashboard/subscription#connection')
+      return
+    }
+
+    window.location.assign(`incy://import/${subscriptionUrl}`)
+    window.setTimeout(() => {
+      void navigator.clipboard?.writeText(subscriptionUrl).catch(() => undefined)
+    }, 500)
   }
 
   if (loadError && !devices) {
@@ -120,6 +149,7 @@ export function DevicesList({ embedded = false, deviceLimit }: DevicesListProps 
 
   const recentDevices = countRecentDevices(devices)
   const devicesValue = deviceLimit && deviceLimit > 0 ? `${devices.length} из ${deviceLimit}` : devices.length.toString()
+  const limitState = getDeviceLimitState(devices.length, deviceLimit)
 
   if (embedded) {
     return (
@@ -143,6 +173,7 @@ export function DevicesList({ embedded = false, deviceLimit }: DevicesListProps 
               <p className="mt-1 text-sm leading-5 text-slate-500 dark:text-slate-400">
                 {recentDevices > 0 ? 'VPN использовался сегодня.' : 'Сегодня подключений не было.'}
               </p>
+              <DeviceLimitNotice state={limitState} compact />
             </div>
             <button
               type="button"
@@ -165,6 +196,11 @@ export function DevicesList({ embedded = false, deviceLimit }: DevicesListProps 
               />
             ))}
           </div>
+          <DeviceListActions
+            deviceCount={devices.length}
+            onAdd={addDevice}
+            onRemoveAll={() => setBulkDialogOpen(true)}
+          />
         </section>
         <ConfirmDialog
           open={Boolean(selectedDevice)}
@@ -174,6 +210,15 @@ export function DevicesList({ embedded = false, deviceLimit }: DevicesListProps 
           loading={Boolean(removingHwid)}
           onCancel={() => setSelectedDevice(null)}
           onConfirm={() => selectedDevice && removeDevice(selectedDevice)}
+        />
+        <ConfirmDialog
+          open={bulkDialogOpen}
+          title="Отвязать все устройства?"
+          description="Доступ, профиль и платежи сохранятся. На каждом устройстве потребуется повторно открыть подписку."
+          confirmLabel="Отвязать все"
+          loading={bulkRemoving}
+          onCancel={() => setBulkDialogOpen(false)}
+          onConfirm={removeAllDevices}
         />
       </>
     )
@@ -196,6 +241,7 @@ export function DevicesList({ embedded = false, deviceLimit }: DevicesListProps 
               <p className="mt-1 text-sm leading-6 text-slate-500 dark:text-slate-400">
                 {recentDevices > 0 ? 'Подключение работает. Здесь можно проверить активность и отвязать старые устройства.' : 'Устройства найдены, но сегодня ещё не подключались.'}
               </p>
+              <DeviceLimitNotice state={limitState} />
             </div>
             <button
               type="button"
@@ -224,6 +270,11 @@ export function DevicesList({ embedded = false, deviceLimit }: DevicesListProps 
             />
           ))}
         </div>
+        <DeviceListActions
+          deviceCount={devices.length}
+          onAdd={addDevice}
+          onRemoveAll={() => setBulkDialogOpen(true)}
+        />
       </section>
       <ConfirmDialog
         open={Boolean(selectedDevice)}
@@ -234,7 +285,51 @@ export function DevicesList({ embedded = false, deviceLimit }: DevicesListProps 
         onCancel={() => setSelectedDevice(null)}
         onConfirm={() => selectedDevice && removeDevice(selectedDevice)}
       />
+      <ConfirmDialog
+        open={bulkDialogOpen}
+        title="Отвязать все устройства?"
+        description="Доступ, профиль и платежи сохранятся. На каждом устройстве потребуется повторно открыть подписку."
+        confirmLabel="Отвязать все"
+        loading={bulkRemoving}
+        onCancel={() => setBulkDialogOpen(false)}
+        onConfirm={removeAllDevices}
+      />
     </>
+  )
+}
+
+function DeviceLimitNotice({ state, compact = false }: { state: DeviceLimitState; compact?: boolean }) {
+  const Icon = state.tone === 'danger' || state.tone === 'warning' ? CircleAlert : null
+  return (
+    <div className={cn('device-limit-notice', `device-limit-notice--${state.tone}`, compact && 'device-limit-notice--compact')}>
+      {Icon && <Icon className="h-3.5 w-3.5 shrink-0" />}
+      <span>{state.text}</span>
+    </div>
+  )
+}
+
+function DeviceListActions({
+  deviceCount,
+  onAdd,
+  onRemoveAll,
+}: {
+  deviceCount: number
+  onAdd: () => void
+  onRemoveAll: () => void
+}) {
+  return (
+    <div className="device-list-actions">
+      <button type="button" className="btn-secondary device-list-actions__add" onClick={onAdd}>
+        <Plus className="h-4 w-4" />
+        Подключить ещё
+      </button>
+      {deviceCount > 1 && (
+        <button type="button" className="device-list-actions__remove" onClick={onRemoveAll}>
+          <Trash2 className="h-3.5 w-3.5" />
+          Отвязать все
+        </button>
+      )}
+    </div>
   )
 }
 
@@ -461,6 +556,20 @@ function countRecentDevices(devices: Device[]) {
     const date = device.updatedAt || device.createdAt
     return date ? Date.now() - new Date(date).getTime() <= dayMs : false
   }).length
+}
+
+type DeviceLimitState = {
+  tone: 'neutral' | 'warning' | 'danger'
+  text: string
+}
+
+function getDeviceLimitState(used: number, limit?: number | null): DeviceLimitState {
+  if (!limit || limit < 1) return { tone: 'neutral', text: 'Количество устройств не ограничено.' }
+
+  const remaining = Math.max(limit - used, 0)
+  if (remaining === 0) return { tone: 'danger', text: 'Лимит достигнут. Отвяжите старое устройство перед новым подключением.' }
+  if (remaining === 1) return { tone: 'warning', text: 'Осталось одно свободное место.' }
+  return { tone: 'neutral', text: `Свободно мест: ${remaining}.` }
 }
 
 function shortDeviceId(hwid: string) {
