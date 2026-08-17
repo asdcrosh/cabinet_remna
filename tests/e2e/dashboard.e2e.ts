@@ -127,16 +127,22 @@ test('истёкшее подключение показывает только 
   await expectNoHorizontalOverflow(page)
 })
 
-test('активное подключение показывает компактный выбор приложения и устройства', async ({ page }) => {
+test('активное подключение показывает добавление приложения и управление устройствами', async ({ page }, testInfo) => {
   await login(page, E2E_USERS.active.email)
   await page.goto('/dashboard/subscription')
 
   const access = page.getByTestId('subscription-access')
   await expect(access.getByRole('heading', { name: 'Подписка активна' })).toBeVisible()
-  await expect(page.getByRole('heading', { name: 'Подключить устройство' })).toBeVisible()
-  await expect(page.getByRole('radiogroup', { name: 'Приложение для подключения' })).toBeVisible()
-  await expect(page.getByRole('heading', { name: 'Устройства' })).toBeVisible()
-  await expect(page.getByText('Pixel 8 · Android')).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Подключить ещё устройство' })).toBeVisible()
+  await expect(page.getByRole('button', { name: /Подключить ещё в/ })).toBeVisible()
+  if (testInfo.project.name === 'desktop-chromium') {
+    await expect(page.getByRole('radiogroup', { name: 'Приложение для подключения' })).toBeVisible()
+  }
+
+  const devices = page.getByRole('region', { name: 'Устройства' })
+  await expect(devices.getByText('Pixel 8 · Android')).toBeVisible()
+  await expect(devices.getByText('Свободно мест: 4.')).toBeVisible()
+  await expect(devices.getByRole('button', { name: 'Подключить ещё', exact: true })).toBeVisible()
   await expectNoHorizontalOverflow(page)
 })
 

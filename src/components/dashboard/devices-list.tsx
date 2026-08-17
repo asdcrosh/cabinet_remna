@@ -108,9 +108,9 @@ export function DevicesList({ embedded = false, deviceLimit, subscriptionUrl }: 
   if (devices.length === 0) {
     if (embedded) {
       return (
-        <section id="connected-devices" className="device-panel device-panel--embedded overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.03]">
+        <section id="connected-devices" aria-labelledby="connected-devices-title" className="device-panel device-panel--embedded overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.03]">
           <div className="border-b border-slate-200 p-4 dark:border-white/10">
-            <h2 className="text-lg font-semibold tracking-tight text-slate-950 dark:text-white">Устройства</h2>
+            <h2 id="connected-devices-title" className="text-lg font-semibold tracking-tight text-slate-950 dark:text-white">Устройства</h2>
             <p className="mt-1 text-sm leading-5 text-slate-500 dark:text-slate-400">
               Появятся после первого запуска VPN.
             </p>
@@ -130,9 +130,9 @@ export function DevicesList({ embedded = false, deviceLimit, subscriptionUrl }: 
     }
 
     return (
-      <section id="connected-devices" className="device-panel overflow-hidden rounded-3xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.035]">
+      <section id="connected-devices" aria-labelledby="connected-devices-title" className="device-panel overflow-hidden rounded-3xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.035]">
         <div className="border-b border-slate-100 px-4 py-4 dark:border-white/10 sm:px-5">
-          <h2 className="text-lg font-semibold tracking-tight text-slate-950 dark:text-white">Проверьте подключение</h2>
+          <h2 id="connected-devices-title" className="text-lg font-semibold tracking-tight text-slate-950 dark:text-white">Проверьте подключение</h2>
           <p className="mt-1 text-sm leading-6 text-slate-500 dark:text-slate-400">После первого запуска VPN устройство появится здесь автоматически.</p>
         </div>
         <div className="px-4 py-8 text-center sm:px-5 sm:py-10">
@@ -161,11 +161,11 @@ export function DevicesList({ embedded = false, deviceLimit, subscriptionUrl }: 
             description={actionError || loadError || undefined}
           />
         )}
-        <section id="connected-devices" className="device-panel device-panel--embedded overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.03]">
+        <section id="connected-devices" aria-labelledby="connected-devices-title" className="device-panel device-panel--embedded overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.03]">
           <div className="flex items-start justify-between gap-3 border-b border-slate-200 p-4 dark:border-white/10">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <h2 className="text-lg font-semibold tracking-tight text-slate-950 dark:text-white">Устройства</h2>
+                <h2 id="connected-devices-title" className="text-lg font-semibold tracking-tight text-slate-950 dark:text-white">Устройства</h2>
                 <span className="device-count-chip rounded-md bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600 dark:bg-white/[0.07] dark:text-slate-300">
                   {devicesValue}
                 </span>
@@ -233,11 +233,11 @@ export function DevicesList({ embedded = false, deviceLimit, subscriptionUrl }: 
           description={actionError || loadError || undefined}
         />
       )}
-      <section id="connected-devices" className="device-panel overflow-hidden rounded-3xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.035]">
+      <section id="connected-devices" aria-labelledby="connected-devices-title" className="device-panel overflow-hidden rounded-3xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.035]">
         <div className="border-b border-slate-100 px-4 py-4 dark:border-white/10 sm:px-5 sm:py-5">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0">
-              <h2 className="text-lg font-semibold tracking-tight text-slate-950 dark:text-white">Подключённые устройства</h2>
+              <h2 id="connected-devices-title" className="text-lg font-semibold tracking-tight text-slate-950 dark:text-white">Подключённые устройства</h2>
               <p className="mt-1 text-sm leading-6 text-slate-500 dark:text-slate-400">
                 {recentDevices > 0 ? 'Подключение работает. Здесь можно проверить активность и отвязать старые устройства.' : 'Устройства найдены, но сегодня ещё не подключались.'}
               </p>
