@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { CircleAlert, Laptop, Loader2, Monitor, Plus, RefreshCw, Smartphone, Tablet, Trash2, Unlink2 } from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
 import { InlineAlert } from './empty-state'
@@ -26,6 +27,7 @@ interface DevicesListProps {
 }
 
 export function DevicesList({ embedded = false, deviceLimit, subscriptionUrl }: DevicesListProps = {}) {
+  const router = useRouter()
   const [devices, setDevices] = useState<Device[] | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
@@ -83,7 +85,7 @@ export function DevicesList({ embedded = false, deviceLimit, subscriptionUrl }: 
 
   function addDevice() {
     if (!subscriptionUrl) {
-      window.location.assign('/dashboard/subscription#connection')
+      router.push('/dashboard/subscription#connection')
       return
     }
 

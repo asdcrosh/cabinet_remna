@@ -11,7 +11,7 @@ test('истёкшая подписка не показывает отрицат
   await expect(subscriptionOverview.getByText('Истекла', { exact: true }).first()).toBeVisible()
 
   await expect(subscriptionOverview.getByText('Осталось', { exact: true })).toBeVisible()
-  await expect(subscriptionOverview.getByText('Трафик', { exact: true })).toBeVisible()
+  await expect(subscriptionOverview.getByRole('link', { name: 'Возобновить доступ' })).toBeVisible()
   await expectNoHorizontalOverflow(page)
 })
 
