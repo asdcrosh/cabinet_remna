@@ -33,7 +33,13 @@ type VpnCheckResponse = {
   } | null
 }
 
-export function VpnConnectionCheck({ supportEnabled }: { supportEnabled: boolean }) {
+export function VpnConnectionCheck({
+  supportEnabled,
+  onVerified,
+}: {
+  supportEnabled: boolean
+  onVerified?: () => void
+}) {
   const [state, setState] = useState<CheckState>({ status: 'idle' })
 
   async function checkConnection() {
@@ -67,6 +73,7 @@ export function VpnConnectionCheck({ supportEnabled }: { supportEnabled: boolean
           nodeName: vpnResponse.node.name,
           country: vpnResponse.node.country,
         })
+        if (onVerified) window.setTimeout(onVerified, 900)
         return
       }
 

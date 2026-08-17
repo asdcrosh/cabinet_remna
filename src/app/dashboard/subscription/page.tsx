@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation'
 import type { ReactNode } from 'react'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth/cookies'
-import { remnawave, RemnawaveError } from '@/lib/remnawave'
+import { remnawave, RemnawaveError, remnawaveUserReference } from '@/lib/remnawave'
 import { KeysCard } from '@/components/dashboard/keys-card'
 import { DevicesList } from '@/components/dashboard/devices-list'
 import Link from 'next/link'
@@ -81,6 +81,15 @@ export default async function SubscriptionPage() {
   const isUnlimited = u.trafficLimitBytes === '0'
   const subscriptionExpired = isSubscriptionExpired(u.daysLeft, u.userStatus)
   const expiresAtLabel = new Date(u.expiresAt).toLocaleDateString('ru-RU')
+  let isFirstConnection = false
+  if (!subscriptionExpired) {
+    try {
+      const devices = await remnawave.getUserDevices(remnawaveUserReference(user))
+      isFirstConnection = devices.response.devices.length === 0
+    } catch {
+      // Не прячем управление у существующего пользователя, если Remnawave временно не ответил.
+    }
+  }
   const statusText = subscriptionExpired
     ? 'Подписка истекла'
     : u.isActive
@@ -91,7 +100,9 @@ export default async function SubscriptionPage() {
     <div className="user-workspace page-stack">
       <PageHeader
         title="Подключение"
-        description="Откройте подписку в INСY и управляйте подключёнными устройствами."
+        description={isFirstConnection
+          ? 'Подключите первое устройство за три шага.'
+          : 'Откройте подписку в INСY и управляйте подключёнными устройствами.'}
       />
 
       <section
@@ -111,7 +122,9 @@ export default async function SubscriptionPage() {
             <p className="mt-1 text-sm leading-5 text-slate-500 dark:text-slate-400">
               {subscriptionExpired
                 ? 'Продлите доступ, затем ссылка и устройства снова заработают без новой настройки.'
-                : 'Ссылка готова. Подключите новое устройство или управляйте теми, что уже добавлены.'}
+                : isFirstConnection
+                  ? 'Ссылка готова. Установите приложение, откройте подписку и включите VPN.'
+                  : 'Ссылка готова. Подключите новое устройство или управляйте теми, что уже добавлены.'}
             </p>
           </div>
 
@@ -150,13 +163,23 @@ export default async function SubscriptionPage() {
         </div>
       </section>
 
-      <VpnConnectionCheck supportEnabled={features.support} />
-
       {!subscriptionExpired && (
-        <div className="grid items-start gap-5 min-[1360px]:grid-cols-[minmax(0,1fr)_22rem]">
-          <KeysCard subscriptionUrl={data.response.subscriptionUrl} happLink={happLink} />
-          <DevicesList embedded deviceLimit={localSubscription?.plan?.deviceLimit} />
-        </div>
+        isFirstConnection ? (
+          <KeysCard
+            subscriptionUrl={data.response.subscriptionUrl}
+            happLink={happLink}
+            onboarding
+            supportEnabled={features.support}
+          />
+        ) : (
+          <>
+            <VpnConnectionCheck supportEnabled={features.support} />
+            <div className="grid items-start gap-5 min-[1360px]:grid-cols-[minmax(0,1fr)_22rem]">
+              <KeysCard subscriptionUrl={data.response.subscriptionUrl} happLink={happLink} />
+              <DevicesList embedded deviceLimit={localSubscription?.plan?.deviceLimit} />
+            </div>
+          </>
+        )
       )}
     </div>
   )

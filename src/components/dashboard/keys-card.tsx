@@ -4,6 +4,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Image from 'next/image'
+import { useRouter } from 'next/navigation'
 import {
   Apple,
   CheckCircle2,
@@ -23,6 +24,7 @@ import { Modal } from '@/components/ui/modal'
 import { toast } from '@/components/ui/toaster'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { cn } from '@/lib/cn'
+import { VpnConnectionCheck } from './vpn-connection-check'
 
 type Device = 'ios' | 'android' | 'macos' | 'windows' | 'desktop'
 type AppId = 'incy' | 'happ' | 'rabbit-hole'
@@ -30,6 +32,8 @@ type AppId = 'incy' | 'happ' | 'rabbit-hole'
 interface KeysCardProps {
   subscriptionUrl: string
   happLink?: string | null
+  onboarding?: boolean
+  supportEnabled?: boolean
 }
 
 interface AppOption {
@@ -100,7 +104,13 @@ const appOptions: AppOption[] = [
 ]
 const defaultApp = appOptions[0] as AppOption
 
-export function KeysCard({ subscriptionUrl, happLink }: KeysCardProps) {
+export function KeysCard({
+  subscriptionUrl,
+  happLink,
+  onboarding = false,
+  supportEnabled = false,
+}: KeysCardProps) {
+  const router = useRouter()
   const [device, setDevice] = useState<Device>('desktop')
   const [selectedAppId, setSelectedAppId] = useState<AppId>('incy')
   const [instructionsOpen, setInstructionsOpen] = useState(false)
@@ -176,6 +186,10 @@ export function KeysCard({ subscriptionUrl, happLink }: KeysCardProps) {
     }
   }
 
+  function finishFirstConnection() {
+    router.refresh()
+  }
+
   return (
     <section
       id="connection"
@@ -185,10 +199,12 @@ export function KeysCard({ subscriptionUrl, happLink }: KeysCardProps) {
       <header className="flex items-start justify-between gap-4 border-b border-slate-200 p-4 dark:border-white/10 sm:p-5">
         <div className="min-w-0">
           <h2 id="connection-title" className="text-lg font-semibold tracking-tight text-slate-950 dark:text-white">
-            Подключить устройство
+            {onboarding ? 'Подключите первое устройство' : 'Подключить устройство'}
           </h2>
           <p className="mt-1 text-sm leading-5 text-slate-500 dark:text-slate-400">
-            Установите INCY и добавьте подписку одной кнопкой.
+            {onboarding
+              ? 'Три коротких шага. После проверки откроется управление устройствами.'
+              : 'Установите INCY и добавьте подписку одной кнопкой.'}
           </p>
         </div>
         <span className="inline-flex min-w-0 shrink-0 items-center gap-2 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-500 dark:border-white/10 dark:text-slate-400">
@@ -198,7 +214,54 @@ export function KeysCard({ subscriptionUrl, happLink }: KeysCardProps) {
       </header>
 
       <div className="p-4 sm:p-5">
-        {isIncyFlow ? (
+        {onboarding ? (
+          <div className="connection-first-run">
+            <div className="connection-first-run__step">
+              <span className="connection-first-run__number">1</span>
+              <div className="min-w-0 flex-1">
+                <h3 className="text-sm font-semibold text-slate-950 dark:text-white">Установите {selectedApp.name}</h3>
+                <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
+                  {selectedIsRecommended
+                    ? `Приложение подходит для ${deviceLabel(device)}.`
+                    : `Рекомендуемое приложение для ${deviceLabel(device)}.`}
+                </p>
+              </div>
+              <a
+                href={selectedInstallUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="btn-secondary connection-first-run__action"
+              >
+                <Download className="h-4 w-4" />
+                Установить
+              </a>
+            </div>
+
+            <div className="connection-first-run__step">
+              <span className="connection-first-run__number">2</span>
+              <div className="min-w-0 flex-1">
+                <h3 className="text-sm font-semibold text-slate-950 dark:text-white">Откройте подписку</h3>
+                <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
+                  Добавьте доступ в приложение одним нажатием.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={openInApp}
+                disabled={!subscriptionUrl}
+                className="btn-primary connection-first-run__action"
+              >
+                <ExternalLink className="h-4 w-4" />
+                Открыть
+              </button>
+            </div>
+
+            <div className="connection-first-run__step connection-first-run__step--check">
+              <span className="connection-first-run__number">3</span>
+              <VpnConnectionCheck supportEnabled={supportEnabled} onVerified={finishFirstConnection} />
+            </div>
+          </div>
+        ) : isIncyFlow ? (
           <div className="connection-incy-flow">
             <div className="flex min-w-0 items-center gap-3">
               <span className="connection-incy-flow__icon">
@@ -240,31 +303,32 @@ export function KeysCard({ subscriptionUrl, happLink }: KeysCardProps) {
           </div>
         )}
 
-        <div className="mt-5 flex min-w-0 items-start gap-3 border-t border-dashed border-slate-300 pt-5 dark:border-white/15">
-          <SelectedAppIcon className="mt-0.5 h-5 w-5 shrink-0 text-cyan-600 dark:text-cyan-300" />
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <h3 className="text-base font-semibold text-slate-950 dark:text-white">{selectedApp.name}</h3>
-              {selectedIsRecommended && (
-                <span className="text-xs font-medium text-cyan-700 dark:text-cyan-200">подходит устройству</span>
-              )}
+        {!onboarding && <>
+          <div className="mt-5 flex min-w-0 items-start gap-3 border-t border-dashed border-slate-300 pt-5 dark:border-white/15">
+            <SelectedAppIcon className="mt-0.5 h-5 w-5 shrink-0 text-cyan-600 dark:text-cyan-300" />
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="text-base font-semibold text-slate-950 dark:text-white">{selectedApp.name}</h3>
+                {selectedIsRecommended && (
+                  <span className="text-xs font-medium text-cyan-700 dark:text-cyan-200">подходит устройству</span>
+                )}
+              </div>
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{selectedApp.subtitle}</p>
             </div>
-            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{selectedApp.subtitle}</p>
           </div>
-        </div>
 
-        <div className="mt-4 grid gap-2 sm:grid-cols-2">
-          <button type="button" onClick={openInApp} disabled={!subscriptionUrl} className="btn-primary w-full justify-center">
-            <ExternalLink className="h-4 w-4" />
-            Открыть в {selectedApp.name}
-          </button>
-          <a href={selectedInstallUrl} target="_blank" rel="noreferrer" className="btn-secondary w-full justify-center">
-            <Download className="h-4 w-4" />
-            {installButtonLabel(selectedApp, device)}
-          </a>
-        </div>
+          <div className="mt-4 grid gap-2 sm:grid-cols-2">
+            <button type="button" onClick={openInApp} disabled={!subscriptionUrl} className="btn-primary w-full justify-center">
+              <ExternalLink className="h-4 w-4" />
+              Открыть в {selectedApp.name}
+            </button>
+            <a href={selectedInstallUrl} target="_blank" rel="noreferrer" className="btn-secondary w-full justify-center">
+              <Download className="h-4 w-4" />
+              {installButtonLabel(selectedApp, device)}
+            </a>
+          </div>
 
-        <div className="mt-2 grid grid-cols-3 gap-2">
+          <div className="mt-2 grid grid-cols-3 gap-2">
           <button
             type="button"
             onClick={() => copy(subscriptionUrl, 'Ссылка подписки')}
@@ -290,10 +354,11 @@ export function KeysCard({ subscriptionUrl, happLink }: KeysCardProps) {
             <HelpCircle className="h-4 w-4 shrink-0" />
             Инструкция
           </button>
-        </div>
+          </div>
+        </>}
       </div>
 
-      <footer className="flex flex-col gap-2 border-t border-slate-200 px-4 py-3 text-xs text-slate-500 dark:border-white/10 dark:text-slate-400 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+      {!onboarding && <footer className="flex flex-col gap-2 border-t border-slate-200 px-4 py-3 text-xs text-slate-500 dark:border-white/10 dark:text-slate-400 sm:flex-row sm:items-center sm:justify-between sm:px-5">
         <span>Ссылка приватная. Не пересылайте её другим людям.</span>
         <button
           type="button"
@@ -304,19 +369,19 @@ export function KeysCard({ subscriptionUrl, happLink }: KeysCardProps) {
           <RefreshCw className="h-3.5 w-3.5" />
           {revoking ? 'Обновляем' : 'Сменить ссылку'}
         </button>
-      </footer>
+      </footer>}
 
-      <InstructionModal
+      {!onboarding && <InstructionModal
         open={instructionsOpen}
         app={selectedApp}
         subscriptionUrl={subscriptionUrl}
         onClose={() => setInstructionsOpen(false)}
         onCopy={() => copy(subscriptionUrl, 'Ссылка подписки')}
         onOpen={openInApp}
-      />
-      <QrModal open={qrOpen} subscriptionUrl={subscriptionUrl} onClose={() => setQrOpen(false)} />
+      />}
+      {!onboarding && <QrModal open={qrOpen} subscriptionUrl={subscriptionUrl} onClose={() => setQrOpen(false)} />}
 
-      <ConfirmDialog
+      {!onboarding && <ConfirmDialog
         open={confirmOpen}
         title="Обновить ссылку подписки?"
         description="Старая ссылка перестанет работать. На подключённых устройствах потребуется добавить новую."
@@ -327,7 +392,7 @@ export function KeysCard({ subscriptionUrl, happLink }: KeysCardProps) {
           await revoke()
           setConfirmOpen(false)
         }}
-      />
+      />}
     </section>
   )
 }
