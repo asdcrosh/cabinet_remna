@@ -1,13 +1,13 @@
 <p align="center">
-  <img src="./public/icon.svg" width="88" height="88" alt="Remnawave Cabinet" />
+  <img src="./public/icon.svg" width="84" height="84" alt="Remnawave Cabinet" />
 </p>
 
 <h1 align="center">Remnawave Cabinet</h1>
 
 <p align="center">
-  <strong>Личный кабинет и центр управления VPN-сервисом на Remnawave.</strong>
+  <strong>Готовый личный кабинет для VPN-сервиса на Remnawave</strong>
   <br />
-  От регистрации и оплаты до выдачи подписки, поддержки и мониторинга нод.
+  Продажи, подписки, поддержка и инфраструктура в одном понятном интерфейсе.
 </p>
 
 <p align="center">
@@ -15,58 +15,139 @@
   <a href="https://github.com/asdcrosh/cabinet_remna/actions/workflows/docker-image.yml"><img alt="Docker image" src="https://github.com/asdcrosh/cabinet_remna/actions/workflows/docker-image.yml/badge.svg" /></a>
   <img alt="Node.js 20.9+" src="https://img.shields.io/badge/Node.js-20.9%2B-339933?logo=node.js&amp;logoColor=white" />
   <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?logo=next.js&amp;logoColor=white" />
-  <img alt="PostgreSQL" src="https://img.shields.io/badge/PostgreSQL-16%2B-4169E1?logo=postgresql&amp;logoColor=white" />
+  <img alt="PostgreSQL 16+" src="https://img.shields.io/badge/PostgreSQL-16%2B-4169E1?logo=postgresql&amp;logoColor=white" />
 </p>
 
 <p align="center">
-  <a href="#быстрый-запуск"><strong>Быстрый запуск</strong></a>
-  ·
+  <a href="#запуск-за-несколько-минут"><strong>Установить</strong></a>
+  &nbsp;·&nbsp;
+  <a href="#что-умеет-cabinet">Возможности</a>
+  &nbsp;·&nbsp;
   <a href="./DEPLOYMENT.md">Развёртывание</a>
-  ·
+  &nbsp;·&nbsp;
   <a href="./deploy/RUNBOOK.md">Runbook</a>
-  ·
-  <a href="./deploy/env.production.example">Переменные окружения</a>
+  &nbsp;·&nbsp;
+  <a href="./deploy/env.production.example">Конфигурация</a>
 </p>
 
 <p align="center">
   <img src="./docs/assets/readme-hero.svg" alt="Remnawave Cabinet: единый центр управления VPN-сервисом" width="1200" />
 </p>
 
-> [!IMPORTANT]
-> Production работает из готового Docker-образа. Клонировать репозиторий на сервер не нужно: `cabinetctl` создаёт каталог, конфигурацию и сервисы самостоятельно.
+## Не просто витрина с тарифами
 
-## Один кабинет вместо набора разрозненных инструментов
+Cabinet закрывает весь путь клиента: от первой регистрации до оплаты, подключения нового устройства и обращения в поддержку. Администратор управляет сервисом там же, без ручной сверки нескольких панелей и таблиц.
 
 <table>
   <tr>
     <td width="33%" valign="top">
-      <strong>Для пользователя</strong><br /><br />
-      Понятная покупка тарифа, подключение через INCY, управление устройствами, поддержка, бонусы и история операций.
+      <h3>Личный кабинет</h3>
+      Покупка и продление тарифа, подключение через INCY, устройства, трафик, бонусы и поддержка.
     </td>
     <td width="33%" valign="top">
-      <strong>Для администратора</strong><br /><br />
-      Пользователи, тарифы, платежи, промокоды, рассылки, рефералы, бонусы, аудит и диагностика в одном интерфейсе.
+      <h3>Управление сервисом</h3>
+      Пользователи, платежи, тарифы, промокоды, рассылки, рефералы и история действий.
     </td>
     <td width="33%" valign="top">
-      <strong>Для инфраструктуры</strong><br /><br />
-      Workers, Watch, health-check, бэкапы, S3, создание нод и синхронизация с Remnawave и Remnashop.
+      <h3>Контроль инфраструктуры</h3>
+      Состояние системы, Watch, workers, синхронизация, ноды, бэкапы и диагностика.
     </td>
   </tr>
 </table>
 
 ```text
-Регистрация → Оплата → Выдача подписки → Подключение в INCY → Контроль и продление
+Регистрация  →  Оплата  →  Выдача подписки  →  Подключение в INCY  →  Продление
 ```
 
-## Быстрый запуск
+> [!NOTE]
+> Cabinet дополняет Remnawave, а не заменяет его. Remnawave отвечает за VPN-подписки и ноды, Cabinet добавляет пользовательский интерфейс, платежи и бизнес-логику.
 
-### Production
+## Что получает пользователь
 
-Подходит для чистого Ubuntu/Debian-сервера и для сервера, где уже работают Remnawave или Remnashop.
+| Сценарий | Как это выглядит |
+| --- | --- |
+| **Начать пользоваться** | Регистрация по email, через Telegram Mini App или Яндекс ID |
+| **Купить доступ** | Выбор периода, промокод, удобный способ оплаты и автоматическая выдача |
+| **Подключить устройство** | Определение платформы, установка INCY и открытие подписки одной кнопкой |
+| **Проверить VPN** | Проверка текущего подключения с отображением ноды и страны |
+| **Управлять доступом** | Срок действия, трафик, активные устройства, смена приватной ссылки |
+| **Получить помощь** | Поддержка вынесена в основное меню и доступна без поиска по настройкам |
 
-**1.** Направьте `A`-запись домена кабинета на IP сервера.
+Администратор видит тот же путь целиком: кто зарегистрировался, что оплатил, была ли выдана подписка и где возникла ошибка.
 
-**2.** Установите управляющую консоль:
+## Что умеет Cabinet
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <h3>Продажи и подписки</h3>
+      <ul>
+        <li>Тарифы с визуальной сортировкой</li>
+        <li>Покупка и продление подписки</li>
+        <li>Промокоды для покупки или продления</li>
+        <li>Персональные предложения и кампании</li>
+        <li>Возврат платежа с отзывом выданного доступа</li>
+      </ul>
+    </td>
+    <td width="50%" valign="top">
+      <h3>Платежи</h3>
+      <ul>
+        <li>YooKassa, PayAnyWay и Platega</li>
+        <li>Подписанные webhooks</li>
+        <li>Идемпотентная выдача подписки</li>
+        <li>Сверка зависших операций</li>
+        <li>История платежей и возвратов</li>
+      </ul>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <h3>Удержание клиентов</h3>
+      <ul>
+        <li>Реферальные программы и временные акции</li>
+        <li>Приветственный бонус</li>
+        <li>Задания и колесо подарков</li>
+        <li>Сегментированные рассылки</li>
+        <li>Центр уведомлений</li>
+      </ul>
+    </td>
+    <td width="50%" valign="top">
+      <h3>Эксплуатация</h3>
+      <ul>
+        <li>Единый экран состояния системы</li>
+        <li>Watch с защитой от повторяющихся алертов</li>
+        <li>Автоматическое создание нод</li>
+        <li>Локальные и S3-бэкапы по расписанию</li>
+        <li>Аудит действий и подробная диагностика</li>
+      </ul>
+    </td>
+  </tr>
+</table>
+
+<details>
+<summary><strong>Полная матрица возможностей</strong></summary>
+
+| Контур | Реализовано |
+| --- | --- |
+| **Авторизация** | Email-first регистрация, подтверждение почты, восстановление пароля, Telegram Mini App, Яндекс ID |
+| **Подписка** | Покупка, продление, отзыв доступа, трафик, устройства, QR-код, приватная ссылка, INCY |
+| **Продажи** | Тарифы, промокоды, предложения, кампании, реферальная программа |
+| **Бонусы** | Приветственный бонус, задания, призы, колесо подарков, история, антифрод |
+| **Коммуникации** | Поддержка, уведомления, Telegram, email и сегментированные рассылки |
+| **Администрирование** | Пользователи, роли, платежи, аудит, восстановление и состояние системы |
+| **Инфраструктура** | Workers, Watch, provisioning нод, health-check, retention cleanup, локальные и S3-бэкапы |
+
+</details>
+
+## Запуск за несколько минут
+
+Production устанавливается из готового Docker-образа. Клонировать репозиторий и собирать приложение на сервере не требуется.
+
+### 1. Подготовьте домен
+
+Направьте `A`-запись домена кабинета на IP сервера. Подойдёт чистый Ubuntu/Debian-сервер или сервер с уже установленными Remnawave и Remnashop.
+
+### 2. Установите `cabinetctl`
 
 ```bash
 installer="$(mktemp)"
@@ -78,48 +159,166 @@ sudo bash "${installer}"
 rm -f "${installer}"
 ```
 
-Эта команда устанавливает только `/usr/local/bin/cabinetctl`. Приложение и контейнеры появятся после выбора сценария.
+Команда устанавливает только управляющую консоль `/usr/local/bin/cabinetctl` и пока не меняет работающие сервисы.
 
-**3.** Запустите новую установку:
+### 3. Запустите мастер установки
 
 ```bash
 sudo cabinetctl install
 ```
 
-**4.** Проверьте результат:
+Мастер запросит домен, подключение к Remnawave, почту и платёжный провайдер, затем создаст конфигурацию и первого администратора.
+
+### 4. Проверьте результат
 
 ```bash
 cabinetctl health
 cabinetctl url
 ```
 
-Готово. Далее в админке настройте тарифы, способ оплаты, почту и поддержку.
+После запуска откройте админку и последовательно:
+
+1. Подключите Remnawave.
+2. Проверьте отправку писем.
+3. Добавьте платёжный провайдер.
+4. Создайте и отсортируйте тарифы.
+5. Проведите тестовую оплату до появления подписки в INCY.
+
+> [!TIP]
+> Порядок тарифов задаётся перетаскиванием в админке. Синхронизация с Remnashop не сбрасывает сохранённое расположение.
 
 <details>
-<summary><strong>На сервере уже заняты порты 80 и 443</strong></summary>
+<summary><strong>Если порты 80 и 443 уже заняты Remnawave или Nginx</strong></summary>
 
-Подключите Cabinet к существующему Nginx рядом с Remnawave:
+Подключите Cabinet к существующему Nginx:
 
 ```bash
 sudo cabinetctl nginx
 ```
 
-Безопасный сценарий и откат описаны в [server runbook](./deploy/RUNBOOK.md#5-existing-remnawave-nginx).
+Сценарий установки и безопасный откат описаны в [server runbook](./deploy/RUNBOOK.md#5-existing-remnawave-nginx).
+
 </details>
 
 <details>
-<summary><strong>Нужно восстановиться из локального или S3-бэкапа</strong></summary>
+<summary><strong>Если нужно восстановить сервер из локального или S3-бэкапа</strong></summary>
 
-После установки `cabinetctl` не запускайте обычную установку. Сразу откройте менеджер бэкапов:
+После установки `cabinetctl` сразу откройте менеджер бэкапов:
 
 ```bash
 sudo cabinetctl backups
 ```
 
-Он установит необходимые компоненты, подключит S3 и проведёт восстановление полного стека.
+Не запускайте перед этим обычную установку. Менеджер сам подготовит компоненты, подключит S3 и восстановит выбранный архив.
+
 </details>
 
-### Локальная разработка
+## Как всё связано
+
+```mermaid
+flowchart LR
+  Client[Пользователь] --> Cabinet[Remnawave Cabinet]
+  Admin[Администратор] --> Cabinet
+
+  Cabinet --> Payment[Платёжный провайдер]
+  Payment -->|Webhook| Cabinet
+  Cabinet --> Remnawave[Remnawave]
+  Cabinet <--> Remnashop[Remnashop]
+  Cabinet --> Delivery[Email и Telegram]
+
+  Workers[Фоновые workers] --> Cabinet
+  Watch[Watch] --> Remnawave
+  Backups[Backup service] --> S3[(S3)]
+```
+
+| Компонент | За что отвечает |
+| --- | --- |
+| **Cabinet** | Интерфейс, платежи, продажи, бонусы, поддержка и бизнес-правила |
+| **Remnawave** | Фактически выданные VPN-подписки, трафик, устройства и состояние нод |
+| **Remnashop** | Совместимые пользователи и данные магазина, когда интеграция включена |
+| **Workers** | Платежи, синхронизация, рассылки, Watch и обслуживание вне HTTP-запросов |
+
+## Интеграции
+
+| Сервис | Что подключает | Где настраивается |
+| --- | --- | --- |
+| **Remnawave** | Выдача, продление и отзыв подписки, трафик и устройства | `REMNAWAVE_BASE_URL`, `REMNAWAVE_TOKEN` |
+| **Remnashop** | Пользователи, каталог, оплаты, промокоды и синхронизация | `REMNASHOP_*`, раздел интеграции в админке |
+| **YooKassa** | Оплаты, отмены и возвраты | Платёжные системы, `/api/webhook/yookassa` |
+| **PayAnyWay** | Альтернативная оплата с подписанным callback | Платёжные системы, `/api/webhook/payanyway` |
+| **Platega** | Дополнительный способ оплаты | Платёжные системы, `/api/webhook/platega` |
+| **Resend** | Подтверждение email и восстановление пароля | `RESEND_API_KEY`, `EMAIL_FROM` |
+| **Telegram** | Mini App и служебные уведомления владельцу | `TELEGRAM_BOT_TOKEN`, `ADMIN_TELEGRAM_CHAT_ID` |
+| **Sentry** | Ошибки приложения и workers | `SENTRY_*` |
+| **S3** | Удалённое хранение полных бэкапов | `cabinetctl backups` |
+
+<details>
+<summary><strong>Подробнее о совместной работе с Remnashop</strong></summary>
+
+На одном сервере установщик находит `remnashop-db`, подключает контейнеры к общей сети и заполняет необходимые `REMNASHOP_*` значения. Для раздельных серверов используйте [инструкцию по внешней базе](./deploy/RUNBOOK.md#7-remnashop-database).
+
+Мгновенные изменения передаются через `/api/integrations/remnashop/events`. Периодическая синхронизация остаётся страховочным механизмом.
+
+</details>
+
+## Управление без ручной рутины
+
+Все серверные операции собраны в одной консоли:
+
+```bash
+cabinetctl
+```
+
+| Задача | Команда |
+| --- | --- |
+| Проверить приложение и зависимости | `cabinetctl health` |
+| Посмотреть состояние установки | `cabinetctl status` |
+| Обновить образы и применить миграции | `cabinetctl update` |
+| Проверить результат обновления | `cabinetctl deploy-status` |
+| Перезапустить приложение и workers | `cabinetctl restart` |
+| Открыть логи приложения | `cabinetctl logs app` |
+| Подключить внешний Nginx и HTTPS | `cabinetctl nginx` |
+| Настроить автоматическое создание нод | `cabinetctl provisioning` |
+| Создать или восстановить бэкап | `cabinetctl backups` |
+| Настроить расписание бэкапов | `cabinetctl backup-schedule` |
+
+<details>
+<summary><strong>Сервисы production-стека</strong></summary>
+
+| Сервис | Назначение |
+| --- | --- |
+| `app` | Next.js интерфейс и API |
+| `db` | PostgreSQL |
+| `worker` | Платежи, подписки и синхронизация Remnashop |
+| `broadcast-worker` | Очередь рассылок |
+| `watch-worker` | Мониторинг нод и Reality-кромок |
+| `node-provisioning-worker` | Автоматическое создание нод |
+| `retention-cleanup` | Очистка старых журналов |
+| `caddy` | Встроенный HTTPS reverse proxy для профиля `caddy` |
+
+</details>
+
+## Конфигурация и безопасность
+
+Production использует один файл конфигурации:
+
+```text
+/opt/remnawave-cabinet/.env
+```
+
+Открывайте и проверяйте его через консоль:
+
+```bash
+cabinetctl env
+cabinetctl config-check
+```
+
+Полный список переменных с пояснениями находится в [`deploy/env.production.example`](./deploy/env.production.example).
+
+> [!CAUTION]
+> Не добавляйте в Git `.env`, токены, дампы баз и пользовательские загрузки. Не запускайте `docker compose down -v`, `docker volume rm` или `git reset --hard` на production без проверенного бэкапа.
+
+## Локальная разработка
 
 Нужны Node.js **20.9+**, Docker и Docker Compose.
 
@@ -134,150 +333,26 @@ npm run db:seed
 npm run dev
 ```
 
-Откройте [localhost:3000](http://localhost:3000).
+Приложение откроется на [localhost:3000](http://localhost:3000).
 
-## Возможности
-
-| Контур | Что реализовано |
-| --- | --- |
-| **Доступ** | Email-first регистрация, подтверждение почты, восстановление пароля, Telegram Mini App и Яндекс ID |
-| **Подписка** | Покупка, продление, отзыв доступа, трафик, устройства, QR-код и подключение через INCY |
-| **Платежи** | YooKassa, PayAnyWay и Platega, webhooks, возвраты, сверка и идемпотентная выдача |
-| **Продажи** | Тарифы с ручной сортировкой, промокоды, персональные предложения, кампании и реферальная программа |
-| **Бонусы** | Приветственный бонус, задания, колесо подарков, призы, история и антифрод |
-| **Коммуникации** | Поддержка, уведомления, Telegram и сегментированные рассылки |
-| **Управление** | Пользователи, роли, платежи, аудит, восстановление данных и единый экран состояния системы |
-| **Инфраструктура** | Watch, workers, provisioning нод, health-check, retention cleanup, локальные и S3-бэкапы |
-
-## Архитектура
-
-```mermaid
-flowchart LR
-  User[Пользователь] --> Cabinet[Cabinet]
-  Admin[Администратор] --> Cabinet
-
-  Cabinet --> Payment[Платёжные провайдеры]
-  Payment -->|Webhook| Cabinet
-  Cabinet --> Remnawave[Remnawave]
-  Cabinet <--> Remnashop[Remnashop]
-  Cabinet --> Channels[Email и Telegram]
-
-  Workers[Workers] --> Cabinet
-  Watch[Watch] --> Remnawave
-  Backups[Backup service] --> S3[(S3)]
-```
-
-### Границы ответственности
-
-- **Cabinet** управляет интерфейсом, платежами, бонусами, поддержкой и бизнес-логикой.
-- **Remnawave** хранит фактически выданные VPN-подписки и состояние нод.
-- **Remnashop** остаётся совместимым источником пользователей и данных магазина, если интеграция включена.
-- **Workers** выполняют сверку платежей, синхронизацию, рассылки, Watch и служебные задачи вне HTTP-запроса.
-
-## Интеграции
-
-| Сервис | Назначение | Настройка |
-| --- | --- | --- |
-| **Remnawave** | Выдача, продление и отзыв подписки, трафик и устройства | `REMNAWAVE_BASE_URL`, `REMNAWAVE_TOKEN` |
-| **Remnashop** | Пользователи, каталог, оплаты, промокоды и двусторонняя синхронизация | `REMNASHOP_*` и раздел интеграции в админке |
-| **YooKassa** | Оплата, отмена и возврат | Платёжные системы и `/api/webhook/yookassa` |
-| **PayAnyWay** | Альтернативная оплата с подписанным callback | Платёжные системы и `/api/webhook/payanyway` |
-| **Platega** | Дополнительный платёжный метод | Платёжные системы и `/api/webhook/platega` |
-| **Resend** | Подтверждение email и восстановление пароля | `RESEND_API_KEY`, `EMAIL_FROM` |
-| **Telegram** | Mini App и служебные уведомления владельцу | `TELEGRAM_BOT_TOKEN`, `ADMIN_TELEGRAM_CHAT_ID` |
-| **Sentry** | Ошибки приложения и workers | `SENTRY_*` |
-| **S3** | Удалённое хранение полных бэкапов | `cabinetctl backups` |
-
-<details>
-<summary><strong>Как работает связка с Remnashop</strong></summary>
-
-На одном сервере установщик находит `remnashop-db`, подключает контейнеры к общей сети и заполняет необходимые `REMNASHOP_*` значения. Для раздельных серверов используйте [инструкцию по внешней базе](./deploy/RUNBOOK.md#7-remnashop-database).
-
-Периодическая синхронизация страхует интеграцию, а мгновенные изменения приходят через `/api/integrations/remnashop/events`.
-</details>
-
-## Первый рабочий контур
-
-| Шаг | Действие | Готовый результат |
-| ---: | --- | --- |
-| **01** | Подключить Remnawave | Cabinet читает и выдаёт VPN-подписки |
-| **02** | Настроить email | Работают регистрация и восстановление доступа |
-| **03** | Добавить платёжный провайдер | Можно создать реальную оплату |
-| **04** | Создать и отсортировать тарифы | Каталог доступен пользователю |
-| **05** | Провести тестовую покупку | Проверен путь от платежа до подключения в INCY |
-
-> [!TIP]
-> Порядок тарифов задаётся перетаскиванием в админке и не сбрасывается после синхронизации с Remnashop.
-
-## Управление сервером
-
-Все повседневные операции собраны в `cabinetctl`.
-
-| Команда | Что делает |
-| --- | --- |
-| `cabinetctl status` | Показывает состояние установки |
-| `cabinetctl health` | Проверяет приложение и зависимости |
-| `cabinetctl update` | Обновляет образы, применяет миграции и проверяет запуск |
-| `cabinetctl deploy-status` | Показывает результат последнего обновления |
-| `cabinetctl restart` | Перезапускает приложение и workers |
-| `cabinetctl logs app` | Открывает логи нужного сервиса |
-| `cabinetctl nginx` | Настраивает Nginx и HTTPS рядом с Remnawave |
-| `cabinetctl provisioning` | Настраивает автоматическое создание нод |
-| `cabinetctl backups` | Управляет локальными и S3-бэкапами |
-| `cabinetctl backup-schedule` | Настраивает расписание бэкапов |
-
-<details>
-<summary><strong>Какие контейнеры запускаются</strong></summary>
-
-| Сервис | Назначение |
-| --- | --- |
-| `app` | Next.js интерфейс и API |
-| `db` | PostgreSQL |
-| `worker` | Платежи, подписки и синхронизация Remnashop |
-| `broadcast-worker` | Очередь рассылок |
-| `watch-worker` | Мониторинг нод и Reality-кромок |
-| `node-provisioning-worker` | Создание нод через Timeweb |
-| `retention-cleanup` | Очистка старых журналов |
-| `caddy` | Встроенный HTTPS reverse proxy, если выбран этот профиль |
-</details>
-
-## Конфигурация
-
-Production использует один файл:
-
-```text
-/opt/remnawave-cabinet/.env
-```
-
-Открывайте и проверяйте его через консоль:
-
-```bash
-cabinetctl env
-cabinetctl config-check
-```
-
-Актуальный список переменных с комментариями находится в [`deploy/env.production.example`](./deploy/env.production.example).
-
-> [!CAUTION]
-> Не коммитьте `.env`, токены, дампы баз и пользовательские загрузки. Не запускайте `docker compose down -v`, `docker volume rm` или `git reset --hard` на production без проверенного бэкапа.
-
-## Разработка и качество
+### Проверки перед коммитом
 
 ```bash
 npm run validate       # lint + typecheck + env-check + tests
 npm run build          # Prisma generate + production build
 npm run test:e2e       # Playwright с тестовой БД
-npm run test:smoke     # smoke-check собранного приложения
+npm run test:smoke     # smoke-check production-сборки
 ```
 
-CI проверяет миграции Prisma, зависимости, линтер, типы, тесты, production build и Playwright. Push в `main` публикует:
+CI проверяет миграции Prisma, зависимости, линтер, типы, тесты, production build и Playwright. Push в `main` публикует образы:
 
 ```text
 ghcr.io/asdcrosh/cabinet_remna:latest
 ghcr.io/asdcrosh/cabinet_remna-provisioner:latest
 ```
 
-### Структура репозитория
+<details>
+<summary><strong>Структура репозитория</strong></summary>
 
 ```text
 src/app/             страницы и API routes
@@ -289,17 +364,22 @@ deploy/              установка, compose, бэкапы и runbook
 .github/workflows/   CI и публикация образов
 ```
 
+</details>
+
 ## Документация
 
-| Документ | Когда нужен |
+| Документ | Для чего нужен |
 | --- | --- |
-| [Deployment](./DEPLOYMENT.md) | Image-based deploy, GHCR и reverse proxy |
+| [Deployment](./DEPLOYMENT.md) | Docker-образы, GHCR и reverse proxy |
 | [Server runbook](./deploy/RUNBOOK.md) | Установка, перенос, Remnashop и диагностика |
-| [Production env](./deploy/env.production.example) | Настройка и проверка `.env` |
+| [Production env](./deploy/env.production.example) | Все переменные production-окружения |
 | [152-ФЗ checklist](./deploy/152-fz-checklist.md) | Юридическая и организационная подготовка |
 | [Repository guidelines](./AGENTS.md) | Правила разработки в проекте |
 
+---
+
 <p align="center">
-  <strong>Remnawave Cabinet</strong><br />
-  Один понятный интерфейс для пользователя, администратора и инфраструктуры.
+  <strong>Remnawave Cabinet</strong>
+  <br />
+  Один продукт вместо отдельного сайта, платёжной формы, панели поддержки и набора серверных скриптов.
 </p>
