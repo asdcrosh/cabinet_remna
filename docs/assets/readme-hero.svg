@@ -1,0 +1,82 @@
+<svg width="1200" height="420" viewBox="0 0 1200 420" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="background" x1="75" y1="12" x2="1114" y2="420" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#11071F"/>
+      <stop offset="0.56" stop-color="#170B2C"/>
+      <stop offset="1" stop-color="#071A2A"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="87" y1="72" x2="890" y2="358" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F13ACD"/>
+      <stop offset="0.55" stop-color="#8B4DFF"/>
+      <stop offset="1" stop-color="#35D9FF"/>
+    </linearGradient>
+    <linearGradient id="button" x1="829" y1="286" x2="1078" y2="340" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#D832D4"/>
+      <stop offset="1" stop-color="#6F35DF"/>
+    </linearGradient>
+    <filter id="glow" x="-80%" y="-80%" width="260%" height="260%">
+      <feGaussianBlur stdDeviation="24"/>
+    </filter>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="160%">
+      <feDropShadow dx="0" dy="20" stdDeviation="22" flood-color="#05020B" flood-opacity="0.55"/>
+    </filter>
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M40 0H0V40" stroke="#A875FF" stroke-opacity="0.07"/>
+    </pattern>
+  </defs>
+  <rect width="1200" height="420" rx="28" fill="url(#background)"/>
+  <rect width="1200" height="420" rx="28" fill="url(#grid)"/>
+  <circle cx="166" cy="86" r="118" fill="#D832D4" fill-opacity="0.18" filter="url(#glow)"/>
+  <circle cx="1052" cy="360" r="142" fill="#35D9FF" fill-opacity="0.14" filter="url(#glow)"/>
+  <path d="M0 2H1200" stroke="url(#accent)" stroke-width="4"/>
+  <g transform="translate(68 66)">
+    <rect width="70" height="70" rx="20" fill="#1D1035" stroke="#B85BFF" stroke-opacity="0.65"/>
+    <path d="M35 16L51 22.5V33.3C51 43.4 44.6 52 35 55C25.4 52 19 43.4 19 33.3V22.5L35 16Z" fill="url(#accent)"/>
+    <path d="M28.5 35.2L32.7 39.4L41.8 29" stroke="#130924" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <text x="68" y="178" fill="#FFFFFF" font-family="Inter, Arial, sans-serif" font-size="44" font-weight="750" letter-spacing="-1.6">VPN-сервис</text>
+  <text x="68" y="224" fill="#FFFFFF" font-family="Inter, Arial, sans-serif" font-size="44" font-weight="750" letter-spacing="-1.6">без ручной рутины</text>
+  <text x="68" y="262" fill="#B9B0CA" font-family="Inter, Arial, sans-serif" font-size="18">Продажи, подписки и инфраструктура в одном кабинете.</text>
+  <g transform="translate(68 300)">
+    <rect width="160" height="40" rx="20" fill="#FFFFFF" fill-opacity="0.07" stroke="#FFFFFF" stroke-opacity="0.12"/>
+    <circle cx="21" cy="20" r="5" fill="#35D9FF"/>
+    <text x="36" y="26" fill="#ECE8F4" font-family="Inter, Arial, sans-serif" font-size="15" font-weight="600">Next.js 16</text>
+  </g>
+  <g transform="translate(240 300)">
+    <rect width="166" height="40" rx="20" fill="#FFFFFF" fill-opacity="0.07" stroke="#FFFFFF" stroke-opacity="0.12"/>
+    <circle cx="21" cy="20" r="5" fill="#D832D4"/>
+    <text x="36" y="26" fill="#ECE8F4" font-family="Inter, Arial, sans-serif" font-size="15" font-weight="600">PostgreSQL</text>
+  </g>
+  <g transform="translate(418 300)">
+    <rect width="143" height="40" rx="20" fill="#FFFFFF" fill-opacity="0.07" stroke="#FFFFFF" stroke-opacity="0.12"/>
+    <circle cx="21" cy="20" r="5" fill="#8B4DFF"/>
+    <text x="36" y="26" fill="#ECE8F4" font-family="Inter, Arial, sans-serif" font-size="15" font-weight="600">Docker</text>
+  </g>
+  <g transform="translate(659 54)" filter="url(#shadow)">
+    <rect width="473" height="312" rx="22" fill="#151022" stroke="#FFFFFF" stroke-opacity="0.12"/>
+    <rect width="473" height="58" rx="22" fill="#1C142B"/>
+    <path d="M0 58H473" stroke="#FFFFFF" stroke-opacity="0.09"/>
+    <circle cx="29" cy="29" r="5" fill="#D832D4"/>
+    <circle cx="47" cy="29" r="5" fill="#8B4DFF"/>
+    <circle cx="65" cy="29" r="5" fill="#35D9FF"/>
+    <text x="92" y="35" fill="#F8F7FB" font-family="Inter, Arial, sans-serif" font-size="16" font-weight="650">AlekseevVP Control Room</text>
+    <rect x="24" y="83" width="425" height="82" rx="15" fill="#211632" stroke="#9B5CFF" stroke-opacity="0.42"/>
+    <circle cx="48" cy="107" r="5" fill="#39D5A0"/>
+    <text x="62" y="113" fill="#FFFFFF" font-family="Inter, Arial, sans-serif" font-size="18" font-weight="700">Подписка активна</text>
+    <text x="48" y="143" fill="#9F96B2" font-family="Inter, Arial, sans-serif" font-size="14">90 дней · 5 устройств · безлимит</text>
+    <rect x="312" y="101" width="113" height="42" rx="12" fill="url(#button)"/>
+    <text x="337" y="127" fill="#FFFFFF" font-family="Inter, Arial, sans-serif" font-size="14" font-weight="700">Продлить</text>
+    <rect x="24" y="181" width="132" height="99" rx="15" fill="#1C1529" stroke="#FFFFFF" stroke-opacity="0.09"/>
+    <text x="42" y="208" fill="#8F86A2" font-family="Inter, Arial, sans-serif" font-size="11" font-weight="700" letter-spacing="1.5">ПЛАТЕЖИ</text>
+    <text x="42" y="244" fill="#FFFFFF" font-family="Inter, Arial, sans-serif" font-size="26" font-weight="750">154</text>
+    <text x="42" y="265" fill="#39D5A0" font-family="Inter, Arial, sans-serif" font-size="12">+12 сегодня</text>
+    <rect x="170" y="181" width="132" height="99" rx="15" fill="#1C1529" stroke="#FFFFFF" stroke-opacity="0.09"/>
+    <text x="188" y="208" fill="#8F86A2" font-family="Inter, Arial, sans-serif" font-size="11" font-weight="700" letter-spacing="1.5">НОДЫ</text>
+    <text x="188" y="244" fill="#FFFFFF" font-family="Inter, Arial, sans-serif" font-size="26" font-weight="750">11</text>
+    <text x="188" y="265" fill="#35D9FF" font-family="Inter, Arial, sans-serif" font-size="12">все работают</text>
+    <rect x="316" y="181" width="133" height="99" rx="15" fill="#1C1529" stroke="#FFFFFF" stroke-opacity="0.09"/>
+    <text x="334" y="208" fill="#8F86A2" font-family="Inter, Arial, sans-serif" font-size="11" font-weight="700" letter-spacing="1.5">WORKERS</text>
+    <text x="334" y="244" fill="#FFFFFF" font-family="Inter, Arial, sans-serif" font-size="26" font-weight="750">OK</text>
+    <text x="334" y="265" fill="#39D5A0" font-family="Inter, Arial, sans-serif" font-size="12">очередь чистая</text>
+  </g>
+</svg>
