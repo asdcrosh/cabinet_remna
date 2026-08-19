@@ -203,7 +203,7 @@ function HealthGroup({ category, checks }: { category: SystemHealthCategory; che
         </div>
         <span className={cn('text-xs font-semibold', view.text)}>{view.label}</span>
       </div>
-      <div className="grid gap-3 md:grid-cols-2">
+      <div className="grid items-start gap-3 md:grid-cols-2">
         {checks.map((item) => <HealthCard key={item.id} item={item} />)}
       </div>
     </section>
@@ -226,16 +226,19 @@ function HealthCard({ item }: { item: SystemHealthCheck }) {
       </div>
 
       {item.metrics?.length ? (
-        <div className="mt-4 grid grid-cols-2 gap-px overflow-hidden rounded-xl bg-slate-200 dark:bg-white/10 sm:grid-cols-4">
+        <div className="mt-4 flex flex-wrap gap-2">
           {item.metrics.map((metric) => (
-            <div key={metric.label} className="bg-slate-50 px-3 py-2.5 dark:bg-[#181b21]">
+            <div
+              key={metric.label}
+              className="min-w-[8rem] flex-[1_1_8rem] rounded-xl border border-slate-200/80 bg-slate-50/70 px-3 py-2.5 dark:border-white/[0.08] dark:bg-white/[0.025]"
+            >
               <div className={cn(
                 'text-lg font-semibold tabular-nums',
                 metric.tone === 'positive' && 'text-emerald-600 dark:text-emerald-300',
                 metric.tone === 'warning' && 'text-amber-600 dark:text-amber-300',
                 metric.tone === 'negative' && 'text-red-600 dark:text-red-300',
               )}>{metric.value}</div>
-              <div className="mt-0.5 truncate text-[10px] uppercase tracking-wider text-slate-400">{metric.label}</div>
+              <div className="mt-0.5 text-[10px] leading-4 uppercase tracking-wider text-slate-400">{metric.label}</div>
             </div>
           ))}
         </div>
