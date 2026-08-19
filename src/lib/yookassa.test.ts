@@ -76,4 +76,54 @@ describe('yookassa client', () => {
       idempotenceKey: 'payment-2',
     })).rejects.toThrow('YooKassa createPayment failed: 401 bad credentials')
   })
+
+  it('requests saving a bank card for future renewals', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ id: 'yoo-save', status: 'pending', paid: false }),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const { createPayment } = await import('./yookassa')
+
+    await createPayment({
+      amount: 300,
+      description: 'Подписка',
+      returnUrl: 'https://cabinet.example/return',
+      idempotenceKey: 'payment-save',
+      paymentMethodType: 'bank_card',
+      savePaymentMethod: true,
+    })
+
+    const request = fetchMock.mock.calls[0]?.[1] as RequestInit | undefined
+    const body = JSON.parse(String(request?.body))
+    expect(body.save_payment_method).toBe(true)
+    expect(body.payment_method_data).toEqual({ type: 'bank_card' })
+    expect(body.confirmation).toEqual({
+      type: 'redirect',
+      return_url: 'https://cabinet.example/return',
+    })
+  })
+
+  it('creates a recurring payment without redirect confirmation', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ id: 'yoo-repeat', status: 'pending', paid: false }),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const { createPayment } = await import('./yookassa')
+
+    await createPayment({
+      amount: 300,
+      description: 'Продление подписки',
+      returnUrl: 'https://cabinet.example/return',
+      idempotenceKey: 'payment-repeat',
+      paymentMethodId: 'pm-saved-1',
+    })
+
+    const request = fetchMock.mock.calls[0]?.[1] as RequestInit | undefined
+    const body = JSON.parse(String(request?.body))
+    expect(body.payment_method_id).toBe('pm-saved-1')
+    expect(body.confirmation).toBeUndefined()
+    expect(body.payment_method_data).toBeUndefined()
+  })
 })

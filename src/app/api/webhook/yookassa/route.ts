@@ -8,12 +8,16 @@ import { logError, logWarn } from '@/lib/logger'
 import { prisma } from '@/lib/prisma'
 import { notifyPaymentCanceled, notifyPaymentStuck } from '@/lib/notifications'
 import { provisionPaymentSubscription } from '@/lib/provisioning'
-import { getPayment } from '@/lib/yookassa'
+import { getPayment, type YooPayment } from '@/lib/yookassa'
 import { assertYookassaWebhookSource } from '@/lib/yookassa-webhook'
 import { getResolvedPaymentProviderSettings } from '@/lib/payment-settings'
 import { recordSucceededRefund } from '@/lib/payment-refunds'
 import { terminateUserSubscription } from '@/lib/subscription-termination'
 import { paymentErrorDetails, recordPaymentEvent } from '@/lib/payment-events'
+import {
+  captureSavedPaymentMethodBestEffort,
+  registerAutoRenewalFailureBestEffort,
+} from '@/lib/auto-renewal'
 
 export const runtime = 'nodejs'
 
@@ -66,10 +70,23 @@ export async function POST(req: Request) {
   }
 
   const yookassaId = event.object.id
-  const payment = await prisma.payment.findUnique({
+  let payment = await prisma.payment.findUnique({
     where: { yookassaId },
     include: { plan: true, user: true },
   })
+  const metadataPaymentId = event.object.metadata?.localPaymentId
+  if (!payment && metadataPaymentId) {
+    payment = await prisma.payment.findFirst({
+      where: { id: metadataPaymentId, provider: 'YOOKASSA' },
+      include: { plan: true, user: true },
+    })
+    if (payment) {
+      await prisma.payment.update({
+        where: { id: payment.id },
+        data: { yookassaId, externalPaymentId: yookassaId },
+      })
+    }
+  }
   if (!payment) {
     logWarn('webhook.payment_not_found', { yookassaId })
     return NextResponse.json({ ok: true, notFound: true })
@@ -86,6 +103,14 @@ export async function POST(req: Request) {
   })
 
   if (payment.status === 'SUCCEEDED' && payment.subscriptionProvisionedAt) {
+    try {
+      await captureSavedPaymentMethodBestEffort({
+        localPaymentId: payment.id,
+        providerPayment: await getPayment(yookassaId),
+      })
+    } catch (error) {
+      logError('webhook.saved_payment_method_refresh_failed', error, { paymentId: payment.id, yookassaId })
+    }
     await prisma.promoCodeRedemption.updateMany({
       where: { paymentId: payment.id, status: 'PENDING' },
       data: { status: 'SUCCEEDED' },
@@ -94,9 +119,10 @@ export async function POST(req: Request) {
   }
 
   let status = event.object.status
+  let freshPayment: YooPayment
   try {
-    const fresh = await getPayment(yookassaId)
-    status = fresh.status
+    freshPayment = await getPayment(yookassaId)
+    status = freshPayment.status
   } catch (e) {
     logError('webhook.get_payment_failed', e, { yookassaId })
     await recordPaymentEvent({
@@ -115,6 +141,10 @@ export async function POST(req: Request) {
   }
 
   if (status === 'succeeded') {
+    await captureSavedPaymentMethodBestEffort({
+      localPaymentId: payment.id,
+      providerPayment: freshPayment,
+    })
     await prisma.payment.update({
       where: { id: payment.id },
       data: {
@@ -180,6 +210,10 @@ export async function POST(req: Request) {
       data: { status: 'CANCELED' },
     })
     await notifyPaymentCanceled(payment.id)
+    await registerAutoRenewalFailureBestEffort(
+      payment.id,
+      freshPayment.cancellation_details?.reason ?? 'ЮKassa отменила автоплатёж'
+    )
     await recordPaymentEvent({
       paymentId: payment.id,
       stage: 'PAYMENT',

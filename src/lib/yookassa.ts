@@ -33,6 +33,10 @@ export interface CreatePaymentInput {
   // Метод оплаты: SBP, BANK_CARD, и т.д. Если не указан — пользователь
   // увидит выбор на стороне ЮKassa.
   paymentMethodType?: 'bank_card' | 'sbp' | 'yoo_money' | 'sberbank'
+  // Сохранение доступно только после подключения автоплатежей в магазине ЮKassa.
+  savePaymentMethod?: boolean
+  // Для повторного безакцептного списания. При наличии confirmation не передаётся.
+  paymentMethodId?: string
 }
 
 export interface YooPayment {
@@ -42,12 +46,23 @@ export interface YooPayment {
   amount: { value: string; currency: string }
   confirmation?: { type: string; confirmation_url?: string }
   metadata?: Record<string, string>
+  payment_method?: {
+    id?: string
+    type?: string
+    saved?: boolean
+    title?: string
+    card?: { last4?: string; card_type?: string }
+  }
+  cancellation_details?: { party?: string; reason?: string }
   created_at: string
 }
 
 // ---- API ----------------------------------------------------------------
 
 export async function createPayment(input: CreatePaymentInput): Promise<YooPayment> {
+  if (input.paymentMethodId && input.paymentMethodType) {
+    throw new Error('YooKassa payment method ID and payment method data are mutually exclusive')
+  }
   const config = await getYooKassaConfig()
   const idempotenceKey =
     input.idempotenceKey ??
@@ -59,12 +74,18 @@ export async function createPayment(input: CreatePaymentInput): Promise<YooPayme
       currency: 'RUB',
     },
     capture: input.capture ?? true,
-    confirmation: {
-      type: 'redirect',
-      return_url: input.returnUrl,
-    },
+    ...(!input.paymentMethodId
+      ? {
+          confirmation: {
+            type: 'redirect',
+            return_url: input.returnUrl,
+          },
+        }
+      : {}),
     description: input.description,
     metadata: input.metadata,
+    ...(input.savePaymentMethod ? { save_payment_method: true } : {}),
+    ...(input.paymentMethodId ? { payment_method_id: input.paymentMethodId } : {}),
     ...(input.paymentMethodType
       ? { payment_method_data: { type: input.paymentMethodType } }
       : {}),

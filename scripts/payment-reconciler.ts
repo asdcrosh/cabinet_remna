@@ -12,6 +12,7 @@ import { recordPaymentWorkerHeartbeat } from '../src/lib/worker-health'
 import { logError, logInfo } from '../src/lib/logger'
 import { reconcileSubscriptionHealthBatch } from '../src/lib/subscription-health'
 import { processAdminTelegramDeliveries } from '../src/lib/admin-telegram-notifications'
+import { processDueAutoRenewals } from '../src/lib/auto-renewal'
 
 const intervalMs = readPositiveInt('PAYMENT_RECONCILE_INTERVAL_SECONDS', 60) * 1000
 const batchSize = readPositiveInt('PAYMENT_RECONCILE_BATCH_SIZE', 25)
@@ -26,6 +27,7 @@ const remnashopSyncRetryBatchSize = readPositiveInt('REMNASHOP_SYNC_RETRY_BATCH_
 const subscriptionHealthIntervalMs = readPositiveInt('SUBSCRIPTION_HEALTH_INTERVAL_SECONDS', 600) * 1000
 const subscriptionHealthBatchSize = readPositiveInt('SUBSCRIPTION_HEALTH_BATCH_SIZE', 10)
 const adminTelegramBatchSize = readPositiveInt('ADMIN_TELEGRAM_NOTIFICATION_BATCH_SIZE', 20)
+const autoRenewalBatchSize = readPositiveInt('AUTO_RENEWAL_BATCH_SIZE', 20)
 
 let stopped = false
 let wakeSleep: (() => void) | null = null
@@ -62,6 +64,13 @@ async function runOnce() {
   })
   await syncRemnashopUsersIfDue()
   await syncSubscriptionHealthIfDue()
+  const autoRenewals = await processDueAutoRenewals({
+    limit: autoRenewalBatchSize,
+    shouldStop: () => stopped,
+  })
+  if (autoRenewals.checked > 0) {
+    logInfo('auto_renewal.batch_finished', autoRenewals)
+  }
 
   const cutoff = new Date(Date.now() - minAgeMs)
   const payments = await prisma.payment.findMany({

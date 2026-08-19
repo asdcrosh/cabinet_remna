@@ -6,6 +6,7 @@ import { notifyPaymentSucceeded } from './notifications'
 import { syncCabinetPaymentToRemnashopBestEffort } from './remnashop-reverse-sync'
 import { logError } from './logger'
 import { paymentErrorDetails, recordPaymentEvent } from './payment-events'
+import { refreshAutoRenewalSchedule } from './auto-renewal'
 
 export interface ProvisionPaymentSubscriptionInput extends EnsureSubscriptionInput {
   paymentId: string
@@ -39,6 +40,7 @@ export async function provisionPaymentSubscription(input: ProvisionPaymentSubscr
     await settleReferralRewards(input.paymentId, input.userId)
     await syncCabinetPaymentToRemnashopBestEffort(input.paymentId)
     await notifyPaymentSuccessBestEffort(input.paymentId)
+    await refreshAutoRenewalScheduleBestEffort(input.userId, input.paymentId)
     await recordPaymentEvent({
       paymentId: input.paymentId,
       stage: 'PROVISIONING',
@@ -98,6 +100,7 @@ export async function provisionPaymentSubscription(input: ProvisionPaymentSubscr
     await settleReferralRewards(input.paymentId, input.userId)
     await syncCabinetPaymentToRemnashopBestEffort(input.paymentId)
     await notifyPaymentSuccessBestEffort(input.paymentId)
+    await refreshAutoRenewalScheduleBestEffort(input.userId, input.paymentId)
     await recordPaymentEvent({
       paymentId: input.paymentId,
       stage: 'PROVISIONING',
@@ -130,6 +133,14 @@ export async function provisionPaymentSubscription(input: ProvisionPaymentSubscr
       dedupeKey: `provisioning-failed-${job.attempts}`,
     })
     throw e
+  }
+}
+
+async function refreshAutoRenewalScheduleBestEffort(userId: string, paymentId: string) {
+  try {
+    await refreshAutoRenewalSchedule(userId, paymentId)
+  } catch (error) {
+    logError('auto_renewal.schedule_refresh_failed', error, { userId })
   }
 }
 

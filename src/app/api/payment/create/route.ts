@@ -18,6 +18,7 @@ import { reconcileStalePendingPaymentsForUser } from '@/lib/payment-sync'
 import { logError } from '@/lib/logger'
 import { buildPaymentServiceName } from '@/lib/payment-service-name'
 import { paymentErrorDetails, recordPaymentEvent } from '@/lib/payment-events'
+import { shouldSavePaymentMethodBestEffort } from '@/lib/auto-renewal'
 
 export const runtime = 'nodejs'
 
@@ -379,10 +380,13 @@ export const POST = withAuth(async (req: Request) => {
 
   let payment
   try {
+    const savePaymentMethod = await shouldSavePaymentMethodBestEffort(user.id, plan.id)
     payment = await createPayment({
       amount: amountRub,
       description,
       returnUrl,
+      savePaymentMethod,
+      paymentMethodType: savePaymentMethod ? 'bank_card' : undefined,
       metadata: {
         userId: user.id,
         planId: plan.id,

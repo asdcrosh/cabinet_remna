@@ -6,6 +6,10 @@ import { provisionPaymentSubscription } from './provisioning'
 import { cancelPayment, getPayment } from './yookassa'
 import type { PaymentStatus as YooKassaPaymentStatus } from './yookassa'
 import { paymentErrorDetails, recordPaymentEvent } from './payment-events'
+import {
+  captureSavedPaymentMethodBestEffort,
+  registerAutoRenewalFailureBestEffort,
+} from './auto-renewal'
 
 const DEFAULT_PENDING_TTL_SECONDS = 600
 
@@ -230,6 +234,10 @@ export async function syncPaymentProvisioning(input: {
       }),
     ])
     await notifyPaymentCanceled(payment.id)
+    await registerAutoRenewalFailureBestEffort(
+      payment.id,
+      yooPayment.cancellation_details?.reason ?? 'ЮKassa отменила автоплатёж'
+    )
     await recordPaymentEvent({
       paymentId: payment.id,
       stage: 'PAYMENT',
@@ -277,6 +285,7 @@ export async function syncPaymentProvisioning(input: {
       data: { status: 'SUCCEEDED' },
     }),
   ])
+  await captureSavedPaymentMethodBestEffort({ localPaymentId: payment.id, providerPayment: yooPayment })
   await cancelOtherPendingPaymentsForUser(payment.userId, payment.id)
   await recordPaymentEvent({
     paymentId: payment.id,
@@ -416,6 +425,7 @@ async function cancelLocalPayment(paymentId: string, yookassaStatus: YooKassaPay
     details: { providerStatus: yookassaStatus ?? 'canceled' },
     dedupeKey: 'payment-canceled',
   })
+  await registerAutoRenewalFailureBestEffort(paymentId, 'Автоплатёж не был подтверждён вовремя')
 }
 
 export function getPendingPaymentTtlMs() {

@@ -42,6 +42,7 @@ model Plan {
   updatedAt            DateTime         @updatedAt
 
   payments             Payment[]
+  autoRenewals         AutoRenewal[]
   subscriptions        Subscription[]
   promoCodePlans       PromoCodePlan[]
   trialRedemptions     TrialPlanRedemption[]
@@ -138,6 +139,7 @@ model User {
   revokedSessions            RevokedSession[]
   broadcastDeliveries        BroadcastDelivery[]
   subscriptionHealth         SubscriptionHealth?
+  autoRenewal                AutoRenewal?
 
   @@index([email])
   @@index([role])
@@ -668,6 +670,7 @@ model Payment {
   userId         String
   subscriptionId String?
   planId         String
+  autoRenewalId  String?
   promoCodeId    String?
 
   // Наши суммы (в копейках)
@@ -679,6 +682,7 @@ model Payment {
 
   // Общие данные внешнего провайдера
   provider          PaymentProvider @default(YOOKASSA)
+  origin            PaymentOrigin   @default(MANUAL)
   externalPaymentId String?
   providerStatus    String?
   checkoutKey       String?
@@ -700,6 +704,7 @@ model Payment {
   user                      User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
   subscription              Subscription?              @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
   plan                      Plan                       @relation(fields: [planId], references: [id], onDelete: Restrict)
+  autoRenewal               AutoRenewal?               @relation(fields: [autoRenewalId], references: [id], onDelete: SetNull)
   promoCode                 PromoCode?                 @relation(fields: [promoCodeId], references: [id], onDelete: SetNull)
   promoCodeRedemption       PromoCodeRedemption?
   trialPlanRedemption       TrialPlanRedemption?
@@ -721,6 +726,12 @@ model Payment {
   @@index([status, subscriptionProvisionedAt, remnashopSyncedAt, updatedAt], map: "Payment_status_subscriptionProvisionedAt_remnashopSyncedAt_upda")
   @@index([provider, status, createdAt])
   @@index([promoCodeId])
+  @@index([autoRenewalId, createdAt])
+}
+
+enum PaymentOrigin {
+  MANUAL
+  AUTO_RENEWAL
 }
 
 enum PaymentProvider {
@@ -792,6 +803,41 @@ enum YookassaPaymentStatus {
   waiting_for_capture
   succeeded
   canceled
+}
+
+model AutoRenewal {
+  id                       String            @id @default(cuid())
+  userId                   String            @unique
+  planId                   String
+  status                   AutoRenewalStatus @default(AWAITING_PAYMENT_METHOD)
+  paymentMethodIdEncrypted String?
+  paymentMethodTitle       String?
+  paymentMethodSavedAt     DateTime?
+  nextChargeAt             DateTime?
+  retryCount               Int               @default(0)
+  lastAttemptAt            DateTime?
+  lastSuccessAt            DateTime?
+  lastFailurePaymentId     String?
+  lastError                String?
+  disabledAt               DateTime?
+  createdAt                DateTime          @default(now())
+  updatedAt                DateTime          @updatedAt
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan     Plan      @relation(fields: [planId], references: [id], onDelete: Restrict)
+  payments Payment[]
+
+  @@index([status, nextChargeAt])
+  @@index([planId])
+}
+
+enum AutoRenewalStatus {
+  AWAITING_PAYMENT_METHOD
+  ACTIVE
+  PROCESSING
+  RETRYING
+  PAUSED
+  DISABLED
 }
 
 model SyncEvent {

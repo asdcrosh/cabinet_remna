@@ -14,6 +14,8 @@ import {
 } from '@/lib/payment-sync'
 import { getFeatureFlags } from '@/lib/feature-flags'
 import { ArrowRight, CreditCard } from 'lucide-react'
+import { AutoRenewalCard } from '@/components/dashboard/auto-renewal-card'
+import { getAutoRenewalState } from '@/lib/auto-renewal'
 
 export const dynamic = 'force-dynamic'
 const PAGE_SIZE = 20
@@ -38,15 +40,23 @@ export default async function BillingPage({
           cancelPendingOlderThanMs: getPendingPaymentTtlMs(),
         })
       : null
-  const [total, payments] = await prisma.$transaction([
-    prisma.payment.count({ where: { userId: session.uid } }),
-    prisma.payment.findMany({
-      where: { userId: session.uid },
-      orderBy: { createdAt: 'desc' },
-      skip: (page - 1) * PAGE_SIZE,
-      take: PAGE_SIZE,
-      include: { plan: true, subscription: true },
-    }),
+  const [[total, payments, currentSubscription], autoRenewal] = await Promise.all([
+    prisma.$transaction([
+      prisma.payment.count({ where: { userId: session.uid } }),
+      prisma.payment.findMany({
+        where: { userId: session.uid },
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * PAGE_SIZE,
+        take: PAGE_SIZE,
+        include: { plan: true, subscription: true },
+      }),
+      prisma.subscription.findFirst({
+        where: { userId: session.uid, status: { in: ['ACTIVE', 'LIMITED'] }, planId: { not: null } },
+        orderBy: { expireAt: 'desc' },
+        include: { plan: { select: { id: true, name: true } } },
+      }),
+    ]),
+    getAutoRenewalState(session.uid),
   ])
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
@@ -69,6 +79,20 @@ export default async function BillingPage({
       {params.paid === '1' && returnPaymentId && (
         <PaymentSuccessBanner status={getBannerStatus(syncResult)} supportEnabled={features.support} />
       )}
+
+      {currentSubscription?.plan ? (
+        <AutoRenewalCard
+          planId={currentSubscription.plan.id}
+          planName={currentSubscription.plan.name}
+          initialState={autoRenewal ? {
+            ...autoRenewal,
+            paymentMethodSavedAt: autoRenewal.paymentMethodSavedAt?.toISOString() ?? null,
+            nextChargeAt: autoRenewal.nextChargeAt?.toISOString() ?? null,
+            lastAttemptAt: autoRenewal.lastAttemptAt?.toISOString() ?? null,
+            lastSuccessAt: autoRenewal.lastSuccessAt?.toISOString() ?? null,
+          } : null}
+        />
+      ) : null}
 
       <section aria-labelledby="payment-history-title">
         <div className="mb-3 flex items-end justify-between gap-3 px-1">
