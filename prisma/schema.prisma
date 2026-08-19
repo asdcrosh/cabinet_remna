@@ -863,6 +863,10 @@ model AutoRenewal {
   paymentMethodIdEncrypted String?
   paymentMethodTitle       String?
   paymentMethodSavedAt     DateTime?
+  consentAcceptedAt        DateTime?
+  consentVersion           String?
+  consentPriceKopecks      Int?
+  consentDurationDays      Int?
   nextChargeAt             DateTime?
   retryCount               Int               @default(0)
   lastAttemptAt            DateTime?

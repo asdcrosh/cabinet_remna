@@ -54,7 +54,7 @@ export default async function BillingPage({
       prisma.subscription.findFirst({
         where: { userId: session.uid, status: { in: ['ACTIVE', 'LIMITED', 'PAUSED'] }, planId: { not: null } },
         orderBy: { expireAt: 'desc' },
-        include: { plan: { select: { id: true, name: true } } },
+        include: { plan: { select: { id: true, name: true, priceKopecks: true, durationDays: true } } },
       }),
     ]),
     getAutoRenewalState(session.uid),
@@ -86,9 +86,12 @@ export default async function BillingPage({
         <AutoRenewalCard
           planId={currentSubscription.plan.id}
           planName={currentSubscription.plan.name}
+          planPriceKopecks={currentSubscription.plan.priceKopecks}
+          planDurationDays={currentSubscription.plan.durationDays}
           initialState={autoRenewal ? {
             ...autoRenewal,
             paymentMethodSavedAt: autoRenewal.paymentMethodSavedAt?.toISOString() ?? null,
+            consentAcceptedAt: autoRenewal.consentAcceptedAt?.toISOString() ?? null,
             nextChargeAt: autoRenewal.nextChargeAt?.toISOString() ?? null,
             lastAttemptAt: autoRenewal.lastAttemptAt?.toISOString() ?? null,
             lastSuccessAt: autoRenewal.lastSuccessAt?.toISOString() ?? null,

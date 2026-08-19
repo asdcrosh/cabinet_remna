@@ -4,11 +4,16 @@ import { requireAuth, withAuth } from '@/lib/auth/guard'
 import { disableAutoRenewal, enableAutoRenewal, getAutoRenewalState } from '@/lib/auto-renewal'
 import { isYookassaConfigured } from '@/lib/yookassa'
 import { rateLimit } from '@/lib/rate-limit'
+import { AUTO_RENEWAL_CONSENT_VERSION } from '@/lib/auto-renewal-consent'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-const enableSchema = z.object({ planId: z.string().min(1).max(100) }).strict()
+const enableSchema = z.object({
+  planId: z.string().min(1).max(100),
+  consentAccepted: z.literal(true),
+  consentVersion: z.literal(AUTO_RENEWAL_CONSENT_VERSION),
+}).strict()
 
 export const GET = withAuth(async () => {
   const session = await requireAuth()
@@ -29,10 +34,13 @@ export const POST = withAuth(async (req: Request) => {
   }
   const parsed = enableSchema.safeParse(await req.json().catch(() => null))
   if (!parsed.success) {
-    return NextResponse.json({ error: 'Не удалось определить тариф' }, { status: 422 })
+    return NextResponse.json(
+      { error: 'Подтвердите согласие на регулярные списания и условия автопродления' },
+      { status: 422 }
+    )
   }
   try {
-    await enableAutoRenewal({ userId: session.uid, planId: parsed.data.planId })
+    await enableAutoRenewal({ userId: session.uid, ...parsed.data })
     return NextResponse.json({ autoRenewal: await getAutoRenewalState(session.uid) })
   } catch (error) {
     return NextResponse.json(

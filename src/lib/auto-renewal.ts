@@ -6,6 +6,7 @@ import { createPayment, type YooPayment } from './yookassa'
 import { logError, logInfo } from './logger'
 import { notifyUser } from './notifications'
 import { getAppUrl } from './app-url'
+import { AUTO_RENEWAL_CONSENT_VERSION } from './auto-renewal-consent'
 
 const HOUR_MS = 60 * 60 * 1000
 const DEFAULT_LEAD_HOURS = 24
@@ -27,6 +28,10 @@ export async function getAutoRenewalState(userId: string) {
     status: setting.status,
     paymentMethodTitle: setting.paymentMethodTitle,
     paymentMethodSavedAt: setting.paymentMethodSavedAt,
+    consentAcceptedAt: setting.consentAcceptedAt,
+    consentVersion: setting.consentVersion,
+    consentPriceKopecks: setting.consentPriceKopecks,
+    consentDurationDays: setting.consentDurationDays,
     nextChargeAt: setting.nextChargeAt,
     retryCount: setting.retryCount,
     lastAttemptAt: setting.lastAttemptAt,
@@ -35,7 +40,15 @@ export async function getAutoRenewalState(userId: string) {
   }
 }
 
-export async function enableAutoRenewal(input: { userId: string; planId: string }) {
+export async function enableAutoRenewal(input: {
+  userId: string
+  planId: string
+  consentAccepted: true
+  consentVersion: string
+}) {
+  if (!input.consentAccepted || input.consentVersion !== AUTO_RENEWAL_CONSENT_VERSION) {
+    throw new Error('Подтвердите согласие на регулярные списания')
+  }
   const [plan, subscription] = await Promise.all([
     prisma.plan.findFirst({ where: { id: input.planId, isActive: true } }),
     prisma.subscription.findFirst({
@@ -53,17 +66,26 @@ export async function enableAutoRenewal(input: { userId: string; planId: string 
 
   const existing = await prisma.autoRenewal.findUnique({ where: { userId: input.userId } })
   const hasMethod = Boolean(existing?.paymentMethodIdEncrypted)
+  const consentAcceptedAt = new Date()
   return prisma.autoRenewal.upsert({
     where: { userId: input.userId },
     create: {
       userId: input.userId,
       planId: plan.id,
       status: 'AWAITING_PAYMENT_METHOD',
+      consentAcceptedAt,
+      consentVersion: AUTO_RENEWAL_CONSENT_VERSION,
+      consentPriceKopecks: plan.priceKopecks,
+      consentDurationDays: plan.durationDays,
       nextChargeAt: null,
     },
     update: {
       planId: plan.id,
       status: hasMethod ? 'ACTIVE' : 'AWAITING_PAYMENT_METHOD',
+      consentAcceptedAt,
+      consentVersion: AUTO_RENEWAL_CONSENT_VERSION,
+      consentPriceKopecks: plan.priceKopecks,
+      consentDurationDays: plan.durationDays,
       nextChargeAt: hasMethod && subscription ? chargeAt(subscription.expireAt) : null,
       retryCount: 0,
       lastFailurePaymentId: null,
@@ -96,12 +118,20 @@ export async function disableAutoRenewal(userId: string) {
 export async function shouldSavePaymentMethod(userId: string, planId: string) {
   const setting = await prisma.autoRenewal.findUnique({
     where: { userId },
-    select: { planId: true, status: true, paymentMethodIdEncrypted: true },
+    select: {
+      planId: true,
+      status: true,
+      paymentMethodIdEncrypted: true,
+      consentAcceptedAt: true,
+      consentVersion: true,
+    },
   })
   return Boolean(
     setting
     && setting.planId === planId
     && setting.status !== 'DISABLED'
+    && Boolean(setting.consentAcceptedAt)
+    && setting.consentVersion === AUTO_RENEWAL_CONSENT_VERSION
     && !setting.paymentMethodIdEncrypted
   )
 }
@@ -128,7 +158,13 @@ export async function captureSavedPaymentMethod(input: {
   })
   if (!payment) return false
   const setting = await prisma.autoRenewal.findUnique({ where: { userId: payment.userId } })
-  if (!setting || setting.status === 'DISABLED' || setting.planId !== payment.planId) return false
+  if (
+    !setting
+    || setting.status === 'DISABLED'
+    || setting.planId !== payment.planId
+    || !setting.consentAcceptedAt
+    || setting.consentVersion !== AUTO_RENEWAL_CONSENT_VERSION
+  ) return false
 
   const subscription = await prisma.subscription.findFirst({
     where: { userId: payment.userId, status: { in: ['ACTIVE', 'LIMITED'] } },
@@ -166,28 +202,39 @@ export async function captureSavedPaymentMethodBestEffort(input: {
 
 export async function refreshAutoRenewalSchedule(userId: string, paymentId?: string) {
   const setting = await prisma.autoRenewal.findUnique({ where: { userId } })
-  if (!setting || !setting.paymentMethodIdEncrypted || setting.status === 'DISABLED') return
+  if (
+    !setting
+    || !setting.paymentMethodIdEncrypted
+    || setting.status === 'DISABLED'
+    || !setting.consentAcceptedAt
+    || setting.consentVersion !== AUTO_RENEWAL_CONSENT_VERSION
+  ) return
   const [subscription, payment] = await Promise.all([
     prisma.subscription.findFirst({
       where: { userId, status: { in: ['ACTIVE', 'LIMITED'] } },
       orderBy: { expireAt: 'desc' },
-      include: { plan: { select: { id: true, isPromo: true, priceKopecks: true } } },
+      include: { plan: { select: { id: true, isPromo: true, priceKopecks: true, durationDays: true } } },
     }),
     paymentId
       ? prisma.payment.findUnique({ where: { id: paymentId }, select: { origin: true } })
       : null,
   ])
   if (!subscription?.plan || subscription.plan.isPromo || subscription.plan.priceKopecks <= 0) return
+  const consentCurrent = (
+    setting.planId === subscription.plan.id
+    && setting.consentPriceKopecks === subscription.plan.priceKopecks
+    && setting.consentDurationDays === subscription.plan.durationDays
+  )
   await prisma.autoRenewal.update({
     where: { id: setting.id },
     data: {
       planId: subscription.plan.id,
-      status: 'ACTIVE',
-      nextChargeAt: chargeAt(subscription.expireAt),
+      status: consentCurrent ? 'ACTIVE' : 'PAUSED',
+      nextChargeAt: consentCurrent ? chargeAt(subscription.expireAt) : null,
       retryCount: 0,
       lastSuccessAt: payment?.origin === 'AUTO_RENEWAL' ? new Date() : setting.lastSuccessAt,
       lastFailurePaymentId: null,
-      lastError: null,
+      lastError: consentCurrent ? null : 'Условия тарифа изменились. Требуется новое согласие на автопродление.',
     },
   })
 }
@@ -241,6 +288,10 @@ export async function processDueAutoRenewals(options?: { limit?: number; shouldS
       status: { in: ['ACTIVE', 'RETRYING'] },
       nextChargeAt: { lte: new Date() },
       paymentMethodIdEncrypted: { not: null },
+      consentAcceptedAt: { not: null },
+      consentVersion: AUTO_RENEWAL_CONSENT_VERSION,
+      consentPriceKopecks: { not: null },
+      consentDurationDays: { not: null },
     },
     orderBy: { nextChargeAt: 'asc' },
     take: options?.limit ?? 20,
@@ -251,8 +302,8 @@ export async function processDueAutoRenewals(options?: { limit?: number; shouldS
   for (const setting of settings) {
     if (options?.shouldStop?.()) break
     try {
-      await createAutoRenewalPayment(setting)
-      created += 1
+      const payment = await createAutoRenewalPayment(setting)
+      if (payment) created += 1
     } catch (error) {
       failed += 1
       logError('auto_renewal.create_failed', error, { autoRenewalId: setting.id, userId: setting.userId })
@@ -262,6 +313,29 @@ export async function processDueAutoRenewals(options?: { limit?: number; shouldS
 }
 
 async function createAutoRenewalPayment(setting: DueAutoRenewal) {
+  if (
+    setting.consentPriceKopecks !== setting.plan.priceKopecks
+    || setting.consentDurationDays !== setting.plan.durationDays
+  ) {
+    await prisma.autoRenewal.update({
+      where: { id: setting.id },
+      data: {
+        status: 'PAUSED',
+        nextChargeAt: null,
+        lastError: 'Условия тарифа изменились. Требуется новое согласие на автопродление.',
+      },
+    })
+    await notifyUser({
+      userId: setting.userId,
+      type: 'PAYMENT_FAILED',
+      dedupeKey: `auto-renewal-consent-outdated:${setting.id}:${setting.plan.updatedAt.toISOString()}`,
+      title: 'Автопродление требует подтверждения',
+      body: 'Цена или срок тарифа изменились. Откройте платежи и подтвердите новые условия.',
+      actionHref: '/dashboard/billing',
+      actionLabel: 'Подтвердить условия',
+    })
+    return null
+  }
   const scheduledAt = setting.nextChargeAt ?? new Date()
   const checkoutKey = `auto:${setting.id}:${scheduledAt.toISOString()}:${setting.retryCount}`
   const existing = await prisma.payment.findUnique({

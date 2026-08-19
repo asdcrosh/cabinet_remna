@@ -7,6 +7,9 @@ import { apiFetch } from '@/lib/api-client'
 import { toast } from '@/components/ui/toaster'
 import { Switch } from '@/components/ui/switch'
 import { Modal } from '@/components/ui/modal'
+import { Checkbox } from '@/components/ui/checkbox'
+import { formatPrice } from '@/lib/format'
+import { AUTO_RENEWAL_CONSENT_VERSION } from '@/lib/auto-renewal-consent'
 
 type AutoRenewalState = {
   id: string
@@ -14,6 +17,10 @@ type AutoRenewalState = {
   status: 'AWAITING_PAYMENT_METHOD' | 'ACTIVE' | 'PROCESSING' | 'RETRYING' | 'PAUSED' | 'DISABLED'
   paymentMethodTitle: string | null
   paymentMethodSavedAt: string | null
+  consentAcceptedAt: string | null
+  consentVersion: string | null
+  consentPriceKopecks: number | null
+  consentDurationDays: number | null
   nextChargeAt: string | null
   retryCount: number
   lastAttemptAt: string | null
@@ -44,36 +51,59 @@ const reasons: Array<{ value: RetentionReason; title: string; detail: string }> 
 export function AutoRenewalCard({
   planId,
   planName,
+  planPriceKopecks,
+  planDurationDays,
   initialState,
   initialPause,
 }: {
   planId: string
   planName: string
+  planPriceKopecks: number
+  planDurationDays: number
   initialState: AutoRenewalState
   initialPause: PauseState
 }) {
   const [state, setState] = useState(initialState)
   const [pause, setPause] = useState(initialPause)
   const [saving, setSaving] = useState(false)
-  const [dialog, setDialog] = useState<'disable' | 'pause' | null>(null)
+  const [dialog, setDialog] = useState<'enable' | 'disable' | 'pause' | null>(null)
+  const [consentAccepted, setConsentAccepted] = useState(false)
   const [reason, setReason] = useState<RetentionReason>('NOT_USING')
   const [pauseDays, setPauseDays] = useState(14)
   const [comment, setComment] = useState('')
-  const enabled = Boolean(state && state.status !== 'DISABLED')
+  const consentCurrent = Boolean(
+    state?.consentAcceptedAt
+    && state.consentVersion === AUTO_RENEWAL_CONSENT_VERSION
+    && state.consentPriceKopecks === planPriceKopecks
+    && state.consentDurationDays === planDurationDays
+  )
+  const enabled = Boolean(state && state.status !== 'DISABLED' && consentCurrent)
 
   async function changeEnabled(next: boolean) {
     if (!next) {
       setDialog('disable')
       return
     }
+    setConsentAccepted(false)
+    setDialog('enable')
+  }
+
+  async function submitEnable() {
+    if (!consentAccepted) return
     setSaving(true)
     try {
       const data = await apiFetch<{ autoRenewal: AutoRenewalState }>('/api/auto-renewal', {
-        method: next ? 'POST' : 'DELETE',
-        body: next ? JSON.stringify({ planId }) : undefined,
+        method: 'POST',
+        body: JSON.stringify({
+          planId,
+          consentAccepted: true,
+          consentVersion: AUTO_RENEWAL_CONSENT_VERSION,
+        }),
       })
       setState(data.autoRenewal)
-      toast(next ? 'Автопродление включено' : 'Автопродление выключено', 'success')
+      setDialog(null)
+      setConsentAccepted(false)
+      toast('Согласие принято. Автопродление включено', 'success')
     } finally {
       setSaving(false)
     }
@@ -134,7 +164,9 @@ export function AutoRenewalCard({
           </div>
         </div>
         <div className="flex min-h-9 items-center gap-3 self-stretch rounded-2xl bg-slate-50 px-3 py-2 dark:bg-white/[0.045] sm:self-auto">
-          <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{enabled ? 'Включено' : 'Выключено'}</span>
+          <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
+            {enabled ? 'Включено' : state && state.status !== 'DISABLED' ? 'Нужно согласие' : 'Выключено'}
+          </span>
           {pause ? (
             <button className="inline-flex items-center gap-2 text-sm font-semibold text-cyan-700 dark:text-cyan-300" disabled={saving} onClick={() => void resumeAccess()}>
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
@@ -179,7 +211,11 @@ export function AutoRenewalCard({
       ) : null}
       {!pause ? (
         <div className="flex flex-col gap-2 border-t border-slate-200 px-5 py-3 dark:border-white/[0.08] sm:flex-row sm:items-center sm:justify-between sm:px-6">
-          <span className="text-xs leading-5 text-slate-500 dark:text-slate-400">Не нужен VPN какое-то время? Срок можно заморозить до 30 дней.</span>
+          <span className="text-xs leading-5 text-slate-500 dark:text-slate-400">
+            {enabled && state?.consentAcceptedAt
+              ? <>Согласие на регулярные списания принято {formatDate(state.consentAcceptedAt)}. <Link href="/offer" className="font-semibold text-brand-600 hover:underline dark:text-brand-300">Условия</Link></>
+              : 'Не нужен VPN какое-то время? Срок можно заморозить до 30 дней.'}
+          </span>
           <button className="inline-flex min-h-9 shrink-0 items-center justify-center gap-2 rounded-xl px-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/[0.06]" onClick={() => setDialog('pause')}>
             <PauseCircle className="h-4 w-4" /> Поставить на паузу
           </button>
@@ -189,11 +225,27 @@ export function AutoRenewalCard({
 
     <Modal
       open={dialog !== null}
-      title={dialog === 'pause' ? 'Приостановить доступ' : 'Перед отключением'}
-      description={dialog === 'pause' ? 'Остаток дней сохранится. Устройства и профиль останутся на месте.' : 'Выберите причину. Это поможет сделать сервис удобнее.'}
-      onClose={() => !saving && setDialog(null)}
+      title={dialog === 'enable' ? 'Согласие на автопродление' : dialog === 'pause' ? 'Приостановить доступ' : 'Перед отключением'}
+      description={dialog === 'enable'
+        ? 'Регулярные списания включатся только после вашего явного подтверждения.'
+        : dialog === 'pause'
+          ? 'Остаток дней сохранится. Устройства и профиль останутся на месте.'
+          : 'Выберите причину. Это поможет сделать сервис удобнее.'}
+      onClose={() => {
+        if (saving) return
+        setDialog(null)
+        setConsentAccepted(false)
+      }}
       panelClassName="sm:max-w-2xl"
-      footer={(
+      footer={dialog === 'enable' ? (
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <button className="btn-secondary" disabled={saving} onClick={() => setDialog(null)}>Отмена</button>
+          <button className="btn-primary" disabled={saving || !consentAccepted} onClick={() => void submitEnable()}>
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            Согласен и включить
+          </button>
+        </div>
+      ) : (
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <button className="btn-secondary" disabled={saving} onClick={() => setDialog(null)}>Отмена</button>
           <button className="btn-primary" disabled={saving} onClick={() => void submitRetention()}>
@@ -203,6 +255,35 @@ export function AutoRenewalCard({
         </div>
       )}
     >
+      {dialog === 'enable' ? (
+        <div className="space-y-4">
+          <div className="grid overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 dark:border-white/10 dark:bg-white/[0.035] sm:grid-cols-2">
+            <div className="p-4 sm:p-5">
+              <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Регулярный платёж</div>
+              <div className="mt-2 text-2xl font-semibold tracking-tight text-slate-950 dark:text-white">{formatPrice(planPriceKopecks)}</div>
+              <div className="mt-1 text-sm text-slate-500 dark:text-slate-400">каждые {planDurationDays} дней</div>
+            </div>
+            <div className="border-t border-slate-200 p-4 dark:border-white/10 sm:border-l sm:border-t-0 sm:p-5">
+              <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Когда спишется</div>
+              <div className="mt-2 text-sm font-semibold text-slate-900 dark:text-white">За 24 часа до окончания</div>
+              <div className="mt-1 text-sm leading-5 text-slate-500 dark:text-slate-400">Точную дату покажем в разделе платежей.</div>
+            </div>
+          </div>
+
+          <Checkbox
+            checked={consentAccepted}
+            onChange={(event) => setConsentAccepted(event.target.checked)}
+            label={(
+              <span>
+                Я согласен на регулярное списание {formatPrice(planPriceKopecks)} каждые {planDurationDays} дней для продления тарифа «{planName}» и принимаю{' '}
+                <Link href="/offer" target="_blank" className="font-semibold text-brand-600 hover:underline dark:text-brand-300" onClick={(event) => event.stopPropagation()}>условия оферты</Link>.
+              </span>
+            )}
+            description="Согласие можно отозвать в любой момент до следующего списания. Полные данные карты хранит ЮKassa, а не кабинет."
+            className="w-full rounded-2xl border border-slate-200 p-4 dark:border-white/10"
+          />
+        </div>
+      ) : <>
       <div className="grid gap-2 sm:grid-cols-2">
         {reasons.map((item) => (
           <button
@@ -234,6 +315,7 @@ export function AutoRenewalCard({
       {reason === 'CONNECTION_ISSUES' ? (
         <Link href="/dashboard/support" className="mt-4 inline-flex text-sm font-semibold text-cyan-700 hover:underline dark:text-cyan-300">Сначала попросить помощь с подключением</Link>
       ) : null}
+      </>}
     </Modal>
     </>
   )
