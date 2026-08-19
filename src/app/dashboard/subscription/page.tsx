@@ -173,7 +173,10 @@ export default async function SubscriptionPage() {
           />
         ) : (
           <>
-            <VpnConnectionCheck supportEnabled={features.support} />
+            <VpnConnectionCheck
+              supportEnabled={features.support}
+              deviceLimit={localSubscription?.plan?.deviceLimit}
+            />
             <div className="grid items-start gap-5 min-[1360px]:grid-cols-[minmax(0,1fr)_22rem]">
               <KeysCard subscriptionUrl={data.response.subscriptionUrl} happLink={happLink} />
               <DevicesList

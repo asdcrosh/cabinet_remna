@@ -274,7 +274,7 @@ export function KeysCard({
 
             <div className="connection-first-run__step connection-first-run__step--check">
               <span className="connection-first-run__number">3</span>
-              <VpnConnectionCheck supportEnabled={supportEnabled} onVerified={finishFirstConnection} />
+              <VpnConnectionCheck supportEnabled={supportEnabled} onVerified={finishFirstConnection} compact />
             </div>
           </div>
         ) : (

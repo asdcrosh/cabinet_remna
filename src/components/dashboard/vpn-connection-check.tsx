@@ -2,48 +2,62 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { CheckCircle2, Loader2, RefreshCw, ShieldAlert, Wifi } from 'lucide-react'
+import { Check, CheckCircle2, ChevronRight, CircleAlert, Copy, Loader2, RefreshCw, Wifi } from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
 
 type Device = {
   hwid: string
-  deviceModel?: string | null
-  platform?: string | null
   updatedAt?: string | null
   createdAt?: string | null
 }
-
-type CheckState =
-  | { status: 'idle' }
-  | { status: 'loading' }
-  | { status: 'vpn'; deviceCount: number; checkedAt: string; publicIp: string; nodeName: string; country: string | null }
-  | { status: 'direct'; checkedAt: string; publicIp: string }
-  | { status: 'waiting'; checkedAt: string }
-  | { status: 'stopped'; checkedAt: string }
-  | { status: 'unknown'; checkedAt: string; message: string }
-  | { status: 'error'; message: string }
 
 type VpnCheckResponse = {
   status: 'vpn' | 'direct' | 'unknown'
   publicIp?: string
   message?: string
-  node?: {
-    name: string
-    country: string | null
-  } | null
+  node?: { name: string; country: string | null } | null
 }
+
+type ConnectionResult = {
+  tone: 'success' | 'warning' | 'danger'
+  title: string
+  summary: string
+  checkedAt: string
+  publicIp?: string
+  nodeName?: string
+  country?: string | null
+  deviceCount: number
+  deviceLimit?: number | null
+  checks: Array<{
+    label: string
+    detail: string
+    state: 'ok' | 'warning' | 'danger'
+  }>
+  action: 'connection' | 'devices' | 'plans' | 'retry' | 'support' | null
+}
+
+type CheckState =
+  | { status: 'idle' }
+  | { status: 'loading' }
+  | { status: 'complete'; result: ConnectionResult }
 
 export function VpnConnectionCheck({
   supportEnabled,
   onVerified,
+  deviceLimit,
+  compact = false,
 }: {
   supportEnabled: boolean
   onVerified?: () => void
+  deviceLimit?: number | null
+  compact?: boolean
 }) {
   const [state, setState] = useState<CheckState>({ status: 'idle' })
+  const [copied, setCopied] = useState(false)
 
   async function checkConnection() {
     setState({ status: 'loading' })
+    setCopied(false)
 
     try {
       const [subscriptionResponse, devicesResponse, vpnResponse] = await Promise.all([
@@ -51,63 +65,48 @@ export function VpnConnectionCheck({
         apiFetch<{ devices: Device[] }>('/api/devices'),
         apiFetch<VpnCheckResponse>('/api/vpn-check', { cache: 'no-store' }),
       ])
-      const checkedAt = new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
-
-      if (subscriptionResponse.warning) {
-        setState({ status: 'error', message: 'Не удалось получить свежий статус подписки. Попробуйте ещё раз чуть позже.' })
-        return
-      }
-
-      if (!subscriptionResponse.subscription || !['ACTIVE', 'LIMITED'].includes(subscriptionResponse.subscription.status ?? '')) {
-        setState({ status: 'stopped', checkedAt })
-        return
-      }
-
-      const activeDevices = devicesResponse.devices.filter((device) => isActiveToday(device.updatedAt ?? device.createdAt))
-      if (vpnResponse.status === 'vpn' && vpnResponse.publicIp && vpnResponse.node) {
-        setState({
-          status: 'vpn',
-          deviceCount: activeDevices.length,
-          checkedAt,
-          publicIp: vpnResponse.publicIp,
-          nodeName: vpnResponse.node.name,
-          country: vpnResponse.node.country,
-        })
-        if (onVerified) window.setTimeout(onVerified, 900)
-        return
-      }
-
-      if (vpnResponse.status === 'direct' && vpnResponse.publicIp) {
-        setState({ status: 'direct', publicIp: vpnResponse.publicIp, checkedAt })
-        return
-      }
-
-      if (vpnResponse.status === 'unknown') {
-        setState({
-          status: 'unknown',
-          checkedAt,
-          message: vpnResponse.message || 'Не удалось сопоставить внешний IP с доступными нодами.',
-        })
-        return
-      }
-
-      setState({ status: 'waiting', checkedAt })
-    } catch (error) {
-      setState({
-        status: 'error',
-        message: error instanceof Error ? error.message : 'Не удалось проверить подключение.',
+      const result = buildConnectionResult({
+        subscription: subscriptionResponse.subscription,
+        subscriptionWarning: subscriptionResponse.warning,
+        devices: devicesResponse.devices,
+        vpn: vpnResponse,
+        deviceLimit,
       })
+      setState({ status: 'complete', result })
+      if (result.tone === 'success' && onVerified) window.setTimeout(onVerified, 900)
+    } catch (error) {
+      setState({ status: 'complete', result: buildConnectionError(error, deviceLimit) })
     }
   }
 
+  async function copyResult(result: ConnectionResult) {
+    const text = [
+      `Проверка подключения: ${result.title}`,
+      result.summary,
+      result.nodeName ? `Нода: ${result.nodeName}${result.country ? `, ${result.country}` : ''}` : null,
+      result.publicIp ? `IP: ${result.publicIp}` : null,
+      `Устройства: ${result.deviceCount}${result.deviceLimit ? ` из ${result.deviceLimit}` : ''}`,
+      `Проверено: ${result.checkedAt}`,
+    ].filter(Boolean).join('\n')
+    await navigator.clipboard.writeText(text)
+    setCopied(true)
+    window.setTimeout(() => setCopied(false), 1800)
+  }
+
+  const result = state.status === 'complete' ? state.result : null
+
   return (
-    <section className="connection-client-check" aria-live="polite">
-      <div className="flex min-w-0 items-start gap-3">
-        <span className="connection-client-check__icon"><Wifi className="h-4 w-4" /></span>
+    <section className={`connection-recovery ${compact ? 'connection-recovery--compact' : ''}`} aria-live="polite">
+      <div className="connection-recovery__heading">
+        <span className="connection-recovery__icon"><Wifi className="h-4 w-4" /></span>
         <div className="min-w-0 flex-1">
-          <div className="text-sm font-semibold text-slate-950 dark:text-white">Проверить VPN</div>
+          <div className="text-sm font-semibold text-slate-950 dark:text-white">
+            {compact ? 'Проверьте подключение' : 'Диагностика подключения'}
+          </div>
           <p className="mt-0.5 text-xs leading-5 text-slate-500 dark:text-slate-400">
-            Проверим, идёт ли запрос этого устройства к кабинету через VPN-ноду.
+            {compact
+              ? 'Включите VPN и убедитесь, что устройство подключилось.'
+              : 'За один запуск проверим доступ, устройства и маршрут через VPN.'}
           </p>
         </div>
         <button
@@ -117,55 +116,177 @@ export function VpnConnectionCheck({
           disabled={state.status === 'loading'}
         >
           {state.status === 'loading' ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-          Проверить сейчас
+          {state.status === 'loading' ? 'Проверяем' : result ? 'Повторить' : 'Проверить'}
         </button>
       </div>
 
-      {state.status !== 'idle' && state.status !== 'loading' && (
-        <div className={`connection-client-check__result connection-client-check__result--${state.status}`}>
-          {state.status === 'vpn' && <CheckCircle2 className="h-4 w-4 shrink-0" />}
-          {(state.status === 'direct' || state.status === 'waiting' || state.status === 'stopped' || state.status === 'unknown' || state.status === 'error') && <ShieldAlert className="h-4 w-4 shrink-0" />}
-          <div className="min-w-0 text-xs leading-5">
-            {state.status === 'vpn' && (
-              <><strong>VPN подключён.</strong> Этот браузер выходит через ноду «{state.nodeName}»{state.country ? `, ${state.country}` : ''}. IP: {state.publicIp}. {state.deviceCount > 0 && `Активных сегодня устройств: ${state.deviceCount} ${pluralDevices(state.deviceCount)}. `}Проверено в {state.checkedAt}.</>
-            )}
-            {state.status === 'direct' && (
-              <><strong>Кабинет открыт напрямую.</strong> Внешний IP устройства: {state.publicIp}. Включите VPN в INCY, обновите страницу и проверьте снова.</>
-            )}
-            {state.status === 'waiting' && (
-              <><strong>Подписка готова, но подключения пока не видно.</strong> Включите VPN в INCY, откройте любой сайт, подождите несколько секунд и проверьте снова. Проверено в {state.checkedAt}.</>
-            )}
-            {state.status === 'stopped' && (
-              <><strong>Доступ сейчас не активен.</strong> Продлите подписку, затем снова включите VPN в INCY. Проверено в {state.checkedAt}.</>
-            )}
-            {state.status === 'unknown' && (
-              <><strong>Не удалось подтвердить маршрут через VPN.</strong> {state.message} Проверьте, что INCY включён, и повторите попытку.</>
-            )}
-            {state.status === 'error' && (
-              <><strong>Проверка не завершилась.</strong> {state.message} {supportEnabled && <Link href="/dashboard/support" className="underline underline-offset-2">Написать в поддержку</Link>}</>
-            )}
-          </div>
+      {state.status === 'loading' && !compact ? (
+        <div className="connection-recovery__loading">
+          <span /> <span /> <span />
+          <p>Получаем свежий статус подписки и подключения</p>
         </div>
-      )}
+      ) : null}
+
+      {result ? (
+        <div className={`connection-recovery__result connection-recovery__result--${result.tone}`}>
+          <div className="connection-recovery__summary">
+            {result.tone === 'success' ? <CheckCircle2 className="h-5 w-5" /> : <CircleAlert className="h-5 w-5" />}
+            <div className="min-w-0 flex-1">
+              <strong>{result.title}</strong>
+              <p>{result.summary}</p>
+            </div>
+            <time>{result.checkedAt}</time>
+          </div>
+
+          {!compact ? (
+            <>
+              <div className="connection-recovery__checks">
+                {result.checks.map((check) => (
+                  <div key={check.label} className="connection-recovery__check">
+                    <span className={`connection-recovery__check-mark connection-recovery__check-mark--${check.state}`}>
+                      {check.state === 'ok' ? <Check className="h-3.5 w-3.5" /> : <CircleAlert className="h-3.5 w-3.5" />}
+                    </span>
+                    <div>
+                      <strong>{check.label}</strong>
+                      <small>{check.detail}</small>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="connection-recovery__actions">
+                <RecoveryAction action={result.action} supportEnabled={supportEnabled} />
+                <button type="button" onClick={() => void copyResult(result)}>
+                  {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                  {copied ? 'Скопировано' : 'Скопировать результат'}
+                </button>
+              </div>
+            </>
+          ) : null}
+        </div>
+      ) : null}
     </section>
   )
 }
 
-function isActiveToday(value?: string | null) {
-  if (!value) return false
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return false
-  return Date.now() - date.getTime() <= 24 * 60 * 60 * 1000
+function RecoveryAction({ action, supportEnabled }: { action: ConnectionResult['action']; supportEnabled: boolean }) {
+  if (action === 'connection') return <a href="#connection">Открыть подключение <ChevronRight className="h-4 w-4" /></a>
+  if (action === 'devices') return <a href="#connected-devices">Управлять устройствами <ChevronRight className="h-4 w-4" /></a>
+  if (action === 'plans') return <Link href="/dashboard/plans?intent=renew">Продлить доступ <ChevronRight className="h-4 w-4" /></Link>
+  if ((action === 'support' || action === 'retry') && supportEnabled) return <Link href="/dashboard/support">Открыть поддержку <ChevronRight className="h-4 w-4" /></Link>
+  return null
 }
 
-function pluralDevices(value: number) {
-  const remainder = value % 100
-  if (remainder >= 11 && remainder <= 14) return 'устройство'
-  switch (value % 10) {
-    case 1: return 'устройство'
-    case 2:
-    case 3:
-    case 4: return 'устройства'
-    default: return 'устройств'
+export function buildConnectionResult({
+  subscription,
+  subscriptionWarning,
+  devices,
+  vpn,
+  deviceLimit,
+  now = new Date(),
+}: {
+  subscription: { status?: string | null } | null
+  subscriptionWarning?: string
+  devices: Device[]
+  vpn: VpnCheckResponse
+  deviceLimit?: number | null
+  now?: Date
+}): ConnectionResult {
+  const checkedAt = now.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
+  const active = Boolean(subscription && ['ACTIVE', 'LIMITED'].includes(subscription.status ?? ''))
+  const deviceCount = devices.length
+  const capacityReached = Boolean(deviceLimit && deviceCount >= deviceLimit)
+  const routeReady = vpn.status === 'vpn' && Boolean(vpn.node)
+  const checks: ConnectionResult['checks'] = [
+    {
+      label: 'Доступ',
+      detail: subscriptionWarning ? 'Статус не удалось обновить' : active ? 'Подписка активна' : 'Подписка остановлена',
+      state: subscriptionWarning ? 'warning' : active ? 'ok' : 'danger',
+    },
+    {
+      label: 'Профиль',
+      detail: subscription ? 'Ссылка подписки доступна' : 'Профиль не найден',
+      state: subscription ? 'ok' : 'danger',
+    },
+    {
+      label: 'Устройства',
+      detail: deviceLimit ? `${deviceCount} из ${deviceLimit} подключено` : `${deviceCount} подключено`,
+      state: capacityReached ? 'warning' : 'ok',
+    },
+    {
+      label: 'Маршрут VPN',
+      detail: routeReady && vpn.node
+        ? `Через «${vpn.node.name}»${vpn.node.country ? `, ${vpn.node.country}` : ''}`
+        : vpn.status === 'direct' ? 'Кабинет открыт напрямую' : 'Маршрут не определён',
+      state: routeReady ? 'ok' : vpn.status === 'unknown' ? 'warning' : 'danger',
+    },
+  ]
+
+  if (subscriptionWarning) return createResult({
+    tone: 'warning', title: 'Статус подписки не обновился',
+    summary: 'Подождите минуту и повторите проверку. Текущие настройки не изменены.',
+    action: 'retry', checkedAt, vpn, deviceCount, deviceLimit, checks,
+  })
+  if (!active) return createResult({
+    tone: 'danger', title: 'Доступ остановлен',
+    summary: 'Продлите подписку. После оплаты заново настраивать устройства не потребуется.',
+    action: 'plans', checkedAt, vpn, deviceCount, deviceLimit, checks,
+  })
+  if (!routeReady) return createResult({
+    tone: 'warning',
+    title: vpn.status === 'direct' ? 'VPN не включён на этом устройстве' : 'Маршрут пока не определён',
+    summary: vpn.status === 'direct'
+      ? 'Откройте INCY, включите VPN, загрузите любой сайт и повторите проверку.'
+      : vpn.message || 'Проверьте подключение в INCY и повторите попытку через несколько секунд.',
+    action: 'connection', checkedAt, vpn, deviceCount, deviceLimit, checks,
+  })
+  if (capacityReached) return createResult({
+    tone: 'warning', title: 'VPN работает, но места для нового устройства нет',
+    summary: 'Отключите неиспользуемое устройство перед добавлением нового.',
+    action: 'devices', checkedAt, vpn, deviceCount, deviceLimit, checks,
+  })
+  return createResult({
+    tone: 'success', title: 'Подключение работает',
+    summary: `Это устройство выходит через ноду «${vpn.node?.name}»${vpn.node?.country ? `, ${vpn.node.country}` : ''}.`,
+    action: deviceCount > 0 ? 'devices' : null, checkedAt, vpn, deviceCount, deviceLimit, checks,
+  })
+}
+
+function createResult(input: {
+  tone: ConnectionResult['tone']
+  title: string
+  summary: string
+  action: ConnectionResult['action']
+  checkedAt: string
+  vpn: VpnCheckResponse
+  deviceCount: number
+  deviceLimit?: number | null
+  checks: ConnectionResult['checks']
+}): ConnectionResult {
+  return {
+    tone: input.tone,
+    title: input.title,
+    summary: input.summary,
+    action: input.action,
+    checkedAt: input.checkedAt,
+    publicIp: input.vpn.publicIp,
+    nodeName: input.vpn.node?.name,
+    country: input.vpn.node?.country,
+    deviceCount: input.deviceCount,
+    deviceLimit: input.deviceLimit,
+    checks: input.checks,
+  }
+}
+
+function buildConnectionError(error: unknown, deviceLimit?: number | null): ConnectionResult {
+  return {
+    tone: 'danger',
+    title: 'Проверка не завершилась',
+    summary: error instanceof Error ? error.message : 'Сервис диагностики временно недоступен.',
+    checkedAt: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }),
+    deviceCount: 0,
+    deviceLimit,
+    checks: [{ label: 'Диагностика', detail: 'Не удалось получить все данные', state: 'danger' }],
+    action: 'support',
   }
 }
