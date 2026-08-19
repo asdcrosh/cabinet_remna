@@ -56,6 +56,7 @@ vi.mock('@/lib/promo-codes', () => ({
 vi.mock('@/lib/logger', () => ({ logError: mocks.logError, logWarn: mocks.logWarn }))
 
 import { POST } from './route'
+import { AUTO_RENEWAL_CONSENT_VERSION } from '@/lib/auto-renewal-consent'
 
 const plan = {
   id: 'plan-1',
@@ -175,6 +176,42 @@ describe('payment create route', () => {
       localPaymentId: 'payment-1',
       provider: 'YOOKASSA',
     })
+  })
+
+  it('records explicit auto-renewal consent and asks YooKassa to save the card', async () => {
+    const response = await POST(paymentRequest({
+      autoRenewalConsent: true,
+      autoRenewalConsentVersion: AUTO_RENEWAL_CONSENT_VERSION,
+    }))
+
+    expect(response.status).toBe(200)
+    expect(mocks.txPaymentCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        autoRenewalConsentAcceptedAt: expect.any(Date),
+        autoRenewalConsentVersion: AUTO_RENEWAL_CONSENT_VERSION,
+      }),
+    })
+    expect(mocks.createPayment).toHaveBeenCalledWith(expect.objectContaining({
+      savePaymentMethod: true,
+      paymentMethodType: 'bank_card',
+      metadata: expect.objectContaining({
+        autoRenewalConsentVersion: AUTO_RENEWAL_CONSENT_VERSION,
+      }),
+    }))
+  })
+
+  it('does not accept auto-renewal consent for providers without recurring payments', async () => {
+    const response = await POST(paymentRequest({
+      provider: 'PLATEGA',
+      autoRenewalConsent: true,
+      autoRenewalConsentVersion: AUTO_RENEWAL_CONSENT_VERSION,
+    }))
+    const body = await response.json()
+
+    expect(response.status).toBe(422)
+    expect(body.error).toContain('ЮKassa')
+    expect(mocks.prisma.plan.findUnique).not.toHaveBeenCalled()
+    expect(mocks.prisma.$transaction).not.toHaveBeenCalled()
   })
 
   it('does not create payments before email verification', async () => {

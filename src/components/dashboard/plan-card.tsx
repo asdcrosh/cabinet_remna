@@ -2,11 +2,15 @@
 
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { apiFetch } from "@/lib/api-client";
 import { toast } from "@/components/ui/toaster";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Modal } from "@/components/ui/modal";
 import { cn } from "@/lib/cn";
 import { formatPrice } from "@/lib/format";
 import type { CheckoutPaymentProvider } from "@/lib/payment-providers";
+import { AUTO_RENEWAL_CONSENT_VERSION } from "@/lib/auto-renewal-consent";
 import {
   ArrowRight,
   BadgePercent,
@@ -15,6 +19,7 @@ import {
   CreditCard,
   Gauge,
   MonitorSmartphone,
+  RefreshCw,
   ShieldCheck,
   Sparkles,
   Tag,
@@ -36,6 +41,7 @@ export interface PlanCardProps {
   promoCodesEnabled?: boolean;
   popular?: boolean;
   current?: boolean;
+  autoRenewalEnabled?: boolean;
   display?: "full" | "checkout";
   initialPromoCode?: string;
   paymentProviders?: Array<{
@@ -65,6 +71,7 @@ export function PlanCard({
   promoCodesEnabled = true,
   popular,
   current,
+  autoRenewalEnabled = false,
   display = "full",
   initialPromoCode,
   paymentProviders = [{ id: "YOOKASSA", label: "ЮKassa" }],
@@ -75,6 +82,8 @@ export function PlanCard({
   const [validatingPromo, setValidatingPromo] = useState(false);
   const [promoOpen, setPromoOpen] = useState(false);
   const [manualPromoOpen, setManualPromoOpen] = useState(false);
+  const [checkoutConfirmOpen, setCheckoutConfirmOpen] = useState(false);
+  const [autoRenewalRequested, setAutoRenewalRequested] = useState(false);
   const [selectedProvider, setSelectedProvider] = useState<CheckoutPaymentProvider>(
     paymentProviders[0]?.id ?? "YOOKASSA",
   );
@@ -109,6 +118,7 @@ export function PlanCard({
   const bestPromo = suggestedPromoCodes[0] ?? null;
   const showManualPromoInput =
     promoOpen && (manualPromoOpen || suggestedPromoCodes.length === 0);
+  const autoRenewalSupported = selectedProvider === "YOOKASSA";
 
   useEffect(() => {
     if (!initialPromoCode || isPromoPlan || !promoCodesEnabled) return;
@@ -139,7 +149,7 @@ export function PlanCard({
   async function buy() {
     const checkoutFingerprint = isPromoPlan
       ? `${id}:LOCAL`
-      : `${id}:${selectedProvider}:${appliedPromo?.code ?? ""}`;
+      : `${id}:${selectedProvider}:${appliedPromo?.code ?? ""}:${autoRenewalRequested ? "AUTO" : "MANUAL"}`;
     if (checkoutAttemptRef.current?.fingerprint !== checkoutFingerprint) {
       checkoutAttemptRef.current = {
         key: crypto.randomUUID(),
@@ -188,6 +198,12 @@ export function PlanCard({
           planId: id,
           provider: selectedProvider,
           idempotencyKey,
+          ...(autoRenewalRequested
+            ? {
+                autoRenewalConsent: true,
+                autoRenewalConsentVersion: AUTO_RENEWAL_CONSENT_VERSION,
+              }
+            : {}),
           ...(appliedPromo ? { promoCode: appliedPromo.code } : {}),
         }),
       });
@@ -204,6 +220,19 @@ export function PlanCard({
     } finally {
       setLoading(false);
     }
+  }
+
+  function openCheckoutConfirmation() {
+    if (promoCodesEnabled && trimmedPromo && !appliedPromo) {
+      toast("Сначала примените промокод или очистите поле");
+      return;
+    }
+    if (paymentProviders.length === 0) {
+      toast("Оплата временно недоступна");
+      return;
+    }
+    setAutoRenewalRequested(false);
+    setCheckoutConfirmOpen(true);
   }
 
   function resetFailedCheckoutAttempt(error: unknown) {
@@ -296,6 +325,7 @@ export function PlanCard({
   }
 
   return (
+    <>
     <div
       data-testid="plan-card"
       data-display={display}
@@ -561,7 +591,10 @@ export function PlanCard({
                   type="button"
                   role="radio"
                   aria-checked={selectedProvider === provider.id}
-                  onClick={() => setSelectedProvider(provider.id)}
+                  onClick={() => {
+                    setSelectedProvider(provider.id);
+                    if (provider.id !== "YOOKASSA") setAutoRenewalRequested(false);
+                  }}
                   className={cn(
                     "plan-payment-provider flex min-h-[3.75rem] items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition",
                     selectedProvider === provider.id
@@ -628,6 +661,19 @@ export function PlanCard({
           </div>
         ) : null}
 
+        {!isPromoPlan && checkoutDisplay ? (
+          <div className="mt-3">
+            <AutoRenewalChoice
+              enabled={autoRenewalEnabled}
+              supported={autoRenewalSupported}
+              requested={autoRenewalRequested}
+              price={effectivePrice}
+              durationDays={durationDays}
+              onChange={setAutoRenewalRequested}
+            />
+          </div>
+        ) : null}
+
         <div
           className={cn(
             checkoutDisplay
@@ -637,7 +683,7 @@ export function PlanCard({
         >
           <button
             type="button"
-            onClick={buy}
+            onClick={isPromoPlan || checkoutDisplay ? buy : openCheckoutConfirmation}
             disabled={loading || (!isPromoPlan && paymentProviders.length === 0)}
             className="plan-payment-cta btn-primary group min-h-12 w-full justify-between px-4"
           >
@@ -661,6 +707,46 @@ export function PlanCard({
         </div>
       </div>
     </div>
+    <Modal
+      open={checkoutConfirmOpen}
+      title="Подтвердите оплату"
+      description="Проверьте заказ и выберите, нужно ли продлевать доступ автоматически"
+      panelClassName="sm:max-w-[34rem]"
+      onClose={() => {
+        if (!loading) setCheckoutConfirmOpen(false);
+      }}
+      footer={(
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <button type="button" className="btn-secondary" disabled={loading} onClick={() => setCheckoutConfirmOpen(false)}>
+            Назад
+          </button>
+          <button type="button" className="btn-primary min-w-[12rem] justify-between" disabled={loading} onClick={() => void buy()}>
+            <span>{loading ? "Создаём платёж..." : "Оплатить"}</span>
+            <span className="tabular-nums">{effectivePrice}</span>
+          </button>
+        </div>
+      )}
+    >
+      <div className="space-y-3">
+        <div className="flex items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 dark:border-white/[0.08] dark:bg-white/[0.035]">
+          <div className="min-w-0">
+            <div className="truncate text-sm font-semibold text-slate-950 dark:text-white">{name}</div>
+            <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">{durationDays} дней · {paymentProviders.find((provider) => provider.id === selectedProvider)?.label}</div>
+          </div>
+          <div className="shrink-0 text-lg font-semibold tabular-nums text-slate-950 dark:text-white">{effectivePrice}</div>
+        </div>
+
+        <AutoRenewalChoice
+          enabled={autoRenewalEnabled}
+          supported={autoRenewalSupported}
+          requested={autoRenewalRequested}
+          price={effectivePrice}
+          durationDays={durationDays}
+          onChange={setAutoRenewalRequested}
+        />
+      </div>
+    </Modal>
+    </>
   );
 }
 
@@ -668,6 +754,68 @@ function paymentProviderHint(provider: CheckoutPaymentProvider) {
   if (provider === "PLATEGA") return "Выбор метода продолжится на защищённой странице Platega";
   if (provider === "PAYANYWAY") return "Оплата продолжится на защищённой форме PayAnyWay";
   return "Оплата продолжится на защищённой странице ЮKassa";
+}
+
+function AutoRenewalChoice({
+  enabled,
+  supported,
+  requested,
+  price,
+  durationDays,
+  onChange,
+}: {
+  enabled: boolean;
+  supported: boolean;
+  requested: boolean;
+  price: string;
+  durationDays: number;
+  onChange: (value: boolean) => void;
+}) {
+  return (
+    <div className={cn(
+      "rounded-2xl border p-4",
+      enabled
+        ? "border-emerald-200 bg-emerald-50/70 dark:border-emerald-400/20 dark:bg-emerald-400/[0.06]"
+        : "border-slate-200 bg-white dark:border-white/[0.09] dark:bg-white/[0.02]",
+    )}>
+      <div className="flex items-start gap-3">
+        <span className={cn(
+          "grid h-10 w-10 shrink-0 place-items-center rounded-xl",
+          enabled || requested
+            ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-300"
+            : "bg-brand-500/10 text-brand-600 dark:text-brand-300",
+        )}>
+          <RefreshCw className="h-5 w-5" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="font-semibold text-slate-950 dark:text-white">Автопродление</div>
+          {enabled ? (
+            <p className="mt-1 text-sm leading-5 text-slate-600 dark:text-slate-300">
+              Уже включено для этого тарифа. Следующее списание будет выполнено перед окончанием доступа.
+            </p>
+          ) : supported ? (
+            <Checkbox
+              className="mt-2"
+              checked={requested}
+              onChange={(event) => onChange(event.target.checked)}
+              label={`Продлевать автоматически за ${price}`}
+              description={`Регулярное списание раз в ${durationDays} дней. Отключить можно в любой момент.`}
+            />
+          ) : (
+            <p className="mt-1 text-sm leading-5 text-slate-500 dark:text-slate-400">
+              Доступно при оплате банковской картой через ЮKassa. Выберите этот способ оплаты выше.
+            </p>
+          )}
+        </div>
+      </div>
+      {!enabled && requested ? (
+        <p className="mt-3 border-t border-slate-200 pt-3 text-xs leading-5 text-slate-500 dark:border-white/[0.08] dark:text-slate-400">
+          Нажимая «Оплатить», вы соглашаетесь на регулярные списания по условиям
+          {" "}<Link href="/offer" target="_blank" rel="noreferrer" className="font-semibold text-brand-600 hover:underline dark:text-brand-300">оферты</Link>.
+        </p>
+      ) : null}
+    </div>
+  );
 }
 
 function PlanFact({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {

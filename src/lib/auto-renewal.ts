@@ -154,36 +154,78 @@ export async function captureSavedPaymentMethod(input: {
 
   const payment = await prisma.payment.findUnique({
     where: { id: input.localPaymentId },
-    select: { userId: true, planId: true },
+    select: {
+      userId: true,
+      planId: true,
+      autoRenewalConsentAcceptedAt: true,
+      autoRenewalConsentVersion: true,
+      plan: { select: { priceKopecks: true, durationDays: true } },
+    },
   })
   if (!payment) return false
   const setting = await prisma.autoRenewal.findUnique({ where: { userId: payment.userId } })
+  const checkoutConsentCurrent = Boolean(
+    payment.autoRenewalConsentAcceptedAt
+    && payment.autoRenewalConsentVersion === AUTO_RENEWAL_CONSENT_VERSION
+  )
   if (
-    !setting
-    || setting.status === 'DISABLED'
-    || setting.planId !== payment.planId
-    || !setting.consentAcceptedAt
-    || setting.consentVersion !== AUTO_RENEWAL_CONSENT_VERSION
+    !checkoutConsentCurrent
+    && (
+      !setting
+      || setting.status === 'DISABLED'
+      || setting.planId !== payment.planId
+      || !setting.consentAcceptedAt
+      || setting.consentVersion !== AUTO_RENEWAL_CONSENT_VERSION
+    )
   ) return false
 
   const subscription = await prisma.subscription.findFirst({
     where: { userId: payment.userId, status: { in: ['ACTIVE', 'LIMITED'] } },
     orderBy: { expireAt: 'desc' },
-    select: { expireAt: true },
+    select: { expireAt: true, planId: true },
   })
-  await prisma.autoRenewal.update({
-    where: { id: setting.id },
-    data: {
+  const consentAcceptedAt = checkoutConsentCurrent
+    ? payment.autoRenewalConsentAcceptedAt!
+    : setting!.consentAcceptedAt!
+  const autoRenewal = await prisma.autoRenewal.upsert({
+    where: { userId: payment.userId },
+    create: {
+      userId: payment.userId,
       planId: payment.planId,
       status: 'ACTIVE',
       paymentMethodIdEncrypted: encryptPaymentSecret(method.id),
       paymentMethodTitle: paymentMethodTitle(method),
       paymentMethodSavedAt: new Date(),
-      nextChargeAt: subscription ? chargeAt(subscription.expireAt) : null,
+      consentAcceptedAt,
+      consentVersion: AUTO_RENEWAL_CONSENT_VERSION,
+      consentPriceKopecks: payment.plan.priceKopecks,
+      consentDurationDays: payment.plan.durationDays,
+      nextChargeAt: subscription?.planId === payment.planId ? chargeAt(subscription.expireAt) : null,
+    },
+    update: {
+      planId: payment.planId,
+      status: 'ACTIVE',
+      paymentMethodIdEncrypted: encryptPaymentSecret(method.id),
+      paymentMethodTitle: paymentMethodTitle(method),
+      paymentMethodSavedAt: new Date(),
+      ...(checkoutConsentCurrent
+        ? {
+            consentAcceptedAt,
+            consentVersion: AUTO_RENEWAL_CONSENT_VERSION,
+            consentPriceKopecks: payment.plan.priceKopecks,
+            consentDurationDays: payment.plan.durationDays,
+          }
+        : {}),
+      nextChargeAt: subscription?.planId === payment.planId ? chargeAt(subscription.expireAt) : null,
       retryCount: 0,
+      lastFailurePaymentId: null,
       lastError: null,
       disabledAt: null,
     },
+  })
+  await prisma.payment.update({
+    where: { id: input.localPaymentId },
+    data: { autoRenewalId: autoRenewal.id },
   })
   return true
 }

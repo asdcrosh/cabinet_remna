@@ -33,6 +33,8 @@ describe('api serializers', () => {
       planId: 'plan-1',
       promoCodeId: null,
       autoRenewalId: null,
+      autoRenewalConsentAcceptedAt: null,
+      autoRenewalConsentVersion: null,
       origin: 'MANUAL',
       amountKopecks: 19900,
       originalAmountKopecks: 19900,

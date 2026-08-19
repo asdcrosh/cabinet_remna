@@ -45,7 +45,21 @@ export const POST = withAuth(async (req: Request) => {
       { status: 400 }
     )
   }
-  const { planId, promoCode, provider, idempotencyKey } = parsed.data
+  const {
+    planId,
+    promoCode,
+    provider,
+    idempotencyKey,
+    autoRenewalConsent,
+    autoRenewalConsentVersion,
+  } = parsed.data
+
+  if (autoRenewalConsent && provider !== 'YOOKASSA') {
+    return NextResponse.json(
+      { error: 'Автопродление доступно при оплате банковской картой через ЮKassa' },
+      { status: 422 }
+    )
+  }
 
   const plan = await prisma.plan.findUnique({ where: { id: planId } })
   if (!plan || !plan.isActive) {
@@ -188,7 +202,7 @@ export const POST = withAuth(async (req: Request) => {
     },
   })
   if (existingCheckout) {
-    return existingCheckoutResponse(existingCheckout, { planId, promoCode, provider })
+    return existingCheckoutResponse(existingCheckout, { planId, promoCode, provider, autoRenewalConsent })
   }
 
   if (!(await isPaymentProviderAvailable(provider))) {
@@ -234,6 +248,8 @@ export const POST = withAuth(async (req: Request) => {
             provider,
             providerStatus: 'pending',
             checkoutKey: idempotencyKey,
+            autoRenewalConsentAcceptedAt: autoRenewalConsent ? new Date() : null,
+            autoRenewalConsentVersion: autoRenewalConsent ? autoRenewalConsentVersion : null,
             status: 'PENDING',
           },
         })
@@ -262,7 +278,7 @@ export const POST = withAuth(async (req: Request) => {
   } catch (e) {
     const duplicateCheckout = await findDuplicateCheckout(user.id, idempotencyKey)
     if (duplicateCheckout) {
-      return existingCheckoutResponse(duplicateCheckout, { planId, promoCode, provider })
+      return existingCheckoutResponse(duplicateCheckout, { planId, promoCode, provider, autoRenewalConsent })
     }
     if (e instanceof PromoCodeError) {
       return NextResponse.json({ error: e.message, code: e.code }, { status: e.status })
@@ -380,7 +396,7 @@ export const POST = withAuth(async (req: Request) => {
 
   let payment
   try {
-    const savePaymentMethod = await shouldSavePaymentMethodBestEffort(user.id, plan.id)
+    const savePaymentMethod = autoRenewalConsent || await shouldSavePaymentMethodBestEffort(user.id, plan.id)
     payment = await createPayment({
       amount: amountRub,
       description,
@@ -391,6 +407,7 @@ export const POST = withAuth(async (req: Request) => {
         userId: user.id,
         planId: plan.id,
         localPaymentId: localPayment.id,
+        ...(autoRenewalConsent ? { autoRenewalConsentVersion: autoRenewalConsentVersion! } : {}),
         ...(appliedPromo
           ? {
               promoCode: appliedPromo.normalizedCode,
@@ -460,6 +477,7 @@ function existingCheckoutResponse(
     planId: string
     promoCode?: string
     provider: 'YOOKASSA' | 'PAYANYWAY' | 'PLATEGA'
+    autoRenewalConsent: boolean
   }
 ) {
   const requestedPromoCode = input.promoCode?.trim().toUpperCase() ?? null
@@ -468,6 +486,7 @@ function existingCheckoutResponse(
     payment.planId !== input.planId
     || payment.provider !== input.provider
     || storedPromoCode !== requestedPromoCode
+    || Boolean(payment.autoRenewalConsentAcceptedAt) !== input.autoRenewalConsent
   ) {
     return NextResponse.json({
       error: 'Ключ оплаты уже использован для другого заказа',

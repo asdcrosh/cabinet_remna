@@ -2,6 +2,7 @@
 // Проверяем на сервере, не доверяем клиенту.
 
 import { z } from 'zod'
+import { AUTO_RENEWAL_CONSENT_VERSION } from '@/lib/auto-renewal-consent'
 
 const nameSchema = z
   .string()
@@ -84,6 +85,17 @@ export const createPaymentSchema = z.object({
   promoCode: z.string().trim().min(1).max(64).optional(),
   provider: z.enum(['YOOKASSA', 'PAYANYWAY', 'PLATEGA']).default('YOOKASSA'),
   idempotencyKey: z.string().uuid(),
+  autoRenewalConsent: z.boolean().optional().default(false),
+  autoRenewalConsentVersion: z.string().max(100).optional(),
+}).superRefine((value, context) => {
+  if (!value.autoRenewalConsent) return
+  if (value.autoRenewalConsentVersion !== AUTO_RENEWAL_CONSENT_VERSION) {
+    context.addIssue({
+      code: 'custom',
+      path: ['autoRenewalConsentVersion'],
+      message: 'Подтвердите актуальные условия автопродления',
+    })
+  }
 })
 
 export const validatePromoCodeSchema = z.object({

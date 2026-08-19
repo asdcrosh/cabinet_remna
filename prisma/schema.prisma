@@ -742,6 +742,10 @@ model Payment {
   yookassaStatus  YookassaPaymentStatus?
   confirmationUrl String? // URL для редиректа пользователя
 
+  // Явное согласие пользователя, принятое в окне оформления заказа.
+  autoRenewalConsentAcceptedAt DateTime?
+  autoRenewalConsentVersion    String?
+
   status                    PaymentStatus @default(PENDING)
   paidAt                    DateTime?
   subscriptionProvisionedAt DateTime?

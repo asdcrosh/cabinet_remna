@@ -11,6 +11,8 @@ import { getPlanAudienceContext, isPlanAvailableForUser } from '@/lib/plan-acces
 import { getAvailableUserPromoCodesByPlan } from '@/lib/user-promo-codes'
 import { getAvailablePaymentProviders } from '@/lib/payment-providers'
 import { ArrowRight, MessageCircleQuestion, RefreshCw, ShieldCheck } from 'lucide-react'
+import { getAutoRenewalState } from '@/lib/auto-renewal'
+import { AUTO_RENEWAL_CONSENT_VERSION } from '@/lib/auto-renewal-consent'
 
 export const dynamic = 'force-dynamic'
 
@@ -64,6 +66,7 @@ export default async function PlansPage({
         orderBy: { expireAt: 'desc' },
       })
     : null
+  const autoRenewal = session ? await getAutoRenewalState(session.uid) : null
   const hasAnySubscription = session
     ? (await prisma.subscription.count({ where: { userId: session.uid } })) > 0
     : false
@@ -105,6 +108,20 @@ export default async function PlansPage({
   const referenceDailyPrice = referencePlan
     ? referencePlan.priceKopecks / Math.max(1, referencePlan.durationDays)
     : 0
+  const autoRenewalAvailable = paymentProviders.some((provider) => provider.id === 'YOOKASSA')
+  const autoRenewalConsentCurrent = Boolean(
+    autoRenewal
+    && autoRenewal.status !== 'DISABLED'
+    && autoRenewal.consentAcceptedAt
+    && autoRenewal.consentVersion === AUTO_RENEWAL_CONSENT_VERSION
+    && autoRenewal.consentPriceKopecks === autoRenewal.plan.priceKopecks
+    && autoRenewal.consentDurationDays === autoRenewal.plan.durationDays
+  )
+  const activeAutoRenewal = Boolean(
+    autoRenewalConsentCurrent
+    && autoRenewal?.status === 'ACTIVE'
+    && autoRenewal.paymentMethodSavedAt
+  )
   const planViews = visiblePlans.map((plan) => ({
     id: plan.id,
     name: plan.name,
@@ -122,6 +139,7 @@ export default async function PlansPage({
     promoCodesEnabled: plan.promoCodesEnabled,
     popular: plan.isFeatured,
     current: currentSubscription?.planId === plan.id,
+    autoRenewalEnabled: autoRenewalConsentCurrent && autoRenewal?.plan.id === plan.id,
     initialPromoCode,
     availablePromoCodes: availablePromoCodesByPlan.get(plan.id) ?? [],
     paymentProviders,
@@ -176,6 +194,36 @@ export default async function PlansPage({
           </Link>
         </div>
       )}
+
+      {autoRenewalAvailable ? (
+        <section className="flex flex-col gap-3 border-y border-slate-200 py-3 dark:border-white/[0.08] sm:flex-row sm:items-center sm:justify-between" aria-label="Автопродление">
+          <div className="flex min-w-0 items-start gap-3">
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-brand-500/10 text-brand-600 dark:text-brand-300">
+              <RefreshCw className="h-4 w-4" />
+            </span>
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="text-sm font-semibold text-slate-950 dark:text-white">Автопродление</h2>
+                <span className={activeAutoRenewal ? 'text-xs font-semibold text-emerald-600 dark:text-emerald-300' : 'text-xs font-medium text-slate-400'}>
+                  {activeAutoRenewal ? 'Включено' : autoRenewalConsentCurrent ? 'Ожидает оплаты' : 'По желанию'}
+                </span>
+              </div>
+              <p className="mt-0.5 text-xs leading-5 text-slate-500 dark:text-slate-400">
+                {activeAutoRenewal
+                  ? `Тариф «${autoRenewal?.plan.name}» продлится автоматически. Управление доступно в разделе платежей.`
+                  : autoRenewalConsentCurrent
+                    ? 'Завершите оплату картой через ЮKassa, чтобы сохранить способ оплаты.'
+                    : 'Вы сможете включить его в окне подтверждения после выбора тарифа.'}
+              </p>
+            </div>
+          </div>
+          {autoRenewalConsentCurrent ? (
+            <Link href="/dashboard/billing" className="inline-flex min-h-9 shrink-0 items-center gap-1.5 self-start text-sm font-semibold text-slate-700 hover:text-slate-950 dark:text-slate-300 dark:hover:text-white sm:self-auto">
+              Управлять <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          ) : null}
+        </section>
+      ) : null}
 
       {planViews.length > 0 ? (
         <PlanCatalog
