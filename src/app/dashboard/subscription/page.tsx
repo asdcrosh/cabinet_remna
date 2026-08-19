@@ -25,7 +25,7 @@ export default async function SubscriptionPage() {
   const [user, localSubscription] = await Promise.all([
     prisma.user.findUnique({ where: { id: session.uid } }),
     prisma.subscription.findFirst({
-      where: { userId: session.uid, status: { in: ['ACTIVE', 'LIMITED'] } },
+      where: { userId: session.uid, status: { in: ['ACTIVE', 'LIMITED', 'PAUSED'] } },
       orderBy: { expireAt: 'desc' },
       select: { plan: { select: { name: true, deviceLimit: true } } },
     }),

@@ -16,6 +16,7 @@ import { getFeatureFlags } from '@/lib/feature-flags'
 import { ArrowRight, CreditCard } from 'lucide-react'
 import { AutoRenewalCard } from '@/components/dashboard/auto-renewal-card'
 import { getAutoRenewalState } from '@/lib/auto-renewal'
+import { getRetentionState } from '@/lib/subscription-retention'
 
 export const dynamic = 'force-dynamic'
 const PAGE_SIZE = 20
@@ -40,7 +41,7 @@ export default async function BillingPage({
           cancelPendingOlderThanMs: getPendingPaymentTtlMs(),
         })
       : null
-  const [[total, payments, currentSubscription], autoRenewal] = await Promise.all([
+  const [[total, payments, currentSubscription], autoRenewal, retentionPause] = await Promise.all([
     prisma.$transaction([
       prisma.payment.count({ where: { userId: session.uid } }),
       prisma.payment.findMany({
@@ -51,12 +52,13 @@ export default async function BillingPage({
         include: { plan: true, subscription: true },
       }),
       prisma.subscription.findFirst({
-        where: { userId: session.uid, status: { in: ['ACTIVE', 'LIMITED'] }, planId: { not: null } },
+        where: { userId: session.uid, status: { in: ['ACTIVE', 'LIMITED', 'PAUSED'] }, planId: { not: null } },
         orderBy: { expireAt: 'desc' },
         include: { plan: { select: { id: true, name: true } } },
       }),
     ]),
     getAutoRenewalState(session.uid),
+    getRetentionState(session.uid),
   ])
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
@@ -90,6 +92,11 @@ export default async function BillingPage({
             nextChargeAt: autoRenewal.nextChargeAt?.toISOString() ?? null,
             lastAttemptAt: autoRenewal.lastAttemptAt?.toISOString() ?? null,
             lastSuccessAt: autoRenewal.lastSuccessAt?.toISOString() ?? null,
+          } : null}
+          initialPause={retentionPause ? {
+            ...retentionPause,
+            pauseUntil: retentionPause.pauseUntil?.toISOString() ?? null,
+            createdAt: retentionPause.createdAt.toISOString(),
           } : null}
         />
       ) : null}

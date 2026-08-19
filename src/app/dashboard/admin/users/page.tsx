@@ -338,6 +338,7 @@ function subscriptionStatusLabel(status: string) {
     EXPIRED: 'Истекла',
     DISABLED: 'Отключена',
     LIMITED: 'Лимит',
+    PAUSED: 'На паузе',
   }
   return labels[status] ?? status
 }

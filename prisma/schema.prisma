@@ -140,6 +140,7 @@ model User {
   broadcastDeliveries        BroadcastDelivery[]
   subscriptionHealth         SubscriptionHealth?
   autoRenewal                AutoRenewal?
+  retentionEvents            SubscriptionRetention[]
 
   @@index([email])
   @@index([role])
@@ -413,6 +414,8 @@ enum NotificationType {
   PAYMENT_STUCK
   SUBSCRIPTION_EXPIRING
   SUBSCRIPTION_TERMINATED
+  SUBSCRIPTION_PAUSED
+  SUBSCRIPTION_RESUMED
   TRAFFIC_LIMIT
   SUPPORT_REPLY
   BONUS_GRANTED
@@ -595,6 +598,7 @@ model Subscription {
   user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   plan     Plan?     @relation(fields: [planId], references: [id], onDelete: SetNull)
   payments Payment[]
+  retentionEvents SubscriptionRetention[]
 
   @@index([userId, status])
   @@index([userId, status, expireAt])
@@ -607,6 +611,52 @@ enum SubscriptionStatus {
   EXPIRED
   DISABLED
   LIMITED
+  PAUSED
+}
+
+model SubscriptionRetention {
+  id               String                  @id @default(cuid())
+  userId           String
+  subscriptionId   String?
+  reason           RetentionReason
+  action           RetentionAction
+  status           RetentionStatus         @default(CLOSED)
+  comment          String?
+  remainingSeconds BigInt?
+  pauseUntil       DateTime?
+  resumedAt        DateTime?
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subscription Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([status, pauseUntil])
+  @@index([reason, createdAt])
+}
+
+enum RetentionReason {
+  TOO_EXPENSIVE
+  CONNECTION_ISSUES
+  NOT_USING
+  PAYMENT_PROBLEM
+  MISSING_REGION
+  OTHER
+}
+
+enum RetentionAction {
+  AUTO_RENEWAL_DISABLED
+  SUBSCRIPTION_PAUSED
+  SUBSCRIPTION_RESUMED
+  SUPPORT_OPENED
+}
+
+enum RetentionStatus {
+  OPEN
+  PAUSED
+  RESUMED
+  CLOSED
 }
 
 model SubscriptionHealth {

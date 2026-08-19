@@ -74,9 +74,18 @@ export const GET = withAuth(async (request: Request) => {
       const u = data.response.user
       const limit = readRemnawaveBigInt(u, ['trafficLimitBytes', 'trafficLimit'])
 
+      const activePause = subscription ? await prisma.subscriptionRetention.findFirst({
+        where: {
+          userId: user.id,
+          subscriptionId: subscription.id,
+          status: 'PAUSED',
+          action: 'SUBSCRIPTION_PAUSED',
+        },
+        select: { id: true },
+      }) : null
       const dataToSave = {
         expireAt: new Date(u.expiresAt),
-        status: mapRemnawaveStatus(u.userStatus),
+        status: activePause ? 'PAUSED' as const : mapRemnawaveStatus(u.userStatus),
         trafficLimitBytes: limit === 0n ? null : limit,
         trafficUsedBytes: readRemnawaveBigInt(u, ['trafficUsedBytes', 'usedTrafficBytes']),
         lifetimeUsedBytes: readRemnawaveBigInt(u, ['lifetimeTrafficUsedBytes', 'lifetimeUsedTrafficBytes']),

@@ -12,6 +12,7 @@ const subscriptionLabels: Record<string, string> = {
   LIMITED: 'Лимит',
   EXPIRED: 'Истекла',
   DISABLED: 'Отключена',
+  PAUSED: 'На паузе',
 }
 
 export function PaymentBadge({ status }: { status: string }) {

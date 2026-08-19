@@ -13,6 +13,7 @@ import { logError, logInfo } from '../src/lib/logger'
 import { reconcileSubscriptionHealthBatch } from '../src/lib/subscription-health'
 import { processAdminTelegramDeliveries } from '../src/lib/admin-telegram-notifications'
 import { processDueAutoRenewals } from '../src/lib/auto-renewal'
+import { resumeDuePausedSubscriptions } from '../src/lib/subscription-retention'
 
 const intervalMs = readPositiveInt('PAYMENT_RECONCILE_INTERVAL_SECONDS', 60) * 1000
 const batchSize = readPositiveInt('PAYMENT_RECONCILE_BATCH_SIZE', 25)
@@ -70,6 +71,13 @@ async function runOnce() {
   })
   if (autoRenewals.checked > 0) {
     logInfo('auto_renewal.batch_finished', autoRenewals)
+  }
+  const resumedSubscriptions = await resumeDuePausedSubscriptions({
+    limit: autoRenewalBatchSize,
+    shouldStop: () => stopped,
+  })
+  if (resumedSubscriptions.checked > 0) {
+    logInfo('subscription_retention.resume_finished', resumedSubscriptions)
   }
 
   const cutoff = new Date(Date.now() - minAgeMs)

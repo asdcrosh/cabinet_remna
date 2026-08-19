@@ -1,10 +1,12 @@
 'use client'
 
 import { useState } from 'react'
-import { CalendarClock, CreditCard, Loader2, RefreshCw } from 'lucide-react'
+import Link from 'next/link'
+import { CalendarClock, CreditCard, Loader2, PauseCircle, Play, RefreshCw } from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
 import { toast } from '@/components/ui/toaster'
 import { Switch } from '@/components/ui/switch'
+import { Modal } from '@/components/ui/modal'
 
 type AutoRenewalState = {
   id: string
@@ -19,20 +21,51 @@ type AutoRenewalState = {
   lastError: string | null
 } | null
 
+type PauseState = {
+  id: string
+  reason: RetentionReason
+  comment: string | null
+  pauseUntil: string | null
+  createdAt: string
+  subscription: { id: string; plan: { name: string } | null } | null
+} | null
+
+type RetentionReason = 'TOO_EXPENSIVE' | 'CONNECTION_ISSUES' | 'NOT_USING' | 'PAYMENT_PROBLEM' | 'MISSING_REGION' | 'OTHER'
+
+const reasons: Array<{ value: RetentionReason; title: string; detail: string }> = [
+  { value: 'TOO_EXPENSIVE', title: 'Стало дорого', detail: 'Учтём это при подготовке тарифов' },
+  { value: 'NOT_USING', title: 'Пока не пользуюсь', detail: 'Можно сохранить остаток на паузе' },
+  { value: 'CONNECTION_ISSUES', title: 'Есть проблемы с VPN', detail: 'Поможем проверить подключение' },
+  { value: 'PAYMENT_PROBLEM', title: 'Не подходит оплата', detail: 'Можно продолжить вручную другим способом' },
+  { value: 'MISSING_REGION', title: 'Нет нужной локации', detail: 'Передадим запрос команде' },
+  { value: 'OTHER', title: 'Другая причина', detail: 'Можно коротко описать ниже' },
+]
+
 export function AutoRenewalCard({
   planId,
   planName,
   initialState,
+  initialPause,
 }: {
   planId: string
   planName: string
   initialState: AutoRenewalState
+  initialPause: PauseState
 }) {
   const [state, setState] = useState(initialState)
+  const [pause, setPause] = useState(initialPause)
   const [saving, setSaving] = useState(false)
+  const [dialog, setDialog] = useState<'disable' | 'pause' | null>(null)
+  const [reason, setReason] = useState<RetentionReason>('NOT_USING')
+  const [pauseDays, setPauseDays] = useState(14)
+  const [comment, setComment] = useState('')
   const enabled = Boolean(state && state.status !== 'DISABLED')
 
   async function changeEnabled(next: boolean) {
+    if (!next) {
+      setDialog('disable')
+      return
+    }
     setSaving(true)
     try {
       const data = await apiFetch<{ autoRenewal: AutoRenewalState }>('/api/auto-renewal', {
@@ -46,11 +79,47 @@ export function AutoRenewalCard({
     }
   }
 
+  async function submitRetention() {
+    if (!dialog) return
+    setSaving(true)
+    try {
+      const data = await apiFetch<{ pause: PauseState }>('/api/retention', {
+        method: 'POST',
+        body: JSON.stringify(dialog === 'pause'
+          ? { action: 'PAUSE', reason, pauseDays, comment }
+          : { action: 'DISABLE_AUTO_RENEWAL', reason, comment }),
+      })
+      setPause(data.pause)
+      if (dialog === 'disable') {
+        setState((current) => current ? { ...current, status: 'DISABLED', nextChargeAt: null } : current)
+        toast('Автопродление выключено', 'success')
+      } else {
+        toast('Остаток подписки сохранён на паузе', 'success')
+      }
+      setDialog(null)
+      setComment('')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function resumeAccess() {
+    setSaving(true)
+    try {
+      await apiFetch('/api/retention', { method: 'DELETE' })
+      setPause(null)
+      toast('Доступ снова активен', 'success')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const pendingMethod = state?.status === 'AWAITING_PAYMENT_METHOD'
   const paused = state?.status === 'PAUSED'
   const retrying = state?.status === 'RETRYING'
 
   return (
+    <>
     <section className="overflow-hidden rounded-[1.4rem] border border-slate-200 bg-white dark:border-white/[0.09] dark:bg-white/[0.035]" aria-labelledby="auto-renewal-title">
       <div className="flex flex-col gap-4 px-5 py-5 sm:flex-row sm:items-start sm:justify-between sm:px-6">
         <div className="flex min-w-0 items-start gap-3.5">
@@ -60,13 +129,18 @@ export function AutoRenewalCard({
           <div className="min-w-0">
             <h2 id="auto-renewal-title" className="text-base font-semibold text-slate-950 dark:text-white">Автопродление</h2>
             <p className="mt-1 max-w-xl text-sm leading-6 text-slate-500 dark:text-slate-400">
-              Продлим «{state?.plan.name ?? planName}» до окончания доступа. Отключить можно в любой момент.
+              {pause ? `Остаток «${pause.subscription?.plan?.name ?? planName}» сохранён до возобновления.` : `Продлим «${state?.plan.name ?? planName}» до окончания доступа. Отключить можно в любой момент.`}
             </p>
           </div>
         </div>
         <div className="flex min-h-9 items-center gap-3 self-stretch rounded-2xl bg-slate-50 px-3 py-2 dark:bg-white/[0.045] sm:self-auto">
           <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{enabled ? 'Включено' : 'Выключено'}</span>
-          {saving ? <Loader2 className="h-5 w-5 animate-spin text-slate-400" /> : (
+          {pause ? (
+            <button className="inline-flex items-center gap-2 text-sm font-semibold text-cyan-700 dark:text-cyan-300" disabled={saving} onClick={() => void resumeAccess()}>
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+              Возобновить
+            </button>
+          ) : saving ? <Loader2 className="h-5 w-5 animate-spin text-slate-400" /> : (
             <Switch
               checked={enabled}
               onCheckedChange={(checked) => void changeEnabled(checked)}
@@ -77,7 +151,17 @@ export function AutoRenewalCard({
         </div>
       </div>
 
-      {enabled ? (
+      {pause ? (
+        <div className="flex flex-col gap-3 border-t border-slate-200 bg-amber-50/70 px-5 py-4 dark:border-white/[0.08] dark:bg-amber-300/[0.05] sm:flex-row sm:items-center sm:justify-between sm:px-6">
+          <div>
+            <div className="text-sm font-semibold text-slate-900 dark:text-white">Доступ на паузе</div>
+            <div className="mt-0.5 text-xs leading-5 text-slate-500 dark:text-slate-400">
+              Автоматически включится {pause.pauseUntil ? formatDate(pause.pauseUntil) : 'после ручного возобновления'}.
+            </div>
+          </div>
+          <span className="inline-flex items-center gap-2 text-xs font-semibold text-amber-700 dark:text-amber-300"><PauseCircle className="h-4 w-4" /> Дни не расходуются</span>
+        </div>
+      ) : enabled ? (
         <div className="grid border-t border-slate-200 dark:border-white/[0.08] sm:grid-cols-2">
           <StatusCell
             icon={CreditCard}
@@ -93,7 +177,65 @@ export function AutoRenewalCard({
           />
         </div>
       ) : null}
+      {!pause ? (
+        <div className="flex flex-col gap-2 border-t border-slate-200 px-5 py-3 dark:border-white/[0.08] sm:flex-row sm:items-center sm:justify-between sm:px-6">
+          <span className="text-xs leading-5 text-slate-500 dark:text-slate-400">Не нужен VPN какое-то время? Срок можно заморозить до 30 дней.</span>
+          <button className="inline-flex min-h-9 shrink-0 items-center justify-center gap-2 rounded-xl px-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/[0.06]" onClick={() => setDialog('pause')}>
+            <PauseCircle className="h-4 w-4" /> Поставить на паузу
+          </button>
+        </div>
+      ) : null}
     </section>
+
+    <Modal
+      open={dialog !== null}
+      title={dialog === 'pause' ? 'Приостановить доступ' : 'Перед отключением'}
+      description={dialog === 'pause' ? 'Остаток дней сохранится. Устройства и профиль останутся на месте.' : 'Выберите причину. Это поможет сделать сервис удобнее.'}
+      onClose={() => !saving && setDialog(null)}
+      panelClassName="sm:max-w-2xl"
+      footer={(
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <button className="btn-secondary" disabled={saving} onClick={() => setDialog(null)}>Отмена</button>
+          <button className="btn-primary" disabled={saving} onClick={() => void submitRetention()}>
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            {dialog === 'pause' ? 'Сохранить остаток' : 'Выключить автопродление'}
+          </button>
+        </div>
+      )}
+    >
+      <div className="grid gap-2 sm:grid-cols-2">
+        {reasons.map((item) => (
+          <button
+            key={item.value}
+            type="button"
+            aria-pressed={reason === item.value}
+            onClick={() => setReason(item.value)}
+            className={`rounded-2xl border p-3.5 text-left transition ${reason === item.value ? 'border-cyan-500 bg-cyan-50 ring-2 ring-cyan-500/10 dark:border-cyan-300 dark:bg-cyan-300/[0.07]' : 'border-slate-200 hover:border-slate-300 dark:border-white/10 dark:hover:border-white/20'}`}
+          >
+            <span className="block text-sm font-semibold text-slate-900 dark:text-white">{item.title}</span>
+            <span className="mt-1 block text-xs leading-5 text-slate-500 dark:text-slate-400">{item.detail}</span>
+          </button>
+        ))}
+      </div>
+      {dialog === 'pause' ? (
+        <label className="mt-4 block">
+          <span className="text-sm font-semibold text-slate-800 dark:text-slate-100">Срок паузы</span>
+          <select className="input mt-2" value={pauseDays} onChange={(event) => setPauseDays(Number(event.target.value))}>
+            <option value={7}>7 дней</option>
+            <option value={14}>14 дней</option>
+            <option value={30}>30 дней</option>
+          </select>
+        </label>
+      ) : null}
+      <label className="mt-4 block">
+        <span className="text-sm font-semibold text-slate-800 dark:text-slate-100">Комментарий <span className="font-normal text-slate-400">необязательно</span></span>
+        <textarea className="input mt-2 min-h-24 resize-y" maxLength={500} value={comment} onChange={(event) => setComment(event.target.value)} placeholder="Что именно можно улучшить?" />
+      </label>
+      {reason === 'CONNECTION_ISSUES' ? (
+        <Link href="/dashboard/support" className="mt-4 inline-flex text-sm font-semibold text-cyan-700 hover:underline dark:text-cyan-300">Сначала попросить помощь с подключением</Link>
+      ) : null}
+    </Modal>
+    </>
   )
 }
 

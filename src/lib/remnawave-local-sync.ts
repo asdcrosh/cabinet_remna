@@ -35,15 +35,24 @@ export async function upsertLocalSubscriptionFromRemnawave(input: {
     },
   })
 
-  const existing = await prisma.subscription.findFirst({
-    where: { userId: input.localUserId },
-    orderBy: { expireAt: 'desc' },
-  })
+  const [existing, activePause] = await Promise.all([
+    prisma.subscription.findFirst({
+      where: { userId: input.localUserId },
+      orderBy: { expireAt: 'desc' },
+    }),
+    prisma.subscriptionRetention.findFirst({
+      where: { userId: input.localUserId, status: 'PAUSED', action: 'SUBSCRIPTION_PAUSED' },
+      select: { subscriptionId: true },
+      orderBy: { createdAt: 'desc' },
+    }),
+  ])
 
   const data = {
     ...(input.planId ? { planId: input.planId } : {}),
     expireAt: new Date(input.remnawaveUser.expireAt),
-    status: mapRemnawaveStatus(input.remnawaveUser.status),
+    status: activePause && (!existing || activePause.subscriptionId === existing.id)
+      ? 'PAUSED' as const
+      : mapRemnawaveStatus(input.remnawaveUser.status),
     trafficLimitBytes: trafficLimit === 0n ? null : trafficLimit,
     trafficUsedBytes: trafficUsed,
     lifetimeUsedBytes: lifetimeUsed,

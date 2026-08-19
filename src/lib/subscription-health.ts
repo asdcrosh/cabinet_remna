@@ -273,7 +273,8 @@ function compareCabinetAndRemnawave(user: LoadedUser, remote: UserResponse, issu
     issues.push(issue('CABINET_SUBSCRIPTION_MISSING', 'WARNING', 'CABINET', 'Нет локальной подписки', 'Профиль есть в Remnawave, но подписка отсутствует в Cabinet.', 'AUTO'))
     return
   }
-  if (local.status !== remote.status) {
+  const statusesMatch = local.status === remote.status || (local.status === 'PAUSED' && remote.status === 'DISABLED')
+  if (!statusesMatch) {
     issues.push(issue('STATUS_MISMATCH', 'WARNING', 'CABINET', 'Разный статус подписки', `Cabinet: ${local.status}, Remnawave: ${remote.status}.`, 'AUTO'))
   }
   const remoteExpireAt = new Date(remote.expireAt)
@@ -308,7 +309,7 @@ function compareRemnashop(
     issues.push(issue('REMNASHOP_SUBSCRIPTION_MISSING', 'WARNING', 'REMNASHOP', 'Нет подписки в Remnashop', 'Пользователь связан, но запись подписки не найдена.', 'AUTO'))
     return
   }
-  const sourceStatus = remote?.status ?? local?.status
+  const sourceStatus = local?.status === 'PAUSED' ? 'DISABLED' : remote?.status ?? local?.status
   if (sourceStatus && shop.status && normalizeStatus(shop.status) !== sourceStatus) {
     issues.push(issue('REMNASHOP_STATUS_MISMATCH', 'WARNING', 'REMNASHOP', 'Разный статус в Remnashop', `Ожидается ${sourceStatus}, в Remnashop ${shop.status}.`, 'AUTO'))
   }
@@ -355,7 +356,7 @@ async function applyManualRepairs(state: Awaited<ReturnType<typeof inspect>>) {
   const plan = local?.plan
   if (!state.remote || !local || !plan) return []
   const updated = await remnawave.updateUser(state.remote, {
-    status: local.status,
+    status: local.status === 'PAUSED' ? 'DISABLED' : local.status,
     expireAt: local.expireAt.toISOString(),
     trafficLimitBytes: plan.trafficLimitGb == null ? 0 : Number(gbToBytes(plan.trafficLimitGb)),
     hwidDeviceLimit: plan.deviceLimit,
