@@ -1,5 +1,6 @@
 import {
   Activity,
+  BarChart3,
   Bell,
   BookOpen,
   CalendarRange,
@@ -81,6 +82,7 @@ export const informationNavigation: NavigationItem[] = legalNavigation.map((item
 
 export const adminNavigation: NavigationItem[] = [
   { href: '/dashboard/admin', label: 'Обзор', icon: UserCog, exact: true },
+  { href: '/dashboard/admin/analytics', label: 'Аналитика', icon: BarChart3 },
   { href: '/dashboard/admin/campaigns', label: 'Кампании', icon: CalendarRange },
   { href: '/dashboard/admin/notifications', label: 'Уведомления', icon: Bell },
   { href: '/dashboard/admin/broadcasts', label: 'Рассылки', icon: Send },
@@ -106,6 +108,7 @@ export const adminNavigationGroups = [
     title: 'Главное',
     items: [
       '/dashboard/admin',
+      '/dashboard/admin/analytics',
       '/dashboard/admin/users',
       '/dashboard/admin/payments',
       '/dashboard/admin/support',
