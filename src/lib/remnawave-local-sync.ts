@@ -56,7 +56,7 @@ export async function upsertLocalSubscriptionFromRemnawave(input: {
     trafficLimitBytes: trafficLimit === 0n ? null : trafficLimit,
     trafficUsedBytes: trafficUsed,
     lifetimeUsedBytes: lifetimeUsed,
-    deviceLimit: input.remnawaveUser.hwidDeviceLimit ?? null,
+    deviceLimit: normalizeRemnawaveDeviceLimit(input.remnawaveUser.hwidDeviceLimit),
     lastSyncedAt: new Date(),
     pendingSync: false,
   }
@@ -75,6 +75,10 @@ export async function upsertLocalSubscriptionFromRemnawave(input: {
       ...data,
     },
   })
+}
+
+export function normalizeRemnawaveDeviceLimit(value: number | null | undefined) {
+  return typeof value === 'number' && Number.isInteger(value) && value > 0 ? value : null
 }
 
 export function mapRemnawaveStatus(status: UserResponse['status']) {
