@@ -27,7 +27,10 @@ export default async function SubscriptionPage() {
     prisma.subscription.findFirst({
       where: { userId: session.uid, status: { in: ['ACTIVE', 'LIMITED', 'PAUSED'] } },
       orderBy: { expireAt: 'desc' },
-      select: { plan: { select: { name: true, deviceLimit: true } } },
+      select: {
+        deviceLimit: true,
+        plan: { select: { name: true, deviceLimit: true } },
+      },
     }),
   ])
   if (!user?.remnawaveUsername) {
@@ -175,13 +178,13 @@ export default async function SubscriptionPage() {
           <>
             <VpnConnectionCheck
               supportEnabled={features.support}
-              deviceLimit={localSubscription?.plan?.deviceLimit}
+              deviceLimit={localSubscription?.deviceLimit ?? localSubscription?.plan?.deviceLimit}
             />
             <div className="grid items-start gap-5 min-[1360px]:grid-cols-[minmax(0,1fr)_22rem]">
               <KeysCard subscriptionUrl={data.response.subscriptionUrl} happLink={happLink} />
               <DevicesList
                 embedded
-                deviceLimit={localSubscription?.plan?.deviceLimit}
+                deviceLimit={localSubscription?.deviceLimit ?? localSubscription?.plan?.deviceLimit}
                 subscriptionUrl={data.response.subscriptionUrl}
               />
             </div>

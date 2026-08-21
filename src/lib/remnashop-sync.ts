@@ -1,3 +1,4 @@
+import type { Prisma } from '@prisma/client'
 import { prisma } from './prisma'
 import { remnashopQuery } from './remnashop-db'
 import { syncRemnashopUsersToCabinet } from './remnashop-users'
@@ -15,8 +16,10 @@ interface RemnashopPlanRow {
   is_trial: boolean
   traffic_limit: number
   device_limit: number
+  max_device_limit: number
   duration_days: number
   price_rub: string | null
+  extra_device_price_rub: string | null
   internal_squads: string[] | string
   availability: 'ALL' | 'NEW' | 'EXISTING' | 'INVITED' | 'ALLOWED' | 'LINK'
   allowed_telegram_ids: Array<string | number | bigint>
@@ -319,6 +322,8 @@ export async function getRemnashopSyncDryRun() {
       priceKopecks: normalized.priceKopecks,
       trafficLimitGb: normalized.trafficLimitGb,
       deviceLimit: normalized.deviceLimit,
+      maxDeviceLimit: normalized.maxDeviceLimit,
+      extraDevicePriceKopecks: normalized.extraDevicePriceKopecks,
       isTrial: normalized.isPromo,
       existsInCabinet: cabinetPlanKeys.has(key),
       action: cabinetPlanKeys.has(key) ? 'keep' : 'wouldCreate',
@@ -481,6 +486,8 @@ export async function syncRemnashopCatalog(options: {
         remnashopPlanId: plan.id,
         trafficLimitGb: normalized.trafficLimitGb,
         deviceLimit: normalized.deviceLimit,
+        maxDeviceLimit: normalized.maxDeviceLimit,
+        extraDevicePriceKopecks: normalized.extraDevicePriceKopecks,
         activeInternalSquads: normalized.activeInternalSquads,
         isPromo: normalized.isPromo,
         isActive: normalized.isActive,
@@ -699,6 +706,12 @@ async function syncRemnashopTransactionToCabinet(
 ): Promise<'created' | 'updated' | 'skipped' | 'blocked'> {
   const provider = mapRemnashopGateway(transaction.gateway_type)
   const status = mapTransactionStatus(transaction.status)
+  const snapshot = parseJsonRecord(transaction.plan_snapshot)
+  const selectedDeviceLimit = readPositiveInt(snapshot, [
+    'selectedDeviceLimit',
+    'device_limit',
+    'deviceLimit',
+  ])
   const existing = await prisma.payment.findFirst({
     where: {
       OR: [
@@ -715,11 +728,19 @@ async function syncRemnashopTransactionToCabinet(
       subscriptionId: true,
       subscriptionProvisionedAt: true,
       yookassaId: true,
+      deviceLimit: true,
+      planSnapshot: true,
     },
   })
 
   if (existing) {
-    const statusChanged = existing.status !== status || existing.providerStatus !== transaction.status
+    const snapshotChanged = (
+      (existing.deviceLimit == null && selectedDeviceLimit != null)
+      || (existing.planSnapshot == null && snapshot != null)
+    )
+    const statusChanged = existing.status !== status
+      || existing.providerStatus !== transaction.status
+      || snapshotChanged
     await prisma.$transaction(async (tx) => {
       await tx.payment.update({
         where: { id: existing.id },
@@ -727,6 +748,12 @@ async function syncRemnashopTransactionToCabinet(
           status,
           providerStatus: transaction.status,
           remnashopSyncedAt: new Date(),
+          ...(existing.deviceLimit == null && selectedDeviceLimit != null
+            ? { deviceLimit: selectedDeviceLimit }
+            : {}),
+          ...(existing.planSnapshot == null && snapshot != null
+            ? { planSnapshot: snapshot as Prisma.InputJsonValue }
+            : {}),
           ...(provider === 'YOOKASSA'
             ? { yookassaId: existing.yookassaId ?? transaction.payment_id }
             : {}),
@@ -788,7 +815,6 @@ async function syncRemnashopTransactionToCabinet(
   })
   if (!user) return 'blocked'
 
-  const snapshot = parseJsonRecord(transaction.plan_snapshot)
   const durationDays = readPositiveInt(snapshot, ['duration', 'duration_days', 'durationDays'])
   const sourcePlanId = readPositiveInt(snapshot, ['id', 'plan_id', 'planId'])
   const snapshotName = readText(snapshot, ['name'])
@@ -831,6 +857,8 @@ async function syncRemnashopTransactionToCabinet(
       originalAmountKopecks,
       discountPercent,
       discountKopecks: Math.max(0, originalAmountKopecks - amountKopecks),
+      deviceLimit: selectedDeviceLimit,
+      planSnapshot: snapshot ? snapshot as Prisma.InputJsonValue : undefined,
       provider,
       externalPaymentId: transaction.payment_id,
       yookassaId: provider === 'YOOKASSA' ? transaction.payment_id : null,
@@ -888,6 +916,16 @@ export async function maybeSyncRemnashopCatalog() {
 }
 
 async function fetchRemnashopPlans() {
+  const [planColumns, planPriceColumns] = await Promise.all([
+    tableColumns('plans'),
+    tableColumns('plan_prices'),
+  ])
+  const maxDeviceLimitSql = planColumns.has('max_device_limit')
+    ? 'p.max_device_limit'
+    : 'p.device_limit'
+  const extraDevicePriceSql = planPriceColumns.has('extra_device_price')
+    ? "MAX(CASE WHEN pp.currency = 'RUB' THEN pp.extra_device_price::text END)"
+    : 'NULL::text'
   const result = await remnashopQuery<RemnashopPlanRow>(`
     SELECT
       p.id,
@@ -896,6 +934,7 @@ async function fetchRemnashopPlans() {
       p.is_trial,
       p.traffic_limit,
       p.device_limit,
+      ${maxDeviceLimitSql} AS max_device_limit,
       p.internal_squads,
       p.availability::text AS availability,
       COALESCE(
@@ -904,7 +943,8 @@ async function fetchRemnashopPlans() {
       ) AS allowed_telegram_ids,
       COALESCE(p.allowed_emails, ARRAY[]::text[]) AS allowed_emails,
       d.days AS duration_days,
-      MAX(CASE WHEN pp.currency = 'RUB' THEN pp.price::text END) AS price_rub
+      MAX(CASE WHEN pp.currency = 'RUB' THEN pp.price::text END) AS price_rub,
+      ${extraDevicePriceSql} AS extra_device_price_rub
     FROM plans p
     JOIN plan_durations d ON d.plan_id = p.id
     LEFT JOIN plan_prices pp ON pp.plan_duration_id = d.id
@@ -1144,13 +1184,16 @@ function rubToKopecks(value: string | null) {
 function normalizeRemnashopPlan(plan: RemnashopPlanRow) {
   const durationLabel = plan.duration_days > 0 ? `${plan.duration_days} дн.` : ''
   const baseName = plan.name.trim()
+  const deviceLimit = Math.max(1, plan.device_limit || 1)
   return {
     name: durationLabel && !baseName.includes(durationLabel) ? `${baseName} ${durationLabel}` : baseName,
     description: plan.is_trial ? 'Ознакомительный тариф' : null,
     priceKopecks: plan.is_trial ? 0 : rubToKopecks(plan.price_rub),
     durationDays: Math.max(1, plan.duration_days),
     trafficLimitGb: plan.traffic_limit === 0 ? null : plan.traffic_limit,
-    deviceLimit: Math.max(1, plan.device_limit || 1),
+    deviceLimit,
+    maxDeviceLimit: Math.max(deviceLimit, plan.max_device_limit || deviceLimit),
+    extraDevicePriceKopecks: rubToKopecks(plan.extra_device_price_rub),
     activeInternalSquads: parseInternalSquads(plan.internal_squads),
     availability: plan.availability,
     allowedEmails: plan.allowed_emails.map((email) => email.trim().toLowerCase()).filter(Boolean),

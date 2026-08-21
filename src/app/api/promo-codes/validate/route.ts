@@ -4,6 +4,7 @@ import { requireAuth, withAuth } from '@/lib/auth/guard'
 import { validatePromoCodeSchema } from '@/lib/auth/validation'
 import { PromoCodeError, validatePromoCodeForPlan } from '@/lib/promo-codes'
 import { rateLimit } from '@/lib/rate-limit'
+import { calculatePlanPurchase, DeviceLimitSelectionError } from '@/lib/plan-purchase'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -39,11 +40,13 @@ export const POST = withAuth(async (req: Request) => {
   }
 
   try {
+    const pricing = calculatePlanPurchase(plan, parsed.data.deviceLimit)
     const discount = await validatePromoCodeForPlan({
       prisma,
       code: parsed.data.promoCode,
       userId: session.uid,
       plan,
+      originalAmountKopecks: pricing.originalAmountKopecks,
     })
 
     return NextResponse.json({
@@ -54,6 +57,9 @@ export const POST = withAuth(async (req: Request) => {
       finalAmountKopecks: discount.finalAmountKopecks,
     })
   } catch (e) {
+    if (e instanceof DeviceLimitSelectionError) {
+      return NextResponse.json({ error: e.message, code: e.code }, { status: 400 })
+    }
     if (e instanceof PromoCodeError) {
       return NextResponse.json({ error: e.message, code: e.code }, { status: e.status })
     }

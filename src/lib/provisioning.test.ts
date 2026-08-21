@@ -21,6 +21,7 @@ const mocks = vi.hoisted(() => {
   const syncCabinetPaymentToRemnashopBestEffort = vi.fn()
   const logError = vi.fn()
   const logWarn = vi.fn()
+  const trimUserDevicesToLimit = vi.fn()
 
   return {
     prisma,
@@ -33,6 +34,7 @@ const mocks = vi.hoisted(() => {
     syncCabinetPaymentToRemnashopBestEffort,
     logError,
     logWarn,
+    trimUserDevicesToLimit,
     subscription,
   }
 })
@@ -56,6 +58,9 @@ vi.mock('./remnashop-reverse-sync', () => ({
   syncCabinetPaymentToRemnashopBestEffort: mocks.syncCabinetPaymentToRemnashopBestEffort,
 }))
 vi.mock('./logger', () => ({ logError: mocks.logError, logWarn: mocks.logWarn }))
+vi.mock('./hwid-device-limit', () => ({
+  trimUserDevicesToLimit: mocks.trimUserDevicesToLimit,
+}))
 
 import { provisionPaymentSubscription } from './provisioning'
 
@@ -79,6 +84,7 @@ describe('provisionPaymentSubscription', () => {
     vi.clearAllMocks()
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-01-01T00:00:00.000Z'))
+    mocks.trimUserDevicesToLimit.mockResolvedValue({ total: 0, removed: 0 })
   })
 
   afterEach(() => {
@@ -170,6 +176,54 @@ describe('provisionPaymentSubscription', () => {
     expect(mocks.grantPaymentBonusBoxAttempts).not.toHaveBeenCalled()
     expect(mocks.grantReferralBonusBoxAttemptsForPayment).not.toHaveBeenCalled()
     expect(mocks.syncCabinetPaymentToRemnashopBestEffort).not.toHaveBeenCalled()
+  })
+
+  it('uses the paid device limit snapshot and trims only excess devices', async () => {
+    mocks.prisma.payment.findUnique.mockResolvedValue({
+      id: 'pay-1',
+      deviceLimit: 8,
+      planSnapshot: {
+        version: 1,
+        id: 'plan-1',
+        remnashopPlanId: 10,
+        name: 'Базовый',
+        durationDays: 30,
+        trafficLimitGb: 200,
+        baseDeviceLimit: 4,
+        maxDeviceLimit: 20,
+        selectedDeviceLimit: 8,
+        extraDevicePriceKopecks: 10000,
+        extraDeviceCount: 4,
+        extraDeviceAmountKopecks: 40000,
+        basePriceKopecks: 70000,
+        originalAmountKopecks: 110000,
+        activeInternalSquads: ['squad-1'],
+        deviceLimitSelectionConfirmed: true,
+      },
+      subscriptionProvisionedAt: null,
+      subscription: null,
+      provisioningJob: null,
+    })
+    mocks.prisma.provisioningJob.upsert.mockResolvedValue({ id: 'job-1', attempts: 1 })
+    mocks.ensureRemnawaveSubscription.mockResolvedValue({
+      subscription: mocks.subscription,
+      remnawaveUser: null,
+      isNew: false,
+      idempotent: false,
+    })
+
+    await provisionPaymentSubscription(input)
+
+    expect(mocks.ensureRemnawaveSubscription).toHaveBeenCalledWith(expect.objectContaining({
+      plan: expect.objectContaining({
+        deviceLimit: 8,
+        activeInternalSquads: ['squad-1'],
+      }),
+    }))
+    expect(mocks.trimUserDevicesToLimit).toHaveBeenCalledWith({
+      localUserId: 'user-1',
+      deviceLimit: 8,
+    })
   })
 
   it('keeps provisioning successful when only the notification fails', async () => {

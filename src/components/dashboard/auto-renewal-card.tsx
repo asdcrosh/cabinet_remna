@@ -21,6 +21,7 @@ type AutoRenewalState = {
   consentVersion: string | null
   consentPriceKopecks: number | null
   consentDurationDays: number | null
+  deviceLimit: number
   nextChargeAt: string | null
   retryCount: number
   lastAttemptAt: string | null
@@ -53,6 +54,7 @@ export function AutoRenewalCard({
   planName,
   planPriceKopecks,
   planDurationDays,
+  planDeviceLimit,
   initialState,
   initialPause,
 }: {
@@ -60,6 +62,7 @@ export function AutoRenewalCard({
   planName: string
   planPriceKopecks: number
   planDurationDays: number
+  planDeviceLimit: number
   initialState: AutoRenewalState
   initialPause: PauseState
 }) {
@@ -74,6 +77,7 @@ export function AutoRenewalCard({
   const consentCurrent = Boolean(
     state?.consentAcceptedAt
     && state.consentVersion === AUTO_RENEWAL_CONSENT_VERSION
+    && state.deviceLimit === planDeviceLimit
     && state.consentPriceKopecks === planPriceKopecks
     && state.consentDurationDays === planDurationDays
   )
@@ -261,7 +265,9 @@ export function AutoRenewalCard({
             <div className="p-4 sm:p-5">
               <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Регулярный платёж</div>
               <div className="mt-2 text-2xl font-semibold tracking-tight text-slate-950 dark:text-white">{formatPrice(planPriceKopecks)}</div>
-              <div className="mt-1 text-sm text-slate-500 dark:text-slate-400">каждые {planDurationDays} дней</div>
+              <div className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                {planDeviceLimit} устройств · каждые {planDurationDays} дней
+              </div>
             </div>
             <div className="border-t border-slate-200 p-4 dark:border-white/10 sm:border-l sm:border-t-0 sm:p-5">
               <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Когда спишется</div>

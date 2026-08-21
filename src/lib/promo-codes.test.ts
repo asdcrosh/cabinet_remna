@@ -85,6 +85,24 @@ describe('promo code helpers', () => {
     expect(result.finalAmountKopecks).toBe(8000)
   })
 
+  it('applies the discount after the extra-device surcharge', async () => {
+    prisma.promoCode.findUnique.mockResolvedValue(promoCode())
+    prisma.promoCodeRedemption.count.mockResolvedValue(0)
+
+    const result = await validatePromoCodeForPlan({
+      prisma,
+      code: 'sale20',
+      userId: 'user-1',
+      plan,
+      originalAmountKopecks: 14000,
+      now: new Date('2026-01-01T00:00:00.000Z'),
+    })
+
+    expect(result.originalAmountKopecks).toBe(14000)
+    expect(result.discountKopecks).toBe(2800)
+    expect(result.finalAmountKopecks).toBe(11200)
+  })
+
   it('rejects an expired promo code', async () => {
     prisma.promoCode.findUnique.mockResolvedValue(
       promoCode({ expiresAt: new Date('2025-12-31T00:00:00.000Z') })

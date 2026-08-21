@@ -20,6 +20,8 @@ import {
   Gauge,
   MonitorSmartphone,
   RefreshCw,
+  Minus,
+  Plus,
   ShieldCheck,
   Sparkles,
   Tag,
@@ -37,6 +39,10 @@ export interface PlanCardProps {
   durationDays: number;
   trafficLimitGb: number | null;
   deviceLimit: number;
+  maxDeviceLimit: number;
+  extraDevicePriceKopecks: number;
+  initialDeviceLimit?: number;
+  currentDeviceLimit?: number | null;
   isPromo?: boolean;
   promoCodesEnabled?: boolean;
   popular?: boolean;
@@ -62,11 +68,15 @@ export function PlanCard({
   name,
   description,
   price,
-  monthlyPrice,
+  priceKopecks,
   savingsPercent,
   durationDays,
   trafficLimitGb,
   deviceLimit,
+  maxDeviceLimit,
+  extraDevicePriceKopecks,
+  initialDeviceLimit,
+  currentDeviceLimit,
   isPromo = false,
   promoCodesEnabled = true,
   popular,
@@ -88,6 +98,13 @@ export function PlanCard({
     paymentProviders[0]?.id ?? "YOOKASSA",
   );
   const [promoInput, setPromoInput] = useState("");
+  const normalizedMaxDeviceLimit = Math.max(deviceLimit, maxDeviceLimit);
+  const [selectedDeviceLimit, setSelectedDeviceLimit] = useState(() =>
+    clampDeviceLimit(initialDeviceLimit ?? deviceLimit, deviceLimit, normalizedMaxDeviceLimit),
+  );
+  const [deviceLimitInput, setDeviceLimitInput] = useState(() =>
+    String(clampDeviceLimit(initialDeviceLimit ?? deviceLimit, deviceLimit, normalizedMaxDeviceLimit)),
+  );
   const [appliedPromo, setAppliedPromo] = useState<{
     code: string;
     discountPercent: number;
@@ -98,9 +115,22 @@ export function PlanCard({
 
   const isPromoPlan = isPromo;
   const trimmedPromo = promoInput.trim();
-  const effectivePrice = appliedPromo
-    ? formatPrice(appliedPromo.finalAmountKopecks)
-    : price;
+  const extraDeviceCount = selectedDeviceLimit - deviceLimit;
+  const extraDeviceAmountKopecks = extraDeviceCount * extraDevicePriceKopecks;
+  const purchasePriceKopecks = priceKopecks + extraDeviceAmountKopecks;
+  const displayedDiscount = appliedPromo
+    ? calculateDisplayedDiscount(purchasePriceKopecks, appliedPromo.discountPercent)
+    : null;
+  const effectivePriceKopecks = displayedDiscount?.finalAmountKopecks ?? purchasePriceKopecks;
+  const effectivePrice = formatPrice(effectivePriceKopecks);
+  const purchasePrice = formatPrice(purchasePriceKopecks);
+  const effectiveMonthlyPrice = formatPrice(
+    Math.round((effectivePriceKopecks / Math.max(1, durationDays)) * 30),
+  );
+  const variableDeviceLimit = !isPromoPlan && normalizedMaxDeviceLimit > deviceLimit;
+  const lowersCurrentLimit = Boolean(
+    currentDeviceLimit && selectedDeviceLimit < currentDeviceLimit,
+  );
   const normalizedInitialPromoCode = initialPromoCode?.trim().toUpperCase() || "";
   const suggestedPromoCodes = useMemo(() => {
     const sorted = [...availablePromoCodes].sort((a, b) => {
@@ -119,6 +149,16 @@ export function PlanCard({
   const showManualPromoInput =
     promoOpen && (manualPromoOpen || suggestedPromoCodes.length === 0);
   const autoRenewalSupported = selectedProvider === "YOOKASSA";
+
+  function selectDeviceLimit(value: number) {
+    const nextValue = clampDeviceLimit(value, deviceLimit, normalizedMaxDeviceLimit);
+    setSelectedDeviceLimit(nextValue);
+    setDeviceLimitInput(String(nextValue));
+  }
+
+  function commitDeviceLimitInput() {
+    selectDeviceLimit(Number(deviceLimitInput));
+  }
 
   useEffect(() => {
     if (!initialPromoCode || isPromoPlan || !promoCodesEnabled) return;
@@ -149,7 +189,7 @@ export function PlanCard({
   async function buy() {
     const checkoutFingerprint = isPromoPlan
       ? `${id}:LOCAL`
-      : `${id}:${selectedProvider}:${appliedPromo?.code ?? ""}:${autoRenewalRequested ? "AUTO" : "MANUAL"}`;
+      : `${id}:${selectedDeviceLimit}:${selectedProvider}:${appliedPromo?.code ?? ""}:${autoRenewalRequested ? "AUTO" : "MANUAL"}`;
     if (checkoutAttemptRef.current?.fingerprint !== checkoutFingerprint) {
       checkoutAttemptRef.current = {
         key: crypto.randomUUID(),
@@ -196,6 +236,7 @@ export function PlanCard({
         method: "POST",
         body: JSON.stringify({
           planId: id,
+          deviceLimit: selectedDeviceLimit,
           provider: selectedProvider,
           idempotencyKey,
           ...(autoRenewalRequested
@@ -281,7 +322,7 @@ export function PlanCard({
         finalAmountKopecks: number;
       }>("/api/promo-codes/validate", {
         method: "POST",
-        body: JSON.stringify({ planId: id, promoCode: trimmedPromo }),
+        body: JSON.stringify({ planId: id, deviceLimit: selectedDeviceLimit, promoCode: trimmedPromo }),
       });
       setAppliedPromo(discount);
       setPromoInput(discount.code);
@@ -369,7 +410,7 @@ export function PlanCard({
                 <div className="whitespace-nowrap text-[2rem] font-semibold leading-none tracking-[-0.04em] tabular-nums text-slate-950 dark:text-white">
                   {effectivePrice}
                 </div>
-                {appliedPromo && <div className="text-sm text-slate-400 line-through">{price}</div>}
+                {appliedPromo && <div className="text-sm text-slate-400 line-through">{purchasePrice}</div>}
               </div>
               <span className="mt-1.5 block text-[11px] text-slate-500 dark:text-slate-400">
                 {isPromo ? "Один раз на аккаунт" : "Итоговая сумма"}
@@ -378,7 +419,7 @@ export function PlanCard({
             <div className="shrink-0 text-right">
               <span className="block text-sm font-semibold text-slate-800 dark:text-slate-200">{durationDays} дн.</span>
               <span className="mt-1 block text-[11px] text-slate-500 dark:text-slate-400">
-                {isPromo ? "бесплатно" : `${monthlyPrice} / 30 дней`}
+                {isPromo ? "бесплатно" : `${effectiveMonthlyPrice} / 30 дней`}
               </span>
             </div>
           </div>
@@ -433,7 +474,7 @@ export function PlanCard({
                 <div className="whitespace-nowrap text-[2rem] font-semibold leading-none tracking-[-0.04em] tabular-nums text-slate-950 dark:text-white sm:text-4xl">
                   {effectivePrice}
                 </div>
-                {appliedPromo && <div className="text-sm text-slate-400 line-through">{price}</div>}
+                {appliedPromo && <div className="text-sm text-slate-400 line-through">{purchasePrice}</div>}
               </div>
               {savingsPercent > 0 && !isPromoPlan ? (
                 <span className="inline-flex items-center gap-1 rounded-sm bg-emerald-100/80 px-2 py-1 font-mono text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-200">
@@ -443,7 +484,7 @@ export function PlanCard({
               ) : null}
             </div>
             <div className="mt-2 flex flex-wrap items-center justify-between gap-1.5 text-xs text-slate-500 dark:text-slate-400">
-              <span>{isPromo ? "Один раз на аккаунт" : `${monthlyPrice} за 30 дней`}</span>
+              <span>{isPromo ? "Один раз на аккаунт" : `${effectiveMonthlyPrice} за 30 дней`}</span>
               <span>за весь срок</span>
             </div>
           </div>
@@ -458,8 +499,93 @@ export function PlanCard({
             label="Трафик"
             value={trafficLimitGb == null ? "Безлимит" : `${trafficLimitGb} ГБ`}
           />
-          <PlanFact icon={<MonitorSmartphone className="h-4 w-4" />} label="Устройства" value={`До ${deviceLimit}`} />
+          <PlanFact
+            icon={<MonitorSmartphone className="h-4 w-4" />}
+            label="Устройства"
+            value={variableDeviceLimit ? `${deviceLimit}–${normalizedMaxDeviceLimit}` : `До ${deviceLimit}`}
+          />
         </div>
+      ) : null}
+
+      {variableDeviceLimit ? (
+        <section className="mt-3 rounded-2xl border border-brand-200/80 bg-brand-50/55 p-3.5 dark:border-brand-400/20 dark:bg-brand-500/[0.07]" aria-label="Количество устройств">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div className="text-sm font-semibold text-slate-900 dark:text-white">Количество устройств</div>
+              <div className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
+                Включено {deviceLimit}, далее +{formatPrice(extraDevicePriceKopecks)} за устройство на весь срок
+              </div>
+            </div>
+            <span className="rounded-md bg-white px-2 py-1 font-mono text-xs font-semibold tabular-nums text-brand-700 ring-1 ring-brand-200 dark:bg-white/[0.06] dark:text-brand-200 dark:ring-brand-400/20">
+              {selectedDeviceLimit}
+            </span>
+          </div>
+
+          <div className="mt-3 grid grid-cols-[2.75rem_minmax(4rem,1fr)_2.75rem] items-center gap-2">
+            <button
+              type="button"
+              className="grid h-11 w-11 place-items-center rounded-xl border border-slate-200 bg-white text-slate-700 transition hover:border-brand-300 hover:text-brand-700 disabled:cursor-not-allowed disabled:opacity-35 dark:border-white/10 dark:bg-white/[0.05] dark:text-slate-200"
+              onClick={() => selectDeviceLimit(selectedDeviceLimit - 1)}
+              disabled={selectedDeviceLimit <= deviceLimit}
+              aria-label="Уменьшить количество устройств"
+            >
+              <Minus className="h-4 w-4" />
+            </button>
+            <input
+              type="number"
+              inputMode="numeric"
+              min={deviceLimit}
+              max={normalizedMaxDeviceLimit}
+              value={deviceLimitInput}
+              onFocus={(event) => event.currentTarget.select()}
+              onChange={(event) => {
+                const rawValue = event.target.value.replace(/\D/g, '');
+                setDeviceLimitInput(rawValue);
+                const value = Number(rawValue);
+                if (
+                  Number.isInteger(value)
+                  && value >= deviceLimit
+                  && value <= normalizedMaxDeviceLimit
+                ) {
+                  setSelectedDeviceLimit(value);
+                }
+              }}
+              onBlur={commitDeviceLimitInput}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  commitDeviceLimitInput();
+                  event.currentTarget.blur();
+                }
+              }}
+              className="h-11 min-w-0 rounded-xl border border-slate-200 bg-white px-3 text-center text-lg font-semibold tabular-nums text-slate-950 outline-none transition focus:border-brand-400 focus:ring-2 focus:ring-brand-200/70 dark:border-white/10 dark:bg-surface-900 dark:text-white dark:focus:ring-brand-400/20"
+              aria-label={`Количество устройств, от ${deviceLimit} до ${normalizedMaxDeviceLimit}`}
+            />
+            <button
+              type="button"
+              className="grid h-11 w-11 place-items-center rounded-xl border border-slate-200 bg-white text-slate-700 transition hover:border-brand-300 hover:text-brand-700 disabled:cursor-not-allowed disabled:opacity-35 dark:border-white/10 dark:bg-white/[0.05] dark:text-slate-200"
+              onClick={() => selectDeviceLimit(selectedDeviceLimit + 1)}
+              disabled={selectedDeviceLimit >= normalizedMaxDeviceLimit}
+              aria-label="Увеличить количество устройств"
+            >
+              <Plus className="h-4 w-4" />
+            </button>
+          </div>
+
+          <div className="mt-3 flex items-center justify-between gap-3 border-t border-brand-200/70 pt-2.5 text-xs dark:border-brand-400/15">
+            <span className="text-slate-500 dark:text-slate-400">
+              {extraDeviceCount > 0
+                ? `${price} + ${formatPrice(extraDeviceAmountKopecks)} за ${extraDeviceCount} доп.`
+                : 'Дополнительных устройств нет'}
+            </span>
+            <span className="font-semibold tabular-nums text-slate-900 dark:text-white">{purchasePrice}</span>
+          </div>
+
+          {lowersCurrentLimit ? (
+            <p className="mt-2.5 rounded-xl bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800 ring-1 ring-amber-200/70 dark:bg-amber-400/10 dark:text-amber-100 dark:ring-amber-400/20">
+              После оплаты останутся {selectedDeviceLimit} устройств с самой недавней активностью. Остальные привязки будут удалены.
+            </p>
+          ) : null}
+        </section>
       ) : null}
 
       <div className={cn("mt-auto", checkoutDisplay ? "pt-3" : "pt-4")}>
@@ -531,7 +657,7 @@ export function PlanCard({
             )}
             {appliedPromo && (
               <div className="mt-2.5 flex items-center justify-between gap-2 text-xs font-medium text-emerald-600 dark:text-emerald-300">
-                <span>Экономия {formatPrice(appliedPromo.discountKopecks)}</span>
+                <span>Экономия {formatPrice(displayedDiscount?.discountKopecks ?? appliedPromo.discountKopecks)}</span>
                 {suggestedPromoCodes.length > 0 && !manualPromoOpen ? (
                   <button type="button" className="rounded-lg px-2 py-1 text-slate-500 transition-colors hover:bg-white hover:text-slate-900 dark:hover:bg-white/[0.06] dark:hover:text-white" onClick={resetPromo}>
                     Другой код
@@ -826,4 +952,18 @@ function PlanFact({ icon, label, value }: { icon: ReactNode; label: string; valu
       <div className="mt-1 text-[11px] leading-tight text-slate-500 dark:text-slate-400">{label}</div>
     </div>
   );
+}
+
+function clampDeviceLimit(value: number, minimum: number, maximum: number) {
+  if (!Number.isFinite(value)) return minimum;
+  return Math.min(maximum, Math.max(minimum, Math.round(value)));
+}
+
+function calculateDisplayedDiscount(amountKopecks: number, discountPercent: number) {
+  const rawDiscount = Math.floor((amountKopecks * discountPercent) / 100);
+  const discountKopecks = Math.min(rawDiscount, Math.max(0, amountKopecks - 100));
+  return {
+    discountKopecks,
+    finalAmountKopecks: amountKopecks - discountKopecks,
+  };
 }

@@ -56,6 +56,7 @@ export async function upsertLocalSubscriptionFromRemnawave(input: {
     trafficLimitBytes: trafficLimit === 0n ? null : trafficLimit,
     trafficUsedBytes: trafficUsed,
     lifetimeUsedBytes: lifetimeUsed,
+    deviceLimit: input.remnawaveUser.hwidDeviceLimit ?? null,
     lastSyncedAt: new Date(),
     pendingSync: false,
   }

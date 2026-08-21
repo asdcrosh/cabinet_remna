@@ -97,17 +97,22 @@ export function AdminActionsMenu({
 
   useEffect(() => {
     if (!open || mobile) return
+    let readyToCloseOnScroll = false
+    const readyFrame = window.requestAnimationFrame(() => {
+      readyToCloseOnScroll = true
+    })
     function onPointerDown(event: PointerEvent) {
       const target = event.target as Node
       if (!rootRef.current?.contains(target) && !menuRef.current?.contains(target)) setOpen(false)
     }
     function close() {
-      setOpen(false)
+      if (readyToCloseOnScroll) setOpen(false)
     }
     document.addEventListener('pointerdown', onPointerDown)
     window.addEventListener('resize', close)
     window.addEventListener('scroll', close, true)
     return () => {
+      window.cancelAnimationFrame(readyFrame)
       document.removeEventListener('pointerdown', onPointerDown)
       window.removeEventListener('resize', close)
       window.removeEventListener('scroll', close, true)

@@ -20,26 +20,28 @@ datasource db {
 // trafficLimitGb — лимит трафика в ГБ; null = безлимит.
 // ----------------------------------------------------------------------
 model Plan {
-  id                   String           @id @default(cuid())
-  name                 String // "Базовый", "PRO", "Безлимит"
-  description          String?
-  priceKopecks         Int // 19900 = 199 ₽
-  durationDays         Int              @default(30)
-  remnashopPlanId      Int? // исходный ID плана Remnashop для точной синхронизации
-  trafficLimitGb       Int? // null = безлимит
-  deviceLimit          Int              @default(5)
-  activeInternalSquads String[]         @default([]) // UUID squads Remnawave для этого тарифа
-  availability         PlanAvailability @default(ALL) // аудитория тарифа как в Remnashop
-  allowedEmails        String[]         @default([]) // явный доступ для availability=ALLOWED
-  allowedTelegramIds   String[]         @default([]) // Telegram ID строками, чтобы безопасно отдавать JSON
-  isPromo              Boolean          @default(false) // бесплатный одноразовый ознакомительный тариф
-  promoCodesEnabled    Boolean          @default(true) // можно ли применять скидочные промокоды к тарифу
-  isFeatured           Boolean          @default(false) // тариф, выделенный в витрине
-  featuredSlot         Int?             @unique // 1 только у одного выделенного тарифа
-  isActive             Boolean          @default(true)
-  sortOrder            Int              @default(0)
-  createdAt            DateTime         @default(now())
-  updatedAt            DateTime         @updatedAt
+  id                      String           @id @default(cuid())
+  name                    String // "Базовый", "PRO", "Безлимит"
+  description             String?
+  priceKopecks            Int // 19900 = 199 ₽
+  durationDays            Int              @default(30)
+  remnashopPlanId         Int? // исходный ID плана Remnashop для точной синхронизации
+  trafficLimitGb          Int? // null = безлимит
+  deviceLimit             Int              @default(5)
+  maxDeviceLimit          Int              @default(5)
+  extraDevicePriceKopecks Int              @default(0)
+  activeInternalSquads    String[]         @default([]) // UUID squads Remnawave для этого тарифа
+  availability            PlanAvailability @default(ALL) // аудитория тарифа как в Remnashop
+  allowedEmails           String[]         @default([]) // явный доступ для availability=ALLOWED
+  allowedTelegramIds      String[]         @default([]) // Telegram ID строками, чтобы безопасно отдавать JSON
+  isPromo                 Boolean          @default(false) // бесплатный одноразовый ознакомительный тариф
+  promoCodesEnabled       Boolean          @default(true) // можно ли применять скидочные промокоды к тарифу
+  isFeatured              Boolean          @default(false) // тариф, выделенный в витрине
+  featuredSlot            Int?             @unique // 1 только у одного выделенного тарифа
+  isActive                Boolean          @default(true)
+  sortOrder               Int              @default(0)
+  createdAt               DateTime         @default(now())
+  updatedAt               DateTime         @updatedAt
 
   payments             Payment[]
   autoRenewals         AutoRenewal[]
@@ -585,6 +587,8 @@ model Subscription {
   trafficUsedBytes  BigInt   @default(0)
   // Lifetime-использование (как в Remnawave).
   lifetimeUsedBytes BigInt   @default(0)
+  // Фактически оплаченный лимит. null допустим только у старых записей до синхронизации.
+  deviceLimit       Int?
   // Когда последний раз дёргали /api/subscription на нашей стороне.
   lastSyncedAt      DateTime @default(now())
 
@@ -595,9 +599,9 @@ model Subscription {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  plan     Plan?     @relation(fields: [planId], references: [id], onDelete: SetNull)
-  payments Payment[]
+  user            User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan            Plan?                   @relation(fields: [planId], references: [id], onDelete: SetNull)
+  payments        Payment[]
   retentionEvents SubscriptionRetention[]
 
   @@index([userId, status])
@@ -615,18 +619,18 @@ enum SubscriptionStatus {
 }
 
 model SubscriptionRetention {
-  id               String                  @id @default(cuid())
+  id               String          @id @default(cuid())
   userId           String
   subscriptionId   String?
   reason           RetentionReason
   action           RetentionAction
-  status           RetentionStatus         @default(CLOSED)
+  status           RetentionStatus @default(CLOSED)
   comment          String?
   remainingSeconds BigInt?
   pauseUntil       DateTime?
   resumedAt        DateTime?
-  createdAt        DateTime                @default(now())
-  updatedAt        DateTime                @updatedAt
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
 
   user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   subscription Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
@@ -729,6 +733,9 @@ model Payment {
   discountPercent       Int?
   discountKopecks       Int   @default(0)
   promoCodeSnapshot     Json?
+  // Выбранный лимит и неизменяемые условия заказа на момент оплаты.
+  deviceLimit           Int?
+  planSnapshot          Json?
 
   // Общие данные внешнего провайдера
   provider          PaymentProvider @default(YOOKASSA)
@@ -871,6 +878,7 @@ model AutoRenewal {
   consentVersion           String?
   consentPriceKopecks      Int?
   consentDurationDays      Int?
+  deviceLimit              Int               @default(5)
   nextChargeAt             DateTime?
   retryCount               Int               @default(0)
   lastAttemptAt            DateTime?

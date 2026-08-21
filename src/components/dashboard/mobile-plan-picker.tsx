@@ -84,7 +84,7 @@ export function PlanCatalog({ plans, initialPlanId }: { plans: CatalogPlan[]; in
             <div className="min-w-[7.6rem] text-right">
               <div className="mb-2">
                 <span className="block whitespace-nowrap text-lg font-semibold tracking-[-0.03em] tabular-nums text-slate-950 dark:text-white">
-                {plan.price}
+                  {plan.maxDeviceLimit > plan.deviceLimit ? `от ${plan.price}` : plan.price}
                 </span>
                 <span className="mt-0.5 block text-[10px] text-slate-500 dark:text-slate-400">{dailyRateLabel(plan)}</span>
               </div>
@@ -150,14 +150,18 @@ export function PlanCatalog({ plans, initialPlanId }: { plans: CatalogPlan[]; in
                     <span className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
                       <span>{plan.durationDays} дней</span>
                       <span>{plan.trafficLimitGb == null ? 'Безлимитный трафик' : `${plan.trafficLimitGb} ГБ`}</span>
-                      <span>До {plan.deviceLimit} устройств</span>
+                      <span>
+                        {plan.maxDeviceLimit > plan.deviceLimit
+                          ? `${plan.deviceLimit}–${plan.maxDeviceLimit} устройств`
+                          : `До ${plan.deviceLimit} устройств`}
+                      </span>
                     </span>
                   </span>
 
                   <span className="col-span-2 flex items-end justify-between gap-3 pl-11 sm:col-span-1 sm:block sm:pl-0 sm:text-right">
                     <span className="text-xs text-slate-400 dark:text-slate-500 sm:block">{dailyRateLabel(plan)}</span>
                     <span className="block whitespace-nowrap text-xl font-semibold tracking-tight tabular-nums text-slate-950 dark:text-white sm:mt-1">
-                      {plan.price}
+                      {plan.maxDeviceLimit > plan.deviceLimit ? `от ${plan.price}` : plan.price}
                     </span>
                   </span>
                 </button>

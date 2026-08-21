@@ -59,12 +59,14 @@ export async function validatePromoCodeForPlan({
   code,
   userId,
   plan,
+  originalAmountKopecks,
   now = new Date(),
 }: {
   prisma: PromoPrisma
   code: string
   userId: string
   plan: Pick<Plan, 'id' | 'priceKopecks' | 'promoCodesEnabled'>
+  originalAmountKopecks?: number
   now?: Date
 }): Promise<PromoDiscountResult> {
   const normalizedCode = normalizePromoCode(code)
@@ -123,15 +125,16 @@ export async function validatePromoCodeForPlan({
     throw new PromoCodeError('Вы уже использовали этот промокод', 409, 'PROMO_USER_LIMIT_REACHED')
   }
 
+  const purchaseAmountKopecks = originalAmountKopecks ?? plan.priceKopecks
   const { discountKopecks, finalAmountKopecks } = calculatePercentDiscount(
-    plan.priceKopecks,
+    purchaseAmountKopecks,
     promoCode.discountPercent
   )
 
   return {
     promoCode,
     normalizedCode,
-    originalAmountKopecks: plan.priceKopecks,
+    originalAmountKopecks: purchaseAmountKopecks,
     discountPercent: promoCode.discountPercent,
     discountKopecks,
     finalAmountKopecks,

@@ -7,6 +7,11 @@ import { logError, logInfo } from './logger'
 import { notifyUser } from './notifications'
 import { getAppUrl } from './app-url'
 import { AUTO_RENEWAL_CONSENT_VERSION } from './auto-renewal-consent'
+import {
+  buildPlanPurchaseSnapshot,
+  calculatePlanPurchase,
+  type DevicePricedPlan,
+} from './plan-purchase'
 
 const HOUR_MS = 60 * 60 * 1000
 const DEFAULT_LEAD_HOURS = 24
@@ -19,7 +24,19 @@ type DueAutoRenewal = Prisma.AutoRenewalGetPayload<{
 export async function getAutoRenewalState(userId: string) {
   const setting = await prisma.autoRenewal.findUnique({
     where: { userId },
-    include: { plan: { select: { id: true, name: true, priceKopecks: true, durationDays: true } } },
+    include: {
+      plan: {
+        select: {
+          id: true,
+          name: true,
+          priceKopecks: true,
+          durationDays: true,
+          deviceLimit: true,
+          maxDeviceLimit: true,
+          extraDevicePriceKopecks: true,
+        },
+      },
+    },
   })
   if (!setting) return null
   return {
@@ -32,6 +49,7 @@ export async function getAutoRenewalState(userId: string) {
     consentVersion: setting.consentVersion,
     consentPriceKopecks: setting.consentPriceKopecks,
     consentDurationDays: setting.consentDurationDays,
+    deviceLimit: setting.deviceLimit,
     nextChargeAt: setting.nextChargeAt,
     retryCount: setting.retryCount,
     lastAttemptAt: setting.lastAttemptAt,
@@ -54,7 +72,7 @@ export async function enableAutoRenewal(input: {
     prisma.subscription.findFirst({
       where: { userId: input.userId, status: { in: ['ACTIVE', 'LIMITED'] } },
       orderBy: { expireAt: 'desc' },
-      select: { expireAt: true, planId: true },
+      select: { expireAt: true, planId: true, deviceLimit: true },
     }),
   ])
   if (!plan || plan.isPromo || plan.priceKopecks <= 0) {
@@ -63,6 +81,8 @@ export async function enableAutoRenewal(input: {
   if (!subscription || subscription.planId !== plan.id) {
     throw new Error('Автопродление можно включить только для текущего тарифа')
   }
+  const deviceLimit = subscription.deviceLimit ?? plan.deviceLimit
+  const pricing = calculateAutoRenewalPurchase(plan, deviceLimit)
 
   const existing = await prisma.autoRenewal.findUnique({ where: { userId: input.userId } })
   const hasMethod = Boolean(existing?.paymentMethodIdEncrypted)
@@ -75,8 +95,9 @@ export async function enableAutoRenewal(input: {
       status: 'AWAITING_PAYMENT_METHOD',
       consentAcceptedAt,
       consentVersion: AUTO_RENEWAL_CONSENT_VERSION,
-      consentPriceKopecks: plan.priceKopecks,
+      consentPriceKopecks: pricing.originalAmountKopecks,
       consentDurationDays: plan.durationDays,
+      deviceLimit,
       nextChargeAt: null,
     },
     update: {
@@ -84,8 +105,9 @@ export async function enableAutoRenewal(input: {
       status: hasMethod ? 'ACTIVE' : 'AWAITING_PAYMENT_METHOD',
       consentAcceptedAt,
       consentVersion: AUTO_RENEWAL_CONSENT_VERSION,
-      consentPriceKopecks: plan.priceKopecks,
+      consentPriceKopecks: pricing.originalAmountKopecks,
       consentDurationDays: plan.durationDays,
+      deviceLimit,
       nextChargeAt: hasMethod && subscription ? chargeAt(subscription.expireAt) : null,
       retryCount: 0,
       lastFailurePaymentId: null,
@@ -157,9 +179,18 @@ export async function captureSavedPaymentMethod(input: {
     select: {
       userId: true,
       planId: true,
+      deviceLimit: true,
       autoRenewalConsentAcceptedAt: true,
       autoRenewalConsentVersion: true,
-      plan: { select: { priceKopecks: true, durationDays: true } },
+      plan: {
+        select: {
+          priceKopecks: true,
+          durationDays: true,
+          deviceLimit: true,
+          maxDeviceLimit: true,
+          extraDevicePriceKopecks: true,
+        },
+      },
     },
   })
   if (!payment) return false
@@ -182,8 +213,10 @@ export async function captureSavedPaymentMethod(input: {
   const subscription = await prisma.subscription.findFirst({
     where: { userId: payment.userId, status: { in: ['ACTIVE', 'LIMITED'] } },
     orderBy: { expireAt: 'desc' },
-    select: { expireAt: true, planId: true },
+    select: { expireAt: true, planId: true, deviceLimit: true },
   })
+  const deviceLimit = payment.deviceLimit ?? subscription?.deviceLimit ?? payment.plan.deviceLimit
+  const pricing = calculateAutoRenewalPurchase(payment.plan, deviceLimit)
   const consentAcceptedAt = checkoutConsentCurrent
     ? payment.autoRenewalConsentAcceptedAt!
     : setting!.consentAcceptedAt!
@@ -198,8 +231,9 @@ export async function captureSavedPaymentMethod(input: {
       paymentMethodSavedAt: new Date(),
       consentAcceptedAt,
       consentVersion: AUTO_RENEWAL_CONSENT_VERSION,
-      consentPriceKopecks: payment.plan.priceKopecks,
+      consentPriceKopecks: pricing.originalAmountKopecks,
       consentDurationDays: payment.plan.durationDays,
+      deviceLimit,
       nextChargeAt: subscription?.planId === payment.planId ? chargeAt(subscription.expireAt) : null,
     },
     update: {
@@ -212,8 +246,9 @@ export async function captureSavedPaymentMethod(input: {
         ? {
             consentAcceptedAt,
             consentVersion: AUTO_RENEWAL_CONSENT_VERSION,
-            consentPriceKopecks: payment.plan.priceKopecks,
+            consentPriceKopecks: pricing.originalAmountKopecks,
             consentDurationDays: payment.plan.durationDays,
+            deviceLimit,
           }
         : {}),
       nextChargeAt: subscription?.planId === payment.planId ? chargeAt(subscription.expireAt) : null,
@@ -255,16 +290,31 @@ export async function refreshAutoRenewalSchedule(userId: string, paymentId?: str
     prisma.subscription.findFirst({
       where: { userId, status: { in: ['ACTIVE', 'LIMITED'] } },
       orderBy: { expireAt: 'desc' },
-      include: { plan: { select: { id: true, isPromo: true, priceKopecks: true, durationDays: true } } },
+      include: {
+        plan: {
+          select: {
+            id: true,
+            isPromo: true,
+            priceKopecks: true,
+            durationDays: true,
+            deviceLimit: true,
+            maxDeviceLimit: true,
+            extraDevicePriceKopecks: true,
+          },
+        },
+      },
     }),
     paymentId
       ? prisma.payment.findUnique({ where: { id: paymentId }, select: { origin: true } })
       : null,
   ])
   if (!subscription?.plan || subscription.plan.isPromo || subscription.plan.priceKopecks <= 0) return
+  const subscriptionDeviceLimit = subscription.deviceLimit ?? subscription.plan.deviceLimit
+  const currentPricing = tryCalculateAutoRenewalPurchase(subscription.plan, subscriptionDeviceLimit)
   const consentCurrent = (
     setting.planId === subscription.plan.id
-    && setting.consentPriceKopecks === subscription.plan.priceKopecks
+    && setting.deviceLimit === subscriptionDeviceLimit
+    && setting.consentPriceKopecks === currentPricing?.originalAmountKopecks
     && setting.consentDurationDays === subscription.plan.durationDays
   )
   await prisma.autoRenewal.update({
@@ -355,8 +405,10 @@ export async function processDueAutoRenewals(options?: { limit?: number; shouldS
 }
 
 async function createAutoRenewalPayment(setting: DueAutoRenewal) {
+  const pricing = tryCalculateAutoRenewalPurchase(setting.plan, setting.deviceLimit)
   if (
-    setting.consentPriceKopecks !== setting.plan.priceKopecks
+    !pricing
+    || setting.consentPriceKopecks !== pricing.originalAmountKopecks
     || setting.consentDurationDays !== setting.plan.durationDays
   ) {
     await prisma.autoRenewal.update({
@@ -386,13 +438,16 @@ async function createAutoRenewalPayment(setting: DueAutoRenewal) {
   if (existing) return existing
 
   const localPayment = await prisma.$transaction(async (tx) => {
+    const planSnapshot = buildPlanPurchaseSnapshot(setting.plan, pricing)
     const payment = await tx.payment.create({
       data: {
         userId: setting.userId,
         planId: setting.planId,
         autoRenewalId: setting.id,
-        amountKopecks: setting.plan.priceKopecks,
-        originalAmountKopecks: setting.plan.priceKopecks,
+        amountKopecks: pricing.originalAmountKopecks,
+        originalAmountKopecks: pricing.originalAmountKopecks,
+        deviceLimit: pricing.selectedDeviceLimit,
+        planSnapshot: planSnapshot as unknown as Prisma.InputJsonValue,
         provider: 'YOOKASSA',
         origin: 'AUTO_RENEWAL',
         providerStatus: 'pending',
@@ -417,6 +472,7 @@ async function createAutoRenewalPayment(setting: DueAutoRenewal) {
         planId: setting.planId,
         localPaymentId: localPayment.id,
         autoRenewalId: setting.id,
+        deviceLimit: String(pricing.selectedDeviceLimit),
       },
       idempotenceKey: localPayment.id,
     })
@@ -445,6 +501,24 @@ async function createAutoRenewalPayment(setting: DueAutoRenewal) {
     })
     await registerAutoRenewalFailure(localPayment.id, errorMessage(error))
     throw error
+  }
+}
+
+export function calculateAutoRenewalPurchase(
+  plan: Pick<DevicePricedPlan, 'priceKopecks' | 'deviceLimit' | 'maxDeviceLimit' | 'extraDevicePriceKopecks'>,
+  deviceLimit: number
+) {
+  return calculatePlanPurchase(plan, deviceLimit)
+}
+
+function tryCalculateAutoRenewalPurchase(
+  plan: Pick<DevicePricedPlan, 'priceKopecks' | 'deviceLimit' | 'maxDeviceLimit' | 'extraDevicePriceKopecks'>,
+  deviceLimit: number
+) {
+  try {
+    return calculateAutoRenewalPurchase(plan, deviceLimit)
+  } catch {
+    return null
   }
 }
 

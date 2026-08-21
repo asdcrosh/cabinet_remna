@@ -59,6 +59,8 @@ const payment = {
   remnashopSyncedAt: null,
   paidAt: new Date('2026-07-04T10:00:00.000Z'),
   createdAt: new Date('2026-07-04T09:59:00.000Z'),
+  deviceLimit: 3,
+  planSnapshot: null,
   user: {
     id: 'user-1',
     email: 'user@example.com',
@@ -76,8 +78,11 @@ const payment = {
     name: 'Стандарт',
     remnashopPlanId: 77,
     durationDays: 30,
+    priceKopecks: 30000,
     trafficLimitGb: 0,
     deviceLimit: 3,
+    maxDeviceLimit: 3,
+    extraDevicePriceKopecks: 0,
     activeInternalSquads: ['squad-1'],
   },
   subscription: {
@@ -85,6 +90,7 @@ const payment = {
     status: 'ACTIVE',
     startAt: new Date('2026-07-04T10:00:00.000Z'),
     expireAt: new Date('2026-08-03T10:00:00.000Z'),
+    deviceLimit: 3,
   },
 }
 
@@ -268,6 +274,11 @@ describe('remnashop reverse sync', () => {
     ))
     expect(transactionInsert?.[1]).toContain(JSON.stringify({
       original_amount: 300,
+      base_amount: 300,
+      selected_device_limit: 3,
+      extra_device_count: 0,
+      extra_device_price: 0,
+      extra_device_amount: 0,
       discount_percent: 0,
       final_amount: 300,
     }))

@@ -230,6 +230,7 @@ async function inspect(userId: string) {
         expireAt: local.expireAt.toISOString(),
         trafficLimitBytes: local.trafficLimitBytes?.toString() ?? null,
         trafficUsedBytes: local.trafficUsedBytes.toString(),
+        deviceLimit: local.deviceLimit,
         devices: user._count.devices,
       } : null,
       remnawave: remote ? {
@@ -293,8 +294,9 @@ function compareCabinetAndRemnawave(user: LoadedUser, remote: UserResponse, issu
     if (expectedTraffic !== remoteLimit) {
       issues.push(issue('PLAN_TRAFFIC_MISMATCH', 'WARNING', 'REMNAWAVE', 'Тариф и Remnawave расходятся', `По тарифу лимит ${expectedTraffic.toString()} байт, в Remnawave ${remoteLimit.toString()} байт.`, 'MANUAL'))
     }
-    if ((remote.hwidDeviceLimit ?? 0) !== plan.deviceLimit) {
-      issues.push(issue('PLAN_DEVICE_MISMATCH', 'WARNING', 'REMNAWAVE', 'Не совпадает лимит устройств', `По тарифу: ${plan.deviceLimit}, в Remnawave: ${remote.hwidDeviceLimit ?? 0}.`, 'MANUAL'))
+    const expectedDeviceLimit = local.deviceLimit ?? plan.deviceLimit
+    if ((remote.hwidDeviceLimit ?? 0) !== expectedDeviceLimit) {
+      issues.push(issue('PLAN_DEVICE_MISMATCH', 'WARNING', 'REMNAWAVE', 'Не совпадает лимит устройств', `По подписке: ${expectedDeviceLimit}, в Remnawave: ${remote.hwidDeviceLimit ?? 0}.`, 'MANUAL'))
     }
   }
 }
@@ -320,6 +322,21 @@ function compareRemnashop(
   }
   if (remote?.uuid && shop.remnawaveUuid && shop.remnawaveUuid !== remote.uuid) {
     issues.push(issue('REMNASHOP_UUID_MISMATCH', 'ERROR', 'REMNASHOP', 'Remnashop связан с другим профилем', `Remnawave UUID: ${remote.uuid}, в Remnashop: ${shop.remnawaveUuid}.`, 'MANUAL'))
+  }
+  const expectedDeviceLimit = local?.deviceLimit ?? remote?.hwidDeviceLimit ?? null
+  if (
+    expectedDeviceLimit != null
+    && shop.deviceLimit != null
+    && shop.deviceLimit !== expectedDeviceLimit
+  ) {
+    issues.push(issue(
+      'REMNASHOP_DEVICE_LIMIT_MISMATCH',
+      'WARNING',
+      'REMNASHOP',
+      'Не совпадает лимит устройств',
+      `По подписке: ${expectedDeviceLimit}, в Remnashop: ${shop.deviceLimit}.`,
+      'AUTO'
+    ))
   }
 }
 
@@ -359,7 +376,7 @@ async function applyManualRepairs(state: Awaited<ReturnType<typeof inspect>>) {
     status: local.status === 'PAUSED' ? 'DISABLED' : local.status,
     expireAt: local.expireAt.toISOString(),
     trafficLimitBytes: plan.trafficLimitGb == null ? 0 : Number(gbToBytes(plan.trafficLimitGb)),
-    hwidDeviceLimit: plan.deviceLimit,
+    hwidDeviceLimit: local.deviceLimit ?? plan.deviceLimit,
     ...(plan.activeInternalSquads.length > 0 ? { activeInternalSquads: plan.activeInternalSquads } : {}),
   })
   await upsertLocalSubscriptionFromRemnawave({

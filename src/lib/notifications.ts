@@ -6,6 +6,7 @@ import { prisma } from './prisma'
 import { createAdminNotification } from './admin-notifications'
 import { logError, logWarn } from './logger'
 import { remnawave } from './remnawave'
+import { readPlanPurchaseSnapshot, resolveEffectiveDeviceLimit } from './plan-purchase'
 import {
   buildAdminPaymentStuckTelegramText,
   buildAdminPaymentTelegramText,
@@ -142,7 +143,7 @@ export async function notifyPaymentSucceeded(paymentId: string) {
         },
       },
       plan: { select: { name: true, durationDays: true, trafficLimitGb: true, deviceLimit: true } },
-      subscription: { select: { startAt: true, expireAt: true } },
+      subscription: { select: { startAt: true, expireAt: true, deviceLimit: true } },
     },
   })
   if (!payment) return
@@ -159,12 +160,23 @@ export async function notifyPaymentSucceeded(paymentId: string) {
 
   const appUrl = getAppUrl()
   const amount = formatRubles(payment.amountKopecks)
-  const planName = payment.plan?.name ?? 'тариф'
+  const purchaseSnapshot = readPlanPurchaseSnapshot(payment.planSnapshot)
+  const planName = purchaseSnapshot?.name ?? payment.plan?.name ?? 'тариф'
+  const durationDays = purchaseSnapshot?.durationDays ?? payment.plan?.durationDays ?? null
+  const trafficLimitGb = purchaseSnapshot?.trafficLimitGb ?? payment.plan?.trafficLimitGb ?? null
   const subscriptionUrl = await getSubscriptionUrl(payment.user.remnawaveUsername)
   const dashboardSubscriptionUrl = `${appUrl}${SUBSCRIPTION_PATH}`
   const qrUrl = subscriptionUrl ? `${appUrl}/api/qr?text=${encodeURIComponent(subscriptionUrl)}` : null
   const isPaid = payment.amountKopecks > 0
   const isRenewal = isPaid && previousSucceededPayments > 0
+  const deviceLimit = payment.plan
+    ? resolveEffectiveDeviceLimit({
+        snapshot: payment.planSnapshot,
+        paymentDeviceLimit: payment.deviceLimit,
+        subscriptionDeviceLimit: payment.subscription?.deviceLimit,
+        planDeviceLimit: payment.plan.deviceLimit,
+      })
+    : payment.deviceLimit ?? payment.subscription?.deviceLimit ?? null
   const expireText = payment.subscription?.expireAt ? `до ${formatDate(payment.subscription.expireAt)}` : null
   const title = isPaid ? (isRenewal ? 'Подписка продлена' : 'Подписка оплачена') : 'Пробный тариф активирован'
   const body = [
@@ -178,9 +190,9 @@ export async function notifyPaymentSucceeded(paymentId: string) {
     userName: payment.user.name,
     planName,
     amount,
-    durationDays: payment.plan?.durationDays ?? null,
-    trafficLimitGb: payment.plan?.trafficLimitGb ?? null,
-    deviceLimit: payment.plan?.deviceLimit ?? null,
+    durationDays,
+    trafficLimitGb,
+    deviceLimit,
     expireAt: payment.subscription?.expireAt ?? null,
     paidAt: payment.paidAt ?? payment.subscriptionProvisionedAt ?? payment.updatedAt,
     isPaid,
@@ -205,9 +217,9 @@ export async function notifyPaymentSucceeded(paymentId: string) {
       body,
       planName,
       amount,
-      durationDays: payment.plan?.durationDays ?? null,
-      trafficLimitGb: payment.plan?.trafficLimitGb ?? null,
-      deviceLimit: payment.plan?.deviceLimit ?? null,
+      durationDays,
+      trafficLimitGb,
+      deviceLimit,
       expireAt: payment.subscription?.expireAt ?? null,
       subscriptionUrl,
       dashboardSubscriptionUrl,
@@ -220,9 +232,9 @@ export async function notifyPaymentSucceeded(paymentId: string) {
       greetingName: payment.user.name,
       planName,
       amount,
-      durationDays: payment.plan?.durationDays ?? null,
-      trafficLimitGb: payment.plan?.trafficLimitGb ?? null,
-      deviceLimit: payment.plan?.deviceLimit ?? null,
+      durationDays,
+      trafficLimitGb,
+      deviceLimit,
       expireAt: payment.subscription?.expireAt ?? null,
       subscriptionUrl,
       dashboardSubscriptionUrl,

@@ -7,6 +7,8 @@ import { syncCabinetPaymentToRemnashopBestEffort } from './remnashop-reverse-syn
 import { logError } from './logger'
 import { paymentErrorDetails, recordPaymentEvent } from './payment-events'
 import { refreshAutoRenewalSchedule } from './auto-renewal'
+import { trimUserDevicesToLimit } from './hwid-device-limit'
+import { readPlanPurchaseSnapshot } from './plan-purchase'
 
 export interface ProvisionPaymentSubscriptionInput extends EnsureSubscriptionInput {
   paymentId: string
@@ -18,10 +20,35 @@ export async function provisionPaymentSubscription(input: ProvisionPaymentSubscr
     include: {
       subscription: true,
       provisioningJob: true,
+      plan: true,
     },
   })
 
+  const purchaseSnapshot = readPlanPurchaseSnapshot(payment?.planSnapshot)
+  const effectiveInput = {
+    ...input,
+    plan: purchaseSnapshot
+      ? {
+          id: purchaseSnapshot.id,
+          name: purchaseSnapshot.name,
+          durationDays: purchaseSnapshot.durationDays,
+          trafficLimitGb: purchaseSnapshot.trafficLimitGb,
+          deviceLimit: purchaseSnapshot.selectedDeviceLimit,
+          activeInternalSquads: purchaseSnapshot.activeInternalSquads,
+        }
+      : {
+          ...input.plan,
+          deviceLimit: payment?.deviceLimit ?? input.plan.deviceLimit,
+        },
+  }
+
   if (payment?.subscriptionProvisionedAt && payment.subscription) {
+    await trimPurchasedDevices({
+      paymentId: input.paymentId,
+      userId: input.userId,
+      deviceLimit: effectiveInput.plan.deviceLimit,
+      enabled: purchaseSnapshot?.deviceLimitSelectionConfirmed === true,
+    })
     await prisma.provisioningJob.upsert({
       where: { paymentId: input.paymentId },
       create: {
@@ -87,7 +114,13 @@ export async function provisionPaymentSubscription(input: ProvisionPaymentSubscr
   })
 
   try {
-    const result = await ensureRemnawaveSubscription(input)
+    const result = await ensureRemnawaveSubscription(effectiveInput)
+    await trimPurchasedDevices({
+      paymentId: input.paymentId,
+      userId: input.userId,
+      deviceLimit: effectiveInput.plan.deviceLimit,
+      enabled: purchaseSnapshot?.deviceLimitSelectionConfirmed === true,
+    })
     await prisma.provisioningJob.update({
       where: { id: job.id },
       data: {
@@ -141,6 +174,30 @@ async function refreshAutoRenewalScheduleBestEffort(userId: string, paymentId: s
     await refreshAutoRenewalSchedule(userId, paymentId)
   } catch (error) {
     logError('auto_renewal.schedule_refresh_failed', error, { userId })
+  }
+}
+
+async function trimPurchasedDevices(input: {
+  paymentId: string
+  userId: string
+  deviceLimit: number
+  enabled: boolean
+}) {
+  if (!input.enabled) return
+  const result = await trimUserDevicesToLimit({
+    localUserId: input.userId,
+    deviceLimit: input.deviceLimit,
+  })
+  if (result.removed > 0) {
+    await recordPaymentEvent({
+      paymentId: input.paymentId,
+      stage: 'PROVISIONING',
+      status: 'INFO',
+      source: 'provisioning',
+      message: `Отвязаны давно неактивные устройства: ${result.removed}`,
+      details: { deviceLimit: input.deviceLimit, removedDevices: result.removed },
+      dedupeKey: `devices-trimmed-${input.deviceLimit}`,
+    })
   }
 }
 

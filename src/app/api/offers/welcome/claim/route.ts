@@ -6,6 +6,7 @@ import { rateLimit } from '@/lib/rate-limit'
 import { provisionPaymentSubscription } from '@/lib/provisioning'
 import { getBonusBoxConfig } from '@/lib/bonus-box'
 import { isFeatureEnabled } from '@/lib/feature-flags'
+import { buildPlanPurchaseSnapshot, calculatePlanPurchase } from '@/lib/plan-purchase'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -126,6 +127,8 @@ async function claimTrialPlan({
   }
 
   let paymentId: string
+  const pricing = calculatePlanPurchase(plan, plan.deviceLimit)
+  const planSnapshot = buildPlanPurchaseSnapshot(plan, pricing)
   try {
     const payment = await prisma.$transaction(
       async (tx) => {
@@ -136,6 +139,8 @@ async function claimTrialPlan({
             amountKopecks: 0,
             originalAmountKopecks: plan.priceKopecks,
             discountKopecks: plan.priceKopecks,
+            deviceLimit: plan.deviceLimit,
+            planSnapshot: planSnapshot as unknown as Prisma.InputJsonValue,
             provider: 'LOCAL',
             providerStatus: 'succeeded',
             status: 'SUCCEEDED',

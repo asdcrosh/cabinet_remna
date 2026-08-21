@@ -33,6 +33,8 @@ export interface PlanAdminRow {
   durationDays: number
   trafficLimitGb: number | null
   deviceLimit: number
+  maxDeviceLimit: number
+  extraDevicePriceKopecks: number
   activeInternalSquads: string[]
   availability: PlanAvailabilityValue
   allowedEmails: string[]
@@ -53,6 +55,8 @@ interface PlanFormState {
   trafficLimitGb: string
   unlimitedTraffic: boolean
   deviceLimit: string
+  maxDeviceLimit: string
+  extraDevicePriceRub: string
   activeInternalSquads: string
   availability: PlanAvailabilityValue
   allowedUsers: string
@@ -81,6 +85,8 @@ const emptyForm: PlanFormState = {
   trafficLimitGb: '200',
   unlimitedTraffic: false,
   deviceLimit: '5',
+  maxDeviceLimit: '5',
+  extraDevicePriceRub: '0',
   activeInternalSquads: '',
   availability: 'ALL',
   allowedUsers: '',
@@ -446,7 +452,12 @@ export function PlansAdmin({ plans }: { plans: PlanAdminRow[] }) {
                 <div className="mt-3 grid grid-cols-2 gap-2 lg:mt-0">
                   <PlanFact label="Срок" value={`${plan.durationDays} дней`} />
                   <PlanFact label="Трафик" value={plan.trafficLimitGb == null ? 'Безлимит' : `${plan.trafficLimitGb} ГБ`} />
-                  <PlanFact label="Устройства" value={String(plan.deviceLimit)} />
+                  <PlanFact
+                    label="Устройства"
+                    value={plan.maxDeviceLimit > plan.deviceLimit
+                      ? `${plan.deviceLimit}–${plan.maxDeviceLimit} · +${formatPrice(plan.extraDevicePriceKopecks)}`
+                      : String(plan.deviceLimit)}
+                  />
                   <PlanFact label="Доступ" value={planAvailabilityLabels[plan.availability]} />
                 </div>
 
@@ -642,15 +653,21 @@ function PlanEditor({
       </EditorSection>
 
       <EditorSection title="Условия тарифа" description="Цена, срок и пользовательские ограничения.">
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           <Field label="Цена, ₽">
             <input value={form.priceRub} onChange={(event) => set('priceRub', event.target.value)} className="input" type="number" min={0} step="0.01" />
           </Field>
           <Field label="Срок, дней">
             <input value={form.durationDays} onChange={(event) => set('durationDays', event.target.value)} className="input" type="number" min={1} />
           </Field>
-          <Field label="Устройств">
+          <Field label="Включено устройств">
             <input value={form.deviceLimit} onChange={(event) => set('deviceLimit', event.target.value)} className="input" type="number" min={1} />
+          </Field>
+          <Field label="Максимум устройств">
+            <input value={form.maxDeviceLimit} onChange={(event) => set('maxDeviceLimit', event.target.value)} className="input" type="number" min={1} max={100} />
+          </Field>
+          <Field label="Доплата за устройство, ₽">
+            <input value={form.extraDevicePriceRub} onChange={(event) => set('extraDevicePriceRub', event.target.value)} className="input" type="number" min={0} step="0.01" />
           </Field>
           <Field label="Трафик, ГБ">
             <input value={form.trafficLimitGb} onChange={(event) => set('trafficLimitGb', event.target.value)} className="input" type="number" min={1} disabled={form.unlimitedTraffic} placeholder="Безлимит" />
@@ -823,6 +840,8 @@ function formFromPlan(plan: PlanAdminRow): PlanFormState {
     trafficLimitGb: plan.trafficLimitGb == null ? '' : String(plan.trafficLimitGb),
     unlimitedTraffic: plan.trafficLimitGb == null,
     deviceLimit: String(plan.deviceLimit),
+    maxDeviceLimit: String(plan.maxDeviceLimit),
+    extraDevicePriceRub: String(plan.extraDevicePriceKopecks / 100),
     activeInternalSquads: plan.activeInternalSquads.join('\n'),
     availability: plan.availability,
     allowedUsers: [...plan.allowedEmails, ...plan.allowedTelegramIds].join('\n'),
@@ -841,6 +860,8 @@ function toPayload(form: PlanFormState) {
     durationDays: Number(form.durationDays),
     trafficLimitGb: form.unlimitedTraffic || !form.trafficLimitGb ? null : Number(form.trafficLimitGb),
     deviceLimit: Number(form.deviceLimit),
+    maxDeviceLimit: Number(form.maxDeviceLimit),
+    extraDevicePriceKopecks: Math.round(Number(form.extraDevicePriceRub) * 100),
     activeInternalSquads: parseSquads(form.activeInternalSquads),
     availability: form.availability,
     allowedEmails: parseAllowedUsers(form.allowedUsers).emails,

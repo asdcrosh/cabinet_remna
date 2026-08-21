@@ -54,6 +54,8 @@ describe('auth validation', () => {
       durationDays: 7,
       trafficLimitGb: 10,
       deviceLimit: 1,
+      maxDeviceLimit: 1,
+      extraDevicePriceKopecks: 0,
       activeInternalSquads: [],
       availability: 'ALL',
       allowedEmails: [],

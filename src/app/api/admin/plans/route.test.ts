@@ -38,6 +38,8 @@ function planRequest(overrides: Record<string, unknown> = {}) {
       durationDays: 30,
       trafficLimitGb: 100,
       deviceLimit: 5,
+      maxDeviceLimit: 20,
+      extraDevicePriceKopecks: 10000,
       activeInternalSquads: [],
       availability: 'ALL',
       allowedEmails: ['USER@example.com', 'user@example.com'],

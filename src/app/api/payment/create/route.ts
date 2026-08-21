@@ -19,6 +19,11 @@ import { logError } from '@/lib/logger'
 import { buildPaymentServiceName } from '@/lib/payment-service-name'
 import { paymentErrorDetails, recordPaymentEvent } from '@/lib/payment-events'
 import { shouldSavePaymentMethodBestEffort } from '@/lib/auto-renewal'
+import {
+  buildPlanPurchaseSnapshot,
+  calculatePlanPurchase,
+  DeviceLimitSelectionError,
+} from '@/lib/plan-purchase'
 
 export const runtime = 'nodejs'
 
@@ -47,6 +52,7 @@ export const POST = withAuth(async (req: Request) => {
   }
   const {
     planId,
+    deviceLimit,
     promoCode,
     provider,
     idempotencyKey,
@@ -88,6 +94,23 @@ export const POST = withAuth(async (req: Request) => {
       { status: 400 }
     )
   }
+  if (!plan.isPromo && deviceLimit == null) {
+    return NextResponse.json(
+      { error: 'Обновите страницу тарифа и выберите количество устройств', code: 'DEVICE_LIMIT_REQUIRED' },
+      { status: 400 }
+    )
+  }
+
+  let pricing: ReturnType<typeof calculatePlanPurchase>
+  try {
+    pricing = calculatePlanPurchase(plan, plan.isPromo ? plan.deviceLimit : deviceLimit)
+  } catch (error) {
+    if (error instanceof DeviceLimitSelectionError) {
+      return NextResponse.json({ error: error.message, code: error.code }, { status: 400 })
+    }
+    throw error
+  }
+  const planSnapshot = buildPlanPurchaseSnapshot(plan, pricing)
 
   if (plan.isPromo) {
     if (promoCode) {
@@ -146,6 +169,8 @@ export const POST = withAuth(async (req: Request) => {
               amountKopecks: 0,
               originalAmountKopecks: plan.priceKopecks,
               discountKopecks: plan.priceKopecks,
+              deviceLimit: pricing.selectedDeviceLimit,
+              planSnapshot: planSnapshot as unknown as Prisma.InputJsonValue,
               provider: 'LOCAL',
               providerStatus: 'succeeded',
               checkoutKey: idempotencyKey,
@@ -202,7 +227,13 @@ export const POST = withAuth(async (req: Request) => {
     },
   })
   if (existingCheckout) {
-    return existingCheckoutResponse(existingCheckout, { planId, promoCode, provider, autoRenewalConsent })
+    return existingCheckoutResponse(existingCheckout, {
+      planId,
+      deviceLimit: pricing.selectedDeviceLimit,
+      promoCode,
+      provider,
+      autoRenewalConsent,
+    })
   }
 
   if (!(await isPaymentProviderAvailable(provider))) {
@@ -223,6 +254,7 @@ export const POST = withAuth(async (req: Request) => {
               code: promoCode,
               userId: user.id,
               plan,
+              originalAmountKopecks: pricing.originalAmountKopecks,
             })
           : null
 
@@ -231,10 +263,12 @@ export const POST = withAuth(async (req: Request) => {
             userId: user.id,
             planId: plan.id,
             promoCodeId: discount?.promoCode.id,
-            amountKopecks: discount?.finalAmountKopecks ?? plan.priceKopecks,
-            originalAmountKopecks: plan.priceKopecks,
+            amountKopecks: discount?.finalAmountKopecks ?? pricing.originalAmountKopecks,
+            originalAmountKopecks: pricing.originalAmountKopecks,
             discountPercent: discount?.discountPercent,
             discountKopecks: discount?.discountKopecks ?? 0,
+            deviceLimit: pricing.selectedDeviceLimit,
+            planSnapshot: planSnapshot as unknown as Prisma.InputJsonValue,
             promoCodeSnapshot: discount
               ? {
                   code: discount.normalizedCode,
@@ -278,7 +312,13 @@ export const POST = withAuth(async (req: Request) => {
   } catch (e) {
     const duplicateCheckout = await findDuplicateCheckout(user.id, idempotencyKey)
     if (duplicateCheckout) {
-      return existingCheckoutResponse(duplicateCheckout, { planId, promoCode, provider, autoRenewalConsent })
+      return existingCheckoutResponse(duplicateCheckout, {
+        planId,
+        deviceLimit: pricing.selectedDeviceLimit,
+        promoCode,
+        provider,
+        autoRenewalConsent,
+      })
     }
     if (e instanceof PromoCodeError) {
       return NextResponse.json({ error: e.message, code: e.code }, { status: e.status })
@@ -295,6 +335,7 @@ export const POST = withAuth(async (req: Request) => {
     details: {
       provider,
       planId: plan.id,
+      deviceLimit: pricing.selectedDeviceLimit,
       amountKopecks: localPayment.amountKopecks,
       discountKopecks: localPayment.discountKopecks,
     },
@@ -408,6 +449,7 @@ export const POST = withAuth(async (req: Request) => {
         planId: plan.id,
         localPaymentId: localPayment.id,
         ...(autoRenewalConsent ? { autoRenewalConsentVersion: autoRenewalConsentVersion! } : {}),
+        deviceLimit: String(pricing.selectedDeviceLimit),
         ...(appliedPromo
           ? {
               promoCode: appliedPromo.normalizedCode,
@@ -475,6 +517,7 @@ function existingCheckoutResponse(
   payment: Payment,
   input: {
     planId: string
+    deviceLimit: number
     promoCode?: string
     provider: 'YOOKASSA' | 'PAYANYWAY' | 'PLATEGA'
     autoRenewalConsent: boolean
@@ -484,6 +527,7 @@ function existingCheckoutResponse(
   const storedPromoCode = promoCodeFromSnapshot(payment.promoCodeSnapshot)
   if (
     payment.planId !== input.planId
+    || payment.deviceLimit !== input.deviceLimit
     || payment.provider !== input.provider
     || storedPromoCode !== requestedPromoCode
     || Boolean(payment.autoRenewalConsentAcceptedAt) !== input.autoRenewalConsent

@@ -82,6 +82,7 @@ export const changePasswordSchema = z
 
 export const createPaymentSchema = z.object({
   planId: z.string().min(1).max(64),
+  deviceLimit: z.coerce.number().int().min(1).max(100).optional(),
   promoCode: z.string().trim().min(1).max(64).optional(),
   provider: z.enum(['YOOKASSA', 'PAYANYWAY', 'PLATEGA']).default('YOOKASSA'),
   idempotencyKey: z.string().uuid(),
@@ -100,6 +101,7 @@ export const createPaymentSchema = z.object({
 
 export const validatePromoCodeSchema = z.object({
   planId: z.string().min(1).max(64),
+  deviceLimit: z.coerce.number().int().min(1).max(100).optional(),
   promoCode: z.string().trim().min(1).max(64),
 })
 
@@ -241,7 +243,9 @@ const adminPlanBaseSchema = z.object({
   priceKopecks: z.coerce.number().int().min(0).max(10_000_000),
   durationDays: z.coerce.number().int().min(1).max(3650),
   trafficLimitGb: z.coerce.number().int().min(1).max(1_000_000).optional().nullable(),
-  deviceLimit: z.coerce.number().int().min(1).max(1000),
+  deviceLimit: z.coerce.number().int().min(1).max(100),
+  maxDeviceLimit: z.coerce.number().int().min(1).max(100),
+  extraDevicePriceKopecks: z.coerce.number().int().min(0).max(10_000_000),
   activeInternalSquads: z.array(z.string().trim().uuid()).default([]),
   availability: z.enum(['ALL', 'NEW', 'EXISTING', 'INVITED', 'ALLOWED', 'LINK']).default('ALL'),
   allowedEmails: z.array(z.string().trim().email()).max(10_000).default([]),
@@ -258,6 +262,13 @@ export const adminPlanSchema = adminPlanBaseSchema.superRefine((value, context) 
       code: 'custom',
       path: ['priceKopecks'],
       message: 'Бесплатный тариф должен быть промо-тарифом',
+    })
+  }
+  if (value.maxDeviceLimit < value.deviceLimit) {
+    context.addIssue({
+      code: 'custom',
+      path: ['maxDeviceLimit'],
+      message: 'Максимум устройств не может быть меньше включённого количества',
     })
   }
 })

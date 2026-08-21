@@ -31,6 +31,8 @@ describe('public plans route', () => {
         durationDays: true,
         trafficLimitGb: true,
         deviceLimit: true,
+        maxDeviceLimit: true,
+        extraDevicePriceKopecks: true,
         isPromo: true,
         promoCodesEnabled: true,
         isFeatured: true,

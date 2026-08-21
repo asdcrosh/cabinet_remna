@@ -65,6 +65,8 @@ const plan = {
   durationDays: 30,
   trafficLimitGb: null,
   deviceLimit: 5,
+  maxDeviceLimit: 20,
+  extraDevicePriceKopecks: 10000,
   activeInternalSquads: [],
   availability: 'ALL',
   isActive: true,
@@ -86,6 +88,7 @@ const localPayment = {
   userId: user.id,
   planId: plan.id,
   amountKopecks: plan.priceKopecks,
+  deviceLimit: plan.deviceLimit,
 }
 
 const idempotencyKey = '6dad4f34-1b9e-4863-9ce1-5db7a29e12f7'
@@ -93,7 +96,12 @@ const idempotencyKey = '6dad4f34-1b9e-4863-9ce1-5db7a29e12f7'
 function paymentRequest(body: Record<string, unknown> = {}) {
   return new Request('http://localhost:3000/api/payment/create', {
     method: 'POST',
-    body: JSON.stringify({ planId: plan.id, idempotencyKey, ...body }),
+    body: JSON.stringify({
+      planId: plan.id,
+      deviceLimit: plan.deviceLimit,
+      idempotencyKey,
+      ...body,
+    }),
   })
 }
 
@@ -245,6 +253,7 @@ describe('payment create route', () => {
       yookassaId: 'yoo-existing',
       confirmationUrl: 'https://pay.example/existing',
       promoCodeSnapshot: null,
+      deviceLimit: plan.deviceLimit,
       status: 'PENDING',
     })
 
@@ -270,6 +279,7 @@ describe('payment create route', () => {
       planId: 'another-plan',
       provider: 'YOOKASSA',
       promoCodeSnapshot: null,
+      deviceLimit: plan.deviceLimit,
       status: 'PENDING',
       confirmationUrl: 'https://pay.example/existing',
     })
@@ -349,6 +359,36 @@ describe('payment create route', () => {
       localPaymentId: 'payment-1',
       provider: 'PAYANYWAY',
     })
+  })
+
+  it('calculates extra devices on the server and freezes the selected limit', async () => {
+    mocks.txPaymentCreate.mockResolvedValue({
+      ...localPayment,
+      amountKopecks: 60000,
+      originalAmountKopecks: 60000,
+      deviceLimit: 8,
+    })
+
+    const response = await POST(paymentRequest({ deviceLimit: 8 }))
+
+    expect(response.status).toBe(200)
+    expect(mocks.txPaymentCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        deviceLimit: 8,
+        originalAmountKopecks: 60000,
+        amountKopecks: 60000,
+        planSnapshot: expect.objectContaining({
+          baseDeviceLimit: 5,
+          selectedDeviceLimit: 8,
+          extraDeviceCount: 3,
+          extraDeviceAmountKopecks: 30000,
+        }),
+      }),
+    })
+    expect(mocks.createPayment).toHaveBeenCalledWith(expect.objectContaining({
+      amount: 600,
+      metadata: expect.objectContaining({ deviceLimit: '8' }),
+    }))
   })
 
   it('creates a Platega checkout and stores the external transaction', async () => {

@@ -5,6 +5,7 @@ import { remnawave } from './remnawave'
 import { remnashopQuery } from './remnashop-db'
 import { logInfo, logWarn } from './logger'
 import { markSyncFailed, markSyncSkipped, markSyncSucceeded } from './sync-events'
+import { readPlanPurchaseSnapshot, resolveEffectiveDeviceLimit } from './plan-purchase'
 
 type RemnashopColumns = Set<string>
 
@@ -258,6 +259,7 @@ async function upsertRemnashopSubscription(input: {
     ? await resolveRemnawaveSubscriptionUrl(input.payment.user)
     : undefined
   const snapshot = buildPlanSnapshot(input.payment)
+  const deviceLimit = effectivePaymentDeviceLimit(input.payment)
   const existingId = columns.has('user_remna_id')
     ? await findRemnashopSubscription(
         input.remnashopUserId,
@@ -272,13 +274,13 @@ async function upsertRemnashopSubscription(input: {
     status: mapSubscriptionStatus(input.payment.subscription.status),
     is_trial: false,
     disabled_by_channel_leave: false,
-    internal_squads: input.payment.plan.activeInternalSquads ?? [],
+    internal_squads: snapshot.internal_squads,
     external_squad: null,
     traffic_limit_strategy: 'NO_RESET',
     tag: null,
     expire_at: input.payment.subscription.expireAt,
-    traffic_limit: input.payment.plan.trafficLimitGb ?? 0,
-    device_limit: input.payment.plan.deviceLimit,
+    traffic_limit: snapshot.traffic_limit,
+    device_limit: deviceLimit,
     plan_snapshot: snapshot,
     created_at: input.payment.subscription.startAt,
     updated_at: new Date(),
@@ -524,11 +526,16 @@ async function updateRow(
 }
 
 function buildPlanSnapshot(payment: PaymentForRemnashopSync) {
-  const hasTrafficLimit = payment.plan.trafficLimitGb != null
-  const hasDeviceLimit = payment.plan.deviceLimit > 0
+  const purchase = readPlanPurchaseSnapshot(payment.planSnapshot)
+  const trafficLimitGb = purchase?.trafficLimitGb ?? payment.plan.trafficLimitGb
+  const deviceLimit = effectivePaymentDeviceLimit(payment)
+  const durationDays = purchase?.durationDays ?? payment.plan.durationDays
+  const activeInternalSquads = purchase?.activeInternalSquads ?? payment.plan.activeInternalSquads
+  const hasTrafficLimit = trafficLimitGb != null
+  const hasDeviceLimit = deviceLimit > 0
   return {
-    id: payment.plan.remnashopPlanId ?? -1,
-    name: payment.plan.name,
+    id: purchase?.remnashopPlanId ?? payment.plan.remnashopPlanId ?? -1,
+    name: purchase?.name ?? payment.plan.name,
     tag: null,
     type: hasTrafficLimit && hasDeviceLimit
       ? 'BOTH'
@@ -538,22 +545,37 @@ function buildPlanSnapshot(payment: PaymentForRemnashopSync) {
           ? 'DEVICES'
           : 'UNLIMITED',
     traffic_limit_strategy: 'NO_RESET',
-    traffic_limit: payment.plan.trafficLimitGb ?? 0,
-    device_limit: payment.plan.deviceLimit,
-    duration: payment.plan.durationDays,
-    internal_squads: payment.plan.activeInternalSquads ?? [],
+    traffic_limit: trafficLimitGb ?? 0,
+    device_limit: deviceLimit,
+    duration: durationDays,
+    internal_squads: activeInternalSquads ?? [],
     external_squad: null,
     is_trial: false,
   }
 }
 
+function effectivePaymentDeviceLimit(payment: PaymentForRemnashopSync) {
+  return resolveEffectiveDeviceLimit({
+    snapshot: payment.planSnapshot,
+    paymentDeviceLimit: payment.deviceLimit,
+    subscriptionDeviceLimit: payment.subscription.deviceLimit,
+    planDeviceLimit: payment.plan.deviceLimit,
+  })
+}
+
 function buildPricingSnapshot(payment: PaymentForRemnashopSync) {
+  const purchase = readPlanPurchaseSnapshot(payment.planSnapshot)
   const originalAmount = payment.originalAmountKopecks ?? payment.amountKopecks
   const derivedDiscountPercent = originalAmount > 0
     ? Math.round((payment.discountKopecks / originalAmount) * 100)
     : 0
   return {
     original_amount: originalAmount / 100,
+    base_amount: purchase ? purchase.basePriceKopecks / 100 : payment.plan.priceKopecks / 100,
+    selected_device_limit: effectivePaymentDeviceLimit(payment),
+    extra_device_count: purchase?.extraDeviceCount ?? 0,
+    extra_device_price: purchase ? purchase.extraDevicePriceKopecks / 100 : 0,
+    extra_device_amount: purchase ? purchase.extraDeviceAmountKopecks / 100 : 0,
     discount_percent: payment.discountPercent ?? derivedDiscountPercent,
     final_amount: payment.amountKopecks / 100,
   }

@@ -11,8 +11,13 @@ import { getPlanAudienceContext, isPlanAvailableForUser } from '@/lib/plan-acces
 import { getAvailableUserPromoCodesByPlan } from '@/lib/user-promo-codes'
 import { getAvailablePaymentProviders } from '@/lib/payment-providers'
 import { ArrowRight, MessageCircleQuestion, RefreshCw, ShieldCheck } from 'lucide-react'
-import { getAutoRenewalState } from '@/lib/auto-renewal'
+import { calculateAutoRenewalPurchase, getAutoRenewalState } from '@/lib/auto-renewal'
 import { AUTO_RENEWAL_CONSENT_VERSION } from '@/lib/auto-renewal-consent'
+import {
+  hasRemnawaveUserReference,
+  remnawave,
+  remnawaveUserReference,
+} from '@/lib/remnawave'
 
 export const dynamic = 'force-dynamic'
 
@@ -67,6 +72,15 @@ export default async function PlansPage({
       })
     : null
   const autoRenewal = session ? await getAutoRenewalState(session.uid) : null
+  let currentDeviceLimit = currentSubscription?.deviceLimit ?? null
+  if (currentDeviceLimit == null && user && hasRemnawaveUserReference(user)) {
+    try {
+      const remote = await remnawave.getUser(remnawaveUserReference(user))
+      currentDeviceLimit = remote.response.hwidDeviceLimit ?? null
+    } catch {
+      // Витрина остаётся доступной; сервер всё равно проверит выбранное значение перед оплатой.
+    }
+  }
   const hasAnySubscription = session
     ? (await prisma.subscription.count({ where: { userId: session.uid } })) > 0
     : false
@@ -109,12 +123,16 @@ export default async function PlansPage({
     ? referencePlan.priceKopecks / Math.max(1, referencePlan.durationDays)
     : 0
   const autoRenewalAvailable = paymentProviders.some((provider) => provider.id === 'YOOKASSA')
+  const autoRenewalCurrentPrice = autoRenewal
+    ? currentAutoRenewalPrice(autoRenewal.plan, autoRenewal.deviceLimit)
+    : null
   const autoRenewalConsentCurrent = Boolean(
     autoRenewal
     && autoRenewal.status !== 'DISABLED'
     && autoRenewal.consentAcceptedAt
     && autoRenewal.consentVersion === AUTO_RENEWAL_CONSENT_VERSION
-    && autoRenewal.consentPriceKopecks === autoRenewal.plan.priceKopecks
+    && autoRenewal.deviceLimit === (currentDeviceLimit ?? autoRenewal.plan.deviceLimit)
+    && autoRenewal.consentPriceKopecks === autoRenewalCurrentPrice
     && autoRenewal.consentDurationDays === autoRenewal.plan.durationDays
   )
   const activeAutoRenewal = Boolean(
@@ -135,6 +153,12 @@ export default async function PlansPage({
     durationDays: plan.durationDays,
     trafficLimitGb: plan.trafficLimitGb,
     deviceLimit: plan.deviceLimit,
+    maxDeviceLimit: plan.maxDeviceLimit,
+    extraDevicePriceKopecks: plan.extraDevicePriceKopecks,
+    initialDeviceLimit: plan.isPromo
+      ? plan.deviceLimit
+      : clampDeviceLimit(currentDeviceLimit ?? plan.deviceLimit, plan.deviceLimit, plan.maxDeviceLimit),
+    currentDeviceLimit,
     isPromo: plan.isPromo,
     promoCodesEnabled: plan.promoCodesEnabled,
     popular: plan.isFeatured,
@@ -227,7 +251,7 @@ export default async function PlansPage({
 
       {planViews.length > 0 ? (
         <PlanCatalog
-          key={`${currentSubscription?.planId ?? 'none'}:${linkedPlanId ?? ''}`}
+          key={`${currentSubscription?.planId ?? 'none'}:${currentDeviceLimit ?? 'unknown'}:${linkedPlanId ?? ''}`}
           plans={planViews}
           initialPlanId={linkedPlanId}
         />
@@ -245,4 +269,24 @@ export default async function PlansPage({
       )}
     </div>
   )
+}
+
+function currentAutoRenewalPrice(
+  plan: {
+    priceKopecks: number
+    deviceLimit: number
+    maxDeviceLimit: number
+    extraDevicePriceKopecks: number
+  },
+  deviceLimit: number
+) {
+  try {
+    return calculateAutoRenewalPurchase(plan, deviceLimit).originalAmountKopecks
+  } catch {
+    return null
+  }
+}
+
+function clampDeviceLimit(value: number, minimum: number, maximum: number) {
+  return Math.min(Math.max(minimum, maximum), Math.max(minimum, value))
 }

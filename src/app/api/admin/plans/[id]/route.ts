@@ -35,10 +35,18 @@ export const PATCH = withAuth(async (req: Request, { params }: { params: Promise
   const invariant = {
     priceKopecks: parsed.data.priceKopecks ?? currentPlan.priceKopecks,
     isPromo: parsed.data.isPromo ?? currentPlan.isPromo,
+    deviceLimit: parsed.data.deviceLimit ?? currentPlan.deviceLimit,
+    maxDeviceLimit: parsed.data.maxDeviceLimit ?? currentPlan.maxDeviceLimit,
   }
   if (invariant.priceKopecks <= 0 && !invariant.isPromo) {
     return NextResponse.json(
       { error: 'Бесплатный тариф должен быть промо-тарифом' },
+      { status: 400 }
+    )
+  }
+  if (invariant.maxDeviceLimit < invariant.deviceLimit) {
+    return NextResponse.json(
+      { error: 'Максимум устройств не может быть меньше включённого количества' },
       { status: 400 }
     )
   }

@@ -46,7 +46,13 @@ async function main() {
   } else {
     for (const plan of PLANS) {
       await prisma.plan.create({
-        data: { id: `plan-${plan.sortOrder}`, ...plan, isActive: true },
+        data: {
+          id: `plan-${plan.sortOrder}`,
+          ...plan,
+          maxDeviceLimit: plan.deviceLimit,
+          extraDevicePriceKopecks: 0,
+          isActive: true,
+        },
       })
     }
     console.log(`✅ Seeded ${PLANS.length} plans`)

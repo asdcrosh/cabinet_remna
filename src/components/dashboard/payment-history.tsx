@@ -6,6 +6,7 @@ import { getPendingPaymentTtlMs } from '@/lib/payment-sync'
 import { EmptyState } from '@/components/dashboard/empty-state'
 import { paymentProviderLabel } from '@/lib/payment-provider-label'
 import { cn } from '@/lib/cn'
+import { readPlanPurchaseSnapshot, resolveEffectiveDeviceLimit } from '@/lib/plan-purchase'
 
 export type PaymentHistoryPayment = Prisma.PaymentGetPayload<{ include: { plan: true; subscription: true } }>
 
@@ -16,6 +17,13 @@ export function PaymentHistory({ payments }: { payments: PaymentHistoryPayment[]
     <div className="space-y-3">
       {payments.map((payment) => {
         const freshPending = payment.status === 'PENDING' && isFreshPendingPayment(payment.createdAt)
+        const purchaseSnapshot = readPlanPurchaseSnapshot(payment.planSnapshot)
+        const deviceLimit = resolveEffectiveDeviceLimit({
+          snapshot: payment.planSnapshot,
+          paymentDeviceLimit: payment.deviceLimit,
+          subscriptionDeviceLimit: payment.subscription?.deviceLimit,
+          planDeviceLimit: payment.plan.deviceLimit,
+        })
 
         return (
           <article
@@ -31,13 +39,17 @@ export function PaymentHistory({ payments }: { payments: PaymentHistoryPayment[]
               <PaymentStatusIcon status={payment.status} createdAt={payment.createdAt} />
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
-                  <div className="truncate text-sm font-semibold text-slate-950 dark:text-white">{payment.plan.name}</div>
+                  <div className="truncate text-sm font-semibold text-slate-950 dark:text-white">
+                    {purchaseSnapshot?.name ?? payment.plan.name}
+                  </div>
                   <PaymentStatusBadge status={payment.status} createdAt={payment.createdAt} />
                 </div>
                 <div className="mt-1.5 flex flex-wrap gap-x-2 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
                   <span>{formatPaymentDate(payment.createdAt)}</span>
                   <span aria-hidden="true">·</span>
                   <span>{paymentProviderLabel(payment.provider)}</span>
+                  <span aria-hidden="true">·</span>
+                  <span>{deviceLimit} {deviceCountLabel(deviceLimit)}</span>
                 </div>
               </div>
             </div>
@@ -216,6 +228,15 @@ function getPromoCodeLabel(snapshot: unknown) {
   if (!snapshot || typeof snapshot !== 'object') return '—'
   const code = (snapshot as { code?: unknown }).code
   return typeof code === 'string' && code ? code : '—'
+}
+
+function deviceCountLabel(count: number) {
+  const lastTwo = count % 100
+  if (lastTwo >= 11 && lastTwo <= 14) return 'устройств'
+  const last = count % 10
+  if (last === 1) return 'устройство'
+  if (last >= 2 && last <= 4) return 'устройства'
+  return 'устройств'
 }
 
 function formatPaymentDate(date: Date) {

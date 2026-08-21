@@ -15,7 +15,7 @@ import {
 import { getFeatureFlags } from '@/lib/feature-flags'
 import { ArrowRight, CreditCard } from 'lucide-react'
 import { AutoRenewalCard } from '@/components/dashboard/auto-renewal-card'
-import { getAutoRenewalState } from '@/lib/auto-renewal'
+import { calculateAutoRenewalPurchase, getAutoRenewalState } from '@/lib/auto-renewal'
 import { getRetentionState } from '@/lib/subscription-retention'
 
 export const dynamic = 'force-dynamic'
@@ -54,7 +54,19 @@ export default async function BillingPage({
       prisma.subscription.findFirst({
         where: { userId: session.uid, status: { in: ['ACTIVE', 'LIMITED', 'PAUSED'] }, planId: { not: null } },
         orderBy: { expireAt: 'desc' },
-        include: { plan: { select: { id: true, name: true, priceKopecks: true, durationDays: true } } },
+        include: {
+          plan: {
+            select: {
+              id: true,
+              name: true,
+              priceKopecks: true,
+              durationDays: true,
+              deviceLimit: true,
+              maxDeviceLimit: true,
+              extraDevicePriceKopecks: true,
+            },
+          },
+        },
       }),
     ]),
     getAutoRenewalState(session.uid),
@@ -86,8 +98,12 @@ export default async function BillingPage({
         <AutoRenewalCard
           planId={currentSubscription.plan.id}
           planName={currentSubscription.plan.name}
-          planPriceKopecks={currentSubscription.plan.priceKopecks}
+          planPriceKopecks={currentRenewalPrice(
+            currentSubscription.plan,
+            currentSubscription.deviceLimit ?? currentSubscription.plan.deviceLimit
+          )}
           planDurationDays={currentSubscription.plan.durationDays}
+          planDeviceLimit={currentSubscription.deviceLimit ?? currentSubscription.plan.deviceLimit}
           initialState={autoRenewal ? {
             ...autoRenewal,
             paymentMethodSavedAt: autoRenewal.paymentMethodSavedAt?.toISOString() ?? null,
@@ -136,6 +152,22 @@ export default async function BillingPage({
       )}
     </div>
   )
+}
+
+function currentRenewalPrice(
+  plan: {
+    priceKopecks: number
+    deviceLimit: number
+    maxDeviceLimit: number
+    extraDevicePriceKopecks: number
+  },
+  deviceLimit: number
+) {
+  try {
+    return calculateAutoRenewalPurchase(plan, deviceLimit).originalAmountKopecks
+  } catch {
+    return plan.priceKopecks
+  }
 }
 
 function getBannerStatus(syncResult: PaymentSyncResult | null) {

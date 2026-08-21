@@ -29,6 +29,8 @@ export default async function AdminPlansPage() {
     durationDays: plan.durationDays,
     trafficLimitGb: plan.trafficLimitGb,
     deviceLimit: plan.deviceLimit,
+    maxDeviceLimit: plan.maxDeviceLimit,
+    extraDevicePriceKopecks: plan.extraDevicePriceKopecks,
     activeInternalSquads: plan.activeInternalSquads,
     availability: plan.availability,
     allowedEmails: plan.allowedEmails,
