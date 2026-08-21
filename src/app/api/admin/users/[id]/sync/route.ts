@@ -8,7 +8,6 @@ import {
 } from '@/lib/remnawave'
 import { upsertLocalSubscriptionFromRemnawave } from '@/lib/remnawave-local-sync'
 import { syncLinkedTelegramUser } from '@/lib/telegram-link-sync'
-import { syncCabinetPaymentToRemnashopBestEffort } from '@/lib/remnashop-reverse-sync'
 import { writeAuditLog } from '@/lib/audit-log'
 import { syncLocalDevicesFromRemnawave } from '@/lib/remnawave-device-sync'
 import { describeSyncError } from '@/lib/sync-error'
@@ -61,7 +60,6 @@ export const POST = withAuth(async (req: Request, { params }: { params: Promise<
     telegram: false,
     remnawave: false,
     devices: 0,
-    remnashopPayments: 0,
     warnings: [] as string[],
   }
 
@@ -103,22 +101,6 @@ export const POST = withAuth(async (req: Request, { params }: { params: Promise<
     } catch (error) {
       result.warnings.push(`Remnawave: ${describeSyncError(error)}`)
     }
-  }
-
-  const payments = await prisma.payment.findMany({
-    where: {
-      userId: user.id,
-      status: 'SUCCEEDED',
-      subscriptionProvisionedAt: { not: null },
-    },
-    orderBy: { paidAt: 'desc' },
-    take: 10,
-    select: { id: true },
-  })
-
-  for (const payment of payments) {
-    const sync = await syncCabinetPaymentToRemnashopBestEffort(payment.id)
-    if (sync.ok) result.remnashopPayments += 1
   }
 
   await writeAuditLog({

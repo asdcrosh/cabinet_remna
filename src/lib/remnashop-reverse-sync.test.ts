@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
   paymentFindUnique: vi.fn(),
+  paymentFindFirst: vi.fn(),
   paymentUpdate: vi.fn(),
   userUpdate: vi.fn(),
   remnashopQuery: vi.fn(),
@@ -12,6 +13,7 @@ vi.mock('./prisma', () => ({
   prisma: {
     payment: {
       findUnique: mocks.paymentFindUnique,
+      findFirst: mocks.paymentFindFirst,
       update: mocks.paymentUpdate,
     },
     user: {
@@ -99,6 +101,7 @@ describe('remnashop reverse sync', () => {
     vi.clearAllMocks()
     process.env.REMNASHOP_DATABASE_URL = 'postgresql://remnashop'
     mocks.paymentFindUnique.mockResolvedValue(payment)
+    mocks.paymentFindFirst.mockResolvedValue({ id: payment.id })
     mocks.paymentUpdate.mockResolvedValue({})
     mocks.userUpdate.mockResolvedValue({})
     mocks.getSubscriptionByUsername.mockResolvedValue({
@@ -351,7 +354,7 @@ describe('remnashop reverse sync', () => {
           rows: [
             'id', 'user_id', 'plan_id', 'user_remna_id', 'url', 'status', 'is_trial',
             'internal_squads', 'traffic_limit_strategy', 'expire_at', 'traffic_limit',
-            'device_limit', 'plan_snapshot', 'created_at', 'updated_at',
+            'device_limit', 'plan_snapshot', 'external_squad', 'created_at', 'updated_at',
           ].map((column_name) => ({ column_name })),
         }
       }
@@ -393,6 +396,33 @@ describe('remnashop reverse sync', () => {
       String(sql).includes('UPDATE "subscriptions"')
     )
     expect(subscriptionUpdate?.[1]).toContain('legacy-remnashop-uuid')
+    expect(subscriptionUpdate?.[0]).not.toContain('"external_squad"')
+  })
+
+  it('keeps an older payment in history without replacing the current subscription', async () => {
+    mocks.paymentFindFirst.mockResolvedValue({ id: 'pay-newer' })
+    const defaultQuery = mocks.remnashopQuery.getMockImplementation()
+    mocks.remnashopQuery.mockImplementation(async (sql: string, values: unknown[] = []) => {
+      if (sql.includes('FROM subscriptions s')) return { rows: [{ id: '100' }] }
+      return defaultQuery?.(sql, values) ?? { rows: [] }
+    })
+
+    await expect(syncCabinetPaymentToRemnashop('pay-1')).resolves.toMatchObject({
+      ok: true,
+      remnashopSubscriptionId: 100,
+      remnashopTransactionId: 200,
+      subscriptionUpdated: false,
+    })
+
+    expect(mocks.remnashopQuery.mock.calls.some(([sql]) =>
+      String(sql).includes('UPDATE "subscriptions"')
+    )).toBe(false)
+    expect(mocks.remnashopQuery.mock.calls.some(([sql]) =>
+      String(sql).includes('UPDATE users SET current_subscription_id')
+    )).toBe(false)
+    expect(mocks.remnashopQuery.mock.calls.some(([sql]) =>
+      String(sql).includes('INSERT INTO "transactions"')
+    )).toBe(true)
   })
 
   it('records promo activation without relying on a missing database constraint', async () => {

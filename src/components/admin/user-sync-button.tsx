@@ -18,7 +18,6 @@ export function UserSyncButton({ userId, showLabel = false }: { userId: string; 
           telegram: boolean
           remnawave: boolean
           devices: number
-          remnashopPayments: number
           warnings: string[]
         }
       }>(`/api/admin/users/${userId}/sync`, { method: 'POST' })

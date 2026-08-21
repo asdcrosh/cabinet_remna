@@ -54,6 +54,20 @@ export async function syncCabinetPaymentToRemnashop(paymentId: string) {
     await markPaymentRemnashopSyncFailed(payment.id, 'subscription is missing')
     return { ok: false as const, skipped: 'subscription is missing' }
   }
+  const latestPayment = await prisma.payment.findFirst({
+    where: {
+      userId: payment.userId,
+      status: 'SUCCEEDED',
+      subscriptionProvisionedAt: { not: null },
+    },
+    orderBy: [
+      { paidAt: { sort: 'desc', nulls: 'last' } },
+      { createdAt: 'desc' },
+      { id: 'desc' },
+    ],
+    select: { id: true },
+  })
+  const updatesCurrentSubscription = !latestPayment || latestPayment.id === payment.id
   const remnashopUserId = await resolveRemnashopUserId(payment.user)
   if (!remnashopUserId) {
     await markPaymentRemnashopSyncFailed(payment.id, 'remnashop user not found')
@@ -70,18 +84,32 @@ export async function syncCabinetPaymentToRemnashop(paymentId: string) {
   }
 
   const syncPayment = payment as PaymentForRemnashopSync
-  const remnashopSubscriptionId = await upsertRemnashopSubscription({
-    remnashopUserId,
-    remnashopRemnawaveUuid,
-    payment: syncPayment,
-  })
+  const existingSubscriptionId = updatesCurrentSubscription
+    ? null
+    : await findRemnashopSubscription(remnashopUserId, remnashopRemnawaveUuid)
+  if (!updatesCurrentSubscription && !existingSubscriptionId) {
+    await markPaymentRemnashopSyncSucceeded(payment.id)
+    return {
+      ok: false as const,
+      skipped: 'historical payment cannot create or replace the current Remnashop subscription',
+    }
+  }
+  const remnashopSubscriptionId = updatesCurrentSubscription
+    ? await upsertRemnashopSubscription({
+        remnashopUserId,
+        remnashopRemnawaveUuid,
+        payment: syncPayment,
+      })
+    : Number(existingSubscriptionId)
   const remnashopTransactionId = await upsertRemnashopTransaction({
     remnashopUserId,
     remnashopSubscriptionId,
     payment: syncPayment,
   })
   await syncRemnashopPromoActivation(remnashopUserId, syncPayment)
-  await setCurrentRemnashopSubscription(remnashopUserId, remnashopSubscriptionId)
+  if (updatesCurrentSubscription) {
+    await setCurrentRemnashopSubscription(remnashopUserId, remnashopSubscriptionId)
+  }
   await markPaymentRemnashopSyncSucceeded(payment.id)
 
   logInfo('remnashop.reverse_sync.completed', {
@@ -89,6 +117,7 @@ export async function syncCabinetPaymentToRemnashop(paymentId: string) {
     remnashopUserId,
     remnashopSubscriptionId,
     remnashopTransactionId,
+    subscriptionUpdated: updatesCurrentSubscription,
   })
 
   return {
@@ -96,6 +125,7 @@ export async function syncCabinetPaymentToRemnashop(paymentId: string) {
     remnashopUserId,
     remnashopSubscriptionId,
     remnashopTransactionId,
+    subscriptionUpdated: updatesCurrentSubscription,
   }
 }
 
@@ -275,7 +305,6 @@ async function upsertRemnashopSubscription(input: {
     is_trial: false,
     disabled_by_channel_leave: false,
     internal_squads: snapshot.internal_squads,
-    external_squad: null,
     traffic_limit_strategy: 'NO_RESET',
     tag: null,
     expire_at: input.payment.subscription.expireAt,
@@ -291,7 +320,10 @@ async function upsertRemnashopSubscription(input: {
     return Number(existingId)
   }
 
-  const id = await insertRow('subscriptions', columns, data)
+  const id = await insertRow('subscriptions', columns, {
+    ...data,
+    external_squad: null,
+  })
   return Number(id)
 }
 

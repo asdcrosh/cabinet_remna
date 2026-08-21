@@ -360,11 +360,6 @@ async function applySafeRepairs(state: Awaited<ReturnType<typeof inspect>>) {
       // Ошибка останется отдельным пунктом после повторной проверки и не блокирует другие исправления.
     }
   }
-  const paymentId = state.user.payments[0]?.id
-  if (paymentId && process.env.REMNASHOP_DATABASE_URL) {
-    const result = await syncCabinetPaymentToRemnashopBestEffort(paymentId)
-    if (result.ok) changes.push('Подписка повторно отправлена в Remnashop')
-  }
   return changes
 }
 
