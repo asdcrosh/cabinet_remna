@@ -109,7 +109,7 @@ export async function retryRemnashopSyncEvent(event: RetryableSyncEvent) {
     )
     if (result.alreadyRunning) throw new Error('Telegram identity sync is already running')
     if (result.warnings.length > 0) throw new Error(result.warnings.join('; '))
-    return result
+    return result.skipped ? { ...result, skipped: result.skipped } : result
   }
 
   throw new Error(`Retry is not supported for ${event.direction}:${event.entityType}`)
@@ -171,8 +171,10 @@ export async function retryDueRemnashopSyncEvents(options: {
     }
     await markSyncPending(input)
     try {
-      await retryRemnashopSyncEvent(event)
-      await markSyncSucceeded(input)
+      const result = await retryRemnashopSyncEvent(event)
+      const skipped = remnashopRetrySkippedReason(result)
+      if (skipped) await markSyncSkipped(input, skipped)
+      else await markSyncSucceeded(input)
       succeeded += 1
     } catch (error) {
       await markSyncFailed(input, error)
@@ -184,6 +186,12 @@ export async function retryDueRemnashopSyncEvents(options: {
   }
 
   return { attempted: succeeded + failed, succeeded, failed }
+}
+
+export function remnashopRetrySkippedReason(result: unknown) {
+  if (!result || typeof result !== 'object' || !('skipped' in result)) return null
+  const skipped = result.skipped
+  return typeof skipped === 'string' && skipped.trim() ? skipped : null
 }
 
 function readSubscriptionRemovalMetadata(metadata: Prisma.JsonValue | null | undefined) {

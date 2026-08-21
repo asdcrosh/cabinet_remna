@@ -1,8 +1,12 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAdmin, withAuth } from '@/lib/auth/guard'
-import { retryDueRemnashopSyncEvents, retryRemnashopSyncEvent } from '@/lib/remnashop-retry'
-import { markSyncFailed, markSyncPending, markSyncSucceeded } from '@/lib/sync-events'
+import {
+  remnashopRetrySkippedReason,
+  retryDueRemnashopSyncEvents,
+  retryRemnashopSyncEvent,
+} from '@/lib/remnashop-retry'
+import { markSyncFailed, markSyncPending, markSyncSkipped, markSyncSucceeded } from '@/lib/sync-events'
 import { writeAuditLog } from '@/lib/audit-log'
 
 export const runtime = 'nodejs'
@@ -42,12 +46,15 @@ export const POST = withAuth(async (req: Request) => {
 
   try {
     const result = await retryRemnashopSyncEvent(event)
-    await markSyncSucceeded({
+    const input = {
       direction: event.direction,
       entityType: event.entityType,
       entityId: event.entityId,
       operation: event.operation,
-    })
+    }
+    const skipped = remnashopRetrySkippedReason(result)
+    if (skipped) await markSyncSkipped(input, skipped)
+    else await markSyncSucceeded(input)
     await writeAuditLog({
       actorId: session.uid,
       action: 'PAYMENT_SYNCED',

@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   syncDevices: vi.fn(),
   withDistributedLock: vi.fn(),
   markSyncPending: vi.fn(),
+  markSyncSkipped: vi.fn(),
   markSyncSucceeded: vi.fn(),
   markSyncFailed: vi.fn(),
   createAdminNotification: vi.fn(),
@@ -44,6 +45,7 @@ vi.mock('./distributed-lock', () => ({
 }))
 vi.mock('./sync-events', () => ({
   markSyncPending: mocks.markSyncPending,
+  markSyncSkipped: mocks.markSyncSkipped,
   markSyncSucceeded: mocks.markSyncSucceeded,
   markSyncFailed: mocks.markSyncFailed,
 }))
@@ -242,6 +244,81 @@ describe('syncLinkedTelegramUser', () => {
     })
     expect(mocks.userFindUnique).not.toHaveBeenCalled()
     expect(mocks.updateUser).not.toHaveBeenCalled()
+  })
+
+  it('skips a Remnashop account without a subscription or Remnawave profile', async () => {
+    mocks.userFindUnique.mockReset()
+      .mockResolvedValueOnce({
+        remnawaveId: null,
+        remnawaveUuid: null,
+        remnawaveUsername: null,
+      })
+      .mockResolvedValueOnce({
+        email: 'user@example.com',
+        emailVerifiedAt: new Date(),
+        remnashopUserId: 42,
+      })
+    mocks.remnashopQuery.mockReset()
+      .mockResolvedValueOnce({ rows: [{ user_id: 42, merged_duplicate: false }] })
+      .mockResolvedValueOnce({
+        rows: [{
+          id: 42,
+          telegram_id: telegramId.toString(),
+          email: 'user@example.com',
+          is_email_verified: true,
+          name: 'User',
+          current_subscription_id: null,
+          user_remna_id: null,
+        }],
+      })
+
+    const result = await syncLinkedTelegramUser({
+      localUserId: 'cabinet-user-1',
+      telegramId,
+    })
+
+    expect('skipped' in result ? result.skipped : null).toContain('нет подписки')
+    expect(mocks.getUser).not.toHaveBeenCalled()
+    expect(mocks.markSyncSkipped).toHaveBeenCalledOnce()
+    expect(mocks.markSyncFailed).not.toHaveBeenCalled()
+    expect(mocks.createAdminNotification).not.toHaveBeenCalled()
+  })
+
+  it('keeps a missing Remnawave profile as an error when a subscription exists', async () => {
+    mocks.userFindUnique.mockReset()
+      .mockResolvedValueOnce({
+        remnawaveId: null,
+        remnawaveUuid: null,
+        remnawaveUsername: null,
+      })
+      .mockResolvedValueOnce({
+        email: 'user@example.com',
+        emailVerifiedAt: new Date(),
+        remnashopUserId: 42,
+      })
+    mocks.remnashopQuery.mockReset()
+      .mockResolvedValueOnce({ rows: [{ user_id: 42, merged_duplicate: false }] })
+      .mockResolvedValueOnce({
+        rows: [{
+          id: 42,
+          telegram_id: telegramId.toString(),
+          email: 'user@example.com',
+          is_email_verified: true,
+          name: 'User',
+          current_subscription_id: 7,
+          user_remna_id: null,
+        }],
+      })
+
+    const result = await syncLinkedTelegramUser({
+      localUserId: 'cabinet-user-1',
+      telegramId,
+    })
+
+    expect(result.warnings).toContain('Пользователь найден в Remnashop, но у него нет связанного профиля Remnawave.')
+    expect(mocks.markSyncFailed).toHaveBeenCalledOnce()
+    expect(mocks.markSyncSkipped).not.toHaveBeenCalled()
+    expect(mocks.createAdminNotification).toHaveBeenCalledOnce()
   })
 })
 

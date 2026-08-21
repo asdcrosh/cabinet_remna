@@ -13,6 +13,7 @@ import { withDistributedLock } from './distributed-lock'
 import {
   markSyncFailed,
   markSyncPending,
+  markSyncSkipped,
   markSyncSucceeded,
   type SyncEventInput,
 } from './sync-events'
@@ -133,7 +134,9 @@ export async function syncLinkedTelegramUser(input: {
       if (trackEvent) await markSyncPending(event)
       try {
         const result = await performLinkedTelegramSync(input)
-        if (trackEvent && result.warnings.length > 0) {
+        if (trackEvent && result.skipped) {
+          await markSyncSkipped(event, result.skipped)
+        } else if (trackEvent && result.warnings.length > 0) {
           const warning = new Error(result.warnings.join('; '))
           await markSyncFailed(event, warning)
           await notifyTelegramSyncIssue(input.localUserId, warning, 'WARNING')
@@ -228,7 +231,12 @@ async function performLinkedTelegramSync(input: {
   }
 
   if (!remnawaveUser) {
-    warnings.push('Пользователь найден в Remnashop, но у него нет связанного профиля Remnawave.')
+    const skipped = remnashopUser.current_subscription_id
+      ? undefined
+      : 'У пользователя Remnashop нет подписки; профиль Remnawave пока не требуется.'
+    if (!skipped) {
+      warnings.push('Пользователь найден в Remnashop, но у него нет связанного профиля Remnawave.')
+    }
     return {
       foundRemnashopUser: true as const,
       syncedRemnawave: Boolean(remnawaveUser && telegramId),
@@ -236,6 +244,7 @@ async function performLinkedTelegramSync(input: {
       remnashopUserId: remnashopUser.id,
       devicesSynced,
       warnings,
+      skipped,
     }
   }
 

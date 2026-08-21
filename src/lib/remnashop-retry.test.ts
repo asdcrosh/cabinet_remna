@@ -1,8 +1,12 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
   syncPromo: vi.fn(),
   markSyncSkipped: vi.fn(),
+  markSyncPending: vi.fn(),
+  markSyncSucceeded: vi.fn(),
+  markSyncFailed: vi.fn(),
+  syncEventFindMany: vi.fn(),
   userFindUnique: vi.fn(),
   syncLinkedTelegramUser: vi.fn(),
 }))
@@ -12,6 +16,9 @@ vi.mock('./prisma', () => ({
   prisma: {
     user: {
       findUnique: mocks.userFindUnique,
+    },
+    syncEvent: {
+      findMany: mocks.syncEventFindMany,
     },
   },
 }))
@@ -33,13 +40,13 @@ vi.mock('./telegram-link-sync', () => ({
   syncLinkedTelegramUser: mocks.syncLinkedTelegramUser,
 }))
 vi.mock('./sync-events', () => ({
-  markSyncFailed: vi.fn(),
-  markSyncPending: vi.fn(),
+  markSyncFailed: mocks.markSyncFailed,
+  markSyncPending: mocks.markSyncPending,
   markSyncSkipped: mocks.markSyncSkipped,
-  markSyncSucceeded: vi.fn(),
+  markSyncSucceeded: mocks.markSyncSucceeded,
 }))
 
-import { retryRemnashopSyncEvent } from './remnashop-retry'
+import { retryDueRemnashopSyncEvents, retryRemnashopSyncEvent } from './remnashop-retry'
 
 const promoEvent = {
   direction: 'CABINET_TO_REMNASHOP' as const,
@@ -47,10 +54,12 @@ const promoEvent = {
   entityId: 'promo-1',
   operation: 'upsert',
 }
+const originalDatabaseUrl = process.env.REMNASHOP_DATABASE_URL
 
 describe('Remnashop sync retries', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    process.env.REMNASHOP_DATABASE_URL = 'postgresql://remnashop@db/remnashop'
   })
 
   it('collapses missing promo write access into one configuration issue', async () => {
@@ -96,4 +105,40 @@ describe('Remnashop sync retries', () => {
       telegramId: 123n,
     }, { trackEvent: false })
   })
+
+  it('stops retrying a Telegram identity that has no Remnashop subscription', async () => {
+    mocks.syncEventFindMany.mockResolvedValue([{
+      direction: 'REMNASHOP_TO_CABINET',
+      entityType: 'telegramIdentity',
+      entityId: 'user-1',
+      operation: 'sync',
+      attempts: 300,
+      metadata: null,
+    }])
+    mocks.userFindUnique.mockResolvedValue({ telegramId: 123n })
+    mocks.syncLinkedTelegramUser.mockResolvedValue({
+      alreadyRunning: false,
+      warnings: [],
+      skipped: 'У пользователя Remnashop нет подписки; профиль Remnawave пока не требуется.',
+    })
+
+    await expect(retryDueRemnashopSyncEvents({ force: true })).resolves.toEqual({
+      attempted: 1,
+      succeeded: 1,
+      failed: 0,
+    })
+    expect(mocks.markSyncSkipped).toHaveBeenCalledWith({
+      direction: 'REMNASHOP_TO_CABINET',
+      entityType: 'telegramIdentity',
+      entityId: 'user-1',
+      operation: 'sync',
+    }, 'У пользователя Remnashop нет подписки; профиль Remnawave пока не требуется.')
+    expect(mocks.markSyncSucceeded).not.toHaveBeenCalled()
+    expect(mocks.markSyncFailed).not.toHaveBeenCalled()
+  })
+})
+
+afterAll(() => {
+  if (originalDatabaseUrl === undefined) delete process.env.REMNASHOP_DATABASE_URL
+  else process.env.REMNASHOP_DATABASE_URL = originalDatabaseUrl
 })
