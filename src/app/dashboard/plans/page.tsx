@@ -168,6 +168,8 @@ export default async function PlansPage({
     promoCodesEnabled: plan.promoCodesEnabled,
     popular: plan.isFeatured,
     current: currentSubscription?.planId === plan.id,
+    currentWhitelistAddonActive: currentSubscription?.planId === plan.id
+      && currentSubscription.whitelistAddonActive,
     autoRenewalEnabled: autoRenewalConsentCurrent && autoRenewal?.plan.id === plan.id,
     autoRenewalWhitelistAddonEnabled: autoRenewal?.plan.id === plan.id
       && autoRenewal.whitelistAddonEnabled,
