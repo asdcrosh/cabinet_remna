@@ -186,6 +186,9 @@ describe('ensureRemnawaveSubscription', () => {
         data: expect.objectContaining({
           planId: 'plan-1',
           startAt: new Date('2026-01-01T00:00:00.000Z'),
+          whitelistAddonActive: false,
+          whitelistAddonActivatedAt: null,
+          whitelistAddonPaymentId: null,
         }),
       })
     )

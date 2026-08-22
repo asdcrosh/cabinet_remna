@@ -24,6 +24,10 @@ import {
   calculatePlanPurchase,
   DeviceLimitSelectionError,
 } from '@/lib/plan-purchase'
+import {
+  buildWhitelistAddonSnapshot,
+  WHITELIST_ADDON_NAME,
+} from '@/lib/whitelist-addon'
 
 export const runtime = 'nodejs'
 
@@ -52,6 +56,7 @@ export const POST = withAuth(async (req: Request) => {
   }
   const {
     planId,
+    purchaseType,
     deviceLimit,
     promoCode,
     provider,
@@ -67,8 +72,9 @@ export const POST = withAuth(async (req: Request) => {
     )
   }
 
+  const isWhitelistAddon = purchaseType === 'WHITELIST_ADDON'
   const plan = await prisma.plan.findUnique({ where: { id: planId } })
-  if (!plan || !plan.isActive) {
+  if (!plan || (!isWhitelistAddon && !plan.isActive)) {
     return NextResponse.json({ error: 'Тариф не найден' }, { status: 404 })
   }
   const user = await prisma.user.findUnique({ where: { id: session.uid } })
@@ -84,17 +90,60 @@ export const POST = withAuth(async (req: Request) => {
     )
   }
   await reconcileStalePendingPaymentsForUser(user.id)
+  const activeSubscription = isWhitelistAddon
+    ? await prisma.subscription.findFirst({
+        where: {
+          userId: user.id,
+          planId: plan.id,
+          status: { in: ['ACTIVE', 'LIMITED'] },
+          expireAt: { gt: new Date() },
+        },
+        orderBy: { expireAt: 'desc' },
+      })
+    : null
+
+  if (isWhitelistAddon) {
+    if (!activeSubscription) {
+      return NextResponse.json({ error: 'Для дополнения нужна действующая подписка этого тарифа' }, { status: 409 })
+    }
+    if (!plan.whitelistAddonEnabled || plan.whitelistAddonPriceKopecks <= 0) {
+      return NextResponse.json({ error: 'Дополнение для этого тарифа недоступно' }, { status: 404 })
+    }
+    if (plan.whitelistAddonInternalSquads.length === 0) {
+      return NextResponse.json({ error: 'Группы дополнения не настроены' }, { status: 503 })
+    }
+    if (activeSubscription.whitelistAddonActive) {
+      return NextResponse.json({ error: 'Дополнение уже подключено' }, { status: 409 })
+    }
+    const pendingAddon = await prisma.payment.findFirst({
+      where: {
+        userId: user.id,
+        subscriptionId: activeSubscription.id,
+        purchaseType: 'WHITELIST_ADDON',
+        status: 'PENDING',
+      },
+      orderBy: { createdAt: 'desc' },
+    })
+    if (pendingAddon && pendingAddon.checkoutKey !== idempotencyKey) {
+      return NextResponse.json({
+        error: 'Оплата дополнения уже ожидает завершения',
+        code: 'ADDON_PAYMENT_PENDING',
+        confirmationUrl: pendingAddon.confirmationUrl,
+      }, { status: 409 })
+    }
+  }
+
   const audienceContext = await getPlanAudienceContext(user.id)
-  if (!audienceContext || !isPlanAvailableForUser(plan, audienceContext, { allowLink: plan.availability === 'LINK' })) {
+  if (!isWhitelistAddon && (!audienceContext || !isPlanAvailableForUser(plan, audienceContext, { allowLink: plan.availability === 'LINK' }))) {
     return NextResponse.json({ error: 'Этот тариф недоступен для вашего аккаунта' }, { status: 403 })
   }
-  if (plan.priceKopecks <= 0 && !plan.isPromo) {
+  if (!isWhitelistAddon && plan.priceKopecks <= 0 && !plan.isPromo) {
     return NextResponse.json(
       { error: 'Бесплатный тариф должен быть настроен как ознакомительный.' },
       { status: 400 }
     )
   }
-  if (!plan.isPromo && deviceLimit == null) {
+  if (!isWhitelistAddon && !plan.isPromo && deviceLimit == null) {
     return NextResponse.json(
       { error: 'Обновите страницу тарифа и выберите количество устройств', code: 'DEVICE_LIMIT_REQUIRED' },
       { status: 400 }
@@ -102,17 +151,38 @@ export const POST = withAuth(async (req: Request) => {
   }
 
   let pricing: ReturnType<typeof calculatePlanPurchase>
-  try {
-    pricing = calculatePlanPurchase(plan, plan.isPromo ? plan.deviceLimit : deviceLimit)
-  } catch (error) {
-    if (error instanceof DeviceLimitSelectionError) {
-      return NextResponse.json({ error: error.message, code: error.code }, { status: 400 })
+  if (isWhitelistAddon) {
+    const selectedDeviceLimit = activeSubscription?.deviceLimit ?? plan.deviceLimit
+    pricing = {
+      baseDeviceLimit: selectedDeviceLimit,
+      maxDeviceLimit: selectedDeviceLimit,
+      selectedDeviceLimit,
+      extraDeviceCount: 0,
+      extraDeviceAmountKopecks: 0,
+      originalAmountKopecks: plan.whitelistAddonPriceKopecks,
     }
-    throw error
+  } else {
+    try {
+      pricing = calculatePlanPurchase(plan, plan.isPromo ? plan.deviceLimit : deviceLimit)
+    } catch (error) {
+      if (error instanceof DeviceLimitSelectionError) {
+        return NextResponse.json({ error: error.message, code: error.code }, { status: 400 })
+      }
+      throw error
+    }
   }
-  const planSnapshot = buildPlanPurchaseSnapshot(plan, pricing)
+  const planSnapshot = isWhitelistAddon ? null : buildPlanPurchaseSnapshot(plan, pricing)
+  const addonSnapshot = isWhitelistAddon && activeSubscription
+    ? buildWhitelistAddonSnapshot({
+        planId: plan.id,
+        subscriptionId: activeSubscription.id,
+        subscriptionExpireAt: activeSubscription.expireAt,
+        priceKopecks: plan.whitelistAddonPriceKopecks,
+        internalSquads: plan.whitelistAddonInternalSquads,
+      })
+    : null
 
-  if (plan.isPromo) {
+  if (!isWhitelistAddon && plan.isPromo) {
     if (promoCode) {
       return NextResponse.json({ error: 'Промокод не нужен для этого тарифа' }, { status: 400 })
     }
@@ -229,6 +299,7 @@ export const POST = withAuth(async (req: Request) => {
   if (existingCheckout) {
     return existingCheckoutResponse(existingCheckout, {
       planId,
+      purchaseType,
       deviceLimit: pricing.selectedDeviceLimit,
       promoCode,
       provider,
@@ -248,7 +319,7 @@ export const POST = withAuth(async (req: Request) => {
   try {
     const result = await prisma.$transaction(
       async (tx) => {
-        const discount = promoCode
+        const discount = !isWhitelistAddon && promoCode
           ? await validatePromoCodeForPlan({
               prisma: tx,
               code: promoCode,
@@ -262,13 +333,20 @@ export const POST = withAuth(async (req: Request) => {
           data: {
             userId: user.id,
             planId: plan.id,
+            subscriptionId: activeSubscription?.id,
+            purchaseType,
             promoCodeId: discount?.promoCode.id,
             amountKopecks: discount?.finalAmountKopecks ?? pricing.originalAmountKopecks,
             originalAmountKopecks: pricing.originalAmountKopecks,
             discountPercent: discount?.discountPercent,
             discountKopecks: discount?.discountKopecks ?? 0,
             deviceLimit: pricing.selectedDeviceLimit,
-            planSnapshot: planSnapshot as unknown as Prisma.InputJsonValue,
+            ...(planSnapshot
+              ? { planSnapshot: planSnapshot as unknown as Prisma.InputJsonValue }
+              : {}),
+            ...(addonSnapshot
+              ? { addonSnapshot: addonSnapshot as unknown as Prisma.InputJsonValue }
+              : {}),
             promoCodeSnapshot: discount
               ? {
                   code: discount.normalizedCode,
@@ -314,6 +392,7 @@ export const POST = withAuth(async (req: Request) => {
     if (duplicateCheckout) {
       return existingCheckoutResponse(duplicateCheckout, {
         planId,
+        purchaseType,
         deviceLimit: pricing.selectedDeviceLimit,
         promoCode,
         provider,
@@ -335,6 +414,7 @@ export const POST = withAuth(async (req: Request) => {
     details: {
       provider,
       planId: plan.id,
+      purchaseType,
       deviceLimit: pricing.selectedDeviceLimit,
       amountKopecks: localPayment.amountKopecks,
       discountKopecks: localPayment.discountKopecks,
@@ -345,7 +425,9 @@ export const POST = withAuth(async (req: Request) => {
   const amountRub = localPayment.amountKopecks / 100
   const baseUrl = getAppUrl()
   const returnUrl = `${baseUrl}/dashboard/billing?paid=1&payment=${localPayment.id}`
-  const description = buildPaymentServiceName(plan.durationDays)
+  const description = isWhitelistAddon
+    ? WHITELIST_ADDON_NAME
+    : buildPaymentServiceName(plan.durationDays)
 
   if (provider === 'PAYANYWAY') {
     try {
@@ -437,7 +519,9 @@ export const POST = withAuth(async (req: Request) => {
 
   let payment
   try {
-    const savePaymentMethod = autoRenewalConsent || await shouldSavePaymentMethodBestEffort(user.id, plan.id)
+    const savePaymentMethod = !isWhitelistAddon && (
+      autoRenewalConsent || await shouldSavePaymentMethodBestEffort(user.id, plan.id)
+    )
     payment = await createPayment({
       amount: amountRub,
       description,
@@ -447,6 +531,7 @@ export const POST = withAuth(async (req: Request) => {
       metadata: {
         userId: user.id,
         planId: plan.id,
+        purchaseType,
         localPaymentId: localPayment.id,
         ...(autoRenewalConsent ? { autoRenewalConsentVersion: autoRenewalConsentVersion! } : {}),
         deviceLimit: String(pricing.selectedDeviceLimit),
@@ -517,6 +602,7 @@ function existingCheckoutResponse(
   payment: Payment,
   input: {
     planId: string
+    purchaseType: 'SUBSCRIPTION' | 'WHITELIST_ADDON'
     deviceLimit: number
     promoCode?: string
     provider: 'YOOKASSA' | 'PAYANYWAY' | 'PLATEGA'
@@ -527,6 +613,7 @@ function existingCheckoutResponse(
   const storedPromoCode = promoCodeFromSnapshot(payment.promoCodeSnapshot)
   if (
     payment.planId !== input.planId
+    || payment.purchaseType !== input.purchaseType
     || payment.deviceLimit !== input.deviceLimit
     || payment.provider !== input.provider
     || storedPromoCode !== requestedPromoCode

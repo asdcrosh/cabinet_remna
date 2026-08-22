@@ -36,6 +36,9 @@ export interface PlanAdminRow {
   maxDeviceLimit: number
   extraDevicePriceKopecks: number
   activeInternalSquads: string[]
+  whitelistAddonEnabled: boolean
+  whitelistAddonPriceKopecks: number
+  whitelistAddonInternalSquads: string[]
   availability: PlanAvailabilityValue
   allowedEmails: string[]
   allowedTelegramIds: string[]
@@ -58,6 +61,9 @@ interface PlanFormState {
   maxDeviceLimit: string
   extraDevicePriceRub: string
   activeInternalSquads: string
+  whitelistAddonEnabled: boolean
+  whitelistAddonPriceRub: string
+  whitelistAddonInternalSquads: string
   availability: PlanAvailabilityValue
   allowedUsers: string
   isPromo: boolean
@@ -88,6 +94,9 @@ const emptyForm: PlanFormState = {
   maxDeviceLimit: '5',
   extraDevicePriceRub: '0',
   activeInternalSquads: '',
+  whitelistAddonEnabled: false,
+  whitelistAddonPriceRub: '200',
+  whitelistAddonInternalSquads: '',
   availability: 'ALL',
   allowedUsers: '',
   isPromo: false,
@@ -477,6 +486,9 @@ export function PlansAdmin({ plans }: { plans: PlanAdminRow[] }) {
                   <div className="mt-2 flex flex-wrap gap-1.5 text-xs">
                     {plan.isFeatured && <PlanTag>Популярный</PlanTag>}
                     {!plan.promoCodesEnabled && <PlanTag>Без скидок</PlanTag>}
+                    {plan.whitelistAddonEnabled && (
+                      <PlanTag>Белые списки +{formatPrice(plan.whitelistAddonPriceKopecks)}</PlanTag>
+                    )}
                     {plan.availability === 'ALLOWED' && <PlanTag>{allowedUsersCount} польз.</PlanTag>}
                     <PlanTag>{plan.subscriptionsCount} подписок</PlanTag>
                     <PlanTag>{plan.paymentsCount} оплат</PlanTag>
@@ -630,6 +642,10 @@ function PlanEditor({
   onSubmit: () => void
 }) {
   const selected = useMemo(() => new Set(parseSquads(form.activeInternalSquads)), [form.activeInternalSquads])
+  const selectedAddon = useMemo(
+    () => new Set(parseSquads(form.whitelistAddonInternalSquads)),
+    [form.whitelistAddonInternalSquads]
+  )
   const set = <K extends keyof PlanFormState>(key: K, value: PlanFormState[K]) =>
     setForm((current) => ({ ...current, [key]: value }))
   const selectAllActive = () =>
@@ -637,6 +653,12 @@ function PlanEditor({
   const toggleSquad = (uuid: string) => {
     const next = selected.has(uuid) ? [...selected].filter((id) => id !== uuid) : [...selected, uuid]
     set('activeInternalSquads', next.join('\n'))
+  }
+  const toggleAddonSquad = (uuid: string) => {
+    const next = selectedAddon.has(uuid)
+      ? [...selectedAddon].filter((id) => id !== uuid)
+      : [...selectedAddon, uuid]
+    set('whitelistAddonInternalSquads', next.join('\n'))
   }
 
   return (
@@ -697,6 +719,61 @@ function PlanEditor({
           <Toggle checked={form.isPromo} onChange={(value) => set('isPromo', value)} label="Пробный" description="Промо-тариф" />
           <Toggle checked={form.promoCodesEnabled} onChange={(value) => set('promoCodesEnabled', value)} label="Промокоды" description="Скидки разрешены" />
         </div>
+      </EditorSection>
+
+      <EditorSection
+        title="Дополнение: белые списки"
+        description="Пользователь сможет отдельно купить доступ к выбранным группам до конца текущего периода."
+      >
+        <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(12rem,.45fr)]">
+          <Toggle
+            checked={form.whitelistAddonEnabled}
+            onChange={(value) => set('whitelistAddonEnabled', value)}
+            label="Разрешить покупку дополнения"
+            description="Показывать предложение в активной подписке"
+          />
+          <Field label="Цена дополнения, ₽">
+            <input
+              value={form.whitelistAddonPriceRub}
+              onChange={(event) => set('whitelistAddonPriceRub', event.target.value)}
+              className="input"
+              type="number"
+              min={0}
+              step="0.01"
+              disabled={!form.whitelistAddonEnabled}
+            />
+          </Field>
+        </div>
+        <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+          {squads.map((squad) => (
+            <button
+              key={squad.uuid}
+              type="button"
+              disabled={!form.whitelistAddonEnabled}
+              onClick={() => toggleAddonSquad(squad.uuid)}
+              className={cn(
+                'flex min-w-0 items-center gap-3 rounded-xl border px-3 py-3 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-50',
+                selectedAddon.has(squad.uuid)
+                  ? 'border-amber-300 bg-amber-50 text-amber-950 dark:border-amber-400/40 dark:bg-amber-400/10 dark:text-amber-100'
+                  : 'border-slate-200 bg-white hover:border-slate-300 dark:border-white/10 dark:bg-surface-900/70'
+              )}
+            >
+              <span className={cn('grid h-5 w-5 shrink-0 place-items-center rounded border text-xs', selectedAddon.has(squad.uuid) ? 'border-amber-500 bg-amber-500 text-white' : 'border-slate-300')}>
+                {selectedAddon.has(squad.uuid) ? '✓' : ''}
+              </span>
+              <span className="min-w-0 truncate text-sm font-medium">{squad.name}</span>
+            </button>
+          ))}
+        </div>
+        <details className="mt-4 rounded-2xl border border-slate-200 bg-white px-3 py-2.5 dark:border-white/10 dark:bg-surface-900/60">
+          <summary className="cursor-pointer text-xs font-medium text-slate-500">Ручной ввод UUID групп дополнения</summary>
+          <textarea
+            value={form.whitelistAddonInternalSquads}
+            onChange={(event) => set('whitelistAddonInternalSquads', event.target.value)}
+            className="input mt-2 min-h-[76px] resize-y font-mono text-xs"
+            disabled={!form.whitelistAddonEnabled}
+          />
+        </details>
       </EditorSection>
 
       {form.availability === 'ALLOWED' && (
@@ -843,6 +920,9 @@ function formFromPlan(plan: PlanAdminRow): PlanFormState {
     maxDeviceLimit: String(plan.maxDeviceLimit),
     extraDevicePriceRub: String(plan.extraDevicePriceKopecks / 100),
     activeInternalSquads: plan.activeInternalSquads.join('\n'),
+    whitelistAddonEnabled: plan.whitelistAddonEnabled,
+    whitelistAddonPriceRub: String(plan.whitelistAddonPriceKopecks / 100),
+    whitelistAddonInternalSquads: plan.whitelistAddonInternalSquads.join('\n'),
     availability: plan.availability,
     allowedUsers: [...plan.allowedEmails, ...plan.allowedTelegramIds].join('\n'),
     isPromo: plan.isPromo,
@@ -863,6 +943,9 @@ function toPayload(form: PlanFormState) {
     maxDeviceLimit: Number(form.maxDeviceLimit),
     extraDevicePriceKopecks: Math.round(Number(form.extraDevicePriceRub) * 100),
     activeInternalSquads: parseSquads(form.activeInternalSquads),
+    whitelistAddonEnabled: form.whitelistAddonEnabled,
+    whitelistAddonPriceKopecks: Math.round(Number(form.whitelistAddonPriceRub) * 100),
+    whitelistAddonInternalSquads: parseSquads(form.whitelistAddonInternalSquads),
     availability: form.availability,
     allowedEmails: parseAllowedUsers(form.allowedUsers).emails,
     allowedTelegramIds: parseAllowedUsers(form.allowedUsers).telegramIds,

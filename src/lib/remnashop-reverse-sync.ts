@@ -49,6 +49,9 @@ export async function syncCabinetPaymentToRemnashop(paymentId: string) {
   })
 
   if (!payment) return { ok: false as const, skipped: 'payment not found' }
+  if (payment.purchaseType === 'WHITELIST_ADDON') {
+    return { ok: false as const, skipped: 'whitelist add-on is not a Remnashop subscription payment' }
+  }
   if (payment.status !== 'SUCCEEDED') return { ok: false as const, skipped: 'payment is not succeeded' }
   if (!payment.subscription) {
     await markPaymentRemnashopSyncFailed(payment.id, 'subscription is missing')
@@ -58,6 +61,7 @@ export async function syncCabinetPaymentToRemnashop(paymentId: string) {
     where: {
       userId: payment.userId,
       status: 'SUCCEEDED',
+      purchaseType: 'SUBSCRIPTION',
       subscriptionProvisionedAt: { not: null },
     },
     orderBy: [

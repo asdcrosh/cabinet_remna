@@ -1,5 +1,6 @@
 import { prisma } from './prisma'
 import { recordPaymentEvent } from './payment-events'
+import { revokeWhitelistAddonForPayment } from './whitelist-addon'
 
 interface RecordSucceededRefundInput {
   paymentId: string
@@ -51,6 +52,10 @@ export async function recordSucceededRefund(input: RecordSucceededRefundInput) {
 
     return { fullyRefunded, refundedAmountKopecks }
   })
+
+  if (result.fullyRefunded) {
+    await revokeWhitelistAddonForPayment(input.paymentId)
+  }
 
   await recordPaymentEvent({
     paymentId: input.paymentId,

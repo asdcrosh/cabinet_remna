@@ -153,7 +153,9 @@ export async function syncPaymentProvisioning(input: {
         data: { status: 'SUCCEEDED' },
       }),
     ])
-    await cancelOtherPendingPaymentsForUser(payment.userId, payment.id)
+    if (payment.purchaseType !== 'WHITELIST_ADDON') {
+      await cancelOtherPendingPaymentsForUser(payment.userId, payment.id)
+    }
     await recordPaymentEvent({
       paymentId: payment.id,
       stage: 'PAYMENT',
@@ -286,7 +288,9 @@ export async function syncPaymentProvisioning(input: {
     }),
   ])
   await captureSavedPaymentMethodBestEffort({ localPaymentId: payment.id, providerPayment: yooPayment })
-  await cancelOtherPendingPaymentsForUser(payment.userId, payment.id)
+  if (payment.purchaseType !== 'WHITELIST_ADDON') {
+    await cancelOtherPendingPaymentsForUser(payment.userId, payment.id)
+  }
   await recordPaymentEvent({
     paymentId: payment.id,
     stage: 'PAYMENT',

@@ -8,12 +8,16 @@ const mocks = vi.hoisted(() => ({
   payment: { update: vi.fn() },
   promoCodeRedemption: { updateMany: vi.fn() },
   transaction: vi.fn(),
+  revokeWhitelistAddonForPayment: vi.fn(),
 }))
 
 vi.mock('./prisma', () => ({
   prisma: {
     $transaction: mocks.transaction,
   },
+}))
+vi.mock('./whitelist-addon', () => ({
+  revokeWhitelistAddonForPayment: mocks.revokeWhitelistAddonForPayment,
 }))
 
 import { recordSucceededRefund } from './payment-refunds'
@@ -29,6 +33,7 @@ describe('recordSucceededRefund', () => {
     mocks.paymentRefund.upsert.mockResolvedValue({})
     mocks.payment.update.mockResolvedValue({})
     mocks.promoCodeRedemption.updateMany.mockResolvedValue({ count: 1 })
+    mocks.revokeWhitelistAddonForPayment.mockResolvedValue({ revoked: false })
   })
 
   it('keeps payment active while total refunds are partial', async () => {
@@ -69,5 +74,6 @@ describe('recordSucceededRefund', () => {
       },
       data: { status: 'CANCELED' },
     })
+    expect(mocks.revokeWhitelistAddonForPayment).toHaveBeenCalledWith('payment-1')
   })
 })

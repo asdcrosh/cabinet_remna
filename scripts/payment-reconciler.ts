@@ -263,6 +263,7 @@ async function retryRemnashopReverseSync() {
   const payments = await prisma.payment.findMany({
     where: {
       status: 'SUCCEEDED',
+      purchaseType: 'SUBSCRIPTION',
       subscriptionProvisionedAt: { not: null },
       OR: [
         { remnashopSyncedAt: null },

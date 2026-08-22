@@ -12,6 +12,7 @@ import {
   buildAdminPaymentTelegramText,
 } from './admin-telegram-notifications'
 import { paymentProviderLabel } from './payment-provider-label'
+import { readWhitelistAddonSnapshot } from './whitelist-addon'
 
 const RENEW_PATH = '/dashboard/plans?intent=renew'
 const SUBSCRIPTION_PATH = '/dashboard/subscription'
@@ -147,6 +148,51 @@ export async function notifyPaymentSucceeded(paymentId: string) {
     },
   })
   if (!payment) return
+
+  if (payment.purchaseType === 'WHITELIST_ADDON') {
+    const snapshot = readWhitelistAddonSnapshot(payment.addonSnapshot)
+    const amount = formatRubles(payment.amountKopecks)
+    const expireAt = payment.subscription?.expireAt ?? null
+    const expireText = expireAt ? ` до ${formatDate(expireAt)}` : ''
+    await notifyUser({
+      userId: payment.user.id,
+      type: 'PAYMENT_SUCCESS',
+      dedupeKey: `payment-success:${payment.id}`,
+      title: 'Белые списки подключены',
+      body: `Доплата ${amount} прошла успешно. Дополнительные серверы доступны${expireText}.`,
+      actionHref: SUBSCRIPTION_PATH,
+      actionLabel: 'Открыть подписку',
+      telegramText: [
+        '<b>Белые списки подключены</b>',
+        '',
+        `Оплата: <b>${amount}</b>`,
+        snapshot?.name ? `Дополнение: ${snapshot.name}` : null,
+        expireAt ? `Доступ: до ${formatDate(expireAt)}` : null,
+      ].filter(Boolean).join('\n'),
+      telegramActionUrl: `${getAppUrl()}${SUBSCRIPTION_PATH}`,
+      telegramActionLabel: 'Открыть подписку',
+      telegramActionOpenInTelegram: true,
+      emailSubject: `Белые списки подключены в ${getBrandName()}`,
+      emailText: `Доплата ${amount} прошла успешно. Дополнительные серверы доступны${expireText}.`,
+      emailHtml: renderNotificationEmail({
+        eyebrow: 'Оплата прошла',
+        title: 'Белые списки подключены',
+        lead: `Доплата ${amount} прошла успешно. Дополнительные серверы доступны${expireText}.`,
+        ctaUrl: `${getAppUrl()}${SUBSCRIPTION_PATH}`,
+        ctaLabel: 'Открыть подписку',
+        greetingName: payment.user.name,
+      }),
+    })
+    await recordPaymentEvent({
+      paymentId: payment.id,
+      stage: 'NOTIFICATION',
+      status: 'SUCCESS',
+      source: 'notifications',
+      message: 'Уведомление об активации дополнения обработано',
+      dedupeKey: 'notification-payment-success',
+    })
+    return
+  }
 
   const previousSucceededPayments = await prisma.payment.count({
     where: {

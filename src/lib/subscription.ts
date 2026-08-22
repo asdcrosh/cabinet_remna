@@ -38,7 +38,7 @@ export interface EnsureSubscriptionInput {
  * Локальную запись Subscription создаёт/обновляет по результату.
  */
 export async function ensureRemnawaveSubscription(input: EnsureSubscriptionInput) {
-  const activeInternalSquads = getPlanActiveInternalSquads(input.plan.activeInternalSquads)
+  const activeInternalSquads = resolvePlanActiveInternalSquads(input.plan.activeInternalSquads)
 
   if (input.paymentId) {
     const payment = await prisma.payment.findUnique({
@@ -79,7 +79,7 @@ export async function ensureRemnawaveSubscription(input: EnsureSubscriptionInput
         hwidDeviceLimit: input.plan.deviceLimit,
         telegramId: toRemnawaveTelegramId(user.telegramId),
         tag: 'IMPORTED',
-        ...(activeInternalSquads.length > 0 ? { activeInternalSquads } : {}),
+        activeInternalSquads,
       })
       remnawaveUser = updated.response
       if (input.periodMode === 'REPLACE') {
@@ -171,6 +171,9 @@ export async function ensureRemnawaveSubscription(input: EnsureSubscriptionInput
             deviceLimit: input.plan.deviceLimit,
             lastSyncedAt: new Date(),
             pendingSync: false,
+            whitelistAddonActive: false,
+            whitelistAddonActivatedAt: null,
+            whitelistAddonPaymentId: null,
           },
         })
       : await tx.subscription.create({
@@ -186,6 +189,7 @@ export async function ensureRemnawaveSubscription(input: EnsureSubscriptionInput
             deviceLimit: input.plan.deviceLimit,
             lastSyncedAt: new Date(),
             pendingSync: false,
+            whitelistAddonActive: false,
           },
         })
 
@@ -276,7 +280,7 @@ function createRemnawaveUser(input: {
     trafficLimitBytes:
       input.plan.trafficLimitGb == null ? 0 : Number(gbToBytes(input.plan.trafficLimitGb)),
     hwidDeviceLimit: input.plan.deviceLimit,
-    ...(input.activeInternalSquads.length > 0 ? { activeInternalSquads: input.activeInternalSquads } : {}),
+    activeInternalSquads: input.activeInternalSquads,
     // По умолчанию — месячный сброс. Если в Remnawave вы настроили
     // свою стратегию — поменяйте здесь.
     trafficLimitStrategy: 'MONTH',
@@ -295,7 +299,7 @@ function isRemnawaveUserNotFound(error: RemnawaveError) {
   )
 }
 
-function getPlanActiveInternalSquads(planSquads: string[] | undefined) {
+export function resolvePlanActiveInternalSquads(planSquads: string[] | undefined) {
   if (planSquads && planSquads.length > 0) return planSquads
   return getDefaultActiveInternalSquads()
 }

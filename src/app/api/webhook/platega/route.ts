@@ -47,6 +47,7 @@ export async function POST(request: Request) {
       amountKopecks: true,
       status: true,
       paidAt: true,
+      purchaseType: true,
     },
   })
   if (!payment) {
@@ -144,7 +145,9 @@ export async function POST(request: Request) {
         data: { status: 'SUCCEEDED' },
       }),
     ])
-    await cancelOtherPendingPaymentsForUser(payment.userId, payment.id)
+    if (payment.purchaseType !== 'WHITELIST_ADDON') {
+      await cancelOtherPendingPaymentsForUser(payment.userId, payment.id)
+    }
     await recordPaymentEvent({
       paymentId: payment.id,
       stage: 'PAYMENT',

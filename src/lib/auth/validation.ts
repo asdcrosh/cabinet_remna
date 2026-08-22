@@ -82,6 +82,7 @@ export const changePasswordSchema = z
 
 export const createPaymentSchema = z.object({
   planId: z.string().min(1).max(64),
+  purchaseType: z.enum(['SUBSCRIPTION', 'WHITELIST_ADDON']).default('SUBSCRIPTION'),
   deviceLimit: z.coerce.number().int().min(1).max(100).optional(),
   promoCode: z.string().trim().min(1).max(64).optional(),
   provider: z.enum(['YOOKASSA', 'PAYANYWAY', 'PLATEGA']).default('YOOKASSA'),
@@ -89,6 +90,16 @@ export const createPaymentSchema = z.object({
   autoRenewalConsent: z.boolean().optional().default(false),
   autoRenewalConsentVersion: z.string().max(100).optional(),
 }).superRefine((value, context) => {
+  if (value.purchaseType === 'WHITELIST_ADDON') {
+    if (value.promoCode || value.autoRenewalConsent) {
+      context.addIssue({
+        code: 'custom',
+        path: ['purchaseType'],
+        message: 'Промокоды и автопродление для дополнения недоступны',
+      })
+    }
+    return
+  }
   if (!value.autoRenewalConsent) return
   if (value.autoRenewalConsentVersion !== AUTO_RENEWAL_CONSENT_VERSION) {
     context.addIssue({
@@ -247,6 +258,9 @@ const adminPlanBaseSchema = z.object({
   maxDeviceLimit: z.coerce.number().int().min(1).max(100),
   extraDevicePriceKopecks: z.coerce.number().int().min(0).max(10_000_000),
   activeInternalSquads: z.array(z.string().trim().uuid()).default([]),
+  whitelistAddonEnabled: z.boolean().default(false),
+  whitelistAddonPriceKopecks: z.coerce.number().int().min(0).max(10_000_000).default(0),
+  whitelistAddonInternalSquads: z.array(z.string().trim().uuid()).default([]),
   availability: z.enum(['ALL', 'NEW', 'EXISTING', 'INVITED', 'ALLOWED', 'LINK']).default('ALL'),
   allowedEmails: z.array(z.string().trim().email()).max(10_000).default([]),
   allowedTelegramIds: z.array(z.string().trim().regex(/^\d+$/, 'Telegram ID должен состоять из цифр')).max(10_000).default([]),
@@ -269,6 +283,20 @@ export const adminPlanSchema = adminPlanBaseSchema.superRefine((value, context) 
       code: 'custom',
       path: ['maxDeviceLimit'],
       message: 'Максимум устройств не может быть меньше включённого количества',
+    })
+  }
+  if (value.whitelistAddonEnabled && value.whitelistAddonPriceKopecks <= 0) {
+    context.addIssue({
+      code: 'custom',
+      path: ['whitelistAddonPriceKopecks'],
+      message: 'Укажите цену дополнения',
+    })
+  }
+  if (value.whitelistAddonEnabled && value.whitelistAddonInternalSquads.length === 0) {
+    context.addIssue({
+      code: 'custom',
+      path: ['whitelistAddonInternalSquads'],
+      message: 'Выберите хотя бы одну группу для дополнения',
     })
   }
 })

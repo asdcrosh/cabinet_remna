@@ -9,6 +9,7 @@ import { paymentErrorDetails, recordPaymentEvent } from './payment-events'
 import { refreshAutoRenewalSchedule } from './auto-renewal'
 import { trimUserDevicesToLimit } from './hwid-device-limit'
 import { readPlanPurchaseSnapshot } from './plan-purchase'
+import { provisionWhitelistAddon } from './whitelist-addon'
 
 export interface ProvisionPaymentSubscriptionInput extends EnsureSubscriptionInput {
   paymentId: string
@@ -23,8 +24,10 @@ export async function provisionPaymentSubscription(input: ProvisionPaymentSubscr
       plan: true,
     },
   })
+  if (!payment) throw new Error(`Payment ${input.paymentId} not found`)
+  const isWhitelistAddon = payment.purchaseType === 'WHITELIST_ADDON'
 
-  const purchaseSnapshot = readPlanPurchaseSnapshot(payment?.planSnapshot)
+  const purchaseSnapshot = readPlanPurchaseSnapshot(payment.planSnapshot)
   const effectiveInput = {
     ...input,
     plan: purchaseSnapshot
@@ -38,17 +41,19 @@ export async function provisionPaymentSubscription(input: ProvisionPaymentSubscr
         }
       : {
           ...input.plan,
-          deviceLimit: payment?.deviceLimit ?? input.plan.deviceLimit,
+          deviceLimit: payment.deviceLimit ?? input.plan.deviceLimit,
         },
   }
 
   if (payment?.subscriptionProvisionedAt && payment.subscription) {
-    await trimPurchasedDevices({
-      paymentId: input.paymentId,
-      userId: input.userId,
-      deviceLimit: effectiveInput.plan.deviceLimit,
-      enabled: purchaseSnapshot?.deviceLimitSelectionConfirmed === true,
-    })
+    if (!isWhitelistAddon) {
+      await trimPurchasedDevices({
+        paymentId: input.paymentId,
+        userId: input.userId,
+        deviceLimit: effectiveInput.plan.deviceLimit,
+        enabled: purchaseSnapshot?.deviceLimitSelectionConfirmed === true,
+      })
+    }
     await prisma.provisioningJob.upsert({
       where: { paymentId: input.paymentId },
       create: {
@@ -64,16 +69,20 @@ export async function provisionPaymentSubscription(input: ProvisionPaymentSubscr
       },
     })
 
-    await settleReferralRewards(input.paymentId, input.userId)
-    await syncCabinetPaymentToRemnashopBestEffort(input.paymentId)
+    if (!isWhitelistAddon) {
+      await settleReferralRewards(input.paymentId, input.userId)
+      await syncCabinetPaymentToRemnashopBestEffort(input.paymentId)
+      await refreshAutoRenewalScheduleBestEffort(input.userId, input.paymentId)
+    }
     await notifyPaymentSuccessBestEffort(input.paymentId)
-    await refreshAutoRenewalScheduleBestEffort(input.userId, input.paymentId)
     await recordPaymentEvent({
       paymentId: input.paymentId,
       stage: 'PROVISIONING',
       status: 'SUCCESS',
       source: 'provisioning',
-      message: 'Подписка уже была выдана, повторная операция не потребовалась',
+      message: isWhitelistAddon
+        ? 'Дополнение уже было выдано, повторная операция не потребовалась'
+        : 'Подписка уже была выдана, повторная операция не потребовалась',
       dedupeKey: 'provisioning-idempotent',
     })
 
@@ -108,19 +117,23 @@ export async function provisionPaymentSubscription(input: ProvisionPaymentSubscr
     stage: 'PROVISIONING',
     status: 'INFO',
     source: 'provisioning',
-    message: `Запущена выдача подписки, попытка ${job.attempts}`,
+    message: `${isWhitelistAddon ? 'Запущена выдача дополнения' : 'Запущена выдача подписки'}, попытка ${job.attempts}`,
     details: { attempt: job.attempts },
     dedupeKey: `provisioning-attempt-${job.attempts}`,
   })
 
   try {
-    const result = await ensureRemnawaveSubscription(effectiveInput)
-    await trimPurchasedDevices({
-      paymentId: input.paymentId,
-      userId: input.userId,
-      deviceLimit: effectiveInput.plan.deviceLimit,
-      enabled: purchaseSnapshot?.deviceLimitSelectionConfirmed === true,
-    })
+    const result = isWhitelistAddon
+      ? await provisionWhitelistAddon(input.paymentId)
+      : await ensureRemnawaveSubscription(effectiveInput)
+    if (!isWhitelistAddon) {
+      await trimPurchasedDevices({
+        paymentId: input.paymentId,
+        userId: input.userId,
+        deviceLimit: effectiveInput.plan.deviceLimit,
+        enabled: purchaseSnapshot?.deviceLimitSelectionConfirmed === true,
+      })
+    }
     await prisma.provisioningJob.update({
       where: { id: job.id },
       data: {
@@ -130,16 +143,18 @@ export async function provisionPaymentSubscription(input: ProvisionPaymentSubscr
         lastError: null,
       },
     })
-    await settleReferralRewards(input.paymentId, input.userId)
-    await syncCabinetPaymentToRemnashopBestEffort(input.paymentId)
+    if (!isWhitelistAddon) {
+      await settleReferralRewards(input.paymentId, input.userId)
+      await syncCabinetPaymentToRemnashopBestEffort(input.paymentId)
+      await refreshAutoRenewalScheduleBestEffort(input.userId, input.paymentId)
+    }
     await notifyPaymentSuccessBestEffort(input.paymentId)
-    await refreshAutoRenewalScheduleBestEffort(input.userId, input.paymentId)
     await recordPaymentEvent({
       paymentId: input.paymentId,
       stage: 'PROVISIONING',
       status: 'SUCCESS',
       source: 'provisioning',
-      message: 'Подписка успешно выдана',
+      message: isWhitelistAddon ? 'Дополнение успешно выдано' : 'Подписка успешно выдана',
       details: { attempt: job.attempts },
       dedupeKey: 'provisioning-succeeded',
     })
@@ -161,7 +176,9 @@ export async function provisionPaymentSubscription(input: ProvisionPaymentSubscr
       stage: 'PROVISIONING',
       status: 'ERROR',
       source: 'provisioning',
-      message: 'Не удалось выдать подписку, назначен автоматический повтор',
+      message: isWhitelistAddon
+        ? 'Не удалось выдать дополнение, назначен автоматический повтор'
+        : 'Не удалось выдать подписку, назначен автоматический повтор',
       details: paymentErrorDetails(e, { attempt: job.attempts, nextRetryAt }),
       dedupeKey: `provisioning-failed-${job.attempts}`,
     })

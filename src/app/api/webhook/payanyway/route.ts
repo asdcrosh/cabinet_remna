@@ -11,6 +11,7 @@ import {
 import { buildPaymentServiceName } from '@/lib/payment-service-name'
 import { provisionPaymentSubscription } from '@/lib/provisioning'
 import { paymentErrorDetails, recordPaymentEvent } from '@/lib/payment-events'
+import { WHITELIST_ADDON_NAME } from '@/lib/whitelist-addon'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -97,7 +98,9 @@ async function handlePayAnyWayRequest(params: URLSearchParams) {
       merchantId: callback.merchantId,
       transactionId: payment.id,
       amountKopecks: payment.amountKopecks,
-      itemName: buildPaymentServiceName(payment.plan.durationDays),
+      itemName: payment.purchaseType === 'WHITELIST_ADDON'
+        ? WHITELIST_ADDON_NAME
+        : buildPaymentServiceName(payment.plan.durationDays),
       customerEmail: payment.user.email,
     })
   } catch (error) {
@@ -123,7 +126,9 @@ async function handlePayAnyWayRequest(params: URLSearchParams) {
           data: { status: 'SUCCEEDED' },
         }),
       ])
-      await cancelOtherPendingPaymentsForUser(payment.userId, payment.id)
+      if (payment.purchaseType !== 'WHITELIST_ADDON') {
+        await cancelOtherPendingPaymentsForUser(payment.userId, payment.id)
+      }
       await recordPaymentEvent({
         paymentId: payment.id,
         stage: 'PAYMENT',

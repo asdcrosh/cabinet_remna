@@ -7,6 +7,7 @@ import { EmptyState } from '@/components/dashboard/empty-state'
 import { paymentProviderLabel } from '@/lib/payment-provider-label'
 import { cn } from '@/lib/cn'
 import { readPlanPurchaseSnapshot, resolveEffectiveDeviceLimit } from '@/lib/plan-purchase'
+import { readWhitelistAddonSnapshot } from '@/lib/whitelist-addon'
 
 export type PaymentHistoryPayment = Prisma.PaymentGetPayload<{ include: { plan: true; subscription: true } }>
 
@@ -18,6 +19,7 @@ export function PaymentHistory({ payments }: { payments: PaymentHistoryPayment[]
       {payments.map((payment) => {
         const freshPending = payment.status === 'PENDING' && isFreshPendingPayment(payment.createdAt)
         const purchaseSnapshot = readPlanPurchaseSnapshot(payment.planSnapshot)
+        const addonSnapshot = readWhitelistAddonSnapshot(payment.addonSnapshot)
         const deviceLimit = resolveEffectiveDeviceLimit({
           snapshot: payment.planSnapshot,
           paymentDeviceLimit: payment.deviceLimit,
@@ -40,7 +42,7 @@ export function PaymentHistory({ payments }: { payments: PaymentHistoryPayment[]
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <div className="truncate text-sm font-semibold text-slate-950 dark:text-white">
-                    {purchaseSnapshot?.name ?? payment.plan.name}
+                    {addonSnapshot?.name ?? purchaseSnapshot?.name ?? payment.plan.name}
                   </div>
                   <PaymentStatusBadge status={payment.status} createdAt={payment.createdAt} />
                 </div>
@@ -49,7 +51,7 @@ export function PaymentHistory({ payments }: { payments: PaymentHistoryPayment[]
                   <span aria-hidden="true">·</span>
                   <span>{paymentProviderLabel(payment.provider)}</span>
                   <span aria-hidden="true">·</span>
-                  <span>{deviceLimit} {deviceCountLabel(deviceLimit)}</span>
+                  <span>{payment.purchaseType === 'WHITELIST_ADDON' ? 'дополнение' : `${deviceLimit} ${deviceCountLabel(deviceLimit)}`}</span>
                 </div>
               </div>
             </div>
@@ -70,7 +72,9 @@ export function PaymentHistory({ payments }: { payments: PaymentHistoryPayment[]
             </div>
 
             <div className="flex items-end justify-between gap-3 border-t border-slate-100 pt-3 dark:border-white/[0.07] sm:block sm:border-0 sm:pt-0">
-              <div className="text-[11px] font-medium uppercase tracking-wide text-slate-400 sm:mb-1.5">Подписка</div>
+              <div className="text-[11px] font-medium uppercase tracking-wide text-slate-400 sm:mb-1.5">
+                {payment.purchaseType === 'WHITELIST_ADDON' ? 'Дополнение' : 'Подписка'}
+              </div>
               <div className="sm:mt-0">
                 <ProvisioningBadge provisioned={Boolean(payment.subscriptionProvisionedAt)} status={payment.status} />
               </div>

@@ -37,6 +37,11 @@ export const PATCH = withAuth(async (req: Request, { params }: { params: Promise
     isPromo: parsed.data.isPromo ?? currentPlan.isPromo,
     deviceLimit: parsed.data.deviceLimit ?? currentPlan.deviceLimit,
     maxDeviceLimit: parsed.data.maxDeviceLimit ?? currentPlan.maxDeviceLimit,
+    whitelistAddonEnabled: parsed.data.whitelistAddonEnabled ?? currentPlan.whitelistAddonEnabled,
+    whitelistAddonPriceKopecks:
+      parsed.data.whitelistAddonPriceKopecks ?? currentPlan.whitelistAddonPriceKopecks,
+    whitelistAddonInternalSquads:
+      parsed.data.whitelistAddonInternalSquads ?? currentPlan.whitelistAddonInternalSquads,
   }
   if (invariant.priceKopecks <= 0 && !invariant.isPromo) {
     return NextResponse.json(
@@ -49,6 +54,12 @@ export const PATCH = withAuth(async (req: Request, { params }: { params: Promise
       { error: 'Максимум устройств не может быть меньше включённого количества' },
       { status: 400 }
     )
+  }
+  if (invariant.whitelistAddonEnabled && invariant.whitelistAddonPriceKopecks <= 0) {
+    return NextResponse.json({ error: 'Укажите цену дополнения' }, { status: 400 })
+  }
+  if (invariant.whitelistAddonEnabled && invariant.whitelistAddonInternalSquads.length === 0) {
+    return NextResponse.json({ error: 'Выберите группы Remnawave для дополнения' }, { status: 400 })
   }
 
   const normalized = normalizePlanInput(parsed.data)

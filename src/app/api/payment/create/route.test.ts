@@ -17,9 +17,9 @@ const mocks = vi.hoisted(() => ({
   prisma: {
     plan: { findUnique: vi.fn() },
     user: { findUnique: vi.fn() },
-    payment: { findUnique: vi.fn(), update: vi.fn() },
+    payment: { findUnique: vi.fn(), findFirst: vi.fn(), update: vi.fn() },
     promoCodeRedemption: { updateMany: vi.fn() },
-    subscription: { count: vi.fn() },
+    subscription: { count: vi.fn(), findFirst: vi.fn() },
     trialPlanRedemption: { findUnique: vi.fn() },
     $transaction: vi.fn(),
   },
@@ -68,6 +68,9 @@ const plan = {
   maxDeviceLimit: 20,
   extraDevicePriceKopecks: 10000,
   activeInternalSquads: [],
+  whitelistAddonEnabled: true,
+  whitelistAddonPriceKopecks: 20000,
+  whitelistAddonInternalSquads: ['07eb7d61-533d-4ef5-9fa0-977f0db4c227'],
   availability: 'ALL',
   isActive: true,
   isPromo: false,
@@ -114,6 +117,7 @@ describe('payment create route', () => {
     mocks.prisma.plan.findUnique.mockResolvedValue(plan)
     mocks.prisma.user.findUnique.mockResolvedValue(user)
     mocks.prisma.payment.findUnique.mockResolvedValue(null)
+    mocks.prisma.payment.findFirst.mockResolvedValue(null)
     mocks.reconcileStalePendingPaymentsForUser.mockResolvedValue(undefined)
     mocks.getPlanAudienceContext.mockResolvedValue({})
     mocks.isPlanAvailableForUser.mockReturnValue(true)
@@ -140,6 +144,49 @@ describe('payment create route', () => {
     })
     mocks.prisma.payment.update.mockResolvedValue({})
     mocks.prisma.promoCodeRedemption.updateMany.mockResolvedValue({ count: 0 })
+  })
+
+  it('creates a separate payment for the whitelist add-on', async () => {
+    mocks.prisma.subscription.findFirst.mockResolvedValue({
+      id: 'subscription-1',
+      userId: user.id,
+      planId: plan.id,
+      status: 'ACTIVE',
+      expireAt: new Date('2026-09-01T00:00:00.000Z'),
+      deviceLimit: 5,
+      whitelistAddonActive: false,
+    })
+    mocks.txPaymentCreate.mockResolvedValue({
+      ...localPayment,
+      subscriptionId: 'subscription-1',
+      purchaseType: 'WHITELIST_ADDON',
+      amountKopecks: 20000,
+    })
+
+    const response = await POST(paymentRequest({
+      purchaseType: 'WHITELIST_ADDON',
+      deviceLimit: undefined,
+    }))
+
+    expect(response.status).toBe(200)
+    expect(mocks.txPaymentCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        planId: plan.id,
+        subscriptionId: 'subscription-1',
+        purchaseType: 'WHITELIST_ADDON',
+        amountKopecks: 20000,
+        addonSnapshot: expect.objectContaining({
+          type: 'WHITELIST_ADDON',
+          subscriptionId: 'subscription-1',
+          internalSquads: plan.whitelistAddonInternalSquads,
+        }),
+      }),
+    })
+    expect(mocks.createPayment).toHaveBeenCalledWith(expect.objectContaining({
+      amount: 200,
+      description: 'Доступ к серверам с белыми списками',
+      metadata: expect.objectContaining({ purchaseType: 'WHITELIST_ADDON' }),
+    }))
   })
 
   it('creates a local payment, sends it to YooKassa and stores confirmation data', async () => {
@@ -255,6 +302,7 @@ describe('payment create route', () => {
       promoCodeSnapshot: null,
       deviceLimit: plan.deviceLimit,
       status: 'PENDING',
+      purchaseType: 'SUBSCRIPTION',
     })
 
     const response = await POST(paymentRequest())

@@ -14,6 +14,7 @@ import { syncLocalDevicesFromRemnawave } from './remnawave-device-sync'
 import { upsertLocalSubscriptionFromRemnawave } from './remnawave-local-sync'
 import { readRemnawaveBigInt } from './remnawave-usage'
 import { describeSyncError } from './sync-error'
+import { resolvePlanActiveInternalSquads } from './subscription'
 
 const EXPIRY_TOLERANCE_MS = 2 * 60 * 1000
 
@@ -367,12 +368,16 @@ async function applyManualRepairs(state: Awaited<ReturnType<typeof inspect>>) {
   const local = state.user.subscriptions[0]
   const plan = local?.plan
   if (!state.remote || !local || !plan) return []
+  const activeInternalSquads = Array.from(new Set([
+    ...resolvePlanActiveInternalSquads(plan.activeInternalSquads),
+    ...(local.whitelistAddonActive ? plan.whitelistAddonInternalSquads : []),
+  ]))
   const updated = await remnawave.updateUser(state.remote, {
     status: local.status === 'PAUSED' ? 'DISABLED' : local.status,
     expireAt: local.expireAt.toISOString(),
     trafficLimitBytes: plan.trafficLimitGb == null ? 0 : Number(gbToBytes(plan.trafficLimitGb)),
     hwidDeviceLimit: local.deviceLimit ?? plan.deviceLimit,
-    ...(plan.activeInternalSquads.length > 0 ? { activeInternalSquads: plan.activeInternalSquads } : {}),
+    activeInternalSquads,
   })
   await upsertLocalSubscriptionFromRemnawave({
     localUserId: state.user.id,

@@ -20,28 +20,31 @@ datasource db {
 // trafficLimitGb — лимит трафика в ГБ; null = безлимит.
 // ----------------------------------------------------------------------
 model Plan {
-  id                      String           @id @default(cuid())
-  name                    String // "Базовый", "PRO", "Безлимит"
-  description             String?
-  priceKopecks            Int // 19900 = 199 ₽
-  durationDays            Int              @default(30)
-  remnashopPlanId         Int? // исходный ID плана Remnashop для точной синхронизации
-  trafficLimitGb          Int? // null = безлимит
-  deviceLimit             Int              @default(5)
-  maxDeviceLimit          Int              @default(5)
-  extraDevicePriceKopecks Int              @default(0)
-  activeInternalSquads    String[]         @default([]) // UUID squads Remnawave для этого тарифа
-  availability            PlanAvailability @default(ALL) // аудитория тарифа как в Remnashop
-  allowedEmails           String[]         @default([]) // явный доступ для availability=ALLOWED
-  allowedTelegramIds      String[]         @default([]) // Telegram ID строками, чтобы безопасно отдавать JSON
-  isPromo                 Boolean          @default(false) // бесплатный одноразовый ознакомительный тариф
-  promoCodesEnabled       Boolean          @default(true) // можно ли применять скидочные промокоды к тарифу
-  isFeatured              Boolean          @default(false) // тариф, выделенный в витрине
-  featuredSlot            Int?             @unique // 1 только у одного выделенного тарифа
-  isActive                Boolean          @default(true)
-  sortOrder               Int              @default(0)
-  createdAt               DateTime         @default(now())
-  updatedAt               DateTime         @updatedAt
+  id                           String           @id @default(cuid())
+  name                         String // "Базовый", "PRO", "Безлимит"
+  description                  String?
+  priceKopecks                 Int // 19900 = 199 ₽
+  durationDays                 Int              @default(30)
+  remnashopPlanId              Int? // исходный ID плана Remnashop для точной синхронизации
+  trafficLimitGb               Int? // null = безлимит
+  deviceLimit                  Int              @default(5)
+  maxDeviceLimit               Int              @default(5)
+  extraDevicePriceKopecks      Int              @default(0)
+  activeInternalSquads         String[]         @default([]) // UUID squads Remnawave для этого тарифа
+  whitelistAddonEnabled        Boolean          @default(false)
+  whitelistAddonPriceKopecks   Int              @default(0)
+  whitelistAddonInternalSquads String[]         @default([])
+  availability                 PlanAvailability @default(ALL) // аудитория тарифа как в Remnashop
+  allowedEmails                String[]         @default([]) // явный доступ для availability=ALLOWED
+  allowedTelegramIds           String[]         @default([]) // Telegram ID строками, чтобы безопасно отдавать JSON
+  isPromo                      Boolean          @default(false) // бесплатный одноразовый ознакомительный тариф
+  promoCodesEnabled            Boolean          @default(true) // можно ли применять скидочные промокоды к тарифу
+  isFeatured                   Boolean          @default(false) // тариф, выделенный в витрине
+  featuredSlot                 Int?             @unique // 1 только у одного выделенного тарифа
+  isActive                     Boolean          @default(true)
+  sortOrder                    Int              @default(0)
+  createdAt                    DateTime         @default(now())
+  updatedAt                    DateTime         @updatedAt
 
   payments             Payment[]
   autoRenewals         AutoRenewal[]
@@ -596,6 +599,10 @@ model Subscription {
   // Чтобы не зафлэдить — используем флаг.
   pendingSync Boolean @default(false)
 
+  whitelistAddonActive      Boolean   @default(false)
+  whitelistAddonActivatedAt DateTime?
+  whitelistAddonPaymentId   String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -736,10 +743,12 @@ model Payment {
   // Выбранный лимит и неизменяемые условия заказа на момент оплаты.
   deviceLimit           Int?
   planSnapshot          Json?
+  addonSnapshot         Json?
 
   // Общие данные внешнего провайдера
-  provider          PaymentProvider @default(YOOKASSA)
-  origin            PaymentOrigin   @default(MANUAL)
+  provider          PaymentProvider     @default(YOOKASSA)
+  origin            PaymentOrigin       @default(MANUAL)
+  purchaseType      PaymentPurchaseType @default(SUBSCRIPTION)
   externalPaymentId String?
   providerStatus    String?
   checkoutKey       String?
@@ -786,6 +795,7 @@ model Payment {
   @@index([status, subscriptionProvisionedAt, createdAt])
   @@index([status, subscriptionProvisionedAt, remnashopSyncedAt, updatedAt], map: "Payment_status_subscriptionProvisionedAt_remnashopSyncedAt_upda")
   @@index([provider, status, createdAt])
+  @@index([purchaseType, status, createdAt])
   @@index([promoCodeId])
   @@index([autoRenewalId, createdAt])
 }
@@ -793,6 +803,11 @@ model Payment {
 enum PaymentOrigin {
   MANUAL
   AUTO_RENEWAL
+}
+
+enum PaymentPurchaseType {
+  SUBSCRIPTION
+  WHITELIST_ADDON
 }
 
 enum PaymentProvider {
