@@ -15,6 +15,45 @@ export type WhitelistAddonSnapshot = {
   internalSquads: string[]
 }
 
+export type BundledWhitelistAddonSnapshot = {
+  type: 'WHITELIST_ADDON_BUNDLE'
+  name: string
+  planId: string
+  priceKopecks: number
+  internalSquads: string[]
+}
+
+export function buildBundledWhitelistAddonSnapshot(input: {
+  planId: string
+  priceKopecks: number
+  internalSquads: string[]
+}): BundledWhitelistAddonSnapshot {
+  return {
+    type: 'WHITELIST_ADDON_BUNDLE',
+    name: WHITELIST_ADDON_NAME,
+    planId: input.planId,
+    priceKopecks: input.priceKopecks,
+    internalSquads: uniqueSquads(input.internalSquads),
+  }
+}
+
+export function readBundledWhitelistAddonSnapshot(
+  value: Prisma.JsonValue | null | undefined
+): BundledWhitelistAddonSnapshot | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+  if (
+    value.type !== 'WHITELIST_ADDON_BUNDLE'
+    || typeof value.name !== 'string'
+    || typeof value.planId !== 'string'
+    || typeof value.priceKopecks !== 'number'
+    || !Array.isArray(value.internalSquads)
+    || !value.internalSquads.every((item) => typeof item === 'string')
+  ) {
+    return null
+  }
+  return value as BundledWhitelistAddonSnapshot
+}
+
 export function buildWhitelistAddonSnapshot(input: {
   planId: string
   subscriptionId: string

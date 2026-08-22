@@ -23,6 +23,9 @@ export interface EnsureSubscriptionInput {
   email: string                   // для Remnawave username
   paymentId?: string              // локальный Payment.id, если выдача идёт из webhook
   periodMode?: 'AUTO' | 'REPLACE' | 'EXTEND'
+  whitelistAddon?: {
+    internalSquads: string[]
+  }
   plan: {
     id: string
     name: string
@@ -38,7 +41,11 @@ export interface EnsureSubscriptionInput {
  * Локальную запись Subscription создаёт/обновляет по результату.
  */
 export async function ensureRemnawaveSubscription(input: EnsureSubscriptionInput) {
-  const activeInternalSquads = resolvePlanActiveInternalSquads(input.plan.activeInternalSquads)
+  const whitelistAddonActive = Boolean(input.whitelistAddon)
+  const activeInternalSquads = Array.from(new Set([
+    ...resolvePlanActiveInternalSquads(input.plan.activeInternalSquads),
+    ...(input.whitelistAddon?.internalSquads ?? []),
+  ]))
 
   if (input.paymentId) {
     const payment = await prisma.payment.findUnique({
@@ -171,9 +178,9 @@ export async function ensureRemnawaveSubscription(input: EnsureSubscriptionInput
             deviceLimit: input.plan.deviceLimit,
             lastSyncedAt: new Date(),
             pendingSync: false,
-            whitelistAddonActive: false,
-            whitelistAddonActivatedAt: null,
-            whitelistAddonPaymentId: null,
+            whitelistAddonActive,
+            whitelistAddonActivatedAt: whitelistAddonActive ? new Date() : null,
+            whitelistAddonPaymentId: whitelistAddonActive ? input.paymentId : null,
           },
         })
       : await tx.subscription.create({
@@ -189,7 +196,9 @@ export async function ensureRemnawaveSubscription(input: EnsureSubscriptionInput
             deviceLimit: input.plan.deviceLimit,
             lastSyncedAt: new Date(),
             pendingSync: false,
-            whitelistAddonActive: false,
+            whitelistAddonActive,
+            whitelistAddonActivatedAt: whitelistAddonActive ? new Date() : null,
+            whitelistAddonPaymentId: whitelistAddonActive ? input.paymentId : null,
           },
         })
 

@@ -33,7 +33,7 @@ vi.mock('./payment-settings-crypto', () => ({
   decryptPaymentSecret: () => 'saved-method',
 }))
 vi.mock('./notifications', () => ({ notifyUser: mocks.notifyUser }))
-vi.mock('./logger', () => ({ logError: vi.fn(), logInfo: vi.fn() }))
+vi.mock('./logger', () => ({ logError: vi.fn(), logInfo: vi.fn(), logWarn: vi.fn() }))
 vi.mock('./app-url', () => ({ getAppUrl: () => 'https://cabinet.example' }))
 
 import { processDueAutoRenewals } from './auto-renewal'
@@ -57,6 +57,7 @@ describe('automatic renewal device pricing', () => {
       consentPriceKopecks: 110000,
       consentDurationDays: 30,
       deviceLimit: 8,
+      whitelistAddonEnabled: false,
       nextChargeAt: new Date('2026-08-21T00:00:00.000Z'),
       retryCount: 0,
       user: { id: 'user-1', email: 'user@example.com' },
@@ -70,6 +71,9 @@ describe('automatic renewal device pricing', () => {
         maxDeviceLimit: 20,
         extraDevicePriceKopecks: 10000,
         activeInternalSquads: ['squad-1'],
+        whitelistAddonEnabled: true,
+        whitelistAddonPriceKopecks: 20000,
+        whitelistAddonInternalSquads: ['whitelist-squad'],
         remnashopPlanId: 10,
         isPromo: false,
         updatedAt: new Date('2026-08-01T00:00:00.000Z'),
@@ -95,6 +99,32 @@ describe('automatic renewal device pricing', () => {
     expect(mocks.createPayment).toHaveBeenCalledWith(expect.objectContaining({
       amount: 1100,
       metadata: expect.objectContaining({ deviceLimit: '8' }),
+    }))
+  })
+
+  it('includes the whitelist add-on in an automatic renewal', async () => {
+    const [setting] = await mocks.autoRenewalFindMany()
+    setting.whitelistAddonEnabled = true
+    setting.consentPriceKopecks = 130000
+    mocks.autoRenewalFindMany.mockResolvedValue([setting])
+    mocks.paymentCreate.mockResolvedValue({ id: 'payment-1', amountKopecks: 130000 })
+
+    await expect(processDueAutoRenewals()).resolves.toEqual({ checked: 1, created: 1, failed: 0 })
+
+    expect(mocks.paymentCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        amountKopecks: 130000,
+        originalAmountKopecks: 130000,
+        addonSnapshot: expect.objectContaining({
+          type: 'WHITELIST_ADDON_BUNDLE',
+          priceKopecks: 20000,
+          internalSquads: ['whitelist-squad'],
+        }),
+      }),
+    })
+    expect(mocks.createPayment).toHaveBeenCalledWith(expect.objectContaining({
+      amount: 1300,
+      metadata: expect.objectContaining({ whitelistAddon: 'true' }),
     }))
   })
 })

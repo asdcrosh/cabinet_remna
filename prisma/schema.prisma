@@ -894,6 +894,7 @@ model AutoRenewal {
   consentPriceKopecks      Int?
   consentDurationDays      Int?
   deviceLimit              Int               @default(5)
+  whitelistAddonEnabled    Boolean           @default(false)
   nextChargeAt             DateTime?
   retryCount               Int               @default(0)
   lastAttemptAt            DateTime?

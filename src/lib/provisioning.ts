@@ -9,7 +9,7 @@ import { paymentErrorDetails, recordPaymentEvent } from './payment-events'
 import { refreshAutoRenewalSchedule } from './auto-renewal'
 import { trimUserDevicesToLimit } from './hwid-device-limit'
 import { readPlanPurchaseSnapshot } from './plan-purchase'
-import { provisionWhitelistAddon } from './whitelist-addon'
+import { provisionWhitelistAddon, readBundledWhitelistAddonSnapshot } from './whitelist-addon'
 
 export interface ProvisionPaymentSubscriptionInput extends EnsureSubscriptionInput {
   paymentId: string
@@ -28,8 +28,12 @@ export async function provisionPaymentSubscription(input: ProvisionPaymentSubscr
   const isWhitelistAddon = payment.purchaseType === 'WHITELIST_ADDON'
 
   const purchaseSnapshot = readPlanPurchaseSnapshot(payment.planSnapshot)
+  const bundledWhitelistAddon = readBundledWhitelistAddonSnapshot(payment.addonSnapshot)
   const effectiveInput = {
     ...input,
+    whitelistAddon: bundledWhitelistAddon
+      ? { internalSquads: bundledWhitelistAddon.internalSquads }
+      : undefined,
     plan: purchaseSnapshot
       ? {
           id: purchaseSnapshot.id,

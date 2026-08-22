@@ -15,8 +15,6 @@ import { getFeatureFlags } from '@/lib/feature-flags'
 import { formatSubscriptionDaysLeft, isSubscriptionExpired } from '@/lib/subscription-time'
 import { PageHeader } from '@/components/dashboard/page-header'
 import { VpnConnectionCheck } from '@/components/dashboard/vpn-connection-check'
-import { getAvailablePaymentProviders } from '@/lib/payment-providers'
-import { WhitelistAddonCard } from '@/components/dashboard/whitelist-addon-card'
 
 export const dynamic = 'force-dynamic'
 
@@ -24,7 +22,7 @@ export default async function SubscriptionPage() {
   const features = await getFeatureFlags()
   const session = await getCurrentUser()
   if (!session) redirect('/login')
-  const [user, localSubscription, paymentProviders] = await Promise.all([
+  const [user, localSubscription] = await Promise.all([
     prisma.user.findUnique({ where: { id: session.uid } }),
     prisma.subscription.findFirst({
       where: { userId: session.uid, status: { in: ['ACTIVE', 'LIMITED', 'PAUSED'] } },
@@ -33,20 +31,15 @@ export default async function SubscriptionPage() {
         planId: true,
         status: true,
         expireAt: true,
-        whitelistAddonActive: true,
         deviceLimit: true,
         plan: {
           select: {
             name: true,
             deviceLimit: true,
-            whitelistAddonEnabled: true,
-            whitelistAddonPriceKopecks: true,
-            whitelistAddonInternalSquads: true,
           },
         },
       },
     }),
-    getAvailablePaymentProviders(),
   ])
   if (!user?.remnawaveUsername) {
     return (
@@ -180,21 +173,6 @@ export default async function SubscriptionPage() {
           />
         </div>
       </section>
-
-      {!subscriptionExpired
-        && localSubscription?.planId
-        && (localSubscription.status === 'ACTIVE' || localSubscription.status === 'LIMITED')
-        && localSubscription.plan?.whitelistAddonEnabled
-        && localSubscription.plan.whitelistAddonPriceKopecks > 0
-        && localSubscription.plan.whitelistAddonInternalSquads.length > 0 ? (
-          <WhitelistAddonCard
-            planId={localSubscription.planId}
-            priceKopecks={localSubscription.plan.whitelistAddonPriceKopecks}
-            active={localSubscription.whitelistAddonActive}
-            expiresAt={localSubscription.expireAt.toLocaleDateString('ru-RU')}
-            paymentProviders={paymentProviders}
-          />
-        ) : null}
 
       {!subscriptionExpired && (
         isFirstConnection ? (

@@ -25,7 +25,9 @@ import {
   DeviceLimitSelectionError,
 } from '@/lib/plan-purchase'
 import {
+  buildBundledWhitelistAddonSnapshot,
   buildWhitelistAddonSnapshot,
+  readBundledWhitelistAddonSnapshot,
   WHITELIST_ADDON_NAME,
 } from '@/lib/whitelist-addon'
 
@@ -63,6 +65,7 @@ export const POST = withAuth(async (req: Request) => {
     idempotencyKey,
     autoRenewalConsent,
     autoRenewalConsentVersion,
+    whitelistAddon,
   } = parsed.data
 
   if (autoRenewalConsent && provider !== 'YOOKASSA') {
@@ -133,6 +136,20 @@ export const POST = withAuth(async (req: Request) => {
     }
   }
 
+  const includesBundledWhitelistAddon = !isWhitelistAddon && whitelistAddon
+  if (includesBundledWhitelistAddon) {
+    if (plan.isPromo) {
+      return NextResponse.json({ error: 'Дополнение недоступно для ознакомительного тарифа' }, { status: 422 })
+    }
+    if (
+      !plan.whitelistAddonEnabled
+      || plan.whitelistAddonPriceKopecks <= 0
+      || plan.whitelistAddonInternalSquads.length === 0
+    ) {
+      return NextResponse.json({ error: 'Дополнение для этого тарифа не настроено' }, { status: 422 })
+    }
+  }
+
   const audienceContext = await getPlanAudienceContext(user.id)
   if (!isWhitelistAddon && (!audienceContext || !isPlanAvailableForUser(plan, audienceContext, { allowLink: plan.availability === 'LINK' }))) {
     return NextResponse.json({ error: 'Этот тариф недоступен для вашего аккаунта' }, { status: 403 })
@@ -180,7 +197,16 @@ export const POST = withAuth(async (req: Request) => {
         priceKopecks: plan.whitelistAddonPriceKopecks,
         internalSquads: plan.whitelistAddonInternalSquads,
       })
-    : null
+    : includesBundledWhitelistAddon
+      ? buildBundledWhitelistAddonSnapshot({
+          planId: plan.id,
+          priceKopecks: plan.whitelistAddonPriceKopecks,
+          internalSquads: plan.whitelistAddonInternalSquads,
+        })
+      : null
+  const bundledAddonPriceKopecks = includesBundledWhitelistAddon
+    ? plan.whitelistAddonPriceKopecks
+    : 0
 
   if (!isWhitelistAddon && plan.isPromo) {
     if (promoCode) {
@@ -304,6 +330,7 @@ export const POST = withAuth(async (req: Request) => {
       promoCode,
       provider,
       autoRenewalConsent,
+      whitelistAddon: includesBundledWhitelistAddon,
     })
   }
 
@@ -329,6 +356,7 @@ export const POST = withAuth(async (req: Request) => {
             })
           : null
 
+        const discountedPlanAmountKopecks = discount?.finalAmountKopecks ?? pricing.originalAmountKopecks
         const payment = await tx.payment.create({
           data: {
             userId: user.id,
@@ -336,8 +364,8 @@ export const POST = withAuth(async (req: Request) => {
             subscriptionId: activeSubscription?.id,
             purchaseType,
             promoCodeId: discount?.promoCode.id,
-            amountKopecks: discount?.finalAmountKopecks ?? pricing.originalAmountKopecks,
-            originalAmountKopecks: pricing.originalAmountKopecks,
+            amountKopecks: discountedPlanAmountKopecks + bundledAddonPriceKopecks,
+            originalAmountKopecks: pricing.originalAmountKopecks + bundledAddonPriceKopecks,
             discountPercent: discount?.discountPercent,
             discountKopecks: discount?.discountKopecks ?? 0,
             deviceLimit: pricing.selectedDeviceLimit,
@@ -397,6 +425,7 @@ export const POST = withAuth(async (req: Request) => {
         promoCode,
         provider,
         autoRenewalConsent,
+        whitelistAddon: includesBundledWhitelistAddon,
       })
     }
     if (e instanceof PromoCodeError) {
@@ -427,7 +456,7 @@ export const POST = withAuth(async (req: Request) => {
   const returnUrl = `${baseUrl}/dashboard/billing?paid=1&payment=${localPayment.id}`
   const description = isWhitelistAddon
     ? WHITELIST_ADDON_NAME
-    : buildPaymentServiceName(plan.durationDays)
+    : `${buildPaymentServiceName(plan.durationDays)}${includesBundledWhitelistAddon ? ' + белые списки' : ''}`
 
   if (provider === 'PAYANYWAY') {
     try {
@@ -534,6 +563,7 @@ export const POST = withAuth(async (req: Request) => {
         purchaseType,
         localPaymentId: localPayment.id,
         ...(autoRenewalConsent ? { autoRenewalConsentVersion: autoRenewalConsentVersion! } : {}),
+        ...(includesBundledWhitelistAddon ? { whitelistAddon: 'true' } : {}),
         deviceLimit: String(pricing.selectedDeviceLimit),
         ...(appliedPromo
           ? {
@@ -607,6 +637,7 @@ function existingCheckoutResponse(
     promoCode?: string
     provider: 'YOOKASSA' | 'PAYANYWAY' | 'PLATEGA'
     autoRenewalConsent: boolean
+    whitelistAddon: boolean
   }
 ) {
   const requestedPromoCode = input.promoCode?.trim().toUpperCase() ?? null
@@ -618,6 +649,7 @@ function existingCheckoutResponse(
     || payment.provider !== input.provider
     || storedPromoCode !== requestedPromoCode
     || Boolean(payment.autoRenewalConsentAcceptedAt) !== input.autoRenewalConsent
+    || Boolean(readBundledWhitelistAddonSnapshot(payment.addonSnapshot)) !== input.whitelistAddon
   ) {
     return NextResponse.json({
       error: 'Ключ оплаты уже использован для другого заказа',

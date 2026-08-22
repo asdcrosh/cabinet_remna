@@ -89,9 +89,10 @@ export const createPaymentSchema = z.object({
   idempotencyKey: z.string().uuid(),
   autoRenewalConsent: z.boolean().optional().default(false),
   autoRenewalConsentVersion: z.string().max(100).optional(),
+  whitelistAddon: z.boolean().optional().default(false),
 }).superRefine((value, context) => {
   if (value.purchaseType === 'WHITELIST_ADDON') {
-    if (value.promoCode || value.autoRenewalConsent) {
+    if (value.promoCode || value.autoRenewalConsent || value.whitelistAddon) {
       context.addIssue({
         code: 'custom',
         path: ['purchaseType'],

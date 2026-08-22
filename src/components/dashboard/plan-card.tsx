@@ -18,6 +18,7 @@ import {
   Check,
   CreditCard,
   Gauge,
+  Globe2,
   MonitorSmartphone,
   RefreshCw,
   Minus,
@@ -48,6 +49,9 @@ export interface PlanCardProps {
   popular?: boolean;
   current?: boolean;
   autoRenewalEnabled?: boolean;
+  autoRenewalWhitelistAddonEnabled?: boolean;
+  whitelistAddonEnabled?: boolean;
+  whitelistAddonPriceKopecks?: number;
   display?: "full" | "checkout";
   initialPromoCode?: string;
   paymentProviders?: Array<{
@@ -82,6 +86,9 @@ export function PlanCard({
   popular,
   current,
   autoRenewalEnabled = false,
+  autoRenewalWhitelistAddonEnabled = false,
+  whitelistAddonEnabled = false,
+  whitelistAddonPriceKopecks = 0,
   display = "full",
   initialPromoCode,
   paymentProviders = [{ id: "YOOKASSA", label: "ЮKassa" }],
@@ -94,6 +101,9 @@ export function PlanCard({
   const [manualPromoOpen, setManualPromoOpen] = useState(false);
   const [checkoutConfirmOpen, setCheckoutConfirmOpen] = useState(false);
   const [autoRenewalRequested, setAutoRenewalRequested] = useState(false);
+  const [whitelistAddonRequested, setWhitelistAddonRequested] = useState(
+    autoRenewalEnabled && autoRenewalWhitelistAddonEnabled,
+  );
   const [selectedProvider, setSelectedProvider] = useState<CheckoutPaymentProvider>(
     paymentProviders[0]?.id ?? "YOOKASSA",
   );
@@ -123,6 +133,10 @@ export function PlanCard({
     : null;
   const effectivePriceKopecks = displayedDiscount?.finalAmountKopecks ?? purchasePriceKopecks;
   const effectivePrice = formatPrice(effectivePriceKopecks);
+  const whitelistAddonAvailable = !isPromoPlan && whitelistAddonEnabled && whitelistAddonPriceKopecks > 0;
+  const checkoutTotalKopecks = effectivePriceKopecks
+    + (whitelistAddonRequested && whitelistAddonAvailable ? whitelistAddonPriceKopecks : 0);
+  const checkoutTotalPrice = formatPrice(checkoutTotalKopecks);
   const purchasePrice = formatPrice(purchasePriceKopecks);
   const effectiveMonthlyPrice = formatPrice(
     Math.round((effectivePriceKopecks / Math.max(1, durationDays)) * 30),
@@ -149,6 +163,8 @@ export function PlanCard({
   const showManualPromoInput =
     promoOpen && (manualPromoOpen || suggestedPromoCodes.length === 0);
   const autoRenewalSupported = selectedProvider === "YOOKASSA";
+  const autoRenewalTermsCurrent = autoRenewalEnabled
+    && autoRenewalWhitelistAddonEnabled === whitelistAddonRequested;
 
   function selectDeviceLimit(value: number) {
     const nextValue = clampDeviceLimit(value, deviceLimit, normalizedMaxDeviceLimit);
@@ -189,7 +205,7 @@ export function PlanCard({
   async function buy() {
     const checkoutFingerprint = isPromoPlan
       ? `${id}:LOCAL`
-      : `${id}:${selectedDeviceLimit}:${selectedProvider}:${appliedPromo?.code ?? ""}:${autoRenewalRequested ? "AUTO" : "MANUAL"}`;
+      : `${id}:${selectedDeviceLimit}:${selectedProvider}:${appliedPromo?.code ?? ""}:${autoRenewalRequested ? "AUTO" : "MANUAL"}:${whitelistAddonRequested ? "ADDON" : "BASE"}`;
     if (checkoutAttemptRef.current?.fingerprint !== checkoutFingerprint) {
       checkoutAttemptRef.current = {
         key: crypto.randomUUID(),
@@ -239,6 +255,7 @@ export function PlanCard({
           deviceLimit: selectedDeviceLimit,
           provider: selectedProvider,
           idempotencyKey,
+          whitelistAddon: whitelistAddonRequested && whitelistAddonAvailable,
           ...(autoRenewalRequested
             ? {
                 autoRenewalConsent: true,
@@ -273,6 +290,7 @@ export function PlanCard({
       return;
     }
     setAutoRenewalRequested(false);
+    setWhitelistAddonRequested(autoRenewalEnabled && autoRenewalWhitelistAddonEnabled);
     setCheckoutConfirmOpen(true);
   }
 
@@ -788,12 +806,19 @@ export function PlanCard({
         ) : null}
 
         {!isPromoPlan && checkoutDisplay ? (
-          <div className="mt-3">
+          <div className="mt-3 space-y-3">
+            {whitelistAddonAvailable ? (
+              <WhitelistAddonChoice
+                requested={whitelistAddonRequested}
+                priceKopecks={whitelistAddonPriceKopecks}
+                onChange={setWhitelistAddonRequested}
+              />
+            ) : null}
             <AutoRenewalChoice
-              enabled={autoRenewalEnabled}
+              enabled={autoRenewalTermsCurrent}
               supported={autoRenewalSupported}
               requested={autoRenewalRequested}
-              price={effectivePrice}
+              price={checkoutTotalPrice}
               durationDays={durationDays}
               onChange={setAutoRenewalRequested}
             />
@@ -826,7 +851,7 @@ export function PlanCard({
                     : "Перейти к оплате"}
             </span>
             <span className="inline-flex shrink-0 items-center gap-2">
-              {!loading && !isPromoPlan ? <span className="tabular-nums">{effectivePrice}</span> : null}
+              {!loading && !isPromoPlan ? <span className="tabular-nums">{checkoutTotalPrice}</span> : null}
               <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
             </span>
           </button>
@@ -848,7 +873,7 @@ export function PlanCard({
           </button>
           <button type="button" className="btn-primary min-w-[12rem] justify-between" disabled={loading} onClick={() => void buy()}>
             <span>{loading ? "Создаём платёж..." : "Оплатить"}</span>
-            <span className="tabular-nums">{effectivePrice}</span>
+            <span className="tabular-nums">{checkoutTotalPrice}</span>
           </button>
         </div>
       )}
@@ -859,20 +884,68 @@ export function PlanCard({
             <div className="truncate text-sm font-semibold text-slate-950 dark:text-white">{name}</div>
             <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">{durationDays} дней · {paymentProviders.find((provider) => provider.id === selectedProvider)?.label}</div>
           </div>
-          <div className="shrink-0 text-lg font-semibold tabular-nums text-slate-950 dark:text-white">{effectivePrice}</div>
+          <div className="shrink-0 text-lg font-semibold tabular-nums text-slate-950 dark:text-white">{checkoutTotalPrice}</div>
         </div>
 
+        {whitelistAddonAvailable ? (
+          <WhitelistAddonChoice
+            requested={whitelistAddonRequested}
+            priceKopecks={whitelistAddonPriceKopecks}
+            onChange={setWhitelistAddonRequested}
+          />
+        ) : null}
+
         <AutoRenewalChoice
-          enabled={autoRenewalEnabled}
+          enabled={autoRenewalTermsCurrent}
           supported={autoRenewalSupported}
           requested={autoRenewalRequested}
-          price={effectivePrice}
+          price={checkoutTotalPrice}
           durationDays={durationDays}
           onChange={setAutoRenewalRequested}
         />
       </div>
     </Modal>
     </>
+  );
+}
+
+function WhitelistAddonChoice({
+  requested,
+  priceKopecks,
+  onChange,
+}: {
+  requested: boolean;
+  priceKopecks: number;
+  onChange: (value: boolean) => void;
+}) {
+  return (
+    <div className={cn(
+      "rounded-2xl border p-4",
+      requested
+        ? "border-amber-200 bg-amber-50/70 dark:border-amber-400/20 dark:bg-amber-400/[0.06]"
+        : "border-slate-200 bg-white dark:border-white/[0.09] dark:bg-white/[0.02]",
+    )}>
+      <div className="flex items-start gap-3">
+        <span className={cn(
+          "grid h-10 w-10 shrink-0 place-items-center rounded-xl",
+          requested
+            ? "bg-amber-500/10 text-amber-700 dark:text-amber-300"
+            : "bg-slate-100 text-slate-500 dark:bg-white/[0.06] dark:text-slate-400",
+        )}>
+          <Globe2 className="h-5 w-5" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="font-semibold text-slate-950 dark:text-white">Белые списки</div>
+          <Checkbox
+            className="mt-2"
+            checked={requested}
+            onChange={(event) => onChange(event.target.checked)}
+            label={`Добавить за ${formatPrice(priceKopecks)}`}
+            description="Доступ к специальным серверам на весь оплачиваемый период."
+          />
+        </div>
+      </div>
+    </div>
   );
 }
 

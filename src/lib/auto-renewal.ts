@@ -12,6 +12,10 @@ import {
   calculatePlanPurchase,
   type DevicePricedPlan,
 } from './plan-purchase'
+import {
+  buildBundledWhitelistAddonSnapshot,
+  readBundledWhitelistAddonSnapshot,
+} from './whitelist-addon'
 
 const HOUR_MS = 60 * 60 * 1000
 const DEFAULT_LEAD_HOURS = 24
@@ -34,6 +38,9 @@ export async function getAutoRenewalState(userId: string) {
           deviceLimit: true,
           maxDeviceLimit: true,
           extraDevicePriceKopecks: true,
+          whitelistAddonEnabled: true,
+          whitelistAddonPriceKopecks: true,
+          whitelistAddonInternalSquads: true,
         },
       },
     },
@@ -50,6 +57,7 @@ export async function getAutoRenewalState(userId: string) {
     consentPriceKopecks: setting.consentPriceKopecks,
     consentDurationDays: setting.consentDurationDays,
     deviceLimit: setting.deviceLimit,
+    whitelistAddonEnabled: setting.whitelistAddonEnabled,
     nextChargeAt: setting.nextChargeAt,
     retryCount: setting.retryCount,
     lastAttemptAt: setting.lastAttemptAt,
@@ -72,7 +80,7 @@ export async function enableAutoRenewal(input: {
     prisma.subscription.findFirst({
       where: { userId: input.userId, status: { in: ['ACTIVE', 'LIMITED'] } },
       orderBy: { expireAt: 'desc' },
-      select: { expireAt: true, planId: true, deviceLimit: true },
+      select: { expireAt: true, planId: true, deviceLimit: true, whitelistAddonActive: true },
     }),
   ])
   if (!plan || plan.isPromo || plan.priceKopecks <= 0) {
@@ -83,6 +91,14 @@ export async function enableAutoRenewal(input: {
   }
   const deviceLimit = subscription.deviceLimit ?? plan.deviceLimit
   const pricing = calculateAutoRenewalPurchase(plan, deviceLimit)
+  const whitelistAddonEnabled = Boolean(
+    subscription.whitelistAddonActive
+    && plan.whitelistAddonEnabled
+    && plan.whitelistAddonPriceKopecks > 0
+    && plan.whitelistAddonInternalSquads.length > 0
+  )
+  const consentPriceKopecks = pricing.originalAmountKopecks
+    + (whitelistAddonEnabled ? plan.whitelistAddonPriceKopecks : 0)
 
   const existing = await prisma.autoRenewal.findUnique({ where: { userId: input.userId } })
   const hasMethod = Boolean(existing?.paymentMethodIdEncrypted)
@@ -95,9 +111,10 @@ export async function enableAutoRenewal(input: {
       status: 'AWAITING_PAYMENT_METHOD',
       consentAcceptedAt,
       consentVersion: AUTO_RENEWAL_CONSENT_VERSION,
-      consentPriceKopecks: pricing.originalAmountKopecks,
+      consentPriceKopecks,
       consentDurationDays: plan.durationDays,
       deviceLimit,
+      whitelistAddonEnabled,
       nextChargeAt: null,
     },
     update: {
@@ -105,9 +122,10 @@ export async function enableAutoRenewal(input: {
       status: hasMethod ? 'ACTIVE' : 'AWAITING_PAYMENT_METHOD',
       consentAcceptedAt,
       consentVersion: AUTO_RENEWAL_CONSENT_VERSION,
-      consentPriceKopecks: pricing.originalAmountKopecks,
+      consentPriceKopecks,
       consentDurationDays: plan.durationDays,
       deviceLimit,
+      whitelistAddonEnabled,
       nextChargeAt: hasMethod && subscription ? chargeAt(subscription.expireAt) : null,
       retryCount: 0,
       lastFailurePaymentId: null,
@@ -182,6 +200,7 @@ export async function captureSavedPaymentMethod(input: {
       deviceLimit: true,
       autoRenewalConsentAcceptedAt: true,
       autoRenewalConsentVersion: true,
+      addonSnapshot: true,
       plan: {
         select: {
           priceKopecks: true,
@@ -189,6 +208,9 @@ export async function captureSavedPaymentMethod(input: {
           deviceLimit: true,
           maxDeviceLimit: true,
           extraDevicePriceKopecks: true,
+          whitelistAddonEnabled: true,
+          whitelistAddonPriceKopecks: true,
+          whitelistAddonInternalSquads: true,
         },
       },
     },
@@ -217,6 +239,10 @@ export async function captureSavedPaymentMethod(input: {
   })
   const deviceLimit = payment.deviceLimit ?? subscription?.deviceLimit ?? payment.plan.deviceLimit
   const pricing = calculateAutoRenewalPurchase(payment.plan, deviceLimit)
+  const bundledWhitelistAddon = readBundledWhitelistAddonSnapshot(payment.addonSnapshot)
+  const whitelistAddonEnabled = Boolean(bundledWhitelistAddon)
+  const consentPriceKopecks = pricing.originalAmountKopecks
+    + (bundledWhitelistAddon?.priceKopecks ?? 0)
   const consentAcceptedAt = checkoutConsentCurrent
     ? payment.autoRenewalConsentAcceptedAt!
     : setting!.consentAcceptedAt!
@@ -231,9 +257,10 @@ export async function captureSavedPaymentMethod(input: {
       paymentMethodSavedAt: new Date(),
       consentAcceptedAt,
       consentVersion: AUTO_RENEWAL_CONSENT_VERSION,
-      consentPriceKopecks: pricing.originalAmountKopecks,
+      consentPriceKopecks,
       consentDurationDays: payment.plan.durationDays,
       deviceLimit,
+      whitelistAddonEnabled,
       nextChargeAt: subscription?.planId === payment.planId ? chargeAt(subscription.expireAt) : null,
     },
     update: {
@@ -246,9 +273,10 @@ export async function captureSavedPaymentMethod(input: {
         ? {
             consentAcceptedAt,
             consentVersion: AUTO_RENEWAL_CONSENT_VERSION,
-            consentPriceKopecks: pricing.originalAmountKopecks,
+            consentPriceKopecks,
             consentDurationDays: payment.plan.durationDays,
             deviceLimit,
+            whitelistAddonEnabled,
           }
         : {}),
       nextChargeAt: subscription?.planId === payment.planId ? chargeAt(subscription.expireAt) : null,
@@ -300,6 +328,9 @@ export async function refreshAutoRenewalSchedule(userId: string, paymentId?: str
             deviceLimit: true,
             maxDeviceLimit: true,
             extraDevicePriceKopecks: true,
+            whitelistAddonEnabled: true,
+            whitelistAddonPriceKopecks: true,
+            whitelistAddonInternalSquads: true,
           },
         },
       },
@@ -311,10 +342,21 @@ export async function refreshAutoRenewalSchedule(userId: string, paymentId?: str
   if (!subscription?.plan || subscription.plan.isPromo || subscription.plan.priceKopecks <= 0) return
   const subscriptionDeviceLimit = subscription.deviceLimit ?? subscription.plan.deviceLimit
   const currentPricing = tryCalculateAutoRenewalPurchase(subscription.plan, subscriptionDeviceLimit)
+  const addonConfigurationValid = !setting.whitelistAddonEnabled || (
+    subscription.plan.whitelistAddonEnabled
+    && subscription.plan.whitelistAddonPriceKopecks > 0
+    && subscription.plan.whitelistAddonInternalSquads.length > 0
+    && subscription.whitelistAddonActive
+  )
+  const currentPriceKopecks = currentPricing
+    ? currentPricing.originalAmountKopecks
+      + (setting.whitelistAddonEnabled ? subscription.plan.whitelistAddonPriceKopecks : 0)
+    : null
   const consentCurrent = (
     setting.planId === subscription.plan.id
     && setting.deviceLimit === subscriptionDeviceLimit
-    && setting.consentPriceKopecks === currentPricing?.originalAmountKopecks
+    && addonConfigurationValid
+    && setting.consentPriceKopecks === currentPriceKopecks
     && setting.consentDurationDays === subscription.plan.durationDays
   )
   await prisma.autoRenewal.update({
@@ -406,9 +448,19 @@ export async function processDueAutoRenewals(options?: { limit?: number; shouldS
 
 async function createAutoRenewalPayment(setting: DueAutoRenewal) {
   const pricing = tryCalculateAutoRenewalPurchase(setting.plan, setting.deviceLimit)
+  const addonConfigurationValid = !setting.whitelistAddonEnabled || (
+    setting.plan.whitelistAddonEnabled
+    && setting.plan.whitelistAddonPriceKopecks > 0
+    && setting.plan.whitelistAddonInternalSquads.length > 0
+  )
+  const totalAmountKopecks = pricing
+    ? pricing.originalAmountKopecks
+      + (setting.whitelistAddonEnabled ? setting.plan.whitelistAddonPriceKopecks : 0)
+    : null
   if (
     !pricing
-    || setting.consentPriceKopecks !== pricing.originalAmountKopecks
+    || !addonConfigurationValid
+    || setting.consentPriceKopecks !== totalAmountKopecks
     || setting.consentDurationDays !== setting.plan.durationDays
   ) {
     await prisma.autoRenewal.update({
@@ -439,15 +491,25 @@ async function createAutoRenewalPayment(setting: DueAutoRenewal) {
 
   const localPayment = await prisma.$transaction(async (tx) => {
     const planSnapshot = buildPlanPurchaseSnapshot(setting.plan, pricing)
+    const addonSnapshot = setting.whitelistAddonEnabled
+      ? buildBundledWhitelistAddonSnapshot({
+          planId: setting.plan.id,
+          priceKopecks: setting.plan.whitelistAddonPriceKopecks,
+          internalSquads: setting.plan.whitelistAddonInternalSquads,
+        })
+      : null
     const payment = await tx.payment.create({
       data: {
         userId: setting.userId,
         planId: setting.planId,
         autoRenewalId: setting.id,
-        amountKopecks: pricing.originalAmountKopecks,
-        originalAmountKopecks: pricing.originalAmountKopecks,
+        amountKopecks: totalAmountKopecks!,
+        originalAmountKopecks: totalAmountKopecks!,
         deviceLimit: pricing.selectedDeviceLimit,
         planSnapshot: planSnapshot as unknown as Prisma.InputJsonValue,
+        ...(addonSnapshot
+          ? { addonSnapshot: addonSnapshot as unknown as Prisma.InputJsonValue }
+          : {}),
         provider: 'YOOKASSA',
         origin: 'AUTO_RENEWAL',
         providerStatus: 'pending',
@@ -464,7 +526,7 @@ async function createAutoRenewalPayment(setting: DueAutoRenewal) {
   try {
     const providerPayment = await createPayment({
       amount: localPayment.amountKopecks / 100,
-      description: buildPaymentServiceName(setting.plan.durationDays),
+      description: `${buildPaymentServiceName(setting.plan.durationDays)}${setting.whitelistAddonEnabled ? ' + белые списки' : ''}`,
       returnUrl: `${getAppUrl()}/dashboard/billing`,
       paymentMethodId: decryptPaymentSecret(setting.paymentMethodIdEncrypted!),
       metadata: {
@@ -473,6 +535,7 @@ async function createAutoRenewalPayment(setting: DueAutoRenewal) {
         localPaymentId: localPayment.id,
         autoRenewalId: setting.id,
         deviceLimit: String(pricing.selectedDeviceLimit),
+        ...(setting.whitelistAddonEnabled ? { whitelistAddon: 'true' } : {}),
       },
       idempotenceKey: localPayment.id,
     })

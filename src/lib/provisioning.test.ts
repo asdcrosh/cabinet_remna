@@ -226,6 +226,36 @@ describe('provisionPaymentSubscription', () => {
     })
   })
 
+  it('passes a bundled whitelist add-on to subscription provisioning', async () => {
+    mocks.prisma.payment.findUnique.mockResolvedValue({
+      id: 'pay-1',
+      purchaseType: 'SUBSCRIPTION',
+      addonSnapshot: {
+        type: 'WHITELIST_ADDON_BUNDLE',
+        name: 'Доступ к серверам с белыми списками',
+        planId: 'plan-1',
+        priceKopecks: 20000,
+        internalSquads: ['whitelist-squad'],
+      },
+      subscriptionProvisionedAt: null,
+      subscription: null,
+      provisioningJob: null,
+    })
+    mocks.prisma.provisioningJob.upsert.mockResolvedValue({ id: 'job-1', attempts: 1 })
+    mocks.ensureRemnawaveSubscription.mockResolvedValue({
+      subscription: mocks.subscription,
+      remnawaveUser: null,
+      isNew: false,
+      idempotent: false,
+    })
+
+    await provisionPaymentSubscription(input)
+
+    expect(mocks.ensureRemnawaveSubscription).toHaveBeenCalledWith(expect.objectContaining({
+      whitelistAddon: { internalSquads: ['whitelist-squad'] },
+    }))
+  })
+
   it('keeps provisioning successful when only the notification fails', async () => {
     mocks.prisma.payment.findUnique.mockResolvedValue({
       id: 'pay-1',

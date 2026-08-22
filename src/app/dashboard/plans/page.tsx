@@ -124,7 +124,11 @@ export default async function PlansPage({
     : 0
   const autoRenewalAvailable = paymentProviders.some((provider) => provider.id === 'YOOKASSA')
   const autoRenewalCurrentPrice = autoRenewal
-    ? currentAutoRenewalPrice(autoRenewal.plan, autoRenewal.deviceLimit)
+    ? currentAutoRenewalPrice(
+        autoRenewal.plan,
+        autoRenewal.deviceLimit,
+        autoRenewal.whitelistAddonEnabled
+      )
     : null
   const autoRenewalConsentCurrent = Boolean(
     autoRenewal
@@ -134,6 +138,7 @@ export default async function PlansPage({
     && autoRenewal.deviceLimit === (currentDeviceLimit ?? autoRenewal.plan.deviceLimit)
     && autoRenewal.consentPriceKopecks === autoRenewalCurrentPrice
     && autoRenewal.consentDurationDays === autoRenewal.plan.durationDays
+    && (!autoRenewal.whitelistAddonEnabled || currentSubscription?.whitelistAddonActive)
   )
   const activeAutoRenewal = Boolean(
     autoRenewalConsentCurrent
@@ -164,6 +169,10 @@ export default async function PlansPage({
     popular: plan.isFeatured,
     current: currentSubscription?.planId === plan.id,
     autoRenewalEnabled: autoRenewalConsentCurrent && autoRenewal?.plan.id === plan.id,
+    autoRenewalWhitelistAddonEnabled: autoRenewal?.plan.id === plan.id
+      && autoRenewal.whitelistAddonEnabled,
+    whitelistAddonEnabled: plan.whitelistAddonEnabled,
+    whitelistAddonPriceKopecks: plan.whitelistAddonPriceKopecks,
     initialPromoCode,
     availablePromoCodes: availablePromoCodesByPlan.get(plan.id) ?? [],
     paymentProviders,
@@ -277,11 +286,22 @@ function currentAutoRenewalPrice(
     deviceLimit: number
     maxDeviceLimit: number
     extraDevicePriceKopecks: number
+    whitelistAddonEnabled: boolean
+    whitelistAddonPriceKopecks: number
+    whitelistAddonInternalSquads: string[]
   },
-  deviceLimit: number
+  deviceLimit: number,
+  includeWhitelistAddon: boolean
 ) {
   try {
+    if (
+      includeWhitelistAddon
+      && (!plan.whitelistAddonEnabled
+        || plan.whitelistAddonPriceKopecks <= 0
+        || plan.whitelistAddonInternalSquads.length === 0)
+    ) return null
     return calculateAutoRenewalPurchase(plan, deviceLimit).originalAmountKopecks
+      + (includeWhitelistAddon ? plan.whitelistAddonPriceKopecks : 0)
   } catch {
     return null
   }

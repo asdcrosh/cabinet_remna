@@ -233,6 +233,34 @@ describe('payment create route', () => {
     })
   })
 
+  it('adds the whitelist add-on to a subscription checkout', async () => {
+    mocks.txPaymentCreate.mockResolvedValue({
+      ...localPayment,
+      amountKopecks: 50000,
+    })
+
+    const response = await POST(paymentRequest({ whitelistAddon: true }))
+
+    expect(response.status).toBe(200)
+    expect(mocks.txPaymentCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        purchaseType: 'SUBSCRIPTION',
+        amountKopecks: 50000,
+        originalAmountKopecks: 50000,
+        addonSnapshot: expect.objectContaining({
+          type: 'WHITELIST_ADDON_BUNDLE',
+          priceKopecks: 20000,
+          internalSquads: plan.whitelistAddonInternalSquads,
+        }),
+      }),
+    })
+    expect(mocks.createPayment).toHaveBeenCalledWith(expect.objectContaining({
+      amount: 500,
+      description: expect.stringContaining('белые списки'),
+      metadata: expect.objectContaining({ whitelistAddon: 'true' }),
+    }))
+  })
+
   it('records explicit auto-renewal consent and asks YooKassa to save the card', async () => {
     const response = await POST(paymentRequest({
       autoRenewalConsent: true,

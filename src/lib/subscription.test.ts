@@ -156,6 +156,48 @@ describe('ensureRemnawaveSubscription', () => {
     )
   })
 
+  it('activates a bundled whitelist add-on for the purchased period', async () => {
+    mocks.prisma.payment.findUnique.mockResolvedValue(null)
+    mocks.prisma.user.findUnique.mockResolvedValue({
+      id: 'user-1',
+      email: 'user@example.com',
+      remnawaveUuid: 'rw-1',
+      subscriptions: [{
+        id: 'sub-1',
+        planId: 'plan-1',
+        expireAt: new Date('2026-01-15T00:00:00.000Z'),
+        status: 'ACTIVE',
+      }],
+    })
+    mocks.remnawave.updateUser.mockResolvedValue({ response: remnawaveUser })
+    mocks.prisma.subscription.update.mockResolvedValue({ id: 'sub-1' })
+    mocks.prisma.payment.update.mockResolvedValue({})
+
+    await ensureRemnawaveSubscription({
+      userId: 'user-1',
+      email: 'user@example.com',
+      paymentId: 'pay-1',
+      plan,
+      whitelistAddon: { internalSquads: ['whitelist-squad'] },
+    })
+
+    expect(mocks.remnawave.updateUser).toHaveBeenCalledWith(
+      expect.objectContaining({ uuid: 'rw-1' }),
+      expect.objectContaining({
+        activeInternalSquads: ['squad-1', 'squad-2', 'whitelist-squad'],
+      })
+    )
+    expect(mocks.prisma.subscription.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          whitelistAddonActive: true,
+          whitelistAddonActivatedAt: expect.any(Date),
+          whitelistAddonPaymentId: 'pay-1',
+        }),
+      })
+    )
+  })
+
   it('starts a fresh period when switching to another plan', async () => {
     const currentExpireAt = new Date('2026-03-01T00:00:00.000Z')
     mocks.prisma.payment.findUnique.mockResolvedValue(null)
