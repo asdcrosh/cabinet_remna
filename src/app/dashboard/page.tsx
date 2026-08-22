@@ -18,7 +18,9 @@ import { logWarn } from '@/lib/logger'
 import { formatSubscriptionDaysLeft, isSubscriptionExpired } from '@/lib/subscription-time'
 import { getFreshPendingPaymentCutoff } from '@/lib/payment-sync'
 import { getFeatureFlags } from '@/lib/feature-flags'
+import { getAvailablePaymentProviders } from '@/lib/payment-providers'
 import { cn } from '@/lib/cn'
+import { HomeWhitelistAddon } from '@/components/dashboard/home-whitelist-addon'
 
 export const dynamic = 'force-dynamic'
 
@@ -27,7 +29,7 @@ export default async function DashboardHome() {
   if (!session) redirect('/login')
 
   const freshPendingCutoff = getFreshPendingPaymentCutoff()
-  const [features, user] = await Promise.all([
+  const [features, user, paymentProviders] = await Promise.all([
     getFeatureFlags(),
     prisma.user.findUnique({
       where: { id: session.uid },
@@ -42,6 +44,7 @@ export default async function DashboardHome() {
         _count: { select: { devices: true } },
       },
     }),
+    getAvailablePaymentProviders(),
   ])
   if (!user) {
     logWarn('auth.dashboard.stale_session_redirect', { userId: session.uid })
@@ -120,6 +123,21 @@ export default async function DashboardHome() {
           label: 'Управлять подключением',
           icon: <KeyRound className="h-4 w-4" />,
         }
+  const whitelistAddonOffer = subRow
+    && subRow.planId
+    && subRow.plan
+    && !subscriptionExpired
+    && ['ACTIVE', 'LIMITED'].includes(subRow.status)
+    && subRow.expireAt.getTime() > Date.now()
+    && subRow.plan.whitelistAddonEnabled
+    && subRow.plan.whitelistAddonPriceKopecks > 0
+    && subRow.plan.whitelistAddonInternalSquads.length > 0
+    ? {
+        planId: subRow.planId,
+        priceKopecks: subRow.plan.whitelistAddonPriceKopecks,
+        active: subRow.whitelistAddonActive,
+      }
+    : null
   return (
     <div className="user-workspace page-stack">
       <HomeHeader
@@ -198,6 +216,15 @@ export default async function DashboardHome() {
           </div>
         </div>
       </section>
+
+      {whitelistAddonOffer ? (
+        <HomeWhitelistAddon
+          planId={whitelistAddonOffer.planId}
+          priceKopecks={whitelistAddonOffer.priceKopecks}
+          active={whitelistAddonOffer.active}
+          paymentProviders={paymentProviders}
+        />
+      ) : null}
 
       <HomeQuickActions supportEnabled={features.support} />
     </div>

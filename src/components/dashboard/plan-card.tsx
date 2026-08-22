@@ -48,7 +48,6 @@ export interface PlanCardProps {
   promoCodesEnabled?: boolean;
   popular?: boolean;
   current?: boolean;
-  currentWhitelistAddonActive?: boolean;
   autoRenewalEnabled?: boolean;
   autoRenewalWhitelistAddonEnabled?: boolean;
   whitelistAddonEnabled?: boolean;
@@ -86,7 +85,6 @@ export function PlanCard({
   promoCodesEnabled = true,
   popular,
   current,
-  currentWhitelistAddonActive = false,
   autoRenewalEnabled = false,
   autoRenewalWhitelistAddonEnabled = false,
   whitelistAddonEnabled = false,
@@ -102,7 +100,6 @@ export function PlanCard({
   const [promoOpen, setPromoOpen] = useState(false);
   const [manualPromoOpen, setManualPromoOpen] = useState(false);
   const [checkoutConfirmOpen, setCheckoutConfirmOpen] = useState(false);
-  const [addonOnlyConfirmOpen, setAddonOnlyConfirmOpen] = useState(false);
   const [autoRenewalRequested, setAutoRenewalRequested] = useState(false);
   const [whitelistAddonRequested, setWhitelistAddonRequested] = useState(
     autoRenewalEnabled && autoRenewalWhitelistAddonEnabled,
@@ -272,48 +269,6 @@ export function PlanCard({
         window.location.href = confirmationUrl;
       } else if (redirectUrl) {
         window.location.href = redirectUrl;
-      } else {
-        toast("Не получили ссылку на оплату");
-      }
-    } catch (error) {
-      resetFailedCheckoutAttempt(error);
-      redirectToRequiredAction(error);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function buyWhitelistAddonOnly() {
-    if (!current || !whitelistAddonAvailable || currentWhitelistAddonActive) return;
-    if (paymentProviders.length === 0) {
-      toast("Оплата временно недоступна");
-      return;
-    }
-    const checkoutFingerprint = `${id}:${selectedProvider}:WHITELIST_ADDON_ONLY`;
-    if (checkoutAttemptRef.current?.fingerprint !== checkoutFingerprint) {
-      checkoutAttemptRef.current = {
-        key: crypto.randomUUID(),
-        fingerprint: checkoutFingerprint,
-      };
-    }
-
-    setLoading(true);
-    try {
-      const { confirmationUrl, redirectUrl } = await apiFetch<{
-        confirmationUrl?: string;
-        redirectUrl?: string;
-      }>("/api/payment/create", {
-        method: "POST",
-        body: JSON.stringify({
-          planId: id,
-          purchaseType: "WHITELIST_ADDON",
-          provider: selectedProvider,
-          idempotencyKey: checkoutAttemptRef.current.key,
-        }),
-      });
-      const paymentUrl = confirmationUrl ?? redirectUrl;
-      if (paymentUrl) {
-        window.location.href = paymentUrl;
       } else {
         toast("Не получили ссылку на оплату");
       }
@@ -850,38 +805,6 @@ export function PlanCard({
           </div>
         ) : null}
 
-        {!checkoutDisplay && current && whitelistAddonAvailable ? (
-          <div className={cn(
-            "mt-3 rounded-2xl border px-3 py-3",
-            currentWhitelistAddonActive
-              ? "border-emerald-200 bg-emerald-50/70 dark:border-emerald-400/20 dark:bg-emerald-400/[0.06]"
-              : "border-amber-200 bg-amber-50/70 dark:border-amber-400/20 dark:bg-amber-400/[0.06]",
-          )}>
-            <div className="flex items-center justify-between gap-3">
-              <div className="min-w-0">
-                <div className="text-sm font-semibold text-slate-950 dark:text-white">Белые списки</div>
-                <div className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                  {currentWhitelistAddonActive
-                    ? "Подключены до конца текущего тарифа"
-                    : `Можно докупить отдельно за ${formatPrice(whitelistAddonPriceKopecks)}`}
-                </div>
-              </div>
-              {currentWhitelistAddonActive ? (
-                <span className="shrink-0 text-xs font-semibold text-emerald-700 dark:text-emerald-300">Подключено</span>
-              ) : (
-                <button
-                  type="button"
-                  className="btn-secondary min-h-9 shrink-0 px-3 text-xs"
-                  onClick={() => setAddonOnlyConfirmOpen(true)}
-                  disabled={loading || paymentProviders.length === 0}
-                >
-                  Докупить
-                </button>
-              )}
-            </div>
-          </div>
-        ) : null}
-
         {!isPromoPlan && checkoutDisplay ? (
           <div className="mt-3 space-y-3">
             {whitelistAddonAvailable ? (
@@ -980,40 +903,6 @@ export function PlanCard({
           durationDays={durationDays}
           onChange={setAutoRenewalRequested}
         />
-      </div>
-    </Modal>
-    <Modal
-      open={addonOnlyConfirmOpen}
-      title="Докупить белые списки"
-      description="Текущий тариф повторно оплачивать не нужно"
-      panelClassName="sm:max-w-[30rem]"
-      onClose={() => {
-        if (!loading) setAddonOnlyConfirmOpen(false);
-      }}
-      footer={(
-        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-          <button type="button" className="btn-secondary" disabled={loading} onClick={() => setAddonOnlyConfirmOpen(false)}>
-            Назад
-          </button>
-          <button type="button" className="btn-primary min-w-[12rem] justify-between" disabled={loading} onClick={() => void buyWhitelistAddonOnly()}>
-            <span>{loading ? "Создаём платёж..." : "Оплатить"}</span>
-            <span className="tabular-nums">{formatPrice(whitelistAddonPriceKopecks)}</span>
-          </button>
-        </div>
-      )}
-    >
-      <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-4 dark:border-amber-400/20 dark:bg-amber-400/[0.06]">
-        <div className="flex items-start gap-3">
-          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-amber-500/10 text-amber-700 dark:text-amber-300">
-            <Globe2 className="h-5 w-5" />
-          </span>
-          <div>
-            <div className="font-semibold text-slate-950 dark:text-white">Серверы с белыми списками</div>
-            <p className="mt-1 text-sm leading-5 text-slate-600 dark:text-slate-300">
-              Доступ включится сразу после оплаты и будет действовать до окончания текущего тарифа.
-            </p>
-          </div>
-        </div>
       </div>
     </Modal>
     </>
