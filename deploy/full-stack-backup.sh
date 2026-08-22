@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="1.4.1"
+VERSION="1.5.0"
 INSTALL_PATH="${FULL_BACKUP_INSTALL_PATH:-/usr/local/bin/remna-backup}"
 BACKUP_DIR="${FULL_BACKUP_DIR:-/opt/remnawave-backups}"
 S3_CONFIG_FILE="${FULL_BACKUP_S3_CONFIG:-/etc/remna-backup-s3.conf}"
@@ -23,6 +23,8 @@ REMNASHOP_DB_SERVICE="${REMNASHOP_DB_SERVICE:-remnashop-db}"
 CABINET_DB_SERVICE="${CABINET_DB_SERVICE:-db}"
 LOCK_FILE="${FULL_BACKUP_LOCK_FILE:-/var/lock/remna-full-backup.lock}"
 MAX_AGE_HOURS="${FULL_BACKUP_MAX_AGE_HOURS:-48}"
+RESTORE_HEALTH_TIMEOUT="${FULL_RESTORE_HEALTH_TIMEOUT:-420}"
+RESTORE_STABLE_POLLS="${FULL_RESTORE_STABLE_POLLS:-3}"
 CLEANUP_PATHS=("")
 
 S3_ENDPOINT=""
@@ -64,13 +66,14 @@ trap cleanup_paths EXIT
 
 if [[ -t 1 ]]; then
   BOLD=$'\033[1m'
+  DIM=$'\033[2m'
   CYAN=$'\033[36m'
   GREEN=$'\033[32m'
   YELLOW=$'\033[33m'
   RED=$'\033[31m'
   RESET=$'\033[0m'
 else
-  BOLD="" CYAN="" GREEN="" YELLOW="" RED="" RESET=""
+  BOLD="" DIM="" CYAN="" GREEN="" YELLOW="" RED="" RESET=""
 fi
 
 info() { printf '%s\n' "${CYAN}[INFO]${RESET} $*"; }
@@ -93,6 +96,13 @@ require_commands() {
 
 require_tty() {
   [[ -r /dev/tty ]] || fail "Для этого действия нужен интерактивный терминал."
+}
+
+validate_restore_settings() {
+  [[ "${RESTORE_HEALTH_TIMEOUT}" =~ ^[0-9]+$ && "${RESTORE_HEALTH_TIMEOUT}" -ge 30 ]] \
+    || fail "FULL_RESTORE_HEALTH_TIMEOUT должен быть целым числом не меньше 30."
+  [[ "${RESTORE_STABLE_POLLS}" =~ ^[0-9]+$ && "${RESTORE_STABLE_POLLS}" -ge 1 ]] \
+    || fail "FULL_RESTORE_STABLE_POLLS должен быть положительным целым числом."
 }
 
 is_truthy() {
@@ -427,6 +437,157 @@ container_running() {
   [[ "$(docker inspect -f '{{.State.Running}}' "$1" 2>/dev/null || true)" == "true" ]]
 }
 
+restore_progress() {
+  local current="$1"
+  local total="$2"
+  local label="$3"
+  local state="${4:-active}"
+  local width=28 percent filled empty bar="" marker color
+  percent=$((current * 100 / total))
+  filled=$((percent * width / 100))
+  empty=$((width - filled))
+  ((filled > 0)) && printf -v bar '%*s' "${filled}" ''
+  bar="${bar// /━}"
+  if ((empty > 0)); then
+    local tail
+    printf -v tail '%*s' "${empty}" ''
+    bar+="${tail// /─}"
+  fi
+  case "${state}" in
+    done) marker="✓"; color="${GREEN}" ;;
+    failed) marker="×"; color="${RED}" ;;
+    *) marker="●"; color="${CYAN}" ;;
+  esac
+  printf '%b %s%b %b%s%b %3d%%  %s\n' \
+    "${color}" "${marker}" "${RESET}" "${color}" "${bar}" "${RESET}" "${percent}" "${label}"
+}
+
+stack_service_ids() {
+  local directory="$1"
+  local service="$2"
+  compose "${directory}" ps --all -q "${service}" 2>/dev/null || true
+}
+
+container_readiness() {
+  local container="$1"
+  local status health exit_code
+  status="$(docker inspect -f '{{.State.Status}}' "${container}" 2>/dev/null || true)"
+  health="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{end}}' "${container}" 2>/dev/null || true)"
+  exit_code="$(docker inspect -f '{{.State.ExitCode}}' "${container}" 2>/dev/null || true)"
+  if [[ "${status}" == "running" && ( -z "${health}" || "${health}" == "healthy" ) ]]; then
+    printf 'ready\n'
+  elif [[ "${status}" == "exited" && "${exit_code}" == "0" ]]; then
+    printf 'completed\n'
+  else
+    printf '%s\n' "${health:-${status:-missing}}"
+  fi
+}
+
+wait_for_stack() {
+  local label="$1"
+  local directory="$2"
+  local timeout="${3:-${RESTORE_HEALTH_TIMEOUT}}"
+  local started now elapsed ready total service id state stable=0
+  local -a services=()
+
+  while IFS= read -r service; do
+    [[ -n "${service}" ]] && services+=("${service}")
+  done < <(compose "${directory}" config --services)
+  ((${#services[@]} > 0)) || fail "${label}: в Compose не найдены сервисы."
+  started="$(date +%s)"
+
+  while true; do
+    ready=0
+    total=0
+    for service in "${services[@]}"; do
+      local -a ids=()
+      while IFS= read -r id; do
+        [[ -n "${id}" ]] && ids+=("${id}")
+      done < <(stack_service_ids "${directory}" "${service}")
+      if ((${#ids[@]} == 0)); then
+        total=$((total + 1))
+        continue
+      fi
+      for id in "${ids[@]}"; do
+        [[ -n "${id}" ]] || continue
+        total=$((total + 1))
+        state="$(container_readiness "${id}")"
+        if [[ "${state}" == "ready" || "${state}" == "completed" ]]; then
+          ready=$((ready + 1))
+        fi
+      done
+    done
+
+    now="$(date +%s)"
+    elapsed=$((now - started))
+    if ((total > 0 && ready == total)); then
+      stable=$((stable + 1))
+      if ((stable >= RESTORE_STABLE_POLLS)); then
+        if [[ -t 1 ]]; then
+          printf '\r\033[2K'
+        fi
+        printf '  %b✓%b %s: готовы все сервисы (%d/%d) за %d сек.\n' \
+          "${GREEN}" "${RESET}" "${label}" "${ready}" "${total}" "${elapsed}"
+        return 0
+      fi
+    else
+      stable=0
+    fi
+
+    if ((elapsed >= timeout)); then
+      [[ -t 2 ]] && printf '\r\033[2K' >&2
+      warn "${label}: сервисы не стали работоспособны за ${timeout} сек. (${ready}/${total})."
+      compose "${directory}" ps --all || true
+      printf '\nПоследние логи %s:\n' "${label}" >&2
+      compose "${directory}" logs --tail=60 || true
+      fail "Восстановление файлов и баз выполнено, но проверка ${label} не пройдена."
+    fi
+
+    if [[ -t 1 ]]; then
+      local -a frames=('◐' '◓' '◑' '◒')
+      local frame_index=$(((elapsed / 2) % 4))
+      printf '\r\033[2K  %b%s%b %s: запуск и health-check %d/%d, %d сек.' \
+        "${CYAN}" "${frames[frame_index]}" "${RESET}" "${label}" "${ready}" "${total}" "${elapsed}"
+    elif ((elapsed % 20 == 0)); then
+      info "${label}: ожидаем сервисы ${ready}/${total}, прошло ${elapsed} сек."
+    fi
+    sleep 2
+  done
+}
+
+start_and_wait_stack() {
+  local label="$1"
+  local directory="$2"
+  compose "${directory}" up -d
+  wait_for_stack "${label}" "${directory}"
+}
+
+wait_for_cabinet_http() {
+  local timeout="${1:-120}"
+  local app_port health_token started elapsed
+  command -v curl >/dev/null 2>&1 || fail "Кабинет: для итоговой HTTP-проверки нужен curl."
+  app_port="$(cabinet_env_value CABINET_APP_PORT)"
+  health_token="$(cabinet_env_value HEALTHCHECK_TOKEN)"
+  [[ -n "${app_port}" ]] || app_port="3000"
+  [[ -n "${health_token}" ]] || fail "Кабинет: HEALTHCHECK_TOKEN отсутствует в ${CABINET_ENV_FILE}."
+  started="$(date +%s)"
+  while true; do
+    if curl -fsS --max-time 8 \
+      -H "x-healthcheck-token: ${health_token}" \
+      "http://127.0.0.1:${app_port}/api/health" >/dev/null; then
+      ok "Кабинет: HTTP health и база отвечают."
+      return 0
+    fi
+    elapsed=$(( $(date +%s) - started ))
+    if ((elapsed >= timeout)); then
+      compose "${CABINET_DIR}" ps --all || true
+      compose "${CABINET_DIR}" logs --tail=60 app || true
+      fail "Кабинет запущен, но /api/health не ответил за ${timeout} сек."
+    fi
+    sleep 3
+  done
+}
+
 find_compose_file() {
   local directory="$1"
   local candidate
@@ -748,7 +909,7 @@ start_optional_nginx() {
   local nginx_dir="${REMNAWAVE_DIR}/nginx"
   if [[ -d "${nginx_dir}" ]] && find_compose_file "${nginx_dir}" >/dev/null; then
     info "Запускаем nginx Remnawave..."
-    compose "${nginx_dir}" up -d
+    start_and_wait_stack "Nginx Remnawave" "${nginx_dir}"
   fi
 }
 
@@ -756,7 +917,7 @@ start_optional_remnawave_subscription() {
   if [[ -d "${REMNAWAVE_SUBSCRIPTION_DIR}" ]] \
     && find_compose_file "${REMNAWAVE_SUBSCRIPTION_DIR}" >/dev/null; then
     info "Запускаем страницу подписки Remnawave..."
-    compose "${REMNAWAVE_SUBSCRIPTION_DIR}" up -d
+    start_and_wait_stack "Страница подписки" "${REMNAWAVE_SUBSCRIPTION_DIR}"
   fi
 }
 
@@ -764,6 +925,7 @@ restore_backup() {
   require_root
   require_commands
   require_docker
+  validate_restore_settings
   acquire_lock
   assert_safe_directory "${REMNAWAVE_DIR}"
   assert_safe_directory "${REMNASHOP_DIR}"
@@ -775,12 +937,12 @@ restore_backup() {
     fail "Восстановление перезапишет три установки. Запустите с RESTORE_CONFIRM=RESTORE_REMNAWAVE_REMNASHOP_CABINET"
   fi
 
-  local staging safety_dir
+  local staging safety_dir step=0 total_steps=12
   staging="$(mktemp -d /tmp/remna-full-restore.XXXXXX)"
   safety_dir="/opt/remna-pre-restore-$(date -u +%Y%m%d-%H%M%S)"
   CLEANUP_PATHS+=("${staging}")
 
-  info "Проверяем архив..."
+  step=$((step + 1)); restore_progress "${step}" "${total_steps}" "Проверка архива"
   tar -xzf "${archive}" -C "${staging}"
   (
     cd "${staging}"
@@ -797,8 +959,9 @@ restore_backup() {
   do
     [[ -f "${staging}/${required}" ]] || fail "В архиве отсутствует ${required}."
   done
+  restore_progress "${step}" "${total_steps}" "Архив проверен" done
 
-  info "Останавливаем текущие сервисы..."
+  step=$((step + 1)); restore_progress "${step}" "${total_steps}" "Остановка текущих сервисов"
   stop_component "${CABINET_DIR}"
   stop_component "${REMNASHOP_DIR}"
   if [[ -d "${REMNAWAVE_DIR}/nginx" ]]; then
@@ -808,7 +971,9 @@ restore_backup() {
     stop_component "${REMNAWAVE_SUBSCRIPTION_DIR}"
   fi
   stop_component "${REMNAWAVE_DIR}"
+  restore_progress "${step}" "${total_steps}" "Текущие сервисы остановлены" done
 
+  step=$((step + 1)); restore_progress "${step}" "${total_steps}" "Сохранение текущих файлов"
   mkdir -p "${safety_dir}"
   for directory in "${REMNAWAVE_DIR}" "${REMNASHOP_DIR}" "${CABINET_DIR}"; do
     if [[ -d "${directory}" ]]; then
@@ -816,24 +981,49 @@ restore_backup() {
     fi
   done
   warn "Предыдущие каталоги сохранены в ${safety_dir}."
+  restore_progress "${step}" "${total_steps}" "Страховочная копия создана" done
 
+  step=$((step + 1)); restore_progress "${step}" "${total_steps}" "Распаковка конфигурации"
   restore_directory_archive "${staging}/directories/remnawave.tar.gz" "${REMNAWAVE_DIR}"
   restore_directory_archive "${staging}/directories/remnashop.tar.gz" "${REMNASHOP_DIR}"
   restore_directory_archive "${staging}/directories/cabinet.tar.gz" "${CABINET_DIR}"
+  restore_progress "${step}" "${total_steps}" "Конфигурация восстановлена" done
 
+  step=$((step + 1)); restore_progress "${step}" "${total_steps}" "База Remnawave"
   restore_database "Remnawave" "${REMNAWAVE_DIR}" "${REMNAWAVE_DB_SERVICE}" "${REMNAWAVE_DB_CONTAINER}" "${staging}/databases/remnawave.dump"
-  compose "${REMNAWAVE_DIR}" up -d
-  start_optional_remnawave_subscription
+  restore_progress "${step}" "${total_steps}" "База Remnawave восстановлена" done
+  step=$((step + 1)); restore_progress "${step}" "${total_steps}" "Запуск Remnawave"
+  start_and_wait_stack "Remnawave" "${REMNAWAVE_DIR}"
+  restore_progress "${step}" "${total_steps}" "Remnawave работает" done
 
+  step=$((step + 1)); restore_progress "${step}" "${total_steps}" "База Remnashop"
   restore_database "Remnashop" "${REMNASHOP_DIR}" "${REMNASHOP_DB_SERVICE}" "${REMNASHOP_DB_CONTAINER}" "${staging}/databases/remnashop.dump"
   restore_remnashop_integration_access
-  compose "${REMNASHOP_DIR}" up -d
+  restore_progress "${step}" "${total_steps}" "База Remnashop восстановлена" done
+  step=$((step + 1)); restore_progress "${step}" "${total_steps}" "Запуск Remnashop"
+  start_and_wait_stack "Remnashop" "${REMNASHOP_DIR}"
+  restore_progress "${step}" "${total_steps}" "Remnashop работает" done
 
+  step=$((step + 1)); restore_progress "${step}" "${total_steps}" "База кабинета"
   restore_database "Кабинет" "${CABINET_DIR}" "${CABINET_DB_SERVICE}" "${CABINET_DB_CONTAINER}" "${staging}/databases/cabinet.dump"
-  compose "${CABINET_DIR}" up -d
-  start_optional_nginx
+  restore_progress "${step}" "${total_steps}" "База кабинета восстановлена" done
+  step=$((step + 1)); restore_progress "${step}" "${total_steps}" "Запуск кабинета"
+  start_and_wait_stack "Кабинет" "${CABINET_DIR}"
+  restore_progress "${step}" "${total_steps}" "Кабинет работает" done
 
-  ok "Восстановление завершено."
+  step=$((step + 1)); restore_progress "${step}" "${total_steps}" "Дополнительные сервисы"
+  start_optional_remnawave_subscription
+  start_optional_nginx
+  restore_progress "${step}" "${total_steps}" "Дополнительные сервисы проверены" done
+
+  step=$((step + 1)); restore_progress "${step}" "${total_steps}" "Итоговая проверка"
+  wait_for_stack "Remnawave" "${REMNAWAVE_DIR}" 60
+  wait_for_stack "Remnashop" "${REMNASHOP_DIR}" 60
+  wait_for_stack "Кабинет" "${CABINET_DIR}" 120
+  wait_for_cabinet_http 120
+  restore_progress "${step}" "${total_steps}" "Все сервисы работают" done
+
+  printf '\n%s\n' "${BOLD}${GREEN}Восстановление успешно завершено${RESET}"
   warn "Проверьте DNS, внешний IP, firewall и адреса узлов Remnawave."
   printf '%s\n' "Предыдущие файлы: ${safety_dir}"
 }
@@ -1435,6 +1625,8 @@ Remnawave Full Backup ${VERSION}
   FULL_BACKUP_KEEP_DAYS=${KEEP_DAYS}
   FULL_BACKUP_S3_CONFIG=${S3_CONFIG_FILE}
   FULL_BACKUP_SCHEDULE_CONFIG=${SCHEDULE_CONFIG_FILE}
+  FULL_RESTORE_HEALTH_TIMEOUT=${RESTORE_HEALTH_TIMEOUT}
+  FULL_RESTORE_STABLE_POLLS=${RESTORE_STABLE_POLLS}
   REMNAWAVE_DIR=${REMNAWAVE_DIR}
   REMNAWAVE_SUBSCRIPTION_DIR=${REMNAWAVE_SUBSCRIPTION_DIR}
   REMNASHOP_DIR=${REMNASHOP_DIR}
