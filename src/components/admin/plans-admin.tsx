@@ -660,6 +660,19 @@ function PlanEditor({
       : [...selectedAddon, uuid]
     set('whitelistAddonInternalSquads', next.join('\n'))
   }
+  const toggleWhitelistAddon = (enabled: boolean) => {
+    setForm((current) => ({
+      ...current,
+      whitelistAddonEnabled: enabled,
+      whitelistAddonPriceRub: enabled && Number(current.whitelistAddonPriceRub) <= 0
+        ? '200'
+        : current.whitelistAddonPriceRub,
+    }))
+  }
+  const addonPriceInvalid = form.whitelistAddonEnabled
+    && (!Number.isFinite(Number(form.whitelistAddonPriceRub)) || Number(form.whitelistAddonPriceRub) <= 0)
+  const addonSquadsInvalid = form.whitelistAddonEnabled && selectedAddon.size === 0
+  const addonConfigurationInvalid = addonPriceInvalid || addonSquadsInvalid
 
   return (
     <div className="space-y-5">
@@ -728,7 +741,7 @@ function PlanEditor({
         <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(12rem,.45fr)]">
           <Toggle
             checked={form.whitelistAddonEnabled}
-            onChange={(value) => set('whitelistAddonEnabled', value)}
+            onChange={toggleWhitelistAddon}
             label="Разрешить покупку дополнения"
             description="Показывать предложение в активной подписке"
           />
@@ -741,9 +754,20 @@ function PlanEditor({
               min={0}
               step="0.01"
               disabled={!form.whitelistAddonEnabled}
+              aria-invalid={addonPriceInvalid}
             />
           </Field>
         </div>
+        {form.whitelistAddonEnabled ? (
+          <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-950 dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-amber-100">
+            Укажите цену и выберите ниже серверные группы с белыми списками. Они будут добавлены к текущему тарифу до конца оплаченного периода.
+          </div>
+        ) : null}
+        {addonPriceInvalid ? (
+          <p className="mt-2 text-sm font-medium text-red-600 dark:text-red-300">
+            Цена дополнения должна быть больше нуля.
+          </p>
+        ) : null}
         <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
           {squads.map((squad) => (
             <button
@@ -765,6 +789,11 @@ function PlanEditor({
             </button>
           ))}
         </div>
+        {addonSquadsInvalid ? (
+          <p className="mt-2 text-sm font-medium text-red-600 dark:text-red-300">
+            Выберите хотя бы одну серверную группу.
+          </p>
+        ) : null}
         <details className="mt-4 rounded-2xl border border-slate-200 bg-white px-3 py-2.5 dark:border-white/10 dark:bg-surface-900/60">
           <summary className="cursor-pointer text-xs font-medium text-slate-500">Ручной ввод UUID групп дополнения</summary>
           <textarea
@@ -844,7 +873,7 @@ function PlanEditor({
       </div>
 
       <div className="sticky -bottom-5 -mx-4 flex justify-end border-t border-slate-200 bg-white/95 px-4 py-3 backdrop-blur dark:border-white/10 dark:bg-surface-900/95 sm:-mx-6 sm:px-6">
-        <button type="button" className="btn-primary w-full sm:w-auto" onClick={onSubmit} disabled={loading}>
+        <button type="button" className="btn-primary w-full sm:w-auto" onClick={onSubmit} disabled={loading || addonConfigurationInvalid}>
           {loading ? 'Сохраняем...' : submitLabel}
         </button>
       </div>
