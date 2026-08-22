@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="1.8.0"
+VERSION="1.9.0"
 BRANCH="${BRANCH:-main}"
 RAW_BASE_URL="${RAW_BASE_URL:-https://raw.githubusercontent.com/asdcrosh/cabinet_remna/${BRANCH}}"
 GITHUB_API_URL="${GITHUB_API_URL:-https://api.github.com/repos/asdcrosh/cabinet_remna/commits/${BRANCH}}"
@@ -33,6 +33,8 @@ ENV_SCHEMA_SYNCED=0
 ENV_SYNC_NOTICE=""
 RESOLVED_RELEASE_SHA=""
 VERIFIED_RELEASE_RAW_BASE_URL=""
+STATUS_FRAME=0
+MENU_CHOICE=""
 
 if [[ -t 1 ]]; then
   BOLD=$'\033[1m'
@@ -129,19 +131,19 @@ container_state() {
 }
 
 state_label() {
-  printf '%s%s%s' "$(state_color "${1:-}")" "$(state_text "${1:-}")" "${RESET}"
+  printf '%s%s[ %s ]%s' "$(state_color "${1:-}")" "${BOLD}" "$(state_text "${1:-}")" "${RESET}"
 }
 
 state_text() {
   case "${1:-}" in
-    healthy) printf 'исправен' ;;
-    running) printf 'запущен' ;;
-    starting) printf 'проверяется' ;;
-    unhealthy) printf 'неисправен' ;;
-    restarting) printf 'перезапуск' ;;
-    created) printf 'создан' ;;
-    exited|dead|removing|paused) printf 'остановлен' ;;
-    "не найден"|"") printf 'не найден' ;;
+    healthy) printf 'В НОРМЕ' ;;
+    running) printf 'ЗАПУЩЕН' ;;
+    starting) printf 'ЗАПУСК' ;;
+    unhealthy) printf 'СБОЙ' ;;
+    restarting) printf 'ПЕРЕЗАПУСК' ;;
+    created) printf 'СОЗДАН' ;;
+    exited|dead|removing|paused) printf 'ОСТАНОВЛЕН' ;;
+    "не найден"|"") printf 'НЕТ' ;;
     *) printf '%s' "$1" ;;
   esac
 }
@@ -166,9 +168,12 @@ print_service_state() {
 }
 
 state_marker() {
+  local frame=$((STATUS_FRAME % 4))
+  local -a healthy_frames=('●' '◉' '●' '◉')
+  local -a pending_frames=('◐' '◓' '◑' '◒')
   case "${1:-}" in
-    healthy|running) printf '%s' "${GREEN}●${RESET}" ;;
-    starting|restarting|created) printf '%s' "${YELLOW}◐${RESET}" ;;
+    healthy|running) printf '%s' "${GREEN}${healthy_frames[frame]}${RESET}" ;;
+    starting|restarting|created) printf '%s' "${YELLOW}${pending_frames[frame]}${RESET}" ;;
     unhealthy) printf '%s' "${RED}×${RESET}" ;;
     exited|dead|removing|paused) printf '%s' "${RED}●${RESET}" ;;
     *) printf '%s' "${DIM}○${RESET}" ;;
@@ -179,9 +184,7 @@ print_status_row() {
   local marker="$1"
   local label="$2"
   local value="$3"
-  local padding=$((16 - ${#label}))
-  (( padding > 0 )) || padding=1
-  printf '  %b  %s%*s%b\n' "${marker}" "${label}" "${padding}" "" "${value}"
+  printf '  %b  %s%b\n' "${marker}" "$(pad_text "${label}" 16)" "${value}"
 }
 
 pad_text() {
@@ -202,19 +205,15 @@ print_menu_row() {
     "${CYAN}" "${right_number}" "${RESET}" "$(pad_text "${right_label}" 22)"
 }
 
-print_menu_single() {
-  printf '  │ %s%s%s  %s │\n' "${CYAN}" "$1" "${RESET}" "$(pad_text "$2" 49)"
-}
-
 print_service_grid_row() {
   local left_label="$1" left_container="$2" right_label="$3" right_container="$4"
   local left_state right_state
   left_state="$(container_state "${left_container}")"
   right_state="$(container_state "${right_container}")"
   printf '  %b  %s %b%s%b  %b  %s %b%s%b\n' \
-    "$(state_marker "${left_state}")" "$(pad_text "${left_label}" 10)" "$(state_color "${left_state}")" \
-    "$(pad_text "$(state_text "${left_state}")" 12)" "${RESET}" "$(state_marker "${right_state}")" \
-    "$(pad_text "${right_label}" 10)" "$(state_color "${right_state}")" "$(state_text "${right_state}")" "${RESET}"
+    "$(state_marker "${left_state}")" "$(pad_text "${left_label}" 11)" "$(state_color "${left_state}")${BOLD}" \
+    "$(pad_text "[ $(state_text "${left_state}") ]" 14)" "${RESET}" "$(state_marker "${right_state}")" \
+    "$(pad_text "${right_label}" 11)" "$(state_color "${right_state}")${BOLD}" "[ $(state_text "${right_state}") ]" "${RESET}"
 }
 
 env_value() {
@@ -533,8 +532,8 @@ check_update_status() {
 
 print_update_status_key() {
   case "${1:-unknown}" in
-    latest|current) print_status_row "${GREEN}●${RESET}" "Обновление" "${GREEN}не требуется${RESET}" ;;
-    available) print_status_row "${YELLOW}↑${RESET}" "Обновление" "${YELLOW}${BOLD}доступно${RESET}" ;;
+    latest|current) print_status_row "$(state_marker healthy)" "Обновление" "${GREEN}${BOLD}[ АКТУАЛЬНО ]${RESET}" ;;
+    available) print_status_row "${YELLOW}↑${RESET}" "Обновление" "${YELLOW}${BOLD}[ ДОСТУПНО ]${RESET}" ;;
     check-failed|check_failed|unknown) print_status_row "${DIM}○${RESET}" "Обновление" "${DIM}проверим позже${RESET}" ;;
     version-unknown|version_unknown) print_status_row "${YELLOW}○${RESET}" "Обновление" "${YELLOW}версия не определена${RESET}" ;;
     docker-unavailable|docker_unavailable) print_status_row "${YELLOW}○${RESET}" "Обновление" "${YELLOW}Docker недоступен${RESET}" ;;
@@ -603,8 +602,8 @@ PY
 )"
   IFS='|' read -r status revision finished_at <<<"${summary}"
   case "${status}" in
-    success) print_status_row "${GREEN}●${RESET}" "Деплой" "${GREEN}успешно ${revision}${RESET}" ;;
-    deploying) print_status_row "${YELLOW}●${RESET}" "Деплой" "${YELLOW}выполняется ${revision}${RESET}" ;;
+    success) print_status_row "$(state_marker healthy)" "Деплой" "${GREEN}${BOLD}[ УСПЕШНО ]${RESET} ${DIM}${revision}${RESET}" ;;
+    deploying) print_status_row "$(state_marker starting)" "Деплой" "${YELLOW}${BOLD}[ ВЫПОЛНЯЕТСЯ ]${RESET} ${revision}" ;;
     rolled_back) print_status_row "${RED}↶${RESET}" "Деплой" "${RED}откат ${revision}${RESET}" ;;
     failed) print_status_row "${RED}●${RESET}" "Деплой" "${RED}ошибка${RESET}" ;;
   esac
@@ -780,7 +779,8 @@ show_status() {
     return
   fi
 
-  printf '%s\n' "${BOLD}  Сервисы кабинета${RESET}"
+  printf '%s\n' "${BOLD}  СОСТОЯНИЕ СЕРВИСОВ${RESET}"
+  printf '%s\n' "${DIM}  ─────────────────────────────────────────────────────────${RESET}"
   print_service_grid_row "Кабинет" "remnawave-cabinet-app" "База" "remnawave-cabinet-db"
   print_service_grid_row "Платежи" "remnawave-cabinet-worker" "Рассылки" "remnawave-cabinet-broadcast-worker"
   print_service_grid_row "Watch" "remnawave-cabinet-watch-worker" "Ноды" "remnawave-cabinet-node-provisioning-worker"
@@ -946,8 +946,8 @@ restore_backup() {
 }
 
 show_header() {
-  clear 2>/dev/null || true
-  printf '%s\n' "${BOLD}${CYAN}Remnawave Cabinet${RESET}  ${DIM}v${VERSION}${RESET}"
+  printf '\033[H\033[2J'
+  printf '%s\n' "${BOLD}${CYAN}REMNAWAVE CABINET${RESET}  ${DIM}v${VERSION}${RESET}"
   printf '%s\n' "${DIM}${CABINET_DIR}${RESET}"
   printf '\n'
   show_status
@@ -962,14 +962,15 @@ show_menu() {
   show_header
   printf '\n'
   if cabinet_installed; then
-    printf '%s\n' '  ╭──────────────────────────╮──────────────────────────╮'
+    printf '%s\n' "${BOLD}  УПРАВЛЕНИЕ${RESET}"
+    printf '%s\n' "${DIM}${CYAN}  ╭───────────────────────────┬───────────────────────────╮${RESET}"
     print_menu_row "1" "Обновить кабинет" "6" "Проверить .env"
     print_menu_row "2" "Перезапустить" "7" "Логи"
     print_menu_row "3" "Диагностика" "8" "Бэкапы"
     print_menu_row "4" "Настроить ноды" "9" "Обновить cabinetctl"
-    print_menu_single "5" "Открыть .env"
-    printf '%s\n' '  ╰──────────────────────────╯──────────────────────────╯'
-    printf '\n  %s0%s  Выход\n' "${DIM}" "${RESET}"
+    print_menu_row "5" "Открыть .env" " " ""
+    printf '%s\n' "${DIM}${CYAN}  ╰───────────────────────────┴───────────────────────────╯${RESET}"
+    printf '\n  %s[ 0 ]%s  Выход\n' "${DIM}" "${RESET}"
   else
     printf '  %s1%s  Установить кабинет\n' "${CYAN}" "${RESET}"
     printf '  %s2%s  Диагностика\n' "${CYAN}" "${RESET}"
@@ -977,7 +978,33 @@ show_menu() {
     printf '  %s8%s  Обновить cabinetctl\n' "${CYAN}" "${RESET}"
     printf '\n  %s0%s  Выход\n' "${DIM}" "${RESET}"
   fi
-  printf '\n%s›%s ' "${CYAN}" "${RESET}" >/dev/tty
+  printf '\n  %sВыберите пункт%s  %sEnter не нужен%s' \
+    "${CYAN}${BOLD}" "${RESET}" "${DIM}" "${RESET}" >/dev/tty
+}
+
+show_terminal_cursor() {
+  printf '\033[?25h' 2>/dev/null >/dev/tty || true
+}
+
+read_animated_menu_choice() {
+  local read_status
+  MENU_CHOICE=""
+  printf '\033[?25l' 2>/dev/null >/dev/tty || return 1
+  while [[ -z "${MENU_CHOICE}" ]]; do
+    show_menu
+    if IFS= read -r -s -n 1 -t 1 MENU_CHOICE 2>/dev/null </dev/tty; then
+      [[ -n "${MENU_CHOICE}" ]] && break
+    else
+      read_status=$?
+      if ((read_status == 1)); then
+        show_terminal_cursor
+        return 1
+      fi
+    fi
+    STATUS_FRAME=$(((STATUS_FRAME + 1) % 4))
+  done
+  show_terminal_cursor
+  printf '\r\033[2K  %s›%s %s\n' "${CYAN}" "${RESET}" "${MENU_CHOICE}" >/dev/tty
 }
 
 run_menu() {
@@ -987,11 +1014,12 @@ run_menu() {
   }
 
   sync_env_schema
+  trap show_terminal_cursor EXIT
 
   while true; do
-    show_menu
     local choice
-    IFS= read -r choice </dev/tty || exit 0
+    read_animated_menu_choice || exit 0
+    choice="${MENU_CHOICE}"
     printf '\n'
     if cabinet_installed; then
       case "${choice}" in
