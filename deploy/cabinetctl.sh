@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="1.9.0"
+VERSION="1.9.1"
 BRANCH="${BRANCH:-main}"
 RAW_BASE_URL="${RAW_BASE_URL:-https://raw.githubusercontent.com/asdcrosh/cabinet_remna/${BRANCH}}"
 GITHUB_API_URL="${GITHUB_API_URL:-https://api.github.com/repos/asdcrosh/cabinet_remna/commits/${BRANCH}}"
@@ -33,7 +33,6 @@ ENV_SCHEMA_SYNCED=0
 ENV_SYNC_NOTICE=""
 RESOLVED_RELEASE_SHA=""
 VERIFIED_RELEASE_RAW_BASE_URL=""
-STATUS_FRAME=0
 MENU_CHOICE=""
 
 if [[ -t 1 ]]; then
@@ -43,9 +42,10 @@ if [[ -t 1 ]]; then
   GREEN=$'\033[32m'
   YELLOW=$'\033[33m'
   RED=$'\033[31m'
+  BLINK=$'\033[5m'
   RESET=$'\033[0m'
 else
-  BOLD="" DIM="" CYAN="" GREEN="" YELLOW="" RED="" RESET=""
+  BOLD="" DIM="" CYAN="" GREEN="" YELLOW="" RED="" BLINK="" RESET=""
 fi
 
 info() { printf '%s\n' "${CYAN}•${RESET} $*"; }
@@ -168,12 +168,9 @@ print_service_state() {
 }
 
 state_marker() {
-  local frame=$((STATUS_FRAME % 4))
-  local -a healthy_frames=('●' '◉' '●' '◉')
-  local -a pending_frames=('◐' '◓' '◑' '◒')
   case "${1:-}" in
-    healthy|running) printf '%s' "${GREEN}${healthy_frames[frame]}${RESET}" ;;
-    starting|restarting|created) printf '%s' "${YELLOW}${pending_frames[frame]}${RESET}" ;;
+    healthy|running) printf '%s' "${GREEN}${BLINK}●${RESET}" ;;
+    starting|restarting|created) printf '%s' "${YELLOW}${BLINK}◐${RESET}" ;;
     unhealthy) printf '%s' "${RED}×${RESET}" ;;
     exited|dead|removing|paused) printf '%s' "${RED}●${RESET}" ;;
     *) printf '%s' "${DIM}○${RESET}" ;;
@@ -982,28 +979,10 @@ show_menu() {
     "${CYAN}${BOLD}" "${RESET}" "${DIM}" "${RESET}" >/dev/tty
 }
 
-show_terminal_cursor() {
-  printf '\033[?25h' 2>/dev/null >/dev/tty || true
-}
-
-read_animated_menu_choice() {
-  local read_status
+read_menu_choice() {
   MENU_CHOICE=""
-  printf '\033[?25l' 2>/dev/null >/dev/tty || return 1
-  while [[ -z "${MENU_CHOICE}" ]]; do
-    show_menu
-    if IFS= read -r -s -n 1 -t 1 MENU_CHOICE 2>/dev/null </dev/tty; then
-      [[ -n "${MENU_CHOICE}" ]] && break
-    else
-      read_status=$?
-      if ((read_status == 1)); then
-        show_terminal_cursor
-        return 1
-      fi
-    fi
-    STATUS_FRAME=$(((STATUS_FRAME + 1) % 4))
-  done
-  show_terminal_cursor
+  show_menu
+  IFS= read -r -s -n 1 MENU_CHOICE 2>/dev/null </dev/tty || return 1
   printf '\r\033[2K  %s›%s %s\n' "${CYAN}" "${RESET}" "${MENU_CHOICE}" >/dev/tty
 }
 
@@ -1014,11 +993,10 @@ run_menu() {
   }
 
   sync_env_schema
-  trap show_terminal_cursor EXIT
 
   while true; do
     local choice
-    read_animated_menu_choice || exit 0
+    read_menu_choice || exit 0
     choice="${MENU_CHOICE}"
     printf '\n'
     if cabinet_installed; then
