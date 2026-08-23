@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="1.9.9"
+VERSION="1.9.10"
 BRANCH="${BRANCH:-main}"
 RAW_BASE_URL="${RAW_BASE_URL:-https://raw.githubusercontent.com/asdcrosh/cabinet_remna/${BRANCH}}"
 GITHUB_API_URL="${GITHUB_API_URL:-https://api.github.com/repos/asdcrosh/cabinet_remna/commits/${BRANCH}}"
@@ -36,12 +36,10 @@ RESOLVED_RELEASE_SHA=""
 VERIFIED_RELEASE_RAW_BASE_URL=""
 MENU_CHOICE=""
 MENU_SELECTED="1"
-STATUS_ANIMATION_PID=""
 REMOTE_CONSOLE_VERSION=""
 LAST_LIVE_REFRESH_AT=0
-ANIM_MARKER_ROWS=()
-ANIM_MARKER_COLUMNS=()
-ANIM_MARKER_STATES=()
+LIVE_CONSOLE_STATUS=""
+LIVE_IMAGE_STATUS=""
 
 if [[ -t 1 ]]; then
   BOLD=$'\033[1m'
@@ -225,12 +223,10 @@ print_menu_cell() {
 }
 
 print_service_grid_row() {
-  local left_label="$1" left_container="$2" right_label="$3" right_container="$4" row="$5"
+  local left_label="$1" left_container="$2" right_label="$3" right_container="$4"
   local left_state right_state
   left_state="$(container_state "${left_container}")"
   right_state="$(container_state "${right_container}")"
-  register_animated_marker "${row}" 3 "${left_state}"
-  register_animated_marker "${row}" 34 "${right_state}"
   printf '  %b  %s %b%s%b  %b  %s %b%s%b\n' \
     "$(state_marker "${left_state}")" "$(pad_text "${left_label}" 11)" "$(state_color "${left_state}")${BOLD}" \
     "$(pad_text "[ $(state_text "${left_state}") ]" 14)" "${RESET}" "$(state_marker "${right_state}")" \
@@ -270,59 +266,6 @@ version_is_newer() {
   (( candidate_major > current_major )) \
     || (( candidate_major == current_major && candidate_minor > current_minor )) \
     || (( candidate_major == current_major && candidate_minor == current_minor && candidate_patch > current_patch ))
-}
-
-register_animated_marker() {
-  ANIM_MARKER_ROWS+=("$1")
-  ANIM_MARKER_COLUMNS+=("$2")
-  ANIM_MARKER_STATES+=("$3")
-}
-
-animation_character() {
-  local state="$1"
-  local frame="$2"
-  local -a healthy_frames=('●' '◉' '●' '◉')
-  local -a pending_frames=('◐' '◓' '◑' '◒')
-  case "${state}" in
-    healthy|running) printf '%s' "${healthy_frames[frame]}" ;;
-    starting|restarting|created) printf '%s' "${pending_frames[frame]}" ;;
-    *) printf '%s' "$(state_marker "${state}")" ;;
-  esac
-}
-
-render_status_animation_frame() {
-  local frame="$1"
-  local index state color character
-  printf '\0337'
-  for index in "${!ANIM_MARKER_ROWS[@]}"; do
-    state="${ANIM_MARKER_STATES[index]}"
-    color="$(state_color "${state}")"
-    character="$(animation_character "${state}" "${frame}")"
-    printf '\033[%s;%sH%b%s%b' \
-      "${ANIM_MARKER_ROWS[index]}" "${ANIM_MARKER_COLUMNS[index]}" \
-      "${color}" "${character}" "${RESET}"
-  done
-  printf '\0338'
-}
-
-start_status_animation() {
-  ((${#ANIM_MARKER_ROWS[@]} > 0)) || return 0
-  (
-    local frame=0
-    while true; do
-      sleep 0.45
-      frame=$(((frame + 1) % 4))
-      render_status_animation_frame "${frame}"
-    done
-  ) 2>/dev/null >/dev/tty &
-  STATUS_ANIMATION_PID=$!
-}
-
-stop_status_animation() {
-  [[ -n "${STATUS_ANIMATION_PID}" ]] || return 0
-  kill "${STATUS_ANIMATION_PID}" 2>/dev/null || true
-  wait "${STATUS_ANIMATION_PID}" 2>/dev/null || true
-  STATUS_ANIMATION_PID=""
 }
 
 env_value() {
@@ -922,9 +865,6 @@ edit_env() {
 }
 
 show_status() {
-  ANIM_MARKER_ROWS=()
-  ANIM_MARKER_COLUMNS=()
-  ANIM_MARKER_STATES=()
   if ! docker_available; then
     print_status_row "${YELLOW}○${RESET}" "Docker" "${YELLOW}не установлен${RESET}"
     return
@@ -941,9 +881,9 @@ show_status() {
 
   printf '%s\n' "${BOLD}  СОСТОЯНИЕ СЕРВИСОВ${RESET}"
   printf '%s\n' "${DIM}  ─────────────────────────────────────────────────────────${RESET}"
-  print_service_grid_row "Кабинет" "remnawave-cabinet-app" "База" "remnawave-cabinet-db" 6
-  print_service_grid_row "Платежи" "remnawave-cabinet-worker" "Рассылки" "remnawave-cabinet-broadcast-worker" 7
-  print_service_grid_row "Watch" "remnawave-cabinet-watch-worker" "Ноды" "remnawave-cabinet-node-provisioning-worker" 8
+  print_service_grid_row "Кабинет" "remnawave-cabinet-app" "База" "remnawave-cabinet-db"
+  print_service_grid_row "Платежи" "remnawave-cabinet-worker" "Рассылки" "remnawave-cabinet-broadcast-worker"
+  print_service_grid_row "Watch" "remnawave-cabinet-watch-worker" "Ноды" "remnawave-cabinet-node-provisioning-worker"
 }
 
 show_logs() {
@@ -1261,10 +1201,8 @@ render_menu_option_at_cursor() {
 render_menu_selection_change() {
   local previous="$1"
   [[ "${previous}" != "${MENU_SELECTED}" ]] || return 0
-  stop_status_animation
   render_menu_option_at_cursor "${previous}"
   render_menu_option_at_cursor "${MENU_SELECTED}"
-  start_status_animation
 }
 
 update_status_screen_row() {
@@ -1276,13 +1214,35 @@ update_status_screen_row() {
 }
 
 render_live_update_statuses() {
-  local update_row
+  local redraw_console="$1" redraw_image="$2" update_row
+  [[ "${redraw_console}" == "1" || "${redraw_image}" == "1" ]] || return 0
   update_row="$(update_status_screen_row)"
-  printf '\0337\033[1;1H\033[2K' >/dev/tty
-  print_console_header >/dev/tty
-  printf '\033[%s;1H\033[2K' "${update_row}" >/dev/tty
-  update_status_line >/dev/tty
+  printf '\0337' >/dev/tty
+  if [[ "${redraw_console}" == "1" ]]; then
+    printf '\033[1;1H\033[2K' >/dev/tty
+    print_console_header >/dev/tty
+  fi
+  if [[ "${redraw_image}" == "1" ]]; then
+    printf '\033[%s;1H\033[2K' "${update_row}" >/dev/tty
+    update_status_line >/dev/tty
+  fi
   printf '\0338' >/dev/tty
+}
+
+remember_live_statuses() {
+  LIVE_CONSOLE_STATUS="$(console_update_badge)"
+  LIVE_IMAGE_STATUS="$(update_status_line)"
+}
+
+refresh_and_render_live_statuses() {
+  local previous_console previous_image redraw_console=0 redraw_image=0
+  previous_console="${LIVE_CONSOLE_STATUS}"
+  previous_image="${LIVE_IMAGE_STATUS}"
+  refresh_live_statuses
+  remember_live_statuses
+  [[ "${LIVE_CONSOLE_STATUS}" == "${previous_console}" ]] || redraw_console=1
+  [[ "${LIVE_IMAGE_STATUS}" == "${previous_image}" ]] || redraw_image=1
+  render_live_update_statuses "${redraw_console}" "${redraw_image}"
 }
 
 read_menu_choice() {
@@ -1290,8 +1250,8 @@ read_menu_choice() {
   ensure_valid_menu_selection
   refresh_live_statuses
   show_menu
+  remember_live_statuses
   printf '\033[?25l' 2>/dev/null >/dev/tty || return 1
-  start_status_animation
   local key escape_tail now previous_selection
   while [[ -z "${MENU_CHOICE}" ]]; do
     key=""
@@ -1326,19 +1286,14 @@ read_menu_choice() {
 
     now="$(date +%s)"
     if ((now - LAST_LIVE_REFRESH_AT >= $(live_refresh_interval))); then
-      stop_status_animation
-      refresh_live_statuses
-      render_live_update_statuses
-      start_status_animation
+      refresh_and_render_live_statuses
     fi
   done
-  stop_status_animation
   printf '\033[?25h' 2>/dev/null >/dev/tty || true
   printf '\r\033[2K  %s›%s %s\n' "${CYAN}" "${RESET}" "${MENU_CHOICE}" >/dev/tty
 }
 
 cleanup_menu_terminal() {
-  stop_status_animation
   printf '\033[?25h' 2>/dev/null >/dev/tty || true
 }
 

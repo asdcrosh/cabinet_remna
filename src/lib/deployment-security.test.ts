@@ -122,8 +122,10 @@ describe('production deployment security', () => {
     expect(cabinetctl).toContain('render_menu_selection_change "${previous_selection}"')
     expect(cabinetctl).not.toContain('move_menu_selection previous; redraw_interactive_menu')
     expect(cabinetctl).toContain('render_live_update_statuses')
-    expect(cabinetctl).toContain(`refresh_live_statuses
-      render_live_update_statuses`)
+    expect(cabinetctl).toContain('refresh_and_render_live_statuses')
+    expect(cabinetctl).toContain('[[ "${LIVE_IMAGE_STATUS}" == "${previous_image}" ]] || redraw_image=1')
+    expect(cabinetctl).not.toContain('start_status_animation')
+    expect(cabinetctl).not.toContain('render_status_animation_frame')
     expect(cabinetctl).toContain('refresh_live_statuses')
     expect(cabinetctl).toContain('[ АКТУАЛЬНА ]')
     expect(cabinetctl).toContain('if ! run_verified_script "${CONSOLE_INSTALL_URL}"; then')
