@@ -114,6 +114,8 @@ describe('production deployment security', () => {
     expect(cabinetctl).toContain('UPDATE_STATUS_CACHE_TTL="${CABINETCTL_UPDATE_CACHE_TTL:-60}"')
     expect(cabinetctl).toContain('rm -f "${UPDATE_STATUS_CACHE}"')
     expect(cabinetctl).toContain('[ СОБИРАЕТСЯ ]')
+    expect(cabinetctl).toContain('if ! run_verified_script "${CONSOLE_INSTALL_URL}"; then')
+    expect(cabinetctl).toContain('Консоль не обновлена.')
     expect(cabinetctl).toContain('console_badge="$(console_update_badge)"')
     expect(cabinetctl).toContain('[ ДОСТУПНА v%s ]')
     expect(cabinetctl).toContain('details="$(latest_workflow_details || true)"')

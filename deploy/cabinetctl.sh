@@ -871,7 +871,10 @@ configure_node_provisioning() {
 
 update_console() {
   info "Обновляем управляющую консоль..."
-  run_verified_script "${CONSOLE_INSTALL_URL}"
+  if ! run_verified_script "${CONSOLE_INSTALL_URL}"; then
+    fail "Консоль не обновлена. Дождитесь успешного завершения сборки и повторите попытку."
+    return 1
+  fi
   rm -f "${UPDATE_STATUS_CACHE}" 2>/dev/null || true
   ok "Консоль обновлена. Перезапустите cabinetctl для загрузки новой версии."
 }
