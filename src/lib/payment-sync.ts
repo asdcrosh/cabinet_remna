@@ -493,8 +493,11 @@ function validatePlategaTransaction(
   if (transaction.paymentDetails.currency !== 'RUB') {
     throw new Error('Platega transaction currency mismatch')
   }
-  if (Math.round(transaction.paymentDetails.amount * 100) !== payment.amountKopecks) {
-    throw new Error('Platega transaction amount mismatch')
+  const receivedAmountKopecks = Math.round(transaction.paymentDetails.amount * 100)
+  if (transaction.status === 'CONFIRMED' && receivedAmountKopecks !== payment.amountKopecks) {
+    throw new Error(
+      `Platega transaction amount mismatch: expected ${payment.amountKopecks}, received ${receivedAmountKopecks}`
+    )
   }
 }
 

@@ -394,6 +394,24 @@ describe('payment sync pending expiration', () => {
     expect(mocks.notifyPaymentCanceled).not.toHaveBeenCalled()
   })
 
+  it('does not fail a pending Platega payment with intermediate amount details', async () => {
+    mocks.prisma.payment.findFirst.mockResolvedValue(plategaPayment())
+    mocks.getPlategaTransaction.mockResolvedValue({
+      id: 'platega-1',
+      status: 'PENDING',
+      paymentDetails: { amount: 1, currency: 'RUB' },
+      paymentMethod: null,
+      expiresIn: '2026-06-26T12:15:00.000Z',
+      payload: 'pay-platega',
+    })
+
+    await expect(
+      syncPaymentProvisioning({ paymentId: 'pay-platega', userId: 'user-1' })
+    ).resolves.toEqual({ ok: true, status: 'pending', provisioned: false })
+
+    expect(mocks.provisionPaymentSubscription).not.toHaveBeenCalled()
+  })
+
   it('rejects a Platega status response with a different amount', async () => {
     mocks.prisma.payment.findFirst.mockResolvedValue(plategaPayment())
     mocks.getPlategaTransaction.mockResolvedValue({
@@ -411,7 +429,7 @@ describe('payment sync pending expiration', () => {
       ok: false,
       status: 'check_failed',
       provisioned: false,
-      error: 'Platega transaction amount mismatch',
+      error: 'Platega transaction amount mismatch: expected 59900, received 100',
     })
     expect(mocks.provisionPaymentSubscription).not.toHaveBeenCalled()
   })
