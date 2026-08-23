@@ -58,4 +58,20 @@ describe('device rename route', () => {
     expect(response.status).toBe(400)
     expect(mocks.updateMany).not.toHaveBeenCalled()
   })
+
+  it('unblocks only the current user device', async () => {
+    const response = await PATCH(
+      new Request('https://cabinet.example/api/devices/device-1', {
+        method: 'PATCH',
+        body: JSON.stringify({ blocked: false }),
+      }),
+      { params: Promise.resolve({ hwid: 'device-1' }) }
+    )
+
+    expect(response.status).toBe(200)
+    expect(mocks.updateMany).toHaveBeenCalledWith({
+      where: { userId: 'user-1', hwid: 'device-1' },
+      data: { blockedAt: null },
+    })
+  })
 })

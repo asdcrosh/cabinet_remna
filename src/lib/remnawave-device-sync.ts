@@ -7,12 +7,15 @@ export async function syncLocalDevicesFromRemnawave(input: {
 }) {
   const localDevices = await prisma.device.findMany({
     where: { userId: input.localUserId },
-    select: { hwid: true, displayName: true },
+    select: { hwid: true, displayName: true, blockedAt: true },
   })
   const displayNames = new Map(localDevices.map((device) => [device.hwid, device.displayName]))
+  const blockedHwids = new Set(localDevices.filter((device) => device.blockedAt).map((device) => device.hwid))
   const remoteUser = (await remnawave.getUser(input.reference)).response
   const data = await remnawave.getUserDevices(remoteUser)
-  const devices = data.response.devices.map((device) => ({
+  const blockedRemoteDevices = data.response.devices.filter((device) => blockedHwids.has(device.hwid))
+  await Promise.all(blockedRemoteDevices.map((device) => remnawave.deleteUserDevice(remoteUser, device.hwid)))
+  const devices = data.response.devices.filter((device) => !blockedHwids.has(device.hwid)).map((device) => ({
     hwid: device.hwid,
     displayName: displayNames.get(device.hwid) ?? null,
     platform: device.platform ?? device.deviceModel ?? null,
@@ -49,6 +52,7 @@ export async function syncLocalDevicesFromRemnawave(input: {
   await prisma.device.deleteMany({
     where: {
       userId: input.localUserId,
+      blockedAt: null,
       hwid: { notIn: devices.map((device) => device.hwid) },
     },
   })
@@ -63,5 +67,13 @@ export async function syncLocalDevicesFromRemnawave(input: {
     },
   })
 
-  return { devices, total: devices.length }
+  const blockedDevices = localDevices
+    .filter((device) => device.blockedAt)
+    .map((device) => ({
+      hwid: device.hwid,
+      displayName: device.displayName,
+      blockedAt: device.blockedAt?.toISOString() ?? null,
+    }))
+
+  return { devices, blockedDevices, total: devices.length }
 }

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { CircleAlert, Laptop, Loader2, Monitor, Pencil, Plus, RefreshCw, Smartphone, Tablet, Trash2, Unlink2 } from 'lucide-react'
+import { CircleAlert, Laptop, Loader2, Monitor, Pencil, Plus, RefreshCw, ShieldBan, ShieldCheck, Smartphone, Tablet, Trash2 } from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
 import { InlineAlert } from './empty-state'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
@@ -22,6 +22,7 @@ interface Device {
   ip?: string | null
   createdAt?: string | null
   updatedAt?: string | null
+  blockedAt?: string | null
 }
 
 interface DevicesListProps {
@@ -33,10 +34,12 @@ interface DevicesListProps {
 export function DevicesList({ embedded = false, deviceLimit, subscriptionUrl }: DevicesListProps = {}) {
   const router = useRouter()
   const [devices, setDevices] = useState<Device[] | null>(null)
+  const [blockedDevices, setBlockedDevices] = useState<Device[]>([])
   const [loadError, setLoadError] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
   const [removingHwid, setRemovingHwid] = useState<string | null>(null)
+  const [unblockingHwid, setUnblockingHwid] = useState<string | null>(null)
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null)
   const [bulkDialogOpen, setBulkDialogOpen] = useState(false)
   const [bulkRemoving, setBulkRemoving] = useState(false)
@@ -50,8 +53,9 @@ export function DevicesList({ embedded = false, deviceLimit, subscriptionUrl }: 
     setActionError(null)
     setRefreshing(true)
     try {
-      const data = await apiFetch<{ devices: Device[] }>('/api/devices')
+      const data = await apiFetch<{ devices: Device[]; blockedDevices?: Device[] }>('/api/devices')
       setDevices(data.devices)
+      setBlockedDevices(data.blockedDevices ?? [])
     } catch (e) {
       setLoadError(e instanceof Error ? e.message : 'Не удалось загрузить устройства')
     } finally {
@@ -69,9 +73,13 @@ export function DevicesList({ embedded = false, deviceLimit, subscriptionUrl }: 
     try {
       await apiFetch(`/api/devices/${encodeURIComponent(device.hwid)}`, { method: 'DELETE' })
       setDevices((current) => current?.filter((item) => item.hwid !== device.hwid) ?? [])
+      setBlockedDevices((current) => [
+        { ...device, blockedAt: new Date().toISOString() },
+        ...current.filter((item) => item.hwid !== device.hwid),
+      ])
       setSelectedDevice(null)
     } catch (e) {
-      setActionError(e instanceof Error ? e.message : 'Не удалось отвязать устройство')
+      setActionError(e instanceof Error ? e.message : 'Не удалось заблокировать устройство')
     } finally {
       setRemovingHwid(null)
     }
@@ -82,12 +90,32 @@ export function DevicesList({ embedded = false, deviceLimit, subscriptionUrl }: 
     setActionError(null)
     try {
       await apiFetch('/api/devices', { method: 'DELETE' })
+      setBlockedDevices((current) => [
+        ...(devices ?? []).map((device) => ({ ...device, blockedAt: new Date().toISOString() })),
+        ...current.filter((blocked) => !(devices ?? []).some((device) => device.hwid === blocked.hwid)),
+      ])
       setDevices([])
       setBulkDialogOpen(false)
     } catch (e) {
-      setActionError(e instanceof Error ? e.message : 'Не удалось отвязать устройства')
+      setActionError(e instanceof Error ? e.message : 'Не удалось заблокировать устройства')
     } finally {
       setBulkRemoving(false)
+    }
+  }
+
+  async function unblockDevice(device: Device) {
+    setUnblockingHwid(device.hwid)
+    setActionError(null)
+    try {
+      await apiFetch(`/api/devices/${encodeURIComponent(device.hwid)}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ blocked: false }),
+      })
+      setBlockedDevices((current) => current.filter((item) => item.hwid !== device.hwid))
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : 'Не удалось разблокировать устройство')
+    } finally {
+      setUnblockingHwid(null)
     }
   }
 
@@ -146,7 +174,7 @@ export function DevicesList({ embedded = false, deviceLimit, subscriptionUrl }: 
     )
   }
   if (!devices) return <DevicesSkeleton compact={embedded} />
-  if (devices.length === 0) {
+  if (devices.length === 0 && blockedDevices.length === 0) {
     if (embedded) {
       return (
         <section id="connected-devices" aria-labelledby="connected-devices-title" className="device-panel device-panel--embedded overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.03]">
@@ -198,7 +226,7 @@ export function DevicesList({ embedded = false, deviceLimit, subscriptionUrl }: 
         {(loadError || actionError) && (
           <InlineAlert
             tone="danger"
-            title={actionError ? 'Не удалось отвязать устройство' : 'Не удалось обновить список'}
+            title={actionError ? 'Не удалось выполнить действие' : 'Не удалось обновить список'}
             description={actionError || loadError || undefined}
           />
         )}
@@ -228,6 +256,9 @@ export function DevicesList({ embedded = false, deviceLimit, subscriptionUrl }: 
           </div>
 
           <div className="divide-y divide-slate-200 dark:divide-white/10">
+            {devices.length === 0 && (
+              <div className="px-4 py-4 text-sm text-slate-500 dark:text-slate-400">Активных устройств нет.</div>
+            )}
             {devices.map((device) => (
               <CompactDeviceRow
                 key={device.hwid}
@@ -238,6 +269,7 @@ export function DevicesList({ embedded = false, deviceLimit, subscriptionUrl }: 
               />
             ))}
           </div>
+          <BlockedDevices devices={blockedDevices} unblockingHwid={unblockingHwid} onUnblock={(device) => void unblockDevice(device)} />
           <DeviceListActions
             deviceCount={devices.length}
             onAdd={addDevice}
@@ -246,18 +278,18 @@ export function DevicesList({ embedded = false, deviceLimit, subscriptionUrl }: 
         </section>
         <ConfirmDialog
           open={Boolean(selectedDevice)}
-          title="Отвязать устройство?"
-          description="Устройство исчезнет из списка привязок. При следующем подключении может потребоваться повторная авторизация."
-          confirmLabel="Отвязать"
+          title="Заблокировать устройство?"
+          description="Этот HWID будет автоматически удаляться при каждой повторной регистрации. Вернуть доступ можно в списке заблокированных устройств."
+          confirmLabel="Заблокировать"
           loading={Boolean(removingHwid)}
           onCancel={() => setSelectedDevice(null)}
           onConfirm={() => selectedDevice && removeDevice(selectedDevice)}
         />
         <ConfirmDialog
           open={bulkDialogOpen}
-          title="Отвязать все устройства?"
-          description="Доступ, профиль и платежи сохранятся. На каждом устройстве потребуется повторно открыть подписку."
-          confirmLabel="Отвязать все"
+          title="Заблокировать все устройства?"
+          description="Все текущие HWID будут удалены и не смогут зарегистрироваться снова, пока вы их не разблокируете."
+          confirmLabel="Заблокировать все"
           loading={bulkRemoving}
           onCancel={() => setBulkDialogOpen(false)}
           onConfirm={removeAllDevices}
@@ -280,7 +312,7 @@ export function DevicesList({ embedded = false, deviceLimit, subscriptionUrl }: 
       {(loadError || actionError) && (
         <InlineAlert
           tone="danger"
-          title={actionError ? 'Не удалось отвязать устройство' : 'Не удалось обновить список'}
+          title={actionError ? 'Не удалось выполнить действие' : 'Не удалось обновить список'}
           description={actionError || loadError || undefined}
         />
       )}
@@ -290,7 +322,7 @@ export function DevicesList({ embedded = false, deviceLimit, subscriptionUrl }: 
             <div className="min-w-0">
               <h2 id="connected-devices-title" className="text-lg font-semibold tracking-tight text-slate-950 dark:text-white">Подключённые устройства</h2>
               <p className="mt-1 text-sm leading-6 text-slate-500 dark:text-slate-400">
-                {recentDevices > 0 ? 'Подключение работает. Здесь можно проверить активность и отвязать старые устройства.' : 'Устройства найдены, но сегодня ещё не подключались.'}
+                {recentDevices > 0 ? 'Подключение работает. Здесь можно проверить активность и заблокировать старые устройства.' : 'Устройства найдены, но сегодня ещё не подключались.'}
               </p>
               <DeviceLimitNotice state={limitState} />
             </div>
@@ -312,6 +344,9 @@ export function DevicesList({ embedded = false, deviceLimit, subscriptionUrl }: 
         </div>
 
         <div className="grid gap-3 p-3 sm:grid-cols-2 sm:p-4">
+          {devices.length === 0 && (
+            <div className="text-sm text-slate-500 dark:text-slate-400 sm:col-span-2">Активных устройств нет.</div>
+          )}
           {devices.map((d) => (
             <DeviceCard
               key={d.hwid}
@@ -322,6 +357,7 @@ export function DevicesList({ embedded = false, deviceLimit, subscriptionUrl }: 
             />
           ))}
         </div>
+        <BlockedDevices devices={blockedDevices} unblockingHwid={unblockingHwid} onUnblock={(device) => void unblockDevice(device)} />
         <DeviceListActions
           deviceCount={devices.length}
           onAdd={addDevice}
@@ -330,18 +366,18 @@ export function DevicesList({ embedded = false, deviceLimit, subscriptionUrl }: 
       </section>
       <ConfirmDialog
         open={Boolean(selectedDevice)}
-        title="Отвязать устройство?"
-        description="Устройство исчезнет из списка привязок. При следующем подключении может потребоваться повторная авторизация."
-        confirmLabel="Отвязать"
+        title="Заблокировать устройство?"
+        description="Этот HWID будет автоматически удаляться при каждой повторной регистрации. Вернуть доступ можно в списке заблокированных устройств."
+        confirmLabel="Заблокировать"
         loading={Boolean(removingHwid)}
         onCancel={() => setSelectedDevice(null)}
         onConfirm={() => selectedDevice && removeDevice(selectedDevice)}
       />
       <ConfirmDialog
         open={bulkDialogOpen}
-        title="Отвязать все устройства?"
-        description="Доступ, профиль и платежи сохранятся. На каждом устройстве потребуется повторно открыть подписку."
-        confirmLabel="Отвязать все"
+        title="Заблокировать все устройства?"
+        description="Все текущие HWID будут удалены и не смогут зарегистрироваться снова, пока вы их не разблокируете."
+        confirmLabel="Заблокировать все"
         loading={bulkRemoving}
         onCancel={() => setBulkDialogOpen(false)}
         onConfirm={removeAllDevices}
@@ -387,7 +423,7 @@ function DeviceListActions({
       {deviceCount > 1 && (
         <button type="button" className="device-list-actions__remove" onClick={onRemoveAll}>
           <Trash2 className="h-3.5 w-3.5" />
-          Отвязать все
+          Заблокировать все
         </button>
       )}
     </div>
@@ -433,7 +469,7 @@ function DeviceCard({
             <Pencil className="h-4 w-4" />
             Имя
           </button>
-          <DeviceActionButton loading={loading} label="Отвязать" onClick={onRemove} />
+          <DeviceActionButton loading={loading} label="Блокировать" onClick={onRemove} />
         </div>
       </div>
     </article>
@@ -484,11 +520,60 @@ function CompactDeviceRow({
         className="device-row__remove grid h-9 w-9 shrink-0 place-items-center rounded-lg text-slate-400 transition-colors hover:bg-red-50 hover:text-red-700 disabled:opacity-50 dark:hover:bg-red-500/10 dark:hover:text-red-200"
         disabled={loading}
         onClick={onRemove}
-        aria-label={`Отвязать ${getDeviceTitle(device)}`}
+        aria-label={`Заблокировать ${getDeviceTitle(device)}`}
       >
-        {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Unlink2 className="h-4 w-4" />}
+        {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldBan className="h-4 w-4" />}
       </button>
     </article>
+  )
+}
+
+function BlockedDevices({
+  devices,
+  unblockingHwid,
+  onUnblock,
+}: {
+  devices: Device[]
+  unblockingHwid: string | null
+  onUnblock: (device: Device) => void
+}) {
+  if (devices.length === 0) return null
+
+  return (
+    <div className="border-t border-slate-200 bg-slate-50/60 px-4 py-4 dark:border-white/10 dark:bg-white/[0.02]">
+      <div className="flex items-center gap-2">
+        <ShieldBan className="h-4 w-4 text-red-600 dark:text-red-300" />
+        <h3 className="text-sm font-semibold text-slate-950 dark:text-white">Заблокированные</h3>
+        <span className="rounded-md bg-red-100 px-1.5 py-0.5 text-xs font-semibold text-red-700 dark:bg-red-500/10 dark:text-red-200">{devices.length}</span>
+      </div>
+      <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
+        Эти устройства автоматически удаляются при повторной регистрации.
+      </p>
+      <div className="mt-3 space-y-2">
+        {devices.map((device) => {
+          const loading = unblockingHwid === device.hwid
+          return (
+            <div key={device.hwid} className="flex min-w-0 flex-col gap-3 rounded-xl border border-slate-200 bg-white p-3 dark:border-white/10 dark:bg-white/[0.025] sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0">
+                <div className="truncate text-sm font-medium text-slate-900 dark:text-white">{getDeviceTitle(device)}</div>
+                <div className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                  Заблокировано {formatDeviceDate(device.blockedAt)} · ID {shortDeviceId(device.hwid)}
+                </div>
+              </div>
+              <button
+                type="button"
+                className="btn-secondary h-9 shrink-0 px-3 text-sm"
+                disabled={loading || Boolean(unblockingHwid)}
+                onClick={() => onUnblock(device)}
+              >
+                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
+                {loading ? 'Разблокируем...' : 'Разблокировать'}
+              </button>
+            </div>
+          )
+        })}
+      </div>
+    </div>
   )
 }
 
@@ -503,14 +588,14 @@ function DeviceMetric({ label, value, active = false }: { label: string; value: 
 
 function DeviceActionButton({
   loading,
-  label = 'Отвязать',
+  label = 'Блокировать',
   onClick,
 }: {
   loading: boolean
   label?: string
   onClick: () => void
 }) {
-  const Icon = loading ? Loader2 : Unlink2
+  const Icon = loading ? Loader2 : ShieldBan
 
   return (
     <button
@@ -702,7 +787,7 @@ function getDeviceLimitState(used: number, limit?: number | null): DeviceLimitSt
   if (!limit || limit < 1) return { tone: 'neutral', text: 'Количество устройств не ограничено.' }
 
   const remaining = Math.max(limit - used, 0)
-  if (remaining === 0) return { tone: 'danger', text: 'Лимит достигнут. Отвяжите старое устройство перед новым подключением.' }
+  if (remaining === 0) return { tone: 'danger', text: 'Лимит достигнут. Заблокируйте старое устройство перед новым подключением.' }
   if (remaining === 1) return { tone: 'warning', text: 'Осталось одно свободное место.' }
   return { tone: 'neutral', text: `Свободно мест: ${remaining}.` }
 }

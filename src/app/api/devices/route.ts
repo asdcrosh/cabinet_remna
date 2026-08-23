@@ -13,18 +13,18 @@ export const dynamic = 'force-dynamic'
 export const GET = withAuth(async () => {
   const session = await requireAuth()
   const user = await prisma.user.findUnique({ where: { id: session.uid } })
-  if (!user || !hasRemnawaveUserReference(user)) return NextResponse.json({ devices: [] })
+  if (!user || !hasRemnawaveUserReference(user)) return NextResponse.json({ devices: [], blockedDevices: [] })
 
   try {
-    const { devices } = await syncLocalDevicesFromRemnawave({
+    const { devices, blockedDevices } = await syncLocalDevicesFromRemnawave({
       localUserId: user.id,
       reference: remnawaveUserReference(user),
     })
-    return NextResponse.json({ devices })
+    return NextResponse.json({ devices, blockedDevices })
   } catch (e) {
     if (e instanceof RemnawaveError) {
       return NextResponse.json(
-        { devices: [], error: 'Не удалось загрузить устройства. Попробуйте позже.' },
+        { devices: [], blockedDevices: [], error: 'Не удалось загрузить устройства. Попробуйте позже.' },
         { status: 200 }
       )
     }
@@ -41,12 +41,15 @@ export const DELETE = withAuth(async () => {
 
   try {
     await remnawave.deleteAllUserDevices(remnawaveUserReference(user))
-    const result = await prisma.device.deleteMany({ where: { userId: user.id } })
-    return NextResponse.json({ ok: true, removed: result.count })
+    const result = await prisma.device.updateMany({
+      where: { userId: user.id, blockedAt: null },
+      data: { blockedAt: new Date() },
+    })
+    return NextResponse.json({ ok: true, blocked: result.count })
   } catch (e) {
     if (e instanceof RemnawaveError) {
       return NextResponse.json(
-        { error: 'Не удалось отвязать устройства. Попробуйте позже.' },
+        { error: 'Не удалось заблокировать устройства. Попробуйте позже.' },
         { status: 502 }
       )
     }

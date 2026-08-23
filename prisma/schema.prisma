@@ -1261,6 +1261,7 @@ model Device {
   userId      String
   hwid        String // device hardware id
   displayName String?
+  blockedAt   DateTime?
   platform    String? // android, ios, windows...
   userAgent   String?
   ip          String?
@@ -1271,6 +1272,7 @@ model Device {
 
   @@unique([userId, hwid])
   @@index([userId])
+  @@index([blockedAt])
 }
 
 // ----------------------------------------------------------------------
