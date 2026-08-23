@@ -20,7 +20,7 @@ describe('subscription expiry notifications', () => {
     mocks.notify.mockResolvedValue(undefined)
   })
 
-  it('sends 3 day, 1 day and expired stages in one reconciliation', async () => {
+  it('sends tariff, grace period and expired stages in one reconciliation', async () => {
     const now = new Date('2026-07-17T12:00:00.000Z')
     mocks.findMany
       .mockResolvedValueOnce([
@@ -28,16 +28,20 @@ describe('subscription expiry notifications', () => {
         { id: 'sub-1d', userId: 'user-2', expireAt: new Date('2026-07-18T11:00:00.000Z'), plan: { name: 'Сутки' } },
       ])
       .mockResolvedValueOnce([
+        { id: 'sub-grace', userId: 'user-4', graceExpireAt: new Date('2026-07-18T10:00:00.000Z'), plan: { name: 'Льготный' } },
+      ])
+      .mockResolvedValueOnce([
         { id: 'sub-expired', userId: 'user-3', expireAt: new Date('2026-07-17T11:59:00.000Z'), plan: { name: 'Истёк' } },
       ])
 
     await expect(reconcileSubscriptionExpiryNotifications({ now, batchSize: 50 })).resolves.toEqual({
-      checked: 3,
-      sent: 3,
+      checked: 4,
+      sent: 4,
     })
     expect(mocks.notify).toHaveBeenNthCalledWith(1, expect.objectContaining({ subscriptionId: 'sub-3d', stage: '3d' }))
     expect(mocks.notify).toHaveBeenNthCalledWith(2, expect.objectContaining({ subscriptionId: 'sub-1d', stage: '1d' }))
-    expect(mocks.notify).toHaveBeenNthCalledWith(3, expect.objectContaining({ subscriptionId: 'sub-expired', stage: 'expired' }))
+    expect(mocks.notify).toHaveBeenNthCalledWith(3, expect.objectContaining({ subscriptionId: 'sub-grace', stage: 'grace_1d' }))
+    expect(mocks.notify).toHaveBeenNthCalledWith(4, expect.objectContaining({ subscriptionId: 'sub-expired', stage: 'expired' }))
   })
 
   it('only scans subscriptions expired within the last day', async () => {
@@ -46,7 +50,7 @@ describe('subscription expiry notifications', () => {
 
     await reconcileSubscriptionExpiryNotifications({ now })
 
-    const expiredQuery = mocks.findMany.mock.calls[1]?.[0]
+    const expiredQuery = mocks.findMany.mock.calls[2]?.[0]
     expect(expiredQuery.where.expireAt).toEqual({
       gt: new Date('2026-07-16T12:00:00.000Z'),
       lte: now,

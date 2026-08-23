@@ -542,13 +542,18 @@ export async function notifySubscriptionExpiring(input: {
   userId: string
   subscriptionId: string
   expireAt: Date
-  stage: '3d' | '1d' | 'expired'
+  stage: '3d' | '1d' | 'grace_1d' | 'expired'
   planName?: string | null
 }) {
   const plan = input.planName ? ` «${input.planName}»` : ''
   const expired = input.stage === 'expired'
-  const title = expired ? 'Подписка закончилась' : 'Подписка скоро закончится'
-  const body = expired
+  const graceEnding = input.stage === 'grace_1d'
+  const title = graceEnding
+    ? 'Льготный период закончится через сутки'
+    : expired ? 'Подписка закончилась' : 'Подписка скоро закончится'
+  const body = graceEnding
+    ? `Льготный доступ для подписки${plan} закончится ${formatDate(input.expireAt)}. Продлите тариф, чтобы сохранить устройства и настройки.`
+    : expired
     ? `Подписка${plan} закончилась ${formatDate(input.expireAt)}. Продлите её, чтобы вернуть доступ.`
     : `Подписка${plan} закончится ${input.stage === '3d' ? 'через 3 дня' : 'через сутки'}, ${formatDate(input.expireAt)}.`
   const expiryKey = input.expireAt.toISOString()
@@ -567,7 +572,7 @@ export async function notifySubscriptionExpiring(input: {
     emailSubject: `${title} — ${getBrandName()}`,
     emailText: `${body}\n\nПродлить: ${getAppUrl()}${RENEW_PATH}`,
     emailHtml: renderNotificationEmail({
-      eyebrow: 'Подписка',
+      eyebrow: graceEnding ? 'Льготный период' : 'Подписка',
       title,
       lead: body,
       ctaLabel: 'Продлить подписку',

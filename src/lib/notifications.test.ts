@@ -313,6 +313,42 @@ describe('notifyUser', () => {
     )
   })
 
+  it('warns in the cabinet and Telegram before the grace period ends', async () => {
+    mocks.prisma.user.findUnique.mockResolvedValue({
+      id: 'user-1',
+      email: 'user@example.test',
+      emailVerifiedAt: new Date(),
+      name: 'User',
+      telegramId: 123n,
+    })
+    mocks.prisma.notificationLog.createMany.mockResolvedValue({ count: 1 })
+    mocks.prisma.userNotification.createMany.mockResolvedValue({ count: 1 })
+
+    await notifySubscriptionExpiring({
+      userId: 'user-1',
+      subscriptionId: 'subscription-1',
+      expireAt: new Date('2026-08-25T12:00:00.000Z'),
+      stage: 'grace_1d',
+      planName: 'Стандарт',
+    })
+
+    expect(mocks.prisma.userNotification.createMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          type: 'SUBSCRIPTION_EXPIRING',
+          title: 'Льготный период закончится через сутки',
+          body: expect.stringContaining('сохранить устройства и настройки'),
+          actionHref: '/dashboard/plans?intent=renew',
+          actionLabel: 'Продлить',
+        }),
+      })
+    )
+    expect(fetch).toHaveBeenCalledWith(
+      'https://api.telegram.org/bottelegram-token/sendMessage',
+      expect.objectContaining({ body: expect.stringContaining('Льготный период закончится через сутки') })
+    )
+  })
+
   it('sends Telegram action button as Web App when requested', async () => {
     mocks.prisma.user.findUnique.mockResolvedValue({
       id: 'user-1',

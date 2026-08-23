@@ -1260,6 +1260,7 @@ model Device {
   id          String   @id @default(cuid())
   userId      String
   hwid        String // device hardware id
+  displayName String?
   platform    String? // android, ios, windows...
   userAgent   String?
   ip          String?

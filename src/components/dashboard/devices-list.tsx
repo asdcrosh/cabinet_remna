@@ -1,16 +1,20 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { CircleAlert, Laptop, Loader2, Monitor, Plus, RefreshCw, Smartphone, Tablet, Trash2, Unlink2 } from 'lucide-react'
+import { CircleAlert, Laptop, Loader2, Monitor, Pencil, Plus, RefreshCw, Smartphone, Tablet, Trash2, Unlink2 } from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
 import { InlineAlert } from './empty-state'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { cn } from '@/lib/cn'
+import { Modal } from '@/components/ui/modal'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 
 interface Device {
   hwid: string
+  displayName?: string | null
   platform?: string | null
   osVersion?: string | null
   deviceModel?: string | null
@@ -36,6 +40,10 @@ export function DevicesList({ embedded = false, deviceLimit, subscriptionUrl }: 
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null)
   const [bulkDialogOpen, setBulkDialogOpen] = useState(false)
   const [bulkRemoving, setBulkRemoving] = useState(false)
+  const [editingDevice, setEditingDevice] = useState<Device | null>(null)
+  const [renameDraft, setRenameDraft] = useState('')
+  const [renaming, setRenaming] = useState(false)
+  const [renameError, setRenameError] = useState<string | null>(null)
 
   const loadDevices = useCallback(async () => {
     setLoadError(null)
@@ -80,6 +88,37 @@ export function DevicesList({ embedded = false, deviceLimit, subscriptionUrl }: 
       setActionError(e instanceof Error ? e.message : 'Не удалось отвязать устройства')
     } finally {
       setBulkRemoving(false)
+    }
+  }
+
+  function openRename(device: Device) {
+    setRenameError(null)
+    setEditingDevice(device)
+    setRenameDraft(device.displayName ?? '')
+  }
+
+  async function renameDevice() {
+    if (!editingDevice) return
+    const displayName = renameDraft.trim()
+    if (!displayName || displayName.length > 40) {
+      setRenameError('Название должно содержать от 1 до 40 символов')
+      return
+    }
+    setRenaming(true)
+    setRenameError(null)
+    try {
+      await apiFetch(`/api/devices/${encodeURIComponent(editingDevice.hwid)}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ displayName }),
+      })
+      setDevices((current) => current?.map((device) => (
+        device.hwid === editingDevice.hwid ? { ...device, displayName } : device
+      )) ?? [])
+      setEditingDevice(null)
+    } catch (e) {
+      setRenameError(e instanceof Error ? e.message : 'Не удалось переименовать устройство')
+    } finally {
+      setRenaming(false)
     }
   }
 
@@ -195,6 +234,7 @@ export function DevicesList({ embedded = false, deviceLimit, subscriptionUrl }: 
                 device={device}
                 loading={removingHwid === device.hwid}
                 onRemove={() => setSelectedDevice(device)}
+                onRename={() => openRename(device)}
               />
             ))}
           </div>
@@ -221,6 +261,15 @@ export function DevicesList({ embedded = false, deviceLimit, subscriptionUrl }: 
           loading={bulkRemoving}
           onCancel={() => setBulkDialogOpen(false)}
           onConfirm={removeAllDevices}
+        />
+        <DeviceRenameDialog
+          device={editingDevice}
+          value={renameDraft}
+          loading={renaming}
+          error={renameError}
+          onChange={setRenameDraft}
+          onClose={() => !renaming && setEditingDevice(null)}
+          onSave={() => void renameDevice()}
         />
       </>
     )
@@ -269,6 +318,7 @@ export function DevicesList({ embedded = false, deviceLimit, subscriptionUrl }: 
               device={d}
               loading={removingHwid === d.hwid}
               onRemove={() => setSelectedDevice(d)}
+              onRename={() => openRename(d)}
             />
           ))}
         </div>
@@ -295,6 +345,15 @@ export function DevicesList({ embedded = false, deviceLimit, subscriptionUrl }: 
         loading={bulkRemoving}
         onCancel={() => setBulkDialogOpen(false)}
         onConfirm={removeAllDevices}
+      />
+      <DeviceRenameDialog
+        device={editingDevice}
+        value={renameDraft}
+        loading={renaming}
+        error={renameError}
+        onChange={setRenameDraft}
+        onClose={() => !renaming && setEditingDevice(null)}
+        onSave={() => void renameDevice()}
       />
     </>
   )
@@ -339,10 +398,12 @@ function DeviceCard({
   device,
   loading,
   onRemove,
+  onRename,
 }: {
   device: Device
   loading: boolean
   onRemove: () => void
+  onRename: () => void
 }) {
   const activity = getActivityState(device.updatedAt || device.createdAt)
   const Icon = getDeviceIcon(device)
@@ -367,7 +428,13 @@ function DeviceCard({
           <div className="mt-0.5 break-words font-medium text-slate-600 dark:text-slate-300">{formatDeviceDate(device.updatedAt || device.createdAt)}</div>
           <div className="mt-0.5 break-all font-mono text-[11px]" title={device.hwid}>ID {shortDeviceId(device.hwid)}</div>
         </div>
-        <DeviceActionButton loading={loading} label="Отвязать" onClick={onRemove} />
+        <div className="flex gap-2">
+          <button type="button" className="btn-secondary h-10 px-3" onClick={onRename}>
+            <Pencil className="h-4 w-4" />
+            Имя
+          </button>
+          <DeviceActionButton loading={loading} label="Отвязать" onClick={onRemove} />
+        </div>
       </div>
     </article>
   )
@@ -377,10 +444,12 @@ function CompactDeviceRow({
   device,
   loading,
   onRemove,
+  onRename,
 }: {
   device: Device
   loading: boolean
   onRemove: () => void
+  onRename: () => void
 }) {
   const activity = getActivityState(device.updatedAt || device.createdAt)
   const Icon = getDeviceIcon(device)
@@ -402,6 +471,14 @@ function CompactDeviceRow({
           <span className="truncate">{activity.label}</span>
         </div>
       </div>
+      <button
+        type="button"
+        className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-white/[0.06] dark:hover:text-white"
+        onClick={onRename}
+        aria-label={`Переименовать ${getDeviceTitle(device)}`}
+      >
+        <Pencil className="h-4 w-4" />
+      </button>
       <button
         type="button"
         className="device-row__remove grid h-9 w-9 shrink-0 place-items-center rounded-lg text-slate-400 transition-colors hover:bg-red-50 hover:text-red-700 disabled:opacity-50 dark:hover:bg-red-500/10 dark:hover:text-red-200"
@@ -508,13 +585,69 @@ function DevicesSkeleton({ compact = false }: { compact?: boolean }) {
 }
 
 function getDeviceTitle(device: Device) {
+  if (device.displayName) return device.displayName
   if (device.deviceModel && device.platform) return `${device.deviceModel} · ${device.platform}`
   return device.deviceModel || device.platform || 'Неизвестное устройство'
 }
 
 function getDeviceSubtitle(device: Device) {
-  const parts = [device.osVersion ? `OS ${device.osVersion}` : null, device.ip].filter(Boolean)
+  const technicalName = device.displayName
+    ? [device.deviceModel, device.platform].filter(Boolean).join(' · ')
+    : null
+  const parts = [technicalName || null, device.osVersion ? `OS ${device.osVersion}` : null, device.ip].filter(Boolean)
   return parts.length > 0 ? parts.join(' · ') : device.userAgent || 'Детали устройства не переданы'
+}
+
+function DeviceRenameDialog({
+  device,
+  value,
+  loading,
+  error,
+  onChange,
+  onClose,
+  onSave,
+}: {
+  device: Device | null
+  value: string
+  loading: boolean
+  error: string | null
+  onChange: (value: string) => void
+  onClose: () => void
+  onSave: () => void
+}) {
+  const inputRef = useRef<HTMLInputElement | null>(null)
+  return (
+    <Modal
+      open={Boolean(device)}
+      title="Название устройства"
+      description="Например: iPhone Артёма или Рабочий ноутбук"
+      variant="sheet"
+      panelClassName="sm:max-w-md"
+      initialFocusRef={inputRef}
+      onClose={onClose}
+      footer={(
+        <div className="grid grid-cols-2 gap-2 sm:flex sm:justify-end">
+          <Button variant="secondary" disabled={loading} onClick={onClose}>Отмена</Button>
+          <Button disabled={loading || !value.trim() || value.trim().length > 40} onClick={onSave}>
+            {loading ? 'Сохраняем...' : 'Сохранить'}
+          </Button>
+        </div>
+      )}
+    >
+      <Input
+        ref={inputRef}
+        value={value}
+        maxLength={40}
+        placeholder="Введите название"
+        onChange={(event) => onChange(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' && value.trim() && !loading) onSave()
+        }}
+      />
+      {error ? <p className="mt-2 text-sm text-red-600 dark:text-red-300">{error}</p> : null}
+      <div className="mt-2 text-right text-xs text-slate-400">{value.length}/40</div>
+    </Modal>
+  )
 }
 
 function getDeviceIcon(device: Device) {

@@ -5,10 +5,16 @@ export async function syncLocalDevicesFromRemnawave(input: {
   localUserId: string
   reference: RemnawaveUserReference
 }) {
+  const localDevices = await prisma.device.findMany({
+    where: { userId: input.localUserId },
+    select: { hwid: true, displayName: true },
+  })
+  const displayNames = new Map(localDevices.map((device) => [device.hwid, device.displayName]))
   const remoteUser = (await remnawave.getUser(input.reference)).response
   const data = await remnawave.getUserDevices(remoteUser)
   const devices = data.response.devices.map((device) => ({
     hwid: device.hwid,
+    displayName: displayNames.get(device.hwid) ?? null,
     platform: device.platform ?? device.deviceModel ?? null,
     osVersion: device.osVersion ?? null,
     deviceModel: device.deviceModel ?? null,

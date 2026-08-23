@@ -19,7 +19,7 @@ export async function reconcileSubscriptionExpiryNotifications(options?: {
     plan: { select: { name: true } },
   } as const
 
-  const [upcoming, expired] = await Promise.all([
+  const [upcoming, graceEnding, expired] = await Promise.all([
     prisma.subscription.findMany({
       where: {
         status: { in: ['ACTIVE', 'LIMITED'] },
@@ -31,6 +31,23 @@ export async function reconcileSubscriptionExpiryNotifications(options?: {
       orderBy: { expireAt: 'asc' },
       take: batchSize,
       select,
+    }),
+    prisma.subscription.findMany({
+      where: {
+        status: 'LIMITED',
+        graceExpireAt: {
+          gt: now,
+          lte: new Date(nowMs + DAY_MS),
+        },
+      },
+      orderBy: { graceExpireAt: 'asc' },
+      take: batchSize,
+      select: {
+        id: true,
+        userId: true,
+        graceExpireAt: true,
+        plan: { select: { name: true } },
+      },
     }),
     prisma.subscription.findMany({
       where: {
@@ -61,6 +78,19 @@ export async function reconcileSubscriptionExpiryNotifications(options?: {
     sent += 1
   }
 
+  for (const subscription of graceEnding) {
+    if (shouldStop()) break
+    if (!subscription.graceExpireAt) continue
+    await notifySubscriptionExpiring({
+      userId: subscription.userId,
+      subscriptionId: subscription.id,
+      expireAt: subscription.graceExpireAt,
+      stage: 'grace_1d',
+      planName: subscription.plan?.name,
+    })
+    sent += 1
+  }
+
   for (const subscription of expired) {
     if (shouldStop()) break
     await notifySubscriptionExpiring({
@@ -73,5 +103,5 @@ export async function reconcileSubscriptionExpiryNotifications(options?: {
     sent += 1
   }
 
-  return { checked: upcoming.length + expired.length, sent }
+  return { checked: upcoming.length + graceEnding.length + expired.length, sent }
 }
