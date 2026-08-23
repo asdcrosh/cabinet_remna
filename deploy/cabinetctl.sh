@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="1.9.10"
+VERSION="1.9.11"
 BRANCH="${BRANCH:-main}"
 RAW_BASE_URL="${RAW_BASE_URL:-https://raw.githubusercontent.com/asdcrosh/cabinet_remna/${BRANCH}}"
 GITHUB_API_URL="${GITHUB_API_URL:-https://api.github.com/repos/asdcrosh/cabinet_remna/commits/${BRANCH}}"
 GITHUB_WORKFLOW_RUNS_URL="${GITHUB_WORKFLOW_RUNS_URL:-https://api.github.com/repos/asdcrosh/cabinet_remna/actions/workflows/docker-image.yml/runs}"
+GITHUB_COMMITS_ATOM_URL="${GITHUB_COMMITS_ATOM_URL:-https://github.com/asdcrosh/cabinet_remna/commits/${BRANCH}.atom}"
+GHCR_REPOSITORY="${GHCR_REPOSITORY:-asdcrosh/cabinet_remna}"
 OFFICIAL_RAW_REPOSITORY="https://raw.githubusercontent.com/asdcrosh/cabinet_remna"
 OFFICIAL_CONTENTS_API="https://api.github.com/repos/asdcrosh/cabinet_remna/contents"
 INSTALL_URL="${INSTALL_URL:-${RAW_BASE_URL}/deploy/install-server.sh}"
@@ -40,6 +42,7 @@ REMOTE_CONSOLE_VERSION=""
 LAST_LIVE_REFRESH_AT=0
 LIVE_CONSOLE_STATUS=""
 LIVE_IMAGE_STATUS=""
+LAST_LIVE_TIMER_VALUE=""
 
 if [[ -t 1 ]]; then
   BOLD=$'\033[1m'
@@ -407,6 +410,45 @@ remote_commit_sha() {
     | head -n 1
 }
 
+remote_branch_sha() {
+  local response
+  response="$(curl -fsSL --connect-timeout 3 --max-time 10 "${GITHUB_COMMITS_ATOM_URL}" 2>/dev/null || true)"
+  printf '%s\n' "${response}" \
+    | sed -n 's#.*Grit::Commit/\([0-9a-f]\{40\}\).*#\1#p' \
+    | head -n 1
+}
+
+ghcr_pull_token() {
+  local response
+  response="$(curl -fsSL --connect-timeout 3 --max-time 10 \
+    --get \
+    --data-urlencode 'service=ghcr.io' \
+    --data-urlencode "scope=repository:${GHCR_REPOSITORY}:pull" \
+    'https://ghcr.io/token' 2>/dev/null || true)"
+  GHCR_TOKEN_RESPONSE="${response}" python3 <<'PY'
+import json
+import os
+
+try:
+    print(json.loads(os.environ.get("GHCR_TOKEN_RESPONSE", "{}"))["token"])
+except (KeyError, TypeError, ValueError):
+    pass
+PY
+}
+
+ghcr_image_exists() {
+  local sha="$1" token status
+  [[ "${sha}" =~ ^[0-9a-f]{40}$ ]] || return 1
+  token="$(ghcr_pull_token)"
+  [[ -n "${token}" ]] || return 1
+  status="$(curl -sS -o /dev/null -w '%{http_code}' \
+    --connect-timeout 3 --max-time 10 \
+    -H "Authorization: Bearer ${token}" \
+    -H 'Accept: application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.list.v2+json, application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.v2+json' \
+    "https://ghcr.io/v2/${GHCR_REPOSITORY}/manifests/sha-${sha}" 2>/dev/null || true)"
+  [[ "${status}" == "200" ]]
+}
+
 resolve_release_sha() {
   local details workflow_sha workflow_status workflow_conclusion workflow_url
   if [[ "${RESOLVED_RELEASE_SHA}" =~ ^[0-9a-f]{40}$ ]]; then
@@ -525,8 +567,13 @@ remote_image_sha() {
 }
 
 latest_workflow_details() {
-  local response
+  local branch_sha response
   command -v curl >/dev/null 2>&1 || return 1
+  branch_sha="$(remote_branch_sha || true)"
+  if ghcr_image_exists "${branch_sha}"; then
+    printf '%s|completed|success|\n' "${branch_sha}"
+    return 0
+  fi
   response="$(curl -fsSL --connect-timeout 2 --max-time 5 \
     -H 'Accept: application/vnd.github+json' \
     --get \
@@ -550,6 +597,9 @@ try:
 except (IndexError, TypeError, ValueError):
     pass
 PY
+  if [[ -z "${response}" && "${branch_sha}" =~ ^[0-9a-f]{40}$ ]]; then
+    printf '%s|queued||\n' "${branch_sha}"
+  fi
 }
 
 installed_commit_sha() {
@@ -1089,8 +1139,22 @@ show_menu() {
   fi
   printf '\n  %s↑/↓ или цифра%s  выбрать   %sEnter%s  запустить\n' \
     "${CYAN}${BOLD}" "${RESET}" "${CYAN}${BOLD}" "${RESET}" >/dev/tty
-  printf '  %sСтатусы Docker-образа и cabinetctl обновляются каждые %s сек.%s' \
-    "${DIM}" "$(live_refresh_interval)" "${RESET}" >/dev/tty
+  print_live_refresh_notice "$(live_refresh_interval)" >/dev/tty
+}
+
+print_live_refresh_notice() {
+  local remaining="$1"
+  printf '  %sСледующая проверка Docker-образа и cabinetctl через %s сек.%s' \
+    "${DIM}" "${remaining}" "${RESET}"
+}
+
+render_live_refresh_timer() {
+  local remaining="$1"
+  [[ "${remaining}" == "${LAST_LIVE_TIMER_VALUE}" ]] && return 0
+  LAST_LIVE_TIMER_VALUE="${remaining}"
+  printf '\0337\r\033[2K' >/dev/tty
+  print_live_refresh_notice "${remaining}" >/dev/tty
+  printf '\0338' >/dev/tty
 }
 
 print_menu_single() {
@@ -1251,8 +1315,10 @@ read_menu_choice() {
   refresh_live_statuses
   show_menu
   remember_live_statuses
+  LAST_LIVE_TIMER_VALUE="$(live_refresh_interval)"
   printf '\033[?25l' 2>/dev/null >/dev/tty || return 1
-  local key escape_tail now previous_selection
+  local key escape_tail now previous_selection interval remaining
+  interval="$(live_refresh_interval)"
   while [[ -z "${MENU_CHOICE}" ]]; do
     key=""
     if IFS= read -r -s -n 1 -t 1 key 2>/dev/null </dev/tty; then
@@ -1285,9 +1351,12 @@ read_menu_choice() {
     fi
 
     now="$(date +%s)"
-    if ((now - LAST_LIVE_REFRESH_AT >= $(live_refresh_interval))); then
+    if ((now - LAST_LIVE_REFRESH_AT >= interval)); then
       refresh_and_render_live_statuses
     fi
+    remaining=$((interval - (now - LAST_LIVE_REFRESH_AT)))
+    ((remaining < 0)) && remaining=0
+    render_live_refresh_timer "${remaining}"
   done
   printf '\033[?25h' 2>/dev/null >/dev/tty || true
   printf '\r\033[2K  %s›%s %s\n' "${CYAN}" "${RESET}" "${MENU_CHOICE}" >/dev/tty
@@ -1377,7 +1446,7 @@ case "${1:-menu}" in
 esac
 
 if [[ "$(id -u)" -ne 0 ]]; then
-  exec sudo --preserve-env=BRANCH,RAW_BASE_URL,GITHUB_API_URL,GITHUB_WORKFLOW_RUNS_URL,INSTALL_URL,UPDATE_URL,NGINX_SETUP_URL,CONSOLE_INSTALL_URL,BACKUP_SCRIPT_URL,NODE_PROVISIONING_CONFIG_URL,ENV_TEMPLATE_URL,CABINETCTL_PATH,BACKUP_SCRIPT_PATH,NODE_PROVISIONING_CONFIG_PATH,INSTALL_DIR,CABINET_VERSION_FILE,CABINET_STATE_DIR,CABINETCTL_UPDATE_CACHE,CABINETCTL_UPDATE_CACHE_TTL,CABINETCTL_CHECK_UPDATES_IN_MENU,CABINETCTL_LIVE_REFRESH_INTERVAL "$0" "$@"
+  exec sudo --preserve-env=BRANCH,RAW_BASE_URL,GITHUB_API_URL,GITHUB_WORKFLOW_RUNS_URL,GITHUB_COMMITS_ATOM_URL,GHCR_REPOSITORY,INSTALL_URL,UPDATE_URL,NGINX_SETUP_URL,CONSOLE_INSTALL_URL,BACKUP_SCRIPT_URL,NODE_PROVISIONING_CONFIG_URL,ENV_TEMPLATE_URL,CABINETCTL_PATH,BACKUP_SCRIPT_PATH,NODE_PROVISIONING_CONFIG_PATH,INSTALL_DIR,CABINET_VERSION_FILE,CABINET_STATE_DIR,CABINETCTL_UPDATE_CACHE,CABINETCTL_UPDATE_CACHE_TTL,CABINETCTL_CHECK_UPDATES_IN_MENU,CABINETCTL_LIVE_REFRESH_INTERVAL "$0" "$@"
 fi
 
 case "${1:-menu}" in
