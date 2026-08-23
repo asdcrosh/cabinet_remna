@@ -111,6 +111,8 @@ describe('production deployment security', () => {
     expect(cabinetctl).not.toContain('if [[ -n "${CABINET_IMAGE:-}" ]]')
     expect(cabinetctl).toContain("printf '%s|%s|%s\\n' \"$(date +%s)\" \"${VERSION}\" \"${status}\"")
     expect(cabinetctl).toContain('[[ "${cache_version}" == "${VERSION}" ]] || return 1')
+    expect(cabinetctl).toContain('console_badge="$(console_update_badge)"')
+    expect(cabinetctl).toContain('[ ДОСТУПНА v%s ]')
     expect(cabinetctl).toContain('details="$(latest_workflow_details || true)"')
     expect(cabinetctl).toContain('RESOLVED_RELEASE_SHA="${workflow_sha}"')
     expect(cabinetctl).not.toContain("--data-urlencode 'status=success'")

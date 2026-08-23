@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="1.9.4"
+VERSION="1.9.5"
 BRANCH="${BRANCH:-main}"
 RAW_BASE_URL="${RAW_BASE_URL:-https://raw.githubusercontent.com/asdcrosh/cabinet_remna/${BRANCH}}"
 GITHUB_API_URL="${GITHUB_API_URL:-https://api.github.com/repos/asdcrosh/cabinet_remna/commits/${BRANCH}}"
@@ -216,6 +216,36 @@ print_service_grid_row() {
     "$(state_marker "${left_state}")" "$(pad_text "${left_label}" 11)" "$(state_color "${left_state}")${BOLD}" \
     "$(pad_text "[ $(state_text "${left_state}") ]" 14)" "${RESET}" "$(state_marker "${right_state}")" \
     "$(pad_text "${right_label}" 11)" "$(state_color "${right_state}")${BOLD}" "[ $(state_text "${right_state}") ]" "${RESET}"
+}
+
+remote_console_version() {
+  local source
+  command -v curl >/dev/null 2>&1 || return 1
+  source="$(curl -fsSL --proto '=https' --tlsv1.2 --connect-timeout 2 --max-time 5 \
+    "${RAW_BASE_URL}/deploy/cabinetctl.sh?cache=$(date +%s)" 2>/dev/null || true)"
+  printf '%s\n' "${source}" \
+    | sed -n 's/^VERSION="\([0-9][0-9.]*\)"$/\1/p' \
+    | head -n 1
+}
+
+console_update_badge() {
+  local remote_version
+  remote_version="$(remote_console_version || true)"
+  [[ "${remote_version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || return 0
+  if version_is_newer "${remote_version}" "${VERSION}"; then
+    printf '  %s%s[ ДОСТУПНА v%s ]%s' "${YELLOW}" "${BOLD}" "${remote_version}" "${RESET}"
+  fi
+}
+
+version_is_newer() {
+  local candidate="$1" current="$2"
+  local candidate_major candidate_minor candidate_patch
+  local current_major current_minor current_patch
+  IFS='.' read -r candidate_major candidate_minor candidate_patch <<<"${candidate}"
+  IFS='.' read -r current_major current_minor current_patch <<<"${current}"
+  (( candidate_major > current_major )) \
+    || (( candidate_major == current_major && candidate_minor > current_minor )) \
+    || (( candidate_major == current_major && candidate_minor == current_minor && candidate_patch > current_patch ))
 }
 
 register_animated_marker() {
@@ -1048,8 +1078,10 @@ restore_backup() {
 }
 
 show_header() {
+  local console_badge
+  console_badge="$(console_update_badge)"
   printf '\033[H\033[2J'
-  printf '%s\n' "${BOLD}${CYAN}REMNAWAVE CABINET${RESET}  ${DIM}v${VERSION}${RESET}"
+  printf '%s\n' "${BOLD}${CYAN}REMNAWAVE CABINET${RESET}  ${DIM}v${VERSION}${RESET}${console_badge}"
   printf '%s\n' "${DIM}${CABINET_DIR}${RESET}"
   printf '\n'
   show_status
