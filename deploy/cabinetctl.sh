@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="1.9.8"
+VERSION="1.9.9"
 BRANCH="${BRANCH:-main}"
 RAW_BASE_URL="${RAW_BASE_URL:-https://raw.githubusercontent.com/asdcrosh/cabinet_remna/${BRANCH}}"
 GITHUB_API_URL="${GITHUB_API_URL:-https://api.github.com/repos/asdcrosh/cabinet_remna/commits/${BRANCH}}"
@@ -1106,10 +1106,9 @@ restore_backup() {
 }
 
 show_header() {
-  local console_badge
-  console_badge="$(console_update_badge)"
   printf '\033[H\033[2J'
-  printf '%s\n' "${BOLD}${CYAN}REMNAWAVE CABINET${RESET}  ${DIM}v${VERSION}${RESET}${console_badge}"
+  print_console_header
+  printf '\n'
   printf '%s\n' "${DIM}${CABINET_DIR}${RESET}"
   printf '\n'
   show_status
@@ -1118,6 +1117,12 @@ show_header() {
   if [[ -n "${ENV_SYNC_NOTICE}" ]]; then
     print_status_row "${CYAN}+${RESET}" ".env" "${CYAN}${ENV_SYNC_NOTICE}${RESET}"
   fi
+}
+
+print_console_header() {
+  local console_badge
+  console_badge="$(console_update_badge)"
+  printf '%s' "${BOLD}${CYAN}REMNAWAVE CABINET${RESET}  ${DIM}v${VERSION}${RESET}${console_badge}"
 }
 
 show_menu() {
@@ -1262,6 +1267,24 @@ render_menu_selection_change() {
   start_status_animation
 }
 
+update_status_screen_row() {
+  if docker_available && docker_running && cabinet_installed; then
+    printf '9'
+  else
+    printf '5'
+  fi
+}
+
+render_live_update_statuses() {
+  local update_row
+  update_row="$(update_status_screen_row)"
+  printf '\0337\033[1;1H\033[2K' >/dev/tty
+  print_console_header >/dev/tty
+  printf '\033[%s;1H\033[2K' "${update_row}" >/dev/tty
+  update_status_line >/dev/tty
+  printf '\0338' >/dev/tty
+}
+
 read_menu_choice() {
   MENU_CHOICE=""
   ensure_valid_menu_selection
@@ -1305,7 +1328,7 @@ read_menu_choice() {
     if ((now - LAST_LIVE_REFRESH_AT >= $(live_refresh_interval))); then
       stop_status_animation
       refresh_live_statuses
-      show_menu
+      render_live_update_statuses
       start_status_animation
     fi
   done
