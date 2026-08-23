@@ -93,15 +93,27 @@ export const POST = withAuth(async (req: Request) => {
     )
   }
   await reconcileStalePendingPaymentsForUser(user.id)
+  const now = new Date()
   const activeSubscription = isWhitelistAddon
     ? await prisma.subscription.findFirst({
         where: {
           userId: user.id,
           planId: plan.id,
           status: { in: ['ACTIVE', 'LIMITED'] },
-          expireAt: { gt: new Date() },
+          expireAt: { gt: now },
         },
         orderBy: { expireAt: 'desc' },
+      })
+    : null
+  const currentSubscription = !isWhitelistAddon
+    ? await prisma.subscription.findFirst({
+        where: {
+          userId: user.id,
+          status: { in: ['ACTIVE', 'LIMITED'] },
+          expireAt: { gt: now },
+        },
+        orderBy: { expireAt: 'desc' },
+        include: { plan: { select: { id: true, name: true } } },
       })
     : null
 
@@ -145,6 +157,16 @@ export const POST = withAuth(async (req: Request) => {
     ) {
       return NextResponse.json({ error: 'Дополнение для этого тарифа не настроено' }, { status: 422 })
     }
+    if (
+      currentSubscription?.whitelistAddonActive
+      && currentSubscription.whitelistAddonExpireAt
+      && currentSubscription.whitelistAddonExpireAt > now
+    ) {
+      return NextResponse.json({
+        error: 'БС уже подключены и сохранятся при смене тарифа. Продлить их можно отдельно на главной странице.',
+        code: 'WHITELIST_ADDON_ALREADY_ACTIVE',
+      }, { status: 409 })
+    }
   }
 
   const audienceContext = await getPlanAudienceContext(user.id)
@@ -185,7 +207,9 @@ export const POST = withAuth(async (req: Request) => {
       throw error
     }
   }
-  const planSnapshot = isWhitelistAddon ? null : buildPlanPurchaseSnapshot(plan, pricing)
+  const planSnapshot = isWhitelistAddon
+    ? null
+    : buildPlanPurchaseSnapshot(plan, pricing, currentSubscription?.plan ?? null)
   const addonSnapshot = isWhitelistAddon && activeSubscription
     ? buildWhitelistAddonSnapshot({
         planId: plan.id,

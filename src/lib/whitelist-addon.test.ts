@@ -173,6 +173,7 @@ describe('whitelist add-on', () => {
         id: 'subscription-1',
         whitelistAddonActive: true,
         whitelistAddonPaymentId: 'payment-1',
+        plan: { activeInternalSquads: ['current-base-squad'] },
       },
       user: { id: 'user-1', remnawaveUuid: 'rw-1' },
       plan: { activeInternalSquads: ['base-squad'] },
@@ -183,7 +184,7 @@ describe('whitelist add-on', () => {
     await expect(revokeWhitelistAddonForPayment('payment-1')).resolves.toEqual({ revoked: true })
     expect(mocks.remnawave.updateUser).toHaveBeenCalledWith(
       { uuid: 'rw-1' },
-      { activeInternalSquads: ['base-squad'] }
+      { activeInternalSquads: ['current-base-squad'] }
     )
     expect(mocks.prisma.subscription.update).toHaveBeenCalledWith({
       where: { id: 'subscription-1' },

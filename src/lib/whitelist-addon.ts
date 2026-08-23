@@ -149,6 +149,7 @@ export async function provisionWhitelistAddon(paymentId: string) {
         whitelistAddonActivatedAt: activatedAt,
         whitelistAddonExpireAt: expireAt,
         whitelistAddonPaymentId: payment.id,
+        whitelistAddonInternalSquads: snapshot.internalSquads,
         lastSyncedAt: activatedAt,
       },
     })
@@ -173,7 +174,7 @@ export async function provisionWhitelistAddon(paymentId: string) {
 export async function revokeWhitelistAddonForPayment(paymentId: string) {
   const payment = await prisma.payment.findUnique({
     where: { id: paymentId },
-    include: { user: true, plan: true, subscription: true },
+    include: { user: true, plan: true, subscription: { include: { plan: true } } },
   })
   const subscription = payment?.subscription
   if (
@@ -189,7 +190,9 @@ export async function revokeWhitelistAddonForPayment(paymentId: string) {
   }
 
   await remnawave.updateUser(remnawaveUserReference(payment.user), {
-    activeInternalSquads: resolvePlanActiveInternalSquads(payment.plan.activeInternalSquads),
+    activeInternalSquads: resolvePlanActiveInternalSquads(
+      subscription.plan?.activeInternalSquads ?? payment.plan.activeInternalSquads
+    ),
   })
   await prisma.subscription.update({
     where: { id: subscription.id },
@@ -198,6 +201,7 @@ export async function revokeWhitelistAddonForPayment(paymentId: string) {
       whitelistAddonActivatedAt: null,
       whitelistAddonExpireAt: null,
       whitelistAddonPaymentId: null,
+      whitelistAddonInternalSquads: [],
       lastSyncedAt: new Date(),
     },
   })
@@ -245,6 +249,7 @@ export async function grantWhitelistAddonManually(input: {
       whitelistAddonActivatedAt: now,
       whitelistAddonExpireAt: input.expireAt,
       whitelistAddonPaymentId: null,
+      whitelistAddonInternalSquads: subscription.plan.whitelistAddonInternalSquads,
       lastSyncedAt: now,
     },
   })
@@ -274,6 +279,7 @@ export async function revokeWhitelistAddonManually(userId: string) {
       whitelistAddonActivatedAt: null,
       whitelistAddonExpireAt: null,
       whitelistAddonPaymentId: null,
+      whitelistAddonInternalSquads: [],
       lastSyncedAt: new Date(),
     },
   })
@@ -314,6 +320,7 @@ export async function reconcileExpiredWhitelistAddons(options?: {
         },
         data: {
           whitelistAddonActive: false,
+          whitelistAddonInternalSquads: [],
           lastSyncedAt: new Date(),
         },
       })

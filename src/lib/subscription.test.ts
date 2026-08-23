@@ -206,7 +206,18 @@ describe('ensureRemnawaveSubscription', () => {
       id: 'user-1',
       email: 'user@example.com',
       remnawaveUuid: 'rw-1',
-      subscriptions: [{ id: 'sub-1', planId: 'old-plan', expireAt: currentExpireAt, status: 'ACTIVE' }],
+      subscriptions: [{
+        id: 'sub-1',
+        planId: 'old-plan',
+        expireAt: currentExpireAt,
+        status: 'ACTIVE',
+        whitelistAddonActive: true,
+        whitelistAddonActivatedAt: new Date('2025-12-20T00:00:00.000Z'),
+        whitelistAddonExpireAt: new Date('2026-01-20T00:00:00.000Z'),
+        whitelistAddonPaymentId: 'addon-payment',
+        whitelistAddonInternalSquads: ['old-whitelist-squad'],
+        plan: { whitelistAddonInternalSquads: ['legacy-plan-squad'] },
+      }],
     })
     mocks.remnawave.updateUser.mockResolvedValue({ response: remnawaveUser })
     mocks.prisma.subscription.update.mockResolvedValue({ id: 'sub-1' })
@@ -221,6 +232,7 @@ describe('ensureRemnawaveSubscription', () => {
       expect.objectContaining({ uuid: 'rw-1' }),
       expect.objectContaining({
         expireAt: new Date('2026-01-31T00:00:00.000Z').toISOString(),
+        activeInternalSquads: ['squad-1', 'squad-2', 'old-whitelist-squad'],
       })
     )
     expect(mocks.prisma.subscription.update).toHaveBeenCalledWith(
@@ -229,10 +241,11 @@ describe('ensureRemnawaveSubscription', () => {
         data: expect.objectContaining({
           planId: 'plan-1',
           startAt: new Date('2026-01-01T00:00:00.000Z'),
-          whitelistAddonActive: false,
-          whitelistAddonActivatedAt: null,
-          whitelistAddonExpireAt: null,
-          whitelistAddonPaymentId: null,
+          whitelistAddonActive: true,
+          whitelistAddonActivatedAt: new Date('2025-12-20T00:00:00.000Z'),
+          whitelistAddonExpireAt: new Date('2026-01-20T00:00:00.000Z'),
+          whitelistAddonPaymentId: 'addon-payment',
+          whitelistAddonInternalSquads: ['old-whitelist-squad'],
         }),
       })
     )

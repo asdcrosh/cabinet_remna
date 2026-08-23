@@ -118,6 +118,7 @@ describe('payment create route', () => {
     mocks.prisma.user.findUnique.mockResolvedValue(user)
     mocks.prisma.payment.findUnique.mockResolvedValue(null)
     mocks.prisma.payment.findFirst.mockResolvedValue(null)
+    mocks.prisma.subscription.findFirst.mockResolvedValue(null)
     mocks.reconcileStalePendingPaymentsForUser.mockResolvedValue(undefined)
     mocks.getPlanAudienceContext.mockResolvedValue({})
     mocks.isPlanAvailableForUser.mockReturnValue(true)
@@ -263,6 +264,48 @@ describe('payment create route', () => {
       localPaymentId: 'payment-1',
       provider: 'YOOKASSA',
     })
+  })
+
+  it('records the previous tariff when creating a switch payment', async () => {
+    mocks.prisma.subscription.findFirst.mockResolvedValue({
+      id: 'subscription-1',
+      planId: 'old-plan',
+      status: 'ACTIVE',
+      expireAt: new Date('2026-09-01T00:00:00.000Z'),
+      whitelistAddonActive: false,
+      plan: { id: 'old-plan', name: 'Старый' },
+    })
+
+    const response = await POST(paymentRequest())
+
+    expect(response.status).toBe(200)
+    expect(mocks.txPaymentCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        planSnapshot: expect.objectContaining({
+          name: plan.name,
+          switchFromPlan: { id: 'old-plan', name: 'Старый' },
+        }),
+      }),
+    })
+  })
+
+  it('does not sell bundled whitelist access again during a tariff switch', async () => {
+    mocks.prisma.subscription.findFirst.mockResolvedValue({
+      id: 'subscription-1',
+      planId: 'old-plan',
+      status: 'ACTIVE',
+      expireAt: new Date('2026-09-01T00:00:00.000Z'),
+      whitelistAddonActive: true,
+      whitelistAddonExpireAt: new Date('2026-08-28T00:00:00.000Z'),
+      plan: { id: 'old-plan', name: 'Старый' },
+    })
+
+    const response = await POST(paymentRequest({ whitelistAddon: true }))
+    const body = await response.json()
+
+    expect(response.status).toBe(409)
+    expect(body.code).toBe('WHITELIST_ADDON_ALREADY_ACTIVE')
+    expect(mocks.prisma.$transaction).not.toHaveBeenCalled()
   })
 
   it('adds the whitelist add-on to a subscription checkout', async () => {

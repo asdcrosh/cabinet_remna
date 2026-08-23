@@ -604,6 +604,7 @@ model Subscription {
   whitelistAddonActivatedAt DateTime?
   whitelistAddonExpireAt    DateTime?
   whitelistAddonPaymentId   String?
+  whitelistAddonInternalSquads String[] @default([])
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

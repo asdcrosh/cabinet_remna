@@ -144,6 +144,12 @@ export default async function PlansPage({
     && autoRenewal?.status === 'ACTIVE'
     && autoRenewal.paymentMethodSavedAt
   )
+  const currentPlanName = plans.find((plan) => plan.id === currentSubscription?.planId)?.name ?? null
+  const currentWhitelistAddonActive = Boolean(
+    currentSubscription?.whitelistAddonActive
+    && currentSubscription.whitelistAddonExpireAt
+    && currentSubscription.whitelistAddonExpireAt.getTime() > Date.now()
+  )
   const planViews = visiblePlans.map((plan) => ({
     id: plan.id,
     name: plan.name,
@@ -167,6 +173,12 @@ export default async function PlansPage({
     promoCodesEnabled: plan.promoCodesEnabled,
     popular: plan.isFeatured,
     current: currentSubscription?.planId === plan.id,
+    isPlanSwitch: Boolean(currentSubscription && currentSubscription.planId !== plan.id),
+    currentPlanName,
+    currentWhitelistAddonActive,
+    currentWhitelistAddonExpireAt: currentWhitelistAddonActive
+      ? currentSubscription?.whitelistAddonExpireAt?.toISOString() ?? null
+      : null,
     autoRenewalEnabled: autoRenewalConsentCurrent && autoRenewal?.plan.id === plan.id,
     autoRenewalWhitelistAddonEnabled: autoRenewal?.plan.id === plan.id
       && autoRenewal.whitelistAddonEnabled,

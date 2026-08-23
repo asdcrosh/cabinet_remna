@@ -37,6 +37,7 @@ export interface PlanPurchaseSnapshot {
   originalAmountKopecks: number
   activeInternalSquads: string[]
   deviceLimitSelectionConfirmed: boolean
+  switchFromPlan: { id: string; name: string } | null
 }
 
 export class DeviceLimitSelectionError extends Error {
@@ -80,7 +81,11 @@ export function calculatePlanPurchase(
   }
 }
 
-export function buildPlanPurchaseSnapshot(plan: DevicePricedPlan, pricing: PlanPurchasePricing): PlanPurchaseSnapshot {
+export function buildPlanPurchaseSnapshot(
+  plan: DevicePricedPlan,
+  pricing: PlanPurchasePricing,
+  currentPlan?: { id: string; name: string } | null
+): PlanPurchaseSnapshot {
   return {
     version: 1,
     id: plan.id,
@@ -98,6 +103,9 @@ export function buildPlanPurchaseSnapshot(plan: DevicePricedPlan, pricing: PlanP
     originalAmountKopecks: pricing.originalAmountKopecks,
     activeInternalSquads: plan.activeInternalSquads,
     deviceLimitSelectionConfirmed: true,
+    switchFromPlan: currentPlan && currentPlan.id !== plan.id
+      ? { id: currentPlan.id, name: currentPlan.name }
+      : null,
   }
 }
 
@@ -127,6 +135,17 @@ export function readPlanPurchaseSnapshot(snapshot: unknown): PlanPurchaseSnapsho
   if (trafficLimitGb !== null && !isPositiveInteger(trafficLimitGb)) return null
   const remnashopPlanId = value.remnashopPlanId
   if (remnashopPlanId !== null && remnashopPlanId !== undefined && !isPositiveInteger(remnashopPlanId)) return null
+  const switchFromPlan = value.switchFromPlan
+  if (
+    switchFromPlan !== null
+    && switchFromPlan !== undefined
+    && (
+      typeof switchFromPlan !== 'object'
+      || Array.isArray(switchFromPlan)
+      || typeof Reflect.get(switchFromPlan, 'id') !== 'string'
+      || typeof Reflect.get(switchFromPlan, 'name') !== 'string'
+    )
+  ) return null
 
   return {
     version: 1,
@@ -145,6 +164,12 @@ export function readPlanPurchaseSnapshot(snapshot: unknown): PlanPurchaseSnapsho
     originalAmountKopecks: value.originalAmountKopecks,
     activeInternalSquads: value.activeInternalSquads as string[],
     deviceLimitSelectionConfirmed: value.deviceLimitSelectionConfirmed === true,
+    switchFromPlan: switchFromPlan && typeof switchFromPlan === 'object'
+      ? {
+          id: Reflect.get(switchFromPlan, 'id') as string,
+          name: Reflect.get(switchFromPlan, 'name') as string,
+        }
+      : null,
   }
 }
 

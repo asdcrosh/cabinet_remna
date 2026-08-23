@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
+  buildPlanPurchaseSnapshot,
   calculatePlanPurchase,
   DeviceLimitSelectionError,
+  readPlanPurchaseSnapshot,
   resolveEffectiveDeviceLimit,
 } from './plan-purchase'
 
@@ -45,5 +47,29 @@ describe('calculatePlanPurchase', () => {
       subscriptionDeviceLimit: 8,
       planDeviceLimit: 4,
     })).toBe(8)
+  })
+
+  it('records a tariff switch in the immutable purchase snapshot', () => {
+    const pricedPlan = {
+      id: 'new-plan',
+      name: 'Новый',
+      priceKopecks: 70_000,
+      durationDays: 30,
+      trafficLimitGb: null,
+      deviceLimit: 4,
+      maxDeviceLimit: 20,
+      extraDevicePriceKopecks: 10_000,
+      activeInternalSquads: ['new-squad'],
+    }
+    const snapshot = buildPlanPurchaseSnapshot(
+      pricedPlan,
+      calculatePlanPurchase(pricedPlan, 4),
+      { id: 'old-plan', name: 'Старый' }
+    )
+
+    expect(readPlanPurchaseSnapshot(snapshot)?.switchFromPlan).toEqual({
+      id: 'old-plan',
+      name: 'Старый',
+    })
   })
 })

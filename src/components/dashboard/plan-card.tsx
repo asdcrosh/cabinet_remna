@@ -48,6 +48,10 @@ export interface PlanCardProps {
   promoCodesEnabled?: boolean;
   popular?: boolean;
   current?: boolean;
+  isPlanSwitch?: boolean;
+  currentPlanName?: string | null;
+  currentWhitelistAddonActive?: boolean;
+  currentWhitelistAddonExpireAt?: string | null;
   autoRenewalEnabled?: boolean;
   autoRenewalWhitelistAddonEnabled?: boolean;
   whitelistAddonEnabled?: boolean;
@@ -85,6 +89,10 @@ export function PlanCard({
   promoCodesEnabled = true,
   popular,
   current,
+  isPlanSwitch = false,
+  currentPlanName,
+  currentWhitelistAddonActive = false,
+  currentWhitelistAddonExpireAt,
   autoRenewalEnabled = false,
   autoRenewalWhitelistAddonEnabled = false,
   whitelistAddonEnabled = false,
@@ -133,7 +141,10 @@ export function PlanCard({
     : null;
   const effectivePriceKopecks = displayedDiscount?.finalAmountKopecks ?? purchasePriceKopecks;
   const effectivePrice = formatPrice(effectivePriceKopecks);
-  const whitelistAddonAvailable = !isPromoPlan && whitelistAddonEnabled && whitelistAddonPriceKopecks > 0;
+  const whitelistAddonAvailable = !isPromoPlan
+    && whitelistAddonEnabled
+    && whitelistAddonPriceKopecks > 0
+    && !currentWhitelistAddonActive;
   const checkoutTotalKopecks = effectivePriceKopecks
     + (whitelistAddonRequested && whitelistAddonAvailable ? whitelistAddonPriceKopecks : 0);
   const checkoutTotalPrice = formatPrice(checkoutTotalKopecks);
@@ -848,7 +859,9 @@ export function PlanCard({
                   ? "Активировать бесплатно"
                   : current
                     ? "Продлить тариф"
-                    : "Перейти к оплате"}
+                    : isPlanSwitch
+                      ? "Перейти на тариф"
+                      : "Перейти к оплате"}
             </span>
             <span className="inline-flex shrink-0 items-center gap-2">
               {!loading && !isPromoPlan ? <span className="tabular-nums">{checkoutTotalPrice}</span> : null}
@@ -860,8 +873,10 @@ export function PlanCard({
     </div>
     <Modal
       open={checkoutConfirmOpen}
-      title="Подтвердите оплату"
-      description="Проверьте заказ и выберите, нужно ли продлевать доступ автоматически"
+      title={isPlanSwitch ? `Перейти на тариф «${name}»?` : current ? "Продлить тариф" : "Подтвердите оплату"}
+      description={isPlanSwitch
+        ? "Новый тариф включится сразу после успешной оплаты"
+        : "Проверьте заказ и выберите, нужно ли продлевать доступ автоматически"}
       panelClassName="sm:max-w-[34rem]"
       onClose={() => {
         if (!loading) setCheckoutConfirmOpen(false);
@@ -879,6 +894,25 @@ export function PlanCard({
       )}
     >
       <div className="space-y-3">
+        {isPlanSwitch ? (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-4 text-sm leading-5 text-slate-700 dark:border-amber-400/20 dark:bg-amber-400/[0.06] dark:text-slate-200">
+            <div className="font-semibold text-slate-950 dark:text-white">
+              {currentPlanName ? `«${currentPlanName}» → «${name}»` : `Переход на «${name}»`}
+            </div>
+            <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-slate-600 dark:text-slate-300">
+              <li>Текущий тариф завершится сразу после выдачи нового.</li>
+              <li>Неиспользованные дни текущего тарифа не переносятся.</li>
+              {currentWhitelistAddonActive ? (
+                <li>
+                  БС сохранятся отдельно
+                  {currentWhitelistAddonExpireAt
+                    ? ` до ${new Date(currentWhitelistAddonExpireAt).toLocaleDateString("ru-RU", { timeZone: "Europe/Moscow" })}`
+                    : " до своей даты окончания"}.
+                </li>
+              ) : null}
+            </ul>
+          </div>
+        ) : null}
         <div className="flex items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 dark:border-white/[0.08] dark:bg-white/[0.035]">
           <div className="min-w-0">
             <div className="truncate text-sm font-semibold text-slate-950 dark:text-white">{name}</div>

@@ -73,8 +73,7 @@ export async function ensureRemnawaveSubscription(input: EnsureSubscriptionInput
   const isPlanSwitch = Boolean(latestSubscription && latestSubscription.planId !== input.plan.id)
   const requestedWhitelistAddon = Boolean(input.whitelistAddon)
   const preservedWhitelistAddon = Boolean(
-    !isPlanSwitch
-    && latestSubscription
+    latestSubscription
     && isWhitelistAddonCurrentlyActive(latestSubscription)
   )
   const whitelistAddonActive = requestedWhitelistAddon || preservedWhitelistAddon
@@ -96,7 +95,9 @@ export async function ensureRemnawaveSubscription(input: EnsureSubscriptionInput
   const whitelistAddonSquads = requestedWhitelistAddon
     ? input.whitelistAddon?.internalSquads ?? []
     : preservedWhitelistAddon
-      ? latestSubscription?.plan?.whitelistAddonInternalSquads ?? []
+      ? latestSubscription?.whitelistAddonInternalSquads?.length
+        ? latestSubscription.whitelistAddonInternalSquads
+        : latestSubscription?.plan?.whitelistAddonInternalSquads ?? []
       : []
   const activeInternalSquads = Array.from(new Set([
     ...resolvePlanActiveInternalSquads(input.plan.activeInternalSquads),
@@ -214,6 +215,7 @@ export async function ensureRemnawaveSubscription(input: EnsureSubscriptionInput
             whitelistAddonActivatedAt,
             whitelistAddonExpireAt,
             whitelistAddonPaymentId,
+            whitelistAddonInternalSquads: whitelistAddonSquads,
           },
         })
       : await tx.subscription.create({
@@ -233,6 +235,7 @@ export async function ensureRemnawaveSubscription(input: EnsureSubscriptionInput
             whitelistAddonActivatedAt,
             whitelistAddonExpireAt,
             whitelistAddonPaymentId,
+            whitelistAddonInternalSquads: whitelistAddonSquads,
           },
         })
 

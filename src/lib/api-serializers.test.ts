@@ -20,6 +20,7 @@ describe('api serializers', () => {
       whitelistAddonActivatedAt: null,
       whitelistAddonExpireAt: null,
       whitelistAddonPaymentId: null,
+      whitelistAddonInternalSquads: [],
       createdAt: new Date('2026-01-01T00:00:00.000Z'),
       updatedAt: new Date('2026-01-01T00:00:00.000Z'),
       plan: null,
@@ -28,6 +29,7 @@ describe('api serializers', () => {
     expect(subscription?.trafficLimitBytes).toBe('1000')
     expect(subscription?.trafficUsedBytes).toBe('250')
     expect(subscription?.lifetimeUsedBytes).toBe('500')
+    expect(subscription).not.toHaveProperty('whitelistAddonInternalSquads')
   })
 
   it('serializes payment relations safely', () => {
