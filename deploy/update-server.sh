@@ -132,18 +132,94 @@ configure_target_image() {
   export CABINET_IMAGE
 }
 
+pull_progress_snapshot() {
+  local log_file="$1"
+  local elapsed="$2"
+  python3 - "${log_file}" "${elapsed}" <<'PY'
+import re
+import sys
+
+path = sys.argv[1]
+elapsed = max(int(sys.argv[2]), 1)
+units = {
+    "B": 1,
+    "kB": 1_000,
+    "KB": 1_000,
+    "MB": 1_000_000,
+    "GB": 1_000_000_000,
+    "TB": 1_000_000_000_000,
+}
+layers = {}
+pattern = re.compile(
+    r"^([0-9a-f]{4,64}):\s+Downloading.*?"
+    r"([0-9.]+)\s*(B|kB|KB|MB|GB|TB)\s*/\s*"
+    r"([0-9.]+)\s*(B|kB|KB|MB|GB|TB)"
+)
+
+try:
+    content = open(path, "rb").read().decode("utf-8", "replace").replace("\r", "\n")
+except OSError:
+    sys.exit(0)
+
+for line in content.splitlines():
+    match = pattern.search(line.strip())
+    if not match:
+        continue
+    layer, current, current_unit, total, total_unit = match.groups()
+    current_bytes = float(current) * units[current_unit]
+    total_bytes = float(total) * units[total_unit]
+    if total_bytes > 0:
+        layers[layer] = (min(current_bytes, total_bytes), total_bytes)
+
+if not layers:
+    sys.exit(0)
+
+downloaded = sum(value[0] for value in layers.values())
+total = sum(value[1] for value in layers.values())
+percent = min(100, max(0, round(downloaded * 100 / total)))
+if downloaded <= 0 or downloaded >= total:
+    print(f"{percent}|-1")
+else:
+    eta = max(1, round((total - downloaded) / (downloaded / elapsed)))
+    print(f"{percent}|{eta}")
+PY
+}
+
+format_eta() {
+  local seconds="$1"
+  if ((seconds < 60)); then
+    printf '%s сек.' "${seconds}"
+  elif ((seconds < 3600)); then
+    printf '%s мин.' "$(((seconds + 59) / 60))"
+  else
+    printf '%s ч. %s мин.' "$((seconds / 3600))" "$(((seconds % 3600 + 59) / 60))"
+  fi
+}
+
 pull_target_image() {
-  local log_file pull_pid started_at elapsed pull_status=0
+  local log_file pull_pid started_at elapsed pull_status=0 snapshot percent eta eta_label
 
   log_file="$(mktemp)"
   started_at="$(date +%s)"
-  docker pull --quiet "${TARGET_CABINET_IMAGE}" >"${log_file}" 2>&1 &
+  docker pull "${TARGET_CABINET_IMAGE}" >"${log_file}" 2>&1 &
   pull_pid=$!
 
   if [[ -t 1 ]]; then
     while kill -0 "${pull_pid}" 2>/dev/null; do
       elapsed=$(($(date +%s) - started_at))
-      printf '\r[ 20%%] Загрузка образа кабинета: %s сек.' "${elapsed}"
+      snapshot="$(pull_progress_snapshot "${log_file}" "${elapsed}" || true)"
+      if [[ "${snapshot}" =~ ^([0-9]+)\|(-?[0-9]+)$ ]]; then
+        percent="${BASH_REMATCH[1]}"
+        eta="${BASH_REMATCH[2]}"
+        if ((eta >= 0)); then
+          eta_label="$(format_eta "${eta}")"
+          printf '\r\033[2K[ 20%%] Загрузка образа кабинета: %s%%, осталось ~%s' "${percent}" "${eta_label}"
+        else
+          printf '\r\033[2K[ 20%%] Загрузка образа кабинета: завершаем...'
+        fi
+      else
+        printf '\r\033[2K[ 20%%] Загрузка образа кабинета: оцениваем оставшееся время...'
+      fi
       sleep 2
     done
     printf '\r\033[2K'
