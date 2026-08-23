@@ -94,6 +94,7 @@ export function HomeWhitelistAddon({
           </span>
           <div className="min-w-0">
             <div className="text-sm font-semibold text-slate-950 dark:text-white">Серверы с белыми списками</div>
+            <p className="mt-0.5 text-xs font-medium text-amber-700 dark:text-amber-300">Только для приложения INCY</p>
             <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Доплата только за БС, без повторной оплаты тарифа</p>
           </div>
         </div>
@@ -111,7 +112,7 @@ export function HomeWhitelistAddon({
       <Modal
         open={open}
         title="Докупить белые списки"
-        description="Текущий тариф повторно оплачивать не нужно"
+        description="Только для приложения INCY. Текущий тариф повторно оплачивать не нужно"
         panelClassName="sm:max-w-[30rem]"
         onClose={() => {
           if (!loading) setOpen(false)
@@ -130,7 +131,7 @@ export function HomeWhitelistAddon({
       >
         <div className="space-y-3">
           <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-4 text-sm leading-5 text-slate-700 dark:border-amber-400/20 dark:bg-amber-400/[0.06] dark:text-slate-200">
-            Доступ включится сразу после оплаты ровно на 30 дней. Затем группы БС автоматически снимутся.
+            БС работают только в приложении INCY. Доступ включится сразу после оплаты ровно на 30 дней. Затем группы БС автоматически снимутся.
           </div>
           {paymentProviders.length > 1 ? (
             <label className="block">
