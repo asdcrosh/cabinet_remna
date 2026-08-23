@@ -132,19 +132,18 @@ configure_target_image() {
   export CABINET_IMAGE
 }
 
-pull_compose_images() {
+pull_target_image() {
   local log_file pull_pid started_at elapsed pull_status=0
 
   log_file="$(mktemp)"
   started_at="$(date +%s)"
-  CABINET_IMAGE="${TARGET_CABINET_IMAGE}" CABINET_ENV_FILE="${ENV_FILE}" \
-    "${COMPOSE[@]}" pull --quiet >"${log_file}" 2>&1 &
+  docker pull --quiet "${TARGET_CABINET_IMAGE}" >"${log_file}" 2>&1 &
   pull_pid=$!
 
   if [[ -t 1 ]]; then
     while kill -0 "${pull_pid}" 2>/dev/null; do
       elapsed=$(($(date +%s) - started_at))
-      printf '\rDownloading Docker images: %s sec.' "${elapsed}"
+      printf '\rPulling cabinet image: %s sec.' "${elapsed}"
       sleep 2
     done
     printf '\r\033[2K'
@@ -644,8 +643,8 @@ if [[ -n "${PREVIOUS_IMAGE_ID}" ]] && docker image inspect "${PREVIOUS_IMAGE_ID}
   docker image tag "${PREVIOUS_IMAGE_ID}" "${ROLLBACK_IMAGE}"
 fi
 
-echo "Pulling Docker images..."
-pull_compose_images
+echo "Pulling cabinet image..."
+pull_target_image
 verify_target_image
 write_deployment_state "deploying" "Новый образ загружен. Запускаются миграции."
 
