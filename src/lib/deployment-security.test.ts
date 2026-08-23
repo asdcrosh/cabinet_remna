@@ -109,6 +109,8 @@ describe('production deployment security', () => {
     expect(cabinetctl).toContain('CABINET_IMAGE="ghcr.io/asdcrosh/cabinet_remna:sha-${verified_release_sha}"')
     expect(cabinetctl).toContain('info "Целевая версия: ${verified_release_sha:0:12}"')
     expect(cabinetctl).not.toContain('if [[ -n "${CABINET_IMAGE:-}" ]]')
+    expect(cabinetctl).toContain("printf '%s|%s|%s\\n' \"$(date +%s)\" \"${VERSION}\" \"${status}\"")
+    expect(cabinetctl).toContain('[[ "${cache_version}" == "${VERSION}" ]] || return 1')
     expect(cabinetctl).toContain('details="$(latest_workflow_details || true)"')
     expect(cabinetctl).toContain('RESOLVED_RELEASE_SHA="${workflow_sha}"')
     expect(cabinetctl).not.toContain("--data-urlencode 'status=success'")

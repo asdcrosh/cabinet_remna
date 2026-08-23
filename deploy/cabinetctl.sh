@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="1.9.3"
+VERSION="1.9.4"
 BRANCH="${BRANCH:-main}"
 RAW_BASE_URL="${RAW_BASE_URL:-https://raw.githubusercontent.com/asdcrosh/cabinet_remna/${BRANCH}}"
 GITHUB_API_URL="${GITHUB_API_URL:-https://api.github.com/repos/asdcrosh/cabinet_remna/commits/${BRANCH}}"
@@ -641,14 +641,16 @@ write_update_status_cache() {
   local cache_dir
   cache_dir="$(dirname "${UPDATE_STATUS_CACHE}")"
   mkdir -p "${cache_dir}" 2>/dev/null || true
-  printf '%s|%s\n' "$(date +%s)" "${status}" >"${UPDATE_STATUS_CACHE}" 2>/dev/null || true
+  printf '%s|%s|%s\n' "$(date +%s)" "${VERSION}" "${status}" >"${UPDATE_STATUS_CACHE}" 2>/dev/null || true
 }
 
 read_update_status_cache() {
   [[ -f "${UPDATE_STATUS_CACHE}" ]] || return 1
-  local created_at status now
-  IFS='|' read -r created_at status <"${UPDATE_STATUS_CACHE}" || return 1
+  local created_at cache_version status now
+  IFS='|' read -r created_at cache_version status <"${UPDATE_STATUS_CACHE}" || return 1
   [[ "${created_at}" =~ ^[0-9]+$ ]] || return 1
+  [[ "${cache_version}" == "${VERSION}" ]] || return 1
+  [[ -n "${status}" ]] || return 1
   [[ "${UPDATE_STATUS_CACHE_TTL}" =~ ^[0-9]+$ ]] || return 1
   now="$(date +%s)"
   if (( now - created_at > UPDATE_STATUS_CACHE_TTL )); then
