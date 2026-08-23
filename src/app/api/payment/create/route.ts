@@ -28,7 +28,7 @@ import {
   buildBundledWhitelistAddonSnapshot,
   buildWhitelistAddonSnapshot,
   readBundledWhitelistAddonSnapshot,
-  WHITELIST_ADDON_NAME,
+  WHITELIST_ADDON_RECEIPT_NAME,
 } from '@/lib/whitelist-addon'
 
 export const runtime = 'nodejs'
@@ -455,8 +455,8 @@ export const POST = withAuth(async (req: Request) => {
   const baseUrl = getAppUrl()
   const returnUrl = `${baseUrl}/dashboard/billing?paid=1&payment=${localPayment.id}`
   const description = isWhitelistAddon
-    ? WHITELIST_ADDON_NAME
-    : `${buildPaymentServiceName(plan.durationDays)}${includesBundledWhitelistAddon ? ' + белые списки' : ''}`
+    ? WHITELIST_ADDON_RECEIPT_NAME
+    : `${buildPaymentServiceName(plan.durationDays)}${includesBundledWhitelistAddon ? ` + ${WHITELIST_ADDON_RECEIPT_NAME}` : ''}`
 
   if (provider === 'PAYANYWAY') {
     try {

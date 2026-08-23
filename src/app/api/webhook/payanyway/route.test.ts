@@ -102,6 +102,20 @@ describe('PayAnyWay Pay URL', () => {
     }))
   })
 
+  it('uses neutral wording for a whitelist add-on receipt', async () => {
+    mocks.prisma.payment.findUnique.mockResolvedValue({
+      ...mocks.payment,
+      purchaseType: 'WHITELIST_ADDON',
+    })
+
+    const response = await POST(callbackRequest())
+    const body = await response.text()
+
+    expect(response.status).toBe(200)
+    expect(body).toContain('&quot;name&quot;:&quot;Расширенный доступ&quot;')
+    expect(body).not.toContain('белыми списками')
+  })
+
   it('rejects a forged signature before reading the payment', async () => {
     const response = await POST(callbackRequest({ MNT_SIGNATURE: '0'.repeat(32) }))
 

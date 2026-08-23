@@ -15,6 +15,7 @@ import {
 import {
   buildBundledWhitelistAddonSnapshot,
   readBundledWhitelistAddonSnapshot,
+  WHITELIST_ADDON_RECEIPT_NAME,
 } from './whitelist-addon'
 import { isWhitelistAddonCurrentlyActive } from './whitelist-addon-policy'
 
@@ -532,7 +533,7 @@ async function createAutoRenewalPayment(setting: DueAutoRenewal) {
   try {
     const providerPayment = await createPayment({
       amount: localPayment.amountKopecks / 100,
-      description: `${buildPaymentServiceName(setting.plan.durationDays)}${setting.whitelistAddonEnabled ? ' + белые списки' : ''}`,
+      description: `${buildPaymentServiceName(setting.plan.durationDays)}${setting.whitelistAddonEnabled ? ` + ${WHITELIST_ADDON_RECEIPT_NAME}` : ''}`,
       returnUrl: `${getAppUrl()}/dashboard/billing`,
       paymentMethodId: decryptPaymentSecret(setting.paymentMethodIdEncrypted!),
       metadata: {

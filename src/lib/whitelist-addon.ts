@@ -6,6 +6,7 @@ import { logError } from './logger'
 import { getWhitelistAddonExpireAt } from './whitelist-addon-policy'
 
 export const WHITELIST_ADDON_NAME = 'Доступ к серверам с белыми списками'
+export const WHITELIST_ADDON_RECEIPT_NAME = 'Расширенный доступ'
 export { WHITELIST_ADDON_DURATION_DAYS } from './whitelist-addon-policy'
 
 export type WhitelistAddonSnapshot = {

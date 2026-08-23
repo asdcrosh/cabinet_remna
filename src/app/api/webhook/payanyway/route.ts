@@ -11,7 +11,7 @@ import {
 import { buildPaymentServiceName } from '@/lib/payment-service-name'
 import { provisionPaymentSubscription } from '@/lib/provisioning'
 import { paymentErrorDetails, recordPaymentEvent } from '@/lib/payment-events'
-import { WHITELIST_ADDON_NAME } from '@/lib/whitelist-addon'
+import { WHITELIST_ADDON_RECEIPT_NAME } from '@/lib/whitelist-addon'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -99,7 +99,7 @@ async function handlePayAnyWayRequest(params: URLSearchParams) {
       transactionId: payment.id,
       amountKopecks: payment.amountKopecks,
       itemName: payment.purchaseType === 'WHITELIST_ADDON'
-        ? WHITELIST_ADDON_NAME
+        ? WHITELIST_ADDON_RECEIPT_NAME
         : buildPaymentServiceName(payment.plan.durationDays),
       customerEmail: payment.user.email,
     })

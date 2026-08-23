@@ -184,7 +184,7 @@ describe('payment create route', () => {
     })
     expect(mocks.createPayment).toHaveBeenCalledWith(expect.objectContaining({
       amount: 200,
-      description: 'Доступ к серверам с белыми списками',
+      description: 'Расширенный доступ',
       metadata: expect.objectContaining({ purchaseType: 'WHITELIST_ADDON' }),
     }))
   })
@@ -256,7 +256,7 @@ describe('payment create route', () => {
     })
     expect(mocks.createPayment).toHaveBeenCalledWith(expect.objectContaining({
       amount: 500,
-      description: expect.stringContaining('белые списки'),
+      description: expect.stringContaining('Расширенный доступ'),
       metadata: expect.objectContaining({ whitelistAddon: 'true' }),
     }))
   })
