@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="1.9.7"
+VERSION="1.9.8"
 BRANCH="${BRANCH:-main}"
 RAW_BASE_URL="${RAW_BASE_URL:-https://raw.githubusercontent.com/asdcrosh/cabinet_remna/${BRANCH}}"
 GITHUB_API_URL="${GITHUB_API_URL:-https://api.github.com/repos/asdcrosh/cabinet_remna/commits/${BRANCH}}"
@@ -1211,9 +1211,54 @@ refresh_live_statuses() {
   LAST_LIVE_REFRESH_AT="$(date +%s)"
 }
 
-redraw_interactive_menu() {
+menu_option_label() {
+  case "$1" in
+    0) printf 'Выход' ;;
+    1) cabinet_installed && printf 'Обновить кабинет' || printf 'Установить кабинет' ;;
+    2) cabinet_installed && printf 'Перезапустить' || printf 'Диагностика' ;;
+    3) cabinet_installed && printf 'Диагностика' || printf 'Бэкапы' ;;
+    4) printf 'Настроить ноды' ;;
+    5) printf 'Открыть .env' ;;
+    6) printf 'Проверить .env' ;;
+    7) printf 'Логи' ;;
+    8) cabinet_installed && printf 'Бэкапы' || printf 'Обновить cabinetctl' ;;
+    9) printf 'Обновить cabinetctl' ;;
+  esac
+}
+
+menu_option_position() {
+  local option="$1"
+  if cabinet_installed; then
+    case "${option}" in
+      1) printf '10 5' ;; 2) printf '9 5' ;; 3) printf '8 5' ;;
+      4) printf '7 5' ;; 5) printf '6 5' ;;
+      6) printf '10 33' ;; 7) printf '9 33' ;; 8) printf '8 33' ;; 9) printf '7 33' ;;
+      0) printf '3 3' ;;
+    esac
+  else
+    case "${option}" in
+      1) printf '8 3' ;; 2) printf '7 3' ;; 3) printf '6 3' ;; 8) printf '5 3' ;; 0) printf '3 3' ;;
+    esac
+  fi
+}
+
+render_menu_option_at_cursor() {
+  local option="$1" position rows_up column label
+  position="$(menu_option_position "${option}")"
+  [[ -n "${position}" ]] || return 0
+  IFS=' ' read -r rows_up column <<<"${position}"
+  label="$(menu_option_label "${option}")"
+  printf '\0337\033[%sA\033[%sG' "${rows_up}" "${column}" >/dev/tty
+  print_menu_cell "${option}" "${label}" >/dev/tty
+  printf '\0338' >/dev/tty
+}
+
+render_menu_selection_change() {
+  local previous="$1"
+  [[ "${previous}" != "${MENU_SELECTED}" ]] || return 0
   stop_status_animation
-  show_menu
+  render_menu_option_at_cursor "${previous}"
+  render_menu_option_at_cursor "${MENU_SELECTED}"
   start_status_animation
 }
 
@@ -1224,7 +1269,7 @@ read_menu_choice() {
   show_menu
   printf '\033[?25l' 2>/dev/null >/dev/tty || return 1
   start_status_animation
-  local key escape_tail now
+  local key escape_tail now previous_selection
   while [[ -z "${MENU_CHOICE}" ]]; do
     key=""
     if IFS= read -r -s -n 1 -t 1 key 2>/dev/null </dev/tty; then
@@ -1234,14 +1279,23 @@ read_menu_choice() {
           escape_tail=""
           IFS= read -r -s -n 2 -t 1 escape_tail 2>/dev/null </dev/tty || true
           case "${escape_tail}" in
-            '[A'|'[D') move_menu_selection previous; redraw_interactive_menu ;;
-            '[B'|'[C') move_menu_selection next; redraw_interactive_menu ;;
+            '[A'|'[D')
+              previous_selection="${MENU_SELECTED}"
+              move_menu_selection previous
+              render_menu_selection_change "${previous_selection}"
+              ;;
+            '[B'|'[C')
+              previous_selection="${MENU_SELECTED}"
+              move_menu_selection next
+              render_menu_selection_change "${previous_selection}"
+              ;;
           esac
           ;;
         [0-9])
           if menu_selection_is_valid "${key}"; then
+            previous_selection="${MENU_SELECTED}"
             MENU_SELECTED="${key}"
-            redraw_interactive_menu
+            render_menu_selection_change "${previous_selection}"
           fi
           ;;
       esac
