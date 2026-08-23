@@ -49,8 +49,10 @@ export async function upsertLocalSubscriptionFromRemnawave(input: {
 
   const data = {
     ...(input.planId ? { planId: input.planId } : {}),
-    expireAt: new Date(input.remnawaveUser.expireAt),
-    status: activePause && (!existing || activePause.subscriptionId === existing.id)
+    expireAt: existing?.graceExpireAt ? existing.expireAt : new Date(input.remnawaveUser.expireAt),
+    status: existing?.graceExpireAt && existing.graceExpireAt > new Date()
+      ? 'LIMITED' as const
+      : activePause && (!existing || activePause.subscriptionId === existing.id)
       ? 'PAUSED' as const
       : mapRemnawaveStatus(input.remnawaveUser.status),
     trafficLimitBytes: trafficLimit === 0n ? null : trafficLimit,

@@ -1,6 +1,7 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { CheckCircle2, CreditCard, Globe2 } from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
 import { formatPrice } from '@/lib/format'
@@ -27,11 +28,16 @@ export function HomeWhitelistAddon({
   paymentProviders: Provider[]
 }) {
   const [open, setOpen] = useState(false)
+  const searchParams = useSearchParams()
   const [loading, setLoading] = useState(false)
   const [provider, setProvider] = useState<CheckoutPaymentProvider>(
     paymentProviders[0]?.id ?? 'YOOKASSA'
   )
   const checkoutKeyRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    if (searchParams.get('whitelistAddon') === 'renew') setOpen(true)
+  }, [searchParams])
 
   async function buy() {
     if (paymentProviders.length === 0) {

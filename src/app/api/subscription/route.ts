@@ -83,9 +83,14 @@ export const GET = withAuth(async (request: Request) => {
         },
         select: { id: true },
       }) : null
+      const graceActive = Boolean(subscription?.graceExpireAt && subscription.graceExpireAt > new Date())
       const dataToSave = {
-        expireAt: new Date(u.expiresAt),
-        status: activePause ? 'PAUSED' as const : mapRemnawaveStatus(u.userStatus),
+        expireAt: graceActive && subscription ? subscription.expireAt : new Date(u.expiresAt),
+        status: graceActive
+          ? 'LIMITED' as const
+          : activePause
+            ? 'PAUSED' as const
+            : mapRemnawaveStatus(u.userStatus),
         trafficLimitBytes: limit === 0n ? null : limit,
         trafficUsedBytes: readRemnawaveBigInt(u, ['trafficUsedBytes', 'usedTrafficBytes']),
         lifetimeUsedBytes: readRemnawaveBigInt(u, ['lifetimeTrafficUsedBytes', 'lifetimeUsedTrafficBytes']),

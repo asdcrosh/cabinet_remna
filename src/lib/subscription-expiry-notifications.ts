@@ -35,6 +35,7 @@ export async function reconcileSubscriptionExpiryNotifications(options?: {
     prisma.subscription.findMany({
       where: {
         status: { in: ['ACTIVE', 'LIMITED', 'EXPIRED'] },
+        graceExpireAt: null,
         expireAt: {
           gt: new Date(nowMs - DAY_MS),
           lte: now,

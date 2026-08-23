@@ -5,44 +5,55 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { AlertTriangle, Check, CheckCircle2, Circle, CreditCard, KeyRound, Loader2, X } from 'lucide-react'
 import { cn } from '@/lib/cn'
+import { apiFetch } from '@/lib/api-client'
 
-type PaymentSuccessBannerStatus = 'ready' | 'processing' | 'attention' | 'canceled' | 'not_found'
+type PaymentSuccessBannerStatus = 'awaiting' | 'ready' | 'processing' | 'attention' | 'canceled' | 'not_found'
 const PAYMENT_STATUS_POLL_SECONDS = 60
 const PAYMENT_STATUS_POLL_INTERVAL_MS = 3000
 
 export function PaymentSuccessBanner({
   status = 'processing',
   supportEnabled = true,
+  paymentId,
 }: {
   status?: PaymentSuccessBannerStatus
   supportEnabled?: boolean
+  paymentId: string
 }) {
   const router = useRouter()
+  const [liveStatus, setLiveStatus] = useState(status)
   const [seconds, setSeconds] = useState(PAYMENT_STATUS_POLL_SECONDS)
 
   useEffect(() => {
-    if (status !== 'processing') return
+    if (liveStatus !== 'processing' && liveStatus !== 'awaiting') return
     setSeconds(PAYMENT_STATUS_POLL_SECONDS)
     let refreshCount = 0
-    const maxRefreshCount = PAYMENT_STATUS_POLL_SECONDS / (PAYMENT_STATUS_POLL_INTERVAL_MS / 1000)
 
-    const refresh = window.setInterval(() => {
+    const refresh = window.setInterval(async () => {
       if (document.visibilityState === 'hidden') return
       refreshCount += 1
-      router.refresh()
+      try {
+        const result = await apiFetch<{ status: PaymentSuccessBannerStatus }>('/api/payment/status', {
+          method: 'POST',
+          body: JSON.stringify({ paymentId }),
+        })
+        setLiveStatus(result.status)
+        if (result.status === 'ready') router.refresh()
+      } catch {
+        // Следующая автоматическая проверка повторит запрос.
+      }
       setSeconds(Math.max(0, PAYMENT_STATUS_POLL_SECONDS - refreshCount * 3))
-      if (refreshCount >= maxRefreshCount) window.clearInterval(refresh)
     }, PAYMENT_STATUS_POLL_INTERVAL_MS)
 
     return () => window.clearInterval(refresh)
-  }, [router, status])
+  }, [liveStatus, paymentId, router])
 
-  const copy = getBannerCopy(status, seconds)
+  const copy = getBannerCopy(liveStatus, seconds)
 
   return (
     <section
       className={cn('relative overflow-hidden rounded-3xl border p-4 sm:p-5', copy.shell)}
-      role={status === 'attention' || status === 'canceled' || status === 'not_found' ? 'alert' : 'status'}
+      role={liveStatus === 'attention' || liveStatus === 'canceled' || liveStatus === 'not_found' ? 'alert' : 'status'}
       aria-live="polite"
     >
       <div className="flex items-start gap-3.5">
@@ -52,8 +63,8 @@ export function PaymentSuccessBanner({
         <div className="min-w-0 flex-1 pt-0.5">
           <div className="font-semibold tracking-tight">{copy.title}</div>
           <div className="mt-1 text-sm leading-5 opacity-80">{copy.description}</div>
-          {status !== 'not_found' && <PaymentProgress status={status} />}
-          {status === 'ready' && (
+          {liveStatus !== 'not_found' && <PaymentProgress status={liveStatus} />}
+          {liveStatus === 'ready' && (
             <div className="mt-4">
               <Link href="/dashboard/subscription" className="btn-primary min-h-11 w-full px-4 sm:w-auto">
                 <KeyRound className="h-4 w-4" />
@@ -61,13 +72,13 @@ export function PaymentSuccessBanner({
               </Link>
             </div>
           )}
-          {status === 'attention' && (
+          {liveStatus === 'attention' && (
             <div className="mt-4 flex flex-col gap-2 sm:flex-row">
               <button type="button" onClick={() => router.refresh()} className="btn-primary min-h-11 px-4">Обновить статус</button>
               {supportEnabled && <Link href="/dashboard/support" className="btn-secondary min-h-11 px-4">Написать в поддержку</Link>}
             </div>
           )}
-          {status === 'canceled' && (
+          {liveStatus === 'canceled' && (
             <div className="mt-4">
               <Link href="/dashboard/plans" className="btn-primary min-h-11 w-full px-4 sm:w-auto">
                 <CreditCard className="h-4 w-4" />
@@ -75,7 +86,7 @@ export function PaymentSuccessBanner({
               </Link>
             </div>
           )}
-          {status === 'not_found' && (
+          {liveStatus === 'not_found' && (
             <div className="mt-4">
               <Link href="/dashboard/billing" className="btn-secondary min-h-11 w-full px-4 sm:w-auto">
                 Открыть историю платежей
@@ -91,9 +102,9 @@ export function PaymentSuccessBanner({
 function PaymentProgress({ status }: { status: PaymentSuccessBannerStatus }) {
   const canceled = status === 'canceled'
   const steps = [
-    { label: 'Оплата', done: !canceled, failed: canceled },
-    { label: 'Выдача', done: status === 'ready', active: status === 'processing' || status === 'attention' },
-    { label: 'Подключение', done: false, active: status === 'ready' },
+    { label: 'Оплата получена', done: status !== 'awaiting' && !canceled, active: status === 'awaiting', failed: canceled },
+    { label: 'Настраиваем подписку', done: status === 'ready', active: status === 'processing' || status === 'attention' },
+    { label: 'Доступ готов', done: status === 'ready', active: false },
   ]
 
   return (
@@ -118,6 +129,16 @@ function PaymentProgress({ status }: { status: PaymentSuccessBannerStatus }) {
 }
 
 function getBannerCopy(status: PaymentSuccessBannerStatus, seconds: number) {
+  if (status === 'awaiting') {
+    return {
+      title: 'Проверяем оплату',
+      description: 'Ждём подтверждение платёжной системы. Статус обновляется автоматически.',
+      icon: <Loader2 className="h-5 w-5 animate-spin" />,
+      shell: 'border-cyan-200 bg-cyan-50/80 text-cyan-950 dark:border-cyan-500/30 dark:bg-cyan-500/10 dark:text-cyan-100',
+      iconShell: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-300/10 dark:text-cyan-100',
+    }
+  }
+
   if (status === 'ready') {
     return {
       title: 'Доступ готов',
@@ -160,7 +181,9 @@ function getBannerCopy(status: PaymentSuccessBannerStatus, seconds: number) {
 
   return {
     title: 'Оплата принята',
-    description: `Готовим доступ. Страница обновится ещё несколько раз${seconds > 0 ? `, примерно ${seconds} сек.` : '.'}`,
+    description: seconds > 0
+      ? `Готовим доступ. Статус обновляется автоматически, обычно до ${seconds} сек.`
+      : 'Готовим доступ. Статус обновляется автоматически.',
     icon: <Loader2 className="h-5 w-5 animate-spin" />,
     shell: 'border-cyan-200 bg-cyan-50/80 text-cyan-950 dark:border-cyan-500/30 dark:bg-cyan-500/10 dark:text-cyan-100',
     iconShell: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-300/10 dark:text-cyan-100',

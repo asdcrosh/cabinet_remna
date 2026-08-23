@@ -583,7 +583,7 @@ export async function notifyWhitelistAddonExpiring(input: {
 }) {
   const title = 'Расширенный доступ скоро закончится'
   const body = `БС действуют до ${formatDate(input.expireAt)}. Продлите их, чтобы не потерять доступ к безграничному интернету в приложении INCY.`
-  const actionHref = '/dashboard'
+  const actionHref = '/dashboard?whitelistAddon=renew'
   await notifyUser({
     userId: input.userId,
     type: 'WHITELIST_ADDON_EXPIRING',

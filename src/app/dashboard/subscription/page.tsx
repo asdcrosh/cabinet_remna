@@ -8,7 +8,7 @@ import { remnawave, RemnawaveError, remnawaveUserReference } from '@/lib/remnawa
 import { KeysCard } from '@/components/dashboard/keys-card'
 import { DevicesList } from '@/components/dashboard/devices-list'
 import Link from 'next/link'
-import { ArrowRight, CalendarDays, Gauge, Globe2, ShieldAlert, Sparkles } from 'lucide-react'
+import { ArrowRight, CalendarDays, Clock3, Gauge, Globe2, ShieldAlert, Sparkles } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { EmptyState } from '@/components/dashboard/empty-state'
 import { getFeatureFlags } from '@/lib/feature-flags'
@@ -16,6 +16,7 @@ import { formatSubscriptionDaysLeft, isSubscriptionExpired } from '@/lib/subscri
 import { PageHeader } from '@/components/dashboard/page-header'
 import { VpnConnectionCheck } from '@/components/dashboard/vpn-connection-check'
 import { isWhitelistAddonCurrentlyActive } from '@/lib/whitelist-addon-policy'
+import { readPlanPurchaseSnapshot } from '@/lib/plan-purchase'
 
 export const dynamic = 'force-dynamic'
 
@@ -23,7 +24,7 @@ export default async function SubscriptionPage() {
   const features = await getFeatureFlags()
   const session = await getCurrentUser()
   if (!session) redirect('/login')
-  const [user, localSubscription] = await Promise.all([
+  const [user, localSubscription, payments, auditEvents] = await Promise.all([
     prisma.user.findUnique({ where: { id: session.uid } }),
     prisma.subscription.findFirst({
       where: { userId: session.uid, status: { in: ['ACTIVE', 'LIMITED', 'PAUSED'] } },
@@ -35,6 +36,7 @@ export default async function SubscriptionPage() {
         deviceLimit: true,
         whitelistAddonActive: true,
         whitelistAddonExpireAt: true,
+        graceExpireAt: true,
         plan: {
           select: {
             name: true,
@@ -42,6 +44,27 @@ export default async function SubscriptionPage() {
           },
         },
       },
+    }),
+    prisma.payment.findMany({
+      where: { userId: session.uid, status: { in: ['SUCCEEDED', 'REFUNDED'] } },
+      orderBy: { createdAt: 'desc' },
+      take: 20,
+      select: { id: true, purchaseType: true, status: true, createdAt: true, paidAt: true, planSnapshot: true, plan: { select: { name: true } } },
+    }),
+    prisma.auditLog.findMany({
+      where: {
+        targetId: session.uid,
+        OR: [
+          { action: { in: ['ADMIN_PLAN_ASSIGNED', 'ADMIN_SUBSCRIPTION_DISABLED', 'ADMIN_SUBSCRIPTION_DELETED'] } },
+          {
+            action: 'ADMIN_FEATURES_UPDATED',
+            OR: [{ message: { contains: 'БС' } }, { message: { contains: 'льгот' } }, { message: { contains: 'Льгот' } }],
+          },
+        ],
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 20,
+      select: { id: true, message: true, createdAt: true },
     }),
   ])
   if (!user?.remnawaveUsername) {
@@ -93,7 +116,8 @@ export default async function SubscriptionPage() {
 
   const u = data.response.user
   const isUnlimited = u.trafficLimitBytes === '0'
-  const subscriptionExpired = isSubscriptionExpired(u.daysLeft, u.userStatus)
+  const graceActive = Boolean(localSubscription?.graceExpireAt && localSubscription.graceExpireAt > new Date())
+  const subscriptionExpired = !graceActive && isSubscriptionExpired(u.daysLeft, u.userStatus)
   const expiresAtLabel = new Date(u.expiresAt).toLocaleDateString('ru-RU')
   const whitelistAddonActive = Boolean(
     localSubscription && isWhitelistAddonCurrentlyActive(localSubscription)
@@ -109,7 +133,9 @@ export default async function SubscriptionPage() {
       // Не прячем управление у существующего пользователя, если Remnawave временно не ответил.
     }
   }
-  const statusText = subscriptionExpired
+  const statusText = graceActive
+    ? 'Льготный период'
+    : subscriptionExpired
     ? 'Подписка истекла'
     : u.isActive
       ? 'Подписка активна'
@@ -139,7 +165,9 @@ export default async function SubscriptionPage() {
               </span>
             </div>
             <p className="mt-1 text-sm leading-5 text-slate-500 dark:text-slate-400">
-              {subscriptionExpired
+              {graceActive
+                ? `Доступ сохранён до ${localSubscription?.graceExpireAt?.toLocaleString('ru-RU')}. Оплатите тариф, чтобы не потерять подключение.`
+                : subscriptionExpired
                 ? 'Продлите доступ, затем ссылка и устройства снова заработают без новой настройки.'
                 : isFirstConnection
                   ? 'Ссылка готова. Установите приложение, откройте подписку и включите VPN.'
@@ -192,6 +220,8 @@ export default async function SubscriptionPage() {
         </div>
       </section>
 
+      <SubscriptionTimeline payments={payments} auditEvents={auditEvents} />
+
       {!subscriptionExpired && (
         isFirstConnection ? (
           <KeysCard
@@ -218,6 +248,48 @@ export default async function SubscriptionPage() {
         )
       )}
     </div>
+  )
+}
+
+function SubscriptionTimeline({
+  payments,
+  auditEvents,
+}: {
+  payments: Array<{ id: string; purchaseType: string; status: string; createdAt: Date; paidAt: Date | null; planSnapshot: unknown; plan: { name: string } }>
+  auditEvents: Array<{ id: string; message: string; createdAt: Date }>
+}) {
+  const chronological = [...payments].reverse()
+  let subscriptionPurchases = 0
+  const paymentItems = chronological.map((payment) => {
+    const snapshot = readPlanPurchaseSnapshot(payment.planSnapshot)
+    let title: string
+    if (payment.purchaseType === 'WHITELIST_ADDON') title = payment.status === 'REFUNDED' ? 'БС отключены' : 'БС подключены'
+    else if (snapshot?.switchFromPlan) title = `Смена тарифа: ${snapshot.switchFromPlan.name} → ${snapshot.name}`
+    else title = subscriptionPurchases === 0 ? `Тариф «${snapshot?.name ?? payment.plan.name}» подключён` : `Тариф «${snapshot?.name ?? payment.plan.name}» продлён`
+    if (payment.purchaseType !== 'WHITELIST_ADDON') subscriptionPurchases += 1
+    return { id: `payment-${payment.id}`, title, createdAt: payment.paidAt ?? payment.createdAt }
+  })
+  const items = [...paymentItems, ...auditEvents.map((event) => ({ id: `audit-${event.id}`, title: event.message, createdAt: event.createdAt }))]
+    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+    .slice(0, 12)
+  if (items.length === 0) return null
+  return (
+    <section className="rounded-3xl border border-slate-200 bg-white p-4 dark:border-white/[0.09] dark:bg-white/[0.025] sm:p-5">
+      <div className="flex items-center gap-2">
+        <Clock3 className="h-4 w-4 text-slate-400" />
+        <h2 className="font-semibold">История подписки</h2>
+      </div>
+      <div className="mt-4 space-y-3">
+        {items.map((item) => (
+          <div key={item.id} className="flex gap-3 border-l-2 border-cyan-500/40 pl-3">
+            <div className="min-w-0">
+              <div className="text-sm font-medium text-slate-900 dark:text-white">{item.title}</div>
+              <div className="mt-0.5 text-xs text-slate-400">{item.createdAt.toLocaleString('ru-RU')}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
   )
 }
 

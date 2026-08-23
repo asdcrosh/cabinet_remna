@@ -17,6 +17,7 @@ import { resumeDuePausedSubscriptions } from '../src/lib/subscription-retention'
 import { reconcileExpiredWhitelistAddons } from '../src/lib/whitelist-addon'
 import { reconcileWhitelistAddonExpiryNotifications } from '../src/lib/whitelist-addon-expiry-notifications'
 import { checkReleaseNotifications } from '../src/lib/release-notifications'
+import { reconcileSubscriptionGracePeriods } from '../src/lib/subscription-grace'
 
 const intervalMs = readPositiveInt('PAYMENT_RECONCILE_INTERVAL_SECONDS', 60) * 1000
 const batchSize = readPositiveInt('PAYMENT_RECONCILE_BATCH_SIZE', 25)
@@ -71,6 +72,10 @@ async function runOnce() {
   await syncRemnashopUsersIfDue()
   await syncSubscriptionHealthIfDue()
   await checkReleasesIfDue()
+  const gracePeriods = await reconcileSubscriptionGracePeriods({ limit: notificationBatchSize })
+  if (gracePeriods.started > 0 || gracePeriods.expired > 0) {
+    logInfo('subscription_grace.reconciled', gracePeriods)
+  }
   await reconcileWhitelistAddonExpiryNotifications({
     batchSize: notificationBatchSize,
     shouldStop: () => stopped,

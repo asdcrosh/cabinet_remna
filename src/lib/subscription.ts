@@ -216,6 +216,8 @@ export async function ensureRemnawaveSubscription(input: EnsureSubscriptionInput
             whitelistAddonExpireAt,
             whitelistAddonPaymentId,
             whitelistAddonInternalSquads: whitelistAddonSquads,
+            graceStartedAt: null,
+            graceExpireAt: null,
           },
         })
       : await tx.subscription.create({
@@ -236,6 +238,8 @@ export async function ensureRemnawaveSubscription(input: EnsureSubscriptionInput
             whitelistAddonExpireAt,
             whitelistAddonPaymentId,
             whitelistAddonInternalSquads: whitelistAddonSquads,
+            graceStartedAt: null,
+            graceExpireAt: null,
           },
         })
 

@@ -91,7 +91,11 @@ export default async function BillingPage({
       />
 
       {params.paid === '1' && returnPaymentId && (
-        <PaymentSuccessBanner status={getBannerStatus(syncResult)} supportEnabled={features.support} />
+        <PaymentSuccessBanner
+          paymentId={returnPaymentId}
+          status={getBannerStatus(syncResult)}
+          supportEnabled={features.support}
+        />
       )}
 
       {currentSubscription?.plan ? (
@@ -174,6 +178,7 @@ function getBannerStatus(syncResult: PaymentSyncResult | null) {
   if (!syncResult) return 'processing'
   if (syncResult.status === 'not_found') return 'not_found'
   if (syncResult.status === 'canceled') return 'canceled'
+  if (syncResult.status === 'pending' || syncResult.status === 'missing_external_id') return 'awaiting'
   if (syncResult.status === 'succeeded' && syncResult.provisioned) return 'ready'
   if (!syncResult.ok) return 'attention'
   return 'processing'

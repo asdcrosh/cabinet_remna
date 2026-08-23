@@ -301,7 +301,7 @@ describe('notifyUser', () => {
           type: 'WHITELIST_ADDON_EXPIRING',
           title: 'Расширенный доступ скоро закончится',
           body: expect.stringContaining('не потерять доступ к безграничному интернету'),
-          actionHref: '/dashboard',
+          actionHref: '/dashboard?whitelistAddon=renew',
           actionLabel: 'Продлить БС',
         }),
       })

@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => {
   const prisma = {
     payment: { findUnique: vi.fn(), update: vi.fn() },
     subscription: { findFirst: vi.fn(), findMany: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
+    auditLog: { create: vi.fn() },
     $transaction: vi.fn(),
   }
   const remnawave = { updateUser: vi.fn() }
@@ -30,6 +31,7 @@ describe('whitelist add-on', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mocks.prisma.$transaction.mockImplementation(async (callback) => callback(mocks.prisma))
+    mocks.prisma.auditLog.create.mockResolvedValue({})
   })
 
   it('adds paid squads without extending the subscription', async () => {

@@ -325,6 +325,16 @@ export async function reconcileExpiredWhitelistAddons(options?: {
         },
       })
       revoked += result.count
+      if (result.count > 0) {
+        await prisma.auditLog.create({
+          data: {
+            targetId: subscription.userId,
+            action: 'ADMIN_FEATURES_UPDATED',
+            message: 'Доступ к БС отключён по окончании срока',
+            metadata: { subscriptionId: subscription.id },
+          },
+        })
+      }
     } catch (error) {
       failed += 1
       logError('whitelist_addon.expiry_revoke_failed', error, {

@@ -95,13 +95,16 @@ export default async function DashboardHome() {
   const remnawaveCard = remnawaveCardResult.data
   const remnawaveErrorStatus = remnawaveCardResult.errorStatus
   const sub = remnawaveCard?.response.user
-  const localDaysLeft = subRow
-    ? Math.ceil((subRow.expireAt.getTime() - Date.now()) / (24 * 60 * 60 * 1000))
+  const now = new Date()
+  const graceActive = Boolean(subRow?.graceExpireAt && subRow.graceExpireAt > now)
+  const effectiveExpireAt = graceActive ? subRow?.graceExpireAt ?? null : sub?.expiresAt ? new Date(sub.expiresAt) : subRow?.expireAt ?? null
+  const localDaysLeft = effectiveExpireAt
+    ? Math.ceil((effectiveExpireAt.getTime() - now.getTime()) / (24 * 60 * 60 * 1000))
     : 0
-  const daysLeft = sub?.daysLeft ?? localDaysLeft
-  const subscriptionStatus = (sub?.userStatus ?? subRow?.status ?? 'DISABLED') as UserStatus
+  const daysLeft = graceActive ? localDaysLeft : sub?.daysLeft ?? localDaysLeft
+  const subscriptionStatus = (graceActive ? 'LIMITED' : sub?.userStatus ?? subRow?.status ?? 'DISABLED') as UserStatus
   const subscriptionExpired = isSubscriptionExpired(daysLeft, subscriptionStatus)
-  const expiresAt = sub?.expiresAt ? new Date(sub.expiresAt) : subRow?.expireAt ?? null
+  const expiresAt = subRow?.expireAt ?? (sub?.expiresAt ? new Date(sub.expiresAt) : null)
   const expiresAtLabel = expiresAt?.toLocaleDateString('ru-RU', {
     day: 'numeric',
     month: 'long',
@@ -206,7 +209,9 @@ export default async function DashboardHome() {
               {subRow || sub ? formatSubscriptionDaysLeft(daysLeft, subscriptionStatus) : 'Нет данных'}
             </strong>
             <p className="mt-3 text-sm leading-5 text-slate-500 dark:text-slate-400">
-              {subscriptionExpired
+              {graceActive
+                ? `Льготный доступ до ${subRow?.graceExpireAt?.toLocaleString('ru-RU')}. Оплатите тариф, чтобы сохранить подключение.`
+                : subscriptionExpired
                 ? 'Профиль сохранён. Продлите доступ без повторной настройки.'
                 : expiresAtLabel
                   ? `Оплачено до ${expiresAtLabel}`

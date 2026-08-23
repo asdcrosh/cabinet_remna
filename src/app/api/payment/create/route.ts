@@ -14,7 +14,7 @@ import { getAppUrl } from '@/lib/app-url'
 import { rateLimit } from '@/lib/rate-limit'
 import { provisionPaymentSubscription } from '@/lib/provisioning'
 import { getPlanAudienceContext, isPlanAvailableForUser } from '@/lib/plan-access'
-import { reconcileStalePendingPaymentsForUser } from '@/lib/payment-sync'
+import { getFreshPendingPaymentCutoff, reconcileStalePendingPaymentsForUser } from '@/lib/payment-sync'
 import { logError } from '@/lib/logger'
 import { buildPaymentServiceName } from '@/lib/payment-service-name'
 import { paymentErrorDetails, recordPaymentEvent } from '@/lib/payment-events'
@@ -137,11 +137,7 @@ export const POST = withAuth(async (req: Request) => {
       orderBy: { createdAt: 'desc' },
     })
     if (pendingAddon && pendingAddon.checkoutKey !== idempotencyKey) {
-      return NextResponse.json({
-        error: 'Оплата дополнения уже ожидает завершения',
-        code: 'ADDON_PAYMENT_PENDING',
-        confirmationUrl: pendingAddon.confirmationUrl,
-      }, { status: 409 })
+      return pendingCheckoutResponse(pendingAddon)
     }
   }
 
@@ -205,6 +201,28 @@ export const POST = withAuth(async (req: Request) => {
         return NextResponse.json({ error: error.message, code: error.code }, { status: 400 })
       }
       throw error
+    }
+  }
+  if (!promoCode) {
+    const pendingPayment = await prisma.payment.findFirst({
+      where: {
+        userId: user.id,
+        planId: plan.id,
+        purchaseType,
+        provider,
+        status: 'PENDING',
+        createdAt: { gt: getFreshPendingPaymentCutoff() },
+        deviceLimit: pricing.selectedDeviceLimit,
+        promoCodeId: null,
+      },
+      orderBy: { createdAt: 'desc' },
+    })
+    if (
+      pendingPayment
+      && Boolean(readBundledWhitelistAddonSnapshot(pendingPayment.addonSnapshot)) === includesBundledWhitelistAddon
+      && Boolean(pendingPayment.autoRenewalConsentAcceptedAt) === autoRenewalConsent
+    ) {
+      return pendingCheckoutResponse(pendingPayment)
     }
   }
   const planSnapshot = isWhitelistAddon
@@ -710,6 +728,22 @@ function existingCheckoutResponse(
     localPaymentId: payment.id,
     provider: payment.provider,
     idempotent: true,
+  })
+}
+
+function pendingCheckoutResponse(payment: Payment) {
+  if (!payment.confirmationUrl) {
+    return NextResponse.json({
+      error: 'Ссылка на оплату ещё создаётся. Повторите через несколько секунд.',
+      code: 'PAYMENT_CREATION_IN_PROGRESS',
+    }, { status: 409, headers: { 'Retry-After': '3' } })
+  }
+  return NextResponse.json({
+    confirmationUrl: payment.confirmationUrl,
+    paymentId: payment.externalPaymentId ?? payment.yookassaId ?? payment.id,
+    localPaymentId: payment.id,
+    provider: payment.provider,
+    resumed: true,
   })
 }
 

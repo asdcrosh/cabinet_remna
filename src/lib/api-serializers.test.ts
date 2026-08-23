@@ -21,6 +21,8 @@ describe('api serializers', () => {
       whitelistAddonExpireAt: null,
       whitelistAddonPaymentId: null,
       whitelistAddonInternalSquads: [],
+      graceStartedAt: null,
+      graceExpireAt: null,
       createdAt: new Date('2026-01-01T00:00:00.000Z'),
       updatedAt: new Date('2026-01-01T00:00:00.000Z'),
       plan: null,

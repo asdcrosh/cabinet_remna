@@ -605,6 +605,8 @@ model Subscription {
   whitelistAddonExpireAt    DateTime?
   whitelistAddonPaymentId   String?
   whitelistAddonInternalSquads String[] @default([])
+  graceStartedAt               DateTime?
+  graceExpireAt                DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -619,6 +621,7 @@ model Subscription {
   @@index([expireAt])
   @@index([pendingSync, updatedAt])
   @@index([whitelistAddonActive, whitelistAddonExpireAt])
+  @@index([graceExpireAt])
 }
 
 enum SubscriptionStatus {

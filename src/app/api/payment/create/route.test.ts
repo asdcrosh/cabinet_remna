@@ -32,6 +32,7 @@ vi.mock('@/lib/auth/guard', () => ({
 vi.mock('@/lib/rate-limit', () => ({ rateLimit: mocks.rateLimit }))
 vi.mock('@/lib/prisma', () => ({ prisma: mocks.prisma }))
 vi.mock('@/lib/payment-sync', () => ({
+  getFreshPendingPaymentCutoff: () => new Date('2026-08-22T00:00:00.000Z'),
   reconcileStalePendingPaymentsForUser: mocks.reconcileStalePendingPaymentsForUser,
 }))
 vi.mock('@/lib/plan-access', () => ({
@@ -418,6 +419,39 @@ describe('payment create route', () => {
       localPaymentId: 'payment-existing',
       provider: 'YOOKASSA',
       idempotent: true,
+    })
+    expect(mocks.prisma.$transaction).not.toHaveBeenCalled()
+    expect(mocks.createPayment).not.toHaveBeenCalled()
+  })
+
+  it('returns a fresh matching checkout instead of creating a duplicate payment', async () => {
+    mocks.prisma.payment.findFirst.mockResolvedValue({
+      id: 'payment-pending',
+      userId: user.id,
+      planId: plan.id,
+      purchaseType: 'SUBSCRIPTION',
+      provider: 'YOOKASSA',
+      status: 'PENDING',
+      deviceLimit: plan.deviceLimit,
+      confirmationUrl: 'https://pay.example/continue',
+      externalPaymentId: 'yoo-pending',
+      yookassaId: 'yoo-pending',
+      addonSnapshot: null,
+      autoRenewalConsentAcceptedAt: null,
+    })
+
+    const response = await POST(paymentRequest({
+      idempotencyKey: '527e89d3-9708-4ca5-9cb5-d3c08e1bcc35',
+    }))
+    const body = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(body).toEqual({
+      confirmationUrl: 'https://pay.example/continue',
+      paymentId: 'yoo-pending',
+      localPaymentId: 'payment-pending',
+      provider: 'YOOKASSA',
+      resumed: true,
     })
     expect(mocks.prisma.$transaction).not.toHaveBeenCalled()
     expect(mocks.createPayment).not.toHaveBeenCalled()
