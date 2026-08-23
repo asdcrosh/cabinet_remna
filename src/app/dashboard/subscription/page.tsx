@@ -8,7 +8,7 @@ import { remnawave, RemnawaveError, remnawaveUserReference } from '@/lib/remnawa
 import { KeysCard } from '@/components/dashboard/keys-card'
 import { DevicesList } from '@/components/dashboard/devices-list'
 import Link from 'next/link'
-import { ArrowRight, CalendarDays, Clock3, Gauge, Globe2, ShieldAlert, Sparkles } from 'lucide-react'
+import { ArrowRight, CalendarDays, ChevronDown, Clock3, Gauge, Globe2, ShieldAlert, Sparkles } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { EmptyState } from '@/components/dashboard/empty-state'
 import { getFeatureFlags } from '@/lib/feature-flags'
@@ -300,23 +300,48 @@ function SubscriptionTimeline({
     .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
     .slice(0, 12)
   if (items.length === 0) return null
+  const recentItems = items.slice(0, 3)
+  const olderItems = items.slice(3)
   return (
-    <section className="rounded-3xl border border-slate-200 bg-white p-4 dark:border-white/[0.09] dark:bg-white/[0.025] sm:p-5">
-      <div className="flex items-center gap-2">
-        <Clock3 className="h-4 w-4 text-slate-400" />
-        <h2 className="font-semibold">История подписки</h2>
+    <details className="group rounded-3xl border border-slate-200 bg-white p-4 dark:border-white/[0.09] dark:bg-white/[0.025] sm:p-5">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 [&::-webkit-details-marker]:hidden">
+        <span className="flex min-w-0 items-center gap-2">
+          <Clock3 className="h-4 w-4 shrink-0 text-slate-400" />
+          <span className="font-semibold">История подписки</span>
+          <span className="hidden text-xs font-normal text-slate-400 sm:inline">Последние 3 действия</span>
+        </span>
+        {olderItems.length > 0 ? (
+          <span className="inline-flex shrink-0 items-center gap-1.5 text-xs font-medium text-slate-500 transition-colors group-hover:text-slate-900 dark:group-hover:text-white">
+            <span className="group-open:hidden">Показать все</span>
+            <span className="hidden group-open:inline">Свернуть</span>
+            <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" />
+          </span>
+        ) : null}
+      </summary>
+
+      <div className="mt-4 grid gap-2.5 md:grid-cols-3">
+        {recentItems.map((item) => <TimelineItem key={item.id} item={item} />)}
       </div>
-      <div className="mt-4 space-y-3">
-        {items.map((item) => (
-          <div key={item.id} className="flex gap-3 border-l-2 border-cyan-500/40 pl-3">
-            <div className="min-w-0">
-              <div className="text-sm font-medium text-slate-900 dark:text-white">{item.title}</div>
-              <div className="mt-0.5 text-xs text-slate-400">{item.createdAt.toLocaleString('ru-RU')}</div>
-            </div>
-          </div>
-        ))}
-      </div>
-    </section>
+
+      {olderItems.length > 0 ? (
+        <div className="mt-2.5 hidden gap-2.5 border-t border-slate-200 pt-2.5 group-open:grid dark:border-white/[0.07] md:grid-cols-3">
+          {olderItems.map((item) => <TimelineItem key={item.id} item={item} />)}
+        </div>
+      ) : null}
+    </details>
+  )
+}
+
+function TimelineItem({
+  item,
+}: {
+  item: { id: string; title: string; createdAt: Date }
+}) {
+  return (
+    <div className="min-w-0 rounded-2xl border border-slate-200/80 bg-slate-50/70 px-3.5 py-3 dark:border-white/[0.07] dark:bg-white/[0.025]">
+      <div className="truncate text-sm font-medium text-slate-900 dark:text-white" title={item.title}>{item.title}</div>
+      <div className="mt-1 text-xs text-slate-400">{item.createdAt.toLocaleString('ru-RU')}</div>
+    </div>
   )
 }
 
