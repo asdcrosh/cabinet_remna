@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="1.9.12"
+VERSION="1.9.13"
 BRANCH="${BRANCH:-main}"
 RAW_BASE_URL="${RAW_BASE_URL:-https://raw.githubusercontent.com/asdcrosh/cabinet_remna/${BRANCH}}"
 GITHUB_API_URL="${GITHUB_API_URL:-https://api.github.com/repos/asdcrosh/cabinet_remna/commits/${BRANCH}}"
@@ -60,6 +60,17 @@ info() { printf '%s\n' "${CYAN}•${RESET} $*"; }
 ok() { printf '%s\n' "${GREEN}✓${RESET} $*"; }
 warn() { printf '%s\n' "${YELLOW}!${RESET} $*"; }
 fail() { printf '%s\n' "${RED}Ошибка:${RESET} $*" >&2; return 1; }
+
+curl_with_retries() {
+  local attempt
+  for attempt in 1 2 3; do
+    if curl "$@"; then
+      return 0
+    fi
+    ((attempt == 3)) || sleep "${attempt}"
+  done
+  return 1
+}
 
 pause() {
   if [[ -r /dev/tty ]]; then
@@ -475,7 +486,7 @@ remote_blob_sha() {
   local relative_path="$1"
   local commit_sha="$2"
   local response
-  response="$(curl -fsSL --proto '=https' --tlsv1.2 \
+  response="$(curl_with_retries -fsSL --proto '=https' --tlsv1.2 \
     --connect-timeout 5 --max-time 20 \
     -H 'Accept: application/vnd.github+json' \
     --get --data-urlencode "ref=${commit_sha}" \
@@ -503,6 +514,10 @@ download_verified_release_file() {
 
   VERIFIED_RELEASE_RAW_BASE_URL=""
   if [[ "${url}" == "${official_prefix}"* ]]; then
+    # Menu startup may have resolved a release while its replacement was still
+    # building. Every user-triggered download must resolve the current release
+    # again instead of reusing that stale process-wide value.
+    RESOLVED_RELEASE_SHA=""
     resolve_release_sha || return 1
     relative_path="${url#${official_prefix}}"
     source_url="${OFFICIAL_RAW_REPOSITORY}/${RESOLVED_RELEASE_SHA}/${relative_path}"
@@ -514,7 +529,7 @@ download_verified_release_file() {
     VERIFIED_RELEASE_RAW_BASE_URL="${OFFICIAL_RAW_REPOSITORY}/${RESOLVED_RELEASE_SHA}"
   fi
 
-  if ! curl -fsSL --proto '=https' --tlsv1.2 --connect-timeout 5 --max-time 60 \
+  if ! curl_with_retries -fsSL --proto '=https' --tlsv1.2 --connect-timeout 5 --max-time 60 \
     "${source_url}" -o "${destination}"; then
     return 1
   fi

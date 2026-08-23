@@ -139,6 +139,8 @@ describe('production deployment security', () => {
     expect(cabinetctl).toContain('[ ДОСТУПНА v%s ]')
     expect(cabinetctl).toContain('details="$(latest_workflow_details || true)"')
     expect(cabinetctl).toContain('RESOLVED_RELEASE_SHA="${workflow_sha}"')
+    expect(cabinetctl).toContain('RESOLVED_RELEASE_SHA=""\n    resolve_release_sha || return 1')
+    expect(cabinetctl).toContain('curl_with_retries -fsSL --proto')
     expect(cabinetctl).not.toContain("--data-urlencode 'status=success'")
     expect(updater).toContain('TARGET_CABINET_IMAGE="${expected_image}"')
     expect(updater).toContain('export CABINET_IMAGE')
