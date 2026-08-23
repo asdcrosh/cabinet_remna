@@ -8,13 +8,14 @@ import { remnawave, RemnawaveError, remnawaveUserReference } from '@/lib/remnawa
 import { KeysCard } from '@/components/dashboard/keys-card'
 import { DevicesList } from '@/components/dashboard/devices-list'
 import Link from 'next/link'
-import { ArrowRight, CalendarDays, Gauge, ShieldAlert, Sparkles } from 'lucide-react'
+import { ArrowRight, CalendarDays, Gauge, Globe2, ShieldAlert, Sparkles } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { EmptyState } from '@/components/dashboard/empty-state'
 import { getFeatureFlags } from '@/lib/feature-flags'
 import { formatSubscriptionDaysLeft, isSubscriptionExpired } from '@/lib/subscription-time'
 import { PageHeader } from '@/components/dashboard/page-header'
 import { VpnConnectionCheck } from '@/components/dashboard/vpn-connection-check'
+import { isWhitelistAddonCurrentlyActive } from '@/lib/whitelist-addon-policy'
 
 export const dynamic = 'force-dynamic'
 
@@ -32,6 +33,8 @@ export default async function SubscriptionPage() {
         status: true,
         expireAt: true,
         deviceLimit: true,
+        whitelistAddonActive: true,
+        whitelistAddonExpireAt: true,
         plan: {
           select: {
             name: true,
@@ -92,6 +95,11 @@ export default async function SubscriptionPage() {
   const isUnlimited = u.trafficLimitBytes === '0'
   const subscriptionExpired = isSubscriptionExpired(u.daysLeft, u.userStatus)
   const expiresAtLabel = new Date(u.expiresAt).toLocaleDateString('ru-RU')
+  const whitelistAddonActive = Boolean(
+    localSubscription && isWhitelistAddonCurrentlyActive(localSubscription)
+  )
+  const whitelistAddonExpireAtLabel = localSubscription?.whitelistAddonExpireAt
+    ?.toLocaleDateString('ru-RU', { timeZone: 'Europe/Moscow' }) ?? null
   let isFirstConnection = false
   if (!subscriptionExpired) {
     try {
@@ -153,7 +161,10 @@ export default async function SubscriptionPage() {
           </div>
         </div>
 
-        <div className="connection-access-summary__metrics">
+        <div className={cn(
+          'connection-access-summary__metrics',
+          whitelistAddonActive && 'connection-access-summary__metrics--with-addon'
+        )}>
           <AccessMetric
             icon={<Sparkles className="h-4 w-4" />}
             label="Доступ"
@@ -164,6 +175,13 @@ export default async function SubscriptionPage() {
             label={subscriptionExpired ? 'Завершилась' : 'Оплачено до'}
             value={expiresAtLabel}
           />
+          {whitelistAddonActive && whitelistAddonExpireAtLabel ? (
+            <AccessMetric
+              icon={<Globe2 className="h-4 w-4" />}
+              label="БС действуют до"
+              value={whitelistAddonExpireAtLabel}
+            />
+          ) : null}
           <AccessMetric
             icon={<Gauge className="h-4 w-4" />}
             label="Трафик"
