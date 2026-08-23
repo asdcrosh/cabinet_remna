@@ -29,6 +29,8 @@ RUN apk add --no-cache openssl
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npm run build
+RUN sed -n 's/^VERSION="\([0-9][0-9.]*\)"$/\1/p' deploy/cabinetctl.sh > .next/cabinetctl-version \
+  && test -s .next/cabinetctl-version
 RUN ./node_modules/.bin/esbuild \
   scripts/payment-reconciler.ts \
   scripts/admin-telegram-test.ts \
@@ -117,6 +119,7 @@ COPY --chown=nextjs:nextjs --from=builder /app/public ./public
 COPY --chown=nextjs:nextjs --from=builder /app/.next/standalone ./
 COPY --chown=nextjs:nextjs --from=builder /app/.next/static ./.next/static
 COPY --chown=nextjs:nextjs --from=builder /app/.next/ops ./ops
+COPY --chown=nextjs:nextjs --from=builder /app/.next/cabinetctl-version ./cabinetctl-version
 COPY --chown=nextjs:nextjs --from=builder /app/scripts/check-env.mjs ./ops/check-env.mjs
 COPY --chown=nextjs:nextjs --from=builder /app/prisma ./prisma
 

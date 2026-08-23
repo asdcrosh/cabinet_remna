@@ -15,6 +15,7 @@ import { processAdminTelegramDeliveries } from '../src/lib/admin-telegram-notifi
 import { processDueAutoRenewals } from '../src/lib/auto-renewal'
 import { resumeDuePausedSubscriptions } from '../src/lib/subscription-retention'
 import { reconcileExpiredWhitelistAddons } from '../src/lib/whitelist-addon'
+import { checkReleaseNotifications } from '../src/lib/release-notifications'
 
 const intervalMs = readPositiveInt('PAYMENT_RECONCILE_INTERVAL_SECONDS', 60) * 1000
 const batchSize = readPositiveInt('PAYMENT_RECONCILE_BATCH_SIZE', 25)
@@ -30,11 +31,13 @@ const subscriptionHealthIntervalMs = readPositiveInt('SUBSCRIPTION_HEALTH_INTERV
 const subscriptionHealthBatchSize = readPositiveInt('SUBSCRIPTION_HEALTH_BATCH_SIZE', 10)
 const adminTelegramBatchSize = readPositiveInt('ADMIN_TELEGRAM_NOTIFICATION_BATCH_SIZE', 20)
 const autoRenewalBatchSize = readPositiveInt('AUTO_RENEWAL_BATCH_SIZE', 20)
+const releaseCheckIntervalMs = readPositiveInt('RELEASE_CHECK_INTERVAL_SECONDS', 300) * 1000
 
 let stopped = false
 let wakeSleep: (() => void) | null = null
 let lastRemnashopUsersSyncAt = 0
 let lastSubscriptionHealthAt = 0
+let lastReleaseCheckAt = 0
 
 process.on('SIGTERM', stop)
 process.on('SIGINT', stop)
@@ -66,6 +69,7 @@ async function runOnce() {
   })
   await syncRemnashopUsersIfDue()
   await syncSubscriptionHealthIfDue()
+  await checkReleasesIfDue()
   const expiredWhitelistAddons = await reconcileExpiredWhitelistAddons({
     limit: notificationBatchSize,
     shouldStop: () => stopped,
@@ -142,6 +146,17 @@ async function deliverAdminTelegramNotifications() {
     if (result.attempted > 0) logInfo('admin_telegram.batch_completed', result)
   } catch (error) {
     logError('admin_telegram.batch_failed', error)
+  }
+}
+
+async function checkReleasesIfDue() {
+  if (Date.now() - lastReleaseCheckAt < releaseCheckIntervalMs) return
+  lastReleaseCheckAt = Date.now()
+  try {
+    const result = await checkReleaseNotifications()
+    logInfo('release_notifications.checked', result)
+  } catch (error) {
+    logError('release_notifications.failed', error)
   }
 }
 
