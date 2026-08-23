@@ -494,9 +494,9 @@ function validatePlategaTransaction(
     throw new Error('Platega transaction currency mismatch')
   }
   const receivedAmountKopecks = Math.round(transaction.paymentDetails.amount * 100)
-  if (transaction.status === 'CONFIRMED' && receivedAmountKopecks !== payment.amountKopecks) {
+  if (transaction.status === 'CONFIRMED' && receivedAmountKopecks < payment.amountKopecks) {
     throw new Error(
-      `Platega transaction amount mismatch: expected ${payment.amountKopecks}, received ${receivedAmountKopecks}`
+      `Platega transaction amount below expected: expected ${payment.amountKopecks}, received ${receivedAmountKopecks}`
     )
   }
 }

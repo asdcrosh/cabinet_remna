@@ -112,6 +112,16 @@ describe('Platega webhook', () => {
     expect(mocks.paymentUpdate).not.toHaveBeenCalled()
   })
 
+  it('accepts a confirmed amount with Platega commission added on top', async () => {
+    const response = await POST(callbackRequest('CONFIRMED', { amount: 324 }))
+
+    expect(response.status).toBe(200)
+    expect(mocks.paymentUpdate).toHaveBeenCalledWith({
+      where: { id: 'payment-1' },
+      data: expect.objectContaining({ status: 'SUCCEEDED' }),
+    })
+  })
+
   it('cancels only a pending payment', async () => {
     const response = await POST(callbackRequest('CANCELED'))
 
@@ -124,7 +134,7 @@ describe('Platega webhook', () => {
   })
 
   it('records a chargeback without issuing access again', async () => {
-    const response = await POST(callbackRequest('CHARGEBACKED'))
+    const response = await POST(callbackRequest('CHARGEBACKED', { amount: 324 }))
 
     expect(response.status).toBe(200)
     expect(mocks.recordSucceededRefund).toHaveBeenCalledWith({

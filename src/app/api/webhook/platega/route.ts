@@ -66,7 +66,8 @@ export async function POST(request: Request) {
   })
 
   const amountKopecks = Math.round(callback.amount * 100)
-  if (callback.currency.toUpperCase() !== 'RUB' || amountKopecks !== payment.amountKopecks) {
+  const amountBelowExpected = callback.status === 'CONFIRMED' && amountKopecks < payment.amountKopecks
+  if (callback.currency.toUpperCase() !== 'RUB' || amountBelowExpected) {
     logWarn('webhook.platega.payment_mismatch', {
       paymentId: payment.id,
       expectedAmountKopecks: payment.amountKopecks,
@@ -80,7 +81,7 @@ export async function POST(request: Request) {
     await recordSucceededRefund({
       paymentId: payment.id,
       providerRefundId: `platega-chargeback:${callback.id}`,
-      amountKopecks,
+      amountKopecks: payment.amountKopecks,
       paymentAmountKopecks: payment.amountKopecks,
       providerStatus: callback.status,
     })
