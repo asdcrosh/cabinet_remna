@@ -533,16 +533,17 @@ function UserActions({
           showLabel={showLabels}
         />
       )}
-      {actorRole === 'SUPER_ADMIN' && activeSubscription && (
+      {actorRole === 'SUPER_ADMIN' && (
         <UserWhitelistAddonButton
           userId={user.id}
           email={user.email}
+          available={Boolean(activeSubscription)}
           active={Boolean(
-            activeSubscription.whitelistAddonActive
+            activeSubscription?.whitelistAddonActive
             && activeSubscription.whitelistAddonExpireAt
             && activeSubscription.whitelistAddonExpireAt.getTime() > Date.now()
           )}
-          expireAt={activeSubscription.whitelistAddonExpireAt?.toISOString() ?? null}
+          expireAt={activeSubscription?.whitelistAddonExpireAt?.toISOString() ?? null}
           showLabel={showLabels}
         />
       )}

@@ -12,12 +12,14 @@ export function UserWhitelistAddonButton({
   email,
   active: initialActive,
   expireAt,
+  available = true,
   showLabel = false,
 }: {
   userId: string
   email: string
   active: boolean
   expireAt: string | null
+  available?: boolean
   showLabel?: boolean
 }) {
   const router = useRouter()
@@ -64,7 +66,7 @@ export function UserWhitelistAddonButton({
         aria-label="Управление БС"
       >
         <Globe2 className="h-4 w-4" />
-        {showLabel ? <span>Управление БС</span> : null}
+        {showLabel ? <span>{available ? 'Управление БС' : 'БС: нужна подписка'}</span> : null}
       </button>
 
       <AdminModal
@@ -74,45 +76,51 @@ export function UserWhitelistAddonButton({
         description={email}
         size="md"
       >
-        <form className="space-y-5" onSubmit={grant}>
-          <div className={`rounded-xl border p-3 text-sm ${active
-            ? 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-400/20 dark:bg-emerald-400/[0.06] dark:text-emerald-200'
-            : 'border-slate-200 bg-slate-50 text-slate-600 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-300'
-          }`}>
-            {active ? `БС подключены до ${formatDate(expiresOn)}` : 'БС не подключены'}
+        {!available ? (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-400/20 dark:bg-amber-400/[0.08] dark:text-amber-100">
+            У пользователя нет действующей подписки. Сначала назначьте тариф, после этого здесь можно будет выдать БС до выбранной даты.
           </div>
-
-          <label className="block">
-            <span className="label">Выдать до конца дня</span>
-            <input
-              type="date"
-              className="input"
-              min={todayDate()}
-              value={expiresOn}
-              disabled={loading}
-              onChange={(event) => setExpiresOn(event.target.value)}
-              required
-            />
-            <span className="mt-1.5 block text-xs text-slate-500">
-              Серверные группы берутся из настроек БС текущего тарифа. После этой даты доступ снимется автоматически.
-            </span>
-          </label>
-
-          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-between">
-            <div>
-              {active ? (
-                <button type="button" className="btn-secondary text-red-600 dark:text-red-300" disabled={loading} onClick={() => void revoke()}>
-                  <Trash2 className="h-4 w-4" />
-                  Снять БС
-                </button>
-              ) : null}
+        ) : (
+          <form className="space-y-5" onSubmit={grant}>
+            <div className={`rounded-xl border p-3 text-sm ${active
+              ? 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-400/20 dark:bg-emerald-400/[0.06] dark:text-emerald-200'
+              : 'border-slate-200 bg-slate-50 text-slate-600 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-300'
+            }`}>
+              {active ? `БС подключены до ${formatDate(expiresOn)}` : 'БС не подключены'}
             </div>
-            <button type="submit" className="btn-primary" disabled={loading || !expiresOn}>
-              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-              {active ? 'Изменить дату' : 'Выдать БС'}
-            </button>
-          </div>
-        </form>
+
+            <label className="block">
+              <span className="label">Выдать до конца дня</span>
+              <input
+                type="date"
+                className="input"
+                min={todayDate()}
+                value={expiresOn}
+                disabled={loading}
+                onChange={(event) => setExpiresOn(event.target.value)}
+                required
+              />
+              <span className="mt-1.5 block text-xs text-slate-500">
+                Серверные группы берутся из настроек БС текущего тарифа. После этой даты доступ снимется автоматически.
+              </span>
+            </label>
+
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-between">
+              <div>
+                {active ? (
+                  <button type="button" className="btn-secondary text-red-600 dark:text-red-300" disabled={loading} onClick={() => void revoke()}>
+                    <Trash2 className="h-4 w-4" />
+                    Снять БС
+                  </button>
+                ) : null}
+              </div>
+              <button type="submit" className="btn-primary" disabled={loading || !expiresOn}>
+                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                {active ? 'Изменить дату' : 'Выдать БС'}
+              </button>
+            </div>
+          </form>
+        )}
       </AdminModal>
     </>
   )
