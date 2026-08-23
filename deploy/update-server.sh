@@ -143,7 +143,7 @@ pull_target_image() {
   if [[ -t 1 ]]; then
     while kill -0 "${pull_pid}" 2>/dev/null; do
       elapsed=$(($(date +%s) - started_at))
-      printf '\rPulling cabinet image: %s sec.' "${elapsed}"
+      printf '\r[ 20%%] Загрузка образа кабинета: %s сек.' "${elapsed}"
       sleep 2
     done
     printf '\r\033[2K'
@@ -186,6 +186,8 @@ ROLLBACK_ARMED="false"
 MIGRATION_STATUS="pending"
 LOCAL_HEALTH_STATUS="pending"
 PUBLIC_HEALTH_STATUS="pending"
+DEPLOY_STAGE="starting"
+DEPLOY_PROGRESS=0
 
 write_deployment_state() {
   local status="$1"
@@ -205,6 +207,8 @@ write_deployment_state() {
     MIGRATION_STATUS_VALUE="${MIGRATION_STATUS}" \
     LOCAL_HEALTH_STATUS_VALUE="${LOCAL_HEALTH_STATUS}" \
     PUBLIC_HEALTH_STATUS_VALUE="${PUBLIC_HEALTH_STATUS}" \
+    DEPLOY_STAGE_VALUE="${DEPLOY_STAGE}" \
+    DEPLOY_PROGRESS_VALUE="${DEPLOY_PROGRESS}" \
     python3 <<'PY'
 import json
 import os
@@ -219,6 +223,8 @@ payload = {
     "deployedRevision": os.environ.get("DEPLOYED_REVISION_VALUE") or None,
     "rollbackRevision": os.environ.get("ROLLBACK_REVISION_VALUE") or None,
     "message": os.environ.get("DEPLOY_MESSAGE") or None,
+    "stage": os.environ.get("DEPLOY_STAGE_VALUE") or None,
+    "progress": int(os.environ.get("DEPLOY_PROGRESS_VALUE") or 0),
     "migrations": os.environ["MIGRATION_STATUS_VALUE"],
     "health": {
         "local": os.environ["LOCAL_HEALTH_STATUS_VALUE"],
@@ -233,6 +239,23 @@ temporary.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n")
 temporary.chmod(0o644)
 temporary.replace(path)
 PY
+}
+
+print_deploy_progress() {
+  local progress="$1"
+  local label="$2"
+  printf '[%3d%%] %s\n' "${progress}" "${label}"
+}
+
+set_deploy_stage() {
+  local progress="$1"
+  local stage="$2"
+  local label="$3"
+  local message="$4"
+  DEPLOY_PROGRESS="${progress}"
+  DEPLOY_STAGE="${stage}"
+  print_deploy_progress "${progress}" "${label}"
+  write_deployment_state "deploying" "${message}"
 }
 
 rollback_runtime_services() {
@@ -296,7 +319,7 @@ PREVIOUS_DEPLOYED_REVISION="$(running_app_revision || installed_version_revision
 PREVIOUS_IMAGE_ID="$(running_app_image_id)"
 DEPLOY_TARGET_REVISION="$(remote_commit_sha || true)"
 mkdir -p "${STATE_DIR}"
-write_deployment_state "deploying" "Подготовка обновления и проверка конфигурации."
+set_deploy_stage 5 "preparing" "Подготовка обновления" "Подготовка обновления и проверка конфигурации."
 trap handle_update_failure ERR
 
 if docker inspect remnashop >/dev/null 2>&1; then
@@ -637,25 +660,25 @@ NODE_PROVISIONING_API_FAILURE_FATAL="false" \
 
 COMPOSE=(docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}")
 configure_target_image
+set_deploy_stage 15 "configuration" "Проверка конфигурации" "Конфигурация синхронизирована. Подготавливается загрузка образа."
 
 if [[ -n "${PREVIOUS_IMAGE_ID}" ]] && docker image inspect "${PREVIOUS_IMAGE_ID}" >/dev/null 2>&1; then
   ROLLBACK_IMAGE="remnawave-cabinet:rollback-$(date -u +%Y%m%d%H%M%S)"
   docker image tag "${PREVIOUS_IMAGE_ID}" "${ROLLBACK_IMAGE}"
 fi
 
-echo "Pulling cabinet image..."
+set_deploy_stage 20 "pulling" "Загрузка образа кабинета" "Загружается точный Docker-образ новой версии."
 pull_target_image
 verify_target_image
-write_deployment_state "deploying" "Новый образ загружен. Запускаются миграции."
+set_deploy_stage 35 "image_ready" "Образ загружен и проверен" "Новый образ загружен и проверен. Запускаются миграции."
 
-echo "Preparing one-shot services..."
+set_deploy_stage 45 "migrations" "Подготовка и применение миграций" "Подготавливаются и применяются миграции базы данных."
 CABINET_ENV_FILE="${ENV_FILE}" "${COMPOSE[@]}" rm -fsv check-env migrate seed >/dev/null 2>&1 || true
 
 if ! grep -Eq '^COMPOSE_PROFILES=.*caddy' "${ENV_FILE}"; then
   CABINET_ENV_FILE="${ENV_FILE}" "${COMPOSE[@]}" rm -fsv caddy >/dev/null 2>&1 || true
 fi
 
-echo "Applying migrations and restarting services..."
 ROLLBACK_ARMED="true"
 if ! CABINET_ENV_FILE="${ENV_FILE}" "${COMPOSE[@]}" up -d --remove-orphans; then
   if disable_bundled_caddy_if_conflicting; then
@@ -665,17 +688,17 @@ if ! CABINET_ENV_FILE="${ENV_FILE}" "${COMPOSE[@]}" up -d --remove-orphans; then
   fi
 fi
 MIGRATION_STATUS="ok"
-write_deployment_state "deploying" "Миграции применены. Проверяется новая версия."
+set_deploy_stage 65 "starting_services" "Запуск сервисов" "Миграции применены. Запускаются сервисы новой версии."
 
 # A mutable `latest` tag can be pulled successfully while Compose keeps an
 # already-running container. Recreate runtime services explicitly so the
 # update always starts the image that was just pulled without touching the DB.
-echo "Recreating runtime services from the pulled image..."
 runtime_services=(app worker broadcast-worker watch-worker)
 if [[ ",$(read_update_env_value COMPOSE_PROFILES | tr -d ' ')," == *",provisioning,"* ]]; then
   runtime_services+=(node-provisioning-worker)
 fi
 CABINET_ENV_FILE="${ENV_FILE}" "${COMPOSE[@]}" up -d --no-deps --force-recreate "${runtime_services[@]}"
+set_deploy_stage 75 "waiting_services" "Ожидание готовности сервисов" "Сервисы запущены. Ожидается их готовность."
 
 wait_for_container() {
   local service="$1"
@@ -890,7 +913,7 @@ CABINET_APP_BIND="${CABINET_APP_BIND:-127.0.0.1}"
 CABINET_APP_PORT="${CABINET_APP_PORT:-3000}"
 [[ "${CABINET_APP_BIND}" == "0.0.0.0" ]] && CABINET_APP_BIND="127.0.0.1"
 
-echo "Checking local app on ${CABINET_APP_BIND}:${CABINET_APP_PORT}..."
+set_deploy_stage 85 "local_health" "Локальный health-check" "Проверяется локальная доступность новой версии."
 if [[ -n "${HEALTHCHECK_TOKEN}" ]]; then
   wait_for_url "http://${CABINET_APP_BIND}:${CABINET_APP_PORT}/api/health" 60 \
     -H "x-healthcheck-token: ${HEALTHCHECK_TOKEN}"
@@ -898,14 +921,14 @@ else
   wait_for_url "http://${CABINET_APP_BIND}:${CABINET_APP_PORT}/login" 60
 fi
 LOCAL_HEALTH_STATUS="ok"
-write_deployment_state "deploying" "Локальный health-check пройден. Проверяется публичный адрес."
 
 if [[ -n "${APP_URL}" && -n "${HEALTHCHECK_TOKEN}" ]]; then
-  echo "Checking public health..."
+  set_deploy_stage 92 "public_health" "Публичный health-check" "Локальная проверка пройдена. Проверяется публичный адрес."
   wait_for_url "${APP_URL%/}/api/health" 60 -H "x-healthcheck-token: ${HEALTHCHECK_TOKEN}"
   PUBLIC_HEALTH_STATUS="ok"
 else
   PUBLIC_HEALTH_STATUS="skipped"
+  set_deploy_stage 92 "public_health" "Публичный health-check пропущен" "Локальная проверка пройдена. Публичная проверка не настроена."
 fi
 
 DEPLOYED_REVISION="$(running_app_revision || true)"
@@ -927,9 +950,12 @@ if [[ "${CABINET_RELEASE_SHA:-}" =~ ^[0-9a-f]{40}$ \
   && "${TARGET_CABINET_IMAGE}" == "${OFFICIAL_CABINET_IMAGE}:sha-${CABINET_RELEASE_SHA}" ]]; then
   write_update_env_value "CABINET_IMAGE" "${TARGET_CABINET_IMAGE}"
 fi
-write_deployment_state "success" "Новая версия запущена и прошла автоматические проверки." "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-
+set_deploy_stage 97 "cleanup" "Очистка старого образа" "Новая версия проверена. Удаляется предыдущий образ."
 cleanup_docker_artifacts
+DEPLOY_PROGRESS=100
+DEPLOY_STAGE="completed"
+print_deploy_progress 100 "Обновление завершено"
+write_deployment_state "success" "Новая версия запущена и прошла автоматические проверки." "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 VERSION_TO_RECORD="${DEPLOYED_REVISION:-$(remote_commit_sha || true)}"
 write_installed_version "${VERSION_TO_RECORD}"
 mkdir -p /var/cache/remnawave-cabinet 2>/dev/null || true

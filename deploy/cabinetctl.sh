@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="1.9.16"
+VERSION="1.9.17"
 BRANCH="${BRANCH:-main}"
 RAW_BASE_URL="${RAW_BASE_URL:-https://raw.githubusercontent.com/asdcrosh/cabinet_remna/${BRANCH}}"
 GITHUB_API_URL="${GITHUB_API_URL:-https://api.github.com/repos/asdcrosh/cabinet_remna/commits/${BRANCH}}"
@@ -265,7 +265,7 @@ console_update_badge() {
   if [[ ! "${REMOTE_CONSOLE_VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
     printf '  %s[ СТАТУС НЕИЗВЕСТЕН ]%s' "${DIM}" "${RESET}"
   elif version_is_newer "${REMOTE_CONSOLE_VERSION}" "${VERSION}"; then
-    printf '  %s%s[ ДОСТУПНА v%s ]%s' "${YELLOW}" "${BOLD}" "${REMOTE_CONSOLE_VERSION}" "${RESET}"
+    printf '  %s%s[ НОВАЯ ВЕРСИЯ КОНСОЛИ v%s ]%s' "${YELLOW}" "${BOLD}" "${REMOTE_CONSOLE_VERSION}" "${RESET}"
   else
     printf '  %s%s[ АКТУАЛЬНА ]%s' "${GREEN}" "${BOLD}" "${RESET}"
   fi
@@ -686,8 +686,8 @@ check_update_status() {
 print_update_status_key() {
   case "${1:-unknown}" in
     latest|current) print_status_row "$(state_marker healthy)" "Docker-образ" "${GREEN}${BOLD}[ АКТУАЛЬНО ]${RESET}" ;;
-    available) print_status_row "${YELLOW}↑${RESET}" "Docker-образ" "${YELLOW}${BOLD}[ ДОСТУПНО ]${RESET}" ;;
-    building) print_status_row "$(state_marker starting)" "Docker-образ" "${YELLOW}${BOLD}[ СОБИРАЕТСЯ ]${RESET}" ;;
+    available) print_status_row "${YELLOW}↑${RESET}" "Docker-образ" "${YELLOW}${BOLD}[ НОВАЯ ВЕРСИЯ КАБИНЕТА ]${RESET}" ;;
+    building) print_status_row "$(state_marker starting)" "Docker-образ" "${YELLOW}${BOLD}[ НОВАЯ ВЕРСИЯ КАБИНЕТА СОБИРАЕТСЯ ]${RESET}" ;;
     build-failed|build_failed) print_status_row "${RED}×${RESET}" "Docker-образ" "${RED}${BOLD}[ СБОРКА НЕ ГОТОВА ]${RESET}" ;;
     check-failed|check_failed|unknown) print_status_row "${DIM}○${RESET}" "Docker-образ" "${DIM}проверим позже${RESET}" ;;
     version-unknown|version_unknown) print_status_row "${YELLOW}○${RESET}" "Docker-образ" "${YELLOW}версия не определена${RESET}" ;;
@@ -744,7 +744,7 @@ update_status_line() {
 
 deployment_status_line() {
   [[ -f "${DEPLOY_STATE_FILE}" ]] || return 0
-  local summary status revision finished_at
+  local summary status revision finished_at progress
   summary="$(python3 - "${DEPLOY_STATE_FILE}" <<'PY' 2>/dev/null || true
 import json
 import sys
@@ -752,15 +752,20 @@ import sys
 try:
     data = json.load(open(sys.argv[1]))
     revision = data.get("deployedRevision") or data.get("rollbackRevision") or data.get("targetRevision") or ""
-    print("|".join((str(data.get("status") or "unknown"), revision[:7], str(data.get("finishedAt") or ""))))
+    print("|".join((
+        str(data.get("status") or "unknown"),
+        revision[:7],
+        str(data.get("finishedAt") or ""),
+        str(data.get("progress") or 0),
+    )))
 except Exception:
     pass
 PY
 )"
-  IFS='|' read -r status revision finished_at <<<"${summary}"
+  IFS='|' read -r status revision finished_at progress <<<"${summary}"
   case "${status}" in
     success) print_status_row "$(state_marker healthy)" "Деплой" "${GREEN}${BOLD}[ УСПЕШНО ]${RESET} ${DIM}${revision}${RESET}" ;;
-    deploying) print_status_row "$(state_marker starting)" "Деплой" "${YELLOW}${BOLD}[ ВЫПОЛНЯЕТСЯ ]${RESET} ${revision}" ;;
+    deploying) print_status_row "$(state_marker starting)" "Деплой" "${YELLOW}${BOLD}[ ВЫПОЛНЯЕТСЯ ${progress:-0}% ]${RESET} ${revision}" ;;
     rolled_back) print_status_row "${RED}↶${RESET}" "Деплой" "${RED}откат ${revision}${RESET}" ;;
     failed) print_status_row "${RED}●${RESET}" "Деплой" "${RED}ошибка${RESET}" ;;
   esac
@@ -782,7 +787,22 @@ labels = {
     "failed": "ошибка",
     "rolled_back": "выполнен автоматический откат",
 }
+stages = {
+    "preparing": "подготовка",
+    "configuration": "проверка конфигурации",
+    "pulling": "загрузка образа",
+    "image_ready": "проверка образа",
+    "migrations": "миграции",
+    "starting_services": "запуск сервисов",
+    "waiting_services": "ожидание сервисов",
+    "local_health": "локальный health-check",
+    "public_health": "публичный health-check",
+    "cleanup": "очистка",
+    "completed": "завершено",
+}
 print(f"Результат: {labels.get(data.get('status'), data.get('status', 'неизвестно'))}")
+print(f"Этап: {stages.get(data.get('stage'), data.get('stage') or 'неизвестно')}")
+print(f"Прогресс: {data.get('progress', 0)}%")
 print(f"Начало: {data.get('startedAt') or 'неизвестно'}")
 print(f"Завершение: {data.get('finishedAt') or 'ещё не завершено'}")
 print(f"Предыдущая версия: {(data.get('previousRevision') or 'неизвестно')[:12]}")
