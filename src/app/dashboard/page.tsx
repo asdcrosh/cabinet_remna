@@ -21,6 +21,7 @@ import { getFeatureFlags } from '@/lib/feature-flags'
 import { getAvailablePaymentProviders } from '@/lib/payment-providers'
 import { cn } from '@/lib/cn'
 import { HomeWhitelistAddon } from '@/components/dashboard/home-whitelist-addon'
+import { isWhitelistAddonCurrentlyActive } from '@/lib/whitelist-addon-policy'
 
 export const dynamic = 'force-dynamic'
 
@@ -123,19 +124,23 @@ export default async function DashboardHome() {
           label: 'Управлять подключением',
           icon: <KeyRound className="h-4 w-4" />,
         }
+  const whitelistAddonActive = Boolean(subRow && isWhitelistAddonCurrentlyActive(subRow))
+  const whitelistAddonConfigured = Boolean(
+    subRow?.plan?.whitelistAddonEnabled
+    && subRow.plan.whitelistAddonPriceKopecks > 0
+    && subRow.plan.whitelistAddonInternalSquads.length > 0
+  )
   const whitelistAddonOffer = subRow
     && subRow.planId
     && subRow.plan
     && !subscriptionExpired
     && ['ACTIVE', 'LIMITED'].includes(subRow.status)
     && subRow.expireAt.getTime() > Date.now()
-    && subRow.plan.whitelistAddonEnabled
-    && subRow.plan.whitelistAddonPriceKopecks > 0
-    && subRow.plan.whitelistAddonInternalSquads.length > 0
+    && (whitelistAddonActive || whitelistAddonConfigured)
     ? {
         planId: subRow.planId,
         priceKopecks: subRow.plan.whitelistAddonPriceKopecks,
-        active: subRow.whitelistAddonActive,
+        active: whitelistAddonActive,
         expireAt: subRow.whitelistAddonExpireAt?.toISOString() ?? null,
       }
     : null

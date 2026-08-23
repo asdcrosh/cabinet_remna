@@ -35,7 +35,7 @@ vi.mock('@/lib/feature-flags', () => ({ isFeatureEnabled: vi.fn(async () => true
 type AdminRouteCase = {
   name: string
   module: string
-  method: 'GET' | 'POST' | 'PATCH' | 'DELETE'
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
   url?: string
   params?: Record<string, string>
 }
@@ -99,6 +99,8 @@ const routeCases: AdminRouteCase[] = [
   { name: 'user profile update', module: './users/[id]/profile/route', method: 'PATCH', params: { id: 'user-1' } },
   { name: 'user role update', module: './users/[id]/role/route', method: 'PATCH', params: { id: 'user-1' } },
   { name: 'user sync', module: './users/[id]/sync/route', method: 'POST', params: { id: 'user-1' } },
+  { name: 'manual whitelist grant', module: './users/[id]/whitelist-addon/route', method: 'PUT', params: { id: 'user-1' } },
+  { name: 'manual whitelist revoke', module: './users/[id]/whitelist-addon/route', method: 'DELETE', params: { id: 'user-1' } },
   { name: 'users merge', module: './users/merge/route', method: 'POST' },
   { name: 'users list', module: './users/route', method: 'GET' },
   { name: 'welcome bonus update', module: './welcome-bonus/route', method: 'PATCH' },
@@ -113,7 +115,7 @@ describe('admin API authorization matrix', () => {
     const response = await handler!(
       new Request(item.url ?? 'http://localhost:3000/api/admin/test', {
         method: item.method,
-        body: ['POST', 'PATCH', 'DELETE'].includes(item.method) ? JSON.stringify({}) : undefined,
+        body: ['POST', 'PUT', 'PATCH', 'DELETE'].includes(item.method) ? JSON.stringify({}) : undefined,
       }),
       { params: item.params ?? {} }
     )

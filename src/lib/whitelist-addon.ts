@@ -9,6 +9,13 @@ export const WHITELIST_ADDON_NAME = 'Доступ к серверам с бел�
 export const WHITELIST_ADDON_RECEIPT_NAME = 'Расширенный доступ'
 export { WHITELIST_ADDON_DURATION_DAYS } from './whitelist-addon-policy'
 
+export class WhitelistAddonManagementError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'WhitelistAddonManagementError'
+  }
+}
+
 export type WhitelistAddonSnapshot = {
   type: 'WHITELIST_ADDON'
   name: string
@@ -190,6 +197,82 @@ export async function revokeWhitelistAddonForPayment(paymentId: string) {
     },
   })
   return { revoked: true as const }
+}
+
+export async function grantWhitelistAddonManually(input: {
+  userId: string
+  expireAt: Date
+}) {
+  const now = new Date()
+  if (!Number.isFinite(input.expireAt.getTime()) || input.expireAt.getTime() <= now.getTime()) {
+    throw new WhitelistAddonManagementError('Дата окончания БС должна быть в будущем')
+  }
+
+  const subscription = await prisma.subscription.findFirst({
+    where: {
+      userId: input.userId,
+      status: { in: ['ACTIVE', 'LIMITED'] },
+      expireAt: { gt: now },
+    },
+    orderBy: { expireAt: 'desc' },
+    include: { user: true, plan: true },
+  })
+  if (!subscription) throw new WhitelistAddonManagementError('У пользователя нет действующей подписки')
+  if (!subscription.plan) throw new WhitelistAddonManagementError('У подписки не найден тариф')
+  if (subscription.plan.whitelistAddonInternalSquads.length === 0) {
+    throw new WhitelistAddonManagementError('В текущем тарифе не настроены серверные группы БС')
+  }
+  if (!hasRemnawaveUserReference(subscription.user)) {
+    throw new WhitelistAddonManagementError('Профиль Remnawave не найден')
+  }
+
+  const activeInternalSquads = uniqueSquads([
+    ...resolvePlanActiveInternalSquads(subscription.plan.activeInternalSquads),
+    ...subscription.plan.whitelistAddonInternalSquads,
+  ])
+  const updated = await remnawave.updateUser(remnawaveUserReference(subscription.user), {
+    activeInternalSquads,
+  })
+  const savedSubscription = await prisma.subscription.update({
+    where: { id: subscription.id },
+    data: {
+      whitelistAddonActive: true,
+      whitelistAddonActivatedAt: now,
+      whitelistAddonExpireAt: input.expireAt,
+      whitelistAddonPaymentId: null,
+      lastSyncedAt: now,
+    },
+  })
+
+  return { subscription: savedSubscription, remnawaveUser: updated.response }
+}
+
+export async function revokeWhitelistAddonManually(userId: string) {
+  const subscription = await prisma.subscription.findFirst({
+    where: { userId, whitelistAddonActive: true },
+    orderBy: { expireAt: 'desc' },
+    include: { user: true, plan: true },
+  })
+  if (!subscription) return { revoked: false as const }
+  if (!subscription.plan) throw new WhitelistAddonManagementError('У подписки не найден тариф')
+  if (!hasRemnawaveUserReference(subscription.user)) {
+    throw new WhitelistAddonManagementError('Профиль Remnawave не найден')
+  }
+
+  await remnawave.updateUser(remnawaveUserReference(subscription.user), {
+    activeInternalSquads: resolvePlanActiveInternalSquads(subscription.plan.activeInternalSquads),
+  })
+  const savedSubscription = await prisma.subscription.update({
+    where: { id: subscription.id },
+    data: {
+      whitelistAddonActive: false,
+      whitelistAddonActivatedAt: null,
+      whitelistAddonExpireAt: null,
+      whitelistAddonPaymentId: null,
+      lastSyncedAt: new Date(),
+    },
+  })
+  return { revoked: true as const, subscription: savedSubscription }
 }
 
 export async function reconcileExpiredWhitelistAddons(options?: {

@@ -17,6 +17,7 @@ import { AdminFilterBar, AdminFilterField } from '@/components/admin/admin-filte
 import { AdminEmptyState } from '@/components/admin/admin-empty-state'
 import { AdminActionsMenu } from '@/components/admin/admin-actions-menu'
 import { UserSubscriptionDeleteButton } from '@/components/admin/user-subscription-delete-button'
+import { UserWhitelistAddonButton } from '@/components/admin/user-whitelist-addon-button'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Пользователи — Админка' }
@@ -183,7 +184,9 @@ export default async function AdminUsersPage({
           <span className="sr-only">Действия</span>
         </div>
         {users.map((user) => {
-          const subscription = user.subscriptions[0]
+          const subscription = user.subscriptions.find((item) => (
+            ['ACTIVE', 'LIMITED'].includes(item.status) && item.expireAt.getTime() > now.getTime()
+          )) ?? user.subscriptions[0]
           const lastPayment = user.payments[0]
           const attemptsCount = attemptsByUser.get(user.id) ?? 0
           return (
@@ -365,6 +368,8 @@ function buildUserDetails(user: {
     trafficLimitBytes: bigint | null
     trafficUsedBytes: bigint
     lastSyncedAt: Date
+    whitelistAddonActive: boolean
+    whitelistAddonExpireAt: Date | null
     plan: { name: string } | null
   }>
   payments: Array<{
@@ -405,6 +410,14 @@ function buildUserDetails(user: {
       expireAt: formatDate(subscription.expireAt),
       traffic: formatTraffic(subscription.trafficUsedBytes, subscription.trafficLimitBytes),
       syncedAt: formatDateTime(subscription.lastSyncedAt),
+      whitelistAddonActive: Boolean(
+        subscription.whitelistAddonActive
+        && subscription.whitelistAddonExpireAt
+        && subscription.whitelistAddonExpireAt.getTime() > Date.now()
+      ),
+      whitelistAddonExpireAt: subscription.whitelistAddonExpireAt
+        ? formatDate(subscription.whitelistAddonExpireAt)
+        : null,
     })),
     payments: user.payments.map((payment) => ({
       id: payment.id,
@@ -504,6 +517,9 @@ function UserActions({
   showLabels?: boolean
 }) {
   const canManageUser = actorRole === 'SUPER_ADMIN' || user.role !== 'SUPER_ADMIN'
+  const activeSubscription = user.subscriptions.find((subscription) => (
+    ['ACTIVE', 'LIMITED'].includes(subscription.status) && subscription.expireAt.getTime() > Date.now()
+  ))
 
   return (
     <>
@@ -514,6 +530,19 @@ function UserActions({
           userId={user.id}
           email={user.email}
           attemptsCount={attemptsCount}
+          showLabel={showLabels}
+        />
+      )}
+      {actorRole === 'SUPER_ADMIN' && activeSubscription && (
+        <UserWhitelistAddonButton
+          userId={user.id}
+          email={user.email}
+          active={Boolean(
+            activeSubscription.whitelistAddonActive
+            && activeSubscription.whitelistAddonExpireAt
+            && activeSubscription.whitelistAddonExpireAt.getTime() > Date.now()
+          )}
+          expireAt={activeSubscription.whitelistAddonExpireAt?.toISOString() ?? null}
           showLabel={showLabels}
         />
       )}

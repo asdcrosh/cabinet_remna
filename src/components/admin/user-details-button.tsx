@@ -27,6 +27,8 @@ export interface AdminUserDetails {
     expireAt: string
     traffic: string
     syncedAt: string
+    whitelistAddonActive: boolean
+    whitelistAddonExpireAt: string | null
   }>
   payments: Array<{
     id: string
@@ -115,6 +117,14 @@ export function UserDetailsButton({ details, showLabel = false }: { details: Adm
                       <span>До: {subscription.expireAt}</span>
                       <span>{subscription.traffic}</span>
                       <span>Sync: {subscription.syncedAt}</span>
+                    </div>
+                    <div className={`mt-2 text-sm font-medium ${subscription.whitelistAddonActive
+                      ? 'text-emerald-700 dark:text-emerald-300'
+                      : 'text-slate-400'
+                    }`}>
+                      {subscription.whitelistAddonActive && subscription.whitelistAddonExpireAt
+                        ? `БС подключены до ${subscription.whitelistAddonExpireAt}`
+                        : 'БС не подключены'}
                     </div>
                   </div>
                 ))}
