@@ -36,7 +36,9 @@ export function BrandingSettingsPanel({ initialSettings }: { initialSettings: Pu
       const data = await response.json().catch(() => null)
       if (!response.ok || !data?.logoUrl) throw new Error(data?.error || 'Не удалось загрузить логотип')
       setSettings((current) => ({ ...current, logoUrl: data.logoUrl }))
-      toast('Логотип загружен. Сохраните оформление.', 'success')
+      setSaved((current) => ({ ...current, logoUrl: data.logoUrl }))
+      toast('Логотип загружен и установлен', 'success')
+      router.refresh()
     } catch (error) {
       toast(error instanceof Error ? error.message : 'Не удалось загрузить логотип')
     } finally {

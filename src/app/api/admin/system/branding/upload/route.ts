@@ -1,8 +1,10 @@
 import { randomUUID } from 'crypto'
-import { mkdir, writeFile } from 'fs/promises'
+import { mkdir, unlink, writeFile } from 'fs/promises'
 import path from 'path'
 import { NextResponse } from 'next/server'
+import { writeAuditLog } from '@/lib/audit-log'
 import { requireAdmin, withAuth } from '@/lib/auth/guard'
+import { getPublicBrandSettings, updateBrandSettings } from '@/lib/branding'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -10,7 +12,7 @@ export const dynamic = 'force-dynamic'
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024
 
 export const POST = withAuth(async (req: Request) => {
-  await requireAdmin()
+  const session = await requireAdmin()
   const form = await req.formData().catch(() => null)
   const file = form?.get('file')
   if (!isUploadedFile(file)) {
@@ -28,9 +30,26 @@ export const POST = withAuth(async (req: Request) => {
 
   const directory = path.join(process.cwd(), 'public', 'uploads', 'branding')
   const filename = `${randomUUID()}.${detected.extension}`
+  const filePath = path.join(directory, filename)
+  const logoUrl = `/uploads/branding/${filename}`
   await mkdir(directory, { recursive: true })
-  await writeFile(path.join(directory, filename), bytes, { flag: 'wx' })
-  return NextResponse.json({ logoUrl: `/uploads/branding/${filename}` })
+  await writeFile(filePath, bytes, { flag: 'wx' })
+
+  try {
+    const current = await getPublicBrandSettings()
+    const branding = await updateBrandSettings({ ...current, logoUrl })
+    await writeAuditLog({
+      actorId: session.uid,
+      action: 'ADMIN_FEATURES_UPDATED',
+      message: 'Загружен и установлен логотип кабинета',
+      metadata: branding,
+      request: req,
+    })
+    return NextResponse.json({ logoUrl: branding.logoUrl, branding })
+  } catch (error) {
+    await unlink(filePath).catch(() => undefined)
+    throw error
+  }
 })
 
 function isUploadedFile(value: FormDataEntryValue | null | undefined): value is File {
