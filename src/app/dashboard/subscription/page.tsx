@@ -17,6 +17,8 @@ import { PageHeader } from '@/components/dashboard/page-header'
 import { VpnConnectionCheck } from '@/components/dashboard/vpn-connection-check'
 import { isWhitelistAddonCurrentlyActive } from '@/lib/whitelist-addon-policy'
 import { readPlanPurchaseSnapshot } from '@/lib/plan-purchase'
+import { logError } from '@/lib/logger'
+import { SubscriptionPendingRefresh } from '@/components/dashboard/subscription-pending-refresh'
 
 export const dynamic = 'force-dynamic'
 
@@ -50,6 +52,9 @@ export default async function SubscriptionPage() {
       orderBy: { createdAt: 'desc' },
       take: 20,
       select: { id: true, purchaseType: true, status: true, createdAt: true, paidAt: true, planSnapshot: true, plan: { select: { name: true } } },
+    }).catch((error) => {
+      logError('subscription.timeline_payments_failed', error, { userId: session.uid })
+      return []
     }),
     prisma.auditLog.findMany({
       where: {
@@ -65,6 +70,9 @@ export default async function SubscriptionPage() {
       orderBy: { createdAt: 'desc' },
       take: 20,
       select: { id: true, message: true, createdAt: true },
+    }).catch((error) => {
+      logError('subscription.timeline_audit_failed', error, { userId: session.uid })
+      return []
     }),
   ])
   if (!user?.remnawaveUsername) {
@@ -82,26 +90,27 @@ export default async function SubscriptionPage() {
   try {
     data = await remnawave.getSubscriptionByUsername(user.remnawaveUsername)
   } catch (e) {
-    if (e instanceof RemnawaveError) {
-      return (
-        <EmptyState
-          title="Не удалось загрузить подписку"
-          description={features.support
-            ? 'Сервис временно недоступен. Можно повторить загрузку или написать в поддержку.'
-            : 'Сервис временно недоступен. Повторите загрузку чуть позже.'}
-          icon={<ShieldAlert className="h-7 w-7" />}
-          action={
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <Link href="/dashboard/subscription" className="btn-primary">
-                Обновить
-              </Link>
-              {features.support && <Link href="/dashboard/support" className="btn-secondary">В поддержку</Link>}
-            </div>
-          }
-        />
-      )
-    }
-    throw e
+    logError('subscription.remnawave_load_failed', e, {
+      userId: session.uid,
+      remnawaveStatus: e instanceof RemnawaveError ? e.status : null,
+    })
+    return <SubscriptionUnavailable supportEnabled={features.support} />
+  }
+
+  if (!data.response.isFound || !data.response.user) {
+    return (
+      <EmptyState
+        title="Подписка настраивается"
+        description="Оплата получена. Профиль подключения ещё создаётся, страница обновится после завершения настройки."
+        icon={<Sparkles className="h-7 w-7" />}
+        action={(
+          <>
+            <SubscriptionPendingRefresh />
+            <Link href="/dashboard/subscription" className="btn-primary">Проверить снова</Link>
+          </>
+        )}
+      />
+    )
   }
 
   let happLink = data.response.happ?.cryptoLink
@@ -248,6 +257,24 @@ export default async function SubscriptionPage() {
         )
       )}
     </div>
+  )
+}
+
+function SubscriptionUnavailable({ supportEnabled }: { supportEnabled: boolean }) {
+  return (
+    <EmptyState
+      title="Не удалось загрузить подписку"
+      description={supportEnabled
+        ? 'Сервис временно недоступен. Можно повторить загрузку или написать в поддержку.'
+        : 'Сервис временно недоступен. Повторите загрузку чуть позже.'}
+      icon={<ShieldAlert className="h-7 w-7" />}
+      action={(
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <Link href="/dashboard/subscription" className="btn-primary">Обновить</Link>
+          {supportEnabled && <Link href="/dashboard/support" className="btn-secondary">В поддержку</Link>}
+        </div>
+      )}
+    />
   )
 }
 
