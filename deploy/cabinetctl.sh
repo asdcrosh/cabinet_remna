@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="1.9.17"
+VERSION="1.9.18"
 BRANCH="${BRANCH:-main}"
 RAW_BASE_URL="${RAW_BASE_URL:-https://raw.githubusercontent.com/asdcrosh/cabinet_remna/${BRANCH}}"
 GITHUB_API_URL="${GITHUB_API_URL:-https://api.github.com/repos/asdcrosh/cabinet_remna/commits/${BRANCH}}"
@@ -928,7 +928,7 @@ update_console() {
     return 1
   fi
   rm -f "${UPDATE_STATUS_CACHE}" 2>/dev/null || true
-  ok "Консоль обновлена. Перезапустите cabinetctl для загрузки новой версии."
+  ok "Консоль обновлена. Загружаем новую версию."
 }
 
 edit_env() {
@@ -1401,6 +1401,15 @@ cleanup_menu_terminal() {
   printf '\033[?25h' 2>/dev/null >/dev/tty || true
 }
 
+reload_installed_console() {
+  cleanup_menu_terminal
+  trap - EXIT
+  if [[ -x "${CABINETCTL_PATH}" ]]; then
+    exec "${CABINETCTL_PATH}"
+  fi
+  exec "$0"
+}
+
 run_menu() {
   [[ -r /dev/tty ]] || {
     show_help
@@ -1417,7 +1426,13 @@ run_menu() {
     printf '\n'
     if cabinet_installed; then
       case "${choice}" in
-        1) update_cabinet || true; pause ;;
+        1)
+          if update_cabinet; then
+            reload_installed_console
+          else
+            pause
+          fi
+          ;;
         2) restart_cabinet || true; pause ;;
         3) health_check || true; pause ;;
         4) configure_node_provisioning || true; pause ;;
@@ -1425,16 +1440,34 @@ run_menu() {
         6) check_config || true; pause ;;
         7) logs_menu || true; pause ;;
         8) backup_menu || true; pause ;;
-        9) update_console || true; pause ;;
+        9)
+          if update_console; then
+            reload_installed_console
+          else
+            pause
+          fi
+          ;;
         0) exit 0 ;;
         *) warn "Неизвестный пункт."; pause ;;
       esac
     else
       case "${choice}" in
-        1) install_cabinet || true; pause ;;
+        1)
+          if install_cabinet; then
+            reload_installed_console
+          else
+            pause
+          fi
+          ;;
         2) health_check || true; pause ;;
         3) backup_menu || true; pause ;;
-        8) update_console || true; pause ;;
+        8)
+          if update_console; then
+            reload_installed_console
+          else
+            pause
+          fi
+          ;;
         0) exit 0 ;;
         *) warn "Неизвестный пункт."; pause ;;
       esac
