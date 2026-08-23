@@ -838,6 +838,12 @@ cleanup_docker_artifacts() {
         remove_image_if_unused "${image_id}"
       done || true
 
+  if [[ "${PREVIOUS_DEPLOYED_REVISION:-}" =~ ^[0-9a-f]{40}$ \
+    && "${PREVIOUS_DEPLOYED_REVISION}" != "${DEPLOYED_REVISION}" ]]; then
+    echo "Removing previous immutable cabinet image..."
+    remove_image_if_unused "${OFFICIAL_CABINET_IMAGE}:sha-${PREVIOUS_DEPLOYED_REVISION}"
+  fi
+
   echo "Pruning dangling Docker images..."
   docker image prune -f >/dev/null || true
 
@@ -847,11 +853,9 @@ cleanup_docker_artifacts() {
     docker builder prune -f --filter "until=${max_age}" >/dev/null || true
   fi
 
-  docker image ls --format '{{.Repository}}:{{.Tag}}' --filter 'reference=remnawave-cabinet:rollback-*' \
-    | while read -r rollback_tag; do
-        [[ -n "${rollback_tag}" && "${rollback_tag}" != "${ROLLBACK_IMAGE}" ]] || continue
-        remove_image_if_unused "${rollback_tag}"
-      done || true
+  if [[ -n "${ROLLBACK_IMAGE}" ]]; then
+    remove_image_if_unused "${ROLLBACK_IMAGE}"
+  fi
 }
 
 wait_for_url() {
