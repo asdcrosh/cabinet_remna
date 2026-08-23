@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="1.9.6"
+VERSION="1.9.7"
 BRANCH="${BRANCH:-main}"
 RAW_BASE_URL="${RAW_BASE_URL:-https://raw.githubusercontent.com/asdcrosh/cabinet_remna/${BRANCH}}"
 GITHUB_API_URL="${GITHUB_API_URL:-https://api.github.com/repos/asdcrosh/cabinet_remna/commits/${BRANCH}}"
@@ -26,6 +26,7 @@ DEPLOY_STATE_FILE="${CABINET_STATE_DIR:-${CABINET_DIR}/state}/deployment.json"
 UPDATE_STATUS_CACHE="${CABINETCTL_UPDATE_CACHE:-/var/cache/remnawave-cabinet/update-status}"
 UPDATE_STATUS_CACHE_TTL="${CABINETCTL_UPDATE_CACHE_TTL:-60}"
 CHECK_UPDATES_IN_MENU="${CABINETCTL_CHECK_UPDATES_IN_MENU:-1}"
+LIVE_REFRESH_INTERVAL="${CABINETCTL_LIVE_REFRESH_INTERVAL:-60}"
 DOCKER_INSTALL_COMMIT="a23123f03978989e95d257beb9de0c5ad9da6e70"
 DOCKER_INSTALL_SHA256="754dc3837b3da3eb65c8a355a713569cf7f0328addd3edc783897c3b9a54e192"
 DOCKER_INSTALL_URL="https://raw.githubusercontent.com/docker/docker-install/${DOCKER_INSTALL_COMMIT}/install.sh"
@@ -34,7 +35,10 @@ ENV_SYNC_NOTICE=""
 RESOLVED_RELEASE_SHA=""
 VERIFIED_RELEASE_RAW_BASE_URL=""
 MENU_CHOICE=""
+MENU_SELECTED="1"
 STATUS_ANIMATION_PID=""
+REMOTE_CONSOLE_VERSION=""
+LAST_LIVE_REFRESH_AT=0
 ANIM_MARKER_ROWS=()
 ANIM_MARKER_COLUMNS=()
 ANIM_MARKER_STATES=()
@@ -200,9 +204,24 @@ print_menu_row() {
   local left_label="$2"
   local right_number="$3"
   local right_label="$4"
-  printf '  │ %s%s%s  %s │ %s%s%s  %s │\n' \
-    "${CYAN}" "${left_number}" "${RESET}" "$(pad_text "${left_label}" 22)" \
-    "${CYAN}" "${right_number}" "${RESET}" "$(pad_text "${right_label}" 22)"
+  printf '  │ '
+  print_menu_cell "${left_number}" "${left_label}"
+  printf ' │ '
+  print_menu_cell "${right_number}" "${right_label}"
+  printf ' │\n'
+}
+
+print_menu_cell() {
+  local number="$1"
+  local label="$2"
+  local marker=' '
+  local color="${RESET}"
+  if [[ -n "${number}" && "${number}" == "${MENU_SELECTED}" ]]; then
+    marker='›'
+    color="${CYAN}${BOLD}"
+  fi
+  local value="${marker} ${number}  ${label}"
+  printf '%b%s%b' "${color}" "$(pad_text "${value}" 25)" "${RESET}"
 }
 
 print_service_grid_row() {
@@ -228,12 +247,17 @@ remote_console_version() {
     | head -n 1
 }
 
+refresh_console_version() {
+  REMOTE_CONSOLE_VERSION="$(remote_console_version || true)"
+}
+
 console_update_badge() {
-  local remote_version
-  remote_version="$(remote_console_version || true)"
-  [[ "${remote_version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || return 0
-  if version_is_newer "${remote_version}" "${VERSION}"; then
-    printf '  %s%s[ ДОСТУПНА v%s ]%s' "${YELLOW}" "${BOLD}" "${remote_version}" "${RESET}"
+  if [[ ! "${REMOTE_CONSOLE_VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    printf '  %s[ СТАТУС НЕИЗВЕСТЕН ]%s' "${DIM}" "${RESET}"
+  elif version_is_newer "${REMOTE_CONSOLE_VERSION}" "${VERSION}"; then
+    printf '  %s%s[ ДОСТУПНА v%s ]%s' "${YELLOW}" "${BOLD}" "${REMOTE_CONSOLE_VERSION}" "${RESET}"
+  else
+    printf '  %s%s[ АКТУАЛЬНА ]%s' "${GREEN}" "${BOLD}" "${RESET}"
   fi
 }
 
@@ -653,15 +677,15 @@ check_update_status() {
 
 print_update_status_key() {
   case "${1:-unknown}" in
-    latest|current) print_status_row "$(state_marker healthy)" "Обновление" "${GREEN}${BOLD}[ АКТУАЛЬНО ]${RESET}" ;;
-    available) print_status_row "${YELLOW}↑${RESET}" "Обновление" "${YELLOW}${BOLD}[ ДОСТУПНО ]${RESET}" ;;
-    building) print_status_row "$(state_marker starting)" "Обновление" "${YELLOW}${BOLD}[ СОБИРАЕТСЯ ]${RESET}" ;;
-    build-failed|build_failed) print_status_row "${RED}×${RESET}" "Обновление" "${RED}${BOLD}[ СБОРКА НЕ ГОТОВА ]${RESET}" ;;
-    check-failed|check_failed|unknown) print_status_row "${DIM}○${RESET}" "Обновление" "${DIM}проверим позже${RESET}" ;;
-    version-unknown|version_unknown) print_status_row "${YELLOW}○${RESET}" "Обновление" "${YELLOW}версия не определена${RESET}" ;;
-    docker-unavailable|docker_unavailable) print_status_row "${YELLOW}○${RESET}" "Обновление" "${YELLOW}Docker недоступен${RESET}" ;;
-    app-not-running|app_not_running) print_status_row "${YELLOW}○${RESET}" "Обновление" "${YELLOW}кабинет не запущен${RESET}" ;;
-    not-installed|not_installed) print_status_row "${DIM}○${RESET}" "Обновление" "${DIM}после установки${RESET}" ;;
+    latest|current) print_status_row "$(state_marker healthy)" "Docker-образ" "${GREEN}${BOLD}[ АКТУАЛЬНО ]${RESET}" ;;
+    available) print_status_row "${YELLOW}↑${RESET}" "Docker-образ" "${YELLOW}${BOLD}[ ДОСТУПНО ]${RESET}" ;;
+    building) print_status_row "$(state_marker starting)" "Docker-образ" "${YELLOW}${BOLD}[ СОБИРАЕТСЯ ]${RESET}" ;;
+    build-failed|build_failed) print_status_row "${RED}×${RESET}" "Docker-образ" "${RED}${BOLD}[ СБОРКА НЕ ГОТОВА ]${RESET}" ;;
+    check-failed|check_failed|unknown) print_status_row "${DIM}○${RESET}" "Docker-образ" "${DIM}проверим позже${RESET}" ;;
+    version-unknown|version_unknown) print_status_row "${YELLOW}○${RESET}" "Docker-образ" "${YELLOW}версия не определена${RESET}" ;;
+    docker-unavailable|docker_unavailable) print_status_row "${YELLOW}○${RESET}" "Docker-образ" "${YELLOW}Docker недоступен${RESET}" ;;
+    app-not-running|app_not_running) print_status_row "${YELLOW}○${RESET}" "Docker-образ" "${YELLOW}кабинет не запущен${RESET}" ;;
+    not-installed|not_installed) print_status_row "${DIM}○${RESET}" "Docker-образ" "${DIM}после установки${RESET}" ;;
     *) return 1 ;;
   esac
 }
@@ -1108,28 +1132,129 @@ show_menu() {
     print_menu_row "4" "Настроить ноды" "9" "Обновить cabinetctl"
     print_menu_row "5" "Открыть .env" " " ""
     printf '%s\n' "${DIM}${CYAN}  ╰───────────────────────────┴───────────────────────────╯${RESET}"
-    printf '\n  %s[ 0 ]%s  Выход\n' "${DIM}" "${RESET}"
+    printf '\n'
+    print_menu_single "0" "Выход"
   else
-    printf '  %s1%s  Установить кабинет\n' "${CYAN}" "${RESET}"
-    printf '  %s2%s  Диагностика\n' "${CYAN}" "${RESET}"
-    printf '  %s3%s  Бэкапы\n' "${CYAN}" "${RESET}"
-    printf '  %s8%s  Обновить cabinetctl\n' "${CYAN}" "${RESET}"
-    printf '\n  %s0%s  Выход\n' "${DIM}" "${RESET}"
+    print_menu_single "1" "Установить кабинет"
+    print_menu_single "2" "Диагностика"
+    print_menu_single "3" "Бэкапы"
+    print_menu_single "8" "Обновить cabinetctl"
+    printf '\n'
+    print_menu_single "0" "Выход"
   fi
-  printf '\n  %sВыберите пункт%s  %sEnter не нужен%s' \
-    "${CYAN}${BOLD}" "${RESET}" "${DIM}" "${RESET}" >/dev/tty
+  printf '\n  %s↑/↓ или цифра%s  выбрать   %sEnter%s  запустить\n' \
+    "${CYAN}${BOLD}" "${RESET}" "${CYAN}${BOLD}" "${RESET}" >/dev/tty
+  printf '  %sСтатусы Docker-образа и cabinetctl обновляются каждые %s сек.%s' \
+    "${DIM}" "$(live_refresh_interval)" "${RESET}" >/dev/tty
+}
+
+print_menu_single() {
+  printf '  '
+  print_menu_cell "$1" "$2"
+  printf '\n'
+}
+
+menu_options() {
+  if cabinet_installed; then
+    printf '%s\n' 1 2 3 4 5 6 7 8 9 0
+  else
+    printf '%s\n' 1 2 3 8 0
+  fi
+}
+
+menu_selection_is_valid() {
+  local candidate="$1" option
+  while IFS= read -r option; do
+    [[ "${candidate}" == "${option}" ]] && return 0
+  done < <(menu_options)
+  return 1
+}
+
+ensure_valid_menu_selection() {
+  if ! menu_selection_is_valid "${MENU_SELECTED}"; then
+    MENU_SELECTED="$(menu_options | head -n 1)"
+  fi
+}
+
+move_menu_selection() {
+  local direction="$1" option index=0 current_index=-1
+  local -a options=()
+  while IFS= read -r option; do
+    options+=("${option}")
+  done < <(menu_options)
+  for index in "${!options[@]}"; do
+    if [[ "${options[index]}" == "${MENU_SELECTED}" ]]; then
+      current_index="${index}"
+      break
+    fi
+  done
+  ((current_index >= 0)) || current_index=0
+  if [[ "${direction}" == "next" ]]; then
+    current_index=$(((current_index + 1) % ${#options[@]}))
+  else
+    current_index=$(((current_index - 1 + ${#options[@]}) % ${#options[@]}))
+  fi
+  MENU_SELECTED="${options[current_index]}"
+}
+
+live_refresh_interval() {
+  if [[ "${LIVE_REFRESH_INTERVAL}" =~ ^[0-9]+$ ]] && ((LIVE_REFRESH_INTERVAL >= 10)); then
+    printf '%s' "${LIVE_REFRESH_INTERVAL}"
+  else
+    printf '60'
+  fi
+}
+
+refresh_live_statuses() {
+  refresh_console_version
+  check_update_status >/dev/null 2>&1 || true
+  LAST_LIVE_REFRESH_AT="$(date +%s)"
+}
+
+redraw_interactive_menu() {
+  stop_status_animation
+  show_menu
+  start_status_animation
 }
 
 read_menu_choice() {
   MENU_CHOICE=""
+  ensure_valid_menu_selection
+  refresh_live_statuses
   show_menu
   printf '\033[?25l' 2>/dev/null >/dev/tty || return 1
   start_status_animation
-  if ! IFS= read -r -s -n 1 MENU_CHOICE 2>/dev/null </dev/tty; then
-    stop_status_animation
-    printf '\033[?25h' 2>/dev/null >/dev/tty || true
-    return 1
-  fi
+  local key escape_tail now
+  while [[ -z "${MENU_CHOICE}" ]]; do
+    key=""
+    if IFS= read -r -s -n 1 -t 1 key 2>/dev/null </dev/tty; then
+      case "${key}" in
+        '') MENU_CHOICE="${MENU_SELECTED}" ;;
+        $'\e')
+          escape_tail=""
+          IFS= read -r -s -n 2 -t 1 escape_tail 2>/dev/null </dev/tty || true
+          case "${escape_tail}" in
+            '[A'|'[D') move_menu_selection previous; redraw_interactive_menu ;;
+            '[B'|'[C') move_menu_selection next; redraw_interactive_menu ;;
+          esac
+          ;;
+        [0-9])
+          if menu_selection_is_valid "${key}"; then
+            MENU_SELECTED="${key}"
+            redraw_interactive_menu
+          fi
+          ;;
+      esac
+    fi
+
+    now="$(date +%s)"
+    if ((now - LAST_LIVE_REFRESH_AT >= $(live_refresh_interval))); then
+      stop_status_animation
+      refresh_live_statuses
+      show_menu
+      start_status_animation
+    fi
+  done
   stop_status_animation
   printf '\033[?25h' 2>/dev/null >/dev/tty || true
   printf '\r\033[2K  %s›%s %s\n' "${CYAN}" "${RESET}" "${MENU_CHOICE}" >/dev/tty
@@ -1220,7 +1345,7 @@ case "${1:-menu}" in
 esac
 
 if [[ "$(id -u)" -ne 0 ]]; then
-  exec sudo --preserve-env=BRANCH,RAW_BASE_URL,GITHUB_API_URL,GITHUB_WORKFLOW_RUNS_URL,INSTALL_URL,UPDATE_URL,NGINX_SETUP_URL,CONSOLE_INSTALL_URL,BACKUP_SCRIPT_URL,NODE_PROVISIONING_CONFIG_URL,ENV_TEMPLATE_URL,CABINETCTL_PATH,BACKUP_SCRIPT_PATH,NODE_PROVISIONING_CONFIG_PATH,INSTALL_DIR,CABINET_VERSION_FILE,CABINET_STATE_DIR,CABINETCTL_UPDATE_CACHE,CABINETCTL_UPDATE_CACHE_TTL,CABINETCTL_CHECK_UPDATES_IN_MENU "$0" "$@"
+  exec sudo --preserve-env=BRANCH,RAW_BASE_URL,GITHUB_API_URL,GITHUB_WORKFLOW_RUNS_URL,INSTALL_URL,UPDATE_URL,NGINX_SETUP_URL,CONSOLE_INSTALL_URL,BACKUP_SCRIPT_URL,NODE_PROVISIONING_CONFIG_URL,ENV_TEMPLATE_URL,CABINETCTL_PATH,BACKUP_SCRIPT_PATH,NODE_PROVISIONING_CONFIG_PATH,INSTALL_DIR,CABINET_VERSION_FILE,CABINET_STATE_DIR,CABINETCTL_UPDATE_CACHE,CABINETCTL_UPDATE_CACHE_TTL,CABINETCTL_CHECK_UPDATES_IN_MENU,CABINETCTL_LIVE_REFRESH_INTERVAL "$0" "$@"
 fi
 
 case "${1:-menu}" in
