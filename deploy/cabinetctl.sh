@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="1.9.5"
+VERSION="1.9.6"
 BRANCH="${BRANCH:-main}"
 RAW_BASE_URL="${RAW_BASE_URL:-https://raw.githubusercontent.com/asdcrosh/cabinet_remna/${BRANCH}}"
 GITHUB_API_URL="${GITHUB_API_URL:-https://api.github.com/repos/asdcrosh/cabinet_remna/commits/${BRANCH}}"
@@ -24,7 +24,7 @@ CABINET_COMPOSE="${CABINET_DIR}/docker-compose.yml"
 CABINET_VERSION_FILE="${CABINET_VERSION_FILE:-${CABINET_DIR}/.cabinet-version}"
 DEPLOY_STATE_FILE="${CABINET_STATE_DIR:-${CABINET_DIR}/state}/deployment.json"
 UPDATE_STATUS_CACHE="${CABINETCTL_UPDATE_CACHE:-/var/cache/remnawave-cabinet/update-status}"
-UPDATE_STATUS_CACHE_TTL="${CABINETCTL_UPDATE_CACHE_TTL:-1800}"
+UPDATE_STATUS_CACHE_TTL="${CABINETCTL_UPDATE_CACHE_TTL:-60}"
 CHECK_UPDATES_IN_MENU="${CABINETCTL_CHECK_UPDATES_IN_MENU:-1}"
 DOCKER_INSTALL_COMMIT="a23123f03978989e95d257beb9de0c5ad9da6e70"
 DOCKER_INSTALL_SHA256="754dc3837b3da3eb65c8a355a713569cf7f0328addd3edc783897c3b9a54e192"
@@ -655,7 +655,7 @@ print_update_status_key() {
   case "${1:-unknown}" in
     latest|current) print_status_row "$(state_marker healthy)" "Обновление" "${GREEN}${BOLD}[ АКТУАЛЬНО ]${RESET}" ;;
     available) print_status_row "${YELLOW}↑${RESET}" "Обновление" "${YELLOW}${BOLD}[ ДОСТУПНО ]${RESET}" ;;
-    building) print_status_row "$(state_marker starting)" "Обновление" "${YELLOW}${BOLD}[ СБОРКА ]${RESET}" ;;
+    building) print_status_row "$(state_marker starting)" "Обновление" "${YELLOW}${BOLD}[ СОБИРАЕТСЯ ]${RESET}" ;;
     build-failed|build_failed) print_status_row "${RED}×${RESET}" "Обновление" "${RED}${BOLD}[ СБОРКА НЕ ГОТОВА ]${RESET}" ;;
     check-failed|check_failed|unknown) print_status_row "${DIM}○${RESET}" "Обновление" "${DIM}проверим позже${RESET}" ;;
     version-unknown|version_unknown) print_status_row "${YELLOW}○${RESET}" "Обновление" "${YELLOW}версия не определена${RESET}" ;;
@@ -872,6 +872,7 @@ configure_node_provisioning() {
 update_console() {
   info "Обновляем управляющую консоль..."
   run_verified_script "${CONSOLE_INSTALL_URL}"
+  rm -f "${UPDATE_STATUS_CACHE}" 2>/dev/null || true
   ok "Консоль обновлена. Перезапустите cabinetctl для загрузки новой версии."
 }
 
