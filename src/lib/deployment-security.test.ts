@@ -107,7 +107,11 @@ describe('production deployment security', () => {
     const updater = read('deploy/update-server.sh')
 
     expect(cabinetctl).toContain('CABINET_IMAGE="ghcr.io/asdcrosh/cabinet_remna:sha-${verified_release_sha}"')
-    expect(cabinetctl).toContain('RESOLVED_RELEASE_SHA="$(remote_image_sha || true)"')
+    expect(cabinetctl).toContain('info "Целевая версия: ${verified_release_sha:0:12}"')
+    expect(cabinetctl).not.toContain('if [[ -n "${CABINET_IMAGE:-}" ]]')
+    expect(cabinetctl).toContain('details="$(latest_workflow_details || true)"')
+    expect(cabinetctl).toContain('RESOLVED_RELEASE_SHA="${workflow_sha}"')
+    expect(cabinetctl).not.toContain("--data-urlencode 'status=success'")
     expect(updater).toContain('CABINET_IMAGE_REFERENCE="${CABINET_IMAGE:-$(read_update_env_value CABINET_IMAGE)}"')
     expect(updater).toContain('write_update_env_value "CABINET_IMAGE" "${CABINET_IMAGE}"')
   })

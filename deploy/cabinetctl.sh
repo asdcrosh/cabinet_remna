@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="1.9.2"
+VERSION="1.9.3"
 BRANCH="${BRANCH:-main}"
 RAW_BASE_URL="${RAW_BASE_URL:-https://raw.githubusercontent.com/asdcrosh/cabinet_remna/${BRANCH}}"
 GITHUB_API_URL="${GITHUB_API_URL:-https://api.github.com/repos/asdcrosh/cabinet_remna/commits/${BRANCH}}"
@@ -411,15 +411,25 @@ remote_commit_sha() {
 }
 
 resolve_release_sha() {
+  local details workflow_sha workflow_status workflow_conclusion workflow_url
   if [[ "${RESOLVED_RELEASE_SHA}" =~ ^[0-9a-f]{40}$ ]]; then
     return 0
   fi
-  RESOLVED_RELEASE_SHA="$(remote_image_sha || true)"
-  if [[ ! "${RESOLVED_RELEASE_SHA}" =~ ^[0-9a-f]{40}$ ]]; then
-    RESOLVED_RELEASE_SHA=""
-    fail "Не удалось определить commit последней успешно собранной версии."
+  details="$(latest_workflow_details || true)"
+  IFS='|' read -r workflow_sha workflow_status workflow_conclusion workflow_url <<<"${details}"
+  if [[ ! "${workflow_sha}" =~ ^[0-9a-f]{40}$ ]]; then
+    fail "Не удалось определить сборку последнего commit."
     return 1
   fi
+  if [[ "${workflow_status}" != "completed" ]]; then
+    fail "Последняя версия ${workflow_sha:0:7} ещё собирается (${workflow_status:-unknown}). Повторите обновление после завершения GitHub Actions: ${workflow_url:-unknown}"
+    return 1
+  fi
+  if [[ "${workflow_conclusion}" != "success" ]]; then
+    fail "Сборка последней версии ${workflow_sha:0:7} завершилась со статусом ${workflow_conclusion:-unknown}. Старый образ не будет установлен вместо неё: ${workflow_url:-unknown}"
+    return 1
+  fi
+  RESOLVED_RELEASE_SHA="${workflow_sha}"
 }
 
 remote_blob_sha() {
@@ -496,16 +506,11 @@ run_verified_script() {
 
   status=0
   if [[ -n "${verified_raw_base}" ]]; then
-    if [[ -n "${CABINET_IMAGE:-}" ]]; then
-      RAW_BASE_URL="${verified_raw_base}" \
-        CABINET_RELEASE_SHA="${verified_release_sha}" \
-        bash "${temporary}" || status=$?
-    else
-      RAW_BASE_URL="${verified_raw_base}" \
-        CABINET_RELEASE_SHA="${verified_release_sha}" \
-        CABINET_IMAGE="ghcr.io/asdcrosh/cabinet_remna:sha-${verified_release_sha}" \
-        bash "${temporary}" || status=$?
-    fi
+    info "Целевая версия: ${verified_release_sha:0:12}"
+    RAW_BASE_URL="${verified_raw_base}" \
+      CABINET_RELEASE_SHA="${verified_release_sha}" \
+      CABINET_IMAGE="ghcr.io/asdcrosh/cabinet_remna:sha-${verified_release_sha}" \
+      bash "${temporary}" || status=$?
   else
     bash "${temporary}" || status=$?
   fi
@@ -514,18 +519,40 @@ run_verified_script() {
 }
 
 remote_image_sha() {
+  local details workflow_sha workflow_status workflow_conclusion workflow_url
+  details="$(latest_workflow_details || true)"
+  IFS='|' read -r workflow_sha workflow_status workflow_conclusion workflow_url <<<"${details}"
+  if [[ "${workflow_status}" == "completed" && "${workflow_conclusion}" == "success" ]]; then
+    printf '%s\n' "${workflow_sha}"
+  fi
+}
+
+latest_workflow_details() {
   local response
   command -v curl >/dev/null 2>&1 || return 1
   response="$(curl -fsSL --connect-timeout 2 --max-time 5 \
     -H 'Accept: application/vnd.github+json' \
     --get \
     --data-urlencode "branch=${BRANCH}" \
-    --data-urlencode 'status=success' \
     --data-urlencode 'per_page=1' \
     "${GITHUB_WORKFLOW_RUNS_URL}" 2>/dev/null || true)"
-  printf '%s\n' "${response}" \
-    | sed -n 's/.*"head_sha"[[:space:]]*:[[:space:]]*"\([0-9a-f]\{40\}\)".*/\1/p' \
-    | head -n 1
+  WORKFLOW_RESPONSE="${response}" python3 <<'PY'
+import json
+import os
+
+try:
+    runs = json.loads(os.environ.get("WORKFLOW_RESPONSE", "{}")).get("workflow_runs") or []
+    run = runs[0]
+    values = (
+        run.get("head_sha") or "",
+        run.get("status") or "",
+        run.get("conclusion") or "",
+        run.get("html_url") or "",
+    )
+    print("|".join(values))
+except (IndexError, TypeError, ValueError):
+    pass
+PY
 }
 
 installed_commit_sha() {
@@ -563,10 +590,19 @@ check_update_status() {
     return 2
   fi
 
-  local remote_sha installed_sha
-  remote_sha="$(remote_image_sha)"
-  if [[ -z "${remote_sha}" ]]; then
+  local details remote_sha workflow_status workflow_conclusion workflow_url installed_sha
+  details="$(latest_workflow_details || true)"
+  IFS='|' read -r remote_sha workflow_status workflow_conclusion workflow_url <<<"${details}"
+  if [[ ! "${remote_sha}" =~ ^[0-9a-f]{40}$ ]]; then
     write_update_status_cache "check-failed"
+    return 2
+  fi
+  if [[ "${workflow_status}" != "completed" ]]; then
+    write_update_status_cache "building"
+    return 2
+  fi
+  if [[ "${workflow_conclusion}" != "success" ]]; then
+    write_update_status_cache "build-failed"
     return 2
   fi
 
@@ -589,6 +625,8 @@ print_update_status_key() {
   case "${1:-unknown}" in
     latest|current) print_status_row "$(state_marker healthy)" "Обновление" "${GREEN}${BOLD}[ АКТУАЛЬНО ]${RESET}" ;;
     available) print_status_row "${YELLOW}↑${RESET}" "Обновление" "${YELLOW}${BOLD}[ ДОСТУПНО ]${RESET}" ;;
+    building) print_status_row "$(state_marker starting)" "Обновление" "${YELLOW}${BOLD}[ СБОРКА ]${RESET}" ;;
+    build-failed|build_failed) print_status_row "${RED}×${RESET}" "Обновление" "${RED}${BOLD}[ СБОРКА НЕ ГОТОВА ]${RESET}" ;;
     check-failed|check_failed|unknown) print_status_row "${DIM}○${RESET}" "Обновление" "${DIM}проверим позже${RESET}" ;;
     version-unknown|version_unknown) print_status_row "${YELLOW}○${RESET}" "Обновление" "${YELLOW}версия не определена${RESET}" ;;
     docker-unavailable|docker_unavailable) print_status_row "${YELLOW}○${RESET}" "Обновление" "${YELLOW}Docker недоступен${RESET}" ;;
@@ -706,7 +744,11 @@ show_update_check_result() {
     0) warn "Доступно обновление." ;;
     1) ok "Установлена актуальная версия." ;;
     *)
-      if [[ -f "${UPDATE_STATUS_CACHE}" ]] && grep -q '|version-unknown$' "${UPDATE_STATUS_CACHE}" 2>/dev/null; then
+      if [[ -f "${UPDATE_STATUS_CACHE}" ]] && grep -q '|building$' "${UPDATE_STATUS_CACHE}" 2>/dev/null; then
+        warn "Последняя версия ещё собирается. Старый образ вместо неё установлен не будет."
+      elif [[ -f "${UPDATE_STATUS_CACHE}" ]] && grep -Eq '\|build[-_]failed$' "${UPDATE_STATUS_CACHE}" 2>/dev/null; then
+        warn "Сборка последней версии неуспешна или отменена. Старый образ вместо неё установлен не будет."
+      elif [[ -f "${UPDATE_STATUS_CACHE}" ]] && grep -q '|version-unknown$' "${UPDATE_STATUS_CACHE}" 2>/dev/null; then
         warn "Версия не зафиксирована. Запустите обновление системы."
       else
         warn "Не удалось проверить обновление."
