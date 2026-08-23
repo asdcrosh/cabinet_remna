@@ -144,7 +144,12 @@ function NotificationItem({ notification }: { notification: UserNotificationView
 
 function notificationGroup(type: UserNotificationView['type']): NotificationFilter {
   if (type === 'PAYMENT_SUCCESS' || type === 'PAYMENT_FAILED' || type === 'PAYMENT_STUCK') return 'payments'
-  if (type === 'SUBSCRIPTION_EXPIRING' || type === 'SUBSCRIPTION_TERMINATED' || type === 'TRAFFIC_LIMIT') return 'subscription'
+  if (
+    type === 'SUBSCRIPTION_EXPIRING'
+    || type === 'WHITELIST_ADDON_EXPIRING'
+    || type === 'SUBSCRIPTION_TERMINATED'
+    || type === 'TRAFFIC_LIMIT'
+  ) return 'subscription'
   if (type === 'SUPPORT_REPLY') return 'support'
   if (type === 'BONUS_GRANTED') return 'bonus'
   return 'broadcast'

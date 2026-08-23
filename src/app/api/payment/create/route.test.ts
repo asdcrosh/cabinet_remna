@@ -189,6 +189,38 @@ describe('payment create route', () => {
     }))
   })
 
+  it('allows renewing an active whitelist add-on', async () => {
+    mocks.prisma.subscription.findFirst.mockResolvedValue({
+      id: 'subscription-1',
+      userId: user.id,
+      planId: plan.id,
+      status: 'ACTIVE',
+      expireAt: new Date('2026-09-01T00:00:00.000Z'),
+      deviceLimit: 5,
+      whitelistAddonActive: true,
+      whitelistAddonExpireAt: new Date('2026-08-28T00:00:00.000Z'),
+    })
+    mocks.txPaymentCreate.mockResolvedValue({
+      ...localPayment,
+      subscriptionId: 'subscription-1',
+      purchaseType: 'WHITELIST_ADDON',
+      amountKopecks: 20000,
+    })
+
+    const response = await POST(paymentRequest({
+      purchaseType: 'WHITELIST_ADDON',
+      deviceLimit: undefined,
+    }))
+
+    expect(response.status).toBe(200)
+    expect(mocks.txPaymentCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        subscriptionId: 'subscription-1',
+        purchaseType: 'WHITELIST_ADDON',
+      }),
+    })
+  })
+
   it('creates a local payment, sends it to YooKassa and stores confirmation data', async () => {
     const response = await POST(paymentRequest())
     const body = await response.json()

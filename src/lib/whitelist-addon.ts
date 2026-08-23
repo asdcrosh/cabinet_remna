@@ -135,7 +135,12 @@ export async function provisionWhitelistAddon(paymentId: string) {
     activeInternalSquads,
   })
   const activatedAt = payment.paidAt ?? new Date()
-  const expireAt = getWhitelistAddonExpireAt(activatedAt)
+  const expiryBase = subscription.whitelistAddonActive
+    && subscription.whitelistAddonExpireAt
+    && subscription.whitelistAddonExpireAt.getTime() > activatedAt.getTime()
+    ? subscription.whitelistAddonExpireAt
+    : activatedAt
+  const expireAt = getWhitelistAddonExpireAt(expiryBase)
   const savedSubscription = await prisma.$transaction(async (tx) => {
     const row = await tx.subscription.update({
       where: { id: subscription.id },

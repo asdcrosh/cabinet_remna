@@ -15,6 +15,7 @@ import { processAdminTelegramDeliveries } from '../src/lib/admin-telegram-notifi
 import { processDueAutoRenewals } from '../src/lib/auto-renewal'
 import { resumeDuePausedSubscriptions } from '../src/lib/subscription-retention'
 import { reconcileExpiredWhitelistAddons } from '../src/lib/whitelist-addon'
+import { reconcileWhitelistAddonExpiryNotifications } from '../src/lib/whitelist-addon-expiry-notifications'
 import { checkReleaseNotifications } from '../src/lib/release-notifications'
 
 const intervalMs = readPositiveInt('PAYMENT_RECONCILE_INTERVAL_SECONDS', 60) * 1000
@@ -70,6 +71,10 @@ async function runOnce() {
   await syncRemnashopUsersIfDue()
   await syncSubscriptionHealthIfDue()
   await checkReleasesIfDue()
+  await reconcileWhitelistAddonExpiryNotifications({
+    batchSize: notificationBatchSize,
+    shouldStop: () => stopped,
+  })
   const expiredWhitelistAddons = await reconcileExpiredWhitelistAddons({
     limit: notificationBatchSize,
     shouldStop: () => stopped,

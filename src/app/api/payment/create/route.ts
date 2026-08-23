@@ -115,9 +115,6 @@ export const POST = withAuth(async (req: Request) => {
     if (plan.whitelistAddonInternalSquads.length === 0) {
       return NextResponse.json({ error: 'Группы дополнения не настроены' }, { status: 503 })
     }
-    if (activeSubscription.whitelistAddonActive) {
-      return NextResponse.json({ error: 'Дополнение уже подключено' }, { status: 409 })
-    }
     const pendingAddon = await prisma.payment.findFirst({
       where: {
         userId: user.id,

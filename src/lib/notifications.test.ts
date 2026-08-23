@@ -22,7 +22,12 @@ vi.mock('./app-url', () => ({ getAppUrl: () => 'https://cabinet.example.test' })
 vi.mock('./branding', () => ({ getBrandName: () => 'Cabinet' }))
 vi.mock('./email-template', () => ({ renderActionEmail: () => '<p>Email</p>' }))
 
-import { notifySubscriptionExpiring, notifySubscriptionTerminated, notifyUser } from './notifications'
+import {
+  notifySubscriptionExpiring,
+  notifySubscriptionTerminated,
+  notifyUser,
+  notifyWhitelistAddonExpiring,
+} from './notifications'
 
 describe('notifyUser', () => {
   beforeEach(() => {
@@ -271,6 +276,41 @@ describe('notifyUser', () => {
     expect(result).toEqual({ telegram: 'duplicate', email: 'duplicate' })
     expect(mocks.prisma.notificationLog.createMany).toHaveBeenCalledTimes(2)
     expect(fetch).not.toHaveBeenCalled()
+  })
+
+  it('warns about whitelist add-on expiry in the cabinet and Telegram', async () => {
+    mocks.prisma.user.findUnique.mockResolvedValue({
+      id: 'user-1',
+      email: 'user@example.test',
+      emailVerifiedAt: new Date(),
+      name: 'User',
+      telegramId: 123n,
+    })
+    mocks.prisma.notificationLog.createMany.mockResolvedValue({ count: 1 })
+    mocks.prisma.userNotification.createMany.mockResolvedValue({ count: 1 })
+
+    await notifyWhitelistAddonExpiring({
+      userId: 'user-1',
+      subscriptionId: 'subscription-1',
+      expireAt: new Date('2026-08-26T12:00:00.000Z'),
+    })
+
+    expect(mocks.prisma.userNotification.createMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          type: 'WHITELIST_ADDON_EXPIRING',
+          title: 'Расширенный доступ скоро закончится',
+          body: expect.stringContaining('не потерять доступ к безграничному интернету'),
+          actionHref: '/dashboard',
+          actionLabel: 'Продлить БС',
+        }),
+      })
+    )
+    expect(mocks.prisma.notificationLog.createMany).toHaveBeenCalledTimes(1)
+    expect(fetch).toHaveBeenCalledWith(
+      'https://api.telegram.org/bottelegram-token/sendMessage',
+      expect.objectContaining({ body: expect.stringContaining('Продлить БС') })
+    )
   })
 
   it('sends Telegram action button as Web App when requested', async () => {

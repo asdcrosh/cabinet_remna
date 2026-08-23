@@ -576,6 +576,29 @@ export async function notifySubscriptionExpiring(input: {
   })
 }
 
+export async function notifyWhitelistAddonExpiring(input: {
+  userId: string
+  subscriptionId: string
+  expireAt: Date
+}) {
+  const title = 'Расширенный доступ скоро закончится'
+  const body = `БС действуют до ${formatDate(input.expireAt)}. Продлите их, чтобы не потерять доступ к безграничному интернету в приложении INCY.`
+  const actionHref = '/dashboard'
+  await notifyUser({
+    userId: input.userId,
+    type: 'WHITELIST_ADDON_EXPIRING',
+    dedupeKey: `whitelist-addon-expiring:${input.subscriptionId}:${input.expireAt.toISOString()}:3d`,
+    title,
+    body,
+    actionHref,
+    actionLabel: 'Продлить БС',
+    telegramText: [`<b>${title}</b>`, escapeTelegram(body)].join('\n'),
+    telegramActionUrl: `${getAppUrl()}${actionHref}`,
+    telegramActionLabel: 'Продлить БС',
+    telegramActionOpenInTelegram: true,
+  })
+}
+
 export async function notifySubscriptionTerminated(input: {
   userId: string
   source: 'USER_REQUEST' | 'ADMIN_REQUEST' | 'YOOKASSA_REFUND' | 'PLATEGA_CHARGEBACK' | 'REMNASHOP_REFUND'
