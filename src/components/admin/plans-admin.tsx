@@ -736,7 +736,7 @@ function PlanEditor({
 
       <EditorSection
         title="Дополнение: белые списки"
-        description="Пользователь сможет отдельно купить доступ к выбранным группам до конца текущего периода."
+        description="Пользователь сможет купить доступ к выбранным группам на 30 дней."
       >
         <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(12rem,.45fr)]">
           <Toggle
@@ -760,7 +760,7 @@ function PlanEditor({
         </div>
         {form.whitelistAddonEnabled ? (
           <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-950 dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-amber-100">
-            Укажите цену и выберите ниже серверные группы с белыми списками. Они будут добавлены к текущему тарифу до конца оплаченного периода.
+            Укажите цену и выберите ниже серверные группы с белыми списками. Через 30 дней после оплаты группы автоматически снимутся.
           </div>
         ) : null}
         {addonPriceInvalid ? (

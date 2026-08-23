@@ -138,7 +138,6 @@ export default async function PlansPage({
     && autoRenewal.deviceLimit === (currentDeviceLimit ?? autoRenewal.plan.deviceLimit)
     && autoRenewal.consentPriceKopecks === autoRenewalCurrentPrice
     && autoRenewal.consentDurationDays === autoRenewal.plan.durationDays
-    && (!autoRenewal.whitelistAddonEnabled || currentSubscription?.whitelistAddonActive)
   )
   const activeAutoRenewal = Boolean(
     autoRenewalConsentCurrent

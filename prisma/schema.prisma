@@ -601,6 +601,7 @@ model Subscription {
 
   whitelistAddonActive      Boolean   @default(false)
   whitelistAddonActivatedAt DateTime?
+  whitelistAddonExpireAt    DateTime?
   whitelistAddonPaymentId   String?
 
   createdAt DateTime @default(now())
@@ -615,6 +616,7 @@ model Subscription {
   @@index([userId, status, expireAt])
   @@index([expireAt])
   @@index([pendingSync, updatedAt])
+  @@index([whitelistAddonActive, whitelistAddonExpireAt])
 }
 
 enum SubscriptionStatus {

@@ -16,6 +16,7 @@ import {
   buildBundledWhitelistAddonSnapshot,
   readBundledWhitelistAddonSnapshot,
 } from './whitelist-addon'
+import { isWhitelistAddonCurrentlyActive } from './whitelist-addon-policy'
 
 const HOUR_MS = 60 * 60 * 1000
 const DEFAULT_LEAD_HOURS = 24
@@ -80,7 +81,13 @@ export async function enableAutoRenewal(input: {
     prisma.subscription.findFirst({
       where: { userId: input.userId, status: { in: ['ACTIVE', 'LIMITED'] } },
       orderBy: { expireAt: 'desc' },
-      select: { expireAt: true, planId: true, deviceLimit: true, whitelistAddonActive: true },
+      select: {
+        expireAt: true,
+        planId: true,
+        deviceLimit: true,
+        whitelistAddonActive: true,
+        whitelistAddonExpireAt: true,
+      },
     }),
   ])
   if (!plan || plan.isPromo || plan.priceKopecks <= 0) {
@@ -92,7 +99,7 @@ export async function enableAutoRenewal(input: {
   const deviceLimit = subscription.deviceLimit ?? plan.deviceLimit
   const pricing = calculateAutoRenewalPurchase(plan, deviceLimit)
   const whitelistAddonEnabled = Boolean(
-    subscription.whitelistAddonActive
+    isWhitelistAddonCurrentlyActive(subscription)
     && plan.whitelistAddonEnabled
     && plan.whitelistAddonPriceKopecks > 0
     && plan.whitelistAddonInternalSquads.length > 0
@@ -346,7 +353,6 @@ export async function refreshAutoRenewalSchedule(userId: string, paymentId?: str
     subscription.plan.whitelistAddonEnabled
     && subscription.plan.whitelistAddonPriceKopecks > 0
     && subscription.plan.whitelistAddonInternalSquads.length > 0
-    && subscription.whitelistAddonActive
   )
   const currentPriceKopecks = currentPricing
     ? currentPricing.originalAmountKopecks

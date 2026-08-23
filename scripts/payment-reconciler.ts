@@ -14,6 +14,7 @@ import { reconcileSubscriptionHealthBatch } from '../src/lib/subscription-health
 import { processAdminTelegramDeliveries } from '../src/lib/admin-telegram-notifications'
 import { processDueAutoRenewals } from '../src/lib/auto-renewal'
 import { resumeDuePausedSubscriptions } from '../src/lib/subscription-retention'
+import { reconcileExpiredWhitelistAddons } from '../src/lib/whitelist-addon'
 
 const intervalMs = readPositiveInt('PAYMENT_RECONCILE_INTERVAL_SECONDS', 60) * 1000
 const batchSize = readPositiveInt('PAYMENT_RECONCILE_BATCH_SIZE', 25)
@@ -65,6 +66,13 @@ async function runOnce() {
   })
   await syncRemnashopUsersIfDue()
   await syncSubscriptionHealthIfDue()
+  const expiredWhitelistAddons = await reconcileExpiredWhitelistAddons({
+    limit: notificationBatchSize,
+    shouldStop: () => stopped,
+  })
+  if (expiredWhitelistAddons.checked > 0) {
+    logInfo('whitelist_addon.expiry_batch_finished', expiredWhitelistAddons)
+  }
   const autoRenewals = await processDueAutoRenewals({
     limit: autoRenewalBatchSize,
     shouldStop: () => stopped,

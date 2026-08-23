@@ -144,7 +144,14 @@ export async function notifyPaymentSucceeded(paymentId: string) {
         },
       },
       plan: { select: { name: true, durationDays: true, trafficLimitGb: true, deviceLimit: true } },
-      subscription: { select: { startAt: true, expireAt: true, deviceLimit: true } },
+      subscription: {
+        select: {
+          startAt: true,
+          expireAt: true,
+          deviceLimit: true,
+          whitelistAddonExpireAt: true,
+        },
+      },
     },
   })
   if (!payment) return
@@ -152,7 +159,7 @@ export async function notifyPaymentSucceeded(paymentId: string) {
   if (payment.purchaseType === 'WHITELIST_ADDON') {
     const snapshot = readWhitelistAddonSnapshot(payment.addonSnapshot)
     const amount = formatRubles(payment.amountKopecks)
-    const expireAt = payment.subscription?.expireAt ?? null
+    const expireAt = payment.subscription?.whitelistAddonExpireAt ?? null
     const expireText = expireAt ? ` до ${formatDate(expireAt)}` : ''
     await notifyUser({
       userId: payment.user.id,

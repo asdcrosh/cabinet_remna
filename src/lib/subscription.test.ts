@@ -192,6 +192,7 @@ describe('ensureRemnawaveSubscription', () => {
         data: expect.objectContaining({
           whitelistAddonActive: true,
           whitelistAddonActivatedAt: expect.any(Date),
+          whitelistAddonExpireAt: new Date('2026-01-31T00:00:00.000Z'),
           whitelistAddonPaymentId: 'pay-1',
         }),
       })
@@ -230,6 +231,7 @@ describe('ensureRemnawaveSubscription', () => {
           startAt: new Date('2026-01-01T00:00:00.000Z'),
           whitelistAddonActive: false,
           whitelistAddonActivatedAt: null,
+          whitelistAddonExpireAt: null,
           whitelistAddonPaymentId: null,
         }),
       })

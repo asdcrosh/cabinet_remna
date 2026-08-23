@@ -941,7 +941,7 @@ function WhitelistAddonChoice({
             checked={requested}
             onChange={(event) => onChange(event.target.checked)}
             label={`Добавить за ${formatPrice(priceKopecks)}`}
-            description="Доступ к специальным серверам на весь оплачиваемый период."
+            description="Доступ к специальным серверам на 30 дней с даты оплаты."
           />
         </div>
       </div>

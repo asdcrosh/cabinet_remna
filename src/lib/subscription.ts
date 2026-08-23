@@ -17,6 +17,10 @@ import {
 import { gbToBytes } from './format'
 import { toRemnawaveTelegramId } from './telegram-remnawave'
 import { readRemnawaveBigInt } from './remnawave-usage'
+import {
+  getWhitelistAddonExpireAt,
+  isWhitelistAddonCurrentlyActive,
+} from './whitelist-addon-policy'
 
 export interface EnsureSubscriptionInput {
   userId: string                  // локальный ID в нашей БД
@@ -25,6 +29,7 @@ export interface EnsureSubscriptionInput {
   periodMode?: 'AUTO' | 'REPLACE' | 'EXTEND'
   whitelistAddon?: {
     internalSquads: string[]
+    activatedAt?: Date
   }
   plan: {
     id: string
@@ -41,12 +46,6 @@ export interface EnsureSubscriptionInput {
  * Локальную запись Subscription создаёт/обновляет по результату.
  */
 export async function ensureRemnawaveSubscription(input: EnsureSubscriptionInput) {
-  const whitelistAddonActive = Boolean(input.whitelistAddon)
-  const activeInternalSquads = Array.from(new Set([
-    ...resolvePlanActiveInternalSquads(input.plan.activeInternalSquads),
-    ...(input.whitelistAddon?.internalSquads ?? []),
-  ]))
-
   if (input.paymentId) {
     const payment = await prisma.payment.findUnique({
       where: { id: input.paymentId },
@@ -64,10 +63,45 @@ export async function ensureRemnawaveSubscription(input: EnsureSubscriptionInput
         where: { status: { in: ['ACTIVE', 'LIMITED'] } },
         orderBy: { expireAt: 'desc' },
         take: 1,
+        include: { plan: true },
       },
     },
   })
   if (!user) throw new Error(`User ${input.userId} not found`)
+
+  const latestSubscription = user.subscriptions[0]
+  const isPlanSwitch = Boolean(latestSubscription && latestSubscription.planId !== input.plan.id)
+  const requestedWhitelistAddon = Boolean(input.whitelistAddon)
+  const preservedWhitelistAddon = Boolean(
+    !isPlanSwitch
+    && latestSubscription
+    && isWhitelistAddonCurrentlyActive(latestSubscription)
+  )
+  const whitelistAddonActive = requestedWhitelistAddon || preservedWhitelistAddon
+  const whitelistAddonActivatedAt = requestedWhitelistAddon
+    ? input.whitelistAddon?.activatedAt ?? new Date()
+    : preservedWhitelistAddon
+      ? latestSubscription?.whitelistAddonActivatedAt ?? null
+      : null
+  const whitelistAddonExpireAt = requestedWhitelistAddon && whitelistAddonActivatedAt
+    ? getWhitelistAddonExpireAt(whitelistAddonActivatedAt)
+    : preservedWhitelistAddon
+      ? latestSubscription?.whitelistAddonExpireAt ?? null
+      : null
+  const whitelistAddonPaymentId = requestedWhitelistAddon
+    ? input.paymentId ?? null
+    : preservedWhitelistAddon
+      ? latestSubscription?.whitelistAddonPaymentId ?? null
+      : null
+  const whitelistAddonSquads = requestedWhitelistAddon
+    ? input.whitelistAddon?.internalSquads ?? []
+    : preservedWhitelistAddon
+      ? latestSubscription?.plan?.whitelistAddonInternalSquads ?? []
+      : []
+  const activeInternalSquads = Array.from(new Set([
+    ...resolvePlanActiveInternalSquads(input.plan.activeInternalSquads),
+    ...whitelistAddonSquads,
+  ]))
 
   let remnawaveUser: UserResponse
   let isNew = false
@@ -161,8 +195,6 @@ export async function ensureRemnawaveSubscription(input: EnsureSubscriptionInput
     'lifetimeUsedTrafficBytes',
     'lifetimeTrafficUsedBytes',
   ])
-  const latestSubscription = user.subscriptions[0]
-  const isPlanSwitch = Boolean(latestSubscription && latestSubscription.planId !== input.plan.id)
   const subscription = await prisma.$transaction(async (tx) => {
     const row = latestSubscription
       ? await tx.subscription.update({
@@ -179,8 +211,9 @@ export async function ensureRemnawaveSubscription(input: EnsureSubscriptionInput
             lastSyncedAt: new Date(),
             pendingSync: false,
             whitelistAddonActive,
-            whitelistAddonActivatedAt: whitelistAddonActive ? new Date() : null,
-            whitelistAddonPaymentId: whitelistAddonActive ? input.paymentId : null,
+            whitelistAddonActivatedAt,
+            whitelistAddonExpireAt,
+            whitelistAddonPaymentId,
           },
         })
       : await tx.subscription.create({
@@ -197,8 +230,9 @@ export async function ensureRemnawaveSubscription(input: EnsureSubscriptionInput
             lastSyncedAt: new Date(),
             pendingSync: false,
             whitelistAddonActive,
-            whitelistAddonActivatedAt: whitelistAddonActive ? new Date() : null,
-            whitelistAddonPaymentId: whitelistAddonActive ? input.paymentId : null,
+            whitelistAddonActivatedAt,
+            whitelistAddonExpireAt,
+            whitelistAddonPaymentId,
           },
         })
 

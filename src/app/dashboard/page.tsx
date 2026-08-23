@@ -136,6 +136,7 @@ export default async function DashboardHome() {
         planId: subRow.planId,
         priceKopecks: subRow.plan.whitelistAddonPriceKopecks,
         active: subRow.whitelistAddonActive,
+        expireAt: subRow.whitelistAddonExpireAt?.toISOString() ?? null,
       }
     : null
   return (
@@ -222,6 +223,7 @@ export default async function DashboardHome() {
           planId={whitelistAddonOffer.planId}
           priceKopecks={whitelistAddonOffer.priceKopecks}
           active={whitelistAddonOffer.active}
+          expireAt={whitelistAddonOffer.expireAt}
           paymentProviders={paymentProviders}
         />
       ) : null}

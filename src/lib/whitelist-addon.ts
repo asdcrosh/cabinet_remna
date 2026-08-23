@@ -2,8 +2,11 @@ import type { Prisma } from '@prisma/client'
 import { prisma } from './prisma'
 import { hasRemnawaveUserReference, remnawave, remnawaveUserReference } from './remnawave'
 import { resolvePlanActiveInternalSquads } from './subscription'
+import { logError } from './logger'
+import { getWhitelistAddonExpireAt } from './whitelist-addon-policy'
 
 export const WHITELIST_ADDON_NAME = 'Доступ к серверам с белыми списками'
+export { WHITELIST_ADDON_DURATION_DAYS } from './whitelist-addon-policy'
 
 export type WhitelistAddonSnapshot = {
   type: 'WHITELIST_ADDON'
@@ -123,13 +126,15 @@ export async function provisionWhitelistAddon(paymentId: string) {
   const updated = await remnawave.updateUser(remnawaveUserReference(payment.user), {
     activeInternalSquads,
   })
-  const activatedAt = new Date()
+  const activatedAt = payment.paidAt ?? new Date()
+  const expireAt = getWhitelistAddonExpireAt(activatedAt)
   const savedSubscription = await prisma.$transaction(async (tx) => {
     const row = await tx.subscription.update({
       where: { id: subscription.id },
       data: {
         whitelistAddonActive: true,
         whitelistAddonActivatedAt: activatedAt,
+        whitelistAddonExpireAt: expireAt,
         whitelistAddonPaymentId: payment.id,
         lastSyncedAt: activatedAt,
       },
@@ -178,11 +183,62 @@ export async function revokeWhitelistAddonForPayment(paymentId: string) {
     data: {
       whitelistAddonActive: false,
       whitelistAddonActivatedAt: null,
+      whitelistAddonExpireAt: null,
       whitelistAddonPaymentId: null,
       lastSyncedAt: new Date(),
     },
   })
   return { revoked: true as const }
+}
+
+export async function reconcileExpiredWhitelistAddons(options?: {
+  limit?: number
+  shouldStop?: () => boolean
+}) {
+  const now = new Date()
+  const subscriptions = await prisma.subscription.findMany({
+    where: {
+      whitelistAddonActive: true,
+      whitelistAddonExpireAt: { lte: now },
+    },
+    orderBy: { whitelistAddonExpireAt: 'asc' },
+    take: options?.limit ?? 100,
+    include: { user: true, plan: true },
+  })
+  let revoked = 0
+  let failed = 0
+
+  for (const subscription of subscriptions) {
+    if (options?.shouldStop?.()) break
+    try {
+      if (hasRemnawaveUserReference(subscription.user)) {
+        if (!subscription.plan) throw new Error('Тариф дополнения не найден')
+        await remnawave.updateUser(remnawaveUserReference(subscription.user), {
+          activeInternalSquads: resolvePlanActiveInternalSquads(subscription.plan.activeInternalSquads),
+        })
+      }
+      const result = await prisma.subscription.updateMany({
+        where: {
+          id: subscription.id,
+          whitelistAddonActive: true,
+          whitelistAddonExpireAt: { lte: now },
+        },
+        data: {
+          whitelistAddonActive: false,
+          lastSyncedAt: new Date(),
+        },
+      })
+      revoked += result.count
+    } catch (error) {
+      failed += 1
+      logError('whitelist_addon.expiry_revoke_failed', error, {
+        subscriptionId: subscription.id,
+        userId: subscription.userId,
+      })
+    }
+  }
+
+  return { checked: subscriptions.length, revoked, failed }
 }
 
 function uniqueSquads(squads: string[]) {

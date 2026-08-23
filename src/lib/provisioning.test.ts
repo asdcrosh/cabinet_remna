@@ -252,7 +252,10 @@ describe('provisionPaymentSubscription', () => {
     await provisionPaymentSubscription(input)
 
     expect(mocks.ensureRemnawaveSubscription).toHaveBeenCalledWith(expect.objectContaining({
-      whitelistAddon: { internalSquads: ['whitelist-squad'] },
+      whitelistAddon: {
+        internalSquads: ['whitelist-squad'],
+        activatedAt: new Date('2026-01-01T00:00:00.000Z'),
+      },
     }))
   })
 

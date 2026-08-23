@@ -17,11 +17,13 @@ export function HomeWhitelistAddon({
   planId,
   priceKopecks,
   active,
+  expireAt,
   paymentProviders,
 }: {
   planId: string
   priceKopecks: number
   active: boolean
+  expireAt: string | null
   paymentProviders: Provider[]
 }) {
   const [open, setOpen] = useState(false)
@@ -73,7 +75,11 @@ export function HomeWhitelistAddon({
         </span>
         <div className="min-w-0">
           <div className="text-sm font-bold tracking-wide text-emerald-800 dark:text-emerald-200">БС ПОДКЛЮЧЕН</div>
-          <p className="mt-0.5 text-xs text-emerald-700/80 dark:text-emerald-200/70">Действует до окончания текущего тарифа</p>
+          <p className="mt-0.5 text-xs text-emerald-700/80 dark:text-emerald-200/70">
+            {expireAt
+              ? `Действует до ${new Date(expireAt).toLocaleDateString('ru-RU', { timeZone: 'Europe/Moscow' })}`
+              : 'Действует 30 дней с даты оплаты'}
+          </p>
         </div>
       </section>
     )
@@ -124,7 +130,7 @@ export function HomeWhitelistAddon({
       >
         <div className="space-y-3">
           <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-4 text-sm leading-5 text-slate-700 dark:border-amber-400/20 dark:bg-amber-400/[0.06] dark:text-slate-200">
-            Доступ включится сразу после оплаты и будет действовать до окончания текущего тарифа.
+            Доступ включится сразу после оплаты ровно на 30 дней. Затем группы БС автоматически снимутся.
           </div>
           {paymentProviders.length > 1 ? (
             <label className="block">

@@ -15,6 +15,7 @@ import { upsertLocalSubscriptionFromRemnawave } from './remnawave-local-sync'
 import { readRemnawaveBigInt } from './remnawave-usage'
 import { describeSyncError } from './sync-error'
 import { resolvePlanActiveInternalSquads } from './subscription'
+import { isWhitelistAddonCurrentlyActive } from './whitelist-addon-policy'
 
 const EXPIRY_TOLERANCE_MS = 2 * 60 * 1000
 
@@ -370,7 +371,7 @@ async function applyManualRepairs(state: Awaited<ReturnType<typeof inspect>>) {
   if (!state.remote || !local || !plan) return []
   const activeInternalSquads = Array.from(new Set([
     ...resolvePlanActiveInternalSquads(plan.activeInternalSquads),
-    ...(local.whitelistAddonActive ? plan.whitelistAddonInternalSquads : []),
+    ...(isWhitelistAddonCurrentlyActive(local) ? plan.whitelistAddonInternalSquads : []),
   ]))
   const updated = await remnawave.updateUser(state.remote, {
     status: local.status === 'PAUSED' ? 'DISABLED' : local.status,

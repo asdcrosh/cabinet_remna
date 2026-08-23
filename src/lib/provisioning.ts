@@ -32,7 +32,10 @@ export async function provisionPaymentSubscription(input: ProvisionPaymentSubscr
   const effectiveInput = {
     ...input,
     whitelistAddon: bundledWhitelistAddon
-      ? { internalSquads: bundledWhitelistAddon.internalSquads }
+      ? {
+          internalSquads: bundledWhitelistAddon.internalSquads,
+          activatedAt: payment.paidAt ?? new Date(),
+        }
       : undefined,
     plan: purchaseSnapshot
       ? {

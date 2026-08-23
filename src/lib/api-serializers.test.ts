@@ -18,6 +18,7 @@ describe('api serializers', () => {
       pendingSync: false,
       whitelistAddonActive: false,
       whitelistAddonActivatedAt: null,
+      whitelistAddonExpireAt: null,
       whitelistAddonPaymentId: null,
       createdAt: new Date('2026-01-01T00:00:00.000Z'),
       updatedAt: new Date('2026-01-01T00:00:00.000Z'),
