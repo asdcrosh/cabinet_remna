@@ -10,6 +10,7 @@ import { readPlanPurchaseSnapshot, resolveEffectiveDeviceLimit } from './plan-pu
 import {
   buildAdminPaymentStuckTelegramText,
   buildAdminPaymentTelegramText,
+  buildAdminWhitelistAddonTelegramText,
 } from './admin-telegram-notifications'
 import { paymentProviderLabel } from './payment-provider-label'
 import { readWhitelistAddonSnapshot } from './whitelist-addon'
@@ -189,6 +190,25 @@ export async function notifyPaymentSucceeded(paymentId: string) {
         ctaLabel: 'Открыть подписку',
         greetingName: payment.user.name,
       }),
+    })
+    await createAdminNotification({
+      type: 'payment',
+      severity: 'SUCCESS',
+      dedupeKey: `admin:payment-success:${payment.id}`,
+      title: 'Куплены БС',
+      body: `${payment.user.name || 'Пользователь'} оплатил ${amount} за расширенный доступ.${expireAt ? ` БС подключены до ${formatDate(expireAt)}.` : ''}`,
+      entityType: 'payment',
+      entityId: payment.id,
+      actionHref: '/dashboard/admin/payments',
+      actionLabel: 'Открыть платежи',
+      telegram: {
+        text: buildAdminWhitelistAddonTelegramText({
+          amount,
+          expireAt,
+        }),
+        actionHref: '/dashboard/admin/payments',
+        actionLabel: 'Открыть платежи',
+      },
     })
     await recordPaymentEvent({
       paymentId: payment.id,

@@ -23,6 +23,7 @@ vi.mock('./logger', () => ({ logError: mocks.logError, logInfo: mocks.logInfo })
 import {
   buildAdminPaymentTelegramText,
   buildAdminSupportTelegramText,
+  buildAdminWhitelistAddonTelegramText,
   processAdminTelegramDeliveries,
 } from './admin-telegram-notifications'
 
@@ -72,6 +73,18 @@ describe('admin Telegram notifications', () => {
     expect(text).toContain('Premium &lt;90&gt; · 90 дней')
     expect(text).toContain('Иван &amp; Ко · @ivan · ivan@example.test')
     expect(text).toContain('17.11.2026')
+  })
+
+  it('formats a whitelist add-on purchase for the owner', () => {
+    const text = buildAdminWhitelistAddonTelegramText({
+      amount: '200 ₽',
+      expireAt: new Date('2026-09-22T12:00:00.000Z'),
+    })
+
+    expect(text).toContain('<b>✅ Куплены БС</b>')
+    expect(text).toContain('<b>200 ₽</b> · расширенный доступ')
+    expect(text).not.toContain('ivan@example.test')
+    expect(text).toContain('22.09.2026')
   })
 
   it('formats support previews without leaking a technical pending email', () => {

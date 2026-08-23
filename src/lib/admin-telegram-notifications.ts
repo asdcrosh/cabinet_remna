@@ -155,6 +155,20 @@ export function buildAdminPaymentTelegramText(input: {
   ].join('\n')
 }
 
+export function buildAdminWhitelistAddonTelegramText(input: {
+  amount: string
+  expireAt: Date | null
+}) {
+  return [
+    '<b>✅ Куплены БС</b>',
+    '',
+    `<b>${escapeTelegramHtml(input.amount)}</b> · расширенный доступ`,
+    input.expireAt
+      ? `📦 БС подключены до <b>${escapeTelegramHtml(formatDate(input.expireAt))}</b>`
+      : '📦 БС подключены',
+  ].join('\n')
+}
+
 export function buildAdminPaymentStuckTelegramText(input: {
   amount: string
   planName: string
