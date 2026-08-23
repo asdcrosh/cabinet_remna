@@ -132,14 +132,40 @@ configure_target_image() {
   export CABINET_IMAGE
 }
 
-pull_and_verify_target_image() {
+pull_compose_images() {
+  local log_file pull_pid started_at elapsed pull_status=0
+
+  log_file="$(mktemp)"
+  started_at="$(date +%s)"
+  CABINET_IMAGE="${TARGET_CABINET_IMAGE}" CABINET_ENV_FILE="${ENV_FILE}" \
+    "${COMPOSE[@]}" pull --quiet >"${log_file}" 2>&1 &
+  pull_pid=$!
+
+  if [[ -t 1 ]]; then
+    while kill -0 "${pull_pid}" 2>/dev/null; do
+      elapsed=$(($(date +%s) - started_at))
+      printf '\rDownloading Docker images: %s sec.' "${elapsed}"
+      sleep 2
+    done
+    printf '\r\033[2K'
+  fi
+
+  wait "${pull_pid}" || pull_status=$?
+  if ((pull_status != 0)); then
+    cat "${log_file}" >&2
+    rm -f "${log_file}"
+    return "${pull_status}"
+  fi
+  rm -f "${log_file}"
+}
+
+verify_target_image() {
   local pulled_revision
 
   echo "Target cabinet image: ${TARGET_CABINET_IMAGE}"
   if [[ "${CABINET_RELEASE_SHA:-}" =~ ^[0-9a-f]{40}$ ]]; then
     echo "Target cabinet revision: ${CABINET_RELEASE_SHA}"
   fi
-  docker pull "${TARGET_CABINET_IMAGE}"
   pulled_revision="$(image_revision "${TARGET_CABINET_IMAGE}" || true)"
   if [[ ! "${pulled_revision}" =~ ^[0-9a-f]{40}$ ]]; then
     echo "Pulled cabinet image has no valid org.opencontainers.image.revision label." >&2
@@ -618,10 +644,9 @@ if [[ -n "${PREVIOUS_IMAGE_ID}" ]] && docker image inspect "${PREVIOUS_IMAGE_ID}
   docker image tag "${PREVIOUS_IMAGE_ID}" "${ROLLBACK_IMAGE}"
 fi
 
-echo "Pulling target cabinet image..."
-pull_and_verify_target_image
-echo "Pulling supporting images..."
-CABINET_IMAGE="${TARGET_CABINET_IMAGE}" CABINET_ENV_FILE="${ENV_FILE}" "${COMPOSE[@]}" pull
+echo "Pulling Docker images..."
+pull_compose_images
+verify_target_image
 write_deployment_state "deploying" "Новый образ загружен. Запускаются миграции."
 
 echo "Preparing one-shot services..."
