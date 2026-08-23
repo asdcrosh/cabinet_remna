@@ -23,6 +23,8 @@ ENV_TEMPLATE_TEMP="${INSTALL_DIR}/.env.template.tmp"
 NODE_PROVISIONING_CONFIG_URL="${NODE_PROVISIONING_CONFIG_URL:-${RAW_BASE_URL}/deploy/configure-node-provisioning.sh}"
 NODE_PROVISIONING_CONFIG_PATH="${NODE_PROVISIONING_CONFIG_PATH:-/usr/local/bin/cabinet-node-provisioning}"
 NODE_PROVISIONING_CONFIG_TEMP="${NODE_PROVISIONING_CONFIG_PATH}.tmp"
+OFFICIAL_CABINET_IMAGE="ghcr.io/asdcrosh/cabinet_remna"
+TARGET_CABINET_IMAGE=""
 
 if [[ "$(id -u)" -ne 0 ]]; then
   echo "Run as root or with sudo:"
@@ -104,6 +106,50 @@ image_revision() {
     return 0
   fi
   return 1
+}
+
+configure_target_image() {
+  local expected_image=""
+
+  if [[ -n "${CABINET_RELEASE_SHA:-}" && ! "${CABINET_RELEASE_SHA}" =~ ^[0-9a-f]{40}$ ]]; then
+    echo "Invalid CABINET_RELEASE_SHA: ${CABINET_RELEASE_SHA}" >&2
+    return 1
+  fi
+
+  if [[ "${CABINET_RELEASE_SHA:-}" =~ ^[0-9a-f]{40}$ ]]; then
+    expected_image="${OFFICIAL_CABINET_IMAGE}:sha-${CABINET_RELEASE_SHA}"
+    if [[ -n "${CABINET_IMAGE:-}" && "${CABINET_IMAGE}" != "${expected_image}" ]]; then
+      echo "CABINET_IMAGE does not match release ${CABINET_RELEASE_SHA}: ${CABINET_IMAGE}" >&2
+      return 1
+    fi
+    TARGET_CABINET_IMAGE="${expected_image}"
+  else
+    TARGET_CABINET_IMAGE="${CABINET_IMAGE:-$(read_update_env_value CABINET_IMAGE)}"
+    TARGET_CABINET_IMAGE="${TARGET_CABINET_IMAGE:-${OFFICIAL_CABINET_IMAGE}:latest}"
+  fi
+
+  CABINET_IMAGE="${TARGET_CABINET_IMAGE}"
+  export CABINET_IMAGE
+}
+
+pull_and_verify_target_image() {
+  local pulled_revision
+
+  echo "Target cabinet image: ${TARGET_CABINET_IMAGE}"
+  if [[ "${CABINET_RELEASE_SHA:-}" =~ ^[0-9a-f]{40}$ ]]; then
+    echo "Target cabinet revision: ${CABINET_RELEASE_SHA}"
+  fi
+  docker pull "${TARGET_CABINET_IMAGE}"
+  pulled_revision="$(image_revision "${TARGET_CABINET_IMAGE}" || true)"
+  if [[ ! "${pulled_revision}" =~ ^[0-9a-f]{40}$ ]]; then
+    echo "Pulled cabinet image has no valid org.opencontainers.image.revision label." >&2
+    return 1
+  fi
+  if [[ "${CABINET_RELEASE_SHA:-}" =~ ^[0-9a-f]{40}$ && "${pulled_revision}" != "${CABINET_RELEASE_SHA}" ]]; then
+    echo "Pulled image revision ${pulled_revision} does not match requested release ${CABINET_RELEASE_SHA}." >&2
+    return 1
+  fi
+  DEPLOY_TARGET_REVISION="${pulled_revision}"
 }
 
 DEPLOY_STARTED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
@@ -565,17 +611,17 @@ NODE_PROVISIONING_API_FAILURE_FATAL="false" \
 "${NODE_PROVISIONING_CONFIG_PATH}"
 
 COMPOSE=(docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}")
+configure_target_image
 
 if [[ -n "${PREVIOUS_IMAGE_ID}" ]] && docker image inspect "${PREVIOUS_IMAGE_ID}" >/dev/null 2>&1; then
   ROLLBACK_IMAGE="remnawave-cabinet:rollback-$(date -u +%Y%m%d%H%M%S)"
   docker image tag "${PREVIOUS_IMAGE_ID}" "${ROLLBACK_IMAGE}"
 fi
 
-echo "Pulling latest images..."
-CABINET_ENV_FILE="${ENV_FILE}" "${COMPOSE[@]}" pull
-CABINET_IMAGE_REFERENCE="${CABINET_IMAGE:-$(read_update_env_value CABINET_IMAGE)}"
-CABINET_IMAGE_REFERENCE="${CABINET_IMAGE_REFERENCE:-ghcr.io/asdcrosh/cabinet_remna:latest}"
-DEPLOY_TARGET_REVISION="$(image_revision "${CABINET_IMAGE_REFERENCE}" || true)"
+echo "Pulling target cabinet image..."
+pull_and_verify_target_image
+echo "Pulling supporting images..."
+CABINET_IMAGE="${TARGET_CABINET_IMAGE}" CABINET_ENV_FILE="${ENV_FILE}" "${COMPOSE[@]}" pull
 write_deployment_state "deploying" "Новый образ загружен. Запускаются миграции."
 
 echo "Preparing one-shot services..."
@@ -835,15 +881,23 @@ else
 fi
 
 DEPLOYED_REVISION="$(running_app_revision || true)"
+if [[ ! "${DEPLOYED_REVISION}" =~ ^[0-9a-f]{40}$ ]]; then
+  echo "Running cabinet image has no valid revision label." >&2
+  false
+fi
 if [[ "${DEPLOY_TARGET_REVISION}" =~ ^[0-9a-f]{40}$ && "${DEPLOYED_REVISION}" != "${DEPLOY_TARGET_REVISION}" ]]; then
   echo "Running image revision ${DEPLOYED_REVISION:-unknown} does not match pulled image ${DEPLOY_TARGET_REVISION}." >&2
+  false
+fi
+if [[ "${CABINET_RELEASE_SHA:-}" =~ ^[0-9a-f]{40}$ && "${DEPLOYED_REVISION}" != "${CABINET_RELEASE_SHA}" ]]; then
+  echo "Running image revision ${DEPLOYED_REVISION} does not match requested release ${CABINET_RELEASE_SHA}." >&2
   false
 fi
 ROLLBACK_ARMED="false"
 if [[ "${CABINET_RELEASE_SHA:-}" =~ ^[0-9a-f]{40}$ \
   && "${DEPLOYED_REVISION}" == "${CABINET_RELEASE_SHA}" \
-  && "${CABINET_IMAGE:-}" == "ghcr.io/asdcrosh/cabinet_remna:sha-${CABINET_RELEASE_SHA}" ]]; then
-  write_update_env_value "CABINET_IMAGE" "${CABINET_IMAGE}"
+  && "${TARGET_CABINET_IMAGE}" == "${OFFICIAL_CABINET_IMAGE}:sha-${CABINET_RELEASE_SHA}" ]]; then
+  write_update_env_value "CABINET_IMAGE" "${TARGET_CABINET_IMAGE}"
 fi
 write_deployment_state "success" "Новая версия запущена и прошла автоматические проверки." "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
