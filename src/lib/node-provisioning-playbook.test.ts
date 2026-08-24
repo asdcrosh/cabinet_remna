@@ -13,6 +13,13 @@ function taskBlock(name: string) {
 }
 
 describe('node provisioning playbook safety', () => {
+  it('pulls the current Remnanode image on every provisioning or repair run', () => {
+    const start = taskBlock('Start or reconcile Remnanode')
+    expect(start).toContain('- --pull')
+    expect(start).toContain('- always')
+    expect(start).toContain('- --remove-orphans')
+  })
+
   it('uses the pinned official SelfSteal force mode with Ansible-managed TLS', () => {
     expect(playbook).toContain('selfsteal_script_version: 2.10.0')
     expect(playbook).toContain('3594f3a4ddae19582f9dde95fdf65edeaf2892dec662eadabba55e1f8faff4c4')

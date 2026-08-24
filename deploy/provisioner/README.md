@@ -15,7 +15,9 @@ Required extra variables:
 - `remnanode_secret_key` (legacy runner alias: `node_secret_key`)
 - `panel_api_cidrs` (legacy aliases: `panel_api_cidr`, `panel_ip`; allowed to reach port 2222)
 - `remnanode_image` defaults to `remnawave/node:latest` and is pulled on every
-  provisioning or repair run
+  provisioning or repair run. During `cabinetctl update`, fixed tags and digests
+  of the official Docker Hub or GHCR Remnawave Node image are migrated to this
+  rolling default. An image from a private registry remains an explicit override
 - node country is detected locally from the bundled MaxMind GeoLite2 country
   database; `NODE_PROVISIONING_COUNTRY_CODE` can override it with an ISO code
 - the shared `torrent_block` plugin is created/configured through Remnawave API

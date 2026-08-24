@@ -55,11 +55,14 @@ describe('configure-node-provisioning.sh', () => {
     expect(secondEnv.NODE_PROVISIONING_ENCRYPTION_KEY).toBe(firstEnv.NODE_PROVISIONING_ENCRYPTION_KEY)
   })
 
-  it('upgrades the released Remnanode 2.8 default to latest', async () => {
-    const fixture = await createFixture(completeEnv().replace(
-      'remnawave/node:latest',
-      'remnawave/node:2.8.0@sha256:03f14935751b4ab565181e2b1766ccd1a9ac349d6839acd3ee49014e543fa232',
-    ))
+  it.each([
+    'remnawave/node:2.8.0@sha256:03f14935751b4ab565181e2b1766ccd1a9ac349d6839acd3ee49014e543fa232',
+    'remnawave/node:3.3.1',
+    'docker.io/remnawave/node:3.3.1',
+    'ghcr.io/remnawave/node:3.3.1',
+    `ghcr.io/remnawave/node@sha256:${'b'.repeat(64)}`,
+  ])('upgrades the official fixed Remnanode image %s to latest', async (image) => {
+    const fixture = await createFixture(completeEnv().replace('remnawave/node:latest', image))
 
     const result = run(fixture)
     const env = await readEnv(fixture.envFile)
@@ -86,6 +89,16 @@ describe('configure-node-provisioning.sh', () => {
 
     expect(result.status).toBe(0)
     expect(env.NODE_PROVISIONING_REMNANODE_IMAGE).toBe('registry.example.net/node:tested')
+  })
+
+  it('keeps the rolling Remnanode image unchanged', async () => {
+    const fixture = await createFixture(completeEnv())
+
+    const result = run(fixture)
+    const env = await readEnv(fixture.envFile)
+
+    expect(result.status).toBe(0)
+    expect(env.NODE_PROVISIONING_REMNANODE_IMAGE).toBe('remnawave/node:latest')
   })
 
   it('disables provisioning when an API token is rejected', async () => {

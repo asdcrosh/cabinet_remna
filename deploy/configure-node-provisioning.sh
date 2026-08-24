@@ -11,7 +11,6 @@ VALIDATE_APIS="${NODE_PROVISIONING_VALIDATE_APIS:-${START_WORKER}}"
 API_FAILURE_FATAL="${NODE_PROVISIONING_API_FAILURE_FATAL:-${START_WORKER}}"
 DEFAULT_PROVISIONER_IMAGE="ghcr.io/asdcrosh/cabinet_remna-provisioner:latest"
 DEFAULT_REMNANODE_IMAGE="remnawave/node:latest"
-LEGACY_DEFAULT_REMNANODE_IMAGE="remnawave/node:2.8.0@sha256:03f14935751b4ab565181e2b1766ccd1a9ac349d6839acd3ee49014e543fa232"
 
 if [[ ! -f "${ENV_FILE}" ]]; then
   echo "Node provisioning: ${ENV_FILE} not found." >&2
@@ -139,8 +138,19 @@ raise SystemExit(0 if valid else 1)
 PY
 }
 
-valid_pinned_image() {
+valid_image_reference() {
   [[ "$1" == *@sha256:* || "$1" =~ ^.+:[^/:]+$ ]]
+}
+
+official_remnanode_image() {
+  case "$1" in
+    remnawave/node:*|remnawave/node@sha256:*|\
+    docker.io/remnawave/node:*|docker.io/remnawave/node@sha256:*|\
+    index.docker.io/remnawave/node:*|index.docker.io/remnawave/node@sha256:*|\
+    registry-1.docker.io/remnawave/node:*|registry-1.docker.io/remnawave/node@sha256:*|\
+    ghcr.io/remnawave/node:*|ghcr.io/remnawave/node@sha256:*) return 0 ;;
+    *) return 1 ;;
+  esac
 }
 
 valid_positive_integer() {
@@ -158,7 +168,7 @@ valid_config_value() {
     NODE_PROVISIONING_ENCRYPTION_KEY) valid_secret "${value}" ;;
     NODE_PROVISIONING_ADMIN_EMAIL) valid_email "${value}" ;;
     NODE_PROVISIONING_COUNTRY_CODE) [[ "${value}" == "AUTO" || "${value}" =~ ^[A-Za-z]{2}$ ]] ;;
-    NODE_PROVISIONING_REMNANODE_IMAGE) valid_pinned_image "${value}" ;;
+    NODE_PROVISIONING_REMNANODE_IMAGE) valid_image_reference "${value}" ;;
     NODE_PROVISIONING_WORKER_INTERVAL_SECONDS|NODE_PROVISIONING_WORKER_HEARTBEAT_MAX_AGE_SECONDS|NODE_PROVISIONING_CREDENTIALS_TTL_HOURS|NODE_PROVISIONING_DNS_TIMEOUT_SECONDS|NODE_PROVISIONING_CONNECT_TIMEOUT_SECONDS|NODE_PROVISIONING_ANSIBLE_TIMEOUT_SECONDS)
       valid_positive_integer "${value}"
       ;;
@@ -187,7 +197,8 @@ ensure_valid_default() {
 ensure_current_remnanode_default() {
   local current
   current="$(read_env_value NODE_PROVISIONING_REMNANODE_IMAGE || true)"
-  if ! valid_pinned_image "${current}" || [[ "${current}" == "${LEGACY_DEFAULT_REMNANODE_IMAGE}" ]]; then
+  if ! valid_image_reference "${current}" || \
+    { official_remnanode_image "${current}" && [[ "${current}" != "${DEFAULT_REMNANODE_IMAGE}" ]]; }; then
     write_env_value NODE_PROVISIONING_REMNANODE_IMAGE "${DEFAULT_REMNANODE_IMAGE}"
   fi
 }
@@ -415,7 +426,7 @@ valid_https_url "${remnawave_url}" || missing+=("REMNAWAVE_BASE_URL(valid HTTPS 
 valid_api_token "${timeweb_token}" || missing+=("TIMEWEB_API_TOKEN(valid token)")
 valid_api_token "${remnawave_token}" || missing+=("REMNAWAVE_TOKEN(valid token)")
 valid_secret "${encryption_key}" || missing+=("NODE_PROVISIONING_ENCRYPTION_KEY(32+ safe chars)")
-if ! valid_pinned_image "${remnanode_image}"; then
+if ! valid_image_reference "${remnanode_image}"; then
   missing+=("NODE_PROVISIONING_REMNANODE_IMAGE(valid image)")
 fi
 
