@@ -23,6 +23,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { toast } from '@/components/ui/toaster'
+import { Checkbox } from '@/components/ui/checkbox'
 
 const POLL_INTERVAL_MS = 4_000
 const MAX_VISIBLE_JOBS = 8
@@ -81,6 +82,15 @@ type ProvisioningResponse = {
   templates?: ProvisioningTemplates
   templatesError?: string | null
   configuration?: { ready: boolean; missing: string[] }
+  inspection?: HostKeyInspection
+}
+
+type HostKeyInspection = {
+  serverIp: string
+  sshPort: number
+  expectedFingerprint: string
+  currentFingerprint: string
+  changed: boolean
 }
 
 type ProvisioningTemplates = {
@@ -260,6 +270,29 @@ export function NodeProvisioningPanel() {
         jobId: job.id,
         message: error instanceof Error ? error.message : 'Не удалось повторно запустить задачу',
       })
+    } finally {
+      setRetryingJobId(null)
+    }
+  }
+
+  async function trustHostKey(job: ProvisioningJob, fingerprint: string) {
+    if (job.status !== 'FAILED' || retryingJobId) return
+    setRetryingJobId(job.id)
+    setRetryError(null)
+    try {
+      const response = await fetch(`/api/admin/nodes/provisioning/${encodeURIComponent(job.id)}/ssh-host-key`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'x-error-presentation': 'silent' },
+        body: JSON.stringify({ fingerprint }),
+      })
+      const data = await response.json().catch(() => null) as ProvisioningResponse | null
+      if (!response.ok) throw new Error(formatApiError(data, 'Не удалось подтвердить новый SSH-ключ'))
+      if (!data?.job) throw new Error('Сервер не вернул обновлённое состояние задачи')
+      setJobs((current) => current.map((item) => item.id === data.job!.id ? data.job! : item))
+      toast('Новый SSH-ключ подтверждён, установка продолжена', 'success')
+      await refreshJobs(false)
+    } catch (error) {
+      setRetryError({ jobId: job.id, message: error instanceof Error ? error.message : 'Не удалось подтвердить новый SSH-ключ' })
     } finally {
       setRetryingJobId(null)
     }
@@ -461,6 +494,7 @@ export function NodeProvisioningPanel() {
                 retrying={retryingJobId === selectedJob.id}
                 retryError={retryError?.jobId === selectedJob.id ? retryError.message : null}
                 onRetry={() => void retryJob(selectedJob)}
+                onTrustHostKey={(fingerprint) => void trustHostKey(selectedJob, fingerprint)}
               />
             ) : null}
           </div>
@@ -518,11 +552,13 @@ function JobProgress({
   retrying,
   retryError,
   onRetry,
+  onTrustHostKey,
 }: {
   job: ProvisioningJob
   retrying: boolean
   retryError: string | null
   onRetry: () => void
+  onTrustHostKey: (fingerprint: string) => void
 }) {
   const steps = resolveSteps(job)
 
@@ -589,26 +625,91 @@ function JobProgress({
                   <span>{retryError}</span>
                 </div>
               ) : null}
-              <button
-                type="button"
-                className="btn-secondary min-h-10"
-                onClick={onRetry}
-                disabled={retrying}
-              >
-                {retrying ? (
-                  <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" />
-                ) : (
-                  <RefreshCw className="h-4 w-4" />
-                )}
-                {retrying ? 'Возвращаем в очередь...' : 'Повторить установку'}
-              </button>
+              {job.lastError?.includes('SSH host key изменился после предыдущего запуска') ? (
+                <SshHostKeyRecovery job={job} retrying={retrying} onRetry={onRetry} onTrust={onTrustHostKey} />
+              ) : (
+                <button type="button" className="btn-secondary min-h-10" onClick={onRetry} disabled={retrying}>
+                  {retrying ? <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" /> : <RefreshCw className="h-4 w-4" />}
+                  {retrying ? 'Возвращаем в очередь...' : 'Повторить установку'}
+                </button>
+              )}
               <p className="mt-2 text-xs leading-5 text-red-700/80 dark:text-red-200/80">
-                Уже созданные этой задачей домен, нода и хосты будут использованы повторно.
+                Существующие объекты будут использованы повторно, а удалённые из Remnawave — созданы заново.
               </p>
             </div>
           ) : null}
         </div>
       ) : null}
+    </div>
+  )
+}
+
+function SshHostKeyRecovery({
+  job,
+  retrying,
+  onRetry,
+  onTrust,
+}: {
+  job: ProvisioningJob
+  retrying: boolean
+  onRetry: () => void
+  onTrust: (fingerprint: string) => void
+}) {
+  const [inspection, setInspection] = useState<HostKeyInspection | null>(null)
+  const [checking, setChecking] = useState(false)
+  const [confirmed, setConfirmed] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function inspect() {
+    setChecking(true)
+    setError(null)
+    try {
+      const response = await fetch(`/api/admin/nodes/provisioning/${encodeURIComponent(job.id)}/ssh-host-key`, {
+        headers: { 'x-error-presentation': 'silent' },
+        cache: 'no-store',
+      })
+      const data = await response.json().catch(() => null) as ProvisioningResponse | null
+      if (!response.ok) throw new Error(formatApiError(data, 'Не удалось проверить SSH-ключ'))
+      if (!data?.inspection) throw new Error('Сервер не вернул SSH fingerprint')
+      setInspection(data.inspection)
+      setConfirmed(false)
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Не удалось проверить SSH-ключ')
+    } finally {
+      setChecking(false)
+    }
+  }
+
+  if (!inspection) {
+    return (
+      <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-amber-950 dark:border-amber-400/25 dark:bg-amber-400/10 dark:text-amber-100">
+        <div className="flex items-start gap-2"><ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" /><p className="text-sm leading-5">После переустановки сервера новый ключ нужно проверить и подтвердить.</p></div>
+        {error ? <p className="mt-2 text-xs text-red-700 dark:text-red-200">{error}</p> : null}
+        <button type="button" className="btn-secondary mt-3 min-h-10" onClick={() => void inspect()} disabled={checking}>
+          {checking ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}
+          {checking ? 'Проверяем...' : 'Проверить новый SSH-ключ'}
+        </button>
+      </div>
+    )
+  }
+
+  if (!inspection.changed) {
+    return <button type="button" className="btn-secondary min-h-10" onClick={onRetry} disabled={retrying}><RefreshCw className="h-4 w-4" /> Повторить установку</button>
+  }
+
+  return (
+    <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-amber-950 dark:border-amber-400/25 dark:bg-amber-400/10 dark:text-amber-100">
+      <p className="text-sm font-semibold">Сверьте fingerprint на переустановленном сервере</p>
+      <code className="mt-2 block overflow-x-auto rounded-lg bg-slate-950 px-3 py-2 font-mono text-xs text-cyan-200">ssh-keygen -E sha256 -lf /etc/ssh/ssh_host_ed25519_key.pub</code>
+      <div className="mt-3 space-y-1 text-xs">
+        <p>Старый: <span className="break-all font-mono">{inspection.expectedFingerprint}</span></p>
+        <p>Новый: <span className="break-all font-mono font-semibold">{inspection.currentFingerprint}</span></p>
+      </div>
+      <Checkbox className="mt-3" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} label="Fingerprint на сервере совпадает с новым ключом" />
+      <button type="button" className="btn-primary mt-3 min-h-10" disabled={!confirmed || retrying} onClick={() => onTrust(inspection.currentFingerprint)}>
+        {retrying ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
+        {retrying ? 'Продолжаем установку...' : 'Подтвердить ключ и продолжить'}
+      </button>
     </div>
   )
 }

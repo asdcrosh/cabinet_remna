@@ -66,6 +66,8 @@ const routeCases: AdminRouteCase[] = [
   { name: 'node provisioning create', module: './nodes/provisioning/route', method: 'POST' },
   { name: 'node provisioning read', module: './nodes/provisioning/[id]/route', method: 'GET', params: { id: 'job-1' } },
   { name: 'node provisioning retry', module: './nodes/provisioning/[id]/route', method: 'POST', params: { id: 'job-1' } },
+  { name: 'node provisioning host key inspect', module: './nodes/provisioning/[id]/ssh-host-key/route', method: 'GET', params: { id: 'job-1' } },
+  { name: 'node provisioning host key trust', module: './nodes/provisioning/[id]/ssh-host-key/route', method: 'PATCH', params: { id: 'job-1' } },
   { name: 'offer update', module: './offers/[id]/route', method: 'PATCH', params: { id: 'offer-1' } },
   { name: 'payment sync', module: './payment-sync/route', method: 'POST' },
   { name: 'payments list', module: './payments/route', method: 'GET' },

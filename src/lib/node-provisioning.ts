@@ -3,6 +3,11 @@ import { prisma } from '@/lib/prisma'
 import { remnawave, RemnawaveError } from '@/lib/remnawave'
 import type { RemnawaveHost, RemnawaveNodeInbound } from '@/lib/remnawave'
 import { encryptNodeProvisioningSecret } from '@/lib/node-provisioning-crypto'
+import {
+  isSshHostKeyChangedError,
+  isSshHostKeyFingerprint,
+} from '@/lib/node-provisioning-host-key'
+import { scanSshHostKey } from '@/lib/node-provisioning-runner'
 import { buildProvisioningFqdn } from '@/lib/node-provisioning-validation'
 
 export const NODE_PROVISIONING_STEPS = [
@@ -124,6 +129,95 @@ export async function retryNodeProvisioningJob(id: string) {
     })
     if (conflicting) throw new NodeProvisioningConflictError(conflicting.id)
 
+    const recoveryData = retryRecoveryData(job.lastError)
+
+    return tx.nodeProvisioningJob.update({
+      where: { id },
+      data: {
+        ...recoveryData,
+        status: 'PENDING',
+        activeKey: job.fqdn,
+        lockedAt: null,
+        completedAt: null,
+        lastError: null,
+        events: {
+          create: {
+            step: job.step,
+            level: Object.keys(recoveryData).length > 0 ? 'WARNING' : 'INFO',
+            message: Object.keys(recoveryData).length > 0
+              ? 'Удалённые из Remnawave объекты будут созданы заново; задача возвращена в очередь'
+              : 'Задача возвращена в очередь',
+          },
+        },
+      },
+      include: jobInclude,
+    })
+  })
+}
+
+function retryRecoveryData(lastError: string | null): Prisma.NodeProvisioningJobUpdateInput {
+  if (lastError === 'Созданная ранее нода не найдена в Remnawave') {
+    return {
+      remnawaveNodeUuid: null,
+      tcpHostUuid: null,
+      xhttpHostUuid: null,
+    }
+  }
+  if (lastError === 'Созданный ранее TCP host не найден в Remnawave') return { tcpHostUuid: null }
+  if (lastError === 'Созданный ранее XHTTP host не найден в Remnawave') return { xhttpHostUuid: null }
+  return {}
+}
+
+export async function inspectNodeProvisioningSshHostKey(id: string) {
+  const job = await prisma.nodeProvisioningJob.findUnique({ where: { id } })
+  if (!job) throw new NodeProvisioningNotFoundError()
+  assertNodeProvisioningJobCanRetry(job)
+  if (!job.sshHostKeyFingerprint || !isSshHostKeyChangedError(job.lastError)) {
+    throw new NodeProvisioningStateError('Эта задача не ожидает подтверждения нового SSH host key')
+  }
+
+  try {
+    const current = await scanSshHostKey(job.serverIp, job.sshPort)
+    return {
+      serverIp: job.serverIp,
+      sshPort: job.sshPort,
+      expectedFingerprint: job.sshHostKeyFingerprint,
+      currentFingerprint: current.fingerprint,
+      changed: job.sshHostKeyFingerprint !== current.fingerprint,
+    }
+  } catch {
+    throw new NodeProvisioningStateError('Сервер не отдал SSH host key. Проверьте доступность SSH и повторите проверку.')
+  }
+}
+
+export async function trustNodeProvisioningSshHostKeyAndRetry(id: string, acceptedFingerprint: string) {
+  if (!isSshHostKeyFingerprint(acceptedFingerprint)) {
+    throw new NodeProvisioningStateError('Некорректный SSH host key fingerprint')
+  }
+
+  const inspection = await inspectNodeProvisioningSshHostKey(id)
+  if (inspection.currentFingerprint !== acceptedFingerprint) {
+    throw new NodeProvisioningStateError('SSH host key снова изменился. Выполните проверку ещё раз.')
+  }
+
+  return prisma.$transaction(async (tx) => {
+    const job = await tx.nodeProvisioningJob.findUnique({ where: { id } })
+    if (!job) throw new NodeProvisioningNotFoundError()
+    assertNodeProvisioningJobCanRetry(job)
+    if (!isSshHostKeyChangedError(job.lastError)) {
+      throw new NodeProvisioningStateError('Эта задача больше не ожидает подтверждения SSH host key')
+    }
+
+    const conflicting = await tx.nodeProvisioningJob.findFirst({
+      where: {
+        id: { not: id },
+        status: { in: ['PENDING', 'RUNNING'] },
+        OR: [{ fqdn: job.fqdn }, { serverIp: job.serverIp }],
+      },
+      select: { id: true },
+    })
+    if (conflicting) throw new NodeProvisioningConflictError(conflicting.id)
+
     return tx.nodeProvisioningJob.update({
       where: { id },
       data: {
@@ -132,7 +226,14 @@ export async function retryNodeProvisioningJob(id: string) {
         lockedAt: null,
         completedAt: null,
         lastError: null,
-        events: { create: { step: job.step, message: 'Задача возвращена в очередь' } },
+        sshHostKeyFingerprint: acceptedFingerprint,
+        events: {
+          create: {
+            step: 'SSH_PREFLIGHT',
+            level: 'WARNING',
+            message: `Администратор подтвердил новый SSH host key ${acceptedFingerprint}; задача возвращена в очередь`,
+          },
+        },
       },
       include: jobInclude,
     })
@@ -252,6 +353,13 @@ export function inferHostKind(
 function positiveInteger(raw: string | undefined, fallback: number) {
   const value = Number(raw)
   return Number.isInteger(value) && value > 0 ? value : fallback
+}
+
+function assertNodeProvisioningJobCanRetry(job: Pick<NodeProvisioningJob, 'status' | 'credentialsExpireAt' | 'encryptedSshPassword'>) {
+  if (job.status !== 'FAILED') throw new NodeProvisioningStateError('Повторить можно только задачу с ошибкой')
+  if (job.credentialsExpireAt <= new Date() || !job.encryptedSshPassword) {
+    throw new NodeProvisioningStateError('SSH-пароль уже удалён или истёк. Создайте новую задачу.')
+  }
 }
 
 export class NodeProvisioningConflictError extends Error {

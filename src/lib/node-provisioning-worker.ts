@@ -5,6 +5,7 @@ import type { NodeProvisioningJob, NodeProvisioningStep, Prisma } from '@prisma/
 import { prisma } from '@/lib/prisma'
 import { nodeHostRemark, resolveNodeCountryCode } from '@/lib/node-country'
 import { decryptNodeProvisioningSecret } from '@/lib/node-provisioning-crypto'
+import { sshHostKeyChangedError } from '@/lib/node-provisioning-host-key'
 import { runNodeAnsible, sanitizeProvisioningOutput, scanSshHostKey } from '@/lib/node-provisioning-runner'
 import { upsertTimewebARecord } from '@/lib/timeweb'
 import {
@@ -105,7 +106,7 @@ export async function processNodeProvisioningJob(jobId: string) {
     await advance(jobId, 'SSH_PREFLIGHT', 'Проверяю SSH и фиксирую host key')
     const hostKey = await scanSshHostKey(job.serverIp, job.sshPort)
     if (job.sshHostKeyFingerprint && job.sshHostKeyFingerprint !== hostKey.fingerprint) {
-      throw new Error('SSH host key изменился после предыдущего запуска')
+      throw sshHostKeyChangedError(job.sshHostKeyFingerprint, hostKey.fingerprint)
     }
     await updateJob(jobId, { sshHostKeyFingerprint: hostKey.fingerprint }, 'SSH_PREFLIGHT', `SSH доступен, ключ ${hostKey.fingerprint}`)
 
