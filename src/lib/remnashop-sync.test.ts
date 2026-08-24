@@ -34,7 +34,13 @@ vi.mock('./subscription-termination', () => ({
   terminateUserSubscription: mocks.terminateUserSubscription,
 }))
 
-import { syncRemnashopPaymentsToCabinet } from './remnashop-sync'
+import { makeSourcePlanKey, syncRemnashopPaymentsToCabinet } from './remnashop-sync'
+
+describe('Remnashop catalog keys', () => {
+  it('keeps a zero-day source duration linked to its normalized one-day Cabinet plan', () => {
+    expect(makeSourcePlanKey(4, 0)).toBe(makeSourcePlanKey(4, 1))
+  })
+})
 
 describe('Remnashop payment import', () => {
   beforeEach(() => {

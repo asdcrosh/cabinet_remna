@@ -1189,7 +1189,7 @@ function normalizeRemnashopPlan(plan: RemnashopPlanRow) {
     name: durationLabel && !baseName.includes(durationLabel) ? `${baseName} ${durationLabel}` : baseName,
     description: plan.is_trial ? 'Ознакомительный тариф' : null,
     priceKopecks: plan.is_trial ? 0 : rubToKopecks(plan.price_rub),
-    durationDays: Math.max(1, plan.duration_days),
+    durationDays: normalizeRemnashopDurationDays(plan.duration_days),
     trafficLimitGb: plan.traffic_limit === 0 ? null : plan.traffic_limit,
     deviceLimit,
     maxDeviceLimit: Math.max(deviceLimit, plan.max_device_limit || deviceLimit),
@@ -1234,8 +1234,12 @@ function makePlanKey(name: string, durationDays: number, priceKopecks: number) {
   return `${name}:${durationDays}:${priceKopecks}`
 }
 
-function makeSourcePlanKey(planId: number, durationDays: number) {
-  return `${planId}:${durationDays}`
+export function makeSourcePlanKey(planId: number, durationDays: number) {
+  return `${planId}:${normalizeRemnashopDurationDays(durationDays)}`
+}
+
+function normalizeRemnashopDurationDays(durationDays: number) {
+  return Math.max(1, durationDays)
 }
 
 function firstExistingColumn(columns: Set<string>, candidates: string[]) {
