@@ -8,7 +8,7 @@ const GRACE_MS = SUBSCRIPTION_GRACE_HOURS * 60 * 60 * 1000
 export async function reconcileSubscriptionGracePeriods(options?: { now?: Date; limit?: number }) {
   const now = options?.now ?? new Date()
   const limit = options?.limit ?? 100
-  const candidates = await prisma.subscription.findMany({
+  const localCandidates = await prisma.subscription.findMany({
     where: {
       graceExpireAt: null,
       expireAt: { gt: new Date(now.getTime() - GRACE_MS), lte: now },
@@ -18,8 +18,43 @@ export async function reconcileSubscriptionGracePeriods(options?: { now?: Date; 
     take: limit,
     include: { user: true },
   })
-  let started = 0
+  const candidateById = new Map(localCandidates.map((subscription) => [subscription.id, subscription]))
   let failed = 0
+
+  // Remnawave is authoritative for the paid expiration date. The local row may
+  // still contain an old future date, so rotate through active subscriptions
+  // and pull the real date before deciding whether grace must start.
+  const remoteCandidates = await prisma.subscription.findMany({
+    where: {
+      graceExpireAt: null,
+      expireAt: { gt: now },
+      status: { in: ['ACTIVE', 'LIMITED', 'EXPIRED'] },
+    },
+    orderBy: [{ lastSyncedAt: 'asc' }, { id: 'asc' }],
+    take: limit,
+    include: { user: true },
+  })
+  for (const subscription of remoteCandidates) {
+    if (!hasRemnawaveUserReference(subscription.user)) continue
+    try {
+      const remoteUser = (await remnawave.getUser(remnawaveUserReference(subscription.user))).response
+      const remoteExpireAt = new Date(remoteUser.expireAt)
+      if (!Number.isFinite(remoteExpireAt.getTime())) throw new Error('Remnawave returned an invalid expiration date')
+      await prisma.subscription.update({
+        where: { id: subscription.id },
+        data: { expireAt: remoteExpireAt, lastSyncedAt: now },
+      })
+      if (remoteExpireAt <= now && remoteExpireAt > new Date(now.getTime() - GRACE_MS)) {
+        candidateById.set(subscription.id, { ...subscription, expireAt: remoteExpireAt })
+      }
+    } catch (error) {
+      failed += 1
+      logError('subscription_grace.remote_expiry_sync_failed', error, { subscriptionId: subscription.id })
+    }
+  }
+
+  const candidates = [...candidateById.values()]
+  let started = 0
   for (const subscription of candidates) {
     const graceExpireAt = new Date(subscription.expireAt.getTime() + GRACE_MS)
     if (graceExpireAt <= now) continue
