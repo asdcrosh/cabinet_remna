@@ -21,6 +21,7 @@ import { getFeatureFlags } from '@/lib/feature-flags'
 import { getAvailablePaymentProviders } from '@/lib/payment-providers'
 import { cn } from '@/lib/cn'
 import { HomeWhitelistAddon } from '@/components/dashboard/home-whitelist-addon'
+import { HomeDeviceAddon } from '@/components/dashboard/home-device-addon'
 import { isWhitelistAddonCurrentlyActive } from '@/lib/whitelist-addon-policy'
 
 export const dynamic = 'force-dynamic'
@@ -147,6 +148,24 @@ export default async function DashboardHome() {
         expireAt: subRow.whitelistAddonExpireAt?.toISOString() ?? null,
       }
     : null
+  const currentDeviceLimit = subRow?.deviceLimit ?? subRow?.plan?.deviceLimit ?? null
+  const deviceAddonOffer = subRow?.planId
+    && subRow.plan
+    && currentDeviceLimit
+    && currentDeviceLimit < subRow.plan.maxDeviceLimit
+    && subRow.plan.extraDevicePriceKopecks > 0
+    && !subscriptionExpired
+    && ['ACTIVE', 'LIMITED'].includes(subRow.status)
+    && subRow.expireAt.getTime() > Date.now()
+    ? {
+        planId: subRow.planId,
+        currentLimit: currentDeviceLimit,
+        maxLimit: subRow.plan.maxDeviceLimit,
+        extraDevicePriceKopecks: subRow.plan.extraDevicePriceKopecks,
+        durationDays: subRow.plan.durationDays,
+        expireAt: subRow.expireAt.toISOString(),
+      }
+    : null
   return (
     <div className="user-workspace page-stack">
       <HomeHeader
@@ -236,6 +255,10 @@ export default async function DashboardHome() {
           expireAt={whitelistAddonOffer.expireAt}
           paymentProviders={paymentProviders}
         />
+      ) : null}
+
+      {deviceAddonOffer ? (
+        <HomeDeviceAddon {...deviceAddonOffer} paymentProviders={paymentProviders} />
       ) : null}
 
       <HomeQuickActions supportEnabled={features.support} />

@@ -223,6 +223,53 @@ describe('payment create route', () => {
     })
   })
 
+  it('creates a prorated device limit add-on without extending the subscription', async () => {
+    const expireAt = new Date(Date.now() + 15 * 24 * 60 * 60 * 1000)
+    mocks.prisma.subscription.findFirst.mockResolvedValue({
+      id: 'subscription-1',
+      userId: user.id,
+      planId: plan.id,
+      status: 'ACTIVE',
+      expireAt,
+      deviceLimit: 5,
+      plan: { id: plan.id, name: plan.name },
+    })
+    mocks.txPaymentCreate.mockResolvedValue({
+      ...localPayment,
+      subscriptionId: 'subscription-1',
+      purchaseType: 'DEVICE_LIMIT_ADDON',
+      deviceLimit: 7,
+      amountKopecks: 10000,
+    })
+
+    const response = await POST(paymentRequest({
+      purchaseType: 'DEVICE_LIMIT_ADDON',
+      deviceLimit: 7,
+    }))
+
+    expect(response.status).toBe(200)
+    expect(mocks.txPaymentCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        subscriptionId: 'subscription-1',
+        purchaseType: 'DEVICE_LIMIT_ADDON',
+        deviceLimit: 7,
+        amountKopecks: 10000,
+        addonSnapshot: expect.objectContaining({
+          type: 'DEVICE_LIMIT_ADDON',
+          subscriptionId: 'subscription-1',
+          fromLimit: 5,
+          toLimit: 7,
+          additionalDevices: 2,
+        }),
+      }),
+    })
+    expect(mocks.createPayment).toHaveBeenCalledWith(expect.objectContaining({
+      amount: 100,
+      description: 'Дополнительные устройства',
+      metadata: expect.objectContaining({ purchaseType: 'DEVICE_LIMIT_ADDON', deviceLimit: '7' }),
+    }))
+  })
+
   it('creates a local payment, sends it to YooKassa and stores confirmation data', async () => {
     const response = await POST(paymentRequest())
     const body = await response.json()

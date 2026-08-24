@@ -815,6 +815,7 @@ enum PaymentOrigin {
 enum PaymentPurchaseType {
   SUBSCRIPTION
   WHITELIST_ADDON
+  DEVICE_LIMIT_ADDON
 }
 
 enum PaymentProvider {

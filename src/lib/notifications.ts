@@ -14,6 +14,7 @@ import {
 } from './admin-telegram-notifications'
 import { paymentProviderLabel } from './payment-provider-label'
 import { readWhitelistAddonSnapshot } from './whitelist-addon'
+import { readDeviceLimitAddonSnapshot } from './device-limit-addon'
 
 const RENEW_PATH = '/dashboard/plans?intent=renew'
 const SUBSCRIPTION_PATH = '/dashboard/subscription'
@@ -156,6 +157,61 @@ export async function notifyPaymentSucceeded(paymentId: string) {
     },
   })
   if (!payment) return
+
+  if (payment.purchaseType === 'DEVICE_LIMIT_ADDON') {
+    const snapshot = readDeviceLimitAddonSnapshot(payment.addonSnapshot)
+    const amount = formatRubles(payment.amountKopecks)
+    const deviceLimit = payment.subscription?.deviceLimit ?? snapshot?.toLimit ?? payment.deviceLimit
+    const body = `Доплата ${amount} прошла успешно. Теперь доступно до ${deviceLimit ?? 'выбранного количества'} устройств до конца текущей подписки.`
+    await notifyUser({
+      userId: payment.user.id,
+      type: 'PAYMENT_SUCCESS',
+      dedupeKey: `payment-success:${payment.id}`,
+      title: 'Дополнительные устройства подключены',
+      body,
+      actionHref: '/dashboard/devices',
+      actionLabel: 'Открыть устройства',
+      telegramText: `<b>Дополнительные устройства подключены</b>\n\nОплата: <b>${amount}</b>\nЛимит: <b>до ${deviceLimit ?? '—'} устройств</b>`,
+      telegramActionUrl: `${getAppUrl()}/dashboard/devices`,
+      telegramActionLabel: 'Открыть устройства',
+      telegramActionOpenInTelegram: true,
+      emailSubject: `Дополнительные устройства подключены в ${getBrandName()}`,
+      emailText: body,
+      emailHtml: renderNotificationEmail({
+        eyebrow: 'Оплата прошла',
+        title: 'Дополнительные устройства подключены',
+        lead: body,
+        ctaUrl: `${getAppUrl()}/dashboard/devices`,
+        ctaLabel: 'Открыть устройства',
+        greetingName: payment.user.name,
+      }),
+    })
+    await createAdminNotification({
+      type: 'payment',
+      severity: 'SUCCESS',
+      dedupeKey: `admin:payment-success:${payment.id}`,
+      title: 'Докуплены устройства',
+      body: `${payment.user.name || 'Пользователь'} оплатил ${amount}. Новый лимит: ${deviceLimit ?? '—'}.`,
+      entityType: 'payment',
+      entityId: payment.id,
+      actionHref: '/dashboard/admin/payments',
+      actionLabel: 'Открыть платежи',
+      telegram: {
+        text: `<b>Докуплены устройства</b>\n\nПользователь: ${payment.user.name || payment.user.email}\nОплата: <b>${amount}</b>\nНовый лимит: <b>${deviceLimit ?? '—'}</b>`,
+        actionHref: '/dashboard/admin/payments',
+        actionLabel: 'Открыть платежи',
+      },
+    })
+    await recordPaymentEvent({
+      paymentId: payment.id,
+      stage: 'NOTIFICATION',
+      status: 'SUCCESS',
+      source: 'notifications',
+      message: 'Уведомление о дополнительных устройствах обработано',
+      dedupeKey: 'notification-payment-success',
+    })
+    return
+  }
 
   if (payment.purchaseType === 'WHITELIST_ADDON') {
     const snapshot = readWhitelistAddonSnapshot(payment.addonSnapshot)

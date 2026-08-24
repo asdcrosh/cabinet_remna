@@ -247,6 +247,7 @@ async function handleSucceededRefund(event: YookassaRefundWebhookEvent) {
       id: true,
       userId: true,
       amountKopecks: true,
+      purchaseType: true,
     },
   })
   if (!payment) {
@@ -270,6 +271,10 @@ async function handleSucceededRefund(event: YookassaRefundWebhookEvent) {
       partialRefund: true,
       refundedAmountKopecks: result.refundedAmountKopecks,
     })
+  }
+
+  if (payment.purchaseType === 'WHITELIST_ADDON' || payment.purchaseType === 'DEVICE_LIMIT_ADDON') {
+    return NextResponse.json({ ok: true, refunded: true })
   }
 
   try {

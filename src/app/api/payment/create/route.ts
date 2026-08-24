@@ -30,6 +30,11 @@ import {
   readBundledWhitelistAddonSnapshot,
   WHITELIST_ADDON_RECEIPT_NAME,
 } from '@/lib/whitelist-addon'
+import {
+  calculateDeviceLimitAddon,
+  DEVICE_LIMIT_ADDON_RECEIPT_NAME,
+  type DeviceLimitAddonSnapshot,
+} from '@/lib/device-limit-addon'
 
 export const runtime = 'nodejs'
 
@@ -76,8 +81,10 @@ export const POST = withAuth(async (req: Request) => {
   }
 
   const isWhitelistAddon = purchaseType === 'WHITELIST_ADDON'
+  const isDeviceLimitAddon = purchaseType === 'DEVICE_LIMIT_ADDON'
+  const isSubscriptionPurchase = purchaseType === 'SUBSCRIPTION'
   const plan = await prisma.plan.findUnique({ where: { id: planId } })
-  if (!plan || (!isWhitelistAddon && !plan.isActive)) {
+  if (!plan || (isSubscriptionPurchase && !plan.isActive)) {
     return NextResponse.json({ error: 'Тариф не найден' }, { status: 404 })
   }
   const user = await prisma.user.findUnique({ where: { id: session.uid } })
@@ -117,6 +124,28 @@ export const POST = withAuth(async (req: Request) => {
       })
     : null
 
+  if (isDeviceLimitAddon) {
+    if (!currentSubscription || currentSubscription.planId !== plan.id) {
+      return NextResponse.json({ error: 'Действующая подписка этого тарифа не найдена' }, { status: 409 })
+    }
+    if (deviceLimit == null) {
+      return NextResponse.json({ error: 'Выберите новый лимит устройств' }, { status: 400 })
+    }
+    const pendingAddon = await prisma.payment.findFirst({
+      where: {
+        userId: user.id,
+        subscriptionId: currentSubscription.id,
+        purchaseType: 'DEVICE_LIMIT_ADDON',
+        status: 'PENDING',
+        createdAt: { gt: getFreshPendingPaymentCutoff() },
+      },
+      orderBy: { createdAt: 'desc' },
+    })
+    if (pendingAddon && pendingAddon.checkoutKey !== idempotencyKey) {
+      return pendingCheckoutResponse(pendingAddon)
+    }
+  }
+
   if (isWhitelistAddon) {
     if (!activeSubscription) {
       return NextResponse.json({ error: 'Для дополнения нужна действующая подписка этого тарифа' }, { status: 409 })
@@ -141,7 +170,7 @@ export const POST = withAuth(async (req: Request) => {
     }
   }
 
-  const includesBundledWhitelistAddon = !isWhitelistAddon && whitelistAddon
+  const includesBundledWhitelistAddon = isSubscriptionPurchase && whitelistAddon
   if (includesBundledWhitelistAddon) {
     if (plan.isPromo) {
       return NextResponse.json({ error: 'Дополнение недоступно для ознакомительного тарифа' }, { status: 422 })
@@ -166,16 +195,16 @@ export const POST = withAuth(async (req: Request) => {
   }
 
   const audienceContext = await getPlanAudienceContext(user.id)
-  if (!isWhitelistAddon && (!audienceContext || !isPlanAvailableForUser(plan, audienceContext, { allowLink: plan.availability === 'LINK' }))) {
+  if (isSubscriptionPurchase && (!audienceContext || !isPlanAvailableForUser(plan, audienceContext, { allowLink: plan.availability === 'LINK' }))) {
     return NextResponse.json({ error: 'Этот тариф недоступен для вашего аккаунта' }, { status: 403 })
   }
-  if (!isWhitelistAddon && plan.priceKopecks <= 0 && !plan.isPromo) {
+  if (isSubscriptionPurchase && plan.priceKopecks <= 0 && !plan.isPromo) {
     return NextResponse.json(
       { error: 'Бесплатный тариф должен быть настроен как ознакомительный.' },
       { status: 400 }
     )
   }
-  if (!isWhitelistAddon && !plan.isPromo && deviceLimit == null) {
+  if (isSubscriptionPurchase && !plan.isPromo && deviceLimit == null) {
     return NextResponse.json(
       { error: 'Обновите страницу тарифа и выберите количество устройств', code: 'DEVICE_LIMIT_REQUIRED' },
       { status: 400 }
@@ -183,6 +212,7 @@ export const POST = withAuth(async (req: Request) => {
   }
 
   let pricing: ReturnType<typeof calculatePlanPurchase>
+  let deviceLimitAddonSnapshot: DeviceLimitAddonSnapshot | null = null
   if (isWhitelistAddon) {
     const selectedDeviceLimit = activeSubscription?.deviceLimit ?? plan.deviceLimit
     pricing = {
@@ -192,6 +222,38 @@ export const POST = withAuth(async (req: Request) => {
       extraDeviceCount: 0,
       extraDeviceAmountKopecks: 0,
       originalAmountKopecks: plan.whitelistAddonPriceKopecks,
+    }
+  } else if (isDeviceLimitAddon && currentSubscription && deviceLimit != null) {
+    try {
+      const currentLimit = currentSubscription.deviceLimit ?? plan.deviceLimit
+      const addon = calculateDeviceLimitAddon({
+        currentLimit,
+        targetLimit: deviceLimit,
+        maxLimit: plan.maxDeviceLimit,
+        extraDevicePriceKopecks: plan.extraDevicePriceKopecks,
+        durationDays: plan.durationDays,
+        expireAt: currentSubscription.expireAt,
+        now,
+      })
+      pricing = {
+        baseDeviceLimit: currentLimit,
+        maxDeviceLimit: plan.maxDeviceLimit,
+        selectedDeviceLimit: deviceLimit,
+        extraDeviceCount: addon.additionalDevices,
+        extraDeviceAmountKopecks: addon.priceKopecks,
+        originalAmountKopecks: addon.priceKopecks,
+      }
+      deviceLimitAddonSnapshot = {
+        type: 'DEVICE_LIMIT_ADDON',
+        subscriptionId: currentSubscription.id,
+        fromLimit: currentLimit,
+        toLimit: deviceLimit,
+        additionalDevices: addon.additionalDevices,
+        remainingDays: addon.remainingDays,
+        priceKopecks: addon.priceKopecks,
+      }
+    } catch (error) {
+      return NextResponse.json({ error: error instanceof Error ? error.message : 'Некорректный лимит устройств' }, { status: 400 })
     }
   } else {
     try {
@@ -225,9 +287,9 @@ export const POST = withAuth(async (req: Request) => {
       return pendingCheckoutResponse(pendingPayment)
     }
   }
-  const planSnapshot = isWhitelistAddon
-    ? null
-    : buildPlanPurchaseSnapshot(plan, pricing, currentSubscription?.plan ?? null)
+  const planSnapshot = isSubscriptionPurchase
+    ? buildPlanPurchaseSnapshot(plan, pricing, currentSubscription?.plan ?? null)
+    : null
   const addonSnapshot = isWhitelistAddon && activeSubscription
     ? buildWhitelistAddonSnapshot({
         planId: plan.id,
@@ -236,7 +298,9 @@ export const POST = withAuth(async (req: Request) => {
         priceKopecks: plan.whitelistAddonPriceKopecks,
         internalSquads: plan.whitelistAddonInternalSquads,
       })
-    : includesBundledWhitelistAddon
+    : deviceLimitAddonSnapshot
+      ? deviceLimitAddonSnapshot
+      : includesBundledWhitelistAddon
       ? buildBundledWhitelistAddonSnapshot({
           planId: plan.id,
           priceKopecks: plan.whitelistAddonPriceKopecks,
@@ -247,7 +311,7 @@ export const POST = withAuth(async (req: Request) => {
     ? plan.whitelistAddonPriceKopecks
     : 0
 
-  if (!isWhitelistAddon && plan.isPromo) {
+  if (isSubscriptionPurchase && plan.isPromo) {
     if (promoCode) {
       return NextResponse.json({ error: 'Промокод не нужен для этого тарифа' }, { status: 400 })
     }
@@ -385,7 +449,7 @@ export const POST = withAuth(async (req: Request) => {
   try {
     const result = await prisma.$transaction(
       async (tx) => {
-        const discount = !isWhitelistAddon && promoCode
+        const discount = isSubscriptionPurchase && promoCode
           ? await validatePromoCodeForPlan({
               prisma: tx,
               code: promoCode,
@@ -400,7 +464,7 @@ export const POST = withAuth(async (req: Request) => {
           data: {
             userId: user.id,
             planId: plan.id,
-            subscriptionId: activeSubscription?.id,
+            subscriptionId: isWhitelistAddon ? activeSubscription?.id : isDeviceLimitAddon ? currentSubscription?.id : undefined,
             purchaseType,
             promoCodeId: discount?.promoCode.id,
             amountKopecks: discountedPlanAmountKopecks + bundledAddonPriceKopecks,
@@ -495,7 +559,9 @@ export const POST = withAuth(async (req: Request) => {
   const returnUrl = `${baseUrl}/dashboard/billing?paid=1&payment=${localPayment.id}`
   const description = isWhitelistAddon
     ? WHITELIST_ADDON_RECEIPT_NAME
-    : `${buildPaymentServiceName(plan.durationDays)}${includesBundledWhitelistAddon ? ` + ${WHITELIST_ADDON_RECEIPT_NAME}` : ''}`
+    : isDeviceLimitAddon
+      ? DEVICE_LIMIT_ADDON_RECEIPT_NAME
+      : `${buildPaymentServiceName(plan.durationDays)}${includesBundledWhitelistAddon ? ` + ${WHITELIST_ADDON_RECEIPT_NAME}` : ''}`
 
   if (provider === 'PAYANYWAY') {
     try {
@@ -587,7 +653,7 @@ export const POST = withAuth(async (req: Request) => {
 
   let payment
   try {
-    const savePaymentMethod = !isWhitelistAddon && (
+    const savePaymentMethod = isSubscriptionPurchase && (
       autoRenewalConsent || await shouldSavePaymentMethodBestEffort(user.id, plan.id)
     )
     payment = await createPayment({
@@ -671,7 +737,7 @@ function existingCheckoutResponse(
   payment: Payment,
   input: {
     planId: string
-    purchaseType: 'SUBSCRIPTION' | 'WHITELIST_ADDON'
+    purchaseType: 'SUBSCRIPTION' | 'WHITELIST_ADDON' | 'DEVICE_LIMIT_ADDON'
     deviceLimit: number
     promoCode?: string
     provider: 'YOOKASSA' | 'PAYANYWAY' | 'PLATEGA'

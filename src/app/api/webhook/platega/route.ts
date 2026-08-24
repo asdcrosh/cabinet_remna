@@ -85,6 +85,9 @@ export async function POST(request: Request) {
       paymentAmountKopecks: payment.amountKopecks,
       providerStatus: callback.status,
     })
+    if (payment.purchaseType === 'WHITELIST_ADDON' || payment.purchaseType === 'DEVICE_LIMIT_ADDON') {
+      return new NextResponse(null, { status: 200 })
+    }
     try {
       await terminateUserSubscription({
         userId: payment.userId,
@@ -146,7 +149,7 @@ export async function POST(request: Request) {
         data: { status: 'SUCCEEDED' },
       }),
     ])
-    if (payment.purchaseType !== 'WHITELIST_ADDON') {
+    if (payment.purchaseType !== 'WHITELIST_ADDON' && payment.purchaseType !== 'DEVICE_LIMIT_ADDON') {
       await cancelOtherPendingPaymentsForUser(payment.userId, payment.id)
     }
     await recordPaymentEvent({

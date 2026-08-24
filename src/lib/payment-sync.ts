@@ -153,7 +153,7 @@ export async function syncPaymentProvisioning(input: {
         data: { status: 'SUCCEEDED' },
       }),
     ])
-    if (payment.purchaseType !== 'WHITELIST_ADDON') {
+    if (payment.purchaseType !== 'WHITELIST_ADDON' && payment.purchaseType !== 'DEVICE_LIMIT_ADDON') {
       await cancelOtherPendingPaymentsForUser(payment.userId, payment.id)
     }
     await recordPaymentEvent({
@@ -288,7 +288,7 @@ export async function syncPaymentProvisioning(input: {
     }),
   ])
   await captureSavedPaymentMethodBestEffort({ localPaymentId: payment.id, providerPayment: yooPayment })
-  if (payment.purchaseType !== 'WHITELIST_ADDON') {
+  if (payment.purchaseType !== 'WHITELIST_ADDON' && payment.purchaseType !== 'DEVICE_LIMIT_ADDON') {
     await cancelOtherPendingPaymentsForUser(payment.userId, payment.id)
   }
   await recordPaymentEvent({

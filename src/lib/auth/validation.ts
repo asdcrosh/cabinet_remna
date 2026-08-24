@@ -82,7 +82,7 @@ export const changePasswordSchema = z
 
 export const createPaymentSchema = z.object({
   planId: z.string().min(1).max(64),
-  purchaseType: z.enum(['SUBSCRIPTION', 'WHITELIST_ADDON']).default('SUBSCRIPTION'),
+  purchaseType: z.enum(['SUBSCRIPTION', 'WHITELIST_ADDON', 'DEVICE_LIMIT_ADDON']).default('SUBSCRIPTION'),
   deviceLimit: z.coerce.number().int().min(1).max(100).optional(),
   promoCode: z.string().trim().min(1).max(64).optional(),
   provider: z.enum(['YOOKASSA', 'PAYANYWAY', 'PLATEGA']).default('YOOKASSA'),
@@ -91,12 +91,12 @@ export const createPaymentSchema = z.object({
   autoRenewalConsentVersion: z.string().max(100).optional(),
   whitelistAddon: z.boolean().optional().default(false),
 }).superRefine((value, context) => {
-  if (value.purchaseType === 'WHITELIST_ADDON') {
+  if (value.purchaseType !== 'SUBSCRIPTION') {
     if (value.promoCode || value.autoRenewalConsent || value.whitelistAddon) {
       context.addIssue({
         code: 'custom',
         path: ['purchaseType'],
-        message: 'Промокоды и автопродление для дополнения недоступны',
+        message: 'Промокоды и автопродление для дополнений недоступны',
       })
     }
     return

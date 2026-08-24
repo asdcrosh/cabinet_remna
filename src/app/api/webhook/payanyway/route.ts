@@ -12,6 +12,7 @@ import { buildPaymentServiceName } from '@/lib/payment-service-name'
 import { provisionPaymentSubscription } from '@/lib/provisioning'
 import { paymentErrorDetails, recordPaymentEvent } from '@/lib/payment-events'
 import { WHITELIST_ADDON_RECEIPT_NAME } from '@/lib/whitelist-addon'
+import { DEVICE_LIMIT_ADDON_RECEIPT_NAME } from '@/lib/device-limit-addon'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -100,7 +101,9 @@ async function handlePayAnyWayRequest(params: URLSearchParams) {
       amountKopecks: payment.amountKopecks,
       itemName: payment.purchaseType === 'WHITELIST_ADDON'
         ? WHITELIST_ADDON_RECEIPT_NAME
-        : buildPaymentServiceName(payment.plan.durationDays),
+        : payment.purchaseType === 'DEVICE_LIMIT_ADDON'
+          ? DEVICE_LIMIT_ADDON_RECEIPT_NAME
+          : buildPaymentServiceName(payment.plan.durationDays),
       customerEmail: payment.user.email,
     })
   } catch (error) {
@@ -126,7 +129,7 @@ async function handlePayAnyWayRequest(params: URLSearchParams) {
           data: { status: 'SUCCEEDED' },
         }),
       ])
-      if (payment.purchaseType !== 'WHITELIST_ADDON') {
+      if (payment.purchaseType !== 'WHITELIST_ADDON' && payment.purchaseType !== 'DEVICE_LIMIT_ADDON') {
         await cancelOtherPendingPaymentsForUser(payment.userId, payment.id)
       }
       await recordPaymentEvent({

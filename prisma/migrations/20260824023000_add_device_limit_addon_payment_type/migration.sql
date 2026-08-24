@@ -1,0 +1,1 @@
+ALTER TYPE "PaymentPurchaseType" ADD VALUE 'DEVICE_LIMIT_ADDON';
