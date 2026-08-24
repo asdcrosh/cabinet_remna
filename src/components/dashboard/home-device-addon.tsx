@@ -15,7 +15,6 @@ export function HomeDeviceAddon({
   currentLimit,
   maxLimit,
   extraDevicePriceKopecks,
-  durationDays,
   expireAt,
   paymentProviders,
 }: {
@@ -23,7 +22,6 @@ export function HomeDeviceAddon({
   currentLimit: number
   maxLimit: number
   extraDevicePriceKopecks: number
-  durationDays: number
   expireAt: string
   paymentProviders: Provider[]
 }) {
@@ -35,7 +33,7 @@ export function HomeDeviceAddon({
   const remainingDays = Math.max(1, Math.ceil((new Date(expireAt).getTime() - Date.now()) / 86_400_000))
   const additionalDevices = targetLimit - currentLimit
   const amountKopecks = Math.max(100, Math.ceil(
-    additionalDevices * extraDevicePriceKopecks * Math.min(remainingDays, durationDays) / Math.max(1, durationDays) / 100
+    additionalDevices * extraDevicePriceKopecks * Math.min(remainingDays, 30) / 30 / 100
   ) * 100)
 
   async function buy() {
@@ -104,23 +102,23 @@ export function HomeDeviceAddon({
       >
         <div className="space-y-4">
           <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 dark:border-white/10 dark:bg-white/[0.035]">
-            <div className="text-sm font-semibold text-slate-950 dark:text-white">Новый лимит устройств</div>
+            <div className="text-sm font-semibold text-slate-950 dark:text-white">Сколько устройств добавить</div>
             <div className="mt-3 grid grid-cols-[2.75rem_1fr_2.75rem] items-center gap-2">
               <button type="button" className="btn-secondary h-11 w-11 p-0" disabled={targetLimit <= currentLimit + 1} onClick={() => setTargetLimit((value) => value - 1)} aria-label="Уменьшить">
                 <Minus className="h-4 w-4" />
               </button>
-              <div className="text-center text-2xl font-semibold tabular-nums text-slate-950 dark:text-white">{targetLimit}</div>
+              <div className="text-center text-2xl font-semibold tabular-nums text-slate-950 dark:text-white">+{additionalDevices}</div>
               <button type="button" className="btn-secondary h-11 w-11 p-0" disabled={targetLimit >= maxLimit} onClick={() => setTargetLimit((value) => value + 1)} aria-label="Увеличить">
                 <Plus className="h-4 w-4" />
               </button>
             </div>
             <div className="mt-3 flex items-center justify-between border-t border-slate-200 pt-3 text-sm dark:border-white/10">
-              <span className="text-slate-500 dark:text-slate-400">+{additionalDevices} до конца подписки</span>
+              <span className="text-slate-500 dark:text-slate-400">Новый лимит: {targetLimit}</span>
               <strong className="tabular-nums text-slate-950 dark:text-white">{formatPrice(amountKopecks)}</strong>
             </div>
           </div>
           <p className="text-xs leading-5 text-slate-500 dark:text-slate-400">
-            Стоимость рассчитана пропорционально оставшимся {remainingDays} дням. Если включено автопродление, новый лимит и сумму нужно будет подтвердить заново.
+            Цена устройства указана за 30 дней и рассчитана пропорционально оставшимся {remainingDays} дням. Если включено автопродление, новый лимит и сумму нужно будет подтвердить заново.
           </p>
           {paymentProviders.length > 1 ? (
             <label className="block">

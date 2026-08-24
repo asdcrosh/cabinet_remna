@@ -19,7 +19,6 @@ export function calculateDeviceLimitAddon(input: {
   targetLimit: number
   maxLimit: number
   extraDevicePriceKopecks: number
-  durationDays: number
   expireAt: Date
   now?: Date
 }) {
@@ -36,8 +35,8 @@ export function calculateDeviceLimitAddon(input: {
   const additionalDevices = input.targetLimit - input.currentLimit
   const rawAmount = additionalDevices
     * input.extraDevicePriceKopecks
-    * Math.min(remainingDays, input.durationDays)
-    / Math.max(1, input.durationDays)
+    * Math.min(remainingDays, 30)
+    / 30
   const priceKopecks = Math.max(100, Math.ceil(rawAmount / 100) * 100)
 
   return { additionalDevices, remainingDays, priceKopecks }
