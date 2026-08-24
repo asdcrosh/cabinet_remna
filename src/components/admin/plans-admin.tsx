@@ -324,6 +324,16 @@ export function PlansAdmin({ plans }: { plans: PlanAdminRow[] }) {
         description="Цена, срок, аудитория и группы Remnawave"
         onClose={closeEditor}
         size="xl"
+        footer={(
+          <button
+            type="button"
+            className="btn-primary w-full sm:w-auto"
+            onClick={() => void submit(createForm)}
+            disabled={loadingId === 'create' || isWhitelistAddonConfigurationInvalid(createForm)}
+          >
+            {loadingId === 'create' ? 'Сохраняем...' : 'Создать тариф'}
+          </button>
+        )}
       >
         <PlanEditor
           form={createForm}
@@ -331,9 +341,6 @@ export function PlansAdmin({ plans }: { plans: PlanAdminRow[] }) {
           squads={squads}
           squadsLoading={squadsLoading}
           squadsError={squadsError}
-          submitLabel="Создать тариф"
-          loading={loadingId === 'create'}
-          onSubmit={() => void submit(createForm)}
         />
       </AdminModal>
 
@@ -343,6 +350,16 @@ export function PlansAdmin({ plans }: { plans: PlanAdminRow[] }) {
         description="Изменения применятся к карточке тарифа после сохранения"
         onClose={closeEditor}
         size="xl"
+        footer={editingId && editForm ? (
+          <button
+            type="button"
+            className="btn-primary w-full sm:w-auto"
+            onClick={() => void submit(editForm, editingId)}
+            disabled={loadingId === editingId || isWhitelistAddonConfigurationInvalid(editForm)}
+          >
+            {loadingId === editingId ? 'Сохраняем...' : 'Сохранить изменения'}
+          </button>
+        ) : undefined}
       >
         {editingId && editForm && (
           <PlanEditor
@@ -356,9 +373,6 @@ export function PlansAdmin({ plans }: { plans: PlanAdminRow[] }) {
             squads={squads}
             squadsLoading={squadsLoading}
             squadsError={squadsError}
-            submitLabel="Сохранить изменения"
-            loading={loadingId === editingId}
-            onSubmit={() => void submit(editForm, editingId)}
           />
         )}
       </AdminModal>
@@ -628,18 +642,12 @@ function PlanEditor({
   squads,
   squadsLoading,
   squadsError,
-  submitLabel,
-  loading,
-  onSubmit,
 }: {
   form: PlanFormState
   setForm: (value: PlanFormState | ((current: PlanFormState) => PlanFormState)) => void
   squads: RemnawaveSquad[]
   squadsLoading: boolean
   squadsError: string | null
-  submitLabel: string
-  loading: boolean
-  onSubmit: () => void
 }) {
   const selected = useMemo(() => new Set(parseSquads(form.activeInternalSquads)), [form.activeInternalSquads])
   const selectedAddon = useMemo(
@@ -672,7 +680,6 @@ function PlanEditor({
   const addonPriceInvalid = form.whitelistAddonEnabled
     && (!Number.isFinite(Number(form.whitelistAddonPriceRub)) || Number(form.whitelistAddonPriceRub) <= 0)
   const addonSquadsInvalid = form.whitelistAddonEnabled && selectedAddon.size === 0
-  const addonConfigurationInvalid = addonPriceInvalid || addonSquadsInvalid
 
   return (
     <div className="space-y-5">
@@ -872,11 +879,6 @@ function PlanEditor({
         </details>
       </div>
 
-      <div className="sticky -bottom-5 -mx-4 flex justify-end border-t border-slate-200 bg-white/95 px-4 py-3 backdrop-blur dark:border-white/10 dark:bg-surface-900/95 sm:-mx-6 sm:px-6">
-        <button type="button" className="btn-primary w-full sm:w-auto" onClick={onSubmit} disabled={loading || addonConfigurationInvalid}>
-          {loading ? 'Сохраняем...' : submitLabel}
-        </button>
-      </div>
     </div>
   )
 }
@@ -959,6 +961,12 @@ function formFromPlan(plan: PlanAdminRow): PlanFormState {
     isFeatured: plan.isFeatured,
     isActive: plan.isActive,
   }
+}
+
+function isWhitelistAddonConfigurationInvalid(form: PlanFormState) {
+  if (!form.whitelistAddonEnabled) return false
+  const price = Number(form.whitelistAddonPriceRub)
+  return !Number.isFinite(price) || price <= 0 || parseSquads(form.whitelistAddonInternalSquads).length === 0
 }
 
 function toPayload(form: PlanFormState) {

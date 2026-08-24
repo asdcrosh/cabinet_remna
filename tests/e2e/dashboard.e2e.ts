@@ -414,6 +414,15 @@ test('каталог тарифов использует компактные с
   await expect(editor.getByRole('spinbutton', { name: 'Включено устройств' })).toHaveValue('5')
   await expect(editor.getByRole('spinbutton', { name: 'Максимум устройств' })).toHaveValue('20')
   await expect(editor.getByRole('spinbutton', { name: 'Доплата за устройство, ₽' })).toHaveValue('100')
+  await editor.getByText('Разрешить покупку дополнения', { exact: true }).click()
+
+  const editorFooter = editor.getByTestId('admin-modal-footer')
+  await expect(editorFooter).toBeVisible()
+  expect(await editor.evaluate((element) => element.scrollTop)).toBe(0)
+  const [editorBox, footerBox] = await Promise.all([editor.boundingBox(), editorFooter.boundingBox()])
+  expect(editorBox).not.toBeNull()
+  expect(footerBox).not.toBeNull()
+  expect(Math.abs(footerBox!.y + footerBox!.height - (editorBox!.y + editorBox!.height))).toBeLessThanOrEqual(2)
   await editor.getByRole('button', { name: 'Закрыть' }).click()
 
   let toggleIsActive: boolean | undefined

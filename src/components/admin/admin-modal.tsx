@@ -21,6 +21,7 @@ export function AdminModal({
   description,
   onClose,
   children,
+  footer,
   size = 'lg',
 }: {
   open: boolean
@@ -28,6 +29,7 @@ export function AdminModal({
   description?: string
   onClose: () => void
   children: ReactNode
+  footer?: ReactNode
   size?: 'md' | 'lg' | 'xl'
 }) {
   const [mounted, setMounted] = useState(false)
@@ -115,7 +117,7 @@ export function AdminModal({
         aria-labelledby={titleId}
         aria-describedby={description ? descriptionId : undefined}
         tabIndex={-1}
-        className={`relative z-10 flex h-auto max-h-[92dvh] w-full flex-col overflow-hidden rounded-t-[22px] border border-b-0 border-slate-200 bg-white shadow-[0_32px_90px_rgba(15,23,42,.26)] dark:border-white/10 dark:bg-surface-900 sm:max-h-[calc(100dvh-40px)] sm:rounded-[16px] sm:border ${widths[size]}`}
+        className={`relative z-10 flex h-auto max-h-[92dvh] w-full flex-col overflow-clip rounded-t-[22px] border border-b-0 border-slate-200 bg-white shadow-[0_32px_90px_rgba(15,23,42,.26)] dark:border-white/10 dark:bg-surface-900 sm:max-h-[calc(100dvh-40px)] sm:rounded-[16px] sm:border ${widths[size]}`}
       >
         <header className="flex shrink-0 items-start justify-between gap-4 border-b px-4 py-4 sm:px-6">
           <div className="min-w-0">
@@ -131,9 +133,14 @@ export function AdminModal({
             <X className="h-4 w-4" />
           </button>
         </header>
-        <div className="min-h-0 overflow-y-auto overscroll-contain px-4 py-5 sm:px-6">
+        <div data-testid="admin-modal-body" className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-5 sm:px-6">
           {children}
         </div>
+        {footer ? (
+          <footer data-testid="admin-modal-footer" className="flex shrink-0 justify-end border-t border-slate-200 bg-white px-4 py-3 dark:border-white/10 dark:bg-surface-900 sm:px-6 sm:py-4">
+            {footer}
+          </footer>
+        ) : null}
       </section>
     </div>,
     document.body
