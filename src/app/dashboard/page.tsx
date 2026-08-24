@@ -149,6 +149,7 @@ export default async function DashboardHome() {
       }
     : null
   const currentDeviceLimit = subRow?.deviceLimit ?? subRow?.plan?.deviceLimit ?? null
+  const deviceAddonExpireAt = sub?.expiresAt ? new Date(sub.expiresAt) : subRow?.expireAt ?? null
   const deviceAddonOffer = subRow?.planId
     && subRow.plan
     && currentDeviceLimit
@@ -156,14 +157,15 @@ export default async function DashboardHome() {
     && subRow.plan.extraDevicePriceKopecks > 0
     && !subscriptionExpired
     && ['ACTIVE', 'LIMITED'].includes(subRow.status)
-    && subRow.expireAt.getTime() > Date.now()
+    && deviceAddonExpireAt
+    && deviceAddonExpireAt.getTime() > Date.now()
     ? {
         planId: subRow.planId,
         currentLimit: currentDeviceLimit,
         maxLimit: subRow.plan.maxDeviceLimit,
         extraDevicePriceKopecks: subRow.plan.extraDevicePriceKopecks,
         durationDays: subRow.plan.durationDays,
-        expireAt: subRow.expireAt.toISOString(),
+        expireAt: deviceAddonExpireAt.toISOString(),
       }
     : null
   return (

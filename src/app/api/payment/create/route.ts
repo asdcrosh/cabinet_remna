@@ -35,6 +35,7 @@ import {
   DEVICE_LIMIT_ADDON_RECEIPT_NAME,
   type DeviceLimitAddonSnapshot,
 } from '@/lib/device-limit-addon'
+import { hasRemnawaveUserReference, remnawave, remnawaveUserReference } from '@/lib/remnawave'
 
 export const runtime = 'nodejs'
 
@@ -211,6 +212,23 @@ export const POST = withAuth(async (req: Request) => {
     )
   }
 
+  let deviceAddonExpireAt: Date | null = null
+  if (isDeviceLimitAddon) {
+    if (!hasRemnawaveUserReference(user)) {
+      return NextResponse.json({ error: 'Профиль Remnawave не найден' }, { status: 409 })
+    }
+    try {
+      const remoteUser = (await remnawave.getUser(remnawaveUserReference(user))).response
+      deviceAddonExpireAt = new Date(remoteUser.expireAt)
+      if (!Number.isFinite(deviceAddonExpireAt.getTime())) throw new Error('invalid Remnawave expiry')
+    } catch {
+      return NextResponse.json(
+        { error: 'Не удалось проверить фактический срок подписки. Попробуйте ещё раз.' },
+        { status: 503 }
+      )
+    }
+  }
+
   let pricing: ReturnType<typeof calculatePlanPurchase>
   let deviceLimitAddonSnapshot: DeviceLimitAddonSnapshot | null = null
   if (isWhitelistAddon) {
@@ -223,7 +241,7 @@ export const POST = withAuth(async (req: Request) => {
       extraDeviceAmountKopecks: 0,
       originalAmountKopecks: plan.whitelistAddonPriceKopecks,
     }
-  } else if (isDeviceLimitAddon && currentSubscription && deviceLimit != null) {
+  } else if (isDeviceLimitAddon && currentSubscription && deviceLimit != null && deviceAddonExpireAt) {
     try {
       const currentLimit = currentSubscription.deviceLimit ?? plan.deviceLimit
       const addon = calculateDeviceLimitAddon({
@@ -232,7 +250,7 @@ export const POST = withAuth(async (req: Request) => {
         maxLimit: plan.maxDeviceLimit,
         extraDevicePriceKopecks: plan.extraDevicePriceKopecks,
         durationDays: plan.durationDays,
-        expireAt: currentSubscription.expireAt,
+        expireAt: deviceAddonExpireAt,
         now,
       })
       pricing = {

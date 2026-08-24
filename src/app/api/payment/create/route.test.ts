@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   isPlanAvailableForUser: vi.fn(),
   createPayment: vi.fn(),
   createPlategaPayment: vi.fn(),
+  getRemnawaveUser: vi.fn(),
   isPaymentProviderAvailable: vi.fn(),
   validatePromoCodeForPlan: vi.fn(),
   logError: vi.fn(),
@@ -41,6 +42,11 @@ vi.mock('@/lib/plan-access', () => ({
 }))
 vi.mock('@/lib/yookassa', () => ({ createPayment: mocks.createPayment }))
 vi.mock('@/lib/platega', () => ({ createPlategaPayment: mocks.createPlategaPayment }))
+vi.mock('@/lib/remnawave', () => ({
+  hasRemnawaveUserReference: (value: { remnawaveId?: number | null }) => Boolean(value.remnawaveId),
+  remnawaveUserReference: (value: { remnawaveId: number }) => ({ id: value.remnawaveId }),
+  remnawave: { getUser: mocks.getRemnawaveUser },
+}))
 vi.mock('@/lib/payment-providers', () => ({ isPaymentProviderAvailable: mocks.isPaymentProviderAvailable }))
 vi.mock('@/lib/promo-codes', () => ({
   PromoCodeError: class PromoCodeError extends Error {
@@ -85,6 +91,7 @@ const user = {
   remnashopSyncedAt: null,
   remnashopUserId: null,
   remnawaveUuid: null,
+  remnawaveId: 42,
 }
 
 const localPayment = {
@@ -143,6 +150,9 @@ describe('payment create route', () => {
       status: 'PENDING',
       url: 'https://pay.platega.io/?id=platega-1',
       expiresIn: '00:15:00',
+    })
+    mocks.getRemnawaveUser.mockResolvedValue({
+      response: { expireAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() },
     })
     mocks.prisma.payment.update.mockResolvedValue({})
     mocks.prisma.promoCodeRedemption.updateMany.mockResolvedValue({ count: 0 })
@@ -225,6 +235,7 @@ describe('payment create route', () => {
 
   it('creates a prorated device limit add-on without extending the subscription', async () => {
     const expireAt = new Date(Date.now() + 15 * 24 * 60 * 60 * 1000)
+    mocks.getRemnawaveUser.mockResolvedValue({ response: { expireAt: expireAt.toISOString() } })
     mocks.prisma.subscription.findFirst.mockResolvedValue({
       id: 'subscription-1',
       userId: user.id,
