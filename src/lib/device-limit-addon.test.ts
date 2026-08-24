@@ -7,6 +7,7 @@ describe('device limit addon', () => {
       currentLimit: 3,
       targetLimit: 5,
       maxLimit: 10,
+      durationDays: 30,
       extraDevicePriceKopecks: 10_000,
       now: new Date('2026-08-01T00:00:00.000Z'),
       expireAt: new Date('2026-08-16T00:00:00.000Z'),
@@ -15,17 +16,18 @@ describe('device limit addon', () => {
     expect(result).toEqual({ additionalDevices: 2, remainingDays: 15, priceKopecks: 10_000 })
   })
 
-  it('uses a 30-day device price even when the tariff itself is shorter', () => {
+  it('uses the price for the full tariff duration', () => {
     const result = calculateDeviceLimitAddon({
       currentLimit: 5,
       targetLimit: 6,
       maxLimit: 10,
-      extraDevicePriceKopecks: 7_000,
+      durationDays: 90,
+      extraDevicePriceKopecks: 30_000,
       now: new Date('2026-08-01T00:00:00.000Z'),
-      expireAt: new Date('2026-08-06T00:00:00.000Z'),
+      expireAt: new Date('2026-08-31T00:00:00.000Z'),
     })
 
-    expect(result).toEqual({ additionalDevices: 1, remainingDays: 5, priceKopecks: 1_200 })
+    expect(result).toEqual({ additionalDevices: 1, remainingDays: 30, priceKopecks: 10_000 })
   })
 
   it('rejects a limit that does not increase the current one', () => {
@@ -33,6 +35,7 @@ describe('device limit addon', () => {
       currentLimit: 5,
       targetLimit: 5,
       maxLimit: 10,
+      durationDays: 30,
       extraDevicePriceKopecks: 10_000,
       expireAt: new Date(Date.now() + 86_400_000),
     })).toThrow('Выберите лимит больше текущего')

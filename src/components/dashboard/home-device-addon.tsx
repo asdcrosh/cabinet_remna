@@ -14,6 +14,7 @@ export function HomeDeviceAddon({
   planId,
   currentLimit,
   maxLimit,
+  durationDays,
   extraDevicePriceKopecks,
   expireAt,
   paymentProviders,
@@ -21,6 +22,7 @@ export function HomeDeviceAddon({
   planId: string
   currentLimit: number
   maxLimit: number
+  durationDays: number
   extraDevicePriceKopecks: number
   expireAt: string
   paymentProviders: Provider[]
@@ -33,7 +35,7 @@ export function HomeDeviceAddon({
   const remainingDays = Math.max(1, Math.ceil((new Date(expireAt).getTime() - Date.now()) / 86_400_000))
   const additionalDevices = targetLimit - currentLimit
   const amountKopecks = Math.max(100, Math.ceil(
-    additionalDevices * extraDevicePriceKopecks * Math.min(remainingDays, 30) / 30 / 100
+    additionalDevices * extraDevicePriceKopecks * Math.min(remainingDays, durationDays) / durationDays / 100
   ) * 100)
 
   async function buy() {
@@ -118,7 +120,7 @@ export function HomeDeviceAddon({
             </div>
           </div>
           <p className="text-xs leading-5 text-slate-500 dark:text-slate-400">
-            Цена устройства указана за 30 дней и рассчитана пропорционально оставшимся {remainingDays} дням. Если включено автопродление, новый лимит и сумму нужно будет подтвердить заново.
+            Цена устройства указана за весь срок тарифа и рассчитана пропорционально оставшимся {remainingDays} дням. Если включено автопродление, новый лимит и сумму нужно будет подтвердить заново.
           </p>
           {paymentProviders.length > 1 ? (
             <label className="block">

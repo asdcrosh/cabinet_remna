@@ -163,6 +163,7 @@ export default async function DashboardHome() {
         planId: subRow.planId,
         currentLimit: currentDeviceLimit,
         maxLimit: subRow.plan.maxDeviceLimit,
+        durationDays: subRow.plan.durationDays,
         extraDevicePriceKopecks: subRow.plan.extraDevicePriceKopecks,
         expireAt: deviceAddonExpireAt.toISOString(),
       }

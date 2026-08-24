@@ -248,6 +248,7 @@ export const POST = withAuth(async (req: Request) => {
         currentLimit,
         targetLimit: deviceLimit,
         maxLimit: plan.maxDeviceLimit,
+        durationDays: plan.durationDays,
         extraDevicePriceKopecks: plan.extraDevicePriceKopecks,
         expireAt: deviceAddonExpireAt,
         now,
