@@ -8,13 +8,14 @@ loadEnvFile(isProduction ? ".env.production" : ".env");
 const requiredAlways = ["DATABASE_URL", "JWT_SECRET"];
 const requiredProduction = [
   "APP_URL",
+  "CABINET_BRAND_NAME",
   "HEALTHCHECK_TOKEN",
   "EMAIL_VERIFICATION_WEBHOOK_URL",
   "REMNAWAVE_BASE_URL",
   "REMNAWAVE_TOKEN",
   "LEGAL_OPERATOR_NAME",
   "LEGAL_OPERATOR_TAX_ID",
-  "LEGAL_SUPPORT_EMAIL",
+  "SUPERUSER_EMAIL",
 ];
 
 const optionalPairs = [
@@ -115,14 +116,17 @@ if (isProduction) {
     if (!value(key)) errors.push(`${key} is required in production`);
   }
 
-  if (/(ВСТАВЬ|Оператор сервиса|example\.com)/i.test(value("LEGAL_OPERATOR_NAME"))) {
+  if (/(ВСТАВЬ|CHANGE_ME)/i.test(value("CABINET_BRAND_NAME"))) {
+    errors.push("CABINET_BRAND_NAME must contain the real service name");
+  }
+  if (/(ВСТАВЬ|CHANGE_ME|Оператор сервиса|example\.com)/i.test(value("LEGAL_OPERATOR_NAME"))) {
     errors.push("LEGAL_OPERATOR_NAME must contain the real operator name");
   }
   if (!/^\d{10}(\d{2})?$/.test(value("LEGAL_OPERATOR_TAX_ID"))) {
     errors.push("LEGAL_OPERATOR_TAX_ID must contain a 10 or 12 digit INN");
   }
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value("LEGAL_SUPPORT_EMAIL"))) {
-    errors.push("LEGAL_SUPPORT_EMAIL must be a valid public email address");
+  if (!/^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,63}$/.test(value("SUPERUSER_EMAIL"))) {
+    errors.push("SUPERUSER_EMAIL must be a valid main administrator email");
   }
 }
 
@@ -152,7 +156,6 @@ if (provisioningEnabled) {
     "TIMEWEB_API_TOKEN",
     "NODE_PROVISIONING_BASE_DOMAIN",
     "NODE_PROVISIONING_ENCRYPTION_KEY",
-    "NODE_PROVISIONING_ADMIN_EMAIL",
     "NODE_PROVISIONING_REMNANODE_IMAGE",
   ];
   for (const key of requiredProvisioning) {
@@ -162,12 +165,6 @@ if (provisioningEnabled) {
     if (value(key) && !isSafeEnvToken(value(key))) {
       errors.push(`${key} contains unsupported characters`);
     }
-  }
-  if (
-    value("NODE_PROVISIONING_ADMIN_EMAIL") &&
-    !/^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,63}$/.test(value("NODE_PROVISIONING_ADMIN_EMAIL"))
-  ) {
-    errors.push("NODE_PROVISIONING_ADMIN_EMAIL must be a valid email");
   }
   const countryCode = value("NODE_PROVISIONING_COUNTRY_CODE").toUpperCase();
   if (countryCode && countryCode !== "AUTO" && !/^[A-Z]{2}$/.test(countryCode)) {

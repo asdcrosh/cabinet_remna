@@ -166,7 +166,6 @@ valid_config_value() {
     REMNAWAVE_BASE_URL) valid_https_url "${value}" ;;
     NODE_PROVISIONING_BASE_DOMAIN) valid_domain "${value}" ;;
     NODE_PROVISIONING_ENCRYPTION_KEY) valid_secret "${value}" ;;
-    NODE_PROVISIONING_ADMIN_EMAIL) valid_email "${value}" ;;
     NODE_PROVISIONING_COUNTRY_CODE) [[ "${value}" == "AUTO" || "${value}" =~ ^[A-Za-z]{2}$ ]] ;;
     NODE_PROVISIONING_REMNANODE_IMAGE) valid_image_reference "${value}" ;;
     NODE_PROVISIONING_WORKER_INTERVAL_SECONDS|NODE_PROVISIONING_WORKER_HEARTBEAT_MAX_AGE_SECONDS|NODE_PROVISIONING_CREDENTIALS_TTL_HOURS|NODE_PROVISIONING_DNS_TIMEOUT_SECONDS|NODE_PROVISIONING_CONNECT_TIMEOUT_SECONDS|NODE_PROVISIONING_ANSIBLE_TIMEOUT_SECONDS)
@@ -227,7 +226,6 @@ import_legacy_env() {
     NODE_PROVISIONING_TCP_TEMPLATE_HOST_UUID \
     NODE_PROVISIONING_XHTTP_TEMPLATE_HOST_UUID \
     NODE_PROVISIONING_COUNTRY_CODE \
-    NODE_PROVISIONING_ADMIN_EMAIL \
     NODE_PROVISIONING_REMNANODE_IMAGE \
     NODE_PROVISIONING_WORKER_INTERVAL_SECONDS \
     NODE_PROVISIONING_WORKER_HEARTBEAT_MAX_AGE_SECONDS \
@@ -280,24 +278,6 @@ prompt_secret() {
   printf '%s' "${value}"
 }
 
-detect_admin_email() {
-  local candidate email_from
-  for candidate in \
-    "$(read_env_value LEGAL_SUPPORT_EMAIL || true)" \
-    "$(read_env_value SYSTEM_HEALTH_EMAIL_TO || true)"
-  do
-    if valid_email "${candidate}"; then
-      printf '%s\n' "${candidate}"
-      return 0
-    fi
-  done
-  email_from="$(read_env_value EMAIL_FROM || true)"
-  candidate="$(printf '%s' "${email_from}" | sed -n 's/.*<\([^<>[:space:]]*@[^<>[:space:]]*\)>.*/\1/p')"
-  if valid_email "${candidate}"; then
-    printf '%s\n' "${candidate}"
-  fi
-}
-
 set_profile() {
   local action="$1"
   local current normalized next
@@ -323,7 +303,6 @@ remove_env_key NODE_PROVISIONING_PANEL_IP
 for key in \
   TIMEWEB_API_TOKEN \
   NODE_PROVISIONING_BASE_DOMAIN \
-  NODE_PROVISIONING_ADMIN_EMAIL \
   NODE_PROVISIONING_COUNTRY_CODE \
   NODE_PROVISIONING_REMNANODE_IMAGE
 do
@@ -346,14 +325,6 @@ if ! valid_secret "${encryption_key}"; then
   write_env_value NODE_PROVISIONING_ENCRYPTION_KEY "$(openssl rand -hex 32)"
 fi
 
-admin_email="$(read_env_value NODE_PROVISIONING_ADMIN_EMAIL || true)"
-if ! valid_email "${admin_email}"; then
-  admin_email="$(detect_admin_email || true)"
-  if valid_email "${admin_email}"; then
-    write_env_value NODE_PROVISIONING_ADMIN_EMAIL "${admin_email}"
-  fi
-fi
-
 base_domain="$(read_env_value NODE_PROVISIONING_BASE_DOMAIN || true)"
 if ! valid_domain "${base_domain}"; then
   base_domain="$(prompt_text 'Основной домен для нод, например vpn.example.com' || true)"
@@ -368,14 +339,6 @@ if ! usable_value "${timeweb_token}"; then
   timeweb_token="$(prompt_secret 'Timeweb API token' || true)"
   if valid_api_token "${timeweb_token}"; then
     write_env_value TIMEWEB_API_TOKEN "${timeweb_token}"
-  fi
-fi
-
-admin_email="$(read_env_value NODE_PROVISIONING_ADMIN_EMAIL || true)"
-if ! valid_email "${admin_email}"; then
-  admin_email="$(prompt_text 'Email администратора для сертификатов' || true)"
-  if valid_email "${admin_email}"; then
-    write_env_value NODE_PROVISIONING_ADMIN_EMAIL "${admin_email}"
   fi
 fi
 
@@ -405,7 +368,7 @@ for key in \
   REMNAWAVE_TOKEN \
   NODE_PROVISIONING_BASE_DOMAIN \
   NODE_PROVISIONING_ENCRYPTION_KEY \
-  NODE_PROVISIONING_ADMIN_EMAIL \
+  SUPERUSER_EMAIL \
   NODE_PROVISIONING_REMNANODE_IMAGE
 do
   value="$(read_env_value "${key}" || true)"
@@ -413,7 +376,7 @@ do
 done
 
 base_domain="$(read_env_value NODE_PROVISIONING_BASE_DOMAIN || true)"
-admin_email="$(read_env_value NODE_PROVISIONING_ADMIN_EMAIL || true)"
+admin_email="$(read_env_value SUPERUSER_EMAIL || true)"
 remnanode_image="$(read_env_value NODE_PROVISIONING_REMNANODE_IMAGE || true)"
 remnawave_url="$(read_env_value REMNAWAVE_BASE_URL || true)"
 encryption_key="$(read_env_value NODE_PROVISIONING_ENCRYPTION_KEY || true)"
@@ -421,7 +384,7 @@ timeweb_token="$(read_env_value TIMEWEB_API_TOKEN || true)"
 remnawave_token="$(read_env_value REMNAWAVE_TOKEN || true)"
 
 valid_domain "${base_domain}" || missing+=("NODE_PROVISIONING_BASE_DOMAIN(valid domain)")
-valid_email "${admin_email}" || missing+=("NODE_PROVISIONING_ADMIN_EMAIL(valid email)")
+valid_email "${admin_email}" || missing+=("SUPERUSER_EMAIL(valid email)")
 valid_https_url "${remnawave_url}" || missing+=("REMNAWAVE_BASE_URL(valid HTTPS URL)")
 valid_api_token "${timeweb_token}" || missing+=("TIMEWEB_API_TOKEN(valid token)")
 valid_api_token "${remnawave_token}" || missing+=("REMNAWAVE_TOKEN(valid token)")

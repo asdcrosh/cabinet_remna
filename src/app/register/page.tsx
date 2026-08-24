@@ -8,14 +8,13 @@ import Link from 'next/link'
 
 export const metadata = { title: 'Регистрация' }
 
-const yandexEnabled = Boolean(process.env.YANDEX_CLIENT_ID && process.env.YANDEX_CLIENT_SECRET)
-
 export default async function RegisterPage({
   searchParams,
 }: {
   searchParams: Promise<{ ref?: string }>
 }) {
   const params = await searchParams
+  const yandexEnabled = Boolean(process.env.YANDEX_CLIENT_ID && process.env.YANDEX_CLIENT_SECRET)
   const session = await getCurrentUser()
   if (session) redirect('/dashboard')
 

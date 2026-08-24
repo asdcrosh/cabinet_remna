@@ -16,10 +16,9 @@ import { NotificationPreferencesPanel } from '@/components/dashboard/notificatio
 
 export const dynamic = 'force-dynamic'
 
-const telegramClientId = process.env.TELEGRAM_CLIENT_ID?.trim() || null
-const appUrl = process.env.APP_URL?.trim() || null
-
 export default async function SettingsPage() {
+  const telegramClientId = process.env.TELEGRAM_CLIENT_ID?.trim() || null
+  const appUrl = process.env.APP_URL?.trim() || null
   const session = await getCurrentUser()
   if (!session) redirect('/login')
   const user = await prisma.user.findUnique({ where: { id: session.uid } })

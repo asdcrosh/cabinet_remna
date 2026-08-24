@@ -400,7 +400,7 @@ async function checkEmail(sendEmail: boolean) {
   const webhookSecret = env('EMAIL_VERIFICATION_WEBHOOK_SECRET')
   const resendKey = env('RESEND_API_KEY')
   const from = env('EMAIL_FROM')
-  const testTo = env('SYSTEM_HEALTH_EMAIL_TO') || env('ADMIN_EMAIL')
+  const testTo = env('SYSTEM_HEALTH_EMAIL_TO') || env('SUPERUSER_EMAIL')
   const usesBuiltInSender = webhookUrl.includes('/api/email/resend')
 
   if (!webhookUrl || !webhookSecret) {
@@ -415,7 +415,7 @@ async function checkEmail(sendEmail: boolean) {
   }
 
   if (!testTo) {
-    return check('email', 'Email', 'warn', 'Нет адреса для тестовой отправки', 'Заполните SYSTEM_HEALTH_EMAIL_TO или ADMIN_EMAIL')
+    return check('email', 'Email', 'warn', 'Нет адреса для тестовой отправки', 'Заполните SUPERUSER_EMAIL или SYSTEM_HEALTH_EMAIL_TO')
   }
 
   try {

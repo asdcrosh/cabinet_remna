@@ -4,7 +4,7 @@
 
 ## Перед публикацией
 
-- Заполнить `LEGAL_OPERATOR_NAME`, `LEGAL_OPERATOR_TAX_ID`, `LEGAL_SUPPORT_EMAIL` и при необходимости адрес, телефон и Telegram.
+- Заполнить `SUPERUSER_EMAIL`, `LEGAL_OPERATOR_NAME`, `LEGAL_OPERATOR_TAX_ID` и при необходимости адрес, телефон и Telegram. Публичный email для обращений берётся из `SUPERUSER_EMAIL`.
 - Проверить страницы `/privacy`, `/consent`, `/terms`, `/contacts` и `/refunds` на production-домене.
 - Убедиться, что основная база с персональными данными граждан РФ находится в России.
 - Подать уведомление об обработке персональных данных в Роскомнадзор, если к деятельности не применяется законное исключение.

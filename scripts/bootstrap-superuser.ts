@@ -31,11 +31,16 @@ async function uniqueReferralCode() {
 
 async function main() {
   if (process.env.SUPERUSER_CHECK_ONLY === 'true') {
-    const exists = await prisma.user.findFirst({
-      where: { role: 'SUPER_ADMIN' },
-      select: { id: true },
+    const email = process.env.SUPERUSER_EMAIL?.trim().toLowerCase()
+    if (!email) {
+      process.exitCode = 1
+      return
+    }
+    const existing = await prisma.user.findUnique({
+      where: { email },
+      select: { role: true },
     })
-    if (!exists) process.exitCode = 1
+    if (existing?.role !== 'SUPER_ADMIN') process.exitCode = 1
     return
   }
 

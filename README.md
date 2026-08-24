@@ -248,6 +248,7 @@ flowchart LR
 | **PayAnyWay** | Альтернативная оплата с подписанным callback | Платёжные системы, `/api/webhook/payanyway` |
 | **Platega** | Дополнительный способ оплаты | Платёжные системы, `/api/webhook/platega` |
 | **Resend** | Подтверждение email и восстановление пароля | `RESEND_API_KEY`, `EMAIL_FROM` |
+| **Главный администратор** | Вход владельца, публичный email обращений и системный email по умолчанию | `SUPERUSER_EMAIL` |
 | **Telegram** | Mini App и служебные уведомления владельцу | `TELEGRAM_BOT_TOKEN`, `ADMIN_TELEGRAM_CHAT_ID` |
 | **Sentry** | Ошибки приложения и workers | `SENTRY_*` |
 | **S3** | Удалённое хранение полных бэкапов | `cabinetctl backups` |

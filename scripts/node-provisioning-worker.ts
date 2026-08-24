@@ -78,7 +78,7 @@ function validateWorkerConfiguration() {
     'REMNAWAVE_TOKEN',
     'NODE_PROVISIONING_BASE_DOMAIN',
     'NODE_PROVISIONING_ENCRYPTION_KEY',
-    'NODE_PROVISIONING_ADMIN_EMAIL',
+    'SUPERUSER_EMAIL',
     'NODE_PROVISIONING_REMNANODE_IMAGE',
   ] as const
   const missing = required.filter((name) => !process.env[name]?.trim())
@@ -91,8 +91,8 @@ function validateWorkerConfiguration() {
   if (!/^(?=.{4,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/i.test(baseDomain)) {
     throw new Error('NODE_PROVISIONING_BASE_DOMAIN must be a valid base domain')
   }
-  if (!/^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,63}$/.test(process.env.NODE_PROVISIONING_ADMIN_EMAIL!.trim())) {
-    throw new Error('NODE_PROVISIONING_ADMIN_EMAIL must be a valid email')
+  if (!/^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,63}$/.test(process.env.SUPERUSER_EMAIL!.trim())) {
+    throw new Error('SUPERUSER_EMAIL must be a valid email')
   }
   const countryCode = (process.env.NODE_PROVISIONING_COUNTRY_CODE || 'AUTO').trim().toUpperCase()
   if (countryCode !== 'AUTO' && !/^[A-Z]{2}$/.test(countryCode)) {

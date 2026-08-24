@@ -11,14 +11,13 @@ import Link from 'next/link'
 
 export const metadata = { title: 'Вход' }
 
-const yandexEnabled = Boolean(process.env.YANDEX_CLIENT_ID && process.env.YANDEX_CLIENT_SECRET)
-
 export default async function LoginPage({
   searchParams,
 }: {
   searchParams: Promise<{ next?: string }>
 }) {
   const params = await searchParams
+  const yandexEnabled = Boolean(process.env.YANDEX_CLIENT_ID && process.env.YANDEX_CLIENT_SECRET)
   const session = await getCurrentUser()
   if (session) {
     const user = await prisma.user.findUnique({

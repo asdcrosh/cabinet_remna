@@ -73,7 +73,7 @@ The `cabinetctl install` command will:
 - ask for missing production values
 - create `CABINET_EXTERNAL_NETWORK` if it is missing
 - deploy automatically after required values are filled
-- ask for the first administrator email and password after services start
+- save the main administrator email in `.env` and ask for its password after services start
 - configure node provisioning in the same `.env`; when its two new required
   values are missing, the worker stays disabled and the cabinet still starts
 
@@ -95,6 +95,10 @@ and Cabinet from the backup menu.
 Fill real production values:
 
 - `CABINET_DOMAIN`
+- `CABINET_BRAND_NAME`
+- `SUPERUSER_EMAIL`
+- `LEGAL_OPERATOR_NAME`
+- `LEGAL_OPERATOR_TAX_ID`
 - `EMAIL_VERIFICATION_WEBHOOK_URL`
 - `EMAIL_VERIFICATION_WEBHOOK_SECRET`
 - `RESEND_API_KEY`

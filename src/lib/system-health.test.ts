@@ -104,6 +104,10 @@ beforeEach(() => {
     'TELEGRAM_NOTIFY_CHAT_ID',
     'EMAIL_VERIFICATION_WEBHOOK_URL',
     'EMAIL_VERIFICATION_WEBHOOK_SECRET',
+    'RESEND_API_KEY',
+    'EMAIL_FROM',
+    'SYSTEM_HEALTH_EMAIL_TO',
+    'SUPERUSER_EMAIL',
     'REMNAWAVE_BASE_URL',
     'REMNAWAVE_TOKEN',
   ]) delete process.env[key]
@@ -151,5 +155,21 @@ describe('getSystemHealth', () => {
 
     expect(report.checks.find((item) => item.id === 'payment-worker')?.status).toBe('error')
     expect(report.ok).toBe(false)
+  })
+
+  it('sends the test email to the main administrator by default', async () => {
+    process.env.EMAIL_VERIFICATION_WEBHOOK_URL = 'https://mail.example.test/api/email/resend'
+    process.env.EMAIL_VERIFICATION_WEBHOOK_SECRET = 'webhook-secret'
+    process.env.RESEND_API_KEY = 'resend-key'
+    process.env.EMAIL_FROM = 'Cabinet <noreply@example.test>'
+    process.env.SUPERUSER_EMAIL = 'main.admin@example.test'
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null, { status: 200 }))
+
+    const report = await getSystemHealth({ sendEmail: true })
+
+    expect(report.checks.find((item) => item.id === 'email')?.message).toContain('main.admin@example.test')
+    const [, request] = fetchMock.mock.calls.find(([url]) => url === process.env.EMAIL_VERIFICATION_WEBHOOK_URL) ?? []
+    expect(JSON.parse(String(request?.body))).toMatchObject({ to: 'main.admin@example.test' })
+    fetchMock.mockRestore()
   })
 })

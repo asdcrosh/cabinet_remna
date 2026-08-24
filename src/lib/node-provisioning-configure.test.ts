@@ -146,7 +146,7 @@ describe('configure-node-provisioning.sh', () => {
       'TIMEWEB_API_TOKEN="timeweb-token-valid"',
       'NODE_PROVISIONING_BASE_DOMAIN="nodes.example.net"',
       'NODE_PROVISIONING_PANEL_IP="8.8.8.8"',
-      'LEGAL_SUPPORT_EMAIL="admin@example.net"',
+      'SUPERUSER_EMAIL="admin@example.net"',
       '',
     ].join('\n'))
     const result = run(fixture)
@@ -166,7 +166,7 @@ function completeEnv(profiles = 'caddy,maintenance') {
     'TIMEWEB_API_TOKEN="timeweb-token-valid"',
     'NODE_PROVISIONING_BASE_DOMAIN="nodes.example.net"',
     `NODE_PROVISIONING_ENCRYPTION_KEY="${'a'.repeat(64)}"`,
-    'NODE_PROVISIONING_ADMIN_EMAIL="admin@example.net"',
+    'SUPERUSER_EMAIL="admin@example.net"',
     'NODE_PROVISIONING_REMNANODE_IMAGE="remnawave/node:latest"',
     '',
   ].join('\n')

@@ -615,6 +615,12 @@ prompt_required_config() {
   fi
 
   echo "" >"${TTY_DEVICE}"
+  echo "Main administrator and public contact" >"${TTY_DEVICE}"
+  prompt_env_text "SUPERUSER_EMAIL" "Main administrator email"
+  prompt_env_text "LEGAL_OPERATOR_NAME" "Legal operator name"
+  prompt_env_text "LEGAL_OPERATOR_TAX_ID" "Legal operator INN"
+
+  echo "" >"${TTY_DEVICE}"
   echo "Email verification / Resend" >"${TTY_DEVICE}"
   prompt_env_text "EMAIL_VERIFICATION_WEBHOOK_URL" "Email webhook URL" "https://${CABINET_DOMAIN}/api/email/resend"
   prompt_env_secret "EMAIL_VERIFICATION_WEBHOOK_SECRET" "Email webhook secret"
@@ -674,7 +680,7 @@ wait_for_app_health() {
 }
 
 bootstrap_superuser() {
-  local email="${SUPERUSER_EMAIL:-}"
+  local email="${SUPERUSER_EMAIL:-$(read_env_value SUPERUSER_EMAIL || true)}"
   local password="${SUPERUSER_PASSWORD:-}"
 
   if "${COMPOSE[@]}" exec -T \
@@ -809,6 +815,7 @@ for key in \
   CABINET_APP_PORT \
   CABINET_EXTERNAL_NETWORK \
   CABINET_BRAND_NAME \
+  SUPERUSER_EMAIL \
   EMAIL_VERIFICATION_WEBHOOK_URL \
   EMAIL_VERIFICATION_WEBHOOK_SECRET \
   RESEND_API_KEY \
@@ -818,7 +825,6 @@ for key in \
   REMNAWAVE_INTERNAL_SQUAD_UUIDS \
   TIMEWEB_API_TOKEN \
   NODE_PROVISIONING_BASE_DOMAIN \
-  NODE_PROVISIONING_ADMIN_EMAIL \
   NODE_PROVISIONING_COUNTRY_CODE \
   NODE_PROVISIONING_REMNANODE_IMAGE \
   REMNASHOP_DB_CONTAINER \
@@ -908,6 +914,10 @@ Fill the remaining production values:
 
 Required values:
   CABINET_DOMAIN
+  CABINET_BRAND_NAME
+  SUPERUSER_EMAIL
+  LEGAL_OPERATOR_NAME
+  LEGAL_OPERATOR_TAX_ID
   EMAIL_VERIFICATION_WEBHOOK_URL
   EMAIL_VERIFICATION_WEBHOOK_SECRET
   RESEND_API_KEY
@@ -918,7 +928,7 @@ Required values:
   YOOKASSA_SECRET_KEY
 
 Then run this installer command again.
-After services start, it will ask for the first admin email and password.
+After services start, it will ask for the main administrator password.
 
 EOF
   exit 0

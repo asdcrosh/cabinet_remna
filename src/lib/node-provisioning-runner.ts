@@ -52,9 +52,9 @@ export async function runNodeAnsible(
       },
     }))
     const panelApiCidrs = await resolvePanelApiCidrs(requiredEnv('REMNAWAVE_BASE_URL'))
-    const adminEmail = requiredEnv('NODE_PROVISIONING_ADMIN_EMAIL')
+    const adminEmail = requiredEnv('SUPERUSER_EMAIL')
     if (!/^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,63}$/.test(adminEmail)) {
-      throw new Error('NODE_PROVISIONING_ADMIN_EMAIL must be a valid email')
+      throw new Error('SUPERUSER_EMAIL must be a valid email')
     }
     await writeSecure(varsPath, JSON.stringify({
       provisioning_job_id: input.jobId,
