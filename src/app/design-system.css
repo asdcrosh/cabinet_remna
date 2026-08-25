@@ -3155,3 +3155,334 @@ html:not(.dark) .bonus-wheel-result-modal .bonus-wheel-result-promo small {
     grid-column: auto;
   }
 }
+
+/* Admin workspace: one visual language for every management section. */
+.admin-workspace {
+  gap: clamp(1rem, 1.7vw, 1.55rem) !important;
+}
+
+.admin-page-hero {
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--app-ink) 15%, var(--app-border));
+  border-radius: 1.5rem;
+  padding: clamp(1.2rem, 2.4vw, 1.75rem);
+  background:
+    radial-gradient(circle at 92% 0, color-mix(in srgb, var(--app-signal) 15%, transparent), transparent 13rem),
+    radial-gradient(circle at 4% 110%, color-mix(in srgb, var(--app-accent) 11%, transparent), transparent 16rem),
+    color-mix(in srgb, var(--app-surface) 97%, var(--app-bg));
+  box-shadow: 0 20px 55px color-mix(in srgb, var(--app-ink) 8%, transparent);
+}
+
+.admin-page-hero::after {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 3px;
+  content: "";
+  background: linear-gradient(90deg, var(--app-accent), var(--app-ink) 58%, var(--app-signal));
+}
+
+.admin-page-hero__glow {
+  position: absolute;
+  top: -7rem;
+  right: -4rem;
+  width: 17rem;
+  height: 17rem;
+  border: 1px solid color-mix(in srgb, var(--app-signal) 16%, transparent);
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 2.8rem color-mix(in srgb, var(--app-signal) 3%, transparent),
+    0 0 0 5.4rem color-mix(in srgb, var(--app-accent) 2.5%, transparent);
+  pointer-events: none;
+}
+
+.admin-page-hero__content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  min-height: 5.6rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+}
+
+.admin-page-hero__eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin-bottom: 0.5rem;
+  color: var(--app-accent-text);
+  font-size: 0.65rem;
+  font-weight: 750;
+  letter-spacing: 0.17em;
+  text-transform: uppercase;
+}
+
+.admin-page-hero__eyebrow span {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--app-accent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--app-accent) 12%, transparent);
+}
+
+.admin-page-hero__title {
+  max-width: 48rem;
+  color: var(--app-text);
+  font-size: clamp(1.9rem, 3.1vw, 3rem);
+  font-weight: 720;
+  letter-spacing: -0.055em;
+  line-height: 1;
+}
+
+.admin-page-hero__description {
+  max-width: 42rem;
+  margin-top: 0.65rem;
+  color: var(--app-muted);
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.admin-page-hero__aside {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.admin-page-hero__action {
+  min-width: 0;
+}
+
+.admin-page-hero__mark {
+  display: grid;
+  width: 3.7rem;
+  height: 3.7rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--app-accent) 24%, var(--app-border));
+  border-radius: 1.15rem;
+  background: linear-gradient(145deg, var(--app-accent), var(--app-ink));
+  color: var(--app-gradient-on);
+  box-shadow: 0 16px 32px color-mix(in srgb, var(--app-accent) 20%, transparent);
+  transform: rotate(3deg);
+}
+
+.admin-workspace :is(.card, .panel, .surface-card, .admin-list, .table-shell) {
+  border-color: color-mix(in srgb, var(--app-ink) 11%, var(--app-border)) !important;
+  border-radius: 1.3rem !important;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--app-accent) 2.5%, var(--app-surface)), var(--app-surface) 62%) !important;
+  box-shadow: 0 16px 44px color-mix(in srgb, var(--app-ink) 6%, transparent) !important;
+}
+
+.admin-workspace [class*="rounded-3xl"][class*="border"][class*="bg-white"],
+.admin-workspace [class*="rounded-[1.4rem]"][class*="border"],
+.admin-workspace [class*="rounded-[1.25rem]"][class*="border"] {
+  border-color: color-mix(in srgb, var(--app-ink) 11%, var(--app-border)) !important;
+  box-shadow: 0 16px 44px color-mix(in srgb, var(--app-ink) 6%, transparent);
+}
+
+.admin-workspace [class*="rounded-3xl"][class*="border"][class*="bg-white"] {
+  border-radius: 1.4rem !important;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--app-accent) 2.5%, var(--app-surface)), var(--app-surface) 64%) !important;
+}
+
+.admin-workspace .admin-list,
+.admin-workspace .table-shell {
+  position: relative;
+  overflow: clip;
+}
+
+.admin-workspace .admin-list::before,
+.admin-workspace .table-shell::before {
+  position: absolute;
+  z-index: 2;
+  inset: 0 0 auto;
+  height: 2px;
+  content: "";
+  background: linear-gradient(90deg, var(--app-accent), var(--app-ink), var(--app-signal));
+  pointer-events: none;
+}
+
+.admin-workspace .admin-list-header,
+.admin-workspace .table-shell thead,
+.admin-workspace .table-shell th {
+  background: color-mix(in srgb, var(--app-surface-soft) 64%, var(--app-surface)) !important;
+}
+
+.admin-workspace .admin-list-header {
+  min-height: 3rem;
+  align-items: center;
+  padding-block: 0.8rem !important;
+}
+
+.admin-workspace .admin-list-row,
+.admin-workspace .table-shell tbody tr {
+  transition: background-color 160ms ease, box-shadow 160ms ease;
+}
+
+.admin-workspace .admin-list-row:hover,
+.admin-workspace .table-shell tbody tr:hover {
+  background: color-mix(in srgb, var(--app-accent) 3.5%, var(--app-surface)) !important;
+}
+
+.admin-workspace table thead {
+  background: color-mix(in srgb, var(--app-surface-soft) 58%, var(--app-surface));
+}
+
+.admin-workspace table th {
+  color: var(--app-muted);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.admin-workspace table tbody tr {
+  transition: background-color 160ms ease;
+}
+
+.admin-workspace table tbody tr:hover {
+  background: color-mix(in srgb, var(--app-accent) 3.5%, transparent);
+}
+
+.admin-filter-bar--polished {
+  position: relative;
+  overflow: hidden;
+  border-color: color-mix(in srgb, var(--app-ink) 12%, var(--app-border)) !important;
+  border-radius: 1.25rem !important;
+  background:
+    radial-gradient(circle at 100% 0, color-mix(in srgb, var(--app-signal) 7%, transparent), transparent 13rem),
+    color-mix(in srgb, var(--app-surface) 97%, var(--app-bg)) !important;
+  box-shadow: 0 14px 38px color-mix(in srgb, var(--app-ink) 5%, transparent) !important;
+}
+
+.admin-filter-bar--polished::before {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  content: "";
+  background: linear-gradient(180deg, var(--app-accent), var(--app-signal));
+}
+
+.admin-filter-bar--polished .input,
+.admin-filter-bar--polished select,
+.admin-filter-bar--polished input:not([type="hidden"]) {
+  min-height: 2.75rem;
+  border-color: color-mix(in srgb, var(--app-ink) 12%, var(--app-border)) !important;
+  border-radius: 0.85rem !important;
+  background: color-mix(in srgb, var(--app-surface) 88%, transparent) !important;
+}
+
+.admin-workspace :is(.metric-card, .stat-card) {
+  min-height: 7.5rem;
+  border: 1px solid color-mix(in srgb, var(--app-ink) 11%, var(--app-border)) !important;
+  border-radius: 1.2rem !important;
+  background:
+    radial-gradient(circle at 100% 0, color-mix(in srgb, var(--app-accent) 7%, transparent), transparent 9rem),
+    var(--app-surface) !important;
+  box-shadow: 0 14px 36px color-mix(in srgb, var(--app-ink) 5%, transparent) !important;
+}
+
+.admin-workspace :is(.metric-card, .stat-card)::after {
+  top: 0;
+  width: 2.75rem !important;
+  height: 3px;
+  border-radius: 0 0 999px;
+  background: linear-gradient(90deg, var(--app-accent), var(--app-ink)) !important;
+}
+
+.admin-workspace .btn-primary {
+  border-color: transparent !important;
+  border-radius: 0.85rem !important;
+  background: linear-gradient(135deg, var(--app-accent), var(--app-ink)) !important;
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--app-accent) 17%, transparent) !important;
+}
+
+.admin-workspace .btn-primary:hover {
+  background: linear-gradient(135deg, var(--app-accent-hover), var(--app-ink-hover)) !important;
+}
+
+.admin-workspace .btn-secondary {
+  border-color: color-mix(in srgb, var(--app-ink) 13%, var(--app-border)) !important;
+  border-radius: 0.85rem !important;
+  background: color-mix(in srgb, var(--app-surface) 92%, transparent) !important;
+  box-shadow: 0 7px 20px color-mix(in srgb, var(--app-ink) 4%, transparent) !important;
+}
+
+.admin-workspace .btn-secondary:hover {
+  border-color: color-mix(in srgb, var(--app-accent) 28%, var(--app-border)) !important;
+  background: color-mix(in srgb, var(--app-accent) 4%, var(--app-surface)) !important;
+}
+
+.admin-workspace :is(.badge, .badge-active, .badge-disabled, .badge-limited, .status-badge) {
+  border-radius: 999px !important;
+}
+
+.admin-empty-state {
+  position: relative;
+  overflow: hidden;
+  border-color: color-mix(in srgb, var(--app-accent) 24%, var(--app-border)) !important;
+  border-radius: 1.4rem !important;
+  background:
+    radial-gradient(circle at 100% 0, color-mix(in srgb, var(--app-signal) 8%, transparent), transparent 13rem),
+    linear-gradient(135deg, color-mix(in srgb, var(--app-accent) 4%, var(--app-surface)), var(--app-surface)) !important;
+}
+
+.admin-empty-state__icon {
+  border-color: color-mix(in srgb, var(--app-accent) 22%, var(--app-border)) !important;
+  border-radius: 1rem;
+  background: linear-gradient(145deg, color-mix(in srgb, var(--app-accent) 12%, var(--app-surface)), color-mix(in srgb, var(--app-signal) 9%, var(--app-surface)));
+  color: var(--app-accent-text) !important;
+  box-shadow: 0 10px 25px color-mix(in srgb, var(--app-accent) 10%, transparent);
+}
+
+.admin-workspace details > summary {
+  transition: background-color 160ms ease, color 160ms ease;
+}
+
+.admin-workspace details > summary:hover {
+  background: color-mix(in srgb, var(--app-accent) 4%, transparent) !important;
+  color: var(--app-text);
+}
+
+@media (max-width: 767px) {
+  .admin-page-hero {
+    padding: 1.2rem;
+  }
+
+  .admin-page-hero__content {
+    min-height: 0;
+    align-items: flex-start;
+  }
+
+  .admin-page-hero__title {
+    font-size: 2rem;
+  }
+
+  .admin-page-hero__aside {
+    max-width: 48%;
+  }
+
+  .admin-page-hero__mark {
+    display: none;
+  }
+}
+
+@media (max-width: 639px) {
+  .admin-page-hero__content {
+    flex-direction: column;
+  }
+
+  .admin-page-hero__aside,
+  .admin-page-hero__action {
+    width: 100%;
+    max-width: none;
+  }
+
+  .admin-page-hero__action > * {
+    width: 100%;
+  }
+}

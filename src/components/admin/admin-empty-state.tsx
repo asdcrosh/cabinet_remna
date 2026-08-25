@@ -22,13 +22,14 @@ export function AdminEmptyState({
   return (
     <div
       className={cn(
+        'admin-empty-state',
         surface === 'card'
           ? 'rounded-xl border border-dashed border-slate-300/80 bg-white px-4 py-8 text-left dark:border-white/[0.1] dark:bg-white/[0.025] sm:px-6'
           : 'rounded-xl border border-dashed border-slate-300/80 bg-slate-50/70 px-4 py-8 text-left dark:border-white/15 dark:bg-white/[0.025]',
         className
       )}
     >
-      <div className="mb-4 grid h-10 w-10 place-items-center border border-slate-400 text-slate-500 dark:border-white/25 dark:text-slate-300">
+      <div className="admin-empty-state__icon mb-4 grid h-10 w-10 place-items-center border border-slate-400 text-slate-500 dark:border-white/25 dark:text-slate-300">
         {icon ?? <Inbox className="h-6 w-6" />}
       </div>
       <h2 className="text-base font-semibold text-slate-950 dark:text-white sm:text-lg">{title}</h2>

@@ -31,7 +31,7 @@ export function AdminFilterBar({
   const filtersId = useId()
 
   return (
-    <section className="admin-filter-bar rounded-[14px] border border-slate-200 bg-white p-2.5 dark:border-white/[0.09] dark:bg-white/[0.025] sm:p-3">
+    <section className="admin-filter-bar admin-filter-bar--polished rounded-[14px] border border-slate-200 bg-white p-2.5 dark:border-white/[0.09] dark:bg-white/[0.025] sm:p-3">
       <button
         type="button"
         className="flex min-h-11 w-full items-center gap-2.5 bg-transparent px-1 text-left text-sm font-semibold text-slate-800 dark:text-slate-100 md:hidden"
