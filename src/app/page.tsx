@@ -53,7 +53,7 @@ export default async function HomePage() {
   const brandName = getBrandName()
 
   return (
-    <main className="site-shell min-h-dvh overflow-hidden text-slate-950 dark:text-white">
+    <main className="site-shell min-h-dvh overflow-hidden pt-[var(--telegram-miniapp-safe-top)] text-slate-950 dark:text-white xl:pt-0">
       <section className="relative isolate border-b border-slate-200/80 dark:border-white/[0.08]">
         <div
           aria-hidden="true"
