@@ -2,7 +2,7 @@
 
 import type { ReactNode } from 'react'
 import { useMemo, useState } from 'react'
-import { ArrowRight, Check } from 'lucide-react'
+import { ArrowRight, Check, Sparkles } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { formatPrice } from '@/lib/format'
 import { Modal } from '@/components/ui/modal'
@@ -28,28 +28,39 @@ export function PlanCatalog({ plans, initialPlanId }: { plans: CatalogPlan[]; in
   if (orderedPlans.length === 0) return null
 
   return (
-    <section className="plan-catalog" aria-label="Выбор тарифа">
-      <div className="plan-catalog__heading mb-4 hidden flex-wrap items-end justify-between gap-3 min-[1360px]:flex">
-        <div>
-          <div className="page-eyebrow">Срок подписки</div>
-          <h2 className="text-xl font-semibold tracking-[-0.035em] text-slate-950 dark:text-white">Выберите период</h2>
+    <section className="plan-catalog relative overflow-hidden rounded-[1.5rem] border border-slate-200/80 bg-white p-4 shadow-[0_18px_50px_-32px_rgba(15,23,42,0.38)] dark:border-white/[0.09] dark:bg-white/[0.035] sm:p-5" aria-label="Выбор тарифа">
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-fuchsia-500/[0.06] to-transparent dark:from-fuchsia-400/[0.08]" />
+      <div className="plan-catalog__heading relative mb-5 hidden flex-wrap items-end justify-between gap-3 min-[1360px]:flex">
+        <div className="flex items-center gap-3">
+          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-fuchsia-500/10 text-fuchsia-600 ring-1 ring-fuchsia-500/15 dark:text-fuchsia-300">
+            <Sparkles className="h-4 w-4" />
+          </span>
+          <div>
+            <div className="page-eyebrow">Срок подписки</div>
+            <h2 className="text-xl font-semibold tracking-[-0.035em] text-slate-950 dark:text-white">Выберите период</h2>
+          </div>
         </div>
-        <span className="shrink-0 border-l-2 border-cyan-400 pl-2 font-mono text-[10px] font-semibold uppercase tracking-[0.14em] tabular-nums text-slate-500 dark:text-slate-400">
+        <span className="shrink-0 rounded-full border border-fuchsia-200/80 bg-fuchsia-50/80 px-2.5 py-1 font-mono text-[10px] font-semibold uppercase tracking-[0.12em] tabular-nums text-fuchsia-700 dark:border-fuchsia-400/15 dark:bg-fuchsia-400/10 dark:text-fuchsia-200">
           {orderedPlans.length} {planCountLabel(orderedPlans.length)}
         </span>
       </div>
 
-      <div className="plan-catalog__compact-heading mb-3 flex items-center justify-between gap-3 min-[1360px]:hidden">
-        <div>
-          <div className="page-eyebrow">Срок подписки</div>
-          <h2 className="text-lg font-semibold tracking-[-0.035em] text-slate-950 dark:text-white">Выберите период</h2>
+      <div className="plan-catalog__compact-heading relative mb-4 flex items-center justify-between gap-3 min-[1360px]:hidden">
+        <div className="flex items-center gap-2.5">
+          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-fuchsia-500/10 text-fuchsia-600 ring-1 ring-fuchsia-500/15 dark:text-fuchsia-300">
+            <Sparkles className="h-4 w-4" />
+          </span>
+          <div>
+            <div className="page-eyebrow">Срок подписки</div>
+            <h2 className="text-lg font-semibold tracking-[-0.035em] text-slate-950 dark:text-white">Выберите период</h2>
+          </div>
         </div>
-        <span className="shrink-0 border-l-2 border-brand-400 pl-2 font-mono text-[10px] font-semibold uppercase tracking-[0.14em] tabular-nums text-slate-500 dark:text-slate-400">
+        <span className="shrink-0 rounded-full border border-fuchsia-200/80 bg-fuchsia-50/80 px-2.5 py-1 font-mono text-[10px] font-semibold uppercase tracking-[0.12em] tabular-nums text-fuchsia-700 dark:border-fuchsia-400/15 dark:bg-fuchsia-400/10 dark:text-fuchsia-200">
           {orderedPlans.length} {planCountLabel(orderedPlans.length)}
         </span>
       </div>
 
-      <div className="plan-period-list grid gap-2 min-[1360px]:hidden">
+      <div className="plan-period-list relative grid gap-2.5 min-[1360px]:hidden">
         {orderedPlans.map((plan, index) => (
           <article
             key={plan.id}
@@ -108,7 +119,7 @@ export function PlanCatalog({ plans, initialPlanId }: { plans: CatalogPlan[]; in
         ))}
       </div>
 
-      <div className="hidden gap-5 min-[1360px]:grid min-[1360px]:grid-cols-2 min-[1360px]:items-start">
+      <div className="relative hidden gap-5 min-[1360px]:grid min-[1360px]:grid-cols-2 min-[1360px]:items-start">
         <div className="plan-period-panel flex flex-col border p-4">
           <div className="mb-3 px-1 sm:flex sm:items-end sm:justify-between sm:gap-4">
             <div>

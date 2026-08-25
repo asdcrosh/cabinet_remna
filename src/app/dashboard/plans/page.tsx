@@ -212,8 +212,11 @@ export default async function PlansPage({
       />
 
       {isRenewIntent && (
-        <section className="flex items-start gap-3 border-l-2 border-cyan-500 py-1 pl-3 text-sm text-slate-700 dark:text-slate-200">
-          <RefreshCw className="mt-0.5 h-4 w-4 shrink-0 text-cyan-700 dark:text-cyan-300" />
+        <section className="relative flex items-start gap-3 overflow-hidden rounded-[1.25rem] border border-cyan-200/80 bg-gradient-to-br from-cyan-50 via-white to-sky-50/70 p-4 text-sm text-slate-700 shadow-[0_12px_32px_-25px_rgba(8,145,178,0.55)] dark:border-cyan-400/15 dark:from-cyan-500/[0.09] dark:via-white/[0.025] dark:to-sky-500/[0.05] dark:text-slate-200">
+          <div className="pointer-events-none absolute -right-10 -top-14 h-28 w-28 rounded-full bg-cyan-300/20 blur-2xl dark:bg-cyan-300/10" />
+          <span className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-cyan-500/10 text-cyan-700 ring-1 ring-cyan-500/15 dark:text-cyan-200">
+            <RefreshCw className="h-4 w-4" />
+          </span>
           <div className="min-w-0">
             <div className="font-semibold">Продление подписки</div>
             <div className="mt-1 leading-5 text-slate-500 dark:text-slate-400">
@@ -224,9 +227,11 @@ export default async function PlansPage({
       )}
 
       {needsTelegramCheckForPromo && (
-        <div className="flex items-center gap-3 border-l-2 border-amber-400 py-1 pl-3 text-sm text-slate-800 dark:text-slate-100">
+        <div className="relative flex items-center gap-3 overflow-hidden rounded-[1.25rem] border border-amber-200/80 bg-gradient-to-br from-amber-50 via-white to-orange-50/70 p-4 text-sm text-slate-800 shadow-[0_12px_32px_-25px_rgba(217,119,6,0.5)] dark:border-amber-400/15 dark:from-amber-500/[0.09] dark:via-white/[0.025] dark:to-orange-500/[0.05] dark:text-slate-100">
           <span className="flex min-w-0 items-center gap-3">
-            <MessageCircleQuestion className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-300" />
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-500/10 text-amber-700 ring-1 ring-amber-500/15 dark:text-amber-200">
+              <MessageCircleQuestion className="h-4 w-4" />
+            </span>
             <span className="min-w-0">
               <span className="block font-semibold">Доступен пробный тариф</span>
               <span className="mt-0.5 block truncate text-xs text-slate-500 dark:text-slate-400">Подтвердите аккаунт через Telegram</span>
@@ -240,15 +245,16 @@ export default async function PlansPage({
       )}
 
       {autoRenewalAvailable ? (
-        <section className="flex flex-col gap-3 border-y border-slate-200 py-3 dark:border-white/[0.08] sm:flex-row sm:items-center sm:justify-between" aria-label="Автопродление">
+        <section className="relative flex flex-col gap-3 overflow-hidden rounded-[1.25rem] border border-slate-200/80 bg-white p-4 shadow-[0_14px_36px_-28px_rgba(15,23,42,0.45)] dark:border-white/[0.09] dark:bg-white/[0.035] sm:flex-row sm:items-center sm:justify-between" aria-label="Автопродление">
+          <div className="pointer-events-none absolute inset-y-0 left-0 w-28 bg-gradient-to-r from-violet-500/[0.07] to-transparent dark:from-violet-400/[0.08]" />
           <div className="flex min-w-0 items-start gap-3">
-            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-brand-500/10 text-brand-600 dark:text-brand-300">
+            <span className="relative grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-violet-500/10 text-violet-600 ring-1 ring-violet-500/15 dark:text-violet-300">
               <RefreshCw className="h-4 w-4" />
             </span>
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
                 <h2 className="text-sm font-semibold text-slate-950 dark:text-white">Автопродление</h2>
-                <span className={activeAutoRenewal ? 'text-xs font-semibold text-emerald-600 dark:text-emerald-300' : 'text-xs font-medium text-slate-400'}>
+                <span className={activeAutoRenewal ? 'rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-semibold text-emerald-700 dark:text-emerald-300' : 'rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500 dark:bg-white/[0.06] dark:text-slate-400'}>
                   {activeAutoRenewal ? 'Включено' : autoRenewalConsentCurrent ? 'Ожидает оплаты' : 'По желанию'}
                 </span>
               </div>
@@ -278,8 +284,10 @@ export default async function PlansPage({
       ) : null}
 
       {planViews.length === 0 && (
-        <div className="border-y border-slate-200 px-4 py-10 text-center dark:border-white/[0.08] sm:px-6 sm:py-12">
-          <ShieldCheck className="mx-auto mb-4 h-7 w-7 text-cyan-700 dark:text-cyan-200" />
+        <div className="rounded-[1.5rem] border border-dashed border-slate-300 bg-white px-4 py-10 text-center shadow-sm dark:border-white/15 dark:bg-white/[0.025] sm:px-6 sm:py-12">
+          <span className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-cyan-500/10 text-cyan-700 ring-1 ring-cyan-500/15 dark:text-cyan-200">
+            <ShieldCheck className="h-6 w-6" />
+          </span>
           <h3 className="text-lg font-semibold">Тарифы скоро появятся</h3>
           <p className="mx-auto mt-2 max-w-md text-sm text-slate-500 dark:text-slate-400">Сейчас нет опубликованных тарифов.</p>
           {canManagePlans && (
