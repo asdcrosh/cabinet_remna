@@ -1,8 +1,26 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { DragEvent, ReactNode } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
+import {
+  closestCenter,
+  DndContext,
+  DragOverlay,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core'
+import type { DragEndEvent, DragStartEvent } from '@dnd-kit/core'
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import {
   ChevronDown,
   Edit3,
@@ -78,11 +96,6 @@ interface RemnawaveSquad {
   isActive: boolean
 }
 
-type PlanDropTarget = {
-  planId: string
-  placement: 'before' | 'after'
-}
-
 const emptyForm: PlanFormState = {
   name: '',
   description: '',
@@ -109,7 +122,6 @@ export function PlansAdmin({ plans }: { plans: PlanAdminRow[] }) {
   const router = useRouter()
   const [orderedPlans, setOrderedPlans] = useState(plans)
   const [draggedPlanId, setDraggedPlanId] = useState<string | null>(null)
-  const [dropTarget, setDropTarget] = useState<PlanDropTarget | null>(null)
   const [reordering, setReordering] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
   const [createForm, setCreateForm] = useState<PlanFormState>(emptyForm)
@@ -122,7 +134,14 @@ export function PlansAdmin({ plans }: { plans: PlanAdminRow[] }) {
   const [deleteCandidate, setDeleteCandidate] = useState<PlanAdminRow | null>(null)
   const orderedPlansRef = useRef(plans)
   const dragStartPlansRef = useRef<PlanAdminRow[] | null>(null)
-  const dragCommittedRef = useRef(false)
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 8 },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  )
 
   useEffect(() => {
     void loadSquads()
@@ -230,42 +249,26 @@ export function PlansAdmin({ plans }: { plans: PlanAdminRow[] }) {
     setOrderedPlans(nextPlans)
   }
 
-  function beginDrag(event: DragEvent<HTMLButtonElement>, planId: string) {
-    if (reordering) return
-    event.dataTransfer.effectAllowed = 'move'
-    event.dataTransfer.setData('text/plain', planId)
+  function beginDrag(event: DragStartEvent) {
     dragStartPlansRef.current = orderedPlansRef.current
-    dragCommittedRef.current = false
-    setDraggedPlanId(planId)
-    setDropTarget(null)
+    setDraggedPlanId(String(event.active.id))
   }
 
-  function previewMove(event: DragEvent<HTMLElement>, targetPlanId: string) {
-    const sourcePlanId = event.dataTransfer.getData('text/plain') || draggedPlanId
-    if (!sourcePlanId || sourcePlanId === targetPlanId || reordering) return
-
-    event.preventDefault()
-    event.dataTransfer.dropEffect = 'move'
-    const bounds = event.currentTarget.getBoundingClientRect()
-    const placement = event.clientY < bounds.top + bounds.height / 2 ? 'before' : 'after'
-    if (dropTarget?.planId === targetPlanId && dropTarget.placement === placement) return
-
-    const nextPlans = reorderPlans(orderedPlansRef.current, sourcePlanId, targetPlanId, placement)
-    updatePlanOrder(nextPlans)
-    setDropTarget({ planId: targetPlanId, placement })
-  }
-
-  async function persistDraggedOrder() {
-    const previousPlans = dragStartPlansRef.current
-    const nextPlans = orderedPlansRef.current
-    dragCommittedRef.current = true
+  async function finishDrag(event: DragEndEvent) {
+    const previousPlans = dragStartPlansRef.current ?? orderedPlansRef.current
+    const sourcePlanId = String(event.active.id)
+    const targetPlanId = event.over ? String(event.over.id) : null
+    dragStartPlansRef.current = null
     setDraggedPlanId(null)
-    setDropTarget(null)
 
-    if (!previousPlans || hasSamePlanOrder(previousPlans, nextPlans)) {
-      dragStartPlansRef.current = null
-      return
-    }
+    if (!targetPlanId || sourcePlanId === targetPlanId) return
+
+    const sourceIndex = previousPlans.findIndex((plan) => plan.id === sourcePlanId)
+    const targetIndex = previousPlans.findIndex((plan) => plan.id === targetPlanId)
+    if (sourceIndex < 0 || targetIndex < 0) return
+
+    const nextPlans = arrayMove(previousPlans, sourceIndex, targetIndex)
+    updatePlanOrder(nextPlans)
 
     setReordering(true)
 
@@ -280,23 +283,18 @@ export function PlansAdmin({ plans }: { plans: PlanAdminRow[] }) {
       updatePlanOrder(previousPlans)
     } finally {
       setReordering(false)
-      dragStartPlansRef.current = null
-      dragCommittedRef.current = false
     }
   }
 
   function cancelDrag() {
-    if (!dragCommittedRef.current && dragStartPlansRef.current) {
-      updatePlanOrder(dragStartPlansRef.current)
-    }
     dragStartPlansRef.current = null
     setDraggedPlanId(null)
-    setDropTarget(null)
   }
 
   const squadById = useMemo(() => new Map(squads.map((squad) => [squad.uuid, squad])), [squads])
   const activePlansCount = orderedPlans.filter((plan) => plan.isActive).length
   const subscriptionsCount = orderedPlans.reduce((total, plan) => total + plan.subscriptionsCount, 0)
+  const draggedPlan = draggedPlanId ? orderedPlans.find((plan) => plan.id === draggedPlanId) ?? null : null
 
   return (
     <div className="space-y-4">
@@ -390,142 +388,60 @@ export function PlansAdmin({ plans }: { plans: PlanAdminRow[] }) {
       )}
 
       {orderedPlans.length > 0 && (
-        <>
-          <div className="hidden items-center justify-between gap-4 rounded-2xl border border-violet-200/80 bg-violet-50/70 px-4 py-3 text-sm text-violet-950 dark:border-violet-400/20 dark:bg-violet-400/[0.06] dark:text-violet-100 lg:flex">
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragStart={beginDrag}
+          onDragEnd={(event) => void finishDrag(event)}
+          onDragCancel={cancelDrag}
+          accessibility={{
+            screenReaderInstructions: {
+              draggable: 'Нажмите пробел, чтобы поднять тариф. Используйте стрелки для перемещения. Нажмите пробел ещё раз, чтобы сохранить позицию, или Escape для отмены.',
+            },
+          }}
+        >
+          <div className="flex flex-col gap-3 rounded-2xl border border-violet-200/80 bg-violet-50/70 px-4 py-3 text-sm text-violet-950 dark:border-violet-400/20 dark:bg-violet-400/[0.06] dark:text-violet-100 sm:flex-row sm:items-center sm:justify-between">
             <span className="flex items-center gap-2.5">
               <span className="grid h-8 w-8 place-items-center rounded-lg border border-violet-200 bg-white text-violet-600 dark:border-violet-400/30 dark:bg-violet-400/10 dark:text-violet-200">
                 <GripVertical className="h-4 w-4" />
               </span>
-              <span><strong>Порядок каталога.</strong> Зажмите маркер у тарифа и проведите его к нужной позиции.</span>
+              <span><strong>Порядок каталога.</strong> Потяните тариф за маркер или используйте клавиатуру.</span>
             </span>
             <span className="shrink-0 font-medium text-violet-700 dark:text-violet-200">
-              {draggedPlanId && dropTarget
-                ? `Отпустите: ${dropTarget.placement === 'before' ? 'перед' : 'после'} «${orderedPlans.find((plan) => plan.id === dropTarget.planId)?.name ?? 'тарифа'}»`
-                : 'Порядок сохраняется после отпускания'}
+              {reordering
+                ? 'Сохраняем новый порядок...'
+                : draggedPlan
+                  ? `Перемещаем «${draggedPlan.name}»`
+                  : 'Изменения сохраняются автоматически'}
             </span>
           </div>
-          <div data-testid="admin-plan-grid" className="admin-list">
-          <div className="admin-list-header grid-cols-[minmax(14rem,1.15fr)_minmax(12rem,.9fr)_minmax(12rem,.9fr)_2.5rem] items-center gap-x-6">
-            <span>Тариф <span className="ml-2 hidden normal-case tracking-normal text-slate-400 lg:inline">порядок можно менять</span></span>
-            <span>Условия</span>
-            <span>Доступ и использование</span>
-            <span className="sr-only">Действия</span>
-          </div>
-          {orderedPlans.map((plan) => {
-            const selectedSquads = plan.activeInternalSquads.map((id) => squadById.get(id)).filter(Boolean) as RemnawaveSquad[]
-            const unknownSquads = plan.activeInternalSquads.filter((id) => !squadById.has(id))
-            const allowedUsersCount = new Set([...plan.allowedEmails, ...plan.allowedTelegramIds]).size
-
-            return (
-              <article
-                key={plan.id}
-                data-testid="admin-plan-card"
-                onDragOver={(event) => previewMove(event, plan.id)}
-                onDrop={(event) => {
-                  event.preventDefault()
-                  void persistDraggedOrder()
-                }}
-                className={cn(
-                  'admin-list-row relative min-w-0 p-3.5 transition-[opacity,box-shadow,background-color] duration-150 sm:p-4 lg:grid lg:grid-cols-[minmax(14rem,1.15fr)_minmax(12rem,.9fr)_minmax(12rem,.9fr)_auto] lg:items-center lg:gap-x-6',
-                  draggedPlanId === plan.id && 'scale-[0.995] bg-violet-100/50 opacity-35 shadow-inner dark:bg-violet-400/[0.08]',
-                  dropTarget?.planId === plan.id && 'bg-violet-50/80 dark:bg-violet-400/[0.05]'
-                )}
-              >
-                {dropTarget?.planId === plan.id && (
-                  <div
-                    aria-hidden="true"
-                    className={cn(
-                      'pointer-events-none absolute inset-x-3 z-10 flex items-center gap-2',
-                      dropTarget.placement === 'before' ? 'top-0 -translate-y-1/2' : 'bottom-0 translate-y-1/2'
-                    )}
-                  >
-                    <span className="h-1 flex-1 rounded-full bg-violet-500 shadow-[0_0_12px_rgba(139,92,246,0.8)]" />
-                    <span className="rounded-full bg-violet-600 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-white shadow-sm">
-                      {dropTarget.placement === 'before' ? 'Вставить перед' : 'Вставить после'}
-                    </span>
-                  </div>
-                )}
-                <div className="min-w-0">
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <button
-                        type="button"
-                        draggable={!reordering}
-                        onDragStart={(event) => beginDrag(event, plan.id)}
-                        onDragEnd={cancelDrag}
-                        className="hidden h-10 w-10 shrink-0 cursor-grab touch-none items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-500 shadow-sm transition-all hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700 active:cursor-grabbing active:scale-95 dark:border-white/10 dark:bg-white/[0.035] dark:text-slate-300 dark:hover:border-violet-400/40 dark:hover:bg-violet-400/10 dark:hover:text-violet-200 lg:inline-flex"
-                        title="Перетащить тариф"
-                        aria-label={`Перетащить тариф ${plan.name}`}
-                        disabled={reordering}
-                      >
-                        <GripVertical className="h-5 w-5" />
-                      </button>
-                      <h3 className="break-words font-semibold tracking-tight">{plan.name}</h3>
-                      {!plan.isActive && <span className="badge-disabled">Скрыт</span>}
-                      {plan.isPromo && <span className="badge-limited">Пробный</span>}
-                    </div>
-                    {plan.description && <p className="mt-1 line-clamp-2 text-sm leading-5 text-slate-500 dark:text-slate-400">{plan.description}</p>}
-                  </div>
-                  <div className="mt-3 flex items-baseline gap-1.5 lg:mt-2">
-                    <span className="text-lg font-semibold tracking-tight text-slate-950 dark:text-white">{formatPrice(plan.priceKopecks)}</span>
-                    <span className="text-xs text-slate-400">за {plan.durationDays} дн.</span>
-                  </div>
-                </div>
-
-                <div className="mt-3 grid grid-cols-2 gap-2 lg:mt-0">
-                  <PlanFact label="Срок" value={`${plan.durationDays} дней`} />
-                  <PlanFact label="Трафик" value={plan.trafficLimitGb == null ? 'Безлимит' : `${plan.trafficLimitGb} ГБ`} />
-                  <PlanFact
-                    label="Устройства"
-                    value={plan.maxDeviceLimit > plan.deviceLimit
-                      ? `${plan.deviceLimit}–${plan.maxDeviceLimit} · +${formatPrice(plan.extraDevicePriceKopecks)}`
-                      : String(plan.deviceLimit)}
-                  />
-                  <PlanFact label="Доступ" value={planAvailabilityLabels[plan.availability]} />
-                </div>
-
-                <div className="mt-3 min-w-0 rounded-2xl bg-slate-50 p-3 text-sm text-slate-500 dark:bg-white/[0.035] dark:text-slate-400 lg:mt-0 lg:rounded-none lg:bg-transparent lg:p-0 lg:dark:bg-transparent">
-                  {plan.activeInternalSquads.length > 0 ? (
-                    <div className="flex min-w-0 items-center gap-2">
-                      <Server className="h-4 w-4 shrink-0 text-slate-400" />
-                      <span className="min-w-0 break-words lg:truncate">
-                        {selectedSquads.slice(0, 2).map((squad) => squad.name).join(', ') || 'Группы не найдены'}
-                      </span>
-                      {plan.activeInternalSquads.length > 2 && <span className="shrink-0">+{plan.activeInternalSquads.length - 2}</span>}
-                      {unknownSquads.length > 0 && <span className="shrink-0 text-amber-600">{unknownSquads.length}?</span>}
-                    </div>
-                  ) : (
-                    <span>Без серверных групп</span>
-                  )}
-                  <div className="mt-2 flex flex-wrap gap-1.5 text-xs">
-                    {plan.isFeatured && <PlanTag>Популярный</PlanTag>}
-                    {!plan.promoCodesEnabled && <PlanTag>Без скидок</PlanTag>}
-                    {plan.whitelistAddonEnabled && (
-                      <PlanTag>Белые списки +{formatPrice(plan.whitelistAddonPriceKopecks)}</PlanTag>
-                    )}
-                    {plan.availability === 'ALLOWED' && <PlanTag>{allowedUsersCount} польз.</PlanTag>}
-                    <PlanTag>{plan.subscriptionsCount} подписок</PlanTag>
-                    <PlanTag>{plan.paymentsCount} оплат</PlanTag>
-                  </div>
-                </div>
-
-                <div className="mt-3 flex justify-end border-t border-slate-100 pt-3 dark:border-white/[0.07] lg:mt-0 lg:border-0 lg:pt-0">
-                  <AdminActionsMenu compact label={`Действия: ${plan.name}`}>
-                    <PlanActions
-                      plan={plan}
-                      loading={loadingId === plan.id}
-                      onEdit={() => startEdit(plan)}
-                      onCopy={() => void copyPlanLink(plan)}
-                      onToggle={() => void toggleActive(plan)}
-                      onDelete={() => requestDeletePlan(plan)}
-                    />
-                  </AdminActionsMenu>
-                </div>
-              </article>
-            )
-          })}
-          </div>
-        </>
+          <SortableContext items={orderedPlans.map((plan) => plan.id)} strategy={verticalListSortingStrategy}>
+            <div data-testid="admin-plan-grid" className="admin-list">
+              <div className="admin-list-header grid-cols-[minmax(14rem,1.15fr)_minmax(12rem,.9fr)_minmax(12rem,.9fr)_2.5rem] items-center gap-x-6">
+                <span>Тариф <span className="ml-2 hidden normal-case tracking-normal text-slate-400 lg:inline">порядок можно менять</span></span>
+                <span>Условия</span>
+                <span>Доступ и использование</span>
+                <span className="sr-only">Действия</span>
+              </div>
+              {orderedPlans.map((plan) => (
+                <SortablePlanCard
+                  key={plan.id}
+                  plan={plan}
+                  squadById={squadById}
+                  disabled={reordering}
+                  loading={loadingId === plan.id}
+                  onEdit={() => startEdit(plan)}
+                  onCopy={() => void copyPlanLink(plan)}
+                  onToggle={() => void toggleActive(plan)}
+                  onDelete={() => requestDeletePlan(plan)}
+                />
+              ))}
+            </div>
+          </SortableContext>
+          <DragOverlay dropAnimation={{ duration: 180, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' }}>
+            {draggedPlan ? <PlanDragOverlay plan={draggedPlan} /> : null}
+          </DragOverlay>
+        </DndContext>
       )}
       <ConfirmDialog
         open={Boolean(deleteCandidate)}
@@ -540,29 +456,159 @@ export function PlansAdmin({ plans }: { plans: PlanAdminRow[] }) {
   )
 }
 
-function reorderPlans(
-  plans: PlanAdminRow[],
-  sourcePlanId: string,
-  targetPlanId: string,
-  placement: PlanDropTarget['placement']
-) {
-  const sourcePlan = plans.find((plan) => plan.id === sourcePlanId)
-  if (!sourcePlan || sourcePlanId === targetPlanId) return plans
+function SortablePlanCard({
+  plan,
+  squadById,
+  disabled,
+  loading,
+  onEdit,
+  onCopy,
+  onToggle,
+  onDelete,
+}: {
+  plan: PlanAdminRow
+  squadById: Map<string, RemnawaveSquad>
+  disabled: boolean
+  loading: boolean
+  onEdit: () => void
+  onCopy: () => void
+  onToggle: () => void
+  onDelete: () => void
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    setActivatorNodeRef,
+    transform,
+    transition,
+    isDragging,
+    isOver,
+  } = useSortable({
+    id: plan.id,
+    disabled,
+    transition: {
+      duration: 220,
+      easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
+    },
+  })
+  const selectedSquads = plan.activeInternalSquads.map((id) => squadById.get(id)).filter(Boolean) as RemnawaveSquad[]
+  const unknownSquads = plan.activeInternalSquads.filter((id) => !squadById.has(id))
+  const allowedUsersCount = new Set([...plan.allowedEmails, ...plan.allowedTelegramIds]).size
+  const style: CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 10 : undefined,
+  }
 
-  const withoutSource = plans.filter((plan) => plan.id !== sourcePlanId)
-  const targetIndex = withoutSource.findIndex((plan) => plan.id === targetPlanId)
-  if (targetIndex < 0) return plans
+  return (
+    <article
+      ref={setNodeRef}
+      style={style}
+      data-testid="admin-plan-card"
+      className={cn(
+        'admin-list-row relative min-w-0 p-3.5 transition-[opacity,box-shadow,background-color] sm:p-4 lg:grid lg:grid-cols-[minmax(14rem,1.15fr)_minmax(12rem,.9fr)_minmax(12rem,.9fr)_auto] lg:items-center lg:gap-x-6',
+        isDragging && 'bg-violet-100/50 opacity-25 shadow-inner dark:bg-violet-400/[0.08]',
+        isOver && !isDragging && 'bg-violet-50/80 dark:bg-violet-400/[0.05]'
+      )}
+    >
+      <div className="min-w-0">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              ref={setActivatorNodeRef}
+              type="button"
+              className="inline-flex h-10 w-10 shrink-0 cursor-grab touch-none items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-500 shadow-sm transition-[border-color,background-color,color,transform,box-shadow] hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700 hover:shadow-md active:cursor-grabbing active:scale-95 disabled:cursor-wait disabled:opacity-50 dark:border-white/10 dark:bg-white/[0.035] dark:text-slate-300 dark:hover:border-violet-400/40 dark:hover:bg-violet-400/10 dark:hover:text-violet-200"
+              title="Изменить позицию тарифа"
+              aria-label={`Изменить позицию тарифа ${plan.name}`}
+              disabled={disabled}
+              {...attributes}
+              {...listeners}
+            >
+              <GripVertical className="h-5 w-5" />
+            </button>
+            <h3 className="break-words font-semibold tracking-tight">{plan.name}</h3>
+            {!plan.isActive && <span className="badge-disabled">Скрыт</span>}
+            {plan.isPromo && <span className="badge-limited">Пробный</span>}
+          </div>
+          {plan.description && <p className="mt-1 line-clamp-2 text-sm leading-5 text-slate-500 dark:text-slate-400">{plan.description}</p>}
+        </div>
+        <div className="mt-3 flex items-baseline gap-1.5 lg:mt-2">
+          <span className="text-lg font-semibold tracking-tight text-slate-950 dark:text-white">{formatPrice(plan.priceKopecks)}</span>
+          <span className="text-xs text-slate-400">за {plan.durationDays} дн.</span>
+        </div>
+      </div>
 
-  const insertionIndex = placement === 'before' ? targetIndex : targetIndex + 1
-  return [
-    ...withoutSource.slice(0, insertionIndex),
-    sourcePlan,
-    ...withoutSource.slice(insertionIndex),
-  ]
+      <div className="mt-3 grid grid-cols-2 gap-2 lg:mt-0">
+        <PlanFact label="Срок" value={`${plan.durationDays} дней`} />
+        <PlanFact label="Трафик" value={plan.trafficLimitGb == null ? 'Безлимит' : `${plan.trafficLimitGb} ГБ`} />
+        <PlanFact
+          label="Устройства"
+          value={plan.maxDeviceLimit > plan.deviceLimit
+            ? `${plan.deviceLimit}–${plan.maxDeviceLimit} · +${formatPrice(plan.extraDevicePriceKopecks)}`
+            : String(plan.deviceLimit)}
+        />
+        <PlanFact label="Доступ" value={planAvailabilityLabels[plan.availability]} />
+      </div>
+
+      <div className="mt-3 min-w-0 rounded-2xl bg-slate-50 p-3 text-sm text-slate-500 dark:bg-white/[0.035] dark:text-slate-400 lg:mt-0 lg:rounded-none lg:bg-transparent lg:p-0 lg:dark:bg-transparent">
+        {plan.activeInternalSquads.length > 0 ? (
+          <div className="flex min-w-0 items-center gap-2">
+            <Server className="h-4 w-4 shrink-0 text-slate-400" />
+            <span className="min-w-0 break-words lg:truncate">
+              {selectedSquads.slice(0, 2).map((squad) => squad.name).join(', ') || 'Группы не найдены'}
+            </span>
+            {plan.activeInternalSquads.length > 2 && <span className="shrink-0">+{plan.activeInternalSquads.length - 2}</span>}
+            {unknownSquads.length > 0 && <span className="shrink-0 text-amber-600">{unknownSquads.length}?</span>}
+          </div>
+        ) : (
+          <span>Без серверных групп</span>
+        )}
+        <div className="mt-2 flex flex-wrap gap-1.5 text-xs">
+          {plan.isFeatured && <PlanTag>Популярный</PlanTag>}
+          {!plan.promoCodesEnabled && <PlanTag>Без скидок</PlanTag>}
+          {plan.whitelistAddonEnabled && (
+            <PlanTag>Белые списки +{formatPrice(plan.whitelistAddonPriceKopecks)}</PlanTag>
+          )}
+          {plan.availability === 'ALLOWED' && <PlanTag>{allowedUsersCount} польз.</PlanTag>}
+          <PlanTag>{plan.subscriptionsCount} подписок</PlanTag>
+          <PlanTag>{plan.paymentsCount} оплат</PlanTag>
+        </div>
+      </div>
+
+      <div className="mt-3 flex justify-end border-t border-slate-100 pt-3 dark:border-white/[0.07] lg:mt-0 lg:border-0 lg:pt-0">
+        <AdminActionsMenu compact label={`Действия: ${plan.name}`}>
+          <PlanActions
+            plan={plan}
+            loading={loading}
+            onEdit={onEdit}
+            onCopy={onCopy}
+            onToggle={onToggle}
+            onDelete={onDelete}
+          />
+        </AdminActionsMenu>
+      </div>
+    </article>
+  )
 }
 
-function hasSamePlanOrder(left: PlanAdminRow[], right: PlanAdminRow[]) {
-  return left.length === right.length && left.every((plan, index) => plan.id === right[index]?.id)
+function PlanDragOverlay({ plan }: { plan: PlanAdminRow }) {
+  return (
+    <div className="flex min-w-[18rem] max-w-[32rem] cursor-grabbing items-center gap-3 rounded-2xl border border-violet-300 bg-white px-4 py-3 text-slate-950 shadow-2xl shadow-violet-950/20 ring-2 ring-violet-500/20 dark:border-violet-400/40 dark:bg-surface-900 dark:text-white">
+      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-violet-100 text-violet-700 dark:bg-violet-400/15 dark:text-violet-200">
+        <GripVertical className="h-5 w-5" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate font-semibold">{plan.name}</span>
+        <span className="mt-0.5 block text-xs text-slate-500 dark:text-slate-400">
+          {formatPrice(plan.priceKopecks)} · {plan.durationDays} дн.
+        </span>
+      </span>
+      <span className="rounded-full bg-violet-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-violet-700 dark:bg-violet-400/15 dark:text-violet-200">
+        Перемещение
+      </span>
+    </div>
+  )
 }
 
 function CatalogMetric({ value, label }: { value: number; label: string }) {
