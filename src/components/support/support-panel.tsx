@@ -461,25 +461,31 @@ export function SupportPanel({
   return (
     <div
       className={cn(
-        'grid h-[calc(100dvh-10rem-env(safe-area-inset-bottom))] min-h-0 gap-3 overflow-hidden xl:h-[calc(100dvh-6.25rem)]',
+        'grid h-[calc(100dvh-10rem-env(safe-area-inset-bottom))] min-h-0 gap-4 overflow-hidden xl:h-[calc(100dvh-6.25rem)]',
         mode === 'admin'
           ? 'xl:h-[calc(100dvh-5.5rem)] xl:grid-cols-[21rem_minmax(0,1fr)]'
           : 'xl:grid-cols-[18rem_minmax(0,1fr)]'
       )}
     >
-      <section className={cn('min-h-0 overflow-y-auto pr-0.5 xl:flex xl:flex-col xl:overflow-hidden', mobileChatOpen && 'hidden xl:flex')}>
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-white/10 dark:bg-surface-900">
+      <section className={cn('min-h-0 overflow-y-auto xl:flex xl:flex-col xl:overflow-hidden', mobileChatOpen && 'hidden xl:flex')}>
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[1.5rem] border border-slate-200/80 bg-white shadow-[0_20px_55px_-36px_rgba(15,23,42,0.45)] dark:border-white/[0.09] dark:bg-white/[0.035] dark:shadow-black/20">
           <div className={cn(
-            'border-b border-slate-100 bg-white/80 px-3 py-2.5 dark:border-slate-800 dark:bg-surface-900/60',
-            mode === 'admin' && 'bg-slate-50/85 dark:bg-surface-950/70'
+            'relative overflow-hidden border-b border-slate-100/80 bg-gradient-to-br from-fuchsia-50/75 via-white to-cyan-50/80 px-3.5 py-3.5 dark:border-white/[0.07] dark:from-fuchsia-500/[0.08] dark:via-transparent dark:to-cyan-400/[0.07]',
+            mode === 'admin' && 'from-violet-50/80 dark:from-violet-500/[0.08]'
           )}>
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <div className="font-semibold">{mode === 'admin' ? 'Очередь' : 'Поддержка'}</div>
-                <div className="text-xs text-slate-500">
-                  {mode === 'admin'
-                    ? `${listTotal} обращений${folderCounts['need-answer'] > 0 ? ` · ${folderCounts['need-answer']} ждут ответа` : ''}`
-                    : unreadTotal > 0 ? `${unreadTotal} новых сообщений` : 'Выберите диалог или создайте новый'}
+            <div aria-hidden="true" className="pointer-events-none absolute -right-12 -top-16 h-36 w-36 rounded-full bg-fuchsia-300/20 blur-3xl dark:bg-fuchsia-400/10" />
+            <div className="relative flex items-center justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-2.5">
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-white/90 text-fuchsia-600 shadow-sm ring-1 ring-fuchsia-100 dark:bg-white/[0.08] dark:text-fuchsia-300 dark:ring-white/10">
+                  <LifeBuoy className="h-5 w-5" />
+                </span>
+                <div className="min-w-0">
+                  <div className="font-semibold tracking-tight">{mode === 'admin' ? 'Очередь' : 'Поддержка'}</div>
+                  <div className="truncate text-xs text-slate-500 dark:text-slate-400">
+                    {mode === 'admin'
+                      ? `${listTotal} обращений${folderCounts['need-answer'] > 0 ? ` · ${folderCounts['need-answer']} ждут ответа` : ''}`
+                      : unreadTotal > 0 ? `${unreadTotal} новых сообщений` : 'Диалоги с командой поддержки'}
+                  </div>
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -487,7 +493,7 @@ export function SupportPanel({
                 {mode === 'user' && (
                   <button
                     type="button"
-                    className="grid h-9 w-9 place-items-center rounded-xl bg-slate-950 text-white shadow-sm transition-colors hover:bg-slate-800 dark:bg-white dark:text-slate-950"
+                    className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-fuchsia-600 to-cyan-500 text-white shadow-lg shadow-fuchsia-500/20 transition-transform hover:scale-105 dark:from-fuchsia-500 dark:to-cyan-400"
                     onClick={() => {
                       setNewTicketOpen(true)
                       setMobileChatOpen(true)
@@ -502,7 +508,7 @@ export function SupportPanel({
               </div>
             </div>
             <FolderTabs folder={folder} counts={folderCounts} mode={mode} onChange={setFolder} />
-            <div className="mt-2 flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 dark:border-slate-800 dark:bg-surface-950">
+            <div className="relative mt-2.5 flex items-center gap-2 rounded-xl border border-white/90 bg-white/80 px-3 py-2.5 shadow-sm shadow-slate-950/5 backdrop-blur dark:border-white/[0.08] dark:bg-black/15">
               <Search className="h-4 w-4 shrink-0 text-slate-400" />
               <input
                 value={query}
@@ -513,7 +519,7 @@ export function SupportPanel({
             </div>
           </div>
 
-          <div className="min-h-0 flex-1 overflow-y-auto p-1.5">
+          <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto p-2.5">
             {mode === 'user' && (
               <button
                 type="button"
@@ -523,13 +529,13 @@ export function SupportPanel({
                   setError('')
                 }}
                 className={cn(
-                  'mb-1.5 flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition-all',
+                  'flex w-full items-center gap-3 rounded-2xl border px-3 py-3 text-left transition-all',
                   newTicketOpen
-                    ? 'border-cyan-200 bg-cyan-50 text-slate-950 shadow-sm dark:border-cyan-400/30 dark:bg-cyan-400/10 dark:text-white'
-                    : 'border-slate-200 bg-white text-slate-700 hover:border-cyan-200 hover:bg-cyan-50/60 dark:border-slate-800 dark:bg-surface-950 dark:text-slate-200'
+                    ? 'border-fuchsia-200 bg-gradient-to-r from-fuchsia-50 to-cyan-50 text-slate-950 shadow-sm dark:border-fuchsia-400/25 dark:from-fuchsia-400/10 dark:to-cyan-400/10 dark:text-white'
+                    : 'border-slate-200/80 bg-slate-50/60 text-slate-700 hover:border-fuchsia-200 hover:bg-fuchsia-50/50 dark:border-white/[0.07] dark:bg-white/[0.025] dark:text-slate-200 dark:hover:border-fuchsia-400/20'
                 )}
               >
-                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-cyan-500 text-white dark:bg-cyan-300 dark:text-slate-950">
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-fuchsia-600 to-cyan-500 text-white shadow-md shadow-fuchsia-500/15 dark:from-fuchsia-500 dark:to-cyan-400">
                   <MessageSquarePlus className="h-5 w-5" />
                 </span>
                 <span className="min-w-0">
@@ -573,8 +579,7 @@ export function SupportPanel({
       </section>
 
       <section className={cn(
-        'relative min-h-0 overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-white/10 dark:bg-surface-900',
-        mode === 'admin' && 'shadow-sm',
+        'relative min-h-0 overflow-hidden rounded-[1.5rem] border border-slate-200/80 bg-white shadow-[0_20px_55px_-36px_rgba(15,23,42,0.45)] dark:border-white/[0.09] dark:bg-white/[0.035] dark:shadow-black/20',
         !mobileChatOpen && 'hidden xl:block'
       )}>
         {mode === 'user' && newTicketOpen ? (
@@ -592,7 +597,7 @@ export function SupportPanel({
           />
         ) : selected ? (
           <div className="flex h-full min-h-0 flex-col">
-            <div className="border-b border-slate-100 bg-white/95 px-3 py-2.5 dark:border-slate-800 dark:bg-surface-900/95 sm:px-4">
+            <div className="border-b border-slate-100/80 bg-gradient-to-r from-white via-fuchsia-50/35 to-cyan-50/45 px-3 py-3 dark:border-white/[0.07] dark:from-transparent dark:via-fuchsia-500/[0.045] dark:to-cyan-400/[0.045] sm:px-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex min-w-0 flex-1 gap-3">
                   <button
@@ -646,7 +651,7 @@ export function SupportPanel({
                 const element = event.currentTarget
                 stickToBottomRef.current = element.scrollHeight - element.scrollTop - element.clientHeight < 120
               }}
-              className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-slate-50/60 px-3 py-3 dark:bg-surface-950/30 sm:px-4"
+              className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-gradient-to-b from-slate-50/90 via-white to-cyan-50/25 px-3 py-4 dark:from-black/15 dark:via-transparent dark:to-cyan-400/[0.025] sm:px-4"
             >
               <div className="mx-auto max-w-3xl space-y-3">
                 {selected.messagePagination?.hasMore && (
@@ -668,7 +673,7 @@ export function SupportPanel({
               </div>
             </div>
 
-            <form onSubmit={sendMessage} className="border-t border-slate-100 bg-white/95 p-2.5 pb-[calc(0.625rem+env(safe-area-inset-bottom))] dark:border-slate-800 dark:bg-surface-900/95">
+            <form onSubmit={sendMessage} className="border-t border-slate-100/80 bg-white/90 p-2.5 pb-[calc(0.625rem+env(safe-area-inset-bottom))] backdrop-blur dark:border-white/[0.07] dark:bg-surface-900/80">
               {selected.status === 'CLOSED' ? (
                 <div className="flex items-center gap-2 rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-500 dark:bg-surface-800">
                   <Lock className="h-4 w-4" />
@@ -677,7 +682,7 @@ export function SupportPanel({
               ) : (
                 <div className="space-y-2">
                   <QuickReplies mode={mode} onPick={(value) => setMessage((current) => current.trim() ? `${current.trim()}\n\n${value}` : value)} />
-                  <div className="relative flex items-end gap-2 rounded-2xl border border-slate-200 bg-white p-1.5 shadow-sm dark:border-slate-800 dark:bg-surface-950">
+                  <div className="relative flex items-end gap-2 rounded-2xl border border-slate-200/90 bg-white p-1.5 shadow-[0_8px_28px_-18px_rgba(15,23,42,0.45)] dark:border-white/10 dark:bg-black/20">
                     <EmojiPicker onPick={insertMessageEmoji} />
                     <textarea
                       ref={messageInputRef}
@@ -689,7 +694,7 @@ export function SupportPanel({
                       maxLength={3000}
                       required
                     />
-                    <button type="submit" className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-slate-950 text-white shadow-sm transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-45 dark:bg-white dark:text-slate-950" disabled={isPending || !message.trim()} aria-label="Отправить сообщение">
+                    <button type="submit" className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-fuchsia-600 to-cyan-500 text-white shadow-lg shadow-fuchsia-500/20 transition-transform hover:scale-105 disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:scale-100 dark:from-fuchsia-500 dark:to-cyan-400" disabled={isPending || !message.trim()} aria-label="Отправить сообщение">
                       <Send className="h-4 w-4" />
                     </button>
                   </div>
@@ -718,13 +723,13 @@ export function SupportPanel({
             )}
           </div>
         ) : (
-          <div className="grid h-full min-h-0 place-items-center p-8 text-center">
-            <div>
-              <div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-brand-50 text-brand-600">
-                <LifeBuoy className="h-7 w-7" />
+          <div className="grid h-full min-h-0 place-items-center bg-gradient-to-br from-fuchsia-50/45 via-white to-cyan-50/60 p-8 text-center dark:from-fuchsia-500/[0.04] dark:via-transparent dark:to-cyan-400/[0.04]">
+            <div className="max-w-sm rounded-[1.75rem] border border-white/80 bg-white/65 px-8 py-9 shadow-xl shadow-slate-950/[0.04] backdrop-blur dark:border-white/[0.07] dark:bg-white/[0.025]">
+              <div className="mx-auto mb-4 grid h-16 w-16 place-items-center rounded-[1.35rem] bg-gradient-to-br from-fuchsia-600 to-cyan-500 text-white shadow-xl shadow-fuchsia-500/20 dark:from-fuchsia-500 dark:to-cyan-400">
+                <LifeBuoy className="h-8 w-8" />
               </div>
               <h2 className="text-xl font-semibold">Выберите обращение</h2>
-              <p className="mt-2 max-w-sm text-sm text-slate-500">Здесь появится переписка.</p>
+              <p className="mt-2 text-sm leading-6 text-slate-500">Выберите диалог слева, чтобы открыть переписку и ответить.</p>
             </div>
           </div>
         )}
@@ -770,10 +775,10 @@ function NewTicketForm({
 
   return (
     <form onSubmit={onSubmit} className="flex h-full min-h-0 flex-col overflow-hidden">
-      <div className="border-b border-slate-100 bg-white/95 px-3 py-3 dark:border-slate-800 dark:bg-surface-900/95 sm:px-5">
+      <div className="border-b border-slate-100/80 bg-gradient-to-r from-fuchsia-50/70 via-white to-cyan-50/70 px-3 py-3 dark:border-white/[0.07] dark:from-fuchsia-500/[0.07] dark:via-transparent dark:to-cyan-400/[0.06] sm:px-5">
         <div className="flex items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-cyan-50 text-cyan-700 ring-1 ring-cyan-100 dark:bg-cyan-400/10 dark:text-cyan-200 dark:ring-cyan-400/20">
+            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-fuchsia-600 to-cyan-500 text-white shadow-lg shadow-fuchsia-500/20 dark:from-fuchsia-500 dark:to-cyan-400">
               <MessageSquarePlus className="h-5 w-5" />
             </div>
             <div className="min-w-0">
@@ -789,7 +794,7 @@ function NewTicketForm({
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3 sm:space-y-5 sm:p-5">
+      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto bg-gradient-to-b from-white to-slate-50/60 p-3 dark:from-transparent dark:to-black/10 sm:space-y-5 sm:p-5">
         <div role="group" aria-labelledby="new-ticket-category-label">
           <div id="new-ticket-category-label" className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
             <Tag className="h-3.5 w-3.5" />
@@ -805,14 +810,14 @@ function NewTicketForm({
                   aria-pressed={active}
                   onClick={() => onCategoryChange(item.value)}
                   className={cn(
-                    'min-w-[13rem] rounded-2xl border p-3 text-left transition-colors sm:min-w-0',
+                    'min-w-[13rem] rounded-2xl border p-3 text-left transition-all sm:min-w-0',
                     active
-                      ? 'border-cyan-300 bg-cyan-50 text-slate-950 shadow-sm shadow-cyan-950/5 dark:border-cyan-400/40 dark:bg-cyan-400/10 dark:text-white'
-                      : 'border-slate-200 bg-white text-slate-700 hover:border-cyan-200 hover:bg-cyan-50/40 dark:border-slate-800 dark:bg-surface-950 dark:text-slate-200 dark:hover:border-cyan-400/30'
+                      ? 'border-fuchsia-200 bg-gradient-to-br from-fuchsia-50 to-cyan-50 text-slate-950 shadow-md shadow-fuchsia-950/5 dark:border-fuchsia-400/30 dark:from-fuchsia-400/10 dark:to-cyan-400/10 dark:text-white'
+                      : 'border-slate-200/80 bg-white text-slate-700 hover:-translate-y-0.5 hover:border-fuchsia-200 hover:shadow-sm dark:border-white/[0.08] dark:bg-white/[0.025] dark:text-slate-200 dark:hover:border-fuchsia-400/25'
                   )}
                 >
                   <span className="block text-sm font-semibold sm:text-base">{item.label}</span>
-                  <span className={cn('mt-1 line-clamp-2 block text-xs leading-relaxed', active ? 'text-cyan-700 dark:text-cyan-200' : 'text-slate-500')}>
+                  <span className={cn('mt-1 line-clamp-2 block text-xs leading-relaxed', active ? 'text-fuchsia-700 dark:text-fuchsia-200' : 'text-slate-500')}>
                     {item.description}
                   </span>
                 </button>
@@ -823,7 +828,7 @@ function NewTicketForm({
 
         <div>
           <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Сообщение</div>
-          <div className="relative flex items-start gap-1.5 rounded-2xl border border-slate-200 bg-white p-1.5 shadow-sm dark:border-slate-800 dark:bg-surface-950 sm:gap-2 sm:p-2">
+          <div className="relative flex items-start gap-1.5 rounded-2xl border border-slate-200/90 bg-white p-1.5 shadow-[0_12px_32px_-24px_rgba(15,23,42,0.5)] dark:border-white/10 dark:bg-black/20 sm:gap-2 sm:p-2">
             <EmojiPicker onPick={insertEmoji} />
             <textarea
               ref={messageInputRef}
@@ -846,7 +851,7 @@ function NewTicketForm({
         </div>
       </div>
 
-      <div className="flex items-center justify-between gap-3 border-t border-slate-100 bg-white/95 p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] dark:border-slate-800 dark:bg-surface-900/95 sm:p-4">
+      <div className="flex items-center justify-between gap-3 border-t border-slate-100/80 bg-white/90 p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] backdrop-blur dark:border-white/[0.07] dark:bg-surface-900/80 sm:p-4">
         <div className="text-xs text-slate-400">{message.trim().length}/3000</div>
         <div className="flex justify-end gap-2">
           {onCancel && (
@@ -975,7 +980,7 @@ function FolderTabs({
 
   return (
     <div className={cn(
-      'mt-3 gap-1 rounded-xl bg-slate-100 p-1 dark:bg-white/5',
+      'relative mt-3 gap-1 rounded-xl border border-white/70 bg-slate-100/80 p-1 shadow-inner shadow-slate-950/[0.03] dark:border-white/[0.05] dark:bg-black/15',
       mode === 'admin' ? 'grid grid-cols-4' : 'flex overflow-x-auto'
     )}>
       {items.map((item) => {
@@ -987,10 +992,10 @@ function FolderTabs({
             type="button"
             onClick={() => onChange(item.value)}
             className={cn(
-              'flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium transition-colors',
+              'flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium transition-all',
               active
-                ? 'bg-white text-slate-950 shadow-sm dark:bg-surface-800 dark:text-white'
-                : 'text-slate-500 hover:text-slate-950 dark:text-slate-400 dark:hover:text-white'
+                ? 'bg-white text-fuchsia-700 shadow-sm dark:bg-white/10 dark:text-fuchsia-200'
+                : 'text-slate-500 hover:bg-white/50 hover:text-slate-950 dark:text-slate-400 dark:hover:bg-white/5 dark:hover:text-white'
             )}
           >
             <span className="flex min-w-0 items-center gap-1.5">
@@ -1025,14 +1030,14 @@ function TicketListItem({
       type="button"
       onClick={onClick}
       className={cn(
-        'group relative w-full rounded-xl border px-3 py-2.5 text-left transition-colors',
+        'group relative w-full rounded-2xl border px-3 py-2.5 text-left transition-all',
         mode === 'admin' && 'py-3 pl-4',
         active
-          ? 'border-cyan-200 bg-cyan-50/70 text-slate-950 dark:border-cyan-400/25 dark:bg-cyan-400/10 dark:text-white'
-          : 'border-transparent hover:border-slate-200 hover:bg-slate-50 dark:hover:border-slate-800 dark:hover:bg-surface-800'
+          ? 'border-fuchsia-200 bg-gradient-to-r from-fuchsia-50/90 to-cyan-50/70 text-slate-950 shadow-sm dark:border-fuchsia-400/25 dark:from-fuchsia-400/10 dark:to-cyan-400/[0.07] dark:text-white'
+          : 'border-transparent hover:border-slate-200/80 hover:bg-slate-50/80 hover:shadow-sm dark:hover:border-white/[0.07] dark:hover:bg-white/[0.035]'
       )}
     >
-      {active && <span className="absolute inset-y-3 left-0 w-0.5 rounded-full bg-cyan-500" />}
+      {active && <span className="absolute inset-y-3 left-0 w-0.5 rounded-full bg-gradient-to-b from-fuchsia-500 to-cyan-400" />}
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex min-w-0 items-center gap-2">
@@ -1344,13 +1349,13 @@ function MessageBubble({ message, own }: { message: SupportMessage; own: boolean
     <div className={cn('flex', own ? 'justify-end' : 'justify-start')}>
       <div
         className={cn(
-          'max-w-[min(42rem,82%)] rounded-2xl px-4 py-3 ring-1',
+          'max-w-[min(42rem,82%)] rounded-2xl px-4 py-3 shadow-[0_10px_28px_-20px_rgba(15,23,42,0.55)] ring-1',
           own
-            ? 'bg-cyan-600 text-white ring-cyan-600 dark:bg-cyan-300 dark:text-slate-950 dark:ring-cyan-300'
-            : 'bg-white text-slate-900 ring-slate-200 dark:bg-surface-800 dark:text-white dark:ring-slate-700'
+            ? 'bg-gradient-to-br from-fuchsia-600 to-cyan-600 text-white ring-fuchsia-500/40 dark:from-fuchsia-500 dark:to-cyan-400 dark:text-white dark:ring-fuchsia-400/25'
+            : 'bg-white/95 text-slate-900 ring-slate-200/90 dark:bg-white/[0.06] dark:text-white dark:ring-white/10'
         )}
       >
-        <div className={cn('mb-1 text-xs', own ? 'text-white/55 dark:text-slate-950/55' : 'text-slate-500')}>
+        <div className={cn('mb-1 text-xs', own ? 'text-white/60' : 'text-slate-500')}>
           {message.senderRole === 'ADMIN' ? 'Поддержка' : 'Пользователь'} · {formatDate(message.createdAt)}
         </div>
         <div className="whitespace-pre-wrap break-words text-sm leading-relaxed">{message.body}</div>
@@ -1370,7 +1375,7 @@ function EmptyFolder({ folder }: { folder: TicketFolder }) {
   return (
     <div className="grid min-h-48 place-items-center px-4 py-10 text-center">
       <div>
-        <div className="mx-auto mb-3 grid h-11 w-11 place-items-center rounded-2xl bg-slate-50 text-slate-400 dark:bg-surface-800">
+        <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-2xl bg-gradient-to-br from-fuchsia-50 to-cyan-50 text-fuchsia-500 ring-1 ring-fuchsia-100/80 dark:from-fuchsia-400/10 dark:to-cyan-400/10 dark:text-fuchsia-300 dark:ring-white/[0.07]">
           <MessageCircle className="h-5 w-5" />
         </div>
         <div className="font-medium">{labels[folder]}</div>
