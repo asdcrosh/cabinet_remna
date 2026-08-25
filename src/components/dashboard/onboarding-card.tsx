@@ -70,7 +70,7 @@ export function DashboardOnboardingCard({
   }
 
   return (
-    <section className="access-pass p-5 sm:p-6">
+    <section className="access-pass home-onboarding-card p-5 sm:p-6">
       <div className="grid gap-5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
         <div className="min-w-0">
           <div className="flex items-start gap-3">

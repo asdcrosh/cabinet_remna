@@ -5,9 +5,12 @@ import { redirect } from 'next/navigation'
 import {
   AlertTriangle,
   ArrowRight,
+  CalendarDays,
   CreditCard,
   KeyRound,
   MessageCircleQuestion,
+  MonitorSmartphone,
+  ShieldCheck,
 } from 'lucide-react'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth/cookies'
@@ -180,7 +183,7 @@ export default async function DashboardHome() {
       />
 
       {remnawaveErrorStatus !== null && (
-        <div className="flex flex-col gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-3 rounded-2xl border border-amber-200/80 bg-amber-50/80 px-4 py-3.5 text-sm text-amber-900 shadow-sm dark:border-amber-500/25 dark:bg-amber-500/[0.08] dark:text-amber-100 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-start gap-3">
             <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
             <div>
@@ -201,20 +204,26 @@ export default async function DashboardHome() {
       )}
 
       <section
-        className={cn('access-pass access-overview access-overview--focused', subscriptionExpired && 'access-pass--expired')}
+        className={cn('home-access-card', subscriptionExpired && 'home-access-card--expired')}
         data-testid="subscription-overview"
       >
-        <div className="access-overview__top">
+        <div aria-hidden="true" className="home-access-card__orb home-access-card__orb--primary" />
+        <div aria-hidden="true" className="home-access-card__orb home-access-card__orb--signal" />
+
+        <div className="home-access-card__top">
           <div className="min-w-0">
-            <div className="access-overview__label">Текущий доступ</div>
-            <div className="mt-1.5 flex flex-wrap items-center gap-2.5">
-              <h2 className="break-words text-lg font-semibold tracking-[-0.03em] text-slate-950 dark:text-white sm:text-xl">
+            <div className="home-access-card__label">
+              <span className={cn('home-access-card__pulse', subscriptionExpired && 'home-access-card__pulse--expired')} />
+              Текущий доступ
+            </div>
+            <div className="mt-2 flex flex-wrap items-center gap-2.5">
+              <h2 className="break-words text-xl font-semibold tracking-[-0.035em] text-slate-950 dark:text-white sm:text-2xl">
                 {subRow?.plan?.name ?? 'VPN-подписка'}
               </h2>
               <StatusBadge status={subscriptionStatus} />
             </div>
           </div>
-          <Link href={primaryAction.href} className="btn-primary group hidden shrink-0 justify-between sm:inline-flex">
+          <Link href={primaryAction.href} className="btn-primary home-access-card__action group hidden shrink-0 justify-between sm:inline-flex">
             <span className="inline-flex items-center gap-2">
               {primaryAction.icon}
               {primaryAction.label}
@@ -223,13 +232,13 @@ export default async function DashboardHome() {
           </Link>
         </div>
 
-        <div className="access-overview__body">
-          <div className="access-overview__remaining">
-            <div className="text-xs font-medium uppercase tracking-[0.12em] text-slate-400">Осталось</div>
-            <strong className="mt-2 block text-[3rem] font-semibold leading-none tracking-[-0.07em] text-slate-950 dark:text-white sm:text-[4.4rem]">
+        <div className="home-access-card__body">
+          <div className="home-access-card__remaining">
+            <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Осталось</div>
+            <strong className="mt-2 block text-[3.4rem] font-semibold leading-none tracking-[-0.075em] text-slate-950 dark:text-white sm:text-[4.8rem]">
               {subRow || sub ? formatSubscriptionDaysLeft(daysLeft, subscriptionStatus) : 'Нет данных'}
             </strong>
-            <p className="mt-3 text-sm leading-5 text-slate-500 dark:text-slate-400">
+            <p className="mt-3 max-w-xl text-sm leading-6 text-slate-500 dark:text-slate-400">
               {graceActive
                 ? `Льготный доступ до ${subRow?.graceExpireAt?.toLocaleString('ru-RU')}. Оплатите тариф, чтобы сохранить подключение.`
                 : subscriptionExpired
@@ -238,13 +247,42 @@ export default async function DashboardHome() {
                   ? `Оплачено до ${expiresAtLabel}`
                   : 'Доступ активен.'}
             </p>
-            <Link href={primaryAction.href} className="btn-primary group mt-5 w-full justify-between sm:hidden">
+            <Link href={primaryAction.href} className="btn-primary home-access-card__action group mt-5 w-full justify-between sm:hidden">
               <span className="inline-flex items-center gap-2">
                 {primaryAction.icon}
                 {primaryAction.label}
               </span>
               <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
             </Link>
+          </div>
+
+          <div className="home-access-card__facts">
+            <div className="home-access-card__fact">
+              <span className="home-access-card__fact-icon home-access-card__fact-icon--violet">
+                <MonitorSmartphone className="h-5 w-5" />
+              </span>
+              <div>
+                <div className="text-xs font-medium text-slate-500 dark:text-slate-400">Устройства</div>
+                <div className="mt-1 text-lg font-semibold tracking-tight text-slate-950 dark:text-white">
+                  {user._count.devices} подключено
+                </div>
+                <div className="mt-0.5 text-xs text-slate-400">
+                  {currentDeviceLimit ? `Лимит до ${currentDeviceLimit}` : 'Без указанного лимита'}
+                </div>
+              </div>
+            </div>
+            <div className="home-access-card__fact">
+              <span className="home-access-card__fact-icon home-access-card__fact-icon--cyan">
+                <CalendarDays className="h-5 w-5" />
+              </span>
+              <div>
+                <div className="text-xs font-medium text-slate-500 dark:text-slate-400">Период доступа</div>
+                <div className="mt-1 text-lg font-semibold tracking-tight text-slate-950 dark:text-white">
+                  {expiresAtLabel ?? 'Без даты'}
+                </div>
+                <div className="mt-0.5 text-xs text-slate-400">Продлить можно в любой момент</div>
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -270,54 +308,74 @@ export default async function DashboardHome() {
 
 function HomeHeader({ name, description }: { name: string; description: string }) {
   return (
-    <header className="home-intro pb-1">
-      <div className="page-eyebrow">Личный кабинет</div>
-      <h1 className="text-[1.8rem] font-semibold leading-tight tracking-[-0.04em] text-slate-950 dark:text-white sm:text-[2rem]">
-        Привет, {name}
-      </h1>
-      <p className="mt-1 max-w-2xl text-sm leading-5 text-slate-500 dark:text-slate-400">
-        {description}
-      </p>
+    <header className="home-hero">
+      <div aria-hidden="true" className="home-hero__glow" />
+      <div className="home-hero__content">
+        <div className="min-w-0">
+          <div className="page-eyebrow">Личный кабинет</div>
+          <h1 className="text-[2rem] font-semibold leading-tight tracking-[-0.045em] text-slate-950 dark:text-white sm:text-[2.5rem]">
+            Привет, {name}
+          </h1>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500 dark:text-slate-400 sm:text-base">
+            {description}
+          </p>
+        </div>
+        <div className="home-hero__mark" aria-hidden="true">
+          <ShieldCheck className="h-7 w-7" />
+        </div>
+      </div>
     </header>
   )
 }
 
 function HomeQuickActions({ supportEnabled }: { supportEnabled: boolean }) {
   return (
-    <nav className={cn('home-quick-actions', !supportEnabled && 'home-quick-actions--two')} aria-label="Быстрые действия">
-      <Link href="/dashboard/subscription" className="home-quick-actions__item group">
-        <span className="home-quick-actions__icon">
-          <KeyRound className="h-4 w-4" />
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="block text-sm font-semibold text-slate-950 dark:text-white">Подключение</span>
-          <span className="mt-0.5 block text-xs text-slate-500 dark:text-slate-400">INCY, ссылка и устройства</span>
-        </span>
-        <ArrowRight className="h-4 w-4 shrink-0 text-slate-400 transition-transform group-hover:translate-x-0.5 group-hover:text-slate-950 dark:group-hover:text-white" />
-      </Link>
-      <Link href="/dashboard/plans?intent=renew" className="home-quick-actions__item group">
-        <span className="home-quick-actions__icon">
-          <CreditCard className="h-4 w-4" />
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="block text-sm font-semibold text-slate-950 dark:text-white">Продлить доступ</span>
-          <span className="mt-0.5 block text-xs text-slate-500 dark:text-slate-400">Выбрать подходящий срок</span>
-        </span>
-        <ArrowRight className="h-4 w-4 shrink-0 text-slate-400 transition-transform group-hover:translate-x-0.5 group-hover:text-slate-950 dark:group-hover:text-white" />
-      </Link>
-      {supportEnabled && (
-        <Link href="/dashboard/support" className="home-quick-actions__item group">
-          <span className="home-quick-actions__icon">
-            <MessageCircleQuestion className="h-4 w-4" />
+    <section>
+      <div className="mb-3 flex items-end justify-between gap-4 px-1">
+        <div>
+          <div className="page-eyebrow">Навигация</div>
+          <h2 className="text-lg font-semibold tracking-tight text-slate-950 dark:text-white">Быстрый доступ</h2>
+        </div>
+        <span className="hidden text-xs text-slate-400 sm:block">Всё нужное под рукой</span>
+      </div>
+      <nav className={cn('home-action-grid', !supportEnabled && 'home-action-grid--two')} aria-label="Быстрые действия">
+        <Link href="/dashboard/subscription" className="home-action-card home-action-card--connection group">
+          <span className="home-action-card__icon">
+            <KeyRound className="h-5 w-5" />
           </span>
           <span className="min-w-0 flex-1">
-            <span className="block text-sm font-semibold text-slate-950 dark:text-white">Поддержка</span>
-            <span className="mt-0.5 block text-xs text-slate-500 dark:text-slate-400">Вопросы по доступу и оплате</span>
+            <span className="home-action-card__eyebrow">Настройка</span>
+            <span className="mt-1 block text-base font-semibold text-slate-950 dark:text-white">Подключение</span>
+            <span className="mt-1 block text-xs leading-5 text-slate-500 dark:text-slate-400">INCY, ссылка и устройства</span>
           </span>
-          <ArrowRight className="h-4 w-4 shrink-0 text-slate-400 transition-transform group-hover:translate-x-0.5 group-hover:text-slate-950 dark:group-hover:text-white" />
+          <ArrowRight className="home-action-card__arrow" />
         </Link>
-      )}
-    </nav>
+        <Link href="/dashboard/plans?intent=renew" className="home-action-card home-action-card--billing group">
+          <span className="home-action-card__icon">
+            <CreditCard className="h-5 w-5" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="home-action-card__eyebrow">Подписка</span>
+            <span className="mt-1 block text-base font-semibold text-slate-950 dark:text-white">Продлить доступ</span>
+            <span className="mt-1 block text-xs leading-5 text-slate-500 dark:text-slate-400">Выбрать подходящий срок</span>
+          </span>
+          <ArrowRight className="home-action-card__arrow" />
+        </Link>
+        {supportEnabled && (
+          <Link href="/dashboard/support" className="home-action-card home-action-card--support group">
+            <span className="home-action-card__icon">
+              <MessageCircleQuestion className="h-5 w-5" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="home-action-card__eyebrow">Помощь</span>
+              <span className="mt-1 block text-base font-semibold text-slate-950 dark:text-white">Поддержка</span>
+              <span className="mt-1 block text-xs leading-5 text-slate-500 dark:text-slate-400">Вопросы по доступу и оплате</span>
+            </span>
+            <ArrowRight className="home-action-card__arrow" />
+          </Link>
+        )}
+      </nav>
+    </section>
   )
 }
 
@@ -328,7 +386,7 @@ function PendingPaymentCard({
 }) {
   const href = payment.confirmationUrl || '/dashboard/billing'
   return (
-    <section className="access-pass p-5 sm:p-6">
+    <section className="access-pass home-pending-card p-5 sm:p-6">
       <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
           <div className="text-xs font-semibold uppercase tracking-[0.1em] text-amber-700 dark:text-amber-200">
