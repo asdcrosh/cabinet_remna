@@ -123,8 +123,8 @@ body {
 }
 
 .dashboard-topbar {
-  border-color: var(--app-border);
-  background: color-mix(in srgb, var(--app-bg) 88%, transparent);
+  border-color: transparent;
+  background: transparent;
 }
 
 .page-transition {
@@ -1895,7 +1895,7 @@ textarea:focus {
 }
 
 .dark .dashboard-topbar {
-  background: color-mix(in srgb, var(--app-bg) 88%, transparent);
+  background: transparent;
 }
 
 .dark .page-title {
