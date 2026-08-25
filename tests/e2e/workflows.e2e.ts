@@ -94,19 +94,25 @@ test('смена пароля сохраняет текущую сессию и 
   await expectNoHorizontalOverflow(page)
 })
 
-test('пользователь отвязывает устройство с подтверждением', async ({ page }, testInfo) => {
+test('пользователь блокирует устройство с подтверждением', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop-chromium', 'Сценарий достаточно проверить один раз')
   await login(page, E2E_USERS.active.email)
   await page.goto('/dashboard/devices')
 
   await expect(page.getByRole('heading', { name: 'Pixel 8 · Android' })).toBeVisible()
-  await page.getByRole('button', { name: 'Отвязать' }).click()
-  const dialog = page.getByRole('dialog', { name: 'Отвязать устройство?' })
+  await page.getByRole('button', { name: 'Блокировать', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: 'Заблокировать устройство?' })
   await expect(dialog).toBeVisible()
-  await dialog.getByRole('button', { name: 'Отвязать' }).click()
+  const blockResponse = page.waitForResponse((response) =>
+    response.url().includes('/api/devices/') && response.request().method() === 'DELETE'
+  )
+  await dialog.getByRole('button', { name: 'Заблокировать', exact: true }).click()
+  await expect((await blockResponse).ok()).toBe(true)
 
   await expect(page.getByRole('heading', { name: 'Pixel 8 · Android' })).toHaveCount(0)
-  await expect(page.getByText('Устройств пока нет', { exact: true })).toBeVisible()
+  await expect(page.getByText('Активных устройств нет.', { exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Заблокированные' })).toBeVisible()
+  await expect(page.getByText('Pixel 8 · Android', { exact: true })).toBeVisible()
   await expectNoHorizontalOverflow(page)
 })
 
