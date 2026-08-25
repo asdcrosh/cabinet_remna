@@ -24,7 +24,9 @@ NODE_PROVISIONING_CONFIG_URL="${NODE_PROVISIONING_CONFIG_URL:-${RAW_BASE_URL}/de
 NODE_PROVISIONING_CONFIG_PATH="${NODE_PROVISIONING_CONFIG_PATH:-/usr/local/bin/cabinet-node-provisioning}"
 NODE_PROVISIONING_CONFIG_TEMP="${NODE_PROVISIONING_CONFIG_PATH}.tmp"
 OFFICIAL_CABINET_IMAGE="ghcr.io/asdcrosh/cabinet_remna"
+OFFICIAL_PROVISIONER_IMAGE="ghcr.io/asdcrosh/cabinet_remna-provisioner"
 TARGET_CABINET_IMAGE=""
+TARGET_PROVISIONER_IMAGE=""
 
 if [[ "$(id -u)" -ne 0 ]]; then
   echo "Run as root or with sudo:"
@@ -96,6 +98,22 @@ running_app_image_id() {
   docker inspect remnawave-cabinet-app --format '{{.Image}}' 2>/dev/null || true
 }
 
+running_provisioner_revision() {
+  local image_id revision
+  image_id="$(docker inspect remnawave-cabinet-node-provisioning-worker --format '{{.Image}}' 2>/dev/null || true)"
+  [[ -n "${image_id}" ]] || return 1
+  revision="$(docker image inspect "${image_id}" --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' 2>/dev/null || true)"
+  if [[ "${revision}" =~ ^[0-9a-f]{40}$ ]]; then
+    printf '%s\n' "${revision}"
+    return 0
+  fi
+  return 1
+}
+
+running_provisioner_image_id() {
+  docker inspect remnawave-cabinet-node-provisioning-worker --format '{{.Image}}' 2>/dev/null || true
+}
+
 image_revision() {
   local image="$1"
   local revision
@@ -109,7 +127,7 @@ image_revision() {
 }
 
 configure_target_image() {
-  local expected_image=""
+  local expected_image="" expected_provisioner_image=""
 
   if [[ -n "${CABINET_RELEASE_SHA:-}" && ! "${CABINET_RELEASE_SHA}" =~ ^[0-9a-f]{40}$ ]]; then
     echo "Invalid CABINET_RELEASE_SHA: ${CABINET_RELEASE_SHA}" >&2
@@ -118,18 +136,27 @@ configure_target_image() {
 
   if [[ "${CABINET_RELEASE_SHA:-}" =~ ^[0-9a-f]{40}$ ]]; then
     expected_image="${OFFICIAL_CABINET_IMAGE}:sha-${CABINET_RELEASE_SHA}"
+    expected_provisioner_image="${OFFICIAL_PROVISIONER_IMAGE}:sha-${CABINET_RELEASE_SHA}"
     if [[ -n "${CABINET_IMAGE:-}" && "${CABINET_IMAGE}" != "${expected_image}" ]]; then
       echo "CABINET_IMAGE does not match release ${CABINET_RELEASE_SHA}: ${CABINET_IMAGE}" >&2
       return 1
     fi
     TARGET_CABINET_IMAGE="${expected_image}"
+    TARGET_PROVISIONER_IMAGE="${expected_provisioner_image}"
   else
     TARGET_CABINET_IMAGE="${CABINET_IMAGE:-$(read_update_env_value CABINET_IMAGE)}"
     TARGET_CABINET_IMAGE="${TARGET_CABINET_IMAGE:-${OFFICIAL_CABINET_IMAGE}:latest}"
+    TARGET_PROVISIONER_IMAGE="${CABINET_PROVISIONER_IMAGE:-$(read_update_env_value CABINET_PROVISIONER_IMAGE)}"
+    TARGET_PROVISIONER_IMAGE="${TARGET_PROVISIONER_IMAGE:-${OFFICIAL_PROVISIONER_IMAGE}:latest}"
   fi
 
   CABINET_IMAGE="${TARGET_CABINET_IMAGE}"
-  export CABINET_IMAGE
+  CABINET_PROVISIONER_IMAGE="${TARGET_PROVISIONER_IMAGE}"
+  export CABINET_IMAGE CABINET_PROVISIONER_IMAGE
+}
+
+provisioning_profile_enabled() {
+  [[ ",$(read_update_env_value COMPOSE_PROFILES | tr -d ' ')," == *",provisioning,"* ]]
 }
 
 pull_progress_snapshot() {
@@ -234,6 +261,11 @@ pull_target_image() {
   rm -f "${log_file}"
 }
 
+pull_target_provisioner_image() {
+  echo "Pulling node provisioner image..."
+  docker pull "${TARGET_PROVISIONER_IMAGE}" >/dev/null
+}
+
 verify_target_image() {
   local pulled_revision
 
@@ -253,11 +285,27 @@ verify_target_image() {
   DEPLOY_TARGET_REVISION="${pulled_revision}"
 }
 
+verify_target_provisioner_image() {
+  local pulled_revision
+
+  echo "Target provisioner image: ${TARGET_PROVISIONER_IMAGE}"
+  pulled_revision="$(image_revision "${TARGET_PROVISIONER_IMAGE}" || true)"
+  if [[ ! "${pulled_revision}" =~ ^[0-9a-f]{40}$ ]]; then
+    echo "Pulled provisioner image has no valid org.opencontainers.image.revision label." >&2
+    return 1
+  fi
+  if [[ "${CABINET_RELEASE_SHA:-}" =~ ^[0-9a-f]{40}$ && "${pulled_revision}" != "${CABINET_RELEASE_SHA}" ]]; then
+    echo "Pulled provisioner image revision ${pulled_revision} does not match requested release ${CABINET_RELEASE_SHA}." >&2
+    return 1
+  fi
+}
+
 DEPLOY_STARTED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 DEPLOY_TARGET_REVISION=""
 DEPLOYED_REVISION=""
 ROLLBACK_REVISION=""
 ROLLBACK_IMAGE=""
+ROLLBACK_PROVISIONER_IMAGE=""
 ROLLBACK_ARMED="false"
 MIGRATION_STATUS="pending"
 LOCAL_HEALTH_STATUS="pending"
@@ -340,6 +388,10 @@ rollback_runtime_services() {
   echo "Health-check failed. Restoring previous runtime image..." >&2
   CABINET_IMAGE="${ROLLBACK_IMAGE}" CABINET_ENV_FILE="${ENV_FILE}" "${COMPOSE[@]}" up -d --no-deps --force-recreate \
     app worker broadcast-worker watch-worker
+  if [[ -n "${ROLLBACK_PROVISIONER_IMAGE}" ]] && provisioning_profile_enabled; then
+    CABINET_PROVISIONER_IMAGE="${ROLLBACK_PROVISIONER_IMAGE}" CABINET_ENV_FILE="${ENV_FILE}" \
+      "${COMPOSE[@]}" up -d --no-deps --force-recreate node-provisioning-worker
+  fi
   bind_address="$(read_update_env_value CABINET_APP_BIND)"
   app_port="$(read_update_env_value CABINET_APP_PORT)"
   bind_address="${bind_address:-127.0.0.1}"
@@ -393,6 +445,7 @@ if [[ -n "${ENV_STATE_DIR}" ]]; then
 fi
 PREVIOUS_DEPLOYED_REVISION="$(running_app_revision || installed_version_revision || true)"
 PREVIOUS_IMAGE_ID="$(running_app_image_id)"
+PREVIOUS_PROVISIONER_IMAGE_ID="$(running_provisioner_image_id)"
 DEPLOY_TARGET_REVISION="$(remote_commit_sha || true)"
 mkdir -p "${STATE_DIR}"
 set_deploy_stage 5 "preparing" "Подготовка обновления" "Подготовка обновления и проверка конфигурации."
@@ -742,10 +795,20 @@ if [[ -n "${PREVIOUS_IMAGE_ID}" ]] && docker image inspect "${PREVIOUS_IMAGE_ID}
   ROLLBACK_IMAGE="remnawave-cabinet:rollback-$(date -u +%Y%m%d%H%M%S)"
   docker image tag "${PREVIOUS_IMAGE_ID}" "${ROLLBACK_IMAGE}"
 fi
+if provisioning_profile_enabled \
+  && [[ -n "${PREVIOUS_PROVISIONER_IMAGE_ID}" ]] \
+  && docker image inspect "${PREVIOUS_PROVISIONER_IMAGE_ID}" >/dev/null 2>&1; then
+  ROLLBACK_PROVISIONER_IMAGE="remnawave-cabinet-provisioner:rollback-$(date -u +%Y%m%d%H%M%S)"
+  docker image tag "${PREVIOUS_PROVISIONER_IMAGE_ID}" "${ROLLBACK_PROVISIONER_IMAGE}"
+fi
 
 set_deploy_stage 20 "pulling" "Загрузка образа кабинета" "Загружается точный Docker-образ новой версии."
 pull_target_image
 verify_target_image
+if provisioning_profile_enabled; then
+  pull_target_provisioner_image
+  verify_target_provisioner_image
+fi
 set_deploy_stage 35 "image_ready" "Образ загружен и проверен" "Новый образ загружен и проверен. Запускаются миграции."
 
 set_deploy_stage 45 "migrations" "Подготовка и применение миграций" "Подготавливаются и применяются миграции базы данных."
@@ -770,7 +833,7 @@ set_deploy_stage 65 "starting_services" "Запуск сервисов" "Миг�
 # already-running container. Recreate runtime services explicitly so the
 # update always starts the image that was just pulled without touching the DB.
 runtime_services=(app worker broadcast-worker watch-worker)
-if [[ ",$(read_update_env_value COMPOSE_PROFILES | tr -d ' ')," == *",provisioning,"* ]]; then
+if provisioning_profile_enabled; then
   runtime_services+=(node-provisioning-worker)
 fi
 CABINET_ENV_FILE="${ENV_FILE}" "${COMPOSE[@]}" up -d --no-deps --force-recreate "${runtime_services[@]}"
@@ -790,6 +853,23 @@ wait_for_container() {
   done
 
   echo "Service ${service} did not start in time."
+  return 1
+}
+
+wait_for_provisioner_ready() {
+  local attempts="${1:-60}"
+  local status=""
+
+  for _ in $(seq 1 "${attempts}"); do
+    status="$(docker inspect remnawave-cabinet-node-provisioning-worker --format '{{.State.Status}}' 2>/dev/null || true)"
+    if [[ "${status}" == "running" ]] \
+      && docker exec remnawave-cabinet-node-provisioning-worker test -f /tmp/node-provisioning-worker-heartbeat >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 2
+  done
+
+  echo "Node provisioning worker did not create its heartbeat in time."
   return 1
 }
 
@@ -940,6 +1020,7 @@ cleanup_docker_artifacts() {
     && "${PREVIOUS_DEPLOYED_REVISION}" != "${DEPLOYED_REVISION}" ]]; then
     echo "Removing previous immutable cabinet image..."
     remove_image_if_unused "${OFFICIAL_CABINET_IMAGE}:sha-${PREVIOUS_DEPLOYED_REVISION}"
+    remove_image_if_unused "${OFFICIAL_PROVISIONER_IMAGE}:sha-${PREVIOUS_DEPLOYED_REVISION}"
   fi
 
   echo "Pruning dangling Docker images..."
@@ -953,6 +1034,9 @@ cleanup_docker_artifacts() {
 
   if [[ -n "${ROLLBACK_IMAGE}" ]]; then
     remove_image_if_unused "${ROLLBACK_IMAGE}"
+  fi
+  if [[ -n "${ROLLBACK_PROVISIONER_IMAGE}" ]]; then
+    remove_image_if_unused "${ROLLBACK_PROVISIONER_IMAGE}"
   fi
 }
 
@@ -977,7 +1061,16 @@ wait_for_container worker 60
 wait_for_container broadcast-worker 60
 wait_for_container watch-worker 60
 if [[ " ${runtime_services[*]} " == *" node-provisioning-worker "* ]]; then
-  wait_for_container node-provisioning-worker 60
+  wait_for_provisioner_ready 60
+  RUNNING_PROVISIONER_REVISION="$(running_provisioner_revision || true)"
+  if [[ ! "${RUNNING_PROVISIONER_REVISION}" =~ ^[0-9a-f]{40}$ ]]; then
+    echo "Running provisioner image has no valid revision label." >&2
+    false
+  fi
+  if [[ "${CABINET_RELEASE_SHA:-}" =~ ^[0-9a-f]{40}$ && "${RUNNING_PROVISIONER_REVISION}" != "${CABINET_RELEASE_SHA}" ]]; then
+    echo "Running provisioner revision ${RUNNING_PROVISIONER_REVISION} does not match requested release ${CABINET_RELEASE_SHA}." >&2
+    false
+  fi
 fi
 
 CABINET_APP_BIND="$(env_value CABINET_APP_BIND)"
@@ -1025,6 +1118,10 @@ if [[ "${CABINET_RELEASE_SHA:-}" =~ ^[0-9a-f]{40}$ \
   && "${DEPLOYED_REVISION}" == "${CABINET_RELEASE_SHA}" \
   && "${TARGET_CABINET_IMAGE}" == "${OFFICIAL_CABINET_IMAGE}:sha-${CABINET_RELEASE_SHA}" ]]; then
   write_update_env_value "CABINET_IMAGE" "${TARGET_CABINET_IMAGE}"
+  if provisioning_profile_enabled \
+    && [[ "${TARGET_PROVISIONER_IMAGE}" == "${OFFICIAL_PROVISIONER_IMAGE}:sha-${CABINET_RELEASE_SHA}" ]]; then
+    write_update_env_value "CABINET_PROVISIONER_IMAGE" "${TARGET_PROVISIONER_IMAGE}"
+  fi
 fi
 set_deploy_stage 97 "cleanup" "Очистка старого образа" "Новая версия проверена. Удаляется предыдущий образ."
 cleanup_docker_artifacts
