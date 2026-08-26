@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="1.9.18"
+VERSION="1.9.19"
 BRANCH="${BRANCH:-main}"
 RAW_BASE_URL="${RAW_BASE_URL:-https://raw.githubusercontent.com/asdcrosh/cabinet_remna/${BRANCH}}"
 GITHUB_API_URL="${GITHUB_API_URL:-https://api.github.com/repos/asdcrosh/cabinet_remna/commits/${BRANCH}}"
@@ -26,6 +26,7 @@ CABINET_COMPOSE="${CABINET_DIR}/docker-compose.yml"
 CABINET_VERSION_FILE="${CABINET_VERSION_FILE:-${CABINET_DIR}/.cabinet-version}"
 DEPLOY_STATE_FILE="${CABINET_STATE_DIR:-${CABINET_DIR}/state}/deployment.json"
 UPDATE_STATUS_CACHE="${CABINETCTL_UPDATE_CACHE:-/var/cache/remnawave-cabinet/update-status}"
+CONSOLE_VERSION_CACHE="${UPDATE_STATUS_CACHE}.console-version"
 UPDATE_STATUS_CACHE_TTL="${CABINETCTL_UPDATE_CACHE_TTL:-60}"
 CHECK_UPDATES_IN_MENU="${CABINETCTL_CHECK_UPDATES_IN_MENU:-1}"
 LIVE_REFRESH_INTERVAL="${CABINETCTL_LIVE_REFRESH_INTERVAL:-60}"
@@ -43,6 +44,8 @@ LAST_LIVE_REFRESH_AT=0
 LIVE_CONSOLE_STATUS=""
 LIVE_IMAGE_STATUS=""
 LAST_LIVE_TIMER_VALUE=""
+LIVE_REFRESH_PID=""
+LIVE_REFRESH_RESULT_FILE=""
 
 if [[ -t 1 ]]; then
   BOLD=$'\033[1m'
@@ -259,6 +262,23 @@ remote_console_version() {
 
 refresh_console_version() {
   REMOTE_CONSOLE_VERSION="$(remote_console_version || true)"
+}
+
+load_cached_console_version() {
+  [[ -f "${CONSOLE_VERSION_CACHE}" ]] || return 0
+  local cached_version
+  cached_version="$(sed -n '1p' "${CONSOLE_VERSION_CACHE}" 2>/dev/null || true)"
+  if [[ "${cached_version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    REMOTE_CONSOLE_VERSION="${cached_version}"
+  fi
+}
+
+write_console_version_cache() {
+  local version="$1" cache_dir
+  [[ "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || return 0
+  cache_dir="$(dirname "${CONSOLE_VERSION_CACHE}")"
+  mkdir -p "${cache_dir}" 2>/dev/null || true
+  printf '%s\n' "${version}" >"${CONSOLE_VERSION_CACHE}" 2>/dev/null || true
 }
 
 console_update_badge() {
@@ -721,6 +741,15 @@ read_update_status_cache() {
   print_update_status_key "${status}"
 }
 
+read_stale_update_status_cache() {
+  [[ -f "${UPDATE_STATUS_CACHE}" ]] || return 1
+  local created_at cache_version status
+  IFS='|' read -r created_at cache_version status <"${UPDATE_STATUS_CACHE}" || return 1
+  [[ "${created_at}" =~ ^[0-9]+$ ]] || return 1
+  [[ -n "${status}" ]] || return 1
+  print_update_status_key "${status}"
+}
+
 update_status_line() {
   if ! cabinet_installed; then
     print_update_status_key "not-installed"
@@ -731,11 +760,7 @@ update_status_line() {
     return
   fi
 
-  if [[ "${CHECK_UPDATES_IN_MENU}" == "1" || "${CHECK_UPDATES_IN_MENU}" == "true" ]]; then
-    set +e
-    check_update_status >/dev/null 2>&1
-    set -e
-    read_update_status_cache || print_update_status_key "check-failed"
+  if read_stale_update_status_cache; then
     return
   fi
 
@@ -1250,9 +1275,54 @@ live_refresh_interval() {
 }
 
 refresh_live_statuses() {
-  refresh_console_version
-  check_update_status >/dev/null 2>&1 || true
+  if [[ "${CHECK_UPDATES_IN_MENU}" != "1" && "${CHECK_UPDATES_IN_MENU}" != "true" ]]; then
+    LAST_LIVE_REFRESH_AT="$(date +%s)"
+    return 0
+  fi
+  if [[ -n "${LIVE_REFRESH_PID}" ]] && kill -0 "${LIVE_REFRESH_PID}" 2>/dev/null; then
+    return 0
+  fi
+
+  LIVE_REFRESH_RESULT_FILE="$(mktemp)"
+  (
+    local remote_version
+    remote_version="$(remote_console_version || true)"
+    write_console_version_cache "${remote_version}"
+    printf '%s\n' "${remote_version}" >"${LIVE_REFRESH_RESULT_FILE}"
+    check_update_status >/dev/null 2>&1 || true
+  ) &
+  LIVE_REFRESH_PID=$!
   LAST_LIVE_REFRESH_AT="$(date +%s)"
+}
+
+collect_live_status_refresh() {
+  [[ -n "${LIVE_REFRESH_PID}" ]] || return 1
+  if kill -0 "${LIVE_REFRESH_PID}" 2>/dev/null; then
+    return 1
+  fi
+
+  wait "${LIVE_REFRESH_PID}" 2>/dev/null || true
+  if [[ -f "${LIVE_REFRESH_RESULT_FILE}" ]]; then
+    local remote_version
+    remote_version="$(sed -n '1p' "${LIVE_REFRESH_RESULT_FILE}" 2>/dev/null || true)"
+    if [[ "${remote_version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+      REMOTE_CONSOLE_VERSION="${remote_version}"
+    fi
+    rm -f "${LIVE_REFRESH_RESULT_FILE}"
+  fi
+  LIVE_REFRESH_PID=""
+  LIVE_REFRESH_RESULT_FILE=""
+  return 0
+}
+
+stop_live_status_refresh() {
+  if [[ -n "${LIVE_REFRESH_PID}" ]] && kill -0 "${LIVE_REFRESH_PID}" 2>/dev/null; then
+    kill "${LIVE_REFRESH_PID}" 2>/dev/null || true
+    wait "${LIVE_REFRESH_PID}" 2>/dev/null || true
+  fi
+  [[ -z "${LIVE_REFRESH_RESULT_FILE}" ]] || rm -f "${LIVE_REFRESH_RESULT_FILE}"
+  LIVE_REFRESH_PID=""
+  LIVE_REFRESH_RESULT_FILE=""
 }
 
 menu_option_label() {
@@ -1337,7 +1407,7 @@ refresh_and_render_live_statuses() {
   local previous_console previous_image redraw_console=0 redraw_image=0
   previous_console="${LIVE_CONSOLE_STATUS}"
   previous_image="${LIVE_IMAGE_STATUS}"
-  refresh_live_statuses
+  collect_live_status_refresh || return 0
   remember_live_statuses
   [[ "${LIVE_CONSOLE_STATUS}" == "${previous_console}" ]] || redraw_console=1
   [[ "${LIVE_IMAGE_STATUS}" == "${previous_image}" ]] || redraw_image=1
@@ -1347,9 +1417,10 @@ refresh_and_render_live_statuses() {
 read_menu_choice() {
   MENU_CHOICE=""
   ensure_valid_menu_selection
-  refresh_live_statuses
+  load_cached_console_version
   show_menu
   remember_live_statuses
+  refresh_live_statuses
   LAST_LIVE_TIMER_VALUE="$(live_refresh_interval)"
   printf '\033[?25l' 2>/dev/null >/dev/tty || return 1
   local key escape_tail now previous_selection interval remaining
@@ -1386,18 +1457,21 @@ read_menu_choice() {
     fi
 
     now="$(date +%s)"
+    refresh_and_render_live_statuses
     if ((now - LAST_LIVE_REFRESH_AT >= interval)); then
-      refresh_and_render_live_statuses
+      refresh_live_statuses
     fi
     remaining=$((interval - (now - LAST_LIVE_REFRESH_AT)))
     ((remaining < 0)) && remaining=0
     render_live_refresh_timer "${remaining}"
   done
+  stop_live_status_refresh
   printf '\033[?25h' 2>/dev/null >/dev/tty || true
   printf '\r\033[2K  %s›%s %s\n' "${CYAN}" "${RESET}" "${MENU_CHOICE}" >/dev/tty
 }
 
 cleanup_menu_terminal() {
+  stop_live_status_refresh
   printf '\033[?25h' 2>/dev/null >/dev/tty || true
 }
 

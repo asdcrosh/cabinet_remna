@@ -154,10 +154,23 @@ describe('production deployment security', () => {
     expect(cabinetctl).not.toContain('move_menu_selection previous; redraw_interactive_menu')
     expect(cabinetctl).toContain('render_live_update_statuses')
     expect(cabinetctl).toContain('refresh_and_render_live_statuses')
+    expect(cabinetctl).toContain('collect_live_status_refresh || return 0')
+    expect(cabinetctl).toContain('LIVE_REFRESH_PID=$!')
+    expect(cabinetctl).toContain('read_stale_update_status_cache')
     expect(cabinetctl).toContain('[[ "${LIVE_IMAGE_STATUS}" == "${previous_image}" ]] || redraw_image=1')
     expect(cabinetctl).not.toContain('start_status_animation')
     expect(cabinetctl).not.toContain('render_status_animation_frame')
     expect(cabinetctl).toContain('refresh_live_statuses')
+    const readMenu = cabinetctl.slice(
+      cabinetctl.indexOf('read_menu_choice()'),
+      cabinetctl.indexOf('cleanup_menu_terminal()')
+    )
+    expect(readMenu.indexOf('show_menu')).toBeLessThan(readMenu.indexOf('refresh_live_statuses'))
+    const updateStatus = cabinetctl.slice(
+      cabinetctl.indexOf('update_status_line()'),
+      cabinetctl.indexOf('deployment_status_line()')
+    )
+    expect(updateStatus).not.toContain('check_update_status')
     expect(cabinetctl).toContain('[ АКТУАЛЬНА ]')
     expect(cabinetctl).toContain('if ! run_verified_script "${CONSOLE_INSTALL_URL}"; then')
     expect(cabinetctl).toContain('Консоль не обновлена.')
