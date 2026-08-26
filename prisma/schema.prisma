@@ -29,6 +29,7 @@ model Plan {
   trafficLimitGb               Int? // null = безлимит
   deviceLimit                  Int              @default(5)
   maxDeviceLimit               Int              @default(5)
+  deviceAddonEnabled           Boolean          @default(false)
   extraDevicePriceKopecks      Int              @default(0)
   activeInternalSquads         String[]         @default([]) // UUID squads Remnawave для этого тарифа
   whitelistAddonEnabled        Boolean          @default(false)

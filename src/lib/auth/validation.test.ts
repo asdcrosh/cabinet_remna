@@ -71,6 +71,32 @@ describe('auth validation', () => {
     expect(adminPlanSchema.safeParse({ ...plan, priceKopecks: 10_000 }).success).toBe(true)
   })
 
+  it('validates enabled device add-ons', () => {
+    const plan = {
+      name: 'Тестовый тариф',
+      description: null,
+      priceKopecks: 10_000,
+      durationDays: 30,
+      trafficLimitGb: null,
+      deviceLimit: 5,
+      maxDeviceLimit: 10,
+      deviceAddonEnabled: true,
+      extraDevicePriceKopecks: 10_000,
+      activeInternalSquads: [],
+      availability: 'ALL',
+      allowedEmails: [],
+      allowedTelegramIds: [],
+      isPromo: false,
+      isFeatured: false,
+      isActive: true,
+    }
+
+    expect(adminPlanSchema.safeParse(plan).success).toBe(true)
+    expect(adminPlanSchema.safeParse({ ...plan, maxDeviceLimit: 5 }).success).toBe(false)
+    expect(adminPlanSchema.safeParse({ ...plan, extraDevicePriceKopecks: 0 }).success).toBe(false)
+    expect(adminPlanSchema.safeParse({ ...plan, deviceAddonEnabled: false, maxDeviceLimit: 5, extraDevicePriceKopecks: 0 }).success).toBe(true)
+  })
+
   it('accepts renewal-only promo codes and rejects incompatible audiences', () => {
     const promoCode = {
       code: 'RENEW20',

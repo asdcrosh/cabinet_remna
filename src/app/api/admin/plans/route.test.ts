@@ -39,6 +39,7 @@ function planRequest(overrides: Record<string, unknown> = {}) {
       trafficLimitGb: 100,
       deviceLimit: 5,
       maxDeviceLimit: 20,
+      deviceAddonEnabled: true,
       extraDevicePriceKopecks: 10000,
       activeInternalSquads: [],
       availability: 'ALL',
@@ -91,6 +92,7 @@ describe('admin plans route', () => {
         description: 'Популярный тариф',
         allowedEmails: ['user@example.com'],
         allowedTelegramIds: ['123'],
+        deviceAddonEnabled: true,
         promoCodesEnabled: true,
         isFeatured: true,
         featuredSlot: 1,
@@ -110,5 +112,12 @@ describe('admin plans route', () => {
     expect(mocks.tx.plan.create).toHaveBeenCalledWith({
       data: expect.objectContaining({ promoCodesEnabled: false }),
     })
+  })
+
+  it('rejects enabled device add-ons without a price', async () => {
+    const response = await POST(planRequest({ extraDevicePriceKopecks: 0 }))
+
+    expect(response.status).toBe(400)
+    expect(mocks.prisma.$transaction).not.toHaveBeenCalled()
   })
 })

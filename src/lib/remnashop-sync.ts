@@ -503,6 +503,9 @@ export async function syncRemnashopCatalog(options: {
         : await tx.plan.create({
             data: {
               ...catalogData,
+              deviceAddonEnabled:
+                normalized.maxDeviceLimit > normalized.deviceLimit
+                && normalized.extraDevicePriceKopecks > 0,
               ...accessData,
               sortOrder: nextSortOrder,
             },

@@ -164,10 +164,15 @@ export default async function PlansPage({
     trafficLimitGb: plan.trafficLimitGb,
     deviceLimit: plan.deviceLimit,
     maxDeviceLimit: plan.maxDeviceLimit,
+    deviceAddonEnabled: plan.deviceAddonEnabled,
     extraDevicePriceKopecks: plan.extraDevicePriceKopecks,
     initialDeviceLimit: plan.isPromo
       ? plan.deviceLimit
-      : clampDeviceLimit(currentDeviceLimit ?? plan.deviceLimit, plan.deviceLimit, plan.maxDeviceLimit),
+      : plan.deviceAddonEnabled
+        ? clampDeviceLimit(currentDeviceLimit ?? plan.deviceLimit, plan.deviceLimit, plan.maxDeviceLimit)
+        : currentSubscription?.planId === plan.id
+          ? Math.max(plan.deviceLimit, currentDeviceLimit ?? plan.deviceLimit)
+          : plan.deviceLimit,
     currentDeviceLimit,
     isPromo: plan.isPromo,
     promoCodesEnabled: plan.promoCodesEnabled,

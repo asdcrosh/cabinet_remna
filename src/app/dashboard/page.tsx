@@ -155,6 +155,7 @@ export default async function DashboardHome() {
   const deviceAddonExpireAt = sub?.expiresAt ? new Date(sub.expiresAt) : subRow?.expireAt ?? null
   const deviceAddonOffer = subRow?.planId
     && subRow.plan
+    && subRow.plan.deviceAddonEnabled
     && currentDeviceLimit
     && currentDeviceLimit < subRow.plan.maxDeviceLimit
     && subRow.plan.extraDevicePriceKopecks > 0

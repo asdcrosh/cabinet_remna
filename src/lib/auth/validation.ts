@@ -257,6 +257,7 @@ const adminPlanBaseSchema = z.object({
   trafficLimitGb: z.coerce.number().int().min(1).max(1_000_000).optional().nullable(),
   deviceLimit: z.coerce.number().int().min(1).max(100),
   maxDeviceLimit: z.coerce.number().int().min(1).max(100),
+  deviceAddonEnabled: z.boolean().default(false),
   extraDevicePriceKopecks: z.coerce.number().int().min(0).max(10_000_000),
   activeInternalSquads: z.array(z.string().trim().uuid()).default([]),
   whitelistAddonEnabled: z.boolean().default(false),
@@ -284,6 +285,20 @@ export const adminPlanSchema = adminPlanBaseSchema.superRefine((value, context) 
       code: 'custom',
       path: ['maxDeviceLimit'],
       message: 'Максимум устройств не может быть меньше включённого количества',
+    })
+  }
+  if (value.deviceAddonEnabled && value.maxDeviceLimit <= value.deviceLimit) {
+    context.addIssue({
+      code: 'custom',
+      path: ['maxDeviceLimit'],
+      message: 'Максимум устройств должен быть больше включённого количества',
+    })
+  }
+  if (value.deviceAddonEnabled && value.extraDevicePriceKopecks <= 0) {
+    context.addIssue({
+      code: 'custom',
+      path: ['extraDevicePriceKopecks'],
+      message: 'Укажите стоимость дополнительного устройства',
     })
   }
   if (value.whitelistAddonEnabled && value.whitelistAddonPriceKopecks <= 0) {

@@ -73,6 +73,7 @@ const plan = {
   trafficLimitGb: null,
   deviceLimit: 5,
   maxDeviceLimit: 20,
+  deviceAddonEnabled: true,
   extraDevicePriceKopecks: 10000,
   activeInternalSquads: [],
   whitelistAddonEnabled: true,
@@ -279,6 +280,20 @@ describe('payment create route', () => {
       description: 'Дополнительные устройства',
       metadata: expect.objectContaining({ purchaseType: 'DEVICE_LIMIT_ADDON', deviceLimit: '7' }),
     }))
+  })
+
+  it('rejects a device limit add-on disabled for the tariff', async () => {
+    mocks.prisma.plan.findUnique.mockResolvedValue({ ...plan, deviceAddonEnabled: false })
+
+    const response = await POST(paymentRequest({
+      purchaseType: 'DEVICE_LIMIT_ADDON',
+      deviceLimit: 7,
+    }))
+    const body = await response.json()
+
+    expect(response.status).toBe(404)
+    expect(body.error).toContain('недоступны')
+    expect(mocks.prisma.$transaction).not.toHaveBeenCalled()
   })
 
   it('creates a local payment, sends it to YooKassa and stores confirmation data', async () => {
@@ -632,6 +647,17 @@ describe('payment create route', () => {
       amount: 600,
       metadata: expect.objectContaining({ deviceLimit: '8' }),
     }))
+  })
+
+  it('rejects extra devices in a new subscription when the option is disabled', async () => {
+    mocks.prisma.plan.findUnique.mockResolvedValue({ ...plan, deviceAddonEnabled: false })
+
+    const response = await POST(paymentRequest({ deviceLimit: 8 }))
+    const body = await response.json()
+
+    expect(response.status).toBe(422)
+    expect(body.error).toContain('недоступны')
+    expect(mocks.prisma.$transaction).not.toHaveBeenCalled()
   })
 
   it('creates a Platega checkout and stores the external transaction', async () => {

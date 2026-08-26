@@ -39,6 +39,30 @@ export const POST = withAuth(async (req: Request) => {
     return NextResponse.json({ error: 'Тариф не найден' }, { status: 404 })
   }
 
+  if (
+    !plan.deviceAddonEnabled
+    && parsed.data.deviceLimit != null
+    && parsed.data.deviceLimit > plan.deviceLimit
+  ) {
+    const currentSubscription = await prisma.subscription.findFirst({
+      where: {
+        userId: session.uid,
+        planId: plan.id,
+        status: { in: ['ACTIVE', 'LIMITED'] },
+        expireAt: { gt: new Date() },
+      },
+      orderBy: { expireAt: 'desc' },
+      select: { deviceLimit: true },
+    })
+    const allowedDeviceLimit = currentSubscription?.deviceLimit ?? plan.deviceLimit
+    if (parsed.data.deviceLimit > allowedDeviceLimit) {
+      return NextResponse.json(
+        { error: 'Дополнительные устройства для этого тарифа недоступны' },
+        { status: 422 }
+      )
+    }
+  }
+
   try {
     const pricing = calculatePlanPurchase(plan, parsed.data.deviceLimit)
     const discount = await validatePromoCodeForPlan({

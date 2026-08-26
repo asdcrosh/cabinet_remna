@@ -126,6 +126,16 @@ export const POST = withAuth(async (req: Request) => {
     : null
 
   if (isDeviceLimitAddon) {
+    if (
+      !plan.deviceAddonEnabled
+      || plan.maxDeviceLimit <= plan.deviceLimit
+      || plan.extraDevicePriceKopecks <= 0
+    ) {
+      return NextResponse.json(
+        { error: 'Дополнительные устройства для этого тарифа недоступны' },
+        { status: 404 }
+      )
+    }
     if (!currentSubscription || currentSubscription.planId !== plan.id) {
       return NextResponse.json({ error: 'Действующая подписка этого тарифа не найдена' }, { status: 409 })
     }
@@ -210,6 +220,17 @@ export const POST = withAuth(async (req: Request) => {
       { error: 'Обновите страницу тарифа и выберите количество устройств', code: 'DEVICE_LIMIT_REQUIRED' },
       { status: 400 }
     )
+  }
+  if (isSubscriptionPurchase && !plan.isPromo && !plan.deviceAddonEnabled && deviceLimit != null) {
+    const allowedDeviceLimit = currentSubscription?.planId === plan.id
+      ? currentSubscription.deviceLimit ?? plan.deviceLimit
+      : plan.deviceLimit
+    if (deviceLimit > allowedDeviceLimit) {
+      return NextResponse.json(
+        { error: 'Дополнительные устройства для этого тарифа недоступны' },
+        { status: 422 }
+      )
+    }
   }
 
   let deviceAddonExpireAt: Date | null = null

@@ -30,6 +30,7 @@ export default async function AdminPlansPage() {
     trafficLimitGb: plan.trafficLimitGb,
     deviceLimit: plan.deviceLimit,
     maxDeviceLimit: plan.maxDeviceLimit,
+    deviceAddonEnabled: plan.deviceAddonEnabled,
     extraDevicePriceKopecks: plan.extraDevicePriceKopecks,
     activeInternalSquads: plan.activeInternalSquads,
     whitelistAddonEnabled: plan.whitelistAddonEnabled,

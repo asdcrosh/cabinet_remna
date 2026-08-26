@@ -37,6 +37,9 @@ export const PATCH = withAuth(async (req: Request, { params }: { params: Promise
     isPromo: parsed.data.isPromo ?? currentPlan.isPromo,
     deviceLimit: parsed.data.deviceLimit ?? currentPlan.deviceLimit,
     maxDeviceLimit: parsed.data.maxDeviceLimit ?? currentPlan.maxDeviceLimit,
+    deviceAddonEnabled: parsed.data.deviceAddonEnabled ?? currentPlan.deviceAddonEnabled,
+    extraDevicePriceKopecks:
+      parsed.data.extraDevicePriceKopecks ?? currentPlan.extraDevicePriceKopecks,
     whitelistAddonEnabled: parsed.data.whitelistAddonEnabled ?? currentPlan.whitelistAddonEnabled,
     whitelistAddonPriceKopecks:
       parsed.data.whitelistAddonPriceKopecks ?? currentPlan.whitelistAddonPriceKopecks,
@@ -52,6 +55,18 @@ export const PATCH = withAuth(async (req: Request, { params }: { params: Promise
   if (invariant.maxDeviceLimit < invariant.deviceLimit) {
     return NextResponse.json(
       { error: 'Максимум устройств не может быть меньше включённого количества' },
+      { status: 400 }
+    )
+  }
+  if (invariant.deviceAddonEnabled && invariant.maxDeviceLimit <= invariant.deviceLimit) {
+    return NextResponse.json(
+      { error: 'Максимум устройств должен быть больше включённого количества' },
+      { status: 400 }
+    )
+  }
+  if (invariant.deviceAddonEnabled && invariant.extraDevicePriceKopecks <= 0) {
+    return NextResponse.json(
+      { error: 'Укажите стоимость дополнительного устройства' },
       { status: 400 }
     )
   }

@@ -53,6 +53,7 @@ export interface PlanAdminRow {
   trafficLimitGb: number | null
   deviceLimit: number
   maxDeviceLimit: number
+  deviceAddonEnabled: boolean
   extraDevicePriceKopecks: number
   activeInternalSquads: string[]
   whitelistAddonEnabled: boolean
@@ -78,6 +79,7 @@ interface PlanFormState {
   unlimitedTraffic: boolean
   deviceLimit: string
   maxDeviceLimit: string
+  deviceAddonEnabled: boolean
   extraDevicePriceRub: string
   activeInternalSquads: string
   whitelistAddonEnabled: boolean
@@ -106,6 +108,7 @@ const emptyForm: PlanFormState = {
   unlimitedTraffic: false,
   deviceLimit: '5',
   maxDeviceLimit: '5',
+  deviceAddonEnabled: false,
   extraDevicePriceRub: '0',
   activeInternalSquads: '',
   whitelistAddonEnabled: false,
@@ -328,7 +331,7 @@ export function PlansAdmin({ plans }: { plans: PlanAdminRow[] }) {
             type="button"
             className="btn-primary w-full sm:w-auto"
             onClick={() => void submit(createForm)}
-            disabled={loadingId === 'create' || isWhitelistAddonConfigurationInvalid(createForm)}
+            disabled={loadingId === 'create' || isPlanConfigurationInvalid(createForm)}
           >
             {loadingId === 'create' ? 'Сохраняем...' : 'Создать тариф'}
           </button>
@@ -354,7 +357,7 @@ export function PlansAdmin({ plans }: { plans: PlanAdminRow[] }) {
             type="button"
             className="btn-primary w-full sm:w-auto"
             onClick={() => void submit(editForm, editingId)}
-            disabled={loadingId === editingId || isWhitelistAddonConfigurationInvalid(editForm)}
+            disabled={loadingId === editingId || isPlanConfigurationInvalid(editForm)}
           >
             {loadingId === editingId ? 'Сохраняем...' : 'Сохранить изменения'}
           </button>
@@ -553,7 +556,7 @@ function SortablePlanCard({
         <PlanFact label="Трафик" value={plan.trafficLimitGb == null ? 'Безлимит' : `${plan.trafficLimitGb} ГБ`} />
         <PlanFact
           label="Устройства"
-          value={plan.maxDeviceLimit > plan.deviceLimit
+          value={plan.deviceAddonEnabled && plan.maxDeviceLimit > plan.deviceLimit
             ? `${plan.deviceLimit}–${plan.maxDeviceLimit} · +${formatPrice(plan.extraDevicePriceKopecks)}`
             : String(plan.deviceLimit)}
         />
@@ -576,6 +579,9 @@ function SortablePlanCard({
         <div className="mt-2 flex flex-wrap gap-1.5 text-xs">
           {plan.isFeatured && <PlanTag>Популярный</PlanTag>}
           {!plan.promoCodesEnabled && <PlanTag>Без скидок</PlanTag>}
+          {plan.deviceAddonEnabled && (
+            <PlanTag>Доп. устройства +{formatPrice(plan.extraDevicePriceKopecks)}</PlanTag>
+          )}
           {plan.whitelistAddonEnabled && (
             <PlanTag>Белые списки +{formatPrice(plan.whitelistAddonPriceKopecks)}</PlanTag>
           )}
@@ -732,6 +738,25 @@ function PlanEditor({
         : current.whitelistAddonPriceRub,
     }))
   }
+  const toggleDeviceAddon = (enabled: boolean) => {
+    setForm((current) => ({
+      ...current,
+      deviceAddonEnabled: enabled,
+      maxDeviceLimit: enabled && Number(current.maxDeviceLimit) <= Number(current.deviceLimit)
+        ? String(Number(current.deviceLimit) + 1)
+        : current.maxDeviceLimit,
+      extraDevicePriceRub: enabled && Number(current.extraDevicePriceRub) <= 0
+        ? '100'
+        : current.extraDevicePriceRub,
+    }))
+  }
+  const deviceAddonMaxInvalid = form.deviceAddonEnabled && (
+    !Number.isFinite(Number(form.maxDeviceLimit))
+    || !Number.isFinite(Number(form.deviceLimit))
+    || Number(form.maxDeviceLimit) <= Number(form.deviceLimit)
+  )
+  const deviceAddonPriceInvalid = form.deviceAddonEnabled
+    && (!Number.isFinite(Number(form.extraDevicePriceRub)) || Number(form.extraDevicePriceRub) <= 0)
   const addonPriceInvalid = form.whitelistAddonEnabled
     && (!Number.isFinite(Number(form.whitelistAddonPriceRub)) || Number(form.whitelistAddonPriceRub) <= 0)
   const addonSquadsInvalid = form.whitelistAddonEnabled && selectedAddon.size === 0
@@ -761,16 +786,22 @@ function PlanEditor({
             <input value={form.deviceLimit} onChange={(event) => set('deviceLimit', event.target.value)} className="input" type="number" min={1} />
           </Field>
           <Field label="Максимум устройств">
-            <input value={form.maxDeviceLimit} onChange={(event) => set('maxDeviceLimit', event.target.value)} className="input" type="number" min={1} max={100} />
+            <input value={form.maxDeviceLimit} onChange={(event) => set('maxDeviceLimit', event.target.value)} className="input" type="number" min={1} max={100} disabled={!form.deviceAddonEnabled} aria-invalid={deviceAddonMaxInvalid} />
           </Field>
           <Field label="Доплата за устройство, ₽">
-            <input value={form.extraDevicePriceRub} onChange={(event) => set('extraDevicePriceRub', event.target.value)} className="input" type="number" min={0} step="0.01" />
+            <input value={form.extraDevicePriceRub} onChange={(event) => set('extraDevicePriceRub', event.target.value)} className="input" type="number" min={0} step="0.01" disabled={!form.deviceAddonEnabled} aria-invalid={deviceAddonPriceInvalid} />
           </Field>
           <Field label="Трафик, ГБ">
             <input value={form.trafficLimitGb} onChange={(event) => set('trafficLimitGb', event.target.value)} className="input" type="number" min={1} disabled={form.unlimitedTraffic} placeholder="Безлимит" />
           </Field>
         </div>
-        <div className="mt-3">
+        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+          <Toggle
+            checked={form.deviceAddonEnabled}
+            onChange={toggleDeviceAddon}
+            label="Докупка устройств"
+            description="Разрешить увеличивать лимит устройств"
+          />
           <Toggle
             checked={form.unlimitedTraffic}
             onChange={(value) => set('unlimitedTraffic', value)}
@@ -778,6 +809,16 @@ function PlanEditor({
             description="Лимит в гигабайтах не применяется"
           />
         </div>
+        {deviceAddonMaxInvalid ? (
+          <p className="mt-2 text-sm font-medium text-red-600 dark:text-red-300">
+            Максимум устройств должен быть больше включённого количества.
+          </p>
+        ) : null}
+        {deviceAddonPriceInvalid ? (
+          <p className="mt-2 text-sm font-medium text-red-600 dark:text-red-300">
+            Стоимость дополнительного устройства должна быть больше нуля.
+          </p>
+        ) : null}
       </EditorSection>
 
       <EditorSection title="Публикация и доступ" description="Кому показывать тариф и как он участвует в каталоге.">
@@ -1004,6 +1045,7 @@ function formFromPlan(plan: PlanAdminRow): PlanFormState {
     unlimitedTraffic: plan.trafficLimitGb == null,
     deviceLimit: String(plan.deviceLimit),
     maxDeviceLimit: String(plan.maxDeviceLimit),
+    deviceAddonEnabled: plan.deviceAddonEnabled,
     extraDevicePriceRub: String(plan.extraDevicePriceKopecks / 100),
     activeInternalSquads: plan.activeInternalSquads.join('\n'),
     whitelistAddonEnabled: plan.whitelistAddonEnabled,
@@ -1018,10 +1060,20 @@ function formFromPlan(plan: PlanAdminRow): PlanFormState {
   }
 }
 
-function isWhitelistAddonConfigurationInvalid(form: PlanFormState) {
+function isPlanConfigurationInvalid(form: PlanFormState) {
+  const deviceAddonInvalid = form.deviceAddonEnabled && (
+    !Number.isFinite(Number(form.maxDeviceLimit))
+    || !Number.isFinite(Number(form.deviceLimit))
+    || Number(form.maxDeviceLimit) <= Number(form.deviceLimit)
+    || !Number.isFinite(Number(form.extraDevicePriceRub))
+    || Number(form.extraDevicePriceRub) <= 0
+  )
+  if (deviceAddonInvalid) return true
   if (!form.whitelistAddonEnabled) return false
-  const price = Number(form.whitelistAddonPriceRub)
-  return !Number.isFinite(price) || price <= 0 || parseSquads(form.whitelistAddonInternalSquads).length === 0
+  const whitelistPrice = Number(form.whitelistAddonPriceRub)
+  return !Number.isFinite(whitelistPrice)
+    || whitelistPrice <= 0
+    || parseSquads(form.whitelistAddonInternalSquads).length === 0
 }
 
 function toPayload(form: PlanFormState) {
@@ -1033,6 +1085,7 @@ function toPayload(form: PlanFormState) {
     trafficLimitGb: form.unlimitedTraffic || !form.trafficLimitGb ? null : Number(form.trafficLimitGb),
     deviceLimit: Number(form.deviceLimit),
     maxDeviceLimit: Number(form.maxDeviceLimit),
+    deviceAddonEnabled: form.deviceAddonEnabled,
     extraDevicePriceKopecks: Math.round(Number(form.extraDevicePriceRub) * 100),
     activeInternalSquads: parseSquads(form.activeInternalSquads),
     whitelistAddonEnabled: form.whitelistAddonEnabled,

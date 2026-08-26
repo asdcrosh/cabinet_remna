@@ -20,6 +20,7 @@ export async function GET() {
       trafficLimitGb: true,
       deviceLimit: true,
       maxDeviceLimit: true,
+      deviceAddonEnabled: true,
       extraDevicePriceKopecks: true,
       isPromo: true,
       promoCodesEnabled: true,

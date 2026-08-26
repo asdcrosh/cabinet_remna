@@ -41,6 +41,7 @@ export interface PlanCardProps {
   trafficLimitGb: number | null;
   deviceLimit: number;
   maxDeviceLimit: number;
+  deviceAddonEnabled: boolean;
   extraDevicePriceKopecks: number;
   initialDeviceLimit?: number;
   currentDeviceLimit?: number | null;
@@ -82,6 +83,7 @@ export function PlanCard({
   trafficLimitGb,
   deviceLimit,
   maxDeviceLimit,
+  deviceAddonEnabled,
   extraDevicePriceKopecks,
   initialDeviceLimit,
   currentDeviceLimit,
@@ -152,7 +154,10 @@ export function PlanCard({
   const effectiveMonthlyPrice = formatPrice(
     Math.round((effectivePriceKopecks / Math.max(1, durationDays)) * 30),
   );
-  const variableDeviceLimit = !isPromoPlan && normalizedMaxDeviceLimit > deviceLimit;
+  const variableDeviceLimit = !isPromoPlan
+    && deviceAddonEnabled
+    && normalizedMaxDeviceLimit > deviceLimit
+    && extraDevicePriceKopecks > 0;
   const lowersCurrentLimit = Boolean(
     currentDeviceLimit && selectedDeviceLimit < currentDeviceLimit,
   );
@@ -531,7 +536,9 @@ export function PlanCard({
           <PlanFact
             icon={<MonitorSmartphone className="h-4 w-4" />}
             label="Устройства"
-            value={variableDeviceLimit ? `${deviceLimit}–${normalizedMaxDeviceLimit}` : `До ${deviceLimit}`}
+            value={variableDeviceLimit
+              ? `${deviceLimit}–${normalizedMaxDeviceLimit}`
+              : `До ${Math.max(deviceLimit, selectedDeviceLimit)}`}
           />
         </div>
       ) : null}
