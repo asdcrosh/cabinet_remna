@@ -1,5 +1,7 @@
-import { readFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
+import { execFileSync } from 'node:child_process'
 import { describe, expect, it } from 'vitest'
 
 function read(relativePath: string) {
@@ -12,7 +14,30 @@ function composeService(source: string, service: string) {
   return match[0]
 }
 
+function parsePullProgress(log: string, elapsedSeconds: number) {
+  const updater = read('deploy/update-server.sh')
+  const parser = updater.match(/python3 - "\$\{log_file\}" "\$\{elapsed\}" <<'PY'\n([\s\S]*?)\nPY/)
+  if (!parser?.[1]) throw new Error('Pull progress parser not found')
+
+  const directory = mkdtempSync(resolve(tmpdir(), 'cabinet-pull-progress-'))
+  const logPath = resolve(directory, 'docker-pull.log')
+  try {
+    writeFileSync(logPath, log)
+    return execFileSync('python3', ['-', logPath, String(elapsedSeconds)], {
+      encoding: 'utf8',
+      input: parser[1],
+    }).trim()
+  } finally {
+    rmSync(directory, { recursive: true, force: true })
+  }
+}
+
 describe('production deployment security', () => {
+  it('calculates Docker pull ETA for classic and current progress formats', () => {
+    expect(parsePullProgress('abcd1234: Downloading [======>] 5MB/10MB\r', 12)).toBe('50|12')
+    expect(parsePullProgress('\u001b[2Kabcd1234 Downloading 1.5MiB / 3MiB\r', 8)).toBe('50|8')
+  })
+
   it('does not inject the application env file into database or Caddy', () => {
     const compose = read('deploy/docker-compose.server.yml')
     const database = composeService(compose, 'db')
@@ -156,7 +181,10 @@ describe('production deployment security', () => {
     expect(updater).toContain('docker pull "${TARGET_PROVISIONER_IMAGE}"')
     expect(updater).toContain('pull_progress_snapshot "${log_file}" "${elapsed}"')
     expect(updater).toContain('Загрузка образа кабинета: %s%%, осталось ~%s')
-    expect(updater).toContain('Загрузка образа кабинета: оцениваем оставшееся время...')
+    expect(updater).toContain('Загрузка образа кабинета: прошло %s, ETA уточняется...')
+    expect(updater).toContain('Загрузка образа кабинета: завершена за %s')
+    expect(updater).toContain('format_elapsed()')
+    expect(updater).toContain('B|kB|KiB|MB|MiB|GB|GiB|TB|TiB')
     expect(updater).not.toContain('Загрузка образа кабинета: %s сек.')
     expect(updater).toContain('set_deploy_stage 45 "migrations"')
     expect(updater).toContain('set_deploy_stage 85 "local_health"')

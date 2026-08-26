@@ -169,19 +169,24 @@ import sys
 path = sys.argv[1]
 elapsed = max(int(sys.argv[2]), 1)
 units = {
-    "B": 1,
-    "kB": 1_000,
-    "KB": 1_000,
-    "MB": 1_000_000,
-    "GB": 1_000_000_000,
-    "TB": 1_000_000_000_000,
+    "b": 1,
+    "kb": 1_000,
+    "kib": 1_024,
+    "mb": 1_000_000,
+    "mib": 1_048_576,
+    "gb": 1_000_000_000,
+    "gib": 1_073_741_824,
+    "tb": 1_000_000_000_000,
+    "tib": 1_099_511_627_776,
 }
 layers = {}
 pattern = re.compile(
-    r"^([0-9a-f]{4,64}):\s+Downloading.*?"
-    r"([0-9.]+)\s*(B|kB|KB|MB|GB|TB)\s*/\s*"
-    r"([0-9.]+)\s*(B|kB|KB|MB|GB|TB)"
+    r"^([0-9a-f]{4,64})(?::|\s+)\s*.*?Downloading.*?"
+    r"([0-9.]+)\s*(B|kB|KiB|MB|MiB|GB|GiB|TB|TiB)\s*/\s*"
+    r"([0-9.]+)\s*(B|kB|KiB|MB|MiB|GB|GiB|TB|TiB)",
+    re.IGNORECASE,
 )
+ansi_escape = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
 
 try:
     content = open(path, "rb").read().decode("utf-8", "replace").replace("\r", "\n")
@@ -189,12 +194,12 @@ except OSError:
     sys.exit(0)
 
 for line in content.splitlines():
-    match = pattern.search(line.strip())
+    match = pattern.search(ansi_escape.sub("", line).strip())
     if not match:
         continue
     layer, current, current_unit, total, total_unit = match.groups()
-    current_bytes = float(current) * units[current_unit]
-    total_bytes = float(total) * units[total_unit]
+    current_bytes = float(current) * units[current_unit.lower()]
+    total_bytes = float(total) * units[total_unit.lower()]
     if total_bytes > 0:
         layers[layer] = (min(current_bytes, total_bytes), total_bytes)
 
@@ -223,8 +228,19 @@ format_eta() {
   fi
 }
 
+format_elapsed() {
+  local seconds="$1"
+  if ((seconds < 60)); then
+    printf '%s сек.' "${seconds}"
+  elif ((seconds < 3600)); then
+    printf '%s мин. %s сек.' "$((seconds / 60))" "$((seconds % 60))"
+  else
+    printf '%s ч. %s мин.' "$((seconds / 3600))" "$(((seconds % 3600) / 60))"
+  fi
+}
+
 pull_target_image() {
-  local log_file pull_pid started_at elapsed pull_status=0 snapshot percent eta eta_label
+  local log_file pull_pid started_at elapsed pull_status=0 snapshot percent eta eta_label elapsed_label
 
   log_file="$(mktemp)"
   started_at="$(date +%s)"
@@ -245,7 +261,8 @@ pull_target_image() {
           printf '\r\033[2K[ 20%%] Загрузка образа кабинета: завершаем...'
         fi
       else
-        printf '\r\033[2K[ 20%%] Загрузка образа кабинета: оцениваем оставшееся время...'
+        elapsed_label="$(format_elapsed "${elapsed}")"
+        printf '\r\033[2K[ 20%%] Загрузка образа кабинета: прошло %s, ETA уточняется...' "${elapsed_label}"
       fi
       sleep 2
     done
@@ -258,6 +275,9 @@ pull_target_image() {
     rm -f "${log_file}"
     return "${pull_status}"
   fi
+  elapsed=$(($(date +%s) - started_at))
+  elapsed_label="$(format_elapsed "${elapsed}")"
+  printf '[ 20%%] Загрузка образа кабинета: завершена за %s\n' "${elapsed_label}"
   rm -f "${log_file}"
 }
 
