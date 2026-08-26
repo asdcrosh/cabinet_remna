@@ -30,7 +30,7 @@ describe('PayAnyWay payment form redirect', () => {
       id: 'payment-1',
       userId: 'user-1',
       amountKopecks: 30000,
-      plan: { durationDays: 30 },
+      plan: { durationDays: 30, unlimitedDuration: false },
     })
     mocks.createPayAnyWayPaymentRequest.mockResolvedValue({
       action: 'https://www.payanyway.ru/assistant.htm',
@@ -109,7 +109,7 @@ describe('PayAnyWay payment form redirect', () => {
         provider: 'PAYANYWAY',
         status: 'PENDING',
       },
-      include: { plan: { select: { durationDays: true } } },
+      include: { plan: { select: { durationDays: true, unlimitedDuration: true } } },
     })
     expect(mocks.createPayAnyWayPaymentRequest).not.toHaveBeenCalled()
   })

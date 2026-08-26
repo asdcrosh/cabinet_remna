@@ -35,6 +35,7 @@ export const PATCH = withAuth(async (req: Request, { params }: { params: Promise
   const invariant = {
     priceKopecks: parsed.data.priceKopecks ?? currentPlan.priceKopecks,
     isPromo: parsed.data.isPromo ?? currentPlan.isPromo,
+    unlimitedDevices: parsed.data.unlimitedDevices ?? currentPlan.unlimitedDevices,
     deviceLimit: parsed.data.deviceLimit ?? currentPlan.deviceLimit,
     maxDeviceLimit: parsed.data.maxDeviceLimit ?? currentPlan.maxDeviceLimit,
     deviceAddonEnabled: parsed.data.deviceAddonEnabled ?? currentPlan.deviceAddonEnabled,
@@ -61,6 +62,12 @@ export const PATCH = withAuth(async (req: Request, { params }: { params: Promise
   if (invariant.deviceAddonEnabled && invariant.maxDeviceLimit <= invariant.deviceLimit) {
     return NextResponse.json(
       { error: 'Максимум устройств должен быть больше включённого количества' },
+      { status: 400 }
+    )
+  }
+  if (invariant.unlimitedDevices && invariant.deviceAddonEnabled) {
+    return NextResponse.json(
+      { error: 'Для безлимитных устройств докупка не требуется' },
       { status: 400 }
     )
   }

@@ -35,8 +35,10 @@ export interface EnsureSubscriptionInput {
     id: string
     name: string
     durationDays: number
+    unlimitedDuration?: boolean
     trafficLimitGb: number | null
     deviceLimit: number
+    unlimitedDevices?: boolean
     activeInternalSquads?: string[]
   }
 }
@@ -118,7 +120,7 @@ export async function ensureRemnawaveSubscription(input: EnsureSubscriptionInput
         // (например, с безлимита переходим на 200 ГБ), обновим:
         trafficLimitBytes:
           input.plan.trafficLimitGb == null ? 0 : Number(gbToBytes(input.plan.trafficLimitGb)),
-        hwidDeviceLimit: input.plan.deviceLimit,
+        hwidDeviceLimit: input.plan.unlimitedDevices ? 0 : input.plan.deviceLimit,
         telegramId: toRemnawaveTelegramId(user.telegramId),
         tag: 'IMPORTED',
         activeInternalSquads,
@@ -157,7 +159,7 @@ export async function ensureRemnawaveSubscription(input: EnsureSubscriptionInput
   } else {
     // Создаём
     isNew = true
-    const expireAt = new Date(Date.now() + input.plan.durationDays * 24 * 60 * 60 * 1000)
+    const expireAt = computeNewExpireAt(undefined, input.plan, input.periodMode)
     const created = await createRemnawaveUser({
       localUserId: user.id,
       email: input.email,
@@ -208,7 +210,7 @@ export async function ensureRemnawaveSubscription(input: EnsureSubscriptionInput
             trafficLimitBytes: trafficLimit === 0n ? null : trafficLimit,
             trafficUsedBytes: trafficUsed,
             lifetimeUsedBytes: lifetimeUsed,
-            deviceLimit: input.plan.deviceLimit,
+            deviceLimit: input.plan.unlimitedDevices ? null : input.plan.deviceLimit,
             lastSyncedAt: new Date(),
             pendingSync: false,
             whitelistAddonActive,
@@ -230,7 +232,7 @@ export async function ensureRemnawaveSubscription(input: EnsureSubscriptionInput
             trafficLimitBytes: trafficLimit === 0n ? null : trafficLimit,
             trafficUsedBytes: trafficUsed,
             lifetimeUsedBytes: lifetimeUsed,
-            deviceLimit: input.plan.deviceLimit,
+            deviceLimit: input.plan.unlimitedDevices ? null : input.plan.deviceLimit,
             lastSyncedAt: new Date(),
             pendingSync: false,
             whitelistAddonActive,
@@ -269,6 +271,7 @@ function computeNewExpireAt(
   plan: EnsureSubscriptionInput['plan'],
   periodMode: EnsureSubscriptionInput['periodMode'] = 'AUTO'
 ) {
+  if (plan.unlimitedDuration) return unlimitedExpireAt()
   if (periodMode === 'REPLACE') {
     return new Date(Date.now() + plan.durationDays * 24 * 60 * 60 * 1000)
   }
@@ -279,6 +282,10 @@ function computeNewExpireAt(
   const isSamePlan = active?.planId === plan.id
   const base = isSamePlan && active.expireAt.getTime() > Date.now() ? active.expireAt : new Date()
   return new Date(base.getTime() + plan.durationDays * 24 * 60 * 60 * 1000)
+}
+
+function unlimitedExpireAt() {
+  return new Date('2099-12-31T23:59:59.000Z')
 }
 
 function getLatestActiveSubscription(subscriptions: { expireAt: Date; status: string; planId?: string | null }[]) {
@@ -329,7 +336,7 @@ function createRemnawaveUser(input: {
     tag: 'IMPORTED',
     trafficLimitBytes:
       input.plan.trafficLimitGb == null ? 0 : Number(gbToBytes(input.plan.trafficLimitGb)),
-    hwidDeviceLimit: input.plan.deviceLimit,
+    hwidDeviceLimit: input.plan.unlimitedDevices ? 0 : input.plan.deviceLimit,
     activeInternalSquads: input.activeInternalSquads,
     // По умолчанию — месячный сброс. Если в Remnawave вы настроили
     // свою стратегию — поменяйте здесь.

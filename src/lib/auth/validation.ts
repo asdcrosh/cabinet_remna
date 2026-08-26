@@ -254,8 +254,10 @@ const adminPlanBaseSchema = z.object({
   description: z.string().trim().max(240, 'Максимум 240 символов').optional().nullable(),
   priceKopecks: z.coerce.number().int().min(0).max(10_000_000),
   durationDays: z.coerce.number().int().min(1).max(3650),
+  unlimitedDuration: z.boolean().default(false),
   trafficLimitGb: z.coerce.number().int().min(1).max(1_000_000).optional().nullable(),
   deviceLimit: z.coerce.number().int().min(1).max(100),
+  unlimitedDevices: z.boolean().default(false),
   maxDeviceLimit: z.coerce.number().int().min(1).max(100),
   deviceAddonEnabled: z.boolean().default(false),
   extraDevicePriceKopecks: z.coerce.number().int().min(0).max(10_000_000),
@@ -292,6 +294,13 @@ export const adminPlanSchema = adminPlanBaseSchema.superRefine((value, context) 
       code: 'custom',
       path: ['maxDeviceLimit'],
       message: 'Максимум устройств должен быть больше включённого количества',
+    })
+  }
+  if (value.unlimitedDevices && value.deviceAddonEnabled) {
+    context.addIssue({
+      code: 'custom',
+      path: ['deviceAddonEnabled'],
+      message: 'Для безлимитных устройств докупка не требуется',
     })
   }
   if (value.deviceAddonEnabled && value.extraDevicePriceKopecks <= 0) {

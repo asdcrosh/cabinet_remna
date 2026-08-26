@@ -156,6 +156,58 @@ describe('ensureRemnawaveSubscription', () => {
     )
   })
 
+  it('provisions unlimited duration, traffic and devices', async () => {
+    const unlimitedUser = {
+      ...remnawaveUser,
+      expireAt: '2099-12-31T23:59:59.000Z',
+      trafficLimitBytes: '0',
+      hwidDeviceLimit: 0,
+    }
+    mocks.prisma.payment.findUnique.mockResolvedValue(null)
+    mocks.prisma.user.findUnique.mockResolvedValue({
+      id: 'user-1',
+      email: 'user@example.com',
+      remnawaveUuid: 'rw-1',
+      subscriptions: [{
+        id: 'sub-1',
+        planId: 'old-plan',
+        expireAt: new Date('2026-01-15T00:00:00.000Z'),
+        status: 'ACTIVE',
+      }],
+    })
+    mocks.remnawave.updateUser.mockResolvedValue({ response: unlimitedUser })
+    mocks.prisma.subscription.update.mockResolvedValue({ id: 'sub-1' })
+
+    await ensureRemnawaveSubscription({
+      userId: 'user-1',
+      email: 'user@example.com',
+      plan: {
+        ...plan,
+        unlimitedDuration: true,
+        unlimitedDevices: true,
+        trafficLimitGb: null,
+      },
+    })
+
+    expect(mocks.remnawave.updateUser).toHaveBeenCalledWith(
+      expect.objectContaining({ uuid: 'rw-1' }),
+      expect.objectContaining({
+        expireAt: '2099-12-31T23:59:59.000Z',
+        trafficLimitBytes: 0,
+        hwidDeviceLimit: 0,
+      })
+    )
+    expect(mocks.prisma.subscription.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          expireAt: new Date('2099-12-31T23:59:59.000Z'),
+          trafficLimitBytes: null,
+          deviceLimit: null,
+        }),
+      })
+    )
+  })
+
   it('activates a bundled whitelist add-on for the purchased period', async () => {
     mocks.prisma.payment.findUnique.mockResolvedValue(null)
     mocks.prisma.user.findUnique.mockResolvedValue({

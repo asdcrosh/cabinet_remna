@@ -61,6 +61,7 @@ export default async function BillingPage({
               name: true,
               priceKopecks: true,
               durationDays: true,
+              unlimitedDuration: true,
               deviceLimit: true,
               maxDeviceLimit: true,
               extraDevicePriceKopecks: true,
@@ -98,7 +99,7 @@ export default async function BillingPage({
         />
       )}
 
-      {currentSubscription?.plan ? (
+      {currentSubscription?.plan && !currentSubscription.plan.unlimitedDuration ? (
         <AutoRenewalCard
           planId={currentSubscription.plan.id}
           planName={currentSubscription.plan.name}

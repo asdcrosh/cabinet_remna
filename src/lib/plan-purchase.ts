@@ -3,8 +3,10 @@ export interface DevicePricedPlan {
   name: string
   priceKopecks: number
   durationDays: number
+  unlimitedDuration?: boolean
   trafficLimitGb: number | null
   deviceLimit: number
+  unlimitedDevices?: boolean
   maxDeviceLimit: number
   extraDevicePriceKopecks: number
   activeInternalSquads: string[]
@@ -26,7 +28,9 @@ export interface PlanPurchaseSnapshot {
   remnashopPlanId: number | null
   name: string
   durationDays: number
+  unlimitedDuration: boolean
   trafficLimitGb: number | null
+  unlimitedDevices: boolean
   baseDeviceLimit: number
   maxDeviceLimit: number
   selectedDeviceLimit: number
@@ -92,7 +96,9 @@ export function buildPlanPurchaseSnapshot(
     remnashopPlanId: plan.remnashopPlanId ?? null,
     name: plan.name,
     durationDays: plan.durationDays,
+    unlimitedDuration: plan.unlimitedDuration === true,
     trafficLimitGb: plan.trafficLimitGb,
+    unlimitedDevices: plan.unlimitedDevices === true,
     baseDeviceLimit: pricing.baseDeviceLimit,
     maxDeviceLimit: pricing.maxDeviceLimit,
     selectedDeviceLimit: pricing.selectedDeviceLimit,
@@ -102,7 +108,7 @@ export function buildPlanPurchaseSnapshot(
     basePriceKopecks: plan.priceKopecks,
     originalAmountKopecks: pricing.originalAmountKopecks,
     activeInternalSquads: plan.activeInternalSquads,
-    deviceLimitSelectionConfirmed: true,
+    deviceLimitSelectionConfirmed: plan.unlimitedDevices !== true,
     switchFromPlan: currentPlan && currentPlan.id !== plan.id
       ? { id: currentPlan.id, name: currentPlan.name }
       : null,
@@ -153,7 +159,9 @@ export function readPlanPurchaseSnapshot(snapshot: unknown): PlanPurchaseSnapsho
     remnashopPlanId: typeof remnashopPlanId === 'number' ? remnashopPlanId : null,
     name: value.name,
     durationDays: value.durationDays,
+    unlimitedDuration: value.unlimitedDuration === true,
     trafficLimitGb,
+    unlimitedDevices: value.unlimitedDevices === true,
     baseDeviceLimit: value.baseDeviceLimit,
     maxDeviceLimit: value.maxDeviceLimit,
     selectedDeviceLimit: value.selectedDeviceLimit,

@@ -43,6 +43,8 @@ export default async function SubscriptionPage() {
           select: {
             name: true,
             deviceLimit: true,
+            unlimitedDevices: true,
+            unlimitedDuration: true,
           },
         },
       },
@@ -125,9 +127,12 @@ export default async function SubscriptionPage() {
 
   const u = data.response.user
   const isUnlimited = u.trafficLimitBytes === '0'
+  const unlimitedDuration = Boolean(localSubscription?.plan?.unlimitedDuration)
   const graceActive = Boolean(localSubscription?.graceExpireAt && localSubscription.graceExpireAt > new Date())
   const subscriptionExpired = !graceActive && isSubscriptionExpired(u.daysLeft, u.userStatus)
-  const expiresAtLabel = new Date(u.expiresAt).toLocaleDateString('ru-RU')
+  const expiresAtLabel = unlimitedDuration
+    ? 'Бессрочно'
+    : new Date(u.expiresAt).toLocaleDateString('ru-RU')
   const whitelistAddonActive = Boolean(
     localSubscription && isWhitelistAddonCurrentlyActive(localSubscription)
   )
@@ -208,7 +213,7 @@ export default async function SubscriptionPage() {
             >
               <span className="inline-flex items-center gap-2">
                 <Sparkles className="h-4 w-4" />
-                Продлить
+                {unlimitedDuration ? 'Сменить тариф' : 'Продлить'}
               </span>
               <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
             </Link>
@@ -222,7 +227,7 @@ export default async function SubscriptionPage() {
           <AccessMetric
             icon={<Sparkles className="h-4 w-4" />}
             label="Доступ"
-            value={formatSubscriptionDaysLeft(u.daysLeft, u.userStatus)}
+            value={unlimitedDuration ? 'Безлимит' : formatSubscriptionDaysLeft(u.daysLeft, u.userStatus)}
           />
           <AccessMetric
             icon={<CalendarDays className="h-4 w-4" />}
@@ -260,13 +265,17 @@ export default async function SubscriptionPage() {
           <>
             <VpnConnectionCheck
               supportEnabled={features.support}
-              deviceLimit={localSubscription?.deviceLimit ?? localSubscription?.plan?.deviceLimit}
+              deviceLimit={localSubscription?.plan?.unlimitedDevices
+                ? null
+                : localSubscription?.deviceLimit ?? localSubscription?.plan?.deviceLimit}
             />
             <div className="grid items-start gap-5 min-[1360px]:grid-cols-[minmax(0,1fr)_22rem]">
               <KeysCard subscriptionUrl={data.response.subscriptionUrl} happLink={happLink} />
               <DevicesList
                 embedded
-                deviceLimit={localSubscription?.deviceLimit ?? localSubscription?.plan?.deviceLimit}
+                deviceLimit={localSubscription?.plan?.unlimitedDevices
+                  ? null
+                  : localSubscription?.deviceLimit ?? localSubscription?.plan?.deviceLimit}
                 subscriptionUrl={data.response.subscriptionUrl}
               />
             </div>

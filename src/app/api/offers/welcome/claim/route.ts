@@ -192,8 +192,10 @@ async function claimTrialPlan({
         id: plan.id,
         name: plan.name,
         durationDays: plan.durationDays,
+        unlimitedDuration: plan.unlimitedDuration,
         trafficLimitGb: plan.trafficLimitGb,
         deviceLimit: plan.deviceLimit,
+        unlimitedDevices: plan.unlimitedDevices,
         activeInternalSquads: plan.activeInternalSquads,
       },
     })

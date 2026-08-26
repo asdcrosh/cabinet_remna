@@ -51,7 +51,13 @@ export function PaymentHistory({ payments }: { payments: PaymentHistoryPayment[]
                   <span aria-hidden="true">·</span>
                   <span>{paymentProviderLabel(payment.provider)}</span>
                   <span aria-hidden="true">·</span>
-                  <span>{payment.purchaseType === 'WHITELIST_ADDON' ? 'дополнение' : `${deviceLimit} ${deviceCountLabel(deviceLimit)}`}</span>
+                  <span>
+                    {payment.purchaseType === 'WHITELIST_ADDON'
+                      ? 'дополнение'
+                      : purchaseSnapshot?.unlimitedDevices || payment.plan.unlimitedDevices
+                        ? 'безлимит устройств'
+                        : `${deviceLimit} ${deviceCountLabel(deviceLimit)}`}
+                  </span>
                 </div>
                 {purchaseSnapshot?.switchFromPlan ? (
                   <div className="mt-1.5 text-xs font-medium text-cyan-700 dark:text-cyan-300">

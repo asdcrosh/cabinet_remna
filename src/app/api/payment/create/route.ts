@@ -88,6 +88,12 @@ export const POST = withAuth(async (req: Request) => {
   if (!plan || (isSubscriptionPurchase && !plan.isActive)) {
     return NextResponse.json({ error: 'Тариф не найден' }, { status: 404 })
   }
+  if (autoRenewalConsent && plan.unlimitedDuration) {
+    return NextResponse.json(
+      { error: 'Бессрочный тариф не требует автопродления' },
+      { status: 422 }
+    )
+  }
   const user = await prisma.user.findUnique({ where: { id: session.uid } })
   if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
   if (!user.emailVerifiedAt || user.email.endsWith('@pending.invalid')) {
@@ -128,6 +134,7 @@ export const POST = withAuth(async (req: Request) => {
   if (isDeviceLimitAddon) {
     if (
       !plan.deviceAddonEnabled
+      || plan.unlimitedDevices
       || plan.maxDeviceLimit <= plan.deviceLimit
       || plan.extraDevicePriceKopecks <= 0
     ) {
@@ -215,13 +222,13 @@ export const POST = withAuth(async (req: Request) => {
       { status: 400 }
     )
   }
-  if (isSubscriptionPurchase && !plan.isPromo && deviceLimit == null) {
+  if (isSubscriptionPurchase && !plan.isPromo && !plan.unlimitedDevices && deviceLimit == null) {
     return NextResponse.json(
       { error: 'Обновите страницу тарифа и выберите количество устройств', code: 'DEVICE_LIMIT_REQUIRED' },
       { status: 400 }
     )
   }
-  if (isSubscriptionPurchase && !plan.isPromo && !plan.deviceAddonEnabled && deviceLimit != null) {
+  if (isSubscriptionPurchase && !plan.isPromo && !plan.unlimitedDevices && !plan.deviceAddonEnabled && deviceLimit != null) {
     const allowedDeviceLimit = currentSubscription?.planId === plan.id
       ? currentSubscription.deviceLimit ?? plan.deviceLimit
       : plan.deviceLimit
@@ -231,6 +238,12 @@ export const POST = withAuth(async (req: Request) => {
         { status: 422 }
       )
     }
+  }
+  if (isSubscriptionPurchase && plan.unlimitedDevices && deviceLimit != null && deviceLimit !== plan.deviceLimit) {
+    return NextResponse.json(
+      { error: 'В тарифе уже включён безлимит устройств' },
+      { status: 422 }
+    )
   }
 
   let deviceAddonExpireAt: Date | null = null
@@ -600,7 +613,7 @@ export const POST = withAuth(async (req: Request) => {
     ? WHITELIST_ADDON_RECEIPT_NAME
     : isDeviceLimitAddon
       ? DEVICE_LIMIT_ADDON_RECEIPT_NAME
-      : `${buildPaymentServiceName(plan.durationDays)}${includesBundledWhitelistAddon ? ` + ${WHITELIST_ADDON_RECEIPT_NAME}` : ''}`
+      : `${buildPaymentServiceName(plan.durationDays, plan.unlimitedDuration)}${includesBundledWhitelistAddon ? ` + ${WHITELIST_ADDON_RECEIPT_NAME}` : ''}`
 
   if (provider === 'PAYANYWAY') {
     try {
@@ -897,8 +910,10 @@ async function provisionPromoPayment(
     id: string
     name: string
     durationDays: number
+    unlimitedDuration?: boolean
     trafficLimitGb: number | null
     deviceLimit: number
+    unlimitedDevices?: boolean
     activeInternalSquads: string[]
   }
 ) {
@@ -920,8 +935,10 @@ async function provisionPromoPayment(
         id: plan.id,
         name: plan.name,
         durationDays: plan.durationDays,
+        unlimitedDuration: plan.unlimitedDuration,
         trafficLimitGb: plan.trafficLimitGb,
         deviceLimit: plan.deviceLimit,
+        unlimitedDevices: plan.unlimitedDevices,
         activeInternalSquads: plan.activeInternalSquads,
       },
     })

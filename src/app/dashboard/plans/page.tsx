@@ -117,7 +117,7 @@ export default async function PlansPage({
     isOtherwiseEligibleForPromo &&
     (!user?.telegramId || !user?.remnashopSyncedAt)
   const referencePlan = visiblePlans
-    .filter((plan) => !plan.isPromo && plan.priceKopecks > 0)
+    .filter((plan) => !plan.isPromo && !plan.unlimitedDuration && plan.priceKopecks > 0)
     .sort((a, b) => a.durationDays - b.durationDays)[0]
   const referenceDailyPrice = referencePlan
     ? referencePlan.priceKopecks / Math.max(1, referencePlan.durationDays)
@@ -157,16 +157,18 @@ export default async function PlansPage({
     price: formatPrice(plan.priceKopecks),
     priceKopecks: plan.priceKopecks,
     monthlyPrice: formatPrice(Math.round((plan.priceKopecks / Math.max(1, plan.durationDays)) * 30)),
-    savingsPercent: !plan.isPromo && referenceDailyPrice > 0
+    savingsPercent: !plan.isPromo && !plan.unlimitedDuration && referenceDailyPrice > 0
       ? Math.max(0, Math.round((1 - (plan.priceKopecks / Math.max(1, plan.durationDays)) / referenceDailyPrice) * 100))
       : 0,
     durationDays: plan.durationDays,
+    unlimitedDuration: plan.unlimitedDuration,
     trafficLimitGb: plan.trafficLimitGb,
     deviceLimit: plan.deviceLimit,
+    unlimitedDevices: plan.unlimitedDevices,
     maxDeviceLimit: plan.maxDeviceLimit,
     deviceAddonEnabled: plan.deviceAddonEnabled,
     extraDevicePriceKopecks: plan.extraDevicePriceKopecks,
-    initialDeviceLimit: plan.isPromo
+    initialDeviceLimit: plan.isPromo || plan.unlimitedDevices
       ? plan.deviceLimit
       : plan.deviceAddonEnabled
         ? clampDeviceLimit(currentDeviceLimit ?? plan.deviceLimit, plan.deviceLimit, plan.maxDeviceLimit)

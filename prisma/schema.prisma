@@ -25,9 +25,11 @@ model Plan {
   description                  String?
   priceKopecks                 Int // 19900 = 199 ₽
   durationDays                 Int              @default(30)
+  unlimitedDuration            Boolean          @default(false)
   remnashopPlanId              Int? // исходный ID плана Remnashop для точной синхронизации
   trafficLimitGb               Int? // null = безлимит
   deviceLimit                  Int              @default(5)
+  unlimitedDevices             Boolean          @default(false)
   maxDeviceLimit               Int              @default(5)
   deviceAddonEnabled           Boolean          @default(false)
   extraDevicePriceKopecks      Int              @default(0)

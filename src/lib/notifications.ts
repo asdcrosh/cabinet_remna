@@ -145,7 +145,16 @@ export async function notifyPaymentSucceeded(paymentId: string) {
           remnawaveUsername: true,
         },
       },
-      plan: { select: { name: true, durationDays: true, trafficLimitGb: true, deviceLimit: true } },
+      plan: {
+        select: {
+          name: true,
+          durationDays: true,
+          unlimitedDuration: true,
+          trafficLimitGb: true,
+          deviceLimit: true,
+          unlimitedDevices: true,
+        },
+      },
       subscription: {
         select: {
           startAt: true,
@@ -291,14 +300,24 @@ export async function notifyPaymentSucceeded(paymentId: string) {
   const amount = formatRubles(payment.amountKopecks)
   const purchaseSnapshot = readPlanPurchaseSnapshot(payment.planSnapshot)
   const planName = purchaseSnapshot?.name ?? payment.plan?.name ?? 'тариф'
-  const durationDays = purchaseSnapshot?.durationDays ?? payment.plan?.durationDays ?? null
+  const unlimitedDuration = purchaseSnapshot?.unlimitedDuration
+    ?? payment.plan?.unlimitedDuration
+    ?? false
+  const unlimitedDevices = purchaseSnapshot?.unlimitedDevices
+    ?? payment.plan?.unlimitedDevices
+    ?? false
+  const durationDays = unlimitedDuration
+    ? null
+    : purchaseSnapshot?.durationDays ?? payment.plan?.durationDays ?? null
   const trafficLimitGb = purchaseSnapshot?.trafficLimitGb ?? payment.plan?.trafficLimitGb ?? null
   const subscriptionUrl = await getSubscriptionUrl(payment.user.remnawaveUsername)
   const dashboardSubscriptionUrl = `${appUrl}${SUBSCRIPTION_PATH}`
   const qrUrl = subscriptionUrl ? `${appUrl}/api/qr?text=${encodeURIComponent(subscriptionUrl)}` : null
   const isPaid = payment.amountKopecks > 0
   const isRenewal = isPaid && previousSucceededPayments > 0
-  const deviceLimit = payment.plan
+  const deviceLimit = unlimitedDevices
+    ? null
+    : payment.plan
     ? resolveEffectiveDeviceLimit({
         snapshot: payment.planSnapshot,
         paymentDeviceLimit: payment.deviceLimit,
@@ -306,7 +325,12 @@ export async function notifyPaymentSucceeded(paymentId: string) {
         planDeviceLimit: payment.plan.deviceLimit,
       })
     : payment.deviceLimit ?? payment.subscription?.deviceLimit ?? null
-  const expireText = payment.subscription?.expireAt ? `до ${formatDate(payment.subscription.expireAt)}` : null
+  const visibleExpireAt = unlimitedDuration ? null : payment.subscription?.expireAt ?? null
+  const expireText = unlimitedDuration
+    ? 'бессрочно'
+    : visibleExpireAt
+      ? `до ${formatDate(visibleExpireAt)}`
+      : null
   const title = isPaid ? (isRenewal ? 'Подписка продлена' : 'Подписка оплачена') : 'Пробный тариф активирован'
   const body = [
     isPaid
@@ -322,7 +346,7 @@ export async function notifyPaymentSucceeded(paymentId: string) {
     durationDays,
     trafficLimitGb,
     deviceLimit,
-    expireAt: payment.subscription?.expireAt ?? null,
+    expireAt: visibleExpireAt,
     paidAt: payment.paidAt ?? payment.subscriptionProvisionedAt ?? payment.updatedAt,
     isPaid,
     isRenewal,
@@ -349,7 +373,7 @@ export async function notifyPaymentSucceeded(paymentId: string) {
       durationDays,
       trafficLimitGb,
       deviceLimit,
-      expireAt: payment.subscription?.expireAt ?? null,
+      expireAt: visibleExpireAt,
       subscriptionUrl,
       dashboardSubscriptionUrl,
       qrUrl,
@@ -364,7 +388,7 @@ export async function notifyPaymentSucceeded(paymentId: string) {
       durationDays,
       trafficLimitGb,
       deviceLimit,
-      expireAt: payment.subscription?.expireAt ?? null,
+      expireAt: visibleExpireAt,
       subscriptionUrl,
       dashboardSubscriptionUrl,
       qrUrl,
@@ -387,12 +411,12 @@ export async function notifyPaymentSucceeded(paymentId: string) {
       text: buildAdminPaymentTelegramText({
         amount,
         planName,
-        durationDays: payment.plan?.durationDays ?? null,
+        durationDays,
         customerName: payment.user.name,
         customerEmail: payment.user.email,
         telegramUsername: payment.user.telegramUsername,
         provider: paymentProviderLabel(payment.provider),
-        expireAt: payment.subscription?.expireAt ?? null,
+        expireAt: visibleExpireAt,
         isPaid,
         isRenewal,
       }),

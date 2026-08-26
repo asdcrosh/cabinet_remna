@@ -503,6 +503,8 @@ export async function syncRemnashopCatalog(options: {
         : await tx.plan.create({
             data: {
               ...catalogData,
+              unlimitedDuration: normalized.unlimitedDuration,
+              unlimitedDevices: normalized.unlimitedDevices,
               deviceAddonEnabled:
                 normalized.maxDeviceLimit > normalized.deviceLimit
                 && normalized.extraDevicePriceKopecks > 0,
@@ -1193,8 +1195,10 @@ function normalizeRemnashopPlan(plan: RemnashopPlanRow) {
     description: plan.is_trial ? 'Ознакомительный тариф' : null,
     priceKopecks: plan.is_trial ? 0 : rubToKopecks(plan.price_rub),
     durationDays: normalizeRemnashopDurationDays(plan.duration_days),
+    unlimitedDuration: plan.duration_days <= 0,
     trafficLimitGb: plan.traffic_limit === 0 ? null : plan.traffic_limit,
     deviceLimit,
+    unlimitedDevices: plan.device_limit === 0,
     maxDeviceLimit: Math.max(deviceLimit, plan.max_device_limit || deviceLimit),
     extraDevicePriceKopecks: rubToKopecks(plan.extra_device_price_rub),
     activeInternalSquads: parseInternalSquads(plan.internal_squads),

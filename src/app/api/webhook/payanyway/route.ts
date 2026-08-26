@@ -103,7 +103,7 @@ async function handlePayAnyWayRequest(params: URLSearchParams) {
         ? WHITELIST_ADDON_RECEIPT_NAME
         : payment.purchaseType === 'DEVICE_LIMIT_ADDON'
           ? DEVICE_LIMIT_ADDON_RECEIPT_NAME
-          : buildPaymentServiceName(payment.plan.durationDays),
+          : buildPaymentServiceName(payment.plan.durationDays, payment.plan.unlimitedDuration),
       customerEmail: payment.user.email,
     })
   } catch (error) {
@@ -159,8 +159,10 @@ async function handlePayAnyWayRequest(params: URLSearchParams) {
         id: payment.plan.id,
         name: payment.plan.name,
         durationDays: payment.plan.durationDays,
+        unlimitedDuration: payment.plan.unlimitedDuration,
         trafficLimitGb: payment.plan.trafficLimitGb,
         deviceLimit: payment.plan.deviceLimit,
+        unlimitedDevices: payment.plan.unlimitedDevices,
         activeInternalSquads: payment.plan.activeInternalSquads,
       },
     })

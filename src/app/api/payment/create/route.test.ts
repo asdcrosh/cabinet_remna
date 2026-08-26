@@ -70,8 +70,10 @@ const plan = {
   name: 'Стандарт',
   priceKopecks: 30000,
   durationDays: 30,
+  unlimitedDuration: false,
   trafficLimitGb: null,
   deviceLimit: 5,
+  unlimitedDevices: false,
   maxDeviceLimit: 20,
   deviceAddonEnabled: true,
   extraDevicePriceKopecks: 10000,
@@ -657,6 +659,36 @@ describe('payment create route', () => {
 
     expect(response.status).toBe(422)
     expect(body.error).toContain('недоступны')
+    expect(mocks.prisma.$transaction).not.toHaveBeenCalled()
+  })
+
+  it('accepts an unlimited tariff without auto-renewal and rejects a custom device limit', async () => {
+    mocks.prisma.plan.findUnique.mockResolvedValue({
+      ...plan,
+      unlimitedDuration: true,
+      unlimitedDevices: true,
+      deviceAddonEnabled: false,
+    })
+
+    const response = await POST(paymentRequest({ deviceLimit: 8 }))
+    const body = await response.json()
+
+    expect(response.status).toBe(422)
+    expect(body.error).toContain('безлимит устройств')
+    expect(mocks.prisma.$transaction).not.toHaveBeenCalled()
+  })
+
+  it('rejects auto-renewal for an unlimited duration tariff', async () => {
+    mocks.prisma.plan.findUnique.mockResolvedValue({ ...plan, unlimitedDuration: true })
+
+    const response = await POST(paymentRequest({
+      autoRenewalConsent: true,
+      autoRenewalConsentVersion: AUTO_RENEWAL_CONSENT_VERSION,
+    }))
+    const body = await response.json()
+
+    expect(response.status).toBe(422)
+    expect(body.error).toContain('не требует автопродления')
     expect(mocks.prisma.$transaction).not.toHaveBeenCalled()
   })
 

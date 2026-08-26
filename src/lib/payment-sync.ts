@@ -508,8 +508,10 @@ async function provisionSubscription(payment: {
     id: string
     name: string
     durationDays: number
+    unlimitedDuration?: boolean
     trafficLimitGb: number | null
     deviceLimit: number
+    unlimitedDevices?: boolean
     activeInternalSquads: string[]
   }
 }): Promise<PaymentSyncResult> {

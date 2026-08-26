@@ -45,8 +45,10 @@ export async function provisionPaymentSubscription(input: ProvisionPaymentSubscr
           id: purchaseSnapshot.id,
           name: purchaseSnapshot.name,
           durationDays: purchaseSnapshot.durationDays,
+          unlimitedDuration: purchaseSnapshot.unlimitedDuration,
           trafficLimitGb: purchaseSnapshot.trafficLimitGb,
           deviceLimit: purchaseSnapshot.selectedDeviceLimit,
+          unlimitedDevices: purchaseSnapshot.unlimitedDevices,
           activeInternalSquads: purchaseSnapshot.activeInternalSquads,
         }
       : {

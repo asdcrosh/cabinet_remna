@@ -1,0 +1,3 @@
+ALTER TABLE "Plan"
+ADD COLUMN "unlimitedDuration" BOOLEAN NOT NULL DEFAULT false,
+ADD COLUMN "unlimitedDevices" BOOLEAN NOT NULL DEFAULT false;

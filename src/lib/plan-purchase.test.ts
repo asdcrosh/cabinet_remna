@@ -55,8 +55,10 @@ describe('calculatePlanPurchase', () => {
       name: 'Новый',
       priceKopecks: 70_000,
       durationDays: 30,
+      unlimitedDuration: true,
       trafficLimitGb: null,
       deviceLimit: 4,
+      unlimitedDevices: true,
       maxDeviceLimit: 20,
       extraDevicePriceKopecks: 10_000,
       activeInternalSquads: ['new-squad'],
@@ -70,6 +72,10 @@ describe('calculatePlanPurchase', () => {
     expect(readPlanPurchaseSnapshot(snapshot)?.switchFromPlan).toEqual({
       id: 'old-plan',
       name: 'Старый',
+    })
+    expect(readPlanPurchaseSnapshot(snapshot)).toMatchObject({
+      unlimitedDuration: true,
+      unlimitedDevices: true,
     })
   })
 })

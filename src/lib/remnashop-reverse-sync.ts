@@ -566,6 +566,7 @@ function buildPlanSnapshot(payment: PaymentForRemnashopSync) {
   const trafficLimitGb = purchase?.trafficLimitGb ?? payment.plan.trafficLimitGb
   const deviceLimit = effectivePaymentDeviceLimit(payment)
   const durationDays = purchase?.durationDays ?? payment.plan.durationDays
+  const unlimitedDuration = purchase?.unlimitedDuration ?? payment.plan.unlimitedDuration
   const activeInternalSquads = purchase?.activeInternalSquads ?? payment.plan.activeInternalSquads
   const hasTrafficLimit = trafficLimitGb != null
   const hasDeviceLimit = deviceLimit > 0
@@ -583,7 +584,7 @@ function buildPlanSnapshot(payment: PaymentForRemnashopSync) {
     traffic_limit_strategy: 'NO_RESET',
     traffic_limit: trafficLimitGb ?? 0,
     device_limit: deviceLimit,
-    duration: durationDays,
+    duration: unlimitedDuration ? 0 : durationDays,
     internal_squads: activeInternalSquads ?? [],
     external_squad: null,
     is_trial: false,
@@ -591,6 +592,8 @@ function buildPlanSnapshot(payment: PaymentForRemnashopSync) {
 }
 
 function effectivePaymentDeviceLimit(payment: PaymentForRemnashopSync) {
+  const purchase = readPlanPurchaseSnapshot(payment.planSnapshot)
+  if (purchase?.unlimitedDevices || payment.plan.unlimitedDevices) return 0
   return resolveEffectiveDeviceLimit({
     snapshot: payment.planSnapshot,
     paymentDeviceLimit: payment.deviceLimit,

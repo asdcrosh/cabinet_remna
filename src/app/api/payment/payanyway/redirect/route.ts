@@ -27,7 +27,7 @@ export const GET = withAuth(async (req: Request) => {
       provider: 'PAYANYWAY',
       status: 'PENDING',
     },
-    include: { plan: { select: { durationDays: true } } },
+    include: { plan: { select: { durationDays: true, unlimitedDuration: true } } },
   })
   if (!payment) {
     return NextResponse.json({ error: 'Платёж не найден или уже завершён' }, { status: 404 })
@@ -37,7 +37,7 @@ export const GET = withAuth(async (req: Request) => {
   const request = await createPayAnyWayPaymentRequest({
     transactionId: payment.id,
     amountKopecks: payment.amountKopecks,
-    description: buildPaymentServiceName(payment.plan.durationDays),
+    description: buildPaymentServiceName(payment.plan.durationDays, payment.plan.unlimitedDuration),
     subscriberId: session.email,
     successUrl: `${baseUrl}/dashboard/billing?paid=1&payment=${payment.id}`,
     failUrl: `${baseUrl}/dashboard/billing?payment=${payment.id}&failed=1`,

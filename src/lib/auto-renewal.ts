@@ -37,6 +37,7 @@ export async function getAutoRenewalState(userId: string) {
           name: true,
           priceKopecks: true,
           durationDays: true,
+          unlimitedDuration: true,
           deviceLimit: true,
           maxDeviceLimit: true,
           extraDevicePriceKopecks: true,
@@ -91,7 +92,7 @@ export async function enableAutoRenewal(input: {
       },
     }),
   ])
-  if (!plan || plan.isPromo || plan.priceKopecks <= 0) {
+  if (!plan || plan.isPromo || plan.priceKopecks <= 0 || plan.unlimitedDuration) {
     throw new Error('Для автопродления нужен активный платный тариф')
   }
   if (!subscription || subscription.planId !== plan.id) {
@@ -333,6 +334,7 @@ export async function refreshAutoRenewalSchedule(userId: string, paymentId?: str
             isPromo: true,
             priceKopecks: true,
             durationDays: true,
+            unlimitedDuration: true,
             deviceLimit: true,
             maxDeviceLimit: true,
             extraDevicePriceKopecks: true,
@@ -360,7 +362,8 @@ export async function refreshAutoRenewalSchedule(userId: string, paymentId?: str
       + (setting.whitelistAddonEnabled ? subscription.plan.whitelistAddonPriceKopecks : 0)
     : null
   const consentCurrent = (
-    setting.planId === subscription.plan.id
+    !subscription.plan.unlimitedDuration
+    && setting.planId === subscription.plan.id
     && setting.deviceLimit === subscriptionDeviceLimit
     && addonConfigurationValid
     && setting.consentPriceKopecks === currentPriceKopecks
@@ -466,6 +469,7 @@ async function createAutoRenewalPayment(setting: DueAutoRenewal) {
     : null
   if (
     !pricing
+    || setting.plan.unlimitedDuration
     || !addonConfigurationValid
     || setting.consentPriceKopecks !== totalAmountKopecks
     || setting.consentDurationDays !== setting.plan.durationDays
@@ -533,7 +537,7 @@ async function createAutoRenewalPayment(setting: DueAutoRenewal) {
   try {
     const providerPayment = await createPayment({
       amount: localPayment.amountKopecks / 100,
-      description: `${buildPaymentServiceName(setting.plan.durationDays)}${setting.whitelistAddonEnabled ? ` + ${WHITELIST_ADDON_RECEIPT_NAME}` : ''}`,
+      description: `${buildPaymentServiceName(setting.plan.durationDays, setting.plan.unlimitedDuration)}${setting.whitelistAddonEnabled ? ` + ${WHITELIST_ADDON_RECEIPT_NAME}` : ''}`,
       returnUrl: `${getAppUrl()}/dashboard/billing`,
       paymentMethodId: decryptPaymentSecret(setting.paymentMethodIdEncrypted!),
       metadata: {

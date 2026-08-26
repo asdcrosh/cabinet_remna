@@ -296,7 +296,7 @@ function compareCabinetAndRemnawave(user: LoadedUser, remote: UserResponse, issu
     if (expectedTraffic !== remoteLimit) {
       issues.push(issue('PLAN_TRAFFIC_MISMATCH', 'WARNING', 'REMNAWAVE', 'Тариф и Remnawave расходятся', `По тарифу лимит ${expectedTraffic.toString()} байт, в Remnawave ${remoteLimit.toString()} байт.`, 'MANUAL'))
     }
-    const expectedDeviceLimit = local.deviceLimit ?? plan.deviceLimit
+    const expectedDeviceLimit = plan.unlimitedDevices ? 0 : local.deviceLimit ?? plan.deviceLimit
     if ((remote.hwidDeviceLimit ?? 0) !== expectedDeviceLimit) {
       issues.push(issue('PLAN_DEVICE_MISMATCH', 'WARNING', 'REMNAWAVE', 'Не совпадает лимит устройств', `По подписке: ${expectedDeviceLimit}, в Remnawave: ${remote.hwidDeviceLimit ?? 0}.`, 'MANUAL'))
     }
@@ -377,7 +377,7 @@ async function applyManualRepairs(state: Awaited<ReturnType<typeof inspect>>) {
     status: local.status === 'PAUSED' ? 'DISABLED' : local.status,
     expireAt: local.expireAt.toISOString(),
     trafficLimitBytes: plan.trafficLimitGb == null ? 0 : Number(gbToBytes(plan.trafficLimitGb)),
-    hwidDeviceLimit: local.deviceLimit ?? plan.deviceLimit,
+    hwidDeviceLimit: plan.unlimitedDevices ? 0 : local.deviceLimit ?? plan.deviceLimit,
     activeInternalSquads,
   })
   await upsertLocalSubscriptionFromRemnawave({

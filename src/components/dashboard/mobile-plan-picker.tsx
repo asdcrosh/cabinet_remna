@@ -77,10 +77,10 @@ export function PlanCatalog({ plans, initialPlanId }: { plans: CatalogPlan[]; in
               </span>
               <div className="min-w-0">
                 <h3 className="text-xl font-semibold leading-none tracking-[-0.045em] text-slate-950 dark:text-white">
-                  {plan.durationDays}
+                  {plan.unlimitedDuration ? '∞' : plan.durationDays}
                   {' '}
                   <span className="ml-1 text-sm font-medium tracking-normal text-slate-500 dark:text-slate-400">
-                    {dayLabel(plan.durationDays)}
+                    {plan.unlimitedDuration ? 'без срока' : dayLabel(plan.durationDays)}
                   </span>
                 </h3>
                 <div className="mt-2 flex flex-wrap items-center gap-1.5">
@@ -159,10 +159,12 @@ export function PlanCatalog({ plans, initialPlanId }: { plans: CatalogPlan[]; in
                       {plan.savingsPercent > 0 && !plan.isPromo ? <PlanPickerBadge>−{plan.savingsPercent}%</PlanPickerBadge> : null}
                     </span>
                     <span className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
-                      <span>{plan.durationDays} дней</span>
+                      <span>{plan.unlimitedDuration ? 'Бессрочно' : `${plan.durationDays} дней`}</span>
                       <span>{plan.trafficLimitGb == null ? 'Безлимитный трафик' : `${plan.trafficLimitGb} ГБ`}</span>
                       <span>
-                        {plan.deviceAddonEnabled && plan.maxDeviceLimit > plan.deviceLimit
+                        {plan.unlimitedDevices
+                          ? 'Безлимит устройств'
+                          : plan.deviceAddonEnabled && plan.maxDeviceLimit > plan.deviceLimit
                           ? `${plan.deviceLimit}–${plan.maxDeviceLimit} устройств`
                           : `До ${plan.deviceLimit} устройств`}
                       </span>
@@ -231,6 +233,7 @@ function planCountLabel(count: number) {
 
 function dailyRateLabel(plan: CatalogPlan) {
   if (plan.isPromo || plan.priceKopecks <= 0) return 'Бесплатно'
+  if (plan.unlimitedDuration) return 'Разовая оплата'
   const dailyPrice = Math.round(plan.priceKopecks / Math.max(1, plan.durationDays))
   return `${formatPrice(dailyPrice)} в день`
 }

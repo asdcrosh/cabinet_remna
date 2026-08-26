@@ -109,7 +109,8 @@ export default async function DashboardHome() {
   const subscriptionStatus = (graceActive ? 'LIMITED' : sub?.userStatus ?? subRow?.status ?? 'DISABLED') as UserStatus
   const subscriptionExpired = isSubscriptionExpired(daysLeft, subscriptionStatus)
   const expiresAt = subRow?.expireAt ?? (sub?.expiresAt ? new Date(sub.expiresAt) : null)
-  const expiresAtLabel = expiresAt?.toLocaleDateString('ru-RU', {
+  const unlimitedDuration = Boolean(subRow?.plan?.unlimitedDuration)
+  const expiresAtLabel = unlimitedDuration ? 'Бессрочно' : expiresAt?.toLocaleDateString('ru-RU', {
     day: 'numeric',
     month: 'long',
     year: 'numeric',
@@ -156,6 +157,7 @@ export default async function DashboardHome() {
   const deviceAddonOffer = subRow?.planId
     && subRow.plan
     && subRow.plan.deviceAddonEnabled
+    && !subRow.plan.unlimitedDevices
     && currentDeviceLimit
     && currentDeviceLimit < subRow.plan.maxDeviceLimit
     && subRow.plan.extraDevicePriceKopecks > 0
@@ -237,7 +239,11 @@ export default async function DashboardHome() {
           <div className="home-access-card__remaining">
             <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Осталось</div>
             <strong className="mt-2 block text-[3.4rem] font-semibold leading-none tracking-[-0.075em] text-slate-950 dark:text-white sm:text-[4.8rem]">
-              {subRow || sub ? formatSubscriptionDaysLeft(daysLeft, subscriptionStatus) : 'Нет данных'}
+              {unlimitedDuration
+                ? 'Безлимит'
+                : subRow || sub
+                  ? formatSubscriptionDaysLeft(daysLeft, subscriptionStatus)
+                  : 'Нет данных'}
             </strong>
             <p className="mt-3 max-w-xl text-sm leading-6 text-slate-500 dark:text-slate-400">
               {graceActive
@@ -268,7 +274,11 @@ export default async function DashboardHome() {
                   {user._count.devices} подключено
                 </div>
                 <div className="mt-0.5 text-xs text-slate-400">
-                  {currentDeviceLimit ? `Лимит до ${currentDeviceLimit}` : 'Без указанного лимита'}
+                  {subRow?.plan?.unlimitedDevices
+                    ? 'Без лимита'
+                    : currentDeviceLimit
+                      ? `Лимит до ${currentDeviceLimit}`
+                      : 'Без указанного лимита'}
                 </div>
               </div>
             </div>
@@ -281,7 +291,9 @@ export default async function DashboardHome() {
                 <div className="mt-1 text-lg font-semibold tracking-tight text-slate-950 dark:text-white">
                   {expiresAtLabel ?? 'Без даты'}
                 </div>
-                <div className="mt-0.5 text-xs text-slate-400">Продлить можно в любой момент</div>
+                <div className="mt-0.5 text-xs text-slate-400">
+                  {unlimitedDuration ? 'Продление не требуется' : 'Продлить можно в любой момент'}
+                </div>
               </div>
             </div>
           </div>

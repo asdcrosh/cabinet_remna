@@ -38,8 +38,10 @@ export interface PlanCardProps {
   monthlyPrice: string;
   savingsPercent: number;
   durationDays: number;
+  unlimitedDuration: boolean;
   trafficLimitGb: number | null;
   deviceLimit: number;
+  unlimitedDevices: boolean;
   maxDeviceLimit: number;
   deviceAddonEnabled: boolean;
   extraDevicePriceKopecks: number;
@@ -80,8 +82,10 @@ export function PlanCard({
   priceKopecks,
   savingsPercent,
   durationDays,
+  unlimitedDuration,
   trafficLimitGb,
   deviceLimit,
+  unlimitedDevices,
   maxDeviceLimit,
   deviceAddonEnabled,
   extraDevicePriceKopecks,
@@ -151,10 +155,11 @@ export function PlanCard({
     + (whitelistAddonRequested && whitelistAddonAvailable ? whitelistAddonPriceKopecks : 0);
   const checkoutTotalPrice = formatPrice(checkoutTotalKopecks);
   const purchasePrice = formatPrice(purchasePriceKopecks);
-  const effectiveMonthlyPrice = formatPrice(
-    Math.round((effectivePriceKopecks / Math.max(1, durationDays)) * 30),
-  );
+  const effectiveMonthlyPrice = unlimitedDuration
+    ? null
+    : formatPrice(Math.round((effectivePriceKopecks / Math.max(1, durationDays)) * 30));
   const variableDeviceLimit = !isPromoPlan
+    && !unlimitedDevices
     && deviceAddonEnabled
     && normalizedMaxDeviceLimit > deviceLimit
     && extraDevicePriceKopecks > 0;
@@ -178,7 +183,7 @@ export function PlanCard({
   const bestPromo = suggestedPromoCodes[0] ?? null;
   const showManualPromoInput =
     promoOpen && (manualPromoOpen || suggestedPromoCodes.length === 0);
-  const autoRenewalSupported = selectedProvider === "YOOKASSA";
+  const autoRenewalSupported = !unlimitedDuration && selectedProvider === "YOOKASSA";
   const autoRenewalTermsCurrent = autoRenewalEnabled
     && autoRenewalWhitelistAddonEnabled === whitelistAddonRequested;
 
@@ -451,9 +456,15 @@ export function PlanCard({
               </span>
             </div>
             <div className="shrink-0 text-right">
-              <span className="block text-sm font-semibold text-slate-800 dark:text-slate-200">{durationDays} дн.</span>
+              <span className="block text-sm font-semibold text-slate-800 dark:text-slate-200">
+                {unlimitedDuration ? "Бессрочно" : `${durationDays} дн.`}
+              </span>
               <span className="mt-1 block text-[11px] text-slate-500 dark:text-slate-400">
-                {isPromo ? "бесплатно" : `${effectiveMonthlyPrice} / 30 дней`}
+                {isPromo
+                  ? "бесплатно"
+                  : unlimitedDuration
+                    ? "разовая оплата"
+                    : `${effectiveMonthlyPrice} / 30 дней`}
               </span>
             </div>
           </div>
@@ -518,7 +529,13 @@ export function PlanCard({
               ) : null}
             </div>
             <div className="mt-2 flex flex-wrap items-center justify-between gap-1.5 text-xs text-slate-500 dark:text-slate-400">
-              <span>{isPromo ? "Один раз на аккаунт" : `${effectiveMonthlyPrice} за 30 дней`}</span>
+              <span>
+                {isPromo
+                  ? "Один раз на аккаунт"
+                  : unlimitedDuration
+                    ? "Бессрочный доступ"
+                    : `${effectiveMonthlyPrice} за 30 дней`}
+              </span>
               <span>за весь срок</span>
             </div>
           </div>
@@ -527,7 +544,7 @@ export function PlanCard({
 
       {!checkoutDisplay ? (
         <div className="mt-3 grid grid-cols-3 gap-2">
-          <PlanFact icon={<CalendarDays className="h-4 w-4" />} label="Срок" value={`${durationDays} дн.`} />
+          <PlanFact icon={<CalendarDays className="h-4 w-4" />} label="Срок" value={unlimitedDuration ? "Бессрочно" : `${durationDays} дн.`} />
           <PlanFact
             icon={<Gauge className="h-4 w-4" />}
             label="Трафик"
@@ -536,7 +553,9 @@ export function PlanCard({
           <PlanFact
             icon={<MonitorSmartphone className="h-4 w-4" />}
             label="Устройства"
-            value={variableDeviceLimit
+            value={unlimitedDevices
+              ? "Безлимит"
+              : variableDeviceLimit
               ? `${deviceLimit}–${normalizedMaxDeviceLimit}`
               : `До ${Math.max(deviceLimit, selectedDeviceLimit)}`}
           />
@@ -832,14 +851,16 @@ export function PlanCard({
                 onChange={setWhitelistAddonRequested}
               />
             ) : null}
-            <AutoRenewalChoice
-              enabled={autoRenewalTermsCurrent}
-              supported={autoRenewalSupported}
-              requested={autoRenewalRequested}
-              price={checkoutTotalPrice}
-              durationDays={durationDays}
-              onChange={setAutoRenewalRequested}
-            />
+            {!unlimitedDuration ? (
+              <AutoRenewalChoice
+                enabled={autoRenewalTermsCurrent}
+                supported={autoRenewalSupported}
+                requested={autoRenewalRequested}
+                price={checkoutTotalPrice}
+                durationDays={durationDays}
+                onChange={setAutoRenewalRequested}
+              />
+            ) : null}
           </div>
         ) : null}
 
@@ -923,7 +944,9 @@ export function PlanCard({
         <div className="flex items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 dark:border-white/[0.08] dark:bg-white/[0.035]">
           <div className="min-w-0">
             <div className="truncate text-sm font-semibold text-slate-950 dark:text-white">{name}</div>
-            <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">{durationDays} дней · {paymentProviders.find((provider) => provider.id === selectedProvider)?.label}</div>
+            <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+              {unlimitedDuration ? "Бессрочно" : `${durationDays} дней`} · {paymentProviders.find((provider) => provider.id === selectedProvider)?.label}
+            </div>
           </div>
           <div className="shrink-0 text-lg font-semibold tabular-nums text-slate-950 dark:text-white">{checkoutTotalPrice}</div>
         </div>
@@ -936,14 +959,16 @@ export function PlanCard({
           />
         ) : null}
 
-        <AutoRenewalChoice
-          enabled={autoRenewalTermsCurrent}
-          supported={autoRenewalSupported}
-          requested={autoRenewalRequested}
-          price={checkoutTotalPrice}
-          durationDays={durationDays}
-          onChange={setAutoRenewalRequested}
-        />
+        {!unlimitedDuration ? (
+          <AutoRenewalChoice
+            enabled={autoRenewalTermsCurrent}
+            supported={autoRenewalSupported}
+            requested={autoRenewalRequested}
+            price={checkoutTotalPrice}
+            durationDays={durationDays}
+            onChange={setAutoRenewalRequested}
+          />
+        ) : null}
       </div>
     </Modal>
     </>

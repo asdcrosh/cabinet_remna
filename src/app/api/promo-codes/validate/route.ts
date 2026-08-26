@@ -40,6 +40,17 @@ export const POST = withAuth(async (req: Request) => {
   }
 
   if (
+    plan.unlimitedDevices
+    && parsed.data.deviceLimit != null
+    && parsed.data.deviceLimit !== plan.deviceLimit
+  ) {
+    return NextResponse.json(
+      { error: 'В тарифе уже включён безлимит устройств' },
+      { status: 422 }
+    )
+  }
+
+  if (
     !plan.deviceAddonEnabled
     && parsed.data.deviceLimit != null
     && parsed.data.deviceLimit > plan.deviceLimit

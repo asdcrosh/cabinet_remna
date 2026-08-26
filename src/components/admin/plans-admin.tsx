@@ -50,8 +50,10 @@ export interface PlanAdminRow {
   description: string | null
   priceKopecks: number
   durationDays: number
+  unlimitedDuration: boolean
   trafficLimitGb: number | null
   deviceLimit: number
+  unlimitedDevices: boolean
   maxDeviceLimit: number
   deviceAddonEnabled: boolean
   extraDevicePriceKopecks: number
@@ -75,9 +77,11 @@ interface PlanFormState {
   description: string
   priceRub: string
   durationDays: string
+  unlimitedDuration: boolean
   trafficLimitGb: string
   unlimitedTraffic: boolean
   deviceLimit: string
+  unlimitedDevices: boolean
   maxDeviceLimit: string
   deviceAddonEnabled: boolean
   extraDevicePriceRub: string
@@ -104,9 +108,11 @@ const emptyForm: PlanFormState = {
   description: '',
   priceRub: '300',
   durationDays: '30',
+  unlimitedDuration: false,
   trafficLimitGb: '200',
   unlimitedTraffic: false,
   deviceLimit: '5',
+  unlimitedDevices: false,
   maxDeviceLimit: '5',
   deviceAddonEnabled: false,
   extraDevicePriceRub: '0',
@@ -547,16 +553,20 @@ function SortablePlanCard({
         </div>
         <div className="mt-3 flex items-baseline gap-1.5 lg:mt-2">
           <span className="text-lg font-semibold tracking-tight text-slate-950 dark:text-white">{formatPrice(plan.priceKopecks)}</span>
-          <span className="text-xs text-slate-400">за {plan.durationDays} дн.</span>
+          <span className="text-xs text-slate-400">
+            {plan.unlimitedDuration ? 'бессрочно' : `за ${plan.durationDays} дн.`}
+          </span>
         </div>
       </div>
 
       <div className="mt-3 grid grid-cols-2 gap-2 lg:mt-0">
-        <PlanFact label="Срок" value={`${plan.durationDays} дней`} />
+        <PlanFact label="Срок" value={plan.unlimitedDuration ? 'Бессрочно' : `${plan.durationDays} дней`} />
         <PlanFact label="Трафик" value={plan.trafficLimitGb == null ? 'Безлимит' : `${plan.trafficLimitGb} ГБ`} />
         <PlanFact
           label="Устройства"
-          value={plan.deviceAddonEnabled && plan.maxDeviceLimit > plan.deviceLimit
+          value={plan.unlimitedDevices
+            ? 'Безлимит'
+            : plan.deviceAddonEnabled && plan.maxDeviceLimit > plan.deviceLimit
             ? `${plan.deviceLimit}–${plan.maxDeviceLimit} · +${formatPrice(plan.extraDevicePriceKopecks)}`
             : String(plan.deviceLimit)}
         />
@@ -616,7 +626,7 @@ function PlanDragOverlay({ plan }: { plan: PlanAdminRow }) {
       <span className="min-w-0 flex-1">
         <span className="block truncate font-semibold">{plan.name}</span>
         <span className="mt-0.5 block text-xs text-slate-500 dark:text-slate-400">
-          {formatPrice(plan.priceKopecks)} · {plan.durationDays} дн.
+          {formatPrice(plan.priceKopecks)} · {plan.unlimitedDuration ? 'бессрочно' : `${plan.durationDays} дн.`}
         </span>
       </span>
       <span className="rounded-full bg-violet-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-violet-700 dark:bg-violet-400/15 dark:text-violet-200">
@@ -750,6 +760,13 @@ function PlanEditor({
         : current.extraDevicePriceRub,
     }))
   }
+  const toggleUnlimitedDevices = (enabled: boolean) => {
+    setForm((current) => ({
+      ...current,
+      unlimitedDevices: enabled,
+      deviceAddonEnabled: enabled ? false : current.deviceAddonEnabled,
+    }))
+  }
   const deviceAddonMaxInvalid = form.deviceAddonEnabled && (
     !Number.isFinite(Number(form.maxDeviceLimit))
     || !Number.isFinite(Number(form.deviceLimit))
@@ -780,34 +797,54 @@ function PlanEditor({
             <input value={form.priceRub} onChange={(event) => set('priceRub', event.target.value)} className="input" type="number" min={0} step="0.01" />
           </Field>
           <Field label="Срок, дней">
-            <input value={form.durationDays} onChange={(event) => set('durationDays', event.target.value)} className="input" type="number" min={1} />
+            <input value={form.durationDays} onChange={(event) => set('durationDays', event.target.value)} className="input" type="number" min={1} disabled={form.unlimitedDuration} />
           </Field>
           <Field label="Включено устройств">
-            <input value={form.deviceLimit} onChange={(event) => set('deviceLimit', event.target.value)} className="input" type="number" min={1} />
+            <input value={form.deviceLimit} onChange={(event) => set('deviceLimit', event.target.value)} className="input" type="number" min={1} disabled={form.unlimitedDevices} />
           </Field>
           <Field label="Максимум устройств">
-            <input value={form.maxDeviceLimit} onChange={(event) => set('maxDeviceLimit', event.target.value)} className="input" type="number" min={1} max={100} disabled={!form.deviceAddonEnabled} aria-invalid={deviceAddonMaxInvalid} />
+            <input value={form.maxDeviceLimit} onChange={(event) => set('maxDeviceLimit', event.target.value)} className="input" type="number" min={1} max={100} disabled={form.unlimitedDevices || !form.deviceAddonEnabled} aria-invalid={deviceAddonMaxInvalid} />
           </Field>
           <Field label="Доплата за устройство, ₽">
-            <input value={form.extraDevicePriceRub} onChange={(event) => set('extraDevicePriceRub', event.target.value)} className="input" type="number" min={0} step="0.01" disabled={!form.deviceAddonEnabled} aria-invalid={deviceAddonPriceInvalid} />
+            <input value={form.extraDevicePriceRub} onChange={(event) => set('extraDevicePriceRub', event.target.value)} className="input" type="number" min={0} step="0.01" disabled={form.unlimitedDevices || !form.deviceAddonEnabled} aria-invalid={deviceAddonPriceInvalid} />
           </Field>
           <Field label="Трафик, ГБ">
             <input value={form.trafficLimitGb} onChange={(event) => set('trafficLimitGb', event.target.value)} className="input" type="number" min={1} disabled={form.unlimitedTraffic} placeholder="Безлимит" />
           </Field>
         </div>
-        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+        <div className="mt-3 grid gap-2 sm:grid-cols-3">
           <Toggle
-            checked={form.deviceAddonEnabled}
-            onChange={toggleDeviceAddon}
-            label="Докупка устройств"
-            description="Разрешить увеличивать лимит устройств"
+            checked={form.unlimitedDuration}
+            onChange={(value) => set('unlimitedDuration', value)}
+            label="Безлимит по дням"
+            description="Доступ без даты окончания"
           />
           <Toggle
             checked={form.unlimitedTraffic}
             onChange={(value) => set('unlimitedTraffic', value)}
-            label="Безлимитный трафик"
+            label="Безлимит по трафику"
             description="Лимит в гигабайтах не применяется"
           />
+          <Toggle
+            checked={form.unlimitedDevices}
+            onChange={toggleUnlimitedDevices}
+            label="Безлимит по устройствам"
+            description="Количество устройств не ограничено"
+          />
+        </div>
+        <div className="mt-2">
+          {form.unlimitedDevices ? (
+            <div className="rounded-xl border border-cyan-200 bg-cyan-50/70 px-3 py-3 text-sm text-cyan-950 dark:border-cyan-400/30 dark:bg-cyan-400/10 dark:text-cyan-100">
+              Докупка устройств отключена: в тарифе уже действует безлимит.
+            </div>
+          ) : (
+            <Toggle
+              checked={form.deviceAddonEnabled}
+              onChange={toggleDeviceAddon}
+              label="Докупка устройств"
+              description="Разрешить увеличивать лимит устройств"
+            />
+          )}
         </div>
         {deviceAddonMaxInvalid ? (
           <p className="mt-2 text-sm font-medium text-red-600 dark:text-red-300">
@@ -1041,9 +1078,11 @@ function formFromPlan(plan: PlanAdminRow): PlanFormState {
     description: plan.description ?? '',
     priceRub: String(plan.priceKopecks / 100),
     durationDays: String(plan.durationDays),
+    unlimitedDuration: plan.unlimitedDuration,
     trafficLimitGb: plan.trafficLimitGb == null ? '' : String(plan.trafficLimitGb),
     unlimitedTraffic: plan.trafficLimitGb == null,
     deviceLimit: String(plan.deviceLimit),
+    unlimitedDevices: plan.unlimitedDevices,
     maxDeviceLimit: String(plan.maxDeviceLimit),
     deviceAddonEnabled: plan.deviceAddonEnabled,
     extraDevicePriceRub: String(plan.extraDevicePriceKopecks / 100),
@@ -1061,6 +1100,7 @@ function formFromPlan(plan: PlanAdminRow): PlanFormState {
 }
 
 function isPlanConfigurationInvalid(form: PlanFormState) {
+  if (form.unlimitedDevices && form.deviceAddonEnabled) return true
   const deviceAddonInvalid = form.deviceAddonEnabled && (
     !Number.isFinite(Number(form.maxDeviceLimit))
     || !Number.isFinite(Number(form.deviceLimit))
@@ -1082,8 +1122,10 @@ function toPayload(form: PlanFormState) {
     description: form.description || null,
     priceKopecks: Math.round(Number(form.priceRub) * 100),
     durationDays: Number(form.durationDays),
+    unlimitedDuration: form.unlimitedDuration,
     trafficLimitGb: form.unlimitedTraffic || !form.trafficLimitGb ? null : Number(form.trafficLimitGb),
     deviceLimit: Number(form.deviceLimit),
+    unlimitedDevices: form.unlimitedDevices,
     maxDeviceLimit: Number(form.maxDeviceLimit),
     deviceAddonEnabled: form.deviceAddonEnabled,
     extraDevicePriceKopecks: Math.round(Number(form.extraDevicePriceRub) * 100),

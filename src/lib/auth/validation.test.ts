@@ -95,6 +95,13 @@ describe('auth validation', () => {
     expect(adminPlanSchema.safeParse({ ...plan, maxDeviceLimit: 5 }).success).toBe(false)
     expect(adminPlanSchema.safeParse({ ...plan, extraDevicePriceKopecks: 0 }).success).toBe(false)
     expect(adminPlanSchema.safeParse({ ...plan, deviceAddonEnabled: false, maxDeviceLimit: 5, extraDevicePriceKopecks: 0 }).success).toBe(true)
+    expect(adminPlanSchema.safeParse({ ...plan, unlimitedDevices: true }).success).toBe(false)
+    expect(adminPlanSchema.safeParse({
+      ...plan,
+      unlimitedDevices: true,
+      unlimitedDuration: true,
+      deviceAddonEnabled: false,
+    }).success).toBe(true)
   })
 
   it('accepts renewal-only promo codes and rejects incompatible audiences', () => {

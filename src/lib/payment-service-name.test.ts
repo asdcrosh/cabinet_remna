@@ -12,4 +12,8 @@ describe('payment service name', () => {
   it('rejects an invalid duration', () => {
     expect(() => buildPaymentServiceName(0)).toThrow('positive integer')
   })
+
+  it('uses lifetime wording for unlimited duration', () => {
+    expect(buildPaymentServiceName(30, true)).toBe('Бессрочный доступ к цифровому сервису')
+  })
 })

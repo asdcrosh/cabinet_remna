@@ -75,8 +75,10 @@ async function provisionOnePayment(req: Request, actorId: string, paymentId: str
         id: payment.plan.id,
         name: payment.plan.name,
         durationDays: payment.plan.durationDays,
+        unlimitedDuration: payment.plan.unlimitedDuration,
         trafficLimitGb: payment.plan.trafficLimitGb,
         deviceLimit: payment.plan.deviceLimit,
+        unlimitedDevices: payment.plan.unlimitedDevices,
         activeInternalSquads: payment.plan.activeInternalSquads,
       },
     })

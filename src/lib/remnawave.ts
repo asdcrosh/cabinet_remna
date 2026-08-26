@@ -86,7 +86,7 @@ export interface CreateUserRequest {
   tag?: string
   email?: string
   telegramId?: number | string
-  hwidDeviceLimit?: number
+  hwidDeviceLimit?: number                      // 0 = безлимит
   activeInternalSquads?: string[]
   externalSquadUuid?: string
 }
