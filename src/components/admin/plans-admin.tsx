@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import {
   closestCenter,
@@ -438,9 +439,17 @@ export function PlansAdmin({ plans }: { plans: PlanAdminRow[] }) {
               ))}
             </div>
           </SortableContext>
-          <DragOverlay dropAnimation={{ duration: 180, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' }}>
-            {draggedPlan ? <PlanDragOverlay plan={draggedPlan} /> : null}
-          </DragOverlay>
+          {typeof document !== 'undefined'
+            ? createPortal(
+                <DragOverlay
+                  adjustScale={false}
+                  dropAnimation={{ duration: 180, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' }}
+                >
+                  {draggedPlan ? <PlanDragOverlay plan={draggedPlan} /> : null}
+                </DragOverlay>,
+                document.body
+              )
+            : null}
         </DndContext>
       )}
       <ConfirmDialog
