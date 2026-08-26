@@ -151,7 +151,10 @@ describe('ensureRemnawaveSubscription', () => {
     expect(mocks.prisma.subscription.update).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: 'sub-1' },
-        data: expect.objectContaining({ planId: 'plan-1' }),
+        data: expect.objectContaining({
+          planId: 'plan-1',
+          planManagedByCabinet: true,
+        }),
       })
     )
   })

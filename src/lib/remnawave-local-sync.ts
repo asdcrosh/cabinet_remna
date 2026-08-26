@@ -48,7 +48,7 @@ export async function upsertLocalSubscriptionFromRemnawave(input: {
   ])
 
   const data = {
-    ...(input.planId ? { planId: input.planId } : {}),
+    ...(shouldReplacePlanFromExternalSync(existing, input.planId) ? { planId: input.planId } : {}),
     expireAt: existing?.graceExpireAt ? existing.expireAt : new Date(input.remnawaveUser.expireAt),
     status: existing?.graceExpireAt && existing.graceExpireAt > new Date()
       ? 'LIMITED' as const
@@ -77,6 +77,13 @@ export async function upsertLocalSubscriptionFromRemnawave(input: {
       ...data,
     },
   })
+}
+
+export function shouldReplacePlanFromExternalSync(
+  existing: { planManagedByCabinet: boolean } | null,
+  incomingPlanId: string | null | undefined
+): incomingPlanId is string {
+  return Boolean(incomingPlanId && !existing?.planManagedByCabinet)
 }
 
 export function normalizeRemnawaveDeviceLimit(value: number | null | undefined) {

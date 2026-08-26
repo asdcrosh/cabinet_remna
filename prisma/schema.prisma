@@ -583,6 +583,8 @@ model Subscription {
   id     String  @id @default(cuid())
   userId String
   planId String?
+  // Тариф назначен или куплен в кабинете и не должен заменяться импортом из Remnashop.
+  planManagedByCabinet Boolean @default(false)
 
   startAt  DateTime
   expireAt DateTime

@@ -9,7 +9,11 @@ type PaymentWithRelations = Payment & {
 
 export function serializeSubscription(subscription: SubscriptionWithPlan | null | undefined) {
   if (!subscription) return null
-  const { whitelistAddonInternalSquads: _internalSquads, ...publicSubscription } = subscription
+  const {
+    whitelistAddonInternalSquads: _internalSquads,
+    planManagedByCabinet: _planManagedByCabinet,
+    ...publicSubscription
+  } = subscription
 
   return {
     ...publicSubscription,

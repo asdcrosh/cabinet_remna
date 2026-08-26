@@ -204,6 +204,7 @@ export async function ensureRemnawaveSubscription(input: EnsureSubscriptionInput
           where: { id: latestSubscription.id },
           data: {
             planId: input.plan.id,
+            planManagedByCabinet: true,
             startAt: isPlanSwitch ? new Date() : undefined,
             expireAt: new Date(remnawaveUser.expireAt),
             status: mapStatus(remnawaveUser.status),
@@ -226,6 +227,7 @@ export async function ensureRemnawaveSubscription(input: EnsureSubscriptionInput
           data: {
             userId: user.id,
             planId: input.plan.id,
+            planManagedByCabinet: true,
             startAt: new Date(),
             expireAt: new Date(remnawaveUser.expireAt),
             status: mapStatus(remnawaveUser.status),

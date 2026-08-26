@@ -7,6 +7,7 @@ describe('api serializers', () => {
       id: 'sub-1',
       userId: 'user-1',
       planId: 'plan-1',
+      planManagedByCabinet: true,
       startAt: new Date('2026-01-01T00:00:00.000Z'),
       expireAt: new Date('2026-02-01T00:00:00.000Z'),
       status: 'ACTIVE',
@@ -32,6 +33,7 @@ describe('api serializers', () => {
     expect(subscription?.trafficUsedBytes).toBe('250')
     expect(subscription?.lifetimeUsedBytes).toBe('500')
     expect(subscription).not.toHaveProperty('whitelistAddonInternalSquads')
+    expect(subscription).not.toHaveProperty('planManagedByCabinet')
   })
 
   it('serializes payment relations safely', () => {
