@@ -11,6 +11,7 @@ import { cn } from '@/lib/cn'
 import { Modal } from '@/components/ui/modal'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { formatDeviceClientName } from '@/lib/device-client'
 
 interface Device {
   hwid: string
@@ -443,6 +444,7 @@ function DeviceCard({
 }) {
   const activity = getActivityState(device.updatedAt || device.createdAt)
   const Icon = getDeviceIcon(device)
+  const clientName = formatDeviceClientName(device.userAgent)
 
   return (
     <article className="device-card flex min-w-0 flex-col rounded-2xl border border-slate-200 bg-slate-50/60 p-4 dark:border-white/[0.08] dark:bg-white/[0.025]">
@@ -456,6 +458,12 @@ function DeviceCard({
             <span className={cn('shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-semibold', activity.className)}>{activity.label}</span>
           </div>
           <p className="mt-1 break-words text-sm leading-5 text-slate-500 dark:text-slate-400">{getDeviceSubtitle(device)}</p>
+          {clientName ? (
+            <div className="mt-2 inline-flex max-w-full items-center gap-1.5 rounded-lg bg-cyan-50 px-2 py-1 text-xs text-cyan-800 dark:bg-cyan-400/10 dark:text-cyan-200" title={device.userAgent ?? undefined}>
+              <span className="font-medium">Клиент</span>
+              <span className="truncate">{clientName}</span>
+            </div>
+          ) : null}
         </div>
       </div>
       <div className="mt-4 flex flex-col items-stretch gap-3 border-t border-slate-200/70 pt-3 dark:border-white/[0.08] min-[380px]:flex-row min-[380px]:items-end min-[380px]:justify-between">
@@ -489,6 +497,7 @@ function CompactDeviceRow({
 }) {
   const activity = getActivityState(device.updatedAt || device.createdAt)
   const Icon = getDeviceIcon(device)
+  const clientName = formatDeviceClientName(device.userAgent)
 
   return (
     <article className="device-row flex min-w-0 items-center gap-3 px-4 py-3.5">
@@ -504,7 +513,7 @@ function CompactDeviceRow({
             'h-1.5 w-1.5 shrink-0 rounded-full',
             activity.label === 'Активно сегодня' ? 'bg-emerald-500' : 'bg-slate-400'
           )} />
-          <span className="truncate">{activity.label}</span>
+          <span className="truncate">{activity.label}{clientName ? ` · ${clientName}` : ''}</span>
         </div>
       </div>
       <button
@@ -552,12 +561,13 @@ function BlockedDevices({
       <div className="mt-3 space-y-2">
         {devices.map((device) => {
           const loading = unblockingHwid === device.hwid
+          const clientName = formatDeviceClientName(device.userAgent)
           return (
             <div key={device.hwid} className="flex min-w-0 flex-col gap-3 rounded-xl border border-slate-200 bg-white p-3 dark:border-white/10 dark:bg-white/[0.025] sm:flex-row sm:items-center sm:justify-between">
               <div className="min-w-0">
                 <div className="truncate text-sm font-medium text-slate-900 dark:text-white">{getDeviceTitle(device)}</div>
                 <div className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                  Заблокировано {formatDeviceDate(device.blockedAt)} · ID {shortDeviceId(device.hwid)}
+                  Заблокировано {formatDeviceDate(device.blockedAt)}{clientName ? ` · ${clientName}` : ''} · ID {shortDeviceId(device.hwid)}
                 </div>
               </div>
               <button
@@ -680,7 +690,7 @@ function getDeviceSubtitle(device: Device) {
     ? [device.deviceModel, device.platform].filter(Boolean).join(' · ')
     : null
   const parts = [technicalName || null, device.osVersion ? `OS ${device.osVersion}` : null, device.ip].filter(Boolean)
-  return parts.length > 0 ? parts.join(' · ') : device.userAgent || 'Детали устройства не переданы'
+  return parts.length > 0 ? parts.join(' · ') : 'Детали устройства не переданы'
 }
 
 function DeviceRenameDialog({

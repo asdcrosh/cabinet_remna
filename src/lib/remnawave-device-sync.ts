@@ -7,7 +7,14 @@ export async function syncLocalDevicesFromRemnawave(input: {
 }) {
   const localDevices = await prisma.device.findMany({
     where: { userId: input.localUserId },
-    select: { hwid: true, displayName: true, blockedAt: true },
+    select: {
+      hwid: true,
+      displayName: true,
+      blockedAt: true,
+      platform: true,
+      userAgent: true,
+      lastSeenAt: true,
+    },
   })
   const displayNames = new Map(localDevices.map((device) => [device.hwid, device.displayName]))
   const blockedHwids = new Set(localDevices.filter((device) => device.blockedAt).map((device) => device.hwid))
@@ -72,6 +79,9 @@ export async function syncLocalDevicesFromRemnawave(input: {
     .map((device) => ({
       hwid: device.hwid,
       displayName: device.displayName,
+      platform: device.platform,
+      userAgent: device.userAgent,
+      updatedAt: device.lastSeenAt.toISOString(),
       blockedAt: device.blockedAt?.toISOString() ?? null,
     }))
 
