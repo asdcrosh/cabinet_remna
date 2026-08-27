@@ -661,6 +661,7 @@ export function SupportPanel({
                       className={cn('btn-secondary h-10 px-3 text-sm 2xl:hidden', detailsOpen && 'border-cyan-200 bg-cyan-50 text-cyan-800 dark:border-cyan-400/30 dark:bg-cyan-400/10 dark:text-cyan-100')}
                       onClick={() => setDetailsOpen((current) => !current)}
                       aria-expanded={detailsOpen}
+                      aria-label="Клиент"
                     >
                       <UserRound className="h-4 w-4" />
                       <span className="hidden sm:inline">Клиент</span>
