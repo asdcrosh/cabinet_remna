@@ -52,6 +52,7 @@ export default async function globalSetup() {
         trafficLimitGb: null,
         deviceLimit: 5,
         maxDeviceLimit: 20,
+        deviceAddonEnabled: true,
         extraDevicePriceKopecks: 10000,
         isActive: true,
         sortOrder: 10_000,
