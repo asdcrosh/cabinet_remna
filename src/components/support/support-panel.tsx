@@ -13,27 +13,37 @@ import {
 } from 'react'
 import {
   Archive,
+  AlertTriangle,
   ArrowLeft,
+  BadgeCheck,
   CheckCircle2,
+  ChevronRight,
+  CircleHelp,
+  Clock3,
+  CreditCard,
+  Gauge,
+  Headphones,
   Inbox,
-  LifeBuoy,
   Lock,
+  MonitorSmartphone,
   MessageCircle,
   MessageSquarePlus,
   PanelRight,
+  RadioTower,
+  RotateCcw,
   Send,
   Search,
   Smile,
-  Tag,
+  Sparkles,
   Timer,
   UserRound,
+  Wifi,
   X,
   XCircle,
 } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import {
   supportCategories,
-  supportCategoryDescription,
   supportCategoryLabel,
   supportStatusLabelForRole,
   type SupportCategoryValue,
@@ -62,6 +72,7 @@ export function SupportPanel({
   initialTickets,
   initialTotal = initialTickets.length,
   pageSize = 25,
+  initialQuery = '',
 }: SupportPanelProps) {
   const messagesScrollRef = useRef<HTMLDivElement | null>(null)
   const loadMoreRef = useRef<HTMLDivElement | null>(null)
@@ -85,8 +96,9 @@ export function SupportPanel({
   const [message, setMessage] = useState('')
   const [newMessage, setNewMessage] = useState('')
   const [newCategory, setNewCategory] = useState<SupportCategoryValue>('connection')
-  const [newTicketOpen, setNewTicketOpen] = useState(mode === 'user' && initialTickets.length === 0)
-  const [query, setQuery] = useState('')
+  const [newTicketOpen, setNewTicketOpen] = useState(false)
+  const [query, setQuery] = useState(initialQuery)
+  const [debouncedQuery, setDebouncedQuery] = useState(initialQuery)
   const [error, setError] = useState('')
   const [isPending, startTransition] = useTransition()
 
@@ -135,6 +147,11 @@ export function SupportPanel({
     return tickets.reduce((sum, ticket) => sum + getUnreadCount(ticket, mode), 0)
   }, [mode, tickets])
 
+  useEffect(() => {
+    const timeout = window.setTimeout(() => setDebouncedQuery(query), 300)
+    return () => window.clearTimeout(timeout)
+  }, [query])
+
   const fetchTicket = useCallback(async (id: string, before?: string | null) => {
     const base = mode === 'admin' ? `/api/admin/support/tickets/${id}` : `/api/support/tickets/${id}`
     const endpoint = before ? `${base}?before=${encodeURIComponent(before)}` : base
@@ -180,6 +197,10 @@ export function SupportPanel({
   const fetchTicketList = useCallback(async (limit: number, cursor?: string | null) => {
     const params = new URLSearchParams(window.location.search)
     params.set('pageSize', String(limit))
+    if (mode === 'admin') {
+      if (debouncedQuery.trim()) params.set('q', debouncedQuery.trim())
+      else params.delete('q')
+    }
     if (cursor) params.set('cursor', cursor)
     else params.set('page', '1')
     const listEndpoint = mode === 'admin'
@@ -192,7 +213,7 @@ export function SupportPanel({
       tickets: SupportTicket[]
       pagination?: { total?: number; nextCursor?: string | null }
     }
-  }, [mode])
+  }, [debouncedQuery, mode])
 
   const loadMoreTickets = useCallback(async () => {
     if (mode !== 'admin' || loadingMore || tickets.length >= listTotal || !listCursor) return
@@ -438,7 +459,7 @@ export function SupportPanel({
   }
 
   function handleMessageKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
-    if (event.key !== 'Enter' || event.shiftKey) return
+    if (event.key !== 'Enter' || (!event.ctrlKey && !event.metaKey) || event.nativeEvent.isComposing) return
     event.preventDefault()
     void sendMessage()
   }
@@ -458,94 +479,109 @@ export function SupportPanel({
     })
   }
 
+  function openNewTicket() {
+    setNewTicketOpen(true)
+    setMobileChatOpen(true)
+    setError('')
+  }
+
+  function closeNewTicket() {
+    setNewTicketOpen(false)
+    setMobileChatOpen(false)
+    setError('')
+  }
+
   return (
     <div
       className={cn(
-        'grid h-[calc(100dvh-10rem-env(safe-area-inset-bottom))] min-h-0 gap-4 overflow-hidden xl:h-[calc(100dvh-6.25rem)]',
+        'grid h-[calc(100dvh-9rem-env(safe-area-inset-bottom))] min-h-[34rem] gap-3 overflow-hidden xl:h-[calc(100dvh-6.25rem)] 2xl:gap-4',
         mode === 'admin'
-          ? 'xl:h-[calc(100dvh-5.5rem)] xl:grid-cols-[21rem_minmax(0,1fr)]'
-          : 'xl:grid-cols-[18rem_minmax(0,1fr)]'
+          ? 'xl:h-[calc(100dvh-5.5rem)] xl:grid-cols-[20rem_minmax(0,1fr)] 2xl:grid-cols-[20rem_minmax(0,1fr)_20rem]'
+          : 'xl:grid-cols-[20rem_minmax(0,1fr)]'
       )}
     >
       <section className={cn('min-h-0 overflow-y-auto xl:flex xl:flex-col xl:overflow-hidden', mobileChatOpen && 'hidden xl:flex')}>
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[1.5rem] border border-slate-200/80 bg-white shadow-[0_20px_55px_-36px_rgba(15,23,42,0.45)] dark:border-white/[0.09] dark:bg-white/[0.035] dark:shadow-black/20">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[1.75rem] border border-slate-200/80 bg-white shadow-[0_24px_70px_-44px_rgba(15,23,42,0.48)] dark:border-white/[0.09] dark:bg-white/[0.035] dark:shadow-black/20">
           <div className={cn(
-            'relative overflow-hidden border-b border-slate-100/80 bg-gradient-to-br from-fuchsia-50/75 via-white to-cyan-50/80 px-3.5 py-3.5 dark:border-white/[0.07] dark:from-fuchsia-500/[0.08] dark:via-transparent dark:to-cyan-400/[0.07]',
-            mode === 'admin' && 'from-violet-50/80 dark:from-violet-500/[0.08]'
+            'relative overflow-hidden border-b border-slate-100/80 px-3.5 py-3.5 dark:border-white/[0.07] sm:px-4',
+            mode === 'admin'
+              ? 'bg-gradient-to-br from-violet-50/90 via-white to-cyan-50/70 dark:from-violet-500/[0.08] dark:via-transparent dark:to-cyan-400/[0.06]'
+              : 'bg-gradient-to-br from-fuchsia-50/90 via-white to-cyan-50/80 dark:from-fuchsia-500/[0.09] dark:via-transparent dark:to-cyan-400/[0.07]'
           )}>
-            <div aria-hidden="true" className="pointer-events-none absolute -right-12 -top-16 h-36 w-36 rounded-full bg-fuchsia-300/20 blur-3xl dark:bg-fuchsia-400/10" />
-            <div className="relative flex items-center justify-between gap-3">
-              <div className="flex min-w-0 items-center gap-2.5">
-                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-white/90 text-fuchsia-600 shadow-sm ring-1 ring-fuchsia-100 dark:bg-white/[0.08] dark:text-fuchsia-300 dark:ring-white/10">
-                  <LifeBuoy className="h-5 w-5" />
-                </span>
-                <div className="min-w-0">
-                  <div className="font-semibold tracking-tight">{mode === 'admin' ? 'Очередь' : 'Поддержка'}</div>
-                  <div className="truncate text-xs text-slate-500 dark:text-slate-400">
-                    {mode === 'admin'
-                      ? `${listTotal} обращений${folderCounts['need-answer'] > 0 ? ` · ${folderCounts['need-answer']} ждут ответа` : ''}`
-                      : unreadTotal > 0 ? `${unreadTotal} новых сообщений` : 'Диалоги с командой поддержки'}
+            <div aria-hidden="true" className="pointer-events-none absolute -right-12 -top-16 h-40 w-40 rounded-full bg-fuchsia-300/20 blur-3xl dark:bg-fuchsia-400/10" />
+            {mode === 'user' ? (
+              <div className="relative">
+                <div className="flex items-start gap-3">
+                  <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-fuchsia-600 to-cyan-500 text-white shadow-lg shadow-fuchsia-500/20 dark:from-fuchsia-500 dark:to-cyan-400">
+                    <Headphones className="h-6 w-6" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="page-eyebrow">Центр помощи</div>
+                    <h1 className="mt-0.5 text-xl font-semibold tracking-[-0.035em] text-slate-950 dark:text-white">Чем можем помочь?</h1>
+                    <p className="mt-1 text-sm leading-5 text-slate-500 dark:text-slate-400">Опишите вопрос, ответ появится прямо здесь.</p>
                   </div>
                 </div>
+                <button type="button" onClick={openNewTicket} className="mt-4 flex min-h-12 w-full items-center justify-between gap-3 rounded-2xl bg-slate-950 px-4 py-3 text-left text-white shadow-lg shadow-slate-950/15 transition hover:-translate-y-0.5 hover:bg-fuchsia-700 dark:bg-white dark:text-slate-950 dark:hover:bg-fuchsia-100">
+                  <span className="flex items-center gap-3">
+                    <span className="grid h-8 w-8 place-items-center rounded-xl bg-white/10 dark:bg-slate-950/10">
+                      <MessageSquarePlus className="h-4 w-4" />
+                    </span>
+                    <span>
+                      <span className="block text-sm font-semibold">Новое обращение</span>
+                      <span className="block text-xs text-white/60 dark:text-slate-500">Тема и описание, займёт меньше минуты</span>
+                    </span>
+                  </span>
+                  <ChevronRight className="h-4 w-4 shrink-0" />
+                </button>
+                <div className="mt-3 flex items-center justify-between gap-3 text-xs text-slate-500 dark:text-slate-400">
+                  <span className="flex items-center gap-1.5"><Clock3 className="h-3.5 w-3.5 text-emerald-500" /> Обычно отвечаем в этом чате</span>
+                  {unreadTotal > 0 && <span className="rounded-full bg-red-600 px-2 py-0.5 font-semibold text-white">{unreadTotal} новых</span>}
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                {unreadTotal > 0 && <span className="rounded-full bg-red-600 px-2.5 py-1 text-xs font-semibold text-white">{unreadTotal}</span>}
-                {mode === 'user' && (
-                  <button
-                    type="button"
-                    className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-fuchsia-600 to-cyan-500 text-white shadow-lg shadow-fuchsia-500/20 transition-transform hover:scale-105 dark:from-fuchsia-500 dark:to-cyan-400"
-                    onClick={() => {
-                      setNewTicketOpen(true)
-                      setMobileChatOpen(true)
-                      setError('')
-                    }}
-                    title="Новое обращение"
-                    aria-label="Новое обращение"
-                  >
-                    <MessageSquarePlus className="h-4 w-4" />
-                  </button>
-                )}
+            ) : (
+              <div className="relative">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-violet-600 text-white shadow-lg shadow-violet-500/20 dark:bg-violet-500">
+                      <Inbox className="h-5 w-5" />
+                    </span>
+                    <div className="min-w-0">
+                      <div className="page-eyebrow">Рабочая очередь</div>
+                      <div className="truncate text-lg font-semibold tracking-tight text-slate-950 dark:text-white">Поддержка</div>
+                    </div>
+                  </div>
+                  {folderCounts['need-answer'] > 0 && <span className="rounded-full bg-red-600 px-2.5 py-1 text-xs font-semibold text-white">{folderCounts['need-answer']}</span>}
+                </div>
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <QueueMetric label="Всего" value={listTotal} />
+                  <QueueMetric label="Нужно ответить" value={folderCounts['need-answer']} accent={folderCounts['need-answer'] > 0} />
+                </div>
               </div>
-            </div>
+            )}
             <FolderTabs folder={folder} counts={folderCounts} mode={mode} onChange={setFolder} />
-            <div className="relative mt-2.5 flex items-center gap-2 rounded-xl border border-white/90 bg-white/80 px-3 py-2.5 shadow-sm shadow-slate-950/5 backdrop-blur dark:border-white/[0.08] dark:bg-black/15">
-              <Search className="h-4 w-4 shrink-0 text-slate-400" />
-              <input
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                className="min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-slate-400 sm:text-sm"
-                placeholder={mode === 'admin' ? 'Поиск по email, теме или тексту' : 'Найти диалог'}
-              />
-            </div>
+            {(mode === 'admin' || tickets.length > 4) && (
+              <label className="relative mt-2.5 flex items-center gap-2 rounded-xl border border-white/90 bg-white/85 px-3 py-2.5 shadow-sm shadow-slate-950/5 backdrop-blur dark:border-white/[0.08] dark:bg-black/15">
+                <Search className="h-4 w-4 shrink-0 text-slate-400" />
+                <span className="sr-only">Поиск обращений</span>
+                <input
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  className="min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-slate-400 sm:text-sm"
+                  placeholder={mode === 'admin' ? 'Клиент, email или тема' : 'Найти обращение'}
+                />
+                {query && <button type="button" onClick={() => setQuery('')} className="grid h-6 w-6 place-items-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-white/10 dark:hover:text-white" aria-label="Очистить поиск"><X className="h-3.5 w-3.5" /></button>}
+              </label>
+            )}
           </div>
 
-          <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto p-2.5">
-            {mode === 'user' && (
-              <button
-                type="button"
-                onClick={() => {
-                  setNewTicketOpen(true)
-                  setMobileChatOpen(true)
-                  setError('')
-                }}
-                className={cn(
-                  'flex w-full items-center gap-3 rounded-2xl border px-3 py-3 text-left transition-all',
-                  newTicketOpen
-                    ? 'border-fuchsia-200 bg-gradient-to-r from-fuchsia-50 to-cyan-50 text-slate-950 shadow-sm dark:border-fuchsia-400/25 dark:from-fuchsia-400/10 dark:to-cyan-400/10 dark:text-white'
-                    : 'border-slate-200/80 bg-slate-50/60 text-slate-700 hover:border-fuchsia-200 hover:bg-fuchsia-50/50 dark:border-white/[0.07] dark:bg-white/[0.025] dark:text-slate-200 dark:hover:border-fuchsia-400/20'
-                )}
-              >
-                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-fuchsia-600 to-cyan-500 text-white shadow-md shadow-fuchsia-500/15 dark:from-fuchsia-500 dark:to-cyan-400">
-                  <MessageSquarePlus className="h-5 w-5" />
-                </span>
-                <span className="min-w-0">
-                  <span className="block font-semibold">Написать в поддержку</span>
-                  <span className="block truncate text-xs text-slate-500">Выберите тему и опишите проблему</span>
-                </span>
-              </button>
-            )}
+          <div className="min-h-0 flex-1 overflow-y-auto px-2.5 pb-3 pt-2.5">
+            <div className="mb-2 flex items-center justify-between gap-3 px-1.5">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.11em] text-slate-400">{mode === 'admin' ? 'Обращения' : 'Ваши обращения'}</span>
+              <span className="text-xs text-slate-400">{filteredTickets.length}</span>
+            </div>
+            <div className="space-y-1.5">
             {filteredTickets.length === 0 ? (
-              <EmptyFolder folder={folder} />
+              <EmptyFolder folder={folder} mode={mode} onCreate={mode === 'user' ? openNewTicket : undefined} />
             ) : (
               filteredTickets.map((ticket) => (
                 <TicketListItem
@@ -557,6 +593,7 @@ export function SupportPanel({
                 />
               ))
             )}
+            </div>
             {mode === 'admin' && (
               <div ref={loadMoreRef} className="flex flex-col items-center gap-2 px-2 py-3">
                 <div className="text-xs text-slate-500">
@@ -579,7 +616,7 @@ export function SupportPanel({
       </section>
 
       <section className={cn(
-        'relative min-h-0 overflow-hidden rounded-[1.5rem] border border-slate-200/80 bg-white shadow-[0_20px_55px_-36px_rgba(15,23,42,0.45)] dark:border-white/[0.09] dark:bg-white/[0.035] dark:shadow-black/20',
+        'relative min-h-0 overflow-hidden rounded-[1.75rem] border border-slate-200/80 bg-white shadow-[0_24px_70px_-44px_rgba(15,23,42,0.48)] dark:border-white/[0.09] dark:bg-white/[0.035] dark:shadow-black/20',
         !mobileChatOpen && 'hidden xl:block'
       )}>
         {mode === 'user' && newTicketOpen ? (
@@ -589,34 +626,31 @@ export function SupportPanel({
             isPending={isPending}
             onCategoryChange={setNewCategory}
             onMessageChange={setNewMessage}
-            onCancel={tickets.length > 0 ? () => {
-              setNewTicketOpen(false)
-              setMobileChatOpen(false)
-            } : undefined}
+            onCancel={closeNewTicket}
             onSubmit={createTicket}
           />
         ) : selected ? (
           <div className="flex h-full min-h-0 flex-col">
-            <div className="border-b border-slate-100/80 bg-gradient-to-r from-white via-fuchsia-50/35 to-cyan-50/45 px-3 py-3 dark:border-white/[0.07] dark:from-transparent dark:via-fuchsia-500/[0.045] dark:to-cyan-400/[0.045] sm:px-4">
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex min-w-0 flex-1 gap-3">
+            <div className="border-b border-slate-100/80 bg-white/95 px-3 py-3 backdrop-blur dark:border-white/[0.07] dark:bg-surface-900/90 sm:px-4">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex min-w-0 flex-1 items-center gap-2.5 sm:gap-3">
                   <button
                     type="button"
                     onClick={() => setMobileChatOpen(false)}
-                    className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition-colors hover:bg-slate-50 xl:hidden"
+                    className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition-colors hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-slate-300 xl:hidden"
                     aria-label="Назад к обращениям"
                   >
                     <ArrowLeft className="h-4 w-4" />
                   </button>
+                  <CategoryIcon category={selected.category} />
                   <div className="min-w-0 flex-1">
                     <div className="flex min-w-0 flex-wrap items-center gap-2">
-                      <h2 className="min-w-0 truncate text-base font-semibold tracking-tight sm:text-lg">{selected.subject}</h2>
-                      <TicketStatusBadge status={selected.status} mode={mode} />
+                      <h2 className="min-w-0 truncate text-base font-semibold tracking-[-0.02em] sm:text-lg">{selected.subject}</h2>
                     </div>
-                    <div className="mt-1 truncate text-sm text-slate-500">
+                    <div className="mt-0.5 truncate text-xs text-slate-500 sm:text-sm">
                       {mode === 'admin'
-                        ? `${supportCategoryLabel(selected.category)}${selected.user ? ` · ${selected.user.email}` : ''}`
-                        : supportCategoryDescription(selected.category)}
+                        ? `${selected.user?.name || selected.user?.email || 'Пользователь'} · ${supportCategoryLabel(selected.category)}`
+                        : ticketStatusDescription(selected, mode)}
                     </div>
                   </div>
                 </div>
@@ -624,7 +658,7 @@ export function SupportPanel({
                   {mode === 'admin' && (
                     <button
                       type="button"
-                      className={cn('btn-secondary h-9 px-3 text-sm', detailsOpen && 'border-cyan-200 bg-cyan-50 text-cyan-800 dark:border-cyan-400/30 dark:bg-cyan-400/10 dark:text-cyan-100')}
+                      className={cn('btn-secondary h-10 px-3 text-sm 2xl:hidden', detailsOpen && 'border-cyan-200 bg-cyan-50 text-cyan-800 dark:border-cyan-400/30 dark:bg-cyan-400/10 dark:text-cyan-100')}
                       onClick={() => setDetailsOpen((current) => !current)}
                       aria-expanded={detailsOpen}
                     >
@@ -632,12 +666,14 @@ export function SupportPanel({
                       <span className="hidden sm:inline">Клиент</span>
                     </button>
                   )}
-                  <div className={cn(mode === 'admin' ? 'hidden 2xl:block' : 'xl:hidden')}>
+                  {mode === 'user' && (
                     <TicketActions selected={selected} mode={mode} isPending={isPending} onUpdateStatus={updateStatus} />
-                  </div>
+                  )}
                 </div>
               </div>
             </div>
+
+            <ConversationNotice ticket={selected} mode={mode} />
 
             {error && (
               <div className="mx-4 mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 sm:mx-5">
@@ -651,9 +687,9 @@ export function SupportPanel({
                 const element = event.currentTarget
                 stickToBottomRef.current = element.scrollHeight - element.scrollTop - element.clientHeight < 120
               }}
-              className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-gradient-to-b from-slate-50/90 via-white to-cyan-50/25 px-3 py-4 dark:from-black/15 dark:via-transparent dark:to-cyan-400/[0.025] sm:px-4"
+              className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-[radial-gradient(circle_at_top,rgba(217,70,239,0.055),transparent_24rem),linear-gradient(to_bottom,rgba(248,250,252,0.96),white)] px-3 py-4 dark:bg-[radial-gradient(circle_at_top,rgba(217,70,239,0.07),transparent_24rem)] sm:px-5 sm:py-5"
             >
-              <div className="mx-auto max-w-3xl space-y-3">
+              <div className="mx-auto max-w-3xl space-y-3.5">
                 {selected.messagePagination?.hasMore && (
                   <div className="flex justify-center pb-1">
                     <button
@@ -666,6 +702,11 @@ export function SupportPanel({
                     </button>
                   </div>
                 )}
+                <div className="flex items-center gap-3 py-1 text-[11px] text-slate-400">
+                  <span className="h-px flex-1 bg-slate-200/80 dark:bg-white/10" />
+                  Обращение создано {formatDate(selected.createdAt)}
+                  <span className="h-px flex-1 bg-slate-200/80 dark:bg-white/10" />
+                </div>
                 {selected.messages.map((item) => {
                   const own = mode === 'admin' ? item.senderRole === 'ADMIN' : item.senderRole === 'USER'
                   return <MessageBubble key={item.id} message={item} own={own} />
@@ -673,30 +714,41 @@ export function SupportPanel({
               </div>
             </div>
 
-            <form onSubmit={sendMessage} className="border-t border-slate-100/80 bg-white/90 p-2.5 pb-[calc(0.625rem+env(safe-area-inset-bottom))] backdrop-blur dark:border-white/[0.07] dark:bg-surface-900/80">
+            <form onSubmit={sendMessage} className="border-t border-slate-100/80 bg-white/95 p-2.5 pb-[calc(0.625rem+env(safe-area-inset-bottom))] backdrop-blur dark:border-white/[0.07] dark:bg-surface-900/90 sm:p-3">
               {selected.status === 'CLOSED' ? (
-                <div className="flex items-center gap-2 rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-500 dark:bg-surface-800">
+                <div className="flex items-center justify-between gap-3 rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-500 dark:bg-surface-800">
+                  <span className="flex items-center gap-2">
                   <Lock className="h-4 w-4" />
                   Обращение закрыто и хранится в архиве
+                  </span>
+                  {mode === 'admin' && <button type="button" className="text-xs font-semibold text-violet-700 dark:text-violet-200" onClick={() => updateStatus('OPEN')}>Открыть снова</button>}
                 </div>
               ) : (
                 <div className="space-y-2">
                   <QuickReplies mode={mode} onPick={(value) => setMessage((current) => current.trim() ? `${current.trim()}\n\n${value}` : value)} />
-                  <div className="relative flex items-end gap-2 rounded-2xl border border-slate-200/90 bg-white p-1.5 shadow-[0_8px_28px_-18px_rgba(15,23,42,0.45)] dark:border-white/10 dark:bg-black/20">
+                  <div className="relative flex items-end gap-1.5 rounded-2xl border border-slate-200/90 bg-white p-1.5 shadow-[0_12px_34px_-22px_rgba(15,23,42,0.5)] focus-within:border-fuchsia-300 focus-within:ring-4 focus-within:ring-fuchsia-500/[0.06] dark:border-white/10 dark:bg-black/20 dark:focus-within:border-fuchsia-400/30 sm:gap-2">
                     <EmojiPicker onPick={insertMessageEmoji} />
                     <textarea
                       ref={messageInputRef}
-                      className="max-h-28 min-h-11 flex-1 resize-none rounded-xl border-0 bg-transparent px-2 py-2 text-base outline-none placeholder:text-slate-400 focus:ring-0 sm:text-sm"
+                      className="max-h-32 min-h-11 flex-1 resize-none rounded-xl border-0 bg-transparent px-1.5 py-2.5 text-base leading-5 outline-none placeholder:text-slate-400 focus:ring-0 sm:px-2 sm:text-sm"
                       value={message}
-                      onChange={(event) => setMessage(event.target.value)}
+                      onChange={(event) => {
+                        setMessage(event.target.value)
+                        event.currentTarget.style.height = 'auto'
+                        event.currentTarget.style.height = `${Math.min(event.currentTarget.scrollHeight, 128)}px`
+                      }}
                       onKeyDown={handleMessageKeyDown}
-                      placeholder={mode === 'admin' ? 'Ответ пользователю' : 'Ваше сообщение'}
+                      placeholder={mode === 'admin' ? 'Напишите понятный ответ пользователю' : 'Напишите сообщение'}
                       maxLength={3000}
                       required
                     />
-                    <button type="submit" className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-fuchsia-600 to-cyan-500 text-white shadow-lg shadow-fuchsia-500/20 transition-transform hover:scale-105 disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:scale-100 dark:from-fuchsia-500 dark:to-cyan-400" disabled={isPending || !message.trim()} aria-label="Отправить сообщение">
-                      <Send className="h-4 w-4" />
+                    <button type="submit" className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-slate-950 text-white shadow-lg shadow-slate-950/15 transition hover:bg-fuchsia-700 disabled:cursor-not-allowed disabled:opacity-35 dark:bg-white dark:text-slate-950 dark:hover:bg-fuchsia-100" disabled={isPending || !message.trim()} aria-label="Отправить сообщение">
+                      <Send className="h-[18px] w-[18px]" />
                     </button>
+                  </div>
+                  <div className="hidden items-center justify-between px-1 text-[11px] text-slate-400 sm:flex">
+                    <span>Ctrl + Enter, чтобы отправить</span>
+                    <span className={message.length > 2700 ? 'text-amber-600' : ''}>{message.length}/3000</span>
                   </div>
                 </div>
               )}
@@ -706,11 +758,11 @@ export function SupportPanel({
               <>
                 <button
                   type="button"
-                  className="absolute inset-0 z-20 bg-slate-950/10 backdrop-blur-[1px] dark:bg-black/30"
+                  className="absolute inset-0 z-20 bg-slate-950/15 backdrop-blur-[1px] dark:bg-black/35 2xl:hidden"
                   onClick={() => setDetailsOpen(false)}
                   aria-label="Закрыть панель"
                 />
-                <aside className="absolute inset-y-0 right-0 z-30 w-[min(24rem,calc(100%-1rem))] border-l border-slate-200 bg-white shadow-2xl shadow-slate-950/15 dark:border-white/10 dark:bg-surface-900">
+                <aside className="absolute inset-y-0 right-0 z-30 w-[min(24rem,calc(100%-1rem))] border-l border-slate-200 bg-white shadow-2xl shadow-slate-950/15 dark:border-white/10 dark:bg-surface-900 2xl:hidden">
                   <TicketSideMenu
                     selected={selected}
                     mode={mode}
@@ -723,18 +775,24 @@ export function SupportPanel({
             )}
           </div>
         ) : (
-          <div className="grid h-full min-h-0 place-items-center bg-gradient-to-br from-fuchsia-50/45 via-white to-cyan-50/60 p-8 text-center dark:from-fuchsia-500/[0.04] dark:via-transparent dark:to-cyan-400/[0.04]">
-            <div className="max-w-sm rounded-[1.75rem] border border-white/80 bg-white/65 px-8 py-9 shadow-xl shadow-slate-950/[0.04] backdrop-blur dark:border-white/[0.07] dark:bg-white/[0.025]">
-              <div className="mx-auto mb-4 grid h-16 w-16 place-items-center rounded-[1.35rem] bg-gradient-to-br from-fuchsia-600 to-cyan-500 text-white shadow-xl shadow-fuchsia-500/20 dark:from-fuchsia-500 dark:to-cyan-400">
-                <LifeBuoy className="h-8 w-8" />
+          <div className="grid h-full min-h-0 place-items-center bg-gradient-to-br from-fuchsia-50/45 via-white to-cyan-50/60 p-6 text-center dark:from-fuchsia-500/[0.04] dark:via-transparent dark:to-cyan-400/[0.04]">
+            <div className="max-w-sm px-4 py-8">
+              <div className="mx-auto mb-4 grid h-16 w-16 place-items-center rounded-[1.35rem] bg-white text-fuchsia-600 shadow-xl shadow-slate-950/[0.06] ring-1 ring-fuchsia-100 dark:bg-white/[0.06] dark:text-fuchsia-300 dark:ring-white/10">
+                <MessageCircle className="h-7 w-7" />
               </div>
-              <h2 className="text-xl font-semibold">Выберите обращение</h2>
-              <p className="mt-2 text-sm leading-6 text-slate-500">Выберите диалог слева, чтобы открыть переписку и ответить.</p>
+              <h2 className="text-xl font-semibold tracking-tight">{mode === 'admin' ? 'Выберите обращение' : 'Здесь появится диалог'}</h2>
+              <p className="mt-2 text-sm leading-6 text-slate-500">{mode === 'admin' ? 'Откройте обращение из очереди слева, чтобы ответить и проверить данные клиента.' : 'Создайте обращение, и вся переписка с поддержкой будет храниться в одном месте.'}</p>
+              {mode === 'user' && <button type="button" onClick={openNewTicket} className="btn-primary mt-5"><MessageSquarePlus className="h-4 w-4" />Новое обращение</button>}
             </div>
           </div>
         )}
       </section>
 
+      {mode === 'admin' && (
+        <aside className="hidden min-h-0 overflow-hidden rounded-[1.75rem] border border-slate-200/80 bg-white shadow-[0_24px_70px_-44px_rgba(15,23,42,0.48)] dark:border-white/[0.09] dark:bg-white/[0.035] 2xl:block">
+          <TicketSideMenu selected={selected} mode={mode} isPending={isPending} onUpdateStatus={updateStatus} />
+        </aside>
+      )}
     </div>
   )
 }
@@ -775,97 +833,213 @@ function NewTicketForm({
 
   return (
     <form onSubmit={onSubmit} className="flex h-full min-h-0 flex-col overflow-hidden">
-      <div className="border-b border-slate-100/80 bg-gradient-to-r from-fuchsia-50/70 via-white to-cyan-50/70 px-3 py-3 dark:border-white/[0.07] dark:from-fuchsia-500/[0.07] dark:via-transparent dark:to-cyan-400/[0.06] sm:px-5">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-3">
-            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-fuchsia-600 to-cyan-500 text-white shadow-lg shadow-fuchsia-500/20 dark:from-fuchsia-500 dark:to-cyan-400">
-              <MessageSquarePlus className="h-5 w-5" />
-            </div>
-            <div className="min-w-0">
-              <h2 className="truncate text-base font-semibold tracking-tight sm:text-lg">Новое обращение</h2>
-              <p className="text-xs text-slate-500 sm:text-sm">Выберите тему и опишите проблему.</p>
-            </div>
+      <div className="border-b border-slate-100/80 bg-white/95 px-3 py-3 backdrop-blur dark:border-white/[0.07] dark:bg-surface-900/90 sm:px-5">
+        <div className="flex items-center gap-3">
+          <button type="button" className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-slate-300" onClick={onCancel} disabled={isPending} aria-label="Назад к обращениям">
+            <ArrowLeft className="h-4 w-4" />
+          </button>
+          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-fuchsia-600 to-cyan-500 text-white shadow-lg shadow-fuchsia-500/20 dark:from-fuchsia-500 dark:to-cyan-400">
+            <MessageSquarePlus className="h-5 w-5" />
+          </span>
+          <div className="min-w-0">
+            <h2 className="truncate text-base font-semibold tracking-[-0.02em] sm:text-lg">Новое обращение</h2>
+            <p className="text-xs text-slate-500 sm:text-sm">Тема и подробности проблемы</p>
           </div>
-          {onCancel && (
-            <button type="button" className="btn-secondary hidden sm:inline-flex" onClick={onCancel} disabled={isPending}>
-              Отмена
-            </button>
-          )}
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto bg-gradient-to-b from-white to-slate-50/60 p-3 dark:from-transparent dark:to-black/10 sm:space-y-5 sm:p-5">
-        <div role="group" aria-labelledby="new-ticket-category-label">
-          <div id="new-ticket-category-label" className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-            <Tag className="h-3.5 w-3.5" />
-            В чем проблема
-          </div>
-          <div className="-mx-3 flex gap-2 overflow-x-auto px-3 pb-1 sm:mx-0 sm:grid sm:grid-cols-2 sm:overflow-visible sm:px-0 sm:pb-0">
-            {supportCategories.map((item) => {
-              const active = category === item.value
-              return (
-                <button
-                  key={item.value}
-                  type="button"
-                  aria-pressed={active}
-                  onClick={() => onCategoryChange(item.value)}
-                  className={cn(
-                    'min-w-[13rem] rounded-2xl border p-3 text-left transition-all sm:min-w-0',
-                    active
-                      ? 'border-fuchsia-200 bg-gradient-to-br from-fuchsia-50 to-cyan-50 text-slate-950 shadow-md shadow-fuchsia-950/5 dark:border-fuchsia-400/30 dark:from-fuchsia-400/10 dark:to-cyan-400/10 dark:text-white'
-                      : 'border-slate-200/80 bg-white text-slate-700 hover:-translate-y-0.5 hover:border-fuchsia-200 hover:shadow-sm dark:border-white/[0.08] dark:bg-white/[0.025] dark:text-slate-200 dark:hover:border-fuchsia-400/25'
-                  )}
-                >
-                  <span className="block text-sm font-semibold sm:text-base">{item.label}</span>
-                  <span className={cn('mt-1 line-clamp-2 block text-xs leading-relaxed', active ? 'text-fuchsia-700 dark:text-fuchsia-200' : 'text-slate-500')}>
-                    {item.description}
-                  </span>
-                </button>
-              )
-            })}
-          </div>
-        </div>
+      <div className="min-h-0 flex-1 overflow-y-auto bg-gradient-to-b from-white to-slate-50/70 p-3 dark:from-transparent dark:to-black/10 sm:p-5">
+        <div className="mx-auto max-w-3xl space-y-5">
+          <section aria-labelledby="new-ticket-category-label">
+            <div className="mb-2.5 flex items-center justify-between gap-3">
+              <div id="new-ticket-category-label" className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">
+                <span className="grid h-6 w-6 place-items-center rounded-lg bg-fuchsia-50 text-fuchsia-600 dark:bg-fuchsia-400/10 dark:text-fuchsia-300">1</span>
+                Выберите тему
+              </div>
+              <span className="text-xs text-slate-400">Шаг 1 из 2</span>
+            </div>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              {supportCategories.map((item) => {
+                const active = category === item.value
+                return (
+                  <button
+                    key={item.value}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => onCategoryChange(item.value)}
+                    className={cn(
+                      'group flex min-h-[5.25rem] flex-col items-start justify-between rounded-2xl border p-3 text-left transition-all',
+                      active
+                        ? 'border-fuchsia-300 bg-gradient-to-br from-fuchsia-50 to-cyan-50 text-slate-950 shadow-md shadow-fuchsia-950/5 ring-2 ring-fuchsia-500/10 dark:border-fuchsia-400/35 dark:from-fuchsia-400/10 dark:to-cyan-400/10 dark:text-white'
+                        : 'border-slate-200/80 bg-white text-slate-700 hover:-translate-y-0.5 hover:border-fuchsia-200 hover:shadow-sm dark:border-white/[0.08] dark:bg-white/[0.025] dark:text-slate-200 dark:hover:border-fuchsia-400/25'
+                    )}
+                  >
+                    <CategoryIcon category={item.value} compact active={active} />
+                    <span className="mt-2 block text-sm font-semibold">{item.label}</span>
+                  </button>
+                )
+              })}
+            </div>
+            <CategoryGuidance category={category} />
+          </section>
 
-        <div>
-          <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Сообщение</div>
-          <div className="relative flex items-start gap-1.5 rounded-2xl border border-slate-200/90 bg-white p-1.5 shadow-[0_12px_32px_-24px_rgba(15,23,42,0.5)] dark:border-white/10 dark:bg-black/20 sm:gap-2 sm:p-2">
-            <EmojiPicker onPick={insertEmoji} />
-            <textarea
-              ref={messageInputRef}
-              aria-label="Сообщение"
-              className="min-h-32 flex-1 resize-none rounded-xl border-0 bg-transparent px-2 py-2 text-base outline-none placeholder:text-slate-400 focus:ring-0 sm:min-h-44 sm:text-sm"
-              value={message}
-              onChange={(event) => onMessageChange(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key !== 'Enter' || event.shiftKey) return
-                event.preventDefault()
-                event.currentTarget.form?.requestSubmit()
-              }}
-              placeholder="Например: не подключается на iPhone, приложение пишет ошибку..."
-              maxLength={3000}
-              required
-              autoFocus
-            />
-          </div>
-          <div className="mt-2 text-xs text-slate-500">Enter отправит обращение, Shift + Enter добавит новую строку.</div>
+          <section>
+            <div className="mb-2.5 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">
+                <span className="grid h-6 w-6 place-items-center rounded-lg bg-cyan-50 text-cyan-700 dark:bg-cyan-400/10 dark:text-cyan-200">2</span>
+                Опишите проблему
+              </div>
+              <span className={cn('text-xs', message.length > 2700 ? 'text-amber-600' : 'text-slate-400')}>{message.length}/3000</span>
+            </div>
+            <div className="relative flex items-start gap-1.5 rounded-2xl border border-slate-200/90 bg-white p-1.5 shadow-[0_14px_38px_-26px_rgba(15,23,42,0.5)] focus-within:border-fuchsia-300 focus-within:ring-4 focus-within:ring-fuchsia-500/[0.06] dark:border-white/10 dark:bg-black/20 sm:gap-2 sm:p-2">
+              <EmojiPicker onPick={insertEmoji} />
+              <textarea
+                ref={messageInputRef}
+                aria-label="Сообщение"
+                className="min-h-40 flex-1 resize-none rounded-xl border-0 bg-transparent px-1.5 py-2.5 text-base leading-6 outline-none placeholder:text-slate-400 focus:ring-0 sm:min-h-48 sm:px-2 sm:text-sm"
+                value={message}
+                onChange={(event) => onMessageChange(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key !== 'Enter' || (!event.ctrlKey && !event.metaKey) || event.nativeEvent.isComposing) return
+                  event.preventDefault()
+                  event.currentTarget.form?.requestSubmit()
+                }}
+                placeholder={ticketMessagePlaceholder(category)}
+                maxLength={3000}
+                required
+              />
+            </div>
+            <p className="mt-2 flex items-start gap-2 text-xs leading-5 text-slate-500">
+              <Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0 text-fuchsia-500" />
+              Чем точнее описание, тем быстрее мы поможем. Не отправляйте пароли и данные банковской карты.
+            </p>
+          </section>
         </div>
       </div>
 
-      <div className="flex items-center justify-between gap-3 border-t border-slate-100/80 bg-white/90 p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] backdrop-blur dark:border-white/[0.07] dark:bg-surface-900/80 sm:p-4">
-        <div className="text-xs text-slate-400">{message.trim().length}/3000</div>
-        <div className="flex justify-end gap-2">
-          {onCancel && (
-            <button type="button" className="btn-secondary sm:hidden" onClick={onCancel} disabled={isPending}>
-              Отмена
-            </button>
-          )}
-          <button type="submit" className="btn-primary" disabled={isPending || message.trim().length < 5}>
+      <div className="border-t border-slate-100/80 bg-white/95 p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] backdrop-blur dark:border-white/[0.07] dark:bg-surface-900/90 sm:p-4">
+        <div className="mx-auto flex max-w-3xl items-center justify-between gap-3">
+          <span className="hidden text-xs text-slate-400 sm:block">Ctrl + Enter, чтобы отправить</span>
+          <button type="submit" className="btn-primary min-h-11 w-full justify-center sm:ml-auto sm:w-auto" disabled={isPending || message.trim().length < 5}>
             <Send className="h-4 w-4" />
-            {isPending ? 'Отправляем...' : 'Отправить'}
+            {isPending ? 'Отправляем...' : 'Отправить обращение'}
           </button>
         </div>
       </div>
     </form>
+  )
+}
+
+function QueueMetric({ label, value, accent = false }: { label: string; value: number; accent?: boolean }) {
+  return (
+    <div className={cn(
+      'rounded-xl border px-3 py-2',
+      accent
+        ? 'border-red-200 bg-red-50/90 dark:border-red-400/20 dark:bg-red-400/10'
+        : 'border-white/90 bg-white/75 dark:border-white/[0.07] dark:bg-white/[0.035]'
+    )}>
+      <div className={cn('text-lg font-semibold tabular-nums', accent ? 'text-red-700 dark:text-red-200' : 'text-slate-950 dark:text-white')}>{value}</div>
+      <div className={cn('text-[10px] font-semibold uppercase tracking-[0.08em]', accent ? 'text-red-500 dark:text-red-300' : 'text-slate-400')}>{label}</div>
+    </div>
+  )
+}
+
+function CategoryIcon({ category, compact = false, active = false }: { category: string; compact?: boolean; active?: boolean }) {
+  const Icon = category === 'connection'
+    ? Wifi
+    : category === 'payment'
+      ? CreditCard
+      : category === 'subscription'
+        ? RadioTower
+        : category === 'devices'
+          ? MonitorSmartphone
+          : category === 'speed'
+            ? Gauge
+            : CircleHelp
+
+  return (
+    <span className={cn(
+      'grid shrink-0 place-items-center rounded-2xl transition-colors',
+      compact ? 'h-9 w-9 rounded-xl' : 'h-11 w-11',
+      active
+        ? 'bg-fuchsia-600 text-white shadow-sm dark:bg-fuchsia-400 dark:text-slate-950'
+        : 'bg-gradient-to-br from-fuchsia-50 to-cyan-50 text-fuchsia-600 ring-1 ring-fuchsia-100/80 dark:from-fuchsia-400/10 dark:to-cyan-400/10 dark:text-fuchsia-300 dark:ring-white/[0.07]'
+    )}>
+      <Icon className={compact ? 'h-4 w-4' : 'h-5 w-5'} />
+    </span>
+  )
+}
+
+const categoryGuidance: Record<SupportCategoryValue, { title: string; details: string }> = {
+  connection: { title: 'Что поможет разобраться', details: 'Устройство, приложение и точный текст ошибки' },
+  payment: { title: 'Что поможет найти платёж', details: 'Дата, сумма и способ оплаты. Не отправляйте данные карты' },
+  subscription: { title: 'Что нужно уточнить', details: 'Какой тариф или срок хотите изменить и какой результат ожидаете' },
+  devices: { title: 'Что поможет с устройством', details: 'Модель устройства, система и название приложения' },
+  speed: { title: 'Что поможет проверить скорость', details: 'Устройство, тип сети и когда началась проблема' },
+  general: { title: 'Расскажите подробнее', details: 'Что произошло, что ожидали увидеть и что уже пробовали' },
+}
+
+function CategoryGuidance({ category }: { category: SupportCategoryValue }) {
+  const guidance = categoryGuidance[category]
+  return (
+    <div className="mt-2.5 flex items-start gap-2.5 rounded-2xl border border-amber-100 bg-amber-50/70 px-3 py-2.5 dark:border-amber-400/15 dark:bg-amber-400/[0.06]">
+      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-300" />
+      <div className="min-w-0 text-xs leading-5">
+        <span className="font-semibold text-slate-800 dark:text-slate-100">{guidance.title}: </span>
+        <span className="text-slate-500 dark:text-slate-400">{guidance.details}</span>
+      </div>
+    </div>
+  )
+}
+
+function ticketMessagePlaceholder(category: SupportCategoryValue) {
+  const placeholders: Record<SupportCategoryValue, string> = {
+    connection: 'Например: не подключается на iPhone, приложение показывает ошибку...',
+    payment: 'Например: оплатил сегодня в 14:30, но подписка не продлилась...',
+    subscription: 'Например: хочу изменить тариф или срок подписки...',
+    devices: 'Например: не получается добавить устройство или открыть QR-код...',
+    speed: 'Например: на Wi-Fi скорость упала вечером, проверял на двух устройствах...',
+    general: 'Опишите вопрос и ожидаемый результат...',
+  }
+  return placeholders[category]
+}
+
+function ticketStatusDescription(ticket: SupportTicket, mode: 'user' | 'admin') {
+  if (ticket.status === 'CLOSED') return 'Обращение закрыто и хранится в архиве'
+  if (ticket.status === 'WAITING_ADMIN') return mode === 'user' ? 'Сообщение доставлено, ждём ответ поддержки' : 'Пользователь ждёт ответа'
+  if (ticket.status === 'WAITING_USER') return mode === 'user' ? 'Поддержка ответила, проверьте диалог' : 'Ответ отправлен, ждём пользователя'
+  return 'Обращение открыто'
+}
+
+function ConversationNotice({ ticket, mode }: { ticket: SupportTicket; mode: 'user' | 'admin' }) {
+  const waitingForAdmin = ticket.status === 'WAITING_ADMIN'
+  const waitingForUser = ticket.status === 'WAITING_USER'
+  const closed = ticket.status === 'CLOSED'
+  const Icon = closed ? Lock : waitingForAdmin ? Clock3 : waitingForUser ? BadgeCheck : MessageCircle
+  const title = ticketStatusDescription(ticket, mode)
+  const detail = closed
+    ? 'Новые сообщения недоступны'
+    : waitingForAdmin
+      ? mode === 'admin' ? `Последнее сообщение ${formatRelativeDate(ticket.lastMessageAt)}` : 'Ответ придёт сюда, обновлять страницу не нужно'
+      : waitingForUser
+        ? mode === 'admin' ? 'Можно закрыть после подтверждения клиента' : 'Если вопрос решён, обращение можно закрыть'
+        : 'Можно продолжить переписку ниже'
+
+  return (
+    <div className={cn(
+      'flex items-start gap-2.5 border-b px-3 py-2.5 text-xs sm:px-4',
+      closed
+        ? 'border-slate-100 bg-slate-50 text-slate-500 dark:border-white/[0.07] dark:bg-white/[0.025] dark:text-slate-400'
+        : waitingForAdmin
+          ? 'border-amber-100 bg-amber-50/75 text-amber-900 dark:border-amber-400/15 dark:bg-amber-400/[0.06] dark:text-amber-100'
+          : 'border-emerald-100 bg-emerald-50/70 text-emerald-900 dark:border-emerald-400/15 dark:bg-emerald-400/[0.06] dark:text-emerald-100'
+    )}>
+      <Icon className="mt-0.5 h-4 w-4 shrink-0" />
+      <div className="min-w-0">
+        <div className="font-semibold">{title}</div>
+        <div className="mt-0.5 opacity-70">{detail}</div>
+      </div>
+    </div>
   )
 }
 
@@ -969,20 +1143,17 @@ function FolderTabs({
   onChange: (folder: TicketFolder) => void
 }) {
   const items = mode === 'user' ? [
-    { value: 'active' as const, label: 'Диалоги', icon: Inbox },
+    { value: 'active' as const, label: 'Активные', icon: Inbox },
     { value: 'closed' as const, label: 'Архив', icon: Archive },
   ] : [
-    { value: 'active' as const, label: 'Активные', icon: Inbox },
-    { value: 'need-answer' as const, label: mode === 'admin' ? 'Новые' : 'Ответы', icon: Timer },
-    { value: 'answered' as const, label: 'Отвеченные', icon: CheckCircle2 },
-    { value: 'closed' as const, label: 'Архив', icon: Archive },
+    { value: 'need-answer' as const, label: 'Нужен ответ', icon: Timer },
+    { value: 'active' as const, label: 'В работе', icon: Inbox },
+    { value: 'answered' as const, label: 'Ждём клиента', icon: CheckCircle2 },
+    { value: 'closed' as const, label: 'Закрытые', icon: Archive },
   ]
 
   return (
-    <div className={cn(
-      'relative mt-3 gap-1 rounded-xl border border-white/70 bg-slate-100/80 p-1 shadow-inner shadow-slate-950/[0.03] dark:border-white/[0.05] dark:bg-black/15',
-      mode === 'admin' ? 'grid grid-cols-4' : 'flex overflow-x-auto'
-    )}>
+    <div className="relative mt-3 grid grid-cols-2 gap-1 rounded-2xl border border-white/70 bg-slate-100/80 p-1 shadow-inner shadow-slate-950/[0.03] dark:border-white/[0.05] dark:bg-black/15">
       {items.map((item) => {
         const Icon = item.icon
         const active = folder === item.value
@@ -992,17 +1163,17 @@ function FolderTabs({
             type="button"
             onClick={() => onChange(item.value)}
             className={cn(
-              'flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium transition-all',
+              'flex min-w-0 items-center justify-between gap-2 rounded-xl px-2.5 py-2 text-xs font-medium transition-all',
               active
                 ? 'bg-white text-fuchsia-700 shadow-sm dark:bg-white/10 dark:text-fuchsia-200'
                 : 'text-slate-500 hover:bg-white/50 hover:text-slate-950 dark:text-slate-400 dark:hover:bg-white/5 dark:hover:text-white'
             )}
           >
             <span className="flex min-w-0 items-center gap-1.5">
-              <Icon className={cn('h-3.5 w-3.5 shrink-0', mode === 'admin' && 'hidden 2xl:block')} />
+              <Icon className="h-3.5 w-3.5 shrink-0" />
               <span className="truncate">{item.label}</span>
             </span>
-            <span className={cn('rounded-full px-1.5 py-0.5 text-[10px]', mode === 'admin' && 'hidden min-[1500px]:inline', active ? 'bg-white/15 dark:bg-slate-950/10' : 'bg-slate-100 dark:bg-slate-800')}>
+            <span className={cn('rounded-full px-1.5 py-0.5 text-[10px] tabular-nums', active ? 'bg-fuchsia-50 text-fuchsia-700 dark:bg-black/15 dark:text-fuchsia-100' : 'bg-white/80 text-slate-500 dark:bg-white/5 dark:text-slate-400')}>
               {counts[item.value]}
             </span>
           </button>
@@ -1030,45 +1201,38 @@ function TicketListItem({
       type="button"
       onClick={onClick}
       className={cn(
-        'group relative w-full rounded-2xl border px-3 py-2.5 text-left transition-all',
-        mode === 'admin' && 'py-3 pl-4',
+        'group relative w-full overflow-hidden rounded-2xl border p-3 text-left transition-all',
         active
-          ? 'border-fuchsia-200 bg-gradient-to-r from-fuchsia-50/90 to-cyan-50/70 text-slate-950 shadow-sm dark:border-fuchsia-400/25 dark:from-fuchsia-400/10 dark:to-cyan-400/[0.07] dark:text-white'
-          : 'border-transparent hover:border-slate-200/80 hover:bg-slate-50/80 hover:shadow-sm dark:hover:border-white/[0.07] dark:hover:bg-white/[0.035]'
+          ? 'border-fuchsia-200 bg-gradient-to-r from-fuchsia-50/95 to-cyan-50/75 text-slate-950 shadow-sm ring-1 ring-fuchsia-500/[0.05] dark:border-fuchsia-400/25 dark:from-fuchsia-400/10 dark:to-cyan-400/[0.07] dark:text-white'
+          : 'border-transparent hover:border-slate-200/80 hover:bg-slate-50/90 hover:shadow-sm dark:hover:border-white/[0.07] dark:hover:bg-white/[0.035]'
       )}
     >
-      {active && <span className="absolute inset-y-3 left-0 w-0.5 rounded-full bg-gradient-to-b from-fuchsia-500 to-cyan-400" />}
-      <div className="flex items-start justify-between gap-3">
+      {active && <span className="absolute inset-y-4 left-0 w-[3px] rounded-full bg-gradient-to-b from-fuchsia-500 to-cyan-400" />}
+      <div className="flex items-start gap-3">
+        <div className="relative shrink-0">
+          <CategoryIcon category={ticket.category} compact />
+          {unread > 0 && <span className="absolute -right-1 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-red-600 px-1 text-[9px] font-bold text-white ring-2 ring-white dark:ring-surface-900">{Math.min(unread, 9)}{unread > 9 ? '+' : ''}</span>}
+        </div>
         <div className="min-w-0 flex-1">
-          <div className="flex min-w-0 items-center gap-2">
-            {unread > 0 && <span className="h-2 w-2 shrink-0 rounded-full bg-red-500" />}
-            <div className="truncate font-semibold">{mode === 'admin' && ticket.user ? ticket.user.name || ticket.user.email : ticket.subject}</div>
+          <div className="flex min-w-0 items-start justify-between gap-2">
+            <div className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-950 dark:text-white">
+              {mode === 'admin' && ticket.user ? ticket.user.name || ticket.user.email : ticket.subject}
+            </div>
+            <span className="shrink-0 text-[10px] tabular-nums text-slate-400">{formatRelativeDate(ticket.lastMessageAt)}</span>
           </div>
-          <div className="mt-1 truncate text-xs text-slate-500 dark:text-slate-400">
+          <div className="mt-0.5 truncate text-[11px] text-slate-500 dark:text-slate-400">
             {mode === 'admin'
               ? ticket.user?.name ? ticket.user.email : `${supportCategoryLabel(ticket.category)} · ${ticket.subject}`
-              : formatDate(ticket.lastMessageAt)}
+              : supportCategoryLabel(ticket.category)}
+          </div>
+          <div className={cn('mt-1.5 line-clamp-2 text-sm leading-5', unread > 0 ? 'font-medium text-slate-800 dark:text-slate-100' : 'text-slate-500 dark:text-slate-400')}>
+            {ticket.messages.at(-1)?.body || ticket.messages[0]?.body || 'Без сообщений'}
+          </div>
+          <div className="mt-2 flex items-center justify-between gap-2">
+            <TicketStatusBadge status={ticket.status} mode={mode} />
+            <ChevronRight className="h-4 w-4 text-slate-300 transition-transform group-hover:translate-x-0.5 group-hover:text-fuchsia-500 dark:text-slate-600" />
           </div>
         </div>
-        <TicketStatusBadge status={ticket.status} mode={mode} />
-      </div>
-      {mode === 'admin' && ticket.user?.name && (
-        <div className="mt-1 truncate text-xs text-slate-500 dark:text-slate-400">
-          {supportCategoryLabel(ticket.category)} · {ticket.subject}
-        </div>
-      )}
-      <div className="mt-1.5 line-clamp-2 text-sm leading-5 text-slate-600 dark:text-slate-300">
-        {ticket.messages.at(-1)?.body || ticket.messages[0]?.body || 'Без сообщений'}
-      </div>
-      <div className="mt-2 flex items-center justify-between gap-3">
-        <div className="text-xs text-slate-400">
-          {formatDate(ticket.lastMessageAt)}
-        </div>
-        {unread > 0 && (
-          <span className="rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-semibold text-red-700 dark:bg-red-500/10 dark:text-red-200">
-            {unread}
-          </span>
-        )}
       </div>
     </button>
   )
@@ -1086,29 +1250,29 @@ function TicketActions({
   onUpdateStatus: (status: TicketStatus) => void
 }) {
   return (
-    <div className="flex shrink-0 flex-wrap justify-end gap-2">
+    <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
       {mode === 'admin' && selected.status === 'CLOSED' && (
-        <button type="button" className="btn-secondary" onClick={() => onUpdateStatus('OPEN')} disabled={isPending}>
-          <CheckCircle2 className="h-4 w-4" />
-          Открыть
+        <button type="button" className="btn-secondary min-h-9 px-3 text-xs" onClick={() => onUpdateStatus('OPEN')} disabled={isPending}>
+          <RotateCcw className="h-3.5 w-3.5" />
+          Открыть снова
         </button>
       )}
       {mode === 'admin' && selected.status !== 'CLOSED' && selected.status !== 'WAITING_ADMIN' && (
-        <button type="button" className="btn-secondary" onClick={() => onUpdateStatus('WAITING_ADMIN')} disabled={isPending}>
-          <Timer className="h-4 w-4" />
+        <button type="button" className="btn-secondary min-h-9 px-3 text-xs" onClick={() => onUpdateStatus('WAITING_ADMIN')} disabled={isPending}>
+          <Timer className="h-3.5 w-3.5" />
           В работу
         </button>
       )}
       {mode === 'admin' && selected.status !== 'CLOSED' && selected.status !== 'WAITING_USER' && (
-        <button type="button" className="btn-secondary" onClick={() => onUpdateStatus('WAITING_USER')} disabled={isPending}>
-          <CheckCircle2 className="h-4 w-4" />
-          Ждет пользователя
+        <button type="button" className="btn-secondary min-h-9 px-3 text-xs" onClick={() => onUpdateStatus('WAITING_USER')} disabled={isPending}>
+          <CheckCircle2 className="h-3.5 w-3.5" />
+          Ждём клиента
         </button>
       )}
       {selected.status !== 'CLOSED' && (
-        <button type="button" className="btn-secondary" onClick={() => onUpdateStatus('CLOSED')} disabled={isPending}>
-          <XCircle className="h-4 w-4" />
-          В архив
+        <button type="button" className="btn-secondary min-h-9 px-2.5 text-xs sm:px-3" onClick={() => onUpdateStatus('CLOSED')} disabled={isPending} aria-label="Закрыть обращение">
+          <XCircle className="h-3.5 w-3.5" />
+          <span className={mode === 'user' ? 'hidden sm:inline' : ''}>{mode === 'user' ? 'Закрыть' : 'В архив'}</span>
         </button>
       )}
     </div>
@@ -1139,13 +1303,12 @@ function TicketSideMenu({
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="flex items-start justify-between gap-3 border-b border-slate-100 px-5 py-4 dark:border-slate-800">
+      <div className="flex items-start justify-between gap-3 border-b border-slate-100 bg-gradient-to-br from-cyan-50/70 via-white to-violet-50/70 px-4 py-4 dark:border-white/[0.08] dark:from-cyan-400/[0.05] dark:via-transparent dark:to-violet-400/[0.06]">
         <div className="min-w-0">
-          <div className="flex items-center gap-2 text-sm font-semibold text-slate-950 dark:text-white">
-            <PanelRight className="h-4 w-4 text-cyan-600 dark:text-cyan-300" />
-            Данные клиента
+          <div className="page-eyebrow">Контекст обращения</div>
+          <div className="mt-1 flex items-center gap-2 text-base font-semibold tracking-tight text-slate-950 dark:text-white">
+            <PanelRight className="h-4 w-4 text-cyan-600 dark:text-cyan-300" /> Клиент и аккаунт
           </div>
-          <div className="mt-1 truncate text-xs text-slate-500">{selected.subject}</div>
         </div>
         {onClose && (
           <button
@@ -1158,24 +1321,27 @@ function TicketSideMenu({
           </button>
         )}
       </div>
-      <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-5">
-        <div className="flex items-start justify-between gap-3">
+      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
+        <div className="rounded-2xl border border-slate-200/80 bg-slate-50/70 p-3.5 dark:border-white/[0.08] dark:bg-white/[0.025]">
+          <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <div className="text-xs text-slate-400">Обращение</div>
-            <div className="mt-1 line-clamp-2 font-semibold text-slate-950 dark:text-white">{selected.subject}</div>
-            <div className="mt-1 text-sm text-slate-500">{supportCategoryLabel(selected.category)}</div>
+              <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-400">Обращение</div>
+              <div className="mt-1 line-clamp-2 text-sm font-semibold text-slate-950 dark:text-white">{selected.subject}</div>
+              <div className="mt-1 text-xs text-slate-500">{supportCategoryLabel(selected.category)} · {formatRelativeDate(selected.lastMessageAt)}</div>
+            </div>
+            <TicketStatusBadge status={selected.status} mode={mode} />
           </div>
-          <TicketStatusBadge status={selected.status} mode={mode} />
         </div>
         {mode === 'admin' && selected.user && (
           <>
-            <div className="flex items-center gap-3 border-y border-slate-100 py-4 dark:border-white/10">
-              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-cyan-50 text-cyan-700 dark:bg-cyan-400/10 dark:text-cyan-200">
+            <div className="flex items-center gap-3 rounded-2xl border border-cyan-100 bg-cyan-50/55 p-3.5 dark:border-cyan-400/15 dark:bg-cyan-400/[0.05]">
+              <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-white text-cyan-700 shadow-sm ring-1 ring-cyan-100 dark:bg-white/[0.07] dark:text-cyan-200 dark:ring-white/10">
                 <UserRound className="h-5 w-5" />
               </div>
               <div className="min-w-0">
                 <div className="truncate text-sm font-semibold text-slate-950 dark:text-white">{selected.user.name || 'Пользователь'}</div>
                 <div className="truncate text-xs text-slate-500" title={selected.user.email}>{selected.user.email}</div>
+                <a href={`/dashboard/admin/users?q=${encodeURIComponent(selected.user.email)}`} className="mt-1 inline-flex text-[11px] font-semibold text-cyan-700 hover:text-slate-950 dark:text-cyan-200 dark:hover:text-white">Открыть профиль</a>
               </div>
             </div>
             <SupportUserDiagnostics user={selected.user} />
@@ -1186,7 +1352,8 @@ function TicketSideMenu({
           <InfoBlock label="Сообщений"><span>{selected.messages.length}</span></InfoBlock>
         </div>
       </div>
-      <div className="border-t border-slate-100 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-white/[0.02]">
+      <div className="border-t border-slate-100 bg-white/95 p-3.5 dark:border-white/[0.08] dark:bg-surface-900/90">
+        <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-400">Статус обращения</div>
         <TicketActions selected={selected} mode={mode} isPending={isPending} onUpdateStatus={onUpdateStatus} />
       </div>
     </div>
@@ -1204,15 +1371,7 @@ function SupportUserDiagnostics({ user }: { user: NonNullable<SupportTicket['use
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-2">
-        <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Состояние аккаунта</div>
-        <a
-          href={`/dashboard/admin/users?q=${encodeURIComponent(user.email)}`}
-          className="text-xs font-semibold text-cyan-700 hover:text-slate-950 dark:text-cyan-200 dark:hover:text-white"
-        >
-          Профиль
-        </a>
-      </div>
+      <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Состояние аккаунта</div>
 
       <div className="grid gap-2.5 text-xs">
         <DiagnosticRow label="Telegram" value={user.telegramId ? `TG ${user.telegramId}` : 'не привязан'} ok={Boolean(user.telegramId)} />
@@ -1346,25 +1505,30 @@ function InfoBlock({ label, children }: { label: string; children: ReactNode }) 
 
 function MessageBubble({ message, own }: { message: SupportMessage; own: boolean }) {
   return (
-    <div className={cn('flex', own ? 'justify-end' : 'justify-start')}>
+    <div className={cn('flex items-end gap-2', own ? 'justify-end' : 'justify-start')}>
+      {!own && (
+        <span className="mb-1 grid h-7 w-7 shrink-0 place-items-center rounded-xl bg-white text-fuchsia-600 shadow-sm ring-1 ring-slate-200/80 dark:bg-white/[0.07] dark:text-fuchsia-300 dark:ring-white/10">
+          {message.senderRole === 'ADMIN' ? <Headphones className="h-3.5 w-3.5" /> : <UserRound className="h-3.5 w-3.5" />}
+        </span>
+      )}
       <div
         className={cn(
-          'max-w-[min(42rem,82%)] rounded-2xl px-4 py-3 shadow-[0_10px_28px_-20px_rgba(15,23,42,0.55)] ring-1',
+          'max-w-[min(42rem,86%)] px-3.5 py-2.5 shadow-[0_10px_28px_-20px_rgba(15,23,42,0.55)] ring-1 sm:max-w-[76%] sm:px-4 sm:py-3',
           own
-            ? 'bg-gradient-to-br from-fuchsia-600 to-cyan-600 text-white ring-fuchsia-500/40 dark:from-fuchsia-500 dark:to-cyan-400 dark:text-white dark:ring-fuchsia-400/25'
-            : 'bg-white/95 text-slate-900 ring-slate-200/90 dark:bg-white/[0.06] dark:text-white dark:ring-white/10'
+            ? 'rounded-[1.25rem_1.25rem_0.35rem_1.25rem] bg-slate-950 text-white ring-slate-950/20 dark:bg-white dark:text-slate-950 dark:ring-white/20'
+            : 'rounded-[1.25rem_1.25rem_1.25rem_0.35rem] bg-white/95 text-slate-900 ring-slate-200/90 dark:bg-white/[0.07] dark:text-white dark:ring-white/10'
         )}
       >
-        <div className={cn('mb-1 text-xs', own ? 'text-white/60' : 'text-slate-500')}>
+        <div className="whitespace-pre-wrap break-words text-sm leading-relaxed">{message.body}</div>
+        <div className={cn('mt-1.5 text-[10px]', own ? 'text-white/50 dark:text-slate-500' : 'text-slate-400')}>
           {message.senderRole === 'ADMIN' ? 'Поддержка' : 'Пользователь'} · {formatDate(message.createdAt)}
         </div>
-        <div className="whitespace-pre-wrap break-words text-sm leading-relaxed">{message.body}</div>
       </div>
     </div>
   )
 }
 
-function EmptyFolder({ folder }: { folder: TicketFolder }) {
+function EmptyFolder({ folder, mode, onCreate }: { folder: TicketFolder; mode: 'user' | 'admin'; onCreate?: () => void }) {
   const labels: Record<TicketFolder, string> = {
     active: 'Активных обращений нет',
     'need-answer': 'Новых сообщений нет',
@@ -1373,13 +1537,14 @@ function EmptyFolder({ folder }: { folder: TicketFolder }) {
   }
 
   return (
-    <div className="grid min-h-48 place-items-center px-4 py-10 text-center">
+    <div className="grid min-h-52 place-items-center px-4 py-10 text-center">
       <div>
         <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-2xl bg-gradient-to-br from-fuchsia-50 to-cyan-50 text-fuchsia-500 ring-1 ring-fuchsia-100/80 dark:from-fuchsia-400/10 dark:to-cyan-400/10 dark:text-fuchsia-300 dark:ring-white/[0.07]">
-          <MessageCircle className="h-5 w-5" />
+          {folder === 'need-answer' ? <BadgeCheck className="h-5 w-5" /> : <MessageCircle className="h-5 w-5" />}
         </div>
         <div className="font-medium">{labels[folder]}</div>
-        <div className="mt-1 text-sm text-slate-500">Здесь появятся подходящие обращения.</div>
+        <div className="mt-1 text-sm text-slate-500">{mode === 'user' && folder === 'active' ? 'Если нужна помощь, создайте новое обращение.' : 'Здесь появятся подходящие обращения.'}</div>
+        {onCreate && folder === 'active' && <button type="button" onClick={onCreate} className="btn-secondary mt-4 min-h-10 px-3 text-xs"><MessageSquarePlus className="h-4 w-4" />Новое обращение</button>}
       </div>
     </div>
   )
@@ -1412,4 +1577,21 @@ function TicketStatusBadge({
 
 function formatDate(value: string) {
   return formatSupportDate(value)
+}
+
+function formatRelativeDate(value: string) {
+  const timestamp = new Date(value).getTime()
+  if (!Number.isFinite(timestamp)) return formatDate(value)
+
+  const diffMs = Math.max(0, Date.now() - timestamp)
+  const minutes = Math.floor(diffMs / 60_000)
+  if (minutes < 1) return 'сейчас'
+  if (minutes < 60) return `${minutes} мин`
+
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours} ч`
+
+  const days = Math.floor(hours / 24)
+  if (days < 7) return `${days} дн`
+  return formatDate(value)
 }

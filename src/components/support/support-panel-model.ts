@@ -65,6 +65,7 @@ export interface SupportPanelProps {
   initialTickets: SupportTicket[]
   initialTotal?: number
   pageSize?: number
+  initialQuery?: string
 }
 
 export function getUnreadCount(ticket: SupportTicket, mode: 'user' | 'admin') {

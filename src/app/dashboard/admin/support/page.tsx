@@ -98,6 +98,7 @@ export default async function AdminSupportPage({
         mode="admin"
         initialTotal={total}
         pageSize={25}
+        initialQuery={q}
         initialTickets={tickets.map((ticket) => ({
           ...serializeSupportTicket(ticket),
           messages: ticket.messages.map(serializeSupportMessage),

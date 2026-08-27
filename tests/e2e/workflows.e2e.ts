@@ -35,10 +35,12 @@ test('пользователь создаёт обращение в поддер
   await login(page, E2E_USERS.basic.email)
   await page.goto('/dashboard/support')
 
+  await expect(page.getByRole('heading', { name: 'Чем можем помочь?' })).toBeVisible()
+  await page.getByRole('button', { name: /Новое обращение/ }).first().click()
   await expect(page.getByRole('heading', { name: 'Новое обращение' })).toBeVisible()
   await page.getByRole('button', { name: 'Оплата' }).click()
   await page.getByRole('textbox', { name: 'Сообщение' }).fill('Не проходит тестовая оплата подписки')
-  await page.getByRole('button', { name: 'Отправить' }).click()
+  await page.getByRole('button', { name: 'Отправить обращение' }).click()
 
   await expect(page.getByRole('heading', { name: 'Вопрос по оплате' })).toBeVisible()
   await expect(page.getByText('Не проходит тестовая оплата подписки', { exact: true })).toHaveCount(2)
@@ -58,11 +60,47 @@ test('главный администратор видит пользовате�
   const clientButton = page.getByRole('button', { name: 'Клиент' })
   await expect(clientButton).toBeVisible()
   await clientButton.click()
-  const clientPanel = page.locator('aside').filter({ hasText: 'Данные клиента' })
+  const clientPanel = page.locator('aside').filter({ hasText: 'Контекст обращения' })
   await expect(clientPanel).toBeVisible()
   await expect(clientPanel.getByText(E2E_USERS.basic.email, { exact: true })).toBeVisible()
   await clientPanel.getByRole('button', { name: 'Закрыть данные клиента' }).click()
   await expect(clientPanel).toBeHidden()
+  await expectNoHorizontalOverflow(page)
+})
+
+test('поддержка удобна пользователю и администратору на телефоне', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'mobile-chromium', 'Сценарий нужен для мобильного проекта')
+  const message = 'На телефоне не получается добавить новое устройство'
+
+  await login(page, E2E_USERS.basic.email)
+  await page.goto('/dashboard/support')
+
+  await expect(page.getByRole('heading', { name: 'Чем можем помочь?' })).toBeVisible()
+  await expectNoHorizontalOverflow(page)
+  await page.getByRole('button', { name: /Новое обращение/ }).first().click()
+  await expect(page.getByRole('heading', { name: 'Новое обращение' })).toBeVisible()
+  await page.getByRole('button', { name: 'Устройства' }).click()
+  await page.getByRole('textbox', { name: 'Сообщение' }).fill(message)
+  await expectNoHorizontalOverflow(page)
+  await page.getByRole('button', { name: 'Отправить обращение' }).click()
+
+  await expect(page.getByRole('heading', { name: 'Вопрос по устройствам' })).toBeVisible()
+  await expect(page.getByText(message, { exact: true })).toBeVisible()
+  await expectNoHorizontalOverflow(page)
+
+  await page.context().clearCookies()
+  await login(page, E2E_USERS.admin.email)
+  await page.goto('/dashboard/admin/support')
+
+  await expect(page.getByText('Рабочая очередь', { exact: true })).toBeVisible()
+  const ticketButton = page.getByRole('button').filter({ hasText: message }).first()
+  await expect(ticketButton).toBeVisible()
+  await ticketButton.click()
+  await expect(page.getByRole('heading', { name: 'Вопрос по устройствам' })).toBeVisible()
+  await page.getByRole('button', { name: 'Клиент' }).click()
+  const clientPanel = page.locator('aside').filter({ hasText: 'Контекст обращения' })
+  await expect(clientPanel).toBeVisible()
+  await expect(clientPanel.getByText(E2E_USERS.basic.email, { exact: true })).toBeVisible()
   await expectNoHorizontalOverflow(page)
 })
 
