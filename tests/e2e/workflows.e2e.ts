@@ -85,7 +85,7 @@ test('поддержка удобна пользователю и админис
   await page.getByRole('button', { name: 'Отправить обращение' }).click()
 
   await expect(page.getByRole('heading', { name: 'Вопрос по устройствам' })).toBeVisible()
-  await expect(page.getByText(message, { exact: true })).toBeVisible()
+  await expect(page.getByText(message, { exact: true }).last()).toBeVisible()
   await expectNoHorizontalOverflow(page)
 
   await page.context().clearCookies()
