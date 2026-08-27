@@ -78,7 +78,8 @@ export function AutoRenewalCard({
     state?.consentAcceptedAt
     && state.consentVersion === AUTO_RENEWAL_CONSENT_VERSION
     && state.deviceLimit === planDeviceLimit
-    && state.consentPriceKopecks === planPriceKopecks
+    && state.consentPriceKopecks != null
+    && state.consentPriceKopecks >= planPriceKopecks
     && state.consentDurationDays === planDurationDays
   )
   const enabled = Boolean(state && state.status !== 'DISABLED' && consentCurrent)

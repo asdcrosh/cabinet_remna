@@ -15,9 +15,11 @@ const mocks = vi.hoisted(() => ({
   logWarn: vi.fn(),
   txPaymentCreate: vi.fn(),
   txPromoCreate: vi.fn(),
+  txUserFindUnique: vi.fn(),
+  txUserUpdateMany: vi.fn(),
   prisma: {
     plan: { findUnique: vi.fn() },
-    user: { findUnique: vi.fn() },
+    user: { findUnique: vi.fn(), updateMany: vi.fn() },
     payment: { findUnique: vi.fn(), findFirst: vi.fn(), update: vi.fn() },
     promoCodeRedemption: { updateMany: vi.fn() },
     subscription: { count: vi.fn(), findFirst: vi.fn() },
@@ -95,6 +97,8 @@ const user = {
   remnashopUserId: null,
   remnawaveUuid: null,
   remnawaveId: 42,
+  personalDiscountPercent: 0,
+  nextPurchaseDiscountPercent: 0,
 }
 
 const localPayment = {
@@ -136,11 +140,20 @@ describe('payment create route', () => {
     mocks.isPaymentProviderAvailable.mockReturnValue(true)
     mocks.txPaymentCreate.mockResolvedValue(localPayment)
     mocks.txPromoCreate.mockResolvedValue({})
+    mocks.txUserFindUnique.mockResolvedValue({
+      personalDiscountPercent: 0,
+      nextPurchaseDiscountPercent: 0,
+    })
+    mocks.txUserUpdateMany.mockResolvedValue({ count: 1 })
     mocks.prisma.$transaction.mockImplementation(async (input) => {
       if (Array.isArray(input)) return Promise.all(input)
       return input({
         payment: { create: mocks.txPaymentCreate },
         promoCodeRedemption: { create: mocks.txPromoCreate },
+        user: {
+          findUnique: mocks.txUserFindUnique,
+          updateMany: mocks.txUserUpdateMany,
+        },
       })
     })
     mocks.createPayment.mockResolvedValue({
@@ -159,6 +172,7 @@ describe('payment create route', () => {
     })
     mocks.prisma.payment.update.mockResolvedValue({})
     mocks.prisma.promoCodeRedemption.updateMany.mockResolvedValue({ count: 0 })
+    mocks.prisma.user.updateMany.mockResolvedValue({ count: 1 })
   })
 
   it('creates a separate payment for the whitelist add-on', async () => {
@@ -339,6 +353,65 @@ describe('payment create route', () => {
       paymentId: 'yoo-1',
       localPaymentId: 'payment-1',
       provider: 'YOOKASSA',
+    })
+  })
+
+  it('applies a personal discount only to the base tariff price', async () => {
+    mocks.txUserFindUnique.mockResolvedValue({
+      personalDiscountPercent: 20,
+      nextPurchaseDiscountPercent: 0,
+    })
+    mocks.txPaymentCreate.mockResolvedValue({
+      ...localPayment,
+      amountKopecks: 54000,
+      originalAmountKopecks: 60000,
+      discountPercent: 20,
+      discountKopecks: 6000,
+      userDiscountType: 'PERSONAL',
+      deviceLimit: 8,
+    })
+
+    const response = await POST(paymentRequest({ deviceLimit: 8 }))
+
+    expect(response.status).toBe(200)
+    expect(mocks.txPaymentCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        amountKopecks: 54000,
+        originalAmountKopecks: 60000,
+        discountPercent: 20,
+        discountKopecks: 6000,
+        userDiscountType: 'PERSONAL',
+      }),
+    })
+    expect(mocks.createPayment).toHaveBeenCalledWith(expect.objectContaining({ amount: 540 }))
+  })
+
+  it('consumes a discount assigned to the next tariff purchase', async () => {
+    mocks.txUserFindUnique.mockResolvedValue({
+      personalDiscountPercent: 10,
+      nextPurchaseDiscountPercent: 25,
+    })
+    mocks.txPaymentCreate.mockResolvedValue({
+      ...localPayment,
+      amountKopecks: 22500,
+      originalAmountKopecks: 30000,
+      discountPercent: 25,
+      discountKopecks: 7500,
+      userDiscountType: 'NEXT_PURCHASE',
+    })
+
+    const response = await POST(paymentRequest())
+
+    expect(response.status).toBe(200)
+    expect(mocks.txUserUpdateMany).toHaveBeenCalledWith({
+      where: { id: user.id, nextPurchaseDiscountPercent: 25 },
+      data: { nextPurchaseDiscountPercent: 0 },
+    })
+    expect(mocks.txPaymentCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        amountKopecks: 22500,
+        userDiscountType: 'NEXT_PURCHASE',
+      }),
     })
   })
 

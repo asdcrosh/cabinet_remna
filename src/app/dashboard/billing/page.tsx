@@ -17,6 +17,7 @@ import { ArrowRight, CreditCard } from 'lucide-react'
 import { AutoRenewalCard } from '@/components/dashboard/auto-renewal-card'
 import { calculateAutoRenewalPurchase, getAutoRenewalState } from '@/lib/auto-renewal'
 import { getRetentionState } from '@/lib/subscription-retention'
+import { calculatePersonalDiscount } from '@/lib/user-discounts'
 
 export const dynamic = 'force-dynamic'
 const PAGE_SIZE = 20
@@ -41,7 +42,7 @@ export default async function BillingPage({
           cancelPendingOlderThanMs: getPendingPaymentTtlMs(),
         })
       : null
-  const [[total, payments, currentSubscription], autoRenewal, retentionPause] = await Promise.all([
+  const [[total, payments, currentSubscription], autoRenewal, retentionPause, discountUser] = await Promise.all([
     prisma.$transaction([
       prisma.payment.count({ where: { userId: session.uid } }),
       prisma.payment.findMany({
@@ -72,6 +73,10 @@ export default async function BillingPage({
     ]),
     getAutoRenewalState(session.uid),
     getRetentionState(session.uid),
+    prisma.user.findUnique({
+      where: { id: session.uid },
+      select: { personalDiscountPercent: true },
+    }),
   ])
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
@@ -105,7 +110,8 @@ export default async function BillingPage({
           planName={currentSubscription.plan.name}
           planPriceKopecks={currentRenewalPrice(
             currentSubscription.plan,
-            currentSubscription.deviceLimit ?? currentSubscription.plan.deviceLimit
+            currentSubscription.deviceLimit ?? currentSubscription.plan.deviceLimit,
+            discountUser?.personalDiscountPercent ?? 0
           )}
           planDurationDays={currentSubscription.plan.durationDays}
           planDeviceLimit={currentSubscription.deviceLimit ?? currentSubscription.plan.deviceLimit}
@@ -166,10 +172,13 @@ function currentRenewalPrice(
     maxDeviceLimit: number
     extraDevicePriceKopecks: number
   },
-  deviceLimit: number
+  deviceLimit: number,
+  personalDiscountPercent: number
 ) {
   try {
-    return calculateAutoRenewalPurchase(plan, deviceLimit).originalAmountKopecks
+    const originalAmountKopecks = calculateAutoRenewalPurchase(plan, deviceLimit).originalAmountKopecks
+    const personalDiscount = calculatePersonalDiscount(plan.priceKopecks, personalDiscountPercent)
+    return originalAmountKopecks - (personalDiscount?.discountKopecks ?? 0)
   } catch {
     return plan.priceKopecks
   }

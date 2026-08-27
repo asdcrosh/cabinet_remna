@@ -26,6 +26,8 @@ const schema = z.object({
   telegramId: z.string().trim().regex(/^\d*$/, 'Telegram ID должен содержать только цифры').max(32).optional(),
   telegramUsername: z.string().trim().max(64).optional(),
   remnashopUserId: z.string().trim().regex(/^\d*$/, 'Remnashop ID должен содержать только цифры').max(16).optional(),
+  personalDiscountPercent: z.number().int().min(0).max(99).optional(),
+  nextPurchaseDiscountPercent: z.number().int().min(0).max(99).optional(),
 })
 
 export const PATCH = withAuth(async (req: Request, { params }: { params: Promise<{ id: string }> }) => {
@@ -45,7 +47,14 @@ export const PATCH = withAuth(async (req: Request, { params }: { params: Promise
     prisma.user.findUnique({ where: { id: session.uid }, select: { role: true } }),
     prisma.user.findUnique({
       where: { id },
-      select: { id: true, role: true, email: true, telegramId: true },
+      select: {
+        id: true,
+        role: true,
+        email: true,
+        telegramId: true,
+        personalDiscountPercent: true,
+        nextPurchaseDiscountPercent: true,
+      },
     }),
   ])
 
@@ -54,6 +63,11 @@ export const PATCH = withAuth(async (req: Request, { params }: { params: Promise
   }
   if (target.role === 'SUPER_ADMIN' && actor.role !== 'SUPER_ADMIN') {
     return NextResponse.json({ error: 'Изменять главного администратора нельзя' }, { status: 403 })
+  }
+  const changesDiscounts = parsed.data.personalDiscountPercent !== undefined
+    || parsed.data.nextPurchaseDiscountPercent !== undefined
+  if (changesDiscounts && actor.role !== 'SUPER_ADMIN') {
+    return NextResponse.json({ error: 'Персональные скидки может изменять только главный администратор' }, { status: 403 })
   }
 
   try {
@@ -68,6 +82,12 @@ export const PATCH = withAuth(async (req: Request, { params }: { params: Promise
           telegramId: parsed.data.telegramId ? BigInt(parsed.data.telegramId) : null,
           telegramUsername: parsed.data.telegramUsername || null,
           remnashopUserId: parsed.data.remnashopUserId ? Number(parsed.data.remnashopUserId) : null,
+          ...(actor.role === 'SUPER_ADMIN'
+            ? {
+                personalDiscountPercent: parsed.data.personalDiscountPercent ?? target.personalDiscountPercent,
+                nextPurchaseDiscountPercent: parsed.data.nextPurchaseDiscountPercent ?? target.nextPurchaseDiscountPercent,
+              }
+            : {}),
         },
         select: {
           id: true,
@@ -77,6 +97,8 @@ export const PATCH = withAuth(async (req: Request, { params }: { params: Promise
           telegramId: true,
           telegramUsername: true,
           remnashopUserId: true,
+          personalDiscountPercent: true,
+          nextPurchaseDiscountPercent: true,
         },
       })
 
@@ -118,6 +140,8 @@ export const PATCH = withAuth(async (req: Request, { params }: { params: Promise
         telegramId: user.telegramId?.toString() ?? null,
         telegramUsername: user.telegramUsername,
         remnashopUserId: user.remnashopUserId,
+        personalDiscountPercent: user.personalDiscountPercent,
+        nextPurchaseDiscountPercent: user.nextPurchaseDiscountPercent,
         syncDeferred,
       },
       request: req,

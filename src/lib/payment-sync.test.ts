@@ -4,10 +4,14 @@ const mocks = vi.hoisted(() => {
   const prisma = {
     payment: {
       findFirst: vi.fn(),
+      findUnique: vi.fn(),
       findMany: vi.fn(),
       update: vi.fn(),
     },
     promoCodeRedemption: {
+      updateMany: vi.fn(),
+    },
+    user: {
       updateMany: vi.fn(),
     },
     $transaction: vi.fn(async (input) => (Array.isArray(input) ? Promise.all(input) : input)),
@@ -55,6 +59,8 @@ describe('payment sync pending expiration', () => {
     delete process.env.PAYMENT_PENDING_UI_TTL_SECONDS
     delete process.env.PAYMENT_CANCEL_PENDING_AFTER_SECONDS
     mocks.prisma.payment.update.mockResolvedValue({})
+    mocks.prisma.payment.findUnique.mockResolvedValue(null)
+    mocks.prisma.user.updateMany.mockResolvedValue({ count: 0 })
     mocks.prisma.promoCodeRedemption.updateMany.mockResolvedValue({ count: 0 })
   })
 
@@ -71,6 +77,11 @@ describe('payment sync pending expiration', () => {
   })
 
   it('locally cancels stale pending payments without YooKassa id', async () => {
+    mocks.prisma.payment.findUnique.mockResolvedValue({
+      userId: 'user-1',
+      userDiscountType: 'NEXT_PURCHASE',
+      discountPercent: 25,
+    })
     mocks.prisma.payment.findFirst.mockResolvedValue({
       id: 'pay-1',
       provider: 'YOOKASSA',
@@ -105,6 +116,10 @@ describe('payment sync pending expiration', () => {
       'pay-1',
       'Платёж отменён, потому что ссылка на оплату устарела.'
     )
+    expect(mocks.prisma.user.updateMany).toHaveBeenCalledWith({
+      where: { id: 'user-1', nextPurchaseDiscountPercent: 0 },
+      data: { nextPurchaseDiscountPercent: 25 },
+    })
   })
 
   it('reconciles only stale user payments', async () => {

@@ -4,6 +4,7 @@ import { remnashopQuery } from './remnashop-db'
 import { syncRemnashopUsersToCabinet } from './remnashop-users'
 import { markSyncFailed, markSyncSkipped, markSyncSucceeded } from './sync-events'
 import { terminateUserSubscription } from './subscription-termination'
+import { restoreNextPurchaseDiscountBestEffort } from './user-discounts'
 
 type RemnashopSubscriptionStatus = 'ACTIVE' | 'DISABLED' | 'EXPIRED' | 'DELETED'
 type RemnashopTransactionStatus = 'PENDING' | 'COMPLETED' | 'CANCELED' | 'REFUNDED' | 'FAILED'
@@ -785,6 +786,9 @@ async function syncRemnashopTransactionToCabinet(
         })
       }
     })
+    if (status === 'CANCELED' && existing.status === 'PENDING') {
+      await restoreNextPurchaseDiscountBestEffort(existing.id)
+    }
     if (status === 'REFUNDED') {
       await terminateUserSubscription({
         userId: existing.userId,

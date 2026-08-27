@@ -60,7 +60,7 @@ describe('automatic renewal device pricing', () => {
       whitelistAddonEnabled: false,
       nextChargeAt: new Date('2026-08-21T00:00:00.000Z'),
       retryCount: 0,
-      user: { id: 'user-1', email: 'user@example.com' },
+      user: { id: 'user-1', email: 'user@example.com', personalDiscountPercent: 0 },
       plan: {
         id: 'plan-1',
         name: 'Premium',
@@ -126,5 +126,26 @@ describe('automatic renewal device pricing', () => {
       amount: 1300,
       metadata: expect.objectContaining({ whitelistAddon: 'true' }),
     }))
+  })
+
+  it('discounts only the base tariff during automatic renewal', async () => {
+    const [setting] = await mocks.autoRenewalFindMany()
+    setting.user.personalDiscountPercent = 20
+    setting.consentPriceKopecks = 96000
+    mocks.autoRenewalFindMany.mockResolvedValue([setting])
+    mocks.paymentCreate.mockResolvedValue({ id: 'payment-1', amountKopecks: 96000 })
+
+    await expect(processDueAutoRenewals()).resolves.toEqual({ checked: 1, created: 1, failed: 0 })
+
+    expect(mocks.paymentCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        amountKopecks: 96000,
+        originalAmountKopecks: 110000,
+        discountPercent: 20,
+        discountKopecks: 14000,
+        userDiscountType: 'PERSONAL',
+      }),
+    })
+    expect(mocks.createPayment).toHaveBeenCalledWith(expect.objectContaining({ amount: 960 }))
   })
 })

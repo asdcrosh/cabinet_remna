@@ -10,6 +10,7 @@ import {
   captureSavedPaymentMethodBestEffort,
   registerAutoRenewalFailureBestEffort,
 } from './auto-renewal'
+import { restoreNextPurchaseDiscountBestEffort } from './user-discounts'
 
 const DEFAULT_PENDING_TTL_SECONDS = 600
 
@@ -104,6 +105,7 @@ export async function syncPaymentProvisioning(input: {
           data: { status: 'CANCELED' },
         }),
       ])
+      await restoreNextPurchaseDiscountBestEffort(payment.id)
       await notifyPaymentCanceled(payment.id)
       await recordPaymentEvent({
         paymentId: payment.id,
@@ -235,6 +237,7 @@ export async function syncPaymentProvisioning(input: {
         data: { status: 'CANCELED' },
       }),
     ])
+    await restoreNextPurchaseDiscountBestEffort(payment.id)
     await notifyPaymentCanceled(payment.id)
     await registerAutoRenewalFailureBestEffort(
       payment.id,
@@ -420,6 +423,7 @@ async function cancelLocalPayment(paymentId: string, yookassaStatus: YooKassaPay
       data: { status: 'CANCELED' },
     }),
   ])
+  await restoreNextPurchaseDiscountBestEffort(paymentId)
   await recordPaymentEvent({
     paymentId,
     stage: 'PAYMENT',

@@ -13,6 +13,7 @@ import { getAvailablePaymentProviders } from '@/lib/payment-providers'
 import { ArrowRight, MessageCircleQuestion, RefreshCw, ShieldCheck } from 'lucide-react'
 import { calculateAutoRenewalPurchase, getAutoRenewalState } from '@/lib/auto-renewal'
 import { AUTO_RENEWAL_CONSENT_VERSION } from '@/lib/auto-renewal-consent'
+import { calculatePersonalDiscount } from '@/lib/user-discounts'
 import {
   hasRemnawaveUserReference,
   remnawave,
@@ -41,6 +42,8 @@ export default async function PlansPage({
         where: { id: session.uid },
         select: {
           role: true,
+          personalDiscountPercent: true,
+          nextPurchaseDiscountPercent: true,
           telegramId: true,
           remnashopUserId: true,
           remnashopSyncedAt: true,
@@ -127,7 +130,8 @@ export default async function PlansPage({
     ? currentAutoRenewalPrice(
         autoRenewal.plan,
         autoRenewal.deviceLimit,
-        autoRenewal.whitelistAddonEnabled
+        autoRenewal.whitelistAddonEnabled,
+        user?.personalDiscountPercent ?? 0
       )
     : null
   const autoRenewalConsentCurrent = Boolean(
@@ -136,7 +140,9 @@ export default async function PlansPage({
     && autoRenewal.consentAcceptedAt
     && autoRenewal.consentVersion === AUTO_RENEWAL_CONSENT_VERSION
     && autoRenewal.deviceLimit === (currentDeviceLimit ?? autoRenewal.plan.deviceLimit)
-    && autoRenewal.consentPriceKopecks === autoRenewalCurrentPrice
+    && autoRenewal.consentPriceKopecks != null
+    && autoRenewalCurrentPrice != null
+    && autoRenewal.consentPriceKopecks >= autoRenewalCurrentPrice
     && autoRenewal.consentDurationDays === autoRenewal.plan.durationDays
   )
   const activeAutoRenewal = Boolean(
@@ -193,6 +199,8 @@ export default async function PlansPage({
     whitelistAddonPriceKopecks: plan.whitelistAddonPriceKopecks,
     initialPromoCode,
     availablePromoCodes: availablePromoCodesByPlan.get(plan.id) ?? [],
+    personalDiscountPercent: user?.personalDiscountPercent ?? 0,
+    nextPurchaseDiscountPercent: user?.nextPurchaseDiscountPercent ?? 0,
     paymentProviders,
   }))
 
@@ -317,7 +325,8 @@ function currentAutoRenewalPrice(
     whitelistAddonInternalSquads: string[]
   },
   deviceLimit: number,
-  includeWhitelistAddon: boolean
+  includeWhitelistAddon: boolean,
+  personalDiscountPercent: number
 ) {
   try {
     if (
@@ -326,7 +335,9 @@ function currentAutoRenewalPrice(
         || plan.whitelistAddonPriceKopecks <= 0
         || plan.whitelistAddonInternalSquads.length === 0)
     ) return null
-    return calculateAutoRenewalPurchase(plan, deviceLimit).originalAmountKopecks
+    const originalAmountKopecks = calculateAutoRenewalPurchase(plan, deviceLimit).originalAmountKopecks
+    const personalDiscount = calculatePersonalDiscount(plan.priceKopecks, personalDiscountPercent)
+    return originalAmountKopecks - (personalDiscount?.discountKopecks ?? 0)
       + (includeWhitelistAddon ? plan.whitelistAddonPriceKopecks : 0)
   } catch {
     return null

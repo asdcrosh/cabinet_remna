@@ -21,6 +21,9 @@ export function UserProfileEditButton({
   remnawaveUuid,
   remnawaveShortUuid,
   remnawaveUsername,
+  personalDiscountPercent = 0,
+  nextPurchaseDiscountPercent = 0,
+  canManageDiscounts = false,
   showLabel = false,
 }: {
   userId: string
@@ -34,6 +37,9 @@ export function UserProfileEditButton({
   remnawaveUuid?: string | null
   remnawaveShortUuid?: string | null
   remnawaveUsername?: string | null
+  personalDiscountPercent?: number
+  nextPurchaseDiscountPercent?: number
+  canManageDiscounts?: boolean
   showLabel?: boolean
 }) {
   const router = useRouter()
@@ -47,6 +53,8 @@ export function UserProfileEditButton({
     telegramId: telegramId ?? '',
     telegramUsername: telegramUsername ?? '',
     remnashopUserId: remnashopUserId ? String(remnashopUserId) : '',
+    personalDiscountPercent: String(personalDiscountPercent),
+    nextPurchaseDiscountPercent: String(nextPurchaseDiscountPercent),
   })
 
   function close() {
@@ -67,6 +75,12 @@ export function UserProfileEditButton({
           telegramId: form.telegramId,
           telegramUsername: form.telegramUsername,
           remnashopUserId: form.remnashopUserId,
+          ...(canManageDiscounts
+            ? {
+                personalDiscountPercent: Number(form.personalDiscountPercent),
+                nextPurchaseDiscountPercent: Number(form.nextPurchaseDiscountPercent),
+              }
+            : {}),
         }),
       })
       toast(
@@ -138,6 +152,41 @@ export function UserProfileEditButton({
             description="Включайте только если адрес проверен. После сохранения он будет использован для связи с Remnashop."
             className="border-y border-slate-200/90 py-3 dark:border-white/[0.09]"
           />
+
+          {canManageDiscounts ? (
+            <section className="space-y-3 rounded-2xl border border-violet-200 bg-violet-50/45 p-4 dark:border-violet-400/20 dark:bg-violet-400/[0.05]">
+              <div>
+                <h3 className="font-semibold">Персональные скидки</h3>
+                <p className="mt-1 text-sm text-slate-500">Обе скидки действуют только на основную стоимость тарифа, без дополнительных устройств и белых списков. Укажите 0, чтобы отключить.</p>
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <label className="block">
+                  <span className="label">Персональная скидка, %</span>
+                  <input
+                    className="input"
+                    type="number"
+                    inputMode="numeric"
+                    min={0}
+                    max={99}
+                    value={form.personalDiscountPercent}
+                    onChange={(event) => setForm((current) => ({ ...current, personalDiscountPercent: event.target.value.replace(/\D/g, '') }))}
+                  />
+                </label>
+                <label className="block">
+                  <span className="label">На следующую покупку, %</span>
+                  <input
+                    className="input"
+                    type="number"
+                    inputMode="numeric"
+                    min={0}
+                    max={99}
+                    value={form.nextPurchaseDiscountPercent}
+                    onChange={(event) => setForm((current) => ({ ...current, nextPurchaseDiscountPercent: event.target.value.replace(/\D/g, '') }))}
+                  />
+                </label>
+              </div>
+            </section>
+          ) : null}
 
           <section className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/40 p-4 dark:border-white/10 dark:bg-white/[0.02]">
             <div>

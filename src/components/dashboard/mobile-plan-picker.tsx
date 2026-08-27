@@ -87,7 +87,11 @@ export function PlanCatalog({ plans, initialPlanId }: { plans: CatalogPlan[]; in
                   <p className="truncate text-[11px] text-slate-500 dark:text-slate-400">{plan.name}</p>
                   {plan.current ? <PlanPickerBadge>Текущий</PlanPickerBadge> : null}
                   {!plan.current && plan.popular ? <PlanPickerBadge>Выбор</PlanPickerBadge> : null}
-                  {plan.savingsPercent > 0 && !plan.isPromo ? <PlanPickerBadge>−{plan.savingsPercent}%</PlanPickerBadge> : null}
+                  {automaticDiscountPercent(plan) > 0 && !plan.isPromo
+                    ? <PlanPickerBadge>Ваша скидка −{automaticDiscountPercent(plan)}%</PlanPickerBadge>
+                    : plan.savingsPercent > 0 && !plan.isPromo
+                      ? <PlanPickerBadge>−{plan.savingsPercent}%</PlanPickerBadge>
+                      : null}
                 </div>
               </div>
             </div>
@@ -95,7 +99,7 @@ export function PlanCatalog({ plans, initialPlanId }: { plans: CatalogPlan[]; in
             <div className="min-w-[7.6rem] text-right">
               <div className="mb-2">
                 <span className="block whitespace-nowrap text-lg font-semibold tracking-[-0.03em] tabular-nums text-slate-950 dark:text-white">
-                  {plan.deviceAddonEnabled && plan.maxDeviceLimit > plan.deviceLimit ? `от ${plan.price}` : plan.price}
+                  {plan.deviceAddonEnabled && plan.maxDeviceLimit > plan.deviceLimit ? `от ${displayPlanPrice(plan)}` : displayPlanPrice(plan)}
                 </span>
                 <span className="mt-0.5 block text-[10px] text-slate-500 dark:text-slate-400">{dailyRateLabel(plan)}</span>
               </div>
@@ -156,7 +160,11 @@ export function PlanCatalog({ plans, initialPlanId }: { plans: CatalogPlan[]; in
                       <span className="break-words text-sm font-semibold text-slate-950 dark:text-white sm:text-base">{plan.name}</span>
                       {plan.current ? <PlanPickerBadge>Текущий</PlanPickerBadge> : null}
                       {!plan.current && plan.popular ? <PlanPickerBadge>Популярный</PlanPickerBadge> : null}
-                      {plan.savingsPercent > 0 && !plan.isPromo ? <PlanPickerBadge>−{plan.savingsPercent}%</PlanPickerBadge> : null}
+                      {automaticDiscountPercent(plan) > 0 && !plan.isPromo
+                        ? <PlanPickerBadge>Ваша скидка −{automaticDiscountPercent(plan)}%</PlanPickerBadge>
+                        : plan.savingsPercent > 0 && !plan.isPromo
+                          ? <PlanPickerBadge>−{plan.savingsPercent}%</PlanPickerBadge>
+                          : null}
                     </span>
                     <span className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
                       <span>{plan.unlimitedDuration ? 'Бессрочно' : `${plan.durationDays} дней`}</span>
@@ -174,7 +182,7 @@ export function PlanCatalog({ plans, initialPlanId }: { plans: CatalogPlan[]; in
                   <span className="col-span-2 flex items-end justify-between gap-3 pl-11 sm:col-span-1 sm:block sm:pl-0 sm:text-right">
                     <span className="text-xs text-slate-400 dark:text-slate-500 sm:block">{dailyRateLabel(plan)}</span>
                     <span className="block whitespace-nowrap text-xl font-semibold tracking-tight tabular-nums text-slate-950 dark:text-white sm:mt-1">
-                      {plan.deviceAddonEnabled && plan.maxDeviceLimit > plan.deviceLimit ? `от ${plan.price}` : plan.price}
+                      {plan.deviceAddonEnabled && plan.maxDeviceLimit > plan.deviceLimit ? `от ${displayPlanPrice(plan)}` : displayPlanPrice(plan)}
                     </span>
                   </span>
                 </button>
@@ -234,8 +242,26 @@ function planCountLabel(count: number) {
 function dailyRateLabel(plan: CatalogPlan) {
   if (plan.isPromo || plan.priceKopecks <= 0) return 'Бесплатно'
   if (plan.unlimitedDuration) return 'Разовая оплата'
-  const dailyPrice = Math.round(plan.priceKopecks / Math.max(1, plan.durationDays))
+  const dailyPrice = Math.round(discountedPlanPriceKopecks(plan) / Math.max(1, plan.durationDays))
   return `${formatPrice(dailyPrice)} в день`
+}
+
+function automaticDiscountPercent(plan: CatalogPlan) {
+  return Math.max(plan.personalDiscountPercent ?? 0, plan.nextPurchaseDiscountPercent ?? 0)
+}
+
+function discountedPlanPriceKopecks(plan: CatalogPlan) {
+  const percent = automaticDiscountPercent(plan)
+  if (percent <= 0 || plan.priceKopecks <= 100) return plan.priceKopecks
+  const discount = Math.min(
+    Math.floor((plan.priceKopecks * percent) / 100),
+    plan.priceKopecks - 100
+  )
+  return plan.priceKopecks - discount
+}
+
+function displayPlanPrice(plan: CatalogPlan) {
+  return formatPrice(discountedPlanPriceKopecks(plan))
 }
 
 function dayLabel(days: number) {

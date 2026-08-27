@@ -8,6 +8,7 @@ import { cancelOtherPendingPaymentsForUser, syncPaymentProvisioning } from '@/li
 import { recordSucceededRefund } from '@/lib/payment-refunds'
 import { terminateUserSubscription } from '@/lib/subscription-termination'
 import { recordPaymentEvent } from '@/lib/payment-events'
+import { restoreNextPurchaseDiscountBestEffort } from '@/lib/user-discounts'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -117,6 +118,7 @@ export async function POST(request: Request) {
           data: { status: 'CANCELED' },
         }),
       ])
+      await restoreNextPurchaseDiscountBestEffort(payment.id)
       await notifyPaymentCanceled(payment.id)
       await recordPaymentEvent({
         paymentId: payment.id,

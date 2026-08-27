@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   transaction: vi.fn(),
   recordSucceededRefund: vi.fn(),
   terminateUserSubscription: vi.fn(),
+  restoreNextPurchaseDiscountBestEffort: vi.fn(),
 }))
 
 vi.mock('@/lib/platega', () => ({ verifyPlategaCallbackHeaders: mocks.verifyHeaders }))
@@ -25,6 +26,9 @@ vi.mock('@/lib/logger', () => ({ logWarn: mocks.logWarn, logError: mocks.logErro
 vi.mock('@/lib/payment-refunds', () => ({ recordSucceededRefund: mocks.recordSucceededRefund }))
 vi.mock('@/lib/subscription-termination', () => ({
   terminateUserSubscription: mocks.terminateUserSubscription,
+}))
+vi.mock('@/lib/user-discounts', () => ({
+  restoreNextPurchaseDiscountBestEffort: mocks.restoreNextPurchaseDiscountBestEffort,
 }))
 vi.mock('@/lib/prisma', () => ({
   prisma: {
@@ -131,6 +135,7 @@ describe('Platega webhook', () => {
       data: { status: 'CANCELED', providerStatus: 'CANCELED' },
     })
     expect(mocks.notifyPaymentCanceled).toHaveBeenCalledWith('payment-1')
+    expect(mocks.restoreNextPurchaseDiscountBestEffort).toHaveBeenCalledWith('payment-1')
   })
 
   it('records a chargeback without issuing access again', async () => {

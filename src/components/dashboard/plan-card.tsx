@@ -61,6 +61,8 @@ export interface PlanCardProps {
   whitelistAddonPriceKopecks?: number;
   display?: "full" | "checkout";
   initialPromoCode?: string;
+  personalDiscountPercent?: number;
+  nextPurchaseDiscountPercent?: number;
   paymentProviders?: Array<{
     id: CheckoutPaymentProvider;
     label: string;
@@ -105,6 +107,8 @@ export function PlanCard({
   whitelistAddonPriceKopecks = 0,
   display = "full",
   initialPromoCode,
+  personalDiscountPercent = 0,
+  nextPurchaseDiscountPercent = 0,
   paymentProviders = [{ id: "YOOKASSA", label: "ЮKassa" }],
   availablePromoCodes = [],
 }: PlanCardProps) {
@@ -142,22 +146,47 @@ export function PlanCard({
   const extraDeviceCount = selectedDeviceLimit - deviceLimit;
   const extraDeviceAmountKopecks = extraDeviceCount * extraDevicePriceKopecks;
   const purchasePriceKopecks = priceKopecks + extraDeviceAmountKopecks;
-  const displayedDiscount = appliedPromo
+  const automaticDiscount = nextPurchaseDiscountPercent > personalDiscountPercent
+    ? { source: "NEXT_PURCHASE" as const, discountPercent: nextPurchaseDiscountPercent }
+    : personalDiscountPercent > 0
+      ? { source: "PERSONAL" as const, discountPercent: personalDiscountPercent }
+      : null;
+  const automaticDisplayedDiscount = automaticDiscount
+    ? calculateDisplayedDiscount(priceKopecks, automaticDiscount.discountPercent)
+    : null;
+  const promoDisplayedDiscount = appliedPromo
     ? calculateDisplayedDiscount(purchasePriceKopecks, appliedPromo.discountPercent)
     : null;
-  const effectivePriceKopecks = displayedDiscount?.finalAmountKopecks ?? purchasePriceKopecks;
-  const effectivePrice = formatPrice(effectivePriceKopecks);
+  const automaticDiscountWins = Boolean(
+    automaticDisplayedDiscount
+    && (
+      !promoDisplayedDiscount
+      || automaticDisplayedDiscount.discountKopecks > promoDisplayedDiscount.discountKopecks
+      || (
+        automaticDisplayedDiscount.discountKopecks === promoDisplayedDiscount.discountKopecks
+        && automaticDiscount?.source === "PERSONAL"
+      )
+    )
+  );
+  const displayedDiscount = automaticDiscountWins
+    ? automaticDisplayedDiscount
+    : promoDisplayedDiscount;
+  const effectivePriceKopecks = displayedDiscount
+    ? purchasePriceKopecks - displayedDiscount.discountKopecks
+    : null;
+  const normalizedEffectivePriceKopecks = effectivePriceKopecks ?? purchasePriceKopecks;
+  const effectivePrice = formatPrice(normalizedEffectivePriceKopecks);
   const whitelistAddonAvailable = !isPromoPlan
     && whitelistAddonEnabled
     && whitelistAddonPriceKopecks > 0
     && !currentWhitelistAddonActive;
-  const checkoutTotalKopecks = effectivePriceKopecks
+  const checkoutTotalKopecks = normalizedEffectivePriceKopecks
     + (whitelistAddonRequested && whitelistAddonAvailable ? whitelistAddonPriceKopecks : 0);
   const checkoutTotalPrice = formatPrice(checkoutTotalKopecks);
   const purchasePrice = formatPrice(purchasePriceKopecks);
   const effectiveMonthlyPrice = unlimitedDuration
     ? null
-    : formatPrice(Math.round((effectivePriceKopecks / Math.max(1, durationDays)) * 30));
+    : formatPrice(Math.round((normalizedEffectivePriceKopecks / Math.max(1, durationDays)) * 30));
   const variableDeviceLimit = !isPromoPlan
     && !unlimitedDevices
     && deviceAddonEnabled
@@ -449,7 +478,7 @@ export function PlanCard({
                 <div className="whitespace-nowrap text-[2rem] font-semibold leading-none tracking-[-0.04em] tabular-nums text-slate-950 dark:text-white">
                   {effectivePrice}
                 </div>
-                {appliedPromo && <div className="text-sm text-slate-400 line-through">{purchasePrice}</div>}
+                {displayedDiscount && <div className="text-sm text-slate-400 line-through">{purchasePrice}</div>}
               </div>
               <span className="mt-1.5 block text-[11px] text-slate-500 dark:text-slate-400">
                 {isPromo ? "Один раз на аккаунт" : "Итоговая сумма"}
@@ -519,7 +548,7 @@ export function PlanCard({
                 <div className="whitespace-nowrap text-[2rem] font-semibold leading-none tracking-[-0.04em] tabular-nums text-slate-950 dark:text-white sm:text-4xl">
                   {effectivePrice}
                 </div>
-                {appliedPromo && <div className="text-sm text-slate-400 line-through">{purchasePrice}</div>}
+                {displayedDiscount && <div className="text-sm text-slate-400 line-through">{purchasePrice}</div>}
               </div>
               {savingsPercent > 0 && !isPromoPlan ? (
                 <span className="inline-flex items-center gap-1 rounded-sm bg-emerald-100/80 px-2 py-1 font-mono text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-200">
@@ -644,6 +673,17 @@ export function PlanCard({
       ) : null}
 
       <div className={cn("mt-auto", checkoutDisplay ? "pt-3" : "pt-4")}>
+        {!isPromoPlan && automaticDiscount ? (
+          <div className="mb-3 flex items-center justify-between gap-3 rounded-2xl border border-violet-200/80 bg-violet-50/70 px-3.5 py-3 text-sm dark:border-violet-400/20 dark:bg-violet-400/[0.07]">
+            <span className="inline-flex min-w-0 items-center gap-2 font-medium text-violet-800 dark:text-violet-100">
+              <BadgePercent className="h-4 w-4 shrink-0" />
+              <span className="truncate">
+                {automaticDiscount.source === "NEXT_PURCHASE" ? "Скидка на следующую покупку" : "Ваша персональная скидка"}
+              </span>
+            </span>
+            <strong className="shrink-0 tabular-nums text-violet-700 dark:text-violet-200">−{automaticDiscount.discountPercent}%</strong>
+          </div>
+        ) : null}
         {!isPromoPlan && promoCodesEnabled && (promoOpen || appliedPromo) ? (
           <div className="rounded-2xl border border-slate-200/80 bg-slate-50/70 p-3.5 dark:border-white/[0.08] dark:bg-white/[0.03]">
             <div className="mb-2.5 flex items-center justify-between gap-2">
@@ -712,7 +752,11 @@ export function PlanCard({
             )}
             {appliedPromo && (
               <div className="mt-2.5 flex items-center justify-between gap-2 text-xs font-medium text-emerald-600 dark:text-emerald-300">
-                <span>Экономия {formatPrice(displayedDiscount?.discountKopecks ?? appliedPromo.discountKopecks)}</span>
+                <span>
+                  {automaticDiscountWins
+                    ? "Автоматическая скидка выгоднее или равна"
+                    : `Экономия ${formatPrice(displayedDiscount?.discountKopecks ?? appliedPromo.discountKopecks)}`}
+                </span>
                 {suggestedPromoCodes.length > 0 && !manualPromoOpen ? (
                   <button type="button" className="rounded-lg px-2 py-1 text-slate-500 transition-colors hover:bg-white hover:text-slate-900 dark:hover:bg-white/[0.06] dark:hover:text-white" onClick={resetPromo}>
                     Другой код

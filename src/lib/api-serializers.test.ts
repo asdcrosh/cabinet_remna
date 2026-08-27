@@ -51,6 +51,7 @@ describe('api serializers', () => {
       originalAmountKopecks: 19900,
       discountPercent: null,
       discountKopecks: 0,
+      userDiscountType: null,
       promoCodeSnapshot: null,
       deviceLimit: 5,
       planSnapshot: null,

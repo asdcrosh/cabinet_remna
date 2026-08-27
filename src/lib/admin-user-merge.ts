@@ -70,6 +70,14 @@ export async function mergeTechnicalTelegramUserIntoEmailUser(input: AdminMergeU
       personalDataConsentAt: personalDataConsent.at,
       personalDataConsentVersion: personalDataConsent.version,
       emailVerifiedAt: target.emailVerifiedAt || source.emailVerifiedAt,
+      personalDiscountPercent: Math.max(
+        target.personalDiscountPercent ?? 0,
+        source.personalDiscountPercent ?? 0
+      ),
+      nextPurchaseDiscountPercent: Math.max(
+        target.nextPurchaseDiscountPercent ?? 0,
+        source.nextPurchaseDiscountPercent ?? 0
+      ),
     }
 
     const transferred: Record<string, number> = {
@@ -102,6 +110,8 @@ export async function mergeTechnicalTelegramUserIntoEmailUser(input: AdminMergeU
         remnawaveUuid: null,
         remnawaveShortUuid: null,
         remnawaveUsername: null,
+        personalDiscountPercent: 0,
+        nextPurchaseDiscountPercent: 0,
       },
     })
 

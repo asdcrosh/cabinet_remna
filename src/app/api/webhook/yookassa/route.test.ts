@@ -37,6 +37,7 @@ const mocks = vi.hoisted(() => {
     notifyPaymentStuck: vi.fn(),
     recordSucceededRefund: vi.fn(),
     terminateUserSubscription: vi.fn(),
+    restoreNextPurchaseDiscountBestEffort: vi.fn(),
   }
 })
 
@@ -60,6 +61,9 @@ vi.mock('@/lib/payment-settings', () => ({
 vi.mock('@/lib/payment-refunds', () => ({ recordSucceededRefund: mocks.recordSucceededRefund }))
 vi.mock('@/lib/subscription-termination', () => ({
   terminateUserSubscription: mocks.terminateUserSubscription,
+}))
+vi.mock('@/lib/user-discounts', () => ({
+  restoreNextPurchaseDiscountBestEffort: mocks.restoreNextPurchaseDiscountBestEffort,
 }))
 
 import { POST } from './route'
@@ -183,6 +187,7 @@ describe('YooKassa webhook route', () => {
       where: { paymentId: 'pay-1', status: 'PENDING' },
       data: { status: 'CANCELED' },
     })
+    expect(mocks.restoreNextPurchaseDiscountBestEffort).toHaveBeenCalledWith('pay-1')
   })
 
   it('records a full refund and disables the subscription', async () => {

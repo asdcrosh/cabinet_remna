@@ -18,6 +18,7 @@ import {
   captureSavedPaymentMethodBestEffort,
   registerAutoRenewalFailureBestEffort,
 } from '@/lib/auto-renewal'
+import { restoreNextPurchaseDiscountBestEffort } from '@/lib/user-discounts'
 
 export const runtime = 'nodejs'
 
@@ -211,6 +212,9 @@ export async function POST(req: Request) {
       where: { paymentId: payment.id, status: 'PENDING' },
       data: { status: 'CANCELED' },
     })
+    if (payment.status === 'PENDING') {
+      await restoreNextPurchaseDiscountBestEffort(payment.id)
+    }
     await notifyPaymentCanceled(payment.id)
     await registerAutoRenewalFailureBestEffort(
       payment.id,

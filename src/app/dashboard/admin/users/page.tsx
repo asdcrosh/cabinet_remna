@@ -62,6 +62,8 @@ export default async function AdminUsersPage({
         email: true,
         name: true,
         role: true,
+        personalDiscountPercent: true,
+        nextPurchaseDiscountPercent: true,
         telegramId: true,
         telegramUsername: true,
         emailVerifiedAt: true,
@@ -215,6 +217,12 @@ export default async function AdminUsersPage({
                     <span className={user.remnawaveId || user.remnawaveUuid || user.remnawaveUsername ? 'text-emerald-600 dark:text-emerald-300' : 'text-slate-400'}>
                       {user.remnawaveId || user.remnawaveUuid || user.remnawaveUsername ? 'VPN-профиль готов' : 'Без VPN-профиля'}
                     </span>
+                    {user.personalDiscountPercent > 0 ? (
+                      <span className="font-medium text-violet-600 dark:text-violet-300">Персональная скидка {user.personalDiscountPercent}%</span>
+                    ) : null}
+                    {user.nextPurchaseDiscountPercent > 0 ? (
+                      <span className="font-medium text-fuchsia-600 dark:text-fuchsia-300">Следующая покупка −{user.nextPurchaseDiscountPercent}%</span>
+                    ) : null}
                   </div>
                 </div>
 
@@ -496,6 +504,8 @@ function UserActions({
     email: string
     name: string | null
     role: string
+    personalDiscountPercent: number
+    nextPurchaseDiscountPercent: number
     emailVerifiedAt: Date | null
     telegramId: bigint | null
     telegramUsername: string | null
@@ -578,6 +588,9 @@ function UserActions({
           remnawaveUuid={user.remnawaveUuid}
           remnawaveShortUuid={user.remnawaveShortUuid}
           remnawaveUsername={user.remnawaveUsername}
+          personalDiscountPercent={user.personalDiscountPercent}
+          nextPurchaseDiscountPercent={user.nextPurchaseDiscountPercent}
+          canManageDiscounts={actorRole === 'SUPER_ADMIN'}
           showLabel={showLabels}
         />
       )}

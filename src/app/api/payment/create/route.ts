@@ -36,6 +36,12 @@ import {
   type DeviceLimitAddonSnapshot,
 } from '@/lib/device-limit-addon'
 import { hasRemnawaveUserReference, remnawave, remnawaveUserReference } from '@/lib/remnawave'
+import {
+  calculateUserDiscount,
+  preferUserDiscount,
+  restoreNextPurchaseDiscountBestEffort,
+  type CalculatedUserDiscount,
+} from '@/lib/user-discounts'
 
 export const runtime = 'nodejs'
 
@@ -498,10 +504,11 @@ export const POST = withAuth(async (req: Request) => {
 
   let localPayment: Payment
   let appliedPromo: Awaited<ReturnType<typeof validatePromoCodeForPlan>> | null = null
+  let appliedUserDiscount: CalculatedUserDiscount | null = null
   try {
     const result = await prisma.$transaction(
       async (tx) => {
-        const discount = isSubscriptionPurchase && promoCode
+        const validatedPromo = isSubscriptionPurchase && promoCode
           ? await validatePromoCodeForPlan({
               prisma: tx,
               code: promoCode,
@@ -510,8 +517,39 @@ export const POST = withAuth(async (req: Request) => {
               originalAmountKopecks: pricing.originalAmountKopecks,
             })
           : null
+        const discountProfile = isSubscriptionPurchase
+          ? await tx.user.findUnique({
+              where: { id: user.id },
+              select: {
+                personalDiscountPercent: true,
+                nextPurchaseDiscountPercent: true,
+              },
+            })
+          : null
+        const automaticDiscount = discountProfile
+          ? calculateUserDiscount(plan.priceKopecks, discountProfile)
+          : null
+        const selectedDiscount = preferUserDiscount(automaticDiscount, validatedPromo)
+        const discount = selectedDiscount.promoDiscount
+        const userDiscount = selectedDiscount.userDiscount
 
-        const discountedPlanAmountKopecks = discount?.finalAmountKopecks ?? pricing.originalAmountKopecks
+        if (userDiscount?.source === 'NEXT_PURCHASE') {
+          const consumed = await tx.user.updateMany({
+            where: {
+              id: user.id,
+              nextPurchaseDiscountPercent: userDiscount.discountPercent,
+            },
+            data: { nextPurchaseDiscountPercent: 0 },
+          })
+          if (consumed.count !== 1) throw new NextPurchaseDiscountConflictError()
+        }
+
+        const selectedPricing = discount ?? userDiscount
+        const discountedPlanAmountKopecks = discount
+          ? discount.finalAmountKopecks
+          : userDiscount
+            ? pricing.originalAmountKopecks - userDiscount.discountKopecks
+            : pricing.originalAmountKopecks
         const payment = await tx.payment.create({
           data: {
             userId: user.id,
@@ -521,8 +559,9 @@ export const POST = withAuth(async (req: Request) => {
             promoCodeId: discount?.promoCode.id,
             amountKopecks: discountedPlanAmountKopecks + bundledAddonPriceKopecks,
             originalAmountKopecks: pricing.originalAmountKopecks + bundledAddonPriceKopecks,
-            discountPercent: discount?.discountPercent,
-            discountKopecks: discount?.discountKopecks ?? 0,
+            discountPercent: selectedPricing?.discountPercent,
+            discountKopecks: selectedPricing?.discountKopecks ?? 0,
+            userDiscountType: userDiscount?.source,
             deviceLimit: pricing.selectedDeviceLimit,
             ...(planSnapshot
               ? { planSnapshot: planSnapshot as unknown as Prisma.InputJsonValue }
@@ -539,7 +578,13 @@ export const POST = withAuth(async (req: Request) => {
                   originalAmountKopecks: discount.originalAmountKopecks,
                   finalAmountKopecks: discount.finalAmountKopecks,
                 }
-              : undefined,
+              : validatedPromo
+                ? {
+                    code: validatedPromo.normalizedCode,
+                    notApplied: true,
+                    discountPercent: validatedPromo.discountPercent,
+                  }
+                : undefined,
             provider,
             providerStatus: 'pending',
             checkoutKey: idempotencyKey,
@@ -564,12 +609,13 @@ export const POST = withAuth(async (req: Request) => {
           })
         }
 
-        return { payment, discount }
+        return { payment, discount, userDiscount }
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
     )
     localPayment = result.payment
     appliedPromo = result.discount
+    appliedUserDiscount = result.userDiscount
   } catch (e) {
     const duplicateCheckout = await findDuplicateCheckout(user.id, idempotencyKey)
     if (duplicateCheckout) {
@@ -585,6 +631,9 @@ export const POST = withAuth(async (req: Request) => {
     }
     if (e instanceof PromoCodeError) {
       return NextResponse.json({ error: e.message, code: e.code }, { status: e.status })
+    }
+    if (e instanceof NextPurchaseDiscountConflictError) {
+      return NextResponse.json({ error: e.message, code: 'DISCOUNT_STATE_CHANGED' }, { status: 409 })
     }
     throw e
   }
@@ -602,6 +651,7 @@ export const POST = withAuth(async (req: Request) => {
       deviceLimit: pricing.selectedDeviceLimit,
       amountKopecks: localPayment.amountKopecks,
       discountKopecks: localPayment.discountKopecks,
+      userDiscountType: appliedUserDiscount?.source ?? null,
     },
     dedupeKey: 'order-created',
   })
@@ -892,6 +942,7 @@ async function cancelFailedLocalPayment(paymentId: string, message: string) {
       data: { status: 'CANCELED' },
     }),
   ])
+  await restoreNextPurchaseDiscountBestEffort(paymentId)
   await recordPaymentEvent({
     paymentId,
     stage: 'PROVIDER',
@@ -901,6 +952,13 @@ async function cancelFailedLocalPayment(paymentId: string, message: string) {
     details: paymentErrorDetails(message),
     dedupeKey: 'provider-checkout-failed',
   })
+}
+
+class NextPurchaseDiscountConflictError extends Error {
+  constructor() {
+    super('Скидка на следующую покупку уже изменилась. Обновите страницу и повторите оплату.')
+    this.name = 'NextPurchaseDiscountConflictError'
+  }
 }
 
 async function provisionPromoPayment(

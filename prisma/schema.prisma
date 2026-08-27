@@ -78,12 +78,14 @@ enum PlanAvailability {
 // чтобы не дёргать Remnawave при каждом логине.
 // ----------------------------------------------------------------------
 model User {
-  id             String   @id @default(cuid())
-  email          String   @unique
-  passwordHash   String
-  sessionVersion Int      @default(0)
-  name           String?
-  role           UserRole @default(USER)
+  id                          String   @id @default(cuid())
+  email                       String   @unique
+  passwordHash                String
+  sessionVersion              Int      @default(0)
+  name                        String?
+  role                        UserRole @default(USER)
+  personalDiscountPercent     Int      @default(0)
+  nextPurchaseDiscountPercent Int      @default(0)
 
   // Реферальная система: код пользователя и кто его пригласил.
   referralCode             String?          @unique
@@ -750,7 +752,8 @@ model Payment {
   amountKopecks         Int
   originalAmountKopecks Int?
   discountPercent       Int?
-  discountKopecks       Int   @default(0)
+  discountKopecks       Int               @default(0)
+  userDiscountType      UserDiscountType?
   promoCodeSnapshot     Json?
   // Выбранный лимит и неизменяемые условия заказа на момент оплаты.
   deviceLimit           Int?
@@ -810,6 +813,11 @@ model Payment {
   @@index([purchaseType, status, createdAt])
   @@index([promoCodeId])
   @@index([autoRenewalId, createdAt])
+}
+
+enum UserDiscountType {
+  PERSONAL
+  NEXT_PURCHASE
 }
 
 enum PaymentOrigin {

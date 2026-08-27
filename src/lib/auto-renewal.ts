@@ -18,13 +18,14 @@ import {
   WHITELIST_ADDON_RECEIPT_NAME,
 } from './whitelist-addon'
 import { isWhitelistAddonCurrentlyActive } from './whitelist-addon-policy'
+import { calculatePersonalDiscount } from './user-discounts'
 
 const HOUR_MS = 60 * 60 * 1000
 const DEFAULT_LEAD_HOURS = 24
 const RETRY_DELAYS_HOURS = [6, 24, 48]
 
 type DueAutoRenewal = Prisma.AutoRenewalGetPayload<{
-  include: { user: { select: { id: true; email: true } }; plan: true }
+  include: { user: { select: { id: true; email: true; personalDiscountPercent: true } }; plan: true }
 }>
 
 export async function getAutoRenewalState(userId: string) {
@@ -78,7 +79,7 @@ export async function enableAutoRenewal(input: {
   if (!input.consentAccepted || input.consentVersion !== AUTO_RENEWAL_CONSENT_VERSION) {
     throw new Error('Подтвердите согласие на регулярные списания')
   }
-  const [plan, subscription] = await Promise.all([
+  const [plan, subscription, discountUser] = await Promise.all([
     prisma.plan.findFirst({ where: { id: input.planId, isActive: true } }),
     prisma.subscription.findFirst({
       where: { userId: input.userId, status: { in: ['ACTIVE', 'LIMITED'] } },
@@ -90,6 +91,10 @@ export async function enableAutoRenewal(input: {
         whitelistAddonActive: true,
         whitelistAddonExpireAt: true,
       },
+    }),
+    prisma.user.findUnique({
+      where: { id: input.userId },
+      select: { personalDiscountPercent: true },
     }),
   ])
   if (!plan || plan.isPromo || plan.priceKopecks <= 0 || plan.unlimitedDuration) {
@@ -106,7 +111,12 @@ export async function enableAutoRenewal(input: {
     && plan.whitelistAddonPriceKopecks > 0
     && plan.whitelistAddonInternalSquads.length > 0
   )
+  const personalDiscount = calculatePersonalDiscount(
+    plan.priceKopecks,
+    discountUser?.personalDiscountPercent ?? 0
+  )
   const consentPriceKopecks = pricing.originalAmountKopecks
+    - (personalDiscount?.discountKopecks ?? 0)
     + (whitelistAddonEnabled ? plan.whitelistAddonPriceKopecks : 0)
 
   const existing = await prisma.autoRenewal.findUnique({ where: { userId: input.userId } })
@@ -222,6 +232,7 @@ export async function captureSavedPaymentMethod(input: {
           whitelistAddonInternalSquads: true,
         },
       },
+      user: { select: { personalDiscountPercent: true } },
     },
   })
   if (!payment) return false
@@ -250,7 +261,12 @@ export async function captureSavedPaymentMethod(input: {
   const pricing = calculateAutoRenewalPurchase(payment.plan, deviceLimit)
   const bundledWhitelistAddon = readBundledWhitelistAddonSnapshot(payment.addonSnapshot)
   const whitelistAddonEnabled = Boolean(bundledWhitelistAddon)
+  const personalDiscount = calculatePersonalDiscount(
+    payment.plan.priceKopecks,
+    payment.user.personalDiscountPercent
+  )
   const consentPriceKopecks = pricing.originalAmountKopecks
+    - (personalDiscount?.discountKopecks ?? 0)
     + (bundledWhitelistAddon?.priceKopecks ?? 0)
   const consentAcceptedAt = checkoutConsentCurrent
     ? payment.autoRenewalConsentAcceptedAt!
@@ -323,7 +339,7 @@ export async function refreshAutoRenewalSchedule(userId: string, paymentId?: str
     || !setting.consentAcceptedAt
     || setting.consentVersion !== AUTO_RENEWAL_CONSENT_VERSION
   ) return
-  const [subscription, payment] = await Promise.all([
+  const [subscription, payment, discountUser] = await Promise.all([
     prisma.subscription.findFirst({
       where: { userId, status: { in: ['ACTIVE', 'LIMITED'] } },
       orderBy: { expireAt: 'desc' },
@@ -348,6 +364,10 @@ export async function refreshAutoRenewalSchedule(userId: string, paymentId?: str
     paymentId
       ? prisma.payment.findUnique({ where: { id: paymentId }, select: { origin: true } })
       : null,
+    prisma.user.findUnique({
+      where: { id: userId },
+      select: { personalDiscountPercent: true },
+    }),
   ])
   if (!subscription?.plan || subscription.plan.isPromo || subscription.plan.priceKopecks <= 0) return
   const subscriptionDeviceLimit = subscription.deviceLimit ?? subscription.plan.deviceLimit
@@ -357,8 +377,14 @@ export async function refreshAutoRenewalSchedule(userId: string, paymentId?: str
     && subscription.plan.whitelistAddonPriceKopecks > 0
     && subscription.plan.whitelistAddonInternalSquads.length > 0
   )
+  const currentPersonalDiscount = currentPricing
+    ? calculatePersonalDiscount(
+        subscription.plan.priceKopecks,
+        discountUser?.personalDiscountPercent ?? 0
+      )
+    : null
   const currentPriceKopecks = currentPricing
-    ? currentPricing.originalAmountKopecks
+    ? currentPricing.originalAmountKopecks - (currentPersonalDiscount?.discountKopecks ?? 0)
       + (setting.whitelistAddonEnabled ? subscription.plan.whitelistAddonPriceKopecks : 0)
     : null
   const consentCurrent = (
@@ -366,7 +392,9 @@ export async function refreshAutoRenewalSchedule(userId: string, paymentId?: str
     && setting.planId === subscription.plan.id
     && setting.deviceLimit === subscriptionDeviceLimit
     && addonConfigurationValid
-    && setting.consentPriceKopecks === currentPriceKopecks
+    && setting.consentPriceKopecks != null
+    && currentPriceKopecks != null
+    && setting.consentPriceKopecks >= currentPriceKopecks
     && setting.consentDurationDays === subscription.plan.durationDays
   )
   await prisma.autoRenewal.update({
@@ -439,7 +467,10 @@ export async function processDueAutoRenewals(options?: { limit?: number; shouldS
     },
     orderBy: { nextChargeAt: 'asc' },
     take: options?.limit ?? 20,
-    include: { user: { select: { id: true, email: true } }, plan: true },
+    include: {
+      user: { select: { id: true, email: true, personalDiscountPercent: true } },
+      plan: true,
+    },
   })
   let created = 0
   let failed = 0
@@ -458,20 +489,25 @@ export async function processDueAutoRenewals(options?: { limit?: number; shouldS
 
 async function createAutoRenewalPayment(setting: DueAutoRenewal) {
   const pricing = tryCalculateAutoRenewalPurchase(setting.plan, setting.deviceLimit)
+  const personalDiscount = pricing
+    ? calculatePersonalDiscount(setting.plan.priceKopecks, setting.user.personalDiscountPercent)
+    : null
   const addonConfigurationValid = !setting.whitelistAddonEnabled || (
     setting.plan.whitelistAddonEnabled
     && setting.plan.whitelistAddonPriceKopecks > 0
     && setting.plan.whitelistAddonInternalSquads.length > 0
   )
   const totalAmountKopecks = pricing
-    ? pricing.originalAmountKopecks
+    ? pricing.originalAmountKopecks - (personalDiscount?.discountKopecks ?? 0)
       + (setting.whitelistAddonEnabled ? setting.plan.whitelistAddonPriceKopecks : 0)
     : null
   if (
     !pricing
     || setting.plan.unlimitedDuration
     || !addonConfigurationValid
-    || setting.consentPriceKopecks !== totalAmountKopecks
+    || setting.consentPriceKopecks == null
+    || totalAmountKopecks == null
+    || setting.consentPriceKopecks < totalAmountKopecks
     || setting.consentDurationDays !== setting.plan.durationDays
   ) {
     await prisma.autoRenewal.update({
@@ -515,7 +551,11 @@ async function createAutoRenewalPayment(setting: DueAutoRenewal) {
         planId: setting.planId,
         autoRenewalId: setting.id,
         amountKopecks: totalAmountKopecks!,
-        originalAmountKopecks: totalAmountKopecks!,
+        originalAmountKopecks: pricing.originalAmountKopecks
+          + (setting.whitelistAddonEnabled ? setting.plan.whitelistAddonPriceKopecks : 0),
+        discountPercent: personalDiscount?.discountPercent,
+        discountKopecks: personalDiscount?.discountKopecks ?? 0,
+        userDiscountType: personalDiscount ? 'PERSONAL' : undefined,
         deviceLimit: pricing.selectedDeviceLimit,
         planSnapshot: planSnapshot as unknown as Prisma.InputJsonValue,
         ...(addonSnapshot
