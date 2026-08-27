@@ -57,7 +57,7 @@ test('главный администратор видит пользовате�
 
   await page.goto('/dashboard/admin/support')
   await expect(page.getByRole('heading', { name: 'Вопрос по оплате' })).toBeVisible()
-  const clientButton = page.getByRole('button', { name: 'Клиент' })
+  const clientButton = page.getByRole('button', { name: 'Клиент', exact: true })
   await expect(clientButton).toBeVisible()
   await clientButton.click()
   const clientPanel = page.locator('aside').filter({ hasText: 'Контекст обращения' })
@@ -97,7 +97,7 @@ test('поддержка удобна пользователю и админис
   await expect(ticketButton).toBeVisible()
   await ticketButton.click()
   await expect(page.getByRole('heading', { name: 'Вопрос по устройствам' })).toBeVisible()
-  await page.getByRole('button', { name: 'Клиент' }).click()
+  await page.getByRole('button', { name: 'Клиент', exact: true }).click()
   const clientPanel = page.locator('aside').filter({ hasText: 'Контекст обращения' })
   await expect(clientPanel).toBeVisible()
   await expect(clientPanel.getByText(E2E_USERS.basic.email, { exact: true })).toBeVisible()
