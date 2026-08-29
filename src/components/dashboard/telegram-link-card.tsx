@@ -83,8 +83,8 @@ export function TelegramLinkCard({
             <Send className="h-5 w-5" />
           </div>
           <div className="min-w-0">
-            <h2 className="font-semibold">Перенос из Telegram</h2>
-            <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">Для старых покупок и связи аккаунта.</p>
+            <h2 className="font-semibold">Telegram</h2>
+            <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">Вход и перенос старых покупок.</p>
           </div>
         </div>
         {telegramId ? (

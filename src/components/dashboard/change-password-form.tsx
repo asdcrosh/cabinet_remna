@@ -46,41 +46,46 @@ export function ChangePasswordForm() {
 
   return (
     <form onSubmit={onSubmit} className="max-w-3xl space-y-4">
-      <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 dark:border-white/[0.08] dark:bg-white/[0.025]">
-        <label className="label" htmlFor="oldPassword">Текущий пароль</label>
-        <PasswordField
-          id="oldPassword"
-          autoComplete="current-password"
-          register={register('oldPassword')}
-        />
-        {errors.oldPassword && (
-          <p className="mt-1 text-xs text-red-600 dark:text-red-300">{errors.oldPassword.message}</p>
-        )}
-      </div>
-      <div className="grid gap-4 rounded-2xl border border-cyan-200 bg-cyan-50/55 p-4 dark:border-cyan-400/20 dark:bg-cyan-400/[0.06] sm:grid-cols-2">
+      <div className="space-y-4 rounded-xl border border-slate-200 bg-slate-50/60 p-4 dark:border-white/[0.08] dark:bg-white/[0.025]">
         <div>
-          <label className="label" htmlFor="newPassword">Новый пароль</label>
+          <label className="label" htmlFor="oldPassword">Текущий пароль</label>
           <PasswordField
-            id="newPassword"
-            autoComplete="new-password"
-            register={register('newPassword')}
+            id="oldPassword"
+            autoComplete="current-password"
+            register={register('oldPassword')}
           />
-          {errors.newPassword ? (
-            <p className="mt-1 text-xs text-red-600 dark:text-red-300">{errors.newPassword.message}</p>
-          ) : (
-            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Используйте буквы, цифры и символы.</p>
+          {errors.oldPassword && (
+            <p className="mt-1 text-xs text-red-600 dark:text-red-300">{errors.oldPassword.message}</p>
           )}
         </div>
-        <div>
-          <label className="label" htmlFor="confirm">Повторите пароль</label>
-          <PasswordField
-            id="confirm"
-            autoComplete="new-password"
-            register={register('confirm')}
-          />
-          {errors.confirm && (
-            <p className="mt-1 text-xs text-red-600 dark:text-red-300">{errors.confirm.message}</p>
-          )}
+        <div className="border-t border-slate-200 pt-4 dark:border-white/[0.08]">
+          <p className="mb-3 text-xs font-medium text-slate-500 dark:text-slate-400">Новый пароль</p>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label className="label" htmlFor="newPassword">Новый пароль</label>
+              <PasswordField
+                id="newPassword"
+                autoComplete="new-password"
+                register={register('newPassword')}
+              />
+              {errors.newPassword ? (
+                <p className="mt-1 text-xs text-red-600 dark:text-red-300">{errors.newPassword.message}</p>
+              ) : (
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Используйте буквы, цифры и символы.</p>
+              )}
+            </div>
+            <div>
+              <label className="label" htmlFor="confirm">Повторите пароль</label>
+              <PasswordField
+                id="confirm"
+                autoComplete="new-password"
+                register={register('confirm')}
+              />
+              {errors.confirm && (
+                <p className="mt-1 text-xs text-red-600 dark:text-red-300">{errors.confirm.message}</p>
+              )}
+            </div>
+          </div>
         </div>
       </div>
       {serverError && (

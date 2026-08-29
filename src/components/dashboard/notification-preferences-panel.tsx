@@ -44,14 +44,16 @@ export function NotificationPreferencesPanel({ initialPreferences }: { initialPr
 
   return (
     <div>
-      <div className="divide-y divide-slate-200 border-y border-slate-200 dark:divide-white/10 dark:border-white/10">
+      <div className="grid gap-2 sm:grid-cols-2">
         {options.map((option) => {
           const Icon = option.icon
           const enabled = preferences[option.key]
           return (
-            <div key={option.key} className="flex items-center justify-between gap-4 py-3.5">
+            <div key={option.key} className="flex min-h-[5.25rem] items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50/60 p-3.5 dark:border-white/[0.08] dark:bg-white/[0.025]">
               <div className="flex min-w-0 items-start gap-3">
-                <Icon className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
+                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-white text-slate-500 shadow-sm dark:bg-white/[0.06] dark:text-slate-300 dark:shadow-none">
+                  <Icon className="h-4 w-4" />
+                </span>
                 <div className="min-w-0">
                   <div className="text-sm font-semibold text-slate-950 dark:text-white">{option.title}</div>
                   <div className="mt-0.5 text-xs leading-5 text-slate-500">{option.description}</div>
@@ -63,7 +65,7 @@ export function NotificationPreferencesPanel({ initialPreferences }: { initialPr
         })}
       </div>
       <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-xs leading-5 text-slate-500">Начисления подарков не создают уведомления. Результат всегда остаётся в истории бонусов.</p>
+        <p className="text-xs leading-5 text-slate-500">Подарки всегда сохраняются в истории бонусов, даже если уведомления выключены.</p>
         <button type="button" className="btn-primary w-full sm:w-auto" disabled={!dirty || saving} onClick={() => void save()}>
           {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
           Сохранить

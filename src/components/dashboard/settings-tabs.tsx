@@ -10,6 +10,7 @@ type SettingsTabSection = {
   id: SettingsTabId
   title: string
   shortTitle?: string
+  description: string
   children: ReactNode
 }
 
@@ -33,10 +34,13 @@ export function SettingsTabs({ sections }: { sections: SettingsTabSection[] }) {
   }
 
   return (
-    <div className="settings-workspace grid gap-4 min-[1360px]:grid-cols-[12.5rem_minmax(0,1fr)] min-[1360px]:gap-6">
-      <div className="sticky top-14 z-20 -mx-4 bg-surface-50/95 px-4 py-2 backdrop-blur dark:bg-surface-950/95 sm:static sm:mx-0 sm:bg-transparent sm:px-0 sm:py-0 sm:backdrop-blur-none min-[1360px]:self-start">
-        <div className="settings-workspace-tabs border-y border-slate-200 py-1 dark:border-white/10 min-[1360px]:sticky min-[1360px]:top-6 min-[1360px]:border-y-0 min-[1360px]:border-l min-[1360px]:py-0 min-[1360px]:pl-2">
-          <div role="tablist" aria-label="Разделы настроек" className="grid grid-cols-4 gap-1 min-[1360px]:grid-cols-1">
+    <div className="settings-workspace grid gap-4 lg:grid-cols-[15.5rem_minmax(0,1fr)] lg:gap-5">
+      <div className="min-w-0 lg:self-start">
+        <div className="settings-workspace-tabs lg:sticky lg:top-6">
+          <p className="mb-2 hidden px-1 font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400 dark:text-slate-500 lg:block">
+            Разделы
+          </p>
+          <div role="tablist" aria-label="Разделы настроек" className="grid grid-cols-2 gap-2 lg:grid-cols-1">
           {sections.map((section, index) => {
             const active = section.id === activeId
 
@@ -47,14 +51,15 @@ export function SettingsTabs({ sections }: { sections: SettingsTabSection[] }) {
                 type="button"
                 role="tab"
                 id={`settings-tab-${section.id}`}
+                aria-label={section.title}
                 aria-selected={active}
                 aria-controls={`settings-panel-${section.id}`}
                 tabIndex={active ? 0 : -1}
                 className={cn(
-                  'flex h-11 min-w-0 items-center justify-center gap-1.5 rounded-[6px] px-1.5 text-[11px] font-semibold transition sm:gap-2 sm:px-3 sm:text-sm min-[1360px]:min-h-12 min-[1360px]:justify-start',
+                  'group flex min-h-[4.5rem] min-w-0 items-start gap-2.5 rounded-xl border px-3 py-3 text-left transition lg:min-h-0',
                   active
-                    ? 'bg-brand-50 text-brand-800 ring-1 ring-inset ring-brand-200 dark:bg-brand-400/10 dark:text-brand-200 dark:ring-brand-300/15'
-                    : 'text-slate-500 hover:bg-slate-950/[0.04] hover:text-slate-950 dark:text-slate-400 dark:hover:bg-white/[0.06] dark:hover:text-white'
+                    ? 'border-brand-200 bg-brand-50 text-brand-900 dark:border-brand-400/20 dark:bg-brand-400/10 dark:text-brand-100'
+                    : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50 dark:border-white/[0.08] dark:bg-white/[0.025] dark:text-slate-300 dark:hover:border-white/15 dark:hover:bg-white/[0.05]'
                 )}
                 onClick={() => setActiveId(section.id)}
                 onKeyDown={(event) => {
@@ -74,13 +79,20 @@ export function SettingsTabs({ sections }: { sections: SettingsTabSection[] }) {
                 }}
               >
                 <span
-                  className={cn('grid h-6 w-6 shrink-0 place-items-center', active ? 'text-brand-600 dark:text-brand-300' : 'text-slate-400')}
+                  className={cn(
+                    'grid h-8 w-8 shrink-0 place-items-center rounded-lg transition-colors',
+                    active
+                      ? 'bg-white text-brand-700 shadow-sm dark:bg-white/10 dark:text-brand-200'
+                      : 'bg-slate-100 text-slate-400 group-hover:text-slate-600 dark:bg-white/[0.06] dark:text-slate-500 dark:group-hover:text-slate-300'
+                  )}
                 >
                   {tabIcons[section.id]}
                 </span>
-                <span className="min-w-0 max-w-full">
-                  <span className="block max-w-full truncate leading-tight sm:hidden">{section.shortTitle ?? section.title}</span>
-                  <span className="hidden whitespace-normal text-left leading-5 sm:block">{section.title}</span>
+                <span className="min-w-0 flex-1 pt-0.5">
+                  <span className="block text-sm font-semibold leading-5">{section.shortTitle ?? section.title}</span>
+                  <span className="mt-0.5 hidden text-xs leading-4 text-slate-500 dark:text-slate-400 sm:block lg:block">
+                    {section.description}
+                  </span>
                 </span>
               </button>
             )
@@ -90,7 +102,7 @@ export function SettingsTabs({ sections }: { sections: SettingsTabSection[] }) {
       </div>
 
       <div
-        className="min-w-0"
+        className="min-w-0 lg:pt-6"
         id={activeSection ? `settings-panel-${activeSection.id}` : undefined}
         role="tabpanel"
         aria-labelledby={activeSection ? `settings-tab-${activeSection.id}` : undefined}

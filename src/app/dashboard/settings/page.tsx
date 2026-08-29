@@ -28,45 +28,53 @@ export default async function SettingsPage() {
     getNotificationPreferences(user.id),
   ])
   const hasVerifiedEmail = Boolean(user.emailVerifiedAt && !user.email.endsWith('@pending.invalid'))
+  const hasTelegram = Boolean(user.telegramId)
+  const hasRemnashop = Boolean(user.remnashopUserId)
+  const hasVpnProfile = Boolean(user.remnawaveId || user.remnawaveUuid || user.remnawaveUsername)
   const accountLinks = [
     { href: '/dashboard/billing', label: 'Покупки', description: 'Платежи и чеки', icon: ReceiptText, visible: true },
     { href: '/dashboard/referrals', label: 'Приглашения', description: 'Ссылка и вознаграждения', icon: Gift, visible: features.referrals },
   ].filter((item) => item.visible)
 
   return (
-    <div className="user-workspace mx-auto max-w-6xl page-stack">
+    <div className="user-workspace mx-auto max-w-7xl page-stack">
       <PageHeader
-        title="Аккаунт"
-        description="Профиль, уведомления и безопасность."
+        title="Настройки"
+        description="Управляйте профилем, входом и уведомлениями в одном месте."
       />
 
-      <div className="grid gap-6 min-[1360px]:grid-cols-[minmax(0,1fr)_15rem] min-[1360px]:items-start">
-        <div className="min-w-0">
-          <SettingsTabs
-            sections={[
+      <SettingsTabs
+        sections={[
           {
             id: 'account',
-            title: 'Аккаунт',
-            shortTitle: 'Аккаунт',
+            title: 'Профиль',
+            shortTitle: 'Профиль',
+            description: 'Имя и состояние аккаунта',
             children: (
               <SettingsSection
                 id="account"
-                title="Профиль"
-                description="Основные данные и готовность аккаунта"
+                title="Личные данные"
+                description="То, как вас видит кабинет"
                 icon={<CircleUserRound className="h-5 w-5" />}
               >
-                <div className="min-w-0">
-                  <div className="mb-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-                    <AccountFact label="Email" value={hasVerifiedEmail ? 'Подтверждён' : 'Требует подтверждения'} ready={hasVerifiedEmail} />
-                    <AccountFact label="Telegram" value={user.telegramId ? 'Привязан' : 'Не привязан'} ready={Boolean(user.telegramId)} />
-                    <AccountFact label="Remnashop" value={user.remnashopUserId ? 'Связан' : 'Ожидает связи'} ready={Boolean(user.remnashopUserId)} />
-                    <AccountFact
-                      label="VPN-профиль"
-                      value={user.remnawaveId || user.remnawaveUuid || user.remnawaveUsername ? 'Связан' : 'Создастся при покупке'}
-                      ready={Boolean(user.remnawaveId || user.remnawaveUuid || user.remnawaveUsername)}
-                    />
+                <div className="grid gap-5 min-[1180px]:grid-cols-[minmax(0,1fr)_18rem]">
+                  <div className="min-w-0">
+                    <ProfileForm name={user.name} />
                   </div>
-                  <ProfileForm name={user.name} />
+                  <div className="rounded-xl bg-slate-50 p-3.5 dark:bg-white/[0.03]">
+                    <h3 className="text-sm font-semibold text-slate-950 dark:text-white">Состояние аккаунта</h3>
+                    <p className="mt-0.5 text-xs leading-5 text-slate-500 dark:text-slate-400">Подключённые способы входа и профиль VPN.</p>
+                    <div className="mt-3 divide-y divide-slate-200 dark:divide-white/[0.08]">
+                      <AccountFact label="Email" value={hasVerifiedEmail ? 'Подтверждён' : 'Нужно подтвердить'} state={hasVerifiedEmail ? 'ready' : 'attention'} />
+                      <AccountFact label="Telegram" value={hasTelegram ? 'Подключён' : 'Не подключён'} state={hasTelegram ? 'ready' : 'neutral'} />
+                      <AccountFact label="Старые покупки" value={hasRemnashop ? 'Найдены' : 'Не найдены'} state={hasRemnashop ? 'ready' : 'neutral'} />
+                      <AccountFact
+                        label="Профиль VPN"
+                        value={hasVpnProfile ? 'Готов' : 'Создастся при покупке'}
+                        state={hasVpnProfile ? 'ready' : 'neutral'}
+                      />
+                    </div>
+                  </div>
                 </div>
               </SettingsSection>
             ),
@@ -74,7 +82,8 @@ export default async function SettingsPage() {
           {
             id: 'notifications',
             title: 'Уведомления',
-            shortTitle: 'События',
+            shortTitle: 'Уведомления',
+            description: 'Куда присылать события',
             children: (
               <SettingsSection
                 id="notifications"
@@ -90,15 +99,16 @@ export default async function SettingsPage() {
             id: 'sync',
             title: 'Способы входа',
             shortTitle: 'Вход',
+            description: 'Telegram и email',
             children: (
               <SettingsSection
                 id="sync"
-                title="Способы входа"
-                description="Свяжите Telegram и email с одним аккаунтом"
+                title="Вход в кабинет"
+                description="Подключите удобные способы входа и перенесите старые покупки"
                 icon={<Link2 className="h-5 w-5" />}
               >
-                <div className="grid border-y border-slate-200 dark:border-white/10 2xl:grid-cols-[minmax(0,1fr)_20rem]">
-                  <div className="py-4 2xl:pr-5">
+                <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_19rem]">
+                  <div className="rounded-xl border border-slate-200 p-4 dark:border-white/[0.08]">
                     <TelegramLinkCard
                       telegramClientId={telegramClientId}
                       appUrl={appUrl}
@@ -109,7 +119,7 @@ export default async function SettingsPage() {
                       embedded
                     />
                   </div>
-                  <div className="flex flex-col border-t border-slate-200 py-4 dark:border-white/10 2xl:border-l 2xl:border-t-0 2xl:pl-5">
+                  <div className="flex flex-col rounded-xl border border-slate-200 p-4 dark:border-white/[0.08]">
                     <div className="flex items-center gap-3">
                       <MailPlus className="h-5 w-5 shrink-0 text-cyan-600 dark:text-cyan-300" />
                       <div className="min-w-0">
@@ -138,6 +148,7 @@ export default async function SettingsPage() {
             id: 'security',
             title: 'Безопасность',
             shortTitle: 'Пароль',
+            description: 'Пароль и защита входа',
             children: (
               <SettingsSection
                 id="security"
@@ -155,29 +166,30 @@ export default async function SettingsPage() {
               </SettingsSection>
             ),
           },
-            ]}
-          />
-        </div>
+        ]}
+      />
 
-        <aside className="rounded-[14px] border border-slate-200 bg-white p-4 dark:border-white/[0.09] dark:bg-white/[0.025]" aria-labelledby="account-links-title">
-          <h2 id="account-links-title" className="pb-2 font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400 dark:text-slate-500">Быстрый доступ</h2>
-          <div className="grid gap-1.5 sm:grid-cols-2 xl:grid-cols-1">
-            {accountLinks.map((item) => {
-              const Icon = item.icon
-              return (
-                <Link key={item.href} href={item.href} className="group flex min-w-0 items-center gap-3 border-b border-slate-200 py-3 transition-colors last:border-b-0 dark:border-white/[0.08]">
-                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[8px] bg-brand-50 text-brand-700 dark:bg-brand-500/10 dark:text-brand-300"><Icon className="h-4 w-4" /></span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-sm font-semibold text-slate-950 dark:text-white">{item.label}</span>
-                    <span className="block truncate text-xs text-slate-500 dark:text-slate-400">{item.description}</span>
-                  </span>
-                  <ArrowRight className="h-4 w-4 shrink-0 text-slate-400 transition-transform group-hover:translate-x-0.5" />
-                </Link>
-              )
-            })}
-          </div>
-        </aside>
-      </div>
+      <section aria-labelledby="account-links-title">
+        <div className="mb-3">
+          <h2 id="account-links-title" className="text-sm font-semibold text-slate-950 dark:text-white">Ещё в кабинете</h2>
+          <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Покупки, чеки и приглашения находятся в отдельных разделах.</p>
+        </div>
+        <div className="grid gap-2 sm:grid-cols-2">
+          {accountLinks.map((item) => {
+            const Icon = item.icon
+            return (
+              <Link key={item.href} href={item.href} className="group flex min-w-0 items-center gap-3 rounded-xl border border-slate-200 bg-white p-3.5 transition-colors hover:border-brand-200 hover:bg-brand-50/50 dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-brand-400/20 dark:hover:bg-brand-400/[0.06]">
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-brand-50 text-brand-700 dark:bg-brand-500/10 dark:text-brand-300"><Icon className="h-4 w-4" /></span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-semibold text-slate-950 dark:text-white">{item.label}</span>
+                  <span className="block truncate text-xs text-slate-500 dark:text-slate-400">{item.description}</span>
+                </span>
+                <ArrowRight className="h-4 w-4 shrink-0 text-slate-400 transition-transform group-hover:translate-x-0.5" />
+              </Link>
+            )
+          })}
+        </div>
+      </section>
 
       <div className="grid gap-3 border-t border-slate-200 pt-4 dark:border-white/10 sm:grid-cols-[minmax(0,1fr)_10rem] sm:items-start">
         <section aria-labelledby="legal-title">
@@ -220,28 +232,43 @@ function SettingsSection({
   return (
     <section
       id={id}
-      className={`settings-section scroll-mt-20 border border-slate-200 bg-white p-4 dark:border-white/[0.09] dark:bg-white/[0.025] sm:p-5 ${className ?? ''}`}
+      className={`settings-section scroll-mt-20 overflow-hidden border border-slate-200 bg-white dark:border-white/[0.09] dark:bg-white/[0.025] ${className ?? ''}`}
     >
-      <div className="mb-4 flex min-w-0 items-start gap-2.5">
-        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[9px] bg-brand-50 text-brand-700 dark:bg-brand-500/10 dark:text-brand-300">{icon}</span>
-        <div className="min-w-0 pt-0.5">
-          <h2 className="text-base font-semibold text-slate-950 dark:text-white sm:text-lg">{title}</h2>
+      <div className="flex min-w-0 items-center gap-3 border-b border-slate-200 bg-slate-50/60 px-4 py-3.5 dark:border-white/[0.08] dark:bg-white/[0.02] sm:px-5">
+        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-brand-50 text-brand-700 dark:bg-brand-500/10 dark:text-brand-300">{icon}</span>
+        <div className="min-w-0">
+          <h2 className="text-base font-semibold text-slate-950 dark:text-white">{title}</h2>
           <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">{description}</p>
         </div>
       </div>
-      {children}
+      <div className="p-4 sm:p-5">{children}</div>
     </section>
   )
 }
 
-function AccountFact({ label, value, ready }: { label: string; value: string; ready?: boolean }) {
+function AccountFact({
+  label,
+  value,
+  state,
+}: {
+  label: string
+  value: string
+  state: 'ready' | 'attention' | 'neutral'
+}) {
+  const stateClass = state === 'ready'
+    ? 'text-emerald-700 dark:text-emerald-300'
+    : state === 'attention'
+      ? 'text-amber-700 dark:text-amber-300'
+      : 'text-slate-500 dark:text-slate-400'
+  const dotClass = state === 'ready' ? 'bg-emerald-500' : state === 'attention' ? 'bg-amber-500' : 'bg-slate-400'
+
   return (
-    <div className="min-w-0 rounded-[9px] border border-slate-200 bg-slate-50/70 px-3 py-2.5 dark:border-white/10 dark:bg-white/[0.03]">
-      <div className="flex items-center gap-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.07em] text-slate-500 dark:text-slate-400">
-        {ready !== undefined && <span className={`h-1.5 w-1.5 rounded-full ${ready ? 'bg-emerald-500' : 'bg-amber-500'}`} />}
-        {label}
+    <div className="flex min-w-0 items-center justify-between gap-3 py-2.5">
+      <div className="min-w-0 text-sm text-slate-600 dark:text-slate-300">{label}</div>
+      <div className={`flex min-w-0 items-center gap-1.5 text-right text-xs font-semibold ${stateClass}`} title={value}>
+        <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${dotClass}`} />
+        <span className="truncate">{value}</span>
       </div>
-      <div className="mt-1 truncate text-sm font-medium text-slate-950 dark:text-white" title={value}>{value}</div>
     </div>
   )
 }
