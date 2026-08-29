@@ -80,15 +80,14 @@ export function BrandingSettingsPanel({ initialSettings }: { initialSettings: Pu
         </button>
       </div>
 
-      <div className="space-y-5 p-4 sm:p-5">
-        <div className="grid gap-4 rounded-2xl border border-slate-200 bg-slate-50/70 p-4 dark:border-white/10 dark:bg-white/[0.025] lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+      <div className="grid items-start gap-4 p-4 sm:p-5 xl:grid-cols-[minmax(0,1fr)_20rem]">
+        <div className="min-w-0 space-y-4">
+          <div className="grid gap-3 rounded-xl border border-slate-200 bg-slate-50/70 p-3 dark:border-white/10 dark:bg-white/[0.025] sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
           <div className="flex min-w-0 items-center gap-4">
-            <BrandLogo className="h-16 w-16 shrink-0 text-white" src={settings.logoUrl} />
+            <BrandLogo className="h-12 w-12 shrink-0 text-white" src={settings.logoUrl} />
             <div className="min-w-0">
               <div className="font-semibold">Логотип кабинета</div>
-              <p className="mt-1 max-w-2xl text-sm leading-5 text-slate-500 dark:text-slate-400">
-                Если изображение не загружено или недоступно, интерфейс автоматически покажет стандартный знак.
-              </p>
+              <p className="mt-0.5 text-xs leading-5 text-slate-500 dark:text-slate-400">PNG, JPEG или WebP. Без файла используется стандартный знак.</p>
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -109,20 +108,20 @@ export function BrandingSettingsPanel({ initialSettings }: { initialSettings: Pu
               </button>
             ) : null}
           </div>
-        </div>
+          </div>
 
-        <div>
+          <div className="rounded-xl border border-slate-200 p-3 dark:border-white/10 sm:p-4">
           <div className="flex flex-wrap items-end justify-between gap-2">
             <div>
               <h3 className="font-semibold">Готовые темы</h3>
-              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Выберите основу. «Фирменная» возвращает предыдущий готовый стиль.</p>
+              <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Выберите готовую основу или настройте цвета вручную.</p>
             </div>
             <span className="text-xs font-medium uppercase tracking-[0.12em] text-slate-400">
               {selectedPreset ? selectedPreset.name : 'Своя палитра'}
             </span>
           </div>
 
-          <div className="mt-3 flex snap-x gap-3 overflow-x-auto pb-2 [scrollbar-width:thin] xl:grid xl:grid-cols-5 xl:overflow-visible xl:pb-0">
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
             {BRAND_THEME_PRESETS.map((preset) => {
               const active = selectedPreset?.id === preset.id
               const light = getBrandThemePreview(preset.accentColor, preset.accentSecondaryColor, 'light')
@@ -132,7 +131,7 @@ export function BrandingSettingsPanel({ initialSettings }: { initialSettings: Pu
                   key={preset.id}
                   type="button"
                   aria-pressed={active}
-                  className="group w-56 shrink-0 snap-start overflow-hidden rounded-2xl border bg-transparent text-left transition hover:-translate-y-0.5 xl:w-auto"
+                  className="group flex min-h-[4.25rem] items-center gap-3 rounded-xl border bg-slate-50/60 p-2.5 text-left transition hover:border-slate-300 hover:bg-white dark:bg-white/[0.025] dark:hover:border-white/15 dark:hover:bg-white/[0.05]"
                   style={{ borderColor: active ? preset.accentColor : undefined }}
                   onClick={() => setSettings((current) => ({
                     ...current,
@@ -140,28 +139,26 @@ export function BrandingSettingsPanel({ initialSettings }: { initialSettings: Pu
                     accentSecondaryColor: preset.accentSecondaryColor,
                   }))}
                 >
-                  <div className="grid h-20 grid-cols-2">
-                    <PresetModeSample colors={light} />
-                    <PresetModeSample colors={dark} />
-                  </div>
-                  <div className="flex min-h-24 gap-2 border-t border-slate-200 bg-white p-3 dark:border-white/10 dark:bg-white/[0.025]">
-                    <div className="min-w-0 flex-1">
-                      <div className="font-semibold text-slate-900 dark:text-white">{preset.name}</div>
-                      <div className="mt-1 text-xs leading-4 text-slate-500 dark:text-slate-400">{preset.description}</div>
-                    </div>
-                    {active ? (
-                      <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full" style={{ background: preset.accentColor, color: light.accentOn }}>
-                        <Check className="h-3.5 w-3.5" />
-                      </span>
-                    ) : null}
-                  </div>
+                  <span className="relative grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-lg" style={{ background: light.background }}>
+                    <span className="absolute inset-y-0 right-0 w-1/2" style={{ background: dark.background }} />
+                    <span className="relative h-4 w-4 rounded-full ring-2 ring-white/80" style={{ background: preset.accentColor }} />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-semibold text-slate-900 dark:text-white">{preset.name}</span>
+                    <span className="mt-0.5 block truncate text-xs text-slate-500 dark:text-slate-400">{preset.description}</span>
+                  </span>
+                  {active ? (
+                    <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full" style={{ background: preset.accentColor, color: light.accentOn }}>
+                      <Check className="h-3.5 w-3.5" />
+                    </span>
+                  ) : null}
                 </button>
               )
             })}
           </div>
-        </div>
+          </div>
 
-        <details className="group overflow-hidden rounded-2xl border border-slate-200 dark:border-white/10">
+          <details className="group overflow-hidden rounded-2xl border border-slate-200 dark:border-white/10">
           <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4 [&::-webkit-details-marker]:hidden">
             <span>
               <span className="block font-semibold">Расширенная настройка</span>
@@ -170,41 +167,26 @@ export function BrandingSettingsPanel({ initialSettings }: { initialSettings: Pu
             <span className="text-xs font-semibold text-brand-700 dark:text-brand-300 group-open:hidden">Открыть</span>
             <span className="hidden text-xs font-semibold text-brand-700 dark:text-brand-300 group-open:inline">Свернуть</span>
           </summary>
-          <div className="grid gap-5 border-t border-slate-200 p-4 dark:border-white/10 xl:grid-cols-[minmax(17rem,0.55fr)_minmax(0,1.45fr)]">
-            <div className="rounded-xl bg-slate-50/70 p-4 dark:bg-white/[0.025]">
-              <div className="font-semibold">Точная настройка</div>
-              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Можно изменить любой шаблон вручную. Текстовые оттенки рассчитываются автоматически.</p>
-              <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+          <div className="border-t border-slate-200 p-4 dark:border-white/10">
+              <p className="text-sm text-slate-500 dark:text-slate-400">Текстовые оттенки и контраст рассчитываются автоматически.</p>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
                 <ColorField label="Основной акцент" value={settings.accentColor} onChange={(accentColor) => setSettings((current) => ({ ...current, accentColor }))} />
                 <ColorField label="Глубокий акцент" value={settings.accentSecondaryColor} onChange={(accentSecondaryColor) => setSettings((current) => ({ ...current, accentSecondaryColor }))} />
               </div>
-            </div>
-
-            <div>
-              <div className="mb-2 flex items-center justify-between gap-3">
-                <div className="font-semibold">Проверка читаемости</div>
-                <div className="text-xs text-slate-500 dark:text-slate-400">Контраст текста подбирается отдельно</div>
-              </div>
-              <div className="grid gap-3 md:grid-cols-2">
-                <ThemeModePreview mode="light" accentColor={previewAccentColor} accentSecondaryColor={previewSecondaryColor} />
-                <ThemeModePreview mode="dark" accentColor={previewAccentColor} accentSecondaryColor={previewSecondaryColor} />
-              </div>
-            </div>
           </div>
-        </details>
+          </details>
+        </div>
+
+        <aside className="min-w-0 space-y-2 xl:sticky xl:top-4">
+          <div className="flex items-center justify-between gap-2 px-1">
+            <h3 className="text-sm font-semibold">Предпросмотр</h3>
+            <span className="text-[10px] font-medium uppercase tracking-[0.12em] text-slate-400">Сразу для двух тем</span>
+          </div>
+          <ThemeModePreview mode="light" accentColor={previewAccentColor} accentSecondaryColor={previewSecondaryColor} />
+          <ThemeModePreview mode="dark" accentColor={previewAccentColor} accentSecondaryColor={previewSecondaryColor} />
+        </aside>
       </div>
     </section>
-  )
-}
-
-function PresetModeSample({ colors }: { colors: ReturnType<typeof getBrandThemePreview> }) {
-  return (
-    <span className="relative block p-2.5" style={{ background: colors.background }}>
-      <span className="block h-2 w-12 rounded-full" style={{ background: colors.text }} />
-      <span className="mt-2 block h-1.5 w-8 rounded-full" style={{ background: colors.muted }} />
-      <span className="absolute bottom-2.5 left-2.5 h-2 w-8 rounded-full" style={{ background: colors.accent }} />
-      <span className="absolute bottom-2.5 right-2.5 h-2 w-5 rounded-full" style={{ background: colors.secondary }} />
-    </span>
   )
 }
 
@@ -231,9 +213,9 @@ function ThemeModePreview({ mode, accentColor, accentSecondaryColor }: {
         <p className="mt-1 text-sm" style={{ color: colors.muted }}>Основной и вторичный текст остаются читаемыми.</p>
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
           <span className="text-sm font-semibold" style={{ color: colors.accentText }}>Управлять подключением</span>
-          <button type="button" className="rounded-lg px-3 py-2 text-xs font-semibold" style={{ background: colors.secondary, color: colors.secondaryOn }}>
+          <span className="rounded-lg px-3 py-2 text-xs font-semibold" style={{ background: colors.secondary, color: colors.secondaryOn }}>
             Продлить
-          </button>
+          </span>
         </div>
       </div>
     </div>

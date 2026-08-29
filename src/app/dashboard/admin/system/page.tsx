@@ -43,15 +43,6 @@ export default async function AdminSystemPage() {
     >
       <AdminSystemTabs tabs={[
         {
-          id: 'health',
-          title: 'Состояние',
-          description: 'Сервисы и процессы',
-          badge: healthBadge,
-          tone: errorCount > 0 ? 'danger' : warningCount > 0 ? 'warning' : 'success',
-          keywords: ['диагностика', 'база данных', 'воркеры', 'обновления', 'бэкапы', 'remnawave', 'telegram'],
-          children: <SystemHealthPanel initialReport={report} />,
-        },
-        {
           id: 'branding',
           title: 'Оформление',
           description: 'Логотип и цвета',
@@ -76,6 +67,15 @@ export default async function AdminSystemPage() {
           tone: configuredPaymentCount > 0 ? 'success' : 'warning',
           keywords: ['юкасса', 'yookassa', 'payanyway', 'platega', 'webhook', 'оплата'],
           children: <PaymentProviderSettingsPanel initialSettings={paymentSettings} />,
+        },
+        {
+          id: 'health',
+          title: 'Состояние',
+          description: 'Сервисы и процессы',
+          badge: healthBadge,
+          tone: errorCount > 0 ? 'danger' : warningCount > 0 ? 'warning' : 'success',
+          keywords: ['диагностика', 'база данных', 'воркеры', 'обновления', 'бэкапы', 'remnawave', 'telegram'],
+          children: <SystemHealthPanel initialReport={report} />,
         },
       ]} />
     </AdminPageShell>

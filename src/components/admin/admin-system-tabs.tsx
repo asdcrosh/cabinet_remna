@@ -24,7 +24,7 @@ const icons: Record<SystemTabId, ComponentType<{ className?: string }>> = {
 }
 
 export function AdminSystemTabs({ tabs }: { tabs: SystemTab[] }) {
-  const [activeId, setActiveId] = useState<SystemTabId>(tabs[0]?.id ?? 'health')
+  const [activeId, setActiveId] = useState<SystemTabId>(tabs[0]?.id ?? 'branding')
   const [query, setQuery] = useState('')
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([])
   const normalizedQuery = query.trim().toLocaleLowerCase('ru-RU')
