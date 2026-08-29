@@ -38,8 +38,8 @@ export default async function AdminSystemPage() {
   return (
     <AdminPageShell
       title="Настройки"
-      description="Состояние системы, оформление, функции и приём платежей"
-      compact
+      description="Всё важное в одном месте, без длинной страницы"
+      variant="plain"
     >
       <AdminSystemTabs tabs={[
         {
@@ -48,6 +48,7 @@ export default async function AdminSystemPage() {
           description: 'Сервисы и процессы',
           badge: healthBadge,
           tone: errorCount > 0 ? 'danger' : warningCount > 0 ? 'warning' : 'success',
+          keywords: ['диагностика', 'база данных', 'воркеры', 'обновления', 'бэкапы', 'remnawave', 'telegram'],
           children: <SystemHealthPanel initialReport={report} />,
         },
         {
@@ -55,6 +56,7 @@ export default async function AdminSystemPage() {
           title: 'Оформление',
           description: 'Логотип и цвета',
           badge: branding.logoUrl ? 'Свой логотип' : 'Стандартный логотип',
+          keywords: ['бренд', 'тема', 'акцент', 'светлая', 'тёмная', 'иконка'],
           children: <BrandingSettingsPanel initialSettings={branding} />,
         },
         {
@@ -63,6 +65,7 @@ export default async function AdminSystemPage() {
           description: 'Разделы кабинета',
           badge: `${enabledFeatureCount} из 4 включено`,
           tone: 'success',
+          keywords: ['рефералы', 'промокоды', 'бонусы', 'рулетка', 'разделы'],
           children: <FeatureSettingsPanel initialFeatures={features} />,
         },
         {
@@ -71,6 +74,7 @@ export default async function AdminSystemPage() {
           description: 'Провайдеры оплаты',
           badge: `${configuredPaymentCount} из 3 готовы`,
           tone: configuredPaymentCount > 0 ? 'success' : 'warning',
+          keywords: ['юкасса', 'yookassa', 'payanyway', 'platega', 'webhook', 'оплата'],
           children: <PaymentProviderSettingsPanel initialSettings={paymentSettings} />,
         },
       ]} />

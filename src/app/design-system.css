@@ -3298,11 +3298,49 @@ html:not(.dark) .bonus-wheel-result-modal .bonus-wheel-result-promo small {
   border-radius: 0.85rem;
 }
 
-.admin-system-tabs {
-  padding: 0.2rem;
-  border-radius: 0.95rem;
-  background: color-mix(in srgb, var(--app-bg) 92%, transparent);
-  backdrop-filter: blur(14px);
+.admin-page-heading {
+  display: flex;
+  min-width: 0;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.15rem 0.15rem 0.25rem;
+}
+
+.admin-page-heading__eyebrow {
+  margin-bottom: 0.35rem;
+  color: var(--app-accent-text);
+  font-size: 0.66rem;
+  font-weight: 750;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.admin-page-heading__title {
+  color: var(--app-text);
+  font-size: clamp(1.65rem, 2.4vw, 2.25rem);
+  font-weight: 720;
+  letter-spacing: -0.045em;
+  line-height: 1.05;
+}
+
+.admin-page-heading__description {
+  margin-top: 0.4rem;
+  color: var(--app-muted);
+  font-size: 0.86rem;
+}
+
+.admin-page-heading__action {
+  flex: 0 0 auto;
+}
+
+.admin-system-nav {
+  min-width: 0;
+  padding: 0.65rem;
+  border: 1px solid color-mix(in srgb, var(--app-ink) 11%, var(--app-border));
+  border-radius: 1rem;
+  background: color-mix(in srgb, var(--app-surface) 97%, var(--app-bg));
+  box-shadow: 0 12px 34px color-mix(in srgb, var(--app-ink) 5%, transparent);
 }
 
 .admin-workspace :is(.card, .panel, .surface-card, .admin-list, .table-shell) {

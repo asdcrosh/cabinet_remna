@@ -9,7 +9,6 @@ import {
   Check,
   ChevronDown,
   CircleOff,
-  Clock3,
   CreditCard,
   Database,
   HardDrive,
@@ -104,32 +103,43 @@ export function SystemHealthPanel({ initialReport }: { initialReport: SystemHeal
 
   return (
     <div className="space-y-4" aria-live="polite">
-      <section className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-950 text-white shadow-sm dark:border-white/10">
-        <div className="grid gap-4 p-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
-          <div>
-            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-              <Activity className="h-4 w-4" /> Операционный статус
+      <section className={cn(
+        'rounded-2xl border bg-white p-4 shadow-sm dark:bg-white/[0.025] sm:p-5',
+        errors.length > 0 && 'border-red-200 dark:border-red-500/25',
+        errors.length === 0 && warnings.length > 0 && 'border-amber-200 dark:border-amber-500/25',
+        errors.length === 0 && warnings.length === 0 && 'border-emerald-200 dark:border-emerald-500/20'
+      )}>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex min-w-0 items-start gap-3">
+            <span className={cn(
+              'grid h-10 w-10 shrink-0 place-items-center rounded-xl',
+              errors.length > 0 && 'bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-300',
+              errors.length === 0 && warnings.length > 0 && 'bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-300',
+              errors.length === 0 && warnings.length === 0 && 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-300'
+            )}>
+              <Activity className="h-5 w-5" />
+            </span>
+            <div className="min-w-0">
+              <h2 className="text-lg font-semibold tracking-tight">{headline}</h2>
+              <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
+                Автопроверка раз в минуту · проверено {checkedAtLabel}
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <StatusMetric label="Работает" value={working} tone="success" />
+                <StatusMetric label="Внимание" value={warnings.length} tone="warning" />
+                <StatusMetric label="Ошибки" value={errors.length} tone="danger" />
+              </div>
             </div>
-            <h2 className="mt-2 text-xl font-semibold tracking-tight sm:text-2xl">{headline}</h2>
-            <p className="mt-1.5 max-w-2xl text-sm leading-5 text-slate-300">
-              Проверка платежей, выдачи доступа и фоновых процессов раз в минуту.
-            </p>
           </div>
           <button
             type="button"
             onClick={() => void refresh(true)}
             disabled={loading}
-            className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/10 px-4 text-sm font-semibold transition hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 disabled:opacity-60 sm:w-auto"
+            className="btn-secondary inline-flex min-h-10 w-full items-center justify-center gap-2 px-4 text-sm font-semibold disabled:opacity-60 sm:w-auto"
           >
             {loading ? <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" /> : <RefreshCw className="h-4 w-4" />}
             Обновить
           </button>
-        </div>
-
-        <div className="grid grid-cols-3 border-t border-white/10">
-          <HeroMetric label="Работает" value={working} tone="text-emerald-300" />
-          <HeroMetric label="Внимание" value={warnings.length} tone="text-amber-300" border />
-          <HeroMetric label="Ошибки" value={errors.length} tone="text-red-300" border />
         </div>
       </section>
 
@@ -165,9 +175,6 @@ export function SystemHealthPanel({ initialReport }: { initialReport: SystemHeal
         ))}
       </div>
 
-      <div className="flex items-center gap-2 px-1 text-xs text-slate-400">
-        <Clock3 className="h-3.5 w-3.5" /> Проверено {checkedAtLabel}
-      </div>
     </div>
   )
 }
@@ -263,12 +270,16 @@ function ActionLink({ item, compact = false }: { item: SystemHealthCheck; compac
   )
 }
 
-function HeroMetric({ label, value, tone, border = false }: { label: string; value: number; tone: string; border?: boolean }) {
+function StatusMetric({ label, value, tone }: { label: string; value: number; tone: 'success' | 'warning' | 'danger' }) {
   return (
-    <div className={cn('px-4 py-3', border && 'border-l border-white/10')}>
-      <div className={cn('text-xl font-semibold tabular-nums', tone)}>{value}</div>
-      <div className="mt-0.5 text-xs text-slate-400">{label}</div>
-    </div>
+    <span className={cn(
+      'inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-medium tabular-nums',
+      tone === 'success' && 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300',
+      tone === 'warning' && 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300',
+      tone === 'danger' && 'bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300'
+    )}>
+      <strong>{value}</strong> {label}
+    </span>
   )
 }
 
