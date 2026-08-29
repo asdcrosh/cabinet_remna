@@ -54,11 +54,11 @@ export function FeatureSettingsPanel({ initialFeatures }: { initialFeatures: Fea
   }
 
   return (
-    <section data-testid="feature-settings" className="overflow-hidden rounded-3xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.025]">
+    <section data-testid="feature-settings" className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.025]">
       <div className="flex flex-col gap-3 border-b border-slate-200 p-4 dark:border-white/[0.07] sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-lg font-semibold">Функции кабинета</h2>
-          <p className="mt-0.5 text-sm text-slate-500">Настройки хранятся в кабинете, без правки .env</p>
+          <p className="mt-0.5 text-sm text-slate-500">Включайте только те разделы, которыми пользуетесь</p>
         </div>
         <button type="button" className="btn-primary w-full sm:w-auto" disabled={!dirty || saving} onClick={save}>
           {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
@@ -66,11 +66,11 @@ export function FeatureSettingsPanel({ initialFeatures }: { initialFeatures: Fea
         </button>
       </div>
 
-      <div className="divide-y divide-slate-200 dark:divide-white/[0.07]">
+      <div className="grid gap-2 p-4 sm:grid-cols-2">
         {items.map((item) => {
           const enabled = features[item.key]
           return (
-            <div key={item.key} className="flex items-center justify-between gap-4 px-4 py-3.5">
+            <div key={item.key} className="flex min-h-[5rem] items-center justify-between gap-4 rounded-xl border border-slate-200 bg-slate-50/60 p-3.5 dark:border-white/[0.08] dark:bg-white/[0.025]">
               <div className="min-w-0">
                 <div className="font-medium">{item.title}</div>
                 <div className="mt-0.5 text-sm text-slate-500">{item.description}</div>

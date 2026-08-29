@@ -9,6 +9,7 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { Switch } from '@/components/ui/switch'
 
 type EditableSettings = Omit<PublicPaymentProviderSettings, 'source'>
+type ProviderId = 'yookassa' | 'payAnyWay' | 'platega'
 
 export function PaymentProviderSettingsPanel({
   initialSettings,
@@ -21,12 +22,33 @@ export function PaymentProviderSettingsPanel({
   const [yookassaSecret, setYookassaSecret] = useState('')
   const [payAnyWaySecret, setPayAnyWaySecret] = useState('')
   const [plategaSecret, setPlategaSecret] = useState('')
+  const [activeProvider, setActiveProvider] = useState<ProviderId>('yookassa')
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [resetOpen, setResetOpen] = useState(false)
   const dirty = JSON.stringify(settings) !== JSON.stringify(saved) || Boolean(
     yookassaSecret || payAnyWaySecret || plategaSecret
   )
+  const yookassaConfigured = Boolean(
+    settings.yookassa.enabled
+    && settings.yookassa.shopId.trim()
+    && (settings.yookassa.secretConfigured || yookassaSecret.trim())
+  )
+  const payAnyWayConfigured = Boolean(
+    settings.payAnyWay.enabled
+    && settings.payAnyWay.merchantId.trim()
+    && (settings.payAnyWay.integrityCodeConfigured || payAnyWaySecret.trim())
+  )
+  const plategaConfigured = Boolean(
+    settings.platega.enabled
+    && settings.platega.merchantId.trim()
+    && (settings.platega.secretConfigured || plategaSecret.trim())
+  )
+  const providerTabs: Array<{ id: ProviderId; title: string; configured: boolean; enabled: boolean }> = [
+    { id: 'yookassa', title: 'ЮKassa', configured: yookassaConfigured, enabled: settings.yookassa.enabled },
+    { id: 'payAnyWay', title: 'PayAnyWay', configured: payAnyWayConfigured, enabled: settings.payAnyWay.enabled },
+    { id: 'platega', title: 'Platega', configured: plategaConfigured, enabled: settings.platega.enabled },
+  ]
   useUnsavedChanges(dirty && !saving)
 
   async function save() {
@@ -95,7 +117,7 @@ export function PaymentProviderSettingsPanel({
   }
 
   return (
-    <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.025]">
+    <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.025]">
       <div className="flex flex-col gap-3 border-b border-slate-200 p-4 dark:border-white/[0.07] sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-lg font-semibold">Платёжные системы</h2>
@@ -117,16 +139,52 @@ export function PaymentProviderSettingsPanel({
         </div>
       </div>
 
-      <div className="grid gap-0 divide-y divide-slate-200 dark:divide-white/[0.07] lg:grid-cols-3 lg:divide-x lg:divide-y-0">
-        <ProviderCard
+      <div className="p-4">
+        <div className="grid grid-cols-3 gap-2" role="tablist" aria-label="Платёжные провайдеры">
+          {providerTabs.map((provider) => {
+            const active = provider.id === activeProvider
+            const status = provider.configured ? 'Готова' : provider.enabled ? 'Настроить' : 'Отключена'
+            return (
+              <button
+                key={provider.id}
+                type="button"
+                role="tab"
+                id={`payment-provider-tab-${provider.id}`}
+                aria-selected={active}
+                aria-controls={`payment-provider-${provider.id}`}
+                className={cn(
+                  'min-w-0 rounded-xl border px-2.5 py-2.5 text-left transition sm:px-3',
+                  active
+                    ? 'border-brand-200 bg-brand-50 dark:border-brand-400/20 dark:bg-brand-400/10'
+                    : 'border-slate-200 bg-slate-50/60 hover:border-slate-300 dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-white/15'
+                )}
+                onClick={() => setActiveProvider(provider.id)}
+              >
+                <span className="block truncate text-xs font-semibold sm:text-sm">{provider.title}</span>
+                <span className={cn(
+                  'mt-1 flex items-center gap-1.5 text-[10px] sm:text-xs',
+                  provider.configured ? 'text-emerald-700 dark:text-emerald-300' : 'text-slate-500'
+                )}>
+                  <span className={cn('h-1.5 w-1.5 shrink-0 rounded-full bg-slate-400', provider.configured && 'bg-emerald-500')} />
+                  <span className="truncate">{status}</span>
+                </span>
+              </button>
+            )
+          })}
+        </div>
+
+        <div
+          id={`payment-provider-${activeProvider}`}
+          role="tabpanel"
+          aria-labelledby={`payment-provider-tab-${activeProvider}`}
+          className="mt-4"
+        >
+          {activeProvider === 'yookassa' ? (
+            <ProviderCard
           icon={<CreditCard className="h-5 w-5" />}
           title="ЮKassa"
           enabled={settings.yookassa.enabled}
-          configured={Boolean(
-            settings.yookassa.enabled &&
-            settings.yookassa.shopId.trim() &&
-            (settings.yookassa.secretConfigured || yookassaSecret.trim())
-          )}
+          configured={yookassaConfigured}
           onToggle={() => setSettings((current) => ({
             ...current,
             yookassa: { ...current.yookassa, enabled: !current.yookassa.enabled },
@@ -168,17 +226,15 @@ export function PaymentProviderSettingsPanel({
             />
           </Field>
           <CallbackPath path="/api/webhook/yookassa" />
-        </ProviderCard>
+            </ProviderCard>
+          ) : null}
 
-        <ProviderCard
+          {activeProvider === 'payAnyWay' ? (
+            <ProviderCard
           icon={<ShieldCheck className="h-5 w-5" />}
           title="PayAnyWay"
           enabled={settings.payAnyWay.enabled}
-          configured={Boolean(
-            settings.payAnyWay.enabled &&
-            settings.payAnyWay.merchantId.trim() &&
-            (settings.payAnyWay.integrityCodeConfigured || payAnyWaySecret.trim())
-          )}
+          configured={payAnyWayConfigured}
           onToggle={() => setSettings((current) => ({
             ...current,
             payAnyWay: { ...current.payAnyWay, enabled: !current.payAnyWay.enabled },
@@ -230,17 +286,15 @@ export function PaymentProviderSettingsPanel({
             />
           </div>
           <CallbackPath path="/api/webhook/payanyway" label="Pay URL" />
-        </ProviderCard>
+            </ProviderCard>
+          ) : null}
 
-        <ProviderCard
+          {activeProvider === 'platega' ? (
+            <ProviderCard
           icon={<ShieldCheck className="h-5 w-5" />}
           title="Platega"
           enabled={settings.platega.enabled}
-          configured={Boolean(
-            settings.platega.enabled &&
-            settings.platega.merchantId.trim() &&
-            (settings.platega.secretConfigured || plategaSecret.trim())
-          )}
+          configured={plategaConfigured}
           onToggle={() => setSettings((current) => ({
             ...current,
             platega: { ...current.platega, enabled: !current.platega.enabled },
@@ -273,7 +327,9 @@ export function PaymentProviderSettingsPanel({
             Покупатель выберет доступный способ на защищённой странице Platega.
           </div>
           <CallbackPath path="/api/webhook/platega" />
-        </ProviderCard>
+            </ProviderCard>
+          ) : null}
+        </div>
       </div>
 
       {message ? (
@@ -311,7 +367,7 @@ function ProviderCard({
   children: React.ReactNode
 }) {
   return (
-    <div className="p-4">
+    <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 dark:border-white/[0.08] dark:bg-white/[0.025] sm:p-5">
       <div className="mb-4 flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2.5">
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-slate-200">

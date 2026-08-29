@@ -68,8 +68,8 @@ export function BrandingSettingsPanel({ initialSettings }: { initialSettings: Pu
   }
 
   return (
-    <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.025]">
-      <div className="flex flex-col gap-3 border-b border-slate-200 p-5 dark:border-white/[0.07] sm:flex-row sm:items-center sm:justify-between">
+    <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.025]">
+      <div className="flex flex-col gap-3 border-b border-slate-200 p-4 dark:border-white/[0.07] sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="flex items-center gap-2 text-lg font-semibold"><Palette className="h-5 w-5" />Тема и бренд</h2>
           <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">Готовая палитра, логотип и проверка читаемости в обоих режимах</p>
@@ -80,7 +80,7 @@ export function BrandingSettingsPanel({ initialSettings }: { initialSettings: Pu
         </button>
       </div>
 
-      <div className="space-y-7 p-5">
+      <div className="space-y-5 p-4 sm:p-5">
         <div className="grid gap-4 rounded-2xl border border-slate-200 bg-slate-50/70 p-4 dark:border-white/10 dark:bg-white/[0.025] lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
           <div className="flex min-w-0 items-center gap-4">
             <BrandLogo className="h-16 w-16 shrink-0 text-white" src={settings.logoUrl} />
@@ -122,7 +122,7 @@ export function BrandingSettingsPanel({ initialSettings }: { initialSettings: Pu
             </span>
           </div>
 
-          <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+          <div className="mt-3 flex snap-x gap-3 overflow-x-auto pb-2 [scrollbar-width:thin] xl:grid xl:grid-cols-5 xl:overflow-visible xl:pb-0">
             {BRAND_THEME_PRESETS.map((preset) => {
               const active = selectedPreset?.id === preset.id
               const light = getBrandThemePreview(preset.accentColor, preset.accentSecondaryColor, 'light')
@@ -132,7 +132,7 @@ export function BrandingSettingsPanel({ initialSettings }: { initialSettings: Pu
                   key={preset.id}
                   type="button"
                   aria-pressed={active}
-                  className="group overflow-hidden rounded-2xl border bg-transparent text-left transition hover:-translate-y-0.5"
+                  className="group w-56 shrink-0 snap-start overflow-hidden rounded-2xl border bg-transparent text-left transition hover:-translate-y-0.5 xl:w-auto"
                   style={{ borderColor: active ? preset.accentColor : undefined }}
                   onClick={() => setSettings((current) => ({
                     ...current,
@@ -161,27 +161,37 @@ export function BrandingSettingsPanel({ initialSettings }: { initialSettings: Pu
           </div>
         </div>
 
-        <div className="grid gap-5 xl:grid-cols-[minmax(17rem,0.55fr)_minmax(0,1.45fr)]">
-          <div className="rounded-2xl border border-slate-200 p-4 dark:border-white/10">
-            <div className="font-semibold">Точная настройка</div>
-            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Можно изменить любой шаблон вручную. Текстовые оттенки рассчитываются автоматически.</p>
-            <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-              <ColorField label="Основной акцент" value={settings.accentColor} onChange={(accentColor) => setSettings((current) => ({ ...current, accentColor }))} />
-              <ColorField label="Глубокий акцент" value={settings.accentSecondaryColor} onChange={(accentSecondaryColor) => setSettings((current) => ({ ...current, accentSecondaryColor }))} />
+        <details className="group overflow-hidden rounded-2xl border border-slate-200 dark:border-white/10">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4 [&::-webkit-details-marker]:hidden">
+            <span>
+              <span className="block font-semibold">Расширенная настройка</span>
+              <span className="mt-0.5 block text-sm text-slate-500 dark:text-slate-400">Свои цвета и проверка контраста</span>
+            </span>
+            <span className="text-xs font-semibold text-brand-700 dark:text-brand-300 group-open:hidden">Открыть</span>
+            <span className="hidden text-xs font-semibold text-brand-700 dark:text-brand-300 group-open:inline">Свернуть</span>
+          </summary>
+          <div className="grid gap-5 border-t border-slate-200 p-4 dark:border-white/10 xl:grid-cols-[minmax(17rem,0.55fr)_minmax(0,1.45fr)]">
+            <div className="rounded-xl bg-slate-50/70 p-4 dark:bg-white/[0.025]">
+              <div className="font-semibold">Точная настройка</div>
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Можно изменить любой шаблон вручную. Текстовые оттенки рассчитываются автоматически.</p>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+                <ColorField label="Основной акцент" value={settings.accentColor} onChange={(accentColor) => setSettings((current) => ({ ...current, accentColor }))} />
+                <ColorField label="Глубокий акцент" value={settings.accentSecondaryColor} onChange={(accentSecondaryColor) => setSettings((current) => ({ ...current, accentSecondaryColor }))} />
+              </div>
             </div>
-          </div>
 
-          <div>
-            <div className="mb-2 flex items-center justify-between gap-3">
-              <div className="font-semibold">Проверка читаемости</div>
-              <div className="text-xs text-slate-500 dark:text-slate-400">Контраст текста подбирается отдельно</div>
-            </div>
-            <div className="grid gap-3 md:grid-cols-2">
-              <ThemeModePreview mode="light" accentColor={previewAccentColor} accentSecondaryColor={previewSecondaryColor} />
-              <ThemeModePreview mode="dark" accentColor={previewAccentColor} accentSecondaryColor={previewSecondaryColor} />
+            <div>
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <div className="font-semibold">Проверка читаемости</div>
+                <div className="text-xs text-slate-500 dark:text-slate-400">Контраст текста подбирается отдельно</div>
+              </div>
+              <div className="grid gap-3 md:grid-cols-2">
+                <ThemeModePreview mode="light" accentColor={previewAccentColor} accentSecondaryColor={previewSecondaryColor} />
+                <ThemeModePreview mode="dark" accentColor={previewAccentColor} accentSecondaryColor={previewSecondaryColor} />
+              </div>
             </div>
           </div>
-        </div>
+        </details>
       </div>
     </section>
   )

@@ -490,7 +490,7 @@ test('экраны админки не создают горизонтальну
     ['/dashboard/admin/notifications', 'Уведомления'],
     ['/dashboard/admin/broadcasts', 'Рассылки'],
     ['/dashboard/admin/remnashop-sync', 'Remnashop'],
-    ['/dashboard/admin/system', 'Состояние системы'],
+    ['/dashboard/admin/system', 'Настройки'],
   ] as const
 
   for (const [href, title] of screens) {
@@ -503,6 +503,7 @@ test('экраны админки не создают горизонтальну
 test('функции кабинета управляются из системного раздела', async ({ page }) => {
   await login(page, E2E_USERS.admin.email)
   await page.goto('/dashboard/admin/system')
+  await page.getByRole('tab', { name: 'Функции' }).click()
 
   const features = page.getByRole('main').getByTestId('feature-settings')
   await expect(features).toBeVisible()

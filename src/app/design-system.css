@@ -3269,6 +3269,42 @@ html:not(.dark) .bonus-wheel-result-modal .bonus-wheel-result-promo small {
   transform: rotate(3deg);
 }
 
+.admin-page-hero--compact {
+  padding: 1rem 1.15rem;
+  border-radius: 1.2rem;
+}
+
+.admin-page-hero--compact .admin-page-hero__content {
+  min-height: 3.4rem;
+}
+
+.admin-page-hero--compact .admin-page-hero__eyebrow {
+  margin-bottom: 0.35rem;
+}
+
+.admin-page-hero--compact .admin-page-hero__title {
+  font-size: clamp(1.55rem, 2.2vw, 2.15rem);
+  letter-spacing: -0.045em;
+}
+
+.admin-page-hero--compact .admin-page-hero__description {
+  margin-top: 0.4rem;
+  font-size: 0.85rem;
+}
+
+.admin-page-hero--compact .admin-page-hero__mark {
+  width: 2.8rem;
+  height: 2.8rem;
+  border-radius: 0.85rem;
+}
+
+.admin-system-tabs {
+  padding: 0.2rem;
+  border-radius: 0.95rem;
+  background: color-mix(in srgb, var(--app-bg) 92%, transparent);
+  backdrop-filter: blur(14px);
+}
+
 .admin-workspace :is(.card, .panel, .surface-card, .admin-list, .table-shell) {
   border-color: color-mix(in srgb, var(--app-ink) 11%, var(--app-border)) !important;
   border-radius: 1.3rem !important;

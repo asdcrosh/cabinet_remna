@@ -7,6 +7,7 @@ import {
   AlertTriangle,
   ArrowUpRight,
   Check,
+  ChevronDown,
   CircleOff,
   Clock3,
   CreditCard,
@@ -102,23 +103,23 @@ export function SystemHealthPanel({ initialReport }: { initialReport: SystemHeal
       : 'Все основные контуры работают'
 
   return (
-    <div className="space-y-5" aria-live="polite">
-      <section className="overflow-hidden rounded-3xl border border-slate-800 bg-slate-950 text-white shadow-sm dark:border-white/10">
-        <div className="grid gap-6 p-5 sm:p-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+    <div className="space-y-4" aria-live="polite">
+      <section className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-950 text-white shadow-sm dark:border-white/10">
+        <div className="grid gap-4 p-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
           <div>
             <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
               <Activity className="h-4 w-4" /> Операционный статус
             </div>
-            <h2 className="mt-3 text-2xl font-semibold tracking-tight sm:text-3xl">{headline}</h2>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">
-              Один экран для денег, выдачи доступа, интеграций и фоновых процессов. Данные обновляются автоматически раз в минуту.
+            <h2 className="mt-2 text-xl font-semibold tracking-tight sm:text-2xl">{headline}</h2>
+            <p className="mt-1.5 max-w-2xl text-sm leading-5 text-slate-300">
+              Проверка платежей, выдачи доступа и фоновых процессов раз в минуту.
             </p>
           </div>
           <button
             type="button"
             onClick={() => void refresh(true)}
             disabled={loading}
-            className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/10 px-4 text-sm font-semibold transition hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 disabled:opacity-60 sm:w-auto"
+            className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/10 px-4 text-sm font-semibold transition hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 disabled:opacity-60 sm:w-auto"
           >
             {loading ? <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" /> : <RefreshCw className="h-4 w-4" />}
             Обновить
@@ -158,20 +159,7 @@ export function SystemHealthPanel({ initialReport }: { initialReport: SystemHeal
         </section>
       ) : null}
 
-      <nav className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:thin]" aria-label="Разделы состояния системы">
-        {groups.map(({ category, checks }) => {
-          const meta = categoryView[category]
-          const state = categoryStatus(checks)
-          return (
-            <a key={category} href={`#health-${category}`} className="inline-flex min-h-10 shrink-0 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium transition hover:border-slate-300 dark:border-white/10 dark:bg-white/[0.03] dark:hover:border-white/20">
-              <span className={cn('h-2 w-2 rounded-full', statusView[state].dot)} />
-              {meta.title}
-            </a>
-          )
-        })}
-      </nav>
-
-      <div className="space-y-7">
+      <div className="space-y-2">
         {groups.map(({ category, checks }) => (
           <HealthGroup key={category} category={category} checks={checks} />
         ))}
@@ -190,23 +178,30 @@ function HealthGroup({ category, checks }: { category: SystemHealthCategory; che
   const state = categoryStatus(checks)
   const view = statusView[state]
   return (
-    <section id={`health-${category}`} className="scroll-mt-24" aria-labelledby={`health-${category}-title`}>
-      <div className="mb-3 flex items-end justify-between gap-3 px-1">
+    <details
+      id={`health-${category}`}
+      className="group scroll-mt-24 overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.03]"
+      open={state === 'error' || state === 'warn' ? true : undefined}
+    >
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-3.5 [&::-webkit-details-marker]:hidden">
         <div className="flex items-center gap-3">
-          <div className="grid h-10 w-10 place-items-center rounded-2xl bg-slate-100 text-slate-600 dark:bg-white/[0.06] dark:text-slate-300">
-            <Icon className="h-5 w-5" />
+          <div className="grid h-9 w-9 place-items-center rounded-lg bg-slate-100 text-slate-600 dark:bg-white/[0.06] dark:text-slate-300">
+            <Icon className="h-4 w-4" />
           </div>
           <div>
             <h2 id={`health-${category}-title`} className="font-semibold">{meta.title}</h2>
             <p className="text-xs text-slate-500">{meta.description}</p>
           </div>
         </div>
-        <span className={cn('text-xs font-semibold', view.text)}>{view.label}</span>
-      </div>
-      <div className="grid items-start gap-3 md:grid-cols-2">
+        <span className="flex shrink-0 items-center gap-2">
+          <span className={cn('text-xs font-semibold', view.text)}>{view.label}</span>
+          <ChevronDown className="h-4 w-4 text-slate-400 transition-transform group-open:rotate-180" />
+        </span>
+      </summary>
+      <div className="grid items-start gap-3 border-t border-slate-200 p-3 dark:border-white/[0.08] md:grid-cols-2">
         {checks.map((item) => <HealthCard key={item.id} item={item} />)}
       </div>
-    </section>
+    </details>
   )
 }
 
@@ -270,8 +265,8 @@ function ActionLink({ item, compact = false }: { item: SystemHealthCheck; compac
 
 function HeroMetric({ label, value, tone, border = false }: { label: string; value: number; tone: string; border?: boolean }) {
   return (
-    <div className={cn('px-4 py-4 sm:px-6', border && 'border-l border-white/10')}>
-      <div className={cn('text-2xl font-semibold tabular-nums', tone)}>{value}</div>
+    <div className={cn('px-4 py-3', border && 'border-l border-white/10')}>
+      <div className={cn('text-xl font-semibold tabular-nums', tone)}>{value}</div>
       <div className="mt-0.5 text-xs text-slate-400">{label}</div>
     </div>
   )

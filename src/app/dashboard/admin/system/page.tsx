@@ -8,9 +8,10 @@ import { PaymentProviderSettingsPanel } from '@/components/admin/payment-provide
 import { getPublicPaymentProviderSettings } from '@/lib/payment-settings'
 import { BrandingSettingsPanel } from '@/components/admin/branding-settings-panel'
 import { getPublicBrandSettings } from '@/lib/branding'
+import { AdminSystemTabs } from '@/components/admin/admin-system-tabs'
 
 export const dynamic = 'force-dynamic'
-export const metadata = { title: 'Состояние системы' }
+export const metadata = { title: 'Настройки' }
 
 export default async function AdminSystemPage() {
   await requireAdminPage()
@@ -20,26 +21,59 @@ export default async function AdminSystemPage() {
     getPublicPaymentProviderSettings(),
     getPublicBrandSettings(),
   ])
+  const errorCount = report.checks.filter((item) => item.status === 'error').length
+  const warningCount = report.checks.filter((item) => item.status === 'warn').length
+  const enabledFeatureCount = Object.values(features).filter(Boolean).length
+  const configuredPaymentCount = [
+    paymentSettings.yookassa,
+    paymentSettings.payAnyWay,
+    paymentSettings.platega,
+  ].filter((provider) => provider.enabled && provider.configured).length
+  const healthBadge = errorCount > 0
+    ? `${errorCount} ошибок`
+    : warningCount > 0
+      ? `${warningCount} замечаний`
+      : 'Всё работает'
 
   return (
     <AdminPageShell
-      title="Состояние системы"
-      description="Платежи, синхронизация, фоновые процессы и инфраструктура"
+      title="Настройки"
+      description="Состояние системы, оформление, функции и приём платежей"
+      compact
     >
-      <div className="space-y-8">
-        <SystemHealthPanel initialReport={report} />
-        <div className="border-t border-slate-200 pt-7 dark:border-white/10">
-          <div className="mb-4 px-1">
-            <h2 className="text-xl font-semibold tracking-tight">Настройки</h2>
-            <p className="mt-1 text-sm text-slate-500">Оформление, функции кабинета и платёжные провайдеры</p>
-          </div>
-          <div className="space-y-5">
-            <BrandingSettingsPanel initialSettings={branding} />
-            <FeatureSettingsPanel initialFeatures={features} />
-            <PaymentProviderSettingsPanel initialSettings={paymentSettings} />
-          </div>
-        </div>
-      </div>
+      <AdminSystemTabs tabs={[
+        {
+          id: 'health',
+          title: 'Состояние',
+          description: 'Сервисы и процессы',
+          badge: healthBadge,
+          tone: errorCount > 0 ? 'danger' : warningCount > 0 ? 'warning' : 'success',
+          children: <SystemHealthPanel initialReport={report} />,
+        },
+        {
+          id: 'branding',
+          title: 'Оформление',
+          description: 'Логотип и цвета',
+          badge: branding.logoUrl ? 'Свой логотип' : 'Стандартный логотип',
+          children: <BrandingSettingsPanel initialSettings={branding} />,
+        },
+        {
+          id: 'features',
+          title: 'Функции',
+          description: 'Разделы кабинета',
+          badge: `${enabledFeatureCount} из 4 включено`,
+          tone: 'success',
+          children: <FeatureSettingsPanel initialFeatures={features} />,
+        },
+        {
+          id: 'payments',
+          title: 'Платежи',
+          description: 'Провайдеры оплаты',
+          badge: `${configuredPaymentCount} из 3 готовы`,
+          tone: configuredPaymentCount > 0 ? 'success' : 'warning',
+          children: <PaymentProviderSettingsPanel initialSettings={paymentSettings} />,
+        },
+      ]} />
     </AdminPageShell>
   )
 }
