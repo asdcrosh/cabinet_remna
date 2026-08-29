@@ -110,6 +110,7 @@ const localPayment = {
 }
 
 const idempotencyKey = '6dad4f34-1b9e-4863-9ce1-5db7a29e12f7'
+const futureDate = (days: number) => new Date(Date.now() + days * 24 * 60 * 60 * 1000)
 
 function paymentRequest(body: Record<string, unknown> = {}) {
   return new Request('http://localhost:3000/api/payment/create', {
@@ -181,7 +182,7 @@ describe('payment create route', () => {
       userId: user.id,
       planId: plan.id,
       status: 'ACTIVE',
-      expireAt: new Date('2026-09-01T00:00:00.000Z'),
+      expireAt: futureDate(30),
       deviceLimit: 5,
       whitelistAddonActive: false,
     })
@@ -224,10 +225,10 @@ describe('payment create route', () => {
       userId: user.id,
       planId: plan.id,
       status: 'ACTIVE',
-      expireAt: new Date('2026-09-01T00:00:00.000Z'),
+      expireAt: futureDate(30),
       deviceLimit: 5,
       whitelistAddonActive: true,
-      whitelistAddonExpireAt: new Date('2026-08-28T00:00:00.000Z'),
+      whitelistAddonExpireAt: futureDate(7),
     })
     mocks.txPaymentCreate.mockResolvedValue({
       ...localPayment,
@@ -420,7 +421,7 @@ describe('payment create route', () => {
       id: 'subscription-1',
       planId: 'old-plan',
       status: 'ACTIVE',
-      expireAt: new Date('2026-09-01T00:00:00.000Z'),
+      expireAt: futureDate(30),
       whitelistAddonActive: false,
       plan: { id: 'old-plan', name: 'Старый' },
     })
@@ -443,9 +444,9 @@ describe('payment create route', () => {
       id: 'subscription-1',
       planId: 'old-plan',
       status: 'ACTIVE',
-      expireAt: new Date('2026-09-01T00:00:00.000Z'),
+      expireAt: futureDate(30),
       whitelistAddonActive: true,
-      whitelistAddonExpireAt: new Date('2026-08-28T00:00:00.000Z'),
+      whitelistAddonExpireAt: futureDate(7),
       plan: { id: 'old-plan', name: 'Старый' },
     })
 
