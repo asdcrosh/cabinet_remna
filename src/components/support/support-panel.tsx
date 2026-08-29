@@ -503,56 +503,45 @@ export function SupportPanel({
       <section className={cn('min-h-0 overflow-y-auto xl:flex xl:flex-col xl:overflow-hidden', mobileChatOpen && 'hidden xl:flex')}>
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[1.75rem] border border-slate-200/80 bg-white shadow-[0_24px_70px_-44px_rgba(15,23,42,0.48)] dark:border-white/[0.09] dark:bg-white/[0.035] dark:shadow-black/20">
           <div className={cn(
-            'relative overflow-hidden border-b border-slate-100/80 px-3.5 py-3.5 dark:border-white/[0.07] sm:px-4',
+            'relative overflow-hidden border-b border-slate-100/80 px-3 py-2.5 dark:border-white/[0.07] sm:px-3.5',
             mode === 'admin'
               ? 'bg-gradient-to-br from-violet-50/90 via-white to-cyan-50/70 dark:from-violet-500/[0.08] dark:via-transparent dark:to-cyan-400/[0.06]'
               : 'bg-gradient-to-br from-fuchsia-50/90 via-white to-cyan-50/80 dark:from-fuchsia-500/[0.09] dark:via-transparent dark:to-cyan-400/[0.07]'
           )}>
-            <div aria-hidden="true" className="pointer-events-none absolute -right-12 -top-16 h-40 w-40 rounded-full bg-fuchsia-300/20 blur-3xl dark:bg-fuchsia-400/10" />
+            <div aria-hidden="true" className="pointer-events-none absolute -right-10 -top-14 h-28 w-28 rounded-full bg-fuchsia-300/15 blur-3xl dark:bg-fuchsia-400/[0.07]" />
             {mode === 'user' ? (
               <div className="relative">
-                <div className="flex items-start gap-3">
-                  <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-fuchsia-600 to-cyan-500 text-white shadow-lg shadow-fuchsia-500/20 dark:from-fuchsia-500 dark:to-cyan-400">
-                    <Headphones className="h-6 w-6" />
+                <div className="flex items-center gap-2.5">
+                  <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-fuchsia-600 to-cyan-500 text-white shadow-md shadow-fuchsia-500/15 dark:from-fuchsia-500 dark:to-cyan-400">
+                    <Headphones className="h-[18px] w-[18px]" />
                   </span>
                   <div className="min-w-0 flex-1">
-                    <div className="page-eyebrow">Центр помощи</div>
-                    <h1 className="mt-0.5 text-xl font-semibold tracking-[-0.035em] text-slate-950 dark:text-white">Чем можем помочь?</h1>
-                    <p className="mt-1 text-sm leading-5 text-slate-500 dark:text-slate-400">Опишите вопрос, ответ появится прямо здесь.</p>
+                    <h1 className="truncate text-base font-semibold tracking-[-0.025em] text-slate-950 dark:text-white">Чем можем помочь?</h1>
+                    <p className="mt-0.5 flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400">
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> Ответим в этом чате
+                    </p>
                   </div>
-                </div>
-                <button type="button" onClick={openNewTicket} className="mt-4 flex min-h-12 w-full items-center justify-between gap-3 rounded-2xl bg-slate-950 px-4 py-3 text-left text-white shadow-lg shadow-slate-950/15 transition hover:-translate-y-0.5 hover:bg-fuchsia-700 dark:bg-white dark:text-slate-950 dark:hover:bg-fuchsia-100">
-                  <span className="flex items-center gap-3">
-                    <span className="grid h-8 w-8 place-items-center rounded-xl bg-white/10 dark:bg-slate-950/10">
-                      <MessageSquarePlus className="h-4 w-4" />
-                    </span>
-                    <span>
-                      <span className="block text-sm font-semibold">Новое обращение</span>
-                      <span className="block text-xs text-white/60 dark:text-slate-500">Тема и описание, займёт меньше минуты</span>
-                    </span>
-                  </span>
-                  <ChevronRight className="h-4 w-4 shrink-0" />
-                </button>
-                <div className="mt-3 flex items-center justify-between gap-3 text-xs text-slate-500 dark:text-slate-400">
-                  <span className="flex items-center gap-1.5"><Clock3 className="h-3.5 w-3.5 text-emerald-500" /> Обычно отвечаем в этом чате</span>
-                  {unreadTotal > 0 && <span className="rounded-full bg-red-600 px-2 py-0.5 font-semibold text-white">{unreadTotal} новых</span>}
+                  <button type="button" onClick={openNewTicket} className="flex h-9 shrink-0 items-center gap-1.5 rounded-xl bg-slate-950 px-3 text-xs font-semibold text-white shadow-md shadow-slate-950/10 transition hover:bg-fuchsia-700 dark:bg-white dark:text-slate-950 dark:hover:bg-fuchsia-100" aria-label="Новое обращение">
+                    <MessageSquarePlus className="h-4 w-4" />
+                    <span className="hidden sm:inline">Новое обращение</span>
+                  </button>
+                  {unreadTotal > 0 && <span className="grid h-5 min-w-5 place-items-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white">{unreadTotal}</span>}
                 </div>
               </div>
             ) : (
               <div className="relative">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex min-w-0 items-center gap-3">
-                    <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-violet-600 text-white shadow-lg shadow-violet-500/20 dark:bg-violet-500">
-                      <Inbox className="h-5 w-5" />
+                <div className="flex items-center justify-between gap-2.5">
+                  <div className="flex min-w-0 items-center gap-2.5">
+                    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-violet-600 text-white shadow-md shadow-violet-500/15 dark:bg-violet-500">
+                      <Inbox className="h-[18px] w-[18px]" />
                     </span>
                     <div className="min-w-0">
-                      <div className="page-eyebrow">Рабочая очередь</div>
-                      <div className="truncate text-lg font-semibold tracking-tight text-slate-950 dark:text-white">Поддержка</div>
+                      <div className="truncate text-base font-semibold tracking-tight text-slate-950 dark:text-white">Поддержка</div>
+                      <div className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">Рабочая очередь</div>
                     </div>
                   </div>
-                  {folderCounts['need-answer'] > 0 && <span className="rounded-full bg-red-600 px-2.5 py-1 text-xs font-semibold text-white">{folderCounts['need-answer']}</span>}
                 </div>
-                <div className="mt-3 grid grid-cols-2 gap-2">
+                <div className="mt-2 flex gap-1.5">
                   <QueueMetric label="Всего" value={listTotal} />
                   <QueueMetric label="Нужно ответить" value={folderCounts['need-answer']} accent={folderCounts['need-answer'] > 0} />
                 </div>
@@ -560,7 +549,7 @@ export function SupportPanel({
             )}
             <FolderTabs folder={folder} counts={folderCounts} mode={mode} onChange={setFolder} />
             {(mode === 'admin' || tickets.length > 4) && (
-              <label className="relative mt-2.5 flex items-center gap-2 rounded-xl border border-white/90 bg-white/85 px-3 py-2.5 shadow-sm shadow-slate-950/5 backdrop-blur dark:border-white/[0.08] dark:bg-black/15">
+              <label className="relative mt-2 flex items-center gap-2 rounded-xl border border-white/90 bg-white/85 px-3 py-2 shadow-sm shadow-slate-950/5 backdrop-blur dark:border-white/[0.08] dark:bg-black/15">
                 <Search className="h-4 w-4 shrink-0 text-slate-400" />
                 <span className="sr-only">Поиск обращений</span>
                 <input
@@ -631,13 +620,13 @@ export function SupportPanel({
           />
         ) : selected ? (
           <div className="flex h-full min-h-0 flex-col">
-            <div className="border-b border-slate-100/80 bg-white/95 px-3 py-3 backdrop-blur dark:border-white/[0.07] dark:bg-surface-900/90 sm:px-4">
+            <div className="border-b border-slate-100/80 bg-white/95 px-2.5 py-2 backdrop-blur dark:border-white/[0.07] dark:bg-surface-900/90 sm:px-3">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex min-w-0 flex-1 items-center gap-2.5 sm:gap-3">
                   <button
                     type="button"
                     onClick={() => setMobileChatOpen(false)}
-                    className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition-colors hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-slate-300 xl:hidden"
+                    className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition-colors hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-slate-300 xl:hidden"
                     aria-label="Назад к обращениям"
                   >
                     <ArrowLeft className="h-4 w-4" />
@@ -645,7 +634,7 @@ export function SupportPanel({
                   <CategoryIcon category={selected.category} />
                   <div className="min-w-0 flex-1">
                     <div className="flex min-w-0 flex-wrap items-center gap-2">
-                      <h2 className="min-w-0 truncate text-base font-semibold tracking-[-0.02em] sm:text-lg">{selected.subject}</h2>
+                      <h2 className="min-w-0 truncate text-sm font-semibold tracking-[-0.01em] sm:text-base">{selected.subject}</h2>
                     </div>
                     <div className="mt-0.5 truncate text-xs text-slate-500 sm:text-sm">
                       {mode === 'admin'
@@ -658,7 +647,7 @@ export function SupportPanel({
                   {mode === 'admin' && (
                     <button
                       type="button"
-                      className={cn('btn-secondary h-10 px-3 text-sm 2xl:hidden', detailsOpen && 'border-cyan-200 bg-cyan-50 text-cyan-800 dark:border-cyan-400/30 dark:bg-cyan-400/10 dark:text-cyan-100')}
+                      className={cn('btn-secondary h-9 px-2.5 text-xs 2xl:hidden', detailsOpen && 'border-cyan-200 bg-cyan-50 text-cyan-800 dark:border-cyan-400/30 dark:bg-cyan-400/10 dark:text-cyan-100')}
                       onClick={() => setDetailsOpen((current) => !current)}
                       aria-expanded={detailsOpen}
                       aria-label="Клиент"
@@ -834,17 +823,17 @@ function NewTicketForm({
 
   return (
     <form onSubmit={onSubmit} className="flex h-full min-h-0 flex-col overflow-hidden">
-      <div className="border-b border-slate-100/80 bg-white/95 px-3 py-3 backdrop-blur dark:border-white/[0.07] dark:bg-surface-900/90 sm:px-5">
-        <div className="flex items-center gap-3">
-          <button type="button" className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-slate-300" onClick={onCancel} disabled={isPending} aria-label="Назад к обращениям">
+      <div className="border-b border-slate-100/80 bg-white/95 px-2.5 py-2 backdrop-blur dark:border-white/[0.07] dark:bg-surface-900/90 sm:px-3">
+        <div className="flex items-center gap-2.5">
+          <button type="button" className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-slate-300" onClick={onCancel} disabled={isPending} aria-label="Назад к обращениям">
             <ArrowLeft className="h-4 w-4" />
           </button>
-          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-fuchsia-600 to-cyan-500 text-white shadow-lg shadow-fuchsia-500/20 dark:from-fuchsia-500 dark:to-cyan-400">
-            <MessageSquarePlus className="h-5 w-5" />
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-fuchsia-600 to-cyan-500 text-white shadow-md shadow-fuchsia-500/15 dark:from-fuchsia-500 dark:to-cyan-400">
+            <MessageSquarePlus className="h-4 w-4" />
           </span>
           <div className="min-w-0">
-            <h2 className="truncate text-base font-semibold tracking-[-0.02em] sm:text-lg">Новое обращение</h2>
-            <p className="text-xs text-slate-500 sm:text-sm">Тема и подробности проблемы</p>
+            <h2 className="truncate text-sm font-semibold tracking-[-0.01em] sm:text-base">Новое обращение</h2>
+            <p className="text-[11px] text-slate-500 sm:text-xs">Тема и подробности проблемы</p>
           </div>
         </div>
       </div>
@@ -934,13 +923,13 @@ function NewTicketForm({
 function QueueMetric({ label, value, accent = false }: { label: string; value: number; accent?: boolean }) {
   return (
     <div className={cn(
-      'rounded-xl border px-3 py-2',
+      'flex min-w-0 flex-1 items-center gap-1.5 rounded-lg border px-2 py-1.5',
       accent
         ? 'border-red-200 bg-red-50/90 dark:border-red-400/20 dark:bg-red-400/10'
         : 'border-white/90 bg-white/75 dark:border-white/[0.07] dark:bg-white/[0.035]'
     )}>
-      <div className={cn('text-lg font-semibold tabular-nums', accent ? 'text-red-700 dark:text-red-200' : 'text-slate-950 dark:text-white')}>{value}</div>
-      <div className={cn('text-[10px] font-semibold uppercase tracking-[0.08em]', accent ? 'text-red-500 dark:text-red-300' : 'text-slate-400')}>{label}</div>
+      <div className={cn('text-sm font-semibold tabular-nums', accent ? 'text-red-700 dark:text-red-200' : 'text-slate-950 dark:text-white')}>{value}</div>
+      <div className={cn('truncate text-[9px] font-semibold uppercase tracking-[0.06em]', accent ? 'text-red-500 dark:text-red-300' : 'text-slate-400')}>{label}</div>
     </div>
   )
 }
@@ -961,12 +950,12 @@ function CategoryIcon({ category, compact = false, active = false }: { category:
   return (
     <span className={cn(
       'grid shrink-0 place-items-center rounded-2xl transition-colors',
-      compact ? 'h-9 w-9 rounded-xl' : 'h-11 w-11',
+      compact ? 'h-8 w-8 rounded-xl' : 'h-9 w-9 rounded-xl',
       active
         ? 'bg-fuchsia-600 text-white shadow-sm dark:bg-fuchsia-400 dark:text-slate-950'
         : 'bg-gradient-to-br from-fuchsia-50 to-cyan-50 text-fuchsia-600 ring-1 ring-fuchsia-100/80 dark:from-fuchsia-400/10 dark:to-cyan-400/10 dark:text-fuchsia-300 dark:ring-white/[0.07]'
     )}>
-      <Icon className={compact ? 'h-4 w-4' : 'h-5 w-5'} />
+      <Icon className="h-4 w-4" />
     </span>
   )
 }
@@ -1154,7 +1143,7 @@ function FolderTabs({
   ]
 
   return (
-    <div className="relative mt-3 grid grid-cols-2 gap-1 rounded-2xl border border-white/70 bg-slate-100/80 p-1 shadow-inner shadow-slate-950/[0.03] dark:border-white/[0.05] dark:bg-black/15">
+    <div className="relative mt-2 grid grid-cols-2 gap-1 rounded-xl border border-white/70 bg-slate-100/80 p-1 shadow-inner shadow-slate-950/[0.03] dark:border-white/[0.05] dark:bg-black/15">
       {items.map((item) => {
         const Icon = item.icon
         const active = folder === item.value
@@ -1164,7 +1153,7 @@ function FolderTabs({
             type="button"
             onClick={() => onChange(item.value)}
             className={cn(
-              'flex min-w-0 items-center justify-between gap-2 rounded-xl px-2.5 py-2 text-xs font-medium transition-all',
+              'flex min-w-0 items-center justify-between gap-2 rounded-lg px-2.5 py-1.5 text-[11px] font-medium transition-all',
               active
                 ? 'bg-white text-fuchsia-700 shadow-sm dark:bg-white/10 dark:text-fuchsia-200'
                 : 'text-slate-500 hover:bg-white/50 hover:text-slate-950 dark:text-slate-400 dark:hover:bg-white/5 dark:hover:text-white'
@@ -1304,17 +1293,20 @@ function TicketSideMenu({
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="flex items-start justify-between gap-3 border-b border-slate-100 bg-gradient-to-br from-cyan-50/70 via-white to-violet-50/70 px-4 py-4 dark:border-white/[0.08] dark:from-cyan-400/[0.05] dark:via-transparent dark:to-violet-400/[0.06]">
-        <div className="min-w-0">
-          <div className="page-eyebrow">Контекст обращения</div>
-          <div className="mt-1 flex items-center gap-2 text-base font-semibold tracking-tight text-slate-950 dark:text-white">
-            <PanelRight className="h-4 w-4 text-cyan-600 dark:text-cyan-300" /> Клиент и аккаунт
+      <div className="flex items-center justify-between gap-3 border-b border-slate-100 bg-gradient-to-br from-cyan-50/70 via-white to-violet-50/70 px-3 py-2.5 dark:border-white/[0.08] dark:from-cyan-400/[0.05] dark:via-transparent dark:to-violet-400/[0.06]">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-white/80 text-cyan-700 ring-1 ring-cyan-100 dark:bg-white/[0.06] dark:text-cyan-200 dark:ring-white/10">
+            <PanelRight className="h-4 w-4" />
+          </span>
+          <div className="min-w-0">
+            <div className="truncate text-sm font-semibold tracking-tight text-slate-950 dark:text-white">Клиент и аккаунт</div>
+            <div className="text-[10px] uppercase tracking-[0.08em] text-slate-400">Контекст обращения</div>
           </div>
         </div>
         {onClose && (
           <button
             type="button"
-            className="grid h-9 w-9 shrink-0 place-items-center rounded-xl text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-950 dark:hover:bg-white/5 dark:hover:text-white"
+            className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-950 dark:hover:bg-white/5 dark:hover:text-white"
             onClick={onClose}
             aria-label="Закрыть данные клиента"
           >
