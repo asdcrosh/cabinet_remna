@@ -47,14 +47,25 @@ export async function upsertLocalSubscriptionFromRemnawave(input: {
     }),
   ])
 
+  const now = new Date()
+  const remoteExpireAt = new Date(input.remnawaveUser.expireAt)
+  const renewedAfterGrace = Boolean(
+    existing?.graceExpireAt && remoteExpireAt > existing.graceExpireAt
+  )
+  const preservePaidExpireAt = Boolean(existing?.graceExpireAt && !renewedAfterGrace)
+  const graceActive = Boolean(
+    existing?.graceExpireAt && existing.graceExpireAt > now && !renewedAfterGrace
+  )
+
   const data = {
     ...(shouldReplacePlanFromExternalSync(existing, input.planId) ? { planId: input.planId } : {}),
-    expireAt: existing?.graceExpireAt ? existing.expireAt : new Date(input.remnawaveUser.expireAt),
-    status: existing?.graceExpireAt && existing.graceExpireAt > new Date()
+    expireAt: preservePaidExpireAt ? existing!.expireAt : remoteExpireAt,
+    status: graceActive
       ? 'LIMITED' as const
       : activePause && (!existing || activePause.subscriptionId === existing.id)
       ? 'PAUSED' as const
       : mapRemnawaveStatus(input.remnawaveUser.status),
+    ...(renewedAfterGrace ? { graceStartedAt: null, graceExpireAt: null } : {}),
     trafficLimitBytes: trafficLimit === 0n ? null : trafficLimit,
     trafficUsedBytes: trafficUsed,
     lifetimeUsedBytes: lifetimeUsed,

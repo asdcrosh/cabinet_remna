@@ -112,7 +112,7 @@ export default async function DashboardHome() {
   const daysLeft = graceActive ? localDaysLeft : sub?.daysLeft ?? localDaysLeft
   const subscriptionStatus = (graceActive ? 'LIMITED' : sub?.userStatus ?? subRow?.status ?? 'DISABLED') as UserStatus
   const subscriptionExpired = isSubscriptionExpired(daysLeft, subscriptionStatus)
-  const expiresAt = subRow?.expireAt ?? (sub?.expiresAt ? new Date(sub.expiresAt) : null)
+  const expiresAt = effectiveExpireAt
   const unlimitedDuration = Boolean(subRow?.plan?.unlimitedDuration)
   const expiresAtLabel = unlimitedDuration ? 'Бессрочно' : expiresAt?.toLocaleDateString('ru-RU', {
     day: 'numeric',
@@ -162,8 +162,9 @@ export default async function DashboardHome() {
   const canBuyWhitelistAddon = Boolean(
     whitelistAddonRow
     && !subscriptionExpired
-    && ['ACTIVE', 'LIMITED'].includes(whitelistAddonRow.status)
-    && whitelistAddonRow.expireAt > now
+    && ['ACTIVE', 'LIMITED'].includes(subscriptionStatus)
+    && effectiveExpireAt
+    && effectiveExpireAt > now
   )
   const whitelistAddonOffer = whitelistAddonRow
     && whitelistAddonRow.planId

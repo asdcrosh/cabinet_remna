@@ -121,6 +121,9 @@ describe('syncRemnashopUsersToCabinet', () => {
 
     const result = await syncRemnashopUsersToCabinet()
 
+    expect(mocks.remnashopQuery.mock.calls[0]?.[0]).toContain(
+      'COALESCE(latest_s.user_remna_id, current_s.user_remna_id)'
+    )
     expect(mocks.remnawave.getUser).toHaveBeenCalledWith(expect.objectContaining({ uuid: 'rw-1' }))
     expect(mocks.remnawave.updateUser).toHaveBeenCalledWith(
       expect.objectContaining({ uuid: 'rw-1' }),

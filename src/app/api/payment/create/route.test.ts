@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   createPayment: vi.fn(),
   createPlategaPayment: vi.fn(),
   getRemnawaveUser: vi.fn(),
+  upsertLocalSubscriptionFromRemnawave: vi.fn(),
   isPaymentProviderAvailable: vi.fn(),
   validatePromoCodeForPlan: vi.fn(),
   logError: vi.fn(),
@@ -48,6 +49,9 @@ vi.mock('@/lib/remnawave', () => ({
   hasRemnawaveUserReference: (value: { remnawaveId?: number | null }) => Boolean(value.remnawaveId),
   remnawaveUserReference: (value: { remnawaveId: number }) => ({ id: value.remnawaveId }),
   remnawave: { getUser: mocks.getRemnawaveUser },
+}))
+vi.mock('@/lib/remnawave-local-sync', () => ({
+  upsertLocalSubscriptionFromRemnawave: mocks.upsertLocalSubscriptionFromRemnawave,
 }))
 vi.mock('@/lib/payment-providers', () => ({ isPaymentProviderAvailable: mocks.isPaymentProviderAvailable }))
 vi.mock('@/lib/promo-codes', () => ({
@@ -171,6 +175,7 @@ describe('payment create route', () => {
     mocks.getRemnawaveUser.mockResolvedValue({
       response: { expireAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() },
     })
+    mocks.upsertLocalSubscriptionFromRemnawave.mockResolvedValue({ id: 'subscription-1' })
     mocks.prisma.payment.update.mockResolvedValue({})
     mocks.prisma.promoCodeRedemption.updateMany.mockResolvedValue({ count: 0 })
     mocks.prisma.user.updateMany.mockResolvedValue({ count: 1 })
@@ -217,6 +222,45 @@ describe('payment create route', () => {
       description: 'Расширенный доступ',
       metadata: expect.objectContaining({ purchaseType: 'WHITELIST_ADDON' }),
     }))
+  })
+
+  it('refreshes a stale local subscription from Remnawave before buying the whitelist add-on', async () => {
+    const refreshedSubscription = {
+      id: 'subscription-1',
+      userId: user.id,
+      planId: plan.id,
+      status: 'ACTIVE',
+      expireAt: futureDate(30),
+      deviceLimit: 5,
+      whitelistAddonActive: false,
+    }
+    mocks.prisma.subscription.findFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(refreshedSubscription)
+    mocks.txPaymentCreate.mockResolvedValue({
+      ...localPayment,
+      subscriptionId: 'subscription-1',
+      purchaseType: 'WHITELIST_ADDON',
+      amountKopecks: 20000,
+    })
+
+    const response = await POST(paymentRequest({
+      purchaseType: 'WHITELIST_ADDON',
+      deviceLimit: undefined,
+    }))
+
+    expect(response.status).toBe(200)
+    expect(mocks.getRemnawaveUser).toHaveBeenCalledWith({ id: user.remnawaveId })
+    expect(mocks.upsertLocalSubscriptionFromRemnawave).toHaveBeenCalledWith({
+      localUserId: user.id,
+      remnawaveUser: expect.objectContaining({ expireAt: expect.any(String) }),
+    })
+    expect(mocks.txPaymentCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        subscriptionId: 'subscription-1',
+        purchaseType: 'WHITELIST_ADDON',
+      }),
+    })
   })
 
   it('allows renewing an active whitelist add-on', async () => {

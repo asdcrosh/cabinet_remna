@@ -43,6 +43,7 @@ import {
   type CalculatedUserDiscount,
 } from '@/lib/user-discounts'
 import { hasWhitelistAddonEntitlement } from '@/lib/whitelist-addon-policy'
+import { upsertLocalSubscriptionFromRemnawave } from '@/lib/remnawave-local-sync'
 
 export const runtime = 'nodejs'
 
@@ -115,7 +116,7 @@ export const POST = withAuth(async (req: Request) => {
   }
   await reconcileStalePendingPaymentsForUser(user.id)
   const now = new Date()
-  const activeSubscription = isWhitelistAddon
+  let activeSubscription = isWhitelistAddon
     ? await prisma.subscription.findFirst({
         where: {
           userId: user.id,
@@ -126,6 +127,28 @@ export const POST = withAuth(async (req: Request) => {
         orderBy: { expireAt: 'desc' },
       })
     : null
+  let whitelistSubscriptionRefreshFailed = false
+  if (isWhitelistAddon && !activeSubscription && hasRemnawaveUserReference(user)) {
+    try {
+      const remnawaveUser = (await remnawave.getUser(remnawaveUserReference(user))).response
+      await upsertLocalSubscriptionFromRemnawave({
+        localUserId: user.id,
+        remnawaveUser,
+      })
+      activeSubscription = await prisma.subscription.findFirst({
+        where: {
+          userId: user.id,
+          planId: plan.id,
+          status: { in: ['ACTIVE', 'LIMITED'] },
+          expireAt: { gt: now },
+        },
+        orderBy: { expireAt: 'desc' },
+      })
+    } catch (error) {
+      whitelistSubscriptionRefreshFailed = true
+      logError('payment.whitelist_addon.subscription_refresh_failed', error, { userId: user.id })
+    }
+  }
   const currentSubscription = !isWhitelistAddon
     ? await prisma.subscription.findFirst({
         where: {
@@ -173,6 +196,12 @@ export const POST = withAuth(async (req: Request) => {
 
   if (isWhitelistAddon) {
     if (!activeSubscription) {
+      if (whitelistSubscriptionRefreshFailed) {
+        return NextResponse.json(
+          { error: 'Не удалось проверить действующую подписку. Попробуйте ещё раз.' },
+          { status: 503 }
+        )
+      }
       return NextResponse.json({ error: 'Для дополнения нужна действующая подписка этого тарифа' }, { status: 409 })
     }
     if (!plan.whitelistAddonEnabled || plan.whitelistAddonPriceKopecks <= 0) {

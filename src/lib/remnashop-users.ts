@@ -373,11 +373,11 @@ function fetchRemnashopSources(options: {
       u.is_email_verified,
       u.name,
       u.username,
-      COALESCE(current_s.user_remna_id, latest_s.user_remna_id)::text AS user_remna_id,
-      COALESCE(current_s.created_at, latest_s.created_at) AS subscription_created_at,
-      COALESCE(current_s.plan_snapshot, latest_s.plan_snapshot) AS subscription_plan_snapshot,
-      COALESCE(current_s.traffic_limit, latest_s.traffic_limit)::int AS subscription_traffic_limit,
-      COALESCE(current_s.device_limit, latest_s.device_limit)::int AS subscription_device_limit
+      COALESCE(latest_s.user_remna_id, current_s.user_remna_id)::text AS user_remna_id,
+      COALESCE(latest_s.created_at, current_s.created_at) AS subscription_created_at,
+      COALESCE(latest_s.plan_snapshot, current_s.plan_snapshot) AS subscription_plan_snapshot,
+      COALESCE(latest_s.traffic_limit, current_s.traffic_limit)::int AS subscription_traffic_limit,
+      COALESCE(latest_s.device_limit, current_s.device_limit)::int AS subscription_device_limit
     FROM users u
     LEFT JOIN subscriptions current_s ON current_s.id = u.current_subscription_id
     LEFT JOIN LATERAL (
