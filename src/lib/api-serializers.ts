@@ -20,6 +20,7 @@ export function serializeSubscription(subscription: SubscriptionWithPlan | null 
     trafficLimitBytes: subscription.trafficLimitBytes?.toString() ?? null,
     trafficUsedBytes: subscription.trafficUsedBytes.toString(),
     lifetimeUsedBytes: subscription.lifetimeUsedBytes.toString(),
+    whitelistAddonRemainingSeconds: subscription.whitelistAddonRemainingSeconds?.toString() ?? null,
     plan: subscription.plan ?? null,
   }
 }

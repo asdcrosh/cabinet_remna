@@ -25,7 +25,11 @@ import { getAvailablePaymentProviders } from '@/lib/payment-providers'
 import { cn } from '@/lib/cn'
 import { HomeWhitelistAddon } from '@/components/dashboard/home-whitelist-addon'
 import { HomeDeviceAddon } from '@/components/dashboard/home-device-addon'
-import { isWhitelistAddonCurrentlyActive } from '@/lib/whitelist-addon-policy'
+import {
+  getWhitelistAddonRemainingSeconds,
+  hasWhitelistAddonEntitlement,
+  isWhitelistAddonCurrentlyActive,
+} from '@/lib/whitelist-addon-policy'
 
 export const dynamic = 'force-dynamic'
 
@@ -132,24 +136,48 @@ export default async function DashboardHome() {
           label: 'Управлять подключением',
           icon: <KeyRound className="h-4 w-4" />,
         }
-  const whitelistAddonActive = Boolean(subRow && isWhitelistAddonCurrentlyActive(subRow))
-  const whitelistAddonConfigured = Boolean(
-    subRow?.plan?.whitelistAddonEnabled
-    && subRow.plan.whitelistAddonPriceKopecks > 0
-    && subRow.plan.whitelistAddonInternalSquads.length > 0
+  const whitelistAddonRow = user.subscriptions.find((subscription) =>
+    hasWhitelistAddonEntitlement(subscription, now)
+  ) ?? subRow
+  const whitelistAddonActive = Boolean(
+    whitelistAddonRow && isWhitelistAddonCurrentlyActive(whitelistAddonRow, now)
   )
-  const whitelistAddonOffer = subRow
-    && subRow.planId
-    && subRow.plan
+  const derivedPausedSeconds = whitelistAddonRow?.whitelistAddonActive && !whitelistAddonActive
+    ? getWhitelistAddonRemainingSeconds(
+        whitelistAddonRow.whitelistAddonExpireAt,
+        whitelistAddonRow.whitelistAddonPausedAt
+          ?? (whitelistAddonRow.expireAt < now ? whitelistAddonRow.expireAt : now)
+      )
+    : 0n
+  const whitelistAddonPausedSeconds = whitelistAddonRow?.whitelistAddonRemainingSeconds
+    && whitelistAddonRow.whitelistAddonRemainingSeconds > 0n
+    ? whitelistAddonRow.whitelistAddonRemainingSeconds
+    : derivedPausedSeconds
+  const whitelistAddonConfigured = Boolean(
+    whitelistAddonRow?.plan?.whitelistAddonEnabled
+    && whitelistAddonRow.plan.whitelistAddonPriceKopecks > 0
+    && whitelistAddonRow.plan.whitelistAddonInternalSquads.length > 0
+  )
+  const whitelistAddonPaused = whitelistAddonPausedSeconds > 0n
+  const canBuyWhitelistAddon = Boolean(
+    whitelistAddonRow
     && !subscriptionExpired
-    && ['ACTIVE', 'LIMITED'].includes(subRow.status)
-    && subRow.expireAt.getTime() > Date.now()
-    && (whitelistAddonActive || whitelistAddonConfigured)
+    && ['ACTIVE', 'LIMITED'].includes(whitelistAddonRow.status)
+    && whitelistAddonRow.expireAt > now
+  )
+  const whitelistAddonOffer = whitelistAddonRow
+    && whitelistAddonRow.planId
+    && whitelistAddonRow.plan
+    && (whitelistAddonPaused || canBuyWhitelistAddon)
+    && (whitelistAddonActive || whitelistAddonPaused || whitelistAddonConfigured)
     ? {
-        planId: subRow.planId,
-        priceKopecks: subRow.plan.whitelistAddonPriceKopecks,
+        planId: whitelistAddonRow.planId,
+        priceKopecks: whitelistAddonRow.plan.whitelistAddonPriceKopecks,
         active: whitelistAddonActive,
-        expireAt: subRow.whitelistAddonExpireAt?.toISOString() ?? null,
+        expireAt: whitelistAddonRow.whitelistAddonExpireAt?.toISOString() ?? null,
+        pausedRemainingSeconds: whitelistAddonPaused
+          ? Number(whitelistAddonPausedSeconds)
+          : undefined,
       }
     : null
   const currentDeviceLimit = subRow?.deviceLimit ?? subRow?.plan?.deviceLimit ?? null
@@ -306,6 +334,7 @@ export default async function DashboardHome() {
           priceKopecks={whitelistAddonOffer.priceKopecks}
           active={whitelistAddonOffer.active}
           expireAt={whitelistAddonOffer.expireAt}
+          pausedRemainingSeconds={whitelistAddonOffer.pausedRemainingSeconds}
           paymentProviders={paymentProviders}
         />
       ) : null}

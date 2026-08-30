@@ -979,7 +979,7 @@ export function PlanCard({
                   БС сохранятся отдельно
                   {currentWhitelistAddonExpireAt
                     ? ` до ${new Date(currentWhitelistAddonExpireAt).toLocaleDateString("ru-RU", { timeZone: "Europe/Moscow" })}`
-                    : " до своей даты окончания"}.
+                    : " и возобновятся вместе с новым тарифом"}.
                 </li>
               ) : null}
             </ul>
@@ -1051,7 +1051,7 @@ function WhitelistAddonChoice({
             checked={requested}
             onChange={(event) => onChange(event.target.checked)}
             label={`Добавить за ${formatPrice(priceKopecks)}`}
-            description="Только для приложения INCY. Доступ на 30 дней с даты оплаты."
+            description="Только для приложения INCY. 30 оплаченных дней расходуются только при активном тарифе."
           />
         </div>
       </div>

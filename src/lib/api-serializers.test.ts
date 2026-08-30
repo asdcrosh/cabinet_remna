@@ -20,6 +20,8 @@ describe('api serializers', () => {
       whitelistAddonActive: false,
       whitelistAddonActivatedAt: null,
       whitelistAddonExpireAt: null,
+      whitelistAddonPausedAt: null,
+      whitelistAddonRemainingSeconds: null,
       whitelistAddonPaymentId: null,
       whitelistAddonInternalSquads: [],
       graceStartedAt: null,
@@ -32,6 +34,7 @@ describe('api serializers', () => {
     expect(subscription?.trafficLimitBytes).toBe('1000')
     expect(subscription?.trafficUsedBytes).toBe('250')
     expect(subscription?.lifetimeUsedBytes).toBe('500')
+    expect(subscription?.whitelistAddonRemainingSeconds).toBeNull()
     expect(subscription).not.toHaveProperty('whitelistAddonInternalSquads')
     expect(subscription).not.toHaveProperty('planManagedByCabinet')
   })

@@ -19,6 +19,7 @@ import {
   remnawave,
   remnawaveUserReference,
 } from '@/lib/remnawave'
+import { hasWhitelistAddonEntitlement, isWhitelistAddonCurrentlyActive } from '@/lib/whitelist-addon-policy'
 
 export const dynamic = 'force-dynamic'
 
@@ -72,6 +73,18 @@ export default async function PlansPage({
     ? await prisma.subscription.findFirst({
         where: { userId: session.uid, status: { in: ['ACTIVE', 'LIMITED'] } },
         orderBy: { expireAt: 'desc' },
+      })
+    : null
+  const whitelistAddonEntitlement = session
+    ? await prisma.subscription.findFirst({
+        where: {
+          userId: session.uid,
+          OR: [
+            { whitelistAddonActive: true },
+            { whitelistAddonRemainingSeconds: { gt: 0n } },
+          ],
+        },
+        orderBy: { updatedAt: 'desc' },
       })
     : null
   const autoRenewal = session ? await getAutoRenewalState(session.uid) : null
@@ -152,9 +165,12 @@ export default async function PlansPage({
   )
   const currentPlanName = plans.find((plan) => plan.id === currentSubscription?.planId)?.name ?? null
   const currentWhitelistAddonActive = Boolean(
-    currentSubscription?.whitelistAddonActive
-    && currentSubscription.whitelistAddonExpireAt
-    && currentSubscription.whitelistAddonExpireAt.getTime() > Date.now()
+    whitelistAddonEntitlement
+    && hasWhitelistAddonEntitlement(whitelistAddonEntitlement)
+  )
+  const currentWhitelistAddonRunning = Boolean(
+    whitelistAddonEntitlement
+    && isWhitelistAddonCurrentlyActive(whitelistAddonEntitlement)
   )
   const planViews = visiblePlans.map((plan) => ({
     id: plan.id,
@@ -190,7 +206,9 @@ export default async function PlansPage({
     currentPlanName,
     currentWhitelistAddonActive,
     currentWhitelistAddonExpireAt: currentWhitelistAddonActive
-      ? currentSubscription?.whitelistAddonExpireAt?.toISOString() ?? null
+      ? currentWhitelistAddonRunning
+        ? whitelistAddonEntitlement?.whitelistAddonExpireAt?.toISOString() ?? null
+        : null
       : null,
     autoRenewalEnabled: autoRenewalConsentCurrent && autoRenewal?.plan.id === plan.id,
     autoRenewalWhitelistAddonEnabled: autoRenewal?.plan.id === plan.id

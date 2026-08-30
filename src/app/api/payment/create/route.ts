@@ -42,6 +42,7 @@ import {
   restoreNextPurchaseDiscountBestEffort,
   type CalculatedUserDiscount,
 } from '@/lib/user-discounts'
+import { hasWhitelistAddonEntitlement } from '@/lib/whitelist-addon-policy'
 
 export const runtime = 'nodejs'
 
@@ -206,13 +207,22 @@ export const POST = withAuth(async (req: Request) => {
     ) {
       return NextResponse.json({ error: 'Дополнение для этого тарифа не настроено' }, { status: 422 })
     }
-    if (
-      currentSubscription?.whitelistAddonActive
-      && currentSubscription.whitelistAddonExpireAt
-      && currentSubscription.whitelistAddonExpireAt > now
-    ) {
+    const whitelistAddonEntitlement = currentSubscription
+      && hasWhitelistAddonEntitlement(currentSubscription, now)
+      ? currentSubscription
+      : await prisma.subscription.findFirst({
+          where: {
+            userId: user.id,
+            OR: [
+              { whitelistAddonActive: true },
+              { whitelistAddonRemainingSeconds: { gt: 0n } },
+            ],
+          },
+          orderBy: { updatedAt: 'desc' },
+        })
+    if (whitelistAddonEntitlement && hasWhitelistAddonEntitlement(whitelistAddonEntitlement, now)) {
       return NextResponse.json({
-        error: 'БС уже подключены и сохранятся при смене тарифа. Продлить их можно отдельно на главной странице.',
+        error: 'БС уже подключены или стоят на паузе. После покупки тарифа они продолжат работать автоматически.',
         code: 'WHITELIST_ADDON_ALREADY_ACTIVE',
       }, { status: 409 })
     }

@@ -5,6 +5,11 @@ import { logError, logInfo } from './logger'
 import { notifyUser } from './notifications'
 import { prisma } from './prisma'
 import { hasRemnawaveUserReference, remnawave, remnawaveUserReference } from './remnawave'
+import { resolvePlanActiveInternalSquads } from './subscription'
+import {
+  getResumedWhitelistAddonExpireAt,
+  getWhitelistAddonRemainingSeconds,
+} from './whitelist-addon-policy'
 
 const DAY_MS = 24 * 60 * 60 * 1000
 const MAX_PAUSE_DAYS = 30
@@ -78,6 +83,9 @@ export async function pauseSubscription(input: {
 
   const now = new Date()
   const remainingSeconds = BigInt(Math.max(1, Math.ceil((subscription.expireAt.getTime() - now.getTime()) / 1000)))
+  const whitelistAddonRemainingSeconds = subscription.whitelistAddonActive
+    ? getWhitelistAddonRemainingSeconds(subscription.whitelistAddonExpireAt, now)
+    : subscription.whitelistAddonRemainingSeconds ?? 0n
   const pauseUntil = new Date(now.getTime() + pauseDays * DAY_MS)
 
   await remnawave.disableUser(remnawaveUserReference(user))
@@ -85,7 +93,18 @@ export async function pauseSubscription(input: {
     const retention = await prisma.$transaction(async (tx) => {
       await tx.subscription.update({
         where: { id: subscription.id },
-        data: { status: 'PAUSED', pendingSync: false },
+        data: {
+          status: 'PAUSED',
+          pendingSync: false,
+          ...(whitelistAddonRemainingSeconds > 0n
+            ? {
+                whitelistAddonActive: false,
+                whitelistAddonExpireAt: null,
+                whitelistAddonPausedAt: now,
+                whitelistAddonRemainingSeconds,
+              }
+            : {}),
+        },
       })
       return tx.subscriptionRetention.create({
         data: {
@@ -118,7 +137,11 @@ export async function resumeSubscription(userId: string, source: 'USER' | 'WORKE
     orderBy: { createdAt: 'desc' },
     include: {
       user: true,
-      subscription: { include: { plan: { select: { name: true } } } },
+      subscription: {
+        include: {
+          plan: { select: { name: true, activeInternalSquads: true } },
+        },
+      },
     },
   })
   if (!pause?.subscription || !hasRemnawaveUserReference(pause.user)) {
@@ -128,15 +151,42 @@ export async function resumeSubscription(userId: string, source: 'USER' | 'WORKE
 
   const remainingMs = Number(pause.remainingSeconds ?? 1n) * 1000
   const expireAt = new Date(Date.now() + Math.max(remainingMs, 1000))
+  const now = new Date()
+  const whitelistAddonRemainingSeconds = pause.subscription.whitelistAddonRemainingSeconds ?? 0n
+  const whitelistAddonExpireAt = whitelistAddonRemainingSeconds > 0n
+    ? getResumedWhitelistAddonExpireAt(now, whitelistAddonRemainingSeconds)
+    : null
   const reference = remnawaveUserReference(pause.user)
-  await remnawave.updateUser(reference, { expireAt: expireAt.toISOString() })
+  await remnawave.updateUser(reference, {
+    expireAt: expireAt.toISOString(),
+    ...(whitelistAddonExpireAt
+      ? {
+          activeInternalSquads: Array.from(new Set([
+            ...resolvePlanActiveInternalSquads(pause.subscription.plan?.activeInternalSquads),
+            ...pause.subscription.whitelistAddonInternalSquads,
+          ])),
+        }
+      : {}),
+  })
   await remnawave.enableUser(reference)
 
-  const now = new Date()
   await prisma.$transaction([
     prisma.subscription.update({
       where: { id: pause.subscription.id },
-      data: { status: 'ACTIVE', expireAt, lastSyncedAt: now, pendingSync: false },
+      data: {
+        status: 'ACTIVE',
+        expireAt,
+        lastSyncedAt: now,
+        pendingSync: false,
+        ...(whitelistAddonExpireAt
+          ? {
+              whitelistAddonActive: true,
+              whitelistAddonExpireAt,
+              whitelistAddonPausedAt: null,
+              whitelistAddonRemainingSeconds: null,
+            }
+          : {}),
+      },
     }),
     prisma.subscriptionRetention.update({
       where: { id: pause.id },

@@ -19,6 +19,10 @@ import { toRemnawaveTelegramId } from './telegram-remnawave'
 import { readRemnawaveBigInt } from './remnawave-usage'
 import {
   getWhitelistAddonExpireAt,
+  getResumedWhitelistAddonExpireAt,
+  getWhitelistAddonPauseAt,
+  getWhitelistAddonRemainingSeconds,
+  hasWhitelistAddonEntitlement,
   isWhitelistAddonCurrentlyActive,
 } from './whitelist-addon-policy'
 
@@ -62,45 +66,39 @@ export async function ensureRemnawaveSubscription(input: EnsureSubscriptionInput
     where: { id: input.userId },
     include: {
       subscriptions: {
-        where: { status: { in: ['ACTIVE', 'LIMITED'] } },
+        where: {
+          OR: [
+            { status: { in: ['ACTIVE', 'LIMITED'] } },
+            { whitelistAddonActive: true },
+            { whitelistAddonRemainingSeconds: { gt: 0n } },
+          ],
+        },
         orderBy: { expireAt: 'desc' },
-        take: 1,
         include: { plan: true },
       },
     },
   })
   if (!user) throw new Error(`User ${input.userId} not found`)
 
-  const latestSubscription = user.subscriptions[0]
+  const now = new Date()
+  const latestSubscription = getLatestActiveSubscription(user.subscriptions)
   const isPlanSwitch = Boolean(latestSubscription && latestSubscription.planId !== input.plan.id)
-  const requestedWhitelistAddon = Boolean(input.whitelistAddon)
-  const preservedWhitelistAddon = Boolean(
-    latestSubscription
-    && isWhitelistAddonCurrentlyActive(latestSubscription)
+  const whitelistAddonSource = user.subscriptions.find((subscription) =>
+    hasWhitelistAddonEntitlement(subscription, now)
   )
-  const whitelistAddonActive = requestedWhitelistAddon || preservedWhitelistAddon
-  const whitelistAddonActivatedAt = requestedWhitelistAddon
-    ? input.whitelistAddon?.activatedAt ?? new Date()
-    : preservedWhitelistAddon
-      ? latestSubscription?.whitelistAddonActivatedAt ?? null
-      : null
-  const whitelistAddonExpireAt = requestedWhitelistAddon && whitelistAddonActivatedAt
-    ? getWhitelistAddonExpireAt(whitelistAddonActivatedAt)
-    : preservedWhitelistAddon
-      ? latestSubscription?.whitelistAddonExpireAt ?? null
-      : null
-  const whitelistAddonPaymentId = requestedWhitelistAddon
-    ? input.paymentId ?? null
-    : preservedWhitelistAddon
-      ? latestSubscription?.whitelistAddonPaymentId ?? null
-      : null
-  const whitelistAddonSquads = requestedWhitelistAddon
-    ? input.whitelistAddon?.internalSquads ?? []
-    : preservedWhitelistAddon
-      ? latestSubscription?.whitelistAddonInternalSquads?.length
-        ? latestSubscription.whitelistAddonInternalSquads
-        : latestSubscription?.plan?.whitelistAddonInternalSquads ?? []
-      : []
+  const whitelistAddonState = resolveWhitelistAddonForActivation({
+    source: whitelistAddonSource,
+    requested: input.whitelistAddon,
+    paymentId: input.paymentId,
+    now,
+  })
+  const {
+    active: whitelistAddonActive,
+    activatedAt: whitelistAddonActivatedAt,
+    expireAt: whitelistAddonExpireAt,
+    paymentId: whitelistAddonPaymentId,
+    squads: whitelistAddonSquads,
+  } = whitelistAddonState
   const activeInternalSquads = Array.from(new Set([
     ...resolvePlanActiveInternalSquads(input.plan.activeInternalSquads),
     ...whitelistAddonSquads,
@@ -217,6 +215,8 @@ export async function ensureRemnawaveSubscription(input: EnsureSubscriptionInput
             whitelistAddonActive,
             whitelistAddonActivatedAt,
             whitelistAddonExpireAt,
+            whitelistAddonPausedAt: null,
+            whitelistAddonRemainingSeconds: null,
             whitelistAddonPaymentId,
             whitelistAddonInternalSquads: whitelistAddonSquads,
             graceStartedAt: null,
@@ -240,12 +240,29 @@ export async function ensureRemnawaveSubscription(input: EnsureSubscriptionInput
             whitelistAddonActive,
             whitelistAddonActivatedAt,
             whitelistAddonExpireAt,
+            whitelistAddonPausedAt: null,
+            whitelistAddonRemainingSeconds: null,
             whitelistAddonPaymentId,
             whitelistAddonInternalSquads: whitelistAddonSquads,
             graceStartedAt: null,
             graceExpireAt: null,
           },
         })
+
+    if (whitelistAddonSource && whitelistAddonSource.id !== row.id) {
+      await tx.subscription.update({
+        where: { id: whitelistAddonSource.id },
+        data: {
+          whitelistAddonActive: false,
+          whitelistAddonActivatedAt: null,
+          whitelistAddonExpireAt: null,
+          whitelistAddonPausedAt: null,
+          whitelistAddonRemainingSeconds: null,
+          whitelistAddonPaymentId: null,
+          whitelistAddonInternalSquads: [],
+        },
+      })
+    }
 
     if (input.paymentId) {
       await tx.payment.update({
@@ -290,10 +307,77 @@ function unlimitedExpireAt() {
   return new Date('2099-12-31T23:59:59.000Z')
 }
 
-function getLatestActiveSubscription(subscriptions: { expireAt: Date; status: string; planId?: string | null }[]) {
+function getLatestActiveSubscription<Subscription extends {
+  expireAt: Date
+  status: string
+  planId?: string | null
+}>(subscriptions: Subscription[]) {
   return subscriptions
     .filter((s) => s.status === 'ACTIVE' || s.status === 'LIMITED')
     .sort((a, b) => b.expireAt.getTime() - a.expireAt.getTime())[0]
+}
+
+type WhitelistAddonSource = {
+  whitelistAddonActive: boolean
+  whitelistAddonActivatedAt: Date | null
+  whitelistAddonExpireAt: Date | null
+  whitelistAddonPausedAt: Date | null
+  whitelistAddonRemainingSeconds: bigint | null
+  whitelistAddonPaymentId: string | null
+  whitelistAddonInternalSquads: string[]
+  status: string
+  expireAt: Date
+  graceExpireAt: Date | null
+  updatedAt: Date
+  plan?: { whitelistAddonInternalSquads: string[] } | null
+}
+
+function resolveWhitelistAddonForActivation(input: {
+  source?: WhitelistAddonSource
+  requested?: EnsureSubscriptionInput['whitelistAddon']
+  paymentId?: string
+  now: Date
+}) {
+  const source = input.source
+  const sourceIsActive = Boolean(source && isWhitelistAddonCurrentlyActive(source, input.now))
+  const storedRemaining = source?.whitelistAddonRemainingSeconds ?? 0n
+  const derivedPauseAt = source
+    ? getWhitelistAddonPauseAt(source, input.now)
+    : input.now
+  const remainingSeconds = storedRemaining > 0n
+    ? storedRemaining
+    : source && !sourceIsActive
+      ? getWhitelistAddonRemainingSeconds(source.whitelistAddonExpireAt, derivedPauseAt)
+      : 0n
+  const resumedExpireAt = remainingSeconds > 0n
+    ? getResumedWhitelistAddonExpireAt(input.now, remainingSeconds)
+    : null
+  const existingExpireAt = sourceIsActive ? source?.whitelistAddonExpireAt ?? null : resumedExpireAt
+  const requestedAt = input.requested?.activatedAt ?? input.now
+  const requestedBase = existingExpireAt && existingExpireAt > requestedAt ? existingExpireAt : requestedAt
+  const expireAt = input.requested
+    ? getWhitelistAddonExpireAt(requestedBase)
+    : existingExpireAt
+  const active = Boolean(expireAt && expireAt > input.now)
+  const squads = input.requested
+    ? input.requested.internalSquads
+    : source?.whitelistAddonInternalSquads.length
+      ? source.whitelistAddonInternalSquads
+      : source?.plan?.whitelistAddonInternalSquads ?? []
+
+  return {
+    active,
+    activatedAt: active
+      ? source?.whitelistAddonActivatedAt ?? requestedAt
+      : null,
+    expireAt: active ? expireAt : null,
+    paymentId: active
+      ? input.requested
+        ? input.paymentId ?? null
+        : source?.whitelistAddonPaymentId ?? null
+      : null,
+    squads: active ? squads : [],
+  }
 }
 
 function mapStatus(s: UserResponse['status']) {

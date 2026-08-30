@@ -32,6 +32,7 @@ export default async function AdminWhitelistAddonsPage({
     OR: [
       { whitelistAddonActivatedAt: { not: null } },
       { whitelistAddonExpireAt: { not: null } },
+      { whitelistAddonRemainingSeconds: { gt: 0n } },
       { whitelistAddonPaymentId: { not: null } },
     ],
   }
@@ -42,8 +43,15 @@ export default async function AdminWhitelistAddonsPage({
         ? [{ whitelistAddonActive: true, whitelistAddonExpireAt: { gt: expiringBefore } }]
         : status === 'EXPIRING'
           ? [{ whitelistAddonActive: true, whitelistAddonExpireAt: { gt: now, lte: expiringBefore } }]
+          : status === 'PAUSED'
+            ? [{ whitelistAddonActive: false, whitelistAddonRemainingSeconds: { gt: 0n } }]
           : status === 'EXPIRED'
-            ? [{ OR: [{ whitelistAddonActive: false }, { whitelistAddonExpireAt: { lte: now } }] }]
+            ? [{
+                AND: [
+                  { OR: [{ whitelistAddonActive: false }, { whitelistAddonExpireAt: { lte: now } }] },
+                  { OR: [{ whitelistAddonRemainingSeconds: null }, { whitelistAddonRemainingSeconds: { lte: 0n } }] },
+                ],
+              }]
             : []),
       ...(source === 'PURCHASED'
         ? [{ whitelistAddonPaymentId: { not: null } }]
@@ -64,7 +72,7 @@ export default async function AdminWhitelistAddonsPage({
     ],
   }
 
-  const [total, subscriptions, activeCount, expiringCount, expiredCount, purchasedCount] = await prisma.$transaction([
+  const [total, subscriptions, activeCount, expiringCount, pausedCount, expiredCount, purchasedCount] = await prisma.$transaction([
     prisma.subscription.count({ where }),
     prisma.subscription.findMany({
       where,
@@ -75,6 +83,8 @@ export default async function AdminWhitelistAddonsPage({
         whitelistAddonActive: true,
         whitelistAddonActivatedAt: true,
         whitelistAddonExpireAt: true,
+        whitelistAddonPausedAt: true,
+        whitelistAddonRemainingSeconds: true,
         whitelistAddonPaymentId: true,
         user: { select: { id: true, email: true, name: true, telegramUsername: true, remnawaveUsername: true } },
         plan: { select: { name: true } },
@@ -82,11 +92,13 @@ export default async function AdminWhitelistAddonsPage({
     }),
     prisma.subscription.count({ where: { ...accessExists, whitelistAddonActive: true, whitelistAddonExpireAt: { gt: now } } }),
     prisma.subscription.count({ where: { ...accessExists, whitelistAddonActive: true, whitelistAddonExpireAt: { gt: now, lte: expiringBefore } } }),
+    prisma.subscription.count({ where: { ...accessExists, whitelistAddonActive: false, whitelistAddonRemainingSeconds: { gt: 0n } } }),
     prisma.subscription.count({
       where: {
         AND: [
           accessExists,
           { OR: [{ whitelistAddonActive: false }, { whitelistAddonExpireAt: { lte: now } }] },
+          { OR: [{ whitelistAddonRemainingSeconds: null }, { whitelistAddonRemainingSeconds: { lte: 0n } }] },
         ],
       },
     }),
@@ -95,9 +107,10 @@ export default async function AdminWhitelistAddonsPage({
 
   return (
     <AdminPageShell title="Белые списки" description="Покупки, ручные выдачи и сроки расширенного доступа">
-      <section className="grid grid-cols-2 gap-2 lg:grid-cols-4" aria-label="Состояние белых списков">
+      <section className="grid grid-cols-2 gap-2 lg:grid-cols-5" aria-label="Состояние белых списков">
         <StatusCard title="Активны" value={activeCount} tone="emerald" href="/dashboard/admin/whitelist-addons?status=ACTIVE" />
         <StatusCard title="Истекают за 3 дня" value={expiringCount} tone="amber" href="/dashboard/admin/whitelist-addons?status=EXPIRING" />
+        <StatusCard title="На паузе" value={pausedCount} tone="cyan" href="/dashboard/admin/whitelist-addons?status=PAUSED" />
         <StatusCard title="Истекли" value={expiredCount} tone="slate" href="/dashboard/admin/whitelist-addons?status=EXPIRED" />
         <StatusCard title="Куплены" value={purchasedCount} tone="cyan" href="/dashboard/admin/whitelist-addons?source=PURCHASED" />
       </section>
@@ -121,6 +134,7 @@ export default async function AdminWhitelistAddonsPage({
             <option value="ALL">Все статусы</option>
             <option value="ACTIVE">Активные</option>
             <option value="EXPIRING">Истекают за 3 дня</option>
+            <option value="PAUSED">На паузе</option>
             <option value="EXPIRED">Истекшие</option>
           </select>
         </AdminFilterField>
@@ -167,7 +181,11 @@ export default async function AdminWhitelistAddonsPage({
                     {statusLabel(currentStatus)}
                   </span>
                   <div className="mt-1 text-xs text-slate-500">
-                    {subscription.whitelistAddonExpireAt ? `до ${formatDateTime(subscription.whitelistAddonExpireAt)}` : 'Без даты окончания'}
+                    {subscription.whitelistAddonRemainingSeconds && subscription.whitelistAddonRemainingSeconds > 0n
+                      ? `осталось ${formatRemaining(subscription.whitelistAddonRemainingSeconds)}`
+                      : subscription.whitelistAddonExpireAt
+                        ? `до ${formatDateTime(subscription.whitelistAddonExpireAt)}`
+                        : 'Без даты окончания'}
                   </div>
                 </div>
                 <div className="text-sm text-slate-600 dark:text-slate-300">{subscription.plan?.name || 'Без тарифа'}</div>
@@ -192,13 +210,18 @@ export default async function AdminWhitelistAddonsPage({
   )
 }
 
-type AddonStatus = 'ACTIVE' | 'EXPIRING' | 'EXPIRED'
+type AddonStatus = 'ACTIVE' | 'EXPIRING' | 'PAUSED' | 'EXPIRED'
 
 function addonStatus(
-  subscription: { whitelistAddonActive: boolean; whitelistAddonExpireAt: Date | null },
+  subscription: {
+    whitelistAddonActive: boolean
+    whitelistAddonExpireAt: Date | null
+    whitelistAddonRemainingSeconds: bigint | null
+  },
   now: Date,
   expiringBefore: Date
 ): AddonStatus {
+  if (subscription.whitelistAddonRemainingSeconds && subscription.whitelistAddonRemainingSeconds > 0n) return 'PAUSED'
   if (!subscription.whitelistAddonActive || !subscription.whitelistAddonExpireAt || subscription.whitelistAddonExpireAt <= now) return 'EXPIRED'
   if (subscription.whitelistAddonExpireAt <= expiringBefore) return 'EXPIRING'
   return 'ACTIVE'
@@ -207,17 +230,24 @@ function addonStatus(
 function statusLabel(status: AddonStatus) {
   if (status === 'ACTIVE') return 'Активен'
   if (status === 'EXPIRING') return 'Истекает'
+  if (status === 'PAUSED') return 'На паузе'
   return 'Истёк'
 }
 
 function statusClass(status: AddonStatus) {
   if (status === 'ACTIVE') return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-200'
   if (status === 'EXPIRING') return 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-200'
+  if (status === 'PAUSED') return 'bg-cyan-100 text-cyan-700 dark:bg-cyan-500/15 dark:text-cyan-200'
   return 'bg-slate-100 text-slate-600 dark:bg-white/[0.07] dark:text-slate-300'
 }
 
 function formatDateTime(date: Date) {
   return date.toLocaleString('ru-RU', { timeZone: 'Europe/Moscow', dateStyle: 'short', timeStyle: 'short' })
+}
+
+function formatRemaining(seconds: bigint) {
+  const days = Math.max(1, Math.ceil(Number(seconds) / (24 * 60 * 60)))
+  return `${days} дн.`
 }
 
 function StatusCard({

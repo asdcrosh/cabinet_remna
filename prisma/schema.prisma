@@ -610,6 +610,9 @@ model Subscription {
   whitelistAddonActive      Boolean   @default(false)
   whitelistAddonActivatedAt DateTime?
   whitelistAddonExpireAt    DateTime?
+  // Неиспользованный остаток хранится только пока БС стоят на паузе.
+  whitelistAddonPausedAt    DateTime?
+  whitelistAddonRemainingSeconds BigInt?
   whitelistAddonPaymentId   String?
   whitelistAddonInternalSquads String[] @default([])
   graceStartedAt               DateTime?
@@ -628,6 +631,7 @@ model Subscription {
   @@index([expireAt])
   @@index([pendingSync, updatedAt])
   @@index([whitelistAddonActive, whitelistAddonExpireAt])
+  @@index([whitelistAddonRemainingSeconds])
   @@index([graceExpireAt])
 }
 

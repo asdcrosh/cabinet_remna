@@ -10,6 +10,8 @@ import {
 import { removeRemnashopSubscription } from './remnashop-subscription-removal'
 import { markSyncFailed, markSyncSkipped, markSyncSucceeded } from './sync-events'
 import { paymentErrorDetails, recordPaymentEvent } from './payment-events'
+import { getWhitelistAddonRemainingSeconds } from './whitelist-addon-policy'
+import { readBundledWhitelistAddonSnapshot } from './whitelist-addon'
 
 export type SubscriptionTerminationSource =
   | 'USER_REQUEST'
@@ -49,11 +51,29 @@ export async function terminateUserSubscription(input: TerminateUserSubscription
         where: { status: { in: ['ACTIVE', 'LIMITED'] } },
         orderBy: { expireAt: 'desc' },
         take: 1,
-        select: { id: true },
+        select: {
+          id: true,
+          whitelistAddonActive: true,
+          whitelistAddonExpireAt: true,
+          whitelistAddonRemainingSeconds: true,
+          whitelistAddonPaymentId: true,
+        },
       },
     },
   })
   if (!user) throw new Error('User not found')
+
+  const refundedPayment = input.paymentId && isRefundSource(input.source)
+    ? await prisma.payment.findUnique({
+        where: { id: input.paymentId },
+        select: { addonSnapshot: true },
+      })
+    : null
+  const revokeRefundedBundledAddon = Boolean(
+    input.paymentId
+    && readBundledWhitelistAddonSnapshot(refundedPayment?.addonSnapshot)
+    && user.subscriptions[0]?.whitelistAddonPaymentId === input.paymentId
+  )
 
   const hadSubscription = user.subscriptions.length > 0
   const notificationDedupeId = input.paymentId
@@ -98,6 +118,34 @@ export async function terminateUserSubscription(input: TerminateUserSubscription
   }
 
   await prisma.$transaction(async (tx) => {
+    const currentSubscription = user.subscriptions[0]
+    const whitelistAddonRemainingSeconds = currentSubscription?.whitelistAddonActive
+      ? getWhitelistAddonRemainingSeconds(currentSubscription.whitelistAddonExpireAt, now)
+      : currentSubscription?.whitelistAddonRemainingSeconds ?? 0n
+    if (currentSubscription && revokeRefundedBundledAddon) {
+      await tx.subscription.updateMany({
+        where: { id: currentSubscription.id },
+        data: {
+          whitelistAddonActive: false,
+          whitelistAddonActivatedAt: null,
+          whitelistAddonExpireAt: null,
+          whitelistAddonPausedAt: null,
+          whitelistAddonRemainingSeconds: null,
+          whitelistAddonPaymentId: null,
+          whitelistAddonInternalSquads: [],
+        },
+      })
+    } else if (currentSubscription && whitelistAddonRemainingSeconds > 0n) {
+      await tx.subscription.updateMany({
+        where: { id: currentSubscription.id },
+        data: {
+          whitelistAddonActive: false,
+          whitelistAddonExpireAt: null,
+          whitelistAddonPausedAt: now,
+          whitelistAddonRemainingSeconds,
+        },
+      })
+    }
     await tx.subscription.updateMany({
       where: { userId: user.id, status: { in: ['ACTIVE', 'LIMITED'] } },
       data: {
@@ -186,6 +234,12 @@ export async function terminateUserSubscription(input: TerminateUserSubscription
   }
 
   return { hadSubscription }
+}
+
+function isRefundSource(source: SubscriptionTerminationSource) {
+  return source === 'YOOKASSA_REFUND'
+    || source === 'PLATEGA_CHARGEBACK'
+    || source === 'REMNASHOP_REFUND'
 }
 
 async function runRemnawaveCleanup(

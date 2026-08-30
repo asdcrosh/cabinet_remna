@@ -458,6 +458,26 @@ describe('payment create route', () => {
     expect(mocks.prisma.$transaction).not.toHaveBeenCalled()
   })
 
+  it('does not sell bundled whitelist access while an existing balance is paused', async () => {
+    mocks.prisma.subscription.findFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({
+        id: 'subscription-1',
+        planId: 'old-plan',
+        status: 'EXPIRED',
+        expireAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
+        whitelistAddonActive: false,
+        whitelistAddonRemainingSeconds: 20n * 24n * 60n * 60n,
+      })
+
+    const response = await POST(paymentRequest({ whitelistAddon: true }))
+    const body = await response.json()
+
+    expect(response.status).toBe(409)
+    expect(body.code).toBe('WHITELIST_ADDON_ALREADY_ACTIVE')
+    expect(mocks.prisma.$transaction).not.toHaveBeenCalled()
+  })
+
   it('adds the whitelist add-on to a subscription checkout', async () => {
     mocks.txPaymentCreate.mockResolvedValue({
       ...localPayment,

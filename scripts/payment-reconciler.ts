@@ -14,7 +14,11 @@ import { reconcileSubscriptionHealthBatch } from '../src/lib/subscription-health
 import { processAdminTelegramDeliveries } from '../src/lib/admin-telegram-notifications'
 import { processDueAutoRenewals } from '../src/lib/auto-renewal'
 import { resumeDuePausedSubscriptions } from '../src/lib/subscription-retention'
-import { reconcileExpiredWhitelistAddons } from '../src/lib/whitelist-addon'
+import {
+  reconcileAvailableSubscriptionWhitelistAddons,
+  reconcileExpiredWhitelistAddons,
+  reconcileUnavailableSubscriptionWhitelistAddons,
+} from '../src/lib/whitelist-addon'
 import { reconcileWhitelistAddonExpiryNotifications } from '../src/lib/whitelist-addon-expiry-notifications'
 import { checkReleaseNotifications } from '../src/lib/release-notifications'
 import { reconcileSubscriptionGracePeriods } from '../src/lib/subscription-grace'
@@ -80,6 +84,20 @@ async function runOnce() {
   const blockedDevices = await reconcileBlockedDevices()
   if (blockedDevices.revoked > 0 || blockedDevices.failed > 0) {
     logInfo('blocked_devices.reconciled', blockedDevices)
+  }
+  const pausedWhitelistAddons = await reconcileUnavailableSubscriptionWhitelistAddons({
+    limit: notificationBatchSize,
+    shouldStop: () => stopped,
+  })
+  if (pausedWhitelistAddons.checked > 0) {
+    logInfo('whitelist_addon.pause_batch_finished', pausedWhitelistAddons)
+  }
+  const resumedWhitelistAddons = await reconcileAvailableSubscriptionWhitelistAddons({
+    limit: notificationBatchSize,
+    shouldStop: () => stopped,
+  })
+  if (resumedWhitelistAddons.checked > 0) {
+    logInfo('whitelist_addon.resume_batch_finished', resumedWhitelistAddons)
   }
   await reconcileWhitelistAddonExpiryNotifications({
     batchSize: notificationBatchSize,

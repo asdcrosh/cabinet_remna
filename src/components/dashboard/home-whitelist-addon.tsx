@@ -1,8 +1,9 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { CheckCircle2, CreditCard, Globe2 } from 'lucide-react'
+import { CheckCircle2, CreditCard, Globe2, PauseCircle } from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
 import { formatPrice } from '@/lib/format'
 import type { CheckoutPaymentProvider } from '@/lib/payment-providers'
@@ -19,12 +20,14 @@ export function HomeWhitelistAddon({
   priceKopecks,
   active,
   expireAt,
+  pausedRemainingSeconds,
   paymentProviders,
 }: {
   planId: string
   priceKopecks: number
   active: boolean
   expireAt: string | null
+  pausedRemainingSeconds?: number
   paymentProviders: Provider[]
 }) {
   const [open, setOpen] = useState(false)
@@ -36,8 +39,8 @@ export function HomeWhitelistAddon({
   const checkoutKeyRef = useRef<string | null>(null)
 
   useEffect(() => {
-    if (searchParams.get('whitelistAddon') === 'renew') setOpen(true)
-  }, [searchParams])
+    if (!pausedRemainingSeconds && searchParams.get('whitelistAddon') === 'renew') setOpen(true)
+  }, [pausedRemainingSeconds, searchParams])
 
   async function buy() {
     if (paymentProviders.length === 0) {
@@ -98,7 +101,7 @@ export function HomeWhitelistAddon({
         <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-4 text-sm leading-5 text-slate-700 dark:border-amber-400/20 dark:bg-amber-400/[0.06] dark:text-slate-200">
           {active
             ? 'К текущей дате окончания добавятся ещё 30 дней. Оставшиеся оплаченные дни не сгорят.'
-            : 'БС работают только в приложении INCY. Доступ включится сразу после оплаты ровно на 30 дней. Затем группы БС автоматически снимутся.'}
+            : 'БС работают только в приложении INCY. Покупка добавляет 30 дней. Если основной тариф закончится раньше, остаток БС сохранится и продолжит расходоваться после возобновления тарифа.'}
         </div>
         {paymentProviders.length > 1 ? (
           <label className="block">
@@ -117,6 +120,27 @@ export function HomeWhitelistAddon({
       </div>
     </Modal>
   )
+
+  if (pausedRemainingSeconds && pausedRemainingSeconds > 0) {
+    return (
+      <section className="flex flex-col gap-3 rounded-2xl border border-sky-200 bg-sky-50/70 px-4 py-3 dark:border-sky-400/20 dark:bg-sky-400/[0.06] sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-sky-500/10 text-sky-700 dark:text-sky-300">
+            <PauseCircle className="h-5 w-5" />
+          </span>
+          <div className="min-w-0">
+            <div className="text-sm font-bold tracking-wide text-sky-800 dark:text-sky-200">БС НА ПАУЗЕ</div>
+            <p className="mt-0.5 text-xs text-sky-700/80 dark:text-sky-200/70">
+              Осталось {formatRemainingTime(pausedRemainingSeconds)}. Продолжат работать после покупки тарифа.
+            </p>
+          </div>
+        </div>
+        <Link href="/dashboard/plans?intent=renew" className="btn-primary w-full shrink-0 sm:w-auto">
+          Возобновить подписку
+        </Link>
+      </section>
+    )
+  }
 
   if (active) {
     return (
@@ -176,4 +200,21 @@ export function HomeWhitelistAddon({
       {purchaseModal}
     </>
   )
+}
+
+function formatRemainingTime(seconds: number) {
+  if (seconds >= 24 * 60 * 60) {
+    const days = Math.ceil(seconds / (24 * 60 * 60))
+    return `${days} ${plural(days, 'день', 'дня', 'дней')}`
+  }
+  const hours = Math.max(1, Math.ceil(seconds / (60 * 60)))
+  return `${hours} ${plural(hours, 'час', 'часа', 'часов')}`
+}
+
+function plural(value: number, one: string, few: string, many: string) {
+  const mod10 = value % 10
+  const mod100 = value % 100
+  if (mod10 === 1 && mod100 !== 11) return one
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return few
+  return many
 }
