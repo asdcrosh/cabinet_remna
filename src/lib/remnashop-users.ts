@@ -417,11 +417,22 @@ async function syncSubscriptionFromRemnawave(input: {
     where: { id: input.localUserId },
     select: { remnawaveId: true, remnawaveUsername: true },
   })
-  let remnawaveUser = (await remnawave.getUser({
-    id: localUser?.remnawaveId,
-    uuid: input.remnawaveUuid,
-    username: localUser?.remnawaveUsername,
-  })).response
+  let remnawaveUser
+  try {
+    remnawaveUser = (await remnawave.getUser({
+      id: localUser?.remnawaveId,
+      uuid: input.remnawaveUuid,
+      username: localUser?.remnawaveUsername,
+    })).response
+  } catch (error) {
+    const fallbackUsername = input.telegramId ? `rs_${input.telegramId}` : null
+    const canTryRemnashopUsername = fallbackUsername
+      && fallbackUsername !== localUser?.remnawaveUsername
+      && error instanceof RemnawaveError
+      && (error.status === 400 || error.status === 404)
+    if (!canTryRemnashopUsername) throw error
+    remnawaveUser = (await remnawave.getUser({ username: fallbackUsername })).response
+  }
   const telegramId = toRemnawaveTelegramId(input.telegramId)
   if (telegramId && remnawaveUser.telegramId !== telegramId) {
     remnawaveUser = (await remnawave.updateUser(remnawaveUser, {

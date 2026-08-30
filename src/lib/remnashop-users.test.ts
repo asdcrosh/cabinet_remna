@@ -45,6 +45,7 @@ vi.mock('./remnawave-local-sync', () => ({
 vi.mock('./referrals', () => ({ generateUniqueReferralCode: mocks.generateUniqueReferralCode }))
 
 import { syncRemnashopUserToCabinet, syncRemnashopUsersToCabinet } from './remnashop-users'
+import { RemnawaveError } from './remnawave'
 
 const sourceUser = {
   id: 10,
@@ -141,6 +142,57 @@ describe('syncRemnashopUsersToCabinet', () => {
       startAt: new Date('2026-06-01T00:00:00.000Z'),
       remnawaveUser: expect.objectContaining({ uuid: 'rw-1', username: 'rw_user' }),
     })
+    expect(result.subscriptionsSynced).toBe(1)
+    expect(result.subscriptionsFailed).toBe(0)
+  })
+
+  it('falls back to the Remnashop username when Remnawave rejects a numeric legacy UUID', async () => {
+    const numericRemnawaveUser = {
+      ...remnawaveUser,
+      id: 127,
+      uuid: null,
+      username: 'rs_123',
+      telegramId: 123,
+    }
+    mocks.remnashopQuery.mockResolvedValue({
+      rows: [{
+        ...sourceUser,
+        user_remna_id: '00000000-0000-0000-0000-00000000007f',
+      }],
+    })
+    mocks.prisma.user.findFirst.mockResolvedValue({
+      id: 'user-1',
+      email: 'telegram-123@pending.invalid',
+      name: null,
+      remnashopUserId: 10,
+      remnawaveUuid: null,
+      remnawaveUsername: null,
+      telegramId: 123n,
+      telegramUsername: null,
+      telegramLinkedAt: null,
+      emailVerifiedAt: null,
+      subscriptions: [],
+    })
+    mocks.prisma.user.update.mockResolvedValue({
+      id: 'user-1',
+      remnawaveUuid: null,
+      remnawaveUsername: null,
+      subscriptions: [],
+    })
+    mocks.remnawave.getUser
+      .mockRejectedValueOnce(new RemnawaveError(400, null, 'numeric id validation failed'))
+      .mockResolvedValueOnce({ response: numericRemnawaveUser })
+    mocks.upsertLocalSubscriptionFromRemnawave.mockResolvedValue({ id: 'sub-1' })
+
+    const result = await syncRemnashopUsersToCabinet()
+
+    expect(mocks.remnawave.getUser).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      uuid: '00000000-0000-0000-0000-00000000007f',
+    }))
+    expect(mocks.remnawave.getUser).toHaveBeenNthCalledWith(2, { username: 'rs_123' })
+    expect(mocks.upsertLocalSubscriptionFromRemnawave).toHaveBeenCalledWith(
+      expect.objectContaining({ remnawaveUser: numericRemnawaveUser })
+    )
     expect(result.subscriptionsSynced).toBe(1)
     expect(result.subscriptionsFailed).toBe(0)
   })
