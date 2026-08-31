@@ -39,7 +39,8 @@ test('мобильная навигация переносит второсте�
   await expect(page).toHaveURL(/\/dashboard\/settings(?:\?|$)/)
   await expect(page.getByRole('heading', { name: 'Аккаунт' })).toBeVisible()
   const settingsTabs = page.getByRole('tablist', { name: 'Разделы настроек' })
-  await expect(settingsTabs.getByRole('tab')).toHaveCount(4)
+  await expect(settingsTabs.getByRole('tab')).toHaveCount(5)
+  await expect(settingsTabs.getByRole('tab', { name: 'Автопродление' })).toBeVisible()
   expect(await settingsTabs.locator('..').evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true)
   await expectNoHorizontalOverflow(page)
 
