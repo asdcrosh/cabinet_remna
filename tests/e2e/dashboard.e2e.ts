@@ -147,6 +147,13 @@ test('активное подключение показывает добавл�
 
   const access = page.getByTestId('subscription-access')
   await expect(access.getByRole('heading', { name: 'Подписка активна' })).toBeVisible()
+  const autoRenewal = page.getByRole('region', { name: 'Автопродление' })
+  await expect(autoRenewal.getByRole('button', { name: 'Отключить автопродление' })).toBeVisible()
+  await autoRenewal.getByRole('button', { name: 'Отключить автопродление' }).click()
+  const cancelDialog = page.getByRole('dialog', { name: 'Отключить автопродление' })
+  await expect(cancelDialog.getByText('VISA •••• 4567')).toBeVisible()
+  await expect(cancelDialog.getByText(/Доступ сохранится до/)).toBeVisible()
+  await cancelDialog.getByRole('button', { name: 'Оставить включённым' }).click()
   await expect(page.getByRole('heading', { name: 'Подключить ещё устройство' })).toBeVisible()
   await expect(page.getByRole('button', { name: /Подключить в/ })).toBeVisible()
   await expect(page.getByLabel('Устройство для подключения')).toBeVisible()

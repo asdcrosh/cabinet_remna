@@ -54,6 +54,7 @@ export function AutoRenewalCard({
   planPriceKopecks,
   planDurationDays,
   planDeviceLimit,
+  accessExpiresAt = null,
   initialState,
   initialPause,
 }: {
@@ -62,6 +63,7 @@ export function AutoRenewalCard({
   planPriceKopecks: number
   planDurationDays: number
   planDeviceLimit: number
+  accessExpiresAt?: string | null
   initialState: AutoRenewalState
   initialPause: PauseState
 }) {
@@ -82,6 +84,7 @@ export function AutoRenewalCard({
     && state.consentDurationDays === planDurationDays
   )
   const enabled = Boolean(state && state.status !== 'DISABLED' && consentCurrent)
+  const cancellable = Boolean(state && state.status !== 'DISABLED')
 
   async function changeEnabled(next: boolean) {
     if (!next) {
@@ -183,13 +186,13 @@ export function AutoRenewalCard({
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
               Возобновить
             </button>
-          ) : saving ? <Loader2 className="h-5 w-5 animate-spin text-slate-400" /> : enabled ? (
+          ) : saving ? <Loader2 className="h-5 w-5 animate-spin text-slate-400" /> : cancellable ? (
             <button
               type="button"
               className="inline-flex min-h-8 items-center rounded-lg px-2.5 text-sm font-semibold text-red-600 transition hover:bg-red-50 dark:text-red-300 dark:hover:bg-red-500/10"
               onClick={() => void changeEnabled(false)}
             >
-              Отключить
+              Отключить автопродление
             </button>
           ) : (
             <button
@@ -197,7 +200,7 @@ export function AutoRenewalCard({
               className="inline-flex min-h-8 items-center rounded-lg bg-cyan-500 px-3 text-sm font-semibold text-white transition hover:bg-cyan-600 dark:bg-cyan-300 dark:text-slate-950 dark:hover:bg-cyan-200"
               onClick={() => void changeEnabled(true)}
             >
-              Включить
+              Подключить автопродление
             </button>
           )}
         </div>
@@ -314,8 +317,21 @@ export function AutoRenewalCard({
           />
         </div>
       ) : dialog === 'disable' ? (
-        <div className="rounded-2xl border border-red-200 bg-red-50/70 p-4 text-sm leading-6 text-red-900 dark:border-red-500/25 dark:bg-red-500/[0.07] dark:text-red-100">
-          Способ оплаты будет удалён из кабинета, дата следующего списания сбросится. Уже оплаченные дни и доступ к VPN останутся без изменений.
+        <div className="space-y-3">
+          <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-white/[0.035]">
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-brand-500/10 text-brand-600 dark:text-brand-300">
+              <CreditCard className="h-5 w-5" />
+            </span>
+            <div className="min-w-0">
+              <div className="text-xs font-medium text-slate-500 dark:text-slate-400">Способ оплаты</div>
+              <div className="mt-0.5 truncate text-sm font-semibold text-slate-950 dark:text-white">
+                {state?.paymentMethodTitle ?? 'Сохранённый способ оплаты ЮKassa'}
+              </div>
+            </div>
+          </div>
+          <div className="rounded-2xl border border-red-200 bg-red-50/70 p-4 text-sm leading-6 text-red-900 dark:border-red-500/25 dark:bg-red-500/[0.07] dark:text-red-100">
+            После отключения новых списаний не будет. Доступ сохранится {accessExpiresAt ? `до ${formatDateOnly(accessExpiresAt)}` : 'до окончания оплаченного срока'}.
+          </div>
         </div>
       ) : <>
       <div className="grid gap-2 sm:grid-cols-2">
@@ -379,6 +395,15 @@ function formatDate(value: string) {
     month: 'long',
     hour: '2-digit',
     minute: '2-digit',
+    timeZone: 'Europe/Moscow',
+  }).format(new Date(value))
+}
+
+function formatDateOnly(value: string) {
+  return new Intl.DateTimeFormat('ru-RU', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
     timeZone: 'Europe/Moscow',
   }).format(new Date(value))
 }

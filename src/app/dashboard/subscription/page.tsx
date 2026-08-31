@@ -19,6 +19,10 @@ import { isWhitelistAddonCurrentlyActive } from '@/lib/whitelist-addon-policy'
 import { readPlanPurchaseSnapshot } from '@/lib/plan-purchase'
 import { logError } from '@/lib/logger'
 import { SubscriptionPendingRefresh } from '@/components/dashboard/subscription-pending-refresh'
+import { AutoRenewalCard } from '@/components/dashboard/auto-renewal-card'
+import { calculateAutoRenewalPurchase, getAutoRenewalState } from '@/lib/auto-renewal'
+import { getRetentionState } from '@/lib/subscription-retention'
+import { calculatePersonalDiscount } from '@/lib/user-discounts'
 
 export const dynamic = 'force-dynamic'
 
@@ -26,7 +30,7 @@ export default async function SubscriptionPage() {
   const features = await getFeatureFlags()
   const session = await getCurrentUser()
   if (!session) redirect('/login')
-  const [user, localSubscription, payments, auditEvents] = await Promise.all([
+  const [user, localSubscription, payments, auditEvents, autoRenewal, retentionPause] = await Promise.all([
     prisma.user.findUnique({ where: { id: session.uid } }),
     prisma.subscription.findFirst({
       where: { userId: session.uid, status: { in: ['ACTIVE', 'LIMITED', 'PAUSED'] } },
@@ -42,7 +46,11 @@ export default async function SubscriptionPage() {
         plan: {
           select: {
             name: true,
+            priceKopecks: true,
+            durationDays: true,
             deviceLimit: true,
+            maxDeviceLimit: true,
+            extraDevicePriceKopecks: true,
             unlimitedDevices: true,
             unlimitedDuration: true,
           },
@@ -76,6 +84,8 @@ export default async function SubscriptionPage() {
       logError('subscription.timeline_audit_failed', error, { userId: session.uid })
       return []
     }),
+    getAutoRenewalState(session.uid),
+    getRetentionState(session.uid),
   ])
   if (!user?.remnawaveUsername) {
     return (
@@ -251,6 +261,34 @@ export default async function SubscriptionPage() {
         </div>
       </section>
 
+      {!subscriptionExpired && localSubscription?.plan && localSubscription.planId && !unlimitedDuration ? (
+        <AutoRenewalCard
+          planId={localSubscription.planId}
+          planName={localSubscription.plan.name}
+          planPriceKopecks={currentRenewalPrice(
+            localSubscription.plan,
+            localSubscription.deviceLimit ?? localSubscription.plan.deviceLimit,
+            user.personalDiscountPercent
+          )}
+          planDurationDays={localSubscription.plan.durationDays}
+          planDeviceLimit={localSubscription.deviceLimit ?? localSubscription.plan.deviceLimit}
+          accessExpiresAt={u.expiresAt}
+          initialState={autoRenewal ? {
+            ...autoRenewal,
+            paymentMethodSavedAt: autoRenewal.paymentMethodSavedAt?.toISOString() ?? null,
+            consentAcceptedAt: autoRenewal.consentAcceptedAt?.toISOString() ?? null,
+            nextChargeAt: autoRenewal.nextChargeAt?.toISOString() ?? null,
+            lastAttemptAt: autoRenewal.lastAttemptAt?.toISOString() ?? null,
+            lastSuccessAt: autoRenewal.lastSuccessAt?.toISOString() ?? null,
+          } : null}
+          initialPause={retentionPause ? {
+            ...retentionPause,
+            pauseUntil: retentionPause.pauseUntil?.toISOString() ?? null,
+            createdAt: retentionPause.createdAt.toISOString(),
+          } : null}
+        />
+      ) : null}
+
       <SubscriptionTimeline payments={payments} auditEvents={auditEvents} />
 
       {!subscriptionExpired && (
@@ -284,6 +322,25 @@ export default async function SubscriptionPage() {
       )}
     </div>
   )
+}
+
+function currentRenewalPrice(
+  plan: {
+    priceKopecks: number
+    deviceLimit: number
+    maxDeviceLimit: number
+    extraDevicePriceKopecks: number
+  },
+  deviceLimit: number,
+  personalDiscountPercent: number
+) {
+  try {
+    const originalAmountKopecks = calculateAutoRenewalPurchase(plan, deviceLimit).originalAmountKopecks
+    const personalDiscount = calculatePersonalDiscount(plan.priceKopecks, personalDiscountPercent)
+    return originalAmountKopecks - (personalDiscount?.discountKopecks ?? 0)
+  } catch {
+    return plan.priceKopecks
+  }
 }
 
 function SubscriptionUnavailable({ supportEnabled }: { supportEnabled: boolean }) {
