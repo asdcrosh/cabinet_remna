@@ -1,10 +1,10 @@
 'use client'
 
 import { type ReactNode, useRef, useState } from 'react'
-import { Bell, Link2, LockKeyhole, UserRound } from 'lucide-react'
+import { Bell, Link2, LockKeyhole, RefreshCw, UserRound } from 'lucide-react'
 import { cn } from '@/lib/cn'
 
-type SettingsTabId = 'account' | 'notifications' | 'sync' | 'security'
+type SettingsTabId = 'account' | 'auto-renewal' | 'notifications' | 'sync' | 'security'
 
 type SettingsTabSection = {
   id: SettingsTabId
@@ -16,6 +16,7 @@ type SettingsTabSection = {
 
 const tabIcons: Record<SettingsTabId, ReactNode> = {
   account: <UserRound className="h-4 w-4" />,
+  'auto-renewal': <RefreshCw className="h-4 w-4" />,
   notifications: <Bell className="h-4 w-4" />,
   sync: <Link2 className="h-4 w-4" />,
   security: <LockKeyhole className="h-4 w-4" />,

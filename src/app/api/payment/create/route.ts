@@ -792,11 +792,11 @@ export const POST = withAuth(async (req: Request) => {
     }
   }
 
+  const savePaymentMethod = isSubscriptionPurchase && (
+    autoRenewalConsent || await shouldSavePaymentMethodBestEffort(user.id, plan.id)
+  )
   let payment
   try {
-    const savePaymentMethod = isSubscriptionPurchase && (
-      autoRenewalConsent || await shouldSavePaymentMethodBestEffort(user.id, plan.id)
-    )
     payment = await createPayment({
       amount: amountRub,
       description,
@@ -821,7 +821,7 @@ export const POST = withAuth(async (req: Request) => {
     })
   } catch (e) {
     const message = e instanceof Error ? e.message : 'YooKassa createPayment failed'
-    const failure = yookassaCreateFailure(e)
+    const failure = yookassaCreateFailure(e, savePaymentMethod)
     await cancelFailedLocalPayment(localPayment.id, message)
     logError('payment.create.yookassa_failed', e, { localPaymentId: localPayment.id })
     return NextResponse.json(
@@ -965,7 +965,7 @@ function paymentProviderUnavailableMessage(provider: 'YOOKASSA' | 'PAYANYWAY' | 
   return 'ЮKassa пока не настроена'
 }
 
-function yookassaCreateFailure(error: unknown) {
+function yookassaCreateFailure(error: unknown, savePaymentMethod: boolean) {
   const providerError = error && typeof error === 'object'
     ? error as {
         status?: unknown
@@ -983,16 +983,22 @@ function yookassaCreateFailure(error: unknown) {
     ? providerError.providerParameter
     : null
 
-  if (status === 401 || status === 403) {
+  if (parameter === 'save_payment_method' || (status === 403 && savePaymentMethod)) {
+    return {
+      error: 'ЮKassa запретила сохранение карты. Для магазина нужно подключить автоплатежи у менеджера ЮKassa. Обычная оплата без автопродления продолжит работать.',
+      code: 'YOOKASSA_AUTOPAYMENTS_UNAVAILABLE',
+    }
+  }
+  if (status === 401) {
     return {
       error: 'ЮKassa отклонила авторизацию магазина. Проверьте Shop ID и секретный API-ключ.',
       code: 'YOOKASSA_AUTH_FAILED',
     }
   }
-  if (parameter === 'save_payment_method') {
+  if (status === 403) {
     return {
-      error: 'В магазине ЮKassa не подключены автоплатежи. Подключите сохранение способов оплаты через менеджера ЮKassa.',
-      code: 'YOOKASSA_AUTOPAYMENTS_UNAVAILABLE',
+      error: 'ЮKassa запретила магазину выполнять эту операцию. Проверьте права и подключённые способы оплаты.',
+      code: 'YOOKASSA_ACCESS_FORBIDDEN',
     }
   }
   if (status === 400 || status === 422) {

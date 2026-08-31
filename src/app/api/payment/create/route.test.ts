@@ -738,10 +738,9 @@ describe('payment create route', () => {
 
   it('reports unavailable YooKassa autopayments without blaming credentials', async () => {
     mocks.createPayment.mockRejectedValue(Object.assign(new Error('provider rejected request'), {
-      status: 400,
-      providerCode: 'invalid_request',
-      providerDescription: 'Saving payment methods is not available',
-      providerParameter: 'save_payment_method',
+      status: 403,
+      providerCode: 'forbidden',
+      providerDescription: 'Insufficient permission',
     }))
 
     const response = await POST(paymentRequest({

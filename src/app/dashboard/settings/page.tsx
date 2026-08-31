@@ -13,6 +13,10 @@ import { getFeatureFlags } from '@/lib/feature-flags'
 import { legalNavigation } from '@/lib/legal-links'
 import { getNotificationPreferences } from '@/lib/notification-preferences'
 import { NotificationPreferencesPanel } from '@/components/dashboard/notification-preferences-panel'
+import { AutoRenewalCard } from '@/components/dashboard/auto-renewal-card'
+import { calculateAutoRenewalPurchase, getAutoRenewalState } from '@/lib/auto-renewal'
+import { getRetentionState } from '@/lib/subscription-retention'
+import { calculatePersonalDiscount } from '@/lib/user-discounts'
 
 export const dynamic = 'force-dynamic'
 
@@ -23,9 +27,29 @@ export default async function SettingsPage() {
   if (!session) redirect('/login')
   const user = await prisma.user.findUnique({ where: { id: session.uid } })
   if (!user) redirect('/login')
-  const [features, notificationPreferences] = await Promise.all([
+  const [features, notificationPreferences, currentSubscription, autoRenewal, retentionPause] = await Promise.all([
     getFeatureFlags(),
     getNotificationPreferences(user.id),
+    prisma.subscription.findFirst({
+      where: { userId: user.id, status: { in: ['ACTIVE', 'LIMITED', 'PAUSED'] }, planId: { not: null } },
+      orderBy: { expireAt: 'desc' },
+      include: {
+        plan: {
+          select: {
+            id: true,
+            name: true,
+            priceKopecks: true,
+            durationDays: true,
+            unlimitedDuration: true,
+            deviceLimit: true,
+            maxDeviceLimit: true,
+            extraDevicePriceKopecks: true,
+          },
+        },
+      },
+    }),
+    getAutoRenewalState(user.id),
+    getRetentionState(user.id),
   ])
   const hasVerifiedEmail = Boolean(user.emailVerifiedAt && !user.email.endsWith('@pending.invalid'))
   const hasTelegram = Boolean(user.telegramId)
@@ -76,6 +100,47 @@ export default async function SettingsPage() {
                     </div>
                   </div>
                 </div>
+              </SettingsSection>
+            ),
+          },
+          {
+            id: 'auto-renewal',
+            title: 'Автопродление',
+            shortTitle: 'Оплата',
+            description: 'Регулярные списания',
+            children: currentSubscription?.plan && !currentSubscription.plan.unlimitedDuration ? (
+              <AutoRenewalCard
+                planId={currentSubscription.plan.id}
+                planName={currentSubscription.plan.name}
+                planPriceKopecks={currentRenewalPrice(
+                  currentSubscription.plan,
+                  currentSubscription.deviceLimit ?? currentSubscription.plan.deviceLimit,
+                  user.personalDiscountPercent
+                )}
+                planDurationDays={currentSubscription.plan.durationDays}
+                planDeviceLimit={currentSubscription.deviceLimit ?? currentSubscription.plan.deviceLimit}
+                initialState={autoRenewal ? {
+                  ...autoRenewal,
+                  paymentMethodSavedAt: autoRenewal.paymentMethodSavedAt?.toISOString() ?? null,
+                  consentAcceptedAt: autoRenewal.consentAcceptedAt?.toISOString() ?? null,
+                  nextChargeAt: autoRenewal.nextChargeAt?.toISOString() ?? null,
+                  lastAttemptAt: autoRenewal.lastAttemptAt?.toISOString() ?? null,
+                  lastSuccessAt: autoRenewal.lastSuccessAt?.toISOString() ?? null,
+                } : null}
+                initialPause={retentionPause ? {
+                  ...retentionPause,
+                  pauseUntil: retentionPause.pauseUntil?.toISOString() ?? null,
+                  createdAt: retentionPause.createdAt.toISOString(),
+                } : null}
+              />
+            ) : (
+              <SettingsSection
+                id="auto-renewal"
+                title="Автопродление"
+                description="Станет доступно после покупки обычного тарифа"
+                icon={<ReceiptText className="h-5 w-5" />}
+              >
+                <Link href="/dashboard/plans" className="btn-primary">Выбрать тариф</Link>
               </SettingsSection>
             ),
           },
@@ -212,6 +277,25 @@ export default async function SettingsPage() {
       </div>
     </div>
   )
+}
+
+function currentRenewalPrice(
+  plan: {
+    priceKopecks: number
+    deviceLimit: number
+    maxDeviceLimit: number
+    extraDevicePriceKopecks: number
+  },
+  deviceLimit: number,
+  personalDiscountPercent: number
+) {
+  try {
+    const originalAmountKopecks = calculateAutoRenewalPurchase(plan, deviceLimit).originalAmountKopecks
+    const personalDiscount = calculatePersonalDiscount(plan.priceKopecks, personalDiscountPercent)
+    return originalAmountKopecks - (personalDiscount?.discountKopecks ?? 0)
+  } catch {
+    return plan.priceKopecks
+  }
 }
 
 function SettingsSection({
