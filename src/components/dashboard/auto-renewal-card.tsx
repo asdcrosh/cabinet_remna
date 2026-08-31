@@ -1,8 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { type ReactNode, useState } from 'react'
 import Link from 'next/link'
-import { CalendarClock, CreditCard, Loader2, PauseCircle, Play, RefreshCw } from 'lucide-react'
+import { ArrowRight, CalendarClock, CheckCircle2, CreditCard, Loader2, PauseCircle, Play, ReceiptText, RefreshCw, ShieldCheck, type LucideIcon } from 'lucide-react'
+import { cn } from '@/lib/cn'
 import { apiFetch } from '@/lib/api-client'
 import { toast } from '@/components/ui/toaster'
 import { Modal } from '@/components/ui/modal'
@@ -83,7 +84,11 @@ export function AutoRenewalCard({
     && state.consentPriceKopecks >= planPriceKopecks
     && state.consentDurationDays === planDurationDays
   )
-  const enabled = Boolean(state && state.status !== 'DISABLED' && consentCurrent)
+  const enabled = Boolean(
+    state
+    && ['ACTIVE', 'PROCESSING', 'RETRYING'].includes(state.status)
+    && consentCurrent
+  )
   const cancellable = Boolean(state && state.status !== 'DISABLED')
 
   async function changeEnabled(next: boolean) {
@@ -110,7 +115,12 @@ export function AutoRenewalCard({
       setState(data.autoRenewal)
       setDialog(null)
       setConsentAccepted(false)
-      toast('Согласие принято. Автопродление включено', 'success')
+      toast(
+        data.autoRenewal?.status === 'AWAITING_PAYMENT_METHOD'
+          ? 'Настройка сохранена. Теперь привяжите карту при оплате'
+          : 'Автопродление включено',
+        'success'
+      )
     } finally {
       setSaving(false)
     }
@@ -159,85 +169,127 @@ export function AutoRenewalCard({
   }
 
   const pendingMethod = state?.status === 'AWAITING_PAYMENT_METHOD'
-  const paused = state?.status === 'PAUSED'
   const retrying = state?.status === 'RETRYING'
+  const processing = state?.status === 'PROCESSING'
+  const renewalPaused = state?.status === 'PAUSED'
+  const configured = Boolean(state && state.status !== 'DISABLED')
+  const needsConsent = Boolean(configured && !consentCurrent)
+  const status = pause
+    ? { label: 'На паузе', tone: 'amber' as const, description: `Остаток «${pause.subscription?.plan?.name ?? planName}» сохранён и не расходуется.` }
+    : pendingMethod
+      ? { label: 'Нужна карта', tone: 'cyan' as const, description: 'Остался один шаг: оплатите тариф картой через ЮKassa, и она сохранится для следующих продлений.' }
+      : processing
+        ? { label: 'Идёт списание', tone: 'cyan' as const, description: 'ЮKassa обрабатывает платёж. Обычно это занимает несколько секунд.' }
+        : retrying
+          ? { label: 'Платёж не прошёл', tone: 'amber' as const, description: 'Повторим списание автоматически. Доступ пока продолжает работать.' }
+          : renewalPaused
+            ? { label: 'Требуется действие', tone: 'amber' as const, description: state?.lastError ?? 'Автопродление остановлено. Оплатите подписку вручную или привяжите другую карту.' }
+          : needsConsent
+            ? { label: 'Нужно подтверждение', tone: 'amber' as const, description: 'Условия тарифа изменились. Подтвердите новую сумму, чтобы продление продолжило работать.' }
+            : enabled
+              ? { label: 'Работает', tone: 'emerald' as const, description: 'Продлим подписку автоматически до окончания доступа. Ничего делать не нужно.' }
+              : { label: 'Выключено', tone: 'slate' as const, description: 'Подключите один раз, чтобы не следить за датой окончания подписки.' }
 
   return (
     <>
-    <section id="auto-renewal" className="scroll-mt-24 overflow-hidden rounded-[1.4rem] border border-slate-200 bg-white dark:border-white/[0.09] dark:bg-white/[0.035]" aria-labelledby="auto-renewal-title">
-      <div className="flex flex-col gap-4 px-5 py-5 sm:flex-row sm:items-start sm:justify-between sm:px-6">
-        <div className="flex min-w-0 items-start gap-3.5">
-          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-cyan-500/10 text-cyan-600 dark:bg-cyan-300/10 dark:text-cyan-300">
-            <RefreshCw className="h-5 w-5" />
-          </span>
-          <div className="min-w-0">
-            <h2 id="auto-renewal-title" className="text-base font-semibold text-slate-950 dark:text-white">Автопродление</h2>
-            <p className="mt-1 max-w-xl text-sm leading-6 text-slate-500 dark:text-slate-400">
-              {pause ? `Остаток «${pause.subscription?.plan?.name ?? planName}» сохранён до возобновления.` : `Продлим «${state?.plan.name ?? planName}» до окончания доступа. Отключить можно в любой момент.`}
-            </p>
+    <section id="auto-renewal" className="scroll-mt-24 overflow-hidden rounded-[1.4rem] border border-slate-200 bg-white shadow-[0_20px_60px_-48px_rgba(15,23,42,0.55)] dark:border-white/[0.09] dark:bg-white/[0.035]" aria-labelledby="auto-renewal-title">
+      <div className="relative overflow-hidden px-5 py-5 sm:px-6 sm:py-6">
+        <div className="pointer-events-none absolute -right-16 -top-20 h-44 w-44 rounded-full bg-cyan-300/15 blur-3xl dark:bg-cyan-300/[0.07]" />
+        <div className="relative flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
+          <div className="flex min-w-0 items-start gap-3.5">
+            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-cyan-500/10 text-cyan-600 ring-1 ring-cyan-500/10 dark:bg-cyan-300/10 dark:text-cyan-300 dark:ring-cyan-300/10">
+              <RefreshCw className="h-5 w-5" />
+            </span>
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2.5">
+                <h2 id="auto-renewal-title" className="text-base font-semibold text-slate-950 dark:text-white">Автопродление</h2>
+                <StatusBadge tone={status.tone}>{status.label}</StatusBadge>
+              </div>
+              <p className="mt-1.5 max-w-2xl text-sm leading-6 text-slate-500 dark:text-slate-400">{status.description}</p>
+            </div>
           </div>
-        </div>
-        <div className="flex min-h-9 items-center gap-3 self-stretch rounded-2xl bg-slate-50 px-3 py-2 dark:bg-white/[0.045] sm:self-auto">
-          <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
-            {enabled ? 'Включено' : state && state.status !== 'DISABLED' ? 'Нужно согласие' : 'Выключено'}
-          </span>
-          {pause ? (
-            <button className="inline-flex items-center gap-2 text-sm font-semibold text-cyan-700 dark:text-cyan-300" disabled={saving} onClick={() => void resumeAccess()}>
-              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
-              Возобновить
-            </button>
-          ) : saving ? <Loader2 className="h-5 w-5 animate-spin text-slate-400" /> : cancellable ? (
-            <button
-              type="button"
-              className="inline-flex min-h-8 items-center rounded-lg px-2.5 text-sm font-semibold text-red-600 transition hover:bg-red-50 dark:text-red-300 dark:hover:bg-red-500/10"
-              onClick={() => void changeEnabled(false)}
-            >
-              Отключить и отвязать карту
-            </button>
-          ) : (
-            <button
-              type="button"
-              className="inline-flex min-h-8 items-center rounded-lg bg-cyan-500 px-3 text-sm font-semibold text-white transition hover:bg-cyan-600 dark:bg-cyan-300 dark:text-slate-950 dark:hover:bg-cyan-200"
-              onClick={() => void changeEnabled(true)}
-            >
-              Подключить автопродление
-            </button>
-          )}
+
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap xl:justify-end">
+            {pause ? (
+              <button className="btn-primary w-full justify-center sm:w-auto" disabled={saving} onClick={() => void resumeAccess()}>
+                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+                Возобновить доступ
+              </button>
+            ) : saving ? (
+              <div className="flex min-h-11 items-center justify-center px-4"><Loader2 className="h-5 w-5 animate-spin text-slate-400" /></div>
+            ) : pendingMethod ? (
+              <>
+                <Link href="/dashboard/plans?intent=renew" className="btn-primary w-full justify-center sm:w-auto">
+                  Привязать карту <ArrowRight className="h-4 w-4" />
+                </Link>
+                <button type="button" className="btn-secondary w-full justify-center sm:w-auto" onClick={() => void changeEnabled(false)}>Отменить настройку</button>
+              </>
+            ) : needsConsent ? (
+              <>
+                <button type="button" className="btn-primary w-full justify-center sm:w-auto" onClick={() => void changeEnabled(true)}>Подтвердить условия</button>
+                <button type="button" className="btn-secondary w-full justify-center sm:w-auto" onClick={() => void changeEnabled(false)}>Отключить</button>
+              </>
+            ) : renewalPaused ? (
+              <>
+                <Link href="/dashboard/plans?intent=renew" className="btn-primary w-full justify-center sm:w-auto">Оплатить вручную <ArrowRight className="h-4 w-4" /></Link>
+                <button type="button" className="btn-secondary w-full justify-center sm:w-auto" onClick={() => void changeEnabled(false)}>Отвязать карту</button>
+              </>
+            ) : cancellable ? (
+              <button type="button" className="btn-secondary w-full justify-center text-red-600 hover:border-red-200 hover:bg-red-50 dark:text-red-300 dark:hover:border-red-500/20 dark:hover:bg-red-500/[0.07] sm:w-auto" onClick={() => void changeEnabled(false)}>
+                Отключить и отвязать карту
+              </button>
+            ) : (
+              <button type="button" className="btn-primary w-full justify-center sm:w-auto" onClick={() => void changeEnabled(true)}>
+                Подключить автопродление
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
-      {pause ? (
-        <div className="flex flex-col gap-3 border-t border-slate-200 bg-amber-50/70 px-5 py-4 dark:border-white/[0.08] dark:bg-amber-300/[0.05] sm:flex-row sm:items-center sm:justify-between sm:px-6">
-          <div>
-            <div className="text-sm font-semibold text-slate-900 dark:text-white">Доступ на паузе</div>
-            <div className="mt-0.5 text-xs leading-5 text-slate-500 dark:text-slate-400">
-              Автоматически включится {pause.pauseUntil ? formatDate(pause.pauseUntil) : 'после ручного возобновления'}.
-            </div>
-          </div>
-          <span className="inline-flex items-center gap-2 text-xs font-semibold text-amber-700 dark:text-amber-300"><PauseCircle className="h-4 w-4" /> Дни не расходуются</span>
-        </div>
-      ) : enabled ? (
-        <div className="grid border-t border-slate-200 dark:border-white/[0.08] sm:grid-cols-2">
+      {configured && !pause ? (
+        <div className="grid divide-y divide-slate-200 border-t border-slate-200 dark:divide-white/[0.08] dark:border-white/[0.08] lg:grid-cols-3 lg:divide-x lg:divide-y-0">
+          <StatusCell
+            icon={ReceiptText}
+            label="Сумма и период"
+            value={`${formatPrice(state?.consentPriceKopecks ?? planPriceKopecks)} · ${planDurationDays} дн.`}
+            detail={`Тариф «${state?.plan.name ?? planName}» · ${planDeviceLimit} устройств`}
+          />
           <StatusCell
             icon={CreditCard}
-            label="Способ оплаты"
-            value={pendingMethod ? 'Сохранится при следующей оплате' : state?.paymentMethodTitle ?? 'Сохранён в ЮKassa'}
-            detail={pendingMethod ? 'Оплатите тариф картой через ЮKassa один раз' : 'Данные карты не хранятся в кабинете'}
+            label="Карта"
+            value={pendingMethod ? 'Ещё не привязана' : state?.paymentMethodTitle ?? 'Сохранена в ЮKassa'}
+            detail={pendingMethod ? 'Привяжется после успешной оплаты' : 'Полные данные карты хранит ЮKassa'}
           />
           <StatusCell
             icon={CalendarClock}
-            label={paused ? 'Списание остановлено' : retrying ? 'Повторное списание' : 'Следующее списание'}
-            value={paused ? 'Нужна ручная оплата' : state?.nextChargeAt ? formatDate(state.nextChargeAt) : 'После следующей оплаты'}
-            detail={retrying ? `Попытка ${state.retryCount + 1} из 3` : state?.lastError && paused ? state.lastError : 'До окончания текущего доступа'}
+            label={retrying ? 'Повторное списание' : 'Следующее списание'}
+            value={state?.nextChargeAt ? formatDate(state.nextChargeAt) : 'После привязки карты'}
+            detail={retrying ? `Попытка ${state.retryCount + 1} из 3` : processing ? 'Платёж уже обрабатывается' : 'За 24 часа до окончания доступа'}
           />
         </div>
-      ) : null}
+      ) : pause ? (
+        <div className="flex flex-col gap-3 border-t border-slate-200 bg-amber-50/70 px-5 py-4 dark:border-white/[0.08] dark:bg-amber-300/[0.05] sm:flex-row sm:items-center sm:justify-between sm:px-6">
+          <div>
+            <div className="text-sm font-semibold text-slate-900 dark:text-white">Доступ на паузе</div>
+            <div className="mt-0.5 text-xs leading-5 text-slate-500 dark:text-slate-400">Возобновится {pause.pauseUntil ? formatDate(pause.pauseUntil) : 'после вашего подтверждения'}.</div>
+          </div>
+          <span className="inline-flex items-center gap-2 text-xs font-semibold text-amber-700 dark:text-amber-300"><PauseCircle className="h-4 w-4" /> Оплаченные дни не расходуются</span>
+        </div>
+      ) : (
+        <div className="grid gap-3 border-t border-slate-200 bg-slate-50/70 px-5 py-4 dark:border-white/[0.08] dark:bg-white/[0.02] sm:grid-cols-3 sm:px-6">
+          <Benefit icon={CheckCircle2}>Подписка продлевается сама</Benefit>
+          <Benefit icon={ShieldCheck}>Платёж проходит через ЮKassa</Benefit>
+          <Benefit icon={CreditCard}>Карту можно отвязать в любой момент</Benefit>
+        </div>
+      )}
+
       {!pause ? (
         <div className="flex flex-col gap-2 border-t border-slate-200 px-5 py-3 dark:border-white/[0.08] sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <span className="text-xs leading-5 text-slate-500 dark:text-slate-400">
-            {enabled && state?.consentAcceptedAt
-              ? <>Согласие на регулярные списания принято {formatDate(state.consentAcceptedAt)}. <Link href="/offer" className="font-semibold text-brand-600 hover:underline dark:text-brand-300">Условия</Link></>
-              : 'Не нужен VPN какое-то время? Срок можно заморозить до 30 дней.'}
+            {configured && state?.consentAcceptedAt
+              ? <>Согласие принято {formatDate(state.consentAcceptedAt)}. <Link href="/offer" className="font-semibold text-brand-600 hover:underline dark:text-brand-300">Условия автоплатежей</Link></>
+              : 'Не нужен VPN какое-то время? Оплаченные дни можно сохранить на паузе.'}
           </span>
           <button className="inline-flex min-h-9 shrink-0 items-center justify-center gap-2 rounded-xl px-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/[0.06]" onClick={() => setDialog('pause')}>
             <PauseCircle className="h-4 w-4" /> Поставить на паузу
@@ -371,18 +423,52 @@ export function AutoRenewalCard({
   )
 }
 
+function StatusBadge({ tone, children }: { tone: 'emerald' | 'cyan' | 'amber' | 'slate'; children: ReactNode }) {
+  return (
+    <span className={cn(
+      'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold',
+      tone === 'emerald' && 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
+      tone === 'cyan' && 'bg-cyan-500/10 text-cyan-700 dark:text-cyan-300',
+      tone === 'amber' && 'bg-amber-500/10 text-amber-800 dark:text-amber-300',
+      tone === 'slate' && 'bg-slate-100 text-slate-600 dark:bg-white/[0.07] dark:text-slate-300'
+    )}>
+      <span className={cn(
+        'h-1.5 w-1.5 rounded-full',
+        tone === 'emerald' && 'bg-emerald-500',
+        tone === 'cyan' && 'bg-cyan-500',
+        tone === 'amber' && 'bg-amber-500',
+        tone === 'slate' && 'bg-slate-400'
+      )} />
+      {children}
+    </span>
+  )
+}
+
+function Benefit({ icon: Icon, children }: { icon: LucideIcon; children: ReactNode }) {
+  return (
+    <div className="flex items-center gap-2 text-xs font-medium leading-5 text-slate-600 dark:text-slate-300">
+      <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-white text-cyan-600 shadow-sm ring-1 ring-slate-200 dark:bg-white/[0.06] dark:text-cyan-300 dark:ring-white/10">
+        <Icon className="h-3.5 w-3.5" />
+      </span>
+      <span>{children}</span>
+    </div>
+  )
+}
+
 function StatusCell({ icon: Icon, label, value, detail }: {
-  icon: typeof CreditCard
+  icon: LucideIcon
   label: string
   value: string
   detail: string
 }) {
   return (
-    <div className="flex gap-3 px-5 py-4 first:border-b first:border-slate-200 dark:first:border-white/[0.08] sm:px-6 sm:first:border-b-0 sm:first:border-r sm:first:border-slate-200 sm:dark:first:border-white/[0.08]">
-      <Icon className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
+    <div className="flex min-w-0 gap-3 px-5 py-4 sm:px-6">
+      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-500 dark:bg-white/[0.055] dark:text-slate-300">
+        <Icon className="h-4 w-4" />
+      </span>
       <div className="min-w-0">
         <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">{label}</div>
-        <div className="mt-1 text-sm font-semibold text-slate-900 dark:text-white">{value}</div>
+        <div className="mt-1 truncate text-sm font-semibold text-slate-900 dark:text-white">{value}</div>
         <div className="mt-0.5 text-xs leading-5 text-slate-500">{detail}</div>
       </div>
     </div>
