@@ -64,17 +64,29 @@ describe('yookassa client', () => {
   it('throws with response details when create payment fails', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       ok: false,
-      status: 401,
-      text: async () => 'bad credentials',
+      status: 400,
+      text: async () => JSON.stringify({
+        code: 'invalid_request',
+        description: 'Invalid parameter value',
+        parameter: 'save_payment_method',
+      }),
     }))
-    const { createPayment } = await import('./yookassa')
+    const { createPayment, YooKassaApiError } = await import('./yookassa')
 
-    await expect(createPayment({
+    const error = await createPayment({
       amount: 100,
       description: 'Подписка',
       returnUrl: 'https://cabinet.example/return',
       idempotenceKey: 'payment-2',
-    })).rejects.toThrow('YooKassa createPayment failed: 401 bad credentials')
+    }).catch((caught) => caught)
+
+    expect(error).toBeInstanceOf(YooKassaApiError)
+    expect(error).toMatchObject({
+      status: 400,
+      providerCode: 'invalid_request',
+      providerDescription: 'Invalid parameter value',
+      providerParameter: 'save_payment_method',
+    })
   })
 
   it('requests saving a bank card for future renewals', async () => {
@@ -90,14 +102,13 @@ describe('yookassa client', () => {
       description: 'Подписка',
       returnUrl: 'https://cabinet.example/return',
       idempotenceKey: 'payment-save',
-      paymentMethodType: 'bank_card',
       savePaymentMethod: true,
     })
 
     const request = fetchMock.mock.calls[0]?.[1] as RequestInit | undefined
     const body = JSON.parse(String(request?.body))
     expect(body.save_payment_method).toBe(true)
-    expect(body.payment_method_data).toEqual({ type: 'bank_card' })
+    expect(body.payment_method_data).toBeUndefined()
     expect(body.confirmation).toEqual({
       type: 'redirect',
       return_url: 'https://cabinet.example/return',

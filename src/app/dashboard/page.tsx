@@ -321,7 +321,11 @@ export default async function DashboardHome() {
                   {expiresAtLabel ?? 'Без даты'}
                 </div>
                 <div className="mt-0.5 text-xs text-slate-400">
-                  {unlimitedDuration ? 'Продление не требуется' : 'Продлить можно в любой момент'}
+                  {unlimitedDuration ? 'Продление не требуется' : (
+                    <Link href="/dashboard/billing#auto-renewal" className="font-semibold text-brand-600 transition hover:text-brand-700 hover:underline dark:text-brand-300">
+                      Автопродление и платежи
+                    </Link>
+                  )}
                 </div>
               </div>
             </div>

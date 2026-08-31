@@ -802,7 +802,6 @@ export const POST = withAuth(async (req: Request) => {
       description,
       returnUrl,
       savePaymentMethod,
-      paymentMethodType: savePaymentMethod ? 'bank_card' : undefined,
       metadata: {
         userId: user.id,
         planId: plan.id,
@@ -822,13 +821,13 @@ export const POST = withAuth(async (req: Request) => {
     })
   } catch (e) {
     const message = e instanceof Error ? e.message : 'YooKassa createPayment failed'
+    const failure = yookassaCreateFailure(e)
     await cancelFailedLocalPayment(localPayment.id, message)
     logError('payment.create.yookassa_failed', e, { localPaymentId: localPayment.id })
     return NextResponse.json(
       {
-        error:
-          'ЮKassa не приняла shopId/secretKey. Проверьте, что в .env указаны API-ключи магазина, а не OAuth/токен другого типа.',
-        code: 'PAYMENT_PROVIDER_CREATE_FAILED',
+        error: failure.error,
+        code: failure.code,
         details: process.env.NODE_ENV === 'development' ? message : undefined,
       },
       { status: 502 }
@@ -964,6 +963,50 @@ function paymentProviderUnavailableMessage(provider: 'YOOKASSA' | 'PAYANYWAY' | 
   if (provider === 'PAYANYWAY') return 'PayAnyWay пока не настроен'
   if (provider === 'PLATEGA') return 'Platega пока не настроена'
   return 'ЮKassa пока не настроена'
+}
+
+function yookassaCreateFailure(error: unknown) {
+  const providerError = error && typeof error === 'object'
+    ? error as {
+        status?: unknown
+        providerCode?: unknown
+        providerDescription?: unknown
+        providerParameter?: unknown
+      }
+    : null
+  const status = typeof providerError?.status === 'number' ? providerError.status : null
+  const code = typeof providerError?.providerCode === 'string' ? providerError.providerCode : null
+  const description = typeof providerError?.providerDescription === 'string'
+    ? providerError.providerDescription
+    : null
+  const parameter = typeof providerError?.providerParameter === 'string'
+    ? providerError.providerParameter
+    : null
+
+  if (status === 401 || status === 403) {
+    return {
+      error: 'ЮKassa отклонила авторизацию магазина. Проверьте Shop ID и секретный API-ключ.',
+      code: 'YOOKASSA_AUTH_FAILED',
+    }
+  }
+  if (parameter === 'save_payment_method') {
+    return {
+      error: 'В магазине ЮKassa не подключены автоплатежи. Подключите сохранение способов оплаты через менеджера ЮKassa.',
+      code: 'YOOKASSA_AUTOPAYMENTS_UNAVAILABLE',
+    }
+  }
+  if (status === 400 || status === 422) {
+    const parameterLabel = parameter ? ` Параметр: ${parameter}.` : ''
+    const descriptionLabel = description ? ` ${description}` : ''
+    return {
+      error: `ЮKassa отклонила параметры платежа.${parameterLabel}${descriptionLabel}`.trim(),
+      code: code === 'invalid_request' ? 'YOOKASSA_INVALID_REQUEST' : 'YOOKASSA_REQUEST_REJECTED',
+    }
+  }
+  return {
+    error: 'ЮKassa временно не смогла создать платёж. Попробуйте ещё раз или выберите другой способ оплаты.',
+    code: 'PAYMENT_PROVIDER_CREATE_FAILED',
+  }
 }
 
 async function cancelFailedLocalPayment(paymentId: string, message: string) {

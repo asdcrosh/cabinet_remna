@@ -565,11 +565,11 @@ describe('payment create route', () => {
     })
     expect(mocks.createPayment).toHaveBeenCalledWith(expect.objectContaining({
       savePaymentMethod: true,
-      paymentMethodType: 'bank_card',
       metadata: expect.objectContaining({
         autoRenewalConsentVersion: AUTO_RENEWAL_CONSENT_VERSION,
       }),
     }))
+    expect(mocks.createPayment.mock.calls[0]?.[0]).not.toHaveProperty('paymentMethodType')
   })
 
   it('does not accept auto-renewal consent for providers without recurring payments', async () => {
@@ -734,6 +734,40 @@ describe('payment create route', () => {
       where: { paymentId: 'payment-1' },
       data: { status: 'CANCELED' },
     })
+  })
+
+  it('reports unavailable YooKassa autopayments without blaming credentials', async () => {
+    mocks.createPayment.mockRejectedValue(Object.assign(new Error('provider rejected request'), {
+      status: 400,
+      providerCode: 'invalid_request',
+      providerDescription: 'Saving payment methods is not available',
+      providerParameter: 'save_payment_method',
+    }))
+
+    const response = await POST(paymentRequest({
+      autoRenewalConsent: true,
+      autoRenewalConsentVersion: AUTO_RENEWAL_CONSENT_VERSION,
+    }))
+    const body = await response.json()
+
+    expect(response.status).toBe(502)
+    expect(body.code).toBe('YOOKASSA_AUTOPAYMENTS_UNAVAILABLE')
+    expect(body.error).toContain('автоплатежи')
+    expect(body.error).not.toContain('Shop ID')
+  })
+
+  it('reports YooKassa authorization failures separately', async () => {
+    mocks.createPayment.mockRejectedValue(Object.assign(new Error('unauthorized'), {
+      status: 401,
+      providerCode: 'invalid_credentials',
+    }))
+
+    const response = await POST(paymentRequest())
+    const body = await response.json()
+
+    expect(response.status).toBe(502)
+    expect(body.code).toBe('YOOKASSA_AUTH_FAILED')
+    expect(body.error).toContain('Shop ID')
   })
 
   it('creates an internal PayAnyWay form redirect without calling YooKassa', async () => {

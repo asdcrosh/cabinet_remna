@@ -5,7 +5,6 @@ import Link from 'next/link'
 import { CalendarClock, CreditCard, Loader2, PauseCircle, Play, RefreshCw } from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
 import { toast } from '@/components/ui/toaster'
-import { Switch } from '@/components/ui/switch'
 import { Modal } from '@/components/ui/modal'
 import { Checkbox } from '@/components/ui/checkbox'
 import { formatPrice } from '@/lib/format'
@@ -115,24 +114,31 @@ export function AutoRenewalCard({
   }
 
   async function submitRetention() {
-    if (!dialog) return
+    if (dialog !== 'pause') return
     setSaving(true)
     try {
       const data = await apiFetch<{ pause: PauseState }>('/api/retention', {
         method: 'POST',
-        body: JSON.stringify(dialog === 'pause'
-          ? { action: 'PAUSE', reason, pauseDays, comment }
-          : { action: 'DISABLE_AUTO_RENEWAL', reason, comment }),
+        body: JSON.stringify({ action: 'PAUSE', reason, pauseDays, comment }),
       })
       setPause(data.pause)
-      if (dialog === 'disable') {
-        setState((current) => current ? { ...current, status: 'DISABLED', nextChargeAt: null } : current)
-        toast('Автопродление выключено', 'success')
-      } else {
-        toast('Остаток подписки сохранён на паузе', 'success')
-      }
+      toast('Остаток подписки сохранён на паузе', 'success')
       setDialog(null)
       setComment('')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function submitDisable() {
+    setSaving(true)
+    try {
+      const data = await apiFetch<{ autoRenewal: AutoRenewalState }>('/api/auto-renewal', {
+        method: 'DELETE',
+      })
+      setState(data.autoRenewal)
+      setDialog(null)
+      toast('Автопродление отключено. Текущий оплаченный срок сохранён', 'success')
     } finally {
       setSaving(false)
     }
@@ -155,7 +161,7 @@ export function AutoRenewalCard({
 
   return (
     <>
-    <section className="overflow-hidden rounded-[1.4rem] border border-slate-200 bg-white dark:border-white/[0.09] dark:bg-white/[0.035]" aria-labelledby="auto-renewal-title">
+    <section id="auto-renewal" className="scroll-mt-24 overflow-hidden rounded-[1.4rem] border border-slate-200 bg-white dark:border-white/[0.09] dark:bg-white/[0.035]" aria-labelledby="auto-renewal-title">
       <div className="flex flex-col gap-4 px-5 py-5 sm:flex-row sm:items-start sm:justify-between sm:px-6">
         <div className="flex min-w-0 items-start gap-3.5">
           <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-cyan-500/10 text-cyan-600 dark:bg-cyan-300/10 dark:text-cyan-300">
@@ -177,13 +183,22 @@ export function AutoRenewalCard({
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
               Возобновить
             </button>
-          ) : saving ? <Loader2 className="h-5 w-5 animate-spin text-slate-400" /> : (
-            <Switch
-              checked={enabled}
-              onCheckedChange={(checked) => void changeEnabled(checked)}
-              label={enabled ? 'Выключить автопродление' : 'Включить автопродление'}
-              compact
-            />
+          ) : saving ? <Loader2 className="h-5 w-5 animate-spin text-slate-400" /> : enabled ? (
+            <button
+              type="button"
+              className="inline-flex min-h-8 items-center rounded-lg px-2.5 text-sm font-semibold text-red-600 transition hover:bg-red-50 dark:text-red-300 dark:hover:bg-red-500/10"
+              onClick={() => void changeEnabled(false)}
+            >
+              Отключить
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="inline-flex min-h-8 items-center rounded-lg bg-cyan-500 px-3 text-sm font-semibold text-white transition hover:bg-cyan-600 dark:bg-cyan-300 dark:text-slate-950 dark:hover:bg-cyan-200"
+              onClick={() => void changeEnabled(true)}
+            >
+              Включить
+            </button>
           )}
         </div>
       </div>
@@ -230,12 +245,12 @@ export function AutoRenewalCard({
 
     <Modal
       open={dialog !== null}
-      title={dialog === 'enable' ? 'Согласие на автопродление' : dialog === 'pause' ? 'Приостановить доступ' : 'Перед отключением'}
+      title={dialog === 'enable' ? 'Согласие на автопродление' : dialog === 'pause' ? 'Приостановить доступ' : 'Отключить автопродление'}
       description={dialog === 'enable'
         ? 'Регулярные списания включатся только после вашего явного подтверждения.'
         : dialog === 'pause'
           ? 'Остаток дней сохранится. Устройства и профиль останутся на месте.'
-          : 'Выберите причину. Это поможет сделать сервис удобнее.'}
+          : 'Следующих автоматических списаний не будет. Текущая подписка продолжит работать до конца оплаченного срока.'}
       onClose={() => {
         if (saving) return
         setDialog(null)
@@ -250,12 +265,20 @@ export function AutoRenewalCard({
             Согласен и включить
           </button>
         </div>
+      ) : dialog === 'disable' ? (
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <button className="btn-secondary" disabled={saving} onClick={() => setDialog(null)}>Оставить включённым</button>
+          <button className="inline-flex min-h-11 items-center justify-center rounded-xl bg-red-600 px-4 text-sm font-semibold text-white transition hover:bg-red-700 disabled:opacity-60" disabled={saving} onClick={() => void submitDisable()}>
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            Отключить автопродление
+          </button>
+        </div>
       ) : (
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <button className="btn-secondary" disabled={saving} onClick={() => setDialog(null)}>Отмена</button>
           <button className="btn-primary" disabled={saving} onClick={() => void submitRetention()}>
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-            {dialog === 'pause' ? 'Сохранить остаток' : 'Выключить автопродление'}
+            Сохранить остаток
           </button>
         </div>
       )}
@@ -289,6 +312,10 @@ export function AutoRenewalCard({
             description="Согласие можно отозвать в любой момент до следующего списания. Полные данные карты хранит ЮKassa, а не кабинет."
             className="w-full rounded-2xl border border-slate-200 p-4 dark:border-white/10"
           />
+        </div>
+      ) : dialog === 'disable' ? (
+        <div className="rounded-2xl border border-red-200 bg-red-50/70 p-4 text-sm leading-6 text-red-900 dark:border-red-500/25 dark:bg-red-500/[0.07] dark:text-red-100">
+          Способ оплаты будет удалён из кабинета, дата следующего списания сбросится. Уже оплаченные дни и доступ к VPN останутся без изменений.
         </div>
       ) : <>
       <div className="grid gap-2 sm:grid-cols-2">

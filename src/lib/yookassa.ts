@@ -57,6 +57,26 @@ export interface YooPayment {
   created_at: string
 }
 
+export class YooKassaApiError extends Error {
+  readonly status: number
+  readonly providerCode: string | null
+  readonly providerDescription: string | null
+  readonly providerParameter: string | null
+
+  constructor(operation: string, status: number, responseBody: string) {
+    const details = parseYooKassaError(responseBody)
+    const summary = [details.code, details.description, details.parameter && `parameter=${details.parameter}`]
+      .filter(Boolean)
+      .join(' ')
+    super(`YooKassa ${operation} failed: ${status}${summary ? ` ${summary}` : ''}`)
+    this.name = 'YooKassaApiError'
+    this.status = status
+    this.providerCode = details.code
+    this.providerDescription = details.description
+    this.providerParameter = details.parameter
+  }
+}
+
 // ---- API ----------------------------------------------------------------
 
 export async function createPayment(input: CreatePaymentInput): Promise<YooPayment> {
@@ -104,7 +124,7 @@ export async function createPayment(input: CreatePaymentInput): Promise<YooPayme
 
   if (!res.ok) {
     const text = await res.text()
-    throw new Error(`YooKassa createPayment failed: ${res.status} ${text}`)
+    throw new YooKassaApiError('createPayment', res.status, text)
   }
   return (await res.json()) as YooPayment
 }
@@ -118,7 +138,7 @@ export async function getPayment(id: string): Promise<YooPayment> {
   })
   if (!res.ok) {
     const text = await res.text()
-    throw new Error(`YooKassa getPayment failed: ${res.status} ${text}`)
+    throw new YooKassaApiError('getPayment', res.status, text)
   }
   return (await res.json()) as YooPayment
 }
@@ -138,7 +158,7 @@ export async function cancelPayment(id: string, idempotenceKey = `cancel-${id}`)
   })
   if (!res.ok) {
     const text = await res.text()
-    throw new Error(`YooKassa cancelPayment failed: ${res.status} ${text}`)
+    throw new YooKassaApiError('cancelPayment', res.status, text)
   }
   return (await res.json()) as YooPayment
 }
@@ -157,4 +177,17 @@ async function getYooKassaConfig() {
 
 function authHeader(shopId: string, secretKey: string) {
   return 'Basic ' + Buffer.from(`${shopId}:${secretKey}`).toString('base64')
+}
+
+function parseYooKassaError(responseBody: string) {
+  try {
+    const value = JSON.parse(responseBody) as Record<string, unknown>
+    return {
+      code: typeof value.code === 'string' ? value.code : null,
+      description: typeof value.description === 'string' ? value.description.slice(0, 300) : null,
+      parameter: typeof value.parameter === 'string' ? value.parameter.slice(0, 100) : null,
+    }
+  } catch {
+    return { code: null, description: responseBody.trim().slice(0, 300) || null, parameter: null }
+  }
 }

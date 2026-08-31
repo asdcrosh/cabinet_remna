@@ -22,7 +22,7 @@ vi.mock('@/lib/auto-renewal', () => ({
 vi.mock('@/lib/yookassa', () => ({ isYookassaConfigured: mocks.isYookassaConfigured }))
 vi.mock('@/lib/rate-limit', () => ({ rateLimit: mocks.rateLimit }))
 
-import { POST } from './route'
+import { DELETE, POST } from './route'
 
 function request(body: unknown) {
   return new Request('https://cabinet.example/api/auto-renewal', {
@@ -65,5 +65,18 @@ describe('auto-renewal route', () => {
       consentAccepted: true,
       consentVersion: AUTO_RENEWAL_CONSENT_VERSION,
     })
+  })
+
+  it('allows the user to disable recurring charges', async () => {
+    mocks.getAutoRenewalState.mockResolvedValue({ id: 'renewal-1', status: 'DISABLED' })
+
+    const response = await DELETE(new Request('https://cabinet.example/api/auto-renewal', {
+      method: 'DELETE',
+    }))
+    const body = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(mocks.disableAutoRenewal).toHaveBeenCalledWith('user-1')
+    expect(body.autoRenewal.status).toBe('DISABLED')
   })
 })
