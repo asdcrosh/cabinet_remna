@@ -122,21 +122,6 @@ export default async function globalSetup() {
             trafficLimitBytes: null,
           },
         },
-        autoRenewal: {
-          create: {
-            planId: E2E_PLAN_ID,
-            status: 'ACTIVE',
-            paymentMethodIdEncrypted: 'e2e-encrypted-payment-method',
-            paymentMethodTitle: 'VISA •••• 4567',
-            paymentMethodSavedAt: now,
-            consentAcceptedAt: now,
-            consentVersion: AUTO_RENEWAL_CONSENT_VERSION,
-            consentPriceKopecks: 13000,
-            consentDurationDays: 7,
-            deviceLimit: 5,
-            nextChargeAt: new Date(activeExpireAt.getTime() - 24 * 60 * 60 * 1000),
-          },
-        },
       },
     })
 
@@ -155,6 +140,21 @@ export default async function globalSetup() {
             expireAt: activeExpireAt,
             status: 'ACTIVE',
             trafficLimitBytes: null,
+          },
+        },
+        autoRenewal: {
+          create: {
+            planId: E2E_PLAN_ID,
+            status: 'ACTIVE',
+            paymentMethodIdEncrypted: 'e2e-encrypted-payment-method',
+            paymentMethodTitle: 'VISA •••• 4567',
+            paymentMethodSavedAt: now,
+            consentAcceptedAt: now,
+            consentVersion: AUTO_RENEWAL_CONSENT_VERSION,
+            consentPriceKopecks: 13000,
+            consentDurationDays: 7,
+            deviceLimit: 5,
+            nextChargeAt: new Date(activeExpireAt.getTime() - 24 * 60 * 60 * 1000),
           },
         },
       },

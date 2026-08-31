@@ -141,7 +141,7 @@ export function AutoRenewalCard({
       })
       setState(data.autoRenewal)
       setDialog(null)
-      toast('Автопродление отключено. Текущий оплаченный срок сохранён', 'success')
+      toast('Карта отвязана. Автопродление отключено, оплаченный срок сохранён', 'success')
     } finally {
       setSaving(false)
     }
@@ -192,7 +192,7 @@ export function AutoRenewalCard({
               className="inline-flex min-h-8 items-center rounded-lg px-2.5 text-sm font-semibold text-red-600 transition hover:bg-red-50 dark:text-red-300 dark:hover:bg-red-500/10"
               onClick={() => void changeEnabled(false)}
             >
-              Отключить автопродление
+              Отключить и отвязать карту
             </button>
           ) : (
             <button
@@ -248,12 +248,12 @@ export function AutoRenewalCard({
 
     <Modal
       open={dialog !== null}
-      title={dialog === 'enable' ? 'Согласие на автопродление' : dialog === 'pause' ? 'Приостановить доступ' : 'Отключить автопродление'}
+      title={dialog === 'enable' ? 'Согласие на автопродление' : dialog === 'pause' ? 'Приостановить доступ' : 'Отвязать карту'}
       description={dialog === 'enable'
         ? 'Регулярные списания включатся только после вашего явного подтверждения.'
         : dialog === 'pause'
           ? 'Остаток дней сохранится. Устройства и профиль останутся на месте.'
-          : 'Следующих автоматических списаний не будет. Текущая подписка продолжит работать до конца оплаченного срока.'}
+          : 'Удалим идентификатор сохранённой карты из кабинета и отключим следующие автоматические списания.'}
       onClose={() => {
         if (saving) return
         setDialog(null)
@@ -273,7 +273,7 @@ export function AutoRenewalCard({
           <button className="btn-secondary" disabled={saving} onClick={() => setDialog(null)}>Оставить включённым</button>
           <button className="inline-flex min-h-11 items-center justify-center rounded-xl bg-red-600 px-4 text-sm font-semibold text-white transition hover:bg-red-700 disabled:opacity-60" disabled={saving} onClick={() => void submitDisable()}>
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-            Отключить автопродление
+            Отвязать карту
           </button>
         </div>
       ) : (
@@ -330,7 +330,7 @@ export function AutoRenewalCard({
             </div>
           </div>
           <div className="rounded-2xl border border-red-200 bg-red-50/70 p-4 text-sm leading-6 text-red-900 dark:border-red-500/25 dark:bg-red-500/[0.07] dark:text-red-100">
-            После отключения новых списаний не будет. Доступ сохранится {accessExpiresAt ? `до ${formatDateOnly(accessExpiresAt)}` : 'до окончания оплаченного срока'}.
+            Карта будет отвязана от аккаунта, а автопродление отключено. Новых списаний не будет. Доступ сохранится {accessExpiresAt ? `до ${formatDateOnly(accessExpiresAt)}` : 'до окончания оплаченного срока'}.
           </div>
         </div>
       ) : <>

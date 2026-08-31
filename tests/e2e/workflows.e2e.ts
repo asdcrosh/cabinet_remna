@@ -9,7 +9,8 @@ test('пользователь обновляет профиль через на
   await login(page, E2E_USERS.basic.email)
   await page.goto('/dashboard/settings')
 
-  const nameInput = page.locator('#profile-name')
+  const profileForm = page.locator('form').filter({ has: page.locator('#profile-name:visible') })
+  const nameInput = profileForm.locator('#profile-name')
   await expect(nameInput).toHaveCount(1)
   await expect(nameInput).toBeEnabled()
   const updatedName = await nameInput.inputValue() === 'Тест Обновлён'
@@ -19,12 +20,12 @@ test('пользователь обновляет профиль через на
   const updateResponse = page.waitForResponse((response) =>
     response.url().endsWith('/api/me') && response.request().method() === 'PATCH'
   )
-  await page.getByRole('button', { name: 'Сохранить', exact: true }).click()
+  await profileForm.getByRole('button', { name: 'Сохранить', exact: true }).click()
   await expect((await updateResponse).ok()).toBe(true)
   await expect(page.getByText('Профиль обновлён', { exact: true })).toBeVisible()
 
   await page.reload()
-  const persistedNameInput = page.locator('#profile-name')
+  const persistedNameInput = page.locator('#profile-name:visible')
   await expect(persistedNameInput).toHaveCount(1)
   await expect(persistedNameInput).toHaveValue(updatedName)
   await expectNoHorizontalOverflow(page)
