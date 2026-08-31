@@ -109,30 +109,33 @@ export default async function SettingsPage() {
             shortTitle: 'Оплата',
             description: 'Регулярные списания',
             children: currentSubscription?.plan && !currentSubscription.plan.unlimitedDuration ? (
-              <AutoRenewalCard
-                planId={currentSubscription.plan.id}
-                planName={currentSubscription.plan.name}
-                planPriceKopecks={currentRenewalPrice(
-                  currentSubscription.plan,
-                  currentSubscription.deviceLimit ?? currentSubscription.plan.deviceLimit,
-                  user.personalDiscountPercent
-                )}
-                planDurationDays={currentSubscription.plan.durationDays}
-                planDeviceLimit={currentSubscription.deviceLimit ?? currentSubscription.plan.deviceLimit}
-                initialState={autoRenewal ? {
-                  ...autoRenewal,
-                  paymentMethodSavedAt: autoRenewal.paymentMethodSavedAt?.toISOString() ?? null,
-                  consentAcceptedAt: autoRenewal.consentAcceptedAt?.toISOString() ?? null,
-                  nextChargeAt: autoRenewal.nextChargeAt?.toISOString() ?? null,
-                  lastAttemptAt: autoRenewal.lastAttemptAt?.toISOString() ?? null,
-                  lastSuccessAt: autoRenewal.lastSuccessAt?.toISOString() ?? null,
-                } : null}
-                initialPause={retentionPause ? {
-                  ...retentionPause,
-                  pauseUntil: retentionPause.pauseUntil?.toISOString() ?? null,
-                  createdAt: retentionPause.createdAt.toISOString(),
-                } : null}
-              />
+              <div className="space-y-3">
+                <AutoRenewalCard
+                  planId={currentSubscription.plan.id}
+                  planName={currentSubscription.plan.name}
+                  planPriceKopecks={currentRenewalPrice(
+                    currentSubscription.plan,
+                    currentSubscription.deviceLimit ?? currentSubscription.plan.deviceLimit,
+                    user.personalDiscountPercent
+                  )}
+                  planDurationDays={currentSubscription.plan.durationDays}
+                  planDeviceLimit={currentSubscription.deviceLimit ?? currentSubscription.plan.deviceLimit}
+                  initialState={autoRenewal ? {
+                    ...autoRenewal,
+                    paymentMethodSavedAt: autoRenewal.paymentMethodSavedAt?.toISOString() ?? null,
+                    consentAcceptedAt: autoRenewal.consentAcceptedAt?.toISOString() ?? null,
+                    nextChargeAt: autoRenewal.nextChargeAt?.toISOString() ?? null,
+                    lastAttemptAt: autoRenewal.lastAttemptAt?.toISOString() ?? null,
+                    lastSuccessAt: autoRenewal.lastSuccessAt?.toISOString() ?? null,
+                  } : null}
+                  initialPause={retentionPause ? {
+                    ...retentionPause,
+                    pauseUntil: retentionPause.pauseUntil?.toISOString() ?? null,
+                    createdAt: retentionPause.createdAt.toISOString(),
+                  } : null}
+                />
+                <AutoRenewalExplanation />
+              </div>
             ) : (
               <SettingsSection
                 id="auto-renewal"
@@ -140,7 +143,10 @@ export default async function SettingsPage() {
                 description="Станет доступно после покупки обычного тарифа"
                 icon={<ReceiptText className="h-5 w-5" />}
               >
-                <Link href="/dashboard/plans" className="btn-primary">Выбрать тариф</Link>
+                <div className="space-y-4">
+                  <AutoRenewalExplanation />
+                  <Link href="/dashboard/plans" className="btn-primary">Выбрать тариф</Link>
+                </div>
               </SettingsSection>
             ),
           },
@@ -274,6 +280,29 @@ export default async function SettingsPage() {
         <section className="overflow-hidden rounded-xl border border-slate-200 dark:border-white/10" aria-label="Выход из аккаунта">
           <LogoutButton />
         </section>
+      </div>
+    </div>
+  )
+}
+
+function AutoRenewalExplanation() {
+  return (
+    <div className="grid gap-2 sm:grid-cols-2" aria-label="Подключение и отключение автопродления">
+      <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-3.5 dark:border-emerald-400/20 dark:bg-emerald-400/[0.05]">
+        <div className="flex items-center gap-2 text-sm font-semibold text-emerald-900 dark:text-emerald-100">
+          <BadgeCheck className="h-4 w-4 shrink-0" /> Подключение только с согласия
+        </div>
+        <p className="mt-1.5 text-xs leading-5 text-emerald-900/75 dark:text-emerald-100/70">
+          Включается отдельной кнопкой. До оплаты показываем сумму, периодичность и условия регулярных списаний.
+        </p>
+      </div>
+      <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3.5 dark:border-white/[0.09] dark:bg-white/[0.03]">
+        <div className="flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-white">
+          <CircleAlert className="h-4 w-4 shrink-0 text-slate-500" /> Отключение без поддержки
+        </div>
+        <p className="mt-1.5 text-xs leading-5 text-slate-600 dark:text-slate-300">
+          Нажмите «Отключить» в этой вкладке. Новых списаний не будет, а уже оплаченный доступ сохранится.
+        </p>
       </div>
     </div>
   )

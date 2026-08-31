@@ -40,7 +40,11 @@ test('мобильная навигация переносит второсте�
   await expect(page.getByRole('heading', { name: 'Аккаунт' })).toBeVisible()
   const settingsTabs = page.getByRole('tablist', { name: 'Разделы настроек' })
   await expect(settingsTabs.getByRole('tab')).toHaveCount(5)
-  await expect(settingsTabs.getByRole('tab', { name: 'Автопродление' })).toBeVisible()
+  const autoRenewalTab = settingsTabs.getByRole('tab', { name: 'Автопродление' })
+  await expect(autoRenewalTab).toBeVisible()
+  await autoRenewalTab.click()
+  await expect(page.getByText('Подключение только с согласия')).toBeVisible()
+  await expect(page.getByText('Отключение без поддержки')).toBeVisible()
   expect(await settingsTabs.locator('..').evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true)
   await expectNoHorizontalOverflow(page)
 
