@@ -6,7 +6,7 @@ import { useSearchParams } from 'next/navigation'
 import { ArrowLeft, Check, Copy, ExternalLink, ShieldAlert, ShieldCheck } from 'lucide-react'
 import { toast } from '@/components/ui/toaster'
 
-const allowedSchemes = ['incy:', 'happ:', 'rabbithole:', 'rabbit-hole:']
+const allowedSchemes = ['incy:', 'happ:']
 
 export function AppOpenBridge({ brandName }: { brandName: string }) {
   const searchParams = useSearchParams()

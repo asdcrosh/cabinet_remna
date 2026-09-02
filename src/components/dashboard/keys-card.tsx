@@ -6,7 +6,6 @@ import { useEffect, useMemo, useState } from 'react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import {
-  Apple,
   CheckCircle2,
   Copy,
   Download,
@@ -27,7 +26,7 @@ import { cn } from '@/lib/cn'
 import { VpnConnectionCheck } from './vpn-connection-check'
 
 type Device = 'ios' | 'android' | 'macos' | 'windows' | 'desktop'
-type AppId = 'incy' | 'happ' | 'rabbit-hole'
+type AppId = 'incy' | 'happ'
 
 interface KeysCardProps {
   subscriptionUrl: string
@@ -81,24 +80,6 @@ const appOptions: AppOption[] = [
       'Установите HAPP на устройство.',
       'Нажмите “Подключить в HAPP”. Если приложение не открылось, используйте кнопку копирования.',
       'При ручном добавлении в HAPP нажмите “Буфер обмена” и подтвердите подписку.',
-    ],
-  },
-  {
-    id: 'rabbit-hole',
-    name: 'Rabbit Hole',
-    subtitle: 'Apple-устройства',
-    devices: ['ios', 'macos'],
-    primaryDevices: ['macos'],
-    icon: Apple,
-    deepLinks: (url) => [
-      `rabbithole://import?url=${encodeURIComponent(url)}`,
-      `rabbit-hole://import?url=${encodeURIComponent(url)}`,
-    ],
-    installUrl: 'https://apps.apple.com/search?term=Rabbit%20Hole%20VPN',
-    steps: [
-      'Установите Rabbit Hole из App Store.',
-      'Нажмите “Подключить” или отсканируйте QR-код.',
-      'После импорта выберите профиль и включите VPN.',
     ],
   },
 ]

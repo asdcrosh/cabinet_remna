@@ -162,6 +162,7 @@ test('активное подключение показывает добавл�
   await expect(page.getByRole('heading', { name: 'Подключить ещё устройство' })).toBeVisible()
   await expect(page.getByRole('button', { name: /Подключить в/ })).toBeVisible()
   await expect(page.getByLabel('Устройство для подключения')).toBeVisible()
+  await expect(page.getByText('Rabbit Hole', { exact: true })).toHaveCount(0)
 
   const devices = page.getByRole('region', { name: 'Устройства' })
   await expect(devices.getByText('Pixel 8 · Android')).toBeVisible()
