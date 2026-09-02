@@ -259,7 +259,7 @@ function formatChartDate(value: string | undefined) {
   const date = new Date(`${value}T00:00:00Z`)
   return Number.isNaN(date.getTime())
     ? value
-    : new Intl.DateTimeFormat('ru-RU', { day: '2-digit', month: 'short' }).format(date)
+    : new Intl.DateTimeFormat('ru-RU', { day: '2-digit', month: 'short', timeZone: 'UTC' }).format(date)
 }
 
 function formatDayNumber(value: string | undefined) {
@@ -267,5 +267,5 @@ function formatDayNumber(value: string | undefined) {
   const date = new Date(`${value}T00:00:00Z`)
   return Number.isNaN(date.getTime())
     ? value
-    : new Intl.DateTimeFormat('ru-RU', { day: '2-digit' }).format(date)
+    : new Intl.DateTimeFormat('ru-RU', { day: '2-digit', timeZone: 'UTC' }).format(date)
 }

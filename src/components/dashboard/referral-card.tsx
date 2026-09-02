@@ -106,8 +106,17 @@ function referralRewardText(
   const attempts = side === 'referrer' ? settings.referrerAttempts : settings.referredAttempts
   const rewards = []
   if (days > 0) rewards.push(`+${days} дн.`)
-  if (attempts > 0) rewards.push(`+${attempts} прокр.`)
+  if (attempts > 0) rewards.push(`+${attempts} ${attemptWord(attempts)}`)
   return `${subject}: ${rewards.join(' и ') || 'без награды'}`
+}
+
+function attemptWord(value: number) {
+  const mod100 = value % 100
+  const mod10 = value % 10
+  if (mod100 >= 11 && mod100 <= 14) return 'попыток'
+  if (mod10 === 1) return 'попытка'
+  if (mod10 >= 2 && mod10 <= 4) return 'попытки'
+  return 'попыток'
 }
 
 function formatPromotionEnd(value: string) {

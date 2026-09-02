@@ -4,7 +4,7 @@ export function prizeLabel(prize: BonusBoxPrizeView) {
   if (prize.type === "NO_PRIZE") return "Без начисления";
   if (prize.type === "SUBSCRIPTION_DAYS") return `+${prize.value} дн.`;
   if (prize.type === "TRAFFIC_GB") return `+${prize.value} ГБ`;
-  if (prize.type === "BONUS_ATTEMPTS") return `+${prize.value} открытий`;
+  if (prize.type === "BONUS_ATTEMPTS") return `+${prize.value} попыток`;
   return `-${prize.value}%`;
 }
 
@@ -14,17 +14,17 @@ export function prizeRequiresSubscription(prize: BonusBoxPrizeView) {
 
 export function getDisabledCtaLabel(reason: string) {
   if (reason.includes("подписк")) return "Оформить подписку";
-  if (reason.includes("Нет доступных")) return "Нет открытий";
+  if (reason.includes("Нет доступных")) return "Нет попыток";
   if (reason.includes("настро")) return "Подарки скоро";
   if (reason.includes("подходящ")) return "Нет подходящих подарков";
   return "Недоступно";
 }
 
 export function rarityLabel(rarity: Rarity) {
-  if (rarity === "LEGENDARY") return "Легенда";
-  if (rarity === "EPIC") return "Эпик";
+  if (rarity === "LEGENDARY") return "Главный";
+  if (rarity === "EPIC") return "Особый";
   if (rarity === "RARE") return "Редкий";
-  return "База";
+  return "Обычный";
 }
 
 export function rarityClass(rarity: Rarity) {
@@ -84,6 +84,7 @@ export function formatDate(value: string) {
     month: "short",
     hour: "2-digit",
     minute: "2-digit",
+    timeZone: "Europe/Moscow",
   });
 }
 
@@ -92,6 +93,7 @@ export function formatDateOnly(value: string) {
     day: "2-digit",
     month: "long",
     year: "numeric",
+    timeZone: "Europe/Moscow",
   });
 }
 

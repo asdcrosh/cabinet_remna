@@ -1579,12 +1579,12 @@
 
   .bonus-wheel-segment-copy--epic::after {
     color: #f7b5ff;
-    content: 'эпик';
+    content: 'особый';
   }
 
   .bonus-wheel-segment-copy--legendary::after {
     color: #ffe5a0;
-    content: 'легенда';
+    content: 'главный';
   }
 
   .bonus-wheel-segment-copy--winner span {

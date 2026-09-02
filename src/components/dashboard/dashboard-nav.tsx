@@ -283,7 +283,7 @@ export function MobileBottomNav({
                   </span>
                 )}
               </span>
-              <span className="max-w-full truncate">{item.label}</span>
+              <span className="max-w-full truncate">{item.shortLabel ?? item.label}</span>
             </Link>
           )
         })}
@@ -451,7 +451,7 @@ export function Brand({ compact = false, brandName }: { compact?: boolean; brand
       <BrandLogo className={cn('brand-mark', compact ? 'h-9 w-9' : 'h-10 w-10')} priority />
       <div className="min-w-0">
         <div className={cn('truncate text-sm font-semibold tracking-tight', compact ? 'text-slate-950 dark:text-white' : 'text-white')}>{brandName}</div>
-        {!compact && <div className="mt-0.5 truncate font-mono text-[9px] uppercase tracking-[0.14em] text-slate-400">Control room</div>}
+        {!compact && <div className="mt-0.5 truncate text-xs text-slate-400">Личный кабинет</div>}
       </div>
     </Link>
   )

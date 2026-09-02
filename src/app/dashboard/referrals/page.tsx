@@ -13,7 +13,7 @@ import { CountUp } from '@/components/dashboard/count-up'
 import { isFeatureEnabled } from '@/lib/feature-flags'
 
 export const dynamic = 'force-dynamic'
-export const metadata = { title: 'Рефералы' }
+export const metadata = { title: 'Пригласить друга' }
 
 type RewardStatus = 'PENDING' | 'PROCESSING' | 'APPLIED'
 
@@ -95,8 +95,8 @@ export default async function ReferralsPage() {
   return (
     <div className="page-stack">
       <PageHeader
-        title="Рефералы"
-        description={referralConditionText(settings)}
+        title="Пригласить друга"
+        description={`Поделитесь ссылкой. ${referralConditionText(settings)}`}
       />
 
       <section id="referral-link" className="min-w-0 scroll-mt-24">
@@ -257,8 +257,17 @@ function getReferralStatus(
 function formatRewardSummary(days: number, attempts: number) {
   const parts = []
   if (days > 0) parts.push(`+${days} дн.`)
-  if (attempts > 0) parts.push(`+${attempts} прокр.`)
+  if (attempts > 0) parts.push(`+${attempts} ${attemptWord(attempts)}`)
   return parts.join(' и ') || 'Награда'
+}
+
+function attemptWord(value: number) {
+  const mod100 = value % 100
+  const mod10 = value % 10
+  if (mod100 >= 11 && mod100 <= 14) return 'попыток'
+  if (mod10 === 1) return 'попытка'
+  if (mod10 >= 2 && mod10 <= 4) return 'попытки'
+  return 'попыток'
 }
 
 function referralConditionText(settings: ReferralSettings) {

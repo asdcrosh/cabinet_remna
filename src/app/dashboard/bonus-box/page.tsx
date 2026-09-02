@@ -20,7 +20,7 @@ export default async function BonusBoxPage() {
     <div className="page-stack">
       <PageHeader
         title="Бонусы"
-        description="Открывайте подарки, следите за доступными попытками и используйте выигранные промокоды."
+        description="Получайте подарки за активность и используйте начисленные бонусы и промокоды."
       />
       <BonusBoxClientDynamic initialData={data} />
     </div>

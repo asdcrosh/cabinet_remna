@@ -4,7 +4,7 @@ import { buildConnectionResult } from './vpn-connection-check'
 const now = new Date('2026-08-19T12:00:00.000Z')
 
 describe('buildConnectionResult', () => {
-  it('подтверждает рабочий маршрут через ноду', () => {
+  it('подтверждает рабочий маршрут через сервер', () => {
     const result = buildConnectionResult({
       subscription: { status: 'ACTIVE' },
       devices: [{ hwid: 'device-1' }],

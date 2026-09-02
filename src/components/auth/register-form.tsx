@@ -37,6 +37,7 @@ export function RegisterForm({
   const [showPassword, setShowPassword] = useState(false)
   const [registeredEmail, setRegisteredEmail] = useState<string | null>(null)
   const [emailDelivery, setEmailDelivery] = useState<string | null>(null)
+  const [showConsentHint, setShowConsentHint] = useState(false)
   const password = watch('password')
   const legalAccepted = watch('agreeToTerms') && watch('agreeToPersonalData')
 
@@ -91,38 +92,6 @@ export function RegisterForm({
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
-      <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-3.5 dark:border-white/[0.08] dark:bg-white/[0.025]">
-        <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Документы</div>
-        <Checkbox
-          {...register('agreeToTerms')}
-          label={(
-            <>
-            Принимаю{' '}
-            <Link href="/terms" className="text-brand-600 hover:underline">
-              пользовательское соглашение
-            </Link>
-            </>
-          )}
-        />
-        <Checkbox
-          {...register('agreeToPersonalData')}
-          label={(
-            <>
-            Даю отдельное{' '}
-            <Link href="/consent" className="text-brand-600 hover:underline">
-              согласие на обработку персональных данных
-            </Link>
-            {' '}и ознакомлен с{' '}
-            <Link href="/privacy" className="text-brand-600 hover:underline">
-              политикой
-            </Link>
-            </>
-          )}
-        />
-        {(errors.agreeToTerms || errors.agreeToPersonalData) && (
-          <p className="text-xs text-red-600">Подтвердите оба документа для регистрации</p>
-        )}
-      </div>
       {yandexEnabled && (
         <>
           <YandexAuthButton
@@ -130,7 +99,16 @@ export function RegisterForm({
             label="Зарегистрироваться через Яндекс"
             legalAccepted={legalAccepted}
             registering
+            onLegalRequired={() => {
+              setShowConsentHint(true)
+              document.getElementById('registration-consent')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+            }}
           />
+          {!legalAccepted && (
+            <p id="registration-consent-hint" className="text-center text-xs leading-5 text-slate-500 dark:text-slate-400">
+              Перед переходом в Яндекс подтвердите документы ниже.
+            </p>
+          )}
           <div className="flex items-center gap-3 text-xs font-medium text-slate-400">
             <span className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
             или email
@@ -171,7 +149,7 @@ export function RegisterForm({
           {errors.name && <p className="text-xs text-red-600 mt-1">{errors.name.message}</p>}
         </div>
         <div>
-          <label className="label" htmlFor="referralCode">Реферальный код <span className="text-slate-400">(необязательно)</span></label>
+          <label className="label" htmlFor="referralCode">Код приглашения <span className="text-slate-400">(необязательно)</span></label>
           <div className="relative">
             <Ticket className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
@@ -213,10 +191,50 @@ export function RegisterForm({
           <StrengthIndicator value={password} />
         )}
       </div>
+      <div
+        id="registration-consent"
+        className={`space-y-3 rounded-2xl border bg-slate-50/70 p-3.5 transition-colors dark:bg-white/[0.025] ${showConsentHint && !legalAccepted ? 'border-brand-300 ring-2 ring-brand-200/60 dark:border-brand-300/35 dark:ring-brand-300/10' : 'border-slate-200 dark:border-white/[0.08]'}`}
+      >
+        <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Подтверждение документов</div>
+        <Checkbox
+          {...register('agreeToTerms')}
+          label={(
+            <>
+              Принимаю{' '}
+              <Link href="/terms" className="text-brand-600 hover:underline">
+                пользовательское соглашение
+              </Link>
+            </>
+          )}
+        />
+        <Checkbox
+          {...register('agreeToPersonalData')}
+          label={(
+            <>
+              Даю отдельное{' '}
+              <Link href="/consent" className="text-brand-600 hover:underline">
+                согласие на обработку персональных данных
+              </Link>
+              {' '}и ознакомлен с{' '}
+              <Link href="/privacy" className="text-brand-600 hover:underline">
+                политикой
+              </Link>
+            </>
+          )}
+        />
+        {(errors.agreeToTerms || errors.agreeToPersonalData || (showConsentHint && !legalAccepted)) && (
+          <p className="text-xs text-red-600">Подтвердите оба документа для регистрации</p>
+        )}
+      </div>
       {serverError && (
         <FormAlert>{serverError}</FormAlert>
       )}
-      <button type="submit" disabled={isSubmitting} className="btn-primary min-h-12 w-full">
+      <button
+        type="submit"
+        disabled={isSubmitting || !legalAccepted}
+        title={!legalAccepted ? 'Сначала подтвердите оба документа' : undefined}
+        className="btn-primary min-h-12 w-full"
+      >
         <UserRound className="h-4 w-4" />
         {isSubmitting ? 'Создаём аккаунт...' : 'Зарегистрироваться'}
       </button>

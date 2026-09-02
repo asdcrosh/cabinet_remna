@@ -976,7 +976,7 @@ export function PlanCard({
               <li>Неиспользованные дни текущего тарифа не переносятся.</li>
               {currentWhitelistAddonActive ? (
                 <li>
-                  БС сохранятся отдельно
+                  Доступ к серверам с белыми списками сохранится отдельно
                   {currentWhitelistAddonExpireAt
                     ? ` до ${new Date(currentWhitelistAddonExpireAt).toLocaleDateString("ru-RU", { timeZone: "Europe/Moscow" })}`
                     : " и возобновятся вместе с новым тарифом"}.

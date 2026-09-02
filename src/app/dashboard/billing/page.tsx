@@ -18,14 +18,16 @@ import { AutoRenewalCard } from '@/components/dashboard/auto-renewal-card'
 import { calculateAutoRenewalPurchase, getAutoRenewalState } from '@/lib/auto-renewal'
 import { getRetentionState } from '@/lib/subscription-retention'
 import { calculatePersonalDiscount } from '@/lib/user-discounts'
+import type { Prisma } from '@prisma/client'
 
 export const dynamic = 'force-dynamic'
 const PAGE_SIZE = 20
+type PaymentView = 'important' | 'succeeded' | 'canceled' | 'all'
 
 export default async function BillingPage({
   searchParams,
 }: {
-  searchParams: Promise<{ paid?: string; payment?: string; page?: string }>
+  searchParams: Promise<{ paid?: string; payment?: string; page?: string; view?: string }>
 }) {
   const params = await searchParams
   const features = await getFeatureFlags()
@@ -34,6 +36,19 @@ export default async function BillingPage({
   const returnPaymentId = typeof params.payment === 'string' ? params.payment : null
   const requestedPage = Number(params.page)
   const page = Number.isInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1
+  const view: PaymentView = ['succeeded', 'canceled', 'all'].includes(params.view ?? '')
+    ? params.view as PaymentView
+    : 'important'
+  const paymentWhere: Prisma.PaymentWhereInput = {
+    userId: session.uid,
+    ...(view === 'important'
+      ? { status: { in: ['SUCCEEDED', 'REFUNDED', 'PENDING'] } }
+      : view === 'succeeded'
+        ? { status: { in: ['SUCCEEDED', 'REFUNDED'] } }
+        : view === 'canceled'
+          ? { status: 'CANCELED' }
+          : {}),
+  }
   const syncResult =
     params.paid === '1' && returnPaymentId
       ? await syncPaymentProvisioning({
@@ -44,9 +59,9 @@ export default async function BillingPage({
       : null
   const [[total, payments, currentSubscription], autoRenewal, retentionPause, discountUser] = await Promise.all([
     prisma.$transaction([
-      prisma.payment.count({ where: { userId: session.uid } }),
+      prisma.payment.count({ where: paymentWhere }),
       prisma.payment.findMany({
-        where: { userId: session.uid },
+        where: paymentWhere,
         orderBy: { createdAt: 'desc' },
         skip: (page - 1) * PAGE_SIZE,
         take: PAGE_SIZE,
@@ -132,7 +147,7 @@ export default async function BillingPage({
       ) : null}
 
       <section aria-labelledby="payment-history-title">
-        <div className="mb-3 flex items-end justify-between gap-3 px-1">
+        <div className="mb-3 flex flex-col gap-3 px-1 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <h2 id="payment-history-title" className="text-lg font-semibold tracking-tight text-slate-950 dark:text-white">
               История операций
@@ -141,28 +156,53 @@ export default async function BillingPage({
               {total === 0 ? 'Покупок пока нет' : `${total} ${paymentCountLabel(total)}`}
             </p>
           </div>
-          {pages > 1 && (
-            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-500 dark:bg-white/[0.06] dark:text-slate-400">
-              Страница {Math.min(page, pages)}
-            </span>
-          )}
+          <nav className="flex max-w-full gap-1 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" aria-label="Фильтр платежей">
+            {([
+              ['important', 'Важные'],
+              ['succeeded', 'Оплаченные'],
+              ['canceled', 'Отменённые'],
+              ['all', 'Все'],
+            ] as const).map(([value, label]) => (
+              <Link
+                key={value}
+                href={billingHref(value, 1)}
+                aria-current={view === value ? 'page' : undefined}
+                className={view === value
+                  ? 'min-w-fit rounded-full bg-slate-950 px-3 py-1.5 text-xs font-semibold text-white dark:bg-white dark:text-slate-950'
+                  : 'min-w-fit rounded-full bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-200 dark:bg-white/[0.06] dark:text-slate-300 dark:hover:bg-white/10'}
+              >
+                {label}
+              </Link>
+            ))}
+          </nav>
         </div>
+        {view === 'important' ? (
+          <p className="mb-3 px-1 text-xs text-slate-500 dark:text-slate-400">Отменённые попытки оплаты скрыты. Они доступны во вкладке «Все».</p>
+        ) : null}
         <PaymentHistory payments={payments} />
       </section>
 
       {pages > 1 && (
         <nav className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 rounded-2xl border border-slate-200 bg-white p-2 dark:border-white/[0.09] dark:bg-white/[0.03] sm:gap-3" aria-label="Страницы платежей">
           {page > 1
-            ? <Link href={`/dashboard/billing?page=${page - 1}`} className="btn-secondary min-h-10 justify-self-start px-3 py-2">Назад</Link>
+            ? <Link href={billingHref(view, page - 1)} className="btn-secondary min-h-10 justify-self-start px-3 py-2">Назад</Link>
             : <span />}
           <span className="text-center text-xs font-medium text-slate-500 sm:text-sm">{Math.min(page, pages)} из {pages}</span>
           {page < pages
-            ? <Link href={`/dashboard/billing?page=${page + 1}`} className="btn-secondary min-h-10 justify-self-end px-3 py-2">Дальше</Link>
+            ? <Link href={billingHref(view, page + 1)} className="btn-secondary min-h-10 justify-self-end px-3 py-2">Дальше</Link>
             : <span />}
         </nav>
       )}
     </div>
   )
+}
+
+function billingHref(view: PaymentView, page: number) {
+  const params = new URLSearchParams()
+  if (view !== 'important') params.set('view', view)
+  if (page > 1) params.set('page', String(page))
+  const query = params.toString()
+  return query ? `/dashboard/billing?${query}` : '/dashboard/billing'
 }
 
 function currentRenewalPrice(

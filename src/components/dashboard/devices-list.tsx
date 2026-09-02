@@ -280,7 +280,7 @@ export function DevicesList({ embedded = false, deviceLimit, subscriptionUrl }: 
         <ConfirmDialog
           open={Boolean(selectedDevice)}
           title="Заблокировать устройство?"
-          description="Этот HWID будет автоматически удаляться при каждой повторной регистрации. Вернуть доступ можно в списке заблокированных устройств."
+          description="Устройство отключится и не сможет подключиться снова, пока вы не разблокируете его."
           confirmLabel="Заблокировать"
           loading={Boolean(removingHwid)}
           onCancel={() => setSelectedDevice(null)}
@@ -289,7 +289,7 @@ export function DevicesList({ embedded = false, deviceLimit, subscriptionUrl }: 
         <ConfirmDialog
           open={bulkDialogOpen}
           title="Заблокировать все устройства?"
-          description="Все текущие HWID будут удалены и не смогут зарегистрироваться снова, пока вы их не разблокируете."
+          description="Все устройства отключатся и не смогут подключиться снова, пока вы их не разблокируете."
           confirmLabel="Заблокировать все"
           loading={bulkRemoving}
           onCancel={() => setBulkDialogOpen(false)}
@@ -368,7 +368,7 @@ export function DevicesList({ embedded = false, deviceLimit, subscriptionUrl }: 
       <ConfirmDialog
         open={Boolean(selectedDevice)}
         title="Заблокировать устройство?"
-        description="Этот HWID будет автоматически удаляться при каждой повторной регистрации. Вернуть доступ можно в списке заблокированных устройств."
+        description="Устройство отключится и не сможет подключиться снова, пока вы не разблокируете его."
         confirmLabel="Заблокировать"
         loading={Boolean(removingHwid)}
         onCancel={() => setSelectedDevice(null)}
@@ -377,7 +377,7 @@ export function DevicesList({ embedded = false, deviceLimit, subscriptionUrl }: 
       <ConfirmDialog
         open={bulkDialogOpen}
         title="Заблокировать все устройства?"
-        description="Все текущие HWID будут удалены и не смогут зарегистрироваться снова, пока вы их не разблокируете."
+        description="Все устройства отключатся и не смогут подключиться снова, пока вы их не разблокируете."
         confirmLabel="Заблокировать все"
         loading={bulkRemoving}
         onCancel={() => setBulkDialogOpen(false)}

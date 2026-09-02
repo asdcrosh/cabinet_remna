@@ -101,7 +101,7 @@ export function HomeWhitelistAddon({
         <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-4 text-sm leading-5 text-slate-700 dark:border-amber-400/20 dark:bg-amber-400/[0.06] dark:text-slate-200">
           {active
             ? 'К текущей дате окончания добавятся ещё 30 дней. Оставшиеся оплаченные дни не сгорят.'
-            : 'БС работают только в приложении INCY. Покупка добавляет 30 дней. Если основной тариф закончится раньше, остаток БС сохранится и продолжит расходоваться после возобновления тарифа.'}
+            : 'Серверы с белыми списками работают только в приложении INCY. Покупка добавляет 30 дней. Если основной тариф закончится раньше, остаток сохранится и продолжит расходоваться после возобновления тарифа.'}
         </div>
         {paymentProviders.length > 1 ? (
           <label className="block">
@@ -129,7 +129,7 @@ export function HomeWhitelistAddon({
             <PauseCircle className="h-5 w-5" />
           </span>
           <div className="min-w-0">
-            <div className="text-sm font-bold tracking-wide text-sky-800 dark:text-sky-200">БС НА ПАУЗЕ</div>
+            <div className="text-sm font-semibold text-sky-800 dark:text-sky-200">Белые списки на паузе</div>
             <p className="mt-0.5 text-xs text-sky-700/80 dark:text-sky-200/70">
               Осталось {formatRemainingTime(pausedRemainingSeconds)}. Продолжат работать после покупки тарифа.
             </p>
@@ -151,7 +151,7 @@ export function HomeWhitelistAddon({
               <CheckCircle2 className="h-5 w-5" />
             </span>
             <div className="min-w-0">
-              <div className="text-sm font-bold tracking-wide text-emerald-800 dark:text-emerald-200">БС ПОДКЛЮЧЕН</div>
+              <div className="text-sm font-semibold text-emerald-800 dark:text-emerald-200">Белые списки подключены</div>
               <p className="mt-0.5 text-xs text-emerald-700/80 dark:text-emerald-200/70">
                 {expireAt
                   ? `Действует до ${new Date(expireAt).toLocaleDateString('ru-RU', { timeZone: 'Europe/Moscow' })}`
@@ -165,7 +165,7 @@ export function HomeWhitelistAddon({
             disabled={paymentProviders.length === 0}
             onClick={() => setOpen(true)}
           >
-            Продлить БС на 30 дней
+            Продлить на 30 дней
           </button>
         </section>
         {purchaseModal}
@@ -183,7 +183,7 @@ export function HomeWhitelistAddon({
           <div className="min-w-0">
             <div className="text-sm font-semibold text-slate-950 dark:text-white">Серверы с белыми списками</div>
             <p className="mt-0.5 text-xs font-medium text-amber-700 dark:text-amber-300">Только для приложения INCY</p>
-            <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Доплата только за БС, без повторной оплаты тарифа</p>
+            <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Отдельное дополнение, без повторной оплаты тарифа</p>
           </div>
         </div>
         <button
@@ -193,7 +193,7 @@ export function HomeWhitelistAddon({
           onClick={() => setOpen(true)}
         >
           <CreditCard className="h-4 w-4" />
-          Докупить БС за {formatPrice(priceKopecks)}
+          Подключить за {formatPrice(priceKopecks)}
         </button>
       </section>
 

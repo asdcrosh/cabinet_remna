@@ -10,6 +10,7 @@ interface YandexAuthButtonProps {
   className?: string
   legalAccepted?: boolean
   registering?: boolean
+  onLegalRequired?: () => void
 }
 
 export function YandexAuthButton({
@@ -19,6 +20,7 @@ export function YandexAuthButton({
   className,
   legalAccepted = true,
   registering = false,
+  onLegalRequired,
 }: YandexAuthButtonProps) {
   const params = new URLSearchParams({ next })
   if (referralCode) params.set('ref', referralCode)
@@ -28,14 +30,14 @@ export function YandexAuthButton({
     return (
       <button
         type="button"
-        disabled
-        title="Сначала примите соглашение и дайте согласие на обработку персональных данных"
+        onClick={onLegalRequired}
+        aria-describedby="registration-consent-hint"
         className={cn(
-          'flex min-h-12 w-full cursor-not-allowed items-center justify-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-semibold text-slate-400 dark:border-white/[0.08] dark:bg-white/[0.025] dark:text-slate-600',
+          'flex min-h-12 w-full items-center justify-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-800 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50 dark:border-white/[0.08] dark:bg-white/[0.025] dark:text-white dark:hover:bg-white/[0.05]',
           className
         )}
       >
-        <span className="grid h-6 w-6 place-items-center rounded-full bg-[#fc3f1d]/50 text-sm font-bold text-white">
+        <span className="grid h-6 w-6 place-items-center rounded-full bg-[#fc3f1d] text-sm font-bold text-white">
           Я
         </span>
         {label}

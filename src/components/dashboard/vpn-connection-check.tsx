@@ -247,7 +247,7 @@ export function buildConnectionResult({
   })
   return createResult({
     tone: 'success', title: 'Подключение работает',
-    summary: `Это устройство выходит через ноду «${vpn.node?.name}»${vpn.node?.country ? `, ${vpn.node.country}` : ''}.`,
+    summary: `Это устройство подключено через сервер «${vpn.node?.name}»${vpn.node?.country ? `, ${vpn.node.country}` : ''}.`,
     action: deviceCount > 0 ? 'devices' : null, checkedAt, vpn, deviceCount, deviceLimit, checks,
   })
 }

@@ -14,8 +14,6 @@ import {
   ShoppingCart,
   TicketPercent,
   Users,
-  Volume2,
-  VolumeX,
   Zap,
 } from "lucide-react";
 import { apiFetch, isApiFetchError } from "@/lib/api-client";
@@ -49,11 +47,10 @@ import type {
 
 export type { BonusBoxPrizeView } from "@/components/bonus-box/bonus-box-types";
 
-const WHEEL_DURATION_MS = 5000;
+const WHEEL_DURATION_MS = 2400;
 const REVEAL_EFFECT_DURATION_MS = 900;
 const BONUS_TABS: BonusBoxTab[] = ["missions", "outcomes", "history"];
 const WHEEL_COLORS = ["#31126f", "#5b25b3", "#792aca", "#47208e"];
-const SOUND_PREFERENCE_KEY = "bonus-wheel-sound:v1";
 const PENDING_OPENING_KEY = "bonus-wheel-pending:v1";
 const OPENING_STARTED_KEY = "bonus-wheel-opening-started:v1";
 
@@ -74,7 +71,6 @@ export function BonusBoxClient({
     initialData.events.length > 0 || initialData.missions.length > 0 ? "missions" : "outcomes",
   );
   const [reducedMotion, setReducedMotion] = useState(false);
-  const [soundEnabled, setSoundEnabled] = useState(true);
   const [cooldownSeconds, setCooldownSeconds] = useState(0);
   const [claimingMissionId, setClaimingMissionId] = useState<string | null>(null);
   const effectTimerRef = useRef<number | null>(null);
@@ -84,9 +80,6 @@ export function BonusBoxClient({
   const targetWheelRotationRef = useRef<number | null>(null);
   const finishingRef = useRef(false);
   const requestInFlightRef = useRef(false);
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const lastTickSegmentRef = useRef<number | null>(null);
-  const lastTickAtRef = useRef(0);
   const canUseWelcomeAttempts =
     !data.hasActiveSubscription && data.welcomeAttemptsCount > 0;
   const availableNow = data.hasActiveSubscription
@@ -110,14 +103,14 @@ export function BonusBoxClient({
   const canOpen = !data.canOpenReason && !opening && cooldownSeconds === 0;
   const subscribeCta = Boolean(data.canOpenReason?.includes("подписк"));
   const openButtonLabel = opening
-    ? "Колесо вращается"
+    ? "Определяем подарок"
     : cooldownSeconds > 0
       ? `Повтор через ${formatCooldown(cooldownSeconds)}`
     : data.canOpenReason
       ? getDisabledCtaLabel(data.canOpenReason)
       : canUseWelcomeAttempts
-        ? "Запустить приветственный ход"
-        : "Запустить рулетку";
+        ? "Получить приветственный подарок"
+        : "Получить подарок";
   const totalChance = useMemo(
     () => data.prizes.reduce((sum, prize) => sum + prize.chance, 0),
     [data.prizes],
@@ -141,13 +134,6 @@ export function BonusBoxClient({
   }, []);
 
   useEffect(() => {
-    try {
-      const preference = window.localStorage.getItem(SOUND_PREFERENCE_KEY);
-      setSoundEnabled(preference !== "off");
-    } catch {
-      setSoundEnabled(true);
-    }
-
     const restored = readStoredOpening();
     if (restored) {
       setResult(restored);
@@ -183,90 +169,7 @@ export function BonusBoxClient({
   useEffect(() => () => {
     if (effectTimerRef.current !== null) window.clearTimeout(effectTimerRef.current);
     if (wheelFrameRef.current !== null) window.cancelAnimationFrame(wheelFrameRef.current);
-    void audioContextRef.current?.close();
   }, []);
-
-  function prepareSound() {
-    if (!soundEnabled || audioContextRef.current) return;
-    try {
-      audioContextRef.current = new AudioContext();
-    } catch {
-      audioContextRef.current = null;
-    }
-  }
-
-  function playTone(frequency: number, duration: number, volume: number, delay = 0) {
-    if (!soundEnabled) return;
-    const context = audioContextRef.current;
-    if (!context) return;
-    if (context.state === "suspended") void context.resume();
-
-    const startsAt = context.currentTime + delay;
-    const oscillator = context.createOscillator();
-    const gain = context.createGain();
-    oscillator.type = "triangle";
-    oscillator.frequency.setValueAtTime(frequency, startsAt);
-    gain.gain.setValueAtTime(0.0001, startsAt);
-    gain.gain.exponentialRampToValueAtTime(volume, startsAt + 0.008);
-    gain.gain.exponentialRampToValueAtTime(0.0001, startsAt + duration);
-    oscillator.connect(gain);
-    gain.connect(context.destination);
-    oscillator.start(startsAt);
-    oscillator.stop(startsAt + duration + 0.02);
-  }
-
-  function playWheelTick(rotation: number, progress: number) {
-    const tickSegment = Math.floor(positiveModulo(rotation, 360) / segmentAngle);
-    const now = performance.now();
-    if (tickSegment === lastTickSegmentRef.current || now - lastTickAtRef.current < 38) return;
-    lastTickSegmentRef.current = tickSegment;
-    lastTickAtRef.current = now;
-    playTone(780 - progress * 260, 0.035, 0.026);
-  }
-
-  function playWinSound(response: OpenBoxResponse) {
-    if (response.prize.type === "NO_PRIZE") {
-      playTone(220, 0.14, 0.035);
-      return;
-    }
-    const notes = response.prize.rarity === "LEGENDARY"
-      ? [523, 659, 784, 1047]
-      : response.prize.rarity === "EPIC"
-        ? [440, 554, 659]
-        : response.prize.rarity === "RARE"
-          ? [392, 494, 587]
-          : [392, 523];
-    notes.forEach((frequency, index) => playTone(frequency, 0.19, 0.045, index * 0.085));
-  }
-
-  function toggleSound() {
-    const nextValue = !soundEnabled;
-    setSoundEnabled(nextValue);
-    try {
-      window.localStorage.setItem(SOUND_PREFERENCE_KEY, nextValue ? "on" : "off");
-    } catch {
-      // Настройка останется активной до перезагрузки страницы.
-    }
-    if (nextValue) {
-      try {
-        if (!audioContextRef.current) audioContextRef.current = new AudioContext();
-      } catch {
-        audioContextRef.current = null;
-      }
-      const context = audioContextRef.current;
-      if (!context) return;
-      if (context.state === "suspended") void context.resume();
-      const oscillator = context.createOscillator();
-      const gain = context.createGain();
-      oscillator.frequency.setValueAtTime(520, context.currentTime);
-      gain.gain.setValueAtTime(0.025, context.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.07);
-      oscillator.connect(gain);
-      gain.connect(context.destination);
-      oscillator.start();
-      oscillator.stop(context.currentTime + 0.08);
-    }
-  }
 
   function dismissResult() {
     setRevealEffect(false);
@@ -298,7 +201,6 @@ export function BonusBoxClient({
       const rotation = startRotation + distance * progress;
 
       if (wheelRef.current) wheelRef.current.style.transform = `rotate(${rotation}deg)`;
-      playWheelTick(rotation, progress);
       if (wheelPointerRef.current) {
         const phase = positiveModulo(rotation, segmentAngle) / segmentAngle;
         const deflection = phase < 0.72
@@ -330,7 +232,6 @@ export function BonusBoxClient({
     storeOpening(response);
     setPendingResult(null);
     setRevealEffect(!reducedMotion);
-    playWinSound(response);
     const freshData = await apiFetch<BonusBoxOverview>("/api/bonus-box").catch(() => null);
     if (freshData) {
       setData(freshData);
@@ -365,7 +266,7 @@ export function BonusBoxClient({
         `/api/bonus-box/missions/${mission.id}/claim`,
         { method: "POST" },
       );
-      toast(`Начислено открытий: ${result.attempts}`, "success");
+      toast(`Начислено попыток: ${result.attempts}`, "success");
       const freshData = await apiFetch<BonusBoxOverview>("/api/bonus-box");
       setData(freshData);
     } catch {
@@ -378,7 +279,6 @@ export function BonusBoxClient({
   async function openBox() {
     if (!canOpen || requestInFlightRef.current) return;
     requestInFlightRef.current = true;
-    prepareSound();
     try {
       window.sessionStorage.setItem(OPENING_STARTED_KEY, String(Date.now()));
     } catch {
@@ -483,24 +383,15 @@ export function BonusBoxClient({
         <div className="bonus-box-stage-header flex flex-wrap items-center justify-between gap-3 border-b border-brand-200/70 px-4 py-4 dark:border-brand-300/10 sm:px-6">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-brand-600 dark:text-brand-300">Bonus drop</span>
+              <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-brand-600 dark:text-brand-300">Программа наград</span>
               <span className="h-1 w-1 rounded-full bg-fuchsia-400" />
-              <span className="text-xs font-medium text-slate-500 dark:text-slate-400">{availableNow} {turnWord(availableNow)}</span>
+              <span className="text-xs font-medium text-slate-500 dark:text-slate-400">{availableNow} {attemptWord(availableNow)}</span>
             </div>
-            <h2 className="mt-1 text-lg font-semibold tracking-tight text-slate-950 dark:text-white sm:text-xl">Колесо подарков</h2>
+            <h2 className="mt-1 text-lg font-semibold tracking-tight text-slate-950 dark:text-white sm:text-xl">Получить бонус</h2>
           </div>
           <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
             <span className={cn("h-2 w-2 rounded-full", opening ? "animate-pulse bg-fuchsia-400" : "bg-cyan-400")} />
-            <span aria-live="polite">{opening ? "Определяем подарок" : result ? `${rarityLabel(result.prize.rarity)} результат` : "Готово к запуску"}</span>
-            <button
-              type="button"
-              className="bonus-wheel-sound-toggle"
-              onClick={toggleSound}
-              aria-label={soundEnabled ? "Выключить звук рулетки" : "Включить звук рулетки"}
-              title={soundEnabled ? "Звук включён" : "Звук выключен"}
-            >
-              {soundEnabled ? <Volume2 /> : <VolumeX />}
-            </button>
+            <span aria-live="polite">{opening ? "Определяем подарок" : result ? `${rarityLabel(result.prize.rarity)} результат` : "Готово"}</span>
           </div>
         </div>
 
@@ -512,7 +403,7 @@ export function BonusBoxClient({
                 <div
                   ref={wheelRef}
                   className={cn("bonus-wheel", wheelPrizes.length > 8 && "bonus-wheel--dense")}
-                  aria-label={`Колесо с ${wheelPrizes.length} вариантами призов`}
+                  aria-label={`${wheelPrizes.length} возможных подарков`}
                   style={{
                     "--bonus-segment-size": `${segmentAngle}deg`,
                     background: wheelBackground,
@@ -546,14 +437,14 @@ export function BonusBoxClient({
                   className="bonus-wheel-hub"
                   onClick={openBox}
                   disabled={!canOpen}
-                  aria-label={`${openButtonLabel}. Доступно: ${availableNow} ${turnWord(availableNow)}`}
+                  aria-label={`${openButtonLabel}. Доступно: ${availableNow} ${attemptWord(availableNow)}`}
                 >
                   <span className="bonus-wheel-hub-icon" aria-hidden="true">
                     {opening ? <LoaderCircle /> : <Sparkles />}
                   </span>
                   <strong>{availableNow}</strong>
-                  <span className="bonus-wheel-hub-count-label">{turnWord(availableNow)}</span>
-                  <em>{opening ? "Крутим" : cooldownSeconds > 0 ? formatCooldown(cooldownSeconds) : canOpen ? "Нажать" : "Закрыто"}</em>
+                  <span className="bonus-wheel-hub-count-label">{attemptWord(availableNow)}</span>
+                  <em>{opening ? "Ждите" : cooldownSeconds > 0 ? formatCooldown(cooldownSeconds) : canOpen ? "Получить" : "Закрыто"}</em>
                 </button>
                 {cooldownSeconds > 0 && (
                   <div className="bonus-wheel-cooldown" role="status" aria-live="polite">
@@ -577,13 +468,13 @@ export function BonusBoxClient({
 
             <div className={cn("bonus-wheel-console", !openCaseCta && "bonus-wheel-console--informational")}>
               <div>
-                <div className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-600 dark:text-brand-300">Ваш ход</div>
+                <div className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-600 dark:text-brand-300">Доступно сейчас</div>
                 <p className="mt-2 text-lg font-semibold tracking-tight text-slate-950 dark:text-white">
                   {opening
-                    ? "Колесо уже запущено"
+                    ? "Подарок определяется"
                     : cooldownSeconds > 0
                       ? "Нужно немного подождать"
-                      : "Нажмите на центр колеса"}
+                      : "Нажмите, чтобы получить подарок"}
                 </p>
                 <p className="mt-1 text-sm leading-6 text-slate-500 dark:text-slate-400">
                   {cooldownSeconds > 0
@@ -612,8 +503,8 @@ export function BonusBoxClient({
         {(canUseWelcomeAttempts || lockedAttempts > 0) && (
           <div className="border-t border-slate-200 bg-slate-50/80 px-3 py-2 text-sm text-slate-600 dark:border-white/10 dark:bg-white/[0.035] dark:text-slate-300 sm:px-5">
             {canUseWelcomeAttempts
-              ? `Приветственных открытий сейчас: ${data.welcomeAttemptsCount}.${lockedAttempts > 0 ? ` Ещё ${lockedAttempts} будут доступны после активации подписки.` : ""}`
-              : `${lockedAttempts} открытий сохранено на балансе и станет доступно после активации подписки.`}
+              ? `Приветственных попыток сейчас: ${data.welcomeAttemptsCount}.${lockedAttempts > 0 ? ` Ещё ${lockedAttempts} будут доступны после активации подписки.` : ""}`
+              : `${lockedAttempts} попыток сохранено на балансе и станет доступно после активации подписки.`}
           </div>
         )}
       </section>
@@ -623,7 +514,7 @@ export function BonusBoxClient({
           <div className="flex flex-col gap-2 border-y border-slate-200 py-3 text-sm dark:border-white/10 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-700 dark:text-cyan-300">
-                Защита от неудач
+                Гарантия подарка
               </span>
               <p className="mt-1 text-slate-600 dark:text-slate-300">
                 {data.pityProgress.guaranteedNext
@@ -680,7 +571,7 @@ export function BonusBoxClient({
           >
             <div className="bonus-panel-heading">
               <div>
-                <span>Заработать ходы</span>
+                <span>Получить попытки</span>
                 <h2>Задания и события</h2>
               </div>
               <small>{data.missions.filter((mission) => !mission.claimed).length} доступно</small>
@@ -699,7 +590,7 @@ export function BonusBoxClient({
             )}
             <details className="group border-t border-slate-200 pt-3 dark:border-white/10">
               <summary className="cursor-pointer list-none text-sm font-medium text-slate-600 hover:text-slate-950 dark:text-slate-300 dark:hover:text-white [&::-webkit-details-marker]:hidden">
-                Как получить открытия
+                Как получить попытки
               </summary>
               <div className="pt-3">
                 <BonusBoxRules
@@ -720,7 +611,7 @@ export function BonusBoxClient({
           >
             <div className="bonus-panel-heading">
               <div>
-                <span>Состав колеса</span>
+                <span>Список подарков</span>
                 <h2>Возможные призы</h2>
               </div>
               <small>Сумма шансов {Math.round(totalChance * 100)}%</small>
@@ -753,7 +644,7 @@ export function BonusBoxClient({
           >
             <div className="bonus-panel-heading">
               <div>
-                <span>Архив открытий</span>
+                <span>История попыток</span>
                 <h2>Ваши результаты</h2>
               </div>
               <small>{data.openings.length} сохранено</small>
@@ -792,9 +683,9 @@ function BonusWheelResultOverlay({
   const isEmpty = result.prize.type === "NO_PRIZE";
   const isCelebration = !isEmpty && result.prize.rarity !== "COMMON";
   const resultClass = `bonus-wheel-result-modal--${isEmpty ? "empty" : result.prize.rarity.toLowerCase()}`;
-  const title = isEmpty ? "Открытие завершено" : "Подарок получен";
+  const title = isEmpty ? "Результат готов" : "Подарок получен";
   const description = isEmpty
-    ? "Результат сохранён в истории открытий."
+    ? "Результат сохранён в истории попыток."
     : "Подарок уже сохранён в вашем кабинете.";
 
   return (
@@ -852,7 +743,7 @@ function BonusWheelResultOverlay({
         </div>
         <div className="bonus-wheel-result-kicker">
           {isEmpty
-            ? "Открытие завершено"
+            ? "Результат готов"
             : !result.remoteSynced && prizeRequiresSubscription(result.prize)
               ? "Подарок сохранён"
               : `${rarityLabel(result.prize.rarity)} подарок`}
@@ -862,7 +753,7 @@ function BonusWheelResultOverlay({
         <p>
           {result.prize.description
             || (isEmpty
-              ? "В этот раз без начисления. Следующий ход может оказаться удачнее."
+              ? "В этот раз без начисления. Следующая попытка может принести подарок."
               : "Подарок уже сохранён в вашем кабинете.")}
         </p>
 
@@ -930,13 +821,13 @@ function positiveModulo(value: number, divisor: number) {
   return ((value % divisor) + divisor) % divisor;
 }
 
-function turnWord(value: number) {
+function attemptWord(value: number) {
   const mod100 = value % 100;
   const mod10 = value % 10;
-  if (mod100 >= 11 && mod100 <= 14) return 'ходов';
-  if (mod10 === 1) return 'ход';
-  if (mod10 >= 2 && mod10 <= 4) return 'хода';
-  return 'ходов';
+  if (mod100 >= 11 && mod100 <= 14) return 'попыток';
+  if (mod10 === 1) return 'попытка';
+  if (mod10 >= 2 && mod10 <= 4) return 'попытки';
+  return 'попыток';
 }
 
 function formatCooldown(seconds: number) {
@@ -951,7 +842,7 @@ function wheelPrizeLabel(prize: BonusBoxPrizeView) {
   if (prize.type === 'NO_PRIZE') return 'Ещё раз';
   if (prize.type === 'SUBSCRIPTION_DAYS') return `+${prize.value} д`;
   if (prize.type === 'TRAFFIC_GB') return `+${prize.value} ГБ`;
-  if (prize.type === 'BONUS_ATTEMPTS') return `+${prize.value} ход`;
+  if (prize.type === 'BONUS_ATTEMPTS') return `+${prize.value} попыт.`;
   return `−${prize.value}%`;
 }
 
@@ -986,7 +877,7 @@ function BonusEngagementPanel({
                 </div>
                 <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
                   {event.description && <span>{event.description}</span>}
-                  {event.attemptsGranted > 0 && <span>Получено открытий: {event.attemptsGranted}</span>}
+                  {event.attemptsGranted > 0 && <span>Получено попыток: {event.attemptsGranted}</span>}
                   {event.boostedPrizeTitles.length > 0 && (
                     <span>
                       Шанс x{event.weightMultiplier}: {event.boostedPrizeTitles.join(", ")}
@@ -1018,7 +909,7 @@ function BonusEngagementPanel({
                       </p>
                       </div>
                       <span className="bonus-mission-reward">
-                        +{mission.rewardAttempts} {turnWord(mission.rewardAttempts)}
+                        +{mission.rewardAttempts} {attemptWord(mission.rewardAttempts)}
                       </span>
                     </div>
                     <div className="mt-2 flex items-center gap-2">
@@ -1294,22 +1185,22 @@ function BonusBoxRules({
   const referralText =
     config.referrerAttempts > 0 || config.referredAttempts > 0
       ? `За приглашение после первой оплаты: вам +${config.referrerAttempts}, другу +${config.referredAttempts}.`
-      : "Реферальные открытия сейчас не начисляются.";
+      : "Попытки за приглашения сейчас не начисляются.";
   const weeklyText =
     config.weeklyEnabled && config.weeklyAttempts > 0
       ? `Раз в неделю с дня "${weekdayLabel(config.weeklyDay)}": +${config.weeklyAttempts}, если VPN-подписка активна.`
       : "Еженедельный бонус сейчас выключен.";
   const ttlText =
     config.attemptTtlDays > 0
-      ? `Открытия хранятся ${config.attemptTtlDays} дн.`
-      : "Открытия не сгорают.";
+      ? `Попытки хранятся ${config.attemptTtlDays} дн.`
+      : "Попытки не сгорают.";
 
   return (
     <section className="grid gap-3 md:grid-cols-3">
       <RuleCard
         icon={<CreditCard className="h-5 w-5" />}
         title="За оплату"
-        text={`1 открытие за каждые ${config.rubPerAttempt} ₽. За платеж можно получить ${paymentRange}.`}
+        text={`1 попытка за каждые ${config.rubPerAttempt} ₽. За платёж можно получить ${paymentRange}.`}
       />
       <RuleCard
         icon={<Users className="h-5 w-5" />}

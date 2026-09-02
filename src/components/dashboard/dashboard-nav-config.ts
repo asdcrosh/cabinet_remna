@@ -33,6 +33,7 @@ import type { FeatureFlags } from '@/lib/feature-flags'
 export type NavigationItem = {
   href: string
   label: string
+  shortLabel?: string
   icon: LucideIcon
   exact?: boolean
 }
@@ -41,12 +42,13 @@ export type UserRole = 'USER' | 'MODERATOR' | 'ADMIN' | 'SUPER_ADMIN'
 
 export const userNavigation: NavigationItem[] = [
   { href: '/dashboard', label: 'Главная', icon: Home, exact: true },
-  { href: '/dashboard/subscription', label: 'Подключение', icon: KeyRound },
-  { href: '/dashboard/plans', label: 'Тарифы', icon: ShieldCheck },
-  { href: '/dashboard/bonus-box', label: 'Бонусы', icon: Gift },
-  { href: '/dashboard/support', label: 'Поддержка', icon: MessageCircleQuestion },
+  { href: '/dashboard/subscription', label: 'Подключение', shortLabel: 'VPN', icon: KeyRound },
+  { href: '/dashboard/plans', label: 'Тарифы', shortLabel: 'Тариф', icon: ShieldCheck },
+  { href: '/dashboard/support', label: 'Поддержка', shortLabel: 'Помощь', icon: MessageCircleQuestion },
   { href: '/dashboard/settings', label: 'Аккаунт', icon: Settings },
 ]
+
+const bonusNavigationItem: NavigationItem = { href: '/dashboard/bonus-box', label: 'Бонусы', icon: Gift }
 
 export const userPrimaryNavigation = userNavigation.filter((item) => [
   '/dashboard',
@@ -56,13 +58,13 @@ export const userPrimaryNavigation = userNavigation.filter((item) => [
 ].includes(item.href))
 
 export const userSecondaryNavigation = userNavigation.filter((item) => [
-  '/dashboard/bonus-box',
   '/dashboard/settings',
 ].includes(item.href))
 
 export const bottomNavigation: NavigationItem[] = userPrimaryNavigation
 export const bottomMoreNavigation: NavigationItem[] = [
   { href: '/dashboard/notifications', label: 'Уведомления', icon: Bell },
+  bonusNavigationItem,
   ...userSecondaryNavigation,
 ]
 

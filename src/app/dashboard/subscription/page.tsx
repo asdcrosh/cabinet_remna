@@ -247,7 +247,7 @@ export default async function SubscriptionPage() {
           {whitelistAddonActive && whitelistAddonExpireAtLabel ? (
             <AccessMetric
               icon={<Globe2 className="h-4 w-4" />}
-              label="БС действуют до"
+              label="Белые списки до"
               value={whitelistAddonExpireAtLabel}
             />
           ) : null}
@@ -373,7 +373,7 @@ function SubscriptionTimeline({
   const paymentItems = chronological.map((payment) => {
     const snapshot = readPlanPurchaseSnapshot(payment.planSnapshot)
     let title: string
-    if (payment.purchaseType === 'WHITELIST_ADDON') title = payment.status === 'REFUNDED' ? 'БС отключены' : 'БС подключены'
+    if (payment.purchaseType === 'WHITELIST_ADDON') title = payment.status === 'REFUNDED' ? 'Белые списки отключены' : 'Белые списки подключены'
     else if (snapshot?.switchFromPlan) title = `Смена тарифа: ${snapshot.switchFromPlan.name} → ${snapshot.name}`
     else title = subscriptionPurchases === 0 ? `Тариф «${snapshot?.name ?? payment.plan.name}» подключён` : `Тариф «${snapshot?.name ?? payment.plan.name}» продлён`
     if (payment.purchaseType !== 'WHITELIST_ADDON') subscriptionPurchases += 1

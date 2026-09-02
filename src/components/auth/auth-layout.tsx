@@ -41,7 +41,7 @@ export function AuthLayout({
           </Link>
         </nav>
         <div className="relative max-w-md">
-          <div className="mb-5 font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-brand-200">Private access / 01</div>
+          <div className="mb-5 font-mono text-xs font-semibold uppercase tracking-[0.16em] text-brand-200">Личный кабинет / 01</div>
           <h2 className="text-3xl font-semibold leading-[1.05] tracking-[-0.04em] xl:text-[2.7rem]">Подключение без лишних экранов.</h2>
           <p className="mt-4 text-base leading-7 text-white/60">
             Войдите, чтобы увидеть статус подписки и следующий нужный шаг.

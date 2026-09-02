@@ -58,6 +58,7 @@ export default async function SettingsPage() {
   const accountLinks = [
     { href: '/dashboard/billing', label: 'Покупки', description: 'Платежи и чеки', icon: ReceiptText, visible: true },
     { href: '/dashboard/referrals', label: 'Приглашения', description: 'Ссылка и вознаграждения', icon: Gift, visible: features.referrals },
+    { href: '/dashboard/bonus-box', label: 'Бонусы', description: 'Доступные подарки и награды', icon: Gift, visible: features.bonusBox },
   ].filter((item) => item.visible)
 
   return (
@@ -243,7 +244,7 @@ export default async function SettingsPage() {
       <section aria-labelledby="account-links-title">
         <div className="mb-3">
           <h2 id="account-links-title" className="text-sm font-semibold text-slate-950 dark:text-white">Ещё в кабинете</h2>
-          <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Покупки, чеки и приглашения находятся в отдельных разделах.</p>
+          <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Покупки, приглашения и необязательные бонусы находятся в отдельных разделах.</p>
         </div>
         <div className="grid gap-2 sm:grid-cols-2">
           {accountLinks.map((item) => {

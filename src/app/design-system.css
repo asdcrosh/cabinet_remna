@@ -170,10 +170,10 @@ body {
   margin-bottom: 0.5rem;
   color: var(--app-accent-text);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 0.62rem;
+  font-size: 0.7rem;
   font-weight: 750;
   letter-spacing: 0.18em;
-  line-height: 1;
+  line-height: 1.2;
   text-transform: uppercase;
 }
 
