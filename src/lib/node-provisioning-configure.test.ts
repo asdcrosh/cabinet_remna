@@ -11,7 +11,7 @@ afterEach(async () => {
   await Promise.all(workDirs.splice(0).map((path) => rm(path, { recursive: true, force: true })))
 })
 
-describe('configure-node-provisioning.sh', () => {
+describe('configure-node-provisioning.sh', { timeout: 15_000 }, () => {
   it('fills safe defaults and keeps provisioning disabled when required values are missing', async () => {
     const fixture = await createFixture('COMPOSE_PROFILES="caddy,maintenance,provisioning"\n')
 

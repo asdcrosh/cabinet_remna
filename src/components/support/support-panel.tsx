@@ -536,7 +536,7 @@ export function SupportPanel({
                   </div>
                   <button type="button" onClick={openNewTicket} className="flex h-9 shrink-0 items-center gap-1.5 rounded-xl bg-slate-950 px-3 text-xs font-semibold text-white shadow-md shadow-slate-950/10 transition hover:bg-fuchsia-700 dark:bg-white dark:text-slate-950 dark:hover:bg-fuchsia-100" aria-label="Новое обращение">
                     <MessageSquarePlus className="h-4 w-4" />
-                    <span className="hidden sm:inline">Новое обращение</span>
+                    <span className="hidden sm:inline">Новое</span>
                   </button>
                   {unreadTotal > 0 && <span className="grid h-5 min-w-5 place-items-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white">{unreadTotal}</span>}
                 </div>
