@@ -59,7 +59,6 @@ export function ChangePasswordForm() {
           )}
         </div>
         <div className="border-t border-slate-200 pt-4 dark:border-white/[0.08]">
-          <p className="mb-3 text-xs font-medium text-slate-500 dark:text-slate-400">Новый пароль</p>
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label className="label" htmlFor="newPassword">Новый пароль</label>

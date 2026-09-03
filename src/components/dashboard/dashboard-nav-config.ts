@@ -45,7 +45,7 @@ export const userNavigation: NavigationItem[] = [
   { href: '/dashboard/subscription', label: 'Подключение', shortLabel: 'VPN', icon: KeyRound },
   { href: '/dashboard/plans', label: 'Тарифы', shortLabel: 'Тариф', icon: ShieldCheck },
   { href: '/dashboard/support', label: 'Поддержка', shortLabel: 'Помощь', icon: MessageCircleQuestion },
-  { href: '/dashboard/settings', label: 'Аккаунт', icon: Settings },
+  { href: '/dashboard/settings', label: 'Настройки', icon: Settings },
 ]
 
 const bonusNavigationItem: NavigationItem = { href: '/dashboard/bonus-box', label: 'Бонусы', icon: Gift }

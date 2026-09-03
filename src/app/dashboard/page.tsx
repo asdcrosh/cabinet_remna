@@ -7,6 +7,7 @@ import {
   ArrowRight,
   CalendarDays,
   CreditCard,
+  Gift,
   KeyRound,
   MonitorSmartphone,
   ShieldCheck,
@@ -37,7 +38,7 @@ export default async function DashboardHome() {
   if (!session) redirect('/login')
 
   const freshPendingCutoff = getFreshPendingPaymentCutoff()
-  const [features, user, paymentProviders] = await Promise.all([
+  const [features, user, paymentProviders, bonusAttempts] = await Promise.all([
     getFeatureFlags(),
     prisma.user.findUnique({
       where: { id: session.uid },
@@ -53,6 +54,13 @@ export default async function DashboardHome() {
       },
     }),
     getAvailablePaymentProviders(),
+    prisma.bonusBoxAttempt.count({
+      where: {
+        userId: session.uid,
+        usedAt: null,
+        OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+      },
+    }),
   ])
   if (!user) {
     logWarn('auth.dashboard.stale_session_redirect', { userId: session.uid })
@@ -336,6 +344,24 @@ export default async function DashboardHome() {
         </div>
       </section>
 
+      {features.bonusBox && bonusAttempts > 0 ? (
+        <Link
+          href="/dashboard/bonus-box"
+          className="group flex min-h-16 items-center gap-3 rounded-2xl border border-fuchsia-200/80 bg-fuchsia-50/70 px-4 py-3 text-slate-800 transition hover:border-fuchsia-300 hover:bg-fuchsia-50 dark:border-fuchsia-400/15 dark:bg-fuchsia-400/[0.06] dark:text-slate-100 dark:hover:bg-fuchsia-400/[0.1]"
+        >
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-fuchsia-500/10 text-fuchsia-700 dark:text-fuchsia-200">
+            <Gift className="h-5 w-5" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block font-semibold">Доступны подарки</span>
+            <span className="mt-0.5 block text-sm text-slate-500 dark:text-slate-400">
+              {bonusAttempts} {bonusAttemptLabel(bonusAttempts)} можно использовать сейчас
+            </span>
+          </span>
+          <ArrowRight className="h-4 w-4 shrink-0 transition-transform group-hover:translate-x-0.5" />
+        </Link>
+      ) : null}
+
       {whitelistAddonOffer ? (
         <HomeWhitelistAddon
           planId={whitelistAddonOffer.planId}
@@ -353,6 +379,15 @@ export default async function DashboardHome() {
 
     </div>
   )
+}
+
+function bonusAttemptLabel(count: number) {
+  const lastTwo = count % 100
+  if (lastTwo >= 11 && lastTwo <= 14) return 'попыток'
+  const last = count % 10
+  if (last === 1) return 'попытку'
+  if (last >= 2 && last <= 4) return 'попытки'
+  return 'попыток'
 }
 
 function HomeHeader({ name, description }: { name: string; description: string }) {

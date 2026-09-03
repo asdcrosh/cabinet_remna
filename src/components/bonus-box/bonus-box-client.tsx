@@ -383,7 +383,7 @@ export function BonusBoxClient({
         <div className="bonus-box-stage-header flex flex-wrap items-center justify-between gap-3 border-b border-brand-200/70 px-4 py-4 dark:border-brand-300/10 sm:px-6">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-brand-600 dark:text-brand-300">Программа наград</span>
+              <span className="font-mono text-xs font-semibold uppercase tracking-[0.18em] text-brand-600 dark:text-brand-300">Программа наград</span>
               <span className="h-1 w-1 rounded-full bg-fuchsia-400" />
               <span className="text-xs font-medium text-slate-500 dark:text-slate-400">{availableNow} {attemptWord(availableNow)}</span>
             </div>
@@ -468,7 +468,7 @@ export function BonusBoxClient({
 
             <div className={cn("bonus-wheel-console", !openCaseCta && "bonus-wheel-console--informational")}>
               <div>
-                <div className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-600 dark:text-brand-300">Доступно сейчас</div>
+                <div className="font-mono text-xs font-semibold uppercase tracking-[0.16em] text-brand-600 dark:text-brand-300">Доступно сейчас</div>
                 <p className="mt-2 text-lg font-semibold tracking-tight text-slate-950 dark:text-white">
                   {opening
                     ? "Подарок определяется"
@@ -513,7 +513,7 @@ export function BonusBoxClient({
         {data.pityProgress.enabled && hasRareOrBetter && (
           <div className="flex flex-col gap-2 border-y border-slate-200 py-3 text-sm dark:border-white/10 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-700 dark:text-cyan-300">
+              <span className="font-mono text-xs font-semibold uppercase tracking-[0.14em] text-cyan-700 dark:text-cyan-300">
                 Гарантия подарка
               </span>
               <p className="mt-1 text-slate-600 dark:text-slate-300">
@@ -894,7 +894,10 @@ function BonusEngagementPanel({
         <div className="bonus-mission-list">
           <div className="grid gap-2">
             {missions.map((mission) => {
-              const percent = Math.min(100, (mission.value / Math.max(1, mission.target)) * 100);
+              const displayTarget = mission.claimed && mission.value < mission.target
+                ? Math.max(1, mission.value)
+                : mission.target
+              const percent = Math.min(100, (mission.value / Math.max(1, displayTarget)) * 100)
               return (
                 <article
                   key={mission.id}
@@ -916,14 +919,14 @@ function BonusEngagementPanel({
                       <div className="bonus-mission-progress">
                         <div style={{ width: `${percent}%` }} />
                       </div>
-                      <span className="text-xs tabular-nums text-slate-500">{mission.value}/{mission.target}</span>
+                      <span className="text-xs tabular-nums text-slate-500">{mission.value}/{displayTarget}</span>
                     </div>
                   </div>
                   <div className="bonus-mission-action">
                     {mission.claimed ? (
                       <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-600 dark:text-emerald-300">
                         <Check className="h-3.5 w-3.5" />
-                        Получено
+                        {mission.value < mission.target ? "Получено ранее" : "Получено"}
                       </span>
                     ) : mission.completed ? (
                       <button
@@ -935,7 +938,7 @@ function BonusEngagementPanel({
                         {claimingMissionId === mission.id ? "Начисляем..." : "Получить"}
                       </button>
                     ) : mission.endsAt ? (
-                      <span className="text-[10px] text-slate-400">до {formatDateOnly(mission.endsAt)}</span>
+                      <span className="text-xs text-slate-400">до {formatDateOnly(mission.endsAt)}</span>
                     ) : null}
                   </div>
                 </article>
@@ -970,7 +973,7 @@ function ActivePromoRewards({
             Можно скопировать или сразу применить к тарифу.
           </p>
         </div>
-        <span className="border-l-2 border-cyan-400 pl-2 font-mono text-[10px] font-semibold uppercase text-cyan-700 dark:text-cyan-100">
+        <span className="border-l-2 border-cyan-400 pl-2 font-mono text-xs font-semibold uppercase text-cyan-700 dark:text-cyan-100">
           {rewards.length}
         </span>
       </div>
@@ -989,7 +992,7 @@ function ActivePromoRewards({
                   -{reward.discountPercent}% · {reward.prizeTitle}
                 </div>
                 {reward.expiresAt && (
-                  <div className="mt-1 font-mono text-[10px] uppercase tracking-wide text-amber-700 dark:text-amber-300">
+                  <div className="mt-1 font-mono text-xs uppercase tracking-wide text-amber-700 dark:text-amber-300">
                     Действует до {formatDateOnly(reward.expiresAt)}
                   </div>
                 )}
@@ -1075,7 +1078,7 @@ function OutcomeRow({ prize }: { prize: BonusBoxPrizeView }) {
             <h3 className="truncate text-sm font-semibold leading-tight text-slate-950 dark:text-white">{prize.title}</h3>
             <span
               className={cn(
-                "shrink-0 rounded-sm px-1.5 py-0.5 font-mono text-[9px] font-semibold uppercase",
+                "shrink-0 rounded-sm px-1.5 py-0.5 font-mono text-xs font-semibold uppercase",
                 rarityClass(prize.rarity),
               )}
             >
@@ -1101,7 +1104,7 @@ function OutcomeRow({ prize }: { prize: BonusBoxPrizeView }) {
           <div className="text-sm font-semibold leading-none text-slate-950 dark:text-white">
             {chancePercent.toFixed(1)}%
           </div>
-          <div className="mt-0.5 text-[10px] text-slate-400">базовый шанс</div>
+          <div className="mt-0.5 text-xs text-slate-400">базовый шанс</div>
         </div>
       </div>
     </article>
@@ -1145,7 +1148,7 @@ function OpeningRow({ opening }: { opening: BonusBoxOpeningView }) {
           </div>
           <span
             className={cn(
-              "mt-2 inline-flex rounded-sm px-2 py-1 font-mono text-[9px] font-semibold uppercase",
+              "mt-2 inline-flex rounded-sm px-2 py-1 font-mono text-xs font-semibold uppercase",
               rarityClass(opening.prize.rarity),
             )}
           >

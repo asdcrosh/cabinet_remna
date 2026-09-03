@@ -68,7 +68,7 @@ export function PaymentHistory({ payments }: { payments: PaymentHistoryPayment[]
             </div>
 
             <div className="flex items-end justify-between gap-3 border-t border-slate-100 pt-3 dark:border-white/[0.07] sm:block sm:border-0 sm:pt-0">
-              <div className="text-[11px] font-medium uppercase tracking-wide text-slate-400 sm:mb-1.5">Сумма</div>
+              <div className="text-xs font-medium uppercase tracking-wide text-slate-400 sm:mb-1.5">Сумма</div>
               <PaymentAmount
                 amountKopecks={payment.amountKopecks}
                 originalAmountKopecks={payment.originalAmountKopecks}
@@ -83,7 +83,7 @@ export function PaymentHistory({ payments }: { payments: PaymentHistoryPayment[]
             </div>
 
             <div className="flex items-end justify-between gap-3 border-t border-slate-100 pt-3 dark:border-white/[0.07] sm:block sm:border-0 sm:pt-0">
-              <div className="text-[11px] font-medium uppercase tracking-wide text-slate-400 sm:mb-1.5">
+              <div className="text-xs font-medium uppercase tracking-wide text-slate-400 sm:mb-1.5">
                 {payment.purchaseType === 'WHITELIST_ADDON' ? 'Дополнение' : 'Подписка'}
               </div>
               <div className="sm:mt-0">

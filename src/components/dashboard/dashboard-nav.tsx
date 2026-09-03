@@ -269,7 +269,7 @@ export function MobileBottomNav({
               href={item.href}
               aria-current={active ? 'page' : undefined}
               className={cn(
-                'relative flex min-h-12 min-w-0 flex-col items-center justify-center gap-0.5 rounded-md border-t-2 px-1 py-1.5 text-[10px] font-semibold transition-colors',
+                'relative flex min-h-12 min-w-0 flex-col items-center justify-center gap-0.5 rounded-md border-t-2 px-1 py-1.5 text-xs font-semibold transition-colors',
                 active
                   ? 'border-cyan-600 bg-white text-slate-950 dark:border-cyan-300 dark:bg-white/[0.06] dark:text-white'
                   : 'border-transparent text-slate-500 hover:bg-white hover:text-slate-950 dark:text-slate-400 dark:hover:bg-white/[0.04] dark:hover:text-white'
@@ -297,7 +297,7 @@ export function MobileBottomNav({
             aria-haspopup="dialog"
             onClick={() => setMoreOpen(true)}
             className={cn(
-              'relative flex min-h-12 min-w-0 flex-col items-center justify-center gap-0.5 rounded-md border-t-2 px-1 py-1.5 text-[10px] font-semibold transition-colors',
+              'relative flex min-h-12 min-w-0 flex-col items-center justify-center gap-0.5 rounded-md border-t-2 px-1 py-1.5 text-xs font-semibold transition-colors',
               moreActive
                 ? 'border-cyan-600 bg-white text-slate-950 dark:border-cyan-300 dark:bg-white/[0.06] dark:text-white'
                 : 'border-transparent text-slate-500 hover:bg-white hover:text-slate-950 dark:text-slate-400 dark:hover:bg-white/[0.04] dark:hover:text-white'
@@ -394,7 +394,7 @@ function MobileMoreSection({
 
   return (
     <section>
-      <h2 className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">{title}</h2>
+      <h2 className="mb-2 px-1 text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">{title}</h2>
       <MobileMoreGrid items={items} pathname={pathname} badges={badges} onNavigate={onNavigate} />
     </section>
   )
@@ -483,7 +483,7 @@ function NavList({
           <NavGroup items={userPrimaryItems} pathname={pathname} badges={liveBadges} onNavigate={onNavigate} />
           {userSecondaryItems.length > 0 && (
             <section className="border-t border-white/10 pt-3" aria-label="Дополнительные разделы">
-              <div className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">Ещё</div>
+              <div className="px-3 pb-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Ещё</div>
               <NavGroup items={userSecondaryItems} pathname={pathname} badges={liveBadges} onNavigate={onNavigate} />
             </section>
           )}
@@ -708,7 +708,7 @@ function AdminNavGroups({
     <div className="space-y-4">
       {groups.map((group) => (
         <section key={group.title} aria-label={group.title}>
-          <h2 className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400 dark:text-slate-500">
+          <h2 className="mb-1 px-3 text-xs font-semibold uppercase tracking-[0.14em] text-slate-400 dark:text-slate-500">
             {group.title}
           </h2>
           <NavGroup

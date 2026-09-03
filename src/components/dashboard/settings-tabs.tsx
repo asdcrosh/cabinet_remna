@@ -38,7 +38,7 @@ export function SettingsTabs({ sections }: { sections: SettingsTabSection[] }) {
     <div className="settings-workspace grid gap-4 lg:grid-cols-[15.5rem_minmax(0,1fr)] lg:gap-5">
       <div className="min-w-0 lg:self-start">
         <div className="settings-workspace-tabs lg:sticky lg:top-6">
-          <p className="mb-2 hidden px-1 font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400 dark:text-slate-500 lg:block">
+          <p className="mb-2 hidden px-1 font-mono text-xs font-semibold uppercase tracking-[0.14em] text-slate-400 dark:text-slate-500 lg:block">
             Разделы
           </p>
           <div role="tablist" aria-label="Разделы настроек" className="grid grid-cols-2 gap-2 lg:grid-cols-1">

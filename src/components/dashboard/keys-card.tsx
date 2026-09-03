@@ -385,7 +385,7 @@ function AppChoice({ option, selected, onSelect }: { option: AppOption; selected
       <Icon className={cn('h-4 w-4 shrink-0', selected && 'text-brand-600 dark:text-brand-300')} />
       <span className="min-w-0">
         <span className="block truncate text-sm font-semibold">{option.name}</span>
-        <span className="block truncate text-[11px] opacity-70">{option.subtitle}</span>
+        <span className="block truncate text-xs opacity-70">{option.subtitle}</span>
       </span>
     </button>
   )

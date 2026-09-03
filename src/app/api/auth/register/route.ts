@@ -18,6 +18,7 @@ import { PERSONAL_DATA_CONSENT_VERSION, TERMS_VERSION } from '@/lib/legal'
 import { logWarn } from '@/lib/logger'
 import { isFeatureEnabled } from '@/lib/feature-flags'
 import { grantReferralRewardForRegistration } from '@/lib/referral-rewards'
+import { sanitizeInternalNext } from '@/lib/auth/next-path'
 
 export const runtime = 'nodejs'
 
@@ -83,6 +84,7 @@ export async function POST(req: Request) {
   }
 
   const { email, password, name } = parsed.data
+  const next = sanitizeInternalNext(parsed.data.next)
   const referralCode = await isFeatureEnabled('referrals')
     ? normalizeReferralCode(parsed.data.referralCode)
     : null
@@ -133,6 +135,7 @@ export async function POST(req: Request) {
     email: user.email,
     name: user.name,
     token,
+    next,
   })
 
   let remnashopSync: 'synced' | 'already_exists' | 'not_configured' | 'failed' = 'not_configured'

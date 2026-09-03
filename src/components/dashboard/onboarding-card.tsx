@@ -56,7 +56,7 @@ export function DashboardOnboardingCard({
             {action.icon}
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.13em] text-cyan-700 dark:text-cyan-200">Следующий шаг</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.13em] text-cyan-700 dark:text-cyan-200">Следующий шаг</p>
             <h2 className="mt-1 text-lg font-semibold leading-tight tracking-tight text-slate-950 dark:text-white">{action.title}</h2>
             <p className="mt-1 text-sm leading-5 text-slate-500 dark:text-slate-400">{action.description}</p>
           </div>

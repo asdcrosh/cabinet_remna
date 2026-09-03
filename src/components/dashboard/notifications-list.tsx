@@ -26,6 +26,7 @@ export function NotificationsList({ initialNotifications }: { initialNotificatio
 
   const unreadCount = notifications.filter((item) => !item.readAt).length
   const filteredNotifications = notifications.filter((item) => filter === 'all' || notificationGroup(item.type) === filter)
+  const groupedNotifications = groupNotifications(filteredNotifications)
   const filterItems: Array<{ value: NotificationFilter; label: string; count: number }> = [
     { value: 'all', label: 'Все', count: notifications.length },
     { value: 'payments', label: 'Платежи', count: notifications.filter((item) => notificationGroup(item.type) === 'payments').length },
@@ -44,15 +45,16 @@ export function NotificationsList({ initialNotifications }: { initialNotificatio
           <div className="font-semibold text-slate-950 dark:text-white">{unreadCount > 0 ? `${unreadCount} непрочитанных` : 'Всё прочитано'}</div>
           <div className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">{notifications.length} событий</div>
         </div>
-        <button
-          type="button"
-          onClick={markAllRead}
-          disabled={unreadCount === 0}
-          className="btn-secondary w-full sm:w-auto"
-        >
-          <CheckCheck className="h-4 w-4" />
-          Отметить все
-        </button>
+        {unreadCount > 0 && (
+          <button
+            type="button"
+            onClick={markAllRead}
+            className="btn-secondary w-full sm:w-auto"
+          >
+            <CheckCheck className="h-4 w-4" />
+            Отметить все
+          </button>
+        )}
       </div>
 
       <div className="flex gap-1 overflow-x-auto border-b border-slate-200 pb-2 [scrollbar-width:none] dark:border-white/10 [&::-webkit-scrollbar]:hidden">
@@ -69,7 +71,7 @@ export function NotificationsList({ initialNotifications }: { initialNotificatio
             )}
           >
             {item.label}
-            <span className={cn('rounded-full px-1.5 py-0.5 text-[10px]', filter === item.value ? 'bg-cyan-100 text-cyan-800 dark:bg-cyan-300/15 dark:text-cyan-100' : 'bg-slate-100 dark:bg-white/10')}>
+            <span className={cn('rounded-full px-1.5 py-0.5 text-xs', filter === item.value ? 'bg-cyan-100 text-cyan-800 dark:bg-cyan-300/15 dark:text-cyan-100' : 'bg-slate-100 dark:bg-white/10')}>
               {item.count}
             </span>
           </button>
@@ -77,8 +79,10 @@ export function NotificationsList({ initialNotifications }: { initialNotificatio
       </div>
 
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.035]">
-        {filteredNotifications.length > 0 ? (
-          filteredNotifications.map((item) => <NotificationItem key={item.id} notification={item} />)
+        {groupedNotifications.length > 0 ? (
+          groupedNotifications.map((item) => (
+            <NotificationItem key={item.notification.id} notification={item.notification} duplicateCount={item.count} />
+          ))
         ) : (
           <div className="grid min-h-64 place-items-center px-4 py-12 text-center">
             <div>
@@ -109,7 +113,13 @@ function getEmptyCopy(filter: NotificationFilter, label: string, total: number) 
   }
 }
 
-function NotificationItem({ notification }: { notification: UserNotificationView }) {
+function NotificationItem({
+  notification,
+  duplicateCount,
+}: {
+  notification: UserNotificationView
+  duplicateCount: number
+}) {
   const Icon = notificationIcon(notification.type)
   const content = (
     <div
@@ -127,6 +137,11 @@ function NotificationItem({ notification }: { notification: UserNotificationView
           <time className="text-xs text-slate-400">{formatDate(notification.createdAt)}</time>
         </div>
         <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-300">{notification.body}</p>
+        {duplicateCount > 1 && (
+          <div className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+            Ещё похожих событий: {duplicateCount - 1}
+          </div>
+        )}
         {notification.actionLabel && <div className="mt-2 text-sm font-medium text-cyan-700 dark:text-cyan-300">{notification.actionLabel}</div>}
       </div>
     </div>
@@ -140,6 +155,22 @@ function NotificationItem({ notification }: { notification: UserNotificationView
     )
   }
   return content
+}
+
+function groupNotifications(notifications: UserNotificationView[]) {
+  const grouped = new Map<string, { notification: UserNotificationView; count: number }>()
+  for (const notification of notifications) {
+    const key = [
+      notification.type,
+      notification.title,
+      notification.body,
+      notification.actionHref ?? '',
+    ].join('\u0000')
+    const current = grouped.get(key)
+    if (current) current.count += 1
+    else grouped.set(key, { notification, count: 1 })
+  }
+  return [...grouped.values()]
 }
 
 function notificationGroup(type: UserNotificationView['type']): NotificationFilter {

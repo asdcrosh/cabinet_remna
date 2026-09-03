@@ -15,9 +15,11 @@ import { YandexAuthButton } from './yandex-auth-button'
 
 export function RegisterForm({
   initialReferralCode = '',
+  initialNextPath = '/dashboard',
   yandexEnabled = false,
 }: {
   initialReferralCode?: string
+  initialNextPath?: string
   yandexEnabled?: boolean
 }) {
   const router = useRouter()
@@ -29,6 +31,7 @@ export function RegisterForm({
         password: '',
         name: '',
         referralCode: initialReferralCode,
+        next: initialNextPath,
         agreeToTerms: false as any,
         agreeToPersonalData: false as any,
       },
@@ -78,7 +81,7 @@ export function RegisterForm({
         <button
           type="button"
           className="btn-primary w-full"
-          onClick={() => router.push('/login')}
+          onClick={() => router.push(`/login?next=${encodeURIComponent(initialNextPath)}`)}
         >
           Перейти ко входу
         </button>
@@ -92,9 +95,11 @@ export function RegisterForm({
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
+      <input type="hidden" {...register('next')} />
       {yandexEnabled && (
         <>
           <YandexAuthButton
+            next={initialNextPath}
             referralCode={initialReferralCode}
             label="Зарегистрироваться через Яндекс"
             legalAccepted={legalAccepted}
@@ -238,6 +243,11 @@ export function RegisterForm({
         <UserRound className="h-4 w-4" />
         {isSubmitting ? 'Создаём аккаунт...' : 'Зарегистрироваться'}
       </button>
+      {!legalAccepted && (
+        <p className="text-center text-xs leading-5 text-slate-500 dark:text-slate-400">
+          Для регистрации подтвердите оба документа выше.
+        </p>
+      )}
     </form>
   )
 }

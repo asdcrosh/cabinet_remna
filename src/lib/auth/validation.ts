@@ -41,6 +41,7 @@ export const registerSchema = z.object({
   agreeToPersonalData: z.literal(true, {
     errorMap: () => ({ message: 'Нужно дать согласие на обработку персональных данных' }),
   }),
+  next: z.string().trim().max(512).optional(),
 })
 
 export const loginSchema = z.object({

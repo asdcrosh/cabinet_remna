@@ -23,6 +23,8 @@ ENV_TEMPLATE_TEMP="${INSTALL_DIR}/.env.template.tmp"
 NODE_PROVISIONING_CONFIG_URL="${NODE_PROVISIONING_CONFIG_URL:-${RAW_BASE_URL}/deploy/configure-node-provisioning.sh}"
 NODE_PROVISIONING_CONFIG_PATH="${NODE_PROVISIONING_CONFIG_PATH:-/usr/local/bin/cabinet-node-provisioning}"
 NODE_PROVISIONING_CONFIG_TEMP="${NODE_PROVISIONING_CONFIG_PATH}.tmp"
+NGINX_CONF="${NGINX_CONF:-/opt/remnawave/nginx/nginx.conf}"
+NGINX_CONTAINER="${NGINX_CONTAINER:-remnawave-nginx}"
 OFFICIAL_CABINET_IMAGE="ghcr.io/asdcrosh/cabinet_remna"
 OFFICIAL_PROVISIONER_IMAGE="ghcr.io/asdcrosh/cabinet_remna-provisioner"
 TARGET_CABINET_IMAGE=""
@@ -332,6 +334,8 @@ LOCAL_HEALTH_STATUS="pending"
 PUBLIC_HEALTH_STATUS="pending"
 DEPLOY_STAGE="starting"
 DEPLOY_PROGRESS=0
+DEPLOY_CANDIDATE_STARTED="false"
+DEPLOY_PROXY_SWITCHED="false"
 
 write_deployment_state() {
   local status="$1"
@@ -402,6 +406,104 @@ set_deploy_stage() {
   write_deployment_state "deploying" "${message}"
 }
 
+wait_for_successful_container() {
+  local container="$1"
+  local attempts="${2:-90}"
+  local status="" exit_code=""
+
+  for _ in $(seq 1 "${attempts}"); do
+    status="$(docker inspect "${container}" --format '{{.State.Status}}' 2>/dev/null || true)"
+    exit_code="$(docker inspect "${container}" --format '{{.State.ExitCode}}' 2>/dev/null || true)"
+    if [[ "${status}" == "exited" && "${exit_code}" == "0" ]]; then
+      return 0
+    fi
+    if [[ "${status}" == "exited" && "${exit_code}" != "0" ]]; then
+      docker logs "${container}" >&2 || true
+      return 1
+    fi
+    sleep 2
+  done
+
+  echo "Container ${container} did not complete successfully in time." >&2
+  docker logs "${container}" >&2 || true
+  return 1
+}
+
+wait_for_healthy_container() {
+  local container="$1"
+  local attempts="${2:-60}"
+  local status="" health=""
+
+  for _ in $(seq 1 "${attempts}"); do
+    status="$(docker inspect "${container}" --format '{{.State.Status}}' 2>/dev/null || true)"
+    health="$(docker inspect "${container}" --format '{{if .State.Health}}{{.State.Health.Status}}{{end}}' 2>/dev/null || true)"
+    if [[ "${status}" == "running" && "${health}" == "healthy" ]]; then
+      return 0
+    fi
+    if [[ "${status}" == "exited" || "${status}" == "dead" ]]; then
+      docker logs "${container}" >&2 || true
+      return 1
+    fi
+    sleep 2
+  done
+
+  echo "Container ${container} did not become healthy in time." >&2
+  docker logs "${container}" >&2 || true
+  return 1
+}
+
+switch_nginx_upstream() {
+  local upstream="$1"
+  [[ -f "${NGINX_CONF}" ]] || return 1
+  docker inspect "${NGINX_CONTAINER}" >/dev/null 2>&1 || return 1
+
+  NGINX_CONF_PATH="${NGINX_CONF}" NGINX_UPSTREAM_VALUE="${upstream}" python3 <<'PY'
+from pathlib import Path
+import os
+import re
+import sys
+
+path = Path(os.environ["NGINX_CONF_PATH"])
+text = path.read_text()
+begin = "# BEGIN REMNAWAVE CABINET"
+end = "# END REMNAWAVE CABINET"
+start = text.find(begin)
+finish = text.find(end, start + len(begin))
+if start < 0 or finish < 0:
+    sys.exit(1)
+block = text[start:finish]
+updated, count = re.subn(
+    r"set \$cabinet_upstream [^;]+;",
+    f"set $cabinet_upstream {os.environ['NGINX_UPSTREAM_VALUE']};",
+    block,
+    count=1,
+)
+if count != 1:
+    sys.exit(1)
+temporary = path.with_suffix(path.suffix + ".cabinet-update")
+temporary.write_text(text[:start] + updated + text[finish:])
+metadata = path.stat()
+temporary.chmod(metadata.st_mode)
+os.chown(temporary, metadata.st_uid, metadata.st_gid)
+temporary.replace(path)
+PY
+  if [[ "${upstream}" == "remnawave-cabinet-app-candidate:3000" ]]; then
+    DEPLOY_PROXY_SWITCHED="true"
+  fi
+  docker exec "${NGINX_CONTAINER}" nginx -t >/dev/null
+  docker exec "${NGINX_CONTAINER}" nginx -s reload >/dev/null
+  if [[ "${upstream}" != "remnawave-cabinet-app-candidate:3000" ]]; then
+    DEPLOY_PROXY_SWITCHED="false"
+  fi
+}
+
+stop_deploy_candidate() {
+  if [[ "${DEPLOY_CANDIDATE_STARTED}" == "true" ]]; then
+    CABINET_ENV_FILE="${ENV_FILE}" "${COMPOSE[@]}" --profile deployment rm -fsv app-candidate >/dev/null 2>&1 || true
+    DEPLOY_CANDIDATE_STARTED="false"
+  fi
+}
+
 rollback_runtime_services() {
   local bind_address app_port
   [[ -n "${ROLLBACK_IMAGE}" ]] || return 1
@@ -429,7 +531,7 @@ rollback_runtime_services() {
 handle_update_failure() {
   local exit_code=$?
   local finished_at
-  trap - ERR
+  trap - ERR INT TERM
   set +e
   finished_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   MIGRATION_STATUS="${MIGRATION_STATUS/pending/error}"
@@ -443,6 +545,10 @@ handle_update_failure() {
   else
     write_deployment_state "failed" "Обновление завершилось ошибкой. Проверьте журнал update-server и контейнеры." "${finished_at}"
   fi
+  if [[ "${DEPLOY_PROXY_SWITCHED}" == "true" ]]; then
+    switch_nginx_upstream "remnawave-cabinet-app:3000" || true
+  fi
+  stop_deploy_candidate
   exit "${exit_code}"
 }
 
@@ -469,7 +575,7 @@ PREVIOUS_PROVISIONER_IMAGE_ID="$(running_provisioner_image_id)"
 DEPLOY_TARGET_REVISION="$(remote_commit_sha || true)"
 mkdir -p "${STATE_DIR}"
 set_deploy_stage 5 "preparing" "Подготовка обновления" "Подготовка обновления и проверка конфигурации."
-trap handle_update_failure ERR
+trap handle_update_failure ERR INT TERM
 
 if docker inspect remnashop >/dev/null 2>&1; then
   REMNASHOP_CRYPT_KEY_VALUE="$(docker inspect remnashop --format '{{range .Config.Env}}{{println .}}{{end}}' | sed -n 's/^APP_CRYPT_KEY=//p' | head -n1)"
@@ -838,16 +944,25 @@ if ! grep -Eq '^COMPOSE_PROFILES=.*caddy' "${ENV_FILE}"; then
   CABINET_ENV_FILE="${ENV_FILE}" "${COMPOSE[@]}" rm -fsv caddy >/dev/null 2>&1 || true
 fi
 
-ROLLBACK_ARMED="true"
-if ! CABINET_ENV_FILE="${ENV_FILE}" "${COMPOSE[@]}" up -d --remove-orphans; then
+if ! CABINET_ENV_FILE="${ENV_FILE}" "${COMPOSE[@]}" up -d --remove-orphans seed; then
   if disable_bundled_caddy_if_conflicting; then
-    CABINET_ENV_FILE="${ENV_FILE}" "${COMPOSE[@]}" up -d --remove-orphans
+    CABINET_ENV_FILE="${ENV_FILE}" "${COMPOSE[@]}" up -d --remove-orphans seed
   else
     false
   fi
 fi
+wait_for_successful_container remnawave-cabinet-seed 90
 MIGRATION_STATUS="ok"
-set_deploy_stage 65 "starting_services" "Запуск сервисов" "Миграции применены. Запускаются сервисы новой версии."
+set_deploy_stage 60 "candidate" "Проверка нового приложения" "Миграции применены. Запускается временный экземпляр новой версии."
+CABINET_ENV_FILE="${ENV_FILE}" "${COMPOSE[@]}" --profile deployment up -d --no-deps --force-recreate app-candidate
+DEPLOY_CANDIDATE_STARTED="true"
+wait_for_healthy_container remnawave-cabinet-app-candidate 60
+if switch_nginx_upstream "remnawave-cabinet-app-candidate:3000"; then
+  echo "Public traffic switched to the healthy deployment candidate."
+else
+  echo "Warning: managed nginx was not found; continuing with the shared Docker network alias." >&2
+fi
+set_deploy_stage 65 "starting_services" "Запуск сервисов" "Временный экземпляр готов. Запускаются основные сервисы новой версии."
 
 # A mutable `latest` tag can be pulled successfully while Compose keeps an
 # already-running container. Recreate runtime services explicitly so the
@@ -856,6 +971,7 @@ runtime_services=(app worker broadcast-worker watch-worker)
 if provisioning_profile_enabled; then
   runtime_services+=(node-provisioning-worker)
 fi
+ROLLBACK_ARMED="true"
 CABINET_ENV_FILE="${ENV_FILE}" "${COMPOSE[@]}" up -d --no-deps --force-recreate "${runtime_services[@]}"
 set_deploy_stage 75 "waiting_services" "Ожидание готовности сервисов" "Сервисы запущены. Ожидается их готовность."
 
@@ -1111,6 +1227,10 @@ else
 fi
 LOCAL_HEALTH_STATUS="ok"
 
+if [[ "${DEPLOY_PROXY_SWITCHED}" == "true" ]]; then
+  switch_nginx_upstream "remnawave-cabinet-app:3000"
+fi
+
 if [[ -n "${APP_URL}" && -n "${HEALTHCHECK_TOKEN}" ]]; then
   set_deploy_stage 92 "public_health" "Публичный health-check" "Локальная проверка пройдена. Проверяется публичный адрес."
   wait_for_url "${APP_URL%/}/api/health" 60 -H "x-healthcheck-token: ${HEALTHCHECK_TOKEN}"
@@ -1119,6 +1239,7 @@ else
   PUBLIC_HEALTH_STATUS="skipped"
   set_deploy_stage 92 "public_health" "Публичный health-check пропущен" "Локальная проверка пройдена. Публичная проверка не настроена."
 fi
+stop_deploy_candidate
 
 DEPLOYED_REVISION="$(running_app_revision || true)"
 if [[ ! "${DEPLOYED_REVISION}" =~ ^[0-9a-f]{40}$ ]]; then

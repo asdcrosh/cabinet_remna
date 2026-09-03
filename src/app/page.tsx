@@ -179,7 +179,7 @@ export default async function HomePage() {
                     <BadgeCheck className="h-4 w-4 text-emerald-600 dark:text-emerald-300" />
                     {plan.unlimitedDevices ? 'Без ограничения устройств' : `До ${plan.deviceLimit} устройств`}
                   </div>
-                  <Link href="/register" className="btn-primary mt-6 w-full justify-between">
+                  <Link href={`/register?plan=${encodeURIComponent(plan.id)}`} className="btn-primary mt-6 w-full justify-between">
                     Выбрать тариф
                     <ArrowRight className="h-4 w-4" />
                   </Link>

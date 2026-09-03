@@ -21,7 +21,10 @@ export function bytesToGb(bytes: bigint | number): number {
   return Math.round((b / (1024 * 1024 * 1024)) * 100) / 100
 }
 
-// Копейки -> "199.00 ₽"
+// Копейки -> "199 ₽" или "199,50 ₽"
 export function formatPrice(kopecks: number, currency = '₽'): string {
-  return `${(kopecks / 100).toFixed(2)} ${currency}`
+  return `${new Intl.NumberFormat('ru-RU', {
+    minimumFractionDigits: kopecks % 100 === 0 ? 0 : 2,
+    maximumFractionDigits: 2,
+  }).format(kopecks / 100)} ${currency}`
 }

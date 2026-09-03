@@ -145,4 +145,25 @@ describe('email verification helpers', () => {
     expect(body.html).toContain('Ссылка действует 24 часа.')
     expect(body.html).toContain('Если кнопка не открывается')
   })
+
+  it('adds a safe continuation path to the verification link', async () => {
+    process.env.APP_URL = 'http://localhost:3000'
+    process.env.EMAIL_VERIFICATION_WEBHOOK_URL = 'https://mail.example.test/send'
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true })
+    vi.stubGlobal('fetch', fetchMock)
+
+    await sendEmailVerificationLink({
+      email: 'user@example.com',
+      token: 'token-1',
+      next: '/dashboard/plans?plan=starter',
+    })
+
+    const request = fetchMock.mock.calls[0]?.[1] as { body: string } | undefined
+    expect(request).toBeDefined()
+    if (!request) throw new Error('Expected fetch request')
+    const body = JSON.parse(request.body)
+    expect(body.text).toContain(
+      'http://localhost:3000/api/auth/verify-email?token=token-1&next=%2Fdashboard%2Fplans%3Fplan%3Dstarter'
+    )
+  })
 })

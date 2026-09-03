@@ -76,7 +76,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
             <DashboardNav role={role} badges={navBadges} features={features} />
           </div>
           <div className="shrink-0 border-t border-slate-200 p-3 dark:border-white/[0.08]">
-            <div className="mb-1 px-3 py-2 text-[11px] text-slate-500">
+            <div className="mb-1 px-3 py-2 text-xs text-slate-500">
               <div className="truncate font-medium text-slate-700 dark:text-slate-200">{accountLabel}</div>
               <div>{roleLabel(role)}</div>
             </div>

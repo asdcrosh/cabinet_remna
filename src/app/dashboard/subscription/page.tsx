@@ -256,7 +256,7 @@ export default async function SubscriptionPage() {
             label="Трафик"
             value={subscriptionExpired
               ? '0 доступно'
-              : `${u.trafficUsed}${isUnlimited ? ' · безлимит' : ` из ${u.trafficLimit}`}`}
+              : `${formatTrafficForUser(u.trafficUsed)}${isUnlimited ? ' · безлимит' : ` из ${formatTrafficForUser(u.trafficLimit)}`}`}
           />
         </div>
       </section>
@@ -322,6 +322,23 @@ export default async function SubscriptionPage() {
       )}
     </div>
   )
+}
+
+function formatTrafficForUser(value: string) {
+  const match = value.trim().match(/^([\d.,]+)\s*(GiB|MiB|KiB|GB|MB|KB)$/i)
+  if (!match) return value
+  const amount = Number(match[1]!.replace(',', '.'))
+  if (!Number.isFinite(amount)) return value
+  const units: Record<string, string> = {
+    gib: 'ГБ',
+    gb: 'ГБ',
+    mib: 'МБ',
+    mb: 'МБ',
+    kib: 'КБ',
+    kb: 'КБ',
+  }
+  const unit = units[match[2]!.toLowerCase()]
+  return unit ? `${amount.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} ${unit}` : value
 }
 
 function currentRenewalPrice(
@@ -445,7 +462,7 @@ function AccessMetric({
     <div className="connection-access-summary__metric flex min-w-0 items-start gap-2.5">
       <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-700 ring-1 ring-emerald-500/15 dark:text-emerald-300">{icon}</span>
       <span className="min-w-0">
-        <span className="block text-[10px] font-medium uppercase tracking-[0.1em] text-slate-400">{label}</span>
+        <span className="block text-xs font-medium uppercase tracking-[0.1em] text-slate-400">{label}</span>
         <strong className="mt-1 block break-words text-sm text-slate-950 dark:text-white">{value}</strong>
       </span>
     </div>

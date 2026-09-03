@@ -40,7 +40,7 @@ export function PlanCatalog({ plans, initialPlanId }: { plans: CatalogPlan[]; in
             <h2 className="text-xl font-semibold tracking-[-0.035em] text-slate-950 dark:text-white">Выберите период</h2>
           </div>
         </div>
-        <span className="shrink-0 rounded-full border border-fuchsia-200/80 bg-fuchsia-50/80 px-2.5 py-1 font-mono text-[10px] font-semibold uppercase tracking-[0.12em] tabular-nums text-fuchsia-700 dark:border-fuchsia-400/15 dark:bg-fuchsia-400/10 dark:text-fuchsia-200">
+        <span className="shrink-0 rounded-full border border-fuchsia-200/80 bg-fuchsia-50/80 px-2.5 py-1 font-mono text-xs font-semibold uppercase tracking-[0.12em] tabular-nums text-fuchsia-700 dark:border-fuchsia-400/15 dark:bg-fuchsia-400/10 dark:text-fuchsia-200">
           {orderedPlans.length} {planCountLabel(orderedPlans.length)}
         </span>
       </div>
@@ -55,7 +55,7 @@ export function PlanCatalog({ plans, initialPlanId }: { plans: CatalogPlan[]; in
             <h2 className="text-lg font-semibold tracking-[-0.035em] text-slate-950 dark:text-white">Выберите период</h2>
           </div>
         </div>
-        <span className="shrink-0 rounded-full border border-fuchsia-200/80 bg-fuchsia-50/80 px-2.5 py-1 font-mono text-[10px] font-semibold uppercase tracking-[0.12em] tabular-nums text-fuchsia-700 dark:border-fuchsia-400/15 dark:bg-fuchsia-400/10 dark:text-fuchsia-200">
+        <span className="shrink-0 rounded-full border border-fuchsia-200/80 bg-fuchsia-50/80 px-2.5 py-1 font-mono text-xs font-semibold uppercase tracking-[0.12em] tabular-nums text-fuchsia-700 dark:border-fuchsia-400/15 dark:bg-fuchsia-400/10 dark:text-fuchsia-200">
           {orderedPlans.length} {planCountLabel(orderedPlans.length)}
         </span>
       </div>
@@ -84,7 +84,7 @@ export function PlanCatalog({ plans, initialPlanId }: { plans: CatalogPlan[]; in
                   </span>
                 </h3>
                 <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                  <p className="truncate text-[11px] text-slate-500 dark:text-slate-400">{plan.name}</p>
+                  <p className="truncate text-xs text-slate-500 dark:text-slate-400">{plan.name}</p>
                   {plan.current ? <PlanPickerBadge>Текущий</PlanPickerBadge> : null}
                   {!plan.current && plan.popular ? <PlanPickerBadge>Выбор</PlanPickerBadge> : null}
                   {automaticDiscountPercent(plan) > 0 && !plan.isPromo
@@ -101,7 +101,7 @@ export function PlanCatalog({ plans, initialPlanId }: { plans: CatalogPlan[]; in
                 <span className="block whitespace-nowrap text-lg font-semibold tracking-[-0.03em] tabular-nums text-slate-950 dark:text-white">
                   {plan.deviceAddonEnabled && plan.maxDeviceLimit > plan.deviceLimit ? `от ${displayPlanPrice(plan)}` : displayPlanPrice(plan)}
                 </span>
-                <span className="mt-0.5 block text-[10px] text-slate-500 dark:text-slate-400">{dailyRateLabel(plan)}</span>
+                <span className="mt-0.5 block text-xs text-slate-500 dark:text-slate-400">{dailyRateLabel(plan)}</span>
               </div>
               <button
                 type="button"
@@ -227,7 +227,7 @@ export function PlanCatalog({ plans, initialPlanId }: { plans: CatalogPlan[]; in
 
 function PlanPickerBadge({ children }: { children: ReactNode }) {
   return (
-    <span className="rounded-[5px] bg-brand-50 px-1.5 py-0.5 font-mono text-[9px] font-semibold uppercase text-brand-700 dark:bg-brand-500/10 dark:text-brand-300">
+    <span className="rounded-[5px] bg-brand-50 px-1.5 py-0.5 font-mono text-xs font-semibold uppercase text-brand-700 dark:bg-brand-500/10 dark:text-brand-300">
       {children}
     </span>
   )

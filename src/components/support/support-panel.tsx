@@ -67,6 +67,13 @@ import {
 const SUPPORT_LIST_REFRESH_MS = 20_000
 const SUPPORT_ACTIVE_TICKET_REFRESH_MS = 5_000
 
+function ticketMatchesFolder(ticket: SupportTicket, folder: TicketFolder, mode: 'user' | 'admin') {
+  if (folder === 'closed') return ticket.status === 'CLOSED'
+  if (folder === 'need-answer') return needsCurrentActor(ticket, mode)
+  if (folder === 'answered') return ticket.status === 'WAITING_USER'
+  return ticket.status !== 'CLOSED'
+}
+
 export function SupportPanel({
   mode,
   initialTickets,
@@ -86,9 +93,10 @@ export function SupportPanel({
   )
   const [loadingMore, setLoadingMore] = useState(false)
   const [loadingOlderMessages, setLoadingOlderMessages] = useState(false)
-  const [selectedId, setSelectedId] = useState(initialTickets.find((ticket) => ticket.status !== 'CLOSED')?.id ?? initialTickets[0]?.id ?? '')
+  const initialActiveTicket = initialTickets.find((ticket) => ticket.status !== 'CLOSED') ?? null
+  const [selectedId, setSelectedId] = useState(initialActiveTicket?.id ?? '')
   const [selectedTicket, setSelectedTicket] = useState<SupportTicket | null>(
-    initialTickets.find((ticket) => ticket.status !== 'CLOSED') ?? initialTickets[0] ?? null
+    initialActiveTicket
   )
   const [folder, setFolder] = useState<TicketFolder>('active')
   const [mobileChatOpen, setMobileChatOpen] = useState(false)
@@ -118,16 +126,7 @@ export function SupportPanel({
   const filteredTickets = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase()
     return tickets.filter((ticket) => {
-      const matchesFolder =
-        folder === 'closed'
-          ? ticket.status === 'CLOSED'
-          : folder === 'need-answer'
-            ? needsCurrentActor(ticket, mode)
-            : folder === 'answered'
-              ? ticket.status === 'WAITING_USER'
-              : ticket.status !== 'CLOSED'
-
-      if (!matchesFolder) return false
+      if (!ticketMatchesFolder(ticket, folder, mode)) return false
       if (!normalizedQuery) return true
 
       const haystack = [
@@ -454,6 +453,8 @@ export function SupportPanel({
       setTickets((current) => current.map((ticket) => ticket.id === updated.id ? { ...ticket, ...updated } : ticket))
       if (status === 'CLOSED') {
         setFolder('closed')
+      } else if (folder === 'closed') {
+        setFolder('active')
       }
     })
   }
@@ -491,6 +492,18 @@ export function SupportPanel({
     setError('')
   }
 
+  function changeFolder(nextFolder: TicketFolder) {
+    setFolder(nextFolder)
+    setMobileChatOpen(false)
+    setNewTicketOpen(false)
+    setError('')
+
+    if (selected && ticketMatchesFolder(selected, nextFolder, mode)) return
+    const firstTicket = tickets.find((ticket) => ticketMatchesFolder(ticket, nextFolder, mode)) ?? null
+    setSelectedId(firstTicket?.id ?? '')
+    setSelectedTicket(firstTicket)
+  }
+
   return (
     <div
       className={cn(
@@ -516,8 +529,8 @@ export function SupportPanel({
                     <Headphones className="h-[18px] w-[18px]" />
                   </span>
                   <div className="min-w-0 flex-1">
-                    <h1 className="truncate text-base font-semibold tracking-[-0.025em] text-slate-950 dark:text-white">Чем можем помочь?</h1>
-                    <p className="mt-0.5 flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400">
+                    <h1 className="truncate text-base font-semibold tracking-[-0.025em] text-slate-950 dark:text-white">Поддержка</h1>
+                    <p className="mt-0.5 flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
                       <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> Ответим в этом чате
                     </p>
                   </div>
@@ -537,7 +550,7 @@ export function SupportPanel({
                     </span>
                     <div className="min-w-0">
                       <div className="truncate text-base font-semibold tracking-tight text-slate-950 dark:text-white">Поддержка</div>
-                      <div className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">Рабочая очередь</div>
+                      <div className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Рабочая очередь</div>
                     </div>
                   </div>
                 </div>
@@ -547,7 +560,7 @@ export function SupportPanel({
                 </div>
               </div>
             )}
-            <FolderTabs folder={folder} counts={folderCounts} mode={mode} onChange={setFolder} />
+            <FolderTabs folder={folder} counts={folderCounts} mode={mode} onChange={changeFolder} />
             {(mode === 'admin' || tickets.length > 4) && (
               <label className="relative mt-2 flex items-center gap-2 rounded-xl border border-white/90 bg-white/85 px-3 py-2 shadow-sm shadow-slate-950/5 backdrop-blur dark:border-white/[0.08] dark:bg-black/15">
                 <Search className="h-4 w-4 shrink-0 text-slate-400" />
@@ -565,7 +578,7 @@ export function SupportPanel({
 
           <div className="min-h-0 flex-1 overflow-y-auto px-2.5 pb-3 pt-2.5">
             <div className="mb-2 flex items-center justify-between gap-3 px-1.5">
-              <span className="text-[11px] font-semibold uppercase tracking-[0.11em] text-slate-400">{mode === 'admin' ? 'Обращения' : 'Ваши обращения'}</span>
+              <span className="text-xs font-semibold uppercase tracking-[0.11em] text-slate-400">{mode === 'admin' ? 'Обращения' : 'Ваши обращения'}</span>
               <span className="text-xs text-slate-400">{filteredTickets.length}</span>
             </div>
             <div className="space-y-1.5">
@@ -692,7 +705,7 @@ export function SupportPanel({
                     </button>
                   </div>
                 )}
-                <div className="flex items-center gap-3 py-1 text-[11px] text-slate-400">
+                <div className="flex items-center gap-3 py-1 text-xs text-slate-400">
                   <span className="h-px flex-1 bg-slate-200/80 dark:bg-white/10" />
                   Обращение создано {formatDate(selected.createdAt)}
                   <span className="h-px flex-1 bg-slate-200/80 dark:bg-white/10" />
@@ -705,15 +718,15 @@ export function SupportPanel({
             </div>
 
             <form onSubmit={sendMessage} className="border-t border-slate-100/80 bg-white/95 p-2.5 pb-[calc(0.625rem+env(safe-area-inset-bottom))] backdrop-blur dark:border-white/[0.07] dark:bg-surface-900/90 sm:p-3">
-              {selected.status === 'CLOSED' ? (
+              {selected.status === 'CLOSED' && mode === 'admin' ? (
                 <div className="flex items-center justify-between gap-3 rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-500 dark:bg-surface-800">
                   <span className="flex items-center gap-2">
                   <Lock className="h-4 w-4" />
-                  Обращение закрыто и хранится в архиве
+                  Новые сообщения недоступны
                   </span>
-                  {mode === 'admin' && <button type="button" className="text-xs font-semibold text-violet-700 dark:text-violet-200" onClick={() => updateStatus('OPEN')}>Открыть снова</button>}
+                  <button type="button" className="text-xs font-semibold text-violet-700 dark:text-violet-200" onClick={() => updateStatus('OPEN')}>Открыть снова</button>
                 </div>
-              ) : (
+              ) : selected.status !== 'CLOSED' ? (
                 <div className="space-y-2">
                   <QuickReplies mode={mode} onPick={(value) => setMessage((current) => current.trim() ? `${current.trim()}\n\n${value}` : value)} />
                   <div className="relative flex items-end gap-1.5 rounded-2xl border border-slate-200/90 bg-white p-1.5 shadow-[0_12px_34px_-22px_rgba(15,23,42,0.5)] focus-within:border-fuchsia-300 focus-within:ring-4 focus-within:ring-fuchsia-500/[0.06] dark:border-white/10 dark:bg-black/20 dark:focus-within:border-fuchsia-400/30 sm:gap-2">
@@ -736,12 +749,12 @@ export function SupportPanel({
                       <Send className="h-[18px] w-[18px]" />
                     </button>
                   </div>
-                  <div className="hidden items-center justify-between px-1 text-[11px] text-slate-400 sm:flex">
+                  <div className="hidden items-center justify-between px-1 text-xs text-slate-400 sm:flex">
                     <span>Ctrl + Enter, чтобы отправить</span>
                     <span className={message.length > 2700 ? 'text-amber-600' : ''}>{message.length}/3000</span>
                   </div>
                 </div>
-              )}
+              ) : null}
             </form>
 
             {mode === 'admin' && detailsOpen && (
@@ -833,7 +846,7 @@ function NewTicketForm({
           </span>
           <div className="min-w-0">
             <h2 className="truncate text-sm font-semibold tracking-[-0.01em] sm:text-base">Новое обращение</h2>
-            <p className="text-[11px] text-slate-500 sm:text-xs">Тема и подробности проблемы</p>
+            <p className="text-xs text-slate-500">Тема и подробности проблемы</p>
           </div>
         </div>
       </div>
@@ -929,7 +942,7 @@ function QueueMetric({ label, value, accent = false }: { label: string; value: n
         : 'border-white/90 bg-white/75 dark:border-white/[0.07] dark:bg-white/[0.035]'
     )}>
       <div className={cn('text-sm font-semibold tabular-nums', accent ? 'text-red-700 dark:text-red-200' : 'text-slate-950 dark:text-white')}>{value}</div>
-      <div className={cn('truncate text-[9px] font-semibold uppercase tracking-[0.06em]', accent ? 'text-red-500 dark:text-red-300' : 'text-slate-400')}>{label}</div>
+      <div className={cn('truncate text-xs font-semibold uppercase tracking-[0.06em]', accent ? 'text-red-500 dark:text-red-300' : 'text-slate-400')}>{label}</div>
     </div>
   )
 }
@@ -1153,7 +1166,7 @@ function FolderTabs({
             type="button"
             onClick={() => onChange(item.value)}
             className={cn(
-              'flex min-w-0 items-center justify-between gap-2 rounded-lg px-2.5 py-1.5 text-[11px] font-medium transition-all',
+              'flex min-w-0 items-center justify-between gap-2 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-all',
               active
                 ? 'bg-white text-fuchsia-700 shadow-sm dark:bg-white/10 dark:text-fuchsia-200'
                 : 'text-slate-500 hover:bg-white/50 hover:text-slate-950 dark:text-slate-400 dark:hover:bg-white/5 dark:hover:text-white'
@@ -1208,9 +1221,9 @@ function TicketListItem({
             <div className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-950 dark:text-white">
               {mode === 'admin' && ticket.user ? ticket.user.name || ticket.user.email : ticket.subject}
             </div>
-            <span className="shrink-0 text-[10px] tabular-nums text-slate-400">{formatRelativeDate(ticket.lastMessageAt)}</span>
+            <span className="shrink-0 text-xs tabular-nums text-slate-400">{formatRelativeDate(ticket.lastMessageAt)}</span>
           </div>
-          <div className="mt-0.5 truncate text-[11px] text-slate-500 dark:text-slate-400">
+          <div className="mt-0.5 truncate text-xs text-slate-500 dark:text-slate-400">
             {mode === 'admin'
               ? ticket.user?.name ? ticket.user.email : `${supportCategoryLabel(ticket.category)} · ${ticket.subject}`
               : supportCategoryLabel(ticket.category)}
@@ -1300,7 +1313,7 @@ function TicketSideMenu({
           </span>
           <div className="min-w-0">
             <div className="truncate text-sm font-semibold tracking-tight text-slate-950 dark:text-white">Клиент и аккаунт</div>
-            <div className="text-[10px] uppercase tracking-[0.08em] text-slate-400">Контекст обращения</div>
+            <div className="text-xs uppercase tracking-[0.08em] text-slate-400">Контекст обращения</div>
           </div>
         </div>
         {onClose && (
@@ -1318,7 +1331,7 @@ function TicketSideMenu({
         <div className="rounded-2xl border border-slate-200/80 bg-slate-50/70 p-3.5 dark:border-white/[0.08] dark:bg-white/[0.025]">
           <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-400">Обращение</div>
+              <div className="text-xs font-semibold uppercase tracking-[0.1em] text-slate-400">Обращение</div>
               <div className="mt-1 line-clamp-2 text-sm font-semibold text-slate-950 dark:text-white">{selected.subject}</div>
               <div className="mt-1 text-xs text-slate-500">{supportCategoryLabel(selected.category)} · {formatRelativeDate(selected.lastMessageAt)}</div>
             </div>
@@ -1334,7 +1347,7 @@ function TicketSideMenu({
               <div className="min-w-0">
                 <div className="truncate text-sm font-semibold text-slate-950 dark:text-white">{selected.user.name || 'Пользователь'}</div>
                 <div className="truncate text-xs text-slate-500" title={selected.user.email}>{selected.user.email}</div>
-                <a href={`/dashboard/admin/users?q=${encodeURIComponent(selected.user.email)}`} className="mt-1 inline-flex text-[11px] font-semibold text-cyan-700 hover:text-slate-950 dark:text-cyan-200 dark:hover:text-white">Открыть профиль</a>
+                <a href={`/dashboard/admin/users?q=${encodeURIComponent(selected.user.email)}`} className="mt-1 inline-flex text-xs font-semibold text-cyan-700 hover:text-slate-950 dark:text-cyan-200 dark:hover:text-white">Открыть профиль</a>
               </div>
             </div>
             <SupportUserDiagnostics user={selected.user} />
@@ -1346,7 +1359,7 @@ function TicketSideMenu({
         </div>
       </div>
       <div className="border-t border-slate-100 bg-white/95 p-3.5 dark:border-white/[0.08] dark:bg-surface-900/90">
-        <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-400">Статус обращения</div>
+        <div className="mb-2 text-xs font-semibold uppercase tracking-[0.1em] text-slate-400">Статус обращения</div>
         <TicketActions selected={selected} mode={mode} isPending={isPending} onUpdateStatus={onUpdateStatus} />
       </div>
     </div>
@@ -1513,7 +1526,7 @@ function MessageBubble({ message, own }: { message: SupportMessage; own: boolean
         )}
       >
         <div className="whitespace-pre-wrap break-words text-sm leading-relaxed">{message.body}</div>
-        <div className={cn('mt-1.5 text-[10px]', own ? 'text-white/50 dark:text-slate-500' : 'text-slate-400')}>
+        <div className={cn('mt-1.5 text-xs', own ? 'text-white/50 dark:text-slate-500' : 'text-slate-400')}>
           {message.senderRole === 'ADMIN' ? 'Поддержка' : 'Пользователь'} · {formatDate(message.createdAt)}
         </div>
       </div>

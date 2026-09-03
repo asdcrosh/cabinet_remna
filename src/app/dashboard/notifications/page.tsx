@@ -13,11 +13,20 @@ export default async function NotificationsPage() {
     orderBy: { createdAt: 'desc' },
     take: 100,
   })
+  const now = Date.now()
+  const notificationViews = notifications.map(serializeUserNotification).map((notification) => {
+    const staleExpiringBonus = notification.type === 'BONUS_GRANTED'
+      && notification.title.toLocaleLowerCase('ru-RU').includes('скоро истеч')
+      && now - new Date(notification.createdAt).getTime() > 3 * 24 * 60 * 60 * 1000
+    return staleExpiringBonus
+      ? { ...notification, actionHref: null, actionLabel: null }
+      : notification
+  })
 
   return (
     <div className="page-stack">
       <PageHeader title="Уведомления" description="Только важные события по платежам, подписке и поддержке." />
-      <NotificationsList initialNotifications={notifications.map(serializeUserNotification)} />
+      <NotificationsList initialNotifications={notificationViews} />
     </div>
   )
 }

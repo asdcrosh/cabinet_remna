@@ -467,7 +467,7 @@ function StatusCell({ icon: Icon, label, value, detail }: {
         <Icon className="h-4 w-4" />
       </span>
       <div className="min-w-0">
-        <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">{label}</div>
+        <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">{label}</div>
         <div className="mt-1 truncate text-sm font-semibold text-slate-900 dark:text-white">{value}</div>
         <div className="mt-0.5 text-xs leading-5 text-slate-500">{detail}</div>
       </div>

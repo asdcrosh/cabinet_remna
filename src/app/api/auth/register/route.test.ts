@@ -124,8 +124,27 @@ describe('register route', () => {
     expect(mocks.sendEmailVerificationLink).toHaveBeenCalledWith({
       email: validBody.email,
       name: validBody.name,
+      next: '/dashboard',
       token: 'verify-token',
     })
+  })
+
+  it('keeps a safe selected-plan destination for email verification', async () => {
+    const response = await POST(registerRequest({ ...validBody, next: '/dashboard/plans?plan=starter' }))
+
+    expect(response.status).toBe(201)
+    expect(mocks.sendEmailVerificationLink).toHaveBeenCalledWith(
+      expect.objectContaining({ next: '/dashboard/plans?plan=starter' })
+    )
+  })
+
+  it('rejects an external post-registration destination', async () => {
+    const response = await POST(registerRequest({ ...validBody, next: 'https://evil.example' }))
+
+    expect(response.status).toBe(201)
+    expect(mocks.sendEmailVerificationLink).toHaveBeenCalledWith(
+      expect.objectContaining({ next: '/dashboard' })
+    )
   })
 
   it('creates a registration reward when a referral code is present', async () => {

@@ -110,6 +110,43 @@ services:
         aliases:
           - remnawave-cabinet-app
 
+  app-candidate:
+    image: ${CABINET_IMAGE:-ghcr.io/asdcrosh/cabinet_remna:latest}
+    container_name: remnawave-cabinet-app-candidate
+    restart: "no"
+    profiles:
+      - deployment
+    env_file:
+      - ${CABINET_ENV_FILE:-.env}
+    environment:
+      APP_IMAGE_REFERENCE: ${CABINET_IMAGE:-ghcr.io/asdcrosh/cabinet_remna:latest}
+      DEPLOY_STATE_FILE: /run/cabinet-state/deployment.json
+      TIMEWEB_API_TOKEN: ""
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    expose:
+      - "3000"
+    volumes:
+      - "${FULL_BACKUP_DIR:-/opt/remnawave-backups}:/backups:ro"
+      - "${CABINET_STATE_DIR:-/opt/remnawave-cabinet/state}:/run/cabinet-state:ro"
+      - broadcast_uploads:/app/public/uploads
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget -qO- --header=\"x-healthcheck-token: $$HEALTHCHECK_TOKEN\" http://127.0.0.1:3000/api/health >/dev/null || exit 1",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    networks:
+      cabinet:
+      remnawave_external:
+        aliases:
+          - remnawave-cabinet-app-candidate
+          - remnawave-cabinet-app
+
   worker:
     image: ${CABINET_IMAGE:-ghcr.io/asdcrosh/cabinet_remna:latest}
     container_name: remnawave-cabinet-worker

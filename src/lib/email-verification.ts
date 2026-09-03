@@ -4,6 +4,7 @@ import { getAppUrl } from './app-url'
 import { getBrandName } from './branding'
 import { renderActionEmail } from './email-template'
 import { logError, logInfo } from './logger'
+import { sanitizeInternalNext } from './auth/next-path'
 
 const TOKEN_BYTES = 32
 const TOKEN_TTL_MS = 24 * 60 * 60 * 1000
@@ -68,9 +69,13 @@ export async function sendEmailVerificationLink(input: {
   email: string
   name?: string | null
   token: string
+  next?: string
 }): Promise<EmailDeliveryResult> {
   const appUrl = getAppUrl()
-  const verifyUrl = `${appUrl}/api/auth/verify-email?token=${encodeURIComponent(input.token)}`
+  const params = new URLSearchParams({ token: input.token })
+  const next = sanitizeInternalNext(input.next)
+  if (next !== '/dashboard') params.set('next', next)
+  const verifyUrl = `${appUrl}/api/auth/verify-email?${params.toString()}`
   const webhookUrl = process.env.EMAIL_VERIFICATION_WEBHOOK_URL
 
   if (!webhookUrl) {

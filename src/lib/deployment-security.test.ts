@@ -50,6 +50,29 @@ describe('production deployment security', () => {
     expect(caddy).not.toContain('REMNAWAVE_TOKEN')
   })
 
+  it('keeps a healthy candidate online while replacing the main application', () => {
+    const compose = read('deploy/docker-compose.server.yml')
+    const updater = read('deploy/update-server.sh')
+    const candidate = composeService(compose, 'app-candidate')
+    const candidateStart = updater.indexOf('--force-recreate app-candidate')
+    const candidateHealth = updater.indexOf('wait_for_healthy_container remnawave-cabinet-app-candidate')
+    const trafficSwitch = updater.indexOf('switch_nginx_upstream "remnawave-cabinet-app-candidate:3000"')
+    const mainStart = updater.indexOf('--force-recreate "${runtime_services[@]}"')
+
+    expect(candidate).toContain('profiles:')
+    expect(candidate).toContain('- deployment')
+    expect(candidate).toContain('remnawave-cabinet-app-candidate')
+    expect(candidate).toContain('healthcheck:')
+    expect(candidateStart).toBeGreaterThan(0)
+    expect(candidateHealth).toBeGreaterThan(candidateStart)
+    expect(trafficSwitch).toBeGreaterThan(candidateHealth)
+    expect(mainStart).toBeGreaterThan(trafficSwitch)
+    expect(updater).toContain('up -d --remove-orphans seed')
+    expect(updater).toContain('wait_for_successful_container remnawave-cabinet-seed')
+    expect(updater).toContain('switch_nginx_upstream "remnawave-cabinet-app:3000"')
+    expect(updater).toContain('--profile deployment rm -fsv app-candidate')
+  })
+
   it('pins every GitHub Action to a full commit SHA', () => {
     for (const workflow of ['.github/workflows/quality.yml', '.github/workflows/docker-image.yml']) {
       const actions = [...read(workflow).matchAll(/^\s*-?\s*uses:\s*([^\s#]+)/gm)].map((match) => match[1])

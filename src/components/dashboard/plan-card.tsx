@@ -460,13 +460,13 @@ export function PlanCard({
         <div className="plan-checkout-summary rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-white/[0.08] dark:bg-white/[0.035]">
           <div className="flex min-w-0 items-start justify-between gap-3">
             <div className="min-w-0">
-              <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">Вы выбрали</span>
+              <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Вы выбрали</span>
               <h3 className="mt-1 truncate text-lg font-semibold tracking-[-0.025em] text-slate-950 dark:text-white">
                 {name}
               </h3>
             </div>
             {savingsPercent > 0 && !isPromoPlan ? (
-              <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-100/80 px-2 py-1 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-200">
+              <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-100/80 px-2 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-200">
                 <BadgePercent className="h-3.5 w-3.5" />
                 −{savingsPercent}%
               </span>
@@ -480,7 +480,7 @@ export function PlanCard({
                 </div>
                 {displayedDiscount && <div className="text-sm text-slate-400 line-through">{purchasePrice}</div>}
               </div>
-              <span className="mt-1.5 block text-[11px] text-slate-500 dark:text-slate-400">
+              <span className="mt-1.5 block text-xs text-slate-500 dark:text-slate-400">
                 {isPromo ? "Один раз на аккаунт" : "Итоговая сумма"}
               </span>
             </div>
@@ -488,12 +488,12 @@ export function PlanCard({
               <span className="block text-sm font-semibold text-slate-800 dark:text-slate-200">
                 {unlimitedDuration ? "Бессрочно" : `${durationDays} дн.`}
               </span>
-              <span className="mt-1 block text-[11px] text-slate-500 dark:text-slate-400">
+              <span className="mt-1 block text-xs text-slate-500 dark:text-slate-400">
                 {isPromo
                   ? "бесплатно"
                   : unlimitedDuration
                     ? "разовая оплата"
-                    : `${effectiveMonthlyPrice} / 30 дней`}
+                    : "за весь выбранный срок"}
               </span>
             </div>
           </div>
@@ -551,7 +551,7 @@ export function PlanCard({
                 {displayedDiscount && <div className="text-sm text-slate-400 line-through">{purchasePrice}</div>}
               </div>
               {savingsPercent > 0 && !isPromoPlan ? (
-                <span className="inline-flex items-center gap-1 rounded-sm bg-emerald-100/80 px-2 py-1 font-mono text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-200">
+                <span className="inline-flex items-center gap-1 rounded-sm bg-emerald-100/80 px-2 py-1 font-mono text-xs font-semibold uppercase tracking-wide text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-200">
                   <BadgePercent className="h-3.5 w-3.5" />
                   -{savingsPercent}%
                 </span>
@@ -694,7 +694,7 @@ export function PlanCard({
                 Промокод
               </span>
               {appliedPromo ? (
-                <span className="rounded-sm bg-emerald-100/80 px-2 py-1 font-mono text-[10px] font-semibold uppercase text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">
+                <span className="rounded-sm bg-emerald-100/80 px-2 py-1 font-mono text-xs font-semibold uppercase text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">
                   Скидка {appliedPromo.discountPercent}%
                 </span>
               ) : null}
@@ -839,7 +839,7 @@ export function PlanCard({
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm font-semibold">{provider.label}</span>
-                    <span className="mt-0.5 block text-[10px] font-normal text-slate-400 dark:text-slate-500">Безопасный переход</span>
+                    <span className="mt-0.5 block text-xs font-normal text-slate-400 dark:text-slate-500">Безопасный переход</span>
                   </span>
                   <span
                     className={cn(
@@ -854,7 +854,7 @@ export function PlanCard({
                 </button>
               ))}
             </div>
-            <p className="mt-2 px-1 text-[10px] leading-4 text-slate-400 dark:text-slate-500">
+            <p className="mt-2 px-1 text-xs leading-4 text-slate-400 dark:text-slate-500">
               {paymentProviderHint(selectedProvider)}
             </p>
           </fieldset>
@@ -871,7 +871,7 @@ export function PlanCard({
               <CreditCard className="h-4 w-4 text-slate-400" />
               <span>
                 <span className="block font-medium text-slate-600 dark:text-slate-300">Способ оплаты</span>
-                <span className="mt-0.5 block text-[11px] text-slate-400">
+                <span className="mt-0.5 block text-xs text-slate-400">
                   {paymentProviderHint(paymentProviders[0]!.id)}
                 </span>
               </span>
@@ -931,9 +931,7 @@ export function PlanCard({
                   ? "Активировать бесплатно"
                   : current
                     ? "Продлить тариф"
-                    : isPlanSwitch
-                      ? "Перейти на тариф"
-                      : "Перейти к оплате"}
+                    : "Перейти к оплате"}
             </span>
             <span className="inline-flex shrink-0 items-center gap-2">
               {!loading && !isPromoPlan ? <span className="tabular-nums">{checkoutTotalPrice}</span> : null}
@@ -1132,7 +1130,7 @@ function PlanFact({ icon, label, value }: { icon: ReactNode; label: string; valu
     <div className="plan-fact min-w-0 rounded-xl border border-slate-200/70 bg-slate-50/70 px-2.5 py-2.5 dark:border-white/[0.07] dark:bg-white/[0.025]">
       <div className="mb-2 text-brand-600 dark:text-brand-300">{icon}</div>
       <div className="break-words text-sm font-semibold leading-tight tabular-nums text-slate-900 dark:text-white">{value}</div>
-      <div className="mt-1 text-[11px] leading-tight text-slate-500 dark:text-slate-400">{label}</div>
+      <div className="mt-1 text-xs leading-tight text-slate-500 dark:text-slate-400">{label}</div>
     </div>
   );
 }
