@@ -469,19 +469,30 @@ begin = "# BEGIN REMNAWAVE CABINET"
 end = "# END REMNAWAVE CABINET"
 start = text.find(begin)
 finish = text.find(end, start + len(begin))
-if start < 0 or finish < 0:
+pattern = re.compile(r"set \$cabinet_upstream [^;\r\n]+;")
+
+# Remnawave can regenerate nginx.conf and remove comments while preserving the
+# cabinet server block. Prefer the managed block, but safely fall back to the
+# single cabinet upstream directive in the complete configuration.
+if start >= 0 and finish >= 0:
+    prefix = text[:start]
+    target = text[start:finish]
+    suffix = text[finish:]
+else:
+    prefix = ""
+    target = text
+    suffix = ""
+
+if len(pattern.findall(target)) != 1:
+    print("Could not identify a unique cabinet upstream in nginx.conf.", file=sys.stderr)
     sys.exit(1)
-block = text[start:finish]
-updated, count = re.subn(
-    r"set \$cabinet_upstream [^;]+;",
+updated = pattern.sub(
     f"set $cabinet_upstream {os.environ['NGINX_UPSTREAM_VALUE']};",
-    block,
+    target,
     count=1,
 )
-if count != 1:
-    sys.exit(1)
 temporary = path.with_suffix(path.suffix + ".cabinet-update")
-temporary.write_text(text[:start] + updated + text[finish:])
+temporary.write_text(prefix + updated + suffix)
 metadata = path.stat()
 temporary.chmod(metadata.st_mode)
 os.chown(temporary, metadata.st_uid, metadata.st_gid)
@@ -1193,6 +1204,7 @@ wait_for_url() {
 }
 
 wait_for_container app 60
+wait_for_healthy_container remnawave-cabinet-app 60
 wait_for_container worker 60
 wait_for_container broadcast-worker 60
 wait_for_container watch-worker 60
@@ -1228,6 +1240,7 @@ fi
 LOCAL_HEALTH_STATUS="ok"
 
 if [[ "${DEPLOY_PROXY_SWITCHED}" == "true" ]]; then
+  set_deploy_stage 90 "proxy_switch" "Переключение на основное приложение" "Основной контейнер готов. Переключается публичный трафик."
   switch_nginx_upstream "remnawave-cabinet-app:3000"
 fi
 

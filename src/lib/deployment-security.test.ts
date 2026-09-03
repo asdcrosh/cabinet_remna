@@ -32,6 +32,30 @@ function parsePullProgress(log: string, elapsedSeconds: number) {
   }
 }
 
+function rewriteNginxUpstream(config: string, upstream: string) {
+  const updater = read('deploy/update-server.sh')
+  const script = updater.match(/switch_nginx_upstream\(\) \{[\s\S]*?python3 <<'PY'\n([\s\S]*?)\nPY/)
+  if (!script?.[1]) throw new Error('Nginx upstream rewriter not found')
+
+  const directory = mkdtempSync(resolve(tmpdir(), 'cabinet-nginx-switch-'))
+  const configPath = resolve(directory, 'nginx.conf')
+  try {
+    writeFileSync(configPath, config)
+    execFileSync('python3', ['-'], {
+      encoding: 'utf8',
+      input: script[1],
+      env: {
+        ...process.env,
+        NGINX_CONF_PATH: configPath,
+        NGINX_UPSTREAM_VALUE: upstream,
+      },
+    })
+    return readFileSync(configPath, 'utf8')
+  } finally {
+    rmSync(directory, { recursive: true, force: true })
+  }
+}
+
 describe('production deployment security', () => {
   it('calculates Docker pull ETA for classic and current progress formats', () => {
     expect(parsePullProgress('abcd1234: Downloading [======>] 5MB/10MB\r', 12)).toBe('50|12')
@@ -71,6 +95,24 @@ describe('production deployment security', () => {
     expect(updater).toContain('wait_for_successful_container remnawave-cabinet-seed')
     expect(updater).toContain('switch_nginx_upstream "remnawave-cabinet-app:3000"')
     expect(updater).toContain('--profile deployment rm -fsv app-candidate')
+  })
+
+  it('switches nginx after Remnawave removes managed block comments', () => {
+    const unmanaged = `server {
+  server_name cabinet.example.com;
+  location / {
+    set $cabinet_upstream remnawave-cabinet-app-candidate:3000;
+    proxy_pass http://$cabinet_upstream;
+  }
+}\n`
+    const managed = `# BEGIN REMNAWAVE CABINET
+${unmanaged}# END REMNAWAVE CABINET\n`
+
+    for (const config of [unmanaged, managed]) {
+      const result = rewriteNginxUpstream(config, 'remnawave-cabinet-app:3000')
+      expect(result).toContain('set $cabinet_upstream remnawave-cabinet-app:3000;')
+      expect(result).not.toContain('set $cabinet_upstream remnawave-cabinet-app-candidate:3000;')
+    }
   })
 
   it('pins every GitHub Action to a full commit SHA', () => {
