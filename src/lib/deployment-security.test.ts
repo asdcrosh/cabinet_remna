@@ -95,6 +95,9 @@ describe('production deployment security', () => {
     expect(updater).toContain('wait_for_successful_container remnawave-cabinet-seed')
     expect(updater).toContain('switch_nginx_upstream "remnawave-cabinet-app:3000"')
     expect(updater).toContain('--profile deployment rm -fsv app-candidate')
+    expect(updater).toContain('runtime_services+=(retention-cleanup)')
+    expect(updater).toContain('rollback_services+=(retention-cleanup)')
+    expect(updater).toContain('wait_for_container retention-cleanup')
   })
 
   it('switches nginx after Remnawave removes managed block comments', () => {

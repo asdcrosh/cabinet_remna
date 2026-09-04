@@ -161,6 +161,10 @@ provisioning_profile_enabled() {
   [[ ",$(read_update_env_value COMPOSE_PROFILES | tr -d ' ')," == *",provisioning,"* ]]
 }
 
+maintenance_profile_enabled() {
+  [[ ",$(read_update_env_value COMPOSE_PROFILES | tr -d ' ')," == *",maintenance,"* ]]
+}
+
 pull_progress_snapshot() {
   local log_file="$1"
   local elapsed="$2"
@@ -517,10 +521,14 @@ stop_deploy_candidate() {
 
 rollback_runtime_services() {
   local bind_address app_port
+  local -a rollback_services=(app worker broadcast-worker watch-worker)
   [[ -n "${ROLLBACK_IMAGE}" ]] || return 1
   echo "Health-check failed. Restoring previous runtime image..." >&2
+  if maintenance_profile_enabled; then
+    rollback_services+=(retention-cleanup)
+  fi
   CABINET_IMAGE="${ROLLBACK_IMAGE}" CABINET_ENV_FILE="${ENV_FILE}" "${COMPOSE[@]}" up -d --no-deps --force-recreate \
-    app worker broadcast-worker watch-worker
+    "${rollback_services[@]}"
   if [[ -n "${ROLLBACK_PROVISIONER_IMAGE}" ]] && provisioning_profile_enabled; then
     CABINET_PROVISIONER_IMAGE="${ROLLBACK_PROVISIONER_IMAGE}" CABINET_ENV_FILE="${ENV_FILE}" \
       "${COMPOSE[@]}" up -d --no-deps --force-recreate node-provisioning-worker
@@ -979,6 +987,9 @@ set_deploy_stage 65 "starting_services" "Запуск сервисов" "Вре�
 # already-running container. Recreate runtime services explicitly so the
 # update always starts the image that was just pulled without touching the DB.
 runtime_services=(app worker broadcast-worker watch-worker)
+if maintenance_profile_enabled; then
+  runtime_services+=(retention-cleanup)
+fi
 if provisioning_profile_enabled; then
   runtime_services+=(node-provisioning-worker)
 fi
@@ -1208,6 +1219,9 @@ wait_for_healthy_container remnawave-cabinet-app 60
 wait_for_container worker 60
 wait_for_container broadcast-worker 60
 wait_for_container watch-worker 60
+if [[ " ${runtime_services[*]} " == *" retention-cleanup "* ]]; then
+  wait_for_container retention-cleanup 60
+fi
 if [[ " ${runtime_services[*]} " == *" node-provisioning-worker "* ]]; then
   wait_for_provisioner_ready 60
   RUNNING_PROVISIONER_REVISION="$(running_provisioner_revision || true)"
