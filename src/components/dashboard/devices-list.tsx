@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { CircleAlert, Laptop, Loader2, Monitor, Pencil, RefreshCw, ShieldBan, ShieldCheck, Smartphone, Tablet, Trash2 } from 'lucide-react'
+import { CircleAlert, Laptop, Loader2, Monitor, Pencil, RefreshCw, ShieldBan, ShieldCheck, Smartphone, Tablet } from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
 import { InlineAlert } from './empty-state'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
@@ -39,8 +39,6 @@ export function DevicesList({ embedded = false, deviceLimit }: DevicesListProps 
   const [removingHwid, setRemovingHwid] = useState<string | null>(null)
   const [unblockingHwid, setUnblockingHwid] = useState<string | null>(null)
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null)
-  const [bulkDialogOpen, setBulkDialogOpen] = useState(false)
-  const [bulkRemoving, setBulkRemoving] = useState(false)
   const [editingDevice, setEditingDevice] = useState<Device | null>(null)
   const [renameDraft, setRenameDraft] = useState('')
   const [renaming, setRenaming] = useState(false)
@@ -80,24 +78,6 @@ export function DevicesList({ embedded = false, deviceLimit }: DevicesListProps 
       setActionError(e instanceof Error ? e.message : 'Не удалось отключить устройство')
     } finally {
       setRemovingHwid(null)
-    }
-  }
-
-  async function removeAllDevices() {
-    setBulkRemoving(true)
-    setActionError(null)
-    try {
-      await apiFetch('/api/devices', { method: 'DELETE' })
-      setBlockedDevices((current) => [
-        ...(devices ?? []).map((device) => ({ ...device, blockedAt: new Date().toISOString() })),
-        ...current.filter((blocked) => !(devices ?? []).some((device) => device.hwid === blocked.hwid)),
-      ])
-      setDevices([])
-      setBulkDialogOpen(false)
-    } catch (e) {
-      setActionError(e instanceof Error ? e.message : 'Не удалось отключить устройства')
-    } finally {
-      setBulkRemoving(false)
     }
   }
 
@@ -282,15 +262,6 @@ export function DevicesList({ embedded = false, deviceLimit }: DevicesListProps 
           onCancel={() => setSelectedDevice(null)}
           onConfirm={() => selectedDevice && removeDevice(selectedDevice)}
         />
-        <ConfirmDialog
-          open={bulkDialogOpen}
-          title="Отключить все устройства?"
-          description="Все устройства потеряют доступ к VPN. Это действие можно отменить для каждого устройства отдельно."
-          confirmLabel="Отключить все"
-          loading={bulkRemoving}
-          onCancel={() => setBulkDialogOpen(false)}
-          onConfirm={removeAllDevices}
-        />
         <DeviceRenameDialog
           device={editingDevice}
           value={renameDraft}
@@ -314,8 +285,8 @@ export function DevicesList({ embedded = false, deviceLimit }: DevicesListProps 
         />
       )}
       <section id="connected-devices" aria-labelledby="connected-devices-title" className="device-panel overflow-hidden rounded-3xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.035]">
-        <div className="border-b border-slate-100 px-4 py-4 dark:border-white/10 sm:px-5 sm:py-5">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="border-b border-slate-100 px-4 py-4 dark:border-white/10 sm:px-5">
+          <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
                 <h2 id="connected-devices-title" className="text-lg font-semibold tracking-tight text-slate-950 dark:text-white">Ваши устройства</h2>
@@ -323,43 +294,35 @@ export function DevicesList({ embedded = false, deviceLimit }: DevicesListProps 
                   {devicesValue}
                 </span>
               </div>
-              <p className="mt-1 text-sm leading-6 text-slate-500 dark:text-slate-400">
-                {recentDevices > 0 ? 'VPN использовался сегодня.' : 'Сегодня подключений не было.'}
-              </p>
-              <DeviceLimitNotice state={limitState} />
+              {limitState.tone !== 'neutral' ? <DeviceLimitNotice state={limitState} /> : null}
             </div>
             <button
               type="button"
-              className="btn-secondary min-h-10 w-full shrink-0 px-3 sm:w-auto"
+              className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-slate-200 text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-950 disabled:opacity-60 dark:border-white/10 dark:text-slate-400 dark:hover:bg-white/[0.06] dark:hover:text-white"
               onClick={() => void loadDevices()}
               disabled={refreshing}
               aria-label="Обновить устройства"
             >
               <RefreshCw className={cn('h-4 w-4', refreshing && 'animate-spin')} />
-              Обновить
             </button>
           </div>
         </div>
 
-        <div className="grid gap-3 p-3 sm:grid-cols-2 sm:p-4">
+        <div className="divide-y divide-slate-200 dark:divide-white/10">
           {devices.length === 0 && (
-            <div className="text-sm text-slate-500 dark:text-slate-400 sm:col-span-2">Активных устройств нет.</div>
+            <div className="px-4 py-5 text-sm text-slate-500 dark:text-slate-400">Активных устройств нет.</div>
           )}
-          {devices.map((d) => (
-            <DeviceCard
-              key={d.hwid}
-              device={d}
-              loading={removingHwid === d.hwid}
-              onRemove={() => setSelectedDevice(d)}
-              onRename={() => openRename(d)}
+          {devices.map((device) => (
+            <CompactDeviceRow
+              key={device.hwid}
+              device={device}
+              loading={removingHwid === device.hwid}
+              onRemove={() => setSelectedDevice(device)}
+              onRename={() => openRename(device)}
             />
           ))}
         </div>
         <BlockedDevices devices={blockedDevices} unblockingHwid={unblockingHwid} onUnblock={(device) => void unblockDevice(device)} />
-        <DeviceListActions
-          deviceCount={devices.length}
-          onRemoveAll={() => setBulkDialogOpen(true)}
-        />
       </section>
       <ConfirmDialog
         open={Boolean(selectedDevice)}
@@ -369,15 +332,6 @@ export function DevicesList({ embedded = false, deviceLimit }: DevicesListProps 
         loading={Boolean(removingHwid)}
         onCancel={() => setSelectedDevice(null)}
         onConfirm={() => selectedDevice && removeDevice(selectedDevice)}
-      />
-      <ConfirmDialog
-        open={bulkDialogOpen}
-        title="Отключить все устройства?"
-        description="Все устройства потеряют доступ к VPN. Это действие можно отменить для каждого устройства отдельно."
-        confirmLabel="Отключить все"
-        loading={bulkRemoving}
-        onCancel={() => setBulkDialogOpen(false)}
-        onConfirm={removeAllDevices}
       />
       <DeviceRenameDialog
         device={editingDevice}
@@ -399,85 +353,6 @@ function DeviceLimitNotice({ state, compact = false }: { state: DeviceLimitState
       {Icon && <Icon className="h-3.5 w-3.5 shrink-0" />}
       <span>{state.text}</span>
     </div>
-  )
-}
-
-function DeviceListActions({
-  deviceCount,
-  onRemoveAll,
-}: {
-  deviceCount: number
-  onRemoveAll: () => void
-}) {
-  if (deviceCount <= 1) return null
-
-  return (
-    <div className="device-list-actions justify-end">
-      <button type="button" className="device-list-actions__remove" onClick={onRemoveAll}>
-        <Trash2 className="h-3.5 w-3.5" />
-        Отключить все
-      </button>
-    </div>
-  )
-}
-
-function DeviceCard({
-  device,
-  loading,
-  onRemove,
-  onRename,
-}: {
-  device: Device
-  loading: boolean
-  onRemove: () => void
-  onRename: () => void
-}) {
-  const activity = getActivityState(device.updatedAt || device.createdAt)
-  const Icon = getDeviceIcon(device)
-  const clientName = formatDeviceClientName(device.userAgent)
-
-  return (
-    <article className="device-card flex min-w-0 flex-col rounded-2xl border border-slate-200 bg-slate-50/60 p-4 dark:border-white/[0.08] dark:bg-white/[0.025]">
-      <div className="flex min-w-0 items-start gap-3">
-        <div className="device-card__icon grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-white text-cyan-700 shadow-sm dark:bg-white/[0.06] dark:text-cyan-200 dark:shadow-none">
-          <Icon className="h-5 w-5" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex min-w-0 flex-col items-start gap-1.5 min-[380px]:flex-row min-[380px]:justify-between min-[380px]:gap-2">
-            <h3 className="min-w-0 break-words text-sm font-semibold text-slate-950 dark:text-white sm:text-base">{getDeviceTitle(device)}</h3>
-            <span className={cn('shrink-0 rounded-full border px-2 py-0.5 text-xs font-semibold', activity.className)}>{activity.label}</span>
-          </div>
-          <p className="mt-1 break-words text-sm leading-5 text-slate-500 dark:text-slate-400">{getDeviceSubtitle(device)}</p>
-          {clientName ? (
-            <div className="mt-2 inline-flex max-w-full items-center gap-1.5 rounded-lg bg-cyan-50 px-2 py-1 text-xs text-cyan-800 dark:bg-cyan-400/10 dark:text-cyan-200" title={device.userAgent ?? undefined}>
-              <span className="font-medium">Клиент</span>
-              <span className="truncate">{clientName}</span>
-            </div>
-          ) : null}
-        </div>
-      </div>
-      <div className="mt-4 flex flex-col items-stretch gap-3 border-t border-slate-200/70 pt-3 dark:border-white/[0.08] min-[380px]:flex-row min-[380px]:items-end min-[380px]:justify-between">
-        <div className="min-w-0 text-xs text-slate-400 dark:text-slate-500">
-          <div>Последняя активность</div>
-          <div className="mt-0.5 break-words font-medium text-slate-600 dark:text-slate-300">{formatDeviceDate(device.updatedAt || device.createdAt)}</div>
-        </div>
-        <div className="flex gap-2">
-          <button type="button" className="btn-secondary h-10 px-3" onClick={onRename}>
-            <Pencil className="h-4 w-4" />
-            Переименовать
-          </button>
-          <DeviceActionButton loading={loading} label="Отключить" onClick={onRemove} />
-        </div>
-      </div>
-      <details className="mt-3 border-t border-slate-200/70 pt-3 text-xs text-slate-500 dark:border-white/[0.08] dark:text-slate-400">
-        <summary className="cursor-pointer font-medium text-slate-600 dark:text-slate-300">Технические данные</summary>
-        <dl className="mt-2 grid gap-1.5 sm:grid-cols-2">
-          <div><dt className="inline">Система: </dt><dd className="inline">{device.osVersion || 'не определена'}</dd></div>
-          <div><dt className="inline">IP: </dt><dd className="inline">{device.ip || 'не определён'}</dd></div>
-          <div className="break-all sm:col-span-2"><dt className="inline">ID: </dt><dd className="inline font-mono">{device.hwid}</dd></div>
-        </dl>
-      </details>
-    </article>
   )
 }
 
@@ -546,15 +421,10 @@ function BlockedDevices({
   if (devices.length === 0) return null
 
   return (
-    <div className="border-t border-slate-200 bg-slate-50/60 px-4 py-4 dark:border-white/10 dark:bg-white/[0.02]">
-      <div className="flex items-center gap-2">
-        <ShieldBan className="h-4 w-4 text-red-600 dark:text-red-300" />
-        <h3 className="text-sm font-semibold text-slate-950 dark:text-white">Отключённые</h3>
-        <span className="rounded-md bg-red-100 px-1.5 py-0.5 text-xs font-semibold text-red-700 dark:bg-red-500/10 dark:text-red-200">{devices.length}</span>
-      </div>
-      <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
-        Эти устройства автоматически удаляются при повторной регистрации.
-      </p>
+    <details className="border-t border-slate-200 bg-slate-50/60 px-4 py-3 dark:border-white/10 dark:bg-white/[0.02]">
+      <summary className="cursor-pointer text-sm font-semibold text-slate-700 dark:text-slate-200">
+        Отключённые устройства: {devices.length}
+      </summary>
       <div className="mt-3 space-y-2">
         {devices.map((device) => {
           const loading = unblockingHwid === device.hwid
@@ -580,37 +450,7 @@ function BlockedDevices({
           )
         })}
       </div>
-    </div>
-  )
-}
-
-function DeviceActionButton({
-  loading,
-  label = 'Отключить',
-  onClick,
-}: {
-  loading: boolean
-  label?: string
-  onClick: () => void
-}) {
-  const Icon = loading ? Loader2 : ShieldBan
-
-  return (
-    <button
-      type="button"
-      className={cn(
-        'inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-red-200/80 bg-white px-3 text-sm font-medium text-red-700 transition-colors',
-        'hover:border-red-300 hover:bg-red-50 hover:text-red-800',
-        'disabled:cursor-not-allowed disabled:opacity-60',
-        'dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200 dark:hover:bg-red-500/15',
-        'w-full shrink-0 min-[380px]:w-auto'
-      )}
-      disabled={loading}
-      onClick={onClick}
-    >
-      <Icon className={cn('h-4 w-4 shrink-0', loading && 'animate-spin')} />
-      <span className="truncate">{loading ? 'Ждём...' : label}</span>
-    </button>
+    </details>
   )
 }
 
@@ -669,15 +509,7 @@ function DevicesSkeleton({ compact = false }: { compact?: boolean }) {
 
 function getDeviceTitle(device: Device) {
   if (device.displayName) return device.displayName
-  if (device.deviceModel && device.platform) return `${device.deviceModel} · ${device.platform}`
   return device.deviceModel || device.platform || 'Неизвестное устройство'
-}
-
-function getDeviceSubtitle(device: Device) {
-  const technicalName = device.displayName
-    ? [device.deviceModel, device.platform].filter(Boolean).join(' · ')
-    : null
-  return technicalName || 'Название можно изменить'
 }
 
 function DeviceRenameDialog({
@@ -781,12 +613,12 @@ type DeviceLimitState = {
 }
 
 function getDeviceLimitState(used: number, limit?: number | null): DeviceLimitState {
-  if (!limit || limit < 1) return { tone: 'neutral', text: 'Количество устройств не ограничено.' }
+  if (!limit || limit < 1) return { tone: 'neutral', text: 'Без ограничений' }
 
   const remaining = Math.max(limit - used, 0)
-  if (remaining === 0) return { tone: 'danger', text: 'Лимит достигнут. Отключите старое устройство перед новым подключением.' }
-  if (remaining === 1) return { tone: 'warning', text: 'Осталось одно свободное место.' }
-  return { tone: 'neutral', text: `Свободно мест: ${remaining}.` }
+  if (remaining === 0) return { tone: 'danger', text: 'Лимит достигнут. Отключите ненужное устройство.' }
+  if (remaining === 1) return { tone: 'warning', text: 'Осталось 1 место' }
+  return { tone: 'neutral', text: `Свободно: ${remaining}` }
 }
 
 function formatDeviceDate(date: string | null | undefined) {
