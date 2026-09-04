@@ -113,7 +113,6 @@ export function KeysCard({
   )
 
   const selectedApp = appOptions.find((option) => option.id === selectedAppId) ?? defaultApp
-  const SelectedAppIcon = selectedApp.icon
   const selectedDeepLinks = selectedApp.getOpenLinks
     ? selectedApp.getOpenLinks({ subscriptionUrl, happLink, device })
     : selectedApp.deepLinks(subscriptionUrl)
@@ -180,19 +179,19 @@ export function KeysCard({
       aria-labelledby="connection-title"
       className="connection-panel overflow-hidden rounded-3xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.03]"
     >
-      <header className="flex items-start justify-between gap-4 border-b border-slate-200 p-4 dark:border-white/10 sm:p-5">
+      <header className="flex flex-col gap-4 border-b border-slate-200 p-4 dark:border-white/10 sm:flex-row sm:items-start sm:justify-between sm:p-5">
         <div className="min-w-0">
           <h2 id="connection-title" className="text-lg font-semibold tracking-tight text-slate-950 dark:text-white">
-            {onboarding ? 'Подключите первое устройство' : 'Подключить ещё устройство'}
+            {onboarding ? 'Подключить VPN' : 'Подключить это устройство'}
           </h2>
           <p className="mt-1 text-sm leading-5 text-slate-500 dark:text-slate-400">
             {onboarding
-              ? 'Три коротких шага. После проверки откроется управление устройствами.'
-              : 'Откройте подписку на новом устройстве. Текущие подключения сохранятся.'}
+              ? 'Установите приложение и добавьте в него VPN.'
+              : 'Используйте этот блок на устройстве, которое хотите подключить.'}
           </p>
         </div>
         <label className="connection-device-picker">
-          <span className="connection-device-picker__label">Устройство</span>
+          <span className="connection-device-picker__label">Система</span>
           <span className="connection-device-picker__control">
             <DeviceIcon device={device} />
             <select
@@ -211,90 +210,69 @@ export function KeysCard({
       </header>
 
       <div className="p-4 sm:p-5">
-        {onboarding ? (
-          <div className="connection-first-run">
-            <div className="connection-first-run__step">
-              <span className="connection-first-run__number">1</span>
-              <div className="min-w-0 flex-1">
-                <h3 className="text-sm font-semibold text-slate-950 dark:text-white">Установите {selectedApp.name}</h3>
-                <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
-                  {selectedIsRecommended
-                    ? `Приложение подходит для ${deviceLabel(device)}.`
-                    : `Рекомендуемое приложение для ${deviceLabel(device)}.`}
-                </p>
-              </div>
-              <a
-                href={selectedInstallUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="btn-secondary connection-first-run__action"
-              >
-                <Download className="h-4 w-4" />
-                Установить
-              </a>
+        <div className="connection-first-run">
+          <div className="connection-first-run__step">
+            <span className="connection-first-run__number">1</span>
+            <div className="min-w-0 flex-1">
+              <h3 className="text-sm font-semibold text-slate-950 dark:text-white">Установите {selectedApp.name}</h3>
+              <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
+                {selectedIsRecommended
+                  ? `Подходит для ${deviceLabel(device)}.`
+                  : `Выбран вариант для ${deviceLabel(device)}.`}
+              </p>
             </div>
+            <a
+              href={selectedInstallUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="btn-secondary connection-first-run__action"
+            >
+              <Download className="h-4 w-4" />
+              {installButtonLabel(selectedApp, device)}
+            </a>
+          </div>
 
-            <div className="connection-first-run__step">
-              <span className="connection-first-run__number">2</span>
-              <div className="min-w-0 flex-1">
-                <h3 className="text-sm font-semibold text-slate-950 dark:text-white">Откройте подписку</h3>
-                <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
-                  Добавьте доступ в приложение одним нажатием.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={openInApp}
-                disabled={!subscriptionUrl}
-                className="btn-primary connection-first-run__action"
-              >
-                <ExternalLink className="h-4 w-4" />
-                Открыть
-              </button>
+          <div className="connection-first-run__step">
+            <span className="connection-first-run__number">2</span>
+            <div className="min-w-0 flex-1">
+              <h3 className="text-sm font-semibold text-slate-950 dark:text-white">Добавьте VPN</h3>
+              <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
+                Нажмите кнопку и подтвердите добавление в приложении.
+              </p>
             </div>
+            <button
+              type="button"
+              onClick={openInApp}
+              disabled={!subscriptionUrl}
+              className="btn-primary connection-first-run__action"
+            >
+              <ExternalLink className="h-4 w-4" />
+              Добавить VPN
+            </button>
+          </div>
 
+          <div className="flex items-start gap-2 rounded-xl bg-emerald-50 px-3 py-2.5 text-sm leading-5 text-emerald-900 dark:bg-emerald-400/10 dark:text-emerald-100">
+            <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>После добавления откройте {selectedApp.name} и включите VPN.</span>
+          </div>
+
+          {onboarding && (
             <div className="connection-first-run__step connection-first-run__step--check">
               <span className="connection-first-run__number">3</span>
               <VpnConnectionCheck supportEnabled={supportEnabled} onVerified={finishFirstConnection} compact />
             </div>
-          </div>
-        ) : (
-          <div className="connection-connect">
-            <div className="connection-connect__hero">
-              <div className="connection-connect__app">
-                <span className="connection-connect__icon">
-                  <SelectedAppIcon className="h-5 w-5" />
-                </span>
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="text-base font-semibold text-slate-950 dark:text-white">{selectedApp.name}</h3>
-                    {selectedIsRecommended && <span className="connection-connect__badge">Рекомендуем</span>}
-                  </div>
-                  <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                    Для {deviceLabel(device)}. Текущие устройства останутся подключёнными.
-                  </p>
-                </div>
-              </div>
+          )}
 
-              <div className="connection-connect__actions">
-                <button type="button" onClick={openInApp} disabled={!subscriptionUrl} className="btn-primary justify-center">
-                  <ExternalLink className="h-4 w-4" />
-                  Подключить в {selectedApp.name}
-                </button>
-                <a href={selectedInstallUrl} target="_blank" rel="noreferrer" className="btn-secondary justify-center">
-                  <Download className="h-4 w-4" />
-                  {installButtonLabel(selectedApp, device)}
-                </a>
-              </div>
-            </div>
-
-            <ol className="connection-connect__steps" aria-label="Шаги подключения">
-              <li><span>1</span><div><strong>Установите</strong><small>{selectedApp.name}</small></div></li>
-              <li><span>2</span><div><strong>Добавьте доступ</strong><small>Одним нажатием</small></div></li>
-              <li><span>3</span><div><strong>Включите VPN</strong><small>Готово к работе</small></div></li>
-            </ol>
-
-            <div className="connection-connect__tools" aria-label="Другие способы подключения">
+          <details className="connection-alternatives">
+            <summary>Не получилось подключить?</summary>
+            <p className="mt-2 text-xs leading-5 text-slate-500 dark:text-slate-400">
+              Откройте подробную инструкцию или выберите другой способ.
+            </p>
+            <div className="connection-connect__tools mt-3" aria-label="Другие способы подключения">
+              <button type="button" onClick={() => setInstructionsOpen(true)}>
+                <HelpCircle className="h-4 w-4" />
+                Подробная инструкция
+              </button>
               <button type="button" onClick={() => copy(subscriptionUrl, 'Ссылка подписки')} disabled={!subscriptionUrl}>
                 {copied ? <CheckCircle2 className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
                 {copied ? 'Ссылка скопирована' : 'Скопировать ссылку'}
@@ -303,16 +281,12 @@ export function KeysCard({
                 <QrCode className="h-4 w-4" />
                 Показать QR-код
               </button>
-              <button type="button" onClick={() => setInstructionsOpen(true)}>
-                <HelpCircle className="h-4 w-4" />
-                Открыть инструкцию
-              </button>
             </div>
 
             {compatibleApps.length > 1 && (
-              <details className="connection-alternatives connection-connect__alternatives">
-                <summary>Выбрать другое приложение</summary>
-                <div className="mt-3 grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="Приложение для подключения">
+              <div className="mt-4">
+                <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">Другое приложение</p>
+                <div className="mt-2 grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="Приложение для подключения">
                   {compatibleApps.map((option) => (
                     <AppChoice
                       key={option.id}
@@ -322,10 +296,10 @@ export function KeysCard({
                     />
                   ))}
                 </div>
-              </details>
+              </div>
             )}
-          </div>
-        )}
+          </details>
+        </div>
       </div>
 
       {!onboarding && <footer className="flex flex-col gap-2 border-t border-slate-200 px-4 py-3 text-xs text-slate-500 dark:border-white/10 dark:text-slate-400 sm:flex-row sm:items-center sm:justify-between sm:px-5">
@@ -341,15 +315,15 @@ export function KeysCard({
         </button>
       </footer>}
 
-      {!onboarding && <InstructionModal
+      <InstructionModal
         open={instructionsOpen}
         app={selectedApp}
         subscriptionUrl={subscriptionUrl}
         onClose={() => setInstructionsOpen(false)}
         onCopy={() => copy(subscriptionUrl, 'Ссылка подписки')}
         onOpen={openInApp}
-      />}
-      {!onboarding && <QrModal open={qrOpen} subscriptionUrl={subscriptionUrl} onClose={() => setQrOpen(false)} />}
+      />
+      <QrModal open={qrOpen} subscriptionUrl={subscriptionUrl} onClose={() => setQrOpen(false)} />
 
       {!onboarding && <ConfirmDialog
         open={confirmOpen}

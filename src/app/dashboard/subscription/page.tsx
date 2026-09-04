@@ -261,6 +261,40 @@ export default async function SubscriptionPage() {
         </div>
       </section>
 
+      {!subscriptionExpired ? (
+        isFirstConnection ? (
+          <KeysCard
+            subscriptionUrl={data.response.subscriptionUrl}
+            happLink={happLink}
+            onboarding
+            supportEnabled={features.support}
+          />
+        ) : (
+          <>
+            <div className="grid items-start gap-5 min-[1360px]:grid-cols-[minmax(0,1fr)_22rem]">
+              <KeysCard subscriptionUrl={data.response.subscriptionUrl} happLink={happLink} />
+              <DevicesList
+                embedded
+                deviceLimit={localSubscription?.plan?.unlimitedDevices
+                  ? null
+                  : localSubscription?.deviceLimit ?? localSubscription?.plan?.deviceLimit}
+              />
+            </div>
+            <details className="connection-alternatives">
+              <summary>Проверить, работает ли VPN</summary>
+              <div className="mt-4">
+                <VpnConnectionCheck
+                  supportEnabled={features.support}
+                  deviceLimit={localSubscription?.plan?.unlimitedDevices
+                    ? null
+                    : localSubscription?.deviceLimit ?? localSubscription?.plan?.deviceLimit}
+                />
+              </div>
+            </details>
+          </>
+        )
+      ) : null}
+
       {!subscriptionExpired && localSubscription?.plan && localSubscription.planId && !unlimitedDuration ? (
         <AutoRenewalCard
           planId={localSubscription.planId}
@@ -290,36 +324,6 @@ export default async function SubscriptionPage() {
       ) : null}
 
       <SubscriptionTimeline payments={payments} auditEvents={auditEvents} />
-
-      {!subscriptionExpired && (
-        isFirstConnection ? (
-          <KeysCard
-            subscriptionUrl={data.response.subscriptionUrl}
-            happLink={happLink}
-            onboarding
-            supportEnabled={features.support}
-          />
-        ) : (
-          <>
-            <VpnConnectionCheck
-              supportEnabled={features.support}
-              deviceLimit={localSubscription?.plan?.unlimitedDevices
-                ? null
-                : localSubscription?.deviceLimit ?? localSubscription?.plan?.deviceLimit}
-            />
-            <div className="grid items-start gap-5 min-[1360px]:grid-cols-[minmax(0,1fr)_22rem]">
-              <KeysCard subscriptionUrl={data.response.subscriptionUrl} happLink={happLink} />
-              <DevicesList
-                embedded
-                deviceLimit={localSubscription?.plan?.unlimitedDevices
-                  ? null
-                  : localSubscription?.deviceLimit ?? localSubscription?.plan?.deviceLimit}
-                subscriptionUrl={data.response.subscriptionUrl}
-              />
-            </div>
-          </>
-        )
-      )}
     </div>
   )
 }

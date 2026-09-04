@@ -2,8 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { CircleAlert, Laptop, Loader2, Monitor, Pencil, Plus, RefreshCw, ShieldBan, ShieldCheck, Smartphone, Tablet, Trash2 } from 'lucide-react'
+import { CircleAlert, Laptop, Loader2, Monitor, Pencil, RefreshCw, ShieldBan, ShieldCheck, Smartphone, Tablet, Trash2 } from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
 import { InlineAlert } from './empty-state'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
@@ -29,11 +28,9 @@ interface Device {
 interface DevicesListProps {
   embedded?: boolean
   deviceLimit?: number | null
-  subscriptionUrl?: string
 }
 
-export function DevicesList({ embedded = false, deviceLimit, subscriptionUrl }: DevicesListProps = {}) {
-  const router = useRouter()
+export function DevicesList({ embedded = false, deviceLimit }: DevicesListProps = {}) {
   const [devices, setDevices] = useState<Device[] | null>(null)
   const [blockedDevices, setBlockedDevices] = useState<Device[]>([])
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -151,18 +148,6 @@ export function DevicesList({ embedded = false, deviceLimit, subscriptionUrl }: 
     }
   }
 
-  function addDevice() {
-    if (!subscriptionUrl) {
-      router.push('/dashboard/subscription#connection')
-      return
-    }
-
-    window.location.assign(`incy://import/${subscriptionUrl}`)
-    window.setTimeout(() => {
-      void navigator.clipboard?.writeText(subscriptionUrl).catch(() => undefined)
-    }, 500)
-  }
-
   if (loadError && !devices) {
     return (
       <div className="space-y-3">
@@ -211,7 +196,7 @@ export function DevicesList({ embedded = false, deviceLimit, subscriptionUrl }: 
           </span>
           <div className="mt-4 font-semibold text-slate-950 dark:text-white">Устройств пока нет</div>
           <p className="mx-auto mt-1 max-w-md text-sm leading-6 text-slate-500 dark:text-slate-400">Вернитесь к подключению, добавьте подписку в приложение и включите VPN.</p>
-          <Link href="/dashboard/subscription#connection" className="btn-primary mt-5 w-full sm:w-auto">Подключить устройство</Link>
+          <Link href="#add-device-guide" className="btn-secondary mt-5 w-full sm:w-auto">Как подключить устройство</Link>
         </div>
       </section>
     )
@@ -280,10 +265,9 @@ export function DevicesList({ embedded = false, deviceLimit, subscriptionUrl }: 
             )}
           </div>
           <div className="device-list-actions">
-            <button type="button" className="btn-secondary device-list-actions__add" onClick={addDevice}>
-              <Plus className="h-4 w-4" />
-              Подключить ещё
-            </button>
+            <Link href="/dashboard/devices#add-device-guide" className="btn-secondary device-list-actions__add">
+              Как подключить другое устройство
+            </Link>
             <Link href="/dashboard/devices" className="text-sm font-semibold text-cyan-700 hover:underline dark:text-cyan-300">
               Управлять устройствами
             </Link>
@@ -333,9 +317,14 @@ export function DevicesList({ embedded = false, deviceLimit, subscriptionUrl }: 
         <div className="border-b border-slate-100 px-4 py-4 dark:border-white/10 sm:px-5 sm:py-5">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0">
-              <h2 id="connected-devices-title" className="text-lg font-semibold tracking-tight text-slate-950 dark:text-white">Подключённые устройства</h2>
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 id="connected-devices-title" className="text-lg font-semibold tracking-tight text-slate-950 dark:text-white">Ваши устройства</h2>
+                <span className="device-count-chip rounded-md bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600 dark:bg-white/[0.07] dark:text-slate-300">
+                  {devicesValue}
+                </span>
+              </div>
               <p className="mt-1 text-sm leading-6 text-slate-500 dark:text-slate-400">
-                {recentDevices > 0 ? 'Подключение работает. Здесь можно проверить активность и отключить старые устройства.' : 'Устройства найдены, но сегодня ещё не подключались.'}
+                {recentDevices > 0 ? 'VPN использовался сегодня.' : 'Сегодня подключений не было.'}
               </p>
               <DeviceLimitNotice state={limitState} />
             </div>
@@ -349,10 +338,6 @@ export function DevicesList({ embedded = false, deviceLimit, subscriptionUrl }: 
               <RefreshCw className={cn('h-4 w-4', refreshing && 'animate-spin')} />
               Обновить
             </button>
-          </div>
-          <div className="mt-4 grid grid-cols-2 gap-2">
-            <DeviceMetric label={deviceLimit && deviceLimit > 0 ? 'использовано' : 'всего'} value={devicesValue} />
-            <DeviceMetric label="активны сегодня" value={recentDevices.toString()} active={recentDevices > 0} />
           </div>
         </div>
 
@@ -373,7 +358,6 @@ export function DevicesList({ embedded = false, deviceLimit, subscriptionUrl }: 
         <BlockedDevices devices={blockedDevices} unblockingHwid={unblockingHwid} onUnblock={(device) => void unblockDevice(device)} />
         <DeviceListActions
           deviceCount={devices.length}
-          onAdd={addDevice}
           onRemoveAll={() => setBulkDialogOpen(true)}
         />
       </section>
@@ -420,25 +404,19 @@ function DeviceLimitNotice({ state, compact = false }: { state: DeviceLimitState
 
 function DeviceListActions({
   deviceCount,
-  onAdd,
   onRemoveAll,
 }: {
   deviceCount: number
-  onAdd: () => void
   onRemoveAll: () => void
 }) {
+  if (deviceCount <= 1) return null
+
   return (
-    <div className="device-list-actions">
-      <button type="button" className="btn-secondary device-list-actions__add" onClick={onAdd}>
-        <Plus className="h-4 w-4" />
-        Подключить ещё
+    <div className="device-list-actions justify-end">
+      <button type="button" className="device-list-actions__remove" onClick={onRemoveAll}>
+        <Trash2 className="h-3.5 w-3.5" />
+        Отключить все
       </button>
-      {deviceCount > 1 && (
-        <button type="button" className="device-list-actions__remove" onClick={onRemoveAll}>
-          <Trash2 className="h-3.5 w-3.5" />
-          Отключить все
-        </button>
-      )}
     </div>
   )
 }
@@ -602,15 +580,6 @@ function BlockedDevices({
           )
         })}
       </div>
-    </div>
-  )
-}
-
-function DeviceMetric({ label, value, active = false }: { label: string; value: string; active?: boolean }) {
-  return (
-    <div className={cn('device-metric rounded-xl border border-slate-100 bg-slate-50/70 px-3 py-2.5 dark:border-white/[0.07] dark:bg-white/[0.025]', active && 'device-metric--active')}>
-      <div className={cn('text-lg font-semibold tracking-tight text-slate-950 dark:text-white', active && 'text-emerald-700 dark:text-emerald-200')}>{value}</div>
-      <div className="text-xs font-medium uppercase tracking-wide text-slate-400">{label}</div>
     </div>
   )
 }
