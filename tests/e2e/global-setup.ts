@@ -67,6 +67,32 @@ export default async function globalSetup() {
         emailVerifiedAt: now,
         agreedToTermsAt: now,
         referralCode: 'E2EBASIC',
+        notifications: {
+          create: [
+            {
+              type: 'PAYMENT_FAILED',
+              dedupeKey: 'e2e-payment-failed-1',
+              title: 'Платёж не прошёл',
+              body: 'Выберите другой способ оплаты.',
+              actionHref: '/dashboard/billing',
+            },
+            {
+              type: 'PAYMENT_FAILED',
+              dedupeKey: 'e2e-payment-failed-2',
+              title: 'Платёж не прошёл',
+              body: 'Выберите другой способ оплаты.',
+              actionHref: '/dashboard/billing',
+            },
+            {
+              type: 'SUPPORT_REPLY',
+              dedupeKey: 'e2e-support-reply',
+              title: 'Поддержка ответила',
+              body: 'Откройте обращение, чтобы прочитать ответ.',
+              actionHref: '/dashboard/support',
+              actionLabel: 'Открыть ответ',
+            },
+          ],
+        },
       },
     })
 

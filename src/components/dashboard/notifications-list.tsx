@@ -2,11 +2,23 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { Bell, CheckCheck, Gift, LifeBuoy, Megaphone, ShieldAlert, WalletCards } from 'lucide-react'
+import { ArrowRight, Bell, Check, CheckCheck, Gift, LifeBuoy, Megaphone, ShieldAlert, WalletCards } from 'lucide-react'
 import type { UserNotificationView } from '@/lib/user-notifications'
+import {
+  groupNotifications,
+  notificationGroup,
+  notificationPriority,
+  type GroupedUserNotification,
+  type NotificationFilter,
+  type NotificationPriority,
+} from '@/lib/notification-presentation'
 import { cn } from '@/lib/cn'
 
-type NotificationFilter = 'all' | 'payments' | 'subscription' | 'support' | 'bonus' | 'broadcast'
+const prioritySections: Array<{ value: NotificationPriority; title: string; description: string }> = [
+  { value: 'action', title: 'Требуют действия', description: 'Оплата или доступ нуждаются в вашем внимании.' },
+  { value: 'attention', title: 'Обратите внимание', description: 'События, которые лучше не откладывать.' },
+  { value: 'updates', title: 'Остальные события', description: 'Оплаты, бонусы и новости.' },
+]
 
 export function NotificationsList({ initialNotifications }: { initialNotifications: UserNotificationView[] }) {
   const [notifications, setNotifications] = useState(initialNotifications)
@@ -17,8 +29,28 @@ export function NotificationsList({ initialNotifications }: { initialNotificatio
     const previous = notifications
     setNotifications((items) => items.map((item) => ({ ...item, readAt: item.readAt ?? now })))
     try {
-      const res = await fetch('/api/notifications', { method: 'PATCH' })
-      if (!res.ok) setNotifications(previous)
+      const response = await fetch('/api/notifications', { method: 'PATCH' })
+      if (!response.ok) setNotifications(previous)
+    } catch {
+      setNotifications(previous)
+    }
+  }
+
+  async function markGroupRead(ids: string[]) {
+    const unreadIds = ids.filter((id) => notifications.some((item) => item.id === id && !item.readAt))
+    if (unreadIds.length === 0) return
+
+    const now = new Date().toISOString()
+    const previous = notifications
+    const idSet = new Set(unreadIds)
+    setNotifications((items) => items.map((item) => idSet.has(item.id) ? { ...item, readAt: now } : item))
+
+    try {
+      const results = await Promise.all(unreadIds.map((id) => fetch(`/api/notifications/${id}`, {
+        method: 'PATCH',
+        keepalive: true,
+      })))
+      if (results.some((response) => !response.ok)) setNotifications(previous)
     } catch {
       setNotifications(previous)
     }
@@ -39,18 +71,14 @@ export function NotificationsList({ initialNotifications }: { initialNotificatio
   const emptyCopy = getEmptyCopy(filter, activeFilter.label, notifications.length)
 
   return (
-    <section className="space-y-4">
+    <section className="space-y-5" aria-label="История уведомлений">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="font-semibold text-slate-950 dark:text-white">{unreadCount > 0 ? `${unreadCount} непрочитанных` : 'Всё прочитано'}</div>
           <div className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">{notifications.length} событий</div>
         </div>
         {unreadCount > 0 && (
-          <button
-            type="button"
-            onClick={markAllRead}
-            className="btn-secondary w-full sm:w-auto"
-          >
+          <button type="button" onClick={markAllRead} className="btn-secondary w-full sm:w-auto">
             <CheckCheck className="h-4 w-4" />
             Отметить все
           </button>
@@ -62,6 +90,7 @@ export function NotificationsList({ initialNotifications }: { initialNotificatio
           <button
             key={item.value}
             type="button"
+            aria-pressed={filter === item.value}
             onClick={() => setFilter(item.value)}
             className={cn(
               'flex min-h-10 min-w-fit items-center gap-2 rounded-lg px-3 text-sm font-medium transition',
@@ -78,112 +107,103 @@ export function NotificationsList({ initialNotifications }: { initialNotificatio
         ))}
       </div>
 
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.035]">
-        {groupedNotifications.length > 0 ? (
-          groupedNotifications.map((item) => (
-            <NotificationItem key={item.notification.id} notification={item.notification} duplicateCount={item.count} />
-          ))
-        ) : (
-          <div className="grid min-h-64 place-items-center px-4 py-12 text-center">
-            <div>
-              <div className="mx-auto grid h-12 w-12 place-items-center rounded-xl bg-slate-100 text-slate-500 dark:bg-white/10 dark:text-slate-300">
-                <Bell className="h-5 w-5" />
-              </div>
-              <div className="mt-3 font-medium text-slate-950 dark:text-white">{emptyCopy.title}</div>
-              <div className="mt-1 text-sm text-slate-500">{emptyCopy.description}</div>
+      {groupedNotifications.length > 0 ? (
+        <div className="space-y-6">
+          {prioritySections.map((section) => {
+            const items = groupedNotifications.filter((item) => notificationPriority(item.notification.type) === section.value)
+            if (items.length === 0) return null
+
+            return (
+              <section key={section.value} aria-labelledby={`notification-priority-${section.value}`}>
+                <div className="mb-2.5 flex flex-wrap items-end justify-between gap-2 px-1">
+                  <div>
+                    <h2 id={`notification-priority-${section.value}`} className="text-sm font-semibold text-slate-950 dark:text-white">{section.title}</h2>
+                    <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{section.description}</p>
+                  </div>
+                  <span className="text-xs font-medium text-slate-400">{items.length}</span>
+                </div>
+                <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.035]">
+                  {items.map((item) => <NotificationItem key={item.notification.id} group={item} onRead={markGroupRead} />)}
+                </div>
+              </section>
+            )
+          })}
+        </div>
+      ) : (
+        <div className="grid min-h-64 place-items-center rounded-2xl border border-slate-200 bg-white px-4 py-12 text-center dark:border-white/10 dark:bg-white/[0.035]">
+          <div>
+            <div className="mx-auto grid h-12 w-12 place-items-center rounded-xl bg-slate-100 text-slate-500 dark:bg-white/10 dark:text-slate-300">
+              <Bell className="h-5 w-5" />
             </div>
+            <div className="mt-3 font-medium text-slate-950 dark:text-white">{emptyCopy.title}</div>
+            <div className="mx-auto mt-1 max-w-sm text-sm text-slate-500 dark:text-slate-400">{emptyCopy.description}</div>
+            {notifications.length > 0 ? (
+              <button type="button" className="btn-secondary mt-4" onClick={() => setFilter('all')}>Показать все</button>
+            ) : (
+              <Link href="/dashboard/settings?section=notifications" className="btn-secondary mt-4">Настроить уведомления</Link>
+            )}
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </section>
   )
 }
 
 function getEmptyCopy(filter: NotificationFilter, label: string, total: number) {
   if (total === 0 || filter === 'all') {
-    return {
-      title: 'Уведомлений пока нет',
-      description: 'Важные события появятся здесь.',
-    }
+    return { title: 'Здесь пока тихо', description: 'Новые события по подписке, оплатам и поддержке появятся здесь.' }
   }
-
-  return {
-    title: `В категории «${label}» пока пусто`,
-    description: 'В других категориях уведомления уже есть.',
-  }
+  return { title: `В разделе «${label}» ничего нет`, description: 'Можно вернуться ко всем уведомлениям.' }
 }
 
-function NotificationItem({
-  notification,
-  duplicateCount,
-}: {
-  notification: UserNotificationView
-  duplicateCount: number
-}) {
+function NotificationItem({ group, onRead }: { group: GroupedUserNotification; onRead: (ids: string[]) => Promise<void> }) {
+  const { notification, count, unreadCount, ids } = group
   const Icon = notificationIcon(notification.type)
-  const content = (
-    <div
-      className={cn(
-        'flex gap-3 border-b border-slate-100 px-4 py-3.5 last:border-b-0 dark:border-white/10',
-        notification.readAt ? 'bg-white/40 dark:bg-transparent' : 'bg-cyan-50/60 dark:bg-cyan-950/20'
-      )}
-    >
-      <span className={cn('mt-1 grid h-8 w-8 shrink-0 place-items-center', notification.readAt ? 'text-slate-400' : 'text-cyan-700 dark:text-cyan-200')}>
+  const actionLabel = notification.actionHref ? notification.actionLabel ?? defaultActionLabel(notification.type) : null
+
+  return (
+    <article className={cn(
+      'flex gap-3 border-b border-slate-100 px-4 py-4 last:border-b-0 dark:border-white/10 sm:px-5',
+      unreadCount > 0 ? 'bg-cyan-50/60 dark:bg-cyan-950/20' : 'bg-white/40 dark:bg-transparent'
+    )}>
+      <span className={cn('mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-xl', unreadCount > 0 ? 'bg-cyan-100 text-cyan-800 dark:bg-cyan-300/10 dark:text-cyan-200' : 'bg-slate-100 text-slate-400 dark:bg-white/[0.06]')}>
         <Icon className="h-4 w-4" />
       </span>
       <div className="min-w-0 flex-1">
-        <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-          <h2 className="font-semibold text-slate-950 dark:text-white">{notification.title}</h2>
-          <time className="text-xs text-slate-400">{formatDate(notification.createdAt)}</time>
+        <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+          <h3 className="break-words font-semibold text-slate-950 dark:text-white">{notification.title}</h3>
+          <time className="shrink-0 text-xs text-slate-400">{formatDate(notification.createdAt)}</time>
         </div>
-        <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-300">{notification.body}</p>
-        {duplicateCount > 1 && (
-          <div className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-            Ещё похожих событий: {duplicateCount - 1}
-          </div>
-        )}
-        {notification.actionLabel && <div className="mt-2 text-sm font-medium text-cyan-700 dark:text-cyan-300">{notification.actionLabel}</div>}
+        <p className="mt-1 break-words text-sm leading-6 text-slate-600 dark:text-slate-300">{notification.body}</p>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          {count > 1 && <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600 dark:bg-white/[0.07] dark:text-slate-300">{count} похожих</span>}
+          {actionLabel && notification.actionHref ? (
+            <Link
+              href={notification.actionHref}
+              className="inline-flex min-h-9 items-center gap-1.5 rounded-lg bg-slate-950 px-3 text-sm font-semibold text-white transition hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100"
+              onClick={() => void onRead(ids)}
+            >
+              {actionLabel}
+              <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          ) : unreadCount > 0 ? (
+            <button type="button" className="inline-flex min-h-9 items-center gap-1.5 rounded-lg px-3 text-sm font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/[0.07]" onClick={() => void onRead(ids)}>
+              <Check className="h-3.5 w-3.5" />
+              Прочитано
+            </button>
+          ) : null}
+        </div>
       </div>
-    </div>
+    </article>
   )
-
-  if (notification.actionHref) {
-    return (
-      <Link href={notification.actionHref} className="block transition hover:bg-slate-50 dark:hover:bg-white/5">
-        {content}
-      </Link>
-    )
-  }
-  return content
 }
 
-function groupNotifications(notifications: UserNotificationView[]) {
-  const grouped = new Map<string, { notification: UserNotificationView; count: number }>()
-  for (const notification of notifications) {
-    const key = [
-      notification.type,
-      notification.title,
-      notification.body,
-      notification.actionHref ?? '',
-    ].join('\u0000')
-    const current = grouped.get(key)
-    if (current) current.count += 1
-    else grouped.set(key, { notification, count: 1 })
-  }
-  return [...grouped.values()]
-}
-
-function notificationGroup(type: UserNotificationView['type']): NotificationFilter {
-  if (type === 'PAYMENT_SUCCESS' || type === 'PAYMENT_FAILED' || type === 'PAYMENT_STUCK') return 'payments'
-  if (
-    type === 'SUBSCRIPTION_EXPIRING'
-    || type === 'WHITELIST_ADDON_EXPIRING'
-    || type === 'SUBSCRIPTION_TERMINATED'
-    || type === 'TRAFFIC_LIMIT'
-  ) return 'subscription'
-  if (type === 'SUPPORT_REPLY') return 'support'
-  if (type === 'BONUS_GRANTED') return 'bonus'
-  return 'broadcast'
+function defaultActionLabel(type: UserNotificationView['type']) {
+  if (type === 'PAYMENT_FAILED' || type === 'PAYMENT_STUCK') return 'Проверить оплату'
+  if (type === 'SUBSCRIPTION_EXPIRING' || type === 'SUBSCRIPTION_TERMINATED') return 'Продлить'
+  if (type === 'SUPPORT_REPLY') return 'Открыть ответ'
+  if (type === 'BONUS_GRANTED') return 'Открыть бонус'
+  return 'Открыть'
 }
 
 function notificationIcon(type: UserNotificationView['type']) {

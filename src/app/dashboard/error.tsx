@@ -22,9 +22,9 @@ export default function DashboardError({ error, reset }: { error: Error & { dige
     <SystemState
       className="mx-auto max-w-xl"
       tone="danger"
-      eyebrow="Ошибка раздела"
-      title="Не удалось загрузить данные"
-      description="Повторите запрос. Администратору доступна подробная диагностика ошибки."
+      eyebrow="Ошибка"
+      title="Страница не загрузилась"
+      description="Проверьте подключение и попробуйте ещё раз."
       reference={error.digest}
       action={(
         <button type="button" className="btn-primary w-full sm:w-auto" onClick={reset}>

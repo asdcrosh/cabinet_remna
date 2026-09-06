@@ -18,8 +18,8 @@ export default function AdminError({ error, reset }: { error: Error & { digest?:
       className="mx-auto max-w-xl"
       tone="danger"
       eyebrow="Администрирование"
-      title="Раздел не загрузился"
-      description="Подробности ошибки открыты в диагностическом окне. Изменения не считаются применёнными."
+      title="Не удалось открыть раздел"
+      description="Попробуйте загрузить страницу снова."
       reference={error.digest}
       action={(
         <Button variant="danger" className="w-full sm:w-auto" onClick={reset}>

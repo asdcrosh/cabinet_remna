@@ -67,33 +67,32 @@ export function TelegramLinkCard({
             : 'Telegram привязан и синхронизирован',
         syncStatus === 'failed' || syncStatus === 'running' ? undefined : 'success'
       )
-      router.replace('/dashboard/settings')
+      router.replace('/dashboard/settings?section=telegram')
     } else if (error) {
       callbackHandled.current = true
       toast(`Telegram не привязан: ${error}`)
-      router.replace('/dashboard/settings')
+      router.replace('/dashboard/settings?section=telegram')
     }
   }, [router, searchParams])
 
   return (
     <div className={embedded ? '' : 'card'}>
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex min-w-0 items-center gap-3">
-          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white text-sky-600 shadow-sm dark:bg-white/[0.06] dark:text-sky-300 dark:shadow-none">
-            <Send className="h-5 w-5" />
+      {!embedded ? (
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white text-sky-600 shadow-sm dark:bg-white/[0.06] dark:text-sky-300 dark:shadow-none">
+              <Send className="h-5 w-5" />
+            </div>
+            <div className="min-w-0">
+              <h2 className="font-semibold">Telegram</h2>
+              <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">Вход и перенос старых покупок.</p>
+            </div>
           </div>
-          <div className="min-w-0">
-            <h2 className="font-semibold">Telegram</h2>
-            <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">Вход и перенос старых покупок.</p>
-          </div>
+          {telegramId ? <SyncButton syncing={syncing} onSync={syncTelegram} /> : null}
         </div>
-        {telegramId ? (
-          <button type="button" className="btn-secondary w-full shrink-0 sm:w-auto" onClick={() => void syncTelegram()} disabled={syncing}>
-            <RefreshCw className="h-4 w-4" />
-            {syncing ? 'Синхронизация...' : 'Синхронизировать'}
-          </button>
-        ) : null}
-      </div>
+      ) : telegramId ? (
+        <div className="mb-3 flex justify-end"><SyncButton syncing={syncing} onSync={syncTelegram} /></div>
+      ) : null}
 
       <div className="mb-3 grid gap-2 text-sm sm:grid-cols-3">
         <Info label="Telegram" value={telegramId ? `@${telegramUsername || telegramId}` : 'не привязан'} />
@@ -122,6 +121,15 @@ export function TelegramLinkCard({
       )}
 
     </div>
+  )
+}
+
+function SyncButton({ syncing, onSync }: { syncing: boolean; onSync: () => Promise<void> }) {
+  return (
+    <button type="button" className="btn-secondary w-full shrink-0 sm:w-auto" onClick={() => void onSync()} disabled={syncing}>
+      <RefreshCw className="h-4 w-4" />
+      {syncing ? 'Синхронизация...' : 'Синхронизировать'}
+    </button>
   )
 }
 

@@ -1,3 +1,5 @@
+import Link from 'next/link'
+import { Settings2 } from 'lucide-react'
 import { PageHeader } from '@/components/dashboard/page-header'
 import { NotificationsList } from '@/components/dashboard/notifications-list'
 import { requireAuth } from '@/lib/auth/guard'
@@ -24,8 +26,17 @@ export default async function NotificationsPage() {
   })
 
   return (
-    <div className="page-stack">
-      <PageHeader title="Уведомления" description="Только важные события по платежам, подписке и поддержке." />
+    <div className="user-workspace page-stack">
+      <PageHeader
+        title="Уведомления"
+        description="События по подписке, оплатам и поддержке."
+        action={(
+          <Link href="/dashboard/settings?section=notifications" className="btn-secondary w-full sm:w-auto">
+            <Settings2 className="h-4 w-4" />
+            Настроить
+          </Link>
+        )}
+      />
       <NotificationsList initialNotifications={notificationViews} />
     </div>
   )

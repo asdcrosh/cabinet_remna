@@ -68,17 +68,20 @@ test('мобильная навигация переносит второсте�
   await moreMenu.getByRole('link', { name: 'Настройки' }).click()
 
   await expect(page).toHaveURL(/\/dashboard\/settings(?:\?|$)/)
-  await expect(page.getByRole('heading', { name: 'Аккаунт' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Настройки' })).toBeVisible()
   const settingsTabs = page.getByRole('tablist', { name: 'Разделы настроек' })
-  await expect(settingsTabs.getByRole('tab')).toHaveCount(5)
-  const autoRenewalTab = settingsTabs.getByRole('tab', { name: 'Автопродление' })
-  await expect(autoRenewalTab).toBeVisible()
-  await autoRenewalTab.click()
-  await expect(page.getByText('Подключение только с согласия')).toBeVisible()
-  await expect(page.getByText('Отключение без поддержки')).toBeVisible()
+  await expect(settingsTabs.getByRole('tab')).toHaveCount(4)
+  await expect(settingsTabs.getByRole('tab', { name: 'Профиль' })).toBeVisible()
+  await settingsTabs.getByRole('tab', { name: 'Безопасность' }).click()
+  await expect(page.getByRole('heading', { name: 'Завершить сеанс' })).toBeVisible()
+  await settingsTabs.getByRole('tab', { name: 'Telegram' }).click()
+  await expect(page.getByRole('heading', { name: 'Telegram' }).first()).toBeVisible()
+  await settingsTabs.getByRole('tab', { name: 'Уведомления' }).click()
+  await expect(page.getByText('Колокольчик и история')).toBeVisible()
   expect(await settingsTabs.locator('..').evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true)
   await expectNoHorizontalOverflow(page)
 
+  await settingsTabs.getByRole('tab', { name: 'Безопасность' }).click()
   await page.getByRole('button', { name: 'Выйти' }).click()
   await expect(page).toHaveURL(/\/login(?:\?|$)/)
 })
@@ -176,6 +179,8 @@ test('активное подключение показывает добавл�
   await login(page, E2E_USERS.active.email)
   await page.goto('/dashboard/subscription')
 
+  await expect(page.getByRole('heading', { name: /Установите/ })).toBeVisible()
+  await page.getByText('Подписка и оплата', { exact: true }).click()
   const access = page.getByTestId('subscription-access')
   await expect(access.getByRole('heading', { name: 'Подписка активна' })).toBeVisible()
   const autoRenewal = page.getByRole('region', { name: 'Автопродление' })
@@ -190,15 +195,10 @@ test('активное подключение показывает добавл�
   await expect(cancelDialog.getByText(/Карта будет отвязана от аккаунта/)).toBeVisible()
   await expect(cancelDialog.getByText(/Доступ сохранится до/)).toBeVisible()
   await cancelDialog.getByRole('button', { name: 'Оставить включённым' }).click()
-  await expect(page.getByRole('heading', { name: 'Подключить ещё устройство' })).toBeVisible()
-  await expect(page.getByRole('button', { name: /Подключить в/ })).toBeVisible()
-  await expect(page.getByLabel('Устройство для подключения')).toBeVisible()
-  await expect(page.getByText('Rabbit Hole', { exact: true })).toHaveCount(0)
-
-  const devices = page.getByRole('region', { name: 'Устройства' })
-  await expect(devices.getByText('Pixel 8 · Android')).toBeVisible()
-  await expect(devices.getByText('Свободно мест: 4.')).toBeVisible()
-  await expect(devices.getByRole('button', { name: 'Подключить ещё', exact: true })).toBeVisible()
+  await expect(page.getByText('Как подключить другое устройство', { exact: true })).toBeVisible()
+  await page.getByRole('link', { name: 'Мои устройства' }).click()
+  await expect(page.getByRole('heading', { name: 'Устройства', level: 1 })).toBeVisible()
+  await expect(page.getByText(/Pixel 8/)).toBeVisible()
   await expectNoHorizontalOverflow(page)
 })
 
@@ -440,6 +440,38 @@ test('мобильные уведомления доступны через ме
 
   await expect(page).toHaveURL(/\/dashboard\/notifications(?:\?|$)/)
   await expect(page.getByRole('heading', { name: 'Уведомления' })).toBeVisible()
+  await expectNoHorizontalOverflow(page)
+})
+
+test('уведомления объединяются, сортируются по важности и имеют быстрые действия', async ({ page }) => {
+  await login(page, E2E_USERS.basic.email)
+  await page.goto('/dashboard/notifications')
+
+  await expect(page.getByRole('heading', { name: 'Требуют действия' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Обратите внимание' })).toBeVisible()
+  await expect(page.getByText('2 похожих')).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Проверить оплату' })).toHaveAttribute('href', '/dashboard/billing')
+  await expect(page.getByRole('link', { name: 'Открыть ответ' })).toHaveAttribute('href', '/dashboard/support')
+
+  await page.getByRole('button', { name: /^Новости/ }).click()
+  await expect(page.getByText('В разделе «Новости» ничего нет')).toBeVisible()
+  await page.getByRole('button', { name: 'Показать все' }).click()
+  await expect(page.getByText('2 похожих')).toBeVisible()
+  await expectNoHorizontalOverflow(page)
+})
+
+test('настройки и уведомления помещаются на маленьком телефоне и планшете', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop-chromium', 'Одна проверка охватывает оба дополнительных viewport')
+  await login(page, E2E_USERS.basic.email)
+
+  await page.setViewportSize({ width: 320, height: 720 })
+  await page.goto('/dashboard/settings?section=notifications')
+  await expect(page.getByRole('tab', { name: 'Уведомления' })).toHaveAttribute('aria-selected', 'true')
+  await expectNoHorizontalOverflow(page)
+
+  await page.setViewportSize({ width: 820, height: 1024 })
+  await page.goto('/dashboard/notifications')
+  await expect(page.getByRole('heading', { name: 'Требуют действия' })).toBeVisible()
   await expectNoHorizontalOverflow(page)
 })
 

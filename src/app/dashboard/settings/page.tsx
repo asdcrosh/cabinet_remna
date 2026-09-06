@@ -1,11 +1,11 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { ArrowRight, BadgeCheck, Bell, BookOpen, CircleAlert, CircleUserRound, Gift, Link2, LockKeyhole, MailPlus, ReceiptText } from 'lucide-react'
+import { ArrowRight, Bell, BookOpen, CircleUserRound, Gift, LockKeyhole, ReceiptText, Send } from 'lucide-react'
 import { getCurrentUser } from '@/lib/auth/cookies'
 import { prisma } from '@/lib/prisma'
 import { ChangePasswordForm } from '@/components/dashboard/change-password-form'
 import { ProfileForm } from '@/components/dashboard/profile-form'
-import { SettingsTabs } from '@/components/dashboard/settings-tabs'
+import { SettingsTabs, type SettingsTabId } from '@/components/dashboard/settings-tabs'
 import { TelegramLinkCard } from '@/components/dashboard/telegram-link-card'
 import { PageHeader } from '@/components/dashboard/page-header'
 import { LogoutButton } from '@/components/dashboard/logout-button'
@@ -13,48 +13,31 @@ import { getFeatureFlags } from '@/lib/feature-flags'
 import { legalNavigation } from '@/lib/legal-links'
 import { getNotificationPreferences } from '@/lib/notification-preferences'
 import { NotificationPreferencesPanel } from '@/components/dashboard/notification-preferences-panel'
-import { AutoRenewalCard } from '@/components/dashboard/auto-renewal-card'
-import { calculateAutoRenewalPurchase, getAutoRenewalState } from '@/lib/auto-renewal'
-import { getRetentionState } from '@/lib/subscription-retention'
-import { calculatePersonalDiscount } from '@/lib/user-discounts'
 
 export const dynamic = 'force-dynamic'
 
-export default async function SettingsPage() {
+export default async function SettingsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ section?: string | string[] }>
+}) {
   const telegramClientId = process.env.TELEGRAM_CLIENT_ID?.trim() || null
   const appUrl = process.env.APP_URL?.trim() || null
   const session = await getCurrentUser()
   if (!session) redirect('/login')
   const user = await prisma.user.findUnique({ where: { id: session.uid } })
   if (!user) redirect('/login')
-  const [features, notificationPreferences, currentSubscription, autoRenewal, retentionPause] = await Promise.all([
+  const [features, notificationPreferences, resolvedSearchParams] = await Promise.all([
     getFeatureFlags(),
     getNotificationPreferences(user.id),
-    prisma.subscription.findFirst({
-      where: { userId: user.id, status: { in: ['ACTIVE', 'LIMITED', 'PAUSED'] }, planId: { not: null } },
-      orderBy: { expireAt: 'desc' },
-      include: {
-        plan: {
-          select: {
-            id: true,
-            name: true,
-            priceKopecks: true,
-            durationDays: true,
-            unlimitedDuration: true,
-            deviceLimit: true,
-            maxDeviceLimit: true,
-            extraDevicePriceKopecks: true,
-          },
-        },
-      },
-    }),
-    getAutoRenewalState(user.id),
-    getRetentionState(user.id),
+    searchParams,
   ])
   const hasVerifiedEmail = Boolean(user.emailVerifiedAt && !user.email.endsWith('@pending.invalid'))
   const hasTelegram = Boolean(user.telegramId)
   const hasRemnashop = Boolean(user.remnashopUserId)
   const hasVpnProfile = Boolean(user.remnawaveId || user.remnawaveUuid || user.remnawaveUsername)
+  const requestedSection = Array.isArray(resolvedSearchParams.section) ? resolvedSearchParams.section[0] : resolvedSearchParams.section
+  const initialSection: SettingsTabId = isSettingsSection(requestedSection) ? requestedSection : 'account'
   const accountLinks = [
     { href: '/dashboard/billing', label: 'Покупки', description: 'Платежи и чеки', icon: ReceiptText, visible: true },
     { href: '/dashboard/referrals', label: 'Приглашения', description: 'Ссылка и вознаграждения', icon: Gift, visible: features.referrals },
@@ -65,10 +48,11 @@ export default async function SettingsPage() {
     <div className="user-workspace mx-auto max-w-7xl page-stack">
       <PageHeader
         title="Настройки"
-        description="Управляйте профилем, входом и уведомлениями в одном месте."
+        description="Профиль, безопасность, Telegram и уведомления."
       />
 
       <SettingsTabs
+        initialId={initialSection}
         sections={[
           {
             id: 'account',
@@ -91,7 +75,6 @@ export default async function SettingsPage() {
                     <p className="mt-0.5 text-xs leading-5 text-slate-500 dark:text-slate-400">Подключённые способы входа и профиль VPN.</p>
                     <div className="mt-3 divide-y divide-slate-200 dark:divide-white/[0.08]">
                       <AccountFact label="Email" value={hasVerifiedEmail ? 'Подтверждён' : 'Нужно подтвердить'} state={hasVerifiedEmail ? 'ready' : 'attention'} />
-                      <AccountFact label="Telegram" value={hasTelegram ? 'Подключён' : 'Не подключён'} state={hasTelegram ? 'ready' : 'neutral'} />
                       <AccountFact label="Старые покупки" value={hasRemnashop ? 'Найдены' : 'Не найдены'} state={hasRemnashop ? 'ready' : 'neutral'} />
                       <AccountFact
                         label="Профиль VPN"
@@ -99,118 +82,11 @@ export default async function SettingsPage() {
                         state={hasVpnProfile ? 'ready' : 'neutral'}
                       />
                     </div>
-                  </div>
-                </div>
-              </SettingsSection>
-            ),
-          },
-          {
-            id: 'auto-renewal',
-            title: 'Автопродление',
-            shortTitle: 'Оплата',
-            description: 'Регулярные списания',
-            children: currentSubscription?.plan && !currentSubscription.plan.unlimitedDuration ? (
-              <div className="space-y-3">
-                <AutoRenewalCard
-                  planId={currentSubscription.plan.id}
-                  planName={currentSubscription.plan.name}
-                  planPriceKopecks={currentRenewalPrice(
-                    currentSubscription.plan,
-                    currentSubscription.deviceLimit ?? currentSubscription.plan.deviceLimit,
-                    user.personalDiscountPercent
-                  )}
-                  planDurationDays={currentSubscription.plan.durationDays}
-                  planDeviceLimit={currentSubscription.deviceLimit ?? currentSubscription.plan.deviceLimit}
-                  initialState={autoRenewal ? {
-                    ...autoRenewal,
-                    paymentMethodSavedAt: autoRenewal.paymentMethodSavedAt?.toISOString() ?? null,
-                    consentAcceptedAt: autoRenewal.consentAcceptedAt?.toISOString() ?? null,
-                    nextChargeAt: autoRenewal.nextChargeAt?.toISOString() ?? null,
-                    lastAttemptAt: autoRenewal.lastAttemptAt?.toISOString() ?? null,
-                    lastSuccessAt: autoRenewal.lastSuccessAt?.toISOString() ?? null,
-                  } : null}
-                  initialPause={retentionPause ? {
-                    ...retentionPause,
-                    pauseUntil: retentionPause.pauseUntil?.toISOString() ?? null,
-                    createdAt: retentionPause.createdAt.toISOString(),
-                  } : null}
-                />
-                <AutoRenewalExplanation />
-              </div>
-            ) : (
-              <SettingsSection
-                id="auto-renewal"
-                title="Автопродление"
-                description="Станет доступно после покупки обычного тарифа"
-                icon={<ReceiptText className="h-5 w-5" />}
-              >
-                <div className="space-y-4">
-                  <AutoRenewalExplanation />
-                  <Link href="/dashboard/plans" className="btn-primary">Выбрать тариф</Link>
-                </div>
-              </SettingsSection>
-            ),
-          },
-          {
-            id: 'notifications',
-            title: 'Уведомления',
-            shortTitle: 'Уведомления',
-            description: 'Куда присылать события',
-            children: (
-              <SettingsSection
-                id="notifications"
-                title="Уведомления"
-                description="Выберите нужные каналы и отключите необязательные сообщения"
-                icon={<Bell className="h-5 w-5" />}
-              >
-                <NotificationPreferencesPanel initialPreferences={notificationPreferences} />
-              </SettingsSection>
-            ),
-          },
-          {
-            id: 'sync',
-            title: 'Способы входа',
-            shortTitle: 'Вход',
-            description: 'Telegram и email',
-            children: (
-              <SettingsSection
-                id="sync"
-                title="Вход в кабинет"
-                description="Подключите удобные способы входа и перенесите старые покупки"
-                icon={<Link2 className="h-5 w-5" />}
-              >
-                <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_19rem]">
-                  <div className="rounded-xl border border-slate-200 p-4 dark:border-white/[0.08]">
-                    <TelegramLinkCard
-                      telegramClientId={telegramClientId}
-                      appUrl={appUrl}
-                      telegramId={user.telegramId?.toString() ?? null}
-                      telegramUsername={user.telegramUsername}
-                      remnashopUserId={user.remnashopUserId}
-                      remnawaveUsername={user.remnawaveUsername}
-                      embedded
-                    />
-                  </div>
-                  <div className="flex flex-col rounded-xl border border-slate-200 p-4 dark:border-white/[0.08]">
-                    <div className="flex items-center gap-3">
-                      <MailPlus className="h-5 w-5 shrink-0 text-cyan-600 dark:text-cyan-300" />
-                      <div className="min-w-0">
-                        <h3 className="font-semibold text-slate-950 dark:text-white">Email</h3>
-                        <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
-                          {hasVerifiedEmail ? 'Email подтверждён' : 'Добавьте email для входа'}
-                        </p>
-                      </div>
-                    </div>
                     {!hasVerifiedEmail && user.telegramId ? (
-                      <Link href="/telegram-email" className="btn-primary mt-4 w-full justify-center">
+                      <Link href="/telegram-email" className="btn-secondary mt-3 w-full justify-center">
                         Добавить email
                       </Link>
-                    ) : (
-                      <div className={`mt-4 flex items-start gap-2 border-l-2 px-3 py-1.5 text-sm ${hasVerifiedEmail ? 'border-emerald-400 text-emerald-800 dark:text-emerald-100' : 'border-amber-400 text-amber-900 dark:text-amber-100'}`}>
-                        {hasVerifiedEmail ? <BadgeCheck className="mt-0.5 h-4 w-4 shrink-0" /> : <CircleAlert className="mt-0.5 h-4 w-4 shrink-0" />}
-                        <span className="min-w-0 break-all">{hasVerifiedEmail ? user.email : 'Сначала привяжите Telegram.'}</span>
-                      </div>
-                    )}
+                    ) : null}
                   </div>
                 </div>
               </SettingsSection>
@@ -219,22 +95,71 @@ export default async function SettingsPage() {
           {
             id: 'security',
             title: 'Безопасность',
-            shortTitle: 'Пароль',
-            description: 'Пароль и защита входа',
+            shortTitle: 'Безопасность',
+            description: 'Пароль и сеансы',
             children: (
               <SettingsSection
                 id="security"
                 title="Безопасность"
-                description="Смена пароля для входа по email"
+                description="Пароль и доступ к аккаунту"
                 icon={<LockKeyhole className="h-5 w-5" />}
               >
-                {hasVerifiedEmail ? (
-                  <ChangePasswordForm />
-                ) : (
-                  <div className="border-l-2 border-amber-400 px-3 py-1.5 text-sm text-amber-900 dark:text-amber-100">
-                    Добавьте и подтвердите email, чтобы включить вход по паролю.
+                <div className="space-y-5">
+                  {hasVerifiedEmail ? (
+                    <ChangePasswordForm />
+                  ) : (
+                    <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-400/20 dark:bg-amber-400/[0.08] dark:text-amber-100">
+                      Добавьте и подтвердите email, чтобы установить пароль.
+                    </div>
+                  )}
+                  <div className="rounded-xl border border-rose-200 bg-rose-50/70 p-4 dark:border-rose-400/20 dark:bg-rose-400/[0.06]">
+                    <h3 className="text-sm font-semibold text-rose-950 dark:text-rose-100">Завершить сеанс</h3>
+                    <p className="mt-1 text-sm text-rose-800/80 dark:text-rose-100/70">Потребуется снова войти на этом устройстве.</p>
+                    <div className="mt-3 max-w-40 overflow-hidden rounded-xl border border-rose-200 bg-white dark:border-rose-400/20 dark:bg-white/[0.04]">
+                      <LogoutButton />
+                    </div>
                   </div>
-                )}
+                </div>
+              </SettingsSection>
+            ),
+          },
+          {
+            id: 'telegram',
+            title: 'Telegram',
+            shortTitle: 'Telegram',
+            description: hasTelegram ? 'Аккаунт подключён' : 'Подключить аккаунт',
+            children: (
+              <SettingsSection
+                id="telegram"
+                title="Telegram"
+                description="Вход и перенос старых покупок"
+                icon={<Send className="h-5 w-5" />}
+              >
+                <TelegramLinkCard
+                  telegramClientId={telegramClientId}
+                  appUrl={appUrl}
+                  telegramId={user.telegramId?.toString() ?? null}
+                  telegramUsername={user.telegramUsername}
+                  remnashopUserId={user.remnashopUserId}
+                  remnawaveUsername={user.remnawaveUsername}
+                  embedded
+                />
+              </SettingsSection>
+            ),
+          },
+          {
+            id: 'notifications',
+            title: 'Уведомления',
+            shortTitle: 'Уведомления',
+            description: 'Каналы и рассылки',
+            children: (
+              <SettingsSection
+                id="notifications"
+                title="Уведомления"
+                description="Выберите, куда присылать события"
+                icon={<Bell className="h-5 w-5" />}
+              >
+                <NotificationPreferencesPanel initialPreferences={notificationPreferences} />
               </SettingsSection>
             ),
           },
@@ -244,7 +169,7 @@ export default async function SettingsPage() {
       <section aria-labelledby="account-links-title">
         <div className="mb-3">
           <h2 id="account-links-title" className="text-sm font-semibold text-slate-950 dark:text-white">Ещё в кабинете</h2>
-          <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Покупки, приглашения и необязательные бонусы находятся в отдельных разделах.</p>
+          <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Платежи, приглашения и бонусы.</p>
         </div>
         <div className="grid gap-2 sm:grid-cols-2">
           {accountLinks.map((item) => {
@@ -263,7 +188,7 @@ export default async function SettingsPage() {
         </div>
       </section>
 
-      <div className="grid gap-3 border-t border-slate-200 pt-4 dark:border-white/10 sm:grid-cols-[minmax(0,1fr)_10rem] sm:items-start">
+      <div className="border-t border-slate-200 pt-4 dark:border-white/10">
         <section aria-labelledby="legal-title">
           <div className="mb-2 flex items-center gap-2">
             <BookOpen className="h-4 w-4 text-slate-400" />
@@ -277,55 +202,13 @@ export default async function SettingsPage() {
             ))}
           </nav>
         </section>
-
-        <section className="overflow-hidden rounded-xl border border-slate-200 dark:border-white/10" aria-label="Выход из аккаунта">
-          <LogoutButton />
-        </section>
       </div>
     </div>
   )
 }
 
-function AutoRenewalExplanation() {
-  return (
-    <div className="grid gap-2 sm:grid-cols-2" aria-label="Подключение и отключение автопродления">
-      <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-3.5 dark:border-emerald-400/20 dark:bg-emerald-400/[0.05]">
-        <div className="flex items-center gap-2 text-sm font-semibold text-emerald-900 dark:text-emerald-100">
-          <BadgeCheck className="h-4 w-4 shrink-0" /> Подключение только с согласия
-        </div>
-        <p className="mt-1.5 text-xs leading-5 text-emerald-900/75 dark:text-emerald-100/70">
-          Включается отдельной кнопкой. До оплаты показываем сумму, периодичность и условия регулярных списаний.
-        </p>
-      </div>
-      <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3.5 dark:border-white/[0.09] dark:bg-white/[0.03]">
-        <div className="flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-white">
-          <CircleAlert className="h-4 w-4 shrink-0 text-slate-500" /> Отключение без поддержки
-        </div>
-        <p className="mt-1.5 text-xs leading-5 text-slate-600 dark:text-slate-300">
-          Нажмите «Отключить» в этой вкладке. Новых списаний не будет, а уже оплаченный доступ сохранится.
-        </p>
-      </div>
-    </div>
-  )
-}
-
-function currentRenewalPrice(
-  plan: {
-    priceKopecks: number
-    deviceLimit: number
-    maxDeviceLimit: number
-    extraDevicePriceKopecks: number
-  },
-  deviceLimit: number,
-  personalDiscountPercent: number
-) {
-  try {
-    const originalAmountKopecks = calculateAutoRenewalPurchase(plan, deviceLimit).originalAmountKopecks
-    const personalDiscount = calculatePersonalDiscount(plan.priceKopecks, personalDiscountPercent)
-    return originalAmountKopecks - (personalDiscount?.discountKopecks ?? 0)
-  } catch {
-    return plan.priceKopecks
-  }
+function isSettingsSection(value: string | undefined): value is SettingsTabId {
+  return value === 'account' || value === 'security' || value === 'telegram' || value === 'notifications'
 }
 
 function SettingsSection({

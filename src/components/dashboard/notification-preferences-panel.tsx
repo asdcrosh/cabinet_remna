@@ -14,10 +14,10 @@ const options: Array<{
   description: string
   icon: typeof Bell
 }> = [
-  { key: 'inAppEnabled', title: 'В кабинете', description: 'Важные события в колокольчике и истории', icon: Bell },
-  { key: 'telegramEnabled', title: 'Telegram', description: 'Срочные события в привязанный аккаунт', icon: Send },
-  { key: 'emailEnabled', title: 'Email', description: 'Важные письма на подтверждённый адрес', icon: Mail },
-  { key: 'broadcastsEnabled', title: 'Новости и предложения', description: 'Необязательные рассылки по включённым каналам', icon: Megaphone },
+  { key: 'inAppEnabled', title: 'В кабинете', description: 'Колокольчик и история', icon: Bell },
+  { key: 'telegramEnabled', title: 'Telegram', description: 'Срочные события', icon: Send },
+  { key: 'emailEnabled', title: 'Email', description: 'Важные письма', icon: Mail },
+  { key: 'broadcastsEnabled', title: 'Новости', description: 'Предложения и обновления', icon: Megaphone },
 ]
 
 export function NotificationPreferencesPanel({ initialPreferences }: { initialPreferences: NotificationPreferences }) {
@@ -65,7 +65,7 @@ export function NotificationPreferencesPanel({ initialPreferences }: { initialPr
         })}
       </div>
       <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-xs leading-5 text-slate-500">Подарки всегда сохраняются в истории бонусов, даже если уведомления выключены.</p>
+        <p className="text-xs leading-5 text-slate-500">Бонусы сохраняются в истории при любых настройках.</p>
         <button type="button" className="btn-primary w-full sm:w-auto" disabled={!dirty || saving} onClick={() => void save()}>
           {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
           Сохранить

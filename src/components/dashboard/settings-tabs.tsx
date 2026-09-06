@@ -1,10 +1,10 @@
 'use client'
 
 import { type ReactNode, useRef, useState } from 'react'
-import { Bell, Link2, LockKeyhole, RefreshCw, UserRound } from 'lucide-react'
+import { Bell, LockKeyhole, Send, UserRound } from 'lucide-react'
 import { cn } from '@/lib/cn'
 
-type SettingsTabId = 'account' | 'auto-renewal' | 'notifications' | 'sync' | 'security'
+export type SettingsTabId = 'account' | 'security' | 'telegram' | 'notifications'
 
 type SettingsTabSection = {
   id: SettingsTabId
@@ -16,14 +16,19 @@ type SettingsTabSection = {
 
 const tabIcons: Record<SettingsTabId, ReactNode> = {
   account: <UserRound className="h-4 w-4" />,
-  'auto-renewal': <RefreshCw className="h-4 w-4" />,
-  notifications: <Bell className="h-4 w-4" />,
-  sync: <Link2 className="h-4 w-4" />,
   security: <LockKeyhole className="h-4 w-4" />,
+  telegram: <Send className="h-4 w-4" />,
+  notifications: <Bell className="h-4 w-4" />,
 }
 
-export function SettingsTabs({ sections }: { sections: SettingsTabSection[] }) {
-  const [activeId, setActiveId] = useState<SettingsTabId>(sections[0]?.id ?? 'account')
+export function SettingsTabs({
+  sections,
+  initialId = 'account',
+}: {
+  sections: SettingsTabSection[]
+  initialId?: SettingsTabId
+}) {
+  const [activeId, setActiveId] = useState<SettingsTabId>(initialId)
   const activeSection = sections.find((section) => section.id === activeId) ?? sections[0]
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([])
 
@@ -64,10 +69,10 @@ export function SettingsTabs({ sections }: { sections: SettingsTabSection[] }) {
                 )}
                 onClick={() => setActiveId(section.id)}
                 onKeyDown={(event) => {
-                  if (event.key === 'ArrowRight') {
+                  if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
                     event.preventDefault()
                     selectTab((index + 1) % sections.length)
-                  } else if (event.key === 'ArrowLeft') {
+                  } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
                     event.preventDefault()
                     selectTab((index - 1 + sections.length) % sections.length)
                   } else if (event.key === 'Home') {
