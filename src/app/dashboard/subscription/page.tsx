@@ -4,17 +4,14 @@ import { redirect } from 'next/navigation'
 import type { ReactNode } from 'react'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth/cookies'
-import { remnawave, RemnawaveError, remnawaveUserReference } from '@/lib/remnawave'
-import { KeysCard } from '@/components/dashboard/keys-card'
-import { DevicesList } from '@/components/dashboard/devices-list'
+import { remnawave, RemnawaveError } from '@/lib/remnawave'
+import { ConnectionPage } from '@/components/dashboard/connection-page'
 import Link from 'next/link'
 import { ArrowRight, CalendarDays, ChevronDown, Clock3, Gauge, Globe2, ShieldAlert, Sparkles } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { EmptyState } from '@/components/dashboard/empty-state'
 import { getFeatureFlags } from '@/lib/feature-flags'
 import { formatSubscriptionDaysLeft, isSubscriptionExpired } from '@/lib/subscription-time'
-import { PageHeader } from '@/components/dashboard/page-header'
-import { VpnConnectionCheck } from '@/components/dashboard/vpn-connection-check'
 import { isWhitelistAddonCurrentlyActive } from '@/lib/whitelist-addon-policy'
 import { readPlanPurchaseSnapshot } from '@/lib/plan-purchase'
 import { logError } from '@/lib/logger'
@@ -148,15 +145,6 @@ export default async function SubscriptionPage() {
   )
   const whitelistAddonExpireAtLabel = localSubscription?.whitelistAddonExpireAt
     ?.toLocaleDateString('ru-RU', { timeZone: 'Europe/Moscow' }) ?? null
-  let isFirstConnection = false
-  if (!subscriptionExpired) {
-    try {
-      const devices = await remnawave.getUserDevices(remnawaveUserReference(user))
-      isFirstConnection = devices.response.devices.length === 0
-    } catch {
-      // Не прячем управление у существующего пользователя, если Remnawave временно не ответил.
-    }
-  }
   const statusText = graceActive
     ? 'Льготный период'
     : subscriptionExpired
@@ -166,14 +154,20 @@ export default async function SubscriptionPage() {
       : 'Подписка не активна'
 
   return (
-    <div className="user-workspace page-stack">
-      <PageHeader
-        title="Подключение"
-        description={isFirstConnection
-          ? 'Подключите первое устройство за три шага.'
-          : 'Откройте подписку в INСY и управляйте подключёнными устройствами.'}
-      />
-
+    <ConnectionPage
+      subscriptionUrl={data.response.subscriptionUrl}
+      happLink={happLink}
+      supportEnabled={features.support}
+      deviceLimit={localSubscription?.plan?.unlimitedDevices
+        ? null
+        : localSubscription?.deviceLimit ?? localSubscription?.plan?.deviceLimit}
+      expired={subscriptionExpired}
+      notice={graceActive ? (
+        <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-400/10 dark:text-amber-200">
+          Льготный период до {localSubscription?.graceExpireAt?.toLocaleDateString('ru-RU')}. <Link href="/dashboard/plans?intent=renew" className="underline">Продлить доступ</Link>
+        </p>
+      ) : null}
+    >
       <section
         data-testid="subscription-access"
         className={cn('connection-access-summary', subscriptionExpired && 'connection-access-summary--expired')}
@@ -209,9 +203,7 @@ export default async function SubscriptionPage() {
                   ? `Доступ сохранён до ${localSubscription?.graceExpireAt?.toLocaleString('ru-RU')}. Оплатите тариф, чтобы не потерять подключение.`
                   : subscriptionExpired
                   ? 'Продлите доступ, затем ссылка и устройства снова заработают без новой настройки.'
-                  : isFirstConnection
-                    ? 'Ссылка готова. Установите приложение, откройте подписку и включите VPN.'
-                    : 'Ссылка готова. Подключите новое устройство или управляйте теми, что уже добавлены.'}
+                  : 'Здесь можно продлить доступ и управлять оплатой.'}
               </p>
             </div>
           </div>
@@ -261,40 +253,6 @@ export default async function SubscriptionPage() {
         </div>
       </section>
 
-      {!subscriptionExpired ? (
-        isFirstConnection ? (
-          <KeysCard
-            subscriptionUrl={data.response.subscriptionUrl}
-            happLink={happLink}
-            onboarding
-            supportEnabled={features.support}
-          />
-        ) : (
-          <>
-            <div className="grid items-start gap-5 min-[1360px]:grid-cols-[minmax(0,1fr)_22rem]">
-              <KeysCard subscriptionUrl={data.response.subscriptionUrl} happLink={happLink} />
-              <DevicesList
-                embedded
-                deviceLimit={localSubscription?.plan?.unlimitedDevices
-                  ? null
-                  : localSubscription?.deviceLimit ?? localSubscription?.plan?.deviceLimit}
-              />
-            </div>
-            <details className="connection-alternatives">
-              <summary>Проверить, работает ли VPN</summary>
-              <div className="mt-4">
-                <VpnConnectionCheck
-                  supportEnabled={features.support}
-                  deviceLimit={localSubscription?.plan?.unlimitedDevices
-                    ? null
-                    : localSubscription?.deviceLimit ?? localSubscription?.plan?.deviceLimit}
-                />
-              </div>
-            </details>
-          </>
-        )
-      ) : null}
-
       {!subscriptionExpired && localSubscription?.plan && localSubscription.planId && !unlimitedDuration ? (
         <AutoRenewalCard
           planId={localSubscription.planId}
@@ -324,7 +282,7 @@ export default async function SubscriptionPage() {
       ) : null}
 
       <SubscriptionTimeline payments={payments} auditEvents={auditEvents} />
-    </div>
+    </ConnectionPage>
   )
 }
 

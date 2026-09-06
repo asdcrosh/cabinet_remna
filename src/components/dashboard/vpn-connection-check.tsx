@@ -44,13 +44,17 @@ type CheckState =
 export function VpnConnectionCheck({
   supportEnabled,
   onVerified,
+  onReconnect,
   deviceLimit,
   compact = false,
+  simple = false,
 }: {
   supportEnabled: boolean
   onVerified?: () => void
+  onReconnect?: () => void
   deviceLimit?: number | null
   compact?: boolean
+  simple?: boolean
 }) {
   const [state, setState] = useState<CheckState>({ status: 'idle' })
   const [copied, setCopied] = useState(false)
@@ -94,6 +98,31 @@ export function VpnConnectionCheck({
   }
 
   const result = state.status === 'complete' ? state.result : null
+
+  if (simple) {
+    return (
+      <div className="space-y-3" aria-live="polite">
+        <p className="text-sm leading-6 text-slate-500 dark:text-slate-400">Когда включите VPN, вернитесь сюда и проверьте подключение.</p>
+        <button type="button" className="btn-primary min-h-12 w-full justify-center" onClick={() => void checkConnection()} disabled={state.status === 'loading'}>
+          {state.status === 'loading' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wifi className="h-4 w-4" />}
+          {state.status === 'loading' ? 'Проверяем…' : result ? 'Проверить ещё раз' : 'Проверить подключение'}
+        </button>
+        {result && (
+          <div className="rounded-xl border border-slate-200 p-4 dark:border-white/10">
+            <p className="font-semibold">{result.title}</p>
+            <p className="mt-1 text-sm leading-6 text-slate-500 dark:text-slate-400">{result.summary}</p>
+            {result.tone !== 'success' && (
+              <div className="mt-2 text-sm underline">
+                {result.action === 'connection' && onReconnect
+                  ? <button type="button" className="min-h-11" onClick={onReconnect}>Вернуться к настройке</button>
+                  : <RecoveryAction action={result.action} supportEnabled={supportEnabled} />}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    )
+  }
 
   return (
     <section className={`connection-recovery ${compact ? 'connection-recovery--compact' : ''}`} aria-live="polite">
@@ -171,7 +200,7 @@ export function VpnConnectionCheck({
 
 function RecoveryAction({ action, supportEnabled }: { action: ConnectionResult['action']; supportEnabled: boolean }) {
   if (action === 'connection') return <a href="#connection">Открыть подключение <ChevronRight className="h-4 w-4" /></a>
-  if (action === 'devices') return <a href="#connected-devices">Управлять устройствами <ChevronRight className="h-4 w-4" /></a>
+  if (action === 'devices') return <Link href="/dashboard/devices">Управлять устройствами <ChevronRight className="h-4 w-4" /></Link>
   if (action === 'plans') return <Link href="/dashboard/plans?intent=renew">Продлить доступ <ChevronRight className="h-4 w-4" /></Link>
   if ((action === 'support' || action === 'retry') && supportEnabled) return <Link href="/dashboard/support">Открыть поддержку <ChevronRight className="h-4 w-4" /></Link>
   return null

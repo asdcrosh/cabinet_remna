@@ -1,20 +1,17 @@
-// Компактное подключение подписки: автоопределение устройства, deeplink, QR и инструкции в модалке.
+// Пошаговое подключение VPN с дополнительными способами по запросу.
 
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
 import Image from 'next/image'
-import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import {
   CheckCircle2,
   Copy,
   Download,
   ExternalLink,
   HelpCircle,
-  Laptop,
-  Monitor,
   QrCode,
-  RefreshCw,
   ShieldCheck,
   Smartphone,
 } from 'lucide-react'
@@ -31,8 +28,8 @@ type AppId = 'incy' | 'happ'
 interface KeysCardProps {
   subscriptionUrl: string
   happLink?: string | null
-  onboarding?: boolean
   supportEnabled?: boolean
+  deviceLimit?: number | null
 }
 
 interface AppOption {
@@ -62,7 +59,7 @@ const appOptions: AppOption[] = [
       : 'https://apps.apple.com/app/incy/id6756943388',
     steps: [
       'Установите INCY из App Store или Google Play.',
-      'Вернитесь в кабинет и нажмите “Открыть в INCY”.',
+      'Вернитесь в кабинет, нажмите «Уже установлено», затем «Добавить в INCY».',
       'Подтвердите импорт подписки, выберите сервер и включите VPN.',
     ],
   },
@@ -78,7 +75,7 @@ const appOptions: AppOption[] = [
     installUrl: 'https://happ.su',
     steps: [
       'Установите HAPP на устройство.',
-      'Нажмите “Подключить в HAPP”. Если приложение не открылось, используйте кнопку копирования.',
+      'На втором шаге нажмите «Добавить в HAPP». Если приложение не открылось, скопируйте ссылку.',
       'При ручном добавлении в HAPP нажмите “Буфер обмена” и подтвердите подписку.',
     ],
   },
@@ -88,10 +85,12 @@ const defaultApp = appOptions[0] as AppOption
 export function KeysCard({
   subscriptionUrl,
   happLink,
-  onboarding = false,
   supportEnabled = false,
+  deviceLimit,
 }: KeysCardProps) {
-  const router = useRouter()
+  const [step, setStep] = useState<1 | 2 | 3>(1)
+  const [installOpened, setInstallOpened] = useState(false)
+  const [ready, setReady] = useState(false)
   const [device, setDevice] = useState<Device>('desktop')
   const [selectedAppId, setSelectedAppId] = useState<AppId>('incy')
   const [instructionsOpen, setInstructionsOpen] = useState(false)
@@ -102,6 +101,7 @@ export function KeysCard({
 
   useEffect(() => {
     const detected = detectDevice(navigator.userAgent)
+    setReady(true)
     setDevice(detected)
     setSelectedAppId(recommendedAppForDevice(detected).id)
   }, [])
@@ -117,12 +117,13 @@ export function KeysCard({
     ? selectedApp.getOpenLinks({ subscriptionUrl, happLink, device })
     : selectedApp.deepLinks(subscriptionUrl)
   const primaryLink = selectedDeepLinks[0]
-  const selectedIsRecommended = selectedApp.id === recommendedAppForDevice(device).id
   const selectedInstallUrl = typeof selectedApp.installUrl === 'function'
     ? selectedApp.installUrl(device)
     : selectedApp.installUrl
 
   function selectDevice(nextDevice: Device) {
+    setStep(1)
+    setInstallOpened(false)
     setDevice(nextDevice)
     setSelectedAppId(recommendedAppForDevice(nextDevice).id)
   }
@@ -144,13 +145,13 @@ export function KeysCard({
 
     if (!primaryLink) {
       void copy(subscriptionUrl, 'Ссылка подписки')
-      toast('Ссылка скопирована. Добавьте её в приложение вручную.', 'success')
+      // The copy helper reports success only after clipboard access succeeds.
       setInstructionsOpen(true)
       return
     }
 
+    setStep(3)
     openExternal(primaryLink, selectedDeepLinks.slice(1), selectedApp.name)
-    toast(`Открываем ${selectedApp.name}. Если приложение не открылось, скопируйте ссылку вручную.`, 'success')
     window.setTimeout(() => {
       void navigator.clipboard?.writeText(subscriptionUrl).catch(() => undefined)
     }, 500)
@@ -169,151 +170,135 @@ export function KeysCard({
     }
   }
 
-  function finishFirstConnection() {
-    router.refresh()
-  }
-
   return (
     <section
       id="connection"
       aria-labelledby="connection-title"
       className="connection-panel overflow-hidden rounded-3xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.03]"
     >
-      <header className="flex flex-col gap-4 border-b border-slate-200 p-4 dark:border-white/10 sm:flex-row sm:items-start sm:justify-between sm:p-5">
-        <div className="min-w-0">
-          <h2 id="connection-title" className="text-lg font-semibold tracking-tight text-slate-950 dark:text-white">
-            {onboarding ? 'Подключить VPN' : 'Подключить это устройство'}
+      <div className="p-5 sm:p-7">
+        <div className="flex items-center justify-between gap-3 text-xs text-slate-500 dark:text-slate-400">
+          <span>Шаг {step} из 3</span>
+          <span>{ready ? deviceLabel(device) : 'Определяем устройство…'}</span>
+        </div>
+        <div className="mt-3 flex gap-1.5" aria-hidden="true">
+          {[1, 2, 3].map((value) => (
+            <span key={value} className={cn('h-1 flex-1 rounded-full', value <= step ? 'bg-brand-500' : 'bg-slate-200 dark:bg-white/10')} />
+          ))}
+        </div>
+
+        <div className="mt-6" aria-live="polite">
+          <h2 id="connection-title" className="text-xl font-semibold tracking-tight text-slate-950 dark:text-white sm:text-2xl">
+            {step === 1 ? `Установите ${selectedApp.name}` : step === 2 ? 'Добавьте настройку VPN' : 'Включите VPN в приложении'}
           </h2>
-          <p className="mt-1 text-sm leading-5 text-slate-500 dark:text-slate-400">
-            {onboarding
-              ? 'Установите приложение и добавьте в него VPN.'
-              : 'Используйте этот блок на устройстве, которое хотите подключить.'}
+          <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
+            {step === 1
+              ? 'Это приложение для работы VPN. После установки вернитесь на эту страницу.'
+              : step === 2
+                ? `Кнопка откроет ${selectedApp.name}. Разрешите открытие приложения и подтвердите добавление подписки.`
+                : `В ${selectedApp.name} подтвердите добавление, выберите сервер и нажмите кнопку включения. Разрешите VPN-подключение, если устройство спросит.`}
           </p>
         </div>
-        <label className="connection-device-picker">
-          <span className="connection-device-picker__label">Система</span>
-          <span className="connection-device-picker__control">
-            <DeviceIcon device={device} />
-            <select
-              aria-label="Устройство для подключения"
-              value={device}
-              onChange={(event) => selectDevice(event.target.value as Device)}
-            >
-              <option value="macos">macOS</option>
-              <option value="ios">iPhone / iPad</option>
-              <option value="android">Android</option>
-              <option value="windows">Windows</option>
-              <option value="desktop">Другой компьютер</option>
-            </select>
-          </span>
-        </label>
-      </header>
 
-      <div className="p-4 sm:p-5">
-        <div className="connection-first-run">
-          <div className="connection-first-run__step">
-            <span className="connection-first-run__number">1</span>
-            <div className="min-w-0 flex-1">
-              <h3 className="text-sm font-semibold text-slate-950 dark:text-white">Установите {selectedApp.name}</h3>
-              <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
-                {selectedIsRecommended
-                  ? `Подходит для ${deviceLabel(device)}.`
-                  : `Выбран вариант для ${deviceLabel(device)}.`}
-              </p>
-            </div>
-            <a
-              href={selectedInstallUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="btn-secondary connection-first-run__action"
-            >
-              <Download className="h-4 w-4" />
-              {installButtonLabel(selectedApp, device)}
-            </a>
+        {step === 1 && (
+          <div className="mt-6 space-y-3">
+            {installOpened ? (
+              <>
+                <button type="button" className="btn-primary min-h-12 w-full justify-center" onClick={() => setStep(2)}>
+                  Установлено. Продолжить
+                </button>
+                <a href={selectedInstallUrl} target="_blank" rel="noreferrer" className="flex min-h-11 items-center justify-center text-sm text-slate-500 hover:underline dark:text-slate-400">
+                  Открыть страницу установки ещё раз
+                </a>
+              </>
+            ) : (
+              <>
+                <a
+                  href={ready ? selectedInstallUrl : undefined}
+                  aria-disabled={!ready}
+                  onClick={(event) => {
+                    if (!ready) { event.preventDefault(); return }
+                    setInstallOpened(true)
+                  }}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="btn-primary min-h-12 w-full justify-center"
+                >
+                  <Download className="h-4 w-4" />
+                  {ready ? `Установить ${selectedApp.name}` : 'Подождите…'}
+                </a>
+                <button type="button" disabled={!ready} className="min-h-11 w-full text-sm font-medium text-slate-600 disabled:opacity-50 dark:text-slate-300" onClick={() => setStep(2)}>
+                  Уже установлено
+                </button>
+              </>
+            )}
           </div>
+        )}
 
-          <div className="connection-first-run__step">
-            <span className="connection-first-run__number">2</span>
-            <div className="min-w-0 flex-1">
-              <h3 className="text-sm font-semibold text-slate-950 dark:text-white">Добавьте VPN</h3>
-              <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
-                Нажмите кнопку и подтвердите добавление в приложении.
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={openInApp}
-              disabled={!subscriptionUrl}
-              className="btn-primary connection-first-run__action"
-            >
-              <ExternalLink className="h-4 w-4" />
-              Добавить VPN
-            </button>
+        {step === 2 && (
+          <button type="button" onClick={openInApp} disabled={!subscriptionUrl || !ready} className="btn-primary mt-6 min-h-12 w-full justify-center">
+            <ExternalLink className="h-4 w-4" />
+            Добавить в {selectedApp.name}
+          </button>
+        )}
+
+        {step === 3 && (
+          <div className="mt-6">
+            <VpnConnectionCheck supportEnabled={supportEnabled} deviceLimit={deviceLimit} onReconnect={() => setStep(2)} simple />
           </div>
+        )}
 
-          <div className="flex items-start gap-2 rounded-xl bg-emerald-50 px-3 py-2.5 text-sm leading-5 text-emerald-900 dark:bg-emerald-400/10 dark:text-emerald-100">
-            <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
-            <span>После добавления откройте {selectedApp.name} и включите VPN.</span>
-          </div>
+        {step > 1 && (
+          <button type="button" className="mt-3 min-h-11 w-full text-sm text-slate-500 dark:text-slate-400" onClick={() => setStep(step === 3 ? 2 : 1)}>
+            {step === 3 ? 'Вернуться к добавлению' : 'Назад к установке'}
+          </button>
+        )}
 
-          {onboarding && (
-            <div className="connection-first-run__step connection-first-run__step--check">
-              <span className="connection-first-run__number">3</span>
-              <VpnConnectionCheck supportEnabled={supportEnabled} onVerified={finishFirstConnection} compact />
-            </div>
-          )}
-
-          <details className="connection-alternatives">
-            <summary>Не получилось подключить?</summary>
-            <p className="mt-2 text-xs leading-5 text-slate-500 dark:text-slate-400">
-              Откройте подробную инструкцию или выберите другой способ.
-            </p>
-            <div className="connection-connect__tools mt-3" aria-label="Другие способы подключения">
-              <button type="button" onClick={() => setInstructionsOpen(true)}>
-                <HelpCircle className="h-4 w-4" />
-                Подробная инструкция
-              </button>
-              <button type="button" onClick={() => copy(subscriptionUrl, 'Ссылка подписки')} disabled={!subscriptionUrl}>
-                {copied ? <CheckCircle2 className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
-                {copied ? 'Ссылка скопирована' : 'Скопировать ссылку'}
-              </button>
-              <button type="button" onClick={() => setQrOpen(true)}>
-                <QrCode className="h-4 w-4" />
-                Показать QR-код
-              </button>
-            </div>
-
+        <details className="mt-5 border-t border-slate-200 pt-4 dark:border-white/10" key={step}>
+          <summary className="cursor-pointer py-2 text-sm font-medium text-slate-600 dark:text-slate-300">
+            {step === 1 ? 'Не подходит приложение?' : 'Не получается?'}
+          </summary>
+          <div className="mt-3 space-y-4">
+            <label className="block text-sm text-slate-600 dark:text-slate-300">
+              Система устройства
+              <select className="input mt-2 w-full" value={device} onChange={(event) => selectDevice(event.target.value as Device)}>
+                <option value="ios">iPhone / iPad</option>
+                <option value="android">Android</option>
+                <option value="macos">macOS</option>
+                <option value="windows">Windows</option>
+                <option value="desktop">Linux / другой компьютер</option>
+              </select>
+            </label>
             {compatibleApps.length > 1 && (
-              <div className="mt-4">
-                <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">Другое приложение</p>
-                <div className="mt-2 grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="Приложение для подключения">
-                  {compatibleApps.map((option) => (
-                    <AppChoice
-                      key={option.id}
-                      option={option}
-                      selected={option.id === selectedApp.id}
-                      onSelect={() => setSelectedAppId(option.id)}
-                    />
-                  ))}
-                </div>
+              <div className="grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="Приложение для подключения">
+                {compatibleApps.map((option) => (
+                  <AppChoice key={option.id} option={option} selected={option.id === selectedApp.id} onSelect={() => {
+                    setSelectedAppId(option.id)
+                    setStep(1)
+                    setInstallOpened(false)
+                  }} />
+                ))}
               </div>
             )}
-          </details>
-        </div>
+            <div className="grid gap-2">
+              <button type="button" className="btn-secondary justify-center" onClick={() => setInstructionsOpen(true)}>
+                <HelpCircle className="h-4 w-4" /> Инструкция для {selectedApp.name}
+              </button>
+              <button type="button" className="btn-secondary justify-center" onClick={() => copy(subscriptionUrl, 'Ссылка подписки')} disabled={!subscriptionUrl}>
+                <Copy className="h-4 w-4" /> {copied ? 'Ссылка скопирована' : 'Скопировать ссылку'}
+              </button>
+              <button type="button" className="btn-secondary justify-center" onClick={() => setQrOpen(true)} disabled={!subscriptionUrl}>
+                <QrCode className="h-4 w-4" /> QR-код для приложения
+              </button>
+            </div>
+            <p className="text-xs leading-5 text-slate-500">Ссылка даёт доступ к вашему VPN. Не отправляйте её другим людям.</p>
+            <button type="button" onClick={() => setConfirmOpen(true)} disabled={revoking} className="min-h-11 text-xs text-slate-500 hover:underline">
+              {revoking ? 'Обновляем…' : 'Сменить ссылку доступа'}
+            </button>
+            {supportEnabled && <Link href="/dashboard/support" className="block py-2 text-sm font-medium underline">Написать в поддержку</Link>}
+          </div>
+        </details>
       </div>
-
-      {!onboarding && <footer className="flex flex-col gap-2 border-t border-slate-200 px-4 py-3 text-xs text-slate-500 dark:border-white/10 dark:text-slate-400 sm:flex-row sm:items-center sm:justify-between sm:px-5">
-        <span>Ссылка приватная. Не пересылайте её другим людям.</span>
-        <button
-          type="button"
-          onClick={() => setConfirmOpen(true)}
-          disabled={revoking}
-          className="inline-flex min-h-8 w-fit items-center gap-1.5 font-semibold text-slate-500 hover:text-slate-950 disabled:opacity-60 dark:text-slate-400 dark:hover:text-white"
-        >
-          <RefreshCw className="h-3.5 w-3.5" />
-          {revoking ? 'Обновляем' : 'Сменить ссылку'}
-        </button>
-      </footer>}
 
       <InstructionModal
         open={instructionsOpen}
@@ -325,7 +310,7 @@ export function KeysCard({
       />
       <QrModal open={qrOpen} subscriptionUrl={subscriptionUrl} onClose={() => setQrOpen(false)} />
 
-      {!onboarding && <ConfirmDialog
+      <ConfirmDialog
         open={confirmOpen}
         title="Обновить ссылку подписки?"
         description="Старая ссылка перестанет работать. На подключённых устройствах потребуется добавить новую."
@@ -336,7 +321,7 @@ export function KeysCard({
           await revoke()
           setConfirmOpen(false)
         }}
-      />}
+      />
     </section>
   )
 }
@@ -423,7 +408,7 @@ function InstructionModal({
       <div className="mt-4 rounded-xl border border-cyan-100 bg-cyan-50/70 p-3 text-sm leading-6 text-cyan-950 dark:border-cyan-400/20 dark:bg-cyan-400/10 dark:text-cyan-100">
         <div className="flex gap-2">
           <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
-          <span>Если приложение не открылось автоматически, ссылка уже может быть скопирована. Добавьте её вручную как URL подписки.</span>
+          <span>Если приложение не открылось, нажмите «Скопировать», затем добавьте ссылку в приложении как подписку.</span>
         </div>
       </div>
     </Modal>
@@ -449,12 +434,6 @@ function QrModal({ open, subscriptionUrl, onClose }: { open: boolean; subscripti
       )}
     </Modal>
   )
-}
-
-function DeviceIcon({ device }: { device: Device }) {
-  if (device === 'ios' || device === 'android') return <Smartphone className="h-3.5 w-3.5" />
-  if (device === 'macos') return <Laptop className="h-3.5 w-3.5" />
-  return <Monitor className="h-3.5 w-3.5" />
 }
 
 function detectDevice(userAgent: string): Device {
@@ -558,13 +537,5 @@ function deviceLabel(device: Device) {
   if (device === 'android') return 'Android'
   if (device === 'macos') return 'macOS'
   if (device === 'windows') return 'Windows'
-  return 'Устройство'
-}
-
-function installButtonLabel(app: AppOption, device: Device) {
-  if (app.id !== 'incy') return 'Установить приложение'
-  if (device === 'android') return 'Скачать в Google Play'
-  if (device === 'ios') return 'Скачать в App Store'
-  if (device === 'macos') return 'Скачать для macOS'
-  return 'Установить INCY'
+  return 'Linux / другой компьютер'
 }
