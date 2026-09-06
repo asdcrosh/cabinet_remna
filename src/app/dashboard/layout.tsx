@@ -84,10 +84,12 @@ export default async function DashboardLayout({ children }: { children: React.Re
           </div>
         </aside>
         <main className="dashboard-main min-w-0 w-full overflow-x-clip xl:ml-64 xl:w-auto">
-          <div className="dashboard-topbar z-50 hidden sm:fixed sm:right-6 sm:top-4 sm:flex sm:h-auto sm:w-auto sm:items-center sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-none">
-            <NotificationBell showAdmin={isStaff} />
+          <div className="dashboard-content-frame mx-auto grid w-full max-w-[92rem] min-w-0 grid-cols-[minmax(0,1fr)] px-4 pb-28 pt-5 sm:grid-cols-[minmax(0,1fr)_2.75rem] sm:gap-x-4 sm:px-7 sm:pt-8 xl:px-9 xl:pb-14 xl:pt-9">
+            <div id="dashboard-content" className="page-transition col-start-1 row-start-1 min-w-0 scroll-mt-20">{children}</div>
+            <div className="dashboard-topbar relative z-50 hidden self-start sm:col-start-2 sm:row-start-1 sm:flex">
+              <NotificationBell showAdmin={isStaff} />
+            </div>
           </div>
-          <div id="dashboard-content" className="page-transition mx-auto w-full max-w-[92rem] min-w-0 scroll-mt-20 px-4 pb-28 pt-5 sm:px-7 sm:pt-8 xl:px-9 xl:pb-14 xl:pr-24 xl:pt-9">{children}</div>
         </main>
         <MobileBottomNav role={role} badges={navBadges} features={features} />
       </div>

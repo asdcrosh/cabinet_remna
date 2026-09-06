@@ -19,25 +19,6 @@
   line-height: 1.2;
 }
 
-@media (min-width: 640px) {
-  .header { padding-right: 60px; }
-
-  :global(.dashboard-main):has(.header) { position: relative; }
-
-  :global(.dashboard-main):has(.header) :global(.dashboard-topbar) {
-    position: absolute;
-    top: 32px;
-    right: max(28px, calc((100% - 92rem) / 2 + 28px));
-  }
-}
-
-@media (min-width: 1280px) {
-  :global(.dashboard-main):has(.header) :global(.dashboard-topbar) {
-    top: 36px;
-    right: max(96px, calc((100% - 92rem) / 2 + 96px));
-  }
-}
-
 .overview { display: grid; grid-template-columns: minmax(0, 1fr) 235px; gap: 16px; }
 .access {
   position: relative;

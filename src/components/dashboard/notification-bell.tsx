@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { createPortal } from 'react-dom'
 import { Bell, CheckCheck, ExternalLink, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import type { UserNotificationView } from '@/lib/user-notifications'
@@ -37,7 +36,6 @@ export function NotificationBell({ showAdmin = false }: { showAdmin?: boolean })
   const [tab, setTab] = useState<'user' | 'admin'>('user')
   const [summary, setSummary] = useState<NotificationSummary>({ unreadCount: 0, notifications: [] })
   const [adminSummary, setAdminSummary] = useState<AdminNotificationSummary>({ unreadCount: 0, notifications: [] })
-  const [mounted, setMounted] = useState(false)
   const [clearConfirmOpen, setClearConfirmOpen] = useState(false)
   const [clearLoading, setClearLoading] = useState(false)
   const rootRef = useRef<HTMLDivElement | null>(null)
@@ -176,10 +174,6 @@ export function NotificationBell({ showAdmin = false }: { showAdmin?: boolean })
   }
 
   useEffect(() => {
-    setMounted(true)
-  }, [])
-
-  useEffect(() => {
     void refresh()
     const interval = window.setInterval(() => {
       if (document.visibilityState === 'visible') void refresh()
@@ -256,7 +250,7 @@ export function NotificationBell({ showAdmin = false }: { showAdmin?: boolean })
       aria-labelledby="notification-panel-title"
       tabIndex={-1}
       onKeyDown={handlePanelKeyDown}
-      className="fixed inset-x-2 top-[4.5rem] z-[120] max-h-[72dvh] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl shadow-slate-950/10 dark:border-white/10 dark:bg-surface-950 dark:shadow-black/30 sm:inset-x-auto sm:right-6 sm:w-[min(24rem,calc(100vw-2rem))] sm:max-h-[34rem]"
+      className="absolute right-0 top-[calc(100%+0.75rem)] z-[120] max-h-[72dvh] w-[min(24rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl shadow-slate-950/10 dark:border-white/10 dark:bg-surface-950 dark:shadow-black/30 sm:max-h-[34rem]"
     >
       <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 dark:border-white/10">
         <div>
@@ -390,7 +384,7 @@ export function NotificationBell({ showAdmin = false }: { showAdmin?: boolean })
         )}
       </button>
 
-      {mounted && panel ? createPortal(panel, document.body) : null}
+      {panel}
       <ConfirmDialog
         open={clearConfirmOpen}
         title="Очистить уведомления"
