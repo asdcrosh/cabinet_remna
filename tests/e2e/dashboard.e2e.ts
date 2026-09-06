@@ -17,7 +17,7 @@ test('главная показывает подписку и быстрые д�
   for (const theme of ['light', 'dark']) {
     await page.evaluate((value) => document.documentElement.classList.toggle('dark', value === 'dark'), theme)
     await expectNoHorizontalOverflow(page)
-    await page.screenshot({ path: testInfo.outputPath(`home-${theme}.png`), fullPage: true })
+    await page.screenshot({ path: testInfo.outputPath(`home-${theme}.png`), fullPage: true, animations: 'disabled' })
   }
   await actions.getByRole('link', { name: /Подключить VPN/ }).click()
   await expect(page).toHaveURL(/\/dashboard\/subscription(?:\?|$)/)

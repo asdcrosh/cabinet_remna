@@ -6,43 +6,36 @@
 
 .header {
   display: flex;
+  min-height: 44px;
   align-items: center;
-  justify-content: space-between;
-  gap: 20px;
-  padding: 6px 0;
-}
-
-.headerEyebrow {
-  margin-bottom: 12px;
-  color: var(--app-muted);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: .12em;
-  text-transform: uppercase;
 }
 
 .header h1 {
   overflow-wrap: anywhere;
   color: var(--app-text);
-  font-size: clamp(28px, 3vw, 40px);
+  font-size: clamp(24px, 2.5vw, 30px);
   font-weight: 600;
-  letter-spacing: -.045em;
-  line-height: 1.15;
+  letter-spacing: -.035em;
+  line-height: 1.2;
 }
 
-.header p { margin-top: 10px; color: var(--app-muted); font-size: 14px; line-height: 1.6; }
-.avatar {
-  display: grid;
-  width: 48px;
-  height: 48px;
-  flex: 0 0 auto;
-  place-items: center;
-  border: 1px solid var(--app-border);
-  border-radius: 50%;
-  background: var(--app-surface);
-  color: var(--app-text);
-  font-size: 18px;
-  font-weight: 600;
+@media (min-width: 640px) {
+  .header { padding-right: 60px; }
+
+  :global(.dashboard-main):has(.header) { position: relative; }
+
+  :global(.dashboard-main):has(.header) :global(.dashboard-topbar) {
+    position: absolute;
+    top: 32px;
+    right: max(28px, calc((100% - 92rem) / 2 + 28px));
+  }
+}
+
+@media (min-width: 1280px) {
+  :global(.dashboard-main):has(.header) :global(.dashboard-topbar) {
+    top: 36px;
+    right: max(96px, calc((100% - 92rem) / 2 + 96px));
+  }
 }
 
 .overview { display: grid; grid-template-columns: minmax(0, 1fr) 235px; gap: 16px; }
@@ -110,10 +103,6 @@
 
 @media (max-width: 639px) {
   .page { gap: 24px; }
-  .header { gap: 12px; }
-  .headerEyebrow { font-size: 10px; margin-bottom: 10px; }
-  .header p { font-size: 13px; }
-  .avatar { width: 40px; height: 40px; }
   .access { min-height: 350px; padding: 22px; border-radius: 20px; }
   .accessContent { margin-top: 20px; }
   .planName { max-width: 100%; font-size: 18px; }

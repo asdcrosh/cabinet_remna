@@ -83,12 +83,7 @@ export default async function DashboardHome() {
   if (!user.remnawaveUsername) {
     return (
       <div className={cn('user-workspace', styles.page)}>
-        <HomeHeader
-          name={dashboardDisplayName(user.name, user.email)}
-          description={user.payments[0]
-            ? 'Оплата ещё не завершена. Продолжите с того же места.'
-            : 'Начните с подписки, затем подключите свои устройства.'}
-        />
+        <HomeHeader name={dashboardDisplayName(user.name, user.email)} />
         {user.payments[0] ? (
           <PendingPaymentCard payment={user.payments[0]} />
         ) : (
@@ -215,14 +210,7 @@ export default async function DashboardHome() {
     : null
   return (
     <div className={cn('user-workspace', styles.page)}>
-      <HomeHeader
-        name={dashboardDisplayName(user.name, user.email)}
-        description={subscriptionExpired
-          ? 'Доступ остановлен, профиль сохранён и готов к повторной активации.'
-          : user._count.devices === 0
-            ? 'Подписка готова. Теперь подключите первое устройство.'
-            : 'Ваш доступ, устройства и всё, что нужно для подключения.'}
-      />
+      <HomeHeader name={dashboardDisplayName(user.name, user.email)} />
 
       {remnawaveErrorStatus !== null && (
         <div className="flex flex-col gap-3 rounded-2xl border border-amber-200/80 bg-amber-50/80 px-4 py-3.5 text-sm text-amber-900 shadow-sm dark:border-amber-500/25 dark:bg-amber-500/[0.08] dark:text-amber-100 sm:flex-row sm:items-center sm:justify-between">
@@ -371,17 +359,10 @@ function bonusAttemptLabel(count: number) {
   return 'попыток'
 }
 
-function HomeHeader({ name, description }: { name: string; description: string }) {
+function HomeHeader({ name }: { name: string }) {
   return (
     <header className={styles.header}>
-      <div>
-        <div className={styles.headerEyebrow}>Главная / Обзор</div>
-        <h1>Привет, {name}</h1>
-        <p>{description}</p>
-      </div>
-      <Link href="/dashboard/settings" className={styles.avatar} aria-label="Настройки аккаунта">
-        {name.slice(0, 1).toLocaleUpperCase('ru-RU')}
-      </Link>
+      <h1>Привет, {name}</h1>
     </header>
   )
 }
