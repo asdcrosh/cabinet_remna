@@ -133,7 +133,7 @@ test('мобильный выбор тарифа открывает оплату
   const period = catalog.locator('article').filter({ hasText: 'E2E Стандарт' }).first()
   await period.scrollIntoViewIfNeeded()
   await expect(period.getByText('7 дней', { exact: false })).toBeVisible()
-  await period.getByRole('button', { name: 'Оплатить' }).click()
+  await period.getByRole('button', { name: 'Выбрать', exact: true }).click()
 
   const checkout = page.getByRole('dialog', { name: 'Оформление подписки' })
   await expect(checkout).toBeVisible()

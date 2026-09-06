@@ -71,8 +71,9 @@ export default async function PlansPage({
     : new Set<string>()
   const currentSubscription = session
     ? await prisma.subscription.findFirst({
-        where: { userId: session.uid, status: { in: ['ACTIVE', 'LIMITED'] } },
+        where: { userId: session.uid, status: { in: ['ACTIVE', 'LIMITED'] }, expireAt: { gt: new Date() } },
         orderBy: { expireAt: 'desc' },
+        include: { plan: { select: { name: true, unlimitedDuration: true, unlimitedDevices: true, deviceLimit: true } } },
       })
     : null
   const whitelistAddonEntitlement = session
@@ -163,7 +164,7 @@ export default async function PlansPage({
     && autoRenewal?.status === 'ACTIVE'
     && autoRenewal.paymentMethodSavedAt
   )
-  const currentPlanName = plans.find((plan) => plan.id === currentSubscription?.planId)?.name ?? null
+  const currentPlanName = currentSubscription?.plan?.name ?? null
   const currentWhitelistAddonActive = Boolean(
     whitelistAddonEntitlement
     && hasWhitelistAddonEntitlement(whitelistAddonEntitlement)
@@ -226,7 +227,7 @@ export default async function PlansPage({
     <div className="user-workspace page-stack">
       <PageHeader
         title="Тарифы"
-        description="Один доступ, разные сроки. Чем дольше период, тем ниже цена дня."
+        description="Выберите тариф и настройте подписку под свои устройства."
         action={(
           <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
             {canManagePlans && (
@@ -244,20 +245,28 @@ export default async function PlansPage({
         )}
       />
 
-      {isRenewIntent && (
-        <section className="relative flex items-start gap-3 overflow-hidden rounded-[1.25rem] border border-cyan-200/80 bg-gradient-to-br from-cyan-50 via-white to-sky-50/70 p-4 text-sm text-slate-700 shadow-[0_12px_32px_-25px_rgba(8,145,178,0.55)] dark:border-cyan-400/15 dark:from-cyan-500/[0.09] dark:via-white/[0.025] dark:to-sky-500/[0.05] dark:text-slate-200">
-          <div className="pointer-events-none absolute -right-10 -top-14 h-28 w-28 rounded-full bg-cyan-300/20 blur-2xl dark:bg-cyan-300/10" />
-          <span className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-cyan-500/10 text-cyan-700 ring-1 ring-cyan-500/15 dark:text-cyan-200">
-            <RefreshCw className="h-4 w-4" />
-          </span>
-          <div className="min-w-0">
-            <div className="font-semibold">Продление подписки</div>
-            <div className="mt-1 leading-5 text-slate-500 dark:text-slate-400">
-              Можно выбрать текущий или другой тариф. Оплаченный срок добавится автоматически.
+      {currentSubscription ? (
+        <section aria-label="Текущая подписка" className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-5 dark:border-white/10 dark:bg-white/[0.03] sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex min-w-0 items-start gap-3">
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"><ShieldCheck className="h-5 w-5" /></span>
+            <div className="min-w-0">
+              <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Текущая подписка</p>
+              <h2 className="mt-1 break-words text-lg font-semibold">{currentPlanName ?? 'VPN-подписка'}</h2>
+              <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
+                {currentSubscription.plan?.unlimitedDuration ? 'Бессрочно' : `Оплачено до ${currentSubscription.expireAt.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Moscow' })}`}
+                {' · '}{currentSubscription.plan?.unlimitedDevices ? 'Безлимит устройств' : `До ${currentDeviceLimit ?? currentSubscription.plan?.deviceLimit ?? '—'} устройств`}
+              </p>
             </div>
           </div>
+          <Link href="/dashboard/billing" className="inline-flex min-h-11 shrink-0 items-center gap-2 text-sm font-semibold">Подписка и платежи <ArrowRight className="h-4 w-4" /></Link>
         </section>
-      )}
+      ) : null}
+
+      {isRenewIntent ? (
+        <p className="text-sm leading-6 text-slate-500 dark:text-slate-400">
+          При продлении текущего тарифа дни добавятся к подписке. При переходе на другой тариф начнётся новый срок, оставшиеся дни не переносятся.
+        </p>
+      ) : null}
 
       {needsTelegramCheckForPromo && (
         <div className="relative flex items-center gap-3 overflow-hidden rounded-[1.25rem] border border-amber-200/80 bg-gradient-to-br from-amber-50 via-white to-orange-50/70 p-4 text-sm text-slate-800 shadow-[0_12px_32px_-25px_rgba(217,119,6,0.5)] dark:border-amber-400/15 dark:from-amber-500/[0.09] dark:via-white/[0.025] dark:to-orange-500/[0.05] dark:text-slate-100">
@@ -276,6 +285,14 @@ export default async function PlansPage({
           </Link>
         </div>
       )}
+
+      {planViews.length > 0 ? (
+        <PlanCatalog
+          key={`${currentSubscription?.planId ?? 'none'}:${currentDeviceLimit ?? 'unknown'}:${linkedPlanId ?? ''}`}
+          plans={planViews}
+          initialPlanId={linkedPlanId}
+        />
+      ) : null}
 
       {autoRenewalAvailable ? (
         <section className="relative flex flex-col gap-3 overflow-hidden rounded-[1.25rem] border border-slate-200/80 bg-white p-4 shadow-[0_14px_36px_-28px_rgba(15,23,42,0.45)] dark:border-white/[0.09] dark:bg-white/[0.035] sm:flex-row sm:items-center sm:justify-between" aria-label="Автопродление">
@@ -306,14 +323,6 @@ export default async function PlansPage({
             </Link>
           ) : null}
         </section>
-      ) : null}
-
-      {planViews.length > 0 ? (
-        <PlanCatalog
-          key={`${currentSubscription?.planId ?? 'none'}:${currentDeviceLimit ?? 'unknown'}:${linkedPlanId ?? ''}`}
-          plans={planViews}
-          initialPlanId={linkedPlanId}
-        />
       ) : null}
 
       {planViews.length === 0 && (

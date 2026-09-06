@@ -2,11 +2,12 @@
 
 import type { ReactNode } from 'react'
 import { useMemo, useState } from 'react'
-import { ArrowRight, Check, Sparkles } from 'lucide-react'
+import { ArrowRight, Check } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { formatPrice } from '@/lib/format'
 import { Modal } from '@/components/ui/modal'
 import { PlanCard, type PlanCardProps } from './plan-card'
+import styles from './plan-catalog.module.css'
 
 type CatalogPlan = PlanCardProps
 
@@ -28,114 +29,36 @@ export function PlanCatalog({ plans, initialPlanId }: { plans: CatalogPlan[]; in
   if (orderedPlans.length === 0) return null
 
   return (
-    <section className="plan-catalog relative overflow-hidden rounded-[1.5rem] border border-slate-200/80 bg-white p-4 shadow-[0_18px_50px_-32px_rgba(15,23,42,0.38)] dark:border-white/[0.09] dark:bg-white/[0.035] sm:p-5" aria-label="Выбор тарифа">
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-fuchsia-500/[0.06] to-transparent dark:from-fuchsia-400/[0.08]" />
-      <div className="plan-catalog__heading relative mb-5 hidden flex-wrap items-end justify-between gap-3 min-[1360px]:flex">
-        <div className="flex items-center gap-3">
-          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-fuchsia-500/10 text-fuchsia-600 ring-1 ring-fuchsia-500/15 dark:text-fuchsia-300">
-            <Sparkles className="h-4 w-4" />
-          </span>
-          <div>
-            <div className="page-eyebrow">Срок подписки</div>
-            <h2 className="text-xl font-semibold tracking-[-0.035em] text-slate-950 dark:text-white">Выберите период</h2>
-          </div>
-        </div>
-        <span className="shrink-0 rounded-full border border-fuchsia-200/80 bg-fuchsia-50/80 px-2.5 py-1 font-mono text-xs font-semibold uppercase tracking-[0.12em] tabular-nums text-fuchsia-700 dark:border-fuchsia-400/15 dark:bg-fuchsia-400/10 dark:text-fuchsia-200">
-          {orderedPlans.length} {planCountLabel(orderedPlans.length)}
-        </span>
+    <section className={styles.catalog} aria-label="Выбор тарифа">
+      <div className={styles.heading}>
+        <div><span className={styles.eyebrow}>01 / Тариф</span><h2>Выберите свой вариант</h2></div>
+        <p>Стоимость указана за весь срок.<br />Количество устройств уточните перед оплатой.</p>
       </div>
 
-      <div className="plan-catalog__compact-heading relative mb-4 flex items-center justify-between gap-3 min-[1360px]:hidden">
-        <div className="flex items-center gap-2.5">
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-fuchsia-500/10 text-fuchsia-600 ring-1 ring-fuchsia-500/15 dark:text-fuchsia-300">
-            <Sparkles className="h-4 w-4" />
-          </span>
-          <div>
-            <div className="page-eyebrow">Срок подписки</div>
-            <h2 className="text-lg font-semibold tracking-[-0.035em] text-slate-950 dark:text-white">Выберите период</h2>
-          </div>
-        </div>
-        <span className="shrink-0 rounded-full border border-fuchsia-200/80 bg-fuchsia-50/80 px-2.5 py-1 font-mono text-xs font-semibold uppercase tracking-[0.12em] tabular-nums text-fuchsia-700 dark:border-fuchsia-400/15 dark:bg-fuchsia-400/10 dark:text-fuchsia-200">
-          {orderedPlans.length} {planCountLabel(orderedPlans.length)}
-        </span>
-      </div>
-
-      <div className="plan-period-list relative grid gap-2.5 min-[1360px]:hidden">
-        {orderedPlans.map((plan, index) => (
-          <article
-            key={plan.id}
-            className={cn(
-              'plan-period-card relative grid min-h-0 min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 rounded-2xl border border-slate-200 bg-white/70 px-3 py-3.5 dark:border-white/[0.08] dark:bg-white/[0.025] sm:px-4',
-              plan.current
-                ? 'plan-period-card--current'
-                : ''
-            )}
-          >
-            <div className="flex min-w-0 items-start gap-3">
-              <span className="plan-period-card__index" aria-hidden="true">
-                {String(index + 1).padStart(2, '0')}
-              </span>
-              <div className="min-w-0">
-                <h3 className="text-xl font-semibold leading-none tracking-[-0.045em] text-slate-950 dark:text-white">
-                  {plan.unlimitedDuration ? '∞' : plan.durationDays}
-                  {' '}
-                  <span className="ml-1 text-sm font-medium tracking-normal text-slate-500 dark:text-slate-400">
-                    {plan.unlimitedDuration ? 'без срока' : dayLabel(plan.durationDays)}
-                  </span>
-                </h3>
-                <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                  <p className="truncate text-xs text-slate-500 dark:text-slate-400">{plan.name}</p>
-                  {plan.current ? <PlanPickerBadge>Текущий</PlanPickerBadge> : null}
-                  {!plan.current && plan.popular ? <PlanPickerBadge>Выбор</PlanPickerBadge> : null}
-                  {automaticDiscountPercent(plan) > 0 && !plan.isPromo
-                    ? <PlanPickerBadge>Ваша скидка −{automaticDiscountPercent(plan)}%</PlanPickerBadge>
-                    : plan.savingsPercent > 0 && !plan.isPromo
-                      ? <PlanPickerBadge>−{plan.savingsPercent}%</PlanPickerBadge>
-                      : null}
+      <div className={styles.layout}>
+        <div>
+          <div className={styles.mobileList}>
+            {orderedPlans.map((plan) => (
+              <article key={plan.id} className={cn(styles.option, plan.current && styles.current)}>
+                <PlanOptionDetails plan={plan} />
+                <div className={styles.mobilePrice}>
+                  <span><strong>{displayPlanPrice(plan)}</strong><small>{dailyRateLabel(plan)}</small></span>
+                  <button
+                    type="button"
+                    aria-haspopup="dialog"
+                    onClick={() => setMobileCheckoutPlanId(plan.id)}
+                    disabled={!plan.isPromo && plan.paymentProviders?.length === 0}
+                    className={styles.choose}
+                  >
+                    {mobileCtaLabel(plan)}<ArrowRight className="h-4 w-4" />
+                  </button>
                 </div>
-              </div>
-            </div>
-
-            <div className="min-w-[7.6rem] text-right">
-              <div className="mb-2">
-                <span className="block whitespace-nowrap text-lg font-semibold tracking-[-0.03em] tabular-nums text-slate-950 dark:text-white">
-                  {plan.deviceAddonEnabled && plan.maxDeviceLimit > plan.deviceLimit ? `от ${displayPlanPrice(plan)}` : displayPlanPrice(plan)}
-                </span>
-                <span className="mt-0.5 block text-xs text-slate-500 dark:text-slate-400">{dailyRateLabel(plan)}</span>
-              </div>
-              <button
-                type="button"
-                aria-haspopup="dialog"
-                onClick={() => setMobileCheckoutPlanId(plan.id)}
-                disabled={!plan.isPromo && plan.paymentProviders?.length === 0}
-                className={cn(
-                  'plan-period-card__action group inline-flex min-h-9 w-full items-center justify-between gap-1 border px-3 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-50',
-                  plan.current
-                    ? 'border-brand-600 bg-brand-600 text-white hover:bg-brand-700 dark:border-brand-400 dark:bg-brand-400 dark:text-white dark:hover:bg-brand-300'
-                    : 'border-slate-300 bg-transparent text-slate-800 hover:border-slate-950 dark:border-white/15 dark:text-white dark:hover:border-white/40'
-                )}
-              >
-                {mobileCtaLabel(plan)}
-                <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
-              </button>
-            </div>
-          </article>
-        ))}
-      </div>
-
-      <div className="relative hidden gap-5 min-[1360px]:grid min-[1360px]:grid-cols-2 min-[1360px]:items-start">
-        <div className="plan-period-panel flex flex-col border p-4">
-          <div className="mb-3 px-1 sm:flex sm:items-end sm:justify-between sm:gap-4">
-            <div>
-              <h3 className="text-base font-semibold text-slate-950 dark:text-white">Период подписки</h3>
-            </div>
-            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400 sm:mt-0 sm:text-right">
-              Дольше срок, ниже стоимость дня
-            </p>
+              </article>
+            ))}
           </div>
 
-          <div className="grid gap-2" role="radiogroup" aria-label="Выбор тарифа">
-            {orderedPlans.map((plan, index) => {
+          <div className={styles.desktopList} role="radiogroup" aria-label="Выбор тарифа">
+            {orderedPlans.map((plan) => {
               const selected = plan.id === activePlanId
               return (
                 <button
@@ -144,84 +67,65 @@ export function PlanCatalog({ plans, initialPlanId }: { plans: CatalogPlan[]; in
                   role="radio"
                   aria-checked={selected}
                   onClick={() => setSelectedPlanId(plan.id)}
-                  className={cn(
-                    'group grid w-full min-w-0 grid-cols-[2rem_minmax(0,1fr)] gap-3 border px-3.5 py-3.5 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 sm:grid-cols-[2rem_minmax(0,1fr)_auto] sm:items-center sm:px-4 sm:py-4',
-                    selected
-                      ? 'border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.05]'
-                      : 'border-transparent bg-white/55 hover:border-slate-200 hover:bg-white dark:bg-white/[0.015] dark:hover:border-white/10 dark:hover:bg-white/[0.04]'
-                  )}
+                  onKeyDown={(event) => {
+                    const offset = ['ArrowRight', 'ArrowDown'].includes(event.key) ? 1 : ['ArrowLeft', 'ArrowUp'].includes(event.key) ? -1 : 0
+                    if (!offset && !['Home', 'End'].includes(event.key)) return
+                    event.preventDefault()
+                    const index = orderedPlans.findIndex((item) => item.id === plan.id)
+                    const nextIndex = event.key === 'Home' ? 0 : event.key === 'End' ? orderedPlans.length - 1 : (index + offset + orderedPlans.length) % orderedPlans.length
+                    setSelectedPlanId(orderedPlans[nextIndex]!.id)
+                    event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('[role="radio"]')[nextIndex]?.focus()
+                  }}
+                  tabIndex={selected ? 0 : -1}
+                  className={cn(styles.option, selected && styles.selected)}
                 >
-                  <span className="plan-choice-index" aria-hidden="true">
-                    {selected ? <Check className="h-3.5 w-3.5" /> : String(index + 1).padStart(2, '0')}
+                  <span className={styles.optionTop}>
+                    <span className={styles.radio} aria-hidden="true">{selected ? <Check className="h-3 w-3" /> : null}</span>
+                    <span className={styles.price}><strong>{displayPlanPrice(plan)}</strong><small>{dailyRateLabel(plan)}</small></span>
                   </span>
-
-                  <span className="min-w-0">
-                    <span className="flex flex-wrap items-center gap-1.5">
-                      <span className="break-words text-sm font-semibold text-slate-950 dark:text-white sm:text-base">{plan.name}</span>
-                      {plan.current ? <PlanPickerBadge>Текущий</PlanPickerBadge> : null}
-                      {!plan.current && plan.popular ? <PlanPickerBadge>Популярный</PlanPickerBadge> : null}
-                      {automaticDiscountPercent(plan) > 0 && !plan.isPromo
-                        ? <PlanPickerBadge>Ваша скидка −{automaticDiscountPercent(plan)}%</PlanPickerBadge>
-                        : plan.savingsPercent > 0 && !plan.isPromo
-                          ? <PlanPickerBadge>−{plan.savingsPercent}%</PlanPickerBadge>
-                          : null}
-                    </span>
-                    <span className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
-                      <span>{plan.unlimitedDuration ? 'Бессрочно' : `${plan.durationDays} дней`}</span>
-                      <span>{plan.trafficLimitGb == null ? 'Безлимитный трафик' : `${plan.trafficLimitGb} ГБ`}</span>
-                      <span>
-                        {plan.unlimitedDevices
-                          ? 'Безлимит устройств'
-                          : plan.deviceAddonEnabled && plan.maxDeviceLimit > plan.deviceLimit
-                          ? `${plan.deviceLimit}–${plan.maxDeviceLimit} устройств`
-                          : `До ${plan.deviceLimit} устройств`}
-                      </span>
-                    </span>
-                  </span>
-
-                  <span className="col-span-2 flex items-end justify-between gap-3 pl-11 sm:col-span-1 sm:block sm:pl-0 sm:text-right">
-                    <span className="text-xs text-slate-400 dark:text-slate-500 sm:block">{dailyRateLabel(plan)}</span>
-                    <span className="block whitespace-nowrap text-xl font-semibold tracking-tight tabular-nums text-slate-950 dark:text-white sm:mt-1">
-                      {plan.deviceAddonEnabled && plan.maxDeviceLimit > plan.deviceLimit ? `от ${displayPlanPrice(plan)}` : displayPlanPrice(plan)}
-                    </span>
-                  </span>
+                  <PlanOptionDetails plan={plan} />
                 </button>
               )
             })}
           </div>
-
-          <div className="mt-4 flex items-start gap-2.5 border-t border-slate-200/90 px-1 pt-3 text-xs leading-5 text-slate-500 dark:border-white/[0.09] dark:text-slate-400">
-            <span className="mt-0.5 h-3 w-0.5 shrink-0 bg-cyan-400" />
-            <span>Цена фиксирована за весь выбранный срок. Доступ активируется автоматически после подтверждения оплаты.</span>
-          </div>
+          <p className={styles.footnote}>Дополнительные устройства и опции рассчитываются отдельно. Полную сумму покажем до перехода к оплате.</p>
         </div>
-
-        <div className="min-w-0" aria-live="polite">
-          {activePlan ? (
-            <div key={activePlan.id} className="plan-checkout-transition">
-              <PlanCard {...activePlan} />
-            </div>
-          ) : null}
+        <div className={styles.checkout}>
+          <div className={styles.checkoutHeading}><span className={styles.eyebrow}>02 / Настройка</span><h2>Ваша подписка</h2></div>
+          {activePlan ? <div key={activePlan.id}><PlanCard {...activePlan} /></div> : null}
         </div>
       </div>
 
       <Modal
         open={Boolean(mobileCheckoutPlan)}
         title="Оформление подписки"
-        description="Проверьте срок, сумму и выберите способ оплаты"
+        description="Выберите устройства и проверьте полную стоимость"
         variant="sheet"
         overlayClassName="min-[1360px]:hidden"
         panelClassName="sm:max-w-[32rem]"
         bodyClassName="px-4 pb-1 pt-3 sm:px-5"
         onClose={() => setMobileCheckoutPlanId(null)}
       >
-        {mobileCheckoutPlan ? (
-          <div key={mobileCheckoutPlan.id} className="plan-checkout-transition">
-            <PlanCard {...mobileCheckoutPlan} display="checkout" />
-          </div>
-        ) : null}
+        {mobileCheckoutPlan ? <div key={mobileCheckoutPlan.id}><PlanCard {...mobileCheckoutPlan} display="checkout" /></div> : null}
       </Modal>
     </section>
+  )
+}
+
+function PlanOptionDetails({ plan }: { plan: CatalogPlan }) {
+  return (
+    <span className={styles.details}>
+      <span className={styles.badges}>
+        {plan.current ? <PlanPickerBadge>Текущий тариф</PlanPickerBadge> : plan.popular ? <PlanPickerBadge>Популярный</PlanPickerBadge> : null}
+        {plan.isPromo ? <PlanPickerBadge>Пробный</PlanPickerBadge> : automaticDiscountPercent(plan) > 0 ? <PlanPickerBadge>Ваша скидка −{automaticDiscountPercent(plan)}%</PlanPickerBadge> : null}
+      </span>
+      <span className={styles.duration}>{plan.unlimitedDuration ? 'Бессрочно' : `${plan.durationDays} ${dayLabel(plan.durationDays)}`}</span>
+      <span className={styles.name}>{plan.name}</span>
+      <span className={styles.facts}>
+        <span>{plan.unlimitedDevices ? 'Безлимит устройств' : `Включено устройств: ${plan.deviceLimit}`}</span>
+        <span>{plan.trafficLimitGb == null ? 'Безлимитный трафик' : `${plan.trafficLimitGb} ГБ трафика`}</span>
+      </span>
+    </span>
   )
 }
 
@@ -231,12 +135,6 @@ function PlanPickerBadge({ children }: { children: ReactNode }) {
       {children}
     </span>
   )
-}
-
-function planCountLabel(count: number) {
-  if (count % 10 === 1 && count % 100 !== 11) return 'тариф'
-  if ([2, 3, 4].includes(count % 10) && ![12, 13, 14].includes(count % 100)) return 'тарифа'
-  return 'тарифов'
 }
 
 function dailyRateLabel(plan: CatalogPlan) {
@@ -276,5 +174,5 @@ function dayLabel(days: number) {
 function mobileCtaLabel(plan: CatalogPlan) {
   if (plan.isPromo) return 'Активировать'
   if (plan.current) return 'Продлить'
-  return 'Оплатить'
+  return 'Выбрать'
 }

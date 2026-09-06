@@ -8,6 +8,7 @@ import { toast } from "@/components/ui/toaster";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Modal } from "@/components/ui/modal";
 import { cn } from "@/lib/cn";
+import { PlanPurchaseOutcome } from "./plan-purchase-outcome";
 import { formatPrice } from "@/lib/format";
 import type { CheckoutPaymentProvider } from "@/lib/payment-providers";
 import { AUTO_RENEWAL_CONSENT_VERSION } from "@/lib/auto-renewal-consent";
@@ -175,7 +176,6 @@ export function PlanCard({
     ? purchasePriceKopecks - displayedDiscount.discountKopecks
     : null;
   const normalizedEffectivePriceKopecks = effectivePriceKopecks ?? purchasePriceKopecks;
-  const effectivePrice = formatPrice(normalizedEffectivePriceKopecks);
   const whitelistAddonAvailable = !isPromoPlan
     && whitelistAddonEnabled
     && whitelistAddonPriceKopecks > 0
@@ -184,9 +184,8 @@ export function PlanCard({
     + (whitelistAddonRequested && whitelistAddonAvailable ? whitelistAddonPriceKopecks : 0);
   const checkoutTotalPrice = formatPrice(checkoutTotalKopecks);
   const purchasePrice = formatPrice(purchasePriceKopecks);
-  const effectiveMonthlyPrice = unlimitedDuration
-    ? null
-    : formatPrice(Math.round((normalizedEffectivePriceKopecks / Math.max(1, durationDays)) * 30));
+  const checkoutOriginalPrice = formatPrice(purchasePriceKopecks
+    + (whitelistAddonRequested && whitelistAddonAvailable ? whitelistAddonPriceKopecks : 0));
   const variableDeviceLimit = !isPromoPlan
     && !unlimitedDevices
     && deviceAddonEnabled
@@ -476,9 +475,9 @@ export function PlanCard({
             <div className="min-w-0">
               <div className="flex flex-wrap items-baseline gap-2">
                 <div className="whitespace-nowrap text-[2rem] font-semibold leading-none tracking-[-0.04em] tabular-nums text-slate-950 dark:text-white">
-                  {effectivePrice}
+                  {checkoutTotalPrice}
                 </div>
-                {displayedDiscount && <div className="text-sm text-slate-400 line-through">{purchasePrice}</div>}
+                {displayedDiscount && <div className="text-sm text-slate-400 line-through">{checkoutOriginalPrice}</div>}
               </div>
               <span className="mt-1.5 block text-xs text-slate-500 dark:text-slate-400">
                 {isPromo ? "Один раз на аккаунт" : "Итоговая сумма"}
@@ -546,9 +545,9 @@ export function PlanCard({
             <div className="flex flex-wrap items-end justify-between gap-3">
               <div className="flex flex-wrap items-baseline gap-2">
                 <div className="whitespace-nowrap text-[2rem] font-semibold leading-none tracking-[-0.04em] tabular-nums text-slate-950 dark:text-white sm:text-4xl">
-                  {effectivePrice}
+                  {checkoutTotalPrice}
                 </div>
-                {displayedDiscount && <div className="text-sm text-slate-400 line-through">{purchasePrice}</div>}
+                {displayedDiscount && <div className="text-sm text-slate-400 line-through">{checkoutOriginalPrice}</div>}
               </div>
               {savingsPercent > 0 && !isPromoPlan ? (
                 <span className="inline-flex items-center gap-1 rounded-sm bg-emerald-100/80 px-2 py-1 font-mono text-xs font-semibold uppercase tracking-wide text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-200">
@@ -563,13 +562,24 @@ export function PlanCard({
                   ? "Один раз на аккаунт"
                   : unlimitedDuration
                     ? "Бессрочный доступ"
-                    : `${effectiveMonthlyPrice} за 30 дней`}
+                    : `${durationDays} дн. доступа`}
               </span>
               <span>за весь срок</span>
             </div>
           </div>
         </>
       )}
+
+      {!isPromoPlan ? (
+        <>
+            <PlanPurchaseOutcome current={current} isPlanSwitch={isPlanSwitch} currentPlanName={currentPlanName} name={name} unlimitedDuration={unlimitedDuration} durationDays={durationDays} />
+            {lowersCurrentLimit && !variableDeviceLimit && !unlimitedDevices ? (
+              <p className="mt-2 text-xs leading-5 text-amber-700 dark:text-amber-200">
+                После оплаты останутся {selectedDeviceLimit} устройств с самой недавней активностью. Остальные привязки будут удалены.
+              </p>
+            ) : null}
+        </>
+      ) : null}
 
       {!checkoutDisplay ? (
         <div className="mt-3 grid grid-cols-3 gap-2">
@@ -906,6 +916,20 @@ export function PlanCard({
               />
             ) : null}
           </div>
+        ) : null}
+
+        {!isPromoPlan ? (
+          <>
+            <section aria-label="Состав оплаты" className="mt-4 border-t border-slate-200 pt-3 dark:border-white/10">
+              <dl className="space-y-2 text-xs text-slate-500 dark:text-slate-400">
+                <div className="flex justify-between gap-4"><dt>Тариф · {unlimitedDuration ? 'бессрочно' : `${durationDays} дн.`}</dt><dd className="shrink-0 tabular-nums">{price}</dd></div>
+                {extraDeviceCount > 0 ? <div className="flex justify-between gap-4"><dt>Дополнительные устройства · {extraDeviceCount}</dt><dd className="shrink-0 tabular-nums">+{formatPrice(extraDeviceAmountKopecks)}</dd></div> : null}
+                {displayedDiscount ? <div className="flex justify-between gap-4"><dt>Скидка</dt><dd className="shrink-0 tabular-nums">−{formatPrice(displayedDiscount.discountKopecks)}</dd></div> : null}
+                {whitelistAddonRequested && whitelistAddonAvailable ? <div className="flex justify-between gap-4"><dt>Белые списки</dt><dd className="shrink-0 tabular-nums">+{formatPrice(whitelistAddonPriceKopecks)}</dd></div> : null}
+                <div className="flex justify-between gap-4 border-t border-slate-200 pt-3 text-base font-semibold text-slate-950 dark:border-white/10 dark:text-white"><dt>Итого к оплате</dt><dd className="shrink-0 tabular-nums" aria-live="polite">{checkoutTotalPrice}</dd></div>
+              </dl>
+            </section>
+          </>
         ) : null}
 
         <div
