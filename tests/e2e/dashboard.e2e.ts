@@ -2,6 +2,37 @@ import { expect, test } from '@playwright/test'
 import { expectNoHorizontalOverflow, login } from './helpers'
 import { E2E_BONUS_PRIZE_IDS, E2E_USERS } from './test-data'
 
+test('главная показывает подписку и быстрые действия в обеих темах', async ({ page }, testInfo) => {
+  await login(page, E2E_USERS.active.email)
+  await page.getByRole('button', { name: 'Закрыть уведомление' }).click()
+
+  const overview = page.getByTestId('subscription-overview')
+  await expect(overview.getByRole('heading', { name: 'E2E Стандарт' })).toBeVisible()
+  await expect(overview.getByRole('link', { name: 'Подключить устройство' })).toBeVisible()
+  const actions = page.getByRole('region', { name: 'Быстрые действия' })
+  await expect(actions.getByRole('link', { name: /Подключить VPN/ })).toHaveAttribute('href', '/dashboard/subscription')
+  await expect(actions.getByRole('link', { name: /Подписка и оплата/ })).toHaveAttribute('href', '/dashboard/billing')
+  await expect(actions.getByRole('link', { name: /Нужна помощь/ })).toHaveAttribute('href', '/dashboard/support')
+
+  for (const theme of ['light', 'dark']) {
+    await page.evaluate((value) => document.documentElement.classList.toggle('dark', value === 'dark'), theme)
+    await expectNoHorizontalOverflow(page)
+    await page.screenshot({ path: testInfo.outputPath(`home-${theme}.png`), fullPage: true })
+  }
+  await actions.getByRole('link', { name: /Подключить VPN/ }).click()
+  await expect(page).toHaveURL(/\/dashboard\/subscription(?:\?|$)/)
+})
+
+test('главная без подписки предлагает выбрать тариф', async ({ page }) => {
+  await login(page, E2E_USERS.basic.email)
+  await expect(page.getByTestId('subscription-overview')).toHaveCount(0)
+  const actions = page.getByRole('region', { name: 'Быстрые действия' })
+  await actions.getByRole('link', { name: /Выбрать подписку/ }).click()
+  await expect(page).toHaveURL(/\/dashboard\/plans(?:\?|$)/)
+  await expect(page.getByRole('heading', { name: 'Тарифы' })).toBeVisible()
+  await expectNoHorizontalOverflow(page)
+})
+
 test('истёкшая подписка не показывает отрицательные дни', async ({ page }) => {
   await login(page, E2E_USERS.expired.email)
 

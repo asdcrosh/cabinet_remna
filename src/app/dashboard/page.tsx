@@ -1,4 +1,4 @@
-// Главная кабинета: состояние доступа и одно следующее действие.
+// Главная кабинета: подписка, подключение и быстрые действия.
 
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
@@ -6,6 +6,7 @@ import {
   AlertTriangle,
   ArrowRight,
   CalendarDays,
+  LifeBuoy,
   CreditCard,
   Gift,
   KeyRound,
@@ -23,6 +24,7 @@ import { getFreshPendingPaymentCutoff } from '@/lib/payment-sync'
 import { getFeatureFlags } from '@/lib/feature-flags'
 import { getAvailablePaymentProviders } from '@/lib/payment-providers'
 import { cn } from '@/lib/cn'
+import styles from './home.module.css'
 import { HomeWhitelistAddon } from '@/components/dashboard/home-whitelist-addon'
 import { HomeDeviceAddon } from '@/components/dashboard/home-device-addon'
 import {
@@ -80,12 +82,12 @@ export default async function DashboardHome() {
 
   if (!user.remnawaveUsername) {
     return (
-      <div className="user-workspace page-stack">
+      <div className={cn('user-workspace', styles.page)}>
         <HomeHeader
           name={dashboardDisplayName(user.name, user.email)}
           description={user.payments[0]
             ? 'Оплата ещё не завершена. Продолжите с того же места.'
-            : 'До первого подключения остался один шаг.'}
+            : 'Начните с подписки, затем подключите свои устройства.'}
         />
         {user.payments[0] ? (
           <PendingPaymentCard payment={user.payments[0]} />
@@ -97,6 +99,7 @@ export default async function DashboardHome() {
             focus="access"
           />
         )}
+        <HomeActions supportEnabled={features.support} hasSubscription={false} />
       </div>
     )
   }
@@ -126,7 +129,7 @@ export default async function DashboardHome() {
     month: 'long',
     year: 'numeric',
   }) ?? null
-  const primaryAction = subscriptionExpired || daysLeft <= 7
+  const primaryAction = subscriptionExpired || (!unlimitedDuration && daysLeft <= 7)
     ? {
         href: '/dashboard/plans?intent=renew',
         label: subscriptionExpired ? 'Возобновить доступ' : 'Продлить подписку',
@@ -211,14 +214,14 @@ export default async function DashboardHome() {
       }
     : null
   return (
-    <div className="user-workspace page-stack">
+    <div className={cn('user-workspace', styles.page)}>
       <HomeHeader
         name={dashboardDisplayName(user.name, user.email)}
         description={subscriptionExpired
           ? 'Доступ остановлен, профиль сохранён и готов к повторной активации.'
           : user._count.devices === 0
             ? 'Подписка готова. Теперь подключите первое устройство.'
-            : 'Подписка работает. Здесь только актуальное состояние.'}
+            : 'Ваш доступ, устройства и всё, что нужно для подключения.'}
       />
 
       {remnawaveErrorStatus !== null && (
@@ -242,141 +245,119 @@ export default async function DashboardHome() {
         </div>
       )}
 
-      <section
-        className={cn('home-access-card', subscriptionExpired && 'home-access-card--expired')}
-        data-testid="subscription-overview"
-      >
-        <div aria-hidden="true" className="home-access-card__orb home-access-card__orb--primary" />
-        <div aria-hidden="true" className="home-access-card__orb home-access-card__orb--signal" />
-
-        <div className="home-access-card__top">
-          <div className="min-w-0">
-            <div className="home-access-card__label">
-              <span className={cn('home-access-card__pulse', subscriptionExpired && 'home-access-card__pulse--expired')} />
-              Текущий доступ
-            </div>
-            <div className="mt-2 flex flex-wrap items-center gap-2.5">
-              <h2 className="break-words text-xl font-semibold tracking-[-0.035em] text-slate-950 dark:text-white sm:text-2xl">
-                {subRow?.plan?.name ?? 'VPN-подписка'}
-              </h2>
-              <StatusBadge status={subscriptionStatus} />
-            </div>
+      <div className={styles.overview}>
+        <section
+          className={cn(styles.access, subscriptionExpired && styles.expired)}
+          data-testid="subscription-overview"
+        >
+          <div className={styles.accessTop}>
+            <span className={styles.eyebrow}>Ваша подписка</span>
+            <StatusBadge status={subscriptionStatus} />
           </div>
-          <Link href={primaryAction.href} className="btn-primary home-access-card__action group hidden shrink-0 justify-between sm:inline-flex">
-            <span className="inline-flex items-center gap-2">
-              {primaryAction.icon}
-              {primaryAction.label}
-            </span>
-            <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-          </Link>
-        </div>
-
-        <div className="home-access-card__body">
-          <div className="home-access-card__remaining">
-            <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
-              {unlimitedDuration ? 'Доступ' : 'Осталось'}
-            </div>
-            <strong className="mt-2 block text-[3.4rem] font-semibold leading-none tracking-[-0.075em] text-slate-950 dark:text-white sm:text-[4.8rem]">
+          <div className={styles.accessContent}>
+            <h2 className={styles.planName}>{subRow?.plan?.name ?? 'VPN-подписка'}</h2>
+            <div className={styles.remainingLabel}>{unlimitedDuration ? 'Доступ' : 'Осталось'}</div>
+            <strong className={cn(styles.remaining, unlimitedDuration && styles.remainingUnlimited)}>
               {unlimitedDuration
                 ? 'Бессрочно'
                 : subRow || sub
                   ? formatSubscriptionDaysLeft(daysLeft, subscriptionStatus)
                   : 'Нет данных'}
             </strong>
-            <p className="mt-3 max-w-xl text-sm leading-6 text-slate-500 dark:text-slate-400">
+            <p className={styles.accessDescription}>
               {graceActive
                 ? `Льготный доступ до ${subRow?.graceExpireAt?.toLocaleString('ru-RU')}. Оплатите тариф, чтобы сохранить подключение.`
                 : subscriptionExpired
-                ? 'Профиль сохранён. Продлите доступ без повторной настройки.'
-                : unlimitedDuration
-                  ? 'Продление не требуется.'
-                : expiresAtLabel
-                  ? `Оплачено до ${expiresAtLabel}`
-                  : 'Доступ активен.'}
+                  ? 'Продлите подписку и продолжайте пользоваться привычным подключением.'
+                  : unlimitedDuration
+                    ? 'Продление не требуется. Подключайте свои устройства и пользуйтесь VPN.'
+                    : expiresAtLabel
+                      ? `Оплачено до ${expiresAtLabel}`
+                      : 'Срок подписки пока недоступен.'}
             </p>
-            <Link href={primaryAction.href} className="btn-primary home-access-card__action group mt-5 w-full justify-between sm:hidden">
-              <span className="inline-flex items-center gap-2">
-                {primaryAction.icon}
-                {primaryAction.label}
-              </span>
-              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+          </div>
+          <div className={styles.accessBottom}>
+            <Link href={primaryAction.href} className={styles.primaryAction}>
+              {primaryAction.icon}
+              <span>{primaryAction.label}</span>
+              <ArrowRight className="h-4 w-4 shrink-0" />
             </Link>
+            <span className={styles.accessNote}>Одна подписка для ваших устройств</span>
           </div>
+          <div className={styles.orbit} aria-hidden="true">
+            <div className={styles.orbitMiddle}><div className={styles.orbitCore}><ShieldCheck /></div></div>
+          </div>
+        </section>
 
-          <div className="home-access-card__facts">
-            <div className="home-access-card__fact">
-              <span className="home-access-card__fact-icon home-access-card__fact-icon--violet">
-                <MonitorSmartphone className="h-5 w-5" />
-              </span>
-              <div>
-                <div className="text-xs font-medium text-slate-500 dark:text-slate-400">Устройства</div>
-                <div className="mt-1 text-lg font-semibold tracking-tight text-slate-950 dark:text-white">
-                  {user._count.devices} подключено
-                </div>
-                <div className="mt-0.5 text-xs text-slate-400">
-                  {subRow?.plan?.unlimitedDevices
-                    ? 'Без лимита'
-                    : currentDeviceLimit
-                      ? `Лимит до ${currentDeviceLimit}`
-                      : 'Без указанного лимита'}
-                </div>
-              </div>
+        <div className={styles.metrics}>
+          <Link href="/dashboard/devices" className={styles.metric}>
+            <div className={styles.metricTop}>
+              <span className={styles.metricIcon}><MonitorSmartphone className="h-5 w-5" /></span>
+              <ArrowRight className="h-4 w-4" />
             </div>
-            {!unlimitedDuration ? (
-              <div className="home-access-card__fact">
-                <span className="home-access-card__fact-icon home-access-card__fact-icon--cyan">
-                  <CalendarDays className="h-5 w-5" />
-                </span>
-                <div>
-                  <div className="text-xs font-medium text-slate-500 dark:text-slate-400">Оплачено до</div>
-                  <div className="mt-1 text-lg font-semibold tracking-tight text-slate-950 dark:text-white">
-                    {expiresAtLabel ?? 'Без даты'}
-                  </div>
-                  <div className="mt-0.5 text-xs text-slate-400">
-                    <Link href="/dashboard/billing#auto-renewal" className="font-semibold text-brand-600 transition hover:text-brand-700 hover:underline dark:text-brand-300">
-                      Автопродление и платежи
-                    </Link>
-                  </div>
-                </div>
-              </div>
-            ) : null}
-          </div>
+            <span className={styles.metricLabel}>Мои устройства</span>
+            <strong className={styles.metricValue}>
+              {user._count.devices}
+              <span>{subRow?.plan?.unlimitedDevices ? ' / ∞' : currentDeviceLimit ? ` / ${currentDeviceLimit}` : ' подключено'}</span>
+            </strong>
+            <span className={styles.metricHint}>Посмотреть и управлять</span>
+          </Link>
+          <Link href="/dashboard/billing#auto-renewal" className={styles.metric}>
+            <div className={styles.metricTop}>
+              <span className={styles.metricIcon}><CalendarDays className="h-5 w-5" /></span>
+              <ArrowRight className="h-4 w-4" />
+            </div>
+            <span className={styles.metricLabel}>{unlimitedDuration ? 'Срок подписки' : 'Оплачено до'}</span>
+            <strong className={styles.metricDate}>{expiresAtLabel ?? 'Нет данных'}</strong>
+            <span className={styles.metricHint}>Автопродление и платежи</span>
+          </Link>
         </div>
-      </section>
+      </div>
 
-      {features.bonusBox && bonusAttempts > 0 ? (
-        <Link
-          href="/dashboard/bonus-box"
-          className="group flex min-h-16 items-center gap-3 rounded-2xl border border-fuchsia-200/80 bg-fuchsia-50/70 px-4 py-3 text-slate-800 transition hover:border-fuchsia-300 hover:bg-fuchsia-50 dark:border-fuchsia-400/15 dark:bg-fuchsia-400/[0.06] dark:text-slate-100 dark:hover:bg-fuchsia-400/[0.1]"
-        >
-          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-fuchsia-500/10 text-fuchsia-700 dark:text-fuchsia-200">
-            <Gift className="h-5 w-5" />
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block font-semibold">Доступны подарки</span>
-            <span className="mt-0.5 block text-sm text-slate-500 dark:text-slate-400">
-              {bonusAttempts} {bonusAttemptLabel(bonusAttempts)} можно использовать сейчас
-            </span>
-          </span>
-          <ArrowRight className="h-4 w-4 shrink-0 transition-transform group-hover:translate-x-0.5" />
-        </Link>
+      {user.payments[0] ? <PendingPaymentCard payment={user.payments[0]} /> : null}
+
+      <HomeActions supportEnabled={features.support} hasSubscription />
+
+      {((features.bonusBox && bonusAttempts > 0) || whitelistAddonOffer || deviceAddonOffer) ? (
+        <section className={styles.extras} aria-label="Дополнительные возможности">
+          <div className={styles.sectionHeading}>
+            <h2>Больше возможностей</h2>
+            <p>Дополнения и бонусы к вашей подписке</p>
+          </div>
+          {features.bonusBox && bonusAttempts > 0 ? (
+            <Link
+              href="/dashboard/bonus-box"
+              className="group flex min-h-16 items-center gap-3 rounded-2xl border border-fuchsia-200/80 bg-fuchsia-50/70 px-4 py-3 text-slate-800 transition hover:border-fuchsia-300 hover:bg-fuchsia-50 dark:border-fuchsia-400/15 dark:bg-fuchsia-400/[0.06] dark:text-slate-100 dark:hover:bg-fuchsia-400/[0.1]"
+            >
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-fuchsia-500/10 text-fuchsia-700 dark:text-fuchsia-200">
+                <Gift className="h-5 w-5" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block font-semibold">Доступны подарки</span>
+                <span className="mt-0.5 block text-sm text-slate-500 dark:text-slate-400">
+                  {bonusAttempts} {bonusAttemptLabel(bonusAttempts)} можно использовать сейчас
+                </span>
+              </span>
+              <ArrowRight className="h-4 w-4 shrink-0 transition-transform group-hover:translate-x-0.5" />
+            </Link>
+          ) : null}
+
+          {whitelistAddonOffer ? (
+            <HomeWhitelistAddon
+              planId={whitelistAddonOffer.planId}
+              priceKopecks={whitelistAddonOffer.priceKopecks}
+              active={whitelistAddonOffer.active}
+              expireAt={whitelistAddonOffer.expireAt}
+              pausedRemainingSeconds={whitelistAddonOffer.pausedRemainingSeconds}
+              paymentProviders={paymentProviders}
+            />
+          ) : null}
+
+          {deviceAddonOffer ? (
+            <HomeDeviceAddon {...deviceAddonOffer} paymentProviders={paymentProviders} />
+          ) : null}
+        </section>
       ) : null}
-
-      {whitelistAddonOffer ? (
-        <HomeWhitelistAddon
-          planId={whitelistAddonOffer.planId}
-          priceKopecks={whitelistAddonOffer.priceKopecks}
-          active={whitelistAddonOffer.active}
-          expireAt={whitelistAddonOffer.expireAt}
-          pausedRemainingSeconds={whitelistAddonOffer.pausedRemainingSeconds}
-          paymentProviders={paymentProviders}
-        />
-      ) : null}
-
-      {deviceAddonOffer ? (
-        <HomeDeviceAddon {...deviceAddonOffer} paymentProviders={paymentProviders} />
-      ) : null}
-
     </div>
   )
 }
@@ -392,23 +373,53 @@ function bonusAttemptLabel(count: number) {
 
 function HomeHeader({ name, description }: { name: string; description: string }) {
   return (
-    <header className="home-hero">
-      <div aria-hidden="true" className="home-hero__glow" />
-      <div className="home-hero__content">
-        <div className="min-w-0">
-          <div className="page-eyebrow">Личный кабинет</div>
-          <h1 className="text-[2rem] font-semibold leading-tight tracking-[-0.045em] text-slate-950 dark:text-white sm:text-[2.5rem]">
-            Привет, {name}
-          </h1>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500 dark:text-slate-400 sm:text-base">
-            {description}
-          </p>
-        </div>
-        <div className="home-hero__mark" aria-hidden="true">
-          <ShieldCheck className="h-7 w-7" />
-        </div>
+    <header className={styles.header}>
+      <div>
+        <div className={styles.headerEyebrow}>Главная / Обзор</div>
+        <h1>Привет, {name}</h1>
+        <p>{description}</p>
       </div>
+      <Link href="/dashboard/settings" className={styles.avatar} aria-label="Настройки аккаунта">
+        {name.slice(0, 1).toLocaleUpperCase('ru-RU')}
+      </Link>
     </header>
+  )
+}
+
+function HomeActions({ supportEnabled, hasSubscription }: { supportEnabled: boolean; hasSubscription: boolean }) {
+  const actions = [
+    {
+      href: hasSubscription ? '/dashboard/subscription' : '/dashboard/plans',
+      title: hasSubscription ? 'Подключить VPN' : 'Выбрать подписку',
+      description: hasSubscription ? 'Приложение и инструкция для вашего устройства' : 'Тарифы, сроки и количество устройств',
+      icon: KeyRound,
+    },
+    {
+      href: '/dashboard/billing',
+      title: 'Подписка и оплата',
+      description: 'История платежей и управление автопродлением',
+      icon: CreditCard,
+    },
+    ...(supportEnabled ? [{
+      href: '/dashboard/support',
+      title: 'Нужна помощь?',
+      description: 'Обратитесь в поддержку, если что-то не получается',
+      icon: LifeBuoy,
+    }] : []),
+  ]
+  return (
+    <section aria-label="Быстрые действия" className={styles.actionsSection}>
+      <div className={styles.sectionHeading}><h2>Всегда под рукой</h2></div>
+      <div className={styles.actions}>
+        {actions.map(({ href, title, description, icon: Icon }) => (
+          <Link key={href} href={href} className={styles.action}>
+            <span className={styles.actionIcon}><Icon className="h-5 w-5" /></span>
+            <span className={styles.actionText}><strong>{title}</strong><span>{description}</span></span>
+            <ArrowRight className="h-4 w-4 shrink-0" />
+          </Link>
+        ))}
+      </div>
+    </section>
   )
 }
 
