@@ -7,13 +7,19 @@ import {
   Check,
   CircleSlash,
   Copy,
+  Crown,
   CreditCard,
+  Gem,
   Gift,
   LoaderCircle,
+  RotateCw,
   Sparkles,
   ShoppingCart,
   TicketPercent,
+  Trophy,
   Users,
+  Volume2,
+  VolumeX,
   Zap,
 } from "lucide-react";
 import { apiFetch, isApiFetchError } from "@/lib/api-client";
@@ -44,15 +50,26 @@ import type {
   BonusBoxTab,
   OpenBoxResponse,
 } from "@/components/bonus-box/bonus-box-types";
+import {
+  revealDelayMs,
+  revealParticleCount,
+  rouletteActiveIndex,
+  rouletteMotionPhase,
+  rouletteProgress,
+  rouletteTargetOffset,
+  type RouletteMotionPhase,
+} from "@/components/bonus-box/bonus-roulette-motion";
 
 export type { BonusBoxPrizeView } from "@/components/bonus-box/bonus-box-types";
 
-const WHEEL_DURATION_MS = 2400;
-const REVEAL_EFFECT_DURATION_MS = 900;
+const REVEAL_EFFECT_DURATION_MS = 1600;
 const BONUS_TABS: BonusBoxTab[] = ["missions", "outcomes", "history"];
-const WHEEL_COLORS = ["#31126f", "#5b25b3", "#792aca", "#47208e"];
 const PENDING_OPENING_KEY = "bonus-wheel-pending:v1";
 const OPENING_STARTED_KEY = "bonus-wheel-opening-started:v1";
+const OPENING_SPIN_ID_KEY = "bonus-roulette-spin-id:v1";
+const COOLDOWN_UNTIL_KEY = "bonus-roulette-cooldown-until:v1";
+const SOUND_ENABLED_KEY = "bonus-roulette-sound:v1";
+type RoulettePhase = "idle" | RouletteMotionPhase | "locked" | "revealing" | "error";
 
 export function BonusBoxClient({
   initialData,
@@ -60,9 +77,10 @@ export function BonusBoxClient({
   initialData: BonusBoxOverview;
 }) {
   const [data, setData] = useState(initialData);
-  const [wheelRotation, setWheelRotation] = useState(
-    () => -180 / Math.max(1, initialData.prizes.length),
-  );
+  const [rouletteItems, setRouletteItems] = useState(() => buildIdleRoulette(initialData.prizes));
+  const [roulettePhase, setRoulettePhase] = useState<RoulettePhase>("idle");
+  const [spinError, setSpinError] = useState("");
+  const [soundEnabled, setSoundEnabled] = useState(true);
   const [opening, setOpening] = useState(false);
   const [revealEffect, setRevealEffect] = useState(false);
   const [result, setResult] = useState<OpenBoxResponse | null>(null);
@@ -74,10 +92,15 @@ export function BonusBoxClient({
   const [cooldownSeconds, setCooldownSeconds] = useState(0);
   const [claimingMissionId, setClaimingMissionId] = useState<string | null>(null);
   const effectTimerRef = useRef<number | null>(null);
-  const wheelFrameRef = useRef<number | null>(null);
-  const wheelRef = useRef<HTMLDivElement | null>(null);
-  const wheelPointerRef = useRef<HTMLDivElement | null>(null);
-  const targetWheelRotationRef = useRef<number | null>(null);
+  const revealTimerRef = useRef<number | null>(null);
+  const rouletteFrameRef = useRef<number | null>(null);
+  const rouletteTrackRef = useRef<HTMLDivElement | null>(null);
+  const rouletteViewportRef = useRef<HTMLDivElement | null>(null);
+  const rouletteReadoutRef = useRef<HTMLSpanElement | null>(null);
+  const currentRouletteOffsetRef = useRef(0);
+  const activeCardIndexRef = useRef<number | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const lastTickAtRef = useRef(0);
   const finishingRef = useRef(false);
   const requestInFlightRef = useRef(false);
   const canUseWelcomeAttempts =
@@ -86,19 +109,12 @@ export function BonusBoxClient({
     ? data.attemptsCount
     : data.welcomeAttemptsCount;
   const lockedAttempts = Math.max(0, data.attemptsCount - availableNow);
-  const wheelPrizes = data.prizes;
-  const segmentAngle = 360 / Math.max(1, wheelPrizes.length);
-  const wheelBackground = useMemo(() => {
-    if (wheelPrizes.length === 0) return WHEEL_COLORS[0];
-    return `conic-gradient(from 0deg, ${wheelPrizes
-      .map((prize, index) => {
-        const start = index * segmentAngle;
-        const end = (index + 1) * segmentAngle;
-        return `${wheelSegmentColor(prize, index)} ${start}deg ${end}deg`;
-      })
-      .join(", ")})`;
-  }, [segmentAngle, wheelPrizes]);
-  const normalizedWheelRotation = ((wheelRotation % 360) + 360) % 360;
+  const spotlightPrizes = useMemo(
+    () => [...data.prizes]
+      .sort((left, right) => rarityRank(right.rarity) - rarityRank(left.rarity))
+      .slice(0, 3),
+    [data.prizes],
+  );
 
   const canOpen = !data.canOpenReason && !opening && cooldownSeconds === 0;
   const subscribeCta = Boolean(data.canOpenReason?.includes("подписк"));
@@ -118,7 +134,8 @@ export function BonusBoxClient({
   const hasRareOrBetter = data.prizes.some((prize) => prize.rarity !== "COMMON");
   const openButtonClass =
     "bonus-box-open-button group relative inline-flex min-h-12 items-center justify-center overflow-hidden rounded-lg px-5 text-sm font-semibold text-white transition duration-200 disabled:cursor-not-allowed disabled:text-slate-400 sm:min-w-44";
-  const revealClass = result ? bonusBoxRevealClass(result.prize) : null;
+  const revealedOpening = result ?? pendingResult;
+  const revealClass = revealedOpening ? bonusBoxRevealClass(revealedOpening.prize) : null;
 
   useEffect(() => {
     const motionMedia = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -131,6 +148,18 @@ export function BonusBoxClient({
     return () => {
       motionMedia.removeEventListener("change", sync);
     };
+  }, []);
+
+  useEffect(() => {
+    try {
+      setSoundEnabled(window.localStorage.getItem(SOUND_ENABLED_KEY) !== "off");
+      const retryAt = Number(window.sessionStorage.getItem(COOLDOWN_UNTIL_KEY));
+      if (Number.isFinite(retryAt) && retryAt > Date.now()) {
+        setCooldownSeconds(Math.ceil((retryAt - Date.now()) / 1000));
+      }
+    } catch {
+      // Настройки эффектов остаются доступными только на текущей странице.
+    }
   }, []);
 
   useEffect(() => {
@@ -161,78 +190,195 @@ export function BonusBoxClient({
   useEffect(() => {
     if (cooldownSeconds <= 0) return;
     const timer = window.setInterval(() => {
-      setCooldownSeconds((current) => Math.max(0, current - 1));
+      let remaining = 0;
+      try {
+        const retryAt = Number(window.sessionStorage.getItem(COOLDOWN_UNTIL_KEY));
+        remaining = Number.isFinite(retryAt) ? Math.max(0, Math.ceil((retryAt - Date.now()) / 1000)) : 0;
+        if (remaining === 0) window.sessionStorage.removeItem(COOLDOWN_UNTIL_KEY);
+      } catch {
+        remaining = Math.max(0, cooldownSeconds - 1);
+      }
+      setCooldownSeconds(remaining);
     }, 1_000);
     return () => window.clearInterval(timer);
   }, [cooldownSeconds]);
 
   useEffect(() => () => {
     if (effectTimerRef.current !== null) window.clearTimeout(effectTimerRef.current);
-    if (wheelFrameRef.current !== null) window.cancelAnimationFrame(wheelFrameRef.current);
+    if (revealTimerRef.current !== null) window.clearTimeout(revealTimerRef.current);
+    if (rouletteFrameRef.current !== null) window.cancelAnimationFrame(rouletteFrameRef.current);
+    void audioContextRef.current?.close();
   }, []);
 
   function dismissResult() {
+    const idleItems = buildIdleRoulette(data.prizes);
     setRevealEffect(false);
     setResult(null);
+    setPendingResult(null);
+    setRouletteItems(idleItems);
+    setRoulettePhase("idle");
+    setSpinError("");
+    activeCardIndexRef.current = null;
+    currentRouletteOffsetRef.current = 0;
+    window.requestAnimationFrame(() => {
+      if (rouletteTrackRef.current) {
+        rouletteTrackRef.current.style.transform = "translate3d(0, 0, 0)";
+      }
+      if (rouletteViewportRef.current) {
+        rouletteViewportRef.current.dataset.activeRarity = "common";
+      }
+      if (rouletteReadoutRef.current) {
+        rouletteReadoutRef.current.textContent = "Система готова · выберите запуск";
+      }
+    });
     clearStoredOpening();
   }
 
-  function settleWheel(targetRotation = targetWheelRotationRef.current) {
-    if (wheelFrameRef.current !== null) {
-      window.cancelAnimationFrame(wheelFrameRef.current);
-      wheelFrameRef.current = null;
-    }
-    if (targetRotation !== null) {
-      setWheelRotation(targetRotation);
-      if (wheelRef.current) wheelRef.current.style.transform = `rotate(${targetRotation}deg)`;
-    }
-    if (wheelPointerRef.current) {
-      wheelPointerRef.current.style.transform = "translateX(-50%) rotate(0deg)";
-    }
+  function cancelRouletteFrame() {
+    if (rouletteFrameRef.current === null) return;
+    window.cancelAnimationFrame(rouletteFrameRef.current);
+    rouletteFrameRef.current = null;
   }
 
-  function animateWheel(startRotation: number, targetRotation: number, response: OpenBoxResponse) {
+  function rouletteMetrics() {
+    const viewport = rouletteViewportRef.current;
+    const firstCard = rouletteTrackRef.current?.querySelector<HTMLElement>("[data-roulette-index='0']");
+    if (!viewport || !firstCard) return null;
+    const styles = window.getComputedStyle(rouletteTrackRef.current!);
+    return {
+      viewportWidth: viewport.clientWidth,
+      itemWidth: firstCard.offsetWidth,
+      gap: Number.parseFloat(styles.columnGap || styles.gap || "0") || 0,
+    };
+  }
+
+  function updateRouletteOffset(offset: number, items: BonusBoxPrizeView[], progress: number) {
+    currentRouletteOffsetRef.current = offset;
+    if (rouletteTrackRef.current) {
+      rouletteTrackRef.current.style.transform = `translate3d(${offset}px, 0, 0)`;
+    }
+    const metrics = rouletteMetrics();
+    if (!metrics || items.length === 0) return;
+    const activeIndex = rouletteActiveIndex({
+      offset,
+      ...metrics,
+      itemCount: items.length,
+    });
+    if (activeCardIndexRef.current === activeIndex) return;
+
+    const previousCard = activeCardIndexRef.current === null
+      ? null
+      : rouletteTrackRef.current?.querySelector<HTMLElement>(`[data-roulette-index='${activeCardIndexRef.current}']`);
+    const activeCard = rouletteTrackRef.current?.querySelector<HTMLElement>(`[data-roulette-index='${activeIndex}']`);
+    previousCard?.removeAttribute("data-active");
+    activeCard?.setAttribute("data-active", "true");
+    activeCardIndexRef.current = activeIndex;
+
+    const activePrize = items[activeIndex];
+    if (!activePrize) return;
+    if (rouletteViewportRef.current) {
+      rouletteViewportRef.current.dataset.activeRarity = activePrize.type === "NO_PRIZE"
+        ? "empty"
+        : activePrize.rarity.toLowerCase();
+    }
+    if (rouletteReadoutRef.current) {
+      rouletteReadoutRef.current.textContent = `${rarityLabel(activePrize.rarity)} · ${prizeLabel(activePrize)}`;
+    }
+    if (requestInFlightRef.current) playRouletteTick(activePrize, progress);
+  }
+
+  function beginLaunch() {
+    cancelRouletteFrame();
+    setRoulettePhase("launch");
     const startedAt = performance.now();
-    const distance = targetRotation - startRotation;
+    let previousAt = startedAt;
+    let offset = currentRouletteOffsetRef.current;
 
     const frame = (now: number) => {
-      const elapsed = Math.min(1, (now - startedAt) / WHEEL_DURATION_MS);
-      const progress = 1 - Math.pow(1 - elapsed, 2.7);
-      const rotation = startRotation + distance * progress;
-
-      if (wheelRef.current) wheelRef.current.style.transform = `rotate(${rotation}deg)`;
-      if (wheelPointerRef.current) {
-        const phase = positiveModulo(rotation, segmentAngle) / segmentAngle;
-        const deflection = phase < 0.72
-          ? 0
-          : phase < 0.92
-            ? ((phase - 0.72) / 0.2) * 7
-            : 7 - ((phase - 0.92) / 0.08) * 12;
-        wheelPointerRef.current.style.transform = `translateX(-50%) rotate(${deflection}deg)`;
+      const metrics = rouletteMetrics();
+      const elapsed = now - startedAt;
+      const delta = Math.min(48, now - previousAt);
+      previousAt = now;
+      const speed = Math.min(0.72, 0.18 + elapsed * 0.00028);
+      offset -= delta * speed;
+      if (metrics && data.prizes.length > 0) {
+        const cycle = data.prizes.length * (metrics.itemWidth + metrics.gap);
+        if (offset <= -cycle) offset += cycle;
       }
+      updateRouletteOffset(offset, rouletteItems, Math.min(0.5, elapsed / 2200));
+      rouletteFrameRef.current = window.requestAnimationFrame(frame);
+    };
 
-      if (elapsed < 1) {
-        wheelFrameRef.current = window.requestAnimationFrame(frame);
+    rouletteFrameRef.current = window.requestAnimationFrame(frame);
+  }
+
+  async function animateRoulette(response: OpenBoxResponse) {
+    cancelRouletteFrame();
+    const winningIndex = resolveWinningIndex(response);
+    setRouletteItems(response.reel);
+    activeCardIndexRef.current = null;
+    await nextPaint();
+
+    const metrics = rouletteMetrics();
+    if (!metrics) {
+      void finishOpening(response, true);
+      return;
+    }
+    const targetOffset = rouletteTargetOffset({
+      ...metrics,
+      winningIndex,
+      stopOffsetRatio: response.stopOffsetRatio,
+    });
+    const startOffset = Math.min(-2 * (metrics.itemWidth + metrics.gap), currentRouletteOffsetRef.current);
+    const startedAt = performance.now();
+    const distance = targetOffset - startOffset;
+
+    const frame = (now: number) => {
+      const elapsedMs = now - startedAt;
+      const progress = rouletteProgress(elapsedMs);
+      const offset = startOffset + distance * progress;
+      const phase = rouletteMotionPhase(progress);
+      setRoulettePhase((current) => current === phase ? current : phase);
+      updateRouletteOffset(offset, response.reel, progress);
+
+      if (progress < 1) {
+        rouletteFrameRef.current = window.requestAnimationFrame(frame);
         return;
       }
 
-      wheelFrameRef.current = null;
-      settleWheel(targetRotation);
+      rouletteFrameRef.current = null;
+      updateRouletteOffset(targetOffset, response.reel, 1);
       void finishOpening(response);
     };
 
-    wheelFrameRef.current = window.requestAnimationFrame(frame);
+    if (reducedMotion) {
+      updateRouletteOffset(targetOffset, response.reel, 1);
+      void finishOpening(response);
+      return;
+    }
+    rouletteFrameRef.current = window.requestAnimationFrame(frame);
   }
 
-  async function finishOpening(response: OpenBoxResponse) {
+  async function finishOpening(response: OpenBoxResponse, skipDelay = false) {
     if (finishingRef.current) return;
     finishingRef.current = true;
-    settleWheel();
-    setResult(response);
+    cancelRouletteFrame();
+    snapRouletteToWinner(response);
+    setRoulettePhase("locked");
     storeOpening(response);
+    playRouletteWin(response.prize);
+    vibrateForPrize(response.prize);
+    const freshDataPromise = apiFetch<BonusBoxOverview>("/api/bonus-box").catch(() => null);
+    if (!skipDelay) {
+      await waitForReveal(revealDelayMs(response.prize.rarity, reducedMotion));
+    }
+    setResult(response);
     setPendingResult(null);
+    setRoulettePhase("revealing");
     setRevealEffect(!reducedMotion);
-    const freshData = await apiFetch<BonusBoxOverview>("/api/bonus-box").catch(() => null);
+    setOpening(false);
+    requestInFlightRef.current = false;
+    const freshData = await freshDataPromise;
     if (freshData) {
       setData(freshData);
     } else {
@@ -252,11 +398,104 @@ export function BonusBoxClient({
         ].slice(0, 12),
       }));
     }
-    setOpening(false);
-    requestInFlightRef.current = false;
     if (!reducedMotion) {
       effectTimerRef.current = window.setTimeout(() => setRevealEffect(false), REVEAL_EFFECT_DURATION_MS);
     }
+  }
+
+  function snapRouletteToWinner(response: OpenBoxResponse) {
+    const metrics = rouletteMetrics();
+    if (!metrics) return;
+    const targetOffset = rouletteTargetOffset({
+      ...metrics,
+      winningIndex: resolveWinningIndex(response),
+      stopOffsetRatio: response.stopOffsetRatio,
+    });
+    updateRouletteOffset(targetOffset, response.reel, 1);
+  }
+
+  function setCooldown(seconds: number) {
+    const safeSeconds = Math.max(1, Math.ceil(seconds));
+    setCooldownSeconds(safeSeconds);
+    try {
+      window.sessionStorage.setItem(COOLDOWN_UNTIL_KEY, String(Date.now() + safeSeconds * 1000));
+    } catch {
+      // Таймер продолжит работать до обновления страницы.
+    }
+  }
+
+  function toggleSound() {
+    const next = !soundEnabled;
+    setSoundEnabled(next);
+    try {
+      window.localStorage.setItem(SOUND_ENABLED_KEY, next ? "on" : "off");
+    } catch {
+      // Настройка останется активной до закрытия страницы.
+    }
+    if (next) playTone(620, 0.08, 0.035, "sine");
+  }
+
+  function getAudioContext() {
+    if (!soundEnabled) return null;
+    if (audioContextRef.current) return audioContextRef.current;
+    const AudioContextConstructor = window.AudioContext
+      ?? (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!AudioContextConstructor) return null;
+    audioContextRef.current = new AudioContextConstructor();
+    return audioContextRef.current;
+  }
+
+  function playTone(frequency: number, duration: number, volume: number, type: OscillatorType) {
+    const context = getAudioContext();
+    if (!context) return;
+    void context.resume();
+    const oscillator = context.createOscillator();
+    const gain = context.createGain();
+    oscillator.type = type;
+    oscillator.frequency.setValueAtTime(frequency, context.currentTime);
+    gain.gain.setValueAtTime(volume, context.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + duration);
+    oscillator.connect(gain).connect(context.destination);
+    oscillator.start();
+    oscillator.stop(context.currentTime + duration);
+  }
+
+  function playRouletteTick(prize: BonusBoxPrizeView, progress: number) {
+    const now = performance.now();
+    const interval = progress > 0.84 ? 34 : 48;
+    if (now - lastTickAtRef.current < interval) return;
+    lastTickAtRef.current = now;
+    const premiumBoost = prize.rarity === "LEGENDARY" ? 260 : prize.rarity === "EPIC" ? 150 : 0;
+    playTone(250 + premiumBoost + progress * 180, 0.045, premiumBoost > 0 ? 0.045 : 0.022, "triangle");
+  }
+
+  function playRouletteWin(prize: BonusBoxPrizeView) {
+    if (prize.type === "NO_PRIZE") {
+      playTone(190, 0.18, 0.025, "sine");
+      return;
+    }
+    const root = prize.rarity === "LEGENDARY" ? 520 : prize.rarity === "EPIC" ? 440 : prize.rarity === "RARE" ? 390 : 330;
+    playTone(root, 0.28, 0.05, "sine");
+    window.setTimeout(() => playTone(root * 1.25, 0.32, 0.045, "sine"), 110);
+    if (prize.rarity === "LEGENDARY") {
+      window.setTimeout(() => playTone(root * 1.5, 0.45, 0.055, "sine"), 230);
+    }
+  }
+
+  function vibrateForPrize(prize: BonusBoxPrizeView) {
+    if (reducedMotion || !soundEnabled || typeof navigator.vibrate !== "function") return;
+    if (prize.rarity === "LEGENDARY") navigator.vibrate([35, 45, 80]);
+    else if (prize.rarity === "EPIC") navigator.vibrate([30, 35, 55]);
+    else if (prize.rarity === "RARE") navigator.vibrate(35);
+  }
+
+  function waitForReveal(milliseconds: number) {
+    return new Promise<void>((resolve) => {
+      revealTimerRef.current = window.setTimeout(() => {
+        revealTimerRef.current = null;
+        resolve();
+      }, milliseconds);
+    });
   }
 
   async function claimMission(mission: BonusBoxMissionView) {
@@ -279,52 +518,91 @@ export function BonusBoxClient({
   async function openBox() {
     if (!canOpen || requestInFlightRef.current) return;
     requestInFlightRef.current = true;
+    const storedStartedAt = readOpeningStartedAt();
+    const storedSpinId = readOpeningSpinId();
+    const continuingPendingSpin = Boolean(storedSpinId && storedStartedAt > 0);
+    const startedAt = continuingPendingSpin ? storedStartedAt : Date.now();
+    const spinId = continuingPendingSpin ? storedSpinId! : createSpinId();
     try {
-      window.sessionStorage.setItem(OPENING_STARTED_KEY, String(Date.now()));
+      window.sessionStorage.setItem(OPENING_STARTED_KEY, String(startedAt));
+      window.sessionStorage.setItem(OPENING_SPIN_ID_KEY, spinId);
     } catch {
       // Открытие всё равно защищено серверной транзакцией.
     }
     finishingRef.current = false;
     setOpening(true);
+    setSpinError("");
     setRevealEffect(false);
     setResult(null);
     setPendingResult(null);
+    void getAudioContext()?.resume();
+    playTone(145, 0.22, 0.035, "sine");
+    beginLaunch();
 
     try {
-      const response = await apiFetch<OpenBoxResponse>("/api/bonus-box", {
-        method: "POST",
-      });
+      let response: OpenBoxResponse;
+      try {
+        response = await requestBonusSpin(spinId);
+      } catch (firstError) {
+        if (isApiFetchError(firstError) && firstError.status < 500) throw firstError;
+        await delay(450);
+        try {
+          response = await requestBonusSpin(spinId);
+        } catch (retryError) {
+          const recovered = await recoverCommittedOpening(startedAt);
+          if (!recovered) throw retryError;
+          response = recovered;
+        }
+      }
       setCooldownSeconds(0);
+      try {
+        window.sessionStorage.removeItem(COOLDOWN_UNTIL_KEY);
+      } catch {
+        // Таймер уже сброшен в состоянии страницы.
+      }
       setPendingResult(response);
       storeOpening(response);
-
-      const winnerIndex = Math.max(0, wheelPrizes.findIndex((prize) => prize.id === response.prize.id));
-      const winnerCenter = (winnerIndex + 0.5) * segmentAngle;
-      const targetRotation = (360 - winnerCenter) % 360;
-      const normalized = positiveModulo(wheelRotation, 360);
-      const correction = positiveModulo(targetRotation - normalized, 360);
-      const finalRotation = wheelRotation + correction + 360 * 7;
-      targetWheelRotationRef.current = finalRotation;
-
-      if (reducedMotion) {
-        settleWheel(finalRotation);
-        void finishOpening(response);
-      } else {
-        animateWheel(wheelRotation, finalRotation, response);
-      }
+      await animateRoulette(response);
     } catch (error) {
       if (isApiFetchError(error) && error.status === 429) {
         const responseRetryAfter = typeof error.data?.retryAfter === "number"
           ? error.data.retryAfter
           : null;
-        setCooldownSeconds(error.retryAfter ?? responseRetryAfter ?? 60);
+        setCooldown(error.retryAfter ?? responseRetryAfter ?? 60);
       }
+      cancelRouletteFrame();
       requestInFlightRef.current = false;
-      clearStoredOpening();
+      if (isApiFetchError(error) && error.status < 500) clearStoredOpening();
       setOpening(false);
       setPendingResult(null);
       setRevealEffect(false);
+      setRoulettePhase("error");
+      setSpinError(
+        isApiFetchError(error) && error.status === 429
+          ? "Рулетка защищена от частых запусков. Таймер уже запущен."
+          : error instanceof Error
+            ? error.message
+            : "Не удалось завершить запуск. Попробуйте ещё раз.",
+      );
     }
+  }
+
+  async function requestBonusSpin(spinId: string) {
+    return apiFetch<OpenBoxResponse>("/api/bonus-box", {
+      method: "POST",
+      body: JSON.stringify({ spinId }),
+    });
+  }
+
+  async function recoverCommittedOpening(startedAt: number) {
+    const freshData = await apiFetch<BonusBoxOverview>("/api/bonus-box").catch(() => null);
+    if (!freshData) return null;
+    const recovered = freshData.openings.find(
+      (opening) => new Date(opening.createdAt).getTime() >= startedAt - 2_000,
+    );
+    if (!recovered) return null;
+    setData(freshData);
+    return buildRecoveredResponse(recovered, freshData);
   }
 
   function handleTabKeyDown(event: KeyboardEvent<HTMLDivElement>) {
@@ -395,108 +673,139 @@ export function BonusBoxClient({
           </div>
         </div>
 
-        {wheelPrizes.length > 0 && (
-          <div className="bonus-wheel-layout">
-            <div className="bonus-wheel-area">
-              <div className="bonus-wheel-frame">
-                <div ref={wheelPointerRef} className="bonus-wheel-pointer" aria-hidden="true"><span /></div>
-                <div
-                  ref={wheelRef}
-                  className={cn("bonus-wheel", wheelPrizes.length > 8 && "bonus-wheel--dense")}
-                  aria-label={`${wheelPrizes.length} возможных подарков`}
-                  style={{
-                    "--bonus-segment-size": `${segmentAngle}deg`,
-                    background: wheelBackground,
-                    transform: `rotate(${wheelRotation}deg)`,
-                  } as CSSProperties}
-                >
-                  {wheelPrizes.map((prize, index) => {
-                    const angle = (index + 0.5) * segmentAngle;
-                    return (
-                      <div key={prize.id} className="bonus-wheel-segment" style={{ transform: `rotate(${angle}deg)` }}>
-                        <div
-                          className={cn(
-                            "bonus-wheel-segment-copy",
-                            prize.rarity === "EPIC" && "bonus-wheel-segment-copy--epic",
-                            prize.rarity === "LEGENDARY" && "bonus-wheel-segment-copy--legendary",
-                            result?.prize.id === prize.id && "bonus-wheel-segment-copy--winner",
-                          )}
-                          data-rarity={prize.rarity}
-                          title={`${prize.title}: ${prizeLabel(prize)}`}
-                          style={{ transform: `translateX(-50%) rotate(${-angle - normalizedWheelRotation}deg)` }}
-                        >
-                          <span>{wheelPrizeLabel(prize)}</span>
-                          {wheelPrizes.length <= 8 && <small>{prize.title}</small>}
-                        </div>
-                      </div>
-                    );
-                  })}
+        {rouletteItems.length > 0 && (
+          <div className="bonus-roulette-layout">
+            <div className="bonus-roulette-theater">
+              <div className="bonus-roulette-atmosphere" aria-hidden="true">
+                <span /><span /><span />
+              </div>
+              <div className="bonus-roulette-marquee" aria-hidden="true">
+                {Array.from({ length: 18 }, (_, index) => <span key={index} />)}
+              </div>
+              <div
+                ref={rouletteViewportRef}
+                className="bonus-roulette-viewport"
+                data-phase={roulettePhase}
+                data-active-rarity="common"
+                aria-label={`Рулетка с ${data.prizes.length} возможными подарками`}
+              >
+                <div className="bonus-roulette-gate" aria-hidden="true">
+                  <span className="bonus-roulette-gate-label">DROP ZONE</span>
+                </div>
+                <div ref={rouletteTrackRef} className="bonus-roulette-track" role="list">
+                  {rouletteItems.map((prize, index) => (
+                    <RoulettePrizeCard
+                      key={`${prize.id}-${index}`}
+                      prize={prize}
+                      index={index}
+                    />
+                  ))}
+                </div>
+                <div className="bonus-roulette-vignette" aria-hidden="true" />
+              </div>
+              <div className="bonus-roulette-live">
+                <span className="bonus-roulette-live-dot" aria-hidden="true" />
+                <span ref={rouletteReadoutRef}>Система готова · выберите запуск</span>
+                <strong aria-live="polite">{rouletteStatusLabel(roulettePhase)}</strong>
+              </div>
+            </div>
+
+            <aside className="bonus-roulette-console">
+              <div className="bonus-roulette-console-head">
+                <div>
+                  <span>Призовой пул</span>
+                  <h3>Главные дропы</h3>
                 </div>
                 <button
                   type="button"
-                  className="bonus-wheel-hub"
+                  className="bonus-wheel-sound-toggle"
+                  onClick={toggleSound}
+                  aria-label={soundEnabled ? "Выключить звук рулетки" : "Включить звук рулетки"}
+                  title={soundEnabled ? "Звук включён" : "Звук выключен"}
+                >
+                  {soundEnabled ? <Volume2 /> : <VolumeX />}
+                </button>
+              </div>
+
+              <div className="bonus-roulette-spotlights">
+                {spotlightPrizes.map((prize, index) => (
+                  <div key={prize.id} className="bonus-roulette-spotlight" data-rarity={prize.rarity.toLowerCase()}>
+                    <span>{index === 0 ? <Crown /> : <Gem />}</span>
+                    <div>
+                      <small>{rarityLabel(prize.rarity)}</small>
+                      <strong>{prizeLabel(prize)}</strong>
+                      <p>{prize.title}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="bonus-roulette-stats">
+                <div>
+                  <span>Попытки</span>
+                  <strong>{availableNow}</strong>
+                </div>
+                <div>
+                  <span>Серия</span>
+                  <strong>{data.openingStreak.current}</strong>
+                </div>
+                <div>
+                  <span>До гарантии</span>
+                  <strong>{data.pityProgress.guaranteedNext ? "сейчас" : data.pityProgress.remaining ?? "—"}</strong>
+                </div>
+              </div>
+
+              {openCaseCta ? (
+                <div className="mt-4">{openCaseCta}</div>
+              ) : (
+                <button
+                  type="button"
+                  className={cn(openButtonClass, "mt-4 w-full")}
                   onClick={openBox}
                   disabled={!canOpen}
                   aria-label={`${openButtonLabel}. Доступно: ${availableNow} ${attemptWord(availableNow)}`}
                 >
-                  <span className="bonus-wheel-hub-icon" aria-hidden="true">
-                    {opening ? <LoaderCircle /> : <Sparkles />}
+                  <span className="bonus-roulette-cta-shine" aria-hidden="true" />
+                  <span className="relative flex items-center justify-center gap-2">
+                    {opening ? <LoaderCircle className="animate-spin" /> : spinError ? <RotateCw /> : <Sparkles />}
+                    <span>{opening ? "Рулетка запущена" : spinError ? "Запустить снова" : "Крутить рулетку"}</span>
                   </span>
-                  <strong>{availableNow}</strong>
-                  <span className="bonus-wheel-hub-count-label">{attemptWord(availableNow)}</span>
-                  <em>{opening ? "Ждите" : cooldownSeconds > 0 ? formatCooldown(cooldownSeconds) : canOpen ? "Получить" : "Закрыто"}</em>
                 </button>
-                {cooldownSeconds > 0 && (
-                  <div className="bonus-wheel-cooldown" role="status" aria-live="polite">
-                    <CalendarClock aria-hidden="true" />
-                    <span>
-                      Следующий запуск через <strong>{formatCooldown(cooldownSeconds)}</strong>
-                    </span>
-                  </div>
-                )}
-                {result && (
-                  <BonusWheelResultOverlay
-                    result={result}
-                    revealEffect={revealEffect}
-                    hasActiveSubscription={data.hasActiveSubscription}
-                    onCopyPromoCode={copyPromoCode}
-                    onClose={dismissResult}
-                  />
-                )}
-              </div>
-            </div>
+              )}
 
-            <div className={cn("bonus-wheel-console", !openCaseCta && "bonus-wheel-console--informational")}>
-              <div>
-                <div className="font-mono text-xs font-semibold uppercase tracking-[0.16em] text-brand-600 dark:text-brand-300">Доступно сейчас</div>
-                <p className="mt-2 text-lg font-semibold tracking-tight text-slate-950 dark:text-white">
-                  {opening
-                    ? "Подарок определяется"
-                    : cooldownSeconds > 0
-                      ? "Нужно немного подождать"
-                      : "Нажмите, чтобы получить подарок"}
-                </p>
-                <p className="mt-1 text-sm leading-6 text-slate-500 dark:text-slate-400">
-                  {cooldownSeconds > 0
-                    ? `Ограничение снимется автоматически через ${formatCooldown(cooldownSeconds)}.`
-                    : data.canOpenReason || "Подарок определяется на сервере и сразу сохраняется в истории."}
-                </p>
-              </div>
-              {openCaseCta && <div className="mt-5">{openCaseCta}</div>}
               {opening && pendingResult && !reducedMotion && (
                 <button
                   type="button"
-                  className="mt-3 w-full text-center text-xs font-medium text-brand-600 underline-offset-4 hover:text-brand-800 hover:underline dark:text-brand-300 dark:hover:text-white"
-                  onClick={() => void finishOpening(pendingResult)}
+                  className="bonus-roulette-skip"
+                  onClick={() => void finishOpening(pendingResult, true)}
                 >
                   Показать результат сразу
                 </button>
               )}
-              <div className="bonus-wheel-console-meta">
-                <span>{wheelPrizes.length} вариантов</span>
-                <span>Результат сохраняется</span>
-              </div>
-            </div>
+              {cooldownSeconds > 0 && (
+                <div className="bonus-roulette-cooldown" role="status" aria-live="polite">
+                  <CalendarClock aria-hidden="true" />
+                  <span>Новый запуск через <strong>{formatCooldown(cooldownSeconds)}</strong></span>
+                </div>
+              )}
+              {spinError && cooldownSeconds === 0 && (
+                <div className="bonus-roulette-error" role="alert">{spinError}</div>
+              )}
+
+              <p className="bonus-roulette-fairness">
+                Размер карточки не показывает шанс. Итог рассчитывается на сервере, точные проценты есть во вкладке «Призы».
+              </p>
+            </aside>
+
+            {result && (
+              <BonusWheelResultOverlay
+                result={result}
+                revealEffect={revealEffect}
+                hasActiveSubscription={data.hasActiveSubscription}
+                onCopyPromoCode={copyPromoCode}
+                onClose={dismissResult}
+              />
+            )}
           </div>
         )}
 
@@ -667,6 +976,34 @@ export function BonusBoxClient({
   );
 }
 
+function RoulettePrizeCard({ prize, index }: { prize: BonusBoxPrizeView; index: number }) {
+  const empty = prize.type === "NO_PRIZE";
+  return (
+    <article
+      className="bonus-roulette-card"
+      data-roulette-index={index}
+      data-rarity={empty ? "empty" : prize.rarity.toLowerCase()}
+      role="listitem"
+      aria-label={`${prize.title}: ${prizeLabel(prize)}, ${rarityLabel(prize.rarity)}`}
+    >
+      <div className="bonus-roulette-card-sheen" aria-hidden="true" />
+      <div className="bonus-roulette-card-icon" aria-hidden="true">
+        {empty
+          ? <CircleSlash />
+          : prize.rarity === "LEGENDARY"
+            ? <Crown />
+            : prize.rarity === "EPIC"
+              ? <Gem />
+              : <Gift />}
+      </div>
+      <span className="bonus-roulette-card-rarity">{rarityLabel(prize.rarity)}</span>
+      <strong>{prizeLabel(prize)}</strong>
+      <h4>{prize.title}</h4>
+      <div className="bonus-roulette-card-line" aria-hidden="true" />
+    </article>
+  );
+}
+
 function BonusWheelResultOverlay({
   result,
   revealEffect,
@@ -681,11 +1018,17 @@ function BonusWheelResultOverlay({
   onClose: () => void;
 }) {
   const isEmpty = result.prize.type === "NO_PRIZE";
-  const isCelebration = !isEmpty && result.prize.rarity !== "COMMON";
+  const particleCount = revealParticleCount(result.prize.rarity, isEmpty);
   const resultClass = `bonus-wheel-result-modal--${isEmpty ? "empty" : result.prize.rarity.toLowerCase()}`;
-  const title = isEmpty ? "Результат готов" : "Подарок получен";
+  const title = isEmpty
+    ? "В этот раз без бонуса"
+    : result.prize.rarity === "LEGENDARY"
+      ? "Главный приз"
+      : result.prize.rarity === "EPIC"
+        ? "Особый дроп"
+        : "Подарок получен";
   const description = isEmpty
-    ? "Результат сохранён в истории попыток."
+    ? "Прогресс до гарантированного приза продолжает расти."
     : "Подарок уже сохранён в вашем кабинете.";
 
   return (
@@ -722,15 +1065,16 @@ function BonusWheelResultOverlay({
         </div>
       }
     >
-      {revealEffect && isCelebration && (
+      {revealEffect && particleCount > 0 && (
         <div className="bonus-wheel-celebration" aria-hidden="true">
-          {Array.from({ length: 18 }, (_, index) => (
+          {Array.from({ length: particleCount }, (_, index) => (
             <span
               key={index}
               style={{
                 "--particle-index": index,
-                "--particle-x": `${(index % 6) * 18 - 45}%`,
-                "--particle-delay": `${(index % 5) * 45}ms`,
+                "--particle-x": `${(index % 9) * 14 - 56}%`,
+                "--particle-delay": `${(index % 7) * 38}ms`,
+                "--particle-rotation": `${420 + (index % 5) * 115}deg`,
               } as CSSProperties}
             />
           ))}
@@ -738,8 +1082,15 @@ function BonusWheelResultOverlay({
       )}
 
       <div className="bonus-wheel-result-copy" role="status" aria-live="polite">
+        <div className="bonus-wheel-result-orbits" aria-hidden="true"><span /><span /><span /></div>
         <div className="bonus-wheel-result-icon" aria-hidden="true">
-          {isEmpty ? <CircleSlash /> : <Sparkles />}
+          {isEmpty
+            ? <CircleSlash />
+            : result.prize.rarity === "LEGENDARY"
+              ? <Crown />
+              : result.prize.rarity === "EPIC"
+                ? <Gem />
+                : <Trophy />}
         </div>
         <div className="bonus-wheel-result-kicker">
           {isEmpty
@@ -808,17 +1159,25 @@ function readOpeningStartedAt() {
   }
 }
 
+function readOpeningSpinId() {
+  try {
+    const value = window.sessionStorage.getItem(OPENING_SPIN_ID_KEY);
+    return value && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
+      ? value
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 function clearStoredOpening() {
   try {
     window.sessionStorage.removeItem(PENDING_OPENING_KEY);
     window.sessionStorage.removeItem(OPENING_STARTED_KEY);
+    window.sessionStorage.removeItem(OPENING_SPIN_ID_KEY);
   } catch {
     // Хранилище может быть недоступно в приватном режиме браузера.
   }
-}
-
-function positiveModulo(value: number, divisor: number) {
-  return ((value % divisor) + divisor) % divisor;
 }
 
 function attemptWord(value: number) {
@@ -838,19 +1197,68 @@ function formatCooldown(seconds: number) {
     : `0:${String(remainder).padStart(2, "0")}`;
 }
 
-function wheelPrizeLabel(prize: BonusBoxPrizeView) {
-  if (prize.type === 'NO_PRIZE') return 'Ещё раз';
-  if (prize.type === 'SUBSCRIPTION_DAYS') return `+${prize.value} д`;
-  if (prize.type === 'TRAFFIC_GB') return `+${prize.value} ГБ`;
-  if (prize.type === 'BONUS_ATTEMPTS') return `+${prize.value} попыт.`;
-  return `−${prize.value}%`;
+function buildIdleRoulette(prizes: BonusBoxPrizeView[]) {
+  if (prizes.length === 0) return [];
+  const length = Math.max(28, prizes.length * 5);
+  return Array.from({ length }, (_, index) => prizes[index % prizes.length]!);
 }
 
-function wheelSegmentColor(prize: BonusBoxPrizeView, index: number) {
-  if (prize.rarity === 'LEGENDARY') return index % 2 === 0 ? '#c77b17' : '#df9b22';
-  if (prize.rarity === 'EPIC') return index % 2 === 0 ? '#b122b5' : '#d032c8';
-  if (prize.rarity === 'RARE') return index % 2 === 0 ? '#17627f' : '#1b7892';
-  return WHEEL_COLORS[index % WHEEL_COLORS.length];
+function buildRecoveredResponse(opening: BonusBoxOpeningView, data: BonusBoxOverview): OpenBoxResponse {
+  const winningIndex = 42;
+  const source = data.prizes.length > 0 ? data.prizes : [opening.prize];
+  const reel = Array.from({ length: 52 }, (_, index) => source[index % source.length]!);
+  reel[winningIndex] = opening.prize;
+  return {
+    ...opening,
+    reel,
+    winningIndex,
+    stopOffsetRatio: 0.5,
+    remainingAttempts: data.hasActiveSubscription ? data.attemptsCount : data.welcomeAttemptsCount,
+  };
+}
+
+function resolveWinningIndex(response: OpenBoxResponse) {
+  const serverWinner = response.reel[response.winningIndex];
+  if (serverWinner?.id === response.prize.id) return response.winningIndex;
+  const recoveredIndex = response.reel.findIndex((prize) => prize.id === response.prize.id);
+  return recoveredIndex >= 0 ? recoveredIndex : 0;
+}
+
+function rouletteStatusLabel(phase: RoulettePhase) {
+  if (phase === "launch") return "Разгон";
+  if (phase === "cruise") return "Высокая скорость";
+  if (phase === "anticipation") return "Приз уже близко";
+  if (phase === "locking") return "Фиксируем дроп";
+  if (phase === "locked") return "Приз выбран";
+  if (phase === "revealing") return "Результат готов";
+  if (phase === "error") return "Нужен повтор";
+  return "Готово к запуску";
+}
+
+function rarityRank(rarity: BonusBoxPrizeView["rarity"]) {
+  if (rarity === "LEGENDARY") return 3;
+  if (rarity === "EPIC") return 2;
+  if (rarity === "RARE") return 1;
+  return 0;
+}
+
+function createSpinId() {
+  if (typeof crypto.randomUUID === "function") return crypto.randomUUID();
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  bytes[6] = (bytes[6]! & 0x0f) | 0x40;
+  bytes[8] = (bytes[8]! & 0x3f) | 0x80;
+  const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0"));
+  return `${hex.slice(0, 4).join("")}-${hex.slice(4, 6).join("")}-${hex.slice(6, 8).join("")}-${hex.slice(8, 10).join("")}-${hex.slice(10).join("")}`;
+}
+
+function nextPaint() {
+  return new Promise<void>((resolve) => {
+    window.requestAnimationFrame(() => window.requestAnimationFrame(() => resolve()));
+  });
+}
+
+function delay(milliseconds: number) {
+  return new Promise<void>((resolve) => window.setTimeout(resolve, milliseconds));
 }
 
 function BonusEngagementPanel({

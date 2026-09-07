@@ -51,6 +51,7 @@ const REEL_ITEM_COUNT = 88
 const REEL_WINNING_BASE_INDEX = 72
 const REEL_WINNING_SPREAD = 4
 const WELCOME_ATTEMPT_PREFIX = 'welcome:'
+const OPEN_TRANSACTION_ATTEMPTS = 3
 
 const RARITY_VISUAL_WEIGHT: Record<BonusBoxPublicPrize['rarity'], number> = {
   COMMON: 1,
@@ -114,6 +115,103 @@ export class BonusBoxError extends Error {
     super(message)
     this.name = 'BonusBoxError'
   }
+}
+
+const openingReplaySelect = Prisma.validator<Prisma.BonusBoxOpeningSelect>()({
+  id: true,
+  reelSnapshot: true,
+  winningIndex: true,
+  stopOffsetRatio: true,
+  remoteSynced: true,
+  promoCode: {
+    select: {
+      code: true,
+      expiresAt: true,
+    },
+  },
+})
+
+type BonusBoxOpeningReplay = Prisma.BonusBoxOpeningGetPayload<{
+  select: typeof openingReplaySelect
+}>
+
+function parseOpeningReel(value: Prisma.JsonValue | null): BonusBoxPublicPrize[] | null {
+  if (!Array.isArray(value) || value.length === 0) return null
+
+  const validTypes = new Set([
+    'SUBSCRIPTION_DAYS',
+    'TRAFFIC_GB',
+    'PROMO_CODE_PERCENT',
+    'BONUS_ATTEMPTS',
+    'NO_PRIZE',
+  ])
+  const validRarities = new Set(['COMMON', 'RARE', 'EPIC', 'LEGENDARY'])
+  const valid = value.every((item) => {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) return false
+    const prize = item as Record<string, unknown>
+    return typeof prize.id === 'string'
+      && typeof prize.title === 'string'
+      && (prize.description === null || typeof prize.description === 'string')
+      && typeof prize.type === 'string'
+      && validTypes.has(prize.type)
+      && typeof prize.value === 'number'
+      && typeof prize.weight === 'number'
+      && typeof prize.rarity === 'string'
+      && validRarities.has(prize.rarity)
+      && typeof prize.chance === 'number'
+  })
+
+  return valid ? value as unknown as BonusBoxPublicPrize[] : null
+}
+
+async function findOpeningBySpinId(
+  userId: string,
+  spinId: string,
+  tx: Pick<BonusBoxTx, 'bonusBoxOpening'> = prisma
+): Promise<BonusBoxOpeningReplay | null> {
+  return tx.bonusBoxOpening.findFirst({
+    where: { userId, spinId },
+    select: openingReplaySelect,
+  })
+}
+
+async function replayOpeningResult(
+  userId: string,
+  opening: BonusBoxOpeningReplay
+): Promise<BonusBoxOpeningResult> {
+  const reel = parseOpeningReel(opening.reelSnapshot)
+  const winningIndex = opening.winningIndex
+  const stopOffsetRatio = opening.stopOffsetRatio
+  if (
+    !reel
+    || winningIndex == null
+    || winningIndex < 0
+    || winningIndex >= reel.length
+    || stopOffsetRatio == null
+  ) {
+    throw new BonusBoxError(
+      'Не удалось восстановить результат открытия',
+      500,
+      'INVALID_OPENING_SNAPSHOT'
+    )
+  }
+
+  return {
+    id: opening.id,
+    prize: reel[winningIndex]!,
+    reel,
+    winningIndex,
+    stopOffsetRatio,
+    promoCode: opening.promoCode?.code ?? null,
+    promoCodeExpiresAt: opening.promoCode?.expiresAt?.toISOString() ?? null,
+    remainingAttempts: await countAvailableAttempts(userId),
+    remoteSynced: opening.remoteSynced,
+  }
+}
+
+function isRetryableOpenConflict(error: unknown) {
+  return error instanceof Prisma.PrismaClientKnownRequestError
+    && (error.code === 'P2002' || error.code === 'P2034')
 }
 
 export function getBonusBoxConfig() {
@@ -573,15 +671,42 @@ export async function grantWeeklyBonusBoxAttempts(userId: string) {
   return { granted: result.count }
 }
 
-export async function openBonusBox(userId: string): Promise<BonusBoxOpeningResult> {
+export async function openBonusBox(userId: string, spinId: string): Promise<BonusBoxOpeningResult> {
+  const completedOpening = await findOpeningBySpinId(userId, spinId)
+  if (completedOpening) return replayOpeningResult(userId, completedOpening)
+
   const config = await getBonusBoxRuntimeConfig()
   if (!config.enabled) {
     throw new BonusBoxError('Подарочный бокс сейчас недоступен', 403, 'BONUS_BOX_DISABLED')
   }
 
   const now = new Date()
-  const txResult = await prisma.$transaction(
+  let txResult:
+    | { kind: 'existing'; opening: BonusBoxOpeningReplay }
+    | {
+        kind: 'created'
+        openingId: string
+        prize: BonusBoxPublicPrize
+        reel: BonusBoxPublicPrize[]
+        winningIndex: number
+        stopOffsetRatio: number
+        promoCodeId: string | null
+        promoCode: string | null
+        promoCodeExpiresAt: string | null
+        remoteUpdate:
+          | ({ type: 'SUBSCRIPTION_DAYS'; subscriptionId: string; expireAt: Date } & { reference: RemnawaveUserReference })
+          | ({ type: 'TRAFFIC_GB'; subscriptionId: string; trafficLimitBytes: bigint } & { reference: RemnawaveUserReference })
+          | null
+      }
+    | undefined
+
+  const openInTransaction = () => prisma.$transaction(
     async (tx) => {
+      const existingOpening = await findOpeningBySpinId(userId, spinId, tx)
+      if (existingOpening) {
+        return { kind: 'existing' as const, opening: existingOpening }
+      }
+
       const user = await tx.user.findUnique({
         where: { id: userId },
         select: {
@@ -697,6 +822,15 @@ export async function openBonusBox(userId: string): Promise<BonusBoxOpeningResul
         title: item.title,
         probability: selectionWeight > 0 ? item.weight / selectionWeight : 0,
       }))
+      const eligiblePublicPrizes = publicPrizesWithChances(eligiblePrizes, eligiblePrizes)
+      const publicPrize = publicPrizeFromPrize(
+        prize,
+        chanceForPrize(prize, eligiblePublicPrizes)
+      )
+      const reel = buildReel(
+        eligiblePublicPrizes.length > 0 ? eligiblePublicPrizes : [publicPrize],
+        publicPrize
+      )
       const claimedPrize = await tx.bonusBoxPrize.updateMany({
         where: {
           id: prize.id,
@@ -720,9 +854,13 @@ export async function openBonusBox(userId: string): Promise<BonusBoxOpeningResul
       const opening = await tx.bonusBoxOpening.create({
         data: {
           userId,
+          spinId,
           attemptId: attempt.id,
           prizeId: prize.id,
           prizeSnapshot: makePrizeSnapshot(prize),
+          reelSnapshot: reel.items,
+          winningIndex: reel.winningIndex,
+          stopOffsetRatio: reel.stopOffsetRatio,
           awardedSubscriptionId: application.subscriptionId,
           promoCodeId: application.promoCodeId,
           remoteSynced: !application.remoteUpdate,
@@ -734,9 +872,12 @@ export async function openBonusBox(userId: string): Promise<BonusBoxOpeningResul
       })
 
       return {
+        kind: 'created' as const,
         openingId: opening.id,
-        prize,
-        eligiblePrizes,
+        prize: publicPrize,
+        reel: reel.items,
+        winningIndex: reel.winningIndex,
+        stopOffsetRatio: reel.stopOffsetRatio,
         promoCodeId: application.promoCodeId,
         promoCode: opening.promoCode?.code ?? null,
         promoCodeExpiresAt: opening.promoCode?.expiresAt?.toISOString() ?? null,
@@ -749,6 +890,26 @@ export async function openBonusBox(userId: string): Promise<BonusBoxOpeningResul
     { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
   )
 
+  for (let transactionAttempt = 0; transactionAttempt < OPEN_TRANSACTION_ATTEMPTS; transactionAttempt++) {
+    try {
+      txResult = await openInTransaction()
+      break
+    } catch (error) {
+      if (!isRetryableOpenConflict(error)) throw error
+
+      const existingOpening = await findOpeningBySpinId(userId, spinId)
+      if (existingOpening) return replayOpeningResult(userId, existingOpening)
+      if (transactionAttempt === OPEN_TRANSACTION_ATTEMPTS - 1) throw error
+    }
+  }
+
+  if (!txResult) {
+    throw new BonusBoxError('Не удалось завершить открытие', 500, 'OPEN_TRANSACTION_FAILED')
+  }
+  if (txResult.kind === 'existing') {
+    return replayOpeningResult(userId, txResult.opening)
+  }
+
   let remoteSynced = true
   if (txResult.remoteUpdate) {
     remoteSynced = await syncPrizeToRemnawave(txResult.remoteUpdate)
@@ -759,22 +920,13 @@ export async function openBonusBox(userId: string): Promise<BonusBoxOpeningResul
   }
 
   const remainingAttempts = await countAvailableAttempts(userId)
-  const eligiblePublicPrizes = publicPrizesWithChances(
-    txResult.eligiblePrizes,
-    txResult.eligiblePrizes
-  )
-  const publicPrize = publicPrizeFromPrize(
-    txResult.prize,
-    chanceForPrize(txResult.prize, eligiblePublicPrizes)
-  )
-  const reel = buildReel(eligiblePublicPrizes.length > 0 ? eligiblePublicPrizes : [publicPrize], publicPrize)
 
   return {
     id: txResult.openingId,
-    prize: publicPrize,
-    reel: reel.items,
-    winningIndex: reel.winningIndex,
-    stopOffsetRatio: reel.stopOffsetRatio,
+    prize: txResult.prize,
+    reel: txResult.reel,
+    winningIndex: txResult.winningIndex,
+    stopOffsetRatio: txResult.stopOffsetRatio,
     promoCode: txResult.promoCode,
     promoCodeExpiresAt: txResult.promoCodeExpiresAt,
     remainingAttempts,

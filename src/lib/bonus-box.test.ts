@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { BonusBoxPrize, BonusBoxRarity } from '@prisma/client'
+import { Prisma, type BonusBoxPrize, type BonusBoxRarity } from '@prisma/client'
 
 const mocks = vi.hoisted(() => {
   const prisma = {
@@ -30,6 +30,7 @@ const mocks = vi.hoisted(() => {
       findUnique: vi.fn(),
     },
     bonusBoxOpening: {
+      findFirst: vi.fn(),
       findMany: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
@@ -279,6 +280,7 @@ describe('openBonusBox', () => {
     vi.setSystemTime(new Date('2026-06-24T12:00:00.000Z'))
     mocks.prisma.$transaction.mockImplementation(async (fn) => fn(mocks.prisma))
     mocks.prisma.bonusBoxSetting.findUnique.mockResolvedValue(null)
+    mocks.prisma.bonusBoxOpening.findFirst.mockResolvedValue(null)
   })
 
   afterEach(() => {
@@ -307,7 +309,7 @@ describe('openBonusBox', () => {
     mocks.prisma.bonusBoxOpening.findMany.mockResolvedValue([])
     mocks.prisma.bonusBoxAttempt.count.mockResolvedValue(2)
 
-    const result = await openBonusBox('user-1')
+    const result = await openBonusBox('user-1', '00000000-0000-4000-8000-000000000001')
 
     expect(result.remainingAttempts).toBe(2)
     expect(mocks.prisma.bonusBoxAttempt.createMany).toHaveBeenCalledWith({
@@ -319,6 +321,7 @@ describe('openBonusBox', () => {
     })
     expect(mocks.prisma.bonusBoxOpening.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
+        spinId: '00000000-0000-4000-8000-000000000001',
         expectedChance: 1,
         expectedDistribution: [{
           prizeId: attemptPrize.id,
@@ -351,7 +354,7 @@ describe('openBonusBox', () => {
     mocks.prisma.bonusBoxOpening.findMany.mockResolvedValue([])
     mocks.prisma.bonusBoxAttempt.count.mockResolvedValue(0)
 
-    const result = await openBonusBox('user-1')
+    const result = await openBonusBox('user-1', '00000000-0000-4000-8000-000000000002')
 
     expect(result.prize.type).toBe('NO_PRIZE')
     expect(result.remainingAttempts).toBe(0)
@@ -388,7 +391,7 @@ describe('openBonusBox', () => {
     mocks.prisma.bonusBoxOpening.findMany.mockResolvedValue([])
     mocks.prisma.bonusBoxAttempt.count.mockResolvedValue(0)
 
-    const result = await openBonusBox('user-1')
+    const result = await openBonusBox('user-1', '00000000-0000-4000-8000-000000000003')
 
     expect(result.prize.type).toBe('PROMO_CODE_PERCENT')
     expect(result.promoCode).toBe('BOX-WELCOME')
@@ -413,7 +416,7 @@ describe('openBonusBox', () => {
     mocks.prisma.bonusBoxPrize.findMany.mockResolvedValue([daysPrize])
     mocks.prisma.bonusBoxAttempt.updateMany.mockResolvedValue({ count: 1 })
 
-    await expect(openBonusBox('user-1')).rejects.toMatchObject({
+    await expect(openBonusBox('user-1', '00000000-0000-4000-8000-000000000004')).rejects.toMatchObject({
       code: 'NO_PRIZES',
     })
 
@@ -445,7 +448,7 @@ describe('openBonusBox', () => {
     mocks.prisma.bonusBoxOpening.findMany.mockResolvedValue([])
     mocks.prisma.bonusBoxAttempt.count.mockResolvedValue(1)
 
-    const result = await openBonusBox('user-1')
+    const result = await openBonusBox('user-1', '00000000-0000-4000-8000-000000000005')
 
     expect(result.prize.id).toBe('attempts-prize')
     expect(result.reel.every((item) => item.id === 'attempts-prize')).toBe(true)
@@ -481,7 +484,7 @@ describe('openBonusBox', () => {
     mocks.prisma.bonusBoxOpening.create.mockResolvedValue({ id: 'opening-1', promoCode: null })
     mocks.prisma.bonusBoxAttempt.count.mockResolvedValue(0)
 
-    const result = await openBonusBox('user-1')
+    const result = await openBonusBox('user-1', '00000000-0000-4000-8000-000000000006')
 
     expect(result.prize.id).toBe('rare-prize')
     expect(mocks.prisma.bonusBoxPrize.updateMany).toHaveBeenCalledWith(
@@ -506,9 +509,82 @@ describe('openBonusBox', () => {
     mocks.prisma.bonusBoxAttempt.updateMany.mockResolvedValue({ count: 0 })
     mocks.prisma.bonusBoxPrize.findMany.mockResolvedValue([emptyPrize])
 
-    await expect(openBonusBox('user-1')).rejects.toMatchObject({ code: 'ATTEMPT_ALREADY_USED' })
+    await expect(openBonusBox('user-1', '00000000-0000-4000-8000-000000000007')).rejects.toMatchObject({ code: 'ATTEMPT_ALREADY_USED' })
     expect(mocks.prisma.bonusBoxPrize.updateMany).not.toHaveBeenCalled()
     expect(mocks.prisma.bonusBoxOpening.create).not.toHaveBeenCalled()
+  })
+
+  it('returns the stored opening for the same spin without consuming another attempt', async () => {
+    const reelPrize = {
+      id: 'prize-1',
+      title: 'Подарок',
+      description: null,
+      type: 'NO_PRIZE' as const,
+      value: 0,
+      weight: 10,
+      rarity: 'COMMON' as const,
+      chance: 1,
+    }
+    mocks.prisma.bonusBoxOpening.findFirst.mockResolvedValue({
+      id: 'opening-1',
+      reelSnapshot: [reelPrize],
+      winningIndex: 0,
+      stopOffsetRatio: 0.62,
+      remoteSynced: true,
+      promoCode: null,
+    })
+    mocks.prisma.bonusBoxAttempt.count.mockResolvedValue(3)
+
+    const result = await openBonusBox('user-1', '00000000-0000-4000-8000-000000000008')
+
+    expect(result).toMatchObject({
+      id: 'opening-1',
+      prize: reelPrize,
+      remainingAttempts: 3,
+    })
+    expect(mocks.prisma.$transaction).not.toHaveBeenCalled()
+    expect(mocks.prisma.bonusBoxAttempt.updateMany).not.toHaveBeenCalled()
+    expect(mocks.prisma.bonusBoxPrize.updateMany).not.toHaveBeenCalled()
+  })
+
+  it('recovers the committed opening after a serializable transaction conflict', async () => {
+    const reelPrize = {
+      id: 'prize-1',
+      title: 'Подарок',
+      description: null,
+      type: 'NO_PRIZE' as const,
+      value: 0,
+      weight: 10,
+      rarity: 'COMMON' as const,
+      chance: 1,
+    }
+    const persistedOpening = {
+      id: 'opening-1',
+      reelSnapshot: [reelPrize],
+      winningIndex: 0,
+      stopOffsetRatio: 0.38,
+      remoteSynced: true,
+      promoCode: null,
+    }
+    mocks.prisma.bonusBoxOpening.findFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(persistedOpening)
+    mocks.prisma.bonusBoxAttempt.count.mockResolvedValue(0)
+    mocks.prisma.$transaction.mockRejectedValueOnce(
+      new Prisma.PrismaClientKnownRequestError('Transaction write conflict', {
+        code: 'P2034',
+        clientVersion: '5.22.0',
+      })
+    )
+
+    const result = await openBonusBox('user-1', '00000000-0000-4000-8000-000000000009')
+
+    expect(result).toMatchObject({ id: 'opening-1', prize: reelPrize })
+    expect(mocks.prisma.$transaction).toHaveBeenCalledWith(
+      expect.any(Function),
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
+    )
+    expect(mocks.prisma.bonusBoxAttempt.updateMany).not.toHaveBeenCalled()
   })
 })
 

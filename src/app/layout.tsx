@@ -1,5 +1,6 @@
 import './globals.css'
 import './design-system.css'
+import './bonus-roulette.css'
 import type { Metadata, Viewport } from 'next'
 import { Toaster } from '@/components/ui/toaster'
 import { brandCssVariables, getBrandName, getPublicBrandSettings } from '@/lib/branding'

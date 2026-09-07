@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { z } from 'zod'
 import { BonusBoxError, getBonusBoxOverview, openBonusBox, retryPendingBonusBoxSyncsForUser } from '@/lib/bonus-box'
 import { requireAuth, withAuth } from '@/lib/auth/guard'
 import { rateLimit } from '@/lib/rate-limit'
@@ -7,6 +8,10 @@ import { assessBonusBoxRisk, BonusBoxRiskError } from '@/lib/bonus-box-engagemen
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
+
+const openSchema = z.object({
+  spinId: z.string().uuid(),
+}).strict()
 
 export const GET = withAuth(async () => {
   if (!await isFeatureEnabled('bonusBox')) return NextResponse.json({ error: 'Not found' }, { status: 404 })
@@ -31,8 +36,19 @@ export const POST = withAuth(async (req: Request) => {
   }
 
   try {
+    let body: unknown
+    try {
+      body = await req.json()
+    } catch {
+      return NextResponse.json({ error: 'Некорректный запрос', code: 'INVALID_SPIN_ID' }, { status: 400 })
+    }
+    const parsed = openSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ error: 'Некорректный идентификатор вращения', code: 'INVALID_SPIN_ID' }, { status: 400 })
+    }
+
     await assessBonusBoxRisk(session.uid, req)
-    const result = await openBonusBox(session.uid)
+    const result = await openBonusBox(session.uid, parsed.data.spinId)
     return NextResponse.json(result)
   } catch (error) {
     if (error instanceof BonusBoxError) {

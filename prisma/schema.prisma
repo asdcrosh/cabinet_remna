@@ -1676,9 +1676,13 @@ model BonusBoxRiskSignal {
 model BonusBoxOpening {
   id                    String    @id @default(cuid())
   userId                String
+  spinId                String?
   attemptId             String    @unique
   prizeId               String
   prizeSnapshot         Json
+  reelSnapshot          Json?
+  winningIndex          Int?
+  stopOffsetRatio       Float?
   awardedSubscriptionId String?
   promoCodeId           String?
   remoteSynced          Boolean   @default(true)
@@ -1697,6 +1701,7 @@ model BonusBoxOpening {
   seasonalEvent BonusBoxEvent?  @relation(fields: [seasonalEventId], references: [id], onDelete: SetNull)
 
   @@index([userId, createdAt])
+  @@unique([userId, spinId])
   @@index([prizeId, createdAt])
   @@index([promoCodeId])
   @@index([userId, remoteSynced, nextSyncAt])
