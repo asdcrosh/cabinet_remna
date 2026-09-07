@@ -785,7 +785,7 @@ export function BonusBoxClient({
               {cooldownSeconds > 0 && (
                 <div className="bonus-roulette-cooldown" role="status" aria-live="polite">
                   <CalendarClock aria-hidden="true" />
-                  <span>Новый запуск через <strong>{formatCooldown(cooldownSeconds)}</strong></span>
+                  <span>Следующий запуск через <strong>{formatCooldown(cooldownSeconds)}</strong></span>
                 </div>
               )}
               {spinError && cooldownSeconds === 0 && (
