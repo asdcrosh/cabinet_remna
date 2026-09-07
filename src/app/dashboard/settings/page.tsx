@@ -8,7 +8,7 @@ import { ProfileForm } from '@/components/dashboard/profile-form'
 import { SettingsTabs, type SettingsTabId } from '@/components/dashboard/settings-tabs'
 import { TelegramLinkCard } from '@/components/dashboard/telegram-link-card'
 import { PageHeader } from '@/components/dashboard/page-header'
-import { LogoutButton } from '@/components/dashboard/logout-button'
+import { SessionSecurityPanel } from '@/components/dashboard/session-security-panel'
 import { getFeatureFlags } from '@/lib/feature-flags'
 import { legalNavigation } from '@/lib/legal-links'
 import { getNotificationPreferences } from '@/lib/notification-preferences'
@@ -27,9 +27,18 @@ export default async function SettingsPage({
   if (!session) redirect('/login')
   const user = await prisma.user.findUnique({ where: { id: session.uid } })
   if (!user) redirect('/login')
-  const [features, notificationPreferences, resolvedSearchParams] = await Promise.all([
+  const [features, notificationPreferences, securityEvents, resolvedSearchParams] = await Promise.all([
     getFeatureFlags(),
     getNotificationPreferences(user.id),
+    prisma.auditLog.findMany({
+      where: {
+        actorId: user.id,
+        action: { in: ['USER_PASSWORD_CHANGED', 'USER_SESSIONS_REVOKED'] },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 5,
+      select: { id: true, action: true, createdAt: true, userAgent: true },
+    }),
     searchParams,
   ])
   const hasVerifiedEmail = Boolean(user.emailVerifiedAt && !user.email.endsWith('@pending.invalid'))
@@ -39,7 +48,7 @@ export default async function SettingsPage({
   const requestedSection = Array.isArray(resolvedSearchParams.section) ? resolvedSearchParams.section[0] : resolvedSearchParams.section
   const initialSection: SettingsTabId = isSettingsSection(requestedSection) ? requestedSection : 'account'
   const accountLinks = [
-    { href: '/dashboard/billing', label: 'Покупки', description: 'Платежи и чеки', icon: ReceiptText, visible: true },
+    { href: '/dashboard/billing', label: 'Покупки', description: 'Платежи и их статусы', icon: ReceiptText, visible: true },
     { href: '/dashboard/referrals', label: 'Приглашения', description: 'Ссылка и вознаграждения', icon: Gift, visible: features.referrals },
     { href: '/dashboard/bonus-box', label: 'Бонусы', description: 'Доступные подарки и награды', icon: Gift, visible: features.bonusBox },
   ].filter((item) => item.visible)
@@ -112,13 +121,14 @@ export default async function SettingsPage({
                       Добавьте и подтвердите email, чтобы установить пароль.
                     </div>
                   )}
-                  <div className="rounded-xl border border-rose-200 bg-rose-50/70 p-4 dark:border-rose-400/20 dark:bg-rose-400/[0.06]">
-                    <h3 className="text-sm font-semibold text-rose-950 dark:text-rose-100">Завершить сеанс</h3>
-                    <p className="mt-1 text-sm text-rose-800/80 dark:text-rose-100/70">Потребуется снова войти на этом устройстве.</p>
-                    <div className="mt-3 max-w-40 overflow-hidden rounded-xl border border-rose-200 bg-white dark:border-rose-400/20 dark:bg-white/[0.04]">
-                      <LogoutButton />
-                    </div>
-                  </div>
+                  <SessionSecurityPanel
+                    expiresAt={typeof session.exp === 'number' ? new Date(session.exp * 1000).toISOString() : null}
+                    events={securityEvents.map((event) => ({
+                      ...event,
+                      action: event.action as 'USER_PASSWORD_CHANGED' | 'USER_SESSIONS_REVOKED',
+                      createdAt: event.createdAt.toISOString(),
+                    }))}
+                  />
                 </div>
               </SettingsSection>
             ),

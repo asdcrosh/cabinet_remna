@@ -10,6 +10,11 @@ import {
   updateSupportTicketSchema,
 } from '@/lib/support'
 import { isFeatureEnabled } from '@/lib/feature-flags'
+import {
+  readSupportMutationRequest,
+  SupportAttachmentError,
+  supportAttachmentSelect,
+} from '@/lib/support-attachments'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -68,6 +73,7 @@ export const GET = withAuth(async (req: Request, { params }: { params: Promise<{
           senderRole: true,
           createdAt: true,
           sender: { select: { email: true, name: true } },
+          attachments: { select: supportAttachmentSelect },
         },
       },
     },
@@ -106,10 +112,16 @@ export const POST = withAuth(async (req: Request, { params }: { params: Promise<
   const { id } = await params
 
   let body: unknown
+  let attachments: Awaited<ReturnType<typeof readSupportMutationRequest>>['attachments'] = []
   try {
-    body = await req.json()
-  } catch {
-    return NextResponse.json({ error: 'Некорректный запрос.' }, { status: 400 })
+    const requestData = await readSupportMutationRequest(req)
+    body = requestData.body
+    attachments = requestData.attachments
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof SupportAttachmentError ? error.message : 'Некорректный запрос.' },
+      { status: 400 }
+    )
   }
 
   const parsed = createSupportMessageSchema.safeParse(body)
@@ -135,6 +147,7 @@ export const POST = withAuth(async (req: Request, { params }: { params: Promise<
         senderId: session.uid,
         senderRole: 'ADMIN',
         body: parsed.data.message,
+        ...(attachments.length > 0 ? { attachments: { create: attachments } } : {}),
       },
       select: {
         id: true,
@@ -142,6 +155,7 @@ export const POST = withAuth(async (req: Request, { params }: { params: Promise<
         senderRole: true,
         createdAt: true,
         sender: { select: { email: true, name: true } },
+        attachments: { select: supportAttachmentSelect },
       },
     })
     await tx.supportTicket.update({

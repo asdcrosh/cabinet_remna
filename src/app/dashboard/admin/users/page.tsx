@@ -18,6 +18,7 @@ import { AdminEmptyState } from '@/components/admin/admin-empty-state'
 import { AdminActionsMenu } from '@/components/admin/admin-actions-menu'
 import { UserSubscriptionDeleteButton } from '@/components/admin/user-subscription-delete-button'
 import { UserWhitelistAddonButton } from '@/components/admin/user-whitelist-addon-button'
+import { BulkUserSyncButton } from '@/components/admin/bulk-user-sync-button'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Пользователи — Админка' }
@@ -129,10 +130,17 @@ export default async function AdminUsersPage({
       title="Пользователи"
       description="Аккаунты, роли и подписки"
       action={
-        <a href={buildUsersExportHref(q, role, account)} className="btn-secondary w-full sm:w-auto">
-          <Download className="h-4 w-4" />
-          Экспорт CSV
-        </a>
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+          <BulkUserSyncButton
+            userIds={users
+              .filter((item) => actor.role === 'SUPER_ADMIN' || item.role !== 'SUPER_ADMIN')
+              .map((item) => item.id)}
+          />
+          <a href={buildUsersExportHref(q, role, account)} className="btn-secondary w-full sm:w-auto">
+            <Download className="h-4 w-4" />
+            Экспорт CSV
+          </a>
+        </div>
       }
     >
       <AdminFilterBar

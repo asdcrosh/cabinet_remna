@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   bcryptHash: vi.fn(),
   syncRemnashop: vi.fn(),
   createAdminNotification: vi.fn(),
+  writeAuditLog: vi.fn(),
   passwordResetToken: {
     findUnique: vi.fn(),
     updateMany: vi.fn(),
@@ -27,6 +28,7 @@ vi.mock('./prisma', () => ({
 vi.mock('./admin-notifications', () => ({
   createAdminNotification: mocks.createAdminNotification,
 }))
+vi.mock('./audit-log', () => ({ writeAuditLog: mocks.writeAuditLog }))
 vi.mock('./remnashop-password-sync', () => ({
   syncResetPasswordToRemnashop: mocks.syncRemnashop,
 }))
@@ -68,6 +70,12 @@ describe('password reset', () => {
       password: 'Password2',
     })
     expect(mocks.createAdminNotification).not.toHaveBeenCalled()
+    expect(mocks.writeAuditLog).toHaveBeenCalledWith({
+      actorId: 'user-1',
+      targetId: 'user-1',
+      action: 'USER_PASSWORD_CHANGED',
+      message: 'Пользователь восстановил пароль по ссылке',
+    })
   })
 
   it('keeps the Cabinet reset valid and warns the administrator when remote sync is unavailable', async () => {

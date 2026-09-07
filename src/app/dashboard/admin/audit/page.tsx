@@ -15,6 +15,8 @@ export const dynamic = 'force-dynamic'
 export const metadata = { title: 'История действий — Админка' }
 
 const ACTION_LABELS: Record<AuditAction, string> = {
+  USER_PASSWORD_CHANGED: 'Пароль изменён',
+  USER_SESSIONS_REVOKED: 'Сеансы завершены',
   ADMIN_PLAN_CREATED: 'Тариф создан',
   ADMIN_PLAN_UPDATED: 'Тариф изменён',
   ADMIN_PLAN_DELETED: 'Тариф удалён',

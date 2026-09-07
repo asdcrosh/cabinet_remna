@@ -1492,11 +1492,26 @@ model SupportMessage {
   body       String
   createdAt  DateTime             @default(now())
 
-  ticket SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-  sender User?         @relation(fields: [senderId], references: [id], onDelete: SetNull)
+  ticket      SupportTicket       @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  sender      User?               @relation(fields: [senderId], references: [id], onDelete: SetNull)
+  attachments SupportAttachment[]
 
   @@index([ticketId, createdAt])
   @@index([senderId])
+}
+
+model SupportAttachment {
+  id        String   @id @default(cuid())
+  messageId String
+  fileName  String
+  mimeType  String
+  sizeBytes Int
+  data      Bytes
+  createdAt DateTime @default(now())
+
+  message SupportMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([messageId, createdAt])
 }
 
 enum SupportTicketStatus {
@@ -1752,6 +1767,8 @@ model AuditLog {
 }
 
 enum AuditAction {
+  USER_PASSWORD_CHANGED
+  USER_SESSIONS_REVOKED
   ADMIN_PLAN_CREATED
   ADMIN_PLAN_UPDATED
   ADMIN_PLAN_DELETED

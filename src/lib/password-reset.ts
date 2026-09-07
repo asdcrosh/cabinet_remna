@@ -7,6 +7,7 @@ import { renderActionEmail } from './email-template'
 import { logError, logInfo } from './logger'
 import { createAdminNotification } from './admin-notifications'
 import { syncResetPasswordToRemnashop } from './remnashop-password-sync'
+import { writeAuditLog } from './audit-log'
 
 const TOKEN_BYTES = 32
 const TOKEN_TTL_MS = 60 * 60 * 1000
@@ -130,6 +131,12 @@ export async function resetPasswordByToken(input: { token: string; password: str
       data: { usedAt: new Date() },
     }),
   ])
+  await writeAuditLog({
+    actorId: row.userId,
+    targetId: row.userId,
+    action: 'USER_PASSWORD_CHANGED',
+    message: 'Пользователь восстановил пароль по ссылке',
+  })
 
   let remnashopSync: 'synced' | 'not_linked' | 'not_configured' | 'failed' = 'not_linked'
   if (row.user.remnashopUserId) {

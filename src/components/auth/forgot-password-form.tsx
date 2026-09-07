@@ -1,12 +1,14 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { apiFetch } from '@/lib/api-client'
 import { forgotPasswordSchema, type ForgotPasswordInput } from '@/lib/auth/validation'
 import { FormAlert } from '@/components/ui/form-alert'
-import { CheckCircle2, Mail, Send } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, Mail, RefreshCw, Send } from 'lucide-react'
+
+const RESEND_DELAY_SECONDS = 60
 
 export function ForgotPasswordForm() {
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<ForgotPasswordInput>({
@@ -15,6 +17,16 @@ export function ForgotPasswordForm() {
   })
   const [sent, setSent] = useState(false)
   const [serverError, setServerError] = useState<string | null>(null)
+  const [sentEmail, setSentEmail] = useState('')
+  const [resendIn, setResendIn] = useState(0)
+
+  useEffect(() => {
+    if (resendIn <= 0) return
+    const timer = window.setInterval(() => {
+      setResendIn((value) => Math.max(0, value - 1))
+    }, 1000)
+    return () => window.clearInterval(timer)
+  }, [resendIn])
 
   const onSubmit = handleSubmit(async (values) => {
     setServerError(null)
@@ -23,20 +35,62 @@ export function ForgotPasswordForm() {
         method: 'POST',
         body: JSON.stringify(values),
       })
+      setSentEmail(values.email)
       setSent(true)
+      setResendIn(RESEND_DELAY_SECONDS)
     } catch (error) {
       setServerError(error instanceof Error ? error.message : 'Не удалось отправить ссылку')
     }
   })
 
+  if (sent) {
+    return (
+      <div className="space-y-4 text-center">
+        <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-200">
+          <CheckCircle2 className="h-7 w-7" />
+        </div>
+        <div>
+          <h2 className="text-lg font-semibold text-slate-950 dark:text-white">Проверьте почту</h2>
+          <p className="mt-1 text-sm leading-6 text-slate-500 dark:text-slate-400">
+            Если аккаунт существует, ссылка отправлена на{' '}
+            <span className="break-all font-medium text-slate-700 dark:text-slate-200">{sentEmail}</span>.
+          </p>
+        </div>
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-left text-xs leading-5 text-slate-600 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-300">
+          Письмо может прийти в течение нескольких минут. Проверьте папку «Спам», если его нет во входящих.
+        </div>
+        {serverError && <FormAlert>{serverError}</FormAlert>}
+        <button
+          type="button"
+          disabled={isSubmitting || resendIn > 0}
+          className="btn-primary w-full"
+          onClick={() => void onSubmit()}
+        >
+          <RefreshCw className={isSubmitting ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />
+          {isSubmitting
+            ? 'Отправляем...'
+            : resendIn > 0
+              ? `Отправить ещё раз через ${resendIn} сек.`
+              : 'Отправить ещё раз'}
+        </button>
+        <button
+          type="button"
+          className="btn-secondary w-full"
+          onClick={() => {
+            setSent(false)
+            setServerError(null)
+            setResendIn(0)
+          }}
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Изменить email
+        </button>
+      </div>
+    )
+  }
+
   return (
     <form onSubmit={onSubmit} className="space-y-4">
-      {sent && (
-        <div role="status" className="flex items-start gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-3.5 py-3 text-sm leading-5 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-100">
-          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
-          <span>Если такой email зарегистрирован, ссылка для восстановления отправлена.</span>
-        </div>
-      )}
       <div>
         <label className="label" htmlFor="email">Email</label>
         <div className="relative">

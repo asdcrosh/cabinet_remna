@@ -11,7 +11,13 @@ import { readWhitelistAddonSnapshot } from '@/lib/whitelist-addon'
 
 export type PaymentHistoryPayment = Prisma.PaymentGetPayload<{ include: { plan: true; subscription: true } }>
 
-export function PaymentHistory({ payments }: { payments: PaymentHistoryPayment[] }) {
+export function PaymentHistory({
+  payments,
+  supportEnabled = false,
+}: {
+  payments: PaymentHistoryPayment[]
+  supportEnabled?: boolean
+}) {
   if (payments.length === 0) return <PaymentHistoryEmpty />
 
   return (
@@ -64,6 +70,9 @@ export function PaymentHistory({ payments }: { payments: PaymentHistoryPayment[]
                     Переход: «{purchaseSnapshot.switchFromPlan.name}» → «{purchaseSnapshot.name}»
                   </div>
                 ) : null}
+                <p className="mt-2 text-xs leading-5 text-slate-500 dark:text-slate-400">
+                  {paymentStatusDescription(payment)}
+                </p>
               </div>
             </div>
 
@@ -98,6 +107,14 @@ export function PaymentHistory({ payments }: { payments: PaymentHistoryPayment[]
               </details>
               {payment.status === 'PENDING' ? (
                 <PaymentAction confirmationUrl={payment.confirmationUrl} status={payment.status} createdAt={payment.createdAt} fullWidth />
+              ) : null}
+              {supportEnabled && needsPaymentSupportAction(payment) ? (
+                <Link
+                  href={`/dashboard/support?category=payment&payment=${encodeURIComponent(payment.id)}`}
+                  className="btn-secondary min-h-10 w-full justify-center px-3 py-2 text-xs"
+                >
+                  Помощь с платежом
+                </Link>
               ) : null}
             </div>
           </article>
@@ -269,4 +286,29 @@ function shortId(id: string) {
 
 function isFreshPendingPayment(createdAt: Date) {
   return createdAt.getTime() > Date.now() - getPendingPaymentTtlMs()
+}
+
+function paymentStatusDescription(payment: PaymentHistoryPayment) {
+  if (payment.status === 'PENDING') {
+    return isFreshPendingPayment(payment.createdAt)
+      ? 'Завершите оплату в окне платёжной системы. После подтверждения статус обновится автоматически.'
+      : 'Ссылка на оплату истекла. Если оплата не была завершена, списания не произошло.'
+  }
+  if (payment.status === 'CANCELED') {
+    return 'Платёж не был завершён. Если деньги списались, передайте номер платежа поддержке.'
+  }
+  if (payment.status === 'REFUNDED') {
+    return 'Возврат оформлен. Срок зачисления зависит от банка, выпустившего карту.'
+  }
+  if (payment.status === 'SUCCEEDED' && !payment.subscriptionProvisionedAt) {
+    return 'Оплата получена, подписка ещё настраивается. Обычно это занимает несколько минут.'
+  }
+  return 'Оплата подтверждена, доступ выдан.'
+}
+
+function needsPaymentSupportAction(payment: PaymentHistoryPayment) {
+  return payment.status === 'CANCELED'
+    || payment.status === 'REFUNDED'
+    || (payment.status === 'PENDING' && !isFreshPendingPayment(payment.createdAt))
+    || (payment.status === 'SUCCEEDED' && !payment.subscriptionProvisionedAt)
 }

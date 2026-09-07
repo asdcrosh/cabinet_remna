@@ -9,6 +9,7 @@ import { setSessionCookieOnResponse } from '@/lib/auth/cookies'
 import { rateLimit } from '@/lib/rate-limit'
 import { changeRemnashopPassword } from '@/lib/remnashop-api'
 import { createAdminNotification } from '@/lib/admin-notifications'
+import { writeAuditLog } from '@/lib/audit-log'
 
 export const runtime = 'nodejs'
 
@@ -85,6 +86,13 @@ export const POST = withAuth(async (req: Request) => {
       passwordHash: newHash,
       sessionVersion: { increment: 1 },
     },
+  })
+  await writeAuditLog({
+    actorId: user.id,
+    targetId: user.id,
+    action: 'USER_PASSWORD_CHANGED',
+    message: 'Пользователь изменил пароль',
+    request: req,
   })
 
   const response = NextResponse.json({ ok: true })

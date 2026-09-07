@@ -122,6 +122,19 @@ export function serializeSupportMessage<T extends { createdAt: Date }>(message: 
   return {
     ...message,
     createdAt: message.createdAt.toISOString(),
+    ...('attachments' in message && Array.isArray(message.attachments)
+      ? {
+          attachments: message.attachments.map((attachment: any) => ({
+            id: attachment.id,
+            fileName: attachment.fileName,
+            mimeType: attachment.mimeType,
+            sizeBytes: attachment.sizeBytes,
+            createdAt: attachment.createdAt instanceof Date
+              ? attachment.createdAt.toISOString()
+              : attachment.createdAt,
+          })),
+        }
+      : {}),
   }
 }
 

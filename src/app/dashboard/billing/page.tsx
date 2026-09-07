@@ -179,7 +179,7 @@ export default async function BillingPage({
         {view === 'important' ? (
           <p className="mb-3 px-1 text-xs text-slate-500 dark:text-slate-400">Отменённые попытки оплаты скрыты. Они доступны во вкладке «Все».</p>
         ) : null}
-        <PaymentHistory payments={payments} />
+        <PaymentHistory payments={payments} supportEnabled={features.support} />
       </section>
 
       {pages > 1 && (

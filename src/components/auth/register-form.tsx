@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useForm } from 'react-hook-form'
@@ -10,7 +10,7 @@ import { registerSchema, type RegisterInput } from '@/lib/auth/validation'
 import { toast } from '@/components/ui/toaster'
 import { FormAlert } from '@/components/ui/form-alert'
 import { Checkbox } from '@/components/ui/checkbox'
-import { CheckCircle2, Eye, EyeOff, LockKeyhole, Mail, Ticket, UserRound } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, Eye, EyeOff, LockKeyhole, Mail, RefreshCw, Ticket, UserRound } from 'lucide-react'
 import { YandexAuthButton } from './yandex-auth-button'
 
 export function RegisterForm({
@@ -40,9 +40,17 @@ export function RegisterForm({
   const [showPassword, setShowPassword] = useState(false)
   const [registeredEmail, setRegisteredEmail] = useState<string | null>(null)
   const [emailDelivery, setEmailDelivery] = useState<string | null>(null)
+  const [resending, setResending] = useState(false)
+  const [resendIn, setResendIn] = useState(0)
   const [showConsentHint, setShowConsentHint] = useState(false)
   const password = watch('password')
   const legalAccepted = watch('agreeToTerms') && watch('agreeToPersonalData')
+
+  useEffect(() => {
+    if (resendIn <= 0) return
+    const timer = window.setInterval(() => setResendIn((value) => Math.max(0, value - 1)), 1000)
+    return () => window.clearInterval(timer)
+  }, [resendIn])
 
   const onSubmit = handleSubmit(async (values) => {
     setServerError(null)
@@ -53,11 +61,31 @@ export function RegisterForm({
       })
       setRegisteredEmail(values.email)
       setEmailDelivery(result.emailDelivery ?? null)
+      setResendIn(60)
       toast('Проверьте почту для продолжения', 'success')
     } catch (error) {
       setServerError(error instanceof Error ? error.message : 'Не удалось создать аккаунт')
     }
   })
+
+  async function resendVerification() {
+    if (!registeredEmail || resendIn > 0) return
+    setResending(true)
+    setServerError(null)
+    try {
+      const result = await apiFetch<{ emailDelivery?: string }>('/api/auth/resend-verification', {
+        method: 'POST',
+        body: JSON.stringify({ email: registeredEmail }),
+      })
+      setEmailDelivery(result.emailDelivery ?? null)
+      setResendIn(60)
+      toast('Ссылка подтверждения отправлена повторно', 'success')
+    } catch (error) {
+      setServerError(error instanceof Error ? error.message : 'Не удалось отправить ссылку')
+    } finally {
+      setResending(false)
+    }
+  }
 
   if (registeredEmail) {
     return (
@@ -78,12 +106,38 @@ export function RegisterForm({
             Доставка email не настроена. В dev-режиме ссылка подтверждения выведена в консоль сервера.
           </div>
         )}
+        {serverError && <FormAlert>{serverError}</FormAlert>}
         <button
           type="button"
           className="btn-primary w-full"
           onClick={() => router.push(`/login?next=${encodeURIComponent(initialNextPath)}`)}
         >
           Перейти ко входу
+        </button>
+        <button
+          type="button"
+          className="btn-secondary w-full"
+          disabled={resending || resendIn > 0}
+          onClick={() => void resendVerification()}
+        >
+          <RefreshCw className={resending ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />
+          {resending
+            ? 'Отправляем...'
+            : resendIn > 0
+              ? `Отправить ещё раз через ${resendIn} сек.`
+              : 'Отправить письмо ещё раз'}
+        </button>
+        <button
+          type="button"
+          className="inline-flex w-full items-center justify-center gap-2 text-sm font-medium text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
+          onClick={() => {
+            setRegisteredEmail(null)
+            setServerError(null)
+            setResendIn(0)
+          }}
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Изменить email
         </button>
         <div className="flex items-center justify-center gap-2 text-sm text-emerald-600">
           <CheckCircle2 className="h-4 w-4" />

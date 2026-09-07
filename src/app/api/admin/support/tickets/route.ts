@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { requireStaff, withAuth } from '@/lib/auth/guard'
 import { serializeSupportMessage, serializeSupportTicket } from '@/lib/support'
 import { isFeatureEnabled } from '@/lib/feature-flags'
+import { supportAttachmentSelect } from '@/lib/support-attachments'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -80,7 +81,7 @@ export const GET = withAuth(async (req: Request) => {
         messages: {
           orderBy: { createdAt: 'desc' },
           take: 1,
-          select: { id: true, body: true, senderRole: true, createdAt: true },
+          select: { id: true, body: true, senderRole: true, createdAt: true, attachments: { select: supportAttachmentSelect } },
         },
       },
     }),

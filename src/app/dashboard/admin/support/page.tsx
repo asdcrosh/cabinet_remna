@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { requireStaffPage } from '@/lib/auth/admin-page'
 import { serializeSupportMessage, serializeSupportTicket } from '@/lib/support'
 import { SupportPanelDynamic } from '@/components/support/support-panel-dynamic'
+import { supportAttachmentSelect } from '@/lib/support-attachments'
 import { parseAdminListLimit } from '@/lib/admin-list'
 import { AdminPageShell } from '@/components/admin/admin-page-shell'
 import { notFound } from 'next/navigation'
@@ -86,6 +87,7 @@ export default async function AdminSupportPage({
             senderRole: true,
             createdAt: true,
             sender: { select: { email: true, name: true } },
+            attachments: { select: supportAttachmentSelect },
           },
         },
       },

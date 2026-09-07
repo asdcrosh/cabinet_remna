@@ -18,6 +18,7 @@ export type ApiFetchError = Error & {
 }
 
 const API_TIMEOUT_MS = 20_000
+const API_GET_RETRY_DELAY_MS = 350
 
 const STATUS_MESSAGES: Record<number, string> = {
   400: 'Некорректный запрос. Проверьте введенные данные.',
@@ -32,32 +33,51 @@ const STATUS_MESSAGES: Record<number, string> = {
   500: 'Внутренняя ошибка сервера.',
   502: 'Внешний сервис временно недоступен.',
   503: 'Сервис временно недоступен.',
+  504: 'Сервис не ответил вовремя.',
 }
 
 export async function apiFetch<T = unknown>(
   path: string,
   init: RequestInit = {}
 ): Promise<T> {
-  const timeoutSignal = AbortSignal.timeout(API_TIMEOUT_MS)
-  const signal = init.signal ? AbortSignal.any([init.signal, timeoutSignal]) : timeoutSignal
-  let res: Response
-  try {
-    res = await fetch(path, {
-      ...init,
-      headers: {
-        'Content-Type': 'application/json',
-        ...(init.headers || {}),
-      },
-      signal,
-    })
-  } catch (error) {
-    if (error instanceof Error && error.name === 'TimeoutError') {
-      const message = 'Сервер не ответил вовремя. Попробуйте ещё раз.'
-      if (init.method && init.method !== 'GET' && !isAdminPage()) toast(message)
+  const method = (init.method ?? 'GET').toUpperCase()
+  const canRetry = method === 'GET' || method === 'HEAD'
+  const attempts = canRetry ? 2 : 1
+  let res: Response | null = null
+
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    const timeoutSignal = AbortSignal.timeout(API_TIMEOUT_MS)
+    const signal = init.signal ? AbortSignal.any([init.signal, timeoutSignal]) : timeoutSignal
+    try {
+      res = await fetch(path, {
+        ...init,
+        headers: {
+          'Content-Type': 'application/json',
+          ...(init.headers || {}),
+        },
+        signal,
+      })
+      if (attempt + 1 < attempts && [502, 503, 504].includes(res.status)) {
+        await waitBeforeRetry()
+        continue
+      }
+      break
+    } catch (error) {
+      if (init.signal?.aborted) throw error
+      if (attempt + 1 < attempts) {
+        await waitBeforeRetry()
+        continue
+      }
+
+      const message = error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError')
+        ? 'Сервер не ответил вовремя. Попробуйте ещё раз.'
+        : 'Нет соединения с сервером. Проверьте интернет и попробуйте ещё раз.'
+      if (method !== 'GET' && method !== 'HEAD' && !isAdminPage()) toast(message)
       throw new Error(message)
     }
-    throw error
   }
+
+  if (!res) throw new Error('Нет соединения с сервером. Проверьте интернет и попробуйте ещё раз.')
   let data: any = null
   try {
     data = await res.json()
@@ -82,6 +102,10 @@ export async function apiFetch<T = unknown>(
     throw err
   }
   return data as T
+}
+
+function waitBeforeRetry() {
+  return new Promise((resolve) => setTimeout(resolve, API_GET_RETRY_DELAY_MS))
 }
 
 export function isApiFetchError(error: unknown): error is ApiFetchError {

@@ -11,6 +11,11 @@ import {
 import { createAdminNotification } from '@/lib/admin-notifications'
 import { isFeatureEnabled } from '@/lib/feature-flags'
 import { buildAdminSupportTelegramText } from '@/lib/admin-telegram-notifications'
+import {
+  readSupportMutationRequest,
+  SupportAttachmentError,
+  supportAttachmentSelect,
+} from '@/lib/support-attachments'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -26,7 +31,7 @@ export const GET = withAuth(async () => {
       messages: {
         orderBy: { createdAt: 'desc' },
         take: 1,
-        select: { id: true, body: true, senderRole: true, createdAt: true },
+        select: { id: true, body: true, senderRole: true, createdAt: true, attachments: { select: supportAttachmentSelect } },
       },
     },
   })
@@ -48,10 +53,16 @@ export const POST = withAuth(async (req: Request) => {
   }
 
   let body: unknown
+  let attachments: Awaited<ReturnType<typeof readSupportMutationRequest>>['attachments'] = []
   try {
-    body = await req.json()
-  } catch {
-    return NextResponse.json({ error: 'Некорректный запрос.' }, { status: 400 })
+    const requestData = await readSupportMutationRequest(req)
+    body = requestData.body
+    attachments = requestData.attachments
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof SupportAttachmentError ? error.message : 'Некорректный запрос.' },
+      { status: 400 }
+    )
   }
 
   const parsed = createSupportTicketSchema.safeParse(body)
@@ -72,13 +83,14 @@ export const POST = withAuth(async (req: Request) => {
             senderId: session.uid,
             senderRole: 'USER',
             body: parsed.data.message,
+            ...(attachments.length > 0 ? { attachments: { create: attachments } } : {}),
           },
         },
       },
       include: {
         messages: {
           orderBy: { createdAt: 'asc' },
-          select: { id: true, body: true, senderRole: true, createdAt: true },
+          select: { id: true, body: true, senderRole: true, createdAt: true, attachments: { select: supportAttachmentSelect } },
         },
       },
     })

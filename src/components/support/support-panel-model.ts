@@ -1,3 +1,5 @@
+import type { SupportCategoryValue } from '@/lib/support'
+
 export type TicketStatus = 'OPEN' | 'WAITING_ADMIN' | 'WAITING_USER' | 'CLOSED'
 export type SenderRole = 'USER' | 'ADMIN'
 export type TicketFolder = 'active' | 'need-answer' | 'answered' | 'closed'
@@ -11,6 +13,13 @@ export interface SupportMessage {
     email: string
     name: string | null
   } | null
+  attachments?: Array<{
+    id: string
+    fileName: string
+    mimeType: string
+    sizeBytes: number
+    createdAt: string
+  }>
 }
 
 export interface SupportTicket {
@@ -66,6 +75,9 @@ export interface SupportPanelProps {
   initialTotal?: number
   pageSize?: number
   initialQuery?: string
+  initialCategory?: SupportCategoryValue
+  initialMessage?: string
+  initialNewTicketOpen?: boolean
 }
 
 export function getUnreadCount(ticket: SupportTicket, mode: 'user' | 'admin') {
