@@ -399,6 +399,7 @@ export function PlansAdmin({ plans }: { plans: PlanAdminRow[] }) {
 
       {orderedPlans.length > 0 && (
         <DndContext
+          id="admin-plans-sortable"
           sensors={sensors}
           collisionDetection={closestCenter}
           onDragStart={beginDrag}

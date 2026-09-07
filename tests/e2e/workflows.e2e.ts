@@ -138,8 +138,8 @@ test('пользователь отключает устройство с под
   await login(page, E2E_USERS.active.email)
   await page.goto('/dashboard/devices')
 
-  await expect(page.getByRole('heading', { name: 'Pixel 8 · Android' })).toBeVisible()
-  await page.getByRole('button', { name: 'Отключить', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'Pixel 8' })).toBeVisible()
+  await page.getByRole('button', { name: 'Отключить Pixel 8' }).click()
   const dialog = page.getByRole('dialog', { name: 'Отключить устройство?' })
   await expect(dialog).toBeVisible()
   const disconnectResponse = page.waitForResponse((response) =>
@@ -150,8 +150,8 @@ test('пользователь отключает устройство с под
 
   await expect(page.getByRole('heading', { name: 'Pixel 8 · Android' })).toHaveCount(0)
   await expect(page.getByText('Активных устройств нет.', { exact: true })).toBeVisible()
-  await expect(page.getByRole('heading', { name: 'Отключённые' })).toBeVisible()
-  await expect(page.getByText('Pixel 8 · Android', { exact: true })).toBeVisible()
+  await page.getByText('Отключённые устройства: 1', { exact: true }).click()
+  await expect(page.getByText('Pixel 8', { exact: true })).toBeVisible()
   await expectNoHorizontalOverflow(page)
 
   const restoreResponse = page.waitForResponse((response) =>

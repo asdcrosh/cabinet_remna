@@ -13,6 +13,11 @@ import {
   type NotificationPriority,
 } from '@/lib/notification-presentation'
 import { cn } from '@/lib/cn'
+import { refreshNotificationSummary } from '@/lib/notification-summary-client'
+import { toast } from '@/components/ui/toaster'
+
+const NOTIFICATION_PAGE_SIZE = 30
+const NOTIFICATION_REQUEST_TIMEOUT_MS = 10_000
 
 const prioritySections: Array<{ value: NotificationPriority; title: string; description: string }> = [
   { value: 'action', title: 'Требуют действия', description: 'Оплата или доступ нуждаются в вашем внимании.' },
@@ -20,19 +25,37 @@ const prioritySections: Array<{ value: NotificationPriority; title: string; desc
   { value: 'updates', title: 'Остальные события', description: 'Оплаты, бонусы и новости.' },
 ]
 
-export function NotificationsList({ initialNotifications }: { initialNotifications: UserNotificationView[] }) {
+export function NotificationsList({
+  initialNotifications,
+  initialHasMore = false,
+  initialCursor = null,
+}: {
+  initialNotifications: UserNotificationView[]
+  initialHasMore?: boolean
+  initialCursor?: string | null
+}) {
   const [notifications, setNotifications] = useState(initialNotifications)
   const [filter, setFilter] = useState<NotificationFilter>('all')
+  const [hasMore, setHasMore] = useState(initialHasMore)
+  const [cursor, setCursor] = useState(initialCursor)
+  const [loadingMore, setLoadingMore] = useState(false)
 
   async function markAllRead() {
     const now = new Date().toISOString()
-    const previous = notifications
+    const previousReadAt = new Map(notifications.map((item) => [item.id, item.readAt]))
     setNotifications((items) => items.map((item) => ({ ...item, readAt: item.readAt ?? now })))
     try {
-      const response = await fetch('/api/notifications', { method: 'PATCH' })
-      if (!response.ok) setNotifications(previous)
+      const response = await fetch('/api/notifications', {
+        method: 'PATCH',
+        signal: AbortSignal.timeout(NOTIFICATION_REQUEST_TIMEOUT_MS),
+      })
+      if (!response.ok) throw new Error('Notification update failed')
+      void refreshNotificationSummary('/api/notifications/summary')
     } catch {
-      setNotifications(previous)
+      setNotifications((items) => items.map((item) => (
+        previousReadAt.has(item.id) ? { ...item, readAt: previousReadAt.get(item.id) ?? null } : item
+      )))
+      toast('Не удалось отметить уведомления прочитанными')
     }
   }
 
@@ -41,18 +64,51 @@ export function NotificationsList({ initialNotifications }: { initialNotificatio
     if (unreadIds.length === 0) return
 
     const now = new Date().toISOString()
-    const previous = notifications
+    const previousReadAt = new Map(
+      notifications.filter((item) => unreadIds.includes(item.id)).map((item) => [item.id, item.readAt])
+    )
     const idSet = new Set(unreadIds)
     setNotifications((items) => items.map((item) => idSet.has(item.id) ? { ...item, readAt: now } : item))
 
     try {
-      const results = await Promise.all(unreadIds.map((id) => fetch(`/api/notifications/${id}`, {
+      const response = await fetch('/api/notifications', {
         method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: unreadIds }),
         keepalive: true,
-      })))
-      if (results.some((response) => !response.ok)) setNotifications(previous)
+        signal: AbortSignal.timeout(NOTIFICATION_REQUEST_TIMEOUT_MS),
+      })
+      if (!response.ok) throw new Error('Notification update failed')
+      void refreshNotificationSummary('/api/notifications/summary')
     } catch {
-      setNotifications(previous)
+      setNotifications((items) => items.map((item) => (
+        previousReadAt.has(item.id) ? { ...item, readAt: previousReadAt.get(item.id) ?? null } : item
+      )))
+      toast('Не удалось отметить уведомление прочитанным')
+    }
+  }
+
+  async function loadMore() {
+    if (!cursor || loadingMore) return
+    setLoadingMore(true)
+    try {
+      const params = new URLSearchParams({ cursor, take: String(NOTIFICATION_PAGE_SIZE) })
+      const response = await fetch(`/api/notifications?${params.toString()}`, {
+        cache: 'no-store',
+        signal: AbortSignal.timeout(NOTIFICATION_REQUEST_TIMEOUT_MS),
+      })
+      const data = await response.json().catch(() => null)
+      if (!response.ok || !Array.isArray(data?.notifications)) throw new Error('Notification load failed')
+      setNotifications((current) => {
+        const knownIds = new Set(current.map((item) => item.id))
+        return [...current, ...data.notifications.filter((item: UserNotificationView) => !knownIds.has(item.id))]
+      })
+      setHasMore(Boolean(data.hasMore))
+      setCursor(typeof data.nextCursor === 'string' ? data.nextCursor : null)
+    } catch {
+      toast('Не удалось загрузить старые уведомления')
+    } finally {
+      setLoadingMore(false)
     }
   }
 
@@ -75,7 +131,9 @@ export function NotificationsList({ initialNotifications }: { initialNotificatio
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="font-semibold text-slate-950 dark:text-white">{unreadCount > 0 ? `${unreadCount} непрочитанных` : 'Всё прочитано'}</div>
-          <div className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">{notifications.length} событий</div>
+          <div className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
+            {notifications.length} {hasMore ? 'событий загружено' : 'событий'}
+          </div>
         </div>
         {unreadCount > 0 && (
           <button type="button" onClick={markAllRead} className="btn-secondary w-full sm:w-auto">
@@ -145,6 +203,17 @@ export function NotificationsList({ initialNotifications }: { initialNotificatio
           </div>
         </div>
       )}
+
+      {hasMore ? (
+        <button
+          type="button"
+          className="btn-secondary mx-auto flex w-full sm:w-auto"
+          disabled={loadingMore}
+          onClick={() => void loadMore()}
+        >
+          {loadingMore ? 'Загружаем...' : 'Загрузить ещё'}
+        </button>
+      ) : null}
     </section>
   )
 }

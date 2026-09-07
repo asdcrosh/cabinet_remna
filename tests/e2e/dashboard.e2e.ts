@@ -8,7 +8,7 @@ test('главная показывает подписку и быстрые д�
 
   const overview = page.getByTestId('subscription-overview')
   await expect(overview.getByRole('heading', { name: 'E2E Стандарт' })).toBeVisible()
-  await expect(overview.getByRole('link', { name: 'Подключить устройство' })).toBeVisible()
+  await expect(overview.getByRole('link', { name: /Подключить устройство|Управлять подключением/ })).toBeVisible()
   const actions = page.getByRole('region', { name: 'Быстрые действия' })
   await expect(actions.getByRole('link', { name: /Подключить VPN/ })).toHaveAttribute('href', '/dashboard/subscription')
   await expect(actions.getByRole('link', { name: /Подписка и оплата/ })).toHaveAttribute('href', '/dashboard/billing')
@@ -473,6 +473,33 @@ test('настройки и уведомления помещаются на м�
   await page.goto('/dashboard/notifications')
   await expect(page.getByRole('heading', { name: 'Требуют действия' })).toBeVisible()
   await expectNoHorizontalOverflow(page)
+})
+
+test('настройки сохраняют черновик между разделами и предупреждают перед уходом', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop-chromium', 'Сценарий достаточно проверить один раз')
+  await login(page, E2E_USERS.basic.email)
+  await page.goto('/dashboard/settings?section=notifications')
+
+  const notificationSwitch = page.getByRole('switch', { name: /в кабинете/i })
+  const initialState = await notificationSwitch.isChecked()
+  await notificationSwitch.locator('..').click()
+  await page.getByRole('tab', { name: 'Безопасность' }).click()
+  await expect(page).toHaveURL(/section=security/)
+  await page.goBack()
+  await expect(page.getByRole('tab', { name: 'Уведомления' })).toHaveAttribute('aria-selected', 'true')
+  await expect(notificationSwitch).toHaveJSProperty('checked', !initialState)
+
+  const dialogPromise = page.waitForEvent('dialog')
+  const navigationAttempt = page.getByRole('link', { name: 'Главная', exact: true }).first().click()
+  const dialog = await dialogPromise
+  expect(dialog.message()).toContain('несохранённые изменения')
+  await dialog.dismiss()
+  await navigationAttempt
+  await expect(page).toHaveURL(/\/dashboard\/settings\?section=notifications/)
+
+  await notificationSwitch.locator('..').click()
+  await page.getByRole('link', { name: 'Главная', exact: true }).first().click()
+  await expect(page).toHaveURL(/\/dashboard(?:\?|$)/)
 })
 
 test('каталог тарифов использует компактные строки с понятными действиями', async ({ page }, testInfo) => {

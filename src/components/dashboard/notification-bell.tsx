@@ -8,9 +8,12 @@ import type { UserNotificationView } from '@/lib/user-notifications'
 import type { AdminNotificationView } from '@/lib/admin-notifications'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { toast } from '@/components/ui/toaster'
-import { fetchNotificationSummary } from '@/lib/notification-summary-client'
+import {
+  fetchNotificationSummary,
+  publishNotificationSummary,
+  subscribeNotificationSummary,
+} from '@/lib/notification-summary-client'
 
-const NOTIFICATION_REFRESH_MS = 60_000
 const NOTIFICATION_REQUEST_TIMEOUT_MS = 10_000
 const FOCUSABLE_SELECTOR = [
   'a[href]',
@@ -31,11 +34,19 @@ type AdminNotificationSummary = {
   notifications: AdminNotificationView[]
 }
 
-export function NotificationBell({ showAdmin = false }: { showAdmin?: boolean }) {
+export function NotificationBell({
+  showAdmin = false,
+  initialUserUnreadCount = 0,
+  initialAdminUnreadCount = 0,
+}: {
+  showAdmin?: boolean
+  initialUserUnreadCount?: number
+  initialAdminUnreadCount?: number
+}) {
   const [open, setOpen] = useState(false)
   const [tab, setTab] = useState<'user' | 'admin'>('user')
-  const [summary, setSummary] = useState<NotificationSummary>({ unreadCount: 0, notifications: [] })
-  const [adminSummary, setAdminSummary] = useState<AdminNotificationSummary>({ unreadCount: 0, notifications: [] })
+  const [summary, setSummary] = useState<NotificationSummary>({ unreadCount: initialUserUnreadCount, notifications: [] })
+  const [adminSummary, setAdminSummary] = useState<AdminNotificationSummary>({ unreadCount: initialAdminUnreadCount, notifications: [] })
   const [clearConfirmOpen, setClearConfirmOpen] = useState(false)
   const [clearLoading, setClearLoading] = useState(false)
   const rootRef = useRef<HTMLDivElement | null>(null)
@@ -43,7 +54,6 @@ export function NotificationBell({ showAdmin = false }: { showAdmin?: boolean })
   const triggerRef = useRef<HTMLButtonElement | null>(null)
   const userTabRef = useRef<HTMLButtonElement | null>(null)
   const adminTabRef = useRef<HTMLButtonElement | null>(null)
-  const refreshInFlightRef = useRef(false)
   const activeSummary = tab === 'admin' ? adminSummary : summary
   const personalUnread = summary.unreadCount
 
@@ -52,48 +62,23 @@ export function NotificationBell({ showAdmin = false }: { showAdmin?: boolean })
     window.requestAnimationFrame(() => triggerRef.current?.focus())
   }, [])
 
-  const refresh = useCallback(async () => {
-    if (refreshInFlightRef.current) return
-    refreshInFlightRef.current = true
-    try {
-      const [userData, adminData] = await Promise.all([
-        fetchNotificationSummary<UserNotificationView>('/api/notifications/summary'),
-        showAdmin
-          ? fetchNotificationSummary<AdminNotificationView>('/api/admin/notifications/summary')
-          : Promise.resolve(null),
-      ])
-      if (userData) {
-        setSummary({
-          unreadCount: userData.unreadCount,
-          notifications: userData.notifications,
-        })
-      }
-      if (adminData) {
-        setAdminSummary({
-          unreadCount: adminData.unreadCount,
-          notifications: adminData.notifications,
-        })
-      }
-    } catch {
-      // Silent polling. The last known state is enough for the header.
-    } finally {
-      refreshInFlightRef.current = false
-    }
-  }, [showAdmin])
-
   async function markAllRead() {
     const previousUser = summary
     const previousAdmin = adminSummary
     if (tab === 'admin') {
-      setAdminSummary((current) => ({
+      const next = {
         unreadCount: 0,
-        notifications: current.notifications.map((item) => ({ ...item, readAt: item.readAt ?? new Date().toISOString() })),
-      }))
+        notifications: adminSummary.notifications.map((item) => ({ ...item, readAt: item.readAt ?? new Date().toISOString() })),
+      }
+      setAdminSummary(next)
+      publishNotificationSummary('/api/admin/notifications/summary', next)
     } else {
-      setSummary((current) => ({
+      const next = {
         unreadCount: 0,
-        notifications: current.notifications.map((item) => ({ ...item, readAt: item.readAt ?? new Date().toISOString() })),
-      }))
+        notifications: summary.notifications.map((item) => ({ ...item, readAt: item.readAt ?? new Date().toISOString() })),
+      }
+      setSummary(next)
+      publishNotificationSummary('/api/notifications/summary', next)
     }
     try {
       const res = await fetch(tab === 'admin' ? '/api/admin/notifications' : '/api/notifications', {
@@ -103,36 +88,54 @@ export function NotificationBell({ showAdmin = false }: { showAdmin?: boolean })
       if (!res.ok) {
         setSummary(previousUser)
         setAdminSummary(previousAdmin)
+        publishNotificationSummary('/api/notifications/summary', previousUser)
+        if (showAdmin) publishNotificationSummary('/api/admin/notifications/summary', previousAdmin)
+        toast('Не удалось отметить уведомления прочитанными')
       }
     } catch {
       setSummary(previousUser)
       setAdminSummary(previousAdmin)
+      publishNotificationSummary('/api/notifications/summary', previousUser)
+      if (showAdmin) publishNotificationSummary('/api/admin/notifications/summary', previousAdmin)
+      toast('Не удалось отметить уведомления прочитанными')
     }
   }
 
   async function markOneRead(id: string) {
+    const previousUser = summary
+    const previousAdmin = adminSummary
     if (tab === 'admin') {
-      setAdminSummary((current) => ({
-        unreadCount: Math.max(0, current.unreadCount - (current.notifications.find((item) => item.id === id)?.readAt ? 0 : 1)),
-        notifications: current.notifications.map((item) =>
+      const next = {
+        unreadCount: Math.max(0, adminSummary.unreadCount - (adminSummary.notifications.find((item) => item.id === id)?.readAt ? 0 : 1)),
+        notifications: adminSummary.notifications.map((item) =>
           item.id === id ? { ...item, readAt: item.readAt ?? new Date().toISOString() } : item
         ),
-      }))
+      }
+      setAdminSummary(next)
+      publishNotificationSummary('/api/admin/notifications/summary', next)
     } else {
-      setSummary((current) => ({
-        unreadCount: Math.max(0, current.unreadCount - (current.notifications.find((item) => item.id === id)?.readAt ? 0 : 1)),
-        notifications: current.notifications.map((item) =>
+      const next = {
+        unreadCount: Math.max(0, summary.unreadCount - (summary.notifications.find((item) => item.id === id)?.readAt ? 0 : 1)),
+        notifications: summary.notifications.map((item) =>
           item.id === id ? { ...item, readAt: item.readAt ?? new Date().toISOString() } : item
         ),
-      }))
+      }
+      setSummary(next)
+      publishNotificationSummary('/api/notifications/summary', next)
     }
     try {
-      await fetch(tab === 'admin' ? `/api/admin/notifications/${id}` : `/api/notifications/${id}`, {
+      const response = await fetch(tab === 'admin' ? `/api/admin/notifications/${id}` : `/api/notifications/${id}`, {
         method: 'PATCH',
+        keepalive: true,
         signal: AbortSignal.timeout(NOTIFICATION_REQUEST_TIMEOUT_MS),
       })
+      if (!response.ok) throw new Error('Notification update failed')
     } catch {
-      // Counter will self-heal on the next polling cycle.
+      setSummary(previousUser)
+      setAdminSummary(previousAdmin)
+      publishNotificationSummary('/api/notifications/summary', previousUser)
+      if (showAdmin) publishNotificationSummary('/api/admin/notifications/summary', previousAdmin)
+      toast('Не удалось отметить уведомление прочитанным')
     }
   }
 
@@ -147,8 +150,10 @@ export function NotificationBell({ showAdmin = false }: { showAdmin?: boolean })
     const previousAdmin = adminSummary
     if (tab === 'admin') {
       setAdminSummary({ unreadCount: 0, notifications: [] })
+      publishNotificationSummary('/api/admin/notifications/summary', { unreadCount: 0, notifications: [] })
     } else {
       setSummary({ unreadCount: 0, notifications: [] })
+      publishNotificationSummary('/api/notifications/summary', { unreadCount: 0, notifications: [] })
     }
 
     try {
@@ -159,6 +164,8 @@ export function NotificationBell({ showAdmin = false }: { showAdmin?: boolean })
       if (!res.ok) {
         setSummary(previousUser)
         setAdminSummary(previousAdmin)
+        publishNotificationSummary('/api/notifications/summary', previousUser)
+        if (showAdmin) publishNotificationSummary('/api/admin/notifications/summary', previousAdmin)
         toast('Не удалось очистить уведомления')
       } else {
         setClearConfirmOpen(false)
@@ -167,6 +174,8 @@ export function NotificationBell({ showAdmin = false }: { showAdmin?: boolean })
     } catch {
       setSummary(previousUser)
       setAdminSummary(previousAdmin)
+      publishNotificationSummary('/api/notifications/summary', previousUser)
+      if (showAdmin) publishNotificationSummary('/api/admin/notifications/summary', previousAdmin)
       toast('Не удалось очистить уведомления')
     } finally {
       setClearLoading(false)
@@ -174,22 +183,21 @@ export function NotificationBell({ showAdmin = false }: { showAdmin?: boolean })
   }
 
   useEffect(() => {
-    void refresh()
-    const interval = window.setInterval(() => {
-      if (document.visibilityState === 'visible') void refresh()
-    }, NOTIFICATION_REFRESH_MS)
-    const onFocus = () => void refresh()
-    const onVisibility = () => {
-      if (document.visibilityState === 'visible') void refresh()
-    }
-    window.addEventListener('focus', onFocus)
-    document.addEventListener('visibilitychange', onVisibility)
+    const unsubscribeUser = subscribeNotificationSummary<UserNotificationView>(
+      '/api/notifications/summary',
+      setSummary
+    )
+    const unsubscribeAdmin = showAdmin
+      ? subscribeNotificationSummary<AdminNotificationView>('/api/admin/notifications/summary', setAdminSummary)
+      : () => undefined
+    void fetchNotificationSummary<UserNotificationView>('/api/notifications/summary')
+    if (showAdmin) void fetchNotificationSummary<AdminNotificationView>('/api/admin/notifications/summary')
+
     return () => {
-      window.clearInterval(interval)
-      window.removeEventListener('focus', onFocus)
-      document.removeEventListener('visibilitychange', onVisibility)
+      unsubscribeUser()
+      unsubscribeAdmin()
     }
-  }, [refresh])
+  }, [showAdmin])
 
   useEffect(() => {
     if (!open) return

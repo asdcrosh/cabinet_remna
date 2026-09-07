@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   fetchNotificationSummary,
+  publishNotificationSummary,
   resetNotificationSummaryClientForTests,
+  subscribeNotificationSummary,
 } from './notification-summary-client'
 
 describe('notification summary client', () => {
@@ -37,5 +39,20 @@ describe('notification summary client', () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new DOMException('signal timed out', 'TimeoutError')))
 
     await expect(fetchNotificationSummary('/api/notifications/summary')).resolves.toBeNull()
+  })
+
+  it('shares optimistic counter updates with every notification surface', () => {
+    const listener = vi.fn()
+    const unsubscribe = subscribeNotificationSummary('/api/notifications/summary', listener)
+
+    publishNotificationSummary('/api/notifications/summary', {
+      unreadCount: 0,
+      notifications: [{ id: 'notification-1', readAt: '2026-09-07T08:00:00.000Z' }],
+    })
+
+    expect(listener).toHaveBeenCalledWith(expect.objectContaining({ unreadCount: 0 }))
+    unsubscribe()
+    publishNotificationSummary('/api/notifications/summary', { unreadCount: 1, notifications: [] })
+    expect(listener).toHaveBeenCalledTimes(1)
   })
 })

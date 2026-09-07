@@ -15,7 +15,7 @@ import { BrandLogo } from '@/components/brand-logo'
 import { useBodyScrollLock } from '@/lib/use-body-scroll-lock'
 import { useDialogFocus } from '@/lib/use-dialog-focus'
 import type { FeatureFlags } from '@/lib/feature-flags'
-import { fetchNotificationSummary } from '@/lib/notification-summary-client'
+import { fetchNotificationSummary, subscribeNotificationSummary } from '@/lib/notification-summary-client'
 import { LogoutButton } from './logout-button'
 import {
   adminNavigationGroups,
@@ -567,7 +567,7 @@ function useLiveBadges(initialBadges: NavBadges, supportEnabled: boolean, showAd
         })
         const data = await res.json().catch(() => null)
         if (active && res.ok && data?.badges) {
-          setBadges(data.badges)
+          setBadges((current) => ({ ...current, ...data.badges }))
         }
       } catch {
         // Quiet polling: menu keeps the last known counters.
@@ -595,28 +595,40 @@ function useLiveBadges(initialBadges: NavBadges, supportEnabled: boolean, showAd
 
   useEffect(() => {
     let active = true
+    const unsubscribeUser = subscribeNotificationSummary('/api/notifications/summary', (summary) => {
+      if (active) setBadges((current) => ({ ...current, '/dashboard/notifications': summary.unreadCount }))
+    })
+    const unsubscribeAdmin = showAdmin
+      ? subscribeNotificationSummary('/api/admin/notifications/summary', (summary) => {
+          if (active) setBadges((current) => ({ ...current, '/dashboard/admin/notifications': summary.unreadCount }))
+        })
+      : () => undefined
 
     async function refreshNotificationBadges() {
-      const [userSummary, adminSummary] = await Promise.all([
+      await Promise.all([
         fetchNotificationSummary('/api/notifications/summary'),
         showAdmin ? fetchNotificationSummary('/api/admin/notifications/summary') : Promise.resolve(null),
       ])
-      if (!active) return
-
-      const updates: NavBadges = {}
-      if (userSummary !== null) updates['/dashboard/notifications'] = userSummary.unreadCount
-      if (adminSummary !== null) updates['/dashboard/admin/notifications'] = adminSummary.unreadCount
-      if (Object.keys(updates).length > 0) {
-        setBadges((current) => ({ ...current, ...updates }))
-      }
     }
 
     void refreshNotificationBadges()
-    const interval = window.setInterval(refreshNotificationBadges, 60_000)
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === 'visible') void refreshNotificationBadges()
+    }, 60_000)
+    const refreshOnFocus = () => void refreshNotificationBadges()
+    const refreshOnVisible = () => {
+      if (document.visibilityState === 'visible') void refreshNotificationBadges()
+    }
+    window.addEventListener('focus', refreshOnFocus)
+    document.addEventListener('visibilitychange', refreshOnVisible)
 
     return () => {
       active = false
       window.clearInterval(interval)
+      window.removeEventListener('focus', refreshOnFocus)
+      document.removeEventListener('visibilitychange', refreshOnVisible)
+      unsubscribeUser()
+      unsubscribeAdmin()
     }
   }, [showAdmin])
 

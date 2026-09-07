@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAuth, withAuth } from '@/lib/auth/guard'
-import { serializeUserNotification } from '@/lib/user-notifications'
+import { prepareUserNotificationForDisplay, serializeUserNotification } from '@/lib/user-notifications'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -20,6 +20,6 @@ export const GET = withAuth(async () => {
 
   return NextResponse.json({
     unreadCount,
-    notifications: notifications.map(serializeUserNotification),
+    notifications: notifications.map(serializeUserNotification).map((item) => prepareUserNotificationForDisplay(item)),
   })
 })

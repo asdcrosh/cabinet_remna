@@ -5,7 +5,11 @@ import Link from 'next/link'
 import { CheckCheck, ExternalLink } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import type { AdminNotificationView } from '@/lib/admin-notifications'
+import { refreshNotificationSummary } from '@/lib/notification-summary-client'
+import { toast } from '@/components/ui/toaster'
 import { AdminEmptyState } from './admin-empty-state'
+
+const NOTIFICATION_REQUEST_TIMEOUT_MS = 10_000
 
 const filters = [
   { value: 'ALL', label: 'Все' },
@@ -27,27 +31,55 @@ export function AdminNotificationsList({ initialNotifications }: { initialNotifi
     params.set('type', nextFilter)
     if (nextOnlyUnread) params.set('filter', 'unread')
     try {
-      const res = await fetch(`/api/admin/notifications?${params.toString()}`, { cache: 'no-store' })
+      const res = await fetch(`/api/admin/notifications?${params.toString()}`, {
+        cache: 'no-store',
+        signal: AbortSignal.timeout(NOTIFICATION_REQUEST_TIMEOUT_MS),
+      })
       const data = await res.json().catch(() => null)
-      if (res.ok && Array.isArray(data?.notifications)) setNotifications(data.notifications)
+      if (!res.ok || !Array.isArray(data?.notifications)) throw new Error('Notification load failed')
+      setNotifications(data.notifications)
+    } catch {
+      toast('Не удалось загрузить уведомления')
     } finally {
       setLoading(false)
     }
   }
 
   async function markAllRead() {
-    setNotifications((current) =>
-      current.map((item) => ({ ...item, readAt: item.readAt ?? new Date().toISOString() }))
-    )
-    await fetch('/api/admin/notifications', { method: 'PATCH' }).catch(() => null)
-    if (onlyUnread) setNotifications([])
+    const previous = notifications
+    const next = notifications.map((item) => ({ ...item, readAt: item.readAt ?? new Date().toISOString() }))
+    setNotifications(onlyUnread ? [] : next)
+    try {
+      const response = await fetch('/api/admin/notifications', {
+        method: 'PATCH',
+        signal: AbortSignal.timeout(NOTIFICATION_REQUEST_TIMEOUT_MS),
+      })
+      if (!response.ok) throw new Error('Notification update failed')
+      void refreshNotificationSummary('/api/admin/notifications/summary')
+    } catch {
+      setNotifications(previous)
+      toast('Не удалось отметить уведомления прочитанными')
+    }
   }
 
   async function markOneRead(id: string) {
-    setNotifications((current) =>
-      current.map((item) => (item.id === id ? { ...item, readAt: item.readAt ?? new Date().toISOString() } : item))
-    )
-    await fetch(`/api/admin/notifications/${id}`, { method: 'PATCH' }).catch(() => null)
+    const previous = notifications
+    const next = notifications.map((item) => (
+      item.id === id ? { ...item, readAt: item.readAt ?? new Date().toISOString() } : item
+    ))
+    setNotifications(onlyUnread ? next.filter((item) => item.id !== id) : next)
+    try {
+      const response = await fetch(`/api/admin/notifications/${id}`, {
+        method: 'PATCH',
+        keepalive: true,
+        signal: AbortSignal.timeout(NOTIFICATION_REQUEST_TIMEOUT_MS),
+      })
+      if (!response.ok) throw new Error('Notification update failed')
+      void refreshNotificationSummary('/api/admin/notifications/summary')
+    } catch {
+      setNotifications(previous)
+      toast('Не удалось отметить уведомление прочитанным')
+    }
   }
 
   return (

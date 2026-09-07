@@ -1,6 +1,7 @@
 'use client'
 
-import { type ReactNode, useRef, useState } from 'react'
+import { type ReactNode, useEffect, useRef, useState } from 'react'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { Bell, LockKeyhole, Send, UserRound } from 'lucide-react'
 import { cn } from '@/lib/cn'
 
@@ -29,13 +30,27 @@ export function SettingsTabs({
   initialId?: SettingsTabId
 }) {
   const [activeId, setActiveId] = useState<SettingsTabId>(initialId)
-  const activeSection = sections.find((section) => section.id === activeId) ?? sections[0]
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([])
+  const pathname = usePathname()
+  const router = useRouter()
+  const searchParams = useSearchParams()
+
+  useEffect(() => {
+    setActiveId(initialId)
+  }, [initialId])
+
+  function activateTab(id: SettingsTabId) {
+    if (id === activeId) return
+    setActiveId(id)
+    const params = new URLSearchParams(searchParams.toString())
+    params.set('section', id)
+    router.push(`${pathname}?${params.toString()}`, { scroll: false })
+  }
 
   function selectTab(index: number) {
     const section = sections[index]
     if (!section) return
-    setActiveId(section.id)
+    activateTab(section.id)
     window.requestAnimationFrame(() => tabRefs.current[index]?.focus())
   }
 
@@ -67,7 +82,7 @@ export function SettingsTabs({
                     ? 'border-brand-200 bg-brand-50 text-brand-900 dark:border-brand-400/20 dark:bg-brand-400/10 dark:text-brand-100'
                     : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50 dark:border-white/[0.08] dark:bg-white/[0.025] dark:text-slate-300 dark:hover:border-white/15 dark:hover:bg-white/[0.05]'
                 )}
-                onClick={() => setActiveId(section.id)}
+                onClick={() => activateTab(section.id)}
                 onKeyDown={(event) => {
                   if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
                     event.preventDefault()
@@ -107,13 +122,18 @@ export function SettingsTabs({
         </div>
       </div>
 
-      <div
-        className="min-w-0 lg:pt-6"
-        id={activeSection ? `settings-panel-${activeSection.id}` : undefined}
-        role="tabpanel"
-        aria-labelledby={activeSection ? `settings-tab-${activeSection.id}` : undefined}
-      >
-        {activeSection?.children}
+      <div className="min-w-0 lg:pt-6">
+        {sections.map((section) => (
+          <div
+            key={section.id}
+            id={`settings-panel-${section.id}`}
+            role="tabpanel"
+            aria-labelledby={`settings-tab-${section.id}`}
+            hidden={section.id !== activeId}
+          >
+            {section.children}
+          </div>
+        ))}
       </div>
     </div>
   )
