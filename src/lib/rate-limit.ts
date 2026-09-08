@@ -7,6 +7,10 @@ export interface RateLimitResult {
   retryAfter?: number
 }
 
+type RateLimitOptions = {
+  penaltyMs?: number
+}
+
 type RateLimitBucketRow = {
   count: number
   resetAt: Date
@@ -16,10 +20,14 @@ export async function rateLimit(
   req: Request,
   key: string,
   limit: number,
-  windowMs: number
+  windowMs: number,
+  options: RateLimitOptions = {}
 ): Promise<RateLimitResult> {
   if (!Number.isInteger(limit) || limit < 1 || !Number.isInteger(windowMs) || windowMs < 1) {
     throw new Error('Rate limit and window must be positive integers')
+  }
+  if (options.penaltyMs !== undefined && (!Number.isInteger(options.penaltyMs) || options.penaltyMs < 1)) {
+    throw new Error('Rate limit penalty must be a positive integer')
   }
 
   const now = Date.now()
@@ -30,6 +38,8 @@ export async function rateLimit(
   const bucketKey = `${key}:${ip}`
   const nowDate = new Date(now)
   const nextResetAt = new Date(now + windowMs)
+  const extendWhenLimited = options.penaltyMs !== undefined
+  const penaltyResetAt = new Date(now + (options.penaltyMs ?? windowMs))
 
   const rows = await prisma.$queryRaw<RateLimitBucketRow[]>`
     INSERT INTO "RateLimitBucket" AS bucket ("key", "count", "resetAt", "createdAt", "updatedAt")
@@ -41,6 +51,7 @@ export async function rateLimit(
       END,
       "resetAt" = CASE
         WHEN bucket."resetAt" <= ${nowDate} THEN EXCLUDED."resetAt"
+        WHEN ${extendWhenLimited} AND bucket."count" >= ${limit} THEN ${penaltyResetAt}
         ELSE bucket."resetAt"
       END,
       "updatedAt" = EXCLUDED."updatedAt"

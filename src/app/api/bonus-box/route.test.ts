@@ -71,4 +71,27 @@ describe('POST /api/bonus-box', () => {
     expect(mocks.openBonusBox).not.toHaveBeenCalled()
     expect(mocks.assessBonusBoxRisk).not.toHaveBeenCalled()
   })
+
+  it('returns a stable cooldown when the rate-limit window is almost over', async () => {
+    mocks.rateLimit.mockResolvedValue({ ok: false, retryAfter: 1 })
+    const request = new Request('https://cabinet.example/api/bonus-box', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ spinId }),
+    })
+
+    const response = await POST(request)
+
+    expect(response.status).toBe(429)
+    expect(response.headers.get('Retry-After')).toBe('60')
+    await expect(response.json()).resolves.toMatchObject({ retryAfter: 60 })
+    expect(mocks.rateLimit).toHaveBeenCalledWith(
+      request,
+      'bonus-box-open:user-1',
+      8,
+      60_000,
+      { penaltyMs: 60_000 },
+    )
+    expect(mocks.openBonusBox).not.toHaveBeenCalled()
+  })
 })

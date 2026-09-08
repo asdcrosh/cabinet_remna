@@ -9,6 +9,8 @@ import { assessBonusBoxRisk, BonusBoxRiskError } from '@/lib/bonus-box-engagemen
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
+const BONUS_BOX_RATE_LIMIT_COOLDOWN_SECONDS = 60
+
 const openSchema = z.object({
   spinId: z.string().uuid(),
 }).strict()
@@ -24,14 +26,21 @@ export const GET = withAuth(async () => {
 export const POST = withAuth(async (req: Request) => {
   if (!await isFeatureEnabled('bonusBox')) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   const session = await requireAuth()
-  const limited = await rateLimit(req, `bonus-box-open:${session.uid}`, 8, 60_000)
+  const limited = await rateLimit(
+    req,
+    `bonus-box-open:${session.uid}`,
+    8,
+    60_000,
+    { penaltyMs: BONUS_BOX_RATE_LIMIT_COOLDOWN_SECONDS * 1_000 }
+  )
   if (!limited.ok) {
+    const retryAfter = Math.max(BONUS_BOX_RATE_LIMIT_COOLDOWN_SECONDS, limited.retryAfter ?? 0)
     return NextResponse.json(
       {
         error: 'Слишком много открытий. Попробуйте позже.',
-        retryAfter: limited.retryAfter,
+        retryAfter,
       },
-      { status: 429, headers: { 'Retry-After': String(limited.retryAfter) } }
+      { status: 429, headers: { 'Retry-After': String(retryAfter) } }
     )
   }
 

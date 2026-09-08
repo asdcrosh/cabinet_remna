@@ -1,4 +1,23 @@
-export const ROULETTE_SPIN_DURATION_MS = 4600;
+export const ROULETTE_SPIN_DURATION_MS = 5800;
+
+const ACCELERATION_END = 0.18;
+const CRUISE_END = 0.54;
+const START_VELOCITY = 0.46;
+const CRUISE_VELOCITY = 1.55;
+const END_VELOCITY = 0;
+
+const ACCELERATION_DISTANCE = smoothVelocityDistance(
+  ACCELERATION_END,
+  START_VELOCITY,
+  CRUISE_VELOCITY,
+);
+const CRUISE_DISTANCE = (CRUISE_END - ACCELERATION_END) * CRUISE_VELOCITY;
+const DECELERATION_DISTANCE = smoothVelocityDistance(
+  1 - CRUISE_END,
+  CRUISE_VELOCITY,
+  END_VELOCITY,
+);
+const TOTAL_MOTION_DISTANCE = ACCELERATION_DISTANCE + CRUISE_DISTANCE + DECELERATION_DISTANCE;
 
 export type RouletteMotionPhase = "launch" | "cruise" | "anticipation" | "locking";
 
@@ -41,15 +60,55 @@ export function rouletteActiveIndex({
 }
 
 export function rouletteProgress(elapsedMs: number) {
-  const progress = Math.min(1, Math.max(0, elapsedMs / ROULETTE_SPIN_DURATION_MS));
-  return 1 - Math.pow(1 - progress, 3.35);
+  const time = Math.min(1, Math.max(0, elapsedMs / ROULETTE_SPIN_DURATION_MS));
+
+  if (time <= ACCELERATION_END) {
+    const segmentProgress = time / ACCELERATION_END;
+    return smoothVelocityDistance(
+      ACCELERATION_END,
+      START_VELOCITY,
+      CRUISE_VELOCITY,
+      segmentProgress,
+    ) / TOTAL_MOTION_DISTANCE;
+  }
+
+  if (time <= CRUISE_END) {
+    const cruiseElapsed = time - ACCELERATION_END;
+    return (ACCELERATION_DISTANCE + cruiseElapsed * CRUISE_VELOCITY) / TOTAL_MOTION_DISTANCE;
+  }
+
+  const segmentProgress = (time - CRUISE_END) / (1 - CRUISE_END);
+  return (
+    ACCELERATION_DISTANCE
+    + CRUISE_DISTANCE
+    + smoothVelocityDistance(
+      1 - CRUISE_END,
+      CRUISE_VELOCITY,
+      END_VELOCITY,
+      segmentProgress,
+    )
+  ) / TOTAL_MOTION_DISTANCE;
 }
 
 export function rouletteMotionPhase(progress: number): RouletteMotionPhase {
-  if (progress < 0.12) return "launch";
-  if (progress < 0.62) return "cruise";
-  if (progress < 0.92) return "anticipation";
+  if (progress < 0.17) return "launch";
+  if (progress < 0.68) return "cruise";
+  if (progress < 0.95) return "anticipation";
   return "locking";
+}
+
+function smoothVelocityDistance(
+  duration: number,
+  fromVelocity: number,
+  toVelocity: number,
+  progress = 1,
+) {
+  const safeProgress = Math.min(1, Math.max(0, progress));
+  const integratedSmoothstep = safeProgress ** 3 - 0.5 * safeProgress ** 4;
+  return duration * (
+    fromVelocity * safeProgress
+    + (toVelocity - fromVelocity) * integratedSmoothstep
+  );
 }
 
 export function revealDelayMs(rarity: string, reducedMotion: boolean) {

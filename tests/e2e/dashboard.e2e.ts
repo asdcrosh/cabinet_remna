@@ -260,7 +260,7 @@ test('рулетка отправляет только один запрос и 
   await expectNoHorizontalOverflow(page)
 })
 
-test('рулетка после ограничения показывает обратный отсчёт', async ({ page }) => {
+test('рулетка сохраняет ограничение после обновления страницы', async ({ page }) => {
   await login(page, E2E_USERS.active.email)
   await page.route('**/api/bonus-box', async (route) => {
     if (route.request().method() !== 'POST') {
@@ -269,9 +269,9 @@ test('рулетка после ограничения показывает об
     }
     await route.fulfill({
       status: 429,
-      headers: { 'Retry-After': '2' },
+      headers: { 'Retry-After': '1' },
       contentType: 'application/json',
-      body: JSON.stringify({ error: 'Слишком много открытий. Попробуйте позже.', retryAfter: 2 }),
+      body: JSON.stringify({ error: 'Слишком много открытий. Попробуйте позже.', retryAfter: 1 }),
     })
   })
 
@@ -279,10 +279,14 @@ test('рулетка после ограничения показывает об
   await page.getByRole('button', { name: /Получить подарок/ }).click()
 
   const cooldown = page.getByRole('status').filter({ hasText: 'Следующий запуск через' })
-  await expect(cooldown).toContainText('0:02')
+  await expect(cooldown).toContainText(/0:59|1:00/)
   await expect(page.getByRole('button', { name: /Повтор через/ })).toBeDisabled()
-  await expect(cooldown).toHaveCount(0, { timeout: 4_000 })
-  await expect(page.getByRole('button', { name: /Получить подарок/ })).toBeEnabled()
+
+  await page.reload()
+
+  await expect(page.getByRole('status').filter({ hasText: 'Следующий запуск через' })).toBeVisible()
+  await expect(page.getByRole('button', { name: /Повтор через/ })).toBeDisabled()
+  await page.evaluate((key) => window.localStorage.removeItem(key), 'bonus-roulette-cooldown-until:v1')
 })
 
 test('администратор видит карту вероятностей призов', async ({ page }) => {

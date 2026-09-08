@@ -42,6 +42,21 @@ describe('rate limit', () => {
     })
   })
 
+  it('extends an exceeded bucket when a penalty is configured', async () => {
+    const resetAt = new Date(Date.now() + 60_000)
+    mocks.queryRaw.mockResolvedValue([{ count: 9, resetAt }])
+    const request = new Request('https://cabinet.example/api/bonus-box', {
+      headers: { 'x-forwarded-for': '203.0.113.10' },
+    })
+
+    await rateLimit(request, 'bonus-box-open:user-1', 8, 60_000, { penaltyMs: 60_000 })
+
+    const [query, ...values] = mocks.queryRaw.mock.calls[0] ?? []
+    expect(Array.from(query as TemplateStringsArray).join('?')).toContain('bucket."count" >= ?')
+    expect(values).toContain(true)
+    expect(values).toContain(8)
+  })
+
   it('fails closed in production when the proxy does not provide an IP', async () => {
     vi.stubEnv('NODE_ENV', 'production')
     const request = new Request('https://cabinet.example/api/auth/login')
@@ -56,6 +71,7 @@ describe('rate limit', () => {
     })
 
     await expect(rateLimit(request, 'login', 0, 60_000)).rejects.toThrow('positive integers')
+    await expect(rateLimit(request, 'login', 5, 60_000, { penaltyMs: 0 })).rejects.toThrow('positive integer')
     expect(mocks.queryRaw).not.toHaveBeenCalled()
   })
 })

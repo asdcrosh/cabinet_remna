@@ -69,6 +69,7 @@ const OPENING_STARTED_KEY = "bonus-wheel-opening-started:v1";
 const OPENING_SPIN_ID_KEY = "bonus-roulette-spin-id:v1";
 const COOLDOWN_UNTIL_KEY = "bonus-roulette-cooldown-until:v1";
 const SOUND_ENABLED_KEY = "bonus-roulette-sound:v1";
+const MIN_RATE_LIMIT_COOLDOWN_SECONDS = 60;
 type RoulettePhase = "idle" | RouletteMotionPhase | "locked" | "revealing" | "error";
 
 export function BonusBoxClient({
@@ -90,6 +91,7 @@ export function BonusBoxClient({
   );
   const [reducedMotion, setReducedMotion] = useState(false);
   const [cooldownSeconds, setCooldownSeconds] = useState(0);
+  const [cooldownReady, setCooldownReady] = useState(false);
   const [claimingMissionId, setClaimingMissionId] = useState<string | null>(null);
   const effectTimerRef = useRef<number | null>(null);
   const revealTimerRef = useRef<number | null>(null);
@@ -116,7 +118,7 @@ export function BonusBoxClient({
     [data.prizes],
   );
 
-  const canOpen = !data.canOpenReason && !opening && cooldownSeconds === 0;
+  const canOpen = cooldownReady && !data.canOpenReason && !opening && cooldownSeconds === 0;
   const subscribeCta = Boolean(data.canOpenReason?.includes("подписк"));
   const openButtonLabel = opening
     ? "Определяем подарок"
@@ -153,12 +155,20 @@ export function BonusBoxClient({
   useEffect(() => {
     try {
       setSoundEnabled(window.localStorage.getItem(SOUND_ENABLED_KEY) !== "off");
-      const retryAt = Number(window.sessionStorage.getItem(COOLDOWN_UNTIL_KEY));
+      const persistedRetryAt = Number(window.localStorage.getItem(COOLDOWN_UNTIL_KEY));
+      const legacyRetryAt = Number(window.sessionStorage.getItem(COOLDOWN_UNTIL_KEY));
+      const retryAt = Math.max(
+        Number.isFinite(persistedRetryAt) ? persistedRetryAt : 0,
+        Number.isFinite(legacyRetryAt) ? legacyRetryAt : 0,
+      );
       if (Number.isFinite(retryAt) && retryAt > Date.now()) {
         setCooldownSeconds(Math.ceil((retryAt - Date.now()) / 1000));
       }
+      window.sessionStorage.removeItem(COOLDOWN_UNTIL_KEY);
     } catch {
       // Настройки эффектов остаются доступными только на текущей странице.
+    } finally {
+      setCooldownReady(true);
     }
   }, []);
 
@@ -192,9 +202,9 @@ export function BonusBoxClient({
     const timer = window.setInterval(() => {
       let remaining = 0;
       try {
-        const retryAt = Number(window.sessionStorage.getItem(COOLDOWN_UNTIL_KEY));
+        const retryAt = Number(window.localStorage.getItem(COOLDOWN_UNTIL_KEY));
         remaining = Number.isFinite(retryAt) ? Math.max(0, Math.ceil((retryAt - Date.now()) / 1000)) : 0;
-        if (remaining === 0) window.sessionStorage.removeItem(COOLDOWN_UNTIL_KEY);
+        if (remaining === 0) window.localStorage.removeItem(COOLDOWN_UNTIL_KEY);
       } catch {
         remaining = Math.max(0, cooldownSeconds - 1);
       }
@@ -299,10 +309,13 @@ export function BonusBoxClient({
       const elapsed = now - startedAt;
       const delta = Math.min(48, now - previousAt);
       previousAt = now;
-      const speed = Math.min(0.72, 0.18 + elapsed * 0.00028);
+      const launchProgress = Math.min(1, elapsed / 280);
+      const smoothLaunch = launchProgress * launchProgress * (3 - 2 * launchProgress);
+      const itemStep = metrics ? metrics.itemWidth + metrics.gap : 144;
+      const speed = itemStep * (0.0016 + 0.0036 * smoothLaunch);
       offset -= delta * speed;
       if (metrics && data.prizes.length > 0) {
-        const cycle = data.prizes.length * (metrics.itemWidth + metrics.gap);
+        const cycle = data.prizes.length * itemStep;
         if (offset <= -cycle) offset += cycle;
       }
       updateRouletteOffset(offset, rouletteItems, Math.min(0.5, elapsed / 2200));
@@ -329,7 +342,7 @@ export function BonusBoxClient({
       winningIndex,
       stopOffsetRatio: response.stopOffsetRatio,
     });
-    const startOffset = Math.min(-2 * (metrics.itemWidth + metrics.gap), currentRouletteOffsetRef.current);
+    const startOffset = currentRouletteOffsetRef.current;
     const startedAt = performance.now();
     const distance = targetOffset - startOffset;
 
@@ -418,7 +431,7 @@ export function BonusBoxClient({
     const safeSeconds = Math.max(1, Math.ceil(seconds));
     setCooldownSeconds(safeSeconds);
     try {
-      window.sessionStorage.setItem(COOLDOWN_UNTIL_KEY, String(Date.now() + safeSeconds * 1000));
+      window.localStorage.setItem(COOLDOWN_UNTIL_KEY, String(Date.now() + safeSeconds * 1000));
     } catch {
       // Таймер продолжит работать до обновления страницы.
     }
@@ -560,7 +573,7 @@ export function BonusBoxClient({
       }
       setCooldownSeconds(0);
       try {
-        window.sessionStorage.removeItem(COOLDOWN_UNTIL_KEY);
+        window.localStorage.removeItem(COOLDOWN_UNTIL_KEY);
       } catch {
         // Таймер уже сброшен в состоянии страницы.
       }
@@ -572,7 +585,11 @@ export function BonusBoxClient({
         const responseRetryAfter = typeof error.data?.retryAfter === "number"
           ? error.data.retryAfter
           : null;
-        setCooldown(error.retryAfter ?? responseRetryAfter ?? 60);
+        setCooldown(Math.max(
+          MIN_RATE_LIMIT_COOLDOWN_SECONDS,
+          error.retryAfter ?? 0,
+          responseRetryAfter ?? 0,
+        ));
       }
       cancelRouletteFrame();
       requestInFlightRef.current = false;
@@ -1093,7 +1110,7 @@ function BonusWheelResultOverlay({
     >
       {revealEffect && !isEmpty && (
         <div className="bonus-wheel-result-impact" data-rarity={result.prize.rarity.toLowerCase()} aria-hidden="true">
-          <div className="bonus-wheel-result-rays" />
+          <div className="bonus-wheel-result-aura" />
           <div className="bonus-wheel-result-shockwaves"><span /><span /><span /></div>
           {result.prize.rarity === "LEGENDARY" && <strong>ДЖЕКПОТ</strong>}
         </div>
