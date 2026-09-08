@@ -465,7 +465,7 @@ export function BonusBoxClient({
     const interval = progress > 0.84 ? 34 : 48;
     if (now - lastTickAtRef.current < interval) return;
     lastTickAtRef.current = now;
-    const premiumBoost = prize.rarity === "LEGENDARY" ? 260 : prize.rarity === "EPIC" ? 150 : 0;
+    const premiumBoost = prize.rarity === "LEGENDARY" ? 260 : prize.rarity === "EPIC" ? 150 : prize.rarity === "RARE" ? 70 : 0;
     playTone(250 + premiumBoost + progress * 180, 0.045, premiumBoost > 0 ? 0.045 : 0.022, "triangle");
   }
 
@@ -475,10 +475,14 @@ export function BonusBoxClient({
       return;
     }
     const root = prize.rarity === "LEGENDARY" ? 520 : prize.rarity === "EPIC" ? 440 : prize.rarity === "RARE" ? 390 : 330;
+    if (prize.rarity !== "COMMON") playTone(root / 2, 0.34, 0.035, "sawtooth");
     playTone(root, 0.28, 0.05, "sine");
     window.setTimeout(() => playTone(root * 1.25, 0.32, 0.045, "sine"), 110);
-    if (prize.rarity === "LEGENDARY") {
+    if (prize.rarity === "EPIC" || prize.rarity === "LEGENDARY") {
       window.setTimeout(() => playTone(root * 1.5, 0.45, 0.055, "sine"), 230);
+    }
+    if (prize.rarity === "LEGENDARY") {
+      window.setTimeout(() => playTone(root * 2, 0.62, 0.045, "triangle"), 390);
     }
   }
 
@@ -645,6 +649,62 @@ export function BonusBoxClient({
     </div>
   ) : null;
 
+  function renderSpinControls(variant: "desktop" | "mobile") {
+    return (
+      <div className={cn("bonus-roulette-controls", `bonus-roulette-controls--${variant}`)}>
+        <div className="bonus-roulette-action-row">
+          <div className="bonus-roulette-action-main">
+            {openCaseCta ?? (
+              <button
+                type="button"
+                className={cn(openButtonClass, "w-full")}
+                onClick={openBox}
+                disabled={!canOpen}
+                aria-label={`${openButtonLabel}. Доступно: ${availableNow} ${attemptWord(availableNow)}`}
+              >
+                <span className="bonus-roulette-cta-shine" aria-hidden="true" />
+                <span className="relative flex items-center justify-center gap-2">
+                  {opening ? <LoaderCircle className="animate-spin" /> : spinError ? <RotateCw /> : <Sparkles />}
+                  <span>{opening ? "Рулетка запущена" : spinError ? "Запустить снова" : "Крутить рулетку"}</span>
+                </span>
+              </button>
+            )}
+          </div>
+          {variant === "mobile" && (
+            <button
+              type="button"
+              className="bonus-wheel-sound-toggle bonus-roulette-mobile-sound"
+              onClick={toggleSound}
+              aria-label={soundEnabled ? "Выключить звук рулетки" : "Включить звук рулетки"}
+              title={soundEnabled ? "Звук включён" : "Звук выключен"}
+            >
+              {soundEnabled ? <Volume2 /> : <VolumeX />}
+            </button>
+          )}
+        </div>
+
+        {opening && pendingResult && !reducedMotion && (
+          <button
+            type="button"
+            className="bonus-roulette-skip"
+            onClick={() => void finishOpening(pendingResult, true)}
+          >
+            Показать результат сразу
+          </button>
+        )}
+        {cooldownSeconds > 0 && (
+          <div className="bonus-roulette-cooldown" role="status" aria-live="polite">
+            <CalendarClock aria-hidden="true" />
+            <span>Следующий запуск через <strong>{formatCooldown(cooldownSeconds)}</strong></span>
+          </div>
+        )}
+        {spinError && cooldownSeconds === 0 && (
+          <div className="bonus-roulette-error" role="alert">{spinError}</div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-4 sm:gap-5">
       <section
@@ -690,7 +750,7 @@ export function BonusBoxClient({
                 aria-label={`Рулетка с ${data.prizes.length} возможными подарками`}
               >
                 <div className="bonus-roulette-gate" aria-hidden="true">
-                  <span className="bonus-roulette-gate-label">DROP ZONE</span>
+                  <span className="bonus-roulette-gate-label">ПРИЗОВАЯ ЗОНА</span>
                 </div>
                 <div ref={rouletteTrackRef} className="bonus-roulette-track" role="list">
                   {rouletteItems.map((prize, index) => (
@@ -708,6 +768,7 @@ export function BonusBoxClient({
                 <span ref={rouletteReadoutRef}>Система готова · выберите запуск</span>
                 <strong aria-live="polite">{rouletteStatusLabel(roulettePhase)}</strong>
               </div>
+              {renderSpinControls("mobile")}
             </div>
 
             <aside className="bonus-roulette-console">
@@ -755,42 +816,7 @@ export function BonusBoxClient({
                 </div>
               </div>
 
-              {openCaseCta ? (
-                <div className="mt-4">{openCaseCta}</div>
-              ) : (
-                <button
-                  type="button"
-                  className={cn(openButtonClass, "mt-4 w-full")}
-                  onClick={openBox}
-                  disabled={!canOpen}
-                  aria-label={`${openButtonLabel}. Доступно: ${availableNow} ${attemptWord(availableNow)}`}
-                >
-                  <span className="bonus-roulette-cta-shine" aria-hidden="true" />
-                  <span className="relative flex items-center justify-center gap-2">
-                    {opening ? <LoaderCircle className="animate-spin" /> : spinError ? <RotateCw /> : <Sparkles />}
-                    <span>{opening ? "Рулетка запущена" : spinError ? "Запустить снова" : "Крутить рулетку"}</span>
-                  </span>
-                </button>
-              )}
-
-              {opening && pendingResult && !reducedMotion && (
-                <button
-                  type="button"
-                  className="bonus-roulette-skip"
-                  onClick={() => void finishOpening(pendingResult, true)}
-                >
-                  Показать результат сразу
-                </button>
-              )}
-              {cooldownSeconds > 0 && (
-                <div className="bonus-roulette-cooldown" role="status" aria-live="polite">
-                  <CalendarClock aria-hidden="true" />
-                  <span>Следующий запуск через <strong>{formatCooldown(cooldownSeconds)}</strong></span>
-                </div>
-              )}
-              {spinError && cooldownSeconds === 0 && (
-                <div className="bonus-roulette-error" role="alert">{spinError}</div>
-              )}
+              {renderSpinControls("desktop")}
 
               <p className="bonus-roulette-fairness">
                 Размер карточки не показывает шанс. Итог рассчитывается на сервере, точные проценты есть во вкладке «Призы».
@@ -1037,7 +1063,7 @@ function BonusWheelResultOverlay({
       title={title}
       description={description}
       onClose={onClose}
-      overlayClassName="bonus-wheel-result-overlay"
+      overlayClassName={cn("bonus-wheel-result-overlay", resultClass)}
       panelClassName={cn("bonus-wheel-result-modal sm:max-w-md", resultClass)}
       bodyClassName="bonus-wheel-result-body"
       footer={
@@ -1065,6 +1091,13 @@ function BonusWheelResultOverlay({
         </div>
       }
     >
+      {revealEffect && !isEmpty && (
+        <div className="bonus-wheel-result-impact" data-rarity={result.prize.rarity.toLowerCase()} aria-hidden="true">
+          <div className="bonus-wheel-result-rays" />
+          <div className="bonus-wheel-result-shockwaves"><span /><span /><span /></div>
+          {result.prize.rarity === "LEGENDARY" && <strong>ДЖЕКПОТ</strong>}
+        </div>
+      )}
       {revealEffect && particleCount > 0 && (
         <div className="bonus-wheel-celebration" aria-hidden="true">
           {Array.from({ length: particleCount }, (_, index) => (
