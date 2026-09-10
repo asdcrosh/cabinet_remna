@@ -132,9 +132,9 @@ export default async function AdminUsersPage({
       action={
         <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
           <BulkUserSyncButton
-            userIds={users
+            users={users
               .filter((item) => actor.role === 'SUPER_ADMIN' || item.role !== 'SUPER_ADMIN')
-              .map((item) => item.id)}
+              .map((item) => ({ id: item.id, label: item.email }))}
           />
           <a href={buildUsersExportHref(q, role, account)} className="btn-secondary w-full sm:w-auto">
             <Download className="h-4 w-4" />

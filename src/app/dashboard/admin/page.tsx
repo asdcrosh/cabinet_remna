@@ -22,6 +22,7 @@ import { getPendingPaymentTtlMs } from '@/lib/payment-sync'
 import { findIdentityDuplicateCandidates } from '@/lib/identity-duplicates'
 import { logError } from '@/lib/logger'
 import { AdminPageShell } from '@/components/admin/admin-page-shell'
+import { AdminQuickSearch } from '@/components/admin/admin-quick-search'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Админка' }
@@ -148,6 +149,7 @@ export default async function AdminDashboardPage() {
           </div>
         </section>
       ) : null}
+      <AdminQuickSearch />
       <section className="relative overflow-hidden rounded-[1.5rem] border border-amber-200/80 bg-gradient-to-br from-amber-50 via-white to-orange-50/60 p-4 shadow-[0_12px_35px_-24px_rgba(217,119,6,0.45)] dark:border-amber-400/15 dark:from-amber-500/[0.09] dark:via-white/[0.025] dark:to-orange-500/[0.05] sm:p-5">
         <div className="pointer-events-none absolute -right-16 -top-20 h-44 w-44 rounded-full bg-amber-300/20 blur-3xl dark:bg-amber-400/10" />
         <div className="relative flex flex-wrap items-start justify-between gap-3">

@@ -330,6 +330,42 @@ test('админская навигация не смешивается с ли�
   }
 })
 
+test('главная админки быстро находит пользователя или платёж', async ({ page }) => {
+  await login(page, E2E_USERS.admin.email)
+  await page.goto('/dashboard/admin')
+
+  const search = page.getByRole('search', { name: 'Быстрый поиск в админке' })
+  await search.getByLabel('Пользователь или платёж').fill(E2E_USERS.basic.email)
+  await search.getByRole('radio', { name: 'Платежи' }).click()
+  await search.getByRole('button', { name: 'Найти' }).click()
+
+  await expect(page).toHaveURL(new RegExp(`/dashboard/admin/payments\\?q=${encodeURIComponent(E2E_USERS.basic.email)}`))
+  await expect(page.getByRole('heading', { level: 1, name: 'Платежи' })).toBeVisible()
+  await expectNoHorizontalOverflow(page)
+})
+
+test('массовая синхронизация показывает один список ошибок', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop-chromium', 'Сценарий достаточно проверить один раз')
+  await login(page, E2E_USERS.admin.email)
+  await page.route('**/api/admin/users/*/sync', async (route) => {
+    await route.fulfill({
+      status: 502,
+      contentType: 'application/json',
+      body: JSON.stringify({ error: 'Remnawave временно недоступен' }),
+    })
+  })
+  await page.goto(`/dashboard/admin/users?q=${encodeURIComponent(E2E_USERS.basic.email)}`)
+
+  await page.getByRole('button', { name: /^Синхронизировать \(1\)$/ }).click()
+  const confirmation = page.getByRole('dialog', { name: 'Синхронизировать показанных пользователей?' })
+  await confirmation.getByRole('button', { name: 'Запустить синхронизацию' }).click()
+
+  const result = page.getByRole('dialog', { name: 'Не все аккаунты синхронизированы' })
+  await expect(result).toBeVisible()
+  await expect(result.getByText(E2E_USERS.basic.email)).toBeVisible()
+  await expect(result.getByRole('button', { name: 'Повторить ошибки' })).toBeVisible()
+})
+
 test('массовое начисление прокруток позволяет выбрать получателя и проверить итог', async ({ page }) => {
   await login(page, E2E_USERS.admin.email)
   await page.goto('/dashboard/admin/bonus-box')
