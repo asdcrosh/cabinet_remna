@@ -37,7 +37,7 @@ export function ChangePasswordForm() {
         method: 'POST',
         body: JSON.stringify({ oldPassword: values.oldPassword, newPassword: values.newPassword }),
       })
-      toast('Пароль изменён', 'success')
+      toast('Пароль изменён. Другие сеансы завершены.', 'success')
       reset()
     } catch (error) {
       setServerError(error instanceof Error ? error.message : 'Не удалось изменить пароль')

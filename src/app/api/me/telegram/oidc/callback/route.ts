@@ -15,6 +15,8 @@ import {
   TelegramAccountMergeError,
 } from '@/lib/telegram-account-merge'
 import { recordIdentityConflict } from '@/lib/identity-conflicts'
+import { writeAuditLog } from '@/lib/audit-log'
+import { logError } from '@/lib/logger'
 
 export const runtime = 'nodejs'
 const OAUTH_TIMEOUT_MS = 10_000
@@ -47,7 +49,7 @@ export const GET = withAuth(async (req: Request) => {
 
     const currentUser = await prisma.user.findUnique({
       where: { id: session.uid },
-      select: { id: true, emailVerifiedAt: true },
+      select: { id: true, emailVerifiedAt: true, telegramId: true },
     })
     if (!currentUser) {
       settingsUrl.searchParams.set('telegram_error', 'user_not_found')
@@ -95,6 +97,25 @@ export const GET = withAuth(async (req: Request) => {
     })
 
     try {
+      await writeAuditLog({
+        actorId: session.uid,
+        targetId: session.uid,
+        action: 'ADMIN_PROFILE_UPDATED',
+        message: currentUser.telegramId
+          ? 'Пользователь изменил привязку Telegram'
+          : 'Пользователь привязал Telegram',
+        metadata: {
+          previousTelegramId: currentUser.telegramId?.toString() ?? null,
+          telegramId: telegramUser.id.toString(),
+          username: telegramUser.username,
+        },
+        request: req,
+      })
+    } catch (error) {
+      logError('telegram_link.audit_failed', error, { userId: session.uid })
+    }
+
+    try {
       const sync = await syncLinkedTelegramUser({
         localUserId: session.uid,
         telegramId: telegramUser.id,
@@ -107,9 +128,8 @@ export const GET = withAuth(async (req: Request) => {
     }
 
     return clearOidcCookies(NextResponse.redirect(settingsUrl))
-  } catch (e) {
-    const message = e instanceof Error ? e.message : 'telegram_oidc_failed'
-    settingsUrl.searchParams.set('telegram_error', message)
+  } catch {
+    settingsUrl.searchParams.set('telegram_error', 'telegram_oidc_failed')
     return clearOidcCookies(NextResponse.redirect(settingsUrl))
   }
 })

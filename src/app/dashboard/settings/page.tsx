@@ -33,11 +33,11 @@ export default async function SettingsPage({
     prisma.auditLog.findMany({
       where: {
         actorId: user.id,
-        action: { in: ['USER_PASSWORD_CHANGED', 'USER_SESSIONS_REVOKED'] },
+        action: { in: ['USER_PASSWORD_CHANGED', 'USER_SESSIONS_REVOKED', 'ADMIN_PROFILE_UPDATED'] },
       },
       orderBy: { createdAt: 'desc' },
       take: 5,
-      select: { id: true, action: true, createdAt: true, userAgent: true },
+      select: { id: true, action: true, message: true, createdAt: true, userAgent: true },
     }),
     searchParams,
   ])
@@ -125,7 +125,7 @@ export default async function SettingsPage({
                     expiresAt={typeof session.exp === 'number' ? new Date(session.exp * 1000).toISOString() : null}
                     events={securityEvents.map((event) => ({
                       ...event,
-                      action: event.action as 'USER_PASSWORD_CHANGED' | 'USER_SESSIONS_REVOKED',
+                      action: event.action as 'USER_PASSWORD_CHANGED' | 'USER_SESSIONS_REVOKED' | 'ADMIN_PROFILE_UPDATED',
                       createdAt: event.createdAt.toISOString(),
                     }))}
                   />

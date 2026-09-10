@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Clock3, KeyRound, Laptop, LogOut, ShieldCheck } from 'lucide-react'
+import { Clock3, KeyRound, Laptop, LogOut, Send, ShieldCheck } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { apiFetch } from '@/lib/api-client'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
@@ -9,9 +9,10 @@ import { LogoutButton } from '@/components/dashboard/logout-button'
 
 type SecurityEvent = {
   id: string
-  action: 'USER_PASSWORD_CHANGED' | 'USER_SESSIONS_REVOKED'
+  action: 'USER_PASSWORD_CHANGED' | 'USER_SESSIONS_REVOKED' | 'ADMIN_PROFILE_UPDATED'
   createdAt: string
   userAgent: string | null
+  message: string
 }
 
 export function SessionSecurityPanel({
@@ -94,12 +95,20 @@ export function SessionSecurityPanel({
             <div className="space-y-2">
               {events.map((event) => (
                 <div key={event.id} className="flex items-start gap-3 rounded-lg bg-slate-50 px-3 py-2.5 dark:bg-white/[0.03]">
-                  {event.action === 'USER_PASSWORD_CHANGED'
-                    ? <KeyRound className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
-                    : <LogOut className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />}
+                  {event.action === 'USER_PASSWORD_CHANGED' ? (
+                    <KeyRound className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
+                  ) : event.action === 'ADMIN_PROFILE_UPDATED' ? (
+                    <Send className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
+                  ) : (
+                    <LogOut className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
+                  )}
                   <div className="min-w-0">
                     <div className="text-xs font-medium text-slate-800 dark:text-slate-200">
-                      {event.action === 'USER_PASSWORD_CHANGED' ? 'Пароль изменён' : 'Все сеансы завершены'}
+                      {event.action === 'USER_PASSWORD_CHANGED'
+                        ? 'Пароль изменён'
+                        : event.action === 'ADMIN_PROFILE_UPDATED'
+                          ? event.message.includes('изменил') ? 'Telegram изменён' : 'Telegram подключён'
+                          : 'Все сеансы завершены'}
                     </div>
                     <div className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
                       {formatSecurityEventDate(event.createdAt)}{event.userAgent ? ` · ${browserLabel(event.userAgent)}` : ''}
@@ -110,7 +119,7 @@ export function SessionSecurityPanel({
             </div>
           ) : (
             <p className="text-xs leading-5 text-slate-500 dark:text-slate-400">
-              Здесь появятся смена пароля и завершение всех сеансов.
+              Здесь появятся смена пароля, Telegram и завершение всех сеансов.
             </p>
           )}
         </div>

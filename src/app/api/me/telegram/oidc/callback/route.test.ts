@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   verifyTelegramIdToken: vi.fn(),
   mergeTechnicalTelegramAccount: vi.fn(),
   recordIdentityConflict: vi.fn(),
+  writeAuditLog: vi.fn(),
   syncLinkedTelegramUser: vi.fn(),
   prisma: {
     user: {
@@ -45,6 +46,8 @@ vi.mock('@/lib/telegram-account-merge', () => ({
 vi.mock('@/lib/identity-conflicts', () => ({
   recordIdentityConflict: mocks.recordIdentityConflict,
 }))
+vi.mock('@/lib/audit-log', () => ({ writeAuditLog: mocks.writeAuditLog }))
+vi.mock('@/lib/logger', () => ({ logError: vi.fn() }))
 vi.mock('@/lib/telegram-oidc', async () => {
   const actual = await vi.importActual<typeof import('@/lib/telegram-oidc')>('@/lib/telegram-oidc')
   return {
@@ -79,6 +82,7 @@ describe('Telegram OIDC callback', () => {
     mocks.prisma.user.findUnique.mockResolvedValue({
       id: session.uid,
       emailVerifiedAt: new Date('2026-01-01T00:00:00.000Z'),
+      telegramId: BigInt(654321),
     })
     mocks.prisma.user.update.mockResolvedValue({})
     mocks.mergeTechnicalTelegramAccount.mockResolvedValue(undefined)
@@ -148,6 +152,26 @@ describe('Telegram OIDC callback', () => {
       localUserId: session.uid,
       telegramId: telegramUser.id,
     })
+    expect(mocks.writeAuditLog).toHaveBeenCalledWith(expect.objectContaining({
+      actorId: session.uid,
+      targetId: session.uid,
+      action: 'ADMIN_PROFILE_UPDATED',
+      message: 'Пользователь изменил привязку Telegram',
+      metadata: expect.objectContaining({
+        previousTelegramId: '654321',
+        telegramId: telegramUser.id.toString(),
+      }),
+    }))
+  })
+
+  it('keeps a completed link successful when audit logging is unavailable', async () => {
+    mocks.writeAuditLog.mockRejectedValue(new Error('audit unavailable'))
+
+    const response = await GET(new Request('https://cabinet.example/api/me/telegram/oidc/callback?code=code-1&state=state-1'))
+
+    expect(locationPath(response)).toBe('/dashboard/settings?telegram_linked=1')
+    expect(mocks.prisma.user.update).toHaveBeenCalledOnce()
+    expect(mocks.syncLinkedTelegramUser).toHaveBeenCalledOnce()
   })
 })
 

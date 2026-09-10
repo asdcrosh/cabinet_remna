@@ -16,6 +16,7 @@ import { describeSyncError } from '@/lib/sync-error'
 import { recordIdentityConflict } from '@/lib/identity-conflicts'
 import { assertSameOrigin } from '@/lib/security'
 import { rateLimit } from '@/lib/rate-limit'
+import { logError } from '@/lib/logger'
 
 export const runtime = 'nodejs'
 
@@ -50,7 +51,7 @@ export const POST = withAuth(async (req: Request) => {
   const telegramId = BigInt(payload.id)
   const currentUser = await prisma.user.findUnique({
     where: { id: session.uid },
-    select: { id: true, emailVerifiedAt: true },
+    select: { id: true, emailVerifiedAt: true, telegramId: true },
   })
   if (!currentUser) return NextResponse.json({ error: 'User not found' }, { status: 404 })
   if (!currentUser.emailVerifiedAt) {
@@ -96,17 +97,24 @@ export const POST = withAuth(async (req: Request) => {
     },
   })
 
-  await writeAuditLog({
-    actorId: session.uid,
-    targetId: session.uid,
-    action: 'ADMIN_PROFILE_UPDATED',
-    message: 'Пользователь привязал Telegram',
-    metadata: {
-      telegramId: telegramId.toString(),
-      username: payload.username ?? null,
-    },
-    request: req,
-  })
+  try {
+    await writeAuditLog({
+      actorId: session.uid,
+      targetId: session.uid,
+      action: 'ADMIN_PROFILE_UPDATED',
+      message: currentUser.telegramId
+        ? 'Пользователь изменил привязку Telegram'
+        : 'Пользователь привязал Telegram',
+      metadata: {
+        previousTelegramId: currentUser.telegramId?.toString() ?? null,
+        telegramId: telegramId.toString(),
+        username: payload.username ?? null,
+      },
+      request: req,
+    })
+  } catch (error) {
+    logError('telegram_link.audit_failed', error, { userId: session.uid })
+  }
 
   try {
     const sync = await syncLinkedTelegramUser({

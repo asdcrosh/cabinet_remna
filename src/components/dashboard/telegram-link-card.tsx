@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { BadgeCheck, ExternalLink, RefreshCw, Send } from 'lucide-react'
 import { toast } from '@/components/ui/toaster'
 import { apiFetch } from '@/lib/api-client'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 
 interface TelegramLinkCardProps {
   telegramClientId: string | null
@@ -28,6 +29,7 @@ export function TelegramLinkCard({
   const router = useRouter()
   const searchParams = useSearchParams()
   const [syncing, setSyncing] = useState(false)
+  const [replaceConfirmOpen, setReplaceConfirmOpen] = useState(false)
   const callbackHandled = useRef(false)
   const telegramStartUrl = appUrl ? `${appUrl.replace(/\/+$/, '')}/api/me/telegram/oidc/start` : '/api/me/telegram/oidc/start'
 
@@ -70,7 +72,7 @@ export function TelegramLinkCard({
       router.replace('/dashboard/settings?section=telegram')
     } else if (error) {
       callbackHandled.current = true
-      toast(`Telegram не привязан: ${error}`)
+      toast(telegramErrorMessage(error))
       router.replace('/dashboard/settings?section=telegram')
     }
   }, [router, searchParams])
@@ -88,10 +90,24 @@ export function TelegramLinkCard({
               <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">Вход и перенос старых покупок.</p>
             </div>
           </div>
-          {telegramId ? <SyncButton syncing={syncing} onSync={syncTelegram} /> : null}
+          {telegramId ? (
+            <TelegramActions
+              syncing={syncing}
+              canReplace={Boolean(telegramClientId)}
+              onSync={syncTelegram}
+              onReplace={() => setReplaceConfirmOpen(true)}
+            />
+          ) : null}
         </div>
       ) : telegramId ? (
-        <div className="mb-3 flex justify-end"><SyncButton syncing={syncing} onSync={syncTelegram} /></div>
+        <div className="mb-3 flex justify-end">
+          <TelegramActions
+            syncing={syncing}
+            canReplace={Boolean(telegramClientId)}
+            onSync={syncTelegram}
+            onReplace={() => setReplaceConfirmOpen(true)}
+          />
+        </div>
       ) : null}
 
       <div className="mb-3 grid gap-2 text-sm sm:grid-cols-3">
@@ -103,7 +119,7 @@ export function TelegramLinkCard({
       {telegramId ? (
         <div className="flex items-start gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-sm text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-100">
           <BadgeCheck className="mt-0.5 h-4 w-4 shrink-0" />
-          <span>Telegram привязан. Старые покупки синхронизируются с кабинетом.</span>
+          <span>Telegram привязан. Если доступ к нему потерян, привяжите новый аккаунт.</span>
         </div>
       ) : !telegramClientId ? (
         <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
@@ -120,6 +136,41 @@ export function TelegramLinkCard({
         </div>
       )}
 
+      <ConfirmDialog
+        open={replaceConfirmOpen}
+        title="Сменить Telegram?"
+        description="Войдите через новый Telegram. Покупки и VPN-профиль останутся в этом кабинете."
+        confirmLabel="Продолжить в Telegram"
+        tone="neutral"
+        details="Старый Telegram перестанет получать уведомления этого аккаунта."
+        onCancel={() => setReplaceConfirmOpen(false)}
+        onConfirm={() => window.location.assign(telegramStartUrl)}
+      />
+
+    </div>
+  )
+}
+
+function TelegramActions({
+  syncing,
+  canReplace,
+  onSync,
+  onReplace,
+}: {
+  syncing: boolean
+  canReplace: boolean
+  onSync: () => Promise<void>
+  onReplace: () => void
+}) {
+  return (
+    <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+      <SyncButton syncing={syncing} onSync={onSync} />
+      {canReplace ? (
+        <button type="button" className="btn-secondary w-full shrink-0 sm:w-auto" onClick={onReplace}>
+          <ExternalLink className="h-4 w-4" />
+          Сменить Telegram
+        </button>
+      ) : null}
     </div>
   )
 }
@@ -149,4 +200,16 @@ function Info({ label, value }: { label: string; value: string }) {
       <div className="mt-1 truncate font-medium text-slate-950 dark:text-white">{value}</div>
     </div>
   )
+}
+
+function telegramErrorMessage(code: string) {
+  const messages: Record<string, string> = {
+    invalid_state: 'Сессия привязки Telegram истекла. Попробуйте ещё раз.',
+    access_denied: 'Привязка Telegram отменена.',
+    email_not_verified: 'Сначала подтвердите email в настройках аккаунта.',
+    user_not_found: 'Сеанс кабинета истёк. Войдите снова.',
+    telegram_identity_conflict: 'Этот Telegram уже связан с другим аккаунтом. Обратитесь в поддержку.',
+    telegram_privileged_source: 'Этот Telegram нельзя привязать автоматически. Обратитесь в поддержку.',
+  }
+  return messages[code] ?? 'Не удалось привязать Telegram. Попробуйте ещё раз.'
 }

@@ -4,6 +4,7 @@ import { forgotPasswordSchema } from '@/lib/auth/validation'
 import { rateLimit } from '@/lib/rate-limit'
 import { createPasswordResetToken, sendPasswordResetLink } from '@/lib/password-reset'
 import { assertSameOrigin } from '@/lib/security'
+import { logError } from '@/lib/logger'
 
 export const runtime = 'nodejs'
 
@@ -14,7 +15,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Invalid request origin' }, { status: 403 })
   }
 
-  const limited = await rateLimit(req, 'forgot-password', 20, 60_000)
+  const limited = await rateLimit(req, 'forgot-password', 20, 60_000, { penaltyMs: 60_000 })
   if (!limited.ok) {
     return NextResponse.json(
       { error: 'Слишком много запросов. Попробуйте позже.' },
@@ -43,8 +44,12 @@ export async function POST(req: Request) {
   })
 
   if (user) {
-    const token = await createPasswordResetToken(user.id)
-    await sendPasswordResetLink({ email: user.email, name: user.name, token })
+    try {
+      const token = await createPasswordResetToken(user.id)
+      await sendPasswordResetLink({ userId: user.id, email: user.email, name: user.name, token })
+    } catch (error) {
+      logError('password_reset.request_failed', error, { userId: user.id })
+    }
   }
 
   return NextResponse.json({ ok: true })

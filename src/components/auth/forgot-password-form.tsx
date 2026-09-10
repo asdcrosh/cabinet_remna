@@ -1,17 +1,20 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { apiFetch } from '@/lib/api-client'
+import { apiFetch, isApiFetchError } from '@/lib/api-client'
 import { forgotPasswordSchema, type ForgotPasswordInput } from '@/lib/auth/validation'
 import { FormAlert } from '@/components/ui/form-alert'
 import { ArrowLeft, CheckCircle2, Mail, RefreshCw, Send } from 'lucide-react'
 
-const RESEND_DELAY_SECONDS = 60
+const RESEND_DELAY_MS = 60_000
+const RESEND_UNTIL_KEY = 'password-reset-resend-until:v1'
+const SENT_EMAIL_KEY = 'password-reset-email:v1'
 
 export function ForgotPasswordForm() {
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<ForgotPasswordInput>({
+  const { register, handleSubmit, setValue, formState: { errors, isSubmitting } } = useForm<ForgotPasswordInput>({
     resolver: zodResolver(forgotPasswordSchema),
     defaultValues: { email: '' },
   })
@@ -19,14 +22,35 @@ export function ForgotPasswordForm() {
   const [serverError, setServerError] = useState<string | null>(null)
   const [sentEmail, setSentEmail] = useState('')
   const [resendIn, setResendIn] = useState(0)
+  const [resendUntil, setResendUntil] = useState(0)
+  const [cooldownReady, setCooldownReady] = useState(false)
 
   useEffect(() => {
-    if (resendIn <= 0) return
+    const storedEmail = window.sessionStorage.getItem(SENT_EMAIL_KEY)?.trim() ?? ''
+    const storedUntil = Number(window.sessionStorage.getItem(RESEND_UNTIL_KEY) ?? 0)
+    if (storedEmail) {
+      setValue('email', storedEmail)
+      setSentEmail(storedEmail)
+      setSent(true)
+    }
+    if (Number.isFinite(storedUntil) && storedUntil > Date.now()) {
+      setResendUntil(storedUntil)
+      setResendIn(Math.ceil((storedUntil - Date.now()) / 1000))
+    }
+    setCooldownReady(true)
+  }, [setValue])
+
+  useEffect(() => {
+    if (resendUntil <= Date.now()) return
+    const updateCountdown = () => {
+      setResendIn(Math.max(0, Math.ceil((resendUntil - Date.now()) / 1000)))
+    }
+    updateCountdown()
     const timer = window.setInterval(() => {
-      setResendIn((value) => Math.max(0, value - 1))
-    }, 1000)
+      updateCountdown()
+    }, 250)
     return () => window.clearInterval(timer)
-  }, [resendIn])
+  }, [resendUntil])
 
   const onSubmit = handleSubmit(async (values) => {
     setServerError(null)
@@ -35,10 +59,20 @@ export function ForgotPasswordForm() {
         method: 'POST',
         body: JSON.stringify(values),
       })
+      const nextResendAt = Date.now() + RESEND_DELAY_MS
+      window.sessionStorage.setItem(SENT_EMAIL_KEY, values.email)
+      window.sessionStorage.setItem(RESEND_UNTIL_KEY, String(nextResendAt))
       setSentEmail(values.email)
       setSent(true)
-      setResendIn(RESEND_DELAY_SECONDS)
+      setResendUntil(nextResendAt)
+      setResendIn(Math.ceil(RESEND_DELAY_MS / 1000))
     } catch (error) {
+      if (isApiFetchError(error) && error.status === 429 && error.retryAfter) {
+        const nextResendAt = Date.now() + error.retryAfter * 1000
+        window.sessionStorage.setItem(RESEND_UNTIL_KEY, String(nextResendAt))
+        setResendUntil(nextResendAt)
+        setResendIn(error.retryAfter)
+      }
       setServerError(error instanceof Error ? error.message : 'Не удалось отправить ссылку')
     }
   })
@@ -62,7 +96,7 @@ export function ForgotPasswordForm() {
         {serverError && <FormAlert>{serverError}</FormAlert>}
         <button
           type="button"
-          disabled={isSubmitting || resendIn > 0}
+          disabled={!cooldownReady || isSubmitting || resendIn > 0}
           className="btn-primary w-full"
           onClick={() => void onSubmit()}
         >
@@ -77,14 +111,23 @@ export function ForgotPasswordForm() {
           type="button"
           className="btn-secondary w-full"
           onClick={() => {
+            window.sessionStorage.removeItem(SENT_EMAIL_KEY)
+            window.sessionStorage.removeItem(RESEND_UNTIL_KEY)
             setSent(false)
             setServerError(null)
             setResendIn(0)
+            setResendUntil(0)
           }}
         >
           <ArrowLeft className="h-4 w-4" />
           Изменить email
         </button>
+        <p className="text-xs leading-5 text-slate-500 dark:text-slate-400">
+          Нет доступа к почте?{' '}
+          <Link href="/contacts" className="font-medium text-brand-600 hover:underline">
+            Обратитесь в поддержку
+          </Link>
+        </p>
       </div>
     )
   }
@@ -109,9 +152,13 @@ export function ForgotPasswordForm() {
       {serverError && (
         <FormAlert>{serverError}</FormAlert>
       )}
-      <button type="submit" disabled={isSubmitting} className="btn-primary min-h-12 w-full">
+      <button type="submit" disabled={!cooldownReady || isSubmitting || resendIn > 0} className="btn-primary min-h-12 w-full">
         <Send className="h-4 w-4" />
-        {isSubmitting ? 'Отправляем...' : 'Отправить ссылку'}
+        {isSubmitting
+          ? 'Отправляем...'
+          : resendIn > 0
+            ? `Повторить через ${resendIn} сек.`
+            : 'Отправить ссылку'}
       </button>
     </form>
   )

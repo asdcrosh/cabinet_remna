@@ -20,6 +20,7 @@ export function LoginForm({ yandexEnabled = false }: { yandexEnabled?: boolean }
   const verified = search.get('verified')
   const yandexError = search.get('yandex_error')
   const sessionsRevoked = search.get('sessions') === 'revoked'
+  const resetComplete = search.get('reset') === 'success'
   const { register, handleSubmit, watch, formState: { errors, isSubmitting } } = useForm<LoginInput>({
     resolver: zodResolver(loginSchema),
     defaultValues: { email: '', password: '' },
@@ -92,6 +93,12 @@ export function LoginForm({ yandexEnabled = false }: { yandexEnabled?: boolean }
         <div role="status" className="flex items-start gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-100">
           <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
           Все сеансы завершены. Войдите снова на доверенном устройстве.
+        </div>
+      )}
+      {resetComplete && (
+        <div role="status" className="flex items-start gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-100">
+          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+          Пароль обновлён. Все прежние сеансы завершены. Войдите с новым паролем.
         </div>
       )}
       {(verified === 'invalid' || verified === 'missing') && (
