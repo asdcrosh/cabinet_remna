@@ -106,6 +106,16 @@ export default async function globalSetup() {
       },
     })
 
+    await prisma.user.create({
+      data: {
+        ...E2E_USERS.telegram,
+        passwordHash,
+        telegramLinkedAt: now,
+        agreedToTermsAt: now,
+        referralCode: 'E2ETELEGRAM',
+      },
+    })
+
     await prisma.bonusBoxPrize.createMany({
       data: [
         {

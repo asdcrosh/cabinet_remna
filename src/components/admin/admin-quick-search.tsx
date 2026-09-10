@@ -52,7 +52,7 @@ export function AdminQuickSearch() {
       >
         <div>
           <h2 className="text-lg font-semibold tracking-tight text-slate-950 dark:text-white">Найти и проверить</h2>
-          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Введите email, имя или идентификатор</p>
+          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Введите email, имя, Telegram или идентификатор</p>
         </div>
         <div className="mt-4 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
           <label className="relative block min-w-0">
@@ -64,7 +64,7 @@ export function AdminQuickSearch() {
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               className="input pl-9"
-              placeholder={target === 'users' ? 'Email, имя или ID пользователя' : 'Email, тариф или ID платежа'}
+              placeholder={target === 'users' ? 'Email, Telegram или ID пользователя' : 'Email, тариф или ID платежа'}
             />
           </label>
           <button type="submit" className="btn-primary w-full sm:w-auto">

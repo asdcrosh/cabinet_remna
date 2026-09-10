@@ -11,6 +11,13 @@ export const E2E_USERS = {
     email: 'e2e-password@example.test',
     name: 'E2E Смена пароля',
   },
+  telegram: {
+    id: 'e2e-telegram-user',
+    email: 'telegram-718395003@pending.invalid',
+    name: 'E2E Telegram',
+    telegramId: BigInt(718395003),
+    telegramUsername: 'mitfleg',
+  },
   expired: {
     id: 'e2e-expired-user',
     email: 'e2e-expired@example.test',

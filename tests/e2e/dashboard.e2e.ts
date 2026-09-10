@@ -344,6 +344,23 @@ test('главная админки быстро находит пользова
   await expectNoHorizontalOverflow(page)
 })
 
+test('поиск пользователей учитывает Telegram username и ID', async ({ page }) => {
+  await login(page, E2E_USERS.admin.email)
+
+  for (const query of [
+    E2E_USERS.telegram.telegramUsername,
+    `@${E2E_USERS.telegram.telegramUsername}`,
+    E2E_USERS.telegram.telegramId.toString(),
+  ]) {
+    await page.goto(`/dashboard/admin/users?q=${encodeURIComponent(query)}`)
+    const user = page.locator('article').filter({ hasText: E2E_USERS.telegram.email })
+    await expect(user).toHaveCount(1)
+    await expect(user.locator('span:visible').filter({ hasText: `@${E2E_USERS.telegram.telegramUsername}` })).toHaveCount(1)
+  }
+
+  await expectNoHorizontalOverflow(page)
+})
+
 test('массовая синхронизация показывает один список ошибок', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop-chromium', 'Сценарий достаточно проверить один раз')
   await login(page, E2E_USERS.admin.email)

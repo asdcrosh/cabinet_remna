@@ -19,6 +19,7 @@ import { AdminActionsMenu } from '@/components/admin/admin-actions-menu'
 import { UserSubscriptionDeleteButton } from '@/components/admin/user-subscription-delete-button'
 import { UserWhitelistAddonButton } from '@/components/admin/user-whitelist-addon-button'
 import { BulkUserSyncButton } from '@/components/admin/bulk-user-sync-button'
+import { buildAdminUserSearchFilters } from '@/lib/admin-user-search'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Пользователи — Админка' }
@@ -44,10 +45,7 @@ export default async function AdminUsersPage({
         : {}),
     ...(q ? {
         OR: [
-          { id: { equals: q } },
-          { email: { contains: q, mode: 'insensitive' as const } },
-          { name: { contains: q, mode: 'insensitive' as const } },
-          { remnawaveUsername: { contains: q, mode: 'insensitive' as const } },
+          ...buildAdminUserSearchFilters(q),
         ],
       } : {}),
   }
@@ -158,7 +156,7 @@ export default async function AdminUsersPage({
               type="search"
               name="q"
               defaultValue={q}
-              placeholder="Email, имя, ID или Remnawave username"
+              placeholder="Email, имя, Telegram, ID или VPN username"
               className="input pl-9"
             />
           </div>

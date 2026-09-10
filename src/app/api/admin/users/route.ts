@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { requireAdmin, withAuth } from '@/lib/auth/guard'
 import { ADMIN_LIST_PAGE_SIZE, parseAdminListLimit } from '@/lib/admin-list'
 import { csvResponse } from '@/lib/csv'
+import { buildAdminUserSearchFilters } from '@/lib/admin-user-search'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -30,9 +31,7 @@ export const GET = withAuth(async (req: Request) => {
     ...(q
       ? {
           OR: [
-            { email: { contains: q, mode: 'insensitive' as const } },
-            { name: { contains: q, mode: 'insensitive' as const } },
-            { remnawaveUsername: { contains: q, mode: 'insensitive' as const } },
+            ...buildAdminUserSearchFilters(q),
           ],
         }
       : {}),
@@ -51,6 +50,7 @@ export const GET = withAuth(async (req: Request) => {
         email: true,
         name: true,
         role: true,
+        telegramId: true,
         telegramUsername: true,
         remnashopUserId: true,
         remnawaveUsername: true,
@@ -65,6 +65,7 @@ export const GET = withAuth(async (req: Request) => {
       email: user.email,
       name: user.name ?? '',
       role: user.role,
+      telegramId: user.telegramId ?? '',
       telegramUsername: user.telegramUsername ?? '',
       remnashopUserId: user.remnashopUserId ?? '',
       remnawaveUsername: user.remnawaveUsername ?? '',
@@ -87,6 +88,8 @@ export const GET = withAuth(async (req: Request) => {
         email: true,
         name: true,
         role: true,
+        telegramId: true,
+        telegramUsername: true,
         remnawaveId: true,
         remnawaveUuid: true,
         remnawaveUsername: true,
