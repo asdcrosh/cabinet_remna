@@ -181,9 +181,22 @@ function PaymentAction({
 }) {
   if (status === 'PENDING' && !isFreshPendingPayment(createdAt)) {
     return (
-      <Link href="/dashboard/plans" className="btn-secondary min-h-10 w-full justify-center px-3 py-2 text-xs">
-        Создать новый платёж
-      </Link>
+      <div className="flex flex-col gap-2">
+        {confirmationUrl ? (
+          <a
+            href={confirmationUrl}
+            className="btn-primary min-h-10 w-full justify-center px-3 py-2 text-xs"
+            target="_blank"
+            rel="noreferrer"
+          >
+            <ExternalLink className="h-4 w-4" />
+            Вернуться к оплате
+          </a>
+        ) : null}
+        <Link href="/dashboard/plans" className="btn-secondary min-h-10 w-full justify-center px-3 py-2 text-xs">
+          Создать новый платёж
+        </Link>
+      </div>
     )
   }
   if (status !== 'PENDING') return <span className="text-sm text-slate-400">—</span>
@@ -232,7 +245,7 @@ function PaymentStatusIcon({ status, createdAt }: { status: string; createdAt: D
 
 function PaymentStatusBadge({ status, createdAt }: { status: string; createdAt: Date }) {
   if (status === 'PENDING' && !isFreshPendingPayment(createdAt)) {
-    return <span className="badge-disabled">Истёк</span>
+    return <span className="badge-disabled">Не завершён</span>
   }
   const map: Record<string, string> = {
     SUCCEEDED: 'badge-active',
@@ -292,7 +305,7 @@ function paymentStatusDescription(payment: PaymentHistoryPayment) {
   if (payment.status === 'PENDING') {
     return isFreshPendingPayment(payment.createdAt)
       ? 'Завершите оплату в окне платёжной системы. После подтверждения статус обновится автоматически.'
-      : 'Ссылка на оплату истекла. Если оплата не была завершена, списания не произошло.'
+      : 'ЮKassa ещё не сообщила итоговый статус. Можно вернуться к оплате по сохранённой ссылке или создать новый платёж.'
   }
   if (payment.status === 'CANCELED') {
     return 'Платёж не был завершён. Если деньги списались, передайте номер платежа поддержке.'

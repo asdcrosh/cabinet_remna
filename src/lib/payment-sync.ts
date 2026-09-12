@@ -249,6 +249,11 @@ export async function syncPaymentProvisioning(input: {
       status: 'WARNING',
       source: 'payment-sync',
       message: 'ЮKassa сообщила об отмене платежа',
+      details: {
+        providerStatus: yooPayment.status,
+        cancellationParty: yooPayment.cancellation_details?.party ?? null,
+        cancellationReason: yooPayment.cancellation_details?.reason ?? null,
+      },
       dedupeKey: 'payment-canceled',
     })
 
@@ -257,6 +262,7 @@ export async function syncPaymentProvisioning(input: {
 
   if (yooPayment.status !== 'succeeded') {
     if (
+      yooPayment.status === 'waiting_for_capture' &&
       input.cancelPendingOlderThanMs &&
       Date.now() - payment.createdAt.getTime() >= input.cancelPendingOlderThanMs
     ) {
@@ -381,9 +387,20 @@ async function cancelPendingPayment(payment: PendingPaymentForCancel, reason: st
       return 'canceled' as const
     }
 
+    // YooKassa keeps redirect payments in `pending` while it waits for the
+    // customer. The cancel endpoint is intended for `waiting_for_capture`, so
+    // a pending payment must stay pending until the provider reports a final
+    // status. Otherwise a failed cancel request creates a false local cancel.
+    if (remotePayment.status !== 'waiting_for_capture') return 'pending' as const
+
     const canceledPayment = await cancelPayment(yooKassaPaymentId, `cancel-${payment.id}`)
     remoteStatus = canceledPayment.status
     if (canceledPayment.status === 'succeeded') return 'paid' as const
+    if (canceledPayment.status === 'canceled') {
+      await cancelLocalPayment(payment.id, 'canceled')
+      await notifyPaymentCanceled(payment.id, reason)
+      return 'canceled' as const
+    }
   } catch (error) {
     try {
       const remotePayment = await getPayment(yooKassaPaymentId)
@@ -394,18 +411,26 @@ async function cancelPendingPayment(payment: PendingPaymentForCancel, reason: st
         await notifyPaymentCanceled(payment.id, reason)
         return 'canceled' as const
       }
-    } catch {
+    } catch (statusError) {
       const message = error instanceof Error ? error.message : 'payment cancellation failed'
       logError('payment_sync.remote_status_after_cancel_failed', error, {
         paymentId: payment.id,
         message,
+        statusCheckMessage: statusError instanceof Error ? statusError.message : 'unknown error',
       })
     }
   }
 
-  await cancelLocalPayment(payment.id, remoteStatus)
-  await notifyPaymentCanceled(payment.id, reason)
-  return 'canceled' as const
+  await recordPaymentEvent({
+    paymentId: payment.id,
+    stage: 'PROVIDER',
+    status: 'WARNING',
+    source: 'payment-sync',
+    message: 'ЮKassa не подтвердила отмену платежа',
+    details: { providerStatus: remoteStatus },
+    dedupeKey: 'provider-cancellation-not-confirmed',
+  })
+  return 'pending' as const
 }
 
 async function cancelLocalPayment(paymentId: string, yookassaStatus: YooKassaPaymentStatus | null) {

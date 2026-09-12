@@ -226,6 +226,11 @@ export async function POST(req: Request) {
       status: 'WARNING',
       source: 'yookassa-webhook',
       message: 'Платёж отменён ЮKassa',
+      details: {
+        providerStatus: freshPayment.status,
+        cancellationParty: freshPayment.cancellation_details?.party ?? null,
+        cancellationReason: freshPayment.cancellation_details?.reason ?? null,
+      },
       dedupeKey: 'payment-canceled',
     })
     return NextResponse.json({ ok: true })

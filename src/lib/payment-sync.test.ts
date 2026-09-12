@@ -142,7 +142,7 @@ describe('payment sync pending expiration', () => {
       },
       subscription: null,
     })
-    mocks.getPayment.mockResolvedValue({ status: 'pending' })
+    mocks.getPayment.mockResolvedValue({ status: 'waiting_for_capture' })
     mocks.cancelPayment.mockResolvedValue({ status: 'canceled' })
 
     await expect(reconcileStalePendingPaymentsForUser('user-1')).resolves.toEqual({ checked: 1 })
@@ -159,7 +159,7 @@ describe('payment sync pending expiration', () => {
     expect(mocks.cancelPayment).toHaveBeenCalledWith('yoo-1', 'cancel-old-pay')
   })
 
-  it('locally cancels stale pending payment when YooKassa cancel fails and payment is not paid', async () => {
+  it('keeps a stale redirect payment pending while YooKassa has no final status', async () => {
     mocks.prisma.payment.findFirst.mockResolvedValue({
       id: 'old-pay',
       userId: 'user-1',
@@ -188,11 +188,50 @@ describe('payment sync pending expiration', () => {
       cancelPendingOlderThanMs: 600_000,
     })
 
-    expect(result).toEqual({ ok: true, status: 'canceled', provisioned: false })
+    expect(result).toEqual({ ok: true, status: 'pending', provisioned: false })
+    expect(mocks.cancelPayment).not.toHaveBeenCalled()
     expect(mocks.prisma.payment.update).toHaveBeenCalledWith({
       where: { id: 'old-pay' },
-      data: { status: 'CANCELED', yookassaStatus: 'pending', providerStatus: 'pending' },
+      data: { yookassaStatus: 'pending', providerStatus: 'pending' },
     })
+    expect(mocks.notifyPaymentCanceled).not.toHaveBeenCalled()
+  })
+
+  it('does not create a local cancellation when YooKassa cannot cancel a captured payment', async () => {
+    mocks.prisma.payment.findFirst.mockResolvedValue({
+      id: 'old-pay',
+      userId: 'user-1',
+      provider: 'YOOKASSA',
+      externalPaymentId: null,
+      yookassaId: 'yoo-1',
+      status: 'PENDING',
+      createdAt: new Date('2026-06-26T11:40:00.000Z'),
+      user: { id: 'user-1', email: 'user@example.test' },
+      plan: {
+        id: 'plan-1',
+        name: 'Стандарт',
+        durationDays: 30,
+        trafficLimitGb: null,
+        deviceLimit: 5,
+        activeInternalSquads: [],
+      },
+      subscription: null,
+    })
+    mocks.getPayment.mockResolvedValue({ status: 'waiting_for_capture' })
+    mocks.cancelPayment.mockRejectedValue(new Error('YooKassa cancelPayment failed: 409 invalid_request'))
+
+    const result = await syncPaymentProvisioning({
+      paymentId: 'old-pay',
+      userId: 'user-1',
+      cancelPendingOlderThanMs: 600_000,
+    })
+
+    expect(result).toEqual({ ok: true, status: 'pending', provisioned: false })
+    expect(mocks.cancelPayment).toHaveBeenCalledWith('yoo-1', 'cancel-old-pay')
+    expect(mocks.prisma.payment.update).not.toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ status: 'CANCELED' }),
+    }))
+    expect(mocks.notifyPaymentCanceled).not.toHaveBeenCalled()
   })
 
   it('cancels other pending user payments after one payment succeeds', async () => {
@@ -221,7 +260,7 @@ describe('payment sync pending expiration', () => {
       { id: 'old-pay-1', userId: 'user-1', provider: 'YOOKASSA', externalPaymentId: null, yookassaId: 'yoo-old-1' },
       { id: 'old-pay-2', userId: 'user-1', provider: 'YOOKASSA', externalPaymentId: null, yookassaId: null },
     ])
-    mocks.getPayment.mockResolvedValueOnce({ status: 'succeeded' }).mockResolvedValueOnce({ status: 'pending' })
+    mocks.getPayment.mockResolvedValueOnce({ status: 'succeeded' }).mockResolvedValueOnce({ status: 'waiting_for_capture' })
     mocks.cancelPayment.mockResolvedValue({ status: 'canceled' })
 
     const result = await syncPaymentProvisioning({ paymentId: 'paid-pay', userId: 'user-1' })
