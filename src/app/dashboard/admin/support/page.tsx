@@ -7,6 +7,12 @@ import { parseAdminListLimit } from '@/lib/admin-list'
 import { AdminPageShell } from '@/components/admin/admin-page-shell'
 import { notFound } from 'next/navigation'
 import { isFeatureEnabled } from '@/lib/feature-flags'
+import {
+  buildAdminSupportFolderWhere,
+  buildAdminSupportOrderBy,
+  buildAdminSupportSearchWhere,
+  parseAdminSupportFolder,
+} from '@/lib/admin-support-query'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Поддержка — Админка' }
@@ -14,34 +20,23 @@ export const metadata = { title: 'Поддержка — Админка' }
 export default async function AdminSupportPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; q?: string; limit?: string }>
+  searchParams: Promise<{ folder?: string; q?: string; limit?: string }>
 }) {
   if (!await isFeatureEnabled('support')) notFound()
   await requireStaffPage()
 
   const params = await searchParams
-  const status = params.status || 'ALL'
+  const folder = parseAdminSupportFolder(params.folder)
   const q = params.q?.trim() ?? ''
   const limit = parseAdminListLimit(params.limit)
-  const where = {
-    ...(status !== 'ALL' ? { status: status as any } : {}),
-    ...(q
-      ? {
-          OR: [
-            { id: { equals: q } },
-            { subject: { contains: q, mode: 'insensitive' as const } },
-            { user: { email: { contains: q, mode: 'insensitive' as const } } },
-            { user: { name: { contains: q, mode: 'insensitive' as const } } },
-          ],
-        }
-      : {}),
-  }
+  const searchWhere = buildAdminSupportSearchWhere(q)
+  const where = { AND: [searchWhere, buildAdminSupportFolderWhere(folder)] }
 
-  const [total, tickets] = await prisma.$transaction([
+  const [total, tickets, allCount, activeCount, needAnswerCount, answeredCount, closedCount] = await prisma.$transaction([
     prisma.supportTicket.count({ where }),
     prisma.supportTicket.findMany({
       where,
-      orderBy: [{ adminUnreadCount: 'desc' }, { lastMessageAt: 'desc' }],
+      orderBy: buildAdminSupportOrderBy(folder),
       take: limit,
       include: {
         user: {
@@ -50,6 +45,7 @@ export default async function AdminSupportPage({
             email: true,
             name: true,
             telegramId: true,
+            telegramUsername: true,
             remnashopUserId: true,
             remnashopSyncedAt: true,
             remnawaveId: true,
@@ -65,7 +61,10 @@ export default async function AdminSupportPage({
               take: 1,
               select: {
                 id: true,
+                provider: true,
                 status: true,
+                externalPaymentId: true,
+                yookassaId: true,
                 amountKopecks: true,
                 paidAt: true,
                 createdAt: true,
@@ -92,6 +91,11 @@ export default async function AdminSupportPage({
         },
       },
     }),
+    prisma.supportTicket.count({ where: searchWhere }),
+    prisma.supportTicket.count({ where: { AND: [searchWhere, buildAdminSupportFolderWhere('active')] } }),
+    prisma.supportTicket.count({ where: { AND: [searchWhere, buildAdminSupportFolderWhere('need-answer')] } }),
+    prisma.supportTicket.count({ where: { AND: [searchWhere, buildAdminSupportFolderWhere('answered')] } }),
+    prisma.supportTicket.count({ where: { AND: [searchWhere, buildAdminSupportFolderWhere('closed')] } }),
   ])
 
   return (
@@ -101,6 +105,14 @@ export default async function AdminSupportPage({
         initialTotal={total}
         pageSize={25}
         initialQuery={q}
+        initialFolder={folder}
+        initialCounts={{
+          all: allCount,
+          active: activeCount,
+          'need-answer': needAnswerCount,
+          answered: answeredCount,
+          closed: closedCount,
+        }}
         initialTickets={tickets.map((ticket) => ({
           ...serializeSupportTicket(ticket),
           messages: ticket.messages.map(serializeSupportMessage),

@@ -57,7 +57,10 @@ test('главный администратор видит пользовате�
   await expect(page.locator('article').filter({ hasText: E2E_USERS.basic.email })).toHaveCount(1)
 
   await page.goto('/dashboard/admin/support')
+  await expect(page.getByPlaceholder('Клиент, Telegram, платёж или текст')).toBeVisible()
+  await expect(page.getByRole('button', { name: /Нужен ответ/ })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Вопрос по оплате' })).toBeVisible()
+  await expect(page.getByText(/Ждёт \d+ мин/).first()).toBeVisible()
   const clientButton = page.getByRole('button', { name: 'Клиент', exact: true })
   await expect(clientButton).toBeVisible()
   await clientButton.click()

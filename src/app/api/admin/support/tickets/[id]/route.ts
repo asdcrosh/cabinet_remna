@@ -35,6 +35,7 @@ export const GET = withAuth(async (req: Request, { params }: { params: Promise<{
           email: true,
           name: true,
           telegramId: true,
+          telegramUsername: true,
           remnashopUserId: true,
           remnashopSyncedAt: true,
           remnawaveId: true,
@@ -50,7 +51,10 @@ export const GET = withAuth(async (req: Request, { params }: { params: Promise<{
             take: 1,
             select: {
               id: true,
+              provider: true,
               status: true,
+              externalPaymentId: true,
+              yookassaId: true,
               amountKopecks: true,
               paidAt: true,
               createdAt: true,

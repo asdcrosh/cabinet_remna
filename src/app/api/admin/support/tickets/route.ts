@@ -5,6 +5,13 @@ import { requireStaff, withAuth } from '@/lib/auth/guard'
 import { serializeSupportMessage, serializeSupportTicket } from '@/lib/support'
 import { isFeatureEnabled } from '@/lib/feature-flags'
 import { supportAttachmentSelect } from '@/lib/support-attachments'
+import {
+  buildAdminSupportFolderWhere,
+  buildAdminSupportOrderBy,
+  buildAdminSupportSearchWhere,
+  parseAdminSupportFolder,
+  type AdminSupportFolder,
+} from '@/lib/admin-support-query'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -14,34 +21,26 @@ export const GET = withAuth(async (req: Request) => {
   await requireStaff()
 
   const url = new URL(req.url)
-  const status = url.searchParams.get('status')
+  const folder = parseAdminSupportFolder(url.searchParams.get('folder'))
   const q = url.searchParams.get('q')?.trim()
   const page = Math.max(1, Number(url.searchParams.get('page') || '1') || 1)
   const cursor = parseSupportCursor(url.searchParams.get('cursor'))
   const pageSizeLimit = cursor ? 100 : 5000
   const pageSize = Math.min(pageSizeLimit, Math.max(1, Number(url.searchParams.get('pageSize') || '25') || 25))
 
+  const searchWhere = buildAdminSupportSearchWhere(q ?? '')
   const baseWhere: Prisma.SupportTicketWhereInput = {
-    ...(status && status !== 'ALL' ? { status: status as any } : {}),
-    ...(q
-      ? {
-          OR: [
-            { subject: { contains: q, mode: 'insensitive' as const } },
-            { user: { email: { contains: q, mode: 'insensitive' as const } } },
-            { user: { name: { contains: q, mode: 'insensitive' as const } } },
-          ],
-        }
-      : {}),
+    AND: [searchWhere, buildAdminSupportFolderWhere(folder)],
   }
   const where: Prisma.SupportTicketWhereInput = cursor
-    ? { AND: [baseWhere, { OR: buildSupportCursorWhere(cursor) }] }
+    ? { AND: [baseWhere, { OR: buildSupportCursorWhere(cursor, folder) }] }
     : baseWhere
 
-  const [total, tickets] = await prisma.$transaction([
+  const [total, tickets, allCount, activeCount, needAnswerCount, answeredCount, closedCount] = await prisma.$transaction([
     prisma.supportTicket.count({ where: baseWhere }),
     prisma.supportTicket.findMany({
       where,
-      orderBy: [{ adminUnreadCount: 'desc' }, { lastMessageAt: 'desc' }, { id: 'desc' }],
+      orderBy: buildAdminSupportOrderBy(folder),
       take: pageSize + 1,
       include: {
         user: {
@@ -50,6 +49,7 @@ export const GET = withAuth(async (req: Request) => {
             email: true,
             name: true,
             telegramId: true,
+            telegramUsername: true,
             remnashopUserId: true,
             remnashopSyncedAt: true,
             remnawaveId: true,
@@ -65,7 +65,10 @@ export const GET = withAuth(async (req: Request) => {
               take: 1,
               select: {
                 id: true,
+                provider: true,
                 status: true,
+                externalPaymentId: true,
+                yookassaId: true,
                 amountKopecks: true,
                 paidAt: true,
                 createdAt: true,
@@ -85,9 +88,15 @@ export const GET = withAuth(async (req: Request) => {
         },
       },
     }),
+    prisma.supportTicket.count({ where: searchWhere }),
+    prisma.supportTicket.count({ where: { AND: [searchWhere, buildAdminSupportFolderWhere('active')] } }),
+    prisma.supportTicket.count({ where: { AND: [searchWhere, buildAdminSupportFolderWhere('need-answer')] } }),
+    prisma.supportTicket.count({ where: { AND: [searchWhere, buildAdminSupportFolderWhere('answered')] } }),
+    prisma.supportTicket.count({ where: { AND: [searchWhere, buildAdminSupportFolderWhere('closed')] } }),
   ])
   const visibleTickets = tickets.slice(0, pageSize)
-  const nextTicket = tickets[pageSize]
+  const hasMore = tickets.length > pageSize
+  const lastVisibleTicket = visibleTickets.at(-1)
 
   return NextResponse.json({
     pagination: {
@@ -95,7 +104,16 @@ export const GET = withAuth(async (req: Request) => {
       pageSize,
       total,
       pageCount: Math.max(1, Math.ceil(total / pageSize)),
-      nextCursor: nextTicket ? formatSupportCursor(nextTicket) : null,
+      nextCursor: hasMore && lastVisibleTicket
+        ? formatSupportCursor(lastVisibleTicket)
+        : null,
+    },
+    counts: {
+      all: allCount,
+      active: activeCount,
+      'need-answer': needAnswerCount,
+      answered: answeredCount,
+      closed: closedCount,
     },
     tickets: visibleTickets.map((ticket) => ({
       ...serializeSupportTicket(ticket),
@@ -119,7 +137,16 @@ function parseSupportCursor(raw: string | null): SupportCursor | null {
   return { adminUnreadCount, lastMessageAt, id }
 }
 
-function buildSupportCursorWhere(cursor: SupportCursor): Prisma.SupportTicketWhereInput[] {
+function buildSupportCursorWhere(cursor: SupportCursor, folder: AdminSupportFolder): Prisma.SupportTicketWhereInput[] {
+  if (folder === 'need-answer') {
+    return [
+      { lastMessageAt: { gt: cursor.lastMessageAt } },
+      {
+        lastMessageAt: cursor.lastMessageAt,
+        id: { gt: cursor.id },
+      },
+    ]
+  }
   return [
     { adminUnreadCount: { lt: cursor.adminUnreadCount } },
     {

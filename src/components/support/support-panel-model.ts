@@ -1,4 +1,5 @@
 import type { SupportCategoryValue } from '@/lib/support'
+import type { PaymentProvider } from '@prisma/client'
 
 export type TicketStatus = 'OPEN' | 'WAITING_ADMIN' | 'WAITING_USER' | 'CLOSED'
 export type SenderRole = 'USER' | 'ADMIN'
@@ -37,6 +38,7 @@ export interface SupportTicket {
     email: string
     name: string | null
     telegramId?: string | null
+    telegramUsername?: string | null
     remnashopUserId?: number | null
     remnashopSyncedAt?: string | null
     remnawaveId?: number | null
@@ -51,7 +53,10 @@ export interface SupportTicket {
     }>
     payments?: Array<{
       id: string
+      provider: PaymentProvider
       status: string
+      externalPaymentId: string | null
+      yookassaId: string | null
       amountKopecks: number
       paidAt: string | null
       createdAt: string
@@ -75,10 +80,14 @@ export interface SupportPanelProps {
   initialTotal?: number
   pageSize?: number
   initialQuery?: string
+  initialFolder?: TicketFolder
+  initialCounts?: SupportQueueCounts
   initialCategory?: SupportCategoryValue
   initialMessage?: string
   initialNewTicketOpen?: boolean
 }
+
+export type SupportQueueCounts = Record<TicketFolder, number> & { all: number }
 
 export function getUnreadCount(ticket: SupportTicket, mode: 'user' | 'admin') {
   return mode === 'admin' ? ticket.adminUnreadCount : ticket.userUnreadCount

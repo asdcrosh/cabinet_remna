@@ -44,6 +44,7 @@ import {
   XCircle,
 } from 'lucide-react'
 import { cn } from '@/lib/cn'
+import { paymentProviderLabel } from '@/lib/payment-provider-label'
 import {
   supportCategories,
   supportCategoryLabel,
@@ -61,6 +62,7 @@ import {
   needsCurrentActor,
   type SupportMessage,
   type SupportPanelProps,
+  type SupportQueueCounts,
   type SupportTicket,
   type TicketFolder,
   type TicketStatus,
@@ -76,12 +78,24 @@ function ticketMatchesFolder(ticket: SupportTicket, folder: TicketFolder, mode: 
   return ticket.status !== 'CLOSED'
 }
 
+function getLocalFolderCounts(tickets: SupportTicket[], mode: 'user' | 'admin'): SupportQueueCounts {
+  return {
+    all: tickets.length,
+    active: tickets.filter((ticket) => ticket.status !== 'CLOSED').length,
+    'need-answer': tickets.filter((ticket) => needsCurrentActor(ticket, mode)).length,
+    answered: tickets.filter((ticket) => ticket.status === 'WAITING_USER').length,
+    closed: tickets.filter((ticket) => ticket.status === 'CLOSED').length,
+  }
+}
+
 export function SupportPanel({
   mode,
   initialTickets,
   initialTotal = initialTickets.length,
   pageSize = 25,
   initialQuery = '',
+  initialFolder = 'active',
+  initialCounts,
   initialCategory = 'connection',
   initialMessage = '',
   initialNewTicketOpen = false,
@@ -98,12 +112,15 @@ export function SupportPanel({
   )
   const [loadingMore, setLoadingMore] = useState(false)
   const [loadingOlderMessages, setLoadingOlderMessages] = useState(false)
-  const initialActiveTicket = initialTickets.find((ticket) => ticket.status !== 'CLOSED') ?? null
+  const initialActiveTicket = mode === 'admin'
+    ? initialTickets[0] ?? null
+    : initialTickets.find((ticket) => ticket.status !== 'CLOSED') ?? null
   const [selectedId, setSelectedId] = useState(initialActiveTicket?.id ?? '')
   const [selectedTicket, setSelectedTicket] = useState<SupportTicket | null>(
     initialActiveTicket
   )
-  const [folder, setFolder] = useState<TicketFolder>('active')
+  const [folder, setFolder] = useState<TicketFolder>(mode === 'admin' ? initialFolder : 'active')
+  const [queueCounts, setQueueCounts] = useState(() => initialCounts ?? getLocalFolderCounts(initialTickets, mode))
   const [mobileChatOpen, setMobileChatOpen] = useState(mode === 'user' && initialNewTicketOpen)
   const [detailsOpen, setDetailsOpen] = useState(false)
   const [message, setMessage] = useState('')
@@ -121,19 +138,16 @@ export function SupportPanel({
     ? selectedTicket
     : tickets.find((ticket) => ticket.id === selectedId) ?? null
 
-  const folderCounts = useMemo(() => {
-    return {
-      active: tickets.filter((ticket) => ticket.status !== 'CLOSED').length,
-      'need-answer': tickets.filter((ticket) => needsCurrentActor(ticket, mode)).length,
-      answered: tickets.filter((ticket) => ticket.status === 'WAITING_USER').length,
-      closed: tickets.filter((ticket) => ticket.status === 'CLOSED').length,
-    }
-  }, [mode, tickets])
+  const folderCounts = useMemo(
+    () => mode === 'admin' ? queueCounts : getLocalFolderCounts(tickets, mode),
+    [mode, queueCounts, tickets]
+  )
 
   const filteredTickets = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase()
     return tickets.filter((ticket) => {
       if (!ticketMatchesFolder(ticket, folder, mode)) return false
+      if (mode === 'admin') return true
       if (!normalizedQuery) return true
 
       const haystack = [
@@ -206,6 +220,8 @@ export function SupportPanel({
     if (mode === 'admin') {
       if (debouncedQuery.trim()) params.set('q', debouncedQuery.trim())
       else params.delete('q')
+      params.set('folder', folder)
+      params.delete('status')
     }
     if (cursor) params.set('cursor', cursor)
     else params.set('page', '1')
@@ -218,8 +234,9 @@ export function SupportPanel({
     return listData as {
       tickets: SupportTicket[]
       pagination?: { total?: number; nextCursor?: string | null }
+      counts?: SupportQueueCounts
     }
-  }, [debouncedQuery, mode])
+  }, [debouncedQuery, folder, mode])
 
   const loadMoreTickets = useCallback(async () => {
     if (mode !== 'admin' || loadingMore || tickets.length >= listTotal || !listCursor) return
@@ -231,6 +248,7 @@ export function SupportPanel({
       setListLimit((current) => current + data.tickets.length)
       setListCursor(data.pagination?.nextCursor ?? null)
       if (typeof data.pagination?.total === 'number') setListTotal(data.pagination.total)
+      if (data.counts) setQueueCounts(data.counts)
     } finally {
       setLoadingMore(false)
     }
@@ -247,9 +265,16 @@ export function SupportPanel({
           mergeTicketList(listData.tickets)
           setListCursor(listData.pagination?.nextCursor ?? null)
           if (typeof listData.pagination?.total === 'number') setListTotal(listData.pagination.total)
+          if (listData.counts) setQueueCounts(listData.counts)
+
+          if (mode === 'admin' && !listData.tickets.some((ticket) => ticket.id === selectedId)) {
+            const nextTicket = listData.tickets[0] ?? null
+            setSelectedId(nextTicket?.id ?? '')
+            setSelectedTicket(nextTicket)
+          }
         }
 
-        if (selectedId) {
+        if (selectedId && (mode !== 'admin' || listData?.tickets.some((ticket) => ticket.id === selectedId))) {
           const ticket = await fetchTicket(selectedId)
           if (active && ticket) {
             setSelectedTicket((current) => current?.id === ticket.id ? mergeSupportTicket(current, ticket, true) : ticket)
@@ -276,7 +301,7 @@ export function SupportPanel({
       window.clearInterval(interval)
       document.removeEventListener('visibilitychange', refreshOnVisible)
     }
-  }, [fetchTicket, fetchTicketList, listLimit, mergeTicketList, selectedId])
+  }, [fetchTicket, fetchTicketList, listLimit, mergeTicketList, mode, selectedId])
 
   useEffect(() => {
     const marker = loadMoreRef.current
@@ -440,6 +465,7 @@ export function SupportPanel({
       }
       setSelectedTicket(updated)
       setTickets((current) => current.map((ticket) => ticket.id === updated.id ? { ...ticket, ...updated } : ticket))
+      advanceAdminQueueIfNeeded(updated)
     })
   }
 
@@ -467,12 +493,26 @@ export function SupportPanel({
       }
       setSelectedTicket(updated)
       setTickets((current) => current.map((ticket) => ticket.id === updated.id ? { ...ticket, ...updated } : ticket))
-      if (status === 'CLOSED') {
+      if (mode === 'admin') {
+        advanceAdminQueueIfNeeded(updated)
+      } else if (status === 'CLOSED') {
         setFolder('closed')
       } else if (folder === 'closed') {
         setFolder('active')
       }
     })
+  }
+
+  function advanceAdminQueueIfNeeded(updated: SupportTicket) {
+    if (mode !== 'admin' || ticketMatchesFolder(updated, folder, mode)) return
+    const nextTicket = tickets.find((ticket) => ticket.id !== updated.id && ticketMatchesFolder(ticket, folder, mode)) ?? null
+    if (nextTicket) {
+      void loadTicket(nextTicket.id)
+      return
+    }
+    setSelectedId('')
+    setSelectedTicket(null)
+    setMobileChatOpen(false)
   }
 
   function handleMessageKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
@@ -514,6 +554,17 @@ export function SupportPanel({
     setNewTicketOpen(false)
     setError('')
 
+    if (mode === 'admin') {
+      const url = new URL(window.location.href)
+      url.searchParams.set('folder', nextFolder)
+      window.history.replaceState(null, '', url)
+      setListCursor(null)
+      setListTotal(queueCounts[nextFolder])
+      setSelectedId('')
+      setSelectedTicket(null)
+      return
+    }
+
     if (selected && ticketMatchesFolder(selected, nextFolder, mode)) return
     const firstTicket = tickets.find((ticket) => ticketMatchesFolder(ticket, nextFolder, mode)) ?? null
     setSelectedId(firstTicket?.id ?? '')
@@ -525,7 +576,7 @@ export function SupportPanel({
       className={cn(
         'grid h-[calc(100dvh-9rem-env(safe-area-inset-bottom))] min-h-[34rem] gap-3 overflow-hidden xl:h-[calc(100dvh-6.25rem)] 2xl:gap-4',
         mode === 'admin'
-          ? 'xl:h-[calc(100dvh-5.5rem)] xl:grid-cols-[20rem_minmax(0,1fr)] 2xl:grid-cols-[20rem_minmax(0,1fr)_20rem]'
+          ? 'xl:h-[calc(100dvh-5.5rem)] xl:grid-cols-[21rem_minmax(0,1fr)] 2xl:grid-cols-[22rem_minmax(0,1fr)_21rem]'
           : 'xl:grid-cols-[20rem_minmax(0,1fr)]'
       )}
     >
@@ -571,8 +622,8 @@ export function SupportPanel({
                   </div>
                 </div>
                 <div className="mt-2 flex gap-1.5">
-                  <QueueMetric label="Всего" value={listTotal} />
-                  <QueueMetric label="Нужно ответить" value={folderCounts['need-answer']} accent={folderCounts['need-answer'] > 0} />
+                  <QueueMetric label="Все обращения" value={queueCounts.all} />
+                  <QueueMetric label="Без ответа" value={folderCounts['need-answer']} accent={folderCounts['need-answer'] > 0} />
                 </div>
               </div>
             )}
@@ -585,7 +636,7 @@ export function SupportPanel({
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
                   className="min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-slate-400 sm:text-sm"
-                  placeholder={mode === 'admin' ? 'Клиент, email или тема' : 'Найти обращение'}
+                  placeholder={mode === 'admin' ? 'Клиент, Telegram, платёж или текст' : 'Найти обращение'}
                 />
                 {query && <button type="button" onClick={() => setQuery('')} className="grid h-6 w-6 place-items-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-white/10 dark:hover:text-white" aria-label="Очистить поиск"><X className="h-3.5 w-3.5" /></button>}
               </label>
@@ -667,6 +718,7 @@ export function SupportPanel({
                   <div className="min-w-0 flex-1">
                     <div className="flex min-w-0 flex-wrap items-center gap-2">
                       <h2 className="min-w-0 truncate text-sm font-semibold tracking-[-0.01em] sm:text-base">{selected.subject}</h2>
+                      {mode === 'admin' && <TicketStatusBadge status={selected.status} mode={mode} />}
                     </div>
                     <div className="mt-0.5 truncate text-xs text-slate-500 sm:text-sm">
                       {mode === 'admin'
@@ -1237,6 +1289,9 @@ function TicketListItem({
   onClick: () => void
 }) {
   const unread = getUnreadCount(ticket, mode)
+  const waitingAge = mode === 'admin' && ticket.status === 'WAITING_ADMIN'
+    ? getWaitingAge(ticket.lastMessageAt)
+    : null
 
   return (
     <button
@@ -1271,13 +1326,36 @@ function TicketListItem({
             {ticket.messages.at(-1)?.body || ticket.messages[0]?.body || 'Без сообщений'}
           </div>
           <div className="mt-2 flex items-center justify-between gap-2">
-            <TicketStatusBadge status={ticket.status} mode={mode} />
+            <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+              <TicketStatusBadge status={ticket.status} mode={mode} />
+              {waitingAge && (
+                <span className={cn('inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold', waitingAge.tone)}>
+                  <Clock3 className="h-3 w-3" />
+                  {waitingAge.label}
+                </span>
+              )}
+            </div>
             <ChevronRight className="h-4 w-4 text-slate-300 transition-transform group-hover:translate-x-0.5 group-hover:text-fuchsia-500 dark:text-slate-600" />
           </div>
         </div>
       </div>
     </button>
   )
+}
+
+function getWaitingAge(value: string) {
+  const minutes = Math.max(0, Math.floor((Date.now() - new Date(value).getTime()) / 60_000))
+  const label = minutes < 60
+    ? `Ждёт ${Math.max(1, minutes)} мин`
+    : minutes < 24 * 60
+      ? `Ждёт ${Math.floor(minutes / 60)} ч`
+      : `Ждёт ${Math.floor(minutes / (24 * 60))} дн`
+  const tone = minutes >= 24 * 60
+    ? 'bg-red-50 text-red-700 dark:bg-red-400/10 dark:text-red-200'
+    : minutes >= 4 * 60
+      ? 'bg-amber-50 text-amber-700 dark:bg-amber-400/10 dark:text-amber-200'
+      : 'bg-slate-100 text-slate-500 dark:bg-white/[0.06] dark:text-slate-300'
+  return { label, tone }
 }
 
 function TicketActions({
@@ -1408,6 +1486,7 @@ function TicketSideMenu({
 function SupportUserDiagnostics({ user }: { user: NonNullable<SupportTicket['user']> }) {
   const subscription = user.subscriptions?.[0] ?? null
   const payment = user.payments?.[0] ?? null
+  const paymentSearchId = payment?.externalPaymentId || payment?.yookassaId || payment?.id || ''
   const syncProblems = [
     subscription?.pendingSync ? 'Подписка ждет синхронизацию' : '',
     payment?.provisioningError ? `Выдача: ${payment.provisioningError}` : '',
@@ -1419,7 +1498,11 @@ function SupportUserDiagnostics({ user }: { user: NonNullable<SupportTicket['use
       <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Состояние аккаунта</div>
 
       <div className="grid gap-2.5 text-xs">
-        <DiagnosticRow label="Telegram" value={user.telegramId ? `TG ${user.telegramId}` : 'не привязан'} ok={Boolean(user.telegramId)} />
+        <DiagnosticRow
+          label="Telegram"
+          value={user.telegramUsername ? `@${user.telegramUsername}` : user.telegramId ? `ID ${user.telegramId}` : 'не привязан'}
+          ok={Boolean(user.telegramId)}
+        />
         <DiagnosticRow label="Remnashop" value={user.remnashopUserId ? `ID ${user.remnashopUserId}` : 'не связан'} ok={Boolean(user.remnashopUserId)} />
         <DiagnosticRow
           label="Remnawave"
@@ -1434,7 +1517,7 @@ function SupportUserDiagnostics({ user }: { user: NonNullable<SupportTicket['use
           <div className="text-slate-400">Подписка</div>
           <div className="font-semibold text-slate-900 dark:text-white">{subscription.plan?.name ?? 'Подписка'}</div>
           <div className="mt-1 text-slate-500">
-            {subscription.status} до {formatDate(subscription.expireAt)}
+            {supportSubscriptionStatusLabel(subscription.status)} до {formatDate(subscription.expireAt)}
           </div>
         </div>
       ) : (
@@ -1456,12 +1539,13 @@ function SupportUserDiagnostics({ user }: { user: NonNullable<SupportTicket['use
                   ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-200'
                   : 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-200'
             )}>
-              {payment.status}
+              {supportPaymentStatusLabel(payment.status)}
             </span>
           </div>
           <div className="mt-1 text-slate-500">
-            {formatSupportPrice(payment.amountKopecks)} · {formatDate(payment.paidAt ?? payment.createdAt)}
+            {formatSupportPrice(payment.amountKopecks)} · {paymentProviderLabel(payment.provider)} · {formatDate(payment.paidAt ?? payment.createdAt)}
           </div>
+          <div className="mt-1 truncate font-mono text-[10px] text-slate-400" title={paymentSearchId}>{paymentSearchId}</div>
           <div className="mt-2 grid gap-1 text-slate-500">
             <span>Выдача: {payment.subscriptionProvisionedAt ? 'готово' : 'нет'}</span>
             <span>Remnashop: {payment.remnashopSyncedAt ? 'записан' : 'нет записи'}</span>
@@ -1479,7 +1563,7 @@ function SupportUserDiagnostics({ user }: { user: NonNullable<SupportTicket['use
       )}
 
       <div className="grid grid-cols-2 gap-2 border-t border-slate-100 pt-3 dark:border-white/10">
-        <a href={`/dashboard/admin/payments?q=${encodeURIComponent(user.email)}`} className="btn-secondary h-9 justify-center px-2 text-xs">
+        <a href={`/dashboard/admin/payments?q=${encodeURIComponent(paymentSearchId || user.email)}`} className="btn-secondary h-9 justify-center px-2 text-xs">
           Платежи
         </a>
         <a href="/dashboard/admin/recovery" className="btn-secondary h-9 justify-center px-2 text-xs">
@@ -1488,6 +1572,27 @@ function SupportUserDiagnostics({ user }: { user: NonNullable<SupportTicket['use
       </div>
     </div>
   )
+}
+
+function supportPaymentStatusLabel(status: string) {
+  const labels: Record<string, string> = {
+    PENDING: 'Ожидает',
+    SUCCEEDED: 'Оплачен',
+    CANCELED: 'Отменён',
+    REFUNDED: 'Возврат',
+  }
+  return labels[status] ?? status
+}
+
+function supportSubscriptionStatusLabel(status: string) {
+  const labels: Record<string, string> = {
+    ACTIVE: 'Активна',
+    LIMITED: 'Ограничена',
+    PAUSED: 'На паузе',
+    EXPIRED: 'Истекла',
+    DISABLED: 'Отключена',
+  }
+  return labels[status] ?? status
 }
 
 function DiagnosticRow({ label, value, ok, mono = false }: { label: string; value: string; ok: boolean; mono?: boolean }) {
@@ -1560,11 +1665,11 @@ function MessageBubble({ message, own }: { message: SupportMessage; own: boolean
         className={cn(
           'max-w-[min(42rem,86%)] px-3.5 py-2.5 shadow-[0_10px_28px_-20px_rgba(15,23,42,0.55)] ring-1 sm:max-w-[76%] sm:px-4 sm:py-3',
           own
-            ? 'rounded-[1.25rem_1.25rem_0.35rem_1.25rem] bg-slate-950 text-white ring-slate-950/20 dark:bg-white dark:text-slate-950 dark:ring-white/20'
+            ? 'rounded-[1.25rem_1.25rem_0.35rem_1.25rem] bg-slate-950 text-white ring-slate-950/20 dark:bg-fuchsia-400/[0.14] dark:text-slate-100 dark:ring-fuchsia-300/20'
             : 'rounded-[1.25rem_1.25rem_1.25rem_0.35rem] bg-white/95 text-slate-900 ring-slate-200/90 dark:bg-white/[0.07] dark:text-white dark:ring-white/10'
         )}
       >
-        <div className="whitespace-pre-wrap break-words text-sm leading-relaxed">{message.body}</div>
+        <div className="whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-sm leading-relaxed">{message.body}</div>
         {message.attachments && message.attachments.length > 0 ? (
           <div className="mt-2 space-y-1.5">
             {message.attachments.map((attachment) => (
@@ -1576,7 +1681,7 @@ function MessageBubble({ message, own }: { message: SupportMessage; own: boolean
                 className={cn(
                   'flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-medium ring-1 transition-colors',
                   own
-                    ? 'bg-white/10 text-white ring-white/15 hover:bg-white/15 dark:bg-slate-950/5 dark:text-slate-800 dark:ring-slate-950/10'
+                    ? 'bg-white/10 text-white ring-white/15 hover:bg-white/15 dark:bg-white/[0.06] dark:text-slate-100 dark:ring-white/10 dark:hover:bg-white/10'
                     : 'bg-slate-50 text-slate-700 ring-slate-200 hover:bg-slate-100 dark:bg-white/[0.05] dark:text-slate-200 dark:ring-white/10'
                 )}
               >
@@ -1587,7 +1692,7 @@ function MessageBubble({ message, own }: { message: SupportMessage; own: boolean
             ))}
           </div>
         ) : null}
-        <div className={cn('mt-1.5 text-xs', own ? 'text-white/50 dark:text-slate-500' : 'text-slate-400')}>
+        <div className={cn('mt-1.5 text-xs', own ? 'text-white/50 dark:text-fuchsia-100/55' : 'text-slate-400')}>
           {message.senderRole === 'ADMIN' ? 'Поддержка' : 'Пользователь'} · {formatDate(message.createdAt)}
         </div>
       </div>
