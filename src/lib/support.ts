@@ -51,8 +51,15 @@ export const createSupportMessageSchema = z.object({
   message: z.string().trim().min(1).max(3000),
 })
 
+export const createSupportInternalNoteSchema = z.object({
+  body: z.string().trim().min(1).max(3000),
+})
+
 export const updateSupportTicketSchema = z.object({
-  status: z.enum(['OPEN', 'WAITING_ADMIN', 'WAITING_USER', 'CLOSED']),
+  status: z.enum(['OPEN', 'WAITING_ADMIN', 'WAITING_USER', 'CLOSED']).optional(),
+  assigneeId: z.string().trim().min(1).nullable().optional(),
+}).refine((value) => value.status !== undefined || value.assigneeId !== undefined, {
+  message: 'Укажите статус или исполнителя.',
 })
 
 export const userUpdateSupportTicketSchema = z.object({
@@ -96,6 +103,7 @@ export function serializeSupportTicket<T extends {
   updatedAt: Date
   lastMessageAt: Date
   closedAt: Date | null
+  assignedAt?: Date | null
   user?: {
     telegramId?: bigint | null
     remnashopSyncedAt?: Date | null
@@ -115,6 +123,7 @@ export function serializeSupportTicket<T extends {
     updatedAt: ticket.updatedAt.toISOString(),
     lastMessageAt: ticket.lastMessageAt.toISOString(),
     closedAt: ticket.closedAt?.toISOString() ?? null,
+    assignedAt: ticket.assignedAt?.toISOString() ?? null,
   }
 }
 
@@ -135,6 +144,13 @@ export function serializeSupportMessage<T extends { createdAt: Date }>(message: 
           })),
         }
       : {}),
+  }
+}
+
+export function serializeSupportInternalNote<T extends { createdAt: Date }>(note: T) {
+  return {
+    ...note,
+    createdAt: note.createdAt.toISOString(),
   }
 }
 

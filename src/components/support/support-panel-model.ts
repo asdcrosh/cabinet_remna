@@ -4,6 +4,21 @@ import type { PaymentProvider } from '@prisma/client'
 export type TicketStatus = 'OPEN' | 'WAITING_ADMIN' | 'WAITING_USER' | 'CLOSED'
 export type SenderRole = 'USER' | 'ADMIN'
 export type TicketFolder = 'active' | 'need-answer' | 'answered' | 'closed'
+export type AdminSupportAssigneeScope = 'all' | 'mine' | 'unassigned'
+
+export interface SupportStaffMember {
+  id: string
+  email: string
+  name: string | null
+  role: string
+}
+
+export interface SupportInternalNote {
+  id: string
+  body: string
+  createdAt: string
+  author: Pick<SupportStaffMember, 'id' | 'email' | 'name'> | null
+}
 
 export interface SupportMessage {
   id: string
@@ -33,6 +48,9 @@ export interface SupportTicket {
   lastMessageAt: string
   createdAt: string
   closedAt: string | null
+  assignedAt?: string | null
+  assignee?: Pick<SupportStaffMember, 'id' | 'email' | 'name'> | null
+  internalNotes?: SupportInternalNote[]
   user?: {
     id: string
     email: string
@@ -82,6 +100,9 @@ export interface SupportPanelProps {
   initialQuery?: string
   initialFolder?: TicketFolder
   initialCounts?: SupportQueueCounts
+  initialAssigneeScope?: AdminSupportAssigneeScope
+  currentStaffId?: string
+  staffMembers?: SupportStaffMember[]
   initialCategory?: SupportCategoryValue
   initialMessage?: string
   initialNewTicketOpen?: boolean

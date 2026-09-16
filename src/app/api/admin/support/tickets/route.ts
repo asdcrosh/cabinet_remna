@@ -6,10 +6,12 @@ import { serializeSupportMessage, serializeSupportTicket } from '@/lib/support'
 import { isFeatureEnabled } from '@/lib/feature-flags'
 import { supportAttachmentSelect } from '@/lib/support-attachments'
 import {
+  buildAdminSupportAssigneeWhere,
   buildAdminSupportFolderWhere,
   buildAdminSupportOrderBy,
   buildAdminSupportSearchWhere,
   parseAdminSupportFolder,
+  parseAdminSupportAssigneeScope,
   type AdminSupportFolder,
 } from '@/lib/admin-support-query'
 
@@ -18,10 +20,11 @@ export const dynamic = 'force-dynamic'
 
 export const GET = withAuth(async (req: Request) => {
   if (!await isFeatureEnabled('support')) return NextResponse.json({ error: 'Not found' }, { status: 404 })
-  await requireStaff()
+  const session = await requireStaff()
 
   const url = new URL(req.url)
   const folder = parseAdminSupportFolder(url.searchParams.get('folder'))
+  const assigneeScope = parseAdminSupportAssigneeScope(url.searchParams.get('assignee'))
   const q = url.searchParams.get('q')?.trim()
   const page = Math.max(1, Number(url.searchParams.get('page') || '1') || 1)
   const cursor = parseSupportCursor(url.searchParams.get('cursor'))
@@ -29,8 +32,10 @@ export const GET = withAuth(async (req: Request) => {
   const pageSize = Math.min(pageSizeLimit, Math.max(1, Number(url.searchParams.get('pageSize') || '25') || 25))
 
   const searchWhere = buildAdminSupportSearchWhere(q ?? '')
+  const assigneeWhere = buildAdminSupportAssigneeWhere(assigneeScope, session.uid)
+  const scopedWhere: Prisma.SupportTicketWhereInput = { AND: [searchWhere, assigneeWhere] }
   const baseWhere: Prisma.SupportTicketWhereInput = {
-    AND: [searchWhere, buildAdminSupportFolderWhere(folder)],
+    AND: [scopedWhere, buildAdminSupportFolderWhere(folder)],
   }
   const where: Prisma.SupportTicketWhereInput = cursor
     ? { AND: [baseWhere, { OR: buildSupportCursorWhere(cursor, folder) }] }
@@ -43,6 +48,7 @@ export const GET = withAuth(async (req: Request) => {
       orderBy: buildAdminSupportOrderBy(folder),
       take: pageSize + 1,
       include: {
+        assignee: { select: { id: true, email: true, name: true } },
         user: {
           select: {
             id: true,
@@ -88,11 +94,11 @@ export const GET = withAuth(async (req: Request) => {
         },
       },
     }),
-    prisma.supportTicket.count({ where: searchWhere }),
-    prisma.supportTicket.count({ where: { AND: [searchWhere, buildAdminSupportFolderWhere('active')] } }),
-    prisma.supportTicket.count({ where: { AND: [searchWhere, buildAdminSupportFolderWhere('need-answer')] } }),
-    prisma.supportTicket.count({ where: { AND: [searchWhere, buildAdminSupportFolderWhere('answered')] } }),
-    prisma.supportTicket.count({ where: { AND: [searchWhere, buildAdminSupportFolderWhere('closed')] } }),
+    prisma.supportTicket.count({ where: scopedWhere }),
+    prisma.supportTicket.count({ where: { AND: [scopedWhere, buildAdminSupportFolderWhere('active')] } }),
+    prisma.supportTicket.count({ where: { AND: [scopedWhere, buildAdminSupportFolderWhere('need-answer')] } }),
+    prisma.supportTicket.count({ where: { AND: [scopedWhere, buildAdminSupportFolderWhere('answered')] } }),
+    prisma.supportTicket.count({ where: { AND: [scopedWhere, buildAdminSupportFolderWhere('closed')] } }),
   ])
   const visibleTickets = tickets.slice(0, pageSize)
   const hasMore = tickets.length > pageSize

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import { Bell, CheckCheck, ExternalLink, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import type { UserNotificationView } from '@/lib/user-notifications'
@@ -49,6 +50,7 @@ export function NotificationBell({
   const [adminSummary, setAdminSummary] = useState<AdminNotificationSummary>({ unreadCount: initialAdminUnreadCount, notifications: [] })
   const [clearConfirmOpen, setClearConfirmOpen] = useState(false)
   const [clearLoading, setClearLoading] = useState(false)
+  const pathname = usePathname()
   const rootRef = useRef<HTMLDivElement | null>(null)
   const panelRef = useRef<HTMLDivElement | null>(null)
   const triggerRef = useRef<HTMLButtonElement | null>(null)
@@ -210,6 +212,10 @@ export function NotificationBell({
     document.addEventListener('pointerdown', onPointerDown)
     return () => document.removeEventListener('pointerdown', onPointerDown)
   }, [closePanel, open])
+
+  useEffect(() => {
+    setOpen(false)
+  }, [pathname])
 
   useEffect(() => {
     if (!open) return

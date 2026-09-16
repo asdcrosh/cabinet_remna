@@ -5,6 +5,7 @@ import { notifySupportReply } from '@/lib/notifications'
 import { writeAuditLog } from '@/lib/audit-log'
 import {
   createSupportMessageSchema,
+  serializeSupportInternalNote,
   serializeSupportMessage,
   serializeSupportTicket,
   updateSupportTicketSchema,
@@ -29,6 +30,7 @@ export const GET = withAuth(async (req: Request, { params }: { params: Promise<{
   const ticket = await prisma.supportTicket.findUnique({
     where: { id },
     include: {
+      assignee: { select: { id: true, email: true, name: true } },
       user: {
         select: {
           id: true,
@@ -80,6 +82,16 @@ export const GET = withAuth(async (req: Request, { params }: { params: Promise<{
           attachments: { select: supportAttachmentSelect },
         },
       },
+      internalNotes: {
+        orderBy: { createdAt: 'desc' },
+        take: 50,
+        select: {
+          id: true,
+          body: true,
+          createdAt: true,
+          author: { select: { id: true, email: true, name: true } },
+        },
+      },
     },
   })
 
@@ -102,6 +114,7 @@ export const GET = withAuth(async (req: Request, { params }: { params: Promise<{
     ticket: {
       ...serializeSupportTicket(ticket),
       messages: messages.map(serializeSupportMessage),
+      internalNotes: ticket.internalNotes.reverse().map(serializeSupportInternalNote),
       messagePagination: {
         hasMore: hasOlderMessages,
         before: hasOlderMessages ? messages[0]?.id ?? null : null,
@@ -135,7 +148,7 @@ export const POST = withAuth(async (req: Request, { params }: { params: Promise<
 
   const ticket = await prisma.supportTicket.findUnique({
     where: { id },
-    select: { id: true, status: true, userId: true },
+    select: { id: true, status: true, userId: true, assigneeId: true },
   })
   if (!ticket) {
     return NextResponse.json({ error: 'Обращение не найдено.' }, { status: 404 })
@@ -169,6 +182,7 @@ export const POST = withAuth(async (req: Request, { params }: { params: Promise<
         userUnreadCount: { increment: 1 },
         adminUnreadCount: 0,
         lastMessageAt: created.createdAt,
+        ...(!ticket.assigneeId ? { assigneeId: session.uid, assignedAt: created.createdAt } : {}),
       },
     })
     return created
@@ -206,33 +220,67 @@ export const PATCH = withAuth(async (req: Request, { params }: { params: Promise
 
   const parsed = updateSupportTicketSchema.safeParse(body)
   if (!parsed.success) {
-    return NextResponse.json({ error: 'Некорректный статус обращения.', details: parsed.error.flatten() }, { status: 400 })
+    return NextResponse.json({ error: 'Некорректное обновление обращения.', details: parsed.error.flatten() }, { status: 400 })
   }
 
   const before = await prisma.supportTicket.findUnique({
     where: { id },
-    select: { id: true, status: true, userId: true },
+    select: { id: true, status: true, userId: true, assigneeId: true },
   })
   if (!before) {
     return NextResponse.json({ error: 'Обращение не найдено.' }, { status: 404 })
   }
 
+  if (parsed.data.assigneeId) {
+    const assignee = await prisma.user.findFirst({
+      where: {
+        id: parsed.data.assigneeId,
+        role: { in: ['MODERATOR', 'ADMIN', 'SUPER_ADMIN'] },
+      },
+      select: { id: true },
+    })
+    if (!assignee) {
+      return NextResponse.json({ error: 'Исполнитель не найден.' }, { status: 400 })
+    }
+  }
+
   const ticket = await prisma.supportTicket.update({
     where: { id },
     data: {
-      status: parsed.data.status,
-      closedAt: parsed.data.status === 'CLOSED' ? new Date() : null,
+      ...(parsed.data.status
+        ? {
+            status: parsed.data.status,
+            closedAt: parsed.data.status === 'CLOSED' ? new Date() : null,
+          }
+        : {}),
+      ...(parsed.data.assigneeId !== undefined
+        ? {
+            assigneeId: parsed.data.assigneeId,
+            assignedAt: parsed.data.assigneeId ? new Date() : null,
+          }
+        : {}),
     },
+    include: { assignee: { select: { id: true, email: true, name: true } } },
   })
+  const changes = [
+    parsed.data.status && parsed.data.status !== before.status
+      ? `статус ${before.status} → ${parsed.data.status}`
+      : '',
+    parsed.data.assigneeId !== undefined && parsed.data.assigneeId !== before.assigneeId
+      ? parsed.data.assigneeId ? 'назначен исполнитель' : 'исполнитель снят'
+      : '',
+  ].filter(Boolean)
   await writeAuditLog({
     actorId: session.uid,
     targetId: before.userId,
     action: 'ADMIN_SUPPORT_UPDATED',
-    message: `Статус обращения изменён: ${before.status} → ${ticket.status}`,
+    message: `Обращение обновлено: ${changes.join(', ') || 'без изменений'}`,
     metadata: {
       ticketId: ticket.id,
-      fromStatus: before.status,
-      toStatus: ticket.status,
+      ...(parsed.data.status ? { fromStatus: before.status, toStatus: ticket.status } : {}),
+      ...(parsed.data.assigneeId !== undefined
+        ? { fromAssigneeId: before.assigneeId, toAssigneeId: ticket.assigneeId }
+        : {}),
     },
     request: req,
   })

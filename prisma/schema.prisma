@@ -125,6 +125,8 @@ model User {
   devices                    Device[]
   supportTickets             SupportTicket[]
   supportMessages            SupportMessage[]
+  supportTicketsAssigned     SupportTicket[]       @relation("SupportTicketAssignee")
+  supportInternalNotes       SupportInternalNote[] @relation("SupportInternalNoteAuthor")
   promoCodeRedemptions       PromoCodeRedemption[]
   giftCertificateRedemptions GiftCertificateRedemption[]
   trialPlanRedemptions       TrialPlanRedemption[]
@@ -1463,18 +1465,22 @@ model RevokedSession {
 model SupportTicket {
   id               String              @id @default(cuid())
   userId           String
+  assigneeId       String?
   subject          String
   category         String              @default("general")
   status           SupportTicketStatus @default(OPEN)
   userUnreadCount  Int                 @default(0)
   adminUnreadCount Int                 @default(1)
   lastMessageAt    DateTime            @default(now())
+  assignedAt       DateTime?
   closedAt         DateTime?
   createdAt        DateTime            @default(now())
   updatedAt        DateTime            @updatedAt
 
-  user     User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  messages SupportMessage[]
+  user          User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assignee      User?                 @relation("SupportTicketAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  messages      SupportMessage[]
+  internalNotes SupportInternalNote[]
 
   @@index([userId, status, lastMessageAt])
   @@index([userId, lastMessageAt])
@@ -1482,6 +1488,7 @@ model SupportTicket {
   @@index([adminUnreadCount])
   @@index([adminUnreadCount, lastMessageAt])
   @@index([adminUnreadCount, lastMessageAt, id])
+  @@index([assigneeId, status, lastMessageAt])
 }
 
 model SupportMessage {
@@ -1498,6 +1505,20 @@ model SupportMessage {
 
   @@index([ticketId, createdAt])
   @@index([senderId])
+}
+
+model SupportInternalNote {
+  id        String   @id @default(cuid())
+  ticketId  String
+  authorId  String?
+  body      String
+  createdAt DateTime @default(now())
+
+  ticket SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  author User?         @relation("SupportInternalNoteAuthor", fields: [authorId], references: [id], onDelete: SetNull)
+
+  @@index([ticketId, createdAt])
+  @@index([authorId])
 }
 
 model SupportAttachment {

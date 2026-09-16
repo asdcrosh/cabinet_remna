@@ -37,8 +37,11 @@ import {
   Search,
   Smile,
   Sparkles,
+  StickyNote,
   Timer,
+  UserCheck,
   UserRound,
+  UsersRound,
   Wifi,
   X,
   XCircle,
@@ -63,7 +66,9 @@ import {
   type SupportMessage,
   type SupportPanelProps,
   type SupportQueueCounts,
+  type SupportStaffMember,
   type SupportTicket,
+  type AdminSupportAssigneeScope,
   type TicketFolder,
   type TicketStatus,
 } from './support-panel-model'
@@ -76,6 +81,16 @@ function ticketMatchesFolder(ticket: SupportTicket, folder: TicketFolder, mode: 
   if (folder === 'need-answer') return needsCurrentActor(ticket, mode)
   if (folder === 'answered') return ticket.status === 'WAITING_USER'
   return ticket.status !== 'CLOSED'
+}
+
+function ticketMatchesAssigneeScope(
+  ticket: SupportTicket,
+  scope: AdminSupportAssigneeScope,
+  currentStaffId: string
+) {
+  if (scope === 'mine') return ticket.assignee?.id === currentStaffId
+  if (scope === 'unassigned') return !ticket.assignee
+  return true
 }
 
 function getLocalFolderCounts(tickets: SupportTicket[], mode: 'user' | 'admin'): SupportQueueCounts {
@@ -96,6 +111,9 @@ export function SupportPanel({
   initialQuery = '',
   initialFolder = 'active',
   initialCounts,
+  initialAssigneeScope = 'all',
+  currentStaffId = '',
+  staffMembers = [],
   initialCategory = 'connection',
   initialMessage = '',
   initialNewTicketOpen = false,
@@ -120,6 +138,7 @@ export function SupportPanel({
     initialActiveTicket
   )
   const [folder, setFolder] = useState<TicketFolder>(mode === 'admin' ? initialFolder : 'active')
+  const [assigneeScope, setAssigneeScope] = useState<AdminSupportAssigneeScope>(initialAssigneeScope)
   const [queueCounts, setQueueCounts] = useState(() => initialCounts ?? getLocalFolderCounts(initialTickets, mode))
   const [mobileChatOpen, setMobileChatOpen] = useState(mode === 'user' && initialNewTicketOpen)
   const [detailsOpen, setDetailsOpen] = useState(false)
@@ -147,7 +166,7 @@ export function SupportPanel({
     const normalizedQuery = query.trim().toLowerCase()
     return tickets.filter((ticket) => {
       if (!ticketMatchesFolder(ticket, folder, mode)) return false
-      if (mode === 'admin') return true
+      if (mode === 'admin') return ticketMatchesAssigneeScope(ticket, assigneeScope, currentStaffId)
       if (!normalizedQuery) return true
 
       const haystack = [
@@ -161,7 +180,7 @@ export function SupportPanel({
 
       return haystack.includes(normalizedQuery)
     })
-  }, [folder, mode, query, tickets])
+  }, [assigneeScope, currentStaffId, folder, mode, query, tickets])
 
   const unreadTotal = useMemo(() => {
     return tickets.reduce((sum, ticket) => sum + getUnreadCount(ticket, mode), 0)
@@ -221,6 +240,7 @@ export function SupportPanel({
       if (debouncedQuery.trim()) params.set('q', debouncedQuery.trim())
       else params.delete('q')
       params.set('folder', folder)
+      params.set('assignee', assigneeScope)
       params.delete('status')
     }
     if (cursor) params.set('cursor', cursor)
@@ -236,7 +256,7 @@ export function SupportPanel({
       pagination?: { total?: number; nextCursor?: string | null }
       counts?: SupportQueueCounts
     }
-  }, [debouncedQuery, folder, mode])
+  }, [assigneeScope, debouncedQuery, folder, mode])
 
   const loadMoreTickets = useCallback(async () => {
     if (mode !== 'admin' || loadingMore || tickets.length >= listTotal || !listCursor) return
@@ -456,11 +476,15 @@ export function SupportPanel({
         return
       }
       const nextStatus: TicketStatus = mode === 'admin' ? 'WAITING_USER' : 'WAITING_ADMIN'
+      const currentStaff = staffMembers.find((staff) => staff.id === currentStaffId) ?? null
       const updated = {
         ...selected,
         status: nextStatus,
         closedAt: null,
         lastMessageAt: data.message.createdAt,
+        ...(mode === 'admin' && !selected.assignee && currentStaff
+          ? { assignee: currentStaff, assignedAt: data.message.createdAt }
+          : {}),
         messages: optimisticTicket.messages.map((item) => item.id === temporaryId ? data.message : item),
       }
       setSelectedTicket(updated)
@@ -503,9 +527,62 @@ export function SupportPanel({
     })
   }
 
-  function advanceAdminQueueIfNeeded(updated: SupportTicket) {
-    if (mode !== 'admin' || ticketMatchesFolder(updated, folder, mode)) return
-    const nextTicket = tickets.find((ticket) => ticket.id !== updated.id && ticketMatchesFolder(ticket, folder, mode)) ?? null
+  function updateAssignee(assigneeId: string | null) {
+    if (!selected || mode !== 'admin') return
+    setError('')
+
+    startTransition(async () => {
+      const res = await fetch(`/api/admin/support/tickets/${selected.id}`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ assigneeId }),
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) {
+        setError(data?.error || 'Не удалось назначить исполнителя')
+        return
+      }
+      const updated = { ...selected, ...(data?.ticket ?? {}) }
+      setSelectedTicket(updated)
+      setTickets((current) => current.map((ticket) => ticket.id === updated.id ? { ...ticket, ...updated } : ticket))
+
+      if (assigneeScope === 'mine' && assigneeId !== currentStaffId) advanceAdminQueueIfNeeded(updated, false)
+      if (assigneeScope === 'unassigned' && assigneeId) advanceAdminQueueIfNeeded(updated, false)
+    })
+  }
+
+  async function addInternalNote(body: string) {
+    if (!selected || mode !== 'admin') return false
+    setError('')
+    const res = await fetch(`/api/admin/support/tickets/${selected.id}/notes`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ body }),
+    })
+    const data = await res.json().catch(() => null)
+    if (!res.ok || !data?.note) {
+      setError(data?.error || 'Не удалось сохранить заметку')
+      return false
+    }
+
+    const updated = {
+      ...selected,
+      internalNotes: [...(selected.internalNotes ?? []), data.note],
+    }
+    setSelectedTicket(updated)
+    return true
+  }
+
+  function advanceAdminQueueIfNeeded(updated: SupportTicket, checkFolder = true) {
+    if (mode !== 'admin') return
+    const remainsInQueue = ticketMatchesFolder(updated, folder, mode)
+      && ticketMatchesAssigneeScope(updated, assigneeScope, currentStaffId)
+    if (checkFolder && remainsInQueue) return
+    const nextTicket = tickets.find((ticket) => (
+      ticket.id !== updated.id
+      && ticketMatchesFolder(ticket, folder, mode)
+      && ticketMatchesAssigneeScope(ticket, assigneeScope, currentStaffId)
+    )) ?? null
     if (nextTicket) {
       void loadTicket(nextTicket.id)
       return
@@ -571,6 +648,22 @@ export function SupportPanel({
     setSelectedTicket(firstTicket)
   }
 
+  function changeAssigneeScope(nextScope: AdminSupportAssigneeScope) {
+    if (mode !== 'admin' || assigneeScope === nextScope) return
+    setAssigneeScope(nextScope)
+    setTickets([])
+    setListCursor(null)
+    setListTotal(0)
+    setSelectedId('')
+    setSelectedTicket(null)
+    setMobileChatOpen(false)
+    setError('')
+
+    const url = new URL(window.location.href)
+    url.searchParams.set('assignee', nextScope)
+    window.history.replaceState(null, '', url)
+  }
+
   return (
     <div
       className={cn(
@@ -628,6 +721,9 @@ export function SupportPanel({
               </div>
             )}
             <FolderTabs folder={folder} counts={folderCounts} mode={mode} onChange={changeFolder} />
+            {mode === 'admin' && (
+              <AssigneeScopeTabs value={assigneeScope} onChange={changeAssigneeScope} />
+            )}
             {(mode === 'admin' || tickets.length > 4) && (
               <label className="relative mt-2 flex items-center gap-2 rounded-xl border border-white/90 bg-white/85 px-3 py-2 shadow-sm shadow-slate-950/5 backdrop-blur dark:border-white/[0.08] dark:bg-black/15">
                 <Search className="h-4 w-4 shrink-0 text-slate-400" />
@@ -849,6 +945,10 @@ export function SupportPanel({
                     mode={mode}
                     isPending={isPending}
                     onUpdateStatus={updateStatus}
+                    currentStaffId={currentStaffId}
+                    staffMembers={staffMembers}
+                    onAssign={updateAssignee}
+                    onAddNote={addInternalNote}
                     onClose={() => setDetailsOpen(false)}
                   />
                 </aside>
@@ -871,7 +971,16 @@ export function SupportPanel({
 
       {mode === 'admin' && (
         <aside className="hidden min-h-0 overflow-hidden rounded-[1.75rem] border border-slate-200/80 bg-white shadow-[0_24px_70px_-44px_rgba(15,23,42,0.48)] dark:border-white/[0.09] dark:bg-white/[0.035] 2xl:block">
-          <TicketSideMenu selected={selected} mode={mode} isPending={isPending} onUpdateStatus={updateStatus} />
+          <TicketSideMenu
+            selected={selected}
+            mode={mode}
+            isPending={isPending}
+            onUpdateStatus={updateStatus}
+            currentStaffId={currentStaffId}
+            staffMembers={staffMembers}
+            onAssign={updateAssignee}
+            onAddNote={addInternalNote}
+          />
         </aside>
       )}
     </div>
@@ -1225,6 +1334,45 @@ function EmojiPicker({ onPick }: { onPick: (emoji: string) => void }) {
   )
 }
 
+function AssigneeScopeTabs({
+  value,
+  onChange,
+}: {
+  value: AdminSupportAssigneeScope
+  onChange: (value: AdminSupportAssigneeScope) => void
+}) {
+  const items = [
+    { value: 'all' as const, label: 'Все', icon: UsersRound },
+    { value: 'mine' as const, label: 'Мои', icon: UserCheck },
+    { value: 'unassigned' as const, label: 'Без исполнителя', icon: CircleHelp },
+  ]
+
+  return (
+    <div className="mt-2 flex gap-1 overflow-x-auto" aria-label="Фильтр по исполнителю">
+      {items.map((item) => {
+        const Icon = item.icon
+        const active = value === item.value
+        return (
+          <button
+            key={item.value}
+            type="button"
+            onClick={() => onChange(item.value)}
+            className={cn(
+              'flex min-w-fit items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors',
+              active
+                ? 'bg-violet-600 text-white shadow-sm dark:bg-violet-500'
+                : 'bg-white/75 text-slate-500 hover:bg-white hover:text-slate-950 dark:bg-white/[0.04] dark:text-slate-400 dark:hover:bg-white/[0.08] dark:hover:text-white'
+            )}
+          >
+            <Icon className="h-3.5 w-3.5" />
+            {item.label}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
 function FolderTabs({
   folder,
   counts,
@@ -1334,6 +1482,17 @@ function TicketListItem({
                   {waitingAge.label}
                 </span>
               )}
+              {mode === 'admin' && (
+                <span className={cn(
+                  'inline-flex max-w-32 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold',
+                  ticket.assignee
+                    ? 'bg-violet-50 text-violet-700 dark:bg-violet-400/10 dark:text-violet-200'
+                    : 'bg-slate-100 text-slate-400 dark:bg-white/[0.05] dark:text-slate-400'
+                )}>
+                  <UserCheck className="h-3 w-3 shrink-0" />
+                  <span className="truncate">{ticket.assignee?.name || ticket.assignee?.email || 'Не назначено'}</span>
+                </span>
+              )}
             </div>
             <ChevronRight className="h-4 w-4 text-slate-300 transition-transform group-hover:translate-x-0.5 group-hover:text-fuchsia-500 dark:text-slate-600" />
           </div>
@@ -1404,14 +1563,29 @@ function TicketSideMenu({
   mode,
   isPending,
   onUpdateStatus,
+  currentStaffId,
+  staffMembers,
+  onAssign,
+  onAddNote,
   onClose,
 }: {
   selected: SupportTicket | null
   mode: 'user' | 'admin'
   isPending: boolean
   onUpdateStatus: (status: TicketStatus) => void
+  currentStaffId: string
+  staffMembers: SupportStaffMember[]
+  onAssign: (assigneeId: string | null) => void
+  onAddNote: (body: string) => Promise<boolean>
   onClose?: () => void
 }) {
+  const [noteBody, setNoteBody] = useState('')
+  const [notePending, setNotePending] = useState(false)
+
+  useEffect(() => {
+    setNoteBody('')
+  }, [selected?.id])
+
   if (!selected) {
     return (
       <div className="flex h-full flex-col items-center justify-center p-5 text-center text-sm text-slate-500">
@@ -1455,6 +1629,41 @@ function TicketSideMenu({
             <TicketStatusBadge status={selected.status} mode={mode} />
           </div>
         </div>
+        {mode === 'admin' && (
+          <div className="rounded-2xl border border-violet-100 bg-violet-50/45 p-3.5 dark:border-violet-400/15 dark:bg-violet-400/[0.04]">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <div className="text-xs font-semibold uppercase tracking-[0.1em] text-slate-400">Исполнитель</div>
+              {!selected.assignee && currentStaffId && (
+                <button
+                  type="button"
+                  className="text-xs font-semibold text-violet-700 hover:text-violet-950 dark:text-violet-200 dark:hover:text-white"
+                  onClick={() => onAssign(currentStaffId)}
+                  disabled={isPending}
+                >
+                  Взять себе
+                </button>
+              )}
+            </div>
+            <label className="sr-only" htmlFor={`support-assignee-${selected.id}`}>Исполнитель обращения</label>
+            <select
+              id={`support-assignee-${selected.id}`}
+              value={selected.assignee?.id ?? ''}
+              onChange={(event) => onAssign(event.target.value || null)}
+              disabled={isPending}
+              className="h-10 w-full rounded-xl border border-violet-100 bg-white px-3 text-sm text-slate-800 outline-none transition focus:border-violet-300 focus:ring-4 focus:ring-violet-500/10 dark:border-white/10 dark:bg-white/[0.06] dark:text-white"
+            >
+              <option value="">Без исполнителя</option>
+              {staffMembers.map((staff) => (
+                <option key={staff.id} value={staff.id}>
+                  {staff.name || staff.email}{staff.id === currentStaffId ? ' (вы)' : ''}
+                </option>
+              ))}
+            </select>
+            {selected.assignedAt && (
+              <div className="mt-1.5 text-[11px] text-slate-400">Назначено {formatRelativeDate(selected.assignedAt)}</div>
+            )}
+          </div>
+        )}
         {mode === 'admin' && selected.user && (
           <>
             <div className="flex items-center gap-3 rounded-2xl border border-cyan-100 bg-cyan-50/55 p-3.5 dark:border-cyan-400/15 dark:bg-cyan-400/[0.05]">
@@ -1469,6 +1678,56 @@ function TicketSideMenu({
             </div>
             <SupportUserDiagnostics user={selected.user} />
           </>
+        )}
+        {mode === 'admin' && (
+          <div className="space-y-2.5 rounded-2xl border border-amber-100 bg-amber-50/45 p-3.5 dark:border-amber-400/15 dark:bg-amber-400/[0.04]">
+            <div className="flex items-center gap-2">
+              <StickyNote className="h-4 w-4 text-amber-600 dark:text-amber-300" />
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-[0.1em] text-slate-500 dark:text-slate-300">Заметки команды</div>
+                <div className="text-[11px] text-slate-400">Клиент их не увидит</div>
+              </div>
+            </div>
+            {(selected.internalNotes ?? []).length > 0 ? (
+              <div className="max-h-52 space-y-2 overflow-y-auto pr-1">
+                {(selected.internalNotes ?? []).map((note) => (
+                  <div key={note.id} className="rounded-xl bg-white/90 px-3 py-2.5 text-xs shadow-sm ring-1 ring-amber-100 dark:bg-white/[0.06] dark:ring-white/10">
+                    <div className="whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-slate-700 dark:text-slate-200">{note.body}</div>
+                    <div className="mt-1.5 text-[10px] text-slate-400">
+                      {note.author?.name || note.author?.email || 'Сотрудник'} · {formatDate(note.createdAt)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-xs text-slate-400">Пока без заметок</div>
+            )}
+            <form
+              className="space-y-2"
+              onSubmit={async (event) => {
+                event.preventDefault()
+                if (!noteBody.trim() || notePending) return
+                setNotePending(true)
+                const saved = await onAddNote(noteBody)
+                if (saved) setNoteBody('')
+                setNotePending(false)
+              }}
+            >
+              <label className="sr-only" htmlFor={`support-note-${selected.id}`}>Внутренняя заметка</label>
+              <textarea
+                id={`support-note-${selected.id}`}
+                value={noteBody}
+                onChange={(event) => setNoteBody(event.target.value)}
+                placeholder="Контекст для коллег"
+                maxLength={3000}
+                className="min-h-20 w-full resize-y rounded-xl border border-amber-100 bg-white px-3 py-2 text-sm outline-none transition placeholder:text-slate-400 focus:border-amber-300 focus:ring-4 focus:ring-amber-500/10 dark:border-white/10 dark:bg-white/[0.06] dark:text-white"
+              />
+              <button type="submit" className="btn-secondary min-h-9 w-full justify-center text-xs" disabled={notePending || !noteBody.trim()}>
+                <StickyNote className="h-3.5 w-3.5" />
+                {notePending ? 'Сохраняем...' : 'Добавить заметку'}
+              </button>
+            </form>
+          </div>
         )}
         <div className="grid grid-cols-2 gap-3 text-sm">
           <InfoBlock label="Создано"><span>{formatDate(selected.createdAt)}</span></InfoBlock>

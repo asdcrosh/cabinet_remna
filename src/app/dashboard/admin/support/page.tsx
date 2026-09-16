@@ -8,10 +8,12 @@ import { AdminPageShell } from '@/components/admin/admin-page-shell'
 import { notFound } from 'next/navigation'
 import { isFeatureEnabled } from '@/lib/feature-flags'
 import {
+  buildAdminSupportAssigneeWhere,
   buildAdminSupportFolderWhere,
   buildAdminSupportOrderBy,
   buildAdminSupportSearchWhere,
   parseAdminSupportFolder,
+  parseAdminSupportAssigneeScope,
 } from '@/lib/admin-support-query'
 
 export const dynamic = 'force-dynamic'
@@ -20,25 +22,29 @@ export const metadata = { title: 'Поддержка — Админка' }
 export default async function AdminSupportPage({
   searchParams,
 }: {
-  searchParams: Promise<{ folder?: string; q?: string; limit?: string }>
+  searchParams: Promise<{ folder?: string; assignee?: string; q?: string; limit?: string }>
 }) {
   if (!await isFeatureEnabled('support')) notFound()
-  await requireStaffPage()
+  const { user: currentStaff } = await requireStaffPage()
 
   const params = await searchParams
   const folder = parseAdminSupportFolder(params.folder)
+  const assigneeScope = parseAdminSupportAssigneeScope(params.assignee)
   const q = params.q?.trim() ?? ''
   const limit = parseAdminListLimit(params.limit)
   const searchWhere = buildAdminSupportSearchWhere(q)
-  const where = { AND: [searchWhere, buildAdminSupportFolderWhere(folder)] }
+  const assigneeWhere = buildAdminSupportAssigneeWhere(assigneeScope, currentStaff.id)
+  const scopedWhere = { AND: [searchWhere, assigneeWhere] }
+  const where = { AND: [scopedWhere, buildAdminSupportFolderWhere(folder)] }
 
-  const [total, tickets, allCount, activeCount, needAnswerCount, answeredCount, closedCount] = await prisma.$transaction([
+  const [total, tickets, allCount, activeCount, needAnswerCount, answeredCount, closedCount, staffMembers] = await prisma.$transaction([
     prisma.supportTicket.count({ where }),
     prisma.supportTicket.findMany({
       where,
       orderBy: buildAdminSupportOrderBy(folder),
       take: limit,
       include: {
+        assignee: { select: { id: true, email: true, name: true } },
         user: {
           select: {
             id: true,
@@ -91,11 +97,16 @@ export default async function AdminSupportPage({
         },
       },
     }),
-    prisma.supportTicket.count({ where: searchWhere }),
-    prisma.supportTicket.count({ where: { AND: [searchWhere, buildAdminSupportFolderWhere('active')] } }),
-    prisma.supportTicket.count({ where: { AND: [searchWhere, buildAdminSupportFolderWhere('need-answer')] } }),
-    prisma.supportTicket.count({ where: { AND: [searchWhere, buildAdminSupportFolderWhere('answered')] } }),
-    prisma.supportTicket.count({ where: { AND: [searchWhere, buildAdminSupportFolderWhere('closed')] } }),
+    prisma.supportTicket.count({ where: scopedWhere }),
+    prisma.supportTicket.count({ where: { AND: [scopedWhere, buildAdminSupportFolderWhere('active')] } }),
+    prisma.supportTicket.count({ where: { AND: [scopedWhere, buildAdminSupportFolderWhere('need-answer')] } }),
+    prisma.supportTicket.count({ where: { AND: [scopedWhere, buildAdminSupportFolderWhere('answered')] } }),
+    prisma.supportTicket.count({ where: { AND: [scopedWhere, buildAdminSupportFolderWhere('closed')] } }),
+    prisma.user.findMany({
+      where: { role: { in: ['MODERATOR', 'ADMIN', 'SUPER_ADMIN'] } },
+      orderBy: [{ name: 'asc' }, { email: 'asc' }],
+      select: { id: true, email: true, name: true, role: true },
+    }),
   ])
 
   return (
@@ -106,6 +117,9 @@ export default async function AdminSupportPage({
         pageSize={25}
         initialQuery={q}
         initialFolder={folder}
+        initialAssigneeScope={assigneeScope}
+        currentStaffId={currentStaff.id}
+        staffMembers={staffMembers}
         initialCounts={{
           all: allCount,
           active: activeCount,

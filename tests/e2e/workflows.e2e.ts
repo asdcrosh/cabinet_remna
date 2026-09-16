@@ -14,7 +14,7 @@ test('пользователь обновляет профиль через на
   await expect(nameInput).toHaveCount(1)
   await expect(nameInput).toBeEnabled()
   const updatedName = await nameInput.inputValue() === 'Тест Обновлён'
-    ? 'E2E Пользователь'
+    ? 'Тестовый Пользователь'
     : 'Тест Обновлён'
   await nameInput.fill(updatedName)
   const updateResponse = page.waitForResponse((response) =>
@@ -59,6 +59,8 @@ test('главный администратор видит пользовате�
   await page.goto('/dashboard/admin/support')
   await expect(page.getByPlaceholder('Клиент, Telegram, платёж или текст')).toBeVisible()
   await expect(page.getByRole('button', { name: /Нужен ответ/ })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Мои', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Без исполнителя', exact: true })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Вопрос по оплате' })).toBeVisible()
   await expect(page.getByText(/Ждёт \d+ мин/).first()).toBeVisible()
   const clientButton = page.getByRole('button', { name: 'Клиент', exact: true })
@@ -67,9 +69,26 @@ test('главный администратор видит пользовате�
   const clientPanel = page.locator('aside').filter({ hasText: 'Контекст обращения' }).first()
   await expect(clientPanel).toBeVisible()
   await expect(clientPanel.getByText(E2E_USERS.basic.email, { exact: true })).toBeVisible()
+  const takeTicketButton = clientPanel.getByRole('button', { name: 'Взять себе' })
+  if (await takeTicketButton.isVisible()) await takeTicketButton.click()
+  await expect(clientPanel.getByLabel('Исполнитель обращения')).not.toHaveValue('')
+
+  const internalNote = 'E2E: клиент подтвердил повторную проверку платежа'
+  await clientPanel.getByLabel('Внутренняя заметка').fill(internalNote)
+  await clientPanel.getByRole('button', { name: 'Добавить заметку' }).click()
+  await expect(clientPanel.getByText(internalNote, { exact: true })).toBeVisible()
   await clientPanel.getByRole('button', { name: 'Закрыть данные клиента' }).click()
   await expect(clientPanel).toBeHidden()
+  await page.getByRole('button', { name: 'Мои', exact: true }).click()
+  await expect(page.getByText('Не проходит тестовая оплата подписки', { exact: true }).first()).toBeVisible()
+  await page.getByRole('button', { name: 'Без исполнителя', exact: true }).click()
+  await expect(page.getByText('Не проходит тестовая оплата подписки', { exact: true })).toHaveCount(0)
   await expectNoHorizontalOverflow(page)
+
+  await page.context().clearCookies()
+  await login(page, E2E_USERS.basic.email)
+  await page.goto('/dashboard/support')
+  await expect(page.getByText(internalNote, { exact: true })).toHaveCount(0)
 })
 
 test('поддержка удобна пользователю и администратору на телефоне', async ({ page }, testInfo) => {
@@ -173,5 +192,5 @@ async function changePassword(page: import('@playwright/test').Page, oldPassword
   )
   await page.getByRole('button', { name: 'Сменить пароль' }).click()
   await expect((await response).ok()).toBe(true)
-  await expect(page.getByText('Пароль изменён', { exact: true })).toBeVisible()
+  await expect(page.getByText('Пароль изменён. Другие сеансы завершены.', { exact: true })).toBeVisible()
 }

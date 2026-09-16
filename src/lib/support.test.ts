@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  createSupportInternalNoteSchema,
   createSupportMessageSchema,
   createSupportTicketSchema,
   supportCategorySubject,
@@ -29,6 +30,8 @@ describe('support helpers', () => {
 
   it('rejects empty messages and user status changes except close', () => {
     expect(createSupportMessageSchema.safeParse({ message: '' }).success).toBe(false)
+    expect(createSupportInternalNoteSchema.safeParse({ body: '   ' }).success).toBe(false)
+    expect(createSupportInternalNoteSchema.safeParse({ body: 'Передать смене детали проверки' }).success).toBe(true)
     expect(userUpdateSupportTicketSchema.safeParse({ status: 'WAITING_USER' }).success).toBe(false)
     expect(userUpdateSupportTicketSchema.safeParse({ status: 'CLOSED' }).success).toBe(true)
   })

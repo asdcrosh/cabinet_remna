@@ -73,7 +73,7 @@ test('мобильная навигация переносит второсте�
   await expect(settingsTabs.getByRole('tab')).toHaveCount(4)
   await expect(settingsTabs.getByRole('tab', { name: 'Профиль' })).toBeVisible()
   await settingsTabs.getByRole('tab', { name: 'Безопасность' }).click()
-  await expect(page.getByRole('heading', { name: 'Завершить сеанс' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Сеансы аккаунта' })).toBeVisible()
   await settingsTabs.getByRole('tab', { name: 'Telegram' }).click()
   await expect(page.getByRole('heading', { name: 'Telegram' }).first()).toBeVisible()
   await settingsTabs.getByRole('tab', { name: 'Уведомления' }).click()
@@ -82,7 +82,7 @@ test('мобильная навигация переносит второсте�
   await expectNoHorizontalOverflow(page)
 
   await settingsTabs.getByRole('tab', { name: 'Безопасность' }).click()
-  await page.getByRole('button', { name: 'Выйти' }).click()
+  await page.getByRole('button', { name: 'Выйти', exact: true }).click()
   await expect(page).toHaveURL(/\/login(?:\?|$)/)
 })
 
