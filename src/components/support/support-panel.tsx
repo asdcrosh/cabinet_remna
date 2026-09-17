@@ -3,7 +3,6 @@
 import {
   FormEvent,
   KeyboardEvent,
-  type ReactNode,
   useCallback,
   useEffect,
   useMemo,
@@ -66,7 +65,6 @@ import {
   type SupportMessage,
   type SupportPanelProps,
   type SupportQueueCounts,
-  type SupportStaffMember,
   type SupportTicket,
   type AdminSupportAssigneeScope,
   type TicketFolder,
@@ -667,21 +665,24 @@ export function SupportPanel({
   return (
     <div
       className={cn(
-        'grid h-[calc(100dvh-9rem-env(safe-area-inset-bottom))] min-h-[34rem] gap-3 overflow-hidden xl:h-[calc(100dvh-6.25rem)] 2xl:gap-4',
+        'grid h-[calc(100dvh-9rem-env(safe-area-inset-bottom))] min-h-[34rem] gap-3 overflow-hidden xl:h-[calc(100dvh-6.25rem)]',
         mode === 'admin'
-          ? 'xl:h-[calc(100dvh-5.5rem)] xl:grid-cols-[21rem_minmax(0,1fr)] 2xl:grid-cols-[22rem_minmax(0,1fr)_21rem]'
+          ? 'xl:h-[calc(100dvh-5.5rem)] xl:grid-cols-[19rem_minmax(0,1fr)] 2xl:grid-cols-[19rem_minmax(0,1fr)_20rem]'
           : 'xl:grid-cols-[20rem_minmax(0,1fr)]'
       )}
     >
       <section className={cn('min-h-0 overflow-y-auto xl:flex xl:flex-col xl:overflow-hidden', mobileChatOpen && 'hidden xl:flex')}>
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[1.75rem] border border-slate-200/80 bg-white shadow-[0_24px_70px_-44px_rgba(15,23,42,0.48)] dark:border-white/[0.09] dark:bg-white/[0.035] dark:shadow-black/20">
+        <div className={cn(
+          'flex min-h-0 flex-1 flex-col overflow-hidden border border-slate-200/80 bg-white dark:border-white/[0.09] dark:bg-white/[0.035]',
+          mode === 'admin' ? 'rounded-2xl shadow-sm' : 'rounded-[1.75rem] shadow-[0_24px_70px_-44px_rgba(15,23,42,0.48)] dark:shadow-black/20'
+        )}>
           <div className={cn(
             'relative overflow-hidden border-b border-slate-100/80 px-3 py-2.5 dark:border-white/[0.07] sm:px-3.5',
             mode === 'admin'
-              ? 'bg-gradient-to-br from-violet-50/90 via-white to-cyan-50/70 dark:from-violet-500/[0.08] dark:via-transparent dark:to-cyan-400/[0.06]'
+              ? 'bg-slate-50/75 dark:bg-white/[0.025]'
               : 'bg-gradient-to-br from-fuchsia-50/90 via-white to-cyan-50/80 dark:from-fuchsia-500/[0.09] dark:via-transparent dark:to-cyan-400/[0.07]'
           )}>
-            <div aria-hidden="true" className="pointer-events-none absolute -right-10 -top-14 h-28 w-28 rounded-full bg-fuchsia-300/15 blur-3xl dark:bg-fuchsia-400/[0.07]" />
+            {mode === 'user' && <div aria-hidden="true" className="pointer-events-none absolute -right-10 -top-14 h-28 w-28 rounded-full bg-fuchsia-300/15 blur-3xl dark:bg-fuchsia-400/[0.07]" />}
             {mode === 'user' ? (
               <div className="relative">
                 <div className="flex items-center gap-2.5">
@@ -702,22 +703,19 @@ export function SupportPanel({
                 </div>
               </div>
             ) : (
-              <div className="relative">
-                <div className="flex items-center justify-between gap-2.5">
-                  <div className="flex min-w-0 items-center gap-2.5">
-                    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-violet-600 text-white shadow-md shadow-violet-500/15 dark:bg-violet-500">
-                      <Inbox className="h-[18px] w-[18px]" />
-                    </span>
-                    <div className="min-w-0">
-                      <div className="truncate text-base font-semibold tracking-tight text-slate-950 dark:text-white">Поддержка</div>
-                      <div className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Рабочая очередь</div>
-                    </div>
+              <div className="relative flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="truncate text-base font-semibold tracking-tight text-slate-950 dark:text-white">Очередь</div>
+                  <div className={cn(
+                    'mt-0.5 text-xs',
+                    folderCounts['need-answer'] > 0 ? 'font-medium text-red-600 dark:text-red-300' : 'text-slate-500 dark:text-slate-400'
+                  )}>
+                    {folderCounts['need-answer'] > 0 ? `${folderCounts['need-answer']} ждут ответа` : 'Новых обращений нет'}
                   </div>
                 </div>
-                <div className="mt-2 flex gap-1.5">
-                  <QueueMetric label="Все обращения" value={queueCounts.all} />
-                  <QueueMetric label="Без ответа" value={folderCounts['need-answer']} accent={folderCounts['need-answer'] > 0} />
-                </div>
+                <span className="rounded-lg bg-white/80 px-2.5 py-1 text-sm font-semibold tabular-nums text-slate-700 ring-1 ring-slate-200/70 dark:bg-white/[0.06] dark:text-slate-200 dark:ring-white/10">
+                  {queueCounts.all}
+                </span>
               </div>
             )}
             <FolderTabs folder={folder} counts={folderCounts} mode={mode} onChange={changeFolder} />
@@ -740,8 +738,8 @@ export function SupportPanel({
           </div>
 
           <div className="min-h-0 flex-1 overflow-y-auto px-2.5 pb-3 pt-2.5">
-            <div className="mb-2 flex items-center justify-between gap-3 px-1.5">
-              <span className="text-xs font-semibold uppercase tracking-[0.11em] text-slate-400">{mode === 'admin' ? 'Обращения' : 'Ваши обращения'}</span>
+            <div className={cn('mb-2 flex items-center justify-between gap-3 px-1.5', mode === 'admin' && 'mb-1.5')}>
+              <span className={cn('text-xs font-semibold uppercase tracking-[0.11em] text-slate-400', mode === 'admin' && 'normal-case tracking-normal')}>{mode === 'admin' ? 'Найдено' : 'Ваши обращения'}</span>
               <span className="text-xs text-slate-400">{filteredTickets.length}</span>
             </div>
             <div className="space-y-1.5">
@@ -781,7 +779,8 @@ export function SupportPanel({
       </section>
 
       <section className={cn(
-        'relative min-h-0 overflow-hidden rounded-[1.75rem] border border-slate-200/80 bg-white shadow-[0_24px_70px_-44px_rgba(15,23,42,0.48)] dark:border-white/[0.09] dark:bg-white/[0.035] dark:shadow-black/20',
+        'relative min-h-0 overflow-hidden border border-slate-200/80 bg-white dark:border-white/[0.09] dark:bg-white/[0.035]',
+        mode === 'admin' ? 'rounded-2xl shadow-sm' : 'rounded-[1.75rem] shadow-[0_24px_70px_-44px_rgba(15,23,42,0.48)] dark:shadow-black/20',
         !mobileChatOpen && 'hidden xl:block'
       )}>
         {mode === 'user' && newTicketOpen ? (
@@ -823,24 +822,52 @@ export function SupportPanel({
                     </div>
                   </div>
                 </div>
-                <div className="flex shrink-0 items-center gap-2">
-                  {mode === 'admin' && (
+                {mode === 'user' && (
+                  <TicketActions selected={selected} mode={mode} isPending={isPending} onUpdateStatus={updateStatus} />
+                )}
+              </div>
+              {mode === 'admin' && (
+                <div className="mt-2 flex items-center gap-1.5 overflow-x-auto pb-0.5">
+                  {!selected.assignee && currentStaffId && (
                     <button
                       type="button"
-                      className={cn('btn-secondary h-9 px-2.5 text-xs 2xl:hidden', detailsOpen && 'border-cyan-200 bg-cyan-50 text-cyan-800 dark:border-cyan-400/30 dark:bg-cyan-400/10 dark:text-cyan-100')}
-                      onClick={() => setDetailsOpen((current) => !current)}
-                      aria-expanded={detailsOpen}
-                      aria-label="Клиент"
+                      className="btn-secondary min-h-9 shrink-0 px-3 text-xs"
+                      onClick={() => updateAssignee(currentStaffId)}
+                      disabled={isPending}
                     >
-                      <UserRound className="h-4 w-4" />
-                      <span className="hidden sm:inline">Клиент</span>
+                      <UserCheck className="h-3.5 w-3.5" />
+                      Взять себе
                     </button>
                   )}
-                  {mode === 'user' && (
-                    <TicketActions selected={selected} mode={mode} isPending={isPending} onUpdateStatus={updateStatus} />
-                  )}
+                  <label className="relative shrink-0">
+                    <span className="sr-only">Исполнитель обращения</span>
+                    <select
+                      value={selected.assignee?.id ?? ''}
+                      onChange={(event) => updateAssignee(event.target.value || null)}
+                      disabled={isPending}
+                      className="h-9 max-w-44 rounded-xl border border-slate-200 bg-white pl-3 pr-8 text-xs font-medium text-slate-700 outline-none transition focus:border-violet-300 focus:ring-4 focus:ring-violet-500/10 dark:border-white/10 dark:bg-white/[0.06] dark:text-white"
+                    >
+                      <option value="">Без исполнителя</option>
+                      {staffMembers.map((staff) => (
+                        <option key={staff.id} value={staff.id}>
+                          {staff.name || staff.email}{staff.id === currentStaffId ? ' (вы)' : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <TicketActions selected={selected} mode={mode} isPending={isPending} onUpdateStatus={updateStatus} />
+                  <button
+                    type="button"
+                    className={cn('btn-secondary min-h-9 shrink-0 px-2.5 text-xs 2xl:hidden', detailsOpen && 'border-cyan-200 bg-cyan-50 text-cyan-800 dark:border-cyan-400/30 dark:bg-cyan-400/10 dark:text-cyan-100')}
+                    onClick={() => setDetailsOpen((current) => !current)}
+                    aria-expanded={detailsOpen}
+                    aria-label="Контекст клиента"
+                  >
+                    <PanelRight className="h-4 w-4" />
+                    <span>Контекст</span>
+                  </button>
                 </div>
-              </div>
+              )}
             </div>
 
             <ConversationNotice ticket={selected} mode={mode} />
@@ -857,7 +884,12 @@ export function SupportPanel({
                 const element = event.currentTarget
                 stickToBottomRef.current = element.scrollHeight - element.scrollTop - element.clientHeight < 120
               }}
-              className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-[radial-gradient(circle_at_top,rgba(217,70,239,0.055),transparent_24rem),linear-gradient(to_bottom,rgba(248,250,252,0.96),white)] px-3 py-4 dark:bg-[radial-gradient(circle_at_top,rgba(217,70,239,0.07),transparent_24rem)] sm:px-5 sm:py-5"
+              className={cn(
+                'min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-4 sm:px-5 sm:py-5',
+                mode === 'admin'
+                  ? 'bg-slate-50/55 dark:bg-black/10'
+                  : 'bg-[radial-gradient(circle_at_top,rgba(217,70,239,0.055),transparent_24rem),linear-gradient(to_bottom,rgba(248,250,252,0.96),white)] dark:bg-[radial-gradient(circle_at_top,rgba(217,70,239,0.07),transparent_24rem)]'
+              )}
             >
               <div className="mx-auto max-w-3xl space-y-3.5">
                 {selected.messagePagination?.hasMore && (
@@ -879,7 +911,7 @@ export function SupportPanel({
                 </div>
                 {selected.messages.map((item) => {
                   const own = mode === 'admin' ? item.senderRole === 'ADMIN' : item.senderRole === 'USER'
-                  return <MessageBubble key={item.id} message={item} own={own} />
+                  return <MessageBubble key={item.id} message={item} own={own} mode={mode} />
                 })}
               </div>
             </div>
@@ -895,8 +927,9 @@ export function SupportPanel({
                 </div>
               ) : selected.status !== 'CLOSED' ? (
                 <div className="space-y-2">
-                  <QuickReplies mode={mode} onPick={(value) => setMessage((current) => current.trim() ? `${current.trim()}\n\n${value}` : value)} />
+                  {mode === 'user' && <QuickReplies mode={mode} onPick={(value) => setMessage((current) => current.trim() ? `${current.trim()}\n\n${value}` : value)} />}
                   <div className="relative flex items-end gap-1.5 rounded-2xl border border-slate-200/90 bg-white p-1.5 shadow-[0_12px_34px_-22px_rgba(15,23,42,0.5)] focus-within:border-fuchsia-300 focus-within:ring-4 focus-within:ring-fuchsia-500/[0.06] dark:border-white/10 dark:bg-black/20 dark:focus-within:border-fuchsia-400/30 sm:gap-2">
+                    {mode === 'admin' && <QuickReplies mode={mode} onPick={(value) => setMessage((current) => current.trim() ? `${current.trim()}\n\n${value}` : value)} />}
                     <EmojiPicker onPick={insertMessageEmoji} />
                     <AttachmentPicker
                       files={messageFiles}
@@ -940,17 +973,7 @@ export function SupportPanel({
                   aria-label="Закрыть панель"
                 />
                 <aside className="absolute inset-y-0 right-0 z-30 w-[min(24rem,calc(100%-1rem))] border-l border-slate-200 bg-white shadow-2xl shadow-slate-950/15 dark:border-white/10 dark:bg-surface-900 2xl:hidden">
-                  <TicketSideMenu
-                    selected={selected}
-                    mode={mode}
-                    isPending={isPending}
-                    onUpdateStatus={updateStatus}
-                    currentStaffId={currentStaffId}
-                    staffMembers={staffMembers}
-                    onAssign={updateAssignee}
-                    onAddNote={addInternalNote}
-                    onClose={() => setDetailsOpen(false)}
-                  />
+                  <TicketSideMenu selected={selected} mode={mode} onAddNote={addInternalNote} onClose={() => setDetailsOpen(false)} />
                 </aside>
               </>
             )}
@@ -970,17 +993,8 @@ export function SupportPanel({
       </section>
 
       {mode === 'admin' && (
-        <aside className="hidden min-h-0 overflow-hidden rounded-[1.75rem] border border-slate-200/80 bg-white shadow-[0_24px_70px_-44px_rgba(15,23,42,0.48)] dark:border-white/[0.09] dark:bg-white/[0.035] 2xl:block">
-          <TicketSideMenu
-            selected={selected}
-            mode={mode}
-            isPending={isPending}
-            onUpdateStatus={updateStatus}
-            currentStaffId={currentStaffId}
-            staffMembers={staffMembers}
-            onAssign={updateAssignee}
-            onAddNote={addInternalNote}
-          />
+        <aside className="hidden min-h-0 overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm dark:border-white/[0.09] dark:bg-white/[0.035] 2xl:block">
+          <TicketSideMenu selected={selected} mode={mode} onAddNote={addInternalNote} />
         </aside>
       )}
     </div>
@@ -1133,20 +1147,6 @@ function NewTicketForm({
   )
 }
 
-function QueueMetric({ label, value, accent = false }: { label: string; value: number; accent?: boolean }) {
-  return (
-    <div className={cn(
-      'flex min-w-0 flex-1 items-center gap-1.5 rounded-lg border px-2 py-1.5',
-      accent
-        ? 'border-red-200 bg-red-50/90 dark:border-red-400/20 dark:bg-red-400/10'
-        : 'border-white/90 bg-white/75 dark:border-white/[0.07] dark:bg-white/[0.035]'
-    )}>
-      <div className={cn('text-sm font-semibold tabular-nums', accent ? 'text-red-700 dark:text-red-200' : 'text-slate-950 dark:text-white')}>{value}</div>
-      <div className={cn('truncate text-xs font-semibold uppercase tracking-[0.06em]', accent ? 'text-red-500 dark:text-red-300' : 'text-slate-400')}>{label}</div>
-    </div>
-  )
-}
-
 function CategoryIcon({ category, compact = false, active = false }: { category: string; compact?: boolean; active?: boolean }) {
   const Icon = category === 'connection'
     ? Wifi
@@ -1227,6 +1227,23 @@ function ConversationNotice({ ticket, mode }: { ticket: SupportTicket; mode: 'us
       : waitingForUser
         ? mode === 'admin' ? 'Можно закрыть после подтверждения клиента' : 'Если вопрос решён, обращение можно закрыть'
         : 'Можно продолжить переписку ниже'
+
+  if (mode === 'admin') {
+    return (
+      <div className={cn(
+        'flex min-h-9 items-center gap-2 border-b px-3 py-1.5 text-xs sm:px-4',
+        closed
+          ? 'border-slate-100 bg-slate-50 text-slate-500 dark:border-white/[0.07] dark:bg-white/[0.025] dark:text-slate-400'
+          : waitingForAdmin
+            ? 'border-amber-100 bg-amber-50/70 text-amber-900 dark:border-amber-400/15 dark:bg-amber-400/[0.06] dark:text-amber-100'
+            : 'border-emerald-100 bg-emerald-50/65 text-emerald-900 dark:border-emerald-400/15 dark:bg-emerald-400/[0.06] dark:text-emerald-100'
+      )}>
+        <Icon className="h-3.5 w-3.5 shrink-0" />
+        <span className="shrink-0 font-semibold">{title}</span>
+        <span className="truncate opacity-65">{detail}</span>
+      </div>
+    )
+  }
 
   return (
     <div className={cn(
@@ -1348,7 +1365,7 @@ function AssigneeScopeTabs({
   ]
 
   return (
-    <div className="mt-2 flex gap-1 overflow-x-auto" aria-label="Фильтр по исполнителю">
+    <div className="mt-1.5 flex gap-1 overflow-x-auto" aria-label="Фильтр по исполнителю">
       {items.map((item) => {
         const Icon = item.icon
         const active = value === item.value
@@ -1358,10 +1375,10 @@ function AssigneeScopeTabs({
             type="button"
             onClick={() => onChange(item.value)}
             className={cn(
-              'flex min-w-fit items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors',
+              'flex min-w-fit items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium transition-colors',
               active
-                ? 'bg-violet-600 text-white shadow-sm dark:bg-violet-500'
-                : 'bg-white/75 text-slate-500 hover:bg-white hover:text-slate-950 dark:bg-white/[0.04] dark:text-slate-400 dark:hover:bg-white/[0.08] dark:hover:text-white'
+                ? 'bg-slate-950 text-white dark:bg-white dark:text-slate-950'
+                : 'text-slate-500 hover:bg-white hover:text-slate-950 dark:text-slate-400 dark:hover:bg-white/[0.08] dark:hover:text-white'
             )}
           >
             <Icon className="h-3.5 w-3.5" />
@@ -1388,14 +1405,19 @@ function FolderTabs({
     { value: 'active' as const, label: 'Активные', icon: Inbox },
     { value: 'closed' as const, label: 'Архив', icon: Archive },
   ] : [
-    { value: 'need-answer' as const, label: 'Нужен ответ', icon: Timer },
+    { value: 'need-answer' as const, label: 'Ответить', icon: Timer },
     { value: 'active' as const, label: 'В работе', icon: Inbox },
-    { value: 'answered' as const, label: 'Ждём клиента', icon: CheckCircle2 },
-    { value: 'closed' as const, label: 'Закрытые', icon: Archive },
+    { value: 'answered' as const, label: 'Ждём', icon: CheckCircle2 },
+    { value: 'closed' as const, label: 'Архив', icon: Archive },
   ]
 
   return (
-    <div className="relative mt-2 grid grid-cols-2 gap-1 rounded-xl border border-white/70 bg-slate-100/80 p-1 shadow-inner shadow-slate-950/[0.03] dark:border-white/[0.05] dark:bg-black/15">
+    <div className={cn(
+      'relative mt-2 grid grid-cols-2 gap-1 rounded-xl p-1',
+      mode === 'admin'
+        ? 'border border-slate-200/70 bg-slate-100/75 dark:border-white/[0.06] dark:bg-black/15'
+        : 'border border-white/70 bg-slate-100/80 shadow-inner shadow-slate-950/[0.03] dark:border-white/[0.05] dark:bg-black/15'
+    )}>
       {items.map((item) => {
         const Icon = item.icon
         const active = folder === item.value
@@ -1407,7 +1429,9 @@ function FolderTabs({
             className={cn(
               'flex min-w-0 items-center justify-between gap-2 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-all',
               active
-                ? 'bg-white text-fuchsia-700 shadow-sm dark:bg-white/10 dark:text-fuchsia-200'
+                ? mode === 'admin'
+                  ? 'bg-white text-slate-950 shadow-sm dark:bg-white/10 dark:text-white'
+                  : 'bg-white text-fuchsia-700 shadow-sm dark:bg-white/10 dark:text-fuchsia-200'
                 : 'text-slate-500 hover:bg-white/50 hover:text-slate-950 dark:text-slate-400 dark:hover:bg-white/5 dark:hover:text-white'
             )}
           >
@@ -1415,7 +1439,7 @@ function FolderTabs({
               <Icon className="h-3.5 w-3.5 shrink-0" />
               <span className="truncate">{item.label}</span>
             </span>
-            <span className={cn('rounded-full px-1.5 py-0.5 text-[10px] tabular-nums', active ? 'bg-fuchsia-50 text-fuchsia-700 dark:bg-black/15 dark:text-fuchsia-100' : 'bg-white/80 text-slate-500 dark:bg-white/5 dark:text-slate-400')}>
+            <span className={cn('rounded-full px-1.5 py-0.5 text-[10px] tabular-nums', active ? mode === 'admin' ? 'bg-slate-100 text-slate-700 dark:bg-black/15 dark:text-slate-200' : 'bg-fuchsia-50 text-fuchsia-700 dark:bg-black/15 dark:text-fuchsia-100' : 'bg-white/80 text-slate-500 dark:bg-white/5 dark:text-slate-400')}>
               {counts[item.value]}
             </span>
           </button>
@@ -1441,6 +1465,51 @@ function TicketListItem({
     ? getWaitingAge(ticket.lastMessageAt)
     : null
 
+  if (mode === 'admin') {
+    const latestMessage = ticket.messages.at(-1)?.body || ticket.messages[0]?.body || 'Без сообщений'
+    const customerName = ticket.user?.name || ticket.user?.email || 'Пользователь'
+    const statusTone = ticket.status === 'WAITING_ADMIN'
+      ? 'bg-red-500'
+      : ticket.status === 'WAITING_USER'
+        ? 'bg-emerald-500'
+        : ticket.status === 'CLOSED'
+          ? 'bg-slate-300 dark:bg-slate-600'
+          : 'bg-violet-500'
+
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        className={cn(
+          'group relative w-full rounded-xl px-2.5 py-2.5 text-left transition-colors',
+          active
+            ? 'bg-slate-100 text-slate-950 ring-1 ring-slate-200/80 dark:bg-white/[0.08] dark:text-white dark:ring-white/10'
+            : 'hover:bg-slate-50 dark:hover:bg-white/[0.04]'
+        )}
+      >
+        {active && <span className="absolute inset-y-3 left-0 w-0.5 rounded-full bg-violet-500" />}
+        <div className="flex min-w-0 items-center gap-2">
+          <span className={cn('h-2 w-2 shrink-0 rounded-full', statusTone)} />
+          <span className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-900 dark:text-white">{customerName}</span>
+          {unread > 0 && <span className="grid h-4 min-w-4 shrink-0 place-items-center rounded-full bg-red-600 px-1 text-[9px] font-bold text-white">{Math.min(unread, 9)}{unread > 9 ? '+' : ''}</span>}
+          <span className="shrink-0 text-[11px] tabular-nums text-slate-400">{formatRelativeDate(ticket.lastMessageAt)}</span>
+        </div>
+        <div className="mt-1 truncate text-xs font-medium text-slate-600 dark:text-slate-300">{ticket.subject}</div>
+        <div className={cn('mt-0.5 truncate text-xs', unread > 0 ? 'text-slate-700 dark:text-slate-200' : 'text-slate-400')}>{latestMessage}</div>
+        <div className="mt-1.5 flex min-w-0 items-center gap-2 text-[10px]">
+          {waitingAge ? (
+            <span className={cn('rounded-full px-1.5 py-0.5 font-semibold', waitingAge.tone)}>{waitingAge.label}</span>
+          ) : (
+            <span className="truncate text-slate-400">{supportStatusLabelForRole(ticket.status, 'admin')}</span>
+          )}
+          <span className="min-w-0 flex-1 truncate text-right text-slate-400">
+            {ticket.assignee?.name || ticket.assignee?.email || 'Без исполнителя'}
+          </span>
+        </div>
+      </button>
+    )
+  }
+
   return (
     <button
       type="button"
@@ -1461,14 +1530,12 @@ function TicketListItem({
         <div className="min-w-0 flex-1">
           <div className="flex min-w-0 items-start justify-between gap-2">
             <div className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-950 dark:text-white">
-              {mode === 'admin' && ticket.user ? ticket.user.name || ticket.user.email : ticket.subject}
+              {ticket.subject}
             </div>
             <span className="shrink-0 text-xs tabular-nums text-slate-400">{formatRelativeDate(ticket.lastMessageAt)}</span>
           </div>
           <div className="mt-0.5 truncate text-xs text-slate-500 dark:text-slate-400">
-            {mode === 'admin'
-              ? ticket.user?.name ? ticket.user.email : `${supportCategoryLabel(ticket.category)} · ${ticket.subject}`
-              : supportCategoryLabel(ticket.category)}
+            {supportCategoryLabel(ticket.category)}
           </div>
           <div className={cn('mt-1.5 line-clamp-2 text-sm leading-5', unread > 0 ? 'font-medium text-slate-800 dark:text-slate-100' : 'text-slate-500 dark:text-slate-400')}>
             {ticket.messages.at(-1)?.body || ticket.messages[0]?.body || 'Без сообщений'}
@@ -1480,17 +1547,6 @@ function TicketListItem({
                 <span className={cn('inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold', waitingAge.tone)}>
                   <Clock3 className="h-3 w-3" />
                   {waitingAge.label}
-                </span>
-              )}
-              {mode === 'admin' && (
-                <span className={cn(
-                  'inline-flex max-w-32 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold',
-                  ticket.assignee
-                    ? 'bg-violet-50 text-violet-700 dark:bg-violet-400/10 dark:text-violet-200'
-                    : 'bg-slate-100 text-slate-400 dark:bg-white/[0.05] dark:text-slate-400'
-                )}>
-                  <UserCheck className="h-3 w-3 shrink-0" />
-                  <span className="truncate">{ticket.assignee?.name || ticket.assignee?.email || 'Не назначено'}</span>
                 </span>
               )}
             </div>
@@ -1561,29 +1617,21 @@ function TicketActions({
 function TicketSideMenu({
   selected,
   mode,
-  isPending,
-  onUpdateStatus,
-  currentStaffId,
-  staffMembers,
-  onAssign,
   onAddNote,
   onClose,
 }: {
   selected: SupportTicket | null
   mode: 'user' | 'admin'
-  isPending: boolean
-  onUpdateStatus: (status: TicketStatus) => void
-  currentStaffId: string
-  staffMembers: SupportStaffMember[]
-  onAssign: (assigneeId: string | null) => void
   onAddNote: (body: string) => Promise<boolean>
   onClose?: () => void
 }) {
+  const [panelTab, setPanelTab] = useState<'context' | 'notes'>('context')
   const [noteBody, setNoteBody] = useState('')
   const [notePending, setNotePending] = useState(false)
 
   useEffect(() => {
     setNoteBody('')
+    setPanelTab('context')
   }, [selected?.id])
 
   if (!selected) {
@@ -1597,101 +1645,95 @@ function TicketSideMenu({
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="flex items-center justify-between gap-3 border-b border-slate-100 bg-gradient-to-br from-cyan-50/70 via-white to-violet-50/70 px-3 py-2.5 dark:border-white/[0.08] dark:from-cyan-400/[0.05] dark:via-transparent dark:to-violet-400/[0.06]">
-        <div className="flex min-w-0 items-center gap-2.5">
-          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-white/80 text-cyan-700 ring-1 ring-cyan-100 dark:bg-white/[0.06] dark:text-cyan-200 dark:ring-white/10">
-            <PanelRight className="h-4 w-4" />
-          </span>
-          <div className="min-w-0">
-            <div className="truncate text-sm font-semibold tracking-tight text-slate-950 dark:text-white">Клиент и аккаунт</div>
-            <div className="text-xs uppercase tracking-[0.08em] text-slate-400">Контекст обращения</div>
-          </div>
+      <div className="border-b border-slate-100 px-3 pt-3 dark:border-white/[0.08]">
+        <div className="flex items-center justify-between gap-3">
+          <div className="truncate text-sm font-semibold tracking-tight text-slate-950 dark:text-white">Контекст обращения</div>
+          {onClose && (
+            <button
+              type="button"
+              className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-950 dark:hover:bg-white/5 dark:hover:text-white"
+              onClick={onClose}
+              aria-label="Закрыть данные клиента"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
         </div>
-        {onClose && (
+        <div className="mt-2 flex gap-1" role="tablist" aria-label="Данные обращения">
           <button
             type="button"
-            className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-950 dark:hover:bg-white/5 dark:hover:text-white"
-            onClick={onClose}
-            aria-label="Закрыть данные клиента"
+            role="tab"
+            aria-selected={panelTab === 'context'}
+            onClick={() => setPanelTab('context')}
+            className={cn(
+              'border-b-2 px-2.5 py-2 text-xs font-semibold transition-colors',
+              panelTab === 'context' ? 'border-violet-500 text-slate-950 dark:text-white' : 'border-transparent text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+            )}
           >
-            <X className="h-4 w-4" />
+            Клиент
           </button>
-        )}
-      </div>
-      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
-        <div className="rounded-2xl border border-slate-200/80 bg-slate-50/70 p-3.5 dark:border-white/[0.08] dark:bg-white/[0.025]">
-          <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-              <div className="text-xs font-semibold uppercase tracking-[0.1em] text-slate-400">Обращение</div>
-              <div className="mt-1 line-clamp-2 text-sm font-semibold text-slate-950 dark:text-white">{selected.subject}</div>
-              <div className="mt-1 text-xs text-slate-500">{supportCategoryLabel(selected.category)} · {formatRelativeDate(selected.lastMessageAt)}</div>
-            </div>
-            <TicketStatusBadge status={selected.status} mode={mode} />
-          </div>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={panelTab === 'notes'}
+            onClick={() => setPanelTab('notes')}
+            className={cn(
+              'flex items-center gap-1.5 border-b-2 px-2.5 py-2 text-xs font-semibold transition-colors',
+              panelTab === 'notes' ? 'border-amber-500 text-slate-950 dark:text-white' : 'border-transparent text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+            )}
+          >
+            Заметки
+            {(selected.internalNotes ?? []).length > 0 && (
+              <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-500 dark:bg-white/[0.08] dark:text-slate-300">{selected.internalNotes?.length}</span>
+            )}
+          </button>
         </div>
-        {mode === 'admin' && (
-          <div className="rounded-2xl border border-violet-100 bg-violet-50/45 p-3.5 dark:border-violet-400/15 dark:bg-violet-400/[0.04]">
-            <div className="mb-2 flex items-center justify-between gap-2">
-              <div className="text-xs font-semibold uppercase tracking-[0.1em] text-slate-400">Исполнитель</div>
-              {!selected.assignee && currentStaffId && (
-                <button
-                  type="button"
-                  className="text-xs font-semibold text-violet-700 hover:text-violet-950 dark:text-violet-200 dark:hover:text-white"
-                  onClick={() => onAssign(currentStaffId)}
-                  disabled={isPending}
-                >
-                  Взять себе
-                </button>
-              )}
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto p-4">
+        {panelTab === 'context' ? (
+          <div className="space-y-4">
+            <div className="border-b border-slate-100 pb-4 dark:border-white/[0.08]">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="line-clamp-2 text-sm font-semibold text-slate-950 dark:text-white">{selected.subject}</div>
+                  <div className="mt-1 text-xs text-slate-500">{supportCategoryLabel(selected.category)} · {formatRelativeDate(selected.lastMessageAt)}</div>
+                </div>
+                <TicketStatusBadge status={selected.status} mode={mode} />
+              </div>
+              <div className="mt-2 text-[11px] text-slate-400">Создано {formatDate(selected.createdAt)} · {selected.messages.length} сообщ.</div>
             </div>
-            <label className="sr-only" htmlFor={`support-assignee-${selected.id}`}>Исполнитель обращения</label>
-            <select
-              id={`support-assignee-${selected.id}`}
-              value={selected.assignee?.id ?? ''}
-              onChange={(event) => onAssign(event.target.value || null)}
-              disabled={isPending}
-              className="h-10 w-full rounded-xl border border-violet-100 bg-white px-3 text-sm text-slate-800 outline-none transition focus:border-violet-300 focus:ring-4 focus:ring-violet-500/10 dark:border-white/10 dark:bg-white/[0.06] dark:text-white"
-            >
-              <option value="">Без исполнителя</option>
-              {staffMembers.map((staff) => (
-                <option key={staff.id} value={staff.id}>
-                  {staff.name || staff.email}{staff.id === currentStaffId ? ' (вы)' : ''}
-                </option>
-              ))}
-            </select>
-            {selected.assignedAt && (
-              <div className="mt-1.5 text-[11px] text-slate-400">Назначено {formatRelativeDate(selected.assignedAt)}</div>
+
+            {selected.user ? (
+              <>
+                <div className="flex items-center gap-3 border-b border-slate-100 pb-4 dark:border-white/[0.08]">
+                  <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-slate-100 text-slate-600 dark:bg-white/[0.08] dark:text-slate-200">
+                    <UserRound className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-semibold text-slate-950 dark:text-white">{selected.user.name || 'Пользователь'}</div>
+                    <div className="truncate text-xs text-slate-500" title={selected.user.email}>{selected.user.email}</div>
+                  </div>
+                  <a href={`/dashboard/admin/users?q=${encodeURIComponent(selected.user.email)}`} className="shrink-0 text-xs font-semibold text-violet-700 hover:text-slate-950 dark:text-violet-200 dark:hover:text-white">Профиль</a>
+                </div>
+                <SupportUserDiagnostics user={selected.user} />
+              </>
+            ) : (
+              <div className="text-sm text-slate-500">Данные клиента недоступны</div>
             )}
           </div>
-        )}
-        {mode === 'admin' && selected.user && (
-          <>
-            <div className="flex items-center gap-3 rounded-2xl border border-cyan-100 bg-cyan-50/55 p-3.5 dark:border-cyan-400/15 dark:bg-cyan-400/[0.05]">
-              <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-white text-cyan-700 shadow-sm ring-1 ring-cyan-100 dark:bg-white/[0.07] dark:text-cyan-200 dark:ring-white/10">
-                <UserRound className="h-5 w-5" />
-              </div>
-              <div className="min-w-0">
-                <div className="truncate text-sm font-semibold text-slate-950 dark:text-white">{selected.user.name || 'Пользователь'}</div>
-                <div className="truncate text-xs text-slate-500" title={selected.user.email}>{selected.user.email}</div>
-                <a href={`/dashboard/admin/users?q=${encodeURIComponent(selected.user.email)}`} className="mt-1 inline-flex text-xs font-semibold text-cyan-700 hover:text-slate-950 dark:text-cyan-200 dark:hover:text-white">Открыть профиль</a>
-              </div>
-            </div>
-            <SupportUserDiagnostics user={selected.user} />
-          </>
-        )}
-        {mode === 'admin' && (
-          <div className="space-y-2.5 rounded-2xl border border-amber-100 bg-amber-50/45 p-3.5 dark:border-amber-400/15 dark:bg-amber-400/[0.04]">
-            <div className="flex items-center gap-2">
-              <StickyNote className="h-4 w-4 text-amber-600 dark:text-amber-300" />
+        ) : (
+          <div className="space-y-3">
+            <div className="flex items-start gap-2 border-b border-slate-100 pb-3 dark:border-white/[0.08]">
+              <StickyNote className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-300" />
               <div>
-                <div className="text-xs font-semibold uppercase tracking-[0.1em] text-slate-500 dark:text-slate-300">Заметки команды</div>
-                <div className="text-[11px] text-slate-400">Клиент их не увидит</div>
+                <div className="text-sm font-semibold text-slate-900 dark:text-white">Внутренние заметки</div>
+                <div className="mt-0.5 text-xs text-slate-400">Их видит только команда поддержки</div>
               </div>
             </div>
             {(selected.internalNotes ?? []).length > 0 ? (
-              <div className="max-h-52 space-y-2 overflow-y-auto pr-1">
+              <div className="space-y-2">
                 {(selected.internalNotes ?? []).map((note) => (
-                  <div key={note.id} className="rounded-xl bg-white/90 px-3 py-2.5 text-xs shadow-sm ring-1 ring-amber-100 dark:bg-white/[0.06] dark:ring-white/10">
+                  <div key={note.id} className="rounded-xl bg-amber-50/70 px-3 py-2.5 text-xs dark:bg-amber-400/[0.06]">
                     <div className="whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-slate-700 dark:text-slate-200">{note.body}</div>
                     <div className="mt-1.5 text-[10px] text-slate-400">
                       {note.author?.name || note.author?.email || 'Сотрудник'} · {formatDate(note.createdAt)}
@@ -1700,7 +1742,7 @@ function TicketSideMenu({
                 ))}
               </div>
             ) : (
-              <div className="text-xs text-slate-400">Пока без заметок</div>
+              <div className="rounded-xl border border-dashed border-slate-200 px-3 py-5 text-center text-xs text-slate-400 dark:border-white/10">Пока без заметок</div>
             )}
             <form
               className="space-y-2"
@@ -1720,7 +1762,7 @@ function TicketSideMenu({
                 onChange={(event) => setNoteBody(event.target.value)}
                 placeholder="Контекст для коллег"
                 maxLength={3000}
-                className="min-h-20 w-full resize-y rounded-xl border border-amber-100 bg-white px-3 py-2 text-sm outline-none transition placeholder:text-slate-400 focus:border-amber-300 focus:ring-4 focus:ring-amber-500/10 dark:border-white/10 dark:bg-white/[0.06] dark:text-white"
+                className="min-h-24 w-full resize-y rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none transition placeholder:text-slate-400 focus:border-amber-300 focus:ring-4 focus:ring-amber-500/10 dark:border-white/10 dark:bg-white/[0.06] dark:text-white"
               />
               <button type="submit" className="btn-secondary min-h-9 w-full justify-center text-xs" disabled={notePending || !noteBody.trim()}>
                 <StickyNote className="h-3.5 w-3.5" />
@@ -1729,14 +1771,6 @@ function TicketSideMenu({
             </form>
           </div>
         )}
-        <div className="grid grid-cols-2 gap-3 text-sm">
-          <InfoBlock label="Создано"><span>{formatDate(selected.createdAt)}</span></InfoBlock>
-          <InfoBlock label="Сообщений"><span>{selected.messages.length}</span></InfoBlock>
-        </div>
-      </div>
-      <div className="border-t border-slate-100 bg-white/95 p-3.5 dark:border-white/[0.08] dark:bg-surface-900/90">
-        <div className="mb-2 text-xs font-semibold uppercase tracking-[0.1em] text-slate-400">Статус обращения</div>
-        <TicketActions selected={selected} mode={mode} isPending={isPending} onUpdateStatus={onUpdateStatus} />
       </div>
     </div>
   )
@@ -1866,6 +1900,7 @@ function DiagnosticRow({ label, value, ok, mono = false }: { label: string; valu
 }
 
 function QuickReplies({ mode, onPick }: { mode: 'user' | 'admin'; onPick: (value: string) => void }) {
+  const [open, setOpen] = useState(mode === 'user')
   const replies = mode === 'admin'
     ? [
         'Проверяю и скоро вернусь с ответом.',
@@ -1881,51 +1916,84 @@ function QuickReplies({ mode, onPick }: { mode: 'user' | 'admin'; onPick: (value
         'Хочу сменить устройство',
       ]
 
+  if (mode === 'admin') {
+    return (
+      <div className="relative shrink-0">
+        <button
+          type="button"
+          onClick={() => setOpen((current) => !current)}
+          aria-expanded={open}
+          aria-label="Открыть шаблоны ответов"
+          title="Шаблоны ответов"
+          className={cn(
+            'grid h-10 w-10 place-items-center rounded-xl transition-colors',
+            open ? 'bg-slate-100 text-slate-900 dark:bg-white/[0.08] dark:text-white' : 'text-slate-400 hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-white/[0.06] dark:hover:text-white'
+          )}
+        >
+          <FileText className="h-4 w-4" />
+        </button>
+        {open && (
+          <div className="fixed inset-x-3 bottom-[calc(5.5rem+env(safe-area-inset-bottom))] z-30 overflow-hidden rounded-2xl border border-slate-200 bg-white p-2 shadow-xl shadow-slate-950/10 dark:border-slate-800 dark:bg-surface-900 sm:absolute sm:bottom-12 sm:left-0 sm:right-auto sm:w-80">
+            <div className="px-2 pb-1.5 text-xs font-semibold text-slate-400">Шаблоны ответов</div>
+            <div className="space-y-1">
+              {replies.map((reply) => (
+                <button
+                  key={reply}
+                  type="button"
+                  onClick={() => {
+                    onPick(reply)
+                    setOpen(false)
+                  }}
+                  className="block w-full rounded-xl px-2.5 py-2 text-left text-xs leading-5 text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-white/[0.06] dark:hover:text-white"
+                >
+                  {reply}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
+
   return (
     <div className="flex items-center gap-2 overflow-hidden">
-      <div className="shrink-0 text-xs font-medium text-slate-400">
-        {mode === 'admin' ? 'Шаблоны' : 'Быстрый ответ'}
-      </div>
+      <div className="shrink-0 text-xs font-medium text-slate-400">Быстрый ответ</div>
       <div className="flex min-w-0 gap-1.5 overflow-x-auto pb-0.5">
-      {replies.map((reply) => (
-        <button
-          key={reply}
-          type="button"
-          onClick={() => onPick(reply)}
-          className="max-w-64 shrink-0 truncate rounded-full bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-cyan-50 hover:text-cyan-800 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-cyan-400/10 dark:hover:text-cyan-100"
-          title={reply}
-        >
-          {reply}
-        </button>
-      ))}
+        {replies.map((reply) => (
+          <button
+            key={reply}
+            type="button"
+            onClick={() => onPick(reply)}
+            className="max-w-64 shrink-0 truncate rounded-full bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-cyan-50 hover:text-cyan-800 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-cyan-400/10 dark:hover:text-cyan-100"
+            title={reply}
+          >
+            {reply}
+          </button>
+        ))}
       </div>
     </div>
   )
 }
 
-function InfoBlock({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div>
-      <div className="mb-1 text-xs font-medium text-slate-400">{label}</div>
-      <div className="text-sm text-slate-700 dark:text-slate-200">{children}</div>
-    </div>
-  )
-}
-
-function MessageBubble({ message, own }: { message: SupportMessage; own: boolean }) {
+function MessageBubble({ message, own, mode }: { message: SupportMessage; own: boolean; mode: 'user' | 'admin' }) {
   return (
     <div className={cn('flex items-end gap-2', own ? 'justify-end' : 'justify-start')}>
-      {!own && (
+      {!own && mode === 'user' && (
         <span className="mb-1 grid h-7 w-7 shrink-0 place-items-center rounded-xl bg-white text-fuchsia-600 shadow-sm ring-1 ring-slate-200/80 dark:bg-white/[0.07] dark:text-fuchsia-300 dark:ring-white/10">
           {message.senderRole === 'ADMIN' ? <Headphones className="h-3.5 w-3.5" /> : <UserRound className="h-3.5 w-3.5" />}
         </span>
       )}
       <div
         className={cn(
-          'max-w-[min(42rem,86%)] px-3.5 py-2.5 shadow-[0_10px_28px_-20px_rgba(15,23,42,0.55)] ring-1 sm:max-w-[76%] sm:px-4 sm:py-3',
-          own
-            ? 'rounded-[1.25rem_1.25rem_0.35rem_1.25rem] bg-slate-950 text-white ring-slate-950/20 dark:bg-fuchsia-400/[0.14] dark:text-slate-100 dark:ring-fuchsia-300/20'
-            : 'rounded-[1.25rem_1.25rem_1.25rem_0.35rem] bg-white/95 text-slate-900 ring-slate-200/90 dark:bg-white/[0.07] dark:text-white dark:ring-white/10'
+          'max-w-[min(42rem,86%)] px-3.5 py-2.5 sm:max-w-[76%] sm:px-4 sm:py-3',
+          mode === 'admin'
+            ? own
+              ? 'rounded-xl border border-violet-200/70 bg-violet-50/80 text-slate-900 dark:border-violet-400/20 dark:bg-violet-400/[0.08] dark:text-slate-100'
+              : 'rounded-xl border border-slate-200/80 bg-white text-slate-900 dark:border-white/10 dark:bg-white/[0.05] dark:text-white'
+            : own
+              ? 'rounded-[1.25rem_1.25rem_0.35rem_1.25rem] bg-slate-950 text-white shadow-[0_10px_28px_-20px_rgba(15,23,42,0.55)] ring-1 ring-slate-950/20 dark:bg-fuchsia-400/[0.14] dark:text-slate-100 dark:ring-fuchsia-300/20'
+              : 'rounded-[1.25rem_1.25rem_1.25rem_0.35rem] bg-white/95 text-slate-900 shadow-[0_10px_28px_-20px_rgba(15,23,42,0.55)] ring-1 ring-slate-200/90 dark:bg-white/[0.07] dark:text-white dark:ring-white/10'
         )}
       >
         <div className="whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-sm leading-relaxed">{message.body}</div>
@@ -1939,7 +2007,7 @@ function MessageBubble({ message, own }: { message: SupportMessage; own: boolean
                 rel="noreferrer"
                 className={cn(
                   'flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-medium ring-1 transition-colors',
-                  own
+                  own && mode === 'user'
                     ? 'bg-white/10 text-white ring-white/15 hover:bg-white/15 dark:bg-white/[0.06] dark:text-slate-100 dark:ring-white/10 dark:hover:bg-white/10'
                     : 'bg-slate-50 text-slate-700 ring-slate-200 hover:bg-slate-100 dark:bg-white/[0.05] dark:text-slate-200 dark:ring-white/10'
                 )}
@@ -1951,7 +2019,7 @@ function MessageBubble({ message, own }: { message: SupportMessage; own: boolean
             ))}
           </div>
         ) : null}
-        <div className={cn('mt-1.5 text-xs', own ? 'text-white/50 dark:text-fuchsia-100/55' : 'text-slate-400')}>
+        <div className={cn('mt-1.5 text-xs', own && mode === 'user' ? 'text-white/50 dark:text-fuchsia-100/55' : 'text-slate-400')}>
           {message.senderRole === 'ADMIN' ? 'Поддержка' : 'Пользователь'} · {formatDate(message.createdAt)}
         </div>
       </div>
