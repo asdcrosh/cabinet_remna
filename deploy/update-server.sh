@@ -285,38 +285,50 @@ format_elapsed() {
 }
 
 pull_target_image() {
-  local log_file pull_pid started_at elapsed pull_status=0 snapshot percent eta eta_label elapsed_label
+  local log_file pull_pid started_at elapsed pull_status=1 snapshot percent eta eta_label elapsed_label attempt
 
   log_file="$(mktemp)"
-  started_at="$(date +%s)"
-  docker pull "${TARGET_CABINET_IMAGE}" >"${log_file}" 2>&1 &
-  pull_pid=$!
+  for attempt in 1 2 3; do
+    : >"${log_file}"
+    pull_status=0
+    started_at="$(date +%s)"
+    docker pull "${TARGET_CABINET_IMAGE}" >"${log_file}" 2>&1 &
+    pull_pid=$!
 
-  if [[ -t 1 ]]; then
-    while kill -0 "${pull_pid}" 2>/dev/null; do
-      elapsed=$(($(date +%s) - started_at))
-      snapshot="$(pull_progress_snapshot "${log_file}" "${elapsed}" || true)"
-      if [[ "${snapshot}" =~ ^([0-9]+)\|(-?[0-9]+)$ ]]; then
-        percent="${BASH_REMATCH[1]}"
-        eta="${BASH_REMATCH[2]}"
-        if ((eta >= 0)); then
-          eta_label="$(format_eta "${eta}")"
-          printf '\r\033[2K[ 20%%] Загрузка образа кабинета: %s%%, осталось ~%s' "${percent}" "${eta_label}"
+    if [[ -t 1 ]]; then
+      while kill -0 "${pull_pid}" 2>/dev/null; do
+        elapsed=$(($(date +%s) - started_at))
+        snapshot="$(pull_progress_snapshot "${log_file}" "${elapsed}" || true)"
+        if [[ "${snapshot}" =~ ^([0-9]+)\|(-?[0-9]+)$ ]]; then
+          percent="${BASH_REMATCH[1]}"
+          eta="${BASH_REMATCH[2]}"
+          if ((eta >= 0)); then
+            eta_label="$(format_eta "${eta}")"
+            printf '\r\033[2K[ 20%%] Загрузка образа кабинета: %s%%, осталось ~%s' "${percent}" "${eta_label}"
+          else
+            printf '\r\033[2K[ 20%%] Загрузка образа кабинета: завершаем...'
+          fi
         else
-          printf '\r\033[2K[ 20%%] Загрузка образа кабинета: завершаем...'
+          elapsed_label="$(format_elapsed "${elapsed}")"
+          printf '\r\033[2K[ 20%%] Загрузка образа кабинета: прошло %s, ETA уточняется...' "${elapsed_label}"
         fi
-      else
-        elapsed_label="$(format_elapsed "${elapsed}")"
-        printf '\r\033[2K[ 20%%] Загрузка образа кабинета: прошло %s, ETA уточняется...' "${elapsed_label}"
-      fi
-      sleep 2
-    done
-    printf '\r\033[2K'
-  fi
+        sleep 2
+      done
+      printf '\r\033[2K'
+    fi
 
-  wait "${pull_pid}" || pull_status=$?
-  if ((pull_status != 0)); then
+    wait "${pull_pid}" || pull_status=$?
+    if ((pull_status == 0)); then
+      break
+    fi
     cat "${log_file}" >&2
+    if ((attempt < 3)); then
+      echo "Docker pull failed. Retrying (${attempt}/3)..." >&2
+      sleep "$((attempt * 3))"
+    fi
+  done
+
+  if ((pull_status != 0)); then
     rm -f "${log_file}"
     return "${pull_status}"
   fi
@@ -326,9 +338,25 @@ pull_target_image() {
   rm -f "${log_file}"
 }
 
+docker_pull_with_retries() {
+  local image="$1"
+  local attempt
+
+  for attempt in 1 2 3; do
+    if docker pull "${image}"; then
+      return 0
+    fi
+    if ((attempt < 3)); then
+      echo "Docker pull failed for ${image}. Retrying (${attempt}/3)..." >&2
+      sleep "$((attempt * 3))"
+    fi
+  done
+  return 1
+}
+
 pull_target_provisioner_image() {
   echo "Pulling node provisioner image..."
-  docker pull "${TARGET_PROVISIONER_IMAGE}" >/dev/null
+  docker_pull_with_retries "${TARGET_PROVISIONER_IMAGE}" >/dev/null
 }
 
 verify_target_image() {

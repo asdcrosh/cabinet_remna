@@ -76,6 +76,19 @@ curl_with_retries() {
   return 1
 }
 
+docker_pull_with_retries() {
+  local image="$1"
+  local attempt
+
+  for attempt in 1 2 3; do
+    if docker pull "${image}"; then
+      return 0
+    fi
+    ((attempt == 3)) || sleep "$((attempt * 3))"
+  done
+  return 1
+}
+
 pause() {
   if [[ -r /dev/tty ]]; then
     printf '\nНажмите Enter, чтобы вернуться в меню...' >/dev/tty
@@ -508,14 +521,14 @@ resolve_release_sha_from_latest_image() {
   latest_image="${OFFICIAL_CABINET_IMAGE}:latest"
   ensure_docker
   info "GitHub API недоступен. Определяем релиз через Docker Registry..."
-  docker pull "${latest_image}" || return 1
+  docker_pull_with_retries "${latest_image}" || return 1
   revision="$(docker image inspect "${latest_image}" \
     --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' 2>/dev/null || true)"
   [[ "${revision}" =~ ^[0-9a-f]{40}$ ]] || {
     fail "У latest-образа отсутствует корректная метка revision."
     return 1
   }
-  docker pull "${OFFICIAL_CABINET_IMAGE}:sha-${revision}" || return 1
+  docker_pull_with_retries "${OFFICIAL_CABINET_IMAGE}:sha-${revision}" || return 1
   RESOLVED_RELEASE_SHA="${revision}"
 }
 
@@ -528,7 +541,7 @@ run_bundled_update() {
   fi
   release_sha="${RESOLVED_RELEASE_SHA}"
   image="${OFFICIAL_CABINET_IMAGE}:sha-${release_sha}"
-  docker pull "${image}" || return 90
+  docker_pull_with_retries "${image}" || return 90
   actual_revision="$(docker image inspect "${image}" \
     --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' 2>/dev/null || true)"
   [[ "${actual_revision}" == "${release_sha}" ]] || {

@@ -189,6 +189,18 @@ ${unmanaged}# END REMNAWAVE CABINET\n`
     expect(updater).toContain('stage_release_file "docker-compose.server.yml"')
   })
 
+  it('retries transient Docker registry failures during updates', () => {
+    const cabinetctl = read('deploy/cabinetctl.sh')
+    const updater = read('deploy/update-server.sh')
+    const consolePull = cabinetctl.match(/docker_pull_with_retries\(\) \{([\s\S]*?)\n\}/)?.[1] || ''
+    const updaterPull = updater.match(/docker_pull_with_retries\(\) \{([\s\S]*?)\n\}/)?.[1] || ''
+
+    expect(consolePull).toContain('for attempt in 1 2 3')
+    expect(updaterPull).toContain('for attempt in 1 2 3')
+    expect(updater).toContain('Docker pull failed. Retrying')
+    expect(updater).toContain('docker_pull_with_retries "${TARGET_PROVISIONER_IMAGE}"')
+  })
+
   it('pins and verifies third-party bootstrap scripts', () => {
     const cabinetctl = read('deploy/cabinetctl.sh')
     const installer = read('deploy/install-server.sh')
@@ -289,7 +301,7 @@ ${unmanaged}# END REMNAWAVE CABINET\n`
     expect(updater).toContain('TARGET_PROVISIONER_IMAGE="${expected_provisioner_image}"')
     expect(updater).toContain('export CABINET_IMAGE CABINET_PROVISIONER_IMAGE')
     expect(updater).toContain('docker pull "${TARGET_CABINET_IMAGE}"')
-    expect(updater).toContain('docker pull "${TARGET_PROVISIONER_IMAGE}"')
+    expect(updater).toContain('docker_pull_with_retries "${TARGET_PROVISIONER_IMAGE}"')
     expect(updater).toContain('pull_progress_snapshot "${log_file}" "${elapsed}"')
     expect(updater).toContain('Загрузка образа кабинета: %s%%, осталось ~%s')
     expect(updater).toContain('Загрузка образа кабинета: прошло %s, ETA уточняется...')
