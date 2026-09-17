@@ -70,10 +70,31 @@ fi
 remote_commit_sha() {
   local response
   command -v curl >/dev/null 2>&1 || return 1
-  response="$(curl -fsSL -H 'Accept: application/vnd.github+json' "${GITHUB_API_URL}" 2>/dev/null || true)"
+  response="$(curl -fsSL --connect-timeout 5 --max-time 20 \
+    -H 'Accept: application/vnd.github+json' "${GITHUB_API_URL}" 2>/dev/null || true)"
   printf '%s\n' "${response}" \
     | sed -n 's/.*"sha"[[:space:]]*:[[:space:]]*"\([0-9a-f]\{40\}\)".*/\1/p' \
     | head -n 1
+}
+
+download_release_file() {
+  local url="$1"
+  local destination="$2"
+  local temporary attempt
+
+  temporary="$(mktemp "${destination}.download.XXXXXX")"
+  for attempt in 1 2 3; do
+    if curl -fsSL --connect-timeout 5 --max-time 30 "${url}" -o "${temporary}"; then
+      mv -f "${temporary}" "${destination}"
+      return 0
+    fi
+    : >"${temporary}"
+    ((attempt == 3)) || sleep "${attempt}"
+  done
+
+  rm -f "${temporary}"
+  echo "Failed to download ${url} after 3 attempts." >&2
+  return 1
 }
 
 write_installed_version() {
@@ -102,14 +123,14 @@ running_app_revision() {
 echo "Preparing deployment files in ${INSTALL_DIR}..."
 mkdir -p "${INSTALL_DIR}" "${STATE_DIR}"
 chmod 755 "${STATE_DIR}" 2>/dev/null || true
-curl -fsSL "${COMPOSE_URL}" -o "${COMPOSE_FILE}"
-curl -fsSL "${CABINETCTL_URL}" -o "${CABINETCTL_TEMP}"
+download_release_file "${COMPOSE_URL}" "${COMPOSE_FILE}"
+download_release_file "${CABINETCTL_URL}" "${CABINETCTL_TEMP}"
 install -m 755 "${CABINETCTL_TEMP}" "${CABINETCTL_PATH}"
 rm -f "${CABINETCTL_TEMP}"
-curl -fsSL "${FULL_BACKUP_URL}" -o "${FULL_BACKUP_TEMP}"
+download_release_file "${FULL_BACKUP_URL}" "${FULL_BACKUP_TEMP}"
 install -m 755 "${FULL_BACKUP_TEMP}" "${FULL_BACKUP_PATH}"
 rm -f "${FULL_BACKUP_TEMP}"
-curl -fsSL "${NODE_PROVISIONING_CONFIG_URL}" -o "${NODE_PROVISIONING_CONFIG_TEMP}"
+download_release_file "${NODE_PROVISIONING_CONFIG_URL}" "${NODE_PROVISIONING_CONFIG_TEMP}"
 bash -n "${NODE_PROVISIONING_CONFIG_TEMP}"
 install -m 755 "${NODE_PROVISIONING_CONFIG_TEMP}" "${NODE_PROVISIONING_CONFIG_PATH}"
 rm -f "${NODE_PROVISIONING_CONFIG_TEMP}"
@@ -119,7 +140,7 @@ if [[ ! -f "${ENV_FILE}" ]]; then
   if [[ -f "${LEGACY_ENV_FILE}" ]]; then
     cp "${LEGACY_ENV_FILE}" "${ENV_FILE}"
   else
-    curl -fsSL "${ENV_URL}" -o "${ENV_FILE}"
+    download_release_file "${ENV_URL}" "${ENV_FILE}"
   fi
 fi
 

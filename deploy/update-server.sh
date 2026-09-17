@@ -23,6 +23,7 @@ ENV_TEMPLATE_TEMP="${INSTALL_DIR}/.env.template.tmp"
 NODE_PROVISIONING_CONFIG_URL="${NODE_PROVISIONING_CONFIG_URL:-${RAW_BASE_URL}/deploy/configure-node-provisioning.sh}"
 NODE_PROVISIONING_CONFIG_PATH="${NODE_PROVISIONING_CONFIG_PATH:-/usr/local/bin/cabinet-node-provisioning}"
 NODE_PROVISIONING_CONFIG_TEMP="${NODE_PROVISIONING_CONFIG_PATH}.tmp"
+RELEASE_ASSET_DIR="${RELEASE_ASSET_DIR:-}"
 NGINX_CONF="${NGINX_CONF:-/opt/remnawave/nginx/nginx.conf}"
 NGINX_CONTAINER="${NGINX_CONTAINER:-remnawave-nginx}"
 OFFICIAL_CABINET_IMAGE="ghcr.io/asdcrosh/cabinet_remna"
@@ -56,10 +57,48 @@ fi
 remote_commit_sha() {
   local response
   command -v curl >/dev/null 2>&1 || return 1
-  response="$(curl -fsSL -H 'Accept: application/vnd.github+json' "${GITHUB_API_URL}" 2>/dev/null || true)"
+  response="$(curl -fsSL --connect-timeout 5 --max-time 20 \
+    -H 'Accept: application/vnd.github+json' "${GITHUB_API_URL}" 2>/dev/null || true)"
   printf '%s\n' "${response}" \
     | sed -n 's/.*"sha"[[:space:]]*:[[:space:]]*"\([0-9a-f]\{40\}\)".*/\1/p' \
     | head -n 1
+}
+
+download_release_file() {
+  local url="$1"
+  local destination="$2"
+  local temporary attempt
+
+  temporary="$(mktemp "${destination}.download.XXXXXX")"
+  for attempt in 1 2 3; do
+    if curl -fsSL --connect-timeout 5 --max-time 30 "${url}" -o "${temporary}"; then
+      mv -f "${temporary}" "${destination}"
+      return 0
+    fi
+    : >"${temporary}"
+    ((attempt == 3)) || sleep "${attempt}"
+  done
+
+  rm -f "${temporary}"
+  echo "Failed to download ${url} after 3 attempts." >&2
+  return 1
+}
+
+stage_release_file() {
+  local relative_path="$1"
+  local url="$2"
+  local destination="$3"
+  local source temporary
+
+  source="${RELEASE_ASSET_DIR%/}/${relative_path}"
+  if [[ -n "${RELEASE_ASSET_DIR}" && -f "${source}" ]]; then
+    temporary="$(mktemp "${destination}.stage.XXXXXX")"
+    cp "${source}" "${temporary}"
+    mv -f "${temporary}" "${destination}"
+    return 0
+  fi
+
+  download_release_file "${url}" "${destination}"
 }
 
 write_installed_version() {
@@ -591,7 +630,7 @@ fi
 PREVIOUS_DEPLOYED_REVISION="$(running_app_revision || installed_version_revision || true)"
 PREVIOUS_IMAGE_ID="$(running_app_image_id)"
 PREVIOUS_PROVISIONER_IMAGE_ID="$(running_provisioner_image_id)"
-DEPLOY_TARGET_REVISION="$(remote_commit_sha || true)"
+DEPLOY_TARGET_REVISION="${CABINET_RELEASE_SHA:-$(remote_commit_sha || true)}"
 mkdir -p "${STATE_DIR}"
 set_deploy_stage 5 "preparing" "Подготовка обновления" "Подготовка обновления и проверка конфигурации."
 trap handle_update_failure ERR INT TERM
@@ -843,7 +882,7 @@ if ! grep -q '^CABINET_DB_PORT=' "${ENV_FILE}"; then
 fi
 
 echo "Synchronizing .env schema..."
-curl -fsSL --connect-timeout 5 --max-time 20 "${ENV_TEMPLATE_URL}" -o "${ENV_TEMPLATE_TEMP}"
+stage_release_file "env.production.example" "${ENV_TEMPLATE_URL}" "${ENV_TEMPLATE_TEMP}"
 ENV_FILE_PATH="${ENV_FILE}" ENV_TEMPLATE_PATH="${ENV_TEMPLATE_TEMP}" python3 <<'PY'
 from pathlib import Path
 import os
@@ -909,14 +948,16 @@ PY
 rm -f "${ENV_TEMPLATE_TEMP}"
 
 echo "Updating compose file..."
-curl -fsSL "${COMPOSE_URL}" -o "${COMPOSE_FILE}"
-curl -fsSL "${CABINETCTL_URL}" -o "${CABINETCTL_TEMP}"
+stage_release_file "docker-compose.server.yml" "${COMPOSE_URL}" "${COMPOSE_FILE}"
+stage_release_file "cabinetctl.sh" "${CABINETCTL_URL}" "${CABINETCTL_TEMP}"
+bash -n "${CABINETCTL_TEMP}"
 install -m 755 "${CABINETCTL_TEMP}" "${CABINETCTL_PATH}"
 rm -f "${CABINETCTL_TEMP}"
-curl -fsSL "${FULL_BACKUP_URL}" -o "${FULL_BACKUP_TEMP}"
+stage_release_file "full-stack-backup.sh" "${FULL_BACKUP_URL}" "${FULL_BACKUP_TEMP}"
+bash -n "${FULL_BACKUP_TEMP}"
 install -m 755 "${FULL_BACKUP_TEMP}" "${FULL_BACKUP_PATH}"
 rm -f "${FULL_BACKUP_TEMP}"
-curl -fsSL "${NODE_PROVISIONING_CONFIG_URL}" -o "${NODE_PROVISIONING_CONFIG_TEMP}"
+stage_release_file "configure-node-provisioning.sh" "${NODE_PROVISIONING_CONFIG_URL}" "${NODE_PROVISIONING_CONFIG_TEMP}"
 bash -n "${NODE_PROVISIONING_CONFIG_TEMP}"
 install -m 755 "${NODE_PROVISIONING_CONFIG_TEMP}" "${NODE_PROVISIONING_CONFIG_PATH}"
 rm -f "${NODE_PROVISIONING_CONFIG_TEMP}"

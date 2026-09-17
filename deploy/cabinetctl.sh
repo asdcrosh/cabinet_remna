@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="1.9.19"
+VERSION="1.9.20"
 BRANCH="${BRANCH:-main}"
 RAW_BASE_URL="${RAW_BASE_URL:-https://raw.githubusercontent.com/asdcrosh/cabinet_remna/${BRANCH}}"
 GITHUB_API_URL="${GITHUB_API_URL:-https://api.github.com/repos/asdcrosh/cabinet_remna/commits/${BRANCH}}"
 GITHUB_WORKFLOW_RUNS_URL="${GITHUB_WORKFLOW_RUNS_URL:-https://api.github.com/repos/asdcrosh/cabinet_remna/actions/workflows/docker-image.yml/runs}"
 GITHUB_COMMITS_ATOM_URL="${GITHUB_COMMITS_ATOM_URL:-https://github.com/asdcrosh/cabinet_remna/commits/${BRANCH}.atom}"
 GHCR_REPOSITORY="${GHCR_REPOSITORY:-asdcrosh/cabinet_remna}"
+OFFICIAL_CABINET_IMAGE="ghcr.io/${GHCR_REPOSITORY}"
 OFFICIAL_RAW_REPOSITORY="https://raw.githubusercontent.com/asdcrosh/cabinet_remna"
 OFFICIAL_CONTENTS_API="https://api.github.com/repos/asdcrosh/cabinet_remna/contents"
 INSTALL_URL="${INSTALL_URL:-${RAW_BASE_URL}/deploy/install-server.sh}"
@@ -502,6 +503,71 @@ resolve_release_sha() {
   RESOLVED_RELEASE_SHA="${workflow_sha}"
 }
 
+resolve_release_sha_from_latest_image() {
+  local latest_image revision
+  latest_image="${OFFICIAL_CABINET_IMAGE}:latest"
+  ensure_docker
+  info "GitHub API недоступен. Определяем релиз через Docker Registry..."
+  docker pull "${latest_image}" || return 1
+  revision="$(docker image inspect "${latest_image}" \
+    --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' 2>/dev/null || true)"
+  [[ "${revision}" =~ ^[0-9a-f]{40}$ ]] || {
+    fail "У latest-образа отсутствует корректная метка revision."
+    return 1
+  }
+  docker pull "${OFFICIAL_CABINET_IMAGE}:sha-${revision}" || return 1
+  RESOLVED_RELEASE_SHA="${revision}"
+}
+
+run_bundled_update() {
+  local release_sha image actual_revision bundle_dir container_id status=0
+
+  RESOLVED_RELEASE_SHA=""
+  if ! resolve_release_sha >/dev/null 2>&1; then
+    resolve_release_sha_from_latest_image || return 90
+  fi
+  release_sha="${RESOLVED_RELEASE_SHA}"
+  image="${OFFICIAL_CABINET_IMAGE}:sha-${release_sha}"
+  docker pull "${image}" || return 90
+  actual_revision="$(docker image inspect "${image}" \
+    --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' 2>/dev/null || true)"
+  [[ "${actual_revision}" == "${release_sha}" ]] || {
+    fail "Docker-образ не соответствует релизу ${release_sha}."
+    return 1
+  }
+
+  bundle_dir="$(mktemp -d)"
+  container_id="$(docker create "${image}")" || {
+    rm -rf "${bundle_dir}"
+    return 90
+  }
+  if ! docker cp "${container_id}:/app/deploy-release/." "${bundle_dir}" >/dev/null 2>&1; then
+    docker rm -f "${container_id}" >/dev/null 2>&1 || true
+    rm -rf "${bundle_dir}"
+    return 90
+  fi
+  docker rm -f "${container_id}" >/dev/null 2>&1 || true
+
+  for required in update-server.sh docker-compose.server.yml env.production.example \
+    cabinetctl.sh full-stack-backup.sh configure-node-provisioning.sh; do
+    if [[ ! -s "${bundle_dir}/${required}" ]]; then
+      rm -rf "${bundle_dir}"
+      return 90
+    fi
+  done
+  bash -n "${bundle_dir}/update-server.sh" || {
+    rm -rf "${bundle_dir}"
+    return 1
+  }
+
+  CABINET_RELEASE_SHA="${release_sha}" \
+  CABINET_IMAGE="${image}" \
+  RELEASE_ASSET_DIR="${bundle_dir}" \
+    bash "${bundle_dir}/update-server.sh" || status=$?
+  rm -rf "${bundle_dir}"
+  return "${status}"
+}
+
 remote_blob_sha() {
   local relative_path="$1"
   local commit_sha="$2"
@@ -917,12 +983,19 @@ install_cabinet() {
 }
 
 update_cabinet() {
+  local bundled_status=0
   cabinet_installed || {
     fail "Кабинет ещё не установлен. Сначала выберите установку."
     return 1
   }
   info "Обновляем кабинет..."
-  run_verified_script "${UPDATE_URL}"
+  run_bundled_update || bundled_status=$?
+  if ((bundled_status == 90)); then
+    warn "Обновление из Docker-образа недоступно. Пробуем GitHub."
+    run_verified_script "${UPDATE_URL}"
+  elif ((bundled_status != 0)); then
+    return "${bundled_status}"
+  fi
   write_update_status_cache latest
 }
 

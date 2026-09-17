@@ -159,6 +159,36 @@ ${unmanaged}# END REMNAWAVE CABINET\n`
     }
   })
 
+  it('bounds release downloads and replaces deployment files atomically', () => {
+    for (const file of ['deploy/install-server.sh', 'deploy/update-server.sh']) {
+      const source = read(file)
+      const downloader = source.match(/download_release_file\(\) \{([\s\S]*?)\n\}/)?.[1] || ''
+
+      expect(downloader).toContain('--connect-timeout 5')
+      expect(downloader).toContain('--max-time 30')
+      expect(downloader).toContain('for attempt in 1 2 3')
+      expect(downloader).toContain('mktemp "${destination}.download.XXXXXX"')
+      expect(downloader).toContain('mv -f "${temporary}" "${destination}"')
+      expect(source).toMatch(/(?:download|stage)_release_file (?:"docker-compose\.server\.yml" )?"\$\{COMPOSE_URL\}" "\$\{COMPOSE_FILE\}"/)
+      expect(source).not.toContain('curl -fsSL "${COMPOSE_URL}" -o "${COMPOSE_FILE}"')
+    }
+  })
+
+  it('ships deployment assets in the image and can update without GitHub raw downloads', () => {
+    const dockerfile = read('Dockerfile')
+    const cabinetctl = read('deploy/cabinetctl.sh')
+    const updater = read('deploy/update-server.sh')
+
+    expect(dockerfile).toContain('./deploy-release/')
+    expect(dockerfile).toContain('deploy/update-server.sh')
+    expect(dockerfile).toContain('deploy/docker-compose.server.yml')
+    expect(cabinetctl).toContain('run_bundled_update')
+    expect(cabinetctl).toContain('docker cp "${container_id}:/app/deploy-release/."')
+    expect(cabinetctl).toContain('resolve_release_sha_from_latest_image')
+    expect(updater).toContain('RELEASE_ASSET_DIR="${RELEASE_ASSET_DIR:-}"')
+    expect(updater).toContain('stage_release_file "docker-compose.server.yml"')
+  })
+
   it('pins and verifies third-party bootstrap scripts', () => {
     const cabinetctl = read('deploy/cabinetctl.sh')
     const installer = read('deploy/install-server.sh')

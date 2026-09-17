@@ -122,6 +122,15 @@ COPY --chown=nextjs:nextjs --from=builder /app/.next/ops ./ops
 COPY --chown=nextjs:nextjs --from=builder /app/.next/cabinetctl-version ./cabinetctl-version
 COPY --chown=nextjs:nextjs --from=builder /app/scripts/check-env.mjs ./ops/check-env.mjs
 COPY --chown=nextjs:nextjs --from=builder /app/prisma ./prisma
+COPY --chown=nextjs:nextjs \
+  deploy/docker-compose.server.yml \
+  deploy/env.production.example \
+  deploy/cabinetctl.sh \
+  deploy/update-server.sh \
+  deploy/install-server.sh \
+  deploy/full-stack-backup.sh \
+  deploy/configure-node-provisioning.sh \
+  ./deploy-release/
 
 # Fail the image build if a bundled worker references a dependency that is not
 # present in the final release image.
