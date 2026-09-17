@@ -39,7 +39,7 @@ test('пользователь создаёт обращение в поддер
   await expect(page.getByRole('heading', { name: 'Поддержка', level: 1 })).toBeVisible()
   await page.getByRole('button', { name: /Новое обращение/ }).first().click()
   await expect(page.getByRole('heading', { name: 'Новое обращение' })).toBeVisible()
-  await page.getByRole('button', { name: 'Оплата' }).click()
+  await page.getByRole('button', { name: 'Оплата', exact: true }).click()
   await page.getByRole('textbox', { name: 'Сообщение' }).fill('Не проходит тестовая оплата подписки')
   await page.getByRole('button', { name: 'Отправить обращение' }).click()
 
@@ -58,22 +58,24 @@ test('главный администратор видит пользовате�
 
   await page.goto('/dashboard/admin/support')
   await expect(page.getByPlaceholder('Клиент, Telegram, платёж или текст')).toBeVisible()
-  await expect(page.getByRole('button', { name: /Нужен ответ/ })).toBeVisible()
+  await expect(page.getByRole('button', { name: /Ответить/ })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Мои', exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Без исполнителя', exact: true })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Вопрос по оплате' })).toBeVisible()
   await expect(page.getByText(/Ждёт \d+ мин/).first()).toBeVisible()
-  const clientButton = page.getByRole('button', { name: 'Клиент', exact: true })
+  const takeTicketButton = page.getByRole('button', { name: 'Взять себе', exact: true })
+  if (await takeTicketButton.isVisible()) await takeTicketButton.click()
+  await expect(page.getByLabel('Исполнитель обращения')).not.toHaveValue('')
+
+  const clientButton = page.getByRole('button', { name: 'Контекст клиента', exact: true })
   await expect(clientButton).toBeVisible()
   await clientButton.click()
   const clientPanel = page.locator('aside').filter({ hasText: 'Контекст обращения' }).first()
   await expect(clientPanel).toBeVisible()
   await expect(clientPanel.getByText(E2E_USERS.basic.email, { exact: true })).toBeVisible()
-  const takeTicketButton = clientPanel.getByRole('button', { name: 'Взять себе' })
-  if (await takeTicketButton.isVisible()) await takeTicketButton.click()
-  await expect(clientPanel.getByLabel('Исполнитель обращения')).not.toHaveValue('')
 
   const internalNote = 'E2E: клиент подтвердил повторную проверку платежа'
+  await clientPanel.getByRole('tab', { name: /Заметки/ }).click()
   await clientPanel.getByLabel('Внутренняя заметка').fill(internalNote)
   await clientPanel.getByRole('button', { name: 'Добавить заметку' }).click()
   await expect(clientPanel.getByText(internalNote, { exact: true })).toBeVisible()

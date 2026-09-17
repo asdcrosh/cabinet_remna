@@ -66,25 +66,35 @@ warn() { printf '%s\n' "${YELLOW}!${RESET} $*"; }
 fail() { printf '%s\n' "${RED}Ошибка:${RESET} $*" >&2; return 1; }
 
 curl_with_retries() {
-  local attempt
-  for attempt in 1 2 3; do
+  local attempt delay
+  local attempts="${CABINET_DOWNLOAD_ATTEMPTS:-5}"
+  for ((attempt = 1; attempt <= attempts; attempt++)); do
     if curl "$@"; then
       return 0
     fi
-    ((attempt == 3)) || sleep "${attempt}"
+    if ((attempt < attempts)); then
+      delay=$((attempt * 3))
+      printf '%s\n' "Сеть недоступна, повтор загрузки ${attempt}/${attempts} через ${delay} сек..." >&2
+      sleep "${delay}"
+    fi
   done
   return 1
 }
 
 docker_pull_with_retries() {
   local image="$1"
-  local attempt
+  local attempt delay
+  local attempts="${CABINET_REGISTRY_ATTEMPTS:-5}"
 
-  for attempt in 1 2 3; do
+  for ((attempt = 1; attempt <= attempts; attempt++)); do
     if docker pull "${image}"; then
       return 0
     fi
-    ((attempt == 3)) || sleep "$((attempt * 3))"
+    if ((attempt < attempts)); then
+      delay=$((attempt * 5))
+      warn "Registry не ответил, повтор ${attempt}/${attempts} через ${delay} сек..."
+      sleep "${delay}"
+    fi
   done
   return 1
 }
@@ -628,7 +638,7 @@ download_verified_release_file() {
     VERIFIED_RELEASE_RAW_BASE_URL="${OFFICIAL_RAW_REPOSITORY}/${RESOLVED_RELEASE_SHA}"
   fi
 
-  if ! curl_with_retries -fsSL --proto '=https' --tlsv1.2 --connect-timeout 5 --max-time 60 \
+  if ! curl_with_retries -fsSL --proto '=https' --tlsv1.2 --connect-timeout 15 --max-time 120 \
     "${source_url}" -o "${destination}"; then
     return 1
   fi

@@ -80,20 +80,25 @@ remote_commit_sha() {
 download_release_file() {
   local url="$1"
   local destination="$2"
-  local temporary attempt
+  local temporary attempt delay
+  local attempts="${CABINET_DOWNLOAD_ATTEMPTS:-5}"
 
   temporary="$(mktemp "${destination}.download.XXXXXX")"
-  for attempt in 1 2 3; do
-    if curl -fsSL --connect-timeout 5 --max-time 30 "${url}" -o "${temporary}"; then
+  for ((attempt = 1; attempt <= attempts; attempt++)); do
+    if curl -fsSL --connect-timeout 15 --max-time 120 "${url}" -o "${temporary}"; then
       mv -f "${temporary}" "${destination}"
       return 0
     fi
     : >"${temporary}"
-    ((attempt == 3)) || sleep "${attempt}"
+    if ((attempt < attempts)); then
+      delay=$((attempt * 3))
+      echo "Network download failed (${attempt}/${attempts}). Retrying in ${delay}s..." >&2
+      sleep "${delay}"
+    fi
   done
 
   rm -f "${temporary}"
-  echo "Failed to download ${url} after 3 attempts." >&2
+  echo "Failed to download ${url} after ${attempts} attempts." >&2
   return 1
 }
 

@@ -164,9 +164,10 @@ ${unmanaged}# END REMNAWAVE CABINET\n`
       const source = read(file)
       const downloader = source.match(/download_release_file\(\) \{([\s\S]*?)\n\}/)?.[1] || ''
 
-      expect(downloader).toContain('--connect-timeout 5')
-      expect(downloader).toContain('--max-time 30')
-      expect(downloader).toContain('for attempt in 1 2 3')
+      expect(downloader).toContain('--connect-timeout 15')
+      expect(downloader).toContain('--max-time 120')
+      expect(downloader).toContain('CABINET_DOWNLOAD_ATTEMPTS:-5')
+      expect(downloader).toContain('attempt <= attempts')
       expect(downloader).toContain('mktemp "${destination}.download.XXXXXX"')
       expect(downloader).toContain('mv -f "${temporary}" "${destination}"')
       expect(source).toMatch(/(?:download|stage)_release_file (?:"docker-compose\.server\.yml" )?"\$\{COMPOSE_URL\}" "\$\{COMPOSE_FILE\}"/)
@@ -195,8 +196,10 @@ ${unmanaged}# END REMNAWAVE CABINET\n`
     const consolePull = cabinetctl.match(/docker_pull_with_retries\(\) \{([\s\S]*?)\n\}/)?.[1] || ''
     const updaterPull = updater.match(/docker_pull_with_retries\(\) \{([\s\S]*?)\n\}/)?.[1] || ''
 
-    expect(consolePull).toContain('for attempt in 1 2 3')
-    expect(updaterPull).toContain('for attempt in 1 2 3')
+    expect(consolePull).toContain('CABINET_REGISTRY_ATTEMPTS:-5')
+    expect(consolePull).toContain('attempt <= attempts')
+    expect(updaterPull).toContain('CABINET_REGISTRY_ATTEMPTS:-5')
+    expect(updaterPull).toContain('attempt <= attempts')
     expect(updater).toContain('Docker pull failed. Retrying')
     expect(updater).toContain('docker_pull_with_retries "${TARGET_PROVISIONER_IMAGE}"')
   })
@@ -296,6 +299,9 @@ ${unmanaged}# END REMNAWAVE CABINET\n`
     expect(cabinetctl).toContain('RESOLVED_RELEASE_SHA="${workflow_sha}"')
     expect(cabinetctl).toContain('RESOLVED_RELEASE_SHA=""\n    resolve_release_sha || return 1')
     expect(cabinetctl).toContain('curl_with_retries -fsSL --proto')
+    expect(cabinetctl).toContain('CABINET_DOWNLOAD_ATTEMPTS:-5')
+    expect(cabinetctl).toContain('CABINET_REGISTRY_ATTEMPTS:-5')
+    expect(cabinetctl).toContain('--connect-timeout 15 --max-time 120')
     expect(cabinetctl).not.toContain("--data-urlencode 'status=success'")
     expect(updater).toContain('TARGET_CABINET_IMAGE="${expected_image}"')
     expect(updater).toContain('TARGET_PROVISIONER_IMAGE="${expected_provisioner_image}"')
