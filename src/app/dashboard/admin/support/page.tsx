@@ -110,7 +110,7 @@ export default async function AdminSupportPage({
   ])
 
   return (
-    <AdminPageShell title="Поддержка" description="Очередь обращений и переписка с пользователями">
+    <AdminPageShell title="Поддержка" description="Очередь обращений и переписка с пользователями" variant="plain">
       <SupportPanelDynamic
         mode="admin"
         initialTotal={total}

@@ -44,7 +44,7 @@ test('пользователь создаёт обращение в поддер
   await page.getByRole('button', { name: 'Отправить обращение' }).click()
 
   await expect(page.getByRole('heading', { name: 'Вопрос по оплате' })).toBeVisible()
-  await expect(page.getByText('Не проходит тестовая оплата подписки', { exact: true })).toHaveCount(2)
+  await expect(page.getByText('Не проходит тестовая оплата подписки', { exact: true }).last()).toBeVisible()
   await expectNoHorizontalOverflow(page)
 })
 
@@ -58,14 +58,15 @@ test('главный администратор видит пользовате�
 
   await page.goto('/dashboard/admin/support')
   await expect(page.getByPlaceholder('Клиент, Telegram, платёж или текст')).toBeVisible()
-  await expect(page.getByRole('button', { name: /Ответить/ })).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Мои', exact: true })).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Без исполнителя', exact: true })).toBeVisible()
+  await expect(page.getByLabel('Статус очереди')).toBeVisible()
+  await expect(page.getByLabel('Исполнитель очереди')).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Вопрос по оплате' })).toBeVisible()
   await expect(page.getByText(/Ждёт \d+ мин/).first()).toBeVisible()
-  const takeTicketButton = page.getByRole('button', { name: 'Взять себе', exact: true })
-  if (await takeTicketButton.isVisible()) await takeTicketButton.click()
-  await expect(page.getByLabel('Исполнитель обращения')).not.toHaveValue('')
+  const ticketAssignee = page.getByLabel('Исполнитель обращения', { exact: true })
+  const currentStaffOption = ticketAssignee.locator('option').filter({ hasText: '(вы)' })
+  const currentStaffValue = await currentStaffOption.getAttribute('value')
+  if (currentStaffValue) await ticketAssignee.selectOption(currentStaffValue)
+  await expect(ticketAssignee).not.toHaveValue('')
 
   const clientButton = page.getByRole('button', { name: 'Контекст клиента', exact: true })
   await expect(clientButton).toBeVisible()
@@ -81,9 +82,9 @@ test('главный администратор видит пользовате�
   await expect(clientPanel.getByText(internalNote, { exact: true })).toBeVisible()
   await clientPanel.getByRole('button', { name: 'Закрыть данные клиента' }).click()
   await expect(clientPanel).toBeHidden()
-  await page.getByRole('button', { name: 'Мои', exact: true }).click()
+  await page.getByLabel('Исполнитель очереди').selectOption('mine')
   await expect(page.getByText('Не проходит тестовая оплата подписки', { exact: true }).first()).toBeVisible()
-  await page.getByRole('button', { name: 'Без исполнителя', exact: true }).click()
+  await page.getByLabel('Исполнитель очереди').selectOption('unassigned')
   await expect(page.getByText('Не проходит тестовая оплата подписки', { exact: true })).toHaveCount(0)
   await expectNoHorizontalOverflow(page)
 
@@ -117,7 +118,7 @@ test('поддержка удобна пользователю и админис
   await login(page, E2E_USERS.admin.email)
   await page.goto('/dashboard/admin/support')
 
-  await expect(page.getByText('Очередь', { exact: true })).toBeVisible()
+  await expect(page.getByText('Обращения', { exact: true })).toBeVisible()
   const ticketButton = page.getByRole('button').filter({ hasText: message }).first()
   await expect(ticketButton).toBeVisible()
   await ticketButton.click()
