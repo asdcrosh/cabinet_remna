@@ -16,7 +16,7 @@ vi.mock('../src/lib/prisma', () => ({
 vi.mock('../src/lib/payment-sync', () => ({
   syncPaymentProvisioning: mocks.syncPaymentProvisioning,
 }))
-vi.mock('../src/lib/logger', () => ({ logInfo: vi.fn(), logError: vi.fn() }))
+vi.mock('../src/lib/logger', () => ({ logInfo: vi.fn(), logError: vi.fn(), logWarn: vi.fn() }))
 
 import { runPriorityPaymentQueues } from './payment-reconciler'
 
