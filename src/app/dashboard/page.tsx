@@ -15,11 +15,12 @@ import {
 } from 'lucide-react'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth/cookies'
-import { remnawave, RemnawaveError, type UserStatus } from '@/lib/remnawave'
+import { remnawave, RemnawaveError } from '@/lib/remnawave'
 import { StatusBadge } from '@/components/dashboard/status-badge'
 import { DashboardOnboardingCard, type DashboardOnboardingState } from '@/components/dashboard/onboarding-card'
 import { logWarn } from '@/lib/logger'
-import { formatSubscriptionDaysLeft, isSubscriptionExpired } from '@/lib/subscription-time'
+import { formatSubscriptionDaysLeft } from '@/lib/subscription-time'
+import { resolveSubscriptionPresentation } from '@/lib/subscription-presentation'
 import { getFreshPendingPaymentCutoff } from '@/lib/payment-sync'
 import { getFeatureFlags } from '@/lib/feature-flags'
 import { getAvailablePaymentProviders } from '@/lib/payment-providers'
@@ -109,22 +110,43 @@ export default async function DashboardHome() {
   const remnawaveErrorStatus = remnawaveCardResult.errorStatus
   const sub = remnawaveCard?.response.user
   const now = new Date()
-  const graceActive = Boolean(subRow?.graceExpireAt && subRow.graceExpireAt > now)
-  const effectiveExpireAt = graceActive ? subRow?.graceExpireAt ?? null : sub?.expiresAt ? new Date(sub.expiresAt) : subRow?.expireAt ?? null
-  const localDaysLeft = effectiveExpireAt
-    ? Math.ceil((effectiveExpireAt.getTime() - now.getTime()) / (24 * 60 * 60 * 1000))
-    : 0
-  const daysLeft = graceActive ? localDaysLeft : sub?.daysLeft ?? localDaysLeft
-  const subscriptionStatus = (graceActive ? 'LIMITED' : sub?.userStatus ?? subRow?.status ?? 'DISABLED') as UserStatus
-  const subscriptionExpired = isSubscriptionExpired(daysLeft, subscriptionStatus)
-  const expiresAt = effectiveExpireAt
   const unlimitedDuration = Boolean(subRow?.plan?.unlimitedDuration)
+  const subscriptionState = resolveSubscriptionPresentation({
+    localStatus: subRow?.status,
+    remoteStatus: sub?.userStatus,
+    localExpireAt: subRow?.expireAt,
+    remoteExpireAt: sub?.expiresAt ? new Date(sub.expiresAt) : null,
+    remoteDaysLeft: sub?.daysLeft,
+    graceExpireAt: subRow?.graceExpireAt,
+    unlimitedDuration,
+    pendingSync: subRow?.pendingSync,
+    remoteUnavailable: remnawaveErrorStatus !== null,
+    now,
+  })
+  const subscriptionStatus = subscriptionState.status
+  const subscriptionExpired = subscriptionState.requiresRenewal
+  const expiresAt = subscriptionState.expireAt
+  const daysLeft = subscriptionState.daysLeft ?? 0
+  const graceActive = subscriptionState.phase === 'grace'
+  const effectiveExpireAt = subscriptionState.expireAt
   const expiresAtLabel = unlimitedDuration ? 'Бессрочно' : expiresAt?.toLocaleDateString('ru-RU', {
     day: 'numeric',
     month: 'long',
     year: 'numeric',
   }) ?? null
-  const primaryAction = subscriptionExpired || (!unlimitedDuration && daysLeft <= 7)
+  const primaryAction = subscriptionState.phase === 'paused'
+    ? {
+        href: '/dashboard/billing#auto-renewal',
+        label: 'Возобновить подписку',
+        icon: <CreditCard className="h-4 w-4" />,
+      }
+    : subscriptionState.phase === 'syncing'
+      ? {
+          href: '/dashboard/subscription',
+          label: 'Проверить доступ',
+          icon: <KeyRound className="h-4 w-4" />,
+        }
+      : subscriptionExpired || (!unlimitedDuration && daysLeft <= 7)
     ? {
         href: '/dashboard/plans?intent=renew',
         label: subscriptionExpired ? 'Возобновить доступ' : 'Продлить подписку',
@@ -166,8 +188,7 @@ export default async function DashboardHome() {
   const whitelistAddonPaused = whitelistAddonPausedSeconds > 0n
   const canBuyWhitelistAddon = Boolean(
     whitelistAddonRow
-    && !subscriptionExpired
-    && ['ACTIVE', 'LIMITED'].includes(subscriptionStatus)
+    && subscriptionState.usable
     && effectiveExpireAt
     && effectiveExpireAt > now
   )
@@ -195,7 +216,7 @@ export default async function DashboardHome() {
     && currentDeviceLimit
     && currentDeviceLimit < subRow.plan.maxDeviceLimit
     && subRow.plan.extraDevicePriceKopecks > 0
-    && !subscriptionExpired
+    && subscriptionState.usable
     && ['ACTIVE', 'LIMITED'].includes(subRow.status)
     && deviceAddonExpireAt
     && deviceAddonExpireAt.getTime() > Date.now()
@@ -223,7 +244,7 @@ export default async function DashboardHome() {
               <div className="mt-1 opacity-80">
                 {remnawaveErrorStatus === 404
                   ? 'Локальная подписка сохранена. Если повторная загрузка не поможет, обратитесь в поддержку.'
-                  : 'Срок показан по данным кабинета, трафик временно недоступен.'}
+                  : `Срок показан по данным кабинета${subRow?.lastSyncedAt ? ` от ${subRow.lastSyncedAt.toLocaleString('ru-RU')}` : ''}, трафик временно недоступен.`}
               </div>
             </div>
           </div>
@@ -249,14 +270,18 @@ export default async function DashboardHome() {
               {unlimitedDuration
                 ? 'Бессрочно'
                 : subRow || sub
-                  ? formatSubscriptionDaysLeft(daysLeft, subscriptionStatus)
+                  ? subscriptionState.phase === 'paused'
+                    ? 'На паузе'
+                    : formatSubscriptionDaysLeft(daysLeft, subscriptionStatus)
                   : 'Нет данных'}
             </strong>
             <p className={styles.accessDescription}>
-              {graceActive
+              {subscriptionState.remoteUnavailable
+                ? subscriptionState.description
+                : graceActive
                 ? `Льготный доступ до ${subRow?.graceExpireAt?.toLocaleString('ru-RU')}. Оплатите тариф, чтобы сохранить подключение.`
-                : subscriptionExpired
-                  ? 'Продлите подписку и продолжайте пользоваться привычным подключением.'
+                : subscriptionState.phase === 'paused' || subscriptionState.phase === 'syncing' || subscriptionExpired
+                  ? subscriptionState.description
                   : unlimitedDuration
                     ? 'Продление не требуется. Подключайте свои устройства и пользуйтесь VPN.'
                     : expiresAtLabel

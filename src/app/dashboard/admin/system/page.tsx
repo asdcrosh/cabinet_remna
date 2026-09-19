@@ -9,17 +9,20 @@ import { getPublicPaymentProviderSettings } from '@/lib/payment-settings'
 import { BrandingSettingsPanel } from '@/components/admin/branding-settings-panel'
 import { getPublicBrandSettings } from '@/lib/branding'
 import { AdminSystemTabs } from '@/components/admin/admin-system-tabs'
+import { SupportSettingsPanel } from '@/components/admin/support-settings-panel'
+import { getSupportSettings } from '@/lib/support-settings'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Настройки' }
 
 export default async function AdminSystemPage() {
   await requireAdminPage()
-  const [report, features, paymentSettings, branding] = await Promise.all([
+  const [report, features, paymentSettings, branding, supportSettings] = await Promise.all([
     getSystemHealth(),
     getFeatureFlags(),
     getPublicPaymentProviderSettings(),
     getPublicBrandSettings(),
+    getSupportSettings(),
   ])
   const errorCount = report.checks.filter((item) => item.status === 'error').length
   const warningCount = report.checks.filter((item) => item.status === 'warn').length
@@ -67,6 +70,14 @@ export default async function AdminSystemPage() {
           tone: configuredPaymentCount > 0 ? 'success' : 'warning',
           keywords: ['юкасса', 'yookassa', 'payanyway', 'platega', 'webhook', 'оплата'],
           children: <PaymentProviderSettingsPanel initialSettings={paymentSettings} />,
+        },
+        {
+          id: 'support',
+          title: 'Поддержка',
+          description: 'SLA и шаблоны',
+          badge: `${supportSettings.quickReplies.length} шаблонов`,
+          keywords: ['поддержка', 'sla', 'ответы', 'шаблоны', 'операторы'],
+          children: <SupportSettingsPanel initialSettings={supportSettings} />,
         },
         {
           id: 'health',

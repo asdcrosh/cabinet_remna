@@ -3,22 +3,27 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const mocks = vi.hoisted(() => ({
   createPayment: vi.fn(),
   paymentFindUnique: vi.fn(),
+  paymentFindFirst: vi.fn(),
   paymentCreate: vi.fn(),
   paymentUpdate: vi.fn(),
   autoRenewalFindMany: vi.fn(),
+  autoRenewalFindFirst: vi.fn(),
   autoRenewalUpdate: vi.fn(),
   transactionAutoRenewalUpdate: vi.fn(),
   notifyUser: vi.fn(),
+  withDistributedLock: vi.fn(),
 }))
 
 vi.mock('./prisma', () => ({
   prisma: {
     autoRenewal: {
       findMany: mocks.autoRenewalFindMany,
+      findFirst: mocks.autoRenewalFindFirst,
       update: mocks.autoRenewalUpdate,
     },
     payment: {
       findUnique: mocks.paymentFindUnique,
+      findFirst: mocks.paymentFindFirst,
       update: mocks.paymentUpdate,
     },
     $transaction: (callback: (tx: unknown) => unknown) => callback({
@@ -35,6 +40,7 @@ vi.mock('./payment-settings-crypto', () => ({
 vi.mock('./notifications', () => ({ notifyUser: mocks.notifyUser }))
 vi.mock('./logger', () => ({ logError: vi.fn(), logInfo: vi.fn(), logWarn: vi.fn() }))
 vi.mock('./app-url', () => ({ getAppUrl: () => 'https://cabinet.example' }))
+vi.mock('./distributed-lock', () => ({ withDistributedLock: mocks.withDistributedLock }))
 
 import { processDueAutoRenewals } from './auto-renewal'
 
@@ -42,11 +48,12 @@ describe('automatic renewal device pricing', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mocks.paymentFindUnique.mockResolvedValue(null)
+    mocks.paymentFindFirst.mockResolvedValue(null)
     mocks.paymentCreate.mockResolvedValue({ id: 'payment-1', amountKopecks: 110000 })
     mocks.paymentUpdate.mockResolvedValue({})
     mocks.transactionAutoRenewalUpdate.mockResolvedValue({})
     mocks.createPayment.mockResolvedValue({ id: 'yoo-1', status: 'pending' })
-    mocks.autoRenewalFindMany.mockResolvedValue([{
+    const setting = {
       id: 'renewal-1',
       userId: 'user-1',
       planId: 'plan-1',
@@ -78,7 +85,13 @@ describe('automatic renewal device pricing', () => {
         isPromo: false,
         updatedAt: new Date('2026-08-01T00:00:00.000Z'),
       },
-    }])
+    }
+    mocks.autoRenewalFindMany.mockResolvedValue([setting])
+    mocks.autoRenewalFindFirst.mockImplementation(async () => (await mocks.autoRenewalFindMany())[0] ?? null)
+    mocks.withDistributedLock.mockImplementation(async (_key: string, task: () => Promise<unknown>) => ({
+      acquired: true,
+      value: await task(),
+    }))
   })
 
   it('charges and provisions the frozen selected device count', async () => {
@@ -147,5 +160,60 @@ describe('automatic renewal device pricing', () => {
       }),
     })
     expect(mocks.createPayment).toHaveBeenCalledWith(expect.objectContaining({ amount: 960 }))
+  })
+
+  it('does not charge when a manual subscription checkout is pending', async () => {
+    mocks.paymentFindFirst.mockResolvedValue({ id: 'manual-payment' })
+
+    await expect(processDueAutoRenewals()).resolves.toEqual({ checked: 1, created: 0, failed: 0 })
+
+    expect(mocks.paymentCreate).not.toHaveBeenCalled()
+    expect(mocks.createPayment).not.toHaveBeenCalled()
+  })
+
+  it('does not use stale settings after auto-renewal was disabled', async () => {
+    mocks.autoRenewalFindFirst.mockResolvedValue(null)
+
+    await expect(processDueAutoRenewals()).resolves.toEqual({ checked: 1, created: 0, failed: 0 })
+
+    expect(mocks.paymentFindFirst).not.toHaveBeenCalled()
+    expect(mocks.createPayment).not.toHaveBeenCalled()
+  })
+
+  it('leaves a due renewal for the next worker when the user lock is busy', async () => {
+    mocks.withDistributedLock.mockResolvedValue({ acquired: false })
+
+    await expect(processDueAutoRenewals()).resolves.toEqual({ checked: 1, created: 0, failed: 0 })
+
+    expect(mocks.autoRenewalFindFirst).not.toHaveBeenCalled()
+    expect(mocks.createPayment).not.toHaveBeenCalled()
+  })
+
+  it('pauses charging when the current price exceeds the accepted amount', async () => {
+    const [setting] = await mocks.autoRenewalFindMany()
+    setting.plan.priceKopecks = 120000
+    mocks.autoRenewalFindMany.mockResolvedValue([setting])
+
+    await expect(processDueAutoRenewals()).resolves.toEqual({ checked: 1, created: 0, failed: 0 })
+
+    expect(mocks.autoRenewalUpdate).toHaveBeenCalledWith({
+      where: { id: 'renewal-1' },
+      data: expect.objectContaining({ status: 'PAUSED', nextChargeAt: null }),
+    })
+    expect(mocks.createPayment).not.toHaveBeenCalled()
+  })
+
+  it('pauses charging when the accepted device limit is no longer valid', async () => {
+    const [setting] = await mocks.autoRenewalFindMany()
+    setting.plan.maxDeviceLimit = 6
+    mocks.autoRenewalFindMany.mockResolvedValue([setting])
+
+    await expect(processDueAutoRenewals()).resolves.toEqual({ checked: 1, created: 0, failed: 0 })
+
+    expect(mocks.autoRenewalUpdate).toHaveBeenCalledWith({
+      where: { id: 'renewal-1' },
+      data: expect.objectContaining({ status: 'PAUSED', nextChargeAt: null }),
+    })
+    expect(mocks.createPayment).not.toHaveBeenCalled()
   })
 })

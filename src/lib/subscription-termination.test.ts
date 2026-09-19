@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => {
     TestRemnawaveError,
     userFindUnique: vi.fn(),
     paymentFindUnique: vi.fn(),
+    paymentFindFirst: vi.fn(),
     subscriptionUpdateMany: vi.fn(),
     deviceDeleteMany: vi.fn(),
     transaction: vi.fn(),
@@ -28,7 +29,7 @@ const mocks = vi.hoisted(() => {
 vi.mock('./prisma', () => ({
   prisma: {
     user: { findUnique: mocks.userFindUnique },
-    payment: { findUnique: mocks.paymentFindUnique },
+    payment: { findUnique: mocks.paymentFindUnique, findFirst: mocks.paymentFindFirst },
     $transaction: mocks.transaction,
   },
 }))
@@ -74,6 +75,7 @@ describe('terminateUserSubscription', () => {
       subscriptions: [{ id: 'subscription-1' }],
     })
     mocks.paymentFindUnique.mockResolvedValue(null)
+    mocks.paymentFindFirst.mockResolvedValue(null)
     mocks.disableUser.mockResolvedValue({ response: { id: 42, status: 'DISABLED' } })
     mocks.updateUser.mockResolvedValue({ response: { id: 42, status: 'DISABLED' } })
     mocks.resetTraffic.mockResolvedValue({ response: { usedTrafficBytes: '0' } })
@@ -206,5 +208,36 @@ describe('terminateUserSubscription', () => {
         whitelistAddonPaymentId: null,
       }),
     })
+  })
+
+  it('preserves access bought by a newer provisioned payment when an older payment is refunded', async () => {
+    mocks.paymentFindUnique.mockResolvedValue({
+      addonSnapshot: null,
+      purchaseType: 'SUBSCRIPTION',
+      paidAt: new Date('2026-08-01T00:00:00.000Z'),
+      createdAt: new Date('2026-08-01T00:00:00.000Z'),
+      subscriptionProvisionedAt: new Date('2026-08-01T00:01:00.000Z'),
+    })
+    mocks.paymentFindFirst.mockResolvedValue({ id: 'payment-newer' })
+
+    await expect(terminateUserSubscription({
+      userId: 'user-1',
+      source: 'YOOKASSA_REFUND',
+      paymentId: 'payment-old',
+    })).resolves.toEqual({ hadSubscription: true, preservedByNewerPayment: true })
+
+    expect(mocks.paymentFindFirst).toHaveBeenCalledWith({
+      where: {
+        userId: 'user-1',
+        id: { not: 'payment-old' },
+        purchaseType: 'SUBSCRIPTION',
+        status: 'SUCCEEDED',
+        subscriptionProvisionedAt: { gt: new Date('2026-08-01T00:01:00.000Z') },
+      },
+      select: { id: true },
+    })
+    expect(mocks.disableUser).not.toHaveBeenCalled()
+    expect(mocks.transaction).not.toHaveBeenCalled()
+    expect(mocks.notifySubscriptionTerminated).not.toHaveBeenCalled()
   })
 })

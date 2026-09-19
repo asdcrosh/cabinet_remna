@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import { PlanPurchaseOutcome } from './plan-purchase-outcome'
-import { PlanCard, type PlanCardProps } from './plan-card'
+import { PlanCard, PurchaseSummary, type PlanCardProps } from './plan-card'
 
 const plan: PlanCardProps = {
   id: 'test-plan', name: 'Стандарт', description: null, price: '130 ₽',
@@ -45,5 +45,20 @@ describe('объяснение покупки тарифа', () => {
     expect(summary).toContain('+70 ₽')
     expect(summary).toContain('487 ₽')
     expect(html.slice(0, html.indexOf('Итоговая сумма'))).toContain('487 ₽')
+  })
+
+  it('показывает единый итог перед оплатой', () => {
+    const html = renderToStaticMarkup(<PurchaseSummary
+      unlimitedDuration={false} durationDays={7} unlimitedDevices={false} deviceLimit={8}
+      extraDeviceCount={3} extraDeviceAmountKopecks={30000} discountKopecks={3250}
+      discountLabel="SALE25" whitelistAddonKopecks={7000} checkoutTotalKopecks={46650}
+      autoRenewal renewalTotalKopecks={50000}
+    />)
+    expect(html).toContain('Итог покупки')
+    expect(html).toContain('К оплате сейчас')
+    expect(html).toContain('Следующее автопродление')
+    expect(html).toContain('466,50 ₽')
+    expect(html).toContain('500 ₽')
+    expect(html).toContain('SALE25')
   })
 })

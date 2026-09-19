@@ -11,12 +11,30 @@ import { trimUserDevicesToLimit } from './hwid-device-limit'
 import { readPlanPurchaseSnapshot } from './plan-purchase'
 import { provisionWhitelistAddon, readBundledWhitelistAddonSnapshot } from './whitelist-addon'
 import { provisionDeviceLimitAddon } from './device-limit-addon'
+import { withDistributedLock } from './distributed-lock'
 
 export interface ProvisionPaymentSubscriptionInput extends EnsureSubscriptionInput {
   paymentId: string
 }
 
 export async function provisionPaymentSubscription(input: ProvisionPaymentSubscriptionInput) {
+  const locked = await withDistributedLock(
+    `payment-provisioning:${input.userId}`,
+    () => provisionPaymentSubscriptionLocked(input),
+    { timeoutMs: 120_000 }
+  )
+  if (!locked.acquired) throw new ProvisioningInProgressError(input.userId)
+  return locked.value
+}
+
+export class ProvisioningInProgressError extends Error {
+  constructor(userId: string) {
+    super(`Provisioning is already running for user ${userId}`)
+    this.name = 'ProvisioningInProgressError'
+  }
+}
+
+async function provisionPaymentSubscriptionLocked(input: ProvisionPaymentSubscriptionInput) {
   const payment = await prisma.payment.findUnique({
     where: { id: input.paymentId },
     include: {

@@ -5,6 +5,7 @@ import { rateLimit } from '@/lib/rate-limit'
 import { createPasswordResetToken, sendPasswordResetLink } from '@/lib/password-reset'
 import { assertSameOrigin } from '@/lib/security'
 import { logError } from '@/lib/logger'
+import { sanitizeInternalNext } from '@/lib/auth/next-path'
 
 export const runtime = 'nodejs'
 
@@ -46,7 +47,13 @@ export async function POST(req: Request) {
   if (user) {
     try {
       const token = await createPasswordResetToken(user.id)
-      await sendPasswordResetLink({ userId: user.id, email: user.email, name: user.name, token })
+      await sendPasswordResetLink({
+        userId: user.id,
+        email: user.email,
+        name: user.name,
+        token,
+        next: sanitizeInternalNext(parsed.data.next),
+      })
     } catch (error) {
       logError('password_reset.request_failed', error, { userId: user.id })
     }

@@ -127,6 +127,59 @@ describe('admin user merge', () => {
     expect(mocks.writeAuditLog).not.toHaveBeenCalled()
   })
 
+  it('blocks using a privileged account as the merge target', async () => {
+    mocks.sourceFindUnique.mockResolvedValueOnce(sourceUser)
+    mocks.targetFindUnique.mockResolvedValueOnce({ ...targetUser, role: 'ADMIN' })
+
+    await expect(
+      mergeTechnicalTelegramUserIntoEmailUser({
+        sourceUserId: sourceUser.id,
+        targetUserId: targetUser.id,
+        actorId: 'admin-user',
+      })
+    ).rejects.toMatchObject({ status: 400 })
+
+    expect(mocks.relationUpdateMany).not.toHaveBeenCalled()
+  })
+
+  it('blocks merging a regular email account through the Telegram merge endpoint', async () => {
+    mocks.sourceFindUnique.mockResolvedValueOnce({
+      ...sourceUser,
+      email: 'second@example.com',
+      emailVerifiedAt: new Date(),
+    })
+    mocks.targetFindUnique.mockResolvedValueOnce(targetUser)
+
+    await expect(
+      mergeTechnicalTelegramUserIntoEmailUser({
+        sourceUserId: sourceUser.id,
+        targetUserId: targetUser.id,
+        actorId: 'admin-user',
+      })
+    ).rejects.toMatchObject({ status: 400 })
+
+    expect(mocks.relationUpdateMany).not.toHaveBeenCalled()
+  })
+
+  it('stops before transferring data when external identities conflict', async () => {
+    mocks.sourceFindUnique.mockResolvedValueOnce(sourceUser)
+    mocks.targetFindUnique.mockResolvedValueOnce({
+      ...targetUser,
+      remnawaveUuid: 'different-remnawave-user',
+    })
+
+    await expect(
+      mergeTechnicalTelegramUserIntoEmailUser({
+        sourceUserId: sourceUser.id,
+        targetUserId: targetUser.id,
+        actorId: 'admin-user',
+      })
+    ).rejects.toMatchObject({ status: 409 })
+
+    expect(mocks.relationUpdateMany).not.toHaveBeenCalled()
+    expect(mocks.userUpdate).not.toHaveBeenCalled()
+  })
+
   it('moves source-owned records into the target and writes an audit log', async () => {
     mocks.sourceFindUnique.mockResolvedValueOnce(sourceUser)
     mocks.targetFindUnique.mockResolvedValueOnce(targetUser)
@@ -162,6 +215,7 @@ describe('admin user merge', () => {
       data: expect.objectContaining({
         email: `merged-${sourceUser.id}@pending.invalid`,
         telegramUsername: null,
+        sessionVersion: { increment: 1 },
       }),
     })
     expect(mocks.writeAuditLog).toHaveBeenCalledWith(expect.objectContaining({
@@ -223,5 +277,7 @@ function createTx() {
       update: mocks.relationUpdate,
       delete: mocks.relationDelete,
     },
+    emailVerificationToken: { deleteMany: mocks.relationUpdateMany },
+    passwordResetToken: { deleteMany: mocks.relationUpdateMany },
   }
 }

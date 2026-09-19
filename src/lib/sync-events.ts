@@ -15,6 +15,7 @@ export async function markSyncSucceeded(input: SyncEventInput) {
     status: 'SUCCEEDED',
     lastError: null,
     nextRetryAt: null,
+    lockedAt: null,
     lastSyncedAt: new Date(),
   })
 }
@@ -24,6 +25,7 @@ export async function markSyncSkipped(input: SyncEventInput, reason: string) {
     status: 'SKIPPED',
     lastError: reason.slice(0, 1000),
     nextRetryAt: null,
+    lockedAt: null,
   })
 }
 
@@ -44,12 +46,14 @@ export async function markSyncFailed(input: SyncEventInput, error: unknown) {
       attempts,
       lastError: message.slice(0, 1000),
       nextRetryAt: computeNextRetryAt(attempts),
+      lockedAt: null,
     },
     update: {
       status: 'FAILED',
       attempts,
       lastError: message.slice(0, 1000),
       nextRetryAt: computeNextRetryAt(attempts),
+      lockedAt: null,
       ...(input.metadata ? { metadata: input.metadata } : {}),
     },
   }).catch((eventError) => {
@@ -66,12 +70,13 @@ export async function markSyncPending(input: SyncEventInput) {
     status: 'PENDING',
     lastError: null,
     nextRetryAt: new Date(),
+    lockedAt: null,
   })
 }
 
 async function upsertSyncEvent(
   input: SyncEventInput,
-  data: Pick<Prisma.SyncEventUncheckedUpdateInput, 'status' | 'lastError' | 'nextRetryAt' | 'lastSyncedAt'>
+  data: Pick<Prisma.SyncEventUncheckedUpdateInput, 'status' | 'lastError' | 'nextRetryAt' | 'lockedAt' | 'lastSyncedAt'>
 ) {
   if (!prisma.syncEvent) return
   await prisma.syncEvent.upsert({
@@ -81,6 +86,7 @@ async function upsertSyncEvent(
       status: data.status as SyncEventStatus,
       lastError: data.lastError as string | null,
       nextRetryAt: data.nextRetryAt as Date | null,
+      lockedAt: data.lockedAt as Date | null,
       lastSyncedAt: data.lastSyncedAt as Date | null | undefined,
     },
     update: {

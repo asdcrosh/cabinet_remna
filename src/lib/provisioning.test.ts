@@ -22,6 +22,7 @@ const mocks = vi.hoisted(() => {
   const logError = vi.fn()
   const logWarn = vi.fn()
   const trimUserDevicesToLimit = vi.fn()
+  const withDistributedLock = vi.fn()
 
   return {
     prisma,
@@ -36,6 +37,7 @@ const mocks = vi.hoisted(() => {
     logWarn,
     trimUserDevicesToLimit,
     subscription,
+    withDistributedLock,
   }
 })
 
@@ -61,6 +63,9 @@ vi.mock('./logger', () => ({ logError: mocks.logError, logWarn: mocks.logWarn })
 vi.mock('./hwid-device-limit', () => ({
   trimUserDevicesToLimit: mocks.trimUserDevicesToLimit,
 }))
+vi.mock('./distributed-lock', () => ({
+  withDistributedLock: mocks.withDistributedLock,
+}))
 
 import { provisionPaymentSubscription } from './provisioning'
 
@@ -85,6 +90,10 @@ describe('provisionPaymentSubscription', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-01-01T00:00:00.000Z'))
     mocks.trimUserDevicesToLimit.mockResolvedValue({ total: 0, removed: 0 })
+    mocks.withDistributedLock.mockImplementation(async (
+      _key: string,
+      task: () => Promise<unknown>
+    ) => ({ acquired: true, value: await task() }))
   })
 
   afterEach(() => {
@@ -226,6 +235,68 @@ describe('provisionPaymentSubscription', () => {
     })
   })
 
+  it('uses the immutable purchase snapshot after the plan is edited', async () => {
+    mocks.prisma.payment.findUnique.mockResolvedValue({
+      id: 'pay-1',
+      planSnapshot: {
+        version: 1,
+        id: 'plan-1',
+        remnashopPlanId: 10,
+        name: 'Условия при оплате',
+        durationDays: 30,
+        unlimitedDuration: false,
+        trafficLimitGb: 200,
+        unlimitedDevices: false,
+        baseDeviceLimit: 4,
+        maxDeviceLimit: 10,
+        selectedDeviceLimit: 6,
+        extraDevicePriceKopecks: 10000,
+        extraDeviceCount: 2,
+        extraDeviceAmountKopecks: 20000,
+        basePriceKopecks: 70000,
+        originalAmountKopecks: 90000,
+        activeInternalSquads: ['paid-squad'],
+        deviceLimitSelectionConfirmed: true,
+        switchFromPlan: null,
+      },
+      subscriptionProvisionedAt: null,
+      subscription: null,
+      provisioningJob: null,
+    })
+    mocks.prisma.provisioningJob.upsert.mockResolvedValue({ id: 'job-1', attempts: 1 })
+    mocks.ensureRemnawaveSubscription.mockResolvedValue({
+      subscription: mocks.subscription,
+      remnawaveUser: null,
+      isNew: false,
+      idempotent: false,
+    })
+
+    await provisionPaymentSubscription({
+      ...input,
+      plan: {
+        ...plan,
+        name: 'Изменённый тариф',
+        durationDays: 90,
+        trafficLimitGb: null,
+        deviceLimit: 10,
+        activeInternalSquads: ['new-squad'],
+      },
+    })
+
+    expect(mocks.ensureRemnawaveSubscription).toHaveBeenCalledWith(expect.objectContaining({
+      plan: {
+        id: 'plan-1',
+        name: 'Условия при оплате',
+        durationDays: 30,
+        unlimitedDuration: false,
+        trafficLimitGb: 200,
+        deviceLimit: 6,
+        unlimitedDevices: false,
+        activeInternalSquads: ['paid-squad'],
+      },
+    }))
+  })
+
   it('passes a bundled whitelist add-on to subscription provisioning', async () => {
     mocks.prisma.payment.findUnique.mockResolvedValue({
       id: 'pay-1',
@@ -288,5 +359,14 @@ describe('provisionPaymentSubscription', () => {
       expect.any(Error),
       expect.objectContaining({ paymentId: 'pay-1' })
     )
+  })
+
+  it('does not start a second provisioning operation for the same user', async () => {
+    mocks.withDistributedLock.mockResolvedValue({ acquired: false })
+
+    await expect(provisionPaymentSubscription(input)).rejects.toMatchObject({
+      name: 'ProvisioningInProgressError',
+    })
+    expect(mocks.prisma.payment.findUnique).not.toHaveBeenCalled()
   })
 })

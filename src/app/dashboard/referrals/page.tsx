@@ -17,10 +17,19 @@ export const metadata = { title: 'Пригласить друга' }
 
 type RewardStatus = 'PENDING' | 'PROCESSING' | 'APPLIED'
 
-export default async function ReferralsPage() {
+const REFERRALS_PAGE_SIZE = 50
+
+export default async function ReferralsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string }>
+}) {
   if (!await isFeatureEnabled('referrals')) notFound()
   const session = await getCurrentUser()
   if (!session) redirect('/login')
+  const params = await searchParams
+  const requestedPage = Number(params.page)
+  const page = Number.isInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1
 
   const settings = await getEffectiveReferralSettings()
   const referralCode = await ensureUserReferralCode(session.uid)
@@ -54,7 +63,8 @@ export default async function ReferralsPage() {
     prisma.user.findMany({
       where: { referredById: session.uid },
       orderBy: { createdAt: 'desc' },
-      take: 50,
+      skip: (page - 1) * REFERRALS_PAGE_SIZE,
+      take: REFERRALS_PAGE_SIZE,
       select: {
         id: true,
         email: true,
@@ -91,6 +101,8 @@ export default async function ReferralsPage() {
   const appliedDays = appliedReward._sum.bonusDays ?? 0
   const pendingDays = pendingReward._sum.bonusDays ?? 0
   const conversion = invitedCount > 0 ? Math.round((paidCount / invitedCount) * 100) : 0
+  const pages = Math.max(1, Math.ceil(invitedCount / REFERRALS_PAGE_SIZE))
+  if (page > pages) redirect(page === 1 ? '/dashboard/referrals' : `/dashboard/referrals?page=${pages}`)
 
   return (
     <div className="page-stack">
@@ -120,7 +132,7 @@ export default async function ReferralsPage() {
             <h2 className="text-lg font-semibold sm:text-xl">Приглашённые</h2>
             <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Кто зарегистрировался и когда начислится бонус.</p>
           </div>
-          {invitedCount > 0 && <div className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-500 dark:bg-white/10 dark:text-slate-300">{referrals.length} из {invitedCount}</div>}
+          {invitedCount > 0 && <div className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-500 dark:bg-white/10 dark:text-slate-300">{(page - 1) * REFERRALS_PAGE_SIZE + 1}–{Math.min(page * REFERRALS_PAGE_SIZE, invitedCount)} из {invitedCount}</div>}
         </div>
 
         <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.035]">
@@ -166,6 +178,17 @@ export default async function ReferralsPage() {
             </div>
           )}
         </div>
+        {pages > 1 && (
+          <nav className="mt-3 grid grid-cols-3 items-center" aria-label="Страницы приглашённых">
+            {page > 1
+              ? <a href={page === 2 ? '/dashboard/referrals' : `/dashboard/referrals?page=${page - 1}`} className="btn-secondary min-h-10 justify-self-start px-3 py-2">Назад</a>
+              : <span />}
+            <span className="text-center text-xs font-medium text-slate-500">{page} из {pages}</span>
+            {page < pages
+              ? <a href={`/dashboard/referrals?page=${page + 1}`} className="btn-secondary min-h-10 justify-self-end px-3 py-2">Дальше</a>
+              : <span />}
+          </nav>
+        )}
       </section>
     </div>
   )

@@ -32,6 +32,12 @@ export const supportCategories = [
     description: 'Медленная работа, высокий пинг или нестабильное соединение.',
   },
   {
+    value: 'account',
+    label: 'Данные аккаунта',
+    subject: 'Запрос по данным аккаунта',
+    description: 'Экспорт персональных данных или запрос на удаление аккаунта.',
+  },
+  {
     value: 'general',
     label: 'Другое',
     subject: 'Другой вопрос',
@@ -43,12 +49,13 @@ export type SupportCategoryValue = typeof supportCategories[number]['value']
 
 export const createSupportTicketSchema = z.object({
   subject: z.never().optional(),
-  category: z.enum(['payment', 'connection', 'subscription', 'devices', 'speed', 'general']).default('connection'),
+  category: z.enum(['payment', 'connection', 'subscription', 'devices', 'speed', 'account', 'general']).default('connection'),
   message: z.string().trim().min(5).max(3000),
 })
 
 export const createSupportMessageSchema = z.object({
   message: z.string().trim().min(1).max(3000),
+  clientMessageId: z.string().uuid().optional(),
 })
 
 export const createSupportInternalNoteSchema = z.object({
@@ -58,6 +65,7 @@ export const createSupportInternalNoteSchema = z.object({
 export const updateSupportTicketSchema = z.object({
   status: z.enum(['OPEN', 'WAITING_ADMIN', 'WAITING_USER', 'CLOSED']).optional(),
   assigneeId: z.string().trim().min(1).nullable().optional(),
+  expectedUpdatedAt: z.string().datetime(),
 }).refine((value) => value.status !== undefined || value.assigneeId !== undefined, {
   message: 'Укажите статус или исполнителя.',
 })

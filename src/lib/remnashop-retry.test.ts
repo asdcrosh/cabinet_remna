@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   markSyncSucceeded: vi.fn(),
   markSyncFailed: vi.fn(),
   syncEventFindMany: vi.fn(),
+  syncEventUpdateMany: vi.fn(),
   userFindUnique: vi.fn(),
   syncLinkedTelegramUser: vi.fn(),
 }))
@@ -19,6 +20,7 @@ vi.mock('./prisma', () => ({
     },
     syncEvent: {
       findMany: mocks.syncEventFindMany,
+      updateMany: mocks.syncEventUpdateMany,
     },
   },
 }))
@@ -60,6 +62,7 @@ describe('Remnashop sync retries', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     process.env.REMNASHOP_DATABASE_URL = 'postgresql://remnashop@db/remnashop'
+    mocks.syncEventUpdateMany.mockResolvedValue({ count: 1 })
   })
 
   it('collapses missing promo write access into one configuration issue', async () => {
@@ -108,12 +111,15 @@ describe('Remnashop sync retries', () => {
 
   it('stops retrying a Telegram identity that has no Remnashop subscription', async () => {
     mocks.syncEventFindMany.mockResolvedValue([{
+      id: 'event-1',
       direction: 'REMNASHOP_TO_CABINET',
       entityType: 'telegramIdentity',
       entityId: 'user-1',
       operation: 'sync',
       attempts: 300,
       metadata: null,
+      status: 'FAILED',
+      updatedAt: new Date('2026-09-18T12:00:00.000Z'),
     }])
     mocks.userFindUnique.mockResolvedValue({ telegramId: 123n })
     mocks.syncLinkedTelegramUser.mockResolvedValue({
@@ -135,6 +141,35 @@ describe('Remnashop sync retries', () => {
     }, 'У пользователя Remnashop нет подписки; профиль Remnawave пока не требуется.')
     expect(mocks.markSyncSucceeded).not.toHaveBeenCalled()
     expect(mocks.markSyncFailed).not.toHaveBeenCalled()
+  })
+
+  it('recovers a stale running event through an atomic lease claim', async () => {
+    const updatedAt = new Date('2026-09-18T11:00:00.000Z')
+    mocks.syncEventFindMany.mockResolvedValue([{
+      id: 'event-stale',
+      direction: 'REMNASHOP_TO_CABINET',
+      entityType: 'telegramIdentity',
+      entityId: 'user-1',
+      operation: 'sync',
+      attempts: 1,
+      metadata: null,
+      status: 'RUNNING',
+      lockedAt: new Date('2026-09-18T11:00:00.000Z'),
+      updatedAt,
+    }])
+    mocks.userFindUnique.mockResolvedValue({ telegramId: 123n })
+    mocks.syncLinkedTelegramUser.mockResolvedValue({ alreadyRunning: false, warnings: [] })
+
+    await expect(retryDueRemnashopSyncEvents({ lockTimeoutMs: 60_000 })).resolves.toEqual({
+      attempted: 1,
+      succeeded: 1,
+      failed: 0,
+    })
+    expect(mocks.syncEventUpdateMany).toHaveBeenCalledWith({
+      where: { id: 'event-stale', status: 'RUNNING', updatedAt },
+      data: { status: 'RUNNING', lockedAt: expect.any(Date), nextRetryAt: null },
+    })
+    expect(mocks.markSyncSucceeded).toHaveBeenCalled()
   })
 })
 

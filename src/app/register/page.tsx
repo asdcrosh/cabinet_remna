@@ -12,12 +12,12 @@ export const metadata = { title: 'Регистрация' }
 export default async function RegisterPage({
   searchParams,
 }: {
-  searchParams: Promise<{ ref?: string; plan?: string }>
+  searchParams: Promise<{ ref?: string; plan?: string; next?: string }>
 }) {
   const params = await searchParams
   const planId = params.plan?.trim().slice(0, 64)
   const nextPath = sanitizeInternalNext(
-    planId ? `/dashboard/plans?plan=${encodeURIComponent(planId)}` : undefined
+    planId ? `/dashboard/plans?plan=${encodeURIComponent(planId)}` : params.next
   )
   const yandexEnabled = Boolean(process.env.YANDEX_CLIENT_ID && process.env.YANDEX_CLIENT_SECRET)
   const session = await getCurrentUser()

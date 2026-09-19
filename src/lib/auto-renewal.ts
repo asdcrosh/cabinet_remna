@@ -18,7 +18,8 @@ import {
   WHITELIST_ADDON_RECEIPT_NAME,
 } from './whitelist-addon'
 import { isWhitelistAddonCurrentlyActive } from './whitelist-addon-policy'
-import { calculatePersonalDiscount } from './user-discounts'
+import { withDistributedLock } from './distributed-lock'
+import { calculateRenewalPricing, tryCalculateRenewalPricing } from './renewal-pricing'
 
 const HOUR_MS = 60 * 60 * 1000
 const DEFAULT_LEAD_HOURS = 24
@@ -104,20 +105,19 @@ export async function enableAutoRenewal(input: {
     throw new Error('Автопродление можно включить только для текущего тарифа')
   }
   const deviceLimit = subscription.deviceLimit ?? plan.deviceLimit
-  const pricing = calculateAutoRenewalPurchase(plan, deviceLimit)
   const whitelistAddonEnabled = Boolean(
     isWhitelistAddonCurrentlyActive(subscription)
     && plan.whitelistAddonEnabled
     && plan.whitelistAddonPriceKopecks > 0
     && plan.whitelistAddonInternalSquads.length > 0
   )
-  const personalDiscount = calculatePersonalDiscount(
-    plan.priceKopecks,
-    discountUser?.personalDiscountPercent ?? 0
+  const pricing = calculateRenewalPricing(
+    plan,
+    deviceLimit,
+    discountUser?.personalDiscountPercent ?? 0,
+    whitelistAddonEnabled ? plan.whitelistAddonPriceKopecks : 0
   )
-  const consentPriceKopecks = pricing.originalAmountKopecks
-    - (personalDiscount?.discountKopecks ?? 0)
-    + (whitelistAddonEnabled ? plan.whitelistAddonPriceKopecks : 0)
+  const consentPriceKopecks = pricing.totalAmountKopecks
 
   const existing = await prisma.autoRenewal.findUnique({ where: { userId: input.userId } })
   const hasMethod = Boolean(existing?.paymentMethodIdEncrypted)
@@ -258,16 +258,15 @@ export async function captureSavedPaymentMethod(input: {
     select: { expireAt: true, planId: true, deviceLimit: true },
   })
   const deviceLimit = payment.deviceLimit ?? subscription?.deviceLimit ?? payment.plan.deviceLimit
-  const pricing = calculateAutoRenewalPurchase(payment.plan, deviceLimit)
   const bundledWhitelistAddon = readBundledWhitelistAddonSnapshot(payment.addonSnapshot)
   const whitelistAddonEnabled = Boolean(bundledWhitelistAddon)
-  const personalDiscount = calculatePersonalDiscount(
-    payment.plan.priceKopecks,
-    payment.user.personalDiscountPercent
+  const pricing = calculateRenewalPricing(
+    payment.plan,
+    deviceLimit,
+    payment.user.personalDiscountPercent,
+    bundledWhitelistAddon?.priceKopecks ?? 0
   )
-  const consentPriceKopecks = pricing.originalAmountKopecks
-    - (personalDiscount?.discountKopecks ?? 0)
-    + (bundledWhitelistAddon?.priceKopecks ?? 0)
+  const consentPriceKopecks = pricing.totalAmountKopecks
   const consentAcceptedAt = checkoutConsentCurrent
     ? payment.autoRenewalConsentAcceptedAt!
     : setting!.consentAcceptedAt!
@@ -371,22 +370,18 @@ export async function refreshAutoRenewalSchedule(userId: string, paymentId?: str
   ])
   if (!subscription?.plan || subscription.plan.isPromo || subscription.plan.priceKopecks <= 0) return
   const subscriptionDeviceLimit = subscription.deviceLimit ?? subscription.plan.deviceLimit
-  const currentPricing = tryCalculateAutoRenewalPurchase(subscription.plan, subscriptionDeviceLimit)
+  const currentPricing = tryCalculateRenewalPricing(
+    subscription.plan,
+    subscriptionDeviceLimit,
+    discountUser?.personalDiscountPercent ?? 0,
+    setting.whitelistAddonEnabled ? subscription.plan.whitelistAddonPriceKopecks : 0
+  )
   const addonConfigurationValid = !setting.whitelistAddonEnabled || (
     subscription.plan.whitelistAddonEnabled
     && subscription.plan.whitelistAddonPriceKopecks > 0
     && subscription.plan.whitelistAddonInternalSquads.length > 0
   )
-  const currentPersonalDiscount = currentPricing
-    ? calculatePersonalDiscount(
-        subscription.plan.priceKopecks,
-        discountUser?.personalDiscountPercent ?? 0
-      )
-    : null
-  const currentPriceKopecks = currentPricing
-    ? currentPricing.originalAmountKopecks - (currentPersonalDiscount?.discountKopecks ?? 0)
-      + (setting.whitelistAddonEnabled ? subscription.plan.whitelistAddonPriceKopecks : 0)
-    : null
+  const currentPriceKopecks = currentPricing?.totalAmountKopecks ?? null
   const consentCurrent = (
     !subscription.plan.unlimitedDuration
     && setting.planId === subscription.plan.id
@@ -477,8 +472,43 @@ export async function processDueAutoRenewals(options?: { limit?: number; shouldS
   for (const setting of settings) {
     if (options?.shouldStop?.()) break
     try {
-      const payment = await createAutoRenewalPayment(setting)
-      if (payment) created += 1
+      const locked = await withDistributedLock(
+        `billing-operation:${setting.userId}`,
+        async () => {
+          const freshSetting = await prisma.autoRenewal.findFirst({
+            where: {
+              id: setting.id,
+              status: { in: ['ACTIVE', 'RETRYING'] },
+              nextChargeAt: { lte: new Date() },
+              paymentMethodIdEncrypted: { not: null },
+              consentAcceptedAt: { not: null },
+              consentVersion: AUTO_RENEWAL_CONSENT_VERSION,
+              consentPriceKopecks: { not: null },
+              consentDurationDays: { not: null },
+            },
+            include: {
+              user: { select: { id: true, email: true, personalDiscountPercent: true } },
+              plan: true,
+            },
+          })
+          if (!freshSetting) return null
+
+          const manualCheckout = await prisma.payment.findFirst({
+            where: {
+              userId: setting.userId,
+              origin: 'MANUAL',
+              purchaseType: 'SUBSCRIPTION',
+              status: 'PENDING',
+            },
+            select: { id: true },
+          })
+          if (manualCheckout) return null
+
+          return createAutoRenewalPayment(freshSetting)
+        },
+        { timeoutMs: 30_000 }
+      )
+      if (locked.acquired && locked.value) created += 1
     } catch (error) {
       failed += 1
       logError('auto_renewal.create_failed', error, { autoRenewalId: setting.id, userId: setting.userId })
@@ -488,19 +518,18 @@ export async function processDueAutoRenewals(options?: { limit?: number; shouldS
 }
 
 async function createAutoRenewalPayment(setting: DueAutoRenewal) {
-  const pricing = tryCalculateAutoRenewalPurchase(setting.plan, setting.deviceLimit)
-  const personalDiscount = pricing
-    ? calculatePersonalDiscount(setting.plan.priceKopecks, setting.user.personalDiscountPercent)
-    : null
   const addonConfigurationValid = !setting.whitelistAddonEnabled || (
     setting.plan.whitelistAddonEnabled
     && setting.plan.whitelistAddonPriceKopecks > 0
     && setting.plan.whitelistAddonInternalSquads.length > 0
   )
-  const totalAmountKopecks = pricing
-    ? pricing.originalAmountKopecks - (personalDiscount?.discountKopecks ?? 0)
-      + (setting.whitelistAddonEnabled ? setting.plan.whitelistAddonPriceKopecks : 0)
-    : null
+  const pricing = tryCalculateRenewalPricing(
+    setting.plan,
+    setting.deviceLimit,
+    setting.user.personalDiscountPercent,
+    setting.whitelistAddonEnabled ? setting.plan.whitelistAddonPriceKopecks : 0
+  )
+  const totalAmountKopecks = pricing?.totalAmountKopecks ?? null
   if (
     !pricing
     || setting.plan.unlimitedDuration
@@ -551,11 +580,10 @@ async function createAutoRenewalPayment(setting: DueAutoRenewal) {
         planId: setting.planId,
         autoRenewalId: setting.id,
         amountKopecks: totalAmountKopecks!,
-        originalAmountKopecks: pricing.originalAmountKopecks
-          + (setting.whitelistAddonEnabled ? setting.plan.whitelistAddonPriceKopecks : 0),
-        discountPercent: personalDiscount?.discountPercent,
-        discountKopecks: personalDiscount?.discountKopecks ?? 0,
-        userDiscountType: personalDiscount ? 'PERSONAL' : undefined,
+        originalAmountKopecks: pricing.totalOriginalAmountKopecks,
+        discountPercent: pricing.discountKopecks > 0 ? pricing.discountPercent : undefined,
+        discountKopecks: pricing.discountKopecks,
+        userDiscountType: pricing.discountKopecks > 0 ? 'PERSONAL' : undefined,
         deviceLimit: pricing.selectedDeviceLimit,
         planSnapshot: planSnapshot as unknown as Prisma.InputJsonValue,
         ...(addonSnapshot
@@ -623,17 +651,6 @@ export function calculateAutoRenewalPurchase(
   deviceLimit: number
 ) {
   return calculatePlanPurchase(plan, deviceLimit)
-}
-
-function tryCalculateAutoRenewalPurchase(
-  plan: Pick<DevicePricedPlan, 'priceKopecks' | 'deviceLimit' | 'maxDeviceLimit' | 'extraDevicePriceKopecks'>,
-  deviceLimit: number
-) {
-  try {
-    return calculateAutoRenewalPurchase(plan, deviceLimit)
-  } catch {
-    return null
-  }
 }
 
 function chargeAt(expireAt: Date) {

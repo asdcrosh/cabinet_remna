@@ -48,8 +48,34 @@ describe('trimUserDevicesToLimit', () => {
     expect(result).toEqual({ total: 6, removed: 2 })
     expect(mocks.remnawave.deleteUserDevice).toHaveBeenNthCalledWith(1, { id: 42 }, 'device-1')
     expect(mocks.remnawave.deleteUserDevice).toHaveBeenNthCalledWith(2, { id: 42 }, 'device-2')
+    expect(mocks.prisma.device.deleteMany).toHaveBeenNthCalledWith(1, {
+      where: { userId: 'user-1', hwid: 'device-1' },
+    })
+    expect(mocks.prisma.device.deleteMany).toHaveBeenNthCalledWith(2, {
+      where: { userId: 'user-1', hwid: 'device-2' },
+    })
+  })
+
+  it('keeps local state consistent after a partial Remnawave failure', async () => {
+    mocks.remnawave.getUserDevices.mockResolvedValue({
+      response: {
+        total: 3,
+        devices: [
+          { hwid: 'newest', updatedAt: '2026-03-01T00:00:00.000Z' },
+          { hwid: 'middle', updatedAt: '2026-02-01T00:00:00.000Z' },
+          { hwid: 'oldest', updatedAt: '2026-01-01T00:00:00.000Z' },
+        ],
+      },
+    })
+    mocks.remnawave.deleteUserDevice
+      .mockResolvedValueOnce({ response: [] })
+      .mockRejectedValueOnce(new Error('panel unavailable'))
+
+    await expect(trimUserDevicesToLimit({ localUserId: 'user-1', deviceLimit: 1 }))
+      .rejects.toThrow('panel unavailable')
+    expect(mocks.prisma.device.deleteMany).toHaveBeenCalledTimes(1)
     expect(mocks.prisma.device.deleteMany).toHaveBeenCalledWith({
-      where: { userId: 'user-1', hwid: { in: ['device-1', 'device-2'] } },
+      where: { userId: 'user-1', hwid: 'oldest' },
     })
   })
 })

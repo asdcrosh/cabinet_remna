@@ -7,18 +7,16 @@ import Link from 'next/link'
 import { PageHeader } from '@/components/dashboard/page-header'
 import { PaymentSuccessBanner } from '@/components/dashboard/payment-success-banner'
 import { PaymentHistory } from '@/components/dashboard/payment-history'
-import {
-  getPendingPaymentTtlMs,
-  syncPaymentProvisioning,
-  type PaymentSyncResult,
-} from '@/lib/payment-sync'
+import { readPaymentBannerStatus } from '@/lib/payment-status-read'
 import { getFeatureFlags } from '@/lib/feature-flags'
 import { ArrowRight, CreditCard } from 'lucide-react'
 import { AutoRenewalCard } from '@/components/dashboard/auto-renewal-card'
-import { calculateAutoRenewalPurchase, getAutoRenewalState } from '@/lib/auto-renewal'
+import { getAutoRenewalState } from '@/lib/auto-renewal'
 import { getRetentionState } from '@/lib/subscription-retention'
-import { calculatePersonalDiscount } from '@/lib/user-discounts'
+import { tryCalculateRenewalPricing } from '@/lib/renewal-pricing'
 import type { Prisma } from '@prisma/client'
+import { resolveSubscriptionPresentation } from '@/lib/subscription-presentation'
+import { StatusBadge } from '@/components/dashboard/status-badge'
 
 export const dynamic = 'force-dynamic'
 const PAGE_SIZE = 20
@@ -49,13 +47,9 @@ export default async function BillingPage({
           ? { status: 'CANCELED' }
           : {}),
   }
-  const syncResult =
+  const paymentBannerStatus =
     params.paid === '1' && returnPaymentId
-      ? await syncPaymentProvisioning({
-          paymentId: returnPaymentId,
-          userId: session.uid,
-          cancelPendingOlderThanMs: getPendingPaymentTtlMs(),
-        })
+      ? await readPaymentBannerStatus(returnPaymentId, session.uid)
       : null
   const [[total, payments, currentSubscription], autoRenewal, retentionPause, discountUser] = await Promise.all([
     prisma.$transaction([
@@ -68,7 +62,7 @@ export default async function BillingPage({
         include: { plan: true, subscription: true },
       }),
       prisma.subscription.findFirst({
-        where: { userId: session.uid, status: { in: ['ACTIVE', 'LIMITED', 'PAUSED'] }, planId: { not: null } },
+        where: { userId: session.uid, planId: { not: null } },
         orderBy: { expireAt: 'desc' },
         include: {
           plan: {
@@ -94,6 +88,16 @@ export default async function BillingPage({
     }),
   ])
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE))
+  if (page > pages) redirect(billingHref(view, pages))
+  const subscriptionState = currentSubscription
+    ? resolveSubscriptionPresentation({
+        localStatus: currentSubscription.status,
+        localExpireAt: currentSubscription.expireAt,
+        graceExpireAt: currentSubscription.graceExpireAt,
+        unlimitedDuration: currentSubscription.plan?.unlimitedDuration,
+        pendingSync: currentSubscription.pendingSync,
+      })
+    : null
 
   return (
     <div className="page-stack">
@@ -111,15 +115,47 @@ export default async function BillingPage({
         )}
       />
 
+      {currentSubscription?.plan && subscriptionState ? (
+        <section className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-5 dark:border-white/[0.09] dark:bg-white/[0.03] sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="font-semibold text-slate-950 dark:text-white">{subscriptionState.title}</h2>
+              <StatusBadge status={subscriptionState.status} />
+            </div>
+            <p className="mt-1 text-sm leading-6 text-slate-500 dark:text-slate-400">
+              {subscriptionState.phase === 'paused'
+                ? subscriptionState.description
+                : currentSubscription.plan.unlimitedDuration
+                  ? `Тариф «${currentSubscription.plan.name}», срок не ограничен.`
+                  : `Тариф «${currentSubscription.plan.name}» до ${currentSubscription.expireAt.toLocaleDateString('ru-RU')}.`}
+            </p>
+          </div>
+          <Link
+            href={subscriptionState.phase === 'paused'
+              ? '#auto-renewal'
+              : subscriptionState.requiresRenewal
+                ? '/dashboard/plans?intent=renew'
+                : '/dashboard/subscription'}
+            className="btn-secondary w-full shrink-0 justify-center sm:w-auto"
+          >
+            {subscriptionState.phase === 'paused'
+              ? 'Возобновить'
+              : subscriptionState.requiresRenewal
+                ? 'Продлить'
+                : 'Открыть подключение'}
+          </Link>
+        </section>
+      ) : null}
+
       {params.paid === '1' && returnPaymentId && (
         <PaymentSuccessBanner
           paymentId={returnPaymentId}
-          status={getBannerStatus(syncResult)}
+          status={paymentBannerStatus ?? 'not_found'}
           supportEnabled={features.support}
         />
       )}
 
-      {currentSubscription?.plan && !currentSubscription.plan.unlimitedDuration ? (
+      {currentSubscription?.plan && subscriptionState && !subscriptionState.requiresRenewal && !currentSubscription.plan.unlimitedDuration ? (
         <AutoRenewalCard
           planId={currentSubscription.plan.id}
           planName={currentSubscription.plan.name}
@@ -215,23 +251,8 @@ function currentRenewalPrice(
   deviceLimit: number,
   personalDiscountPercent: number
 ) {
-  try {
-    const originalAmountKopecks = calculateAutoRenewalPurchase(plan, deviceLimit).originalAmountKopecks
-    const personalDiscount = calculatePersonalDiscount(plan.priceKopecks, personalDiscountPercent)
-    return originalAmountKopecks - (personalDiscount?.discountKopecks ?? 0)
-  } catch {
-    return plan.priceKopecks
-  }
-}
-
-function getBannerStatus(syncResult: PaymentSyncResult | null) {
-  if (!syncResult) return 'processing'
-  if (syncResult.status === 'not_found') return 'not_found'
-  if (syncResult.status === 'canceled') return 'canceled'
-  if (syncResult.status === 'pending' || syncResult.status === 'missing_external_id') return 'awaiting'
-  if (syncResult.status === 'succeeded' && syncResult.provisioned) return 'ready'
-  if (!syncResult.ok) return 'attention'
-  return 'processing'
+  return tryCalculateRenewalPricing(plan, deviceLimit, personalDiscountPercent)?.totalAmountKopecks
+    ?? plan.priceKopecks
 }
 
 function paymentCountLabel(count: number) {

@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const mocks = vi.hoisted(() => ({
   paymentFindUnique: vi.fn(),
   subscriptionUpdate: vi.fn(),
+  subscriptionUpdateMany: vi.fn(),
   paymentUpdate: vi.fn(),
   transaction: vi.fn(),
   updateUser: vi.fn(),
@@ -11,6 +12,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('./prisma', () => ({
   prisma: {
     payment: { findUnique: mocks.paymentFindUnique },
+    subscription: { updateMany: mocks.subscriptionUpdateMany },
     $transaction: mocks.transaction,
   },
 }))
@@ -53,6 +55,7 @@ describe('provisionDeviceLimitAddon', () => {
     mocks.updateUser.mockResolvedValue({ response: { id: 42, hwidDeviceLimit: 5 } })
     mocks.subscriptionUpdate.mockResolvedValue({ ...subscription, deviceLimit: 5 })
     mocks.paymentUpdate.mockResolvedValue({})
+    mocks.subscriptionUpdateMany.mockResolvedValue({ count: 1 })
     mocks.transaction.mockImplementation((callback) => callback({
       subscription: { update: mocks.subscriptionUpdate },
       payment: { update: mocks.paymentUpdate },
@@ -68,5 +71,36 @@ describe('provisionDeviceLimitAddon', () => {
       data: { deviceLimit: 5, lastSyncedAt: expect.any(Date) },
     })
     expect(result.subscription.deviceLimit).toBe(5)
+  })
+
+  it('reverts the exact device limit purchased by a refunded add-on', async () => {
+    const { revokeDeviceLimitAddonForPayment } = await import('./device-limit-addon')
+    const current = await mocks.paymentFindUnique()
+    mocks.paymentFindUnique.mockResolvedValue({
+      ...current,
+      subscriptionProvisionedAt: new Date(),
+      subscription: { ...current.subscription, deviceLimit: 5 },
+    })
+
+    await expect(revokeDeviceLimitAddonForPayment('pay-1')).resolves.toEqual({ revoked: true })
+
+    expect(mocks.updateUser).toHaveBeenCalledWith({ id: 42 }, { hwidDeviceLimit: 3 })
+    expect(mocks.subscriptionUpdateMany).toHaveBeenCalledWith({
+      where: { id: 'sub-1', deviceLimit: 5, status: { in: ['ACTIVE', 'LIMITED'] } },
+      data: { deviceLimit: 3, lastSyncedAt: expect.any(Date) },
+    })
+  })
+
+  it('does not undo a later device-limit change', async () => {
+    const { revokeDeviceLimitAddonForPayment } = await import('./device-limit-addon')
+    const current = await mocks.paymentFindUnique()
+    mocks.paymentFindUnique.mockResolvedValue({
+      ...current,
+      subscriptionProvisionedAt: new Date(),
+      subscription: { ...current.subscription, deviceLimit: 7 },
+    })
+
+    await expect(revokeDeviceLimitAddonForPayment('pay-1')).resolves.toEqual({ revoked: false })
+    expect(mocks.updateUser).not.toHaveBeenCalled()
   })
 })

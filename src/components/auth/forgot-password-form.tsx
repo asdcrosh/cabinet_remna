@@ -13,10 +13,10 @@ const RESEND_DELAY_MS = 60_000
 const RESEND_UNTIL_KEY = 'password-reset-resend-until:v1'
 const SENT_EMAIL_KEY = 'password-reset-email:v1'
 
-export function ForgotPasswordForm() {
+export function ForgotPasswordForm({ next = '/dashboard' }: { next?: string }) {
   const { register, handleSubmit, setValue, formState: { errors, isSubmitting } } = useForm<ForgotPasswordInput>({
     resolver: zodResolver(forgotPasswordSchema),
-    defaultValues: { email: '' },
+    defaultValues: { email: '', next },
   })
   const [sent, setSent] = useState(false)
   const [serverError, setServerError] = useState<string | null>(null)
@@ -134,6 +134,7 @@ export function ForgotPasswordForm() {
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
+      <input type="hidden" {...register('next')} />
       <div>
         <label className="label" htmlFor="email">Email</label>
         <div className="relative">
@@ -142,6 +143,7 @@ export function ForgotPasswordForm() {
             id="email"
             type="email"
             autoComplete="email"
+            disabled={!cooldownReady || isSubmitting}
             className="input pl-10"
             placeholder="name@example.com"
             {...register('email')}

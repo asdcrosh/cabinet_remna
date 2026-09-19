@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { loginSchema } from '@/lib/auth/validation'
+import { resendVerificationSchema } from '@/lib/auth/validation'
 import { rateLimit } from '@/lib/rate-limit'
 import { assertSameOrigin } from '@/lib/security'
 import { createEmailVerificationToken, sendEmailVerificationLink } from '@/lib/email-verification'
+import { sanitizeInternalNext } from '@/lib/auth/next-path'
 
 export const runtime = 'nodejs'
 
@@ -29,7 +30,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
   }
 
-  const parsed = loginSchema.pick({ email: true }).safeParse(body)
+  const parsed = resendVerificationSchema.safeParse(body)
   if (!parsed.success) {
     return NextResponse.json(
       { error: 'Validation error', details: parsed.error.flatten() },
@@ -51,6 +52,7 @@ export async function POST(req: Request) {
     email: user.email,
     name: user.name,
     token,
+    next: sanitizeInternalNext(parsed.data.next),
   })
 
   return NextResponse.json({

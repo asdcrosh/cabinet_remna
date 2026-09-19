@@ -28,6 +28,14 @@ function forgotPasswordRequest(email = 'user@example.com') {
   })
 }
 
+function forgotPasswordRequestWithNext(next: string) {
+  return new Request('https://cabinet.example/api/auth/forgot-password', {
+    method: 'POST',
+    headers: { origin: 'https://cabinet.example' },
+    body: JSON.stringify({ email: 'user@example.com', next }),
+  })
+}
+
 describe('forgot password route', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -63,6 +71,25 @@ describe('forgot password route', () => {
       expect.any(Error),
       { userId: 'user-1' }
     )
+  })
+
+  it('keeps a safe destination in the password reset link', async () => {
+    mocks.userFindUnique.mockResolvedValue({
+      id: 'user-1',
+      email: 'user@example.com',
+      name: 'User',
+    })
+
+    const response = await POST(forgotPasswordRequestWithNext('/dashboard/plans?plan=starter'))
+
+    expect(response.status).toBe(200)
+    expect(mocks.sendPasswordResetLink).toHaveBeenCalledWith({
+      userId: 'user-1',
+      email: 'user@example.com',
+      name: 'User',
+      token: 'reset-token',
+      next: '/dashboard/plans?plan=starter',
+    })
   })
 
   it('extends the cooldown after the request limit is reached', async () => {

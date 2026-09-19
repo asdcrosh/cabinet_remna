@@ -87,6 +87,13 @@ describe('password reset', () => {
       where: { userId: 'user-1', usedAt: null },
       data: { usedAt: expect.any(Date) },
     })
+    expect(mocks.user.update).toHaveBeenCalledWith({
+      where: { id: 'user-1' },
+      data: {
+        passwordHash: 'local-password-hash',
+        sessionVersion: { increment: 1 },
+      },
+    })
     expect(mocks.syncRemnashop).toHaveBeenCalledWith({
       remnashopUserId: 42,
       email: 'user@example.com',
@@ -128,6 +135,30 @@ describe('password reset', () => {
     expect(mocks.syncRemnashop).not.toHaveBeenCalled()
   })
 
+  it.each([
+    ['already used', { usedAt: new Date(), expiresAt: new Date(Date.now() + 60_000) }],
+    ['expired', { usedAt: null, expiresAt: new Date(Date.now() - 1) }],
+  ])('rejects an %s token before hashing the password', async (_case, tokenState) => {
+    mocks.passwordResetToken.findUnique.mockResolvedValue({
+      id: 'token-1',
+      userId: 'user-1',
+      ...tokenState,
+      user: {
+        email: 'user@example.com',
+        remnashopUserId: 42,
+      },
+    })
+
+    await expect(resetPasswordByToken({
+      token: 'reset-token',
+      password: 'Password2',
+    })).resolves.toEqual({ ok: false })
+
+    expect(mocks.bcryptHash).not.toHaveBeenCalled()
+    expect(mocks.transaction).not.toHaveBeenCalled()
+    expect(mocks.user.update).not.toHaveBeenCalled()
+  })
+
   it('keeps the Cabinet reset valid and warns the administrator when remote sync is unavailable', async () => {
     mocks.syncRemnashop.mockResolvedValue({
       ok: false,
@@ -144,6 +175,25 @@ describe('password reset', () => {
         severity: 'WARNING',
         entityId: 'user-1',
         actionHref: '/dashboard/admin/remnashop-sync',
+      })
+    )
+  })
+
+  it('warns the administrator when a linked Remnashop database is not configured', async () => {
+    mocks.syncRemnashop.mockResolvedValue({
+      ok: false,
+      reason: 'database_not_configured',
+    })
+
+    await expect(resetPasswordByToken({
+      token: 'reset-token',
+      password: 'Password2',
+    })).resolves.toEqual({ ok: true, remnashopSync: 'not_configured' })
+    expect(mocks.createAdminNotification).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'remnashop_sync_error',
+        body: 'user@example.com: не настроено подключение к базе Remnashop',
+        entityId: 'user-1',
       })
     )
   })
@@ -179,5 +229,25 @@ describe('password reset', () => {
       entityId: 'user-1',
       actionHref: '/dashboard/admin/recovery',
     }))
+  })
+
+  it('adds a safe continuation path to the reset link', async () => {
+    vi.stubEnv('APP_URL', 'https://cabinet.example')
+    vi.stubEnv('EMAIL_VERIFICATION_WEBHOOK_URL', 'https://mailer.example/reset')
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true })
+    vi.stubGlobal('fetch', fetchMock)
+
+    await sendPasswordResetLink({
+      userId: 'user-1',
+      email: 'user@example.com',
+      token: 'reset-token',
+      next: '/dashboard/plans?plan=starter',
+    })
+
+    const request = fetchMock.mock.calls[0]?.[1] as { body: string }
+    const body = JSON.parse(request.body)
+    expect(body.text).toContain(
+      'https://cabinet.example/reset-password?token=reset-token&next=%2Fdashboard%2Fplans%3Fplan%3Dstarter'
+    )
   })
 })

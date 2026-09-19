@@ -2,7 +2,8 @@
 
 import type { ReactNode } from 'react'
 import { useState } from 'react'
-import { Eye, Laptop, Receipt, ShieldCheck, UserRound } from 'lucide-react'
+import Link from 'next/link'
+import { Eye, History, Laptop, LifeBuoy, Receipt, ShieldCheck, UserRound } from 'lucide-react'
 import { AdminModal } from '@/components/admin/admin-modal'
 import { Tabs } from '@/components/ui/tabs'
 
@@ -46,7 +47,15 @@ export interface AdminUserDetails {
   }>
 }
 
-export function UserDetailsButton({ details, showLabel = false }: { details: AdminUserDetails; showLabel?: boolean }) {
+export function UserDetailsButton({
+  details,
+  showLabel = false,
+  canViewAudit = false,
+}: {
+  details: AdminUserDetails
+  showLabel?: boolean
+  canViewAudit?: boolean
+}) {
   const [open, setOpen] = useState(false)
   const [tab, setTab] = useState<'PROFILE' | 'SUBSCRIPTIONS' | 'PAYMENTS' | 'DEVICES'>('PROFILE')
 
@@ -75,6 +84,19 @@ export function UserDetailsButton({ details, showLabel = false }: { details: Adm
       >
         <div className="space-y-5">
           <UserStatusOverview details={details} />
+          <nav aria-label="Связанные разделы клиента" className="flex flex-wrap gap-2">
+            <Link href={`/dashboard/admin/payments?q=${encodeURIComponent(details.email)}`} className="btn-secondary h-10 px-3">
+              <Receipt className="h-4 w-4" /> Платежи
+            </Link>
+            <Link href={`/dashboard/admin/support?q=${encodeURIComponent(details.email)}`} className="btn-secondary h-10 px-3">
+              <LifeBuoy className="h-4 w-4" /> Обращения
+            </Link>
+            {canViewAudit ? (
+              <Link href={`/dashboard/admin/audit?q=${encodeURIComponent(details.email)}`} className="btn-secondary h-10 px-3">
+                <History className="h-4 w-4" /> Аудит
+              </Link>
+            ) : null}
+          </nav>
           <Tabs
             value={tab}
             onValueChange={setTab}
@@ -141,7 +163,7 @@ export function UserDetailsButton({ details, showLabel = false }: { details: Adm
                   <div key={payment.id} className="grid gap-2 rounded-xl border border-slate-200 bg-slate-50/40 p-3 text-sm dark:border-white/10 dark:bg-white/[0.02] md:grid-cols-[1fr_auto_auto] md:items-center">
                     <div>
                       <div className="font-medium">{payment.plan}</div>
-                      <div className="font-mono text-xs text-slate-400">{payment.id}</div>
+                      <Link href={`/dashboard/admin/payments?q=${encodeURIComponent(payment.id)}`} className="font-mono text-xs text-cyan-700 hover:underline dark:text-cyan-300">{payment.id}</Link>
                     </div>
                     <div className="text-slate-500">{payment.createdAt}</div>
                     <div className="font-semibold">{payment.amount} · {payment.status}</div>

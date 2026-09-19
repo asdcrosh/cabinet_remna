@@ -56,8 +56,9 @@ export default async function AdminAnalyticsPage({
         </nav>
       )}
     >
-      <section className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-        <Metric icon={Wallet} label="Выручка" value={formatPrice(analytics.payments.revenueKopecks)} detail={`${analytics.payments.count} успешных оплат`} />
+      <section className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+        <Metric icon={Wallet} label="Чистая выручка" value={formatPrice(analytics.payments.netKopecks)} detail={`${analytics.payments.count} оплаченных заказов`} />
+        <Metric icon={Wallet} label="Возвраты" value={formatPrice(analytics.payments.refundsKopecks)} detail={`Валовая выручка ${formatPrice(analytics.payments.grossKopecks)}`} />
         <Metric icon={CreditCard} label="Средний чек" value={formatPrice(analytics.payments.averageKopecks)} detail={`${conversionPercent(paid, registered)}% регистрация → оплата`} />
         <Metric icon={Timer} label="До первой оплаты" value={analytics.payments.medianHoursToPayment == null ? 'Нет данных' : formatDuration(analytics.payments.medianHoursToPayment)} detail={`${analytics.payments.paidWithin24h} оплатили за первые сутки`} />
         <Metric icon={Repeat2} label="Повторные покупки" value={analytics.payments.repeatBuyers} detail="Клиенты с двумя и более оплатами за период" />
@@ -67,7 +68,7 @@ export default async function AdminAnalyticsPage({
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-5 py-4 dark:border-white/[0.08] sm:px-6">
           <div>
             <h2 className="text-base font-semibold text-slate-950 dark:text-white">Воронка клиента</h2>
-            <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Пользователи, зарегистрированные за выбранный период</p>
+            <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Срез состояний пользователей, зарегистрированных за период. Этапы не доказывают последовательное прохождение.</p>
           </div>
           <span className="inline-flex items-center gap-2 text-xs font-medium text-slate-500 dark:text-slate-400"><UsersRound className="h-4 w-4" /> {registered} входов в воронку</span>
         </div>

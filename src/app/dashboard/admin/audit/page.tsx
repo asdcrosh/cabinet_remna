@@ -48,6 +48,8 @@ const ACTION_LABELS: Record<AuditAction, string> = {
   ADMIN_PAYMENT_PROVIDERS_RESET: 'Платёжные системы из .env',
   ADMIN_SUPPORT_UPDATED: 'Поддержка',
   ADMIN_BROADCAST_CREATED: 'Рассылка создана',
+  ADMIN_BROADCAST_CANCELED: 'Очередь рассылки остановлена',
+  ADMIN_BROADCAST_RETRIED: 'Ошибки рассылки повторены',
   ADMIN_BROADCAST_TEMPLATE_CREATED: 'Шаблон создан',
   ADMIN_BROADCAST_TEMPLATE_DELETED: 'Шаблон удалён',
   ADMIN_NODE_PROVISIONING_CREATED: 'Установка ноды создана',

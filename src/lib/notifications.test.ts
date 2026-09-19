@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => {
     },
     notificationLog: {
       createMany: vi.fn(),
+      findUnique: vi.fn(),
       updateMany: vi.fn(),
     },
     userNotification: {
@@ -36,6 +37,8 @@ describe('notifyUser', () => {
     process.env.EMAIL_VERIFICATION_WEBHOOK_URL = 'https://mail.example.test/send'
     process.env.EMAIL_VERIFICATION_WEBHOOK_SECRET = 'mail-secret'
     global.fetch = vi.fn(async () => new Response('{}', { status: 200 })) as typeof fetch
+    mocks.prisma.notificationLog.findUnique.mockResolvedValue({ status: 'SENT' })
+    mocks.prisma.notificationLog.updateMany.mockResolvedValue({ count: 1 })
   })
 
   it('sends verified users Telegram and email notifications once per channel', async () => {
@@ -202,7 +205,39 @@ describe('notifyUser', () => {
 
     expect(result).toEqual({ telegram: 'failed', email: 'skipped' })
     expect(mocks.prisma.notificationLog.updateMany).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ error: expect.stringContaining('Telegram failed') }) })
+      expect.objectContaining({ data: expect.objectContaining({ status: 'FAILED', error: expect.stringContaining('Telegram failed') }) })
+    )
+  })
+
+  it('keeps an ambiguous network result as unknown and does not resend it', async () => {
+    mocks.prisma.user.findUnique.mockResolvedValue({
+      id: 'user-1',
+      email: 'user@example.test',
+      emailVerifiedAt: null,
+      name: 'User',
+      telegramId: 123n,
+    })
+    mocks.prisma.notificationLog.createMany
+      .mockResolvedValueOnce({ count: 1 })
+      .mockResolvedValueOnce({ count: 0 })
+    mocks.prisma.notificationLog.findUnique.mockResolvedValue({ status: 'UNKNOWN' })
+    mocks.prisma.userNotification.createMany.mockResolvedValue({ count: 1 })
+    global.fetch = vi.fn(async () => { throw new TypeError('fetch failed') }) as typeof fetch
+
+    const input = {
+      userId: 'user-1',
+      type: 'PAYMENT_FAILED' as const,
+      dedupeKey: 'payment-network-1',
+      title: 'Платёж отменён',
+      body: 'Платёж отменён',
+      telegramText: 'Платёж отменён',
+    }
+    await expect(notifyUser(input)).resolves.toEqual({ telegram: 'unknown', email: 'skipped' })
+    await expect(notifyUser(input)).resolves.toEqual({ telegram: 'unknown', email: 'skipped' })
+
+    expect(fetch).toHaveBeenCalledTimes(1)
+    expect(mocks.prisma.notificationLog.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ status: 'UNKNOWN', error: 'fetch failed' }) })
     )
   })
 

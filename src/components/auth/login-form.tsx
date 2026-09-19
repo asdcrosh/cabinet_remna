@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useForm } from 'react-hook-form'
@@ -26,10 +26,15 @@ export function LoginForm({ yandexEnabled = false }: { yandexEnabled?: boolean }
     defaultValues: { email: '', password: '' },
   })
   const [serverError, setServerError] = useState<string | null>(null)
+  const [isHydrated, setIsHydrated] = useState(false)
   const [needsVerification, setNeedsVerification] = useState(false)
   const [resending, setResending] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const email = watch('email')
+
+  useEffect(() => {
+    setIsHydrated(true)
+  }, [])
 
   const onSubmit = handleSubmit(async (values) => {
     setServerError(null)
@@ -57,10 +62,10 @@ export function LoginForm({ yandexEnabled = false }: { yandexEnabled?: boolean }
     try {
       const result = await apiFetch<{ emailDelivery?: string }>('/api/auth/resend-verification', {
         method: 'POST',
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email, next }),
       })
       if (result.emailDelivery && result.emailDelivery !== 'sent') {
-        toast('Ссылка создана. В dev-режиме она выведена в консоль сервера.', 'success')
+        setServerError('Не удалось отправить письмо. Проверьте адрес и повторите попытку позже.')
       } else {
         toast('Ссылка подтверждения отправлена', 'success')
       }
@@ -119,6 +124,7 @@ export function LoginForm({ yandexEnabled = false }: { yandexEnabled?: boolean }
             id="email"
             type="email"
             autoComplete="email"
+            disabled={!isHydrated || isSubmitting}
             className="input pl-10"
             placeholder="name@example.com"
             {...register('email')}
@@ -129,7 +135,7 @@ export function LoginForm({ yandexEnabled = false }: { yandexEnabled?: boolean }
       <div>
         <div className="mb-1 flex items-center justify-between gap-3">
           <label className="label mb-0" htmlFor="password">Пароль</label>
-          <Link href="/forgot-password" className="text-xs font-medium text-brand-600 hover:underline">
+          <Link href={`/forgot-password?next=${encodeURIComponent(next)}`} className="text-xs font-medium text-brand-600 hover:underline">
             Забыли пароль?
           </Link>
         </div>
@@ -139,6 +145,7 @@ export function LoginForm({ yandexEnabled = false }: { yandexEnabled?: boolean }
             id="password"
             type={showPassword ? 'text' : 'password'}
             autoComplete="current-password"
+            disabled={!isHydrated || isSubmitting}
             className="input px-10"
             placeholder="Введите пароль"
             {...register('password')}
@@ -146,6 +153,7 @@ export function LoginForm({ yandexEnabled = false }: { yandexEnabled?: boolean }
           <button
             type="button"
             className="absolute right-2 top-1/2 -translate-y-1/2 rounded-xl p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-white/5 dark:hover:text-slate-100"
+            disabled={!isHydrated || isSubmitting}
             onClick={() => setShowPassword((value) => !value)}
             aria-label={showPassword ? 'Скрыть пароль' : 'Показать пароль'}
           >
@@ -168,7 +176,7 @@ export function LoginForm({ yandexEnabled = false }: { yandexEnabled?: boolean }
           {resending ? 'Отправляем...' : 'Отправить ссылку повторно'}
         </button>
       )}
-      <button type="submit" disabled={isSubmitting} className="btn-primary min-h-12 w-full">
+      <button type="submit" disabled={!isHydrated || isSubmitting} className="btn-primary min-h-12 w-full">
         <LogIn className="h-4 w-4" />
         {isSubmitting ? 'Входим...' : 'Войти'}
       </button>

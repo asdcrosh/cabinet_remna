@@ -37,14 +37,71 @@ if [[ "${RESTORE_CONFIRM:-}" != "I_UNDERSTAND_DATA_WILL_BE_OVERWRITTEN" ]]; then
 fi
 
 echo "Stopping app and workers before restore..."
-CABINET_ENV_FILE="${ENV_FILE}" docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" stop app worker broadcast-worker watch-worker >/dev/null || true
+compose() {
+  CABINET_ENV_FILE="${ENV_FILE}" docker compose --profile "*" --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" "$@"
+}
+
+DB_WRITERS=(
+  migrate
+  seed
+  app
+  app-candidate
+  worker
+  broadcast-worker
+  watch-worker
+  node-provisioning-worker
+  retention-cleanup
+)
+RUNNING_SERVICES=()
+while IFS= read -r service; do
+  [[ -n "${service}" ]] && RUNNING_SERVICES+=("${service}")
+done < <(compose ps --services --status running)
+RUNNING_WRITERS=()
+for writer in "${DB_WRITERS[@]}"; do
+  for service in "${RUNNING_SERVICES[@]}"; do
+    if [[ "${writer}" == "${service}" ]]; then
+      RUNNING_WRITERS+=("${writer}")
+      break
+    fi
+  done
+done
+
+if [[ ! " ${RUNNING_SERVICES[*]} " =~ " db " ]]; then
+  echo "Database service is not running; restore cannot continue."
+  exit 1
+fi
+
+STATE_FILE="${RESTORE_STATE_FILE:-${ROOT_DIR}/.restore-db-running-services}"
+printf '%s\n' "${RUNNING_WRITERS[@]}" > "${STATE_FILE}"
+echo "Database writers active before restore: ${RUNNING_WRITERS[*]:-none}"
+
+if (( ${#RUNNING_WRITERS[@]} > 0 )); then
+  compose stop "${RUNNING_WRITERS[@]}" >/dev/null
+fi
+
+STILL_RUNNING=()
+while IFS= read -r service; do
+  [[ -n "${service}" ]] && STILL_RUNNING+=("${service}")
+done < <(compose ps --services --status running)
+for writer in "${RUNNING_WRITERS[@]}"; do
+  for service in "${STILL_RUNNING[@]}"; do
+    if [[ "${writer}" == "${service}" ]]; then
+      echo "Refusing to restore: service ${writer} is still running."
+      echo "Saved pre-restore service list: ${STATE_FILE}"
+      exit 1
+    fi
+  done
+done
 
 echo "Restoring database from: ${BACKUP_FILE}"
-cat "${BACKUP_FILE}" | CABINET_ENV_FILE="${ENV_FILE}" docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" exec -T db \
+cat "${BACKUP_FILE}" | compose exec -T db \
   sh -lc 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists --no-owner --no-privileges'
 
-echo "Starting app and workers..."
-CABINET_ENV_FILE="${ENV_FILE}" docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" up -d app worker broadcast-worker watch-worker >/dev/null
+echo "Starting services that were active before restore..."
+if (( ${#RUNNING_WRITERS[@]} > 0 )); then
+  compose up -d --no-deps "${RUNNING_WRITERS[@]}" >/dev/null
+fi
+rm -f "${STATE_FILE}"
 
 echo "Restore complete. Run smoke-check next:"
 echo "  ./deploy/smoke-check.sh"

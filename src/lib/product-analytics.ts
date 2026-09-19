@@ -15,6 +15,7 @@ export async function getProductAnalytics(periodDays = 30) {
     paid,
     active,
     paymentStats,
+    refundStats,
     repeatRows,
     firstPaymentRows,
     autoRenewalRows,
@@ -43,12 +44,16 @@ export async function getProductAnalytics(periodDays = 30) {
     }),
     prisma.payment.aggregate({
       where: {
-        status: 'SUCCEEDED',
+        status: { in: ['SUCCEEDED', 'REFUNDED'] },
         OR: [{ paidAt: { gte: start } }, { paidAt: null, createdAt: { gte: start } }],
       },
       _count: true,
       _sum: { amountKopecks: true },
       _avg: { amountKopecks: true },
+    }),
+    prisma.paymentRefund.aggregate({
+      where: { createdAt: { gte: start } },
+      _sum: { amountKopecks: true },
     }),
     prisma.$queryRaw<Array<{ count: bigint }>>`
       SELECT COUNT(*)::bigint AS count
@@ -148,13 +153,15 @@ export async function getProductAnalytics(periodDays = 30) {
     funnel: [
       { key: 'registered', label: 'Зарегистрировались', value: registered },
       { key: 'verified', label: 'Подтвердили email', value: verified },
-      { key: 'linked', label: 'Связали профиль', value: linked },
+      { key: 'linked', label: 'Есть профиль или Telegram', value: linked },
       { key: 'paid', label: 'Оплатили', value: paid },
-      { key: 'active', label: 'Активны сейчас', value: active },
+      { key: 'active', label: 'Есть активная подписка', value: active },
     ],
     payments: {
       count: paymentStats._count,
-      revenueKopecks: paymentStats._sum.amountKopecks ?? 0,
+      grossKopecks: paymentStats._sum.amountKopecks ?? 0,
+      refundsKopecks: refundStats._sum.amountKopecks ?? 0,
+      netKopecks: Math.max(0, (paymentStats._sum.amountKopecks ?? 0) - (refundStats._sum.amountKopecks ?? 0)),
       averageKopecks: Math.round(paymentStats._avg.amountKopecks ?? 0),
       repeatBuyers,
       paidWithin24h: Number(firstPayment?.paid_24h ?? 0),

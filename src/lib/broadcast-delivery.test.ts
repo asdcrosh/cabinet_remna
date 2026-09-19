@@ -96,6 +96,43 @@ describe('processBroadcastDeliveryBatch', () => {
       { deliveryId: delivery.id, campaignId: delivery.campaignId }
     )
   })
+
+  it('requeues a definitive channel failure instead of marking the delivery successful', async () => {
+    const delivery = makeDelivery()
+    mocks.prisma.broadcastDelivery.findMany.mockResolvedValue([delivery])
+    mocks.notifyUser.mockResolvedValue({ telegram: 'failed', email: 'skipped' })
+
+    const result = await processBroadcastDeliveryBatch({ batchSize: 1, maxAttempts: 3 })
+
+    expect(result).toEqual({ processed: 1, succeeded: 0, failed: 1 })
+    expect(mocks.prisma.broadcastDelivery.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: delivery.id },
+      data: expect.objectContaining({ status: 'PENDING', lastError: 'Ошибка доставки: Telegram' }),
+    }))
+  })
+
+  it('does not automatically repeat a delivery with an unknown provider result', async () => {
+    const delivery = makeDelivery()
+    mocks.prisma.broadcastDelivery.findMany.mockResolvedValue([delivery])
+    mocks.notifyUser.mockResolvedValue({ telegram: 'unknown', email: 'skipped' })
+
+    const result = await processBroadcastDeliveryBatch({ batchSize: 1, maxAttempts: 3 })
+
+    expect(result).toEqual({ processed: 1, succeeded: 0, failed: 1 })
+    expect(mocks.prisma.broadcastDelivery.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: delivery.id },
+      data: expect.objectContaining({ status: 'UNKNOWN', lastError: 'Неизвестен результат доставки: Telegram' }),
+    }))
+    expect(mocks.prisma.broadcastCampaign.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: delivery.campaignId },
+      data: expect.objectContaining({ telegramUnknown: { increment: 1 }, telegramFailed: { increment: 0 } }),
+    }))
+    expect(mocks.prisma.broadcastDelivery.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        OR: expect.not.arrayContaining([expect.objectContaining({ status: 'UNKNOWN' })]),
+      }),
+    }))
+  })
 })
 
 function makeDelivery() {

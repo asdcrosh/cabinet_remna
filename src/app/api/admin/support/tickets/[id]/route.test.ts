@@ -5,7 +5,8 @@ const mocks = vi.hoisted(() => ({
   writeAuditLog: vi.fn(),
   prisma: {
     user: { findFirst: vi.fn() },
-    supportTicket: { findUnique: vi.fn(), update: vi.fn() },
+    supportTicket: { findUnique: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
+    auditLog: { findMany: vi.fn() },
   },
 }))
 
@@ -18,7 +19,7 @@ vi.mock('@/lib/audit-log', () => ({ writeAuditLog: mocks.writeAuditLog }))
 vi.mock('@/lib/notifications', () => ({ notifySupportReply: vi.fn() }))
 vi.mock('@/lib/feature-flags', () => ({ isFeatureEnabled: () => true }))
 
-import { PATCH } from './route'
+import { GET, PATCH } from './route'
 
 const ticket = {
   id: 'ticket-1',
@@ -45,23 +46,63 @@ describe('admin support assignment', () => {
       status: ticket.status,
       userId: ticket.userId,
       assigneeId: ticket.assigneeId,
+      updatedAt: ticket.updatedAt,
     })
+    mocks.prisma.supportTicket.updateMany.mockResolvedValue({ count: 1 })
+    mocks.prisma.auditLog.findMany.mockResolvedValue([])
+  })
+
+  it('returns the updated version after marking the ticket as read', async () => {
+    const readAt = new Date('2026-09-17T08:05:00.000Z')
+    mocks.prisma.supportTicket.findUnique.mockResolvedValue({
+      ...ticket,
+      assignee: null,
+      user: null,
+      messages: [],
+      internalNotes: [],
+    })
+    mocks.prisma.supportTicket.update.mockResolvedValue({ updatedAt: readAt })
+
+    const response = await GET(
+      new Request('https://cabinet.example/api/admin/support/tickets/ticket-1'),
+      { params: Promise.resolve({ id: 'ticket-1' }) },
+    )
+    const body = await response.json()
+
+    expect(body.ticket.adminUnreadCount).toBe(0)
+    expect(body.ticket.updatedAt).toBe(readAt.toISOString())
+    expect(mocks.prisma.supportTicket.update).toHaveBeenCalledWith(expect.objectContaining({
+      data: { adminUnreadCount: 0 },
+      select: { updatedAt: true },
+    }))
   })
 
   it('assigns a ticket only to a staff member', async () => {
     mocks.prisma.user.findFirst.mockResolvedValue({ id: 'staff-2' })
-    mocks.prisma.supportTicket.update.mockResolvedValue({
-      ...ticket,
-      assigneeId: 'staff-2',
-      assignedAt: new Date('2026-09-17T09:00:00.000Z'),
-      assignee: { id: 'staff-2', email: 'operator@example.com', name: 'Оператор' },
-    })
+    mocks.prisma.supportTicket.findUnique
+      .mockResolvedValueOnce({
+        id: ticket.id,
+        status: ticket.status,
+        userId: ticket.userId,
+        assigneeId: ticket.assigneeId,
+        updatedAt: ticket.updatedAt,
+      })
+      .mockResolvedValueOnce({
+        ...ticket,
+        updatedAt: new Date('2026-09-17T09:00:00.000Z'),
+        assigneeId: 'staff-2',
+        assignedAt: new Date('2026-09-17T09:00:00.000Z'),
+        assignee: { id: 'staff-2', email: 'operator@example.com', name: 'Оператор' },
+      })
 
     const response = await PATCH(
       new Request('https://cabinet.example/api/admin/support/tickets/ticket-1', {
         method: 'PATCH',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ assigneeId: 'staff-2' }),
+        body: JSON.stringify({
+          assigneeId: 'staff-2',
+          expectedUpdatedAt: ticket.updatedAt.toISOString(),
+        }),
       }),
       { params: Promise.resolve({ id: 'ticket-1' }) },
     )
@@ -75,6 +116,9 @@ describe('admin support assignment', () => {
       },
     }))
     expect(body.ticket.assignee.id).toBe('staff-2')
+    expect(mocks.prisma.supportTicket.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: ticket.id, updatedAt: ticket.updatedAt },
+    }))
     expect(mocks.writeAuditLog).toHaveBeenCalledOnce()
   })
 
@@ -85,12 +129,54 @@ describe('admin support assignment', () => {
       new Request('https://cabinet.example/api/admin/support/tickets/ticket-1', {
         method: 'PATCH',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ assigneeId: 'user-2' }),
+        body: JSON.stringify({
+          assigneeId: 'user-2',
+          expectedUpdatedAt: ticket.updatedAt.toISOString(),
+        }),
       }),
       { params: Promise.resolve({ id: 'ticket-1' }) },
     )
 
     expect(response.status).toBe(400)
-    expect(mocks.prisma.supportTicket.update).not.toHaveBeenCalled()
+    expect(mocks.prisma.supportTicket.updateMany).not.toHaveBeenCalled()
+  })
+
+  it('returns the current ticket instead of overwriting a concurrent update', async () => {
+    const current = {
+      ...ticket,
+      status: 'WAITING_USER',
+      updatedAt: new Date('2026-09-17T09:05:00.000Z'),
+      assigneeId: 'staff-2',
+      assignee: { id: 'staff-2', email: 'operator@example.com', name: 'Оператор' },
+    }
+    mocks.prisma.supportTicket.updateMany.mockResolvedValue({ count: 0 })
+    mocks.prisma.supportTicket.findUnique
+      .mockResolvedValueOnce({
+        id: ticket.id,
+        status: ticket.status,
+        userId: ticket.userId,
+        assigneeId: ticket.assigneeId,
+        updatedAt: ticket.updatedAt,
+      })
+      .mockResolvedValueOnce(current)
+
+    const response = await PATCH(
+      new Request('https://cabinet.example/api/admin/support/tickets/ticket-1', {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          status: 'CLOSED',
+          expectedUpdatedAt: ticket.updatedAt.toISOString(),
+        }),
+      }),
+      { params: Promise.resolve({ id: 'ticket-1' }) },
+    )
+    const body = await response.json()
+
+    expect(response.status).toBe(409)
+    expect(body.error).toContain('другой сотрудник')
+    expect(body.ticket.status).toBe('WAITING_USER')
+    expect(body.ticket.assignee.id).toBe('staff-2')
+    expect(mocks.writeAuditLog).not.toHaveBeenCalled()
   })
 })

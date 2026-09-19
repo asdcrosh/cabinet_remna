@@ -15,12 +15,18 @@ export async function GET(req: Request) {
   const appUrl = getAppUrlOrRequestOrigin(req)
 
   if (!token) {
-    return NextResponse.redirect(`${appUrl}/login?verified=missing`)
+    const loginUrl = new URL('/login', appUrl)
+    loginUrl.searchParams.set('verified', 'missing')
+    if (next !== '/dashboard') loginUrl.searchParams.set('next', next)
+    return NextResponse.redirect(loginUrl)
   }
 
   const result = await verifyEmailToken(token)
   if (!result.ok) {
-    return NextResponse.redirect(`${appUrl}/login?verified=invalid`)
+    const loginUrl = new URL('/login', appUrl)
+    loginUrl.searchParams.set('verified', 'invalid')
+    if (next !== '/dashboard') loginUrl.searchParams.set('next', next)
+    return NextResponse.redirect(loginUrl)
   }
 
   try {

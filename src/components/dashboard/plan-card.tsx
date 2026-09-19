@@ -12,6 +12,7 @@ import { PlanPurchaseOutcome } from "./plan-purchase-outcome";
 import { formatPrice } from "@/lib/format";
 import type { CheckoutPaymentProvider } from "@/lib/payment-providers";
 import { AUTO_RENEWAL_CONSENT_VERSION } from "@/lib/auto-renewal-consent";
+import { calculateRenewalPricing } from "@/lib/renewal-pricing";
 import {
   ArrowRight,
   BadgePercent,
@@ -183,6 +184,13 @@ export function PlanCard({
   const checkoutTotalKopecks = normalizedEffectivePriceKopecks
     + (whitelistAddonRequested && whitelistAddonAvailable ? whitelistAddonPriceKopecks : 0);
   const checkoutTotalPrice = formatPrice(checkoutTotalKopecks);
+  const renewalTotalKopecks = calculateRenewalPricing(
+    { priceKopecks, deviceLimit, maxDeviceLimit: normalizedMaxDeviceLimit, extraDevicePriceKopecks },
+    selectedDeviceLimit,
+    personalDiscountPercent,
+    whitelistAddonRequested && whitelistAddonAvailable ? whitelistAddonPriceKopecks : 0,
+  ).totalAmountKopecks;
+  const renewalTotalPrice = formatPrice(renewalTotalKopecks);
   const purchasePrice = formatPrice(purchasePriceKopecks);
   const checkoutOriginalPrice = formatPrice(purchasePriceKopecks
     + (whitelistAddonRequested && whitelistAddonAvailable ? whitelistAddonPriceKopecks : 0));
@@ -910,7 +918,7 @@ export function PlanCard({
                 enabled={autoRenewalTermsCurrent}
                 supported={autoRenewalSupported}
                 requested={autoRenewalRequested}
-                price={checkoutTotalPrice}
+                price={renewalTotalPrice}
                 durationDays={durationDays}
                 onChange={setAutoRenewalRequested}
               />
@@ -923,10 +931,12 @@ export function PlanCard({
             <section aria-label="Состав оплаты" className="mt-4 border-t border-slate-200 pt-3 dark:border-white/10">
               <dl className="space-y-2 text-xs text-slate-500 dark:text-slate-400">
                 <div className="flex justify-between gap-4"><dt>Тариф · {unlimitedDuration ? 'бессрочно' : `${durationDays} дн.`}</dt><dd className="shrink-0 tabular-nums">{price}</dd></div>
+                <div className="flex justify-between gap-4"><dt>Устройства</dt><dd className="shrink-0">{unlimitedDevices ? 'Без ограничений' : selectedDeviceLimit}</dd></div>
                 {extraDeviceCount > 0 ? <div className="flex justify-between gap-4"><dt>Дополнительные устройства · {extraDeviceCount}</dt><dd className="shrink-0 tabular-nums">+{formatPrice(extraDeviceAmountKopecks)}</dd></div> : null}
                 {displayedDiscount ? <div className="flex justify-between gap-4"><dt>Скидка</dt><dd className="shrink-0 tabular-nums">−{formatPrice(displayedDiscount.discountKopecks)}</dd></div> : null}
                 {whitelistAddonRequested && whitelistAddonAvailable ? <div className="flex justify-between gap-4"><dt>Белые списки</dt><dd className="shrink-0 tabular-nums">+{formatPrice(whitelistAddonPriceKopecks)}</dd></div> : null}
                 <div className="flex justify-between gap-4 border-t border-slate-200 pt-3 text-base font-semibold text-slate-950 dark:border-white/10 dark:text-white"><dt>Итого к оплате</dt><dd className="shrink-0 tabular-nums" aria-live="polite">{checkoutTotalPrice}</dd></div>
+                {autoRenewalRequested || autoRenewalTermsCurrent ? <div className="flex justify-between gap-4"><dt>Следующее автопродление</dt><dd className="shrink-0 tabular-nums">{renewalTotalPrice}</dd></div> : null}
               </dl>
             </section>
           </>
@@ -1017,6 +1027,21 @@ export function PlanCard({
           <div className="shrink-0 text-lg font-semibold tabular-nums text-slate-950 dark:text-white">{checkoutTotalPrice}</div>
         </div>
 
+        <PurchaseSummary
+          unlimitedDuration={unlimitedDuration}
+          durationDays={durationDays}
+          unlimitedDevices={unlimitedDevices}
+          deviceLimit={selectedDeviceLimit}
+          extraDeviceCount={extraDeviceCount}
+          extraDeviceAmountKopecks={extraDeviceAmountKopecks}
+          discountKopecks={displayedDiscount?.discountKopecks ?? 0}
+          discountLabel={appliedPromo && !automaticDiscountWins ? appliedPromo.code : null}
+          whitelistAddonKopecks={whitelistAddonRequested && whitelistAddonAvailable ? whitelistAddonPriceKopecks : 0}
+          checkoutTotalKopecks={checkoutTotalKopecks}
+          autoRenewal={autoRenewalRequested || autoRenewalTermsCurrent}
+          renewalTotalKopecks={renewalTotalKopecks}
+        />
+
         {whitelistAddonAvailable ? (
           <WhitelistAddonChoice
             requested={whitelistAddonRequested}
@@ -1030,7 +1055,7 @@ export function PlanCard({
             enabled={autoRenewalTermsCurrent}
             supported={autoRenewalSupported}
             requested={autoRenewalRequested}
-            price={checkoutTotalPrice}
+            price={renewalTotalPrice}
             durationDays={durationDays}
             onChange={setAutoRenewalRequested}
           />
@@ -1038,6 +1063,53 @@ export function PlanCard({
       </div>
     </Modal>
     </>
+  );
+}
+
+export function PurchaseSummary({
+  unlimitedDuration,
+  durationDays,
+  unlimitedDevices,
+  deviceLimit,
+  extraDeviceCount,
+  extraDeviceAmountKopecks,
+  discountKopecks,
+  discountLabel,
+  whitelistAddonKopecks,
+  checkoutTotalKopecks,
+  autoRenewal,
+  renewalTotalKopecks,
+}: {
+  unlimitedDuration: boolean;
+  durationDays: number;
+  unlimitedDevices: boolean;
+  deviceLimit: number;
+  extraDeviceCount: number;
+  extraDeviceAmountKopecks: number;
+  discountKopecks: number;
+  discountLabel: string | null;
+  whitelistAddonKopecks: number;
+  checkoutTotalKopecks: number;
+  autoRenewal: boolean;
+  renewalTotalKopecks: number;
+}) {
+  return (
+    <section aria-label="Итог покупки" className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-white/[0.08] dark:bg-white/[0.02]">
+      <h3 className="text-sm font-semibold text-slate-950 dark:text-white">Итог покупки</h3>
+      <dl className="mt-3 space-y-2 text-sm text-slate-600 dark:text-slate-300">
+        <div className="flex justify-between gap-4"><dt>Срок</dt><dd className="text-right font-medium">{unlimitedDuration ? "Бессрочно" : `${durationDays} дней`}</dd></div>
+        <div className="flex justify-between gap-4"><dt>Устройства</dt><dd className="text-right font-medium">{unlimitedDevices ? "Без ограничений" : deviceLimit}</dd></div>
+        {extraDeviceCount > 0 ? <div className="flex justify-between gap-4"><dt>Дополнительные устройства</dt><dd className="shrink-0 tabular-nums">+{formatPrice(extraDeviceAmountKopecks)}</dd></div> : null}
+        {discountKopecks > 0 ? <div className="flex justify-between gap-4 text-emerald-700 dark:text-emerald-300"><dt>Скидка{discountLabel ? ` · ${discountLabel}` : ""}</dt><dd className="shrink-0 tabular-nums">−{formatPrice(discountKopecks)}</dd></div> : null}
+        {whitelistAddonKopecks > 0 ? <div className="flex justify-between gap-4"><dt>Белые списки · 30 оплаченных дней</dt><dd className="shrink-0 tabular-nums">+{formatPrice(whitelistAddonKopecks)}</dd></div> : null}
+        <div className="flex justify-between gap-4 border-t border-slate-200 pt-3 font-semibold text-slate-950 dark:border-white/10 dark:text-white"><dt>К оплате сейчас</dt><dd className="shrink-0 tabular-nums">{formatPrice(checkoutTotalKopecks)}</dd></div>
+        {autoRenewal ? (
+          <div className="flex justify-between gap-4"><dt>Следующее автопродление</dt><dd className="shrink-0 text-right font-medium tabular-nums">{formatPrice(renewalTotalKopecks)} · через {durationDays} дн.</dd></div>
+        ) : (
+          <div className="flex justify-between gap-4"><dt>Автопродление</dt><dd className="text-right font-medium">Не включено</dd></div>
+        )}
+      </dl>
+    </section>
   );
 }
 

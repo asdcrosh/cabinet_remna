@@ -159,6 +159,74 @@ describe('ensureRemnawaveSubscription', () => {
     )
   })
 
+  it('reapplies the same target after external success and local commit failure', async () => {
+    const currentExpireAt = new Date('2026-01-15T00:00:00.000Z')
+    mocks.prisma.payment.findUnique.mockResolvedValue({
+      id: 'pay-recovery',
+      subscriptionProvisionedAt: null,
+      subscription: null,
+    })
+    mocks.prisma.user.findUnique.mockResolvedValue({
+      id: 'user-1',
+      email: 'user@example.com',
+      remnawaveUuid: 'rw-1',
+      subscriptions: [{ id: 'sub-1', planId: 'plan-1', expireAt: currentExpireAt, status: 'ACTIVE' }],
+    })
+    mocks.remnawave.updateUser.mockResolvedValue({ response: remnawaveUser })
+    mocks.prisma.subscription.update.mockResolvedValue({ id: 'sub-1' })
+    mocks.prisma.$transaction
+      .mockRejectedValueOnce(new Error('local commit failed'))
+      .mockImplementationOnce(async (fn) => fn(mocks.prisma))
+
+    const input = {
+      userId: 'user-1',
+      email: 'user@example.com',
+      paymentId: 'pay-recovery',
+      plan,
+    }
+    await expect(ensureRemnawaveSubscription(input)).rejects.toThrow('local commit failed')
+    await expect(ensureRemnawaveSubscription(input)).resolves.toEqual(expect.objectContaining({
+      subscription: { id: 'sub-1' },
+    }))
+
+    expect(mocks.remnawave.updateUser).toHaveBeenCalledTimes(2)
+    for (const [, update] of mocks.remnawave.updateUser.mock.calls) {
+      expect(update.expireAt).toBe('2026-02-14T00:00:00.000Z')
+    }
+  })
+
+  it('preserves both periods when two different payments run sequentially', async () => {
+    mocks.prisma.payment.findUnique.mockResolvedValue({
+      subscriptionProvisionedAt: null,
+      subscription: null,
+    })
+    mocks.prisma.user.findUnique
+      .mockResolvedValueOnce({
+        id: 'user-1',
+        email: 'user@example.com',
+        remnawaveUuid: 'rw-1',
+        subscriptions: [{ id: 'sub-1', planId: 'plan-1', expireAt: new Date('2026-01-15T00:00:00.000Z'), status: 'ACTIVE' }],
+      })
+      .mockResolvedValueOnce({
+        id: 'user-1',
+        email: 'user@example.com',
+        remnawaveUuid: 'rw-1',
+        subscriptions: [{ id: 'sub-1', planId: 'plan-1', expireAt: new Date('2026-02-14T00:00:00.000Z'), status: 'ACTIVE' }],
+      })
+    mocks.remnawave.updateUser
+      .mockResolvedValueOnce({ response: remnawaveUser })
+      .mockResolvedValueOnce({ response: { ...remnawaveUser, expireAt: '2026-03-16T00:00:00.000Z' } })
+    mocks.prisma.subscription.update.mockResolvedValue({ id: 'sub-1' })
+
+    await ensureRemnawaveSubscription({ userId: 'user-1', email: 'user@example.com', paymentId: 'pay-1', plan })
+    await ensureRemnawaveSubscription({ userId: 'user-1', email: 'user@example.com', paymentId: 'pay-2', plan })
+
+    expect(mocks.remnawave.updateUser.mock.calls.map(([, update]) => update.expireAt)).toEqual([
+      '2026-02-14T00:00:00.000Z',
+      '2026-03-16T00:00:00.000Z',
+    ])
+  })
+
   it('provisions unlimited duration, traffic and devices', async () => {
     const unlimitedUser = {
       ...remnawaveUser,

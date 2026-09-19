@@ -256,7 +256,7 @@ export function DevicesList({ embedded = false, deviceLimit }: DevicesListProps 
         <ConfirmDialog
           open={Boolean(selectedDevice)}
           title="Отключить устройство?"
-          description="Устройство потеряет доступ к VPN. Позже его можно будет подключить снова."
+          description="Только это устройство потеряет доступ к VPN и будет заблокировано. Чтобы подключить его снова, сначала нажмите «Разрешить снова» в списке отключённых устройств."
           confirmLabel="Отключить"
           loading={Boolean(removingHwid)}
           onCancel={() => setSelectedDevice(null)}
@@ -327,7 +327,7 @@ export function DevicesList({ embedded = false, deviceLimit }: DevicesListProps 
       <ConfirmDialog
         open={Boolean(selectedDevice)}
         title="Отключить устройство?"
-        description="Устройство потеряет доступ к VPN. Позже его можно будет подключить снова."
+        description="Только это устройство потеряет доступ к VPN и будет заблокировано. Чтобы подключить его снова, сначала нажмите «Разрешить снова» в списке отключённых устройств."
         confirmLabel="Отключить"
         loading={Boolean(removingHwid)}
         onCancel={() => setSelectedDevice(null)}
@@ -612,10 +612,11 @@ type DeviceLimitState = {
   text: string
 }
 
-function getDeviceLimitState(used: number, limit?: number | null): DeviceLimitState {
+export function getDeviceLimitState(used: number, limit?: number | null): DeviceLimitState {
   if (!limit || limit < 1) return { tone: 'neutral', text: 'Без ограничений' }
 
-  const remaining = Math.max(limit - used, 0)
+  const remaining = limit - used
+  if (remaining < 0) return { tone: 'danger', text: `Лимит превышен на ${Math.abs(remaining)}. Отключите лишнее устройство.` }
   if (remaining === 0) return { tone: 'danger', text: 'Лимит достигнут. Отключите ненужное устройство.' }
   if (remaining === 1) return { tone: 'warning', text: 'Осталось 1 место' }
   return { tone: 'neutral', text: `Свободно: ${remaining}` }

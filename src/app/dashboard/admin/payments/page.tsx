@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { Download, Search } from 'lucide-react'
+import { ArrowLeft, Download, Search } from 'lucide-react'
 import { prisma } from '@/lib/prisma'
 import { requireAdminPage } from '@/lib/auth/admin-page'
 import { formatPrice } from '@/lib/format'
@@ -12,9 +12,10 @@ import { AdminFilterBar, AdminFilterField } from '@/components/admin/admin-filte
 import { AdminEmptyState } from '@/components/admin/admin-empty-state'
 import { describeSyncError } from '@/lib/sync-error'
 import { paymentProviderLabel } from '@/lib/payment-provider-label'
-import type { PaymentProvider } from '@prisma/client'
+import type { PaymentProvider, PaymentStatus } from '@prisma/client'
 import { PaymentLiveSync } from '@/components/admin/payment-live-sync'
 import { PaymentTimelineButton } from '@/components/admin/payment-timeline-button'
+import { appendReturnTo, sanitizeAdminSupportReturnPath } from '@/components/support/support-panel-model'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Платежи — Админка' }
@@ -22,20 +23,21 @@ export const metadata = { title: 'Платежи — Админка' }
 export default async function AdminPaymentsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; status?: string; provider?: string; delivery?: string; from?: string; to?: string; range?: string; limit?: string }>
+  searchParams: Promise<{ q?: string; status?: string; provider?: string; delivery?: string; from?: string; to?: string; range?: string; limit?: string; returnTo?: string }>
 }) {
   await requireAdminPage()
 
   const params = await searchParams
   const q = params.q?.trim() ?? ''
-  const status = params.status ?? 'ALL'
-  const provider = params.provider ?? 'ALL'
-  const delivery = params.delivery ?? 'ALL'
-  const range = params.range ?? 'ALL'
+  const returnTo = sanitizeAdminSupportReturnPath(params.returnTo)
+  const status = parseEnum(params.status, ['PENDING', 'SUCCEEDED', 'CANCELED', 'REFUNDED'] as const)
+  const provider = parseEnum(params.provider, ['YOOKASSA', 'PAYANYWAY', 'PLATEGA', 'LOCAL'] as const)
+  const delivery = parseEnum(params.delivery, ['DELIVERED', 'RETRY'] as const)
+  const range = parseEnum(params.range, ['TODAY', '7D', '30D', 'CUSTOM'] as const)
   const { from, to } = resolveDateRange(range, params.from, params.to)
   const limit = parseAdminListLimit(params.limit)
   const where = {
-    ...(status !== 'ALL' ? { status: status as any } : {}),
+    ...(status !== 'ALL' ? { status: status as PaymentStatus } : {}),
     ...(provider !== 'ALL' ? { provider: provider as PaymentProvider } : {}),
     ...(delivery === 'DELIVERED'
       ? { subscriptionProvisionedAt: { not: null } }
@@ -68,7 +70,6 @@ export default async function AdminPaymentsPage({
         plan: true,
         subscription: true,
         provisioningJob: true,
-        events: { orderBy: { updatedAt: 'desc' }, take: 50 },
       },
     }),
     prisma.payment.count({ where: { status: 'PENDING' } }),
@@ -87,28 +88,37 @@ export default async function AdminPaymentsPage({
       title="Платежи"
       description="Оплаты и выдача подписок"
       action={
-        <Link href={buildPaymentsExportHref(q, status, provider, delivery, range, params.from, params.to)} className="btn-secondary w-full sm:w-auto">
-          <Download className="h-4 w-4" />
-          Экспорт CSV
-        </Link>
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+          {returnTo ? (
+            <Link href={returnTo} className="btn-secondary w-full sm:w-auto">
+              <ArrowLeft className="h-4 w-4" />
+              К обращению
+            </Link>
+          ) : null}
+          <Link href={buildPaymentsExportHref(q, status, provider, delivery, range, params.from, params.to)} className="btn-secondary w-full sm:w-auto">
+            <Download className="h-4 w-4" />
+            Экспорт CSV
+          </Link>
+        </div>
       }
     >
       <section className="grid grid-cols-3 gap-2" aria-label="Состояние платежей">
-        <PaymentStat title="Ожидают" value={pendingCount} tone="amber" href="/dashboard/admin/payments?status=PENDING" active={status === 'PENDING'} />
-        <PaymentStat title="Довыдача" value={retryCount} tone={retryCount > 0 ? 'red' : 'slate'} href="/dashboard/admin/payments?delivery=RETRY" active={delivery === 'RETRY'} />
-        <PaymentStat title="Оплачено" value={succeededCount} tone="emerald" href="/dashboard/admin/payments?status=SUCCEEDED" active={status === 'SUCCEEDED' && delivery !== 'RETRY'} />
+        <PaymentStat title="Ожидают" value={pendingCount} tone="amber" href={appendReturnTo('/dashboard/admin/payments?status=PENDING', returnTo)} active={status === 'PENDING'} />
+        <PaymentStat title="Довыдача" value={retryCount} tone={retryCount > 0 ? 'red' : 'slate'} href={appendReturnTo('/dashboard/admin/payments?delivery=RETRY', returnTo)} active={delivery === 'RETRY'} />
+        <PaymentStat title="Оплачено" value={succeededCount} tone="emerald" href={appendReturnTo('/dashboard/admin/payments?status=SUCCEEDED', returnTo)} active={status === 'SUCCEEDED' && delivery !== 'RETRY'} />
       </section>
 
       <PaymentLiveSync paymentIds={autoSyncPaymentIds} />
 
       <AdminFilterBar
         action="/dashboard/admin/payments"
-        resetHref="/dashboard/admin/payments"
+        resetHref={appendReturnTo('/dashboard/admin/payments', returnTo)}
         resetVisible={Boolean(q || status !== 'ALL' || provider !== 'ALL' || delivery !== 'ALL' || range !== 'ALL' || params.from || params.to)}
         count={{ shown: payments.length, total }}
         className="md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-[minmax(15rem,1.4fr)_repeat(4,minmax(9rem,1fr))_auto]"
       >
         <input type="hidden" name="limit" value={ADMIN_LIST_PAGE_SIZE} />
+        {returnTo ? <input type="hidden" name="returnTo" value={returnTo} /> : null}
         <AdminFilterField label="Поиск платежей">
           <div className="relative">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -185,7 +195,7 @@ export default async function AdminPaymentsPage({
           ) : needsRemnashopRetry ? (
             <RemnashopPaymentRetryButton paymentId={payment.id} />
           ) : (
-            <Link href={`/dashboard/admin/users?q=${encodeURIComponent(payment.user.email)}`} className="btn-secondary w-full min-w-[112px] px-3 text-xs lg:w-auto">
+            <Link href={appendReturnTo(`/dashboard/admin/users?q=${encodeURIComponent(payment.user.email)}`, returnTo)} className="btn-secondary w-full min-w-[112px] px-3 text-xs lg:w-auto">
               Пользователь
             </Link>
           )
@@ -249,17 +259,6 @@ export default async function AdminPaymentsPage({
                       nextRetryAt: payment.provisioningJob.nextRetryAt?.toISOString() ?? null,
                       lastError: payment.provisioningJob.lastError,
                     } : null}
-                    events={payment.events.map((event) => ({
-                      id: event.id,
-                      stage: event.stage,
-                      status: event.status,
-                      source: event.source,
-                      message: event.message,
-                      details: event.details,
-                      attempts: event.attempts,
-                      createdAt: event.createdAt.toISOString(),
-                      updatedAt: event.updatedAt.toISOString(),
-                    }))}
                   />
                   {action}
                 </div>
@@ -419,4 +418,8 @@ function formatAdminPaymentDate(date: Date) {
 
 function shortId(id: string) {
   return id.length > 12 ? `${id.slice(0, 8)}…${id.slice(-4)}` : id
+}
+
+function parseEnum<const T extends readonly string[]>(value: string | undefined, allowed: T): T[number] | 'ALL' {
+  return value && allowed.includes(value) ? value as T[number] : 'ALL'
 }

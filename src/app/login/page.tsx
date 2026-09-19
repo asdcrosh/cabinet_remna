@@ -17,6 +17,7 @@ export default async function LoginPage({
   searchParams: Promise<{ next?: string }>
 }) {
   const params = await searchParams
+  const next = sanitizeInternalNext(params.next)
   const yandexEnabled = Boolean(process.env.YANDEX_CLIENT_ID && process.env.YANDEX_CLIENT_SECRET)
   const session = await getCurrentUser()
   if (session) {
@@ -26,7 +27,7 @@ export default async function LoginPage({
     })
     if (user) {
       logInfo('auth.login.redirect_authenticated', { userId: session.uid })
-      redirect(sanitizeInternalNext(params.next))
+      redirect(next)
     }
     logWarn('auth.login.stale_session_ignored', { userId: session.uid })
   }
@@ -35,7 +36,7 @@ export default async function LoginPage({
     <AuthLayout
       title="Вход в кабинет"
       description="Войдите, чтобы управлять подпиской"
-      footer={<>Нет аккаунта? <Link href="/register" className="text-brand-600 hover:underline">Зарегистрироваться</Link></>}
+      footer={<>Нет аккаунта? <Link href={`/register?next=${encodeURIComponent(next)}`} className="text-brand-600 hover:underline">Зарегистрироваться</Link></>}
       enableTelegramMiniApp
     >
       <LoginForm yandexEnabled={yandexEnabled} />

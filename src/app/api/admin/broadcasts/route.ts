@@ -16,6 +16,7 @@ import type { BroadcastDeliveryPayload } from '@/lib/broadcast-delivery'
 import { writeAuditLog } from '@/lib/audit-log'
 import { isFeatureEnabled } from '@/lib/feature-flags'
 import { getBroadcastActionUrl, normalizeBroadcastActionHref } from '@/lib/broadcast-action-url'
+import { buildBroadcastAudiencePreview } from '@/lib/broadcast-audience'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -36,6 +37,7 @@ const schema = z.object({
   actionOpenInTelegram: z.boolean().optional(),
   imageUrl: z.string().trim().url().max(600).optional().nullable().or(z.literal('')),
   testMode: z.boolean().optional(),
+  previewMode: z.boolean().optional(),
 })
 
 const broadcastCampaignSelect = {
@@ -55,10 +57,12 @@ const broadcastCampaignSelect = {
   telegramSkipped: true,
   telegramDuplicate: true,
   telegramFailed: true,
+  telegramUnknown: true,
   emailSent: true,
   emailSkipped: true,
   emailDuplicate: true,
   emailFailed: true,
+  emailUnknown: true,
   limited: true,
   createdAt: true,
   createdBy: { select: { email: true, name: true } },
@@ -103,9 +107,9 @@ export const POST = withAuth(async (req: Request) => {
   const channels = new Set(input.channels)
   const limit = await rateLimit(
     req,
-    input.testMode ? `broadcast-test:${session.uid}` : `broadcast:${session.uid}`,
-    input.testMode ? 20 : 3,
-    input.testMode ? 60_000 : 5 * 60_000
+    input.previewMode ? `broadcast-preview:${session.uid}` : input.testMode ? `broadcast-test:${session.uid}` : `broadcast:${session.uid}`,
+    input.previewMode ? 30 : input.testMode ? 20 : 3,
+    input.previewMode || input.testMode ? 60_000 : 5 * 60_000
   )
   if (!limit.ok) {
     return NextResponse.json(
@@ -121,6 +125,13 @@ export const POST = withAuth(async (req: Request) => {
         take: 1,
       })
     : await findBroadcastUsers(segment, inactiveDays ?? DEFAULT_INACTIVE_DAYS, input.channels)
+
+  if (input.previewMode) {
+    return NextResponse.json({
+      preview: buildBroadcastAudiencePreview(users, channels),
+      limited: users.length === MAX_RECIPIENTS,
+    })
+  }
 
   const appUrl = getAppUrl()
   const actionHref = normalizeBroadcastActionHref(input.actionHref, appUrl)
@@ -169,8 +180,8 @@ export const POST = withAuth(async (req: Request) => {
         emailHtml: payload.emailHtml ?? undefined,
       })
 
-      stats.telegram[result.telegram] += 1
-      stats.email[result.email] += 1
+      stats.telegram[result.telegram === 'unknown' ? 'failed' : result.telegram] += 1
+      stats.email[result.email === 'unknown' ? 'failed' : result.email] += 1
       if (payload.inApp) stats.inApp += 1
       if (payload.inApp || result.telegram === 'sent' || result.email === 'sent') {
         stats.recipients += 1
@@ -288,8 +299,18 @@ function emptyBroadcastStats() {
 const broadcastUserSelect = {
   id: true,
   email: true,
+  emailVerifiedAt: true,
   name: true,
+  telegramId: true,
   referralCode: true,
+  notificationPreference: {
+    select: {
+      broadcastsEnabled: true,
+      inAppEnabled: true,
+      telegramEnabled: true,
+      emailEnabled: true,
+    },
+  },
   subscriptions: {
     where: { status: { in: ACTIVE_SUBSCRIPTION_STATUSES }, expireAt: { gt: new Date() } },
     orderBy: { expireAt: 'desc' },
@@ -674,23 +695,43 @@ function addUniqueWhere(
 }
 
 function buildDeliveryWhere(channels: BroadcastChannel[]): Prisma.UserWhereInput {
-  if (channels.includes('IN_APP')) return {}
-
   const or: Prisma.UserWhereInput[] = []
+  if (channels.includes('IN_APP')) {
+    or.push(channelPreferenceWhere('inAppEnabled'))
+  }
   if (channels.includes('TELEGRAM')) {
-    or.push({ telegramId: { not: null } })
+    or.push({
+      AND: [
+        { telegramId: { not: null } },
+        channelPreferenceWhere('telegramEnabled'),
+      ],
+    })
   }
   if (channels.includes('EMAIL')) {
     or.push({
-      emailVerifiedAt: { not: null },
-      NOT: [
-        { email: { endsWith: '@pending.invalid' } },
-        { email: { endsWith: '@pending.invalid.local' } },
+      AND: [
+        { emailVerifiedAt: { not: null } },
+        {
+          NOT: [
+            { email: { endsWith: '@pending.invalid' } },
+            { email: { endsWith: '@pending.invalid.local' } },
+          ],
+        },
+        channelPreferenceWhere('emailEnabled'),
       ],
     })
   }
 
   return or.length > 0 ? { OR: or } : {}
+}
+
+function channelPreferenceWhere(channel: 'inAppEnabled' | 'telegramEnabled' | 'emailEnabled'): Prisma.UserWhereInput {
+  return {
+    OR: [
+      { notificationPreference: { is: null } },
+      { notificationPreference: { is: { broadcastsEnabled: true, [channel]: true } } },
+    ],
+  }
 }
 
 function combineWhere(...items: Prisma.UserWhereInput[]): Prisma.UserWhereInput {

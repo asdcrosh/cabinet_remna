@@ -8,6 +8,7 @@ import Script from 'next/script'
 import { TelegramMiniAppViewport } from '@/components/telegram/telegram-miniapp-viewport'
 import { TelegramMiniAppScript } from '@/components/telegram/telegram-miniapp-script'
 import { BrandingProvider } from '@/components/branding-provider'
+import { SessionExpiredBanner } from '@/components/auth/session-expired-banner'
 
 export const dynamic = 'force-dynamic'
 
@@ -48,6 +49,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <TelegramMiniAppScript />
         <TelegramMiniAppViewport />
         <BrandingProvider settings={branding}>{children}</BrandingProvider>
+        <SessionExpiredBanner />
         <Toaster />
       </body>
     </html>

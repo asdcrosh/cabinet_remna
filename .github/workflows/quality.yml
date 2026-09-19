@@ -112,8 +112,8 @@ jobs:
       - run: npm ci
       - name: Apply test database migrations
         run: npx prisma migrate deploy
-      - name: Install Playwright Chromium
-        run: npx playwright install --with-deps chromium
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium firefox webkit
       - name: Browser E2E checks
         run: npm run test:e2e -- --shard=${{ matrix.shard }}
       - name: Upload Playwright report

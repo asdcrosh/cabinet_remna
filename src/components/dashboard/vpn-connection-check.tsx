@@ -34,6 +34,7 @@ type ConnectionResult = {
     state: 'ok' | 'warning' | 'danger'
   }>
   action: 'connection' | 'devices' | 'plans' | 'retry' | 'support' | null
+  connectionVerified: boolean
 }
 
 type CheckState =
@@ -48,6 +49,7 @@ export function VpnConnectionCheck({
   deviceLimit,
   compact = false,
   simple = false,
+  appName = 'приложении VPN',
 }: {
   supportEnabled: boolean
   onVerified?: () => void
@@ -55,6 +57,7 @@ export function VpnConnectionCheck({
   deviceLimit?: number | null
   compact?: boolean
   simple?: boolean
+  appName?: string
 }) {
   const [state, setState] = useState<CheckState>({ status: 'idle' })
   const [copied, setCopied] = useState(false)
@@ -75,9 +78,10 @@ export function VpnConnectionCheck({
         devices: devicesResponse.devices,
         vpn: vpnResponse,
         deviceLimit,
+        appName,
       })
       setState({ status: 'complete', result })
-      if (result.tone === 'success' && onVerified) window.setTimeout(onVerified, 900)
+      if (result.connectionVerified && onVerified) window.setTimeout(onVerified, 900)
     } catch (error) {
       setState({ status: 'complete', result: buildConnectionError(error, deviceLimit) })
     }
@@ -212,6 +216,7 @@ export function buildConnectionResult({
   devices,
   vpn,
   deviceLimit,
+  appName = 'приложении VPN',
   now = new Date(),
 }: {
   subscription: { status?: string | null } | null
@@ -219,6 +224,7 @@ export function buildConnectionResult({
   devices: Device[]
   vpn: VpnCheckResponse
   deviceLimit?: number | null
+  appName?: string
   now?: Date
 }): ConnectionResult {
   const checkedAt = now.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
@@ -246,7 +252,7 @@ export function buildConnectionResult({
       label: 'Маршрут VPN',
       detail: routeReady && vpn.node
         ? `Через «${vpn.node.name}»${vpn.node.country ? `, ${vpn.node.country}` : ''}`
-        : vpn.status === 'direct' ? 'Кабинет открыт напрямую' : 'Маршрут не определён',
+        : vpn.status === 'direct' ? 'Маршрут кабинета не совпал с известной VPN-нодой' : 'Маршрут не определён',
       state: routeReady ? 'ok' : vpn.status === 'unknown' ? 'warning' : 'danger',
     },
   ]
@@ -263,15 +269,15 @@ export function buildConnectionResult({
   })
   if (!routeReady) return createResult({
     tone: 'warning',
-    title: vpn.status === 'direct' ? 'VPN не включён на этом устройстве' : 'Маршрут пока не определён',
+    title: vpn.status === 'direct' ? 'Маршрут через VPN-сервер не подтверждён' : 'Маршрут пока не определён',
     summary: vpn.status === 'direct'
-      ? 'Откройте INCY, включите VPN, загрузите любой сайт и повторите проверку.'
-      : vpn.message || 'Проверьте подключение в INCY и повторите попытку через несколько секунд.',
+      ? `Запрос к кабинету пришёл не с известной VPN-ноды. Это возможно при выключенном VPN, split tunneling или другом выходном IP. Проверьте подключение в ${appName}.`
+      : vpn.message || `Проверьте подключение в ${appName} и повторите попытку через несколько секунд.`,
     action: 'connection', checkedAt, vpn, deviceCount, deviceLimit, checks,
   })
   if (capacityReached) return createResult({
-    tone: 'warning', title: 'VPN работает, но места для нового устройства нет',
-    summary: 'Отключите неиспользуемое устройство перед добавлением нового.',
+    tone: 'warning', title: 'Подключение работает, лимит устройств заполнен',
+    summary: 'Текущее устройство подключено. Чтобы добавить ещё одно, отключите неиспользуемое устройство.',
     action: 'devices', checkedAt, vpn, deviceCount, deviceLimit, checks,
   })
   return createResult({
@@ -303,6 +309,7 @@ function createResult(input: {
     country: input.vpn.node?.country,
     deviceCount: input.deviceCount,
     deviceLimit: input.deviceLimit,
+    connectionVerified: input.vpn.status === 'vpn' && Boolean(input.vpn.node),
     checks: input.checks,
   }
 }
@@ -315,6 +322,7 @@ function buildConnectionError(error: unknown, deviceLimit?: number | null): Conn
     checkedAt: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }),
     deviceCount: 0,
     deviceLimit,
+    connectionVerified: false,
     checks: [{ label: 'Диагностика', detail: 'Не удалось получить все данные', state: 'danger' }],
     action: 'support',
   }

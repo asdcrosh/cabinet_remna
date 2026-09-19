@@ -17,8 +17,13 @@ export type ApiFetchError = Error & {
   retryAfter: number | null
 }
 
+export type ApiFetchOptions = RequestInit & {
+  silent?: boolean
+}
+
 const API_TIMEOUT_MS = 20_000
 const API_GET_RETRY_DELAY_MS = 350
+export const SESSION_EXPIRED_EVENT = 'cabinet:session-expired'
 
 const STATUS_MESSAGES: Record<number, string> = {
   400: 'Некорректный запрос. Проверьте введенные данные.',
@@ -38,22 +43,23 @@ const STATUS_MESSAGES: Record<number, string> = {
 
 export async function apiFetch<T = unknown>(
   path: string,
-  init: RequestInit = {}
+  init: ApiFetchOptions = {}
 ): Promise<T> {
-  const method = (init.method ?? 'GET').toUpperCase()
+  const { silent = false, ...requestInit } = init
+  const method = (requestInit.method ?? 'GET').toUpperCase()
   const canRetry = method === 'GET' || method === 'HEAD'
   const attempts = canRetry ? 2 : 1
   let res: Response | null = null
 
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     const timeoutSignal = AbortSignal.timeout(API_TIMEOUT_MS)
-    const signal = init.signal ? AbortSignal.any([init.signal, timeoutSignal]) : timeoutSignal
+    const signal = requestInit.signal ? AbortSignal.any([requestInit.signal, timeoutSignal]) : timeoutSignal
     try {
       res = await fetch(path, {
-        ...init,
+        ...requestInit,
         headers: {
           'Content-Type': 'application/json',
-          ...(init.headers || {}),
+          ...(requestInit.headers || {}),
         },
         signal,
       })
@@ -63,7 +69,7 @@ export async function apiFetch<T = unknown>(
       }
       break
     } catch (error) {
-      if (init.signal?.aborted) throw error
+      if (requestInit.signal?.aborted) throw error
       if (attempt + 1 < attempts) {
         await waitBeforeRetry()
         continue
@@ -72,7 +78,7 @@ export async function apiFetch<T = unknown>(
       const message = error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError')
         ? 'Сервер не ответил вовремя. Попробуйте ещё раз.'
         : 'Нет соединения с сервером. Проверьте интернет и попробуйте ещё раз.'
-      if (method !== 'GET' && method !== 'HEAD' && !isAdminPage()) toast(message)
+      if (!silent && method !== 'GET' && method !== 'HEAD' && !isAdminPage()) toast(message)
       throw new Error(message)
     }
   }
@@ -85,12 +91,13 @@ export async function apiFetch<T = unknown>(
     /* not JSON */
   }
   if (!res.ok) {
+    if (res.status === 401) notifySessionExpired()
     const message = getApiErrorMessage(
       res.status,
       data,
       res.headers.get('x-request-id') || data?.requestId
     )
-    if (init.method && init.method !== 'GET' && !isAdminPage()) toast(message)
+    if (!silent && requestInit.method && requestInit.method !== 'GET' && !isAdminPage()) toast(message)
     const retryAfterHeader = res.headers.get('retry-after')
     const parsedRetryAfter = retryAfterHeader ? Number(retryAfterHeader) : Number.NaN
     const err = new Error(message) as ApiFetchError
@@ -102,6 +109,12 @@ export async function apiFetch<T = unknown>(
     throw err
   }
   return data as T
+}
+
+function notifySessionExpired() {
+  if (typeof window === 'undefined' || !window.location.pathname.startsWith('/dashboard')) return
+  const next = `${window.location.pathname}${window.location.search}`
+  window.dispatchEvent(new CustomEvent(SESSION_EXPIRED_EVENT, { detail: { next } }))
 }
 
 function waitBeforeRetry() {

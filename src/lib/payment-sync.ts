@@ -2,7 +2,7 @@ import { prisma } from './prisma'
 import { logError } from './logger'
 import { notifyPaymentCanceled, notifyPaymentStuck } from './notifications'
 import { getPlategaTransaction, type PlategaTransaction } from './platega'
-import { provisionPaymentSubscription } from './provisioning'
+import { ProvisioningInProgressError, provisionPaymentSubscription } from './provisioning'
 import { cancelPayment, getPayment } from './yookassa'
 import type { PaymentStatus as YooKassaPaymentStatus } from './yookassa'
 import { paymentErrorDetails, recordPaymentEvent } from './payment-events'
@@ -11,13 +11,16 @@ import {
   registerAutoRenewalFailureBestEffort,
 } from './auto-renewal'
 import { restoreNextPurchaseDiscountBestEffort } from './user-discounts'
+import { applyPlategaChargeback } from './platega-chargeback'
+import { validateYooKassaPayment } from './yookassa-payment-validation'
 
 const DEFAULT_PENDING_TTL_SECONDS = 600
 
 export type PaymentSyncResult =
   | { ok: true; status: 'not_found' | 'missing_external_id' | 'pending' | 'canceled'; provisioned: false }
+  | { ok: true; status: 'provisioning_pending'; provisioned: false }
   | { ok: true; status: 'succeeded'; provisioned: true; alreadyProvisioned?: boolean; subscriptionId?: string }
-  | { ok: false; status: 'check_failed' | 'provisioning_failed'; provisioned: false; error: string }
+  | { ok: false; status: 'check_failed' | 'provisioning_failed' | 'reversal_failed'; provisioned: false; error: string }
 
 type PendingPaymentForCancel = {
   id: string
@@ -62,13 +65,29 @@ export async function syncPaymentProvisioning(input: {
   if (payment.status === 'CANCELED' || payment.status === 'REFUNDED') {
     return { ok: true, status: 'canceled', provisioned: false }
   }
+  if (payment.status === 'SUCCEEDED') {
+    if (payment.subscriptionProvisionedAt && payment.subscription) {
+      return {
+        ok: true,
+        status: 'succeeded',
+        provisioned: true,
+        alreadyProvisioned: true,
+        subscriptionId: payment.subscription.id,
+      }
+    }
+    return provisionSubscription(payment)
+  }
   // PayAnyWay подтверждает оплату подписанным Pay URL. Без Merchant API
   // мы не отменяем и не считаем такой платёж неоплаченным по таймеру.
-  if (payment.provider === 'PAYANYWAY' && payment.status !== 'SUCCEEDED') {
+  if (payment.provider === 'PAYANYWAY') {
     return { ok: true, status: 'pending', provisioned: false }
   }
-  if (payment.provider === 'PLATEGA' && payment.status !== 'SUCCEEDED') {
+  if (payment.provider === 'PLATEGA') {
     if (!payment.externalPaymentId) {
+      await prisma.payment.update({
+        where: { id: payment.id },
+        data: { providerStatus: 'MISSING_EXTERNAL_ID' },
+      })
       return { ok: true, status: 'missing_external_id', provisioned: false }
     }
 
@@ -119,16 +138,28 @@ export async function syncPaymentProvisioning(input: {
     }
 
     if (plategaPayment.status === 'CHARGEBACKED') {
-      await prisma.$transaction([
-        prisma.payment.update({
-          where: { id: payment.id },
-          data: { status: 'REFUNDED', providerStatus: 'CHARGEBACKED' },
-        }),
-        prisma.promoCodeRedemption.updateMany({
-          where: { paymentId: payment.id, status: 'PENDING' },
-          data: { status: 'CANCELED' },
-        }),
-      ])
+      try {
+        await applyPlategaChargeback({
+          paymentId: payment.id,
+          userId: payment.userId,
+          purchaseType: payment.purchaseType,
+          amountKopecks: payment.amountKopecks,
+          externalPaymentId: payment.externalPaymentId,
+        })
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Platega chargeback processing failed'
+        logError('payment-sync.platega_chargeback_failed', error, { paymentId: payment.id })
+        await recordPaymentEvent({
+          paymentId: payment.id,
+          stage: 'REFUND',
+          status: 'ERROR',
+          source: 'payment-sync',
+          message: 'Не удалось полностью обработать chargeback Platega',
+          details: paymentErrorDetails(error),
+          dedupeKey: 'platega-chargeback-failed',
+        })
+        return { ok: false, status: 'reversal_failed', provisioned: false, error: message }
+      }
       return { ok: true, status: 'canceled', provisioned: false }
     }
 
@@ -181,33 +212,25 @@ export async function syncPaymentProvisioning(input: {
   }
   const yooKassaPaymentId = getYooKassaPaymentId(payment)
   if (!yooKassaPaymentId) {
-    if (payment.status !== 'SUCCEEDED') {
-      if (
-        input.cancelPendingOlderThanMs &&
-        Date.now() - payment.createdAt.getTime() >= input.cancelPendingOlderThanMs
-      ) {
-        await cancelLocalPayment(payment.id, null)
-        await notifyPaymentCanceled(payment.id, 'Платёж отменён, потому что ссылка на оплату устарела.')
-        return { ok: true, status: 'canceled', provisioned: false }
-      }
-      return { ok: true, status: 'missing_external_id', provisioned: false }
+    if (
+      input.cancelPendingOlderThanMs &&
+      Date.now() - payment.createdAt.getTime() >= input.cancelPendingOlderThanMs
+    ) {
+      await cancelLocalPayment(payment.id, null)
+      await notifyPaymentCanceled(payment.id, 'Платёж отменён, потому что ссылка на оплату устарела.')
+      return { ok: true, status: 'canceled', provisioned: false }
     }
-    if (payment.subscriptionProvisionedAt && payment.subscription) {
-      return {
-        ok: true,
-        status: 'succeeded',
-        provisioned: true,
-        alreadyProvisioned: true,
-        subscriptionId: payment.subscription.id,
-      }
-    }
-
-    return provisionSubscription(payment)
+    await prisma.payment.update({
+      where: { id: payment.id },
+      data: { providerStatus: 'MISSING_EXTERNAL_ID' },
+    })
+    return { ok: true, status: 'missing_external_id', provisioned: false }
   }
 
   let yooPayment
   try {
     yooPayment = await getPayment(yooKassaPaymentId)
+    validateYooKassaPayment(payment, yooPayment, yooKassaPaymentId)
   } catch (e) {
     const message = e instanceof Error ? e.message : 'payment status check failed'
     await prisma.payment.update({
@@ -559,6 +582,9 @@ async function provisionSubscription(payment: {
       subscriptionId: result.subscription.id,
     }
   } catch (e) {
+    if (e instanceof ProvisioningInProgressError) {
+      return { ok: true, status: 'provisioning_pending', provisioned: false }
+    }
     const message = e instanceof Error ? e.message : 'subscription provisioning failed'
     await prisma.payment.update({
       where: { id: payment.id },

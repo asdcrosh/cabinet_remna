@@ -28,6 +28,7 @@ export async function readSupportMutationRequest(req: Request) {
     body: {
       category: form.get('category') ?? undefined,
       message: form.get('message'),
+      clientMessageId: form.get('clientMessageId') ?? undefined,
     },
     attachments: await readSupportAttachments(form.getAll('files')),
   }

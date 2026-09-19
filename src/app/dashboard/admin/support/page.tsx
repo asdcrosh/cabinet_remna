@@ -15,6 +15,7 @@ import {
   parseAdminSupportFolder,
   parseAdminSupportAssigneeScope,
 } from '@/lib/admin-support-query'
+import { getSupportSettings } from '@/lib/support-settings'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Поддержка — Админка' }
@@ -22,7 +23,7 @@ export const metadata = { title: 'Поддержка — Админка' }
 export default async function AdminSupportPage({
   searchParams,
 }: {
-  searchParams: Promise<{ folder?: string; assignee?: string; q?: string; limit?: string }>
+  searchParams: Promise<{ folder?: string; assignee?: string; q?: string; limit?: string; ticket?: string }>
 }) {
   if (!await isFeatureEnabled('support')) notFound()
   const { user: currentStaff } = await requireStaffPage()
@@ -32,10 +33,12 @@ export default async function AdminSupportPage({
   const assigneeScope = parseAdminSupportAssigneeScope(params.assignee)
   const q = params.q?.trim() ?? ''
   const limit = parseAdminListLimit(params.limit)
+  const initialTicketId = params.ticket?.trim().slice(0, 100) ?? ''
   const searchWhere = buildAdminSupportSearchWhere(q)
   const assigneeWhere = buildAdminSupportAssigneeWhere(assigneeScope, currentStaff.id)
   const scopedWhere = { AND: [searchWhere, assigneeWhere] }
   const where = { AND: [scopedWhere, buildAdminSupportFolderWhere(folder)] }
+  const supportSettings = await getSupportSettings()
 
   const [total, tickets, allCount, activeCount, needAnswerCount, answeredCount, closedCount, staffMembers] = await prisma.$transaction([
     prisma.supportTicket.count({ where }),
@@ -113,6 +116,10 @@ export default async function AdminSupportPage({
     <AdminPageShell title="Поддержка" description="Очередь обращений и переписка с пользователями" variant="plain">
       <SupportPanelDynamic
         mode="admin"
+        initialTicketId={initialTicketId}
+        slaWarningMinutes={supportSettings.slaWarningMinutes}
+        slaBreachMinutes={supportSettings.slaBreachMinutes}
+        adminQuickReplies={supportSettings.quickReplies}
         initialTotal={total}
         pageSize={25}
         initialQuery={q}

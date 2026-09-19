@@ -244,7 +244,7 @@ export function KeysCard({
 
         {step === 3 && (
           <div className="mt-6">
-            <VpnConnectionCheck supportEnabled={supportEnabled} deviceLimit={deviceLimit} onReconnect={() => setStep(2)} simple />
+            <VpnConnectionCheck supportEnabled={supportEnabled} deviceLimit={deviceLimit} appName={selectedApp.name} onReconnect={() => setStep(2)} simple />
           </div>
         )}
 

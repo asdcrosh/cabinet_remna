@@ -19,6 +19,10 @@ describe('support helpers', () => {
 
     expect(parsed.success).toBe(true)
     expect(createSupportTicketSchema.safeParse({
+      category: 'account',
+      message: 'Прошу подготовить экспорт данных аккаунта.',
+    }).success).toBe(true)
+    expect(createSupportTicketSchema.safeParse({
       message: 'Не получается подключиться на iPhone.',
     }).success).toBe(true)
     expect(createSupportTicketSchema.safeParse({
@@ -30,6 +34,14 @@ describe('support helpers', () => {
 
   it('rejects empty messages and user status changes except close', () => {
     expect(createSupportMessageSchema.safeParse({ message: '' }).success).toBe(false)
+    expect(createSupportMessageSchema.safeParse({
+      message: 'Повторяем безопасно',
+      clientMessageId: '9e5db216-2b66-4f53-8d93-2a6a14d6707f',
+    }).success).toBe(true)
+    expect(createSupportMessageSchema.safeParse({
+      message: 'Повторяем небезопасно',
+      clientMessageId: 'not-a-uuid',
+    }).success).toBe(false)
     expect(createSupportInternalNoteSchema.safeParse({ body: '   ' }).success).toBe(false)
     expect(createSupportInternalNoteSchema.safeParse({ body: 'Передать смене детали проверки' }).success).toBe(true)
     expect(userUpdateSupportTicketSchema.safeParse({ status: 'WAITING_USER' }).success).toBe(false)
@@ -38,6 +50,7 @@ describe('support helpers', () => {
 
   it('returns labels for known support values', () => {
     expect(supportCategoryLabel('payment')).toBe('Оплата')
+    expect(supportCategoryLabel('account')).toBe('Данные аккаунта')
     expect(supportCategorySubject('connection')).toBe('Проблема с подключением')
     expect(supportStatusLabel('WAITING_ADMIN')).toBe('Ожидает ответа')
     expect(supportStatusLabelForRole('WAITING_ADMIN', 'admin')).toBe('Нужно ответить')

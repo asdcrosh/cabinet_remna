@@ -38,9 +38,10 @@ type NotifyUserInput = {
   emailHtml?: string
   emailDeliveryMode?: 'always' | 'fallback'
   inApp?: boolean
+  reportExistingDeliveryAsSent?: boolean
 }
 
-type NotifyResult = 'sent' | 'duplicate' | 'skipped' | 'failed'
+export type NotifyResult = 'sent' | 'duplicate' | 'skipped' | 'failed' | 'unknown'
 
 export async function notifyUser(input: NotifyUserInput) {
   const user = await prisma.user.findUnique({
@@ -81,12 +82,13 @@ export async function notifyUser(input: NotifyUserInput) {
     })
   }
 
-  const telegram = broadcastsAllowed && preferences?.telegramEnabled !== false && user.telegramId && input.telegramText
+  const telegram = broadcastsAllowed && preferences?.telegramEnabled !== false && user.telegramId && input.telegramText && process.env.TELEGRAM_BOT_TOKEN?.trim()
     ? await sendWithDedupe({
         userId: user.id,
         type: input.type,
         channel: 'TELEGRAM',
         dedupeKey: input.dedupeKey,
+        reportExistingAsSent: input.reportExistingDeliveryAsSent,
         send: () =>
           sendTelegramMessage({
             chatId: user.telegramId!,
@@ -106,10 +108,11 @@ export async function notifyUser(input: NotifyUserInput) {
     isRealEmail(user.email) &&
     input.emailSubject &&
     input.emailText &&
-    input.emailHtml
+    input.emailHtml &&
+    process.env.EMAIL_VERIFICATION_WEBHOOK_URL?.trim()
   const emailMode = input.emailDeliveryMode ?? 'always'
   const shouldSendEmail = Boolean(emailAllowed) && (
-    emailMode === 'always' || telegram === 'skipped' || telegram === 'failed'
+    emailMode === 'always' || telegram === 'skipped' || telegram === 'failed' || telegram === 'unknown'
   )
 
   const email = shouldSendEmail
@@ -118,6 +121,7 @@ export async function notifyUser(input: NotifyUserInput) {
         type: input.type,
         channel: 'EMAIL',
         dedupeKey: input.dedupeKey,
+        reportExistingAsSent: input.reportExistingDeliveryAsSent,
         send: () =>
           sendEmail({
             to: user.email,
@@ -792,6 +796,7 @@ async function sendWithDedupe(input: {
   type: NotificationType
   channel: NotificationChannel
   dedupeKey: string
+  reportExistingAsSent?: boolean
   send: () => Promise<void>
 }): Promise<NotifyResult> {
   const dedupeKey = `${input.type}:${input.dedupeKey}`
@@ -805,16 +810,53 @@ async function sendWithDedupe(input: {
     skipDuplicates: true,
   })
 
-  if (created.count === 0) return 'duplicate'
+  if (created.count === 0) {
+    const existing = await prisma.notificationLog.findUnique({
+      where: { channel_dedupeKey: { channel: input.channel, dedupeKey } },
+      select: { status: true },
+    })
+    if (!existing) return 'unknown'
+    if (existing.status === 'SENT') return input.reportExistingAsSent ? 'sent' : 'duplicate'
+    if (existing.status === 'UNKNOWN' || existing.status === 'PENDING') {
+      if (existing.status === 'PENDING') {
+        await prisma.notificationLog.updateMany({
+          where: { channel: input.channel, dedupeKey, status: 'PENDING' },
+          data: { status: 'UNKNOWN', error: 'Предыдущая попытка доставки завершилась без подтверждения' },
+        })
+      }
+      return 'unknown'
+    }
+
+    const claimed = await prisma.notificationLog.updateMany({
+      where: { channel: input.channel, dedupeKey, status: 'FAILED' },
+      data: {
+        status: 'PENDING',
+        attempts: { increment: 1 },
+        lastAttemptAt: new Date(),
+        error: null,
+      },
+    })
+    if (claimed.count !== 1) return 'unknown'
+  } else {
+    await prisma.notificationLog.updateMany({
+      where: { channel: input.channel, dedupeKey, status: 'PENDING' },
+      data: { attempts: { increment: 1 }, lastAttemptAt: new Date() },
+    })
+  }
 
   try {
     await input.send()
+    await prisma.notificationLog.updateMany({
+      where: { channel: input.channel, dedupeKey, status: { in: ['PENDING', 'UNKNOWN'] } },
+      data: { status: 'SENT', sentAt: new Date(), error: null },
+    })
     return 'sent'
   } catch (error) {
     const message = error instanceof Error ? error.message : 'notification delivery failed'
+    const status = error instanceof DefinitiveDeliveryError ? 'FAILED' : 'UNKNOWN'
     await prisma.notificationLog.updateMany({
       where: { channel: input.channel, dedupeKey },
-      data: { error: message.slice(0, 1000) },
+      data: { status, error: message.slice(0, 1000) },
     })
     logError('notifications.delivery_failed', undefined, {
       userId: input.userId,
@@ -822,9 +864,11 @@ async function sendWithDedupe(input: {
       channel: input.channel,
       message,
     })
-    return 'failed'
+    return status === 'FAILED' ? 'failed' : 'unknown'
   }
 }
+
+class DefinitiveDeliveryError extends Error {}
 
 async function sendTelegramMessage(input: {
   chatId: bigint
@@ -873,7 +917,7 @@ async function sendTelegramMessage(input: {
 
   if (!response.ok) {
     const details = await response.text().catch(() => '')
-    throw new Error(`Telegram failed: ${response.status} ${details}`.slice(0, 1000))
+    throw new DefinitiveDeliveryError(`Telegram failed: ${response.status} ${details}`.slice(0, 1000))
   }
 }
 
@@ -895,7 +939,7 @@ async function sendEmail(input: { to: string; subject: string; text: string; htm
 
   if (!response.ok) {
     const details = await response.text().catch(() => '')
-    throw new Error(`Email failed: ${response.status} ${details}`.slice(0, 1000))
+    throw new DefinitiveDeliveryError(`Email failed: ${response.status} ${details}`.slice(0, 1000))
   }
 }
 

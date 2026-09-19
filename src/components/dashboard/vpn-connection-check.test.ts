@@ -19,6 +19,7 @@ describe('buildConnectionResult', () => {
 
     expect(result.tone).toBe('success')
     expect(result.title).toBe('Подключение работает')
+    expect(result.connectionVerified).toBe(true)
     expect(result.checks.every((check) => check.state === 'ok')).toBe(true)
   })
 
@@ -28,11 +29,15 @@ describe('buildConnectionResult', () => {
       devices: [],
       vpn: { status: 'direct', publicIp: '203.0.113.20' },
       deviceLimit: 5,
+      appName: 'HAPP',
       now,
     })
 
     expect(result.tone).toBe('warning')
     expect(result.action).toBe('connection')
+    expect(result.title).toBe('Маршрут через VPN-сервер не подтверждён')
+    expect(result.summary).toContain('HAPP')
+    expect(result.summary).toContain('split tunneling')
   })
 
   it('предлагает освободить место при заполненном лимите', () => {
@@ -45,6 +50,7 @@ describe('buildConnectionResult', () => {
     })
 
     expect(result.action).toBe('devices')
-    expect(result.title).toContain('места')
+    expect(result.title).toContain('лимит')
+    expect(result.connectionVerified).toBe(true)
   })
 })

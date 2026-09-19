@@ -5,8 +5,7 @@ import { notifyPaymentCanceled } from '@/lib/notifications'
 import { prisma } from '@/lib/prisma'
 import { verifyPlategaCallbackHeaders } from '@/lib/platega'
 import { cancelOtherPendingPaymentsForUser, syncPaymentProvisioning } from '@/lib/payment-sync'
-import { recordSucceededRefund } from '@/lib/payment-refunds'
-import { terminateUserSubscription } from '@/lib/subscription-termination'
+import { applyPlategaChargeback } from '@/lib/platega-chargeback'
 import { recordPaymentEvent } from '@/lib/payment-events'
 import { restoreNextPurchaseDiscountBestEffort } from '@/lib/user-discounts'
 
@@ -79,21 +78,13 @@ export async function POST(request: Request) {
   }
 
   if (callback.status === 'CHARGEBACKED') {
-    await recordSucceededRefund({
-      paymentId: payment.id,
-      providerRefundId: `platega-chargeback:${callback.id}`,
-      amountKopecks: payment.amountKopecks,
-      paymentAmountKopecks: payment.amountKopecks,
-      providerStatus: callback.status,
-    })
-    if (payment.purchaseType === 'WHITELIST_ADDON' || payment.purchaseType === 'DEVICE_LIMIT_ADDON') {
-      return new NextResponse(null, { status: 200 })
-    }
     try {
-      await terminateUserSubscription({
-        userId: payment.userId,
-        source: 'PLATEGA_CHARGEBACK',
+      await applyPlategaChargeback({
         paymentId: payment.id,
+        userId: payment.userId,
+        purchaseType: payment.purchaseType,
+        amountKopecks: payment.amountKopecks,
+        externalPaymentId: callback.id,
       })
     } catch (error) {
       logError('webhook.platega.chargeback_revoke_failed', error, {

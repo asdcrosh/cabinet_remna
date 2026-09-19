@@ -85,7 +85,39 @@ export async function processBroadcastDeliveryBatch(options: {
         emailSubject: payload.emailSubject ?? undefined,
         emailText: payload.emailText ?? undefined,
         emailHtml: payload.emailHtml ?? undefined,
+        reportExistingDeliveryAsSent: true,
       })
+
+      const channelFailure = getChannelFailure(result)
+      if (channelFailure) {
+        const terminal = channelFailure.unknown || delivery.attempts + 1 >= maxAttempts
+        const updateDelivery = prisma.broadcastDelivery.update({
+          where: { id: delivery.id },
+          data: {
+            status: channelFailure.unknown ? 'UNKNOWN' : terminal ? 'FAILED' : 'PENDING',
+            lastError: channelFailure.message,
+            lockedAt: null,
+          },
+        })
+        if (terminal) {
+          await prisma.$transaction([
+            updateDelivery,
+            prisma.broadcastCampaign.update({
+              where: { id: delivery.campaignId },
+              data: buildCampaignCounterUpdate(payload, result),
+            }),
+          ])
+        } else {
+          await updateDelivery
+        }
+        logError('broadcast.delivery_failed', undefined, {
+          deliveryId: delivery.id,
+          campaignId: delivery.campaignId,
+          message: channelFailure.message,
+        })
+        failed += 1
+        continue
+      }
 
       await prisma.$transaction([
         prisma.broadcastDelivery.update({
@@ -134,10 +166,30 @@ function buildCampaignCounterUpdate(
     telegramSkipped: { increment: result.telegram === 'skipped' ? 1 : 0 },
     telegramDuplicate: { increment: result.telegram === 'duplicate' ? 1 : 0 },
     telegramFailed: { increment: result.telegram === 'failed' ? 1 : 0 },
+    telegramUnknown: { increment: result.telegram === 'unknown' ? 1 : 0 },
     emailSent: { increment: result.email === 'sent' ? 1 : 0 },
     emailSkipped: { increment: result.email === 'skipped' ? 1 : 0 },
     emailDuplicate: { increment: result.email === 'duplicate' ? 1 : 0 },
     emailFailed: { increment: result.email === 'failed' ? 1 : 0 },
+    emailUnknown: { increment: result.email === 'unknown' ? 1 : 0 },
+  }
+}
+
+function getChannelFailure(result: NotifyResult) {
+  const failed = [
+    result.telegram === 'failed' ? 'Telegram' : null,
+    result.email === 'failed' ? 'Email' : null,
+  ].filter((channel): channel is string => Boolean(channel))
+  const unknown = [
+    result.telegram === 'unknown' ? 'Telegram' : null,
+    result.email === 'unknown' ? 'Email' : null,
+  ].filter((channel): channel is string => Boolean(channel))
+  if (failed.length === 0 && unknown.length === 0) return null
+  return {
+    unknown: unknown.length > 0,
+    message: unknown.length > 0
+      ? `Неизвестен результат доставки: ${unknown.join(', ')}`
+      : `Ошибка доставки: ${failed.join(', ')}`,
   }
 }
 

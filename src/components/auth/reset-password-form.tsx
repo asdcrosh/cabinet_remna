@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
@@ -20,7 +20,7 @@ const resetFormSchema = resetPasswordSchema
 
 type ResetFormInput = z.infer<typeof resetFormSchema>
 
-export function ResetPasswordForm({ token }: { token: string }) {
+export function ResetPasswordForm({ token, next = '/dashboard' }: { token: string; next?: string }) {
   const router = useRouter()
   const { register, handleSubmit, watch, formState: { errors, isSubmitting } } = useForm<ResetFormInput>({
     resolver: zodResolver(resetFormSchema),
@@ -28,9 +28,14 @@ export function ResetPasswordForm({ token }: { token: string }) {
   })
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmation, setShowConfirmation] = useState(false)
+  const [isHydrated, setIsHydrated] = useState(false)
   const [serverError, setServerError] = useState<string | null>(null)
   const [invalidLink, setInvalidLink] = useState(false)
   const password = watch('password')
+
+  useEffect(() => {
+    setIsHydrated(true)
+  }, [])
 
   const onSubmit = handleSubmit(async (values) => {
     setServerError(null)
@@ -42,7 +47,8 @@ export function ResetPasswordForm({ token }: { token: string }) {
       })
       window.sessionStorage.removeItem('password-reset-email:v1')
       window.sessionStorage.removeItem('password-reset-resend-until:v1')
-      router.push('/login?reset=success')
+      const params = new URLSearchParams({ reset: 'success', next })
+      router.push(`/login?${params.toString()}`)
     } catch (error) {
       if (isApiFetchError(error) && error.status === 400) setInvalidLink(true)
       setServerError(error instanceof Error ? error.message : 'Не удалось сохранить пароль')
@@ -59,6 +65,7 @@ export function ResetPasswordForm({ token }: { token: string }) {
             id="password"
             type={showPassword ? 'text' : 'password'}
             autoComplete="new-password"
+            disabled={!isHydrated || isSubmitting}
             className="input px-10"
             placeholder="Придумайте новый пароль"
             {...register('password')}
@@ -66,6 +73,7 @@ export function ResetPasswordForm({ token }: { token: string }) {
           <button
             type="button"
             className="absolute right-2 top-1/2 -translate-y-1/2 rounded-xl p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-white/5 dark:hover:text-slate-100"
+            disabled={!isHydrated || isSubmitting}
             onClick={() => setShowPassword((value) => !value)}
             aria-label={showPassword ? 'Скрыть пароль' : 'Показать пароль'}
           >
@@ -87,6 +95,7 @@ export function ResetPasswordForm({ token }: { token: string }) {
             id="confirmPassword"
             type={showConfirmation ? 'text' : 'password'}
             autoComplete="new-password"
+            disabled={!isHydrated || isSubmitting}
             className="input px-10"
             placeholder="Повторите новый пароль"
             {...register('confirmPassword')}
@@ -94,6 +103,7 @@ export function ResetPasswordForm({ token }: { token: string }) {
           <button
             type="button"
             className="absolute right-2 top-1/2 -translate-y-1/2 rounded-xl p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-white/5 dark:hover:text-slate-100"
+            disabled={!isHydrated || isSubmitting}
             onClick={() => setShowConfirmation((value) => !value)}
             aria-label={showConfirmation ? 'Скрыть повтор пароля' : 'Показать повтор пароля'}
           >
@@ -106,11 +116,11 @@ export function ResetPasswordForm({ token }: { token: string }) {
         <FormAlert>{serverError}</FormAlert>
       )}
       {invalidLink && (
-        <Link href="/forgot-password" className="btn-secondary min-h-12 w-full">
+        <Link href={`/forgot-password?next=${encodeURIComponent(next)}`} className="btn-secondary min-h-12 w-full">
           Запросить новую ссылку
         </Link>
       )}
-      <button type="submit" disabled={isSubmitting || invalidLink} className="btn-primary min-h-12 w-full">
+      <button type="submit" disabled={!isHydrated || isSubmitting || invalidLink} className="btn-primary min-h-12 w-full">
         <KeyRound className="h-4 w-4" />
         {isSubmitting ? 'Сохраняем...' : 'Сохранить пароль'}
       </button>

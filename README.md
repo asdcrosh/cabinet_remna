@@ -281,6 +281,7 @@ cabinetctl
 | Подключить внешний Nginx и HTTPS | `cabinetctl nginx` |
 | Настроить автоматическое создание нод | `cabinetctl provisioning` |
 | Создать или восстановить бэкап | `cabinetctl backups` |
+| Восстановить платёж PayAnyWay | [`docs/runbooks/payanyway-payment-recovery.md`](docs/runbooks/payanyway-payment-recovery.md) |
 | Настроить расписание бэкапов | `cabinetctl backup-schedule` |
 
 <details>

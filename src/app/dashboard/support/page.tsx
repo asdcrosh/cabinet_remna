@@ -15,7 +15,7 @@ export const metadata = { title: 'Поддержка' }
 export default async function SupportPage({
   searchParams,
 }: {
-  searchParams: Promise<{ category?: string; payment?: string }>
+  searchParams: Promise<{ category?: string; payment?: string; request?: string }>
 }) {
   if (!await isFeatureEnabled('support')) notFound()
   const session = await getCurrentUser()
@@ -25,6 +25,9 @@ export default async function SupportPage({
     ? params.category as SupportCategoryValue
     : 'connection'
   const paymentId = params.payment?.trim().slice(0, 100) || null
+  const accountRequest = category === 'account' && ['export', 'delete'].includes(params.request ?? '')
+    ? params.request
+    : null
 
   const [tickets, payment] = await Promise.all([
     prisma.supportTicket.findMany({
@@ -72,7 +75,20 @@ export default async function SupportPage({
         '',
         'Что произошло: ',
       ].join('\n')
-    : ''
+    : accountRequest === 'export'
+      ? [
+          'Прошу подготовить экспорт данных моего аккаунта.',
+          '',
+          'Дополнительные сведения: ',
+        ].join('\n')
+      : accountRequest === 'delete'
+        ? [
+            'Прошу удалить мой аккаунт и персональные данные, которые можно удалить.',
+            'Понимаю, что сведения о платежах и возвратах могут храниться в объёме и сроках, обязательных для оператора.',
+            '',
+            'Дополнительные сведения: ',
+          ].join('\n')
+        : ''
 
   return (
     <div>
@@ -84,7 +100,7 @@ export default async function SupportPage({
         }))}
         initialCategory={payment ? 'payment' : category}
         initialMessage={initialMessage}
-        initialNewTicketOpen={Boolean(payment || params.category)}
+        initialNewTicketOpen={Boolean(payment || params.category || accountRequest)}
       />
     </div>
   )

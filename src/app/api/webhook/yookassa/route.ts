@@ -19,6 +19,8 @@ import {
   registerAutoRenewalFailureBestEffort,
 } from '@/lib/auto-renewal'
 import { restoreNextPurchaseDiscountBestEffort } from '@/lib/user-discounts'
+import { validateYooKassaPayment, YooKassaPaymentMismatchError } from '@/lib/yookassa-payment-validation'
+import { revokeDeviceLimitAddonForPayment } from '@/lib/device-limit-addon'
 
 export const runtime = 'nodejs'
 
@@ -76,21 +78,50 @@ export async function POST(req: Request) {
     include: { plan: true, user: true },
   })
   const metadataPaymentId = event.object.metadata?.localPaymentId
-  if (!payment && metadataPaymentId) {
+  const foundByMetadata = !payment && Boolean(metadataPaymentId)
+  if (foundByMetadata) {
     payment = await prisma.payment.findFirst({
       where: { id: metadataPaymentId, provider: 'YOOKASSA' },
       include: { plan: true, user: true },
     })
-    if (payment) {
-      await prisma.payment.update({
-        where: { id: payment.id },
-        data: { yookassaId, externalPaymentId: yookassaId },
-      })
-    }
   }
   if (!payment) {
     logWarn('webhook.payment_not_found', { yookassaId })
     return NextResponse.json({ ok: true, notFound: true })
+  }
+
+  let status = event.object.status
+  let freshPayment: YooPayment
+  try {
+    freshPayment = await getPayment(yookassaId)
+    validateYooKassaPayment(payment, freshPayment, yookassaId)
+    status = freshPayment.status
+  } catch (e) {
+    if (e instanceof YooKassaPaymentMismatchError) {
+      logWarn('webhook.yookassa.payment_mismatch', { paymentId: payment.id, yookassaId, reason: e.message })
+      return NextResponse.json({ error: 'payment-mismatch' }, { status: 409 })
+    }
+    logError('webhook.get_payment_failed', e, { yookassaId })
+    await recordPaymentEvent({
+      paymentId: payment.id,
+      stage: 'PROVIDER',
+      status: 'WARNING',
+      source: 'yookassa-webhook',
+      message: 'Не удалось перепроверить статус в ЮKassa, изменения платежа не применены',
+      details: paymentErrorDetails(e),
+      dedupeKey: 'provider-status-check-failed',
+    })
+    return NextResponse.json(
+      { error: 'provider-status-unavailable' },
+      { status: 503, headers: { 'Retry-After': '30' } }
+    )
+  }
+
+  if (foundByMetadata) {
+    await prisma.payment.update({
+      where: { id: payment.id },
+      data: { yookassaId, externalPaymentId: yookassaId },
+    })
   }
 
   await recordPaymentEvent({
@@ -107,38 +138,16 @@ export async function POST(req: Request) {
     try {
       await captureSavedPaymentMethodBestEffort({
         localPaymentId: payment.id,
-        providerPayment: await getPayment(yookassaId),
+        providerPayment: freshPayment,
       })
     } catch (error) {
-      logError('webhook.saved_payment_method_refresh_failed', error, { paymentId: payment.id, yookassaId })
+      logError('webhook.capture_saved_payment_method_failed', error, { paymentId: payment.id })
     }
     await prisma.promoCodeRedemption.updateMany({
       where: { paymentId: payment.id, status: 'PENDING' },
       data: { status: 'SUCCEEDED' },
     })
     return NextResponse.json({ ok: true, idempotent: true })
-  }
-
-  let status = event.object.status
-  let freshPayment: YooPayment
-  try {
-    freshPayment = await getPayment(yookassaId)
-    status = freshPayment.status
-  } catch (e) {
-    logError('webhook.get_payment_failed', e, { yookassaId })
-    await recordPaymentEvent({
-      paymentId: payment.id,
-      stage: 'PROVIDER',
-      status: 'WARNING',
-      source: 'yookassa-webhook',
-      message: 'Не удалось перепроверить статус в ЮKassa, изменения платежа не применены',
-      details: paymentErrorDetails(e),
-      dedupeKey: 'provider-status-check-failed',
-    })
-    return NextResponse.json(
-      { error: 'provider-status-unavailable' },
-      { status: 503, headers: { 'Retry-After': '30' } }
-    )
   }
 
   if (status === 'succeeded') {
@@ -284,7 +293,19 @@ async function handleSucceededRefund(event: YookassaRefundWebhookEvent) {
     })
   }
 
-  if (payment.purchaseType === 'WHITELIST_ADDON' || payment.purchaseType === 'DEVICE_LIMIT_ADDON') {
+  if (payment.purchaseType === 'DEVICE_LIMIT_ADDON') {
+    try {
+      await revokeDeviceLimitAddonForPayment(payment.id)
+    } catch (error) {
+      logError('webhook.yookassa.refund_device_limit_revoke_failed', error, {
+        paymentId: payment.id,
+        refundId: refund.id,
+      })
+      return NextResponse.json({ error: 'Device limit rollback failed' }, { status: 503 })
+    }
+    return NextResponse.json({ ok: true, refunded: true })
+  }
+  if (payment.purchaseType === 'WHITELIST_ADDON') {
     return NextResponse.json({ ok: true, refunded: true })
   }
 

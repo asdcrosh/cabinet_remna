@@ -62,7 +62,10 @@ export const telegramMiniAppEmailSchema = z.object({
 
 export const forgotPasswordSchema = z.object({
   email: z.string().email('Некорректный email').toLowerCase().trim(),
+  next: z.string().trim().max(512).optional(),
 })
+
+export const resendVerificationSchema = registerSchema.pick({ email: true, next: true })
 
 export const resetPasswordSchema = z.object({
   token: z.string().min(16).max(256),

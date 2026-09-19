@@ -66,7 +66,13 @@ export async function terminateUserSubscription(input: TerminateUserSubscription
   const refundedPayment = input.paymentId && isRefundSource(input.source)
     ? await prisma.payment.findUnique({
         where: { id: input.paymentId },
-        select: { addonSnapshot: true },
+        select: {
+          addonSnapshot: true,
+          purchaseType: true,
+          paidAt: true,
+          createdAt: true,
+          subscriptionProvisionedAt: true,
+        },
       })
     : null
   const revokeRefundedBundledAddon = Boolean(
@@ -76,6 +82,35 @@ export async function terminateUserSubscription(input: TerminateUserSubscription
   )
 
   const hadSubscription = user.subscriptions.length > 0
+  const refundedProvisionedAt = refundedPayment?.subscriptionProvisionedAt
+    ?? refundedPayment?.paidAt
+    ?? refundedPayment?.createdAt
+  const newerProvisionedPayment = refundedPayment?.purchaseType === 'SUBSCRIPTION' && refundedProvisionedAt
+    ? await prisma.payment.findFirst({
+        where: {
+          userId: input.userId,
+          id: { not: input.paymentId },
+          purchaseType: 'SUBSCRIPTION',
+          status: 'SUCCEEDED',
+          subscriptionProvisionedAt: { gt: refundedProvisionedAt },
+        },
+        select: { id: true },
+      })
+    : null
+  if (newerProvisionedPayment) {
+    if (input.paymentId) {
+      await recordPaymentEvent({
+        paymentId: input.paymentId,
+        stage: 'SUBSCRIPTION',
+        status: 'INFO',
+        source: 'subscription-termination',
+        message: 'Доступ сохранён: после возвращённого платежа применена более новая покупка',
+        details: { source: input.source, newerPaymentId: newerProvisionedPayment.id },
+        dedupeKey: `termination-skipped-newer-payment-${input.source}`,
+      })
+    }
+    return { hadSubscription, preservedByNewerPayment: true as const }
+  }
   const notificationDedupeId = input.paymentId
     ? `payment:${input.paymentId}`
     : user.subscriptions[0]?.id

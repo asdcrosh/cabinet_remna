@@ -15,6 +15,12 @@ function multipartRequest(files: Blob[]) {
   })
 }
 
+function pngOfSize(size: number) {
+  const bytes = new Uint8Array(size)
+  if (size >= 8) bytes.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
+  return new Blob([bytes], { type: 'image/png' })
+}
+
 describe('support attachments', () => {
   it('accepts a real PNG and keeps the form fields', async () => {
     const png = new Blob(
@@ -27,6 +33,7 @@ describe('support attachments', () => {
     expect(result.body).toEqual({
       category: 'payment',
       message: 'Оплата прошла, но доступа нет',
+      clientMessageId: undefined,
     })
     expect(result.attachments).toHaveLength(1)
     expect(result.attachments[0]).toMatchObject({
@@ -51,5 +58,23 @@ describe('support attachments', () => {
 
     await expect(readSupportMutationRequest(multipartRequest([png(), png(), png(), png()])))
       .rejects.toThrow('не больше 3 файлов')
+  })
+
+  it('accepts three files exactly at the 5 MB boundary', async () => {
+    const result = await readSupportMutationRequest(multipartRequest([
+      pngOfSize(5 * 1024 * 1024),
+      pngOfSize(5 * 1024 * 1024),
+      pngOfSize(5 * 1024 * 1024),
+    ]))
+
+    expect(result.attachments).toHaveLength(3)
+    expect(result.attachments.every((file) => file.sizeBytes === 5 * 1024 * 1024)).toBe(true)
+  })
+
+  it('rejects an empty file and a file above 5 MB', async () => {
+    await expect(readSupportMutationRequest(multipartRequest([pngOfSize(0)])))
+      .rejects.toThrow('не больше 5 МБ')
+    await expect(readSupportMutationRequest(multipartRequest([pngOfSize(5 * 1024 * 1024 + 1)])))
+      .rejects.toThrow('не больше 5 МБ')
   })
 })

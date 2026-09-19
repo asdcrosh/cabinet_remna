@@ -132,6 +132,20 @@ describe('PayAnyWay Pay URL', () => {
     expect(mocks.provisionPaymentSubscription).not.toHaveBeenCalled()
   })
 
+  it('rejects a different operation for an already bound payment', async () => {
+    mocks.prisma.payment.findUnique.mockResolvedValue({
+      ...mocks.payment,
+      externalPaymentId: 'operation-original',
+    })
+
+    const response = await POST(callbackRequest({ MNT_OPERATION_ID: 'operation-foreign' }))
+
+    expect(response.status).toBe(409)
+    expect(await response.text()).toBe('FAIL')
+    expect(mocks.prisma.payment.update).not.toHaveBeenCalled()
+    expect(mocks.provisionPaymentSubscription).not.toHaveBeenCalled()
+  })
+
   it('does not provision the same operation twice', async () => {
     mocks.prisma.payment.findUnique.mockResolvedValue({
       ...mocks.payment,

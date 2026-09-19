@@ -8,6 +8,7 @@ import { logError, logInfo } from './logger'
 import { createAdminNotification } from './admin-notifications'
 import { syncResetPasswordToRemnashop } from './remnashop-password-sync'
 import { writeAuditLog } from './audit-log'
+import { sanitizeInternalNext } from './auth/next-path'
 
 const TOKEN_BYTES = 32
 const TOKEN_TTL_MS = 60 * 60 * 1000
@@ -37,9 +38,13 @@ export async function sendPasswordResetLink(input: {
   email: string
   name?: string | null
   token: string
+  next?: string
 }) {
   const appUrl = getAppUrl()
-  const resetUrl = `${appUrl}/reset-password?token=${encodeURIComponent(input.token)}`
+  const params = new URLSearchParams({ token: input.token })
+  const next = sanitizeInternalNext(input.next)
+  if (next !== '/dashboard') params.set('next', next)
+  const resetUrl = `${appUrl}/reset-password?${params.toString()}`
   const webhookUrl = process.env.EMAIL_VERIFICATION_WEBHOOK_URL
 
   if (!webhookUrl) {
@@ -170,7 +175,7 @@ export async function resetPasswordByToken(input: { token: string; password: str
         : result.reason === 'database_not_configured'
           ? 'not_configured'
           : 'failed'
-      if (!result.ok && result.reason !== 'database_not_configured') {
+      if (!result.ok) {
         await notifyRemnashopPasswordSyncIssue(row.userId, row.user.email, result.reason)
       }
     } catch (error) {
@@ -232,6 +237,7 @@ async function notifyRemnashopPasswordSyncIssue(
 }
 
 function passwordSyncReason(reason: string) {
+  if (reason === 'database_not_configured') return 'не настроено подключение к базе Remnashop'
   if (reason === 'crypt_key_not_configured') return 'не настроен ключ хеширования Remnashop'
   if (reason === 'redis_not_configured') return 'не настроен отзыв активных сессий Remnashop'
   if (reason === 'user_not_found') return 'связанный пользователь не найден'

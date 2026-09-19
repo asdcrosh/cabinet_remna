@@ -11,6 +11,9 @@ const mocks = vi.hoisted(() => {
   const user = { id: 'user-1', email: 'user@example.com' }
   const payment = {
     id: 'pay-1',
+    userId: 'user-1',
+    planId: 'plan-1',
+    amountKopecks: 59900,
     yookassaId: 'yoo-1',
     status: 'PENDING',
     paidAt: null,
@@ -23,6 +26,7 @@ const mocks = vi.hoisted(() => {
     payment,
     prisma: {
       payment: {
+        findFirst: vi.fn(),
         findUnique: vi.fn(),
         update: vi.fn(),
       },
@@ -38,6 +42,7 @@ const mocks = vi.hoisted(() => {
     recordSucceededRefund: vi.fn(),
     terminateUserSubscription: vi.fn(),
     restoreNextPurchaseDiscountBestEffort: vi.fn(),
+    revokeDeviceLimitAddonForPayment: vi.fn(),
   }
 })
 
@@ -64,6 +69,9 @@ vi.mock('@/lib/subscription-termination', () => ({
 }))
 vi.mock('@/lib/user-discounts', () => ({
   restoreNextPurchaseDiscountBestEffort: mocks.restoreNextPurchaseDiscountBestEffort,
+}))
+vi.mock('@/lib/device-limit-addon', () => ({
+  revokeDeviceLimitAddonForPayment: mocks.revokeDeviceLimitAddonForPayment,
 }))
 
 import { POST } from './route'
@@ -98,9 +106,21 @@ function refundWebhookRequest(value = '300.00', refundId = 'refund-1') {
   })
 }
 
+function providerPayment(status: 'pending' | 'waiting_for_capture' | 'succeeded' | 'canceled') {
+  return {
+    id: 'yoo-1',
+    status,
+    paid: status === 'succeeded',
+    amount: { value: '599.00', currency: 'RUB' },
+    metadata: { localPaymentId: 'pay-1', userId: 'user-1', planId: 'plan-1' },
+    created_at: '2026-09-18T00:00:00.000Z',
+  }
+}
+
 describe('YooKassa webhook route', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mocks.getPayment.mockReset()
     mocks.assertYookassaWebhookSource.mockReturnValue({ ok: true })
     mocks.prisma.payment.update.mockResolvedValue({})
     mocks.prisma.promoCodeRedemption.updateMany.mockResolvedValue({ count: 0 })
@@ -109,11 +129,12 @@ describe('YooKassa webhook route', () => {
       refundedAmountKopecks: 30000,
     })
     mocks.terminateUserSubscription.mockResolvedValue({ hadSubscription: true })
+    mocks.revokeDeviceLimitAddonForPayment.mockResolvedValue({ revoked: true })
   })
 
   it('marks payment succeeded and provisions subscription', async () => {
     mocks.prisma.payment.findUnique.mockResolvedValue(mocks.payment)
-    mocks.getPayment.mockResolvedValue({ status: 'succeeded' })
+    mocks.getPayment.mockResolvedValue(providerPayment('succeeded'))
     mocks.provisionPaymentSubscription.mockResolvedValue({ subscription: { id: 'sub-1' } })
 
     const res = await POST(webhookRequest('succeeded'))
@@ -151,12 +172,70 @@ describe('YooKassa webhook route', () => {
     expect(mocks.provisionPaymentSubscription).not.toHaveBeenCalled()
   })
 
+  it('rejects a provider payment with a different amount', async () => {
+    mocks.prisma.payment.findUnique.mockResolvedValue(mocks.payment)
+    mocks.getPayment.mockResolvedValue({
+      ...providerPayment('succeeded'),
+      amount: { value: '598.00', currency: 'RUB' },
+    })
+
+    const res = await POST(webhookRequest('succeeded'))
+
+    expect(res.status).toBe(409)
+    await expect(res.json()).resolves.toEqual({ error: 'payment-mismatch' })
+    expect(mocks.prisma.payment.update).not.toHaveBeenCalled()
+    expect(mocks.provisionPaymentSubscription).not.toHaveBeenCalled()
+  })
+
+  it('does not bind a payment found through untrusted webhook metadata before verification', async () => {
+    mocks.prisma.payment.findUnique.mockResolvedValue(null)
+    mocks.prisma.payment.findFirst.mockResolvedValue(mocks.payment)
+    mocks.getPayment.mockResolvedValue({
+      ...providerPayment('succeeded'),
+      metadata: { localPaymentId: 'pay-other', userId: 'user-1', planId: 'plan-1' },
+    })
+    const request = new Request('http://localhost:3000/api/webhook/yookassa', {
+      method: 'POST',
+      body: JSON.stringify({
+        type: 'notification',
+        event: 'payment.succeeded',
+        object: {
+          id: 'yoo-1',
+          status: 'succeeded',
+          metadata: { localPaymentId: 'pay-1' },
+        },
+      }),
+    })
+
+    const res = await POST(request)
+
+    expect(res.status).toBe(409)
+    await expect(res.json()).resolves.toEqual({ error: 'payment-mismatch' })
+    expect(mocks.prisma.payment.update).not.toHaveBeenCalled()
+    expect(mocks.provisionPaymentSubscription).not.toHaveBeenCalled()
+  })
+
+  it('uses the current provider status when webhook events arrive out of order', async () => {
+    mocks.prisma.payment.findUnique.mockResolvedValue(mocks.payment)
+    mocks.getPayment.mockResolvedValue(providerPayment('canceled'))
+
+    const res = await POST(webhookRequest('succeeded'))
+
+    expect(res.status).toBe(200)
+    expect(mocks.prisma.payment.update).toHaveBeenCalledWith({
+      where: { id: 'pay-1' },
+      data: { status: 'CANCELED', yookassaStatus: 'canceled', providerStatus: 'canceled' },
+    })
+    expect(mocks.provisionPaymentSubscription).not.toHaveBeenCalled()
+  })
+
   it('does not provision again when payment is already provisioned', async () => {
     mocks.prisma.payment.findUnique.mockResolvedValue({
       ...mocks.payment,
       status: 'SUCCEEDED',
       subscriptionProvisionedAt: new Date(),
     })
+    mocks.getPayment.mockResolvedValue(providerPayment('succeeded'))
 
     const res = await POST(webhookRequest('succeeded'))
     const body = await res.json()
@@ -172,7 +251,7 @@ describe('YooKassa webhook route', () => {
 
   it('marks payment canceled and cancels pending promo redemption', async () => {
     mocks.prisma.payment.findUnique.mockResolvedValue(mocks.payment)
-    mocks.getPayment.mockResolvedValue({ status: 'canceled' })
+    mocks.getPayment.mockResolvedValue(providerPayment('canceled'))
 
     const res = await POST(webhookRequest('canceled'))
     const body = await res.json()
@@ -235,6 +314,21 @@ describe('YooKassa webhook route', () => {
       partialRefund: true,
       refundedAmountKopecks: 10000,
     })
+    expect(mocks.terminateUserSubscription).not.toHaveBeenCalled()
+  })
+
+  it('rolls back only the purchased device limit after a full add-on refund', async () => {
+    mocks.prisma.payment.findUnique.mockResolvedValue({
+      id: 'pay-1',
+      userId: 'user-1',
+      amountKopecks: 30000,
+      purchaseType: 'DEVICE_LIMIT_ADDON',
+    })
+
+    const res = await POST(refundWebhookRequest())
+
+    expect(res.status).toBe(200)
+    expect(mocks.revokeDeviceLimitAddonForPayment).toHaveBeenCalledWith('pay-1')
     expect(mocks.terminateUserSubscription).not.toHaveBeenCalled()
   })
 })

@@ -43,8 +43,8 @@ export function TelegramLinkCard({
       const warnings = response.warnings?.filter(Boolean) ?? []
       toast(
         warnings.length
-          ? `Синхронизация завершена с предупреждением: ${warnings.join('; ')}`
-          : `Telegram синхронизирован. Устройств: ${response.sync?.devicesSynced ?? 0}`,
+          ? `Данные обновлены с предупреждением: ${warnings.join('; ')}`
+          : `Покупки и устройства обновлены. Устройств: ${response.sync?.devicesSynced ?? 0}`,
         warnings.length ? undefined : 'success'
       )
       router.refresh()
@@ -63,10 +63,10 @@ export function TelegramLinkCard({
       const syncStatus = searchParams.get('telegram_sync')
       toast(
         syncStatus === 'failed'
-          ? 'Telegram привязан, но синхронизация не удалась'
+          ? 'Telegram привязан, но старые покупки пока не обновились'
           : syncStatus === 'running'
-            ? 'Telegram привязан. Синхронизация уже выполняется'
-            : 'Telegram привязан и синхронизирован',
+            ? 'Telegram привязан. Старые покупки уже обновляются'
+            : 'Telegram привязан, покупки обновлены',
         syncStatus === 'failed' || syncStatus === 'running' ? undefined : 'success'
       )
       router.replace('/dashboard/settings?section=telegram')
@@ -179,7 +179,7 @@ function SyncButton({ syncing, onSync }: { syncing: boolean; onSync: () => Promi
   return (
     <button type="button" className="btn-secondary w-full shrink-0 sm:w-auto" onClick={() => void onSync()} disabled={syncing}>
       <RefreshCw className="h-4 w-4" />
-      {syncing ? 'Синхронизация...' : 'Синхронизировать'}
+      {syncing ? 'Обновляем...' : 'Обновить покупки'}
     </button>
   )
 }

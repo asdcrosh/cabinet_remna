@@ -35,10 +35,12 @@ export type BroadcastHistoryItem = {
   telegramSkipped: number
   telegramDuplicate: number
   telegramFailed: number
+  telegramUnknown: number
   emailSent: number
   emailSkipped: number
   emailDuplicate: number
   emailFailed: number
+  emailUnknown: number
   limited: boolean
   createdAt: string
   createdBy: string | null

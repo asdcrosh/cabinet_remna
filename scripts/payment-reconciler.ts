@@ -1,4 +1,5 @@
 import { writeFile } from 'node:fs/promises'
+import { pathToFileURL } from 'node:url'
 import { prisma } from '../src/lib/prisma'
 import { notifyTrafficLimit } from '../src/lib/notifications'
 import { reconcileSubscriptionExpiryNotifications } from '../src/lib/subscription-expiry-notifications'
@@ -46,10 +47,9 @@ let lastRemnashopUsersSyncAt = 0
 let lastSubscriptionHealthAt = 0
 let lastReleaseCheckAt = 0
 
-process.on('SIGTERM', stop)
-process.on('SIGINT', stop)
-
 async function main() {
+  process.on('SIGTERM', stop)
+  process.on('SIGINT', stop)
   logInfo('payment_reconciler.started', {
     intervalSeconds: intervalMs / 1000,
     batchSize,
@@ -71,67 +71,115 @@ async function main() {
 }
 
 async function runOnce() {
-  await maybeSyncRemnashopCatalog().catch((error) => {
-    logError('remnashop_sync.background_failed', error)
-  })
-  await syncRemnashopUsersIfDue()
-  await syncSubscriptionHealthIfDue()
-  await checkReleasesIfDue()
-  const gracePeriods = await reconcileSubscriptionGracePeriods({ limit: notificationBatchSize })
+  await runPriorityPaymentQueues()
+
+  await runTask('remnashop_sync.background_failed', maybeSyncRemnashopCatalog)
+  await runTask('remnashop_users_sync.batch_failed', syncRemnashopUsersIfDue)
+  await runTask('subscription_health.batch_failed', syncSubscriptionHealthIfDue)
+  await runTask('release_notifications.batch_failed', checkReleasesIfDue)
+  const gracePeriods = await runTask(
+    'subscription_grace.batch_failed',
+    () => reconcileSubscriptionGracePeriods({ limit: notificationBatchSize }),
+    { checked: 0, started: 0, expired: 0, failed: 0 }
+  )
   if (gracePeriods.started > 0 || gracePeriods.expired > 0) {
     logInfo('subscription_grace.reconciled', gracePeriods)
   }
-  const blockedDevices = await reconcileBlockedDevices()
+  const blockedDevices = await runTask(
+    'blocked_devices.batch_failed',
+    reconcileBlockedDevices,
+    { checked: 0, revoked: 0, failed: 0 }
+  )
   if (blockedDevices.revoked > 0 || blockedDevices.failed > 0) {
     logInfo('blocked_devices.reconciled', blockedDevices)
   }
-  const pausedWhitelistAddons = await reconcileUnavailableSubscriptionWhitelistAddons({
-    limit: notificationBatchSize,
-    shouldStop: () => stopped,
-  })
+  const pausedWhitelistAddons = await runTask(
+    'whitelist_addon.pause_batch_failed',
+    () => reconcileUnavailableSubscriptionWhitelistAddons({
+      limit: notificationBatchSize,
+      shouldStop: () => stopped,
+    }),
+    { checked: 0, paused: 0, exhausted: 0, failed: 0 }
+  )
   if (pausedWhitelistAddons.checked > 0) {
     logInfo('whitelist_addon.pause_batch_finished', pausedWhitelistAddons)
   }
-  const resumedWhitelistAddons = await reconcileAvailableSubscriptionWhitelistAddons({
-    limit: notificationBatchSize,
-    shouldStop: () => stopped,
-  })
+  const resumedWhitelistAddons = await runTask(
+    'whitelist_addon.resume_batch_failed',
+    () => reconcileAvailableSubscriptionWhitelistAddons({
+      limit: notificationBatchSize,
+      shouldStop: () => stopped,
+    }),
+    { checked: 0, resumed: 0, failed: 0 }
+  )
   if (resumedWhitelistAddons.checked > 0) {
     logInfo('whitelist_addon.resume_batch_finished', resumedWhitelistAddons)
   }
-  await reconcileWhitelistAddonExpiryNotifications({
+  await runTask('whitelist_addon.notification_batch_failed', () => reconcileWhitelistAddonExpiryNotifications({
     batchSize: notificationBatchSize,
     shouldStop: () => stopped,
-  })
-  const expiredWhitelistAddons = await reconcileExpiredWhitelistAddons({
-    limit: notificationBatchSize,
-    shouldStop: () => stopped,
-  })
+  }))
+  const expiredWhitelistAddons = await runTask(
+    'whitelist_addon.expiry_batch_failed',
+    () => reconcileExpiredWhitelistAddons({
+      limit: notificationBatchSize,
+      shouldStop: () => stopped,
+    }),
+    { checked: 0, revoked: 0, failed: 0 }
+  )
   if (expiredWhitelistAddons.checked > 0) {
     logInfo('whitelist_addon.expiry_batch_finished', expiredWhitelistAddons)
   }
-  const autoRenewals = await processDueAutoRenewals({
-    limit: autoRenewalBatchSize,
-    shouldStop: () => stopped,
-  })
+  const autoRenewals = await runTask(
+    'auto_renewal.batch_failed',
+    () => processDueAutoRenewals({
+      limit: autoRenewalBatchSize,
+      shouldStop: () => stopped,
+    }),
+    { checked: 0, created: 0, failed: 0 }
+  )
   if (autoRenewals.checked > 0) {
     logInfo('auto_renewal.batch_finished', autoRenewals)
   }
-  const resumedSubscriptions = await resumeDuePausedSubscriptions({
-    limit: autoRenewalBatchSize,
-    shouldStop: () => stopped,
-  })
+  const resumedSubscriptions = await runTask(
+    'subscription_retention.resume_batch_failed',
+    () => resumeDuePausedSubscriptions({
+      limit: autoRenewalBatchSize,
+      shouldStop: () => stopped,
+    }),
+    { checked: 0, resumed: 0, failed: 0 }
+  )
   if (resumedSubscriptions.checked > 0) {
     logInfo('subscription_retention.resume_finished', resumedSubscriptions)
   }
 
-  const cutoff = new Date(Date.now() - minAgeMs)
+  await runTask('remnashop_sync.retry_batch_failed', retryRemnashopSyncEvents)
+  await runTask('remnashop_reverse_sync.batch_failed', retryRemnashopReverseSync)
+  await runTask('admin_telegram.batch_failed', deliverAdminTelegramNotifications)
+  await runTask('subscription_expiry.batch_failed', () => reconcileSubscriptionExpiryNotifications({
+    batchSize: notificationBatchSize,
+    shouldStop: () => stopped,
+  }))
+  await runTask('traffic_threshold.batch_failed', notifyTrafficThresholds)
+}
+
+export async function runPriorityPaymentQueues() {
+  await runTask('payment_reconciler.unprovisioned_batch_failed', reconcileUnprovisionedPayments)
+  await runTask('payment_reconciler.provisioning_retry_batch_failed', retryProvisioningJobs)
+  await runTask('payment_reconciler.pending_batch_failed', reconcilePendingPayments)
+}
+
+async function reconcileUnprovisionedPayments() {
+  const now = new Date()
+  const staleLockCutoff = new Date(now.getTime() - 15 * 60_000)
   const payments = await prisma.payment.findMany({
     where: {
-      createdAt: { lte: cutoff },
+      status: 'SUCCEEDED',
+      subscriptionProvisionedAt: null,
       OR: [
-        { status: 'PENDING', provider: { in: ['YOOKASSA', 'PLATEGA'] } },
-        { status: 'SUCCEEDED', subscriptionProvisionedAt: null },
+        { provisioningJob: null },
+        { provisioningJob: { status: 'PENDING', OR: [{ nextRetryAt: null }, { nextRetryAt: { lte: now } }] } },
+        { provisioningJob: { status: 'RUNNING', lockedAt: { lt: staleLockCutoff } } },
       ],
     },
     orderBy: { createdAt: 'asc' },
@@ -139,35 +187,58 @@ async function runOnce() {
     select: { id: true, status: true, provider: true, yookassaId: true },
   })
 
-  if (payments.length > 0) {
-    logInfo('payment_reconciler.payments_check_started', { count: payments.length })
-    for (const payment of payments) {
-      if (stopped) break
-      try {
-        const result = await syncPaymentProvisioning({
-          paymentId: payment.id,
-          cancelPendingOlderThanMs: cancelPendingAfterMs,
-        })
-        logInfo('payment_reconciler.payment_checked', {
-          paymentId: payment.id,
-          status: result.status,
-          provisioned: result.provisioned,
-        })
-      } catch (error) {
-        logError('payment_reconciler.payment_failed', error, { paymentId: payment.id })
-      }
+  await processPayments(payments, 'unprovisioned')
+}
+
+async function reconcilePendingPayments() {
+  const cutoff = new Date(Date.now() - minAgeMs)
+  const payments = await prisma.payment.findMany({
+    where: {
+      createdAt: { lte: cutoff },
+      status: 'PENDING',
+      provider: { in: ['YOOKASSA', 'PLATEGA'] },
+    },
+    orderBy: { updatedAt: 'asc' },
+    take: batchSize,
+    select: { id: true, status: true, provider: true, yookassaId: true },
+  })
+  await processPayments(payments, 'pending')
+}
+
+async function processPayments(
+  payments: Array<{ id: string; status: string; provider: string; yookassaId: string | null }>,
+  queue: 'pending' | 'unprovisioned'
+) {
+  if (payments.length === 0) return
+  logInfo('payment_reconciler.payments_check_started', { count: payments.length, queue })
+  for (const payment of payments) {
+    if (stopped) break
+    try {
+      const result = await syncPaymentProvisioning({
+        paymentId: payment.id,
+        cancelPendingOlderThanMs: cancelPendingAfterMs,
+      })
+      logInfo('payment_reconciler.payment_checked', {
+        paymentId: payment.id,
+        status: result.status,
+        provisioned: result.provisioned,
+        queue,
+      })
+    } catch (error) {
+      logError('payment_reconciler.payment_failed', error, { paymentId: payment.id, queue })
     }
   }
+}
 
-  await retryProvisioningJobs()
-  await retryRemnashopSyncEvents()
-  await retryRemnashopReverseSync()
-  await deliverAdminTelegramNotifications()
-  await reconcileSubscriptionExpiryNotifications({
-    batchSize: notificationBatchSize,
-    shouldStop: () => stopped,
-  })
-  await notifyTrafficThresholds()
+async function runTask<T>(event: string, task: () => Promise<T>): Promise<T | undefined>
+async function runTask<T>(event: string, task: () => Promise<T>, fallback: T): Promise<T>
+async function runTask<T>(event: string, task: () => Promise<T>, fallback?: T) {
+  try {
+    return await task()
+  } catch (error) {
+    logError(event, error)
+    return fallback
+  }
 }
 
 async function deliverAdminTelegramNotifications() {
@@ -443,8 +514,10 @@ async function start() {
   await main()
 }
 
-start().catch(async (error) => {
-  logError('payment_reconciler.fatal', error)
-  await prisma.$disconnect()
-  process.exit(1)
-})
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  start().catch(async (error) => {
+    logError('payment_reconciler.fatal', error)
+    await prisma.$disconnect()
+    process.exit(1)
+  })
+}

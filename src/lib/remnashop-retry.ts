@@ -11,7 +11,7 @@ import { syncCabinetPaymentToRemnashop } from './remnashop-reverse-sync'
 import { removeRemnashopSubscription } from './remnashop-subscription-removal'
 import { syncRemnashopCatalog, syncRemnashopPaymentsToCabinet } from './remnashop-sync'
 import { syncRemnashopUserBySourceId } from './remnashop-users'
-import { markSyncFailed, markSyncPending, markSyncSkipped, markSyncSucceeded } from './sync-events'
+import { markSyncFailed, markSyncSkipped, markSyncSucceeded } from './sync-events'
 import { syncLinkedTelegramUser } from './telegram-link-sync'
 
 type RetryableSyncEvent = {
@@ -128,29 +128,41 @@ export async function retryDueRemnashopSyncEvents(options: {
   batchSize?: number
   shouldStop?: () => boolean
   force?: boolean
+  lockTimeoutMs?: number
 } = {}) {
   if (!process.env.REMNASHOP_DATABASE_URL) return { attempted: 0, succeeded: 0, failed: 0 }
+  const lockTimeoutMs = Math.max(60_000, options.lockTimeoutMs ?? 10 * 60 * 1000)
+  const staleLockCutoff = new Date(Date.now() - lockTimeoutMs)
 
   const events = await prisma.syncEvent.findMany({
     where: {
-      status: 'FAILED',
-      ...(options.force
-        ? {}
-        : {
-            OR: [
-              { nextRetryAt: null },
-              { nextRetryAt: { lte: new Date() } },
-            ],
-          }),
-      AND: [{
-        OR: [
-          { direction: 'CABINET_TO_REMNASHOP', entityType: { in: ['payment', 'promoCode', 'subscription'] } },
-          {
-            direction: 'REMNASHOP_TO_CABINET',
-            entityType: { in: ['user', 'payment', 'catalog', 'telegramIdentity'] },
-          },
-        ],
-      }],
+      AND: [
+        {
+          OR: [
+            {
+              status: 'FAILED',
+              ...(options.force ? {} : {
+                OR: [
+                  { nextRetryAt: null },
+                  { nextRetryAt: { lte: new Date() } },
+                ],
+              }),
+            },
+            { status: 'RUNNING', lockedAt: { lt: staleLockCutoff } },
+            { status: 'RUNNING', lockedAt: null, updatedAt: { lt: staleLockCutoff } },
+            { status: 'PENDING', updatedAt: { lt: staleLockCutoff } },
+          ],
+        },
+        {
+          OR: [
+            { direction: 'CABINET_TO_REMNASHOP', entityType: { in: ['payment', 'promoCode', 'subscription'] } },
+            {
+              direction: 'REMNASHOP_TO_CABINET',
+              entityType: { in: ['user', 'payment', 'catalog', 'telegramIdentity'] },
+            },
+          ],
+        },
+      ],
     },
     orderBy: [
       { nextRetryAt: 'asc' },
@@ -163,13 +175,14 @@ export async function retryDueRemnashopSyncEvents(options: {
   let failed = 0
   for (const event of events) {
     if (options.shouldStop?.()) break
+    const claimed = await claimRemnashopSyncEvent(event)
+    if (!claimed) continue
     const input = {
       direction: event.direction,
       entityType: event.entityType,
       entityId: event.entityId,
       operation: event.operation,
     }
-    await markSyncPending(input)
     try {
       const result = await retryRemnashopSyncEvent(event)
       const skipped = remnashopRetrySkippedReason(result)
@@ -186,6 +199,22 @@ export async function retryDueRemnashopSyncEvents(options: {
   }
 
   return { attempted: succeeded + failed, succeeded, failed }
+}
+
+export async function claimRemnashopSyncEvent(event: {
+  id: string
+  status: 'PENDING' | 'RUNNING' | 'FAILED' | 'SUCCEEDED' | 'SKIPPED'
+  updatedAt: Date
+}) {
+  const claimed = await prisma.syncEvent.updateMany({
+    where: { id: event.id, status: event.status, updatedAt: event.updatedAt },
+    data: {
+      status: 'RUNNING',
+      lockedAt: new Date(),
+      nextRetryAt: null,
+    },
+  })
+  return claimed.count === 1
 }
 
 export function remnashopRetrySkippedReason(result: unknown) {

@@ -691,7 +691,8 @@ test('рассылка собирается в компактном редакт
 
   await main.getByRole('button', { name: /Аудитория/ }).click()
   await expect(main.getByRole('combobox', { name: /^Аудитория/ })).toBeVisible()
-  await main.getByRole('button', { name: /Отправка/ }).click()
+  await main.getByRole('button', { name: 'Посчитать и проверить' }).click()
+  await expect(main.getByTestId('broadcast-recipient-total')).toContainText(/Получатели\d+/)
   await expect(main.getByText('Предпросмотр', { exact: true })).toBeVisible()
   await expectNoHorizontalOverflow(page)
 })

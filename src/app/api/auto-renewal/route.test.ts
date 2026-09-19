@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   getAutoRenewalState: vi.fn(),
   isYookassaConfigured: vi.fn(),
   rateLimit: vi.fn(),
+  withDistributedLock: vi.fn(),
 }))
 
 vi.mock('@/lib/auth/guard', () => ({
@@ -21,6 +22,7 @@ vi.mock('@/lib/auto-renewal', () => ({
 }))
 vi.mock('@/lib/yookassa', () => ({ isYookassaConfigured: mocks.isYookassaConfigured }))
 vi.mock('@/lib/rate-limit', () => ({ rateLimit: mocks.rateLimit }))
+vi.mock('@/lib/distributed-lock', () => ({ withDistributedLock: mocks.withDistributedLock }))
 
 import { DELETE, POST } from './route'
 
@@ -38,6 +40,10 @@ describe('auto-renewal route', () => {
     mocks.requireAuth.mockResolvedValue({ uid: 'user-1', email: 'user@example.com', role: 'USER' })
     mocks.isYookassaConfigured.mockResolvedValue(true)
     mocks.rateLimit.mockResolvedValue({ ok: true })
+    mocks.withDistributedLock.mockImplementation(async (_key: string, task: () => Promise<unknown>) => ({
+      acquired: true,
+      value: await task(),
+    }))
     mocks.enableAutoRenewal.mockResolvedValue({ id: 'renewal-1' })
     mocks.getAutoRenewalState.mockResolvedValue({ id: 'renewal-1' })
   })
@@ -78,5 +84,19 @@ describe('auto-renewal route', () => {
     expect(response.status).toBe(200)
     expect(mocks.disableAutoRenewal).toHaveBeenCalledWith('user-1')
     expect(body.autoRenewal.status).toBe('DISABLED')
+  })
+
+  it('does not unlink the card while a charge is already running', async () => {
+    mocks.withDistributedLock.mockResolvedValue({ acquired: false })
+
+    const response = await DELETE(new Request('https://cabinet.example/api/auto-renewal', {
+      method: 'DELETE',
+    }))
+
+    expect(response.status).toBe(409)
+    expect(await response.json()).toEqual({
+      error: 'Списание уже выполняется. Проверьте его результат перед отключением.',
+    })
+    expect(mocks.disableAutoRenewal).not.toHaveBeenCalled()
   })
 })

@@ -22,13 +22,10 @@ export async function trimUserDevicesToLimit(input: {
 
   for (const device of excess) {
     await remnawave.deleteUserDevice(reference, device.hwid)
-  }
-
-  if (excess.length > 0) {
     await prisma.device.deleteMany({
       where: {
         userId: input.localUserId,
-        hwid: { in: excess.map((device) => device.hwid) },
+        hwid: device.hwid,
       },
     })
   }

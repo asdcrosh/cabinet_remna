@@ -219,14 +219,17 @@ model PaymentProviderSetting {
 }
 
 model NotificationLog {
-  id        String              @id @default(cuid())
-  userId    String
-  type      NotificationType
-  channel   NotificationChannel
-  dedupeKey String
-  sentAt    DateTime            @default(now())
-  error     String?
-  createdAt DateTime            @default(now())
+  id            String                     @id @default(cuid())
+  userId        String
+  type          NotificationType
+  channel       NotificationChannel
+  dedupeKey     String
+  status        NotificationDeliveryStatus @default(PENDING)
+  attempts      Int                        @default(0)
+  lastAttemptAt DateTime?
+  sentAt        DateTime?
+  error         String?
+  createdAt     DateTime                   @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -440,6 +443,13 @@ enum NotificationChannel {
   EMAIL
 }
 
+enum NotificationDeliveryStatus {
+  PENDING
+  SENT
+  FAILED
+  UNKNOWN
+}
+
 model BroadcastCampaign {
   id                   String           @id @default(cuid())
   title                String
@@ -457,10 +467,12 @@ model BroadcastCampaign {
   telegramSkipped      Int              @default(0)
   telegramDuplicate    Int              @default(0)
   telegramFailed       Int              @default(0)
+  telegramUnknown      Int              @default(0)
   emailSent            Int              @default(0)
   emailSkipped         Int              @default(0)
   emailDuplicate       Int              @default(0)
   emailFailed          Int              @default(0)
+  emailUnknown         Int              @default(0)
   limited              Boolean          @default(false)
   createdById          String?
   createdAt            DateTime         @default(now())
@@ -508,6 +520,8 @@ enum BroadcastDeliveryStatus {
   PROCESSING
   SUCCEEDED
   FAILED
+  UNKNOWN
+  CANCELED
 }
 
 model BroadcastTemplate {
@@ -816,6 +830,7 @@ model Payment {
   @@index([status, subscriptionProvisionedAt, createdAt])
   @@index([status, subscriptionProvisionedAt, remnashopSyncedAt, updatedAt], map: "Payment_status_subscriptionProvisionedAt_remnashopSyncedAt_upda")
   @@index([provider, status, createdAt])
+  @@index([provider, status, updatedAt])
   @@index([purchaseType, status, createdAt])
   @@index([promoCodeId])
   @@index([autoRenewalId, createdAt])
@@ -959,6 +974,7 @@ model SyncEvent {
   attempts     Int             @default(0)
   lastError    String?
   nextRetryAt  DateTime?
+  lockedAt     DateTime?
   lastSyncedAt DateTime?
   metadata     Json?
   createdAt    DateTime        @default(now())
@@ -977,6 +993,7 @@ enum SyncDirection {
 
 enum SyncEventStatus {
   PENDING
+  RUNNING
   SUCCEEDED
   FAILED
   SKIPPED
@@ -1491,13 +1508,23 @@ model SupportTicket {
   @@index([assigneeId, status, lastMessageAt])
 }
 
+model SupportSetting {
+  id                String   @id @default("default")
+  slaWarningMinutes Int      @default(240)
+  slaBreachMinutes  Int      @default(1440)
+  quickReplies      Json     @default("[]")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
 model SupportMessage {
-  id         String               @id @default(cuid())
-  ticketId   String
-  senderId   String?
-  senderRole SupportMessageSender
-  body       String
-  createdAt  DateTime             @default(now())
+  id              String               @id @default(cuid())
+  ticketId        String
+  senderId        String?
+  senderRole      SupportMessageSender
+  clientMessageId String?
+  body            String
+  createdAt       DateTime             @default(now())
 
   ticket      SupportTicket       @relation(fields: [ticketId], references: [id], onDelete: Cascade)
   sender      User?               @relation(fields: [senderId], references: [id], onDelete: SetNull)
@@ -1505,6 +1532,7 @@ model SupportMessage {
 
   @@index([ticketId, createdAt])
   @@index([senderId])
+  @@unique([ticketId, clientMessageId])
 }
 
 model SupportInternalNote {
@@ -1826,6 +1854,8 @@ enum AuditAction {
   ADMIN_PAYMENT_PROVIDERS_RESET
   ADMIN_SUPPORT_UPDATED
   ADMIN_BROADCAST_CREATED
+  ADMIN_BROADCAST_CANCELED
+  ADMIN_BROADCAST_RETRIED
   ADMIN_BROADCAST_TEMPLATE_CREATED
   ADMIN_BROADCAST_TEMPLATE_DELETED
   ADMIN_NODE_PROVISIONING_CREATED

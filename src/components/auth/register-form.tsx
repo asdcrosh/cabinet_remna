@@ -37,6 +37,7 @@ export function RegisterForm({
       },
     })
   const [serverError, setServerError] = useState<string | null>(null)
+  const [isHydrated, setIsHydrated] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [registeredEmail, setRegisteredEmail] = useState<string | null>(null)
   const [emailDelivery, setEmailDelivery] = useState<string | null>(null)
@@ -45,6 +46,10 @@ export function RegisterForm({
   const [showConsentHint, setShowConsentHint] = useState(false)
   const password = watch('password')
   const legalAccepted = watch('agreeToTerms') && watch('agreeToPersonalData')
+
+  useEffect(() => {
+    setIsHydrated(true)
+  }, [])
 
   useEffect(() => {
     if (resendIn <= 0) return
@@ -75,7 +80,7 @@ export function RegisterForm({
     try {
       const result = await apiFetch<{ emailDelivery?: string }>('/api/auth/resend-verification', {
         method: 'POST',
-        body: JSON.stringify({ email: registeredEmail }),
+        body: JSON.stringify({ email: registeredEmail, next: initialNextPath }),
       })
       setEmailDelivery(result.emailDelivery ?? null)
       setResendIn(60)
@@ -103,7 +108,10 @@ export function RegisterForm({
         </div>
         {emailDelivery && emailDelivery !== 'sent' && (
           <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-left text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
-            Доставка email не настроена. В dev-режиме ссылка подтверждения выведена в консоль сервера.
+            <p>Не удалось отправить письмо. Проверьте адрес и повторите отправку через минуту.</p>
+            <Link href="/contacts" className="mt-2 inline-flex font-semibold underline underline-offset-2">
+              Связаться с поддержкой
+            </Link>
           </div>
         )}
         {serverError && <FormAlert>{serverError}</FormAlert>}
@@ -183,6 +191,7 @@ export function RegisterForm({
             id="email"
             type="email"
             autoComplete="email"
+            disabled={!isHydrated || isSubmitting}
             className="input pl-10"
             placeholder="name@example.com"
             {...register('email')}
@@ -198,6 +207,7 @@ export function RegisterForm({
             <input
               id="name"
               type="text"
+              disabled={!isHydrated || isSubmitting}
               className="input pl-10"
               autoComplete="name"
               maxLength={40}
@@ -214,6 +224,7 @@ export function RegisterForm({
             <input
               id="referralCode"
               type="text"
+              disabled={!isHydrated || isSubmitting}
               className="input pl-10 uppercase"
               autoComplete="off"
               placeholder="Код приглашения"
@@ -230,6 +241,7 @@ export function RegisterForm({
             id="password"
             type={showPassword ? 'text' : 'password'}
             autoComplete="new-password"
+            disabled={!isHydrated || isSubmitting}
             className="input px-10"
             placeholder="Придумайте пароль"
             {...register('password')}
@@ -237,6 +249,7 @@ export function RegisterForm({
           <button
             type="button"
             className="absolute right-2 top-1/2 -translate-y-1/2 rounded-xl p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-white/5 dark:hover:text-slate-100"
+            disabled={!isHydrated || isSubmitting}
             onClick={() => setShowPassword((value) => !value)}
             aria-label={showPassword ? 'Скрыть пароль' : 'Показать пароль'}
           >
@@ -257,6 +270,7 @@ export function RegisterForm({
         <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Подтверждение документов</div>
         <Checkbox
           {...register('agreeToTerms')}
+          disabled={!isHydrated || isSubmitting}
           label={(
             <>
               Принимаю{' '}
@@ -268,6 +282,7 @@ export function RegisterForm({
         />
         <Checkbox
           {...register('agreeToPersonalData')}
+          disabled={!isHydrated || isSubmitting}
           label={(
             <>
               Даю отдельное{' '}
@@ -290,7 +305,7 @@ export function RegisterForm({
       )}
       <button
         type="submit"
-        disabled={isSubmitting || !legalAccepted}
+        disabled={!isHydrated || isSubmitting || !legalAccepted}
         title={!legalAccepted ? 'Сначала подтвердите оба документа' : undefined}
         className="btn-primary min-h-12 w-full"
       >

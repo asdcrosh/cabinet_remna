@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
-import { CalendarDays, CheckCircle2, ChevronDown, Download, Search, Send, XCircle } from 'lucide-react'
+import Link from 'next/link'
+import { ArrowLeft, CalendarDays, CheckCircle2, ChevronDown, Download, Search, Send, XCircle } from 'lucide-react'
 import { prisma } from '@/lib/prisma'
 import { requireAdminPage } from '@/lib/auth/admin-page'
 import { AdminPageShell } from '@/components/admin/admin-page-shell'
@@ -20,6 +21,7 @@ import { UserSubscriptionDeleteButton } from '@/components/admin/user-subscripti
 import { UserWhitelistAddonButton } from '@/components/admin/user-whitelist-addon-button'
 import { BulkUserSyncButton } from '@/components/admin/bulk-user-sync-button'
 import { buildAdminUserSearchFilters } from '@/lib/admin-user-search'
+import { appendReturnTo, sanitizeAdminSupportReturnPath } from '@/components/support/support-panel-model'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Пользователи — Админка' }
@@ -27,7 +29,7 @@ export const metadata = { title: 'Пользователи — Админка' }
 export default async function AdminUsersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; limit?: string; role?: string; account?: string }>
+  searchParams: Promise<{ q?: string; limit?: string; role?: string; account?: string; returnTo?: string }>
 }) {
   const { session, user: actor } = await requireAdminPage()
 
@@ -35,6 +37,7 @@ export default async function AdminUsersPage({
   const q = params.q?.trim() ?? ''
   const role = params.role ?? 'ALL'
   const account = params.account ?? 'ALL'
+  const returnTo = sanitizeAdminSupportReturnPath(params.returnTo)
   const limit = parseAdminListLimit(params.limit)
   const where = {
     ...(role !== 'ALL' ? { role: role as any } : {}),
@@ -129,6 +132,12 @@ export default async function AdminUsersPage({
       description="Аккаунты, роли и подписки"
       action={
         <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+          {returnTo ? (
+            <Link href={returnTo} className="btn-secondary w-full sm:w-auto">
+              <ArrowLeft className="h-4 w-4" />
+              К обращению
+            </Link>
+          ) : null}
           <BulkUserSyncButton
             users={users
               .filter((item) => actor.role === 'SUPER_ADMIN' || item.role !== 'SUPER_ADMIN')
@@ -143,12 +152,13 @@ export default async function AdminUsersPage({
     >
       <AdminFilterBar
         action="/dashboard/admin/users"
-        resetHref="/dashboard/admin/users"
+        resetHref={appendReturnTo('/dashboard/admin/users', returnTo)}
         resetVisible={Boolean(q || role !== 'ALL' || account !== 'ALL')}
         count={{ shown: users.length, total }}
         className="md:grid-cols-2 xl:grid-cols-[minmax(16rem,1fr)_11rem_13rem_auto]"
       >
         <input type="hidden" name="limit" value={ADMIN_LIST_PAGE_SIZE} />
+        {returnTo ? <input type="hidden" name="returnTo" value={returnTo} /> : null}
         <AdminFilterField label="Поиск пользователей">
           <div className="relative min-w-0 flex-1">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -539,7 +549,7 @@ function UserActions({
 
   return (
     <>
-      <UserDetailsButton details={buildUserDetails(user)} showLabel={showLabels} />
+      <UserDetailsButton details={buildUserDetails(user)} showLabel={showLabels} canViewAudit={actorRole === 'SUPER_ADMIN'} />
       <UserSyncButton userId={user.id} showLabel={showLabels} />
       {actorRole === 'SUPER_ADMIN' && (
         <BonusBoxAttemptsButton

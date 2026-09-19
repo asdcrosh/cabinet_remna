@@ -1,8 +1,9 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { AlertTriangle, Check, Clock3, RotateCcw, X } from 'lucide-react'
+import { AlertTriangle, Check, Clock3, Loader2, RotateCcw, X } from 'lucide-react'
 import { AdminModal } from './admin-modal'
+import { apiFetch } from '@/lib/api-client'
 
 type TimelineStatus = 'INFO' | 'SUCCESS' | 'WARNING' | 'ERROR'
 type TimelineStage = 'ORDER' | 'PROVIDER' | 'WEBHOOK' | 'PAYMENT' | 'PROVISIONING' | 'SUBSCRIPTION' | 'REMNASHOP' | 'NOTIFICATION' | 'REFUND'
@@ -19,7 +20,7 @@ interface TimelineEvent {
   updatedAt: string
 }
 
-export function PaymentTimelineButton({ paymentId, provider, providerStatus, paymentStatus, createdAt, paidAt, provisionedAt, remnashopSyncedAt, job, events }: {
+export function PaymentTimelineButton({ paymentId, provider, providerStatus, paymentStatus, createdAt, paidAt, provisionedAt, remnashopSyncedAt, job }: {
   paymentId: string
   provider: string
   providerStatus: string | null
@@ -29,17 +30,37 @@ export function PaymentTimelineButton({ paymentId, provider, providerStatus, pay
   provisionedAt: string | null
   remnashopSyncedAt: string | null
   job: { status: string; attempts: number; nextRetryAt: string | null; lastError: string | null } | null
-  events: TimelineEvent[]
 }) {
   const [open, setOpen] = useState(false)
+  const [events, setEvents] = useState<TimelineEvent[] | null>(null)
+  const [loadingEvents, setLoadingEvents] = useState(false)
+  const [eventsError, setEventsError] = useState<string | null>(null)
   const orderedEvents = useMemo(
-    () => [...events].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()),
+    () => [...(events ?? [])].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()),
     [events]
   )
 
+  async function loadEvents() {
+    setLoadingEvents(true)
+    setEventsError(null)
+    try {
+      const result = await apiFetch<{ events: TimelineEvent[] }>(`/api/admin/payments/${encodeURIComponent(paymentId)}/events`)
+      setEvents(result.events)
+    } catch (error) {
+      setEventsError(error instanceof Error ? error.message : 'Не удалось загрузить историю')
+    } finally {
+      setLoadingEvents(false)
+    }
+  }
+
+  function openTimeline() {
+    setOpen(true)
+    if (events === null && !loadingEvents) void loadEvents()
+  }
+
   return (
     <>
-      <button type="button" className="btn-secondary w-full min-w-[112px] px-3 text-xs lg:w-auto" onClick={() => setOpen(true)}>
+      <button type="button" className="btn-secondary w-full min-w-[112px] px-3 text-xs lg:w-auto" onClick={openTimeline}>
         <Clock3 className="h-3.5 w-3.5" />
         История
       </button>
@@ -72,7 +93,14 @@ export function PaymentTimelineButton({ paymentId, provider, providerStatus, pay
               <h3 className="text-sm font-semibold">События цепочки</h3>
               <span className="text-xs text-slate-500">{orderedEvents.length}</span>
             </div>
-            {orderedEvents.length ? (
+            {loadingEvents ? (
+              <div className="flex min-h-28 items-center justify-center gap-2 text-sm text-slate-500"><Loader2 className="h-4 w-4 animate-spin" /> Загружаем события…</div>
+            ) : eventsError ? (
+              <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-200">
+                <p>{eventsError}</p>
+                <button type="button" className="btn-secondary mt-3" onClick={() => void loadEvents()}>Повторить</button>
+              </div>
+            ) : orderedEvents.length ? (
               <ol className="relative space-y-0 before:absolute before:bottom-5 before:left-[17px] before:top-5 before:w-px before:bg-slate-200 dark:before:bg-white/10">
                 {orderedEvents.map((event) => (
                   <li key={event.id} className="relative grid grid-cols-[36px_minmax(0,1fr)] gap-3 py-2">

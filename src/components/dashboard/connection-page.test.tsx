@@ -4,9 +4,9 @@ import { ConnectionPage } from './connection-page'
 import { VpnConnectionCheck } from './vpn-connection-check'
 
 describe('экран подключения', () => {
-  function renderPage(expired = false) {
+  function renderPage(expired = false, hasConnectedDevices = false) {
     return renderToStaticMarkup(
-      <ConnectionPage subscriptionUrl="https://example.invalid/subscription" supportEnabled expired={expired}>
+      <ConnectionPage subscriptionUrl="https://example.invalid/subscription" supportEnabled expired={expired} hasConnectedDevices={hasConnectedDevices}>
         <p>Управление оплатой</p>
       </ConnectionPage>,
     )
@@ -36,6 +36,30 @@ describe('экран подключения', () => {
     expect(html).toMatch(/<details[^>]*\bopen=""/)
     expect(html).toContain('Подписка истекла. Продлите доступ')
     expect(html).toContain('Управление оплатой')
+  })
+
+  it('не заставляет возвращающегося пользователя повторять установку', () => {
+    const html = renderPage(false, true)
+    expect(html).toContain('VPN уже настраивали')
+    expect(html).toContain('Проверьте подключение')
+    expect(html).toContain('Настроить это устройство заново')
+    expect(html.indexOf('VPN уже настраивали')).toBeLessThan(html.indexOf('Установите INCY'))
+  })
+
+  it('объясняет паузу вместо показа установки', () => {
+    const html = renderToStaticMarkup(
+      <ConnectionPage
+        subscriptionUrl="https://example.invalid/subscription"
+        supportEnabled
+        expired={false}
+        accessIssue={{ title: 'Подписка на паузе', description: 'Остаток срока сохранён.' }}
+      >
+        <p>Управление паузой</p>
+      </ConnectionPage>,
+    )
+    expect(html).toContain('Подписка на паузе')
+    expect(html).toContain('Остаток срока сохранён.')
+    expect(html).not.toContain('id="connection"')
   })
 
   it('не перегружает последний шаг технической диагностикой', () => {

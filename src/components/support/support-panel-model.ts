@@ -20,11 +20,19 @@ export interface SupportInternalNote {
   author: Pick<SupportStaffMember, 'id' | 'email' | 'name'> | null
 }
 
+export interface SupportAuditEvent {
+  id: string
+  message: string
+  createdAt: string
+  actor: Pick<SupportStaffMember, 'id' | 'email' | 'name'> | null
+}
+
 export interface SupportMessage {
   id: string
   body: string
   senderRole: SenderRole
   createdAt: string
+  deliveryState?: 'sending'
   sender?: {
     email: string
     name: string | null
@@ -47,10 +55,12 @@ export interface SupportTicket {
   adminUnreadCount: number
   lastMessageAt: string
   createdAt: string
+  updatedAt: string
   closedAt: string | null
   assignedAt?: string | null
   assignee?: Pick<SupportStaffMember, 'id' | 'email' | 'name'> | null
   internalNotes?: SupportInternalNote[]
+  auditEvents?: SupportAuditEvent[]
   user?: {
     id: string
     email: string
@@ -95,6 +105,10 @@ export interface SupportTicket {
 export interface SupportPanelProps {
   mode: 'user' | 'admin'
   initialTickets: SupportTicket[]
+  initialTicketId?: string
+  slaWarningMinutes?: number
+  slaBreachMinutes?: number
+  adminQuickReplies?: string[]
   initialTotal?: number
   pageSize?: number
   initialQuery?: string
@@ -106,6 +120,60 @@ export interface SupportPanelProps {
   initialCategory?: SupportCategoryValue
   initialMessage?: string
   initialNewTicketOpen?: boolean
+}
+
+export function buildAdminSupportPath(input: {
+  folder: TicketFolder
+  assigneeScope: AdminSupportAssigneeScope
+  query?: string
+  ticketId?: string
+}) {
+  const params = new URLSearchParams()
+  params.set('folder', input.folder)
+  params.set('assignee', input.assigneeScope)
+  if (input.query?.trim()) params.set('q', input.query.trim())
+  if (input.ticketId?.trim()) params.set('ticket', input.ticketId.trim())
+  return `/dashboard/admin/support?${params.toString()}`
+}
+
+export function sanitizeAdminSupportReturnPath(value: string | null | undefined) {
+  const path = value?.trim() ?? ''
+  if (!path.startsWith('/dashboard/admin/support')) return ''
+  const suffix = path.slice('/dashboard/admin/support'.length, '/dashboard/admin/support'.length + 1)
+  return !suffix || suffix === '?' || suffix === '#' ? path : ''
+}
+
+export function appendReturnTo(href: string, returnTo: string) {
+  if (!returnTo) return href
+  const hashIndex = href.indexOf('#')
+  const pathAndQuery = hashIndex >= 0 ? href.slice(0, hashIndex) : href
+  const hash = hashIndex >= 0 ? href.slice(hashIndex + 1) : ''
+  const separator = pathAndQuery.includes('?') ? '&' : '?'
+  return `${pathAndQuery}${separator}returnTo=${encodeURIComponent(returnTo)}${hash ? `#${hash}` : ''}`
+}
+
+export function getSupportSlaState(
+  value: string,
+  warningMinutes: number,
+  breachMinutes: number,
+  now = Date.now()
+) {
+  const minutes = Math.max(0, Math.floor((now - new Date(value).getTime()) / 60_000))
+  const duration = minutes < 60
+    ? `${Math.max(1, minutes)} мин`
+    : minutes < 24 * 60
+      ? `${Math.floor(minutes / 60)} ч`
+      : `${Math.floor(minutes / (24 * 60))} дн`
+  return {
+    minutes,
+    duration,
+    state: minutes >= breachMinutes ? 'breached' as const : minutes >= warningMinutes ? 'warning' as const : 'ok' as const,
+  }
+}
+
+export function formatSupportTicketAge(value: string, now = Date.now()) {
+  const { duration } = getSupportSlaState(value, Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER, now)
+  return duration
 }
 
 export type SupportQueueCounts = Record<TicketFolder, number> & { all: number }

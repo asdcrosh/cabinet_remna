@@ -103,7 +103,7 @@ describe('Yandex OAuth callback', () => {
     const response = await GET(new Request('https://cabinet.example/api/auth/yandex/callback?code=code-1&state=bad'))
 
     expect(response.status).toBe(307)
-    expect(locationPath(response)).toBe('/login?yandex_error=invalid_state')
+    expect(locationPath(response)).toBe('/login?next=%2Fdashboard%2Fsettings&yandex_error=invalid_state')
     expect(mocks.exchangeYandexCode).not.toHaveBeenCalled()
     expect(mocks.setSessionCookieOnResponse).not.toHaveBeenCalled()
   })
@@ -114,7 +114,7 @@ describe('Yandex OAuth callback', () => {
     const response = await GET(new Request('https://cabinet.example/api/auth/yandex/callback?code=code-1&state=state-1'))
 
     expect(response.status).toBe(307)
-    expect(locationPath(response)).toBe('/login?yandex_error=yandex_auth_failed')
+    expect(locationPath(response)).toBe('/login?next=%2Fdashboard%2Fsettings&yandex_error=yandex_auth_failed')
     expect(mocks.prisma.user.update).not.toHaveBeenCalled()
     expect(mocks.setSessionCookieOnResponse).not.toHaveBeenCalled()
   })
@@ -142,13 +142,62 @@ describe('Yandex OAuth callback', () => {
     })
   })
 
+  it('does not auto-link a new Yandex identity to a privileged email owner', async () => {
+    mocks.prisma.user.findUnique.mockResolvedValue({ ...existingUser, role: 'ADMIN' })
+
+    const response = await GET(new Request('https://cabinet.example/api/auth/yandex/callback?code=code-1&state=state-1'))
+
+    expect(response.status).toBe(307)
+    expect(locationPath(response)).toBe('/login?next=%2Fdashboard%2Fsettings&yandex_error=yandex_auth_failed')
+    expect(mocks.prisma.user.update).not.toHaveBeenCalled()
+    expect(mocks.setSessionCookieOnResponse).not.toHaveBeenCalled()
+  })
+
+  it('keeps an existing provider identity on its original user when Yandex email changes', async () => {
+    const originalUser = {
+      ...existingUser,
+      id: 'original-user',
+      email: 'old@example.com',
+      remnawaveUuid: 'subscription-owner',
+    }
+    mocks.prisma.oAuthAccount.findUnique.mockResolvedValue({
+      id: 'oauth-1',
+      userId: originalUser.id,
+      user: originalUser,
+    })
+
+    const response = await GET(new Request('https://cabinet.example/api/auth/yandex/callback?code=code-1&state=state-1'))
+
+    expect(response.status).toBe(307)
+    expect(locationPath(response)).toBe('/dashboard/settings')
+    expect(mocks.prisma.user.findUnique).not.toHaveBeenCalled()
+    expect(mocks.prisma.oAuthAccount.update).toHaveBeenCalledWith({
+      where: { id: 'oauth-1' },
+      data: {
+        email: profile.email,
+        emailVerified: true,
+        name: profile.name,
+        picture: profile.picture,
+      },
+    })
+    expect(mocks.setSessionCookieOnResponse).toHaveBeenCalledWith(expect.any(Response), {
+      uid: originalUser.id,
+      email: originalUser.email,
+      role: originalUser.role,
+    })
+    expect(mocks.createAdminNotification).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'identity_conflict',
+      entityId: originalUser.id,
+    }))
+  })
+
   it('does not create a new user without separate legal acceptance', async () => {
     mocks.prisma.user.findUnique.mockResolvedValue(null)
 
     const response = await GET(new Request('https://cabinet.example/api/auth/yandex/callback?code=code-1&state=state-1'))
 
     expect(response.status).toBe(307)
-    expect(locationPath(response)).toBe('/login?yandex_error=legal_required')
+    expect(locationPath(response)).toBe('/login?next=%2Fdashboard%2Fsettings&yandex_error=legal_required')
     expect(mocks.prisma.user.create).not.toHaveBeenCalled()
     expect(mocks.setSessionCookieOnResponse).not.toHaveBeenCalled()
   })

@@ -34,11 +34,17 @@ export async function mergeTechnicalTelegramUserIntoEmailUser(input: AdminMergeU
     if (actor?.role !== 'SUPER_ADMIN') {
       throw new AdminMergeUsersError(403, 'Объединять аккаунты может только суперадминистратор')
     }
+    if (target.role !== 'USER') {
+      throw new AdminMergeUsersError(400, 'Нельзя переносить пользовательскую внешнюю идентичность в аккаунт сотрудника')
+    }
     if (isTechnicalTelegramUser(target.email)) {
       throw new AdminMergeUsersError(400, 'Целевой аккаунт должен быть email-аккаунтом')
     }
     if (source.role !== 'USER') {
       throw new AdminMergeUsersError(400, 'Нельзя объединять аккаунт с ролью выше пользователя')
+    }
+    if (!isTechnicalTelegramUser(source.email) || source.emailVerifiedAt) {
+      throw new AdminMergeUsersError(400, 'Исходный аккаунт должен быть неподтверждённым техническим Telegram-аккаунтом')
     }
 
     const conflicts: string[] = []
@@ -79,6 +85,12 @@ export async function mergeTechnicalTelegramUserIntoEmailUser(input: AdminMergeU
         source.nextPurchaseDiscountPercent ?? 0
       ),
     }
+    if (conflicts.length > 0) {
+      throw new AdminMergeUsersError(
+        409,
+        `Объединение остановлено: различаются внешние идентификаторы (${conflicts.join(', ')})`
+      )
+    }
 
     const transferred: Record<string, number> = {
       payments: await updateCount(tx.payment.updateMany({ where: { userId: source.id }, data: { userId: target.id } })),
@@ -116,6 +128,8 @@ export async function mergeTechnicalTelegramUserIntoEmailUser(input: AdminMergeU
     })
 
     await tx.user.update({ where: { id: target.id }, data: targetData })
+    await tx.emailVerificationToken.deleteMany({ where: { userId: source.id } })
+    await tx.passwordResetToken.deleteMany({ where: { userId: source.id } })
     await tx.user.update({
       where: { id: source.id },
       data: {
@@ -125,6 +139,7 @@ export async function mergeTechnicalTelegramUserIntoEmailUser(input: AdminMergeU
         telegramLinkedAt: null,
         remnashopSyncedAt: null,
         referredById: null,
+        sessionVersion: { increment: 1 },
       },
     })
 

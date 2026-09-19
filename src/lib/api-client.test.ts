@@ -5,7 +5,7 @@ const mocks = vi.hoisted(() => ({ toast: vi.fn() }))
 vi.mock('@/components/ui/toaster', () => ({ toast: mocks.toast }))
 vi.mock('@/lib/admin-error-report', () => ({ isAdminErrorPresentationActive: () => false }))
 
-import { apiFetch } from './api-client'
+import { apiFetch, SESSION_EXPIRED_EVENT } from './api-client'
 
 afterEach(() => {
   vi.useRealTimers()
@@ -36,5 +36,39 @@ describe('apiFetch', () => {
       .rejects.toThrow('Нет соединения с сервером')
     expect(fetchMock).toHaveBeenCalledTimes(1)
     expect(mocks.toast).toHaveBeenCalledWith(expect.stringContaining('Проверьте интернет'))
+  })
+
+  it('can suppress mutation toasts for background polling', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json(
+      { error: 'Сервис временно недоступен.' },
+      { status: 503 }
+    )))
+
+    await expect(apiFetch('/api/payment/status', { method: 'POST', silent: true }))
+      .rejects.toThrow('Сервис временно недоступен')
+    expect(mocks.toast).not.toHaveBeenCalled()
+  })
+
+  it('offers reauthentication without navigating away from an unsaved dashboard form', async () => {
+    const dispatchEvent = vi.fn()
+    vi.stubGlobal('window', {
+      location: {
+        pathname: '/dashboard/support',
+        search: '?ticket=ticket-1',
+      },
+      dispatchEvent,
+    })
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json(
+      { error: 'Unauthorized' },
+      { status: 401 }
+    )))
+
+    await expect(apiFetch('/api/support/tickets/ticket-1', { method: 'POST' }))
+      .rejects.toMatchObject({ status: 401 })
+
+    expect(dispatchEvent).toHaveBeenCalledOnce()
+    const event = dispatchEvent.mock.calls[0]?.[0] as CustomEvent<{ next: string }>
+    expect(event.type).toBe(SESSION_EXPIRED_EVENT)
+    expect(event.detail).toEqual({ next: '/dashboard/support?ticket=ticket-1' })
   })
 })

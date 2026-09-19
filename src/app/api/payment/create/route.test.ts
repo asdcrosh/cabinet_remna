@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const mocks = vi.hoisted(() => ({
   requireAuth: vi.fn(),
   rateLimit: vi.fn(),
+  withDistributedLock: vi.fn(),
   reconcileStalePendingPaymentsForUser: vi.fn(),
   getPlanAudienceContext: vi.fn(),
   isPlanAvailableForUser: vi.fn(),
@@ -20,6 +21,7 @@ const mocks = vi.hoisted(() => ({
   txUserUpdateMany: vi.fn(),
   prisma: {
     plan: { findUnique: vi.fn() },
+    autoRenewal: { findUnique: vi.fn() },
     user: { findUnique: vi.fn(), updateMany: vi.fn() },
     payment: { findUnique: vi.fn(), findFirst: vi.fn(), update: vi.fn() },
     promoCodeRedemption: { updateMany: vi.fn() },
@@ -34,6 +36,7 @@ vi.mock('@/lib/auth/guard', () => ({
   withAuth: (handler: (req: Request) => Promise<Response>) => handler,
 }))
 vi.mock('@/lib/rate-limit', () => ({ rateLimit: mocks.rateLimit }))
+vi.mock('@/lib/distributed-lock', () => ({ withDistributedLock: mocks.withDistributedLock }))
 vi.mock('@/lib/prisma', () => ({ prisma: mocks.prisma }))
 vi.mock('@/lib/payment-sync', () => ({
   getFreshPendingPaymentCutoff: () => new Date('2026-08-22T00:00:00.000Z'),
@@ -134,8 +137,13 @@ describe('payment create route', () => {
     process.env.APP_URL = 'https://cabinet.example'
     mocks.requireAuth.mockResolvedValue({ uid: user.id, email: user.email, role: 'USER' })
     mocks.rateLimit.mockResolvedValue({ ok: true })
+    mocks.withDistributedLock.mockImplementation(async (_key: string, task: () => Promise<unknown>) => ({
+      acquired: true,
+      value: await task(),
+    }))
     mocks.prisma.plan.findUnique.mockResolvedValue(plan)
     mocks.prisma.user.findUnique.mockResolvedValue(user)
+    mocks.prisma.autoRenewal.findUnique.mockResolvedValue(null)
     mocks.prisma.payment.findUnique.mockResolvedValue(null)
     mocks.prisma.payment.findFirst.mockResolvedValue(null)
     mocks.prisma.subscription.findFirst.mockResolvedValue(null)
@@ -179,6 +187,33 @@ describe('payment create route', () => {
     mocks.prisma.payment.update.mockResolvedValue({})
     mocks.prisma.promoCodeRedemption.updateMany.mockResolvedValue({ count: 0 })
     mocks.prisma.user.updateMany.mockResolvedValue({ count: 1 })
+  })
+
+  it('does not start a checkout while another billing operation holds the user lock', async () => {
+    mocks.withDistributedLock.mockResolvedValue({ acquired: false })
+
+    const response = await POST(paymentRequest())
+
+    expect(response.status).toBe(409)
+    expect(await response.json()).toEqual({
+      error: 'Другая операция оплаты уже выполняется. Дождитесь её завершения и повторите.',
+    })
+    expect(mocks.prisma.plan.findUnique).not.toHaveBeenCalled()
+    expect(mocks.createPayment).not.toHaveBeenCalled()
+  })
+
+  it('does not start a manual subscription payment while auto-renewal is processing', async () => {
+    mocks.prisma.autoRenewal.findUnique.mockResolvedValue({ status: 'PROCESSING' })
+
+    const response = await POST(paymentRequest())
+
+    expect(response.status).toBe(409)
+    expect(await response.json()).toEqual({
+      error: 'Автопродление уже обрабатывается. Проверьте результат перед ручной оплатой.',
+      code: 'AUTO_RENEWAL_IN_PROGRESS',
+    })
+    expect(mocks.txPaymentCreate).not.toHaveBeenCalled()
+    expect(mocks.createPayment).not.toHaveBeenCalled()
   })
 
   it('creates a separate payment for the whitelist add-on', async () => {

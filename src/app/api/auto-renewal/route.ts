@@ -5,6 +5,7 @@ import { disableAutoRenewal, enableAutoRenewal, getAutoRenewalState } from '@/li
 import { isYookassaConfigured } from '@/lib/yookassa'
 import { rateLimit } from '@/lib/rate-limit'
 import { AUTO_RENEWAL_CONSENT_VERSION } from '@/lib/auto-renewal-consent'
+import { withDistributedLock } from '@/lib/distributed-lock'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -40,8 +41,20 @@ export const POST = withAuth(async (req: Request) => {
     )
   }
   try {
-    await enableAutoRenewal({ userId: session.uid, ...parsed.data })
-    return NextResponse.json({ autoRenewal: await getAutoRenewalState(session.uid) })
+    const locked = await withDistributedLock(
+      `billing-operation:${session.uid}`,
+      async () => {
+        await enableAutoRenewal({ userId: session.uid, ...parsed.data })
+        return getAutoRenewalState(session.uid)
+      }
+    )
+    if (!locked.acquired) {
+      return NextResponse.json(
+        { error: 'Операция оплаты уже выполняется. Повторите после её завершения.' },
+        { status: 409 }
+      )
+    }
+    return NextResponse.json({ autoRenewal: locked.value })
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Не удалось включить автопродление' },
@@ -59,6 +72,18 @@ export const DELETE = withAuth(async (req: Request) => {
       { status: 429, headers: { 'Retry-After': String(limited.retryAfter) } }
     )
   }
-  await disableAutoRenewal(session.uid)
-  return NextResponse.json({ autoRenewal: await getAutoRenewalState(session.uid) })
+  const locked = await withDistributedLock(
+    `billing-operation:${session.uid}`,
+    async () => {
+      await disableAutoRenewal(session.uid)
+      return getAutoRenewalState(session.uid)
+    }
+  )
+  if (!locked.acquired) {
+    return NextResponse.json(
+      { error: 'Списание уже выполняется. Проверьте его результат перед отключением.' },
+      { status: 409 }
+    )
+  }
+  return NextResponse.json({ autoRenewal: locked.value })
 })

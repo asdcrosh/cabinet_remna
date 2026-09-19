@@ -39,6 +39,7 @@ import {
   StickyNote,
   Timer,
   UserRound,
+  UsersRound,
   Wifi,
   X,
   XCircle,
@@ -55,6 +56,10 @@ import { emojiCategories, emojiKeywords, type EmojiCategory } from './support-em
 import {
   formatSupportDate,
   formatSupportPrice,
+  appendReturnTo,
+  buildAdminSupportPath,
+  formatSupportTicketAge,
+  getSupportSlaState,
   getSupportTicketCursor,
   getUnreadCount,
   insertAtSelection,
@@ -69,6 +74,7 @@ import {
   type TicketFolder,
   type TicketStatus,
 } from './support-panel-model'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 
 const SUPPORT_LIST_REFRESH_MS = 20_000
 const SUPPORT_ACTIVE_TICKET_REFRESH_MS = 5_000
@@ -103,6 +109,10 @@ function getLocalFolderCounts(tickets: SupportTicket[], mode: 'user' | 'admin'):
 export function SupportPanel({
   mode,
   initialTickets,
+  initialTicketId,
+  slaWarningMinutes = 240,
+  slaBreachMinutes = 1440,
+  adminQuickReplies = [],
   initialTotal = initialTickets.length,
   pageSize = 25,
   initialQuery = '',
@@ -128,9 +138,9 @@ export function SupportPanel({
   const [loadingMore, setLoadingMore] = useState(false)
   const [loadingOlderMessages, setLoadingOlderMessages] = useState(false)
   const initialActiveTicket = mode === 'admin'
-    ? initialTickets[0] ?? null
+    ? initialTickets.find((ticket) => ticket.id === initialTicketId) ?? (initialTicketId ? null : initialTickets[0] ?? null)
     : initialTickets.find((ticket) => ticket.status !== 'CLOSED') ?? null
-  const [selectedId, setSelectedId] = useState(initialActiveTicket?.id ?? '')
+  const [selectedId, setSelectedId] = useState(mode === 'admin' && initialTicketId ? initialTicketId : initialActiveTicket?.id ?? '')
   const [selectedTicket, setSelectedTicket] = useState<SupportTicket | null>(
     initialActiveTicket
   )
@@ -148,11 +158,48 @@ export function SupportPanel({
   const [query, setQuery] = useState(initialQuery)
   const [debouncedQuery, setDebouncedQuery] = useState(initialQuery)
   const [error, setError] = useState('')
+  const [sendingMessageId, setSendingMessageId] = useState('')
+  const [failedSend, setFailedSend] = useState<{
+    ticketId: string
+    clientMessageId: string
+    body: string
+  } | null>(null)
+  const draftContextRef = useRef<string | null>(null)
+  const draftLoadedRef = useRef(false)
   const [isPending, startTransition] = useTransition()
+  const [bulkSelectedIds, setBulkSelectedIds] = useState<string[]>([])
+  const [bulkAction, setBulkAction] = useState<'assign' | 'close' | null>(null)
+  const [bulkAssigneeId, setBulkAssigneeId] = useState(currentStaffId)
+  const [bulkPending, setBulkPending] = useState(false)
+  const [bulkFeedback, setBulkFeedback] = useState<{ success: number; failed: number } | null>(null)
 
   const selected = selectedTicket && selectedTicket.id === selectedId
     ? selectedTicket
     : tickets.find((ticket) => ticket.id === selectedId) ?? null
+
+  useEffect(() => {
+    const context = selectedId ? `support-draft:${mode}:${selectedId}` : null
+    if (draftContextRef.current === context) return
+    draftContextRef.current = context
+    draftLoadedRef.current = false
+    setMessage(context ? window.localStorage.getItem(context) ?? '' : '')
+    setMessageFiles([])
+    setFailedSend(null)
+  }, [mode, selectedId])
+
+  useEffect(() => {
+    const context = selectedId ? `support-draft:${mode}:${selectedId}` : null
+    if (!context || draftContextRef.current !== context) return
+    if (!draftLoadedRef.current) {
+      draftLoadedRef.current = true
+      return
+    }
+    const timeout = window.setTimeout(() => {
+      if (message.trim()) window.localStorage.setItem(context, message)
+      else window.localStorage.removeItem(context)
+    }, 150)
+    return () => window.clearTimeout(timeout)
+  }, [message, mode, selectedId])
 
   const folderCounts = useMemo(
     () => mode === 'admin' ? queueCounts : getLocalFolderCounts(tickets, mode),
@@ -182,11 +229,30 @@ export function SupportPanel({
   const unreadTotal = useMemo(() => {
     return tickets.reduce((sum, ticket) => sum + getUnreadCount(ticket, mode), 0)
   }, [mode, tickets])
+  const bulkSelectedTickets = useMemo(
+    () => tickets.filter((ticket) => bulkSelectedIds.includes(ticket.id)),
+    [bulkSelectedIds, tickets]
+  )
+  const allFilteredSelected = mode === 'admin'
+    && filteredTickets.length > 0
+    && filteredTickets.every((ticket) => bulkSelectedIds.includes(ticket.id))
+
+  const adminReturnPath = useMemo(() => buildAdminSupportPath({
+    folder,
+    assigneeScope,
+    query: debouncedQuery,
+    ticketId: selectedId,
+  }), [assigneeScope, debouncedQuery, folder, selectedId])
 
   useEffect(() => {
     const timeout = window.setTimeout(() => setDebouncedQuery(query), 300)
     return () => window.clearTimeout(timeout)
   }, [query])
+
+  useEffect(() => {
+    if (mode !== 'admin') return
+    window.history.replaceState(null, '', adminReturnPath)
+  }, [adminReturnPath, mode])
 
   const fetchTicket = useCallback(async (id: string, before?: string | null) => {
     const base = mode === 'admin' ? `/api/admin/support/tickets/${id}` : `/api/support/tickets/${id}`
@@ -284,14 +350,14 @@ export function SupportPanel({
           if (typeof listData.pagination?.total === 'number') setListTotal(listData.pagination.total)
           if (listData.counts) setQueueCounts(listData.counts)
 
-          if (mode === 'admin' && !listData.tickets.some((ticket) => ticket.id === selectedId)) {
+          if (mode === 'admin' && !selectedId) {
             const nextTicket = listData.tickets[0] ?? null
             setSelectedId(nextTicket?.id ?? '')
             setSelectedTicket(nextTicket)
           }
         }
 
-        if (selectedId && (mode !== 'admin' || listData?.tickets.some((ticket) => ticket.id === selectedId))) {
+        if (selectedId) {
           const ticket = await fetchTicket(selectedId)
           if (active && ticket) {
             setSelectedTicket((current) => current?.id === ticket.id ? mergeSupportTicket(current, ticket, true) : ticket)
@@ -429,17 +495,21 @@ export function SupportPanel({
 
   async function sendMessage(event?: FormEvent<HTMLFormElement>) {
     event?.preventDefault()
-    if (!selected || !message.trim()) return
+    if (!selected || !message.trim() || sendingMessageId) return
     setError('')
 
     const messageToSend = message.trim()
     const filesToSend = messageFiles
-    const temporaryId = `pending-${Date.now()}`
+    const clientMessageId = failedSend?.ticketId === selected.id && failedSend.body === messageToSend
+      ? failedSend.clientMessageId
+      : crypto.randomUUID()
+    const temporaryId = `pending-${clientMessageId}`
     const optimisticMessage: SupportMessage = {
       id: temporaryId,
       body: messageToSend,
       senderRole: mode === 'admin' ? 'ADMIN' : 'USER',
       createdAt: new Date().toISOString(),
+      deliveryState: 'sending',
     }
     const optimisticTicket: SupportTicket = {
       ...selected,
@@ -448,8 +518,8 @@ export function SupportPanel({
       lastMessageAt: optimisticMessage.createdAt,
       messages: [...selected.messages, optimisticMessage],
     }
-    setMessage('')
-    setMessageFiles([])
+    setSendingMessageId(clientMessageId)
+    setFailedSend(null)
     stickToBottomRef.current = true
     setSelectedTicket(optimisticTicket)
     setTickets((current) => current.map((ticket) => ticket.id === selected.id ? { ...ticket, ...optimisticTicket } : ticket))
@@ -458,18 +528,36 @@ export function SupportPanel({
       const endpoint = mode === 'admin' ? `/api/admin/support/tickets/${selected.id}` : `/api/support/tickets/${selected.id}`
       const form = new FormData()
       form.set('message', messageToSend)
+      form.set('clientMessageId', clientMessageId)
       for (const file of filesToSend) form.append('files', file)
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        body: form,
-      })
-      const data = await res.json().catch(() => null)
-      if (!res.ok) {
-        setMessage(messageToSend)
-        setMessageFiles(filesToSend)
-        setSelectedTicket(selected)
-        setTickets((current) => current.map((ticket) => ticket.id === selected.id ? { ...ticket, ...selected } : ticket))
-        setError(data?.error || 'Не удалось отправить сообщение')
+      let deliveredMessage: SupportMessage | null = null
+      try {
+        const res = await fetch(endpoint, {
+          method: 'POST',
+          body: form,
+        })
+        const data = await res.json().catch(() => null) as { message?: SupportMessage; error?: string } | null
+        if (!res.ok) throw new Error(data?.error || 'Не удалось отправить сообщение')
+        if (!data?.message) throw new Error('Сервер не вернул отправленное сообщение')
+        deliveredMessage = data.message
+      } catch (sendError) {
+        setSelectedTicket((current) => current?.id === selected.id
+          ? {
+              ...current,
+              status: selected.status,
+              messages: current.messages.filter((item) => item.id !== temporaryId),
+            }
+          : current)
+        setTickets((current) => current.map((ticket) => ticket.id === selected.id
+          ? {
+              ...ticket,
+              status: selected.status,
+              messages: ticket.messages.filter((item) => item.id !== temporaryId),
+            }
+          : ticket))
+        setFailedSend({ ticketId: selected.id, clientMessageId, body: messageToSend })
+        setSendingMessageId('')
+        setError(sendError instanceof Error ? sendError.message : 'Нет соединения. Текст сохранён, повторите отправку.')
         return
       }
       const nextStatus: TicketStatus = mode === 'admin' ? 'WAITING_USER' : 'WAITING_ADMIN'
@@ -478,14 +566,18 @@ export function SupportPanel({
         ...selected,
         status: nextStatus,
         closedAt: null,
-        lastMessageAt: data.message.createdAt,
+        lastMessageAt: deliveredMessage.createdAt,
         ...(mode === 'admin' && !selected.assignee && currentStaff
-          ? { assignee: currentStaff, assignedAt: data.message.createdAt }
+          ? { assignee: currentStaff, assignedAt: deliveredMessage.createdAt }
           : {}),
-        messages: optimisticTicket.messages.map((item) => item.id === temporaryId ? data.message : item),
+        messages: optimisticTicket.messages.map((item) => item.id === temporaryId ? deliveredMessage : item),
       }
       setSelectedTicket(updated)
       setTickets((current) => current.map((ticket) => ticket.id === updated.id ? { ...ticket, ...updated } : ticket))
+      setMessage('')
+      setMessageFiles([])
+      setSendingMessageId('')
+      window.localStorage.removeItem(`support-draft:${mode}:${selected.id}`)
       advanceAdminQueueIfNeeded(updated)
     })
   }
@@ -495,31 +587,43 @@ export function SupportPanel({
     setError('')
 
     startTransition(async () => {
-      const endpoint = mode === 'admin' ? `/api/admin/support/tickets/${selected.id}` : `/api/support/tickets/${selected.id}`
-      const res = await fetch(endpoint, {
-        method: 'PATCH',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ status }),
-      })
-      const data = await res.json().catch(() => null)
-      if (!res.ok) {
-        setError(data?.error || 'Не удалось обновить статус')
+      try {
+        const endpoint = mode === 'admin' ? `/api/admin/support/tickets/${selected.id}` : `/api/support/tickets/${selected.id}`
+        const res = await fetch(endpoint, {
+          method: 'PATCH',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            status,
+            ...(mode === 'admin' ? { expectedUpdatedAt: selected.updatedAt } : {}),
+          }),
+        })
+        const data = await res.json().catch(() => null)
+        if (!res.ok) {
+          if (res.status === 409 && data?.ticket) {
+            const current = { ...selected, ...data.ticket }
+            setSelectedTicket(current)
+            setTickets((tickets) => tickets.map((ticket) => ticket.id === current.id ? { ...ticket, ...current } : ticket))
+          }
+          throw new Error(data?.error || 'Не удалось обновить статус')
+        }
+        const updated = {
+          ...selected,
+          ...(data?.ticket ?? {}),
+          status,
+          closedAt: status === 'CLOSED' ? new Date().toISOString() : null,
+        }
+        setSelectedTicket(updated)
+        setTickets((current) => current.map((ticket) => ticket.id === updated.id ? { ...ticket, ...updated } : ticket))
+        if (mode === 'admin') {
+          advanceAdminQueueIfNeeded(updated)
+        } else if (status === 'CLOSED') {
+          setFolder('closed')
+        } else if (folder === 'closed') {
+          setFolder('active')
+        }
+      } catch (statusError) {
+        setError(statusError instanceof Error ? statusError.message : 'Нет соединения. Статус не изменён.')
         return
-      }
-      const updated = {
-        ...selected,
-        ...(data?.ticket ?? {}),
-        status,
-        closedAt: status === 'CLOSED' ? new Date().toISOString() : null,
-      }
-      setSelectedTicket(updated)
-      setTickets((current) => current.map((ticket) => ticket.id === updated.id ? { ...ticket, ...updated } : ticket))
-      if (mode === 'admin') {
-        advanceAdminQueueIfNeeded(updated)
-      } else if (status === 'CLOSED') {
-        setFolder('closed')
-      } else if (folder === 'closed') {
-        setFolder('active')
       }
     })
   }
@@ -532,10 +636,15 @@ export function SupportPanel({
       const res = await fetch(`/api/admin/support/tickets/${selected.id}`, {
         method: 'PATCH',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ assigneeId }),
+        body: JSON.stringify({ assigneeId, expectedUpdatedAt: selected.updatedAt }),
       })
       const data = await res.json().catch(() => null)
       if (!res.ok) {
+        if (res.status === 409 && data?.ticket) {
+          const current = { ...selected, ...data.ticket }
+          setSelectedTicket(current)
+          setTickets((tickets) => tickets.map((ticket) => ticket.id === current.id ? { ...ticket, ...current } : ticket))
+        }
         setError(data?.error || 'Не удалось назначить исполнителя')
         return
       }
@@ -546,6 +655,74 @@ export function SupportPanel({
       if (assigneeScope === 'mine' && assigneeId !== currentStaffId) advanceAdminQueueIfNeeded(updated, false)
       if (assigneeScope === 'unassigned' && assigneeId) advanceAdminQueueIfNeeded(updated, false)
     })
+  }
+
+  async function applyBulkAction() {
+    if (mode !== 'admin' || !bulkAction || bulkSelectedTickets.length === 0 || bulkPending) return
+    setBulkPending(true)
+    setBulkFeedback(null)
+    try {
+      const response = await fetch('/api/admin/support/tickets/bulk', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          tickets: bulkSelectedTickets.map((ticket) => ({
+            id: ticket.id,
+            expectedUpdatedAt: ticket.updatedAt,
+          })),
+          action: bulkAction === 'close'
+            ? { type: 'close' }
+            : { type: 'assign', assigneeId: bulkAssigneeId },
+        }),
+      })
+      const data = await response.json().catch(() => null) as {
+        error?: string
+        updated?: SupportTicket[]
+        failed?: Array<{ id: string; reason: string }>
+      } | null
+      if (!response.ok || !Array.isArray(data?.updated) || !Array.isArray(data?.failed)) {
+        throw new Error(data?.error || 'Не удалось выполнить массовую операцию')
+      }
+
+      const updatedById = new Map(data.updated.map((ticket) => [ticket.id, ticket]))
+      const failedIds = data.failed.map((item) => item.id)
+      setTickets((current) => current.map((ticket) => {
+        const updated = updatedById.get(ticket.id)
+        return updated ? { ...ticket, ...updated } : ticket
+      }))
+      if (selected && updatedById.has(selected.id)) {
+        const updatedSelected = { ...selected, ...updatedById.get(selected.id)! }
+        setSelectedTicket(updatedSelected)
+        if (!ticketMatchesFolder(updatedSelected, folder, mode)
+          || !ticketMatchesAssigneeScope(updatedSelected, assigneeScope, currentStaffId)) {
+          setSelectedId('')
+          setSelectedTicket(null)
+          setMobileChatOpen(false)
+        }
+      }
+      setBulkSelectedIds(failedIds)
+      setBulkFeedback({ success: data.updated.length, failed: data.failed.length })
+      setBulkAction(null)
+
+      const listData = await fetchTicketList(listLimit)
+      if (listData) {
+        mergeTicketList(listData.tickets)
+        setListCursor(listData.pagination?.nextCursor ?? null)
+        if (typeof listData.pagination?.total === 'number') setListTotal(listData.pagination.total)
+        if (listData.counts) setQueueCounts(listData.counts)
+      }
+    } catch (bulkError) {
+      setError(bulkError instanceof Error ? bulkError.message : 'Не удалось выполнить массовую операцию')
+    } finally {
+      setBulkPending(false)
+    }
+  }
+
+  function toggleBulkTicket(id: string) {
+    setBulkSelectedIds((current) => current.includes(id)
+      ? current.filter((ticketId) => ticketId !== id)
+      : [...current, id].slice(0, 50))
+    setBulkFeedback(null)
   }
 
   async function addInternalNote(body: string) {
@@ -627,6 +804,8 @@ export function SupportPanel({
     setMobileChatOpen(false)
     setNewTicketOpen(false)
     setError('')
+    setBulkSelectedIds([])
+    setBulkFeedback(null)
 
     if (mode === 'admin') {
       const url = new URL(window.location.href)
@@ -655,6 +834,8 @@ export function SupportPanel({
     setSelectedTicket(null)
     setMobileChatOpen(false)
     setError('')
+    setBulkSelectedIds([])
+    setBulkFeedback(null)
 
     const url = new URL(window.location.href)
     url.searchParams.set('assignee', nextScope)
@@ -719,7 +900,13 @@ export function SupportPanel({
                 <span className="sr-only">Поиск обращений</span>
                 <input
                   value={query}
-                  onChange={(event) => setQuery(event.target.value)}
+                  onChange={(event) => {
+                    setQuery(event.target.value)
+                    if (mode === 'admin') {
+                      setBulkSelectedIds([])
+                      setBulkFeedback(null)
+                    }
+                  }}
                   className="min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-slate-400 sm:text-sm"
                   placeholder={mode === 'admin' ? 'Клиент, Telegram, платёж или текст' : 'Найти обращение'}
                 />
@@ -738,6 +925,36 @@ export function SupportPanel({
           </div>
 
           <div className={cn('min-h-0 flex-1 overflow-y-auto', mode === 'admin' ? 'pb-3' : 'px-2.5 pb-3 pt-2.5')}>
+            {mode === 'admin' && (filteredTickets.length > 0 || bulkFeedback) ? (
+              <div className="sticky top-0 z-10 flex flex-col gap-2 border-b border-slate-200 bg-white/95 px-3 py-2 backdrop-blur dark:border-white/[0.07] dark:bg-surface-900/95">
+                {filteredTickets.length > 0 ? <div className="flex items-center justify-between gap-2">
+                  <label className="flex min-h-8 cursor-pointer items-center gap-2 text-xs font-medium text-slate-600 dark:text-slate-300">
+                    <input
+                      type="checkbox"
+                      checked={allFilteredSelected}
+                      onChange={() => setBulkSelectedIds(allFilteredSelected ? [] : filteredTickets.slice(0, 50).map((ticket) => ticket.id))}
+                      className="h-4 w-4 rounded border-slate-300 text-violet-600 focus:ring-violet-500"
+                    />
+                    {bulkSelectedIds.length > 0 ? `Выбрано ${bulkSelectedIds.length}` : 'Выбрать показанные'}
+                  </label>
+                  {bulkSelectedIds.length > 0 ? (
+                    <div className="flex items-center gap-1.5">
+                      <button type="button" className="btn-secondary min-h-8 px-2 text-[11px]" onClick={() => setBulkAction('assign')}>
+                        <UsersRound className="h-3.5 w-3.5" /> Назначить
+                      </button>
+                      <button type="button" className="btn-secondary min-h-8 px-2 text-[11px] text-red-600 dark:text-red-300" onClick={() => setBulkAction('close')}>
+                        <Archive className="h-3.5 w-3.5" /> Закрыть
+                      </button>
+                    </div>
+                  ) : null}
+                </div> : null}
+                {bulkFeedback ? (
+                  <div role="status" className={cn('text-xs', bulkFeedback.failed > 0 ? 'text-amber-700 dark:text-amber-300' : 'text-emerald-700 dark:text-emerald-300')}>
+                    Выполнено: {bulkFeedback.success}. Не применено: {bulkFeedback.failed}{bulkFeedback.failed > 0 ? ' из-за параллельных изменений или удаления.' : '.'}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
             {mode === 'user' && (
               <div className="mb-2 flex items-center justify-between gap-3 px-1.5">
                 <span className="text-xs font-semibold uppercase tracking-[0.11em] text-slate-400">Ваши обращения</span>
@@ -753,6 +970,10 @@ export function SupportPanel({
                   key={ticket.id}
                   ticket={ticket}
                   mode={mode}
+                  slaWarningMinutes={slaWarningMinutes}
+                  slaBreachMinutes={slaBreachMinutes}
+                  selectedForBulk={bulkSelectedIds.includes(ticket.id)}
+                  onBulkSelectionChange={mode === 'admin' ? () => toggleBulkTicket(ticket.id) : undefined}
                   active={selectedId === ticket.id}
                   onClick={() => void loadTicket(ticket.id)}
                 />
@@ -789,6 +1010,7 @@ export function SupportPanel({
           <NewTicketForm
             category={newCategory}
             message={newMessage}
+            error={error}
             isPending={isPending}
             onCategoryChange={setNewCategory}
             onMessageChange={setNewMessage}
@@ -842,8 +1064,18 @@ export function SupportPanel({
             {mode === 'user' && <ConversationNotice ticket={selected} mode={mode} />}
 
             {error && (
-              <div className="mx-4 mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 sm:mx-5">
-                {error}
+              <div className="mx-4 mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 sm:mx-5">
+                <span>{error}</span>
+                {failedSend?.ticketId === selected.id && (
+                  <button
+                    type="button"
+                    className="rounded-lg border border-red-300 bg-white px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-100"
+                    disabled={Boolean(sendingMessageId)}
+                    onClick={() => void sendMessage()}
+                  >
+                    Повторить отправку
+                  </button>
+                )}
               </div>
             )}
 
@@ -878,10 +1110,28 @@ export function SupportPanel({
                   Обращение создано {formatDate(selected.createdAt)}
                   {mode === 'user' && <span className="h-px flex-1 bg-slate-200/80 dark:bg-white/10" />}
                 </div>
-                {selected.messages.map((item) => {
-                  const own = mode === 'admin' ? item.senderRole === 'ADMIN' : item.senderRole === 'USER'
-                  return <MessageBubble key={item.id} message={item} own={own} mode={mode} />
-                })}
+                {[
+                  ...selected.messages.map((message) => ({ kind: 'message' as const, item: message })),
+                  ...(mode === 'admin'
+                    ? (selected.auditEvents ?? []).map((event) => ({ kind: 'audit' as const, item: event }))
+                    : []),
+                ]
+                  .sort((left, right) => new Date(left.item.createdAt).getTime() - new Date(right.item.createdAt).getTime())
+                  .map((entry) => {
+                    if (entry.kind === 'audit') {
+                      return (
+                        <div key={`audit-${entry.item.id}`} className="flex items-center gap-3 py-1 text-[11px] text-slate-400">
+                          <span className="h-px flex-1 bg-slate-200/80 dark:bg-white/10" />
+                          <span className="max-w-[80%] text-center">
+                            {entry.item.message} · {entry.item.actor?.name || entry.item.actor?.email || 'Система'} · {formatDate(entry.item.createdAt)}
+                          </span>
+                          <span className="h-px flex-1 bg-slate-200/80 dark:bg-white/10" />
+                        </div>
+                      )
+                    }
+                    const own = mode === 'admin' ? entry.item.senderRole === 'ADMIN' : entry.item.senderRole === 'USER'
+                    return <MessageBubble key={entry.item.id} message={entry.item} own={own} mode={mode} />
+                  })}
               </div>
             </div>
 
@@ -896,17 +1146,26 @@ export function SupportPanel({
                 </div>
               ) : selected.status !== 'CLOSED' ? (
                 <div className="space-y-2">
-                  {mode === 'user' && <QuickReplies mode={mode} onPick={(value) => setMessage((current) => current.trim() ? `${current.trim()}\n\n${value}` : value)} />}
+                  {mode === 'user' && <QuickReplies mode={mode} onPick={(value) => {
+                    setFailedSend(null)
+                    setMessage((current) => current.trim() ? `${current.trim()}\n\n${value}` : value)
+                  }} />}
                   <div className={cn(
                     'relative flex items-end gap-1.5 border border-slate-200/90 bg-white p-1.5 focus-within:border-fuchsia-300 focus-within:ring-4 focus-within:ring-fuchsia-500/[0.06] dark:border-white/10 dark:bg-black/20 dark:focus-within:border-fuchsia-400/30 sm:gap-2',
                     mode === 'admin' ? 'rounded-lg' : 'rounded-2xl shadow-[0_12px_34px_-22px_rgba(15,23,42,0.5)]'
                   )}>
-                    {mode === 'admin' && <QuickReplies mode={mode} onPick={(value) => setMessage((current) => current.trim() ? `${current.trim()}\n\n${value}` : value)} />}
+                    {mode === 'admin' && <QuickReplies mode={mode} replies={adminQuickReplies} onPick={(value) => {
+                      setFailedSend(null)
+                      setMessage((current) => current.trim() ? `${current.trim()}\n\n${value}` : value)
+                    }} />}
                     <EmojiPicker onPick={insertMessageEmoji} />
                     <AttachmentPicker
                       files={messageFiles}
-                      disabled={isPending}
-                      onChange={setMessageFiles}
+                      disabled={isPending || Boolean(sendingMessageId)}
+                      onChange={(files) => {
+                        setFailedSend(null)
+                        setMessageFiles(files)
+                      }}
                       onError={setError}
                     />
                     <textarea
@@ -914,6 +1173,7 @@ export function SupportPanel({
                       className="max-h-32 min-h-11 flex-1 resize-none rounded-xl border-0 bg-transparent px-1.5 py-2.5 text-base leading-5 outline-none placeholder:text-slate-400 focus:ring-0 sm:px-2 sm:text-sm"
                       value={message}
                       onChange={(event) => {
+                        setFailedSend(null)
                         setMessage(event.target.value)
                         event.currentTarget.style.height = 'auto'
                         event.currentTarget.style.height = `${Math.min(event.currentTarget.scrollHeight, 128)}px`
@@ -921,13 +1181,22 @@ export function SupportPanel({
                       onKeyDown={handleMessageKeyDown}
                       placeholder={mode === 'admin' ? 'Напишите понятный ответ пользователю' : 'Напишите сообщение'}
                       maxLength={3000}
+                      disabled={Boolean(sendingMessageId)}
                       required
                     />
-                    <button type="submit" className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-slate-950 text-white shadow-lg shadow-slate-950/15 transition hover:bg-fuchsia-700 disabled:cursor-not-allowed disabled:opacity-35 dark:bg-white dark:text-slate-950 dark:hover:bg-fuchsia-100" disabled={isPending || !message.trim()} aria-label="Отправить сообщение">
+                    <button type="submit" className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-slate-950 text-white shadow-lg shadow-slate-950/15 transition hover:bg-fuchsia-700 disabled:cursor-not-allowed disabled:opacity-35 dark:bg-white dark:text-slate-950 dark:hover:bg-fuchsia-100" disabled={isPending || Boolean(sendingMessageId) || !message.trim()} aria-label="Отправить сообщение">
                       <Send className="h-[18px] w-[18px]" />
                     </button>
                   </div>
-                  <SelectedAttachments files={messageFiles} onChange={setMessageFiles} />
+                  <SelectedAttachments files={messageFiles} onChange={(files) => {
+                    setFailedSend(null)
+                    setMessageFiles(files)
+                  }} />
+                  {messageFiles.length > 0 && (
+                    <p className="px-1 text-xs text-amber-600 dark:text-amber-300">
+                      Текст черновика сохранится после перезагрузки, прикреплённые файлы нужно будет выбрать снова.
+                    </p>
+                  )}
                   <div className="hidden items-center justify-between px-1 text-xs text-slate-400 sm:flex">
                     <span>Ctrl + Enter, чтобы отправить</span>
                     <span className={message.length > 2700 ? 'text-amber-600' : ''}>{message.length}/3000</span>
@@ -945,7 +1214,7 @@ export function SupportPanel({
                   aria-label="Закрыть панель"
                 />
                 <aside className="absolute inset-y-0 right-0 z-30 w-[min(24rem,calc(100%-1rem))] border-l border-slate-200 bg-white shadow-2xl shadow-slate-950/15 dark:border-white/10 dark:bg-surface-900 2xl:hidden">
-                  <TicketSideMenu selected={selected} mode={mode} onAddNote={addInternalNote} onClose={() => setDetailsOpen(false)} />
+                  <TicketSideMenu selected={selected} mode={mode} returnTo={adminReturnPath} onAddNote={addInternalNote} onClose={() => setDetailsOpen(false)} />
                 </aside>
               </>
             )}
@@ -966,9 +1235,47 @@ export function SupportPanel({
 
       {mode === 'admin' && (
         <aside className="hidden min-h-0 overflow-hidden rounded-xl border border-slate-200/80 bg-white dark:border-white/[0.09] dark:bg-white/[0.035] 2xl:block">
-          <TicketSideMenu selected={selected} mode={mode} onAddNote={addInternalNote} />
+          <TicketSideMenu selected={selected} mode={mode} returnTo={adminReturnPath} onAddNote={addInternalNote} />
         </aside>
       )}
+      <ConfirmDialog
+        open={bulkAction !== null}
+        title={bulkAction === 'close' ? 'Закрыть выбранные обращения?' : 'Назначить выбранные обращения?'}
+        description={`Будет обработано обращений: ${bulkSelectedTickets.length}`}
+        confirmLabel={bulkAction === 'close' ? 'Закрыть обращения' : 'Назначить'}
+        loading={bulkPending}
+        tone={bulkAction === 'close' ? 'warning' : 'neutral'}
+        onCancel={() => {
+          if (!bulkPending) setBulkAction(null)
+        }}
+        onConfirm={() => void applyBulkAction()}
+        details={(
+          <div className="min-w-0 space-y-3">
+            {bulkAction === 'assign' ? (
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-semibold">Исполнитель</span>
+                <select
+                  value={bulkAssigneeId}
+                  onChange={(event) => setBulkAssigneeId(event.target.value)}
+                  className="input"
+                >
+                  {staffMembers.map((staff) => (
+                    <option key={staff.id} value={staff.id}>{staff.name || staff.email}{staff.id === currentStaffId ? ' (вы)' : ''}</option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
+            <div className="max-h-44 space-y-1 overflow-y-auto rounded-xl border border-slate-200 p-2 dark:border-white/10">
+              {bulkSelectedTickets.map((ticket) => (
+                <div key={ticket.id} className="rounded-lg px-2 py-1.5 text-xs">
+                  <div className="truncate font-semibold">{ticket.user?.name || ticket.user?.email || 'Пользователь'}</div>
+                  <div className="truncate text-slate-500">{ticket.subject}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      />
     </div>
   )
 }
@@ -976,6 +1283,7 @@ export function SupportPanel({
 function NewTicketForm({
   category,
   message,
+  error,
   isPending,
   onCategoryChange,
   onMessageChange,
@@ -987,6 +1295,7 @@ function NewTicketForm({
 }: {
   category: SupportCategoryValue
   message: string
+  error: string
   isPending: boolean
   onCategoryChange: (value: SupportCategoryValue) => void
   onMessageChange: (value: string) => void
@@ -1103,6 +1412,11 @@ function NewTicketForm({
               Чем точнее описание, тем быстрее мы поможем. Не отправляйте пароли и данные банковской карты.
             </p>
           </section>
+          {error ? (
+            <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-400/20 dark:bg-red-400/10 dark:text-red-200">
+              {error}
+            </div>
+          ) : null}
         </div>
       </div>
 
@@ -1130,6 +1444,8 @@ function CategoryIcon({ category, compact = false, active = false }: { category:
           ? MonitorSmartphone
           : category === 'speed'
             ? Gauge
+            : category === 'account'
+              ? FileText
             : CircleHelp
 
   return (
@@ -1151,6 +1467,7 @@ const categoryGuidance: Record<SupportCategoryValue, { title: string; details: s
   subscription: { title: 'Что нужно уточнить', details: 'Какой тариф или срок хотите изменить и какой результат ожидаете' },
   devices: { title: 'Что поможет с устройством', details: 'Модель устройства, система и название приложения' },
   speed: { title: 'Что поможет проверить скорость', details: 'Устройство, тип сети и когда началась проблема' },
+  account: { title: 'Что нужно указать', details: 'Экспорт или удаление аккаунта. Поддержка уточнит состав данных и подтвердит личность' },
   general: { title: 'Расскажите подробнее', details: 'Что произошло, что ожидали увидеть и что уже пробовали' },
 }
 
@@ -1174,6 +1491,7 @@ function ticketMessagePlaceholder(category: SupportCategoryValue) {
     subscription: 'Например: хочу изменить тариф или срок подписки...',
     devices: 'Например: не получается добавить устройство или открыть QR-код...',
     speed: 'Например: на Wi-Fi скорость упала вечером, проверял на двух устройствах...',
+    account: 'Напишите, нужен экспорт данных или удаление аккаунта, и добавьте важные детали...',
     general: 'Опишите вопрос и ожидаемый результат...',
   }
   return placeholders[category]
@@ -1545,17 +1863,25 @@ function FolderTabs({
 function TicketListItem({
   ticket,
   mode,
+  slaWarningMinutes,
+  slaBreachMinutes,
+  selectedForBulk = false,
+  onBulkSelectionChange,
   active,
   onClick,
 }: {
   ticket: SupportTicket
   mode: 'user' | 'admin'
+  slaWarningMinutes: number
+  slaBreachMinutes: number
+  selectedForBulk?: boolean
+  onBulkSelectionChange?: () => void
   active: boolean
   onClick: () => void
 }) {
   const unread = getUnreadCount(ticket, mode)
   const waitingAge = mode === 'admin' && ticket.status === 'WAITING_ADMIN'
-    ? getWaitingAge(ticket.lastMessageAt)
+    ? getWaitingAge(ticket.lastMessageAt, slaWarningMinutes, slaBreachMinutes)
     : null
 
   if (mode === 'admin') {
@@ -1570,17 +1896,25 @@ function TicketListItem({
           : 'bg-violet-500'
 
     return (
-      <button
-        type="button"
-        onClick={onClick}
-        className={cn(
-          'group relative w-full px-3 py-2.5 text-left transition-colors',
-          active
-            ? 'bg-slate-100/90 text-slate-950 dark:bg-white/[0.07] dark:text-white'
-            : 'hover:bg-slate-50 dark:hover:bg-white/[0.04]'
-        )}
-      >
-        {active && <span className="absolute inset-y-0 left-0 w-0.5 bg-violet-500" />}
+      <div className={cn('group relative', selectedForBulk && 'bg-violet-50/70 dark:bg-violet-400/[0.06]')}>
+        <input
+          type="checkbox"
+          checked={selectedForBulk}
+          onChange={onBulkSelectionChange}
+          aria-label={`Выбрать обращение ${customerName}`}
+          className="absolute left-3 top-3.5 z-[1] h-4 w-4 rounded border-slate-300 text-violet-600 focus:ring-violet-500"
+        />
+        <button
+          type="button"
+          onClick={onClick}
+          className={cn(
+            'relative w-full py-2.5 pl-9 pr-3 text-left transition-colors',
+            active
+              ? 'bg-slate-100/90 text-slate-950 dark:bg-white/[0.07] dark:text-white'
+              : 'hover:bg-slate-50 dark:hover:bg-white/[0.04]'
+          )}
+        >
+          {active && <span className="absolute inset-y-0 left-0 w-0.5 bg-violet-500" />}
         <div className="flex min-w-0 items-center gap-2">
           <span className={cn('h-2 w-2 shrink-0 rounded-full', statusTone)} />
           <span className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-900 dark:text-white">{customerName}</span>
@@ -1592,7 +1926,8 @@ function TicketListItem({
           {waitingAge && <span className={cn('shrink-0 text-[10px] font-semibold', waitingAge.textTone)}>{waitingAge.label}</span>}
         </div>
         <div className={cn('mt-0.5 truncate text-xs', unread > 0 ? 'text-slate-700 dark:text-slate-200' : 'text-slate-400')}>{latestMessage}</div>
-      </button>
+        </button>
+      </div>
     )
   }
 
@@ -1644,21 +1979,21 @@ function TicketListItem({
   )
 }
 
-function getWaitingAge(value: string) {
-  const minutes = Math.max(0, Math.floor((Date.now() - new Date(value).getTime()) / 60_000))
-  const label = minutes < 60
-    ? `Ждёт ${Math.max(1, minutes)} мин`
-    : minutes < 24 * 60
-      ? `Ждёт ${Math.floor(minutes / 60)} ч`
-      : `Ждёт ${Math.floor(minutes / (24 * 60))} дн`
-  const tone = minutes >= 24 * 60
+function getWaitingAge(value: string, warningMinutes: number, breachMinutes: number) {
+  const sla = getSupportSlaState(value, warningMinutes, breachMinutes)
+  const label = sla.state === 'breached'
+    ? `SLA просрочен · ${sla.duration}`
+    : sla.state === 'warning'
+      ? `SLA скоро · ${sla.duration}`
+      : `Ждёт ${sla.duration}`
+  const tone = sla.state === 'breached'
     ? 'bg-red-50 text-red-700 dark:bg-red-400/10 dark:text-red-200'
-    : minutes >= 4 * 60
+    : sla.state === 'warning'
       ? 'bg-amber-50 text-amber-700 dark:bg-amber-400/10 dark:text-amber-200'
       : 'bg-slate-100 text-slate-500 dark:bg-white/[0.06] dark:text-slate-300'
-  const textTone = minutes >= 24 * 60
+  const textTone = sla.state === 'breached'
     ? 'text-red-600 dark:text-red-300'
-    : minutes >= 4 * 60
+    : sla.state === 'warning'
       ? 'text-amber-600 dark:text-amber-300'
       : 'text-slate-400'
   return { label, tone, textTone }
@@ -1708,11 +2043,13 @@ function TicketActions({
 function TicketSideMenu({
   selected,
   mode,
+  returnTo,
   onAddNote,
   onClose,
 }: {
   selected: SupportTicket | null
   mode: 'user' | 'admin'
+  returnTo: string
   onAddNote: (body: string) => Promise<boolean>
   onClose?: () => void
 }) {
@@ -1791,7 +2128,7 @@ function TicketSideMenu({
                 </div>
                 <TicketStatusBadge status={selected.status} mode={mode} />
               </div>
-              <div className="mt-2 text-[11px] text-slate-400">Создано {formatDate(selected.createdAt)} · {selected.messages.length} сообщ.</div>
+              <div className="mt-2 text-[11px] text-slate-400">Создано {formatDate(selected.createdAt)} · возраст {formatSupportTicketAge(selected.createdAt)} · {selected.messages.length} сообщ.</div>
             </div>
 
             {selected.user ? (
@@ -1804,9 +2141,9 @@ function TicketSideMenu({
                     <div className="truncate text-sm font-semibold text-slate-950 dark:text-white">{selected.user.name || 'Пользователь'}</div>
                     <div className="truncate text-xs text-slate-500" title={selected.user.email}>{selected.user.email}</div>
                   </div>
-                  <a href={`/dashboard/admin/users?q=${encodeURIComponent(selected.user.email)}`} className="shrink-0 text-xs font-semibold text-violet-700 hover:text-slate-950 dark:text-violet-200 dark:hover:text-white">Профиль</a>
+                  <a href={appendReturnTo(`/dashboard/admin/users?q=${encodeURIComponent(selected.user.email)}`, returnTo)} className="shrink-0 text-xs font-semibold text-violet-700 hover:text-slate-950 dark:text-violet-200 dark:hover:text-white">Профиль</a>
                 </div>
-                <SupportUserDiagnostics user={selected.user} />
+                <SupportUserDiagnostics user={selected.user} returnTo={returnTo} />
               </>
             ) : (
               <div className="text-sm text-slate-500">Данные клиента недоступны</div>
@@ -1867,7 +2204,7 @@ function TicketSideMenu({
   )
 }
 
-function SupportUserDiagnostics({ user }: { user: NonNullable<SupportTicket['user']> }) {
+function SupportUserDiagnostics({ user, returnTo }: { user: NonNullable<SupportTicket['user']>; returnTo: string }) {
   const subscription = user.subscriptions?.[0] ?? null
   const payment = user.payments?.[0] ?? null
   const paymentSearchId = payment?.externalPaymentId || payment?.yookassaId || payment?.id || ''
@@ -1947,7 +2284,7 @@ function SupportUserDiagnostics({ user }: { user: NonNullable<SupportTicket['use
       )}
 
       <div className="grid grid-cols-2 gap-2 border-t border-slate-100 pt-3 dark:border-white/10">
-        <a href={`/dashboard/admin/payments?q=${encodeURIComponent(paymentSearchId || user.email)}`} className="btn-secondary h-9 justify-center px-2 text-xs">
+        <a href={appendReturnTo(`/dashboard/admin/payments?q=${encodeURIComponent(paymentSearchId || user.email)}`, returnTo)} className="btn-secondary h-9 justify-center px-2 text-xs">
           Платежи
         </a>
         <a href="/dashboard/admin/recovery" className="btn-secondary h-9 justify-center px-2 text-xs">
@@ -1990,10 +2327,10 @@ function DiagnosticRow({ label, value, ok, mono = false }: { label: string; valu
   )
 }
 
-function QuickReplies({ mode, onPick }: { mode: 'user' | 'admin'; onPick: (value: string) => void }) {
+function QuickReplies({ mode, replies: configuredReplies = [], onPick }: { mode: 'user' | 'admin'; replies?: string[]; onPick: (value: string) => void }) {
   const [open, setOpen] = useState(mode === 'user')
   const replies = mode === 'admin'
-    ? [
+    ? configuredReplies.length > 0 ? configuredReplies : [
         'Проверяю и скоро вернусь с ответом.',
         'Готово, попробуйте подключиться еще раз.',
         'Пришлите, пожалуйста, скрин ошибки и модель устройства.',
@@ -2088,6 +2425,9 @@ function MessageBubble({ message, own, mode }: { message: SupportMessage; own: b
             <time className="shrink-0 text-[11px] tabular-nums text-slate-400">{formatDate(message.createdAt)}</time>
           </div>
           <div className="mt-1 whitespace-pre-wrap break-words text-sm leading-6 text-slate-800 [overflow-wrap:anywhere] dark:text-slate-100">{message.body}</div>
+          {message.deliveryState === 'sending' && (
+            <div className="mt-1 text-[11px] font-medium text-slate-400">Отправляем...</div>
+          )}
           {message.attachments && message.attachments.length > 0 ? (
             <div className="mt-2 grid gap-1.5 sm:grid-cols-2">
               {message.attachments.map((attachment) => (
@@ -2126,6 +2466,9 @@ function MessageBubble({ message, own, mode }: { message: SupportMessage; own: b
         )}
       >
         <div className="whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-sm leading-relaxed">{message.body}</div>
+        {message.deliveryState === 'sending' && (
+          <div className="mt-1 text-[11px] font-medium opacity-60">Отправляем...</div>
+        )}
         {message.attachments && message.attachments.length > 0 ? (
           <div className="mt-2 space-y-1.5">
             {message.attachments.map((attachment) => (
@@ -2180,6 +2523,15 @@ function AttachmentPicker({
         onChange={(event) => {
           const selected = Array.from(event.currentTarget.files ?? [])
           event.currentTarget.value = ''
+          const allowedTypes = new Set(['image/jpeg', 'image/png', 'image/webp', 'application/pdf'])
+          if (selected.some((file) => !allowedTypes.has(file.type))) {
+            onError('Поддерживаются JPG, PNG, WEBP и PDF.')
+            return
+          }
+          if (selected.some((file) => file.size <= 0)) {
+            onError('Нельзя прикрепить пустой файл.')
+            return
+          }
           if (selected.some((file) => file.size > 5 * 1024 * 1024)) {
             onError('Размер каждого файла должен быть не больше 5 МБ.')
             return

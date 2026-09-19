@@ -48,6 +48,22 @@ export default defineConfig({
         extraHTTPHeaders: { 'x-forwarded-for': testClientIp.mobile },
       },
     },
+    {
+      name: 'desktop-firefox',
+      use: {
+        ...devices['Desktop Firefox'],
+        viewport: { width: 1440, height: 1000 },
+        extraHTTPHeaders: { 'x-forwarded-for': '198.51.100.12' },
+      },
+    },
+    {
+      name: 'desktop-webkit',
+      use: {
+        ...devices['Desktop Safari'],
+        viewport: { width: 1440, height: 1000 },
+        extraHTTPHeaders: { 'x-forwarded-for': '198.51.100.13' },
+      },
+    },
   ],
   webServer: usesExternalServer
     ? undefined

@@ -11,15 +11,18 @@ import { ArrowRight, CalendarDays, ChevronDown, Clock3, Gauge, Globe2, ShieldAle
 import { cn } from '@/lib/cn'
 import { EmptyState } from '@/components/dashboard/empty-state'
 import { getFeatureFlags } from '@/lib/feature-flags'
-import { formatSubscriptionDaysLeft, isSubscriptionExpired } from '@/lib/subscription-time'
+import { formatSubscriptionDaysLeft } from '@/lib/subscription-time'
+import { resolveSubscriptionPresentation } from '@/lib/subscription-presentation'
 import { isWhitelistAddonCurrentlyActive } from '@/lib/whitelist-addon-policy'
 import { readPlanPurchaseSnapshot } from '@/lib/plan-purchase'
 import { logError } from '@/lib/logger'
 import { SubscriptionPendingRefresh } from '@/components/dashboard/subscription-pending-refresh'
 import { AutoRenewalCard } from '@/components/dashboard/auto-renewal-card'
-import { calculateAutoRenewalPurchase, getAutoRenewalState } from '@/lib/auto-renewal'
+import { getAutoRenewalState } from '@/lib/auto-renewal'
 import { getRetentionState } from '@/lib/subscription-retention'
-import { calculatePersonalDiscount } from '@/lib/user-discounts'
+import { tryCalculateRenewalPricing } from '@/lib/renewal-pricing'
+import { StatusBadge } from '@/components/dashboard/status-badge'
+import { PageHeader } from '@/components/dashboard/page-header'
 
 export const dynamic = 'force-dynamic'
 
@@ -28,9 +31,9 @@ export default async function SubscriptionPage() {
   const session = await getCurrentUser()
   if (!session) redirect('/login')
   const [user, localSubscription, payments, auditEvents, autoRenewal, retentionPause] = await Promise.all([
-    prisma.user.findUnique({ where: { id: session.uid } }),
+    prisma.user.findUnique({ where: { id: session.uid }, include: { _count: { select: { devices: true } } } }),
     prisma.subscription.findFirst({
-      where: { userId: session.uid, status: { in: ['ACTIVE', 'LIMITED', 'PAUSED'] } },
+      where: { userId: session.uid },
       orderBy: { expireAt: 'desc' },
       select: {
         planId: true,
@@ -40,6 +43,8 @@ export default async function SubscriptionPage() {
         whitelistAddonActive: true,
         whitelistAddonExpireAt: true,
         graceExpireAt: true,
+        pendingSync: true,
+        lastSyncedAt: true,
         plan: {
           select: {
             name: true,
@@ -103,14 +108,34 @@ export default async function SubscriptionPage() {
       userId: session.uid,
       remnawaveStatus: e instanceof RemnawaveError ? e.status : null,
     })
-    return <SubscriptionUnavailable supportEnabled={features.support} />
+    const savedState = localSubscription
+      ? resolveSubscriptionPresentation({
+          localStatus: localSubscription.status,
+          localExpireAt: localSubscription.expireAt,
+          graceExpireAt: localSubscription.graceExpireAt,
+          unlimitedDuration: localSubscription.plan?.unlimitedDuration,
+          pendingSync: localSubscription.pendingSync,
+          remoteUnavailable: true,
+        })
+      : null
+    return (
+      <SubscriptionUnavailable
+        supportEnabled={features.support}
+        savedState={savedState}
+        planName={localSubscription?.plan?.name ?? null}
+        lastSyncedAt={localSubscription?.lastSyncedAt ?? null}
+      />
+    )
   }
 
   if (!data.response.isFound || !data.response.user) {
+    const hasConfirmedAccess = Boolean(localSubscription) || payments.some((payment) => payment.status === 'SUCCEEDED')
     return (
       <EmptyState
-        title="Подписка настраивается"
-        description="Оплата получена. Профиль подключения ещё создаётся, страница обновится после завершения настройки."
+        title={hasConfirmedAccess ? 'Профиль подключения настраивается' : 'Профиль подключения не найден'}
+        description={hasConfirmedAccess
+          ? 'В кабинете есть подтверждённый доступ, но профиль подключения ещё не появился. Страница обновится после завершения настройки.'
+          : 'Сервис подключения пока не вернул профиль. Проверьте историю платежей или выберите тариф.'}
         icon={<Sparkles className="h-7 w-7" />}
         action={(
           <>
@@ -135,8 +160,18 @@ export default async function SubscriptionPage() {
   const u = data.response.user
   const isUnlimited = u.trafficLimitBytes === '0'
   const unlimitedDuration = Boolean(localSubscription?.plan?.unlimitedDuration)
-  const graceActive = Boolean(localSubscription?.graceExpireAt && localSubscription.graceExpireAt > new Date())
-  const subscriptionExpired = !graceActive && isSubscriptionExpired(u.daysLeft, u.userStatus)
+  const subscriptionState = resolveSubscriptionPresentation({
+    localStatus: localSubscription?.status,
+    remoteStatus: u.userStatus,
+    localExpireAt: localSubscription?.expireAt,
+    remoteExpireAt: new Date(u.expiresAt),
+    remoteDaysLeft: u.daysLeft,
+    graceExpireAt: localSubscription?.graceExpireAt,
+    unlimitedDuration,
+    pendingSync: localSubscription?.pendingSync,
+  })
+  const graceActive = subscriptionState.phase === 'grace'
+  const subscriptionExpired = subscriptionState.requiresRenewal
   const expiresAtLabel = unlimitedDuration
     ? 'Бессрочно'
     : new Date(u.expiresAt).toLocaleDateString('ru-RU')
@@ -145,13 +180,10 @@ export default async function SubscriptionPage() {
   )
   const whitelistAddonExpireAtLabel = localSubscription?.whitelistAddonExpireAt
     ?.toLocaleDateString('ru-RU', { timeZone: 'Europe/Moscow' }) ?? null
-  const statusText = graceActive
-    ? 'Льготный период'
-    : subscriptionExpired
-    ? 'Подписка истекла'
-    : u.isActive
-      ? 'Подписка активна'
-      : 'Подписка не активна'
+  const statusText = subscriptionState.title
+  const accessIssue = subscriptionState.usable
+    ? null
+    : { title: subscriptionState.title, description: subscriptionState.description }
 
   return (
     <ConnectionPage
@@ -162,6 +194,8 @@ export default async function SubscriptionPage() {
         ? null
         : localSubscription?.deviceLimit ?? localSubscription?.plan?.deviceLimit}
       expired={subscriptionExpired}
+      hasConnectedDevices={user._count.devices > 0}
+      accessIssue={accessIssue}
       notice={graceActive ? (
         <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-400/10 dark:text-amber-200">
           Льготный период до {localSubscription?.graceExpireAt?.toLocaleDateString('ru-RU')}. <Link href="/dashboard/plans?intent=renew" className="underline">Продлить доступ</Link>
@@ -201,21 +235,19 @@ export default async function SubscriptionPage() {
               <p className="mt-1.5 text-sm leading-5 text-slate-500 dark:text-slate-400">
                 {graceActive
                   ? `Доступ сохранён до ${localSubscription?.graceExpireAt?.toLocaleString('ru-RU')}. Оплатите тариф, чтобы не потерять подключение.`
-                  : subscriptionExpired
-                  ? 'Продлите доступ, затем ссылка и устройства снова заработают без новой настройки.'
-                  : 'Здесь можно продлить доступ и управлять оплатой.'}
+                  : subscriptionState.description}
               </p>
             </div>
           </div>
 
           <div className="connection-access-summary__action">
             <Link
-              href="/dashboard/plans?intent=renew"
+              href={subscriptionState.phase === 'paused' ? '/dashboard/billing#auto-renewal' : '/dashboard/plans?intent=renew'}
               className={`${subscriptionExpired ? 'btn-primary' : 'btn-secondary'} group w-full justify-between min-[1360px]:min-w-44`}
             >
               <span className="inline-flex items-center gap-2">
                 <Sparkles className="h-4 w-4" />
-                {unlimitedDuration ? 'Сменить тариф' : 'Продлить'}
+                {subscriptionState.phase === 'paused' ? 'Возобновить' : unlimitedDuration ? 'Сменить тариф' : 'Продлить'}
               </span>
               <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
             </Link>
@@ -229,7 +261,7 @@ export default async function SubscriptionPage() {
           <AccessMetric
             icon={<Sparkles className="h-4 w-4" />}
             label="Доступ"
-            value={unlimitedDuration ? 'Безлимит' : formatSubscriptionDaysLeft(u.daysLeft, u.userStatus)}
+            value={unlimitedDuration ? 'Безлимит' : formatSubscriptionDaysLeft(subscriptionState.daysLeft ?? 0, subscriptionState.status === 'PAUSED' ? null : subscriptionState.status)}
           />
           <AccessMetric
             icon={<CalendarDays className="h-4 w-4" />}
@@ -313,16 +345,42 @@ function currentRenewalPrice(
   deviceLimit: number,
   personalDiscountPercent: number
 ) {
-  try {
-    const originalAmountKopecks = calculateAutoRenewalPurchase(plan, deviceLimit).originalAmountKopecks
-    const personalDiscount = calculatePersonalDiscount(plan.priceKopecks, personalDiscountPercent)
-    return originalAmountKopecks - (personalDiscount?.discountKopecks ?? 0)
-  } catch {
-    return plan.priceKopecks
-  }
+  return tryCalculateRenewalPricing(plan, deviceLimit, personalDiscountPercent)?.totalAmountKopecks
+    ?? plan.priceKopecks
 }
 
-function SubscriptionUnavailable({ supportEnabled }: { supportEnabled: boolean }) {
+function SubscriptionUnavailable({
+  supportEnabled,
+  savedState,
+  planName,
+  lastSyncedAt,
+}: {
+  supportEnabled: boolean
+  savedState: ReturnType<typeof resolveSubscriptionPresentation> | null
+  planName: string | null
+  lastSyncedAt: Date | null
+}) {
+  if (savedState) {
+    return (
+      <div className="page-stack mx-auto w-full max-w-2xl">
+        <PageHeader title="Подключение" description="Сервис подключения временно не ответил." />
+        <section className="rounded-2xl border border-amber-200 bg-amber-50/80 p-5 dark:border-amber-500/25 dark:bg-amber-500/[0.08]">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="font-semibold text-amber-950 dark:text-amber-100">{savedState.title}</h2>
+            <StatusBadge status={savedState.status} />
+          </div>
+          <p className="mt-2 text-sm leading-6 text-amber-900/80 dark:text-amber-100/80">
+            Показаны последние данные кабинета{planName ? ` по тарифу «${planName}»` : ''}
+            {lastSyncedAt ? `, обновлённые ${lastSyncedAt.toLocaleString('ru-RU')}` : ''}. Настройки не изменены.
+          </p>
+          <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+            <Link href="/dashboard/subscription" className="btn-primary">Проверить снова</Link>
+            {supportEnabled && <Link href="/dashboard/support" className="btn-secondary">В поддержку</Link>}
+          </div>
+        </section>
+      </div>
+    )
+  }
   return (
     <EmptyState
       title="Не удалось загрузить подписку"

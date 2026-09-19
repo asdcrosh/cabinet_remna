@@ -81,7 +81,12 @@ describe('register route', () => {
   })
 
   it('returns neutral response for an existing email', async () => {
-    mocks.prisma.user.findUnique.mockResolvedValue({ id: 'existing-user' })
+    mocks.prisma.user.findUnique.mockResolvedValue({
+      id: 'existing-user',
+      email: validBody.email,
+      name: validBody.name,
+      emailVerifiedAt: new Date(),
+    })
 
     const response = await POST(registerRequest(validBody))
     const body = await response.json()
@@ -90,6 +95,32 @@ describe('register route', () => {
     expect(body).toEqual({ requiresEmailVerification: true, emailDelivery: 'sent' })
     expect(mocks.prisma.user.create).not.toHaveBeenCalled()
     expect(mocks.createEmailVerificationToken).not.toHaveBeenCalled()
+  })
+
+  it('resends verification for an existing unverified account without revealing it', async () => {
+    mocks.prisma.user.findUnique.mockResolvedValue({
+      id: 'existing-user',
+      email: validBody.email,
+      name: validBody.name,
+      emailVerifiedAt: null,
+    })
+
+    const response = await POST(registerRequest({
+      ...validBody,
+      next: '/dashboard/plans?plan=starter',
+    }))
+
+    expect(response.status).toBe(202)
+    await expect(response.json()).resolves.toEqual({
+      requiresEmailVerification: true,
+      emailDelivery: 'sent',
+    })
+    expect(mocks.sendEmailVerificationLink).toHaveBeenCalledWith({
+      email: validBody.email,
+      name: validBody.name,
+      token: 'verify-token',
+      next: '/dashboard/plans?plan=starter',
+    })
   })
 
   it('rejects cross-origin registration before creating a user', async () => {

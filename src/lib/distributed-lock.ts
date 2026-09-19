@@ -7,7 +7,8 @@ export type DistributedLockResult<T> =
 
 export async function withDistributedLock<T>(
   key: string,
-  task: () => Promise<T>
+  task: () => Promise<T>,
+  options: { maxWaitMs?: number; timeoutMs?: number } = {}
 ): Promise<DistributedLockResult<T>> {
   const lockKey = createHash('sha256').update(key).digest().readBigInt64BE(0)
 
@@ -22,7 +23,7 @@ export async function withDistributedLock<T>(
       value: await task(),
     }
   }, {
-    maxWait: 5_000,
-    timeout: 45_000,
+    maxWait: options.maxWaitMs ?? 5_000,
+    timeout: options.timeoutMs ?? 45_000,
   })
 }

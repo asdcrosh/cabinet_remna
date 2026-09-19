@@ -30,6 +30,24 @@ const MAX_UPLOAD_IMAGE_SIZE = 15 * 1024 * 1024
 const ALLOWED_UPLOAD_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif'])
 const BROADCAST_DRAFT_KEY = 'remnawave-cabinet:broadcast-draft'
 
+type BroadcastAudiencePreview = {
+  recipients: number
+  channels: { inApp: number; telegram: number; email: number }
+}
+
+type BroadcastDeliveryFilter = 'ALL' | 'PENDING' | 'PROCESSING' | 'SUCCEEDED' | 'FAILED' | 'UNKNOWN' | 'CANCELED'
+
+type BroadcastDeliveryItem = {
+  id: string
+  status: Exclude<BroadcastDeliveryFilter, 'ALL'>
+  attempts: number
+  lastError: string | null
+  sentAt: string | null
+  createdAt: string
+  user: { email: string; name: string | null }
+  channels: Record<'inApp' | 'telegram' | 'email', { status: string; error: string | null }>
+}
+
 export function BroadcastAdmin({
   initialHistory = [],
   initialHistoryTotal = initialHistory.length,
@@ -60,6 +78,11 @@ export function BroadcastAdmin({
   const [customTemplates, setCustomTemplates] = useState<BroadcastTemplateItem[]>(initialTemplates)
   const [selectedHistoryItem, setSelectedHistoryItem] = useState<BroadcastHistoryItem | null>(null)
   const [sendConfirmOpen, setSendConfirmOpen] = useState(false)
+  const [audiencePreview, setAudiencePreview] = useState<BroadcastAudiencePreview | null>(null)
+  const [audiencePreviewLimited, setAudiencePreviewLimited] = useState(false)
+  const [audiencePreviewLoading, setAudiencePreviewLoading] = useState(false)
+  const [campaignToCancel, setCampaignToCancel] = useState<BroadcastHistoryItem | null>(null)
+  const [cancelingCampaign, setCancelingCampaign] = useState(false)
   const [templateToDelete, setTemplateToDelete] = useState<BroadcastTemplateItem | null>(null)
   const [deletingTemplate, setDeletingTemplate] = useState(false)
   const [step, setStep] = useState<BroadcastStep>('message')
@@ -102,6 +125,11 @@ export function BroadcastAdmin({
     window.localStorage.setItem(BROADCAST_DRAFT_KEY, JSON.stringify(draft))
   }, [actionHref, actionLabel, actionOpenInTelegram, body, imageUrl, inactiveDays, segment, selectedChannels, title])
 
+  useEffect(() => {
+    setAudiencePreview(null)
+    setAudiencePreviewLimited(false)
+  }, [inactiveDays, segment, selectedChannels])
+
   async function submit(testMode = false) {
     const campaignTitle = getBroadcastTitle()
     setLoading(true)
@@ -134,6 +162,60 @@ export function BroadcastAdmin({
     } finally {
       setLoading(false)
       if (!testMode) setSendConfirmOpen(false)
+    }
+  }
+
+  async function loadAudiencePreview() {
+    setAudiencePreviewLoading(true)
+    try {
+      const result = await apiFetch<{ preview: BroadcastAudiencePreview; limited: boolean }>('/api/admin/broadcasts', {
+        method: 'POST',
+        body: JSON.stringify({
+          title: getBroadcastTitle(),
+          body,
+          segment,
+          inactiveDays: segment === 'INACTIVE_N_DAYS' ? inactiveDays : null,
+          channels: selectedChannels,
+          actionHref,
+          actionLabel,
+          actionOpenInTelegram,
+          imageUrl: imageUrl.trim() || null,
+          previewMode: true,
+        }),
+      })
+      setAudiencePreview(result.preview)
+      setAudiencePreviewLimited(result.limited)
+      return true
+    } catch {
+      // apiFetch покажет ошибку.
+      return false
+    } finally {
+      setAudiencePreviewLoading(false)
+    }
+  }
+
+  async function cancelCampaignQueue() {
+    if (!campaignToCancel) return
+    setCancelingCampaign(true)
+    try {
+      const result = await apiFetch<{ canceled: number; inFlight: number }>(
+        `/api/admin/broadcasts/${encodeURIComponent(campaignToCancel.id)}/cancel`,
+        { method: 'POST' }
+      )
+      const inFlightMessage = result.inFlight > 0
+        ? ` Ещё ${result.inFlight} уже выполняются и могут быть доставлены.`
+        : ''
+      toast(
+        result.canceled > 0
+          ? `Остановлено доставок: ${result.canceled}.${inFlightMessage}`
+          : `В очереди нет доставок для отмены.${inFlightMessage}`,
+        result.inFlight > 0 ? 'error' : 'success'
+      )
+      setCampaignToCancel(null)
+    } catch {
+      // apiFetch покажет ошибку.
+    } finally {
+      setCancelingCampaign(false)
     }
   }
 
@@ -295,6 +377,7 @@ export function BroadcastAdmin({
   }
 
   const canSend = body.trim().length >= 5 && selectedChannels.length > 0 && !loading
+  const canQueue = canSend && audiencePreview !== null
   const selectedPreset = actionPresets.find((preset) => preset.href === actionHref)
   const actionSupportsTelegramWebApp = actionHref.startsWith('/dashboard')
   const previewBody = renderPreview(body || 'Текст сообщения будет показан здесь.')
@@ -430,12 +513,35 @@ export function BroadcastAdmin({
             </div>
           </div>
 
+          <div data-testid="broadcast-audience-preview" className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-white/10 dark:bg-white/5">
+            {audiencePreview ? (
+              <div className="grid gap-2 text-sm sm:grid-cols-4">
+                <AudienceMetric label="Получатели" value={audiencePreview.recipients} />
+                <AudienceMetric label="Кабинет" value={audiencePreview.channels.inApp} muted={!selectedChannels.includes('IN_APP')} />
+                <AudienceMetric label="Telegram" value={audiencePreview.channels.telegram} muted={!selectedChannels.includes('TELEGRAM')} />
+                <AudienceMetric label="Email" value={audiencePreview.channels.email} muted={!selectedChannels.includes('EMAIL')} />
+                {audiencePreviewLimited ? (
+                  <p className="sm:col-span-4 text-xs text-amber-700 dark:text-amber-300">
+                    Лимит одной рассылки: первые 5000 получателей.
+                  </p>
+                ) : null}
+              </div>
+            ) : (
+              <p className="text-sm text-slate-500">Количество учитывает доступные каналы и личные настройки рассылок.</p>
+            )}
+          </div>
+
           <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:justify-between">
             <button type="button" className="btn-secondary min-h-11 px-5" onClick={() => setStep('message')}>
               Назад
             </button>
-            <button type="button" className="btn-primary min-h-11 px-5" onClick={() => setStep('delivery')} disabled={!canSend}>
-              К проверке
+            <button
+              type="button"
+              className="btn-primary min-h-11 px-5"
+              onClick={() => void loadAudiencePreview().then((loaded) => loaded && setStep('delivery'))}
+              disabled={!canSend || audiencePreviewLoading}
+            >
+              {audiencePreviewLoading ? 'Считаем...' : 'Посчитать и проверить'}
             </button>
           </div>
         </div>
@@ -668,7 +774,11 @@ export function BroadcastAdmin({
             <div className="grid gap-2 md:grid-cols-3">
               <InfoPill label="Сегмент" value={segmentLabel(segment, inactiveDays)} />
               <InfoPill label="Каналы" value={selectedChannels.map(channelLabel).join(', ')} />
-              <InfoPill label="Кнопка" value={actionHref ? `${previewActionLabel}${actionOpenInTelegram ? ' · Telegram Web App' : ''}` : 'Без кнопки'} />
+              <InfoPill
+                label="Получатели"
+                value={audiencePreview ? `${audiencePreview.recipients}${audiencePreviewLimited ? ' из первых 5000' : ''}` : 'Не посчитаны'}
+                testId="broadcast-recipient-total"
+              />
             </div>
 
             <div className="min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-slate-50 dark:border-white/10 dark:bg-white/5">
@@ -731,7 +841,7 @@ export function BroadcastAdmin({
                   <Send className="h-4 w-4" />
                   Тест себе
                 </button>
-                <button type="button" className="btn-primary min-h-11 px-5" onClick={() => setSendConfirmOpen(true)} disabled={!canSend}>
+                <button type="button" className="btn-primary min-h-11 px-5" onClick={() => setSendConfirmOpen(true)} disabled={!canQueue}>
                   <Send className="h-4 w-4" />
                   {loading ? 'Отправляем...' : 'Отправить'}
                 </button>
@@ -761,7 +871,7 @@ export function BroadcastAdmin({
       <ConfirmDialog
         open={sendConfirmOpen}
         title="Отправить рассылку?"
-        description={`Сегмент: ${segmentLabel(segment, inactiveDays)}. Каналы: ${selectedChannels.map(channelLabel).join(', ')}.`}
+        description={`Получателей: ${audiencePreview?.recipients ?? 0}. Сегмент: ${segmentLabel(segment, inactiveDays)}. Каналы: ${selectedChannels.map(channelLabel).join(', ')}.`}
         confirmLabel="Поставить в очередь"
         loading={loading}
         tone="warning"
@@ -780,7 +890,24 @@ export function BroadcastAdmin({
           if (templateToDelete?.id) void deleteTemplate(templateToDelete.id)
         }}
       />
-      {selectedHistoryItem ? <BroadcastHistoryModal item={selectedHistoryItem} onClose={() => setSelectedHistoryItem(null)} /> : null}
+      <ConfirmDialog
+        open={Boolean(campaignToCancel)}
+        title="Остановить оставшуюся рассылку?"
+        description={`Новые сообщения из рассылки «${campaignToCancel?.title ?? ''}» перестанут отправляться.`}
+        confirmLabel="Остановить очередь"
+        loading={cancelingCampaign}
+        tone="warning"
+        details="Сообщения, которые worker уже отправляет, могут успеть дойти. Доставленные сообщения отозвать нельзя."
+        onCancel={() => setCampaignToCancel(null)}
+        onConfirm={() => void cancelCampaignQueue()}
+      />
+      {selectedHistoryItem ? (
+        <BroadcastHistoryModal
+          item={selectedHistoryItem}
+          onClose={() => setSelectedHistoryItem(null)}
+          onRequestCancel={() => setCampaignToCancel(selectedHistoryItem)}
+        />
+      ) : null}
     </section>
   )
 }
@@ -818,11 +945,20 @@ function BroadcastStepButton({
   )
 }
 
-function InfoPill({ label, value }: { label: string; value: string }) {
+function InfoPill({ label, value, testId }: { label: string; value: string; testId?: string }) {
   return (
-    <div className="min-w-0 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-white/10 dark:bg-white/5">
+    <div data-testid={testId} className="min-w-0 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-white/10 dark:bg-white/5">
       <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">{label}</div>
       <div className="mt-1 truncate text-sm font-semibold text-slate-950 dark:text-white">{value || 'Не выбрано'}</div>
+    </div>
+  )
+}
+
+function AudienceMetric({ label, value, muted = false }: { label: string; value: number; muted?: boolean }) {
+  return (
+    <div className={cn('rounded-lg bg-white px-3 py-2 dark:bg-surface-900', muted && 'opacity-45')}>
+      <div className="text-xs text-slate-500">{label}</div>
+      <div className="mt-0.5 font-semibold tabular-nums text-slate-950 dark:text-white">{muted ? 'Не выбран' : value}</div>
     </div>
   )
 }
@@ -883,7 +1019,7 @@ function BroadcastHistory({
                 </div>
               </div>
               <div className="mt-2 text-xs text-slate-500">
-                Кабинет {item.inAppCount} · Telegram {item.telegramSent}{item.telegramFailed ? ` (${item.telegramFailed} ошибок)` : ''} · Email {item.emailSent}{item.emailFailed ? ` (${item.emailFailed} ошибок)` : ''}
+                Кабинет {item.inAppCount} · Telegram {item.telegramSent}{item.telegramFailed ? ` (${item.telegramFailed} ошибок)` : ''}{item.telegramUnknown ? ` (${item.telegramUnknown} без подтверждения)` : ''} · Email {item.emailSent}{item.emailFailed ? ` (${item.emailFailed} ошибок)` : ''}{item.emailUnknown ? ` (${item.emailUnknown} без подтверждения)` : ''}
               </div>
               {item.limited ? <div className="mt-2 text-xs text-amber-600">Отправлено первым 5000 получателей</div> : null}
             </div>
@@ -899,7 +1035,75 @@ function BroadcastHistory({
   )
 }
 
-function BroadcastHistoryModal({ item, onClose }: { item: BroadcastHistoryItem; onClose: () => void }) {
+function BroadcastHistoryModal({
+  item,
+  onClose,
+  onRequestCancel,
+}: {
+  item: BroadcastHistoryItem
+  onClose: () => void
+  onRequestCancel: () => void
+}) {
+  const [deliveryFilter, setDeliveryFilter] = useState<BroadcastDeliveryFilter>('ALL')
+  const [deliveries, setDeliveries] = useState<BroadcastDeliveryItem[]>([])
+  const [deliveryTotal, setDeliveryTotal] = useState(0)
+  const [deliveryLoading, setDeliveryLoading] = useState(true)
+  const [retryingFailed, setRetryingFailed] = useState(false)
+  const [reloadToken, setReloadToken] = useState(0)
+
+  useEffect(() => {
+    let active = true
+    setDeliveryLoading(true)
+    void apiFetch<{ deliveries: BroadcastDeliveryItem[]; total: number }>(
+      `/api/admin/broadcasts/${encodeURIComponent(item.id)}/deliveries?status=${deliveryFilter}&take=20`
+    ).then((result) => {
+      if (!active) return
+      setDeliveries(result.deliveries)
+      setDeliveryTotal(result.total)
+    }).catch(() => {
+      if (!active) return
+      setDeliveries([])
+      setDeliveryTotal(0)
+    }).finally(() => {
+      if (active) setDeliveryLoading(false)
+    })
+    return () => {
+      active = false
+    }
+  }, [deliveryFilter, item.id, reloadToken])
+
+  async function loadMoreDeliveries() {
+    if (deliveryLoading || deliveries.length >= deliveryTotal) return
+    setDeliveryLoading(true)
+    try {
+      const result = await apiFetch<{ deliveries: BroadcastDeliveryItem[]; total: number }>(
+        `/api/admin/broadcasts/${encodeURIComponent(item.id)}/deliveries?status=${deliveryFilter}&skip=${deliveries.length}&take=20`
+      )
+      setDeliveries((current) => [...current, ...result.deliveries])
+      setDeliveryTotal(result.total)
+    } catch {
+      // apiFetch покажет ошибку.
+    } finally {
+      setDeliveryLoading(false)
+    }
+  }
+
+  async function retryFailedDeliveries() {
+    setRetryingFailed(true)
+    try {
+      const result = await apiFetch<{ retried: number }>(
+        `/api/admin/broadcasts/${encodeURIComponent(item.id)}/deliveries/retry`,
+        { method: 'POST' }
+      )
+      toast(result.retried > 0 ? `Повторно поставлено в очередь: ${result.retried}` : 'Ошибок для повтора нет', 'success')
+      setReloadToken((value) => value + 1)
+    } catch {
+      // apiFetch покажет ошибку.
+    } finally {
+      setRetryingFailed(false)
+    }
+  }
+
   return (
     <AdminModal
       open
@@ -929,10 +1133,97 @@ function BroadcastHistoryModal({ item, onClose }: { item: BroadcastHistoryItem; 
           ) : null}
         </div>
 
-        <div className="flex flex-wrap gap-2 text-sm">
-          <HistoryMetric label="Кабинет" value={item.inAppCount} />
-          <HistoryMetric label="Telegram" value={item.telegramSent} failed={item.telegramFailed + item.telegramSkipped + item.telegramDuplicate} />
-          <HistoryMetric label="Email" value={item.emailSent} failed={item.emailFailed + item.emailSkipped + item.emailDuplicate} />
+        <div className="grid gap-2 sm:grid-cols-3">
+          <DeliverySummary label="Кабинет" sent={item.inAppCount} />
+          <DeliverySummary
+            label="Telegram"
+            sent={item.telegramSent}
+            skipped={item.telegramSkipped}
+            failed={item.telegramFailed}
+            unknown={item.telegramUnknown}
+          />
+          <DeliverySummary
+            label="Email"
+            sent={item.emailSent}
+            skipped={item.emailSkipped}
+            failed={item.emailFailed}
+            unknown={item.emailUnknown}
+          />
+        </div>
+
+        <section className="overflow-hidden rounded-xl border border-slate-200 dark:border-white/10">
+          <div className="border-b border-slate-200 p-3 dark:border-white/10">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h3 className="text-sm font-semibold">Доставки пользователям</h3>
+                <p className="mt-0.5 text-xs text-slate-500">Неопределённый результат не повторяется автоматически.</p>
+              </div>
+              <button
+                type="button"
+                className="btn-secondary min-h-9 px-3 text-sm"
+                onClick={() => void retryFailedDeliveries()}
+                disabled={retryingFailed}
+              >
+                <RotateCcw className="h-4 w-4" />
+                {retryingFailed ? 'Ставим в очередь...' : 'Повторить ошибки'}
+              </button>
+            </div>
+            <div className="mt-3 flex gap-1 overflow-x-auto pb-1" aria-label="Фильтр доставок">
+              {deliveryFilters.map((filter) => (
+                <button
+                  key={filter.value}
+                  type="button"
+                  aria-pressed={deliveryFilter === filter.value}
+                  className={cn(
+                    'shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold',
+                    deliveryFilter === filter.value
+                      ? 'bg-slate-950 text-white dark:bg-white dark:text-slate-950'
+                      : 'bg-slate-100 text-slate-600 dark:bg-white/5 dark:text-slate-300'
+                  )}
+                  onClick={() => setDeliveryFilter(filter.value)}
+                >
+                  {filter.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {deliveryLoading && deliveries.length === 0 ? (
+            <div className="p-4 text-sm text-slate-500">Загружаем доставки...</div>
+          ) : deliveries.length === 0 ? (
+            <div className="p-4 text-sm text-slate-500">В этом статусе доставок нет.</div>
+          ) : (
+            <div className="divide-y divide-slate-100 dark:divide-white/10">
+              {deliveries.map((delivery) => (
+                <div key={delivery.id} className="grid gap-2 p-3">
+                  <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-medium">{delivery.user.name || delivery.user.email}</div>
+                      {delivery.user.name ? <div className="truncate text-xs text-slate-500">{delivery.user.email}</div> : null}
+                    </div>
+                    <DeliveryStatusBadge status={delivery.status} />
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    <ChannelStatus label="Кабинет" result={delivery.channels.inApp} />
+                    <ChannelStatus label="Telegram" result={delivery.channels.telegram} />
+                    <ChannelStatus label="Email" result={delivery.channels.email} />
+                  </div>
+                  {delivery.lastError ? <p className="text-xs text-red-700 dark:text-red-300">{delivery.lastError}</p> : null}
+                </div>
+              ))}
+              {deliveries.length < deliveryTotal ? (
+                <button type="button" className="btn-secondary m-3 min-h-9 px-3 text-sm" onClick={() => void loadMoreDeliveries()} disabled={deliveryLoading}>
+                  {deliveryLoading ? 'Загрузка...' : `Показать ещё (${deliveries.length} из ${deliveryTotal})`}
+                </button>
+              ) : null}
+            </div>
+          )}
+        </section>
+
+        <div className="flex justify-end border-t border-slate-200 pt-4 dark:border-white/10">
+          <button type="button" className="btn-secondary min-h-11 px-4 text-red-700 dark:text-red-300" onClick={onRequestCancel}>
+            Остановить оставшуюся очередь
+          </button>
         </div>
       </div>
     </AdminModal>
@@ -950,13 +1241,75 @@ function BroadcastStats({ stats }: { stats: BroadcastStats }) {
   )
 }
 
-function HistoryMetric({ label, value, failed = 0 }: { label: string; value: number; failed?: number }) {
+const deliveryFilters: Array<{ value: BroadcastDeliveryFilter; label: string }> = [
+  { value: 'ALL', label: 'Все' },
+  { value: 'PENDING', label: 'В очереди' },
+  { value: 'PROCESSING', label: 'Отправляются' },
+  { value: 'SUCCEEDED', label: 'Завершены' },
+  { value: 'FAILED', label: 'Ошибки' },
+  { value: 'UNKNOWN', label: 'Без подтверждения' },
+  { value: 'CANCELED', label: 'Отменены' },
+]
+
+function DeliverySummary({
+  label,
+  sent,
+  skipped = 0,
+  failed = 0,
+  unknown = 0,
+}: {
+  label: string
+  sent: number
+  skipped?: number
+  failed?: number
+  unknown?: number
+}) {
   return (
-    <div className="inline-flex items-center gap-1.5 rounded-full bg-slate-50 px-2.5 py-1.5 dark:bg-white/5">
-      <span className="font-medium text-slate-700 dark:text-slate-200">{label}</span>
-      <span>{value}{failed ? ` · ${failed} ош.` : ''}</span>
+    <div className="rounded-xl bg-slate-50 p-3 text-xs dark:bg-white/5">
+      <div className="font-semibold text-slate-950 dark:text-white">{label}</div>
+      <div className="mt-1 text-emerald-700 dark:text-emerald-300">Доставлено: {sent}</div>
+      {skipped ? <div className="mt-0.5 text-slate-500">Пропущено: {skipped}</div> : null}
+      {failed ? <div className="mt-0.5 text-red-700 dark:text-red-300">Ошибки: {failed}</div> : null}
+      {unknown ? <div className="mt-0.5 text-amber-700 dark:text-amber-300">Без подтверждения: {unknown}</div> : null}
     </div>
   )
+}
+
+function DeliveryStatusBadge({ status }: { status: BroadcastDeliveryItem['status'] }) {
+  const presentation = deliveryStatusPresentation[status]
+  return <span className={cn('w-fit rounded-full px-2.5 py-1 text-xs font-semibold', presentation.className)}>{presentation.label}</span>
+}
+
+function ChannelStatus({ label, result }: { label: string; result: { status: string; error: string | null } }) {
+  const presentation = channelStatusPresentation[result.status] ?? unknownChannelStatusPresentation
+  return (
+    <span title={result.error || undefined} className={cn('rounded-full px-2 py-1 text-xs', presentation.className)}>
+      {label}: {presentation.label}
+    </span>
+  )
+}
+
+const unknownChannelStatusPresentation = {
+  label: 'без подтверждения',
+  className: 'bg-amber-50 text-amber-800 dark:bg-amber-500/10 dark:text-amber-200',
+}
+
+const deliveryStatusPresentation: Record<BroadcastDeliveryItem['status'], { label: string; className: string }> = {
+  PENDING: { label: 'В очереди', className: 'bg-slate-100 text-slate-700 dark:bg-white/10 dark:text-slate-200' },
+  PROCESSING: { label: 'Отправляется', className: 'bg-cyan-50 text-cyan-800 dark:bg-cyan-500/10 dark:text-cyan-200' },
+  SUCCEEDED: { label: 'Завершена', className: 'bg-emerald-50 text-emerald-800 dark:bg-emerald-500/10 dark:text-emerald-200' },
+  FAILED: { label: 'Ошибка', className: 'bg-red-50 text-red-800 dark:bg-red-500/10 dark:text-red-200' },
+  UNKNOWN: { label: 'Без подтверждения', className: 'bg-amber-50 text-amber-800 dark:bg-amber-500/10 dark:text-amber-200' },
+  CANCELED: { label: 'Отменена', className: 'bg-slate-100 text-slate-500 dark:bg-white/5 dark:text-slate-400' },
+}
+
+const channelStatusPresentation: Record<string, { label: string; className: string }> = {
+  SENT: { label: 'доставлено', className: 'bg-emerald-50 text-emerald-800 dark:bg-emerald-500/10 dark:text-emerald-200' },
+  SKIPPED: { label: 'пропущено', className: 'bg-slate-100 text-slate-600 dark:bg-white/5 dark:text-slate-300' },
+  FAILED: { label: 'ошибка', className: 'bg-red-50 text-red-800 dark:bg-red-500/10 dark:text-red-200' },
+  UNKNOWN: unknownChannelStatusPresentation,
+  PENDING: { label: 'отправляется', className: 'bg-cyan-50 text-cyan-800 dark:bg-cyan-500/10 dark:text-cyan-200' },
+  NOT_SELECTED: { label: 'не выбран', className: 'bg-slate-50 text-slate-400 dark:bg-white/[0.03] dark:text-slate-500' },
 }
 
 function segmentLabel(value: string, days?: number) {

@@ -1,0 +1,3 @@
+ALTER TYPE "SyncEventStatus" ADD VALUE 'RUNNING';
+
+ALTER TABLE "SyncEvent" ADD COLUMN "lockedAt" TIMESTAMP(3);

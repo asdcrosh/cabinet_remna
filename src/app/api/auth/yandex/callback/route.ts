@@ -34,6 +34,7 @@ export async function GET(req: Request) {
   const next = sanitizeOAuthNext(cookieStore.get(YANDEX_OAUTH_NEXT_COOKIE)?.value)
   const successUrl = new URL(next, baseUrl)
   const errorUrl = new URL('/login', baseUrl)
+  if (next !== '/dashboard') errorUrl.searchParams.set('next', next)
 
   const providerError = requestUrl.searchParams.get('error')
   if (providerError) {
@@ -112,27 +113,12 @@ async function findOrCreateYandexUser(
   })
 
   if (existingAccount) {
-    let emailOwner =
-      existingAccount.user.email.toLowerCase() === profile.email.toLowerCase()
-        ? existingAccount.user
-        : await prisma.user.findUnique({ where: { email: profile.email } })
-    if (!emailOwner && existingAccount.user.email.toLowerCase() !== profile.email.toLowerCase()) {
-      assertCanCreateYandexUser(allowCreate)
-      emailOwner = await createYandexUser(profile, { createOAuthAccount: false, referralCode })
-    }
-    if (
-      emailOwner &&
-      emailOwner.id !== existingAccount.user.id &&
-      !canLinkYandexToExistingEmailUser(emailOwner, profile)
-    ) {
-      throw new Error('yandex_email_owner_requires_step_up')
-    }
-    const user = emailOwner ?? existingAccount.user
+    const user = existingAccount.user
+    const emailMatches = user.email.toLowerCase() === profile.email.toLowerCase()
 
     await prisma.oAuthAccount.update({
       where: { id: existingAccount.id },
       data: {
-        userId: user.id,
         email: profile.email,
         emailVerified: profile.emailVerified,
         name: profile.name,
@@ -140,7 +126,7 @@ async function findOrCreateYandexUser(
       },
     })
 
-    if (user.email.toLowerCase() === profile.email.toLowerCase()) {
+    if (emailMatches) {
       return prisma.user.update({
         where: { id: user.id },
         data: {
@@ -150,6 +136,11 @@ async function findOrCreateYandexUser(
       })
     }
 
+    await notifyYandexEmailConflict({
+      userId: user.id,
+      localEmail: user.email,
+      providerEmail: profile.email,
+    })
     return user
   }
 
@@ -186,10 +177,35 @@ function assertCanCreateYandexUser(allowCreate: boolean) {
 }
 
 function canLinkYandexToExistingEmailUser(
-  user: { emailVerifiedAt: Date | null },
+  user: { emailVerifiedAt: Date | null; role: string },
   profile: YandexProfile
 ) {
-  return profile.emailVerified && Boolean(user.emailVerifiedAt)
+  return user.role === 'USER' && profile.emailVerified && Boolean(user.emailVerifiedAt)
+}
+
+async function notifyYandexEmailConflict(input: {
+  userId: string
+  localEmail: string
+  providerEmail: string
+}) {
+  try {
+    await createAdminNotification({
+      type: 'identity_conflict',
+      severity: 'WARNING',
+      dedupeKey: `admin:yandex-email-conflict:${input.userId}:${input.providerEmail}`,
+      title: 'Email Яндекс-аккаунта изменился',
+      body: `${input.localEmail} → ${input.providerEmail}. OAuth-привязка оставлена у исходного кабинета.`,
+      entityType: 'user',
+      entityId: input.userId,
+      actionHref: `/dashboard/admin/users?q=${encodeURIComponent(input.userId)}`,
+      actionLabel: 'Проверить аккаунт',
+    })
+  } catch (error) {
+    logWarn('auth.yandex.email_conflict_notification_failed', {
+      userId: input.userId,
+      message: error instanceof Error ? error.message : 'unknown error',
+    })
+  }
 }
 
 async function createYandexUser(

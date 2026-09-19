@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { ArrowRight, Bell, BookOpen, CircleUserRound, Gift, LockKeyhole, ReceiptText, Send } from 'lucide-react'
+import { ArrowRight, Bell, BookOpen, CircleUserRound, FileDown, Gift, LockKeyhole, ReceiptText, Send, Trash2 } from 'lucide-react'
 import { getCurrentUser } from '@/lib/auth/cookies'
 import { prisma } from '@/lib/prisma'
 import { ChangePasswordForm } from '@/components/dashboard/change-password-form'
@@ -197,6 +197,25 @@ export default async function SettingsPage({
           })}
         </div>
       </section>
+
+      {features.support ? (
+        <section aria-labelledby="account-data-title" className="rounded-xl border border-slate-200 bg-white p-4 dark:border-white/[0.09] dark:bg-white/[0.025] sm:p-5">
+          <h2 id="account-data-title" className="text-sm font-semibold text-slate-950 dark:text-white">Данные аккаунта</h2>
+          <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-500 dark:text-slate-400">
+            Запрос создаётся в поддержке, где можно подтвердить личность и видеть статус. При удалении аккаунта персональные данные обезличиваются или удаляются, а сведения о платежах и возвратах сохраняются только в объёме и сроках, обязательных для оператора.
+          </p>
+          <div className="mt-4 grid gap-2 sm:grid-cols-2">
+            <Link href="/dashboard/support?category=account&request=export" className="btn-secondary min-h-11 justify-center">
+              <FileDown className="h-4 w-4" />
+              Запросить экспорт данных
+            </Link>
+            <Link href="/dashboard/support?category=account&request=delete" className="btn-secondary min-h-11 justify-center text-red-700 dark:text-red-300">
+              <Trash2 className="h-4 w-4" />
+              Запросить удаление аккаунта
+            </Link>
+          </div>
+        </section>
+      ) : null}
 
       <div className="border-t border-slate-200 pt-4 dark:border-white/10">
         <section aria-labelledby="legal-title">

@@ -131,6 +131,7 @@ const initialForm: FormState = {
 
 export function NodeProvisioningPanel() {
   const [form, setForm] = useState<FormState>(initialForm)
+  const [isHydrated, setIsHydrated] = useState(false)
   const [jobs, setJobs] = useState<ProvisioningJob[]>([])
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null)
   const [loadingJobs, setLoadingJobs] = useState(true)
@@ -186,6 +187,7 @@ export function NodeProvisioningPanel() {
   }, [])
 
   useEffect(() => {
+    setIsHydrated(true)
     void refreshJobs(true)
   }, [refreshJobs])
 
@@ -335,7 +337,7 @@ export function NodeProvisioningPanel() {
           </div>
 
           <div className="space-y-5 p-4 sm:p-5">
-            <fieldset className="space-y-3">
+            <fieldset className="space-y-3" disabled={!isHydrated || submitting}>
               <legend className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-950 dark:text-white">
                 <Server className="h-4 w-4 text-slate-400" /> Сервер
               </legend>
@@ -411,7 +413,7 @@ export function NodeProvisioningPanel() {
               </Field>
             </fieldset>
 
-            <fieldset className="space-y-3 border-t border-slate-200 pt-5 dark:border-white/[0.07]">
+            <fieldset className="space-y-3 border-t border-slate-200 pt-5 dark:border-white/[0.07]" disabled={!isHydrated || submitting}>
               <legend className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-950 dark:text-white">
                 <Globe2 className="h-4 w-4 text-slate-400" /> Шаблоны хостов
               </legend>
@@ -453,7 +455,7 @@ export function NodeProvisioningPanel() {
             <button
               type="submit"
               className="btn-primary min-h-12 w-full justify-center"
-              disabled={submitting || configuration?.ready === false || !form.tcpTemplateHostUuid || !form.xhttpTemplateHostUuid}
+              disabled={!isHydrated || submitting || configuration?.ready === false || !form.tcpTemplateHostUuid || !form.xhttpTemplateHostUuid}
             >
               {submitting ? <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" /> : <Rocket className="h-4 w-4" />}
               {submitting ? 'Запускаем создание...' : 'Создать и настроить ноду'}

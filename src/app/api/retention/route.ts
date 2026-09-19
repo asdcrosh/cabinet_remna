@@ -9,6 +9,7 @@ import {
   resumeSubscription,
   RetentionError,
 } from '@/lib/subscription-retention'
+import { withDistributedLock } from '@/lib/distributed-lock'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -53,10 +54,22 @@ export const POST = withAuth(async (req: Request) => {
   const parsed = actionSchema.safeParse(await req.json().catch(() => null))
   if (!parsed.success) return NextResponse.json({ error: 'Проверьте выбранное действие' }, { status: 422 })
   try {
-    if (parsed.data.action === 'PAUSE') {
-      await pauseSubscription({ userId: session.uid, ...parsed.data })
-    } else {
-      await recordAutoRenewalCancellation({ userId: session.uid, ...parsed.data })
+    const locked = await withDistributedLock(
+      `billing-operation:${session.uid}`,
+      async () => {
+        if (parsed.data.action === 'PAUSE') {
+          await pauseSubscription({ userId: session.uid, ...parsed.data })
+        } else {
+          await recordAutoRenewalCancellation({ userId: session.uid, ...parsed.data })
+        }
+      },
+      { timeoutMs: 30_000 }
+    )
+    if (!locked.acquired) {
+      return NextResponse.json(
+        { error: 'Списание уже выполняется. Проверьте его результат перед изменением подписки.' },
+        { status: 409 }
+      )
     }
     return NextResponse.json({ ok: true, pause: await getRetentionState(session.uid) })
   } catch (error) {

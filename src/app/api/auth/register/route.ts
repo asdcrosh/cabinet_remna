@@ -91,6 +91,22 @@ export async function POST(req: Request) {
 
   const existing = await prisma.user.findUnique({ where: { email } })
   if (existing) {
+    if (!existing.emailVerifiedAt) {
+      try {
+        const token = await createEmailVerificationToken(existing.id)
+        await sendEmailVerificationLink({
+          email: existing.email,
+          name: existing.name,
+          token,
+          next,
+        })
+      } catch (error) {
+        logWarn('auth.register.existing_verification_deferred', {
+          userId: existing.id,
+          message: error instanceof Error ? error.message : 'unknown error',
+        })
+      }
+    }
     return neutralRegisterResponse()
   }
 

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { requireStaff, withAuth } from '@/lib/auth/guard'
 import { notifySupportReply } from '@/lib/notifications'
@@ -103,18 +104,39 @@ export const GET = withAuth(async (req: Request, { params }: { params: Promise<{
   const messages = ticket.messages.slice(0, MESSAGE_PAGE_SIZE).reverse()
 
   if (ticket.adminUnreadCount > 0) {
-    await prisma.supportTicket.update({
+    const readState = await prisma.supportTicket.update({
       where: { id: ticket.id },
       data: { adminUnreadCount: 0 },
+      select: { updatedAt: true },
     })
     ticket.adminUnreadCount = 0
+    ticket.updatedAt = readState.updatedAt
   }
+
+  const auditEvents = await prisma.auditLog.findMany({
+    where: {
+      action: 'ADMIN_SUPPORT_UPDATED',
+      metadata: { path: ['ticketId'], equals: ticket.id },
+    },
+    orderBy: { createdAt: 'asc' },
+    take: 100,
+    select: {
+      id: true,
+      message: true,
+      createdAt: true,
+      actor: { select: { id: true, email: true, name: true } },
+    },
+  })
 
   return NextResponse.json({
     ticket: {
       ...serializeSupportTicket(ticket),
       messages: messages.map(serializeSupportMessage),
       internalNotes: ticket.internalNotes.reverse().map(serializeSupportInternalNote),
+      auditEvents: auditEvents.map((event) => ({
+        ...event,
+        createdAt: event.createdAt.toISOString(),
+      })),
       messagePagination: {
         hasMore: hasOlderMessages,
         before: hasOlderMessages ? messages[0]?.id ?? null : null,
@@ -157,12 +179,13 @@ export const POST = withAuth(async (req: Request, { params }: { params: Promise<
     return NextResponse.json({ error: 'Обращение уже закрыто.' }, { status: 400 })
   }
 
-  const message = await prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     const created = await tx.supportMessage.create({
       data: {
         ticketId: ticket.id,
         senderId: session.uid,
         senderRole: 'ADMIN',
+        clientMessageId: parsed.data.clientMessageId,
         body: parsed.data.message,
         ...(attachments.length > 0 ? { attachments: { create: attachments } } : {}),
       },
@@ -185,8 +208,34 @@ export const POST = withAuth(async (req: Request, { params }: { params: Promise<
         ...(!ticket.assigneeId ? { assigneeId: session.uid, assignedAt: created.createdAt } : {}),
       },
     })
-    return created
+    return { message: created, created: true as const }
+  }).catch(async (error) => {
+    if (!(error instanceof Prisma.PrismaClientKnownRequestError)
+      || error.code !== 'P2002'
+      || !parsed.data.clientMessageId) throw error
+    const existing = await prisma.supportMessage.findUnique({
+      where: {
+        ticketId_clientMessageId: {
+          ticketId: ticket.id,
+          clientMessageId: parsed.data.clientMessageId,
+        },
+      },
+      select: {
+        id: true,
+        body: true,
+        senderRole: true,
+        createdAt: true,
+        sender: { select: { email: true, name: true } },
+        attachments: { select: supportAttachmentSelect },
+      },
+    })
+    if (!existing) throw error
+    return { message: existing, created: false as const }
   })
+  const message = result.message
+  if (!result.created) {
+    return NextResponse.json({ message: serializeSupportMessage(message) }, { status: 200 })
+  }
 
   await notifySupportReply({ ticketId: ticket.id, messageId: message.id })
   await writeAuditLog({
@@ -225,7 +274,7 @@ export const PATCH = withAuth(async (req: Request, { params }: { params: Promise
 
   const before = await prisma.supportTicket.findUnique({
     where: { id },
-    select: { id: true, status: true, userId: true, assigneeId: true },
+    select: { id: true, status: true, userId: true, assigneeId: true, updatedAt: true },
   })
   if (!before) {
     return NextResponse.json({ error: 'Обращение не найдено.' }, { status: 404 })
@@ -244,8 +293,11 @@ export const PATCH = withAuth(async (req: Request, { params }: { params: Promise
     }
   }
 
-  const ticket = await prisma.supportTicket.update({
-    where: { id },
+  const updated = await prisma.supportTicket.updateMany({
+    where: {
+      id,
+      updatedAt: new Date(parsed.data.expectedUpdatedAt),
+    },
     data: {
       ...(parsed.data.status
         ? {
@@ -260,8 +312,31 @@ export const PATCH = withAuth(async (req: Request, { params }: { params: Promise
           }
         : {}),
     },
+  })
+  if (updated.count !== 1) {
+    const current = await prisma.supportTicket.findUnique({
+      where: { id },
+      include: { assignee: { select: { id: true, email: true, name: true } } },
+    })
+    if (!current) {
+      return NextResponse.json({ error: 'Обращение не найдено.' }, { status: 404 })
+    }
+    return NextResponse.json(
+      {
+        error: 'Обращение уже изменил другой сотрудник. Показано актуальное состояние.',
+        ticket: serializeSupportTicket(current),
+      },
+      { status: 409 }
+    )
+  }
+
+  const ticket = await prisma.supportTicket.findUnique({
+    where: { id },
     include: { assignee: { select: { id: true, email: true, name: true } } },
   })
+  if (!ticket) {
+    return NextResponse.json({ error: 'Обращение не найдено.' }, { status: 404 })
+  }
   const changes = [
     parsed.data.status && parsed.data.status !== before.status
       ? `статус ${before.status} → ${parsed.data.status}`

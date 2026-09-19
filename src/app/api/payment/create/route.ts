@@ -44,6 +44,7 @@ import {
 } from '@/lib/user-discounts'
 import { hasWhitelistAddonEntitlement } from '@/lib/whitelist-addon-policy'
 import { upsertLocalSubscriptionFromRemnawave } from '@/lib/remnawave-local-sync'
+import { withDistributedLock } from '@/lib/distributed-lock'
 
 export const runtime = 'nodejs'
 
@@ -57,6 +58,21 @@ export const POST = withAuth(async (req: Request) => {
     )
   }
 
+  const locked = await withDistributedLock(
+    `billing-operation:${session.uid}`,
+    () => createPaymentForUser(req, session.uid),
+    { timeoutMs: 30_000 }
+  )
+  if (!locked.acquired) {
+    return NextResponse.json(
+      { error: 'Другая операция оплаты уже выполняется. Дождитесь её завершения и повторите.' },
+      { status: 409 }
+    )
+  }
+  return locked.value
+})
+
+async function createPaymentForUser(req: Request, userId: string) {
   let body: unknown
   try {
     body = await req.json()
@@ -102,7 +118,7 @@ export const POST = withAuth(async (req: Request) => {
       { status: 422 }
     )
   }
-  const user = await prisma.user.findUnique({ where: { id: session.uid } })
+  const user = await prisma.user.findUnique({ where: { id: userId } })
   if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
   if (!user.emailVerifiedAt || user.email.endsWith('@pending.invalid')) {
     return NextResponse.json(
@@ -113,6 +129,21 @@ export const POST = withAuth(async (req: Request) => {
       },
       { status: 403 }
     )
+  }
+  if (isSubscriptionPurchase) {
+    const autoRenewal = await prisma.autoRenewal.findUnique({
+      where: { userId: user.id },
+      select: { status: true },
+    })
+    if (autoRenewal?.status === 'PROCESSING') {
+      return NextResponse.json(
+        {
+          error: 'Автопродление уже обрабатывается. Проверьте результат перед ручной оплатой.',
+          code: 'AUTO_RENEWAL_IN_PROGRESS',
+        },
+        { status: 409 }
+      )
+    }
   }
   await reconcileStalePendingPaymentsForUser(user.id)
   const now = new Date()
@@ -860,7 +891,7 @@ export const POST = withAuth(async (req: Request) => {
     localPaymentId: localPayment.id,
     provider,
   })
-})
+}
 
 async function findDuplicateCheckout(userId: string, checkoutKey: string) {
   return prisma.payment.findUnique({

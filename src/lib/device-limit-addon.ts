@@ -95,3 +95,38 @@ export async function provisionDeviceLimitAddon(paymentId: string) {
   })
   return { subscription: savedSubscription, remnawaveUser: updated.response, isNew: false, idempotent: false }
 }
+
+export async function revokeDeviceLimitAddonForPayment(paymentId: string) {
+  const payment = await prisma.payment.findUnique({
+    where: { id: paymentId },
+    include: { user: true, subscription: true },
+  })
+  if (!payment || payment.purchaseType !== 'DEVICE_LIMIT_ADDON') return { revoked: false }
+
+  const snapshot = readDeviceLimitAddonSnapshot(payment.addonSnapshot)
+  const subscription = payment.subscription
+  if (
+    !snapshot
+    || !subscription
+    || snapshot.subscriptionId !== subscription.id
+    || subscription.userId !== payment.userId
+    || !['ACTIVE', 'LIMITED'].includes(subscription.status)
+    || subscription.deviceLimit !== snapshot.toLimit
+  ) {
+    return { revoked: false }
+  }
+  if (!hasRemnawaveUserReference(payment.user)) throw new Error('Профиль Remnawave не найден')
+
+  await remnawave.updateUser(remnawaveUserReference(payment.user), {
+    hwidDeviceLimit: snapshot.fromLimit,
+  })
+  await prisma.subscription.updateMany({
+    where: {
+      id: subscription.id,
+      deviceLimit: snapshot.toLimit,
+      status: { in: ['ACTIVE', 'LIMITED'] },
+    },
+    data: { deviceLimit: snapshot.fromLimit, lastSyncedAt: new Date() },
+  })
+  return { revoked: true }
+}

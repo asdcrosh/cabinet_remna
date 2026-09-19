@@ -11,6 +11,7 @@ import {
   ShieldCheck,
   SearchCheck,
   TriangleAlert,
+  TimerReset,
   UserPlus,
   Wallet,
 } from 'lucide-react'
@@ -35,6 +36,7 @@ export default async function AdminDashboardPage() {
   todayStart.setHours(0, 0, 0, 0)
   const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
   const stalePaymentDate = new Date(now.getTime() - getPendingPaymentTtlMs())
+  const staleProvisioningLock = new Date(now.getTime() - 15 * 60_000)
   const twoWeeksAgo = new Date(now.getTime() - 13 * 24 * 60 * 60 * 1000)
   twoWeeksAgo.setHours(0, 0, 0, 0)
   const failedMetrics: string[] = []
@@ -52,6 +54,7 @@ export default async function AdminDashboardPage() {
     dailyPaymentRows,
     dailyUserRows,
     stalePendingPayments,
+    overdueProvisioningJobs,
     syncFailed,
     duplicateCandidates,
   ] = await Promise.all([
@@ -113,6 +116,16 @@ export default async function AdminDashboardPage() {
       ORDER BY 1 ASC
     `, [], failedMetrics),
     loadAdminMetric('Зависшие оплаты', prisma.payment.count({ where: { status: 'PENDING', createdAt: { lt: stalePaymentDate } } }), 0, failedMetrics),
+    loadAdminMetric('Просроченные задачи выдачи', prisma.provisioningJob.count({
+      where: {
+        payment: { status: 'SUCCEEDED', subscriptionProvisionedAt: null },
+        OR: [
+          { status: 'FAILED', OR: [{ nextRetryAt: null }, { nextRetryAt: { lte: now } }] },
+          { status: 'PENDING', OR: [{ nextRetryAt: null }, { nextRetryAt: { lte: now } }] },
+          { status: 'RUNNING', lockedAt: { lt: staleProvisioningLock } },
+        ],
+      },
+    }), 0, failedMetrics),
     loadAdminMetric('Ошибки синхронизации', prisma.syncEvent.count({ where: { status: 'FAILED' } }), 0, failedMetrics),
     loadAdminMetric('Дубли аккаунтов', findIdentityDuplicateCandidates(20), [], failedMetrics),
   ])
@@ -163,7 +176,7 @@ export default async function AdminDashboardPage() {
             <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">Очереди для ручной проверки</p>
           </div>
           <span className="rounded-full border border-amber-300/70 bg-amber-100/80 px-2.5 py-1 text-xs font-medium text-amber-800 dark:border-amber-300/15 dark:bg-amber-300/10 dark:text-amber-200">
-            {supportWaiting + recoveryCount + syncFailed + duplicateCandidates.length + stalePendingPayments} к проверке
+            {supportWaiting + recoveryCount + overdueProvisioningJobs + syncFailed + duplicateCandidates.length + stalePendingPayments} сигналов
           </span>
         </div>
         <div className="relative mt-4 grid gap-2.5 sm:grid-cols-2 min-[1360px]:grid-cols-3 2xl:grid-cols-5">
@@ -171,7 +184,10 @@ export default async function AdminDashboardPage() {
             <PriorityCard href="/dashboard/admin/support" icon={<LifeBuoy className="h-4 w-4" />} title="Поддержка" value={supportWaiting} text="Обращения без ответа" />
           )}
           {recoveryCount > 0 && (
-            <PriorityCard href="/dashboard/admin/recovery" icon={<Database className="h-4 w-4" />} title="Довыдача" value={recoveryCount} text="Не выданы подписки" />
+            <PriorityCard href="/dashboard/admin/recovery" icon={<Database className="h-4 w-4" />} title="Оплачено без доступа" value={recoveryCount} text="Нужна довыдача подписки" />
+          )}
+          {overdueProvisioningJobs > 0 && (
+            <PriorityCard href="/dashboard/admin/recovery" icon={<TimerReset className="h-4 w-4" />} title="Просроченные задачи" value={overdueProvisioningJobs} text="Повтор уже должен был начаться" />
           )}
           {syncFailed > 0 && (
             <PriorityCard href="/dashboard/admin/remnashop-sync" icon={<RefreshCw className="h-4 w-4" />} title="Синхронизация" value={syncFailed} text="Необработанные ошибки" />
@@ -182,7 +198,7 @@ export default async function AdminDashboardPage() {
           {stalePendingPayments > 0 && (
             <PriorityCard href="/dashboard/admin/payments?status=PENDING" icon={<FileClock className="h-4 w-4" />} title="Оплаты" value={stalePendingPayments} text="Зависли в ожидании" />
           )}
-          {supportWaiting === 0 && recoveryCount === 0 && syncFailed === 0 && duplicateCandidates.length === 0 && stalePendingPayments === 0 && (
+          {supportWaiting === 0 && recoveryCount === 0 && overdueProvisioningJobs === 0 && syncFailed === 0 && duplicateCandidates.length === 0 && stalePendingPayments === 0 && (
             <div className="col-span-full flex min-h-20 items-center gap-3 rounded-[1.15rem] border border-emerald-200/80 bg-emerald-50/80 px-4 py-3 text-sm font-medium text-emerald-800 shadow-sm dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200">
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500/10 ring-1 ring-emerald-500/15">
                 <ShieldCheck className="h-5 w-5 text-emerald-600 dark:text-emerald-300" />

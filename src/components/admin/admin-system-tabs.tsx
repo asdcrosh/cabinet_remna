@@ -1,10 +1,10 @@
 'use client'
 
 import { type ComponentType, type ReactNode, useEffect, useRef, useState } from 'react'
-import { Activity, CreditCard, Palette, Search, SlidersHorizontal, X } from 'lucide-react'
+import { Activity, CreditCard, Headphones, Palette, Search, SlidersHorizontal, X } from 'lucide-react'
 import { cn } from '@/lib/cn'
 
-type SystemTabId = 'health' | 'branding' | 'features' | 'payments'
+type SystemTabId = 'health' | 'branding' | 'features' | 'payments' | 'support'
 
 type SystemTab = {
   id: SystemTabId
@@ -21,6 +21,7 @@ const icons: Record<SystemTabId, ComponentType<{ className?: string }>> = {
   branding: Palette,
   features: SlidersHorizontal,
   payments: CreditCard,
+  support: Headphones,
 }
 
 export function AdminSystemTabs({ tabs }: { tabs: SystemTab[] }) {

@@ -37,6 +37,7 @@ export async function GET(req: Request) {
   } catch {
     const loginUrl = new URL('/login', requestUrl.origin)
     loginUrl.searchParams.set('yandex_error', 'not_configured')
+    if (next !== '/dashboard') loginUrl.searchParams.set('next', next)
     return NextResponse.redirect(loginUrl)
   }
 

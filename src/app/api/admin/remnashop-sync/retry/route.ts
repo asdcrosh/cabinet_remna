@@ -2,11 +2,12 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAdmin, withAuth } from '@/lib/auth/guard'
 import {
+  claimRemnashopSyncEvent,
   remnashopRetrySkippedReason,
   retryDueRemnashopSyncEvents,
   retryRemnashopSyncEvent,
 } from '@/lib/remnashop-retry'
-import { markSyncFailed, markSyncPending, markSyncSkipped, markSyncSucceeded } from '@/lib/sync-events'
+import { markSyncFailed, markSyncSkipped, markSyncSucceeded } from '@/lib/sync-events'
 import { writeAuditLog } from '@/lib/audit-log'
 
 export const runtime = 'nodejs'
@@ -37,12 +38,9 @@ export const POST = withAuth(async (req: Request) => {
   const event = await prisma.syncEvent.findUnique({ where: { id } })
   if (!event) return NextResponse.json({ error: 'Sync event not found' }, { status: 404 })
 
-  await markSyncPending({
-    direction: event.direction,
-    entityType: event.entityType,
-    entityId: event.entityId,
-    operation: event.operation,
-  })
+  if (!await claimRemnashopSyncEvent(event)) {
+    return NextResponse.json({ error: 'Sync event is already being retried' }, { status: 409 })
+  }
 
   try {
     const result = await retryRemnashopSyncEvent(event)

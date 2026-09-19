@@ -175,7 +175,7 @@ function getNextAction(state: DashboardOnboardingState, focus: DashboardOnboardi
   if (!state.telegramLinked) {
     return {
       title: 'Привяжите Telegram',
-      description: 'Так кабинет сможет найти старую подписку и синхронизировать данные из Remnashop.',
+      description: 'Так кабинет сможет найти подписку и покупки, которые оформлялись через Telegram.',
       href: '/dashboard/settings',
       label: 'Привязать',
       icon: <Send className="h-5 w-5" />,
@@ -185,10 +185,10 @@ function getNextAction(state: DashboardOnboardingState, focus: DashboardOnboardi
 
   if (state.telegramLinked && !state.remnashopSynced) {
     return {
-      title: 'Проверить Telegram',
-      description: 'Запустите синхронизацию, чтобы кабинет обновил данные Remnashop и Remnawave.',
+      title: 'Обновить старые покупки',
+      description: 'Запустите проверку, чтобы кабинет обновил подписку и подключённые устройства.',
       href: '/dashboard/settings',
-      label: 'Проверить',
+      label: 'Обновить',
       icon: <Send className="h-5 w-5" />,
       tone: 'amber',
     }

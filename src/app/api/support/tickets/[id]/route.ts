@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { requireAuth, withAuth } from '@/lib/auth/guard'
 import { rateLimit } from '@/lib/rate-limit'
@@ -111,12 +112,13 @@ export const POST = withAuth(async (req: Request, { params }: { params: Promise<
     return NextResponse.json({ error: 'Обращение уже закрыто.' }, { status: 400 })
   }
 
-  const message = await prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     const created = await tx.supportMessage.create({
       data: {
         ticketId: ticket.id,
         senderId: session.uid,
         senderRole: 'USER',
+        clientMessageId: parsed.data.clientMessageId,
         body: parsed.data.message,
         ...(attachments.length > 0 ? { attachments: { create: attachments } } : {}),
       },
@@ -137,8 +139,34 @@ export const POST = withAuth(async (req: Request, { params }: { params: Promise<
         lastMessageAt: created.createdAt,
       },
     })
-    return created
+    return { message: created, created: true as const }
+  }).catch(async (error) => {
+    if (!(error instanceof Prisma.PrismaClientKnownRequestError)
+      || error.code !== 'P2002'
+      || !parsed.data.clientMessageId) throw error
+    const existing = await prisma.supportMessage.findUnique({
+      where: {
+        ticketId_clientMessageId: {
+          ticketId: ticket.id,
+          clientMessageId: parsed.data.clientMessageId,
+        },
+      },
+      select: {
+        id: true,
+        body: true,
+        senderRole: true,
+        createdAt: true,
+        sender: { select: { email: true, name: true } },
+        attachments: { select: supportAttachmentSelect },
+      },
+    })
+    if (!existing) throw error
+    return { message: existing, created: false as const }
   })
+  const message = result.message
+  if (!result.created) {
+    return NextResponse.json({ message: serializeSupportMessage(message) }, { status: 200 })
+  }
   const customer = await prisma.user.findUnique({
     where: { id: session.uid },
     select: { name: true, email: true, telegramUsername: true },

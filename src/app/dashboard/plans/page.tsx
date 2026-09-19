@@ -11,9 +11,9 @@ import { getPlanAudienceContext, isPlanAvailableForUser } from '@/lib/plan-acces
 import { getAvailableUserPromoCodesByPlan } from '@/lib/user-promo-codes'
 import { getAvailablePaymentProviders } from '@/lib/payment-providers'
 import { ArrowRight, MessageCircleQuestion, RefreshCw, ShieldCheck } from 'lucide-react'
-import { calculateAutoRenewalPurchase, getAutoRenewalState } from '@/lib/auto-renewal'
+import { getAutoRenewalState } from '@/lib/auto-renewal'
 import { AUTO_RENEWAL_CONSENT_VERSION } from '@/lib/auto-renewal-consent'
-import { calculatePersonalDiscount } from '@/lib/user-discounts'
+import { tryCalculateRenewalPricing } from '@/lib/renewal-pricing'
 import {
   hasRemnawaveUserReference,
   remnawave,
@@ -362,10 +362,12 @@ function currentAutoRenewalPrice(
         || plan.whitelistAddonPriceKopecks <= 0
         || plan.whitelistAddonInternalSquads.length === 0)
     ) return null
-    const originalAmountKopecks = calculateAutoRenewalPurchase(plan, deviceLimit).originalAmountKopecks
-    const personalDiscount = calculatePersonalDiscount(plan.priceKopecks, personalDiscountPercent)
-    return originalAmountKopecks - (personalDiscount?.discountKopecks ?? 0)
-      + (includeWhitelistAddon ? plan.whitelistAddonPriceKopecks : 0)
+    return tryCalculateRenewalPricing(
+      plan,
+      deviceLimit,
+      personalDiscountPercent,
+      includeWhitelistAddon ? plan.whitelistAddonPriceKopecks : 0
+    )?.totalAmountKopecks ?? null
   } catch {
     return null
   }
