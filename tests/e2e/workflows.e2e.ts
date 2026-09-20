@@ -64,9 +64,16 @@ test('главный администратор видит пользовате�
   await expect(page.getByText(/Ждёт \d+ мин/).first()).toBeVisible()
   const ticketAssignee = page.getByLabel('Исполнитель обращения', { exact: true })
   const currentStaffOption = ticketAssignee.locator('option').filter({ hasText: '(вы)' })
+  await expect(currentStaffOption).toHaveCount(1)
   const currentStaffValue = await currentStaffOption.getAttribute('value')
-  if (currentStaffValue) await ticketAssignee.selectOption(currentStaffValue)
-  await expect(ticketAssignee).not.toHaveValue('')
+  expect(currentStaffValue).toBeTruthy()
+  const assignmentResponse = page.waitForResponse((response) => (
+    response.request().method() === 'PATCH'
+      && /\/api\/admin\/support\/tickets\/[^/]+$/.test(new URL(response.url()).pathname)
+  ))
+  await ticketAssignee.selectOption(currentStaffValue!)
+  expect((await assignmentResponse).ok()).toBe(true)
+  await expect(ticketAssignee).toHaveValue(currentStaffValue!)
 
   const clientButton = page.getByRole('button', { name: 'Контекст клиента', exact: true })
   await expect(clientButton).toBeVisible()

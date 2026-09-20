@@ -52,7 +52,7 @@ test('новый пароль нужно подтвердить, а успешн
   await page.getByLabel('Повторите пароль').fill('Password2')
   await page.getByRole('button', { name: 'Сохранить пароль' }).click()
 
-  await expect(page).toHaveURL(/\/login\?reset=success$/)
+  await expect(page).toHaveURL(/\/login\?reset=success&next=%2Fdashboard$/)
   await expect(page.getByRole('status')).toContainText('Все прежние сеансы завершены')
   await expectNoHorizontalOverflow(page)
 })

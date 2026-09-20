@@ -1,7 +1,6 @@
 'use client'
 
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import { useRef, useState } from 'react'
 import {
   CreditCard,
@@ -24,30 +23,26 @@ const quickActions = [
 ]
 
 export function AdminQuickSearch() {
-  const router = useRouter()
   const inputRef = useRef<HTMLInputElement | null>(null)
-  const [query, setQuery] = useState('')
   const [target, setTarget] = useState<SearchTarget>('users')
-
-  function submitSearch() {
-    const value = query.trim()
-    if (!value) {
-      inputRef.current?.focus()
-      return
-    }
-    const path = target === 'users' ? '/dashboard/admin/users' : '/dashboard/admin/payments'
-    router.push(`${path}?q=${encodeURIComponent(value)}`)
-  }
+  const searchPath = target === 'users' ? '/dashboard/admin/users' : '/dashboard/admin/payments'
 
   return (
     <section className="grid overflow-hidden rounded-[1.5rem] border border-slate-200/80 bg-white shadow-[0_18px_50px_-34px_rgba(15,23,42,0.4)] dark:border-white/[0.09] dark:bg-white/[0.035] lg:grid-cols-[minmax(0,1.15fr)_minmax(22rem,.85fr)]">
       <form
         role="search"
         aria-label="Быстрый поиск в админке"
+        action={searchPath}
+        method="get"
         className="min-w-0 p-4 sm:p-5"
         onSubmit={(event) => {
-          event.preventDefault()
-          submitSearch()
+          const value = inputRef.current?.value.trim() ?? ''
+          if (!value) {
+            event.preventDefault()
+            inputRef.current?.focus()
+            return
+          }
+          if (inputRef.current) inputRef.current.value = value
         }}
       >
         <div>
@@ -60,9 +55,8 @@ export function AdminQuickSearch() {
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
               ref={inputRef}
+              name="q"
               type="search"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
               className="input pl-9"
               placeholder={target === 'users' ? 'Email, Telegram или ID пользователя' : 'Email, тариф или ID платежа'}
             />
