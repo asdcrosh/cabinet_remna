@@ -52,8 +52,7 @@ describe('admin support assignment', () => {
     mocks.prisma.auditLog.findMany.mockResolvedValue([])
   })
 
-  it('returns the updated version after marking the ticket as read', async () => {
-    const readAt = new Date('2026-09-17T08:05:00.000Z')
+  it('marks the ticket as read without invalidating its optimistic version', async () => {
     mocks.prisma.supportTicket.findUnique.mockResolvedValue({
       ...ticket,
       assignee: null,
@@ -61,7 +60,7 @@ describe('admin support assignment', () => {
       messages: [],
       internalNotes: [],
     })
-    mocks.prisma.supportTicket.update.mockResolvedValue({ updatedAt: readAt })
+    mocks.prisma.supportTicket.updateMany.mockResolvedValue({ count: 1 })
 
     const response = await GET(
       new Request('https://cabinet.example/api/admin/support/tickets/ticket-1'),
@@ -70,11 +69,18 @@ describe('admin support assignment', () => {
     const body = await response.json()
 
     expect(body.ticket.adminUnreadCount).toBe(0)
-    expect(body.ticket.updatedAt).toBe(readAt.toISOString())
-    expect(mocks.prisma.supportTicket.update).toHaveBeenCalledWith(expect.objectContaining({
-      data: { adminUnreadCount: 0 },
-      select: { updatedAt: true },
-    }))
+    expect(body.ticket.updatedAt).toBe(ticket.updatedAt.toISOString())
+    expect(mocks.prisma.supportTicket.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: ticket.id,
+        updatedAt: ticket.updatedAt,
+        adminUnreadCount: { gt: 0 },
+      },
+      data: {
+        adminUnreadCount: 0,
+        updatedAt: ticket.updatedAt,
+      },
+    })
   })
 
   it('assigns a ticket only to a staff member', async () => {

@@ -55,11 +55,18 @@ export const GET = withAuth(async (req: Request, { params }: { params: Promise<{
   const messages = ticket.messages.slice(0, MESSAGE_PAGE_SIZE).reverse()
 
   if (ticket.userUnreadCount > 0) {
-    await prisma.supportTicket.update({
-      where: { id: ticket.id },
-      data: { userUnreadCount: 0 },
+    const readState = await prisma.supportTicket.updateMany({
+      where: {
+        id: ticket.id,
+        updatedAt: ticket.updatedAt,
+        userUnreadCount: { gt: 0 },
+      },
+      data: {
+        userUnreadCount: 0,
+        updatedAt: ticket.updatedAt,
+      },
     })
-    ticket.userUnreadCount = 0
+    if (readState.count === 1) ticket.userUnreadCount = 0
   }
 
   return NextResponse.json({

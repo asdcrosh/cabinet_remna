@@ -5,7 +5,7 @@ const mocks = vi.hoisted(() => ({
   prisma: {
     supportTicket: {
       findFirst: vi.fn(),
-      update: vi.fn(),
+      updateMany: vi.fn(),
     },
   },
 }))
@@ -52,7 +52,7 @@ describe('support ticket message pagination', () => {
       updatedAt: new Date('2026-07-14T12:00:00.000Z'),
       messages: makeMessages(),
     })
-    mocks.prisma.supportTicket.update.mockResolvedValue({ id: 'ticket-1' })
+    mocks.prisma.supportTicket.updateMany.mockResolvedValue({ count: 1 })
   })
 
   it('loads 50 older messages by cursor and returns the next cursor', async () => {
@@ -81,9 +81,16 @@ describe('support ticket message pagination', () => {
       hasMore: true,
       before: 'message-2',
     })
-    expect(mocks.prisma.supportTicket.update).toHaveBeenCalledWith({
-      where: { id: 'ticket-1' },
-      data: { userUnreadCount: 0 },
+    expect(mocks.prisma.supportTicket.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: 'ticket-1',
+        updatedAt: new Date('2026-07-14T12:00:00.000Z'),
+        userUnreadCount: { gt: 0 },
+      },
+      data: {
+        userUnreadCount: 0,
+        updatedAt: new Date('2026-07-14T12:00:00.000Z'),
+      },
     })
   })
 })
