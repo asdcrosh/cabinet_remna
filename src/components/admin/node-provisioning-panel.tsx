@@ -30,8 +30,8 @@ const MAX_VISIBLE_JOBS = 8
 
 const fallbackSteps = [
   { key: 'QUEUED', label: 'В очереди' },
+  { key: 'SSH_PREFLIGHT', label: 'Проверка SSH-доступа' },
   { key: 'DNS', label: 'DNS в Timeweb' },
-  { key: 'SSH_PREFLIGHT', label: 'Подключение к серверу' },
   { key: 'REMNAWAVE_NODE', label: 'Нода в Remnawave' },
   { key: 'ANSIBLE', label: 'Установка Ansible' },
   { key: 'NODE_CONNECT', label: 'Подключение ноды' },
@@ -247,7 +247,7 @@ export function NodeProvisioningPanel() {
     }
   }
 
-  async function retryJob(job: ProvisioningJob) {
+  async function retryJob(job: ProvisioningJob, credentials?: { sshUser: string; sshPassword: string }) {
     if (job.status !== 'FAILED' || retryingJobId) return
 
     setRetryingJobId(job.id)
@@ -255,7 +255,8 @@ export function NodeProvisioningPanel() {
     try {
       const response = await fetch(`/api/admin/nodes/provisioning/${encodeURIComponent(job.id)}`, {
         method: 'POST',
-        headers: { 'x-error-presentation': 'silent' },
+        headers: { 'Content-Type': 'application/json', 'x-error-presentation': 'silent' },
+        body: JSON.stringify(credentials ?? {}),
       })
       const data = await response.json().catch(() => null) as ProvisioningResponse | null
       if (!response.ok) throw new Error(formatApiError(data, 'Не удалось повторно запустить задачу'))
@@ -495,7 +496,7 @@ export function NodeProvisioningPanel() {
                 job={selectedJob}
                 retrying={retryingJobId === selectedJob.id}
                 retryError={retryError?.jobId === selectedJob.id ? retryError.message : null}
-                onRetry={() => void retryJob(selectedJob)}
+                onRetry={(credentials) => void retryJob(selectedJob, credentials)}
                 onTrustHostKey={(fingerprint) => void trustHostKey(selectedJob, fingerprint)}
               />
             ) : null}
@@ -559,7 +560,7 @@ function JobProgress({
   job: ProvisioningJob
   retrying: boolean
   retryError: string | null
-  onRetry: () => void
+  onRetry: (credentials?: { sshUser: string; sshPassword: string }) => void
   onTrustHostKey: (fingerprint: string) => void
 }) {
   const steps = resolveSteps(job)
@@ -628,9 +629,11 @@ function JobProgress({
                 </div>
               ) : null}
               {job.lastError?.includes('SSH host key изменился после предыдущего запуска') ? (
-                <SshHostKeyRecovery job={job} retrying={retrying} onRetry={onRetry} onTrust={onTrustHostKey} />
+                <SshHostKeyRecovery job={job} retrying={retrying} onRetry={() => onRetry()} onTrust={onTrustHostKey} />
+              ) : isSshCredentialError(job.lastError) ? (
+                <SshCredentialRecovery key={job.id} job={job} retrying={retrying} onRetry={onRetry} />
               ) : (
-                <button type="button" className="btn-secondary min-h-10" onClick={onRetry} disabled={retrying}>
+                <button type="button" className="btn-secondary min-h-10" onClick={() => onRetry()} disabled={retrying}>
                   {retrying ? <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" /> : <RefreshCw className="h-4 w-4" />}
                   {retrying ? 'Возвращаем в очередь...' : 'Повторить установку'}
                 </button>
@@ -644,6 +647,67 @@ function JobProgress({
       ) : null}
     </div>
   )
+}
+
+function SshCredentialRecovery({
+  job,
+  retrying,
+  onRetry,
+}: {
+  job: ProvisioningJob
+  retrying: boolean
+  onRetry: (credentials: { sshUser: string; sshPassword: string }) => void
+}) {
+  const [sshUser, setSshUser] = useState(job.sshUser || 'root')
+  const [sshPassword, setSshPassword] = useState('')
+
+  return (
+    <form
+      className="space-y-3 rounded-xl border border-red-300 bg-white/60 p-3 dark:border-red-400/25 dark:bg-black/10"
+      onSubmit={(event) => {
+        event.preventDefault()
+        onRetry({ sshUser: sshUser.trim(), sshPassword })
+      }}
+    >
+      <p className="text-sm font-semibold text-red-950 dark:text-red-50">Обновите SSH-доступ</p>
+      <p className="text-xs leading-5 text-red-800/80 dark:text-red-100/80">
+        Сервер отклонил текущие данные. Кабинет проверит вход и root-права до продолжения установки.
+      </p>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field label="SSH-пользователь">
+          <input
+            className="input"
+            value={sshUser}
+            onChange={(event) => setSshUser(event.target.value)}
+            pattern="[A-Za-z_][A-Za-z0-9_-]{0,31}"
+            maxLength={32}
+            autoComplete="username"
+            required
+          />
+        </Field>
+        <Field label="Новый SSH-пароль">
+          <input
+            className="input"
+            type="password"
+            value={sshPassword}
+            onChange={(event) => setSshPassword(event.target.value)}
+            minLength={8}
+            maxLength={512}
+            autoComplete="new-password"
+            required
+          />
+        </Field>
+      </div>
+      <button type="submit" className="btn-primary min-h-10" disabled={retrying}>
+        {retrying ? <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" /> : <RefreshCw className="h-4 w-4" />}
+        {retrying ? 'Проверяем доступ...' : 'Обновить данные и продолжить'}
+      </button>
+    </form>
+  )
+}
+
+function isSshCredentialError(value?: string | null) {
+  return Boolean(value && /SSH-авторизация|Permission denied \(publickey,password\)|authentication failed/i.test(value))
 }
 
 function SshHostKeyRecovery({

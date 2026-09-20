@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { AnsibleProvisioningError, resolvePanelApiCidrs, sanitizeProvisioningOutput } from './node-provisioning-runner'
+import {
+  AnsibleProvisioningError,
+  describeSshAccessFailure,
+  resolvePanelApiCidrs,
+  sanitizeProvisioningOutput,
+} from './node-provisioning-runner'
 
 describe('provisioning output sanitizer', () => {
   it('removes passwords, bearer tokens, JWT and terminal colors', () => {
@@ -26,6 +31,17 @@ describe('provisioning output sanitizer', () => {
     const error = new AnsibleProvisioningError(124, 'ansible-playbook timed out')
 
     expect(error.message).toContain('Ansible timed out with code 124')
+  })
+
+  it('turns an SSH password rejection into an actionable message', () => {
+    const message = describeSshAccessFailure(
+      'root@host: Permission denied (publickey,password).',
+      'root'
+    )
+
+    expect(message).toContain('SSH-авторизация для root отклонена')
+    expect(message).toContain('Проверьте SSH-пользователя, пароль')
+    expect(message).not.toContain('root@host')
   })
 
   it('resolves all current public panel IPv4 addresses before provisioning', async () => {

@@ -6,7 +6,7 @@ import { prisma } from '@/lib/prisma'
 import { nodeHostRemark, resolveNodeCountryCode } from '@/lib/node-country'
 import { decryptNodeProvisioningSecret } from '@/lib/node-provisioning-crypto'
 import { sshHostKeyChangedError } from '@/lib/node-provisioning-host-key'
-import { runNodeAnsible, sanitizeProvisioningOutput, scanSshHostKey } from '@/lib/node-provisioning-runner'
+import { runNodeAnsible, sanitizeProvisioningOutput, verifyNodeSshAccess } from '@/lib/node-provisioning-runner'
 import { upsertTimewebARecord } from '@/lib/timeweb'
 import {
   buildHostCloneRequest,
@@ -98,17 +98,36 @@ export async function processNodeProvisioningJob(jobId: string) {
     const countryCode = resolveNodeCountryCode(job.serverIp)
     const { templates, profileUuid, inboundUuids } = await loadTemplates(job)
 
+    await advance(jobId, 'SSH_PREFLIGHT', 'Проверяю SSH-вход и root-права')
+    let sshAccess
+    try {
+      sshAccess = await verifyNodeSshAccess({
+        serverIp: job.serverIp,
+        sshPort: job.sshPort,
+        sshUser: job.sshUser,
+        sshPassword,
+        expectedHostKeyFingerprint: job.sshHostKeyFingerprint,
+      })
+    } catch (error) {
+      if (error instanceof Error && error.message.startsWith('SSH host key changed:')) {
+        const received = error.message.match(/received (SHA256:[A-Za-z0-9+/]+)$/)?.[1]
+        if (job.sshHostKeyFingerprint && received) {
+          throw sshHostKeyChangedError(job.sshHostKeyFingerprint, received)
+        }
+      }
+      throw error
+    }
+    await updateJob(
+      jobId,
+      { sshHostKeyFingerprint: sshAccess.hostKeyFingerprint },
+      'SSH_PREFLIGHT',
+      `SSH-вход подтверждён для ${job.sshUser}, ключ ${sshAccess.hostKeyFingerprint}`
+    )
+
     await advance(jobId, 'DNS', 'Создаю или обновляю A-запись в Timeweb')
     const dns = await upsertTimewebARecord(job.fqdn, job.serverIp)
     await updateJob(jobId, { dnsRecordId: dns.id }, 'DNS', dns.created ? 'A-запись создана' : 'A-запись уже настроена')
     await waitForDns(job.fqdn, job.serverIp)
-
-    await advance(jobId, 'SSH_PREFLIGHT', 'Проверяю SSH и фиксирую host key')
-    const hostKey = await scanSshHostKey(job.serverIp, job.sshPort)
-    if (job.sshHostKeyFingerprint && job.sshHostKeyFingerprint !== hostKey.fingerprint) {
-      throw sshHostKeyChangedError(job.sshHostKeyFingerprint, hostKey.fingerprint)
-    }
-    await updateJob(jobId, { sshHostKeyFingerprint: hostKey.fingerprint }, 'SSH_PREFLIGHT', `SSH доступен, ключ ${hostKey.fingerprint}`)
 
     await advance(jobId, 'REMNAWAVE_NODE', 'Создаю ноду в Remnawave')
     job = await requiredJob(jobId)
@@ -134,7 +153,7 @@ export async function processNodeProvisioningJob(jobId: string) {
       sshPassword,
       fqdn: job.fqdn,
       nodeSecret,
-      expectedHostKeyFingerprint: hostKey.fingerprint,
+      expectedHostKeyFingerprint: sshAccess.hostKeyFingerprint,
     }, touchActivity)
     await addEvent(jobId, 'ANSIBLE', 'SUCCESS', lastUsefulAnsibleLine(ansible.output) || 'Ansible завершён без ошибок')
 

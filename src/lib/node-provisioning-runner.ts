@@ -22,6 +22,44 @@ export type NodeAnsibleResult = {
   output: string
 }
 
+type NodeSshAccessInput = Pick<
+  NodeAnsibleInput,
+  'serverIp' | 'sshPort' | 'sshUser' | 'sshPassword' | 'expectedHostKeyFingerprint'
+>
+
+export async function verifyNodeSshAccess(input: NodeSshAccessInput): Promise<NodeAnsibleResult> {
+  const workDir = await mkdtemp(join(tmpdir(), 'cabinet-node-preflight-'))
+  try {
+    const hostKey = await scanSshHostKey(input.serverIp, input.sshPort)
+    assertExpectedHostKey(hostKey.fingerprint, input.expectedHostKeyFingerprint)
+
+    const knownHostsPath = join(workDir, 'known_hosts')
+    const inventoryPath = join(workDir, 'inventory.json')
+    await writeSecure(knownHostsPath, hostKey.knownHosts)
+    await writeSecure(inventoryPath, buildInventory(input, knownHostsPath))
+
+    const result = await captureProcess(
+      'ansible',
+      [
+        'all',
+        '-i', inventoryPath,
+        ...(input.sshUser === 'root' ? [] : ['--become']),
+        '-m', 'ansible.builtin.raw',
+        '-a', 'test "$(id -u)" -eq 0',
+      ],
+      {
+        timeoutMs: 45_000,
+        env: ansibleEnvironment(),
+      }
+    )
+    const output = sanitizeProvisioningOutput(result.output, [input.sshPassword])
+    if (result.code !== 0) throw new Error(describeSshAccessFailure(output, input.sshUser))
+    return { hostKeyFingerprint: hostKey.fingerprint, output }
+  } finally {
+    await rm(workDir, { recursive: true, force: true })
+  }
+}
+
 export async function runNodeAnsible(
   input: NodeAnsibleInput,
   onActivity?: () => Promise<void>
@@ -29,28 +67,13 @@ export async function runNodeAnsible(
   const workDir = await mkdtemp(join(tmpdir(), 'cabinet-node-'))
   try {
     const hostKey = await scanSshHostKey(input.serverIp, input.sshPort)
-    if (input.expectedHostKeyFingerprint && input.expectedHostKeyFingerprint !== hostKey.fingerprint) {
-      throw new Error(`SSH host key changed: expected ${input.expectedHostKeyFingerprint}, received ${hostKey.fingerprint}`)
-    }
+    assertExpectedHostKey(hostKey.fingerprint, input.expectedHostKeyFingerprint)
 
     const knownHostsPath = join(workDir, 'known_hosts')
     const inventoryPath = join(workDir, 'inventory.json')
     const varsPath = join(workDir, 'vars.json')
     await writeSecure(knownHostsPath, hostKey.knownHosts)
-    await writeSecure(inventoryPath, JSON.stringify({
-      all: {
-        hosts: {
-          remnanode_target: {
-            ansible_host: input.serverIp,
-            ansible_port: input.sshPort,
-            ansible_user: input.sshUser,
-            ansible_password: input.sshPassword,
-            ansible_become_password: input.sshPassword,
-            ansible_ssh_common_args: `-o UserKnownHostsFile=${knownHostsPath} -o StrictHostKeyChecking=yes`,
-          },
-        },
-      },
-    }))
+    await writeSecure(inventoryPath, buildInventory(input, knownHostsPath))
     const panelApiCidrs = await resolvePanelApiCidrs(requiredEnv('REMNAWAVE_BASE_URL'))
     const adminEmail = requiredEnv('SUPERUSER_EMAIL')
     if (!/^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,63}$/.test(adminEmail)) {
@@ -73,12 +96,7 @@ export async function runNodeAnsible(
       ['-i', inventoryPath, playbook, '--extra-vars', `@${varsPath}`],
       {
         timeoutMs: positiveInteger(process.env.NODE_PROVISIONING_ANSIBLE_TIMEOUT_SECONDS, 1800) * 1000,
-        env: {
-          ...process.env,
-          ANSIBLE_NOCOLOR: 'true',
-          ANSIBLE_HOST_KEY_CHECKING: 'true',
-          ANSIBLE_DISPLAY_ARGS_TO_STDOUT: 'false',
-        },
+        env: ansibleEnvironment(),
         onActivity,
       }
     )
@@ -88,6 +106,17 @@ export async function runNodeAnsible(
   } finally {
     await rm(workDir, { recursive: true, force: true })
   }
+}
+
+export function describeSshAccessFailure(output: string, sshUser: string) {
+  if (/permission denied|authentication failed|invalid\/incorrect password/i.test(output)) {
+    return `SSH-авторизация для ${sshUser} отклонена. Проверьте SSH-пользователя, пароль и разрешение входа по паролю на сервере.`
+  }
+  if (/missing sudo password|incorrect sudo password|become password|sudo:.*password/i.test(output)) {
+    return `SSH-вход для ${sshUser} выполнен, но сервер не дал root-права. Проверьте sudo-доступ пользователя и пароль.`
+  }
+  const detail = output.trim().slice(-1_500)
+  return detail ? `Проверка SSH-доступа завершилась ошибкой: ${detail}` : 'Проверка SSH-доступа завершилась ошибкой'
 }
 
 export async function resolvePanelApiCidrs(
@@ -148,6 +177,38 @@ export function sanitizeProvisioningOutput(value: string, secrets: string[] = []
 
 async function writeSecure(path: string, content: string) {
   await writeFile(path, content, { encoding: 'utf8', mode: 0o600 })
+}
+
+function buildInventory(input: NodeSshAccessInput, knownHostsPath: string) {
+  return JSON.stringify({
+    all: {
+      hosts: {
+        remnanode_target: {
+          ansible_host: input.serverIp,
+          ansible_port: input.sshPort,
+          ansible_user: input.sshUser,
+          ansible_password: input.sshPassword,
+          ansible_become_password: input.sshPassword,
+          ansible_ssh_common_args: `-o UserKnownHostsFile=${knownHostsPath} -o StrictHostKeyChecking=yes`,
+        },
+      },
+    },
+  })
+}
+
+function assertExpectedHostKey(actual: string, expected?: string | null) {
+  if (expected && expected !== actual) {
+    throw new Error(`SSH host key changed: expected ${expected}, received ${actual}`)
+  }
+}
+
+function ansibleEnvironment() {
+  return {
+    ...process.env,
+    ANSIBLE_NOCOLOR: 'true',
+    ANSIBLE_HOST_KEY_CHECKING: 'true',
+    ANSIBLE_DISPLAY_ARGS_TO_STDOUT: 'false',
+  }
 }
 
 async function captureProcess(

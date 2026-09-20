@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { buildProvisioningFqdn, createNodeProvisioningSchema, isPublicIpv4 } from './node-provisioning-validation'
+import {
+  buildProvisioningFqdn,
+  createNodeProvisioningSchema,
+  isPublicIpv4,
+  retryNodeProvisioningSchema,
+} from './node-provisioning-validation'
 
 const previous = process.env.NODE_PROVISIONING_BASE_DOMAIN
 
@@ -30,5 +35,16 @@ describe('node provisioning validation', () => {
     })
     expect(parsed.nodeName).toBe('nl-07')
     expect(buildProvisioningFqdn(parsed.nodeName)).toBe('nl-07.example.com')
+  })
+})
+
+describe('node provisioning retry validation', () => {
+  it('accepts an empty retry and a complete SSH credential replacement', () => {
+    expect(retryNodeProvisioningSchema.safeParse({}).success).toBe(true)
+    expect(retryNodeProvisioningSchema.safeParse({ sshUser: 'root', sshPassword: 'password-123' }).success).toBe(true)
+  })
+
+  it('rejects partial SSH credential replacement', () => {
+    expect(retryNodeProvisioningSchema.safeParse({ sshPassword: 'password-123' }).success).toBe(false)
   })
 })

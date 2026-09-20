@@ -13,6 +13,14 @@ export const createNodeProvisioningSchema = z.object({
   xhttpTemplateHostUuid: z.string().uuid(),
 })
 
+export const retryNodeProvisioningSchema = z.object({
+  sshUser: z.string().trim().regex(sshUserPattern, 'Некорректный SSH-пользователь'),
+  sshPassword: z.string().min(8).max(512),
+}).partial().refine(
+  (value) => Boolean(value.sshUser) === Boolean(value.sshPassword),
+  'Для обновления SSH-доступа укажите пользователя и пароль'
+)
+
 export function buildProvisioningFqdn(nodeName: string) {
   const baseDomain = process.env.NODE_PROVISIONING_BASE_DOMAIN?.trim().toLowerCase().replace(/^\.+|\.+$/g, '')
   if (!baseDomain || !isDomain(baseDomain)) {

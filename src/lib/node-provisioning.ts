@@ -12,8 +12,8 @@ import { buildProvisioningFqdn } from '@/lib/node-provisioning-validation'
 
 export const NODE_PROVISIONING_STEPS = [
   ['QUEUED', 'В очереди'],
+  ['SSH_PREFLIGHT', 'Проверка SSH-доступа'],
   ['DNS', 'DNS в Timeweb'],
-  ['SSH_PREFLIGHT', 'Проверка SSH'],
   ['REMNAWAVE_NODE', 'Нода в Remnawave'],
   ['ANSIBLE', 'Установка Ansible'],
   ['NODE_CONNECT', 'Подключение ноды'],
@@ -110,12 +110,15 @@ export async function createNodeProvisioningJob(input: CreateNodeProvisioningInp
   })
 }
 
-export async function retryNodeProvisioningJob(id: string) {
+export async function retryNodeProvisioningJob(
+  id: string,
+  credentials?: { sshUser: string; sshPassword: string }
+) {
   return prisma.$transaction(async (tx) => {
     const job = await tx.nodeProvisioningJob.findUnique({ where: { id } })
     if (!job) throw new NodeProvisioningNotFoundError()
     if (job.status !== 'FAILED') throw new NodeProvisioningStateError('Повторить можно только задачу с ошибкой')
-    if (job.credentialsExpireAt <= new Date() || !job.encryptedSshPassword) {
+    if (!credentials && (job.credentialsExpireAt <= new Date() || !job.encryptedSshPassword)) {
       throw new NodeProvisioningStateError('SSH-пароль уже удалён или истёк. Создайте новую задачу.')
     }
 
@@ -135,6 +138,11 @@ export async function retryNodeProvisioningJob(id: string) {
       where: { id },
       data: {
         ...recoveryData,
+        ...(credentials ? {
+          sshUser: credentials.sshUser,
+          encryptedSshPassword: encryptNodeProvisioningSecret(credentials.sshPassword),
+          credentialsExpireAt: new Date(Date.now() + positiveInteger(process.env.NODE_PROVISIONING_CREDENTIALS_TTL_HOURS, 24) * 60 * 60 * 1000),
+        } : {}),
         status: 'PENDING',
         activeKey: job.fqdn,
         lockedAt: null,
@@ -144,9 +152,11 @@ export async function retryNodeProvisioningJob(id: string) {
           create: {
             step: job.step,
             level: Object.keys(recoveryData).length > 0 ? 'WARNING' : 'INFO',
-            message: Object.keys(recoveryData).length > 0
-              ? 'Удалённые из Remnawave объекты будут созданы заново; задача возвращена в очередь'
-              : 'Задача возвращена в очередь',
+            message: credentials
+              ? 'SSH-данные обновлены; задача возвращена в очередь'
+              : Object.keys(recoveryData).length > 0
+                ? 'Удалённые из Remnawave объекты будут созданы заново; задача возвращена в очередь'
+                : 'Задача возвращена в очередь',
           },
         },
       },

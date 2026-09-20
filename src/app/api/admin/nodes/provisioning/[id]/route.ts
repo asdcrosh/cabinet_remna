@@ -10,6 +10,7 @@ import {
   retryNodeProvisioningJob,
   serializeNodeProvisioningJob,
 } from '@/lib/node-provisioning'
+import { retryNodeProvisioningSchema } from '@/lib/node-provisioning-validation'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -27,13 +28,20 @@ export const GET = withAuth(async (_request: Request, { params }: RouteContext) 
 export const POST = withAuth(async (request: Request, { params }: RouteContext) => {
   const session = await requireSuperAdmin()
   const { id } = await params
+  const parsed = retryNodeProvisioningSchema.safeParse(await request.json().catch(() => ({})))
+  if (!parsed.success) {
+    return NextResponse.json({ error: 'Проверьте SSH-пользователя и пароль' }, { status: 400 })
+  }
+  const credentials = parsed.data.sshUser && parsed.data.sshPassword
+    ? { sshUser: parsed.data.sshUser, sshPassword: parsed.data.sshPassword }
+    : undefined
   try {
-    const job = await retryNodeProvisioningJob(id)
+    const job = await retryNodeProvisioningJob(id, credentials)
     await writeAuditLog({
       actorId: session.uid,
       action: 'ADMIN_NODE_PROVISIONING_RETRIED',
       message: 'Повторно запущена установка Remnawave-ноды',
-      metadata: { entityType: 'nodeProvisioningJob', jobId: id },
+      metadata: { entityType: 'nodeProvisioningJob', jobId: id, credentialsUpdated: Boolean(credentials) },
       request,
     })
     return NextResponse.json({ job: serializeNodeProvisioningJob(job) }, { status: 202 })
