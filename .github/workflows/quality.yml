@@ -81,12 +81,20 @@ jobs:
         include:
           - shard: 1/4
             artifact: 1
+            project: desktop-chromium
+            browser: chromium
           - shard: 2/4
             artifact: 2
+            project: mobile-chromium
+            browser: chromium
           - shard: 3/4
             artifact: 3
+            project: desktop-firefox
+            browser: firefox
           - shard: 4/4
             artifact: 4
+            project: desktop-webkit
+            browser: webkit
     services:
       postgres:
         image: postgres:16-alpine
@@ -113,9 +121,9 @@ jobs:
       - name: Apply test database migrations
         run: npx prisma migrate deploy
       - name: Install Playwright browsers
-        run: npx playwright install --with-deps chromium firefox webkit
+        run: npx playwright install --with-deps ${{ matrix.browser }}
       - name: Browser E2E checks
-        run: npm run test:e2e -- --shard=${{ matrix.shard }}
+        run: npm run test:e2e -- --project=${{ matrix.project }}
       - name: Upload Playwright report
         if: ${{ always() }}
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
