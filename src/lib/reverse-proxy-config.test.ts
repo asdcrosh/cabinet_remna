@@ -14,4 +14,14 @@ describe('reverse proxy client IP headers', () => {
       expect(normalized).toContain('add_header Referrer-Policy "no-referrer" always;')
     }
   )
+
+  it('persists standalone ACME hooks and supports forced certificate recovery', () => {
+    const source = readFileSync(resolve(process.cwd(), 'deploy/setup-nginx-proxy.sh'), 'utf8')
+
+    expect(source).toContain('--pre-hook "${pre_hook}"')
+    expect(source).toContain('--post-hook "${post_hook}"')
+    expect(source).toContain('force_args+=(--force)')
+    expect(source).toContain('"${force_args[@]}"')
+    expect(source).toContain('docker_bin="$(command -v docker)"')
+  })
 })

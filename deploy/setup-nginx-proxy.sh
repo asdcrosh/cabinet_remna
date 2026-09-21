@@ -131,24 +131,30 @@ ensure_certificate() {
   install_acme
   "${HOME}/.acme.sh/acme.sh" --set-default-ca --server letsencrypt >/dev/null
 
-  local was_running="false"
-  if docker inspect "${NGINX_CONTAINER}" >/dev/null 2>&1; then
-    was_running="$(docker inspect -f '{{.State.Running}}' "${NGINX_CONTAINER}" 2>/dev/null || echo false)"
+  local docker_bin docker_bin_quoted nginx_container_quoted pre_hook post_hook
+  local -a force_args=()
+  docker_bin="$(command -v docker)"
+  printf -v docker_bin_quoted '%q' "${docker_bin}"
+  printf -v nginx_container_quoted '%q' "${NGINX_CONTAINER}"
+  pre_hook="if ${docker_bin_quoted} inspect ${nginx_container_quoted} >/dev/null 2>&1; then ${docker_bin_quoted} stop ${nginx_container_quoted} >/dev/null; fi"
+  post_hook="if ${docker_bin_quoted} inspect ${nginx_container_quoted} >/dev/null 2>&1; then ${docker_bin_quoted} start ${nginx_container_quoted} >/dev/null; fi"
+  if [[ "${FORCE_CERT:-false}" == "true" ]]; then
+    force_args+=(--force)
   fi
 
   echo "Issuing certificate for ${CABINET_DOMAIN}. Nginx will be stopped temporarily."
-  if [[ "${was_running}" == "true" ]]; then
-    docker stop "${NGINX_CONTAINER}" >/dev/null
-  fi
 
   set +e
-  "${HOME}/.acme.sh/acme.sh" --issue -d "${CABINET_DOMAIN}" --standalone --httpport 80 --keylength ec-256
+  "${HOME}/.acme.sh/acme.sh" --issue \
+    -d "${CABINET_DOMAIN}" \
+    --standalone \
+    --httpport 80 \
+    --keylength ec-256 \
+    --pre-hook "${pre_hook}" \
+    --post-hook "${post_hook}" \
+    "${force_args[@]}"
   local issue_status=$?
   set -e
-
-  if [[ "${was_running}" == "true" ]]; then
-    docker start "${NGINX_CONTAINER}" >/dev/null || true
-  fi
 
   if [[ "${issue_status}" -ne 0 ]]; then
     echo "Certificate issue failed. Check DNS A record and that port 80 is reachable from the internet."

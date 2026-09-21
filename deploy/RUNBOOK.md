@@ -202,6 +202,8 @@ The script:
 - uses `CABINET_DOMAIN`
 - backs up `/opt/remnawave/nginx/nginx.conf`
 - issues a certificate with `acme.sh`
+- saves standalone renewal hooks that briefly stop nginx for ACME validation and
+  start it again with the renewed certificate
 - adds `cabinet_fullchain.pem` and `cabinet_privkey.key` mounts to Remnawave nginx compose
 - adds marked cabinet HTTPS and HTTP-to-HTTPS server blocks
 - publishes port `80` in Remnawave nginx compose if it is missing
