@@ -18,6 +18,7 @@ describe('reverse proxy client IP headers', () => {
   it('persists standalone ACME hooks and supports forced certificate recovery', () => {
     const source = readFileSync(resolve(process.cwd(), 'deploy/setup-nginx-proxy.sh'), 'utf8')
 
+    expect(source).toContain('apt-get install -y ca-certificates cron curl socat')
     expect(source).toContain('--pre-hook "${pre_hook}"')
     expect(source).toContain('--post-hook "${post_hook}"')
     expect(source).toContain('force_args+=(--force)')

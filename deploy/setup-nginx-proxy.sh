@@ -96,7 +96,7 @@ echo "Configuring nginx proxy for ${CABINET_DOMAIN}"
 
 if command -v apt-get >/dev/null 2>&1; then
   apt-get update
-  apt-get install -y ca-certificates curl socat
+  apt-get install -y ca-certificates cron curl socat
 fi
 
 install_acme() {
