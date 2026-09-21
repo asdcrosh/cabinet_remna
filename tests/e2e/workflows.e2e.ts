@@ -4,6 +4,8 @@ import { E2E_PASSWORD, E2E_USERS } from './test-data'
 
 test.describe.configure({ mode: 'serial' })
 
+const supportMessage = `Не проходит тестовая оплата подписки [worker ${process.env.TEST_WORKER_INDEX ?? 'local'}]`
+
 test('пользователь обновляет профиль через настройки', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop-chromium', 'Сценарий достаточно проверить один раз')
   await login(page, E2E_USERS.basic.email)
@@ -40,11 +42,11 @@ test('пользователь создаёт обращение в поддер
   await page.getByRole('button', { name: /Новое обращение/ }).first().click()
   await expect(page.getByRole('heading', { name: 'Новое обращение' })).toBeVisible()
   await page.getByRole('button', { name: 'Оплата', exact: true }).click()
-  await page.getByRole('textbox', { name: 'Сообщение' }).fill('Не проходит тестовая оплата подписки')
+  await page.getByRole('textbox', { name: 'Сообщение' }).fill(supportMessage)
   await page.getByRole('button', { name: 'Отправить обращение' }).click()
 
   await expect(page.getByRole('heading', { name: 'Вопрос по оплате' })).toBeVisible()
-  await expect(page.getByText('Не проходит тестовая оплата подписки', { exact: true }).last()).toBeVisible()
+  await expect(page.getByText(supportMessage, { exact: true }).last()).toBeVisible()
   await expectNoHorizontalOverflow(page)
 })
 
@@ -100,9 +102,9 @@ test('главный администратор видит пользовате�
   await returnedClientPanel.getByRole('button', { name: 'Закрыть данные клиента' }).click()
   await expect(returnedClientPanel).toBeHidden()
   await page.getByLabel('Исполнитель очереди').selectOption('mine')
-  await expect(page.getByText('Не проходит тестовая оплата подписки', { exact: true }).first()).toBeVisible()
+  await expect(page.getByText(supportMessage, { exact: true }).first()).toBeVisible()
   await page.getByLabel('Исполнитель очереди').selectOption('unassigned')
-  await expect(page.getByText('Не проходит тестовая оплата подписки', { exact: true })).toHaveCount(0)
+  await expect(page.getByText(supportMessage, { exact: true })).toHaveCount(0)
   await page.getByLabel('Исполнитель очереди').selectOption('all')
   await page.getByLabel(/Выбрать обращение/).first().check()
   await page.getByRole('button', { name: 'Закрыть', exact: true }).click()
