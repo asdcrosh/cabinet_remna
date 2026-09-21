@@ -104,22 +104,45 @@ install_acme() {
     return
   fi
 
-  local installer actual_sha
-  installer="$(mktemp)"
+  local installer_dir installer actual_sha attempt delay
+  local attempts="${CABINET_DOWNLOAD_ATTEMPTS:-5}"
+  installer_dir="$(mktemp -d)"
+  installer="${installer_dir}/acme.sh"
   echo "Installing verified acme.sh ${ACME_SH_VERSION}..."
-  if ! curl -fsSL --proto '=https' --tlsv1.2 "${ACME_SH_URL}" -o "${installer}"; then
-    rm -f "${installer}"
+  for ((attempt = 1; attempt <= attempts; attempt++)); do
+    if curl -fsSL --proto '=https' --tlsv1.2 --connect-timeout 15 --max-time 120 \
+      "${ACME_SH_URL}" -o "${installer}"; then
+      break
+    fi
+    : >"${installer}"
+    if ((attempt < attempts)); then
+      delay=$((attempt * 3))
+      echo "acme.sh download failed (${attempt}/${attempts}). Retrying in ${delay}s..." >&2
+      sleep "${delay}"
+    fi
+  done
+  if [[ ! -s "${installer}" ]]; then
+    rm -rf "${installer_dir}"
     return 1
   fi
   actual_sha="$(sha256sum "${installer}" | awk '{print $1}')"
   if [[ "${actual_sha}" != "${ACME_SH_SHA256}" ]]; then
-    rm -f "${installer}"
+    rm -rf "${installer_dir}"
     echo "acme.sh checksum mismatch. Installation stopped."
     return 1
   fi
   sh -n "${installer}"
-  sh "${installer}" --install
-  rm -f "${installer}"
+  if ! (
+    cd "${installer_dir}"
+    sh ./acme.sh --install --force \
+      --home "${HOME}/.acme.sh" \
+      --config-home "${HOME}/.acme.sh" \
+      --no-profile
+  ); then
+    rm -rf "${installer_dir}"
+    return 1
+  fi
+  rm -rf "${installer_dir}"
 }
 
 ensure_certificate() {
