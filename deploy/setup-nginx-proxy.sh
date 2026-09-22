@@ -145,9 +145,29 @@ install_acme() {
   rm -rf "${installer_dir}"
 }
 
+install_certificate() {
+  local docker_bin docker_bin_quoted nginx_container_quoted reload_cmd
+  docker_bin="$(command -v docker)"
+  printf -v docker_bin_quoted '%q' "${docker_bin}"
+  printf -v nginx_container_quoted '%q' "${NGINX_CONTAINER}"
+  # The post-hook starts nginx before acme.sh copies the renewed cert to these paths.
+  reload_cmd="if ${docker_bin_quoted} inspect ${nginx_container_quoted} >/dev/null 2>&1; then ${docker_bin_quoted} exec ${nginx_container_quoted} nginx -t && ${docker_bin_quoted} exec ${nginx_container_quoted} nginx -s reload; fi"
+
+  "${HOME}/.acme.sh/acme.sh" --install-cert -d "${CABINET_DOMAIN}" --ecc \
+    --key-file "${CERT_PRIVKEY_HOST}" \
+    --fullchain-file "${CERT_FULLCHAIN_HOST}" \
+    --reloadcmd "${reload_cmd}"
+}
+
 ensure_certificate() {
   if [[ -f "${CERT_FULLCHAIN_HOST}" && -f "${CERT_PRIVKEY_HOST}" && "${FORCE_CERT:-false}" != "true" ]]; then
     echo "Certificate files already exist, skipping issue."
+    if [[ -f "${HOME}/.acme.sh/${CABINET_DOMAIN}_ecc/${CABINET_DOMAIN}.conf" ]]; then
+      install_acme
+      install_certificate
+    else
+      echo "No acme.sh certificate record found; automatic renewal was not changed."
+    fi
     return
   fi
 
@@ -184,9 +204,7 @@ ensure_certificate() {
     exit "${issue_status}"
   fi
 
-  "${HOME}/.acme.sh/acme.sh" --install-cert -d "${CABINET_DOMAIN}" --ecc \
-    --key-file "${CERT_PRIVKEY_HOST}" \
-    --fullchain-file "${CERT_FULLCHAIN_HOST}"
+  install_certificate
 }
 
 backup_file() {

@@ -28,5 +28,7 @@ describe('reverse proxy client IP headers', () => {
     expect(source).toContain('cd "${installer_dir}"')
     expect(source).toContain('sh ./acme.sh --install --force')
     expect(source).toContain('--connect-timeout 15 --max-time 120')
+    expect(source).toContain('--reloadcmd "${reload_cmd}"')
+    expect(source).toContain('install_certificate\n    else')
   })
 })
