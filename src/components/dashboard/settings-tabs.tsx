@@ -2,32 +2,34 @@
 
 import { type ReactNode, useEffect, useRef, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { Bell, LockKeyhole, Send, UserRound } from 'lucide-react'
+import { Bell, BookOpen, LockKeyhole, Send, UserRound } from 'lucide-react'
 import { cn } from '@/lib/cn'
 
-export type SettingsTabId = 'account' | 'security' | 'telegram' | 'notifications'
+export type SettingsTabId = 'account' | 'security' | 'telegram' | 'notifications' | 'data'
 
 type SettingsTabSection = {
   id: SettingsTabId
   title: string
-  shortTitle?: string
   description: string
   children: ReactNode
 }
 
 const tabIcons: Record<SettingsTabId, ReactNode> = {
-  account: <UserRound className="h-4 w-4" />,
-  security: <LockKeyhole className="h-4 w-4" />,
-  telegram: <Send className="h-4 w-4" />,
-  notifications: <Bell className="h-4 w-4" />,
+  account: <UserRound className="h-[18px] w-[18px]" />,
+  security: <LockKeyhole className="h-[18px] w-[18px]" />,
+  telegram: <Send className="h-[18px] w-[18px]" />,
+  notifications: <Bell className="h-[18px] w-[18px]" />,
+  data: <BookOpen className="h-[18px] w-[18px]" />,
 }
 
 export function SettingsTabs({
   sections,
   initialId = 'account',
+  footer,
 }: {
   sections: SettingsTabSection[]
   initialId?: SettingsTabId
+  footer?: ReactNode
 }) {
   const [activeId, setActiveId] = useState<SettingsTabId>(initialId)
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([])
@@ -37,6 +39,11 @@ export function SettingsTabs({
 
   useEffect(() => {
     setActiveId(initialId)
+    const activeTab = tabRefs.current.find((tab) => tab?.id === `settings-tab-${initialId}`)
+    if (activeTab && window.innerWidth < 1024) {
+      const list = activeTab.parentElement
+      if (list) list.scrollLeft = activeTab.offsetLeft - (list.clientWidth - activeTab.clientWidth) / 2
+    }
   }, [initialId])
 
   function activateTab(id: SettingsTabId) {
@@ -55,16 +62,12 @@ export function SettingsTabs({
   }
 
   return (
-    <div className="settings-workspace grid gap-4 lg:grid-cols-[15.5rem_minmax(0,1fr)] lg:gap-5">
-      <div className="min-w-0 lg:self-start">
-        <div className="settings-workspace-tabs lg:sticky lg:top-6">
-          <p className="mb-2 hidden px-1 font-mono text-xs font-semibold uppercase tracking-[0.14em] text-slate-400 dark:text-slate-500 lg:block">
-            Разделы
-          </p>
-          <div role="tablist" aria-label="Разделы настроек" className="grid grid-cols-2 gap-2 lg:grid-cols-1">
+    <div className="grid min-w-0 gap-5 lg:grid-cols-[13.75rem_minmax(0,1fr)] lg:gap-7">
+      <aside className="min-w-0 lg:self-start lg:sticky lg:top-6">
+        <p className="mb-2 hidden px-3 text-xs font-semibold uppercase tracking-[0.12em] text-slate-400 dark:text-slate-500 lg:block">Разделы</p>
+        <div role="tablist" aria-label="Разделы настроек" className="flex min-w-0 gap-1 overflow-x-auto pb-2 lg:block lg:space-y-1 lg:overflow-visible lg:pb-0">
           {sections.map((section, index) => {
             const active = section.id === activeId
-
             return (
               <button
                 key={section.id}
@@ -73,14 +76,15 @@ export function SettingsTabs({
                 role="tab"
                 id={`settings-tab-${section.id}`}
                 aria-label={section.title}
+                title={section.description}
                 aria-selected={active}
                 aria-controls={`settings-panel-${section.id}`}
                 tabIndex={active ? 0 : -1}
                 className={cn(
-                  'group flex min-h-[4.5rem] min-w-0 items-start gap-2.5 rounded-xl border px-3 py-3 text-left transition lg:min-h-0',
+                  'group flex min-h-11 shrink-0 items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm font-medium transition-colors lg:min-h-12 lg:w-full lg:border-transparent lg:px-3.5',
                   active
-                    ? 'border-brand-200 bg-brand-50 text-brand-900 dark:border-brand-400/20 dark:bg-brand-400/10 dark:text-brand-100'
-                    : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50 dark:border-white/[0.08] dark:bg-white/[0.025] dark:text-slate-300 dark:hover:border-white/15 dark:hover:bg-white/[0.05]'
+                    ? 'border-slate-950 bg-slate-950 text-white dark:border-white dark:bg-white dark:text-slate-950'
+                    : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-950 dark:border-white/10 dark:bg-white/[0.025] dark:text-slate-300 dark:hover:bg-white/[0.06] dark:hover:text-white lg:bg-transparent lg:dark:bg-transparent'
                 )}
                 onClick={() => activateTab(section.id)}
                 onKeyDown={(event) => {
@@ -99,30 +103,16 @@ export function SettingsTabs({
                   }
                 }}
               >
-                <span
-                  className={cn(
-                    'grid h-8 w-8 shrink-0 place-items-center rounded-lg transition-colors',
-                    active
-                      ? 'bg-white text-brand-700 shadow-sm dark:bg-white/10 dark:text-brand-200'
-                      : 'bg-slate-100 text-slate-400 group-hover:text-slate-600 dark:bg-white/[0.06] dark:text-slate-500 dark:group-hover:text-slate-300'
-                  )}
-                >
-                  {tabIcons[section.id]}
-                </span>
-                <span className="min-w-0 flex-1 pt-0.5">
-                  <span className="block text-sm font-semibold leading-5">{section.shortTitle ?? section.title}</span>
-                  <span className="mt-0.5 hidden text-xs leading-4 text-slate-500 dark:text-slate-400 sm:block lg:block">
-                    {section.description}
-                  </span>
-                </span>
+                <span className={cn('shrink-0', active ? 'text-cyan-300 dark:text-cyan-700' : 'text-slate-400 dark:text-slate-500')}>{tabIcons[section.id]}</span>
+                <span className="whitespace-nowrap">{section.title}</span>
               </button>
             )
           })}
-          </div>
         </div>
-      </div>
+        {footer ? <div className="mt-5 hidden border-t border-slate-200 pt-5 dark:border-white/10 lg:block">{footer}</div> : null}
+      </aside>
 
-      <div className="min-w-0 lg:pt-6">
+      <div className="min-w-0">
         {sections.map((section) => (
           <div
             key={section.id}

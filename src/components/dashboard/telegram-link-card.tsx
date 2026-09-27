@@ -14,7 +14,6 @@ interface TelegramLinkCardProps {
   telegramUsername: string | null
   remnashopUserId: number | null
   remnawaveUsername: string | null
-  embedded?: boolean
 }
 
 export function TelegramLinkCard({
@@ -24,7 +23,6 @@ export function TelegramLinkCard({
   telegramUsername,
   remnashopUserId,
   remnawaveUsername,
-  embedded = false,
 }: TelegramLinkCardProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -78,61 +76,50 @@ export function TelegramLinkCard({
   }, [router, searchParams])
 
   return (
-    <div className={embedded ? '' : 'card'}>
-      {!embedded ? (
-        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex min-w-0 items-center gap-3">
-            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white text-sky-600 shadow-sm dark:bg-white/[0.06] dark:text-sky-300 dark:shadow-none">
-              <Send className="h-5 w-5" />
+    <div>
+      {telegramId ? (
+        <>
+          <div className="flex flex-col gap-4 rounded-xl border border-sky-200 bg-sky-50/70 p-4 dark:border-sky-400/20 dark:bg-sky-400/[0.06] sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex min-w-0 items-center gap-3">
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white text-sky-700 dark:bg-white/[0.08] dark:text-sky-200">
+                <Send className="h-5 w-5" />
+              </span>
+              <div className="min-w-0">
+                <p className="flex items-center gap-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-300"><BadgeCheck className="h-3.5 w-3.5" /> Аккаунт подключён</p>
+                <p className="mt-0.5 truncate text-base font-semibold text-slate-950 dark:text-white">@{telegramUsername || telegramId}</p>
+              </div>
             </div>
-            <div className="min-w-0">
-              <h2 className="font-semibold">Telegram</h2>
-              <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">Вход и перенос старых покупок.</p>
-            </div>
-          </div>
-          {telegramId ? (
             <TelegramActions
               syncing={syncing}
               canReplace={Boolean(telegramClientId)}
               onSync={syncTelegram}
               onReplace={() => setReplaceConfirmOpen(true)}
             />
-          ) : null}
-        </div>
-      ) : telegramId ? (
-        <div className="mb-3 flex justify-end">
-          <TelegramActions
-            syncing={syncing}
-            canReplace={Boolean(telegramClientId)}
-            onSync={syncTelegram}
-            onReplace={() => setReplaceConfirmOpen(true)}
-          />
-        </div>
-      ) : null}
-
-      <div className="mb-3 grid gap-2 text-sm sm:grid-cols-3">
-        <Info label="Telegram" value={telegramId ? `@${telegramUsername || telegramId}` : 'не привязан'} />
-        <Info label="Старая подписка" value={remnashopUserId ? 'найдена' : 'не найдена'} />
-        <Info label="VPN-профиль" value={remnawaveUsername ? 'готов' : 'пока нет'} />
-      </div>
-
-      {telegramId ? (
-        <div className="flex items-start gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-sm text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-100">
-          <BadgeCheck className="mt-0.5 h-4 w-4 shrink-0" />
-          <span>Telegram привязан. Если доступ к нему потерян, привяжите новый аккаунт.</span>
-        </div>
-      ) : !telegramClientId ? (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
-          Перенос старой подписки временно недоступен.
-        </div>
+          </div>
+          <h3 className="mt-6 text-sm font-semibold text-slate-950 dark:text-white">Синхронизация с кабинетом</h3>
+          <p className="mt-1 text-sm leading-6 text-slate-500 dark:text-slate-400">После привязки можно восстановить покупки из Telegram. Если данные не появились, обновите их вручную.</p>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            <Info label="Старые покупки" value={remnashopUserId ? 'Найдены' : 'Пока не найдены'} />
+            <Info label="VPN-профиль" value={remnawaveUsername ? 'Готов' : 'Пока нет'} />
+          </div>
+        </>
       ) : (
-        <div className="space-y-3">
-          <a href={telegramStartUrl} className="btn btn-primary inline-flex w-full items-center justify-center gap-2 sm:w-auto">
-            <Send className="h-4 w-4" />
-            Привязать Telegram
-            <ExternalLink className="h-4 w-4" />
-          </a>
-          <TelegramOidcHint />
+        <div className="max-w-2xl">
+          <p className="text-sm leading-6 text-slate-600 dark:text-slate-300">Подключите Telegram, чтобы входить через него и найти покупки, сделанные раньше через бота.</p>
+          {telegramClientId ? (
+            <div className="mt-5 space-y-4">
+              <a href={telegramStartUrl} className="btn-primary w-full sm:w-auto">
+                <Send className="h-4 w-4" />
+                Подключить Telegram
+                <ExternalLink className="h-4 w-4" />
+              </a>
+              <TelegramOidcHint />
+            </div>
+          ) : (
+            <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
+              Подключение Telegram временно недоступно.
+            </div>
+          )}
         </div>
       )}
 

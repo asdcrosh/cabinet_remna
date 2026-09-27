@@ -69,15 +69,20 @@ test('мобильная навигация переносит второсте�
 
   await expect(page).toHaveURL(/\/dashboard\/settings(?:\?|$)/)
   await expect(page.getByRole('heading', { name: 'Настройки' })).toBeVisible()
+  await expect(page.locator('#profile-name')).toBeEnabled()
+  const welcomeToast = page.getByRole('button', { name: 'Закрыть уведомление' })
+  if (await welcomeToast.isVisible()) await welcomeToast.click()
   const settingsTabs = page.getByRole('tablist', { name: 'Разделы настроек' })
-  await expect(settingsTabs.getByRole('tab')).toHaveCount(4)
+  await expect(settingsTabs.getByRole('tab')).toHaveCount(5)
   await expect(settingsTabs.getByRole('tab', { name: 'Профиль' })).toBeVisible()
   await settingsTabs.getByRole('tab', { name: 'Безопасность' }).click()
   await expect(page.getByRole('heading', { name: 'Сеансы аккаунта' })).toBeVisible()
   await settingsTabs.getByRole('tab', { name: 'Telegram' }).click()
   await expect(page.getByRole('heading', { name: 'Telegram' }).first()).toBeVisible()
   await settingsTabs.getByRole('tab', { name: 'Уведомления' }).click()
-  await expect(page.getByText('Колокольчик и история')).toBeVisible()
+  await expect(page.getByText('Колокольчик и история событий')).toBeVisible()
+  await settingsTabs.getByRole('tab', { name: 'Данные' }).click()
+  await expect(page.getByRole('heading', { name: 'Документы' })).toBeVisible()
   expect(await settingsTabs.locator('..').evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true)
   await expectNoHorizontalOverflow(page)
 
@@ -557,6 +562,30 @@ test('настройки сохраняют черновик между разд
   await notificationSwitch.locator('..').click()
   await page.getByRole('link', { name: 'Главная', exact: true }).first().click()
   await expect(page).toHaveURL(/\/dashboard(?:\?|$)/)
+})
+
+test('настройки уведомлений сохраняются после перезагрузки', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop-chromium', 'Сценарий достаточно проверить один раз')
+  await login(page, E2E_USERS.basic.email)
+  await page.goto('/dashboard/settings?section=notifications')
+
+  const notificationSwitch = page.getByRole('switch', { name: /в кабинете/i })
+  const initialState = await notificationSwitch.isChecked()
+  await notificationSwitch.locator('..').click()
+  const saveResponse = page.waitForResponse((response) =>
+    response.url().endsWith('/api/notifications/preferences') && response.request().method() === 'PATCH'
+  )
+  await page.getByRole('button', { name: 'Сохранить изменения' }).click()
+  await expect((await saveResponse).ok()).toBe(true)
+  await page.reload()
+  await expect(page.getByRole('switch', { name: /в кабинете/i })).toHaveJSProperty('checked', !initialState)
+
+  await notificationSwitch.locator('..').click()
+  const restoreResponse = page.waitForResponse((response) =>
+    response.url().endsWith('/api/notifications/preferences') && response.request().method() === 'PATCH'
+  )
+  await page.getByRole('button', { name: 'Сохранить изменения' }).click()
+  await expect((await restoreResponse).ok()).toBe(true)
 })
 
 test('каталог тарифов использует компактные строки с понятными действиями', async ({ page }, testInfo) => {
