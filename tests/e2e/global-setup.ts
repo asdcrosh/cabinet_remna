@@ -168,6 +168,14 @@ export default async function globalSetup() {
         emailVerifiedAt: now,
         agreedToTermsAt: now,
         referralCode: 'E2EACTIVE',
+        devices: { create: { hwid: 'e2e-device-pixel-8', displayName: 'Pixel 8', platform: 'android' } },
+        payments: {
+          create: {
+            id: 'e2e-stale-payment', planId: E2E_PLAN_ID, amountKopecks: 13000,
+            status: 'PENDING', createdAt: startAt, confirmationUrl: 'https://example.test/stale-payment',
+            provisioningError: 'E2E verification failure',
+          },
+        },
         subscriptions: {
           create: {
             id: E2E_ACTIVE_SUBSCRIPTION_ID,

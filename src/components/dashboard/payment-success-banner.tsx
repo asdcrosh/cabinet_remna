@@ -91,6 +91,8 @@ export function PaymentSuccessBanner({
       })
       setLiveStatus(result.status)
       if (result.status === 'ready') router.refresh()
+    } catch {
+      setLiveStatus('verification_error')
     } finally {
       setCheckingNow(false)
     }
@@ -100,6 +102,7 @@ export function PaymentSuccessBanner({
 
   return (
     <section
+      id="payment-status"
       className={cn('relative overflow-hidden rounded-3xl border p-4 sm:p-5', copy.shell)}
       role={liveStatus === 'verification_error' || liveStatus === 'provisioning_error' || liveStatus === 'reversal_error' || liveStatus === 'canceled' || liveStatus === 'not_found' ? 'alert' : 'status'}
       aria-live="polite"

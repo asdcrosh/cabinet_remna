@@ -1,6 +1,6 @@
 import type { Prisma } from '@prisma/client'
 import Link from 'next/link'
-import { CheckCircle2, Clock3, CreditCard, ExternalLink, ReceiptText, Tag, XCircle } from 'lucide-react'
+import { CheckCircle2, Clock3, ExternalLink, ReceiptText, Tag, XCircle } from 'lucide-react'
 import { formatPrice } from '@/lib/format'
 import { getPendingPaymentTtlMs } from '@/lib/payment-sync'
 import { EmptyState } from '@/components/dashboard/empty-state'
@@ -14,11 +14,13 @@ export type PaymentHistoryPayment = Prisma.PaymentGetPayload<{ include: { plan: 
 export function PaymentHistory({
   payments,
   supportEnabled = false,
+  filtered = false,
 }: {
   payments: PaymentHistoryPayment[]
   supportEnabled?: boolean
+  filtered?: boolean
 }) {
-  if (payments.length === 0) return <PaymentHistoryEmpty />
+  if (payments.length === 0) return <PaymentHistoryEmpty filtered={filtered} />
 
   return (
     <div className="space-y-3">
@@ -37,7 +39,7 @@ export function PaymentHistory({
           <article
             key={payment.id}
             className={cn(
-              'grid gap-4 rounded-3xl border bg-white p-4 shadow-sm shadow-slate-950/[0.02] transition-colors dark:bg-white/[0.03] dark:shadow-none sm:grid-cols-2 lg:grid-cols-[minmax(14rem,1.25fr)_minmax(8rem,.5fr)_minmax(9rem,.55fr)_minmax(8rem,.45fr)] lg:items-center lg:gap-5',
+              'grid gap-3 rounded-xl border bg-white p-4 shadow-sm shadow-slate-950/[0.02] transition-colors dark:bg-white/[0.03] dark:shadow-none sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_8rem_11rem] lg:items-center lg:gap-5',
               freshPending
                 ? 'border-amber-200 ring-1 ring-amber-100 hover:border-amber-300 dark:border-amber-400/25 dark:ring-amber-400/10'
                 : 'border-slate-200 hover:border-slate-300 dark:border-white/[0.09] dark:hover:border-white/[0.14]',
@@ -91,22 +93,13 @@ export function PaymentHistory({
               ) : null}
             </div>
 
-            <div className="flex items-end justify-between gap-3 border-t border-slate-100 pt-3 dark:border-white/[0.07] sm:block sm:border-0 sm:pt-0">
-              <div className="text-xs font-medium uppercase tracking-wide text-slate-400 sm:mb-1.5">
-                {payment.purchaseType === 'WHITELIST_ADDON' ? 'Дополнение' : 'Подписка'}
-              </div>
-              <div className="sm:mt-0">
-                <ProvisioningBadge provisioned={Boolean(payment.subscriptionProvisionedAt)} status={payment.status} />
-              </div>
-            </div>
-
             <div className="flex flex-col justify-center gap-2 border-t border-slate-100 pt-3 dark:border-white/[0.07] sm:col-span-2 lg:col-span-1 lg:border-0 lg:pt-0">
               <details className="text-xs text-slate-400 lg:text-right">
-                <summary className="cursor-pointer select-none hover:text-slate-600 dark:hover:text-slate-200">ID платежа</summary>
-                <div className="mt-1 truncate font-mono">{shortId(payment.externalPaymentId || payment.yookassaId || payment.id)}</div>
+                <summary className="cursor-pointer select-none py-2 hover:text-slate-600 dark:hover:text-slate-200">Номер платежа</summary>
+                <div className="mt-1 break-all font-mono text-slate-600 dark:text-slate-300">{payment.id}</div>
               </details>
-              {payment.status === 'PENDING' ? (
-                <PaymentAction confirmationUrl={payment.confirmationUrl} status={payment.status} createdAt={payment.createdAt} fullWidth />
+              {payment.status === 'PENDING' || (payment.status === 'SUCCEEDED' && !payment.subscriptionProvisionedAt) ? (
+                <PaymentAction paymentId={payment.id} confirmationUrl={payment.confirmationUrl} status={payment.status} createdAt={payment.createdAt} />
               ) : null}
               {supportEnabled && needsPaymentSupportAction(payment) ? (
                 <Link
@@ -124,20 +117,13 @@ export function PaymentHistory({
   )
 }
 
-function PaymentHistoryEmpty() {
-  const action = (
-    <Link href="/dashboard/plans" className="btn-primary w-full sm:w-auto">
-      <CreditCard className="h-4 w-4" />
-      Выбрать тариф
-    </Link>
-  )
-
+function PaymentHistoryEmpty({ filtered }: { filtered: boolean }) {
   return (
     <EmptyState
-      title="Платежей пока нет"
-      description="После первой покупки здесь появится история оплат и состояние выдачи подписки."
+      title={filtered ? 'В этом разделе платежей нет' : 'Платежей пока нет'}
+      description={filtered ? 'Попробуйте другой фильтр или откройте всю историю.' : 'Здесь появятся суммы, статусы и результат выдачи доступа после оплаты.'}
       icon={<ReceiptText className="h-7 w-7" />}
-      action={action}
+      action={filtered ? <Link href="/dashboard/billing?view=all" className="btn-secondary">Вся история</Link> : undefined}
     />
   )
 }
@@ -168,49 +154,24 @@ function PaymentAmount({
   )
 }
 
-function PaymentAction({
-  confirmationUrl,
-  status,
-  createdAt,
-  fullWidth = false,
-}: {
+function PaymentAction({ paymentId, confirmationUrl, status, createdAt }: {
+  paymentId: string
   confirmationUrl: string | null
   status: string
   createdAt: Date
-  fullWidth?: boolean
 }) {
-  if (status === 'PENDING' && !isFreshPendingPayment(createdAt)) {
-    return (
-      <div className="flex flex-col gap-2">
-        {confirmationUrl ? (
-          <a
-            href={confirmationUrl}
-            className="btn-primary min-h-10 w-full justify-center px-3 py-2 text-xs"
-            target="_blank"
-            rel="noreferrer"
-          >
-            <ExternalLink className="h-4 w-4" />
-            Вернуться к оплате
-          </a>
-        ) : null}
-        <Link href="/dashboard/plans" className="btn-secondary min-h-10 w-full justify-center px-3 py-2 text-xs">
-          Создать новый платёж
-        </Link>
-      </div>
-    )
-  }
-  if (status !== 'PENDING') return <span className="text-sm text-slate-400">—</span>
-  if (!confirmationUrl) return <span className="text-sm text-slate-400">Ссылка недоступна</span>
+  const canContinue = status === 'PENDING' && isFreshPendingPayment(createdAt) && confirmationUrl
   return (
-    <a
-      href={confirmationUrl}
-      className={`btn-primary min-h-10 px-3 py-2 text-xs ${fullWidth ? 'w-full justify-center' : ''}`}
-      target="_blank"
-      rel="noreferrer"
-    >
-      <ExternalLink className="h-4 w-4" />
-      Продолжить оплату
-    </a>
+    <div className="flex flex-col gap-2">
+      {canContinue ? (
+        <a href={confirmationUrl} className="btn-primary min-h-11 w-full px-3 text-xs" target="_blank" rel="noreferrer">
+          <ExternalLink className="h-4 w-4" />Продолжить оплату
+        </a>
+      ) : null}
+      <Link href={`/dashboard/billing?paid=1&payment=${encodeURIComponent(paymentId)}#payment-status`} className="btn-secondary min-h-11 w-full px-3 text-xs">
+        Проверить статус
+      </Link>
+    </div>
   )
 }
 
@@ -262,12 +223,6 @@ function PaymentStatusBadge({ status, createdAt }: { status: string; createdAt: 
   return <span className={map[status] ?? 'badge-disabled'}>{labels[status] ?? status}</span>
 }
 
-function ProvisioningBadge({ provisioned, status }: { provisioned: boolean; status: string }) {
-  if (provisioned) return <span className="badge-active">Выдана</span>
-  if (status === 'SUCCEEDED') return <span className="badge-limited">Выдача идёт</span>
-  if (status === 'PENDING') return <span className="badge-disabled">После оплаты</span>
-  return <span className="text-slate-400">—</span>
-}
 
 function getPromoCodeLabel(snapshot: unknown) {
   if (!snapshot || typeof snapshot !== 'object') return '—'
@@ -288,14 +243,13 @@ function formatPaymentDate(date: Date) {
   return new Intl.DateTimeFormat('ru-RU', {
     day: '2-digit',
     month: 'long',
+    year: 'numeric',
+    timeZone: 'Europe/Moscow',
     hour: '2-digit',
     minute: '2-digit',
   }).format(date)
 }
 
-function shortId(id: string) {
-  return id.length > 12 ? `${id.slice(0, 8)}...${id.slice(-4)}` : id
-}
 
 function isFreshPendingPayment(createdAt: Date) {
   return createdAt.getTime() > Date.now() - getPendingPaymentTtlMs()
@@ -305,7 +259,7 @@ function paymentStatusDescription(payment: PaymentHistoryPayment) {
   if (payment.status === 'PENDING') {
     return isFreshPendingPayment(payment.createdAt)
       ? 'Завершите оплату в окне платёжной системы. После подтверждения статус обновится автоматически.'
-      : 'Платёжная система ещё не сообщила итоговый статус. Можно вернуться к оплате по сохранённой ссылке или создать новый платёж.'
+      : 'Результат оплаты пока не подтверждён. Проверьте статус перед новой попыткой, особенно если деньги уже списались.'
   }
   if (payment.status === 'CANCELED') {
     return 'Платёж не был завершён. Если деньги списались, передайте номер платежа поддержке.'

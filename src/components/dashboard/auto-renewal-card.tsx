@@ -1,8 +1,9 @@
 'use client'
 
-import { type ReactNode, useState } from 'react'
+import { type ReactNode, useEffect, useState } from 'react'
 import Link from 'next/link'
-import { ArrowRight, CalendarClock, CheckCircle2, CreditCard, Loader2, PauseCircle, Play, ReceiptText, RefreshCw, ShieldCheck, type LucideIcon } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { ArrowRight, CalendarClock, CreditCard, Loader2, PauseCircle, Play, ReceiptText, RefreshCw, type LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { apiFetch } from '@/lib/api-client'
 import { toast } from '@/components/ui/toaster'
@@ -56,18 +57,23 @@ export function AutoRenewalCard({
   planDurationDays,
   planDeviceLimit,
   accessExpiresAt = null,
+  canPause = true,
+  canEnable = true,
   initialState,
   initialPause,
 }: {
   planId: string
   planName: string
-  planPriceKopecks: number
+  planPriceKopecks: number | null
   planDurationDays: number
   planDeviceLimit: number
   accessExpiresAt?: string | null
+  canPause?: boolean
+  canEnable?: boolean
   initialState: AutoRenewalState
   initialPause: PauseState
 }) {
+  const router = useRouter()
   const [state, setState] = useState(initialState)
   const [pause, setPause] = useState(initialPause)
   const [saving, setSaving] = useState(false)
@@ -76,10 +82,17 @@ export function AutoRenewalCard({
   const [reason, setReason] = useState<RetentionReason>('NOT_USING')
   const [pauseDays, setPauseDays] = useState(14)
   const [comment, setComment] = useState('')
+  useEffect(() => {
+    setState(initialState)
+    setPause(initialPause)
+  }, [initialState, initialPause])
+  const priceLabel = planPriceKopecks == null ? 'Сумма уточняется' : formatPrice(planPriceKopecks)
   const consentCurrent = Boolean(
     state?.consentAcceptedAt
     && state.consentVersion === AUTO_RENEWAL_CONSENT_VERSION
     && state.deviceLimit === planDeviceLimit
+    && state.plan.id === planId
+    && planPriceKopecks != null
     && state.consentPriceKopecks != null
     && state.consentPriceKopecks >= planPriceKopecks
     && state.consentDurationDays === planDurationDays
@@ -101,7 +114,7 @@ export function AutoRenewalCard({
   }
 
   async function submitEnable() {
-    if (!consentAccepted) return
+    if (!consentAccepted || !canEnable || planPriceKopecks == null) return
     setSaving(true)
     try {
       const data = await apiFetch<{ autoRenewal: AutoRenewalState }>('/api/auto-renewal', {
@@ -121,6 +134,9 @@ export function AutoRenewalCard({
           : 'Автопродление включено',
         'success'
       )
+      router.refresh()
+    } catch {
+      // apiFetch reports the error and the dialog stays open for retry.
     } finally {
       setSaving(false)
     }
@@ -138,6 +154,9 @@ export function AutoRenewalCard({
       toast('Остаток подписки сохранён на паузе', 'success')
       setDialog(null)
       setComment('')
+      router.refresh()
+    } catch {
+      // Keep the existing state until the server confirms the change.
     } finally {
       setSaving(false)
     }
@@ -152,6 +171,9 @@ export function AutoRenewalCard({
       setState(data.autoRenewal)
       setDialog(null)
       toast('Карта отвязана. Автопродление отключено, оплаченный срок сохранён', 'success')
+      router.refresh()
+    } catch {
+      // apiFetch reports the error; do not show a successful unlink.
     } finally {
       setSaving(false)
     }
@@ -163,6 +185,9 @@ export function AutoRenewalCard({
       await apiFetch('/api/retention', { method: 'DELETE' })
       setPause(null)
       toast('Доступ снова активен', 'success')
+      router.refresh()
+    } catch {
+      // The pause stays visible when resuming fails.
     } finally {
       setSaving(false)
     }
@@ -181,18 +206,18 @@ export function AutoRenewalCard({
       : processing
         ? { label: 'Идёт списание', tone: 'cyan' as const, description: 'ЮKassa обрабатывает платёж. Обычно это занимает несколько секунд.' }
         : retrying
-          ? { label: 'Платёж не прошёл', tone: 'amber' as const, description: 'Повторим списание автоматически. Доступ пока продолжает работать.' }
+          ? { label: 'Платёж не прошёл', tone: 'amber' as const, description: 'Повторим списание автоматически. Срок доступа указан в вашей подписке выше.' }
           : renewalPaused
             ? { label: 'Требуется действие', tone: 'amber' as const, description: state?.lastError ?? 'Автопродление остановлено. Оплатите подписку вручную или привяжите другую карту.' }
           : needsConsent
             ? { label: 'Нужно подтверждение', tone: 'amber' as const, description: 'Условия тарифа изменились. Подтвердите новую сумму, чтобы продление продолжило работать.' }
             : enabled
-              ? { label: 'Работает', tone: 'emerald' as const, description: 'Продлим подписку автоматически до окончания доступа. Ничего делать не нужно.' }
-              : { label: 'Выключено', tone: 'slate' as const, description: 'Подключите один раз, чтобы не следить за датой окончания подписки.' }
+              ? { label: 'Работает', tone: 'emerald' as const, description: 'Подписка продлевается с сохранённой карты. Сумма и дата списания указаны ниже.' }
+              : { label: 'Выключено', tone: 'slate' as const, description: canEnable ? 'Можно продлевать вручную или включить оплату с сохранённой карты.' : 'Включить автопродление можно после покупки активного платного тарифа.' }
 
   return (
     <>
-    <section id="auto-renewal" className="scroll-mt-24 overflow-hidden rounded-[1.4rem] border border-slate-200 bg-white shadow-[0_20px_60px_-48px_rgba(15,23,42,0.55)] dark:border-white/[0.09] dark:bg-white/[0.035]" aria-labelledby="auto-renewal-title">
+    <section id="auto-renewal" className="scroll-mt-24 overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.025]" aria-labelledby="auto-renewal-title">
       <div className="relative overflow-hidden px-5 py-5 sm:px-6 sm:py-6">
         <div className="pointer-events-none absolute -right-16 -top-20 h-44 w-44 rounded-full bg-cyan-300/15 blur-3xl dark:bg-cyan-300/[0.07]" />
         <div className="relative flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
@@ -211,12 +236,20 @@ export function AutoRenewalCard({
 
           <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap xl:justify-end">
             {pause ? (
+              <>
               <button className="btn-primary w-full justify-center sm:w-auto" disabled={saving} onClick={() => void resumeAccess()}>
                 {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
                 Возобновить доступ
               </button>
+              {cancellable ? <button type="button" className="btn-secondary w-full sm:w-auto" disabled={saving} onClick={() => void changeEnabled(false)}>Отключить и отвязать карту</button> : null}
+              </>
             ) : saving ? (
               <div className="flex min-h-11 items-center justify-center px-4"><Loader2 className="h-5 w-5 animate-spin text-slate-400" /></div>
+            ) : !canEnable || planPriceKopecks == null ? (
+              <>
+                <Link href="/dashboard/plans?intent=renew" className="btn-secondary w-full sm:w-auto">Выбрать условия продления</Link>
+                {cancellable ? <button type="button" className="btn-secondary w-full text-red-600 dark:text-red-300 sm:w-auto" onClick={() => void changeEnabled(false)}>Отключить и отвязать карту</button> : null}
+              </>
             ) : pendingMethod ? (
               <>
                 <Link href="/dashboard/plans?intent=renew" className="btn-primary w-full justify-center sm:w-auto">
@@ -252,8 +285,8 @@ export function AutoRenewalCard({
           <StatusCell
             icon={ReceiptText}
             label="Сумма и период"
-            value={`${formatPrice(state?.consentPriceKopecks ?? planPriceKopecks)} · ${planDurationDays} дн.`}
-            detail={`Тариф «${state?.plan.name ?? planName}» · ${planDeviceLimit} устройств`}
+            value={state?.consentPriceKopecks != null ? `${formatPrice(state.consentPriceKopecks)} · ${state.consentDurationDays ?? planDurationDays} дн.` : 'Условия не подтверждены'}
+            detail={`Тариф «${state?.plan.name ?? planName}» · ${state?.deviceLimit ?? planDeviceLimit} устройств`}
           />
           <StatusCell
             icon={CreditCard}
@@ -264,8 +297,8 @@ export function AutoRenewalCard({
           <StatusCell
             icon={CalendarClock}
             label={retrying ? 'Повторное списание' : 'Следующее списание'}
-            value={state?.nextChargeAt ? formatDate(state.nextChargeAt) : 'После привязки карты'}
-            detail={retrying ? `Попытка ${state.retryCount + 1} из 3` : processing ? 'Платёж уже обрабатывается' : 'За 24 часа до окончания доступа'}
+            value={renewalPaused || needsConsent ? 'Не запланировано' : state?.nextChargeAt ? formatDate(state.nextChargeAt) : pendingMethod ? 'После привязки карты' : 'Дата уточняется'}
+            detail={retrying ? `Повторная попытка: ${state.retryCount + 1}` : processing ? 'Платёж уже обрабатывается' : renewalPaused || needsConsent ? 'Требуется ваше действие' : 'Перед окончанием доступа'}
           />
         </div>
       ) : pause ? (
@@ -277,23 +310,21 @@ export function AutoRenewalCard({
           <span className="inline-flex items-center gap-2 text-xs font-semibold text-amber-700 dark:text-amber-300"><PauseCircle className="h-4 w-4" /> Оплаченные дни не расходуются</span>
         </div>
       ) : (
-        <div className="grid gap-3 border-t border-slate-200 bg-slate-50/70 px-5 py-4 dark:border-white/[0.08] dark:bg-white/[0.02] sm:grid-cols-3 sm:px-6">
-          <Benefit icon={CheckCircle2}>Подписка продлевается сама</Benefit>
-          <Benefit icon={ShieldCheck}>Платёж проходит через ЮKassa</Benefit>
-          <Benefit icon={CreditCard}>Карту можно отвязать в любой момент</Benefit>
+        <div className="border-t border-slate-200 bg-slate-50/70 px-5 py-4 text-sm text-slate-600 dark:border-white/10 dark:bg-white/[0.02] dark:text-slate-300 sm:px-6">
+          {canEnable && planPriceKopecks != null ? <><strong className="font-semibold">{priceLabel} за {planDurationDays} дн.</strong> · через ЮKassa. Списания включатся после вашего согласия.</> : 'Автоматических списаний нет.'}
         </div>
       )}
 
-      {!pause ? (
+      {!pause && (canPause || configured) ? (
         <div className="flex flex-col gap-2 border-t border-slate-200 px-5 py-3 dark:border-white/[0.08] sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <span className="text-xs leading-5 text-slate-500 dark:text-slate-400">
             {configured && state?.consentAcceptedAt
               ? <>Согласие принято {formatDate(state.consentAcceptedAt)}. <Link href="/offer" className="font-semibold text-brand-600 hover:underline dark:text-brand-300">Условия автоплатежей</Link></>
               : 'Не нужен VPN какое-то время? Оплаченные дни можно сохранить на паузе.'}
           </span>
-          <button className="inline-flex min-h-9 shrink-0 items-center justify-center gap-2 rounded-xl px-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/[0.06]" onClick={() => setDialog('pause')}>
+          {canPause ? <button className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl px-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/[0.06]" onClick={() => setDialog('pause')}>
             <PauseCircle className="h-4 w-4" /> Поставить на паузу
-          </button>
+          </button> : null}
         </div>
       ) : null}
     </section>
@@ -305,7 +336,7 @@ export function AutoRenewalCard({
         ? 'Регулярные списания включатся только после вашего явного подтверждения.'
         : dialog === 'pause'
           ? 'Остаток дней сохранится. Устройства и профиль останутся на месте.'
-          : 'Удалим идентификатор сохранённой карты из кабинета и отключим следующие автоматические списания.'}
+          : 'Отвяжем карту от кабинета и отключим следующие автоматические списания.'}
       onClose={() => {
         if (saving) return
         setDialog(null)
@@ -343,7 +374,7 @@ export function AutoRenewalCard({
           <div className="grid overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 dark:border-white/10 dark:bg-white/[0.035] sm:grid-cols-2">
             <div className="p-4 sm:p-5">
               <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Регулярный платёж</div>
-              <div className="mt-2 text-2xl font-semibold tracking-tight text-slate-950 dark:text-white">{formatPrice(planPriceKopecks)}</div>
+              <div className="mt-2 text-2xl font-semibold tracking-tight text-slate-950 dark:text-white">{priceLabel}</div>
               <div className="mt-1 text-sm text-slate-500 dark:text-slate-400">
                 {planDeviceLimit} устройств · каждые {planDurationDays} дней
               </div>
@@ -360,7 +391,7 @@ export function AutoRenewalCard({
             onChange={(event) => setConsentAccepted(event.target.checked)}
             label={(
               <span>
-                Я согласен на регулярное списание {formatPrice(planPriceKopecks)} каждые {planDurationDays} дней для продления тарифа «{planName}» и принимаю{' '}
+                Я согласен на регулярное списание {priceLabel} каждые {planDurationDays} дней для продления тарифа «{planName}» и принимаю{' '}
                 <Link href="/offer" target="_blank" className="font-semibold text-brand-600 hover:underline dark:text-brand-300" onClick={(event) => event.stopPropagation()}>условия оферты</Link>.
               </span>
             )}
@@ -441,17 +472,6 @@ function StatusBadge({ tone, children }: { tone: 'emerald' | 'cyan' | 'amber' | 
       )} />
       {children}
     </span>
-  )
-}
-
-function Benefit({ icon: Icon, children }: { icon: LucideIcon; children: ReactNode }) {
-  return (
-    <div className="flex items-center gap-2 text-xs font-medium leading-5 text-slate-600 dark:text-slate-300">
-      <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-white text-cyan-600 shadow-sm ring-1 ring-slate-200 dark:bg-white/[0.06] dark:text-cyan-300 dark:ring-white/10">
-        <Icon className="h-3.5 w-3.5" />
-      </span>
-      <span>{children}</span>
-    </div>
   )
 }
 

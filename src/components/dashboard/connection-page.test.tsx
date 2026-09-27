@@ -4,9 +4,9 @@ import { ConnectionPage } from './connection-page'
 import { VpnConnectionCheck } from './vpn-connection-check'
 
 describe('экран подключения', () => {
-  function renderPage(expired = false, hasConnectedDevices = false) {
+  function renderPage(expired = false) {
     return renderToStaticMarkup(
-      <ConnectionPage subscriptionUrl="https://example.invalid/subscription" supportEnabled expired={expired} hasConnectedDevices={hasConnectedDevices}>
+      <ConnectionPage subscriptionUrl="https://example.invalid/subscription" supportEnabled expired={expired}>
         <p>Управление оплатой</p>
       </ConnectionPage>,
     )
@@ -14,11 +14,11 @@ describe('экран подключения', () => {
 
   it('начинается с установки, а не с оплаты или диагностики', () => {
     const html = renderPage()
-    expect(html).toContain('Установите INCY')
+    expect(html).toContain('Система этого устройства')
     expect(html).toContain('Уже установлено')
     expect(html).not.toContain('>Добавить в INCY<')
-    expect(html).not.toContain('Проверить подключение')
-    expect(html.indexOf('id="connection"')).toBeLessThan(html.indexOf('Подписка и оплата'))
+    expect(html.indexOf('id="connection"')).toBeLessThan(html.indexOf('Проверить подключение'))
+    expect(html.indexOf('id="connection"')).toBeLessThan(html.indexOf('Срок доступа и трафик'))
     expect(html).not.toMatch(/<details[^>]*\bopen=/)
   })
 
@@ -38,12 +38,13 @@ describe('экран подключения', () => {
     expect(html).toContain('Управление оплатой')
   })
 
-  it('не заставляет возвращающегося пользователя повторять установку', () => {
-    const html = renderPage(false, true)
-    expect(html).toContain('VPN уже настраивали')
-    expect(html).toContain('Проверьте подключение')
-    expect(html).toContain('Настроить это устройство заново')
-    expect(html.indexOf('VPN уже настраивали')).toBeLessThan(html.indexOf('Установите INCY'))
+  it('оставляет настройку видимой и предлагает отдельную проверку готового VPN', () => {
+    const html = renderPage()
+    expect(html).toContain('VPN уже настроен на этом устройстве?')
+    expect(html).toContain('Проверить подключение')
+    expect(html).toContain('href="/dashboard/billing"')
+    expect(html).not.toContain('VPN уже настраивали')
+    expect(html.indexOf('id="connection"')).toBeLessThan(html.indexOf('VPN уже настроен'))
   })
 
   it('объясняет паузу вместо показа установки', () => {

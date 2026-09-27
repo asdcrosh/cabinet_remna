@@ -1,4 +1,4 @@
-// /dashboard/billing — история платежей + банер «оплата прошла».
+// Подписка, продление и история платежей.
 
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth/cookies'
@@ -9,14 +9,15 @@ import { PaymentSuccessBanner } from '@/components/dashboard/payment-success-ban
 import { PaymentHistory } from '@/components/dashboard/payment-history'
 import { readPaymentBannerStatus } from '@/lib/payment-status-read'
 import { getFeatureFlags } from '@/lib/feature-flags'
-import { ArrowRight, CreditCard } from 'lucide-react'
+import { CreditCard } from 'lucide-react'
 import { AutoRenewalCard } from '@/components/dashboard/auto-renewal-card'
 import { getAutoRenewalState } from '@/lib/auto-renewal'
 import { getRetentionState } from '@/lib/subscription-retention'
 import { tryCalculateRenewalPricing } from '@/lib/renewal-pricing'
 import type { Prisma } from '@prisma/client'
 import { resolveSubscriptionPresentation } from '@/lib/subscription-presentation'
-import { StatusBadge } from '@/components/dashboard/status-badge'
+import { BillingOverview } from '@/components/dashboard/billing-overview'
+import { isWhitelistAddonCurrentlyActive } from '@/lib/whitelist-addon-policy'
 
 export const dynamic = 'force-dynamic'
 const PAGE_SIZE = 20
@@ -62,7 +63,7 @@ export default async function BillingPage({
         include: { plan: true, subscription: true },
       }),
       prisma.subscription.findFirst({
-        where: { userId: session.uid, planId: { not: null } },
+        where: { userId: session.uid },
         orderBy: { expireAt: 'desc' },
         include: {
           plan: {
@@ -72,6 +73,12 @@ export default async function BillingPage({
               priceKopecks: true,
               durationDays: true,
               unlimitedDuration: true,
+              unlimitedDevices: true,
+              isActive: true,
+              isPromo: true,
+              whitelistAddonEnabled: true,
+              whitelistAddonPriceKopecks: true,
+              whitelistAddonInternalSquads: true,
               deviceLimit: true,
               maxDeviceLimit: true,
               extraDevicePriceKopecks: true,
@@ -99,73 +106,62 @@ export default async function BillingPage({
       })
     : null
 
-  return (
-    <div className="page-stack">
-      <PageHeader
-        title="Платежи"
-        description="Статусы оплат и выдача доступа в одном месте."
-        action={(
-          <Link href="/dashboard/plans" className="btn-primary group w-full justify-between px-4 sm:w-auto sm:gap-3">
-            <span className="inline-flex items-center gap-2">
-              <CreditCard className="h-4 w-4" />
-              Выбрать тариф
-            </span>
-            <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-          </Link>
-        )}
-      />
+  const plan = currentSubscription?.plan
+  const renewalPlan = plan ?? autoRenewal?.plan
+  const deviceLimit = currentSubscription?.deviceLimit ?? plan?.deviceLimit ?? null
+  const includesAddon = Boolean(currentSubscription && plan
+    && isWhitelistAddonCurrentlyActive(currentSubscription)
+    && plan.whitelistAddonEnabled && plan.whitelistAddonPriceKopecks > 0
+    && plan.whitelistAddonInternalSquads.length > 0)
+  const renewalPrice = plan && deviceLimit != null
+    ? tryCalculateRenewalPricing(plan, deviceLimit, discountUser?.personalDiscountPercent ?? 0, includesAddon ? plan.whitelistAddonPriceKopecks : 0)?.totalAmountKopecks ?? null
+    : null
+  const canManageActiveSubscription = Boolean(currentSubscription
+    && ['ACTIVE', 'LIMITED'].includes(currentSubscription.status)
+    && currentSubscription.expireAt > new Date())
 
-      {currentSubscription?.plan && subscriptionState ? (
-        <section className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-5 dark:border-white/[0.09] dark:bg-white/[0.03] sm:flex-row sm:items-center sm:justify-between">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <h2 className="font-semibold text-slate-950 dark:text-white">{subscriptionState.title}</h2>
-              <StatusBadge status={subscriptionState.status} />
-            </div>
-            <p className="mt-1 text-sm leading-6 text-slate-500 dark:text-slate-400">
-              {subscriptionState.phase === 'paused'
-                ? subscriptionState.description
-                : currentSubscription.plan.unlimitedDuration
-                  ? `Тариф «${currentSubscription.plan.name}», срок не ограничен.`
-                  : `Тариф «${currentSubscription.plan.name}» до ${currentSubscription.expireAt.toLocaleDateString('ru-RU')}.`}
-            </p>
-          </div>
-          <Link
-            href={subscriptionState.phase === 'paused'
-              ? '#auto-renewal'
-              : subscriptionState.requiresRenewal
-                ? '/dashboard/plans?intent=renew'
-                : '/dashboard/subscription'}
-            className="btn-secondary w-full shrink-0 justify-center sm:w-auto"
-          >
-            {subscriptionState.phase === 'paused'
-              ? 'Возобновить'
-              : subscriptionState.requiresRenewal
-                ? 'Продлить'
-                : 'Открыть подключение'}
-          </Link>
-        </section>
-      ) : null}
+  return (
+    <div className="user-workspace page-stack mx-auto max-w-6xl">
+      <PageHeader title="Подписка и оплата" description="Срок доступа, продление и все ваши платежи." />
 
       {params.paid === '1' && returnPaymentId && (
         <PaymentSuccessBanner
+          key={`${returnPaymentId}:${paymentBannerStatus}`}
           paymentId={returnPaymentId}
           status={paymentBannerStatus ?? 'not_found'}
           supportEnabled={features.support}
         />
       )}
 
-      {currentSubscription?.plan && subscriptionState && !subscriptionState.requiresRenewal && !currentSubscription.plan.unlimitedDuration ? (
+      {currentSubscription && subscriptionState ? (
+        <BillingOverview
+          planName={plan?.name ?? 'VPN-подписка'}
+          state={subscriptionState}
+          unlimitedDuration={Boolean(plan?.unlimitedDuration)}
+          unlimitedDevices={Boolean(plan?.unlimitedDevices)}
+          deviceLimit={deviceLimit}
+          renewalPrice={renewalPrice}
+          durationDays={plan?.durationDays ?? null}
+          includesAddon={includesAddon}
+        />
+      ) : (
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-white/10 dark:bg-white/[0.025] sm:p-6">
+          <h2 className="text-xl font-semibold">Подписки пока нет</h2>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500 dark:text-slate-400">Выберите тариф. После подтверждения оплаты здесь появятся срок доступа и условия продления.</p>
+          <Link href="/dashboard/plans" className="btn-primary mt-4 w-full sm:w-auto"><CreditCard className="h-4 w-4" />Выбрать тариф</Link>
+        </section>
+      )}
+
+      {renewalPlan && (!renewalPlan.unlimitedDuration || autoRenewal || retentionPause) ? (
         <AutoRenewalCard
-          planId={currentSubscription.plan.id}
-          planName={currentSubscription.plan.name}
-          planPriceKopecks={currentRenewalPrice(
-            currentSubscription.plan,
-            currentSubscription.deviceLimit ?? currentSubscription.plan.deviceLimit,
-            discountUser?.personalDiscountPercent ?? 0
-          )}
-          planDurationDays={currentSubscription.plan.durationDays}
-          planDeviceLimit={currentSubscription.deviceLimit ?? currentSubscription.plan.deviceLimit}
+          planId={renewalPlan.id}
+          planName={renewalPlan.name}
+          planPriceKopecks={renewalPrice}
+          planDurationDays={renewalPlan.durationDays}
+          planDeviceLimit={deviceLimit ?? autoRenewal?.deviceLimit ?? renewalPlan.deviceLimit}
+          accessExpiresAt={currentSubscription?.expireAt.toISOString() ?? null}
+          canPause={canManageActiveSubscription && !plan?.unlimitedDuration}
+          canEnable={canManageActiveSubscription && Boolean(plan?.isActive && !plan.isPromo && !plan.unlimitedDuration && plan.priceKopecks > 0)}
           initialState={autoRenewal ? {
             ...autoRenewal,
             paymentMethodSavedAt: autoRenewal.paymentMethodSavedAt?.toISOString() ?? null,
@@ -215,7 +211,7 @@ export default async function BillingPage({
         {view === 'important' ? (
           <p className="mb-3 px-1 text-xs text-slate-500 dark:text-slate-400">Отменённые попытки оплаты скрыты. Они доступны во вкладке «Все».</p>
         ) : null}
-        <PaymentHistory payments={payments} supportEnabled={features.support} />
+        <PaymentHistory payments={payments} supportEnabled={features.support} filtered={view !== 'important'} />
       </section>
 
       {pages > 1 && (
@@ -239,20 +235,6 @@ function billingHref(view: PaymentView, page: number) {
   if (page > 1) params.set('page', String(page))
   const query = params.toString()
   return query ? `/dashboard/billing?${query}` : '/dashboard/billing'
-}
-
-function currentRenewalPrice(
-  plan: {
-    priceKopecks: number
-    deviceLimit: number
-    maxDeviceLimit: number
-    extraDevicePriceKopecks: number
-  },
-  deviceLimit: number,
-  personalDiscountPercent: number
-) {
-  return tryCalculateRenewalPricing(plan, deviceLimit, personalDiscountPercent)?.totalAmountKopecks
-    ?? plan.priceKopecks
 }
 
 function paymentCountLabel(count: number) {

@@ -17,10 +17,6 @@ import { isWhitelistAddonCurrentlyActive } from '@/lib/whitelist-addon-policy'
 import { readPlanPurchaseSnapshot } from '@/lib/plan-purchase'
 import { logError } from '@/lib/logger'
 import { SubscriptionPendingRefresh } from '@/components/dashboard/subscription-pending-refresh'
-import { AutoRenewalCard } from '@/components/dashboard/auto-renewal-card'
-import { getAutoRenewalState } from '@/lib/auto-renewal'
-import { getRetentionState } from '@/lib/subscription-retention'
-import { tryCalculateRenewalPricing } from '@/lib/renewal-pricing'
 import { StatusBadge } from '@/components/dashboard/status-badge'
 import { PageHeader } from '@/components/dashboard/page-header'
 
@@ -30,8 +26,8 @@ export default async function SubscriptionPage() {
   const features = await getFeatureFlags()
   const session = await getCurrentUser()
   if (!session) redirect('/login')
-  const [user, localSubscription, payments, auditEvents, autoRenewal, retentionPause] = await Promise.all([
-    prisma.user.findUnique({ where: { id: session.uid }, include: { _count: { select: { devices: true } } } }),
+  const [user, localSubscription, payments, auditEvents] = await Promise.all([
+    prisma.user.findUnique({ where: { id: session.uid } }),
     prisma.subscription.findFirst({
       where: { userId: session.uid },
       orderBy: { expireAt: 'desc' },
@@ -86,10 +82,19 @@ export default async function SubscriptionPage() {
       logError('subscription.timeline_audit_failed', error, { userId: session.uid })
       return []
     }),
-    getAutoRenewalState(session.uid),
-    getRetentionState(session.uid),
   ])
-  if (!user?.remnawaveUsername) {
+  if (!user) redirect('/login')
+  if (!user.remnawaveUsername && (localSubscription?.pendingSync || localSubscription?.status === 'ACTIVE' || localSubscription?.status === 'LIMITED')) {
+    return (
+      <EmptyState
+        title="Готовим подключение"
+        description="Подписка сохранена. Настройки VPN появятся после завершения выдачи доступа. Повторная покупка не нужна."
+        icon={<Sparkles className="h-7 w-7" />}
+        action={<><SubscriptionPendingRefresh /><Link href="/dashboard/billing" className="btn-primary">Проверить оплату и доступ</Link>{features.support ? <Link href="/dashboard/support" className="btn-secondary">Написать в поддержку</Link> : null}</>}
+      />
+    )
+  }
+  if (!user.remnawaveUsername) {
     return (
       <EmptyState
         title="Подписки пока нет"
@@ -194,7 +199,6 @@ export default async function SubscriptionPage() {
         ? null
         : localSubscription?.deviceLimit ?? localSubscription?.plan?.deviceLimit}
       expired={subscriptionExpired}
-      hasConnectedDevices={user._count.devices > 0}
       accessIssue={accessIssue}
       notice={graceActive ? (
         <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-400/10 dark:text-amber-200">
@@ -285,33 +289,7 @@ export default async function SubscriptionPage() {
         </div>
       </section>
 
-      {!subscriptionExpired && localSubscription?.plan && localSubscription.planId && !unlimitedDuration ? (
-        <AutoRenewalCard
-          planId={localSubscription.planId}
-          planName={localSubscription.plan.name}
-          planPriceKopecks={currentRenewalPrice(
-            localSubscription.plan,
-            localSubscription.deviceLimit ?? localSubscription.plan.deviceLimit,
-            user.personalDiscountPercent
-          )}
-          planDurationDays={localSubscription.plan.durationDays}
-          planDeviceLimit={localSubscription.deviceLimit ?? localSubscription.plan.deviceLimit}
-          accessExpiresAt={u.expiresAt}
-          initialState={autoRenewal ? {
-            ...autoRenewal,
-            paymentMethodSavedAt: autoRenewal.paymentMethodSavedAt?.toISOString() ?? null,
-            consentAcceptedAt: autoRenewal.consentAcceptedAt?.toISOString() ?? null,
-            nextChargeAt: autoRenewal.nextChargeAt?.toISOString() ?? null,
-            lastAttemptAt: autoRenewal.lastAttemptAt?.toISOString() ?? null,
-            lastSuccessAt: autoRenewal.lastSuccessAt?.toISOString() ?? null,
-          } : null}
-          initialPause={retentionPause ? {
-            ...retentionPause,
-            pauseUntil: retentionPause.pauseUntil?.toISOString() ?? null,
-            createdAt: retentionPause.createdAt.toISOString(),
-          } : null}
-        />
-      ) : null}
+      <Link href="/dashboard/billing" className="btn-secondary w-full">Управлять подпиской и оплатой</Link>
 
       <SubscriptionTimeline payments={payments} auditEvents={auditEvents} />
     </ConnectionPage>
@@ -333,20 +311,6 @@ function formatTrafficForUser(value: string) {
   }
   const unit = units[match[2]!.toLowerCase()]
   return unit ? `${amount.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} ${unit}` : value
-}
-
-function currentRenewalPrice(
-  plan: {
-    priceKopecks: number
-    deviceLimit: number
-    maxDeviceLimit: number
-    extraDevicePriceKopecks: number
-  },
-  deviceLimit: number,
-  personalDiscountPercent: number
-) {
-  return tryCalculateRenewalPricing(plan, deviceLimit, personalDiscountPercent)?.totalAmountKopecks
-    ?? plan.priceKopecks
 }
 
 function SubscriptionUnavailable({

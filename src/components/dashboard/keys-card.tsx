@@ -100,7 +100,7 @@ export function KeysCard({
   const [copied, setCopied] = useState(false)
 
   useEffect(() => {
-    const detected = detectDevice(navigator.userAgent)
+    const detected = detectDevice(navigator.userAgent, navigator.maxTouchPoints)
     setReady(true)
     setDevice(detected)
     setSelectedAppId(recommendedAppForDevice(detected).id)
@@ -150,8 +150,14 @@ export function KeysCard({
       return
     }
 
-    setStep(3)
-    openExternal(primaryLink, selectedDeepLinks.slice(1), selectedApp.name)
+    try {
+      openExternal(primaryLink, selectedDeepLinks.slice(1), selectedApp.name)
+      setStep(3)
+    } catch {
+      setInstructionsOpen(true)
+      toast('Не удалось открыть приложение. Добавьте ссылку вручную.')
+      return
+    }
     window.setTimeout(() => {
       void navigator.clipboard?.writeText(subscriptionUrl).catch(() => undefined)
     }, 500)
@@ -174,22 +180,33 @@ export function KeysCard({
     <section
       id="connection"
       aria-labelledby="connection-title"
-      className="connection-panel overflow-hidden rounded-3xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.03]"
+      className="connection-panel overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.025]"
     >
       <div className="p-5 sm:p-7">
-        <div className="flex items-center justify-between gap-3 text-xs text-slate-500 dark:text-slate-400">
-          <span>Шаг {step} из 3</span>
-          <span>{ready ? deviceLabel(device) : 'Определяем устройство…'}</span>
+        <div className="flex flex-col gap-2 border-b border-slate-200 pb-5 dark:border-white/10 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <label htmlFor="connection-device" className="text-sm font-semibold">Система этого устройства</label>
+            <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{ready ? 'Можно изменить, если определили неверно.' : 'Определяем устройство…'}</p>
+          </div>
+          <select id="connection-device" className="input w-full sm:max-w-56" value={device} disabled={!ready} onChange={(event) => selectDevice(event.target.value as Device)}>
+            <option value="ios">iPhone / iPad</option>
+            <option value="android">Android</option>
+            <option value="macos">macOS</option>
+            <option value="windows">Windows</option>
+            <option value="desktop">Linux / другой компьютер</option>
+          </select>
         </div>
-        <div className="mt-3 flex gap-1.5" aria-hidden="true">
-          {[1, 2, 3].map((value) => (
-            <span key={value} className={cn('h-1 flex-1 rounded-full', value <= step ? 'bg-brand-500' : 'bg-slate-200 dark:bg-white/10')} />
+        <ol className="mt-5 grid grid-cols-3 gap-2" aria-label="Шаги подключения">
+          {['Установить', 'Добавить', 'Включить'].map((label, index) => (
+            <li key={label} aria-current={index + 1 === step ? 'step' : undefined} className={cn('border-t-2 pt-2 text-xs font-medium', index + 1 <= step ? 'border-brand-500 text-slate-950 dark:text-white' : 'border-slate-200 text-slate-400 dark:border-white/10')}>
+              <span className="mr-1.5">{index + 1}.</span>{label}
+            </li>
           ))}
-        </div>
+        </ol>
 
         <div className="mt-6" aria-live="polite">
           <h2 id="connection-title" className="text-xl font-semibold tracking-tight text-slate-950 dark:text-white sm:text-2xl">
-            {step === 1 ? `Установите ${selectedApp.name}` : step === 2 ? 'Добавьте настройку VPN' : 'Включите VPN в приложении'}
+            {!ready ? 'Подключение VPN' : step === 1 ? `Установите ${selectedApp.name}` : step === 2 ? 'Добавьте настройку VPN' : 'Включите VPN в приложении'}
           </h2>
           <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
             {step === 1
@@ -259,16 +276,6 @@ export function KeysCard({
             {step === 1 ? 'Не подходит приложение?' : 'Не получается?'}
           </summary>
           <div className="mt-3 space-y-4">
-            <label className="block text-sm text-slate-600 dark:text-slate-300">
-              Система устройства
-              <select className="input mt-2 w-full" value={device} onChange={(event) => selectDevice(event.target.value as Device)}>
-                <option value="ios">iPhone / iPad</option>
-                <option value="android">Android</option>
-                <option value="macos">macOS</option>
-                <option value="windows">Windows</option>
-                <option value="desktop">Linux / другой компьютер</option>
-              </select>
-            </label>
             {compatibleApps.length > 1 && (
               <div className="grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="Приложение для подключения">
                 {compatibleApps.map((option) => (
@@ -292,6 +299,7 @@ export function KeysCard({
               </button>
             </div>
             <p className="text-xs leading-5 text-slate-500">Ссылка даёт доступ к вашему VPN. Не отправляйте её другим людям.</p>
+            {step === 2 ? <button type="button" className="btn-secondary w-full" onClick={() => setStep(3)}>Подписка добавлена вручную</button> : null}
             <button type="button" onClick={() => setConfirmOpen(true)} disabled={revoking} className="min-h-11 text-xs text-slate-500 hover:underline">
               {revoking ? 'Обновляем…' : 'Сменить ссылку доступа'}
             </button>
@@ -436,10 +444,10 @@ function QrModal({ open, subscriptionUrl, onClose }: { open: boolean; subscripti
   )
 }
 
-function detectDevice(userAgent: string): Device {
+function detectDevice(userAgent: string, maxTouchPoints = 0): Device {
   const ua = userAgent.toLowerCase()
   if (ua.includes('android')) return 'android'
-  if (ua.includes('iphone') || ua.includes('ipad') || ua.includes('ipod')) return 'ios'
+  if (ua.includes('iphone') || ua.includes('ipad') || ua.includes('ipod') || (ua.includes('macintosh') && maxTouchPoints > 1)) return 'ios'
   if (ua.includes('windows')) return 'windows'
   if (ua.includes('mac os') || ua.includes('macintosh')) return 'macos'
   return 'desktop'
@@ -530,12 +538,4 @@ function appScore(app: AppOption, device: Device) {
   if (app.primaryDevices.includes(device)) return 2
   if (app.devices.includes(device)) return 1
   return 0
-}
-
-function deviceLabel(device: Device) {
-  if (device === 'ios') return 'iPhone/iPad'
-  if (device === 'android') return 'Android'
-  if (device === 'macos') return 'macOS'
-  if (device === 'windows') return 'Windows'
-  return 'Linux / другой компьютер'
 }
