@@ -79,10 +79,16 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - shard: 1/4
-            artifact: 1
+          - shard: 1a/4
+            artifact: 1a
             project: desktop-chromium
             browser: chromium
+            args: --shard=1/2
+          - shard: 1b/4
+            artifact: 1b
+            project: desktop-chromium
+            browser: chromium
+            args: --shard=2/2
           - shard: 2/4
             artifact: 2
             project: mobile-chromium
@@ -123,7 +129,7 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install --with-deps ${{ matrix.browser }}
       - name: Browser E2E checks
-        run: npm run test:e2e -- --project=${{ matrix.project }}
+        run: npm run test:e2e -- --project=${{ matrix.project }} ${{ matrix.args }}
       - name: Upload Playwright report
         if: ${{ always() }}
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
