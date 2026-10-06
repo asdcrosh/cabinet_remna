@@ -34,7 +34,7 @@ jobs:
         run: npm ci
 
       - name: Block known high-severity dependency vulnerabilities
-        run: npm audit --audit-level=high
+        run: npm run check:audit
 
       - name: Lint
         run: npm run lint

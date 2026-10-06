@@ -57,7 +57,7 @@ jobs:
       - name: Check Prisma migration drift
         run: npx prisma migrate diff --from-migrations prisma/migrations --to-schema-datamodel prisma/schema.prisma --shadow-database-url "$DIRECT_URL" --exit-code
       - name: npm audit report
-        run: npm audit --audit-level=high
+        run: npm run check:audit
       - run: npm run check:env
       - run: npm run lint
       - run: npm run typecheck

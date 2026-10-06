@@ -128,7 +128,7 @@ ${unmanaged}# END REMNAWAVE CABINET\n`
 
   it('runs security checks before the Docker registry login and publish steps', () => {
     const workflow = read('.github/workflows/docker-image.yml')
-    const audit = workflow.indexOf('npm audit --audit-level=high')
+    const audit = workflow.indexOf('npm run check:audit')
     const tests = workflow.indexOf('npm run test')
     const login = workflow.indexOf('docker/login-action@')
     const publish = workflow.indexOf('docker/build-push-action@')
