@@ -514,7 +514,11 @@ async function start() {
   await main()
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+const isMainModule = typeof require !== 'undefined' && typeof module !== 'undefined'
+  ? require.main === module
+  : Boolean(process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href)
+
+if (isMainModule) {
   start().catch(async (error) => {
     logError('payment_reconciler.fatal', error)
     await prisma.$disconnect()

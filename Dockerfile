@@ -134,7 +134,10 @@ COPY --chown=nextjs:nextjs \
 
 # Fail the image build if a bundled worker references a dependency that is not
 # present in the final release image.
-RUN OPS_STARTUP_CHECK=true node ops/payment-reconciler.js \
+RUN OPS_STARTUP_CHECK=true node ops/payment-reconciler.js > /tmp/payment-startup-check.log \
+  && grep -q 'payment_reconciler.startup_check_passed' /tmp/payment-startup-check.log \
+  && cat /tmp/payment-startup-check.log \
+  && rm /tmp/payment-startup-check.log \
   && OPS_STARTUP_CHECK=true node ops/broadcast-worker.js \
   && OPS_STARTUP_CHECK=true node ops/watch-worker.js \
   && OPS_STARTUP_CHECK=true node ops/bootstrap-superuser.js

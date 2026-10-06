@@ -1294,7 +1294,7 @@ wait_for_url() {
 
 wait_for_container app 60
 wait_for_healthy_container remnawave-cabinet-app 60
-wait_for_container worker 60
+wait_for_healthy_container remnawave-cabinet-worker 60
 wait_for_container broadcast-worker 60
 wait_for_container watch-worker 60
 if [[ " ${runtime_services[*]} " == *" retention-cleanup "* ]]; then
