@@ -129,6 +129,8 @@ describe('whitelist add-on', () => {
 
   it('adds 30 days to the current add-on expiry when renewed early', async () => {
     const paidAt = new Date('2026-08-20T12:00:00.000Z')
+    vi.useFakeTimers()
+    vi.setSystemTime(paidAt)
     const addonExpireAt = new Date('2026-08-23T12:00:00.000Z')
     const subscriptionExpireAt = new Date('2026-10-01T12:00:00.000Z')
     const subscription = {
@@ -175,6 +177,8 @@ describe('whitelist add-on', () => {
 
   it('adds a standalone purchase after a paused balance from an older subscription', async () => {
     const paidAt = new Date('2026-09-01T00:00:00.000Z')
+    vi.useFakeTimers()
+    vi.setSystemTime(paidAt)
     const subscription = {
       id: 'subscription-2',
       userId: 'user-1',

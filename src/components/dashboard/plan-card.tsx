@@ -61,6 +61,7 @@ export interface PlanCardProps {
   autoRenewalWhitelistAddonEnabled?: boolean;
   whitelistAddonEnabled?: boolean;
   whitelistAddonPriceKopecks?: number;
+  initialWhitelistAddonRequested?: boolean;
   display?: "full" | "checkout";
   initialPromoCode?: string;
   personalDiscountPercent?: number;
@@ -107,6 +108,7 @@ export function PlanCard({
   autoRenewalWhitelistAddonEnabled = false,
   whitelistAddonEnabled = false,
   whitelistAddonPriceKopecks = 0,
+  initialWhitelistAddonRequested = false,
   display = "full",
   initialPromoCode,
   personalDiscountPercent = 0,
@@ -122,7 +124,7 @@ export function PlanCard({
   const [checkoutConfirmOpen, setCheckoutConfirmOpen] = useState(false);
   const [autoRenewalRequested, setAutoRenewalRequested] = useState(false);
   const [whitelistAddonRequested, setWhitelistAddonRequested] = useState(
-    autoRenewalEnabled && autoRenewalWhitelistAddonEnabled,
+    initialWhitelistAddonRequested || (autoRenewalEnabled && autoRenewalWhitelistAddonEnabled),
   );
   const [selectedProvider, setSelectedProvider] = useState<CheckoutPaymentProvider>(
     paymentProviders[0]?.id ?? "YOOKASSA",
@@ -347,7 +349,6 @@ export function PlanCard({
       return;
     }
     setAutoRenewalRequested(false);
-    setWhitelistAddonRequested(autoRenewalEnabled && autoRenewalWhitelistAddonEnabled);
     setCheckoutConfirmOpen(true);
   }
 

@@ -181,9 +181,9 @@ export function HomeWhitelistAddon({
             <Globe2 className="h-5 w-5" />
           </span>
           <div className="min-w-0">
-            <div className="text-sm font-semibold text-slate-950 dark:text-white">Серверы с белыми списками</div>
+            <div className="text-sm font-semibold text-slate-950 dark:text-white">Обход белых списков</div>
             <p className="mt-0.5 text-xs font-medium text-amber-700 dark:text-amber-300">Только для приложения INCY</p>
-            <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Отдельное дополнение, без повторной оплаты тарифа</p>
+            <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">30 дней доступа, без повторной оплаты тарифа</p>
           </div>
         </div>
         <button

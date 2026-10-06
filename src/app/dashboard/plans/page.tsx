@@ -26,7 +26,7 @@ export const dynamic = 'force-dynamic'
 export default async function PlansPage({
   searchParams,
 }: {
-  searchParams: Promise<{ plan?: string; promo?: string; intent?: string }>
+  searchParams: Promise<{ plan?: string; promo?: string; intent?: string; whitelistAddon?: string }>
 }) {
   const params = await searchParams
   const paymentProviders = await getAvailablePaymentProviders()
@@ -216,6 +216,10 @@ export default async function PlansPage({
       && autoRenewal.whitelistAddonEnabled,
     whitelistAddonEnabled: plan.whitelistAddonEnabled,
     whitelistAddonPriceKopecks: plan.whitelistAddonPriceKopecks,
+    initialWhitelistAddonRequested: params.whitelistAddon === 'true'
+      && plan.whitelistAddonEnabled
+      && plan.whitelistAddonPriceKopecks > 0
+      && plan.whitelistAddonInternalSquads.length > 0,
     initialPromoCode,
     availablePromoCodes: availablePromoCodesByPlan.get(plan.id) ?? [],
     personalDiscountPercent: user?.personalDiscountPercent ?? 0,
@@ -288,7 +292,7 @@ export default async function PlansPage({
 
       {planViews.length > 0 ? (
         <PlanCatalog
-          key={`${currentSubscription?.planId ?? 'none'}:${currentDeviceLimit ?? 'unknown'}:${linkedPlanId ?? ''}`}
+          key={`${currentSubscription?.planId ?? 'none'}:${currentDeviceLimit ?? 'unknown'}:${linkedPlanId ?? ''}:${params.whitelistAddon ?? ''}`}
           plans={planViews}
           initialPlanId={linkedPlanId}
         />

@@ -1,3 +1,16 @@
+.bonus-box-home .bonus-roulette-layout { min-height: 22rem; }
+.bonus-box-home .bonus-roulette-console { padding: 1rem; }
+.bonus-box-home .bonus-roulette-stats { display: none; }
+.bonus-box-home .bonus-roulette-spotlight:nth-child(n + 3) { display: none; }
+.bonus-box-home .bonus-roulette-fairness a { text-decoration: underline; text-underline-offset: 3px; }
+
+@media (max-width: 1180px) {
+  .bonus-box-home .bonus-roulette-layout { min-height: 0; }
+  .bonus-box-home .bonus-roulette-console { display: none; }
+  .bonus-box-home .bonus-roulette-controls--mobile { display: block; width: 100%; margin-top: 0; padding: 0.75rem 0.8rem 0; }
+  .bonus-box-home .bonus-roulette-theater { padding-top: 1.5rem; }
+}
+
 .bonus-roulette-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(18rem, 21rem);

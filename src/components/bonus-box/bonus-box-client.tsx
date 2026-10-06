@@ -1,6 +1,7 @@
 "use client";
 
 import { type CSSProperties, type KeyboardEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import {
   CalendarClock,
   CalendarPlus,
@@ -74,10 +75,15 @@ type RoulettePhase = "idle" | RouletteMotionPhase | "locked" | "revealing" | "er
 
 export function BonusBoxClient({
   initialData,
+  compact = false,
+  referralsEnabled = true,
 }: {
   initialData: BonusBoxOverview;
+  compact?: boolean;
+  referralsEnabled?: boolean;
 }) {
   const [data, setData] = useState(initialData);
+  const [attemptsOpen, setAttemptsOpen] = useState(false);
   const [rouletteItems, setRouletteItems] = useState(() => buildIdleRoulette(initialData.prizes));
   const [roulettePhase, setRoulettePhase] = useState<RoulettePhase>("idle");
   const [spinError, setSpinError] = useState("");
@@ -111,6 +117,8 @@ export function BonusBoxClient({
     ? data.attemptsCount
     : data.welcomeAttemptsCount;
   const lockedAttempts = Math.max(0, data.attemptsCount - availableNow);
+  const noAttempts = data.config.enabled && data.prizes.length > 0 && data.attemptsCount === 0;
+  const visibleMissions = data.missions.filter((mission) => referralsEnabled || mission.type !== "REFERRAL_COUNT");
   const spotlightPrizes = useMemo(
     () => [...data.prizes]
       .sort((left, right) => rarityRank(right.rarity) - rarityRank(left.rarity))
@@ -525,6 +533,7 @@ export function BonusBoxClient({
       toast(`Начислено попыток: ${result.attempts}`, "success");
       const freshData = await apiFetch<BonusBoxOverview>("/api/bonus-box");
       setData(freshData);
+      if (!freshData.canOpenReason) setAttemptsOpen(false);
     } catch {
       // apiFetch уже покажет toast
     } finally {
@@ -652,7 +661,12 @@ export function BonusBoxClient({
     }
   }
 
-  const openCaseCta = subscribeCta && !opening ? (
+  const openCaseCta = noAttempts && !opening ? (
+    <button type="button" className={cn(openButtonClass, "w-full")} onClick={() => setAttemptsOpen(true)}>
+      <Gift className="mr-2 h-4 w-4" />
+      Нет попыток · Получить
+    </button>
+  ) : subscribeCta && !opening ? (
     <a href="/dashboard/plans" className={cn(openButtonClass, "w-full")}>
       <span className="relative flex items-center justify-center gap-2">
         <ShoppingCart className="h-4 w-4" />
@@ -723,9 +737,10 @@ export function BonusBoxClient({
   }
 
   return (
-    <div className="flex flex-col gap-4 sm:gap-5">
+    <div className={cn("flex min-w-0 flex-col gap-4 sm:gap-5", compact && "bonus-box-home")}>
       <section
         aria-busy={opening}
+        aria-label="Рулетка бонусов"
         className={cn(
           "bonus-box-stage order-first overflow-hidden rounded-xl border border-brand-200/80 bg-white dark:border-brand-300/15 dark:bg-surface-900",
           opening && "bonus-box-stage--opening",
@@ -746,7 +761,7 @@ export function BonusBoxClient({
           </div>
           <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
             <span className={cn("h-2 w-2 rounded-full", opening ? "animate-pulse bg-fuchsia-400" : "bg-cyan-400")} />
-            <span aria-live="polite">{opening ? "Определяем подарок" : result ? `${rarityLabel(result.prize.rarity)} результат` : "Готово"}</span>
+            <span aria-live="polite">{opening ? "Определяем подарок" : result ? `${rarityLabel(result.prize.rarity)} результат` : noAttempts ? "Попытки закончились" : data.canOpenReason ? "Недоступно" : "Готово"}</span>
           </div>
         </div>
 
@@ -836,7 +851,7 @@ export function BonusBoxClient({
               {renderSpinControls("desktop")}
 
               <p className="bonus-roulette-fairness">
-                Размер карточки не показывает шанс. Итог рассчитывается на сервере, точные проценты есть во вкладке «Призы».
+                Размер карточки не показывает шанс. {compact ? <Link href="/dashboard/bonus-box">Призы и вероятности</Link> : "Точные проценты есть во вкладке «Призы»."}
               </p>
             </aside>
 
@@ -852,6 +867,10 @@ export function BonusBoxClient({
           </div>
         )}
 
+        {rouletteItems.length === 0 && (
+          <p className="p-5 text-sm text-slate-500" role="status">{data.canOpenReason || "Подарки скоро появятся."}</p>
+        )}
+
         {(canUseWelcomeAttempts || lockedAttempts > 0) && (
           <div className="border-t border-slate-200 bg-slate-50/80 px-3 py-2 text-sm text-slate-600 dark:border-white/10 dark:bg-white/[0.035] dark:text-slate-300 sm:px-5">
             {canUseWelcomeAttempts
@@ -861,7 +880,38 @@ export function BonusBoxClient({
         )}
       </section>
 
-      <section className="bonus-content-deck order-4 space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+        <button type="button" className="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-brand-600 dark:text-brand-300" onClick={() => setAttemptsOpen(true)} disabled={opening}>
+          <Gift className="h-4 w-4" />
+          {visibleMissions.some((mission) => mission.completed && !mission.claimed) ? "Забрать попытки за задания" : "Как получить попытки"}
+        </button>
+        {compact && <Link href="/dashboard/bonus-box" className="inline-flex min-h-11 items-center text-sm font-medium text-slate-500 hover:underline dark:text-slate-300">Все бонусы и история →</Link>}
+      </div>
+
+      <Modal
+        open={attemptsOpen}
+        title={noAttempts ? "Попытки закончились" : "Получить попытки"}
+        description="Получайте попытки за покупки и активность."
+        onClose={() => setAttemptsOpen(false)}
+        panelClassName="sm:max-w-3xl"
+        footer={<button type="button" className="btn-secondary w-full sm:w-auto" onClick={() => setAttemptsOpen(false)}>Вернуться к рулетке · {availableNow}</button>}
+      >
+        <div className="space-y-5">
+          <BonusBoxRules config={data.config} hasActiveSubscription={data.hasActiveSubscription} referralsEnabled={referralsEnabled} />
+          {(data.events.length > 0 || visibleMissions.length > 0) && (
+            <div className="space-y-3">
+              <h3 className="font-semibold">Задания и события</h3>
+              <BonusEngagementPanel events={data.events} missions={visibleMissions} claimingMissionId={claimingMissionId} onClaim={claimMission} />
+            </div>
+          )}
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            {data.config.attemptTtlDays > 0 ? `Попытки хранятся ${data.config.attemptTtlDays} дн.` : "Попытки не сгорают."}
+            {!data.hasActiveSubscription && " Для обычных попыток нужна активная VPN-подписка. Приветственные доступны без покупки."}
+          </p>
+        </div>
+      </Modal>
+
+      {!compact && <section className="bonus-content-deck order-4 space-y-4">
         {data.pityProgress.enabled && hasRareOrBetter && (
           <div className="flex flex-col gap-2 border-y border-slate-200 py-3 text-sm dark:border-white/10 sm:flex-row sm:items-center sm:justify-between">
             <div>
@@ -896,7 +946,7 @@ export function BonusBoxClient({
             active={activeTab === "missions"}
             onClick={() => setActiveTab("missions")}
             label="Задания"
-            meta={`${data.missions.length}`}
+            meta={`${visibleMissions.length}`}
           />
           <BonusTabButton
             tab="outcomes"
@@ -926,12 +976,12 @@ export function BonusBoxClient({
                 <span>Получить попытки</span>
                 <h2>Задания и события</h2>
               </div>
-              <small>{data.missions.filter((mission) => !mission.claimed).length} доступно</small>
+              <small>{visibleMissions.filter((mission) => !mission.claimed).length} доступно</small>
             </div>
-            {(data.events.length > 0 || data.missions.length > 0) ? (
+            {(data.events.length > 0 || visibleMissions.length > 0) ? (
               <BonusEngagementPanel
                 events={data.events}
-                missions={data.missions}
+                missions={visibleMissions}
                 claimingMissionId={claimingMissionId}
                 onClaim={claimMission}
               />
@@ -948,6 +998,7 @@ export function BonusBoxClient({
                 <BonusBoxRules
                   config={data.config}
                   hasActiveSubscription={data.hasActiveSubscription}
+                  referralsEnabled={referralsEnabled}
                 />
               </div>
             </details>
@@ -1014,7 +1065,7 @@ export function BonusBoxClient({
           </section>
         )}
 
-      </section>
+      </section>}
     </div>
   );
 }
@@ -1395,9 +1446,16 @@ function BonusEngagementPanel({
                       >
                         {claimingMissionId === mission.id ? "Начисляем..." : "Получить"}
                       </button>
-                    ) : mission.endsAt ? (
-                      <span className="text-xs text-slate-400">до {formatDateOnly(mission.endsAt)}</span>
-                    ) : null}
+                    ) : (
+                      <div className="flex flex-col items-start gap-1">
+                        {mission.type !== "LOGIN_STREAK" && (
+                          <Link href={mission.type === "PAYMENT_COUNT" ? "/dashboard/plans" : "/dashboard/referrals"} className="inline-flex min-h-11 items-center text-sm font-semibold text-brand-600 dark:text-brand-300">
+                            {mission.type === "PAYMENT_COUNT" ? "Выбрать тариф" : "Пригласить друга"}
+                          </Link>
+                        )}
+                        {mission.endsAt && <span className="text-xs text-slate-400">до {formatDateOnly(mission.endsAt)}</span>}
+                      </div>
+                    )}
                   </div>
                 </article>
               );
@@ -1635,45 +1693,37 @@ function OpeningRow({ opening }: { opening: BonusBoxOpeningView }) {
 function BonusBoxRules({
   config,
   hasActiveSubscription,
+  referralsEnabled,
 }: {
   config: BonusBoxConfigView;
   hasActiveSubscription: boolean;
+  referralsEnabled: boolean;
 }) {
   const paymentRange =
     config.minAttemptsPerPayment > 0
       ? `${config.minAttemptsPerPayment}-${config.maxAttemptsPerPayment}`
       : `до ${config.maxAttemptsPerPayment}`;
-  const referralText =
-    config.referrerAttempts > 0 || config.referredAttempts > 0
-      ? `За приглашение после первой оплаты: вам +${config.referrerAttempts}, другу +${config.referredAttempts}.`
-      : "Попытки за приглашения сейчас не начисляются.";
-  const weeklyText =
-    config.weeklyEnabled && config.weeklyAttempts > 0
-      ? `Раз в неделю с дня "${weekdayLabel(config.weeklyDay)}": +${config.weeklyAttempts}, если VPN-подписка активна.`
-      : "Еженедельный бонус сейчас выключен.";
-  const ttlText =
-    config.attemptTtlDays > 0
-      ? `Попытки хранятся ${config.attemptTtlDays} дн.`
-      : "Попытки не сгорают.";
-
   return (
-    <section className="grid gap-3 md:grid-cols-3">
+    <section className="grid gap-3 sm:grid-cols-2">
       <RuleCard
         icon={<CreditCard className="h-5 w-5" />}
         title="За оплату"
-        text={`1 попытка за каждые ${config.rubPerAttempt} ₽. За платёж можно получить ${paymentRange}.`}
+        text={`1 попытка за каждые ${config.rubPerAttempt} ₽, ${paymentRange} за платёж. Начислим после успешной оплаты и активации покупки.`}
+        action={<Link href={hasActiveSubscription ? "/dashboard/plans?intent=renew" : "/dashboard/plans"} className="btn-primary mt-3 w-full">{hasActiveSubscription ? "Продлить подписку" : "Выбрать тариф"}</Link>}
       />
-      <RuleCard
+      {referralsEnabled && config.referrerAttempts > 0 && <RuleCard
         icon={<Users className="h-5 w-5" />}
         title="За приглашения"
-        text={referralText}
-      />
-      <RuleCard
+        text={`После первой оплаты друга: вам +${config.referrerAttempts}${config.referredAttempts > 0 ? `, другу +${config.referredAttempts}` : ""}.`}
+        action={<Link href="/dashboard/referrals" className="btn-secondary mt-3 w-full">Пригласить друга</Link>}
+      />}
+      {config.weeklyEnabled && config.weeklyAttempts > 0 && <RuleCard
         icon={<CalendarClock className="h-5 w-5" />}
         title="Еженедельно"
-        text={`${weeklyText} ${ttlText}`}
+        text={`Каждую неделю с дня «${weekdayLabel(config.weeklyDay)}»: +${config.weeklyAttempts} при активной подписке. Начисляем автоматически при открытии рулетки.${config.weeklyMaxBalance > 0 ? ` Можно накопить до ${config.weeklyMaxBalance} еженедельных попыток.` : ""}`}
         muted={!hasActiveSubscription}
-      />
+        action={!hasActiveSubscription ? <Link href="/dashboard/plans" className="btn-secondary mt-3 w-full">Подключить подписку</Link> : <p className="mt-3 text-xs text-slate-500">Повторный вход не добавляет еженедельные попытки.</p>}
+      />}
     </section>
   );
 }
@@ -1683,11 +1733,13 @@ function RuleCard({
   title,
   text,
   muted = false,
+  action,
 }: {
   icon: ReactNode;
   title: string;
   text: string;
   muted?: boolean;
+  action?: ReactNode;
 }) {
   return (
     <div
@@ -1708,6 +1760,7 @@ function RuleCard({
           </div>
         </div>
       </div>
+      {action}
     </div>
   );
 }

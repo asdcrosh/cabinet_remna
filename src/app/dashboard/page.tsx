@@ -1,5 +1,6 @@
-// Главная кабинета: подписка, подключение и быстрые действия.
+// Главная кабинета: белые списки, рулетка и управление подпиской.
 
+import { Suspense } from 'react'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import {
@@ -8,7 +9,7 @@ import {
   CalendarDays,
   LifeBuoy,
   CreditCard,
-  Gift,
+  Globe2,
   KeyRound,
   MonitorSmartphone,
   ShieldCheck,
@@ -28,6 +29,9 @@ import { cn } from '@/lib/cn'
 import styles from './home.module.css'
 import { HomeWhitelistAddon } from '@/components/dashboard/home-whitelist-addon'
 import { HomeDeviceAddon } from '@/components/dashboard/home-device-addon'
+import { BonusBoxClientDynamic } from '@/components/bonus-box/bonus-box-client-dynamic'
+import { LoadingPanel } from '@/components/ui/loading-panel'
+import { getBonusBoxOverview } from '@/lib/bonus-box'
 import {
   getWhitelistAddonRemainingSeconds,
   hasWhitelistAddonEntitlement,
@@ -41,7 +45,7 @@ export default async function DashboardHome() {
   if (!session) redirect('/login')
 
   const freshPendingCutoff = getFreshPendingPaymentCutoff()
-  const [features, user, paymentProviders, bonusAttempts] = await Promise.all([
+  const [features, user, paymentProviders, whitelistPlan] = await Promise.all([
     getFeatureFlags(),
     prisma.user.findUnique({
       where: { id: session.uid },
@@ -57,12 +61,17 @@ export default async function DashboardHome() {
       },
     }),
     getAvailablePaymentProviders(),
-    prisma.bonusBoxAttempt.count({
+    prisma.plan.findFirst({
       where: {
-        userId: session.uid,
-        usedAt: null,
-        OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+        isActive: true,
+        isPromo: false,
+        availability: 'ALL',
+        whitelistAddonEnabled: true,
+        whitelistAddonPriceKopecks: { gt: 0 },
+        whitelistAddonInternalSquads: { isEmpty: false },
       },
+      orderBy: { sortOrder: 'asc' },
+      select: { id: true },
     }),
   ])
   if (!user) {
@@ -85,6 +94,14 @@ export default async function DashboardHome() {
     return (
       <div className={cn('user-workspace', styles.page)}>
         <HomeHeader name={dashboardDisplayName(user.name, user.email)} />
+        <div className={styles.highlights}>
+          {whitelistPlan ? <HomeWhitelistPlans planId={whitelistPlan.id} /> : null}
+          {features.bonusBox ? (
+            <Suspense fallback={<LoadingPanel label="Загрузка рулетки" />}>
+              <HomeBonusBox userId={session.uid} referralsEnabled={features.referrals} />
+            </Suspense>
+          ) : null}
+        </div>
         {user.payments[0] ? (
           <PendingPaymentCard payment={user.payments[0]} />
         ) : (
@@ -233,6 +250,17 @@ export default async function DashboardHome() {
     <div className={cn('user-workspace', styles.page)}>
       <HomeHeader name={dashboardDisplayName(user.name, user.email)} />
 
+      <div className={styles.highlights}>
+        {whitelistAddonOffer ? (
+          <HomeWhitelistAddon {...whitelistAddonOffer} paymentProviders={paymentProviders} />
+        ) : whitelistPlan ? <HomeWhitelistPlans planId={whitelistPlan.id} /> : null}
+        {features.bonusBox ? (
+          <Suspense fallback={<LoadingPanel label="Загрузка рулетки" />}>
+            <HomeBonusBox userId={session.uid} referralsEnabled={features.referrals} />
+          </Suspense>
+        ) : null}
+      </div>
+
       {remnawaveErrorStatus !== null && (
         <div className="flex flex-col gap-3 rounded-2xl border border-amber-200/80 bg-amber-50/80 px-4 py-3.5 text-sm text-amber-900 shadow-sm dark:border-amber-500/25 dark:bg-amber-500/[0.08] dark:text-amber-100 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-start gap-3">
@@ -331,57 +359,52 @@ export default async function DashboardHome() {
 
       <HomeActions supportEnabled={features.support} hasSubscription />
 
-      {((features.bonusBox && bonusAttempts > 0) || whitelistAddonOffer || deviceAddonOffer) ? (
+      {deviceAddonOffer ? (
         <section className={styles.extras} aria-label="Дополнительные возможности">
           <div className={styles.sectionHeading}>
             <h2>Больше возможностей</h2>
             <p>Дополнения и бонусы к вашей подписке</p>
           </div>
-          {features.bonusBox && bonusAttempts > 0 ? (
-            <Link
-              href="/dashboard/bonus-box"
-              className="group flex min-h-16 items-center gap-3 rounded-2xl border border-fuchsia-200/80 bg-fuchsia-50/70 px-4 py-3 text-slate-800 transition hover:border-fuchsia-300 hover:bg-fuchsia-50 dark:border-fuchsia-400/15 dark:bg-fuchsia-400/[0.06] dark:text-slate-100 dark:hover:bg-fuchsia-400/[0.1]"
-            >
-              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-fuchsia-500/10 text-fuchsia-700 dark:text-fuchsia-200">
-                <Gift className="h-5 w-5" />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block font-semibold">Доступны подарки</span>
-                <span className="mt-0.5 block text-sm text-slate-500 dark:text-slate-400">
-                  {bonusAttempts} {bonusAttemptLabel(bonusAttempts)} можно использовать сейчас
-                </span>
-              </span>
-              <ArrowRight className="h-4 w-4 shrink-0 transition-transform group-hover:translate-x-0.5" />
-            </Link>
-          ) : null}
-
-          {whitelistAddonOffer ? (
-            <HomeWhitelistAddon
-              planId={whitelistAddonOffer.planId}
-              priceKopecks={whitelistAddonOffer.priceKopecks}
-              active={whitelistAddonOffer.active}
-              expireAt={whitelistAddonOffer.expireAt}
-              pausedRemainingSeconds={whitelistAddonOffer.pausedRemainingSeconds}
-              paymentProviders={paymentProviders}
-            />
-          ) : null}
-
-          {deviceAddonOffer ? (
-            <HomeDeviceAddon {...deviceAddonOffer} paymentProviders={paymentProviders} />
-          ) : null}
+          <HomeDeviceAddon {...deviceAddonOffer} paymentProviders={paymentProviders} />
         </section>
       ) : null}
     </div>
   )
 }
 
-function bonusAttemptLabel(count: number) {
-  const lastTwo = count % 100
-  if (lastTwo >= 11 && lastTwo <= 14) return 'попыток'
-  const last = count % 10
-  if (last === 1) return 'попытку'
-  if (last >= 2 && last <= 4) return 'попытки'
-  return 'попыток'
+async function HomeBonusBox({ userId, referralsEnabled }: { userId: string; referralsEnabled: boolean }) {
+  const data = await getBonusBoxOverview(userId).catch(() => {
+    logWarn('dashboard.bonus_box.unavailable', { userId })
+    return null
+  })
+  if (!data) {
+    return (
+      <div className="rounded-2xl border border-slate-200 p-4 dark:border-white/10" role="status">
+        <p className="text-sm text-slate-500">Не удалось загрузить рулетку.</p>
+        <Link href="/dashboard/bonus-box" className="mt-2 inline-flex min-h-11 items-center font-semibold text-brand-600 dark:text-brand-300">
+          Открыть бонусы <ArrowRight className="ml-2 h-4 w-4" />
+        </Link>
+      </div>
+    )
+  }
+  return <BonusBoxClientDynamic initialData={data} compact referralsEnabled={referralsEnabled} />
+}
+
+function HomeWhitelistPlans({ planId }: { planId: string }) {
+  return (
+    <section aria-label="Белые списки" className="flex flex-col gap-3 rounded-2xl border border-amber-200 bg-amber-50/70 px-4 py-3 dark:border-amber-400/20 dark:bg-amber-400/[0.06] sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex min-w-0 items-center gap-3">
+        <Globe2 className="h-6 w-6 shrink-0 text-amber-600 dark:text-amber-300" />
+        <div>
+          <h2 className="text-sm font-semibold">Обход белых списков</h2>
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Подключите вместе с VPN-тарифом. Только в INCY.</p>
+        </div>
+      </div>
+      <Link href={`/dashboard/plans?plan=${encodeURIComponent(planId)}&whitelistAddon=true`} className="btn-primary w-full shrink-0 sm:w-auto">
+        Выбрать тариф с белыми списками <ArrowRight className="h-4 w-4" />
+      </Link>
+    </section>
+  )
 }
 
 function HomeHeader({ name }: { name: string }) {

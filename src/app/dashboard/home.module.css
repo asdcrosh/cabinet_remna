@@ -4,6 +4,9 @@
   padding-bottom: 12px;
 }
 
+.highlights { display: grid; gap: 16px; min-width: 0; }
+.highlights:empty { display: none; }
+
 .header {
   display: flex;
   min-height: 44px;
