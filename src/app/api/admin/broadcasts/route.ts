@@ -140,7 +140,7 @@ export const POST = withAuth(async (req: Request) => {
   }
   const actionUrl = getBroadcastActionUrl(actionHref, appUrl)
   const actionLabel = input.actionLabel || (actionHref ? 'Открыть кабинет' : undefined)
-  const actionOpenInTelegram = Boolean(input.actionOpenInTelegram && actionHref?.startsWith('/dashboard'))
+  const actionOpenInTelegram = Boolean(input.actionOpenInTelegram && actionHref)
   const imageUrl = normalizeImageUrl(input.imageUrl)
   const plainBody = stripTelegramCustomEmojiMarkup(input.body)
   const batchKey = `broadcast:${Date.now()}:${session.uid}`

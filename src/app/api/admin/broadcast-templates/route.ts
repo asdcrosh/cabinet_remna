@@ -65,7 +65,7 @@ export const POST = withAuth(async (req: Request) => {
       channels: input.channels,
       actionHref,
       actionLabel: input.actionLabel || null,
-      actionOpenInTelegram: Boolean(input.actionOpenInTelegram && actionHref?.startsWith('/dashboard')),
+      actionOpenInTelegram: Boolean(input.actionOpenInTelegram && actionHref),
       imageUrl: input.imageUrl || null,
       createdById: session.uid,
     },
