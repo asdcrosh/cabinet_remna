@@ -81,15 +81,14 @@ export const POST = withAuth(async (req: Request) => {
       code: parsed.data.promoCode,
       userId: session.uid,
       plan,
-      originalAmountKopecks: pricing.originalAmountKopecks,
     })
 
     return NextResponse.json({
       code: discount.normalizedCode,
       discountPercent: discount.discountPercent,
       discountKopecks: discount.discountKopecks,
-      originalAmountKopecks: discount.originalAmountKopecks,
-      finalAmountKopecks: discount.finalAmountKopecks,
+      originalAmountKopecks: pricing.originalAmountKopecks,
+      finalAmountKopecks: pricing.originalAmountKopecks - discount.discountKopecks,
     })
   } catch (e) {
     if (e instanceof DeviceLimitSelectionError) {

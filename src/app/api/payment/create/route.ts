@@ -584,7 +584,6 @@ async function createPaymentForUser(req: Request, userId: string) {
               code: promoCode,
               userId: user.id,
               plan,
-              originalAmountKopecks: pricing.originalAmountKopecks,
             })
           : null
         const discountProfile = isSubscriptionPurchase
@@ -615,11 +614,7 @@ async function createPaymentForUser(req: Request, userId: string) {
         }
 
         const selectedPricing = discount ?? userDiscount
-        const discountedPlanAmountKopecks = discount
-          ? discount.finalAmountKopecks
-          : userDiscount
-            ? pricing.originalAmountKopecks - userDiscount.discountKopecks
-            : pricing.originalAmountKopecks
+        const discountedPlanAmountKopecks = pricing.originalAmountKopecks - (selectedPricing?.discountKopecks ?? 0)
         const payment = await tx.payment.create({
           data: {
             userId: user.id,
