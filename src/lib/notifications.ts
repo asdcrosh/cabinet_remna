@@ -897,7 +897,7 @@ async function sendTelegramMessage(input: {
         photo: input.imageUrl,
         caption: input.text.slice(0, 1000),
         parse_mode: 'HTML',
-        show_caption_above_media: true,
+        show_caption_above_media: false,
         ...(replyMarkup ? { reply_markup: replyMarkup } : {}),
       }
     : {
