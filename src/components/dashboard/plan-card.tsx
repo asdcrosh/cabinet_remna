@@ -159,7 +159,7 @@ export function PlanCard({
     ? calculateDisplayedDiscount(priceKopecks, automaticDiscount.discountPercent)
     : null;
   const promoDisplayedDiscount = appliedPromo
-    ? calculateDisplayedDiscount(purchasePriceKopecks, appliedPromo.discountPercent)
+    ? calculateDisplayedDiscount(priceKopecks, appliedPromo.discountPercent)
     : null;
   const automaticDiscountWins = Boolean(
     automaticDisplayedDiscount
