@@ -379,7 +379,8 @@ export function BroadcastAdmin({
   const canSend = body.trim().length >= 5 && selectedChannels.length > 0 && !loading
   const canQueue = canSend && audiencePreview !== null
   const selectedPreset = actionPresets.find((preset) => preset.href === actionHref)
-  const actionSupportsTelegramWebApp = actionHref.startsWith('/dashboard')
+  const hasAction = actionMode === 'custom' || Boolean(actionHref)
+  const actionSupportsTelegramWebApp = actionMode === 'custom' || actionHref.startsWith('/dashboard')
   const previewBody = renderPreview(body || 'Текст сообщения будет показан здесь.')
   const previewActionLabel = renderPreview(actionLabel || 'Открыть')
   const previewImageUrl = getPreviewImageUrl(imageUrl)
@@ -677,8 +678,8 @@ export function BroadcastAdmin({
                       value={actionLabel}
                       onChange={(event) => setActionLabel(event.target.value)}
                       maxLength={32}
-                      placeholder={actionHref ? 'Открыть' : 'Без кнопки'}
-                      disabled={!actionHref}
+                      placeholder={hasAction ? 'Открыть' : 'Без кнопки'}
+                      disabled={!hasAction}
                     />
                   </label>
                 </div>
@@ -699,12 +700,12 @@ export function BroadcastAdmin({
                   </label>
                 ) : null}
 
-                {actionHref && actionSupportsTelegramWebApp ? (
+                {actionSupportsTelegramWebApp ? (
                   <Switch
                     checked={actionOpenInTelegram}
                     onCheckedChange={setActionOpenInTelegram}
                     label="Открывать внутри Telegram"
-                    description="Только для страниц кабинета"
+                    description="В Telegram кнопка откроет ссылку во встроенном окне"
                     className="border-t border-slate-200 pt-3 dark:border-white/[0.09]"
                   />
                 ) : null}
