@@ -42,7 +42,7 @@ export function PlanCatalog({ plans, initialPlanId }: { plans: CatalogPlan[]; in
               <article key={plan.id} className={cn(styles.option, plan.current && styles.current)}>
                 <PlanOptionDetails plan={plan} />
                 <div className={styles.mobilePrice}>
-                  <span><strong>{displayPlanPrice(plan)}</strong><small>{dailyRateLabel(plan)}</small></span>
+                  <span><PlanOptionPrice plan={plan} /></span>
                   <button
                     type="button"
                     aria-haspopup="dialog"
@@ -81,7 +81,7 @@ export function PlanCatalog({ plans, initialPlanId }: { plans: CatalogPlan[]; in
                 >
                   <span className={styles.optionTop}>
                     <span className={styles.radio} aria-hidden="true">{selected ? <Check className="h-3 w-3" /> : null}</span>
-                    <span className={styles.price}><strong>{displayPlanPrice(plan)}</strong><small>{dailyRateLabel(plan)}</small></span>
+                    <span className={styles.price}><PlanOptionPrice plan={plan} /></span>
                   </span>
                   <PlanOptionDetails plan={plan} />
                 </button>
@@ -113,11 +113,12 @@ export function PlanCatalog({ plans, initialPlanId }: { plans: CatalogPlan[]; in
 }
 
 function PlanOptionDetails({ plan }: { plan: CatalogPlan }) {
+  const discountPercent = displayedDiscountPercent(plan)
   return (
     <span className={styles.details}>
       <span className={styles.badges}>
         {plan.current ? <PlanPickerBadge>Текущий тариф</PlanPickerBadge> : plan.popular ? <PlanPickerBadge>Популярный</PlanPickerBadge> : null}
-        {plan.isPromo ? <PlanPickerBadge>Пробный</PlanPickerBadge> : automaticDiscountPercent(plan) > 0 ? <PlanPickerBadge>Ваша скидка −{automaticDiscountPercent(plan)}%</PlanPickerBadge> : null}
+        {plan.isPromo ? <PlanPickerBadge>Пробный</PlanPickerBadge> : discountPercent > 0 ? <PlanPickerBadge>Ваша скидка −{discountPercent}%</PlanPickerBadge> : null}
       </span>
       <span className={styles.duration}>{plan.unlimitedDuration ? 'Бессрочно' : `${plan.durationDays} ${dayLabel(plan.durationDays)}`}</span>
       <span className={styles.name}>{plan.name}</span>
@@ -144,12 +145,20 @@ function dailyRateLabel(plan: CatalogPlan) {
   return `${formatPrice(dailyPrice)} в день`
 }
 
-function automaticDiscountPercent(plan: CatalogPlan) {
-  return Math.max(plan.personalDiscountPercent ?? 0, plan.nextPurchaseDiscountPercent ?? 0)
+function displayedDiscountPercent(plan: CatalogPlan) {
+  const linkedCode = plan.initialPromoCode?.trim().toUpperCase()
+  const linkedPromo = linkedCode && !plan.isPromo && plan.promoCodesEnabled !== false
+    ? plan.availablePromoCodes?.find((promo) => promo.code.toUpperCase() === linkedCode)
+    : undefined
+  return Math.max(
+    plan.personalDiscountPercent ?? 0,
+    plan.nextPurchaseDiscountPercent ?? 0,
+    linkedPromo?.discountPercent ?? 0
+  )
 }
 
 function discountedPlanPriceKopecks(plan: CatalogPlan) {
-  const percent = automaticDiscountPercent(plan)
+  const percent = displayedDiscountPercent(plan)
   if (percent <= 0 || plan.priceKopecks <= 100) return plan.priceKopecks
   const discount = Math.min(
     Math.floor((plan.priceKopecks * percent) / 100),
@@ -158,8 +167,17 @@ function discountedPlanPriceKopecks(plan: CatalogPlan) {
   return plan.priceKopecks - discount
 }
 
-function displayPlanPrice(plan: CatalogPlan) {
-  return formatPrice(discountedPlanPriceKopecks(plan))
+function PlanOptionPrice({ plan }: { plan: CatalogPlan }) {
+  const priceKopecks = discountedPlanPriceKopecks(plan)
+  return (
+    <>
+      <span className="inline-flex flex-wrap items-baseline gap-x-2">
+        <strong>{formatPrice(priceKopecks)}</strong>
+        {priceKopecks < plan.priceKopecks ? <del className="text-xs text-[var(--app-muted)]">{formatPrice(plan.priceKopecks)}</del> : null}
+      </span>
+      <small>{dailyRateLabel(plan)}</small>
+    </>
+  )
 }
 
 function dayLabel(days: number) {
