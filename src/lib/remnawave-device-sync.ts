@@ -10,19 +10,12 @@ export async function syncLocalDevicesFromRemnawave(input: {
     select: {
       hwid: true,
       displayName: true,
-      blockedAt: true,
-      platform: true,
-      userAgent: true,
-      lastSeenAt: true,
     },
   })
   const displayNames = new Map(localDevices.map((device) => [device.hwid, device.displayName]))
-  const blockedHwids = new Set(localDevices.filter((device) => device.blockedAt).map((device) => device.hwid))
   const remoteUser = (await remnawave.getUser(input.reference)).response
   const data = await remnawave.getUserDevices(remoteUser)
-  const blockedRemoteDevices = data.response.devices.filter((device) => blockedHwids.has(device.hwid))
-  await Promise.all(blockedRemoteDevices.map((device) => remnawave.deleteUserDevice(remoteUser, device.hwid)))
-  const devices = data.response.devices.filter((device) => !blockedHwids.has(device.hwid)).map((device) => ({
+  const devices = data.response.devices.map((device) => ({
     hwid: device.hwid,
     displayName: displayNames.get(device.hwid) ?? null,
     platform: device.platform ?? device.deviceModel ?? null,
@@ -74,16 +67,6 @@ export async function syncLocalDevicesFromRemnawave(input: {
     },
   })
 
-  const blockedDevices = localDevices
-    .filter((device) => device.blockedAt)
-    .map((device) => ({
-      hwid: device.hwid,
-      displayName: device.displayName,
-      platform: device.platform,
-      userAgent: device.userAgent,
-      updatedAt: device.lastSeenAt.toISOString(),
-      blockedAt: device.blockedAt?.toISOString() ?? null,
-    }))
-
-  return { devices, blockedDevices, total: devices.length }
+  // Preserve the response shape for older clients; historical flags have no effect.
+  return { devices, blockedDevices: [], total: devices.length }
 }

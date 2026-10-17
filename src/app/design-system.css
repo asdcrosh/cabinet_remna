@@ -1274,10 +1274,6 @@ textarea:focus {
   background: color-mix(in srgb, var(--app-surface-soft) 70%, transparent);
 }
 
-.device-row__remove:hover {
-  background: color-mix(in srgb, #ef4444 10%, transparent) !important;
-}
-
 .plan-period-panel {
   padding: 1.1rem !important;
   border: 0 !important;

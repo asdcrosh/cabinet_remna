@@ -236,32 +236,25 @@ test('смена пароля сохраняет текущую сессию и 
   await expectNoHorizontalOverflow(page)
 })
 
-test('пользователь отключает устройство с подтверждением', async ({ page }, testInfo) => {
+test('устройства доступны для просмотра и переименования без блокировки', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop-chromium', 'Сценарий достаточно проверить один раз')
   await login(page, E2E_USERS.active.email)
   await page.goto('/dashboard/devices')
 
   await expect(page.getByRole('heading', { name: 'Pixel 8' })).toBeVisible()
-  await page.getByRole('button', { name: 'Отключить Pixel 8' }).click()
-  const dialog = page.getByRole('dialog', { name: 'Отключить устройство?' })
-  await expect(dialog).toBeVisible()
-  const disconnectResponse = page.waitForResponse((response) =>
-    response.url().includes('/api/devices/') && response.request().method() === 'DELETE'
-  )
-  await dialog.getByRole('button', { name: 'Отключить', exact: true }).click()
-  await expect((await disconnectResponse).ok()).toBe(true)
+  await expect(page.getByRole('button', { name: 'Переименовать Pixel 8' })).toBeVisible()
+  await expect(page.getByRole('button', { name: /Отключить|Вернуть доступ/ })).toHaveCount(0)
+  await expect(page.getByText(/Отключённые устройства:/)).toHaveCount(0)
 
-  await expect(page.getByRole('heading', { name: 'Pixel 8 · Android' })).toHaveCount(0)
-  await expect(page.getByText('Активных устройств нет.', { exact: true })).toBeVisible()
-  await page.getByText('Отключённые устройства: 1', { exact: true }).click()
-  await expect(page.getByText('Pixel 8', { exact: true })).toBeVisible()
+  const devices = await (await page.request.get('/api/devices')).json()
+  expect(devices.devices).toHaveLength(1)
+  const hwid = devices.devices[0].hwid
+  expect((await page.request.delete(`/api/devices/${encodeURIComponent(hwid)}`)).status()).toBe(410)
+  expect((await page.request.delete('/api/devices')).status()).toBe(410)
+  await page.reload()
+  await expect(page.getByRole('heading', { name: 'Pixel 8' })).toBeVisible()
   await expectNoHorizontalOverflow(page)
-
-  const restoreResponse = page.waitForResponse((response) =>
-    response.url().includes('/api/devices/') && response.request().method() === 'PATCH'
-  )
-  await page.getByRole('button', { name: 'Вернуть доступ' }).click()
-  await expect((await restoreResponse).ok()).toBe(true)
+  await page.screenshot({ path: testInfo.outputPath('devices-without-blocking.png'), fullPage: true })
 })
 
 async function changePassword(page: import('@playwright/test').Page, oldPassword: string, newPassword: string) {

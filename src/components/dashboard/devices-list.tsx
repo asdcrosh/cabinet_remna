@@ -2,10 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { CircleAlert, Laptop, Loader2, Monitor, Pencil, RefreshCw, ShieldBan, ShieldCheck, Smartphone, Tablet } from 'lucide-react'
+import { CircleAlert, Laptop, Monitor, Pencil, RefreshCw, Smartphone, Tablet } from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
 import { InlineAlert } from './empty-state'
-import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { cn } from '@/lib/cn'
 import { Modal } from '@/components/ui/modal'
 import { Button } from '@/components/ui/button'
@@ -22,7 +21,6 @@ interface Device {
   ip?: string | null
   createdAt?: string | null
   updatedAt?: string | null
-  blockedAt?: string | null
 }
 
 interface DevicesListProps {
@@ -32,13 +30,8 @@ interface DevicesListProps {
 
 export function DevicesList({ embedded = false, deviceLimit }: DevicesListProps = {}) {
   const [devices, setDevices] = useState<Device[] | null>(null)
-  const [blockedDevices, setBlockedDevices] = useState<Device[]>([])
   const [loadError, setLoadError] = useState<string | null>(null)
-  const [actionError, setActionError] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
-  const [removingHwid, setRemovingHwid] = useState<string | null>(null)
-  const [unblockingHwid, setUnblockingHwid] = useState<string | null>(null)
-  const [selectedDevice, setSelectedDevice] = useState<Device | null>(null)
   const [editingDevice, setEditingDevice] = useState<Device | null>(null)
   const [renameDraft, setRenameDraft] = useState('')
   const [renaming, setRenaming] = useState(false)
@@ -46,12 +39,10 @@ export function DevicesList({ embedded = false, deviceLimit }: DevicesListProps 
 
   const loadDevices = useCallback(async () => {
     setLoadError(null)
-    setActionError(null)
     setRefreshing(true)
     try {
-      const data = await apiFetch<{ devices: Device[]; blockedDevices?: Device[] }>('/api/devices')
+      const data = await apiFetch<{ devices: Device[] }>('/api/devices')
       setDevices(data.devices)
-      setBlockedDevices(data.blockedDevices ?? [])
     } catch (e) {
       setLoadError(e instanceof Error ? e.message : 'Не удалось загрузить устройства')
     } finally {
@@ -62,40 +53,6 @@ export function DevicesList({ embedded = false, deviceLimit }: DevicesListProps 
   useEffect(() => {
     void loadDevices()
   }, [loadDevices])
-
-  async function removeDevice(device: Device) {
-    setRemovingHwid(device.hwid)
-    setActionError(null)
-    try {
-      await apiFetch(`/api/devices/${encodeURIComponent(device.hwid)}`, { method: 'DELETE' })
-      setDevices((current) => current?.filter((item) => item.hwid !== device.hwid) ?? [])
-      setBlockedDevices((current) => [
-        { ...device, blockedAt: new Date().toISOString() },
-        ...current.filter((item) => item.hwid !== device.hwid),
-      ])
-      setSelectedDevice(null)
-    } catch (e) {
-      setActionError(e instanceof Error ? e.message : 'Не удалось отключить устройство')
-    } finally {
-      setRemovingHwid(null)
-    }
-  }
-
-  async function unblockDevice(device: Device) {
-    setUnblockingHwid(device.hwid)
-    setActionError(null)
-    try {
-      await apiFetch(`/api/devices/${encodeURIComponent(device.hwid)}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ blocked: false }),
-      })
-      setBlockedDevices((current) => current.filter((item) => item.hwid !== device.hwid))
-    } catch (e) {
-      setActionError(e instanceof Error ? e.message : 'Не удалось вернуть доступ устройству')
-    } finally {
-      setUnblockingHwid(null)
-    }
-  }
 
   function openRename(device: Device) {
     setRenameError(null)
@@ -140,7 +97,7 @@ export function DevicesList({ embedded = false, deviceLimit }: DevicesListProps 
     )
   }
   if (!devices) return <DevicesSkeleton compact={embedded} />
-  if (devices.length === 0 && blockedDevices.length === 0) {
+  if (devices.length === 0) {
     if (embedded) {
       return (
         <section id="connected-devices" aria-labelledby="connected-devices-title" className="device-panel device-panel--embedded overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.03]">
@@ -189,11 +146,11 @@ export function DevicesList({ embedded = false, deviceLimit }: DevicesListProps 
   if (embedded) {
     return (
       <>
-        {(loadError || actionError) && (
+        {loadError && (
           <InlineAlert
             tone="danger"
-            title={actionError ? 'Не удалось выполнить действие' : 'Не удалось обновить список'}
-            description={actionError || loadError || undefined}
+            title="Не удалось обновить список"
+            description={loadError}
           />
         )}
         <section id="connected-devices" aria-labelledby="connected-devices-title" className="device-panel device-panel--embedded overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.03]">
@@ -229,8 +186,6 @@ export function DevicesList({ embedded = false, deviceLimit }: DevicesListProps 
               <CompactDeviceRow
                 key={device.hwid}
                 device={device}
-                loading={removingHwid === device.hwid}
-                onRemove={() => setSelectedDevice(device)}
                 onRename={() => openRename(device)}
               />
             ))}
@@ -253,15 +208,6 @@ export function DevicesList({ embedded = false, deviceLimit }: DevicesListProps 
             </Link>
           </div>
         </section>
-        <ConfirmDialog
-          open={Boolean(selectedDevice)}
-          title="Отключить устройство?"
-          description="Только это устройство потеряет доступ к VPN и будет заблокировано. Чтобы подключить его снова, сначала нажмите «Разрешить снова» в списке отключённых устройств."
-          confirmLabel="Отключить"
-          loading={Boolean(removingHwid)}
-          onCancel={() => setSelectedDevice(null)}
-          onConfirm={() => selectedDevice && removeDevice(selectedDevice)}
-        />
         <DeviceRenameDialog
           device={editingDevice}
           value={renameDraft}
@@ -277,11 +223,11 @@ export function DevicesList({ embedded = false, deviceLimit }: DevicesListProps 
 
   return (
     <>
-      {(loadError || actionError) && (
+      {loadError && (
         <InlineAlert
           tone="danger"
-          title={actionError ? 'Не удалось выполнить действие' : 'Не удалось обновить список'}
-          description={actionError || loadError || undefined}
+          title="Не удалось обновить список"
+          description={loadError}
         />
       )}
       <section id="connected-devices" aria-labelledby="connected-devices-title" className="device-panel overflow-hidden rounded-3xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.035]">
@@ -316,23 +262,11 @@ export function DevicesList({ embedded = false, deviceLimit }: DevicesListProps 
             <CompactDeviceRow
               key={device.hwid}
               device={device}
-              loading={removingHwid === device.hwid}
-              onRemove={() => setSelectedDevice(device)}
               onRename={() => openRename(device)}
             />
           ))}
         </div>
-        <BlockedDevices devices={blockedDevices} unblockingHwid={unblockingHwid} onUnblock={(device) => void unblockDevice(device)} />
       </section>
-      <ConfirmDialog
-        open={Boolean(selectedDevice)}
-        title="Отключить устройство?"
-        description="Только это устройство потеряет доступ к VPN и будет заблокировано. Чтобы подключить его снова, сначала нажмите «Разрешить снова» в списке отключённых устройств."
-        confirmLabel="Отключить"
-        loading={Boolean(removingHwid)}
-        onCancel={() => setSelectedDevice(null)}
-        onConfirm={() => selectedDevice && removeDevice(selectedDevice)}
-      />
       <DeviceRenameDialog
         device={editingDevice}
         value={renameDraft}
@@ -358,13 +292,9 @@ function DeviceLimitNotice({ state, compact = false }: { state: DeviceLimitState
 
 function CompactDeviceRow({
   device,
-  loading,
-  onRemove,
   onRename,
 }: {
   device: Device
-  loading: boolean
-  onRemove: () => void
   onRename: () => void
 }) {
   const activity = getActivityState(device.updatedAt || device.createdAt)
@@ -396,61 +326,7 @@ function CompactDeviceRow({
       >
         <Pencil className="h-4 w-4" />
       </button>
-      <button
-        type="button"
-        className="device-row__remove grid h-9 w-9 shrink-0 place-items-center rounded-lg text-slate-400 transition-colors hover:bg-red-50 hover:text-red-700 disabled:opacity-50 dark:hover:bg-red-500/10 dark:hover:text-red-200"
-        disabled={loading}
-        onClick={onRemove}
-        aria-label={`Отключить ${getDeviceTitle(device)}`}
-      >
-        {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldBan className="h-4 w-4" />}
-      </button>
     </article>
-  )
-}
-
-function BlockedDevices({
-  devices,
-  unblockingHwid,
-  onUnblock,
-}: {
-  devices: Device[]
-  unblockingHwid: string | null
-  onUnblock: (device: Device) => void
-}) {
-  if (devices.length === 0) return null
-
-  return (
-    <details className="border-t border-slate-200 bg-slate-50/60 px-4 py-3 dark:border-white/10 dark:bg-white/[0.02]">
-      <summary className="cursor-pointer text-sm font-semibold text-slate-700 dark:text-slate-200">
-        Отключённые устройства: {devices.length}
-      </summary>
-      <div className="mt-3 space-y-2">
-        {devices.map((device) => {
-          const loading = unblockingHwid === device.hwid
-          const clientName = formatDeviceClientName(device.userAgent)
-          return (
-            <div key={device.hwid} className="flex min-w-0 flex-col gap-3 rounded-xl border border-slate-200 bg-white p-3 dark:border-white/10 dark:bg-white/[0.025] sm:flex-row sm:items-center sm:justify-between">
-              <div className="min-w-0">
-                <div className="truncate text-sm font-medium text-slate-900 dark:text-white">{getDeviceTitle(device)}</div>
-                <div className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                  Отключено {formatDeviceDate(device.blockedAt)}{clientName ? ` · ${clientName}` : ''}
-                </div>
-              </div>
-              <button
-                type="button"
-                className="btn-secondary h-9 shrink-0 px-3 text-sm"
-                disabled={loading || Boolean(unblockingHwid)}
-                onClick={() => onUnblock(device)}
-              >
-                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
-                {loading ? 'Возвращаем доступ...' : 'Вернуть доступ'}
-              </button>
-            </div>
-          )
-        })}
-      </div>
-    </details>
   )
 }
 
@@ -616,20 +492,8 @@ export function getDeviceLimitState(used: number, limit?: number | null): Device
   if (!limit || limit < 1) return { tone: 'neutral', text: 'Без ограничений' }
 
   const remaining = limit - used
-  if (remaining < 0) return { tone: 'danger', text: `Лимит превышен на ${Math.abs(remaining)}. Отключите лишнее устройство.` }
-  if (remaining === 0) return { tone: 'danger', text: 'Лимит достигнут. Отключите ненужное устройство.' }
+  if (remaining < 0) return { tone: 'danger', text: `Лимит превышен на ${Math.abs(remaining)}. Увеличьте число устройств в тарифе.` }
+  if (remaining === 0) return { tone: 'danger', text: 'Лимит достигнут. Для нового устройства увеличьте лимит в тарифе.' }
   if (remaining === 1) return { tone: 'warning', text: 'Осталось 1 место' }
   return { tone: 'neutral', text: `Свободно: ${remaining}` }
-}
-
-function formatDeviceDate(date: string | null | undefined) {
-  if (!date) return '—'
-  return new Intl.DateTimeFormat('ru-RU', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    timeZone: 'Europe/Moscow',
-  }).format(new Date(date))
 }
