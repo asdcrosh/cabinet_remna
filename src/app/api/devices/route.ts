@@ -4,7 +4,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAuth, withAuth } from '@/lib/auth/guard'
-import { hasRemnawaveUserReference, remnawave, RemnawaveError, remnawaveUserReference } from '@/lib/remnawave'
+import { hasRemnawaveUserReference, RemnawaveError, remnawaveUserReference } from '@/lib/remnawave'
 import { syncLocalDevicesFromRemnawave } from '@/lib/remnawave-device-sync'
 
 export const runtime = 'nodejs'
@@ -33,26 +33,6 @@ export const GET = withAuth(async () => {
 })
 
 export const DELETE = withAuth(async () => {
-  const session = await requireAuth()
-  const user = await prisma.user.findUnique({ where: { id: session.uid } })
-  if (!user || !hasRemnawaveUserReference(user)) {
-    return NextResponse.json({ error: 'Нет активной подписки' }, { status: 404 })
-  }
-
-  try {
-    await remnawave.deleteAllUserDevices(remnawaveUserReference(user))
-    const result = await prisma.device.updateMany({
-      where: { userId: user.id, blockedAt: null },
-      data: { blockedAt: new Date() },
-    })
-    return NextResponse.json({ ok: true, blocked: result.count })
-  } catch (e) {
-    if (e instanceof RemnawaveError) {
-      return NextResponse.json(
-        { error: 'Не удалось заблокировать устройства. Попробуйте позже.' },
-        { status: 502 }
-      )
-    }
-    throw e
-  }
+  await requireAuth()
+  return NextResponse.json({ error: 'Блокировка устройств отключена' }, { status: 410 })
 })

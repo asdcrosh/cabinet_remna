@@ -277,8 +277,8 @@ export function buildConnectionResult({
   })
   if (capacityReached) return createResult({
     tone: 'warning', title: 'Подключение работает, лимит устройств заполнен',
-    summary: 'Текущее устройство подключено. Чтобы добавить ещё одно, отключите неиспользуемое устройство.',
-    action: 'devices', checkedAt, vpn, deviceCount, deviceLimit, checks,
+    summary: 'Текущее устройство подключено. Чтобы добавить ещё одно, увеличьте лимит устройств в тарифе.',
+    action: 'plans', checkedAt, vpn, deviceCount, deviceLimit, checks,
   })
   return createResult({
     tone: 'success', title: 'Подключение работает',

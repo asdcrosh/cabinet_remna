@@ -23,7 +23,6 @@ import {
 import { reconcileWhitelistAddonExpiryNotifications } from '../src/lib/whitelist-addon-expiry-notifications'
 import { checkReleaseNotifications } from '../src/lib/release-notifications'
 import { reconcileSubscriptionGracePeriods } from '../src/lib/subscription-grace'
-import { reconcileBlockedDevices } from '../src/lib/blocked-devices'
 
 const intervalMs = readPositiveInt('PAYMENT_RECONCILE_INTERVAL_SECONDS', 60) * 1000
 const batchSize = readPositiveInt('PAYMENT_RECONCILE_BATCH_SIZE', 25)
@@ -84,14 +83,6 @@ async function runOnce() {
   )
   if (gracePeriods.started > 0 || gracePeriods.expired > 0) {
     logInfo('subscription_grace.reconciled', gracePeriods)
-  }
-  const blockedDevices = await runTask(
-    'blocked_devices.batch_failed',
-    reconcileBlockedDevices,
-    { checked: 0, revoked: 0, failed: 0 }
-  )
-  if (blockedDevices.revoked > 0 || blockedDevices.failed > 0) {
-    logInfo('blocked_devices.reconciled', blockedDevices)
   }
   const pausedWhitelistAddons = await runTask(
     'whitelist_addon.pause_batch_failed',

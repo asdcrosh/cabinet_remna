@@ -40,7 +40,7 @@ describe('buildConnectionResult', () => {
     expect(result.summary).toContain('split tunneling')
   })
 
-  it('предлагает освободить место при заполненном лимите', () => {
+  it('предлагает увеличить тарифный лимит при заполненных местах', () => {
     const result = buildConnectionResult({
       subscription: { status: 'ACTIVE' },
       devices: [{ hwid: '1' }, { hwid: '2' }],
@@ -49,7 +49,7 @@ describe('buildConnectionResult', () => {
       now,
     })
 
-    expect(result.action).toBe('devices')
+    expect(result.action).toBe('plans')
     expect(result.title).toContain('лимит')
     expect(result.connectionVerified).toBe(true)
   })
