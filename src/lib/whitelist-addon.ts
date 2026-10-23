@@ -3,11 +3,14 @@ import { prisma } from './prisma'
 import { hasRemnawaveUserReference, remnawave, remnawaveUserReference } from './remnawave'
 import { resolvePlanActiveInternalSquads } from './subscription'
 import { logError } from './logger'
+import { updateWhitelistSquads } from './whitelist-addon-squads'
+import { withDistributedLock } from './distributed-lock'
 import {
   getResumedWhitelistAddonExpireAt,
   getWhitelistAddonExpireAt,
   getWhitelistAddonPauseAt,
   getWhitelistAddonRemainingSeconds,
+  WHITELIST_ADDON_DURATION_DAYS,
 } from './whitelist-addon-policy'
 
 export const WHITELIST_ADDON_NAME = 'Доступ к серверам с белыми списками'
@@ -23,6 +26,7 @@ export class WhitelistAddonManagementError extends Error {
 
 export type WhitelistAddonSnapshot = {
   type: 'WHITELIST_ADDON'
+  channel?: 'TELEGRAM_BOT'
   name: string
   planId: string
   subscriptionId: string
@@ -71,6 +75,7 @@ export function readBundledWhitelistAddonSnapshot(
 }
 
 export function buildWhitelistAddonSnapshot(input: {
+  channel?: 'TELEGRAM_BOT'
   planId: string
   subscriptionId: string
   subscriptionExpireAt: Date
@@ -79,6 +84,7 @@ export function buildWhitelistAddonSnapshot(input: {
 }): WhitelistAddonSnapshot {
   return {
     type: 'WHITELIST_ADDON',
+    ...(input.channel ? { channel: input.channel } : {}),
     name: WHITELIST_ADDON_NAME,
     planId: input.planId,
     subscriptionId: input.subscriptionId,
@@ -108,7 +114,7 @@ export function readWhitelistAddonSnapshot(value: Prisma.JsonValue | null | unde
 export async function provisionWhitelistAddon(paymentId: string) {
   const payment = await prisma.payment.findUnique({
     where: { id: paymentId },
-    include: { user: true, plan: true, subscription: true },
+    include: { user: true, plan: true, subscription: { include: { plan: true } } },
   })
   if (!payment || payment.purchaseType !== 'WHITELIST_ADDON') {
     throw new Error('Платёж дополнения не найден')
@@ -118,16 +124,18 @@ export async function provisionWhitelistAddon(paymentId: string) {
   }
 
   const snapshot = readWhitelistAddonSnapshot(payment.addonSnapshot)
-  const subscription = payment.subscription
+  let subscription = payment.subscription
   if (!snapshot || !subscription || snapshot.subscriptionId !== subscription.id) {
     throw new Error('Данные дополнения повреждены')
   }
-  if (subscription.userId !== payment.userId || subscription.planId !== payment.planId) {
+  if (subscription.userId !== payment.userId) {
     throw new Error('Текущая подписка не соответствует дополнению')
   }
-  if (!['ACTIVE', 'LIMITED'].includes(subscription.status) || subscription.expireAt.getTime() <= Date.now()) {
-    throw new Error('Подписка завершилась до выдачи дополнения')
-  }
+  // The main subscription may have been renewed/replaced while the invoice was open.
+  subscription = await prisma.subscription.findFirst({
+    where: { userId: payment.userId, status: { in: ['ACTIVE', 'LIMITED'] }, expireAt: { gt: new Date() } },
+    include: { plan: true }, orderBy: { expireAt: 'desc' },
+  }) ?? subscription
   if (!hasRemnawaveUserReference(payment.user)) {
     throw new Error('Профиль Remnawave не найден')
   }
@@ -144,14 +152,47 @@ export async function provisionWhitelistAddon(paymentId: string) {
         orderBy: { updatedAt: 'desc' },
       })
 
-  const activeInternalSquads = uniqueSquads([
-    ...resolvePlanActiveInternalSquads(payment.plan.activeInternalSquads),
-    ...snapshot.internalSquads,
-  ])
-  const updated = await remnawave.updateUser(remnawaveUserReference(payment.user), {
-    activeInternalSquads,
-  })
-  const activatedAt = payment.paidAt ?? new Date()
+  const activatedAt = new Date()
+  const remote = (await remnawave.getUser(remnawaveUserReference(payment.user))).response
+  const canActivate = ['ACTIVE', 'LIMITED'].includes(remote.status)
+    && new Date(remote.expireAt) > activatedAt
+  if (!canActivate) {
+    // Successful payment is fulfilled as saved time, never left in an endless retry loop.
+    const previousRemaining = pausedSource?.whitelistAddonRemainingSeconds
+      ?? (subscription.whitelistAddonActive
+        ? getWhitelistAddonRemainingSeconds(subscription.whitelistAddonExpireAt, getWhitelistAddonPauseAt(subscription, activatedAt))
+        : 0n)
+    const saved = await prisma.$transaction(async (tx) => {
+      const row = await tx.subscription.update({
+        where: { id: subscription.id },
+        data: {
+          whitelistAddonActive: false,
+          whitelistAddonActivatedAt: activatedAt,
+          whitelistAddonExpireAt: null,
+          whitelistAddonPausedAt: activatedAt,
+          whitelistAddonRemainingSeconds: previousRemaining + BigInt(WHITELIST_ADDON_DURATION_DAYS * 86400),
+          whitelistAddonInternalSquads: uniqueSquads([...(pausedSource?.whitelistAddonInternalSquads ?? []), ...snapshot.internalSquads]),
+          whitelistAddonPaymentId: payment.id,
+        },
+      })
+      if (pausedSource && pausedSource.id !== subscription.id) {
+        await tx.subscription.update({ where: { id: pausedSource.id }, data: {
+          whitelistAddonActive: false, whitelistAddonExpireAt: null,
+          whitelistAddonRemainingSeconds: null, whitelistAddonPausedAt: null,
+        } })
+      }
+      await tx.payment.update({ where: { id: payment.id }, data: {
+        subscriptionId: row.id, subscriptionProvisionedAt: activatedAt, provisioningError: null,
+      } })
+      return row
+    })
+    return { subscription: saved, remnawaveUser: null, isNew: false, idempotent: false }
+  }
+  const updated = await updateWhitelistSquads(
+    payment.user,
+    resolvePlanActiveInternalSquads(subscription.plan?.activeInternalSquads ?? payment.plan.activeInternalSquads),
+    snapshot.internalSquads
+  )
   const resumedExpireAt = pausedSource?.whitelistAddonRemainingSeconds
     && pausedSource.whitelistAddonRemainingSeconds > 0n
     ? getResumedWhitelistAddonExpireAt(activatedAt, pausedSource.whitelistAddonRemainingSeconds)
@@ -189,13 +230,13 @@ export async function provisionWhitelistAddon(paymentId: string) {
           whitelistAddonPausedAt: null,
           whitelistAddonRemainingSeconds: null,
           whitelistAddonPaymentId: null,
-          whitelistAddonInternalSquads: [],
         },
       })
     }
     await tx.payment.update({
       where: { id: payment.id },
       data: {
+        subscriptionId: subscription.id,
         subscriptionProvisionedAt: activatedAt,
         provisioningError: null,
       },
@@ -212,6 +253,12 @@ export async function provisionWhitelistAddon(paymentId: string) {
 }
 
 export async function revokeWhitelistAddonForPayment(paymentId: string) {
+  const payment = await prisma.payment.findUnique({ where: { id: paymentId }, select: { userId: true } })
+  if (!payment) return { revoked: false as const }
+  return withWhitelistUserLock(payment.userId, () => revokeWhitelistAddonForPaymentLocked(paymentId))
+}
+
+async function revokeWhitelistAddonForPaymentLocked(paymentId: string) {
   const payment = await prisma.payment.findUnique({
     where: { id: paymentId },
     include: { user: true, plan: true, subscription: { include: { plan: true } } },
@@ -257,11 +304,9 @@ export async function revokeWhitelistAddonForPayment(paymentId: string) {
     throw new Error('Профиль Remnawave не найден для отзыва дополнения')
   }
 
-  await remnawave.updateUser(remnawaveUserReference(payment.user), {
-    activeInternalSquads: resolvePlanActiveInternalSquads(
-      subscription.plan?.activeInternalSquads ?? payment.plan.activeInternalSquads
-    ),
-  })
+  await updateWhitelistSquads(payment.user,
+    resolvePlanActiveInternalSquads(subscription.plan?.activeInternalSquads ?? payment.plan.activeInternalSquads),
+    [], subscription.whitelistAddonInternalSquads)
   await prisma.subscription.update({
     where: { id: subscription.id },
     data: {
@@ -271,7 +316,6 @@ export async function revokeWhitelistAddonForPayment(paymentId: string) {
       whitelistAddonPausedAt: null,
       whitelistAddonRemainingSeconds: null,
       whitelistAddonPaymentId: null,
-      whitelistAddonInternalSquads: [],
       lastSyncedAt: new Date(),
     },
   })
@@ -282,6 +326,10 @@ export async function grantWhitelistAddonManually(input: {
   userId: string
   expireAt: Date
 }) {
+  return withWhitelistUserLock(input.userId, () => grantWhitelistAddonManuallyLocked(input))
+}
+
+async function grantWhitelistAddonManuallyLocked(input: { userId: string; expireAt: Date }) {
   const now = new Date()
   if (!Number.isFinite(input.expireAt.getTime()) || input.expireAt.getTime() <= now.getTime()) {
     throw new WhitelistAddonManagementError('Дата окончания БС должна быть в будущем')
@@ -305,13 +353,9 @@ export async function grantWhitelistAddonManually(input: {
     throw new WhitelistAddonManagementError('Профиль Remnawave не найден')
   }
 
-  const activeInternalSquads = uniqueSquads([
-    ...resolvePlanActiveInternalSquads(subscription.plan.activeInternalSquads),
-    ...subscription.plan.whitelistAddonInternalSquads,
-  ])
-  const updated = await remnawave.updateUser(remnawaveUserReference(subscription.user), {
-    activeInternalSquads,
-  })
+  const updated = await updateWhitelistSquads(subscription.user,
+    resolvePlanActiveInternalSquads(subscription.plan.activeInternalSquads),
+    subscription.plan.whitelistAddonInternalSquads)
   const savedSubscription = await prisma.subscription.update({
     where: { id: subscription.id },
     data: {
@@ -330,6 +374,10 @@ export async function grantWhitelistAddonManually(input: {
 }
 
 export async function revokeWhitelistAddonManually(userId: string) {
+  return withWhitelistUserLock(userId, () => revokeWhitelistAddonManuallyLocked(userId))
+}
+
+async function revokeWhitelistAddonManuallyLocked(userId: string) {
   const subscription = await prisma.subscription.findFirst({
     where: {
       userId,
@@ -347,9 +395,9 @@ export async function revokeWhitelistAddonManually(userId: string) {
     throw new WhitelistAddonManagementError('Профиль Remnawave не найден')
   }
 
-  await remnawave.updateUser(remnawaveUserReference(subscription.user), {
-    activeInternalSquads: resolvePlanActiveInternalSquads(subscription.plan.activeInternalSquads),
-  })
+  await updateWhitelistSquads(subscription.user,
+    resolvePlanActiveInternalSquads(subscription.plan.activeInternalSquads),
+    [], subscription.whitelistAddonInternalSquads)
   const savedSubscription = await prisma.subscription.update({
     where: { id: subscription.id },
     data: {
@@ -359,7 +407,6 @@ export async function revokeWhitelistAddonManually(userId: string) {
       whitelistAddonPausedAt: null,
       whitelistAddonRemainingSeconds: null,
       whitelistAddonPaymentId: null,
-      whitelistAddonInternalSquads: [],
       lastSyncedAt: new Date(),
     },
   })
@@ -385,45 +432,54 @@ export async function reconcileExpiredWhitelistAddons(options?: {
   let revoked = 0
   let failed = 0
 
-  for (const subscription of subscriptions) {
+  for (const candidate of subscriptions) {
     if (options?.shouldStop?.()) break
     try {
-      if (hasRemnawaveUserReference(subscription.user)) {
-        if (!subscription.plan) throw new Error('Тариф дополнения не найден')
-        await remnawave.updateUser(remnawaveUserReference(subscription.user), {
-          activeInternalSquads: resolvePlanActiveInternalSquads(subscription.plan.activeInternalSquads),
+      const locked = await withDistributedLock(`payment-provisioning:${candidate.userId}`, async () => {
+        const subscription = await prisma.subscription.findUnique({
+          where: { id: candidate.id }, include: { user: true, plan: true },
         })
-      }
-      const result = await prisma.subscription.updateMany({
-        where: {
-          id: subscription.id,
-          whitelistAddonActive: true,
-          whitelistAddonExpireAt: { lte: now },
-        },
-        data: {
-          whitelistAddonActive: false,
-          whitelistAddonPausedAt: null,
-          whitelistAddonRemainingSeconds: null,
-          whitelistAddonInternalSquads: [],
-          lastSyncedAt: new Date(),
-        },
-      })
-      revoked += result.count
-      if (result.count > 0) {
-        await prisma.auditLog.create({
+        if (!subscription || !subscription.whitelistAddonActive
+          || !subscription.whitelistAddonExpireAt || subscription.whitelistAddonExpireAt > now
+          || !['ACTIVE', 'LIMITED'].includes(subscription.status)
+          || (subscription.expireAt <= now && (!subscription.graceExpireAt || subscription.graceExpireAt <= now))) return
+        if (hasRemnawaveUserReference(subscription.user)) {
+          if (!subscription.plan) throw new Error('Тариф дополнения не найден')
+          await updateWhitelistSquads(subscription.user,
+            resolvePlanActiveInternalSquads(subscription.plan.activeInternalSquads),
+            [], subscription.whitelistAddonInternalSquads)
+        }
+        const result = await prisma.subscription.updateMany({
+          where: {
+            id: subscription.id,
+            whitelistAddonActive: true,
+            whitelistAddonExpireAt: { lte: now },
+          },
           data: {
-            targetId: subscription.userId,
-            action: 'ADMIN_FEATURES_UPDATED',
-            message: 'Доступ к БС отключён по окончании срока',
-            metadata: { subscriptionId: subscription.id },
+            whitelistAddonActive: false,
+            whitelistAddonPausedAt: null,
+            whitelistAddonRemainingSeconds: null,
+            lastSyncedAt: new Date(),
           },
         })
-      }
+        revoked += result.count
+        if (result.count > 0) {
+          await prisma.auditLog.create({
+            data: {
+              targetId: subscription.userId,
+              action: 'ADMIN_FEATURES_UPDATED',
+              message: 'Доступ к БС отключён по окончании срока',
+              metadata: { subscriptionId: subscription.id },
+            },
+          })
+        }
+      })
+      if (!locked.acquired) continue
     } catch (error) {
       failed += 1
       logError('whitelist_addon.expiry_revoke_failed', error, {
-        subscriptionId: subscription.id,
-        userId: subscription.userId,
+        subscriptionId: candidate.id,
+        userId: candidate.userId,
       })
     }
   }
@@ -457,41 +513,47 @@ export async function reconcileUnavailableSubscriptionWhitelistAddons(options?: 
   let exhausted = 0
   let failed = 0
 
-  for (const subscription of subscriptions) {
+  for (const candidate of subscriptions) {
     if (options?.shouldStop?.()) break
     try {
-      const pausedAt = getWhitelistAddonPauseAt(subscription, now)
-      const remainingSeconds = getWhitelistAddonRemainingSeconds(
-        subscription.whitelistAddonExpireAt,
-        pausedAt
-      )
-      const result = await prisma.subscription.updateMany({
-        where: {
-          id: subscription.id,
-          whitelistAddonActive: true,
-          whitelistAddonExpireAt: subscription.whitelistAddonExpireAt,
-        },
-        data: remainingSeconds > 0n
-          ? {
-              whitelistAddonActive: false,
-              whitelistAddonExpireAt: null,
-              whitelistAddonPausedAt: pausedAt,
-              whitelistAddonRemainingSeconds: remainingSeconds,
-            }
-          : {
-              whitelistAddonActive: false,
-              whitelistAddonPausedAt: null,
-              whitelistAddonRemainingSeconds: null,
-              whitelistAddonInternalSquads: [],
-            },
+      const locked = await withDistributedLock(`payment-provisioning:${candidate.userId}`, async () => {
+        const subscription = await prisma.subscription.findUnique({
+          where: { id: candidate.id }, include: { user: true, plan: true },
+        })
+        if (!subscription || !subscription.whitelistAddonActive || !subscription.whitelistAddonExpireAt || (['ACTIVE', 'LIMITED'].includes(subscription.status) && (subscription.expireAt > now || (subscription.graceExpireAt && subscription.graceExpireAt > now)))) return
+        const pausedAt = getWhitelistAddonPauseAt(subscription, now)
+        const remainingSeconds = getWhitelistAddonRemainingSeconds(
+          subscription.whitelistAddonExpireAt,
+          pausedAt
+        )
+        const result = await prisma.subscription.updateMany({
+          where: {
+            id: subscription.id,
+            whitelistAddonActive: true,
+            whitelistAddonExpireAt: subscription.whitelistAddonExpireAt,
+          },
+          data: remainingSeconds > 0n
+            ? {
+                whitelistAddonActive: false,
+                whitelistAddonExpireAt: null,
+                whitelistAddonPausedAt: pausedAt,
+                whitelistAddonRemainingSeconds: remainingSeconds,
+              }
+            : {
+                whitelistAddonActive: false,
+                whitelistAddonPausedAt: null,
+                whitelistAddonRemainingSeconds: null,
+                  },
+        })
+        if (remainingSeconds > 0n) paused += result.count
+        else exhausted += result.count
       })
-      if (remainingSeconds > 0n) paused += result.count
-      else exhausted += result.count
+      if (!locked.acquired) continue
     } catch (error) {
       failed += 1
       logError('whitelist_addon.pause_failed', error, {
-        subscriptionId: subscription.id,
-        userId: subscription.userId,
+        subscriptionId: candidate.id,
+        userId: candidate.userId,
       })
     }
   }
@@ -521,48 +583,51 @@ export async function reconcileAvailableSubscriptionWhitelistAddons(options?: {
   let resumed = 0
   let failed = 0
 
-  for (const subscription of subscriptions) {
+  for (const candidate of subscriptions) {
     if (options?.shouldStop?.()) break
     try {
-      const remainingSeconds = subscription.whitelistAddonRemainingSeconds
-      if (!remainingSeconds || remainingSeconds <= 0n) continue
-      if (!hasRemnawaveUserReference(subscription.user)) {
-        throw new Error('Профиль Remnawave не найден')
-      }
-      if (!subscription.plan) throw new Error('Тариф дополнения не найден')
-      const addonSquads = subscription.whitelistAddonInternalSquads.length
-        ? subscription.whitelistAddonInternalSquads
-        : subscription.plan.whitelistAddonInternalSquads
-      if (addonSquads.length === 0) throw new Error('Группы дополнения не найдены')
+      const locked = await withDistributedLock(`payment-provisioning:${candidate.userId}`, async () => {
+        const subscription = await prisma.subscription.findUnique({
+          where: { id: candidate.id }, include: { user: true, plan: true },
+        })
+        if (!subscription || subscription.whitelistAddonActive || !subscription.whitelistAddonRemainingSeconds || subscription.whitelistAddonRemainingSeconds <= 0n || !['ACTIVE', 'LIMITED'].includes(subscription.status) || (subscription.expireAt <= now && (!subscription.graceExpireAt || subscription.graceExpireAt <= now))) return
+        const remainingSeconds = subscription.whitelistAddonRemainingSeconds
+        if (!remainingSeconds || remainingSeconds <= 0n) return
+        if (!hasRemnawaveUserReference(subscription.user)) {
+          throw new Error('Профиль Remnawave не найден')
+        }
+        if (!subscription.plan) throw new Error('Тариф дополнения не найден')
+        const addonSquads = subscription.whitelistAddonInternalSquads.length
+          ? subscription.whitelistAddonInternalSquads
+          : subscription.plan.whitelistAddonInternalSquads
+        if (addonSquads.length === 0) throw new Error('Группы дополнения не найдены')
 
-      await remnawave.updateUser(remnawaveUserReference(subscription.user), {
-        activeInternalSquads: uniqueSquads([
-          ...resolvePlanActiveInternalSquads(subscription.plan.activeInternalSquads),
-          ...addonSquads,
-        ]),
+        await updateWhitelistSquads(subscription.user,
+          resolvePlanActiveInternalSquads(subscription.plan.activeInternalSquads), addonSquads)
+        const expireAt = getResumedWhitelistAddonExpireAt(now, remainingSeconds)
+        const result = await prisma.subscription.updateMany({
+          where: {
+            id: subscription.id,
+            whitelistAddonActive: false,
+            whitelistAddonRemainingSeconds: remainingSeconds,
+          },
+          data: {
+            whitelistAddonActive: true,
+            whitelistAddonExpireAt: expireAt,
+            whitelistAddonPausedAt: null,
+            whitelistAddonRemainingSeconds: null,
+            whitelistAddonInternalSquads: addonSquads,
+            lastSyncedAt: now,
+          },
+        })
+        resumed += result.count
       })
-      const expireAt = getResumedWhitelistAddonExpireAt(now, remainingSeconds)
-      const result = await prisma.subscription.updateMany({
-        where: {
-          id: subscription.id,
-          whitelistAddonActive: false,
-          whitelistAddonRemainingSeconds: remainingSeconds,
-        },
-        data: {
-          whitelistAddonActive: true,
-          whitelistAddonExpireAt: expireAt,
-          whitelistAddonPausedAt: null,
-          whitelistAddonRemainingSeconds: null,
-          whitelistAddonInternalSquads: addonSquads,
-          lastSyncedAt: now,
-        },
-      })
-      resumed += result.count
+      if (!locked.acquired) continue
     } catch (error) {
       failed += 1
       logError('whitelist_addon.resume_failed', error, {
-        subscriptionId: subscription.id,
-        userId: subscription.userId,
+        subscriptionId: candidate.id,
+        userId: candidate.userId,
       })
     }
   }
@@ -572,4 +637,10 @@ export async function reconcileAvailableSubscriptionWhitelistAddons(options?: {
 
 function uniqueSquads(squads: string[]) {
   return Array.from(new Set(squads.map((squad) => squad.trim()).filter(Boolean)))
+}
+
+async function withWhitelistUserLock<T>(userId: string, task: () => Promise<T>) {
+  const locked = await withDistributedLock(`payment-provisioning:${userId}`, task)
+  if (!locked.acquired) throw new WhitelistAddonManagementError('Подписка обновляется. Повторите операцию позже.')
+  return locked.value
 }

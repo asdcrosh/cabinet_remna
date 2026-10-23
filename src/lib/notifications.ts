@@ -14,6 +14,7 @@ import {
 } from './admin-telegram-notifications'
 import { paymentProviderLabel } from './payment-provider-label'
 import { readWhitelistAddonSnapshot } from './whitelist-addon'
+import { isWhitelistAddonPaused } from './whitelist-addon-policy'
 import { readDeviceLimitAddonSnapshot } from './device-limit-addon'
 
 const RENEW_PATH = '/dashboard/plans?intent=renew'
@@ -165,6 +166,8 @@ export async function notifyPaymentSucceeded(paymentId: string) {
           expireAt: true,
           deviceLimit: true,
           whitelistAddonExpireAt: true,
+          whitelistAddonActive: true,
+          whitelistAddonRemainingSeconds: true,
         },
       },
     },
@@ -231,30 +234,39 @@ export async function notifyPaymentSucceeded(paymentId: string) {
     const amount = formatRubles(payment.amountKopecks)
     const expireAt = payment.subscription?.whitelistAddonExpireAt ?? null
     const expireText = expireAt ? ` до ${formatDate(expireAt)}` : ''
+    const paused = Boolean(payment.subscription && isWhitelistAddonPaused(payment.subscription))
+    const title = paused ? 'Белые списки оплачены' : 'Белые списки подключены'
+    const body = paused
+      ? `Оплата ${amount} получена. Оплаченные дни сохранены до возобновления основной VPN-подписки.`
+      : `Доплата ${amount} прошла успешно. Дополнительные серверы доступны${expireText}.`
+    const botUsername = process.env.TELEGRAM_BOT_USERNAME?.trim().replace(/^@/, '')
+    const botUrl = snapshot?.channel === 'TELEGRAM_BOT' && botUsername
+      ? `https://t.me/${botUsername}?start=whitelist` : null
     await notifyUser({
       userId: payment.user.id,
       type: 'PAYMENT_SUCCESS',
       dedupeKey: `payment-success:${payment.id}`,
-      title: 'Белые списки подключены',
-      body: `Доплата ${amount} прошла успешно. Дополнительные серверы доступны${expireText}.`,
+      title,
+      body,
       actionHref: SUBSCRIPTION_PATH,
       actionLabel: 'Открыть подписку',
       telegramText: [
-        '<b>Белые списки подключены</b>',
+        `<b>${title}</b>`,
         '',
         `Оплата: <b>${amount}</b>`,
         snapshot?.name ? `Дополнение: ${snapshot.name}` : null,
-        expireAt ? `Доступ: до ${formatDate(expireAt)}` : null,
+        paused ? 'Дни сохранены до возобновления основной подписки.' : expireAt ? `Доступ: до ${formatDate(expireAt)}` : null,
+        !paused ? 'Обновите подписку в приложении INCY.' : null,
       ].filter(Boolean).join('\n'),
-      telegramActionUrl: `${getAppUrl()}${SUBSCRIPTION_PATH}`,
-      telegramActionLabel: 'Открыть подписку',
-      telegramActionOpenInTelegram: true,
-      emailSubject: `Белые списки подключены в ${getBrandName()}`,
-      emailText: `Доплата ${amount} прошла успешно. Дополнительные серверы доступны${expireText}.`,
+      telegramActionUrl: botUrl ?? `${getAppUrl()}${SUBSCRIPTION_PATH}`,
+      telegramActionLabel: botUrl ? 'Вернуться в бот' : 'Открыть подписку',
+      telegramActionOpenInTelegram: !botUrl,
+      emailSubject: `${title} в ${getBrandName()}`,
+      emailText: body,
       emailHtml: renderNotificationEmail({
         eyebrow: 'Оплата прошла',
-        title: 'Белые списки подключены',
-        lead: `Доплата ${amount} прошла успешно. Дополнительные серверы доступны${expireText}.`,
+        title,
+        lead: body,
         ctaUrl: `${getAppUrl()}${SUBSCRIPTION_PATH}`,
         ctaLabel: 'Открыть подписку',
         greetingName: payment.user.name,
