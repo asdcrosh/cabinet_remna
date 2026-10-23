@@ -5,6 +5,7 @@ import { resolvePlanActiveInternalSquads } from './subscription'
 import { logError } from './logger'
 import { updateWhitelistSquads } from './whitelist-addon-squads'
 import { withDistributedLock } from './distributed-lock'
+import { whitelistRewardTimeLeft } from './whitelist-addon-rewards'
 import {
   getResumedWhitelistAddonExpireAt,
   getWhitelistAddonExpireAt,
@@ -153,6 +154,10 @@ export async function provisionWhitelistAddon(paymentId: string) {
       })
 
   const activatedAt = new Date()
+  const rewardSource = pausedSource ?? subscription
+  const rewardSeconds = whitelistRewardTimeLeft(rewardSource, activatedAt)
+  const rewardSquads = rewardSeconds > 0n ? rewardSource.whitelistAddonRewardSquads ?? [] : []
+  const addonSquads = uniqueSquads([...snapshot.internalSquads, ...rewardSquads])
   const remote = (await remnawave.getUser(remnawaveUserReference(payment.user))).response
   const canActivate = ['ACTIVE', 'LIMITED'].includes(remote.status)
     && new Date(remote.expireAt) > activatedAt
@@ -171,7 +176,9 @@ export async function provisionWhitelistAddon(paymentId: string) {
           whitelistAddonExpireAt: null,
           whitelistAddonPausedAt: activatedAt,
           whitelistAddonRemainingSeconds: previousRemaining + BigInt(WHITELIST_ADDON_DURATION_DAYS * 86400),
-          whitelistAddonInternalSquads: uniqueSquads([...(pausedSource?.whitelistAddonInternalSquads ?? []), ...snapshot.internalSquads]),
+          whitelistAddonInternalSquads: addonSquads,
+          whitelistAddonRewardSeconds: rewardSeconds,
+          whitelistAddonRewardSquads: rewardSquads,
           whitelistAddonPaymentId: payment.id,
         },
       })
@@ -179,6 +186,7 @@ export async function provisionWhitelistAddon(paymentId: string) {
         await tx.subscription.update({ where: { id: pausedSource.id }, data: {
           whitelistAddonActive: false, whitelistAddonExpireAt: null,
           whitelistAddonRemainingSeconds: null, whitelistAddonPausedAt: null,
+          whitelistAddonRewardSeconds: 0n, whitelistAddonRewardSquads: [],
         } })
       }
       await tx.payment.update({ where: { id: payment.id }, data: {
@@ -191,7 +199,8 @@ export async function provisionWhitelistAddon(paymentId: string) {
   const updated = await updateWhitelistSquads(
     payment.user,
     resolvePlanActiveInternalSquads(subscription.plan?.activeInternalSquads ?? payment.plan.activeInternalSquads),
-    snapshot.internalSquads
+    addonSquads,
+    subscription.whitelistAddonInternalSquads,
   )
   const resumedExpireAt = pausedSource?.whitelistAddonRemainingSeconds
     && pausedSource.whitelistAddonRemainingSeconds > 0n
@@ -216,7 +225,9 @@ export async function provisionWhitelistAddon(paymentId: string) {
         whitelistAddonPausedAt: null,
         whitelistAddonRemainingSeconds: null,
         whitelistAddonPaymentId: payment.id,
-        whitelistAddonInternalSquads: snapshot.internalSquads,
+        whitelistAddonInternalSquads: addonSquads,
+        whitelistAddonRewardSeconds: rewardSeconds,
+        whitelistAddonRewardSquads: rewardSquads,
         lastSyncedAt: activatedAt,
       },
     })
@@ -230,6 +241,8 @@ export async function provisionWhitelistAddon(paymentId: string) {
           whitelistAddonPausedAt: null,
           whitelistAddonRemainingSeconds: null,
           whitelistAddonPaymentId: null,
+          whitelistAddonRewardSeconds: 0n,
+          whitelistAddonRewardSquads: [],
         },
       })
     }
@@ -304,6 +317,29 @@ async function revokeWhitelistAddonForPaymentLocked(paymentId: string) {
     throw new Error('Профиль Remnawave не найден для отзыва дополнения')
   }
 
+  const now = new Date()
+  const rewardSeconds = whitelistRewardTimeLeft(subscription, now)
+  const rewardSquads = rewardSeconds > 0n ? subscription.whitelistAddonRewardSquads : []
+  const active = rewardSeconds > 0n && ['ACTIVE', 'LIMITED'].includes(subscription.status)
+    && (subscription.expireAt > now || Boolean(subscription.graceExpireAt && subscription.graceExpireAt > now))
+  if (rewardSeconds > 0n) {
+    await updateWhitelistSquads(payment.user,
+      resolvePlanActiveInternalSquads(subscription.plan?.activeInternalSquads ?? payment.plan.activeInternalSquads),
+      active ? rewardSquads : [], subscription.whitelistAddonInternalSquads)
+    const saved = await prisma.subscription.update({ where: { id: subscription.id }, data: {
+      whitelistAddonActive: active,
+      whitelistAddonExpireAt: active ? new Date(now.getTime() + Number(rewardSeconds) * 1000) : null,
+      whitelistAddonPausedAt: active ? null : now,
+      whitelistAddonRemainingSeconds: active ? null : rewardSeconds,
+      whitelistAddonPaymentId: null,
+      whitelistAddonInternalSquads: rewardSquads,
+      whitelistAddonRewardSeconds: rewardSeconds,
+      whitelistAddonRewardSquads: rewardSquads,
+      lastSyncedAt: now,
+    } })
+    return { revoked: true as const, subscription: saved }
+  }
+
   await updateWhitelistSquads(payment.user,
     resolvePlanActiveInternalSquads(subscription.plan?.activeInternalSquads ?? payment.plan.activeInternalSquads),
     [], subscription.whitelistAddonInternalSquads)
@@ -316,6 +352,8 @@ async function revokeWhitelistAddonForPaymentLocked(paymentId: string) {
       whitelistAddonPausedAt: null,
       whitelistAddonRemainingSeconds: null,
       whitelistAddonPaymentId: null,
+      whitelistAddonRewardSeconds: 0n,
+      whitelistAddonRewardSquads: [],
       lastSyncedAt: new Date(),
     },
   })
@@ -366,6 +404,8 @@ async function grantWhitelistAddonManuallyLocked(input: { userId: string; expire
       whitelistAddonRemainingSeconds: null,
       whitelistAddonPaymentId: null,
       whitelistAddonInternalSquads: subscription.plan.whitelistAddonInternalSquads,
+      whitelistAddonRewardSeconds: 0n,
+      whitelistAddonRewardSquads: [],
       lastSyncedAt: now,
     },
   })
@@ -408,6 +448,8 @@ async function revokeWhitelistAddonManuallyLocked(userId: string) {
       whitelistAddonRemainingSeconds: null,
       whitelistAddonPaymentId: null,
       lastSyncedAt: new Date(),
+      whitelistAddonRewardSeconds: 0n,
+      whitelistAddonRewardSquads: [],
     },
   })
   return { revoked: true as const, subscription: savedSubscription }
@@ -444,9 +486,8 @@ export async function reconcileExpiredWhitelistAddons(options?: {
           || !['ACTIVE', 'LIMITED'].includes(subscription.status)
           || (subscription.expireAt <= now && (!subscription.graceExpireAt || subscription.graceExpireAt <= now))) return
         if (hasRemnawaveUserReference(subscription.user)) {
-          if (!subscription.plan) throw new Error('Тариф дополнения не найден')
           await updateWhitelistSquads(subscription.user,
-            resolvePlanActiveInternalSquads(subscription.plan.activeInternalSquads),
+            resolvePlanActiveInternalSquads(subscription.plan?.activeInternalSquads ?? []),
             [], subscription.whitelistAddonInternalSquads)
         }
         const result = await prisma.subscription.updateMany({
@@ -459,6 +500,8 @@ export async function reconcileExpiredWhitelistAddons(options?: {
             whitelistAddonActive: false,
             whitelistAddonPausedAt: null,
             whitelistAddonRemainingSeconds: null,
+            whitelistAddonRewardSeconds: 0n,
+            whitelistAddonRewardSquads: [],
             lastSyncedAt: new Date(),
           },
         })
@@ -596,14 +639,13 @@ export async function reconcileAvailableSubscriptionWhitelistAddons(options?: {
         if (!hasRemnawaveUserReference(subscription.user)) {
           throw new Error('Профиль Remnawave не найден')
         }
-        if (!subscription.plan) throw new Error('Тариф дополнения не найден')
         const addonSquads = subscription.whitelistAddonInternalSquads.length
           ? subscription.whitelistAddonInternalSquads
-          : subscription.plan.whitelistAddonInternalSquads
+          : subscription.plan?.whitelistAddonInternalSquads ?? []
         if (addonSquads.length === 0) throw new Error('Группы дополнения не найдены')
 
         await updateWhitelistSquads(subscription.user,
-          resolvePlanActiveInternalSquads(subscription.plan.activeInternalSquads), addonSquads)
+          resolvePlanActiveInternalSquads(subscription.plan?.activeInternalSquads ?? []), addonSquads)
         const expireAt = getResumedWhitelistAddonExpireAt(now, remainingSeconds)
         const result = await prisma.subscription.updateMany({
           where: {

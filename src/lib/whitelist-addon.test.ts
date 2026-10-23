@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => {
   const prisma = {
-    payment: { findUnique: vi.fn(), update: vi.fn() },
+    payment: { findUnique: vi.fn(), findFirst: vi.fn(), update: vi.fn() },
     subscription: { findUnique: vi.fn(), findFirst: vi.fn(), findMany: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
     auditLog: { create: vi.fn() },
     $transaction: vi.fn(),
@@ -16,6 +16,10 @@ vi.mock('./distributed-lock', () => ({
 }))
 
 vi.mock('./prisma', () => ({ prisma: mocks.prisma }))
+vi.mock('./remnashop-users', () => ({ syncRemnashopUserBySourceId: vi.fn() }))
+vi.mock('./payment-providers', () => ({
+  getAvailablePaymentProviders: async () => [{ id: 'YOOKASSA' }, { id: 'PLATEGA' }],
+}))
 vi.mock('./remnawave', () => ({
   remnawave: mocks.remnawave,
   hasRemnawaveUserReference: (user: any) => Boolean(user.remnawaveUuid),
@@ -32,6 +36,7 @@ import {
   revokeWhitelistAddonManually,
   revokeWhitelistAddonForPayment,
 } from './whitelist-addon'
+import { getBotWhitelistOffer } from './bot-whitelist'
 
 describe('whitelist add-on', () => {
   beforeEach(() => {
@@ -48,7 +53,7 @@ describe('whitelist add-on', () => {
     vi.useRealTimers()
   })
 
-  it('adds paid squads without extending the subscription', async () => {
+  it.each(['YOOKASSA', 'PLATEGA'])('fulfills %s, hides the offer and preserves the primary subscription on replay', async (provider) => {
     const paidAt = new Date('2026-08-01T12:00:00.000Z')
     vi.useFakeTimers()
     vi.setSystemTime(paidAt)
@@ -58,11 +63,31 @@ describe('whitelist add-on', () => {
       userId: 'user-1',
       planId: 'plan-1',
       status: 'ACTIVE',
+      startAt: new Date('2026-07-01T12:00:00.000Z'),
       expireAt,
+      deviceLimit: 5,
+      trafficLimitBytes: 200n * 1024n ** 3n,
+      trafficUsedBytes: 123456n,
+      lifetimeUsedBytes: 654321n,
       whitelistAddonActive: false,
+      plan: {
+        id: 'plan-1', activeInternalSquads: ['base-squad'], whitelistAddonEnabled: true,
+        whitelistAddonPriceKopecks: 20000, whitelistAddonInternalSquads: ['addon-squad'],
+      },
     }
-    mocks.prisma.payment.findUnique.mockResolvedValue({
+    const primaryBefore = structuredClone(subscription)
+    const user = { id: 'user-1', remnawaveUuid: 'rw-1' }
+    const remote = {
+      uuid: 'rw-1', status: 'ACTIVE', expireAt: expireAt.toISOString(),
+      hwidDeviceLimit: 5, trafficLimitBytes: 214748364800,
+      subscriptionUrl: 'https://subscription.test/existing-key',
+      activeInternalSquads: [{ uuid: 'base-squad' }, { uuid: 'manual-squad' }],
+    }
+    const remoteBefore = structuredClone(remote)
+    const payment = {
       id: 'payment-1',
+      provider,
+      status: 'SUCCEEDED',
       userId: 'user-1',
       planId: 'plan-1',
       purchaseType: 'WHITELIST_ADDON',
@@ -76,20 +101,28 @@ describe('whitelist add-on', () => {
         internalSquads: ['addon-squad'],
       }),
       subscription,
-      user: { id: 'user-1', remnawaveUuid: 'rw-1' },
-      plan: { id: 'plan-1', activeInternalSquads: ['base-squad'] },
+      user,
+      plan: subscription.plan,
+    }
+    mocks.prisma.payment.findUnique.mockImplementation(async () => payment)
+    mocks.prisma.payment.findFirst.mockResolvedValue(null)
+    mocks.prisma.payment.update.mockImplementation(async ({ data }) => Object.assign(payment, data))
+    mocks.prisma.subscription.findMany.mockImplementation(async () => [subscription])
+    mocks.prisma.subscription.findFirst.mockImplementation(async ({ where }) => where.id ? null : subscription)
+    mocks.prisma.subscription.update.mockImplementation(async ({ data }) => Object.assign(subscription, data))
+    mocks.remnawave.getUser.mockImplementation(async () => ({ response: remote }))
+    mocks.remnawave.updateUser.mockImplementation(async (_reference, data) => {
+      Object.assign(remote, data, { activeInternalSquads: data.activeInternalSquads.map((uuid: string) => ({ uuid })) })
+      return { response: remote }
     })
-    mocks.remnawave.updateUser.mockResolvedValue({ response: { uuid: 'rw-1' } })
-    mocks.prisma.subscription.update.mockResolvedValue({
-      ...subscription,
-      whitelistAddonActive: true,
-    })
+
+    expect((await getBotWhitelistOffer(user as never)).available).toBe(true)
 
     const result = await provisionWhitelistAddon('payment-1')
 
     expect(mocks.remnawave.updateUser).toHaveBeenCalledWith(
       { uuid: 'rw-1' },
-      { activeInternalSquads: ['base-squad', 'addon-squad'] }
+      { activeInternalSquads: ['base-squad', 'manual-squad', 'addon-squad'] }
     )
     expect(mocks.prisma.subscription.update).toHaveBeenCalledWith({
       where: { id: subscription.id },
@@ -105,6 +138,20 @@ describe('whitelist add-on', () => {
       data: expect.objectContaining({ subscriptionProvisionedAt: expect.any(Date) }),
     })
     expect(result.subscription.whitelistAddonActive).toBe(true)
+    expect((await getBotWhitelistOffer(user as never)).available).toBe(false)
+    expect(subscription).toMatchObject({ ...primaryBefore, whitelistAddonActive: true })
+    expect(remote).toEqual({
+      ...remoteBefore,
+      activeInternalSquads: [...remoteBefore.activeInternalSquads, { uuid: 'addon-squad' }],
+    })
+    for (const [{ data }] of mocks.prisma.subscription.update.mock.calls) {
+      expect(Object.keys(data).filter((key) => !key.startsWith('whitelistAddon') && key !== 'lastSyncedAt')).toEqual([])
+    }
+    const afterFirst = structuredClone(subscription)
+    expect((await provisionWhitelistAddon('payment-1')).idempotent).toBe(true)
+    expect(subscription).toEqual(afterFirst)
+    expect(mocks.remnawave.updateUser).toHaveBeenCalledTimes(1)
+    expect(mocks.prisma.subscription.update).toHaveBeenCalledTimes(1)
   })
 
   it('saves the paid 30 days on pause when the main subscription expires during payment', async () => {
@@ -243,6 +290,80 @@ describe('whitelist add-on', () => {
       where: { id: 'subscription-1' },
       data: expect.objectContaining({ whitelistAddonRemainingSeconds: null }),
     }))
+  })
+
+  it.each([
+    { paused: false, totalDays: 20, rewardDays: 7, expectedDays: 7 },
+    { paused: false, totalDays: 3, rewardDays: 7, expectedDays: 3 },
+    { paused: true, totalDays: 20, rewardDays: 7, expectedDays: 7 },
+  ])('preserves unused roulette rewards after a refund: %j', async ({ paused, totalDays, rewardDays, expectedDays }) => {
+    vi.useFakeTimers()
+    const now = new Date('2026-10-23T12:00:00Z')
+    vi.setSystemTime(now)
+    const subscription = {
+      id: 'subscription-1', userId: 'user-1', status: paused ? 'EXPIRED' : 'ACTIVE',
+      expireAt: new Date(+now + (paused ? -1 : 60) * 86400_000),
+      whitelistAddonActive: !paused,
+      whitelistAddonExpireAt: paused ? null : new Date(+now + totalDays * 86400_000),
+      whitelistAddonRemainingSeconds: paused ? BigInt(totalDays) * 86400n : null,
+      whitelistAddonPaymentId: 'payment-1', whitelistAddonInternalSquads: ['paid-squad', 'reward-squad'],
+      whitelistAddonRewardSeconds: BigInt(rewardDays) * 86400n, whitelistAddonRewardSquads: ['reward-squad'],
+      plan: { activeInternalSquads: ['base-squad'] },
+    }
+    mocks.prisma.payment.findUnique.mockResolvedValue({
+      id: 'payment-1', userId: 'user-1', purchaseType: 'WHITELIST_ADDON', subscription,
+      user: { id: 'user-1', remnawaveUuid: 'rw-1' }, plan: { activeInternalSquads: ['base-squad'] },
+    })
+    mocks.prisma.subscription.update.mockImplementation(async ({ data }) => Object.assign(subscription, data))
+    mocks.remnawave.getUser.mockResolvedValue({ response: { activeInternalSquads: [
+      { uuid: 'base-squad' }, { uuid: 'paid-squad' }, { uuid: 'reward-squad' }, { uuid: 'manual-squad' },
+    ] } })
+    mocks.remnawave.updateUser.mockResolvedValue({ response: {} })
+    expect(await revokeWhitelistAddonForPayment('payment-1')).toMatchObject({ revoked: true })
+    expect(subscription).toMatchObject({
+      whitelistAddonActive: !paused, whitelistAddonPaymentId: null,
+      whitelistAddonExpireAt: paused ? null : new Date(+now + expectedDays * 86400_000),
+      whitelistAddonRemainingSeconds: paused ? BigInt(expectedDays) * 86400n : null,
+      whitelistAddonRewardSeconds: BigInt(expectedDays) * 86400n,
+      whitelistAddonInternalSquads: ['reward-squad'],
+    })
+    expect(mocks.remnawave.updateUser).toHaveBeenCalledWith(expect.anything(), {
+      activeInternalSquads: paused ? ['base-squad', 'manual-squad'] : ['base-squad', 'manual-squad', 'reward-squad'],
+    })
+    // Repeated refund webhooks must not touch the retained prize.
+    expect(await revokeWhitelistAddonForPayment('payment-1')).toEqual({ revoked: false })
+    expect(mocks.remnawave.updateUser).toHaveBeenCalledTimes(1)
+  })
+
+  it('adds a paid month after a prize without losing reward squads or refund accounting', async () => {
+    vi.useFakeTimers()
+    const now = new Date('2026-10-23T12:00:00Z')
+    vi.setSystemTime(now)
+    const subscription = {
+      id: 'subscription-1', userId: 'user-1', status: 'ACTIVE', expireAt: new Date(+now + 90 * 86400_000),
+      whitelistAddonActive: true, whitelistAddonExpireAt: new Date(+now + 7 * 86400_000),
+      whitelistAddonInternalSquads: ['reward-squad'],
+      whitelistAddonRewardSeconds: 7n * 86400n, whitelistAddonRewardSquads: ['reward-squad'],
+      plan: { activeInternalSquads: ['base-squad'] },
+    }
+    mocks.prisma.payment.findUnique.mockResolvedValue({
+      id: 'payment-new', userId: 'user-1', purchaseType: 'WHITELIST_ADDON', subscription,
+      addonSnapshot: buildWhitelistAddonSnapshot({ planId: 'plan-1', subscriptionId: subscription.id,
+        subscriptionExpireAt: subscription.expireAt, priceKopecks: 20000, internalSquads: ['paid-squad'] }),
+      user: { id: 'user-1', remnawaveUuid: 'rw-1' }, plan: subscription.plan,
+    })
+    mocks.prisma.subscription.findFirst.mockResolvedValue(subscription)
+    mocks.prisma.subscription.update.mockImplementation(async ({ data }) => Object.assign(subscription, data))
+    mocks.remnawave.updateUser.mockResolvedValue({ response: {} })
+    await provisionWhitelistAddon('payment-new')
+    expect(subscription).toMatchObject({
+      whitelistAddonExpireAt: new Date(+now + 37 * 86400_000), whitelistAddonPaymentId: 'payment-new',
+      whitelistAddonRewardSeconds: 7n * 86400n, whitelistAddonRewardSquads: ['reward-squad'],
+      whitelistAddonInternalSquads: ['paid-squad', 'reward-squad'],
+    })
+    expect(mocks.remnawave.updateUser).toHaveBeenLastCalledWith(expect.anything(), {
+      activeInternalSquads: ['base-squad', 'paid-squad', 'reward-squad'],
+    })
   })
 
   it('removes paid squads after a full refund', async () => {

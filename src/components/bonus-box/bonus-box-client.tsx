@@ -1631,7 +1631,7 @@ function OpeningRow({ opening }: { opening: BonusBoxOpeningView }) {
   const Icon =
     opening.prize.type === "NO_PRIZE"
       ? CircleSlash
-      : opening.prize.type === "SUBSCRIPTION_DAYS"
+      : (opening.prize.type === "SUBSCRIPTION_DAYS" || opening.prize.type === "WHITELIST_DAYS")
         ? CalendarPlus
         : opening.prize.type === "TRAFFIC_GB"
           ? Zap

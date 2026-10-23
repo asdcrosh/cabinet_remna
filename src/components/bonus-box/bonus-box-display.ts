@@ -2,6 +2,7 @@ import type { BonusBoxPrizeView, Rarity } from "@/components/bonus-box/bonus-box
 
 export function prizeLabel(prize: BonusBoxPrizeView) {
   if (prize.type === "NO_PRIZE") return "Без начисления";
+  if (prize.type === "WHITELIST_DAYS") return `Белые списки · +${prize.value} дн.`;
   if (prize.type === "SUBSCRIPTION_DAYS") return `+${prize.value} дн.`;
   if (prize.type === "TRAFFIC_GB") return `+${prize.value} ГБ`;
   if (prize.type === "BONUS_ATTEMPTS") return `+${prize.value} попыток`;
@@ -9,7 +10,7 @@ export function prizeLabel(prize: BonusBoxPrizeView) {
 }
 
 export function prizeRequiresSubscription(prize: BonusBoxPrizeView) {
-  return prize.type === "SUBSCRIPTION_DAYS" || prize.type === "TRAFFIC_GB";
+  return prize.type === "WHITELIST_DAYS" || prize.type === "SUBSCRIPTION_DAYS" || prize.type === "TRAFFIC_GB";
 }
 
 export function getDisabledCtaLabel(reason: string) {

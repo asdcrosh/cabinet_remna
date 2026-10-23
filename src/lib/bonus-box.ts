@@ -20,6 +20,10 @@ import {
 } from './bonus-box-engagement'
 import { notifyUser } from './notifications'
 import { getEffectiveReferralSettings } from './referral-settings'
+import { withDistributedLock } from './distributed-lock'
+import { buildWhitelistRewardGrant } from './whitelist-addon-rewards'
+import { updateWhitelistSquads } from './whitelist-addon-squads'
+import { isWhitelistAddonCurrentlyActive } from './whitelist-addon-policy'
 import {
   buildOpeningStreak,
   buildPityProgress,
@@ -139,6 +143,7 @@ function parseOpeningReel(value: Prisma.JsonValue | null): BonusBoxPublicPrize[]
   if (!Array.isArray(value) || value.length === 0) return null
 
   const validTypes = new Set([
+    'WHITELIST_DAYS',
     'SUBSCRIPTION_DAYS',
     'TRAFFIC_GB',
     'PROMO_CODE_PERCENT',
@@ -672,6 +677,12 @@ export async function grantWeeklyBonusBoxAttempts(userId: string) {
 }
 
 export async function openBonusBox(userId: string, spinId: string): Promise<BonusBoxOpeningResult> {
+  const locked = await withDistributedLock(`payment-provisioning:${userId}`, () => openBonusBoxLocked(userId, spinId))
+  if (!locked.acquired) throw new BonusBoxError('Подписка обновляется. Повторите открытие позже.', 409, 'SUBSCRIPTION_BUSY')
+  return locked.value
+}
+
+async function openBonusBoxLocked(userId: string, spinId: string): Promise<BonusBoxOpeningResult> {
   const completedOpening = await findOpeningBySpinId(userId, spinId)
   if (completedOpening) return replayOpeningResult(userId, completedOpening)
 
@@ -694,6 +705,7 @@ export async function openBonusBox(userId: string, spinId: string): Promise<Bonu
         promoCode: string | null
         promoCodeExpiresAt: string | null
         remoteUpdate:
+          | ({ type: 'WHITELIST_DAYS'; subscriptionId: string; previousInternalSquads: string[] } & { reference: RemnawaveUserReference })
           | ({ type: 'SUBSCRIPTION_DAYS'; subscriptionId: string; expireAt: Date } & { reference: RemnawaveUserReference })
           | ({ type: 'TRAFFIC_GB'; subscriptionId: string; trafficLimitBytes: bigint } & { reference: RemnawaveUserReference })
           | null
@@ -857,7 +869,11 @@ export async function openBonusBox(userId: string, spinId: string): Promise<Bonu
           spinId,
           attemptId: attempt.id,
           prizeId: prize.id,
-          prizeSnapshot: makePrizeSnapshot(prize),
+          prizeSnapshot: {
+            ...makePrizeSnapshot(prize),
+            ...(application.remoteUpdate?.type === 'WHITELIST_DAYS'
+              ? { previousInternalSquads: application.remoteUpdate.previousInternalSquads } : {}),
+          },
           reelSnapshot: reel.items,
           winningIndex: reel.winningIndex,
           stopOffsetRatio: reel.stopOffsetRatio,
@@ -939,15 +955,16 @@ function isWelcomeBonusAttempt(attempt: { source: string; sourceKey: string }) {
 }
 
 function isPrizeApplicable(
-  prize: Pick<BonusBoxPrize, 'type'>,
+  prize: Pick<BonusBoxPrize, 'type' | 'internalSquads'>,
   context: {
     hasActiveSubscription: boolean
     trafficLimitBytes: bigint | null
   }
 ) {
   if (!context.hasActiveSubscription) {
-    return prize.type !== 'SUBSCRIPTION_DAYS' && prize.type !== 'TRAFFIC_GB'
+    return !['SUBSCRIPTION_DAYS', 'TRAFFIC_GB', 'WHITELIST_DAYS'].includes(prize.type)
   }
+  if (prize.type === 'WHITELIST_DAYS' && !prize.internalSquads?.length) return false
   if (prize.type === 'TRAFFIC_GB' && context.trafficLimitBytes == null) {
     return false
   }
@@ -978,6 +995,12 @@ async function applyPrizeInTransaction(
       id: string
       expireAt: Date
       trafficLimitBytes: bigint | null
+      whitelistAddonActive: boolean
+      whitelistAddonExpireAt: Date | null
+      whitelistAddonRemainingSeconds: bigint | null
+      whitelistAddonRewardSeconds: bigint
+      whitelistAddonRewardSquads: string[]
+      whitelistAddonInternalSquads: string[]
     }
     prize: BonusBoxPrize
     config: ReturnType<typeof getBonusBoxConfig>
@@ -1024,6 +1047,21 @@ async function applyPrizeInTransaction(
       promoCodeId: null,
       subscriptionId: input.subscription.id,
       remoteUpdate: { type: 'SUBSCRIPTION_DAYS' as const, subscriptionId: input.subscription.id, expireAt },
+    }
+  }
+
+  if (input.prize.type === 'WHITELIST_DAYS') {
+    if (!input.subscription) throw new BonusBoxError('Нужна активная VPN-подписка', 409, 'NO_ACTIVE_SUBSCRIPTION')
+    const previousInternalSquads = [...input.subscription.whitelistAddonInternalSquads ?? []]
+    await tx.subscription.update({
+      where: { id: input.subscription.id },
+      data: buildWhitelistRewardGrant(input.subscription, input.prize.value, input.prize.internalSquads, new Date()),
+    })
+    return {
+      promoCodeId: null,
+      subscriptionId: input.subscription.id,
+      remoteUpdate: { type: 'WHITELIST_DAYS' as const, subscriptionId: input.subscription.id,
+        previousInternalSquads },
     }
   }
 
@@ -1087,10 +1125,32 @@ async function createPrizePromoCode(
 
 async function syncPrizeToRemnawave(
   input:
+    | { type: 'WHITELIST_DAYS'; reference: RemnawaveUserReference; subscriptionId: string; previousInternalSquads: string[] }
     | { type: 'SUBSCRIPTION_DAYS'; reference: RemnawaveUserReference; subscriptionId: string; expireAt: Date }
     | { type: 'TRAFFIC_GB'; reference: RemnawaveUserReference; subscriptionId: string; trafficLimitBytes: bigint }
 ) {
   try {
+    if (input.type === 'WHITELIST_DAYS') {
+      // Read current entitlement, never replay a historic prize's squads after a refund or expiry.
+      const awardedSubscription = await prisma.subscription.findUniqueOrThrow({
+        where: { id: input.subscriptionId }, include: { plan: true },
+      })
+      const subscription = awardedSubscription.whitelistAddonActive || awardedSubscription.whitelistAddonRemainingSeconds
+        ? awardedSubscription
+        : await prisma.subscription.findFirst({
+          where: { userId: awardedSubscription.userId, OR: [
+            { whitelistAddonActive: true }, { whitelistAddonRemainingSeconds: { gt: 0n } },
+          ] },
+          orderBy: { updatedAt: 'desc' }, include: { plan: true },
+        }) ?? awardedSubscription
+      await updateWhitelistSquads(
+        { remnawaveId: input.reference.id, remnawaveUuid: input.reference.uuid, remnawaveUsername: input.reference.username },
+        subscription.plan?.activeInternalSquads ?? [],
+        isWhitelistAddonCurrentlyActive(subscription) ? subscription.whitelistAddonInternalSquads : [],
+        [...new Set([...subscription.whitelistAddonInternalSquads, ...input.previousInternalSquads])],
+      )
+      return true
+    }
     const updated = await remnawave.updateUser(input.reference, {
       status: 'ACTIVE',
       ...(input.type === 'SUBSCRIPTION_DAYS'
@@ -1109,7 +1169,7 @@ async function syncPrizeToRemnawave(
     return true
   } catch (error) {
     logError('bonus_box.remnawave_sync_failed', error, { subscriptionId: input.subscriptionId })
-    await prisma.subscription.update({
+    if (input.type !== 'WHITELIST_DAYS') await prisma.subscription.update({
       where: { id: input.subscriptionId },
       data: { pendingSync: true },
     }).catch(() => undefined)
@@ -1147,6 +1207,7 @@ export async function retryPendingBonusBoxSyncsForUser(
         id: true,
         awardedSubscriptionId: true,
         syncAttempts: true,
+        prizeSnapshot: true,
         prize: { select: { type: true, title: true } },
       },
     }),
@@ -1157,6 +1218,25 @@ export async function retryPendingBonusBoxSyncsForUser(
 
   let synced = 0
   for (const opening of pendingOpenings) {
+    const snapshot = opening.prizeSnapshot
+    const prizeType = snapshot && typeof snapshot === 'object' && !Array.isArray(snapshot) && typeof snapshot.type === 'string'
+      ? snapshot.type : opening.prize.type
+    if (prizeType === 'WHITELIST_DAYS' && opening.awardedSubscriptionId) {
+      const attemptNumber = opening.syncAttempts + 1
+      const locked = await withDistributedLock(`payment-provisioning:${userId}`, async () => {
+        const ok = await syncPrizeToRemnawave({
+          type: 'WHITELIST_DAYS', reference: remnawaveUserReference(user), subscriptionId: opening.awardedSubscriptionId!,
+          previousInternalSquads: readPreviousWhitelistSquads(opening.prizeSnapshot),
+        })
+        await updateBonusBoxSyncState(opening.id, ok, attemptNumber)
+        return ok
+      })
+      if (locked.acquired && locked.value) {
+        synced += 1
+        await notifyBonusSyncRestored(userId, opening.id, opening.prize.title)
+      }
+      continue
+    }
     const subscription = opening.awardedSubscriptionId
       ? await prisma.subscription.findUnique({
           where: { id: opening.awardedSubscriptionId },
@@ -1169,7 +1249,7 @@ export async function retryPendingBonusBoxSyncsForUser(
       continue
     }
 
-    if (opening.prize.type === 'SUBSCRIPTION_DAYS') {
+    if (prizeType === 'SUBSCRIPTION_DAYS') {
       const ok = await syncPrizeToRemnawave({
         type: 'SUBSCRIPTION_DAYS',
         reference: remnawaveUserReference(user),
@@ -1184,7 +1264,7 @@ export async function retryPendingBonusBoxSyncsForUser(
       continue
     }
 
-    if (opening.prize.type === 'TRAFFIC_GB' && subscription.trafficLimitBytes != null) {
+    if (prizeType === 'TRAFFIC_GB' && subscription.trafficLimitBytes != null) {
       const ok = await syncPrizeToRemnawave({
         type: 'TRAFFIC_GB',
         reference: remnawaveUserReference(user),
@@ -1216,6 +1296,12 @@ async function notifyBonusSyncRestored(userId: string, openingId: string, prizeT
     actionHref: '/dashboard/bonus-box',
     actionLabel: 'Открыть бонусы',
   }).catch(() => undefined)
+}
+
+function readPreviousWhitelistSquads(snapshot: Prisma.JsonValue) {
+  if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)) return []
+  const ids = snapshot.previousInternalSquads
+  return Array.isArray(ids) ? ids.filter((id): id is string => typeof id === 'string') : []
 }
 
 async function updateBonusBoxSyncState(
@@ -1468,6 +1554,7 @@ function makePrizeSnapshot(prize: BonusBoxPrize) {
     type: prize.type,
     value: prize.value,
     rarity: prize.rarity,
+    internalSquads: prize.internalSquads,
   }
 }
 

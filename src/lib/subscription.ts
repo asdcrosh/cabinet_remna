@@ -25,6 +25,7 @@ import {
   hasWhitelistAddonEntitlement,
   isWhitelistAddonCurrentlyActive,
 } from './whitelist-addon-policy'
+import { whitelistRewardTimeLeft } from './whitelist-addon-rewards'
 
 export interface EnsureSubscriptionInput {
   userId: string                  // локальный ID в нашей БД
@@ -98,6 +99,8 @@ export async function ensureRemnawaveSubscription(input: EnsureSubscriptionInput
     expireAt: whitelistAddonExpireAt,
     paymentId: whitelistAddonPaymentId,
     squads: whitelistAddonSquads,
+    rewardSeconds: whitelistAddonRewardSeconds,
+    rewardSquads: whitelistAddonRewardSquads,
   } = whitelistAddonState
   const activeInternalSquads = Array.from(new Set([
     ...resolvePlanActiveInternalSquads(input.plan.activeInternalSquads),
@@ -219,6 +222,8 @@ export async function ensureRemnawaveSubscription(input: EnsureSubscriptionInput
             whitelistAddonRemainingSeconds: null,
             whitelistAddonPaymentId,
             whitelistAddonInternalSquads: whitelistAddonSquads,
+            whitelistAddonRewardSeconds,
+            whitelistAddonRewardSquads,
             graceStartedAt: null,
             graceExpireAt: null,
           },
@@ -244,6 +249,8 @@ export async function ensureRemnawaveSubscription(input: EnsureSubscriptionInput
             whitelistAddonRemainingSeconds: null,
             whitelistAddonPaymentId,
             whitelistAddonInternalSquads: whitelistAddonSquads,
+            whitelistAddonRewardSeconds,
+            whitelistAddonRewardSquads,
             graceStartedAt: null,
             graceExpireAt: null,
           },
@@ -260,6 +267,8 @@ export async function ensureRemnawaveSubscription(input: EnsureSubscriptionInput
           whitelistAddonRemainingSeconds: null,
           whitelistAddonPaymentId: null,
           whitelistAddonInternalSquads: [],
+          whitelistAddonRewardSeconds: 0n,
+          whitelistAddonRewardSquads: [],
         },
       })
     }
@@ -325,6 +334,8 @@ type WhitelistAddonSource = {
   whitelistAddonRemainingSeconds: bigint | null
   whitelistAddonPaymentId: string | null
   whitelistAddonInternalSquads: string[]
+  whitelistAddonRewardSeconds?: bigint
+  whitelistAddonRewardSquads?: string[]
   status: string
   expireAt: Date
   graceExpireAt: Date | null
@@ -359,8 +370,10 @@ function resolveWhitelistAddonForActivation(input: {
     ? getWhitelistAddonExpireAt(requestedBase)
     : existingExpireAt
   const active = Boolean(expireAt && expireAt > input.now)
+  const rewardSeconds = source ? whitelistRewardTimeLeft(source, input.now) : 0n
+  const rewardSquads = rewardSeconds > 0n ? source?.whitelistAddonRewardSquads ?? [] : []
   const squads = input.requested
-    ? input.requested.internalSquads
+    ? [...new Set([...input.requested.internalSquads, ...rewardSquads])]
     : source?.whitelistAddonInternalSquads.length
       ? source.whitelistAddonInternalSquads
       : source?.plan?.whitelistAddonInternalSquads ?? []
@@ -377,6 +390,8 @@ function resolveWhitelistAddonForActivation(input: {
         : source?.whitelistAddonPaymentId ?? null
       : null,
     squads: active ? squads : [],
+    rewardSeconds: active ? rewardSeconds : 0n,
+    rewardSquads: active ? rewardSquads : [],
   }
 }
 

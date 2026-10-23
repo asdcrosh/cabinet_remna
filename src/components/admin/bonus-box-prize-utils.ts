@@ -1,4 +1,4 @@
-export type PrizeType = 'SUBSCRIPTION_DAYS' | 'TRAFFIC_GB' | 'PROMO_CODE_PERCENT' | 'BONUS_ATTEMPTS' | 'NO_PRIZE'
+export type PrizeType = 'SUBSCRIPTION_DAYS' | 'TRAFFIC_GB' | 'PROMO_CODE_PERCENT' | 'BONUS_ATTEMPTS' | 'NO_PRIZE' | 'WHITELIST_DAYS'
 export type Rarity = 'COMMON' | 'RARE' | 'EPIC' | 'LEGENDARY'
 
 export type BonusBoxSettingsAdminRow = {
@@ -13,6 +13,7 @@ export type BonusBoxPrizeAdminRow = {
   title: string
   description: string | null
   type: PrizeType
+  internalSquads: string[]
   value: number
   weight: number
   rarity: Rarity
@@ -46,6 +47,7 @@ export type BonusBoxPrizeFormState = {
   title: string
   description: string
   type: PrizeType
+  internalSquads: string[]
   value: string
   weight: string
   rarity: Rarity
@@ -60,6 +62,7 @@ export const emptyBonusBoxPrizeForm: BonusBoxPrizeFormState = {
   title: '',
   description: '',
   type: 'SUBSCRIPTION_DAYS',
+  internalSquads: [],
   value: '1',
   weight: '20',
   rarity: 'COMMON',
@@ -218,6 +221,7 @@ export function formatChance(value: number) {
 
 export function valueLabel(type: PrizeType) {
   if (type === 'NO_PRIZE') return 'Значение'
+  if (type === 'WHITELIST_DAYS') return 'Срок белых списков, дней'
   if (type === 'SUBSCRIPTION_DAYS') return 'Дни'
   if (type === 'TRAFFIC_GB') return 'ГБ'
   if (type === 'BONUS_ATTEMPTS') return 'Открытия'
@@ -226,6 +230,7 @@ export function valueLabel(type: PrizeType) {
 
 export function prizeTypeLabel(type: PrizeType) {
   if (type === 'NO_PRIZE') return 'Открытие без начисления'
+  if (type === 'WHITELIST_DAYS') return 'Белые списки'
   if (type === 'SUBSCRIPTION_DAYS') return 'Дни подписки'
   if (type === 'TRAFFIC_GB') return 'Дополнительный трафик'
   if (type === 'BONUS_ATTEMPTS') return 'Дополнительные открытия'
@@ -239,6 +244,7 @@ export function prizeValue(prize: BonusBoxPrizeAdminRow) {
 
 export function prizeValueFromParts(type: PrizeType, value: number) {
   if (type === 'NO_PRIZE') return 'Без начислений'
+  if (type === 'WHITELIST_DAYS') return `Белые списки · +${value} дн.`
   if (type === 'SUBSCRIPTION_DAYS') return `+${value} дн.`
   if (type === 'TRAFFIC_GB') return `+${value} ГБ`
   if (type === 'BONUS_ATTEMPTS') return `+${value} откр.`

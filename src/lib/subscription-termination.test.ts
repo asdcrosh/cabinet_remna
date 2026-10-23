@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+vi.mock('./distributed-lock', () => ({
+  withDistributedLock: async (_key: string, task: () => Promise<unknown>) => ({ acquired: true, value: await task() }),
+}))
+
 const mocks = vi.hoisted(() => {
   class TestRemnawaveError extends Error {
     constructor(public status: number, public body: unknown) {
@@ -171,7 +175,7 @@ describe('terminateUserSubscription', () => {
     expect(mocks.transaction).toHaveBeenCalledOnce()
   })
 
-  it('does not preserve a bundled add-on when its subscription payment is refunded', async () => {
+  it.each([0, 7])('keeps only unused roulette time after a bundled subscription refund: %i days', async (rewardDays) => {
     mocks.userFindUnique.mockResolvedValue({
       id: 'user-1',
       remnawaveUuid: 'uuid-1',
@@ -182,6 +186,8 @@ describe('terminateUserSubscription', () => {
         whitelistAddonExpireAt: new Date(Date.now() + 20 * 24 * 60 * 60 * 1000),
         whitelistAddonRemainingSeconds: null,
         whitelistAddonPaymentId: 'payment-1',
+        whitelistAddonRewardSeconds: BigInt(rewardDays) * 86400n,
+        whitelistAddonRewardSquads: rewardDays ? ['reward-squad'] : [],
       }],
     })
     mocks.paymentFindUnique.mockResolvedValue({
@@ -204,8 +210,10 @@ describe('terminateUserSubscription', () => {
       where: { id: 'subscription-1' },
       data: expect.objectContaining({
         whitelistAddonActive: false,
-        whitelistAddonRemainingSeconds: null,
+        whitelistAddonRemainingSeconds: rewardDays ? BigInt(rewardDays) * 86400n : null,
         whitelistAddonPaymentId: null,
+        whitelistAddonRewardSeconds: BigInt(rewardDays) * 86400n,
+        whitelistAddonInternalSquads: rewardDays ? ['reward-squad'] : [],
       }),
     })
   })

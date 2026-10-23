@@ -141,6 +141,7 @@ export default async function AdminBonusBoxPage({
     title: prize.title,
     description: prize.description,
     type: prize.type,
+    internalSquads: prize.internalSquads,
     value: prize.value,
     weight: prize.weight,
     rarity: prize.rarity,

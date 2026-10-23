@@ -31,10 +31,15 @@ export const PATCH = withAuth(async (req: Request, { params }: { params: Promise
 
   const existing = await prisma.bonusBoxPrize.findUnique({
     where: { id },
-    select: { type: true, value: true, rarity: true },
+    select: { type: true, value: true, rarity: true, internalSquads: true },
   })
   if (!existing) {
     return NextResponse.json({ error: 'Подарок не найден' }, { status: 404 })
+  }
+
+  if ((parsed.data.type ?? existing.type) === 'WHITELIST_DAYS'
+    && (parsed.data.internalSquads ?? existing.internalSquads).length === 0) {
+    return NextResponse.json({ error: 'Выберите сквады для награды «Белые списки»' }, { status: 400 })
   }
 
   const effectiveType = parsed.data.type ?? existing.type
