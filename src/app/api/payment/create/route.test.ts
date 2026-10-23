@@ -920,6 +920,31 @@ describe('payment create route', () => {
     expect(mocks.prisma.$transaction).not.toHaveBeenCalled()
   })
 
+  it.each(['PLATEGA', 'YOOKASSA'] as const)('resumes whitelist invoices only from the selected %s provider', async (provider) => {
+    mocks.prisma.user.findUnique.mockResolvedValue({ ...user, telegramId: 123n })
+    mocks.prisma.subscription.findFirst.mockResolvedValue({ id: 'subscription-1', planId: plan.id, status: 'ACTIVE', expireAt: futureDate(30) })
+    const oldProvider = provider === 'PLATEGA' ? 'YOOKASSA' : 'PLATEGA'
+    const oldInvoice = { id: 'old-invoice', provider: oldProvider, status: 'PENDING', checkoutKey: 'old-key', confirmationUrl: 'https://wrong-provider.test' }
+    mocks.prisma.payment.findFirst.mockImplementation(async ({ where }) => where.purchaseType === 'WHITELIST_ADDON' && (!where.provider || where.provider === oldProvider) ? oldInvoice : null)
+    mocks.txPaymentCreate.mockResolvedValue({ ...localPayment, amountKopecks: 20000, provider, purchaseType: 'WHITELIST_ADDON', subscriptionId: 'subscription-1' })
+    const response = await createPaymentForUser(paymentRequest({ purchaseType: 'WHITELIST_ADDON', provider }), user.id, { telegramBot: true })
+    expect(response.status).toBe(200)
+    expect(await response.json()).toMatchObject({ provider, localPaymentId: 'payment-1' })
+    expect(mocks.prisma.payment.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ purchaseType: 'WHITELIST_ADDON', provider }) }))
+    expect(provider === 'PLATEGA' ? mocks.createPlategaPayment : mocks.createPayment).toHaveBeenCalledOnce()
+    expect(provider === 'PLATEGA' ? mocks.createPayment : mocks.createPlategaPayment).not.toHaveBeenCalled()
+  })
+
+  it('reuses a pending whitelist invoice from the same provider without creating another', async () => {
+    mocks.prisma.user.findUnique.mockResolvedValue({ ...user, telegramId: 123n })
+    mocks.prisma.subscription.findFirst.mockResolvedValue({ id: 'subscription-1', planId: plan.id, status: 'ACTIVE', expireAt: futureDate(30) })
+    mocks.prisma.payment.findFirst.mockResolvedValue({ id: 'existing', provider: 'PLATEGA', status: 'PENDING', checkoutKey: 'previous-key', confirmationUrl: 'https://pay.platega.io/existing' })
+    const response = await createPaymentForUser(paymentRequest({ purchaseType: 'WHITELIST_ADDON', provider: 'PLATEGA' }), user.id, { telegramBot: true })
+    expect(await response.json()).toMatchObject({ localPaymentId: 'existing', provider: 'PLATEGA', resumed: true })
+    expect(mocks.createPlategaPayment).not.toHaveBeenCalled()
+    expect(mocks.createPayment).not.toHaveBeenCalled()
+  })
+
   it('creates a Platega checkout and stores the external transaction', async () => {
     const response = await POST(paymentRequest({ planId: plan.id, provider: 'PLATEGA' }))
     const body = await response.json()

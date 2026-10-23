@@ -229,14 +229,12 @@ export async function createPaymentForUser(
         userId: user.id,
         subscriptionId: activeSubscription.id,
         purchaseType: 'WHITELIST_ADDON',
+        provider,
         status: 'PENDING',
       },
       orderBy: { createdAt: 'desc' },
     })
     if (pendingAddon && pendingAddon.checkoutKey !== idempotencyKey) {
-      if (options.telegramBot && pendingAddon.provider === 'PAYANYWAY') {
-        return NextResponse.json({ error: 'В кабинете уже создан счёт PayAnyWay. Завершите или отмените его в кабинете.' }, { status: 409 })
-      }
       return pendingCheckoutResponse(pendingAddon)
     }
   }

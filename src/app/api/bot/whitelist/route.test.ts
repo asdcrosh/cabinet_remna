@@ -60,11 +60,18 @@ describe('authenticated bot checkout transport', () => {
     expect(mocks.checkout).not.toHaveBeenCalled()
   })
   it('reuses the same invoice on a timeout retry even after payment has succeeded', async () => {
-    mocks.payment.findFirst.mockResolvedValue({ id: 'p1', status: 'SUCCEEDED', amountKopecks: 24900 })
+    mocks.payment.findFirst.mockResolvedValue({ id: 'p1', status: 'SUCCEEDED', amountKopecks: 24900, provider: 'YOOKASSA', planId: 'plan' })
     const response = await POST(request(checkout))
     expect(await response.json()).toMatchObject({ localPaymentId: 'p1', status: 'SUCCEEDED', confirmationUrl: null })
     expect(mocks.checkout).not.toHaveBeenCalled()
     expect(mocks.offer).not.toHaveBeenCalled()
+  })
+  it('never returns a YooKassa invoice for a Platega request with the same checkout key', async () => {
+    mocks.payment.findFirst.mockResolvedValue({ id: 'p1', status: 'PENDING', amountKopecks: 24900, provider: 'YOOKASSA', planId: 'plan', confirmationUrl: 'https://yookassa.test' })
+    const response = await POST(request({ ...checkout, provider: 'PLATEGA' }))
+    expect(response.status).toBe(409)
+    expect(await response.json()).not.toHaveProperty('confirmationUrl')
+    expect(mocks.checkout).not.toHaveBeenCalled()
   })
   it('cannot check or grant another users payment', async () => {
     expect((await POST(request({ ...checkout, action: 'payment', paymentId: 'foreign' }))).status).toBe(404)

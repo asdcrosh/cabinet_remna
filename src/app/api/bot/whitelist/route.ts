@@ -68,9 +68,12 @@ export async function POST(req: Request) {
       // Reuse an already created checkout after a timeout, even if entitlement is now active.
       const checkoutKey = input.idempotencyKey
       const previous = await prisma.payment.findFirst({ where: { userId: user.id, checkoutKey, purchaseType: 'WHITELIST_ADDON' } })
+      if (previous && (previous.provider !== input.provider || previous.planId !== input.planId || previous.amountKopecks !== input.priceKopecks)) {
+        throw new BotWhitelistError('Ключ оплаты уже использован для другого заказа. Откройте покупку заново.')
+      }
       if (previous) return NextResponse.json({
         localPaymentId: previous.id, confirmationUrl: previous.status === 'PENDING' ? previous.confirmationUrl : null,
-        status: previous.status, amountKopecks: previous.amountKopecks,
+        status: previous.status, amountKopecks: previous.amountKopecks, provider: previous.provider,
       })
       const offer = await getBotWhitelistOffer(user)
       if (!offer.available) throw new BotWhitelistError(offer.reason!)
