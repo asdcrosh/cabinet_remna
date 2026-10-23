@@ -3,13 +3,17 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 const mocks = vi.hoisted(() => {
   const prisma = {
     payment: { findUnique: vi.fn(), update: vi.fn() },
-    subscription: { findFirst: vi.fn(), findMany: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
+    subscription: { findUnique: vi.fn(), findFirst: vi.fn(), findMany: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
     auditLog: { create: vi.fn() },
     $transaction: vi.fn(),
   }
-  const remnawave = { updateUser: vi.fn() }
+  const remnawave = { updateUser: vi.fn(), getUser: vi.fn() }
   return { prisma, remnawave }
 })
+
+vi.mock('./distributed-lock', () => ({
+  withDistributedLock: async (_key: string, task: () => Promise<unknown>) => ({ acquired: true, value: await task() }),
+}))
 
 vi.mock('./prisma', () => ({ prisma: mocks.prisma }))
 vi.mock('./remnawave', () => ({
@@ -31,7 +35,11 @@ import {
 
 describe('whitelist add-on', () => {
   beforeEach(() => {
-    vi.clearAllMocks()
+    vi.resetAllMocks()
+    mocks.remnawave.getUser.mockImplementation(async () => ({ response: {
+      status: 'ACTIVE', expireAt: new Date(Date.now() + 86400_000).toISOString(), activeInternalSquads: [{ uuid: 'base-squad' }],
+    } }))
+    mocks.prisma.subscription.findUnique.mockImplementation(async () => (await mocks.prisma.subscription.findMany())[0])
     mocks.prisma.$transaction.mockImplementation(async (callback) => callback(mocks.prisma))
     mocks.prisma.auditLog.create.mockResolvedValue({})
   })
@@ -42,6 +50,8 @@ describe('whitelist add-on', () => {
 
   it('adds paid squads without extending the subscription', async () => {
     const paidAt = new Date('2026-08-01T12:00:00.000Z')
+    vi.useFakeTimers()
+    vi.setSystemTime(paidAt)
     const expireAt = new Date(Date.now() + 24 * 60 * 60 * 1000)
     const subscription = {
       id: 'subscription-1',
@@ -97,7 +107,7 @@ describe('whitelist add-on', () => {
     expect(result.subscription.whitelistAddonActive).toBe(true)
   })
 
-  it('does not grant the add-on after the subscription expires', async () => {
+  it('saves the paid 30 days on pause when the main subscription expires during payment', async () => {
     const expireAt = new Date(Date.now() - 1000)
     mocks.prisma.payment.findUnique.mockResolvedValue({
       id: 'payment-1',
@@ -123,7 +133,15 @@ describe('whitelist add-on', () => {
       plan: { id: 'plan-1', activeInternalSquads: ['base-squad'] },
     })
 
-    await expect(provisionWhitelistAddon('payment-1')).rejects.toThrow('Подписка завершилась')
+    mocks.remnawave.getUser.mockResolvedValue({ response: { status: 'EXPIRED', expireAt: expireAt.toISOString() } })
+    mocks.prisma.subscription.update.mockResolvedValue({ id: 'subscription-1', whitelistAddonActive: false })
+    await provisionWhitelistAddon('payment-1')
+    expect(mocks.prisma.subscription.update).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ whitelistAddonRemainingSeconds: 30n * 86400n, whitelistAddonActive: false }),
+    }))
+    expect(mocks.prisma.payment.update).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ subscriptionProvisionedAt: expect.any(Date) }),
+    }))
     expect(mocks.remnawave.updateUser).not.toHaveBeenCalled()
   })
 
@@ -206,7 +224,7 @@ describe('whitelist add-on', () => {
       user: { id: 'user-1', remnawaveUuid: 'rw-1' },
       plan: { id: 'plan-1', activeInternalSquads: ['base-squad'] },
     })
-    mocks.prisma.subscription.findFirst.mockResolvedValue({
+    mocks.prisma.subscription.findFirst.mockResolvedValueOnce(subscription).mockResolvedValue({
       id: 'subscription-1',
       whitelistAddonRemainingSeconds: 20n * 24n * 60n * 60n,
     })
@@ -228,6 +246,7 @@ describe('whitelist add-on', () => {
   })
 
   it('removes paid squads after a full refund', async () => {
+    mocks.remnawave.getUser.mockResolvedValue({ response: { activeInternalSquads: [{ uuid: 'current-base-squad' }, { uuid: 'addon-squad' }, { uuid: 'manual-squad' }] } })
     mocks.prisma.payment.findUnique.mockResolvedValue({
       id: 'payment-1',
       purchaseType: 'WHITELIST_ADDON',
@@ -236,6 +255,7 @@ describe('whitelist add-on', () => {
         whitelistAddonActive: true,
         whitelistAddonPaymentId: 'payment-1',
         plan: { activeInternalSquads: ['current-base-squad'] },
+        whitelistAddonInternalSquads: ['addon-squad'],
       },
       user: { id: 'user-1', remnawaveUuid: 'rw-1' },
       plan: { activeInternalSquads: ['base-squad'] },
@@ -246,7 +266,7 @@ describe('whitelist add-on', () => {
     await expect(revokeWhitelistAddonForPayment('payment-1')).resolves.toEqual({ revoked: true })
     expect(mocks.remnawave.updateUser).toHaveBeenCalledWith(
       { uuid: 'rw-1' },
-      { activeInternalSquads: ['current-base-squad'] }
+      { activeInternalSquads: ['current-base-squad', 'manual-squad'] }
     )
     expect(mocks.prisma.subscription.update).toHaveBeenCalledWith({
       where: { id: 'subscription-1' },
@@ -359,6 +379,7 @@ describe('whitelist add-on', () => {
     mocks.prisma.subscription.findMany.mockResolvedValue([{
       id: 'subscription-1',
       userId: 'user-1',
+      status: 'ACTIVE', expireAt: new Date(Date.now() + 86400_000),
       whitelistAddonActive: true,
       whitelistAddonExpireAt: expireAt,
       user: { id: 'user-1', remnawaveUuid: 'rw-1' },
@@ -456,4 +477,19 @@ describe('whitelist add-on', () => {
       }),
     })
   })
+  it('does not revoke a renewal that won the lock before the expiry worker', async () => {
+    const candidate = { id: 'sub', userId: 'user-1', whitelistAddonActive: true, whitelistAddonExpireAt: new Date(0) }
+    mocks.prisma.subscription.findMany.mockResolvedValue([candidate])
+    mocks.prisma.subscription.findUnique.mockResolvedValue({ ...candidate, whitelistAddonExpireAt: new Date(Date.now() + 86400_000) })
+    expect(await reconcileExpiredWhitelistAddons()).toEqual({ checked: 1, revoked: 0, failed: 0 })
+    expect(mocks.remnawave.updateUser).not.toHaveBeenCalled()
+  })
+
+  it('does not add days twice when a successful payment is retried', async () => {
+    mocks.prisma.payment.findUnique.mockResolvedValue({ purchaseType: 'WHITELIST_ADDON', subscriptionProvisionedAt: new Date(), subscription: { id: 'sub' } })
+    expect((await provisionWhitelistAddon('paid')).idempotent).toBe(true)
+    expect(mocks.remnawave.updateUser).not.toHaveBeenCalled()
+    expect(mocks.prisma.subscription.update).not.toHaveBeenCalled()
+  })
+
 })

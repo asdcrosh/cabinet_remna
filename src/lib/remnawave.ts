@@ -107,6 +107,7 @@ export interface UpdateUserRequest {
 }
 
 export interface UserResponse {
+  activeInternalSquads?: Array<{ uuid: string; name?: string }>
   id?: number
   uuid?: string
   shortUuid: string

@@ -72,6 +72,7 @@ vi.mock('@/lib/promo-codes', () => ({
 vi.mock('@/lib/logger', () => ({ logError: mocks.logError, logWarn: mocks.logWarn }))
 
 import { POST } from './route'
+import { createPaymentForUser } from '@/lib/payment-checkout'
 import { AUTO_RENEWAL_CONSENT_VERSION } from '@/lib/auto-renewal-consent'
 
 const plan = {
@@ -187,6 +188,27 @@ describe('payment create route', () => {
     mocks.prisma.payment.update.mockResolvedValue({})
     mocks.prisma.promoCodeRedemption.updateMany.mockResolvedValue({ count: 0 })
     mocks.prisma.user.updateMany.mockResolvedValue({ count: 1 })
+  })
+
+  it('allows the authenticated bot add-on without email and retains the public email gate', async () => {
+    mocks.prisma.user.findUnique.mockResolvedValue({ ...user, email: 'telegram-123@pending.invalid', emailVerifiedAt: null, telegramId: 123n })
+    mocks.prisma.subscription.findFirst.mockResolvedValue({ id: 'subscription-1', userId: user.id, planId: plan.id, status: 'ACTIVE', expireAt: futureDate(5), deviceLimit: 5 })
+    mocks.txPaymentCreate.mockResolvedValue({ ...localPayment, subscriptionId: 'subscription-1', purchaseType: 'WHITELIST_ADDON', amountKopecks: plan.whitelistAddonPriceKopecks })
+    const body = { purchaseType: 'WHITELIST_ADDON', telegramBot: true }
+    const publicResponse = await POST(paymentRequest(body))
+    expect(publicResponse.status).toBe(403)
+    expect(mocks.createPayment).not.toHaveBeenCalled()
+    const response = await createPaymentForUser(paymentRequest(body), user.id, { telegramBot: true, returnUrl: 'https://t.me/test_bot?start=whitelist' })
+    expect(response.status).toBe(200)
+    expect(mocks.createPayment).toHaveBeenCalledWith(expect.objectContaining({ amount: 200, returnUrl: 'https://t.me/test_bot?start=whitelist', savePaymentMethod: false }))
+    expect(mocks.txPaymentCreate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ addonSnapshot: expect.objectContaining({ channel: 'TELEGRAM_BOT' }), purchaseType: 'WHITELIST_ADDON' }) }))
+  })
+
+  it('does not use the bot email exception for base subscriptions or email-only providers', async () => {
+    for (const body of [{ purchaseType: 'SUBSCRIPTION' }, { purchaseType: 'WHITELIST_ADDON', provider: 'PAYANYWAY' }]) {
+      expect((await createPaymentForUser(paymentRequest(body), user.id, { telegramBot: true })).status).toBe(400)
+    }
+    expect(mocks.createPayment).not.toHaveBeenCalled()
   })
 
   it('does not start a checkout while another billing operation holds the user lock', async () => {

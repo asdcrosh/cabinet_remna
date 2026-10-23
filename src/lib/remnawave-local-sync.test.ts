@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   userUpdate: vi.fn(),
   subscriptionFindFirst: vi.fn(),
   subscriptionUpdate: vi.fn(),
+  subscriptionUpdateMany: vi.fn(),
   subscriptionCreate: vi.fn(),
   retentionFindFirst: vi.fn(),
 }))
@@ -14,6 +15,7 @@ vi.mock('./prisma', () => ({
     subscription: {
       findFirst: mocks.subscriptionFindFirst,
       update: mocks.subscriptionUpdate,
+      updateMany: mocks.subscriptionUpdateMany,
       create: mocks.subscriptionCreate,
     },
     subscriptionRetention: { findFirst: mocks.retentionFindFirst },
@@ -81,6 +83,21 @@ describe('upsertLocalSubscriptionFromRemnawave', () => {
         graceExpireAt: null,
       }),
     })
+  })
+
+  it('preserves unused add-on time when a gift renews an expired main subscription before the pause worker', async () => {
+    mocks.subscriptionFindFirst.mockResolvedValue({
+      id: 'subscription-1', expireAt: new Date('2026-08-20T00:00:00Z'), status: 'EXPIRED',
+      whitelistAddonActive: true, whitelistAddonExpireAt: new Date('2026-08-23T00:00:00Z'),
+    })
+    await upsertLocalSubscriptionFromRemnawave({ localUserId: 'user-1', remnawaveUser: {
+      uuid: 'remote', status: 'ACTIVE', expireAt: '2026-09-30T00:00:00Z', createdAt: '2026-01-01T00:00:00Z',
+    } as any })
+    expect(mocks.subscriptionUpdateMany).toHaveBeenCalledWith({
+      where: { id: 'subscription-1', whitelistAddonActive: true, whitelistAddonExpireAt: new Date('2026-08-23T00:00:00Z') },
+      data: { whitelistAddonActive: false, whitelistAddonExpireAt: null, whitelistAddonPausedAt: new Date('2026-08-20T00:00:00Z'), whitelistAddonRemainingSeconds: 3n * 86400n },
+    })
+    expect(mocks.subscriptionUpdate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: 'ACTIVE', expireAt: new Date('2026-09-30T00:00:00Z') }) }))
   })
 })
 

@@ -1,6 +1,7 @@
 import type { UserResponse } from './remnawave'
 import { prisma } from './prisma'
 import { readRemnawaveBigInt } from './remnawave-usage'
+import { getWhitelistAddonPauseAt, getWhitelistAddonRemainingSeconds, isWhitelistAddonCurrentlyActive } from './whitelist-addon-policy'
 
 export async function upsertLocalSubscriptionFromRemnawave(input: {
   localUserId: string
@@ -75,6 +76,22 @@ export async function upsertLocalSubscriptionFromRemnawave(input: {
   }
 
   if (existing) {
+    // A gift/external renewal can arrive before the pause worker. Save the old
+    // unused add-on time before replacing primary expiry, without overwriting
+    // an add-on payment that was granted after this sync read the row.
+    if (existing.whitelistAddonActive && !isWhitelistAddonCurrentlyActive(existing, now)) {
+      const pausedAt = getWhitelistAddonPauseAt(existing, now)
+      const remaining = getWhitelistAddonRemainingSeconds(existing.whitelistAddonExpireAt, pausedAt)
+      if (remaining > 0n) {
+        await prisma.subscription.updateMany({
+          where: { id: existing.id, whitelistAddonActive: true, whitelistAddonExpireAt: existing.whitelistAddonExpireAt },
+          data: {
+            whitelistAddonActive: false, whitelistAddonExpireAt: null,
+            whitelistAddonPausedAt: pausedAt, whitelistAddonRemainingSeconds: remaining,
+          },
+        })
+      }
+    }
     return prisma.subscription.update({
       where: { id: existing.id },
       data,

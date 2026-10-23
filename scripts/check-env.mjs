@@ -238,6 +238,15 @@ if (value("REMNASHOP_WEBHOOK_SECRET") && value("REMNASHOP_WEBHOOK_SECRET").lengt
   errors.push("REMNASHOP_WEBHOOK_SECRET must be at least 32 characters");
 }
 
+if (value("REMNASHOP_BOT_API_SECRET")) {
+  if (value("REMNASHOP_BOT_API_SECRET").length < 32) {
+    errors.push("REMNASHOP_BOT_API_SECRET must be at least 32 characters");
+  }
+  if (!value("REMNASHOP_DATABASE_URL") || !value("TELEGRAM_BOT_USERNAME")) {
+    errors.push("Bot checkout requires REMNASHOP_DATABASE_URL and TELEGRAM_BOT_USERNAME");
+  }
+}
+
 if (isProduction && value("DATABASE_URL")) {
   try {
     const databaseUrl = new URL(value("DATABASE_URL"));
