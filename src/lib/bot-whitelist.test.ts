@@ -9,8 +9,8 @@ vi.mock('./remnashop-users', () => ({ syncRemnashopUserBySourceId: mocks.sync })
 vi.mock('./payment-providers', () => ({ getAvailablePaymentProviders: mocks.providers }))
 vi.mock('./remnawave', () => ({
   remnawave: { getUser: mocks.getUser, updateUser: mocks.updateUser },
-  remnawaveUserReference: (user: any) => ({ uuid: user.remnawaveUuid }),
-  hasRemnawaveUserReference: (user: any) => Boolean(user.remnawaveUuid),
+  remnawaveUserReference: (user: any) => user.remnawaveId ? { id: user.remnawaveId } : { uuid: user.remnawaveUuid },
+  hasRemnawaveUserReference: (user: any) => Boolean(user.remnawaveId || user.remnawaveUuid),
 }))
 import { getBotWhitelistOffer, resolveBotUser, syncBotWhitelistSquads } from './bot-whitelist'
 
@@ -65,6 +65,19 @@ describe('Cabinet authority for bot add-ons', () => {
     mocks.subscription.findMany.mockResolvedValue([row({ whitelistAddonActive: true, whitelistAddonInternalSquads: ['addon'], whitelistAddonExpireAt: new Date(Date.now() + 86400_000) })])
     await syncBotWhitelistSquads(user, { remnawaveUuid: 'remote', baseSquads: ['new-base'], planSquads: ['new-base'], active: true, expireAt: new Date(Date.now() + 86400_000).toISOString() })
     expect(mocks.updateUser).toHaveBeenCalledWith({ uuid: 'remote' }, { activeInternalSquads: ['manual', 'new-base', 'addon'] })
+  })
+  it('syncs a v3 numeric profile using Cabinet identity instead of the bot legacy UUID', async () => {
+    const v3User = { ...user, remnawaveUuid: null, remnawaveId: 42 }
+    expect((await getBotWhitelistOffer(v3User)).available).toBe(true)
+    await syncBotWhitelistSquads(v3User, { remnawaveUuid: 'legacy-bot-alias', baseSquads: ['new-base'], planSquads: ['new-base'], active: true, expireAt: new Date(Date.now() + 86400_000).toISOString() })
+    expect(mocks.getUser).toHaveBeenLastCalledWith({ id: 42 })
+    expect(mocks.updateUser).toHaveBeenCalledWith({ id: 42 }, { activeInternalSquads: ['manual', 'new-base'] })
+  })
+  it('rejects mismatched UUIDs and missing canonical profiles before changing squads', async () => {
+    const input = { remnawaveUuid: 'another-profile', baseSquads: [], planSquads: [], active: true, expireAt: new Date(Date.now() + 86400_000).toISOString() }
+    await expect(syncBotWhitelistSquads(user, input)).rejects.toMatchObject({ status: 403 })
+    await expect(syncBotWhitelistSquads({ ...user, remnawaveUuid: null }, input)).rejects.toMatchObject({ status: 403 })
+    expect(mocks.updateUser).not.toHaveBeenCalled()
   })
   it('never resurrects an expired or revoked add-on from a stale bot subscription', async () => {
     mocks.subscription.findMany.mockResolvedValue([row({ whitelistAddonInternalSquads: ['addon'] })])

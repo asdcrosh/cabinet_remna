@@ -86,13 +86,17 @@ export async function syncBotWhitelistSquads(user: User, input: {
   expireAt: string
   active: boolean
 }) {
-  if (user.remnawaveUuid !== input.remnawaveUuid) {
+  if (!hasRemnawaveUserReference(user)
+    || (user.remnawaveUuid && user.remnawaveUuid !== input.remnawaveUuid)) {
     throw new BotWhitelistError('Профиль VPN не соответствует пользователю', 403)
   }
+  // Remnawave v3 uses numeric IDs; the bot may retain a legacy UUID alias.
+  // Always target the canonical profile linked to the authenticated Cabinet user.
+  const reference = remnawaveUserReference(user)
   const rows = await prisma.subscription.findMany({
     where: { userId: user.id }, include: { plan: true }, orderBy: { expireAt: 'desc' },
   })
-  const remote = (await remnawave.getUser({ uuid: input.remnawaveUuid })).response
+  const remote = (await remnawave.getUser(reference)).response
   if (!Array.isArray(remote.activeInternalSquads)) throw new Error('Remnawave squads missing')
   if (new Date(remote.expireAt).getTime() !== new Date(input.expireAt).getTime()) {
     return { activeInternalSquads: remote.activeInternalSquads.map((squad) => squad.uuid), stale: true }
@@ -109,7 +113,7 @@ export async function syncBotWhitelistSquads(user: User, input: {
     previousAddon: managed,
     addon: primaryActive && entitlement ? entitlement.whitelistAddonInternalSquads : [],
   })
-  await remnawave.updateUser({ uuid: input.remnawaveUuid }, { activeInternalSquads })
+  await remnawave.updateUser(reference, { activeInternalSquads })
   // Capture unused time before the primary renewal overwrites its old expiration.
   // Resume only after the main update succeeds and normal Cabinet synchronization sees it.
   if (entitlement?.whitelistAddonActive
