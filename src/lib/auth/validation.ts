@@ -171,7 +171,8 @@ export const updateAdminPromoCodeSchema = adminPromoCodeBaseSchema.partial().ref
 const adminBonusBoxPrizeBaseSchema = z.object({
   title: z.string().trim().min(2, 'Минимум 2 символа').max(80, 'Максимум 80 символов'),
   description: z.string().trim().max(180, 'Максимум 180 символов').optional().nullable(),
-  type: z.enum(['SUBSCRIPTION_DAYS', 'TRAFFIC_GB', 'PROMO_CODE_PERCENT', 'BONUS_ATTEMPTS', 'NO_PRIZE']),
+  type: z.enum(['SUBSCRIPTION_DAYS', 'TRAFFIC_GB', 'PROMO_CODE_PERCENT', 'BONUS_ATTEMPTS', 'NO_PRIZE', 'WHITELIST_DAYS']),
+  internalSquads: z.array(z.string().uuid('Некорректный UUID сквада')).max(100).transform((ids) => [...new Set(ids)]).default([]),
   value: z.coerce.number().int().min(0).max(10_000),
   weight: z.coerce.number().int().min(1).max(100_000),
   rarity: z.enum(['COMMON', 'RARE', 'EPIC', 'LEGENDARY']).default('COMMON'),
@@ -183,6 +184,9 @@ const adminBonusBoxPrizeBaseSchema = z.object({
 })
 
 export const adminBonusBoxPrizeSchema = adminBonusBoxPrizeBaseSchema.refine(
+  (value) => value.type !== 'WHITELIST_DAYS' || value.internalSquads.length > 0,
+  { path: ['internalSquads'], message: 'Выберите сквады для награды «Белые списки»' }
+).refine(
   (value) => value.type === 'NO_PRIZE' || value.value >= 1,
   {
     path: ['value'],

@@ -631,6 +631,9 @@ model Subscription {
   whitelistAddonRemainingSeconds BigInt?
   whitelistAddonPaymentId   String?
   whitelistAddonInternalSquads String[] @default([])
+  // Reward time is consumed after paid time, and survives payment refunds.
+  whitelistAddonRewardSeconds BigInt @default(0)
+  whitelistAddonRewardSquads String[] @default([])
   graceStartedAt               DateTime?
   graceExpireAt                DateTime?
 
@@ -1588,6 +1591,7 @@ model BonusBoxPrize {
   description          String?
   type                 BonusBoxPrizeType
   value                Int
+  internalSquads       String[]          @default([])
   weight               Int               @default(1)
   rarity               BonusBoxRarity    @default(COMMON)
   isActive             Boolean           @default(true)
@@ -1758,6 +1762,7 @@ model BonusBoxOpening {
 }
 
 enum BonusBoxPrizeType {
+  WHITELIST_DAYS
   SUBSCRIPTION_DAYS
   TRAFFIC_GB
   PROMO_CODE_PERCENT

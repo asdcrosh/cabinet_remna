@@ -1,4 +1,5 @@
 export type PrizeType =
+  | "WHITELIST_DAYS"
   | "SUBSCRIPTION_DAYS"
   | "TRAFFIC_GB"
   | "PROMO_CODE_PERCENT"

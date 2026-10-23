@@ -10,8 +10,10 @@ import {
 import { removeRemnashopSubscription } from './remnashop-subscription-removal'
 import { markSyncFailed, markSyncSkipped, markSyncSucceeded } from './sync-events'
 import { paymentErrorDetails, recordPaymentEvent } from './payment-events'
+import { whitelistRewardTimeLeft } from './whitelist-addon-rewards'
 import { getWhitelistAddonRemainingSeconds } from './whitelist-addon-policy'
 import { readBundledWhitelistAddonSnapshot } from './whitelist-addon'
+import { withDistributedLock } from './distributed-lock'
 
 export type SubscriptionTerminationSource =
   | 'USER_REQUEST'
@@ -28,6 +30,12 @@ interface TerminateUserSubscriptionInput {
 }
 
 export async function terminateUserSubscription(input: TerminateUserSubscriptionInput) {
+  const locked = await withDistributedLock(`payment-provisioning:${input.userId}`, () => terminateUserSubscriptionLocked(input))
+  if (!locked.acquired) throw new Error('Подписка обновляется. Повторите операцию позже.')
+  return locked.value
+}
+
+async function terminateUserSubscriptionLocked(input: TerminateUserSubscriptionInput) {
   if (input.paymentId) {
     await recordPaymentEvent({
       paymentId: input.paymentId,
@@ -57,6 +65,8 @@ export async function terminateUserSubscription(input: TerminateUserSubscription
           whitelistAddonExpireAt: true,
           whitelistAddonRemainingSeconds: true,
           whitelistAddonPaymentId: true,
+          whitelistAddonRewardSeconds: true,
+          whitelistAddonRewardSquads: true,
         },
       },
     },
@@ -157,6 +167,7 @@ export async function terminateUserSubscription(input: TerminateUserSubscription
     const whitelistAddonRemainingSeconds = currentSubscription?.whitelistAddonActive
       ? getWhitelistAddonRemainingSeconds(currentSubscription.whitelistAddonExpireAt, now)
       : currentSubscription?.whitelistAddonRemainingSeconds ?? 0n
+    const rewardSeconds = currentSubscription ? whitelistRewardTimeLeft(currentSubscription, now) : 0n
     if (currentSubscription && revokeRefundedBundledAddon) {
       await tx.subscription.updateMany({
         where: { id: currentSubscription.id },
@@ -164,10 +175,12 @@ export async function terminateUserSubscription(input: TerminateUserSubscription
           whitelistAddonActive: false,
           whitelistAddonActivatedAt: null,
           whitelistAddonExpireAt: null,
-          whitelistAddonPausedAt: null,
-          whitelistAddonRemainingSeconds: null,
+          whitelistAddonPausedAt: rewardSeconds > 0n ? now : null,
+          whitelistAddonRemainingSeconds: rewardSeconds > 0n ? rewardSeconds : null,
           whitelistAddonPaymentId: null,
-          whitelistAddonInternalSquads: [],
+          whitelistAddonInternalSquads: rewardSeconds > 0n ? currentSubscription.whitelistAddonRewardSquads : [],
+          whitelistAddonRewardSeconds: rewardSeconds,
+          whitelistAddonRewardSquads: rewardSeconds > 0n ? currentSubscription.whitelistAddonRewardSquads : [],
         },
       })
     } else if (currentSubscription && whitelistAddonRemainingSeconds > 0n) {

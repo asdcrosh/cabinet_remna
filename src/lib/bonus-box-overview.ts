@@ -53,7 +53,7 @@ export function buildOpeningStreak(openingsCount: number) {
 export function scoreOpening(prize: Pick<BonusBoxPrize, 'rarity' | 'type' | 'value'>) {
   const value = Math.max(0, prize.value)
   const typeScore =
-    prize.type === 'SUBSCRIPTION_DAYS'
+    (prize.type === 'SUBSCRIPTION_DAYS' || prize.type === 'WHITELIST_DAYS')
       ? value * 120
       : prize.type === 'TRAFFIC_GB'
         ? value * 70
@@ -67,6 +67,7 @@ export function scoreOpening(prize: Pick<BonusBoxPrize, 'rarity' | 'type' | 'val
 }
 
 export function prizeValueLabel(prize: Pick<BonusBoxPrize, 'type' | 'value'>) {
+  if (prize.type === 'WHITELIST_DAYS') return `Белые списки · +${prize.value} дн.`
   if (prize.type === 'SUBSCRIPTION_DAYS') return `+${prize.value} дн.`
   if (prize.type === 'TRAFFIC_GB') return `+${prize.value} ГБ`
   if (prize.type === 'BONUS_ATTEMPTS') return `+${prize.value} открытий`

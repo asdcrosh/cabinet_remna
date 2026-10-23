@@ -111,6 +111,10 @@ export function BonusBoxPrizesAdmin({
   )
 
   async function submit() {
+    if (form.type === 'WHITELIST_DAYS' && form.internalSquads.length === 0) {
+      toast('Выберите сквады для награды «Белые списки»', 'error')
+      return
+    }
     setLoading(true)
     try {
       await apiFetch(editingId ? `/api/admin/bonus-box/prizes/${editingId}` : '/api/admin/bonus-box/prizes', {
@@ -185,6 +189,7 @@ export function BonusBoxPrizesAdmin({
       title: prize.title,
       description: prize.description ?? '',
       type: prize.type,
+      internalSquads: prize.internalSquads ?? [],
       value: String(prize.value),
       weight: String(prize.weight),
       rarity: prize.rarity,
@@ -705,6 +710,7 @@ function PrizeEditorDrawer({
                 className="input"
               >
                 <option value="SUBSCRIPTION_DAYS">Дни подписки</option>
+                <option value="WHITELIST_DAYS">Белые списки</option>
                 <option value="TRAFFIC_GB">Трафик, ГБ</option>
                 <option value="PROMO_CODE_PERCENT">Промокод, %</option>
                 <option value="BONUS_ATTEMPTS">Открытия бокса</option>
@@ -722,7 +728,7 @@ function PrizeEditorDrawer({
                 disabled={form.type === 'NO_PRIZE'}
               />
             </Field>
-            <Field label="Вес">
+            <Field label="Вес выпадения">
               <input
                 value={form.weight}
                 onChange={(event) => onChange((current) => ({ ...current, weight: event.target.value }))}
@@ -777,6 +783,9 @@ function PrizeEditorDrawer({
             </Field>
           </div>
 
+          {form.type === 'WHITELIST_DAYS' && (
+            <WhitelistRewardSquadPicker selected={form.internalSquads} onChange={(internalSquads) => onChange((current) => ({ ...current, internalSquads }))} />
+          )}
           <PrizeFormPreview form={form} estimatedChance={estimatedChance} />
 
           <Switch
@@ -1016,11 +1025,51 @@ function BonusBoxOpeningHistory({
   )
 }
 
+function WhitelistRewardSquadPicker({ selected, onChange }: {
+  selected: string[]
+  onChange: (ids: string[]) => void
+}) {
+  const [squads, setSquads] = useState<Array<{ uuid: string; name: string; isActive: boolean }>>([])
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [reload, setReload] = useState(0)
+  useEffect(() => {
+    let cancelled = false
+    apiFetch<{ squads: typeof squads }>('/api/admin/remnawave/squads')
+      .then((result) => { if (!cancelled) { setSquads(result.squads); setError('') } })
+      .catch((reason: unknown) => { if (!cancelled) setError(reason instanceof Error ? reason.message : 'Не удалось загрузить сквады') })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [reload])
+  const choices = [...squads, ...selected.filter((id) => !squads.some((squad) => squad.uuid === id))
+    .map((uuid) => ({ uuid, name: `Недоступный сквад: ${uuid}`, isActive: false }))]
+  return (
+    <fieldset className="rounded-2xl border border-cyan-200 p-4 dark:border-cyan-500/25">
+      <legend className="px-1 text-sm font-semibold">Белые списки</legend>
+      <p className="mb-3 text-xs text-slate-500">Выберите сквады награды. Срок добавится к текущему сроку белых списков, сквады объединятся.</p>
+      {loading && <p className="text-sm text-slate-500">Загружаем сквады…</p>}
+      {error && <div role="alert" className="mb-3 text-sm text-amber-700 dark:text-amber-200">{error} <button type="button" className="underline" onClick={() => { setLoading(true); setReload((value) => value + 1) }}>Повторить</button></div>}
+      <div className="max-h-56 space-y-2 overflow-y-auto">
+        {choices.map((squad) => (
+          <label key={squad.uuid} className="flex items-center gap-2 rounded-lg p-2 text-sm hover:bg-slate-50 dark:hover:bg-white/5">
+            <input type="checkbox" checked={selected.includes(squad.uuid)} disabled={!squad.isActive && !selected.includes(squad.uuid)}
+              onChange={(event) => onChange(event.target.checked ? [...selected, squad.uuid] : selected.filter((id) => id !== squad.uuid))} />
+            <span className="break-all">{squad.name}{!squad.isActive && ' · неактивен'}</span>
+          </label>
+        ))}
+      </div>
+      {!loading && !error && choices.length === 0 && <p className="text-sm text-slate-500">В Remnawave нет доступных сквадов.</p>}
+      {selected.length === 0 && <p className="mt-2 text-xs text-amber-700 dark:text-amber-200">Выберите хотя бы один сквад.</p>}
+    </fieldset>
+  )
+}
+
 function toPayload(form: FormState) {
   return {
     title: form.title,
     description: form.description || null,
     type: form.type,
+    internalSquads: form.type === 'WHITELIST_DAYS' ? form.internalSquads : [],
     value: form.type === 'NO_PRIZE' ? 0 : Number(form.value),
     weight: Number(form.weight),
     rarity: form.type === 'NO_PRIZE' ? 'COMMON' : form.rarity,

@@ -298,6 +298,7 @@ function prize(id: string, weight: number): BonusBoxPrize {
     title: id,
     description: null,
     type: 'BONUS_ATTEMPTS',
+    internalSquads: [],
     value: 1,
     weight,
     rarity: 'COMMON',

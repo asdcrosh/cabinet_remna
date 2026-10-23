@@ -39,7 +39,9 @@ const mocks = vi.hoisted(() => {
       findMany: vi.fn().mockResolvedValue([]),
     },
     subscription: {
+      findFirst: vi.fn(),
       findUnique: vi.fn(),
+      findUniqueOrThrow: vi.fn(),
       update: vi.fn(),
     },
     promoCode: {
@@ -50,12 +52,16 @@ const mocks = vi.hoisted(() => {
 
   const remnawave = {
     updateUser: vi.fn(),
+    getUser: vi.fn(),
   }
 
   return { prisma, remnawave }
 })
 
 vi.mock('./prisma', () => ({ prisma: mocks.prisma }))
+vi.mock('./distributed-lock', () => ({
+  withDistributedLock: async (_key: string, task: () => Promise<unknown>) => ({ acquired: true, value: await task() }),
+}))
 vi.mock('./remnawave', () => ({
   remnawave: mocks.remnawave,
   hasRemnawaveUserReference: (user: any) => Boolean(
@@ -814,6 +820,7 @@ describe('retryPendingBonusBoxSyncsForUser', () => {
         id: true,
         awardedSubscriptionId: true,
         syncAttempts: true,
+        prizeSnapshot: true,
         prize: { select: { type: true, title: true } },
       },
     })
@@ -905,6 +912,106 @@ describe('applyBonusBoxEconomyGuard', () => {
   })
 })
 
+describe('whitelist roulette rewards', () => {
+  const now = new Date('2026-10-23T12:00:00Z')
+  const day = 86400_000
+  const spin = '00000000-0000-4000-8000-000000000099'
+  let subscription: Record<string, any>
+  let storedOpening: any
+  let reward: BonusBoxPrize
+
+  beforeEach(() => {
+    vi.resetAllMocks()
+    vi.useFakeTimers()
+    vi.setSystemTime(now)
+    subscription = {
+      id: 'sub-1', userId: 'user-1', status: 'ACTIVE', expireAt: new Date(+now + 60 * day), trafficLimitBytes: null,
+      whitelistAddonActive: true, whitelistAddonExpireAt: new Date(+now + 10 * day),
+      whitelistAddonPaymentId: 'paid-1', whitelistAddonInternalSquads: ['paid-squad'],
+      whitelistAddonRewardSeconds: 0n, whitelistAddonRewardSquads: [], plan: { activeInternalSquads: ['base'] },
+    }
+    storedOpening = null
+    reward = { ...prize('whitelist', 'COMMON', 'WHITELIST_DAYS', 7), internalSquads: ['reward-squad'] }
+    mocks.prisma.$transaction.mockImplementation(async (fn) => fn(mocks.prisma))
+    mocks.prisma.user.findUnique.mockResolvedValue({ id: 'user-1', remnawaveUuid: 'rw-1', subscriptions: [subscription] })
+    mocks.prisma.bonusBoxSetting.findUnique.mockResolvedValue(null)
+    mocks.prisma.bonusBoxOpening.findFirst.mockImplementation(async ({ where }) => storedOpening?.spinId === where.spinId ? storedOpening : null)
+    mocks.prisma.bonusBoxOpening.findMany.mockResolvedValue([])
+    mocks.prisma.bonusBoxOpening.create.mockImplementation(async ({ data }) => {
+      storedOpening = { ...data, id: 'opening-1', promoCode: null }
+      return storedOpening
+    })
+    mocks.prisma.bonusBoxOpening.update.mockImplementation(async ({ data }) => Object.assign(storedOpening, data))
+    mocks.prisma.bonusBoxPrize.findMany.mockResolvedValue([reward])
+    mocks.prisma.bonusBoxEvent.findMany.mockResolvedValue([])
+    mocks.prisma.bonusBoxPrize.updateMany.mockResolvedValue({ count: 1 })
+    mocks.prisma.bonusBoxAttempt.findFirst.mockResolvedValue({ id: 'attempt-1', source: 'PAYMENT', sourceKey: 'paid:1' })
+    mocks.prisma.bonusBoxAttempt.updateMany.mockResolvedValue({ count: 1 })
+    mocks.prisma.bonusBoxAttempt.count.mockResolvedValue(0)
+    mocks.prisma.subscription.update.mockImplementation(async ({ data }) => Object.assign(subscription, data))
+    mocks.prisma.subscription.findUniqueOrThrow.mockImplementation(async () => subscription)
+    mocks.remnawave.getUser.mockResolvedValue({ response: { activeInternalSquads: [{ uuid: 'base' }, { uuid: 'paid-squad' }, { uuid: 'manual' }] } })
+    mocks.remnawave.updateUser.mockResolvedValue({ response: {} })
+  })
+
+  afterEach(() => vi.useRealTimers())
+
+  it('extends paid access and assigns chosen squads exactly once for the same spin', async () => {
+    const result = await openBonusBox('user-1', spin)
+    expect(result).toMatchObject({ remoteSynced: true, prize: { type: 'WHITELIST_DAYS', value: 7 } })
+    expect(subscription).toMatchObject({
+      whitelistAddonExpireAt: new Date(+now + 17 * day), whitelistAddonPaymentId: 'paid-1',
+      whitelistAddonRewardSeconds: 7n * 86400n, expireAt: new Date(+now + 60 * day),
+    })
+    expect(mocks.remnawave.updateUser).toHaveBeenCalledWith(expect.objectContaining({ uuid: 'rw-1' }), {
+      activeInternalSquads: ['base', 'manual', 'paid-squad', 'reward-squad'],
+    })
+    expect(storedOpening.prizeSnapshot).toMatchObject({ internalSquads: ['reward-squad'], previousInternalSquads: ['paid-squad'] })
+    await openBonusBox('user-1', spin)
+    expect(mocks.prisma.subscription.update).toHaveBeenCalledTimes(1)
+    expect(mocks.prisma.bonusBoxAttempt.updateMany).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps an awarded reward pending on remote failure, and retries without adding time again', async () => {
+    mocks.remnawave.updateUser.mockRejectedValueOnce(new Error('remote unavailable'))
+    expect(await openBonusBox('user-1', spin)).toMatchObject({ remoteSynced: false })
+    // Editing the prize type later must not change what is retried.
+    mocks.prisma.bonusBoxOpening.findMany.mockResolvedValue([{ ...storedOpening, syncAttempts: 1, prize: { type: 'TRAFFIC_GB', title: 'edited' } }])
+    expect(await retryPendingBonusBoxSyncsForUser('user-1', { force: true })).toEqual({ attempted: 1, synced: 1 })
+    expect(subscription.whitelistAddonExpireAt).toEqual(new Date(+now + 17 * day))
+    expect(mocks.prisma.subscription.update).toHaveBeenCalledTimes(1)
+    expect(mocks.remnawave.updateUser).toHaveBeenLastCalledWith(expect.anything(), {
+      activeInternalSquads: ['base', 'manual', 'paid-squad', 'reward-squad'],
+    })
+  })
+
+  it('does not restore refunded paid squads while retrying a reward', async () => {
+    await openBonusBox('user-1', spin)
+    Object.assign(subscription, { whitelistAddonInternalSquads: ['reward-squad'], whitelistAddonPaymentId: null })
+    mocks.prisma.bonusBoxOpening.findMany.mockResolvedValue([{ ...storedOpening, syncAttempts: 1, prize: { type: 'WHITELIST_DAYS', title: 'Белые списки' } }])
+    await retryPendingBonusBoxSyncsForUser('user-1', { force: true })
+    expect(mocks.remnawave.updateUser).toHaveBeenLastCalledWith(expect.anything(), {
+      activeInternalSquads: ['base', 'manual', 'reward-squad'],
+    })
+  })
+
+  it('removes old expired squads when granting a fresh reward', async () => {
+    subscription.whitelistAddonExpireAt = new Date(+now - day)
+    await openBonusBox('user-1', spin)
+    expect(subscription.whitelistAddonExpireAt).toEqual(new Date(+now + 7 * day))
+    expect(mocks.remnawave.updateUser).toHaveBeenLastCalledWith(expect.anything(), {
+      activeInternalSquads: ['base', 'manual', 'reward-squad'],
+    })
+  })
+
+  it('does not consume an attempt for a whitelist prize without a subscription', async () => {
+    mocks.prisma.user.findUnique.mockResolvedValue({ id: 'user-1', subscriptions: [] })
+    mocks.prisma.bonusBoxAttempt.findFirst.mockResolvedValue({ id: 'welcome', source: 'MANUAL', sourceKey: 'welcome:test' })
+    await expect(openBonusBox('user-1', spin)).rejects.toMatchObject({ code: 'NO_PRIZES' })
+    expect(mocks.prisma.bonusBoxAttempt.updateMany).not.toHaveBeenCalled()
+  })
+})
+
 function prizes() {
   return [
     prize('common', 'COMMON'),
@@ -926,6 +1033,7 @@ function prize(
     title: id,
     description: null,
     type,
+    internalSquads: [],
     value,
     weight,
     rarity,
