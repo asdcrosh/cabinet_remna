@@ -1,7 +1,6 @@
 .bonus-box-home .bonus-roulette-layout { min-height: 22rem; }
 .bonus-box-home .bonus-roulette-console { padding: 1rem; }
 .bonus-box-home .bonus-roulette-stats { display: none; }
-.bonus-box-home .bonus-roulette-spotlight:nth-child(n + 3) { display: none; }
 .bonus-box-home .bonus-roulette-fairness a { text-decoration: underline; text-underline-offset: 3px; }
 
 @media (max-width: 1180px) {
