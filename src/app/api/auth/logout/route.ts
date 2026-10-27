@@ -1,6 +1,6 @@
 // POST /api/auth/logout
 
-import { NextResponse } from 'next/server'
+import { jsonResponse } from '@/lib/json-response'
 import { cookies } from 'next/headers'
 import { clearSessionCookieOnResponse } from '@/lib/auth/cookies'
 import { COOKIE_NAME, revokeSessionToken } from '@/lib/auth/jwt'
@@ -12,7 +12,7 @@ export async function POST(req: Request) {
   try {
     assertSameOrigin(req)
   } catch {
-    return NextResponse.json({ error: 'Invalid request origin' }, { status: 403 })
+    return jsonResponse({ error: 'Invalid request origin' }, { status: 403 })
   }
 
   const cookieStore = await cookies()
@@ -21,6 +21,6 @@ export async function POST(req: Request) {
     await revokeSessionToken(token)
   }
 
-  const res = NextResponse.json({ ok: true })
+  const res = jsonResponse({ ok: true })
   return clearSessionCookieOnResponse(res)
 }

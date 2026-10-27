@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { jsonResponse } from '@/lib/json-response'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { requireAdmin, withAuth } from '@/lib/auth/guard'
@@ -23,7 +23,7 @@ export const POST = withAuth(async (req: Request, { params }: { params: Promise<
   const body = await req.json().catch(() => null)
   const parsed = schema.safeParse(body)
   if (!parsed.success) {
-    return NextResponse.json({ error: 'Выберите тариф и способ начисления' }, { status: 400 })
+    return jsonResponse({ error: 'Выберите тариф и способ начисления' }, { status: 400 })
   }
 
   const [actor, user, plan] = await Promise.all([
@@ -36,13 +36,13 @@ export const POST = withAuth(async (req: Request, { params }: { params: Promise<
   ])
 
   if (!actor || !user) {
-    return NextResponse.json({ error: 'Пользователь не найден' }, { status: 404 })
+    return jsonResponse({ error: 'Пользователь не найден' }, { status: 404 })
   }
   if (!plan) {
-    return NextResponse.json({ error: 'Тариф не найден' }, { status: 404 })
+    return jsonResponse({ error: 'Тариф не найден' }, { status: 404 })
   }
   if (user.role === 'SUPER_ADMIN' && actor.role !== 'SUPER_ADMIN') {
-    return NextResponse.json({ error: 'Изменять главного администратора нельзя' }, { status: 403 })
+    return jsonResponse({ error: 'Изменять главного администратора нельзя' }, { status: 403 })
   }
 
   const result = await ensureRemnawaveSubscription({
@@ -76,7 +76,7 @@ export const POST = withAuth(async (req: Request, { params }: { params: Promise<
     request: req,
   })
 
-  return NextResponse.json({
+  return jsonResponse({
     subscription: {
       id: result.subscription.id,
       planId: result.subscription.planId,
@@ -97,10 +97,10 @@ export const DELETE = withAuth(async (req: Request, { params }: { params: Promis
     }),
   ])
   if (!actor || !user) {
-    return NextResponse.json({ error: 'Пользователь не найден' }, { status: 404 })
+    return jsonResponse({ error: 'Пользователь не найден' }, { status: 404 })
   }
   if (user.role === 'SUPER_ADMIN' && actor.role !== 'SUPER_ADMIN') {
-    return NextResponse.json({ error: 'Изменять главного администратора нельзя' }, { status: 403 })
+    return jsonResponse({ error: 'Изменять главного администратора нельзя' }, { status: 403 })
   }
 
   try {
@@ -109,7 +109,7 @@ export const DELETE = withAuth(async (req: Request, { params }: { params: Promis
       source: 'ADMIN_REQUEST',
     })
     if (!result.hadSubscription) {
-      return NextResponse.json({ error: 'Активная подписка не найдена' }, { status: 404 })
+      return jsonResponse({ error: 'Активная подписка не найдена' }, { status: 404 })
     }
   } catch (error) {
     if (error instanceof RemnawaveError) {
@@ -119,7 +119,7 @@ export const DELETE = withAuth(async (req: Request, { params }: { params: Promis
         remnawaveUuid: user.remnawaveUuid,
         status: error.status,
       })
-      return NextResponse.json(
+      return jsonResponse(
         {
           error: 'Не удалось отключить подписку в Remnawave. Повторите позже.',
           details: buildServerErrorDiagnostics(error),
@@ -143,5 +143,5 @@ export const DELETE = withAuth(async (req: Request, { params }: { params: Promis
     request: req,
   })
 
-  return NextResponse.json({ ok: true })
+  return jsonResponse({ ok: true })
 })

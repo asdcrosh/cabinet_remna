@@ -37,6 +37,8 @@ describe('api serializers', () => {
     expect(subscription?.trafficUsedBytes).toBe('250')
     expect(subscription?.lifetimeUsedBytes).toBe('500')
     expect(subscription?.whitelistAddonRemainingSeconds).toBeNull()
+    expect(subscription?.whitelistAddonRewardSeconds).toBe('0')
+    expect(() => JSON.stringify(subscription)).not.toThrow()
     expect(subscription).not.toHaveProperty('whitelistAddonInternalSquads')
     expect(subscription).not.toHaveProperty('planManagedByCabinet')
   })

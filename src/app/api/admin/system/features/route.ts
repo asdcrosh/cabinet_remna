@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { jsonResponse } from '@/lib/json-response'
 import { z } from 'zod'
 import { writeAuditLog } from '@/lib/audit-log'
 import { requireAdmin, withAuth } from '@/lib/auth/guard'
@@ -16,7 +16,7 @@ const schema = z.object({
 
 export const GET = withAuth(async () => {
   await requireAdmin()
-  return NextResponse.json({ features: await getFeatureFlags() })
+  return jsonResponse({ features: await getFeatureFlags() })
 })
 
 export const PATCH = withAuth(async (req: Request) => {
@@ -24,7 +24,7 @@ export const PATCH = withAuth(async (req: Request) => {
   const body = await req.json().catch(() => null)
   const parsed = schema.safeParse(body)
   if (!parsed.success) {
-    return NextResponse.json({ error: 'Некорректные настройки' }, { status: 422 })
+    return jsonResponse({ error: 'Некорректные настройки' }, { status: 422 })
   }
 
   const features = await updateFeatureFlags(parsed.data)
@@ -36,5 +36,5 @@ export const PATCH = withAuth(async (req: Request) => {
     request: req,
   })
 
-  return NextResponse.json({ features })
+  return jsonResponse({ features })
 })

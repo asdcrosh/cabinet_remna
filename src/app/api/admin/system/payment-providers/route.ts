@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { jsonResponse } from '@/lib/json-response'
 import { z } from 'zod'
 import { writeAuditLog } from '@/lib/audit-log'
 import { requireAdmin, withAuth } from '@/lib/auth/guard'
@@ -38,14 +38,14 @@ const schema = z.object({
 
 export const GET = withAuth(async () => {
   await requireAdmin()
-  return NextResponse.json({ settings: await getPublicPaymentProviderSettings() })
+  return jsonResponse({ settings: await getPublicPaymentProviderSettings() })
 })
 
 export const PATCH = withAuth(async (req: Request) => {
   const session = await requireAdmin()
   const parsed = schema.safeParse(await req.json().catch(() => null))
   if (!parsed.success) {
-    return NextResponse.json({
+    return jsonResponse({
       error: parsed.error.issues[0]?.message || 'Некорректные настройки платёжных систем',
     }, { status: 422 })
   }
@@ -58,7 +58,7 @@ export const PATCH = withAuth(async (req: Request) => {
     metadata: settings,
     request: req,
   })
-  return NextResponse.json({ settings })
+  return jsonResponse({ settings })
 })
 
 export const DELETE = withAuth(async (req: Request) => {
@@ -71,5 +71,5 @@ export const DELETE = withAuth(async (req: Request) => {
     metadata: settings,
     request: req,
   })
-  return NextResponse.json({ settings })
+  return jsonResponse({ settings })
 })

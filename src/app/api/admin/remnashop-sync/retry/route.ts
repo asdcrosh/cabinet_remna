@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { jsonResponse } from '@/lib/json-response'
 import { prisma } from '@/lib/prisma'
 import { requireAdmin, withAuth } from '@/lib/auth/guard'
 import {
@@ -29,17 +29,17 @@ export const POST = withAuth(async (req: Request) => {
       metadata: result,
       request: req,
     })
-    return NextResponse.json({ ok: result.failed === 0, result })
+    return jsonResponse({ ok: result.failed === 0, result })
   }
 
   const id = typeof body?.id === 'string' ? body.id : null
-  if (!id) return NextResponse.json({ error: 'id is required' }, { status: 400 })
+  if (!id) return jsonResponse({ error: 'id is required' }, { status: 400 })
 
   const event = await prisma.syncEvent.findUnique({ where: { id } })
-  if (!event) return NextResponse.json({ error: 'Sync event not found' }, { status: 404 })
+  if (!event) return jsonResponse({ error: 'Sync event not found' }, { status: 404 })
 
   if (!await claimRemnashopSyncEvent(event)) {
-    return NextResponse.json({ error: 'Sync event is already being retried' }, { status: 409 })
+    return jsonResponse({ error: 'Sync event is already being retried' }, { status: 409 })
   }
 
   try {
@@ -66,7 +66,7 @@ export const POST = withAuth(async (req: Request) => {
       },
       request: req,
     })
-    return NextResponse.json({ ok: true, result })
+    return jsonResponse({ ok: true, result })
   } catch (error) {
     await markSyncFailed({
       direction: event.direction,
@@ -75,6 +75,6 @@ export const POST = withAuth(async (req: Request) => {
       operation: event.operation,
     }, error)
     const message = error instanceof Error ? error.message : 'sync retry failed'
-    return NextResponse.json({ error: message }, { status: 500 })
+    return jsonResponse({ error: message }, { status: 500 })
   }
 })

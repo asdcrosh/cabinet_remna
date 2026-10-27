@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { jsonResponse } from '@/lib/json-response'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { requireAdmin, withAuth } from '@/lib/auth/guard'
@@ -20,21 +20,21 @@ export const PATCH = withAuth(async (req: Request, { params }: { params: Promise
   ])
 
   if (!actor || !target) {
-    return NextResponse.json({ error: 'Пользователь не найден' }, { status: 404 })
+    return jsonResponse({ error: 'Пользователь не найден' }, { status: 404 })
   }
   if (actor.id === target.id) {
-    return NextResponse.json({ error: 'Нельзя изменить собственную роль' }, { status: 400 })
+    return jsonResponse({ error: 'Нельзя изменить собственную роль' }, { status: 400 })
   }
 
   const body = await req.json().catch(() => null)
   const parsed = schema.safeParse(body)
   if (!parsed.success) {
-    return NextResponse.json({ error: 'Некорректная роль' }, { status: 400 })
+    return jsonResponse({ error: 'Некорректная роль' }, { status: 400 })
   }
 
   if (actor.role !== 'SUPER_ADMIN') {
     if (['ADMIN', 'SUPER_ADMIN'].includes(target.role) || ['ADMIN', 'SUPER_ADMIN'].includes(parsed.data.role)) {
-      return NextResponse.json({ error: 'Назначать администраторов может только главный администратор' }, { status: 403 })
+      return jsonResponse({ error: 'Назначать администраторов может только главный администратор' }, { status: 403 })
     }
   }
 
@@ -53,5 +53,5 @@ export const PATCH = withAuth(async (req: Request, { params }: { params: Promise
     request: req,
   })
 
-  return NextResponse.json({ user })
+  return jsonResponse({ user })
 })

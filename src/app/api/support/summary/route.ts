@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { jsonResponse } from '@/lib/json-response'
 import { prisma } from '@/lib/prisma'
 import { requireAuth, withAuth } from '@/lib/auth/guard'
 import { isFeatureEnabled } from '@/lib/feature-flags'
@@ -7,7 +7,7 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 export const GET = withAuth(async () => {
-  if (!await isFeatureEnabled('support')) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  if (!await isFeatureEnabled('support')) return jsonResponse({ error: 'Not found' }, { status: 404 })
   const session = await requireAuth()
   const user = await prisma.user.findUnique({
     where: { id: session.uid },
@@ -15,7 +15,7 @@ export const GET = withAuth(async () => {
   })
 
   if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    return jsonResponse({ error: 'Unauthorized' }, { status: 401 })
   }
 
   const [userUnread, adminUnread] = await Promise.all([
@@ -31,7 +31,7 @@ export const GET = withAuth(async () => {
       : Promise.resolve({ _sum: { adminUnreadCount: 0 } }),
   ])
 
-  return NextResponse.json({
+  return jsonResponse({
     badges: {
       '/dashboard/support': userUnread._sum.userUnreadCount ?? 0,
       '/dashboard/admin/support': adminUnread._sum.adminUnreadCount ?? 0,

@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { jsonResponse } from '@/lib/json-response'
 import { Prisma, WelcomeBonusType, type Plan, type PromoCode, type WelcomeBonusSetting } from '@prisma/client'
 import { requireAuth, withAuth } from '@/lib/auth/guard'
 import { prisma } from '@/lib/prisma'
@@ -17,7 +17,7 @@ export const POST = withAuth(async (req: Request) => {
   const requestedType = normalizeWelcomeBonusType(body?.type)
   const limited = await rateLimit(req, `welcome-offer:${session.uid}`, 5, 60_000)
   if (!limited.ok) {
-    return NextResponse.json(
+    return jsonResponse(
       { error: 'Слишком много попыток. Попробуйте позже.' },
       { status: 429, headers: { 'Retry-After': String(limited.retryAfter) } }
     )
@@ -28,7 +28,7 @@ export const POST = withAuth(async (req: Request) => {
     include: { trialPlan: true, promoCode: true },
   })
   if (!setting?.enabled) {
-    return NextResponse.json({ error: 'Приветственный бонус сейчас недоступен' }, { status: 404 })
+    return jsonResponse({ error: 'Приветственный бонус сейчас недоступен' }, { status: 404 })
   }
 
   const user = await prisma.user.findUnique({
@@ -47,10 +47,10 @@ export const POST = withAuth(async (req: Request) => {
       welcomeBonusRedemptions: { select: { id: true }, take: 1 },
     },
   })
-  if (!user) return NextResponse.json({ error: 'Пользователь не найден' }, { status: 404 })
+  if (!user) return jsonResponse({ error: 'Пользователь не найден' }, { status: 404 })
   const hasTrustedIdentity = Boolean(user.telegramId || (user.emailVerifiedAt && !user.email.endsWith('@pending.invalid')))
   if (!hasTrustedIdentity) {
-    return NextResponse.json({ error: 'Подтвердите email или войдите через Telegram, чтобы получить приветственный бонус' }, { status: 403 })
+    return jsonResponse({ error: 'Подтвердите email или войдите через Telegram, чтобы получить приветственный бонус' }, { status: 403 })
   }
   if (
     user.remnawaveId ||
@@ -61,7 +61,7 @@ export const POST = withAuth(async (req: Request) => {
     user.trialPlanRedemptions.length > 0 ||
     user.welcomeBonusRedemptions.length > 0
   ) {
-    return NextResponse.json({ error: 'Приветственный бонус доступен только новым пользователям' }, { status: 409 })
+    return jsonResponse({ error: 'Приветственный бонус доступен только новым пользователям' }, { status: 409 })
   }
 
   const availableTypes = getAvailableWelcomeBonusTypes(setting, {
@@ -74,7 +74,7 @@ export const POST = withAuth(async (req: Request) => {
       : null
 
   if (!selectedType) {
-    return NextResponse.json({ error: 'Выберите доступный приветственный бонус' }, { status: 422 })
+    return jsonResponse({ error: 'Выберите доступный приветственный бонус' }, { status: 422 })
   }
 
   if (selectedType === 'TRIAL_PLAN') {
@@ -123,7 +123,7 @@ async function claimTrialPlan({
 }) {
   const plan = setting.trialPlan
   if (!plan || !plan.isActive || !plan.isPromo) {
-    return NextResponse.json({ error: 'Пробный тариф для бонуса не настроен' }, { status: 409 })
+    return jsonResponse({ error: 'Пробный тариф для бонуса не настроен' }, { status: 409 })
   }
 
   let paymentId: string
@@ -178,7 +178,7 @@ async function claimTrialPlan({
     paymentId = payment.id
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-      return NextResponse.json({ error: 'Вы уже получили пробный период' }, { status: 409 })
+      return jsonResponse({ error: 'Вы уже получили пробный период' }, { status: 409 })
     }
     throw error
   }
@@ -205,7 +205,7 @@ async function claimTrialPlan({
       where: { id: paymentId },
       data: { provisioningError: message.slice(0, 1000) },
     })
-    return NextResponse.json(
+    return jsonResponse(
       {
         type: 'TRIAL_PLAN',
         redirectUrl: `/dashboard/billing?paid=1&payment=${paymentId}`,
@@ -215,7 +215,7 @@ async function claimTrialPlan({
     )
   }
 
-  return NextResponse.json({
+  return jsonResponse({
     type: 'TRIAL_PLAN',
     redirectUrl: '/dashboard/subscription?activated=1',
     message: 'Пробный период активирован',
@@ -231,7 +231,7 @@ async function claimBonusAttempts({
 }) {
   const config = getBonusBoxConfig()
   if (!await isFeatureEnabled('bonusBox')) {
-    return NextResponse.json({ error: 'Подарочный бокс сейчас недоступен' }, { status: 403 })
+    return jsonResponse({ error: 'Подарочный бокс сейчас недоступен' }, { status: 403 })
   }
 
   const attemptsCount = Math.max(1, Math.min(50, setting.bonusAttempts))
@@ -263,16 +263,16 @@ async function claimBonusAttempts({
     count = result.count
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-      return NextResponse.json({ error: 'Вы уже получили приветственный бонус' }, { status: 409 })
+      return jsonResponse({ error: 'Вы уже получили приветственный бонус' }, { status: 409 })
     }
     throw error
   }
 
   if (count === 0) {
-    return NextResponse.json({ error: 'Вы уже получили приветственный бонус' }, { status: 409 })
+    return jsonResponse({ error: 'Вы уже получили приветственный бонус' }, { status: 409 })
   }
 
-  return NextResponse.json({
+  return jsonResponse({
     type: 'BONUS_BOX_ATTEMPTS',
     redirectUrl: '/dashboard/bonus-box',
     message: `Начислено открытий: ${count}`,
@@ -288,7 +288,7 @@ async function claimPromoCode({
 }) {
   const promoCode = setting.promoCode
   if (!promoCode || !promoCode.isActive) {
-    return NextResponse.json({ error: 'Промокод для бонуса не настроен' }, { status: 409 })
+    return jsonResponse({ error: 'Промокод для бонуса не настроен' }, { status: 409 })
   }
 
   try {
@@ -303,12 +303,12 @@ async function claimPromoCode({
     })
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-      return NextResponse.json({ error: 'Вы уже получили приветственный бонус' }, { status: 409 })
+      return jsonResponse({ error: 'Вы уже получили приветственный бонус' }, { status: 409 })
     }
     throw error
   }
 
-  return NextResponse.json({
+  return jsonResponse({
     type: 'PROMO_CODE',
     redirectUrl: `/dashboard/plans?promo=${encodeURIComponent(promoCode.code)}`,
     message: `Промокод ${promoCode.code} готов`,

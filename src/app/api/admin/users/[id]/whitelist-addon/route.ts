@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { jsonResponse } from '@/lib/json-response'
 import { z } from 'zod'
 import { writeAuditLog } from '@/lib/audit-log'
 import { requireSuperAdmin, withAuth } from '@/lib/auth/guard'
@@ -20,7 +20,7 @@ export const PUT = withAuth(async (req: Request, { params }: { params: Promise<{
   const { id: userId } = await params
   const parsed = schema.safeParse(await req.json().catch(() => null))
   if (!parsed.success) {
-    return NextResponse.json({ error: 'Укажите дату окончания БС' }, { status: 422 })
+    return jsonResponse({ error: 'Укажите дату окончания БС' }, { status: 422 })
   }
 
   const expireAt = new Date(`${parsed.data.expiresOn}T23:59:59.999+03:00`)
@@ -34,7 +34,7 @@ export const PUT = withAuth(async (req: Request, { params }: { params: Promise<{
       metadata: { subscriptionId: result.subscription.id, expireAt: expireAt.toISOString() },
       request: req,
     })
-    return NextResponse.json({
+    return jsonResponse({
       whitelistAddon: {
         active: true,
         expireAt: result.subscription.whitelistAddonExpireAt,
@@ -42,7 +42,7 @@ export const PUT = withAuth(async (req: Request, { params }: { params: Promise<{
     })
   } catch (error) {
     if (error instanceof WhitelistAddonManagementError) {
-      return NextResponse.json({ error: error.message }, { status: 422 })
+      return jsonResponse({ error: error.message }, { status: 422 })
     }
     throw error
   }
@@ -61,10 +61,10 @@ export const DELETE = withAuth(async (req: Request, { params }: { params: Promis
       metadata: { revoked: result.revoked },
       request: req,
     })
-    return NextResponse.json({ whitelistAddon: { active: false, expireAt: null } })
+    return jsonResponse({ whitelistAddon: { active: false, expireAt: null } })
   } catch (error) {
     if (error instanceof WhitelistAddonManagementError) {
-      return NextResponse.json({ error: error.message }, { status: 422 })
+      return jsonResponse({ error: error.message }, { status: 422 })
     }
     throw error
   }

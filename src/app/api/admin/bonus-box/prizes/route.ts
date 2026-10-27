@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { jsonResponse } from '@/lib/json-response'
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { requireAdmin, withAuth } from '@/lib/auth/guard'
@@ -10,28 +10,28 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 export const GET = withAuth(async () => {
-  if (!await isFeatureEnabled('bonusBox')) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  if (!await isFeatureEnabled('bonusBox')) return jsonResponse({ error: 'Not found' }, { status: 404 })
   await requireAdmin()
   const prizes = await prisma.bonusBoxPrize.findMany({
     orderBy: [{ isActive: 'desc' }, { createdAt: 'desc' }],
   })
-  return NextResponse.json({ prizes })
+  return jsonResponse({ prizes })
 })
 
 export const POST = withAuth(async (req: Request) => {
-  if (!await isFeatureEnabled('bonusBox')) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  if (!await isFeatureEnabled('bonusBox')) return jsonResponse({ error: 'Not found' }, { status: 404 })
   await requireAdmin()
 
   let body: unknown
   try {
     body = await req.json()
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+    return jsonResponse({ error: 'Invalid JSON' }, { status: 400 })
   }
 
   const parsed = adminBonusBoxPrizeSchema.safeParse(body)
   if (!parsed.success) {
-    return NextResponse.json(
+    return jsonResponse(
       { error: 'Validation error', details: parsed.error.flatten() },
       { status: 400 }
     )
@@ -54,10 +54,10 @@ export const POST = withAuth(async (req: Request) => {
       },
       request: req,
     })
-    return NextResponse.json({ prize })
+    return jsonResponse({ prize })
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-      return NextResponse.json({ error: 'Такой подарок уже существует' }, { status: 409 })
+      return jsonResponse({ error: 'Такой подарок уже существует' }, { status: 409 })
     }
     throw error
   }

@@ -1,6 +1,6 @@
 // GET /api/plans — список активных тарифов (открытый эндпоинт).
 
-import { NextResponse } from 'next/server'
+import { jsonResponse } from '@/lib/json-response'
 import { prisma } from '@/lib/prisma'
 
 export const runtime = 'nodejs'
@@ -30,5 +30,5 @@ export async function GET() {
       sortOrder: true,
     },
   })
-  return NextResponse.json({ plans })
+  return jsonResponse({ plans })
 }

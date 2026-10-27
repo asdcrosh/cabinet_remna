@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { jsonResponse } from '@/lib/json-response'
 import { prisma } from '@/lib/prisma'
 import { requireAuth, withAuth } from '@/lib/auth/guard'
 import {
@@ -24,13 +24,13 @@ export const POST = withAuth(async (req: Request) => {
   try {
     assertSameOrigin(req)
   } catch {
-    return NextResponse.json({ error: 'Invalid request origin' }, { status: 403 })
+    return jsonResponse({ error: 'Invalid request origin' }, { status: 403 })
   }
 
   const session = await requireAuth()
   const limited = await rateLimit(req, `telegram-link:${session.uid}`, 5, 60_000)
   if (!limited.ok) {
-    return NextResponse.json(
+    return jsonResponse(
       { error: 'Слишком много попыток привязки. Повторите позже.' },
       { status: 429, headers: { 'Retry-After': String(limited.retryAfter) } }
     )
@@ -40,12 +40,12 @@ export const POST = withAuth(async (req: Request) => {
   try {
     payload = (await req.json()) as TelegramAuthPayload
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+    return jsonResponse({ error: 'Invalid JSON' }, { status: 400 })
   }
 
   const verified = verifyTelegramAuthPayload(payload)
   if (!verified.ok) {
-    return NextResponse.json({ error: verified.error }, { status: 400 })
+    return jsonResponse({ error: verified.error }, { status: 400 })
   }
 
   const telegramId = BigInt(payload.id)
@@ -53,9 +53,9 @@ export const POST = withAuth(async (req: Request) => {
     where: { id: session.uid },
     select: { id: true, emailVerifiedAt: true, telegramId: true },
   })
-  if (!currentUser) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+  if (!currentUser) return jsonResponse({ error: 'User not found' }, { status: 404 })
   if (!currentUser.emailVerifiedAt) {
-    return NextResponse.json({ error: 'Сначала подтвердите email' }, { status: 403 })
+    return jsonResponse({ error: 'Сначала подтвердите email' }, { status: 403 })
   }
 
   try {
@@ -73,7 +73,7 @@ export const POST = withAuth(async (req: Request) => {
         code: error.code,
         request: req,
       })
-      return NextResponse.json(
+      return jsonResponse(
         {
           error:
             error.code === 'PRIVILEGED_SOURCE'
@@ -122,7 +122,7 @@ export const POST = withAuth(async (req: Request) => {
       telegramId,
     })
 
-    return NextResponse.json({
+    return jsonResponse({
       ok: true,
       telegram: {
         id: telegramId.toString(),
@@ -137,7 +137,7 @@ export const POST = withAuth(async (req: Request) => {
     })
   } catch (e) {
     const message = describeSyncError(e)
-    return NextResponse.json(
+    return jsonResponse(
       {
         ok: true,
         telegram: {

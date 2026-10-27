@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { jsonResponse } from '@/lib/json-response'
 import { z } from 'zod'
 import { requireAdmin, withAuth } from '@/lib/auth/guard'
 import { prisma } from '@/lib/prisma'
@@ -26,13 +26,13 @@ const schema = z.object({
 })
 
 export const GET = withAuth(async () => {
-  if (!await isFeatureEnabled('broadcasts')) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  if (!await isFeatureEnabled('broadcasts')) return jsonResponse({ error: 'Not found' }, { status: 404 })
   await requireAdmin()
   const templates = await prisma.broadcastTemplate.findMany({
     orderBy: { createdAt: 'desc' },
     take: 50,
   })
-  return NextResponse.json({
+  return jsonResponse({
     templates: templates.map((template) => ({
       ...template,
       createdAt: template.createdAt.toISOString(),
@@ -42,18 +42,18 @@ export const GET = withAuth(async () => {
 })
 
 export const POST = withAuth(async (req: Request) => {
-  if (!await isFeatureEnabled('broadcasts')) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  if (!await isFeatureEnabled('broadcasts')) return jsonResponse({ error: 'Not found' }, { status: 404 })
   const session = await requireAdmin()
   const parsed = schema.safeParse(await req.json().catch(() => null))
   if (!parsed.success) {
-    return NextResponse.json({ error: 'Проверьте название, текст, сегмент и каналы шаблона' }, { status: 400 })
+    return jsonResponse({ error: 'Проверьте название, текст, сегмент и каналы шаблона' }, { status: 400 })
   }
 
   const input = parsed.data
   const appUrl = getAppUrl()
   const actionHref = normalizeBroadcastActionHref(input.actionHref, appUrl)
   if (input.actionHref && !actionHref) {
-    return NextResponse.json({ error: 'Ссылка должна вести на раздел кабинета или быть HTTPS-адресом' }, { status: 400 })
+    return jsonResponse({ error: 'Ссылка должна вести на раздел кабинета или быть HTTPS-адресом' }, { status: 400 })
   }
   const template = await prisma.broadcastTemplate.create({
     data: {
@@ -84,7 +84,7 @@ export const POST = withAuth(async (req: Request) => {
     request: req,
   })
 
-  return NextResponse.json({
+  return jsonResponse({
     template: {
       ...template,
       createdAt: template.createdAt.toISOString(),

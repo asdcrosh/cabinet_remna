@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { jsonResponse } from '@/lib/json-response'
 import { prisma } from '@/lib/prisma'
 import { requireAuth, withAuth } from '@/lib/auth/guard'
 import { rateLimit } from '@/lib/rate-limit'
@@ -21,7 +21,7 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 export const GET = withAuth(async () => {
-  if (!await isFeatureEnabled('support')) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  if (!await isFeatureEnabled('support')) return jsonResponse({ error: 'Not found' }, { status: 404 })
   const session = await requireAuth()
 
   const tickets = await prisma.supportTicket.findMany({
@@ -36,7 +36,7 @@ export const GET = withAuth(async () => {
     },
   })
 
-  return NextResponse.json({
+  return jsonResponse({
     tickets: tickets.map((ticket) => ({
       ...serializeSupportTicket(ticket),
       messages: ticket.messages.map(serializeSupportMessage),
@@ -45,11 +45,11 @@ export const GET = withAuth(async () => {
 })
 
 export const POST = withAuth(async (req: Request) => {
-  if (!await isFeatureEnabled('support')) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  if (!await isFeatureEnabled('support')) return jsonResponse({ error: 'Not found' }, { status: 404 })
   const session = await requireAuth()
   const limited = await rateLimit(req, `support:create:${session.uid}`, 5, 10 * 60 * 1000)
   if (!limited.ok) {
-    return NextResponse.json({ error: 'Слишком много обращений. Попробуйте позже.' }, { status: 429 })
+    return jsonResponse({ error: 'Слишком много обращений. Попробуйте позже.' }, { status: 429 })
   }
 
   let body: unknown
@@ -59,7 +59,7 @@ export const POST = withAuth(async (req: Request) => {
     body = requestData.body
     attachments = requestData.attachments
   } catch (error) {
-    return NextResponse.json(
+    return jsonResponse(
       { error: error instanceof SupportAttachmentError ? error.message : 'Некорректный запрос.' },
       { status: 400 }
     )
@@ -67,7 +67,7 @@ export const POST = withAuth(async (req: Request) => {
 
   const parsed = createSupportTicketSchema.safeParse(body)
   if (!parsed.success) {
-    return NextResponse.json({ error: 'Выберите тему и напишите сообщение от 5 символов.', details: parsed.error.flatten() }, { status: 400 })
+    return jsonResponse({ error: 'Выберите тему и напишите сообщение от 5 символов.', details: parsed.error.flatten() }, { status: 400 })
   }
 
   const ticket = await prisma.$transaction(async (tx) => {
@@ -129,7 +129,7 @@ export const POST = withAuth(async (req: Request) => {
       : {}),
   })
 
-  return NextResponse.json({
+  return jsonResponse({
     ticket: {
       ...serializeSupportTicket(ticket),
       messages: ticket.messages.map(serializeSupportMessage),

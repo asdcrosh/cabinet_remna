@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { jsonResponse } from '@/lib/json-response'
 import { prisma } from '@/lib/prisma'
 import { requireAuth, withAuth } from '@/lib/auth/guard'
 import { prepareUserNotificationForDisplay, serializeUserNotification } from '@/lib/user-notifications'
@@ -21,7 +21,7 @@ export const GET = withAuth(async (req: Request) => {
     : null
 
   if (cursor && !cursorNotification) {
-    return NextResponse.json({ error: 'Некорректный курсор уведомлений' }, { status: 400 })
+    return jsonResponse({ error: 'Некорректный курсор уведомлений' }, { status: 400 })
   }
 
   const notifications = await prisma.userNotification.findMany({
@@ -43,7 +43,7 @@ export const GET = withAuth(async (req: Request) => {
   const hasMore = notifications.length > take
   const page = notifications.slice(0, take)
 
-  return NextResponse.json({
+  return jsonResponse({
     notifications: page.map(serializeUserNotification).map((item) => prepareUserNotificationForDisplay(item)),
     hasMore,
     nextCursor: hasMore ? page.at(-1)?.id ?? null : null,
@@ -59,7 +59,7 @@ export const PATCH = withAuth(async (req: Request) => {
     try {
       body = JSON.parse(rawBody) as { ids?: unknown }
     } catch {
-      return NextResponse.json({ error: 'Некорректный JSON' }, { status: 400 })
+      return jsonResponse({ error: 'Некорректный JSON' }, { status: 400 })
     }
     if (
       !Array.isArray(body.ids)
@@ -67,7 +67,7 @@ export const PATCH = withAuth(async (req: Request) => {
       || body.ids.length > 100
       || body.ids.some((id) => typeof id !== 'string' || !id || id.length > 128)
     ) {
-      return NextResponse.json({ error: 'Некорректный список уведомлений' }, { status: 400 })
+      return jsonResponse({ error: 'Некорректный список уведомлений' }, { status: 400 })
     }
     ids = [...new Set(body.ids)]
   }
@@ -76,11 +76,11 @@ export const PATCH = withAuth(async (req: Request) => {
     where: { userId: session.uid, readAt: null, ...(ids ? { id: { in: ids } } : {}) },
     data: { readAt: new Date() },
   })
-  return NextResponse.json({ ok: true, updated: result.count })
+  return jsonResponse({ ok: true, updated: result.count })
 })
 
 export const DELETE = withAuth(async () => {
   const session = await requireAuth()
   await prisma.userNotification.deleteMany({ where: { userId: session.uid } })
-  return NextResponse.json({ ok: true })
+  return jsonResponse({ ok: true })
 })

@@ -1,6 +1,7 @@
 // GET /api/qr?text=...
 // Возвращает PNG QR-код. Используется клиентом, чтобы не тянуть
 // тяжёлую либу в браузер.
+import { jsonResponse } from '@/lib/json-response'
 import { NextResponse } from 'next/server'
 import QRCode from 'qrcode'
 import { getSession } from '@/lib/auth/cookies'
@@ -13,16 +14,16 @@ const MAX_QR_TEXT_LENGTH = 4096
 export async function GET(req: Request) {
   const session = await getSession()
   if (!session) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    return jsonResponse({ error: 'Unauthorized' }, { status: 401 })
   }
 
   const url = new URL(req.url)
   const text = url.searchParams.get('text')
   if (!text) {
-    return NextResponse.json({ error: 'text is required' }, { status: 400 })
+    return jsonResponse({ error: 'text is required' }, { status: 400 })
   }
   if (text.length > MAX_QR_TEXT_LENGTH) {
-    return NextResponse.json({ error: 'text is too long' }, { status: 413 })
+    return jsonResponse({ error: 'text is too long' }, { status: 413 })
   }
   try {
     const png = await QRCode.toBuffer(text, {
@@ -38,6 +39,6 @@ export async function GET(req: Request) {
       },
     })
   } catch (e) {
-    return NextResponse.json({ error: 'qr generation failed' }, { status: 500 })
+    return jsonResponse({ error: 'qr generation failed' }, { status: 500 })
   }
 }

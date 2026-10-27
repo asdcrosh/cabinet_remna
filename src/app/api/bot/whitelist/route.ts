@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { jsonResponse } from '@/lib/json-response'
 import { z } from 'zod'
 import { verifyBotRequest } from '@/lib/bot-api-auth'
 import { BotWhitelistError, getBotWhitelistOffer, resolveBotUser, syncBotWhitelistSquads } from '@/lib/bot-whitelist'
@@ -34,22 +34,22 @@ const schema = z.discriminatedUnion('action', [
 
 export async function POST(req: Request) {
   const raw = await req.text()
-  if (raw.length > 16_384) return NextResponse.json({ error: 'Request too large' }, { status: 413 })
-  if (!verifyBotRequest(req, raw)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (raw.length > 16_384) return jsonResponse({ error: 'Request too large' }, { status: 413 })
+  if (!verifyBotRequest(req, raw)) return jsonResponse({ error: 'Unauthorized' }, { status: 401 })
   let json: unknown
-  try { json = JSON.parse(raw) } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }) }
+  try { json = JSON.parse(raw) } catch { return jsonResponse({ error: 'Invalid JSON' }, { status: 400 }) }
   const parsed = schema.safeParse(json)
-  if (!parsed.success) return NextResponse.json({ error: 'Invalid request' }, { status: 400 })
+  if (!parsed.success) return jsonResponse({ error: 'Invalid request' }, { status: 400 })
   const input = parsed.data
   const limited = await rateLimit(req, `bot-whitelist:${input.sourceUserId}:${input.action}`, input.action === 'checkout' ? 10 : 60, 60_000)
-  if (!limited.ok) return NextResponse.json({ error: 'Слишком часто. Попробуйте через минуту.' }, { status: 429 })
+  if (!limited.ok) return jsonResponse({ error: 'Слишком часто. Попробуйте через минуту.' }, { status: 429 })
   try {
     const user = await resolveBotUser(input.sourceUserId, input.telegramId, input.action === 'offer' || input.action === 'checkout')
-    if (input.action === 'offer') return NextResponse.json(await getBotWhitelistOffer(user), { headers: { 'Cache-Control': 'no-store' } })
+    if (input.action === 'offer') return jsonResponse(await getBotWhitelistOffer(user), { headers: { 'Cache-Control': 'no-store' } })
     if (input.action === 'sync-squads') {
       const locked = await withDistributedLock(`payment-provisioning:${user.id}`, () => syncBotWhitelistSquads(user, input))
       if (!locked.acquired) throw new BotWhitelistError('Подписка обновляется. Повторите операцию.')
-      return NextResponse.json(locked.value)
+      return jsonResponse(locked.value)
     }
     if (input.action === 'payment') {
       const payment = await prisma.payment.findFirst({
@@ -58,7 +58,7 @@ export async function POST(req: Request) {
       if (!payment) throw new BotWhitelistError('Платёж не найден', 404)
       await syncPaymentProvisioning({ paymentId: payment.id, userId: user.id })
       const updated = await prisma.payment.findUniqueOrThrow({ where: { id: payment.id }, include: { subscription: true } })
-      return NextResponse.json({
+      return jsonResponse({
         status: updated.status, provisioned: Boolean(updated.subscriptionProvisionedAt),
         paused: Boolean(updated.subscription && isWhitelistAddonPaused(updated.subscription)),
         expireAt: updated.subscription?.whitelistAddonExpireAt?.toISOString() ?? null,
@@ -71,7 +71,7 @@ export async function POST(req: Request) {
       if (previous && (previous.provider !== input.provider || previous.planId !== input.planId || previous.amountKopecks !== input.priceKopecks)) {
         throw new BotWhitelistError('Ключ оплаты уже использован для другого заказа. Откройте покупку заново.')
       }
-      if (previous) return NextResponse.json({
+      if (previous) return jsonResponse({
         localPaymentId: previous.id, confirmationUrl: previous.status === 'PENDING' ? previous.confirmationUrl : null,
         status: previous.status, amountKopecks: previous.amountKopecks, provider: previous.provider,
       })
@@ -89,13 +89,13 @@ export async function POST(req: Request) {
       if (!response.ok) return response
       const result = await response.json()
       const payment = await prisma.payment.findFirst({ where: { id: result.localPaymentId ?? result.paymentId, userId: user.id } })
-      return NextResponse.json({ ...result, amountKopecks: payment?.amountKopecks })
+      return jsonResponse({ ...result, amountKopecks: payment?.amountKopecks })
     }, { timeoutMs: 45_000 })
     if (!locked.acquired) throw new BotWhitelistError('Счёт уже создаётся. Подождите и повторите.')
     return locked.value
   } catch (error) {
-    if (error instanceof BotWhitelistError) return NextResponse.json({ error: error.message }, { status: error.status })
+    if (error instanceof BotWhitelistError) return jsonResponse({ error: error.message }, { status: error.status })
     logError('bot.whitelist.failed', error, { sourceUserId: input.sourceUserId, action: input.action })
-    return NextResponse.json({ error: 'Не удалось связаться с кабинетом. Попробуйте позже.' }, { status: 503 })
+    return jsonResponse({ error: 'Не удалось связаться с кабинетом. Попробуйте позже.' }, { status: 503 })
   }
 }

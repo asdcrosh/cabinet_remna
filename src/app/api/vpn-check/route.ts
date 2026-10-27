@@ -1,9 +1,9 @@
 // GET /api/vpn-check — проверка, проходит ли текущий запрос пользователя
 // через одну из публичных нод Remnawave.
 
+import { jsonResponse } from '@/lib/json-response'
 import { lookup } from 'node:dns/promises'
 import { isIP } from 'node:net'
-import { NextResponse } from 'next/server'
 import { withAuth } from '@/lib/auth/guard'
 import { countryNameRu } from '@/lib/node-country'
 import { remnawave, type RemnawaveNode } from '@/lib/remnawave'
@@ -18,7 +18,7 @@ const nodeIpCache = new Map<string, { expiresAt: number; ips: string[] }>()
 export const GET = withAuth(async (request: Request) => {
   const publicIp = resolveRequestIp(request)
   if (!publicIp) {
-    return NextResponse.json({
+    return jsonResponse({
       status: 'unknown',
       message: 'Не удалось определить внешний IP устройства.',
     }, {
@@ -29,7 +29,7 @@ export const GET = withAuth(async (request: Request) => {
   const nodes = (await remnawave.getNodes()).response
   const node = await findMatchedNode(publicIp, nodes)
 
-  return NextResponse.json({
+  return jsonResponse({
     status: node ? 'vpn' : 'direct',
     publicIp,
     node: node

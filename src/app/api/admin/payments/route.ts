@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { jsonResponse } from '@/lib/json-response'
 import { PaymentProvider, PaymentStatus, Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { requireAdmin, withAuth } from '@/lib/auth/guard'
@@ -86,7 +86,7 @@ export const GET = withAuth(async (req: Request) => {
   const visiblePayments = payments.slice(0, pageSize)
   const nextPayment = payments[pageSize]
 
-  return NextResponse.json({
+  return jsonResponse({
     payments: visiblePayments.map(serializePayment),
     pagination: {
       pageSize,

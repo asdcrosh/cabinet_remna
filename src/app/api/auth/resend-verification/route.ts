@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { jsonResponse } from '@/lib/json-response'
 import { prisma } from '@/lib/prisma'
 import { resendVerificationSchema } from '@/lib/auth/validation'
 import { rateLimit } from '@/lib/rate-limit'
@@ -12,12 +12,12 @@ export async function POST(req: Request) {
   try {
     assertSameOrigin(req)
   } catch {
-    return NextResponse.json({ error: 'Invalid request origin' }, { status: 403 })
+    return jsonResponse({ error: 'Invalid request origin' }, { status: 403 })
   }
 
   const limited = await rateLimit(req, 'auth-resend-verification', 3, 60_000)
   if (!limited.ok) {
-    return NextResponse.json(
+    return jsonResponse(
       { error: 'Слишком много запросов. Попробуйте позже.' },
       { status: 429, headers: { 'Retry-After': String(limited.retryAfter) } }
     )
@@ -27,12 +27,12 @@ export async function POST(req: Request) {
   try {
     body = await req.json()
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+    return jsonResponse({ error: 'Invalid JSON' }, { status: 400 })
   }
 
   const parsed = resendVerificationSchema.safeParse(body)
   if (!parsed.success) {
-    return NextResponse.json(
+    return jsonResponse(
       { error: 'Validation error', details: parsed.error.flatten() },
       { status: 400 }
     )
@@ -44,7 +44,7 @@ export async function POST(req: Request) {
   })
 
   if (!user || user.emailVerifiedAt) {
-    return NextResponse.json({ ok: true })
+    return jsonResponse({ ok: true })
   }
 
   const token = await createEmailVerificationToken(user.id)
@@ -55,7 +55,7 @@ export async function POST(req: Request) {
     next: sanitizeInternalNext(parsed.data.next),
   })
 
-  return NextResponse.json({
+  return jsonResponse({
     ok: true,
     emailDelivery: delivery.sent ? 'sent' : delivery.reason,
   })

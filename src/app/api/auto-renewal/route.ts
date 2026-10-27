@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { jsonResponse } from '@/lib/json-response'
 import { z } from 'zod'
 import { requireAuth, withAuth } from '@/lib/auth/guard'
 import { disableAutoRenewal, enableAutoRenewal, getAutoRenewalState } from '@/lib/auto-renewal'
@@ -18,24 +18,24 @@ const enableSchema = z.object({
 
 export const GET = withAuth(async () => {
   const session = await requireAuth()
-  return NextResponse.json({ autoRenewal: await getAutoRenewalState(session.uid) })
+  return jsonResponse({ autoRenewal: await getAutoRenewalState(session.uid) })
 })
 
 export const POST = withAuth(async (req: Request) => {
   const session = await requireAuth()
   const limited = await rateLimit(req, `auto-renewal:${session.uid}`, 10, 60_000)
   if (!limited.ok) {
-    return NextResponse.json(
+    return jsonResponse(
       { error: 'Слишком много изменений. Попробуйте позже.' },
       { status: 429, headers: { 'Retry-After': String(limited.retryAfter) } }
     )
   }
   if (!(await isYookassaConfigured())) {
-    return NextResponse.json({ error: 'Автопродление временно недоступно' }, { status: 503 })
+    return jsonResponse({ error: 'Автопродление временно недоступно' }, { status: 503 })
   }
   const parsed = enableSchema.safeParse(await req.json().catch(() => null))
   if (!parsed.success) {
-    return NextResponse.json(
+    return jsonResponse(
       { error: 'Подтвердите согласие на регулярные списания и условия автопродления' },
       { status: 422 }
     )
@@ -49,14 +49,14 @@ export const POST = withAuth(async (req: Request) => {
       }
     )
     if (!locked.acquired) {
-      return NextResponse.json(
+      return jsonResponse(
         { error: 'Операция оплаты уже выполняется. Повторите после её завершения.' },
         { status: 409 }
       )
     }
-    return NextResponse.json({ autoRenewal: locked.value })
+    return jsonResponse({ autoRenewal: locked.value })
   } catch (error) {
-    return NextResponse.json(
+    return jsonResponse(
       { error: error instanceof Error ? error.message : 'Не удалось включить автопродление' },
       { status: 409 }
     )
@@ -67,7 +67,7 @@ export const DELETE = withAuth(async (req: Request) => {
   const session = await requireAuth()
   const limited = await rateLimit(req, `auto-renewal:${session.uid}`, 10, 60_000)
   if (!limited.ok) {
-    return NextResponse.json(
+    return jsonResponse(
       { error: 'Слишком много изменений. Попробуйте позже.' },
       { status: 429, headers: { 'Retry-After': String(limited.retryAfter) } }
     )
@@ -80,10 +80,10 @@ export const DELETE = withAuth(async (req: Request) => {
     }
   )
   if (!locked.acquired) {
-    return NextResponse.json(
+    return jsonResponse(
       { error: 'Списание уже выполняется. Проверьте его результат перед отключением.' },
       { status: 409 }
     )
   }
-  return NextResponse.json({ autoRenewal: locked.value })
+  return jsonResponse({ autoRenewal: locked.value })
 })

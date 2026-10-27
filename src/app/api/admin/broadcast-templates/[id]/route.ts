@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { jsonResponse } from '@/lib/json-response'
 import { requireAdmin, withAuth } from '@/lib/auth/guard'
 import { prisma } from '@/lib/prisma'
 import { writeAuditLog } from '@/lib/audit-log'
@@ -8,7 +8,7 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 export const DELETE = withAuth(async (req: Request, { params }: { params: Promise<{ id: string }> }) => {
-  if (!await isFeatureEnabled('broadcasts')) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  if (!await isFeatureEnabled('broadcasts')) return jsonResponse({ error: 'Not found' }, { status: 404 })
   const session = await requireAdmin()
   const { id } = await params
   const template = await prisma.broadcastTemplate.findUnique({
@@ -31,5 +31,5 @@ export const DELETE = withAuth(async (req: Request, { params }: { params: Promis
       request: req,
     })
   }
-  return NextResponse.json({ ok: true })
+  return jsonResponse({ ok: true })
 })

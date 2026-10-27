@@ -1,6 +1,6 @@
 // GET /api/payment/history — история платежей текущего юзера.
 
-import { NextResponse } from 'next/server'
+import { jsonResponse } from '@/lib/json-response'
 import { prisma } from '@/lib/prisma'
 import { requireAuth, withAuth } from '@/lib/auth/guard'
 import { serializePayment } from '@/lib/api-serializers'
@@ -16,5 +16,5 @@ export const GET = withAuth(async () => {
     take: 50,
     include: { plan: true, subscription: true },
   })
-  return NextResponse.json({ payments: payments.map(serializePayment) })
+  return jsonResponse({ payments: payments.map(serializePayment) })
 })

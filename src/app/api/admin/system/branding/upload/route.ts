@@ -1,7 +1,7 @@
+import { jsonResponse } from '@/lib/json-response'
 import { randomUUID } from 'crypto'
 import { mkdir, unlink, writeFile } from 'fs/promises'
 import path from 'path'
-import { NextResponse } from 'next/server'
 import { writeAuditLog } from '@/lib/audit-log'
 import { requireAdmin, withAuth } from '@/lib/auth/guard'
 import { getPublicBrandSettings, updateBrandSettings } from '@/lib/branding'
@@ -16,16 +16,16 @@ export const POST = withAuth(async (req: Request) => {
   const form = await req.formData().catch(() => null)
   const file = form?.get('file')
   if (!isUploadedFile(file)) {
-    return NextResponse.json({ error: 'Файл не найден' }, { status: 400 })
+    return jsonResponse({ error: 'Файл не найден' }, { status: 400 })
   }
   if (file.size <= 0 || file.size > MAX_IMAGE_SIZE) {
-    return NextResponse.json({ error: 'Логотип должен быть до 5 МБ' }, { status: 400 })
+    return jsonResponse({ error: 'Логотип должен быть до 5 МБ' }, { status: 400 })
   }
 
   const bytes = Buffer.from(await file.arrayBuffer())
   const detected = detectImageType(bytes)
   if (!detected || (file.type && file.type !== detected.mimeType)) {
-    return NextResponse.json({ error: 'Поддерживаются JPG, PNG и WEBP' }, { status: 415 })
+    return jsonResponse({ error: 'Поддерживаются JPG, PNG и WEBP' }, { status: 415 })
   }
 
   const directory = path.join(process.cwd(), 'public', 'uploads', 'branding')
@@ -45,7 +45,7 @@ export const POST = withAuth(async (req: Request) => {
       metadata: branding,
       request: req,
     })
-    return NextResponse.json({ logoUrl: branding.logoUrl, branding })
+    return jsonResponse({ logoUrl: branding.logoUrl, branding })
   } catch (error) {
     await unlink(filePath).catch(() => undefined)
     throw error

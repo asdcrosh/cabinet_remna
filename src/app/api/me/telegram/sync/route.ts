@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { jsonResponse } from '@/lib/json-response'
 import { prisma } from '@/lib/prisma'
 import { requireAuth, withAuth } from '@/lib/auth/guard'
 import { syncLinkedTelegramUser } from '@/lib/telegram-link-sync'
@@ -13,13 +13,13 @@ export const POST = withAuth(async (req: Request) => {
   try {
     assertSameOrigin(req)
   } catch {
-    return NextResponse.json({ error: 'Invalid request origin' }, { status: 403 })
+    return jsonResponse({ error: 'Invalid request origin' }, { status: 403 })
   }
 
   const session = await requireAuth()
   const limited = await rateLimit(req, `telegram-sync:${session.uid}`, 5, 60_000)
   if (!limited.ok) {
-    return NextResponse.json(
+    return jsonResponse(
       { error: 'Слишком много запусков синхронизации. Повторите позже.' },
       { status: 429, headers: { 'Retry-After': String(limited.retryAfter) } }
     )
@@ -33,9 +33,9 @@ export const POST = withAuth(async (req: Request) => {
     },
   })
 
-  if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+  if (!user) return jsonResponse({ error: 'User not found' }, { status: 404 })
   if (!user.telegramId) {
-    return NextResponse.json({ error: 'Telegram не привязан' }, { status: 409 })
+    return jsonResponse({ error: 'Telegram не привязан' }, { status: 409 })
   }
 
   try {
@@ -44,7 +44,7 @@ export const POST = withAuth(async (req: Request) => {
       telegramId: user.telegramId,
     })
 
-    return NextResponse.json(
+    return jsonResponse(
       { ok: true, sync, warnings: sync.warnings ?? [] },
       { status: sync.alreadyRunning ? 202 : 200 }
     )
@@ -56,7 +56,7 @@ export const POST = withAuth(async (req: Request) => {
       message: error instanceof Error ? error.message : message,
     })
 
-    return NextResponse.json(
+    return jsonResponse(
       {
         error: message,
         details: 'telegram_sync_failed',

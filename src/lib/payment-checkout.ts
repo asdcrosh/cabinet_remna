@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { jsonResponse } from '@/lib/json-response'
 import { Prisma, type Payment } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { createPaymentSchema } from '@/lib/auth/validation'
@@ -50,11 +50,11 @@ export async function createPaymentForUser(
   try {
     body = await req.json()
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+    return jsonResponse({ error: 'Invalid JSON' }, { status: 400 })
   }
   const parsed = createPaymentSchema.safeParse(body)
   if (!parsed.success) {
-    return NextResponse.json(
+    return jsonResponse(
       { error: 'Validation error', details: parsed.error.flatten() },
       { status: 400 }
     )
@@ -75,11 +75,11 @@ export async function createPaymentForUser(
     purchaseType !== 'WHITELIST_ADDON' || provider === 'PAYANYWAY'
     || promoCode || whitelistAddon || autoRenewalConsent
   )) {
-    return NextResponse.json({ error: 'Этот способ покупки недоступен в боте' }, { status: 400 })
+    return jsonResponse({ error: 'Этот способ покупки недоступен в боте' }, { status: 400 })
   }
 
   if (autoRenewalConsent && provider !== 'YOOKASSA') {
-    return NextResponse.json(
+    return jsonResponse(
       { error: 'Автопродление доступно при оплате банковской картой через ЮKassa' },
       { status: 422 }
     )
@@ -90,21 +90,21 @@ export async function createPaymentForUser(
   const isSubscriptionPurchase = purchaseType === 'SUBSCRIPTION'
   const plan = await prisma.plan.findUnique({ where: { id: planId } })
   if (!plan || (isSubscriptionPurchase && !plan.isActive)) {
-    return NextResponse.json({ error: 'Тариф не найден' }, { status: 404 })
+    return jsonResponse({ error: 'Тариф не найден' }, { status: 404 })
   }
   if (autoRenewalConsent && plan.unlimitedDuration) {
-    return NextResponse.json(
+    return jsonResponse(
       { error: 'Бессрочный тариф не требует автопродления' },
       { status: 422 }
     )
   }
   const user = await prisma.user.findUnique({ where: { id: userId } })
-  if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+  if (!user) return jsonResponse({ error: 'User not found' }, { status: 404 })
   if (options.telegramBot && !user.telegramId) {
-    return NextResponse.json({ error: 'Telegram не привязан' }, { status: 403 })
+    return jsonResponse({ error: 'Telegram не привязан' }, { status: 403 })
   }
   if (!options.telegramBot && (!user.emailVerifiedAt || user.email.endsWith('@pending.invalid'))) {
-    return NextResponse.json(
+    return jsonResponse(
       {
         error: 'Подтвердите email перед оплатой',
         code: 'EMAIL_VERIFICATION_REQUIRED',
@@ -119,7 +119,7 @@ export async function createPaymentForUser(
       select: { status: true },
     })
     if (autoRenewal?.status === 'PROCESSING') {
-      return NextResponse.json(
+      return jsonResponse(
         {
           error: 'Автопродление уже обрабатывается. Проверьте результат перед ручной оплатой.',
           code: 'AUTO_RENEWAL_IN_PROGRESS',
@@ -182,16 +182,16 @@ export async function createPaymentForUser(
       || plan.maxDeviceLimit <= plan.deviceLimit
       || plan.extraDevicePriceKopecks <= 0
     ) {
-      return NextResponse.json(
+      return jsonResponse(
         { error: 'Дополнительные устройства для этого тарифа недоступны' },
         { status: 404 }
       )
     }
     if (!currentSubscription || currentSubscription.planId !== plan.id) {
-      return NextResponse.json({ error: 'Действующая подписка этого тарифа не найдена' }, { status: 409 })
+      return jsonResponse({ error: 'Действующая подписка этого тарифа не найдена' }, { status: 409 })
     }
     if (deviceLimit == null) {
-      return NextResponse.json({ error: 'Выберите новый лимит устройств' }, { status: 400 })
+      return jsonResponse({ error: 'Выберите новый лимит устройств' }, { status: 400 })
     }
     const pendingAddon = await prisma.payment.findFirst({
       where: {
@@ -211,18 +211,18 @@ export async function createPaymentForUser(
   if (isWhitelistAddon) {
     if (!activeSubscription) {
       if (whitelistSubscriptionRefreshFailed) {
-        return NextResponse.json(
+        return jsonResponse(
           { error: 'Не удалось проверить действующую подписку. Попробуйте ещё раз.' },
           { status: 503 }
         )
       }
-      return NextResponse.json({ error: 'Для дополнения нужна действующая подписка этого тарифа' }, { status: 409 })
+      return jsonResponse({ error: 'Для дополнения нужна действующая подписка этого тарифа' }, { status: 409 })
     }
     if (!plan.whitelistAddonEnabled || plan.whitelistAddonPriceKopecks <= 0) {
-      return NextResponse.json({ error: 'Дополнение для этого тарифа недоступно' }, { status: 404 })
+      return jsonResponse({ error: 'Дополнение для этого тарифа недоступно' }, { status: 404 })
     }
     if (plan.whitelistAddonInternalSquads.length === 0) {
-      return NextResponse.json({ error: 'Группы дополнения не настроены' }, { status: 503 })
+      return jsonResponse({ error: 'Группы дополнения не настроены' }, { status: 503 })
     }
     const pendingAddon = await prisma.payment.findFirst({
       where: {
@@ -242,14 +242,14 @@ export async function createPaymentForUser(
   const includesBundledWhitelistAddon = isSubscriptionPurchase && whitelistAddon
   if (includesBundledWhitelistAddon) {
     if (plan.isPromo) {
-      return NextResponse.json({ error: 'Дополнение недоступно для ознакомительного тарифа' }, { status: 422 })
+      return jsonResponse({ error: 'Дополнение недоступно для ознакомительного тарифа' }, { status: 422 })
     }
     if (
       !plan.whitelistAddonEnabled
       || plan.whitelistAddonPriceKopecks <= 0
       || plan.whitelistAddonInternalSquads.length === 0
     ) {
-      return NextResponse.json({ error: 'Дополнение для этого тарифа не настроено' }, { status: 422 })
+      return jsonResponse({ error: 'Дополнение для этого тарифа не настроено' }, { status: 422 })
     }
     const whitelistAddonEntitlement = currentSubscription
       && hasWhitelistAddonEntitlement(currentSubscription, now)
@@ -265,7 +265,7 @@ export async function createPaymentForUser(
           orderBy: { updatedAt: 'desc' },
         })
     if (whitelistAddonEntitlement && hasWhitelistAddonEntitlement(whitelistAddonEntitlement, now)) {
-      return NextResponse.json({
+      return jsonResponse({
         error: 'БС уже подключены или стоят на паузе. После покупки тарифа они продолжат работать автоматически.',
         code: 'WHITELIST_ADDON_ALREADY_ACTIVE',
       }, { status: 409 })
@@ -274,16 +274,16 @@ export async function createPaymentForUser(
 
   const audienceContext = await getPlanAudienceContext(user.id)
   if (isSubscriptionPurchase && (!audienceContext || !isPlanAvailableForUser(plan, audienceContext, { allowLink: plan.availability === 'LINK' }))) {
-    return NextResponse.json({ error: 'Этот тариф недоступен для вашего аккаунта' }, { status: 403 })
+    return jsonResponse({ error: 'Этот тариф недоступен для вашего аккаунта' }, { status: 403 })
   }
   if (isSubscriptionPurchase && plan.priceKopecks <= 0 && !plan.isPromo) {
-    return NextResponse.json(
+    return jsonResponse(
       { error: 'Бесплатный тариф должен быть настроен как ознакомительный.' },
       { status: 400 }
     )
   }
   if (isSubscriptionPurchase && !plan.isPromo && !plan.unlimitedDevices && deviceLimit == null) {
-    return NextResponse.json(
+    return jsonResponse(
       { error: 'Обновите страницу тарифа и выберите количество устройств', code: 'DEVICE_LIMIT_REQUIRED' },
       { status: 400 }
     )
@@ -293,14 +293,14 @@ export async function createPaymentForUser(
       ? currentSubscription.deviceLimit ?? plan.deviceLimit
       : plan.deviceLimit
     if (deviceLimit > allowedDeviceLimit) {
-      return NextResponse.json(
+      return jsonResponse(
         { error: 'Дополнительные устройства для этого тарифа недоступны' },
         { status: 422 }
       )
     }
   }
   if (isSubscriptionPurchase && plan.unlimitedDevices && deviceLimit != null && deviceLimit !== plan.deviceLimit) {
-    return NextResponse.json(
+    return jsonResponse(
       { error: 'В тарифе уже включён безлимит устройств' },
       { status: 422 }
     )
@@ -309,14 +309,14 @@ export async function createPaymentForUser(
   let deviceAddonExpireAt: Date | null = null
   if (isDeviceLimitAddon) {
     if (!hasRemnawaveUserReference(user)) {
-      return NextResponse.json({ error: 'Профиль Remnawave не найден' }, { status: 409 })
+      return jsonResponse({ error: 'Профиль Remnawave не найден' }, { status: 409 })
     }
     try {
       const remoteUser = (await remnawave.getUser(remnawaveUserReference(user))).response
       deviceAddonExpireAt = new Date(remoteUser.expireAt)
       if (!Number.isFinite(deviceAddonExpireAt.getTime())) throw new Error('invalid Remnawave expiry')
     } catch {
-      return NextResponse.json(
+      return jsonResponse(
         { error: 'Не удалось проверить фактический срок подписки. Попробуйте ещё раз.' },
         { status: 503 }
       )
@@ -365,14 +365,14 @@ export async function createPaymentForUser(
         priceKopecks: addon.priceKopecks,
       }
     } catch (error) {
-      return NextResponse.json({ error: error instanceof Error ? error.message : 'Некорректный лимит устройств' }, { status: 400 })
+      return jsonResponse({ error: error instanceof Error ? error.message : 'Некорректный лимит устройств' }, { status: 400 })
     }
   } else {
     try {
       pricing = calculatePlanPurchase(plan, plan.isPromo ? plan.deviceLimit : deviceLimit)
     } catch (error) {
       if (error instanceof DeviceLimitSelectionError) {
-        return NextResponse.json({ error: error.message, code: error.code }, { status: 400 })
+        return jsonResponse({ error: error.message, code: error.code }, { status: 400 })
       }
       throw error
     }
@@ -426,7 +426,7 @@ export async function createPaymentForUser(
 
   if (isSubscriptionPurchase && plan.isPromo) {
     if (promoCode) {
-      return NextResponse.json({ error: 'Промокод не нужен для этого тарифа' }, { status: 400 })
+      return jsonResponse({ error: 'Промокод не нужен для этого тарифа' }, { status: 400 })
     }
 
     const hasAnySubscription = await prisma.subscription.count({
@@ -434,14 +434,14 @@ export async function createPaymentForUser(
     })
 
     if (!user.telegramId) {
-      return NextResponse.json(
+      return jsonResponse(
         { error: 'Ознакомительный тариф доступен после привязки Telegram' },
         { status: 403 }
       )
     }
 
     if (!user.remnashopSyncedAt) {
-      return NextResponse.json(
+      return jsonResponse(
         { error: 'Сначала проверьте старую подписку через Telegram' },
         { status: 403 }
       )
@@ -454,7 +454,7 @@ export async function createPaymentForUser(
       user.remnawaveUsername ||
       hasAnySubscription > 0
     ) {
-      return NextResponse.json({ error: 'Ознакомительный тариф доступен только новым пользователям' }, { status: 409 })
+      return jsonResponse({ error: 'Ознакомительный тариф доступен только новым пользователям' }, { status: 409 })
     }
 
     const existingTrial = await prisma.trialPlanRedemption.findUnique({
@@ -463,7 +463,7 @@ export async function createPaymentForUser(
     })
 
     if (existingTrial?.payment.subscriptionProvisionedAt) {
-      return NextResponse.json({ error: 'Вы уже использовали этот ознакомительный тариф' }, { status: 409 })
+      return jsonResponse({ error: 'Вы уже использовали этот ознакомительный тариф' }, { status: 409 })
     }
 
     if (existingTrial?.payment.status === 'SUCCEEDED') {
@@ -512,7 +512,7 @@ export async function createPaymentForUser(
         if (claimedTrial) {
           return provisionPromoPayment(claimedTrial.payment, user, plan)
         }
-        return NextResponse.json({ error: 'Вы уже использовали этот ознакомительный тариф' }, { status: 409 })
+        return jsonResponse({ error: 'Вы уже использовали этот ознакомительный тариф' }, { status: 409 })
       }
       throw e
     }
@@ -551,7 +551,7 @@ export async function createPaymentForUser(
   }
 
   if (!(await isPaymentProviderAvailable(provider))) {
-    return NextResponse.json(
+    return jsonResponse(
       { error: paymentProviderUnavailableMessage(provider) },
       { status: 503 }
     )
@@ -680,10 +680,10 @@ export async function createPaymentForUser(
       })
     }
     if (e instanceof PromoCodeError) {
-      return NextResponse.json({ error: e.message, code: e.code }, { status: e.status })
+      return jsonResponse({ error: e.message, code: e.code }, { status: e.status })
     }
     if (e instanceof NextPurchaseDiscountConflictError) {
-      return NextResponse.json({ error: e.message, code: 'DISCOUNT_STATE_CHANGED' }, { status: 409 })
+      return jsonResponse({ error: e.message, code: 'DISCOUNT_STATE_CHANGED' }, { status: 409 })
     }
     throw e
   }
@@ -731,7 +731,7 @@ export async function createPaymentForUser(
         details: { provider },
         dedupeKey: 'provider-checkout-created',
       })
-      return NextResponse.json({
+      return jsonResponse({
         confirmationUrl,
         paymentId: localPayment.id,
         localPaymentId: localPayment.id,
@@ -741,7 +741,7 @@ export async function createPaymentForUser(
       const message = e instanceof Error ? e.message : 'PayAnyWay create payment failed'
       await cancelFailedLocalPayment(localPayment.id, message)
       logError('payment.create.payanyway_failed', e, { localPaymentId: localPayment.id })
-      return NextResponse.json(
+      return jsonResponse(
         {
           error: 'PayAnyWay не удалось создать ссылку на оплату. Проверьте номер счёта и код проверки целостности.',
           code: 'PAYMENT_PROVIDER_CREATE_FAILED',
@@ -782,7 +782,7 @@ export async function createPaymentForUser(
         details: { provider, providerStatus: payment.status, externalPaymentId: payment.transactionId },
         dedupeKey: 'provider-checkout-created',
       })
-      return NextResponse.json({
+      return jsonResponse({
         confirmationUrl: payment.url,
         paymentId: payment.transactionId,
         localPaymentId: localPayment.id,
@@ -792,7 +792,7 @@ export async function createPaymentForUser(
       const message = e instanceof Error ? e.message : 'Platega create payment failed'
       await cancelFailedLocalPayment(localPayment.id, message)
       logError('payment.create.platega_failed', e, { localPaymentId: localPayment.id })
-      return NextResponse.json(
+      return jsonResponse(
         {
           error: 'Platega не удалось создать ссылку на оплату. Проверьте Merchant ID и API secret.',
           code: 'PAYMENT_PROVIDER_CREATE_FAILED',
@@ -835,7 +835,7 @@ export async function createPaymentForUser(
     const failure = yookassaCreateFailure(e, savePaymentMethod)
     await cancelFailedLocalPayment(localPayment.id, message)
     logError('payment.create.yookassa_failed', e, { localPaymentId: localPayment.id })
-    return NextResponse.json(
+    return jsonResponse(
       {
         error: failure.error,
         code: failure.code,
@@ -865,7 +865,7 @@ export async function createPaymentForUser(
     dedupeKey: 'provider-checkout-created',
   })
 
-  return NextResponse.json({
+  return jsonResponse({
     confirmationUrl: payment.confirmation?.confirmation_url,
     paymentId: payment.id,
     localPaymentId: localPayment.id,
@@ -907,21 +907,21 @@ function existingCheckoutResponse(
     || Boolean(payment.autoRenewalConsentAcceptedAt) !== input.autoRenewalConsent
     || Boolean(readBundledWhitelistAddonSnapshot(payment.addonSnapshot)) !== input.whitelistAddon
   ) {
-    return NextResponse.json({
+    return jsonResponse({
       error: 'Ключ оплаты уже использован для другого заказа',
       code: 'PAYMENT_IDEMPOTENCY_CONFLICT',
     }, { status: 409 })
   }
 
   if (payment.status === 'CANCELED') {
-    return NextResponse.json({
+    return jsonResponse({
       error: 'Предыдущая попытка оплаты завершилась ошибкой. Повторите ещё раз.',
       code: 'PAYMENT_ATTEMPT_CANCELED',
     }, { status: 409 })
   }
 
   if (payment.status === 'SUCCEEDED') {
-    return NextResponse.json({
+    return jsonResponse({
       redirectUrl: `/dashboard/billing?paid=1&payment=${payment.id}`,
       localPaymentId: payment.id,
       provider: payment.provider,
@@ -930,7 +930,7 @@ function existingCheckoutResponse(
   }
 
   if (!payment.confirmationUrl) {
-    return NextResponse.json({
+    return jsonResponse({
       error: 'Ссылка на оплату ещё создаётся. Повторите через несколько секунд.',
       code: 'PAYMENT_CREATION_IN_PROGRESS',
     }, {
@@ -939,7 +939,7 @@ function existingCheckoutResponse(
     })
   }
 
-  return NextResponse.json({
+  return jsonResponse({
     confirmationUrl: payment.confirmationUrl,
     paymentId: payment.externalPaymentId ?? payment.yookassaId ?? payment.id,
     localPaymentId: payment.id,
@@ -950,12 +950,12 @@ function existingCheckoutResponse(
 
 function pendingCheckoutResponse(payment: Payment) {
   if (!payment.confirmationUrl) {
-    return NextResponse.json({
+    return jsonResponse({
       error: 'Ссылка на оплату ещё создаётся. Повторите через несколько секунд.',
       code: 'PAYMENT_CREATION_IN_PROGRESS',
     }, { status: 409, headers: { 'Retry-After': '3' } })
   }
-  return NextResponse.json({
+  return jsonResponse({
     confirmationUrl: payment.confirmationUrl,
     paymentId: payment.externalPaymentId ?? payment.yookassaId ?? payment.id,
     localPaymentId: payment.id,
@@ -1106,14 +1106,14 @@ async function provisionPromoPayment(
       data: { provisioningError: message.slice(0, 1000) },
     })
     logError('payment.create.promo_provisioning_failed', e, { paymentId: payment.id })
-    return NextResponse.json({
+    return jsonResponse({
       redirectUrl: `/dashboard/billing?paid=1&payment=${payment.id}`,
       localPaymentId: payment.id,
       provisioned: false,
     }, { status: 202 })
   }
 
-  return NextResponse.json({
+  return jsonResponse({
     redirectUrl: `/dashboard/subscription?activated=1`,
     localPaymentId: payment.id,
     provisioned: true,

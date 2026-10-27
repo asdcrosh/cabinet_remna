@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { jsonResponse } from '@/lib/json-response'
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { requireAdmin, withAuth } from '@/lib/auth/guard'
@@ -16,12 +16,12 @@ export const PATCH = withAuth(async (req: Request, { params }: { params: Promise
   try {
     body = await req.json()
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+    return jsonResponse({ error: 'Invalid JSON' }, { status: 400 })
   }
 
   const parsed = updateAdminPlanSchema.safeParse(body)
   if (!parsed.success) {
-    return NextResponse.json(
+    return jsonResponse(
       { error: 'Validation error', details: parsed.error.flatten() },
       { status: 400 }
     )
@@ -29,7 +29,7 @@ export const PATCH = withAuth(async (req: Request, { params }: { params: Promise
 
   const currentPlan = await prisma.plan.findUnique({ where: { id } })
   if (!currentPlan) {
-    return NextResponse.json({ error: 'Тариф не найден' }, { status: 404 })
+    return jsonResponse({ error: 'Тариф не найден' }, { status: 404 })
   }
 
   const invariant = {
@@ -48,40 +48,40 @@ export const PATCH = withAuth(async (req: Request, { params }: { params: Promise
       parsed.data.whitelistAddonInternalSquads ?? currentPlan.whitelistAddonInternalSquads,
   }
   if (invariant.priceKopecks <= 0 && !invariant.isPromo) {
-    return NextResponse.json(
+    return jsonResponse(
       { error: 'Бесплатный тариф должен быть промо-тарифом' },
       { status: 400 }
     )
   }
   if (invariant.maxDeviceLimit < invariant.deviceLimit) {
-    return NextResponse.json(
+    return jsonResponse(
       { error: 'Максимум устройств не может быть меньше включённого количества' },
       { status: 400 }
     )
   }
   if (invariant.deviceAddonEnabled && invariant.maxDeviceLimit <= invariant.deviceLimit) {
-    return NextResponse.json(
+    return jsonResponse(
       { error: 'Максимум устройств должен быть больше включённого количества' },
       { status: 400 }
     )
   }
   if (invariant.unlimitedDevices && invariant.deviceAddonEnabled) {
-    return NextResponse.json(
+    return jsonResponse(
       { error: 'Для безлимитных устройств докупка не требуется' },
       { status: 400 }
     )
   }
   if (invariant.deviceAddonEnabled && invariant.extraDevicePriceKopecks <= 0) {
-    return NextResponse.json(
+    return jsonResponse(
       { error: 'Укажите стоимость дополнительного устройства' },
       { status: 400 }
     )
   }
   if (invariant.whitelistAddonEnabled && invariant.whitelistAddonPriceKopecks <= 0) {
-    return NextResponse.json({ error: 'Укажите цену дополнения' }, { status: 400 })
+    return jsonResponse({ error: 'Укажите цену дополнения' }, { status: 400 })
   }
   if (invariant.whitelistAddonEnabled && invariant.whitelistAddonInternalSquads.length === 0) {
-    return NextResponse.json({ error: 'Выберите группы Remnawave для дополнения' }, { status: 400 })
+    return jsonResponse({ error: 'Выберите группы Remnawave для дополнения' }, { status: 400 })
   }
 
   const normalized = normalizePlanInput(parsed.data)
@@ -117,13 +117,13 @@ export const PATCH = withAuth(async (req: Request, { params }: { params: Promise
       request: req,
     })
 
-    return NextResponse.json({ plan })
+    return jsonResponse({ plan })
   } catch (e) {
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
-      return NextResponse.json({ error: 'Популярный тариф уже изменён другим администратором' }, { status: 409 })
+      return jsonResponse({ error: 'Популярный тариф уже изменён другим администратором' }, { status: 409 })
     }
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2025') {
-      return NextResponse.json({ error: 'Тариф не найден' }, { status: 404 })
+      return jsonResponse({ error: 'Тариф не найден' }, { status: 404 })
     }
     throw e
   }
@@ -147,12 +147,12 @@ export const DELETE = withAuth(async (req: Request, { params }: { params: Promis
   })
 
   if (!plan) {
-    return NextResponse.json({ error: 'Тариф не найден' }, { status: 404 })
+    return jsonResponse({ error: 'Тариф не найден' }, { status: 404 })
   }
 
   const linkedCount = plan._count.payments + plan._count.subscriptions + plan._count.trialRedemptions
   if (linkedCount > 0) {
-    return NextResponse.json(
+    return jsonResponse(
       { error: 'Нельзя удалить тариф с платежами или подписками. Скрывайте его вместо удаления.' },
       { status: 409 }
     )
@@ -172,13 +172,13 @@ export const DELETE = withAuth(async (req: Request, { params }: { params: Promis
       },
       request: req,
     })
-    return NextResponse.json({ ok: true })
+    return jsonResponse({ ok: true })
   } catch (e) {
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2025') {
-      return NextResponse.json({ error: 'Тариф не найден' }, { status: 404 })
+      return jsonResponse({ error: 'Тариф не найден' }, { status: 404 })
     }
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2003') {
-      return NextResponse.json(
+      return jsonResponse(
         { error: 'Нельзя удалить тариф, который используется в данных кабинета.' },
         { status: 409 }
       )

@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { jsonResponse } from '@/lib/json-response'
 import type { Prisma, SubscriptionStatus } from '@prisma/client'
 import { z } from 'zod'
 import { requireAdmin, withAuth } from '@/lib/auth/guard'
@@ -71,7 +71,7 @@ const broadcastCampaignSelect = {
 type BroadcastCampaignListItem = Prisma.BroadcastCampaignGetPayload<{ select: typeof broadcastCampaignSelect }>
 
 export const GET = withAuth(async (req: Request) => {
-  if (!await isFeatureEnabled('broadcasts')) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  if (!await isFeatureEnabled('broadcasts')) return jsonResponse({ error: 'Not found' }, { status: 404 })
   await requireAdmin()
   const url = new URL(req.url)
   const skip = Math.max(0, Number(url.searchParams.get('skip') || '0') || 0)
@@ -87,18 +87,18 @@ export const GET = withAuth(async (req: Request) => {
     }),
   ])
 
-  return NextResponse.json({
+  return jsonResponse({
     history: history.map(serializeBroadcastCampaign),
     total,
   })
 })
 
 export const POST = withAuth(async (req: Request) => {
-  if (!await isFeatureEnabled('broadcasts')) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  if (!await isFeatureEnabled('broadcasts')) return jsonResponse({ error: 'Not found' }, { status: 404 })
   const session = await requireAdmin()
   const parsed = schema.safeParse(await req.json().catch(() => null))
   if (!parsed.success) {
-    return NextResponse.json({ error: 'Проверьте заголовок, текст, сегмент и каналы' }, { status: 400 })
+    return jsonResponse({ error: 'Проверьте заголовок, текст, сегмент и каналы' }, { status: 400 })
   }
 
   const input = parsed.data
@@ -112,7 +112,7 @@ export const POST = withAuth(async (req: Request) => {
     input.previewMode || input.testMode ? 60_000 : 5 * 60_000
   )
   if (!limit.ok) {
-    return NextResponse.json(
+    return jsonResponse(
       { error: 'Слишком много отправок. Подождите и попробуйте снова.' },
       { status: 429, headers: { 'Retry-After': String(limit.retryAfter) } }
     )
@@ -127,7 +127,7 @@ export const POST = withAuth(async (req: Request) => {
     : await findBroadcastUsers(segment, inactiveDays ?? DEFAULT_INACTIVE_DAYS, input.channels)
 
   if (input.previewMode) {
-    return NextResponse.json({
+    return jsonResponse({
       preview: buildBroadcastAudiencePreview(users, channels),
       limited: users.length === MAX_RECIPIENTS,
     })
@@ -136,7 +136,7 @@ export const POST = withAuth(async (req: Request) => {
   const appUrl = getAppUrl()
   const actionHref = normalizeBroadcastActionHref(input.actionHref, appUrl)
   if (input.actionHref && !actionHref) {
-    return NextResponse.json({ error: 'Ссылка должна вести на раздел кабинета или быть HTTPS-адресом' }, { status: 400 })
+    return jsonResponse({ error: 'Ссылка должна вести на раздел кабинета или быть HTTPS-адресом' }, { status: 400 })
   }
   const actionUrl = getBroadcastActionUrl(actionHref, appUrl)
   const actionLabel = input.actionLabel || (actionHref ? 'Открыть кабинет' : undefined)
@@ -188,7 +188,7 @@ export const POST = withAuth(async (req: Request) => {
       }
     }
 
-    return NextResponse.json({
+    return jsonResponse({
       ok: true,
       stats,
       limited: false,
@@ -267,7 +267,7 @@ export const POST = withAuth(async (req: Request) => {
     request: req,
   })
 
-  return NextResponse.json({
+  return jsonResponse({
     ok: true,
     stats: {
       ...emptyBroadcastStats(),

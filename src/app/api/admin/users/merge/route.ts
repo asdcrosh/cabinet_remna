@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { jsonResponse } from '@/lib/json-response'
 import { Prisma } from '@prisma/client'
 import { requireSuperAdmin, withAuth } from '@/lib/auth/guard'
 import { AdminMergeUsersError, mergeTechnicalTelegramUserIntoEmailUser } from '@/lib/admin-user-merge'
@@ -11,7 +11,7 @@ export const POST = withAuth(async (req: Request) => {
   const targetUserId = typeof body?.targetUserId === 'string' ? body.targetUserId.trim() : ''
 
   if (!sourceUserId || !targetUserId) {
-    return NextResponse.json({ error: 'sourceUserId and targetUserId are required' }, { status: 400 })
+    return jsonResponse({ error: 'sourceUserId and targetUserId are required' }, { status: 400 })
   }
 
   try {
@@ -21,18 +21,18 @@ export const POST = withAuth(async (req: Request) => {
       actorId: session.uid,
       request: req,
     })
-    return NextResponse.json({ ok: true, result })
+    return jsonResponse({ ok: true, result })
   } catch (error) {
     if (error instanceof AdminMergeUsersError) {
-      return NextResponse.json({ error: error.message }, { status: error.status })
+      return jsonResponse({ error: error.message }, { status: error.status })
     }
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-      return NextResponse.json(
+      return jsonResponse(
         { error: 'Не удалось объединить: часть Telegram или Remnawave данных уже занята другим аккаунтом.' },
         { status: 409 }
       )
     }
     logError('admin.users.merge_failed', error, { sourceUserId, targetUserId, actorId: session.uid })
-    return NextResponse.json({ error: 'Не удалось объединить аккаунты' }, { status: 500 })
+    return jsonResponse({ error: 'Не удалось объединить аккаунты' }, { status: 500 })
   }
 })

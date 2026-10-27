@@ -4,7 +4,7 @@
 //
 // Этот роут — главная «живая» точка для dashboard'а.
 
-import { NextResponse } from 'next/server'
+import { jsonResponse } from '@/lib/json-response'
 import { prisma } from '@/lib/prisma'
 import { requireAuth, withAuth } from '@/lib/auth/guard'
 import { remnawave, RemnawaveError } from '@/lib/remnawave'
@@ -23,7 +23,7 @@ const STALE_AFTER_MS = 60 * 1000 // 1 минута
 export const GET = withAuth(async (request: Request) => {
   const session = await requireAuth()
   const user = await prisma.user.findUnique({ where: { id: session.uid } })
-  if (!user) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  if (!user) return jsonResponse({ error: 'Not found' }, { status: 404 })
 
   // 1) Активная локальная подписка
   let subscription = await prisma.subscription.findFirst({
@@ -34,7 +34,7 @@ export const GET = withAuth(async (request: Request) => {
 
   // 2) Нет Remnawave-профиля → пользователь ещё ничего не покупал
   if (!user.remnawaveUsername) {
-    return NextResponse.json({ subscription: serializeSubscription(subscription) })
+    return jsonResponse({ subscription: serializeSubscription(subscription) })
   }
 
   if (subscription?.pendingSync) {
@@ -53,7 +53,7 @@ export const GET = withAuth(async (request: Request) => {
         }) > 0
       : false
     if (hasPendingBonusSync) {
-      return NextResponse.json({
+      return jsonResponse({
         subscription: serializeSubscription(subscription),
         warning: 'Бонус сохранён локально и ожидает синхронизации с Remnawave',
       })
@@ -116,7 +116,7 @@ export const GET = withAuth(async (request: Request) => {
       // Не валим UI из-за временных проблем Remnawave
       logError('subscription.remnawave_sync_failed', e)
       if (e instanceof RemnawaveError) {
-        return NextResponse.json(
+        return jsonResponse(
           { subscription: serializeSubscription(subscription), warning: `Remnawave API ${e.status}` },
           { status: 200 }
         )
@@ -124,7 +124,7 @@ export const GET = withAuth(async (request: Request) => {
     }
   }
 
-  return NextResponse.json({ subscription: serializeSubscription(subscription) })
+  return jsonResponse({ subscription: serializeSubscription(subscription) })
 })
 
 function mapRemnawaveStatus(status: 'ACTIVE' | 'LIMITED' | 'EXPIRED' | 'DISABLED') {

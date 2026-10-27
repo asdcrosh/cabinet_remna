@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { jsonResponse } from '@/lib/json-response'
 import { requireAdmin, withAuth } from '@/lib/auth/guard'
 import { bonusBoxEventAdminSchema } from '@/lib/bonus-box-admin-validation'
 import { isFeatureEnabled } from '@/lib/feature-flags'
@@ -13,14 +13,14 @@ export const PATCH = withAuth(async (
   { params }: { params: Promise<{ id: string }> }
 ) => {
   if (!await isFeatureEnabled('bonusBox')) {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    return jsonResponse({ error: 'Not found' }, { status: 404 })
   }
   const session = await requireAdmin()
   const { id } = await params
   const body = await req.json().catch(() => null)
   const parsed = bonusBoxEventAdminSchema.safeParse(body)
   if (!parsed.success) {
-    return NextResponse.json(
+    return jsonResponse(
       { error: 'Проверьте параметры события', details: parsed.error.flatten() },
       { status: 400 }
     )
@@ -41,7 +41,7 @@ export const PATCH = withAuth(async (
     metadata: { eventId: event.id, prizeIds: event.prizeIds },
     request: req,
   })
-  return NextResponse.json({ event })
+  return jsonResponse({ event })
 })
 
 export const DELETE = withAuth(async (
@@ -49,7 +49,7 @@ export const DELETE = withAuth(async (
   { params }: { params: Promise<{ id: string }> }
 ) => {
   if (!await isFeatureEnabled('bonusBox')) {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    return jsonResponse({ error: 'Not found' }, { status: 404 })
   }
   const session = await requireAdmin()
   const { id } = await params
@@ -57,7 +57,7 @@ export const DELETE = withAuth(async (
     where: { id },
     select: { id: true, title: true, claimsCount: true },
   })
-  if (!event) return NextResponse.json({ error: 'Событие не найдено' }, { status: 404 })
+  if (!event) return jsonResponse({ error: 'Событие не найдено' }, { status: 404 })
 
   await prisma.bonusBoxEvent.delete({ where: { id } })
   await writeAuditLog({
@@ -67,5 +67,5 @@ export const DELETE = withAuth(async (
     metadata: { eventId: event.id, title: event.title, claimsCount: event.claimsCount, deleted: true },
     request: req,
   })
-  return NextResponse.json({ ok: true })
+  return jsonResponse({ ok: true })
 })

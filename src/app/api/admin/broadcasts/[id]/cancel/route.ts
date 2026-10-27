@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { jsonResponse } from '@/lib/json-response'
 import { requireAdmin, withAuth } from '@/lib/auth/guard'
 import { prisma } from '@/lib/prisma'
 import { writeAuditLog } from '@/lib/audit-log'
@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic'
 
 export const POST = withAuth(async (request: Request, { params }: { params: Promise<{ id: string }> }) => {
   if (!await isFeatureEnabled('broadcasts')) {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    return jsonResponse({ error: 'Not found' }, { status: 404 })
   }
 
   const session = await requireAdmin()
@@ -18,7 +18,7 @@ export const POST = withAuth(async (request: Request, { params }: { params: Prom
     where: { id },
     select: { id: true, title: true },
   })
-  if (!campaign) return NextResponse.json({ error: 'Рассылка не найдена' }, { status: 404 })
+  if (!campaign) return jsonResponse({ error: 'Рассылка не найдена' }, { status: 404 })
 
   const result = await prisma.$transaction(async (tx) => {
     const canceled = await tx.broadcastDelivery.updateMany({
@@ -45,5 +45,5 @@ export const POST = withAuth(async (request: Request, { params }: { params: Prom
     request,
   })
 
-  return NextResponse.json({ ok: true, ...result })
+  return jsonResponse({ ok: true, ...result })
 })

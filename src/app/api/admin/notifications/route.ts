@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { jsonResponse } from '@/lib/json-response'
 import { requireAdmin, requireStaff, withAuth } from '@/lib/auth/guard'
 import { prisma } from '@/lib/prisma'
 import { serializeAdminNotification } from '@/lib/admin-notifications'
@@ -26,7 +26,7 @@ export const GET = withAuth(async (req: Request) => {
     include: { reads: { where: { userId: session.uid }, select: { readAt: true } } },
   })
 
-  return NextResponse.json({ notifications: notifications.map(serializeAdminNotification) })
+  return jsonResponse({ notifications: notifications.map(serializeAdminNotification) })
 })
 
 export const PATCH = withAuth(async () => {
@@ -44,7 +44,7 @@ export const PATCH = withAuth(async () => {
     })
   }
 
-  return NextResponse.json({ ok: true })
+  return jsonResponse({ ok: true })
 })
 
 export const DELETE = withAuth(async (req: Request) => {
@@ -70,5 +70,5 @@ export const DELETE = withAuth(async (req: Request) => {
     request: req,
   })
 
-  return NextResponse.json({ ok: true, archived: notifications.length })
+  return jsonResponse({ ok: true, archived: notifications.length })
 })

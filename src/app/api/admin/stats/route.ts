@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { jsonResponse } from '@/lib/json-response'
 import { prisma } from '@/lib/prisma'
 import { requireAdmin, withAuth } from '@/lib/auth/guard'
 
@@ -37,7 +37,7 @@ export const GET = withAuth(async () => {
     }),
   ])
 
-  return NextResponse.json({
+  return jsonResponse({
     usersTotal,
     usersNew7d,
     activeSubscriptions,

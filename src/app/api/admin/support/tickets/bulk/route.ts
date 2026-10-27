@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { jsonResponse } from '@/lib/json-response'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { writeAuditLog } from '@/lib/audit-log'
@@ -21,11 +21,11 @@ const schema = z.object({
 }).strict()
 
 export const POST = withAuth(async (req: Request) => {
-  if (!await isFeatureEnabled('support')) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  if (!await isFeatureEnabled('support')) return jsonResponse({ error: 'Not found' }, { status: 404 })
   const session = await requireStaff()
   const parsed = schema.safeParse(await req.json().catch(() => null))
   if (!parsed.success) {
-    return NextResponse.json({ error: 'Некорректная массовая операция.', details: parsed.error.flatten() }, { status: 422 })
+    return jsonResponse({ error: 'Некорректная массовая операция.', details: parsed.error.flatten() }, { status: 422 })
   }
 
   const { tickets, action } = parsed.data
@@ -34,7 +34,7 @@ export const POST = withAuth(async (req: Request) => {
       where: { id: action.assigneeId, role: { in: ['MODERATOR', 'ADMIN', 'SUPER_ADMIN'] } },
       select: { id: true },
     })
-    if (!assignee) return NextResponse.json({ error: 'Исполнитель не найден.' }, { status: 400 })
+    if (!assignee) return jsonResponse({ error: 'Исполнитель не найден.' }, { status: 400 })
   }
 
   const currentTickets = await prisma.supportTicket.findMany({
@@ -92,5 +92,5 @@ export const POST = withAuth(async (req: Request) => {
     })
   }
 
-  return NextResponse.json({ updated, failed })
+  return jsonResponse({ updated, failed })
 })

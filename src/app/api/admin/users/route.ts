@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { jsonResponse } from '@/lib/json-response'
 import { Prisma, UserRole } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { requireAdmin, withAuth } from '@/lib/auth/guard'
@@ -109,7 +109,7 @@ export const GET = withAuth(async (req: Request) => {
   const visibleUsers = users.slice(0, pageSize)
   const nextUser = users[pageSize]
 
-  return NextResponse.json({
+  return jsonResponse({
     pagination: {
       page,
       pageSize,

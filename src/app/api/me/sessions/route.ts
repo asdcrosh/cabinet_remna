@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { jsonResponse } from '@/lib/json-response'
 import { clearSessionCookieOnResponse } from '@/lib/auth/cookies'
 import { requireAuth, withAuth } from '@/lib/auth/guard'
 import { prisma } from '@/lib/prisma'
@@ -11,7 +11,7 @@ export const DELETE = withAuth(async (req: Request) => {
   const session = await requireAuth()
   const limited = await rateLimit(req, `sessions:revoke-all:${session.uid}`, 3, 60_000)
   if (!limited.ok) {
-    return NextResponse.json(
+    return jsonResponse(
       { error: 'Слишком много попыток. Попробуйте позже.' },
       { status: 429, headers: { 'Retry-After': String(limited.retryAfter) } }
     )
@@ -22,7 +22,7 @@ export const DELETE = withAuth(async (req: Request) => {
     data: { sessionVersion: { increment: 1 } },
   })
   if (updated.count === 0) {
-    return NextResponse.json({ error: 'Аккаунт не найден.' }, { status: 404 })
+    return jsonResponse({ error: 'Аккаунт не найден.' }, { status: 404 })
   }
 
   await writeAuditLog({
@@ -33,5 +33,5 @@ export const DELETE = withAuth(async (req: Request) => {
     request: req,
   })
 
-  return clearSessionCookieOnResponse(NextResponse.json({ ok: true }))
+  return clearSessionCookieOnResponse(jsonResponse({ ok: true }))
 })

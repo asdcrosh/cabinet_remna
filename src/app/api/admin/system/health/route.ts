@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { jsonResponse } from '@/lib/json-response'
 import { requireAdmin, withAuth } from '@/lib/auth/guard'
 import { getSystemHealth } from '@/lib/system-health'
 
@@ -7,10 +7,10 @@ export const dynamic = 'force-dynamic'
 
 export const GET = withAuth(async () => {
   await requireAdmin()
-  return NextResponse.json(await getSystemHealth())
+  return jsonResponse(await getSystemHealth())
 })
 
 export const POST = withAuth(async () => {
   await requireAdmin()
-  return NextResponse.json(await getSystemHealth({ sendEmail: true }))
+  return jsonResponse(await getSystemHealth({ sendEmail: true }))
 })

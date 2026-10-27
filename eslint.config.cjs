@@ -24,4 +24,14 @@ module.exports = [
       'react-hooks/static-components': 'off',
     },
   },
+  {
+    files: ['src/**/*.{ts,tsx}'],
+    ignores: ['src/lib/json-response.ts', '**/*.test.{ts,tsx}'],
+    rules: {
+      'no-restricted-syntax': ['error', {
+        selector: 'CallExpression[callee.object.name=/^(NextResponse|Response)$/][callee.property.name="json"]',
+        message: 'Use jsonResponse from @/lib/json-response so nested BigInt fields are serialized safely.',
+      }],
+    },
+  },
 ]

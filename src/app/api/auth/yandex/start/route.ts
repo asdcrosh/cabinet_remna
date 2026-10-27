@@ -1,3 +1,4 @@
+import { jsonResponse } from '@/lib/json-response'
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { rateLimit } from '@/lib/rate-limit'
@@ -19,7 +20,7 @@ export const dynamic = 'force-dynamic'
 export async function GET(req: Request) {
   const limited = await rateLimit(req, 'yandex-oauth-start', 30, 60_000)
   if (!limited.ok) {
-    return NextResponse.json(
+    return jsonResponse(
       { error: 'Слишком много попыток входа. Попробуйте позже.' },
       { status: 429, headers: { 'Retry-After': String(limited.retryAfter) } }
     )

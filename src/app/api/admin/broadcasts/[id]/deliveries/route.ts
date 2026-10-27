@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { jsonResponse } from '@/lib/json-response'
 import type { Prisma } from '@prisma/client'
 import { requireAdmin, withAuth } from '@/lib/auth/guard'
 import { prisma } from '@/lib/prisma'
@@ -11,12 +11,12 @@ const DELIVERY_STATUSES = new Set(['PENDING', 'PROCESSING', 'SUCCEEDED', 'FAILED
 
 export const GET = withAuth(async (request: Request, { params }: { params: Promise<{ id: string }> }) => {
   if (!await isFeatureEnabled('broadcasts')) {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    return jsonResponse({ error: 'Not found' }, { status: 404 })
   }
   await requireAdmin()
   const { id } = await params
   const campaign = await prisma.broadcastCampaign.findUnique({ where: { id }, select: { id: true } })
-  if (!campaign) return NextResponse.json({ error: 'Рассылка не найдена' }, { status: 404 })
+  if (!campaign) return jsonResponse({ error: 'Рассылка не найдена' }, { status: 404 })
 
   const url = new URL(request.url)
   const requestedStatus = url.searchParams.get('status')?.toUpperCase() ?? 'ALL'
@@ -65,7 +65,7 @@ export const GET = withAuth(async (request: Request, { params }: { params: Promi
   const logMap = new Map(logs.map((log) => [`${log.dedupeKey}:${log.channel}`, log]))
   const inAppKeys = new Set(inAppNotifications.map((notification) => notification.dedupeKey))
 
-  return NextResponse.json({
+  return jsonResponse({
     total,
     deliveries: deliveries.map((delivery, index) => {
       const payload = payloads[index]

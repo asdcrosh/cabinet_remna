@@ -1,3 +1,4 @@
+import { jsonResponse } from '@/lib/json-response'
 import { NextResponse } from 'next/server'
 import { requireAuth, requireStaff, withAuth } from '@/lib/auth/guard'
 import { prisma } from '@/lib/prisma'
@@ -19,7 +20,7 @@ export const GET = withAuth(async (_req: Request, { params }: { params: Promise<
   })
 
   if (!attachment) {
-    return NextResponse.json({ error: 'Файл не найден.' }, { status: 404 })
+    return jsonResponse({ error: 'Файл не найден.' }, { status: 404 })
   }
   if (attachment.message.ticket.userId !== session.uid) {
     await requireStaff()

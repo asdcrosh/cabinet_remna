@@ -1,5 +1,5 @@
+import { jsonResponse } from '@/lib/json-response'
 import { Prisma } from '@prisma/client'
-import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { requireAdmin, withAuth } from '@/lib/auth/guard'
@@ -37,7 +37,7 @@ export const PATCH = withAuth(async (req: Request, { params }: { params: Promise
   const parsed = schema.safeParse(body)
 
   if (!parsed.success) {
-    return NextResponse.json({
+    return jsonResponse({
       error: parsed.error.issues[0]?.message || 'Проверьте данные',
       details: parsed.error.flatten(),
     }, { status: 400 })
@@ -59,15 +59,15 @@ export const PATCH = withAuth(async (req: Request, { params }: { params: Promise
   ])
 
   if (!actor || !target) {
-    return NextResponse.json({ error: 'Пользователь не найден' }, { status: 404 })
+    return jsonResponse({ error: 'Пользователь не найден' }, { status: 404 })
   }
   if (target.role === 'SUPER_ADMIN' && actor.role !== 'SUPER_ADMIN') {
-    return NextResponse.json({ error: 'Изменять главного администратора нельзя' }, { status: 403 })
+    return jsonResponse({ error: 'Изменять главного администратора нельзя' }, { status: 403 })
   }
   const changesDiscounts = parsed.data.personalDiscountPercent !== undefined
     || parsed.data.nextPurchaseDiscountPercent !== undefined
   if (changesDiscounts && actor.role !== 'SUPER_ADMIN') {
-    return NextResponse.json({ error: 'Персональные скидки может изменять только главный администратор' }, { status: 403 })
+    return jsonResponse({ error: 'Персональные скидки может изменять только главный администратор' }, { status: 403 })
   }
 
   try {
@@ -147,7 +147,7 @@ export const PATCH = withAuth(async (req: Request, { params }: { params: Promise
       request: req,
     })
 
-    return NextResponse.json({
+    return jsonResponse({
       user: {
         ...user,
         telegramId: user.telegramId?.toString() ?? null,
@@ -159,12 +159,12 @@ export const PATCH = withAuth(async (req: Request, { params }: { params: Promise
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
       const fields = Array.isArray(error.meta?.target) ? error.meta.target.map(String) : []
       if (fields.includes('telegramId')) {
-        return NextResponse.json({ error: 'Этот Telegram уже привязан к другому аккаунту' }, { status: 409 })
+        return jsonResponse({ error: 'Этот Telegram уже привязан к другому аккаунту' }, { status: 409 })
       }
       if (fields.includes('remnashopUserId')) {
-        return NextResponse.json({ error: 'Этот Remnashop ID уже привязан к другому аккаунту' }, { status: 409 })
+        return jsonResponse({ error: 'Этот Remnashop ID уже привязан к другому аккаунту' }, { status: 409 })
       }
-      return NextResponse.json({ error: 'Этот email уже используется другим аккаунтом' }, { status: 409 })
+      return jsonResponse({ error: 'Этот email уже используется другим аккаунтом' }, { status: 409 })
     }
     throw error
   }
