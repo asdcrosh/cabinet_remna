@@ -54,6 +54,22 @@ This command installs Docker and the backup module on demand. Configure S3 or
 place the archive in `/opt/remnawave-backups`, then restore Remnawave,
 Remnashop, and Cabinet from the menu.
 
+Full backup module 1.6.0 also preserves an existing managed host-security policy:
+`/etc/ssh/sshd_config.d/00-stealthnet-security.conf`,
+`/etc/fail2ban/jail.d/stealthnet-sshd.local`, and root's `authorized_keys`.
+The optional `directories/host-security.tar.gz` is covered by archive checksums.
+The Remnawave directory archive already includes NGINX login rate limits.
+
+When restoring on Ubuntu/Debian, the module merges public authorization keys with
+the destination server's existing keys, validates SSH and Fail2ban configuration,
+installs Fail2ban dependencies when needed, reloads SSH, and enables Fail2ban.
+It preserves the new server's SSH identity and never copies private SSH keys,
+password databases, previous bans, or the old server's firewall rules. Older
+archives without the security payload remain supported. Use backup module 1.6.0
+or newer for automatic host-security restoration; a fresh `cabinetctl backups`
+installation downloads the current module. Existing installations can update it
+with `cabinetctl update`.
+
 The `cabinetctl install` command will:
 
 - install Docker and Docker Compose plugin

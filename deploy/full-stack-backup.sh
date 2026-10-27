@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="1.5.0"
+VERSION="1.6.0"
 INSTALL_PATH="${FULL_BACKUP_INSTALL_PATH:-/usr/local/bin/remna-backup}"
 BACKUP_DIR="${FULL_BACKUP_DIR:-/opt/remnawave-backups}"
 S3_CONFIG_FILE="${FULL_BACKUP_S3_CONFIG:-/etc/remna-backup-s3.conf}"
@@ -632,6 +632,159 @@ archive_directory() {
     "$(basename "${source}")"
 }
 
+# Only our managed policy and public authorization keys are portable. Never copy
+# host/private keys, password databases, firewall state, or Fail2ban's ban cache.
+HOST_SECURITY_PATHS=(
+  etc/ssh/sshd_config.d/00-stealthnet-security.conf
+  etc/fail2ban/jail.d/stealthnet-sshd.local
+  root/.ssh/authorized_keys
+)
+
+archive_host_security() {
+  local output="$1" root="${FULL_BACKUP_HOST_ROOT:-/}" path
+  local files=()
+  # An unconfigured installation keeps the old backup format and restore flow.
+  if [[ ! -f "${root%/}/${HOST_SECURITY_PATHS[0]}" && ! -f "${root%/}/${HOST_SECURITY_PATHS[1]}" ]]; then
+    return 0
+  fi
+  for path in "${HOST_SECURITY_PATHS[@]}"; do
+    [[ ! -L "${root%/}/${path}" ]] || fail "Security policy must not be a symlink: ${path}"
+    [[ ! -f "${root%/}/${path}" ]] || files+=("${path}")
+  done
+  if [[ -f "${root%/}/${HOST_SECURITY_PATHS[0]}" ]]; then
+    ssh-keygen -lf "${root%/}/root/.ssh/authorized_keys" >/dev/null \
+      || fail "Cannot back up key-only SSH without valid public authorization keys."
+  fi
+  info "Архивируем политику SSH, публичные ключи и Fail2ban..."
+  COPYFILE_DISABLE=1 tar --numeric-owner -czf "${output}" -C "${root}" "${files[@]}"
+}
+
+extract_host_security() {
+  local archive="$1" output="$2"
+  python3 - "${archive}" "${output}" <<'PY'
+import pathlib, sys, tarfile
+allowed = {
+    'etc/ssh/sshd_config.d/00-stealthnet-security.conf',
+    'etc/fail2ban/jail.d/stealthnet-sshd.local',
+    'root/.ssh/authorized_keys',
+}
+with tarfile.open(sys.argv[1], 'r:gz') as archive:
+    members = archive.getmembers()
+    names = [m.name for m in members]
+    if not members or len(set(names)) != len(names):
+        raise SystemExit('Empty or duplicate host-security archive entries')
+    if any(m.name not in allowed or not m.isfile() or m.size > 1024 * 1024 for m in members):
+        raise SystemExit('Unsafe host-security archive entry')
+    # Validate every member before writing any file; do not use extractall.
+    for member in members:
+        path = pathlib.Path(sys.argv[2]) / member.name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(archive.extractfile(member).read())
+        path.chmod(0o600)
+PY
+}
+
+rollback_host_security_files() {
+  local previous="$1" root="$2" path
+  for path in "${HOST_SECURITY_PATHS[@]}"; do
+    if [[ -f "${previous}/${path}" ]]; then
+      cp -p "${previous}/${path}" "${root%/}/${path}"
+    elif [[ -f "${previous}/${path}.absent" ]]; then
+      rm -f "${root%/}/${path}"
+    fi
+  done
+}
+
+restore_host_security() {
+  local archive="$1" root="${FULL_BACKUP_HOST_ROOT:-/}" staging path source target
+  [[ -f "${archive}" ]] || return 0  # Backward compatible with existing archives.
+  staging="$(mktemp -d /tmp/remna-host-security.XXXXXX)"
+  CLEANUP_PATHS+=("${staging}")
+  extract_host_security "${archive}" "${staging}/policy" || fail "Invalid host-security archive."
+  if [[ -f "${staging}/policy/${HOST_SECURITY_PATHS[0]}" ]]; then
+    ssh-keygen -lf "${staging}/policy/root/.ssh/authorized_keys" >/dev/null \
+      || fail "Refusing key-only SSH without valid restored public keys."
+  fi
+  if [[ -f "${staging}/policy/${HOST_SECURITY_PATHS[1]}" ]] && ! command -v fail2ban-client >/dev/null 2>&1; then
+    command -v apt-get >/dev/null 2>&1 || fail "Automatic Fail2ban restore requires Ubuntu/Debian."
+    DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=l apt-get update -qq
+    DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=l apt-get install -y --no-install-recommends fail2ban nftables python3-systemd
+  fi
+  for path in "${HOST_SECURITY_PATHS[@]}"; do
+    [[ -f "${staging}/policy/${path}" ]] || continue
+    target="${root%/}/${path}"
+    [[ ! -L "${target}" && ! -L "$(dirname "${target}")" ]] || fail "Unsafe security destination: ${path}"
+  done
+  # Save each destination and merge keys instead of removing the new host's keys.
+  for path in "${HOST_SECURITY_PATHS[@]}"; do
+    source="${staging}/policy/${path}"
+    [[ -f "${source}" ]] || continue
+    target="${root%/}/${path}"
+    mkdir -p "${staging}/previous/$(dirname "${path}")"
+    if [[ -e "${target}" ]]; then
+      cp -p "${target}" "${staging}/previous/${path}"
+    else
+      touch "${staging}/previous/${path}.absent"
+    fi
+    if [[ "${path}" == root/.ssh/authorized_keys ]]; then
+      install -d -m 700 "$(dirname "${target}")"
+      python3 - "${source}" "${target}" <<'PY'
+import pathlib, sys
+source, target = map(pathlib.Path, sys.argv[1:])
+existing = target.read_text().splitlines() if target.exists() else []
+for line in source.read_text().splitlines():
+    if line.strip() and line not in existing:
+        existing.append(line)
+target.write_text('\n'.join(existing) + '\n')
+target.chmod(0o600)
+PY
+    else
+      install -d -m 755 "$(dirname "${target}")"
+      install -m 644 "${source}" "${target}"
+    fi
+  done
+  if [[ -f "${staging}/policy/${HOST_SECURITY_PATHS[0]}" ]] && ! sshd -t; then
+    rollback_host_security_files "${staging}/previous" "${root}"
+    fail "Restored SSH policy is invalid; previous files were restored."
+  fi
+  if [[ -f "${staging}/policy/${HOST_SECURITY_PATHS[0]}" ]]; then
+    if ! sshd -T -C user=root,addr=127.0.0.1,host=localhost | awk '
+      $1 == "pubkeyauthentication" { pubkey = ($2 == "yes") }
+      $1 == "passwordauthentication" { password = ($2 == "no") }
+      $1 == "kbdinteractiveauthentication" { keyboard = ($2 == "no") }
+      $1 == "permitrootlogin" { root = ($2 == "without-password" || $2 == "prohibit-password") }
+      $1 == "authorizedkeysfile" {
+        for (i = 2; i <= NF; i++)
+          if ($i == ".ssh/authorized_keys" || $i == "/root/.ssh/authorized_keys" || $i == "%h/.ssh/authorized_keys") keys = 1
+      }
+      END { exit !(pubkey && password && keyboard && root && keys) }
+    '; then
+      rollback_host_security_files "${staging}/previous" "${root}"
+      fail "Destination SSH configuration overrides the restored key-only policy; previous files were restored."
+    fi
+  fi
+  if [[ -f "${staging}/policy/${HOST_SECURITY_PATHS[1]}" ]] && ! fail2ban-client -t; then
+    rollback_host_security_files "${staging}/previous" "${root}"
+    fail "Restored Fail2ban policy is invalid; previous files were restored."
+  fi
+  if [[ -f "${staging}/policy/${HOST_SECURITY_PATHS[0]}" ]]; then
+    if ! systemctl reload ssh; then
+      rollback_host_security_files "${staging}/previous" "${root}"
+      sshd -t && systemctl reload ssh || true
+      fail "Could not reload SSH; previous files were restored."
+    fi
+  fi
+  if [[ -f "${staging}/policy/${HOST_SECURITY_PATHS[1]}" ]]; then
+    if ! systemctl enable --now fail2ban || ! fail2ban-client reload; then
+      rollback_host_security_files "${staging}/previous" "${root}"
+      sshd -t && systemctl reload ssh || true
+      fail2ban-client reload || true
+      fail "Could not activate restored Fail2ban policy; previous files were restored."
+    fi
+  fi
+  ok "Политика SSH, публичные ключи и Fail2ban восстановлены."
+}
+
 dump_database() {
   local component="$1"
   local container="$2"
@@ -665,6 +818,7 @@ write_manifest() {
   cat >"${file}" <<EOF
 FORMAT_VERSION=1
 SCRIPT_VERSION=${VERSION}
+HOST_SECURITY_INCLUDED=$([[ -f "$(dirname "${file}")/directories/host-security.tar.gz" ]] && printf true || printf false)
 CREATED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 SOURCE_HOST=$(hostname)
 REMNAWAVE_DIR=${REMNAWAVE_DIR}
@@ -703,6 +857,7 @@ create_backup() {
   archive_directory "${REMNASHOP_DIR}" "${staging}/directories/remnashop.tar.gz"
   info "Архивируем конфигурацию кабинета..."
   archive_directory "${CABINET_DIR}" "${staging}/directories/cabinet.tar.gz"
+  archive_host_security "${staging}/directories/host-security.tar.gz"
 
   dump_database "Remnawave" "${REMNAWAVE_DB_CONTAINER}" "${staging}/databases/remnawave.dump"
   dump_database "Remnashop" "${REMNASHOP_DB_CONTAINER}" "${staging}/databases/remnashop.dump"
@@ -959,6 +1114,10 @@ restore_backup() {
   do
     [[ -f "${staging}/${required}" ]] || fail "В архиве отсутствует ${required}."
   done
+  if [[ -f "${staging}/directories/host-security.tar.gz" ]]; then
+    extract_host_security "${staging}/directories/host-security.tar.gz" "${staging}/security-preflight" \
+      || fail "Invalid host-security archive."
+  fi
   restore_progress "${step}" "${total_steps}" "Архив проверен" done
 
   step=$((step + 1)); restore_progress "${step}" "${total_steps}" "Остановка текущих сервисов"
@@ -1014,6 +1173,7 @@ restore_backup() {
   step=$((step + 1)); restore_progress "${step}" "${total_steps}" "Дополнительные сервисы"
   start_optional_remnawave_subscription
   start_optional_nginx
+  restore_host_security "${staging}/directories/host-security.tar.gz"
   restore_progress "${step}" "${total_steps}" "Дополнительные сервисы проверены" done
 
   step=$((step + 1)); restore_progress "${step}" "${total_steps}" "Итоговая проверка"
