@@ -4,6 +4,15 @@
 import { z } from 'zod'
 import { AUTO_RENEWAL_CONSENT_VERSION } from '@/lib/auto-renewal-consent'
 
+// PATCH requests must preserve omitted fields instead of applying create defaults.
+function partialWithoutDefaults<T extends Record<string, z.ZodType>>(schema: z.ZodObject<T>) {
+  const shape = Object.fromEntries(Object.entries(schema.shape).map(([key, field]) => [
+    key,
+    z.optional(field instanceof z.ZodDefault ? field.removeDefault() : field),
+  ])) as { [Key in keyof T]: z.ZodOptional<T[Key]> }
+  return z.object(shape)
+}
+
 const nameSchema = z
   .string()
   .trim()
@@ -36,10 +45,10 @@ export const registerSchema = z.object({
     .optional()
     .or(z.literal('')),
   agreeToTerms: z.literal(true, {
-    errorMap: () => ({ message: 'Нужно согласиться с условиями' }),
+    error: 'Нужно согласиться с условиями',
   }),
   agreeToPersonalData: z.literal(true, {
-    errorMap: () => ({ message: 'Нужно дать согласие на обработку персональных данных' }),
+    error: 'Нужно дать согласие на обработку персональных данных',
   }),
   next: z.string().trim().max(512).optional(),
 })
@@ -53,10 +62,10 @@ export const telegramMiniAppEmailSchema = z.object({
   email: z.string().email('Некорректный email').max(255).toLowerCase().trim(),
   password: z.string().min(1, 'Введите пароль').max(128, 'Максимум 128 символов'),
   agreeToTerms: z.literal(true, {
-    errorMap: () => ({ message: 'Нужно согласиться с условиями' }),
+    error: 'Нужно согласиться с условиями',
   }),
   agreeToPersonalData: z.literal(true, {
-    errorMap: () => ({ message: 'Нужно дать согласие на обработку персональных данных' }),
+    error: 'Нужно дать согласие на обработку персональных данных',
   }),
 })
 
@@ -160,7 +169,7 @@ export const adminPromoCodeSchema = adminPromoCodeBaseSchema.refine(startsBefore
   }
 )
 
-export const updateAdminPromoCodeSchema = adminPromoCodeBaseSchema.partial().refine(startsBeforeExpires, {
+export const updateAdminPromoCodeSchema = partialWithoutDefaults(adminPromoCodeBaseSchema).refine(startsBeforeExpires, {
   path: ['expiresAt'],
   message: 'Дата окончания должна быть позже даты начала',
 }).refine((value) => value.audience !== 'PERSONAL' || value.allowedEmails == null || value.allowedEmails.length > 0, {
@@ -218,7 +227,7 @@ export const adminBonusBoxPrizeSchema = adminBonusBoxPrizeBaseSchema.refine(
   }
 )
 
-export const updateAdminBonusBoxPrizeSchema = adminBonusBoxPrizeBaseSchema.partial().refine(
+export const updateAdminBonusBoxPrizeSchema = partialWithoutDefaults(adminBonusBoxPrizeBaseSchema).refine(
   (value) => value.type === 'NO_PRIZE' || value.value == null || value.value >= 1,
   {
     path: ['value'],
@@ -334,7 +343,7 @@ export const adminPlanSchema = adminPlanBaseSchema.superRefine((value, context) 
   }
 })
 
-export const updateAdminPlanSchema = adminPlanBaseSchema.partial()
+export const updateAdminPlanSchema = partialWithoutDefaults(adminPlanBaseSchema)
 
 export const updateProfileSchema = z.object({
   name: nameSchema.optional().nullable(),
