@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { jsonResponse } from '@/lib/json-response'
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { requireAdmin, withAuth } from '@/lib/auth/guard'
@@ -21,12 +21,12 @@ export const PATCH = withAuth(async (req: Request, { params }: { params: Promise
   try {
     body = await req.json()
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+    return jsonResponse({ error: 'Invalid JSON' }, { status: 400 })
   }
 
   const parsed = updateAdminPromoCodeSchema.safeParse(body)
   if (!parsed.success) {
-    return NextResponse.json(
+    return jsonResponse(
       { error: 'Validation error', details: parsed.error.flatten() },
       { status: 400 }
     )
@@ -35,7 +35,7 @@ export const PATCH = withAuth(async (req: Request, { params }: { params: Promise
   const data = parsed.data
   const normalizedCode = data.code === undefined ? undefined : normalizePromoCode(data.code)
   if (data.code !== undefined && !normalizedCode) {
-    return NextResponse.json({ error: 'Введите промокод' }, { status: 400 })
+    return jsonResponse({ error: 'Введите промокод' }, { status: 400 })
   }
 
   const existing = await prisma.promoCode.findUnique({
@@ -43,7 +43,7 @@ export const PATCH = withAuth(async (req: Request, { params }: { params: Promise
     select: { audience: true, purchaseScope: true, allowedEmails: true },
   })
   if (!existing) {
-    return NextResponse.json({ error: 'Промокод не найден' }, { status: 404 })
+    return jsonResponse({ error: 'Промокод не найден' }, { status: 404 })
   }
 
   const effectiveAudience = data.audience ?? existing.audience
@@ -54,7 +54,7 @@ export const PATCH = withAuth(async (req: Request, { params }: { params: Promise
       : []
 
   if (effectiveAudience === 'PERSONAL' && effectiveAllowedEmails.length === 0) {
-    return NextResponse.json(
+    return jsonResponse(
       { error: 'Для персонального промокода укажите хотя бы одного пользователя' },
       { status: 400 }
     )
@@ -63,7 +63,7 @@ export const PATCH = withAuth(async (req: Request, { params }: { params: Promise
     effectivePurchaseScope === 'RENEWAL_ONLY'
     && ['NEW_USERS', 'NO_ACTIVE_SUBSCRIPTION'].includes(effectiveAudience)
   ) {
-    return NextResponse.json(
+    return jsonResponse(
       { error: 'Промокод на продление доступен только всем или выбранным пользователям' },
       { status: 400 }
     )
@@ -116,14 +116,14 @@ export const PATCH = withAuth(async (req: Request, { params }: { params: Promise
     })
     await syncCabinetPromoCodeToRemnashopBestEffort(promoCode.id)
 
-    return NextResponse.json({ promoCode })
+    return jsonResponse({ promoCode })
   } catch (e) {
     if (e instanceof Prisma.PrismaClientKnownRequestError) {
       if (e.code === 'P2002') {
-        return NextResponse.json({ error: 'Промокод с таким кодом уже существует' }, { status: 409 })
+        return jsonResponse({ error: 'Промокод с таким кодом уже существует' }, { status: 409 })
       }
       if (e.code === 'P2025') {
-        return NextResponse.json({ error: 'Промокод не найден' }, { status: 404 })
+        return jsonResponse({ error: 'Промокод не найден' }, { status: 404 })
       }
     }
     throw e
@@ -139,7 +139,7 @@ export const DELETE = withAuth(async (req: Request, { params }: { params: Promis
       where: { id },
       select: { id: true, code: true },
     })
-    if (!existing) return NextResponse.json({ error: 'Промокод не найден' }, { status: 404 })
+    if (!existing) return jsonResponse({ error: 'Промокод не найден' }, { status: 404 })
     await deactivateCabinetPromoCodesInRemnashopBestEffort([existing.code])
     const deleted = await prisma.promoCode.delete({
       where: { id },
@@ -157,10 +157,10 @@ export const DELETE = withAuth(async (req: Request, { params }: { params: Promis
       request: req,
     })
 
-    return NextResponse.json({ ok: true })
+    return jsonResponse({ ok: true })
   } catch (e) {
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2025') {
-      return NextResponse.json({ error: 'Промокод не найден' }, { status: 404 })
+      return jsonResponse({ error: 'Промокод не найден' }, { status: 404 })
     }
     throw e
   }

@@ -1,5 +1,5 @@
+import { jsonResponse } from '@/lib/json-response'
 import { createHmac, timingSafeEqual } from 'node:crypto'
-import { NextResponse } from 'next/server'
 import { syncRemnashopCatalog, syncRemnashopPaymentsToCabinet } from '@/lib/remnashop-sync'
 import { syncRemnashopUserBySourceId } from '@/lib/remnashop-users'
 import { markSyncFailed, markSyncSucceeded } from '@/lib/sync-events'
@@ -23,38 +23,38 @@ type RemnashopEventBody = {
 export async function POST(req: Request) {
   const secret = process.env.REMNASHOP_WEBHOOK_SECRET?.trim()
   if (!secret) {
-    return NextResponse.json({ error: 'Remnashop webhook is not configured' }, { status: 503 })
+    return jsonResponse({ error: 'Remnashop webhook is not configured' }, { status: 503 })
   }
 
   const contentLength = Number(req.headers.get('content-length') || 0)
   if (contentLength > MAX_BODY_BYTES) {
-    return NextResponse.json({ error: 'Payload is too large' }, { status: 413 })
+    return jsonResponse({ error: 'Payload is too large' }, { status: 413 })
   }
 
   const rawBody = await req.text()
   if (Buffer.byteLength(rawBody, 'utf8') > MAX_BODY_BYTES) {
-    return NextResponse.json({ error: 'Payload is too large' }, { status: 413 })
+    return jsonResponse({ error: 'Payload is too large' }, { status: 413 })
   }
   if (!isAuthorized(req, rawBody, secret)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    return jsonResponse({ error: 'Unauthorized' }, { status: 401 })
   }
 
   let body: RemnashopEventBody
   try {
     body = JSON.parse(rawBody) as RemnashopEventBody
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+    return jsonResponse({ error: 'Invalid JSON' }, { status: 400 })
   }
 
   const eventName = readText(body.event) || readText(body.type)
-  if (!eventName) return NextResponse.json({ error: 'event is required' }, { status: 400 })
+  if (!eventName) return jsonResponse({ error: 'event is required' }, { status: 400 })
 
   try {
     const result = await handleEvent(eventName.toLowerCase(), body)
-    return NextResponse.json({ ok: true, event: eventName, result })
+    return jsonResponse({ ok: true, event: eventName, result })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Remnashop event failed'
-    return NextResponse.json({ error: message }, { status: 500 })
+    return jsonResponse({ error: message }, { status: 500 })
   }
 }
 

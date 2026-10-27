@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { jsonResponse } from '@/lib/json-response'
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { requireStaff, withAuth } from '@/lib/auth/guard'
@@ -19,7 +19,7 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 export const GET = withAuth(async (req: Request) => {
-  if (!await isFeatureEnabled('support')) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  if (!await isFeatureEnabled('support')) return jsonResponse({ error: 'Not found' }, { status: 404 })
   const session = await requireStaff()
 
   const url = new URL(req.url)
@@ -104,7 +104,7 @@ export const GET = withAuth(async (req: Request) => {
   const hasMore = tickets.length > pageSize
   const lastVisibleTicket = visibleTickets.at(-1)
 
-  return NextResponse.json({
+  return jsonResponse({
     pagination: {
       page,
       pageSize,

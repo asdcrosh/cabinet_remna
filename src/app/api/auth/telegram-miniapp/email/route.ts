@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { jsonResponse } from '@/lib/json-response'
 import { Prisma } from '@prisma/client'
 import { compare, hash } from 'bcryptjs'
 import { getSession, setSessionCookieOnResponse } from '@/lib/auth/cookies'
@@ -24,21 +24,21 @@ export async function POST(req: Request) {
   try {
     assertSameOrigin(req)
   } catch {
-    return NextResponse.json({ error: 'Invalid request origin' }, { status: 403 })
+    return jsonResponse({ error: 'Invalid request origin' }, { status: 403 })
   }
 
   const session = await getSession()
   if (!session) {
-    return NextResponse.json({ error: 'Telegram session not found' }, { status: 401 })
+    return jsonResponse({ error: 'Telegram session not found' }, { status: 401 })
   }
   const limited = await rateLimit(req, `telegram-miniapp-email:${session.uid}`, 5, 60_000)
   if (!limited.ok) {
-    return NextResponse.json({ error: 'Слишком много запросов. Попробуйте позже.' }, { status: 429 })
+    return jsonResponse({ error: 'Слишком много запросов. Попробуйте позже.' }, { status: 429 })
   }
 
   const parsed = telegramMiniAppEmailSchema.safeParse(await req.json().catch(() => null))
   if (!parsed.success) {
-    return NextResponse.json(
+    return jsonResponse(
       {
         error: parsed.error.issues[0]?.message || 'Проверьте введённые данные',
         details: parsed.error.flatten(),
@@ -60,10 +60,10 @@ export async function POST(req: Request) {
     },
   })
   if (!current?.telegramId) {
-    return NextResponse.json({ error: 'Telegram session not found' }, { status: 404 })
+    return jsonResponse({ error: 'Telegram session not found' }, { status: 404 })
   }
   if (current.emailVerifiedAt) {
-    return NextResponse.json({ ok: true, verified: true })
+    return jsonResponse({ ok: true, verified: true })
   }
 
   const emailOwner = await prisma.user.findUnique({
@@ -85,7 +85,7 @@ export async function POST(req: Request) {
         currentUserId: current.id,
         targetUserId: emailOwner.id,
       })
-      return NextResponse.json(
+      return jsonResponse(
         { error: 'Не удалось подтвердить email или пароль.' },
         { status: 401 }
       )
@@ -111,7 +111,7 @@ export async function POST(req: Request) {
           targetUserId: emailOwner.id,
           code: error.code,
         })
-        return NextResponse.json(
+        return jsonResponse(
           {
             error:
               error.code === 'PRIVILEGED_SOURCE'
@@ -172,9 +172,9 @@ export async function POST(req: Request) {
         fallbackUserId: mergedUser.id,
       })
       if (!sessionUser) {
-        return NextResponse.json({ error: 'Не удалось завершить объединение аккаунтов' }, { status: 409 })
+        return jsonResponse({ error: 'Не удалось завершить объединение аккаунтов' }, { status: 409 })
       }
-      const response = NextResponse.json({
+      const response = jsonResponse({
         ok: true,
         email: sessionUser.email,
         authenticated: true,
@@ -194,7 +194,7 @@ export async function POST(req: Request) {
       name: mergedUser.name,
       token,
     })
-    const response = NextResponse.json({
+    const response = jsonResponse({
       ok: true,
       email: mergedUser.email,
       authenticated: false,
@@ -211,7 +211,7 @@ export async function POST(req: Request) {
 
   const newPassword = newPasswordSchema.safeParse(parsed.data.password)
   if (!newPassword.success) {
-    return NextResponse.json(
+    return jsonResponse(
       {
         error: newPassword.error.issues[0]?.message || 'Пароль не соответствует требованиям',
         details: newPassword.error.flatten(),
@@ -236,7 +236,7 @@ export async function POST(req: Request) {
     })
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-      return NextResponse.json(
+      return jsonResponse(
         { error: 'Не удалось подтвердить email или пароль.' },
         { status: 401 }
       )
@@ -253,7 +253,7 @@ export async function POST(req: Request) {
   const token = await createEmailVerificationToken(user.id)
   const delivery = await sendEmailVerificationLink({ email: user.email, name: user.name, token })
 
-  const response = NextResponse.json({
+  const response = jsonResponse({
     ok: true,
     email: user.email,
     authenticated: false,

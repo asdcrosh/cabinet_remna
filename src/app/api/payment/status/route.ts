@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { jsonResponse } from '@/lib/json-response'
 import { requireAuth, withAuth } from '@/lib/auth/guard'
 import { getPendingPaymentTtlMs, syncPaymentProvisioning } from '@/lib/payment-sync'
 import { getPaymentBannerStatus } from '@/lib/payment-status-presentation'
@@ -18,28 +18,28 @@ function paymentIdFromRequest(req: Request, body?: unknown) {
 export const GET = withAuth(async (req: Request) => {
   const session = await requireAuth()
   const paymentId = paymentIdFromRequest(req)
-  if (!paymentId) return NextResponse.json({ error: 'paymentId is required' }, { status: 400 })
+  if (!paymentId) return jsonResponse({ error: 'paymentId is required' }, { status: 400 })
 
   const limited = await rateLimit(req, `payment-status-read:${session.uid}:${paymentId}`, 60, 60_000)
   if (!limited.ok) {
-    return NextResponse.json(
+    return jsonResponse(
       { error: 'Статус проверяется слишком часто. Подождите немного.' },
       { status: 429, headers: { 'Retry-After': String(limited.retryAfter) } }
     )
   }
 
-  return NextResponse.json({ status: await readPaymentBannerStatus(paymentId, session.uid) })
+  return jsonResponse({ status: await readPaymentBannerStatus(paymentId, session.uid) })
 })
 
 export const POST = withAuth(async (req: Request) => {
   const session = await requireAuth()
   const body = await req.json().catch(() => null)
   const paymentId = paymentIdFromRequest(req, body)
-  if (!paymentId) return NextResponse.json({ error: 'paymentId is required' }, { status: 400 })
+  if (!paymentId) return jsonResponse({ error: 'paymentId is required' }, { status: 400 })
 
   const limited = await rateLimit(req, `payment-status-reconcile:${session.uid}:${paymentId}`, 3, 60_000)
   if (!limited.ok) {
-    return NextResponse.json(
+    return jsonResponse(
       { error: 'Повторная проверка уже запущена. Подождите немного.' },
       { status: 429, headers: { 'Retry-After': String(limited.retryAfter) } }
     )
@@ -50,5 +50,5 @@ export const POST = withAuth(async (req: Request) => {
     userId: session.uid,
     cancelPendingOlderThanMs: getPendingPaymentTtlMs(),
   })
-  return NextResponse.json({ status: getPaymentBannerStatus(result) })
+  return jsonResponse({ status: getPaymentBannerStatus(result) })
 })

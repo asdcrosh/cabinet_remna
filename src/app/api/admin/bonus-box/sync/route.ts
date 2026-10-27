@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { jsonResponse } from '@/lib/json-response'
 import { requireAdmin, withAuth } from '@/lib/auth/guard'
 import { writeAuditLog } from '@/lib/audit-log'
 import { retryPendingBonusBoxSyncsForUser } from '@/lib/bonus-box'
@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic'
 
 export const POST = withAuth(async (req: Request) => {
   if (!await isFeatureEnabled('bonusBox')) {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    return jsonResponse({ error: 'Not found' }, { status: 404 })
   }
   const session = await requireAdmin()
 
@@ -46,5 +46,5 @@ export const POST = withAuth(async (req: Request) => {
     })
   }
 
-  return NextResponse.json({ attempted, synced, pending })
+  return jsonResponse({ attempted, synced, pending })
 })

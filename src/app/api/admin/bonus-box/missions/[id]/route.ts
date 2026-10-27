@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { jsonResponse } from '@/lib/json-response'
 import { requireAdmin, withAuth } from '@/lib/auth/guard'
 import { bonusBoxMissionAdminSchema } from '@/lib/bonus-box-admin-validation'
 import { isFeatureEnabled } from '@/lib/feature-flags'
@@ -13,14 +13,14 @@ export const PATCH = withAuth(async (
   { params }: { params: Promise<{ id: string }> }
 ) => {
   if (!await isFeatureEnabled('bonusBox')) {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    return jsonResponse({ error: 'Not found' }, { status: 404 })
   }
   const session = await requireAdmin()
   const { id } = await params
   const body = await req.json().catch(() => null)
   const parsed = bonusBoxMissionAdminSchema.safeParse(body)
   if (!parsed.success) {
-    return NextResponse.json(
+    return jsonResponse(
       { error: 'Проверьте параметры задания', details: parsed.error.flatten() },
       { status: 400 }
     )
@@ -41,7 +41,7 @@ export const PATCH = withAuth(async (
     metadata: { missionId: mission.id, type: mission.type },
     request: req,
   })
-  return NextResponse.json({ mission })
+  return jsonResponse({ mission })
 })
 
 export const DELETE = withAuth(async (
@@ -49,7 +49,7 @@ export const DELETE = withAuth(async (
   { params }: { params: Promise<{ id: string }> }
 ) => {
   if (!await isFeatureEnabled('bonusBox')) {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    return jsonResponse({ error: 'Not found' }, { status: 404 })
   }
   const session = await requireAdmin()
   const { id } = await params
@@ -57,7 +57,7 @@ export const DELETE = withAuth(async (
     where: { id },
     select: { id: true, title: true, type: true },
   })
-  if (!mission) return NextResponse.json({ error: 'Задание не найдено' }, { status: 404 })
+  if (!mission) return jsonResponse({ error: 'Задание не найдено' }, { status: 404 })
 
   await prisma.bonusBoxMission.delete({ where: { id } })
   await writeAuditLog({
@@ -67,5 +67,5 @@ export const DELETE = withAuth(async (
     metadata: { missionId: mission.id, title: mission.title, type: mission.type, deleted: true },
     request: req,
   })
-  return NextResponse.json({ ok: true })
+  return jsonResponse({ ok: true })
 })

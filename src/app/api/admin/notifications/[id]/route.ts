@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { jsonResponse } from '@/lib/json-response'
 import { requireStaff, withAuth } from '@/lib/auth/guard'
 import { markAdminNotificationRead } from '@/lib/admin-notifications'
 
@@ -9,5 +9,5 @@ export const PATCH = withAuth(async (_req: Request, { params }: { params: Promis
   const session = await requireStaff()
   const { id } = await params
   await markAdminNotificationRead(id, session.uid)
-  return NextResponse.json({ ok: true })
+  return jsonResponse({ ok: true })
 })

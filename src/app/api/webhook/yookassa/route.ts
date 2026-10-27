@@ -3,7 +3,7 @@
 // Идемпотентность: повторный webhook не должен повторно продлевать срок,
 // но обязан довыдать подписку, если прежний provisioning упал.
 
-import { NextResponse } from 'next/server'
+import { jsonResponse } from '@/lib/json-response'
 import { logError, logWarn } from '@/lib/logger'
 import { prisma } from '@/lib/prisma'
 import { notifyPaymentCanceled, notifyPaymentStuck } from '@/lib/notifications'
@@ -54,18 +54,18 @@ export async function POST(req: Request) {
   const settings = await getResolvedPaymentProviderSettings()
   const sourceCheck = assertYookassaWebhookSource(req, settings.yookassa.webhookAllowedIps)
   if (!sourceCheck.ok) {
-    return NextResponse.json({ error: sourceCheck.error }, { status: 403 })
+    return jsonResponse({ error: sourceCheck.error }, { status: 403 })
   }
 
   let event: YookassaWebhookEvent
   try {
     event = (await req.json()) as YookassaWebhookEvent
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+    return jsonResponse({ error: 'Invalid JSON' }, { status: 400 })
   }
 
   if (event.type !== 'notification') {
-    return NextResponse.json({ ok: true, skipped: true })
+    return jsonResponse({ ok: true, skipped: true })
   }
 
   if (event.event === 'refund.succeeded') {
@@ -87,7 +87,7 @@ export async function POST(req: Request) {
   }
   if (!payment) {
     logWarn('webhook.payment_not_found', { yookassaId })
-    return NextResponse.json({ ok: true, notFound: true })
+    return jsonResponse({ ok: true, notFound: true })
   }
 
   let status = event.object.status
@@ -99,7 +99,7 @@ export async function POST(req: Request) {
   } catch (e) {
     if (e instanceof YooKassaPaymentMismatchError) {
       logWarn('webhook.yookassa.payment_mismatch', { paymentId: payment.id, yookassaId, reason: e.message })
-      return NextResponse.json({ error: 'payment-mismatch' }, { status: 409 })
+      return jsonResponse({ error: 'payment-mismatch' }, { status: 409 })
     }
     logError('webhook.get_payment_failed', e, { yookassaId })
     await recordPaymentEvent({
@@ -111,7 +111,7 @@ export async function POST(req: Request) {
       details: paymentErrorDetails(e),
       dedupeKey: 'provider-status-check-failed',
     })
-    return NextResponse.json(
+    return jsonResponse(
       { error: 'provider-status-unavailable' },
       { status: 503, headers: { 'Retry-After': '30' } }
     )
@@ -147,7 +147,7 @@ export async function POST(req: Request) {
       where: { paymentId: payment.id, status: 'PENDING' },
       data: { status: 'SUCCEEDED' },
     })
-    return NextResponse.json({ ok: true, idempotent: true })
+    return jsonResponse({ ok: true, idempotent: true })
   }
 
   if (status === 'succeeded') {
@@ -178,7 +178,7 @@ export async function POST(req: Request) {
     })
 
     if (!payment.user || !payment.plan) {
-      return NextResponse.json({ error: 'payment-relations-missing' }, { status: 500 })
+      return jsonResponse({ error: 'payment-relations-missing' }, { status: 500 })
     }
 
     try {
@@ -206,10 +206,10 @@ export async function POST(req: Request) {
         },
       })
       await notifyPaymentStuck(payment.id, 'Платёж прошёл, но подписка пока не выдана автоматически.')
-      return NextResponse.json({ error: 'subscription-failed' }, { status: 500 })
+      return jsonResponse({ error: 'subscription-failed' }, { status: 500 })
     }
 
-    return NextResponse.json({ ok: true })
+    return jsonResponse({ ok: true })
   }
 
   if (status === 'canceled') {
@@ -242,10 +242,10 @@ export async function POST(req: Request) {
       },
       dedupeKey: 'payment-canceled',
     })
-    return NextResponse.json({ ok: true })
+    return jsonResponse({ ok: true })
   }
 
-  return NextResponse.json({ ok: true, deferred: true })
+  return jsonResponse({ ok: true, deferred: true })
 }
 
 async function handleSucceededRefund(event: YookassaRefundWebhookEvent) {
@@ -258,7 +258,7 @@ async function handleSucceededRefund(event: YookassaRefundWebhookEvent) {
     refund.amount.currency.toUpperCase() !== 'RUB' ||
     amountKopecks == null
   ) {
-    return NextResponse.json({ error: 'Invalid refund payload' }, { status: 400 })
+    return jsonResponse({ error: 'Invalid refund payload' }, { status: 400 })
   }
 
   const payment = await prisma.payment.findUnique({
@@ -275,7 +275,7 @@ async function handleSucceededRefund(event: YookassaRefundWebhookEvent) {
       refundId: refund.id,
       yookassaId: refund.payment_id,
     })
-    return NextResponse.json({ ok: true, notFound: true })
+    return jsonResponse({ ok: true, notFound: true })
   }
 
   const result = await recordSucceededRefund({
@@ -286,7 +286,7 @@ async function handleSucceededRefund(event: YookassaRefundWebhookEvent) {
     providerStatus: 'refund.succeeded',
   })
   if (!result.fullyRefunded) {
-    return NextResponse.json({
+    return jsonResponse({
       ok: true,
       partialRefund: true,
       refundedAmountKopecks: result.refundedAmountKopecks,
@@ -301,12 +301,12 @@ async function handleSucceededRefund(event: YookassaRefundWebhookEvent) {
         paymentId: payment.id,
         refundId: refund.id,
       })
-      return NextResponse.json({ error: 'Device limit rollback failed' }, { status: 503 })
+      return jsonResponse({ error: 'Device limit rollback failed' }, { status: 503 })
     }
-    return NextResponse.json({ ok: true, refunded: true })
+    return jsonResponse({ ok: true, refunded: true })
   }
   if (payment.purchaseType === 'WHITELIST_ADDON') {
-    return NextResponse.json({ ok: true, refunded: true })
+    return jsonResponse({ ok: true, refunded: true })
   }
 
   try {
@@ -320,10 +320,10 @@ async function handleSucceededRefund(event: YookassaRefundWebhookEvent) {
       paymentId: payment.id,
       refundId: refund.id,
     })
-    return NextResponse.json({ error: 'Subscription removal failed' }, { status: 503 })
+    return jsonResponse({ error: 'Subscription removal failed' }, { status: 503 })
   }
 
-  return NextResponse.json({ ok: true, refunded: true })
+  return jsonResponse({ ok: true, refunded: true })
 }
 
 function moneyToKopecks(value: string) {

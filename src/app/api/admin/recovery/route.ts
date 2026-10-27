@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { jsonResponse } from '@/lib/json-response'
 import { prisma } from '@/lib/prisma'
 import { requireAdmin, withAuth } from '@/lib/auth/guard'
 import { serializePayment } from '@/lib/api-serializers'
@@ -20,5 +20,5 @@ export const GET = withAuth(async () => {
     },
   })
 
-  return NextResponse.json({ payments: payments.map(serializePayment) })
+  return jsonResponse({ payments: payments.map(serializePayment) })
 })

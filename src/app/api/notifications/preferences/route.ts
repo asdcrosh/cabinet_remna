@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { jsonResponse } from '@/lib/json-response'
 import { z } from 'zod'
 import { requireAuth, withAuth } from '@/lib/auth/guard'
 import { getNotificationPreferences, updateNotificationPreferences } from '@/lib/notification-preferences'
@@ -15,7 +15,7 @@ const schema = z.object({
 
 export const GET = withAuth(async () => {
   const session = await requireAuth()
-  return NextResponse.json({ preferences: await getNotificationPreferences(session.uid) })
+  return jsonResponse({ preferences: await getNotificationPreferences(session.uid) })
 })
 
 export const PATCH = withAuth(async (req: Request) => {
@@ -23,8 +23,8 @@ export const PATCH = withAuth(async (req: Request) => {
   const body = await req.json().catch(() => null)
   const parsed = schema.safeParse(body)
   if (!parsed.success) {
-    return NextResponse.json({ error: 'Некорректные настройки уведомлений' }, { status: 422 })
+    return jsonResponse({ error: 'Некорректные настройки уведомлений' }, { status: 422 })
   }
   const preferences = await updateNotificationPreferences(session.uid, parsed.data)
-  return NextResponse.json({ preferences })
+  return jsonResponse({ preferences })
 })

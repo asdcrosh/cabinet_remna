@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { jsonResponse } from '@/lib/json-response'
 import { requireAuth, withAuth } from '@/lib/auth/guard'
 import { claimBonusBoxMission } from '@/lib/bonus-box-engagement'
 import { isFeatureEnabled } from '@/lib/feature-flags'
@@ -12,12 +12,12 @@ export const POST = withAuth(async (
   { params }: { params: Promise<{ id: string }> }
 ) => {
   if (!await isFeatureEnabled('bonusBox')) {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    return jsonResponse({ error: 'Not found' }, { status: 404 })
   }
   const session = await requireAuth()
   const limited = await rateLimit(req, `bonus-mission:${session.uid}`, 10, 60_000)
   if (!limited.ok) {
-    return NextResponse.json(
+    return jsonResponse(
       { error: 'Слишком много запросов. Попробуйте позже.' },
       { status: 429, headers: { 'Retry-After': String(limited.retryAfter) } }
     )
@@ -26,10 +26,10 @@ export const POST = withAuth(async (
   const { id } = await params
   try {
     const result = await claimBonusBoxMission(session.uid, id)
-    return NextResponse.json(result)
+    return jsonResponse(result)
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Не удалось получить награду'
     const status = message.includes('недоступно') ? 404 : 409
-    return NextResponse.json({ error: message }, { status })
+    return jsonResponse({ error: message }, { status })
   }
 })

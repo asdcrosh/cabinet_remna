@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { jsonResponse } from '@/lib/json-response'
 import { requireAdmin, withAuth } from '@/lib/auth/guard'
 import { isFeatureEnabled } from '@/lib/feature-flags'
 import { prisma } from '@/lib/prisma'
@@ -12,7 +12,7 @@ export const PATCH = withAuth(async (
   { params }: { params: Promise<{ id: string }> }
 ) => {
   if (!await isFeatureEnabled('bonusBox')) {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    return jsonResponse({ error: 'Not found' }, { status: 404 })
   }
   const session = await requireAdmin()
   const { id } = await params
@@ -28,5 +28,5 @@ export const PATCH = withAuth(async (
     metadata: { signalId: signal.id, kind: signal.kind, score: signal.score },
     request: req,
   })
-  return NextResponse.json({ signal })
+  return jsonResponse({ signal })
 })

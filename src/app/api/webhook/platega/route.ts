@@ -1,3 +1,4 @@
+import { jsonResponse } from '@/lib/json-response'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { logError, logWarn } from '@/lib/logger'
@@ -24,7 +25,7 @@ export async function POST(request: Request) {
   const verification = await verifyPlategaCallbackHeaders(request)
   if (!verification.ok) {
     logWarn('webhook.platega.rejected', { reason: verification.error })
-    return NextResponse.json(
+    return jsonResponse(
       { error: verification.error },
       { status: verification.error === 'not_configured' ? 503 : 403 }
     )
@@ -32,7 +33,7 @@ export async function POST(request: Request) {
 
   const parsed = callbackSchema.safeParse(await request.json().catch(() => null))
   if (!parsed.success) {
-    return NextResponse.json({ error: 'Invalid callback payload' }, { status: 400 })
+    return jsonResponse({ error: 'Invalid callback payload' }, { status: 400 })
   }
 
   const callback = parsed.data
@@ -52,7 +53,7 @@ export async function POST(request: Request) {
   })
   if (!payment) {
     logWarn('webhook.platega.payment_not_found', { transactionId: callback.id })
-    return NextResponse.json({ error: 'Payment not found' }, { status: 503 })
+    return jsonResponse({ error: 'Payment not found' }, { status: 503 })
   }
 
   await recordPaymentEvent({
@@ -74,7 +75,7 @@ export async function POST(request: Request) {
       receivedAmountKopecks: amountKopecks,
       currency: callback.currency,
     })
-    return NextResponse.json({ error: 'Payment amount mismatch' }, { status: 409 })
+    return jsonResponse({ error: 'Payment amount mismatch' }, { status: 409 })
   }
 
   if (callback.status === 'CHARGEBACKED') {
@@ -91,7 +92,7 @@ export async function POST(request: Request) {
         paymentId: payment.id,
         transactionId: callback.id,
       })
-      return NextResponse.json({ error: 'Subscription removal failed' }, { status: 503 })
+      return jsonResponse({ error: 'Subscription removal failed' }, { status: 503 })
     }
     logWarn('webhook.platega.chargeback', { paymentId: payment.id, transactionId: callback.id })
     return new NextResponse(null, { status: 200 })

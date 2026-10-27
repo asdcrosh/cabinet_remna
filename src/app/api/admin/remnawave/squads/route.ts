@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { jsonResponse } from '@/lib/json-response'
 import { requireAdmin, withAuth } from '@/lib/auth/guard'
 import { remnawave, type InternalSquadResponse } from '@/lib/remnawave'
 
@@ -17,7 +17,7 @@ export const GET = withAuth(async () => {
   const raw = await remnawave.getInternalSquads()
   const squads = normalizeSquads(raw)
 
-  return NextResponse.json({ squads })
+  return jsonResponse({ squads })
 })
 
 function normalizeSquads(raw: unknown): AdminSquadRow[] {

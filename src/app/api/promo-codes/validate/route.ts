@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { jsonResponse } from '@/lib/json-response'
 import { prisma } from '@/lib/prisma'
 import { requireAuth, withAuth } from '@/lib/auth/guard'
 import { validatePromoCodeSchema } from '@/lib/auth/validation'
@@ -13,7 +13,7 @@ export const POST = withAuth(async (req: Request) => {
   const session = await requireAuth()
   const limited = await rateLimit(req, `promo-validate:${session.uid}`, 30, 60_000)
   if (!limited.ok) {
-    return NextResponse.json(
+    return jsonResponse(
       { error: 'Слишком много проверок промокода. Попробуйте позже.' },
       { status: 429, headers: { 'Retry-After': String(limited.retryAfter) } }
     )
@@ -23,12 +23,12 @@ export const POST = withAuth(async (req: Request) => {
   try {
     body = await req.json()
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+    return jsonResponse({ error: 'Invalid JSON' }, { status: 400 })
   }
 
   const parsed = validatePromoCodeSchema.safeParse(body)
   if (!parsed.success) {
-    return NextResponse.json(
+    return jsonResponse(
       { error: 'Validation error', details: parsed.error.flatten() },
       { status: 400 }
     )
@@ -36,7 +36,7 @@ export const POST = withAuth(async (req: Request) => {
 
   const plan = await prisma.plan.findUnique({ where: { id: parsed.data.planId } })
   if (!plan || !plan.isActive) {
-    return NextResponse.json({ error: 'Тариф не найден' }, { status: 404 })
+    return jsonResponse({ error: 'Тариф не найден' }, { status: 404 })
   }
 
   if (
@@ -44,7 +44,7 @@ export const POST = withAuth(async (req: Request) => {
     && parsed.data.deviceLimit != null
     && parsed.data.deviceLimit !== plan.deviceLimit
   ) {
-    return NextResponse.json(
+    return jsonResponse(
       { error: 'В тарифе уже включён безлимит устройств' },
       { status: 422 }
     )
@@ -67,7 +67,7 @@ export const POST = withAuth(async (req: Request) => {
     })
     const allowedDeviceLimit = currentSubscription?.deviceLimit ?? plan.deviceLimit
     if (parsed.data.deviceLimit > allowedDeviceLimit) {
-      return NextResponse.json(
+      return jsonResponse(
         { error: 'Дополнительные устройства для этого тарифа недоступны' },
         { status: 422 }
       )
@@ -83,7 +83,7 @@ export const POST = withAuth(async (req: Request) => {
       plan,
     })
 
-    return NextResponse.json({
+    return jsonResponse({
       code: discount.normalizedCode,
       discountPercent: discount.discountPercent,
       discountKopecks: discount.discountKopecks,
@@ -92,10 +92,10 @@ export const POST = withAuth(async (req: Request) => {
     })
   } catch (e) {
     if (e instanceof DeviceLimitSelectionError) {
-      return NextResponse.json({ error: e.message, code: e.code }, { status: 400 })
+      return jsonResponse({ error: e.message, code: e.code }, { status: 400 })
     }
     if (e instanceof PromoCodeError) {
-      return NextResponse.json({ error: e.message, code: e.code }, { status: e.status })
+      return jsonResponse({ error: e.message, code: e.code }, { status: e.status })
     }
     throw e
   }

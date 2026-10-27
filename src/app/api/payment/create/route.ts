@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { jsonResponse } from '@/lib/json-response'
 import { requireAuth, withAuth } from '@/lib/auth/guard'
 import { rateLimit } from '@/lib/rate-limit'
 import { withDistributedLock } from '@/lib/distributed-lock'
@@ -10,7 +10,7 @@ export const POST = withAuth(async (req: Request) => {
   const session = await requireAuth()
   const limited = await rateLimit(req, `payment-create:${session.uid}`, 10, 60_000)
   if (!limited.ok) {
-    return NextResponse.json(
+    return jsonResponse(
       { error: 'Слишком много попыток оплаты. Попробуйте позже.' },
       { status: 429, headers: { 'Retry-After': String(limited.retryAfter) } }
     )
@@ -22,7 +22,7 @@ export const POST = withAuth(async (req: Request) => {
     { timeoutMs: 30_000 }
   )
   if (!locked.acquired) {
-    return NextResponse.json(
+    return jsonResponse(
       { error: 'Другая операция оплаты уже выполняется. Дождитесь её завершения и повторите.' },
       { status: 409 }
     )

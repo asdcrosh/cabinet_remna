@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { jsonResponse } from '@/lib/json-response'
 import { requireAdmin, withAuth } from '@/lib/auth/guard'
 import { getPendingPaymentTtlMs, syncPaymentProvisioning } from '@/lib/payment-sync'
 import { writeAuditLog } from '@/lib/audit-log'
@@ -13,7 +13,7 @@ export const POST = withAuth(async (req: Request) => {
   try {
     body = await req.json()
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+    return jsonResponse({ error: 'Invalid JSON' }, { status: 400 })
   }
 
   const paymentId =
@@ -25,7 +25,7 @@ export const POST = withAuth(async (req: Request) => {
   )
 
   if (!paymentId) {
-    return NextResponse.json({ error: 'paymentId is required' }, { status: 400 })
+    return jsonResponse({ error: 'paymentId is required' }, { status: 400 })
   }
 
   const result = await syncPaymentProvisioning({
@@ -49,17 +49,17 @@ export const POST = withAuth(async (req: Request) => {
     })
   }
 
-  if (result.status === 'not_found') return NextResponse.json({ error: 'Payment not found' }, { status: 404 })
+  if (result.status === 'not_found') return jsonResponse({ error: 'Payment not found' }, { status: 404 })
   if (result.status === 'missing_external_id') {
-    return NextResponse.json({ error: 'У платежа нет внешнего ID для проверки' }, { status: 409 })
+    return jsonResponse({ error: 'У платежа нет внешнего ID для проверки' }, { status: 409 })
   }
 
   if (result.status === 'canceled') {
-    return NextResponse.json({ ok: true, paymentStatus: 'CANCELED', provisioned: false })
+    return jsonResponse({ ok: true, paymentStatus: 'CANCELED', provisioned: false })
   }
 
   if (result.status === 'pending') {
-    return NextResponse.json({
+    return jsonResponse({
       ok: true,
       paymentStatus: 'PENDING',
       provisioned: false,
@@ -67,7 +67,7 @@ export const POST = withAuth(async (req: Request) => {
   }
 
   if (result.ok && result.provisioned) {
-    return NextResponse.json({
+    return jsonResponse({
       ok: true,
       paymentStatus: 'SUCCEEDED',
       provisioned: true,
@@ -76,7 +76,7 @@ export const POST = withAuth(async (req: Request) => {
     })
   }
 
-  return NextResponse.json(
+  return jsonResponse(
     {
       error: result.ok ? 'Не удалось проверить платёж' : result.error,
       paymentStatus: result.status === 'provisioning_failed' ? 'SUCCEEDED' : 'PENDING',

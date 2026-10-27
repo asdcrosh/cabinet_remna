@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { jsonResponse } from '@/lib/json-response'
 import { requireStaff, withAuth } from '@/lib/auth/guard'
 import { prisma } from '@/lib/prisma'
 import { serializeAdminNotification } from '@/lib/admin-notifications'
@@ -23,7 +23,7 @@ export const GET = withAuth(async () => {
     }),
   ])
 
-  return NextResponse.json({
+  return jsonResponse({
     unreadCount,
     notifications: notifications.map(serializeAdminNotification),
   })

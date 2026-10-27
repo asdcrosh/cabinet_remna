@@ -1,6 +1,7 @@
 // Помощник для защищённых server actions и API-роутов.
 // Если сессии нет — кидаем ошибку с кодом 401.
 
+import { jsonResponse } from '@/lib/json-response'
 import { NextResponse } from 'next/server'
 import { getSession } from './cookies'
 import type { SessionPayload } from './jwt'
@@ -73,17 +74,17 @@ export function withAuth<T extends (...args: any[]) => Promise<NextResponse>>(
         return await handler(...args)
       } catch (e) {
         if (e instanceof AuthError) {
-          return NextResponse.json({ error: e.message }, { status: e.status })
+          return jsonResponse({ error: e.message }, { status: e.status })
         }
         if (e instanceof Error && e.message === 'Invalid request origin') {
-          return NextResponse.json({ error: e.message }, { status: 403 })
+          return jsonResponse({ error: e.message }, { status: 403 })
         }
         logError('api.request_failed', e, {
           method: request?.method,
           path: request ? new URL(request.url).pathname : undefined,
         })
         const details = request ? await getAdminErrorDetails(request, e) : undefined
-        return NextResponse.json(
+        return jsonResponse(
           {
             error: 'Внутренняя ошибка сервера.',
             ...(details ? { details } : {}),

@@ -1,6 +1,6 @@
 // POST /api/me/password — смена пароля текущего юзера.
 
-import { NextResponse } from 'next/server'
+import { jsonResponse } from '@/lib/json-response'
 import { compare, hash } from 'bcryptjs'
 import { prisma } from '@/lib/prisma'
 import { changePasswordSchema } from '@/lib/auth/validation'
@@ -17,7 +17,7 @@ export const POST = withAuth(async (req: Request) => {
   const session = await requireAuth()
   const limited = await rateLimit(req, `change-password:${session.uid}`, 5, 60_000)
   if (!limited.ok) {
-    return NextResponse.json(
+    return jsonResponse(
       { error: 'Слишком много попыток. Попробуйте позже.' },
       { status: 429, headers: { 'Retry-After': String(limited.retryAfter) } }
     )
@@ -26,7 +26,7 @@ export const POST = withAuth(async (req: Request) => {
   const body = await req.json().catch(() => null)
   const parsed = changePasswordSchema.safeParse(body)
   if (!parsed.success) {
-    return NextResponse.json(
+    return jsonResponse(
       { error: 'Validation error', details: parsed.error.flatten() },
       { status: 400 }
     )
@@ -35,11 +35,11 @@ export const POST = withAuth(async (req: Request) => {
   // Берём user из БД (а не из сессии) — для свежего passwordHash
   // (требуется requireAuth → но session у нас есть; возьмём id через Prisma напрямую)
   const user = await prisma.user.findUnique({ where: { id: session.uid } })
-  if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+  if (!user) return jsonResponse({ error: 'User not found' }, { status: 404 })
 
   const ok = await compare(oldPassword, user.passwordHash)
   if (!ok) {
-    return NextResponse.json({ error: 'Неверный текущий пароль' }, { status: 400 })
+    return jsonResponse({ error: 'Неверный текущий пароль' }, { status: 400 })
   }
   if (user.remnashopUserId && process.env.REMNASHOP_API_URL) {
     let remotePassword: Awaited<ReturnType<typeof changeRemnashopPassword>>
@@ -50,7 +50,7 @@ export const POST = withAuth(async (req: Request) => {
         newPassword,
       })
     } catch {
-      return NextResponse.json(
+      return jsonResponse(
         {
           error: 'Remnashop сейчас недоступен. Пароль не изменён, попробуйте позже.',
           code: 'REMNASHOP_PASSWORD_SYNC_FAILED',
@@ -70,7 +70,7 @@ export const POST = withAuth(async (req: Request) => {
         actionHref: `/dashboard/admin/users?q=${encodeURIComponent(user.id)}`,
         actionLabel: 'Проверить аккаунт',
       })
-      return NextResponse.json(
+      return jsonResponse(
         {
           error: 'Пароль в старом аккаунте Remnashop отличается. Обратитесь в поддержку, чтобы объединить доступ.',
           code: 'REMNASHOP_PASSWORD_CONFLICT',
@@ -95,7 +95,7 @@ export const POST = withAuth(async (req: Request) => {
     request: req,
   })
 
-  const response = NextResponse.json({ ok: true })
+  const response = jsonResponse({ ok: true })
   return setSessionCookieOnResponse(response, {
     uid: user.id,
     email: user.email,

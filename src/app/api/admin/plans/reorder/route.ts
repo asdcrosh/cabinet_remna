@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { jsonResponse } from '@/lib/json-response'
 import { prisma } from '@/lib/prisma'
 import { requireAdmin, withAuth } from '@/lib/auth/guard'
 import { writeAuditLog } from '@/lib/audit-log'
@@ -13,7 +13,7 @@ export const PATCH = withAuth(async (req: Request) => {
   try {
     body = await req.json()
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+    return jsonResponse({ error: 'Invalid JSON' }, { status: 400 })
   }
 
   const planIds = Array.isArray(body.planIds)
@@ -21,7 +21,7 @@ export const PATCH = withAuth(async (req: Request) => {
     : []
 
   if (!planIds.length || planIds.length > 1000 || new Set(planIds).size !== planIds.length) {
-    return NextResponse.json({ error: 'Передайте полный список уникальных идентификаторов тарифов' }, { status: 400 })
+    return jsonResponse({ error: 'Передайте полный список уникальных идентификаторов тарифов' }, { status: 400 })
   }
 
   const reordered = await prisma.$transaction(async (tx) => {
@@ -40,7 +40,7 @@ export const PATCH = withAuth(async (req: Request) => {
   })
 
   if (!reordered) {
-    return NextResponse.json(
+    return jsonResponse(
       { error: 'Список тарифов изменился. Обновите страницу и повторите перемещение.' },
       { status: 409 }
     )
@@ -56,5 +56,5 @@ export const PATCH = withAuth(async (req: Request) => {
     request: req,
   })
 
-  return NextResponse.json({ ok: true })
+  return jsonResponse({ ok: true })
 })

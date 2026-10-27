@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { jsonResponse } from '@/lib/json-response'
 import { requireAdmin, withAuth } from '@/lib/auth/guard'
 import { bonusBoxMissionAdminSchema } from '@/lib/bonus-box-admin-validation'
 import { isFeatureEnabled } from '@/lib/feature-flags'
@@ -10,13 +10,13 @@ export const dynamic = 'force-dynamic'
 
 export const POST = withAuth(async (req: Request) => {
   if (!await isFeatureEnabled('bonusBox')) {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    return jsonResponse({ error: 'Not found' }, { status: 404 })
   }
   const session = await requireAdmin()
   const body = await req.json().catch(() => null)
   const parsed = bonusBoxMissionAdminSchema.safeParse(body)
   if (!parsed.success) {
-    return NextResponse.json(
+    return jsonResponse(
       { error: 'Проверьте параметры задания', details: parsed.error.flatten() },
       { status: 400 }
     )
@@ -36,5 +36,5 @@ export const POST = withAuth(async (req: Request) => {
     metadata: { missionId: mission.id, type: mission.type },
     request: req,
   })
-  return NextResponse.json({ mission })
+  return jsonResponse({ mission })
 })

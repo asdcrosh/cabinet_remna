@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { jsonResponse } from '@/lib/json-response'
 import { WelcomeBonusType } from '@prisma/client'
 import { requireAdmin, withAuth } from '@/lib/auth/guard'
 import { prisma } from '@/lib/prisma'
@@ -8,7 +8,7 @@ export const PATCH = withAuth(async (req: Request) => {
   const session = await requireAdmin()
   const body = await req.json().catch(() => null)
   const parsed = await parseWelcomeBonusInput(body)
-  if ('error' in parsed) return NextResponse.json({ error: parsed.error }, { status: 422 })
+  if ('error' in parsed) return jsonResponse({ error: parsed.error }, { status: 422 })
 
   const setting = await prisma.welcomeBonusSetting.upsert({
     where: { id: 'default' },
@@ -24,7 +24,7 @@ export const PATCH = withAuth(async (req: Request) => {
     request: req,
   })
 
-  return NextResponse.json({ setting })
+  return jsonResponse({ setting })
 })
 
 async function parseWelcomeBonusInput(body: any):

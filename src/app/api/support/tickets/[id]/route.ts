@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { jsonResponse } from '@/lib/json-response'
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { requireAuth, withAuth } from '@/lib/auth/guard'
@@ -23,7 +23,7 @@ export const dynamic = 'force-dynamic'
 const MESSAGE_PAGE_SIZE = 50
 
 export const GET = withAuth(async (req: Request, { params }: { params: Promise<{ id: string }> }) => {
-  if (!await isFeatureEnabled('support')) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  if (!await isFeatureEnabled('support')) return jsonResponse({ error: 'Not found' }, { status: 404 })
   const session = await requireAuth()
   const { id } = await params
   const before = new URL(req.url).searchParams.get('before')?.trim() || null
@@ -48,7 +48,7 @@ export const GET = withAuth(async (req: Request, { params }: { params: Promise<{
   })
 
   if (!ticket) {
-    return NextResponse.json({ error: 'Обращение не найдено.' }, { status: 404 })
+    return jsonResponse({ error: 'Обращение не найдено.' }, { status: 404 })
   }
 
   const hasOlderMessages = ticket.messages.length > MESSAGE_PAGE_SIZE
@@ -69,7 +69,7 @@ export const GET = withAuth(async (req: Request, { params }: { params: Promise<{
     if (readState.count === 1) ticket.userUnreadCount = 0
   }
 
-  return NextResponse.json({
+  return jsonResponse({
     ticket: {
       ...serializeSupportTicket(ticket),
       messages: messages.map(serializeSupportMessage),
@@ -82,12 +82,12 @@ export const GET = withAuth(async (req: Request, { params }: { params: Promise<{
 })
 
 export const POST = withAuth(async (req: Request, { params }: { params: Promise<{ id: string }> }) => {
-  if (!await isFeatureEnabled('support')) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  if (!await isFeatureEnabled('support')) return jsonResponse({ error: 'Not found' }, { status: 404 })
   const session = await requireAuth()
   const { id } = await params
   const limited = await rateLimit(req, `support:message:${session.uid}`, 20, 10 * 60 * 1000)
   if (!limited.ok) {
-    return NextResponse.json({ error: 'Слишком много сообщений. Попробуйте позже.' }, { status: 429 })
+    return jsonResponse({ error: 'Слишком много сообщений. Попробуйте позже.' }, { status: 429 })
   }
 
   let body: unknown
@@ -97,7 +97,7 @@ export const POST = withAuth(async (req: Request, { params }: { params: Promise<
     body = requestData.body
     attachments = requestData.attachments
   } catch (error) {
-    return NextResponse.json(
+    return jsonResponse(
       { error: error instanceof SupportAttachmentError ? error.message : 'Некорректный запрос.' },
       { status: 400 }
     )
@@ -105,7 +105,7 @@ export const POST = withAuth(async (req: Request, { params }: { params: Promise<
 
   const parsed = createSupportMessageSchema.safeParse(body)
   if (!parsed.success) {
-    return NextResponse.json({ error: 'Напишите сообщение перед отправкой.', details: parsed.error.flatten() }, { status: 400 })
+    return jsonResponse({ error: 'Напишите сообщение перед отправкой.', details: parsed.error.flatten() }, { status: 400 })
   }
 
   const ticket = await prisma.supportTicket.findFirst({
@@ -113,10 +113,10 @@ export const POST = withAuth(async (req: Request, { params }: { params: Promise<
     select: { id: true, status: true, subject: true },
   })
   if (!ticket) {
-    return NextResponse.json({ error: 'Обращение не найдено.' }, { status: 404 })
+    return jsonResponse({ error: 'Обращение не найдено.' }, { status: 404 })
   }
   if (ticket.status === 'CLOSED') {
-    return NextResponse.json({ error: 'Обращение уже закрыто.' }, { status: 400 })
+    return jsonResponse({ error: 'Обращение уже закрыто.' }, { status: 400 })
   }
 
   const result = await prisma.$transaction(async (tx) => {
@@ -172,7 +172,7 @@ export const POST = withAuth(async (req: Request, { params }: { params: Promise<
   })
   const message = result.message
   if (!result.created) {
-    return NextResponse.json({ message: serializeSupportMessage(message) }, { status: 200 })
+    return jsonResponse({ message: serializeSupportMessage(message) }, { status: 200 })
   }
   const customer = await prisma.user.findUnique({
     where: { id: session.uid },
@@ -207,11 +207,11 @@ export const POST = withAuth(async (req: Request, { params }: { params: Promise<
       : {}),
   })
 
-  return NextResponse.json({ message: serializeSupportMessage(message) }, { status: 201 })
+  return jsonResponse({ message: serializeSupportMessage(message) }, { status: 201 })
 })
 
 export const PATCH = withAuth(async (req: Request, { params }: { params: Promise<{ id: string }> }) => {
-  if (!await isFeatureEnabled('support')) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  if (!await isFeatureEnabled('support')) return jsonResponse({ error: 'Not found' }, { status: 404 })
   const session = await requireAuth()
   const { id } = await params
 
@@ -219,12 +219,12 @@ export const PATCH = withAuth(async (req: Request, { params }: { params: Promise
   try {
     body = await req.json()
   } catch {
-    return NextResponse.json({ error: 'Некорректный запрос.' }, { status: 400 })
+    return jsonResponse({ error: 'Некорректный запрос.' }, { status: 400 })
   }
 
   const parsed = userUpdateSupportTicketSchema.safeParse(body)
   if (!parsed.success) {
-    return NextResponse.json({ error: 'Пользователь может только закрыть обращение.', details: parsed.error.flatten() }, { status: 400 })
+    return jsonResponse({ error: 'Пользователь может только закрыть обращение.', details: parsed.error.flatten() }, { status: 400 })
   }
 
   const ticket = await prisma.supportTicket.updateMany({
@@ -236,8 +236,8 @@ export const PATCH = withAuth(async (req: Request, { params }: { params: Promise
   })
 
   if (ticket.count === 0) {
-    return NextResponse.json({ error: 'Обращение не найдено.' }, { status: 404 })
+    return jsonResponse({ error: 'Обращение не найдено.' }, { status: 404 })
   }
 
-  return NextResponse.json({ ok: true })
+  return jsonResponse({ ok: true })
 })

@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { jsonResponse } from '@/lib/json-response'
 import { Prisma } from '@prisma/client'
 import { requireSuperAdmin, withAuth } from '@/lib/auth/guard'
 import { writeAuditLog } from '@/lib/audit-log'
@@ -33,7 +33,7 @@ export const GET = withAuth(async () => {
       },
       templatesError: error instanceof Error ? error.message : 'Не удалось загрузить hosts Remnawave',
     }))
-  return NextResponse.json({
+  return jsonResponse({
     jobs: jobs.map(serializeNodeProvisioningJob),
     templates: templateResult.templates,
     templatesError: templateResult.templatesError,
@@ -45,14 +45,14 @@ export const POST = withAuth(async (request: Request) => {
   const session = await requireSuperAdmin()
   const configuration = await getNodeProvisioningReadiness()
   if (!configuration.ready) {
-    return NextResponse.json(
+    return jsonResponse(
       { error: `Provisioning не настроен: ${configuration.missing.join(', ')}` },
       { status: 503 }
     )
   }
   const limit = await rateLimit(request, `node-provisioning:${session.uid}`, 5, 15 * 60_000)
   if (!limit.ok) {
-    return NextResponse.json(
+    return jsonResponse(
       { error: 'Слишком много задач. Подождите и попробуйте снова.' },
       { status: 429, headers: { 'Retry-After': String(limit.retryAfter) } }
     )
@@ -60,7 +60,7 @@ export const POST = withAuth(async (request: Request) => {
 
   const parsed = createNodeProvisioningSchema.safeParse(await request.json().catch(() => null))
   if (!parsed.success) {
-    return NextResponse.json(
+    return jsonResponse(
       { error: 'Проверьте имя, публичный IP, SSH-доступ и шаблоны hosts', details: parsed.error.flatten() },
       { status: 400 }
     )
@@ -81,13 +81,13 @@ export const POST = withAuth(async (request: Request) => {
       },
       request,
     })
-    return NextResponse.json({ job: serializeNodeProvisioningJob(job) }, { status: 202 })
+    return jsonResponse({ job: serializeNodeProvisioningJob(job) }, { status: 202 })
   } catch (error) {
     if (error instanceof NodeProvisioningConflictError) {
-      return NextResponse.json({ error: error.message, jobId: error.jobId }, { status: 409 })
+      return jsonResponse({ error: error.message, jobId: error.jobId }, { status: 409 })
     }
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-      return NextResponse.json({ error: 'Для этого IP или домена уже выполняется задача' }, { status: 409 })
+      return jsonResponse({ error: 'Для этого IP или домена уже выполняется задача' }, { status: 409 })
     }
     throw error
   }

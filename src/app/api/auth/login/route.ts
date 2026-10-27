@@ -1,6 +1,6 @@
 // POST /api/auth/login
 
-import { NextResponse } from 'next/server'
+import { jsonResponse } from '@/lib/json-response'
 import { compare, hash } from 'bcryptjs'
 import { prisma } from '@/lib/prisma'
 import { loginSchema } from '@/lib/auth/validation'
@@ -20,12 +20,12 @@ export async function POST(req: Request) {
   try {
     assertSameOrigin(req)
   } catch {
-    return NextResponse.json({ error: 'Invalid request origin' }, { status: 403 })
+    return jsonResponse({ error: 'Invalid request origin' }, { status: 403 })
   }
 
   const limited = await rateLimit(req, 'auth-login', 10, 60_000)
   if (!limited.ok) {
-    return NextResponse.json(
+    return jsonResponse(
       { error: 'Слишком много попыток входа. Попробуйте позже.' },
       { status: 429, headers: { 'Retry-After': String(limited.retryAfter) } }
     )
@@ -35,12 +35,12 @@ export async function POST(req: Request) {
   try {
     body = await req.json()
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+    return jsonResponse({ error: 'Invalid JSON' }, { status: 400 })
   }
 
   const parsed = loginSchema.safeParse(body)
   if (!parsed.success) {
-    return NextResponse.json(
+    return jsonResponse(
       { error: 'Validation error', details: parsed.error.flatten() },
       { status: 400 }
     )
@@ -122,7 +122,7 @@ export async function POST(req: Request) {
   }
 
   if (!user || !isValid) {
-    return NextResponse.json(
+    return jsonResponse(
       { error: 'Неверный email или пароль' },
       { status: 401 }
     )
@@ -179,7 +179,7 @@ export async function POST(req: Request) {
   }
 
   if (!user.emailVerifiedAt) {
-    return NextResponse.json(
+    return jsonResponse(
       { error: 'Подтвердите email перед входом', code: 'EMAIL_NOT_VERIFIED' },
       { status: 403 }
     )
@@ -197,7 +197,7 @@ export async function POST(req: Request) {
     remnawaveUsername: user.remnawaveUsername,
   })
 
-  const res = NextResponse.json({
+  const res = jsonResponse({
     user: { id: user.id, email: user.email, name: user.name, role: user.role },
   })
   return setSessionCookieOnResponse(res, {

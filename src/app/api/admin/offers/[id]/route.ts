@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { jsonResponse } from '@/lib/json-response'
 import { PersonalOfferTone } from '@prisma/client'
 import { requireAdmin, withAuth } from '@/lib/auth/guard'
 import { prisma } from '@/lib/prisma'
@@ -9,14 +9,14 @@ export const PATCH = withAuth(async (req: Request, { params }: { params: Promise
   const { id } = await params
   const body = await req.json().catch(() => null)
   const parsed = parseOfferInput(body)
-  if ('error' in parsed) return NextResponse.json({ error: parsed.error }, { status: 422 })
+  if ('error' in parsed) return jsonResponse({ error: parsed.error }, { status: 422 })
 
   if (parsed.data.promoCodeId) {
     const promoCode = await prisma.promoCode.findFirst({
       where: { id: parsed.data.promoCodeId, isActive: true },
       select: { id: true },
     })
-    if (!promoCode) return NextResponse.json({ error: 'Выбранный промокод не найден или отключён' }, { status: 422 })
+    if (!promoCode) return jsonResponse({ error: 'Выбранный промокод не найден или отключён' }, { status: 422 })
   }
   const offer = await prisma.personalOfferSetting.update({
     where: { id },
@@ -31,7 +31,7 @@ export const PATCH = withAuth(async (req: Request, { params }: { params: Promise
     request: req,
   })
 
-  return NextResponse.json({ offer })
+  return jsonResponse({ offer })
 })
 
 function parseOfferInput(body: any):

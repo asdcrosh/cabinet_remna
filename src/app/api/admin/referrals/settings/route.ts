@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { jsonResponse } from '@/lib/json-response'
 import { z } from 'zod'
 import { requireAdmin, withAuth } from '@/lib/auth/guard'
 import { getReferralSettings, updateReferralSettings } from '@/lib/referral-settings'
@@ -24,7 +24,7 @@ const settingsSchema = z.object({
 
 export const GET = withAuth(async () => {
   await requireAdmin()
-  return NextResponse.json({ settings: await getReferralSettings() })
+  return jsonResponse({ settings: await getReferralSettings() })
 })
 
 export const PATCH = withAuth(async (request: Request) => {
@@ -32,7 +32,7 @@ export const PATCH = withAuth(async (request: Request) => {
   const body = await request.json().catch(() => null)
   const parsed = settingsSchema.safeParse(body)
   if (!parsed.success) {
-    return NextResponse.json({
+    return jsonResponse({
       error: parsed.error.issues[0]?.message || 'Проверьте настройки',
     }, { status: 422 })
   }
@@ -52,5 +52,5 @@ export const PATCH = withAuth(async (request: Request) => {
     request,
   })
 
-  return NextResponse.json({ settings })
+  return jsonResponse({ settings })
 })

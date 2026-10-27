@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { jsonResponse } from '@/lib/json-response'
 import { prisma } from '@/lib/prisma'
 import { requireStaff, withAuth } from '@/lib/auth/guard'
 import { createSupportInternalNoteSchema, serializeSupportInternalNote } from '@/lib/support'
@@ -9,13 +9,13 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 export const POST = withAuth(async (req: Request, { params }: { params: Promise<{ id: string }> }) => {
-  if (!await isFeatureEnabled('support')) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  if (!await isFeatureEnabled('support')) return jsonResponse({ error: 'Not found' }, { status: 404 })
   const session = await requireStaff()
   const { id } = await params
 
   const parsed = createSupportInternalNoteSchema.safeParse(await req.json().catch(() => null))
   if (!parsed.success) {
-    return NextResponse.json({ error: 'Напишите заметку перед сохранением.' }, { status: 400 })
+    return jsonResponse({ error: 'Напишите заметку перед сохранением.' }, { status: 400 })
   }
 
   const ticket = await prisma.supportTicket.findUnique({
@@ -23,7 +23,7 @@ export const POST = withAuth(async (req: Request, { params }: { params: Promise<
     select: { id: true, userId: true },
   })
   if (!ticket) {
-    return NextResponse.json({ error: 'Обращение не найдено.' }, { status: 404 })
+    return jsonResponse({ error: 'Обращение не найдено.' }, { status: 404 })
   }
 
   const note = await prisma.supportInternalNote.create({
@@ -49,5 +49,5 @@ export const POST = withAuth(async (req: Request, { params }: { params: Promise<
     request: req,
   })
 
-  return NextResponse.json({ note: serializeSupportInternalNote(note) }, { status: 201 })
+  return jsonResponse({ note: serializeSupportInternalNote(note) }, { status: 201 })
 })

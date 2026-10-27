@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { jsonResponse } from '@/lib/json-response'
 import { z } from 'zod'
 import { BonusBoxError, grantManualBonusBoxAttemptsBulk } from '@/lib/bonus-box'
 import { requireSuperAdmin, withAuth } from '@/lib/auth/guard'
@@ -32,7 +32,7 @@ const grantSchema = z.object({
 
 export const GET = withAuth(async (req: Request) => {
   if (!await isFeatureEnabled('bonusBox')) {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    return jsonResponse({ error: 'Not found' }, { status: 404 })
   }
   await requireSuperAdmin()
 
@@ -41,7 +41,7 @@ export const GET = withAuth(async (req: Request) => {
     q: url.searchParams.get('q') ?? '',
   })
   if (!parsed.success) {
-    return NextResponse.json({ error: 'Слишком длинный поисковый запрос' }, { status: 400 })
+    return jsonResponse({ error: 'Слишком длинный поисковый запрос' }, { status: 400 })
   }
 
   const q = parsed.data.q
@@ -69,7 +69,7 @@ export const GET = withAuth(async (req: Request) => {
     },
   })
 
-  return NextResponse.json({
+  return jsonResponse({
     users: users.map((user) => ({
       ...user,
       lastLoginAt: user.lastLoginAt?.toISOString() ?? null,
@@ -79,7 +79,7 @@ export const GET = withAuth(async (req: Request) => {
 
 export const POST = withAuth(async (req: Request) => {
   if (!await isFeatureEnabled('bonusBox')) {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    return jsonResponse({ error: 'Not found' }, { status: 404 })
   }
   const session = await requireSuperAdmin()
 
@@ -87,12 +87,12 @@ export const POST = withAuth(async (req: Request) => {
   try {
     body = await req.json()
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+    return jsonResponse({ error: 'Invalid JSON' }, { status: 400 })
   }
 
   const parsed = grantSchema.safeParse(body)
   if (!parsed.success) {
-    return NextResponse.json({
+    return jsonResponse({
       error: parsed.error.issues[0]?.message ?? 'Проверьте параметры начисления',
     }, { status: 400 })
   }
@@ -135,7 +135,7 @@ export const POST = withAuth(async (req: Request) => {
       })
     }
 
-    return NextResponse.json({
+    return jsonResponse({
       recipientsCount: result.recipientsCount,
       recipientsGranted: result.recipientsGranted,
       attemptsGranted: result.attemptsGranted,
@@ -144,7 +144,7 @@ export const POST = withAuth(async (req: Request) => {
     })
   } catch (error) {
     if (error instanceof BonusBoxError) {
-      return NextResponse.json({ error: error.message, code: error.code }, { status: error.status })
+      return jsonResponse({ error: error.message, code: error.code }, { status: error.status })
     }
     throw error
   }

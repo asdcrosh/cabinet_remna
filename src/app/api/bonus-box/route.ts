@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { jsonResponse } from '@/lib/json-response'
 import { z } from 'zod'
 import { BonusBoxError, getBonusBoxOverview, openBonusBox, retryPendingBonusBoxSyncsForUser } from '@/lib/bonus-box'
 import { requireAuth, withAuth } from '@/lib/auth/guard'
@@ -16,15 +16,15 @@ const openSchema = z.object({
 }).strict()
 
 export const GET = withAuth(async () => {
-  if (!await isFeatureEnabled('bonusBox')) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  if (!await isFeatureEnabled('bonusBox')) return jsonResponse({ error: 'Not found' }, { status: 404 })
   const session = await requireAuth()
   await retryPendingBonusBoxSyncsForUser(session.uid)
   const overview = await getBonusBoxOverview(session.uid)
-  return NextResponse.json(overview)
+  return jsonResponse(overview)
 })
 
 export const POST = withAuth(async (req: Request) => {
-  if (!await isFeatureEnabled('bonusBox')) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  if (!await isFeatureEnabled('bonusBox')) return jsonResponse({ error: 'Not found' }, { status: 404 })
   const session = await requireAuth()
   const limited = await rateLimit(
     req,
@@ -35,7 +35,7 @@ export const POST = withAuth(async (req: Request) => {
   )
   if (!limited.ok) {
     const retryAfter = Math.max(BONUS_BOX_RATE_LIMIT_COOLDOWN_SECONDS, limited.retryAfter ?? 0)
-    return NextResponse.json(
+    return jsonResponse(
       {
         error: 'Слишком много открытий. Попробуйте позже.',
         retryAfter,
@@ -49,22 +49,22 @@ export const POST = withAuth(async (req: Request) => {
     try {
       body = await req.json()
     } catch {
-      return NextResponse.json({ error: 'Некорректный запрос', code: 'INVALID_SPIN_ID' }, { status: 400 })
+      return jsonResponse({ error: 'Некорректный запрос', code: 'INVALID_SPIN_ID' }, { status: 400 })
     }
     const parsed = openSchema.safeParse(body)
     if (!parsed.success) {
-      return NextResponse.json({ error: 'Некорректный идентификатор вращения', code: 'INVALID_SPIN_ID' }, { status: 400 })
+      return jsonResponse({ error: 'Некорректный идентификатор вращения', code: 'INVALID_SPIN_ID' }, { status: 400 })
     }
 
     await assessBonusBoxRisk(session.uid, req)
     const result = await openBonusBox(session.uid, parsed.data.spinId)
-    return NextResponse.json(result)
+    return jsonResponse(result)
   } catch (error) {
     if (error instanceof BonusBoxError) {
-      return NextResponse.json({ error: error.message, code: error.code }, { status: error.status })
+      return jsonResponse({ error: error.message, code: error.code }, { status: error.status })
     }
     if (error instanceof BonusBoxRiskError) {
-      return NextResponse.json(
+      return jsonResponse(
         { error: error.message, code: 'BONUS_RISK_REVIEW', score: error.score },
         { status: 403 }
       )

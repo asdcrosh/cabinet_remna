@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { jsonResponse } from '@/lib/json-response'
 import { requireAdmin, withAuth } from '@/lib/auth/guard'
 import { syncCabinetPaymentToRemnashop } from '@/lib/remnashop-reverse-sync'
 import { writeAuditLog } from '@/lib/audit-log'
@@ -12,7 +12,7 @@ export const POST = withAuth(async (req: Request) => {
 
   const body = (await req.json().catch(() => null)) as { paymentId?: unknown } | null
   const paymentId = typeof body?.paymentId === 'string' ? body.paymentId : null
-  if (!paymentId) return NextResponse.json({ error: 'paymentId is required' }, { status: 400 })
+  if (!paymentId) return jsonResponse({ error: 'paymentId is required' }, { status: 400 })
 
   try {
     const result = await syncCabinetPaymentToRemnashop(paymentId)
@@ -30,14 +30,14 @@ export const POST = withAuth(async (req: Request) => {
     })
 
     if (!result.ok) {
-      return NextResponse.json(
+      return jsonResponse(
         { error: describeSyncError(new Error('skipped' in result ? result.skipped : 'Remnashop sync failed')) },
         { status: 409 }
       )
     }
 
-    return NextResponse.json({ ok: true, result })
+    return jsonResponse({ ok: true, result })
   } catch (error) {
-    return NextResponse.json({ error: describeSyncError(error) }, { status: 500 })
+    return jsonResponse({ error: describeSyncError(error) }, { status: 500 })
   }
 })

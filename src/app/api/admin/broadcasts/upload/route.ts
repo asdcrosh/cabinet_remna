@@ -1,7 +1,7 @@
+import { jsonResponse } from '@/lib/json-response'
 import { randomUUID } from 'crypto'
 import { mkdir, writeFile } from 'fs/promises'
 import path from 'path'
-import { NextResponse } from 'next/server'
 import { requireAdmin, withAuth } from '@/lib/auth/guard'
 import { getAppUrl } from '@/lib/app-url'
 import { signBroadcastUploadUrl } from '@/lib/broadcast-upload-url'
@@ -19,23 +19,23 @@ const ALLOWED_TYPES = new Map([
 ])
 
 export const POST = withAuth(async (req: Request) => {
-  if (!await isFeatureEnabled('broadcasts')) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  if (!await isFeatureEnabled('broadcasts')) return jsonResponse({ error: 'Not found' }, { status: 404 })
   await requireAdmin()
 
   const form = await req.formData().catch(() => null)
   const file = form?.get('file')
   if (!isUploadedFile(file)) {
-    return NextResponse.json({ error: 'Файл не найден' }, { status: 400 })
+    return jsonResponse({ error: 'Файл не найден' }, { status: 400 })
   }
 
   if (file.size <= 0 || file.size > MAX_IMAGE_SIZE) {
-    return NextResponse.json({ error: 'Картинка должна быть до 15 МБ' }, { status: 400 })
+    return jsonResponse({ error: 'Картинка должна быть до 15 МБ' }, { status: 400 })
   }
 
   const bytes = Buffer.from(await file.arrayBuffer())
   const detectedType = detectImageType(bytes)
   if (!detectedType || (file.type && file.type !== detectedType.mimeType)) {
-    return NextResponse.json({ error: 'Поддерживаются JPG, PNG, WEBP и GIF' }, { status: 400 })
+    return jsonResponse({ error: 'Поддерживаются JPG, PNG, WEBP и GIF' }, { status: 400 })
   }
 
   const directory = path.join(process.cwd(), 'public', 'uploads', 'broadcasts')
@@ -43,7 +43,7 @@ export const POST = withAuth(async (req: Request) => {
   await mkdir(directory, { recursive: true })
   await writeFile(path.join(directory, filename), bytes, { flag: 'wx' })
 
-  return NextResponse.json({
+  return jsonResponse({
     url: signBroadcastUploadUrl(`${getAppUrl()}/uploads/broadcasts/${filename}`),
   })
 })

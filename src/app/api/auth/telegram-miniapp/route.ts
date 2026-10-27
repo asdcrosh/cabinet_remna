@@ -1,6 +1,6 @@
+import { jsonResponse } from '@/lib/json-response'
 import { randomBytes } from 'node:crypto'
 import { hash } from 'bcryptjs'
-import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { assertSameOrigin } from '@/lib/security'
 import { rateLimit } from '@/lib/rate-limit'
@@ -23,17 +23,17 @@ export async function POST(req: Request) {
   try {
     assertSameOrigin(req)
   } catch {
-    return NextResponse.json({ error: 'Invalid request origin' }, { status: 403 })
+    return jsonResponse({ error: 'Invalid request origin' }, { status: 403 })
   }
 
   const limited = await rateLimit(req, 'telegram-miniapp-auth', 20, 60_000)
   if (!limited.ok) {
-    return NextResponse.json({ error: 'Слишком много попыток. Попробуйте позже.' }, { status: 429 })
+    return jsonResponse({ error: 'Слишком много попыток. Попробуйте позже.' }, { status: 429 })
   }
 
   const body = (await req.json().catch(() => null)) as { initData?: unknown } | null
   if (typeof body?.initData !== 'string') {
-    return NextResponse.json({ error: 'Telegram data is required' }, { status: 400 })
+    return jsonResponse({ error: 'Telegram data is required' }, { status: 400 })
   }
 
   let telegram
@@ -43,7 +43,7 @@ export async function POST(req: Request) {
     logWarn('auth.telegram_miniapp.invalid_init_data', {
       message: error instanceof Error ? error.message : 'unknown error',
     })
-    return NextResponse.json(
+    return jsonResponse(
       { error: error instanceof Error ? error.message : 'Telegram authentication failed' },
       { status: 401 }
     )
@@ -220,13 +220,13 @@ export async function POST(req: Request) {
       userId: user.id,
       telegramId: telegram.id,
     })
-    return NextResponse.json(
+    return jsonResponse(
       { error: 'Не удалось завершить вход. Откройте кабинет заново.' },
       { status: 409 }
     )
   }
 
-  const response = NextResponse.json({
+  const response = jsonResponse({
     ok: true,
     emailConfigured: Boolean(sessionUser.emailVerifiedAt),
   })

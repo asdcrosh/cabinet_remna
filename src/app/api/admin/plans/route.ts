@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { jsonResponse } from '@/lib/json-response'
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { requireAdmin, withAuth } from '@/lib/auth/guard'
@@ -15,7 +15,7 @@ export const GET = withAuth(async () => {
     orderBy: [{ sortOrder: 'asc' }, { createdAt: 'desc' }],
   })
 
-  return NextResponse.json({ plans })
+  return jsonResponse({ plans })
 })
 
 export const POST = withAuth(async (req: Request) => {
@@ -25,12 +25,12 @@ export const POST = withAuth(async (req: Request) => {
   try {
     body = await req.json()
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+    return jsonResponse({ error: 'Invalid JSON' }, { status: 400 })
   }
 
   const parsed = adminPlanSchema.safeParse(body)
   if (!parsed.success) {
-    return NextResponse.json(
+    return jsonResponse(
       { error: 'Validation error', details: parsed.error.flatten() },
       { status: 400 }
     )
@@ -60,7 +60,7 @@ export const POST = withAuth(async (req: Request) => {
     })
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-      return NextResponse.json({ error: 'Популярный тариф уже изменён другим администратором' }, { status: 409 })
+      return jsonResponse({ error: 'Популярный тариф уже изменён другим администратором' }, { status: 409 })
     }
     throw error
   }
@@ -80,7 +80,7 @@ export const POST = withAuth(async (req: Request) => {
     request: req,
   })
 
-  return NextResponse.json({ plan }, { status: 201 })
+  return jsonResponse({ plan }, { status: 201 })
 })
 
 function normalizePlanInput<T extends { description?: string | null }>(data: T) {

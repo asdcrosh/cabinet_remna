@@ -2,7 +2,7 @@
 // Создаёт ЛОКАЛЬНЫЙ аккаунт ЛК. Remnawave-профиль НЕ создаём сразу —
 // он понадобится только при первой покупке подписки.
 
-import { NextResponse } from 'next/server'
+import { jsonResponse } from '@/lib/json-response'
 import { Prisma } from '@prisma/client'
 import { hash } from 'bcryptjs'
 import { prisma } from '@/lib/prisma'
@@ -23,7 +23,7 @@ import { sanitizeInternalNext } from '@/lib/auth/next-path'
 export const runtime = 'nodejs'
 
 function neutralRegisterResponse() {
-  return NextResponse.json(
+  return jsonResponse(
     {
       requiresEmailVerification: true,
       emailDelivery: 'sent',
@@ -57,12 +57,12 @@ export async function POST(req: Request) {
   try {
     assertSameOrigin(req)
   } catch {
-    return NextResponse.json({ error: 'Invalid request origin' }, { status: 403 })
+    return jsonResponse({ error: 'Invalid request origin' }, { status: 403 })
   }
 
   const limited = await rateLimit(req, 'auth-register', 5, 60_000)
   if (!limited.ok) {
-    return NextResponse.json(
+    return jsonResponse(
       { error: 'Слишком много регистраций. Попробуйте позже.' },
       { status: 429, headers: { 'Retry-After': String(limited.retryAfter) } }
     )
@@ -72,12 +72,12 @@ export async function POST(req: Request) {
   try {
     body = await req.json()
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+    return jsonResponse({ error: 'Invalid JSON' }, { status: 400 })
   }
 
   const parsed = registerSchema.safeParse(body)
   if (!parsed.success) {
-    return NextResponse.json(
+    return jsonResponse(
       { error: 'Validation error', details: parsed.error.flatten() },
       { status: 400 }
     )
@@ -119,7 +119,7 @@ export async function POST(req: Request) {
     : null
 
   if (referralCode && !referrer) {
-    return NextResponse.json({ error: 'Реферальный код не найден' }, { status: 404 })
+    return jsonResponse({ error: 'Реферальный код не найден' }, { status: 404 })
   }
 
   let user: { id: string; email: string; role: string; name: string | null }
@@ -198,7 +198,7 @@ export async function POST(req: Request) {
     })
   }
 
-  return NextResponse.json(
+  return jsonResponse(
     {
       user,
       requiresEmailVerification: true,

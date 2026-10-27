@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { jsonResponse } from '@/lib/json-response'
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { requireAdmin, withAuth } from '@/lib/auth/guard'
@@ -26,7 +26,7 @@ export const GET = withAuth(async () => {
     },
   })
 
-  return NextResponse.json({ promoCodes })
+  return jsonResponse({ promoCodes })
 })
 
 export const DELETE = withAuth(async (req: Request) => {
@@ -36,7 +36,7 @@ export const DELETE = withAuth(async (req: Request) => {
   try {
     body = await req.json()
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+    return jsonResponse({ error: 'Invalid JSON' }, { status: 400 })
   }
 
   const ids = Array.isArray((body as { ids?: unknown })?.ids)
@@ -44,7 +44,7 @@ export const DELETE = withAuth(async (req: Request) => {
     : []
   const uniqueIds = Array.from(new Set(ids)).slice(0, 100)
   if (uniqueIds.length === 0) {
-    return NextResponse.json({ error: 'Выберите промокоды' }, { status: 400 })
+    return jsonResponse({ error: 'Выберите промокоды' }, { status: 400 })
   }
 
   const promoCodes = await prisma.promoCode.findMany({
@@ -52,7 +52,7 @@ export const DELETE = withAuth(async (req: Request) => {
     select: { id: true, code: true },
   })
   if (promoCodes.length === 0) {
-    return NextResponse.json({ error: 'Промокоды не найдены' }, { status: 404 })
+    return jsonResponse({ error: 'Промокоды не найдены' }, { status: 404 })
   }
 
   await deactivateCabinetPromoCodesInRemnashopBestEffort(promoCodes.map((promoCode) => promoCode.code))
@@ -71,7 +71,7 @@ export const DELETE = withAuth(async (req: Request) => {
     request: req,
   })
 
-  return NextResponse.json({ ok: true, deleted: deleted.count })
+  return jsonResponse({ ok: true, deleted: deleted.count })
 })
 
 export const PATCH = withAuth(async (req: Request) => {
@@ -81,7 +81,7 @@ export const PATCH = withAuth(async (req: Request) => {
   try {
     body = await req.json()
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+    return jsonResponse({ error: 'Invalid JSON' }, { status: 400 })
   }
 
   const ids = Array.isArray((body as { ids?: unknown })?.ids)
@@ -90,10 +90,10 @@ export const PATCH = withAuth(async (req: Request) => {
   const uniqueIds = Array.from(new Set(ids)).slice(0, 100)
   const isActive = (body as { isActive?: unknown })?.isActive
   if (uniqueIds.length === 0) {
-    return NextResponse.json({ error: 'Выберите промокоды' }, { status: 400 })
+    return jsonResponse({ error: 'Выберите промокоды' }, { status: 400 })
   }
   if (typeof isActive !== 'boolean') {
-    return NextResponse.json({ error: 'isActive is required' }, { status: 400 })
+    return jsonResponse({ error: 'isActive is required' }, { status: 400 })
   }
 
   const promoCodes = await prisma.promoCode.findMany({
@@ -101,7 +101,7 @@ export const PATCH = withAuth(async (req: Request) => {
     select: { id: true, code: true },
   })
   if (promoCodes.length === 0) {
-    return NextResponse.json({ error: 'Промокоды не найдены' }, { status: 404 })
+    return jsonResponse({ error: 'Промокоды не найдены' }, { status: 404 })
   }
 
   const updated = await prisma.promoCode.updateMany({
@@ -125,7 +125,7 @@ export const PATCH = withAuth(async (req: Request) => {
     request: req,
   })
 
-  return NextResponse.json({ ok: true, updated: updated.count })
+  return jsonResponse({ ok: true, updated: updated.count })
 })
 
 export const POST = withAuth(async (req: Request) => {
@@ -135,12 +135,12 @@ export const POST = withAuth(async (req: Request) => {
   try {
     body = await req.json()
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+    return jsonResponse({ error: 'Invalid JSON' }, { status: 400 })
   }
 
   const parsed = adminPromoCodeSchema.safeParse(body)
   if (!parsed.success) {
-    return NextResponse.json(
+    return jsonResponse(
       { error: 'Validation error', details: parsed.error.flatten() },
       { status: 400 }
     )
@@ -148,7 +148,7 @@ export const POST = withAuth(async (req: Request) => {
 
   const data = parsed.data
   const code = normalizePromoCode(data.code)
-  if (!code) return NextResponse.json({ error: 'Введите промокод' }, { status: 400 })
+  if (!code) return jsonResponse({ error: 'Введите промокод' }, { status: 400 })
   const allowedEmails = data.audience === 'PERSONAL' ? normalizeAllowedEmails(data.allowedEmails) : []
 
   try {
@@ -187,10 +187,10 @@ export const POST = withAuth(async (req: Request) => {
     })
     await syncCabinetPromoCodeToRemnashopBestEffort(promoCode.id)
 
-    return NextResponse.json({ promoCode })
+    return jsonResponse({ promoCode })
   } catch (e) {
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
-      return NextResponse.json({ error: 'Промокод с таким кодом уже существует' }, { status: 409 })
+      return jsonResponse({ error: 'Промокод с таким кодом уже существует' }, { status: 409 })
     }
     throw e
   }

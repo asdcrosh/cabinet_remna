@@ -1,3 +1,4 @@
+import { jsonResponse } from '@/lib/json-response'
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { requireAuth, withAuth } from '@/lib/auth/guard'
@@ -18,7 +19,7 @@ export const GET = withAuth(async (req: Request) => {
   const session = await requireAuth()
   const limited = await rateLimit(req, `telegram-oidc-start:${session.uid}`, 10, 60_000)
   if (!limited.ok) {
-    return NextResponse.json(
+    return jsonResponse(
       { error: 'Слишком много попыток привязки Telegram. Попробуйте позже.' },
       { status: 429, headers: { 'Retry-After': String(limited.retryAfter) } }
     )
@@ -26,7 +27,7 @@ export const GET = withAuth(async (req: Request) => {
 
   const clientId = process.env.TELEGRAM_CLIENT_ID
   if (!clientId) {
-    return NextResponse.json({ error: 'TELEGRAM_CLIENT_ID is not configured' }, { status: 500 })
+    return jsonResponse({ error: 'TELEGRAM_CLIENT_ID is not configured' }, { status: 500 })
   }
 
   const state = createTelegramOidcState()

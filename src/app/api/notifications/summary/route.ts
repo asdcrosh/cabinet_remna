@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { jsonResponse } from '@/lib/json-response'
 import { prisma } from '@/lib/prisma'
 import { requireAuth, withAuth } from '@/lib/auth/guard'
 import { prepareUserNotificationForDisplay, serializeUserNotification } from '@/lib/user-notifications'
@@ -18,7 +18,7 @@ export const GET = withAuth(async () => {
     }),
   ])
 
-  return NextResponse.json({
+  return jsonResponse({
     unreadCount,
     notifications: notifications.map(serializeUserNotification).map((item) => prepareUserNotificationForDisplay(item)),
   })

@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { jsonResponse } from '@/lib/json-response'
 import { prisma } from '@/lib/prisma'
 import { requireAdmin, withAuth } from '@/lib/auth/guard'
 import { provisionPaymentSubscription } from '@/lib/provisioning'
@@ -13,7 +13,7 @@ export const POST = withAuth(async (req: Request) => {
   try {
     body = await req.json()
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+    return jsonResponse({ error: 'Invalid JSON' }, { status: 400 })
   }
 
   const paymentId =
@@ -26,7 +26,7 @@ export const POST = withAuth(async (req: Request) => {
       : []
 
   if (!paymentId && paymentIds.length === 0) {
-    return NextResponse.json({ error: 'paymentId is required' }, { status: 400 })
+    return jsonResponse({ error: 'paymentId is required' }, { status: 400 })
   }
 
   if (paymentIds.length > 0) {
@@ -34,7 +34,7 @@ export const POST = withAuth(async (req: Request) => {
     for (const id of paymentIds) {
       results.push(await provisionOnePayment(req, session.uid, id))
     }
-    return NextResponse.json({
+    return jsonResponse({
       ok: true,
       total: results.length,
       provisioned: results.filter((item) => item.status === 'provisioned').length,
@@ -45,11 +45,11 @@ export const POST = withAuth(async (req: Request) => {
   }
 
   const result = await provisionOnePayment(req, session.uid, paymentId!)
-  if (result.status === 'not_found') return NextResponse.json({ error: 'Payment not found' }, { status: 404 })
-  if (result.status === 'not_succeeded') return NextResponse.json({ error: 'Payment is not succeeded' }, { status: 409 })
-  if (result.status === 'already_provisioned') return NextResponse.json({ ok: true, alreadyProvisioned: true })
-  if (result.status === 'failed') return NextResponse.json({ error: result.error }, { status: 500 })
-  return NextResponse.json({ ok: true, subscriptionId: result.subscriptionId })
+  if (result.status === 'not_found') return jsonResponse({ error: 'Payment not found' }, { status: 404 })
+  if (result.status === 'not_succeeded') return jsonResponse({ error: 'Payment is not succeeded' }, { status: 409 })
+  if (result.status === 'already_provisioned') return jsonResponse({ ok: true, alreadyProvisioned: true })
+  if (result.status === 'failed') return jsonResponse({ error: result.error }, { status: 500 })
+  return jsonResponse({ ok: true, subscriptionId: result.subscriptionId })
 })
 
 async function provisionOnePayment(req: Request, actorId: string, paymentId: string) {

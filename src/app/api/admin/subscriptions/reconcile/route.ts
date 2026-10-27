@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { jsonResponse } from '@/lib/json-response'
 import { requireAdmin, withAuth } from '@/lib/auth/guard'
 import { prisma } from '@/lib/prisma'
 import { rateLimit } from '@/lib/rate-limit'
@@ -14,13 +14,13 @@ export const POST = withAuth(async (req: Request) => {
   try {
     assertSameOrigin(req)
   } catch {
-    return NextResponse.json({ error: 'Invalid request origin' }, { status: 403 })
+    return jsonResponse({ error: 'Invalid request origin' }, { status: 403 })
   }
 
   const session = await requireAdmin()
   const limited = await rateLimit(req, `admin-subscription-reconcile:${session.uid}`, 20, 60_000)
   if (!limited.ok) {
-    return NextResponse.json(
+    return jsonResponse(
       { error: 'Слишком много запусков. Повторите позже.' },
       { status: 429, headers: { 'Retry-After': String(limited.retryAfter) } }
     )
@@ -38,17 +38,17 @@ export const POST = withAuth(async (req: Request) => {
   const limit = typeof body?.limit === 'number' ? body.limit : 25
 
   if (mode === 'REPAIR' && !userId) {
-    return NextResponse.json({ error: 'Для ручного исправления нужен пользователь.' }, { status: 400 })
+    return jsonResponse({ error: 'Для ручного исправления нужен пользователь.' }, { status: 400 })
   }
 
   try {
     if (userId) {
       const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, role: true } })
-      if (!user) return NextResponse.json({ error: 'Пользователь не найден.' }, { status: 404 })
+      if (!user) return jsonResponse({ error: 'Пользователь не найден.' }, { status: 404 })
 
       const actor = await prisma.user.findUnique({ where: { id: session.uid }, select: { role: true } })
       if (user.role === 'SUPER_ADMIN' && actor?.role !== 'SUPER_ADMIN') {
-        return NextResponse.json({ error: 'Изменять подписку главного администратора нельзя.' }, { status: 403 })
+        return jsonResponse({ error: 'Изменять подписку главного администратора нельзя.' }, { status: 403 })
       }
 
       const result = await checkSubscriptionHealth({ userId, mode, actorId: session.uid })
@@ -65,7 +65,7 @@ export const POST = withAuth(async (req: Request) => {
         },
         request: req,
       })
-      return NextResponse.json({ ok: true, result })
+      return jsonResponse({ ok: true, result })
     }
 
     const result = await reconcileSubscriptionHealthBatch({
@@ -80,8 +80,8 @@ export const POST = withAuth(async (req: Request) => {
       metadata: { mode, ...result },
       request: req,
     })
-    return NextResponse.json({ ok: true, result })
+    return jsonResponse({ ok: true, result })
   } catch (error) {
-    return NextResponse.json({ error: describeSyncError(error) }, { status: 500 })
+    return jsonResponse({ error: describeSyncError(error) }, { status: 500 })
   }
 })

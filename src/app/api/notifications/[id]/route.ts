@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { jsonResponse } from '@/lib/json-response'
 import { prisma } from '@/lib/prisma'
 import { requireAuth, withAuth } from '@/lib/auth/guard'
 
@@ -14,5 +14,5 @@ export const PATCH = withAuth(async (_req: Request, { params }: { params: Promis
     data: { readAt: new Date() },
   })
 
-  return NextResponse.json({ ok: true, updated: result.count })
+  return jsonResponse({ ok: true, updated: result.count })
 })

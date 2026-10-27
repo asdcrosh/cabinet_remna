@@ -1,3 +1,4 @@
+import { jsonResponse } from '@/lib/json-response'
 import { randomBytes } from 'node:crypto'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
@@ -17,7 +18,7 @@ export const GET = withAuth(async (req: Request) => {
   const session = await requireAuth()
   const paymentId = paymentIdSchema.safeParse(new URL(req.url).searchParams.get('payment'))
   if (!paymentId.success) {
-    return NextResponse.json({ error: 'Некорректный платёж' }, { status: 400 })
+    return jsonResponse({ error: 'Некорректный платёж' }, { status: 400 })
   }
 
   const payment = await prisma.payment.findFirst({
@@ -30,7 +31,7 @@ export const GET = withAuth(async (req: Request) => {
     include: { plan: { select: { durationDays: true, unlimitedDuration: true } } },
   })
   if (!payment) {
-    return NextResponse.json({ error: 'Платёж не найден или уже завершён' }, { status: 404 })
+    return jsonResponse({ error: 'Платёж не найден или уже завершён' }, { status: 404 })
   }
 
   const baseUrl = getAppUrl()

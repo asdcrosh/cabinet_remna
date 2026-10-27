@@ -1,7 +1,7 @@
 // GET /api/subscription/keys — публичная для пользователя ссылка подписки.
 // Отдельные протокольные ключи не отдаём в кабинет.
 
-import { NextResponse } from 'next/server'
+import { jsonResponse } from '@/lib/json-response'
 import { prisma } from '@/lib/prisma'
 import { requireAuth, withAuth } from '@/lib/auth/guard'
 import { remnawave, RemnawaveError } from '@/lib/remnawave'
@@ -13,12 +13,12 @@ export const GET = withAuth(async () => {
   const session = await requireAuth()
   const user = await prisma.user.findUnique({ where: { id: session.uid } })
   if (!user?.remnawaveUsername) {
-    return NextResponse.json({ keys: null, message: 'Нет активной подписки' })
+    return jsonResponse({ keys: null, message: 'Нет активной подписки' })
   }
 
   try {
     const data = await remnawave.getSubscriptionByUsername(user.remnawaveUsername)
-    return NextResponse.json({
+    return jsonResponse({
       keys: {
         subscriptionUrl: data.response.subscriptionUrl,
       },
@@ -34,7 +34,7 @@ export const GET = withAuth(async () => {
     })
   } catch (e) {
     if (e instanceof RemnawaveError) {
-      return NextResponse.json(
+      return jsonResponse(
         {
           error: 'Не удалось загрузить ключи. Попробуйте позже.',
           details: process.env.NODE_ENV === 'development' ? e.body : undefined,

@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { jsonResponse } from '@/lib/json-response'
 import { z } from 'zod'
 import { BonusBoxError, grantManualBonusBoxAttempts } from '@/lib/bonus-box'
 import { requireSuperAdmin, withAuth } from '@/lib/auth/guard'
@@ -14,7 +14,7 @@ const schema = z.object({
 })
 
 export const POST = withAuth(async (req: Request, { params }: { params: Promise<{ id: string }> }) => {
-  if (!await isFeatureEnabled('bonusBox')) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  if (!await isFeatureEnabled('bonusBox')) return jsonResponse({ error: 'Not found' }, { status: 404 })
   const session = await requireSuperAdmin()
   const { id } = await params
 
@@ -22,12 +22,12 @@ export const POST = withAuth(async (req: Request, { params }: { params: Promise<
   try {
     body = await req.json()
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+    return jsonResponse({ error: 'Invalid JSON' }, { status: 400 })
   }
 
   const parsed = schema.safeParse(body)
   if (!parsed.success) {
-    return NextResponse.json({ error: 'Укажите количество от 1 до 100' }, { status: 400 })
+    return jsonResponse({ error: 'Укажите количество от 1 до 100' }, { status: 400 })
   }
 
   try {
@@ -49,10 +49,10 @@ export const POST = withAuth(async (req: Request, { params }: { params: Promise<
       },
       request: req,
     })
-    return NextResponse.json(result)
+    return jsonResponse(result)
   } catch (error) {
     if (error instanceof BonusBoxError) {
-      return NextResponse.json({ error: error.message, code: error.code }, { status: error.status })
+      return jsonResponse({ error: error.message, code: error.code }, { status: error.status })
     }
     throw error
   }

@@ -2,7 +2,7 @@
 // Всегда возвращает агрегаты трафика. Посуточная история Remnawave дополняет
 // ответ, но её отсутствие не скрывает реальный расход пользователя.
 
-import { NextResponse } from 'next/server'
+import { jsonResponse } from '@/lib/json-response'
 import { prisma } from '@/lib/prisma'
 import { requireAuth, withAuth } from '@/lib/auth/guard'
 import {
@@ -30,7 +30,7 @@ export const GET = withAuth(async (req: Request) => {
     },
   })
   if (!user || !hasRemnawaveUserReference(user)) {
-    return NextResponse.json({
+    return jsonResponse({
       series: [],
       usedBytes: '0',
       limitBytes: null,
@@ -89,7 +89,7 @@ export const GET = withAuth(async (req: Request) => {
     if (!warning) warning = 'history_unavailable'
   }
 
-  return NextResponse.json({
+  return jsonResponse({
     series,
     usedBytes: usedBytes.toString(),
     limitBytes: limitBytes?.toString() ?? null,

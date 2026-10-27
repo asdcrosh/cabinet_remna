@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { jsonResponse } from '@/lib/json-response'
 import { prisma } from '@/lib/prisma'
 import { requireAdmin, withAuth } from '@/lib/auth/guard'
 import {
@@ -21,14 +21,14 @@ export const POST = withAuth(async (req: Request, { params }: { params: Promise<
   try {
     assertSameOrigin(req)
   } catch {
-    return NextResponse.json({ error: 'Invalid request origin' }, { status: 403 })
+    return jsonResponse({ error: 'Invalid request origin' }, { status: 403 })
   }
 
   const session = await requireAdmin()
   const { id } = await params
   const limited = await rateLimit(req, `admin-user-sync:${session.uid}:${id}`, 10, 60_000)
   if (!limited.ok) {
-    return NextResponse.json(
+    return jsonResponse(
       { error: 'Слишком много запусков синхронизации. Повторите позже.' },
       { status: 429, headers: { 'Retry-After': String(limited.retryAfter) } }
     )
@@ -50,10 +50,10 @@ export const POST = withAuth(async (req: Request, { params }: { params: Promise<
   ])
 
   if (!actor || !user) {
-    return NextResponse.json({ error: 'Пользователь не найден' }, { status: 404 })
+    return jsonResponse({ error: 'Пользователь не найден' }, { status: 404 })
   }
   if (user.role === 'SUPER_ADMIN' && actor.role !== 'SUPER_ADMIN') {
-    return NextResponse.json({ error: 'Синхронизировать главного администратора нельзя' }, { status: 403 })
+    return jsonResponse({ error: 'Синхронизировать главного администратора нельзя' }, { status: 403 })
   }
 
   const result = {
@@ -112,5 +112,5 @@ export const POST = withAuth(async (req: Request, { params }: { params: Promise<
     request: req,
   })
 
-  return NextResponse.json({ ok: true, result })
+  return jsonResponse({ ok: true, result })
 })

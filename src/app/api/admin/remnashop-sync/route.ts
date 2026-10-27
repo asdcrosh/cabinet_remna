@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { jsonResponse } from '@/lib/json-response'
 import { requireAdmin, withAuth } from '@/lib/auth/guard'
 import {
   getRemnashopSyncDryRun,
@@ -19,10 +19,10 @@ export const GET = withAuth(async () => {
   await requireAdmin()
 
   try {
-    return NextResponse.json(await withSyncEvents(await getRemnashopSyncDryRun()))
+    return jsonResponse(await withSyncEvents(await getRemnashopSyncDryRun()))
   } catch (e) {
     const message = e instanceof Error ? e.message : 'remnashop sync failed'
-    return NextResponse.json({ error: message }, { status: 500 })
+    return jsonResponse({ error: message }, { status: 500 })
   }
 })
 
@@ -68,7 +68,7 @@ export const POST = withAuth(async (req: Request) => {
       },
       request: req,
     })
-    return NextResponse.json(await withSyncEvents(reportBase))
+    return jsonResponse(await withSyncEvents(reportBase))
   } catch (e) {
     const message = e instanceof Error ? e.message : 'remnashop sync failed'
     await writeAuditLog({
@@ -81,7 +81,7 @@ export const POST = withAuth(async (req: Request) => {
       },
       request: req,
     })
-    return NextResponse.json({ error: message }, { status: 500 })
+    return jsonResponse({ error: message }, { status: 500 })
   }
 })
 

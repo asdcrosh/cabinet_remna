@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { jsonResponse } from '@/lib/json-response'
 import { z } from 'zod'
 import { writeAuditLog } from '@/lib/audit-log'
 import { requireAdmin, withAuth } from '@/lib/auth/guard'
@@ -21,7 +21,7 @@ const schema = z.object({
 
 export const GET = withAuth(async () => {
   await requireAdmin()
-  return NextResponse.json({ branding: await getPublicBrandSettings() })
+  return jsonResponse({ branding: await getPublicBrandSettings() })
 })
 
 export const PATCH = withAuth(async (req: Request) => {
@@ -29,7 +29,7 @@ export const PATCH = withAuth(async (req: Request) => {
   const body = await req.json().catch(() => null)
   const parsed = schema.safeParse(body)
   if (!parsed.success) {
-    return NextResponse.json({ error: 'Проверьте логотип и цвета темы', details: parsed.error.flatten() }, { status: 422 })
+    return jsonResponse({ error: 'Проверьте логотип и цвета темы', details: parsed.error.flatten() }, { status: 422 })
   }
 
   const branding = await updateBrandSettings(parsed.data)
@@ -40,5 +40,5 @@ export const PATCH = withAuth(async (req: Request) => {
     metadata: branding,
     request: req,
   })
-  return NextResponse.json({ branding })
+  return jsonResponse({ branding })
 })

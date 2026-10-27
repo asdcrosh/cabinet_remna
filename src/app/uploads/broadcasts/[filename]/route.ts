@@ -1,3 +1,4 @@
+import { jsonResponse } from '@/lib/json-response'
 import { readFile } from 'fs/promises'
 import path from 'path'
 import { NextResponse } from 'next/server'
@@ -17,18 +18,18 @@ const CONTENT_TYPES: Record<string, string> = {
 export async function GET(req: Request, { params }: { params: Promise<{ filename: string }> }) {
   const { filename } = await params
   if (!/^\d{4}-\d{2}-\d{2}-[a-f0-9-]+\.(jpg|png|webp|gif)$/i.test(filename)) {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    return jsonResponse({ error: 'Not found' }, { status: 404 })
   }
   const signature = new URL(req.url).searchParams.get('sig')
   const allowUnsignedLegacy = process.env.BROADCAST_UPLOAD_ALLOW_UNSIGNED_LEGACY === 'true'
   if (!isBroadcastUploadSignatureValid(filename, signature) && !allowUnsignedLegacy) {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    return jsonResponse({ error: 'Not found' }, { status: 404 })
   }
 
   const extension = filename.split('.').pop()?.toLowerCase() ?? ''
   const contentType = CONTENT_TYPES[extension]
   if (!contentType) {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    return jsonResponse({ error: 'Not found' }, { status: 404 })
   }
 
   try {
@@ -40,6 +41,6 @@ export async function GET(req: Request, { params }: { params: Promise<{ filename
       },
     })
   } catch {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    return jsonResponse({ error: 'Not found' }, { status: 404 })
   }
 }

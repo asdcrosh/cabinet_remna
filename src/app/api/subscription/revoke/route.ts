@@ -2,7 +2,7 @@
 // Создаёт новые vlessUuid/trojanPassword/ssPassword в Remnawave,
 // старые ссылки у пользователя перестают работать.
 
-import { NextResponse } from 'next/server'
+import { jsonResponse } from '@/lib/json-response'
 import { prisma } from '@/lib/prisma'
 import { requireAuth, withAuth } from '@/lib/auth/guard'
 import {
@@ -18,7 +18,7 @@ export const POST = withAuth(async (_req: Request) => {
   const session = await requireAuth()
   const user = await prisma.user.findUnique({ where: { id: session.uid } })
   if (!user || !hasRemnawaveUserReference(user)) {
-    return NextResponse.json({ error: 'Нет активной подписки' }, { status: 404 })
+    return jsonResponse({ error: 'Нет активной подписки' }, { status: 404 })
   }
   try {
     await remnawave.revokeSubscription(remnawaveUserReference(user))
@@ -26,10 +26,10 @@ export const POST = withAuth(async (_req: Request) => {
       where: { userId: user.id, status: { in: ['ACTIVE', 'LIMITED'] } },
       data: { pendingSync: true },
     })
-    return NextResponse.json({ ok: true })
+    return jsonResponse({ ok: true })
   } catch (e) {
     if (e instanceof RemnawaveError) {
-      return NextResponse.json(
+      return jsonResponse(
         { error: 'Не удалось перевыпустить ключи. Попробуйте позже.' },
         { status: 502 }
       )
