@@ -1,10 +1,12 @@
 import { EventEmitter } from 'node:events'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { resolve4 } from 'node:dns/promises'
 import { provisioningFixture } from '../../tests/fixtures/node-provisioning'
 import { processNodeProvisioningJob } from './node-provisioning-worker'
 import { buildNodeProvisioningProfile, prepareNodeProvisioningProfile, type PreparedProvisioningProfile } from './node-provisioning-profile'
 import { verifyNodeProvisioningTraffic } from './node-provisioning-traffic'
 import { verifyNodeSshAccess } from './node-provisioning-runner'
+import { runNodeAnsible } from './node-provisioning-runner'
 import { remnawave, type RemnawaveHost, type RemnawaveNode } from './remnawave'
 
 const db = vi.hoisted(() => ({ jobFind: vi.fn(), jobUpdate: vi.fn(), event: vi.fn() }))
@@ -12,7 +14,7 @@ vi.mock('./prisma', () => ({ prisma: { nodeProvisioningJob: { findUnique: db.job
 vi.mock('./node-provisioning-crypto', () => ({ decryptNodeProvisioningSecret: () => 'private-password' }))
 vi.mock('./node-country', () => ({ resolveNodeCountryCode: () => 'RO', nodeHostRemark: (_country: string, kind: string) => 'Romania ' + kind }))
 vi.mock('./timeweb', () => ({ upsertTimewebARecord: async () => ({ id: 'dns', created: true }) }))
-vi.mock('node:dns/promises', () => ({ resolve4: async () => ['8.8.8.8'] }))
+vi.mock('node:dns/promises', () => ({ resolve4: vi.fn(async () => ['8.8.8.8']) }))
 vi.mock('node:net', async importOriginal => ({
   ...await importOriginal<typeof import('node:net')>(),
   connect: () => {
@@ -35,8 +37,10 @@ vi.mock('./remnawave', async importOriginal => ({
 }))
 
 beforeEach(() => vi.clearAllMocks())
+afterEach(() => { vi.useRealTimers(); vi.unstubAllEnvs(); vi.unstubAllGlobals() })
 
 function setup() {
+  vi.mocked(resolve4).mockResolvedValue(['8.8.8.8'])
   const fixture = provisioningFixture()
   const built = buildNodeProvisioningProfile(fixture.source, fixture.templates, fixture.job.fqdn)
   const templates = {
@@ -130,5 +134,19 @@ describe('provisioning acceptance gate', () => {
     expect(f.job.status).toBe('FAILED')
     expect(f.hosts[0]!.isDisabled).toBe(false)
     expect(remnawave.updateHost).not.toHaveBeenCalled()
+  })
+
+  it('does not accept DNS that sends some clients to another node', async () => {
+    const f = setup()
+    vi.useFakeTimers()
+    vi.stubEnv('NODE_PROVISIONING_DNS_TIMEOUT_SECONDS', '1')
+    vi.mocked(resolve4).mockResolvedValue(['8.8.8.8', '1.1.1.1'])
+    const running = processNodeProvisioningJob(f.job.id)
+    await vi.runAllTimersAsync()
+    await running
+    expect(f.job.status).toBe('FAILED')
+    expect(f.job.lastError).toContain('DNS')
+    expect(runNodeAnsible).not.toHaveBeenCalled()
+    expect(remnawave.createNode).not.toHaveBeenCalled()
   })
 })

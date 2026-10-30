@@ -107,6 +107,17 @@ describe('Timeweb DNS', () => {
     await expect(upsertTimewebARecord('nl7.example.com', '1.1.1.1')).rejects.toMatchObject({ status: 409 })
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
+
+  it('rejects mixed A records even when one already matches the new node', async () => {
+    process.env.TIMEWEB_API_TOKEN = 'token'
+    const fetchMock = vi.fn().mockResolvedValue(response({ dns_records: [
+      { id: 1, type: 'A', value: '1.1.1.1' },
+      { id: 2, type: 'A', value: '8.8.8.8' },
+    ] }))
+    vi.stubGlobal('fetch', fetchMock)
+    await expect(upsertTimewebARecord('node.example.com', '1.1.1.1')).rejects.toThrow('Multiple A records')
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
 })
 
 function response(body: unknown, status = 200) {

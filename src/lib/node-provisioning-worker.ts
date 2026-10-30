@@ -543,7 +543,7 @@ async function waitForDns(fqdn: string, expectedIp: string, timeoutMs = positive
   const deadline = Date.now() + timeoutMs
   do {
     const addresses: string[] = await resolve4(fqdn).catch(() => [])
-    if (addresses.includes(expectedIp)) return
+    if (addresses.length > 0 && addresses.every(address => address === expectedIp)) return
     await sleep(5_000)
   } while (Date.now() < deadline)
   throw new Error(`DNS ${fqdn} ещё не указывает на ${expectedIp}`)
