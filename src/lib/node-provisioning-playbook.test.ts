@@ -14,10 +14,16 @@ function taskBlock(name: string) {
 
 describe('node provisioning playbook safety', () => {
   it('pulls the current Remnanode image on every provisioning or repair run', () => {
+    const pull = taskBlock('Pull the current Remnanode image with registry recovery')
     const start = taskBlock('Start or reconcile Remnanode')
+    expect(pull).toContain('files/pull-remnanode.sh')
+    expect(pull).toContain('Remnanode image download failed before container startup')
     expect(start).toContain('- --pull')
-    expect(start).toContain('- always')
+    expect(start).toContain('- never')
     expect(start).toContain('- --remove-orphans')
+    expect(start).toContain('until: remnanode_compose_up.rc == 0')
+    expect(start).toContain('Remnanode container startup failed')
+    expect(start).toContain("replace(effective_remnanode_secret_key, '[REDACTED]')")
   })
 
   it('uses the pinned official SelfSteal force mode with Ansible-managed TLS', () => {

@@ -179,36 +179,91 @@
       register: remnanode_compose
 
     - name: Validate the Remnanode Compose project
-      ansible.builtin.command:
-        argv:
-          - docker
-          - compose
-          - --project-directory
-          - '{{ remnanode_dir }}'
-          - config
-          - --quiet
-      changed_when: false
-      no_log: true
+      block:
+        - name: Check the Remnanode Compose configuration without exposing its environment
+          ansible.builtin.command:
+            argv:
+              - docker
+              - compose
+              - --project-directory
+              - '{{ remnanode_dir }}'
+              - config
+              - --quiet
+          changed_when: false
+          no_log: true
+      rescue:
+        - name: Report the sanitized Remnanode configuration error
+          ansible.builtin.fail:
+            msg: >-
+              Remnanode Compose configuration is invalid:
+              {{ (ansible_failed_result.stderr | default(ansible_failed_result.msg | default('Unknown error')))
+                 | replace(effective_remnanode_secret_key, '[REDACTED]') }}
+
+    - name: Pull the current Remnanode image with registry recovery
+      block:
+        - name: Download Remnanode with bounded retries and an official registry fallback
+          ansible.builtin.script:
+            cmd: files/pull-remnanode.sh {{ remnanode_image | quote }}
+            executable: /bin/bash
+          no_log: true
+      rescue:
+        - name: Report the sanitized Remnanode image download error
+          ansible.builtin.fail:
+            msg: >-
+              Remnanode image download failed before container startup:
+              {{ ((ansible_failed_result.stdout | default('')) + '\n' +
+                  (ansible_failed_result.stderr | default(ansible_failed_result.msg | default('Unknown error'))))
+                 | replace(effective_remnanode_secret_key, '[REDACTED]') }}
 
     - name: Start or reconcile Remnanode
-      ansible.builtin.command:
-        argv:
-          - docker
-          - compose
-          - --project-directory
-          - '{{ remnanode_dir }}'
-          - up
-          - -d
-          - --pull
-          - always
-          - --remove-orphans
-      register: remnanode_compose_up
-      changed_when: >-
-        remnanode_environment.changed or remnanode_compose.changed or
-        'Created' in remnanode_compose_up.stderr or
-        'Recreated' in remnanode_compose_up.stderr or
-        'Started' in remnanode_compose_up.stderr
-      no_log: true
+      block:
+        - name: Start Remnanode from the freshly downloaded image
+          ansible.builtin.command:
+            argv:
+              - docker
+              - compose
+              - --project-directory
+              - '{{ remnanode_dir }}'
+              - up
+              - -d
+              - --pull
+              - never
+              - --remove-orphans
+          register: remnanode_compose_up
+          changed_when: >-
+            remnanode_environment.changed or remnanode_compose.changed or
+            'Created' in remnanode_compose_up.stderr or
+            'Recreated' in remnanode_compose_up.stderr or
+            'Started' in remnanode_compose_up.stderr
+          until: remnanode_compose_up.rc == 0
+          retries: 3
+          delay: 5
+          no_log: true
+      rescue:
+        - name: Read the Remnanode container status without its environment
+          ansible.builtin.command:
+            argv:
+              - docker
+              - compose
+              - --project-directory
+              - '{{ remnanode_dir }}'
+              - ps
+              - --all
+              - --format
+              - json
+          register: failed_remnanode_status
+          changed_when: false
+          failed_when: false
+          no_log: true
+
+        - name: Report the sanitized Remnanode startup error
+          ansible.builtin.fail:
+            msg: >-
+              Remnanode container startup failed (rc={{ remnanode_compose_up.rc | default('unknown') }}):
+              {{ ((remnanode_compose_up.stdout | default('')) + '\n' +
+                  (remnanode_compose_up.stderr | default(remnanode_compose_up.msg | default('Unknown error'))) + '\n' +
+                  (failed_remnanode_status.stdout | default('')))
+                 | replace(effective_remnanode_secret_key, '[REDACTED]') }}
 
     - name: Read the initial firewall status
       ansible.builtin.command:

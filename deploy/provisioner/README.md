@@ -15,7 +15,12 @@ Required extra variables:
 - `remnanode_secret_key` (legacy runner alias: `node_secret_key`)
 - `panel_api_cidrs` (legacy aliases: `panel_api_cidr`, `panel_ip`; allowed to reach port 2222)
 - `remnanode_image` defaults to `remnawave/node:latest` and is pulled on every
-  provisioning or repair run. During `cabinetctl update`, fixed tags and digests
+  provisioning or repair run, with three bounded download attempts. Tagged
+  official images can fall back between Docker Hub and the vendor's GHCR
+  repository at the same tag; private images and digest pins never switch.
+  Container startup uses the downloaded image without another registry request.
+  Download, configuration and startup failures report their cause with the node
+  secret removed. During `cabinetctl update`, fixed tags and digests
   of the official Docker Hub or GHCR Remnawave Node image are migrated to this
   rolling default. An image from a private registry remains an explicit override
 - node country is detected locally from the bundled MaxMind GeoLite2 country
