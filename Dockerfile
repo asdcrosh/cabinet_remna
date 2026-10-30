@@ -37,6 +37,7 @@ RUN ./node_modules/.bin/esbuild \
   scripts/broadcast-worker.ts \
   scripts/watch-worker.ts \
   scripts/node-provisioning-worker.ts \
+  scripts/verify-node-provisioning-traffic.ts \
   scripts/cleanup-retention.ts \
   scripts/bootstrap-superuser.ts \
   prisma/seed.ts \
@@ -48,6 +49,9 @@ RUN ./node_modules/.bin/esbuild \
   --entry-names='[name]' \
   --external:@prisma/client \
   --external:pg
+
+# Same reviewed upstream Xray build used to reproduce and verify TCP/XHTTP.
+FROM ghcr.io/remnawave/node@sha256:793f4ac52289f680ea2b12be8047e93f68b710c22ca93b52b9448a6fef7eaaa6 AS traffic-probe
 
 FROM node:24-alpine AS provisioner
 WORKDIR /app
@@ -85,6 +89,7 @@ RUN apk add --no-cache \
 COPY --chown=provisioner:provisioner --from=builder /app/.next/standalone ./
 COPY --chown=provisioner:provisioner --from=builder /app/.next/ops ./ops
 COPY --chown=provisioner:provisioner deploy/provisioner ./deploy/provisioner
+COPY --from=traffic-probe /usr/local/bin/xray /usr/local/bin/xray
 COPY --chown=provisioner:provisioner --from=deps /app/node_modules/geoip-country/data ./geoip-data
 COPY --chown=provisioner:provisioner --from=deps /app/node_modules/geoip-country/LICENSE ./licenses/geoip-country/LICENSE
 COPY --chown=provisioner:provisioner --from=deps /app/node_modules/geoip-country/EULA ./licenses/geoip-country/EULA

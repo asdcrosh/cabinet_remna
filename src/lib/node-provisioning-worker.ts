@@ -8,6 +8,8 @@ import { decryptNodeProvisioningSecret } from '@/lib/node-provisioning-crypto'
 import { sshHostKeyChangedError } from '@/lib/node-provisioning-host-key'
 import { runNodeAnsible, sanitizeProvisioningOutput, verifyNodeSshAccess } from '@/lib/node-provisioning-runner'
 import { upsertTimewebARecord } from '@/lib/timeweb'
+import { buildNodeProvisioningProfile, prepareNodeProvisioningProfile, provisioningNetwork } from '@/lib/node-provisioning-profile'
+import { cleanupNodeProvisioningProbe, verifyNodeProvisioningTraffic } from '@/lib/node-provisioning-traffic'
 import {
   buildHostCloneRequest,
   remnawave,
@@ -26,6 +28,11 @@ export async function failInterruptedNodeProvisioningJobs() {
   })
   if (jobs.length === 0) return 0
 
+  const cleanupWarnings = new Set<string>()
+  for (const job of jobs) {
+    if (job.step !== 'VERIFY') continue
+    try { await cleanupNodeProvisioningProbe(job.id) } catch { cleanupWarnings.add(job.id) }
+  }
   const completedAt = new Date()
   await prisma.$transaction(jobs.map((job) => prisma.nodeProvisioningJob.update({
     where: { id: job.id },
@@ -34,7 +41,7 @@ export async function failInterruptedNodeProvisioningJobs() {
       activeKey: null,
       lockedAt: null,
       completedAt,
-      lastError: INTERRUPTED_JOB_MESSAGE,
+      lastError: INTERRUPTED_JOB_MESSAGE + (cleanupWarnings.has(job.id) ? ' Очистка временного VPN-пользователя не подтверждена; доступ ограничен сроком 15 минут.' : ''),
       events: {
         create: {
           step: job.step,
@@ -96,7 +103,10 @@ export async function processNodeProvisioningJob(jobId: string) {
     if (job.credentialsExpireAt <= new Date()) throw new Error('Срок хранения SSH-пароля истёк')
     sshPassword = decryptNodeProvisioningSecret(job.encryptedSshPassword)
     const countryCode = resolveNodeCountryCode(job.serverIp)
-    const { templates, profileUuid, inboundUuids } = await loadTemplates(job)
+    const { templates: sourceTemplates } = await loadTemplates(job)
+    if ([sourceTemplates.tcp.port, sourceTemplates.xhttp.port, 80, 2222].includes(job.sshPort)) {
+      throw new Error('SSH-порт конфликтует с портом Remnanode или SelfSteal')
+    }
 
     await advance(jobId, 'SSH_PREFLIGHT', 'Проверяю SSH-вход и root-права')
     let sshAccess
@@ -131,6 +141,9 @@ export async function processNodeProvisioningJob(jobId: string) {
 
     await advance(jobId, 'REMNAWAVE_NODE', 'Создаю ноду в Remnawave')
     job = await requiredJob(jobId)
+    const profile = await prepareNodeProvisioningProfile(job, sourceTemplates)
+    const { templates, profileUuid, inboundUuids } = profile
+    await addEvent(jobId, 'REMNAWAVE_NODE', 'SUCCESS', `Создан отдельный профиль; SNI TCP: ${templates.tcp.sni}; XHTTP: ${templates.xhttp.sni}`)
     const plugin = await ensureTorrentBlockPlugin()
     const node = await ensureRemnawaveNode(job, profileUuid, inboundUuids, countryCode, plugin.uuid)
     await updateJob(
@@ -154,6 +167,7 @@ export async function processNodeProvisioningJob(jobId: string) {
       fqdn: job.fqdn,
       nodeSecret,
       expectedHostKeyFingerprint: sshAccess.hostKeyFingerprint,
+      transportPorts: [templates.tcp.port, templates.xhttp.port],
     }, touchActivity)
     await addEvent(jobId, 'ANSIBLE', 'SUCCESS', lastUsefulAnsibleLine(ansible.output) || 'Ansible завершён без ошибок')
 
@@ -162,13 +176,15 @@ export async function processNodeProvisioningJob(jobId: string) {
     await addEvent(jobId, 'NODE_CONNECT', 'SUCCESS', 'Remnawave подтверждает подключение ноды')
 
     await advance(jobId, 'HOSTS', 'Клонирую эталонные TCP и XHTTP hosts')
-    const hosts = await ensureHosts(job, node.uuid, countryCode, templates)
+    const hosts = await ensureHosts(job, node.uuid, countryCode, templates, sourceTemplates)
     await updateJob(jobId, {
       tcpHostUuid: hosts.tcp.uuid,
       xhttpHostUuid: hosts.xhttp.uuid,
     }, 'HOSTS', 'TCP и XHTTP hosts созданы в скрытом состоянии')
 
-    await advance(jobId, 'VERIFY', 'Проверяю DNS, HTTPS, TCP и состояние ноды')
+    await advance(jobId, 'VERIFY', 'Проверяю DNS, HTTPS и реальный VPN-трафик TCP и XHTTP')
+    await verifyNodeProvisioningTraffic(job, hosts, profile,
+      message => addEvent(jobId, 'VERIFY', 'SUCCESS', message), touchActivity)
     const verificationWarning = await verifyProvisionedNode(job, node.uuid, templates.tcp.port)
     if (verificationWarning) await addEvent(jobId, 'VERIFY', 'WARNING', verificationWarning)
     await Promise.all([
@@ -198,7 +214,13 @@ export async function processNodeProvisioningJob(jobId: string) {
       },
     })
   } catch (error) {
-    const message = safeError(error, [sshPassword, nodeSecret])
+    let message = safeError(error, [sshPassword, nodeSecret])
+    try { await cleanupNodeProvisioningProbe(jobId) } catch {
+      message += '\nОчистка временного VPN-пользователя не подтверждена; повтор задачи завершит её.'
+    }
+    try { await quarantineNodeProvisioningHosts(jobId) } catch {
+      message += '\nНе удалось подтвердить скрытие hosts незавершённой установки; повторите задачу после восстановления API.'
+    }
     const job = await prisma.nodeProvisioningJob.findUnique({ where: { id: jobId }, select: { step: true } })
     await prisma.nodeProvisioningJob.update({
       where: { id: jobId },
@@ -223,13 +245,23 @@ async function ensureRemnawaveNode(
 ) {
   const nodes = (await remnawave.getNodes()).response
   const alignNode = async (node: RemnawaveNode) => {
+    const currentProfile = node.configProfile?.activeConfigProfileUuid
+    if (currentProfile && currentProfile !== profileUuid) {
+      const source = (await remnawave.getHosts()).response.find(host => host.uuid === job.tcpTemplateHostUuid)
+      if (currentProfile !== source?.inbound.configProfileUuid) {
+        throw new Error('Профиль ноды изменён вне этой задачи; автоматическая замена остановлена')
+      }
+    }
     const patch = buildRemnawaveNodeAlignmentPatch(node, {
       address: job.fqdn,
       countryCode,
       activePluginUuid,
     })
-    if (!patch) return node
-    return (await remnawave.updateNode(patch)).response
+    const profilePatch = currentProfile !== profileUuid
+      ? { configProfile: { activeConfigProfileUuid: profileUuid, activeInbounds: inboundUuids } }
+      : {}
+    if (!patch && !Object.keys(profilePatch).length) return node
+    return (await remnawave.updateNode({ uuid: node.uuid, ...patch, ...profilePatch })).response
   }
   if (job.remnawaveNodeUuid) {
     const existing = nodes.find((node) => node.uuid === job.remnawaveNodeUuid)
@@ -333,6 +365,7 @@ async function loadTemplates(job: NodeProvisioningJob) {
   }
   const inboundUuids = [tcp.inbound.configProfileInboundUuid, xhttp.inbound.configProfileInboundUuid]
   if (inboundUuids.some((uuid) => !uuid)) throw new Error('У эталонного host отсутствует inbound UUID')
+  buildNodeProvisioningProfile((await remnawave.getConfigProfile(profileUuid)).response, { tcp, xhttp }, job.fqdn, job.id)
   return {
     templates: { tcp, xhttp },
     profileUuid,
@@ -345,7 +378,7 @@ export function assertTemplateTransport(host: RemnawaveHost, expected: 'tcp' | '
   const inbound = nodes
     .flatMap((node) => node.configProfile?.activeInbounds || [])
     .find((item) => item.uuid === inboundUuid)
-  const network = String(inbound?.network ?? inbound?.rawInbound?.streamSettings?.network ?? '').toLowerCase()
+  const network = provisioningNetwork(inbound?.network ?? inbound?.rawInbound?.streamSettings?.network)
   const matches = expected === 'xhttp'
     ? ['xhttp', 'splithttp'].includes(network)
     : network === 'tcp'
@@ -366,7 +399,8 @@ async function ensureHosts(
   job: NodeProvisioningJob,
   nodeUuid: string,
   countryCode: string,
-  templates: { tcp: RemnawaveHost; xhttp: RemnawaveHost }
+  templates: { tcp: RemnawaveHost; xhttp: RemnawaveHost },
+  sourceTemplates: { tcp: RemnawaveHost; xhttp: RemnawaveHost },
 ) {
   const existing = (await remnawave.getHosts()).response
   const ensure = async (template: RemnawaveHost, kind: 'TCP' | 'XHTTP') => {
@@ -388,7 +422,10 @@ async function ensureHosts(
     if (matches.length > 1) throw new Error(`Найдено несколько клонов ${kind} host`)
     if (matches[0]) {
       const match = matches[0]
-      if (match.inbound.configProfileInboundUuid !== template.inbound.configProfileInboundUuid) {
+      const sourceInbound = sourceTemplates[kind === 'TCP' ? 'tcp' : 'xhttp'].inbound.configProfileInboundUuid
+      const ownedLegacy = persistedUuid === match.uuid && match.address === job.fqdn && match.nodes.includes(nodeUuid)
+        && match.inbound.configProfileInboundUuid === sourceInbound
+      if (match.inbound.configProfileInboundUuid !== template.inbound.configProfileInboundUuid && !ownedLegacy) {
         throw new Error(`Существующий клон ${kind} host не совпадает с эталоном`)
       }
       const updated = (await remnawave.updateHost({ uuid: match.uuid, ...payload })).response
@@ -454,6 +491,18 @@ function isProvisionedHostRecoveryCandidate(
 
 function replaceTemplateHostname(value: string | null | undefined, templateAddress: string, nodeFqdn: string) {
   return value?.trim().toLowerCase() === templateAddress.trim().toLowerCase() ? nodeFqdn : value
+}
+
+async function quarantineNodeProvisioningHosts(jobId: string) {
+  const job = await requiredJob(jobId)
+  if (!job.remnawaveNodeUuid || (!job.tcpHostUuid && !job.xhttpHostUuid)) return
+  const hosts = (await remnawave.getHosts()).response
+  for (const uuid of [job.tcpHostUuid, job.xhttpHostUuid]) {
+    const host = hosts.find(item => item.uuid === uuid)
+    if (host?.address === job.fqdn && host.nodes.includes(job.remnawaveNodeUuid)) {
+      await remnawave.updateHost({ uuid: host.uuid, isDisabled: true, isHidden: true })
+    }
+  }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

@@ -231,7 +231,10 @@ export interface RemnawaveNodeInbound {
     enabled?: boolean
     destOverride?: string[]
   }
-  rawInbound?: {
+  rawInbound?: Record<string, unknown> & {
+    tag?: string
+    protocol?: string
+    settings?: Record<string, unknown>
     port?: number
     sniffing?: {
       enabled?: boolean
@@ -248,6 +251,8 @@ export interface RemnawaveNodeInbound {
         serverNames?: string[]
         target?: string
         dest?: string
+        privateKey?: string
+        shortIds?: string[]
       }
     }
   } | null
@@ -257,6 +262,20 @@ export interface RemnawaveConfigProfileInbound extends RemnawaveNodeInbound {
   uuid: string
   profileUuid: string
   activeSquads?: string[]
+}
+
+export interface RemnawaveConfigProfile {
+  uuid: string
+  name: string
+  config: Record<string, unknown>
+  inbounds: RemnawaveConfigProfileInbound[]
+  nodes?: Array<{ uuid: string; name?: string }>
+}
+
+export interface RemnawaveInternalSquad {
+  uuid: string
+  name: string
+  inbounds: RemnawaveConfigProfileInbound[]
 }
 
 export interface GetConfigProfileInboundsResponse {
@@ -714,6 +733,30 @@ export const remnawave = {
 
   async getConfigProfileInbounds() {
     return request<GetConfigProfileInboundsResponse>('GET', '/api/config-profiles/inbounds')
+  },
+
+  async getConfigProfiles() {
+    return request<{ response: { configProfiles: RemnawaveConfigProfile[] } }>('GET', '/api/config-profiles')
+  },
+
+  async getConfigProfile(uuid: string) {
+    return request<{ response: RemnawaveConfigProfile }>('GET', `/api/config-profiles/${encodeURIComponent(uuid)}`)
+  },
+
+  async createConfigProfile(input: { name: string; config: Record<string, unknown> }) {
+    return request<{ response: RemnawaveConfigProfile }>('POST', '/api/config-profiles', input)
+  },
+
+  async deleteConfigProfile(uuid: string) {
+    return request<{ response: { isDeleted: boolean } } | null>('DELETE', `/api/config-profiles/${encodeURIComponent(uuid)}`)
+  },
+
+  async getInternalSquad(uuid: string) {
+    return request<{ response: RemnawaveInternalSquad }>('GET', `/api/internal-squads/${encodeURIComponent(uuid)}`)
+  },
+
+  async updateInternalSquad(input: { uuid: string; inbounds: string[] }) {
+    return request<{ response: RemnawaveInternalSquad }>('PATCH', '/api/internal-squads', input)
   },
 
   async createHost(input: CreateRemnawaveHostRequest) {

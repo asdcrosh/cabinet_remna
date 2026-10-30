@@ -7,6 +7,7 @@ import {
   buildTorrentBlockPluginConfig,
   failInterruptedNodeProvisioningJobs,
 } from './node-provisioning-worker'
+import { cleanupNodeProvisioningProbe } from './node-provisioning-traffic'
 
 const prismaMock = vi.hoisted(() => ({
   nodeProvisioningJob: {
@@ -17,6 +18,7 @@ const prismaMock = vi.hoisted(() => ({
 }))
 
 vi.mock('@/lib/prisma', () => ({ prisma: prismaMock }))
+vi.mock('@/lib/node-provisioning-traffic', () => ({ cleanupNodeProvisioningProbe: vi.fn(async () => undefined), verifyNodeProvisioningTraffic: vi.fn() }))
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -176,5 +178,22 @@ describe('interrupted provisioning recovery', () => {
         },
       }),
     })
+  })
+
+  it('removes a probe account left by an interrupted VERIFY step', async () => {
+    prismaMock.nodeProvisioningJob.findMany.mockResolvedValueOnce([{ id: 'job-verify', step: 'VERIFY' }])
+    prismaMock.nodeProvisioningJob.update.mockResolvedValueOnce({})
+    prismaMock.$transaction.mockResolvedValueOnce([])
+    await failInterruptedNodeProvisioningJobs()
+    expect(cleanupNodeProvisioningProbe).toHaveBeenCalledWith('job-verify')
+  })
+
+  it('records incomplete cleanup without stopping recovery of interrupted jobs', async () => {
+    prismaMock.nodeProvisioningJob.findMany.mockResolvedValueOnce([{ id: 'job-verify', step: 'VERIFY' }])
+    vi.mocked(cleanupNodeProvisioningProbe).mockRejectedValueOnce(new Error('API unavailable'))
+    prismaMock.nodeProvisioningJob.update.mockResolvedValueOnce({})
+    prismaMock.$transaction.mockResolvedValueOnce([])
+    await expect(failInterruptedNodeProvisioningJobs()).resolves.toBe(1)
+    expect(prismaMock.nodeProvisioningJob.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ lastError: expect.stringContaining('Очистка временного VPN-пользователя не подтверждена') }) }))
   })
 })

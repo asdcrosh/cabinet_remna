@@ -52,3 +52,29 @@ provisioner image under `/app/licenses/geoip-country`.
 Set `verify_transport_ports=true` only after the Remnawave panel has delivered
 the cloned TCP and XHTTP host configuration. The base play verifies Docker,
 Remnanode, SelfSteal, Nginx, the Unix socket, TLS key consistency, and UFW.
+
+Each job gets its own config profile and unique inbound tags. Local SelfSteal
+inbounds use the new node's FQDN for SNI; external Reality targets retain an
+allowed camouflage name. Routing references and the source inbounds' internal
+squad access are mapped to the new inbounds. The shared source profile stays
+unchanged, and retries reuse the job's profile.
+
+Hosts remain disabled and hidden until both TCP and XHTTP carry an HTTPS
+request through an isolated Xray client. The client has one VLESS outbound and
+no direct fallback. Its binary is copied from the pinned official Node image.
+The probe user expires after 15 minutes, has a 50 MB limit, and is deleted with
+confirmation before acceptance. Failed or interrupted checks clean up probe
+access; an unconfirmed cleanup prevents publication. SSH passwords are removed
+only after successful acceptance, so failed jobs remain retryable during their
+credential TTL.
+
+To repeat the traffic checks for an existing node without reinstalling it:
+
+```bash
+docker exec remnawave-cabinet-node-provisioning-worker node ops/verify-node-provisioning-traffic.js ro01
+```
+
+Supported templates are VLESS Reality TCP and XHTTP with matching host/inbound
+ports and DEFAULT security. XHTTP uses port 443. Both source inbounds must have
+internal squad access. Unsupported templates fail validation before SSH or DNS
+changes. Concurrent create/retry requests lock both the target IP and FQDN.
