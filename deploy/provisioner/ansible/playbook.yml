@@ -196,7 +196,7 @@
           ansible.builtin.fail:
             msg: >-
               Remnanode Compose configuration is invalid:
-              {{ (ansible_failed_result.stderr | default(ansible_failed_result.msg | default('Unknown error')))
+              {{ (ansible_failed_result.stderr | default(ansible_failed_result.msg | default('Unknown error'), true))
                  | replace(effective_remnanode_secret_key, '[REDACTED]') }}
 
     - name: Pull the current Remnanode image with registry recovery
@@ -212,7 +212,7 @@
             msg: >-
               Remnanode image download failed before container startup:
               {{ ((ansible_failed_result.stdout | default('')) + '\n' +
-                  (ansible_failed_result.stderr | default(ansible_failed_result.msg | default('Unknown error'))))
+                  (ansible_failed_result.stderr | default(ansible_failed_result.msg | default('Unknown error'), true)))
                  | replace(effective_remnanode_secret_key, '[REDACTED]') }}
 
     - name: Start or reconcile Remnanode
@@ -261,7 +261,7 @@
             msg: >-
               Remnanode container startup failed (rc={{ remnanode_compose_up.rc | default('unknown') }}):
               {{ ((remnanode_compose_up.stdout | default('')) + '\n' +
-                  (remnanode_compose_up.stderr | default(remnanode_compose_up.msg | default('Unknown error'))) + '\n' +
+                  (remnanode_compose_up.stderr | default(remnanode_compose_up.msg | default('Unknown error'), true)) + '\n' +
                   (failed_remnanode_status.stdout | default('')))
                  | replace(effective_remnanode_secret_key, '[REDACTED]') }}
 
