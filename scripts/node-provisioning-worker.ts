@@ -1,4 +1,5 @@
 import { writeFile } from 'node:fs/promises'
+import { execFileSync } from 'node:child_process'
 import { Client } from 'pg'
 import { logError, logInfo, logWarn } from '../src/lib/logger'
 import { failInterruptedNodeProvisioningJobs, processNodeProvisioningBatch } from '../src/lib/node-provisioning-worker'
@@ -71,6 +72,7 @@ async function releaseWorkerLock(client: Client) {
 }
 
 function validateWorkerConfiguration() {
+  verifyTrafficProbeBinary()
   const required = [
     'DATABASE_URL',
     'TIMEWEB_API_TOKEN',
@@ -148,14 +150,21 @@ function sleep(ms: number) {
 
 async function start() {
   if (process.env.OPS_STARTUP_CHECK === 'true') {
+    const xrayVersion = verifyTrafficProbeBinary()
     const geoIpCountry = resolveNodeCountryCode('8.8.8.8', 'AUTO')
     if (geoIpCountry !== 'US') throw new Error(`GeoIP startup check returned ${geoIpCountry}, expected US`)
     const geoIpHostRemark = nodeHostRemark(geoIpCountry, 'TCP')
     if (geoIpHostRemark !== '🇺🇸 США') throw new Error(`GeoIP host remark check returned ${geoIpHostRemark}`)
-    logInfo('node_provisioning_worker.startup_check_passed', { geoIpCountry, geoIpHostRemark })
+    logInfo('node_provisioning_worker.startup_check_passed', { geoIpCountry, geoIpHostRemark, xrayVersion })
     return
   }
   await main()
+}
+
+function verifyTrafficProbeBinary() {
+  const version = execFileSync('/usr/local/bin/xray', ['version'], { encoding: 'utf8', timeout: 10_000 }).split('\n')[0]
+  if (!version?.startsWith('Xray ')) throw new Error('Traffic probe Xray startup check failed')
+  return version
 }
 
 start()

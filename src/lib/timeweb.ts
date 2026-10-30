@@ -79,12 +79,11 @@ export async function upsertTimewebARecord(fqdn: string, serverIp: string) {
     throw new TimewebError(409, conflictingRecords, `Conflicting AAAA or CNAME record already exists for ${fqdn}`)
   }
   const aRecords = records.filter((record) => recordType(record) === 'A')
-  const exact = aRecords.find((record) => recordValue(record) === serverIp)
-  if (exact) return { id: String(exact.id), created: false }
-
   if (aRecords.length > 1) {
     throw new TimewebError(409, aRecords, `Multiple A records already exist for ${fqdn}`)
   }
+  const exact = aRecords.find((record) => recordValue(record) === serverIp)
+  if (exact) return { id: String(exact.id), created: false }
 
   if (aRecords[0]) {
     const updated = await request<TimewebDnsRecordResponse>(

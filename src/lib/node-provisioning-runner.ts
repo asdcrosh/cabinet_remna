@@ -15,6 +15,7 @@ export type NodeAnsibleInput = {
   fqdn: string
   nodeSecret: string
   expectedHostKeyFingerprint?: string | null
+  transportPorts?: number[]
 }
 
 export type NodeAnsibleResult = {
@@ -87,6 +88,8 @@ export async function runNodeAnsible(
       admin_email: adminEmail,
       remnanode_image: requiredEnv('NODE_PROVISIONING_REMNANODE_IMAGE'),
       node_api_port: 2222,
+      public_tcp_ports: [...new Set([80, 443, ...(input.transportPorts ?? [10443])])],
+      transport_tcp_ports: input.transportPorts ?? [443, 10443],
     }))
 
     const playbook = process.env.NODE_PROVISIONING_ANSIBLE_PLAYBOOK?.trim()
@@ -148,9 +151,13 @@ export async function resolvePanelApiCidrs(
 }
 
 export async function scanSshHostKey(serverIp: string, sshPort: number) {
-  const result = await captureProcess('ssh-keyscan', ['-T', '10', '-p', String(sshPort), serverIp], {
-    timeoutMs: 15_000,
-  })
+  let result: Awaited<ReturnType<typeof captureProcess>> | undefined
+  for (let attempt = 0; attempt < 3; attempt++) {
+    result = await captureProcess('ssh-keyscan', ['-T', '10', '-p', String(sshPort), serverIp], { timeoutMs: 15_000 })
+    if (result.code === 0 && result.stdout.trim()) break
+    if (attempt < 2) await new Promise(resolve => setTimeout(resolve, 2000))
+  }
+  if (!result) throw new Error('SSH host key is unavailable')
   if (result.code !== 0 || !result.stdout.trim()) throw new Error('SSH host key is unavailable')
   const lines = result.stdout.split('\n').map((line) => line.trim()).filter((line) => line && !line.startsWith('#'))
   const validLines = lines.filter((line) => line.split(/\s+/).length >= 3)

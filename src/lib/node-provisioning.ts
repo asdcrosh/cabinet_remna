@@ -79,6 +79,7 @@ export async function createNodeProvisioningJob(input: CreateNodeProvisioningInp
   const credentialsExpireAt = new Date(Date.now() + credentialsTtlHours * 60 * 60 * 1000)
 
   return prisma.$transaction(async (tx) => {
+    await lockNodeProvisioningTargets(tx, fqdn, input.serverIp)
     const conflicting = await tx.nodeProvisioningJob.findFirst({
       where: {
         status: { in: ['PENDING', 'RUNNING'] },
@@ -115,6 +116,9 @@ export async function retryNodeProvisioningJob(
   credentials?: { sshUser: string; sshPassword: string }
 ) {
   return prisma.$transaction(async (tx) => {
+    const snapshot = await tx.nodeProvisioningJob.findUnique({ where: { id } })
+    if (!snapshot) throw new NodeProvisioningNotFoundError()
+    await lockNodeProvisioningTargets(tx, snapshot.fqdn, snapshot.serverIp)
     const job = await tx.nodeProvisioningJob.findUnique({ where: { id } })
     if (!job) throw new NodeProvisioningNotFoundError()
     if (job.status !== 'FAILED') throw new NodeProvisioningStateError('Повторить можно только задачу с ошибкой')
@@ -163,6 +167,14 @@ export async function retryNodeProvisioningJob(
       include: jobInclude,
     })
   })
+}
+
+async function lockNodeProvisioningTargets(tx: Prisma.TransactionClient, fqdn: string, serverIp: string) {
+  // Different FQDNs can point at the same IP. The existing FQDN unique key
+  // alone does not prevent two concurrent requests provisioning one machine.
+  for (const key of [`cabinet-node:fqdn:${fqdn}`, `cabinet-node:ip:${serverIp}`].sort()) {
+    await tx.$queryRaw`SELECT 1 AS locked FROM pg_advisory_xact_lock(hashtextextended(${key}, 0))`
+  }
 }
 
 function retryRecoveryData(lastError: string | null): Prisma.NodeProvisioningJobUpdateInput {
