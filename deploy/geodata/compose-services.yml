@@ -1,0 +1,46 @@
+# Merge these services into the existing nginx/docker-compose.yml so the normal
+# Remnawave full-stack backup/restore starts them with the existing NGINX stack.
+services:
+  remnawave-geodata:
+    image: nginx@sha256:146adea4768b83c607d0bdfa4188464e3da6e0a3ad4475db1d1d8f64f27c29cc
+    container_name: remnawave-geodata
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    user: '101:101'
+    entrypoint: [nginx, '-g', 'daemon off;']
+    tmpfs: ['/tmp:uid=101,gid=101,mode=1777']
+    volumes:
+      - ../geodata/nginx-main.conf:/etc/nginx/nginx.conf:ro
+      - ../geodata/nginx-static.conf:/etc/nginx/conf.d/default.conf:ro
+      - ../geodata/data:/data:ro
+    networks: [remnawave-network]
+    healthcheck:
+      test: [CMD, curl, --fail, --silent, --output, /dev/null, 'http://127.0.0.1:8080/geodata/roscomvpn/manifest.json']
+      interval: 60s
+      timeout: 5s
+      retries: 3
+  remnawave-geodata-updater:
+    image: node@sha256:8a32c8cf649a49915a66e81e7a609223c708d0adabf288ee3f4077d765542f85
+    container_name: remnawave-geodata-updater
+    restart: unless-stopped
+    init: true
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    user: '1000:1000'
+    env_file: [../geodata/updater.env]
+    environment:
+      GEODATA_ROOT: /data
+    command: [node, /app/updater.mjs, --loop]
+    volumes:
+      - ../geodata/updater.mjs:/app/updater.mjs:ro
+      - ../geodata/data:/data
+    networks: [remnawave-network]
+    healthcheck:
+      test: [CMD, node, /app/updater.mjs, --health]
+      start_period: 5m
+      interval: 60s
+      timeout: 10s
+      retries: 2
