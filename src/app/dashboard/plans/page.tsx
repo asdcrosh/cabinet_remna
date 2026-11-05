@@ -2,24 +2,11 @@
 // подтянем напрямую из Prisma (не из /api/plans, чтобы не ходить самому к себе).
 
 import Link from 'next/link'
-import { prisma } from '@/lib/prisma'
 import { PlanCatalog } from '@/components/dashboard/mobile-plan-picker'
-import { formatPrice } from '@/lib/format'
 import { PageHeader } from '@/components/dashboard/page-header'
 import { getCurrentUser } from '@/lib/auth/cookies'
-import { getPlanAudienceContext, isPlanAvailableForUser } from '@/lib/plan-access'
-import { getAvailableUserPromoCodesByPlan } from '@/lib/user-promo-codes'
-import { getAvailablePaymentProviders } from '@/lib/payment-providers'
+import { buildPlanCatalog } from '@/lib/plan-catalog'
 import { ArrowRight, MessageCircleQuestion, RefreshCw, ShieldCheck } from 'lucide-react'
-import { getAutoRenewalState } from '@/lib/auto-renewal'
-import { AUTO_RENEWAL_CONSENT_VERSION } from '@/lib/auto-renewal-consent'
-import { tryCalculateRenewalPricing } from '@/lib/renewal-pricing'
-import {
-  hasRemnawaveUserReference,
-  remnawave,
-  remnawaveUserReference,
-} from '@/lib/remnawave'
-import { hasWhitelistAddonEntitlement, isWhitelistAddonCurrentlyActive } from '@/lib/whitelist-addon-policy'
 
 export const dynamic = 'force-dynamic'
 
@@ -29,203 +16,27 @@ export default async function PlansPage({
   searchParams: Promise<{ plan?: string; promo?: string; intent?: string; whitelistAddon?: string }>
 }) {
   const params = await searchParams
-  const paymentProviders = await getAvailablePaymentProviders()
   const session = await getCurrentUser()
   const linkedPlanId = params.plan?.trim()
   const initialPromoCode = params.promo?.trim()
   const isRenewIntent = params.intent === 'renew'
-  const plans = await prisma.plan.findMany({
-    where: { isActive: true },
-    orderBy: { sortOrder: 'asc' },
-  })
-  const user = session
-    ? await prisma.user.findUnique({
-        where: { id: session.uid },
-        select: {
-          role: true,
-          personalDiscountPercent: true,
-          nextPurchaseDiscountPercent: true,
-          telegramId: true,
-          remnashopUserId: true,
-          remnashopSyncedAt: true,
-          remnawaveId: true,
-          remnawaveUuid: true,
-          remnawaveUsername: true,
-        },
-      })
-    : null
-  const canManagePlans = user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN'
-  const audienceContext = session ? await getPlanAudienceContext(session.uid) : null
-  const usedTrialPlanIds = session
-    ? new Set(
-        (
-          await prisma.trialPlanRedemption.findMany({
-            where: {
-              userId: session.uid,
-              payment: { subscriptionProvisionedAt: { not: null } },
-            },
-            select: { planId: true },
-          })
-        ).map((redemption) => redemption.planId)
-      )
-    : new Set<string>()
-  const currentSubscription = session
-    ? await prisma.subscription.findFirst({
-        where: { userId: session.uid, status: { in: ['ACTIVE', 'LIMITED'] }, expireAt: { gt: new Date() } },
-        orderBy: { expireAt: 'desc' },
-        include: { plan: { select: { name: true, unlimitedDuration: true, unlimitedDevices: true, deviceLimit: true } } },
-      })
-    : null
-  const whitelistAddonEntitlement = session
-    ? await prisma.subscription.findFirst({
-        where: {
-          userId: session.uid,
-          OR: [
-            { whitelistAddonActive: true },
-            { whitelistAddonRemainingSeconds: { gt: 0n } },
-          ],
-        },
-        orderBy: { updatedAt: 'desc' },
-      })
-    : null
-  const autoRenewal = session ? await getAutoRenewalState(session.uid) : null
-  let currentDeviceLimit = currentSubscription?.deviceLimit ?? null
-  if (currentDeviceLimit == null && user && hasRemnawaveUserReference(user)) {
-    try {
-      const remote = await remnawave.getUser(remnawaveUserReference(user))
-      currentDeviceLimit = remote.response.hwidDeviceLimit ?? null
-    } catch {
-      // Витрина остаётся доступной; сервер всё равно проверит выбранное значение перед оплатой.
-    }
-  }
-  const hasAnySubscription = session
-    ? (await prisma.subscription.count({ where: { userId: session.uid } })) > 0
-    : false
-  const canUsePromo =
-    Boolean(user?.telegramId) &&
-    Boolean(user?.remnashopSyncedAt) &&
-    !usedTrialPlanIds.size &&
-    !hasAnySubscription &&
-    !user?.remnashopUserId &&
-    !user?.remnawaveId &&
-    !user?.remnawaveUuid &&
-    !user?.remnawaveUsername
-  const audiencePlans = audienceContext
-    ? plans.filter((plan) =>
-        isPlanAvailableForUser(plan, audienceContext, {
-          allowLink: plan.availability === 'LINK' && plan.id === linkedPlanId,
-        })
-      )
-    : plans.filter((plan) => plan.availability === 'ALL')
-  const visiblePlans = audiencePlans.filter((plan) => !plan.isPromo || canUsePromo)
-  const availablePromoCodesByPlan = session
-    ? await getAvailableUserPromoCodesByPlan({ userId: session.uid, plans: visiblePlans, linkPromoCode: initialPromoCode })
-    : new Map()
-  const hasPromoPlan = audiencePlans.some((plan) => plan.isPromo)
-  const isOtherwiseEligibleForPromo =
-    !usedTrialPlanIds.size &&
-    !hasAnySubscription &&
-    !user?.remnashopUserId &&
-    !user?.remnawaveId &&
-    !user?.remnawaveUuid &&
-    !user?.remnawaveUsername
-  const needsTelegramCheckForPromo =
-    hasPromoPlan &&
-    isOtherwiseEligibleForPromo &&
-    (!user?.telegramId || !user?.remnashopSyncedAt)
-  const referencePlan = visiblePlans
-    .filter((plan) => !plan.isPromo && !plan.unlimitedDuration && plan.priceKopecks > 0)
-    .sort((a, b) => a.durationDays - b.durationDays)[0]
-  const referenceDailyPrice = referencePlan
-    ? referencePlan.priceKopecks / Math.max(1, referencePlan.durationDays)
-    : 0
-  const autoRenewalAvailable = paymentProviders.some((provider) => provider.id === 'YOOKASSA')
-  const autoRenewalCurrentPrice = autoRenewal
-    ? currentAutoRenewalPrice(
-        autoRenewal.plan,
-        autoRenewal.deviceLimit,
-        autoRenewal.whitelistAddonEnabled,
-        user?.personalDiscountPercent ?? 0
-      )
-    : null
-  const autoRenewalConsentCurrent = Boolean(
-    autoRenewal
-    && autoRenewal.status !== 'DISABLED'
-    && autoRenewal.consentAcceptedAt
-    && autoRenewal.consentVersion === AUTO_RENEWAL_CONSENT_VERSION
-    && autoRenewal.deviceLimit === (currentDeviceLimit ?? autoRenewal.plan.deviceLimit)
-    && autoRenewal.consentPriceKopecks != null
-    && autoRenewalCurrentPrice != null
-    && autoRenewal.consentPriceKopecks >= autoRenewalCurrentPrice
-    && autoRenewal.consentDurationDays === autoRenewal.plan.durationDays
-  )
-  const activeAutoRenewal = Boolean(
-    autoRenewalConsentCurrent
-    && autoRenewal?.status === 'ACTIVE'
-    && autoRenewal.paymentMethodSavedAt
-  )
-  const currentPlanName = currentSubscription?.plan?.name ?? null
-  const currentWhitelistAddonActive = Boolean(
-    whitelistAddonEntitlement
-    && hasWhitelistAddonEntitlement(whitelistAddonEntitlement)
-  )
-  const currentWhitelistAddonRunning = Boolean(
-    whitelistAddonEntitlement
-    && isWhitelistAddonCurrentlyActive(whitelistAddonEntitlement)
-  )
-  const planViews = visiblePlans.map((plan) => ({
-    id: plan.id,
-    name: plan.name,
-    description: plan.description,
-    price: formatPrice(plan.priceKopecks),
-    priceKopecks: plan.priceKopecks,
-    monthlyPrice: formatPrice(Math.round((plan.priceKopecks / Math.max(1, plan.durationDays)) * 30)),
-    savingsPercent: !plan.isPromo && !plan.unlimitedDuration && referenceDailyPrice > 0
-      ? Math.max(0, Math.round((1 - (plan.priceKopecks / Math.max(1, plan.durationDays)) / referenceDailyPrice) * 100))
-      : 0,
-    durationDays: plan.durationDays,
-    unlimitedDuration: plan.unlimitedDuration,
-    trafficLimitGb: plan.trafficLimitGb,
-    deviceLimit: plan.deviceLimit,
-    unlimitedDevices: plan.unlimitedDevices,
-    maxDeviceLimit: plan.maxDeviceLimit,
-    deviceAddonEnabled: plan.deviceAddonEnabled,
-    extraDevicePriceKopecks: plan.extraDevicePriceKopecks,
-    initialDeviceLimit: plan.isPromo || plan.unlimitedDevices
-      ? plan.deviceLimit
-      : plan.deviceAddonEnabled
-        ? clampDeviceLimit(currentDeviceLimit ?? plan.deviceLimit, plan.deviceLimit, plan.maxDeviceLimit)
-        : currentSubscription?.planId === plan.id
-          ? Math.max(plan.deviceLimit, currentDeviceLimit ?? plan.deviceLimit)
-          : plan.deviceLimit,
+  const {
+    plans: planViews,
+    canManagePlans,
+    currentSubscription,
     currentDeviceLimit,
-    isPromo: plan.isPromo,
-    promoCodesEnabled: plan.promoCodesEnabled,
-    popular: plan.isFeatured,
-    current: currentSubscription?.planId === plan.id,
-    isPlanSwitch: Boolean(currentSubscription && currentSubscription.planId !== plan.id),
-    currentPlanName,
-    currentWhitelistAddonActive,
-    currentWhitelistAddonExpireAt: currentWhitelistAddonActive
-      ? currentWhitelistAddonRunning
-        ? whitelistAddonEntitlement?.whitelistAddonExpireAt?.toISOString() ?? null
-        : null
-      : null,
-    autoRenewalEnabled: autoRenewalConsentCurrent && autoRenewal?.plan.id === plan.id,
-    autoRenewalWhitelistAddonEnabled: autoRenewal?.plan.id === plan.id
-      && autoRenewal.whitelistAddonEnabled,
-    whitelistAddonEnabled: plan.whitelistAddonEnabled,
-    whitelistAddonPriceKopecks: plan.whitelistAddonPriceKopecks,
-    initialWhitelistAddonRequested: params.whitelistAddon === 'true'
-      && plan.whitelistAddonEnabled
-      && plan.whitelistAddonPriceKopecks > 0
-      && plan.whitelistAddonInternalSquads.length > 0,
+    needsTelegramCheckForPromo,
+    autoRenewal,
+    autoRenewalAvailable,
+    autoRenewalConsentCurrent,
+    activeAutoRenewal,
+  } = await buildPlanCatalog({
+    userId: session?.uid ?? null,
+    linkedPlanId,
     initialPromoCode,
-    availablePromoCodes: availablePromoCodesByPlan.get(plan.id) ?? [],
-    personalDiscountPercent: user?.personalDiscountPercent ?? 0,
-    nextPurchaseDiscountPercent: user?.nextPurchaseDiscountPercent ?? 0,
-    paymentProviders,
-  }))
+    whitelistAddonRequested: params.whitelistAddon === 'true',
+  })
+  const currentPlanName = currentSubscription?.plan?.name ?? null
 
   return (
     <div className="user-workspace page-stack">
@@ -345,38 +156,3 @@ export default async function PlansPage({
   )
 }
 
-function currentAutoRenewalPrice(
-  plan: {
-    priceKopecks: number
-    deviceLimit: number
-    maxDeviceLimit: number
-    extraDevicePriceKopecks: number
-    whitelistAddonEnabled: boolean
-    whitelistAddonPriceKopecks: number
-    whitelistAddonInternalSquads: string[]
-  },
-  deviceLimit: number,
-  includeWhitelistAddon: boolean,
-  personalDiscountPercent: number
-) {
-  try {
-    if (
-      includeWhitelistAddon
-      && (!plan.whitelistAddonEnabled
-        || plan.whitelistAddonPriceKopecks <= 0
-        || plan.whitelistAddonInternalSquads.length === 0)
-    ) return null
-    return tryCalculateRenewalPricing(
-      plan,
-      deviceLimit,
-      personalDiscountPercent,
-      includeWhitelistAddon ? plan.whitelistAddonPriceKopecks : 0
-    )?.totalAmountKopecks ?? null
-  } catch {
-    return null
-  }
-}
-
-function clampDeviceLimit(value: number, minimum: number, maximum: number) {
-  return Math.min(Math.max(minimum, maximum), Math.max(minimum, value))
-}
