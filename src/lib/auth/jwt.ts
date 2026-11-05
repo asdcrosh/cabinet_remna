@@ -22,21 +22,46 @@ export interface SessionPayload extends JWTPayload {
   role: 'USER' | 'MODERATOR' | 'ADMIN' | 'SUPER_ADMIN'
   stage?: 'FULL' | 'EMAIL_PENDING'
   sv?: number
+  // Только у токенов приложения: id записи MobileSession.
+  sid?: string
 }
 
 export const COOKIE_NAME = 'cabinet_session'
 
-export async function signSession(payload: Omit<SessionPayload, 'iat' | 'exp' | 'sv'>): Promise<string> {
+// Токены приложения StealthNet: короткий срок, отдельная аудитория и привязка к MobileSession.
+export const MOBILE_AUDIENCE = 'mobile'
+export const MOBILE_ACCESS_TTL_SECONDS = 15 * 60
+
+type SignSessionOptions = {
+  // Для токена приложения: id MobileSession. Задаёт aud "mobile" и срок 15 минут.
+  mobileSessionId?: string
+}
+
+export async function signSession(
+  payload: Omit<SessionPayload, 'iat' | 'exp' | 'sv' | 'sid' | 'aud'>,
+  options: SignSessionOptions = {}
+): Promise<string> {
   if (typeof payload.uid !== 'string') throw new Error('Session user id is required')
   const sessionVersion = await getUserSessionVersion(payload.uid)
+  const mobile = typeof options.mobileSessionId === 'string'
 
-  return new SignJWT({ ...payload, sv: sessionVersion })
+  const jwt = new SignJWT({
+    ...payload,
+    sv: sessionVersion,
+    ...(mobile ? { sid: options.mobileSessionId } : {}),
+  })
     .setProtectedHeader({ alg: ALG })
     .setIssuedAt()
-    .setExpirationTime(ACCESS_TTL)
+    .setExpirationTime(mobile ? `${MOBILE_ACCESS_TTL_SECONDS}s` : ACCESS_TTL)
     .setIssuer('remnawave-cabinet')
     .setJti(randomUUID())
-    .sign(getSecretKey())
+  if (mobile) jwt.setAudience(MOBILE_AUDIENCE)
+  return jwt.sign(getSecretKey())
+}
+
+export function isMobileSession(session: Pick<SessionPayload, 'aud' | 'sid'>) {
+  const aud = Array.isArray(session.aud) ? session.aud : [session.aud]
+  return aud.includes(MOBILE_AUDIENCE) && typeof session.sid === 'string'
 }
 
 export async function verifySession(token: string): Promise<SessionPayload | null> {
@@ -59,6 +84,25 @@ export async function verifySession(token: string): Promise<SessionPayload | nul
       }),
     ])
     if (revoked || !user || (payload.sv ?? 0) !== user.sessionVersion) return null
+
+    // Токен приложения действителен, только пока его MobileSession не отозвана и не истекла:
+    // отзыв устройства срабатывает сразу, без ожидания конца 15 минут.
+    const aud = Array.isArray(payload.aud) ? payload.aud : [payload.aud]
+    if (aud.includes(MOBILE_AUDIENCE)) {
+      if (typeof payload.sid !== 'string') return null
+      const mobileSession = await prisma.mobileSession.findUnique({
+        where: { id: payload.sid },
+        select: { userId: true, revokedAt: true, expiresAt: true },
+      })
+      if (
+        !mobileSession ||
+        mobileSession.userId !== payload.uid ||
+        mobileSession.revokedAt ||
+        mobileSession.expiresAt.getTime() <= Date.now()
+      ) {
+        return null
+      }
+    }
     return payload as SessionPayload
   } catch {
     return null

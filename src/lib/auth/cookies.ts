@@ -3,8 +3,8 @@
 // Параметр `req` опционален — если есть, проставим Path=/Domain привязкой к текущему.
 
 import type { NextResponse } from 'next/server'
-import { cookies } from 'next/headers'
-import { COOKIE_NAME, signSession, verifySession, type SessionPayload } from './jwt'
+import { cookies, headers } from 'next/headers'
+import { COOKIE_NAME, isMobileSession, signSession, verifySession, type SessionPayload } from './jwt'
 
 export async function setSessionCookie(payload: Omit<SessionPayload, 'iat' | 'exp'>) {
   const token = await signSession(payload)
@@ -48,8 +48,19 @@ export function clearSessionCookieOnResponse(res: NextResponse) {
 export async function getSession(): Promise<SessionPayload | null> {
   const cookieStore = await cookies()
   const token = cookieStore.get(COOKIE_NAME)?.value
-  if (!token) return null
-  return verifySession(token)
+  if (token) return verifySession(token)
+
+  // Приложение StealthNet авторизуется заголовком Authorization: Bearer.
+  // Принимаем только токены приложения (aud "mobile" + живая MobileSession), не веб-токены.
+  const bearer = readBearerToken((await headers()).get('authorization'))
+  if (!bearer) return null
+  const session = await verifySession(bearer)
+  return session && isMobileSession(session) ? session : null
+}
+
+export function readBearerToken(value: string | null | undefined) {
+  const match = value?.match(/^Bearer\s+([A-Za-z0-9._~+/-]+=*)$/i)
+  return match ? match[1] : null
 }
 
 export async function getCurrentUser() {

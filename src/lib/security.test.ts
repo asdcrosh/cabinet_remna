@@ -138,4 +138,21 @@ describe('security helpers', () => {
 
     expect(getClientIp(req)).toBe('203.0.113.10')
   })
+  it('пропускает запрос приложения с Bearer без cookie, даже без Origin в продакшене', () => {
+    vi.stubEnv('NODE_ENV', 'production')
+    const req = new Request('https://cabinet.example/api/payment/create', {
+      method: 'POST',
+      headers: { authorization: 'Bearer abc.def.ghi' },
+    })
+    expect(() => assertSameOrigin(req)).not.toThrow()
+  })
+
+  it('не пропускает Bearer вместе с cookie: такие запросы проверяются как браузерные', () => {
+    vi.stubEnv('NODE_ENV', 'production')
+    const req = new Request('https://cabinet.example/api/payment/create', {
+      method: 'POST',
+      headers: { authorization: 'Bearer abc.def.ghi', cookie: 'cabinet_session=x', origin: 'https://evil.example' },
+    })
+    expect(() => assertSameOrigin(req)).toThrow('Invalid request origin')
+  })
 })
