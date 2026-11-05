@@ -150,6 +150,7 @@ model User {
   adminNotificationReads     AdminNotificationRead[]
   revokedSessions            RevokedSession[]
   mobileSessions             MobileSession[]
+  mobileAuthCodes            MobileAuthCode[]
   broadcastDeliveries        BroadcastDelivery[]
   subscriptionHealth         SubscriptionHealth?
   autoRenewal                AutoRenewal?
@@ -1489,6 +1490,26 @@ model MobileSession {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, revokedAt])
+  @@index([expiresAt])
+}
+
+// Одноразовый код входа через браузер (OAuth) для приложения StealthNet.
+// Код живёт 2 минуты и обменивается на токены только с PKCE-секретом приложения.
+model MobileAuthCode {
+  id            String    @id @default(cuid())
+  codeHash      String    @unique
+  userId        String
+  codeChallenge String
+  hwid          String
+  deviceName    String?
+  platform      String?
+  appVersion    String?
+  expiresAt     DateTime
+  usedAt        DateTime?
+  createdAt     DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@index([expiresAt])
 }
 

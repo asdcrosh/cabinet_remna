@@ -44,7 +44,8 @@ import { upsertLocalSubscriptionFromRemnawave } from '@/lib/remnawave-local-sync
 export async function createPaymentForUser(
   req: Request,
   userId: string,
-  options: { telegramBot?: boolean; returnUrl?: string } = {}
+  // mobileApp: платёж из приложения StealthNet — после оплаты вернуть пользователя в приложение.
+  options: { telegramBot?: boolean; returnUrl?: string; mobileApp?: boolean } = {}
 ) {
   let body: unknown
   try {
@@ -708,7 +709,9 @@ export async function createPaymentForUser(
 
   const amountRub = localPayment.amountKopecks / 100
   const baseUrl = getAppUrl()
-  const returnUrl = options.returnUrl ?? `${baseUrl}/dashboard/billing?paid=1&payment=${localPayment.id}`
+  const returnUrl = options.returnUrl ?? (options.mobileApp
+    ? `${baseUrl}/app/payment-return?payment=${localPayment.id}`
+    : `${baseUrl}/dashboard/billing?paid=1&payment=${localPayment.id}`)
   const description = isWhitelistAddon
     ? WHITELIST_ADDON_RECEIPT_NAME
     : isDeviceLimitAddon

@@ -414,6 +414,15 @@ describe('payment create route', () => {
     expect(mocks.prisma.$transaction).not.toHaveBeenCalled()
   })
 
+  it('возвращает в приложение StealthNet после оплаты, если платёж создан из приложения', async () => {
+    mocks.requireAuth.mockResolvedValue({ uid: user.id, email: user.email, role: 'USER', aud: 'mobile', sid: 'ms-1' })
+    const response = await POST(paymentRequest())
+    expect(response.status).toBe(200)
+    expect(mocks.createPayment).toHaveBeenCalledWith(expect.objectContaining({
+      returnUrl: 'https://cabinet.example/app/payment-return?payment=payment-1',
+    }))
+  })
+
   it('creates a local payment, sends it to YooKassa and stores confirmation data', async () => {
     const response = await POST(paymentRequest())
     const body = await response.json()

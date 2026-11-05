@@ -3,6 +3,7 @@ import { requireAuth, withAuth } from '@/lib/auth/guard'
 import { rateLimit } from '@/lib/rate-limit'
 import { withDistributedLock } from '@/lib/distributed-lock'
 import { createPaymentForUser } from '@/lib/payment-checkout'
+import { isMobileSession } from '@/lib/auth/jwt'
 
 export const runtime = 'nodejs'
 
@@ -18,7 +19,7 @@ export const POST = withAuth(async (req: Request) => {
 
   const locked = await withDistributedLock(
     `billing-operation:${session.uid}`,
-    () => createPaymentForUser(req, session.uid),
+    () => createPaymentForUser(req, session.uid, { mobileApp: isMobileSession(session) }),
     { timeoutMs: 30_000 }
   )
   if (!locked.acquired) {

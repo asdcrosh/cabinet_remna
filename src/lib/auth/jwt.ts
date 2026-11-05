@@ -148,6 +148,11 @@ export async function revokeSessionToken(token: string) {
   }
 }
 
+// Ключ подписи для других коротких токенов авторизации (например, намерения входа приложения через браузер).
+export function getAuthSigningKey() {
+  return getSecretKey()
+}
+
 function getSecretKey() {
   const secret = process.env.JWT_SECRET
   if (!secret || secret.length < JWT_SECRET_MIN_LENGTH) {
