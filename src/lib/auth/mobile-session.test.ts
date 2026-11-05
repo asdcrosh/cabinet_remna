@@ -46,6 +46,9 @@ vi.mock('@/lib/prisma', () => ({
         if (!row) return null
         return include ? { ...row, user: db.users.get(row.userId) } : row
       }),
+      findFirst: vi.fn(async ({ where }: { where: Record<string, unknown> }) => db.sessions.find((r) => matches(r, where)) ?? null),
+      findMany: vi.fn(async ({ where }: { where: { userId: string; revokedAt: null; expiresAt: { gt: Date } } }) =>
+        db.sessions.filter((r) => r.userId === where.userId && r.revokedAt === null && r.expiresAt > where.expiresAt.gt)),
       updateMany: vi.fn(async ({ where, data }: { where: Record<string, unknown>; data: Partial<Row> }) => {
         const rows = db.sessions.filter((r) => matches(r, where))
         rows.forEach((r) => Object.assign(r, data))
@@ -55,6 +58,8 @@ vi.mock('@/lib/prisma', () => ({
   },
 }))
 vi.mock('@/lib/audit-log', () => ({ writeAuditLog: vi.fn() }))
+const notify = vi.hoisted(() => vi.fn(async () => undefined))
+vi.mock('@/lib/notifications', () => ({ notifyMobileLoginFromNewDevice: notify }))
 vi.mock('next/headers', () => ({
   cookies: async () => ({ get: () => (db.cookie ? { value: db.cookie } : undefined) }),
   headers: async () => new Headers(db.authorization ? { authorization: db.authorization } : {}),
@@ -81,6 +86,33 @@ describe('мобильные сессии', () => {
     db.users.set(user.id, { ...user, sessionVersion: 0 })
     db.cookie = undefined
     db.authorization = null
+    notify.mockClear()
+  })
+
+  it('предупреждает о входе с нового устройства только один раз', async () => {
+    await ms.createMobileSession(user, device, req())
+    expect(notify).toHaveBeenCalledTimes(1)
+    expect(notify).toHaveBeenCalledWith(expect.objectContaining({ userId: user.id, deviceLabel: 'Pixel 8, android' }))
+    await ms.createMobileSession(user, device, req())
+    expect(notify).toHaveBeenCalledTimes(1)
+    await ms.createMobileSession(user, { ...device, hwid: 'another-device-0001' }, req())
+    expect(notify).toHaveBeenCalledTimes(2)
+  })
+
+  it('ошибка уведомления не мешает входу', async () => {
+    notify.mockRejectedValueOnce(new Error('telegram down'))
+    const t = await ms.createMobileSession(user, device, req())
+    expect(t.accessToken).toBeTruthy()
+  })
+
+  it('список устройств не показывает отозванные и истёкшие сессии', async () => {
+    const a = await ms.createMobileSession(user, device, req())
+    const b = await ms.createMobileSession(user, { ...device, hwid: 'another-device-0001' }, req())
+    const c = await ms.createMobileSession(user, { ...device, hwid: 'third-device-00001' }, req())
+    await ms.revokeMobileSession({ sessionId: b.sessionId, userId: user.id })
+    db.sessions.find((r) => r.id === c.sessionId)!.expiresAt = new Date(Date.now() - 1000)
+    const list = await ms.listMobileSessions(user.id)
+    expect(list.map((s) => s.id)).toEqual([a.sessionId])
   })
 
   it('выдаёт токен приложения: aud mobile, sid и короткий срок', async () => {

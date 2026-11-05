@@ -9,6 +9,8 @@ import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { writeAuditLog } from '@/lib/audit-log'
 import { getClientIp } from '@/lib/security'
+import { logWarn } from '@/lib/logger'
+import { notifyMobileLoginFromNewDevice } from '@/lib/notifications'
 import { MOBILE_ACCESS_TTL_SECONDS, signSession, type SessionPayload } from './jwt'
 
 export const MOBILE_REFRESH_TTL_DAYS = 60
@@ -61,6 +63,12 @@ export async function createMobileSession(user: SessionUser, device: MobileDevic
   const owner = await prisma.user.findUnique({ where: { id: user.id }, select: { sessionVersion: true } })
   if (!owner) throw new Error('Cannot create mobile session for missing user')
 
+  // Входили ли раньше с этого устройства — иначе предупреждаем пользователя.
+  const knownDevice = await prisma.mobileSession.findFirst({
+    where: { userId: user.id, hwid: device.hwid },
+    select: { id: true },
+  })
+
   const refreshToken = newRefreshToken()
   const session = await prisma.mobileSession.create({
     data: {
@@ -85,6 +93,20 @@ export async function createMobileSession(user: SessionUser, device: MobileDevic
     metadata: { sessionId: session.id, platform: device.platform ?? null, appVersion: device.appVersion ?? null },
     request: req,
   })
+
+  if (!knownDevice) {
+    // Ошибка доставки уведомления не должна мешать входу.
+    await notifyMobileLoginFromNewDevice({
+      userId: user.id,
+      sessionId: session.id,
+      deviceLabel: [device.name, device.platform].filter(Boolean).join(', ') || 'неизвестное устройство',
+    }).catch((error: unknown) => {
+      logWarn('auth.mobile.new_device_notify_failed', {
+        userId: user.id,
+        message: error instanceof Error ? error.message : 'unknown error',
+      })
+    })
+  }
 
   return {
     accessToken: await issueAccessToken(user, session.id),
@@ -192,4 +214,20 @@ export async function revokeMobileSession(params: { sessionId?: string; userId?:
     return res.count > 0
   }
   return false
+}
+
+/** Активные сессии приложения пользователя — для списка «Где выполнен вход». */
+export async function listMobileSessions(userId: string) {
+  return prisma.mobileSession.findMany({
+    where: { userId, revokedAt: null, expiresAt: { gt: new Date() } },
+    orderBy: { lastUsedAt: 'desc' },
+    select: {
+      id: true,
+      deviceName: true,
+      platform: true,
+      appVersion: true,
+      createdAt: true,
+      lastUsedAt: true,
+    },
+  })
 }

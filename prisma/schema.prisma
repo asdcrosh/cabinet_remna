@@ -437,6 +437,7 @@ enum NotificationType {
   SUPPORT_REPLY
   BONUS_GRANTED
   BROADCAST
+  ACCOUNT_SECURITY
 }
 
 enum NotificationChannel {

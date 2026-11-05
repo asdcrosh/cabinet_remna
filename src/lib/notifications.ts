@@ -621,6 +621,35 @@ export async function notifySupportReply(input: { ticketId: string; messageId: s
   })
 }
 
+export async function notifyMobileLoginFromNewDevice(input: {
+  userId: string
+  sessionId: string
+  deviceLabel: string
+}) {
+  const body = `Выполнен вход в приложение ${getBrandName()} с нового устройства: ${input.deviceLabel}. Если это были не вы, завершите этот сеанс и смените пароль.`
+  const href = '/dashboard/settings'
+  await notifyUser({
+    userId: input.userId,
+    type: 'ACCOUNT_SECURITY',
+    dedupeKey: `mobile-login:${input.sessionId}`,
+    title: 'Вход с нового устройства',
+    body,
+    actionHref: href,
+    actionLabel: 'Открыть настройки',
+    telegramText: [`<b>Вход с нового устройства</b>`, escapeTelegram(body)].join('\n'),
+    emailSubject: `Вход с нового устройства — ${getBrandName()}`,
+    emailText: `${body}\n\nНастройки: ${getAppUrl()}${href}`,
+    emailHtml: renderNotificationEmail({
+      eyebrow: 'Безопасность',
+      title: 'Вход с нового устройства',
+      lead: body,
+      ctaLabel: 'Открыть настройки',
+      ctaUrl: `${getAppUrl()}${href}`,
+    }),
+    emailDeliveryMode: 'fallback',
+  })
+}
+
 export async function notifyBonusGranted(input: { userId: string; attemptsCount: number }) {
   void input
   return { telegram: 'skipped' as NotifyResult, email: 'skipped' as NotifyResult }
