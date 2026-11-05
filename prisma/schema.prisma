@@ -149,6 +149,7 @@ model User {
   notificationPreference     UserNotificationPreference?
   adminNotificationReads     AdminNotificationRead[]
   revokedSessions            RevokedSession[]
+  mobileSessions             MobileSession[]
   broadcastDeliveries        BroadcastDelivery[]
   subscriptionHealth         SubscriptionHealth?
   autoRenewal                AutoRenewal?
@@ -1463,6 +1464,33 @@ enum WatchIncidentType {
   REALITY_TCP
 }
 
+// Сессия входа из приложения StealthNet (Android/Windows).
+// Access-токен — короткий JWT с aud "mobile" и sid = id сессии;
+// refresh-токен хранится только в виде SHA-256 и ротируется при каждом обновлении.
+model MobileSession {
+  id             String    @id @default(cuid())
+  userId         String
+  hwid           String
+  deviceName     String?
+  platform       String?
+  appVersion     String?
+  refreshHash    String    @unique
+  prevHash       String?   @unique
+  sessionVersion Int
+  createdAt      DateTime  @default(now())
+  lastUsedAt     DateTime  @default(now())
+  expiresAt      DateTime
+  revokedAt      DateTime?
+  revokeReason   String?
+  ip             String?
+  userAgent      String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt])
+  @@index([expiresAt])
+}
+
 model RevokedSession {
   id        String   @id @default(cuid())
   jti       String   @unique
@@ -1866,5 +1894,8 @@ enum AuditAction {
   ADMIN_NODE_PROVISIONING_CREATED
   ADMIN_NODE_PROVISIONING_RETRIED
   REMNASHOP_SYNC_RUN
+  MOBILE_SESSION_CREATED
+  MOBILE_SESSION_REVOKED
+  MOBILE_REFRESH_REUSE_DETECTED
   SYSTEM_BACKUP_CREATED
 }

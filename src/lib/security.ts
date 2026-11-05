@@ -3,6 +3,11 @@ const MUTATION_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
 export function assertSameOrigin(req: Request) {
   if (!MUTATION_METHODS.has(req.method)) return
 
+  // CSRF возможен только через cookie, которую браузер подставляет сам.
+  // Запрос приложения с заголовком Bearer и без cookie подделать с чужого сайта нельзя:
+  // токен не отправляется автоматически. Сам токен проверяется в getSession().
+  if (isBearerOnlyRequest(req)) return
+
   const originHeader = req.headers.get('origin')
   if (!originHeader) {
     const fetchSite = req.headers.get('sec-fetch-site')?.trim().toLowerCase()
@@ -116,4 +121,9 @@ function ipv4ToInt(ip: string) {
   }
   const [first = 0, second = 0, third = 0, fourth = 0] = parts
   return (((first << 24) >>> 0) + (second << 16) + (third << 8) + fourth) >>> 0
+}
+
+function isBearerOnlyRequest(req: Request) {
+  const authorization = req.headers.get('authorization')
+  return Boolean(authorization && /^Bearer\s+\S+/i.test(authorization) && !req.headers.get('cookie'))
 }

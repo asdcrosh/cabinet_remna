@@ -17,6 +17,9 @@ export const metadata = { title: 'История действий — Админ
 const ACTION_LABELS: Record<AuditAction, string> = {
   USER_PASSWORD_CHANGED: 'Пароль изменён',
   USER_SESSIONS_REVOKED: 'Сеансы завершены',
+  MOBILE_SESSION_CREATED: 'Вход в приложение',
+  MOBILE_SESSION_REVOKED: 'Сессия приложения отозвана',
+  MOBILE_REFRESH_REUSE_DETECTED: 'Повторное использование токена приложения',
   ADMIN_PLAN_CREATED: 'Тариф создан',
   ADMIN_PLAN_UPDATED: 'Тариф изменён',
   ADMIN_PLAN_DELETED: 'Тариф удалён',
