@@ -284,6 +284,17 @@ if (value("WATCH_TELEGRAM_CHAT_ID") && !value("TELEGRAM_BOT_TOKEN")) {
   warnings.push("TELEGRAM_BOT_TOKEN is required for Watch Telegram alerts");
 }
 
+if (value("FIREBASE_SERVICE_ACCOUNT_BASE64")) {
+  try {
+    const account = JSON.parse(Buffer.from(value("FIREBASE_SERVICE_ACCOUNT_BASE64"), "base64").toString("utf8"));
+    if (!account.project_id || !account.client_email || !account.private_key) {
+      errors.push("FIREBASE_SERVICE_ACCOUNT_BASE64 must contain project_id, client_email and private_key");
+    }
+  } catch {
+    errors.push("FIREBASE_SERVICE_ACCOUNT_BASE64 must be a base64-encoded Firebase service account JSON");
+  }
+}
+
 if (["1", "true", "yes", "on"].includes(value("PAYANYWAY_ENABLED").toLowerCase())) {
   if (!value("PAYANYWAY_MNT_ID")) errors.push("PAYANYWAY_MNT_ID is required when PayAnyWay is enabled");
   if (!value("PAYANYWAY_INTEGRITY_CODE")) {

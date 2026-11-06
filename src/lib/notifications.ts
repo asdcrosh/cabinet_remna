@@ -16,6 +16,7 @@ import { paymentProviderLabel } from './payment-provider-label'
 import { readWhitelistAddonSnapshot } from './whitelist-addon'
 import { isWhitelistAddonPaused } from './whitelist-addon-policy'
 import { readDeviceLimitAddonSnapshot } from './device-limit-addon'
+import { sendPushToUser } from './push'
 
 const RENEW_PATH = '/dashboard/plans?intent=renew'
 const SUBSCRIPTION_PATH = '/dashboard/subscription'
@@ -818,7 +819,7 @@ async function createInAppNotification(input: {
   actionHref?: string
   actionLabel?: string
 }) {
-  await prisma.userNotification.createMany({
+  const created = await prisma.userNotification.createMany({
     data: {
       userId: input.userId,
       type: input.type,
@@ -830,6 +831,17 @@ async function createInAppNotification(input: {
     },
     skipDuplicates: true,
   })
+  // То же уведомление — push в приложение StealthNet. Только новое (не повтор по dedupeKey)
+  // и без ожидания: доставка push не должна задерживать оплату, поддержку и рассылки.
+  if (created.count > 0) {
+    void sendPushToUser({
+      userId: input.userId,
+      type: input.type,
+      title: input.title,
+      body: input.body,
+      actionHref: input.actionHref,
+    })
+  }
 }
 
 async function sendWithDedupe(input: {
