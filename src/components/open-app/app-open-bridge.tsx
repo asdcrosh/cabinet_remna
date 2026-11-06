@@ -5,6 +5,7 @@ import { useEffect, useMemo } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { ArrowLeft, Check, Copy, ExternalLink, ShieldAlert, ShieldCheck } from 'lucide-react'
 import { toast } from '@/components/ui/toaster'
+import { extractRabbitHoleSubscription } from '@/lib/rabbit-hole'
 
 const allowedSchemes = ['incy:', 'happ:']
 
@@ -153,6 +154,7 @@ function isAllowedAppUrl(value: string) {
   if (!value || value.length > 4096) return false
   try {
     const url = new URL(value)
+    if (url.protocol === 'rabbithole:') return Boolean(extractRabbitHoleSubscription(value))
     return allowedSchemes.includes(url.protocol)
   } catch {
     return false
@@ -161,6 +163,7 @@ function isAllowedAppUrl(value: string) {
 
 function extractSubscriptionUrl(value: string) {
   if (!value) return ''
+  if (value.startsWith('rabbithole:')) return extractRabbitHoleSubscription(value)
   if (value.startsWith('incy://import/')) return value.slice('incy://import/'.length)
   if (value.startsWith('incy://add/')) return value.slice('incy://add/'.length)
   if (value.startsWith('happ://add/')) return value.slice('happ://add/'.length)
