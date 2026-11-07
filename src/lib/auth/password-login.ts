@@ -1,8 +1,10 @@
 // Проверка входа по email и паролю — общая для веб-кабинета и приложения StealthNet.
 // Перенесено из /api/auth/login без изменения логики: bcrypt, запасной вход через Remnashop,
 // связывание аккаунта Remnashop, проверка подтверждения почты и профиля Remnawave.
+import { createHash } from 'node:crypto'
 import { compare, hash } from 'bcryptjs'
 import { prisma } from '@/lib/prisma'
+import { rateLimitKey, type RateLimitResult } from '@/lib/rate-limit'
 import { checkRemnawaveProfileOnLogin } from '@/lib/remnawave-profile-check'
 import { logWarn } from '@/lib/logger'
 import { authenticateRemnashopEmail, registerRemnashopEmailUser } from '@/lib/remnashop-api'
@@ -15,11 +17,29 @@ export type PasswordLoginResult =
   | { ok: true; user: User }
   | { ok: false; status: number; body: { error: string; code?: string } }
 
+// Попытки входа в один аккаунт с любых IP (лимит по IP — в самих маршрутах).
+export const EMAIL_LOGIN_LIMIT = 10
+export const EMAIL_LOGIN_WINDOW_MS = 15 * 60_000
+
+/** Лимит попыток входа на один email: перебор пароля с разных адресов. Email в базу — хэшем. */
+export function limitPasswordLoginByEmail(email: string): Promise<RateLimitResult> {
+  const key = createHash('sha256').update(email.trim().toLowerCase(), 'utf8').digest('hex')
+  return rateLimitKey(`auth-login-email:${key}`, EMAIL_LOGIN_LIMIT, EMAIL_LOGIN_WINDOW_MS)
+}
+
+// Настоящий хэш той же стоимости, что у пользователей: сравнение с ним занимает столько же,
+// сколько с паролем существующего аккаунта, и по времени ответа нельзя узнать, есть ли почта.
+let dummyHash: Promise<string> | null = null
+function getDummyHash() {
+  dummyHash ??= hash('stealthnet-dummy-password', 12)
+  return dummyHash
+}
+
 export async function authenticatePassword(email: string, password: string): Promise<PasswordLoginResult> {
   let user = await prisma.user.findUnique({ where: { email } })
-  // Сравниваем даже при отсутствии пользователя — чтобы тайминг не указывал наличия
-  const fakeHash = '$2a$12$0000000000000000000000.0000000000000000000000000000000000'
-  let isValid = await compare(password, user?.passwordHash ?? fakeHash)
+  // Сравниваем даже при отсутствии пользователя (или пароля) — чтобы тайминг не указывал наличия
+  const storedHash = user?.passwordHash || null
+  let isValid = (await compare(password, storedHash ?? (await getDummyHash()))) && storedHash !== null
 
   const canUseRemnashopFallback =
     !user || (user.role === 'USER' && user.remnashopUserId !== null)

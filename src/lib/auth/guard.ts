@@ -4,7 +4,7 @@
 import { jsonResponse } from '@/lib/json-response'
 import { NextResponse } from 'next/server'
 import { getSession } from './cookies'
-import type { SessionPayload } from './jwt'
+import { isMobileSession, type SessionPayload } from './jwt'
 import { assertSameOrigin } from '@/lib/security'
 import { prisma } from '@/lib/prisma'
 import { logError, withRequestLogContext } from '@/lib/logger'
@@ -25,8 +25,16 @@ export async function requireAuth(): Promise<SessionPayload> {
   return session
 }
 
-export async function requireAdmin(): Promise<SessionPayload> {
+// Админка — только из веб-кабинета. Токен приложения StealthNet (Bearer, без проверки Origin)
+// сюда не пускаем: украденная сессия телефона администратора не должна открывать админку.
+async function requireWebAuth(): Promise<SessionPayload> {
   const session = await requireAuth()
+  if (isMobileSession(session)) throw new AuthError(403, 'Forbidden')
+  return session
+}
+
+export async function requireAdmin(): Promise<SessionPayload> {
+  const session = await requireWebAuth()
   const user = await prisma.user.findUnique({
     where: { id: session.uid },
     select: { role: true },
@@ -38,7 +46,7 @@ export async function requireAdmin(): Promise<SessionPayload> {
 }
 
 export async function requireStaff(): Promise<SessionPayload> {
-  const session = await requireAuth()
+  const session = await requireWebAuth()
   const user = await prisma.user.findUnique({
     where: { id: session.uid },
     select: { role: true },
@@ -50,7 +58,7 @@ export async function requireStaff(): Promise<SessionPayload> {
 }
 
 export async function requireSuperAdmin(): Promise<SessionPayload> {
-  const session = await requireAuth()
+  const session = await requireWebAuth()
   const user = await prisma.user.findUnique({
     where: { id: session.uid },
     select: { role: true },

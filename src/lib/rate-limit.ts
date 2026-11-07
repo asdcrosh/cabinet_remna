@@ -23,19 +23,44 @@ export async function rateLimit(
   windowMs: number,
   options: RateLimitOptions = {}
 ): Promise<RateLimitResult> {
+  validateLimit(limit, windowMs, options)
+  const ip = getClientIp(req)
+  if (!ip && process.env.NODE_ENV === 'production') {
+    throw new Error('Client IP is unavailable. Check TRUSTED_PROXY_HEADERS and reverse proxy headers.')
+  }
+  return hitBucket(`${key}:${ip}`, limit, windowMs, options)
+}
+
+/**
+ * Лимит по ключу без IP — например, попытки входа в один аккаунт с разных адресов.
+ * Ключ попадает в базу как есть: персональные данные в нём передавать хэшем.
+ */
+export async function rateLimitKey(
+  key: string,
+  limit: number,
+  windowMs: number,
+  options: RateLimitOptions = {}
+): Promise<RateLimitResult> {
+  validateLimit(limit, windowMs, options)
+  return hitBucket(key, limit, windowMs, options)
+}
+
+function validateLimit(limit: number, windowMs: number, options: RateLimitOptions) {
   if (!Number.isInteger(limit) || limit < 1 || !Number.isInteger(windowMs) || windowMs < 1) {
     throw new Error('Rate limit and window must be positive integers')
   }
   if (options.penaltyMs !== undefined && (!Number.isInteger(options.penaltyMs) || options.penaltyMs < 1)) {
     throw new Error('Rate limit penalty must be a positive integer')
   }
+}
 
+async function hitBucket(
+  bucketKey: string,
+  limit: number,
+  windowMs: number,
+  options: RateLimitOptions
+): Promise<RateLimitResult> {
   const now = Date.now()
-  const ip = getClientIp(req)
-  if (!ip && process.env.NODE_ENV === 'production') {
-    throw new Error('Client IP is unavailable. Check TRUSTED_PROXY_HEADERS and reverse proxy headers.')
-  }
-  const bucketKey = `${key}:${ip}`
   const nowDate = new Date(now)
   const nextResetAt = new Date(now + windowMs)
   const extendWhenLimited = options.penaltyMs !== undefined
