@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   compare: vi.fn(),
   hash: vi.fn(),
   rateLimit: vi.fn(),
+  rateLimitKey: vi.fn(),
   checkRemnawaveProfileOnLogin: vi.fn(),
   authenticateRemnashopEmail: vi.fn(),
   registerRemnashopEmailUser: vi.fn(),
@@ -23,7 +24,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('bcryptjs', () => ({ compare: mocks.compare, hash: mocks.hash }))
 vi.mock('@/lib/prisma', () => ({ prisma: mocks.prisma }))
-vi.mock('@/lib/rate-limit', () => ({ rateLimit: mocks.rateLimit }))
+vi.mock('@/lib/rate-limit', () => ({ rateLimit: mocks.rateLimit, rateLimitKey: mocks.rateLimitKey }))
 vi.mock('@/lib/auth/cookies', () => ({ setSessionCookieOnResponse: mocks.setSessionCookieOnResponse }))
 vi.mock('@/lib/remnawave-profile-check', () => ({ checkRemnawaveProfileOnLogin: mocks.checkRemnawaveProfileOnLogin }))
 vi.mock('@/lib/remnashop-api', () => ({
@@ -69,6 +70,7 @@ describe('login route', () => {
     process.env.REMNASHOP_API_URL = originalRemnashopApiUrl
     process.env.REMNASHOP_DATABASE_URL = originalRemnashopDatabaseUrl
     mocks.rateLimit.mockResolvedValue({ ok: true })
+    mocks.rateLimitKey.mockResolvedValue({ ok: true })
     mocks.prisma.user.findUnique.mockResolvedValue(user)
     mocks.prisma.user.update.mockResolvedValue(user)
     mocks.compare.mockResolvedValue(true)
@@ -88,6 +90,31 @@ describe('login route', () => {
     expect(body.error).toBe('Invalid request origin')
     expect(mocks.rateLimit).not.toHaveBeenCalled()
     expect(mocks.prisma.user.findUnique).not.toHaveBeenCalled()
+  })
+
+  it('limits attempts per email across IPs and stores only a hash of the email', async () => {
+    mocks.rateLimitKey.mockResolvedValue({ ok: false, retryAfter: 120 })
+    const response = await POST(loginRequest({ email: 'User@Example.com', password: 'Password1' }))
+
+    expect(response.status).toBe(429)
+    expect(response.headers.get('retry-after')).toBe('120')
+    expect(mocks.prisma.user.findUnique).not.toHaveBeenCalled()
+    const [key, limit, windowMs] = mocks.rateLimitKey.mock.calls[0] ?? []
+    expect(key).toMatch(/^auth-login-email:[0-9a-f]{64}$/)
+    expect(key).not.toContain('example')
+    expect([limit, windowMs]).toEqual([10, 15 * 60_000])
+  })
+
+  it('compares against a real bcrypt hash when the email is unknown', async () => {
+    delete process.env.REMNASHOP_API_URL
+    mocks.prisma.user.findUnique.mockResolvedValue(null)
+    mocks.hash.mockResolvedValue('$2a$12$dummydummydummydummydu.dummydummydummydummydummydummyd')
+    mocks.compare.mockResolvedValue(true)
+    const response = await POST(loginRequest({ email: 'missing@example.com', password: 'Password1' }))
+
+    expect(response.status).toBe(401)
+    expect(mocks.hash).toHaveBeenCalledWith(expect.any(String), 12)
+    expect(mocks.compare).toHaveBeenCalledWith('Password1', '$2a$12$dummydummydummydummydu.dummydummydummydummydummydummyd')
   })
 
   it('creates a session after valid credentials and verified email', async () => {

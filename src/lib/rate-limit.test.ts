@@ -4,7 +4,7 @@ const mocks = vi.hoisted(() => ({ queryRaw: vi.fn() }))
 
 vi.mock('./prisma', () => ({ prisma: { $queryRaw: mocks.queryRaw } }))
 
-import { rateLimit } from './rate-limit'
+import { rateLimit, rateLimitKey } from './rate-limit'
 
 describe('rate limit', () => {
   beforeEach(() => {
@@ -27,6 +27,17 @@ describe('rate limit', () => {
     expect(Array.from(query as TemplateStringsArray).join('?')).toContain('ON CONFLICT ("key") DO UPDATE')
     expect(Array.from(query as TemplateStringsArray).join('?')).toContain('bucket."count" + 1')
     expect(values).toContain('login:203.0.113.10')
+  })
+
+  it('limits by key alone without the client IP', async () => {
+    vi.stubEnv('NODE_ENV', 'production')
+    vi.stubEnv('TRUSTED_PROXY_HEADERS', '')
+    const resetAt = new Date(Date.now() + 60_000)
+    mocks.queryRaw.mockResolvedValue([{ count: 11, resetAt }])
+
+    await expect(rateLimitKey('auth-login-email:abc', 10, 60_000)).resolves.toMatchObject({ ok: false })
+    const [, ...values] = mocks.queryRaw.mock.calls[0] ?? []
+    expect(values).toContain('auth-login-email:abc')
   })
 
   it('rejects a request based on the count returned by the atomic upsert', async () => {

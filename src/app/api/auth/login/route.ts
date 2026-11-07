@@ -5,7 +5,7 @@ import { loginSchema } from '@/lib/auth/validation'
 import { setSessionCookieOnResponse } from '@/lib/auth/cookies'
 import { rateLimit } from '@/lib/rate-limit'
 import { assertSameOrigin } from '@/lib/security'
-import { authenticatePassword } from '@/lib/auth/password-login'
+import { authenticatePassword, limitPasswordLoginByEmail } from '@/lib/auth/password-login'
 
 export const runtime = 'nodejs'
 
@@ -40,6 +40,15 @@ export async function POST(req: Request) {
   }
 
   const { email, password } = parsed.data
+
+  const emailLimited = await limitPasswordLoginByEmail(email)
+  if (!emailLimited.ok) {
+    return jsonResponse(
+      { error: 'Слишком много попыток входа. Попробуйте позже.' },
+      { status: 429, headers: { 'Retry-After': String(emailLimited.retryAfter) } }
+    )
+  }
+
   const result = await authenticatePassword(email, password)
   if (!result.ok) {
     return jsonResponse(result.body, { status: result.status })

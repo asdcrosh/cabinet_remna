@@ -28,6 +28,29 @@ describe('requireAdmin', () => {
     await expect(requireAdmin()).resolves.toBe(session)
   })
 
+  it('rejects StealthNet app tokens in staff and admin checks even for admins', async () => {
+    mocks.getSession.mockResolvedValue({
+      uid: 'user-1',
+      email: 'admin@example.com',
+      role: 'SUPER_ADMIN',
+      aud: 'mobile',
+      sid: 'mobile-session-1',
+    })
+    mocks.prisma.user.findUnique.mockResolvedValue({ role: 'SUPER_ADMIN' })
+
+    await expect(requireStaff()).rejects.toMatchObject(new AuthError(403, 'Forbidden'))
+    await expect(requireAdmin()).rejects.toMatchObject(new AuthError(403, 'Forbidden'))
+    await expect(requireSuperAdmin()).rejects.toMatchObject(new AuthError(403, 'Forbidden'))
+    expect(mocks.prisma.user.findUnique).not.toHaveBeenCalled()
+  })
+
+  it('still allows StealthNet app tokens in regular user checks', async () => {
+    const session = { uid: 'user-1', email: 'user@example.com', role: 'USER', aud: 'mobile', sid: 'mobile-session-1' }
+    mocks.getSession.mockResolvedValue(session)
+
+    await expect(requireAuth()).resolves.toBe(session)
+  })
+
   it('rejects stale admin session when database role is USER', async () => {
     mocks.getSession.mockResolvedValue({ uid: 'user-1', email: 'admin@example.com', role: 'ADMIN' })
     mocks.prisma.user.findUnique.mockResolvedValue({ role: 'USER' })
