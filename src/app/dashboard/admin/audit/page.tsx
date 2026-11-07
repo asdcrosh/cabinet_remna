@@ -19,6 +19,7 @@ const ACTION_LABELS: Record<AuditAction, string> = {
   USER_SESSIONS_REVOKED: 'Сеансы завершены',
   MOBILE_SESSION_CREATED: 'Вход в приложение',
   MOBILE_SESSION_REVOKED: 'Сессия приложения отозвана',
+  USER_DEVICE_UNBOUND: 'Отвязка устройства',
   MOBILE_REFRESH_REUSE_DETECTED: 'Повторное использование токена приложения',
   ADMIN_PLAN_CREATED: 'Тариф создан',
   ADMIN_PLAN_UPDATED: 'Тариф изменён',

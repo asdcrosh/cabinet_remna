@@ -125,8 +125,8 @@ model User {
   devices                    Device[]
   supportTickets             SupportTicket[]
   supportMessages            SupportMessage[]
-  supportTicketsAssigned     SupportTicket[]       @relation("SupportTicketAssignee")
-  supportInternalNotes       SupportInternalNote[] @relation("SupportInternalNoteAuthor")
+  supportTicketsAssigned     SupportTicket[]             @relation("SupportTicketAssignee")
+  supportInternalNotes       SupportInternalNote[]       @relation("SupportInternalNoteAuthor")
   promoCodeRedemptions       PromoCodeRedemption[]
   giftCertificateRedemptions GiftCertificateRedemption[]
   trialPlanRedemptions       TrialPlanRedemption[]
@@ -150,6 +150,7 @@ model User {
   adminNotificationReads     AdminNotificationRead[]
   revokedSessions            RevokedSession[]
   mobileSessions             MobileSession[]
+  mobilePushTokens           MobilePushToken[]
   mobileAuthCodes            MobileAuthCode[]
   broadcastDeliveries        BroadcastDelivery[]
   subscriptionHealth         SubscriptionHealth?
@@ -601,9 +602,9 @@ model PasswordResetToken {
 // чтобы ЛК работал быстро, не дёргая Panel при каждом запросе)
 // ----------------------------------------------------------------------
 model Subscription {
-  id     String  @id @default(cuid())
-  userId String
-  planId String?
+  id                   String  @id @default(cuid())
+  userId               String
+  planId               String?
   // Тариф назначен или куплен в кабинете и не должен заменяться импортом из Remnashop.
   planManagedByCabinet Boolean @default(false)
 
@@ -626,19 +627,19 @@ model Subscription {
   // Чтобы не зафлэдить — используем флаг.
   pendingSync Boolean @default(false)
 
-  whitelistAddonActive      Boolean   @default(false)
-  whitelistAddonActivatedAt DateTime?
-  whitelistAddonExpireAt    DateTime?
+  whitelistAddonActive           Boolean   @default(false)
+  whitelistAddonActivatedAt      DateTime?
+  whitelistAddonExpireAt         DateTime?
   // Неиспользованный остаток хранится только пока БС стоят на паузе.
-  whitelistAddonPausedAt    DateTime?
+  whitelistAddonPausedAt         DateTime?
   whitelistAddonRemainingSeconds BigInt?
-  whitelistAddonPaymentId   String?
-  whitelistAddonInternalSquads String[] @default([])
+  whitelistAddonPaymentId        String?
+  whitelistAddonInternalSquads   String[]  @default([])
   // Reward time is consumed after paid time, and survives payment refunds.
-  whitelistAddonRewardSeconds BigInt @default(0)
-  whitelistAddonRewardSquads String[] @default([])
-  graceStartedAt               DateTime?
-  graceExpireAt                DateTime?
+  whitelistAddonRewardSeconds    BigInt    @default(0)
+  whitelistAddonRewardSquads     String[]  @default([])
+  graceStartedAt                 DateTime?
+  graceExpireAt                  DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1300,7 +1301,7 @@ enum GiftCertificateRedemptionStatus {
 // список и позволяем отвязать. Храним локально для быстрого рендера.
 // ----------------------------------------------------------------------
 model Device {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   userId      String
   hwid        String // device hardware id
   displayName String?
@@ -1308,8 +1309,8 @@ model Device {
   platform    String? // android, ios, windows...
   userAgent   String?
   ip          String?
-  firstSeenAt DateTime @default(now())
-  lastSeenAt  DateTime @default(now())
+  firstSeenAt DateTime  @default(now())
+  lastSeenAt  DateTime  @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -1487,10 +1488,33 @@ model MobileSession {
   ip             String?
   userAgent      String?
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user       User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pushTokens MobilePushToken[]
 
   @@index([userId, revokedAt])
   @@index([expiresAt])
+}
+
+// Push-токен Firebase приложения StealthNet. Привязан к сессии приложения: выход,
+// отзыв сессии или отвязка устройства — и push на этот телефон больше не уходят.
+// Категории — переключатели «Уведомления» в настройках приложения.
+model MobilePushToken {
+  id                 String   @id @default(cuid())
+  userId             String
+  mobileSessionId    String
+  token              String   @unique
+  platform           String   @default("android")
+  subscriptionAlerts Boolean  @default(true)
+  paymentAlerts      Boolean  @default(true)
+  newsAlerts         Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mobileSession MobileSession @relation(fields: [mobileSessionId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([mobileSessionId])
 }
 
 // Одноразовый код входа через браузер (OAuth) для приложения StealthNet.
@@ -1583,9 +1607,9 @@ model SupportMessage {
   sender      User?               @relation(fields: [senderId], references: [id], onDelete: SetNull)
   attachments SupportAttachment[]
 
+  @@unique([ticketId, clientMessageId])
   @@index([ticketId, createdAt])
   @@index([senderId])
-  @@unique([ticketId, clientMessageId])
 }
 
 model SupportInternalNote {
@@ -1803,8 +1827,8 @@ model BonusBoxOpening {
   promoCode     PromoCode?      @relation(fields: [promoCodeId], references: [id], onDelete: SetNull)
   seasonalEvent BonusBoxEvent?  @relation(fields: [seasonalEventId], references: [id], onDelete: SetNull)
 
-  @@index([userId, createdAt])
   @@unique([userId, spinId])
+  @@index([userId, createdAt])
   @@index([prizeId, createdAt])
   @@index([promoCodeId])
   @@index([userId, remoteSynced, nextSyncAt])
@@ -1918,6 +1942,7 @@ enum AuditAction {
   REMNASHOP_SYNC_RUN
   MOBILE_SESSION_CREATED
   MOBILE_SESSION_REVOKED
+  USER_DEVICE_UNBOUND
   MOBILE_REFRESH_REUSE_DETECTED
   SYSTEM_BACKUP_CREATED
 }

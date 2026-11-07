@@ -248,8 +248,6 @@ test('устройства доступны для просмотра и пер�
 
   const devices = await (await page.request.get('/api/devices')).json()
   expect(devices.devices).toHaveLength(1)
-  const hwid = devices.devices[0].hwid
-  expect((await page.request.delete(`/api/devices/${encodeURIComponent(hwid)}`)).status()).toBe(410)
   expect((await page.request.delete('/api/devices')).status()).toBe(410)
   await page.reload()
   await expect(page.getByRole('heading', { name: 'Pixel 8' })).toBeVisible()
