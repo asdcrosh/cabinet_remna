@@ -191,6 +191,24 @@ can proxy to:
 http://remnawave-cabinet-app:3000
 ```
 
+## Android app releases (optional)
+
+The cabinet can serve the StealthNet Android app and its update manifest.
+Put the APK files and `manifest.json` (produced by the app's
+`scripts/build-release.sh`) into `CABINET_APP_RELEASES_DIR`
+(default `/opt/remnawave-cabinet/app-releases`, mounted read-only). Upload the
+APK files first and `manifest.json` last:
+
+```text
+GET /download/android            APK for arm64-v8a
+GET /download/android/<abi>      arm64-v8a | armeabi-v7a | x86_64
+GET /api/mobile/app-version?abi= version, build, minBuild, url, sha256, size
+```
+
+App Links: set `MOBILE_ANDROID_CERT_SHA256` to the SHA-256 fingerprint of the
+release signing certificate; `/.well-known/assetlinks.json` then confirms
+`/app/*` links for the app.
+
 ## Operations
 
 Update to the newest published image:

@@ -113,6 +113,7 @@ function getSafeReferer(value: string | null) {
 function isSensitiveQueryPath(pathname: string) {
   return [
     '/reset-password',
+    '/app/oauth-return',
     '/api/auth/verify-email',
     '/api/auth/yandex/callback',
     '/api/me/telegram/oidc/callback',

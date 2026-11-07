@@ -3,7 +3,7 @@
 // 1. Приложение открывает /api/mobile/auth/oauth/start с code_challenge (PKCE S256) и данными устройства.
 //    Кабинет сохраняет «намерение входа» в подписанной httpOnly-cookie браузера и запускает обычный OAuth.
 // 2. После входа /api/mobile/auth/oauth/complete выдаёт одноразовый код (2 минуты)
-//    и возвращает браузер в приложение: stealthnet://oauth?code=…
+//    и возвращает браузер в приложение: /app/oauth-return?code=… (App Link), запасной путь — stealthnet://oauth?code=…
 // 3. Приложение меняет код на токены в /api/mobile/auth/oauth/exchange, предъявляя code_verifier.
 //    Перехваченный код без verifier бесполезен.
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto'
