@@ -181,13 +181,15 @@ test('истёкшее подключение показывает только 
 })
 
 test('Rabbit Hole импортирует подписку через Telegram и доступен только на поддерживаемых системах', async ({ page }, testInfo) => {
+  // Telegram подставляем после входа: на странице входа initData запускает вход
+  // через Mini App, а в CI нет TELEGRAM_BOT_TOKEN — обычный вход тогда не проходит.
+  await login(page, E2E_USERS.active.email)
   await page.addInitScript(() => {
     Object.assign(window, { Telegram: { WebApp: {
       initData: 'test',
       openLink: (url: string) => Reflect.set(window, '__openedAppUrl', url),
     } } })
   })
-  await login(page, E2E_USERS.active.email)
   await page.goto('/dashboard/subscription')
   const device = page.getByLabel('Система этого устройства')
   await expect(device).toBeEnabled()
