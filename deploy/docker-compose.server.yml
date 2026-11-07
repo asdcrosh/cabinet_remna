@@ -94,6 +94,8 @@ services:
       - "${FULL_BACKUP_DIR:-/opt/remnawave-backups}:/backups:ro"
       - "${CABINET_STATE_DIR:-/opt/remnawave-cabinet/state}:/run/cabinet-state:ro"
       - broadcast_uploads:/app/public/uploads
+      # APK и manifest.json приложения StealthNet (только чтение): /download/android, /api/mobile/app-version
+      - "${CABINET_APP_RELEASES_DIR:-/opt/remnawave-cabinet/app-releases}:/app/app-releases:ro"
     healthcheck:
       test:
         [
@@ -130,6 +132,8 @@ services:
       - "${FULL_BACKUP_DIR:-/opt/remnawave-backups}:/backups:ro"
       - "${CABINET_STATE_DIR:-/opt/remnawave-cabinet/state}:/run/cabinet-state:ro"
       - broadcast_uploads:/app/public/uploads
+      # APK и manifest.json приложения StealthNet (только чтение): /download/android, /api/mobile/app-version
+      - "${CABINET_APP_RELEASES_DIR:-/opt/remnawave-cabinet/app-releases}:/app/app-releases:ro"
     healthcheck:
       test:
         [

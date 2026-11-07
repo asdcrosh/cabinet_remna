@@ -65,14 +65,14 @@ describe('вход в приложение через браузер', () => {
     expect(mocks.cookieJar.size).toBe(0)
   })
 
-  it('complete: без намерения или без входа возвращает в приложение с ошибкой', async () => {
-    let res = await complete()
-    expect(res.headers.get('location')).toBe('stealthnet://oauth?error=expired')
+  it('complete: без намерения или без входа возвращает на /app/oauth-return с ошибкой', async () => {
+    let res = await complete(new Request('https://cabinet.example/api/mobile/auth/oauth/complete'))
+    expect(res.headers.get('location')).toBe('https://cabinet.example/app/oauth-return?error=expired')
 
     await start(startUrl(goodStart))
     mocks.getSession.mockResolvedValue(null)
-    res = await complete()
-    expect(res.headers.get('location')).toBe('stealthnet://oauth?error=login_failed')
+    res = await complete(new Request('https://cabinet.example/api/mobile/auth/oauth/complete'))
+    expect(res.headers.get('location')).toBe('https://cabinet.example/app/oauth-return?error=login_failed')
     expect(mocks.createMobileAuthCode).not.toHaveBeenCalled()
   })
 
@@ -80,8 +80,8 @@ describe('вход в приложение через браузер', () => {
     await start(startUrl(goodStart))
     mocks.getSession.mockResolvedValue({ uid: 'user-1', stage: 'FULL' })
     mocks.createMobileAuthCode.mockResolvedValue('one-time-code-value')
-    const res = await complete()
-    expect(res.headers.get('location')).toBe('stealthnet://oauth?code=one-time-code-value')
+    const res = await complete(new Request('https://cabinet.example/api/mobile/auth/oauth/complete'))
+    expect(res.headers.get('location')).toBe('https://cabinet.example/app/oauth-return?code=one-time-code-value')
     expect(res.headers.get('cache-control')).toBe('no-store')
     expect(res.headers.get('referrer-policy')).toBe('no-referrer')
     expect(mocks.createMobileAuthCode).toHaveBeenCalledWith('user-1', expect.objectContaining({ codeChallenge: CHALLENGE }))
