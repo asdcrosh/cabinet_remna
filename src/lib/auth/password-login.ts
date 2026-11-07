@@ -4,7 +4,7 @@
 import { createHash } from 'node:crypto'
 import { compare, hash } from 'bcryptjs'
 import { prisma } from '@/lib/prisma'
-import { rateLimitKey, type RateLimitResult } from '@/lib/rate-limit'
+import { peekRateLimitKey, rateLimitKey, type RateLimitResult } from '@/lib/rate-limit'
 import { checkRemnawaveProfileOnLogin } from '@/lib/remnawave-profile-check'
 import { logWarn } from '@/lib/logger'
 import { authenticateRemnashopEmail, registerRemnashopEmailUser } from '@/lib/remnashop-api'
@@ -17,14 +17,23 @@ export type PasswordLoginResult =
   | { ok: true; user: User }
   | { ok: false; status: number; body: { error: string; code?: string } }
 
-// Попытки входа в один аккаунт с любых IP (лимит по IP — в самих маршрутах).
+// Неудачные попытки входа в один аккаунт с любых IP (лимит по IP — в самих маршрутах).
+// Считаются только ошибки пароля: владелец, входящий с верным паролем, лимит не расходует.
 export const EMAIL_LOGIN_LIMIT = 10
 export const EMAIL_LOGIN_WINDOW_MS = 15 * 60_000
 
-/** Лимит попыток входа на один email: перебор пароля с разных адресов. Email в базу — хэшем. */
-export function limitPasswordLoginByEmail(email: string): Promise<RateLimitResult> {
-  const key = createHash('sha256').update(email.trim().toLowerCase(), 'utf8').digest('hex')
-  return rateLimitKey(`auth-login-email:${key}`, EMAIL_LOGIN_LIMIT, EMAIL_LOGIN_WINDOW_MS)
+function emailLimitKey(email: string) {
+  return `auth-login-email:${createHash('sha256').update(email.trim().toLowerCase(), 'utf8').digest('hex')}`
+}
+
+/** Не исчерпан ли лимит неудачных входов для email. Попытку не расходует. Email в базу — хэшем. */
+export function checkPasswordLoginByEmail(email: string): Promise<RateLimitResult> {
+  return peekRateLimitKey(emailLimitKey(email), EMAIL_LOGIN_LIMIT)
+}
+
+/** Учесть неверный пароль для email. */
+export async function recordFailedPasswordLogin(email: string) {
+  await rateLimitKey(emailLimitKey(email), EMAIL_LOGIN_LIMIT, EMAIL_LOGIN_WINDOW_MS)
 }
 
 // Настоящий хэш той же стоимости, что у пользователей: сравнение с ним занимает столько же,

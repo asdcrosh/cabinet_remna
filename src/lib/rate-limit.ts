@@ -45,6 +45,19 @@ export async function rateLimitKey(
   return hitBucket(key, limit, windowMs, options)
 }
 
+/**
+ * Проверить лимит по ключу, не расходуя попытку. Вместе с rateLimitKey — когда считать нужно
+ * только часть запросов (например, неудачные входы), а блокировать — все.
+ */
+export async function peekRateLimitKey(key: string, limit: number): Promise<RateLimitResult> {
+  const bucket = await prisma.rateLimitBucket.findUnique({ where: { key }, select: { count: true, resetAt: true } })
+  const now = Date.now()
+  if (bucket && bucket.resetAt.getTime() > now && bucket.count >= limit) {
+    return { ok: false, retryAfter: Math.max(1, Math.ceil((bucket.resetAt.getTime() - now) / 1000)) }
+  }
+  return { ok: true, remaining: Math.max(0, limit - (bucket && bucket.resetAt.getTime() > now ? bucket.count : 0)) }
+}
+
 function validateLimit(limit: number, windowMs: number, options: RateLimitOptions) {
   if (!Number.isInteger(limit) || limit < 1 || !Number.isInteger(windowMs) || windowMs < 1) {
     throw new Error('Rate limit and window must be positive integers')

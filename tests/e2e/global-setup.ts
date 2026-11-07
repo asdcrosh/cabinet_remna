@@ -31,6 +31,7 @@ export default async function globalSetup() {
       where: {
         OR: [
           { key: { startsWith: 'auth-login:' } },
+          { key: { startsWith: 'auth-login-email:' } },
           { key: { startsWith: 'support:create:e2e-' } },
         ],
       },

@@ -3,14 +3,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const mocks = vi.hoisted(() => ({
   rateLimit: vi.fn(),
   authenticatePassword: vi.fn(),
-  limitPasswordLoginByEmail: vi.fn(),
+  checkPasswordLoginByEmail: vi.fn(),
+  recordFailedPasswordLogin: vi.fn(),
   createMobileSession: vi.fn(),
 }))
 
 vi.mock('@/lib/rate-limit', () => ({ rateLimit: mocks.rateLimit }))
 vi.mock('@/lib/auth/password-login', () => ({
   authenticatePassword: mocks.authenticatePassword,
-  limitPasswordLoginByEmail: mocks.limitPasswordLoginByEmail,
+  checkPasswordLoginByEmail: mocks.checkPasswordLoginByEmail,
+  recordFailedPasswordLogin: mocks.recordFailedPasswordLogin,
 }))
 vi.mock('@/lib/auth/mobile-session', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/auth/mobile-session')>()
@@ -31,7 +33,7 @@ describe('POST /api/mobile/auth/login', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mocks.rateLimit.mockResolvedValue({ ok: true })
-    mocks.limitPasswordLoginByEmail.mockResolvedValue({ ok: true })
+    mocks.checkPasswordLoginByEmail.mockResolvedValue({ ok: true })
     mocks.authenticatePassword.mockResolvedValue({ ok: true, user })
     mocks.createMobileSession.mockResolvedValue(tokens)
   })
@@ -67,11 +69,19 @@ describe('POST /api/mobile/auth/login', () => {
   })
 
   it('ограничивает попытки входа в один аккаунт с разных IP', async () => {
-    mocks.limitPasswordLoginByEmail.mockResolvedValue({ ok: false, retryAfter: 600 })
+    mocks.checkPasswordLoginByEmail.mockResolvedValue({ ok: false, retryAfter: 600 })
     const res = await POST(request({ email: 'User@Example.com', password: 'secret', device }))
     expect(res.status).toBe(429)
     expect(res.headers.get('retry-after')).toBe('600')
-    expect(mocks.limitPasswordLoginByEmail).toHaveBeenCalledWith('user@example.com')
+    expect(mocks.checkPasswordLoginByEmail).toHaveBeenCalledWith('user@example.com')
     expect(mocks.authenticatePassword).not.toHaveBeenCalled()
+  })
+
+  it('учитывает в лимите по почте только неверный пароль', async () => {
+    await POST(request({ email: 'user@example.com', password: 'secret', device }))
+    expect(mocks.recordFailedPasswordLogin).not.toHaveBeenCalled()
+    mocks.authenticatePassword.mockResolvedValue({ ok: false, status: 401, body: { error: 'Неверный email или пароль' } })
+    await POST(request({ email: 'user@example.com', password: 'secret', device }))
+    expect(mocks.recordFailedPasswordLogin).toHaveBeenCalledWith('user@example.com')
   })
 })

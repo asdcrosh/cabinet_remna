@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const mocks = vi.hoisted(() => ({ queryRaw: vi.fn() }))
+const mocks = vi.hoisted(() => ({ queryRaw: vi.fn(), findUnique: vi.fn() }))
 
-vi.mock('./prisma', () => ({ prisma: { $queryRaw: mocks.queryRaw } }))
+vi.mock('./prisma', () => ({ prisma: { $queryRaw: mocks.queryRaw, rateLimitBucket: { findUnique: mocks.findUnique } } }))
 
-import { rateLimit, rateLimitKey } from './rate-limit'
+import { peekRateLimitKey, rateLimit, rateLimitKey } from './rate-limit'
 
 describe('rate limit', () => {
   beforeEach(() => {
@@ -38,6 +38,19 @@ describe('rate limit', () => {
     await expect(rateLimitKey('auth-login-email:abc', 10, 60_000)).resolves.toMatchObject({ ok: false })
     const [, ...values] = mocks.queryRaw.mock.calls[0] ?? []
     expect(values).toContain('auth-login-email:abc')
+  })
+
+  it('peeks a key without spending an attempt', async () => {
+    const resetAt = new Date(Date.now() + 60_000)
+    mocks.findUnique.mockResolvedValueOnce({ count: 10, resetAt })
+    await expect(peekRateLimitKey('k', 10)).resolves.toMatchObject({ ok: false })
+    mocks.findUnique.mockResolvedValueOnce({ count: 9, resetAt })
+    await expect(peekRateLimitKey('k', 10)).resolves.toEqual({ ok: true, remaining: 1 })
+    mocks.findUnique.mockResolvedValueOnce({ count: 50, resetAt: new Date(Date.now() - 1000) })
+    await expect(peekRateLimitKey('k', 10)).resolves.toEqual({ ok: true, remaining: 10 })
+    mocks.findUnique.mockResolvedValueOnce(null)
+    await expect(peekRateLimitKey('k', 10)).resolves.toEqual({ ok: true, remaining: 10 })
+    expect(mocks.queryRaw).not.toHaveBeenCalled()
   })
 
   it('rejects a request based on the count returned by the atomic upsert', async () => {
