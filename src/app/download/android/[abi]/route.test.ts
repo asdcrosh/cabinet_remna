@@ -10,6 +10,8 @@ vi.mock('@/lib/mobile-app-release', async (importOriginal) => ({
 
 import { GET as byAbi } from './route'
 import { GET as latest } from '../route'
+import { GET as named } from '../../StealthNet.apk/route'
+import { GET as named32 } from '../../StealthNet-32bit.apk/route'
 
 const req = (p: string) => new Request(`https://lk.example${p}`)
 const ctx = (abi: string) => ({ params: Promise.resolve({ abi }) })
@@ -19,6 +21,7 @@ describe('GET /download/android', () => {
     vi.clearAllMocks()
     mocks.rateLimit.mockResolvedValue({ ok: true })
     mocks.open.mockImplementation(async (abi: string) => ({
+      manifest: { version: '1.2.0' },
       entry: { file: `stealthnet-1.2.0-${abi}.apk`, sha256: 'c'.repeat(64), size: 3 },
       body: new Response(new Uint8Array([1, 2, 3])).body,
     }))
@@ -30,7 +33,7 @@ describe('GET /download/android', () => {
     expect(mocks.open).toHaveBeenCalledWith('arm64-v8a')
     expect(res.headers.get('content-type')).toBe('application/vnd.android.package-archive')
     expect(res.headers.get('content-length')).toBe('3')
-    expect(res.headers.get('content-disposition')).toBe('attachment; filename="stealthnet-1.2.0-arm64-v8a.apk"')
+    expect(res.headers.get('content-disposition')).toBe('attachment; filename="StealthNet-1.2.0.apk"')
     expect(new Uint8Array(await res.arrayBuffer())).toEqual(new Uint8Array([1, 2, 3]))
   })
 
@@ -42,5 +45,14 @@ describe('GET /download/android', () => {
     expect((await latest(req('/download/android'))).status).toBe(404)
     mocks.rateLimit.mockResolvedValue({ ok: false, retryAfter: 60 })
     expect((await latest(req('/download/android'))).status).toBe(429)
+  })
+
+  it('понятные адреса для людей: StealthNet.apk и StealthNet-32bit.apk', async () => {
+    const main = await named(req('/download/StealthNet.apk'))
+    expect(mocks.open).toHaveBeenLastCalledWith('arm64-v8a')
+    expect(main.headers.get('content-disposition')).toBe('attachment; filename="StealthNet-1.2.0.apk"')
+    const legacy = await named32(req('/download/StealthNet-32bit.apk'))
+    expect(mocks.open).toHaveBeenLastCalledWith('armeabi-v7a')
+    expect(legacy.headers.get('content-disposition')).toBe('attachment; filename="StealthNet-1.2.0-32bit.apk"')
   })
 })

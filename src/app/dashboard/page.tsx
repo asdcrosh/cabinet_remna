@@ -13,6 +13,7 @@ import {
   KeyRound,
   MonitorSmartphone,
   ShieldCheck,
+  Smartphone,
 } from 'lucide-react'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth/cookies'
@@ -24,6 +25,8 @@ import { formatSubscriptionDaysLeft } from '@/lib/subscription-time'
 import { resolveSubscriptionPresentation } from '@/lib/subscription-presentation'
 import { getFreshPendingPaymentCutoff } from '@/lib/payment-sync'
 import { getFeatureFlags } from '@/lib/feature-flags'
+import { getBrandName } from '@/lib/branding'
+import { isMobileAppPromoEnabled, MOBILE_APP_PAGE_PATH } from '@/lib/mobile-app-page'
 import { getAvailablePaymentProviders } from '@/lib/payment-providers'
 import { cn } from '@/lib/cn'
 import styles from './home.module.css'
@@ -429,6 +432,12 @@ function HomeActions({ supportEnabled, hasSubscription }: { supportEnabled: bool
       description: 'История платежей и управление автопродлением',
       icon: CreditCard,
     },
+    ...(isMobileAppPromoEnabled() ? [{
+      href: MOBILE_APP_PAGE_PATH,
+      title: `Приложение ${getBrandName()}`,
+      description: 'Своё приложение для Android',
+      icon: Smartphone,
+    }] : []),
     ...(supportEnabled ? [{
       href: '/dashboard/support',
       title: 'Нужна помощь?',
