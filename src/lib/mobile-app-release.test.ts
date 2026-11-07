@@ -53,6 +53,18 @@ describe('mobile-app-release', () => {
     expect(Buffer.from(await new Response(opened!.body).arrayBuffer())).toEqual(apk)
   })
 
+  it('принимает manifest со всеми архитектурами, как его пишет build-release.sh', async () => {
+    const files = Object.fromEntries(
+      (['arm64-v8a', 'armeabi-v7a', 'x86_64'] as const).map((abi) => [
+        abi,
+        { file: `stealthnet-1.2.0-${abi}.apk`, sha256: 'b'.repeat(64), size: 10 },
+      ])
+    )
+    await writeFile(path.join(dir, 'manifest.json'), JSON.stringify({ ...manifest, files }))
+    const release = await getAppRelease(dir)
+    expect(Object.keys(release?.files ?? {})).toEqual(['arm64-v8a', 'armeabi-v7a', 'x86_64'])
+  })
+
   it('isAppAbi', () => {
     expect(isAppAbi('arm64-v8a')).toBe(true)
     expect(isAppAbi('mips')).toBe(false)

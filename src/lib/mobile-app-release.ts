@@ -17,7 +17,8 @@ export const DEFAULT_APP_ABI: AppAbi = 'arm64-v8a'
 
 const fileSchema = z.object({
   // Только имя файла в папке выпусков: без каталогов и «..».
-  file: z.string().regex(/^stealthnet-[0-9A-Za-z.+-]+\.apk$/),
+  // stealthnet-1.0.0-arm64-v8a.apk, stealthnet-1.0.0-x86_64.apk (в имени ABI бывает «_»).
+  file: z.string().regex(/^stealthnet-[0-9A-Za-z._+-]+\.apk$/),
   sha256: z.string().regex(/^[0-9a-f]{64}$/),
   size: z.number().int().positive(),
 })
