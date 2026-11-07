@@ -180,6 +180,39 @@ test('истёкшее подключение показывает только 
   await expectNoHorizontalOverflow(page)
 })
 
+test('Rabbit Hole импортирует подписку через Telegram и доступен только на поддерживаемых системах', async ({ page }, testInfo) => {
+  await page.addInitScript(() => {
+    Object.assign(window, { Telegram: { WebApp: {
+      initData: 'test',
+      openLink: (url: string) => Reflect.set(window, '__openedAppUrl', url),
+    } } })
+  })
+  await login(page, E2E_USERS.active.email)
+  await page.goto('/dashboard/subscription')
+  const device = page.getByLabel('Система этого устройства')
+  await expect(device).toBeEnabled()
+  for (const platform of ['ios', 'macos']) {
+    await device.selectOption(platform)
+    await expect(page.getByRole('heading', { name: 'Установите Rabbit Hole' })).toBeVisible()
+    await expect(page.getByRole('link', { name: /Установить (INCY|HAPP)/ })).toHaveCount(0)
+    await expect(page.getByRole('radio', { name: /INCY|HAPP/ })).toHaveCount(0)
+    await expect(page.getByRole('link', { name: 'Установить Rabbit Hole', exact: true })).toHaveAttribute('href', 'https://apps.apple.com/app/rabbithole-vpn-client/id6683309629')
+    await expectNoHorizontalOverflow(page)
+  }
+  await page.screenshot({ path: testInfo.outputPath('rabbit-hole.png'), fullPage: true })
+  await page.getByRole('button', { name: 'Уже установлено' }).click()
+  await page.getByRole('button', { name: 'Добавить в Rabbit Hole', exact: true }).click()
+  const bridge = new URL(await page.evaluate(() => Reflect.get(window, '__openedAppUrl')))
+  expect(bridge.pathname).toBe('/open-app')
+  expect(bridge.searchParams.get('app')).toBe('Rabbit Hole')
+  expect(bridge.searchParams.get('url')).toMatch(/^rabbithole:\/\/add\/https?:\/\//)
+  await expect(page.getByText('VPN работает', { exact: true })).toHaveCount(0)
+  for (const platform of ['android', 'windows', 'desktop']) {
+    await device.selectOption(platform)
+    await expect(page.getByRole('radio', { name: /Rabbit Hole/ })).toHaveCount(0)
+  }
+})
+
 test('активное подключение показывает установку даже при наличии другого устройства', async ({ page }, testInfo) => {
   await login(page, E2E_USERS.active.email)
   await page.goto('/dashboard/subscription')

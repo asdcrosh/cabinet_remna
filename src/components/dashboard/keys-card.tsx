@@ -12,6 +12,7 @@ import {
   ExternalLink,
   HelpCircle,
   QrCode,
+  Rabbit,
   ShieldCheck,
   Smartphone,
 } from 'lucide-react'
@@ -20,10 +21,11 @@ import { Modal } from '@/components/ui/modal'
 import { toast } from '@/components/ui/toaster'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { cn } from '@/lib/cn'
+import { buildRabbitHoleLink } from '@/lib/rabbit-hole'
 import { VpnConnectionCheck } from './vpn-connection-check'
 
 type Device = 'ios' | 'android' | 'macos' | 'windows' | 'desktop'
-type AppId = 'incy' | 'happ'
+type AppId = 'incy' | 'happ' | 'rabbit-hole'
 
 interface KeysCardProps {
   subscriptionUrl: string
@@ -50,15 +52,13 @@ const appOptions: AppOption[] = [
     id: 'incy',
     name: 'INCY',
     subtitle: 'Основное приложение для подключения',
-    devices: ['ios', 'android', 'macos'],
-    primaryDevices: ['ios', 'android', 'macos'],
+    devices: ['android'],
+    primaryDevices: ['android'],
     icon: ShieldCheck,
     deepLinks: (subscriptionUrl) => [`incy://import/${subscriptionUrl}`],
-    installUrl: (device) => device === 'android'
-      ? 'https://play.google.com/store/apps/details?id=llc.itdev.incy'
-      : 'https://apps.apple.com/app/incy/id6756943388',
+    installUrl: 'https://play.google.com/store/apps/details?id=llc.itdev.incy',
     steps: [
-      'Установите INCY из App Store или Google Play.',
+      'Установите INCY из Google Play.',
       'Вернитесь в кабинет, нажмите «Уже установлено», затем «Добавить в INCY».',
       'Подтвердите импорт подписки, выберите сервер и включите VPN.',
     ],
@@ -67,7 +67,7 @@ const appOptions: AppOption[] = [
     id: 'happ',
     name: 'HAPP',
     subtitle: 'Запасной вариант',
-    devices: ['ios', 'android', 'macos', 'windows', 'desktop'],
+    devices: ['android', 'windows', 'desktop'],
     primaryDevices: ['windows', 'desktop'],
     icon: ShieldCheck,
     deepLinks: () => [],
@@ -79,8 +79,24 @@ const appOptions: AppOption[] = [
       'При ручном добавлении в HAPP нажмите “Буфер обмена” и подтвердите подписку.',
     ],
   },
+  {
+    id: 'rabbit-hole',
+    name: 'Rabbit Hole',
+    subtitle: 'Для iPhone, iPad и Mac',
+    devices: ['ios', 'macos'],
+    primaryDevices: ['ios', 'macos'],
+    icon: Rabbit,
+    deepLinks: (subscriptionUrl) => [buildRabbitHoleLink(subscriptionUrl)].filter(Boolean),
+    installUrl: 'https://apps.apple.com/app/rabbithole-vpn-client/id6683309629',
+    steps: [
+      'Установите Rabbit Hole из App Store.',
+      'Вернитесь в кабинет и нажмите «Уже установлено», затем «Добавить в Rabbit Hole». Подтвердите добавление конфигурации.',
+      'Выберите конфигурацию и сервер, включите VPN и разрешите добавление VPN-конфигурации в настройках устройства.',
+      'Если автоматическое добавление не сработало: скопируйте ссылку, откройте Configs в Rabbit Hole, нажмите «+» и добавьте ссылку из буфера обмена.',
+    ],
+  },
 ]
-const defaultApp = appOptions[0] as AppOption
+const defaultApp = appOptions.find((app) => app.id === 'rabbit-hole')!
 
 export function KeysCard({
   subscriptionUrl,
@@ -92,7 +108,7 @@ export function KeysCard({
   const [installOpened, setInstallOpened] = useState(false)
   const [ready, setReady] = useState(false)
   const [device, setDevice] = useState<Device>('desktop')
-  const [selectedAppId, setSelectedAppId] = useState<AppId>('incy')
+  const [selectedAppId, setSelectedAppId] = useState<AppId>(defaultApp.id)
   const [instructionsOpen, setInstructionsOpen] = useState(false)
   const [qrOpen, setQrOpen] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
@@ -176,6 +192,18 @@ export function KeysCard({
     }
   }
 
+  const appSelector = compatibleApps.length > 1 ? (
+    <div className={cn('grid gap-2', compatibleApps.length === 3 ? 'sm:grid-cols-3' : 'sm:grid-cols-2')} role="radiogroup" aria-label="Приложение для подключения">
+      {compatibleApps.map((option) => (
+        <AppChoice key={option.id} option={option} selected={option.id === selectedApp.id} onSelect={() => {
+          setSelectedAppId(option.id)
+          setStep(1)
+          setInstallOpened(false)
+        }} />
+      ))}
+    </div>
+  ) : null
+
   return (
     <section
       id="connection"
@@ -196,6 +224,12 @@ export function KeysCard({
             <option value="desktop">Linux / другой компьютер</option>
           </select>
         </div>
+        {ready && step === 1 && appSelector ? (
+          <div className="mt-5 space-y-2">
+            <p className="text-sm font-semibold">Выберите приложение</p>
+            {appSelector}
+          </div>
+        ) : null}
         <ol className="mt-5 grid grid-cols-3 gap-2" aria-label="Шаги подключения">
           {['Установить', 'Добавить', 'Включить'].map((label, index) => (
             <li key={label} aria-current={index + 1 === step ? 'step' : undefined} className={cn('border-t-2 pt-2 text-xs font-medium', index + 1 <= step ? 'border-brand-500 text-slate-950 dark:text-white' : 'border-slate-200 text-slate-400 dark:border-white/10')}>
@@ -273,20 +307,10 @@ export function KeysCard({
 
         <details className="mt-5 border-t border-slate-200 pt-4 dark:border-white/10" key={step}>
           <summary className="cursor-pointer py-2 text-sm font-medium text-slate-600 dark:text-slate-300">
-            {step === 1 ? 'Не подходит приложение?' : 'Не получается?'}
+            {step === 1 ? 'Помощь с подключением' : 'Не получается?'}
           </summary>
           <div className="mt-3 space-y-4">
-            {compatibleApps.length > 1 && (
-              <div className="grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="Приложение для подключения">
-                {compatibleApps.map((option) => (
-                  <AppChoice key={option.id} option={option} selected={option.id === selectedApp.id} onSelect={() => {
-                    setSelectedAppId(option.id)
-                    setStep(1)
-                    setInstallOpened(false)
-                  }} />
-                ))}
-              </div>
-            )}
+            {step > 1 ? appSelector : null}
             <div className="grid gap-2">
               <button type="button" className="btn-secondary justify-center" onClick={() => setInstructionsOpen(true)}>
                 <HelpCircle className="h-4 w-4" /> Инструкция для {selectedApp.name}
@@ -477,15 +501,15 @@ function openExternal(url: string, fallbackUrls: string[] = [], appName = 'пр�
 
   if (!/^https?:\/\//i.test(url)) {
     window.location.assign(url)
+  } else {
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.rel = 'noreferrer'
+    anchor.style.display = 'none'
+    document.body.appendChild(anchor)
+    anchor.click()
+    anchor.remove()
   }
-
-  const anchor = document.createElement('a')
-  anchor.href = url
-  anchor.rel = 'noreferrer'
-  anchor.style.display = 'none'
-  document.body.appendChild(anchor)
-  anchor.click()
-  anchor.remove()
 
   fallbackUrls.forEach((fallbackUrl, index) => {
     window.setTimeout(() => {
@@ -521,8 +545,7 @@ function buildOpenAppBridgeUrl(url: string, fallbackUrl: string | undefined, app
 }
 
 function recommendedAppForDevice(device: Device) {
-  if (device === 'windows' || device === 'desktop') return appOptions[1] ?? defaultApp
-  return defaultApp
+  return appOptions.find((app) => app.primaryDevices.includes(device)) ?? defaultApp
 }
 
 function orderAppsForDevice(device: Device) {
