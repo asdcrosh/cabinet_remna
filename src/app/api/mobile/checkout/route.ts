@@ -1,18 +1,21 @@
 // GET /api/mobile/checkout — витрина покупки для приложения StealthNet: те же тарифы,
 // скидки, способы оплаты и автопродление, что видит пользователь на /dashboard/plans.
 // Точную сумму к оплате считает POST /api/mobile/checkout/quote.
+// ?deviceKey=<sha256> — ключ телефона: пробный тариф без Telegram, один на телефон.
 import { jsonResponse } from '@/lib/json-response'
 import { requireAuth, withAuth } from '@/lib/auth/guard'
 import { prisma } from '@/lib/prisma'
 import { buildPlanCatalog } from '@/lib/plan-catalog'
 import { AUTO_RENEWAL_CONSENT_VERSION } from '@/lib/auto-renewal-consent'
+import { parseTrialDeviceKey } from '@/lib/mobile-trial'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-export const GET = withAuth(async () => {
+export const GET = withAuth(async (req: Request) => {
   const session = await requireAuth()
-  const catalog = await buildPlanCatalog({ userId: session.uid })
+  const trialDeviceKey = parseTrialDeviceKey(new URL(req.url).searchParams.get('deviceKey'))
+  const catalog = await buildPlanCatalog({ userId: session.uid, mobileApp: { trialDeviceKey } })
   const current = catalog.currentSubscription
   const currentPlan = current?.planId
     ? await prisma.plan.findUnique({

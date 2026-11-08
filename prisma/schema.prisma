@@ -1049,6 +1049,9 @@ model TrialPlanRedemption {
   userId    String
   planId    String
   paymentId String   @unique
+  // Ключ телефона (SHA-256 от ANDROID_ID) для пробного периода из приложения StealthNet:
+  // один пробный на телефон, даже с разных аккаунтов.
+  deviceKey String?  @unique
   createdAt DateTime @default(now())
 
   user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)

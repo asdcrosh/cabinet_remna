@@ -79,8 +79,8 @@ describe('GET /api/mobile/checkout', () => {
   })
 
   it('отдаёт витрину текущего пользователя', async () => {
-    const body = await (await GET()).json()
-    expect(mocks.buildPlanCatalog).toHaveBeenCalledWith({ userId: 'user-1' })
+    const body = await (await GET(new Request('https://lk.example/api/mobile/checkout'))).json()
+    expect(mocks.buildPlanCatalog).toHaveBeenCalledWith({ userId: 'user-1', mobileApp: { trialDeviceKey: null } })
     expect(body.plans).toHaveLength(1)
     expect(body.plans[0]).toMatchObject({
       id: 'p90',
@@ -106,9 +106,17 @@ describe('GET /api/mobile/checkout', () => {
   it('без подписки дополнение БС купить нельзя', async () => {
     const catalog = await mocks.buildPlanCatalog()
     mocks.buildPlanCatalog.mockResolvedValue({ ...catalog, currentSubscription: null })
-    const body = await (await GET()).json()
+    const body = await (await GET(new Request('https://lk.example/api/mobile/checkout'))).json()
     expect(body.currentSubscription).toBeNull()
     expect(body.whitelistAddon.purchasable).toBe(false)
     expect(mocks.planFind).not.toHaveBeenCalled()
+  })
+
+  it('передаёт в витрину ключ телефона для пробного периода, некорректный — отбрасывает', async () => {
+    const key = 'a'.repeat(64)
+    await GET(new Request(`https://lk.example/api/mobile/checkout?deviceKey=${key}`))
+    expect(mocks.buildPlanCatalog).toHaveBeenLastCalledWith({ userId: 'user-1', mobileApp: { trialDeviceKey: key } })
+    await GET(new Request('https://lk.example/api/mobile/checkout?deviceKey=nope'))
+    expect(mocks.buildPlanCatalog).toHaveBeenLastCalledWith({ userId: 'user-1', mobileApp: { trialDeviceKey: null } })
   })
 })
