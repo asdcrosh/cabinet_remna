@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   hash: vi.fn(),
   rateLimit: vi.fn(),
   rateLimitKey: vi.fn(),
+  peekRateLimitKey: vi.fn(),
   checkRemnawaveProfileOnLogin: vi.fn(),
   authenticateRemnashopEmail: vi.fn(),
   registerRemnashopEmailUser: vi.fn(),
@@ -24,7 +25,11 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('bcryptjs', () => ({ compare: mocks.compare, hash: mocks.hash }))
 vi.mock('@/lib/prisma', () => ({ prisma: mocks.prisma }))
-vi.mock('@/lib/rate-limit', () => ({ rateLimit: mocks.rateLimit, rateLimitKey: mocks.rateLimitKey }))
+vi.mock('@/lib/rate-limit', () => ({
+  rateLimit: mocks.rateLimit,
+  rateLimitKey: mocks.rateLimitKey,
+  peekRateLimitKey: mocks.peekRateLimitKey,
+}))
 vi.mock('@/lib/auth/cookies', () => ({ setSessionCookieOnResponse: mocks.setSessionCookieOnResponse }))
 vi.mock('@/lib/remnawave-profile-check', () => ({ checkRemnawaveProfileOnLogin: mocks.checkRemnawaveProfileOnLogin }))
 vi.mock('@/lib/remnashop-api', () => ({
@@ -71,6 +76,7 @@ describe('login route', () => {
     process.env.REMNASHOP_DATABASE_URL = originalRemnashopDatabaseUrl
     mocks.rateLimit.mockResolvedValue({ ok: true })
     mocks.rateLimitKey.mockResolvedValue({ ok: true })
+    mocks.peekRateLimitKey.mockResolvedValue({ ok: true })
     mocks.prisma.user.findUnique.mockResolvedValue(user)
     mocks.prisma.user.update.mockResolvedValue(user)
     mocks.compare.mockResolvedValue(true)
@@ -92,17 +98,28 @@ describe('login route', () => {
     expect(mocks.prisma.user.findUnique).not.toHaveBeenCalled()
   })
 
-  it('limits attempts per email across IPs and stores only a hash of the email', async () => {
-    mocks.rateLimitKey.mockResolvedValue({ ok: false, retryAfter: 120 })
+  it('blocks an email after too many failed attempts from any IP; the key is a hash', async () => {
+    mocks.peekRateLimitKey.mockResolvedValue({ ok: false, retryAfter: 120 })
     const response = await POST(loginRequest({ email: 'User@Example.com', password: 'Password1' }))
 
     expect(response.status).toBe(429)
     expect(response.headers.get('retry-after')).toBe('120')
     expect(mocks.prisma.user.findUnique).not.toHaveBeenCalled()
-    const [key, limit, windowMs] = mocks.rateLimitKey.mock.calls[0] ?? []
+    const [key, limit] = mocks.peekRateLimitKey.mock.calls[0] ?? []
     expect(key).toMatch(/^auth-login-email:[0-9a-f]{64}$/)
     expect(key).not.toContain('example')
-    expect([limit, windowMs]).toEqual([10, 15 * 60_000])
+    expect(limit).toBe(10)
+  })
+
+  it('counts only wrong passwords toward the email limit', async () => {
+    await POST(loginRequest({ email: user.email, password: 'Password1' }))
+    expect(mocks.rateLimitKey).not.toHaveBeenCalled()
+
+    delete process.env.REMNASHOP_API_URL
+    mocks.compare.mockResolvedValue(false)
+    const response = await POST(loginRequest({ email: user.email, password: 'Wrong1' }))
+    expect(response.status).toBe(401)
+    expect(mocks.rateLimitKey).toHaveBeenCalledWith(expect.stringMatching(/^auth-login-email:[0-9a-f]{64}$/), 10, 15 * 60_000)
   })
 
   it('compares against a real bcrypt hash when the email is unknown', async () => {

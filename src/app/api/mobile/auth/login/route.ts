@@ -4,7 +4,7 @@
 import { jsonResponse } from '@/lib/json-response'
 import { loginSchema } from '@/lib/auth/validation'
 import { rateLimit } from '@/lib/rate-limit'
-import { authenticatePassword, limitPasswordLoginByEmail } from '@/lib/auth/password-login'
+import { authenticatePassword, checkPasswordLoginByEmail, recordFailedPasswordLogin } from '@/lib/auth/password-login'
 import { createMobileSession, mobileDeviceSchema } from '@/lib/auth/mobile-session'
 
 export const runtime = 'nodejs'
@@ -34,7 +34,7 @@ export async function POST(req: Request) {
   }
   const { email, password, device } = parsed.data
 
-  const emailLimited = await limitPasswordLoginByEmail(email)
+  const emailLimited = await checkPasswordLoginByEmail(email)
   if (!emailLimited.ok) {
     return jsonResponse(
       { error: 'Слишком много попыток входа. Попробуйте позже.' },
@@ -44,6 +44,7 @@ export async function POST(req: Request) {
 
   const result = await authenticatePassword(email, password)
   if (!result.ok) {
+    if (result.status === 401) await recordFailedPasswordLogin(email)
     return jsonResponse(result.body, { status: result.status })
   }
   const { user } = result
