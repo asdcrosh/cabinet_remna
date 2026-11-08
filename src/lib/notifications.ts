@@ -600,23 +600,25 @@ export async function notifySupportReply(input: { ticketId: string; messageId: s
   if (!ticket) return
 
   const body = `В обращении «${ticket.subject}» появился новый ответ.`
+  // Ссылка на само обращение: кабинет и приложение StealthNet открывают сразу переписку.
+  const ticketPath = `/dashboard/support?ticket=${encodeURIComponent(ticket.id)}`
   await notifyUser({
     userId: ticket.userId,
     type: 'SUPPORT_REPLY',
     dedupeKey: `support-reply:${input.messageId}`,
     title: 'Ответ поддержки',
     body,
-    actionHref: '/dashboard/support',
+    actionHref: ticketPath,
     actionLabel: 'Открыть чат',
     telegramText: [`<b>Ответ поддержки</b>`, escapeTelegram(body)].join('\n'),
     emailSubject: `Ответ поддержки — ${getBrandName()}`,
-    emailText: `${body}\n\nОткрыть поддержку: ${getAppUrl()}/dashboard/support`,
+    emailText: `${body}\n\nОткрыть поддержку: ${getAppUrl()}${ticketPath}`,
     emailHtml: renderNotificationEmail({
       eyebrow: 'Поддержка',
       title: 'Ответ поддержки',
       lead: body,
       ctaLabel: 'Открыть чат',
-      ctaUrl: `${getAppUrl()}/dashboard/support`,
+      ctaUrl: `${getAppUrl()}${ticketPath}`,
       greetingName: ticket.user.name,
     }),
   })

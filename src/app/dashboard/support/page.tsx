@@ -15,7 +15,7 @@ export const metadata = { title: 'Поддержка' }
 export default async function SupportPage({
   searchParams,
 }: {
-  searchParams: Promise<{ category?: string; payment?: string; request?: string }>
+  searchParams: Promise<{ category?: string; payment?: string; request?: string; ticket?: string }>
 }) {
   if (!await isFeatureEnabled('support')) notFound()
   const session = await getCurrentUser()
@@ -25,6 +25,8 @@ export default async function SupportPage({
     ? params.category as SupportCategoryValue
     : 'connection'
   const paymentId = params.payment?.trim().slice(0, 100) || null
+  // Ссылка из уведомления «Ответ поддержки» открывает сразу это обращение.
+  const ticketId = params.ticket?.trim().slice(0, 64) || undefined
   const accountRequest = category === 'account' && ['export', 'delete'].includes(params.request ?? '')
     ? params.request
     : null
@@ -98,6 +100,7 @@ export default async function SupportPage({
           ...serializeSupportTicket(ticket),
           messages: ticket.messages.map(serializeSupportMessage),
         }))}
+        initialTicketId={ticketId}
         initialCategory={payment ? 'payment' : category}
         initialMessage={initialMessage}
         initialNewTicketOpen={Boolean(payment || params.category || accountRequest)}
