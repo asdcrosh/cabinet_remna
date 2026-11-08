@@ -137,9 +137,13 @@ export function SupportPanel({
   )
   const [loadingMore, setLoadingMore] = useState(false)
   const [loadingOlderMessages, setLoadingOlderMessages] = useState(false)
+  // Пользователь пришёл по ссылке на обращение (уведомление «Ответ поддержки»).
+  const requestedUserTicket = mode === 'user' && initialTicketId
+    ? initialTickets.find((ticket) => ticket.id === initialTicketId) ?? null
+    : null
   const initialActiveTicket = mode === 'admin'
     ? initialTickets.find((ticket) => ticket.id === initialTicketId) ?? (initialTicketId ? null : initialTickets[0] ?? null)
-    : initialTickets.find((ticket) => ticket.status !== 'CLOSED') ?? null
+    : requestedUserTicket ?? initialTickets.find((ticket) => ticket.status !== 'CLOSED') ?? null
   const [selectedId, setSelectedId] = useState(mode === 'admin' && initialTicketId ? initialTicketId : initialActiveTicket?.id ?? '')
   const [selectedTicket, setSelectedTicket] = useState<SupportTicket | null>(
     initialActiveTicket
@@ -147,7 +151,7 @@ export function SupportPanel({
   const [folder, setFolder] = useState<TicketFolder>(mode === 'admin' ? initialFolder : 'active')
   const [assigneeScope, setAssigneeScope] = useState<AdminSupportAssigneeScope>(initialAssigneeScope)
   const [queueCounts, setQueueCounts] = useState(() => initialCounts ?? getLocalFolderCounts(initialTickets, mode))
-  const [mobileChatOpen, setMobileChatOpen] = useState(mode === 'user' && initialNewTicketOpen)
+  const [mobileChatOpen, setMobileChatOpen] = useState(mode === 'user' && (initialNewTicketOpen || Boolean(requestedUserTicket)))
   const [detailsOpen, setDetailsOpen] = useState(false)
   const [message, setMessage] = useState('')
   const [messageFiles, setMessageFiles] = useState<File[]>([])

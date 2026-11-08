@@ -13,6 +13,9 @@ const mocks = vi.hoisted(() => {
     userNotification: {
       createMany: vi.fn(),
     },
+    supportTicket: {
+      findUnique: vi.fn(),
+    },
   }
 
   return { prisma }
@@ -26,6 +29,7 @@ vi.mock('./email-template', () => ({ renderActionEmail: () => '<p>Email</p>' }))
 import {
   notifySubscriptionExpiring,
   notifySubscriptionTerminated,
+  notifySupportReply,
   notifyUser,
   notifyWhitelistAddonExpiring,
 } from './notifications'
@@ -581,5 +585,34 @@ describe('notifyUser', () => {
     }))
     expect(mocks.prisma.notificationLog.createMany).toHaveBeenCalledTimes(2)
     expect(fetch).toHaveBeenCalledTimes(2)
+  })
+
+  it('ответ поддержки ведёт сразу в обращение — в кабинете, письме и приложении', async () => {
+    mocks.prisma.supportTicket.findUnique.mockResolvedValue({
+      id: 'ticket 1',
+      subject: 'Проблема с подключением',
+      userId: 'user-1',
+      user: { name: 'User' },
+    })
+    mocks.prisma.user.findUnique.mockResolvedValue({
+      id: 'user-1',
+      email: 'user@example.test',
+      emailVerifiedAt: new Date(),
+      name: 'User',
+      telegramId: null,
+    })
+    mocks.prisma.notificationLog.createMany.mockResolvedValue({ count: 1 })
+    mocks.prisma.userNotification.createMany.mockResolvedValue({ count: 1 })
+
+    await notifySupportReply({ ticketId: 'ticket 1', messageId: 'message-1' })
+
+    expect(mocks.prisma.userNotification.createMany).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        type: 'SUPPORT_REPLY',
+        actionHref: '/dashboard/support?ticket=ticket%201',
+      }),
+    }))
+    const emailCall = vi.mocked(fetch).mock.calls.find(([url]) => String(url).includes('mail.example.test'))
+    expect(String(emailCall?.[1]?.body)).toContain('https://cabinet.example.test/dashboard/support?ticket=ticket%201')
   })
 })
