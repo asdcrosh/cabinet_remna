@@ -103,6 +103,8 @@ export const createPaymentSchema = z.object({
   autoRenewalConsent: z.boolean().optional().default(false),
   autoRenewalConsentVersion: z.string().max(100).optional(),
   whitelistAddon: z.boolean().optional().default(false),
+  // Только приложение StealthNet: ключ телефона для пробного периода (см. mobile-trial.ts).
+  deviceKey: z.string().regex(/^[0-9a-f]{64}$/).optional(),
 }).superRefine((value, context) => {
   if (value.purchaseType !== 'SUBSCRIPTION') {
     if (value.promoCode || value.autoRenewalConsent || value.whitelistAddon) {

@@ -39,6 +39,7 @@ import {
 } from '@/lib/user-discounts'
 import { hasWhitelistAddonEntitlement } from '@/lib/whitelist-addon-policy'
 import { upsertLocalSubscriptionFromRemnawave } from '@/lib/remnawave-local-sync'
+import { isTrialDeviceUsed } from '@/lib/mobile-trial'
 
 // Transport options are supplied only by authenticated server code, never by checkout JSON.
 export async function createPaymentForUser(
@@ -70,6 +71,7 @@ export async function createPaymentForUser(
     autoRenewalConsent,
     autoRenewalConsentVersion,
     whitelistAddon,
+    deviceKey,
   } = parsed.data
 
   if (options.telegramBot && (
@@ -434,14 +436,21 @@ export async function createPaymentForUser(
       where: { userId: user.id },
     })
 
-    if (!user.telegramId) {
+    // В приложении StealthNet вместо Telegram — один пробный на телефон (mobile-trial.ts).
+    const trialDeviceKey = options.mobileApp ? deviceKey ?? null : null
+    if (options.mobileApp) {
+      if (!trialDeviceKey) {
+        return jsonResponse({ error: 'Обновите приложение, чтобы получить пробный период' }, { status: 400 })
+      }
+      if (await isTrialDeviceUsed(trialDeviceKey)) {
+        return jsonResponse({ error: 'На этом телефоне пробный период уже использован' }, { status: 409 })
+      }
+    } else if (!user.telegramId) {
       return jsonResponse(
         { error: 'Ознакомительный тариф доступен после привязки Telegram' },
         { status: 403 }
       )
-    }
-
-    if (!user.remnashopSyncedAt) {
+    } else if (!user.remnashopSyncedAt) {
       return jsonResponse(
         { error: 'Сначала проверьте старую подписку через Telegram' },
         { status: 403 }
@@ -497,6 +506,7 @@ export async function createPaymentForUser(
               userId: user.id,
               planId: plan.id,
               paymentId: payment.id,
+              deviceKey: trialDeviceKey,
             },
           })
 

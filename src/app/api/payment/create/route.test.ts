@@ -423,6 +423,54 @@ describe('payment create route', () => {
     }))
   })
 
+  describe('пробный тариф из приложения StealthNet', () => {
+    const promoPlan = { ...plan, isPromo: true, priceKopecks: 0, deviceAddonEnabled: false }
+    const mobileSession = { uid: user.id, email: user.email, role: 'USER', aud: 'mobile', sid: 'ms-1' }
+    const newUser = { ...user, remnawaveId: null, remnawaveUsername: null }
+    const deviceKey = 'b'.repeat(64)
+
+    beforeEach(() => {
+      mocks.prisma.plan.findUnique.mockResolvedValue(promoPlan)
+      mocks.prisma.user.findUnique.mockResolvedValue(newUser)
+      mocks.prisma.subscription.count.mockResolvedValue(0)
+    })
+
+    it('без ключа телефона просит обновить приложение', async () => {
+      mocks.requireAuth.mockResolvedValue(mobileSession)
+      const response = await POST(paymentRequest({ planId: promoPlan.id, deviceLimit: undefined }))
+      expect(response.status).toBe(400)
+      expect((await response.json()).error).toContain('Обновите приложение')
+      expect(mocks.prisma.$transaction).not.toHaveBeenCalled()
+    })
+
+    it('второй пробный на том же телефоне не выдаёт, даже другому аккаунту', async () => {
+      mocks.requireAuth.mockResolvedValue(mobileSession)
+      mocks.prisma.trialPlanRedemption.findUnique.mockImplementation(async ({ where }: { where: { deviceKey?: string } }) =>
+        where.deviceKey === deviceKey ? { id: 'other-user-trial' } : null
+      )
+      const response = await POST(paymentRequest({ planId: promoPlan.id, deviceLimit: undefined, deviceKey }))
+      expect(response.status).toBe(409)
+      expect((await response.json()).error).toContain('На этом телефоне')
+      expect(mocks.prisma.$transaction).not.toHaveBeenCalled()
+    })
+
+    it('в приложении Telegram не нужен; на сайте — по-прежнему нужен', async () => {
+      mocks.requireAuth.mockResolvedValue(mobileSession)
+      mocks.prisma.trialPlanRedemption.findUnique.mockImplementation(async ({ where }: { where: { deviceKey?: string } }) =>
+        where.deviceKey ? null : { payment: { subscriptionProvisionedAt: new Date(), status: 'SUCCEEDED' } }
+      )
+      const mobile = await POST(paymentRequest({ planId: promoPlan.id, deviceLimit: undefined, deviceKey }))
+      // Дошли до проверки «уже использовали на этом аккаунте» — значит, Telegram не потребовался.
+      expect(mobile.status).toBe(409)
+      expect((await mobile.json()).error).toContain('уже использовали')
+
+      mocks.requireAuth.mockResolvedValue({ uid: user.id, email: user.email, role: 'USER' })
+      const web = await POST(paymentRequest({ planId: promoPlan.id, deviceLimit: undefined, deviceKey }))
+      expect(web.status).toBe(403)
+      expect((await web.json()).error).toContain('Telegram')
+    })
+  })
+
   it('creates a local payment, sends it to YooKassa and stores confirmation data', async () => {
     const response = await POST(paymentRequest())
     const body = await response.json()

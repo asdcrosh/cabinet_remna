@@ -16,6 +16,7 @@ import {
   remnawaveUserReference,
 } from '@/lib/remnawave'
 import { hasWhitelistAddonEntitlement, isWhitelistAddonCurrentlyActive } from '@/lib/whitelist-addon-policy'
+import { isTrialDeviceUsed } from '@/lib/mobile-trial'
 
 export interface PlanCatalogOptions {
   userId: string | null
@@ -23,13 +24,18 @@ export interface PlanCatalogOptions {
   linkedPlanId?: string
   initialPromoCode?: string
   whitelistAddonRequested?: boolean
+  /**
+   * Витрина приложения StealthNet: пробный тариф без Telegram, один на телефон.
+   * trialDeviceKey — ключ телефона; без него пробный не показывается.
+   */
+  mobileApp?: { trialDeviceKey: string | null }
 }
 
 export type PlanCatalog = Awaited<ReturnType<typeof buildPlanCatalog>>
 export type PlanCatalogItem = PlanCatalog['plans'][number]
 
 export async function buildPlanCatalog(options: PlanCatalogOptions) {
-  const { userId, linkedPlanId, initialPromoCode } = options
+  const { userId, linkedPlanId, initialPromoCode, mobileApp } = options
   const paymentProviders = await getAvailablePaymentProviders()
   const plans = await prisma.plan.findMany({
     where: { isActive: true },
@@ -98,9 +104,11 @@ export async function buildPlanCatalog(options: PlanCatalogOptions) {
   const hasAnySubscription = userId
     ? (await prisma.subscription.count({ where: { userId } })) > 0
     : false
+  const mobileTrialDeviceFree = mobileApp?.trialDeviceKey
+    ? !(await isTrialDeviceUsed(mobileApp.trialDeviceKey))
+    : false
   const canUsePromo =
-    Boolean(user?.telegramId) &&
-    Boolean(user?.remnashopSyncedAt) &&
+    (mobileApp ? mobileTrialDeviceFree : Boolean(user?.telegramId) && Boolean(user?.remnashopSyncedAt)) &&
     !usedTrialPlanIds.size &&
     !hasAnySubscription &&
     !user?.remnashopUserId &&
@@ -127,6 +135,7 @@ export async function buildPlanCatalog(options: PlanCatalogOptions) {
     !user?.remnawaveUuid &&
     !user?.remnawaveUsername
   const needsTelegramCheckForPromo =
+    !mobileApp &&
     hasPromoPlan &&
     isOtherwiseEligibleForPromo &&
     (!user?.telegramId || !user?.remnashopSyncedAt)
