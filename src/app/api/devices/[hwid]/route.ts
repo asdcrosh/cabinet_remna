@@ -18,8 +18,7 @@ export const PATCH = withAuth(async (req: Request, { params }: { params: Promise
   if (!parsed.success) {
     return jsonResponse({ error: 'Некорректные параметры устройства' }, { status: 400 })
   }
-  const { hwid: rawHwid } = await params
-  const hwid = decodeURIComponent(rawHwid)
+  const { hwid } = await params
   if (!hwid) return jsonResponse({ error: 'Не выбрано устройство' }, { status: 400 })
 
   const { displayName } = parsed.data
@@ -44,8 +43,7 @@ export const DELETE = withAuth(async (req: Request, { params }: { params: Promis
     )
   }
 
-  const { hwid: rawHwid } = await params
-  const hwid = decodeURIComponent(rawHwid)
+  const { hwid } = await params
   if (!hwid || hwid.length > 256) return jsonResponse({ error: 'Не выбрано устройство' }, { status: 400 })
 
   const user = await prisma.user.findUnique({ where: { id: session.uid } })

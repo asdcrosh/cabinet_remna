@@ -9,6 +9,7 @@ import { cn } from '@/lib/cn'
 import { Modal } from '@/components/ui/modal'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { toast } from '@/components/ui/toaster'
 import { formatDeviceClientName } from '@/lib/device-client'
 
 interface Device {
@@ -36,12 +37,16 @@ export function DevicesList({ embedded = false, deviceLimit }: DevicesListProps 
   const [renameDraft, setRenameDraft] = useState('')
   const [renaming, setRenaming] = useState(false)
   const [renameError, setRenameError] = useState<string | null>(null)
+  const [deviceToRemove, setDeviceToRemove] = useState<Device | null>(null)
+  const [removing, setRemoving] = useState(false)
+  const [removeError, setRemoveError] = useState<string | null>(null)
 
   const loadDevices = useCallback(async () => {
     setLoadError(null)
     setRefreshing(true)
     try {
-      const data = await apiFetch<{ devices: Device[] }>('/api/devices')
+      const data = await apiFetch<{ devices: Device[]; error?: string }>('/api/devices')
+      if (data.error) throw new Error(data.error)
       setDevices(data.devices)
     } catch (e) {
       setLoadError(e instanceof Error ? e.message : 'Не удалось загрузить устройства')
@@ -82,6 +87,31 @@ export function DevicesList({ embedded = false, deviceLimit }: DevicesListProps 
       setRenameError(e instanceof Error ? e.message : 'Не удалось переименовать устройство')
     } finally {
       setRenaming(false)
+    }
+  }
+
+  function openRemove(device: Device) {
+    setRemoveError(null)
+    setDeviceToRemove(device)
+  }
+
+  async function removeDevice() {
+    if (!deviceToRemove || removing) return
+    const { hwid } = deviceToRemove
+    setRemoving(true)
+    setRemoveError(null)
+    try {
+      await apiFetch(`/api/devices/${encodeURIComponent(hwid)}`, {
+        method: 'DELETE',
+        silent: true,
+      })
+      setDevices((current) => current?.filter((device) => device.hwid !== hwid) ?? [])
+      setDeviceToRemove(null)
+      toast('Устройство удалено', 'success')
+    } catch (e) {
+      setRemoveError(e instanceof Error ? e.message : 'Не удалось удалить устройство')
+    } finally {
+      setRemoving(false)
     }
   }
 
@@ -142,6 +172,33 @@ export function DevicesList({ embedded = false, deviceLimit }: DevicesListProps 
   const recentDevices = countRecentDevices(devices)
   const devicesValue = deviceLimit && deviceLimit > 0 ? `${devices.length} из ${deviceLimit}` : devices.length.toString()
   const limitState = getDeviceLimitState(devices.length, deviceLimit)
+  const closeRemove = () => {
+    if (!removing) setDeviceToRemove(null)
+  }
+  const removeDialog = (
+    <Modal
+      open={Boolean(deviceToRemove)}
+      title="Удалить устройство?"
+      variant="sheet"
+      panelClassName="sm:max-w-md"
+      onClose={closeRemove}
+      footer={(
+        <div className="grid grid-cols-2 gap-2 sm:flex sm:justify-end">
+          <Button variant="secondary" disabled={removing} onClick={closeRemove}>Отмена</Button>
+          <Button variant="danger" disabled={removing} onClick={() => void removeDevice()}>
+            {removing ? 'Удаляем…' : 'Удалить'}
+          </Button>
+        </div>
+      )}
+    >
+      {deviceToRemove && (
+        <p className="break-words text-sm leading-6 text-slate-600 dark:text-slate-300">
+          «{getDeviceTitle(deviceToRemove)}» исчезнет из списка и освободит место в лимите. Если на нём выполнен вход в StealthNet, потребуется войти заново. Устройство можно подключить снова, пока есть свободное место.
+        </p>
+      )}
+      {removeError && <p role="alert" className="mt-2 text-sm text-red-600 dark:text-red-300">{removeError}</p>}
+    </Modal>
+  )
 
   if (embedded) {
     return (
@@ -187,6 +244,8 @@ export function DevicesList({ embedded = false, deviceLimit }: DevicesListProps 
                 key={device.hwid}
                 device={device}
                 onRename={() => openRename(device)}
+                onRemove={() => openRemove(device)}
+                removeDisabled={refreshing}
               />
             ))}
             {devices.length > 3 && (
@@ -217,6 +276,7 @@ export function DevicesList({ embedded = false, deviceLimit }: DevicesListProps 
           onClose={() => !renaming && setEditingDevice(null)}
           onSave={() => void renameDevice()}
         />
+        {removeDialog}
       </>
     )
   }
@@ -263,6 +323,8 @@ export function DevicesList({ embedded = false, deviceLimit }: DevicesListProps 
               key={device.hwid}
               device={device}
               onRename={() => openRename(device)}
+              onRemove={() => openRemove(device)}
+              removeDisabled={refreshing}
             />
           ))}
         </div>
@@ -276,6 +338,7 @@ export function DevicesList({ embedded = false, deviceLimit }: DevicesListProps 
         onClose={() => !renaming && setEditingDevice(null)}
         onSave={() => void renameDevice()}
       />
+      {removeDialog}
     </>
   )
 }
@@ -293,9 +356,13 @@ function DeviceLimitNotice({ state, compact = false }: { state: DeviceLimitState
 function CompactDeviceRow({
   device,
   onRename,
+  onRemove,
+  removeDisabled,
 }: {
   device: Device
   onRename: () => void
+  onRemove: () => void
+  removeDisabled: boolean
 }) {
   const activity = getActivityState(device.updatedAt || device.createdAt)
   const Icon = getDeviceIcon(device)
@@ -326,6 +393,16 @@ function CompactDeviceRow({
       >
         <Pencil className="h-4 w-4" />
       </button>
+      <Button
+        variant="ghost"
+        size="sm"
+        className="text-red-700 dark:text-red-300"
+        aria-label={`Удалить ${getDeviceTitle(device)}`}
+        disabled={removeDisabled}
+        onClick={onRemove}
+      >
+        Удалить
+      </Button>
     </article>
   )
 }

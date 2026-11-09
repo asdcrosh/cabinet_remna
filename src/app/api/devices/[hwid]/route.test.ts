@@ -92,7 +92,7 @@ describe('device rename route', () => {
 function unbind(hwid = 'device-1') {
   return DELETE(
     new Request(`https://cabinet.example/api/devices/${encodeURIComponent(hwid)}`, { method: 'DELETE' }),
-    { params: Promise.resolve({ hwid: encodeURIComponent(hwid) }) }
+    { params: Promise.resolve({ hwid }) }
   )
 }
 
@@ -161,11 +161,12 @@ describe('device unbind route', () => {
     expect(mocks.getUserDevices).not.toHaveBeenCalled()
   })
 
-  it('decodes HWIDs with special characters', async () => {
-    mocks.getUserDevices.mockResolvedValue({ response: { total: 1, devices: [{ hwid: 'a/b c' }] } })
-    const response = await unbind('a/b c')
+  it('preserves the decoded HWID provided by Next.js', async () => {
+    const hwid = 'a/b 100%'
+    mocks.getUserDevices.mockResolvedValue({ response: { total: 1, devices: [{ hwid }] } })
+    const response = await unbind(hwid)
 
     expect(response.status).toBe(200)
-    expect(mocks.deleteUserDevice).toHaveBeenCalledWith({ username: 'u1' }, 'a/b c')
+    expect(mocks.deleteUserDevice).toHaveBeenCalledWith({ username: 'u1' }, hwid)
   })
 })
