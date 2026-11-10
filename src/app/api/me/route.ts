@@ -7,6 +7,8 @@ import { prisma } from '@/lib/prisma'
 import { requireAuth, withAuth } from '@/lib/auth/guard'
 import { updateProfileSchema } from '@/lib/auth/validation'
 import { logWarn } from '@/lib/logger'
+import { isMobileSession } from '@/lib/auth/jwt'
+import { hasVerifiedEmail, mobileEmailDeadline } from '@/lib/auth/mobile-email-policy'
 
 export const runtime = 'nodejs'
 
@@ -25,6 +27,7 @@ export async function GET() {
       role: true,
       createdAt: true,
       emailVerifiedAt: true,
+      mobileTelegramEmailDueAt: true,
       telegramId: true,
       remnashopUserId: true,
       remnawaveId: true,
@@ -36,7 +39,7 @@ export async function GET() {
     logWarn('auth.me.stale_session', { userId: session.uid })
     return jsonResponse({ user: null })
   }
-  const emailVerified = Boolean(user.emailVerifiedAt && !user.email.endsWith('@pending.invalid'))
+  const emailVerified = hasVerifiedEmail(user)
   return jsonResponse({
     user: {
       id: user.id,
@@ -52,6 +55,7 @@ export async function GET() {
       remnashopLinked: Boolean(user.remnashopUserId),
       remnawaveLinked: Boolean(user.remnawaveId || user.remnawaveUuid || user.remnawaveUsername),
       canPay: emailVerified,
+      ...(isMobileSession(session) ? { mobileEmailDeadline: mobileEmailDeadline(user) } : {}),
       nextAction: emailVerified
         ? null
         : {

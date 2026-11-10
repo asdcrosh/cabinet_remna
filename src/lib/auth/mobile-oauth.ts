@@ -12,6 +12,7 @@ import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { getAuthSigningKey, type SessionPayload } from './jwt'
 import { mobileDeviceSchema, type MobileDevice } from './mobile-session'
+import { hasVerifiedEmail, newMobileEmailDeadline } from './mobile-email-policy'
 
 export const MOBILE_OAUTH_INTENT_COOKIE = 'mobile_oauth_intent'
 export const MOBILE_OAUTH_INTENT_TTL_SECONDS = 10 * 60
@@ -25,15 +26,17 @@ const ISSUER = 'remnawave-cabinet'
 export const codeChallengeSchema = z.string().regex(/^[A-Za-z0-9_-]{43}$/, 'Некорректный code_challenge')
 export const codeVerifierSchema = z.string().regex(/^[A-Za-z0-9._~-]{43,128}$/, 'Некорректный code_verifier')
 
-export type MobileOAuthIntent = {
-  codeChallenge: string
-  device: MobileDevice
-}
+const intentSchema = z.object({
+  codeChallenge: codeChallengeSchema,
+  device: mobileDeviceSchema,
+  legalAccepted: z.boolean().optional(),
+  telegram: z.object({ state: z.string().regex(/^mobile\.[A-Za-z0-9_-]{32}$/), verifier: codeVerifierSchema }).optional(),
+})
 
-const intentSchema = z.object({ codeChallenge: codeChallengeSchema, device: mobileDeviceSchema })
+export type MobileOAuthIntent = z.infer<typeof intentSchema>
 
 export async function signMobileOAuthIntent(intent: MobileOAuthIntent) {
-  return new SignJWT({ codeChallenge: intent.codeChallenge, device: intent.device })
+  return new SignJWT(intent)
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
     .setIssuer(ISSUER)
@@ -61,7 +64,7 @@ export function pkceChallengeFromVerifier(verifier: string) {
   return createHash('sha256').update(verifier, 'ascii').digest('base64url')
 }
 
-export async function createMobileAuthCode(userId: string, intent: MobileOAuthIntent) {
+export async function createMobileAuthCode(userId: string, intent: MobileOAuthIntent, telegramId?: bigint) {
   const code = randomBytes(32).toString('base64url')
   await prisma.mobileAuthCode.create({
     data: {
@@ -72,6 +75,7 @@ export async function createMobileAuthCode(userId: string, intent: MobileOAuthIn
       deviceName: intent.device.name ?? null,
       platform: intent.device.platform ?? null,
       appVersion: intent.device.appVersion ?? null,
+      ...(telegramId != null ? { telegramId } : {}),
       expiresAt: new Date(Date.now() + MOBILE_AUTH_CODE_TTL_MS),
     },
   })
@@ -91,7 +95,7 @@ function safeEqual(a: string, b: string) {
 export async function exchangeMobileAuthCode(code: string, codeVerifier: string, hwid: string): Promise<ExchangeResult> {
   const row = await prisma.mobileAuthCode.findUnique({
     where: { codeHash: hashCode(code) },
-    include: { user: { select: { id: true, email: true, name: true, role: true } } },
+    include: { user: { select: { id: true, email: true, name: true, role: true, telegramId: true, emailVerifiedAt: true } } },
   })
   if (!row || row.usedAt) return { ok: false, reason: 'invalid' }
   if (row.expiresAt.getTime() <= Date.now()) return { ok: false, reason: 'expired' }
@@ -99,6 +103,7 @@ export async function exchangeMobileAuthCode(code: string, codeVerifier: string,
     return { ok: false, reason: 'verifier_mismatch' }
   }
   if (row.hwid !== hwid) return { ok: false, reason: 'device_mismatch' }
+  if (row.telegramId != null && row.telegramId !== row.user.telegramId) return { ok: false, reason: 'invalid' }
 
   // Код одноразовый: помечаем использованным атомарно, второй обмен получит invalid.
   const used = await prisma.mobileAuthCode.updateMany({
@@ -107,9 +112,16 @@ export async function exchangeMobileAuthCode(code: string, codeVerifier: string,
   })
   if (used.count !== 1) return { ok: false, reason: 'invalid' }
 
+  if (row.telegramId != null && !hasVerifiedEmail(row.user)) {
+    await prisma.user.updateMany({
+      where: { id: row.userId, telegramId: row.telegramId, emailVerifiedAt: null, mobileTelegramEmailDueAt: null },
+      data: { mobileTelegramEmailDueAt: newMobileEmailDeadline() },
+    })
+  }
+
   return {
     ok: true,
-    user: row.user,
+    user: { id: row.user.id, email: row.user.email, name: row.user.name, role: row.user.role },
     device: {
       hwid: row.hwid,
       name: row.deviceName ?? undefined,

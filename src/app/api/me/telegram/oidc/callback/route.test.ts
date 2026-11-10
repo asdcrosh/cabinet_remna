@@ -47,7 +47,7 @@ vi.mock('@/lib/identity-conflicts', () => ({
   recordIdentityConflict: mocks.recordIdentityConflict,
 }))
 vi.mock('@/lib/audit-log', () => ({ writeAuditLog: mocks.writeAuditLog }))
-vi.mock('@/lib/logger', () => ({ logError: vi.fn() }))
+vi.mock('@/lib/logger', () => ({ logError: vi.fn(), logWarn: vi.fn() }))
 vi.mock('@/lib/telegram-oidc', async () => {
   const actual = await vi.importActual<typeof import('@/lib/telegram-oidc')>('@/lib/telegram-oidc')
   return {

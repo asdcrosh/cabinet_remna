@@ -13,6 +13,7 @@ export async function mergeTechnicalTelegramAccount(input: {
   telegramId: bigint
   telegramUsername: string | null
   telegramName: string | null
+  expectedSourceUserId?: string
 }) {
   const [target, source] = await Promise.all([
     prisma.user.findUnique({
@@ -30,6 +31,9 @@ export async function mergeTechnicalTelegramAccount(input: {
   ])
 
   if (!target) throw new TelegramAccountMergeError('IDENTITY_CONFLICT')
+  if (input.expectedSourceUserId && source?.id !== input.expectedSourceUserId) {
+    throw new TelegramAccountMergeError('IDENTITY_CONFLICT')
+  }
   if (!source || source.id === target.id) return { merged: false as const }
   if (target.telegramId && target.telegramId !== input.telegramId) {
     throw new TelegramAccountMergeError('TELEGRAM_ALREADY_LINKED')
@@ -63,7 +67,17 @@ export async function mergeTechnicalTelegramAccount(input: {
 
   await prisma.$transaction(async (tx) => {
     await tx.user.update({
-      where: { id: source.id },
+      where: {
+        id: source.id,
+        ...(input.expectedSourceUserId ? { AND: {
+          telegramId: input.telegramId,
+          email: source.email,
+          emailVerifiedAt: null,
+          remnawaveId: source.remnawaveId,
+          remnawaveUuid: source.remnawaveUuid,
+          remnashopUserId: source.remnashopUserId,
+        } } : {}),
+      },
       data: {
         telegramId: null,
         remnashopUserId: null,
@@ -224,7 +238,15 @@ export async function mergeTechnicalTelegramAccount(input: {
     await tx.emailVerificationToken.deleteMany({ where: { userId: source.id } })
     await tx.passwordResetToken.deleteMany({ where: { userId: source.id } })
     await tx.user.update({
-      where: { id: target.id },
+      where: {
+        id: target.id,
+        ...(input.expectedSourceUserId ? { AND: {
+          telegramId: target.telegramId,
+          remnawaveId: target.remnawaveId,
+          remnawaveUuid: target.remnawaveUuid,
+          remnashopUserId: target.remnashopUserId,
+        } } : {}),
+      },
       data: {
         telegramId: input.telegramId,
         telegramUsername: input.telegramUsername ?? source.telegramUsername,

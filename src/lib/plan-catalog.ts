@@ -107,8 +107,12 @@ export async function buildPlanCatalog(options: PlanCatalogOptions) {
   const mobileTrialDeviceFree = mobileApp?.trialDeviceKey
     ? !(await isTrialDeviceUsed(mobileApp.trialDeviceKey))
     : false
+  const telegramChecked = Boolean(user?.remnashopSyncedAt)
+  const trialIdentityEligible = mobileApp
+    ? mobileTrialDeviceFree && (!user?.telegramId || telegramChecked)
+    : Boolean(user?.telegramId) && telegramChecked
   const canUsePromo =
-    (mobileApp ? mobileTrialDeviceFree : Boolean(user?.telegramId) && Boolean(user?.remnashopSyncedAt)) &&
+    trialIdentityEligible &&
     !usedTrialPlanIds.size &&
     !hasAnySubscription &&
     !user?.remnashopUserId &&

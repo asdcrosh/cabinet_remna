@@ -1,3 +1,4 @@
+import type { Prisma } from '@prisma/client'
 import type { UserResponse } from './remnawave'
 import { prisma } from './prisma'
 import { readRemnawaveBigInt } from './remnawave-usage'
@@ -9,7 +10,7 @@ export async function upsertLocalSubscriptionFromRemnawave(input: {
   planId?: string | null
   startAt?: Date | null
   remnawaveUser: UserResponse
-}) {
+}, db: Prisma.TransactionClient = prisma) {
   const trafficLimit = readRemnawaveBigInt(input.remnawaveUser, ['trafficLimitBytes', 'trafficLimit'])
   const trafficUsed = readRemnawaveBigInt(input.remnawaveUser, ['usedTrafficBytes', 'trafficUsedBytes'])
   const lifetimeUsed = readRemnawaveBigInt(input.remnawaveUser, [
@@ -24,7 +25,7 @@ export async function upsertLocalSubscriptionFromRemnawave(input: {
         ? new Date()
         : remnawaveCreatedAt
 
-  await prisma.user.update({
+  await db.user.update({
     where: { id: input.localUserId },
     data: {
       ...(input.remnashopUserId ? { remnashopUserId: input.remnashopUserId } : {}),
@@ -37,11 +38,11 @@ export async function upsertLocalSubscriptionFromRemnawave(input: {
   })
 
   const [existing, activePause] = await Promise.all([
-    prisma.subscription.findFirst({
+    db.subscription.findFirst({
       where: { userId: input.localUserId },
       orderBy: { expireAt: 'desc' },
     }),
-    prisma.subscriptionRetention.findFirst({
+    db.subscriptionRetention.findFirst({
       where: { userId: input.localUserId, status: 'PAUSED', action: 'SUBSCRIPTION_PAUSED' },
       select: { subscriptionId: true },
       orderBy: { createdAt: 'desc' },
@@ -83,7 +84,7 @@ export async function upsertLocalSubscriptionFromRemnawave(input: {
       const pausedAt = getWhitelistAddonPauseAt(existing, now)
       const remaining = getWhitelistAddonRemainingSeconds(existing.whitelistAddonExpireAt, pausedAt)
       if (remaining > 0n) {
-        await prisma.subscription.updateMany({
+        await db.subscription.updateMany({
           where: { id: existing.id, whitelistAddonActive: true, whitelistAddonExpireAt: existing.whitelistAddonExpireAt },
           data: {
             whitelistAddonActive: false, whitelistAddonExpireAt: null,
@@ -92,13 +93,13 @@ export async function upsertLocalSubscriptionFromRemnawave(input: {
         })
       }
     }
-    return prisma.subscription.update({
+    return db.subscription.update({
       where: { id: existing.id },
       data,
     })
   }
 
-  return prisma.subscription.create({
+  return db.subscription.create({
     data: {
       userId: input.localUserId,
       startAt,

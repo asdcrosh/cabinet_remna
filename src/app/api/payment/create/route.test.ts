@@ -35,6 +35,8 @@ vi.mock('@/lib/auth/guard', () => ({
   requireAuth: mocks.requireAuth,
   withAuth: (handler: (req: Request) => Promise<Response>) => handler,
 }))
+const findBotUser = vi.hoisted(() => vi.fn())
+vi.mock('@/lib/telegram-link-sync', () => ({ findRemnashopUserByTelegramId: findBotUser }))
 vi.mock('@/lib/rate-limit', () => ({ rateLimit: mocks.rateLimit }))
 vi.mock('@/lib/distributed-lock', () => ({ withDistributedLock: mocks.withDistributedLock }))
 vi.mock('@/lib/prisma', () => ({ prisma: mocks.prisma }))
@@ -440,6 +442,34 @@ describe('payment create route', () => {
       const response = await POST(paymentRequest({ planId: promoPlan.id, deviceLimit: undefined }))
       expect(response.status).toBe(400)
       expect((await response.json()).error).toContain('Обновите приложение')
+      expect(mocks.prisma.$transaction).not.toHaveBeenCalled()
+    })
+
+    it('пускает Telegram без почты к пробному только в пределах трёх дней', async () => {
+      mocks.requireAuth.mockResolvedValue(mobileSession)
+      const pending = { ...newUser, emailVerifiedAt: null, telegramId: 123n }
+      mocks.prisma.user.findUnique.mockResolvedValue({ ...pending, mobileTelegramEmailDueAt: new Date(Date.now() + 60_000) })
+      const inGrace = await POST(paymentRequest({ planId: promoPlan.id, deviceLimit: undefined }))
+      expect((await inGrace.json()).error).toContain('Обновите приложение')
+
+      mocks.prisma.user.findUnique.mockResolvedValue({ ...pending, mobileTelegramEmailDueAt: new Date(Date.now() - 60_000) })
+      const expired = await POST(paymentRequest({ planId: promoPlan.id, deviceLimit: undefined, deviceKey }))
+      expect(expired.status).toBe(403)
+      expect((await expired.json()).code).toBe('EMAIL_VERIFICATION_REQUIRED')
+      expect(mocks.createPayment).not.toHaveBeenCalled()
+    })
+
+    it.each([409, 503])('отклоняет пробный при найденной записи или ошибке бота (%i)', async (status) => {
+      mocks.requireAuth.mockResolvedValue(mobileSession)
+      mocks.prisma.user.findUnique.mockResolvedValue({ ...newUser, telegramId: 123n })
+      mocks.prisma.trialPlanRedemption.findUnique.mockResolvedValue(null)
+      if (status === 409) findBotUser.mockResolvedValueOnce({ id: 12 })
+      else findBotUser.mockRejectedValueOnce(new Error('Bot DB unavailable'))
+
+      const response = await POST(paymentRequest({ planId: promoPlan.id, deviceLimit: undefined, deviceKey }))
+
+      expect(response.status).toBe(status)
+      expect(findBotUser).toHaveBeenCalledWith(123n)
       expect(mocks.prisma.$transaction).not.toHaveBeenCalled()
     })
 
