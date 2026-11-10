@@ -1,10 +1,12 @@
 // /app/oauth-return?code=… — возврат в приложение StealthNet после входа через браузер.
 // Подтверждённое приложение (App Links) открывается сразу по этому адресу. Если нет
-// (старая версия или Android не подтвердил ссылку) — страница передаёт код по stealthnet://oauth.
+// страница адресует возврат Android-пакету StealthNet, чтобы не появлялся выбор приложений.
 import { LogIn, Smartphone } from 'lucide-react'
+import { headers } from 'next/headers'
 import { SystemState } from '@/components/ui/system-state'
 import { getBrandName } from '@/lib/branding'
 import { MOBILE_APP_RETURN_URL } from '@/lib/auth/mobile-oauth'
+import { getAndroidAppPackageName } from '@/lib/mobile-app-links'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,12 +21,15 @@ export default async function OAuthReturnPage({
 }: {
   searchParams: Promise<{ code?: string | string[]; error?: string | string[] }>
 }) {
-  const params = await searchParams
+  const [params, requestHeaders] = await Promise.all([searchParams, headers()])
   const url = new URL(MOBILE_APP_RETURN_URL)
   if (typeof params.code === 'string' && CODE.test(params.code)) url.searchParams.set('code', params.code)
   else if (typeof params.error === 'string' && ERRORS.has(params.error)) url.searchParams.set('error', params.error)
   else url.searchParams.set('error', 'login_failed')
-  const appUrl = url.toString()
+  const isAndroid = /\bAndroid\b/i.test(requestHeaders.get('user-agent') ?? '')
+  const appUrl = isAndroid
+    ? `intent://${url.host}${url.search}#Intent;scheme=${url.protocol.slice(0, -1)};package=${getAndroidAppPackageName()};end`
+    : url.toString()
   const brandName = getBrandName()
 
   return (
