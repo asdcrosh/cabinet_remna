@@ -29,3 +29,30 @@ export function getTelegramOidcCookieOptions() {
     maxAge: 10 * 60,
   }
 }
+
+export async function exchangeTelegramCode(code: string, codeVerifier: string) {
+  const clientId = process.env.TELEGRAM_CLIENT_ID
+  const clientSecret = process.env.TELEGRAM_CLIENT_SECRET
+  if (!clientId || !clientSecret) throw new Error('Telegram OIDC is not configured')
+
+  const response = await fetch('https://oauth.telegram.org/token', {
+    method: 'POST',
+    headers: {
+      Authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString('base64')}`,
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: new URLSearchParams({
+      grant_type: 'authorization_code',
+      code,
+      redirect_uri: getTelegramRedirectUri(),
+      client_id: clientId,
+      code_verifier: codeVerifier,
+    }),
+    signal: AbortSignal.timeout(10_000),
+  })
+  const data = (await response.json().catch(() => null)) as { id_token?: unknown } | null
+  if (!response.ok || typeof data?.id_token !== 'string' || !data.id_token) {
+    throw new Error('Telegram code exchange failed')
+  }
+  return data.id_token
+}

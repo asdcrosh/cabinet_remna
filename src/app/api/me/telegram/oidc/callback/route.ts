@@ -6,7 +6,7 @@ import { verifyTelegramIdToken } from '@/lib/telegram-auth'
 import { syncLinkedTelegramUser } from '@/lib/telegram-link-sync'
 import { getAppUrlOrRequestOrigin } from '@/lib/app-url'
 import {
-  getTelegramRedirectUri,
+  exchangeTelegramCode,
   TELEGRAM_OIDC_STATE_COOKIE,
   TELEGRAM_OIDC_VERIFIER_COOKIE,
 } from '@/lib/telegram-oidc'
@@ -17,11 +17,10 @@ import {
 import { recordIdentityConflict } from '@/lib/identity-conflicts'
 import { writeAuditLog } from '@/lib/audit-log'
 import { logError } from '@/lib/logger'
+import { completeMobileTelegramOAuth, isMobileTelegramState } from '@/lib/auth/mobile-telegram-oauth'
 
 export const runtime = 'nodejs'
-const OAUTH_TIMEOUT_MS = 10_000
-
-export const GET = withAuth(async (req: Request) => {
+const completeLink = withAuth(async (req: Request) => {
   const session = await requireAuth()
   const url = new URL(req.url)
   const settingsUrl = new URL('/dashboard/settings', getAppUrlOrRequestOrigin(req))
@@ -44,8 +43,7 @@ export const GET = withAuth(async (req: Request) => {
   }
 
   try {
-    const tokenResponse = await exchangeTelegramCode(code, verifier)
-    const telegramUser = await verifyTelegramIdToken(tokenResponse.id_token)
+    const telegramUser = await verifyTelegramIdToken(await exchangeTelegramCode(code, verifier))
 
     const currentUser = await prisma.user.findUnique({
       where: { id: session.uid },
@@ -134,37 +132,11 @@ export const GET = withAuth(async (req: Request) => {
   }
 })
 
-async function exchangeTelegramCode(code: string, codeVerifier: string) {
-  const clientId = process.env.TELEGRAM_CLIENT_ID
-  const clientSecret = process.env.TELEGRAM_CLIENT_SECRET
-  if (!clientId || !clientSecret) {
-    throw new Error('TELEGRAM_CLIENT_ID or TELEGRAM_CLIENT_SECRET is not configured')
-  }
-
-  const body = new URLSearchParams({
-    grant_type: 'authorization_code',
-    code,
-    redirect_uri: getTelegramRedirectUri(),
-    client_id: clientId,
-    code_verifier: codeVerifier,
-  })
-
-  const response = await fetch('https://oauth.telegram.org/token', {
-    method: 'POST',
-    headers: {
-      Authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString('base64')}`,
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-    body,
-    signal: AbortSignal.timeout(OAUTH_TIMEOUT_MS),
-  })
-
-  const data = (await response.json().catch(() => null)) as { id_token?: string; error?: string } | null
-  if (!response.ok || !data?.id_token) {
-    throw new Error(data?.error || 'telegram_token_exchange_failed')
-  }
-
-  return { id_token: data.id_token }
+export async function GET(req: Request) {
+  const params = new URL(req.url).searchParams
+  return isMobileTelegramState(params.get('state'))
+    ? completeMobileTelegramOAuth(req, params)
+    : completeLink(req)
 }
 
 function clearOidcCookies(response: NextResponse) {

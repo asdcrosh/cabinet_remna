@@ -9,7 +9,10 @@ import { MOBILE_APP_RETURN_URL } from '@/lib/auth/mobile-oauth'
 export const dynamic = 'force-dynamic'
 
 const CODE = /^[A-Za-z0-9_-]{16,128}$/
-const ERRORS = new Set(['expired', 'login_failed', 'server_error'])
+const ERRORS = new Set([
+  'expired', 'login_failed', 'server_error',
+  'telegram_not_linked', 'telegram_consent_required', 'telegram_cancelled', 'telegram_unavailable', 'telegram_failed',
+])
 
 export default async function OAuthReturnPage({
   searchParams,
@@ -32,7 +35,7 @@ export default async function OAuthReturnPage({
         eyebrow={brandName}
         icon={<LogIn className="h-7 w-7" />}
         title="Возвращаемся в приложение"
-        description="Вход выполнен в браузере. Приложение завершит его само."
+        description="Откройте приложение, чтобы увидеть результат входа."
         action={(
           <a href={appUrl} className="btn-primary w-full sm:w-auto">
             <Smartphone className="h-4 w-4" />

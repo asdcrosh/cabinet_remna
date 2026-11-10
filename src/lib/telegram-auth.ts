@@ -1,5 +1,5 @@
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto'
-import { createRemoteJWKSet, jwtVerify } from 'jose'
+import { createLocalJWKSet, errors, jwtVerify } from 'jose'
 
 const MAX_AUTH_AGE_MS = 24 * 60 * 60 * 1000
 const MAX_MINI_APP_AUTH_AGE_MS = 15 * 60 * 1000
@@ -109,22 +109,66 @@ export function getTelegramDisplayName(payload: TelegramAuthPayload) {
   return [payload.first_name, payload.last_name].filter(Boolean).join(' ').trim() || payload.username || null
 }
 
-const telegramJwks = createRemoteJWKSet(new URL('https://oauth.telegram.org/.well-known/jwks.json'))
+const telegramJwksUrl = 'https://oauth.telegram.org/.well-known/jwks.json'
+const telegramJwksMaxAgeMs = 10 * 60 * 1000
+const telegramJwksRefreshCooldownMs = 30 * 1000
+type TelegramKeySet = ReturnType<typeof createLocalJWKSet>
 
-export async function verifyTelegramIdToken(idToken: string): Promise<TelegramOidcUser> {
+let telegramJwks: { keys: TelegramKeySet; fetchedAt: number } | undefined
+let telegramJwksRequest: Promise<TelegramKeySet> | undefined
+
+function loadTelegramJwks(force = false) {
+  if (telegramJwksRequest) return telegramJwksRequest
+  if (!force && telegramJwks && Date.now() - telegramJwks.fetchedAt < telegramJwksMaxAgeMs) {
+    return Promise.resolve(telegramJwks.keys)
+  }
+
+  telegramJwksRequest = (async () => {
+    const response = await fetch(telegramJwksUrl, {
+      cache: 'no-store',
+      redirect: 'error',
+      signal: AbortSignal.timeout(5000),
+    })
+    if (!response.ok) throw new Error('Telegram signing keys are unavailable')
+    const keys = createLocalJWKSet(await response.json())
+    telegramJwks = { keys, fetchedAt: Date.now() }
+    return keys
+  })().finally(() => { telegramJwksRequest = undefined })
+  return telegramJwksRequest
+}
+
+const getTelegramKey: TelegramKeySet = async (header, token) => {
+  const keys = await loadTelegramJwks()
+  try {
+    return await keys(header, token)
+  } catch (error) {
+    if (!(error instanceof errors.JWKSNoMatchingKey) || !telegramJwks ||
+        Date.now() - telegramJwks.fetchedAt < telegramJwksRefreshCooldownMs) throw error
+    return (await loadTelegramJwks(true))(header, token)
+  }
+}
+
+export async function verifyTelegramIdToken(
+  idToken: string,
+  { requireNumericId = false } = {},
+): Promise<TelegramOidcUser> {
   const clientId = process.env.TELEGRAM_CLIENT_ID
   if (!clientId) {
     throw new Error('TELEGRAM_CLIENT_ID is not configured')
   }
 
-  const { payload } = await jwtVerify(idToken, telegramJwks, {
+  const { payload } = await jwtVerify(idToken, getTelegramKey, {
     issuer: 'https://oauth.telegram.org',
     audience: clientId,
+    ...(requireNumericId ? { requiredClaims: ['exp', 'iat', 'sub'] } : {}),
   })
 
-  const rawId = payload.id ?? payload.sub
+  const rawId = requireNumericId ? payload.id : payload.id ?? payload.sub
   if (typeof rawId !== 'string' && typeof rawId !== 'number') {
     throw new Error('Telegram ID token does not contain user id')
+  }
+  if (requireNumericId && (!/^[1-9]\d{0,15}$/.test(String(rawId)) || !Number.isSafeInteger(Number(rawId)))) {
+    throw new Error('Telegram ID token contains an invalid user id')
   }
 
   const username =

@@ -39,7 +39,9 @@ import {
 } from '@/lib/user-discounts'
 import { hasWhitelistAddonEntitlement } from '@/lib/whitelist-addon-policy'
 import { upsertLocalSubscriptionFromRemnawave } from '@/lib/remnawave-local-sync'
+import { findRemnashopUserByTelegramId } from '@/lib/telegram-link-sync'
 import { isTrialDeviceUsed } from '@/lib/mobile-trial'
+import { hasVerifiedEmail, mobileEmailDeadline } from '@/lib/auth/mobile-email-policy'
 
 // Transport options are supplied only by authenticated server code, never by checkout JSON.
 export async function createPaymentForUser(
@@ -106,7 +108,10 @@ export async function createPaymentForUser(
   if (options.telegramBot && !user.telegramId) {
     return jsonResponse({ error: 'Telegram не привязан' }, { status: 403 })
   }
-  if (!options.telegramBot && (!user.emailVerifiedAt || user.email.endsWith('@pending.invalid'))) {
+  const deadline = mobileEmailDeadline(user)
+  const freeTrialDuringGrace = options.mobileApp && isSubscriptionPurchase && plan.isPromo
+    && !whitelistAddon && !autoRenewalConsent && deadline && deadline.getTime() > Date.now()
+  if (!options.telegramBot && !hasVerifiedEmail(user) && !freeTrialDuringGrace) {
     return jsonResponse(
       {
         error: 'Подтвердите email перед оплатой',
@@ -478,6 +483,16 @@ export async function createPaymentForUser(
 
     if (existingTrial?.payment.status === 'SUCCEEDED') {
       return provisionPromoPayment(existingTrial.payment, user, plan)
+    }
+
+    if (options.mobileApp && user.telegramId) {
+      try {
+        if (await findRemnashopUserByTelegramId(user.telegramId)) {
+          return jsonResponse({ error: 'Ознакомительный тариф доступен только новым пользователям' }, { status: 409 })
+        }
+      } catch {
+        return jsonResponse({ error: 'Не удалось проверить подписку в Telegram. Попробуйте позже.' }, { status: 503 })
+      }
     }
 
     let promoPayment: Payment

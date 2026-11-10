@@ -67,6 +67,59 @@ export async function syncRemnashopUserToCabinet(localUserId: string, options: {
   }
 }
 
+export async function syncMobileTelegramSubscription(localUserId: string, telegramId: bigint) {
+  const local = await getLocalUserForRemnashopSync(localUserId)
+  if (!local || local.telegramId !== telegramId) return
+  if (local.remnawaveUsername && local.subscriptions.length > 0) return
+
+  const { rows } = await fetchRemnashopSources({
+    whereSql: 'u.telegram_id = $1',
+    values: [telegramId.toString()],
+    limit: 2,
+  })
+  if (rows.length > 1) throw new Error('Telegram identity is ambiguous in Remnashop')
+
+  const source = rows[0]
+  const uuid = source?.user_remna_id
+  const remote = uuid ? (await remnawave.getUserByUuid(uuid)).response : null
+  if (remote?.uuid && remote.uuid !== uuid) throw new Error('Remnawave returned a different subscription profile')
+  if (remote?.telegramId != null && String(remote.telegramId) !== telegramId.toString()) {
+    throw new Error('Telegram identity does not match the Remnawave subscription')
+  }
+  if (remote && (
+    (local.remnawaveUuid && local.remnawaveUuid !== uuid) ||
+    (local.remnawaveId && local.remnawaveId !== remote.id) ||
+    (local.remnawaveUsername && local.remnawaveUsername !== remote.username)
+  )) {
+    throw new Error('Telegram subscription conflicts with the existing cabinet profile')
+  }
+  const planId = source && remote ? await resolveCabinetPlanIdFromRemnashopSubscription(source) : null
+
+  await prisma.$transaction(async (tx) => {
+    // Уникальные ссылки на Remnashop и Remnawave защищают от привязки чужого профиля.
+    const changed = await tx.user.updateMany({
+      where: {
+        id: localUserId,
+        telegramId,
+        remnawaveId: local.remnawaveId,
+        remnawaveUuid: local.remnawaveUuid,
+        remnawaveUsername: local.remnawaveUsername,
+        OR: [{ remnashopUserId: null }, ...(source ? [{ remnashopUserId: source.id }] : [])],
+      },
+      data: { remnashopUserId: source?.id, remnashopSyncedAt: new Date() },
+    })
+    if (changed.count !== 1 || !source || !uuid || !remote) return
+
+    await upsertLocalSubscriptionFromRemnawave({
+      localUserId,
+      remnashopUserId: source.id,
+      planId,
+      startAt: source.subscription_created_at,
+      remnawaveUser: { ...remote, uuid },
+    }, tx)
+  })
+}
+
 export async function syncRemnashopUsersToCabinet(options: {
   forceRemnawaveSubscriptions?: boolean
 } = {}) {

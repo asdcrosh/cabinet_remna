@@ -1,6 +1,6 @@
 // GET /api/mobile/auth/oauth/start — начало входа в приложение через браузер.
 // Приложение открывает этот адрес во встроенном браузере (Custom Tabs) с параметрами:
-//   provider=yandex, code_challenge=<S256>, code_challenge_method=S256,
+//   provider=yandex|telegram, code_challenge=<S256>, code_challenge_method=S256,
 //   hwid, device_name?, platform?, app_version?, legal=1 (согласие при регистрации), ref?
 // Намерение входа сохраняется в подписанной httpOnly-cookie и дальше идёт обычный OAuth кабинета.
 import { NextResponse } from 'next/server'
@@ -16,12 +16,12 @@ import {
   MOBILE_OAUTH_INTENT_TTL_SECONDS,
   signMobileOAuthIntent,
 } from '@/lib/auth/mobile-oauth'
+import { startMobileTelegramOAuth } from '@/lib/auth/mobile-telegram-oauth'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 const COMPLETE_PATH = '/api/mobile/auth/oauth/complete'
-const PROVIDERS = { yandex: '/api/auth/yandex/start' } as const
 
 export async function GET(req: Request) {
   const limited = await rateLimit(req, 'mobile-oauth-start', 30, 60_000)
@@ -33,8 +33,8 @@ export async function GET(req: Request) {
   }
 
   const q = new URL(req.url).searchParams
-  const provider = q.get('provider') as keyof typeof PROVIDERS | null
-  if (!provider || !(provider in PROVIDERS)) {
+  const provider = q.get('provider')
+  if (provider !== 'yandex' && provider !== 'telegram') {
     return jsonResponse({ error: 'Неизвестный способ входа' }, { status: 400 })
   }
   if (q.get('code_challenge_method') !== 'S256') {
@@ -51,14 +51,17 @@ export async function GET(req: Request) {
     return jsonResponse({ error: 'Некорректные параметры входа' }, { status: 400 })
   }
 
-  const intent = await signMobileOAuthIntent({ codeChallenge: challenge.data, device: device.data })
+  const input = { codeChallenge: challenge.data, device: device.data }
+  if (provider === 'telegram') return startMobileTelegramOAuth(req, { ...input, legalAccepted: q.get('legal') === '1' })
+
+  const intent = await signMobileOAuthIntent(input)
   const cookieStore = await cookies()
   cookieStore.set(MOBILE_OAUTH_INTENT_COOKIE, intent, {
     ...getYandexOAuthCookieOptions(),
     maxAge: MOBILE_OAUTH_INTENT_TTL_SECONDS,
   })
 
-  const target = new URL(PROVIDERS[provider], getAppUrlOrRequestOrigin(req))
+  const target = new URL('/api/auth/yandex/start', getAppUrlOrRequestOrigin(req))
   target.searchParams.set('next', COMPLETE_PATH)
   if (q.get('legal') === '1') target.searchParams.set('legal', '1')
   const ref = sanitizeOAuthReferral(q.get('ref'))

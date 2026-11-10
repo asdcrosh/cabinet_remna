@@ -98,6 +98,39 @@ export async function sendEmailVerificationLink(input: {
     'Если вы не регистрировались, просто проигнорируйте это письмо.',
   ].join('\n')
 
+  return deliverVerificationEmail(webhookUrl, {
+    to: input.email,
+    subject,
+    text,
+    html: renderActionEmail({
+      eyebrow: 'Подтверждение аккаунта',
+      title: 'Подтвердите почту',
+      lead: 'Один клик, и аккаунт будет готов к покупке тарифа и получению VPN-доступа.',
+      greetingName: input.name,
+      body: 'Мы получили запрос на регистрацию. Подтвердите этот email, чтобы защитить аккаунт и продолжить работу в кабинете.',
+      ctaLabel: 'Подтвердить email',
+      ctaUrl: verifyUrl,
+      expiry: 'Ссылка действует 24 часа.',
+      securityNote: 'Если вы не создавали аккаунт, письмо можно спокойно проигнорировать.',
+    }),
+  })
+}
+
+export function sendMobileEmailCode(email: string, code: string): Promise<EmailDeliveryResult> {
+  if (!/^\d{6}$/.test(code)) throw new Error('Invalid email confirmation code')
+  const webhookUrl = process.env.EMAIL_VERIFICATION_WEBHOOK_URL
+  if (!webhookUrl) return Promise.resolve({ sent: false, reason: 'not_configured' })
+  return deliverVerificationEmail(webhookUrl, {
+    to: email,
+    subject: `Код подтверждения почты в ${getBrandName()}`,
+    text: `Код подтверждения: ${code}\n\nВведите его в приложении StealthNet. Код действует 10 минут.`,
+    html: `<p>Код подтверждения: <strong>${code}</strong></p><p>Введите его в приложении StealthNet. Код действует 10 минут.</p>`,
+  })
+}
+
+async function deliverVerificationEmail(webhookUrl: string, message: {
+  to: string; subject: string; text: string; html: string
+}): Promise<EmailDeliveryResult> {
   const res = await fetch(webhookUrl, {
     method: 'POST',
     headers: {
@@ -106,22 +139,7 @@ export async function sendEmailVerificationLink(input: {
         ? { Authorization: `Bearer ${process.env.EMAIL_VERIFICATION_WEBHOOK_SECRET}` }
         : {}),
     },
-    body: JSON.stringify({
-      to: input.email,
-      subject,
-      text,
-      html: renderActionEmail({
-        eyebrow: 'Подтверждение аккаунта',
-        title: 'Подтвердите почту',
-        lead: 'Один клик, и аккаунт будет готов к покупке тарифа и получению VPN-доступа.',
-        greetingName: input.name,
-        body: 'Мы получили запрос на регистрацию. Подтвердите этот email, чтобы защитить аккаунт и продолжить работу в кабинете.',
-        ctaLabel: 'Подтвердить email',
-        ctaUrl: verifyUrl,
-        expiry: 'Ссылка действует 24 часа.',
-        securityNote: 'Если вы не создавали аккаунт, письмо можно спокойно проигнорировать.',
-      }),
-    }),
+    body: JSON.stringify(message),
     signal: AbortSignal.timeout(DELIVERY_TIMEOUT_MS),
   })
 

@@ -13,14 +13,22 @@ type CodeRow = {
   appVersion: string | null
   expiresAt: Date
   usedAt: Date | null
+  telegramId?: bigint
 }
 
-const db = vi.hoisted(() => ({ codes: [] as CodeRow[], seq: 0 }))
+const db = vi.hoisted(() => ({ codes: [] as CodeRow[], seq: 0, deadline: null as Date | null }))
 const user = { id: 'user-1', email: 'user@example.com', name: 'User', role: 'USER' as const }
 
 vi.mock('@/lib/prisma', () => ({
   prisma: {
-    user: { findUnique: vi.fn(async () => ({ sessionVersion: 0 })) },
+    user: {
+      findUnique: vi.fn(async () => ({ sessionVersion: 0 })),
+      updateMany: vi.fn(async ({ where, data }) => {
+        if (where.mobileTelegramEmailDueAt === null && db.deadline !== null) return { count: 0 }
+        db.deadline = data.mobileTelegramEmailDueAt
+        return { count: 1 }
+      }),
+    },
     revokedSession: { findUnique: vi.fn(async () => null) },
     mobileAuthCode: {
       create: vi.fn(async ({ data }: { data: Omit<CodeRow, 'id' | 'usedAt'> }) => {
@@ -30,7 +38,7 @@ vi.mock('@/lib/prisma', () => ({
       }),
       findUnique: vi.fn(async ({ where }: { where: { codeHash: string } }) => {
         const row = db.codes.find((c) => c.codeHash === where.codeHash)
-        return row ? { ...row, user } : null
+        return row ? { ...row, user: { ...user, telegramId: 12n, emailVerifiedAt: null } } : null
       }),
       updateMany: vi.fn(async ({ where, data }: { where: { id: string; usedAt: null }; data: Partial<CodeRow> }) => {
         const rows = db.codes.filter((c) => c.id === where.id && c.usedAt === null)
@@ -57,6 +65,7 @@ describe('вход в приложение через браузер (PKCE)', ()
 
   beforeEach(() => {
     db.codes.length = 0
+    db.deadline = null
   })
 
   it('S256 соответствует тестовому вектору RFC 7636', () => {
@@ -103,5 +112,17 @@ describe('вход в приложение через браузер (PKCE)', ()
     db.codes.at(-1)!.expiresAt = new Date(Date.now() - 1000)
     expect(await oauth.exchangeMobileAuthCode(old, VERIFIER, device.hwid)).toEqual({ ok: false, reason: 'expired' })
     expect(await oauth.exchangeMobileAuthCode('unknown-code-xxxxxxxxxxxxx', VERIFIER, device.hwid)).toEqual({ ok: false, reason: 'invalid' })
+  })
+
+  it('срок начинается при обмене кода и сохраняется при повторном Telegram-входе', async () => {
+    const code = await oauth.createMobileAuthCode(user.id, { codeChallenge: CHALLENGE, device }, 12n)
+    expect(db.deadline).toBeNull()
+    const before = Date.now()
+    expect((await oauth.exchangeMobileAuthCode(code, VERIFIER, device.hwid)).ok).toBe(true)
+    const deadline = db.deadline
+    expect(deadline!.getTime() - before).toBeGreaterThanOrEqual(3 * 24 * 60 * 60_000)
+    const again = await oauth.createMobileAuthCode(user.id, { codeChallenge: CHALLENGE, device }, 12n)
+    expect((await oauth.exchangeMobileAuthCode(again, VERIFIER, device.hwid)).ok).toBe(true)
+    expect(db.deadline).toBe(deadline)
   })
 })
