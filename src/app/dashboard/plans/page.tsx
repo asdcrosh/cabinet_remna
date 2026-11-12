@@ -6,6 +6,7 @@ import { PlanCatalog } from '@/components/dashboard/mobile-plan-picker'
 import { PageHeader } from '@/components/dashboard/page-header'
 import { getCurrentUser } from '@/lib/auth/cookies'
 import { buildPlanCatalog } from '@/lib/plan-catalog'
+import { resolvePromoReminderCheckout } from '@/lib/promo-reminder-checkout'
 import { ArrowRight, MessageCircleQuestion, RefreshCw, ShieldCheck } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
@@ -13,12 +14,14 @@ export const dynamic = 'force-dynamic'
 export default async function PlansPage({
   searchParams,
 }: {
-  searchParams: Promise<{ plan?: string; promo?: string; intent?: string; whitelistAddon?: string }>
+  searchParams: Promise<{ plan?: string; promo?: string; promoId?: string; intent?: string; whitelistAddon?: string }>
 }) {
   const params = await searchParams
   const session = await getCurrentUser()
   const linkedPlanId = params.plan?.trim()
-  const initialPromoCode = params.promo?.trim()
+  const promoId = typeof params.promoId === 'string' ? params.promoId : null
+  const reminder = promoId && session ? await resolvePromoReminderCheckout(session.uid, promoId) : null
+  const initialPromoCode = promoId ? reminder?.code : params.promo?.trim()
   const isRenewIntent = params.intent === 'renew'
   const {
     plans: planViews,
@@ -34,9 +37,15 @@ export default async function PlansPage({
     userId: session?.uid ?? null,
     linkedPlanId,
     initialPromoCode,
+    initialPromoPlanIds: reminder?.planIds,
     whitelistAddonRequested: params.whitelistAddon === 'true',
   })
   const currentPlanName = currentSubscription?.plan?.name ?? null
+  const reminderPlans = planViews.filter((plan) => reminder?.planIds?.includes(plan.id))
+  const initialPlanId = reminderPlans.find((plan) => plan.current)?.id
+    ?? reminderPlans.find((plan) => plan.popular)?.id
+    ?? reminderPlans[0]?.id
+    ?? linkedPlanId
 
   return (
     <div className="user-workspace page-stack">
@@ -101,11 +110,15 @@ export default async function PlansPage({
         </div>
       )}
 
+      {reminder?.error && (
+        <p role="status" className="text-sm text-slate-600 dark:text-slate-300">{reminder.error}</p>
+      )}
+
       {planViews.length > 0 ? (
         <PlanCatalog
-          key={`${currentSubscription?.planId ?? 'none'}:${currentDeviceLimit ?? 'unknown'}:${linkedPlanId ?? ''}:${params.whitelistAddon ?? ''}`}
+          key={`${currentSubscription?.planId ?? 'none'}:${currentDeviceLimit ?? 'unknown'}:${initialPlanId ?? ''}:${promoId ?? ''}:${params.whitelistAddon ?? ''}`}
           plans={planViews}
-          initialPlanId={linkedPlanId}
+          initialPlanId={initialPlanId}
         />
       ) : null}
 
