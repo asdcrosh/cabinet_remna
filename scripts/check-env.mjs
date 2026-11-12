@@ -37,6 +37,7 @@ const optionalBooleans = [
   "BONUS_BOX_PITY_ENABLED",
   "BONUS_BOX_SHOW_BEST_RECENT_OPENING",
   "TELEGRAM_MINIAPP_AUTO_MERGE_TECHNICAL",
+  "TELEGRAM_STARS_ENABLED",
   "WATCH_ENABLED",
   "YOOKASSA_ENABLED",
   "PAYANYWAY_ENABLED",
@@ -382,6 +383,37 @@ if (isProduction && value("BROADCAST_UPLOAD_ALLOW_UNSIGNED_LEGACY") !== "false")
 
 if (isProduction && value("TRUSTED_PROXY_HEADERS").toLowerCase() !== "true") {
   errors.push("TRUSTED_PROXY_HEADERS must be true in production");
+}
+
+if (value("TELEGRAM_MINIAPP_ENABLED") === "true") {
+  if (!value("TELEGRAM_MINIAPP_BOT_TOKEN")) errors.push("TELEGRAM_MINIAPP_BOT_TOKEN is required");
+  if (value("TELEGRAM_MINIAPP_WEBHOOK_SECRET").length < 32) errors.push("TELEGRAM_MINIAPP_WEBHOOK_SECRET must be at least 32 characters");
+  if (!/^[A-Za-z0-9_]{5,32}$/.test(value("TELEGRAM_MINIAPP_BOT_USERNAME"))) errors.push("TELEGRAM_MINIAPP_BOT_USERNAME is invalid");
+  if (isProduction && !value("APP_URL").startsWith("https://")) errors.push("APP_URL must be HTTPS for Mini App");
+}
+if (value("TELEGRAM_STARS_ENABLED") === "true") {
+  if (value("TELEGRAM_MINIAPP_ENABLED") !== "true") errors.push("Telegram Stars require the Mini App");
+  const rate = Number(value("TELEGRAM_STARS_KOPECKS_PER_STAR"));
+  if (!Number.isSafeInteger(rate) || rate < 1 || rate > 100000) errors.push("TELEGRAM_STARS_KOPECKS_PER_STAR must be 1..100000");
+}
+if (value("TELEGRAM_LEGACY_WEBHOOK_URL") || value("TELEGRAM_LEGACY_WEBHOOK_SECRET")) {
+  if (value("TELEGRAM_MINIAPP_ENABLED") !== "true") errors.push("Legacy webhook bridge requires the Mini App");
+  if (value("TELEGRAM_LEGACY_WEBHOOK_SECRET").length < 16) errors.push("TELEGRAM_LEGACY_WEBHOOK_SECRET must be at least 16 characters");
+  try {
+    const legacyUrl = new URL(value("TELEGRAM_LEGACY_WEBHOOK_URL"));
+    if (legacyUrl.protocol !== "https:" || legacyUrl.username || legacyUrl.password || legacyUrl.hash) errors.push("TELEGRAM_LEGACY_WEBHOOK_URL must be a clean HTTPS URL");
+  } catch { errors.push("TELEGRAM_LEGACY_WEBHOOK_URL is invalid"); }
+}
+if (value("TELEGRAM_CHANNEL_REWARDS_ENABLED") === "true") {
+  if (value("TELEGRAM_MINIAPP_ENABLED") !== "true") errors.push("Channel rewards require the Mini App");
+  if (!/^(?:-100\d+|@[A-Za-z0-9_]{5,32})$/.test(value("TELEGRAM_REWARD_CHANNEL_ID"))) errors.push("TELEGRAM_REWARD_CHANNEL_ID must be a numeric ID or @username");
+  if (!/^https:\/\/t\.me\/[a-zA-Z0-9_+/-]+$/.test(value("TELEGRAM_REWARD_CHANNEL_URL"))) errors.push("TELEGRAM_REWARD_CHANNEL_URL is invalid");
+  if (value("TELEGRAM_REWARD_CHANNEL_ID").startsWith("@") && value("TELEGRAM_REWARD_CHANNEL_URL").toLowerCase() !== `https://t.me/${value("TELEGRAM_REWARD_CHANNEL_ID").slice(1)}`.toLowerCase()) errors.push("TELEGRAM_REWARD_CHANNEL_URL must match the channel username");
+  if (!value("TELEGRAM_REWARD_PLAN_ID")) errors.push("TELEGRAM_REWARD_PLAN_ID is required");
+  for (const [name, min, max] of [["TELEGRAM_REWARD_REFERRER_DAYS", 1, 365], ["TELEGRAM_REWARD_REFERRED_DAYS", 0, 365], ["TELEGRAM_REWARD_MAX_PER_REFERRER", 1, 1000]]) {
+    const n = Number(value(name));
+    if (!Number.isInteger(n) || n < min || n > max) errors.push(`${name} must be ${min}..${max}`);
+  }
 }
 
 if (errors.length > 0) {

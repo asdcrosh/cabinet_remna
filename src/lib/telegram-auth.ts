@@ -27,17 +27,17 @@ export interface TelegramMiniAppUser {
   languageCode: string | null
 }
 
-export function verifyTelegramMiniAppInitData(initData: string): TelegramMiniAppUser {
-  const botToken = process.env.TELEGRAM_BOT_TOKEN
+export function verifyTelegramMiniAppInitData(initData: string, botToken = process.env.TELEGRAM_BOT_TOKEN): TelegramMiniAppUser {
   if (!botToken) throw new Error('TELEGRAM_BOT_TOKEN is not configured')
   if (!initData || initData.length > 16_384) throw new Error('Invalid Telegram Mini App data')
 
   const params = new URLSearchParams(initData)
+  if (new Set(params.keys()).size !== Array.from(params.keys()).length) throw new Error('Duplicate Telegram fields')
   const receivedHash = params.get('hash')
   const authDate = Number(params.get('auth_date'))
   const rawUser = params.get('user')
-  if (!receivedHash || !authDate || !rawUser) throw new Error('Invalid Telegram Mini App data')
-  if (Math.abs(Date.now() - authDate * 1000) > MAX_MINI_APP_AUTH_AGE_MS) {
+  if (!receivedHash || !/^[a-f0-9]{64}$/i.test(receivedHash) || !Number.isSafeInteger(authDate) || authDate <= 0 || !rawUser) throw new Error('Invalid Telegram Mini App data')
+  if (Date.now() - authDate * 1000 > MAX_MINI_APP_AUTH_AGE_MS || authDate * 1000 - Date.now() > 30_000) {
     throw new Error('Telegram Mini App data expired')
   }
 
@@ -61,7 +61,7 @@ export function verifyTelegramMiniAppInitData(initData: string): TelegramMiniApp
     username?: string
     language_code?: string
   }
-  if (!parsed.id || !Number.isSafeInteger(parsed.id)) throw new Error('Telegram user is missing')
+  if (!parsed.id || parsed.id < 0 || !Number.isSafeInteger(parsed.id)) throw new Error('Telegram user is missing')
 
   return {
     id: BigInt(parsed.id),

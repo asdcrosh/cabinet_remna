@@ -105,11 +105,15 @@ export async function syncCabinetPaymentToRemnashop(paymentId: string) {
         payment: syncPayment,
       })
     : Number(existingSubscriptionId)
-  const remnashopTransactionId = await upsertRemnashopTransaction({
-    remnashopUserId,
-    remnashopSubscriptionId,
-    payment: syncPayment,
-  })
+  // The legacy importer treats unknown gateways as YooKassa/RUB. Keep the
+  // subscription in sync without fabricating a ruble transaction for Stars.
+  const remnashopTransactionId = payment.provider === 'TELEGRAM_STARS'
+    ? null
+    : await upsertRemnashopTransaction({
+        remnashopUserId,
+        remnashopSubscriptionId,
+        payment: syncPayment,
+      })
   await syncRemnashopPromoActivation(remnashopUserId, syncPayment)
   if (updatesCurrentSubscription) {
     await setCurrentRemnashopSubscription(remnashopUserId, remnashopSubscriptionId)

@@ -25,7 +25,7 @@ export type PaymentSyncResult =
 type PendingPaymentForCancel = {
   id: string
   userId: string
-  provider: 'YOOKASSA' | 'PAYANYWAY' | 'PLATEGA' | 'LOCAL'
+  provider: 'YOOKASSA' | 'PAYANYWAY' | 'PLATEGA' | 'TELEGRAM_STARS' | 'LOCAL'
   externalPaymentId: string | null
   yookassaId: string | null
 }
@@ -79,7 +79,7 @@ export async function syncPaymentProvisioning(input: {
   }
   // PayAnyWay подтверждает оплату подписанным Pay URL. Без Merchant API
   // мы не отменяем и не считаем такой платёж неоплаченным по таймеру.
-  if (payment.provider === 'PAYANYWAY') {
+  if (payment.provider === 'PAYANYWAY' || payment.provider === 'TELEGRAM_STARS') {
     return { ok: true, status: 'pending', provisioned: false }
   }
   if (payment.provider === 'PLATEGA') {

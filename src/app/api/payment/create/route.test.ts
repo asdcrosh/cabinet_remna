@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   isPlanAvailableForUser: vi.fn(),
   createPayment: vi.fn(),
   createPlategaPayment: vi.fn(),
+  miniAppBotCall: vi.fn(),
   getRemnawaveUser: vi.fn(),
   upsertLocalSubscriptionFromRemnawave: vi.fn(),
   isPaymentProviderAvailable: vi.fn(),
@@ -50,6 +51,7 @@ vi.mock('@/lib/plan-access', () => ({
 }))
 vi.mock('@/lib/yookassa', () => ({ createPayment: mocks.createPayment }))
 vi.mock('@/lib/platega', () => ({ createPlategaPayment: mocks.createPlategaPayment }))
+vi.mock('@/lib/miniapp/bot-api', () => ({ miniAppBotCall: mocks.miniAppBotCall }))
 vi.mock('@/lib/remnawave', () => ({
   hasRemnawaveUserReference: (value: { remnawaveId?: number | null }) => Boolean(value.remnawaveId),
   remnawaveUserReference: (value: { remnawaveId: number }) => ({ id: value.remnawaveId }),
@@ -138,6 +140,9 @@ describe('payment create route', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     process.env.APP_URL = 'https://cabinet.example'
+    process.env.TELEGRAM_MINIAPP_ENABLED = 'true'
+    process.env.TELEGRAM_STARS_ENABLED = 'true'
+    process.env.TELEGRAM_STARS_KOPECKS_PER_STAR = '300'
     mocks.requireAuth.mockResolvedValue({ uid: user.id, email: user.email, role: 'USER' })
     mocks.rateLimit.mockResolvedValue({ ok: true })
     mocks.withDistributedLock.mockImplementation(async (_key: string, task: () => Promise<unknown>) => ({
@@ -183,6 +188,7 @@ describe('payment create route', () => {
       url: 'https://pay.platega.io/?id=platega-1',
       expiresIn: '00:15:00',
     })
+    mocks.miniAppBotCall.mockResolvedValue('https://t.me/$star-invoice')
     mocks.getRemnawaveUser.mockResolvedValue({
       response: { expireAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() },
     })
@@ -210,6 +216,22 @@ describe('payment create route', () => {
     for (const body of [{ purchaseType: 'SUBSCRIPTION' }, { purchaseType: 'WHITELIST_ADDON', provider: 'PAYANYWAY' }]) {
       expect((await createPaymentForUser(paymentRequest(body), user.id, { telegramBot: true })).status).toBe(400)
     }
+    expect(mocks.createPayment).not.toHaveBeenCalled()
+  })
+
+  it('creates a Stars invoice only for the authenticated Telegram account', async () => {
+    mocks.prisma.user.findUnique.mockResolvedValue({ ...user, email: 'telegram-123@pending.invalid', emailVerifiedAt: null, telegramId: 123n })
+    const request = paymentRequest({ provider: 'TELEGRAM_STARS' })
+    expect((await POST(request)).status).toBe(403)
+    const response = await createPaymentForUser(paymentRequest({ provider: 'TELEGRAM_STARS' }), user.id, { telegramBot: true })
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual(expect.objectContaining({ provider: 'TELEGRAM_STARS', starsAmount: 100 }))
+    expect(mocks.miniAppBotCall).toHaveBeenCalledWith('createInvoiceLink', expect.objectContaining({
+      currency: 'XTR', provider_token: '', payload: 'avp:payment-1', prices: [{ label: 'Стандарт', amount: 100 }],
+    }))
+    expect(mocks.prisma.payment.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({
+      starsAmount: 100, starsRateKopecks: 300,
+    }) }))
     expect(mocks.createPayment).not.toHaveBeenCalled()
   })
 

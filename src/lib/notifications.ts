@@ -348,7 +348,7 @@ export async function notifyPaymentSucceeded(paymentId: string) {
     : visibleExpireAt
       ? `до ${formatDate(visibleExpireAt)}`
       : null
-  const title = isPaid ? (isRenewal ? 'Подписка продлена' : 'Подписка оплачена') : 'Пробный тариф активирован'
+  const title = isPaid ? (isRenewal ? 'Подписка продлена' : 'Подписка оплачена') : payment.providerStatus === 'CHANNEL_REWARD' ? 'Бонусные дни начислены' : 'Пробный тариф активирован'
   const body = [
     isPaid
       ? `${isRenewal ? 'Продление' : 'Оплата'} ${amount} за ${planName} прошло успешно.`

@@ -798,6 +798,8 @@ model Payment {
   externalPaymentId String?
   providerStatus    String?
   checkoutKey       String?
+  starsAmount       Int?
+  starsRateKopecks  Int?
 
   // Legacy-поля ЮKassa. Сохраняются для совместимости со старыми платежами.
   yookassaId      String?                @unique
@@ -867,6 +869,7 @@ enum PaymentProvider {
   YOOKASSA
   PAYANYWAY
   PLATEGA
+  TELEGRAM_STARS
   LOCAL
 }
 
@@ -1995,4 +1998,18 @@ enum AuditAction {
   USER_DEVICE_UNBOUND
   MOBILE_REFRESH_REUSE_DETECTED
   SYSTEM_BACKUP_CREATED
+}
+
+// Durable Telegram ID prevents claiming again after local account recreation.
+model TelegramChannelReferral {
+  referredTelegramId BigInt @id
+  referredUserId String @unique
+  referrerId String
+  channelId String
+  eligible Boolean
+  createdAt DateTime @default(now())
+  claimedAt DateTime?
+  referrerPaymentId String? @unique
+  referredPaymentId String? @unique
+  @@index([referrerId, claimedAt])
 }
