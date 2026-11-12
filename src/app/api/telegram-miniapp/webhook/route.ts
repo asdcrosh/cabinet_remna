@@ -1,6 +1,6 @@
 import { jsonResponse } from '@/lib/json-response'
 import { miniAppEnabled } from '@/lib/miniapp/config'
-import { handleMiniAppUpdate, isPaymentUpdate, telegramUpdateSchema, validWebhookSecret } from '@/lib/miniapp/bot'
+import { handleMiniAppUpdate, isPaymentUpdate, isUnsupportedCallback, telegramUpdateSchema, validWebhookSecret } from '@/lib/miniapp/bot'
 
 export const runtime = 'nodejs'
 export async function POST(req: Request) {
@@ -26,6 +26,7 @@ export async function POST(req: Request) {
   let value: unknown
   try { value = JSON.parse(raw) } catch { return jsonResponse({ error: 'Invalid JSON' }, { status: 400 }) }
   if (isPaymentUpdate(value)) return jsonResponse({ error: 'Payment update requires the existing handler' }, { status: 503 })
+  if (isUnsupportedCallback(value)) return jsonResponse({ error: 'Legacy callback requires the existing handler' }, { status: 503 })
   const parsed = telegramUpdateSchema.safeParse(value)
   if (!parsed.success) return jsonResponse({ error: 'Invalid update' }, { status: 400 })
   try {

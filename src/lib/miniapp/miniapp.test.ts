@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { buildRichScreen } from './rich-screens'
 import { channelCampaign, isChannelMember, isChannelReference } from './channel-referrals'
 import { miniAppDemo } from './model'
-import { isPaymentUpdate, telegramUpdateSchema, validWebhookSecret } from './bot'
+import { isPaymentUpdate, isUnsupportedCallback, telegramUpdateSchema, validWebhookSecret } from './bot'
 
 describe('Telegram Mini App boundaries', () => {
   it('requires the webhook secret and never acknowledges legacy payments', () => {
@@ -12,6 +12,8 @@ describe('Telegram Mini App boundaries', () => {
     expect(isPaymentUpdate({ pre_checkout_query: { id: 'q' } })).toBe(true)
     expect(isPaymentUpdate({ message: { successful_payment: { invoice_payload: 'legacy' } } })).toBe(true)
     expect(isPaymentUpdate({ message: { text: '/start' } })).toBe(false)
+    expect(isUnsupportedCallback({ callback_query: { data: 'buy_subscription' } })).toBe(true)
+    expect(isUnsupportedCallback({ callback_query: { data: 'avp:devices' } })).toBe(false)
     expect(telegramUpdateSchema.safeParse({ update_id: 1, message: { chat: { id: 123, type: 'private' }, from: { id: 123 }, text: '/start' } }).success).toBe(true)
   })
   it('accepts only current channel members', () => {
@@ -52,5 +54,10 @@ describe('Telegram Mini App boundaries', () => {
     expect(html).not.toContain('avp:buy:')
     expect(html).not.toContain('Stars')
     expect(html).toContain('остаток прежнего не переносится')
+  })
+  it('does not render an empty rich button row when optional features are off', () => {
+    const overview = { ...miniAppDemo, support: false, referrals: false }
+    const html = buildRichScreen({ screen: 'home', overview, appUrl: 'https://cabinet.example.test/miniapp' })
+    expect(html).not.toContain('<tg-button-row></tg-button-row>')
   })
 })

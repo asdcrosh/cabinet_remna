@@ -87,7 +87,8 @@ export function buildRichScreen(input: RichScreenInput) {
       break
   }
   if (input.screen === 'home') {
-    parts.push(row(...[...(data.referrals ? [cb('Пригласить друга', 'referrals')] : []), ...(data.support ? [cb('Поддержка', 'support')] : [])]))
+    const extraButtons = [...(data.referrals ? [cb('Пригласить друга', 'referrals')] : []), ...(data.support ? [cb('Поддержка', 'support')] : [])]
+    if (extraButtons.length) parts.push(row(...extraButtons))
   }
   parts.push('<hr>', row(cb('Главная', 'home'), cb('Обновить', input.screen, 'link')))
   return parts.join('')

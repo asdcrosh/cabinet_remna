@@ -31,6 +31,16 @@ export function isPaymentUpdate(value: unknown) {
   return Boolean(message && typeof message === 'object' && Reflect.has(message, 'successful_payment'))
 }
 
+// Old Remnashop messages remain in chats after a webhook switch. Never claim
+// their callbacks as handled until every legacy action has a migration path.
+export function isUnsupportedCallback(value: unknown) {
+  if (!value || typeof value !== 'object' || !Reflect.has(value, 'callback_query')) return false
+  const callback = Reflect.get(value, 'callback_query')
+  return !callback || typeof callback !== 'object' ||
+    typeof Reflect.get(callback, 'data') !== 'string' ||
+    !Reflect.get(callback, 'data').startsWith('avp:')
+}
+
 // No account details or subscription URLs in messages. The signed Mini App session is the boundary.
 export function welcomeMessage(section = 'home', referral?: string) {
   const url = new URL(miniAppUrl())
