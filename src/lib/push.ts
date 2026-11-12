@@ -31,6 +31,7 @@ export function pushCategory(type: NotificationType): PushCategory {
       return 'payments'
     case 'BROADCAST':
     case 'BONUS_GRANTED':
+    case 'PROMO_CODE_EXPIRING':
       return 'news'
     case 'ACCOUNT_SECURITY':
       return 'security'
@@ -89,6 +90,8 @@ export type PushInput = {
   title: string
   body: string
   actionHref?: string | null
+  singleDevice?: boolean
+  expiresAt?: Date
 }
 
 /**
@@ -110,6 +113,10 @@ export async function sendPushToUser(input: PushInput, fetchImpl: typeof fetch =
         ...(category === 'news' ? { newsAlerts: true } : {}),
       },
       select: { id: true, token: true },
+      ...(input.singleDevice ? {
+        orderBy: [{ mobileSession: { lastUsedAt: 'desc' } }, { updatedAt: 'desc' }, { id: 'asc' }],
+        take: 1,
+      } : {}),
     })
     if (tokens.length === 0) return 0
 
@@ -119,6 +126,8 @@ export async function sendPushToUser(input: PushInput, fetchImpl: typeof fetch =
     const dead: string[] = []
     await Promise.all(tokens.map(async ({ id, token }) => {
       try {
+        const remainingMs = input.expiresAt ? input.expiresAt.getTime() - Date.now() : null
+        if (remainingMs != null && remainingMs <= 0) return
         const response = await fetchImpl(url, {
           method: 'POST',
           headers: { Authorization: `Bearer ${access}`, 'Content-Type': 'application/json' },
@@ -129,6 +138,7 @@ export async function sendPushToUser(input: PushInput, fetchImpl: typeof fetch =
               data: { type: input.type, ...(input.actionHref ? { actionHref: input.actionHref } : {}) },
               android: {
                 priority: 'HIGH',
+                ...(remainingMs != null ? { ttl: `${Math.floor(remainingMs / 1000)}s` } : {}),
                 notification: { channel_id: PUSH_CHANNEL_ID },
               },
             },

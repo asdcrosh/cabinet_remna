@@ -3,6 +3,7 @@ import { pathToFileURL } from 'node:url'
 import { prisma } from '../src/lib/prisma'
 import { notifyTrafficLimit } from '../src/lib/notifications'
 import { reconcileSubscriptionExpiryNotifications } from '../src/lib/subscription-expiry-notifications'
+import { reconcilePromoExpiryReminders } from '../src/lib/promo-expiry-reminders'
 import { syncPaymentProvisioning } from '../src/lib/payment-sync'
 import { provisionPaymentSubscription } from '../src/lib/provisioning'
 import { syncCabinetPaymentToRemnashopBestEffort } from '../src/lib/remnashop-reverse-sync'
@@ -39,12 +40,16 @@ const subscriptionHealthBatchSize = readPositiveInt('SUBSCRIPTION_HEALTH_BATCH_S
 const adminTelegramBatchSize = readPositiveInt('ADMIN_TELEGRAM_NOTIFICATION_BATCH_SIZE', 20)
 const autoRenewalBatchSize = readPositiveInt('AUTO_RENEWAL_BATCH_SIZE', 20)
 const releaseCheckIntervalMs = readPositiveInt('RELEASE_CHECK_INTERVAL_SECONDS', 300) * 1000
+const promoExpiryRemindersEnabled = ['1', 'true', 'yes', 'on'].includes(
+  process.env.PROMO_EXPIRY_REMINDERS_ENABLED?.trim().toLowerCase() ?? '',
+)
 
 let stopped = false
 let wakeSleep: (() => void) | null = null
 let lastRemnashopUsersSyncAt = 0
 let lastSubscriptionHealthAt = 0
 let lastReleaseCheckAt = 0
+let promoReminderRun: Promise<void> | undefined
 
 async function main() {
   process.on('SIGTERM', stop)
@@ -65,6 +70,7 @@ async function main() {
     await sleep(intervalMs)
   }
 
+  await promoReminderRun
   await prisma.$disconnect()
   logInfo('payment_reconciler.stopped')
 }
@@ -151,6 +157,12 @@ async function runOnce() {
     batchSize: notificationBatchSize,
     shouldStop: () => stopped,
   }))
+  if (!stopped && !promoReminderRun && promoExpiryRemindersEnabled) {
+    promoReminderRun = runTask('promo_expiry.batch_failed', async () => {
+      const result = await reconcilePromoExpiryReminders({ batchSize: notificationBatchSize, shouldStop: () => stopped })
+      if (result.checked > 0) logInfo('promo_expiry.batch_finished', result)
+    }).finally(() => { promoReminderRun = undefined })
+  }
   await runTask('traffic_threshold.batch_failed', notifyTrafficThresholds)
 }
 
