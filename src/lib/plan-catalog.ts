@@ -23,6 +23,7 @@ export interface PlanCatalogOptions {
   /** Тариф по прямой ссылке (?plan=…): показываем, даже если он доступен только по ссылке. */
   linkedPlanId?: string
   initialPromoCode?: string
+  initialPromoPlanIds?: string[]
   whitelistAddonRequested?: boolean
   /**
    * Витрина приложения StealthNet: пробный тариф без Telegram, один на телефон.
@@ -230,7 +231,8 @@ export async function buildPlanCatalog(options: PlanCatalogOptions) {
       && plan.whitelistAddonEnabled
       && plan.whitelistAddonPriceKopecks > 0
       && plan.whitelistAddonInternalSquads.length > 0,
-    initialPromoCode,
+    initialPromoCode: options.initialPromoPlanIds && !options.initialPromoPlanIds.includes(plan.id)
+      ? undefined : initialPromoCode,
     availablePromoCodes: availablePromoCodesByPlan.get(plan.id) ?? [],
     personalDiscountPercent: user?.personalDiscountPercent ?? 0,
     nextPurchaseDiscountPercent: user?.nextPurchaseDiscountPercent ?? 0,
