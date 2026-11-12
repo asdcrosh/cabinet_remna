@@ -17,6 +17,8 @@ import { ReferralLinkCard } from '@/components/dashboard/referral-card'
 import { PageHeader } from '@/components/dashboard/page-header'
 import { CountUp } from '@/components/dashboard/count-up'
 import { isFeatureEnabled } from '@/lib/feature-flags'
+import { channelCampaign } from '@/lib/miniapp/channel-referrals'
+import { prisma } from '@/lib/prisma'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Пригласить друга' }
@@ -45,10 +47,24 @@ export default async function ReferralsPage({
     pages,
     referrals,
   } = await getReferralOverview(session.uid, page)
+  const channel = channelCampaign()
+  const channelStats = channel ? await Promise.all([
+    prisma.telegramChannelReferral.count({ where: { referrerId: session.uid } }),
+    prisma.telegramChannelReferral.count({ where: { referrerId: session.uid, claimedAt: { not: null } } }),
+  ]) : null
+  const channelBot = process.env.TELEGRAM_MINIAPP_BOT_USERNAME?.trim().replace(/^@/, '')
   if (page > pages) redirect(page === 1 ? '/dashboard/referrals' : `/dashboard/referrals?page=${pages}`)
 
   return (
     <div className="page-stack">
+      {channel && channelBot && channelStats && (
+        <section className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5 dark:border-emerald-500/20 dark:bg-emerald-500/10">
+          <h2 className="text-lg font-semibold">Пригласить в Telegram-канал</h2>
+          <p className="mt-2 text-sm">Новый пользователь приходит по вашей ссылке и вступает в канал. Вам {channel.referrerDays} дн., другу {channel.referredDays} дн. Лимит: {channel.cap} бонусов.</p>
+          <p className="mt-2 text-sm">Приглашено: {channelStats[0]} · Бонусов подтверждено: {channelStats[1]}</p>
+          <a className="btn-primary mt-4" href={`https://t.me/${channelBot}?start=ref_${referralCode}`} target="_blank" rel="noreferrer">Открыть приглашение в боте</a>
+        </section>
+      )}
       <PageHeader
         title="Пригласить друга"
         description={`Поделитесь ссылкой. ${referralConditionText(settings)}`}
