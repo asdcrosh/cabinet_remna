@@ -127,7 +127,8 @@ export async function handleMiniAppUpdate(update: z.infer<typeof telegramUpdateS
   const menu: Record<string, BotScreen> = { 'Моя подписка': 'subscription', 'Мои устройства': 'devices', 'Пригласить друга': 'referrals', 'Поддержка': 'support' }
   const menuScreen = menu[message.text || '']
   if (menuScreen && process.env.TELEGRAM_RICH_MESSAGES_ENABLED === 'true') {
-    await miniAppBotCall('sendRichMessage', { chat_id: message.chat.id, rich_message: { html: await getBotScreen(message.from.id, menuScreen) }, protect_content: true })
+    await miniAppBotCall('sendRichMessage', { chat_id: message.chat.id, rich_message: { html: await getBotScreen(message.from.id, menuScreen) },
+      protect_content: true, reply_markup: { remove_keyboard: true } })
     return
   }
   const command = message.text?.split(/\s+/)[0]?.split('@')[0]
