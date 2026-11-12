@@ -5,6 +5,7 @@ import { resolveSubscriptionPresentation } from '@/lib/subscription-presentation
 import { buildPlanCatalog } from '@/lib/plan-catalog'
 import type { MiniAppOverview } from './model'
 import { AuthError } from '@/lib/auth/guard'
+import { starsEnabled, starsRateKopecks } from './stars'
 
 export async function getMiniAppOverview(userId: string): Promise<MiniAppOverview> {
   const [user, features, catalog] = await Promise.all([
@@ -33,12 +34,14 @@ export async function getMiniAppOverview(userId: string): Promise<MiniAppOvervie
       usable: presentation.usable, daysLeft: presentation.daysLeft, expiresAt: presentation.expireAt?.toISOString() ?? null,
       planName: local?.plan?.name || 'AlekseevVP', deviceLimit: local?.plan?.unlimitedDevices ? null : local?.deviceLimit ?? local?.plan?.deviceLimit ?? null,
       pending: Boolean(local?.pendingSync) } : null,
-    deviceCount: user._count.devices, support: features.support, referrals: features.referrals, warning,
+    deviceCount: user._count.devices, support: features.support, referrals: features.referrals,
+    starsEnabled: starsEnabled(), starsRateKopecks: starsEnabled() ? starsRateKopecks() : null, warning,
     plans: catalog.plans.map(plan => ({ id: plan.id, name: plan.name, description: plan.description,
         days: plan.durationDays, unlimited: plan.unlimitedDuration, trafficLimitGb: plan.trafficLimitGb,
         devices: plan.deviceLimit, unlimitedDevices: plan.unlimitedDevices,
         maxDevices: plan.deviceAddonEnabled ? plan.maxDeviceLimit : plan.initialDeviceLimit,
         initialDevices: plan.initialDeviceLimit, deviceAddonEnabled: plan.deviceAddonEnabled,
+        extraDevicePriceKopecks: plan.extraDevicePriceKopecks, priceKopecks: plan.priceKopecks,
         isPromo: plan.isPromo, current: plan.current, isPlanSwitch: plan.isPlanSwitch,
         currentPlanName: plan.currentPlanName })),
   }

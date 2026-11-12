@@ -98,7 +98,7 @@ export const createPaymentSchema = z.object({
   purchaseType: z.enum(['SUBSCRIPTION', 'WHITELIST_ADDON', 'DEVICE_LIMIT_ADDON']).default('SUBSCRIPTION'),
   deviceLimit: z.coerce.number().int().min(1).max(100).optional(),
   promoCode: z.string().trim().min(1).max(64).optional(),
-  provider: z.enum(['YOOKASSA', 'PAYANYWAY', 'PLATEGA']).default('YOOKASSA'),
+  provider: z.enum(['YOOKASSA', 'PAYANYWAY', 'PLATEGA', 'TELEGRAM_STARS']).default('YOOKASSA'),
   idempotencyKey: z.string().uuid(),
   autoRenewalConsent: z.boolean().optional().default(false),
   autoRenewalConsentVersion: z.string().max(100).optional(),

@@ -52,8 +52,11 @@ export function buildRichScreen(input: RichScreenInput) {
         ['Срок', plan.unlimited ? 'Без ограничения' : `${plan.days} дней`],
         ['Устройства', plan.unlimitedDevices ? 'Без ограничения' : plan.deviceAddonEnabled ? `${plan.devices}–${plan.maxDevices}` : String(plan.initialDevices)],
         ['Трафик', plan.trafficLimitGb == null ? 'Без ограничения' : `${plan.trafficLimitGb} ГБ`],
-      ]))
-      parts.push('<p>Тарифы показаны для ознакомления. При продлении того же тарифа дни добавляются. При смене тарифа начинается новый срок, остаток прежнего не переносится.</p>', row(app('Подробности в приложении', 'plans')))
+      ]), ...(data.starsEnabled && data.starsRateKopecks ? [
+        `<p>${plan.isPromo ? 'Бесплатно' : `Базовая цена ${Math.ceil(plan.priceKopecks / data.starsRateKopecks)} Stars`}</p>`,
+        row(cb(plan.isPromo ? 'Получить доступ' : 'Оформить в Stars', `buy:${plan.id}`, 'success')),
+      ] : []))
+      parts.push('<p>При продлении того же тарифа дни добавляются. При смене тарифа начинается новый срок, остаток прежнего не переносится.</p>', row(app('Подробности в приложении', 'plans')))
       break
     case 'devices':
       parts.push('<p>Устройства и лимит общие с кабинетом.</p>')

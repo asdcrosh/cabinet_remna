@@ -796,6 +796,8 @@ model Payment {
   externalPaymentId String?
   providerStatus    String?
   checkoutKey       String?
+  starsAmount       Int?
+  starsRateKopecks  Int?
 
   // Legacy-поля ЮKassa. Сохраняются для совместимости со старыми платежами.
   yookassaId      String?                @unique
@@ -865,6 +867,7 @@ enum PaymentProvider {
   YOOKASSA
   PAYANYWAY
   PLATEGA
+  TELEGRAM_STARS
   LOCAL
 }
 

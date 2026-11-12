@@ -40,6 +40,8 @@ import {
 import { hasWhitelistAddonEntitlement } from '@/lib/whitelist-addon-policy'
 import { upsertLocalSubscriptionFromRemnawave } from '@/lib/remnawave-local-sync'
 import { findRemnashopUserByTelegramId } from '@/lib/telegram-link-sync'
+import { miniAppBotCall } from '@/lib/miniapp/bot-api'
+import { starsEnabled, starsForKopecks, starsInvoicePayload, starsRateKopecks } from '@/lib/miniapp/stars'
 import { isTrialDeviceUsed } from '@/lib/mobile-trial'
 import { hasVerifiedEmail, mobileEmailDeadline } from '@/lib/auth/mobile-email-policy'
 
@@ -76,7 +78,13 @@ export async function createPaymentForUser(
     deviceKey,
   } = parsed.data
 
-  if (options.telegramBot && (
+  if (provider === 'TELEGRAM_STARS' && (!options.telegramBot || !starsEnabled())) {
+    return jsonResponse({ error: 'Оплата Stars сейчас недоступна' }, { status: 403 })
+  }
+  if (provider === 'TELEGRAM_STARS' && (purchaseType !== 'SUBSCRIPTION' || autoRenewalConsent || whitelistAddon)) {
+    return jsonResponse({ error: 'Для Stars доступна покупка подписки без автопродления и дополнений' }, { status: 400 })
+  }
+  if (options.telegramBot && provider !== 'TELEGRAM_STARS' && (
     purchaseType !== 'WHITELIST_ADDON' || provider === 'PAYANYWAY'
     || promoCode || whitelistAddon || autoRenewalConsent
   )) {
@@ -576,7 +584,7 @@ export async function createPaymentForUser(
     })
   }
 
-  if (!(await isPaymentProviderAvailable(provider))) {
+  if (provider !== 'TELEGRAM_STARS' && !(await isPaymentProviderAvailable(provider))) {
     return jsonResponse(
       { error: paymentProviderUnavailableMessage(provider) },
       { status: 503 }
@@ -742,6 +750,30 @@ export async function createPaymentForUser(
     : isDeviceLimitAddon
       ? DEVICE_LIMIT_ADDON_RECEIPT_NAME
       : `${buildPaymentServiceName(plan.durationDays, plan.unlimitedDuration)}${includesBundledWhitelistAddon ? ` + ${WHITELIST_ADDON_RECEIPT_NAME}` : ''}`
+
+  if (provider === 'TELEGRAM_STARS') {
+    try {
+      const rate = starsRateKopecks()
+      const starsAmount = starsForKopecks(localPayment.amountKopecks, rate)
+      const confirmationUrl = await miniAppBotCall<string>('createInvoiceLink', {
+        title: plan.name.slice(0, 32),
+        description: description.slice(0, 255),
+        payload: starsInvoicePayload(localPayment.id),
+        provider_token: '', currency: 'XTR',
+        prices: [{ label: plan.name.slice(0, 32), amount: starsAmount }],
+      })
+      await prisma.payment.update({ where: { id: localPayment.id }, data: {
+        confirmationUrl, starsAmount, starsRateKopecks: rate,
+      } })
+      await recordPaymentEvent({ paymentId: localPayment.id, stage: 'PROVIDER', status: 'SUCCESS',
+        source: 'telegram-stars', message: 'Счёт Telegram Stars создан',
+        details: { starsAmount, starsRateKopecks: rate }, dedupeKey: 'provider-checkout-created' })
+      return jsonResponse({ confirmationUrl, localPaymentId: localPayment.id, provider, starsAmount })
+    } catch (error) {
+      await cancelFailedLocalPayment(localPayment.id, error instanceof Error ? error.message : 'Stars invoice failed')
+      return jsonResponse({ error: 'Не удалось создать счёт Stars. Повторите позже.' }, { status: 502 })
+    }
+  }
 
   if (provider === 'PAYANYWAY') {
     try {
@@ -919,7 +951,7 @@ function existingCheckoutResponse(
     purchaseType: 'SUBSCRIPTION' | 'WHITELIST_ADDON' | 'DEVICE_LIMIT_ADDON'
     deviceLimit: number
     promoCode?: string
-    provider: 'YOOKASSA' | 'PAYANYWAY' | 'PLATEGA'
+    provider: 'YOOKASSA' | 'PAYANYWAY' | 'PLATEGA' | 'TELEGRAM_STARS'
     autoRenewalConsent: boolean
     whitelistAddon: boolean
   }
@@ -972,6 +1004,7 @@ function existingCheckoutResponse(
     paymentId: payment.externalPaymentId ?? payment.yookassaId ?? payment.id,
     localPaymentId: payment.id,
     provider: payment.provider,
+    ...(payment.provider === 'TELEGRAM_STARS' ? { starsAmount: payment.starsAmount } : {}),
     idempotent: true,
   })
 }
@@ -988,6 +1021,7 @@ function pendingCheckoutResponse(payment: Payment) {
     paymentId: payment.externalPaymentId ?? payment.yookassaId ?? payment.id,
     localPaymentId: payment.id,
     provider: payment.provider,
+    ...(payment.provider === 'TELEGRAM_STARS' ? { starsAmount: payment.starsAmount } : {}),
     resumed: true,
   })
 }

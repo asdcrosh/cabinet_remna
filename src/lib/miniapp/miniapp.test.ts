@@ -2,7 +2,8 @@ import { describe, expect, it, vi } from 'vitest'
 import { buildRichScreen } from './rich-screens'
 import { channelCampaign, isChannelMember, isChannelReference } from './channel-referrals'
 import { miniAppDemo } from './model'
-import { isPaymentUpdate, isUnsupportedCallback, telegramUpdateSchema, validWebhookSecret } from './bot'
+import { isMiniAppOwnedUpdate, isPaymentUpdate, isUnsupportedPaymentUpdate, isUnsupportedCallback, telegramUpdateSchema, validWebhookSecret } from './bot'
+import { starsForKopecks } from './stars'
 
 describe('Telegram Mini App boundaries', () => {
   it('requires the webhook secret and never acknowledges legacy payments', () => {
@@ -11,9 +12,16 @@ describe('Telegram Mini App boundaries', () => {
     expect(validWebhookSecret('b'.repeat(48), secret)).toBe(false)
     expect(isPaymentUpdate({ pre_checkout_query: { id: 'q' } })).toBe(true)
     expect(isPaymentUpdate({ message: { successful_payment: { invoice_payload: 'legacy' } } })).toBe(true)
+    expect(isUnsupportedPaymentUpdate({ message: { successful_payment: { invoice_payload: 'legacy' } } })).toBe(true)
+    expect(isUnsupportedPaymentUpdate({ message: { successful_payment: { invoice_payload: 'avp:ck12345678901234567890' } } })).toBe(false)
     expect(isPaymentUpdate({ message: { text: '/start' } })).toBe(false)
     expect(isUnsupportedCallback({ callback_query: { data: 'buy_subscription' } })).toBe(true)
     expect(isUnsupportedCallback({ callback_query: { data: 'avp:devices' } })).toBe(false)
+    expect(isMiniAppOwnedUpdate({ callback_query: { data: 'buy_subscription' } })).toBe(false)
+    expect(isMiniAppOwnedUpdate({ callback_query: { data: 'avp:devices' } })).toBe(true)
+    expect(isMiniAppOwnedUpdate({ message: { text: '/start legacy_campaign' } })).toBe(false)
+    expect(isMiniAppOwnedUpdate({ message: { text: '/start ref_ABC123' } })).toBe(true)
+    expect(isMiniAppOwnedUpdate({ message: { text: '/support' } })).toBe(true)
     expect(telegramUpdateSchema.safeParse({ update_id: 1, message: { chat: { id: 123, type: 'private' }, from: { id: 123 }, text: '/start' } }).success).toBe(true)
   })
   it('accepts only current channel members', () => {
@@ -45,15 +53,19 @@ describe('Telegram Mini App boundaries', () => {
     expect(html).not.toContain('subscriptionUrl')
     expect(html).toContain('Переименовать или удалить')
   })
-  it('shows Cabinet tariff terms without Telegram checkout', () => {
+  it('shows Cabinet tariff terms with Stars checkout when enabled', () => {
     const overview = { ...miniAppDemo, plans: [{ ...miniAppDemo.plans[0]!, isPlanSwitch: true,
       current: false, trafficLimitGb: 100 }] }
     const html = buildRichScreen({ screen: 'plans', overview, appUrl: 'https://cabinet.example.test/miniapp' })
     expect(html).toContain('100 ГБ')
-    expect(html).toContain('Тарифы показаны для ознакомления')
-    expect(html).not.toContain('avp:buy:')
-    expect(html).not.toContain('Stars')
+    expect(html).toContain('Базовая цена 100 Stars')
+    expect(html).toContain('avp:buy:demo')
     expect(html).toContain('остаток прежнего не переносится')
+  })
+  it('rounds the configured ruble price up to whole Stars', () => {
+    expect(starsForKopecks(30_000, 300)).toBe(100)
+    expect(starsForKopecks(30_001, 300)).toBe(101)
+    expect(() => starsForKopecks(0, 300)).toThrow()
   })
   it('does not render an empty rich button row when optional features are off', () => {
     const overview = { ...miniAppDemo, support: false, referrals: false }

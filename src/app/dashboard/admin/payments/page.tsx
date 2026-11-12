@@ -31,7 +31,7 @@ export default async function AdminPaymentsPage({
   const q = params.q?.trim() ?? ''
   const returnTo = sanitizeAdminSupportReturnPath(params.returnTo)
   const status = parseEnum(params.status, ['PENDING', 'SUCCEEDED', 'CANCELED', 'REFUNDED'] as const)
-  const provider = parseEnum(params.provider, ['YOOKASSA', 'PAYANYWAY', 'PLATEGA', 'LOCAL'] as const)
+  const provider = parseEnum(params.provider, ['YOOKASSA', 'PAYANYWAY', 'PLATEGA', 'TELEGRAM_STARS', 'LOCAL'] as const)
   const delivery = parseEnum(params.delivery, ['DELIVERED', 'RETRY'] as const)
   const range = parseEnum(params.range, ['TODAY', '7D', '30D', 'CUSTOM'] as const)
   const { from, to } = resolveDateRange(range, params.from, params.to)

@@ -33,6 +33,8 @@ export function MiniApp({ demo = false }: { demo?: boolean }) {
   const [tickets, setTickets] = useState<SupportTicket[] | null>(null)
   const [subscriptionUrl, setSubscriptionUrl] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+  const [selectedLimits, setSelectedLimits] = useState<Record<string, number>>({})
+  const [promoCodes, setPromoCodes] = useState<Record<string, string>>({})
 
   useEffect(() => {
     if (demo) return
@@ -110,6 +112,26 @@ export function MiniApp({ demo = false }: { demo?: boolean }) {
     try { await navigator.clipboard.writeText(referrals.url); setCopied(true) }
     catch { setError('Не удалось скопировать. Выделите ссылку и скопируйте вручную.') }
   }
+  async function buyPlan(plan: MiniAppOverview['plans'][number]) {
+    if (demo) { setNotice('Это демонстрация. Счёт не создаётся.'); return }
+    const webApp = window.Telegram?.WebApp
+    if (!webApp?.openInvoice) { setError('Откройте приложение внутри Telegram для оплаты Stars.'); return }
+    setBusy(true); setError(''); setNotice('')
+    try {
+      const result = await request<{ confirmationUrl?: string; starsAmount?: number; redirectUrl?: string }>('/api/miniapp/checkout', {
+        planId: plan.id, purchaseType: 'SUBSCRIPTION', provider: 'TELEGRAM_STARS',
+        deviceLimit: selectedLimits[plan.id] ?? plan.initialDevices, idempotencyKey: crypto.randomUUID(),
+        ...(promoCodes[plan.id]?.trim() ? { promoCode: promoCodes[plan.id]!.trim() } : {}),
+      })
+      if (result.redirectUrl) { setNotice('Ознакомительный доступ оформлен. Обновите подписку.'); await refresh(); return }
+      if (!result.confirmationUrl) throw new Error('Ссылка на счёт не получена')
+      webApp.openInvoice(result.confirmationUrl, status => {
+        if (status === 'paid') { setNotice('Оплата подтверждена. Подписка обновится после выдачи.'); void refresh() }
+        else if (status === 'failed') setError('Оплата не завершилась. Попробуйте ещё раз.')
+      })
+    } catch (e) { setError(e instanceof Error ? e.message : 'Не удалось создать счёт') }
+    finally { setBusy(false) }
+  }
   const sub = data?.subscription
   const date = sub?.expiresAt ? new Date(sub.expiresAt).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' }) : 'Без ограничения срока'
   const visibleTabs = tabs.filter(item => (item.id !== 'support' || data?.support) && (item.id !== 'referrals' || data?.referrals))
@@ -141,8 +163,19 @@ export function MiniApp({ demo = false }: { demo?: boolean }) {
               {plan.description && <p>{plan.description}</p>}
               {plan.isPlanSwitch && <p className={styles.planNote}>При смене тарифа начнётся новый срок. Оставшиеся дни текущего тарифа не переносятся.</p>}
             </div>
+            {data.starsEnabled && data.starsRateKopecks && <div className={styles.planBuy}>
+              {plan.deviceAddonEnabled && !plan.unlimitedDevices && <label>Количество устройств
+                <select value={selectedLimits[plan.id] ?? plan.initialDevices} onChange={e => setSelectedLimits(previous => ({ ...previous, [plan.id]: Number(e.target.value) }))}>
+                  {Array.from({ length: plan.maxDevices - plan.devices + 1 }, (_, index) => plan.devices + index).map(limit =>
+                    <option key={limit} value={limit}>{limit}</option>)}
+                </select></label>}
+              <div className={styles.planPrice}>{plan.isPromo ? 'Бесплатно' : `${Math.ceil((plan.priceKopecks + Math.max(0, (selectedLimits[plan.id] ?? plan.initialDevices) - plan.devices) * plan.extraDevicePriceKopecks) / data.starsRateKopecks)} Stars`}</div>
+              {!plan.isPromo && <input className={styles.linkInput} aria-label={`Промокод для ${plan.name}`} placeholder="Промокод, если есть" value={promoCodes[plan.id] ?? ''} onChange={e => setPromoCodes(previous => ({ ...previous, [plan.id]: e.target.value }))} />}
+              <p>Курс: 1 Star = {(data.starsRateKopecks / 100).toLocaleString('ru-RU')} ₽. Это цена до скидки. Итоговая сумма появится в счёте; подписка продлится по правилам кабинета.</p>
+              <button className={styles.primary} disabled={busy} onClick={() => void buyPlan(plan)}>{plan.isPromo ? 'Получить доступ' : 'Оплатить Stars'}<ArrowUpRight size={18} /></button>
+            </div>}
             </article>)}
-          <p className={styles.footnote}>Раздел показывает условия без оформления заказа. Оплата в рублях через ЮKassa работает на самостоятельном сайте кабинета. После изменения подписки обновите данные здесь.</p>
+          <p className={styles.footnote}>В Telegram оплата цифровой подписки проходит в Stars. На самостоятельном сайте кабинета остаётся оплата в рублях через ЮKassa.</p>
         </section>}
         {tab === 'devices' && <section><Heading eyebrow="ПОДКЛЮЧЕНИЯ" title="Ваши устройства" description="Одно подключение для всех ваших экранов." />
           {demo ? <div className={styles.card}><div className={styles.device}><Smartphone /><span><b>iPhone</b><small>iOS · Rabbit Hole</small></span><Check /></div><div className={styles.device}><Smartphone /><span><b>MacBook</b><small>macOS · Rabbit Hole</small></span><Check /></div></div> : <DevicesList embedded deviceLimit={sub?.deviceLimit} />}

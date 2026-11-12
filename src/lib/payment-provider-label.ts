@@ -5,6 +5,7 @@ export function paymentProviderLabel(provider: PaymentProvider) {
     YOOKASSA: 'ЮKassa',
     PAYANYWAY: 'PayAnyWay',
     PLATEGA: 'Platega',
+    TELEGRAM_STARS: 'Telegram Stars',
     LOCAL: 'Без оплаты',
   }
   return labels[provider]
