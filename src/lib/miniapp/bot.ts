@@ -12,6 +12,7 @@ import { createPaymentForUser } from '@/lib/payment-checkout'
 import { withDistributedLock } from '@/lib/distributed-lock'
 import { rateLimit } from '@/lib/rate-limit'
 import { answerStarsPreCheckout, isOurStarsPayload, refundStarsPayment, settleStarsPayment } from './stars-payments'
+import { displayCallbackScreen } from './callback-screen'
 
 const user = z.object({ id: z.number().int().positive().safe() })
 export const telegramUpdateSchema = z.object({
@@ -102,7 +103,8 @@ export async function handleMiniAppUpdate(update: z.infer<typeof telegramUpdateS
   const callback = update.callback_query
   if (callback?.data?.startsWith('avp:')) {
     if (!callback.message || callback.message.chat.type !== 'private' || callback.message.chat.id !== callback.from.id) return
-    await miniAppBotCall('answerCallbackQuery', { callback_query_id: callback.id })
+    // Expired callback acknowledgements must not prevent the screen from opening.
+    await miniAppBotCall('answerCallbackQuery', { callback_query_id: callback.id }).catch(() => {})
     const action = callback.data.slice(4)
     if (action.startsWith('buy:')) {
       await sendStarsInvoiceFromBot(callback.from.id, callback.id, action.slice(4))
@@ -118,8 +120,7 @@ export async function handleMiniAppUpdate(update: z.infer<typeof telegramUpdateS
       } catch (e) { notice = e instanceof Error ? e.message : 'Операция временно недоступна' }
     }
     const html = await getBotScreen(callback.from.id, screen, notice)
-    await miniAppBotCall('editMessageText', { chat_id: callback.from.id, message_id: callback.message.message_id, rich_message: { html },
-      reply_markup: { inline_keyboard: [[{ text: 'Открыть приложение', web_app: { url: miniAppUrl() } }]] } })
+    await displayCallbackScreen(callback.from.id, callback.message.message_id, html, miniAppUrl())
     return
   }
   const message = update.message
