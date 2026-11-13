@@ -311,6 +311,25 @@ export function BonusBoxPrizesAdmin({
               fieldMax={12}
               onFieldChange={(value) => setSettingsForm((current) => ({ ...current, activePromoRewardsLimit: value }))}
             />
+            <SettingsCard
+              title="Объединение промокодов"
+              description="Пользователь меняет несколько своих промокодов из рулетки на один: max(лучший, ⌊сумма × коэффициент⌋), не выше потолка."
+              checked={settingsForm.promoMergeEnabled}
+              onToggle={(checked) => setSettingsForm((current) => ({ ...current, promoMergeEnabled: checked }))}
+              fieldLabel="Потолок скидки, %"
+              fieldValue={settingsForm.promoMergeCapPercent}
+              fieldMin={5}
+              fieldMax={99}
+              fieldDisabled={!settingsForm.promoMergeEnabled}
+              onFieldChange={(value) => setSettingsForm((current) => ({ ...current, promoMergeCapPercent: value }))}
+              extraField={{
+                label: 'Коэффициент суммы, %',
+                value: settingsForm.promoMergeCoefficient,
+                min: 10,
+                max: 100,
+                onChange: (value) => setSettingsForm((current) => ({ ...current, promoMergeCoefficient: value })),
+              }}
+            />
           </div>
           <div className="mt-3 flex justify-end">
             <button type="button" className="btn-primary w-full justify-center sm:w-auto" onClick={saveSettings} disabled={settingsLoading}>
@@ -1104,6 +1123,7 @@ function SettingsCard({
   fieldMax,
   fieldDisabled = false,
   onFieldChange,
+  extraField,
 }: {
   title: string
   description: string
@@ -1115,6 +1135,7 @@ function SettingsCard({
   fieldMax: number
   fieldDisabled?: boolean
   onFieldChange: (value: number) => void
+  extraField?: { label: string; value: number; min: number; max: number; onChange: (value: number) => void }
 }) {
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.035]">
@@ -1136,6 +1157,20 @@ function SettingsCard({
           disabled={fieldDisabled}
         />
       </label>
+      {extraField && (
+        <label className={cn('mt-3 block', fieldDisabled && 'opacity-55')}>
+          <span className="mb-1.5 block text-sm font-semibold text-slate-700 dark:text-slate-200">{extraField.label}</span>
+          <input
+            type="number"
+            min={extraField.min}
+            max={extraField.max}
+            value={extraField.value}
+            onChange={(event) => extraField.onChange(Number(event.target.value))}
+            className="input h-12 bg-slate-50 text-base font-semibold dark:bg-surface-900"
+            disabled={fieldDisabled}
+          />
+        </label>
+      )}
     </div>
   )
 }

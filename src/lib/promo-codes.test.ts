@@ -231,6 +231,28 @@ describe('promo code helpers', () => {
     ).rejects.toMatchObject({ code: 'PROMO_USER_NOT_ALLOWED' })
   })
 
+  it('lets only the owner use a merged roulette promo code', async () => {
+    const promoCodeMerge = { findUnique: vi.fn() }
+    const withMerges = { ...prisma, promoCodeMerge }
+    prisma.promoCode.findUnique.mockResolvedValue(promoCode({ id: 'merged-1', audience: 'PERSONAL', allowedEmails: [] }))
+    prisma.promoCodeRedemption.count.mockResolvedValue(0)
+    prisma.user.findUnique.mockResolvedValue({ email: 'owner@example.com', remnashopUserId: null })
+
+    promoCodeMerge.findUnique.mockResolvedValue({ userId: 'user-1' })
+    await expect(
+      validatePromoCodeForPlan({ prisma: withMerges, code: 'SALE20', userId: 'user-1', plan })
+    ).resolves.toMatchObject({ discountPercent: 20 })
+    expect(promoCodeMerge.findUnique).toHaveBeenCalledWith({
+      where: { resultPromoCodeId: 'merged-1' },
+      select: { userId: true },
+    })
+
+    promoCodeMerge.findUnique.mockResolvedValue({ userId: 'someone-else' })
+    await expect(
+      validatePromoCodeForPlan({ prisma: withMerges, code: 'SALE20', userId: 'user-1', plan })
+    ).rejects.toMatchObject({ code: 'PROMO_USER_NOT_ALLOWED' })
+  })
+
   it('rejects a new-user promo code for an existing user', async () => {
     prisma.promoCode.findUnique.mockResolvedValue(promoCode({ audience: 'NEW_USERS' }))
     prisma.user.findUnique.mockResolvedValue({
