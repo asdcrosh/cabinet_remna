@@ -22,7 +22,7 @@ export async function getBotScreenInput(telegramId: number, screen: BotScreen, n
   const appUrl = new URL(miniAppUrl())
   if (referralCode) appUrl.searchParams.set('ref', referralCode)
   const input: RichScreenInput = { screen, appUrl: appUrl.toString(), overview: user ? await getMiniAppOverview(user.id) : null,
-    bannerUrl: process.env.TELEGRAM_MINIAPP_BANNER_URL || new URL('/miniapp/banner.png?v=2', appUrl).toString(), notice,
+    bannerUrl: process.env.TELEGRAM_MINIAPP_BANNER_URL || new URL('/miniapp/banner.png?v=3', appUrl).toString(), notice,
     admin: Boolean(user && user.role !== 'USER') }
   if (user && input.overview) {
     if (screen === 'devices' && hasRemnawaveUserReference(user)) {
