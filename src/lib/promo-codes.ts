@@ -1,4 +1,5 @@
 import type { Plan, Prisma } from '@prisma/client'
+import { isMergedPromoCodeOwner } from './promo-code-merge'
 import { logWarn } from './logger'
 import { remnashopQuery } from './remnashop-db'
 
@@ -11,6 +12,7 @@ type PromoCodeWithPlans = Prisma.PromoCodeGetPayload<{
 
 type PromoPrisma = Pick<Prisma.TransactionClient, 'promoCode' | 'promoCodeRedemption' | 'user' | 'subscription' | 'payment'>
 type PromoAudiencePrisma = Pick<Prisma.TransactionClient, 'user' | 'subscription' | 'payment'>
+  & Partial<Pick<Prisma.TransactionClient, 'promoCodeMerge'>>
 
 export class PromoCodeError extends Error {
   constructor(
@@ -148,7 +150,7 @@ async function assertPromoCodeAudienceCanBeUsed({
   now,
 }: {
   prisma: PromoAudiencePrisma
-  promoCode: Pick<PromoCodeWithPlans, 'audience' | 'allowedEmails'>
+  promoCode: Pick<PromoCodeWithPlans, 'audience' | 'allowedEmails'> & { id?: string }
   userId: string
   now: Date
 }) {
@@ -168,10 +170,14 @@ async function assertPromoCodeAudienceCanBeUsed({
 
   if (promoCode.audience === 'PERSONAL') {
     const allowedEmails = new Set(promoCode.allowedEmails.map((email) => email.trim().toLowerCase()))
-    if (!allowedEmails.has(user.email.toLowerCase())) {
-      throw new PromoCodeError('Промокод доступен только выбранным пользователям', 403, 'PROMO_USER_NOT_ALLOWED')
-    }
-    return
+    if (allowedEmails.has(user.email.toLowerCase())) return
+    // Объединённый код из рулетки принадлежит тому, кто его собрал.
+    if (promoCode.id && prisma.promoCodeMerge && await isMergedPromoCodeOwner(
+      { promoCodeMerge: prisma.promoCodeMerge },
+      promoCode.id,
+      userId
+    )) return
+    throw new PromoCodeError('Промокод доступен только выбранным пользователям', 403, 'PROMO_USER_NOT_ALLOWED')
   }
 
   if (promoCode.audience === 'NEW_USERS') {

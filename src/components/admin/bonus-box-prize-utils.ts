@@ -6,6 +6,9 @@ export type BonusBoxSettingsAdminRow = {
   pityOpenings: number
   showBestRecentOpening: boolean
   activePromoRewardsLimit: number
+  promoMergeEnabled: boolean
+  promoMergeCoefficient: number
+  promoMergeCapPercent: number
 }
 
 export type BonusBoxPrizeAdminRow = {

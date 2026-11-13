@@ -44,6 +44,9 @@ export type BonusBoxConfigView = {
   pityOpenings: number;
   showBestRecentOpening: boolean;
   activePromoRewardsLimit: number;
+  promoMergeEnabled?: boolean;
+  promoMergeCoefficient?: number;
+  promoMergeCapPercent?: number;
 };
 
 export type BonusBoxPityProgress = {
@@ -113,6 +116,7 @@ export type BonusBoxOverview = {
   openingStreak: BonusBoxOpeningStreak;
   bestRecentOpening: BestRecentOpeningView | null;
   activePromoRewards: ActivePromoRewardView[];
+  promoMerge?: PromoMergeView;
   missions: BonusBoxMissionView[];
   events: BonusBoxEventView[];
   prizes: BonusBoxPrizeView[];
@@ -132,3 +136,32 @@ export type OpenBoxResponse = {
 };
 
 export type BonusBoxTab = "missions" | "outcomes" | "history";
+
+export type PromoMergeCodeView = {
+  id: string;
+  code: string;
+  discountPercent: number;
+  expiresAt: string;
+  rarity: BonusBoxPrizeView["rarity"];
+  merged: boolean;
+  mergeable: boolean;
+  reason: "AT_CAP" | "RESTRICTED" | null;
+};
+
+export type PromoMergeView = {
+  enabled: boolean;
+  coefficientPercent: number;
+  capPercent: number;
+  ttlDays: number;
+  minCodes: number;
+  maxCodes: number;
+  canMerge: boolean;
+  codes: PromoMergeCodeView[];
+};
+
+export type PromoMergeResponse = {
+  promoCode: PromoMergeCodeView;
+  sourcePercents: number[];
+  bestSourcePercent: number;
+  replayed: boolean;
+};

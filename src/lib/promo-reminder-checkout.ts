@@ -15,6 +15,7 @@ export function promoReminderRecipients(id: string, allowedEmails: string[]): Pr
     OR: [
       { bonusBoxOpenings: { some: { promoCodeId: id } } },
       { welcomeBonusRedemptions: { some: { promoCodeId: id, type: 'PROMO_CODE' } } },
+      { promoCodeMerges: { some: { resultPromoCodeId: id } } },
       ...(emails.length > 0 ? [{ email: { in: emails, mode: 'insensitive' as const } }] : []),
     ],
   }

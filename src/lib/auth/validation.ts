@@ -266,6 +266,9 @@ export const adminBonusBoxSettingsSchema = z.object({
   pityOpenings: z.coerce.number().int().min(2, 'Минимум 2 открытия').max(100, 'Максимум 100 открытий'),
   showBestRecentOpening: z.boolean().default(true),
   activePromoRewardsLimit: z.coerce.number().int().min(0).max(12, 'Максимум 12 промокодов'),
+  promoMergeEnabled: z.boolean().default(true),
+  promoMergeCoefficient: z.coerce.number().int().min(10, 'Минимум 10%').max(100, 'Максимум 100%').default(70),
+  promoMergeCapPercent: z.coerce.number().int().min(5, 'Минимум 5%').max(99, 'Максимум 99%').default(30),
 })
 
 const adminPlanBaseSchema = z.object({

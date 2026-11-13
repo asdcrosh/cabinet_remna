@@ -137,6 +137,7 @@ model User {
   oauthAccounts              OAuthAccount[]
   bonusBoxAttempts           BonusBoxAttempt[]
   bonusBoxOpenings           BonusBoxOpening[]
+  promoCodeMerges            PromoCodeMerge[]
   bonusBoxMissionProgress    BonusBoxMissionProgress[]
   nodeProvisioningJobs       NodeProvisioningJob[]       @relation("NodeProvisioningJobCreator")
   bonusBoxEventClaims        BonusBoxEventClaim[]
@@ -1204,6 +1205,7 @@ model PromoCode {
   personalOfferSettings   PersonalOfferSetting[]
   welcomeBonusSettings    WelcomeBonusSetting[]
   welcomeBonusRedemptions WelcomeBonusRedemption[]
+  mergeResult             PromoCodeMerge?
   reminders               PromoCodeReminder[]
 
   @@index([isActive, startsAt, expiresAt])
@@ -1261,6 +1263,26 @@ model PromoCodePlan {
 
   @@id([promoCodeId, planId])
   @@index([planId])
+}
+
+/// Объединение промокодов из рулетки: несколько кодов пользователя → один код сильнее.
+model PromoCodeMerge {
+  id                 String   @id @default(cuid())
+  userId             String
+  resultPromoCodeId  String   @unique
+  idempotencyKey     String
+  sourcePromoCodeIds String[]
+  sourceCodes        String[]
+  sourcePercents     Int[]
+  coefficientPercent Int
+  capPercent         Int
+  createdAt          DateTime @default(now())
+
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  resultPromo PromoCode @relation(fields: [resultPromoCodeId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, idempotencyKey])
+  @@index([userId, createdAt])
 }
 
 model PromoCodeRedemption {
@@ -1742,6 +1764,9 @@ model BonusBoxSetting {
   pityOpenings            Int      @default(10)
   showBestRecentOpening   Boolean  @default(true)
   activePromoRewardsLimit Int      @default(3)
+  promoMergeEnabled       Boolean  @default(true)
+  promoMergeCoefficient   Int      @default(70)
+  promoMergeCapPercent    Int      @default(30)
   createdAt               DateTime @default(now())
   updatedAt               DateTime @updatedAt
 }
@@ -1967,6 +1992,7 @@ enum AuditAction {
   PERSONAL_OFFER_UPDATED
   PROMO_CODE_CREATED
   PROMO_CODE_UPDATED
+  PROMO_CODE_MERGED
   GIFT_CERTIFICATE_CREATED
   GIFT_CERTIFICATE_UPDATED
   PAYMENT_SYNCED
