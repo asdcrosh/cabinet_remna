@@ -24,6 +24,28 @@ describe('legacy Telegram webhook bridge', () => {
       }) }))
   })
 
+  it('retries a temporary gateway error and keeps the original update unchanged', async () => {
+    vi.stubEnv('APP_URL', 'https://cabinet.example.test')
+    vi.stubEnv('TELEGRAM_LEGACY_WEBHOOK_URL', 'https://legacy.example.test/api/v1/telegram')
+    vi.stubEnv('TELEGRAM_LEGACY_WEBHOOK_SECRET', 'a'.repeat(48))
+    const send = vi.fn().mockResolvedValueOnce({ ok: false, status: 502 }).mockResolvedValueOnce({ ok: true, status: 200 })
+    vi.stubGlobal('fetch', send)
+    const raw = '{"update_id":8,"callback_query":{"data":"old"}}'
+    expect(await forwardLegacyTelegramUpdate(raw)).toBe(true)
+    expect(send).toHaveBeenCalledTimes(2)
+    expect(send.mock.calls.every(([, options]) => options.body === raw)).toBe(true)
+  })
+
+  it('leaves an unavailable legacy update for Telegram to retry', async () => {
+    vi.stubEnv('APP_URL', 'https://cabinet.example.test')
+    vi.stubEnv('TELEGRAM_LEGACY_WEBHOOK_URL', 'https://legacy.example.test/api/v1/telegram')
+    vi.stubEnv('TELEGRAM_LEGACY_WEBHOOK_SECRET', 'a'.repeat(48))
+    const send = vi.fn().mockResolvedValue({ ok: false, status: 502 })
+    vi.stubGlobal('fetch', send)
+    expect(await forwardLegacyTelegramUpdate('{"update_id":9}')).toBe(false)
+    expect(send).toHaveBeenCalledTimes(3)
+  })
+
   it('rejects a loop or unencrypted receiver', async () => {
     vi.stubEnv('APP_URL', 'https://cabinet.example.test')
     vi.stubEnv('TELEGRAM_LEGACY_WEBHOOK_SECRET', 'a'.repeat(48))

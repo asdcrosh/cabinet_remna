@@ -8,8 +8,16 @@ export async function forwardLegacyTelegramUpdate(raw: string) {
   if (url.protocol !== 'https:' || url.username || url.password || url.hash) throw new Error('Invalid legacy webhook URL')
   const own = new URL('/api/telegram-miniapp/webhook', process.env.APP_URL)
   if (url.toString() === own.toString()) throw new Error('Legacy webhook points to the Mini App')
-  const response = await fetch(url, { method: 'POST', headers: {
-    'Content-Type': 'application/json', 'x-telegram-bot-api-secret-token': secret,
-  }, body: raw, signal: AbortSignal.timeout(7_000), cache: 'no-store', redirect: 'error' })
-  return response.ok
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const response = await fetch(url, { method: 'POST', headers: {
+        'Content-Type': 'application/json', 'x-telegram-bot-api-secret-token': secret,
+      }, body: raw, signal: AbortSignal.timeout(2_500), cache: 'no-store', redirect: 'error' })
+      if (response.ok) return true
+      if (![502, 503, 504].includes(response.status)) return false
+    } catch {
+      // A failed connection may recover on another backend instance.
+    }
+  }
+  return false
 }
