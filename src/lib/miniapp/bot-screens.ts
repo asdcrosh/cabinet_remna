@@ -1,11 +1,12 @@
 import { prisma } from '@/lib/prisma'
 import { getMiniAppOverview } from './overview'
-import { buildRichScreen, type BotScreen, type RichScreenInput } from './rich-screens'
+import { buildRichScreen, buildRichPaymentScreen, type BotScreen, type RichScreenInput } from './rich-screens'
 import { miniAppUrl } from './config'
 import { channelCampaign } from './channel-referrals'
 import { ensureUserReferralCode } from '@/lib/referrals'
 import { syncLocalDevicesFromRemnawave } from '@/lib/remnawave-device-sync'
 import { hasRemnawaveUserReference, remnawaveUserReference } from '@/lib/remnawave'
+import { isYookassaConfigured } from '@/lib/yookassa'
 
 export async function getBotScreenInput(telegramId: number, screen: BotScreen, notice?: string, referralCode?: string): Promise<RichScreenInput> {
   const user = await prisma.user.findUnique({ where: { telegramId: BigInt(telegramId) } })
@@ -46,4 +47,11 @@ export async function getBotScreenInput(telegramId: number, screen: BotScreen, n
 
 export async function getBotScreen(telegramId: number, screen: BotScreen, notice?: string, referralCode?: string) {
   return buildRichScreen(await getBotScreenInput(telegramId, screen, notice, referralCode))
+}
+
+export async function getBotPaymentScreen(telegramId: number, planId: string) {
+  const [input, yookassaAvailable] = await Promise.all([
+    getBotScreenInput(telegramId, 'plans'), isYookassaConfigured(),
+  ])
+  return buildRichPaymentScreen(input, planId, yookassaAvailable)
 }

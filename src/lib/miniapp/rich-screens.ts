@@ -1,5 +1,6 @@
 import { escapeTelegramHtml as escape } from '@/lib/telegram-format'
 import type { MiniAppOverview } from './model'
+import { formatPrice } from '@/lib/format'
 
 export type BotScreen = 'home' | 'subscription' | 'plans' | 'devices' | 'referrals' | 'support' | 'connect'
 export const botScreens: BotScreen[] = ['home', 'subscription', 'plans', 'devices', 'referrals', 'support', 'connect']
@@ -52,10 +53,8 @@ export function buildRichScreen(input: RichScreenInput) {
         ['Срок', plan.unlimited ? 'Без ограничения' : `${plan.days} дней`],
         ['Устройства', plan.unlimitedDevices ? 'Без ограничения' : plan.deviceAddonEnabled ? `${plan.devices}–${plan.maxDevices}` : String(plan.initialDevices)],
         ['Трафик', plan.trafficLimitGb == null ? 'Без ограничения' : `${plan.trafficLimitGb} ГБ`],
-      ]), ...(data.starsEnabled && data.starsRateKopecks ? [
-        `<p>${plan.isPromo ? 'Бесплатно' : `Базовая цена ${Math.ceil(plan.priceKopecks / data.starsRateKopecks)} Stars`}</p>`,
-        row(cb(plan.isPromo ? 'Получить доступ' : 'Оформить в Stars', `buy:${plan.id}`, 'success')),
-      ] : []))
+      ]), `<p>${plan.isPromo ? 'Бесплатно' : `Базовая цена ${escape(formatPrice(plan.priceKopecks))}`}</p>`,
+      row(cb(plan.isPromo ? 'Получить доступ' : 'Выбрать способ оплаты', plan.isPromo ? `buy:${plan.id}` : `pay:${plan.id}`, 'success')))
       parts.push('<p>При продлении того же тарифа дни добавляются. При смене тарифа начинается новый срок, остаток прежнего не переносится.</p>', row(app('Подробности в приложении', 'plans')))
       break
     case 'devices':
@@ -94,5 +93,27 @@ export function buildRichScreen(input: RichScreenInput) {
     if (extraButtons.length) parts.push(row(...extraButtons))
   }
   parts.push('<hr>', row(cb('Главная', 'home'), cb('Обновить', input.screen, 'link')))
+  return parts.join('')
+}
+
+export function buildRichPaymentScreen(input: RichScreenInput, planId: string, yookassaAvailable: boolean) {
+  const plan = input.overview?.plans.find(item => item.id === planId && !item.isPromo)
+  if (!plan) return `<h3>Тариф недоступен</h3><p>Откройте актуальный список тарифов.</p>${row(cb('К тарифам', 'plans'))}`
+  const siteUrl = new URL('/pay', input.appUrl)
+  siteUrl.searchParams.set('plan', plan.id)
+  const parts = [
+    '<h2>AlekseevVP</h2><h3>Выберите способ оплаты</h3>',
+    table([
+      ['За что', `${plan.name}, ${plan.unlimited ? 'бессрочно' : `${plan.days} дней`}`],
+      ['Базовая стоимость', formatPrice(plan.priceKopecks)],
+    ]),
+    '<p>Дополнительные устройства и скидки будут учтены перед оплатой. Итоговую сумму покажем на сайте.</p>',
+  ]
+  if (yookassaAvailable) parts.push(row(`<tg-button type="url" style="success" url="${escape(siteUrl.toString())}">Оплатить ₽ через ЮKassa на сайте</tg-button>`))
+  if (input.overview?.starsEnabled && input.overview.starsRateKopecks) {
+    parts.push(row(cb('Оплатить в Stars', `buy:${plan.id}`)))
+  }
+  if (!yookassaAvailable && !input.overview?.starsEnabled) parts.push('<p>Оплата сейчас недоступна.</p>')
+  parts.push('<p>Сайт кабинета и бот используют одну учётную запись и подписку. Для оплаты на сайте может потребоваться вход.</p>', row(cb('К тарифам', 'plans')))
   return parts.join('')
 }

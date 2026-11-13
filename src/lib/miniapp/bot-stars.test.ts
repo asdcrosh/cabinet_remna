@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
   botCall: vi.fn(), findUser: vi.fn(), catalog: vi.fn(), limitKey: vi.fn(),
-  lock: vi.fn(), checkout: vi.fn(),
+  lock: vi.fn(), checkout: vi.fn(), paymentScreen: vi.fn(),
 }))
 
 vi.mock('./bot-api', () => ({ miniAppBotCall: mocks.botCall }))
@@ -10,7 +10,7 @@ vi.mock('./config', () => ({ miniAppUrl: () => 'https://cabinet.example.test/min
 vi.mock('./stars', () => ({ starsEnabled: () => true }))
 vi.mock('./stars-payments', () => ({ answerStarsPreCheckout: vi.fn(), isOurStarsPayload: vi.fn(),
   refundStarsPayment: vi.fn(), settleStarsPayment: vi.fn() }))
-vi.mock('./bot-screens', () => ({ getBotScreen: vi.fn() }))
+vi.mock('./bot-screens', () => ({ getBotScreen: vi.fn(), getBotPaymentScreen: mocks.paymentScreen }))
 vi.mock('./rich-screens', () => ({ botScreens: [] }))
 vi.mock('./channel-referrals', () => ({ claimChannelReward: vi.fn() }))
 vi.mock('@/lib/prisma', () => ({ prisma: { user: { findUnique: mocks.findUser } } }))
@@ -32,6 +32,7 @@ describe('Telegram bot Stars checkout', () => {
     mocks.lock.mockImplementation(async (_key: string, task: () => Promise<Response>) => ({ acquired: true, value: await task() }))
     mocks.checkout.mockResolvedValue(Response.json({ confirmationUrl: 'https://t.me/$invoice',
       localPaymentId: 'ck12345678901234567890', starsAmount: 44 }))
+    mocks.paymentScreen.mockResolvedValue('<h3>Выберите способ оплаты</h3>')
   })
 
   it('creates an invoice without requiring an IP address on the internal bot request', async () => {
@@ -44,5 +45,16 @@ describe('Telegram bot Stars checkout', () => {
     expect(mocks.botCall).toHaveBeenCalledWith('sendInvoice', expect.objectContaining({
       chat_id: 123, currency: 'XTR', prices: [{ label: 'Стандарт 7 дн.', amount: 44 }],
     }))
+  })
+
+  it('opens the payment method screen without creating a charge', async () => {
+    await handleMiniAppUpdate({ update_id: 2, callback_query: { id: 'callback-2', from: { id: 123 },
+      data: 'avp:pay:plan-1', message: { message_id: 2, chat: { id: 123, type: 'private' } } } })
+
+    expect(mocks.paymentScreen).toHaveBeenCalledWith(123, 'plan-1')
+    expect(mocks.botCall).toHaveBeenCalledWith('editMessageText', expect.objectContaining({
+      chat_id: 123, message_id: 2, rich_message: { html: '<h3>Выберите способ оплаты</h3>' },
+    }))
+    expect(mocks.checkout).not.toHaveBeenCalled()
   })
 })

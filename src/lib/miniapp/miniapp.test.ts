@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { buildRichScreen } from './rich-screens'
+import { buildRichPaymentScreen, buildRichScreen } from './rich-screens'
 import { channelCampaign, isChannelMember, isChannelReference } from './channel-referrals'
 import { miniAppDemo } from './model'
 import { isMiniAppOwnedUpdate, isPaymentUpdate, isUnsupportedPaymentUpdate, isUnsupportedCallback, telegramUpdateSchema, validWebhookSecret } from './bot'
@@ -58,9 +58,18 @@ describe('Telegram Mini App boundaries', () => {
       current: false, trafficLimitGb: 100 }] }
     const html = buildRichScreen({ screen: 'plans', overview, appUrl: 'https://cabinet.example.test/miniapp' })
     expect(html).toContain('100 ГБ')
-    expect(html).toContain('Базовая цена 100 Stars')
-    expect(html).toContain('avp:buy:demo')
+    expect(html).toContain('Базовая цена 299 ₽')
+    expect(html).toContain('avp:pay:demo')
     expect(html).toContain('остаток прежнего не переносится')
+  })
+  it('links only an available plan to the external Cabinet checkout and keeps Stars in the bot', () => {
+    const input = { screen: 'plans' as const, overview: miniAppDemo, appUrl: 'https://cabinet.example.test/miniapp' }
+    const html = buildRichPaymentScreen(input, 'demo', true)
+    expect(html).toContain('type="url"')
+    expect(html).toContain('https://cabinet.example.test/pay?plan=demo')
+    expect(html).toContain('avp:buy:demo')
+    expect(buildRichPaymentScreen(input, 'demo', false)).not.toContain('/pay?plan=')
+    expect(buildRichPaymentScreen(input, 'unknown', true)).not.toContain('/pay?plan=')
   })
   it('rounds the configured ruble price up to whole Stars', () => {
     expect(starsForKopecks(30_000, 300)).toBe(100)

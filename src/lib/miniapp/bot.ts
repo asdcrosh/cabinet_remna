@@ -3,7 +3,7 @@ import { miniAppBotCall } from './bot-api'
 import { miniAppUrl } from './config'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
-import { getBotScreen } from './bot-screens'
+import { getBotPaymentScreen, getBotScreen } from './bot-screens'
 import { botScreens, type BotScreen } from './rich-screens'
 import { claimChannelReward } from './channel-referrals'
 import { starsEnabled } from './stars'
@@ -108,6 +108,11 @@ export async function handleMiniAppUpdate(update: z.infer<typeof telegramUpdateS
     const action = callback.data.slice(4)
     if (action.startsWith('buy:')) {
       await sendStarsInvoiceFromBot(callback.from.id, callback.id, action.slice(4))
+      return
+    }
+    if (action.startsWith('pay:')) {
+      const html = await getBotPaymentScreen(callback.from.id, action.slice(4))
+      await displayCallbackScreen(callback.from.id, callback.message.message_id, html, miniAppUrl())
       return
     }
     let screen: BotScreen = botScreens.includes(action as BotScreen) ? action as BotScreen : 'home'
