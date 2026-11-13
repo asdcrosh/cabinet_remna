@@ -147,6 +147,7 @@ model User {
   broadcastCampaigns         BroadcastCampaign[]         @relation("BroadcastCampaignAuthor")
   broadcastTemplates         BroadcastTemplate[]         @relation("BroadcastTemplateAuthor")
   notificationLogs           NotificationLog[]
+  promoCodeReminders         PromoCodeReminder[]
   notifications              UserNotification[]
   notificationPreference     UserNotificationPreference?
   adminNotificationReads     AdminNotificationRead[]
@@ -442,6 +443,7 @@ enum NotificationType {
   BONUS_GRANTED
   BROADCAST
   ACCOUNT_SECURITY
+  PROMO_CODE_EXPIRING
 }
 
 enum NotificationChannel {
@@ -1199,9 +1201,40 @@ model PromoCode {
   personalOfferSettings   PersonalOfferSetting[]
   welcomeBonusSettings    WelcomeBonusSetting[]
   welcomeBonusRedemptions WelcomeBonusRedemption[]
+  reminders               PromoCodeReminder[]
 
   @@index([isActive, startsAt, expiresAt])
   @@index([audience])
+}
+
+model PromoCodeReminder {
+  userId        String
+  promoCodeId   String
+  channel       PromoReminderChannel?
+  status        PromoReminderStatus @default(PENDING)
+  nextAttemptAt DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  promoCode PromoCode @relation(fields: [promoCodeId], references: [id], onDelete: Cascade)
+
+  @@id([userId, promoCodeId])
+  @@index([promoCodeId, status])
+  @@index([status, updatedAt])
+}
+
+enum PromoReminderChannel {
+  APP
+  TELEGRAM
+  EMAIL
+}
+
+enum PromoReminderStatus {
+  PENDING
+  SENDING
+  SENT
+  UNKNOWN
+  SKIPPED
 }
 
 enum PromoCodeAudience {

@@ -42,6 +42,7 @@ const optionalBooleans = [
   "PAYANYWAY_ENABLED",
   "PAYANYWAY_TEST_MODE",
   "PLATEGA_ENABLED",
+  "PROMO_EXPIRY_REMINDERS_ENABLED",
 ];
 
 const optionalNonNegativeIntegers = [

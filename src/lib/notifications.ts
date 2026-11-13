@@ -923,7 +923,50 @@ async function sendWithDedupe(input: {
   }
 }
 
-class DefinitiveDeliveryError extends Error {}
+class DefinitiveDeliveryError extends Error {
+  constructor(message: string, readonly status?: number) {
+    super(message)
+  }
+}
+
+export async function sendPromoReminderExternal(
+  recipient: { channel: 'TELEGRAM'; telegramId: bigint } | { channel: 'EMAIL'; email: string },
+  reminder: { title: string; body: string; actionHref: string; actionLabel: string },
+): Promise<'sent' | 'retry' | 'unavailable' | 'unknown'> {
+  const actionUrl = `${getAppUrl()}${reminder.actionHref}`
+  try {
+    if (recipient.channel === 'TELEGRAM') {
+      await sendTelegramMessage({
+        chatId: recipient.telegramId,
+        text: `<b>${escapeTelegram(reminder.title)}</b>\n${escapeTelegram(reminder.body)}`,
+        actionUrl,
+        actionLabel: reminder.actionLabel,
+      })
+    } else {
+      await sendEmail({
+        to: recipient.email,
+        subject: `${reminder.title} — ${getBrandName()}`,
+        text: `${reminder.body}\n\n${reminder.actionLabel}: ${actionUrl}`,
+        html: renderNotificationEmail({
+          eyebrow: 'Промокод',
+          title: reminder.title,
+          lead: reminder.body,
+          ctaLabel: reminder.actionLabel,
+          ctaUrl: actionUrl,
+        }),
+      })
+    }
+    return 'sent'
+  } catch (error) {
+    if (!(error instanceof DefinitiveDeliveryError) || error.status == null || error.status >= 500) return 'unknown'
+    if (error.status === 429) return 'retry'
+    if (recipient.channel === 'TELEGRAM') {
+      return error.status === 403 || (error.status === 400 && /chat not found/i.test(error.message))
+        ? 'unavailable' : 'unknown'
+    }
+    return 'unavailable'
+  }
+}
 
 async function sendTelegramMessage(input: {
   chatId: bigint
@@ -972,7 +1015,7 @@ async function sendTelegramMessage(input: {
 
   if (!response.ok) {
     const details = await response.text().catch(() => '')
-    throw new DefinitiveDeliveryError(`Telegram failed: ${response.status} ${details}`.slice(0, 1000))
+    throw new DefinitiveDeliveryError(`Telegram failed: ${response.status} ${details}`.slice(0, 1000), response.status)
   }
 }
 
@@ -994,7 +1037,7 @@ async function sendEmail(input: { to: string; subject: string; text: string; htm
 
   if (!response.ok) {
     const details = await response.text().catch(() => '')
-    throw new DefinitiveDeliveryError(`Email failed: ${response.status} ${details}`.slice(0, 1000))
+    throw new DefinitiveDeliveryError(`Email failed: ${response.status} ${details}`.slice(0, 1000), response.status)
   }
 }
 
