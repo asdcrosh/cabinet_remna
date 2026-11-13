@@ -17,6 +17,7 @@ declare global {
         requestFullscreen?: () => void
         setHeaderColor?: (color: string) => void
         openLink?: (url: string, options?: { try_instant_view?: boolean }) => void
+        openInvoice?: (url: string, callback?: (status: string) => void) => void
         viewportHeight?: number
         viewportStableHeight?: number
         onEvent?: (

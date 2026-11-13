@@ -1,5 +1,6 @@
 import { escapeTelegramHtml as escape } from '@/lib/telegram-format'
 import type { MiniAppOverview } from './model'
+import { formatPrice } from '@/lib/format'
 
 export type BotScreen = 'home' | 'subscription' | 'plans' | 'billing' | 'devices' | 'bonus' | 'notifications' | 'referrals' | 'support' | 'connect' | 'settings' | 'admin'
 export const botScreens: BotScreen[] = ['home', 'subscription', 'plans', 'billing', 'devices', 'bonus', 'notifications', 'referrals', 'support', 'connect', 'settings', 'admin']
@@ -17,18 +18,18 @@ export type RichScreenInput = {
   inbox?: { unread: number; items: Array<{ title: string; date: string; fresh: boolean }> }
   prefs?: { telegram: boolean; email: boolean; broadcasts: boolean }
   adminStats?: { users: number; activeSubscriptions: number; paymentsToday: number; openTickets: number }
-  notice?: string
   admin?: boolean
+  notice?: string
 }
 const titles: Record<BotScreen, string> = {
-  home: '🏠 Личный кабинет', subscription: '🔐 Моя подписка', plans: '💳 Тарифы', billing: '🧾 Подписка и оплата',
-  devices: '📱 Устройства', bonus: '🎁 Бонусы', notifications: '🔔 Уведомления', referrals: '🤝 Пригласить друга',
-  support: '💬 Поддержка', connect: '🔌 Подключить VPN', settings: '⚙️ Настройки', admin: '🛠 Управление сервисом',
+  home: 'Главная', subscription: 'Подписка', plans: 'Выберите тариф', billing: 'Платежи', devices: 'Устройства',
+  bonus: 'Бонусы', notifications: 'Уведомления', referrals: 'Пригласить друга', support: 'Поддержка',
+  connect: 'Подключение', settings: 'Настройки', admin: 'Управление сервисом',
 }
 const cb = (label: string, screen: string, style = 'primary') => `<tg-button type="callback_data" style="${style}" data="avp:${escape(screen)}">${escape(label)}</tg-button>`
 const row = (...buttons: string[]) => `<tg-button-row>${buttons.join('')}</tg-button-row>`
 const table = (rows: string[][]) => `<table bordered compact>${rows.map(cells => `<tr>${cells.map(cell => `<td>${escape(cell)}</td>`).join('')}</tr>`).join('')}</table>`
-const toggle = (on: boolean) => (on ? '✅ Вкл' : '⛔️ Выкл')
+const brandHeader = (bannerUrl?: string) => bannerUrl && /^https:\/\//.test(bannerUrl) ? `<img src="${escape(bannerUrl)}">` : '<h2>AlekseevVP</h2>'
 
 // Pure renderer: no personal key, password, initData or panel token can enter its DTO.
 export function buildRichScreen(input: RichScreenInput) {
@@ -36,110 +37,104 @@ export function buildRichScreen(input: RichScreenInput) {
     const url = new URL(input.appUrl); url.searchParams.set('tab', tab)
     return `<tg-button type="web_app" style="success" url="${escape(url.toString())}">${escape(label)}</tg-button>`
   }
-  const header = input.bannerUrl && /^https:\/\//.test(input.bannerUrl) ? `<img src="${escape(input.bannerUrl)}">` : '<h2>AlekseevVP</h2>'
-  const parts = [header, `<h3>${titles[input.screen]}</h3>`]
-  if (input.notice) parts.push(`<p>ℹ️ ${escape(input.notice)}</p>`)
+  const parts = [brandHeader(input.bannerUrl), `<h3>${titles[input.screen]}</h3>`]
+  if (input.notice) parts.push(`<p>${escape(input.notice)}</p>`)
   const data = input.overview
   if (!data) {
-    parts.push('<p><b>Ваш интернет. Ваши правила.</b></p><p>Войдите через Telegram, чтобы открыть общую подписку и устройства из кабинета.</p>', row(app('Войти через Telegram', 'home')))
+    parts.push('<p>Подписка, устройства и обращения в одном месте.</p><p>Войдите через Telegram, чтобы открыть свой кабинет.</p>', row(app('Открыть кабинет', 'home')))
     return parts.join('')
   }
-  if (data.warning) parts.push(`<p>⚠️ ${escape(data.warning)}</p>`)
+  if (data.warning) parts.push(`<p>${escape(data.warning)}</p>`)
   const sub = data.subscription
-  const subTable = () => table([
-    ['Тариф', sub!.planName], ['Срок', sub!.expiresAt ? new Date(sub!.expiresAt).toLocaleDateString('ru-RU', { timeZone: 'Europe/Moscow' }) : 'Без ограничения'],
-    ['Осталось', sub!.daysLeft == null ? 'Без ограничения' : `${Math.max(0, sub!.daysLeft)} дн.`],
-    ['Устройства', `${data.deviceCount} / ${sub!.deviceLimit ?? 'без лимита'}`],
-  ])
   switch (input.screen) {
     case 'home':
     case 'subscription':
-      if (sub) {
-        parts.push(`<p><b>${sub.usable ? '✅' : '⏳'} ${escape(sub.title)}</b></p>`)
-        if (sub.pending) parts.push('<p>⏳ Оплата получена, подписка выдаётся — обычно это занимает меньше минуты.</p>')
-        parts.push(subTable())
-      } else {
-        parts.push('<p><b>Подписка пока не оформлена</b></p><p>Выберите тариф, чтобы получить доступ и подключить устройства.</p>')
-      }
-      parts.push(row(cb('🔌 Подключить VPN', 'connect', 'success'), cb('💳 Тарифы', 'plans')),
-        row(cb('📱 Устройства', 'devices'), cb('🧾 Платежи', 'billing')),
-        row(cb('🎁 Бонусы', 'bonus'), cb('🔔 Уведомления', 'notifications')))
+      parts.push(`<h4>${escape(sub?.title || 'Подписка пока не оформлена')}</h4>`)
+      if (sub) parts.push(table([
+        ['Тариф', sub.planName],
+        ['Действует до', sub.expiresAt ? new Date(sub.expiresAt).toLocaleDateString('ru-RU', { timeZone: 'Europe/Moscow' }) : 'Без ограничения'],
+        ['Осталось', sub.daysLeft == null ? 'Без ограничения' : `${Math.max(0, sub.daysLeft)} дней`],
+        ['Устройства', `${data.deviceCount} из ${sub.deviceLimit ?? 'без лимита'}`],
+      ]))
+      parts.push(row(cb('Подключить VPN', 'connect', 'success'), cb('Выбрать тариф', 'plans')),
+        row(cb('Мои устройства', 'devices'), cb('Моя подписка', 'subscription')),
+        row(cb('Платежи', 'billing'), cb('Бонусы', 'bonus')),
+        row(cb('Уведомления', 'notifications'), cb('Настройки', 'settings')))
       break
     case 'plans':
       if (!data.plans.length) parts.push('<p>Для вашего аккаунта сейчас нет доступных тарифов.</p>')
-      for (const plan of data.plans) parts.push(`<h4>${plan.current ? '⭐ ' : ''}${escape(plan.name)}</h4>`, table([
+      for (const plan of data.plans) parts.push('<hr>', `<h4>${plan.current ? 'Текущий · ' : ''}${escape(plan.name)}</h4>`, table([
         ['Срок', plan.unlimited ? 'Без ограничения' : `${plan.days} дней`],
         ['Устройства', plan.unlimitedDevices ? 'Без ограничения' : plan.deviceAddonEnabled ? `${plan.devices}–${plan.maxDevices}` : String(plan.initialDevices)],
         ['Трафик', plan.trafficLimitGb == null ? 'Без ограничения' : `${plan.trafficLimitGb} ГБ`],
-      ]))
-      parts.push('<p>При продлении того же тарифа дни добавляются. При смене тарифа начинается новый срок, остаток прежнего не переносится. Платная покупка внутри Telegram станет доступна после подключения Stars.</p>', row(app('Открыть тарифы', 'plans')))
+      ]), `<p>${plan.isPromo ? 'Бесплатно' : `Базовая цена ${escape(formatPrice(plan.priceKopecks))}`}</p>`,
+      row(cb(plan.isPromo ? 'Получить доступ' : plan.current ? 'Продлить тариф' : 'Оформить тариф', plan.isPromo ? `buy:${plan.id}` : `pay:${plan.id}`, 'success')))
+      parts.push('<hr><p>Продление того же тарифа добавляет дни. При смене тарифа начинается новый срок: остаток прежнего не переносится.</p>', row(app('Сравнить в приложении', 'plans')))
       break
-    case 'billing': {
-      if (sub) parts.push(`<p><b>${sub.usable ? '✅' : '⏳'} ${escape(sub.title)}</b> · ${escape(sub.planName)}</p>`)
-      else parts.push('<p><b>Подписка пока не оформлена.</b></p>')
-      if (input.autoRenewal) parts.push(`<p>🔁 Автопродление: ${escape(input.autoRenewal)}</p>`)
-      if (input.payments?.length) {
-        parts.push('<h4>Последние операции</h4>')
-        for (const payment of input.payments) parts.push(table([[payment.date, payment.title], [payment.amount, payment.status]]))
-      } else parts.push('<p>Оплат пока не было.</p>')
-      parts.push('<p>Платная покупка внутри Telegram станет доступна после подключения Stars.</p>', row(app('Открыть платежи', 'billing')))
+    case 'billing':
+      parts.push(`<h4>${escape(sub?.title || 'Подписка пока не оформлена')}</h4>`)
+      if (input.autoRenewal) parts.push(`<p>Автопродление: ${escape(input.autoRenewal)}</p>`)
+      if (!input.payments?.length) parts.push('<p>Оплат пока не было. История появится после первой покупки.</p>')
+      if (input.payments?.length) parts.push('<h4>Последние операции</h4>',
+        table(input.payments.map(payment => [`${payment.date} · ${payment.title}`, `${payment.amount} · ${payment.status}`])))
+      parts.push(row(app('История и автопродление', 'billing')))
       break
-    }
     case 'devices':
-      parts.push(`<p>Подключено устройств: <b>${data.deviceCount}${sub?.deviceLimit ? ` / ${sub.deviceLimit}` : ''}</b>. Лимит общий с кабинетом.</p>`)
-      if (!input.devices?.length) parts.push('<p>Подключённых устройств пока нет.</p>')
-      for (const device of input.devices ?? []) parts.push(table([[device.title, device.platform]]))
-      parts.push(row(cb('🔌 Подключить устройство', 'connect', 'success')), row(app('Переименовать или удалить', 'devices')))
+      parts.push('<p>Список синхронизирован с кабинетом.</p>')
+      if (!input.devices?.length) parts.push('<p>Подключённых устройств пока нет. Откройте инструкцию и добавьте первое.</p>')
+      if (input.devices?.length) parts.push(table(input.devices.map(device => [device.title, device.platform])))
+      parts.push(row(cb('Добавить устройство', 'connect', 'success')), row(app('Переименовать или удалить', 'devices')))
       break
     case 'connect':
-      parts.push('<p><b>1.</b> Установите приложение для вашей системы.</p>', table([['🍏 iPhone / Mac', 'Rabbit Hole'], ['🤖 Android', 'INCY'], ['🪟 Windows', 'HAPP']]),
-        '<p><b>2.</b> Добавьте свою подписку. <b>3.</b> Включите VPN в приложении.</p>', row(app('Открыть настройку подключения', 'connect')),
-        '<p>Персональная ссылка доступна только после входа. Этот экран не показывает состояние VPN-туннеля.</p>')
+      parts.push('<h4>01 / Выберите приложение</h4>', table([['iPhone / Mac', 'Rabbit Hole'], ['Android', 'INCY'], ['Windows', 'HAPP']]),
+        '<h4>02 / Добавьте подписку</h4><p>Откройте персональную ссылку в приложении кабинета.</p>',
+        '<h4>03 / Включите VPN</h4><p>После импорта нажмите «Подключить» в VPN-клиенте.</p>',
+        row(app('Открыть настройку', 'connect')),
+        '<p>Персональная ссылка доступна только после входа. Бот не показывает состояние VPN-туннеля.</p>')
       break
     case 'bonus':
       if (input.bonus && !input.bonus.enabled) parts.push('<p>Бонусная программа сейчас отключена. Загляните позже.</p>')
       else {
         const attempts = input.bonus?.attempts ?? 0
-        parts.push(attempts > 0
-          ? `<p><b>🎁 У вас ${attempts} ${attempts === 1 ? 'попытка' : attempts < 5 ? 'попытки' : 'попыток'}</b> для колеса подарков.</p>`
-          : '<p>Подарки за активность, бонусы и промокоды из вашего кабинета. Новые попытки появляются за задания и покупки.</p>')
+        parts.push('<h4>Колесо подарков</h4>', attempts > 0
+          ? `<p>Доступно попыток: ${attempts}. Приз начисляется сразу после открытия.</p>`
+          : '<p>Новые попытки появляются за задания, покупки и приглашения друзей.</p>')
       }
       parts.push(row(app('Открыть бонусы', 'bonus')))
-      if (data.referrals) parts.push(row(cb('🤝 Пригласить друга', 'referrals')))
+      if (data.referrals) parts.push(row(cb('Пригласить друга', 'referrals')))
       break
     case 'notifications': {
       const unread = input.inbox?.unread ?? 0
-      parts.push(unread > 0 ? `<p><b>🔔 Непрочитанных: ${unread}</b></p>` : '<p>Все уведомления прочитаны. ✨</p>')
-      for (const item of input.inbox?.items ?? []) parts.push(table([[item.date, `${item.fresh ? '🔵 ' : ''}${item.title}`]]))
-      if (!input.inbox?.items.length) parts.push('<p>Здесь появятся важные события подписки и сообщения сервиса.</p>')
+      parts.push(unread > 0 ? `<h4>Непрочитанных: ${unread}</h4>` : '<p>Все уведомления прочитаны.</p>')
+      if (input.inbox?.items.length) parts.push(table(input.inbox.items.map(item => [item.date, item.fresh ? `${item.title} · новое` : item.title])))
+      if (input.inbox && !input.inbox.items.length) parts.push('<p>Здесь появятся важные события подписки и сообщения сервиса.</p>')
       parts.push(row(app('Открыть уведомления', 'notifications')))
       break
     }
     case 'referrals': {
       const r = input.referral
-      parts.push(`<p>${escape(r?.condition || 'Программа бонусов за вступление в канал готовится.')}</p>`)
+      parts.push('<h4>Бонус за друга</h4>', `<p>${escape(r?.condition || 'Программа бонусов за вступление в канал готовится.')}</p>`)
       if (r) {
         parts.push(table([['Приглашено', String(r.invited)], ['Бонусов подтверждено', String(r.claimed)]]),
-          `<p><a href="${escape(r.url)}">Ваша ссылка приглашения</a></p>`,
-          row(`<tg-button type="copy_text" text="${escape(r.url)}">Копировать приглашение</tg-button>`))
+          row(`<tg-button type="copy_text" text="${escape(r.url)}">Скопировать ссылку</tg-button>`))
         if (r.channelUrl) parts.push(row(`<tg-button type="url" style="primary" url="${escape(r.channelUrl)}">Вступить в канал</tg-button>`))
         if (r.eligible && !r.ownClaimed) parts.push(row(cb('Я вступил, проверить', 'claim', 'success')))
-        if (r.ownClaimed) parts.push('<p>✅ Бонус подтверждён. Начисление выполняется через общую очередь кабинета.</p>')
+        if (r.ownClaimed) parts.push('<p>Бонус подтверждён. Начисление выполняется через общую очередь кабинета.</p>')
       }
       break
     }
     case 'support':
-      parts.push('<p>История обращений общая с личным кабинетом. По вопросам оплаты укажите номер заказа.</p>')
-      if (!input.tickets?.length) parts.push('<p>Открытых обращений пока нет. Мы на связи и отвечаем быстро.</p>')
-      for (const ticket of input.tickets ?? []) parts.push(table([[ticket.subject, ticket.status]]))
-      parts.push(row(app('Написать или открыть диалог', 'support')))
+      parts.push('<p>Напишите нам в кабинете. История диалогов сохранится в вашем аккаунте.</p>')
+      if (!input.tickets?.length) parts.push('<p>Открытых обращений нет.</p>')
+      if (input.tickets?.length) parts.push('<h4>Открытые обращения</h4>', table(input.tickets.map(ticket => [ticket.subject, ticket.status])))
+      parts.push('<p>По вопросам оплаты укажите номер заказа.</p>', row(app('Открыть поддержку', 'support')))
       break
     case 'settings':
       parts.push('<p>Профиль, безопасность и каналы уведомлений.</p>')
       if (input.prefs) parts.push(table([
-        ['Telegram', toggle(input.prefs.telegram)],
-        ['Email', toggle(input.prefs.email)],
-        ['Рассылки', toggle(input.prefs.broadcasts)],
+        ['Telegram', input.prefs.telegram ? 'Включены' : 'Выключены'],
+        ['Email', input.prefs.email ? 'Включены' : 'Выключены'],
+        ['Рассылки', input.prefs.broadcasts ? 'Включены' : 'Выключены'],
       ]))
       parts.push(row(app('Открыть настройки', 'settings')))
       break
@@ -151,15 +146,36 @@ export function buildRichScreen(input: RichScreenInput) {
           ['Оплаты сегодня', String(input.adminStats.paymentsToday)],
           ['Открытые тикеты', String(input.adminStats.openTickets)],
         ]))
-        parts.push('<p>Пользователи, платежи, тарифы, рассылки и поддержка — в панели управления.</p>', row(app('Открыть админку', 'admin')))
+        parts.push('<p>Пользователи, платежи, тарифы, рассылки и поддержка — в панели управления.</p>', row(app('Открыть панель управления', 'admin')))
       }
       break
   }
   if (input.screen === 'home') {
-    const extraButtons = [...(data.referrals ? [cb('🤝 Пригласить друга', 'referrals')] : []), ...(data.support ? [cb('💬 Поддержка', 'support')] : []), ...(input.admin ? [cb('🛠 Админка', 'admin')] : [])]
+    const extraButtons = [...(data.referrals ? [cb('Пригласить друга', 'referrals')] : []), ...(data.support ? [cb('Поддержка', 'support')] : []), ...(input.admin ? [cb('Админка', 'admin')] : [])]
     if (extraButtons.length) parts.push(row(...extraButtons))
   }
-  if (input.screen === 'home' || input.screen === 'subscription') parts.push(row(app('Открыть весь кабинет', input.screen)))
-  parts.push('<hr>', row(cb('🏠 Главная', 'home'), cb('🔄 Обновить', input.screen, 'link')))
+  parts.push('<hr>', row(cb('На главную', 'home'), cb('Обновить', input.screen, 'link')))
+  return parts.join('')
+}
+
+export function buildRichPaymentScreen(input: RichScreenInput, planId: string, yookassaAvailable: boolean) {
+  const plan = input.overview?.plans.find(item => item.id === planId && !item.isPromo)
+  if (!plan) return `${brandHeader(input.bannerUrl)}<h3>Тариф недоступен</h3><p>Откройте актуальный список тарифов.</p>${row(cb('К тарифам', 'plans'))}`
+  const siteUrl = new URL('/pay', input.appUrl)
+  siteUrl.searchParams.set('plan', plan.id)
+  const parts = [
+    `${brandHeader(input.bannerUrl)}<h3>Способ оплаты</h3>`,
+    table([
+      ['За что', `${plan.name}, ${plan.unlimited ? 'бессрочно' : `${plan.days} дней`}`],
+      ['Базовая стоимость', formatPrice(plan.priceKopecks)],
+    ]),
+    '<p>Дополнительные устройства и скидки учитываются перед оплатой. Итоговую сумму покажем на сайте.</p>',
+  ]
+  if (yookassaAvailable) parts.push(row(`<tg-button type="url" style="success" url="${escape(siteUrl.toString())}">Оплатить ₽ через ЮKassa на сайте</tg-button>`))
+  if (input.overview?.starsEnabled && input.overview.starsRateKopecks) {
+    parts.push(row(cb('Оплатить в Stars', `buy:${plan.id}`)))
+  }
+  if (!yookassaAvailable && !input.overview?.starsEnabled) parts.push('<p>Оплата сейчас недоступна.</p>')
+  parts.push('<hr><p>Бот и сайт используют один аккаунт. Для оплаты на сайте может потребоваться вход.</p>', row(cb('К тарифам', 'plans')))
   return parts.join('')
 }

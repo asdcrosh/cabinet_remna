@@ -46,6 +46,10 @@ const mocks = vi.hoisted(() => {
     },
     promoCode: {
       create: vi.fn(),
+      findMany: vi.fn().mockResolvedValue([]),
+    },
+    promoCodeMerge: {
+      findMany: vi.fn().mockResolvedValue([]),
     },
     $transaction: vi.fn(async (fn) => fn(prisma)),
   }
@@ -117,6 +121,9 @@ const config: Config = {
   pityOpenings: 10,
   showBestRecentOpening: true,
   activePromoRewardsLimit: 3,
+  promoMergeEnabled: true,
+  promoMergeCoefficient: 70,
+  promoMergeCapPercent: 30,
 }
 
 describe('grantReferralBonusBoxAttemptsForReward', () => {

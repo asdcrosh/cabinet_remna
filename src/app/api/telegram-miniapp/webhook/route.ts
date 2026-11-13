@@ -1,6 +1,7 @@
 import { jsonResponse } from '@/lib/json-response'
 import { miniAppEnabled } from '@/lib/miniapp/config'
-import { handleMiniAppUpdate, isPaymentUpdate, isUnsupportedCallback, telegramUpdateSchema, validWebhookSecret } from '@/lib/miniapp/bot'
+import { handleMiniAppUpdate, isMiniAppOwnedUpdate, telegramUpdateSchema, validWebhookSecret } from '@/lib/miniapp/bot'
+import { forwardLegacyTelegramUpdate } from '@/lib/miniapp/legacy-forward'
 
 export const runtime = 'nodejs'
 export async function POST(req: Request) {
@@ -25,8 +26,12 @@ export async function POST(req: Request) {
   raw += decoder.decode()
   let value: unknown
   try { value = JSON.parse(raw) } catch { return jsonResponse({ error: 'Invalid JSON' }, { status: 400 }) }
-  if (isPaymentUpdate(value)) return jsonResponse({ error: 'Payment update requires the existing handler' }, { status: 503 })
-  if (isUnsupportedCallback(value)) return jsonResponse({ error: 'Legacy callback requires the existing handler' }, { status: 503 })
+  if (!isMiniAppOwnedUpdate(value)) {
+    try {
+      if (await forwardLegacyTelegramUpdate(raw)) return jsonResponse({ ok: true, forwarded: true })
+    } catch { /* Telegram retries if the legacy dispatcher is unavailable. */ }
+    return jsonResponse({ error: 'Legacy handler unavailable' }, { status: 503 })
+  }
   const parsed = telegramUpdateSchema.safeParse(value)
   if (!parsed.success) return jsonResponse({ error: 'Invalid update' }, { status: 400 })
   try {

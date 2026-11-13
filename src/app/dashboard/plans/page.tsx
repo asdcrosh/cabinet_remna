@@ -8,7 +8,6 @@ import { getCurrentUser } from '@/lib/auth/cookies'
 import { buildPlanCatalog } from '@/lib/plan-catalog'
 import { resolvePromoReminderCheckout } from '@/lib/promo-reminder-checkout'
 import { ArrowRight, MessageCircleQuestion, RefreshCw, ShieldCheck } from 'lucide-react'
-import { isTelegramMiniAppSession } from '@/lib/auth/jwt'
 
 export const dynamic = 'force-dynamic'
 
@@ -42,8 +41,6 @@ export default async function PlansPage({
     whitelistAddonRequested: params.whitelistAddon === 'true',
   })
   const currentPlanName = currentSubscription?.plan?.name ?? null
-  const inTelegram = Boolean(session && isTelegramMiniAppSession(session))
-  const visiblePlans = inTelegram ? planViews.map(plan => ({ ...plan, paymentProviders: [] })) : planViews
   const reminderPlans = planViews.filter((plan) => reminder?.planIds?.includes(plan.id))
   const initialPlanId = reminderPlans.find((plan) => plan.current)?.id
     ?? reminderPlans.find((plan) => plan.popular)?.id
@@ -71,8 +68,6 @@ export default async function PlansPage({
           </div>
         )}
       />
-
-      {inTelegram && <p className="rounded-xl border border-cyan-200 bg-cyan-50 px-4 py-3 text-sm leading-6 text-slate-700 dark:border-cyan-400/20 dark:bg-cyan-400/[0.08] dark:text-slate-200">В Telegram доступны условия тарифов. Покупку подключим через Telegram Stars; оплату в рублях можно выполнить в самостоятельном кабинете.</p>}
 
       {currentSubscription ? (
         <section aria-label="Текущая подписка" className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-5 dark:border-white/10 dark:bg-white/[0.03] sm:flex-row sm:items-center sm:justify-between">
@@ -119,10 +114,10 @@ export default async function PlansPage({
         <p role="status" className="text-sm text-slate-600 dark:text-slate-300">{reminder.error}</p>
       )}
 
-      {visiblePlans.length > 0 ? (
+      {planViews.length > 0 ? (
         <PlanCatalog
           key={`${currentSubscription?.planId ?? 'none'}:${currentDeviceLimit ?? 'unknown'}:${initialPlanId ?? ''}:${promoId ?? ''}:${params.whitelistAddon ?? ''}`}
-          plans={visiblePlans}
+          plans={planViews}
           initialPlanId={initialPlanId}
         />
       ) : null}

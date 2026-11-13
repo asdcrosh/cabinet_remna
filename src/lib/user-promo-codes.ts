@@ -57,7 +57,7 @@ export async function getAvailableUserPromoCodesByPlan({
 }
 
 async function getAwardedPromoCodes(userId: string, linkPromoCode?: string | null) {
-  const [bonusOpenings, welcomeRedemptions] = await Promise.all([
+  const [bonusOpenings, welcomeRedemptions, merges] = await Promise.all([
     prisma.bonusBoxOpening.findMany({
       where: { userId, promoCodeId: { not: null } },
       include: { promoCode: { select: { code: true } } },
@@ -66,6 +66,11 @@ async function getAwardedPromoCodes(userId: string, linkPromoCode?: string | nul
     prisma.welcomeBonusRedemption.findMany({
       where: { userId, promoCodeId: { not: null } },
       include: { promoCode: { select: { code: true } } },
+      orderBy: { createdAt: 'desc' },
+    }),
+    prisma.promoCodeMerge.findMany({
+      where: { userId, resultPromo: { is: { isActive: true } } },
+      include: { resultPromo: { select: { code: true } } },
       orderBy: { createdAt: 'desc' },
     }),
   ])
@@ -79,6 +84,13 @@ async function getAwardedPromoCodes(userId: string, linkPromoCode?: string | nul
     items.push({ code: normalizedLinkCode, source: 'LINK' })
   }
 
+  for (const merge of merges) {
+    const code = merge.resultPromo.code
+    const normalizedCode = code.toUpperCase()
+    if (seen.has(normalizedCode)) continue
+    seen.add(normalizedCode)
+    items.push({ code, source: 'BONUS_BOX' })
+  }
   for (const opening of bonusOpenings) {
     const code = opening.promoCode?.code
     const normalizedCode = code?.toUpperCase()

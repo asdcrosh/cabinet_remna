@@ -68,6 +68,8 @@ describe('api serializers', () => {
       externalPaymentId: 'yk-1',
       providerStatus: 'succeeded',
       checkoutKey: null,
+      starsAmount: null,
+      starsRateKopecks: null,
       yookassaId: 'yk-1',
       yookassaStatus: 'succeeded',
       confirmationUrl: null,

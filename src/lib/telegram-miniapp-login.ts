@@ -245,7 +245,6 @@ export async function authenticateTelegramMiniApp(req: Request, options: { botTo
     email: sessionUser.email,
     role: sessionUser.role,
     stage: 'FULL',
-    channel: 'telegram-miniapp',
   })
 }
 

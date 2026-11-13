@@ -3,19 +3,32 @@ import { miniAppBotCall } from './bot-api'
 import { miniAppUrl } from './config'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
-import { getBotScreen } from './bot-screens'
+import { getBotPaymentScreen, getBotScreen } from './bot-screens'
 import { botScreens, type BotScreen } from './rich-screens'
 import { claimChannelReward } from './channel-referrals'
+import { starsEnabled } from './stars'
+import { buildPlanCatalog } from '@/lib/plan-catalog'
+import { createPaymentForUser } from '@/lib/payment-checkout'
+import { withDistributedLock } from '@/lib/distributed-lock'
+import { rateLimitKey } from '@/lib/rate-limit'
+import { answerStarsPreCheckout, isOurStarsPayload, refundStarsPayment, settleStarsPayment } from './stars-payments'
+import { displayCallbackScreen } from './callback-screen'
 
 const user = z.object({ id: z.number().int().positive().safe() })
 export const telegramUpdateSchema = z.object({
   update_id: z.number().int().nonnegative(),
+  pre_checkout_query: z.object({ id: z.string().max(128), from: user, currency: z.string(),
+    total_amount: z.number().int().positive(), invoice_payload: z.string().max(128) }).optional(),
   callback_query: z.object({ id: z.string().max(128), from: user, data: z.string().max(64).optional(),
     message: z.object({ message_id: z.number().int().positive(), chat: z.object({ id: z.number().int().safe(), type: z.string() }) }).optional(),
   }).optional(),
   message: z.object({
     chat: z.object({ id: z.number().int().safe(), type: z.string() }),
     from: user.optional(), text: z.string().max(4096).optional(),
+    successful_payment: z.object({ currency: z.string(), total_amount: z.number().int().positive(),
+      invoice_payload: z.string().max(128), telegram_payment_charge_id: z.string().min(1).max(256) }).optional(),
+    refunded_payment: z.object({ currency: z.string(), total_amount: z.number().int().positive(),
+      invoice_payload: z.string().max(128), telegram_payment_charge_id: z.string().min(1).max(256) }).optional(),
   }).optional(),
 })
 
@@ -28,7 +41,16 @@ export function isPaymentUpdate(value: unknown) {
   if (!value || typeof value !== 'object') return false
   if (Reflect.has(value, 'pre_checkout_query')) return true
   const message = Reflect.get(value, 'message')
-  return Boolean(message && typeof message === 'object' && Reflect.has(message, 'successful_payment'))
+  return Boolean(message && typeof message === 'object' && (Reflect.has(message, 'successful_payment') || Reflect.has(message, 'refunded_payment')))
+}
+
+export function isUnsupportedPaymentUpdate(value: unknown) {
+  if (!isPaymentUpdate(value) || !value || typeof value !== 'object') return false
+  const checkout = Reflect.get(value, 'pre_checkout_query')
+  const message = Reflect.get(value, 'message')
+  const event = checkout ?? (message && typeof message === 'object'
+    ? Reflect.get(message, 'successful_payment') ?? Reflect.get(message, 'refunded_payment') : null)
+  return !event || typeof event !== 'object' || !isOurStarsPayload(Reflect.get(event, 'invoice_payload'))
 }
 
 // Old Remnashop messages remain in chats after a webhook switch. Never claim
@@ -41,6 +63,19 @@ export function isUnsupportedCallback(value: unknown) {
     !Reflect.get(callback, 'data').startsWith('avp:')
 }
 
+export function isMiniAppOwnedUpdate(value: unknown) {
+  if (!value || typeof value !== 'object') return false
+  if (isPaymentUpdate(value)) return !isUnsupportedPaymentUpdate(value)
+  if (Reflect.has(value, 'callback_query')) return !isUnsupportedCallback(value)
+  const message = Reflect.get(value, 'message')
+  if (!message || typeof message !== 'object') return false
+  const content = Reflect.get(message, 'text')
+  if (typeof content !== 'string') return false
+  if (['Моя подписка', 'Мои устройства', 'Пригласить друга', 'Поддержка'].includes(content)) return true
+  return /^\/(?:app|menu|subscription|connect|plans|billing|devices|bonus|notifications|referrals|settings|admin|support|paysupport|help)(?:@[A-Za-z0-9_]+)?(?:\s|$)/.test(content)
+    || /^\/start(?:@[A-Za-z0-9_]+)?(?:\s+ref_[A-Z0-9]{6,8})?$/.test(content)
+}
+
 // No account details or subscription URLs in messages. The signed Mini App session is the boundary.
 export function welcomeMessage(section = 'home', referral?: string) {
   const url = new URL(miniAppUrl())
@@ -49,19 +84,37 @@ export function welcomeMessage(section = 'home', referral?: string) {
   return {
     text: section === 'support'
       ? 'Поддержка AlekseevVP. Откройте приложение и создайте обращение. По вопросам оплаты укажите номер заказа.'
-      : 'AlekseevVP\nВаш кабинет в Telegram.\n\nПодписка, оплата, подключение, устройства, бонусы и поддержка.',
-    reply_markup: { inline_keyboard: [[{ text: 'Открыть раздел кабинета', web_app: { url: url.toString() }, style: 'primary' }]] },
+      : 'AlekseevVP\nВаш интернет. Ваши правила.\n\nПодписка, устройства и помощь в одном приложении.',
+    reply_markup: { inline_keyboard: [[{ text: 'Открыть AlekseevVP', web_app: { url: url.toString() }, style: 'primary' }]] },
   }
 }
 
 export const welcomeWidgetHtml = '<html><body><div style="padding:20px;background:#101b25;color:#eef6ef;border-radius:20px"><div style="font-size:12px;color:#b5d4bc">ALEKSEEVVP</div><h2>Ваш интернет.<br>Ваши правила.</h2><p>Подписка, устройства и помощь<br>в одном приложении.</p></div></body></html>'
 
 export async function handleMiniAppUpdate(update: z.infer<typeof telegramUpdateSchema>) {
+  if (update.pre_checkout_query) { await answerStarsPreCheckout(update.pre_checkout_query); return }
+  if (update.message?.successful_payment || update.message?.refunded_payment) {
+    const message = update.message
+    if (message.chat.type !== 'private' || (message.from && message.chat.id !== message.from.id)) throw new Error('Unexpected Stars payer')
+    if (message.successful_payment) await settleStarsPayment(message.chat.id, message.successful_payment)
+    else if (message.refunded_payment) await refundStarsPayment(message.chat.id, message.refunded_payment)
+    return
+  }
   const callback = update.callback_query
   if (callback?.data?.startsWith('avp:')) {
     if (!callback.message || callback.message.chat.type !== 'private' || callback.message.chat.id !== callback.from.id) return
-    await miniAppBotCall('answerCallbackQuery', { callback_query_id: callback.id })
+    // Expired callback acknowledgements must not prevent the screen from opening.
+    await miniAppBotCall('answerCallbackQuery', { callback_query_id: callback.id }).catch(() => {})
     const action = callback.data.slice(4)
+    if (action.startsWith('buy:')) {
+      await sendStarsInvoiceFromBot(callback.from.id, callback.id, action.slice(4))
+      return
+    }
+    if (action.startsWith('pay:')) {
+      const html = await getBotPaymentScreen(callback.from.id, action.slice(4))
+      await displayCallbackScreen(callback.from.id, callback.message.message_id, html, miniAppUrl())
+      return
+    }
     let screen: BotScreen = botScreens.includes(action as BotScreen) ? action as BotScreen : 'home'
     let notice: string | undefined
     if (action === 'claim') {
@@ -71,31 +124,28 @@ export async function handleMiniAppUpdate(update: z.infer<typeof telegramUpdateS
         await claimChannelReward(account.id); screen = 'referrals'; notice = 'Бонус подтверждён и ожидает начисления'
       } catch (e) { notice = e instanceof Error ? e.message : 'Операция временно недоступна' }
     }
-    if (action.startsWith('buy:')) { screen = 'plans'; notice = 'Оформление внутри Telegram недоступно' }
     const html = await getBotScreen(callback.from.id, screen, notice)
-    await miniAppBotCall('editMessageText', { chat_id: callback.from.id, message_id: callback.message.message_id, rich_message: { html },
-      reply_markup: { inline_keyboard: [[{ text: 'Открыть приложение', web_app: { url: miniAppUrl() } }]] } })
+    await displayCallbackScreen(callback.from.id, callback.message.message_id, html, miniAppUrl())
     return
   }
   const message = update.message
   if (!message || message.chat.type !== 'private' || !message.from || message.chat.id !== message.from.id) return
   const menu: Record<string, BotScreen> = {
-    'Главная': 'home', 'Моя подписка': 'subscription', 'Подключение': 'connect',
-    'Тарифы': 'plans', 'Платежи': 'billing', 'Мои устройства': 'devices',
-    'Бонусы': 'bonus', 'Уведомления': 'notifications', 'Пригласить друга': 'referrals',
-    'Поддержка': 'support', 'Настройки': 'settings', 'Админка': 'admin',
+    'Моя подписка': 'subscription', 'Мои устройства': 'devices', 'Пригласить друга': 'referrals', 'Поддержка': 'support',
+    'Тарифы': 'plans', 'Платежи': 'billing', 'Бонусы': 'bonus', 'Уведомления': 'notifications', 'Настройки': 'settings',
   }
   const menuScreen = menu[message.text || '']
   if (menuScreen && process.env.TELEGRAM_RICH_MESSAGES_ENABLED === 'true') {
-    await miniAppBotCall('sendRichMessage', { chat_id: message.chat.id, rich_message: { html: await getBotScreen(message.from.id, menuScreen) }, protect_content: true })
+    await miniAppBotCall('sendRichMessage', { chat_id: message.chat.id, rich_message: { html: await getBotScreen(message.from.id, menuScreen) },
+      protect_content: true, reply_markup: { remove_keyboard: true } })
     return
   }
   const command = message.text?.split(/\s+/)[0]?.split('@')[0]
   const commands: Record<string, BotScreen> = {
-    '/start': 'home', '/app': 'home', '/menu': 'home', '/subscription': 'subscription',
-    '/connect': 'connect', '/plans': 'plans', '/billing': 'billing', '/devices': 'devices',
-    '/bonus': 'bonus', '/notifications': 'notifications', '/referrals': 'referrals',
-    '/support': 'support', '/paysupport': 'support', '/help': 'support', '/settings': 'settings', '/admin': 'admin',
+    '/start': 'home', '/app': 'home', '/menu': 'home', '/subscription': 'subscription', '/connect': 'connect',
+    '/plans': 'plans', '/billing': 'billing', '/devices': 'devices', '/bonus': 'bonus', '/notifications': 'notifications',
+    '/referrals': 'referrals', '/settings': 'settings', '/admin': 'admin',
+    '/support': 'support', '/paysupport': 'support', '/help': 'support',
   }
   const section = menuScreen || commands[command || '']
   if (!section) return
@@ -104,13 +154,7 @@ export async function handleMiniAppUpdate(update: z.infer<typeof telegramUpdateS
   if (process.env.TELEGRAM_RICH_MESSAGES_ENABLED === 'true') {
     await miniAppBotCall('sendRichMessage', { chat_id: message.chat.id,
       rich_message: { html: await getBotScreen(message.from.id, section as BotScreen, undefined, referral) },
-      protect_content: true, reply_markup: { keyboard: [
-        [{ text: 'Моя подписка' }, { text: 'Подключение' }],
-        [{ text: 'Тарифы' }, { text: 'Платежи' }],
-        [{ text: 'Мои устройства' }, { text: 'Бонусы' }],
-        [{ text: 'Пригласить друга' }, { text: 'Поддержка' }],
-        [{ text: 'Уведомления' }, { text: 'Настройки' }],
-      ], resize_keyboard: true, is_persistent: true }  })
+      protect_content: true, reply_markup: { remove_keyboard: true } })
     return
   }
   if (process.env.TELEGRAM_WIDGETS_ENABLED === 'true' && command === '/start') {
@@ -121,4 +165,57 @@ export async function handleMiniAppUpdate(update: z.infer<typeof telegramUpdateS
     } catch { /* Older Bot API installations retain a usable standard message. */ }
   }
   await miniAppBotCall('sendMessage', { chat_id: message.chat.id, ...content })
+}
+
+function checkoutUuid(callbackId: string) {
+  const hash = createHash('sha256').update(`avp-checkout:${callbackId}`).digest('hex')
+  return `${hash.slice(0, 8)}-${hash.slice(8, 12)}-5${hash.slice(13, 16)}-a${hash.slice(17, 20)}-${hash.slice(20, 32)}`
+}
+
+async function sendStarsInvoiceFromBot(telegramId: number, callbackId: string, planId: string) {
+  if (!starsEnabled()) {
+    await miniAppBotCall('sendMessage', { chat_id: telegramId, text: 'Оплата Stars временно недоступна.' })
+    return
+  }
+  const account = await prisma.user.findUnique({ where: { telegramId: BigInt(telegramId) }, select: { id: true } })
+  if (!account) {
+    await miniAppBotCall('sendMessage', { chat_id: telegramId, text: 'Войдите через Telegram в приложение AlekseevVP, затем выберите тариф.' })
+    return
+  }
+  const catalog = await buildPlanCatalog({ userId: account.id })
+  const plan = catalog.plans.find(item => item.id === planId)
+  if (!plan) {
+    await miniAppBotCall('sendMessage', { chat_id: telegramId, text: 'Тариф больше недоступен. Откройте актуальный список.' })
+    return
+  }
+  const request = new Request(miniAppUrl(), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
+    planId, purchaseType: 'SUBSCRIPTION', provider: 'TELEGRAM_STARS', deviceLimit: plan.initialDeviceLimit,
+    idempotencyKey: checkoutUuid(callbackId),
+  }) })
+  const limitKey = `bot-stars:${createHash('sha256').update(String(telegramId)).digest('hex')}`
+  const limited = await rateLimitKey(limitKey, 10, 60_000)
+  if (!limited.ok) {
+    await miniAppBotCall('sendMessage', { chat_id: telegramId, text: 'Слишком много попыток оплаты. Попробуйте позже.' })
+    return
+  }
+  const locked = await withDistributedLock(`billing-operation:${account.id}`,
+    () => createPaymentForUser(request, account.id, { telegramBot: true }), { timeoutMs: 30_000 })
+  if (!locked.acquired) {
+    await miniAppBotCall('sendMessage', { chat_id: telegramId, text: 'Другая операция оплаты ещё выполняется. Повторите позже.' })
+    return
+  }
+  const result = await locked.value.json() as { confirmationUrl?: string; localPaymentId?: string; starsAmount?: number; error?: string; redirectUrl?: string }
+  if (result.error) {
+    await miniAppBotCall('sendMessage', { chat_id: telegramId, text: result.error })
+    return
+  }
+  if (result.redirectUrl) {
+    await miniAppBotCall('sendMessage', { chat_id: telegramId, text: 'Доступ оформлен. Откройте подписку, чтобы увидеть новый срок.' })
+    return
+  }
+  if (!result.confirmationUrl || !result.localPaymentId || !Number.isInteger(result.starsAmount)) throw new Error('Stars invoice was not created')
+  await miniAppBotCall('sendInvoice', { chat_id: telegramId, title: plan.name.slice(0, 32),
+    description: plan.unlimitedDuration ? 'Бессрочная подписка AlekseevVP' : `Подписка AlekseevVP на ${plan.durationDays} дней`,
+    payload: `avp:${result.localPaymentId}`, provider_token: '', currency: 'XTR',
+    prices: [{ label: plan.name.slice(0, 32), amount: result.starsAmount }], protect_content: true })
 }

@@ -26,6 +26,7 @@ import {
 import { apiFetch, isApiFetchError } from "@/lib/api-client";
 import { toast } from "@/components/ui/toaster";
 import { Modal } from "@/components/ui/modal";
+import { PromoMergePanel } from "@/components/bonus-box/promo-merge";
 import { cn } from "@/lib/cn";
 import {
   bonusBoxRevealClass,
@@ -652,6 +653,11 @@ export function BonusBoxClient({
     requestAnimationFrame(() => document.getElementById(`bonus-tab-${nextTab}`)?.focus());
   }
 
+  async function refreshOverview() {
+    const freshData = await apiFetch<BonusBoxOverview>("/api/bonus-box", { silent: true }).catch(() => null);
+    if (freshData) setData(freshData);
+  }
+
   async function copyPromoCode(code: string) {
     try {
       await navigator.clipboard.writeText(code);
@@ -1029,6 +1035,9 @@ export function BonusBoxClient({
                 </div>
               )}
             </div>
+            {data.promoMerge?.enabled && (
+              <PromoMergePanel merge={data.promoMerge} onMerged={refreshOverview} />
+            )}
             {data.activePromoRewards.length > 0 && (
               <ActivePromoRewards
                 rewards={data.activePromoRewards}

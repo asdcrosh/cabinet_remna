@@ -11,6 +11,7 @@ import {
 import { gbToBytes } from './format'
 import { cleanupExpiredBonusBoxPromoCodes } from './promo-code-cleanup'
 import { syncCabinetPromoCodeToRemnashopBestEffort } from './remnashop-promo-sync'
+import { getPromoMergeOverview, type PromoMergeSettings } from './promo-code-merge'
 import { isFeatureEnabled } from './feature-flags'
 import {
   activeEventForPrize,
@@ -42,6 +43,8 @@ const DEFAULT_RUB_PER_ATTEMPT = 300
 const DEFAULT_ATTEMPT_TTL_DAYS = 30
 const DEFAULT_WEEKLY_DAY = 5
 const DEFAULT_PROMO_EXPIRES_IN_DAYS = 7
+const DEFAULT_PROMO_MERGE_COEFFICIENT = 70
+const DEFAULT_PROMO_MERGE_CAP_PERCENT = 30
 const DEFAULT_RARE_COOLDOWN_OPENINGS = 2
 const DEFAULT_EPIC_COOLDOWN_OPENINGS = 8
 const DEFAULT_LEGENDARY_COOLDOWN_OPENINGS = 30
@@ -108,6 +111,9 @@ export type BonusBoxSettings = {
   pityOpenings: number
   showBestRecentOpening: boolean
   activePromoRewardsLimit: number
+  promoMergeEnabled: boolean
+  promoMergeCoefficient: number
+  promoMergeCapPercent: number
 }
 
 export class BonusBoxError extends Error {
@@ -243,6 +249,9 @@ export function getBonusBoxConfig() {
     pityOpenings: envInt('BONUS_BOX_PITY_OPENINGS', DEFAULT_PITY_OPENINGS, 2, 100),
     showBestRecentOpening: envBool('BONUS_BOX_SHOW_BEST_RECENT_OPENING', true),
     activePromoRewardsLimit: envInt('BONUS_BOX_ACTIVE_PROMO_REWARDS_LIMIT', DEFAULT_ACTIVE_PROMO_REWARDS_LIMIT, 0, 12),
+    promoMergeEnabled: envBool('BONUS_BOX_PROMO_MERGE_ENABLED', true),
+    promoMergeCoefficient: envInt('BONUS_BOX_PROMO_MERGE_COEFFICIENT', DEFAULT_PROMO_MERGE_COEFFICIENT, 10, 100),
+    promoMergeCapPercent: envInt('BONUS_BOX_PROMO_MERGE_CAP_PERCENT', DEFAULT_PROMO_MERGE_CAP_PERCENT, 5, 99),
   }
 }
 
@@ -263,6 +272,9 @@ export async function getBonusBoxSettings(
       0,
       12
     ),
+    promoMergeEnabled: settings?.promoMergeEnabled ?? config.promoMergeEnabled,
+    promoMergeCoefficient: clamp(settings?.promoMergeCoefficient ?? config.promoMergeCoefficient, 10, 100),
+    promoMergeCapPercent: clamp(settings?.promoMergeCapPercent ?? config.promoMergeCapPercent, 5, 99),
   }
 }
 
@@ -275,14 +287,38 @@ export async function updateBonusBoxSettings(input: BonusBoxSettings) {
       pityOpenings: clamp(input.pityOpenings, 2, 100),
       showBestRecentOpening: input.showBestRecentOpening,
       activePromoRewardsLimit: clamp(input.activePromoRewardsLimit, 0, 12),
+      promoMergeEnabled: input.promoMergeEnabled,
+      promoMergeCoefficient: clamp(input.promoMergeCoefficient, 10, 100),
+      promoMergeCapPercent: clamp(input.promoMergeCapPercent, 5, 99),
     },
     update: {
       pityEnabled: input.pityEnabled,
       pityOpenings: clamp(input.pityOpenings, 2, 100),
       showBestRecentOpening: input.showBestRecentOpening,
       activePromoRewardsLimit: clamp(input.activePromoRewardsLimit, 0, 12),
+      promoMergeEnabled: input.promoMergeEnabled,
+      promoMergeCoefficient: clamp(input.promoMergeCoefficient, 10, 100),
+      promoMergeCapPercent: clamp(input.promoMergeCapPercent, 5, 99),
     },
   })
+}
+
+export function promoMergeSettingsFrom(
+  config: Pick<BonusBoxSettings, 'promoMergeEnabled' | 'promoMergeCoefficient' | 'promoMergeCapPercent'> & {
+    promoExpiresInDays: number
+    enabled?: boolean
+  }
+): PromoMergeSettings {
+  return {
+    enabled: config.promoMergeEnabled && config.enabled !== false,
+    coefficientPercent: config.promoMergeCoefficient,
+    capPercent: config.promoMergeCapPercent,
+    ttlDays: config.promoExpiresInDays,
+  }
+}
+
+export async function getPromoMergeSettings() {
+  return promoMergeSettingsFrom(await getBonusBoxRuntimeConfig())
 }
 
 async function getBonusBoxRuntimeConfig() {
@@ -310,7 +346,7 @@ export async function getBonusBoxOverview(userId: string) {
 
   const now = new Date()
   const config = await getBonusBoxRuntimeConfig()
-  const [attempts, prizeRows, openings, activePromoRewards, bestRecentOpening, vpnAccess, activeEvents] = await Promise.all([
+  const [attempts, prizeRows, openings, activePromoRewards, bestRecentOpening, vpnAccess, activeEvents, promoMerge] = await Promise.all([
     prisma.bonusBoxAttempt.findMany({
       where: {
         userId,
@@ -353,6 +389,7 @@ export async function getBonusBoxOverview(userId: string) {
       },
       select: { id: true, prizeIds: true, weightMultiplier: true },
     }),
+    getPromoMergeOverview(userId, promoMergeSettingsFrom(config), now),
   ])
   const hasActiveSubscription = Boolean(
     vpnAccess && hasRemnawaveUserReference(vpnAccess) && vpnAccess.subscriptions.length > 0
@@ -396,6 +433,7 @@ export async function getBonusBoxOverview(userId: string) {
     openingStreak: buildOpeningStreak(openings.length),
     bestRecentOpening,
     activePromoRewards,
+    promoMerge,
     missions: engagement.missions,
     events: engagement.events,
     prizes,
@@ -1575,9 +1613,23 @@ async function getActivePromoRewards(userId: string, limit: number, now: Date) {
     take: Math.max(limit * 2, limit),
     include: { prize: true, promoCode: true },
   })
+  const merges = await prisma.promoCodeMerge.findMany({
+    where: {
+      userId,
+      resultPromo: {
+        is: {
+          isActive: true,
+          OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+        },
+      },
+    },
+    orderBy: { createdAt: 'desc' },
+    take: limit,
+    include: { resultPromo: true },
+  })
   const seenCodes = new Set<string>()
 
-  return openings.flatMap((opening) => {
+  const fromOpenings = openings.flatMap((opening) => {
     const promoCode = opening.promoCode
     if (!promoCode || seenCodes.has(promoCode.code)) return []
     seenCodes.add(promoCode.code)
@@ -1590,7 +1642,19 @@ async function getActivePromoRewards(userId: string, limit: number, now: Date) {
       prizeTitle: opening.prize.title,
       createdAt: opening.createdAt.toISOString(),
     }]
-  }).slice(0, limit)
+  })
+  const fromMerges = merges.map((merge) => ({
+    id: merge.resultPromo.id,
+    code: merge.resultPromo.code,
+    discountPercent: merge.resultPromo.discountPercent,
+    expiresAt: merge.resultPromo.expiresAt?.toISOString() ?? null,
+    prizeTitle: `Объединённый −${merge.resultPromo.discountPercent}%`,
+    createdAt: merge.createdAt.toISOString(),
+  }))
+
+  return [...fromMerges, ...fromOpenings]
+    .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
+    .slice(0, limit)
 }
 
 async function getBestRecentOpening(now: Date) {

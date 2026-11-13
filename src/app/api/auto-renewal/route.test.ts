@@ -57,15 +57,6 @@ describe('auto-renewal route', () => {
     expect(mocks.enableAutoRenewal).not.toHaveBeenCalled()
   })
 
-  it('blocks ruble recurring charges in Telegram', async () => {
-    mocks.requireAuth.mockResolvedValue({ uid: 'user-1', email: 'user@example.com', role: 'USER', channel: 'telegram-miniapp' })
-
-    const response = await POST(request({ planId: 'plan-1', consentAccepted: true, consentVersion: AUTO_RENEWAL_CONSENT_VERSION }))
-
-    expect(response.status).toBe(403)
-    expect(mocks.enableAutoRenewal).not.toHaveBeenCalled()
-  })
-
   it('records the accepted consent version when enabling', async () => {
     const response = await POST(request({
       planId: 'plan-1',
