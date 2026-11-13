@@ -10,7 +10,7 @@ import { starsEnabled } from './stars'
 import { buildPlanCatalog } from '@/lib/plan-catalog'
 import { createPaymentForUser } from '@/lib/payment-checkout'
 import { withDistributedLock } from '@/lib/distributed-lock'
-import { rateLimit } from '@/lib/rate-limit'
+import { rateLimitKey } from '@/lib/rate-limit'
 import { answerStarsPreCheckout, isOurStarsPayload, refundStarsPayment, settleStarsPayment } from './stars-payments'
 import { displayCallbackScreen } from './callback-screen'
 
@@ -178,7 +178,8 @@ async function sendStarsInvoiceFromBot(telegramId: number, callbackId: string, p
     planId, purchaseType: 'SUBSCRIPTION', provider: 'TELEGRAM_STARS', deviceLimit: plan.initialDeviceLimit,
     idempotencyKey: checkoutUuid(callbackId),
   }) })
-  const limited = await rateLimit(request, `bot-stars:${telegramId}`, 10, 60_000)
+  const limitKey = `bot-stars:${createHash('sha256').update(String(telegramId)).digest('hex')}`
+  const limited = await rateLimitKey(limitKey, 10, 60_000)
   if (!limited.ok) {
     await miniAppBotCall('sendMessage', { chat_id: telegramId, text: 'Слишком много попыток оплаты. Попробуйте позже.' })
     return
