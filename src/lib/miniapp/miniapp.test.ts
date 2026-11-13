@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { buildRichPaymentScreen, buildRichScreen } from './rich-screens'
+import { buildDeviceDeleteConfirm, buildRichPaymentScreen, buildRichScreen, buildSpinResultScreen } from './rich-screens'
 import { channelCampaign, isChannelMember, isChannelReference } from './channel-referrals'
 import { miniAppDemo } from './model'
 import { isMiniAppOwnedUpdate, isPaymentUpdate, isUnsupportedPaymentUpdate, isUnsupportedCallback, telegramUpdateSchema, validWebhookSecret } from './bot'
@@ -47,11 +47,11 @@ describe('Telegram Mini App boundaries', () => {
     } finally { vi.unstubAllEnvs() }
   })
   it('escapes dynamic chat content and keeps subscription keys outside the chat', () => {
-    const html = buildRichScreen({ screen: 'devices', overview: miniAppDemo, appUrl: 'https://cabinet.example.test/miniapp', devices: [{ title: '<script>alert(1)</script>', platform: 'iOS' }] })
+    const html = buildRichScreen({ screen: 'devices', overview: miniAppDemo, appUrl: 'https://cabinet.example.test/miniapp', devices: [{ id: 'dev-1', title: '<script>alert(1)</script>', platform: 'iOS' }] })
     expect(html).not.toContain('<script>')
     expect(html).toContain('&lt;script&gt;')
     expect(html).not.toContain('subscriptionUrl')
-    expect(html).toContain('Переименовать или удалить')
+    expect(html).toContain('avp:devdel:dev-1')
   })
   it('shows Cabinet tariff terms with Stars checkout when enabled', () => {
     const overview = { ...miniAppDemo, plans: [{ ...miniAppDemo.plans[0]!, isPlanSwitch: true,
@@ -114,6 +114,30 @@ describe('Telegram Mini App boundaries', () => {
     expect(html).toContain('tab=admin')
     expect(buildRichScreen({ screen: 'admin', overview: miniAppDemo, appUrl: 'https://cabinet.example.test/miniapp' })).not.toContain('Пользователи')
     expect(buildRichScreen({ screen: 'home', overview: miniAppDemo, appUrl: 'https://cabinet.example.test/miniapp' })).not.toContain('Админка')
+  })
+  it('runs in-chat actions: device removal, wheel spin and mark-all-read', () => {
+    const input = { screen: 'devices' as const, overview: miniAppDemo, appUrl: 'https://cabinet.example.test/miniapp' }
+    const devices = buildRichScreen({ ...input, devices: [{ id: 'dev-1', title: 'iPhone', platform: 'iOS' }, { id: 'dev-2', title: 'MacBook', platform: 'macOS' }] })
+    expect(devices).toContain('avp:devdel:dev-1')
+    expect(devices).toContain('avp:devdel:dev-2')
+    const confirm = buildDeviceDeleteConfirm(input, { id: 'dev-1', title: 'iPhone', platform: 'iOS' })
+    expect(confirm).toContain('Удалить устройство?')
+    expect(confirm).toContain('avp:devyes:dev-1')
+    expect(confirm).toContain('avp:devices')
+    const spin = buildSpinResultScreen({ ...input, screen: 'bonus' }, { prizeTitle: '7 дней подписки', prizeDescription: null,
+      promoCode: 'BONUS-7', promoCodeExpiresAt: '2026-12-01T00:00:00Z', remainingAttempts: 1 })
+    expect(spin).toContain('🎉 7 дней подписки')
+    expect(spin).toContain('BONUS-7')
+    expect(spin).toContain('type="copy_text"')
+    expect(spin).toContain('avp:spin')
+    const bonus = buildRichScreen({ ...input, screen: 'bonus', bonus: { enabled: true, attempts: 2 } })
+    expect(bonus).toContain('Крутить колесо · 2')
+    const inbox = buildRichScreen({ ...input, screen: 'notifications', inbox: { unread: 3, items: [{ title: 'Подписка продлена', date: '01.11.2026', fresh: true }] } })
+    expect(inbox).toContain('avp:readall')
+    expect(inbox).toContain('Прочитать все')
+    const billing = buildRichScreen({ ...input, screen: 'billing' })
+    expect(billing).toContain('avp:pay:demo')
+    expect(billing).toContain('Продлить')
   })
   it('does not render an empty rich button row when optional features are off', () => {
     const overview = { ...miniAppDemo, support: false, referrals: false }
