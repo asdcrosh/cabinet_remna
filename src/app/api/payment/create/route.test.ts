@@ -192,6 +192,16 @@ describe('payment create route', () => {
     mocks.prisma.user.updateMany.mockResolvedValue({ count: 1 })
   })
 
+  it('blocks ruble checkout in a Telegram Mini App session', async () => {
+    mocks.requireAuth.mockResolvedValue({ uid: user.id, email: user.email, role: 'USER', channel: 'telegram-miniapp' })
+
+    const response = await POST(paymentRequest())
+
+    expect(response.status).toBe(403)
+    expect((await response.json()).error).toContain('Stars')
+    expect(mocks.createPayment).not.toHaveBeenCalled()
+  })
+
   it('allows the authenticated bot add-on without email and retains the public email gate', async () => {
     mocks.prisma.user.findUnique.mockResolvedValue({ ...user, email: 'telegram-123@pending.invalid', emailVerifiedAt: null, telegramId: 123n })
     mocks.prisma.subscription.findFirst.mockResolvedValue({ id: 'subscription-1', userId: user.id, planId: plan.id, status: 'ACTIVE', expireAt: futureDate(5), deviceLimit: 5 })

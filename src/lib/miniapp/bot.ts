@@ -49,8 +49,8 @@ export function welcomeMessage(section = 'home', referral?: string) {
   return {
     text: section === 'support'
       ? 'Поддержка AlekseevVP. Откройте приложение и создайте обращение. По вопросам оплаты укажите номер заказа.'
-      : 'AlekseevVP\nВаш интернет. Ваши правила.\n\nПодписка, устройства и помощь в одном приложении.',
-    reply_markup: { inline_keyboard: [[{ text: 'Открыть AlekseevVP', web_app: { url: url.toString() }, style: 'primary' }]] },
+      : 'AlekseevVP\nВаш кабинет в Telegram.\n\nПодписка, оплата, подключение, устройства, бонусы и поддержка.',
+    reply_markup: { inline_keyboard: [[{ text: 'Открыть раздел кабинета', web_app: { url: url.toString() }, style: 'primary' }]] },
   }
 }
 
@@ -79,21 +79,38 @@ export async function handleMiniAppUpdate(update: z.infer<typeof telegramUpdateS
   }
   const message = update.message
   if (!message || message.chat.type !== 'private' || !message.from || message.chat.id !== message.from.id) return
-  const menu: Record<string, BotScreen> = { 'Моя подписка': 'subscription', 'Мои устройства': 'devices', 'Пригласить друга': 'referrals', 'Поддержка': 'support' }
+  const menu: Record<string, BotScreen> = {
+    'Главная': 'home', 'Моя подписка': 'subscription', 'Подключение': 'connect',
+    'Тарифы': 'plans', 'Платежи': 'billing', 'Мои устройства': 'devices',
+    'Бонусы': 'bonus', 'Уведомления': 'notifications', 'Пригласить друга': 'referrals',
+    'Поддержка': 'support', 'Настройки': 'settings', 'Админка': 'admin',
+  }
   const menuScreen = menu[message.text || '']
   if (menuScreen && process.env.TELEGRAM_RICH_MESSAGES_ENABLED === 'true') {
     await miniAppBotCall('sendRichMessage', { chat_id: message.chat.id, rich_message: { html: await getBotScreen(message.from.id, menuScreen) }, protect_content: true })
     return
   }
   const command = message.text?.split(/\s+/)[0]?.split('@')[0]
-  if (!command || !['/start', '/app', '/support', '/paysupport', '/help'].includes(command)) return
-  const section = ['/support', '/paysupport', '/help'].includes(command) ? 'support' : 'home'
+  const commands: Record<string, BotScreen> = {
+    '/start': 'home', '/app': 'home', '/menu': 'home', '/subscription': 'subscription',
+    '/connect': 'connect', '/plans': 'plans', '/billing': 'billing', '/devices': 'devices',
+    '/bonus': 'bonus', '/notifications': 'notifications', '/referrals': 'referrals',
+    '/support': 'support', '/paysupport': 'support', '/help': 'support', '/settings': 'settings', '/admin': 'admin',
+  }
+  const section = menuScreen || commands[command || '']
+  if (!section) return
   const referral = message.text?.match(/^\/start(?:@[a-zA-Z0-9_]+)? ref_([A-Z0-9]{6,8})$/)?.[1]
   const content = welcomeMessage(section, referral)
   if (process.env.TELEGRAM_RICH_MESSAGES_ENABLED === 'true') {
     await miniAppBotCall('sendRichMessage', { chat_id: message.chat.id,
       rich_message: { html: await getBotScreen(message.from.id, section as BotScreen, undefined, referral) },
-      protect_content: true, reply_markup: { keyboard: [[{ text: 'Моя подписка' }, { text: 'Мои устройства' }], [{ text: 'Пригласить друга' }, { text: 'Поддержка' }]], resize_keyboard: true, is_persistent: true }  })
+      protect_content: true, reply_markup: { keyboard: [
+        [{ text: 'Моя подписка' }, { text: 'Подключение' }],
+        [{ text: 'Тарифы' }, { text: 'Платежи' }],
+        [{ text: 'Мои устройства' }, { text: 'Бонусы' }],
+        [{ text: 'Пригласить друга' }, { text: 'Поддержка' }],
+        [{ text: 'Уведомления' }, { text: 'Настройки' }],
+      ], resize_keyboard: true, is_persistent: true }  })
     return
   }
   if (process.env.TELEGRAM_WIDGETS_ENABLED === 'true' && command === '/start') {

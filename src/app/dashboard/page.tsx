@@ -17,6 +17,7 @@ import {
 } from 'lucide-react'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth/cookies'
+import { isTelegramMiniAppSession } from '@/lib/auth/jwt'
 import { remnawave, RemnawaveError } from '@/lib/remnawave'
 import { StatusBadge } from '@/components/dashboard/status-badge'
 import { DashboardOnboardingCard, type DashboardOnboardingState } from '@/components/dashboard/onboarding-card'
@@ -45,6 +46,7 @@ export const dynamic = 'force-dynamic'
 
 export default async function DashboardHome() {
   const session = await getCurrentUser()
+  const inTelegram = Boolean(session && isTelegramMiniAppSession(session))
   if (!session) redirect('/login')
 
   const freshPendingCutoff = getFreshPendingPaymentCutoff()
@@ -255,7 +257,7 @@ export default async function DashboardHome() {
 
       <div className={styles.highlights}>
         {whitelistAddonOffer ? (
-          <HomeWhitelistAddon {...whitelistAddonOffer} paymentProviders={paymentProviders} />
+          <HomeWhitelistAddon {...whitelistAddonOffer} paymentProviders={inTelegram ? [] : paymentProviders} />
         ) : whitelistPlan ? <HomeWhitelistPlans planId={whitelistPlan.id} /> : null}
         {features.bonusBox ? (
           <Suspense fallback={<LoadingPanel label="Загрузка рулетки" />}>
@@ -368,7 +370,7 @@ export default async function DashboardHome() {
             <h2>Больше возможностей</h2>
             <p>Дополнения и бонусы к вашей подписке</p>
           </div>
-          <HomeDeviceAddon {...deviceAddonOffer} paymentProviders={paymentProviders} />
+          <HomeDeviceAddon {...deviceAddonOffer} paymentProviders={inTelegram ? [] : paymentProviders} />
         </section>
       ) : null}
     </div>

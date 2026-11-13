@@ -21,6 +21,7 @@ export interface SessionPayload extends JWTPayload {
   email: string
   role: 'USER' | 'MODERATOR' | 'ADMIN' | 'SUPER_ADMIN'
   stage?: 'FULL' | 'EMAIL_PENDING'
+  channel?: 'telegram-miniapp'
   sv?: number
   // Только у токенов приложения: id записи MobileSession.
   sid?: string
@@ -62,6 +63,10 @@ export async function signSession(
 export function isMobileSession(session: Pick<SessionPayload, 'aud' | 'sid'>) {
   const aud = Array.isArray(session.aud) ? session.aud : [session.aud]
   return aud.includes(MOBILE_AUDIENCE) && typeof session.sid === 'string'
+}
+
+export function isTelegramMiniAppSession(session: Pick<SessionPayload, 'channel'>) {
+  return session.channel === 'telegram-miniapp'
 }
 
 export async function verifySession(token: string): Promise<SessionPayload | null> {

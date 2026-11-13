@@ -6,6 +6,7 @@ import { isYookassaConfigured } from '@/lib/yookassa'
 import { rateLimit } from '@/lib/rate-limit'
 import { AUTO_RENEWAL_CONSENT_VERSION } from '@/lib/auto-renewal-consent'
 import { withDistributedLock } from '@/lib/distributed-lock'
+import { isTelegramMiniAppSession } from '@/lib/auth/jwt'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -23,6 +24,9 @@ export const GET = withAuth(async () => {
 
 export const POST = withAuth(async (req: Request) => {
   const session = await requireAuth()
+  if (isTelegramMiniAppSession(session)) {
+    return jsonResponse({ error: 'Автопродление через ЮKassa недоступно внутри Telegram.' }, { status: 403 })
+  }
   const limited = await rateLimit(req, `auto-renewal:${session.uid}`, 10, 60_000)
   if (!limited.ok) {
     return jsonResponse(

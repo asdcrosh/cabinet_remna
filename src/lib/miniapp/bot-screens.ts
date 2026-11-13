@@ -4,21 +4,72 @@ import { buildRichScreen, type BotScreen, type RichScreenInput } from './rich-sc
 import { miniAppUrl } from './config'
 import { channelCampaign } from './channel-referrals'
 import { ensureUserReferralCode } from '@/lib/referrals'
+import { getFeatureFlags } from '@/lib/feature-flags'
 import { syncLocalDevicesFromRemnawave } from '@/lib/remnawave-device-sync'
 import { hasRemnawaveUserReference, remnawaveUserReference } from '@/lib/remnawave'
+
+const paymentStatusLabel: Record<string, string> = { SUCCEEDED: '✅ Оплачен', PENDING: '⏳ Ожидает оплаты', CANCELED: '❌ Отменён', REFUNDED: '↩️ Возврат' }
+const autoRenewalLabel: Record<string, string> = {
+  AWAITING_PAYMENT_METHOD: 'ждёт привязки карты', ACTIVE: 'включено', PROCESSING: 'списание в обработке',
+  RETRYING: 'повторная попытка списания', PAUSED: 'на паузе', DISABLED: 'отключено',
+}
+const formatRub = (kopecks: number) => `${(kopecks / 100).toLocaleString('ru-RU')} ₽`
+const formatDate = (date: Date) => date.toLocaleDateString('ru-RU', { timeZone: 'Europe/Moscow' })
 
 export async function getBotScreenInput(telegramId: number, screen: BotScreen, notice?: string, referralCode?: string): Promise<RichScreenInput> {
   const user = await prisma.user.findUnique({ where: { telegramId: BigInt(telegramId) } })
   const appUrl = new URL(miniAppUrl())
   if (referralCode) appUrl.searchParams.set('ref', referralCode)
   const input: RichScreenInput = { screen, appUrl: appUrl.toString(), overview: user ? await getMiniAppOverview(user.id) : null,
-    bannerUrl: process.env.TELEGRAM_MINIAPP_BANNER_URL || new URL('/miniapp/banner.png', appUrl).toString(), notice }
+    bannerUrl: process.env.TELEGRAM_MINIAPP_BANNER_URL || new URL('/miniapp/banner.png', appUrl).toString(), notice,
+    admin: Boolean(user && user.role !== 'USER') }
   if (user && input.overview) {
     if (screen === 'devices' && hasRemnawaveUserReference(user)) {
       try {
         const result = await syncLocalDevicesFromRemnawave({ localUserId: user.id, reference: remnawaveUserReference(user) })
         input.devices = result.devices.slice(0, 12).map(device => ({ title: device.displayName || device.deviceModel || 'Устройство', platform: device.platform || 'VPN-клиент' }))
       } catch { input.notice = 'Не удалось обновить список устройств. Попробуйте позже.' }
+    }
+    if (screen === 'billing') {
+      const [payments, autoRenewal] = await Promise.all([
+        prisma.payment.findMany({ where: { userId: user.id }, orderBy: { createdAt: 'desc' }, take: 5,
+          select: { amountKopecks: true, status: true, createdAt: true, plan: { select: { name: true } } } }),
+        prisma.autoRenewal.findUnique({ where: { userId: user.id }, select: { status: true, paymentMethodTitle: true } }),
+      ])
+      input.payments = payments.map(payment => ({ title: payment.plan.name, amount: formatRub(payment.amountKopecks),
+        status: paymentStatusLabel[payment.status] ?? payment.status, date: formatDate(payment.createdAt) }))
+      input.autoRenewal = autoRenewal
+        ? `${autoRenewalLabel[autoRenewal.status] ?? autoRenewal.status.toLowerCase()}${autoRenewal.status === 'ACTIVE' && autoRenewal.paymentMethodTitle ? ` · ${autoRenewal.paymentMethodTitle}` : ''}`
+        : null
+    }
+    if (screen === 'bonus') {
+      const features = await getFeatureFlags()
+      const attempts = features.bonusBox
+        ? await prisma.bonusBoxAttempt.count({ where: { userId: user.id, usedAt: null, OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] } })
+        : 0
+      input.bonus = { enabled: features.bonusBox, attempts }
+    }
+    if (screen === 'notifications') {
+      const [unread, items] = await Promise.all([
+        prisma.userNotification.count({ where: { userId: user.id, readAt: null } }),
+        prisma.userNotification.findMany({ where: { userId: user.id }, orderBy: { createdAt: 'desc' }, take: 5,
+          select: { title: true, createdAt: true, readAt: true } }),
+      ])
+      input.inbox = { unread, items: items.map(item => ({ title: item.title, date: formatDate(item.createdAt), fresh: !item.readAt })) }
+    }
+    if (screen === 'settings') {
+      const prefs = await prisma.userNotificationPreference.findUnique({ where: { userId: user.id } })
+      input.prefs = { telegram: prefs?.telegramEnabled ?? true, email: prefs?.emailEnabled ?? true, broadcasts: prefs?.broadcastsEnabled ?? true }
+    }
+    if (screen === 'admin' && input.admin) {
+      const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0)
+      const [users, activeSubscriptions, paymentsToday, openTickets] = await Promise.all([
+        prisma.user.count(),
+        prisma.subscription.count({ where: { status: 'ACTIVE', expireAt: { gt: new Date() } } }),
+        prisma.payment.count({ where: { status: 'SUCCEEDED', paidAt: { gte: todayStart } } }),
+        prisma.supportTicket.count({ where: { status: { in: ['OPEN', 'WAITING_ADMIN'] } } }),
+      ])
+      input.adminStats = { users, activeSubscriptions, paymentsToday, openTickets }
     }
     if (screen === 'referrals' && input.overview.referrals) {
       const campaign = channelCampaign()
@@ -35,9 +86,9 @@ export async function getBotScreenInput(telegramId: number, screen: BotScreen, n
     if (screen === 'support' && input.overview.support) {
       const tickets = await prisma.supportTicket.findMany({ where: { userId: user.id, status: { not: 'CLOSED' } }, orderBy: { lastMessageAt: 'desc' }, take: 5,
         select: { subject: true, status: true } })
-      input.tickets = tickets.map(ticket => ({ subject: ticket.subject, status: ticket.status === 'WAITING_USER' ? 'Есть ответ' : 'Ждём ответа поддержки' }))
+      input.tickets = tickets.map(ticket => ({ subject: ticket.subject, status: ticket.status === 'WAITING_USER' ? '💬 Есть ответ' : '⏳ Ждём ответа поддержки' }))
     }
-    if ((screen === 'referrals' && !input.overview.referrals) || (screen === 'support' && !input.overview.support)) {
+    if ((screen === 'referrals' && !input.overview.referrals) || (screen === 'support' && !input.overview.support) || (screen === 'admin' && !input.admin)) {
       input.screen = 'home'; input.notice = 'Раздел сейчас недоступен'
     }
   }

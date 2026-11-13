@@ -10,6 +10,7 @@ import {
   FileClock,
   Gift,
   Home,
+  Smartphone,
   KeyRound,
   Mail,
   MessageCircleQuestion,
@@ -45,10 +46,13 @@ export const userNavigation: NavigationItem[] = [
   { href: '/dashboard/subscription', label: 'Подключение', shortLabel: 'VPN', icon: KeyRound },
   { href: '/dashboard/plans', label: 'Тарифы', shortLabel: 'Тариф', icon: ShieldCheck },
   { href: '/dashboard/support', label: 'Поддержка', shortLabel: 'Помощь', icon: MessageCircleQuestion },
+  { href: '/dashboard/billing', label: 'Подписка и оплата', icon: CreditCard },
+  { href: '/dashboard/devices', label: 'Устройства', icon: Smartphone },
+  { href: '/dashboard/referrals', label: 'Пригласить друга', icon: UsersRound },
+  { href: '/dashboard/bonus-box', label: 'Бонусы', icon: Gift },
+  { href: '/dashboard/notifications', label: 'Уведомления', icon: Bell },
   { href: '/dashboard/settings', label: 'Настройки', icon: Settings },
 ]
-
-const bonusNavigationItem: NavigationItem = { href: '/dashboard/bonus-box', label: 'Бонусы', icon: Gift }
 
 export const userPrimaryNavigation = userNavigation.filter((item) => [
   '/dashboard',
@@ -58,15 +62,16 @@ export const userPrimaryNavigation = userNavigation.filter((item) => [
 ].includes(item.href))
 
 export const userSecondaryNavigation = userNavigation.filter((item) => [
+  '/dashboard/billing',
+  '/dashboard/devices',
+  '/dashboard/referrals',
+  '/dashboard/bonus-box',
+  '/dashboard/notifications',
   '/dashboard/settings',
 ].includes(item.href))
 
 export const bottomNavigation: NavigationItem[] = userPrimaryNavigation
-export const bottomMoreNavigation: NavigationItem[] = [
-  { href: '/dashboard/notifications', label: 'Уведомления', icon: Bell },
-  bonusNavigationItem,
-  ...userSecondaryNavigation,
-]
+export const bottomMoreNavigation: NavigationItem[] = userSecondaryNavigation
 
 const legalIcons: Record<LegalPath, LucideIcon> = {
   '/offer': FileCheck2,
