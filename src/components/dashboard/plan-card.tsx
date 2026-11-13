@@ -70,6 +70,7 @@ export interface PlanCardProps {
     id: CheckoutPaymentProvider;
     label: string;
   }>;
+  receiptOnCreate?: boolean;
   availablePromoCodes?: Array<{
     code: string;
     discountPercent: number;
@@ -114,6 +115,7 @@ export function PlanCard({
   personalDiscountPercent = 0,
   nextPurchaseDiscountPercent = 0,
   paymentProviders = [{ id: "YOOKASSA", label: "ЮKassa" }],
+  receiptOnCreate = false,
   availablePromoCodes = [],
 }: PlanCardProps) {
   const checkoutDisplay = display === "checkout";
@@ -304,9 +306,10 @@ export function PlanCard({
 
     setLoading(true);
     try {
-      const { confirmationUrl, redirectUrl } = await apiFetch<{
+      const { confirmationUrl, redirectUrl, localPaymentId } = await apiFetch<{
         confirmationUrl?: string;
         redirectUrl?: string;
+        localPaymentId?: string;
       }>("/api/payment/create", {
         method: "POST",
         body: JSON.stringify({
@@ -324,7 +327,9 @@ export function PlanCard({
           ...(appliedPromo ? { promoCode: appliedPromo.code } : {}),
         }),
       });
-      if (confirmationUrl) {
+      if (receiptOnCreate && selectedProvider === "YOOKASSA" && localPaymentId && confirmationUrl) {
+        window.location.assign(new URL(`/pay/receipt?payment=${encodeURIComponent(localPaymentId)}`, window.location.origin).toString());
+      } else if (confirmationUrl) {
         window.location.href = confirmationUrl;
       } else if (redirectUrl) {
         window.location.href = redirectUrl;

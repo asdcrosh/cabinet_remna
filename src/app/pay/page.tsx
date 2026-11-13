@@ -49,7 +49,7 @@ export default async function PayPage({ searchParams }: { searchParams: Promise<
             <p className="text-xs font-semibold uppercase tracking-widest text-cyan-700">Счёт AlekseevVP</p>
             <h2 className="mt-2 text-2xl font-bold">{plan.name}</h2>
             <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{plan.unlimitedDuration ? 'Бессрочный доступ' : `${plan.durationDays} дней доступа`}. Устройства и скидки учтём перед переходом к оплате.</p>
-            <div className="mt-6"><PlanCard {...plan} display="checkout" paymentProviders={[yookassa]} /></div>
+            <div className="mt-6"><PlanCard {...plan} display="checkout" paymentProviders={[yookassa]} receiptOnCreate /></div>
             <p className="mt-5 text-center text-xs leading-5 text-slate-500 dark:text-slate-400">Платёж обрабатывает ЮKassa. Доступные способы, включая СБП, зависят от настроек магазина и покажутся на её странице. Статус заказа появится в кабинете.</p>
           </section>
         )}
