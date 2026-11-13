@@ -71,6 +71,13 @@ describe('Telegram Mini App boundaries', () => {
     expect(buildRichPaymentScreen(input, 'demo', false)).not.toContain('/pay?plan=')
     expect(buildRichPaymentScreen(input, 'unknown', true)).not.toContain('/pay?plan=')
   })
+  it('uses one safe brand banner on bot and payment screens', () => {
+    const input = { screen: 'home' as const, overview: miniAppDemo,
+      appUrl: 'https://cabinet.example.test/miniapp', bannerUrl: 'https://cabinet.example.test/miniapp/banner.png' }
+    expect(buildRichScreen(input)).toContain('<img src="https://cabinet.example.test/miniapp/banner.png">')
+    expect(buildRichPaymentScreen(input, 'demo', true)).toContain('<img src="https://cabinet.example.test/miniapp/banner.png">')
+    expect(buildRichScreen({ ...input, bannerUrl: 'http://insecure.example/banner.png' })).not.toContain('<img')
+  })
   it('rounds the configured ruble price up to whole Stars', () => {
     expect(starsForKopecks(30_000, 300)).toBe(100)
     expect(starsForKopecks(30_001, 300)).toBe(101)

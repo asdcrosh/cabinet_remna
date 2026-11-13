@@ -12,6 +12,7 @@ import styles from './mini-app.module.css'
 
 type Tab = 'home' | 'plans' | 'devices' | 'referrals' | 'support' | 'connect'
 type Referrals = { url: string; condition: string; invited: number; claimed: number; enabled: boolean; channelUrl: string | null; eligible: boolean; claimedAt: string | null }
+type PaymentItem = { id: string; status: string; amountKopecks: number; createdAt: string; provider: string; plan: { name: string } | null }
 const tabs = [{ id: 'home', label: 'Главная', icon: Home }, { id: 'plans', label: 'Подписка', icon: Wallet },
   { id: 'devices', label: 'Устройства', icon: Smartphone }, { id: 'referrals', label: 'Друзья', icon: Gift }, { id: 'support', label: 'Помощь', icon: Headphones }] as const
 
@@ -31,6 +32,7 @@ export function MiniApp({ demo = false }: { demo?: boolean }) {
   const [busy, setBusy] = useState(false)
   const [referrals, setReferrals] = useState<Referrals | null>(null)
   const [tickets, setTickets] = useState<SupportTicket[] | null>(null)
+  const [payments, setPayments] = useState<PaymentItem[] | null>(demo ? [] : null)
   const [subscriptionUrl, setSubscriptionUrl] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
   const [selectedLimits, setSelectedLimits] = useState<Record<string, number>>({})
@@ -83,6 +85,7 @@ export function MiniApp({ demo = false }: { demo?: boolean }) {
       try {
         if (tab === 'referrals') { const value = await request<Referrals>('/api/miniapp/referrals'); if (!cancelled) setReferrals(value) }
         if (tab === 'support') { const value = await request<{ tickets: SupportTicket[] }>('/api/support/tickets'); if (!cancelled) setTickets(value.tickets) }
+        if (tab === 'plans') { const value = await request<{ payments: PaymentItem[] }>('/api/payment/history'); if (!cancelled) setPayments(value.payments) }
         if (tab === 'connect') { const value = await request<{ keys: { subscriptionUrl: string } | null }>('/api/subscription/keys'); if (!cancelled) setSubscriptionUrl(value.keys?.subscriptionUrl ?? null) }
       } catch (e) { if (!cancelled) setError(e instanceof Error ? e.message : 'Не удалось загрузить раздел') }
       finally { if (!cancelled) setBusy(false) }
@@ -137,7 +140,7 @@ export function MiniApp({ demo = false }: { demo?: boolean }) {
   const visibleTabs = tabs.filter(item => (item.id !== 'support' || data?.support) && (item.id !== 'referrals' || data?.referrals))
   return <main className={styles.app}>
     <div className={styles.wrap}>
-      <header className={styles.header}><div className={styles.brand}><span className={styles.logo}><Shield size={22} /></span><span>Alekseev<span className={styles.brandAccent}>VP</span><small>Личный доступ</small></span></div>
+      <header className={styles.header}><div className={styles.brand}><span className={styles.logo}>VP</span><span>Alekseev<span className={styles.brandAccent}>VP</span><small>Личный кабинет</small></span></div>
         <button aria-label="Обновить данные" className={styles.iconButton} onClick={() => void refresh()} disabled={busy}><RefreshCw size={19} /></button></header>
       {demo && <div className={styles.demo}>Предпросмотр · вымышленные данные</div>}
       {error && <div role="alert" className={styles.alert}>{error} {!data && <button onClick={() => window.location.reload()}>Повторить</button>}</div>}
@@ -146,7 +149,8 @@ export function MiniApp({ demo = false }: { demo?: boolean }) {
       {data && <>
         {data.warning && <div className={styles.alert}>{data.warning}</div>}
         {tab === 'home' && <>
-          <div className={styles.intro}><span>Рады видеть, {data.name}</span><h1>Интернет.<br /><em>Без лишних границ.</em></h1></div>
+          <div className={styles.banner} aria-hidden="true" />
+          <div className={styles.intro}><span>Кабинет / {data.name}</span><h1>Ваш доступ<br /><em>в одном месте.</em></h1></div>
           <section className={styles.pass} aria-label="Моя подписка"><div className={styles.passTop}><span className={styles.pill}><span className={sub?.usable ? styles.dot : styles.offDot} />{sub?.title || 'Доступ ещё не подключён'}</span><Shield size={28} /></div>
             <div className={styles.passBody}><small>ВАШ ДОСТУП</small><h2>{sub?.planName || 'AlekseevVP'}</h2><p>{sub ? `До ${date}` : 'Начните с выбора подписки'}</p></div>
             <div className={styles.passBottom}><div><strong>{sub?.daysLeft == null ? (sub ? '∞' : '0') : Math.max(0, sub.daysLeft)}</strong><span>дней доступа</span></div><div><strong>{data.deviceCount}<i> / {sub?.deviceLimit ?? '∞'}</i></strong><span>устройств в кабинете</span></div></div>
@@ -163,6 +167,8 @@ export function MiniApp({ demo = false }: { demo?: boolean }) {
               {plan.description && <p>{plan.description}</p>}
               {plan.isPlanSwitch && <p className={styles.planNote}>При смене тарифа начнётся новый срок. Оставшиеся дни текущего тарифа не переносятся.</p>}
             </div>
+            {!plan.isPromo && <div className={styles.rublePrice}><span>Стоимость в кабинете</span><strong>{new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 }).format(plan.priceKopecks / 100)}</strong></div>}
+            {!plan.isPromo && <a className={styles.sitePay} href={`/pay?plan=${encodeURIComponent(plan.id)}`} target="_blank" rel="noopener noreferrer">Оплатить в рублях на сайте<ArrowUpRight size={18} /></a>}
             {data.starsEnabled && data.starsRateKopecks && <div className={styles.planBuy}>
               {plan.deviceAddonEnabled && !plan.unlimitedDevices && <label>Количество устройств
                 <select value={selectedLimits[plan.id] ?? plan.initialDevices} onChange={e => setSelectedLimits(previous => ({ ...previous, [plan.id]: Number(e.target.value) }))}>
@@ -175,11 +181,12 @@ export function MiniApp({ demo = false }: { demo?: boolean }) {
               <button className={styles.primary} disabled={busy} onClick={() => void buyPlan(plan)}>{plan.isPromo ? 'Получить доступ' : 'Оплатить Stars'}<ArrowUpRight size={18} /></button>
             </div>}
             </article>)}
-          <p className={styles.footnote}>В Telegram оплата цифровой подписки проходит в Stars. На самостоятельном сайте кабинета остаётся оплата в рублях через ЮKassa.</p>
+          <p className={styles.footnote}>Оплата в рублях откроется на сайте кабинета. Войдите в тот же аккаунт; сумма с устройствами и скидками появится до создания счёта.</p>
+          <div className={styles.history}><h2>История платежей</h2>{payments === null && <p>Загружаем платежи…</p>}{payments?.length === 0 && <p>Платежей пока нет.</p>}{payments?.slice(0, 5).map(payment => <div className={styles.order} key={payment.id}><span><b>{payment.plan?.name || 'Подписка'}</b><small>{new Date(payment.createdAt).toLocaleDateString('ru-RU')} · {payment.provider}</small></span><span><b>{new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB' }).format(payment.amountKopecks / 100)}</b><small>{payment.status === 'SUCCEEDED' ? 'Оплачено' : payment.status === 'PENDING' ? 'Ожидает оплаты' : 'Не оплачено'}</small></span></div>)}</div>
         </section>}
         {tab === 'devices' && <section><Heading eyebrow="ПОДКЛЮЧЕНИЯ" title="Ваши устройства" description="Одно подключение для всех ваших экранов." />
-          {demo ? <div className={styles.card}><div className={styles.device}><Smartphone /><span><b>iPhone</b><small>iOS · Rabbit Hole</small></span><Check /></div><div className={styles.device}><Smartphone /><span><b>MacBook</b><small>macOS · Rabbit Hole</small></span><Check /></div></div> : <DevicesList embedded deviceLimit={sub?.deviceLimit} />}
-          <button className={styles.primary} onClick={() => navigate('connect')}>Подключить устройство<ArrowUpRight size={20} /></button></section>}
+          {demo ? <div className={styles.card}><div className={styles.device}><Smartphone /><span><b>iPhone</b><small>iOS · Rabbit Hole</small></span><Check /></div><div className={styles.device}><Smartphone /><span><b>MacBook</b><small>macOS · Rabbit Hole</small></span><Check /></div></div> : <DevicesList deviceLimit={sub?.deviceLimit} />}
+          <button id="add-device-guide" className={styles.primary} onClick={() => navigate('connect')}>Подключить устройство<ArrowUpRight size={20} /></button></section>}
         {tab === 'connect' && <section><Heading eyebrow="БЫСТРЫЙ СТАРТ" title="Подключить VPN" description="Установите приложение, добавьте подписку и включите подключение." />
           {demo ? <div className={styles.card}><p>1. Установите VPN-клиент</p><p>2. Добавьте подписку AlekseevVP</p><p>3. Включите VPN в приложении</p><small>Персональная ссылка появится после входа.</small></div>
             : subscriptionUrl ? <KeysCard subscriptionUrl={subscriptionUrl} supportEnabled={data.support} deviceLimit={sub?.deviceLimit} /> : !busy && <div className={styles.empty}>Ссылка пока недоступна. Проверьте состояние подписки.</div>}</section>}
