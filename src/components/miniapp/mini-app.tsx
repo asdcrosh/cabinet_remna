@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, type FormEvent } from 'react'
-import { ArrowUpRight, Check, Copy, Gift, Headphones, Home, LoaderCircle, RefreshCw, Shield, Smartphone, Wallet, Wifi } from 'lucide-react'
+import { ArrowUpRight, Check, Copy, CreditCard, Gift, Headphones, Home, LoaderCircle, Lock, RefreshCw, Shield, Smartphone, Wallet, Wifi, X } from 'lucide-react'
 import { DevicesList } from '@/components/dashboard/devices-list'
 import { KeysCard } from '@/components/dashboard/keys-card'
 import { SupportPanelDynamic } from '@/components/support/support-panel-dynamic'
@@ -16,6 +16,7 @@ type Referrals = { url: string; condition: string; invited: number; claimed: num
 type PaymentItem = { id: string; status: string; amountKopecks: number; createdAt: string; provider: string; plan: { name: string } | null }
 const tabs = [{ id: 'home', label: 'Главная', icon: Home }, { id: 'plans', label: 'Подписка', icon: Wallet },
   { id: 'devices', label: 'Устройства', icon: Smartphone }, { id: 'referrals', label: 'Друзья', icon: Gift }, { id: 'support', label: 'Помощь', icon: Headphones }] as const
+const rub = new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })
 
 async function request<T>(url: string, body?: unknown): Promise<T> {
   const response = await fetch(url, { method: body === undefined ? 'GET' : 'POST', credentials: 'same-origin', cache: 'no-store',
@@ -38,6 +39,7 @@ export function MiniApp({ demo = false }: { demo?: boolean }) {
   const [copied, setCopied] = useState(false)
   const [selectedLimits, setSelectedLimits] = useState<Record<string, number>>({})
   const [promoCodes, setPromoCodes] = useState<Record<string, string>>({})
+  const [checkoutPlanId, setCheckoutPlanId] = useState<string | null>(null)
 
   useEffect(() => {
     if (demo) return
@@ -69,9 +71,19 @@ export function MiniApp({ demo = false }: { demo?: boolean }) {
         const result = await request<MiniAppOverview>('/api/miniapp/overview')
         if (!cancelled) {
           setData(result)
-          const initial = new URLSearchParams(window.location.search).get('tab')
+          const params = new URLSearchParams(window.location.search)
+          const initial = params.get('tab')
           if (tabs.some(item => item.id === initial) || initial === 'connect') setTab(initial as Tab)
           else if (initial && initial !== 'home') window.location.replace(miniAppDestination(initial))
+          // Возврат со страницы ЮKassa: оплата прошла внутри Telegram, подтверждаем здесь же.
+          if (params.get('paid') === '1') setNotice('Оплата получена. Подписка обновится автоматически — обычно это занимает меньше минуты.')
+          const requestedPlan = params.get('plan')
+          if (requestedPlan && result.plans.some(item => item.id === requestedPlan && !item.isPromo)) setCheckoutPlanId(requestedPlan)
+          if (params.get('paid') || requestedPlan) {
+            for (const key of ['paid', 'payment', 'plan']) params.delete(key)
+            const query = params.toString()
+            history.replaceState(null, '', `${window.location.pathname}${query ? `?${query}` : ''}`)
+          }
         }
       } catch (e) { if (!cancelled) setError(e instanceof Error ? e.message : 'Откройте приложение из Telegram') }
     }
@@ -137,7 +149,27 @@ export function MiniApp({ demo = false }: { demo?: boolean }) {
     } catch (e) { setError(e instanceof Error ? e.message : 'Не удалось создать счёт') }
     finally { setBusy(false) }
   }
+  async function payByCard(plan: MiniAppOverview['plans'][number]) {
+    if (demo) { setNotice('Это демонстрация. Счёт не создаётся.'); return }
+    setBusy(true); setError(''); setNotice('')
+    try {
+      const result = await request<{ confirmationUrl?: string; redirectUrl?: string }>('/api/miniapp/checkout', {
+        planId: plan.id, purchaseType: 'SUBSCRIPTION', provider: 'YOOKASSA',
+        deviceLimit: selectedLimits[plan.id] ?? plan.initialDevices, idempotencyKey: crypto.randomUUID(),
+        ...(promoCodes[plan.id]?.trim() ? { promoCode: promoCodes[plan.id]!.trim() } : {}),
+      })
+      if (result.redirectUrl) { setNotice('Подписка уже оформлена. Обновляем данные…'); setCheckoutPlanId(null); await refresh(); return }
+      if (!result.confirmationUrl) throw new Error('Ссылка на оплату не получена')
+      // Страница ЮKassa открывается в этом же окне Telegram — без внешнего браузера.
+      window.location.href = result.confirmationUrl
+    } catch (e) { setError(e instanceof Error ? e.message : 'Не удалось создать счёт') }
+    finally { setBusy(false) }
+  }
   const sub = data?.subscription
+  const checkoutPlan = data?.plans.find(item => item.id === checkoutPlanId && !item.isPromo) ?? null
+  const checkoutLimit = checkoutPlan ? selectedLimits[checkoutPlan.id] ?? checkoutPlan.initialDevices : 0
+  const checkoutExtraKopecks = checkoutPlan ? Math.max(0, checkoutLimit - checkoutPlan.devices) * checkoutPlan.extraDevicePriceKopecks : 0
+  const checkoutTotalKopecks = checkoutPlan ? checkoutPlan.priceKopecks + checkoutExtraKopecks : 0
   const date = sub?.expiresAt ? new Date(sub.expiresAt).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' }) : 'Без ограничения срока'
   const visibleTabs = tabs.filter(item => (item.id !== 'support' || data?.support) && (item.id !== 'referrals' || data?.referrals))
   return <main className={styles.app}>
@@ -169,8 +201,8 @@ export function MiniApp({ demo = false }: { demo?: boolean }) {
               {plan.description && <p>{plan.description}</p>}
               {plan.isPlanSwitch && <p className={styles.planNote}>При смене тарифа начнётся новый срок. Оставшиеся дни текущего тарифа не переносятся.</p>}
             </div>
-            {!plan.isPromo && <div className={styles.rublePrice}><span>Стоимость в кабинете</span><strong>{new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 }).format(plan.priceKopecks / 100)}</strong></div>}
-            {!plan.isPromo && <a className={styles.sitePay} href={`/pay?plan=${encodeURIComponent(plan.id)}`} target="_blank" rel="noopener noreferrer">Оплатить в рублях на сайте<ArrowUpRight size={18} /></a>}
+            {!plan.isPromo && <div className={styles.rublePrice}><span>Стоимость в кабинете</span><strong>{rub.format(plan.priceKopecks / 100)}</strong></div>}
+            {!plan.isPromo && <button className={styles.sitePay} onClick={() => setCheckoutPlanId(plan.id)}><CreditCard size={18} />Оплатить картой или СБП<ArrowUpRight size={18} /></button>}
             {data.starsEnabled && data.starsRateKopecks && <div className={styles.planBuy}>
               {plan.deviceAddonEnabled && !plan.unlimitedDevices && <label>Количество устройств
                 <select value={selectedLimits[plan.id] ?? plan.initialDevices} onChange={e => setSelectedLimits(previous => ({ ...previous, [plan.id]: Number(e.target.value) }))}>
@@ -183,7 +215,7 @@ export function MiniApp({ demo = false }: { demo?: boolean }) {
               <button className={styles.primary} disabled={busy} onClick={() => void buyPlan(plan)}>{plan.isPromo ? 'Получить доступ' : 'Оплатить Stars'}<ArrowUpRight size={18} /></button>
             </div>}
             </article>)}
-          <p className={styles.footnote}>Оплата в рублях откроется на сайте кабинета. Войдите в тот же аккаунт; сумма с устройствами и скидками появится до создания счёта.</p>
+          <p className={styles.footnote}>Оплата картой и по СБП проходит внутри Telegram на защищённой странице ЮKassa. Итоговая сумма со скидками появится до оплаты.</p>
           <div className={styles.history}><h2>История платежей</h2>{payments === null && <p>Загружаем платежи…</p>}{payments?.length === 0 && <p>Платежей пока нет.</p>}{payments?.slice(0, 5).map(payment => <div className={styles.order} key={payment.id}><span><b>{payment.plan?.name || 'Подписка'}</b><small>{new Date(payment.createdAt).toLocaleDateString('ru-RU')} · {payment.provider}</small></span><span><b>{new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB' }).format(payment.amountKopecks / 100)}</b><small>{payment.status === 'SUCCEEDED' ? 'Оплачено' : payment.status === 'PENDING' ? 'Ожидает оплаты' : 'Не оплачено'}</small></span></div>)}</div>
         </section>}
         {tab === 'devices' && <section><Heading eyebrow="ПОДКЛЮЧЕНИЯ" title="Ваши устройства" description="Одно подключение для всех ваших экранов." />
@@ -205,6 +237,28 @@ export function MiniApp({ demo = false }: { demo?: boolean }) {
         {tab === 'support' && <section><Heading eyebrow="МЫ НА СВЯЗИ" title="Поможем разобраться" description="Опишите, что произошло. История обращений общая с кабинетом." />
           {demo ? <DemoSupport /> : tickets && <SupportPanelDynamic mode="user" initialTickets={tickets} />}</section>}
         {busy && <div role="status" className={styles.loading}><LoaderCircle className="animate-spin" size={18} />Загрузка…</div>}
+        {checkoutPlan && <div className={styles.sheetBackdrop} onClick={() => setCheckoutPlanId(null)}>
+          <section className={styles.sheet} role="dialog" aria-modal="true" aria-label="Оплата подписки" onClick={event => event.stopPropagation()}>
+            <button className={styles.sheetClose} aria-label="Закрыть оплату" onClick={() => setCheckoutPlanId(null)}><X size={18} /></button>
+            <small className={styles.sheetEyebrow}>AlekseevVP · Заказ</small>
+            <h2>{checkoutPlan.name}</h2>
+            <p className={styles.sheetSub}>{checkoutPlan.unlimited ? 'Без ограничения срока' : `${checkoutPlan.days} дней`} · {checkoutPlan.unlimitedDevices ? 'безлимит устройств' : `${checkoutLimit} устройств`}{checkoutPlan.trafficLimitGb == null ? ' · безлимит трафика' : ` · ${checkoutPlan.trafficLimitGb} ГБ`}</p>
+            {checkoutPlan.deviceAddonEnabled && !checkoutPlan.unlimitedDevices && <label className={styles.sheetField}>Количество устройств
+              <select value={checkoutLimit} onChange={e => setSelectedLimits(previous => ({ ...previous, [checkoutPlan.id]: Number(e.target.value) }))}>
+                {Array.from({ length: checkoutPlan.maxDevices - checkoutPlan.devices + 1 }, (_, index) => checkoutPlan.devices + index).map(limit =>
+                  <option key={limit} value={limit}>{limit}</option>)}
+              </select></label>}
+            <input className={styles.linkInput} aria-label="Промокод" placeholder="Промокод, если есть" value={promoCodes[checkoutPlan.id] ?? ''}
+              onChange={e => setPromoCodes(previous => ({ ...previous, [checkoutPlan.id]: e.target.value }))} />
+            <div className={styles.sheetLines}>
+              <div className={styles.sheetLine}><span>{checkoutPlan.name} · {checkoutPlan.unlimited ? 'бессрочно' : `${checkoutPlan.days} дней`}</span><b>{rub.format(checkoutPlan.priceKopecks / 100)}</b></div>
+              {checkoutExtraKopecks > 0 && <div className={styles.sheetLine}><span>Дополнительные устройства · {checkoutLimit - checkoutPlan.devices}</span><b>+{rub.format(checkoutExtraKopecks / 100)}</b></div>}
+            </div>
+            <div className={styles.sheetTotal}><span>Итого{promoCodes[checkoutPlan.id]?.trim() ? ' до скидки' : ''}</span><strong>{rub.format(checkoutTotalKopecks / 100)}</strong></div>
+            <button className={styles.primary} disabled={busy} onClick={() => void payByCard(checkoutPlan)}><Lock size={18} />Перейти к оплате<ArrowUpRight size={18} /></button>
+            <p className={styles.sheetSecure}>Откроется защищённая страница ЮKassa прямо здесь, в Telegram — картой или по СБП. Промокод и скидки применятся автоматически перед оплатой.</p>
+          </section>
+        </div>}
         <nav className={styles.nav} aria-label="Разделы приложения">{visibleTabs.map(item => <button key={item.id} aria-current={tab === item.id ? 'page' : undefined} onClick={() => navigate(item.id)}><item.icon size={21} /><span>{item.label}</span></button>)}</nav>
       </>}
     </div>

@@ -4,7 +4,7 @@ import { miniAppUrl } from './config'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { getBotPaymentScreen, getBotScreen, getBotScreenInput } from './bot-screens'
-import { botScreens, buildDeviceDeleteConfirm, buildSpinResultScreen, type BotScreen } from './rich-screens'
+import { botScreens, buildDeviceDeleteConfirm, buildDeviceScreen, buildSpinResultScreen, type BotScreen } from './rich-screens'
 import { claimChannelReward } from './channel-referrals'
 import { unbindUserDevice } from '@/lib/device-unbind'
 import { BonusBoxError, openBonusBox } from '@/lib/bonus-box'
@@ -114,6 +114,17 @@ export async function handleMiniAppUpdate(update: z.infer<typeof telegramUpdateS
     }
     if (action.startsWith('pay:')) {
       const html = await getBotPaymentScreen(callback.from.id, action.slice(4))
+      await displayCallbackScreen(callback.from.id, callback.message.message_id, html, miniAppUrl())
+      return
+    }
+    if (action.startsWith('dev:')) {
+      const account = await prisma.user.findUnique({ where: { telegramId: BigInt(callback.from.id) }, select: { id: true } })
+      const device = account ? await prisma.device.findFirst({ where: { id: action.slice(4), userId: account.id },
+        select: { id: true, displayName: true, platform: true } }) : null
+      const html = device
+        ? buildDeviceScreen(await getBotScreenInput(callback.from.id, 'devices'),
+          { id: device.id, title: device.displayName || 'Устройство', platform: device.platform || 'VPN-клиент' })
+        : await getBotScreen(callback.from.id, 'devices', 'Устройство не найдено')
       await displayCallbackScreen(callback.from.id, callback.message.message_id, html, miniAppUrl())
       return
     }

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { buildDeviceDeleteConfirm, buildRichPaymentScreen, buildRichScreen, buildSpinResultScreen } from './rich-screens'
+import { buildDeviceDeleteConfirm, buildDeviceScreen, buildRichPaymentScreen, buildRichScreen, buildSpinResultScreen } from './rich-screens'
 import { channelCampaign, isChannelMember, isChannelReference } from './channel-referrals'
 import { miniAppDemo } from './model'
 import { isMiniAppOwnedUpdate, isPaymentUpdate, isUnsupportedPaymentUpdate, isUnsupportedCallback, telegramUpdateSchema, validWebhookSecret } from './bot'
@@ -51,25 +51,25 @@ describe('Telegram Mini App boundaries', () => {
     expect(html).not.toContain('<script>')
     expect(html).toContain('&lt;script&gt;')
     expect(html).not.toContain('subscriptionUrl')
-    expect(html).toContain('avp:devdel:dev-1')
+    expect(html).toContain('avp:dev:dev-1')
   })
   it('shows Cabinet tariff terms with Stars checkout when enabled', () => {
     const overview = { ...miniAppDemo, plans: [{ ...miniAppDemo.plans[0]!, isPlanSwitch: true,
       current: false, trafficLimitGb: 100 }] }
     const html = buildRichScreen({ screen: 'plans', overview, appUrl: 'https://cabinet.example.test/miniapp' })
     expect(html).toContain('100 ГБ')
-    expect(html).toContain('Базовая цена 299 ₽')
+    expect(html).toContain('💰 299 ₽')
     expect(html).toContain('avp:pay:demo')
     expect(html).toContain('остаток прежнего не переносится')
   })
-  it('links only an available plan to the external Cabinet checkout and keeps Stars in the bot', () => {
+  it('opens card checkout inside Telegram and keeps Stars in the bot', () => {
     const input = { screen: 'plans' as const, overview: miniAppDemo, appUrl: 'https://cabinet.example.test/miniapp' }
     const html = buildRichPaymentScreen(input, 'demo', true)
-    expect(html).toContain('type="url"')
-    expect(html).toContain('https://cabinet.example.test/pay?plan=demo')
+    expect(html).toContain('type="web_app"')
+    expect(html).toContain('https://cabinet.example.test/miniapp?tab=plans&amp;plan=demo')
     expect(html).toContain('avp:buy:demo')
-    expect(buildRichPaymentScreen(input, 'demo', false)).not.toContain('/pay?plan=')
-    expect(buildRichPaymentScreen(input, 'unknown', true)).not.toContain('/pay?plan=')
+    expect(buildRichPaymentScreen(input, 'demo', false)).not.toContain('plan=demo')
+    expect(buildRichPaymentScreen(input, 'unknown', true)).not.toContain('plan=demo')
   })
   it('uses one safe brand banner on bot and payment screens', () => {
     const input = { screen: 'home' as const, overview: miniAppDemo,
@@ -95,7 +95,7 @@ describe('Telegram Mini App boundaries', () => {
     expect(billing).toContain('tab=billing')
     const bonus = buildRichScreen({ screen: 'bonus', overview: miniAppDemo, appUrl: 'https://cabinet.example.test/miniapp',
       bonus: { enabled: true, attempts: 2 } })
-    expect(bonus).toContain('Доступно попыток: 2')
+    expect(bonus).toContain('Доступно попыток: <b>2</b>')
     expect(buildRichScreen({ screen: 'bonus', overview: miniAppDemo, appUrl: 'https://cabinet.example.test/miniapp',
       bonus: { enabled: false, attempts: 0 } })).toContain('сейчас отключена')
     const inbox = buildRichScreen({ screen: 'notifications', overview: miniAppDemo, appUrl: 'https://cabinet.example.test/miniapp',
@@ -118,8 +118,13 @@ describe('Telegram Mini App boundaries', () => {
   it('runs in-chat actions: device removal, wheel spin and mark-all-read', () => {
     const input = { screen: 'devices' as const, overview: miniAppDemo, appUrl: 'https://cabinet.example.test/miniapp' }
     const devices = buildRichScreen({ ...input, devices: [{ id: 'dev-1', title: 'iPhone', platform: 'iOS' }, { id: 'dev-2', title: 'MacBook', platform: 'macOS' }] })
-    expect(devices).toContain('avp:devdel:dev-1')
-    expect(devices).toContain('avp:devdel:dev-2')
+    expect(devices).toContain('avp:dev:dev-1')
+    expect(devices).toContain('avp:dev:dev-2')
+    expect(devices).not.toContain('avp:devdel:dev-1')
+    const card = buildDeviceScreen(input, { id: 'dev-1', title: 'iPhone', platform: 'iOS' })
+    expect(card).toContain('📱 iPhone')
+    expect(card).toContain('avp:devdel:dev-1')
+    expect(card).toContain('avp:devices')
     const confirm = buildDeviceDeleteConfirm(input, { id: 'dev-1', title: 'iPhone', platform: 'iOS' })
     expect(confirm).toContain('Удалить устройство?')
     expect(confirm).toContain('avp:devyes:dev-1')

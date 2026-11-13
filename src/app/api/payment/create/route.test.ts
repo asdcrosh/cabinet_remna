@@ -212,11 +212,20 @@ describe('payment create route', () => {
     expect(mocks.txPaymentCreate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ addonSnapshot: expect.objectContaining({ channel: 'TELEGRAM_BOT' }), purchaseType: 'WHITELIST_ADDON' }) }))
   })
 
-  it('does not use the bot email exception for base subscriptions or email-only providers', async () => {
-    for (const body of [{ purchaseType: 'SUBSCRIPTION' }, { purchaseType: 'WHITELIST_ADDON', provider: 'PAYANYWAY' }]) {
+  it('allows Mini App card subscriptions and still rejects other bot purchases', async () => {
+    for (const body of [
+      { purchaseType: 'WHITELIST_ADDON', provider: 'PAYANYWAY' },
+      { purchaseType: 'SUBSCRIPTION', autoRenewalConsent: true, autoRenewalConsentVersion: AUTO_RENEWAL_CONSENT_VERSION },
+    ]) {
       expect((await createPaymentForUser(paymentRequest(body), user.id, { telegramBot: true })).status).toBe(400)
     }
     expect(mocks.createPayment).not.toHaveBeenCalled()
+    mocks.prisma.user.findUnique.mockResolvedValue({ ...user, telegramId: 123n })
+    const response = await createPaymentForUser(paymentRequest(), user.id, { telegramBot: true })
+    expect(response.status).toBe(200)
+    expect(mocks.createPayment).toHaveBeenCalledWith(expect.objectContaining({
+      returnUrl: `https://cabinet.example/miniapp?tab=plans&paid=1&payment=${localPayment.id}`,
+    }))
   })
 
   it('creates a Stars invoice only for the authenticated Telegram account', async () => {

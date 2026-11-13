@@ -8,16 +8,24 @@ import { withDistributedLock } from '@/lib/distributed-lock'
 
 export const runtime = 'nodejs'
 
+// В Mini App доступны Stars (инвойс Telegram) и карта/СБП через ЮKassa (страница оплаты в вебвью).
 export const POST = withAuth(async (req: Request) => {
   requireMiniApp()
-  if (!starsEnabled()) return jsonResponse({ error: 'Оплата Stars сейчас недоступна' }, { status: 404 })
   const session = await requireAuth()
   const limited = await rateLimit(req, `miniapp-checkout:${session.uid}`, 10, 60_000)
   if (!limited.ok) return jsonResponse({ error: 'Слишком много попыток оплаты' }, { status: 429 })
   const body = await req.json().catch(() => null)
-  if (!body || typeof body !== 'object' || Array.isArray(body)
-      || Reflect.get(body, 'provider') !== 'TELEGRAM_STARS'
-      || Reflect.get(body, 'purchaseType') !== 'SUBSCRIPTION') {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return jsonResponse({ error: 'Неверный способ оплаты' }, { status: 400 })
+  }
+  const provider = Reflect.get(body, 'provider')
+  if (provider !== 'TELEGRAM_STARS' && provider !== 'YOOKASSA') {
+    return jsonResponse({ error: 'Неверный способ оплаты' }, { status: 400 })
+  }
+  if (provider === 'TELEGRAM_STARS' && !starsEnabled()) {
+    return jsonResponse({ error: 'Оплата Stars сейчас недоступна' }, { status: 404 })
+  }
+  if (Reflect.get(body, 'purchaseType') !== 'SUBSCRIPTION') {
     return jsonResponse({ error: 'Неверный способ оплаты' }, { status: 400 })
   }
   const checkoutRequest = new Request(req.url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })

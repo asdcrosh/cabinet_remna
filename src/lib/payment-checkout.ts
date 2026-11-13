@@ -84,7 +84,10 @@ export async function createPaymentForUser(
   if (provider === 'TELEGRAM_STARS' && (purchaseType !== 'SUBSCRIPTION' || autoRenewalConsent || whitelistAddon)) {
     return jsonResponse({ error: 'Для Stars доступна покупка подписки без автопродления и дополнений' }, { status: 400 })
   }
-  if (options.telegramBot && provider !== 'TELEGRAM_STARS' && (
+  // Mini App: карта/СБП через ЮKassa внутри Telegram — без автопродления и дополнений.
+  const miniAppCardSubscription = options.telegramBot && provider === 'YOOKASSA'
+    && purchaseType === 'SUBSCRIPTION' && !whitelistAddon && !autoRenewalConsent
+  if (options.telegramBot && provider !== 'TELEGRAM_STARS' && !miniAppCardSubscription && (
     purchaseType !== 'WHITELIST_ADDON' || provider === 'PAYANYWAY'
     || promoCode || whitelistAddon || autoRenewalConsent
   )) {
@@ -744,7 +747,9 @@ export async function createPaymentForUser(
   const baseUrl = getAppUrl()
   const returnUrl = options.returnUrl ?? (options.mobileApp
     ? `${baseUrl}/app/payment-return?payment=${localPayment.id}`
-    : `${baseUrl}/dashboard/billing?paid=1&payment=${localPayment.id}`)
+    : options.telegramBot
+      ? `${baseUrl}/miniapp?tab=plans&paid=1&payment=${localPayment.id}`
+      : `${baseUrl}/dashboard/billing?paid=1&payment=${localPayment.id}`)
   const description = isWhitelistAddon
     ? WHITELIST_ADDON_RECEIPT_NAME
     : isDeviceLimitAddon
