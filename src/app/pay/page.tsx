@@ -31,7 +31,7 @@ export default async function PayPage({ searchParams }: { searchParams: Promise<
         <div className="grid gap-8 pt-8 md:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] md:gap-12 md:pt-14">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-teal-300">Оплата подписки</p>
-            <h1 className="mt-4 max-w-md text-3xl font-semibold leading-tight tracking-tight sm:text-4xl">Один тариф. Один аккаунт. Все устройства.</h1>
+            <h1 className="mt-4 max-w-md text-3xl font-semibold leading-tight tracking-tight sm:text-4xl">Подписка и оплата в одном кабинете.</h1>
             <p className="mt-4 max-w-sm text-sm leading-6 text-slate-400">Выберите параметры и проверьте сумму. После создания счёта откроется защищённая страница ЮKassa.</p>
             <ol className="mt-9 border-l border-white/15 pl-5 text-sm md:mt-14">
               <li className="relative pb-7 text-slate-300 before:absolute before:-left-[1.48rem] before:top-1 before:h-2 before:w-2 before:rounded-full before:bg-teal-300">Тариф выбран</li>
