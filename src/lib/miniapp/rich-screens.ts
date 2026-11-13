@@ -2,8 +2,8 @@ import { escapeTelegramHtml as escape } from '@/lib/telegram-format'
 import type { MiniAppOverview } from './model'
 import { formatPrice } from '@/lib/format'
 
-export type BotScreen = 'home' | 'subscription' | 'plans' | 'devices' | 'referrals' | 'support' | 'connect'
-export const botScreens: BotScreen[] = ['home', 'subscription', 'plans', 'devices', 'referrals', 'support', 'connect']
+export type BotScreen = 'home' | 'subscription' | 'plans' | 'billing' | 'devices' | 'bonus' | 'notifications' | 'referrals' | 'support' | 'connect' | 'settings' | 'admin'
+export const botScreens: BotScreen[] = ['home', 'subscription', 'plans', 'billing', 'devices', 'bonus', 'notifications', 'referrals', 'support', 'connect', 'settings', 'admin']
 export type RichScreenInput = {
   screen: BotScreen
   overview: MiniAppOverview | null
@@ -12,9 +12,20 @@ export type RichScreenInput = {
   referral?: { url: string; condition: string; invited: number; claimed: number; channelUrl: string | null; eligible: boolean; ownClaimed: boolean }
   devices?: Array<{ title: string; platform: string }>
   tickets?: Array<{ subject: string; status: string }>
+  payments?: Array<{ title: string; amount: string; status: string; date: string }>
+  autoRenewal?: string | null
+  bonus?: { enabled: boolean; attempts: number }
+  inbox?: { unread: number; items: Array<{ title: string; date: string; fresh: boolean }> }
+  prefs?: { telegram: boolean; email: boolean; broadcasts: boolean }
+  adminStats?: { users: number; activeSubscriptions: number; paymentsToday: number; openTickets: number }
+  admin?: boolean
   notice?: string
 }
-const titles: Record<BotScreen, string> = { home: 'Главная', subscription: 'Подписка', plans: 'Выберите тариф', devices: 'Устройства', referrals: 'Пригласить друга', support: 'Поддержка', connect: 'Подключение' }
+const titles: Record<BotScreen, string> = {
+  home: 'Главная', subscription: 'Подписка', plans: 'Выберите тариф', billing: 'Платежи', devices: 'Устройства',
+  bonus: 'Бонусы', notifications: 'Уведомления', referrals: 'Пригласить друга', support: 'Поддержка',
+  connect: 'Подключение', settings: 'Настройки', admin: 'Управление сервисом',
+}
 const cb = (label: string, screen: string, style = 'primary') => `<tg-button type="callback_data" style="${style}" data="avp:${escape(screen)}">${escape(label)}</tg-button>`
 const row = (...buttons: string[]) => `<tg-button-row>${buttons.join('')}</tg-button-row>`
 const table = (rows: string[][]) => `<table bordered compact>${rows.map(cells => `<tr>${cells.map(cell => `<td>${escape(cell)}</td>`).join('')}</tr>`).join('')}</table>`
@@ -46,17 +57,27 @@ export function buildRichScreen(input: RichScreenInput) {
         ['Устройства', `${data.deviceCount} из ${sub.deviceLimit ?? 'без лимита'}`],
       ]))
       parts.push(row(cb('Подключить VPN', 'connect', 'success'), cb('Выбрать тариф', 'plans')),
-        row(cb('Мои устройства', 'devices'), cb('Моя подписка', 'subscription')))
+        row(cb('Мои устройства', 'devices'), cb('Моя подписка', 'subscription')),
+        row(cb('Платежи', 'billing'), cb('Бонусы', 'bonus')),
+        row(cb('Уведомления', 'notifications'), cb('Настройки', 'settings')))
       break
     case 'plans':
       if (!data.plans.length) parts.push('<p>Для вашего аккаунта сейчас нет доступных тарифов.</p>')
-      for (const plan of data.plans) parts.push('<hr>', `<h4>${escape(plan.name)}</h4>`, table([
+      for (const plan of data.plans) parts.push('<hr>', `<h4>${plan.current ? 'Текущий · ' : ''}${escape(plan.name)}</h4>`, table([
         ['Срок', plan.unlimited ? 'Без ограничения' : `${plan.days} дней`],
         ['Устройства', plan.unlimitedDevices ? 'Без ограничения' : plan.deviceAddonEnabled ? `${plan.devices}–${plan.maxDevices}` : String(plan.initialDevices)],
         ['Трафик', plan.trafficLimitGb == null ? 'Без ограничения' : `${plan.trafficLimitGb} ГБ`],
       ]), `<p>${plan.isPromo ? 'Бесплатно' : `Базовая цена ${escape(formatPrice(plan.priceKopecks))}`}</p>`,
-      row(cb(plan.isPromo ? 'Получить доступ' : 'Оформить тариф', plan.isPromo ? `buy:${plan.id}` : `pay:${plan.id}`, 'success')))
+      row(cb(plan.isPromo ? 'Получить доступ' : plan.current ? 'Продлить тариф' : 'Оформить тариф', plan.isPromo ? `buy:${plan.id}` : `pay:${plan.id}`, 'success')))
       parts.push('<hr><p>Продление того же тарифа добавляет дни. При смене тарифа начинается новый срок: остаток прежнего не переносится.</p>', row(app('Сравнить в приложении', 'plans')))
+      break
+    case 'billing':
+      parts.push(`<h4>${escape(sub?.title || 'Подписка пока не оформлена')}</h4>`)
+      if (input.autoRenewal) parts.push(`<p>Автопродление: ${escape(input.autoRenewal)}</p>`)
+      if (!input.payments?.length) parts.push('<p>Оплат пока не было. История появится после первой покупки.</p>')
+      if (input.payments?.length) parts.push('<h4>Последние операции</h4>',
+        table(input.payments.map(payment => [`${payment.date} · ${payment.title}`, `${payment.amount} · ${payment.status}`])))
+      parts.push(row(app('История и автопродление', 'billing')))
       break
     case 'devices':
       parts.push('<p>Список синхронизирован с кабинетом.</p>')
@@ -71,6 +92,25 @@ export function buildRichScreen(input: RichScreenInput) {
         row(app('Открыть настройку', 'connect')),
         '<p>Персональная ссылка доступна только после входа. Бот не показывает состояние VPN-туннеля.</p>')
       break
+    case 'bonus':
+      if (input.bonus && !input.bonus.enabled) parts.push('<p>Бонусная программа сейчас отключена. Загляните позже.</p>')
+      else {
+        const attempts = input.bonus?.attempts ?? 0
+        parts.push('<h4>Колесо подарков</h4>', attempts > 0
+          ? `<p>Доступно попыток: ${attempts}. Приз начисляется сразу после открытия.</p>`
+          : '<p>Новые попытки появляются за задания, покупки и приглашения друзей.</p>')
+      }
+      parts.push(row(app('Открыть бонусы', 'bonus')))
+      if (data.referrals) parts.push(row(cb('Пригласить друга', 'referrals')))
+      break
+    case 'notifications': {
+      const unread = input.inbox?.unread ?? 0
+      parts.push(unread > 0 ? `<h4>Непрочитанных: ${unread}</h4>` : '<p>Все уведомления прочитаны.</p>')
+      if (input.inbox?.items.length) parts.push(table(input.inbox.items.map(item => [item.date, item.fresh ? `${item.title} · новое` : item.title])))
+      if (input.inbox && !input.inbox.items.length) parts.push('<p>Здесь появятся важные события подписки и сообщения сервиса.</p>')
+      parts.push(row(app('Открыть уведомления', 'notifications')))
+      break
+    }
     case 'referrals': {
       const r = input.referral
       parts.push('<h4>Бонус за друга</h4>', `<p>${escape(r?.condition || 'Программа бонусов за вступление в канал готовится.')}</p>`)
@@ -89,9 +129,29 @@ export function buildRichScreen(input: RichScreenInput) {
       if (input.tickets?.length) parts.push('<h4>Открытые обращения</h4>', table(input.tickets.map(ticket => [ticket.subject, ticket.status])))
       parts.push('<p>По вопросам оплаты укажите номер заказа.</p>', row(app('Открыть поддержку', 'support')))
       break
+    case 'settings':
+      parts.push('<p>Профиль, безопасность и каналы уведомлений.</p>')
+      if (input.prefs) parts.push(table([
+        ['Telegram', input.prefs.telegram ? 'Включены' : 'Выключены'],
+        ['Email', input.prefs.email ? 'Включены' : 'Выключены'],
+        ['Рассылки', input.prefs.broadcasts ? 'Включены' : 'Выключены'],
+      ]))
+      parts.push(row(app('Открыть настройки', 'settings')))
+      break
+    case 'admin':
+      if (input.admin) {
+        if (input.adminStats) parts.push(table([
+          ['Пользователи', String(input.adminStats.users)],
+          ['Активные подписки', String(input.adminStats.activeSubscriptions)],
+          ['Оплаты сегодня', String(input.adminStats.paymentsToday)],
+          ['Открытые тикеты', String(input.adminStats.openTickets)],
+        ]))
+        parts.push('<p>Пользователи, платежи, тарифы, рассылки и поддержка — в панели управления.</p>', row(app('Открыть панель управления', 'admin')))
+      }
+      break
   }
   if (input.screen === 'home') {
-    const extraButtons = [...(data.referrals ? [cb('Пригласить друга', 'referrals')] : []), ...(data.support ? [cb('Поддержка', 'support')] : [])]
+    const extraButtons = [...(data.referrals ? [cb('Пригласить друга', 'referrals')] : []), ...(data.support ? [cb('Поддержка', 'support')] : []), ...(input.admin ? [cb('Админка', 'admin')] : [])]
     if (extraButtons.length) parts.push(row(...extraButtons))
   }
   parts.push('<hr>', row(cb('На главную', 'home'), cb('Обновить', input.screen, 'link')))

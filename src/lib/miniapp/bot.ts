@@ -72,7 +72,7 @@ export function isMiniAppOwnedUpdate(value: unknown) {
   const content = Reflect.get(message, 'text')
   if (typeof content !== 'string') return false
   if (['Моя подписка', 'Мои устройства', 'Пригласить друга', 'Поддержка'].includes(content)) return true
-  return /^\/(?:app|support|paysupport|help)(?:@[A-Za-z0-9_]+)?(?:\s|$)/.test(content)
+  return /^\/(?:app|menu|subscription|connect|plans|billing|devices|bonus|notifications|referrals|settings|admin|support|paysupport|help)(?:@[A-Za-z0-9_]+)?(?:\s|$)/.test(content)
     || /^\/start(?:@[A-Za-z0-9_]+)?(?:\s+ref_[A-Z0-9]{6,8})?$/.test(content)
 }
 
@@ -130,7 +130,10 @@ export async function handleMiniAppUpdate(update: z.infer<typeof telegramUpdateS
   }
   const message = update.message
   if (!message || message.chat.type !== 'private' || !message.from || message.chat.id !== message.from.id) return
-  const menu: Record<string, BotScreen> = { 'Моя подписка': 'subscription', 'Мои устройства': 'devices', 'Пригласить друга': 'referrals', 'Поддержка': 'support' }
+  const menu: Record<string, BotScreen> = {
+    'Моя подписка': 'subscription', 'Мои устройства': 'devices', 'Пригласить друга': 'referrals', 'Поддержка': 'support',
+    'Тарифы': 'plans', 'Платежи': 'billing', 'Бонусы': 'bonus', 'Уведомления': 'notifications', 'Настройки': 'settings',
+  }
   const menuScreen = menu[message.text || '']
   if (menuScreen && process.env.TELEGRAM_RICH_MESSAGES_ENABLED === 'true') {
     await miniAppBotCall('sendRichMessage', { chat_id: message.chat.id, rich_message: { html: await getBotScreen(message.from.id, menuScreen) },
@@ -138,8 +141,14 @@ export async function handleMiniAppUpdate(update: z.infer<typeof telegramUpdateS
     return
   }
   const command = message.text?.split(/\s+/)[0]?.split('@')[0]
-  if (!command || !['/start', '/app', '/support', '/paysupport', '/help'].includes(command)) return
-  const section = ['/support', '/paysupport', '/help'].includes(command) ? 'support' : 'home'
+  const commands: Record<string, BotScreen> = {
+    '/start': 'home', '/app': 'home', '/menu': 'home', '/subscription': 'subscription', '/connect': 'connect',
+    '/plans': 'plans', '/billing': 'billing', '/devices': 'devices', '/bonus': 'bonus', '/notifications': 'notifications',
+    '/referrals': 'referrals', '/settings': 'settings', '/admin': 'admin',
+    '/support': 'support', '/paysupport': 'support', '/help': 'support',
+  }
+  const section = menuScreen || commands[command || '']
+  if (!section) return
   const referral = message.text?.match(/^\/start(?:@[a-zA-Z0-9_]+)? ref_([A-Z0-9]{6,8})$/)?.[1]
   const content = welcomeMessage(section, referral)
   if (process.env.TELEGRAM_RICH_MESSAGES_ENABLED === 'true') {

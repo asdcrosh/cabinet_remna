@@ -7,6 +7,7 @@ import { KeysCard } from '@/components/dashboard/keys-card'
 import { SupportPanelDynamic } from '@/components/support/support-panel-dynamic'
 import type { SupportTicket } from '@/components/support/support-panel-model'
 import { getTelegramLaunchData } from '@/lib/telegram-miniapp-client'
+import { miniAppDestination } from '@/lib/miniapp/destination'
 import { miniAppDemo, type MiniAppOverview } from '@/lib/miniapp/model'
 import styles from './mini-app.module.css'
 
@@ -70,6 +71,7 @@ export function MiniApp({ demo = false }: { demo?: boolean }) {
           setData(result)
           const initial = new URLSearchParams(window.location.search).get('tab')
           if (tabs.some(item => item.id === initial) || initial === 'connect') setTab(initial as Tab)
+          else if (initial && initial !== 'home') window.location.replace(miniAppDestination(initial))
         }
       } catch (e) { if (!cancelled) setError(e instanceof Error ? e.message : 'Откройте приложение из Telegram') }
     }

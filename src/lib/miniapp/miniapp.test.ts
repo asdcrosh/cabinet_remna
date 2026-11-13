@@ -83,6 +83,38 @@ describe('Telegram Mini App boundaries', () => {
     expect(starsForKopecks(30_001, 300)).toBe(101)
     expect(() => starsForKopecks(0, 300)).toThrow()
   })
+  it('owns the section slash commands and renders their screens', () => {
+    for (const command of ['/billing', '/bonus', '/notifications', '/settings', '/admin']) {
+      expect(isMiniAppOwnedUpdate({ message: { text: command } })).toBe(true)
+    }
+    const billing = buildRichScreen({ screen: 'billing', overview: miniAppDemo, appUrl: 'https://cabinet.example.test/miniapp',
+      autoRenewal: 'включено · MIR **1234',
+      payments: [{ title: 'AlekseevVP', amount: '299 ₽', status: 'Оплачен', date: '01.11.2026' }] })
+    expect(billing).toContain('Автопродление: включено · MIR **1234')
+    expect(billing).toContain('299 ₽ · Оплачен')
+    expect(billing).toContain('tab=billing')
+    const bonus = buildRichScreen({ screen: 'bonus', overview: miniAppDemo, appUrl: 'https://cabinet.example.test/miniapp',
+      bonus: { enabled: true, attempts: 2 } })
+    expect(bonus).toContain('Доступно попыток: 2')
+    expect(buildRichScreen({ screen: 'bonus', overview: miniAppDemo, appUrl: 'https://cabinet.example.test/miniapp',
+      bonus: { enabled: false, attempts: 0 } })).toContain('сейчас отключена')
+    const inbox = buildRichScreen({ screen: 'notifications', overview: miniAppDemo, appUrl: 'https://cabinet.example.test/miniapp',
+      inbox: { unread: 1, items: [{ title: 'Подписка продлена', date: '01.11.2026', fresh: true }] } })
+    expect(inbox).toContain('Непрочитанных: 1')
+    expect(inbox).toContain('Подписка продлена · новое')
+    const prefs = buildRichScreen({ screen: 'settings', overview: miniAppDemo, appUrl: 'https://cabinet.example.test/miniapp',
+      prefs: { telegram: true, email: false, broadcasts: true } })
+    expect(prefs).toContain('Включены')
+    expect(prefs).toContain('Выключены')
+  })
+  it('shows service stats only to admins', () => {
+    const html = buildRichScreen({ screen: 'admin', overview: miniAppDemo, appUrl: 'https://cabinet.example.test/miniapp',
+      admin: true, adminStats: { users: 120, activeSubscriptions: 87, paymentsToday: 5, openTickets: 2 } })
+    expect(html).toContain('Активные подписки')
+    expect(html).toContain('tab=admin')
+    expect(buildRichScreen({ screen: 'admin', overview: miniAppDemo, appUrl: 'https://cabinet.example.test/miniapp' })).not.toContain('Пользователи')
+    expect(buildRichScreen({ screen: 'home', overview: miniAppDemo, appUrl: 'https://cabinet.example.test/miniapp' })).not.toContain('Админка')
+  })
   it('does not render an empty rich button row when optional features are off', () => {
     const overview = { ...miniAppDemo, support: false, referrals: false }
     const html = buildRichScreen({ screen: 'home', overview, appUrl: 'https://cabinet.example.test/miniapp' })
