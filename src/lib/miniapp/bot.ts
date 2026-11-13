@@ -3,9 +3,11 @@ import { miniAppBotCall } from './bot-api'
 import { miniAppUrl } from './config'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
-import { getBotPaymentScreen, getBotScreen } from './bot-screens'
-import { botScreens, type BotScreen } from './rich-screens'
+import { getBotPaymentScreen, getBotScreen, getBotScreenInput } from './bot-screens'
+import { botScreens, buildDeviceDeleteConfirm, buildSpinResultScreen, type BotScreen } from './rich-screens'
 import { claimChannelReward } from './channel-referrals'
+import { unbindUserDevice } from '@/lib/device-unbind'
+import { BonusBoxError, openBonusBox } from '@/lib/bonus-box'
 import { starsEnabled } from './stars'
 import { buildPlanCatalog } from '@/lib/plan-catalog'
 import { createPaymentForUser } from '@/lib/payment-checkout'
@@ -115,6 +117,49 @@ export async function handleMiniAppUpdate(update: z.infer<typeof telegramUpdateS
       await displayCallbackScreen(callback.from.id, callback.message.message_id, html, miniAppUrl())
       return
     }
+    if (action.startsWith('devdel:') || action.startsWith('devyes:')) {
+      const account = await prisma.user.findUnique({ where: { telegramId: BigInt(callback.from.id) }, select: { id: true } })
+      const deviceId = action.slice(7)
+      const device = account ? await prisma.device.findFirst({ where: { id: deviceId, userId: account.id },
+        select: { id: true, hwid: true, displayName: true, platform: true } }) : null
+      if (action.startsWith('devdel:') && device) {
+        const input = await getBotScreenInput(callback.from.id, 'devices')
+        const html = buildDeviceDeleteConfirm(input, { id: device.id, title: device.displayName || 'Устройство', platform: device.platform || 'VPN-клиент' })
+        await displayCallbackScreen(callback.from.id, callback.message.message_id, html, miniAppUrl())
+        return
+      }
+      let notice = 'Устройство не найдено'
+      if (action.startsWith('devyes:') && device && account) {
+        const result = await unbindUserDevice({ userId: account.id, hwid: device.hwid })
+        notice = result.ok ? 'Устройство удалено, место в лимите освобождено'
+          : result.error === 'NOT_FOUND' ? 'Устройство не найдено' : 'Не удалось отвязать устройство. Попробуйте позже.'
+      }
+      const html = await getBotScreen(callback.from.id, 'devices', notice)
+      await displayCallbackScreen(callback.from.id, callback.message.message_id, html, miniAppUrl())
+      return
+    }
+    if (action === 'spin') {
+      const account = await prisma.user.findUnique({ where: { telegramId: BigInt(callback.from.id) }, select: { id: true } })
+      let html: string
+      if (!account) html = await getBotScreen(callback.from.id, 'bonus', 'Сначала войдите в приложение через Telegram')
+      else try {
+        const spin = await openBonusBox(account.id, callbackUuid('avp-spin', callback.id))
+        const input = await getBotScreenInput(callback.from.id, 'bonus')
+        html = buildSpinResultScreen(input, { prizeTitle: spin.prize.title, prizeDescription: spin.prize.description,
+          promoCode: spin.promoCode, promoCodeExpiresAt: spin.promoCodeExpiresAt, remainingAttempts: spin.remainingAttempts })
+      } catch (e) {
+        html = await getBotScreen(callback.from.id, 'bonus', e instanceof BonusBoxError ? e.message : 'Розыгрыш временно недоступен')
+      }
+      await displayCallbackScreen(callback.from.id, callback.message.message_id, html, miniAppUrl())
+      return
+    }
+    if (action === 'readall') {
+      const account = await prisma.user.findUnique({ where: { telegramId: BigInt(callback.from.id) }, select: { id: true } })
+      if (account) await prisma.userNotification.updateMany({ where: { userId: account.id, readAt: null }, data: { readAt: new Date() } })
+      const html = await getBotScreen(callback.from.id, 'notifications')
+      await displayCallbackScreen(callback.from.id, callback.message.message_id, html, miniAppUrl())
+      return
+    }
     let screen: BotScreen = botScreens.includes(action as BotScreen) ? action as BotScreen : 'home'
     let notice: string | undefined
     if (action === 'claim') {
@@ -168,7 +213,11 @@ export async function handleMiniAppUpdate(update: z.infer<typeof telegramUpdateS
 }
 
 function checkoutUuid(callbackId: string) {
-  const hash = createHash('sha256').update(`avp-checkout:${callbackId}`).digest('hex')
+  return callbackUuid('avp-checkout', callbackId)
+}
+
+function callbackUuid(salt: string, callbackId: string) {
+  const hash = createHash('sha256').update(`${salt}:${callbackId}`).digest('hex')
   return `${hash.slice(0, 8)}-${hash.slice(8, 12)}-5${hash.slice(13, 16)}-a${hash.slice(17, 20)}-${hash.slice(20, 32)}`
 }
 

@@ -27,9 +27,11 @@ export async function getBotScreenInput(telegramId: number, screen: BotScreen, n
   if (user && input.overview) {
     if (screen === 'devices' && hasRemnawaveUserReference(user)) {
       try {
-        const result = await syncLocalDevicesFromRemnawave({ localUserId: user.id, reference: remnawaveUserReference(user) })
-        input.devices = result.devices.slice(0, 12).map(device => ({ title: device.displayName || device.deviceModel || 'Устройство', platform: device.platform || 'VPN-клиент' }))
-      } catch { input.notice = 'Не удалось обновить список устройств. Попробуйте позже.' }
+        await syncLocalDevicesFromRemnawave({ localUserId: user.id, reference: remnawaveUserReference(user) })
+      } catch { input.notice = 'Не удалось обновить список устройств. Показаны сохранённые данные.' }
+      const devices = await prisma.device.findMany({ where: { userId: user.id }, orderBy: { lastSeenAt: 'desc' }, take: 8,
+        select: { id: true, displayName: true, platform: true } })
+      input.devices = devices.map(device => ({ id: device.id, title: device.displayName || 'Устройство', platform: device.platform || 'VPN-клиент' }))
     }
     if (screen === 'referrals' && input.overview.referrals) {
       const campaign = channelCampaign()

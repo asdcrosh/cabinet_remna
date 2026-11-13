@@ -9,7 +9,7 @@ export function BotPreview() {
   const [screen, setScreen] = useState<BotScreen>('home')
   const [notice, setNotice] = useState('')
   const html = buildRichScreen({ screen, overview: miniAppDemo, appUrl: 'https://cabinet.alekseevvp.site/miniapp',
-    devices: [{ title: 'iPhone', platform: 'iOS · Rabbit Hole' }, { title: 'MacBook', platform: 'macOS · Rabbit Hole' }],
+    devices: [{ id: 'demo-dev-1', title: 'iPhone', platform: 'iOS · Rabbit Hole' }, { id: 'demo-dev-2', title: 'MacBook', platform: 'macOS · Rabbit Hole' }],
     tickets: [{ subject: 'Подключение на iPhone', status: 'Есть ответ' }],
     payments: [{ title: 'AlekseevVP', amount: '299 ₽', status: 'Оплачен', date: '01.11.2026' }, { title: 'AlekseevVP', amount: '299 ₽', status: 'Оплачен', date: '01.10.2026' }],
     autoRenewal: 'включено · MIR **1234',

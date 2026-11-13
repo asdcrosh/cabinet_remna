@@ -4,13 +4,15 @@ import { formatPrice } from '@/lib/format'
 
 export type BotScreen = 'home' | 'subscription' | 'plans' | 'billing' | 'devices' | 'bonus' | 'notifications' | 'referrals' | 'support' | 'connect' | 'settings' | 'admin'
 export const botScreens: BotScreen[] = ['home', 'subscription', 'plans', 'billing', 'devices', 'bonus', 'notifications', 'referrals', 'support', 'connect', 'settings', 'admin']
+export type BotDevice = { id: string; title: string; platform: string }
+export type BotSpinResult = { prizeTitle: string; prizeDescription: string | null; promoCode: string | null; promoCodeExpiresAt: string | null; remainingAttempts: number }
 export type RichScreenInput = {
   screen: BotScreen
   overview: MiniAppOverview | null
   appUrl: string
   bannerUrl?: string
   referral?: { url: string; condition: string; invited: number; claimed: number; channelUrl: string | null; eligible: boolean; ownClaimed: boolean }
-  devices?: Array<{ title: string; platform: string }>
+  devices?: BotDevice[]
   tickets?: Array<{ subject: string; status: string }>
   payments?: Array<{ title: string; amount: string; status: string; date: string }>
   autoRenewal?: string | null
@@ -46,6 +48,7 @@ export function buildRichScreen(input: RichScreenInput) {
   }
   if (data.warning) parts.push(`<p>${escape(data.warning)}</p>`)
   const sub = data.subscription
+  const currentPlan = data.plans.find(plan => plan.current && !plan.isPromo) ?? null
   switch (input.screen) {
     case 'home':
     case 'subscription':
@@ -57,9 +60,8 @@ export function buildRichScreen(input: RichScreenInput) {
         ['Устройства', `${data.deviceCount} из ${sub.deviceLimit ?? 'без лимита'}`],
       ]))
       parts.push(row(cb('Подключить VPN', 'connect', 'success'), cb('Выбрать тариф', 'plans')),
-        row(cb('Мои устройства', 'devices'), cb('Моя подписка', 'subscription')),
-        row(cb('Платежи', 'billing'), cb('Бонусы', 'bonus')),
-        row(cb('Уведомления', 'notifications'), cb('Настройки', 'settings')))
+        row(cb('Устройства', 'devices'), cb('Платежи', 'billing')),
+        row(cb('Бонусы', 'bonus'), cb('Уведомления', 'notifications')))
       break
     case 'plans':
       if (!data.plans.length) parts.push('<p>Для вашего аккаунта сейчас нет доступных тарифов.</p>')
@@ -71,20 +73,29 @@ export function buildRichScreen(input: RichScreenInput) {
       row(cb(plan.isPromo ? 'Получить доступ' : plan.current ? 'Продлить тариф' : 'Оформить тариф', plan.isPromo ? `buy:${plan.id}` : `pay:${plan.id}`, 'success')))
       parts.push('<hr><p>Продление того же тарифа добавляет дни. При смене тарифа начинается новый срок: остаток прежнего не переносится.</p>', row(app('Сравнить в приложении', 'plans')))
       break
-    case 'billing':
+    case 'billing': {
       parts.push(`<h4>${escape(sub?.title || 'Подписка пока не оформлена')}</h4>`)
       if (input.autoRenewal) parts.push(`<p>Автопродление: ${escape(input.autoRenewal)}</p>`)
+      if (currentPlan) parts.push(row(cb(`Продлить · ${formatPrice(currentPlan.priceKopecks)}`, `pay:${currentPlan.id}`, 'success')))
       if (!input.payments?.length) parts.push('<p>Оплат пока не было. История появится после первой покупки.</p>')
       if (input.payments?.length) parts.push('<h4>Последние операции</h4>',
         table(input.payments.map(payment => [`${payment.date} · ${payment.title}`, `${payment.amount} · ${payment.status}`])))
       parts.push(row(app('История и автопродление', 'billing')))
       break
-    case 'devices':
-      parts.push('<p>Список синхронизирован с кабинетом.</p>')
+    }
+    case 'devices': {
+      parts.push(`<p>Подключено устройств: ${data.deviceCount}${sub?.deviceLimit ? ` из ${sub.deviceLimit}` : ''}. Список синхронизирован с кабинетом.</p>`)
       if (!input.devices?.length) parts.push('<p>Подключённых устройств пока нет. Откройте инструкцию и добавьте первое.</p>')
-      if (input.devices?.length) parts.push(table(input.devices.map(device => [device.title, device.platform])))
-      parts.push(row(cb('Добавить устройство', 'connect', 'success')), row(app('Переименовать или удалить', 'devices')))
+      if (input.devices?.length) {
+        parts.push(table(input.devices.map(device => [device.title, device.platform])))
+        const deleteButtons = input.devices.slice(0, 6).map(device => cb(`Удалить ${device.title.slice(0, 18)}`, `devdel:${device.id}`))
+        const deleteRows: string[] = []
+        for (let i = 0; i < deleteButtons.length; i += 2) deleteRows.push(row(...deleteButtons.slice(i, i + 2)))
+        parts.push(...deleteRows)
+      }
+      parts.push(row(cb('Добавить устройство', 'connect', 'success')))
       break
+    }
     case 'connect':
       parts.push('<h4>01 / Выберите приложение</h4>', table([['iPhone / Mac', 'Rabbit Hole'], ['Android', 'INCY'], ['Windows', 'HAPP']]),
         '<h4>02 / Добавьте подписку</h4><p>Откройте персональную ссылку в приложении кабинета.</p>',
@@ -92,23 +103,26 @@ export function buildRichScreen(input: RichScreenInput) {
         row(app('Открыть настройку', 'connect')),
         '<p>Персональная ссылка доступна только после входа. Бот не показывает состояние VPN-туннеля.</p>')
       break
-    case 'bonus':
-      if (input.bonus && !input.bonus.enabled) parts.push('<p>Бонусная программа сейчас отключена. Загляните позже.</p>')
-      else {
-        const attempts = input.bonus?.attempts ?? 0
-        parts.push('<h4>Колесо подарков</h4>', attempts > 0
-          ? `<p>Доступно попыток: ${attempts}. Приз начисляется сразу после открытия.</p>`
-          : '<p>Новые попытки появляются за задания, покупки и приглашения друзей.</p>')
+    case 'bonus': {
+      if (input.bonus && !input.bonus.enabled) {
+        parts.push('<p>Бонусная программа сейчас отключена. Загляните позже.</p>')
+        break
       }
-      parts.push(row(app('Открыть бонусы', 'bonus')))
+      const attempts = input.bonus?.attempts ?? 0
+      parts.push('<h4>Колесо подарков</h4>', attempts > 0
+        ? `<p>Доступно попыток: ${attempts}. Приз начисляется сразу, не закрывая чат.</p>`
+        : '<p>Новые попытки появляются за задания, покупки и приглашения друзей.</p>')
+      if (attempts > 0) parts.push(row(cb(`Крутить колесо · ${attempts}`, 'spin', 'success')))
       if (data.referrals) parts.push(row(cb('Пригласить друга', 'referrals')))
+      parts.push(row(app('Задания и призы', 'bonus')))
       break
+    }
     case 'notifications': {
       const unread = input.inbox?.unread ?? 0
       parts.push(unread > 0 ? `<h4>Непрочитанных: ${unread}</h4>` : '<p>Все уведомления прочитаны.</p>')
       if (input.inbox?.items.length) parts.push(table(input.inbox.items.map(item => [item.date, item.fresh ? `${item.title} · новое` : item.title])))
       if (input.inbox && !input.inbox.items.length) parts.push('<p>Здесь появятся важные события подписки и сообщения сервиса.</p>')
-      parts.push(row(app('Открыть уведомления', 'notifications')))
+      if (unread > 0) parts.push(row(cb('Прочитать все', 'readall', 'success')))
       break
     }
     case 'referrals': {
@@ -151,10 +165,35 @@ export function buildRichScreen(input: RichScreenInput) {
       break
   }
   if (input.screen === 'home') {
-    const extraButtons = [...(data.referrals ? [cb('Пригласить друга', 'referrals')] : []), ...(data.support ? [cb('Поддержка', 'support')] : []), ...(input.admin ? [cb('Админка', 'admin')] : [])]
+    const extraButtons = [...(data.referrals ? [cb('Пригласить друга', 'referrals')] : []), ...(data.support ? [cb('Поддержка', 'support')] : []), cb('Настройки', 'settings'), ...(input.admin ? [cb('Админка', 'admin')] : [])]
     if (extraButtons.length) parts.push(row(...extraButtons))
   }
   parts.push('<hr>', row(cb('На главную', 'home'), cb('Обновить', input.screen, 'link')))
+  return parts.join('')
+}
+
+// Подтверждение отвязки устройства — до необратимого действия всегда один шаг.
+export function buildDeviceDeleteConfirm(input: RichScreenInput, device: BotDevice) {
+  const parts = [brandHeader(input.bannerUrl), '<h3>Удалить устройство?</h3>',
+    table([[device.title, device.platform]]),
+    '<p>Место в лимите освободится сразу. Вход в приложение на этом устройстве завершится. Устройство сможет подключиться снова, пока есть свободные места.</p>',
+    row(cb('Да, удалить', `devyes:${device.id}`, 'success')),
+    row(cb('Отмена', 'devices'))]
+  return parts.join('')
+}
+
+// Результат розыгрыша колеса подарков прямо в чате.
+export function buildSpinResultScreen(input: RichScreenInput, spin: BotSpinResult) {
+  const parts = [brandHeader(input.bannerUrl), '<h3>Колесо подарков</h3>',
+    `<h4>🎉 ${escape(spin.prizeTitle)}</h4>`]
+  if (spin.prizeDescription) parts.push(`<p>${escape(spin.prizeDescription)}</p>`)
+  if (spin.promoCode) {
+    parts.push(table([['Промокод', spin.promoCode], ...(spin.promoCodeExpiresAt ? [['Действует до', new Date(spin.promoCodeExpiresAt).toLocaleDateString('ru-RU', { timeZone: 'Europe/Moscow' })]] as string[][] : [])]),
+      row(`<tg-button type="copy_text" text="${escape(spin.promoCode)}">Скопировать промокод</tg-button>`))
+  }
+  parts.push(`<p>Осталось попыток: ${spin.remainingAttempts}.</p>`)
+  if (spin.remainingAttempts > 0) parts.push(row(cb(`Крутить ещё · ${spin.remainingAttempts}`, 'spin', 'success')))
+  parts.push(row(cb('К бонусам', 'bonus')), '<hr>', row(cb('На главную', 'home'), cb('Обновить', 'bonus', 'link')))
   return parts.join('')
 }
 
