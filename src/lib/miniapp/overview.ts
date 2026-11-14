@@ -35,6 +35,7 @@ export async function getMiniAppOverview(userId: string): Promise<MiniAppOvervie
       planName: local?.plan?.name || 'AlekseevVP', deviceLimit: local?.plan?.unlimitedDevices ? null : local?.deviceLimit ?? local?.plan?.deviceLimit ?? null,
       pending: Boolean(local?.pendingSync) } : null,
     deviceCount: user._count.devices, support: features.support, referrals: features.referrals,
+    admin: user.role !== 'USER',
     starsEnabled: starsEnabled(), starsRateKopecks: starsEnabled() ? starsRateKopecks() : null, warning,
     plans: catalog.plans.map(plan => ({ id: plan.id, name: plan.name, description: plan.description,
         days: plan.durationDays, unlimited: plan.unlimitedDuration, trafficLimitGb: plan.trafficLimitGb,
