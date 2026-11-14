@@ -1,25 +1,40 @@
 'use client'
 
 import { useEffect, useState, type FormEvent } from 'react'
-import { ArrowUpRight, Check, Copy, CreditCard, Gift, Headphones, Home, LoaderCircle, Lock, RefreshCw, Shield, Smartphone, Wallet, Wifi, X } from 'lucide-react'
+import { ArrowUpRight, Bell, Check, Copy, CreditCard, Gift, Headphones, Home, LayoutGrid, LoaderCircle, Lock, RefreshCw, Settings as SettingsIcon, Shield, Smartphone, Sparkles, Trophy, Users, Wallet, Wifi, Wrench, X } from 'lucide-react'
 import { DevicesList } from '@/components/dashboard/devices-list'
 import { KeysCard } from '@/components/dashboard/keys-card'
 import { SupportPanelDynamic } from '@/components/support/support-panel-dynamic'
 import type { SupportTicket } from '@/components/support/support-panel-model'
+import type { BonusBoxMissionView, BonusBoxOverview, OpenBoxResponse } from '@/components/bonus-box/bonus-box-types'
 import { getTelegramLaunchData } from '@/lib/telegram-miniapp-client'
 import { miniAppDestination } from '@/lib/miniapp/destination'
 import { miniAppDemo, type MiniAppOverview } from '@/lib/miniapp/model'
+import { AUTO_RENEWAL_CONSENT_VERSION } from '@/lib/auto-renewal-consent'
 import styles from './mini-app.module.css'
 
-type Tab = 'home' | 'plans' | 'devices' | 'referrals' | 'support' | 'connect'
+type Tab = 'home' | 'plans' | 'devices' | 'referrals' | 'support' | 'connect' | 'menu' | 'billing' | 'bonus' | 'notifications' | 'settings' | 'admin'
 type Referrals = { url: string; condition: string; invited: number; claimed: number; enabled: boolean; channelUrl: string | null; eligible: boolean; claimedAt: string | null }
 type PaymentItem = { id: string; status: string; amountKopecks: number; createdAt: string; provider: string; plan: { name: string } | null }
-const tabs = [{ id: 'home', label: 'Главная', icon: Home }, { id: 'plans', label: 'Подписка', icon: Wallet },
-  { id: 'devices', label: 'Устройства', icon: Smartphone }, { id: 'referrals', label: 'Друзья', icon: Gift }, { id: 'support', label: 'Помощь', icon: Headphones }] as const
-const rub = new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })
+type NotificationItem = { id: string; title: string; body: string | null; actionHref: string | null; actionLabel: string | null; readAt: string | null; createdAt: string }
+type Prefs = { inAppEnabled: boolean; telegramEnabled: boolean; emailEnabled: boolean; broadcastsEnabled: boolean }
+type Me = { id: string; email: string; name: string | null; role: string; createdAt: string }
+type AutoRenewalState = { id: string; status: string; paymentMethodTitle: string | null;
+  plan: { id: string; name: string; priceKopecks: number; durationDays: number; unlimitedDuration: boolean } | null } | null
+type AdminStats = { usersTotal: number; usersNew7d: number; activeSubscriptions: number; expiringSoon: number; recoveryCount: number; succeededPayments: number; succeededAmountKopecks: number }
 
-async function request<T>(url: string, body?: unknown): Promise<T> {
-  const response = await fetch(url, { method: body === undefined ? 'GET' : 'POST', credentials: 'same-origin', cache: 'no-store',
+const tabs = [{ id: 'home', label: 'Главная', icon: Home }, { id: 'plans', label: 'Подписка', icon: Wallet },
+  { id: 'devices', label: 'Устройства', icon: Smartphone }, { id: 'bonus', label: 'Бонусы', icon: Gift }, { id: 'menu', label: 'Меню', icon: LayoutGrid }] as const
+const knownTabs: Tab[] = ['home', 'plans', 'devices', 'referrals', 'support', 'connect', 'menu', 'billing', 'bonus', 'notifications', 'settings', 'admin']
+const rub = new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })
+const rarityEmoji: Record<string, string> = { COMMON: '⚪', RARE: '🔵', EPIC: '🟣', LEGENDARY: '🟡' }
+const renewalStatusLabel: Record<string, string> = {
+  AWAITING_PAYMENT_METHOD: 'ждёт привязки карты', ACTIVE: 'включено', PROCESSING: 'списание в обработке',
+  RETRYING: 'повторная попытка списания', PAUSED: 'на паузе', DISABLED: 'выключено',
+}
+
+async function request<T>(url: string, body?: unknown, method?: 'POST' | 'PATCH' | 'DELETE'): Promise<T> {
+  const response = await fetch(url, { method: method ?? (body === undefined ? 'GET' : 'POST'), credentials: 'same-origin', cache: 'no-store',
     headers: body === undefined ? {} : { 'Content-Type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body), signal: AbortSignal.timeout(25000) })
   const data = await response.json()
   if (!response.ok || data.error) throw new Error(data.error || 'Не удалось получить данные')
@@ -40,6 +55,17 @@ export function MiniApp({ demo = false }: { demo?: boolean }) {
   const [selectedLimits, setSelectedLimits] = useState<Record<string, number>>({})
   const [promoCodes, setPromoCodes] = useState<Record<string, string>>({})
   const [checkoutPlanId, setCheckoutPlanId] = useState<string | null>(null)
+  const [autoRenewal, setAutoRenewal] = useState<AutoRenewalState>(null)
+  const [renewalConsent, setRenewalConsent] = useState(false)
+  const [bonusData, setBonusData] = useState<BonusBoxOverview | null>(null)
+  const [bonusOff, setBonusOff] = useState(false)
+  const [spinning, setSpinning] = useState(false)
+  const [spinResult, setSpinResult] = useState<OpenBoxResponse | null>(null)
+  const [copiedCode, setCopiedCode] = useState<string | null>(null)
+  const [inbox, setInbox] = useState<NotificationItem[] | null>(null)
+  const [prefs, setPrefs] = useState<Prefs | null>(null)
+  const [me, setMe] = useState<Me | null>(null)
+  const [adminStats, setAdminStats] = useState<AdminStats | null>(null)
 
   useEffect(() => {
     if (demo) return
@@ -73,12 +99,12 @@ export function MiniApp({ demo = false }: { demo?: boolean }) {
           setData(result)
           const params = new URLSearchParams(window.location.search)
           const initial = params.get('tab')
-          if (tabs.some(item => item.id === initial) || initial === 'connect') setTab(initial as Tab)
+          if (knownTabs.includes(initial as Tab)) setTab(initial as Tab)
           else if (initial && initial !== 'home') window.location.replace(miniAppDestination(initial))
           // Возврат со страницы ЮKassa: оплата прошла внутри Telegram, подтверждаем здесь же.
           if (params.get('paid') === '1') setNotice('Оплата получена. Подписка обновится автоматически — обычно это занимает меньше минуты.')
           const requestedPlan = params.get('plan')
-          if (requestedPlan && result.plans.some(item => item.id === requestedPlan && !item.isPromo)) setCheckoutPlanId(requestedPlan)
+          if (requestedPlan && result.plans.some(item => item.id === requestedPlan && !item.isPromo)) { setTab('plans'); setCheckoutPlanId(requestedPlan) }
           if (params.get('paid') || requestedPlan) {
             for (const key of ['paid', 'payment', 'plan']) params.delete(key)
             const query = params.toString()
@@ -99,8 +125,34 @@ export function MiniApp({ demo = false }: { demo?: boolean }) {
       try {
         if (tab === 'referrals') { const value = await request<Referrals>('/api/miniapp/referrals'); if (!cancelled) setReferrals(value) }
         if (tab === 'support') { const value = await request<{ tickets: SupportTicket[] }>('/api/support/tickets'); if (!cancelled) setTickets(value.tickets) }
-        if (tab === 'plans') { const value = await request<{ payments: PaymentItem[] }>('/api/payment/history'); if (!cancelled) setPayments(value.payments) }
         if (tab === 'connect') { const value = await request<{ keys: { subscriptionUrl: string } | null }>('/api/subscription/keys'); if (!cancelled) setSubscriptionUrl(value.keys?.subscriptionUrl ?? null) }
+        if (tab === 'billing') {
+          const [history, renewal] = await Promise.all([
+            request<{ payments: PaymentItem[] }>('/api/payment/history'),
+            request<{ autoRenewal: AutoRenewalState }>('/api/auto-renewal'),
+          ])
+          if (!cancelled) { setPayments(history.payments); setAutoRenewal(renewal.autoRenewal) }
+        }
+        if (tab === 'bonus') {
+          try {
+            const value = await request<BonusBoxOverview>('/api/bonus-box')
+            if (!cancelled) { setBonusData(value); setBonusOff(false) }
+          } catch (e) {
+            if (!cancelled) {
+              if (e instanceof Error && e.message === 'Not found') setBonusOff(true)
+              else throw e
+            }
+          }
+        }
+        if (tab === 'notifications') { const value = await request<{ notifications: NotificationItem[] }>('/api/notifications'); if (!cancelled) setInbox(value.notifications) }
+        if (tab === 'settings') {
+          const [prefValue, meValue] = await Promise.all([
+            request<{ preferences: Prefs }>('/api/notifications/preferences'),
+            request<{ user: Me | null }>('/api/me'),
+          ])
+          if (!cancelled) { setPrefs(prefValue.preferences); setMe(meValue.user) }
+        }
+        if (tab === 'admin' && data?.admin) { const value = await request<AdminStats>('/api/admin/stats'); if (!cancelled) setAdminStats(value) }
       } catch (e) { if (!cancelled) setError(e instanceof Error ? e.message : 'Не удалось загрузить раздел') }
       finally { if (!cancelled) setBusy(false) }
     }
@@ -115,7 +167,7 @@ export function MiniApp({ demo = false }: { demo?: boolean }) {
     catch (e) { setError(e instanceof Error ? e.message : 'Не удалось обновить') }
     finally { setBusy(false) }
   }
-  function navigate(next: Tab) { setTab(next); setError(''); setNotice(''); setCopied(false) }
+  function navigate(next: Tab) { setTab(next); setError(''); setNotice(''); setCopied(false); setSpinResult(null) }
   async function claim() {
     setBusy(true); setError('')
     try {
@@ -128,6 +180,10 @@ export function MiniApp({ demo = false }: { demo?: boolean }) {
     if (!referrals) return
     try { await navigator.clipboard.writeText(referrals.url); setCopied(true) }
     catch { setError('Не удалось скопировать. Выделите ссылку и скопируйте вручную.') }
+  }
+  async function copyCode(code: string) {
+    try { await navigator.clipboard.writeText(code); setCopiedCode(code) }
+    catch { setError('Не удалось скопировать промокод.') }
   }
   async function buyPlan(plan: MiniAppOverview['plans'][number]) {
     if (demo) { setNotice('Это демонстрация. Счёт не создаётся.'); return }
@@ -165,13 +221,92 @@ export function MiniApp({ demo = false }: { demo?: boolean }) {
     } catch (e) { setError(e instanceof Error ? e.message : 'Не удалось создать счёт') }
     finally { setBusy(false) }
   }
+  async function toggleAutoRenewal() {
+    if (demo) { setNotice('Это демонстрация. Настройка не меняется.'); return }
+    const currentPlan = data?.plans.find(plan => plan.current && !plan.isPromo)
+    setBusy(true); setError(''); setNotice('')
+    try {
+      if (!autoRenewal || autoRenewal.status === 'DISABLED') {
+        if (!currentPlan) throw new Error('Сначала оформите тариф')
+        if (!renewalConsent) throw new Error('Подтвердите согласие на регулярные списания')
+        const value = await request<{ autoRenewal: AutoRenewalState }>('/api/auto-renewal',
+          { planId: currentPlan.id, consentAccepted: true, consentVersion: AUTO_RENEWAL_CONSENT_VERSION })
+        setAutoRenewal(value.autoRenewal); setRenewalConsent(false)
+        setNotice('Автопродление включено. Карта привяжется при следующей оплате.')
+      } else {
+        const value = await request<{ autoRenewal: AutoRenewalState }>('/api/auto-renewal', {}, 'DELETE')
+        setAutoRenewal(value.autoRenewal)
+        setNotice('Автопродление выключено. Оплаченный срок сохранится.')
+      }
+    } catch (e) { setError(e instanceof Error ? e.message : 'Не удалось изменить автопродление') }
+    finally { setBusy(false) }
+  }
+  async function spin() {
+    if (demo) { setNotice('Это демонстрация. Розыгрыш не выполняется.'); return }
+    setSpinning(true); setError(''); setSpinResult(null)
+    try {
+      const result = await request<OpenBoxResponse>('/api/bonus-box', { spinId: crypto.randomUUID() })
+      setSpinResult(result)
+      setBonusData(await request<BonusBoxOverview>('/api/bonus-box'))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Розыгрыш временно недоступен')
+      try { setBonusData(await request<BonusBoxOverview>('/api/bonus-box')) } catch { /* обзор обновим при следующем открытии */ }
+    }
+    finally { setSpinning(false) }
+  }
+  async function claimMission(mission: BonusBoxMissionView) {
+    if (demo) { setNotice('Это демонстрация. Награда не начисляется.'); return }
+    setBusy(true); setError('')
+    try {
+      await request(`/api/bonus-box/missions/${mission.id}/claim`, {})
+      setNotice(`Награда получена: +${mission.rewardAttempts} попыток.`)
+      setBonusData(await request<BonusBoxOverview>('/api/bonus-box'))
+    } catch (e) { setError(e instanceof Error ? e.message : 'Не удалось получить награду') }
+    finally { setBusy(false) }
+  }
+  async function markAllRead() {
+    if (demo) { setNotice('Это демонстрация. Уведомления не меняются.'); return }
+    setBusy(true); setError('')
+    try {
+      await request('/api/notifications', {}, 'PATCH')
+      const value = await request<{ notifications: NotificationItem[] }>('/api/notifications')
+      setInbox(value.notifications); setNotice('Все уведомления прочитаны.')
+    } catch (e) { setError(e instanceof Error ? e.message : 'Не удалось обновить уведомления') }
+    finally { setBusy(false) }
+  }
+  async function openInboxItem(item: NotificationItem) {
+    if (demo || item.readAt) return
+    setInbox(previous => previous?.map(entry => entry.id === item.id ? { ...entry, readAt: new Date().toISOString() } : entry) ?? null)
+    try { await request('/api/notifications', { ids: [item.id] }, 'PATCH') } catch { /* прочтение отметим при следующем открытии */ }
+  }
+  async function togglePref(key: keyof Prefs) {
+    if (demo) { setNotice('Это демонстрация. Настройки не меняются.'); return }
+    if (!prefs) return
+    const next = { ...prefs, [key]: !prefs[key] }
+    setPrefs(next)
+    try {
+      const value = await request<{ preferences: Prefs }>('/api/notifications/preferences', next, 'PATCH')
+      setPrefs(value.preferences)
+    } catch (e) { setPrefs(prefs); setError(e instanceof Error ? e.message : 'Не удалось сохранить настройки') }
+  }
   const sub = data?.subscription
   const checkoutPlan = data?.plans.find(item => item.id === checkoutPlanId && !item.isPromo) ?? null
   const checkoutLimit = checkoutPlan ? selectedLimits[checkoutPlan.id] ?? checkoutPlan.initialDevices : 0
   const checkoutExtraKopecks = checkoutPlan ? Math.max(0, checkoutLimit - checkoutPlan.devices) * checkoutPlan.extraDevicePriceKopecks : 0
   const checkoutTotalKopecks = checkoutPlan ? checkoutPlan.priceKopecks + checkoutExtraKopecks : 0
   const date = sub?.expiresAt ? new Date(sub.expiresAt).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' }) : 'Без ограничения срока'
-  const visibleTabs = tabs.filter(item => (item.id !== 'support' || data?.support) && (item.id !== 'referrals' || data?.referrals))
+  const currentPlan = data?.plans.find(plan => plan.current && !plan.isPromo) ?? null
+  const unreadCount = inbox?.filter(item => !item.readAt).length ?? 0
+  const renewalOn = Boolean(autoRenewal && autoRenewal.status !== 'DISABLED')
+  const menuItems: Array<{ id: Tab; icon: typeof Wallet; title: string; hint: string; badge?: number }> = [
+    { id: 'billing', icon: CreditCard, title: 'Платежи', hint: renewalOn ? `Автопродление: ${renewalStatusLabel[autoRenewal!.status] ?? autoRenewal!.status}` : 'История и автопродление' },
+    { id: 'notifications', icon: Bell, title: 'Уведомления', hint: unreadCount > 0 ? `Непрочитанных: ${unreadCount}` : 'Все прочитаны', badge: unreadCount || undefined },
+    ...(data?.referrals ? [{ id: 'referrals' as Tab, icon: Users, title: 'Друзья', hint: 'Бонус за приглашения' }] : []),
+    ...(data?.support ? [{ id: 'support' as Tab, icon: Headphones, title: 'Поддержка', hint: 'Мы на связи' }] : []),
+    { id: 'connect', icon: Wifi, title: 'Подключение', hint: 'Инструкция и ссылка' },
+    { id: 'settings', icon: SettingsIcon, title: 'Настройки', hint: 'Уведомления и профиль' },
+    ...(data?.admin ? [{ id: 'admin' as Tab, icon: Wrench, title: 'Управление', hint: 'Панель администратора' }] : []),
+  ]
   return <main className={styles.app}>
     <div className={styles.wrap}>
       <header className={styles.header}><div className={styles.brand}><span className={styles.logo}>VP</span><span>Alekseev<span className={styles.brandAccent}>VP</span><small>Личный кабинет</small></span></div>
@@ -194,6 +329,10 @@ export function MiniApp({ demo = false }: { demo?: boolean }) {
           {data.referrals && <button className={styles.invite} onClick={() => navigate('referrals')}><Gift size={27} /><span><b>Хорошим делятся</b><small>Приглашайте друзей и получайте дни VPN</small></span><ArrowUpRight size={20} /></button>}
           <p className={styles.footnote}>Подписка общая с вашим личным кабинетом.<br />Статус подключения проверяется в VPN-приложении.</p>
         </>}
+        {tab === 'menu' && <section><Heading eyebrow="ВСЁ УПРАВЛЕНИЕ" title="Меню кабинета" description="Все разделы сервиса — как в личном кабинете на сайте." />
+          <div className={styles.quick}>{menuItems.map(item => <button key={item.id} onClick={() => navigate(item.id)}>
+            <item.icon /><b>{item.title}{item.badge ? ` · ${item.badge}` : ''}</b><span>{item.hint}</span></button>)}</div>
+        </section>}
         {tab === 'plans' && <section><Heading eyebrow="ВАШ ДОСТУП" title="Тарифы и подписка" description="Тарифы и условия обновляются из личного кабинета." />
           {data.plans.length === 0 && <div className={styles.empty}>Для вашего аккаунта сейчас нет доступных тарифов.</div>}
           {data.plans.map(plan => <article className={styles.plan} key={plan.id}><div><small>{plan.current ? 'ВАШ ТАРИФ' : 'ALEKSEEVVP'}</small>
@@ -215,8 +354,93 @@ export function MiniApp({ demo = false }: { demo?: boolean }) {
               <button className={styles.primary} disabled={busy} onClick={() => void buyPlan(plan)}>{plan.isPromo ? 'Получить доступ' : 'Оплатить Stars'}<ArrowUpRight size={18} /></button>
             </div>}
             </article>)}
-          <p className={styles.footnote}>Оплата картой и по СБП проходит внутри Telegram на защищённой странице ЮKassa. Итоговая сумма со скидками появится до оплаты.</p>
-          <div className={styles.history}><h2>История платежей</h2>{payments === null && <p>Загружаем платежи…</p>}{payments?.length === 0 && <p>Платежей пока нет.</p>}{payments?.slice(0, 5).map(payment => <div className={styles.order} key={payment.id}><span><b>{payment.plan?.name || 'Подписка'}</b><small>{new Date(payment.createdAt).toLocaleDateString('ru-RU')} · {payment.provider}</small></span><span><b>{new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB' }).format(payment.amountKopecks / 100)}</b><small>{payment.status === 'SUCCEEDED' ? 'Оплачено' : payment.status === 'PENDING' ? 'Ожидает оплаты' : 'Не оплачено'}</small></span></div>)}</div>
+          <p className={styles.footnote}>Оплата картой и по СБП проходит внутри Telegram на защищённой странице ЮKassa. История платежей — в разделе «Платежи».</p>
+        </section>}
+        {tab === 'billing' && <section><Heading eyebrow="ОПЛАТЫ" title="Платежи" description="История оплат и автопродление — как в кабинете на сайте." />
+          <article className={styles.plan}><div><small>АВТОПРОДЛЕНИЕ</small>
+            <h2>{renewalOn ? '🟢 ' : '⚪ '}{renewalStatusLabel[autoRenewal?.status ?? 'DISABLED'] ?? autoRenewal?.status}</h2>
+            {autoRenewal?.plan && <p>{autoRenewal.plan.name} · {rub.format(autoRenewal.plan.priceKopecks / 100)}{autoRenewal.plan.unlimitedDuration ? '' : ` / ${autoRenewal.plan.durationDays} дней`}</p>}
+            {autoRenewal?.paymentMethodTitle && <p>Карта: {autoRenewal.paymentMethodTitle}</p>}
+            {!renewalOn && <p>Подписка будет продлеваться автоматически, чтобы доступ не прерывался.</p>}
+            {autoRenewal?.status === 'AWAITING_PAYMENT_METHOD' && <p>Карта привяжется автоматически при следующей оплате картой.</p>}
+          </div>
+            {!renewalOn && currentPlan && <>
+              <label className={styles.consent}><input type="checkbox" checked={renewalConsent} onChange={e => setRenewalConsent(e.target.checked)} />
+                <span>Разрешаю регулярные списания по тарифу «{currentPlan.name}» согласно условиям автопродления. Отключить можно в любой момент здесь же.</span></label>
+              <button className={styles.primary} disabled={busy || !renewalConsent} onClick={() => void toggleAutoRenewal()}>Включить автопродление<ArrowUpRight size={18} /></button></>}
+            {!renewalOn && !currentPlan && <p className={styles.planNote}>Сначала оформите тариф — автопродление появится после первой оплаты.</p>}
+            {renewalOn && autoRenewal?.status !== 'PROCESSING' && autoRenewal?.status !== 'RETRYING' &&
+              <button className={styles.secondary} disabled={busy} onClick={() => void toggleAutoRenewal()}>Выключить автопродление</button>}
+          </article>
+          <div className={styles.history}><h2>История платежей</h2>{payments === null && <p>Загружаем платежи…</p>}{payments?.length === 0 && <p>Платежей пока нет.</p>}{payments?.slice(0, 20).map(payment => <div className={styles.order} key={payment.id}><span><b>{payment.plan?.name || 'Подписка'}</b><small>{new Date(payment.createdAt).toLocaleDateString('ru-RU')} · {payment.provider}</small></span><span><b>{rub.format(payment.amountKopecks / 100)}</b><small>{payment.status === 'SUCCEEDED' ? 'Оплачено' : payment.status === 'PENDING' ? 'Ожидает оплаты' : payment.status === 'REFUNDED' ? 'Возврат' : 'Не оплачено'}</small></span></div>)}</div>
+        </section>}
+        {tab === 'bonus' && <section><Heading eyebrow="ПОДАРКИ" title="Бонусы" description="Колесо подарков, задания и промокоды — те же, что в кабинете." />
+          {bonusOff && <div className={styles.empty}>Бонусная программа сейчас отключена. Загляните позже.</div>}
+          {demo && <div className={styles.card}><div className={styles.bonusHero}><Sparkles size={40} /><h2>Колесо подарков</h2><p>2 попытки · демонстрация</p></div>
+            <button className={styles.primary} onClick={() => setNotice('Это демонстрация. Розыгрыш не выполняется.')}>Крутить колесо<ArrowUpRight size={18} /></button></div>}
+          {!demo && !bonusOff && !bonusData && !busy && <div className={styles.empty}>Не удалось загрузить бонусы.</div>}
+          {!demo && bonusData && <>
+            <article className={styles.plan}><div className={styles.bonusHero}><Sparkles size={40} />
+              <h2>Колесо подарков</h2>
+              <p>{bonusData.attemptsCount > 0 ? `Доступно попыток: ${bonusData.attemptsCount}` : bonusData.canOpenReason || 'Новые попытки — за покупки, задания и друзей'}</p></div>
+              {spinResult && <div className={styles.prizeCard}><b>{rarityEmoji[spinResult.prize.rarity] ?? '🎁'} {spinResult.prize.title}</b>
+                {spinResult.prize.description && <p>{spinResult.prize.description}</p>}
+                {spinResult.promoCode && <button className={styles.secondary} onClick={() => void copyCode(spinResult.promoCode!)}>{copiedCode === spinResult.promoCode ? <Check size={17} /> : <Copy size={17} />}{copiedCode === spinResult.promoCode ? 'Промокод скопирован' : `Промокод: ${spinResult.promoCode}`}</button>}
+                <small>Осталось попыток: {spinResult.remainingAttempts}</small></div>}
+              <button className={styles.primary} disabled={spinning || bonusData.attemptsCount === 0} onClick={() => void spin()}>
+                {spinning ? <LoaderCircle className="animate-spin" size={19} /> : <Trophy size={19} />}{spinning ? 'Крутим…' : bonusData.attemptsCount > 0 ? `Крутить колесо · ${bonusData.attemptsCount}` : 'Пока нет попыток'}<ArrowUpRight size={18} /></button>
+            </article>
+            {bonusData.activePromoRewards.length > 0 && <div className={styles.history}><h2>Ваши промокоды</h2>
+              {bonusData.activePromoRewards.map(reward => <div className={styles.order} key={reward.id}><span><b>{reward.code}</b><small>{reward.prizeTitle}</small></span><span><b>−{reward.discountPercent}%</b><small>{reward.expiresAt ? `до ${new Date(reward.expiresAt).toLocaleDateString('ru-RU')}` : 'бессрочно'}</small></span></div>)}</div>}
+            {bonusData.missions.length > 0 && <div className={styles.history}><h2>Задания</h2>
+              {bonusData.missions.map(mission => <div className={styles.order} key={mission.id}><span><b>{mission.title}</b><small>{mission.completed ? 'Выполнено' : `Прогресс: ${Math.min(mission.value, mission.target)} из ${mission.target}`} · награда {mission.rewardAttempts} попыток</small></span>
+                {mission.completed && !mission.claimed && <button className={styles.claimButton} disabled={busy} onClick={() => void claimMission(mission)}>Забрать</button>}
+                {mission.claimed && <span><small>✅ Получено</small></span>}</div>)}</div>}
+            {bonusData.openings.length > 0 && <div className={styles.history}><h2>Последние призы</h2>
+              {bonusData.openings.slice(0, 5).map(opening => <div className={styles.order} key={opening.id}><span><b>{rarityEmoji[opening.prize.rarity] ?? '🎁'} {opening.prize.title}</b><small>{new Date(opening.createdAt).toLocaleDateString('ru-RU')}</small></span></div>)}</div>}
+            {data.referrals && <button className={styles.invite} onClick={() => navigate('referrals')}><Users size={26} /><span><b>Попытки за друзей</b><small>Приглашайте друзей и получайте бонусы вместе</small></span><ArrowUpRight size={20} /></button>}
+          </>}
+        </section>}
+        {tab === 'notifications' && <section><Heading eyebrow="СОБЫТИЯ" title="Уведомления" description="Важные события подписки и сообщения сервиса." />
+          {demo && <div className={styles.card}><p>🔔 Подписка продлена на 30 дней</p><small>01.11.2026 · демонстрация</small></div>}
+          {!demo && <>
+            {inbox === null && <div className={styles.empty}>Загружаем уведомления…</div>}
+            {inbox?.length === 0 && <div className={styles.empty}>Уведомлений пока нет.</div>}
+            {unreadCount > 0 && <button className={styles.secondary} disabled={busy} onClick={() => void markAllRead()}><Check size={17} />Прочитать все · {unreadCount}</button>}
+            {inbox?.map(item => <button className={`${styles.notif} ${item.readAt ? '' : styles.notifUnread}`} key={item.id} onClick={() => void openInboxItem(item)}>
+              <span className={styles.notifBody}><b>{item.title}</b>{item.body && <small>{item.body}</small>}
+                <small>{new Date(item.createdAt).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })}{item.actionHref && item.actionLabel ? ` · ${item.actionLabel} →` : ''}</small></span>
+              {!item.readAt && <span className={styles.dot} />}</button>)}
+            {inbox?.some(item => item.actionHref) && <p className={styles.footnote}>Ссылки из уведомлений открывают разделы кабинета в этом же окне.</p>}
+          </>}
+        </section>}
+        {tab === 'settings' && <section><Heading eyebrow="ВАШ ПРОФИЛЬ" title="Настройки" description="Каналы уведомлений и данные аккаунта." />
+          <article className={styles.plan}><div><small>АККАУНТ</small>
+            <h2>{me?.name || data.name}</h2>
+            <p>{demo ? 'demo@alekseevvp.example' : me?.email || 'Загружаем…'}</p>
+            <p>Telegram привязан — вход и уведомления работают через него.</p></div></article>
+          <article className={styles.plan}><div><small>УВЕДОМЛЕНИЯ</small><h2>Каналы связи</h2></div>
+            {([['inAppEnabled', 'В кабинете', 'Лента событий в разделе «Уведомления»'], ['telegramEnabled', 'Telegram', 'Сообщения от бота'], ['emailEnabled', 'Email', 'Письма на почту'], ['broadcastsEnabled', 'Рассылки', 'Новости и акции сервиса']] as Array<[keyof Prefs, string, string]>).map(([key, title, hint]) =>
+              <div className={styles.prefRow} key={key}><span><b>{title}</b><small>{hint}</small></span>
+                <button role="switch" aria-checked={demo ? key !== 'broadcastsEnabled' : Boolean(prefs?.[key])} className={styles.toggle} disabled={busy || (!demo && !prefs)} onClick={() => void togglePref(key)}><span /></button></div>)}
+          </article>
+          <a className={styles.secondary} href="/dashboard/settings">Профиль и безопасность в кабинете<ArrowUpRight size={18} /></a>
+        </section>}
+        {tab === 'admin' && <section><Heading eyebrow="СЕРВИС" title="Управление" description="Статистика сервиса и вход в панель администратора." />
+          {!data.admin && <div className={styles.empty}>Раздел доступен администраторам.</div>}
+          {data.admin && demo && <div className={styles.card}><p>Демонстрация: статистика недоступна.</p></div>}
+          {data.admin && !demo && <>
+            {adminStats === null && <div className={styles.empty}>Загружаем статистику…</div>}
+            {adminStats && <div className={styles.quick}>
+              <div><strong>{adminStats.usersTotal}</strong><span>пользователей · +{adminStats.usersNew7d} за 7 дней</span></div>
+              <div><strong>{adminStats.activeSubscriptions}</strong><span>активных подписок</span></div>
+              <div><strong>{adminStats.expiringSoon}</strong><span>истекают за 7 дней</span></div>
+              <div><strong>{adminStats.recoveryCount}</strong><span>оплат к выдаче</span></div>
+              <div><strong>{adminStats.succeededPayments}</strong><span>успешных оплат</span></div>
+              <div><strong>{rub.format(adminStats.succeededAmountKopecks / 100)}</strong><span>сумма оплат</span></div>
+            </div>}
+            <a className={styles.primary} href="/dashboard/admin"><Wrench size={19} />Открыть панель управления<ArrowUpRight size={18} /></a>
+          </>}
         </section>}
         {tab === 'devices' && <section><Heading eyebrow="ПОДКЛЮЧЕНИЯ" title="Ваши устройства" description="Одно подключение для всех ваших экранов." />
           {demo ? <div className={styles.card}><div className={styles.device}><Smartphone /><span><b>iPhone</b><small>iOS · Rabbit Hole</small></span><Check /></div><div className={styles.device}><Smartphone /><span><b>MacBook</b><small>macOS · Rabbit Hole</small></span><Check /></div></div> : <DevicesList deviceLimit={sub?.deviceLimit} />}
@@ -259,7 +483,7 @@ export function MiniApp({ demo = false }: { demo?: boolean }) {
             <p className={styles.sheetSecure}>Откроется защищённая страница ЮKassa прямо здесь, в Telegram — картой или по СБП. Промокод и скидки применятся автоматически перед оплатой.</p>
           </section>
         </div>}
-        <nav className={styles.nav} aria-label="Разделы приложения">{visibleTabs.map(item => <button key={item.id} aria-current={tab === item.id ? 'page' : undefined} onClick={() => navigate(item.id)}><item.icon size={21} /><span>{item.label}</span></button>)}</nav>
+        <nav className={styles.nav} aria-label="Разделы приложения">{tabs.map(item => <button key={item.id} aria-current={tab === item.id ? 'page' : undefined} onClick={() => navigate(item.id)}><item.icon size={21} /><span>{item.label}</span></button>)}</nav>
       </>}
     </div>
   </main>
