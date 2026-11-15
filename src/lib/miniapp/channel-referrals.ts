@@ -70,26 +70,38 @@ export async function captureChannelReferral(userId: string, telegramId: bigint,
 // Короткий кэш членства, чтобы не дёргать Bot API на каждое сообщение пользователя.
 const gateMembershipCache = new Map<string, { member: boolean; at: number }>()
 const GATE_CACHE_TTL_MS = 60_000
+let cachedGateChannelId: string | null = null
 
-// Обязательная подписка на канал для приглашённых: пока пользователь не вступил,
-// бот показывает только экран подписки. При сбое проверки доступ не блокируем —
-// членство в любом случае перепроверяется при начислении бонуса.
-export async function channelGate(telegramId: number, options?: { fresh?: boolean }): Promise<{ channelUrl: string } | null> {
+async function gateChannelId(reference: string) {
+  if (!cachedGateChannelId) cachedGateChannelId = await resolveChannelId(reference)
+  return cachedGateChannelId
+}
+
+// Обязательная подписка на канал для всех пользователей бота: пока пользователь
+// не вступил (или вышел) из канала, бот на любое действие показывает только
+// экран подписки. claimable=true, если у пользователя есть невостребованный
+// реферальный бонус — после вступления его можно сразу начислить.
+// При сбое проверки (например, бот потерял права администратора канала) доступ
+// не блокируем — членство перепроверяется при начислении бонуса.
+export async function channelGate(telegramId: number, options?: { fresh?: boolean }): Promise<{ channelUrl: string; claimable: boolean } | null> {
   const campaign = channelCampaign()
   if (!campaign || !await isFeatureEnabled('referrals')) return null
   const id = BigInt(telegramId)
+  const user = await prisma.user.findUnique({ where: { telegramId: id }, select: { id: true } })
+  if (!user) return null
   const referral = await prisma.telegramChannelReferral.findUnique({
     where: { referredTelegramId: id }, select: { claimedAt: true, channelId: true } })
-  if (!referral || referral.claimedAt) return null
+  const claimable = Boolean(referral && !referral.claimedAt)
   const key = id.toString()
   const cached = gateMembershipCache.get(key)
   if (!options?.fresh && cached && Date.now() - cached.at < GATE_CACHE_TTL_MS) {
-    return cached.member ? null : { channelUrl: campaign.channelUrl }
+    return cached.member ? null : { channelUrl: campaign.channelUrl, claimable }
   }
   try {
-    const member = isChannelMember(await membership(referral.channelId, id))
+    const channelId = referral?.channelId ?? await gateChannelId(campaign.channelId)
+    const member = isChannelMember(await membership(channelId, id))
     gateMembershipCache.set(key, { member, at: Date.now() })
-    return member ? null : { channelUrl: campaign.channelUrl }
+    return member ? null : { channelUrl: campaign.channelUrl, claimable }
   } catch {
     return null
   }

@@ -161,7 +161,10 @@ export async function handleMiniAppUpdate(update: z.infer<typeof telegramUpdateS
       }
       const account = await prisma.user.findUnique({ where: { telegramId: BigInt(callback.from.id) }, select: { id: true } })
       let notice = '✅ Подписка подтверждена — добро пожаловать!'
-      if (account) try {
+      // Реферальный бонус начисляем только приглашённым с невостребованной наградой.
+      const pendingReferral = account ? await prisma.telegramChannelReferral.findUnique({
+        where: { referredTelegramId: BigInt(callback.from.id) }, select: { claimedAt: true } }) : null
+      if (account && pendingReferral && !pendingReferral.claimedAt) try {
         await claimChannelReward(account.id)
         notice = '🎉 Подписка подтверждена — реферальный бонус начислен!'
       } catch (e) { notice = e instanceof Error ? e.message : notice }
@@ -169,7 +172,7 @@ export async function handleMiniAppUpdate(update: z.infer<typeof telegramUpdateS
       await displayCallbackScreen(callback.from.id, callback.message.message_id, html, miniAppUrl())
       return
     }
-    // Пока приглашённый не вступил в канал, любые кнопки ведут на экран подписки.
+    // Пока пользователь не вступил в канал, любые кнопки ведут на экран подписки.
     const callbackGate = await channelGate(callback.from.id)
     if (callbackGate) {
       await displayCallbackScreen(callback.from.id, callback.message.message_id,
@@ -662,7 +665,7 @@ export async function handleMiniAppUpdate(update: z.infer<typeof telegramUpdateS
   }
   const message = update.message
   if (!message || message.chat.type !== 'private' || !message.from || message.chat.id !== message.from.id) return
-  // Приглашённый без подписки на канал видит только экран подписки — на любое сообщение.
+  // Пользователь без подписки на канал видит только экран подписки — на любое сообщение.
   if (process.env.TELEGRAM_RICH_MESSAGES_ENABLED === 'true') {
     const gate = await channelGate(message.from.id)
     if (gate) {

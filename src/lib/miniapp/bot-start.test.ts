@@ -2,7 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
   botCall: vi.fn(), findUser: vi.fn(), findFirstUser: vi.fn(), updateManyUser: vi.fn(), deleteDialogs: vi.fn(),
-  gate: vi.fn(async () => null as { channelUrl: string } | null), claimReward: vi.fn(),
+  gate: vi.fn(async () => null as { channelUrl: string; claimable: boolean } | null), claimReward: vi.fn(),
+  findReferral: vi.fn(async () => null as { claimedAt: Date | null } | null),
 }))
 
 vi.mock('./bot-api', () => ({ miniAppBotCall: mocks.botCall, downloadTelegramFile: vi.fn() }))
@@ -21,6 +22,7 @@ vi.mock('./channel-referrals', () => ({ claimChannelReward: mocks.claimReward, c
 vi.mock('@/lib/prisma', () => ({ prisma: {
   user: { findUnique: mocks.findUser, findFirst: mocks.findFirstUser, updateMany: mocks.updateManyUser },
   telegramBotDialog: { deleteMany: mocks.deleteDialogs },
+  telegramChannelReferral: { findUnique: mocks.findReferral },
 } }))
 vi.mock('@/lib/plan-catalog', () => ({ buildPlanCatalog: vi.fn() }))
 vi.mock('@/lib/rate-limit', () => ({ rateLimitKey: vi.fn(async () => ({ ok: true })) }))
@@ -86,10 +88,11 @@ describe('Обязательная подписка на канал для пр�
     mocks.deleteDialogs.mockResolvedValue({ count: 0 })
     mocks.gate.mockResolvedValue(null)
     mocks.claimReward.mockResolvedValue({ claimed: true, alreadyClaimed: false })
+    mocks.findReferral.mockResolvedValue(null)
   })
 
   it('без подписки любое сообщение заменяется экраном подписки', async () => {
-    mocks.gate.mockResolvedValue({ channelUrl: 'https://t.me/alekseevVP_Official' })
+    mocks.gate.mockResolvedValue({ channelUrl: 'https://t.me/alekseevVP_Official', claimable: true })
     await handleMiniAppUpdate({ update_id: 10, message: { message_id: 50, from: { id: 123 },
       chat: { id: 123, type: 'private' }, text: '/start' } })
 
@@ -101,7 +104,7 @@ describe('Обязательная подписка на канал для пр�
   })
 
   it('кнопки экранов под гейтом ведут на экран подписки', async () => {
-    mocks.gate.mockResolvedValue({ channelUrl: 'https://t.me/alekseevVP_Official' })
+    mocks.gate.mockResolvedValue({ channelUrl: 'https://t.me/alekseevVP_Official', claimable: true })
     await handleMiniAppUpdate({ update_id: 11, callback_query: { id: 'cb1', from: { id: 123 },
       message: { message_id: 900, chat: { id: 123, type: 'private' } }, data: 'avp:plans' } })
 
@@ -111,7 +114,7 @@ describe('Обязательная подписка на канал для пр�
   })
 
   it('«Я подписался» без вступления показывает предупреждение, гейт остаётся', async () => {
-    mocks.gate.mockResolvedValue({ channelUrl: 'https://t.me/alekseevVP_Official' })
+    mocks.gate.mockResolvedValue({ channelUrl: 'https://t.me/alekseevVP_Official', claimable: true })
     await handleMiniAppUpdate({ update_id: 12, callback_query: { id: 'cb2', from: { id: 123 },
       message: { message_id: 900, chat: { id: 123, type: 'private' } }, data: 'avp:chan:check' } })
 
@@ -121,7 +124,8 @@ describe('Обязательная подписка на канал для пр�
     expect(edit?.[1]?.rich_message?.html).toContain('Подписка пока не найдена')
   })
 
-  it('после вступления бонус начисляется, открывается главный экран', async () => {
+  it('после вступления приглашённому бонус начисляется, открывается главный экран', async () => {
+    mocks.findReferral.mockResolvedValue({ claimedAt: null })
     await handleMiniAppUpdate({ update_id: 13, callback_query: { id: 'cb3', from: { id: 123 },
       message: { message_id: 900, chat: { id: 123, type: 'private' } }, data: 'avp:chan:check' } })
 
@@ -130,7 +134,17 @@ describe('Обязательная подписка на канал для пр�
     expect(edit?.[1]?.rich_message?.html).toContain('Главная')
   })
 
+  it('обычный пользователь после вступления просто возвращается в бот без бонуса', async () => {
+    await handleMiniAppUpdate({ update_id: 15, callback_query: { id: 'cb5', from: { id: 123 },
+      message: { message_id: 900, chat: { id: 123, type: 'private' } }, data: 'avp:chan:check' } })
+
+    expect(mocks.claimReward).not.toHaveBeenCalled()
+    const edit = mocks.botCall.mock.calls.find(([method]) => method === 'editMessageText')
+    expect(edit?.[1]?.rich_message?.html).toContain('Главная')
+  })
+
   it('если бонус недоступен без активной подписки — причина показывается на главном экране', async () => {
+    mocks.findReferral.mockResolvedValue({ claimedAt: null })
     mocks.claimReward.mockRejectedValue(new Error('Бонусные дни добавляются к активной подписке — сначала оформите тариф, затем вернитесь за бонусом'))
     await handleMiniAppUpdate({ update_id: 14, callback_query: { id: 'cb4', from: { id: 123 },
       message: { message_id: 900, chat: { id: 123, type: 'private' } }, data: 'avp:chan:check' } })
