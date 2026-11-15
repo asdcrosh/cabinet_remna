@@ -75,6 +75,19 @@ describe('Telegram single bot window (showBotScreen)', () => {
     expect(prismaMock.updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: { botScreenMessageId: 901 } }))
   })
 
+  it('resends the window fresh when an explicit command changes nothing on screen', async () => {
+    prismaMock.findFirst.mockResolvedValue({ botScreenMessageId: 456 })
+    botCall.mockRejectedValueOnce(new Error('Telegram editMessageText failed: Bad Request: message is not modified'))
+      .mockResolvedValueOnce({}) // deleteMessage старого окна
+      .mockResolvedValueOnce({ message_id: 903 }) // свежий экран внизу чата
+    const used = await showBotScreen(123, '<h3>Главная</h3>', 457)
+    expect(used).toBe(903)
+    expect(botCall).toHaveBeenNthCalledWith(2, 'deleteMessage', { chat_id: 123, message_id: 456 })
+    expect(botCall).toHaveBeenNthCalledWith(3, 'sendRichMessage', { chat_id: 123,
+      rich_message: { html: '<h3>Главная</h3>' }, protect_content: true })
+    expect(prismaMock.updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: { botScreenMessageId: 903 } }))
+  })
+
   it('falls back to a fresh clean message when the remembered window is gone', async () => {
     prismaMock.findFirst.mockResolvedValue({ botScreenMessageId: 456 })
     botCall.mockRejectedValueOnce(new Error('Telegram editMessageText failed')) // правка якоря

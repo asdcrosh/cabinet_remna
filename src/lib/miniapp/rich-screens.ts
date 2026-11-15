@@ -50,7 +50,7 @@ const deviceEmoji = (platform: string) => {
   return '📟'
 }
 const statusDot = (sub: MiniAppOverview['subscription'] | null | undefined) => !sub ? '⚪' : sub.usable ? '🟢' : '🔴'
-const footer = (screen: string) => `<hr>${row(cb('🏠 На главную', 'home'), cb('🔄 Обновить', screen, 'link'))}`
+const footer = (screen: string) => `<hr>${row(cb('🏠 На главную', 'home'), cb('🔄 Обновить', screen))}`
 
 // Pure renderer: no personal key, password, initData or panel token can enter its DTO.
 export function buildRichScreen(input: RichScreenInput) {
