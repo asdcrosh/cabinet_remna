@@ -23,8 +23,8 @@ describe('Telegram Mini App boundaries', () => {
     expect(isMiniAppOwnedUpdate({ message: { text: '/start ref_ABC123' } })).toBe(true)
     expect(isMiniAppOwnedUpdate({ message: { text: '/start update' } })).toBe(true)
     expect(isMiniAppOwnedUpdate({ message: { text: '/support' } })).toBe(true)
-    expect(telegramUpdateSchema.safeParse({ update_id: 1, message: { chat: { id: 123, type: 'private' }, from: { id: 123 }, text: '/start' } }).success).toBe(true)
-    expect(telegramUpdateSchema.safeParse({ update_id: 2, message: { chat: { id: 123, type: 'private' }, from: { id: 123 },
+    expect(telegramUpdateSchema.safeParse({ update_id: 1, message: { message_id: 10, chat: { id: 123, type: 'private' }, from: { id: 123 }, text: '/start' } }).success).toBe(true)
+    expect(telegramUpdateSchema.safeParse({ update_id: 2, message: { message_id: 11, chat: { id: 123, type: 'private' }, from: { id: 123 },
       caption: 'Текст рассылки', photo: [{ file_id: 'file-1', width: 90, height: 90 }, { file_id: 'file-2', width: 800, height: 800 }] } }).success).toBe(true)
   })
   it('accepts only current channel members', () => {
@@ -133,7 +133,7 @@ describe('Telegram Mini App boundaries', () => {
       { id: 'ticket-1', subject: 'Проблема с подключением', status: 'Есть ответ',
         messages: [{ from: 'admin', body: 'Попробуйте переподключиться', date: '01.11.2026' }] })
     expect(thread).toContain('🛟 Поддержка')
-    expect(thread).toContain('avp:supr:ticket-1')
+    expect(thread).toContain('Пишите ответ прямо в чат')
     expect(thread).toContain('avp:supc:ticket-1')
     const connect = buildRichScreen({ screen: 'connect', overview: miniAppDemo, appUrl,
       connectUrl: 'https://panel.example.test/sub/abc123' })
@@ -166,7 +166,7 @@ describe('Telegram Mini App boundaries', () => {
         messages: [{ from: 'user', body: 'Не подключается', date: '01.11.2026' }] }, { viewer: 'admin' })
     expect(thread).toContain('👤 Пользователь')
     expect(thread).toContain('@ivan')
-    expect(thread).toContain('avp:admr:ticket-1')
+    expect(thread).toContain('Пишите ответ прямо в чат')
     expect(thread).toContain('avp:admc:ticket-1')
     expect(buildAdminTicketsScreen({ screen: 'admin', overview: miniAppDemo, appUrl }, [])).toContain('Открытых обращений нет')
   })

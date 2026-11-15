@@ -144,8 +144,8 @@ export async function getBotPaymentScreen(telegramId: number, planId: string) {
 }
 
 // Переписка по обращению для экрана бота. Помечает тикет прочитанным пользователю.
-export async function getBotSupportThreadScreen(telegramId: number, ticketId: string) {
-  const input = await getBotScreenInput(telegramId, 'support')
+export async function getBotSupportThreadScreen(telegramId: number, ticketId: string, notice?: string) {
+  const input = await getBotScreenInput(telegramId, 'support', notice)
   const account = await prisma.user.findUnique({ where: { telegramId: BigInt(telegramId) }, select: { id: true } })
   const ticket = account ? await prisma.supportTicket.findFirst({
     where: { id: ticketId, userId: account.id },

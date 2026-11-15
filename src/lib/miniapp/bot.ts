@@ -30,6 +30,7 @@ export const telegramUpdateSchema = z.object({
     message: z.object({ message_id: z.number().int().positive(), chat: z.object({ id: z.number().int().safe(), type: z.string() }) }).optional(),
   }).optional(),
   message: z.object({
+    message_id: z.number().int().positive(),
     chat: z.object({ id: z.number().int().safe(), type: z.string() }),
     from: user.optional(), text: z.string().max(4096).optional(),
     caption: z.string().max(4096).optional(),
@@ -250,11 +251,12 @@ export async function handleMiniAppUpdate(update: z.infer<typeof telegramUpdateS
       const category = action.slice(7)
       const account = await prisma.user.findUnique({ where: { telegramId: BigInt(callback.from.id) }, select: { id: true } })
       if (account && isSupportCategory(category)) {
-        await setBotDialogState(account.id, `support:new:${category}`)
         const label = supportCategories.find(item => item.value === category)?.label ?? 'Обращение'
         const html = buildSupportPromptScreen(await getBotScreenInput(callback.from.id, 'support'),
           { title: label, hint: 'Опишите вопрос: что случилось, на каком устройстве и когда. По вопросам оплаты укажите номер заказа.' })
-        await displayCallbackScreen(callback.from.id, callback.message.message_id, html, miniAppUrl())
+        const used = await displayCallbackScreen(callback.from.id, callback.message.message_id, html, miniAppUrl())
+        // Id prompt-сообщения: созданное обращение откроется в этом же окне.
+        await setBotDialogState(account.id, `support:new:${category}`, used ? String(used) : null)
         return
       }
       const html = await getBotScreen(callback.from.id, 'support', 'Сначала войдите в приложение через Telegram')
@@ -273,6 +275,9 @@ export async function handleMiniAppUpdate(update: z.infer<typeof telegramUpdateS
           prisma.supportTicket.updateMany({ where: { id: ticketId, userId: account.id }, data: { userBotMessageId: used } }),
           prisma.supportTicket.updateMany({ where: { id: { not: ticketId }, userId: account.id, userBotMessageId: used }, data: { userBotMessageId: null } }),
         ])
+        // Живой режим: пока тред открыт, следующие сообщения уходят в него.
+        const ticket = await prisma.supportTicket.findFirst({ where: { id: ticketId, userId: account.id }, select: { status: true } })
+        if (ticket && ticket.status !== 'CLOSED') await setBotDialogState(account.id, `support:reply:${ticketId}`)
       }
       return
     }
@@ -282,9 +287,9 @@ export async function handleMiniAppUpdate(update: z.infer<typeof telegramUpdateS
       const ticket = account ? await prisma.supportTicket.findFirst({ where: { id: ticketId, userId: account.id }, select: { subject: true, status: true } }) : null
       if (account && ticket && ticket.status !== 'CLOSED') {
         await setBotDialogState(account.id, `support:reply:${ticketId}`)
-        const html = buildSupportPromptScreen(await getBotScreenInput(callback.from.id, 'support'),
-          { title: ticket.subject, hint: 'Напишите ответ — он добавится в переписку и появится в кабинете.' })
-        await displayCallbackScreen(callback.from.id, callback.message.message_id, html, miniAppUrl())
+        const html = await getBotSupportThreadScreen(callback.from.id, ticketId, '✍️ Пишите ответ прямо в чат — следующее сообщение попадёт в обращение.')
+        const used = await displayCallbackScreen(callback.from.id, callback.message.message_id, html, miniAppUrl())
+        if (used) await prisma.supportTicket.updateMany({ where: { id: ticketId, userId: account.id }, data: { userBotMessageId: used } })
         return
       }
       const html = await getBotScreen(callback.from.id, 'support', ticket ? 'Обращение уже закрыто. Создайте новое.' : 'Обращение не найдено')
@@ -294,6 +299,7 @@ export async function handleMiniAppUpdate(update: z.infer<typeof telegramUpdateS
     if (action.startsWith('supc:')) {
       const account = await prisma.user.findUnique({ where: { telegramId: BigInt(callback.from.id) }, select: { id: true } })
       const result = account ? await closeTicketFromBot(account.id, action.slice(5)) : { ok: false as const, error: 'Сначала войдите в приложение через Telegram' }
+      if (account) await clearBotDialogState(account.id)
       const html = await getBotScreen(callback.from.id, 'support', result.ok ? 'Обращение закрыто. История сохранилась в кабинете.' : result.error)
       await displayCallbackScreen(callback.from.id, callback.message.message_id, html, miniAppUrl())
       return
@@ -368,6 +374,8 @@ export async function handleMiniAppUpdate(update: z.infer<typeof telegramUpdateS
       const html = await getBotAdminTicketsScreen(callback.from.id)
       const used = await displayCallbackScreen(callback.from.id, callback.message.message_id, html, miniAppUrl())
       const account = await prisma.user.findUnique({ where: { telegramId: BigInt(callback.from.id) }, select: { id: true, role: true } })
+      // Возврат в очередь выходит из живого режима переписки.
+      if (account) await clearBotDialogState(account.id)
       if (account && account.role !== 'USER' && used) {
         // Сообщение теперь показывает очередь: якоря тредов в нём снимаем,
         // чтобы обновление треда не затёрло список.
@@ -393,6 +401,9 @@ export async function handleMiniAppUpdate(update: z.infer<typeof telegramUpdateS
             data: { adminBotMessageId: null } }),
           prisma.user.updateMany({ where: { id: account.id, adminQueueBotMessageId: used }, data: { adminQueueBotMessageId: null } }),
         ])
+        // Живой режим администратора: свободный текст уходит в открытый тред.
+        const ticket = await prisma.supportTicket.findUnique({ where: { id: ticketId }, select: { status: true } })
+        if (ticket && ticket.status !== 'CLOSED') await setBotDialogState(account.id, `admin:reply:${ticketId}`)
       }
       return
     }
@@ -404,9 +415,12 @@ export async function handleMiniAppUpdate(update: z.infer<typeof telegramUpdateS
         : null
       if (account && ticket && ticket.status !== 'CLOSED') {
         await setBotDialogState(account.id, `admin:reply:${ticketId}`)
-        const html = buildSupportPromptScreen(await getBotScreenInput(callback.from.id, 'admin'),
-          { title: ticket.subject, hint: 'Напишите ответ — пользователь получит его в бот и в кабинет.' })
-        await displayCallbackScreen(callback.from.id, callback.message.message_id, html, miniAppUrl())
+        const html = await getBotAdminThreadScreen(callback.from.id, ticketId, '✍️ Пишите ответ прямо в чат — пользователь увидит его в этом же окне и в кабинете.')
+        const used = await displayCallbackScreen(callback.from.id, callback.message.message_id, html, miniAppUrl())
+        if (used) {
+          await prisma.supportTicket.updateMany({ where: { id: ticketId },
+            data: { adminBotChatId: BigInt(callback.from.id), adminBotMessageId: used } })
+        }
         return
       }
       const html = await getBotAdminTicketsScreen(callback.from.id, ticket ? 'Обращение уже закрыто.' : 'Обращение не найдено')
@@ -418,6 +432,7 @@ export async function handleMiniAppUpdate(update: z.infer<typeof telegramUpdateS
       const result = account && account.role !== 'USER'
         ? await closeTicketAsAdmin(account.id, action.slice(5))
         : { ok: false as const, error: 'Раздел доступен администраторам.' }
+      if (account) await clearBotDialogState(account.id)
       const html = await getBotAdminTicketsScreen(callback.from.id, result.ok ? 'Обращение закрыто.' : result.error)
       await displayCallbackScreen(callback.from.id, callback.message.message_id, html, miniAppUrl())
       return
@@ -431,6 +446,8 @@ export async function handleMiniAppUpdate(update: z.infer<typeof telegramUpdateS
         await claimChannelReward(account.id); screen = 'referrals'; notice = 'Бонус подтверждён и ожидает начисления'
       } catch (e) { notice = e instanceof Error ? e.message : 'Операция временно недоступна' }
     }
+    // Навигация по экранам выходит из живого режима ввода (поддержка, рассылка).
+    await prisma.telegramBotDialog.deleteMany({ where: { user: { telegramId: BigInt(callback.from.id) } } })
     const html = await getBotScreen(callback.from.id, screen, notice)
     await displayCallbackScreen(callback.from.id, callback.message.message_id, html, miniAppUrl())
     return
@@ -453,7 +470,7 @@ export async function handleMiniAppUpdate(update: z.infer<typeof telegramUpdateS
     const account = await prisma.user.findUnique({ where: { telegramId: BigInt(message.from.id) },
       select: { id: true, botDialog: { select: { state: true, payload: true } } } })
     if (account?.botDialog) {
-      await handleBotDialogMessage(message.chat.id, account.id, account.botDialog.state, dialogInput, account.botDialog.payload, photoFileId)
+      await handleBotDialogMessage(message.chat.id, account.id, account.botDialog.state, dialogInput, message.message_id, account.botDialog.payload, photoFileId)
       return
     }
   } else if (isNavigation) {
@@ -502,11 +519,14 @@ function checkoutUuid(callbackId: string) {
 
 // Свободный текст в ожидаемом диалоге: новое обращение, ответ в тикет
 // или ответ администратора. Состояние сохраняется при ошибках валидации,
-// чтобы текст можно было исправить и отправить повторно.
-async function handleBotDialogMessage(chatId: number, userId: string, state: string, text: string, payload?: string | null, imageFileId?: string | null) {
+// чтобы текст можно было исправить и отправить повторно. Успешно принятое
+// сообщение удаляется из чата — переписка живёт в одном обновляемом окне.
+async function handleBotDialogMessage(chatId: number, userId: string, state: string, text: string, sourceMessageId: number, payload?: string | null, imageFileId?: string | null) {
   let html: string
   // Если у треда есть открытое окно — правим его на месте, новое сообщение не шлём.
   let editTarget: { ticketId: string; messageId: number; field: 'userBotMessageId' | 'adminBotMessageId' } | null = null
+  // Сообщение принято в диалог — удаляем его из чата после рендера.
+  let consumeMessage = false
   if (state.startsWith('broadcast:text:') || state.startsWith('broadcast:preview:')) {
     const prefix = state.startsWith('broadcast:text:') ? 'broadcast:text:' : 'broadcast:preview:'
     const theme = findBroadcastTheme(state.slice(prefix.length))
@@ -520,6 +540,7 @@ async function handleBotDialogMessage(chatId: number, userId: string, state: str
         // Текст без нового фото сохраняет приложенное ранее — и наоборот.
         const draft = { text: validated.body, image: imageFileId ?? previousDraft?.image ?? null }
         await setBotDialogState(userId, `broadcast:preview:${theme.key}`, serializeBroadcastDraft(draft))
+        consumeMessage = true
         html = buildBroadcastPreviewScreen(await getBotScreenInput(chatId, 'admin'),
           { themeLabel: theme.label, segmentLabel: theme.segmentLabel, buttonLabel: theme.button?.label ?? null, text: draft.text, withImage: Boolean(draft.image) })
       } else if (prefix === 'broadcast:preview:' && previousDraft) {
@@ -537,23 +558,34 @@ async function handleBotDialogMessage(chatId: number, userId: string, state: str
     }
   } else if (state.startsWith('support:new:')) {
     const category = state.slice('support:new:'.length)
-    let notice: string
     if (!isSupportCategory(category)) {
       await clearBotDialogState(userId)
-      notice = 'Сессия обращения устарела. Начните заново.'
+      html = await getBotScreen(chatId, 'support', 'Сессия обращения устарела. Начните заново.')
     } else {
       const result = await createTicketFromBot(userId, category, text)
-      if (result.ok) {
-        await clearBotDialogState(userId)
-        notice = 'Обращение отправлено. Ответ придёт в этот чат и в кабинет.'
-      } else notice = result.error
+      if (result.ok && result.ticketId) {
+        // Обращение создано — сразу открываем его окно и включаем живой режим:
+        // следующие сообщения пользователя падают в этот же тред.
+        consumeMessage = true
+        await setBotDialogState(userId, `support:reply:${result.ticketId}`)
+        html = await getBotSupportThreadScreen(chatId, result.ticketId,
+          '✅ Обращение создано. Ответ поддержки появится прямо здесь.')
+        const promptMessageId = payload && Number.isInteger(Number(payload)) ? Number(payload) : null
+        editTarget = promptMessageId
+          ? { ticketId: result.ticketId, messageId: promptMessageId, field: 'userBotMessageId' as const }
+          : null
+      } else if (!result.ok) {
+        html = await getBotScreen(chatId, 'support', result.error)
+      } else {
+        html = await getBotScreen(chatId, 'support', 'Не удалось открыть обращение. Попробуйте ещё раз.')
+      }
     }
-    html = await getBotScreen(chatId, 'support', notice)
   } else if (state.startsWith('support:reply:')) {
     const ticketId = state.slice('support:reply:'.length)
     const result = await replyToTicketFromBot(userId, ticketId, text)
     if (result.ok) {
-      await clearBotDialogState(userId)
+      // Живой режим: состояние НЕ очищается — пиши дальше, окно обновляется на месте.
+      consumeMessage = true
       html = await getBotSupportThreadScreen(chatId, ticketId)
       const anchor = await prisma.supportTicket.findUnique({ where: { id: ticketId }, select: { userBotMessageId: true } })
       editTarget = anchor?.userBotMessageId ? { ticketId, messageId: anchor.userBotMessageId, field: 'userBotMessageId' as const } : null
@@ -561,13 +593,13 @@ async function handleBotDialogMessage(chatId: number, userId: string, state: str
       await clearBotDialogState(userId)
       html = await getBotScreen(chatId, 'support', result.error)
     } else {
-      html = await getBotScreen(chatId, 'support', result.error)
+      html = await getBotSupportThreadScreen(chatId, ticketId, result.error)
     }
   } else if (state.startsWith('admin:reply:')) {
     const ticketId = state.slice('admin:reply:'.length)
     const result = await replyToTicketAsAdmin(userId, ticketId, text)
     if (result.ok) {
-      await clearBotDialogState(userId)
+      consumeMessage = true
       html = await getBotAdminThreadScreen(chatId, ticketId, 'Ответ отправлен пользователю.')
       const anchor = await prisma.supportTicket.findUnique({ where: { id: ticketId }, select: { adminBotMessageId: true } })
       editTarget = anchor?.adminBotMessageId ? { ticketId, messageId: anchor.adminBotMessageId, field: 'adminBotMessageId' as const } : null
@@ -581,9 +613,12 @@ async function handleBotDialogMessage(chatId: number, userId: string, state: str
     await clearBotDialogState(userId)
     html = await getBotScreen(chatId, 'support', 'Сессия устарела. Начните заново.')
   }
+  if (consumeMessage) {
+    await miniAppBotCall('deleteMessage', { chat_id: chatId, message_id: sourceMessageId }).catch(() => {})
+  }
   if (editTarget) {
     const used = await displayCallbackScreen(chatId, editTarget.messageId, html)
-    if (used && used !== editTarget.messageId) {
+    if (used) {
       await prisma.supportTicket.updateMany({ where: { id: editTarget.ticketId }, data: { [editTarget.field]: used } })
     }
     return

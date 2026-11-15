@@ -304,6 +304,7 @@ export function buildSupportThreadScreen(input: RichScreenInput, thread: { id: s
   const parts = [brandHeader(input.bannerUrl), '<h3>🛟 Обращение</h3>',
     `<h4>${escape(thread.subject)}</h4>`,
     table([...(thread.userLabel ? [['👤 Пользователь', thread.userLabel]] : []), ['Статус', thread.status]])]
+  if (input.notice) parts.push(`<p>💬 ${escape(input.notice)}</p>`)
   if (!thread.messages.length) parts.push('<p>Сообщений пока нет.</p>')
   if (thread.messages.length) {
     parts.push('<h4>💬 Переписка</h4>')
@@ -312,8 +313,10 @@ export function buildSupportThreadScreen(input: RichScreenInput, thread: { id: s
       parts.push(`<p>${author} · ${escape(message.date)}<br>${escape(message.body)}</p>`)
     }
   }
-  parts.push(row(cb('✍️ Ответить', `${viewer === 'admin' ? 'admr' : 'supr'}:${thread.id}`, 'success')))
-  parts.push(row(cb('✅ Закрыть обращение', `${viewer === 'admin' ? 'admc' : 'supc'}:${thread.id}`)))
+  if (thread.status !== 'Закрыто') {
+    parts.push('<p>✍️ Пишите ответ прямо в чат — следующее сообщение попадёт в обращение и появится здесь. Ваш текст после отправки убирается, переписка остаётся в этом окне.</p>',
+      row(cb('✅ Закрыть обращение', `${viewer === 'admin' ? 'admc' : 'supc'}:${thread.id}`)))
+  }
   parts.push(row(cb('◀️ К обращениям', viewer === 'admin' ? 'admt' : 'support')))
   return parts.join('')
 }

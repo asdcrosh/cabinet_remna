@@ -7,7 +7,7 @@ import { notifySupportReply } from '@/lib/notifications'
 import { writeAuditLog } from '@/lib/audit-log'
 import { syncAdminTicketsQueues, syncSupportThreadViews } from './support-sync'
 
-export type BotSupportResult = { ok: true } | { ok: false; error: string }
+export type BotSupportResult = { ok: true; ticketId?: string } | { ok: false; error: string }
 
 const categoryValues = new Set<string>(supportCategories.map(category => category.value))
 export function isSupportCategory(value: string): value is SupportCategoryValue {
@@ -36,7 +36,7 @@ export async function createTicketFromBot(userId: string, category: SupportCateg
   })
   await notifyAdmins(userId, 'ticket', ticket.id, ticket.subject, text)
   await syncAdminTicketsQueues('🆕 Новое обращение в очереди.')
-  return { ok: true }
+  return { ok: true, ticketId: ticket.id }
 }
 
 export async function replyToTicketFromBot(userId: string, ticketId: string, message: string): Promise<BotSupportResult> {
